@@ -7,7 +7,7 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
-import Rules.ICFP(rulesPrimOps)
+import Rules.ICFP(rulesPrimOps, isChoiceFreeOp)
 import Control.Monad( guard )
 import Data.List( union )
 
@@ -130,7 +130,9 @@ evalX lhs =
 -- ef
 effectFree :: Expr -> Bool
 effectFree (Val _)       = True
-effectFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
+effectFree (One _)       = True
+effectFree (All _)       = True
+effectFree (Op op :@: _) = isChoiceFreeOp op
 effectFree _             = False
 
 --------------------------------------------------------------------------------
@@ -233,7 +235,7 @@ rulesNormalization _ lhs =
  ++
   "SEQ-ASSOC" `name`
   do (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- [lhs]
-     pure ((v1 :=: e1) :>: (v2 :=: e2) :>: e3)
+     pure ((v1 :=: e1) :>: ((v2 :=: e2) :>: e3))
 
 --------------------------------------------------------------------------------
 
