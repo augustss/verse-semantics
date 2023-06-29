@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 module TRS.TRS(
-  Rule,
+  Rule, Rewrite,
   name,
   (-=),
   Rec(..),

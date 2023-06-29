@@ -9,7 +9,7 @@ import TRS.TRS
 import Rules.Core
 import Rules.ICFP(rulesPrimOps, isChoiceFreeOp)
 import Control.Monad( guard )
-import Data.List( union )
+import Data.List( union, partition, isInfixOf )
 
 --------------------------------------------------------------------------------
 
@@ -29,8 +29,15 @@ systemLeftToRight = TRSystem
   , rulesHaveStructural = True
   , confluenceRules     = \_ _ -> []
   , validExpr           = const validE
-  , sortRewrites        = id
+  , sortRewrites        = sortThem
   }
+
+-- Move "looping" rules last so pickiung the first one has a better change
+-- to do something interesting.
+sortThem :: [Rewrite Expr] -> [Rewrite Expr]
+sortThem rs = nl ++ l
+  where (l, nl) = partition isLoopy rs
+        isLoopy (name, _) = "SWAP" `isInfixOf` name || name == "EXI-FLOAT"
 
 -- Turn an expression into the subset of the grammar
 expr :: Expr -> Expr
