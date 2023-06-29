@@ -440,6 +440,10 @@ valueX1 lhs =
      (ctx2, v2) <- valueX v1
      pure (ctx1 . ctx2, v2)
 
+isValueX :: Ident -> Expr -> Bool
+isValueX x (Arr as) = Var x `elem` as || any (isValueX x) as
+isValueX _ _        = False
+
 --------------------------------------------------------------------------------
 
 allRules :: ERule
@@ -618,7 +622,8 @@ rulesUnification env lhs =
      let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
          sub   = [(x, v),(x0, Var x)]
      guard (x `elem` freeX)
-     guard (x `notElem` freeV)
+     guard (not (x `isValueX` v))
+     -- guard (x `notElem` freeV)
      -- guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
  ++
@@ -777,7 +782,8 @@ rulesElimination _ lhs =
   do EXI x a <- [lhs]
      (ctx, (Var x' :=: Val v) :>: e) <- execX a
      guard (x == x')
-     guard (x `notElem` free (ctx (v :>: e)))
+     guard (x `notElem` free (ctx e))
+     guard (not (x `isValueX` v))
      pure (ctx e)
  ++
   "FAIL-ELIM" `name`
