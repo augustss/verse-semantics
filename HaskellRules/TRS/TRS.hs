@@ -92,12 +92,12 @@ singleStep :: Bool
 singleStep = False
 
 stepper :: (Pretty a) => String -> Traced a -> b -> b
-stepper msg (t:<--tr) x | singleStep = unsafePerformIO $ do
+stepper msg (t:<--tr) x | not singleStep = x
+                        | otherwise = unsafePerformIO $ do
   let s = case tr of ((ss,_):_) -> ss; _ -> "REFL"
   printf "%s %10s %s\n" msg s (prettyShow t)
   _ <- getLine
   pure x
-              | otherwise = x
 
 addDone :: Traced a -> NormResult a -> NormResult a
 addDone a nr = nr{ nrDone = a : nrDone nr }
