@@ -13,6 +13,11 @@ import Data.List( union, partition, isInfixOf )
 
 --------------------------------------------------------------------------------
 
+recursiveSubstitution :: Bool
+recursiveSubstitution = False
+  -- True:  using one general SUBST rule
+  -- False: using a simple SUBST and a separate SUBST-REC
+
 allSystemsLeftToRight :: [TRSystem Expr]
 allSystemsLeftToRight =
   [ systemLeftToRight ]
@@ -200,23 +205,24 @@ rulesUnification _ lhs =
 rulesSubstitution :: ERule
 rulesSubstitution _ lhs =
   "SUBST" `name`
-  do (Var x :=: Val v) :>: e <- [lhs]
+  do guard recursiveSubstitution
+     (Var x :=: Val v) :>: e <- [lhs]
+     guard (not (isVctx x v))
+     pure ((Var x :=: v) :>: subst [(x,v)] e)
+ ++
+  "SUBST-SIMP" `name`
+  do guard (not recursiveSubstitution)
+     (Var x :=: Val v) :>: e <- [lhs]
      guard (x `notElem` free v)
      pure ((Var x :=: v) :>: subst [(x,v)] e)
  ++
   "SUBST-REC" `name`
-  do (Var x :=: Val v) :>: e <- [lhs]
+  do guard (not recursiveSubstitution)
+     (Var x :=: Val v) :>: e <- [lhs]
      (ctx, Lam bnd) <- valX v
      let Bind y e1 = alphaRename (free (ctx (Arr []), Var x, v)) bnd
      guard (x `elem` free e1)
      pure ((Var x :=: ctx (Lam (Bind y (Exi (Bind x ((Var x :=: Val v) :>: e1)))))) :>: e)
-{-
- ++
-  "SUBST" `name`
-  do (Var x :=: Val v) :>: e <- [lhs]
-     guard (not (isVctx x v))
-     pure ((Var x :=: v) :>: subst [(x,v)] e)
--}
  ++
   "VAL-SWAP" `name`
   do (Val v :=: Var x) <- [lhs]
@@ -240,7 +246,10 @@ rulesNormalization _ lhs =
   do Exi (Bind x ec) <- [lhs]
      (xs, ctx, (Var x' :=: Val v) :>: e) <- evalX ec
      guard (x == x')
-     guard (x `notElem` (xs `union` free (v, e)))
+     guard (if recursiveSubstitution
+              then not (isVctx x v)
+              else x `notElem` free v)
+     guard (x `notElem` (xs `union` free e))
      pure (ctx e)
  ++
   "EXI-FLOAT" `name`
