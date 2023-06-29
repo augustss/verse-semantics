@@ -109,6 +109,15 @@ isVctx :: Ident -> Expr -> Bool
 isVctx x (Arr as) = Var x `elem` as || any (isVctx x) as
 isVctx _ _        = False
 
+valX :: Expr -> [(Expr->Expr, Expr)]
+valX lhs =
+  do pure (id, lhs)
+ ++
+  do Arr as <- [lhs]
+     i <- [0..length as-1]
+     (ctx, h) <- valX (as!!i)
+     pure (Arr . (take i as ++) . (: drop (i+1) as) . ctx, h)
+
 -- E
 evalX :: Expr -> [([Ident], Expr->Expr, Expr)]
 evalX lhs =
@@ -184,8 +193,22 @@ rulesSubstitution :: ERule
 rulesSubstitution _ lhs =
   "SUBST" `name`
   do (Var x :=: Val v) :>: e <- [lhs]
+     guard (x `notElem` free v)
+     pure ((Var x :=: v) :>: subst [(x,v)] e)
+ ++
+  "SUBST-REC" `name`
+  do (Var x :=: Val v) :>: e <- [lhs]
+     (ctx, Lam bnd) <- valX v
+     let Bind y e1 = alphaRename (free (ctx (Arr []), Var x, v)) bnd
+     guard (x `elem` free e1)
+     pure ((Var x :=: ctx (Lam (Bind y (Exi (Bind x ((Var x :=: Val v) :>: e1)))))) :>: e)
+{-
+ ++
+  "SUBST" `name`
+  do (Var x :=: Val v) :>: e <- [lhs]
      guard (not (isVctx x v))
      pure ((Var x :=: v) :>: subst [(x,v)] e)
+-}
  ++
   "VAL-SWAP" `name`
   do (Val v :=: Var x) <- [lhs]
