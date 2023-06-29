@@ -188,11 +188,21 @@
 \begin{figure}
     $$
       \begin{array}{lr@@{\;}c@@{\;}l}
-      \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-      \text{Choice contexts} & CX & ::= & \hole \vb |v==CX; e| \vb |v==ce; CX| \vb |def x CX| \\
-      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |v==ce_1; ce_2|
-                                      \vb |def x ce| \vb |apply1 op v| % \vb |one e| \vb |all e|
+      \text{Value contexts} & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
+      \text{Evaluation contexts} & |E| & ::= & |hole| \vb |v==E; e| \vb |v==ef; E| \vb |def x E| \\
+      \text{Effect-free exprs} & |ef|  & ::=  & |v| \vb |apply1 op v|
+                                      %-- this is not needed, these will be floated out anyway
+                                      %\vb |v==ce_1; ce_2| \vb |def x ce|
+                                      %-- this is wrong
+                                      % \vb |one e| \vb |all e|
 \\
+\\[-0.6em]
+
+\text{free variables in E} & |fvs(hole)| & = & \{ \} \\
+                           & |fvs(v==E; e)| & = & |fvs(v) `cup` fvs(E) `cup` fvs(e)| \\
+                           & |fvs(v==ef; E)| & = & |fvs(v) `cup` fvs(ef) `cup` fvs(E)| \\
+                           & |fvs(def x E)| & = & |{x} `cup` fvs(E)| \\
+
     \end{array}
      $$
     \caption{The syntax of contexts}
@@ -237,18 +247,19 @@
 \rulegroupname{Substitution:}
 
   \rulename{subst} & |x==v; e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
-  & \text{if $|v|$ is not $|V^[x]|$} \\
+  & \text{if $|v|\ne|V^[x]|$} \\
   \rulename{val-swap} & |v==x; e|    & \movesto & |x==v; e| \\
-  \rulename{eqn-float} & |v==ce; v_1==v_2; e| & \movesto & |v_1==v_2; v==ce; e| \\
+  \rulename{eqn-swap} & |v==ef; v_1==v_2; e| & \movesto & |v_1==v_2; v==ef; e| \\
 
     \\[-0.6em]
 
 \rulegroupname{Normalization:}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x (x==v; e)| & \movesto & |e| & \text{if $|x| \notin \freevars{|v,e|}$} \\
-\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
-\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
-\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
+\rulename{eqn-elim} & |def x E^[x==v; e]| & \movesto & |E^[e]| & \text{if $|x| \notin \freevars{|E,e|}$ and $|v|\ne|V^[x]|$} \\
+\rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|}$} \\
+%\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
+%\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
+%\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
 \rulename{seq-assoc} & |v_2==(v_1==e_1 ; e_2) ; e_3| & \movesto & |v_1==e_1 ; v_2==e_2 ; e_3| \\
 
     \\[-0.6em]
@@ -257,8 +268,8 @@
 \rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
-\rulename{fail} & |CX^[fail]| & \movesto & |fail| \\
-\rulename{choice} & |CX^[e_1 choice e_2]| & \movesto & |CX^[e_1] choice CX^[e_2]| \\
+\rulename{fail} & |E^[fail]| & \movesto & |fail| \\
+\rulename{choice} & |E^[e_1 choice e_2]| & \movesto & |E^[e_1] choice E^[e_2]| \\
 
     \\[-0.6em]
 

@@ -7,10 +7,16 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
-import Rules.ICFP(rulesPrimOps)
+import Rules.ICFP(rulesPrimOps, isChoiceFreeOp)
 import Control.Monad( guard )
+import Data.List( union, partition, isInfixOf )
 
 --------------------------------------------------------------------------------
+
+recursiveSubstitution :: Bool
+recursiveSubstitution = False
+  -- True:  using one general SUBST rule
+  -- False: using a simple SUBST and a separate SUBST-REC
 
 allSystemsLeftToRight :: [TRSystem Expr]
 allSystemsLeftToRight =
@@ -28,14 +34,22 @@ systemLeftToRight = TRSystem
   , rulesHaveStructural = True
   , confluenceRules     = \_ _ -> []
   , validExpr           = const validE
+  , sortRewrites        = sortThem
   }
+
+-- Move "looping" rules last so pickiung the first one has a better change
+-- to do something interesting.
+sortThem :: [Rewrite Expr] -> [Rewrite Expr]
+sortThem rs = nl ++ l
+  where (l, nl) = partition isLoopy rs
+        isLoopy (name, _) = "SWAP" `isInfixOf` name || name == "EXI-FLOAT"
 
 -- Turn an expression into the subset of the grammar
 expr :: Expr -> Expr
 expr (Arr es)         = letExprs (map expr es) Arr
 expr (fe :@: xe)      = letExprs (map expr [fe,xe]) $ \[f,x] -> f :@: x
 expr (Lam (Bind x e)) = Lam (Bind x (expr e))
-expr (e1 :=: e2)      = letExpr (expr e1) (\x -> (x :=: expr e2) :>: x)
+expr (e1 :=: e2)      = expr e1 =:= expr e2
 expr (e1 :|: e2)      = expr e1 :|: expr e2
 expr (e1 :>: e2)      = expr e1 =:>: expr e2
 expr (Exi (Bind x e)) = Exi (Bind x (expr e))
@@ -43,11 +57,20 @@ expr (One e)          = One (expr e)
 expr (All e)          = All (expr e)
 expr e                = e
 
+(=:=) :: Expr -> Expr -> Expr
+Val v               =:= e     = (v :=: e) :>: v
+e                   =:= Val v = (v :=: e) :>: v
+((v :=: e1) :>: e2) =:= e     = (v :=: e1) :>: (e2 =:= e)
+Exi bnd             =:= e     = Exi (Bind x (e1 =:= e)) where Bind x e1 = alphaRename (free e) bnd
+e1                  =:= e     = letExpr e1 (\x -> (x :=: e) :>: x)
+
 (=:>:) :: Expr -> Expr -> Expr
-e1@(_ :=: _) =:>: e2 = e1 :>: e2
-e1           =:>: e2 = Exi (Bind x ((Var x :=: e1) :>: e2))
+Val v               =:>: e = e
+((v :=: e1) :>: e2) =:>: e = (v :=: e1) :>: (e2 =:>: e)
+Exi bnd             =:>: e = Exi (Bind x (e1 =:>: e)) where Bind x e1 = alphaRename (free e) bnd
+e1                  =:>: e = Exi (Bind x ((Var x :=: e1) :>: e))
  where
-  x = identNotIn (free (e1,e2))
+  x = identNotIn (free (e1,e))
 
 letExpr :: Expr -> (Expr -> Expr) -> Expr
 letExpr e@(Val _)     f = f e
@@ -99,33 +122,40 @@ isVctx :: Ident -> Expr -> Bool
 isVctx x (Arr as) = Var x `elem` as || any (isVctx x) as
 isVctx _ _        = False
 
--- CX
-choiceX :: Expr -> [(Expr->Expr, Expr)]
-choiceX lhs =
+valX :: Expr -> [(Expr->Expr, Expr)]
+valX lhs =
   do pure (id, lhs)
  ++
-  do (Val v :=: xe) :>: e2 <- [lhs]
-     (ctx, e) <- choiceX xe
-     pure ((:>: e2) . (v :=:) . ctx, e)
- ++
-  do (Val v :=: ce) :>: xe <- [lhs]
-     guard (isChoiceFree ce)
-     (ctx, e) <- choiceX xe
-     pure (((v :=: ce) :>:) . ctx, e)
- ++
-  do Exi (Bind x xe) <- [lhs]
-     (ctx, e) <- choiceX xe
-     pure ((Exi . Bind x) . ctx, e)
+  do Arr as <- [lhs]
+     i <- [0..length as-1]
+     (ctx, h) <- valX (as!!i)
+     pure (Arr . (take i as ++) . (: drop (i+1) as) . ctx, h)
 
--- ce
-isChoiceFree :: Expr -> Bool
---isChoiceFree (One _)       = True
---isChoiceFree (All _)       = True
-isChoiceFree (Val _)       = True
-isChoiceFree (Op op :@: _) = True -- op `elem` [Add, Gt, ..]
---isChoiceFree (e1 :>: e2)   = isChoiceFree e1 && isChoiceFree e2
---isChoiceFree (e1 :=: e2)   = isChoiceFree e1 && isChoiceFree e2
-isChoiceFree _             = False
+-- E
+evalX :: Expr -> [([Ident], Expr->Expr, Expr)]
+evalX lhs =
+  do pure ([], id, lhs)
+ ++
+  do (Val v :=: eh) :>: e <- [lhs]
+     (xs, ctx, h) <- evalX eh
+     pure (xs `union` free (v,e), (:>: e) . (v :=:) . ctx, h)
+ ++
+  do (Val v :=: ef) :>: eh <- [lhs]
+     guard (effectFree ef)
+     (xs, ctx, h) <- evalX eh
+     pure (xs `union` free (v,ef), ((v :=: ef) :>:) . ctx, h)
+ ++
+  do Exi (Bind x eh) <- [lhs]
+     (xs, ctx, h) <- evalX eh
+     pure (xs `union` [x], Exi . Bind x . ctx, h)
+
+-- ef
+effectFree :: Expr -> Bool
+effectFree (Val _)       = True
+effectFree (One _)       = True
+effectFree (All _)       = True
+effectFree (Op op :@: _) = isChoiceFreeOp op
+effectFree _             = False
 
 --------------------------------------------------------------------------------
 
@@ -175,18 +205,33 @@ rulesUnification _ lhs =
 rulesSubstitution :: ERule
 rulesSubstitution _ lhs =
   "SUBST" `name`
-  do (Var x :=: Val v) :>: e <- [lhs]
+  do guard recursiveSubstitution
+     (Var x :=: Val v) :>: e <- [lhs]
      guard (not (isVctx x v))
      pure ((Var x :=: v) :>: subst [(x,v)] e)
+ ++
+  "SUBST-SIMP" `name`
+  do guard (not recursiveSubstitution)
+     (Var x :=: Val v) :>: e <- [lhs]
+     guard (x `notElem` free v)
+     pure ((Var x :=: v) :>: subst [(x,v)] e)
+ ++
+  "SUBST-REC" `name`
+  do guard (not recursiveSubstitution)
+     (Var x :=: Val v) :>: e <- [lhs]
+     (ctx, Lam bnd) <- valX v
+     let Bind y e1 = alphaRename (free (ctx (Arr []), Var x, v)) bnd
+     guard (x `elem` free e1)
+     pure ((Var x :=: ctx (Lam (Bind y (Exi (Bind x ((Var x :=: Val v) :>: e1)))))) :>: e)
  ++
   "VAL-SWAP" `name`
   do (Val v :=: Var x) <- [lhs]
      pure (Var x :=: v)
  ++
   "EQN-SWAP" `name`
-  do (Val v :=: ce) :>: ((Val v1 :=: Val v2) :>: e) <- [lhs]
-     guard (isChoiceFree ce)
-     pure ((v1 :=: v2) :>: ((v :=: ce) :>: e))
+  do (Val v :=: ef) :>: ((Val v1 :=: Val v2) :>: e) <- [lhs]
+     guard (effectFree ef)
+     pure ((v1 :=: v2) :>: ((v :=: ef) :>: e))
 
 --------------------------------------------------------------------------------
 
@@ -198,10 +243,20 @@ rulesNormalization _ lhs =
      pure e
  ++
   "EQN-ELIM" `name`
-  do Exi (Bind x ((Var x' :=: Val v) :>: e)) <- [lhs]
+  do Exi (Bind x ec) <- [lhs]
+     (xs, ctx, (Var x' :=: Val v) :>: e) <- evalX ec
      guard (x == x')
-     guard (x `notElem` free (v, e))
-     pure e
+     guard (if recursiveSubstitution
+              then not (isVctx x v)
+              else x `notElem` free v)
+     guard (x `notElem` (xs `union` free e))
+     pure (ctx e)
+ ++
+  "EXI-FLOAT" `name`
+  do (xs, ctx, Exi bnd) <- evalX lhs
+     let Bind x e = alphaRename xs bnd
+     pure (Exi (Bind x (ctx e)))
+{-
  ++
   "EXI-FLOAT-L" `name`
   do (v :=: Exi bnd) :>: e2 <- [lhs]
@@ -216,10 +271,11 @@ rulesNormalization _ lhs =
   "EXI-SWAP" `name`
   do Exi (Bind x (Exi (Bind y e))) <- [lhs]
      pure (Exi (Bind y (Exi (Bind x e))))
+-}
  ++
   "SEQ-ASSOC" `name`
   do (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- [lhs]
-     pure ((v1 :=: e1) :>: (v2 :=: e2) :>: e3)
+     pure ((v1 :=: e1) :>: ((v2 :=: e2) :>: e3))
 
 --------------------------------------------------------------------------------
 
@@ -238,11 +294,11 @@ rulesChoice _ lhs =
      pure e1
  ++
   "FAIL" `name`
-  do (_, Fail) <- choiceX lhs
+  do (_, _, Fail) <- evalX lhs
      pure Fail
  ++
   "CHOICE" `name`
-  do (ctx, e1 :|: e2) <- choiceX lhs
+  do (_, ctx, e1 :|: e2) <- evalX lhs
      pure (ctx e1 :|: ctx e2)
 
 --------------------------------------------------------------------------------

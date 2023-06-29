@@ -27,7 +27,7 @@ verifyM :: TRSystem Expr -> Expr -> Maybe (Bool, Traced Expr)
 verifyM sys e = res
  where
    res =
-     case tarjan1 (tfNormSteps (ruleEnv sys)) arrow (e :<-- []) of -- (preProcess sys (ruleEnv sys) e :<-- [])
+     case tarjan1 (tfNormSteps (ruleEnv sys)) arrow (start e) of -- (preProcess sys (ruleEnv sys) e :<-- [])
        Just (tr@(x :<-- _):_) -> Just (isDone x, tr)
        _ -> Nothing
    arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]

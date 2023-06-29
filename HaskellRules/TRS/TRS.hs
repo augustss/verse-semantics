@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 module TRS.TRS(
-  Rule,
+  Rule, Rewrite,
   name,
   (-=),
   Rec(..),
@@ -16,6 +16,7 @@ module TRS.TRS(
 
 import Epic.List( nub, nubKey )
 import Epic.Print(Pretty, prettyShow)
+import TRS.Tarjan(tarjanAny)
 import TRS.Traced
 import qualified Data.Set as S
 --import Control.Monad( unless )
@@ -26,7 +27,8 @@ import Text.Printf
 
 --------------------------------------------------------------------------------
 
-type Rule a = RuleEnv a -> a -> [(String, a)]
+type Rule a = RuleEnv a -> a -> [Rewrite a]
+type Rewrite a = (String, a)
 
 instance Show (Rule t) where
   show _ = "<<Rule>>"
@@ -60,7 +62,7 @@ stepS sys tt =
   case step (rules sys) (ruleEnv sys) tt of
     -- HACK: see comment on TRSystem
     -- If rules did nothing, then try rules2.
-    [] -> nub $ rec (rules2 sys) (ruleEnv sys) tt
+    [] -> sortRewrites sys $ nub $ rec (rules2 sys) (ruleEnv sys) tt
     xs -> xs
 
 data NormResult a = NormResult
@@ -71,7 +73,8 @@ data NormResult a = NormResult
 
 -- Traces are produced in reverse order, i.e. final result first
 normalFormsFuelTracePlain :: (Ord a, Rec a, Pretty a) => TRSystem a -> Int -> a -> NormResult a
-normalFormsFuelTracePlain sys an at = go an S.empty [start at]
+normalFormsFuelTracePlain sys an at | rulesHaveStructural sys = normalTarjan False sys an at
+                                    | otherwise = go an S.empty [start at]
  where
   go  0 _seen trs@(_:_)   = NormResult { nrDone = [], nrLeft = trs }
   go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
@@ -92,19 +95,20 @@ singleStep :: Bool
 singleStep = False
 
 stepper :: (Pretty a) => String -> Traced a -> b -> b
-stepper msg (t:<--tr) x | singleStep = unsafePerformIO $ do
+stepper msg (t:<--tr) x | not singleStep = x
+                        | otherwise = unsafePerformIO $ do
   let s = case tr of ((ss,_):_) -> ss; _ -> "REFL"
   printf "%s %10s %s\n" msg s (prettyShow t)
   _ <- getLine
   pure x
-              | otherwise = x
 
 addDone :: Traced a -> NormResult a -> NormResult a
 addDone a nr = nr{ nrDone = a : nrDone nr }
 
 -- Like normalFormsFuelTrace, but only does a depth first search
 normalFormFuelTracePlain :: (Ord a, Rec a, Pretty a) => TRSystem a -> Int -> a -> NormResult a
-normalFormFuelTracePlain sys an at = go an S.empty (start at)
+normalFormFuelTracePlain sys an at | rulesHaveStructural sys = normalTarjan True sys an at
+                                   | otherwise = go an S.empty (start at)
  where
   go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
   go n seen ttr@(t :<-- tr)
@@ -128,6 +132,16 @@ stepSS sys tt = t1s ++ t2s
 
 --------------------------------------------------------------------------------------------------------
 
+normalTarjan :: (Ord a, Rec a, Pretty a) => Bool -> TRSystem a -> Int -> a -> NormResult a
+normalTarjan justOne sys fuel at =
+  let e = start at
+      arrow (a :<-- t) = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
+  in  case tarjanAny justOne fuel arrow e of
+        Just xss -> NormResult { nrDone = map head xss, nrLeft = [] }
+        Nothing  -> NormResult { nrDone = [], nrLeft = [e] }
+
+--------------------------------------------------------------------------------------------------------
+
 -- The rules2 field has rules that are used when none of the rules
 -- field apply anymore.
 -- This is a hack and not really a normal TRS.
@@ -143,6 +157,7 @@ data TRSystem t = TRSystem
   , rulesHaveStructural :: !Bool                      -- are any rules structural? (slower)
   , confluenceRules     :: !(Rule t)                  -- structural rules for equivalence test
   , validExpr           :: !(RuleEnv t -> t -> Bool)  -- is t valid for reduction
+  , sortRewrites        :: !([Rewrite t] -> [Rewrite t])  -- sort rewrites 
   }
 --  deriving (Show)
 

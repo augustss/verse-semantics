@@ -47,6 +47,7 @@ verify(fail) { foo(n:any):int := if (int[n]) then { 0 } else { (1,2) } }
 verify(fail) { foo(n:any):int := if (int[n]) then { n } else { (1,2) } }
 verify(fail) { foo(n:any):int := if (0 < n) then { n } else { n } }
 verify(fail) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { n } }
+verify(fail) { sum(n:any):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
 
 # higher-order functions
 verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
@@ -60,5 +61,5 @@ verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
 verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
 
 # currently fails
-# verify(pass) { foo(x:any)<decides> := { x = 666 } }
-# verify(pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
+# verify(pass,broken) { foo(x:any)<decides> := { x = 666 } }
+# verify(pass,broken) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }

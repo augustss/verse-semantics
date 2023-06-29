@@ -12,6 +12,8 @@
 %format lengthis s y z = s "\{" length^[y]==z "\}"
 %format dominates s v w = s "\{" v "\twoheadleftarrow" w "\}"
 
+%format fvs e = "\mathsf{fvs}" e
+
 %format effects (g) (e) = "\mathcal{FX}(" g "," e ")"
 
 %format fx_1

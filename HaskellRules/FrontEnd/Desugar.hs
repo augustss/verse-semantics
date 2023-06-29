@@ -718,11 +718,12 @@ lowerForSplit vs e1 e2 = do
   x <- newIdent l "x"   -- array of free variables
   y <- newIdent l "y"   -- thunked result
   h <- newIdent l "h"   -- h = ge, but passed to split to avoid recursion
-  let evs = Array (map Variable vs)
+  let fvs = vs `intersect` getFree e2
+      evs = fvArray (map Variable fvs)
       e1' = lExists vs $ Seq [e1, evs]  -- domain + array of free variables
       be  = Split (eForce (Variable y)) fe (Variable h)
       fe = eThunk $ Array []
-      ge = Lam x $ Lam y $ Lam h $ lExists vs $ Seq
+      ge = Lam x $ Lam y $ Lam h $ lExists fvs $ Seq
              [ Unify (Variable x) evs
              , ApplyD (EPrim "cons$") (Array [e2, be])
              ]
@@ -760,12 +761,13 @@ lowerIfNoLambda :: [Ident] -> Expr -> Expr -> Expr -> D Expr
 lowerIfNoLambda vs e1 e2 e3 = do
   y <- newIdent (getLoc e1) "y"
   let vy = Variable y
-      evs = Array $ map Variable vs
+      fvs = vs `intersect` getFree e2
+      evs = fvArray (map Variable fvs)
   pure $ Exists [y] $ Seq
            [ Unify vy (eOne $ lExists vs (Seq [e1, evs])
                               `Choice`
                               LitInt 0)
-           , lExists vs (Seq [Unify vy evs, e2])
+           , lExists fvs (Seq [Unify vy evs, e2])
              `Choice`
              Seq [Unify vy (LitInt 0), e3]
            ]
@@ -774,10 +776,11 @@ lowerIfNoLambda vs e1 e2 e3 = do
 lowerIfSplit :: [Ident] -> Expr -> Expr -> Expr -> D Expr
 lowerIfSplit vs e1 e2 e3 = do
   x <- newIdent (getLoc e1) "x"
-  let evs = Array (map Variable vs)
+  let fvs = vs `intersect` getFree e2
+      evs = fvArray (map Variable fvs)
       e1' = lExists vs $ Seq [e1, evs]  -- domain + array of free variables      
       fe = eThunk e3
-      ge = Lam x $ Lam underscore $ Lam underscore $ lExists vs $ Seq
+      ge = Lam x $ Lam underscore $ Lam underscore $ lExists fvs $ Seq
              [ Unify (Variable x) evs
              , e2
              ]
@@ -961,6 +964,7 @@ preludeFuncs =
   ,("new", newV)
   ,("post'^'", EPrim "read$")
   ,("in'.='", EPrim "write$")
+  ,("mapAp", EPrim "mapAp$")
   ]
   where typ es = Lam x $ seqE $ es ++ [Variable x]
         vx = Variable x
@@ -1060,6 +1064,12 @@ eAssume = Macro1 (Ident noLoc "assume") []
 eVerify :: Expr -> Expr
 eVerify = Macro1 (Ident noLoc "verify") []
 
+-- Used to create the array of free variables passed from the domain to the range
+-- of for/if.  If it's just a single variable, don't use an array.
+fvArray :: [Expr] -> Expr
+fvArray [e] = e
+fvArray es = Array es
+
 -----------
 
 -- TODO? Add checks
@@ -1068,3 +1078,25 @@ exprToCore _ = id
 
 simpCore :: Core -> Core
 simpCore = id
+
+----------------------
+
+-- Functions that only work on the core subset of Expr
+getFree :: Core -> [Ident]
+getFree = Epic.List.nub . fvs 
+  where
+    fvs (Variable i) = [i]
+    fvs (LitInt _) = []
+    fvs (LitRat _ _) = []
+    fvs (EPrim _) = []
+    fvs (Array es) = concatMap fvs es
+    fvs (Lam i e) = filter (/= i) (fvs e)
+    fvs (Unify e1 e2) = fvs e1 ++ fvs e2
+    fvs (ApplyD e1 e2) = fvs e1 ++ fvs e2
+    fvs (Seq es) = concatMap fvs es
+    fvs (Choice e1 e2) = fvs e1 ++ fvs e2
+    fvs (Exists is e) = filter (`notElem` is) (fvs e)
+    fvs (Wrong _) = []
+    fvs (Macro1 _ _ e) = fvs e
+    fvs (Split e1 e2 e3) = fvs e1 ++ fvs e2 ++ fvs e3
+    fvs e = error $ "getFree: " ++ prettyShow e
