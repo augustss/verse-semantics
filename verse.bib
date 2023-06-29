@@ -3,11 +3,46 @@
                   Federico Lochbaum and
                   Mariana Milicich},
   title        = {Semantics of a Relational {\(\lambda\)}-Calculus},
+  editor="Pun, Violet Ka I and Stolz, Volker and Simao, Adenilso",
   booktitle="Theoretical Aspects of Computing (ICTAC 2020)",
   year="2020",
   publisher="Springer International Publishing",
+  address="Cham",
   pages="242--261",
+  isbn="978-3-030-64276-1",
+  doi = {https://doi.org/10.1007/978-3-030-64276-1_13},
+}
+
+@article{barenbaum:relational-extended,
+  author       = {Pablo Barenbaum and
+                  Federico Lochbaum and
+                  Mariana Milicich},
+  title        = {Semantics of a Relational {\(\lambda\)}-Calculus (Extended Version), version 4},
+  journal      = {CoRR},
+  volume       = {abs/2009.10929},
+  year         = {2021},
+  month = feb,
+  day = {28},
   url          = {https://arxiv.org/abs/2009.10929},
+  eprinttype    = {arXiv},
+  eprint       = {2009.10929},
+  numpages = {51},
+}
+
+@article{DBLP:journals/corr/abs-2009-10929,
+  author       = {Pablo Barenbaum and
+                  Federico Lochbaum and
+                  Mariana Milicich},
+  title        = {Semantics of a Relational {\(\lambda\)}-Calculus (Extended Version)},
+  journal      = {CoRR},
+  volume       = {abs/2009.10929},
+  year         = {2020},
+  url          = {https://arxiv.org/abs/2009.10929},
+  eprinttype    = {arXiv},
+  eprint       = {2009.10929},
+  timestamp    = {Wed, 30 Sep 2020 16:16:22 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2009-10929.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
 @inproceedings{Saraswat90,
@@ -15,12 +50,13 @@
                   Martin C. Rinard},
   editor       = {Frances E. Allen},
   title        = {Concurrent Constraint Programming},
-  booktitle    = {Conference Record of the Seventeenth Annual {ACM} Symposium on Principles
-                  of Programming Languages, San Francisco, California, USA, January
-                  1990},
+  booktitle = {Proceedings of the 17th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
+  location = {San Francisco, California, USA},
+  series = {POPL~'90},
   pages        = {232--245},
   publisher    = {{ACM} Press},
   year         = {1990},
+  isbn = {0897913434},
   url          = {https://doi.org/10.1145/96709.96733},
   doi          = {10.1145/96709.96733},
   timestamp    = {Tue, 06 Nov 2018 11:07:43 +0100},
@@ -28,36 +64,47 @@
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
-
 @article{Escher,
   title={Programming in an Integrated Functional and Logic Language},
   author={John W. Lloyd},
-  journal={J. Funct. Log. Program.},
+  journal={Journal of Functional and Logic Programming},
+  volume={1999},
+  number={3},
+  publisher={The MIT Press},
+  address={Cambridge, Massachusetts, USA},
+  issn={1080–5230},
+  month={March},
   year={1999},
-  volume={1999}
+  url={http://danae.uni-muenster.de/lehre/kuchen/JFLP//articles/1999/A99-03/JFLP-A99-03.pdf},
+  note = {Also available at \url{https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=31d9a554f61ced1304ecd0ded9fca6fee2173b99}}
 }
-
+    
 @article{Goffin,
-title = {GOFFIN: Higher-order functions meet concurrent constraints},
+author = {Manuel M.T. Chakravarty and Yike Guo and Martin Köhler and Hendrik C.R. Lock},
+title = {GOFFIN: Higher-order Functions Meet Concurrent Constraints},
 journal = {Science of Computer Programming},
 volume = {30},
 number = {1},
 pages = {157-199},
 year = {1998},
-note = {Concurrent Constraint Programming},
+month= {January},
+publisher={Elsevier Science},
 issn = {0167-6423},
 doi = {https://doi.org/10.1016/S0167-6423(97)00010-5},
 url = {https://www.sciencedirect.com/science/article/pii/S0167642397000105},
-author = {Manuel M.T. Chakravarty and Yike Guo and Martin Köhler and Hendrik C.R. Lock},
 }
 
-@article{bernd-hanus:encapsulating,
-author       = {Bernd Bra{\ss}el and
+@inproceedings{bernd-hanus:encapsulating,
+  author = {Bernd Bra{\ss}el and
                 Michael Hanus and
                 Frank Huch},
-title = {Encapsulating Non-Determinism in Functional Logic Computations},
-journal = "Journal of Functional and Logic Programming",
-year = 2004
+  title = {Encapsulating Non-Determinism in Functional Logic Computations},
+  booktitle={13th International Workshop on Functional and (Constraint) Logic Programming},
+  pages={74--90},
+  year={2004},
+  series = {WFLP’04},
+  ISSN = {0935-3232},
+  note = {Full proceedings available at \url{http://www-i2.informatik.rwth-aachen.de/WFLP04/WFLP-proceedings.pdf}. RWTH Aachen, Department of Computer Science, Technical Report AIB-2004-05.}
 }
 
 @article{antoy-hanus:survey,
@@ -857,4 +904,18 @@ address="Berlin, Heidelberg",
 pages="190--203",
 abstract="Lambda lifting is a technique for transforming a functional program with local function definitions, possibly with free variables in the function definitions, into a program consisting only of global function (combinator) definitions which will be used as rewrite rules. Different ways of doing lambda lifting are presented, as well as reasons for rejecting or selecting the method used in our Lazy ML compiler. A functional program implementing the chosen algorithm is given.",
 isbn="978-3-540-39677-2"
+}
+
+@article{van-oostrom:decreasing-diagrams,
+title = {Confluence by Decreasing Diagrams},
+journal = {Theoretical Computer Science},
+volume = {126},
+number = {2},
+pages = {259-280},
+year = {1994}, month = apr,
+issn = {0304-3975},
+doi = {https://doi.org/10.1016/0304-3975(92)00023-K},
+url = {https://www.sciencedirect.com/science/article/pii/030439759200023K},
+author = {Vincent {van Oostrom}},
+abstract = {We present a confluence criterion, local decreasingness, for abstract reduction systems. This criterion is shown to be a considerable generalisation of several well-known confluence criteria.}
 }
