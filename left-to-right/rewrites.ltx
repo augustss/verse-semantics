@@ -247,7 +247,7 @@
 \rulegroupname{Substitution:}
 
   \rulename{subst} & |x==v; e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
-  & \text{if $|v|$ is not $|V^[x]|$} \\
+  & \text{if $|v|\ne|V^[x]|$} \\
   \rulename{val-swap} & |v==x; e|    & \movesto & |x==v; e| \\
   \rulename{eqn-swap} & |v==ef; v_1==v_2; e| & \movesto & |v_1==v_2; v==ef; e| \\
 
@@ -255,7 +255,7 @@
 
 \rulegroupname{Normalization:}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x E^[x==v; e]| & \movesto & |E^[e]| & \text{if $|x| \notin \freevars{|E,v,e|}$} \\
+\rulename{eqn-elim} & |def x E^[x==v; e]| & \movesto & |E^[e]| & \text{if $|x| \notin \freevars{|E,e|}$ and $|v|\ne|V^[x]|$} \\
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|}$} \\
 %\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
 %\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
