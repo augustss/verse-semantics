@@ -364,7 +364,7 @@
 \rulegroupname{Elimination:}
 \rulename{val-elim} & |v ; e| & \movesto & |e| \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[v;e]|}$} \\
+\rulename{eqn-elim} & |def x (X^[x==v;e])| & \movesto & |X^[e]| & \text{if $|x| \notin \freevars{|X^[e]|}$ and $|v| \ne |V^[x]|$} \\
 \rulename{fail-elim} & |X^[fail]| & \movesto & |fail| & \\
 
     \\[-0.6em]
