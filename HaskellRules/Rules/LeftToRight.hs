@@ -130,6 +130,8 @@ evalX lhs =
 -- ef
 effectFree :: Expr -> Bool
 effectFree (Val _)       = True
+effectFree (One _)       = True
+effectFree (All _)       = True
 effectFree (Op op :@: _) = isChoiceFreeOp op
 effectFree _             = False
 
@@ -233,7 +235,7 @@ rulesNormalization _ lhs =
  ++
   "SEQ-ASSOC" `name`
   do (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- [lhs]
-     pure ((v1 :=: e1) :>: (v2 :=: e2) :>: e3)
+     pure ((v1 :=: e1) :>: ((v2 :=: e2) :>: e3))
 
 --------------------------------------------------------------------------------
 
