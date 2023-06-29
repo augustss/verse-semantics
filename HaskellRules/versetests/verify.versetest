@@ -31,11 +31,13 @@ verify(pass) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
 verify(pass) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
 verify(pass) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
 verify(pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
+
+# Testing 'if' with 'mustDecide'
 verify(pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
 verify(fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
 verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
 
-# Koen's "stuck" tests
+# stuck tests
 verify(fail) { ex_stuck1(x:any) := { y:any; y } }
 verify(fail) { ex_stuck2(x:any) := { y:any; z:any; y = (x, (x, y)); y } }
 verify(fail) { ex_stuck3(x:any) := { y:any; if (y = 3) then { y = 3 } else { y = 4 } } }
@@ -46,10 +48,17 @@ verify(fail) { foo(n:any):int := if (int[n]) then { n } else { (1,2) } }
 verify(fail) { foo(n:any):int := if (0 < n) then { n } else { n } }
 verify(fail) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { n } }
 
+# higher-order functions
+verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify(fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify(pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify(fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; ex6(suc) }
 
-
+# flex/rigid tests
+verify(pass) { ex_rigid2flex(x:int) := {y := x; y} }
+verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
+verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
 
 # currently fails
-# verify(fail) { sum(n:any):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
 # verify(pass) { foo(x:any)<decides> := { x = 666 } }
 # verify(pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }

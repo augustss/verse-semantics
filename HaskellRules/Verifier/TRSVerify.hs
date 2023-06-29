@@ -308,7 +308,7 @@ g(x:int, y:int, z:int) := { a := x; b := a; b = y }
 
 -}
 
--- TODO: why does this hang the verifier?
+-- hangs the icfpVerifier due to EXI-SWAP blowup, but not icfpeVerifier
 ex00_hang :: Expr
 ex00_hang =
   LAM xt $
@@ -463,7 +463,6 @@ ex5 = Verify $ LAM x (Assert (EXI r ((Var r :=: ite (INT (Var x)) (Int 10) (Int 
 
 ---
 
--- TODO:PORT
 ex6 :: Expr
 ex6 = verse $
   do suc <- def (lam (\x -> do _ <- int x
@@ -482,7 +481,6 @@ ex6 = verse $
 --- examples testing rigid/flexible ---
 
 
--- TODO:PORT
 ex_rigid2flex :: Expr
 ex_rigid2flex = verse $
   timlam $ \x ->
