@@ -342,6 +342,7 @@ cRules line s =
 systemFlags :: [(String, Flags -> Flags)]
 systemFlags =
   [ ("iblock", \ s -> s{ fSplit = True })
+  , ("L2R",    \ s -> s{ fSplit = False, fDfs = True})
   ]
 
 {-
