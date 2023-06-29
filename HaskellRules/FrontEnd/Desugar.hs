@@ -961,6 +961,7 @@ preludeFuncs =
   ,("new", newV)
   ,("post'^'", EPrim "read$")
   ,("in'.='", EPrim "write$")
+  ,("mapAp", EPrim "mapAp$")
   ]
   where typ es = Lam x $ seqE $ es ++ [Variable x]
         vx = Variable x

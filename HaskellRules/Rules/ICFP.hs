@@ -55,6 +55,7 @@ systemICFP = TRSystem
   , rulesHaveStructural = True
   , confluenceRules     = noRules
   , validExpr           = const valid
+  , sortRewrites        = id
   }
 
 systemICFPC :: TRSystem Expr
@@ -541,7 +542,7 @@ unit :: Value
 unit = Arr []
 
 seqs :: [Expr] -> Expr
-seqs = foldl1 (:>:)
+seqs = foldr1 (:>:)
 
 --------------------------------------------------------------------------------
 

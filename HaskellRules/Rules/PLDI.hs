@@ -32,6 +32,7 @@ systemPLDI = TRSystem
   , rulesHaveStructural = False
   , confluenceRules     = rulesStructural
   , validExpr           = const validE
+  , sortRewrites        = id
   }
 
 systemPLDIG :: TRSystem Expr

@@ -53,7 +53,7 @@ blockSystem :: ESystem
 blockSystem = TRSystem { sname = "iblock", description = "left-to-right ICFP rules",
   ruleEnv = defaultTRSFlags,
   preProcess = evaluate, postProcess = const id, rules = noRules, rules2 = noRules, rulesHaveStructural = False,
-  confluenceRules = noRules, validExpr = \ _ _ -> True }
+  confluenceRules = noRules, validExpr = \ _ _ -> True, sortRewrites = id }
   where
     noRules _ _ = []
     evaluate = runBlock
