@@ -16,6 +16,7 @@ module TRS.TRS(
 
 import Epic.List( nub, nubKey )
 import Epic.Print(Pretty, prettyShow)
+import TRS.Tarjan(tarjanAny)
 import TRS.Traced
 import qualified Data.Set as S
 --import Control.Monad( unless )
@@ -71,7 +72,8 @@ data NormResult a = NormResult
 
 -- Traces are produced in reverse order, i.e. final result first
 normalFormsFuelTracePlain :: (Ord a, Rec a, Pretty a) => TRSystem a -> Int -> a -> NormResult a
-normalFormsFuelTracePlain sys an at = go an S.empty [start at]
+normalFormsFuelTracePlain sys an at | rulesHaveStructural sys = normalTarjan False sys an at
+                                    | otherwise = go an S.empty [start at]
  where
   go  0 _seen trs@(_:_)   = NormResult { nrDone = [], nrLeft = trs }
   go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
@@ -104,7 +106,8 @@ addDone a nr = nr{ nrDone = a : nrDone nr }
 
 -- Like normalFormsFuelTrace, but only does a depth first search
 normalFormFuelTracePlain :: (Ord a, Rec a, Pretty a) => TRSystem a -> Int -> a -> NormResult a
-normalFormFuelTracePlain sys an at = go an S.empty (start at)
+normalFormFuelTracePlain sys an at | rulesHaveStructural sys = normalTarjan True sys an at
+                                   | otherwise = go an S.empty (start at)
  where
   go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
   go n seen ttr@(t :<-- tr)
@@ -125,6 +128,16 @@ stepSS sys tt = t1s ++ t2s
   where
     t1s = nubKey snd $ rec (rules  sys) (ruleEnv sys) tt
     t2s = nubKey snd $ {- rec -} (rules2 sys) (ruleEnv sys) tt
+
+--------------------------------------------------------------------------------------------------------
+
+normalTarjan :: (Ord a, Rec a, Pretty a) => Bool -> TRSystem a -> Int -> a -> NormResult a
+normalTarjan justOne sys fuel at =
+  let e = start at
+      arrow (a :<-- t) = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
+  in  case tarjanAny justOne fuel arrow e of
+        Just xss -> NormResult { nrDone = map head xss, nrLeft = [] }
+        Nothing  -> NormResult { nrDone = [], nrLeft = [e] }
 
 --------------------------------------------------------------------------------------------------------
 
