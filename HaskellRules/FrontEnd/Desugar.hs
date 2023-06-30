@@ -11,7 +11,7 @@ import Control.Monad
 import Control.Monad.State.Strict
 import Data.Either
 import Data.List
-import qualified Data.Map as M
+--import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Set as S
 import Debug.Trace
@@ -30,13 +30,14 @@ import FrontEnd.Flags
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
-            (traceDS "primops"    <=< primops  <=<
-             traceDS "lower"      <=< lower    <=<
-             traceDS "simp"       <=< simp     <=<
-             traceDS "addScope"   <=< addScope <=<
-             traceDS "dsD"        <=< dsD      <=<
-             traceDS "addDeref"   <=< addDeref <=<
-             traceDS "dsSmall"    <=< dsSmall  <=<
+            (traceDS "alias"      <=< simpAlias <=<
+             traceDS "primops"    <=< primops   <=<
+             traceDS "lower"      <=< lower     <=<
+             traceDS "simpler"    <=< simpler   <=<
+             traceDS "addScope"   <=< addScope  <=<
+             traceDS "dsD"        <=< dsD       <=<
+             traceDS "addDeref"   <=< addDeref  <=<
+             traceDS "dsSmall"    <=< dsSmall   <=<
              traceDS "dropParens" <=< dropParens)
   where
     tr = fTraceDesugar flgs
@@ -576,8 +577,13 @@ primOps = map (Ident noLoc)
 
 ------------------------
 
-simp :: Expr -> D Expr
-simp = simpUnify {- <=< simpUnused-} <=< simpAny
+simpler :: Expr -> D Expr
+simpler expr = do
+  simpl <- gets (fSimplify . dflags)
+  if simpl then
+    simpUnify <=< simpAny $ expr
+   else
+    pure expr
 
 -- Simplify any[e]  -->  e
 simpAny :: Expr -> D Expr
@@ -586,11 +592,77 @@ simpAny = pure . f
         f e = composOp f e
 
 -- Simplify x = (e1; ...; en)  -->  e1; ...; x = en
+--          x = (y = e)  -->  x = y; y = e
 simpUnify :: Expr -> D Expr
 simpUnify = pure . f
-  where f (Unify v (Seq (Snoc xs x))) | isValue v = Seq $ xs ++ [Unify v x]
+  where f (Unify v (Seq (Snoc xs x))) | isValue v = f $ Seq $ xs ++ [Unify v x]
+        f (Unify e1 (Unify v e2)) | isValue v = f $ Seq [Unify e1 v, Unify v e2]
+        f (Seq es) = seqE es
         f e = composOp f e
 
+-- If we have a unification x=y, and x&y are bound in the same existential
+-- then we can get rid of one of the variables.
+simpAlias :: Expr -> D Expr
+simpAlias expr = do
+  simpl <- gets (fSimplify . dflags)
+  if simpl then
+    pure (f expr)
+   else
+    pure expr
+  where f (Exists is ee) =
+          -- The xys list are the identifiers where the x is among the existential
+          -- bindings and x is bound locally to y.
+          -- We will replace x by y, remove x from the bound variables, and remove the binding.
+          let e = f ee
+              xys = uniq [] $ Epic.List.nub [ xy | (x, y) <- localUnify e, xy <- pickBetter x y ]
+              -- pickBetter x y | trace ("pickBetter " ++ show (x, y)) False = undefined
+              pickBetter x y | x == y = []
+              pickBetter x y | not xlocal && not ylocal = []
+                             |     xlocal && not ylocal = [(x, y)]
+                             | not xlocal &&     ylocal = [(y, x)]
+                             where xlocal = x `elem` is; ylocal = y `elem` is
+              -- Both are local, try to pick the one with the better name to remain.
+              pickBetter x y | isTempIdent x || not (isTempIdent y) = [(x, y)]
+                             | isTempIdent y || not (isTempIdent x) = [(y, x)]
+                             | x < y = [(x, y)]
+                             | otherwise = [(y, x)]
+              is' = filter (`notElem` map fst xys) is
+              e' = substMany [(x, Variable y) | (x, y) <- xys] $ dropUnify xys e
+          in  --trace (show (is, xys)) $
+              lExists is' e'
+        -- Special hack to keep existentials in If3
+        f (If3 (Exists is e1) e2 e3) = If3 (Exists is (f e1)) (f e2) (f e3)
+        f e = composOp f e
+
+uniq :: [Ident] -> [(Ident, Ident)] -> [(Ident, Ident)]
+uniq _ [] = []
+uniq u (x@(a,b):xs) | a `elem` u || b `elem` u = uniq u xs
+                    | otherwise = x : uniq (a:b:u) xs
+
+dropUnify :: [(Ident, Ident)] -> Expr -> Expr
+dropUnify xys (Seq es) = seqE (seqDrop (map (dropUnify xys) $ concatMap flat es))
+  where flat (Seq xs) = concatMap flat xs
+        flat x = [x]
+dropUnify xys (Unify (Variable x) (Variable y)) | (x, y) `elem` xys = Variable y
+                                                | (y, x) `elem` xys = Variable x
+dropUnify _ e = e
+
+seqDrop :: [Expr] -> [Expr]
+seqDrop [] = []
+seqDrop [e] = [e]
+seqDrop (v:es@(_:_)) | isValue v = seqDrop es
+seqDrop (e:es) = e : seqDrop es
+
+localUnify :: Expr -> [(Ident, Ident)]
+localUnify (Seq es) = concatMap localUnify es
+localUnify (Unify (Variable x) (Variable y)) = [(x, y)]
+localUnify _ = []
+
+isTempIdent :: Ident -> Bool
+isTempIdent (Ident _ ('$':_)) = True
+isTempIdent _ = False
+
+{-
 -- XXX assumes no name shadowing
 _simpUnused :: Expr -> D Expr
 _simpUnused e = pure $ removeUnused unused e
