@@ -9,7 +9,6 @@ module FrontEnd.Expr(
   Ident(..), unIdent,
   Expr(..),
   Core,
-  pattern Fail,
   pattern Unit,
   pattern Typedef,
   pattern Succeeds,
@@ -116,6 +115,7 @@ data Expr
   | EPrim String              -- primop
   | Lam Ident Expr            -- \ x . e
   | Split Expr Expr Expr      -- split(e1){e2}{e3}
+  | Fail
   -- These are used when translating back from Rules.Core.Expr
   | LitPtr Ptr
   | EStore Store Expr
@@ -132,8 +132,6 @@ type Ptr = Int
 
 --pattern Range :: Expr -> Expr
 --pattern Range e = ApplyD e AnyT
-pattern Fail :: Expr
-pattern Fail = Range Unit
 pattern Unit :: Expr
 pattern Unit = Array []
 pattern Typedef :: Block -> Expr
@@ -370,6 +368,7 @@ compos _ e@DomainFail = pure e
 compos _ e@EPrim{} = pure e
 compos f (Lam i e) = Lam i <$> f e
 compos f (Split e1 e2 e3) = Split <$> f e1 <*> f e2 <*> f e3
+compos _ e@Fail = pure e
 compos _ e@LitPtr{} = pure e
 compos f (EStore s e) = EStore <$> storeMapA f s <*> f e
 

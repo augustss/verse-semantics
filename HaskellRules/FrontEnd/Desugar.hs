@@ -124,15 +124,15 @@ dsSmall = ds
     ds (For1 e) = do x <- newIdent (getLoc e) "x"; ds $ For2 (DefineE x e) (Variable x)
 
     -- Operators
-    ds (PrefixOp (Op "not") e) = do e' <- ds e; pure $ If3 e' eFail eFalse
+    ds (PrefixOp (Op "not") e) = do e' <- ds e; pure $ If3 e' Fail eFalse
     ds (PrefixOp (Op ":") e) = Range <$> ds e
     ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
     ds (PostfixOp e (Op "?")) = Range <$> ds e
     ds (PostfixOp e (Ident l op)) = ds =<< call "post" l op e
     ds (InfixOp e1 (Op "|") e2) = Choice <$> ds e1 <*> ds e2
     ds (InfixOp e1 (Op "and") e2) = ds $ Seq [e1, e2]                  -- XXX multiplicity?
-    --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 eFail) eFail    -- XXX binding
-    ds (InfixOp e1 (Op "or") e2) = ds $ If2E e1 $ If2E e2 eFail
+    --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 Fail) Fail    -- XXX binding
+    ds (InfixOp e1 (Op "or") e2) = ds $ If2E e1 $ If2E e2 Fail
     ds (InfixOp e1 (Ident l op) e2) = ds =<< call "in" l op (Array [e1, e2])
 
     -- Array
@@ -160,7 +160,7 @@ dsSmall = ds
       ds $ If2 (DefineE t e) (Array [Variable t])
 
     -- one, all
-    ds (Macro1 (Ident _ "one") [] e) = ds $ If2E e eFail
+    ds (Macro1 (Ident _ "one") [] e) = ds $ If2E e Fail
     ds (Macro1 (Ident _ "all") [] e) = ds $ For1 e
 
     ds x = compos ds x
@@ -229,9 +229,6 @@ getFun = gf []
 
 eFalse :: Expr
 eFalse = Array []
-
-eFail :: Expr
-eFail = Range eFalse
 
 eAny :: Expr
 eAny = Variable (Ident noLoc "any")
@@ -353,6 +350,7 @@ dsM i (Function [(t1, r)] t2) = do
   dsFunction c i t1 r t2
 dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
+dsM i Fail = pure $ unifyV i Fail
 dsM _ e = impossible e
 
 dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
@@ -476,6 +474,7 @@ scope sc = expr
       TLam i r e1' <$> scopeD sc' e2 <*> traverse expr me3
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
+    expr Fail = pure Fail
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -519,6 +518,7 @@ getVisible (Exists is e) = is ++ getVisible e
 getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
 getVisible TLam{} = []
 getVisible Lam{} = []
+getVisible Fail = []
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
@@ -548,6 +548,7 @@ getVar TLam{} = []
 getVar (Exists _ e) = getVar e
 getVar (HasType e t) = getVar e ++ getVar t
 getVar Lam{} = []
+getVar Fail = []
 getVar e = impossible e
 
 -- Definitions that should go in a Prelude
@@ -699,6 +700,7 @@ addDeref = pure . exprD S.empty
       where s' = defs s e1
     expr s (Exists is e) = Exists is (expr s e)
     expr s (HasType e t) = HasType (expr s e) (expr s t)
+    expr _ Fail = Fail
     expr _ e = impossible e
 
     exprD s e = expr (defs s e) e
@@ -743,6 +745,7 @@ lower (Exists is e) = lExists is <$> lower e
 lower (TLam i rs (Exists is e1) e2 me3) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2 <*> traverse lower me3
 lower (HasType e t) = join $ lowerHasType <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
+lower Fail = pure Fail
 lower e = impossible e
 
 -- Lower a for loop
@@ -1169,6 +1172,7 @@ getFree = Epic.List.nub . fvs
     fvs (Macro1 _ _ e) = fvs e
     fvs (Split e1 e2 e3) = fvs e1 ++ fvs e2 ++ fvs e3
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
+    fvs Fail = []
     fvs e = error $ "getFree: " ++ prettyShow e
 
 substMany :: [(Ident, Core)] -> Core -> Core
@@ -1196,6 +1200,7 @@ substMany sb = sub
     sub (If3 (Exists is e1) e2 e3) =
       let (is', e1', e2') = if3Hack sub is e1 e2
       in  If3 (Exists is' e1') e2' (sub e3)
+    sub Fail = Fail
     sub e = error $ "substMany: " ++ prettyShow e
 
     binder :: Ident -> (Expr -> Expr) -> Expr -> Expr
@@ -1238,6 +1243,7 @@ alphaConvert vs = alpha []
     alpha m (If3 (Exists is e1) e2 e3) =
       let (is', e1', e2') = if3Hack (alpha m) is e1 e2
       in  If3 (Exists is' e1') e2' (alpha m e3)
+    alpha _ Fail = Fail
     alpha _ e = error $ "alphaConvert: " ++ prettyShow e
 
     add ii@(i, i') m | i == i' = m
