@@ -439,8 +439,7 @@ errMultiple =
 scope :: S.Set Ident -> Expr -> D Expr
 scope sc = expr
   where
-    expr e@LitInt{} = pure e
-    expr e@LitRat{} = pure e
+    expr e@Lit{} = pure e
     expr e@(Variable i) | i `S.member` sc = pure e
                         | otherwise = do errUndefined [i]; pure e
     expr (Array es) = Array <$> mapM expr es
@@ -494,8 +493,7 @@ scope sc = expr
 
 -- Get all visible identifiers from i := e
 getVisible :: HasCallStack => Expr -> [Ident]
-getVisible LitInt{} = []
-getVisible LitRat{} = []
+getVisible Lit{} = []
 getVisible Variable{} = []
 getVisible (Array es) = concatMap getVisible es
 getVisible (Seq es) = concatMap getVisible es
@@ -522,8 +520,7 @@ getVisible Fail = []
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
-getVar LitInt{} = []
-getVar LitRat{} = []
+getVar Lit{} = []
 getVar Variable{} = []
 getVar (Array es) = concatMap getVar es
 getVar (Seq es) = concatMap getVar es
@@ -667,8 +664,7 @@ isTempIdent _ = False
 addDeref :: Expr -> D Expr
 addDeref = pure . exprD S.empty
   where
-    expr _ e@LitInt{} = e
-    expr _ e@LitRat{} = e
+    expr _ e@Lit{} = e
     expr s e@(Variable i) | i `S.member` s = applyPrimD "read$" e
                           | otherwise = e
     expr s (Array es) = Array $ map (expr s) es
@@ -723,8 +719,7 @@ addDeref = pure . exprD S.empty
 
 -- Convert Big Core to Core
 lower :: Expr -> D Expr
-lower e@LitInt{} = pure e
-lower e@LitRat{} = pure e
+lower e@Lit{} = pure e
 lower e@Variable{} = pure e
 lower (Array es) = Array <$> mapM lower es
 lower e@Wrong{} = pure e
@@ -813,10 +808,10 @@ lowerIfNoLambda vs e1 e2 e3 = do
   pure $ Exists [y] $ Seq
            [ Unify vy (eOne $ lExists vs (Seq [e1, evs])
                               `Choice`
-                              LitInt 0)
+                              Lit (LitInt 0))
            , lExists fvs (Seq [Unify vy evs, e2])
              `Choice`
-             Seq [Unify vy (LitInt 0), e3]
+             Seq [Unify vy (Lit (LitInt 0)), e3]
            ]
 
 -- TODO: special case 'if{}'
@@ -1028,7 +1023,7 @@ lowerPrimOpRun s =
 preludeFuncs :: [(String, Func)]
 preludeFuncs =
   [("any", typ [])                                             -- x => x
-  ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (LitInt 0)]) -- x => int#[x]; x>=0; x
+  ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (Lit (LitInt 0))]) -- x => int#[x]; x>=0; x
   ,("int", typ [app "isInt$" vx])                              -- x => int#[x]; x
   ,("in'->'", arrowV)
   ,("false", bare $ Array [])                                      -- ()
@@ -1090,7 +1085,7 @@ verifyPrelude =
     cmpBinOpInt' p = ([x, y],
       [ cInt vx, cInt vy, ApplyD (EPrim p) (Array [vx, vy]), eAssume (Seq [cInt vx, vx]) ])
 
-    yNe0 = ApplyD (EPrim "in'<>'") (Array [vy, LitInt 0])
+    yNe0 = ApplyD (EPrim "in'<>'") (Array [vy, Lit (LitInt 0)])
 
     arithUnOpInt p =
       (p, ([x], [ cInt vx, eAssume (Exists [z] $ Seq [Unify vz (ApplyD (EPrim p) vx), cInt vz, vz]) ]))
@@ -1158,8 +1153,7 @@ getFree :: Core -> [Ident]
 getFree = Epic.List.nub . fvs 
   where
     fvs (Variable i) = [i]
-    fvs (LitInt _) = []
-    fvs (LitRat _ _) = []
+    fvs (Lit _) = []
     fvs (EPrim _) = []
     fvs (Array es) = concatMap fvs es
     fvs (Lam i e) = filter (/= i) (fvs e)
@@ -1183,8 +1177,7 @@ substMany sb = sub
     sub :: Core -> Core
     sub v@(Variable i) | Just b <- lookup i sb = b
                        | otherwise = v
-    sub e@LitInt{} = e
-    sub e@LitRat{} = e
+    sub e@Lit{} = e
     sub e@EPrim{} = e
     sub (Array es) = Array (map sub es)
     sub (Lam i e) = binder i (Lam i) e
@@ -1225,8 +1218,7 @@ alphaConvert vs = alpha []
   where
     alpha :: [(Ident, Ident)] -> Core -> Core
     alpha m (Variable i) = Variable $ fromMaybe i $ lookup i m
-    alpha _ e@LitInt{} = e
-    alpha _ e@LitRat{} = e
+    alpha _ e@Lit{} = e
     alpha _ e@EPrim{} = e
     alpha m (Array es) = Array (map (alpha m) es)
     alpha m (Lam i e) = Lam i' $ alpha (add (i, i') m) e where i' = fresh i

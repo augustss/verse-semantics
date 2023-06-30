@@ -163,10 +163,10 @@ pAngles = between (pOp "<") (pOp ">")
 
 pLiteral :: P Expr
 pLiteral = choice
-  [ LitInt <$> pDecimal
-  , LitChar <$> pChar
+  [ Lit . LitInt <$> pDecimal
+  , Lit . LitChar <$> pChar
   -- Handle 1..2 incorrectly
-  , (LitRat <$> L.scientific <*> many letterChar) <* skip
+  , (Lit <$> (LitRat <$> L.scientific <*> many letterChar) <* skip)
   , pString
   ]
 
@@ -208,12 +208,12 @@ pString :: P Expr
 pString = do
   let pStr = some (pPrintableChar "\"\\{" <|> pBackslashChar)
       pInterp = pBraces pExprSeq
-      conc [] = LitStr ""
+      conc [] = Lit (LitStr "")
       conc [e] = e
       conc es = ApplyD (Variable (Ident noLoc "strConc$")) (Array es)
       toStr e = Macro1 (Ident noLoc "toStr$") [] e
   _ <- char '"'
-  cs <- many ((LitStr <$> pStr) <|> (toStr <$> pInterp))
+  cs <- many ((Lit . LitStr <$> pStr) <|> (toStr <$> pInterp))
   _ <- char '"'
   skip
   pure $ conc cs

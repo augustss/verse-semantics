@@ -8,6 +8,7 @@ module FrontEnd.Expr(
   Loc, noLoc,
   Ident(..), unIdent,
   Expr(..),
+  Lit(..),
   Core,
   pattern Unit,
   pattern Typedef,
@@ -60,10 +61,7 @@ instance Pretty Ident where
   pPrintPrec _ _ (Ident _ i) = text i
 
 data Expr
-  = LitInt Integer            -- d
-  | LitRat Scientific String    -- d.d
-  | LitChar Char              -- 'c'
-  | LitStr String             -- "str"
+  = Lit Lit                   -- k
   | Variable Ident            -- x
   | QualVariable Expr Ident   -- (e:)x
   | Array [Expr]              -- e1,e2,...
@@ -130,6 +128,23 @@ data Store = Store { refMap :: IM.IntMap Value, outputs :: [Core] }
   deriving (Show, Eq, Ord, Data)
 type Ptr = Int
 
+data Lit
+  = LitInt Integer            -- d
+  | LitRat Scientific String  -- d.d
+  | LitChar Char              -- 'c'
+  | LitStr String             -- "str"
+  deriving (Eq, Ord, Show, Data)
+
+instance Pretty Lit where
+  pPrintPrec _ p lit =
+    case lit of
+      LitInt i
+        | i >= 0 -> text $ show i
+        | otherwise -> maybeParens (p >= 10) $ text $ show i
+      LitRat r s -> text (show r ++ s)
+      LitChar c -> text (show c)
+      LitStr s -> text (show s)
+
 --pattern Range :: Expr -> Expr
 --pattern Range e = ApplyD e AnyT
 pattern Unit :: Expr
@@ -171,12 +186,7 @@ instance Pretty Expr where
           _ -> ppNormal expr
       ppNormal expr =
         case expr of
-          LitInt i
-            | i >= 0 -> ppr p i
-            | otherwise -> maybeParens (p >= 10) $ text $ show i
-          LitRat r s -> text (show r ++ s)
-          LitChar c -> text (show c)
-          LitStr s -> text (show s)
+          Lit lit -> ppr p lit
           Array es -> text "array" <> braces (ppSeq l es)
           Seq es -> maybeParens (p > 0) $ ppSeq l es
           Variable v -> ppr 0 v
@@ -316,10 +326,7 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       ]
 
 compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
-compos _ e@LitInt{} = pure e
-compos _ e@LitRat{} = pure e
-compos _ e@LitChar{} = pure e
-compos _ e@LitStr{} = pure e
+compos _ e@Lit{} = pure e
 compos _ e@Variable{} = pure e
 compos f (QualVariable e v) = QualVariable <$> f e <*> pure v
 compos f (Array es) = Array <$> traverse f es
@@ -389,8 +396,7 @@ getLoc :: Expr -> Loc
 getLoc _ = noLoc
 
 isLiteral :: Expr -> Bool
-isLiteral LitInt{} = True
-isLiteral LitRat{} = True
+isLiteral Lit{} = True
 isLiteral _ = False
 
 isValue :: Expr -> Bool

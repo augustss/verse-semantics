@@ -121,8 +121,8 @@ subsT sys = nubTraced (postProcess sys (ruleEnv sys))
 
 coreToTrs :: HasCallStack => Core -> T.Expr
 coreToTrs (Variable i) = T.Var $ coreToTrsI i
-coreToTrs (LitInt i) = T.Int i
-coreToTrs LitRat{} = undefined
+coreToTrs (Lit (LitInt i)) = T.Int i
+coreToTrs Lit{} = undefined
 coreToTrs (EPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
   where ops = map (\ (x,y) -> (y, x)) allOps
 coreToTrs (Array vs) = T.Arr $ map coreToTrs vs
@@ -159,7 +159,7 @@ coreToTrsI (Ident _ s) = T.Name s
 
 trsToCore :: T.Expr -> Core
 trsToCore (T.Var i) = Variable (trsToCoreI i)
-trsToCore (T.Int i) = LitInt i
+trsToCore (T.Int i) = Lit (LitInt i)
 trsToCore (T.Op op) = EPrim $ fromMaybe undefined $ lookup op allOps
 trsToCore (T.Arr vs) = Array $ map trsToCore vs
 trsToCore (T.Lam (T.Bind x e)) = Lam (trsToCoreI x) (trsToCore e)

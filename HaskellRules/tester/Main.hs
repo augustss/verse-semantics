@@ -86,7 +86,7 @@ data TestType
 pTestInfo :: P TestInfo
 pTestInfo = do
   loc <- getSourcePos
-  let strOf (LitStr s) = s
+  let strOf (Lit (LitStr s)) = s
       strOf _ = undefined
   mname <- fmap strOf <$> optional (pString <* pOp ",")
   typ <- pTestType
