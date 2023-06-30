@@ -375,7 +375,7 @@ execEX1 bs lhs =
  ++
   do Lam (Bind y x) <- [lhs]
      (ctx, g, bs', hole) <- execEX (BLam y : bs) x
-     pure (Lam . Bind y . ctx, {- XXX: bndVars instead in mustDecide??? -} Assume (Var y) :>: g, bs', hole)  -- y should be visible to e in g |- e
+     pure (Lam . Bind y . ctx, Assume (Var y) :>: g, bs', hole)  -- y should be visible to e in g |- e
  ++
   do x :@: e <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
