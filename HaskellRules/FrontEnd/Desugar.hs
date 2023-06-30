@@ -612,7 +612,6 @@ removeUnused unused = f
   where f (Unify (Variable i) e) | i `elem` unused = f e
         f (Exists is e) = Exists (filter (`notElem` unused) is) (f e)
         f e = composOp f e
--}
 
 simplify :: Expr -> Expr
 simplify e = e
