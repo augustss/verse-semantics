@@ -201,7 +201,7 @@
 \text{free variables in E} & |fvs(hole)| & = & \{ \} \\
                            & |fvs(v==E; e)| & = & |fvs(v) `cup` fvs(E) `cup` fvs(e)| \\
                            & |fvs(v==ef; E)| & = & |fvs(v) `cup` fvs(ef) `cup` fvs(E)| \\
-                           & |fvs(def x E)| & = & |{x} `cup` fvs(E)| \\
+                           & |fvs(def x E)| & = & |{x} `cup` fvs(E)| |-- this is correct| \\
 
     \end{array}
      $$
