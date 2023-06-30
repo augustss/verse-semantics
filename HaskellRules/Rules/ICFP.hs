@@ -178,6 +178,7 @@ valid' onlyEq = expr
   where
     expr (Assume e) = expr e
     expr (Assert e) = expr e
+    expr (Decide e) = expr e
     expr (Verify e) = expr e
     expr e@Val{} = value e
     expr (LAM _ e) = expr e
@@ -249,6 +250,7 @@ anf' onlyEq = expr
     expr (All e) = All $ expr e
     expr (Assume e) = Assume $ expr e
     expr (Assert e) = Assert $ expr e
+    expr (Decide e) = Decide $ expr e
     expr (Verify e) = Verify $ expr e
     expr e@Fail = e
     expr e@Wrong{} = e
@@ -375,6 +377,9 @@ scopeX lhs =
  ++
   do Assert hole <- [lhs]
      choices Assert hole
+ ++
+  do Assume hole <- [lhs]
+     choices Assume hole
 
  where
   choices ctx e =

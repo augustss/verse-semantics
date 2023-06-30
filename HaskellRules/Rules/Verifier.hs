@@ -122,7 +122,7 @@ generalizedIcfpRules env lhs =
 -- | Rules for `Assume` and `Assert` -------------------------------------------
 
 assumeAssertRules :: VRule
-assumeAssertRules _foo lhs =
+assumeAssertRules env lhs =
   -- ASSUME --
 
   -- Assume {v} ----> v
@@ -198,6 +198,12 @@ assumeAssertRules _foo lhs =
   "Assume-Verify" `name`
   do Assume (Verify _) <- [lhs]
      pure (Val (Arr []))
+  ++
+  "Decide-Verify" `name`
+  -- DECIDE --
+  do Decide e <- [lhs]
+     guard (mustDecide (bndVars env) e)
+     pure e
 
 mustSucceed :: Expr -> Bool
 mustSucceed (Int _)          = True

@@ -80,6 +80,7 @@ data Expr
   | Assert Expr                 -- ^ assert{ e }
   | Assume Expr                 -- ^ assume{ e }
   | Verify Expr                 -- ^ verify{ e }
+  | Decide Expr                 -- ^ decide{ e }
 
   | Split Expr Expr Expr        -- ^ split { e, v1, v2 }
   | BlockC Expr                 -- ^ same as e, but maintaining invariants
@@ -127,6 +128,7 @@ instance Pretty Expr where
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assert a)       = text "assert {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Decide a)       = text "decide {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Verify a)       = text "verify {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (If a b c)       = text "if" <+> parens (pPrintPrec l 0 a) <+> braces (pPrintPrec l 0 b) <+> text "else" <+> braces (pPrintPrec l 0 c)
   pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
@@ -220,6 +222,10 @@ comp _xs _ys _          (Assume _) = GT
 comp  xs  ys (Assert a) (Assert b) = comp xs ys a b
 comp _xs _ys (Assert _) _          = LT
 comp _xs _ys _          (Assert _) = GT
+
+comp  xs  ys (Decide a) (Decide b) = comp xs ys a b
+comp _xs _ys (Decide _) _          = LT
+comp _xs _ys _          (Decide _) = GT
 
 comp  xs  ys (Verify a) (Verify b) = comp xs ys a b
 comp _xs _ys (Verify _) _          = LT
@@ -478,6 +484,7 @@ instance Free Expr where
   free (Assume a) = free a
   free (Assert a) = free a
   free (Verify a) = free a
+  free (Decide a) = free a
   free (If a b c) = free a `union` free b `union` free c
   free (Split e f g) = free e `union` free f `union` free g
   free (BlockC e) = free e
@@ -520,6 +527,7 @@ instance Term Expr where
   subst sub (Assume a) = Assume (subst sub a)
   subst sub (Assert a) = Assert (subst sub a)
   subst sub (Verify a) = Verify (subst sub a)
+  subst sub (Decide a) = Decide (subst sub a)
   subst sub (Split e f g) = Split (subst sub e) (subst sub f) (subst sub g)
   subst sub (BlockC e) = BlockC (subst sub e)
   subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
@@ -579,7 +587,9 @@ instance Arbitrary Expr where
   shrink (All a)   = [a, One a, Arr []] ++ [All a'|a'<-shrink a]
   shrink (Assume a) = [a] ++ [Assume a'| a'<-shrink a]
   shrink (Assert a) = [a] ++ [Assert a'| a'<-shrink a]
+  shrink (Decide a) = [a] ++ [Decide a'| a'<-shrink a]
   shrink (Verify a) = [a] ++ [Verify a'| a'<-shrink a]
+
   shrink (Exi (Bind x a)) = [a |x `notElem` ys]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
