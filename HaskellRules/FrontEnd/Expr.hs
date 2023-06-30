@@ -248,7 +248,7 @@ instance Pretty Expr where
           DomainFail -> text "DomainFail"
           EPrim s -> ppNormal (Variable (Ident noLoc s))
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
-          Split e1 e2 e3 -> text "split" <> parens (ppr 0 e1) <> braces (ppr 0 e2) <> braces (ppr 0 e3)
+          Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
           LitPtr ptr -> text ("R#" ++ show ptr)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
