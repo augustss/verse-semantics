@@ -37,7 +37,7 @@ verifyM sys e = res
 
 verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
 verify sys e =
-  let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = -1 } }
+  let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = 10000 } }
   in  case verifyM sys' e of
         Just  x -> x
         Nothing -> undefined

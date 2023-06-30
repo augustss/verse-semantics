@@ -198,15 +198,17 @@ testeq(pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
 testeq(pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
 # Recursion
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
-            {f(n:int) := if (n = 0)  {1} else  {n * f(n-1)}; f(5)}  {120}
+testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
+            {f(n:any) := if (n = 0) then 1 else f(n-1); f(1)}  {1}
+testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
+            {fac(n:any) := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
 # SLOW with PLDI
 #testeq(pass) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
 #            odd(n:int)  := if (n = 0)  {0} else  {even(n-1)};
 #            for(x := 0|1|2|3)  {(even(x), odd(x))}
 #            }
 #            {((1,0), (0,1), (1,0), (0,1))}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
+testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
              {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
 testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
              {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
