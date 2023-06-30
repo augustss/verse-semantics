@@ -612,6 +612,7 @@ removeUnused unused = f
   where f (Unify (Variable i) e) | i `elem` unused = f e
         f (Exists is e) = Exists (filter (`notElem` unused) is) (f e)
         f e = composOp f e
+-}
 
 simplify :: Expr -> Expr
 simplify e = e
@@ -925,23 +926,21 @@ lowerAssume e = pure $ eAssume e
 primops :: Expr -> D Expr
 primops = f
   where
-{-
     f (ApplyD g@(Variable (Ident _ s)) v) = do
       mfunc <- lowerPrimOp s
       v' <- f v
-      case mfunv of
+      case mfunc of
         Nothing -> pure $ ApplyD g v'
-        Just func -> app func v'
--}
+        Just func -> pure $ app func v'
     f e@(Variable (Ident _ s)) = do
       mfunc <- lowerPrimOp s
       pure $ maybe e toLam mfunc
     f e = compos f e
-{-
-    app ([a], e) v = substMany [(a, v)] $ Seq e
-    app ([a1,a2], e) (CArray [v1,v2]) = substMany [(a1, v1), (a2, v2)] $ Seq e
+
+    app ([a], es) v | isValue v = substMany [(a, v)] $ seqE es
+    app ([a1,a2], es) (Array [v1,v2]) | isValue v1 && isValue v2 = substMany [(a1, v1), (a2, v2)] $ seqE es
     app func v = ApplyD (toLam func) v
--}
+
     arg = Ident noLoc "arg"
     toLam :: Func -> Core
     toLam (   [],    es) = seqE es
@@ -1063,6 +1062,7 @@ verifyPrelude =
 -- are no longer necessary.
 lExists :: [Ident] -> Expr -> Expr
 lExists [] e = e
+lExists is (Exists is' e) = lExists (is ++ is') e
 lExists is e = Exists is e
 
 underscore :: Ident
@@ -1124,4 +1124,80 @@ getFree = Epic.List.nub . fvs
     fvs (Wrong _) = []
     fvs (Macro1 _ _ e) = fvs e
     fvs (Split e1 e2 e3) = fvs e1 ++ fvs e2 ++ fvs e3
+    fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
     fvs e = error $ "getFree: " ++ prettyShow e
+
+substMany :: [(Ident, Core)] -> Core -> Core
+substMany [] = id
+substMany sb = sub
+  where
+    bs = getFree $ Seq $ map snd sb
+    sub :: Core -> Core
+    sub v@(Variable i) | Just b <- lookup i sb = b
+                       | otherwise = v
+    sub e@LitInt{} = e
+    sub e@LitRat{} = e
+    sub e@EPrim{} = e
+    sub (Array es) = Array (map sub es)
+    sub (Lam i e) = binder i (Lam i) e
+    sub (Unify e1 e2) = Unify (sub e1) (sub e2)
+    sub (ApplyD e1 e2) = ApplyD (sub e1) (sub e2)
+    sub (Seq es) = Seq (map sub es)
+    sub (Choice e1 e2) = Choice (sub e1) (sub e2)
+    sub (Exists [] e) = Exists [] (sub e)
+    sub (Exists (i:is) e) = binder i (exists1 i) (Exists is e)
+    sub e@Wrong{} = e
+    sub (Macro1 i rs e) = Macro1 i rs (sub e)
+    sub (Split e1 e2 e3) = Split (sub e1) (sub e2) (sub e3)
+    sub (If3 (Exists is e1) e2 e3) =
+      let (is', e1', e2') = if3Hack sub is e1 e2
+      in  If3 (Exists is' e1') e2' (sub e3)
+    sub e = error $ "substMany: " ++ prettyShow e
+
+    binder :: Ident -> (Expr -> Expr) -> Expr -> Expr
+    binder i con e | Just _ <- lookup i sb = substMany (filter ((/= i) . fst) sb) (con e)
+                   | i `notElem` bs = con (sub e)
+                   | otherwise = sub $ alphaConvert bs (con e)
+
+    exists1 i (Exists is e) = Exists (i:is) e
+    exists1 _ _ = undefined
+
+if3Hack :: (Expr -> Expr) -> [Ident] -> Expr -> Expr -> ([Ident], Expr, Expr)
+if3Hack f is e1 e2 =
+  case f (Exists is (Array [e1, e2])) of
+    Exists is' (Array [e1', e2']) -> (is', e1', e2')
+--    Array [e1', e2'] -> ([], e1', e2')
+    e -> error $ "if3Hack: " ++ prettyShow e
+
+-- Alpha convert a term, avoiding vs as the names for bound
+-- variables.
+alphaConvert :: [Ident] -> Core -> Core
+alphaConvert vs = alpha []
+  where
+    alpha :: [(Ident, Ident)] -> Core -> Core
+    alpha m (Variable i) = Variable $ fromMaybe i $ lookup i m
+    alpha _ e@LitInt{} = e
+    alpha _ e@LitRat{} = e
+    alpha _ e@EPrim{} = e
+    alpha m (Array es) = Array (map (alpha m) es)
+    alpha m (Lam i e) = Lam i' $ alpha (add (i, i') m) e where i' = fresh i
+    alpha m (Unify e1 e2) = Unify (alpha m e1) (alpha m e2)
+    alpha m (Seq es) = Seq (map (alpha m) es)
+    alpha m (ApplyD e1 e2) = ApplyD (alpha m e1) (alpha m e2)
+    alpha m (Choice e1 e2) = Choice (alpha m e1) (alpha m e2)
+    alpha m (Macro1 i rs e) = Macro1 i rs (alpha m e)
+    alpha m (Exists is e) = Exists is' (alpha m' e)
+      where is' = map fresh is
+            m' = foldr add m $ zip is is'
+    alpha _ e@Wrong{} = e
+    alpha m (Split e f g) = Split (alpha m e) (alpha m f) (alpha m g)
+    alpha m (If3 (Exists is e1) e2 e3) =
+      let (is', e1', e2') = if3Hack (alpha m) is e1 e2
+      in  If3 (Exists is' e1') e2' (alpha m e3)
+    alpha _ e = error $ "alphaConvert: " ++ prettyShow e
+
+    add ii@(i, i') m | i == i' = m
+                     | otherwise = ii : m
+
+    fresh i@(Ident l s) | i `notElem` vs = i
+                        | otherwise = fresh $ Ident l (s ++ "'")
