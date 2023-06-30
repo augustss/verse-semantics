@@ -190,7 +190,8 @@
       \begin{array}{lr@@{\;}c@@{\;}l}
       \text{Value contexts} & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
       \text{Evaluation contexts} & |E| & ::= & |hole| \vb |v==E; e| \vb |v==ef; E| \vb |def x E| \\
-      \text{Effect-free exprs} & |ef|  & ::=  & |v| \vb |apply1 op v|
+      \text{Effect-free exprs} & |ef|  & ::=  & |v| \vb |apply1 op v| |-- for certain op|\\
+                               &       &  \vb & |all e| \vb |one e| |-- maybe?| \\
                                       %-- this is not needed, these will be floated out anyway
                                       %\vb |v==ce_1; ce_2| \vb |def x ce|
                                       %-- this is wrong
@@ -246,8 +247,9 @@
 
 \rulegroupname{Substitution:}
 
-  \rulename{subst} & |x==v; e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
+  \rulename{subst} & |x==v; e| & \movesto & |x==v; subst e x v|
   & \text{if $|v|\ne|V^[x]|$} \\
+%\rulename{subst-rec} & |x==V^[lam y e_1]; e| & \movesto & |x==V^[lam y (def x (x==V^[lam y e_1]; e_1))]; e| & \text{if $|x|\in|fvs(e_1)|$} \\
   \rulename{val-swap} & |v==x; e|    & \movesto & |x==v; e| \\
   \rulename{eqn-swap} & |v==ef; v_1==v_2; e| & \movesto & |v_1==v_2; v==ef; e| \\
 
