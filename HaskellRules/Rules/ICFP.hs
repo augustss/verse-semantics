@@ -6,7 +6,7 @@ module Rules.ICFP(
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, anf, anfK, execX, choiceX, ltExpr) where
+  isRecursive, anf, anfK, execX, ltExpr) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe
@@ -410,11 +410,6 @@ choiceX1 lhs =
   do EXI x cx <- [lhs]
      (ctx, hole) <- choiceX cx
      pure (EXI x . ctx, hole)
- -- RJ: adding to allow "forking" choices under assume ("Verify-Choice")
-  ++
-  do LAM x cx <- [lhs]
-     (ctx, hole) <- choiceX cx
-     pure (LAM x . ctx, hole)
 
 isEffFree :: Expr -> Bool
 isEffFree e = isChoiceFree e && isStoreFree e

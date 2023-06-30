@@ -258,9 +258,7 @@ cVerify = do
     tryIt (pure s) (\ _ -> pure s) $ do
       let sys = icfpeVerifier
       let flg = (flags s){ fVerify = True, fSplit = False }
-          eC  = asCore flg e
-          e' = preProcess sys (ruleEnv sys) $ coreToTrs eC -- asCore flg e
-      -- putStrLn $ "Core (raw):\n" ++ prettyShow eC
+          e' = preProcess sys (ruleEnv sys) $ coreToTrs $ asCore flg e
       -- putStrLn $ "Desugared (pretty):\n" ++ prettyShow e'
       let (done, trc) = verify sys e'
       when (fTraceVerify flg) $ do

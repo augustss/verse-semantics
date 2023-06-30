@@ -17,7 +17,7 @@ import TRS.TRS
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core hiding (Wrong)
-import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr, choiceX)
+import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr)
 import Control.Monad (guard)
 import Data.List( intersect )
 
@@ -205,10 +205,10 @@ assumeAssertRules env lhs =
      guard (mustDecide (bndVars env) e)
      pure e
   ++
-  -- Verify{ CX [ Assume(e1 | e2) ]  ----> Verify{ CX[Assume e1] } ; Verify{ CX[Assume e2] }
+  -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
   "Assume-Choice" `name`
   do Verify e                 <- [lhs]
-     (cx, Assume (e1 :|: e2)) <- choiceX e
+     (cx, _, _, Assume (e1 :|: e2)) <-  eX e
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
 
 mustSucceed :: Expr -> Bool
