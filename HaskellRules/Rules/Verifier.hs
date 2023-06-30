@@ -17,7 +17,7 @@ import TRS.TRS
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core hiding (Wrong)
-import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr)
+import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr, choiceX)
 import Control.Monad (guard)
 import Data.List( intersect )
 
@@ -138,11 +138,11 @@ assumeAssertRules env lhs =
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assume e2)
-  ++
-  -- Assume { e1 | e2 } ----> Assume {e1} | Assume {e2}
-  "Assume-Choice" `name`
-  do Assume (e1 :|: e2) <- [lhs]
-     pure (Assume e1 :|: Assume e2)
+--   ++
+--   -- Assume { e1 | e2 } ----> Assume {e1} | Assume {e2}
+--   "Assume-Choice" `name`
+--   do Assume (e1 :|: e2) <- [lhs]
+--      pure (Assume e1 :|: Assume e2)
   ++
   -- Assume { exi x . e } ----> exi x . Assume {e}
   "Assume-Exi" `name`
@@ -204,6 +204,12 @@ assumeAssertRules env lhs =
   do Decide e <- [lhs]
      guard (mustDecide (bndVars env) e)
      pure e
+  ++
+  -- Verify{ CX [ Assume(e1 | e2) ]  ----> Verify{ CX[Assume e1] } ; Verify{ CX[Assume e2] }
+  "Assume-Choice" `name`
+  do Verify e                 <- [lhs]
+     (cx, Assume (e1 :|: e2)) <- choiceX e
+     pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
 
 mustSucceed :: Expr -> Bool
 mustSucceed (Int _)          = True
@@ -369,7 +375,7 @@ execEX1 bs lhs =
  ++
   do Lam (Bind y x) <- [lhs]
      (ctx, g, bs', hole) <- execEX (BLam y : bs) x
-     pure (Lam . Bind y . ctx, Assume (Var y) :>: g, bs', hole)  -- y should be visible to e in g |- e
+     pure (Lam . Bind y . ctx, {- XXX: bndVars instead in mustDecide??? -} Assume (Var y) :>: g, bs', hole)  -- y should be visible to e in g |- e
  ++
   do x :@: e <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x

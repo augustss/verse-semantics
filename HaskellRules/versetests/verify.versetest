@@ -20,6 +20,7 @@ verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := 
 
 # Ported tests from TRSVerify.hs
 verify(pass) { g() := (2 = 2; 2) }
+verify(pass) { ex01(x:any) := x }
 verify(pass) { g(x:int) := x }
 verify(pass) { g(x:int):int := x }
 verify(pass) { g(x:any):int := { if (int[x]) then 10 else 20 } }
@@ -59,6 +60,18 @@ verify(fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; 
 verify(pass) { ex_rigid2flex(x:int) := {y := x; y} }
 verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
 verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
+
+# decides
+verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {x} }
+verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {3} }
+verify(fail) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {4} }
+verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := z }
+verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 666 }
+verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 42 }
+verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 708 - z }
+verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 }
+verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
+
 
 # currently fails
 # verify(pass,broken) { foo(x:any)<decides> := { x = 666 } }
