@@ -147,7 +147,7 @@ command = Command
   , c_bye = "Bye!"
   , c_prompt = "> "
   , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, definitions = []
-                     , prelude = Nothing, flags = defaultFlags{fSplit=True, fNoFuelStop=True}
+                     , prelude = Nothing, flags = defaultFlags{fSplit=True, fNoFuelStop=True, fSimplify=True}
                      , esystem = blockSystem }
   , c_history = Just ".versei"
   }

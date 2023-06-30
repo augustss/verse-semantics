@@ -23,7 +23,7 @@ defaultFlags :: Flags
 defaultFlags = Flags
   { fTrace        = False
   , fSplit        = False
-  , fSimplify     = True
+  , fSimplify     = False
   , fUnderLambda  = True
 --  , fDenSem       = False
   , fDfs          = False
