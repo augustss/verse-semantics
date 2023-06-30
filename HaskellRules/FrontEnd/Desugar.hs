@@ -925,15 +925,34 @@ lowerAssume e = pure $ eAssume e
 primops :: Expr -> D Expr
 primops = f
   where
+{-
+    f (ApplyD g@(Variable (Ident _ s)) v) = do
+      mfunc <- lowerPrimOp s
+      v' <- f v
+      case mfunv of
+        Nothing -> pure $ ApplyD g v'
+        Just func -> app func v'
+-}
     f e@(Variable (Ident _ s)) = do
-      mexp <- lowerPrimOp s
-      pure $ fromMaybe e mexp
+      mfunc <- lowerPrimOp s
+      pure $ maybe e toLam mfunc
     f e = compos f e
+{-
+    app ([a], e) v = substMany [(a, v)] $ Seq e
+    app ([a1,a2], e) (CArray [v1,v2]) = substMany [(a1, v1), (a2, v2)] $ Seq e
+    app func v = ApplyD (toLam func) v
+-}
+    arg = Ident noLoc "arg"
+    toLam :: Func -> Core
+    toLam (   [],    es) = seqE es
+    toLam (   [a],   es) = Lam a   $ seqE es
+    toLam (as@[_,_], es) = Lam arg $ lExists as $ seqE $ Unify (Array $ map Variable as) (Variable arg) : es
+    toLam _ = undefined  -- shouldn't happen
 
 -- Some "primops" will be expanded into code.
 -- This should really be part of the prelude.
 -- For verification, we need a different expansion.
-lowerPrimOp :: String -> D (Maybe Expr)
+lowerPrimOp :: String -> D (Maybe Func)
 lowerPrimOp s = do
   verif <- gets (fVerify . dflags)
   if verif then
@@ -941,51 +960,45 @@ lowerPrimOp s = do
    else
     lowerPrimOpRun s
 
-lowerPrimOpVerif :: String -> D (Maybe Expr)
+type Func = ([Ident], [Core])
+
+lowerPrimOpVerif :: String -> D (Maybe Func)
 lowerPrimOpVerif s = do
   me <- lowerPrimOpRun s
   case me of
-    Just (EPrim p) | Just ises <- lookup p verifyPrelude -> pure $ Just $ toLam ises
+    Just ([], [EPrim p]) | Just func <- lookup p verifyPrelude -> pure $ Just func
     r -> pure r
- where
-    arg = Ident noLoc "arg"
-    toLam (   [a],   es) = Lam a   $ Seq es
-    toLam (as@[_,_], es) = Lam arg $ lExists as $ Seq $ Unify (Array $ map Variable as) (Variable arg) : es
-    toLam _ = undefined  -- shouldn't happen
 
-lowerPrimOpRun :: String -> D (Maybe Expr)
+lowerPrimOpRun :: String -> D (Maybe Func)
 lowerPrimOpRun s =
   case lookup s preludeFuncs of
     r@Just{} -> pure r
     Nothing  ->
       if Ident noLoc s `elem` primOps then
-        pure $ Just $ EPrim s
+        pure $ Just ([], [EPrim s])
       else
         pure $ Nothing
 
-preludeFuncs :: [(String, Expr)]
+preludeFuncs :: [(String, Func)]
 preludeFuncs =
   [("any", typ [])                                             -- x => x
   ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (LitInt 0)]) -- x => int#[x]; x>=0; x
   ,("int", typ [app "isInt$" vx])                              -- x => int#[x]; x
   ,("in'->'", arrowV)
-  ,("false", Array [])                                      -- ()
+  ,("false", bare $ Array [])                                      -- ()
   ,("new", newV)
-  ,("post'^'", EPrim "read$")
-  ,("in'.='", EPrim "write$")
-  ,("mapAp", EPrim "mapAp$")
+  ,("post'^'", bare $ EPrim "read$")
+  ,("in'.='", bare $ EPrim "write$")
+  ,("mapAp", bare $ EPrim "mapAp$")
   ]
-  where typ es = Lam x $ seqE $ es ++ [Variable x]
+  where bare e = ([], [e])
+        typ es = ([x], es ++ [Variable x])
         vx = Variable x
         app f v = ApplyD (EPrim f) v
         app2 f v1 v2 = ApplyD (EPrim f) (Array [v1, v2])
 
-        arrowV =
-          Lam st $
-            Exists [s, t] $
-            Seq [
-              Unify (Array [Variable s, Variable t]) (Variable st),
-              Lam g $ Lam y $
+        arrowV = ([s, t],
+              [ Lam g $ Lam y $
                 Exists [sy, gsy] $
                 Seq [
                   app "isFcn$" (Variable g),
@@ -993,19 +1006,20 @@ preludeFuncs =
                   Unify (Variable gsy) (ApplyD (Variable g) (Variable sy)),
                   ApplyD (Variable t) (Variable gsy)
                   ]
-              ]
-        [st, s, t, g, y, sy, gsy, x, _xy] =
-           map (Ident noLoc . ("$$" ++)) ["st","s","t","g","y","sy","gsy","x", "xy"]
+              ])
+        [s, t, g, y, sy, gsy, x, _xy] =
+           map (Ident noLoc . ("$$" ++)) ["s","t","g","y","sy","gsy","x", "xy"]
 
-        newV =
-          Lam t $ Lam x $
-            Exists [y] $
-            Seq [
-              Unify (Variable y) (ApplyD (Variable t) (Variable x)),
-              app "alloc$" (Variable y)
-              ]
+        newV = ([t],
+                [ Lam x $
+                  Exists [y] $
+                  Seq [
+                    Unify (Variable y) (ApplyD (Variable t) (Variable x)),
+                    app "alloc$" (Variable y)
+                    ]
+                ])
 
-verifyPrelude :: [(String, ([Ident], [Expr]))]
+verifyPrelude :: [(String, Func)]
 verifyPrelude =
   [ arithBinOpInt  "in'+'"
   , arithBinOpInt  "in'-'"
@@ -1027,7 +1041,7 @@ verifyPrelude =
       [ eAssume $ Exists [z] $ Seq [Unify vz (ApplyD (EPrim p) (Array [vx, vy])), cInt vz, vz] ])
 
     cmpBinOpInt  p = (p, cmpBinOpInt' p)
-    cmpBinOpInt' p = ([x, y], 
+    cmpBinOpInt' p = ([x, y],
       [ cInt vx, cInt vy, ApplyD (EPrim p) (Array [vx, vy]), eAssume (Seq [cInt vx, vx]) ])
 
     yNe0 = ApplyD (EPrim "in'<>'") (Array [vy, LitInt 0])
@@ -1042,6 +1056,8 @@ verifyPrelude =
     vx = Variable x
     vy = Variable y
     vz = Variable z
+
+-----------------------------------------------
 
 -- After lowering there are no funny scopes, so empty existential
 -- are no longer necessary.
