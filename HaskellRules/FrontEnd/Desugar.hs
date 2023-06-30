@@ -596,7 +596,7 @@ simpUnify :: Expr -> D Expr
 simpUnify = pure . f
   where f (Unify v (Seq (Snoc xs x))) | isValue v = f $ Seq $ xs ++ [Unify v x]
         f (Unify e1 (Unify v e2)) | isValue v = f $ Seq [Unify e1 v, Unify v e2]
-        f (Seq es) = seqE es
+        f (Seq es) = seqE $ map f es
         f e = composOp f e
 
 -- If we have a unification x=y, and x&y are bound in the same existential
