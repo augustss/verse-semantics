@@ -3,7 +3,6 @@
 module FrontEnd.Desugar(
   desugar,
   primOps, covariantId, dsScope,
-  simplify,
   exprToCore,
   simpCore,
   ) where
@@ -661,32 +660,6 @@ localUnify _ = []
 isTempIdent :: Ident -> Bool
 isTempIdent (Ident _ ('$':_)) = True
 isTempIdent _ = False
-
-{-
--- XXX assumes no name shadowing
-_simpUnused :: Expr -> D Expr
-_simpUnused e = pure $ removeUnused unused e
-  where unused = [ i | (i, [Uni]) <- M.toList $ findUses e, i `notElem` preludeIds, i `notElem` primOps ]
-
-data Use = Uni | Other deriving (Show)
-
--- Find out how variables are used.
--- A variable can be used on either side of a unification, or somewhere else.
--- Existentials that are only used once in a unification, can be removed.
-findUses :: Expr -> M.Map Ident [Use]
-findUses = flip execState M.empty . f
-  where f e@(Variable i) = do modify (M.insertWith (++) i [Other]); pure e
-        f (Unify ei@(Variable i) e) = do modify (M.insertWith (++) i [Uni]); Unify ei <$> f e
-        f e = compos f e
-
-removeUnused :: [Ident] -> Expr -> Expr
-removeUnused unused = f
-  where f (Unify (Variable i) e) | i `elem` unused = f e
-        f (Exists is e) = Exists (filter (`notElem` unused) is) (f e)
-        f e = composOp f e
-
-simplify :: Expr -> Expr
-simplify e = e
 
 -------------------------
 

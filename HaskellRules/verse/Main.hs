@@ -127,12 +127,9 @@ command = Command
       [ Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
-      , Cmd "simplify [EXPR]"      "Simplify [last] expression"            cSimplify
---      , Cmd "csimplify [EXPR]"     "Simplify [last] core expression"       cCoreSimplify
       , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
---      , Cmd "denote [EXPR]"        "Evaluate with (very restricted) denonational semantics"  cDenSem
 --      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
 --      , Cmd "clear"                "Clear global defs"                     cClear
 --      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
@@ -197,17 +194,6 @@ cRead afn s = do
       putStrLn "OK"
     pure prog
 
-{-
-cPrelude :: Run CState
-cPrelude fn s =
-  tryIt (pure s) (\ e -> pure s{ prelude = Just e }) $ do
-    file <- readFile $ if null fn then "prelude.verse" else fn
-    let prog = parseDie pFile fn file
-    when (prog == prog) $
-      putStrLn "OK"
-    pure prog
--}
-
 cParseLine :: Run CState
 cParseLine line s =
   tryIt (pure s) (updateLastExpr s) $ do
@@ -231,14 +217,6 @@ cTransform tr =
 cDesugar :: Run CState
 cDesugar c s = cTransform (Desugared . desugar (flags s) . asExpr) c s
 
-cSimplify :: Run CState
-cSimplify = cTransform (Desugared . simplify . asExpr)
-
-{-
-cCoreSimplify :: Run CState
-cCoreSimplify c s = cTransform (Cored . simpCore . asCore (flags s)) c s
--}
-
 cPreprocess :: Run CState
 cPreprocess c s = cTransform (Cored . pre . asCore (flags s)) c s
   where pre = trsToCore . preProcess sys (ruleEnv sys) . coreToTrs
@@ -248,9 +226,8 @@ cCore :: Run CState
 cCore c s = cTransform (Cored . asCore (flags s)) c s
 
 cEval :: Run CState
-cEval c s = cTransform (Cored . run flg' (esystem s) . asCore flg') c s
+cEval c s = cTransform (Cored . run flg (esystem s) . asCore flg) c s
   where flg = flags s
-        flg' = flg -- if fDenSem flg then flg{ fTimLambda = True, fSplit = False } else flg
 
 cVerify :: Run CState
 cVerify = do
@@ -271,63 +248,6 @@ cVerify = do
         pp $ snd $ head $ toList trc
       pure ()
 
-{-
-replacePrim :: Core -> Core
-replacePrim = f
-  where
-    f (CApply (CPrim i) v) | Just p <- lookup i verifyPrelude = cApply p (f v)
-    f (CApply (CLam a e) v) = cApply ([a], [e]) v
-    f (CPrim i) | Just p <- lookup i verifyPrelude = CValue $ toLam p
-    f e = FrontEnd.Core.composOp f e
-
-    arg = Ident noLoc "arg"
-    toLam (   [a],   es) = CLam a   $ CSeq es
-    toLam (as@[_,_], es) = CLam arg $ CDef as $ CSeq $ CUnify (CArray $ map CVar as) (CVar arg) : es
-    toLam _ = undefined  -- shouldn't happen
-
-    cApply ([a], e) v = subst a v $ CSeq e
-    cApply ([a1,a2], e) (CArray [v1,v2]) = subst a1 v1 $ subst a2 v2 $ CSeq e
-    cApply p v = CApply (toLam p) v
-
-verifyPrelude :: [(String, ([Ident], [Core]))]
-verifyPrelude =
-  [ arithBinOpInt  "in'+'"
-  , arithBinOpInt  "in'-'"
-  , arithBinOpInt  "in'*'"
-  , arithBinOpIntC "in'/'" yNe0
-  , arithUnOpInt   "pre'-'"
-  , arithUnOpInt   "pre'+'"
-  , cmpBinOpInt    "in'<'"
-  , cmpBinOpInt    "in'<='"
-  , cmpBinOpInt    "in'>'"
-  , cmpBinOpInt    "in'>='"
-  , cmpBinOpInt    "in'<>'"
-  ]
-  where
-    arithBinOpInt  p = (p, arithBinOpInt' [] p)
-    arithBinOpIntC p c = (p, arithBinOpInt' [c] p)
-    arithBinOpInt' c p = ([x, y],
-      [ cInt vx, cInt vy] ++ c ++
-      [ cAssume $ CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) (CArray [vx, vy])), cInt vz, vz] ])
-
-    cmpBinOpInt  p = (p, cmpBinOpInt' p)
-    cmpBinOpInt' p = ([x, y],
-      [ cInt vx, cInt vy, CApply (CPrim p) (CArray [vx, vy]), cAssume (CSeq [cInt vx, vx]) ])
-
-    yNe0 = CApply (CPrim "in'<>'") (CArray [vy, CInt 0])
-
-    arithUnOpInt p =
-      (p, ([x], [ cInt vx, cAssume (CDef [z] $ CSeq [CUnify vz (CApply (CPrim p) vx), cInt vz, vz]) ]))
-
-    cInt e = CApply (CPrim "isInt$") e
-    x = Ident noLoc "$$x"
-    y = Ident noLoc "$$y"
-    z = Ident noLoc "$$z"
-    vx = CVar x
-    vy = CVar y
-    vz = CVar z
--}
-
 cRules :: Run CState
 cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s
 cRules line s =
@@ -346,35 +266,30 @@ systemFlags =
   ]
 
 {-
+cPrelude :: Run CState
+cPrelude fn s =
+  tryIt (pure s) (\ e -> pure s{ prelude = Just e }) $ do
+    file <- readFile $ if null fn then "prelude.verse" else fn
+    let prog = parseDie pFile fn file
+    when (prog == prog) $
+      putStrLn "OK"
+    pure prog
+
 cDefEval :: Run CState
 cDefEval c s = do
   let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
       flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
   cTransform (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asExpr) c s
--}
 
-{-
-cDenSem :: Run CState
-cDenSem c s =
-  cTransform (Cored . denSem . compile flgs) c s
-  where flgs = (flags s){ fSplit = False, fSimplify = True, fTimLambda = True }
--}
-{-
-compile :: Flags -> SomeExpr -> Core
-compile s = (if fSimplify s then simpCore else id) . replacePrelude . (if fSimplify s then simpCore else id) . asCore s
--}
-{-
 cDefine :: Run CState
 cDefine =
   withLastExpr $ \ e s -> do
     let !e' = asExpr e
     pure  s{ definitions = definitions s ++ [e'] }
--}
-{-
+
 cClear :: Run CState
 cClear _ s = pure s{ definitions = [] }
--}
-{-
+
 cDisplay :: Run CState
 cDisplay _ s = do
   case prelude s of
