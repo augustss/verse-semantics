@@ -30,9 +30,9 @@ desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
             (traceDS "alias"      <=< simpAlias <=<
+             traceDS "simpler"    <=< simpler   <=<
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
-             traceDS "simpler"    <=< simpler   <=<
              traceDS "addScope"   <=< addScope  <=<
              traceDS "dsD"        <=< dsD       <=<
              traceDS "addDeref"   <=< addDeref  <=<
