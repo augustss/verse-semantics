@@ -30,7 +30,8 @@ import FrontEnd.Flags
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
-            (traceDS "lower"      <=< lower    <=<
+            (traceDS "primops"    <=< primops  <=<
+             traceDS "lower"      <=< lower    <=<
              traceDS "simp"       <=< simp     <=<
              traceDS "addScope"   <=< addScope <=<
              traceDS "dsD"        <=< dsD      <=<
@@ -405,7 +406,7 @@ call p l s e = do
 ----------------------------------------------
 
 dsScope :: Flags -> Expr -> Expr
-dsScope flgs = eval flgs . (lower <=< addScope)
+dsScope flgs = eval flgs . (primops <=< addScope)
 
 addScope :: Expr -> D Expr
 addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
@@ -677,9 +678,7 @@ addDeref = pure . exprD S.empty
 lower :: Expr -> D Expr
 lower e@LitInt{} = pure e
 lower e@LitRat{} = pure e
-lower e@(Variable (Ident _ s)) = do
-  mexp <- lowerPrimOp s
-  pure $ fromMaybe e mexp
+lower e@Variable{} = pure e
 lower (Array es) = Array <$> mapM lower es
 lower e@Wrong{} = pure e
 lower (Seq es) = seqE <$> mapM lower es
@@ -920,6 +919,16 @@ lowerDecidesSplit e = do
 
 lowerAssume :: Expr -> D Expr
 lowerAssume e = pure $ eAssume e
+
+-----------------
+
+primops :: Expr -> D Expr
+primops = f
+  where
+    f e@(Variable (Ident _ s)) = do
+      mexp <- lowerPrimOp s
+      pure $ fromMaybe e mexp
+    f e = compos f e
 
 -- Some "primops" will be expanded into code.
 -- This should really be part of the prelude.
