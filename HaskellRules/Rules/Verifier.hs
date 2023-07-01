@@ -122,7 +122,7 @@ generalizedIcfpRules env lhs =
 -- | Rules for `Assume` and `Assert` -------------------------------------------
 
 assumeAssertRules :: VRule
-assumeAssertRules _foo lhs =
+assumeAssertRules env lhs =
   -- ASSUME --
 
   -- Assume {v} ----> v
@@ -138,11 +138,11 @@ assumeAssertRules _foo lhs =
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assume e2)
-  ++
-  -- Assume { e1 | e2 } ----> Assume {e1} | Assume {e2}
-  "Assume-Choice" `name`
-  do Assume (e1 :|: e2) <- [lhs]
-     pure (Assume e1 :|: Assume e2)
+--   ++
+--   -- Assume { e1 | e2 } ----> Assume {e1} | Assume {e2}
+--   "Assume-Choice" `name`
+--   do Assume (e1 :|: e2) <- [lhs]
+--      pure (Assume e1 :|: Assume e2)
   ++
   -- Assume { exi x . e } ----> exi x . Assume {e}
   "Assume-Exi" `name`
@@ -198,6 +198,18 @@ assumeAssertRules _foo lhs =
   "Assume-Verify" `name`
   do Assume (Verify _) <- [lhs]
      pure (Val (Arr []))
+  ++
+  "Decide-Verify" `name`
+  -- DECIDE --
+  do Decide e <- [lhs]
+     guard (mustDecide (bndVars env) e)
+     pure e
+  ++
+  -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
+  "Assume-Choice" `name`
+  do Verify e                 <- [lhs]
+     (cx, _, _, Assume (e1 :|: e2)) <-  eX e
+     pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
 
 mustSucceed :: Expr -> Bool
 mustSucceed (Int _)          = True
