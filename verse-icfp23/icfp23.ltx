@@ -1700,9 +1700,11 @@ design space is, however, beyond the scope of this paper.
 
 Our rewrite rules seek to implement the idea articulated in \Cref{sec:unify} that
 a program executes by solving its equations, specifically by finding values for the logical variables
-that satisfy the equations.  Ideally, we would like to promise that if any substitution for the
-logical variables exists that satisfies the equations, we will find it: this is \emph{logical completeness}.
-Alas, in practice logical completeness is well out of reach.
+that satisfy the equations.  Ideally, we would like to promise
+to find \emph{all} substitutions for the logical variables that satisfy the equations:
+this is \emph{logical completeness}.
+Alas, in practice logical completeness is well out of reach, at least
+in systems that support arithmetic.
 For example, consider |def x ((x*x*x + 3*x - 8) = 0)| (assuming a version of \versecalc{} extended to have
 a multiplication operator $*$).
 To solve this would require solving a cubic
@@ -2463,7 +2465,7 @@ In the other direction, indexing turns a tuple into choice (for example, |def i 
 Other languages can reify choices into a (non-deterministic)
 list, via an operator called \verb!bagof!, or a mechanism called
 \emph{set-functions} in an extension of Curry \cite[Section 4.2.7]{curry:tutorial},
-implemented in the Kiel Curry System interpreter \cite{brassel:encapsulated,kics,hanus:set-functions}.
+implemented in the Kiel Curry System \cite{brassel:encapsulated,kics,hanus:set-functions}.
 But in Curry, this is regarded as a somewhat sophisticated feature,
 whereas it is part of the foundational fabric of \versecalc{}.
 Curry's set-functions need careful explanation about sharing across non-deterministic choices\footnote{
@@ -2762,7 +2764,6 @@ see \cref{sec:store}.
   Jessica Augustsson,
   Francisco L\'opez-Fraguas,
   Andy Gordon,
-  Michael Hanus,
   David Holz,
   Juan Rodr\'iguez Hortal\'a,
   John Launchbury,
