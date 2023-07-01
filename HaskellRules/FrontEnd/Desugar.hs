@@ -843,21 +843,24 @@ lowerTLam i rs is e1 e2 me3 = do
 
 -- XXX what about _rs
 lowerTLamVerify :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
-lowerTLamVerify i _rs is e1 e2 me3 = do
+lowerTLamVerify i rs is e1 e2 me3 = do
   (e2', e2'') <-
     case me3 of
       Nothing -> pure (e2, e2)
       Just t -> do
         x <- newIdent (getLoc t) "x"
         pure (ApplyD t e2, Exists [x] $ ApplyD t (Variable x))
-  if isDecides _rs
-    then
-      pure $ lowerTLamVerifyDecides i is e1 e2' e2''
-    else
-      pure $ lowerTLamVerifySucceeds i is e1 e2' e2''
+  -- XXX This whole thing is wrong.  Function effects should be handled in some
+  -- consistent way.
+  if null rs || hasEff "succeeds" rs then
+    pure $ lowerTLamVerifySucceeds i is e1 e2' e2''
+   else if hasEff "decides" rs then
+    pure $ lowerTLamVerifyDecides i is e1 e2' e2''
+   else
+    error $ "No multiplicity effect: " ++ prettyShow rs
 
-isDecides :: [Ident] -> Bool
-isDecides rs = not $ null [ r | r@(Ident _ "decides") <- rs ]
+hasEff :: String -> [Ident] -> Bool
+hasEff r rs = Ident noLoc r `elem` rs
 
 lowerTLamVerifyDecides :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
 lowerTLamVerifyDecides i is e1 e2' e2'' =
