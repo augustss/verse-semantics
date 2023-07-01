@@ -177,7 +177,7 @@ apply con e1 e2 = do
   pure $ seqE [DefineE f e1, r]
 
 apply1 :: (Value -> Value -> Expr) -> Value -> Expr -> D Expr
--- val1[val2] 
+-- val1[val2]
 apply1 con x1 e2 | isValue e2 = apply2 con x1 e2   -- Easy special case.  Not really needed
 -- val1[e2]  -->  a:=e2; val1[a]
 apply1 con x1 e2 = do
@@ -185,7 +185,7 @@ apply1 con x1 e2 = do
   r <- apply2 con x1 (Variable a)
   pure $ seqE [DefineE a e2, r]
 
--- val1[val2]  --> 
+-- val1[val2]  -->
 apply2 :: (Value -> Value -> Expr) -> Value -> Value -> D Expr
 apply2 con x1 x2 = pure $ con x1 x2
 
@@ -252,7 +252,7 @@ defnArray ps e = do
   bs <- zipWithM defn ps' xs
 --  traceM ("*** " ++ show bs)
   pure $ seqE $ bs ++ [InfixOp arr (Op "=") e]
-      
+
 arraySplice :: [Expr] -> D Expr
 arraySplice as =
 --  trace ("--- " ++ show (as, arrayElems as)) $
@@ -459,7 +459,7 @@ scope sc = expr
     expr (Do e) = exprD e
     expr (Let e1 e2) = do
       (e1', sc') <- defs sc e1
-      e2' <- scopeD sc' e2      
+      e2' <- scopeD sc' e2
       pure $ seqE [e1', e2']
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
     expr (DefineV i) = pure $ Variable i
@@ -820,7 +820,7 @@ lowerIfSplit vs e1 e2 e3 = do
   x <- newIdent (getLoc e1) "x"
   let fvs = vs `intersect` getFree e2
       evs = fvArray (map Variable fvs)
-      e1' = lExists vs $ Seq [e1, evs]  -- domain + array of free variables      
+      e1' = lExists vs $ Seq [e1, evs]  -- domain + array of free variables
       fe = eThunk e3
       ge = Lam x $ Lam underscore $ Lam underscore $ lExists fvs $ Seq
              [ Unify (Variable x) evs
@@ -850,7 +850,26 @@ lowerTLamVerify i _rs is e1 e2 me3 = do
       Just t -> do
         x <- newIdent (getLoc t) "x"
         pure (ApplyD t e2, Exists [x] $ ApplyD t (Variable x))
-  pure $ Seq
+  if isDecides _rs
+    then
+      pure $ lowerTLamVerifyDecides i is e1 e2' e2''
+    else
+      pure $ lowerTLamVerifySucceeds i is e1 e2' e2''
+
+isDecides :: [Ident] -> Bool
+isDecides rs = not $ null [ r | r@(Ident _ "decides") <- rs ]
+
+lowerTLamVerifyDecides :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
+lowerTLamVerifyDecides i is e1 e2' e2'' =
+  -- Lam i $ lExists is $ Seq [ e1, eDecide e2'']
+  Seq
+    [ eVerify $ Lam i $ lExists is $ Seq [eAssume e1, eDecide e2']
+    ,           Lam i $ lExists is $ Seq [        e1,         e2'']
+    ]
+
+lowerTLamVerifySucceeds :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
+lowerTLamVerifySucceeds i is e1 e2' e2'' =
+  Seq
     [ eVerify $ Lam i $ lExists is $ Seq [eAssume e1, eAssert e2']
     ,           Lam i $ lExists is $ Seq [        e1, eAssume e2'']
     ]
@@ -1131,6 +1150,10 @@ eAssume = Macro1 (Ident noLoc "assume") []
 eVerify :: Expr -> Expr
 eVerify = Macro1 (Ident noLoc "verify") []
 
+eDecide :: Expr -> Expr
+eDecide = Macro1 (Ident noLoc "decide") []
+
+
 -- Used to create the array of free variables passed from the domain to the range
 -- of for/if.  If it's just a single variable, don't use an array.
 fvArray :: [Expr] -> Expr
@@ -1150,7 +1173,7 @@ simpCore = id
 
 -- Functions that only work on the core subset of Expr
 getFree :: Core -> [Ident]
-getFree = Epic.List.nub . fvs 
+getFree = Epic.List.nub . fvs
   where
     fvs (Variable i) = [i]
     fvs (Lit _) = []

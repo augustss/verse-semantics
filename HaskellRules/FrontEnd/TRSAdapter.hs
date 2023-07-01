@@ -145,6 +145,7 @@ coreToTrs (Macro1 (Ident _ "all")    [] e) = T.All    $ coreToTrs e
 coreToTrs (Macro1 (Ident _ "verify") [] e) = T.Verify $ coreToTrs e
 coreToTrs (Macro1 (Ident _ "assert") [] e) = T.Assert $ coreToTrs e
 coreToTrs (Macro1 (Ident _ "assume") [] e) = T.Assume $ coreToTrs e
+coreToTrs (Macro1 (Ident _ "decide") [] e) = T.Decide $ coreToTrs e
 coreToTrs e@Macro1{} = impossible e
 coreToTrs (If3 e1 e2 e3) = T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)
 coreToTrs (EStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)

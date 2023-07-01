@@ -16,7 +16,7 @@ common shared-properties
                       containers,
                       mtl,
                       pretty,
-
+                      haskeline
 
 -- Various utilities.
 -- Should really have its own cabal project

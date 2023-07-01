@@ -401,8 +401,9 @@ FOO(x) = (x = 666 | x = 42); x
 
 -- TODO:PORT
 ex3 :: Expr
-ex3 = EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42)) :>: Var y)) :>:
-        LAM v (One {- to force SX/CX -}
+ex3 = Verify $
+      EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42)) :>: Var y)) :>:
+        LAM v ({- to force SX/CX -}
                 (EXI x $ Assume ((Var x :=: Var foo :@: Var v) :>: Var x) :>:
                         Assert (EXI r (Var r :=: (Int 708 `sub` Var x) :>: (Var foo :@: Var r)))))
   where
