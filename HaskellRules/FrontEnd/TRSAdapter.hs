@@ -122,6 +122,7 @@ subsT sys = nubTraced (postProcess sys (ruleEnv sys))
 coreToTrs :: HasCallStack => Core -> T.Expr
 coreToTrs (Variable i) = T.Var $ coreToTrsI i
 coreToTrs (Lit (LitInt i)) = T.Int i
+coreToTrs (Lit (LitPtr p)) = T.Ref (T.Ptr p)
 coreToTrs Lit{} = undefined
 coreToTrs (EPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
   where ops = map (\ (x,y) -> (y, x)) allOps
@@ -149,7 +150,6 @@ coreToTrs (Macro1 (Ident _ "decide") [] e) = T.Decide $ coreToTrs e
 coreToTrs e@Macro1{} = impossible e
 coreToTrs (If3 e1 e2 e3) = T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)
 coreToTrs (EStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
-coreToTrs (LitPtr p) = T.Ref (T.Ptr p)
 coreToTrs e = error $ "coreToTrs: " ++ prettyShow e
 
 coreToTrsV :: Core -> T.Value
@@ -182,7 +182,7 @@ trsToCore (T.Split e f g) = Split (trsToCore e) (trsToCore f) (trsToCore g)
 trsToCore (T.If e1 e2 e3) = If3 (trsToCore e1) (trsToCore e2) (trsToCore e3)
 trsToCore (T.Store h e) = EStore s (trsToCore e)
   where s = Store { refMap = IM.fromList $ map (\ (T.Ptr i, c) -> (i, trsToCore c)) $ SIM.toList h, outputs = [] }
-trsToCore (T.Ref (T.Ptr i)) = LitPtr i
+trsToCore (T.Ref (T.Ptr i)) = Lit (LitPtr i)
 trsToCore e = error $ "trsToCore: unimplemented: " ++ show e
 
 trsToCoreI :: T.Ident -> Ident

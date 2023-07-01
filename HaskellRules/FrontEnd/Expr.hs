@@ -115,7 +115,6 @@ data Expr
   | Split Expr Expr Expr      -- split(e1){e2}{e3}
   | Fail
   -- These are used when translating back from Rules.Core.Expr
-  | LitPtr Ptr
   | EStore Store Expr
   deriving (Eq, Ord, Show, Data)
 
@@ -133,6 +132,8 @@ data Lit
   | LitRat Scientific String  -- d.d
   | LitChar Char              -- 'c'
   | LitStr String             -- "str"
+  -- These are used when translating back from Rules.Core.Expr
+  | LitPtr Ptr
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Lit where
@@ -144,6 +145,7 @@ instance Pretty Lit where
       LitRat r s -> text (show r ++ s)
       LitChar c -> text (show c)
       LitStr s -> text (show s)
+      LitPtr ptr -> text ("R#" ++ show ptr)
 
 --pattern Range :: Expr -> Expr
 --pattern Range e = ApplyD e AnyT
@@ -257,7 +259,6 @@ instance Pretty Expr where
           EPrim s -> ppNormal (Variable (Ident noLoc s))
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
-          LitPtr ptr -> text ("R#" ++ show ptr)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
       ppVRA _ _ Nothing  Nothing  = undefined
@@ -376,7 +377,6 @@ compos _ e@EPrim{} = pure e
 compos f (Lam i e) = Lam i <$> f e
 compos f (Split e1 e2 e3) = Split <$> f e1 <*> f e2 <*> f e3
 compos _ e@Fail = pure e
-compos _ e@LitPtr{} = pure e
 compos f (EStore s e) = EStore <$> storeMapA f s <*> f e
 
 storeMapA :: (Applicative a) => (Value -> a Value) -> Store -> a Store
