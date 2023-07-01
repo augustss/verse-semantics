@@ -23,6 +23,13 @@ import Debug.Trace
 import System.IO
 import System.IO.Unsafe(unsafePerformIO)
 
+-- TODO:
+--  * Write down how evaluation works.
+--  * Equip lambda with function effects
+--    - What checks are needed for higher order function passing?
+--  * Properly track effects
+--  * Check for effect violation
+
 subset :: (Eq a) => [a] -> [a] -> Bool
 subset xs ys = null (xs \\ ys)
 

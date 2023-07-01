@@ -23,8 +23,9 @@ import FrontEnd.Expr
 import FrontEnd.Flags
 
 -- TODO:
---  reduce variables passed to body in if/for
---  do beta reduction for inlined primitives
+--  x:t=v is syntactic sugar for x:=(:t=v) and 
+--  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
+--  desugar function effects
 
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
