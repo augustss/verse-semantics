@@ -1371,7 +1371,7 @@ and a similar one in % \rulename{subst} and
 \rulename{seq-swap}.
 In the overall proof of confluence, it turns out to
 be very helpful if the unification rules
-are \emph{terminating} (see \cref{sec:design-confluence}).
+are \emph{terminating} (see \cref{sec:confluence-sketch}).
 To achieve this, \rulename{var-swap} fires on |y==x| \emph{only if
 |x|'s binding occurs in the scope of |y|'s binding}, written $|x| \prec |y|$, so that the innermost-bound variable
 ends up on the left.
@@ -2264,7 +2264,7 @@ We discuss some of them here.
 
 The rules of \Cref{fig:rules} are more complicated than we would like, because our
 proof of confluence requires that the unification rules form a \emph{terminating}
-rewrite system (\Cref{sec:design-confluence}).  Tantalizingly, we have
+rewrite system (\Cref{sec:confluence-sketch}).  Tantalizingly, we have
 found simpler versions of four of the unification and elimination rules that
 we believe are equally expressive and still support (modified
 versions of) our proofs of termination and confluence:
