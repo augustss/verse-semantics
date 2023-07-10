@@ -1200,13 +1200,13 @@ constants.  For example $|applyN add (3,4)| \movesto |7|$.  Rules \rulename{app-
 An amusing consequence is that |(10 > x > 0)| succeeds
 iff |x| is between |10| and |0| (comparison is right-associative).
 
-An application of a primitive operator can only rewrite when its
+An application of a primitive operator can rewrite only when its
 arguments are ground values; an application like |applyN gt (x,3)| or |applyN add (7,x)| is \emph{stuck} awaiting a value for |x|,
 which may arrive later, by substitution (\Cref{sec:unification-rules}).
 An ill-typed application, such as |applyN gt (3, lam x x)|, is simply stuck forever.
 
 Note that equality, written |v=e|, is not a primitive operator; it is a language construct, and enjoys
-a rich set of rules of built-in rules (\Cref{sec:unification-rules}).
+a rich set of built-in rules (\Cref{sec:unification-rules}).
 
 % Rule \rulename{p-map} implements a map operation over tuples: It applies the function |f| to each value
 % in turn, and collects the results into a tuple. If the function applications produce a choice
@@ -1869,12 +1869,13 @@ and $e_1$ and $e_2$ are normal forms, then $e_1 = e_2$
 
 \subsection{Two challenges to confluence}
 
-Confluence is a very syntactic property, which leads to two tiresome challenges, as we outline next.
+Confluence is a purely syntactic property, which leads to two tiresome challenges.
 
-\subsubsection{Tiresome problem 1: unifying lambdas} \label{sec:unifying-lambda}
+\subsubsection{Tiresome challenge 1: Unifying lambdas} \label{sec:unifying-lambda}
 
 In \versecalc{}, an attempt to unify a lambda with another value is stuck (\Cref{sec:unification-rules}).
-That choice has consequences.
+That choice has two consequences. One is easy to handle, one is tiresome.
+
 First, while \rulename{u-lit} lets us eliminate equalities on the same literal $|k == k|$,
 \versecalc{} has no analogous \rulename{u-var} rule to drop equalities on the same variable $|x == x|$.
 To see why not, suppose we had such a \rulename{u-var}, and consider the term |(def x (x==(lam y y); x==x; 0))|.
@@ -1884,10 +1885,10 @@ reduces to |0|.
 However, if we first \rulename{subst} the equality |x == (lam y y)|,
 we get |((lam y y) == (lam y y); 0)|, which is stuck.
 %
-Thus, there is no rule \rulename{u-var}: such equalities can be eliminated only
+Therefore, to preserve confluence, \versecalc{} has no rule \rulename{u-var}: such equalities can be eliminated only
 after the value of |x| is substituted in and checked to not be a lambda.
 
-Second, our inability to fail when unifying different lambdas leads to non-confluence.
+Second, the inability to fail when unifying different lambdas leads to non-confluence.
 Here is an expression that rewrites in two different ways, depending on which equation we \rulename{subst} first:
 \[ |(lam p 1) == (lam q 2); 1| \quad\lgos{}\quad |def x (x == (lam p 1); x == (lam q 2); x emptytup)| \quad\gos{}\quad |(lam q 2) == (lam p 1); 2| \]
 % $$
@@ -1931,7 +1932,7 @@ is wrong anyway: we should not be attempting to unify lambdas.
 
 
 
-\subsubsection{Tiresome problem 2: recursion the notorious even/odd problem}  \label{sec:even-odd}
+\subsubsection{Tiresome challenge 2: Recursion and the notorious even/odd problem}  \label{sec:even-odd}
 %
 It is well known that adding {\bf letrec} to the lambda calculus
 makes it non-confluent, in a very tiresome, but hard-to-avoid, way \cite{ariola:skew-confluence}.
@@ -1953,7 +1954,7 @@ rules, as we did when we added \rulename{var-swap} (\cref{sec:unification-rules}
 and \rulename{seq-swap} (\cref{sec:normalization}).  Why not? Because the terms
 are equivalent only under some kind of graph isomorphism.
 
-\subsubsection{Resolving these challenges}
+\subsubsection{Resolving the two challenges}
 
 We explored three different ways to address these challenges.
 The first is simply to abandon confluence as a goal altogether.
@@ -1963,26 +1964,11 @@ much stronger than what we really need, which is that each of our rules be
 an independent notion of semantics, a direction we sketch in \cref{sec:den-sem}.
 
 Second, we can simply exclude programs that unify lambdas, or that use
-recursion (\cref{sec:problematic}).  This is the approach
-we take for the main proof of the paper (\cref{sec:confluence-sketch}).
-Excluding lambda unification is fine; programmers simply cannot expect
-that to work.  Excluding recursion sound drastic, but no
-expressiveness is lost thereby: in our untyped setting, one can still
-write recursive (and non-terminating) programs using one's favorite
-fixpoint combinator, such as \textbf{Y} or \textbf{Z}.
-
-Excluding recursion is, however, not entirely satisfying: it is hard to prove that a term
-has no recursion, and it is clumsy to write recursive programs using only \textbf{Y}-combinators.
-Our third approach is to adopt the idea of \emph{skew confluence}
-\cite{ariola:skew-confluence}, a clever technique developed
-specifically to handle the even/odd problem; we give an overview of skew confluence
-in \cref{sec:skew-overview-2}, and
-provide details of our approach to a proof of skew confluence for \versecalc{} in \cref{sec:skew-confluence},
-including several new lemmas, but we emphasize that the proof of skew confluence is not yet complete.
-
-\subsubsection{Defining problematic programs} \label{sec:problematic}
-
-For the second approach, we want to exclude programs that use recursion, or that unify lambdas.
+recursion.
+%recursion (\cref{sec:problematic}).
+% \subsubsection{Defining problematic programs} \label{sec:problematic}
+%
+% For the second approach, we want to exclude programs that use recursion, or that unify lambdas.
 To be precise:
 % In \versecalc{}, excluding recursion is not so simple because \versecalc{} has no {\bf letrec}; rather,
 % recursion emerges during execution.  For example, is this recursive: |def (x ^^ y) (x==tup (1,y); applyN f (x,y))|?
@@ -1993,17 +1979,33 @@ To be precise:
 % The equation for |f| \emph{looks} recursive because the RHS mentions |f|; but if we \textbeta-reduce the application
 % of |const|, the occurrence of |f| disappears.
 \begin{itemize}
-\item An equation is \emph{obviously problematic} if
+\item An equation is \emph{obviously problematic} if either
   \begin{itemize}
-  \item It is an equation of the form |x == V^[lam y e]|, where $x \in \freevars{e}$, or
-  \item It is an equation of form |hnf = lam x e| or |lam x e = hnf|.
+  \item it is an equation of the form |x == V^[lam y e]|, where $x \in \freevars{e}$, or
+  \item it is an equation of form |hnf = lam x e| or |lam x e = hnf|.
   \end{itemize}
 \item A term $e$ is \emph{obviously problematic} if it contains an obviously problematic equation.
-\item A term $e$ is \emph{problematic} if there exists an obviously-problematic term $e'$
+\item A term $e$ is \emph{problematic} if there exists an obviously problematic term $e'$
   such that $\rsteps{}{e}{e'}$.
 \item A term $e$ is \emph{well-behaved} if it is not problematic.
 \end{itemize}
-Now we prove confluence only for well-behaved terms.
+Then we prove confluence only for well-behaved terms.
+We take this approach for our main proof in this paper (\cref{sec:confluence-sketch}).
+Excluding lambda unification is fine; programmers simply cannot expect
+that to work.  Excluding recursion may seem drastic, but no
+expressiveness is lost thereby: in our untyped setting, one can still
+write recursive (and non-terminating) programs using one's favorite
+fixpoint combinator, such as \textbf{Y} or \textbf{Z}.
+
+But excluding recursion is not entirely satisfying: it is hard to prove that a term
+has no recursion, and it is clumsy to write recursive programs using only \textbf{Y}-combinators.
+Our third approach is to adopt the idea of \emph{skew confluence}
+\cite{ariola:skew-confluence}, a clever technique developed
+specifically to handle the even/odd problem; we give an overview of skew confluence
+in \cref{sec:skew-overview-2}, and
+provide details of our approach to a proof of skew confluence for \versecalc{} in \cref{sec:skew-confluence},
+including several new lemmas, but we emphasize that the proof of skew confluence is not yet complete.
+
 
 \noindent
 \subsection{Proof of confluence} \label{sec:confluence-sketch}
@@ -2665,9 +2667,9 @@ There are many obvious similarities between Verse and the Icon programming langu
 %  The expression |if e_1 then e_2 else e_3| checks to see whether |e_1| succeeds;
 %  it then produces the values of |e_2| (if |e_1| succeeded) \emph{or} produces the values of |e_3| (if |e_1| failed).
 %  If |e_1| succeeds and then |e_2| fails, backtracking does \emph{not} attempt to examine further values from |e_1|.
-  The ``|`choice`|'' construct is idiomatically used as a \emph{logical or} operation \cite[\S 3]{griswold:icon-overview}.
+\item The ``|`choice`|'' construct is idiomatically used as a \emph{logical or} operation \cite[\S 3]{griswold:icon-overview}.
 \item There is a control structure that executes a specified expression once for every value produced by another expression.
-  In Icon, this is \texttt{every}~|e_1| \texttt{do}~|e_2| and in Verse, it is written \texttt{for(}|e_1|\texttt{)} \texttt{do}~|e_2|;
+  In Icon, this is \texttt{every}~|e_1| \texttt{do}~|e_2| and in Verse, it is written \texttt{for(}|e_1|\texttt{)} \texttt{do}~|e_2|.
 %%  in each, the ``\texttt{do}~|e_2|'' may be omitted to simply evaluate |e_1| repeatedly until it has yielded all its values.
 %%  (In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.)
 \item It is impossible to name a generator (Icon) or choice (Verse); if |e| produces multiple values,
