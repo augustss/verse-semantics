@@ -1882,7 +1882,7 @@ To see why not, suppose we had such a \rulename{u-var}, and consider the term |(
 If we first apply \rulename{u-var} to eliminate the equality $|x==x|$, then the remainder
 reduces to |0|.
 However, if we first \rulename{subst} the equality |x == (lam y y)|,
-we get |((lam y y) == (lam y y); 0)|, which fails.
+we get |((lam y y) == (lam y y); 0)|, which is stuck.
 %
 Thus, there is no rule \rulename{u-var}: such equalities can be eliminated only
 after the value of |x| is substituted in and checked to not be a lambda.
@@ -2001,7 +2001,7 @@ To be precise:
 \item A term $e$ is \emph{obviously problematic} if it contains an obviously problematic equation.
 \item A term $e$ is \emph{problematic} if there exists an obviously-problematic term $e'$
   such that $\rsteps{}{e}{e'}$.
-\item A term $e$ is \emph{well-behaved} if it is nt problematic.
+\item A term $e$ is \emph{well-behaved} if it is not problematic.
 \end{itemize}
 Now we prove confluence only for well-behaved terms.
 
