@@ -2646,7 +2646,7 @@ for example to implement static-analysis phases for compilers.
 Datalog has frequently been extended to support functional programming; these extensions typically preserve the guarantee
 that every program terminates.
 \begin{itemize}
-\item Datafun \cite{datafun} is perhaps closest in spirit to Verse in that it support higher-order functions as first-class values;
+\item Datafun \cite{datafun} is perhaps closest in spirit to Verse in that it supports higher-order functions as first-class values;
 it uses a strong type system to prohibit testing functions for equality and to prohibit unbounded recursion.
 
 \item Flix \cite{datalog-to-flix} makes it easy to work with arbitrary user-defined lattices; programs are guaranteed to terminate as long as
@@ -2658,11 +2658,11 @@ this allows the programmer to use inheritance to organize code on related types 
 In some cases what looks like a ``method call'' appears to produce multiple values, but this is just a bit of syntactic sugar
 for expressing relations.
 
-\item Functional IncA \cite{fp-with-datalog} is a language that supports first-class higher-order functions over sets and algebraic data types;
-this language is compiled to pure Datalog. The compilation process eliminates first-class functions through \emph{defunctionalization}.
-
 \item Formulog \cite{formulog} extends Datalog with a first-order functional language (a subset of ML) and an SMT solver.
 Functions are not first-class (functions, predicates, and variables have separate namespaces).
+
+\item Functional IncA \cite{fp-with-datalog} is a language that supports first-class higher-order functions over sets and algebraic data types;
+this language is compiled to pure Datalog. The compilation process eliminates first-class functions through defunctionalization.
 \end{itemize}
 None of these languages supports unbounded computation, a choice operator, or failure.
 
