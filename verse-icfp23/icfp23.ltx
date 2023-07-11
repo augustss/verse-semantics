@@ -1057,9 +1057,9 @@ $$
 $$
 Patterns are truly first-class, going well beyond what can be done with, say, pattern synonyms
 in Haskell.  For example, |pat| could be \emph{computed}, like this:
-$$
+\begin{center}$
 |applyN pat (a,v,w) :== if a==0 then tup (v,1,w,2) else tup (1,1,w,v)|
-$$
+$\end{center}
 so that the pattern depends on the value of |a|.
 
 \subsection{For loops} \label{sec:for}
@@ -1084,10 +1084,10 @@ in terms of the primitive |allKW|.
 Again, we have to be careful when |e_2| itself fails or produces multiple results;
 simply writing |all (e_1;e_2)| would give the wrong semantics. So we put |e_2| within a lambda expression, and
 apply each element of the tuple to |emptytup| afterwards, using a |map| function (as defined in \cref{fig:list-functions}):
-\[
+\begin{center}$
 |fordo(def (x_1^^xdots^^x_n) e_1) e_2| \quad \text{means} \quad
 |v :== all (def (x_1^^xdots^^x_n) e_1; thunk e_2); applyN map (lam z (apply0 z), v)|
-\]
+$\end{center}
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
 Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since the effects are contained within that lambda.
@@ -1819,10 +1819,10 @@ it has run on the order of 100~million tests on the current rule set.
 \section{Metatheory} \label{sec:metatheory}
 
 The rules of our rewrite semantics can be applied anywhere,
-in any order, and they give meaning to programs without
-committing to a particular evaluation strategy.
+in any order; they give meaning to programs without
+committing to a specific evaluation strategy.
 %
-But then it had better be the case that no matter how the
+But then it had better be true that no matter how the
 rules are applied, one always obtains the same result!
 That is, our rules should be \emph{confluent}.  In this section, we describe
 our proof of confluence.  Because the rule set is quite big (compared, say, to the
@@ -1959,7 +1959,7 @@ are equivalent only under some kind of graph isomorphism.
 We explored three different ways to address these challenges.
 The first is simply to abandon confluence as a goal altogether.
 Confluence is, after all, purely \emph{syntactic}, and hence
-much stronger than what we really need, which is that each of our rules be
+much stronger than what we really need, which is only that each of our rules be
 \emph{semantics}-preserving.  But that, of course, requires
 an independent notion of semantics, a direction we sketch in \cref{sec:den-sem}.
 
@@ -2037,12 +2037,12 @@ there exists $e'$ such that $\rsteps{S}{e_1}{e'}$ and $\rsteps{R}{e_2}{e'}$.
 %
 We prove each individual sub-relation is confluent
 and that they pairwise commute. Then confluence of
-their union follows, using \citet{Huet80}:
-
-\begin{lemma}[Commutativity] \label{lem:comm-summary}
+their union follows, using a theorem of \citet{Huet80}:
+%
+%\begin{lemma}[Commutativity] \label{lem:comm-summary}
 If $R$ and $S$ are confluent and commute, then $R \cup S$ is confluent.
-\end{lemma}
-\noindent
+%\end{lemma}
+%\noindent
 %
 Proving confluence for application, elimination and choice is easy:
 %
@@ -2595,7 +2595,8 @@ different model of computation.
 When giving the semantics
 of functional logic languages, a first-order presentation is almost universal.
 User-defined functions can be defined at top level only,
-and function symbols (the names of such functions) are syntactically
+%and function symbols (the names of such functions) are syntactically  
+and the names of functions are syntactically  
 distinguished from ordinary variables.
 % As Hanus describes, it is possible
 % to translate a higher-order program into a first-order
@@ -2612,8 +2613,8 @@ form using defunctionalization~\cite[Section 3.3]{hanus:survey} and a built-in
 one would need to do lambda-lifting \cite{johnsson:lambdalift} as well; this is perhaps a minor point.)
 Sadly, this encoding is hardly a natural rendition of the lambda calculus, and
 it obstructs the goal of using rewrite rules to explain to programmers how
-their program might execute. In contrast, a strength of our \versecalc{}
-presentation is that it deals natively with the full lambda calculus.
+their program might behave. In contrast, a strength of our \versecalc{}
+presentation is that it deals natively with the full lambda calculus.\looseness=-1\relax
 
 \subsection{Intermediate language}
 
@@ -2663,8 +2664,7 @@ this language is compiled to pure Datalog. The compilation process eliminates fi
 \item Formulog \cite{formulog} extends Datalog with a first-order functional language (a subset of ML) and an SMT solver.
 Functions are not first-class (functions, predicates, and variables have separate namespaces).
 \end{itemize}
-Unlike Verse, none of these languages supports unbounded computation,
-a choice operator, or the notion of failure.
+None of these languages supports unbounded computation, a choice operator, or failure.
 
 \subsection{Comparison with Icon} \label{sec:icon}
 
