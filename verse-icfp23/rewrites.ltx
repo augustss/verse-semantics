@@ -129,8 +129,10 @@
 \newcommand{\rfail}{\ensuremath{\mathcal{F}}}
 \newcommand{\rspc}{\ensuremath{\mathcal{C}}}
 \newcommand{\rspchat}{\ensuremath{\trel{\mathcal{C}}}}
-\newcommand{\norecursion}{no recursion\xspace}
+% \newcommand{\norecursion}{no recursion\xspace}
 \newcommand{\noHYPHENrecursion}{no-recursion\xspace}
+\newcommand{\wellbehaved}{well behaved\xspace}
+\newcommand{\wellHYPHENbehaved}{well-behaved\xspace}
 \newcommand{\rdx}[1]{\ensuremath{\Delta_{\alignsubscript{#1}}}}
 \newcommand{\txr}[2]{\ensuremath{\rstep{#1}{\rdx{#2}}{\rdx{#2}'}}}
 \newcommand{\tx}[1]{\ensuremath{\rstep{#1}{\rdx{#1}}{\rdx{#1}'}}}
@@ -348,7 +350,10 @@
   \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
 %%  \rulename{u-tup} & \hspace{-1.8em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
   \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
-  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
+  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & \multicolumn{2}{l}{|fail|
+       \hspace{2cm} \begin{array}[t]{l} \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
+         \text{and neither |hnf_1| nor |hnf_2| are lambdas}
+         \end{array}} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
   \rulename{subst} & |X^[x==v;e]| & \movesto & |(subst X x v)^[x==v; subst e x v]| \hspace*{-0.3em}
   & \text{if $|v| \not= |V^[x]|$} \\

@@ -116,30 +116,26 @@ for the respective relation (resp. pairs of relations).}
 \label{fig:confluence-summary}
 \end{figure}
 
-\begin{definition}[Recursive Equations] \label{def:norec}
-A \emph{recursive equation} is a term of the form
+\begin{definition}[Well-behaved Terms] \label{def:norec}
+An equation is \emph{obviously problematic} if
 %
-$$
-|x == V^[lam y e]| \quad \text{where}\ x \in \freevars{e}
-% |x == V^[lam y E^[x]]| \quad \text{where}\ x \in \freevars{e}
-$$
+\begin{itemize}
+\item It is an equation of the form |x == V^[lam y e]|, where $x \in \freevars{e}$, or
+\item It is an equation of form |hnf = lam x e| or |lam x e = hnf|.
+\end{itemize}
 %
-where the LHS is a variable and the RHS is a \emph{value}
-that is or contains a $\lambda$ in which $|x|$ occurs free.
+A term $e$ is \emph{obviously problematic} if it contains an obviously problematic equation.
 %
-A term $e$ is \emph{recursive} if it contains a recursive equation.
+A term $e$ is \emph{problematic} if there exists an obviously-problematic term $e'$ such that $\rsteps{}{e}{e'}$.
 %
-A term $e$ is \emph{transitively recursive} if $\rsteps{\rr}{e}{e'}$ where $e'$ is recursive.
-%
-A term $e$ \emph{has \norecursion} if it is not transitively recursive.
+A term $e$ is \emph{\wellHYPHENbehaved} if it is not problematic.
 \end{definition}
+
 Our main confluence theorem is as follows:
 
 \begin{theorem}[Confluence] \label{thm:confluence}
 %
-If $e$ has \norecursion and $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$ then $\join{\rr}{e_1}{e_2}$.
-%
-% The reduction relation $\rr$ is confluent for all terms with \norecursion.
+If $e$ is \wellHYPHENbehaved and $\rsteps{\rr}{e}{e_1}$ and $\rsteps{\rr}{e}{e_2}$ then $\join{\rr}{e_1}{e_2}$.
 %
 \end{theorem}
 
@@ -810,7 +806,12 @@ where $b \equiv x_1 = w_1; \ldots ; x_k = w_k$. Let us split cases on whether $x
   Now, we can further assume that we can use \rulename{seq-assoc} and \rulename{seq-swap}
   to ensure that each $x_i \equiv x$ (by swapping the other equations to the left of $eq_1$ or right of $eq_2$
   if $x_i < x$ or $x_i > x$ respectively).
-  We join $e_1$ and $e_2$ using \cref{lem:eq-join-flip}
+  %
+  By the \wellHYPHENbehaved assumption, neither $u$ or $v$ are $\lambda$-terms,
+  as otherwise, substituting one equation for the other would yield a problematic
+  equation.
+  %
+  Hence, we can join $e_1$ and $e_2$ using \cref{lem:eq-join-flip}
   via the context $X' \equiv |subst X x z|[x = z; \hole]$ and $b' \equiv |subst b x z|$ where $z$ is a fresh variable.
   % https://q.uiver.app/#q=WzAsNixbMSwwLCJYW3ggPSB1OyBiOyB4ID0gdl0iXSxbMCwxLCJYXFx7dS94XFx9W3ggPSB1O1xcIGJcXHt1L3hcXH07XFwgdSA9IHZdIl0sWzIsMSwiWFxce3YveFxcfVt2ID0gdTtcXCBiXFx7di94XFx9O1xcIHggPSB2XSJdLFsyLDMsIlgnXFx7di96XFx9W3YgPSB1O1xcIGInXFx7di96XFx9XSJdLFswLDMsIlgnXFx7dS96XFx9W2InXFx7dS96XFx9O1xcIHUgPSB2XSJdLFsxLDQsIlxcYnVsbGV0Il0sWzAsMSwiZXFfMSIsMl0sWzAsMiwiZXFfMiJdLFsyLDMsIlxcbWJveHtzd2FwfSB4PXYgXFxtYm94e292ZXJ9XFwgdj13X2kiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsNCwiXFxlcXVpdiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFs0LDUsIiIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMyw1LCIiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsNSwiXFxjcmVme2xlbTplcS1qb2luLWZsaXB9IiwxLHsibGFiZWxfcG9zaXRpb24iOjkwLCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
@@ -858,7 +859,7 @@ where $b \equiv x_1 = w_1; \ldots ; x_k = w_k$. Let us split cases on whether $x
 	Split cases on whether $u$ and $v$ are HNF values or not.
 	\begin{description}
 		\item[Case \emph{either} $u$ or $v$ are HNF]
-			Join at |fail| if \rulename{u-occurs}, else impossible due to \norecursion.
+			Join at |fail| if \rulename{u-occurs}, else impossible due to \wellbehaved.
 		\item[Case \emph{neither} $u$ nor $v$ are HNF]
 			In this case, we have $x \equiv v$ and $y \equiv u$. WLOG assume that $x \prec y$ (the other case is symmetric) so we can join $e_1$ and $e_2$ using the following diagram.
 % https://q.uiver.app/#q=WzAsNixbMCwwLCJYW3ggPSB5O1xcIGI7XFwgeSA9IHhdIl0sWzIsMCwiWFxce3gveVxcfVt4ID0geDtcXCBiXFx7eC95XFx9O1xcIHkgPSB4XSJdLFswLDIsIlhcXHt5L3hcXH1beCA9IHk7XFwgYlxce3kveFxcfTtcXCB5ID0geV0iXSxbMiwxLCJYXFx7eC95XFx9W3ggPSB4O1xcIGJcXHt4L3lcXH07XFwgeCA9IHldIl0sWzIsMiwiWFxce3kveFxcfVt5ID0geTtcXCBiXFx7eS94XFx9O1xcIHggPSB5XSJdLFsxLDMsIlxcYnVsbGV0Il0sWzAsMSwiZXFfMiAoeSA9IHgpIl0sWzAsMiwiZXFfMSAoeCA9IHkpIiwyXSxbMSwzLCJcXHJ1bGVuYW1le3Zhci1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dLFszLDQsIlxccnVsZW5hbWV7c3Vic3R9ICh4ID0geSkiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifX19XSxbMiw1LCJcXHJ1bGVuYW1le3NlcS1zd2FwfSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNCw1LCJcXHJ1bGVuYW1le3NlcS1zd2FwfSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
@@ -895,7 +896,9 @@ where the substitution with $|x_2=v_2|$ does not affect $X_1, x_1, v_1$.
 Split cases on whether $x_1 \equiv x_2$.
 
 \begin{description}
-\item[Case $x_1 \equiv x_2 \equiv x$]: By \norecursion we have $x \not \in \freevars{v_1}, x \not \in \freevars{v_2}$.
+\item[Case $x_1 \equiv x_2 \equiv x$]: By \wellHYPHENbehaved we have $x \not \in \freevars{v_1}, x \not \in \freevars{v_2}$,
+and neither $v_1$ nor $v_2$ are $\lambda$-terms, as otherwise, substituting one equation for the other would yield a problematic equation.
+%
 Hence, we can join $e_1$ and $e_2$ using \cref{lem:eq-join} on the sub-terms
 $\subst{X_2}{x}{v_1}[v_1=v_2]$ and $\subst{X_2}{x}{v_2}[v_1=v_2]$.
 %
@@ -945,7 +948,7 @@ Split cases on whether $x_i \in \freevars{v_{3-i}}$.
 	\begin{description}
     \item[Case \emph{either} $v_1$ or $v_2$ are HNF] In this case, we get the below diagram
 	where, since $x_2 \in \freevars{v_2'}$, the term $x_2 = v_2'$ either steps to |fail| (and so we can
-	join at |fail|) or the term violates the \norecursion assumption.
+	join at |fail|) or the term violates the \wellHYPHENbehaved assumption.
 % https://q.uiver.app/?q=WzAsNCxbMCwwLCJYXzFbXFxsZG90cyBYXzJbeF8yID0gdl8yXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzAsMSwiWF8xXFx7dl8xL3hfMVxcfVtcXGxkb3RzIFhfMlxce3ZfMS94XzFcXH1beF8yID0gdl8yJ10gXFxsZG90c11beF8xID0gdl8xXSJdLFsxLDEsIlhfMVxce3ZfMS94XzFcXH1bXFxsZG90cyBYXzJcXHt2XzEveF8xLCB2XzInL3hfMlxcfVt4XzIgPSB2XzInXSBcXGxkb3RzXVt4XzEgPSB2XzFdIl0sWzEsMCwiWF8xW1xcbGRvdHMgWF8yXFx7dl8yL3hfMlxcfVt4XzIgPSB2XzJdIFxcbGRvdHNdW3hfMSA9IHZfMV0iXSxbMCwxLCJldV8xIiwyXSxbMCwzLCJldV8yIl0sWzMsMiwiZXVfMSIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
 \[\begin{tikzcd}
 	{X_1[\ldots X_2[x_2 = v_2] \ldots][x_1 = v_1]} & {X_1[\ldots X_2\{v_2/x_2\}[x_2 = v_2] \ldots][x_1 = v_1]} \\
@@ -977,8 +980,11 @@ where both sides are values.
 A \emph{block} is a sequence of value-equations.
 
 \begin{lemma}[Unify] \label{lem:eq-join}
-If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$, and $e,e'$
-are blocks then
+If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$,
+%
+$\overline{u}$ and $\overline{v}$ are not $\lambda$-terms,
+%
+and $e,e'$ are blocks then
 %
 $$\join{\runi}
 	{ \subst{X}{\overline{z}}{\overline{u}}[ \subst{e}{\overline{z}}{\overline{u}}; e'; \overline{u = v}]}
@@ -1086,12 +1092,17 @@ we use \rulename{hnf-swap} on both sides after which the proof follows as in
 the previous case.
 
 \item[Case $|x = v|$] where $x \in \freevars{v}$: either join at |fail|
-via \rulename{u-occurs} or violates the \norecursion assumption.
+via \rulename{u-occurs} or violates the \wellHYPHENbehaved assumption.
 \end{description}
 \end{proof}
 
 \begin{lemma}[Unify-Flip] \label{lem:eq-join-flip}
-If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$ then
+If $\overline{z} \cap (\freevars{\overline{u}} \cup \freevars{\overline{v}}) = \emptyset$,
+%
+$\overline{u}$ and $\overline{v}$ are not $\lambda$-terms,
+%
+and $e,e'$ are blocks then
+%
 $$\join{\runi}
 	{ \subst{X}{\overline{z}}{\overline{u}}[ \subst{e}{\overline{z}}{\overline{u}}; e'; \overline{u = v}]}
 	{ \subst{X}{\overline{z}}{\overline{v}}[ e' ; \overline{v = u}; \subst{e}{\overline{z}}{\overline{v}}]}$$
