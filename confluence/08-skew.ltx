@@ -43,6 +43,19 @@ or when it is in the function position of an application. If we regard any \vers
 the fixpoint construct in effect can label any subtree in such a way that any node beneath it can have a ``back pointer'' up to the labeled node
 by referring to the bound variable that serves as the label. 
 
+The overall plan is to adapt the proof strategy
+of \cref{sec:confluence-sketch} and \cref{sec:confluence} for skew confluence.
+To do this we need a new result: if two relations are skew confluent
+with respect to the same information content function and commute, then their union is also skew confluent.
+(In fact, it is not required that the two relations fully commute: a slightly weaker precondition suffices.)
+Using this result, our plan
+is to (i) define an appropriate information content function for \versecalc{} expressions;
+(ii) prove that all the rewrite rules for \versecalc{} are monotonic in this information content function;
+(iii) prove that the Unification rules (modified to permit recursive substitution) together with the Normalization rules are skew confluent;
+(iv) prove that this combined set of rules commutes in the necessary way with the rules for Application, Elimination, and Choice (which taken together are already known to be confluent);
+and (v) then apply our new result to show that the entire set of rewrite rules is skew confluent.
+At this time steps (iii) and (iv) are incomplete, so we emphasize that we do not yet have a complete proof of skew confluence for \versecalc{}.
+
 \subsection{Free Variables}
 
 
