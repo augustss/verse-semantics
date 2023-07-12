@@ -469,7 +469,7 @@ Like any functional logic language,
 \item \emph{Natively higher order.} \versecalc{} directly supports higher-order functions, just like the lambda calculus.
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional logic literature is rooted in a first-order world, and
-  addresses higher-order features via an encoding called defunctionalization~\cite[3.3]{defunctionalization,hanus:survey}.
+  addresses higher-order features via an encoding called defunctionalization~\citetext{\citealp{defunctionalization}; \citealp{hanus:survey}, 3.3}.
 \item \emph{Deterministic, with native encapsulation}.  \versecalc{} is \emph{deterministic}, in the sense that when an expression yields more than one value (as is often the case in functional logic programs), those values are returned in a well-specified order.  This makes it easy to solve the notoriously tricky issue \cite{bernd-hanus:encapsulating-workshop,bernd-hanus:encapsulating} of
   how to \emph{encapsulate} the result of a search as a data structure, using the |allKW| operator (\cref{sec:all}).
   It opens up a new approach to dealing with so-called ``flexible'' {\vs} ``rigid'' variables
