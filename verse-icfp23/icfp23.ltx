@@ -2641,9 +2641,11 @@ In contrast, |def x e| seems more direct.
 
 Datalog \cite{datalog-survey} in its purest form is a subset of Prolog \cite{prolog-lisp-paper,prolog-book-edition5}
 that is carefully limited so that every Datalog program is guaranteed to terminate.
-Datalog variants are often used as database query languages and to concisely express fixpoint computations on lattices,
-for example to implement static-analysis phases for compilers.
-Datalog has frequently been extended to support functional programming; these extensions typically preserve the guarantee
+Datalog variants are often used as database query languages and to concisely express fixpoint computations on lattices
+(for example, static-analysis phases for compilers).
+% Datalog has frequently been extended to support functional programming; these extensions typically preserve the guarantee
+% that every program terminates.
+Some of these variants support functional programming while preserving the guarantee
 that every program terminates.
 \begin{itemize}
 \item Datafun \cite{datafun} is perhaps closest in spirit to Verse in that it supports higher-order functions as first-class values;
@@ -2659,10 +2661,11 @@ In some cases what looks like a ``method call'' appears to produce multiple valu
 for expressing relations.
 
 \item Formulog \cite{formulog} extends Datalog with a first-order functional language (a subset of ML) and an SMT solver.
-Functions are not first-class (functions, predicates, and variables have separate namespaces).
+Functions are not first-class; functions, predicates, and variables have separate namespaces.
 
 \item Functional IncA \cite{fp-with-datalog} is a language that supports first-class higher-order functions over sets and algebraic data types;
 this language is compiled to pure Datalog. The compilation process eliminates first-class functions through defunctionalization.
+The paper does not discuss an equality operator or whether it may be applied to functions.  
 \end{itemize}
 None of these languages supports unbounded computation, a choice operator, or failure.
 
@@ -2691,11 +2694,13 @@ There are many obvious similarities between Verse and the Icon programming langu
   In Icon, this is \texttt{every}~|e_1| \texttt{do}~|e_2| and in Verse, it is written \texttt{for(}|e_1|\texttt{)} \texttt{do}~|e_2|.
 %%  in each, the ``\texttt{do}~|e_2|'' may be omitted to simply evaluate |e_1| repeatedly until it has yielded all its values.
 %%  (In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.)
+In each language, the ``\texttt{do}~|e_2|'' may be omitted to simply evaluate |e_1| repeatedly until it has yielded all its values.
+In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.
 \item It is impossible to name a generator (Icon) or choice (Verse); if |e| produces multiple values,
   \texttt{|x|~:=~|e|} will provide one value at a time from |e| to be named by variable |x|.
 \end{itemize}
 
-But there are also major differences between Verse and Icon.
+But there are also major differences.
 Icon was designed primarily to use expressions as generators to automatically
 explore a combinatorial space of possibilities (``goal-directed evaluation''), and secondarily to use
 success/failure rather than booleans to drive control structure.
