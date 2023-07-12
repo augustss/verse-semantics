@@ -2217,11 +2217,11 @@ replacing each occurrence of |Omega| in $\omegarr(|e_2|)$ with an (individually-
 Consider the even-odd problem discussed in \cref{sec:even-odd}.
 $$
 \begin{array}{l@@{\,}l@@{\hspace{0.5cm}}||@@{\hspace{0.5cm}}l@@{\,}l}
-\multicolumn{4}{c}{|def (x ^^ y) (x == tup (1, y)); y == lam z x; x)|} \\
+\multicolumn{4}{c}{|def (x ^^ y) (x == tup (1, y)); y == lam z x; x|} \\
     \rsteps{}{}{} & |def y (y == lam z (tup (1, y)); tup (1,y))|
   & \rsteps{}{}{} & |def x (x = tup (1, lam z x); x)| \\
     \rstep{}{}{} & |def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1,y))))|
-  & \rstep{}{}{} & |def x (x = tup (1, lam z x); tup (1, lam z x)))| \\
+  & \rstep{}{}{} & |def x (x = tup (1, lam z x); tup (1, lam z x))| \\
     \rstep{}{}{} & |def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1,lam z (tup (1,y))))))|
   & \rstep{}{}{} & |def x (x = tup (1, lam z x); tup (1, lam z (tup (1,lam z x))))| \\
     \rstep{}{}{} & \cdots & \rstep{}{}{} & \cdots
