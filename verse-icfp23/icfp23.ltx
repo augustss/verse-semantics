@@ -2643,8 +2643,6 @@ Datalog \cite{datalog-survey} in its purest form is a subset of Prolog \cite{pro
 that is carefully limited so that every Datalog program is guaranteed to terminate.
 Datalog variants are often used as database query languages and to concisely express fixpoint computations on lattices
 (for example, static-analysis phases for compilers).
-% Datalog has frequently been extended to support functional programming; these extensions typically preserve the guarantee
-% that every program terminates.
 Some of these variants support functional programming while preserving the guarantee
 that every program terminates.
 \begin{itemize}
@@ -2692,10 +2690,8 @@ There are many obvious similarities between Verse and the Icon programming langu
 \item The ``|`choice`|'' construct is idiomatically used as a \emph{logical or} operation \cite[\S 3]{griswold:icon-overview}.
 \item There is a control structure that executes a specified expression once for every value produced by another expression.
   In Icon, this is \texttt{every}~|e_1| \texttt{do}~|e_2| and in Verse, it is written \texttt{for(}|e_1|\texttt{)} \texttt{do}~|e_2|.
-%%  in each, the ``\texttt{do}~|e_2|'' may be omitted to simply evaluate |e_1| repeatedly until it has yielded all its values.
-%%  (In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.)
-In each language, the ``\texttt{do}~|e_2|'' may be omitted to simply evaluate |e_1| repeatedly until it has yielded all its values.
-In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.
+  In each language, the ``\texttt{do}~|e_2|'' may be omitted to simply evaluate |e_1| repeatedly until it has yielded all its values.
+  In Icon, \texttt{every} |e| may also be written as \texttt{repeat} |e|.
 \item It is impossible to name a generator (Icon) or choice (Verse); if |e| produces multiple values,
   \texttt{|x|~:=~|e|} will provide one value at a time from |e| to be named by variable |x|.
 \end{itemize}
