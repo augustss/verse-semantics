@@ -1069,14 +1069,14 @@ rather like a list comprehension in languages like Haskell or Python.
 The scoping is peculiar\footnote{But similar to C++, Java, Fortress, and Swift, and explained in \versecalc{} by
   the subsequent desugaring into |allKW|.}
 in that variables bound in |e_1| also scope over |e_2|.
-So, for example, |fordo(x :== 2 `choice` 3 `choice` 5) (x+1)| will reduce to the tuple |tup (3,4,6)|.
+So, for example, |fordo(x :== (2 `choice` 3 `choice` 5)) (x+1)| will reduce to the tuple |tup (3,4,6)|.
 % This example can, with the |:==| shorthand, be written |for^(x :== 2 `choice` 3 `choice` 5) do (x+1)|.
 
 Like list comprehension, |for| supports filtering; in \versecalc{}, this falls out naturally by just using
 a possibly failing expression in |e_1|.
-So, |fordo(x :== 2 `choice` 3 `choice` 5; x > 2) (x+1)| reduces to |tup (4,6)|.
+So, |fordo(x :== (2 `choice` 3 `choice` 5); x > 2) (x+1)| reduces to |tup (4,6)|.
 Nested iteration in a |for| works as expected and requires nothing special.
-So, |fordo(def (x^^y) (x==10 `choice` 20; y == 1 `choice` 2 `choice` 3)) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|.
+So, |fordo(def (x^^y) (x==(10 `choice` 20); y == (1 `choice` 2 `choice` 3))) (x+y)| reduces to |tup (11, 12, 13, 21, 22, 23)|.
 
 Just as |if| is defined in terms of the primitive |oneKW| (\cref{sec:if}), we can define |for|
 in terms of the primitive |allKW|.
@@ -1090,7 +1090,7 @@ $\end{center}
 for a fresh variable |v|.
 Note how this achieves that peculiar scoping rule: the initial variables in |def (x_1^^xdots^^x_n) e_1| are in scope in |e_2|.
 Moreover, any effects (like being multi-valued) in |e_2| will not affect the choices defined by |e_1| since the effects are contained within that lambda.
-So, for example, |fordo(x:==10 `choice` 20) (x `choice` x+1)| will reduce to
+So, for example, |fordo(x:==(10 `choice` 20)) (x `choice` x+1)| will reduce to
 |tup (10, 20) `choice` tup (10, 21) `choice` tup (11, 20) `choice` tup (11, 21)|.
 At this point, it is crucial that the desugaring of |for| uses |map|, not |flatMap|.
 
@@ -1571,7 +1571,7 @@ reifies these results into an array, the multiplicity of results is visible to t
 the length of the returned array.
 Moreover, consider
 $$
-|all (def (x, y) (x = ((y=3;1) `choice`(y=4;2)); y))|
+|all (def (x, y) (x = ((y=3;1) `choice`(y=4;2)0); y))|
 $$
 In \versecalc{}, the expression to which |x| is equated must be evaluated, yielding two values, |1| and |2|, which are then discarded since
 |x| is unused.  However, each of these
