@@ -1143,7 +1143,7 @@ Here are some possibilities:
 \item \emph{A small-step operational semantics} addresses this criticism:
   it typically describe how a (heap, expression, stack) configuration evolves, one small
   step at a time ({\eg}, ~\cite{pj:stg-machine}).
-  The difficulty is that the description is now so low level that it is again hard to explain to programmers.
+  The difficulty is that the description is now so low-level that it is again hard to explain to programmers.
 \item \emph{A rewrite semantics} steers between these two extremes.
   For example, Ariola {\etal}'s ``A call-by-need lambda calculus''~\cite{ariola:call-by-need} shows how
   to give the semantics of a call-by-need language as a set of rewrite rules. The great
@@ -1160,11 +1160,11 @@ has the following properties:
   all desugaring.
 \item Any rule can be applied, in either direction,
   anywhere in the program term (including under lambdas).
-\item The rules are (mostly) oriented, with the intent that using them left to right makes progress.
+\item The rules are (mostly) oriented, with the intent that using them left-to-right makes progress.
 \item Despite this orientation, the rules do not say which rule should be
   applied where; that is the task of a separate \emph{evaluation strategy} (\cref{sec:eval-strategy}).
 \item The rules can be applied by programmers to reason about what their program does,
-  and by compilers to transform (and hopefully optimise) the program.
+  and by compilers to transform (and hopefully optimize) the program.
 \item There is no ``magical rewriting'' (\cref{sec:magical}):
   all the free variables on the
   right-hand side of a rule are bound on the left.
@@ -1205,7 +1205,7 @@ which may arrive later, by substitution (\Cref{sec:unification-rules}).
 An ill-typed application, such as |applyN gt (3, lam x x)|, is simply stuck forever.
 
 Note that equality, written |v=e|, is not a primitive operator; it is a language construct, and enjoys
-a rich set of built-in rules (\Cref{sec:unification-rules}).
+a rich set of built-in rewrite rules (see \Cref{sec:unification-rules}).
 
 % Rule \rulename{p-map} implements a map operation over tuples: It applies the function |f| to each value
 % in turn, and collects the results into a tuple. If the function applications produce a choice
@@ -1250,16 +1250,15 @@ are the standard rules for unification, going back nearly 60 years \cite{robinso
 % for unification to yield |emptytup| on success.  It does not make much difference
 % either way.}.
 Rule \rulename{u-fail} makes unification fail (return zero results)
-on two different head-normal forms (see \cref{fig:syntax} for the syntax of |hnf|);
+on two different head-normal forms (see \cref{fig:syntax} for the syntax of |hnf|),
 except that it gets stuck if you attempt to unify a lambda with any other value, including itself.
 Why? Because equality of functions is undecidable, so in \versecalc{} we simply refuse to run
-a program that tries to do so, just as we refuse to run |applyN gt (3, lam x x)| (\Cref{sec:beta}).
+a program that tries to do so, just as we refuse to run |applyN gt (3, lam x x)| (see \Cref{sec:beta}).
 This choice has consequences for confluence: see \Cref{sec:unifying-lambda}.
 
 The standard ``occurs check'' is rule \rulename{u-occurs}, which makes use of a
-\emph{context} |V|, whose syntax is given in \cref{fig:contexts}
-\cite{felleisen:contexts1,felleisen:contexts2}.
-In general, a context is a syntax tree containing a single hole, written |hole|.
+\emph{context} |V|, whose syntax is given in \cref{fig:contexts}.
+In general, a context \cite{felleisen:contexts1,felleisen:contexts2} is a syntax tree containing a single hole, written |hole|.
 The notation |V^[v]| is the term obtained by filling the hole
 in |V| with |v|.  For example, \rulename{u-occurs} reduces |x == tup(1,x,3); e| to |fail|
 using the context |V| = |tup( 1, hole , 3)|.
@@ -1309,7 +1308,7 @@ suffice to express the necessary sharing.
   For example, we can rewrite |(y==x+1; (x==3; x+3))| to |(y==x+1; (x==3; 3+3))|, using
   |X == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
   When there are no remaining occurrences of |x|, we may eliminate
-  the binding as a separate step: see \cref{sec:gc}.
+  the binding by using rule \rulename{eqn-elim} (see \cref{sec:gc}).
 \item The side condition $|v| \not= |V^[x]|$ in \rulename{subst} avoids an overlap with \rulename{u-occurs}.
 \end{itemize}
 
@@ -1391,10 +1390,11 @@ and that is what we need for the proof (but see \Cref{sec:simpler}).
 Four \emph{elimination} rules allow dead code to be dropped (\cref{fig:rules}):
 \rulename{val-elim} discards a value to the left of a semicolon; \rulename{exi-elim} discards
 a dead existential; \rulename{eqn-elim} discards an existential $|defKW| |x|$ that binds a variable whose only
-occurrence is a single equation |x=v|; and \rulename{fail-elim} discards the context surrounding a |fail|.
-Note that none of these rules, except \rulename{fail-elim}, discard an unevaluated expression,
+occurrence is a single equation |x=v|; and \rulename{fail-elim} discards the execution context surrounding a |fail|.
+Note that none of these rules, except \rulename{fail-elim}, discards an unevaluated expression,
 because that expression might fail and we don't want to ``lose'' that failure (see \cref{sec:lenient}).
-The exception is \rulename{fail-elim}, which propagates failure.
+The exception is \rulename{fail-elim}, whose purpose is to propagate a known failure, so losing some other failure
+that might have been in the discarded execution context doesn't matter.
 
 Four \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
@@ -1411,7 +1411,7 @@ Rule \rulename{exi-swap} is unusual because it can be infinitely applied;
 avoiding that eventuality is easily achieved by tweaking the evaluation strategy (\cref{sec:eval-strategy}).
 
 Note that all these swapping and normalization rules \emph{preserve the left-to-right sequencing of expressions},
-which matters because choices are made left to right as we saw in \cref{sec:mixing}.
+which matters because choices are made left-to-right, as we saw in \cref{sec:mixing}.
 Moreover, the rules do not float equalities or existentials out of choices:
 that restriction is the key to localizing unification (\cref{sec:mixing}) and
 to the flexible/rigid distinction of
@@ -1461,7 +1461,7 @@ The rules for choice are given in \cref{fig:rules}:
 The most interesting rule is \rulename{choose}, which, just as described in \cref{sec:choice},
 ``floats the choice outwards,'' duplicating the surrounding context.
 But what ``surrounding context'' precisely? We use two new contexts, |SX| and |CX|, both
-defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like a
+defined in \cref{fig:contexts}. A \emph{choice context} |CX| is like an
 execution context |X|, \emph{but with no possible
 choices to the left of the hole}:
 \begin{center}$
@@ -1484,7 +1484,7 @@ $$
  \movestoR{val-elim, eqn-elim}   \;\;  |77 choice 99|\\
 \end{array}
 $$
-But suppose instead we floated the choice out, \emph{partway}, like this\footnote{
+But suppose instead we floated the choice out \emph{partway}, like this\footnote{
   As in the previous example, here and elsewhere we freely rewrite terms that have not
   been fully desugared, but that is just an expository aid;
   formally, the rewrite rules of \cref{fig:rules} apply only to programs in the basic ``Syntax'' language of \cref{fig:syntax}.}:
@@ -1571,7 +1571,7 @@ reifies these results into an array, the multiplicity of results is visible to t
 the length of the returned array.
 Moreover, consider
 $$
-|all (def (x, y) (x = ((y=3;1) `choice`(y=4;2)0); y))|
+|all (def (x, y) (x = ((y=3;1) `choice`(y=4;2)); y))|
 $$
 In \versecalc{}, the expression to which |x| is equated must be evaluated, yielding two values, |1| and |2|, which are then discarded since
 |x| is unused.  However, each of these
@@ -1605,7 +1605,7 @@ But for \versecalc{} lenience has \emph{semantic} significance, too, as we see i
 % Here, |y| does not get a value until |x| is known; but |x| does not get its
 % value (in this case |7|) until |f| is called.  Without lenience this program would be stuck.
 
-So in \versecalc{} functions can be called on as-yet-evaluated arguments,
+So in \versecalc{} functions can be called on as-yet-unevaluated arguments,
 but almost all redexes that are not under a lambda get evaluated eventually.   You can see this
 enforced in the rule for |oneKW| in \Cref{fig:rules}, which fires only when the first choice
 in the body is a value $|v|$, and similarly for |allKW|.
@@ -1642,13 +1642,13 @@ rule \textbeta{} to \textbeta V, we change the language from call-by-name to cal
 adding {\bf let}, plus suitable rewrite rules, we can express call-by-need \cite{ariola:call-by-need}.
 In \versecalc{}, the rewrite rules are carefully crafted in a similar way; for example, \rulename{subst} will
 substitute |x==v| only when the equation binds a variable to a \emph{value}, rather like \textbeta V in
-lambda calculus.  Similarly, the elimination rules never discard a term that could fail.
+the lambda calculus.  Similarly, the elimination rules never discard a term that could fail.
 
 In any term there may of course be many redexes---that is good.
 An \emph{evaluation strategy} answers the question: given a closed term, which unique redex,
 out of the many possible redexes, should be rewritten next to make progress toward the result?
 Let us call an evaluation strategy \emph{normalizing} if it guarantees to terminate if there
-is \emph{any} terminating sequence of reductions; \ie, if any path terminates with a value,
+is \emph{any} terminating sequence of reductions---that is, if any path terminates with a value,
 then a normalizing evaluation strategy will terminate with that same value\footnote{
 It would be even better if the strategy could guarantee to find the
 result in the minimal number of rewrite steps---so-called ``optimal reduction'' \cite{levy1978reductions,lamping1989algorithm,asperti1998optimal}---but optimal reduction is typically very hard, even in theory, and
@@ -1709,9 +1709,9 @@ this is \emph{logical completeness}.
 Alas, in practice logical completeness is well out of reach, at least
 in systems that support arithmetic.
 For example, consider |def x ((x*x*x + 3*x - 8) = 0; x)| (assuming a version of \versecalc{} extended to have
-a multiplication operator $*$).
+a multiplication operator |*| and subtraction operator~|-|).
 To solve this would require solving a cubic
-equation, and it is equally easy to express intractable problems like Fermat's last theorem.
+equation, and it is equally easy to express very difficult problems such as Fermat's last theorem.
 Moreover, remembering that \versecalc{} is deterministic, in what order would the (infinite sequence of)
 results of, say, |def x (x+1)| be returned?
 So instead we satisfy ourselves with a computable and deterministic approximation
