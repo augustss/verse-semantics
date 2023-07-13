@@ -1417,7 +1417,7 @@ Moreover, the rules do not float equalities or existentials out of choices:
 that restriction is the key to localizing unification (\cref{sec:mixing}) and
 to the flexible/rigid distinction of
 \cref{sec:rigid}. For example, consider the expression
-|(y == ((x==3; x+5) choice (x==4)); tup (x+1,y))|.
+|(y == ((x==3; x+5) choice (x==4;x+2)); tup (x+1,y))|.
 We must not float the binding |(x==3)| up to a point where it might interact with the expression |(x+1)|,
 because the latter is outside the choice, and a different branch of the choice binds |x| to |4|.
 
@@ -1668,7 +1668,7 @@ With that done, we believe that a fair outermost strategy is normalizing for
 \versecalc{}: at each step, just select any redex that is not within a lambda or another redex.
 That sounds easy, but is tricky in practice for two reasons.
 First, a reduction may ``unlock'' a redex far to its left.
-For example, consider |(x+y; tup(x,3)==tup(2,y));x|.  The |(x+y)| is not a
+For example, consider |(x+y; tup(x,3)==tup(2,y);x)|.  The |(x+y)| is not a
 redex, but the equation is; we can apply unification to get |(x==2; y==3)|, and then
 use substitution to rewrite the |(x+y)| to |(2+3)|; and
 \emph{now} the |(2+3)| is a redex. Hence, a challenge for an implementation is to
@@ -1709,7 +1709,7 @@ to find \emph{all} substitutions for the logical variables that satisfy the equa
 this is \emph{logical completeness}.
 Alas, in practice logical completeness is well out of reach, at least
 in systems that support arithmetic.
-For example, consider |def x ((x*x*x + 3*x - 8) = 0)| (assuming a version of \versecalc{} extended to have
+For example, consider |def x ((x*x*x + 3*x - 8) = 0; x)| (assuming a version of \versecalc{} extended to have
 a multiplication operator $*$).
 To solve this would require solving a cubic
 equation, and it is equally easy to express intractable problems like Fermat's last theorem.
