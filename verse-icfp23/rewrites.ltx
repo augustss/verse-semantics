@@ -177,7 +177,7 @@
       \begin{array}{lr@@{\;}c@@{\;}l@@{}}
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-      \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \emptyset \\
+      \text{Programs} & p  & ::=  & |one e| \qquad \text{where} \; \freevars{e} = \emptyset \\
       \text{Expressions}   & e     & ::= & |v| \vb |eq ; e| \vb |def x e| \vb |fail|
                                            \vb |e_1 choice e_2| \vb |apply1N v_1 v_2|
                              \vb |one e| \vb |all e| \\
@@ -200,12 +200,14 @@
       \\[-0.9em]
       \text{\emph{Concrete syntax}:} \;\;
       \begin{array}[t]{l}
-            \text{``|choice|'' and ``;'' are right-associative} \\
-            \text{``|choice|'' and ``|==|'' bind more tightly than ``;''} \\
-            \text{``$\lambda$'', ``|defKW|'' scope as far to the right as possible} \\
+            \text{``|choice|'' and ``;'' are right-associative.} \\
+            \text{``|choice|'' and ``|==|'' bind more tightly than ``;''.} \\
+            \text{``$\lambda$'' and ``|defKW|'' each scope as far to the right as possible.} \\
             \hspace{1.2em} \text{{\eg}, |(lam y (def x (x==1; x+y)))| means |(lam y ((def x (((x==1); (x+y))))))|} \\
       \end{array} \\
       \text{Parentheses may be used freely to aid readability and override default precedence.}\\
+      \text{$\freevars{|e|}$ means the free variables of |e|; in
+    \versecalc{}, $\lambda$ and |defKW| are the only binders.} \\
   \\[-0.6em]
       \textbf{Desugaring} \\
 %%    \begin{array}{rcl@@{\hspace{4em}}l}
@@ -217,10 +219,10 @@
       |v_1 + v_2| & \text{means} & |applyN add ( v_1, v_2 ) | & \\
       |v_1 > v_2| & \text{means} & |applyN gt ( v_1, v_2 ) | & \\
       |def (x_1 ^^ x_2 xdots x_n) e| & \text{means} & |def x_1 (def x_2 (xdots ^ def x_n e))| & \\
-      |e_1 e_2| & \text{means}^* & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
-      |tup (e_1, xdots, e_n)| & \text{means}^* &
+      |e_1 e_2| & \text{means\rlap{${}^\dag$}} & |def (f^^ x) (f == e_1 ; x == e_2; apply1N f x)|  & |f,x|\ \text{fresh} \\
+      |tup (e_1, xdots, e_n)| & \text{means\rlap{${}^\dag$}} &
           |def (x_1 ^^ x_2 xdots x_n) (x_1==e_1; xdots; x_n==e_n; tup (x_1,xdots, x_n))| & \text{|x_i| fresh} \\
-      |e_1 == e_2|      & \text{means}^* & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
+      |e_1 == e_2|      & \text{means\rlap{${}^\ddag$}} & |def x (x == e_1 ; x == e_2; x)|       & |x|\ \text{fresh} \\
 %      |e_1 ; e_2|      & \text{means} & |def x (e_1; x == e_2 ; x)|       & |x|\ \text{fresh} \\
 
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
@@ -235,10 +237,10 @@
       |e_1 > e_2| & \text{means} & |applyN gt ( e_1, e_2 ) | & \\
       |def (x_1 ^^ x_2 xdots x_n) e| & \text{means} & |def x_1 (def x_2 (xdots ^ def x_n e))| & \\
       |x :== e_1; e_2| & \text{means} & |def x (x == e_1; e_2)| \\
-      |e_1 e_2| & \text{means}^* & |f :== e_1 ; x :== e_2; apply1N f x|  & |f,x|\ \text{fresh} \\
-      |tup (e_1, xdots, e_n)| & \text{means}^* &
+      |e_1 e_2| & \text{means\rlap{${}^\dag$}} & |f :== e_1 ; x :== e_2; apply1N f x|  & |f,x|\ \text{fresh} \\
+      |tup (e_1, xdots, e_n)| & \text{means\rlap{${}^\dag$}} &
           |x_1:==e_1; xdots; x_n:==e_n; tup (x_1,xdots, x_n)| & \text{|x_i| fresh} \\
-      |e_1 == e_2|      & \text{means}^* & |x :== e_1 ; x == e_2; x|       & |x|\ \text{fresh} \\
+      |e_1 == e_2|      & \text{means\rlap{${}^\ddag$}} & |x :== e_1 ; x == e_2; x|       & |x|\ \text{fresh} \\
 
 %       |for^(e_1) do e_2| & \text{means} & |def v (v == all (e_1; thunk e_2); applyN map (lam z (apply0 z), v))|
 %      |lamhdr emptytup^^ e| & \text{means} & |lam p (p == emptytup; e)| & \text{|p| fresh} \\
@@ -247,12 +249,12 @@
 %      |if e_1 then e_2 else e_3| & \text{means}
 %         & |y :== one( (e_1; thunk e_2) choice (thunk e_3)); apply0 y| & \text{|y| fresh} \\
       |if (def (x_1^^xdots^^x_n) e_1) then e_2 else e_3| & \text{means}
-         & \multicolumn{2}{@@{}l}{|apply0(one( (def (x_1^^xdots^^x_n) e_1; thunk e_2) choice (thunk e_3)))|} \\
+         & \multicolumn{2}{l}{|apply0(one( (def (x_1^^xdots^^x_n) e_1; thunk e_2) choice (thunk e_3)))|} \\
 \fi
     \end{array} \\
   \\[-0.6em]
-  (*)\; \text{Apply this rule only if at least one of the |e_i| is not a value |v|} \\
-  \text{$\freevars{|e|}$ means the free variables of |e|; in \versecalc{}, $\lambda$ and |defKW| are the only binders.}
+  {}^\dag\text{Apply this rule only if at least one of the |e_i| is not a value |v|.} \\
+  {}^\ddag\text{Apply this rule only if |e_1| is not a value |v|.}
   %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
   \end{array}
   $$
