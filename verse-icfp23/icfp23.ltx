@@ -1261,7 +1261,7 @@ The standard ``occurs check'' is rule \rulename{u-occurs}, which makes use of a
 \cite{felleisen:contexts1,felleisen:contexts2}.
 In general, a context is a syntax tree containing a single hole, written |hole|.
 The notation |V^[v]| is the term obtained by filling the hole
-in |V| with |v|.  For example, \rulename{u-occurs} reduces |x == tup(1,x,3)| to |fail|
+in |V| with |v|.  For example, \rulename{u-occurs} reduces |x == tup(1,x,3); e| to |fail|
 using the context |V| = |tup( 1, hole , 3)|.
 
 
@@ -1308,8 +1308,8 @@ suffice to express the necessary sharing.
   big enough to encompass all occurrences of |x|.
   For example, we can rewrite |(y==x+1; (x==3; x+3))| to |(y==x+1; (x==3; 3+3))|, using
   |X == hole|, where the |hole| is |x==3; x+3|.  But that leaves an occurrence of |x| in |(y==x+1)|.
-  When there are no remaining occurrences of |x| we may eliminate
-  the binding: see \cref{sec:gc}.
+  When there are no remaining occurrences of |x|, we may eliminate
+  the binding as a separate step: see \cref{sec:gc}.
 \item The side condition $|v| \not= |V^[x]|$ in \rulename{subst} avoids an overlap with \rulename{u-occurs}.
 \end{itemize}
 
@@ -1402,7 +1402,7 @@ allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an e
 of the right-hand side of an equation |v==e|.
 For example, we cannot use \rulename{subst} to substitute for |x| in |(x == (e; 3); x+2)|,
 because the RHS of the |x|-equation is not a value; but we can instead apply \rulename{eqn-float}
-to get |(e; x==3); x+2|, and then \rulename{seq-assoc} to get |e; x==3; x+2|; and now we \emph{can}
+to get |e; x==3; x+2|, and now we \emph{can}
 apply \rulename{subst}.
 
 Rule \rulename{exi-swap} allows you to move an existential inward so that a dead equation can be eliminated
@@ -1571,7 +1571,7 @@ reifies these results into an array, the multiplicity of results is visible to t
 the length of the returned array.
 Moreover, consider
 $$
-|all (def (x, y) (x = (y=3;1 `choice` y=4;2); y))|
+|all (def (x, y) (x = ((y=3;1) `choice`(y=4;2)); y))|
 $$
 In \versecalc{}, the expression to which |x| is equated must be evaluated, yielding two values, |1| and |2|, which are then discarded since
 |x| is unused.  However, each of these
