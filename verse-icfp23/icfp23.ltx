@@ -618,7 +618,7 @@ As an example, what might be written |llet x e_1 e_2| in a conventional function
 |def x (x==e_1; e_2)| in \versecalc{}.  The syntax carefully constrains both the form of
 equations and where they can appear: an equation |(v==e)| always equates a \emph{value} $v$ to an expression $e$;
 and an equation can only appear to the left of a ``|;|'' (see |eq| in \cref{fig:syntax}).
-The desugaring rules in \cref{fig:syntax} rewrite a general equation |e_1 == e_2| into this simpler form.
+The desugaring rules in \cref{fig:syntax} rewrite a general equation |e_1 == e_2| (where |e_1| is not a value) into equations of this simpler form.
 
 \emph{A program executes by solving its equations}, using the process of unification.
 For example,
@@ -971,13 +971,7 @@ $\movesto$
 
 \begin{figure}
   $$
-  \begin{array}{l}
-    \textbf{Desugaring}\\
-    \begin{array}{rcll}
-      |apply1 f x :== e| & \text{means} & |f :== lam x e| \\
-      |applyN f (x,y) :== e| & \text{means} & |f :== lam (tup (x,y)) e|  \\
-     \end{array} \\ \\[-3mm]
-
+  \begin{array}{@@{\qquad}l}
     \begin{array}{rcl}
       |apply1 head xsl| & |:==|  & |apply1 xsl 0| \\
       |apply1 tail xsl| & |:==|  & |all (def i (i > 0; apply1 xsl i))| \\
@@ -991,7 +985,12 @@ $\movesto$
       |applyN some (p, xsl)| & |:==| & |one (def i (apply1 p (apply1 xsl i)))|\\
 %      |applyN fromTo (lo,hi)| & |:==| & |if lo > hi then fail else (lo `choice` applyN fromTo (lo+1,hi))|
       |applyN zip (xsl,ysl)| & |:==| & |all (def i (tup (apply1 xsl i, apply1 ysl i)))| \\
-    \end{array}
+    \end{array} \\ \\[-3mm]
+    \multicolumn{1}{@@{}l}{\textbf{Desugaring of function definitions}}\\
+    \begin{array}{rcll}
+      |apply1 f x :== e| & \text{means} & |f :== lam x e| \\
+      |applyN f (x,y) :== e| & \text{means} & |f :== lam (tup (x,y)) e|  \\
+     \end{array}
   \end{array}
   $$
 \caption{Functions on tuples, analogous to list or array functions in some other languages} \label{fig:list-functions}
