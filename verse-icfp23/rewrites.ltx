@@ -209,7 +209,7 @@
       \text{$\freevars{|e|}$ means the free variables of |e|; in
     \versecalc{}, $\lambda$ and |defKW| are the only binders.} \\
   \\[-0.6em]
-      \textbf{Desugaring} \\
+      \textbf{Desugaring of extended expressions} \\
 %%    \begin{array}{rcl@@{\hspace{4em}}l}
     \begin{array}{rcl@@{\hspace{3.2em}}l}
 %%      |emptytup| & \text{means} & |arr ()|\\
@@ -254,7 +254,7 @@
     \end{array} \\
   \\[-0.6em]
   {}^\dag\text{Apply this rule only if at least one of the |e_i| is not a value |v|.} \\
-  {}^\ddag\text{Apply this rule only if |e_1| is not a value |v|.}
+  {}^\ddag\text{Apply this rule only if either (i) |e_1| is not a value |v|, or (ii) |e_1 == e_2| is not to the left of a ``;''.}
   %\text{$S_1 \disjoint S_2$ means that set $S_1$ is disjoint from $S_2$.}
   \end{array}
   $$
