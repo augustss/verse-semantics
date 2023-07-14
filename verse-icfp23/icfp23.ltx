@@ -111,6 +111,8 @@
 \newif\iffullverse
 \fullversefalse
 % use \iffullverse \else \fi
+\newif\iffullpaper
+\fullpaperfalse     %% include appendicies
 
 % ---------------- Useful macros ----------------
 \renewcommand{\arraystretch}{1.1}
@@ -121,7 +123,7 @@
 \definecolor{olive}{rgb}{0.5, 0.5, 0.0}
 \definecolor{dkblue}{rgb}{0,0.1,0.5}
 
-\iftrue  % iftrue to enable, iffalse to disable
+\iffullpaper  % iftrue to enable, iffalse to disable
 \newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
 \newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
 \newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
@@ -137,6 +139,12 @@
 \newcommand{\olin}[1]{}
 \newcommand{\ranjit}[1]{}
 \newcommand{\guy}[1]{}
+\fi
+
+\iffullpaper
+\newcommand{\fullcref}[2]{\cref{#2}}
+\else
+\newcommand{\fullcref}[2]{Appendix #1 of \citet{fullversepaper}}
 \fi
 
 % ---------------- End of comments -----------------
@@ -1134,7 +1142,7 @@ Here are some possibilities:
 \item \emph{A denotational semantics} is the classical approach,
   but it is tricky to give a (perspicuous) denotational semantics to a functional logic language
   because of the logical variables.  We have such a denotational semantics under development,
-  which we offer for completeness in \cref{sec:den-sem}, but that is the subject of another paper.
+  which we offer for completeness in \fullcref{E}{sec:den-sem}, but that is the subject of another paper.
 \item \emph{A big-step operational semantics} typically involves explaining how a (heap, expression) starting point
   evaluates to a (heap, value) pair; Launchbury's natural semantics for lazy evaluation~\cite{launchbury:natural} is the classic paper.  The heap, threaded through the semantics, accounts for updating thunks as they are evaluated.
   Despite its ``operational semantics'' title, the big-step approach
@@ -1960,7 +1968,7 @@ The first is simply to abandon confluence as a goal altogether.
 Confluence is, after all, purely \emph{syntactic}, and hence
 much stronger than what we really need, which is only that each of our rules be
 \emph{semantics}-preserving.  But that, of course, requires
-an independent notion of semantics, a~direction we sketch in \cref{sec:den-sem}.
+an independent notion of semantics, a~direction we sketch in \fullcref{E}{sec:den-sem}.
 
 Second, we can simply exclude programs that unify lambdas, or that use
 recursion.
@@ -2002,15 +2010,17 @@ Our third approach is to adopt the idea of \emph{skew confluence}
 \cite{ariola:skew-confluence}, a clever technique developed
 specifically to handle the even/odd problem; we give an overview of skew confluence
 in \cref{sec:skew-overview-2}, and
-provide details of our approach to a proof of skew confluence for \versecalc{} in \cref{sec:skew-confluence},
-including several new lemmas, but we emphasize that the proof of skew confluence is not yet complete.
+provide details of our approach to a proof of skew confluence
+%% for \versecalc{}
+in \fullcref{D}{sec:skew-confluence},
+with several new lemmas, but we emphasize that the proof of skew confluence is not yet complete.
 
 
 \noindent
 \subsection{Proof of confluence} \label{sec:confluence-sketch}
 
 Our main result is that \versecalc{}'s reduction rules are confluent for well-behaved terms.
-We sketch the proof here, with full details in \cref{sec:confluence} (and relevant preliminaries in \cref{sec:preliminaries}).
+We sketch the proof here, with full details in \fullcref{C}{sec:confluence}\iffullpaper(and relevant preliminaries in \fullcref{B}{sec:preliminaries}).\else.\fi
 
 
 \begin{theorem}[Confluence] \label{thm:confluence-sketch}
@@ -2097,7 +2107,7 @@ with unification and cannot be factored out via a commutativity argument.
 %
 Instead, we prove that the union of unification and normalization
 is confluent by showing that unification \emph{postpones after}
-normalization \cite{Hindley}; see \cref{sec:confluence} for the gory details.
+normalization \cite{Hindley}; see \fullcref{C}{sec:confluence} for the gory details.
 %
 % , \ie, informally speaking, that a
 % mixed sequence of unification-or-normalization steps can be reordered
@@ -2237,8 +2247,8 @@ to a \emph{sequence} (right-associative tree) of \emph{choices} of such outer sh
 For example, however far we reduce the term |tup (68, lam x e_1) `choice` tup (lam y e_2, 57, lam z e_3) `choice` e_4|,
 the result will always look like |tup (68, lam x e1')  `choice` tup (lam y e2', 57, lam z e3') `choice` e4'|,
 where $\rsteps{\rr}{e_k}{e_k'}$ for $1 \leq k \leq 4$.
-In \cref{sec:skew-confluence} we sketch our plan to adapt the proof strategy
-of \cref{sec:confluence-sketch} and \cref{sec:confluence} for skew confluence.
+In \fullcref{D}{sec:skew-confluence} we sketch our plan to adapt the proof strategy
+of \cref{sec:confluence-sketch} and \fullcref{C}{sec:confluence} for skew confluence.
 
 
 % ----------------------- Variations
@@ -2337,7 +2347,7 @@ $$
 \rulename{sort} \quad   |(right e_1) choice (left e_2)| \movesto |(left e_2) choice (right e_1)|
 $$
 We believe this can be made to work, and it would allow more programs to evaluate, but it adds unwelcome clutter to program terms, and the cure may be worse than the disease. However, the idea inspired our denotational
-semantics (\cref{sec:order-sensitive}), where it seems to work rather beautifully.
+semantics (\fullcref{E.4}{sec:order-sensitive}), where it seems to work rather beautifully.
 
 \subsection{Generalizing \texorpdfstring{|oneKW|}{``one''} and \texorpdfstring{|allKW|}{``all''}} \label{sec:split}
 
@@ -2350,7 +2360,7 @@ We could have introduced a more general operator |splitKW|\footnote{The name |sp
 \end{array}\]
 The intuition behind |splitKW| is that it distinguishes a failing computation from one that returns at least one value.
 If |e| fails, it calls |f|; but if |e| returns at least one value, it passes that to |g| together with the remaining computation, safely tucked away within a lambda.
-When adding more effects to \versecalc{} (see \cref{sec:store}), it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
+When adding more effects to \versecalc{} (see \fullcref{F}{sec:store}), it is in fact crucial to use $|splitKW|$ to exactly control the order of effects.
 
 Indeed, this is more general, as we can implement |oneKW| and |allKW| with |splitKW|:
 \[\begin{array}{r@@{\;}l@@{\;}l@@{\;}l}
@@ -2482,7 +2492,7 @@ This determinism has a price: we have to take care to maintain the
 left-to-right order of choices (see \cref{sec:mixing} and \cref{sec:choice-rules}, for example).
 However, maintaining that order has other payoffs. For example, it is relatively easy to add
 effects other than choice, including mutable variables and input/output, to \versecalc{}.
-To substantiate this claim, \cref{sec:store} gives the additional syntax and rewrite rules
+To substantiate this claim, \fullcref{F}{sec:store} gives the additional syntax and rewrite rules
 for mutable variables.
 
 Thirdly, |oneKW| allows us to reify failure: to try something and take different actions
@@ -2783,8 +2793,8 @@ work.  The full Verse language also has a statically checked effect system,
 including both mutable references and input/output.  All these effects
 must be \emph{transactional}; for example, when the condition of an |if|
 fails, any store effects in the condition must be rolled back.
-We have preliminary reduction rules for updateable references
-(see \cref{sec:store}).
+We have preliminary reduction rules for references
+see \fullcref{F}{sec:store}.
 
 % -------------------- Acknowledgements ----------------
 \begin{acks}                            %% acks environment is optional
@@ -2811,53 +2821,15 @@ We have preliminary reduction rules for updateable references
 % -------------------- Bibliography ----------------
 \bibliography{../verse}
 
+\iffullpaper
 \clearpage
 
 \appendix
 
 \clearpage
-% ----------------------- Example
+\input{appendixA}
 
-\section{Example}
-A complete reduction sequence for a small example can be found in \cref{fig:sample-reductions}.
-This example shows how constraining the output of a function call can constrain the argument.
-While most of the reductions are administrative in nature, these are the highlights:
-At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a \textbeta-reduction can happen.
-Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
-At \circlednum{5} and \circlednum{6} the actual numbers are inlined.
-\begin{figure}[h]
-\begin{footnotesize}
-% no space needed around math environments in a figure
-\setlength{\abovedisplayskip}{0pt}%
-\setlength{\belowdisplayskip}{0pt}%
-$$
-\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
-                &                    & |applyN swap (x,y) :== tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
-                & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
-
-
-\circlednum{1}  & \movestoR{subst,eqn-elim}   & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
-                & \movestoR{subst,eqn-elim}   & |def p ((2,3) == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
-\circlednum{2}  & \movestoR{app-beta}          & |def p ((2,3) == (def xy (xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-                & \movestoR{exi-float}          & |def (p ^^ xy) ((2,3) == ((xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
-\circlednum{3}  & \movestoR{subst,eqn-elim}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
-                & \movestoR{exi-float,exi-float} & |def (p ^^ x ^^ y) ((2,3) == (tup (x,y) == p ; tup (y,x)) ; p)| \\
-                & \movestoR{eqn-float,seq-assoc}& |def (p ^^ x ^^ y) (tup (x,y) == p; (2,3) == tup (y,x) ; p)| \\
-                & \movestoR{hnf-swap}          & |def (p ^^ x ^^ y) (p == tup (x,y); (2,3) == tup (y,x) ; p)| \\
-                & \movestoR{subst,eqn-elim}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
-\circlednum{4}  & \movestoR{u-tup,seq-assoc}    & |def (x ^^ y) (2==y; 3==x; tup(x,y))| \\
-                & \movestoR{hnf-swap}          & |def (x ^^ y) (y==2; 3==x; tup(x,y))| \\
-\circlednum{5}  & \movestoR{subst,eqn-elim}   & |def x (3==x; tup(x,2))| \\
-                & \movestoR{hnf-swap}          & |def x (x==3; tup(x,2))| \\
-\circlednum{6}  & \movestoR{subst,eqn-elim}   & |tup(3,2)| \\
-\end{array}
-$$
-\end{footnotesize}
-\caption{A sample reduction sequence} \label{fig:sample-reductions}
-\Description{A sample reduction sequence}
-\end{figure}
-
-
+\clearpage
 \input{../confluence/03-preliminaries}
 \input{../confluence/04-confluence}
 
@@ -2872,6 +2844,7 @@ $$
 \clearpage
 \input{store-icfp23}
 
+\fi
 
 \end{document}
 

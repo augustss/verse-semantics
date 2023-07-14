@@ -1,0 +1,47 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% ----------------------- Example
+
+\section{Example}
+A complete reduction sequence for a small example can be found in \cref{fig:sample-reductions}.
+This example shows how constraining the output of a function call can constrain the argument.
+While most of the reductions are administrative in nature, these are the highlights:
+At \circlednum{1} the |swap| function is inlined so that at \circlednum{2} a \textbeta-reduction can happen.
+Step \circlednum{3} inlines the argument, and \circlednum{4} does the matching of the tuple.
+At \circlednum{5} and \circlednum{6} the actual numbers are inlined.
+\begin{figure}[h]
+\begin{footnotesize}
+% no space needed around math environments in a figure
+\setlength{\abovedisplayskip}{0pt}%
+\setlength{\belowdisplayskip}{0pt}%
+$$
+\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
+                &                    & |applyN swap (x,y) :== tup(y, x); def (p) (apply1 swap p = tup(2,3); p)| \\
+                & \movestoR{desugar} & |def (swap) (swap == (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; def (p ^^ t) (t == apply1 swap(p) ; t == tup (2,3) ; p))| \\
+
+
+\circlednum{1}  & \movestoR{subst,eqn-elim}   & |def (p ^^ t) (t == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; t == tup (2,3) ; p)| \\
+                & \movestoR{subst,eqn-elim}   & |def p ((2,3) == apply1 (lam xy (def (x ^^ y) (tup (x,y) == xy ; tup (y,x))))(p) ; p)| \\
+\circlednum{2}  & \movestoR{app-beta}          & |def p ((2,3) == (def xy (xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
+                & \movestoR{exi-float}          & |def (p ^^ xy) ((2,3) == ((xy == p; def (x ^^ y) (tup (x,y) == xy ; tup (y,x)))) ; p)| \\
+\circlednum{3}  & \movestoR{subst,eqn-elim}   & |def p ((2,3) == (def (x ^^ y) (tup (x,y) == p ; tup (y,x))) ; p)| \\
+                & \movestoR{exi-float,exi-float} & |def (p ^^ x ^^ y) ((2,3) == (tup (x,y) == p ; tup (y,x)) ; p)| \\
+                & \movestoR{eqn-float,seq-assoc}& |def (p ^^ x ^^ y) (tup (x,y) == p; (2,3) == tup (y,x) ; p)| \\
+                & \movestoR{hnf-swap}          & |def (p ^^ x ^^ y) (p == tup (x,y); (2,3) == tup (y,x) ; p)| \\
+                & \movestoR{subst,eqn-elim}   & |def (x ^^ y) ((2,3) == tup (y,x) ; tup(x,y))| \\
+\circlednum{4}  & \movestoR{u-tup,seq-assoc}    & |def (x ^^ y) (2==y; 3==x; tup(x,y))| \\
+                & \movestoR{hnf-swap}          & |def (x ^^ y) (y==2; 3==x; tup(x,y))| \\
+\circlednum{5}  & \movestoR{subst,eqn-elim}   & |def x (3==x; tup(x,2))| \\
+                & \movestoR{hnf-swap}          & |def x (x==3; tup(x,2))| \\
+\circlednum{6}  & \movestoR{subst,eqn-elim}   & |tup(3,2)| \\
+\end{array}
+$$
+\end{footnotesize}
+\caption{A sample reduction sequence} \label{fig:sample-reductions}
+\Description{A sample reduction sequence}
+\end{figure}
+
