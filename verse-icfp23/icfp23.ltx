@@ -590,7 +590,7 @@ an \emph{equation} |v==e|; this syntax ensures that equations can only occur to 
 \end{itemize}
 The formal syntax for |e| allows only applications of \emph{values} to \emph{values}, |(v_1 v_2)|, but the desugaring
 rules in \cref{fig:syntax} show how to desugar more applications |(e_1 e_2)|. This restriction
-not fundamental; it simply reduces the number of rewrite rules we need\footnote{
+is not fundamental; it simply reduces the number of rewrite rules we need\footnote{
 This is a common pattern, often called
   ``administrative normal form'', or ANF \cite{felleisen:anf}}.
 The desugaring rules are more suggestive than precise; we aim to be precise about \versecalc{} but
