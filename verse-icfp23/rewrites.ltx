@@ -201,9 +201,9 @@
       \text{\emph{Concrete syntax}:} \;\;
       \begin{array}[t]{l}
             \text{``|choice|'' and ``;'' are right-associative.} \\
-            \text{``|choice|'' and ``|==|'' bind more tightly than ``;''.} \\
+            \text{``|==|'' binds more tightly than ``;''.} \\
             \text{``$\lambda$'' and ``|defKW|'' each scope as far to the right as possible.} \\
-            \hspace{1.2em} \text{{\eg}, |(lam y (def x (x==1; x+y)))| means |(lam y ((def x (((x==1); (x+y))))))|} \\
+            \hspace{1.2em} \text{For example, |(lam y (def x (x==1; x+y)))| means |(lam y ((def x (((x==1); (x+y))))))|.} \\
       \end{array} \\
       \text{Parentheses may be used freely to aid readability and override default precedence.}\\
       \text{$\freevars{|e|}$ means the free variables of |e|; in
