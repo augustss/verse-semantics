@@ -124,9 +124,9 @@ If the reduction of |e| results in a value (with or without more alternatives) t
 \rulename{st-split} is used.  This rule replaces the outer store with the inner store,
 since we know the inner computation has succeeded.
 
-Similarely, the reduction of |e_1 `choice` e_2| will duplicate the store into the first branch, \rulename{st-choice-dup}.
+Similarly, the reduction of |e_1 `choice` e_2| will duplicate the store into the first branch, \rulename{st-choice-dup}.
 Here |e_1| must not contain any store operation nor be a value.
-And again, similarely, \rulename{st-choice} commits the new store and throws away the old.
+And again, similarly, \rulename{st-choice} commits the new store and throws away the old.
 
 The use of |oe| in the rules is to ensure that the rules cannot get stuck in a loop.
 Using |e| instead of |oe| would mean that failing or committing would make the expression match the duplication rule again.
