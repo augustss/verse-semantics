@@ -178,7 +178,8 @@
 %format all (x) = "\textbf{all}\{" x "\}"
 %format all2 (r) (x) = "\textbf{all}("r")\{" x "\}"
 %format splitKW = "\textbf{split}"
-%format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
+%%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
+%format split (x) (y) (z) = "\textbf{split}\{" x "\}\langle" y "," z "\rangle"
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
 %format def (x) (y) = "\exists" x ".\," y
