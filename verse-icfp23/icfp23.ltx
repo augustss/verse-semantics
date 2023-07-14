@@ -1980,8 +1980,8 @@ To be precise:
 \begin{itemize}
 \item An equation is \emph{obviously problematic} if either
   \begin{itemize}
-  \item it is an equation of the form |x == V^[lam y e]|, where $x \in \freevars{e}$, or
-  \item it is an equation of form |hnf = lam x e| or |lam x e = hnf|.
+  \item it is an equation of form |hnf = lam x e| or |lam x e = hnf|, or
+  \item it is an equation of the form |x == V^[lam y e]|, where $x \in \freevars{e}$.
   \end{itemize}
 \item A term $e$ is \emph{obviously problematic} if it contains an obviously problematic equation.
 \item A term $e$ is \emph{problematic} if there exists an obviously problematic term $e'$
