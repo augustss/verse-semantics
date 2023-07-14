@@ -1877,7 +1877,7 @@ That choice has two consequences. One is easy to handle, one is tiresome.
 
 First, while \rulename{u-lit} lets us eliminate equalities on the same literal $|k == k|$,
 \versecalc{} has no analogous \rulename{u-var} rule to drop equalities on the same variable $|x == x|$.
-To see why not, suppose we had such a \rulename{u-var}, and consider the term |(def x (x==(lam y y); x==x; 0))|.
+To see why not, suppose we had such a \rulename{u-var} rule, and consider the term |(def x (x==(lam y y); x==x; 0))|.
 %
 If we first apply \rulename{u-var} to eliminate the equality $|x==x|$, then the remainder
 reduces to |0|.
@@ -1960,7 +1960,7 @@ The first is simply to abandon confluence as a goal altogether.
 Confluence is, after all, purely \emph{syntactic}, and hence
 much stronger than what we really need, which is only that each of our rules be
 \emph{semantics}-preserving.  But that, of course, requires
-an independent notion of semantics, a direction we sketch in \cref{sec:den-sem}.
+an independent notion of semantics, a~direction we sketch in \cref{sec:den-sem}.
 
 Second, we can simply exclude programs that unify lambdas, or that use
 recursion.
@@ -2227,7 +2227,7 @@ $$
 \end{array}
 $$
 The two columns can never join up, but if you pick any term in either column, there is a term in the other
-column that has a greater amount of permanent structure.  That in turn means that the terms in the left-hand
+column that has at least as much permanent structure.  That in turn means that the terms in the left-hand
 column are contextually equivalent to those in the right-hand column, because the context can
 inspect only the permanent structure. This contextual equivalence is the real reason
 for seeking confluence in the first place.
@@ -2261,7 +2261,7 @@ versions of) our proofs of termination and confluence:
 $$
 \begin{array}{@@{\hskip0.5em}l@@{\qquad}r @@{\;\;}c@@{\;\;}l@@{\qquad}l@@{}}
   \rulename{subst${}'$} & |x==v;e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em}
-  & \text{if $|v| \not= |V^[x]|$}, \\
+  & \text{if $|v| \not= |V^[x]|$} \\
   \rulename{var-swap${}'$} & |y==x; e|    & \movesto & |x==y; e| & \text{(unconditionally)} \\
   \rulename{seq-swap${}'$} & |eq; x==v; e| & \movesto & |x==v; eq; e| &
                       \text{(unconditionally)} \\
@@ -2427,8 +2427,8 @@ called \emph{bubbling} \cite{antoy:bubbling} or \emph{pull-tabbing} \cite{antoy:
 However, laziness imposes significant additional complications, including the need to attach
 an identifier to each choice.
 
-A recent paper by Barenbaum \hbox{\emph{et al.}} describes a functional logic calculus that, like \versecalc{},
-is just an extension of lambda calculus \cite{barenbaum:relational,barenbaum:relational-extended}.
+Recent work by \citet{barenbaum:relational,barenbaum:relational-extended} describes a functional logic calculus that, like \versecalc{},
+is just an extension of lambda calculus.
 They deal with lambda, existentials, choice, and equations
 in a similar way to \versecalc{}, but lack the |allKW| and |oneKW| operators which are central to \versecalc{}.
 As a result they can always float choice up to the top level of the whole program, and
@@ -2485,8 +2485,8 @@ effects other than choice, including mutable variables and input/output, to \ver
 To substantiate this claim, \cref{sec:store} gives the additional syntax and rewrite rules
 for mutable variables.
 
-Thirdly, |oneKW| allows us to reify failure; to try something and take different actions
-depending on whether or not it succeeds. Prolog's ``cut'' operator has a similar flavor,
+Thirdly, |oneKW| allows us to reify failure: to try something and take different actions
+depending on whether or not it succeeds. Prolog's ``cut'' operator \cite[Chapter 4]{prolog-book-edition5} has a similar flavor,
 and Curry's set-functions allow one to do the same thing.
 
 Finally, |oneKW| and |allKW| neatly encapsulate the idea of ``flexible'' {\vs} ``rigid'' logical variables.
@@ -2541,12 +2541,12 @@ $dom(\theta) = \mathit{fvs}(e_1, \ldots, e_n, rhs)$}
 $$
 The substitution for the free variables of the left-hand-side can
 readily be chosen by matching the left-hand-side against the call.
-But the substitution for the extra variables must be chosen ``magically''
+But the substitution for the extra variables on the right-hand side must be chosen ``magically''
 \cite[Section 7]{fraguas:rewriting} or clairvoyantly, so as to make the future execution
 work out. This is admirably high-level because it hides everything
 about unification, but it is not much help to a programmer trying to
 understand a program, nor is it directly executable.
-In a subsequent journal paper, they refine CRWL to avoid magical rewriting using
+In a subsequent journal paper, they refine CRWL to avoid magical rewriting by using
 ``let-narrowing'' \cite[Section 6]{fraguas:let-narrowing}; this system
 looks rather different to ours, especially in its treatment of choice,
 but is rather close in spirit.
@@ -2576,17 +2576,17 @@ logical (existentially quantified) variables and constraints to yield an integra
 of functional and logical constructs, and informally describes a rewriting based
 evaluation mechanism. However, the language does not have the equivalent
 of |oneKW| and |allKW| which reify choice as data, the rules are not precisely
-formalized and no confluence result is established for them.
+formalized, and no confluence result is established for them.
 
 Goffin \cite{Goffin} also presents a way to extend a higher-order functional
 language with existentially quantified logical variables. However, Goffin is
 rather different from \versecalc{} in that it falls in the tradition of
-Concurrent Constraint Programming \cite{Saraswat90} where the constraints
+Concurrent Constraint Programming \cite{Saraswat90}, where the constraints
 over logical variables are used to declare data dependencies as a means to
 co-ordinate efficient concurrent execution of sub-computations, rather
-than in logic programming (and \versecalc) where we seek to declare the properties
-of solutions. Consequently, in Goffin, the logical variables are never ``unified''
-but instead are ``updated'' as values are computed in parallel yielding a completely
+than in the tradition of logic programming (and \versecalc) where we seek to declare the properties
+of solutions. Consequently, in~Goffin, the logical variables are never ``unified''
+but instead are ``updated'' as values are computed in parallel, yielding a completely
 different model of computation.
 
 \subsection{Flat {\vs} higher order}
@@ -2739,15 +2739,15 @@ rather than an imperative approach to processing generated combinations:
 We believe that this is the first presentation of a functional logic
 language as a deterministic rewrite system.  A rewrite system has the
 advantage (compared to more denotational, or more operational,
-methods) that it is is sufficiently low-level to capture the
-\emph{computational model} of the language; and yet sufficiently
+methods) that it is sufficiently low-level to capture the
+\emph{computational model} of the language, and yet sufficiently
 high-level to be \emph{illuminating} to a programmer or compiler
 writer.  Our focus on rewriting as a way to define the
-semantics has forced us to focus on confluence, a rather syntactic
+semantics has forced us to focus on confluence, a~syntactic
 property that is stronger (and hence more delicate and harder to prove) than the
-contextual equivalence that we really need.  That in turn led us to
+contextual equivalence that is all we really need.  That in turn led us to
 study the elegant and ingenious notion of skew confluence, which has been
-barely revisited during the last 20 years, but which we believe deserves a wider
+barely revisited during the last 20 years, but which we believe deserves a~wider
 audience.
 
 % Defining a language by giving its low-level semantics is precise but not necessarily illuminating;
@@ -2781,10 +2781,10 @@ the type, and |fail| otherwise.  This gives a distinctive new
 perspective on type systems, one that we intend to develop in future
 work.  The full Verse language also has a statically checked effect system,
 including both mutable references and input/output.  All these effects
-must be \emph{transactional}, {\eg}, when the condition of an |if|
+must be \emph{transactional}; for example, when the condition of an |if|
 fails, any store effects in the condition must be rolled back.
-We have preliminary reduction rules for updateable references,
-see \cref{sec:store}.
+We have preliminary reduction rules for updateable references
+(see \cref{sec:store}).
 
 % -------------------- Acknowledgements ----------------
 \begin{acks}                            %% acks environment is optional
