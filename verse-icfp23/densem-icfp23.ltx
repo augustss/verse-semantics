@@ -172,9 +172,9 @@ writes a denotation function something like
 $$
 \semapp{E}{|e|}{}  :  \Env \rightarrow \Value
 $$
-where $\Env = Ident \rightarrow \Value$.  So $\semfun{E}$ takes an expession
+where $\Env = Ident \rightarrow \Value$.  So $\semfun{E}$ takes an expression
 |e| and an environment $\rho : \Env$ and returns the value, or denotation, of the
-expresssion.  The environment binds each free variable of |e| to its value.
+expression.  The environment binds each free variable of |e| to its value.
 But what is the semantics of |def x e|?   We need to extend $\rho$ with a binding
 for |x|, but what is |x| bound to?  In a functional logic language |x| is given
 its value by various equalities scattered throughout |e|.
@@ -197,7 +197,7 @@ Our denotational semantics for \versecalc{} is given in \cref{fig:den-sem1}.
   the expression function $\semfun{E}$ returns a \emph{collection of values} $\mtype$ (\cref{sec:collection}).
 \end{itemize}
 
-The semantics is parameterised over the meaning of a ``collection of values $\mtype$''.
+The semantics is parameterized over the meaning of a ``collection of values $\mtype$''.
 To a first approximation, think of $\mtype$ a (possibly infinite) set of values $\Value$,
 with union, intersection etc having their ordinary meaning.
 
