@@ -14,7 +14,9 @@
 %%%     abstract        = "",
 %%%  }
 %%% ====================================================================
+
 %%% Revision history:  see source in git
+
 ENTRY
   { address
     advisor
@@ -66,37 +68,53 @@ ENTRY
   }
   {}
   { label.year extra.label sort.year sort.label basic.label.year}
+
 INTEGERS { output.state before.all mid.sentence after.sentence after.block }
+
 INTEGERS { show-isbn-10-and-13 }  % initialized below in begin.bib
+
 INTEGERS { nameptr namesleft numnames }
+
 INTEGERS { multiresult }
+
 INTEGERS { len }
+
 INTEGERS { last.extra.num }
+
 STRINGS { s t t.org u }
+
 STRINGS { last.label next.extra }
+
 STRINGS { p1 p2 p3 page.count }
+
+
 FUNCTION { not }
 {
     { #0 }
     { #1 }
   if$
 }
+
 FUNCTION { and }
 {
     'skip$
     { pop$ #0 }
   if$
 }
+
 FUNCTION { or }
 {
    { pop$ #1 }
     'skip$
   if$
 }
+
+
 FUNCTION { dump.stack.1 }
 {
     duplicate$ "STACK[top] = [" swap$ * "]" * warning$
 }
+
 FUNCTION { dump.stack.2 }
 {
     duplicate$ "STACK[top  ] = [" swap$ * "]" * warning$
@@ -104,6 +122,7 @@ FUNCTION { dump.stack.2 }
     duplicate$ "STACK[top-1] = [" swap$ * "]" * warning$
     swap$
 }
+
 FUNCTION { empty.or.unknown }
 {
   %% Examine the top stack entry, and push 1 if it is empty, or
@@ -125,19 +144,23 @@ FUNCTION { empty.or.unknown }
   %%
   %% At entry: stack = ... top:[string]
   %% At exit:  stack = ... top:[0 or 1]
+
   duplicate$ empty$
     { pop$ #1 }
     { #1 #2 substring$ "??" = }
   if$
 }
+
 FUNCTION { empty.or.zero }
-{ 
+{
   %% Examine the top entry and push 1 if it is empty, or is zero
   duplicate$ empty$
     { pop$ #1 }
     { "0" = }
   if$
 }
+
+
 FUNCTION { writeln }
 {
   %% In BibTeX style files, the sequences
@@ -184,9 +207,11 @@ FUNCTION { writeln }
   %% in that order, so it makes sense to hide that pair in a private
   %% function like this one, named after a statement in Pascal,
   %% the programming language embedded in the BibTeX Web program.
+
   write$                % output top-of-stack string
   newline$              % immediate write of newline (not via stack)
 }
+
 FUNCTION { init.state.consts }
 {
   #0 'before.all :=
@@ -194,6 +219,7 @@ FUNCTION { init.state.consts }
   #2 'after.sentence :=
   #3 'after.block :=
 }
+
 FUNCTION { output.nonnull }
 { % Stack in: ... R S T  Stack out: ... R T   File out: S<comma><space>
   's :=
@@ -223,6 +249,7 @@ FUNCTION { output.nonnull }
   if$
   s
 }
+
 FUNCTION { output.nonnull.dot.space }
 { % Stack in: ... R S T  Stack out: ... R T   File out: S<dot><space>
   's :=
@@ -251,6 +278,7 @@ FUNCTION { output.nonnull.dot.space }
   if$
   s
 }
+
 FUNCTION { output.nonnull.remove }
 { % Stack in: ... R S T  Stack out: ... R T   File out: S<space>
   's :=
@@ -279,6 +307,7 @@ FUNCTION { output.nonnull.remove }
   if$
   s
 }
+
 FUNCTION { output.nonnull.removenospace }
 { % Stack in: ... R S T  Stack out: ... R T   File out: S
   's :=
@@ -307,6 +336,7 @@ FUNCTION { output.nonnull.removenospace }
   if$
   s
 }
+
 FUNCTION { output }
 { % discard top token if empty, else like output.nonnull
   duplicate$ empty.or.unknown
@@ -314,6 +344,7 @@ FUNCTION { output }
     'output.nonnull
   if$
 }
+
 FUNCTION { output.dot.space }
 { % discard top token if empty, else like output.nonnull.dot.space
   duplicate$ empty.or.unknown
@@ -321,6 +352,7 @@ FUNCTION { output.dot.space }
     'output.nonnull.dot.space
   if$
 }
+
 FUNCTION { output.removenospace }
 { % discard top token if empty, else like output.nonnull.removenospace
   duplicate$ empty.or.unknown
@@ -328,6 +360,7 @@ FUNCTION { output.removenospace }
     'output.nonnull.removenospace
   if$
 }
+
 FUNCTION { output.check }
 { % like output, but warn if key name on top-of-stack is not set
   't :=
@@ -336,6 +369,7 @@ FUNCTION { output.check }
     'output.nonnull
   if$
 }
+
 FUNCTION { bibinfo.output.check }
 { % like output.check, adding bibinfo field
   't :=
@@ -345,6 +379,7 @@ FUNCTION { bibinfo.output.check }
       output.nonnull }
   if$
 }
+
 FUNCTION { output.check.dot.space }
 { % like output.dot.space, but warn if key name on top-of-stack is not set
   't :=
@@ -353,16 +388,19 @@ FUNCTION { output.check.dot.space }
     'output.nonnull.dot.space
   if$
 }
+
 FUNCTION { fin.block }
 { % functionally, but not logically, identical to fin.entry
    add.period$
    writeln
 }
+
 FUNCTION { fin.entry }
 {
    add.period$
    writeln
 }
+
 FUNCTION { new.sentence }
 { % update sentence state, with neither output nor stack change
   output.state after.block =
@@ -375,6 +413,7 @@ FUNCTION { new.sentence }
     }
   if$
 }
+
 FUNCTION { fin.sentence }
 {
    add.period$
@@ -382,6 +421,7 @@ FUNCTION { fin.sentence }
    new.sentence
    ""
 }
+
 FUNCTION { new.block }
 {
   output.state before.all =
@@ -389,6 +429,7 @@ FUNCTION { new.block }
     { after.block 'output.state := }
   if$
 }
+
 FUNCTION { output.coden }       % UTAH
 { % output non-empty CODEN as one-line sentence (stack untouched)
   coden empty.or.unknown
@@ -396,11 +437,13 @@ FUNCTION { output.coden }       % UTAH
     { "\showCODEN{" coden * "}" * writeln }
   if$
 }
+
 %
 % Sometimes articleno starts with the word 'Article' or 'Paper.
 % (this is a bug of acmdl, sigh)
 % We strip them.  We assume eid or articleno is already on stack
 %
+
 FUNCTION { strip.articleno.or.eid }
 {
   't :=
@@ -431,6 +474,8 @@ FUNCTION { strip.articleno.or.eid }
   if$
   t 
 }
+
+
 FUNCTION { format.articleno }
 {
   articleno empty.or.unknown not eid empty.or.unknown not and
@@ -452,6 +497,7 @@ FUNCTION { format.articleno }
      }
   if$
 }
+
 FUNCTION { format.year }
 { % push year string or "[n.\,d.]" onto output stack
   %% Because year is a mandatory field, we always force SOMETHING
@@ -463,6 +509,7 @@ FUNCTION { format.year }
   if$
   *  "}" *
 }
+
 FUNCTION { format.day.month }
 { % push "day month " or "month " or "" onto output stack
   day empty.or.unknown
@@ -480,6 +527,7 @@ FUNCTION { format.day.month }
     }
   if$
 }
+
 FUNCTION { format.day.month.year }     % UTAH
 { % if month is empty, push "" else push "(MON.)" or "(DD MON.)"
   % Needed for frequent periodicals: 2008. ... New York Times C-1, C-2, C-17 (23 Oct.)
@@ -495,6 +543,7 @@ FUNCTION { format.day.month.year }     % UTAH
   if$
   " (" * format.day.month * format.year * ")" *
 }
+
 FUNCTION { output.day.month.year }     % UTAH
 { % if month is empty value, do nothing; else output stack top and
   % leave with new top string "(MON.)" or "(DD MON.)"
@@ -502,6 +551,7 @@ FUNCTION { output.day.month.year }     % UTAH
   format.day.month.year
   output.nonnull.remove
 }
+
 FUNCTION { strip.doi } % UTAH
 { % Strip any Web address prefix to recover the bare DOI, leaving the
   % result on the output stack, as recommended by CrossRef DOI
@@ -522,16 +572,22 @@ FUNCTION { strip.doi } % UTAH
     { doi }
     {
       doi 't :=  % get modifiable copy of DOI
+
       % Change https:// to http:// to strip both prefixes (BV)
+
       t #1 #8 substring$ "https://" =
         { "http://"  t #9 t text.length$ #8 - substring$ * 't := }
         { }
       if$
+
       t #1 #7 substring$ "http://" =
         {
             t #8 t text.length$ #7 - substring$ 't :=
+
             "INTERNAL STYLE-FILE ERROR" 's :=
+
             % search for next "/" and assign its suffix to s
+
             { t text.length$ }
             {
               t #1 #1 substring$ "/" =
@@ -547,12 +603,15 @@ FUNCTION { strip.doi } % UTAH
               if$
             }
             while$
+
             % check for valid DOI (should be 10.xxxx/yyyy)
             s #1 #3 substring$ "10." =
               { }
               { "unrecognized DOI substring " s * " in DOI value [" * doi * "]" * warning$ }
             if$
+
             s   % push the stripped DOI on the output stack
+
         }
         {
           "unrecognized DOI value [" doi * "]" * warning$
@@ -562,6 +621,7 @@ FUNCTION { strip.doi } % UTAH
     }
   if$
 }
+
 %
 % Change by BV: added standard prefix to URL
 %
@@ -578,6 +638,7 @@ FUNCTION { output.doi } % UTAH
     }
   if$
 }
+
 FUNCTION { output.isbn }                % UTAH
 { % output non-empty ISBN-10 and/or ISBN-13 as one-line sentences (stack untouched)
   show-isbn-10-and-13
@@ -614,6 +675,7 @@ FUNCTION { output.isbn }                % UTAH
     }
   if$
 }
+
 FUNCTION { output.issn } % UTAH
 { % output non-empty ISSN as one-line sentence (stack untouched)
   issn empty.or.unknown
@@ -621,6 +683,7 @@ FUNCTION { output.issn } % UTAH
     { "\showISSN{" issn * "}" * writeln }
   if$
 }
+
 FUNCTION { output.issue }
 { % output non-empty issue number as a one-line sentence (stack untouched)
   issue empty.or.unknown
@@ -628,6 +691,7 @@ FUNCTION { output.issue }
     { "Issue " issue * "." * writeln }
   if$
 }
+
 FUNCTION { output.lccn } % UTAH
 { % return with stack untouched
   lccn empty.or.unknown
@@ -635,6 +699,7 @@ FUNCTION { output.lccn } % UTAH
     { "\showLCCN{" lccn * "}" * writeln }
   if$
 }
+
 FUNCTION { output.note } % UTAH
 { % return with stack empty
   note empty.or.unknown
@@ -642,6 +707,7 @@ FUNCTION { output.note } % UTAH
     { "\shownote{" note * "}" add.period$ * writeln }
   if$
 }
+
 FUNCTION { output.note.check } % UTAH
 { % return with stack empty
   note empty.or.unknown
@@ -649,6 +715,7 @@ FUNCTION { output.note.check } % UTAH
     { "\shownote{" note * "}" add.period$ * writeln }
   if$
 }
+
 FUNCTION { output.eprint } %
 { % return with stack empty
   eprint empty.or.unknown
@@ -675,6 +742,8 @@ FUNCTION { output.eprint } %
     }
   if$
 }
+
+
 %
 % Changes by BV 2011/04/15.  Do not output
 % url if doi is defined
@@ -698,6 +767,7 @@ FUNCTION { output.url } % UTAH
           %% the .bbl file would have to be repaired manually.
           "\urldef\tempurl%" writeln
           "\url{" url * "}" * writeln
+
           "\showURL{%" writeln
           lastaccessed empty.or.unknown
             { "" }
@@ -710,6 +780,7 @@ FUNCTION { output.url } % UTAH
   { }
   if$
 }
+
 FUNCTION { output.year.check }
 { % warn if year empty, output top string and leave " YEAR<label>" on stack in mid-sentence
   year empty.or.unknown
@@ -726,27 +797,34 @@ FUNCTION { output.year.check }
      }
   if$
 }
+
+
 FUNCTION { le }
 {
   %% test whether first number is less than or equal to second number
   %% stack in:  n1 n2
   %% stack out: if n1 <= n2 then 1 else 0
+
   %% "DEBUG: le " cite$ * warning$
   > { #0 } { #1 } if$
 }
+
 FUNCTION { ge }
 {
   %% test whether first number is greater than or equal to second number
   %% stack in:  n1 n2
   %% stack out: if n1 >= n2 then 1 else 0
+
   %% "DEBUG: ge " cite$ * warning$
   < { #0 } { #1 } if$
 }
+
 FUNCTION { is.leading.digit }
 {
   %% test whether first character of string is a digit
   %% stack in:  string
   %% stack out: if first-char-is-digit then 1 else 0
+
   #1 #1 substring$                      % replace string by string[1:1]
   duplicate$                            % string[1:1] string[1:1]
   chr.to.int$
@@ -756,17 +834,22 @@ FUNCTION { is.leading.digit }
   "9" chr.to.int$ le                    % string[1:1} <= "9" --> 0-or-1
   and
 }
+
 FUNCTION { skip.digits }
 {
   %% skip over leading digits in string
   %% stack in:  string
   %% stack out: rest-of-string leading-digits
+
   %% "DEBUG: enter skip.digits " cite$ * warning$
+
   %% dump.stack.1
+
   duplicate$
   't :=
   't.org :=
   "" 'u :=
+
   { t text.length$ }
   {
     %% "=================DEBUG: skip.digits   t = [" t * "]" * warning$
@@ -780,21 +863,29 @@ FUNCTION { skip.digits }
     't :=
   }
   while$
+
   u                                                             % rest of string
   t.org #1 t.org text.length$ u text.length$ - substring$       % leading digits
+
   %% "DEBUG: t.org = [" t.org * "]" * warning$
   %% "DEBUG: u     = [" u * "]" * warning$
+
   %% dump.stack.2
+
   %% "DEBUG: leave skip.digits " cite$ * warning$
 }
+
 FUNCTION { skip.nondigits }
 {
   %% skip over leading nondigits in string
   %% stack in:  string
   %% stack out: rest-of-string
+
   %% "DEBUG: enter skip.nondigits " cite$ * warning$
+
   't :=
   "" 'u :=
+
   { t text.length$ }
   {
     %% "=================DEBUG: skip.nondigits   t = [" t * "]" * warning$
@@ -808,10 +899,13 @@ FUNCTION { skip.nondigits }
     't :=
   }
   while$
+
   u                     % rest of string
+
   %% dump.stack.1
   %% "DEBUG: leave skip.nondigits " cite$ * warning$
 }
+
 FUNCTION { parse.next.number }
 {
   %% stack in:  string
@@ -819,10 +913,12 @@ FUNCTION { parse.next.number }
   %% Example:
   %% stack in:  "123:1--123:59"
   %% stack out: ":1--123:59" "123"
+
   's :=
   s skip.nondigits 's :=
   s skip.digits
 }
+
 FUNCTION { reduce.pages.to.page.count }
 {
   %% Stack in:  arbitrary-and-unused
@@ -845,13 +941,17 @@ FUNCTION { reduce.pages.to.page.count }
   %% If articleno is missing or empty, then we should output "1--23",
   %% "23" (with a warning of a missing articleno), or "17:1--17:23",
   %% respectively.
+
   %% "DEBUG: enter reduce.pages.to.page.count " cite$ * warning$
+
   %% "DEBUG: pages = [" pages * "]" * warning$
+
   pages
   parse.next.number 'p1 :=
   parse.next.number 'p2 :=
   parse.next.number 'p3 :=
   parse.next.number 'page.count :=
+
   duplicate$
   empty.or.unknown
     {  }
@@ -864,13 +964,16 @@ FUNCTION { reduce.pages.to.page.count }
       warning$
     }
   if$
+
   pop$
+
   %% "DEBUG: reduce.pages.to.page.count: "
   %% " p1 = " p1 * *
   %% " p2 = " p2 * *
   %% " p3 = " p3 * *
   %% " p4 = " page.count * *
   %% " in " cite$ * * warning$
+
   p1 p3 =   p2 "1" =   and   numpages empty.or.unknown   and
     { "INFO: reduced pages = [" pages * "] to numpages = [" * page.count * "]" * warning$ }
     {
@@ -881,6 +984,7 @@ FUNCTION { reduce.pages.to.page.count }
       'page.count :=
     }
   if$
+
   p1 "1" =   p3 empty.or.unknown   and   numpages empty.or.unknown   and
     {
       p2 'page.count :=
@@ -894,8 +998,10 @@ FUNCTION { reduce.pages.to.page.count }
       'page.count :=
     }
   if$
+
   %% "DEBUG: leave reduce.pages.to.page.count " cite$ * warning$
 }
+
 FUNCTION { new.block.checkb }
 { % issue a new.block only if at least one of top two stack strings is not empty
   empty.or.unknown
@@ -905,6 +1011,7 @@ FUNCTION { new.block.checkb }
     'new.block
   if$
 }
+
 FUNCTION { field.or.null }
 { % convert empty value to null string, else return value
   duplicate$ empty.or.unknown
@@ -912,6 +1019,9 @@ FUNCTION { field.or.null }
     'skip$
   if$
 }
+
+
+
 FUNCTION { emphasize }
 { % emphasize a non-empty top string on the stack
   duplicate$ empty.or.unknown
@@ -919,6 +1029,7 @@ FUNCTION { emphasize }
     { "\emph{" swap$ * "}" * }
   if$
 }
+
 FUNCTION { comma }
 { % convert empty string to null string, or brace string and add trailing comma
   duplicate$ empty.or.unknown
@@ -926,11 +1037,13 @@ FUNCTION { comma }
     { "{" swap$ * "}," * }
   if$
 }
+
 FUNCTION { format.names }
 {
   % Format bibliographical entries with the first author last name first,
   % and subsequent authors with initials followed by last name.
   % All names are formatted in this routine.
+
   's :=
   #1 'nameptr :=               % nameptr = 1;
   s num.names$ 'numnames :=    % numnames = num.name$(s);
@@ -965,6 +1078,7 @@ FUNCTION { format.names }
     }
   while$
 }
+
 FUNCTION { my.full.label }
 {
   's :=
@@ -972,6 +1086,7 @@ FUNCTION { my.full.label }
   s num.names$ 'numnames :=    % numnames = num.name$(s);
   numnames 'namesleft :=
     { namesleft #0 > }
+
     { s nameptr "{vv~}{ll}" format.name$ 't :=  % get the next name
       nameptr #1 >
         {
@@ -995,19 +1110,24 @@ FUNCTION { my.full.label }
       namesleft #1 - 'namesleft :=      % namesleft =- 1;
     }
   while$
+
 }
+
 FUNCTION { format.names.fml }
 {
   % Format names in "familiar" format, with first initial followed by
   % last name. Like format.names, ALL names are formatted.
   % jtb: The names are NOT put in small caps
+
   's :=
   #1 'nameptr :=               % nameptr = 1;
   s num.names$ 'numnames :=    % numnames = num.name$(s);
   numnames 'namesleft :=
     { namesleft #0 > }
+
     {
       "\bibinfo{person}{" s nameptr "{ff~}{vv~}{ll}{, jj}" format.name$ * "}" * 't :=
+
       nameptr #1 >
         {
           namesleft #1 >
@@ -1031,6 +1151,7 @@ FUNCTION { format.names.fml }
     }
   while$
 }
+
 FUNCTION { format.authors }
 {
   author empty.or.unknown
@@ -1040,6 +1161,7 @@ FUNCTION { format.authors }
       author format.names add.period$ * "}" *} % jtb: add period if none before
   if$
 }
+
 FUNCTION { format.key }
 {
   empty.or.unknown
@@ -1047,6 +1169,7 @@ FUNCTION { format.key }
     { "" }
   if$
 }
+
 FUNCTION { format.no.key }
 {
   empty.or.unknown
@@ -1054,12 +1177,14 @@ FUNCTION { format.no.key }
     { "" }
   if$
 }
+
 FUNCTION { format.editors.fml }
 {
   % Format editor names for use in the "in" types: inbook, incollection,
   % inproceedings: first initial, then last names. When editors are the
   % LABEL for an entry, then format.editor is used which lists editors
   % by last name first.
+
   editor empty.or.unknown
     { "" }
     {
@@ -1073,6 +1198,7 @@ FUNCTION { format.editors.fml }
     }
   if$
 }
+
 FUNCTION { format.editors }
 { % format editor names for use in labels, last names first.
   editor empty.or.unknown
@@ -1088,6 +1214,7 @@ FUNCTION { format.editors }
     }
   if$
 }
+
 FUNCTION { format.articletitle }
 {
   title empty.or.unknown
@@ -1098,6 +1225,7 @@ FUNCTION { format.articletitle }
     % { \showarticletitle{" title "t" change.case$ * "}" * }
   if$
 }
+
 FUNCTION { format.title }
 {
   title empty.or.unknown
@@ -1108,6 +1236,7 @@ FUNCTION { format.title }
     % { title "t" change.case$ }
   if$
 }
+
 FUNCTION { n.dashify }
 {
   't :=
@@ -1138,6 +1267,7 @@ FUNCTION { n.dashify }
     }
   while$
 }
+
 FUNCTION { format.a.title.with.edition }
 {
   "\bibinfo{booktitle}{"
@@ -1149,15 +1279,21 @@ FUNCTION { format.a.title.with.edition }
   if$
   "}" *
 }
+
 FUNCTION { format.btitle }
 { title format.a.title.with.edition }
+
 FUNCTION { format.emphasize.booktitle }
 { booktitle format.a.title.with.edition }
+
+
+
 FUNCTION { format.city }
 {
   % jtb: if the preceding string (the title of the conference) is non-empty,
   % jtb: append the location, otherwise leave empty (so as to trigger the
   % jtb: error message in output.check
+
   duplicate$ empty.or.unknown
     { }
     {
@@ -1188,6 +1324,7 @@ FUNCTION { format.city }
     }
   if$
 }
+
 FUNCTION { tie.or.space.connect }
 {
   duplicate$ text.length$ #3 <
@@ -1196,6 +1333,7 @@ FUNCTION { tie.or.space.connect }
   if$
   swap$ * *
 }
+
 FUNCTION { either.or.check }
 {
   empty.or.unknown
@@ -1203,10 +1341,12 @@ FUNCTION { either.or.check }
     { "can't use both " swap$ * " fields in " * cite$ * warning$ }
   if$
 }
+
 FUNCTION { format.bvolume }
 {
   % jtb: If there is a series, this is added and the volume trails after it.
   % jtb: Otherwise, "Vol" is Capitalized.
+
   volume empty.or.unknown
     { "" }
     {
@@ -1219,6 +1359,7 @@ FUNCTION { format.bvolume }
     }
   if$
 }
+
 FUNCTION { format.bvolume.noseries }
 {
   volume empty.or.unknown
@@ -1228,6 +1369,7 @@ FUNCTION { format.bvolume.noseries }
     }
   if$
 }
+
 FUNCTION { format.series }
 {
   series empty.or.unknown
@@ -1247,6 +1389,7 @@ FUNCTION { format.series }
     }
   if$
 }
+
 FUNCTION { format.number.series }
 {
   volume empty.or.unknown
@@ -1280,6 +1423,7 @@ FUNCTION { format.number.series }
     }
   if$
 }
+
 FUNCTION { multi.page.check }
 {
   't :=
@@ -1300,6 +1444,7 @@ FUNCTION { multi.page.check }
   while$
   multiresult
 }
+
 FUNCTION { format.pages }
 {
   pages empty.or.unknown
@@ -1313,6 +1458,7 @@ FUNCTION { format.pages }
     }
   if$
 }
+
 FUNCTION { format.pages.check.without.articleno }
 { %% format pages field only if articleno is absent
   %% Stack out: pages-specification
@@ -1320,6 +1466,7 @@ FUNCTION { format.pages.check.without.articleno }
     { "page numbers missing in both pages and numpages fields in " cite$ * warning$ }
     { }
   if$
+
   articleno empty.or.unknown eid empty.or.unknown and
     {
       pages missing$
@@ -1335,6 +1482,7 @@ FUNCTION { format.pages.check.without.articleno }
     { "" }
   if$
 }
+
 FUNCTION { format.pages.check }
 {
   pages empty.or.unknown
@@ -1342,6 +1490,7 @@ FUNCTION { format.pages.check }
     { pages n.dashify }
   if$
 }
+
 FUNCTION { format.bookpages }
 {
   bookpages empty.or.unknown
@@ -1349,6 +1498,7 @@ FUNCTION { format.bookpages }
     { bookpages "book pages" tie.or.space.connect }
   if$
 }
+
 FUNCTION { format.named.pages }
 {
   pages empty.or.unknown
@@ -1356,11 +1506,13 @@ FUNCTION { format.named.pages }
     { format.pages "pages" tie.or.space.connect }
   if$
 }
+
 %
 % Changed by Boris Veytsman, 2011-03-13
 % Now the word "pages" is printed even if
 % there field pages is not empty.
 %
+
 FUNCTION { format.page.count }
 {
   page.count empty.or.unknown
@@ -1368,6 +1520,7 @@ FUNCTION { format.page.count }
     { "\bibinfo{numpages}{" page.count * "}~pages" * }
   if$
 }
+
 FUNCTION { format.articleno.numpages }
 {
   %% There are seven possible outputs, depending on which fields are set.
@@ -1387,6 +1540,7 @@ FUNCTION { format.articleno.numpages }
   %%     pages                          -> "pages-value"
   %%
   %% We no longer issue warninig when missing articleno, but having numpages
+
   articleno empty.or.unknown eid empty.or.unknown and
     {
 %%      numpages empty.or.unknown
@@ -1410,6 +1564,7 @@ FUNCTION { format.articleno.numpages }
         }
         { numpages 'page.count := }
       if$
+
       %% The Article number is now handled in format.day.month.year because
       %% ACM prefers the style "Digital Libraries 12, 3, Article 5 (July 2008)"
       %% over "Digital Libraries 12, 3 (July 2008), Article 5"
@@ -1418,6 +1573,7 @@ FUNCTION { format.articleno.numpages }
     }
   if$
 }
+
 FUNCTION {calc.format.page.count}
 {
   numpages empty.or.unknown
@@ -1433,6 +1589,8 @@ FUNCTION {calc.format.page.count}
   if$
   format.page.count
 }
+
+
 FUNCTION { journal.canon.abbrev }
 {
   % Returns a canonical abbreviation for 'journal', or else 'journal'
@@ -1532,6 +1690,7 @@ FUNCTION { journal.canon.abbrev }
   } if$ } if$ } if$ } if$ } if$ } if$ } if$ } if$ } if$ } if$ } if$
   } if$ } if$ } if$ } if$ } if$ } if$ } if$ } if$
 }
+
 FUNCTION { format.journal.volume.number.day.month.year }
 {
   % By Young (and Spencer)
@@ -1545,6 +1704,7 @@ FUNCTION { format.journal.volume.number.day.month.year }
       journal.canon.abbrev emphasize *
       "}" * }
   if$
+
   number empty.or.unknown
     {
       volume empty.or.unknown
@@ -1564,13 +1724,16 @@ FUNCTION { format.journal.volume.number.day.month.year }
     }
   if$
   after.block 'output.state :=
+
   % Sometimes proceedings are published in journals
   % In this case we do not want to put year, day and month here
+
   type$ "inproceedings" =
     { }
     {format.day.month.year * }
   if$
 }
+
 FUNCTION { format.chapter.pages }
 {
   chapter empty.or.unknown
@@ -1587,6 +1750,7 @@ FUNCTION { format.chapter.pages }
     }
   if$
 }
+
 FUNCTION { format.in.emphasize.booktitle }
 { % jtb: format for collections or proceedings not appearing in a journal
   booktitle empty.or.unknown
@@ -1594,6 +1758,7 @@ FUNCTION { format.in.emphasize.booktitle }
   { "In " format.emphasize.booktitle * }
   if$
 }
+
 FUNCTION { format.in.booktitle }
 { % jtb: format for proceedings appearing in a journal
   booktitle empty.or.unknown
@@ -1601,6 +1766,7 @@ FUNCTION { format.in.booktitle }
   { "In \bibinfo{booktitle}{" booktitle * "}" * }
   if$
 }
+
 FUNCTION { format.in.ed.booktitle }
 {
   booktitle empty.or.unknown
@@ -1613,6 +1779,7 @@ FUNCTION { format.in.ed.booktitle }
   }
   if$
 }
+
 FUNCTION { format.thesis.type }
 { % call with default type on stack top
   type empty.or.unknown
@@ -1624,6 +1791,7 @@ FUNCTION { format.thesis.type }
     }
   if$
 }
+
 FUNCTION { format.tr.number }
 {
   "\bibinfo{type}{"
@@ -1639,6 +1807,7 @@ FUNCTION { format.tr.number }
     { number tie.or.space.connect }
   if$
 }
+
 FUNCTION { format.advisor }
 {
   advisor empty.or.unknown
@@ -1646,10 +1815,12 @@ FUNCTION { format.advisor }
     { "Advisor(s) " advisor * }
   if$
 }
+
 FUNCTION { format.article.crossref }
 { "See"
   "\citeN{" * crossref * "}" *
 }
+
 FUNCTION { format.crossref.editor }
 {
   editor #1 "{vv~}{ll}" format.name$
@@ -1667,6 +1838,7 @@ FUNCTION { format.crossref.editor }
     }
   if$
 }
+
 FUNCTION { format.book.crossref }
 {
   volume empty.or.unknown
@@ -1696,10 +1868,12 @@ FUNCTION { format.book.crossref }
   if$
   " \citeN{" * crossref * "}" *
 }
+
 FUNCTION { format.incoll.inproc.crossref }
 { "See"
   " \citeN{" * crossref * "}" *
 }
+
 FUNCTION { format.lab.names }
 {
   % format.lab.names:
@@ -1713,6 +1887,7 @@ FUNCTION { format.lab.names }
   % b) one to n               Foo, Bar and Baz
   % c) use of "and others"    Foo, Bar et al.
   % d) more than n            Foo et al.
+
   's :=
   s num.names$ 'numnames :=
   numnames #2 >    % change number to number of others allowed before
@@ -1738,6 +1913,7 @@ FUNCTION { format.lab.names }
     }
   if$
 }
+
 FUNCTION { author.key.label }
 {
   author empty.or.unknown
@@ -1750,6 +1926,7 @@ FUNCTION { author.key.label }
     { author format.lab.names }
   if$
 }
+
 FUNCTION { editor.key.organization.label }
 { % added - gnp. Provide label formatting by organization if editor is null.
   editor empty.or.unknown
@@ -1766,6 +1943,7 @@ FUNCTION { editor.key.organization.label }
     { editor format.lab.names }
   if$
 }
+
 FUNCTION { author.editor.key.label }
 {
   author empty.or.unknown
@@ -1782,6 +1960,7 @@ FUNCTION { author.editor.key.label }
     { author format.lab.names }
   if$
 }
+
 FUNCTION { author.editor.key.organization.label }
 { % added - gnp. Provide label formatting by organization if author is null.
   author empty.or.unknown
@@ -1802,6 +1981,7 @@ FUNCTION { author.editor.key.organization.label }
     { author format.lab.names }
   if$
 }
+
 % Calculate label and leave it on stack
 FUNCTION { calc.basic.label }
 {
@@ -1825,12 +2005,13 @@ FUNCTION { calc.basic.label }
   if$
   duplicate$
   year empty.or.unknown
-    { "[n.\,d.]" }
+    { "{[n.\,d.]}" }
     { year field.or.null purify$ #-1 #4 substring$}
   if$
   *
   'basic.label.year :=
 }
+
 FUNCTION { calc.label }
 {
   % Changed - GNP. See also author.editor.organization.sort, editor.organization.sort
@@ -1838,7 +2019,9 @@ FUNCTION { calc.label }
   % for which type of entry (book, inbook, etc.) are taken from alpha.bst.
   % The change here from newapa is to also include organization as a
   % citation label if author or editor is missing.
+
   calc.basic.label
+
   author empty.or.unknown  % generate the full label citation information.
     {
       editor empty.or.unknown
@@ -1861,18 +2044,22 @@ FUNCTION { calc.label }
     }
     { author my.full.label }
   if$
+
   % leave label on the stack, to be popped when required.
+
   "}{" * swap$ * "}{" *
   %  year field.or.null purify$ #-1 #4 substring$ *
   %
   % save the year for sort processing afterwards (adding a, b, c, etc.)
   %
   year empty.or.unknown
-    { "[n.\,d.]" }
+    { "{[n.\,d.]}" }
     { year field.or.null purify$ #-1 #4 substring$}
   if$
   'label.year :=
 }
+
+
 FUNCTION { output.bibitem }
 {
   newline$
@@ -1888,6 +2075,8 @@ FUNCTION { output.bibitem }
   ""
   before.all 'output.state :=
 }
+
+
 FUNCTION { output.issue.doi.coden.isxn.lccn.url.eprint }
 { % enter and return with stack empty
   %% We switch now from buffered output to output of complete lines, so
@@ -1908,8 +2097,10 @@ FUNCTION { output.issue.doi.coden.isxn.lccn.url.eprint }
   %% manuals to have ISBNs, and anything that has an ISBN may also
   %% have an ISSN.  When there are no values for these keys, there
   %% is no output generated for them here.
+
   "\newblock" writeln
   after.block 'output.state :=
+
   output.issue
   output.isbn
   output.coden  % CODEN is functionally like ISSN, so output them sequentially
@@ -1919,6 +2110,7 @@ FUNCTION { output.issue.doi.coden.isxn.lccn.url.eprint }
   output.eprint
   output.url    % but ACM wants URL last
 }
+
 FUNCTION { output.issue.doi.coden.isxn.lccn.url.eprint.note }
 { % enter with stack empty, return with empty string on stack
   output.issue.doi.coden.isxn.lccn.url.eprint
@@ -1931,6 +2123,7 @@ FUNCTION { output.issue.doi.coden.isxn.lccn.url.eprint.note }
   if$
   ""
 }
+
 FUNCTION { output.issue.doi.coden.isxn.lccn.url.eprint.note.check }
 { % enter with stack empty, return with empty string on stack
   output.issue.doi.coden.isxn.lccn.url.eprint
@@ -1943,9 +2136,11 @@ FUNCTION { output.issue.doi.coden.isxn.lccn.url.eprint.note.check }
   if$
   ""
 }
+
 FUNCTION { article }
 {
   output.bibitem
+
   author empty.or.unknown
     {
       editor empty.or.unknown
@@ -1955,6 +2150,7 @@ FUNCTION { article }
     }
     { format.authors "author" output.check }
   if$
+
   author format.no.key output       % added
   output.year.check                 % added
   new.block
@@ -1964,6 +2160,7 @@ FUNCTION { article }
     { }
     { "\bibinfo{howpublished}{" howpublished "}" * * output }
   if$
+
   crossref missing$
     { format.journal.volume.number.day.month.year output}
     {
@@ -1971,12 +2168,14 @@ FUNCTION { article }
       format.article.crossref output.nonnull
     }
   if$
+
   format.pages.check.without.articleno output
   format.articleno.numpages output
   fin.block
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { book }
 {
   output.bibitem
@@ -2015,6 +2214,7 @@ FUNCTION { book }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { booklet }
 {
   output.bibitem
@@ -2033,6 +2233,7 @@ FUNCTION { booklet }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { inbook }
 {
   output.bibitem
@@ -2073,6 +2274,7 @@ FUNCTION { inbook }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { incollection }
 {
   output.bibitem
@@ -2104,6 +2306,7 @@ FUNCTION { incollection }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { inproceedings }
 {
   output.bibitem
@@ -2153,7 +2356,9 @@ FUNCTION { inproceedings }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { conference } { inproceedings }
+
 FUNCTION { manual }
 {
   output.bibitem
@@ -2177,6 +2382,7 @@ FUNCTION { manual }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { mastersthesis }
 {
   output.bibitem
@@ -2199,6 +2405,7 @@ FUNCTION { mastersthesis }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { misc }
 {
   output.bibitem
@@ -2218,12 +2425,19 @@ FUNCTION { misc }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { online } { manual }
+
 FUNCTION { game } { manual }
+
 FUNCTION { artifactsoftware } { manual }
+
 FUNCTION { artifactdataset } { manual }
+
 FUNCTION { software } { manual }
+
 FUNCTION { dataset } { manual }
+
 FUNCTION { phdthesis }
 {
   output.bibitem
@@ -2246,6 +2460,7 @@ FUNCTION { phdthesis }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION {format.date}
 { year empty.or.unknown
     { month empty.or.unknown
@@ -2285,6 +2500,7 @@ FUNCTION {format.date}
     }
   if$
 }
+
 FUNCTION {new.block.checka}
 {
   empty.or.unknown
@@ -2292,6 +2508,7 @@ FUNCTION {new.block.checka}
     'new.block
   if$
 }
+
 FUNCTION { periodical }
 {
   output.bibitem
@@ -2307,6 +2524,7 @@ FUNCTION { periodical }
   calc.format.page.count output
   fin.entry
 }
+
 FUNCTION { proceedings }
 {
   output.bibitem
@@ -2338,7 +2556,9 @@ FUNCTION { proceedings }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { collection } { proceedings }
+
 FUNCTION { techreport }
 {
   output.bibitem
@@ -2363,6 +2583,7 @@ FUNCTION { techreport }
   output.issue.doi.coden.isxn.lccn.url.eprint.note
   fin.entry
 }
+
 FUNCTION { unpublished }
 {
   output.bibitem
@@ -2379,22 +2600,38 @@ FUNCTION { unpublished }
   output.issue.doi.coden.isxn.lccn.url.eprint.note.check
   fin.entry
 }
+
 FUNCTION { default.type } { misc }
+
 %%% ACM journal-style month definitions: full name if 1--5 letters, else
 %%% abbreviation of 3 or 4 characters and a dot
+
 MACRO {jan}             {"Jan."}
+
 MACRO {feb}             {"Feb."}
+
 MACRO {mar}             {"March"}
+
 MACRO {apr}             {"April"}
+
 MACRO {may}             {"May"}
+
 MACRO {jun}             {"June"}
+
 MACRO {jul}             {"July"}
+
 MACRO {aug}             {"Aug."}
+
 MACRO {sep}             {"Sept."}
+
 MACRO {oct}             {"Oct."}
+
 MACRO {nov}             {"Nov."}
+
 MACRO {dec}             {"Dec."}
+
 %%% ACM journal names
+
 MACRO {cie}  {"ACM Computers in Entertainment"}
 MACRO {csur}  {"ACM Computing Surveys"}
 MACRO {dgov}  {"Digital Government: Research and Practice"}
@@ -2455,28 +2692,47 @@ MACRO {tsas}  {"ACM Transactions on Spatial Algorithms and Systems"}
 MACRO {tsc}  {"ACM Transactions on Social Computing"}
 MACRO {tslp}  {"ACM Transactions on Speech and Language Processing"}
 MACRO {tweb}  {"ACM Transactions on the Web"}
+
 %%% Some traditional macros
 MACRO {acmcs} {"ACM Computing Surveys"}
+
 MACRO {acta} {"Acta Informatica"}
+
 MACRO {cacm} {"Communications of the ACM"}
+
 MACRO {ibmjrd} {"IBM Journal of Research and Development"}
+
 MACRO {ibmsj} {"IBM Systems Journal"}
+
 MACRO {ieeese} {"IEEE Transactions on Software Engineering"}
+
 MACRO {ieeetc} {"IEEE Transactions on Computers"}
+
 MACRO {ieeetcad}
  {"IEEE Transactions on Computer-Aided Design of Integrated Circuits"}
+
 MACRO {ipl} {"Information Processing Letters"}
+
 MACRO {jcss} {"Journal of Computer and System Sciences"}
+
 MACRO {scp} {"Science of Computer Programming"}
+
 MACRO {sicomp} {"SIAM Journal on Computing"}
+
 MACRO {toois} {"ACM Transactions on Office Information Systems"}
+
 MACRO {tcs} {"Theoretical Computer Science"}
+
+
+
 READ
+
 FUNCTION { sortify }
 {
   purify$
   "l" change.case$
 }
+
 FUNCTION { chop.word }
 {
   's :=
@@ -2486,6 +2742,7 @@ FUNCTION { chop.word }
     's
   if$
 }
+
 FUNCTION { sort.format.names }
 {
   's :=
@@ -2508,6 +2765,7 @@ FUNCTION { sort.format.names }
     }
   while$
 }
+
 FUNCTION { sort.format.title }
 {
   't :=
@@ -2519,6 +2777,7 @@ FUNCTION { sort.format.title }
   sortify
   #1 global.max$ substring$
 }
+
 FUNCTION { author.sort }
 {
   author empty.or.unknown
@@ -2531,6 +2790,7 @@ FUNCTION { author.sort }
     { author sort.format.names }
   if$
 }
+
 FUNCTION { author.editor.sort }
 {
   author empty.or.unknown
@@ -2550,10 +2810,12 @@ FUNCTION { author.editor.sort }
     { author sort.format.names }
   if$
 }
+
 FUNCTION { editor.organization.sort }
 {
   % added - GNP. Stack editor or organization for sorting (from alpha.bst).
   % Unlike alpha.bst, we need entire names, not abbreviations
+
   editor empty.or.unknown
     { organization empty.or.unknown
         { key empty.or.unknown
@@ -2569,10 +2831,12 @@ FUNCTION { editor.organization.sort }
     { editor sort.format.names }
   if$
 }
+
 FUNCTION { author.editor.organization.sort }
 {
   % added - GNP. Stack author or organization for sorting (from alpha.bst).
   % Unlike alpha.bst, we need entire names, not abbreviations
+
   author empty.or.unknown
     {
       editor empty.or.unknown
@@ -2593,12 +2857,14 @@ FUNCTION { author.editor.organization.sort }
     { author sort.format.names }
   if$
 }
+
 FUNCTION { presort }
 {
   % Presort creates the bibentry's label via a call to calc.label, and then
   % sorts the entries based on entry type. Chicago.bst adds support for
   % including organizations as the sort key; the following is stolen from
   % alpha.bst.
+
   calc.label
   basic.label.year
   swap$
@@ -2641,11 +2907,18 @@ FUNCTION { presort }
   #1 entry.max$ substring$
   'sort.key$ :=
 }
+
+
+
 ITERATE { presort }
+
 SORT             % by label, year, author/editor, title
+
 % From plainnat.bst
 STRINGS { longest.label }
+
 INTEGERS { longest.label.width number.label }
+
 FUNCTION {initialize.longest.label}
 { "" 'longest.label :=
   #0 int.to.chr$ 'last.label :=
@@ -2654,16 +2927,21 @@ FUNCTION {initialize.longest.label}
   #0 'last.extra.num :=
   #0 'number.label :=
 }
+
+
+
 FUNCTION { initialize.extra.label.stuff }
 { #0 int.to.chr$ 'last.label :=
   "" 'next.extra :=
   #0 'last.extra.num :=
 }
+
 FUNCTION { forward.pass }
 {
   % Pass through all entries, comparing current entry to last one.
   % Need to concatenate year to the stack (done by calc.label) to determine
   % if two entries are the same (see presort)
+
   last.label
   calc.basic.label year field.or.null purify$ #-1 #4 substring$ * % add year
   #1 entry.max$ substring$ =     % are they equal?
@@ -2678,6 +2956,7 @@ FUNCTION { forward.pass }
   if$
   number.label #1 + 'number.label :=
 }
+
 FUNCTION { reverse.pass }
 {
   next.extra "b" =
@@ -2687,10 +2966,15 @@ FUNCTION { reverse.pass }
   label.year extra.label * 'sort.year :=
   extra.label 'next.extra :=
 }
+
 EXECUTE {initialize.extra.label.stuff}
 EXECUTE {initialize.longest.label}
+
+
 ITERATE {forward.pass}
+
 REVERSE {reverse.pass}
+
 FUNCTION { bib.sort.order }
 {
   sort.label
@@ -2706,17 +2990,22 @@ FUNCTION { bib.sort.order }
   #1 entry.max$ substring$
   'sort.key$ :=
 }
+
 ITERATE { bib.sort.order }
+
 SORT             % by sort.label, year, title --- giving final bib. order.
+
 FUNCTION { begin.bib }
 {
   %% Set to #0 show 13-digit ISBN in preference to 10-digit ISBN.
   %% Set to #1 to show both 10-digit and 13-digit ISBNs.
   #1 'show-isbn-10-and-13 :=
+
   "%%% -*-BibTeX-*-" writeln
   "%%% Do NOT edit. File created by BibTeX with style" writeln
   "%%% ACM-Reference-Format-Journals [18-Jan-2012]." writeln
   "" writeln
+
   preamble$ empty.or.unknown
     'skip$
     { preamble$ writeln }
@@ -2740,6 +3029,7 @@ FUNCTION { begin.bib }
   "%%%"                                                                      writeln
   "%%% ====================================================================" writeln
   ""                                                                         writeln
+
   %% ACM publications do not use CODEN, ISSN, and LCCN data, so their default
   %% macro wrappers expand to \unskip, discarding their values and unwanted
   %% space.
@@ -2755,6 +3045,7 @@ FUNCTION { begin.bib }
   %%         \newcommand{\showCODEN}[1]{CODEN #1.}
   %%         \newcommand{\showISSN}[1]#1{ISSN #1.}
   %%         \newcommand{\showLCCN}[1]{LCCN #1.}
+
   "\ifx \showCODEN    \undefined \def \showCODEN     #1{\unskip}     \fi" writeln
   "\ifx \showDOI      \undefined \def \showDOI       #1{#1}\fi" writeln
   % ACM styles omit ISBNs, but they can be included by suitable definitions of
@@ -2773,13 +3064,18 @@ FUNCTION { begin.bib }
   "\providecommand\natexlab[1]{#1}" writeln
   "\providecommand\showeprint[2][]{arXiv:#2}" writeln
 }
+
 EXECUTE {begin.bib}
+
 EXECUTE {init.state.consts}
+
 ITERATE {call.type$}
+
 FUNCTION { end.bib }
 {
   newline$
   "\end{thebibliography}"
   writeln
 }
+
 EXECUTE {end.bib}
