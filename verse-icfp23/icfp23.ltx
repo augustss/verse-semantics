@@ -2248,8 +2248,10 @@ for seeking confluence in the first place.
 In \versecalc{}, the notion of permanent structure must be generalized from an outer shell of \hbox{tuples}, lambdas, and constants
 to a \emph{sequence} (right-associative tree) of \emph{choices} of such outer shells.
 For example, however far we reduce the term |tup (68, lam x e_1) `choice` tup (lam y e_2, 57, lam z e_3) `choice` e_4|,
-the result will always look like |tup (68, lam x e1')  `choice` tup (lam y e2', 57, lam z e3') `choice` e4'|,
-where $\rsteps{\rr}{e_k}{e_k'}$ for $1 \leq k \leq 4$.
+the result will always look like
+|tup (68, lam x e1')  `choice` tup (lam y e2', 57, lam z e3') `choice` e4'|,
+where $\rsteps{\rr}{e_k}{e_k'}$ for $1 \leq k \leq 4$;
+or |tup (68, lam x e1')  `choice` tup (lam y e2', 57, lam z e3')| if $\rsteps{\rr}{e_4}{|fail|}$.
 In \fullcref{D}{sec:skew-confluence} we sketch our plan to adapt the proof strategy
 of \cref{sec:confluence-sketch} and \fullcref{C}{sec:confluence} for skew confluence.
 
