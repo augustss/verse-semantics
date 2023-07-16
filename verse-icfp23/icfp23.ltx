@@ -570,7 +570,8 @@ $
 % $\movestoR{eqn-elim}$      \unskip\quad |2|
 % \end{quote}
 %
-Rules may be applied anywhere they match, again just like the lambda calculus.
+Rules may be applied anywhere they match, including under binders,
+again just like the lambda calculus.
 This freedom only makes sense, however, if each term ultimately reduces to a unique value,
 regardless of its reduction path,
 so we show that \versecalc{} is \emph{confluent}, in \cref{sec:metatheory}.
@@ -584,7 +585,7 @@ We are working on Verse, a new general-purpose programming language, built direc
 our motivation for developing \versecalc{} is practical rather than theoretical.
 No single aspect of \versecalc{} is unique, but we believe that their combination
 is particularly harmonious and orthogonal.
-We discuss design alternatives in \cref{sec:variations}, and related work in \cref{sec:related}.
+We discuss design alternatives in \cref{sec:variations} and related work in \cref{sec:related}.
 
 
 % There is a rich seam of related work, as we discuss in \cref{sec:related}.
@@ -599,7 +600,7 @@ The (abstract) syntax of \versecalc{} is given in \cref{fig:syntax}.
 It has a very conventional sub-language that is just the lambda calculus with
 some built-in operations and tuples as data constructors:
 \begin{itemize}
-\item \emph{Values.}  A value |v| is either a variable |x| or a head-normal form |hnf|.
+\item \emph{Values.}  A value |v| is either a variable |x| or a head-normal form |hnf|\!.
   In \versecalc{}, a variable counts as a value because in a functional logic language an expression
   may evaluate to an as-yet-unknown logical variable.
   A head-normal form is a conventional value: a built-in constant |k|, an operator |op|, a tuple, or
@@ -618,12 +619,12 @@ rules in \cref{fig:syntax} show how to desugar more applications |(e_1 e_2)|. Th
 is not fundamental; it simply reduces the number of rewrite rules we need\footnote{
 This is a common pattern, often called
   ``administrative normal form'', or ANF \cite{felleisen:anf}}.
-The desugaring rules are more suggestive than precise; we aim to be precise about \versecalc{} but
-less so about the source language.
+% The desugaring rules are more suggestive than precise; we aim to be precise about \versecalc{} but
+% less so about the source language.
 
-Modulo this desugaring, every lambda calculus term is a \versecalc{} term,
+Modulo this desugaring, every lambda calculus term is a \versecalc{} term
 and has the same semantics. Just like the lambda calculus, \versecalc{} is untyped;
-adding a type system is an excellent goal, but is the subject of another paper.
+adding a type system is an excellent goal but is the subject of another paper.
 
 Expressions also include two other key collections of constructs:
 logical variables and the use of equations to perform unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
@@ -670,7 +671,8 @@ $$
 %with |tup(a,b)|, where |a,b| are fresh logical
 % variables in the body of the lambda; and returns the first of the two, namely |a|.
 For convenience, we allow ourselves to write a term like
-|applyN first (2,5)|, where we define the library function |first| separately with ``|:==|''; formally, you can imagine
+|applyN first (2,5)|, where we define the library function |first| separately with ``|:==|''.
+Formally, you can imagine
 each example |e| being wrapped with a binding for |first|, thus |def first (first == ...); e|,
 and similarly for other library functions.
 
@@ -861,7 +863,7 @@ $$
 This isn't right yet, but the idea is this: if |e_1| fails, the first branch of the choice fails, so we get |e_3|; if |e_1| succeeds, we
 get |e_2|, and the outer |oneKW| will select it from the choice.
 But what if |e_2| or |e_3| \emph{themselves} fail or return multiple results?  Here is a better translation,
-the one given in \cref{fig:syntax}\footnote{The translation in the figure also allow variables bound in the condition to scope over the |then| branch.}, which wraps the |then| and |else| branches
+the one given in \cref{fig:syntax}\footnote{The translation in the figure also allows variables bound in the condition to scope over the |then| branch.}, which wraps the |then| and |else| branches
 within thunks\footnote{Using thunks for the branches of a conditional is another very old idea;
 for example, see \cite[p.\ 54]{steele:rabbit}.}:
 $$
@@ -902,7 +904,9 @@ but in \versecalc{}, the application of a tuple to a value rewrites to a choice 
 values of the index.
 For example,
 |t :== tup (10,27,32); def i (apply1 t i)|
-looks stuck because we have no value for |i|, but this expression actually rewrites to:
+looks stuck because we have no value for |i|, but this expression actually rewrites
+(via rule \rulename{app-tup} in \Cref{sec:beta})
+to:
 $$
 |def i ((i==0; 10) choice (i==1; 27) choice (i==2; 32)|
 $$
@@ -1166,10 +1170,14 @@ Here are some possibilities:
   does not convey accurate operational intuition, because it goes all the way to a value
   in one step.
 \item \emph{A small-step operational semantics} addresses this criticism:
-  it typically describe how a (heap, expression, stack) configuration evolves, one small
+  it describes how an abstract machine state
+  (typically a (heap, expression, stack) triple) evolves, one small
   step at a time ({\eg}, ~\cite{pj:stg-machine}).
   The difficulty is that the description is now so low-level that it is again hard to explain to programmers.
-\item \emph{A rewrite semantics} steers between these two extremes.
+\item \emph{A rewrite semantics}
+%  steers between these two extremes.
+  steers a middle path between the mathematical abstraction of denotational semantics and the
+  over-concrete details of an operational semantics, whether big or small step.
   For example, Ariola {\etal}'s ``A call-by-need lambda calculus''~\cite{ariola:call-by-need} shows how
   to give the semantics of a call-by-need language as a set of rewrite rules. The great
   advantage of this approach is that it is easily explicable to programmers.
@@ -1590,18 +1598,18 @@ $$
 |all (def x (x=e; 3)|
 $$
 In a lazy language like Curry, the expression |def x (x=e; 3)| would return one result, |3|, regardless of |e|,
-because |x| is unused, and so |x=e| is simply dead code. But in \versecalc{} we must evaluate |e|, and the |allKW| expression will yield an array with one element
-for each result yielded by |e|.  If |e| fails (returns zero results), then the result array is empty.  Since |allKW|
-reifies these results into an array, the multiplicity of results is visible to the context of the |allKW| expression, via
-the length of the returned array.
+because |x| is unused, and so |x=e| is simply dead code. But in \versecalc{} we must evaluate |e|, and the |allKW| expression will yield a tuple with one element
+for each result yielded by |e|.  If |e| fails (returns zero results), then the result tuple is empty.  Since |allKW|
+reifies these results into a tuple, the multiplicity of results is visible to the context of the |allKW| expression, via
+the length of the returned tuple.
 Moreover, consider
 $$
 |all (def (x, y) (x = ((y=3;1) `choice`(y=4;2)); y))|
 $$
 In \versecalc{}, the expression to which |x| is equated must be evaluated, yielding two values, |1| and |2|, which are then discarded since
 |x| is unused.  However, each of these
-values is accompanied by a distinct binding for |y|, so the result of the whole expression is the array |tup (3,4)|.
-In short, we must eventually evaluate the expression to which |x| is equated not only to get the \emph{size} of the array,
+values is accompanied by a distinct binding for |y|, so the result of the whole expression is the tuple |tup (3,4)|.
+In short, we must eventually evaluate the expression to which |x| is equated not only to get the \emph{size} of the tuple,
 but also the \emph{values of its elements}, via the bindings of |y|.
 
 % However, a function can proceed even before its argument is a ground value.
@@ -2744,7 +2752,7 @@ rather than an imperative approach to processing generated combinations:
   (which are then \emph{solved}).
 \item
   Verse also has a concise way to turn a finite sequence of multiple
-  values into an array directly.
+  values into an tuple directly.
   For example, to make variable \texttt{a} refer to an array containing all values generated by expression \texttt{e},
   code such as the following (using a \texttt{repeat} loop containing an assignment) is idiomatic in Icon \cite[\S 8]{griswold:icon-overview}:\\
 \centerline{
