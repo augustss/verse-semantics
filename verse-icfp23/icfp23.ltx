@@ -30,6 +30,9 @@
 \newcommand{\circlednum}[1]{\raisebox{.5pt}{\textcircled{\raisebox{-.9pt} {#1}}}}
 \newcommand{\xmovesto}{\hspace{-0.6em}\movesto\hspace{-0.6em}}
 
+% ---------------- Full Paper ----------------
+\newif\iffullpaper
+\fullpaperfalse     %% include appendicies
 
 \RequirePackage[utf8]{inputenc}
 
@@ -77,9 +80,12 @@
 %% Some recommended packages.
 \usepackage{booktabs}   %% For formal tables:
                         %% http://ctan.org/pkg/booktabs
+\iffullpaper
 \usepackage{subcaption} %% For complex figures with subfigures/subcaptions
                         %% http://ctan.org/pkg/subcaption
-
+\else
+\usepackage[skip=3pt]{caption}
+\fi
 \usepackage{mathpartir}
 
 \usepackage{stmaryrd}
@@ -107,22 +113,26 @@
 %     {<-> ec-lmtlco10}{}
 %\renewcommand{\ttdefault}{lmttc}
 
-% ---------------- Boxed figures ------------------
-\usepackage{float}
-\usepackage{xspace}
-\usepackage{quiver}
-\floatstyle{boxed}
-\restylefloat{figure}
-
 % ---------------- Full Verse ----------------
 \newif\iffullverse
 \fullversefalse
 % use \iffullverse \else \fi
-\newif\iffullpaper
-\fullpaperfalse     %% include appendicies
+
+% ---------------- Boxed figures ------------------
+\usepackage{float}
+\usepackage{xspace}
+\usepackage{quiver}
+\iffullpaper
+\floatstyle{boxed}
+\fi
+\restylefloat{figure}
 
 % ---------------- Useful macros ----------------
+\iffullpaper
 \renewcommand{\arraystretch}{1.1}
+\else
+\renewcommand{\arraystretch}{1.0}
+\fi
 
 % ----------------- Author comments ---------------------
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
