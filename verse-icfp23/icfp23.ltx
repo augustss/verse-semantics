@@ -38,14 +38,18 @@
 %% use defaults for review submission.
 %   \acmConference[ICFP’23]{International Conference on Functional Programming}{September 5–7}{Seattle, WA, USA}
 \setcopyright{rightsretained}
-\acmJournal{PACMPL}
+\acmPrice{}
+\acmDOI{10.1145/3607845}
 \acmYear{2023}
+\copyrightyear{2023}
+\acmSubmissionID{icfp23main-p46-p}
+\acmJournal{PACMPL}
 \acmVolume{7}
 \acmNumber{ICFP}
 \acmArticle{203}
 \acmMonth{8}
-\acmPrice{}
-\acmDOI{10.1145/3607845}
+\received{2023-03-01}
+\received[accepted]{2023-06-27}
 % \acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
 % \startPage{1}
 
@@ -53,7 +57,7 @@
 %% Supplied to authors (based on authors' rights management selection;
 %% see authors.acm.org) by publisher for camera-ready submission;
 %% use 'none' for review submission.
-\setcopyright{none}
+%\setcopyright{none}
 %\setcopyright{acmcopyright}
 %\setcopyright{acmlicensed}
 %\setcopyright{rightsretained}
@@ -619,7 +623,7 @@ arm-waving.  But fear not: \cref{sec:rewrite-rules} spells out the precise detai
 We only have space to describe one incarnation of \versecalc{}; \cref{sec:variations}
 explores some possible alternative design choices.
 
-\subsection{Logical variables and equations} \label{sec:unify}
+\subsection{Logical Variables and Equations} \label{sec:unify}
 
 The Verse calculus includes first-class \emph{logical variables} and \emph{equations} that constrain their values.
 You can bring a fresh logical variable into scope with |defKW|, constrain a value to be equal to
@@ -736,7 +740,7 @@ $$
 |def x (x == fail; 33)| \quad \movesto \quad |fail|
 $$
 
-\subsection{Mixing choice and equations} \label{sec:mixing}
+\subsection{Mixing Choice and Equations} \label{sec:mixing}
 
 In the last section, we discussed what happens if there is a choice in the right-hand side (RHS) of
 an equation. What if we have equations under choice?  For example:
@@ -768,7 +772,7 @@ and now it is apparent that the sole occurrence of |x| in each |defKW| is the eq
 % it yields |(3 choice 4) * (3 choice 4)| which in turn yields |(9 choice 12 choice 12 choice 16)|.
 % All functional logic languages, including
 
-\subsection{Pattern matching and narrowing}
+\subsection{Pattern Matching and Narrowing}
 
 We remarked in \cref{sec:unify} that we can desugar the pattern matching of a high-level
 language into equations. But what about multi-equation pattern matching, such as this definition in Haskell:
@@ -1072,7 +1076,7 @@ in Haskell.  For example, |pat| could be \emph{computed}, like this:
 $\end{center}
 so that the pattern depends on the value of |a|.
 
-\subsection{For loops} \label{sec:for}
+\subsection{For Loops} \label{sec:for}
 
 The expression |fordo e_1 e_2| will evaluate |e_2| for each of the choices in |e_1|,
 rather like a list comprehension in languages like Haskell or Python.
@@ -1200,7 +1204,7 @@ has the following properties:
 % the rule only applies if at least one of the |eq| has no choice.
 
 
-\subsection{Functions and function application rules} \label{sec:beta}
+\subsection{Functions and Function Application Rules} \label{sec:beta}
 
 Looking at \cref{fig:rules}, the rule for a primitive operator like addition, \rulename{app-add},
 should be familiar: it simply rewrites an application of |add| to integer
@@ -1250,7 +1254,7 @@ does not suspend awaiting a value for |x|; instead it explores all the
 alternatives (a form of narrowing), returning |(0 choice 2)|.  This is a free design decision:
 a suspending semantics would be equally easy to express.
 
-\subsection{Unification rules} \label{sec:unification-rules}
+\subsection{Unification Rules} \label{sec:unification-rules}
 
 Next we study unification, again in \cref{fig:rules}.
 Rules \rulename{u-lit} and \rulename{u-tup}
@@ -1323,7 +1327,7 @@ suffice to express the necessary sharing.
 \item The side condition $|v| \not= |V^[x]|$ in \rulename{subst} avoids an overlap with \rulename{u-occurs}.
 \end{itemize}
 
-\subsection{Swapping and binding order} \label{sec:swapping}
+\subsection{Swapping and Binding Order} \label{sec:swapping}
 
 Two rules allow the two sides of an equation to be swapped.
 Rule \rulename{hnf-swap} helps \rulename{subst} to fire by putting the variable on the left.
@@ -1391,7 +1395,7 @@ and thereby re-enable \rulename{var-swap} or \rulename{seq-swap},
 but the unification rules \emph{considered in isolation} are terminating and confluent,
 and that is what we need for the proof (but see \Cref{sec:simpler}).
 
-\subsection{Elimination and normalization rules} \label{sec:gc} \label{sec:normalization}
+\subsection{Elimination and Normalization Rules} \label{sec:gc} \label{sec:normalization}
 
 % Indeed, |e| can mention |x| too: consider |(x == ((y==x+1); 3); y)|. Using
 % \rulename{eqn-float} gives us |(y==x+1; x==3; y)|; to make further progress we must
@@ -1455,7 +1459,7 @@ because the latter is outside the choice, and a different branch of the choice b
 % These rules could be more general, see \cref{sec:variations-liberate-unify}.
 
 
-\subsection{Rules for choice} \label{sec:choice-rules}
+\subsection{Rules for Choice} \label{sec:choice-rules}
 
 The rules for choice are given in \cref{fig:rules}:
 \begin{itemize}
@@ -1563,7 +1567,7 @@ languages like Curry \cite{antoy:pull-tabbing}.
 % to be sequential---without, of course, prohibiting parallel evaluation.  The |SX| is less significant
 % for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
-\subsection{The Verse calculus is lenient} \label{sec:lenient}  \label{sec:laziness}
+\subsection{The Verse Calculus is Lenient} \label{sec:lenient}  \label{sec:laziness}
 
 \versecalc{} is \emph{lenient} \cite{lenience},
 not lazy (call-by-need), nor strict (call-by-value).
@@ -1639,7 +1643,7 @@ This transformation would not be valid under call-by-value.
 % There is a good reason for this choice: |apply0 wombat| might fail, and we should not return |3| until
 % we know there is no failure.  With laziness, we could easily lose confluence.
 
-\subsection{Evaluation strategy} \label{sec:eval-strategy}
+\subsection{Evaluation Strategy} \label{sec:eval-strategy}
 
 Any rewrite rule can apply anywhere in the term, at any time.  For example, in the term |(x==3+4; y==4+2; x+y)|
 the rewrite rules do not say whether to rewrite |3+4| $\rightarrow$ |7| and then |4+2| $\rightarrow$ |6|,
@@ -1710,7 +1714,7 @@ design space is, however, beyond the scope of this paper.
 % is (especially, whether it fails) before the right-hand one can be used.
 % So the basic plan is: rewrite the leftmost-outermost redex, subject to these two constraints.
 
-\subsection{Logical completeness} \label{sec:local-subst}
+\subsection{Logical Completeness} \label{sec:local-subst}
 
 Our rewrite rules seek to implement the idea articulated in \Cref{sec:unify} that
 a program executes by solving its equations, specifically by finding values for the logical variables
@@ -1781,7 +1785,7 @@ the expression gets stuck rather than failing.
 % the simpler \rulename{global-subst}: to establish confluence.
 
 
-\subsection{Developing and debugging rules}\label{sec:testing}
+\subsection{Developing and Debugging Rules}\label{sec:testing}
 The rules we describe here should both be able to transform a program to its value,
 and also be confluent.
 To aid in the development of the rules, we have used several mechanized tools to automate
@@ -1877,11 +1881,11 @@ and $e_1$ and $e_2$ are normal forms, then $e_1 = e_2$
 
 % \begin{definition}[Recursive Equations] \label{def:norec}
 
-\subsection{Two challenges to confluence}
+\subsection{Two Challenges to Confluence}
 
 Confluence is a purely syntactic property, which leads to two tiresome challenges.
 
-\subsubsection{Tiresome challenge 1: Unifying lambdas} \label{sec:unifying-lambda}
+\subsubsection{Tiresome Challenge 1: Unifying Lambdas} \label{sec:unifying-lambda}
 
 In \versecalc{}, an attempt to unify a lambda with another value is stuck (\Cref{sec:unification-rules}).
 That choice has two consequences. One is easy to handle, one is tiresome.
@@ -1942,7 +1946,7 @@ is wrong anyway: we should not be attempting to unify lambdas.
 
 
 
-\subsubsection{Tiresome challenge 2: Recursion and the notorious even/odd problem}  \label{sec:even-odd}
+\subsubsection{Tiresome Challenge 2: Recursion and the Notorious Even/odd Problem}  \label{sec:even-odd}
 %
 It is well known that adding {\bf letrec} to the lambda calculus
 makes it non-confluent, in a very tiresome, but hard-to-avoid, way \cite{ariola:skew-confluence}.
@@ -1964,7 +1968,7 @@ rules, as we did when we added \rulename{var-swap} (\cref{sec:unification-rules}
 and \rulename{seq-swap} (\cref{sec:normalization}).  Why not? Because the terms
 are equivalent only under some kind of graph isomorphism.
 
-\subsubsection{Resolving the two challenges}
+\subsubsection{Resolving the Two Challenges}
 
 We explored three different ways to address these challenges.
 The first is simply to abandon confluence as a goal altogether.
@@ -2020,7 +2024,7 @@ with several new lemmas, but we emphasize that the proof of skew confluence is n
 
 
 \noindent
-\subsection{Proof of confluence} \label{sec:confluence-sketch}
+\subsection{Proof of Confluence} \label{sec:confluence-sketch}
 
 Our main result is that \versecalc{}'s reduction rules are confluent for well-behaved terms.
 We sketch the proof here, with full details in \fullcref{C}{sec:confluence}\iffullpaper(and relevant preliminaries in \fullcref{B}{sec:preliminaries}).\else.\fi
@@ -2162,7 +2166,7 @@ normalization \cite{Hindley}; see \fullcref{C}{sec:confluence} for the gory deta
  % terminates.
 
 
-\subsection{Overview of skew confluence} \label{sec:skew-overview-2}
+\subsection{Overview of Skew Confluence} \label{sec:skew-overview-2}
 
 We travel a path very similar to the one blazed by Ariola and her co-authors.
 Ariola and Klop studied a form of the lambda calculus with an added $\mathsf{letrec}$ construct and
@@ -2265,7 +2269,7 @@ of \cref{sec:confluence-sketch} and \fullcref{C}{sec:confluence} for skew conflu
 In a calculus like \versecalc{}, there is room for many design variations.
 We discuss some of them here.
 
-\subsection{Simplifying the rules} \label{sec:simpler}
+\subsection{Simplifying the Rules} \label{sec:simpler}
 
 The rules of \Cref{fig:rules} are more complicated than we would like, because our
 proof of confluence requires that the unification rules form a \emph{terminating}
@@ -2332,7 +2336,7 @@ is work in progress. We speculate that these same simplifications will also supp
 %   solution for |x|}.  So, if |x| is entirely unconstrained, maybe we should return an infinite number of results?
 % It would be easy to change this decision, by adjusting the rules in \cref{fig:wf} for well-formed results.
 
-\subsection{Ordering and choices} \label{sec:ord-choice}
+\subsection{Ordering and Choices} \label{sec:ord-choice}
 
 As we discussed in \cref{sec:choice-rules}, rule \rulename{choose} is less than satisfying for two reasons.
 First, the |CX| context uses a conservative, syntactic analysis for choice-free expressions; and second,
@@ -2412,7 +2416,7 @@ the longer survey by~\citet{hanus:survey}.  Now that we
 know what \versecalc{} is, we can identify its distinctive features,
 and compare them to other approaches.
 
-\subsection{Choice and non-determinism} \label{sec:deterministic}
+\subsection{Choice and Non-determinism} \label{sec:deterministic}
 
 A significant difference between our presentation and earlier works is our
 treatment of choice. Consider an expression like |(3 + (20 choice 30))|.
@@ -2604,7 +2608,7 @@ of solutions. Consequently, in~Goffin, the logical variables are never ``unified
 but instead are ``updated'' as values are computed in parallel, yielding a completely
 different model of computation.
 
-\subsection{Flat {\vs} higher order}
+\subsection{Flat {\vs} Higher Order}
 
 When giving the semantics
 of functional logic languages, a first-order presentation is almost universal.
@@ -2630,7 +2634,7 @@ it obstructs the goal of using rewrite rules to explain to programmers how
 their program might behave. In contrast, a strength of our \versecalc{}
 presentation is that it deals natively with the full lambda calculus.\looseness=-1\relax
 
-\subsection{Intermediate language}
+\subsection{Intermediate Language}
 
 Hanus's \emph{Flat Language}~\cite[Fig 1]{hanus:semantics}, FLC, plays the same role as \versecalc{}:
 it is a small core language
