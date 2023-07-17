@@ -905,11 +905,10 @@ values of the index.
 For example,
 |t :== tup (10,27,32); def i (apply1 t i)|
 looks stuck because we have no value for |i|, but this expression actually rewrites
-(via rule \rulename{app-tup} in \Cref{sec:beta})
-to:
-$$
+(via rule \rulename{app-tup} in \Cref{sec:beta}) to:
+\begin{center}$
 |def i ((i==0; 10) choice (i==1; 27) choice (i==2; 32)|
-$$
+$\end{center}
 which (as we will see in \cref{sec:rewrite-rules}) simplifies
 to just |(10 `choice` 27 `choice` 32)|.
 So |allKW| allows a choice to be reified into a tuple, and |(def i (apply1 t i))| allows a
