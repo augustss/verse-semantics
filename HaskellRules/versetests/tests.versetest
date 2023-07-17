@@ -230,7 +230,7 @@ testeq(pass) {if(y:int; y=1) y else 23}  {1}
 
 # Confluence: Needs local substitution
 testeq(pass) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}}
-            {x : int; if (y:int; y = 1; y = x; y > 1)  {42} else {23}}
+             {x : int; if (y:int; y = 1; y = x; y > 1)  {42} else {23}}
 
 # Various combinations ';', '=', and application.
 testeq(pass) { (1=1) = (1=1) }         {1}
