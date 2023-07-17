@@ -627,7 +627,7 @@ and has the same semantics. Just like the lambda calculus, \versecalc{} is untyp
 adding a type system is an excellent goal but is the subject of another paper.
 
 Expressions also include two other key collections of constructs:
-logical variables and the use of equations to perform unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
+logical variables with the use of equations to perform unification (\cref{sec:unify}), and choice (\cref{sec:choice}).
 The details of choice and unification, and especially their
 interaction, are subtle, so this section does a lot of
 arm-waving.  But fear not: \cref{sec:rewrite-rules} spells out the precise details.
@@ -1426,7 +1426,7 @@ occurrence is a single equation |x=v|; and \rulename{fail-elim} discards the exe
 Note that none of these rules, except \rulename{fail-elim}, discards an unevaluated expression,
 because that expression might fail and we don't want to ``lose'' that failure (see \cref{sec:lenient}).
 The exception is \rulename{fail-elim}, whose purpose is to propagate a known failure, so losing some other failure
-that might have been in the discarded execution context doesn't matter.
+that might have been in the discarded execution context does not matter.
 
 Four \emph{normalization} rules help to put the expression in a form that
 allows other rules to fire (\cref{fig:rules}):  \rulename{exi-float} allows an existential to float outwards;
