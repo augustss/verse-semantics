@@ -495,21 +495,24 @@ Like any functional logic language,
   Indeed, \emph{every lambda calculus program is a \versecalc{} program}.
   In contrast, most of the functional logic literature is rooted in a first-order world, and
   addresses higher-order features via an encoding called defunctionalization~\citetext{\citealp{defunctionalization}; \citealp{hanus:survey}, 3.3}.
-\item \emph{Deterministic, with native encapsulation}.  \versecalc{} is \emph{deterministic}, in the sense that when an expression yields more than one value (as is often the case in functional logic programs), those values are returned in a well-specified order.  This makes it easy to solve the notoriously tricky issue \cite{bernd-hanus:encapsulating-workshop,bernd-hanus:encapsulating} of
-  how to \emph{encapsulate} the result of a search as a data structure, using the |allKW| operator (\cref{sec:all}).
+\item \emph{Deterministic, with native encapsulation}.  \versecalc{} is \emph{deterministic}, in the sense that when an expression yields more than one value
+  (as is often the case in functional logic programs), those values are returned in a well-specified order.
+  This makes it easy to solve the\hbox{notoriously} tricky issue \cite{bernd-hanus:encapsulating-workshop,bernd-hanus:encapsulating} of
+  how to \emph{encapsulate} the result of a search as a data structure, using the |allKW| operator (see \cref{sec:all}).
   It opens up a new approach to dealing with so-called ``flexible'' {\vs} ``rigid'' variables
-  (\cref{sec:one}).  It supports an elegant economy of concepts: for example,
-  there is just one equality (other languages may have a suspending equality and a narrowing equality),
-  and conditional expressions are driven by failure rather than booleans (\cref{sec:if}).
-  On the other hand, it pretty much rules out \emph{laziness} (\cref{sec:laziness})
+  (see \cref{sec:one}).  It supports an elegant economy of concepts: for example,
+  there is just one equality (other languages may have a \hbox{suspending} equality and a narrowing equality),
+  and conditional expressions are driven by failure rather than booleans (see \cref{sec:if}).
+  On the other hand, it pretty much rules out \emph{laziness} (see \cref{sec:laziness})
   and parallel first-come first-returned search strategies.
   %
-  Most other functional-logic languages (Curry is the brand leader~\cite{hanus:curry-report})
+  Most other functional-logic languages (Curry~\cite{hanus:curry-report} is the brand leader in this design space)
   are non-deterministic by design; \versecalc{}
   explores a different (and less well-examined) part of the design space.
+  \looseness=1\relax % Purely cosmetic, to help fill up page 2; remove if any real material is added 
 \end{itemize}
 {\bf Our second contribution} is to equip \versecalc{} with a
-\emph{small-step term-rewriting semantics} (\cref{sec:rewrite-rules}).
+\emph{small-step term-rewriting semantics} (see \cref{sec:rewrite-rules}).
 We said that the lambda calculus is a subset of \versecalc{}, so it is natural to give its
 semantics using rewrite rules, just as for the lambda calculus.  That seems challenging, however, because
 logical variables and unification involve sharing and non-local communication. How can that
@@ -526,6 +529,7 @@ logical variables, unification, and choice into the term itself,
 and replaces non-deterministic search with a (deterministic) tree of successful results.
 In \versecalc{} the choices are ``laid out in space'' (in the syntax of the term)
 rather than, as is more typical, ``laid out in time'' (via non-deterministic rewrites and backtracking).
+  \looseness=1\relax % Purely cosmetic, to help fill up page 2; remove if any real material is added 
 
 \newpage
 
