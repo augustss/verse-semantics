@@ -893,7 +893,7 @@ with the argument being integers from 0 and up.  Indexing out of range is |fail|
 a non-integer value.
 For example, |t :== tup (10,27,32); apply1 t 1| reduces to |27| and |t :== tup (10,27,32); apply1 t 3| reduces to |fail|.
 
-What if we apply a tuple to a choice, for example |apply1 (tup (10,27,32))(1 `choice` 0 `choice` 1)|?  First we must
+What if we apply a tuple to a choice, \eg, |apply1 (tup (10,27,32))(1 `choice` 0 `choice` 1)|?  First we must
 desugar the application to the form |(apply1N v_1 v_2)|, which is all \versecalc{} permits (see \cref{fig:syntax}),
 giving |x:==(1 `choice` 0 `choice` 1); apply1(tup (10,27,32)) x|, which readily reduces to |(27 `choice` 10 `choice` 27)|.
 
