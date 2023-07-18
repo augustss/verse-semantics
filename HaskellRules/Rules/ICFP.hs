@@ -378,8 +378,12 @@ scopeX lhs =
   do Assert hole <- [lhs]
      choices Assert hole
  ++
+  do Decide hole <- [lhs]
+     choices Decide hole
+ ++
   do Assume hole <- [lhs]
      choices Assume hole
+
 
  where
   choices ctx e =

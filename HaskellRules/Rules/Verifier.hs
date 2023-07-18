@@ -45,7 +45,9 @@ verify sys e =
 isDone :: Expr -> Bool
 isDone = collect done (&&)
  where
+  -- done (Verify _) = False
   done (Assert _) = False
+  done (Decide _) = False
   done _          = True
 
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
@@ -124,12 +126,6 @@ generalizedIcfpRules env lhs =
 assumeAssertRules :: VRule
 assumeAssertRules env lhs =
   -- ASSUME --
-
-  -- Assume {v} ----> v
-  --"Assume-Val" `name`
-  --do Assume (Val v) <- [lhs]
-  --   pure (Val v)
-  -- ++
   "Assume-HNF" `name`
   do Assume (HNF v) <- [lhs]
      pure v
@@ -138,11 +134,6 @@ assumeAssertRules env lhs =
   "Assume-Seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assume e2)
---   ++
---   -- Assume { e1 | e2 } ----> Assume {e1} | Assume {e2}
---   "Assume-Choice" `name`
---   do Assume (e1 :|: e2) <- [lhs]
---      pure (Assume e1 :|: Assume e2)
   ++
   -- Assume { exi x . e } ----> exi x . Assume {e}
   "Assume-Exi" `name`
@@ -159,51 +150,34 @@ assumeAssertRules env lhs =
   do Assume (Assert e) <- [lhs]
      pure (Assume e)
   ++
-
-  -- ASSERT --
-
-  -- Assert { e } ----> e   if   e must succeed
-  "Assert-mustSucceed" `name`
-  do Assert e <- [lhs]
-     guard (mustSucceed e)
-     pure e
-  ++
-{- (these are all subsumed by the above rule)
-  -- Assert {v} ----> v
-  "Assert-Val" `name`
-  do Assert (Val v) <- [lhs]
-     pure (Val v)
-  ++
-  -- Assert {Assert {e}} ----> Assert {e}
-  "Assert-Assert" `name`
-  do Assert (Assert e) <- [lhs]
-     pure (Assert e)
-  ++
-  -- Assert { Assume {e1}; e2 } ----> Assume {e1} ; Assert {e2}
-  "Assert-Assume" `name`
-  do Assert (Assume e1 :>: e2) <- [lhs]
-     pure (Assume e1 :>: Assert e2)
-  ++
--}
-
-  -- VERIFY --
-
-  "Verify" `name`
-  do Verify e <- [lhs]
-     let verified (Assert _) = False
-         verified _          = True
-     guard (collect verified (&&) e)
-     pure (Val (Arr []))
-  ++
+  -- Assume { Verify {e} } ----> ()
   "Assume-Verify" `name`
   do Assume (Verify _) <- [lhs]
      pure (Val (Arr []))
   ++
-  "Decide-Verify" `name`
+  -- ASSERT --
+  -- Assert { e } ----> e   if   e mustSucceed
+  "Assert-Elim" `name`
+  do Assert e <- [lhs]
+     guard (mustSucceed e)
+     pure e
+  ++
   -- DECIDE --
+  -- Decide { e } ----> e   if   e mustDecide
+  "Decide-Elim" `name`
   do Decide e <- [lhs]
      guard (mustDecide (bndVars env) e)
      pure e
+  ++
+  -- VERIFY --
+  -- Verify { e } ----> ()  if   e no Assert/Decide in e
+  "Verify-Elim" `name`
+  do Verify e <- [lhs]
+     let verified (Assert _) = False
+         verified (Decide _) = False
+         verified _          = True
+     guard (collect verified (&&) e)
+     pure (Val (Arr []))
   ++
   -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
   "Assume-Choice" `name`
@@ -230,6 +204,7 @@ mustDecide bs = go
     go (Arr as)    = all go as
     go (One e)     = go e
     go (e1 :=: e2) = go e1 && go e2
+    go (e1 :|: e2) = go e1 && go e2
     go (e1 :>: e2) = go e1 && go e2
     go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
     go (Assume _)  = True
@@ -237,16 +212,6 @@ mustDecide bs = go
     go (Op _)      = True
     go (Var x)     = x `elem` lamBinds
     go _           = False
-
--- mustDecide (Arr as)    = all mustDecide as
--- mustDecide (One e)     = mustDecide e
--- mustDecide (e1 :=: e2) = mustDecide e1 && mustDecide e2
--- mustDecide (e1 :>: e2) = mustDecide e1 && mustDecide e2
--- mustDecide (e1 :@: e2) = mustDecide e1 && mustDecide e2 && isDecideOp e1
--- mustDecide (Assume _)  = True
--- mustDecide (Int _)     = True
--- mustDecide (Op _)      = True
--- mustDecide _           = False
 
 isDecideOp :: Expr -> Bool
 isDecideOp (Op Le)    = True
@@ -285,11 +250,8 @@ verifierRules env lhs =
       (ctx, _, bs, If e1 e2 e3) <- eX e
       let bs0 = bndVars env
       guard (mustDecide (bs0 ++ bs) e1)
-      let (eThen, eElse) = unfoldIte e1 e2 e3
-      pure (Verify (ctx eThen) :>: Verify (ctx eElse))
+      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx e3))
 
-unfoldIte :: Expr -> Expr -> Expr -> (Expr, Expr)
-unfoldIte e1 e2 e3 = (Assume e1 :>: e2 , {- assume-fail{e1} :>: -} e3)
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"

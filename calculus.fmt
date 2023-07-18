@@ -170,15 +170,15 @@
 
 %format assumeKW = "\textbf{assume}"
 %format assertKW = "\textbf{assert}"
-%format succeedKW = "\textbf{succeed}"
-%format verifyKW = "\textbf{verify}"
-%format decideKW = "\textbf{decide}"
+%format succeedKW = "\textbf{suc}"
+%format verifyKW = "\textbf{prove}"
+%format decideKW = "\textbf{dec}"
 
 %format assume (x) = "\textbf{assume}\{" x "\}"
 %format assert (x) = "\textbf{assert}\{" x "\}"
-%format succeed (x) = "\textbf{succeed}\{" x "\}"
-%format verify (x) = "\textbf{verify}\{" x "\}"
-%format decide (x) = "\textbf{decide}\{" x "\}"
+%format succeed (x) = "\textbf{suc}\{" x "\}"
+%format verify (x) = "\textbf{prove}\{" x "\}"
+%format decide (x) = "\textbf{dec}\{" x "\}"
 
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"
@@ -201,7 +201,7 @@
 %format range = "\textbf{range}"
 %format square(x) = x "^2"
 %format univ (x) (y) = "\forall" x ".\," y
-
+%format myite (x) (y) (z) = "\textbf{if}\;" x "\;\{" y "\}\;\{" z "\}"
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"

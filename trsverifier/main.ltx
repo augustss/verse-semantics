@@ -313,8 +313,8 @@ for the Verse language.
 
 \section{Introduction}
 
-\paragraph{The key idea} is to \emph{desugar} the source verse
-programs into a core language that is \vcshort -- the ICFP23 calculus --
+The key idea is to \emph{desugar} the source verse
+programs into a core language that is \vcshort (the ICFP23 calculus)
 extended with
 %
 (1) \emph{syntax} to record \emph{assumptions} and \emph{obligations},
@@ -336,16 +336,14 @@ end-to-end.
 
 \section{Syntax}\label{sec:syntax}
 
-\figureSyntax
+% \figureSyntax
 
 \begin{figure}
 $$\begin{array}{lr@@{\;}c@@{\;}l}
-\text{Expressions} & e & ::= & \ldots    \\
-                   &   & \vb & |if e then e else e| \\
-                   &   & \vb & |assume e| \\
-                   &   & \vb & |succeed e| \\
-                   &   & \vb & |decide e| \\
-                   &   & \vb & |verify e| \\
+\text{Expressions} & e & ::= & \ldots \\
+                   &   & \vb & |myite e e e| \\
+                   &   & \vb & |succeed e| \vb |decide e| \\
+                   &   & \vb & |assume e| \vb |verify e| \\
 \end{array}$$
 \label{fig:verifier-syntax}
 \end{figure}
@@ -357,9 +355,9 @@ they must be proved.
 %
 These extensions are summarized in \cref{fig:verifier-syntax}.
 %
-The |if e1 then e2 else e3| construct makes it easier to use
-the information established by the branch (|e1|) in the |then|
-expression |e2|.
+The |myite e_1 e_2 e_3| construct makes it easier to use
+the information established by the branch (|e_1|) in the |then|
+expression |e_2|.
 %
 The |assume e| construct records an \emph{assumption} that
 the evaluation of |e| always produces a value \ie does not
@@ -373,12 +371,84 @@ The |decide e| construct denotes an \emph{obligation} that
 the evaluation of |e| does not get \emph{stuck} \ie either
 produces values or fails.
 
+\section{Rewrite Rules}
+
+\newcommand{\mustSucceed}[1]{\ensuremath{\mathsf{Suc}(#1)}}
+\newcommand{\mustDecide}[2]{\ensuremath{\mathsf{Dec}(#1, #2)}}
+\newcommand{\mustVerify}[1]{\ensuremath{\mathsf{Prove}(#1)}}
+\newcommand{\proves}[2]{\ensuremath{#1 \vdash #2}}
+
+\begin{figure}[t]
+$\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Assume:}
+  \rulename{asm-hnf} & |assume hnf|         & \movesto & |hnf|                    & \\
+  \rulename{asm-seq} & |assume (e_1; e_2)|  & \movesto & |assume e_1; assume e_2| & \\
+  \rulename{asm-exi} & |assume (def x e)|   & \movesto & |def x (assume e)|       & \\
+  % \rulename{asm-cas} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & \multicolumn{2}{@@{}l}{|verify (E^[assume e_1]) ; verify (E^[assume e_2])|}  \\
+  \rulename{asm-cas} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & |verify (E^[assume e_1]);| & \\
+                     &                                        &          & |verify (E^[assume e_2])|  \\
+  \rulename{asm-id}  & |assume (assume e)|  & \movesto & |assume e|               & \\
+  \rulename{asm-suc} & |assume (succeed e)| & \movesto & |assume e|               & \\
+  \rulename{asm-dec} & |assume (decide e)|  & \movesto & |assume e|               & \\
+  \rulename{asm-ver} & |assume (verify e)|  & \movesto & |tup ()|                 & \\
+\\[-0.6em]
+
+\rulegroupname{Succeed/Decide:}
+  \rulename{suc-elim} & |succeed e|     & \movesto & |e|      & \text{if}\ $\mustSucceed{e}$ \\
+  \rulename{dec-elim} & |E^[decide e]|  & \movesto & |E^[e]|  & \text{if}\ $\mustDecide{E}{e}$ \\
+\\[-0.6em]
+
+\rulegroupname{Prove:}
+  \rulename{asm-intro}  & |E^[e]|                          & \movesto & |E^[assume e]| & \text{if}\ \proves{E}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  \rulename{prove-elim} & |verify e|                       & \movesto & e       & \text{if}\ \mustVerify{e} \\
+  \rulename{prove-if}   & |verify (E^[myite e_1 e_2 e_3])| & \movesto & |verify (E^[assume e_1; e_2]);| & \text{if}\ \mustDecide{E}{e_1} \\
+                        &                                  &          & |verify (E^[e_3])|             & \\
+\end{array}\\
+\end{array}$
+\caption{TRS Verifier Rewrite Rules}
+
+\end{figure}
 
 
-% verify(pass) { f(x:int):=x+1}
-% verify(pass) { foo(x:any):int := if (int[x]) then { x + 1 } else { 0 } }
-% verify(pass) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
-% verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
-% verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 708 - z }
+
+\begin{verbatim}
+
+
+\end{verbatim}
+
+
+
+\section{Examples}
+
+\mypara{Example 1}
+%
+\begin{verbatim}
+f(x:int):=x+1
+\end{verbatim}
+
+\mypara{Example 2}
+\begin{verbatim}
+foo(x:any):int := if (int[x]) then { x + 1 } else { 0 }
+\end{verbatim}
+
+\mypara{Example 3}
+\begin{verbatim}
+sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 }
+\end{verbatim}
+
+\mypara{Example 4}
+\begin{verbatim}
+# pass
+suc(x:int) := {x + 1};
+ex6(h(z:int):int):int := {h(3)};
+ex6(suc)
+\end{verbatim}
+
+\mypara{Example 5}
+\begin{verbatim}
+foo(x:int)<decides> := { (x = 666) | (x = 42) } ;
+phil(z:foo):foo := 708 - z
+\end{verbatim}
 
 \end{document}
