@@ -431,6 +431,8 @@ instance Rec Expr where
       All a -> [ (n, All a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assume a -> [ (n, Assume a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assert a -> [ (n, Assert a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Decide a -> [ (n, Decide a') | (n,a') <- rec r (addBound BBlk s) a ]
+
       Verify a -> [ (n, Verify a') | (n,a') <- rec r (addBound BBlk s) a ]
       Split a f g ->
            [ (n, Split a' f g) | (n,a') <- rec r (addBound BBlk s) a ]
