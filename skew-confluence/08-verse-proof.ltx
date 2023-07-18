@@ -1,0 +1,651 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%include ./skew.fmt 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Verse Calculus Is Skew-Confluent}
+
+
+\subsection{Modified Grammar and Rewrite Rules}
+
+Let us modify the grammar for \versecalc{} to have one additional kind of value, a~\emph{fixpoint} value |mu x hnf|:
+\begin{quote}
+$
+\begin{array}{lr@@{\;}c@@{\;}l}
+      \text{Values} & |v| & ::= & |x|  \vb \hnf \vb |mu x hnf| \\
+\end{array}
+$
+\end{quote}
+and a modify the set of Unification rewrite rules $\runi$ so that rule \rulename{u-occurs}
+\begin{quote}
+$
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulename{u-occurs} & |x=V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+\end{array}
+$
+\end{quote}
+is replaced by the two rules\footnote{These two rules allow equations to be recursive through lambda expressions and possibly also tuples, but not through tuples only;
+  thus equations such as |f = lam y (tup (y, f))| and |x = (tup (1,  lam y (tup (y, x))))| can be processed by rule \rulename{u-occurs-wrap},
+  but the equation |x = (tup (1, x))| can be processed only by rule \rulename{u-occurs-fail}.
+  An alternate design using the single rule
+  \begin{quote}
+$
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulename{u-occurs-wrap} & |x=hnf| & \movesto & |x=mu x hnf| & \text{if $|x| \in \freevars{|hnf|}$} \\
+\end{array}
+$
+\end{quote}
+plus rule \rulename{u-unwrap} could be used instead to support recursion through tuples only as well as through lambda expressions.}\footnote{
+  \rulename{u-occurs-fail} is identical to \rulename{u-occurs} in its effect,
+  but it is re-expressed using $\freevarsoutsidelambdas{\cdot}$, which we need anyway for \rulename{u-occurs-wrap}.  Now we can drop the context $V$, which was only
+  used in \rulename{u-occurs}.
+}
+\begin{quote}
+$
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulename{u-occurs-fail} & |x=hnf; e| & \movesto & |fail| & \text{if $|x| \in \freevarsoutsidelambdas{|hnf|}$} \\
+  \rulename{u-occurs-wrap} & |x=hnf; e| & \movesto & |x=mu x hnf; e| & \text{if $|x| \in \freevars{|hnf|}$ and $|x| \not\in \freevarsoutsidelambdas{|hnf|}$} \\
+\end{array}
+$
+\end{quote}
+Let us also add this rewrite rule:
+\begin{quote}
+$
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;} l l}
+  \rulename{u-unwrap} & |mu x hnf| & \movesto & |subst hnf x (mu x hnf)| \\
+\end{array}
+$
+\end{quote}
+As we will see, rule \rulename{u-unwrap} is confluent but not Noetherian.
+
+The resulting grammar is not confluent; in particular, it suffers from the even-odd problem
+described in \cref{sec:even-odd} \cite[Example 4.1]{ariola:skew-confluence}.
+Therefore we will modify the proof of confluence for $\runi$ to become a proof of \emph{skew confluence} \cite{ariola:skew-confluence},
+and then go on to prove that \versecalc{} itself, with this modification, is skew confluent.
+
+
+
+\begin{figure}
+$
+\begin{array}{r@@{\;\;}c@@{\;\;}l@@{\qquad}l}
+  \freevars{|x|} & = & \{ |x| \} \\
+  \freevars{|k|} & = & \{\,\} \\
+  \freevars{|op|} & = & \{\,\} \\
+  \freevars{|tup (v_1, commadots, v_n)|} & = & \freevars{|v_1|} \cup \cdots \cup \freevars{|v_n|} \\
+  \freevars{|lam x e|} & = & \freevars{|e|} \setminus \{ x \} \\
+  \freevars{|mu x e|} & = & \freevars{|e|} \setminus \{ x \} \\
+  \freevars{|eq; e|} & = & \freevars{|eq|} \cup \freevars{|e|} \\
+  \freevars{|v = e|} & = & \freevars{|v|} \cup \freevars{|e|} \\
+  \freevars{|def x e|} & = & \freevars{|e|} \setminus \{ x \} \\
+  \freevars{|fail|} & = & \{\,\}  \\
+  \freevars{|e_1 choice e_2|} & = & \freevars{|e_1|} \cup \freevars{|e_2|} \\
+  \freevars{|v_1 v_2|} & = & \freevars{|v_1|} \cup \freevars{|v_2|} \\
+  \freevars{|one e|} & = & \freevars{|e|} \\
+  \freevars{|all e|} & = & \freevars{|e|} \\
+\end{array}
+$
+\caption{Definition of the free-variables function $\freevars{|e|}$}\label{fig:fvs}
+\Description{Definition of the free-variables function ``fvs''}
+\end{figure}
+
+\clearpage
+
+\begin{figure}
+$
+\begin{array}{r@@{\;\;}c@@{\;\;}l@@{\qquad}l}
+  \freevarsoutsidelambdas{|x|} & = & \{ |x| \} \\
+  \freevarsoutsidelambdas{|k|} & = & \{\,\} \\
+  \freevarsoutsidelambdas{|op|} & = & \{\,\} \\
+  \freevarsoutsidelambdas{|tup (v_1, commadots, v_n)|} & = & \freevarsoutsidelambdas{|v_1|} \cup \cdots \cup \freevarsoutsidelambdas{|v_n|} \\
+  \freevarsoutsidelambdas{|lam x e|} & = & \{\,\} \\
+%   \freevarsoutsidelambdas{|mu x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
+%  \freevarsoutsidelambdas{|eq; e|} & = & \freevarsoutsidelambdas{|eq|} \cup \freevarsoutsidelambdas{|e|} \\
+%  \freevarsoutsidelambdas{|v = e|} & = & \freevarsoutsidelambdas{|v|} \cup \freevarsoutsidelambdas{|e|} \\
+%  \freevarsoutsidelambdas{|def x e|} & = & \freevarsoutsidelambdas{|e|} \setminus \{ x \} \\
+%  \freevarsoutsidelambdas{|fail|} & = & \{\,\}  \\
+%  \freevarsoutsidelambdas{|e_1 choice e_2|} & = & \freevarsoutsidelambdas{|e_1|} \cup \freevarsoutsidelambdas{|e_2|} \\
+%  \freevarsoutsidelambdas{|v_1 v_2|} & = & \freevarsoutsidelambdas{|v_1|} \cup \freevarsoutsidelambdas{|v_2|} \\
+%  \freevarsoutsidelambdas{|one e|} & = & \freevarsoutsidelambdas{|e|} \\
+%  \freevarsoutsidelambdas{|all e|} & = & \freevarsoutsidelambdas{|e|} \\
+\end{array}
+$
+\caption{Definition of the free-variables-outside-lambdas function $\freevarsoutsidelambdas{|v|}$}
+\label{fig:fvsol}
+\Description{Definition of the free-variables-outside-lambdas function ``fvsol''}
+\end{figure}
+
+
+\begin{figure}
+$
+\begin{array}{r@@{\;\;}c@@{\;\;}l@@{\qquad}l}
+  |subst x x v| & \equiv & |v| \\
+  |subst y x v| & \equiv & |y| & \text{if $y \neq x$}  \\
+  |subst k x v| & \equiv & |k| \\
+  |subst op x v| & \equiv & |op| \\
+  |substNP (arr (v_1, dots, v_n)) x v| & \equiv & |arr (subst v_1 x v, dots, subst v_n x v)| \\
+  |subst (lam y e) x v| & \equiv & |lam y (subst e x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
+  |subst (mu y v') x v| & \equiv & |mu y (subst v' x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
+  |subst (eq; e) x v| & \equiv &  |subst eq x v; subst e x v| \\
+  |subst (v' = e) x v| & \equiv &  |subst v' x v = subst e x v| \\
+  |subst (def y e) x v| & \equiv & |def y (subst e x v)| &  \text{if $y \not\in \freevars{|x|, |v|}$ [use $\alpha$]} \\
+  |subst fail x v| & \equiv & |fail| \\
+  |subst (e_1 choice e_2) x v| & \equiv &  |subst e_1 x v`choice`subst e_2 x v| \\
+  |subst (apply1N v_1 v_2) x v| & \equiv &  |applyNP (subst v_1 x v) (subst v_2 x v)| \\
+  |subst (one e) x v| & \equiv & |one (subst e x v)| \\
+  |subst (all e) x v| & \equiv & |all (subst e x v)| \\
+\end{array}
+$
+\caption{Definition of the substitution notation |subst e x v|}\label{fig:substitution}
+\Description{Definition of the substitution notation used in this paper}
+\end{figure}
+
+
+\subsubsection{Unwrapping of Fixpoints is Confluent but not Noetherian}
+
+\begin{lemma}\label{lem:unwrap-confluent}
+The rule \rulename{u-unwrap} is confluent.
+\end{lemma}
+
+\begin{proof}
+  Suppose that $\rstep{\rulename{u-unwrap}}{|e|}{|e_1|}$ and $\rstep{\rulename{u-unwrap}}{|e|}{|e_2|}$ for distinct redexes within $e$.
+  
+  If the redexes are disjoint, then \cref{lem:disjoint} applies.
+
+  Otherwise, without loss of generality assume the redex for $\rstep{\rulename{u-unwrap}}{|e|}{|e_1|}$ contains the redex for $\rstep{\rulename{u-unwrap}}{|e|}{|e_2|}$;
+  let $e$ must be of the form |C_1^[mu x (C_2^[mu y hnf])]| ($\alpha$-conversion may be used to ensure that $x$ and $y$ are distinct variables).
+
+  Then |e_1 = C_1^[substNP (C_2^[mu y hnf]) x (mu x (C_2^[mu y hnf]))]|
+  and |e_2 = C_1^[mu x (C_2^[subst hnf y (mu y hnf)])]|.
+
+  From |e_2| we can take just one more \rulename{u-unwrap} step, using the outermost redex |mu x (C_2^[cdots])|, obtaining |e' = C_1^[subst (C_2^[subst hnf y (mu y hnf)]) x (mu x (C_2^[subst hnf y (mu y hnf)]))]|.
+
+  \skewtodo{More to come.}
+
+  Thus we have $\rsteps{\rulename{u-unwrap}}{|e_1|}{|e'|}$ and $\rstep{\rulename{u-unwrap}}{|e_2|}{|e'|}$, so \rulename{u-unwrap} is strongly confluent,
+  and therefore by \cref{lem:strong} is confluent.
+\end{proof}
+
+To see that \rulename{u-unwrap} is not Noetherian, observe that
+$$\ensuremath{|mu x (tup (1,x))| \go{\rulename{u-unwrap}}  |tup (1, mu x (tup (1,x)))| \go{\rulename{u-unwrap}} |tup (1, (tup (1, mu x (tup (1,x)))))| \go{\rulename{u-unwrap}} \cdots}$$
+is an unending sequence of reduction steps.
+
+\subsubsection{Information Content}
+
+We define a second grammar, for a second language $\vcOmega$, by adding one more value |Omega|, which indicates a lack of information as to just what will be computed.
+When |Omega| appears in a context where only a value is permitted, it indicates uncertainty as to what value will be provided; 
+when |Omega| appears in a context where any expression is permitted, it furthermore indicates uncertainty as to how many values will be provided (possibly none).
+\begin{quote}
+$
+\begin{array}{lr@@{\;}c@@{\;}l}
+      \text{Values} & |v| & ::= & |x| \vb \hnf \vb |mu x hnf| \vb |Omega| \\
+\end{array}
+$
+\end{quote}
+
+Moreover, we add a new kind of expression |?e|, which explicitly indicates a lack of information as to whether |e| might be replaced by |fail| because of the failure of an
+expression or equation in some execution context containing |e|; it furthermore indicates uncertainty as to whether any of its free variables might be unified with some
+value.
+
+\begin{quote}
+$
+\begin{array}{lr@@{\;}c@@{\;}l}
+        \text{Expressions}   & e     & ::= & |v| \vb |eq ; e| \vb |def x e| \vb |fail|
+                                           \vb |e_1 choice e_2| \vb |apply1N v_1 v_2|
+                             \vb |one e| \vb |all e| \vb |?e| \\
+\end{array}
+$
+\end{quote}
+
+
+For every term of \versecalc{} there is a corresponding term of $\vcOmega$, identical in structure and appearance and containing no occurrence of |Omega| or |?|;
+we identify such terms and regard the set of terms of \versecalc{} as simply a subset of the terms of $\vcOmega$.
+
+The definition of substitution (\cref{fig:substitution}) is extended in the expected trivial manner: $|subst Omega x v| \equiv |Omega|$ and $|subst (?e) x v| \equiv |?(subst e x v)|$.
+
+\begin{definition}
+(after \cite[Definition 2.3]{ariola:skew-confluence})
+Let |T| be a set of terms over a signature that includes the constant |Omega|.
+Define $\urleqomegaof{T}$ to be the relation such that $|Omega| \urleqomegaof{T} |M|$ for every term $|M| \in |T|$;
+then define $\leqomegaof{T}$ to be the transitive, reflexive, and compatible closure of $\urleqomegaof{T}$.
+\end{definition}
+
+
+\begin{definition}
+(compare \cite[Definition 2.3]{ariola:skew-confluence})
+Let |T| be a set of terms over a signature that includes the constant |Omega|, and for every term |M| in |T| also includes the term |?M|.
+%Assume that in every term, every bound variable has been renamed by $\alpha$-conversion so as to be distinct from every free variable.
+
+First define $\urleqomegaof{T}$ to be the primitive relation such that
+\begin{center}
+$\begin{array}{l}
+\forall |M| \in |T| \suchthat |Omega| \urleqomegaof{T} |M| \\
+\forall |M| \in |T| \suchthat {|?M|} \urleqomegaof{T} |M| \\
+\forall |M| \in |T| \suchthat {|?M|} \urleqomegaof{T} |fail| \\
+\forall |M|, |N| \in |T| \suchthat (|M| \urleqomegaof{T} |N|) \implies (|?M| \urleqomegaof{T} |?N|) \\
+\forall |M| \in |T| \suchthat \forall |v| \in \freevars{M} \suchthat {|?M|} \urleqomegaof{T} |subst (?M) v Omega| \text{\quad DO WE NEED THIS??} \\
+\end{array}$
+\end{center}
+This primitive relation is a quasiorder but not a partial order; for example,  $|Omega| \urleqomegaof{T} |?Omega|$ and $|?Omega| \urleqomegaof{T} |Omega|$,
+therefore $\urleqomegaof{T}$ is not antisymmetric. To get a partial order, it is necessary to identify |?Omega| with |Omega|; it is furthermore convenient to identify |?fail| with |fail|,
+to identify
+|??M| with |?M| for all terms |M| in |T|, and to identify |?M| with |?N | where |N| is the result of replacing every occurrence of free variable in |M| with |Omega|.
+(In effect, we are taking the quotient $|T| / \sim_T$ where $\sim_T$ is the equivalence relation defined by $(M \sim_T N) \iff (M \urleqomegaof{T} N) \logand (N \urleqomegaof{T} M)$
+and then representing each equivalence class of terms by its ``simplest'' member---being as small as possible and having as few free variables as possible.)
+
+Then define $\leqomegaof{T}$ to be the transitive, reflexive, and compatible closure of $\urleqomegaof{T}$ on this set of representative terms.
+\end{definition}
+
+\Cref{fig:info-rewrite-rules} shows a system $\rinfo$ of rewrite rules on $\vcOmega$.
+These may be compared to similar rules for the $\lambda\circ$ calculus \cite[Definition 5.20]{ariola:skew-confluence}.
+
+
+\begin{figure}
+ $
+  \begin{array}{l}
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;}l@@{\qquad}l@@{}}
+  \rulegroupname{Information Content:~$\rinfo${}}
+  \rulename{info-fix} & |mu x v| & \movesto & |Omega| \\
+  \rulename{info-seq-eqn-var-var} & |x=y; e| & \movesto & ?|subst2 e x Omega y Omega| \\
+  \rulename{info-seq-eqn-var-val} & |x=v; e| & \movesto & ?|subst e x Omega| & \text{if |v| is not a variable} \\
+  \rulename{info-seq-eqn-val-var} & |v=y; e| & \movesto & ?|subst e y Omega| & \text{if |v| is not a variable} \\
+  \rulename{info-seq-eqn-val-val} & |v_1=v_2; e| & \movesto & |?e| & \text{if neither |v_1| nor |v_2| is a variable} \\
+  \rulename{info-seq-eqn-val-exp} & |v=e'; e| & \movesto & |Omega| & \text{if |e'| is not a value} \\
+  \rulename{info-seq-exp} & |e'; e| & \movesto & |Omega| \\
+  \rulename{info-unsure-fail} & |?fail| & \movesto & |fail| \\
+  \rulename{info-unsure-omega} & |?Omega| & \movesto & |Omega| \\
+  \rulename{info-unsure-unsure} & |??e| & \movesto & |?e| \\
+  \rulename{info-exi} & |def x e| & \movesto & |subst e x Omega| \\
+  \rulename{info-app-hnf} & |apply1N hnf v| & \movesto & |Omega| \\
+
+  \rulename{info-one} & |one e| & \movesto & |Omega| \\
+  \rulename{info-all} & |all e| & \movesto & |Omega| \\
+  \rulename{info-app-omega} & |apply1N Omega v| & \movesto & |Omega| \\
+  \rulename{info-fail-l} & |fail choice e| & \movesto & e \\
+  \rulename{info-fail-r} & |e choice fail| & \movesto & e \\
+  \rulename{info-choice-omega} & |Omega choice e| & \movesto & |Omega| \\
+  \rulename{info-choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+\end{array}
+\end{array}
+$
+\caption{Rewrite rules on $\vcOmega$ for defining the function $\omegavc(e)$}\label{fig:info-rewrite-rules}
+\Description{Rewrite rules on $\vcOmega$ for defining the function $\omegavc(e)$}
+\end{figure}
+
+
+\begin{figure}
+ $
+  \begin{array}{l}
+\begin{array}{@@{\quad}lr@@{\;}c@@{\;}l@@{\qquad}l@@{}}
+  \rulegroupname{Information Content:~$\rinfo${}}
+  \rulename{info-fix} & |mu x v| & \movesto & |Omega| \\
+  \rulename{info-seq} & |e'; e| & \movesto & ?\substsuch{|e|}{|x|}{|Omega|}{|x| \in \freevars{|e|}} \\
+  \rulename{info-unsure-fail} & |?fail| & \movesto & |fail| \\
+  \rulename{info-unsure-omega} & |?Omega| & \movesto & |Omega| \\
+  \rulename{info-unsure-unsure} & |??e| & \movesto & |?e| \\
+  \rulename{info-exi} & |def x e| & \movesto & |subst e x Omega| \\
+  \rulename{info-app-hnf} & |apply1N hnf v| & \movesto & |Omega| \\
+  \rulename{info-app-omega} & |apply1N Omega v| & \movesto & |Omega| \\
+  \rulename{info-one} & |one e| & \movesto & |Omega| \\
+  \rulename{info-all} & |all e| & \movesto & |Omega| \\
+  \rulename{info-fail-l} & |fail choice e| & \movesto & e \\
+  \rulename{info-fail-r} & |e choice fail| & \movesto & e \\
+  \rulename{info-choice-omega} & |Omega choice e| & \movesto & |Omega| \\
+  \rulename{info-choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+\end{array}
+\end{array}
+$
+\caption{Simpler rewrite rules on $\vcOmega$ for defining the function $\omegavc(e)$}\label{fig:info-simpler-rewrite-rules}
+\Description{Rewrite rules on $\vcOmega$ for defining the function $\omegavc(e)$}
+\end{figure}
+
+
+\begin{lemma}\label{lem:critpairs}\cite[Lemma 3.1]{Huet80}
+The relation $\go{\rr}$ is locally confluent iff for every critical pair |(e_1, e_2)| of $\rr$, |e_1| and |e_2| can be \emph{joined}---that is, there exists |e_3| such that
+ $|e_1| \gos{\rr} |e_3|$ and  $|e_2| \gos{\rr} |e_3|$.
+\end{lemma}
+
+Observe that if the two terms of a critical pair |(e_1, e_2)| are identical, they can be joined at $|e_3| = |e_1| = |e_2|$.
+We say that such a critical pair is \emph{trivial}, and no separate proof of joining is required.
+
+
+\begin{lemma}[$\rinfo$-Confluent] \label{lem:rinfo-c}
+$\rinfo$ is locally confluent and Noetherian; therefore $\rinfo$ is confluent.
+\end{lemma}
+
+\begin{proof}
+Consider all critical pairs of $\rinfo$. By inspection, we can easily see that critical pairs can arise only from left-hand-side subterms of the form |?e| or |e choice e'|, so we examine these possibilities in more detail.
+\begin{itemize}
+\item  Rules \rulename{info-unsure-fail} and \rulename{info-unsure-omega} produce no critical pairs.
+
+\item  Rules \rulename{info-unsure-fail} and \rulename{info-unsure-unsure} produce the trivial critical pair |(?fail, ?fail)|. 
+
+\item  Rules \rulename{info-unsure-omega} and \rulename{info-unsure-unsure} produce the trivial critical pair |(?Omega, ?Omega)|. 
+
+\item  Rules \rulename{info-fail-l} and \rulename{info-fail-r} produce the trivial critical pair |(fail, fail)|. 
+
+\item  Rules \rulename{info-fail-l} and \rulename{info-choice-omega} produce no critical pairs.
+
+\item  Rules \rulename{info-fail-l} and \rulename{info-choice-assoc} produce the critical pair |(e_2 choice e_3, fail choice (e_2 choice e_3))|.
+
+\item  Rules \rulename{info-fail-r} and \rulename{info-choice-omega} produce the trivial critical pair |(Omega, Omega)|.
+
+\item  Rules \rulename{info-fail-r} and \rulename{info-choice-assoc} produce the critical pairs |(e_1 choice e_3, e_1 choice (fail choice e_3))| and |(e_1 choice e_2, e_1 choice (e_2 choice fail))|.
+
+\item  Rules \rulename{info-choice-omega} and \rulename{info-choice-assoc} produce the critical pair |(Omega choice e_3, Omega choice (e_2 choice e_3)|.
+
+\item  No other pairs of rules produce any critical pairs.
+\end{itemize}
+The critical pair |(e_2 choice e_3, fail choice (e_2 choice e_3))| can be joined at |e_2 choice e_3| in one step by using rule \rulename{info-fail-l} on |fail choice (e_2 choice e_3))|. 
+The critical pair |(e_1 choice e_3, e_1 choice (fail choice e_3))| can be joined at |e_1 choice e_3| in one step by using rule \rulename{info-fail-l} on (a subterm of) |e_1 choice (fail choice e_3))|. 
+The critical pair |(e_1 choice e_2, e_1 choice (e_2 choice fail))| can be joined at |e_1 choice e_2| in one step by using rule \rulename{info-fail-r} on (a subterm of) |e_1 choice (e_2 choice fail))|. 
+The critical pair |(Omega choice e_3, Omega choice (e_2 choice e_3)| can be joined at |Omega| by using rule \rulename{info-choice-omega} on |Omega choice e_3| and on |Omega choice (e_2 choice e_3)|.
+Trivial critical pairs require no separate proof of joining.
+
+All critical pairs can be joined; therefore by \cref{lem:critpairs} $\rinfo$ is locally confluent.
+
+Let the \emph{size} of a term of $\vcOmega$ be the sum of (i)~the number of tokens it contains other than parentheses,
+and (ii)~the sum, over every subterm of the term that is a choice expression, the size of the left-hand operand of that choice expression.
+Because any given term $e$ has some finite number $n$ of tokens other than parentheses and a finite number $k$ of subterms that are choice expressions,
+and because the size of a subterm cannot be greater than the size of an expression, the size of $e$ cannot exceed $(k+1)n$ and therefore is finite.
+Furthermore the size of a term cannot be less than zero.
+It follows that every rewriting sequence from term $e$ can have no more than $(k+1)n$ steps. So $\rinfo$ is bounded and therefore Noetherian.
+Each of the rewrite rules in \cref{fig:info-rewrite-rules} produces a new expression that is strictly smaller in size. 
+
+Because $\rinfo$ is locally confluent and Noetherian, it is confluent by Newman's lemma.
+\end{proof}
+
+Because $\rinfo$ is confluent and Noetherian, it follows that $\rinfo$ defines unique normal forms for $\vcOmega$, which justifies the following definition.
+\begin{definition}
+Let $\omegavc(e)$ be the function that takes any term in $\vcOmega$ and returns the term that is its normal form under $\rinfo$.
+\end{definition}
+
+\begin{definition}
+The comparison $e \leqomegavc e'$ is defined to mean $\omegavc(e) \leqomega \omegavc(e')$.
+\end{definition}
+
+\begin{lemma}
+For all terms $t$ and $t'$, $t \gos{\rinfo} t'$ implies $\omegavc(t) = \omegavc(t')$.
+\end{lemma}
+\begin{proof}
+This follows immediately from the confluence of $\rinfo$ and the fact that $\omegavc$ returns the normal form under $\rinfo$.
+\end{proof}
+
+\begin{lemma}
+For every term $t$ and every $u \in \occ(t)$, $\omegavc(\tsubst{t}{u}{\omegavc{t/u}}) = \omegavc{t}$.
+\end{lemma}
+\begin{proof}
+  By the definition of $\omegavc$, $t/u \gos{\rinfo} \omegavc{t/u}$. Because $\gos{\rinfo}$ is compatible, it follows that $t \gos{rinfo} \tsubst{t}{u}{\omegavc{t/u}}$.
+  XXX
+\end{proof}
+
+
+
+\subsubsection{}
+
+\skewtodo{Need to prove that $\leqomegavc$ is monotonic with respect to $\leqomega$; this should be routine \cite[Proposition 5.21]{ariola:skew-confluence}.}
+
+\begin{lemma}[\versecalc{} monotonic] \label{lem:vc-monotonic}
+Every rewrite rule in \versecalc{} is monotonic with respect to $\leqomegavc$.
+\end{lemma}
+
+\begin{proof}
+We consider each rewrite rule of \versecalc{} separately.
+(Note that if $\omegavc$ applied to the left-hand side of a rule produces |Omega|, there is no need to consider the right-hand side, because $\forall M \suchthat |Omega| \leqomegavc M$.)
+
+\begin{itemize}
+\item \rulename{app-add} is monotonic in $\leqomegavc$
+because $\omegavc(|applyN add (k_1 ,k_2)|) = |Omega|$.
+
+\item \rulename{app-gt} is monotonic in $\leqomegavc$
+because $\omegavc(|applyN gt (k_1,k_2)|) = |Omega|$.
+
+\item \rulename{app-gt-fail} is monotonic in $\leqomegavc$
+because $\omegavc(|applyN gt (k_1,k_2)|) = |Omega|$.
+
+\item \rulename{app-beta} is monotonic in $\leqomegavc$
+because $\omegavc(|apply1 (lam x e) v|) = |Omega|$.
+
+\item \rulename{app-tup} is monotonic in $\leqomegavc$
+because $\omegavc(|apply1 (tup (v_0,xdots, v_n)) v|) = |Omega|$.
+
+\item \rulename{app-tup-0} is monotonic in $\leqomegavc$
+because $\omegavc(|apply1 emptytup v|) = |Omega|$.
+
+\item \rulename{u-lit} is monotonic in $\leqomegavc$
+because $\omegavc(|k_1 == k_2; e|) = {?}\omegavc(e) \leqomega \omegavc(|e|)$.
+
+\item \rulename{u-tup} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|) = |x| \leqomega |x| = \omegavc(|v_1==v1';xdots;v_n==v_n'; e|)$. {\color{red} PROBLEM with exposed equations}
+
+\item \rulename{u-fail} is monotonic in $\leqomegavc$
+because $\omegavc(|hnf_1 == hnf_2; e|) = \omegavc(|?e|) \leqomega |fail| = \omegavc(|fail|)$.
+
+\item \rulename{u-occurs-fail} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|x=hnf; e|) = {?}|subst e x Omega| \leqomega |fail| = \omegavc(|fail|)$.
+
+\item \rulename{u-occurs-wrap} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|x=hnf; e|) = {?}|subst e x Omega| = \omegavc(|x=mu x hnf; e|)$.
+
+\item \rulename{u-unwrap} is monotonic in $\leqomegavc$
+because $\omegavc(|mu x hnf|) = |Omega|$.
+
+\item \rulename{subst-ctx} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|X^[x==v;S^[e]]|) = |x| \leqomega |x| = \omegavc(|(substNP X x v)^[x==v; (substNP S x v)^[e]]|)$. {\color{red} TRICKY}
+
+\item \rulename{subst-exp} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|X^[x==v;S^[e]]|) = |x| \leqomega |x| = \omegavc(|X^[x==v; S^[subst e x v]]|)$. {\color{red} TRICKY}
+
+\item \rulename{hnf-swap} is monotonic in $\leqomegavc$
+because $\omegavc(|hnf==x; e|) = \omegavc(?|subst e x Omega|) = \omegavc(|x==hnf; e|)$.
+
+\item \rulename{var-swap} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|y==x; e|) = \omegavc({?}|subst2 e y Omega x Omega|) = \omegavc({?}|subst2 e x Omega y Omega|) = \omegavc(|x==y; e|)$.
+
+\item \rulename{seq-swap} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|eq; x==v; e|) = |x| \leqomega |x| = \omegavc(|x==v; eq; e|)$.  {\color{red} TRICKY}
+
+\item \rulename{val-elim} is monotonic in $\leqomegavc$
+because $\omegavc(|v ; e|) = |Omega|$.
+
+\item \rulename{exi-elim} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|def x e|) = \omegavc(?|subst e x Omega|) = \omegavc(|e|)$ (given that $x \not\in \freevars{e}$).
+
+\item \rulename{eqn-elim} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|def x (X^[x==v;e])|) = |x| \leqomega |x| = \omegavc(|X^[e]|)$.   {\color{red} TRICKY}
+
+\item \rulename{fail-elim} is monotonic in $\leqomegavc$
+because $\omegavc(|X^[fail]|) = |fail| = \omegavc(|fail|)$.
+
+\item \rulename{exi-float} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|X^[def x e]|) = \omegavc(|X^[subst e x Omega]|) \leqomega \omegavc(|subst (X^[e]) x Omega|) = \omegavc(|def x (X^[e])|)$.
+
+\item \rulename{seq-assoc} is monotonic in $\leqomegavc$
+because $\omegavc(|(eq ; e_1) ; e_2|) = |Omega|$.
+
+\item \rulename{eqn-float} is monotonic in $\leqomegavc$
+because $\omegavc(|v == (eq ; e_1); e_2|) = |Omega|$.
+
+\item \rulename{exi-swap} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|def x (def y e)|) = \omegavc({?}|subst2 e y Omega x Omega|) = \omegavc({?}|subst2 e x Omega y Omega|) = \omegavc(|def y (def x e)|)$.
+
+\item \rulename{one-fail} is monotonic in $\leqomegavc$
+because $\omegavc(|one fail|) = |Omega|$.
+
+\item \rulename{one-value} is monotonic in $\leqomegavc$
+because $\omegavc(|one v|) = |Omega|$.
+
+\item \rulename{one-choice} is monotonic in $\leqomegavc$
+because $\omegavc(|one (v `choice` e)|) = |Omega|$.
+
+\item \rulename{all-fail} is monotonic in $\leqomegavc$
+because $\omegavc(|all fail|) = |Omega|$.
+
+\item \rulename{all-value} is monotonic in $\leqomegavc$
+because $\omegavc(|all v|) = |Omega|$.
+
+\item \rulename{all-choice} is monotonic in $\leqomegavc$
+because $\omegavc(|all (v_1 choice xdots choice v_n)|) = |Omega|$.
+
+\item \rulename{choose-r} is monotonic in $\leqomegavc$
+because $\omegavc(|fail choice e|) = \omegavc(|e|)$.
+
+\item \rulename{choose-l} is monotonic in $\leqomegavc$
+because $\omegavc(|e choice fail|) = \omegavc(|e|)$.
+
+\item \rulename{choose-assoc} is monotonic in $\leqomegavc$
+because $\omegavc(|(e_1 choice e_2) choice e_3|) = \omegavc(|e_1 choice (e_2 choice e_3)|)$.
+
+\item \rulename{choose} is monotonic in $\leqomegavc$ \hfill\break
+because $\omegavc(|SX^[CX^[e_1 choice e_2]]|) = |x| \leqomega |x| = \omegavc(|SX^[CX^[e_1] choice CX^[e_2]]|)$.   {\color{red} TRICKY}
+\end{itemize}
+\end{proof}
+
+
+
+\subsection {Proof that \texorpdfstring{\versecalc{}}{VC} Is Skew Confluent}
+
+
+Our goal is to show that for all rules \rulename{r} and \rulename{s} (possibly the same), for all terms $e$, $e_1$, and $e_2$, and for all sets of occurrences $U$ and occurrences $w$,
+if   $e_1 \xrnungosup{r}{U} e \xrngosup{s}{w} e_2$
+then
+  $e_1 \leqomegavc \ejoin \xrnungosup{r}{u} e_2$
+  for some term $\ejoin$.
+
+Our overall strategy is to use an expanded rule set that includes a rule that is the inverse of \rulename{subst};
+show that for all rules \rulename{r} and \rulename{s} (possibly the same), for all terms $e$, $e_1$, and $e_2$, and for all sets of occurrences $U$ and occurrences $w$,
+if   $e_1 \xrnungosup{r}{u} e \xrngosup{s}{w} e_2$
+then
+  $e_1 \xrnbothdblsup{}{\preceq} \ejoin \xrnungosup{r}{u} e_2$
+  for some term $\ejoin$.
+
+  Our specific strategy is to use a tiling strategy based on tiles constructed so that
+for all rules \rulename{r} and \rulename{s} (possibly the same), for all terms $e$, $e_1$, and $e_2$, and for all sets of occurrences $U$ and occurrences $w$,
+if   $e_1 \xprnungosup{r}{U} e \xrngosup{s}{w} e_2$
+then
+  $e_1 \xprnbothdblsup{}{\preceq} \ejoin \xprnungosup{r}{U} e_2$
+  for some term $\ejoin$.
+
+  Fortunately, tiles of that form are easy to construct if \rulename{r} and \rulename{s} strongly commute, and
+we already know that all rules in $\rapp \cup \rgc \cup \rspc$ have the diamond property and that all pairs of rules in $\rapp \cup \rgc \cup \rspc$ strongly commute.
+We need only prove separately the ``difficult'' cases.
+
+
+\subsubsection{Preliminary Lemmas}
+
+\begin{lemma}\label{lem:disjoint-sc}
+  For any two rules \rulename{r} and \rulename{s}, and for all terms $e$, $e_1$, and $e_2$:\hfill\break\null\hskip3.5em if\quad
+  $e_1 \xrnungosup{r}{u} e \xrngosup{s}{w} e_2$
+  \unskip\quad and\quad
+  $u \occdis w$
+  \unskip\quad then\quad
+  $e_1 \xrngosup{s}{w} \ejoin \xrnungosup{r}{u} e_2$
+  \hfill\break for some term $\ejoin$.
+\end{lemma}
+\begin{proof}
+  PROBLEM
+  From $e \xrngosup{r}{u} e_1 \xrngosup{s}{w} e'$ and $u \occdis w$ we have $e' = \tsubst{\tsubst{e}{u}{e_1/u}}{w}{e'/w}$,
+  from $e \xrngosup{s}{w} e_2 \xrngosup{r}{u} e''$ and $u \occdis w$ we have $e'' = \tsubst{\tsubst{e}{w}{e_2/w}}{u}{e''/u}$,
+    and we have $e' = e''$ by \emph{commutativity}; therefore let $\ejoin = e_1 = e_2$.
+\end{proof}
+
+\begin{lemma}\label{lem:set-disjoint-sc}
+  For any two rules \rulename{r} and \rulename{s}, and for all terms $e$, $e_1$, and $e_2$:\hfill\break\null\hskip3.5em if\quad
+  $e_1 \xprnungosup{r}{U} e \xrngosup{s}{w} e_2$
+  \unskip\quad and\quad
+  $u \occdis w$
+  \unskip\quad then\quad
+  $e_1 \xrngosup{s}{w} \ejoin \xprnungosup{r}{U} e_2$
+  \hfill\break for some term $\ejoin$.
+\end{lemma}
+\begin{proof}
+  PROBLEM
+  From $e \xrngosup{r}{u} e_1 \xrngosup{s}{w} e'$ and $u \occdis w$ we have $e' = \tsubst{\tsubst{\tsubst{\tsubst{e}{u_1}{e_1/u_1}}{u_2}{e_1/u_2}\cdots}{u_n}{e_1/u_n}}{w}{e'/w}$
+  from $e \xrngosup{s}{w} e_2 \xrngosup{r}{U} e''$ and $u \occdis w$ we have $e'' = \tsubst{\tsubst{e}{w}{e_2/w}}{u}{e_1/u}$,
+    and we have $e' = e''$ by repeated application of \emph{commutativity}; therefore let $\ejoin = e_1 = e_2$.
+\end{proof}
+
+\begin{lemma}\label{lem:diamond-par-sc}
+If $\xrngo{r}$ strongly commutes with itself, then $\xprngo{r}$ strongly commutes with $\xrngo{r}$.
+\end{lemma}
+
+\begin{lemma}\label{lem:sc-par-sc}
+If $\xrngo{r}$ strongly commutes with $\xrngo{s}$, then $\xprngo{r}$ strongly commutes with $\xrngo{s}$.
+\end{lemma}
+
+
+\newpage 
+
+\subsubsection{Lemmas about Rules That Strongly Commute}
+
+
+\begin{lemma}[\rulename{u-occurs-fail} strongly commutes with itself]\label{lem:u-occurs-fail-diamond}
+  For all terms $t$,
+  $t_1$, and $t_2$:\hfill\break\null\hskip2.5em if\quad
+  $t_1 \xrnungosup{u-occurs-fail}{u} t \xrngosup{u-occurs-fail}{w} t_2$
+  \unskip\quad then\quad
+  $t_1 \xrngoeqsup{u-occurs-fail}{w} \tjoin \xrnungoeqsup{u-occurs-fail}{u} t_2$
+  \hfill\break for some term $\tjoin$.
+\end{lemma}
+\begin{proof}
+  Split cases on the position of $u$ relative to $w$ within $t$:
+  \begin{description}
+    \CASE{u=w} Let $\tjoin = t_1 = t_2$.
+    \CASE{u \occdis w} Use \cref{lem:disjoint-sc}.
+    \CASE{u \occstrictin w} Define $\tjoin$ by $t_1 \xrngosup{u-occurs-fail}{w} \tjoin$, then observe that\hfill\break
+    $\tjoin = t_2$ because $\tjoin = \tsubst{\tsubst{t}{u}{t_1/u}}{w}{t_2/w} = \tsubst{t}{w}{t_2/w} \BY{\emph{dominance}} = t_2$. 
+    \CASE{u \occstrictcontains w} Symmetrical with case $u \occstrictin w$.
+  \end{description}
+\end{proof}
+
+\begin{lemma}[\rulename{u-occurs-fail} and \rulename{u-occurs-wrap} strongly commute]\label{lem:u-occurs-fail-sc-u-occurs-wrap}
+  For all terms $t$, $t_1$, and $t_2$:\hfill\break\null\hskip2.5em if\quad
+  $t_1 \xrnungosup{u-occurs-wrap}{u} t \xrngosup{u-occurs-fail}{w} t_2$
+  \unskip\quad then\quad
+  $t_1 \xrngosup{u-occurs-fail}{w'} \tjoin \xrnungoeqsup{u-occurs-wrap}{u} t_2$
+  \hfill\break for some term $\tjoin$ and some occurrence $w'$.
+\end{lemma}
+\begin{proof}
+  Split cases on the position of $u$ relative to $w$ within $t$:
+  \begin{description}
+    \CASE{u=w} Impossible.
+    \CASE{u \occdis w} Let $w'=w$ and use \cref{lem:disjoint-sc}.
+    \CASE{u \occstrictin w} Let $w' = w$; define $\tjoin$ by $t_1 \xrngosup{u-occurs-fail}{w'} \tjoin$, then observe that\hfill\break
+    $\tjoin = t_2$ because $\tjoin = \tsubst{\tsubst{t}{u}{t_1/u}}{w}{t_2/w} = \tsubst{t}{w}{t_2/w} \SBY{\emph{dominance}} = t_2$. 
+    \CASE{u \occstrictcontains w}     Let $\sigma_1 = \{ |x| \mapsto t/u(1,1), |hnf| \mapsto t/u(1,2), |e| \mapsto t/u(2) \}$.
+    
+    Then $ t_1 = \tsubst{t}{u}{\sigma_1(|x = (mu x hnf); e|)}$ and $t_2 = \tsubst{t}{w}{|fail|}$.
+    
+    Let $\sigma_1' = \{ |x| \mapsto t_2/u(1,1), |hnf| \mapsto t_2/u(1,2), |e| \mapsto t_2/u(2) \}$.
+
+        \par$\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
+ \text{Let $\tjoin$} & = & \tsubst{t_1}{w'}{\tjoin/w'} \SBY{\emph{rewriting}} \\
+    & = & \tsubst{\tsubst{t}{u}{\sigma_1(|x = (mu x hnf); e|)}}{w'}{\tjoin/w'} \SBY{value of $t_1$} \\
+    & = & \tsubst{t}{u}{\tsubst{(\sigma_1(|x = (mu x hnf); e|))}{w'}{\tjoin/w'}} \SBY{\emph{associativity}} \\
+     \end{array}$
+
+    Now split cases on the position of $w$ within $t/u \tequiv |x=hnf; e|$~:
+    \begin{description}
+      \CASEIN{w \occin u(1,1)}{|x|} Impossible. 
+      \CASEIN{w \occin u(1,2)}{|hnf|} Let $w'=u(1,2,2)(w/u(1,2))$.
+        \par$\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
+ \text{Then $\tjoin$} & = & \tsubst{t}{u}{\tsubst{(\sigma_1(|x = (mu x hnf); e|))}{w'}{\tjoin/w'}} \BY{\emph{associativity}} \\
+      & = & \tsubst{t}{u}{\tsubst{(\sigma_1(|x = (mu x hnf); e|))}{u(1,2,2)(w/u(1,2))}{\tjoin/u(1,2,2)(w/u(1,2))}} \BY{value of $w'$} \\
+      & = & \tsubst{t}{u}{\tsubst{(\sigma_1(|x = (mu x hnf); e|))}{u(1,2,2)(w/u(1,2))}{\tjoin/u(1,2,2)(w/u(1,2))}} \BY{value of $w'$} \\
+     \end{array}$
+
+
+      \CASEIN{w \occin u(2)}{|e|} Let $w'=w$.
+    \end{description}
+
+    \par$\begin{array}{@@{}l@@{\;}l@@{\;}l@@{}}
+    \tjoin' & = & \tsubst{t_2}{u}{\sigma(|x = (mu x hnf); e|)} \\
+    & = & \tsubst{\tsubst{t}{w}{|fail|}}{u}{\sigma(|x = (mu x hnf); e|)} \\
+    & = & \tsubst{\tsubst{t}{w}{|fail|}}{u}{\sigma(|x = (mu x hnf); e|)}
+\end{array}$
+
+
+  \end{description}
+\end{proof}
+

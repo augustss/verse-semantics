@@ -1,0 +1,292 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%include ./skew.fmt 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Three Languages}
+
+\subsection{Lambda Calculus}
+
+TBD
+
+\subsection{Lambda-Letrec Calculus}
+
+TBD
+
+\subsection{Verse Calculus}
+
+
+\newcommand{\figureSkewProofRewriteRulesOLD}{
+  \begin{figure}
+    $\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Application:}
+\rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
+\rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
+\rulename{app-beta}\rlap{${}^{\alpha}$} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
+                                                  & \text{if $x \not\in \freevars{|v|}$} \\
+\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
+                              \multicolumn{2}{@@{}l}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
+                              \hspace{0.7em}\text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \hskip-0.7em \\
+\rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
+\\[-0.6em]
+\rulegroupname{Unification:}
+  \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & |e| & \text{if $k_1=k_2$} \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
+  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & \multicolumn{2}{l}{|fail|
+       \hspace{2cm} \begin{array}[t]{l} \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
+         \text{and neither |hnf_1| nor |hnf_2| is a lambda}
+         \end{array}} \\
+  \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+  \rulename{u-wrap} & |x=hnf; e| & \movesto & |x=mu x hnf; e| &
+                      \multicolumn{1}{@@{}l@@{}}{\begin{array}[t]{l} \text{if \rulename{u-occurs} does not match and} \\
+         \text{~~$|x| \in \freevars{|hnf|}$}
+         \end{array}} \\
+  \rulename{u-unwrap} & |mu x hnf| & \movesto & |subst hnf x (mu x hnf)| \\
+  \rulename{subst} & |x==v;e| & \movesto & |x==v; subst e x v| \hspace*{-0.3em} & \text{if $|x| \notin \freevars{|v|}$} \\
+  \rulename{hnf-swap} & |hnf==x; e|    & \movesto & |x==hnf; e| \\
+  \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| \\
+  \rulename{seq-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| \\
+
+    \\[-0.6em]
+
+\rulegroupname{Elimination:}
+\rulename{val-elim} & |v ; e| & \movesto & |e| \\
+\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+  \rulename{eqn-elim} & |def x (x==v;e)| & \movesto & |e| & \text{if $|x| \notin \freevars{|v|,|e|}$} \\
+\rulename{fail-elim-eq} & |x=fail; e| & \movesto & |fail| & \\
+\rulename{fail-elim-l} & |fail; e| & \movesto & |fail| & \\
+\rulename{fail-elim-r} & |eq; fail| & \movesto & |fail| & \\
+
+    \\[-0.6em]
+
+\rulegroupname{Normalization:}
+\rulename{exi-float-eq}\rlap{${}^{\alpha}$} & |v=(def x e); e'| & \movesto & |def x (v=e;e')| & \text{if $x \notin \freevars{|v|,|e'|}$} \\
+\rulename{exi-float-l}\rlap{${}^{\alpha}$} & |(def x e); e'| & \movesto & |def x (e;e')| & \text{if $x \notin \freevars{|e'|}$} \\
+\rulename{exi-float-r}\rlap{${}^{\alpha}$} & |eq; (def x e)| & \movesto & |def x (eq; e)| & \text{if $x \notin \freevars{|eq|}$} \\
+\rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & |eq ; (e_1 ; e_2)| \\
+\rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & |eq ; (v == e_1; e_2)| \\
+\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
+
+    \\[-0.6em]
+
+\rulegroupname{Choice:}
+\rulename{one-fail}   & |one fail| & \movesto & |fail| \\
+\rulename{one-value}  & |one v| & \movesto & |v| \\
+\rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+\rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
+\rulename{all-value}  & |all v| & \movesto & |tup v| \\
+\rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)| \\
+\rulename{choose-r} & |fail choice e| & \movesto & |e| \\
+\rulename{choose-l} & |e choice fail| & \movesto & |e| \\
+\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & |SX^[CX^[e_1] choice CX^[e_2]]| &  \\
+
+
+\end{array} \\
+\\[-0.3em]
+\text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
+\end{array}$
+\caption{\textbf{The \vcname: Rewrite rules to be used for the proof of skew confluence (July 14, 2023)}} \label{fig:rulesOLD}
+\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
+\end{figure}
+}
+
+
+\newcommand\MC[2]{\multicolumn{#1}{@@{}l@@{}}{#2}}
+
+\newcommand{\figureSkewProofRewriteRules}{
+  \begin{figure}
+    $\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l @@{\hskip4em} l r c l@@{}}
+\rulegroupname{Application:}
+\rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & \MC{2}{|k_3|} & \MC{3}{\text{where $k_3 = k_1 + k_2$}} \\
+\rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & \MC{2}{|k_1|} &  \MC{3}{\text{if $k_1 > k_2$}} \\
+\rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & \MC{2}{|fail|} &  \MC{3}{\text{if $k_1 \leq k_2$}} \\
+\rulename{app-beta}\rlap{${}^{\alpha}$} & |apply1 (lam x e) v| & \movesto & \MC{2}{|def x (x==v; e)|}
+                                                  & \MC{3}{\text{if $x \not\in \freevars{|v|}$}} \\
+\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
+                              \MC{5}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
+                              \hspace{0.7em}\text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \hskip-0.7em \\
+\rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & \MC{2}{|fail|} \\
+
+    \\[-1.0em]
+
+\rulegroupname{Unification:}
+  \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & \MC{2}{|e|} & \MC{3}{\text{if $k_1=k_2$}} \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & \MC{2}{|v_1==v1';xdots;v_n==v_n'; e|} \\
+  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & \MC{2}{|fail|} &
+       \MC{3}{\begin{array}[t]{@@{}l@@{}} \text{if \rulename{u-lit}, \rulename{u-tup} do not match and} \\
+         \text{\hskip0.6em  neither |hnf_1| nor |hnf_2| is a lambda}
+         \end{array}} \\
+  \rulename{u-occurs} & |x==V^[x]; e| & \movesto & \MC{2}{|fail|} & \MC{3}{\text{if $|V| \ne |hole|$}} \\
+  \rulename{wrap} & |x=hnf; e| & \movesto & \MC{2}{|x=mu x hnf; e|} &
+                      \MC{3}{\begin{array}[t]{@@{}l@@{}} \text{if \rulename{u-occurs} does not match and} \\
+         \text{\hskip0.6em $|x| \in \freevars{|hnf|}$}
+         \end{array}} \\
+  \rulename{unwrap} & |mu x hnf| & \movesto & \MC{2}{|subst hnf x (mu x hnf)|} \\
+  \rulename{subst} & |x==v;e| & \movesto & \MC{2}{|x==v; subst e x v|} \hspace*{-0.3em} & \MC{3}{\text{if $|x| \notin \freevars{|v|}$}} \\
+  \rulename{hnf-swap} & |hnf==x; e|    & \movesto & \MC{2}{|x==hnf; e|} \\
+  \rulename{seq-swap} & |eq; x==v; e| & \movesto & \rlap{|x==v; eq; e|}    & \hskip 2.5em\rlap{\rulename{var-swap}} & |y==x; e|    & \movesto & |x==y; e|\\
+
+    \\[-1.0em]
+
+\rulegroupname{Elimination:}
+\rulename{val-elim} & |v ; e| & \movesto & \MC{2}{|e|} \\
+\rulename{exi-elim} & |def x e| & \movesto & \MC{2}{|e|} & \MC{3}{\text{if $|x| \notin \freevars{|e|}$}} \\
+\rulename{eqn-elim} & |def x (x==v;e)| & \movesto & \MC{2}{|e|} & \MC{3}{\text{if $|x| \notin \freevars{|v|,|e|}$}} \\
+\rulename{fail-elim-eq} & |x=fail; e| & \movesto & \MC{2}{|fail|} & \\
+\rulename{fail-elim-l} & |fail; e| & \movesto & \MC{2}{|fail|} & \\
+\rulename{fail-elim-r} & |eq; fail| & \movesto &\MC{2}{|fail|} & \\
+
+    \\[-1.0em]
+
+\rulegroupname{Normalization:}
+\rulename{exi-float-eq}\rlap{${}^{\alpha}$} & |v=(def x e); e'| & \movesto & \MC{2}{|def x (v=e;e')|} & \MC{3}{\text{if $x \notin \freevars{|v|,|e'|}$}} \\
+\rulename{exi-float-l}\rlap{${}^{\alpha}$} & |(def x e); e'| & \movesto & \MC{2}{|def x (e;e')|} & \MC{3}{\text{if $x \notin \freevars{|e'|}$}} \\
+\rulename{exi-float-r}\rlap{${}^{\alpha}$} & |eq; (def x e)| & \movesto & \MC{2}{|def x (eq; e)|} & \MC{3}{\text{if $x \notin \freevars{|eq|}$}} \\
+\rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & \MC{2}{|eq ; (v == e_1; e_2)|} \\
+\rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & \MC{2}{|eq ; (e_1 ; e_2)|} \\
+\rulename{exi-swap} & |def x (def y e)| & \movesto & \MC{2}{|def y (def x e)|} \\
+
+    \\[-1.0em]
+
+\rulegroupname{Choice:}
+\rulename{one-fail}   & |one fail| & \movesto & |fail|                   & \rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
+\rulename{one-value}  & |one v| & \movesto & |v|                       & \rulename{all-value}  & |all v| & \movesto & |tup v| \\
+\rulename{one-choice} & |one (v `choice` e)| & \movesto & |v|    & \rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)| \\
+\rulename{choose-r} & |fail choice e| & \movesto & |e|                & \rulename{choose-l} & |e choice fail| & \movesto & |e| \\
+\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & \MC{2}{|e_1 choice (e_2 choice e_3)|} \\
+\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & \MC{2}{|SX^[CX^[e_1] choice CX^[e_2]]|} &  \\
+
+\end{array} \\
+
+    \\[-1.1em]
+       
+\text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
+\end{array}$
+\caption{\textbf{The \vcname: Rewrite rules to be used for the proof of skew confluence (July 14, 2023)}} \label{fig:rules}
+\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
+\end{figure}
+}
+
+
+\newcommand{\figureSkewProofRewriteRulesNEW}{
+  \begin{figure}
+    $\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l @@{\hskip4em} l l@@{}}
+%%\rulegroupname{Application:}
+\rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & \MC{2}{|k_3|} & \text{where $k_3 = k_1 + k_2$} \\
+\rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & \MC{2}{|k_1|} &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & \MC{2}{|fail|} &  \text{if $k_1 \leq k_2$} \\
+\rulename{app-beta}\rlap{${}^{\alpha}$} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)| & \hbox{\hskip6em}
+                                                  & \text{if $x \not\in \freevars{|v|}$} \\
+\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
+                              \MC{3}{|def x (x==v^^^ (x == 0^^^ v_0) choice xdots choice (x == n^^^ v_n))|
+                              \hspace{0.7em}\text{fresh $|x| \not\in \freevars{|v, v_0, xdots,v_n|}$}} \hskip-0.7em \\
+\rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & \MC{2}{|fail|} \\
+
+    \\[-0.9em]
+
+%%\rulegroupname{Unification:}
+  \rulename{u-lit}   & |k_1 == k_2; e| & \movesto & \MC{2}{|e|} & \text{if $k_1=k_2$} \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e| & \movesto & \MC{3}{|v_1==v1';xdots;v_n==v_n'; e|} \\
+  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| &
+       \MC{2}{\begin{array}[t]{@@{}l@@{}} \text{if \rulename{u-lit}, \rulename{u-tup} do not match and} \\
+         \text{\hskip0.6em  neither |hnf_1| nor |hnf_2| is a lambda}
+         \end{array}} \\
+  \rulename{u-occurs} & |x==V^[x]; e| & \movesto & \MC{2}{|fail|} & \text{if $|V| \ne |hole|$} \\
+  \rulename{lam-wrap} & |x=V^[lam y e]; e'| & \movesto & \MC{3}{|x=V^[lam y (def x (x=V^[lam y e];  e))]; e'|} \\
+              &&&&        \MC{2}{\begin{array}[t]{@@{}l@@{}} \text{if \rulename{u-occurs} does not match and} \\
+         \text{\hskip0.6em $|x| \in \freevars{|lam y e|}$}
+         \end{array}} \\
+%%  \rulename{subst} & |x==v;SE^[x]| & \movesto & \MC{2}{|x==v; SE^[v]|} & \text{if $|x| \notin \freevars{|v|}$} \\
+  \rulename{subst} & |x==v;e| & \movesto & \MC{2}{|x==v; subst e x v|} & \text{if $|x| \notin \freevars{|v|}$} \\
+  \rulename{hnf-swap} & |hnf==x; e|    & \movesto & \MC{2}{|x==hnf; e|} \\
+  \rulename{var-swap} & |y==x; e|    & \movesto & |x==y; e| \\
+  \rulename{seq-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| \\
+
+    \\[-0.9em]
+
+%%\rulegroupname{Elimination:}
+\rulename{val-elim} & |v ; e| & \movesto & \MC{2}{|e|} \\
+\rulename{exi-elim} & |def x e| & \movesto & \MC{2}{|e|} & \text{if $|x| \notin \freevars{|e|}$} \\
+\rulename{eqn-elim} & |def x (x==v;e)| & \movesto & \MC{2}{|e|} & \text{if $|x| \notin \freevars{|v|,|e|}$} \\
+\rulename{fail-elim-eq} & |x=fail; e| & \movesto & \MC{2}{|fail|} & \\
+\rulename{fail-elim-l} & |fail; e| & \movesto & \MC{2}{|fail|} & \\
+\rulename{fail-elim-r} & |eq; fail| & \movesto &\MC{2}{|fail|} & \\
+
+    \\[-0.9em]
+
+%%\rulegroupname{Normalization:}
+\rulename{exi-float-eq}\rlap{${}^{\alpha}$} & |v=(def x e); e'| & \movesto & \MC{2}{|def x (v=e;e')|} & \text{if $x \notin \freevars{|v|,|e'|}$} \\
+\rulename{exi-float-l}\rlap{${}^{\alpha}$} & |(def x e); e'| & \movesto & \MC{2}{|def x (e;e')|} & \text{if $x \notin \freevars{|e'|}$} \\
+\rulename{exi-float-r}\rlap{${}^{\alpha}$} & |eq; (def x e)| & \movesto & \MC{2}{|def x (eq; e)|} & \text{if $x \notin \freevars{|eq|}$} \\
+\rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & \MC{2}{|eq ; (v == e_1; e_2)|} \\
+\rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & \MC{2}{|eq ; (e_1 ; e_2)|} \\
+\rulename{exi-swap} & |def x (def y e)| & \movesto & \MC{2}{|def y (def x e)|} \\
+
+    \\[-0.9em]
+
+%%\rulegroupname{Choice:}
+\rulename{one-fail}   & |one fail| & \movesto & |fail| \\
+\rulename{one-value}  & |one v| & \movesto & |v| \\
+\rulename{one-choice} & |one (v `choice` e)| & \movesto & |v| \\
+\rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
+\rulename{all-value}  & |all v| & \movesto & |tup v| \\
+\rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)| \\
+\rulename{choose-r} & |fail choice e| & \movesto & |e| \\
+\rulename{choose-l} & |e choice fail| & \movesto & |e| \\
+\rulename{choose-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & \MC{2}{|e_1 choice (e_2 choice e_3)|} \\
+\rulename{choose} & |SX^[CX^[e_1 choice e_2]]| & \movesto & \MC{2}{|SX^[CX^[e_1] choice CX^[e_2]]|}  \\
+
+\end{array} \\
+
+    \\[-1.1em]
+       
+\text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
+\end{array}$
+\caption{\textbf{The \vcname: Rewrite rules to be used for the proof of skew confluence (July 18, 2023)}} \label{fig:rulesNEW}
+\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
+\end{figure}
+}
+
+
+\newcommand{\figureSkewProofContexts}{
+\begin{figure}
+    $$
+\begin{array}{l}
+      \begin{array}{lr@@{\;}r@@{\;}l}
+      % \text{Substitution contexts}  & SE     & ::= & SV \vb |SQ ; e| \vb |eq ; SE| \vb |def x SE|
+      %                                                \vb |SE `choice` e| \vb |e `choice` SE| \\
+      %                                        && \vb & |apply1N SV v| \vb |apply1N v SV| \vb |one SE| \vb |all SE| \\
+      %                        & SQ     & ::= & SE \vb |SV == e|  \vb |v == SE| \\
+      %        & SV & ::= & |x|  \vb |k| \vb |op| \vb |arr (SV_1, xdots, SV_n)| \vb |lam x SE| \\
+      \text{Value contexts} & V & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
+      \text{Scope contexts} & SX & ::= & |one SC| \vb |all SC| \\
+                            & SC & ::= & |hole| \vb |SC choice e| \vb |e choice SC| \\
+      \text{Choice contexts} & CX & ::= & \hole \vb |v == CX; e| \vb |CX ; e| \vb |ceq; CX| \vb |def x CX| \\
+      \text{Choice-free exprs} & ce  & ::=  & |v| \vb |ceq ; ce|
+                                     \vb |one e| \vb |all e| \vb |def x ce|
+                                     \vb |apply1 op v| \\
+                               & ceq & ::= & |ce| \vb |v == ce| \\
+    \end{array}\\
+\end{array}
+\vspace{-0.5em}
+     $$
+    \caption{The syntax of contexts used for the proof of skew confluence}
+    \Description{A table that exhibits a BNF grammar that defines sequence contexts, execution contexts, value contexts, scope contexts, and choice-free expressions}
+      \label{fig:skew-contexts} \label{fig:skew-choice-free-syntax}
+\end{figure}
+}
+
+
+\figureSkewProofRewriteRules 
+\figureSkewProofRewriteRulesNEW
+\figureSkewProofContexts
+
+
+ 

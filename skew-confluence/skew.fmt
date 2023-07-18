@@ -1,0 +1,14 @@
+%%Formatting for skew confluence proof
+
+%format substNP (e) x (v) = "\subst{" e "}{" x "}{" v "}"
+%format applyNP (a) (b) = a "\," b
+%format Omega = "\mathit{\Omega}"
+%format ctrdots = "\cdots"
+%format lowdots = "\ldots"
+%format commadots = "\;\ldots"
+%format subst2 e x (v) y (w) = "\substtwo{" e "}{" x "}{" v "}{" y "}{" w "}"
+%format substsuch e x (v) p = "\substsuch{" e "}{" x "}{" v "}{" p "}"
+%format (tsubst e u (v)) = "\tsubst{" e "}{" u "}{" v "}"
+
+%format SV_1
+%format SV_n
