@@ -24,9 +24,16 @@ If $A$ and $B$ are sets, then any $R \subseteq A \times B$ is a \emph{relation f
 then $R$ is a \emph{relation on $A$}.
 
 Any relation, regarded as a set, may be used as the operand of operators such as $\cup$ and $\cap$ and of predicates such as $\subseteq$ and $\in$.
-Any relation may also be regarded as a predicate; if $R$ is a relation, then $x \mathrel{R} y$ means $(x,y)\in R$.
-Because letters and symbols alike may be used to name relations, we can also say that if $\rightarrow$ is a relation, then $x \mathrel{\rightarrow} y$ means $(x, y)\in {\rightarrow}$.
-We also use the customary notation for \emph{chaining} relation predicates, so that for any $n>0$, $x_0 \mathrel{R_1} x_1 \mathrel{R_2}  x_2 \mathrel{R_3} \cdots \mathrel{R_n} x_n$
+Any relation may also be regarded as a binary predicate; if $R$ is a relation, then $x \mathrel{R} y$ means $(x,y)\in R$.
+Because letters and symbols alike may be used to name relations,
+we can also say that if $\rightarrow$ is a relation, then $x \mathrel{\rightarrow} y$ means $(x, y)\in {\rightarrow}$.
+If $R$ and $S$ are relations, then $R \cap S$ is the set $\setcomp{(x, y)}{(x,y) \in R \logand (x,y) \in S}$ = $\setcomp{(x, y)}{x \mathrel{R} y \logand x \mathrel{S} y}$,
+and one can write $a \mathrel{(R\cap S)} b$, which will true if and only if $a \mathrel{R} s \logand a \mathrel{S} b$.
+As another example, if $\leftarrow$ and $\rightarrow$ are relations,
+then ${\leftarrow}\cup{\rightarrow}$ is the set $\setcomp{(x, y)}{(x,y) \in {\leftarrow} \logand (x,y) \in {\rightarrow}}$ = $\setcomp{(x, y)}{x \leftarrow y \logand x \rightarrow y}$,
+and one can write $a \mathrel{({\leftarrow}\cup {\rightarrow})} b$, which will true if and only if $a \leftarrow b \logor a \rightarrow b$.
+
+We use the customary notation for \emph{conjunctive chaining} of relation predicates, so that for any $n>0$, $x_0 \mathrel{R_1} x_1 \mathrel{R_2}  x_2 \mathrel{R_3} \cdots \mathrel{R_n} x_n$
 means $x_0 \mathrel{R_1} x_1 \logand x_1 \mathrel{R_2} x_2 \logand x_2 \mathrel{R_3} x_3 \logand \cdots \logand x_{n-1} \mathrel{R_n} x_n$.
 For example, $x \leq y \leq z$ means $x \leq y \logand y \leq z$.
 
@@ -42,7 +49,7 @@ While the superscript $^{-1}$ could be applied to symbols as well as letters, we
 that is named by a symbol by flipping the symbol left-to-right, so that $\supset$ denotes the inverse of $\subset$, $\geq$ denotes the inverse of $\leq$,
 and $\leftarrow$ denotes the inverse of $\rightarrow$.
 
-A relation $R$ is said to be \emph{symmetric} if $R^{-1}=R$. It is customary to use symbols that are left-right symmetric, such as $\equiv$, to denote symmetric relations.
+A relation $R$ is said to be \emph{symmetric} if $R^{-1}=R$. It is customary to use symbols that are left-right symmetric, such as $\equiv$ and $\leftrightarrow$, to denote symmetric relations.
 
 Again, let $R$ and $\xgo{}$ be relations on $A$.
 The reflexive closure of $R$ is $R^{\reflexivemarker}=R \cup \iota_A$ and the reflexive closure of $\xgo{}$ is ${\xgoeq{}} = {\xgo{}} \cup \iota_A$.
@@ -66,7 +73,10 @@ We call such tuples \emph{occurrences}; we use variables $u$, $w$, $p$, and $q$ 
 and we use variables $U$, $W$, $P$, and $Q$ to refer to sets of them.
 We use juxtaposition to concatenate such tuples; for example, if $u=(1,2)$ and $w=(2,1,3)$, then $uw =(1,2,2,1,3)$ and $w(2,2)u = (2,1,3,2,2,1,2)$.
 Furthermore we sometimes use juxtaposition to concatenate a sequence with every member of a set to form a new set;
-for example, if $U=\{(1,2),(2,1,3)\}$, then $(2)U = \{(2,1,2),(2,2,1,3)\}$.
+for example, if $U=\{(1,2),(2,1,3)\}$, then $(2,3,3)U = \{(2,3,3,1,2),(2,3,3,2,1,3)\}$.
+For notational convenience, we use single boldface digits as abbreviations for singleton tuples, for example $\1=(1)$ and $\2=(2)$;
+thus $u=(1,2)$ can be written more concisely as $u=\1\2$, and $w(2,2)u$ can be written more concisely as $w\2\2u$.
+
 We say \emph{$u$ is within $w$}, written $u \occin w$, iff $\exists q \in \mathbb{N}^{*}_{+} \suchthat u=wq$,
 in which case we also define $u/w = q$.\footnote{This overloading of the operator $/$ allows
   a very pretty definition of the distributivity property for replacement in \cref{sec:replacement}.}
