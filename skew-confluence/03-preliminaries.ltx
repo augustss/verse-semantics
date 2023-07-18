@@ -1,0 +1,847 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%include ./skew.fmt 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Mathematical Background}
+
+
+Our development of the background material on relations, terms, substitutions, and rewrite rules substantially follows that of
+\citet{Huet80}, with considerable influence also from 
+\citet{van-oostrom:decreasing-diagrams} and \citet{ariola:skew-confluence}.
+
+
+\subsection{Relations, Terms, and Rewrite Rules}
+
+
+\subsubsection{Relations}
+
+
+A \emph{relation} is a set of pairs of related items. We use letters, such as $R$ and $S$, as well as symbols, such as $\subset$ and $\leq$ and $\rightarrow$ and $\equiv$, to name relations.
+If $A$ and $B$ are sets, then any $R \subseteq A \times B$ is a \emph{relation from $A$ to $B$}; if $A=B$, so that $R \subseteq A \times A$,
+then $R$ is a \emph{relation on $A$}.
+
+Any relation, regarded as a set, may be used as the operand of operators such as $\cup$ and $\cap$ and of predicates such as $\subseteq$ and $\in$.
+Any relation may also be regarded as a binary predicate; if $R$ is a relation, then $x \mathrel{R} y$ means $(x,y)\in R$.
+Because letters and symbols alike may be used to name relations,
+we can also say that if $\rightarrow$ is a relation, then $x \mathrel{\rightarrow} y$ means $(x, y)\in {\rightarrow}$.
+If $R$ and $S$ are relations, then $R \cap S$ is the set $\setcomp{(x, y)}{(x,y) \in R \logand (x,y) \in S}$ = $\setcomp{(x, y)}{x \mathrel{R} y \logand x \mathrel{S} y}$,
+and one can write $a \mathrel{(R\cap S)} b$, which will true if and only if $a \mathrel{R} s \logand a \mathrel{S} b$.
+As another example, if $\leftarrow$ and $\rightarrow$ are relations,
+then ${\leftarrow}\cup{\rightarrow}$ is the set $\setcomp{(x, y)}{(x,y) \in {\leftarrow} \logand (x,y) \in {\rightarrow}}$ = $\setcomp{(x, y)}{x \leftarrow y \logand x \rightarrow y}$,
+and one can write $a \mathrel{({\leftarrow}\cup {\rightarrow})} b$, which will true if and only if $a \leftarrow b \logor a \rightarrow b$.
+
+We use the customary notation for \emph{conjunctive chaining} of relation predicates, so that for any $n>0$, $x_0 \mathrel{R_1} x_1 \mathrel{R_2}  x_2 \mathrel{R_3} \cdots \mathrel{R_n} x_n$
+means $x_0 \mathrel{R_1} x_1 \logand x_1 \mathrel{R_2} x_2 \logand x_2 \mathrel{R_3} x_3 \logand \cdots \logand x_{n-1} \mathrel{R_n} x_n$.
+For example, $x \leq y \leq z$ means $x \leq y \logand y \leq z$.
+
+
+We write $\iota_A$ for the identity relation on $A$: $\iota_A = \setcomp{(x,x)}{x \in A}$.
+The operator $\relcomp$ is \emph{relation composition}: if $R$ and $S$ are relations, then $R \relcomp S$ means $\setcomp{(x, y)}{\exists z \suchthat x \mathrel{R} z \mathrel{S} y}$.
+A nonnegative integer superscript $k$ may used to indicate $k$-fold composition of a relation; if $R$ and $\xgo{}$ are relations on $A$, then $R^0 = {\xgosup{}{0}} = \iota_A$,
+and for $k>0$, $R^{k} = R \relcomp R^{k-1}$ and ${\xgosup{}{k}} = {\xgo{}} \relcomp {\xgosup{}{k-1}}$.
+
+
+The \emph{inverse} of a relation $R$ is the set $R^{-1} = \setcomp{(x,y)}{(y,x) \in R}$; note that the inverse of the inverse of $R$ is $R$.
+While the superscript $^{-1}$ could be applied to symbols as well as letters, we instead customarily notate the inverse of a relation
+that is named by a symbol by flipping the symbol left-to-right, so that $\supset$ denotes the inverse of $\subset$, $\geq$ denotes the inverse of $\leq$,
+and $\leftarrow$ denotes the inverse of $\rightarrow$.
+
+A relation $R$ is said to be \emph{symmetric} if $R^{-1}=R$. It is customary to use symbols that are left-right symmetric, such as $\equiv$ and $\leftrightarrow$, to denote symmetric relations.
+
+Again, let $R$ and $\xgo{}$ be relations on $A$.
+The reflexive closure of $R$ is $R^{\reflexivemarker}=R \cup \iota_A$ and the reflexive closure of $\xgo{}$ is ${\xgoeq{}} = {\xgo{}} \cup \iota_A$.
+The transitive reflexive closure of $R$ is $R^{*}= \bigcup_{k \geq 0} R^k$ and the transitive reflexive closure of $\xgo{}$ is ${\xgodbl{}} = \bigcup_{k \geq 0} \xgosup{}{k}$.
+The symmetric closure of $\xgo{}$ is ${\xboth{}} = {\xungo{}} \cup {\xgo{}}$; 
+the symmetric transitive reflexive closure of $\xgo{}$ is ${\xbothdbl{}} = {\xungodbl{}} \cup {\xgodbl{}}$. 
+
+For a given relation denoted by a rightward arrow $\xgo{}$, we define the predicate $x \bothreduceto y$ to mean $\exists z \suchthat x \xgodbl{} z \xungodbl{} y$
+and the predicate $x \bothreducefrom y$ to mean $\exists z \suchthat x \xungodbl{} z \xgodbl{} y$.
+
+\subsubsection{Terms and Occurrences}
+
+Our definition of \emph{term} is specialized for the grammar of {\versecalc}. Briefly put, a term is the parse tree for any BNF nonterminal in the {\versecalc} grammar
+or any string into which such a nonterminal might be expanded, either partially or fully. For our purposes here, we require that terms be finite.
+Let {\metavars} be the set of of \emph{metavariables} (possibly decorated BNF nonterminals) and
+let {\termset} be the set of all possible terms.
+For any term $M \in \termset$, we define its \emph{set of metavariables} $\metavars(M) \subset \metavars$, as shown in \cref{fig:metavars}.
+
+We use elements of $\mathbb{N}_{+}^{*}$ (that is, tuples of positive integers) to represent the positions of the subterms of a term.
+We call such tuples \emph{occurrences}; we use variables $u$, $w$, $p$, and $q$ to refer to them,
+and we use variables $U$, $W$, $P$, and $Q$ to refer to sets of them.
+We use juxtaposition to concatenate such tuples; for example, if $u=(1,2)$ and $w=(2,1,3)$, then $uw =(1,2,2,1,3)$ and $w(2,2)u = (2,1,3,2,2,1,2)$.
+Furthermore we sometimes use juxtaposition to concatenate a sequence with every member of a set to form a new set;
+for example, if $U=\{(1,2),(2,1,3)\}$, then $(2,3,3)U = \{(2,3,3,1,2),(2,3,3,2,1,3)\}$.
+For notational convenience, we use single boldface digits as abbreviations for singleton tuples, for example $\1=(1)$ and $\2=(2)$;
+thus $u=(1,2)$ can be written more concisely as $u=\1\2$, and $w(2,2)u$ can be written more concisely as $w\2\2u$.
+
+We say \emph{$u$ is within $w$}, written $u \occin w$, iff $\exists q \in \mathbb{N}^{*}_{+} \suchthat u=wq$,
+in which case we also define $u/w = q$.\footnote{This overloading of the operator $/$ allows
+  a very pretty definition of the distributivity property for replacement in \cref{sec:replacement}.}
+We say \emph{$u$ and $w$ are disjoint}, written $u \occdis w$, iff $\neg\bigl( u \occin w \logor w \occin u \bigr)$.
+Finally, $u \occstrictin w$ means $u \occin w \logand u \neq w$ and $u \occdiseq w$ means $u \occdis w \logor u = w$.
+
+For any term $M \in \termset$, we define its \emph{set of occurrences} $\occ(M) \subset \mathbb{N}_{+}^{*}$, as shown in \cref{fig:occurrences}, and the \emph{subterm of $M$ at $u$},
+$M/u \in \termset$, where $u \in \occ(M)$, as shown in \cref{fig:selection}. We overload the relations $\occin$ and $\occstrictin$ to apply to terms:
+$M \occin N$ means $\exists u \suchthat M = N/u$, 
+and $M \occstrictin N$ means $\exists u \neq \emptyocc \suchthat M = N/u$.
+We also say that \emph{$u$ is an occurrence of the term $M/u$ in $M$}.
+
+We define $\occ(M,N)$ (the \emph{occurrences of $M$ in $N$} to mean $\setcomp{u}{u\in\occ(N) \logand N/u=M}$.  
+We define $\uniqueocc(M,N)$ (the \emph{unique occurrence of $M$ in $N$} to mean $u$ where $\occ(M,N) = \{u\}$;
+$\uniqueocc(M,N)$ is undefined if $\left||\occ(M,N)\right|| \neq 1$.
+
+
+\begin{figure}
+$
+\begin{array}{@@{}l@@{\qquad}l@@{\qquad}l@@{}}
+  \hbox{form of $M$} & \metavars(M) & \occ(M) \\[4pt] \hline
+  M \in \metavars & \{M\} & \{\emptyocc\} \\ \hline
+  |x| & \{\,\} & \{\emptyocc\} \\ \hline
+  |k| & \{\,\} & \{\emptyocc\} \\ \hline
+  |op| & \{\,\} & \{\emptyocc\} \\ \hline
+  |tup (v_1, commadots, v_n)| & \bigcup_{1\leq i\leq n} \metavars(|v_i|)& \{\emptyocc\} \cup \bigcup_{1\leq i\leq n} (i)\occ(|v_i|) \\ \hline
+  |lam x e| & \metavars(|x|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
+  |mu x e| & \metavars(|x|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
+  |eq; e| & \metavars(|eq|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|eq|) \cup (2)\occ(|e|) \\ \hline
+  |v = e| & \metavars(|v|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|v|) \cup (2)\occ(|e|) \\ \hline
+  |def x e| & \metavars(|x|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
+  |fail| & \{\,\} & \{\emptyocc\} \\ \hline
+  |e_1 choice e_2| & \metavars(|e_1|) \cup \metavars(|e_2|) & \{\emptyocc\} \cup (1)\occ(|e_1|) \cup (2)\occ(|e_2|) \\ \hline
+  |apply1N v_1 v_2| & \metavars(|v_1|) \cup \metavars(|v_2|) & \{\emptyocc\} \cup (1)\occ(|v_1|) \cup (2)\occ(|v_2|) \\ \hline
+  |one e| & \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|e|) \\ \hline
+  |all e| & \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|e|) \\ \hline
+\end{array}
+$
+\caption{Definitions of $\metavars(M)$ (set of metavariables within $M$) and $\occ(M)$ (the set of occurrences within $M$)}\label{fig:metavars}\label{fig:occurrences}
+\Description{Definition of notation for the set of occurrences of subterms within a term $M$}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{@@{}l@@{\qquad}l@@{\quad}l@@{}}
+  \hbox{form of $M$} & \hbox{meaning of $M/u$} \\[4pt] \hline
+  \hbox{any} & M/\emptyocc = M \\ \hline
+  |tup (v_1, commadots, v_n)| & M/(i)u = |v_i|/u & \hbox{for all $1\leq i\leq n, u\in\occ(|v_i|)$} \\ \hline
+  |lam x e| & M/(1)u = |x|/u & \hbox{for all $u\in\occ(|x|)$} \\ & M/(2)u = |e|/u & \hbox{for all $u\in\occ(|e|)$} \\ \hline
+  |mu x e| & M/(1)u = |x|/u & \hbox{for all $u\in\occ(|x|)$} \\ & M/(2)u = |e|/u & \hbox{for all $u\in\occ(|e|)$} \\ \hline
+  |eq; e| & M/(1)u = |eq|/u & \hbox{for all $u\in\occ(|eq|)$} \\ & M/(2)u = |e|/u & \hbox{for all $u\in\occ(|e|)$} \\ \hline
+  |v = e| & M/(1)u = |v|/u & \hbox{for all $u\in\occ(|v|)$} \\ & M/(2)u = |e|/u & \hbox{for all $u\in\occ(|e|)$} \\ \hline
+  |def x e| & M/(1)u = |x|/u & \hbox{for all $u\in\occ(|x|)$} \\ & M/(2)u = |e|/u & \hbox{for all $u\in\occ(|e|)$} \\ \hline
+  |e_1 choice e_2| & M/(1)u = |e_1|/u & \hbox{for all $u\in\occ(|e_1|)$} \\ & M/(2)u = |e_2|/u & \hbox{for all $u\in\occ(|e_2|)$} \\ \hline
+  |apply1N v_1 v_2| & M/(1)u = |v_1|/u & \hbox{for all $u\in\occ(|v_1|)$} \\ & M/(2)u = |v_2|/u & \hbox{for all $u\in\occ(|v_2|)$} \\ \hline
+  |one e| & M/(1)u = |e|/u & \hbox{for all $u\in\occ(|e|)$} \\ \hline
+  |all e| & M/(1)u = |e|/u & \hbox{for all $u\in\occ(|e|)$} \\ \hline
+\end{array}
+$
+\caption{Definition of $M/u$ for a term $M$ and $u \in \occ(M)$}\label{fig:selection}
+\Description{Definitions of notation for selection of a subterm at occurrence $u$ within a term $M$}
+\end{figure}
+
+\newpage
+
+\subsubsection{Replacement of Subterms}\label{sec:replacement}
+
+
+For any $M\in\termset$, $u \in \occ(M)$, and $N \in\termset$, we define the \emph{replacement} operation |tsubst M u N| as shown in \cref{fig:replacement};
+note that $N$ is required to be a term of the correct ``type,'' so that the result of  |tsubst M u N| will be a member of $\termset$.
+The result is a term that is a copy of $M$ except that the subterm at $u$ is replaced by $N$.
+
+Replacement has the following properties~\cite[Proposition 3.1]{Huet80}:
+\begin{quote}
+$\forall M,N,P \in\termset, u \in \occ(M), w \in \occ(N)$:
+\begin{tabbing}
+\qquad\=\hskip 3in\=\kill 
+\>$\tsubst{M}{u}{N}/uw = N/w$ \>{\rm\emph{embedding}} \\  
+\>$\tsubst{\tsubst{M}{u}{N}}{uw}{P} = \tsubst{M}{u}{\tsubst{N}{w}{P}}$ \>{\rm\emph{associativity}}
+\end{tabbing}
+$\forall M,N,P \in\termset, u,w \in \occ(M)$ such that $u \occdis w$:
+\begin{tabbing}
+\qquad\=\hskip 3in\=\kill 
+\>$\tsubst{M}{u}{N}/w = M/w$ \>{\rm\emph{persistence}} \\  
+\>$\tsubst{\tsubst{M}{u}{N}}{w}{P} = \tsubst{\tsubst{M}{w}{P}}{u}{N}$ \>{\rm\emph{commutativity}}
+\end{tabbing}
+$\forall M,N,P \in\termset, u,w \in \occ(M)$ such that $u \occin w$:
+\begin{tabbing}
+\qquad\=\hskip 3in\=\kill 
+\>$\tsubst{M}{u}{N}/w = \tsubst{(M/w)}{u/w}{N}$ \>{\rm\emph{distributivity}} \\  
+\>$\tsubst{\tsubst{M}{u}{N}}{w}{P} = \tsubst{M}{w}{P}$ \>{\rm\emph{dominance}}
+\end{tabbing}
+\end{quote}
+
+We also propose names for two additional properties:
+
+\begin{lemma}
+$\forall M,N,P \in\termset, u \in \occ(M), w \in \occ(N)$:
+\begin{quote}
+\begin{tabbing}
+\qquad\=\hskip 3in\=\kill 
+\>$\tsubst{M}{u}{M/u} = M$\>{\rm\emph{consistency}}
+\end{tabbing}
+\end{quote}
+\end{lemma}
+
+\begin{lemma}
+$\forall M,N \in\termset, q,u \in \occ(M)$ such that $q \occin u$, and let $w=q/u$:\hfill\break
+\begin{quote}
+\begin{tabbing}
+\qquad\=\hskip 3in\=\kill 
+\>$\tsubst{M}{uw}{N} = \tsubst{M}{u}{\tsubst{(M/u)}{w}{N}}$\>{\rm\emph{factoring}}
+\end{tabbing}
+\end{quote}
+\end{lemma}
+\begin{proof}
+  $\tsubst{M}{uw}{N} = \tsubst{\tsubst{M}{u}{M/u}}{uw}{N} \BY{\emph{consistency}}$ \hfill\break \null\hskip1.35in${} = \tsubst{M}{u}{\tsubst{(M/u)}{w}{N}} \BY{\emph{associativity}}$.
+\end{proof}
+
+
+
+
+For any $M\in\termset$, any $U \subseteq \occ(M)$ such that $\forall u, w \in U \suchthat \bigl( M/u = M/w \logand u \occdiseq w\bigr)$, and any $N \in\termset$,
+we define |tsubst M U N|
+to mean $(\cdots\tsubst{(\tsubst{(\tsubst{M}{u_1}{N})}{u_2}{N})\cdots)}{u_n}{N}$ for any arbitrarily chosen ordering $u_1, u_2, \ldots, u_n$ of the elements of $U$.
+The result is a copy of $M$ with any number of its subterms replaced by copies of $N$, but the subterms replaced must all be the same and their occurrences must be disjoint within $M$
+(these restrictions plus the commutativity property for replacement imply that the result is the same no matter what ordering is chosen for the elements of $U$).
+
+
+\begin{figure}
+$
+\begin{array}{@@{}l@@{\hskip1.5em}l@@{\hskip1.5em}l@@{}}
+  \hbox{form of $M$} & \hbox{meaning of |tsubst M u N|} \\[4pt] \hline
+  \hbox{any} & |tsubst M () N| \;\;=\;\; N \\ \hline
+  |tup (v_1, commadots, v_n)| & \tsubst{M}{(i)u}{N} \;\;=\;\; |tup (v_1, commadots, v_im1, (tsubst v_i u N), v_ip1, commadots, v_n)| & \hbox{for all $1\leq i\leq n$} \\ \hline
+  |lam x e|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |lam (tsubst x u N) e| \\ & \tsubst{M}{(2)u}{N} \;\;=\;\; |lam x (tsubst e u N)| \\ \hline
+  |mu x e|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |mu (tsubst x u N) e| \\ & \tsubst{M}{(2)u}{N} \;\;=\;\; |mu x (tsubst e u N)| \\ \hline
+  |eq; e|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |(tsubst eq u N); e| \\ & \tsubst{M}{(2)u}{N} \;\;=\;\; |eq; (tsubst e u N)| \\ \hline
+  |v = e|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |(tsubst v u N) = e| \\ & \tsubst{M}{(2)u}{N} \;\;=\;\; |v = (tsubst e u N)| \\ \hline
+  |def x e|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |def (tsubst x u N) e| \\ & \tsubst{M}{(2)u}{N} \;\;=\;\; |def x (tsubst e u N)| \\ \hline
+  |e_1 choice e_2|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |(tsubst e_1 u N) choice e_2| \\ & \tsubst{M}{(2)u}{N} \;\;=\;\; |e_1 choice (tsubst e_2 u N)| \\ \hline
+  |apply1N v_1 v_2|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |apply1N (tsubst v_1 u N) v_2| \\ & \tsubst{M}{(2)u}{N} \;\;=\;\; |apply1N v_1 (tsubst v_2 u N)| \\ \hline
+  |one e|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |one (tsubst e u N)| \\ \hline
+  |all e|  & \tsubst{M}{(1)u}{N} \;\;=\;\; |all (tsubst e u N)| \\ \hline
+\end{array}
+$
+\caption{Definition of $\tsubst{M}{u}{N}$ for a term $M$, $u \in \occ(M)$, and a term $N$}\label{fig:replacement}
+\Description{Definitions of notation for replacing a subterm within a term $M$}
+\end{figure}
+
+\subsubsection{Substitutions for Metavariables}
+
+\subsubsection{Matching of Terms}
+
+\subsubsection{Rewrite Rules on Terms}
+
+A \emph{rewrite rule} is a pair of terms, customarily written $\langle\alpha \xgo{} \beta\rangle$, such that $\metavars(\beta) \subseteq \metavars(\alpha)$.
+(When rewrite rules are listed in a table, the surrounding angle brackets are typically omitted.)
+A rewrite rule may be given a name, which we write in small caps; we also use the names \rulename{r} and \rulename{s} as metavariables
+that range over rule names. A rewrite rule describes a relation on terms: $(M,N)$ is a member of the relation iff
+$\exists \sigma \suchthat M = \sigma(\alpha) \logand N=\sigma(\beta)$.
+
+Let $\xgo{}$ be a relation on $\termset$. We say that $\xgo{}$ is \emph{stable} iff
+for all substitutions $\sigma$ and all terms $M$ and $N$ in $\termset$, if $M \xgo{} N$ then $\sigma(M) \xgo{} \sigma(N)$ (that is, the relationship is unaffected
+if metavariables are renamed). We say that $\xgo{}$ is \emph{compatible} iff
+for all terms $M$, $N$, and $P$ in $\termset$ and all occurrences $u \in \occ(P)$, if $M \xgo{} N$ then $\tsubst{P}{u}{M} \xgo{} \tsubst{P}{u}{N}$ (that is, a subterm can be
+``rewritten in place'' in the same way as an entire term).
+For any rewrite rule \rulename{r}, we write $\xrngo{r}$ to denote the smallest stable, compatible relation that contains the relation described by \rulename{r}.
+
+If $\rr$ is a set of names of rewrite rules, we write $\xgo{\rr}$ to mean $\bigcup_{\hbox{\rulename{r}}\in\rr} \xrngo{r}$.
+
+When we use $\xrngo{r}$ or $\xgo{\rr}$ to describe a relationship between two terms $M$ and $N$,
+we sometimes annotate it to indicate explicitly the occurrence $u$ within $M$ of the subterm that is rewritten: $M \xrngosup{r}{u} N$ means
+$M \xrngo{r} N \logand \exists \sigma \suchthat M/u = \sigma(\alpha) \logand N = \tsubst{M}{u}{\sigma(\beta)}$.
+
+\begin{lemma}\label{lem:rewrite-basic-tsubst}
+For any rewrite rule $\langle\alpha \xgo{} \beta\rangle$ (call it \rulename{r}) and terms $M$ and $N$,
+\begin{quote}
+\begin{tabbing}
+\qquad\=\hskip 3in\=\kill 
+\>if\quad$M \xrngosup{r}{u} N$\quad then\quad$N = \tsubst{M}{u}{N/u}$\>{\rm\emph{rewriting}}
+\end{tabbing}
+\end{quote}
+\end{lemma}
+\begin{proof}
+  By the definition of $M \xrngosup{r}{u} N$ we have $\exists \sigma \suchthat M/u = \sigma(\alpha) \logand N = \tsubst{M}{u}{\sigma(\beta)}$.
+  Now $N/u = \tsubst{M}{u}{\sigma(\beta)}/u = \sigma(\beta) \BY{\emph{embedding} with $w=\emptyocc$}$;
+  therefore $N = \tsubst{M}{u}{N/u}$.
+\end{proof}
+
+We write $\xrngoeq{r}$ for the reflexive closure of $\xrngo{r}$, and we sometimes annotate it as $\xrngoeqsup{r}{u}$.
+
+We write $\xrngodbl{r}$ for the transitive reflexive closure of $\xrngo{r}$, and similarly write  $\xgodbl{\rr}$ for the transitive reflexive closure of $\xgo{\rr}$.
+We do not annotate such relations with occurrences $u$.\footnote{One could contemplate annotating them
+  with \emph{sequences} of occurrences, but we will not need such annotations for our purposes here.}
+
+We notate the inverses of these relations as
+$\xrnungo{r}$ and
+$\xungo{\rr}$ and
+$\xrnungoeq{r}$ and
+$\xungoeq{\rr}$ and
+$\xrnungodbl{r}$ and
+$\xungodbl{\rr}$, and we sometimes use annotated forms
+$\xrnungosup{r}{u}$ and
+$\xungosup{\rr}{u}$ and
+$\xrnungoeqsup{r}{u}$ and
+$\xungoeqsup{\rr}{u}$.
+
+We notate the symmetric closures of these relations as
+$\xrnboth{r}$ and
+$\xboth{\rr}$ and
+$\xrnbotheq{r}$ and
+$\xbotheq{\rr}$ and
+$\xrnbothdbl{r}$ and
+$\xbothdbl{\rr}$, and we sometimes use annotated forms
+$\xrnbothsup{r}{u}$ and
+$\xbothsup{\rr}{u}$ and
+$\xrnbotheqsup{r}{u}$ and
+$\xbotheqsup{\rr}{u}$.
+
+
+\subsubsection{Disjoint Parallel Compatible Relations}
+
+The \emph{disjoint parallel closure} of the stable compatible relation $\xrngo{r}$ defined by a rewrite rule \rulename{r} is written $\xprngo{r}$;
+it is the smallest relation containing $\xrngo{r}$ such that
+for all terms $M$ and $N$ and sets of occurrences $U\in\occ(M)$ such that $\forall u, w\in U \suchthat u \occdiseq w$,
+if $M \xprngo{r} N$ then $\tsubst{P}{U}{M} \xprngo{r} \tsubst{P}{U}{N}$ (that is, an entire set of identical subterms can each be
+``rewritten in place'' in the same way as an entire term). Because the set $U$ may be empty, $\xprngo{r}$ is reflexive.
+
+If $\rr$ is a set of names of rewrite rules, we write $\xpgo{\rr}$ to mean $\bigcup_{\hbox{\rulename{r}}\in\rr} \xprngo{r}$.
+
+When we use $\xprngo{r}$ to describe a relationship between two terms $M$ and $N$,
+we sometimes annotate it to indicate explicitly the set $U$ of occurrences within $M$ of the subterms that are rewritten: $M \xprngosup{r}{U} N$ means
+$M \xprngo{r} N \logand \exists \sigma \suchthat \bigl(\forall u\in U\suchthat M/u = \sigma(\alpha)\bigr) \logand N = \tsubst{M}{U}{\sigma(\beta)}$.
+
+We write $\xprngodbl{r}$ for the transitive reflexive closure of $\xprngo{r}$, and similarly write  $\xpgodbl{\rr}$ for the transitive reflexive closure of $\xpgo{\rr}$.
+We do not annotate such relations with sets of occurrences $U$.\footnote{One could contemplate annotating them
+  with \emph{sequences} of sets of occurrences, but we will not need such annotations for our purposes here.}
+
+We notate the inverses of these relations as
+$\xprnungo{r}$ and
+$\xpungo{\rr}$ and
+$\xprnungodbl{r}$ and
+$\xpungodbl{\rr}$, and we sometimes use annotated forms
+$\xprnungosup{r}{U}$ and
+$\xpungosup{\rr}{U}$.
+
+We notate the symmetric closures of these relations as
+$\xprnboth{r}$ and
+$\xpboth{\rr}$ and
+$\xprnbothdbl{r}$ and
+$\xpbothdbl{\rr}$, and we sometimes use annotated forms
+$\xprnbothsup{r}{U}$ and
+$\xpbothsup{\rr}{U}$.
+
+
+\subsubsection{Free Variables}
+
+
+We use the conventional notation $\freevars{|e|}$ to denote the set of variables that occur free
+in the expression |e|. Variables are bound by the constructs |def x e|, |lam x e|, and |mu x hnf|.
+\Cref{fig:fvs} contains a formal definition of this function for \versecalc{}.
+
+We define $\freeocc(x,M)$ (the \emph{free occurrences of variable $x$ within $M$} as shown in \cref{fig:freeocc}.
+
+
+We use the variation $\freevarsoutsidelambdas{|e|}$ to denote the set of variables that occur free
+in the expression |e| in at least one position that is not within the body of a
+lambda expression\footnote{
+  ``$\freevarsoutsidelambdas{\cdot}$'' abbreviates ``free variables outside lambda''}.
+As an example, $\freevarsoutsidelambdas{|def x (tup (x, f, g, lam y (tup (x, g, y, z))))|} = \{ f, g \}$ because:
+\begin{itemize}
+\item |x| is bound by |defKW|, so it is not free. 
+\item |f| is free in a position not within the body of a lambda expression.
+\item |g| is free in at least one position not within the body of a lambda expression (it also happens to be free in a second position that is within the body of a lambda expression).
+\item |y| is bound by |lambda|, so it is not free. 
+\item |z| is free, but appears only in a position that is within the body of a lambda expression.
+\end{itemize}
+\Cref{fig:fvsol} contains a formal definition of this function.
+Unlike $\freevars{e}$, $\freevarsoutsidelambdas{|v|}$ is only ever appplied to a value $|v|$.
+
+\subsubsection{Substitution}
+
+We use the notation |subst e x v| to denote the expression that results from performing standard capture-avoiding substitution of the value |v| for every occurrence of the variable |x| within the expression |e| (it turns out that, for \versecalc{}, substitution of general expressions for variables is not required, only substitution of values for variables).
+\Cref{fig:substitution} contains a formal definition of how this notation applies to the \versecalc{} grammar (compare \cite[\S 2.1.15]{Barendregt}).
+
+
+
+\subsection{Skew Confluence}
+
+
+\begin{comment}
+\subsubsection{Overview of Skew Confluence (VERSION 1)} \label{sec:skew-overview}
+
+
+If a reduction relation $\rr$ is confluent, then for all |e|, |e_1|, and |e_2|,
+if $\rstep{\rr}{|e|}{|e_1|}$ and $\rstep{\rr}{|e|}{|e_2|}$ then there exists |e'| such that
+if $\rstep{\rr}{|e_1|}{|e'|}$ and $\rstep{\rr}{|e_2|}{|e'|}$.
+This is useful because the $\rr$-normal form (if it exists) of any expression is if $\rr$ is confluent.
+
+But what can we say if $\rr$ is not confluent---for example, what if $\rr$ has the even-odd problem
+discussed in \cref{sec:even-odd}? Ariola and Blom introduced a notion of \emph{infinite normal form},
+which is a (possibly infinite) set of (possibly \emph{erased}) terms rather than a single term.
+We summarize this idea, using our own terminology, as follows:
+\begin{itemize}
+\item Let an \emph{erasure} of a term be a copy in which one or more subterms (possibly the entire term)
+  have been replaced with |Omega|, a special term that means ``unknown'' or ``we don't know yet.''
+\item We can compare possibly erased terms with the partial order $\leqomega$, which is the transitive,
+  reflexive, and compatible closure of the relation in which |Omega| is less than any other term.
+  Observe that if |e'| is an erasure of |e| then $|e'| \leqomega |e|$.
+\item Define the $\rr$-\emph{information content} $\omegarr(|e|)$ of an expression |e| to be the unique erasure of |e| in which \emph{every} redex
+  has been replaced by |Omega|. Any non-|Omega| structure in the result is therefore ``permanent'':
+  no further reductions under $\rr$ can alter that structure.
+\item For any expression |e|, consider the (possibly infinite) set $A$ of all its $\rr$-reducts, that is, \emph{all} expressions |e'| such that
+  $\rstep{\rr}{e}{e'}$, then let $B = \setcomp{\omegarr(|e|)}{|e| \in A}$.
+  The \emph{infinite $\rr$-normal form} of |e| is a set $C$, the \emph{downward closure} of $B$ under $\leqomega$; that is,
+  for every element of $B$, $C$ contains not only that element but also every possible erasure of that element.
+\end{itemize}
+It is the step of taking a downward closure under $\leqomega$ that makes it possible to prove that infinite normal forms
+are unique for certain reduction relations.
+
+But working with these infinite sets directly is tricky. Fortunately, there is a simpler path, because Ariola and Blom also prove
+an important theorem: a reduction relation that is \emph{monotonic} (meaning that no rewrite rule ever decreases the information content)
+has unique infinite normal forms if and only if the reduction relation is \emph{skew confluent} \cite[Theorem 5.4]{ariola:skew-confluence}---and skew
+confluence is much easier to prove, using techniques that do not involve infinite sets, but are fairly similar to proofs of ordinary confluence
+that use commutative diagrams and case analysis.
+
+Here, then, is the idea behind skew confluence: for all |e|, |e_1|, and |e_2|,
+if $\rstep{\rr}{|e|}{|e_1|}$ and $\rstep{\rr}{|e|}{|e_2|}$, then there may not be any |e'| such that
+if $\rstep{\rr}{|e_1|}{|e'|}$ and $\rstep{\rr}{|e_2|}{|e'|}$. Instead, you can choose either of |e_1| and |e_2| (let's say |e_2|),
+and then there does exists some |e'| such that $\rstep{\rr}{|e_1|}{|e'|}$ and |e'| has at least as much information content as |e_2|,
+that is, $\omegarr(|e_2|) \leqomega \omegarr(|e'|)$. This works both ways, by symmetry, because the choice of |e_1| or |e_2| is arbitrary.
+
+In the case of the even-odd problem discussed in \cref{sec:even-odd}, further reductions on the two expressions
+|def y (y == lam z (tup (1, y); tup (1,y))| and |def x (x = tup (1, lam z x)); x| might produce longer expressions such as
+|def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1, lam z (tup (1, y))))))|
+and |def x (x = tup (1, lam z x); tup (1, lam z (tup (1, lam z (tup (1, lam z x))))))|.
+One can see that each of these expressions
+will produce a value of the form |tup (1, lam z (tup (1, lam z (tup (1, ctrdots))))))|. Confluence cannot be achieved,
+because no matter how many times one substitutes for |y| in the first expression or for |x| in the second expression,
+the first expression will always have one more occurrence of ``|1|'' than ``|lamhdr z|'' but the second expression
+will always have the same number of occurrences of ``|1|'' than ``|lamhdr z|''; on the other hand, no matter
+how long one expression becomes through substitution, the other one can be made even longer,
+so as to have at least as much information content (and in fact more, in this example). The theory of skew confluence makes this idea precise.
+
+Another important fact is that if a reduction relation is confluent and monotonic, then it is skew confluent
+\cite[Corollary 5.5]{ariola:skew-confluence}. In \cref{sec:skew-confluence} we prove a new result: if two relations are skew confluent
+with respect to the same information content function and commute, then their union is also skew confluent.
+(In fact, it is not required that the two relations fully commute; a slightly weaker precondition suffices.)
+This provides a detailed strategy for reusing parts of the proof of confluence for \versecalc{} sketched in \cref{sec:confluence-sketch}
+and detailed in \cref{sec:confluence}: our plan is to (i) define an appropriate information content function for \versecalc{} expressions;
+(ii) prove that all the rewrite rules for \versecalc{} are monotonic in this information content function;
+(iii) prove that the Unification rules (modified to permit recursive substitution) together with the Normalization rules are skew confluent;
+(iv) prove that this combined set of rules commutes in the necessary way with the rules for Application, Elimination, and Choice (which taken together are already known to be confluent);
+and (v) then apply our new result to show that the entire set of rewrite rules is skew confluent.
+At this time steps (iii) and (iv) are incomplete, so we emphasize that \emph{we do not yet have a complete proof of skew confluence for \versecalc{}}.
+\end{comment}
+
+\begin{comment}
+
+further reductions on the two terms
+|def y (y == lam z (tup (1, y); tup (1,y))| and |def x (x = tup (1, lam z x)); x| might produce longer terms such as
+|def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1, lam z (tup (1, y))))))|
+and |def x (x = tup (1, lam z x); tup (1, lam z (tup (1, lam z (tup (1, lam z x))))))|.
+One can see that each of these terms
+will produce a value of the form |tup (1, lam z (tup (1, lam z (tup (1, ctrdots))))))|. Confluence cannot be achieved,
+because no matter how many times one substitutes for |y| in the first expression or for |x| in the second expression,
+the first expression will always have one more occurrence of ``|1|'' than ``|lamhdr z|'' but the second expression
+will always have the same number of occurrences of ``|1|'' than ``|lamhdr z|''; on the other hand, no matter
+how long one expression becomes through substitution, the other one can be made even longer,
+so as to have at least as much information content (and in fact more, in this example). The theory of skew confluence makes this idea precise.
+
+Old...
+and either term can be further reduced so as to contain \emph{all} the permanent structure of the other.
+This provides a notion of convergence even for infinite reduction sequences.
+
+In the case of the even-odd problem discussed in \cref{sec:even-odd}, further reductions on the two terms
+|def y (y == lam z (tup (1, y); tup (1,y))| and |def x (x = tup (1, lam z x)); x| might produce longer terms such as
+|def y (y == lam z (tup (1, y)); tup (1, lam z (tup (1, lam z (tup (1, y))))))|
+and |def x (x = tup (1, lam z x); tup (1, lam z (tup (1, lam z (tup (1, lam z x))))))|.
+One can see that each of these terms
+will produce a value of the form |tup (1, lam z (tup (1, lam z (tup (1, ctrdots))))))|. Confluence cannot be achieved,
+because no matter how many times one substitutes for |y| in the first expression or for |x| in the second expression,
+the first expression will always have one more occurrence of ``|1|'' than ``|lamhdr z|'' but the second expression
+will always have the same number of occurrences of ``|1|'' than ``|lamhdr z|''; on the other hand, no matter
+how long one expression becomes through substitution, the other one can be made even longer,
+so as to have at least as much information content (and in fact more, in this example). The theory of skew confluence makes this idea precise.
+\end{comment}
+
+
+Why use skew confluence? Ordinary confluence is useful because if term |e| has an $\rr$-normal form, then that normal form is \emph{unique} if $\rr$ is confluent.
+Ariola and Blom define a related notion, which we will refer to as \emph{$\rr$-skew-normal form}\footnote{Ariola and Blom call it the ``infinite normal form''; this is a bit misleading because in fact not all such forms are infinite.}, and prove that under certain conditions, if term |e| has an $\rr$-skew-normal form, then that normal form is unique if $\rr$ is skew confluent.
+
+A  $\rr$-skew-normal form is not a single term, but rather a possibly infinite set of \emph{erased} terms.
+We summarize this idea, using our own terminology, as follows:
+\begin{itemize}
+\item Let an \emph{erasure} of a term be a copy in which some number of subterms (possibly zero, and possibly the entire term)
+  have been replaced with |Omega|, a special term that means ``unknown'' or ``we don't know yet.''
+\item We can compare erased terms with the partial order $\leqomega$, which is the transitive,
+  reflexive, and compatible closure of the relation in which |Omega| is less than any other term.
+  Observe that if |e'| is any erasure of |e| (including |e| itself) then $|e'| \leqomega |e|$.
+\item Define the $\rr$-\emph{information content} $\omegarr(|e|)$ of a term |e| to be the unique erasure of |e| in which \emph{every} redex
+  has been replaced by |Omega|. Any non-|Omega| structure in the result is therefore ``permanent'':
+  no further reductions under $\rr$ can alter that structure.
+\item Define the \emph{downward closure} $\downclose A$ of a set of terms $A$ to be the set of all elements of $A$ and all possible erasures of those elements,
+  that is, $\downclose A = \setcomp{|e'|}{|e| \in A, |e'| \leqomega}$.
+\item
+  Define the \emph{$\rr$-skew-normal form} of |e| to be the downward closure of the set of information contents of all possible $\rr$-reducts of |e|,
+  that is, $\downclose \setcomp{\omega(|e'|)}{\rsteps{\rr}{e}{e'}}$.
+\end{itemize}
+Taking the downward closure with respect to $\leqomega$ is crucial; without that step, it would not be possible to prove that skew-normal forms
+are unique for certain reduction relations.
+
+Skew confluence is a natural extension of confluence, in this sense: if $\rr$ is skew confluent,
+then an expression |e| has a unique $\rr$-normal form
+if and only if its $\rr$-skew-normal form is the (finite) set consisting of all possible erasures of that $\rr$-normal form.
+(For example, |tup (1,2)| is the unique normal form of |def x (x=2; tup (1,x))|, and the  $\rr$-skew-normal form of that same term
+is $\{ |tup (1,2)|, |tup (Omega,2)|, |tup (1,Omega)|, |tup (Omega,Omega)|, |Omega| \}$.)
+
+But working with possibly infinite sets directly is tricky. Fortunately, there is a simpler path, because Ariola and Blom prove
+an important theorem:
+Define the partial order $|e| \preceqomegarr |e'|$ to mean $\omegarr(|e|)\leqomega\omegarr(|e'|)$; then
+a reduction relation that is \emph{monotonic} in $\preceqomegarr$ ($\rstep{\rr}{e}{e'} \implies e \preceqomegarr e'$)
+has unique skew-normal forms if and only if the reduction relation is skew confluent \cite[Theorem 5.4]{ariola:skew-confluence}---and skew
+confluence is much easier to prove, using techniques that do not involve possibly infinite sets, but are fairly similar to proofs of ordinary confluence
+that use commutative diagrams and case analysis. They also prove that if a reduction relation is confluent and monotonic, then it is skew confluent
+\cite[Corollary 5.5]{ariola:skew-confluence}.
+
+
+
+
+\begin{definition}
+  Reduction relation $\rr$ over the set of terms $T$ is \emph{skew confluent} using quasi order $\preceq$ if for all $a, b, c \in T$,
+  if $a \gos{\rr} b$ and $a \gos{\rr} c$, there exists $d\in T$ such that $b \gos{\rr} d$ and $c \preceq d$. As a diagram:
+  
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyciIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr", two heads, from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+\end{tikzcd}\]
+\end{definition}
+
+\skewtodo{More to come.}
+
+\subsubsection{New Lemmas about Skew Confluence}
+
+\begin{lemma}
+If relation $\rr$ is monotonic in some quasi order $\preceq$ and confluent, then it is skew confluent using $\preceq$.
+\end{lemma}
+\begin{proof}
+  By the definition of confluence,
+  % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYyJdLFswLDEsImIiXSxbMSwxLCJkIl0sWzAsMiwiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccnIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
+\[\begin{tikzcd}
+	a & c \\
+	b & d
+	\arrow["\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr", two heads, from=1-1, to=1-2]
+	\arrow["\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
+\end{tikzcd}\]
+Because $\rr$ is monotonic, $\gos{\rr} \subset \inccon{\preceq}{\rr}$, therefore 
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYyJdLFswLDEsImIiXSxbMSwxLCJkIl0sWzAsMiwiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccnIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnIiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	a & c \\
+	b & d
+	\arrow["\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr", two heads, from=1-1, to=1-2]
+	\arrow["\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+\end{tikzcd}\]
+\end{proof}
+
+\begin{definition}
+  Let reduction relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$.
+  Let reduction relation $\rr_\preceq^{\leftarrow}$ be defined by a set of rewrite rules that are converses of those rewrite rules of $\rr$ whose converses are used in the proof that $\rr$ is skew
+  confluent.
+  Then we say that $\rr$ is \emph{skew confluent using $\preceq$ and  $\rr_\preceq^{\leftarrow}$}.
+\end{definition}
+
+
+\begin{lemma}\label{lem:four-diagrams}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^{\leftarrow}$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^{\leftarrow}$.
+  Suppose furthermore that $\rr$ and $\rs$ commute and that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute. 
+  Then the following four diagrams hold:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyciIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\qquad
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxycyIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\qquad
+    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxyciJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}
+      \qquad\qquad
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxycyJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFs2LDUsIiIsMSx7InNob3J0ZW4iOnsic291cmNlIjoyMCwidGFyZ2V0IjoyMH0sInN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==
+\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}\]
+  \end{lemma}
+  \begin{proof}
+    
+    (1) Because $\rr$ is skew confluent, we have
+
+    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyciIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyciIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}\]
+
+\noindent    Because $\inccon{\preceq}{\rr} \subset \inccon{\preceq}{\rr\cup\rs}$, the first diagram follows.
+
+        (2) Because $\rr$ and $\rs$ commute, we have
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxycyIsMl0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNiw1LCIiLDEseyJzaG9ydGVuIjp7InNvdXJjZSI6MjAsInRhcmdldCI6MjB9LCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs"', from=1-1, to=1-2]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow[draw=none, from=1, to=0]
+\end{tikzcd}\]
+
+\noindent    Because $\gos{\rs} \subset \inccon{\preceq}{\rr\cup\rs}$, the second diagram follows.
+
+(3) The following diagram clearly holds if the sequence of reduction steps from |b| to |d| is the same as the sequence of reduction steps from |b| to |a| to |d|:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxyciJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxcZXF1aXYiLDEseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNiw1LCIiLDEseyJzaG9ydGVuIjp7InNvdXJjZSI6MjAsInRhcmdldCI6MjB9LCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\equiv"{description}, draw=none, from=2-1, to=2-2]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}\]
+
+    \noindent    Because $\equiv \subset \inccon{\preceq}{\rr\cup\rs}$, the third diagram follows.
+
+    (4) Because $\rr$ and $\rs_\preceq^{\leftarrow}$ commute, we have
+
+    % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzEsMCwiXFxycyJdLFsxLDIsIlxccnIiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzAsMywiXFxyciIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzYsNSwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rs", from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rs", dotted, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+      \end{tikzcd}\]
+
+        \noindent    Because $\ungos{\rs} \subset \inccon{\preceq}{\rr\cup\rs}$, the fourth diagram follows.
+
+        \skewtodo{It may turn out to be impossible to prove for our specific application that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute.
+          In that case, it may be necessary to use a more complicated or more subtle precondition.
+        The important thing is to prove the fourth diagram somehow.}
+\end{proof}
+
+
+
+
+
+
+  
+\begin{lemma}\label{lem:skewrowinduction}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^{\leftarrow}$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^{\leftarrow}$.
+  Suppose furthermore that $\rr$ and $\rs$ commute and that $\rr$ and $\rs_\preceq^{\leftarrow}$ commute. 
+  Then
+
+  % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwwLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMiwiXFxyciIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzcsNiwiIiwxLHsic2hvcnRlbiI6eyJzb3VyY2UiOjIwLCJ0YXJnZXQiOjIwfSwic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr\cup\rs"', dotted, two heads, from=1-1, to=1-2]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+\end{tikzcd}\]
+\end{lemma}
+\begin{proof}
+  By induction on the size of the top edge of the diagram. At each step one of the four diagrams from \cref{lem:four-diagrams} will be used.
+
+  
+ \skewtodo{More to come.}
+\end{proof}
+
+
+\begin{lemma}\label{lem:skewrow}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^\leftarrow$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^\leftarrow$.
+  Then
+
+  % https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFsxLDEsImQiXSxbMCwxLCJjIl0sWzAsMSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwwLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMiwiXFxyclxcY3VwXFxycyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMCwzLCJcXHJyXFxjdXBcXHJzIiwyXSxbMywyLCJcXHJyXFxjdXBcXHJzIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccHJlY2VxIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNyw2LCIiLDEseyJzaG9ydGVuIjp7InNvdXJjZSI6MjAsInRhcmdldCI6MjB9LCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr\cup\rs"', dotted, two heads, from=1-1, to=1-2]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr\cup\rs"', from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow[draw=none, from=1, to=0]
+\end{tikzcd}\]
+
+\end{lemma}
+\begin{proof}
+By case analysis on whether left edge uses $\rr$ or $\rs$; then project that left edge into $\rr^*$ or $\rs^*$ respectively and apply \cref{lem:skewrowinduction}.
+
+  
+ \skewtodo{More to come.}
+\end{proof}
+
+
+\begin{lemma}\label{lem:skewgrid}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^\leftarrow$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^\leftarrow$.
+  Then
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFswLDEsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyXFxjdXBcXHJzIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDAsIlxccHJlY2VxIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+\end{tikzcd}\]
+ \end{lemma}
+\begin{proof}
+  By induction on the size of the left edge of the diagram. 
+
+  \begin{description}
+  \item[Base case] This diagram clearly holds by letting the bottom edge be the same as the top edge:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiXFxlcXVpdiIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFswLDEsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXGVxdWl2IiwxLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzIsMywiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMywyLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMCwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dXQ==
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["\equiv"{description}, draw=none, from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\equiv"{description}, draw=none, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+\end{tikzcd}\]
+
+    and it implies this diagram:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiKFxccnJcXGN1cFxccnMpXjAiLDJdLFswLDEsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwzLCJcXHJyXFxjdXBcXHJzIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDMsIlxccnJcXGN1cFxccnMiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzMsMiwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDAsIlxccHJlY2VxIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["{(\rr\cup\rs)^0}"', from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+\end{tikzcd}\]
+    
+	\item[Inductive case] Assume the diagram holds for left edges of all sizes up to $n$. Then this diagram:
+
+% https://q.uiver.app/?q=WzAsNCxbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiKFxccnJcXGN1cFxccnMpXntuKzF9IiwyXSxbMCwxLCJcXHJyXFxjdXBcXHJzIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMywiXFxyclxcY3VwXFxycyIsMCx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMiwzLCJcXHJyXFxjdXBcXHJzIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZG90dGVkIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFszLDIsIlxccHJlY2VxIiwyLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoibm9uZSJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMSwwLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV1d
+\[\begin{tikzcd}
+	a & b \\
+	c & d
+	\arrow["{(\rr\cup\rs)^{n+1}}"', from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+\end{tikzcd}\]
+
+    \noindent
+    follows from this diagram:
+
+% https://q.uiver.app/?q=WzAsNixbMCwwLCJhIl0sWzEsMCwiYiJdLFswLDEsImMiXSxbMSwxLCJkIl0sWzAsMiwiZSJdLFsxLDIsImYiXSxbMCwyLCIoXFxyclxcY3VwXFxycylebiIsMl0sWzAsMSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsxLDMsIlxccnJcXGN1cFxccnMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzIsMywiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbMywyLCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEsMCwiXFxwcmVjZXEiLDIseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6ImVwaSJ9fX1dLFsyLDQsIlxccnJcXGN1cFxccnMiLDJdLFszLDUsIlxccnJcXGN1cFxccnMiLDAseyJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJkb3R0ZWQifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzQsNSwiXFxyclxcY3VwXFxycyIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRvdHRlZCJ9LCJoZWFkIjp7Im5hbWUiOiJlcGkifX19XSxbNSw0LCJcXHByZWNlcSIsMix7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6Im5vbmUifSwiaGVhZCI6eyJuYW1lIjoiZXBpIn19fV0sWzEyLDEzLCJcXGxhYmVsY3JlZntsZW06c2tld3Jvd30iLDEseyJzaG9ydGVuIjp7InNvdXJjZSI6MjAsInRhcmdldCI6MjB9LCJzdHlsZSI6eyJib2R5Ijp7Im5hbWUiOiJub25lIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XV0=
+\[\begin{tikzcd}
+	a & b \\
+	c & d \\
+	e & f
+	\arrow["{(\rr\cup\rs)^n}"', from=1-1, to=2-1]
+	\arrow["\rr\cup\rs"', two heads, from=1-1, to=1-2]
+	\arrow["\rr\cup\rs", dotted, two heads, from=1-2, to=2-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=2-1, to=2-2]
+	\arrow["\preceq"', no body, two heads, from=2-2, to=2-1]
+	\arrow["\preceq"', no body, two heads, from=1-2, to=1-1]
+	\arrow[""{name=0, anchor=center, inner sep=0}, "\rr\cup\rs"', from=2-1, to=3-1]
+	\arrow[""{name=1, anchor=center, inner sep=0}, "\rr\cup\rs", dotted, two heads, from=2-2, to=3-2]
+	\arrow["\rr\cup\rs"', dotted, two heads, from=3-1, to=3-2]
+	\arrow["\preceq"', no body, two heads, from=3-2, to=3-1]
+	\arrow["{\labelcref{lem:skewrow}}"{description}, draw=none, from=0, to=1]
+\end{tikzcd}\]
+
+
+\noindent
+  where the top half is the inductive hypothesis and the bottom half follows from \cref{lem:skewrow}.
+\end{description}
+\end{proof}
+
+
+\begin{lemma}\label{lem:skew-union}
+  Let relation $\rr$ be monotonic in quasi order $\preceq$ and skew confluent using $\preceq$ and $\rr_\preceq^\leftarrow$;
+  similarly let $\rs$ be monotonic in the same quasi order $\preceq$ and skew confluent using $\preceq$ and $\rs_\preceq^\leftarrow$.
+  If $\rr$ commutes with $\rs$, then $\rt=\rr\cup\rs$ is monotonic in $\preceq$ and skew confluent using $\preceq$ and $\rt_\preceq^\leftarrow$.
+\end{lemma}
+\begin{proof}
+
+\end{proof}

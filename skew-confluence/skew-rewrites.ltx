@@ -1,0 +1,429 @@
+%% Additional rewrites and macros for skew confluence proof
+
+\newcommand{\1}{\hbox{\bf 1}}
+\newcommand{\2}{\hbox{\bf 2}}
+
+
+\newcommand{\CASE}[1]{\item[{\bf case} $#1${\rm :}]}
+\newcommand{\CASEIN}[2]{\item[{\bf case} {\rm $#1$ (within #2):}]}
+\newcommand{\BY}[1]{\mathrel{\hbox{(by #1)}}\mathord{\!}}
+\newcommand{\BYRULE}[1]{\mathrel{\hbox{(by \emph{#1})}}\mathord{\!}}
+\newcommand{\BYVAL}[1]{\mathrel{\hbox{(by value of #1)}}\mathord{\!}}
+\newcommand{\SBY}[1]{\ifhmode\unskip\fi\quad\mathrel{\hbox{(by #1)}}\mathord{\!}}
+\newcommand{\SBYRULE}[1]{\ifhmode\unskip\fi\quad\mathrel{\hbox{(by \emph{#1})}}\mathord{\!}}
+\newcommand{\SBYVAL}[1]{\ifhmode\unskip\fi\quad\mathrel{\hbox{(by value of #1)}}\mathord{\!}}
+
+
+
+%\newcommand{\urleqomegaof}[1]{\leqomegaof{#1}^{\mathrm{P}}}
+\newcommand{\urleqomegaof}[1]{\mathrel{\leq\mskip-10mu\raise0.2ex\hbox{$\cdot$}}_{\omega_{#1}}}
+\newcommand{\leqomegaof}[1]{\mathrel{\leq}_{\omega_{#1}}}
+
+\newcommand{\tequiv}{\mathrel{\,\equiv\,}}
+\newcommand{\suchthat}{.\,}
+\newcommand{\relcomp}{\cdot}
+\newcommand{\occin}{\subseteq}
+\newcommand{\occstrictin}{\subset}
+\newcommand{\occcontains}{\supseteq}
+\newcommand{\occstrictcontains}{\supset}
+\newcommand{\occdis}{\mathbin{\mskip-2.5mu||\mskip-2.5mu}}
+\newcommand{\occdiseq}{\mathbin{\mskip-2.5mu\||\mskip-2.5mu}}
+\newcommand{\bothreduceto}{\mathbin{\mskip-2.5mu\downarrow\mskip-2.5mu}}
+\newcommand{\bothreducefrom}{\mathbin{\mskip-2.5mu\uparrow \mskip-2.5mu}}
+\newcommand{\setcomp}[2]{\{\,#1\mid#2\,\}}
+\newcommand{\metavars}{\hbox{$\mathscr{V}$}}
+\newcommand{\termset}{\hbox{$\mathscr{T}$}}
+\newcommand{\occ}{\hbox{$\mathscr{O}$}}
+\newcommand{\uniqueocc}{\hbox{$\mathscr{O}!$}}
+\newcommand{\freeocc}{\hbox{$\mathscr{F}$}}
+\newcommand{\emptyocc}{\hbox{$(\,)$}}
+\newcommand{\logand}{\mathrel{\,\wedge\,}}
+\newcommand{\logor}{\mathrel{\,\vee\,}}
+\newcommand{\biglogand}{\bigwedge}
+\newcommand{\biglogor}{\bigvee}
+\newcommand{\ejoin}{e_{\mathrm{F}}}
+\newcommand{\tjoin}{t_{\mathrm{F}}}
+
+%% For later:
+%% \newcommand{\go}[1]{\mathbin{\smash{\mathop{\xrightarrow{}}\limits_{\smash{\hbox{\raise0.55ex\hbox{$\scriptstyle#1\mskip13mu$}}}}}}}
+
+
+%% Variations of the "\go" macro.
+%%  "x" means the rule or rule set is tucked underneath. 
+%%  "p" means the parallel-compatible closure (decorated by two strokes).
+%%  "rn" means a rule name is given rather than a rule set name.
+%%  "go" means a right arrow; "ungo" means a left arrow; "both" means a leftright arrow.
+%%  "dbl" means a double-headed arrow (transitive reflexive closure); "eq" means reflexive closure ("p" versions do not have "eq" forms)
+%%  "sup" means one superscript; "suptwo" means two superscripts
+
+\makeatletter
+\newcommand{\xleftrightarrow}[2][]{\ext@@arrow 3399\leftrightarrowfill@@{#1}{#2}}
+\newcommand{\xLeftarrow}[2][]{\ext@@arrow 3095\Leftarrowfill@@{#1}{#2}}
+\newcommand{\xRightarrow}[2][]{\ext@@arrow 0359\Rightarrowfill@@{#1}{#2}}
+\newcommand{\xLeftrightarrow}[2][]{\ext@@arrow 3399\Leftrightarrowfill@@{#1}{#2}}
+
+\newbox\@@arrowbarbox
+
+% %% arguments are {left end}{fill symbol}{centered symbol}{right symbol}{math style}
+% \newcommand\decoratedarrowfill@@[5]{{%
+%     \setbox\@@arrowbarbox\hbox{$#5\rightarrow$}%
+%     \newcommand\arrowbar{\hbox to \wd\@@arrowbarbox{\cleaders\hbox{$#5\mkern-2mu#2\mkern-2mu$}\hfill}}%
+%   $\m@@th\thickmuskip0mu\medmuskip\thickmuskip\thinmuskip\thickmuskip
+%    \relax#5#1\mkern-7mu%
+%    \cleaders\hbox{$#5\mkern-2mu#2\mkern-2mu$}\hfill 
+%    \hbox to 0pt{\hss#3\hss}%
+%    \cleaders\hbox{$#5\mkern-2mu#2\mkern-2mu$}\hfill 
+%    \mkern-7mu#4$%
+%  }}
+%% arguments are {left pad}{right pad}{left end}{fill symbol}{centered symbol}{right symbol}{math style}
+\newcommand\decoratedarrowfill@@[7]{{%
+    \setbox\@@arrowbarbox\hbox{$#7\rightarrow$}%
+    \newcommand\arrowbar{\hbox to \wd\@@arrowbarbox{\cleaders\hbox{$#7\mkern-2mu#4\mkern-2mu$}\hfill}}%
+  $\m@@th\thickmuskip0mu\medmuskip\thickmuskip\thinmuskip\thickmuskip
+   \relax#7#3\mkern-7mu%
+   \cleaders\hbox{$#7\mkern-2mu#4\mkern-2mu$}\hfill 
+   \if0#1\else\mkern#1mu\fi\hbox to 0pt{\hss#5\hss}\if0#2\else\mkern#2mu\fi
+   \cleaders\hbox{$#7\mkern-2mu#4\mkern-2mu$}\hfill 
+   \mkern-7mu#6$%
+ }}
+
+\newcommand\parbars{\raise0.336ex\hbox{$\scriptscriptstyle\shortparallel$}}
+\newcommand\leftpararrowfill@@{\decoratedarrowfill@@30\leftarrow\relbar\parbars\arrowbar}
+\newcommand\rightpararrowfill@@{\decoratedarrowfill@@03\arrowbar\relbar\parbars\rightarrow}
+\newcommand\leftrightpararrowfill@@{\decoratedarrowfill@@33\leftarrow\relbar\parbars\rightarrow}
+
+\newcommand{\xpleftarrow}[2][]{\ext@@arrow 3095\leftpararrowfill@@{#1}{#2}}
+\newcommand{\xprightarrow}[2][]{\ext@@arrow 0359\rightpararrowfill@@{#1}{#2}}
+\newcommand{\xpleftrightarrow}[2][]{\ext@@arrow 3399\leftrightpararrowfill@@{#1}{#2}}
+\makeatother
+
+
+\newcommand{\gorulename}[1]{\hbox{\footnotesize\rm\textsc{#1}}}
+
+\newcommand{\suptwo}[2]{{#1{\mskip18mu}#2}}
+\newcommand{\supthree}[3]{{#1{\mskip18mu}#2{\mskip18mu}#3}}
+\newcommand{\reflexivemarker}{\equiv}
+
+% \newcommand{\xleftrightarrow}[2][]{%
+%   \leftarrow\mathrel{\mkern-14mu}\xrightarrow[#1]{#2}
+% }
+% \newcommand{\xrightarrowdbl}[2][]{%
+%   \xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
+% }
+% \newcommand{\xleftarrowdbl}[2][]{%
+%   \leftarrow\mathrel{\mkern-14mu}\xleftarrow[#1]{#2}%
+% }
+% \newcommand{\xleftrightarrowdbl}[2][]{%
+%   \leftarrow\mathrel{\mkern-14mu}\leftarrow\mathrel{\mkern-14mu}\xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
+% }
+
+
+
+
+
+% \newcommand{\xLeftrightarrow}[2][]{%
+%   \Leftarrow\mathrel{\mkern-14mu}\xRightarrow[#1]{#2}
+% }
+\newcommand{\xRightarrowdbl}[2][]{%
+  \xRightarrow[#1]{#2}\mathrel{\mkern-14mu}\Rightarrow
+}
+\newcommand{\xLeftarrowdbl}[2][]{%
+  \Leftarrow\mathrel{\mkern-14mu}\xLeftarrow[#1]{#2}%
+}
+\newcommand{\xLeftrightarrowdbl}[2][]{%
+  \Leftarrow\mathrel{\mkern-14mu}\Leftarrow\mathrel{\mkern-14mu}\xRightarrow[#1]{#2}\mathrel{\mkern-14mu}\Rightarrow
+}
+
+\newcommand{\xprightarrowdbl}[2][]{%
+  \xprightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
+}
+\newcommand{\xpleftarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\xpleftarrow[#1]{#2}%
+}
+\newcommand{\xpleftrightarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\xpleftrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
+}
+
+%% \mastergo[subscript]{superscript}{arrowtype}{leftpad}{rightpad}
+
+\newbox\sksub 
+\newbox\sksup 
+\newbox\skwid
+
+% \newcommand\mastergo[5]{{\setbox\sksub\hbox{\raise0.55ex\hbox{$\scriptstyle#4#1#5$}}\setbox\sksup\hbox{\lower0.55ex\hbox{$\scriptstyle#4#2#5$}}%
+%     \ht\sksub=0pt \dp\sksub=0pt \ht\sksup=0pt \dp\sksup=0pt
+%     \setbox\skwid\vbox{\copy\sksup\copy\sksub}%
+%     \mathbin{\smash{\mathop{#3{\hbox to \wd\skwid{\hss}}}\limits^{\copy\sksup}_{\copy\sksub}}}}}
+% \newcommand\mastergo[5]{{\setbox\sksub\vbox to 0pt{\vskip-1.65ex\hbox{$\scriptstyle#4#1#5$}\vss}\setbox\sksup\vbox to 0pt{\vss\hbox{$\scriptstyle\mskip3mu#4#2#5\mskip-3mu$}\vskip-1.3ex}%
+%     \setbox\skwid\vbox{\copy\sksup\copy\sksub}%
+%     \mathbin{\smash{\mathop{#3{\hbox to \wd\skwid{\hss}}}\limits^{\copy\sksup}_{\copy\sksub}}}}}
+\newcommand\mastergo[5]{\mathrel{\setbox\sksub\vbox to 0pt{\vskip-1.5ex\hbox{$\scriptscriptstyle{#4}#1{#5}$}\vss}\setbox\sksup\vbox to 0pt{\vss\hbox{$\scriptscriptstyle\mskip3mu{#4}#2{#5}\mskip-3mu$}\vskip-1.3ex}%
+    \setbox\skwid\vbox{\copy\sksup\copy\sksub}%
+    \mathbin{\smash{\mathop{#3{\hbox to \wd\skwid{\hss}}}\limits^{\copy\sksup}_{\copy\sksub}}}}}
+
+\newcommand{\xrightarrowmaker}[1]{#1{\xrightarrow}{}{\mskip6mu}}
+\newcommand{\xleftarrowmaker}[1]{#1{\xleftarrow}{\mskip6mu}{}}
+\newcommand{\xleftrightarrowmaker}[1]{#1{\xleftrightarrow}{\mskip6mu}{\mskip6mu}}
+\newcommand{\xrightarrowdblmaker}[1]{#1{\xrightarrowdbl}{}{\mskip6mu}}
+\newcommand{\xleftarrowdblmaker}[1]{#1{\xleftarrowdbl}{\mskip6mu}{}}
+\newcommand{\xleftrightarrowdblmaker}[1]{#1{\xleftrightarrowdbl}{\mskip6mu}{\mskip6mu}}
+% \newcommand{\xRightarrowmaker}[1]{#1{\xRightarrow}{}{\mskip6mu}}
+% \newcommand{\xLeftarrowmaker}[1]{#1{\xLeftarrow}{\mskip6mu}{}}
+% \newcommand{\xLeftrightarrowmaker}[1]{#1{\xLeftrightarrow}{\mskip6mu}{\mskip6mu}}
+% \newcommand{\xRightarrowdblmaker}[1]{#1{\xRightarrowdbl}{}{\mskip6mu}}
+% \newcommand{\xLeftarrowdblmaker}[1]{#1{\xLeftarrowdbl}{\mskip6mu}{}}
+% \newcommand{\xLeftrightarrowdblmaker}[1]{#1{\xLeftrightarrowdbl}{\mskip6mu}{\mskip6mu}}
+\newcommand{\xRightarrowmaker}[1]{#1{\xprightarrow}{}{\mskip6mu}}
+\newcommand{\xLeftarrowmaker}[1]{#1{\xpleftarrow}{\mskip6mu}{}}
+\newcommand{\xLeftrightarrowmaker}[1]{#1{\xpleftrightarrow}{\mskip6mu}{\mskip6mu}}
+\newcommand{\xRightarrowdblmaker}[1]{#1{\xprightarrowdbl}{}{\mskip6mu}}
+\newcommand{\xLeftarrowdblmaker}[1]{#1{\xpleftarrowdbl}{\mskip6mu}{}}
+\newcommand{\xLeftrightarrowdblmaker}[1]{#1{\xpleftrightarrowdbl}{\mskip6mu}{\mskip6mu}}
+
+%% Every one of these arrows is syntactically a relation from TeX point of view.
+%% Simply enclosing one in braces will turn it into an "ord" token (no \mathord needed).
+
+\newcommand\xgo[1]{\xrightarrowmaker{\mastergo{#1}{}}}
+\newcommand\xgosup[2]{\xrightarrowmaker{\mastergo{#1}{#2}}}
+\newcommand\xgosuptwo[3]{\xrightarrowmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xgodbl[1]{\xrightarrowdblmaker{\mastergo{#1}{}}}
+\newcommand\xgodblsup[2]{\xrightarrowdblmaker{\mastergo{#1}{#2}}}
+\newcommand\xgodblsuptwo[3]{\xrightarrowdblmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xgoeq[1]{\xrightarrowmaker{\mastergo{#1}{\reflexivemarker}}}
+\newcommand\xgoeqsup[2]{\xrightarrowmaker{\mastergo{#1}{\suptwo{#2}{\reflexivemarker}}}}
+\newcommand\xgoeqsuptwo[3]{\xrightarrowmaker{\mastergo{#1}{\supthree{#2}{\reflexivemarker}{#3}}}}
+\newcommand\xungo[1]{\xleftarrowmaker{\mastergo{#1}{}}}
+\newcommand\xungosup[2]{\xleftarrowmaker{\mastergo{#1}{#2}}}
+\newcommand\xungosuptwo[3]{\xleftarrowmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xungodbl[1]{\xleftarrowdblmaker{\mastergo{#1}{}}}
+\newcommand\xungodblsup[2]{\xleftarrowdblmaker{\mastergo{#1}{#2}}}
+\newcommand\xungodblsuptwo[3]{\xleftarrowdblmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xungoeq[1]{\xleftarrowmaker{\mastergo{#1}{\reflexivemarker}}}
+\newcommand\xungoeqsup[2]{\xleftarrowmaker{\mastergo{#1}{\suptwo{#2}{\reflexivemarker}}}}
+\newcommand\xungoeqsuptwo[3]{\xleftarrowmaker{\mastergo{#1}{\supthree{#2}{\reflexivemarker}{#3}}}}
+\newcommand\xboth[1]{\xleftrightarrowmaker{\mastergo{#1}{}}}
+\newcommand\xbothsup[2]{\xleftrightarrowmaker{\mastergo{#1}{#2}}}
+\newcommand\xbothsuptwo[3]{\xleftrightarrowmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xbothdbl[1]{\xleftrightarrowdblmaker{\mastergo{#1}{}}}
+\newcommand\xbothdblsup[2]{\xleftrightarrowdblmaker{\mastergo{#1}{#2}}}
+\newcommand\xbothdblsuptwo[3]{\xleftrightarrowdblmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xbotheq[1]{\xleftrightarrowmaker{\mastergo{#1}{\reflexivemarker}}}
+\newcommand\xbotheqsup[2]{\xleftrightarrowmaker{\mastergo{#1}{\suptwo{#2}{\reflexivemarker}}}}
+\newcommand\xbotheqsuptwo[3]{\xleftrightarrowmaker{\mastergo{#1}{\supthree{#2}{\reflexivemarker}{#3}}}}
+
+\newcommand\xrngo[1]{\xrightarrowmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xrngosup[2]{\xrightarrowmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xrngosuptwo[3]{\xrightarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xrngodbl[1]{\xrightarrowdblmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xrngodblsup[2]{\xrightarrowdblmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xrngodblsuptwo[3]{\xrightarrowdblmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xrngoeq[1]{\xrightarrowmaker{\mastergo{\gorulename{#1}}{\reflexivemarker}}}
+\newcommand\xrngoeqsup[2]{\xrightarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{\reflexivemarker}}}}
+\newcommand\xrngoeqsuptwo[3]{\xrightarrowmaker{\mastergo{\gorulename{#1}}{\supthree{#2}{\reflexivemarker}{#3}}}}
+\newcommand\xrnungo[1]{\xleftarrowmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xrnungosup[2]{\xleftarrowmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xrnungosuptwo[3]{\xleftarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xrnungodbl[1]{\xleftarrowdblmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xrnungodblsup[2]{\xleftarrowdblmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xrnungodblsuptwo[3]{\xleftarrowdblmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xrnungoeq[1]{\xleftarrowmaker{\mastergo{\gorulename{#1}}{\reflexivemarker}}}
+\newcommand\xrnungoeqsup[2]{\xleftarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{\reflexivemarker}}}}
+\newcommand\xrnungoeqsuptwo[3]{\xleftarrowmaker{\mastergo{\gorulename{#1}}{\supthree{#2}{\reflexivemarker}{#3}}}}
+\newcommand\xrnboth[1]{\xleftrightarrowmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xrnbothsup[2]{\xleftrightarrowmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xrnbothsuptwo[3]{\xleftrightarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xrnbothdbl[1]{\xleftrightarrowdblmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xrnbothdblsup[2]{\xleftrightarrowdblmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xrnbothdblsuptwo[3]{\xleftrightarrowdblmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xrnbotheq[1]{\xleftrightarrowmaker{\mastergo{\gorulename{#1}}{\reflexivemarker}}}
+\newcommand\xrnbotheqsup[2]{\xleftrightarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{\reflexivemarker}}}}
+\newcommand\xrnbotheqsuptwo[3]{\xleftrightarrowmaker{\mastergo{\gorulename{#1}}{\supthree{#2}{\reflexivemarker}{#3}}}}
+
+\newcommand\xpgo[1]{\xRightarrowmaker{\mastergo{#1}{}}}
+\newcommand\xpgosup[2]{\xRightarrowmaker{\mastergo{#1}{#2}}}
+\newcommand\xpgosuptwo[3]{\xRightarrowmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xpgodbl[1]{\xRightarrowdblmaker{\mastergo{#1}{}}}
+\newcommand\xpgodblsup[2]{\xRightarrowdblmaker{\mastergo{#1}{#2}}}
+\newcommand\xpgodblsuptwo[3]{\xRightarrowdblmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xpungo[1]{\xLeftarrowmaker{\mastergo{#1}{}}}
+\newcommand\xpungosup[2]{\xLeftarrowmaker{\mastergo{#1}{#2}}}
+\newcommand\xpungosuptwo[3]{\xLeftarrowmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xpungodbl[1]{\xLeftarrowdblmaker{\mastergo{#1}{}}}
+\newcommand\xpungodblsup[2]{\xLeftarrowdblmaker{\mastergo{#1}{#2}}}
+\newcommand\xpungodblsuptwo[3]{\xLeftarrowdblmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xpboth[1]{\xLeftrightarrowmaker{\mastergo{#1}{}}}
+\newcommand\xpbothsup[2]{\xLeftrightarrowmaker{\mastergo{#1}{#2}}}
+\newcommand\xpbothsuptwo[3]{\xLeftrightarrowmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+\newcommand\xpbothdbl[1]{\xLeftrightarrowdblmaker{\mastergo{#1}{}}}
+\newcommand\xpbothdblsup[2]{\xLeftrightarrowdblmaker{\mastergo{#1}{#2}}}
+\newcommand\xpbothdblsuptwo[3]{\xLeftrightarrowdblmaker{\mastergo{#1}{\suptwo{#2}{#3}}}}
+
+\newcommand\xprngo[1]{\xRightarrowmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xprngosup[2]{\xRightarrowmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xprngosuptwo[3]{\xRightarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xprngodbl[1]{\xRightarrowdblmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xprngodblsup[2]{\xRightarrowdblmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xprngodblsuptwo[3]{\xRightarrowdblmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xprnungo[1]{\xLeftarrowmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xprnungosup[2]{\xLeftarrowmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xprnungosuptwo[3]{\xLeftarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xprnungodbl[1]{\xLeftarrowdblmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xprnungodblsup[2]{\xLeftarrowdblmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xprnungodblsuptwo[3]{\xLeftarrowdblmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xprnboth[1]{\xLeftrightarrowmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xprnbothsup[2]{\xLeftrightarrowmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xprnbothsuptwo[3]{\xLeftrightarrowmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+\newcommand\xprnbothdbl[1]{\xLeftrightarrowdblmaker{\mastergo{\gorulename{#1}}{}}}
+\newcommand\xprnbothdblsup[2]{\xLeftrightarrowdblmaker{\mastergo{\gorulename{#1}}{#2}}}
+\newcommand\xprnbothdblsuptwo[3]{\xLeftrightarrowdblmaker{\mastergo{\gorulename{#1}}{\suptwo{#2}{#3}}}}
+
+
+
+%format substNP (e) x (v) = "\subst{" e "}{" x "}{" v "}"
+%format applyNP (a) (b) = a "\," b
+%format Omega = "\mathit{\Omega}"
+%format ctrdots = "\cdots"
+%format lowdots = "\ldots"
+%format commadots = "\;\ldots"
+%format subst2 e x (v) y (w) = "\substtwo{" e "}{" x "}{" v "}{" y "}{" w "}"
+%format substsuch e x (v) p = "\substsuch{" e "}{" x "}{" v "}{" p "}"
+
+\newcommand{\rinfo}{\mathcal{I}}
+\newcommand{\vcOmega}{\mathcal{VC}_\mathit{\Omega}}
+\newcommand{\omegavc}{\omega_{\scriptscriptstyle\mathrm{VC}}}
+\newcommand{\leqomegavc}{\mathrel{\leq_{\omegavc}}} 
+
+\newcommand{\skewtodo}[1]{\par\vskip6pt\textbf{[#1]}\par\vskip6pt}
+
+
+% $
+% e \xgo{\runi}
+% e \xgosup{\runi}{U}
+% e \xgosuptwo{\runi}{U}{W}
+% e \xgodbl{\runi}
+% e \xgodblsup{\runi}{U}
+% e \xgodblsuptwo{\runi}{U}{W} e' $
+
+% %% \bigskip
+% fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp 
+
+% $
+% e \xungo{\runi}
+% e \xungosup{\runi}{U}
+% e \xungosuptwo{\runi}{u}{w}
+% e \xungodbl{\runi}
+% e \xungodblsup{\runi}{U}
+% e \xungodblsuptwo{\runi}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xboth{\runi}
+% e \xbothsup{\runi}{U}
+% e \xbothsuptwo{\runi}{u}{w}
+% e \xbothdbl{\runi}
+% e \xbothdblsup{\runi}{U}
+% e \xbothdblsuptwo{\runi}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xrngo{exi-swap}
+% e \xrngosup{exi-swap}{U}
+% e \xrngosuptwo{exi-swap}{u}{w}
+% e \xrngodbl{exi-swap}
+% e \xrngodblsup{exi-swap}{U}
+% e \xrngodblsuptwo{exi-swap}{u}{w} e' $
+
+% %%\bigskip
+
+% fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp fpfpfpfpfp 
+
+% $
+% e \xrnungo{exi-swap}
+% e \xrnungosup{exi-swap}{U}
+% e \xrnungosuptwo{exi-swap}{u}{w}
+% e \xrnungodbl{exi-swap}
+% e \xrnungodblsup{exi-swap}{U}
+% e \xrnungodblsuptwo{exi-swap}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xrnboth{exi-swap}
+% e \xrnbothsup{exi-swap}{U}
+% e \xrnbothsuptwo{exi-swap}{u}{w}
+% e \xrnbothdbl{exi-swap}
+% e \xrnbothdblsup{exi-swap}{U}
+% e \xrnbothdblsuptwo{exi-swap}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xpgo{\runi}
+% e \xpgosup{\runi}{U}
+% e \xpgosuptwo{\runi}{u}{w}
+% e \xpgodbl{\runi}
+% e \xpgodblsup{\runi}{U}
+% e \xpgodblsuptwo{\runi}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xpungo{\runi}
+% e \xpungosup{\runi}{U}
+% e \xpungosuptwo{\runi}{u}{w}
+% e \xpungodbl{\runi}
+% e \xpungodblsup{\runi}{U}
+% e \xpungodblsuptwo{\runi}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xpboth{\runi}
+% e \xpbothsup{\runi}{U}
+% e \xpbothsuptwo{\runi}{u}{w}
+% e \xpbothdbl{\runi}
+% e \xpbothdblsup{\runi}{U}
+% e \xpbothdblsuptwo{\runi}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xprngo{exi-swap}
+% e \xprngosup{exi-swap}{U}
+% e \xprngosuptwo{exi-swap}{u}{w}
+% e \xprngodbl{exi-swap}
+% e \xprngodblsup{exi-swap}{U}
+% e \xprngodblsuptwo{exi-swap}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xprnungo{exi-swap}
+% e \xprnungosup{exi-swap}{U}
+% e \xprnungosuptwo{exi-swap}{u}{w}
+% e \xprnungodbl{exi-swap}
+% e \xprnungodblsup{exi-swap}{U}
+% e \xprnungodblsuptwo{exi-swap}{u}{w} e' $
+
+% %%\bigskip
+
+% $
+% e \xprnboth{exi-swap}
+% e \xprnbothsup{exi-swap}{U}
+% e \xprnbothsuptwo{exi-swap}{u}{w}
+% e \xprnbothdbl{exi-swap}
+% e \xprnbothdblsup{exi-swap}{U}
+% e \xprnbothdblsuptwo{exi-swap}{u}{w} e'
+% $
+
+
+% $ e \xrnungosuptwo{exi-swap}{u}{}w e \xprnungosuptwo{exi-swap}{u}{w} e \xrnungosuptwo{exi-swap}{u}{w} e \xprnungosuptwo{exi-swap}{u}{w} $
+
+% $ e \xbothsup{\runi}{U} e \xpbothsup{\runi}{U} e \xbothsup{\runi}{U} e \xpbothsup{\runi}{U} $
+
+%format (tsubst e u (v)) = "\tsubst{" e "}{" u "}{" v "}"
+
+\newcommand{\tsubst}[3]{#1[#2 \mathrel{\leftarrow} #3]}
+
