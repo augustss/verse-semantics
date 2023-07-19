@@ -190,7 +190,6 @@ mustSucceed (Int _)          = True
 mustSucceed (Arr as)         = all mustSucceed as
 mustSucceed (Lam _)          = True
 mustSucceed (Assume _)       = True
-mustSucceed (Assert _)       = True
 mustSucceed (One e)          = mustSucceed e
 mustSucceed (e1 :>: e2)      = mustSucceed e1 && mustSucceed e2
 mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
@@ -312,11 +311,6 @@ execEX1 bs lhs =
   do EXI y x <- [lhs]
      (ctx, g, bs', hole) <- execEX (BExi y : bs) x
      pure (EXI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
- ++
-   -- HOLE e
-  do x :@: e <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((:@: e) . ctx, g, bs', hole)
  ++
    -- ONE HOLE
   do One x <- [lhs]
