@@ -20,8 +20,8 @@ build:
 
 testrules:
 	$(TESTER) --quiet --dfs --rules=$(RULES) $(EXTRA)                    --max-steps=25000       $(TESTFILE)
-	$(TESTER) --quiet       --rules=$(RULES) $(EXTRA) --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
 	$(QCTEST)               --rules=$(RULES) $(EXTRA) --ignore-fuel-stop --max-success=1000 --ignore-recursive --koen
+	$(TESTER) --quiet       --rules=$(RULES) $(EXTRA) --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
 
 testiblock:
 	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTFILE)

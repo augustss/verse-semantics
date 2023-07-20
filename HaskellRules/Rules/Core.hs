@@ -19,6 +19,7 @@ module Rules.Core(
   pattern CON,
   isHNF,
   isVal,
+  isLam,
   pattern EXI,
   pattern LAM,
   pattern Block, Eqn,
@@ -26,7 +27,7 @@ module Rules.Core(
   exis,
   opArity,
   comp,
-  subst,
+  Substitutable(subst),
   alphaRename,
   invariant,
   collect,
@@ -337,6 +338,10 @@ getHNF _ = Nothing
 isHNF :: Expr -> Bool
 isHNF = isJust . getHNF
 
+isLam :: Expr -> Bool
+isLam (LAM _ _) = True
+isLam _ = False
+
 pattern CON :: Expr -> Expr
 pattern CON e <- (getCON -> Just e)
 
@@ -497,18 +502,18 @@ instance Free Expr where
 
 --------------------------------------------------------------------------------
 
-class Term a where
+class Substitutable a where
   subst :: Subst Expr -> a -> a
 
 -- rename the binder so that it is not the same as the first argument
-alphaRename :: (Term a, Free a) => [Ident] -> Bind a -> Bind a
+alphaRename :: (Substitutable a, Free a) => [Ident] -> Bind a -> Bind a
 alphaRename xs bnd@(Bind x e)
   | x `notElem` xs = bnd
   | otherwise      = Bind y (subst [(x,Var y)] e)
  where
   y = identNotIn (x : (xs ++ free e))
 
-instance Term Expr where
+instance Substitutable Expr where
   subst [] e = e
   subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
   subst _sub e@Int{}  = e
@@ -535,13 +540,13 @@ instance Term Expr where
   subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
   subst _sub e@Ref{}  = e
 
-instance (Term a, Term b) => Term (a, b) where
+instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
   subst sub (a, b) = (subst sub a, subst sub b)
 
-instance (Term a, Term b, Term c) => Term (a, b, c) where
+instance (Substitutable a, Substitutable b, Substitutable c) => Substitutable (a, b, c) where
   subst sub (a, b, c) = (subst sub a, subst sub b, subst sub c)
 
-instance (Term a) => Term [a] where
+instance (Substitutable a) => Substitutable [a] where
   subst sub xs = map (subst sub) xs
 
 -- TODO(augustss):
