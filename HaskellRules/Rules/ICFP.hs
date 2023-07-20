@@ -664,8 +664,11 @@ xxx  do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
      pure $ ctx' (xv :>: e')
  ++
   "HNF-SWAP" `name`
-  do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
-     pure ((x :=: hnf) :>: e)
+-- Old version, only swap with variables.
+-- This is non-confluent with lambda unification.
+-- do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
+  do (hnf@HNF{} :=: v@Val{}) :>: e <- [lhs]
+     pure ((v :=: hnf) :>: e)
  ++
   "VAR-SWAP" `name`
   do y@Var{} :=: x@Var{} <- [lhs]
@@ -680,12 +683,6 @@ xxx  do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
             _ -> False
      guard (not bad)
      pure $ e2 :>: (e1 :>: e3)
-
-_rulesHNFSwapLiberal :: ERule
-_rulesHNFSwapLiberal _ lhs =
-  "HNF-SWAP-LIBERAL" `name`
-  do (hnf1@HNF{} :=: v@Val{}) :>: e <- [lhs]
-     pure ((v :=: hnf1) :>: e)  
 
 rulesSubstX :: ERule
 rulesSubstX env lhs =
