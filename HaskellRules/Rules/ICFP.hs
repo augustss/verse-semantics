@@ -41,6 +41,7 @@ allSystemsICFP = [ systemICFP,
                    systemICFPBX,
                    systemICFPBXP,
                    systemICFPBXS,
+                   systemICFP51,
                    systemICFPGuy
                  ]
 
@@ -168,6 +169,14 @@ systemICFPS = s
   , postProcess = const dropStore
   }
   where s = systemICFPE
+
+systemICFP51 :: TRSystem Expr
+systemICFP51 = s
+  { sname = "ICFP51"
+  , description = description s ++ ", modified by section 5.1"
+  , rules = rules s -= "SUBST" -= "VAR-SWAP" -= "SEQ-SWAP" -= "EQN-ELIM" <> rulesSection5_1
+  }
+  where s = systemICFP
 
 systemICFPGuy :: TRSystem Expr
 systemICFPGuy = s
@@ -1182,3 +1191,26 @@ rulesStore _ lhs =
 ctxAlpha :: (Free a) => a -> [Ident] -> b -> b
 ctxAlpha e is ctx | null (intersect (free e) is) = ctx
                   | otherwise = error "unimplemented"
+
+rulesSection5_1 :: ERule
+rulesSection5_1 _ lhs =
+  "SUBST'" `name`
+  do xv@(Var x :=: Val v) :>: e <- [lhs]
+     guard (not (x `isValueX` v))  -- check side condition
+     let sub = [(x, v)]
+         e' = subst sub e
+     pure $ xv :>: e'
+ ++
+  "VAR-SWAP'" `name`
+  do y@Var{} :=: x@Var{} <- [lhs]
+     pure (x :=: y)
+ ++
+  "SEQ-SWAP" `name`
+  do e1 :>: (e2@(Var _ :=: Val _) :>: e3) <- [lhs]
+     pure $ e2 :>: (e1 :>: e3)
+ ++
+  "EQN-ELIM" `name`
+  do EXI x ((Var x' :=: Val v) :>: e) <- [lhs]
+     guard (x == x')
+     guard (x `notElem` free (v, e))
+     pure e
