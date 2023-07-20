@@ -1,0 +1,53 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+
+\section{Syntax}\label{sec:syntax}
+
+\subsection{Surface Syntax} \label{sec:syntax:surface}
+
+\subsection{Core Syntax} \label{sec:syntax:core}
+
+% \figureSyntax
+
+\begin{figure}
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\text{Expressions} & e & ::= & \ldots \\
+                   &   & \vb & |myite e e e| \\
+                   &   & \vb & |succeed e| \vb |decide e| \\
+                   &   & \vb & |assume e| \vb |verify e| \\
+\end{array}$$
+\caption{Syntax of the extensions needed by the TRS Verifier.}
+\label{fig:verifier-syntax}
+\end{figure}
+
+The verifier's language is an extension of Core Verse
+-- as described in \cref{fig:syntax} -- with a few constructs
+that record the verification goals and the assumptions under which
+they must be proved.
+%
+These extensions are summarized in \cref{fig:verifier-syntax}.
+%
+The |myite e_1 e_2 e_3| construct makes it easier to use
+the information established by the branch (|e_1|) in the |then|
+expression |e_2|.
+%
+The |assume e| construct records an \emph{assumption} that
+the evaluation of |e| always produces a value \ie does not
+get stuck or |fail|.
+%
+Dually, the |succeed e| construct (perhaps better named |succeeds|)
+denotes an \emph{obligation} that the evaluation of |e| always
+produces a value \ie does not get stuck or fail.
+%
+The |decide e| construct denotes an \emph{obligation} that
+the evaluation of |e| does not get \emph{stuck} \ie either
+produces values or fails.
+
+\section{Desugaring Surface to Core} \label{sec:desugar}
+
+\ranjit{TODO: example}

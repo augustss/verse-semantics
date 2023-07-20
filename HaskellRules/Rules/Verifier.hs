@@ -20,6 +20,7 @@ import Rules.Core hiding (Wrong)
 import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr)
 import Control.Monad (guard)
 import Data.List( intersect )
+import qualified Epic.SIntMap as IM
 
 -- | Run verification rules.
 
@@ -42,13 +43,36 @@ verify sys e =
         Just  x -> x
         Nothing -> undefined
 
+-- isDone :: Expr -> Bool
+-- isDone = collect done (&&)
+--  where
+--   -- done (Verify _) = False
+--   done (Assert _) = False
+--   done (Decide _) = False
+--   done _          = True
+
 isDone :: Expr -> Bool
-isDone = collect done (&&)
+isDone = go False
  where
-  -- done (Verify _) = False
-  done (Assert _) = False
-  done (Decide _) = False
-  done _          = True
+  go :: Bool -> Expr -> Bool
+  go _   (Lam (Bind _ e)) = go True e
+  go lam (Verify e)       = lam || go lam e
+  go lam (Arr es)         = and (go lam <$> es)
+  go lam (Exi (Bind _ e)) = go lam e
+  go lam (e1 :=: e2)      = go lam e1 && go lam e2
+  go lam (e1 :|: e2)      = go lam e1 && go lam e2
+  go lam (e1 :>: e2)      = go lam e1 && go lam e2
+  go lam (e1 :@: e2)      = go lam e1 && go lam e2
+  go lam (One e)          = go lam e
+  go lam (All e)          = go lam e
+  go lam (Assume e)       = go lam e
+  go _   (Assert _)       = False
+  go lam (Split x y z)    = go lam x && go lam y && go lam z
+  go lam (Store h e)      = and (go lam <$> IM.elems h) && go lam e
+  go _   _                = True
+
+
+
 
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
 
@@ -348,7 +372,8 @@ execEX1 bs lhs =
   do Assert x <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
      pure (Assert . ctx, g, bs', hole)
- ++
-  do Verify x <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure (Verify . ctx, g, bs', hole)
+-- TODO: try this
+--  ++
+--   do Verify x <- [lhs]
+--      (ctx, g, bs', hole) <- execEX bs x
+--      pure (Verify . ctx, g, bs', hole)

@@ -1,0 +1,1225 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+
+\section{Examples}
+
+$$\begin{array}{ll}
+|f^(x:int) :== x+1|                           & \text{\# pass} \\
+|f^(x:int) :== x+1; f^(42)|                   & \text{\# pass} \\
+|f^(x:int) :== x+1; f^(arr (4,2))|            & \text{\# fail} \\
+|f^(x):int :== myite (int^[x]) (x + 1) 0|     & \text{\# pass} \\
+|f^(n):int :== myite (0 < n) (n + f^(n-1)) 0| & \text{\# pass} \\
+|f^(x:int) :== {x + 1}; g^(h^(z:int):int):int :== {h^(3)}; g^(f)| & \text{\# pass} \\
+|t^(x:int)(eff decides) :== {x = 666 choice x = 42}; f^(z:t):t :== {708 - z}| & \text{\# pass} \\
+\end{array}$$
+
+\mypara{Example 1} Consider the surface level function definition
+%
+\begin{align*}
+& |f^(x:int) :== x+1|
+\intertext{Desugaring turns the definition of |f| into the verification goal}
+& |verify (lam y (def x (assume (int^(y); x = y; x); succeed (int^(x); int^(1); assume (def r (int^(r)))))))| \\
+% \intertext{which now rewrites via the sequence of steps}
+& \movestoR{subst}    \\
+& |verify (lam y (def x (assume (int^(y); x = y; y); succeed (int^(y); int^(1); assume (def r (int^(r)))))))| \\
+& \movestoR{eqn-elim} \\
+& |verify (lam y (assume (int^(y); y); succeed (int^(y); int^(1); assume (def r (int^(r))))))| \\
+& \movestoR{asm-seq + seq-assoc} \\
+& |verify (lam y (assume (int^(y); assume y; succeed (int^(y); int^(1); assume (def r (int^(r)))))))| \\
+& \movestoR{asm-intro} \\
+& |verify (lam y (assume (int^(y); assume y; succeed (assume (int^(y)); int^(1); assume (def r (int^(r)))))))| \\
+& \movestoR{app-int} \\
+& |verify (lam y (assume (int^(y); assume y; succeed (assume (int^(y)); 1; assume (def r (int^(r)))))))| \\
+& \movestoR{suc-elim} \\
+& |verify (lam y (assume (int^(y); assume y; assume (int^(y)); 1; assume (def r (int^(r))))))| \\
+& \movestoR{prove-elim} \\
+& |arr ()|
+\end{align*}
+
+
+\begin{comment}
+
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {assert {isint(x);
+                              isint(1);
+                              assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}}}};
+   (f = (\$x2.
+         isint($x2);
+         assume {assert {isint($x2);
+                         isint(1);
+                         assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}));
+   f
+Verification trace:
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {assert {isint(x);
+                              isint(1);
+                              assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}}}};
+   (f = (\$x2.
+         isint($x2);
+         assume {assert {isint($x2);
+                         isint(1);
+                         assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}));
+   f
+  --Prove-->
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {assert {isint(x);
+                              isint(1);
+                              assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}}}};
+   (f = (\$x2.
+         isint(assume {$x2});
+         assume {assert {isint($x2);
+                         isint(1);
+                         assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}));
+   f
+  --SEQ-SWAP-SIMON-->
+ex f.
+   (f = (\$x2.
+         isint(assume {$x2});
+         assume {assert {isint($x2);
+                         isint(1);
+                         assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}));
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {assert {isint(x);
+                              isint(1);
+                              assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}}}};
+   f
+  --SUBST-GEN-->
+ex f.
+   (f = (\$x2.
+         isint(assume {$x2});
+         assume {assert {isint($x2);
+                         isint(1);
+                         assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}));
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {assert {isint(x);
+                              isint(1);
+                              assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}}}};
+   (\$x2.
+    isint(assume {$x2});
+    assume {assert {isint($x2);
+                    isint(1);
+                    assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --EQN-ELIM-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); x};
+           assert {assert {isint(x);
+                           isint(1);
+                           assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --SUBST-GEN-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); $x2};
+           assert {assert {isint($x2);
+                           isint(1);
+                           assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --Prove-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); $x2};
+           assert {assert {isint(assume {$x2});
+                           isint(1);
+                           assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --EQN-ELIM-->
+verify {\$x2.
+        assume {isint($x2); $x2};
+        assert {assert {isint(assume {$x2});
+                        isint(1);
+                        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --Assume-Seq-->
+verify {\$x2.
+        (assume {isint($x2)}; assume {$x2});
+        assert {assert {isint(assume {$x2});
+                        isint(1);
+                        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --Prove-->
+verify {\$x2.
+        (assume {isint($x2)}; assume {$x2});
+        assert {assert {assume {isint(assume {$x2})};
+                        isint(1);
+                        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assume {$x2};
+        assert {assert {assume {isint(assume {$x2})};
+                        isint(1);
+                        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --VAL-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {assert {assume {isint(assume {$x2})};
+                        isint(1);
+                        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --APP-ISINT-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {assert {assume {isint(assume {$x2})};
+                        1;
+                        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --Assert-Elim-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {assume {isint(assume {$x2})};
+                1;
+                assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --Assert-Elim-->
+verify {\$x2.
+        assume {isint($x2)};
+        assume {isint(assume {$x2})};
+        1;
+        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}};
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --Verify-Elim-->
+<>;
+(\$x2.
+ isint(assume {$x2});
+ assume {assert {isint($x2);
+                 isint(1);
+                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}})
+  --VAL-ELIM-->
+\$x2.
+isint(assume {$x2});
+assume {assert {isint($x2);
+                isint(1);
+                assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}}
+  --Assume-Assert-->
+\$x2.
+isint(assume {$x2});
+assume {isint($x2);
+        isint(1);
+        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}
+  --Assume-Seq-->
+\$x2.
+isint(assume {$x2});
+assume {isint($x2)};
+assume {isint(1);
+        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}
+  --Prove-->
+\$x2.
+assume {isint(assume {$x2})};
+assume {isint($x2)};
+assume {isint(1);
+        assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}
+  --Assume-Seq-->
+\$x2.
+assume {isint(assume {$x2})};
+assume {isint($x2)};
+assume {isint(1)};
+assume {assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}
+  --APP-ISINT-->
+\$x2.
+assume {isint(assume {$x2})};
+assume {isint($x2)};
+assume {1};
+assume {assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}
+  --VAL-ELIM-->
+\$x2.
+assume {isint(assume {$x2})};
+assume {isint($x2)};
+assume {assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}}
+  --Assume-Assume-->
+\$x2.
+assume {isint(assume {$x2})};
+assume {isint($x2)};
+assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}
+  --Assume-Exi-->
+\$x2.
+assume {isint(assume {$x2})};
+assume {isint($x2)};
+(ex $$z. assume {($$z = add(<$x2, 1>)); isint($$z); $$z})
+  --EXI-FLOAT-->
+\$x2.
+ex $$z.
+   assume {isint(assume {$x2})};
+   assume {isint($x2)};
+   assume {($$z = add(<$x2, 1>)); isint($$z); $$z}
+  --Assume-Seq-->
+\$x2.
+ex $$z.
+   assume {isint(assume {$x2})};
+   assume {isint($x2)};
+   assume {($$z = add(<$x2, 1>))};
+   assume {isint($$z); $$z}
+  --Assume-Seq-->
+\$x2.
+ex $$z.
+   assume {isint(assume {$x2})};
+   assume {isint($x2)};
+   assume {($$z = add(<$x2, 1>))};
+   assume {isint($$z)};
+   assume {$$z}
+
+Verified
+\end{verbatim}
+
+\begin{comment}
+  > :verify {f(x:int):int := (x + 1); f(42)}
+{f(x : int) : int := (x + 1); f(42)}
+Desugared (pretty):
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint($$x); $$x)(v2)}};
+   (f = (\$x2. isint($x2); assume {ex $x3. isint($x3); $x3}));
+   assert {f(42)}
+
+Verification trace:
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint($$x); $$x)(v2)}};
+   (f = (\$x2. isint($x2); assume {ex $x3. isint($x3); $x3}));
+   assert {f(42)}
+  --Prove-->
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); $$x)(v2)}};
+   (f = (\$x2. isint($x2); assume {ex $x3. isint($x3); $x3}));
+   assert {f(42)}
+  --Prove-->
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+   (f = (\$x2. isint($x2); assume {ex $x3. isint($x3); $x3}));
+   assert {f(42)}
+  --Prove-->
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+   (f = (\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3}));
+   assert {f(42)}
+  --SEQ-SWAP-SIMON-->
+ex f.
+   (f = (\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3}));
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+   assert {f(42)}
+  --SUBST-GEN-->
+ex f.
+   (f = (\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3}));
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+   assert {(\$x2.
+            isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EQN-ELIM-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); x};
+           assert {ex v2.
+                      (v2 = assert {isint(x);
+                                    isint(1);
+                                    assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                      (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --SUBST-GEN-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); $x2};
+           assert {ex v2.
+                      (v2 = assert {isint($x2);
+                                    isint(1);
+                                    assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                      (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Prove-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); $x2};
+           assert {ex v2.
+                      (v2 = assert {isint(assume {$x2});
+                                    isint(1);
+                                    assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                      (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EQN-ELIM-->
+verify {\$x2.
+        assume {isint($x2); $x2};
+        assert {ex v2.
+                   (v2 = assert {isint(assume {$x2});
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Assume-Seq-->
+verify {\$x2.
+        (assume {isint($x2)}; assume {$x2});
+        assert {ex v2.
+                   (v2 = assert {isint(assume {$x2});
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Prove-->
+verify {\$x2.
+        (assume {isint($x2)}; assume {$x2});
+        assert {ex v2.
+                   (v2 = assert {assume {isint(assume {$x2})};
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assume {$x2};
+        assert {ex v2.
+                   (v2 = assert {assume {isint(assume {$x2})};
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --VAL-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   (v2 = assert {assume {isint(assume {$x2})};
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --APP-ISINT-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   (v2 = assert {assume {isint(assume {$x2})};
+                                 1;
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Assert-Elim-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   (v2 = (assume {isint(assume {$x2})};
+                          1;
+                          assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EQN-FLOAT-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   (assume {isint(assume {$x2})};
+                    (v2 = (1;
+                           assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z})));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   (v2 = (1;
+                          assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EQN-FLOAT-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   (1;
+                    (v2 = assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   1;
+                   (v2 = assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --VAL-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   (v2 = assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Assume-Exi-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   (v2 = (ex $$z. assume {($$z = add(<$x2, 1>)); isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EXI-FLOAT-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   (v2 = assume {($$z = add(<$x2, 1>)); isint($$z); $$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Assume-Seq-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   (v2 = (assume {($$z = add(<$x2, 1>))}; assume {isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EQN-FLOAT-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   (assume {($$z = add(<$x2, 1>))}; (v2 = assume {isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (v2 = assume {isint($$z); $$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Assume-Seq-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (v2 = (assume {isint($$z)}; assume {$$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EQN-FLOAT-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (assume {isint($$z)}; (v2 = assume {$$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --SUBST-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (assume {isint($$z)}; (v2 = assume {$$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(assume {$$z})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EXI-ELIML-OLD-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (assume {isint($$z)}; assume {$$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(assume {$$z})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   assume {$$z};
+                   (\$$x. isint(assume {$$x}); assume {$$x})(assume {$$z})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --VAL-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   (\$$x. isint(assume {$$x}); assume {$$x})(assume {$$z})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --APP-BETA-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   (ex $$x.
+                       ($$x = assume {$$z}); isint(assume {$$x}); assume {$$x})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EXI-FLOAT-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z $$x.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   ($$x = assume {$$z});
+                   isint(assume {$$x});
+                   assume {$$x}}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --SUBST-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z $$x.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   ($$x = assume {$$z});
+                   isint(assume {assume {$$z}});
+                   assume {assume {$$z}}}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Prove-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z $$x.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   ($$x = assume {$$z});
+                   assume {isint(assume {assume {$$z}})};
+                   assume {assume {$$z}}}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --EQN-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   assume {isint(assume {assume {$$z}})};
+                   assume {assume {$$z}}}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Assert-Elim-->
+verify {\$x2.
+        assume {isint($x2)};
+        (ex $$z.
+            assume {isint(assume {$x2})};
+            assume {($$z = add(<$x2, 1>))};
+            assume {isint($$z)};
+            assume {isint(assume {assume {$$z}})};
+            assume {assume {$$z}})};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --Verify-Elim-->
+<>;
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --VAL-ELIM-->
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(42)}
+  --APP-BETA-->
+assert {ex $x2.
+           ($x2 = 42); isint(assume {$x2}); assume {ex $x3. isint($x3); $x3}}
+  --SUBST-GEN-->
+assert {ex $x2.
+           ($x2 = 42); isint(assume {42}); assume {ex $x3. isint($x3); $x3}}
+  --EQN-ELIM-->
+assert {isint(assume {42}); assume {ex $x3. isint($x3); $x3}}
+  --Assume-HNF-->
+assert {isint(42); assume {ex $x3. isint($x3); $x3}}
+  --APP-ISINT-->
+assert {42; assume {ex $x3. isint($x3); $x3}}
+  --Assert-Elim-->
+42; assume {ex $x3. isint($x3); $x3}
+  --VAL-ELIM-->
+assume {ex $x3. isint($x3); $x3}
+  --Assume-Exi-->
+ex $x3. assume {isint($x3); $x3}
+  --Assume-Seq-->
+ex $x3. assume {isint($x3)}; assume {$x3}
+
+Verified
+\end{comment}
+
+\begin{comment}
+> :verify {f(x:int):int := (x + 1); f((4,2))}
+{f(x : int) : int := (x + 1); f(((4, 2)))}
+Desugared (pretty):
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint($$x); $$x)(v2)}};
+   (f = (\$x2. isint($x2); assume {ex $x3. isint($x3); $x3}));
+   assert {f(<4, 2>)}
+Verification trace:
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint($$x); $$x)(v2)}};
+   (f = (\$x2. isint($x2); assume {ex $x3. isint($x3); $x3}));
+   assert {f(<4, 2>)}
+  --Prove-->
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); $$x)(v2)}};
+   (f = (\$x2. isint($x2); assume {ex $x3. isint($x3); $x3}));
+   assert {f(<4, 2>)}
+  --Prove-->
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+   (f = (\$x2. isint($x2); assume {ex $x3. isint($x3); $x3}));
+   assert {f(<4, 2>)}
+  --Prove-->
+ex f.
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+   (f = (\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3}));
+   assert {f(<4, 2>)}
+  --SEQ-SWAP-SIMON-->
+ex f.
+   (f = (\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3}));
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+   assert {f(<4, 2>)}
+  --SUBST-GEN-->
+ex f.
+   (f = (\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3}));
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {ex v2.
+                         (v2 = assert {isint(x);
+                                       isint(1);
+                                       assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                         (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+   assert {(\$x2.
+            isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EQN-ELIM-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); x};
+           assert {ex v2.
+                      (v2 = assert {isint(x);
+                                    isint(1);
+                                    assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}});
+                      (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --SUBST-GEN-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); $x2};
+           assert {ex v2.
+                      (v2 = assert {isint($x2);
+                                    isint(1);
+                                    assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                      (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Prove-->
+verify {\$x2.
+        ex x.
+           assume {isint($x2); (x = $x2); $x2};
+           assert {ex v2.
+                      (v2 = assert {isint(assume {$x2});
+                                    isint(1);
+                                    assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                      (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EQN-ELIM-->
+verify {\$x2.
+        assume {isint($x2); $x2};
+        assert {ex v2.
+                   (v2 = assert {isint(assume {$x2});
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Assume-Seq-->
+verify {\$x2.
+        (assume {isint($x2)}; assume {$x2});
+        assert {ex v2.
+                   (v2 = assert {isint(assume {$x2});
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Prove-->
+verify {\$x2.
+        (assume {isint($x2)}; assume {$x2});
+        assert {ex v2.
+                   (v2 = assert {assume {isint(assume {$x2})};
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assume {$x2};
+        assert {ex v2.
+                   (v2 = assert {assume {isint(assume {$x2})};
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --VAL-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   (v2 = assert {assume {isint(assume {$x2})};
+                                 isint(1);
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --APP-ISINT-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   (v2 = assert {assume {isint(assume {$x2})};
+                                 1;
+                                 assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Assert-Elim-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   (v2 = (assume {isint(assume {$x2})};
+                          1;
+                          assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EQN-FLOAT-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   (assume {isint(assume {$x2})};
+                    (v2 = (1;
+                           assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z})));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   (v2 = (1;
+                          assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EQN-FLOAT-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   (1;
+                    (v2 = assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   1;
+                   (v2 = assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --VAL-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   (v2 = assume {ex $$z. ($$z = add(<$x2, 1>)); isint($$z); $$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Assume-Exi-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2.
+                   assume {isint(assume {$x2})};
+                   (v2 = (ex $$z. assume {($$z = add(<$x2, 1>)); isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EXI-FLOAT-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   (v2 = assume {($$z = add(<$x2, 1>)); isint($$z); $$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Assume-Seq-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   (v2 = (assume {($$z = add(<$x2, 1>))}; assume {isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EQN-FLOAT-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   (assume {($$z = add(<$x2, 1>))}; (v2 = assume {isint($$z); $$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (v2 = assume {isint($$z); $$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Assume-Seq-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (v2 = (assume {isint($$z)}; assume {$$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EQN-FLOAT-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (assume {isint($$z)}; (v2 = assume {$$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(v2)}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --SUBST-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex v2 $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (assume {isint($$z)}; (v2 = assume {$$z}));
+                   (\$$x. isint(assume {$$x}); assume {$$x})(assume {$$z})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EXI-ELIML-OLD-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   (assume {isint($$z)}; assume {$$z});
+                   (\$$x. isint(assume {$$x}); assume {$$x})(assume {$$z})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --SEQ-ASSOC-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   assume {$$z};
+                   (\$$x. isint(assume {$$x}); assume {$$x})(assume {$$z})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --VAL-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   (\$$x. isint(assume {$$x}); assume {$$x})(assume {$$z})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --APP-BETA-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   (ex $$x.
+                       ($$x = assume {$$z}); isint(assume {$$x}); assume {$$x})}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EXI-FLOAT-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z $$x.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   ($$x = assume {$$z});
+                   isint(assume {$$x});
+                   assume {$$x}}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --SUBST-GEN-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z $$x.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   ($$x = assume {$$z});
+                   isint(assume {assume {$$z}});
+                   assume {assume {$$z}}}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Prove-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z $$x.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   ($$x = assume {$$z});
+                   assume {isint(assume {assume {$$z}})};
+                   assume {assume {$$z}}}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --EQN-ELIM-->
+verify {\$x2.
+        assume {isint($x2)};
+        assert {ex $$z.
+                   assume {isint(assume {$x2})};
+                   assume {($$z = add(<$x2, 1>))};
+                   assume {isint($$z)};
+                   assume {isint(assume {assume {$$z}})};
+                   assume {assume {$$z}}}};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Assert-Elim-->
+verify {\$x2.
+        assume {isint($x2)};
+        (ex $$z.
+            assume {isint(assume {$x2})};
+            assume {($$z = add(<$x2, 1>))};
+            assume {isint($$z)};
+            assume {isint(assume {assume {$$z}})};
+            assume {assume {$$z}})};
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --Verify-Elim-->
+<>;
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --VAL-ELIM-->
+assert {(\$x2.
+         isint(assume {$x2}); assume {ex $x3. isint($x3); $x3})(<4, 2>)}
+  --APP-BETA-->
+assert {ex $x2.
+           ($x2 = <4, 2>);
+           isint(assume {$x2});
+           assume {ex $x3. isint($x3); $x3}}
+  --SUBST-GEN-->
+assert {ex $x2.
+           ($x2 = <4, 2>);
+           isint(assume {<4, 2>});
+           assume {ex $x3. isint($x3); $x3}}
+  --EQN-ELIM-->
+assert {isint(assume {<4, 2>}); assume {ex $x3. isint($x3); $x3}}
+  --Assume-HNF-->
+assert {isint(<4, 2>); assume {ex $x3. isint($x3); $x3}}
+  --APP-ISINT-->
+assert {fail; assume {ex $x3. isint($x3); $x3}}
+  --FAIL-ELIM-->
+assert {fail}
+\end{comment}

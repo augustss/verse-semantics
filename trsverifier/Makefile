@@ -10,12 +10,13 @@ all: main.pdf
 LATEX=pdflatex -halt-on-error
 
 PAPERTEX = $(PAPER).tex rewrites.tex
-PAPERSRC = $(PAPERTEX) ../verse.bib ../calculus.fmt
+PAPERSRC = $(PAPERTEX) overview.tex syntax.tex rules.tex examples.tex ../verse.bib ../calculus.fmt
 
 rewrites.tex: ../verse-icfp23/rewrites.ltx
 	lhs2TeX ../verse-icfp23/rewrites.ltx > rewrites.tex
 
-$(PAPER).tex: $(PAPER).ltx
+%.tex:   %.ltx   ../calculus.fmt
+	lhs2TeX $< > $@
 
 $(PAPER).pdf: $(PAPERSRC)
 	$(LATEX) $(PAPER)

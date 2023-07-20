@@ -71,7 +71,7 @@ runTest (testName, e, expected) =
 
        (True, _tr@(x :<-- _)) ->
          do putStrLn " *** VERIFIED, but expected FAILED:"
-            -- putStr (unlines (showTrace _tr))
+            putStr (unlines (showTrace _tr))
             P.pp x
             return False
 
@@ -120,14 +120,15 @@ ite = If
 -- where
 --  x = identNotIn (free (e2,e3))
 
-tlam :: Ident -> [Ident] -> Expr -> Expr -> Expr
-tlam x ys e1 e2 =
-      Verify (Lam $ Bind x $ exis ys (Assume e1 :>: Assert e2))
-  :>: (Lam $ Bind x $ exis ys (e1 :>: Assume e2))
+tlamOblig :: Ident -> [Ident] -> Expr -> Expr -> Expr
+tlamOblig x ys e1 e2 = Verify (Lam $ Bind x $ exis ys (Assume e1 :>: Assert e2))
 
 tlamAbs :: Ident -> [Ident] -> Expr -> Expr -> Expr
-tlamAbs x ys e1 e2 =
-      (Lam $ Bind x $ exis ys (e1 :>: Assume e2))
+tlamAbs x ys e1 e2 = Lam $ Bind x $ exis ys (e1 :>: Assume e2)
+
+
+tlam :: Ident -> [Ident] -> Expr -> Expr -> Expr
+tlam x ys e1 e2 = tlamOblig x ys e1 e2 :>: tlamAbs x ys e1 e2
 
 {-
 
@@ -477,6 +478,7 @@ ex6 = verse $
                      return $
                        do y <- def (h' :@: Int 3) <? "y"
                           int y) <? "h") <? "g"
+     -- return (Arr [g, suc])
      return (g :@: suc)
 
 --- examples testing rigid/flexible ---
@@ -544,3 +546,22 @@ ex_if2 :: Expr
 ex_if2 = Verify $ LAM x $ (Assume (iNT (Var x))) :>: Assert (ite (leq (Int 0) (Var x)) (Int 1) (Int 2))
   where
     x = ident "x"
+
+ex_inc :: Expr
+ex_inc = tlamOblig y [x]
+            (INT (Var y) :>: (Var x :=: Var y) :>: Var x)
+            (INT (Var x) :>: INT (Int 1) :>: Assume (EXI r (INT (Var r) ) ))
+  where
+    x = ident "x"
+    y = ident "y"
+    r = ident "r"
+
+{-
+   verify {\$x2.
+           ex x.
+              assume {isint($x2); (x = $x2); x};
+              assert {assert {isint(x);
+                              isint(1);
+                              assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}}}};
+
+                              -}

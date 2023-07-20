@@ -1,0 +1,144 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+
+\section{Rewrite Rules}\label{sec:rewrite-rules}
+
+\begin{figure}[t]
+$\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Assume:}
+  \rulename{asm-hnf} & |assume hnf|         & \movesto & |hnf|                    & \\
+  \rulename{asm-seq} & |assume (e_1; e_2)|  & \movesto & |assume e_1; assume e_2| & \\
+  \rulename{asm-exi} & |assume (def x e)|   & \movesto & |def x (assume e)|       & \\
+  % \rulename{asm-cas} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & \multicolumn{2}{@@{}l}{|verify (E^[assume e_1]) ; verify (E^[assume e_2])|}  \\
+  \rulename{asm-cas} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & |verify (E^[assume e_1]);| & \\
+                     &                                        &          & |verify (E^[assume e_2])|  \\
+  \rulename{asm-id}  & |assume (assume e)|  & \movesto & |assume e|               & \\
+  \rulename{asm-suc} & |assume (succeed e)| & \movesto & |assume e|               & \\
+  \rulename{asm-dec} & |assume (decide e)|  & \movesto & |assume e|               & \\
+  \rulename{asm-ver} & |assume (verify e)|  & \movesto & |tup ()|                 & \\
+\\[-0.6em]
+
+\rulegroupname{Succeed/Decide:}
+  \rulename{suc-elim}   & |succeed e|     & \movesto & |e|      & \text{if}\ $\mustSucceed{e}$ \\
+  \rulename{dec-elim}   & |P^[decide e]|  & \movesto & |P^[e]|  & \text{if}\ $\mustDecide{P}{e}$ \\
+  \rulename{prove-elim} & |verify e|      & \movesto & |tup ()| & \text{if}\ $e$\ \text{has no}\ |succeedKW|, |decideKW| \\
+\\[-0.6em]
+
+\rulegroupname{Prove:}
+  \rulename{asm-intro}  & |P^[e]|                          & \movesto & |P^[assume e]|                  & \text{if}\ \proves{P}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  \rulename{asm-if}     & |verify (P^[myite e_1 e_2 e_3])| & \movesto & |verify (P^[assume e_1; e_2]);| & \text{if}\ \mustDecide{P}{e_1} \\
+                        &                                  &          & |verify (P^[e_3])|              & \\
+\end{array}\\
+\end{array}$
+\\[0.1in]
+$\begin{array}{l}
+  \begin{array}{lr@@{\;}c@@{\;}l}
+  \text{Prove contexts} & P & ::= & \hole \vb |v == P| \vb |P ; e| \vb |e; P| \vb |def x P| \vb |lam x P| \vb |apply1N P e| \vb |apply1N e P| \\
+                        &   & \vb & |one P| \vb |all P| \vb |P choice e| \vb |e choice P| \\
+                        &   & \vb & |myite P e e| \vb |succeed P| \vb |verify P| \\
+  \end{array}\\
+\end{array}$
+\\[0.1in]
+\caption{TRS Verifier Rewrite Rules}
+\label{fig:verifier-rewrite-rules}
+\end{figure}
+
+\begin{figure}
+$\begin{array}{lcl}
+  \toprule
+  \mustSucceedKW & :: & e \rightarrow \{ \mathit{true}, \mathit{false} \} \\
+  \midrule
+   \mustSucceed{n}              & \doteq & \mathit{true} \\
+   \mustSucceed{|lam x e|}      & \doteq & \mathit{true} \\
+   \mustSucceed{|assume e|}     & \doteq & \mathit{true} \\
+   \mustSucceed{|arr (v_1, xdots, v_n) |} & \doteq & \mustSucceed{|v_1|} \wedge \dots \wedge \mustSucceed{|v_n|} \\
+   \mustSucceed{|def x e|}         & \doteq & \mustSucceed{e} \\
+   \mustSucceed{|e_1; e_2|}        & \doteq & \mustSucceed{e_1} \wedge \mustSucceed{e_2} \\
+   \mustSucceed{|one e|}           & \doteq & \mustSucceed{e} \\
+   \mustSucceed{|all e|}           & \doteq & \mustSucceed{e} \\
+   \mustSucceed{|e_1 choice e_2|}  & \doteq & \mustSucceed{e_1} \vee \mustSucceed{e_2} \\
+   \mustSucceed{|e|}               & \doteq & \mathit{false} \\
+   \bottomrule
+\end{array}$
+\caption{Definitions of the $\mustSucceedKW$ predicate used in \cref{fig:verifier-rewrite-rules}.}
+\end{figure}
+
+\begin{figure}
+$\begin{array}{lcl}
+  \toprule
+  \mustDecideKW & :: & (P, e) \rightarrow \{ \mathit{true}, \mathit{false} \} \\
+  \midrule
+  \mustDecide{P}{n}                 & \doteq & \mathit{true} \\
+  \mustDecide{P}{|op|}              & \doteq & \mathit{true} \\
+  \mustDecide{P}{|assume e|}        & \doteq & \mathit{true} \\
+  \mustDecide{P}{|arr (v_1, xdots, v_n) |} & \doteq & \mustDecide{P}{|v_1|} \wedge \dots \wedge \mustDecide{P}{|v_n|} \\
+  \mustDecide{P}{x}                 & \doteq & x \in \lamvars{P} \\
+  \mustDecide{P}{|one e|}           & \doteq & \mustDecide{P}{e} \\
+  \mustDecide{P}{|all e|}           & \doteq & \mustDecide{P}{e} \\
+  \mustDecide{P}{|e_1 = e_2|}       & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
+  \mustDecide{P}{|e_1; e_2|}        & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
+  \mustDecide{P}{|e_1 choice e_2|}  & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
+  \mustDecide{P}{|apply1N op e|}    & \doteq & \mustDecide{P}{e} \\
+  \mustDecide{P}{|e|}               & \doteq & \mathit{false} \\
+  \bottomrule
+\end{array}$
+\caption{Definitions of the $\mustDecideKW$ predicates used in \cref{fig:verifier-rewrite-rules}.}
+\end{figure}
+
+\mypara{Notes}
+%
+\begin{itemize}
+\item \rulename{prove-elim} seems redundant; it makes \verb+make testverify+ fail, \ranjit{TODO: investigate}.
+\end{itemize}
+
+\begin{figure}
+$\begin{array}{lcl}
+\toprule
+\proves{P}{e}                & \doteq & \UnAssume{e} \in \FEnv{P}       \\
+\midrule
+%
+\UnAssume{|e_1 = e_2|}       & \doteq & \UnAssume{e_1} = \UnAssume{e_2} \\
+\UnAssume{|e_1 ; e_2|}       & \doteq & \UnAssume{e_1} ; \UnAssume{e_2} \\
+\UnAssume{|e_1 choice e_2|}  & \doteq & \UnAssume{e_1} |choice| \UnAssume{e_2} \\
+\UnAssume{|apply1N e_1 e_2|} & \doteq & \UnAssume{e_1} \ \UnAssume{e_2} \\
+\UnAssume{|assume e|}        & \doteq & \UnAssume{e}                    \\
+\UnAssume{|e|}               & \doteq & e                               \\
+\midrule
+%
+\FEnv{|P; e|}                & \doteq & \FEnv{P} \cup \Facts{e}         \\
+\FEnv{|e; P|}                & \doteq & \FEnv{P} \cup \Facts{e}         \\
+\FEnv{|lam x P|}             & \doteq & \FEnv{P} \cup \{ x \}           \\
+\FEnv{|xdots P xdots|}       & \doteq & \FEnv{P}                        \\
+\midrule
+%
+\Facts{|assume e |} & \doteq & \{\UnAssume{e}\}                         \\
+\Facts{|e_1; e_2|}  & \doteq & \Facts{e_1} \cup \Facts{e_2}             \\
+\Facts{|e_1 choice e_2|} & \doteq & \Facts{e_1} \cap \Facts{e_2}             \\
+\Facts{|def x e|}   & \doteq & \Facts{\subst{e}{x}{x'}} \quad \text{where}\ $|x'|$\ \text{is fresh} \\
+\Facts{|e|}         & \doteq & \emptyset \\
+\bottomrule
+\end{array}$
+\caption{Definitions for the \rulename{asm-intro} rule in \cref{fig:verifier-rewrite-rules}.}
+\end{figure}
+
+% Env(P; e)       = Env(P); e
+% Env(e; P)       = e; Env(P)
+% Env(lam x P)    = assume{x}; Env(P)
+% Env(...P...)    = Env(P)
+% Env(v = P)      = Env(P)
+% Env(def x P)    = Env(P)
+% Env(one P)      = Env(P)
+% Env(all P)      = Env(P)
+% Env(P | e)      = Env(P)
+% Env(e | P)      = Env(P)
+% Env(P e)        = env(P)
+% Env(e P)        = env(P)
+% Env(if P e1 e2) = Env(P)
+% Env(succeed P)  = Env(P)
+% Env(verify P)   = Env(P)
