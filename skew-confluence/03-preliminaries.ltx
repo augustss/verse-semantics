@@ -5,6 +5,7 @@
 %include ./skew.fmt 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 \section{Mathematical Background}
 
 
@@ -47,18 +48,27 @@ and for $k>0$, $R^{k} = R \relcomp R^{k-1}$ and ${\xgosup{}{k}} = {\xgo{}} \relc
 The \emph{inverse} of a relation $R$ is the set $R^{-1} = \setcomp{(x,y)}{(y,x) \in R}$; note that the inverse of the inverse of $R$ is $R$.
 While the superscript $^{-1}$ could be applied to symbols as well as letters, we instead customarily notate the inverse of a relation
 that is named by a symbol by flipping the symbol left-to-right, so that $\supset$ denotes the inverse of $\subset$, $\geq$ denotes the inverse of $\leq$,
-and $\leftarrow$ denotes the inverse of $\rightarrow$.
+and $\leftarrow$ denotes the inverse of $\rightarrow$. It follows that, for example, $|e_1| \leftarrow |e| \rightarrow |e_2|$, which abbreviates
+$|e_1| \leftarrow |e| \logand |e| \rightarrow |e_2|$, means the same as $|e| \rightarrow |e_1| \logand |e| \rightarrow |e_2|$.
 
-A relation $R$ is said to be \emph{symmetric} if $R^{-1}=R$. It is customary to use symbols that are left-right symmetric, such as $\equiv$ and $\leftrightarrow$, to denote symmetric relations.
+
+A relation $R$ is said to be \emph{symmetric} if $R^{-1}=R$. It is customary to use symbols that are left-right symmetric, such as $\equiv$ and $\leftrightarrow$ and $\Leftrightarrow$, to denote symmetric relations.
+
+Arrows have different \emph{styles} if they have different shafts or different subscripts. For example, $\leftrightarrow$ and $\Leftrightarrow$ and $\xpgo{}$ have different styles, because their shafts are all different; $\xgo{}$ and $\xrngo{r}$ and $\xgo{\rr}$ and $\xrngo{subst}$ have different styles because their subscripts (or lack of subscript) are all different.
 
 Again, let $R$ and $\xgo{}$ be relations on $A$.
-The reflexive closure of $R$ is $R^{\reflexivemarker}=R \cup \iota_A$ and the reflexive closure of $\xgo{}$ is ${\xgoeq{}} = {\xgo{}} \cup \iota_A$.
-The transitive reflexive closure of $R$ is $R^{*}= \bigcup_{k \geq 0} R^k$ and the transitive reflexive closure of $\xgo{}$ is ${\xgodbl{}} = \bigcup_{k \geq 0} \xgosup{}{k}$.
-The symmetric closure of $\xgo{}$ is ${\xboth{}} = {\xungo{}} \cup {\xgo{}}$; 
+We use a superscripted $\reflexivemarker$ on a relation to indicate its reflexive closure; thus
+the reflexive closure of $R$ is $R^{\reflexivemarker}=R \cup \iota_A$ and the reflexive closure of $\xgo{}$ is ${\xgoeq{}} = {\xgo{}} \cup \iota_A$.
+We use a superscripted $*$ on a relation to indicate the transitive reflexive closure, except that if the symbol for a relation is an arrow, then
+we use a double-headed arrow of the same style to indicate the transitive reflexive closure; thus
+the transitive reflexive closure of $R$ is $R^{*}= \bigcup_{k \geq 0} R^k$ and the transitive reflexive closure of $\xgo{}$ is ${\xgodbl{}} = \bigcup_{k \geq 0} \xgosup{}{k}$.
+If the symbol for a relation is a leftward-pointing or rightward-pointing arrow, then
+we use a leftward-and-rightward-pointing arrow of the same style to indicate the symmetric closure; thus
+the symmetric closure of $\xgo{}$ is ${\xboth{}} = {\xungo{}} \cup {\xgo{}}$, and
 the symmetric transitive reflexive closure of $\xgo{}$ is ${\xbothdbl{}} = {\xungodbl{}} \cup {\xgodbl{}}$. 
 
-For a given relation denoted by a rightward arrow $\xgo{}$, we define the predicate $x \bothreduceto y$ to mean $\exists z \suchthat x \xgodbl{} z \xungodbl{} y$
-and the predicate $x \bothreducefrom y$ to mean $\exists z \suchthat x \xungodbl{} z \xgodbl{} y$.
+For a given relation denoted by a ri'ghtward arrow $\xgo{}$, we use a downward-pointing arrow of the same style to define the predicate $x \bothreduceto y$ to mean $\exists z \suchthat x \xgodbl{} z \xungodbl{} y$
+and we use an upward-pointing arrow of the same style to define the predicate $x \bothreducefrom y$ to mean $\exists z \suchthat x \xungodbl{} z \xgodbl{} y$.
 
 \subsubsection{Terms and Occurrences}
 
@@ -68,17 +78,18 @@ Let {\metavars} be the set of of \emph{metavariables} (possibly decorated BNF no
 let {\termset} be the set of all possible terms.
 For any term $M \in \termset$, we define its \emph{set of metavariables} $\metavars(M) \subset \metavars$, as shown in \cref{fig:metavars}.
 
-We use elements of $\mathbb{N}_{+}^{*}$ (that is, tuples of positive integers) to represent the positions of the subterms of a term.
-We call such tuples \emph{occurrences}; we use variables $u$, $w$, $p$, and $q$ to refer to them,
-and we use variables $U$, $W$, $P$, and $Q$ to refer to sets of them.
+We use elements of $\mathbb{N}_{+}^{*}$ (that is, tuples of any finite nonnegative length with elements that are positive integers) to represent the positions of the subterms of a term.
+Following \cite[Section 3.1]{Huet80}, we call such tuples \emph{occurrences}; we use variables $u$, $w$, $p$, and $q$ to refer to occurrences,
+and we use variables $U$, $W$, $P$, and $Q$ to refer to sets of occurrences.
 We use juxtaposition to concatenate such tuples; for example, if $u=(1,2)$ and $w=(2,1,3)$, then $uw =(1,2,2,1,3)$ and $w(2,2)u = (2,1,3,2,2,1,2)$.
-Furthermore we sometimes use juxtaposition to concatenate a sequence with every member of a set to form a new set;
+Furthermore we sometimes use juxtaposition to concatenate a tuple with every member of a set of tuples to form a new set of tuples;
 for example, if $U=\{(1,2),(2,1,3)\}$, then $(2,3,3)U = \{(2,3,3,1,2),(2,3,3,2,1,3)\}$.
 For notational convenience, we use single boldface digits as abbreviations for singleton tuples, for example $\1=(1)$ and $\2=(2)$;
 thus $u=(1,2)$ can be written more concisely as $u=\1\2$, and $w(2,2)u$ can be written more concisely as $w\2\2u$.
 
-We say \emph{$u$ is within $w$}, written $u \occin w$, iff $\exists q \in \mathbb{N}^{*}_{+} \suchthat u=wq$,
-in which case we also define $u/w = q$.\footnote{This overloading of the operator $/$ allows
+We say \emph{$u$ is within $w$}, written $u \occin w$,
+iff $\exists q \in \mathbb{N}^{*}_{+} \suchthat u=wq$,
+in which case we also define $u/w = q$.\footnote{This use of the operator $/$ allows
   a very pretty definition of the distributivity property for replacement in \cref{sec:replacement}.}
 We say \emph{$u$ and $w$ are disjoint}, written $u \occdis w$, iff $\neg\bigl( u \occin w \logor w \occin u \bigr)$.
 Finally, $u \occstrictin w$ means $u \occin w \logand u \neq w$ and $u \occdiseq w$ means $u \occdis w \logor u = w$.
@@ -86,7 +97,15 @@ Finally, $u \occstrictin w$ means $u \occin w \logand u \neq w$ and $u \occdiseq
 For any term $M \in \termset$, we define its \emph{set of occurrences} $\occ(M) \subset \mathbb{N}_{+}^{*}$, as shown in \cref{fig:occurrences}, and the \emph{subterm of $M$ at $u$},
 $M/u \in \termset$, where $u \in \occ(M)$, as shown in \cref{fig:selection}. We overload the relations $\occin$ and $\occstrictin$ to apply to terms:
 $M \occin N$ means $\exists u \suchthat M = N/u$, 
-and $M \occstrictin N$ means $\exists u \neq \emptyocc \suchthat M = N/u$.
+and $M \occstrictin N$ means $\exists u \neq \emptyocc \suchthat M = N/u$.\footnote{Instead of using $\occin$ to compare occurrences,
+  \citet[Section 3.1]{Huet80} defines the \emph{prefix ordering} relation $\preceq$
+  on tuples: $w \preceq u$ iff $\exists q \in \mathbb{N}^{*}_{+} \suchthat u=wq$.
+  The notion of occurrences unfortunately runs up against an irreconcilable conflict of terminology:
+  the tuple representing occurrence $u$ is contained within the tuple representing occurrence $w$
+  if and only if the subterm $M/w$ is contained within $M/u$---note the unfortunate chiasmus.
+  We have chosen a notation for comparing occurrences that emphasizes the relationships of subterms
+  selected by occurrences rather than the relationships of the tuple representation of occurrences.
+  This allows us to say that $M/u \occin M/w$ if and only if $u \occin w$.}
 We also say that \emph{$u$ is an occurrence of the term $M/u$ in $M$}.
 
 We define $\occ(M,N)$ (the \emph{occurrences of $M$ in $N$} to mean $\setcomp{u}{u\in\occ(N) \logand N/u=M}$.  
@@ -174,7 +193,7 @@ $\forall M,N,P \in\termset, u,w \in \occ(M)$ such that $u \occin w$:
 We also propose names for two additional properties:
 
 \begin{lemma}
-$\forall M,N,P \in\termset, u \in \occ(M), w \in \occ(N)$:
+$\forall M \in\termset, u \in \occ(M)$:
 \begin{quote}
 \begin{tabbing}
 \qquad\=\hskip 3in\=\kill 
@@ -184,7 +203,7 @@ $\forall M,N,P \in\termset, u \in \occ(M), w \in \occ(N)$:
 \end{lemma}
 
 \begin{lemma}
-$\forall M,N \in\termset, q,u \in \occ(M)$ such that $q \occin u$, and let $w=q/u$:\hfill\break
+$\forall M,N \in\termset, q,u \in \occ(M)$ such that $q \occin u$, and let $w=q/u$:
 \begin{quote}
 \begin{tabbing}
 \qquad\=\hskip 3in\=\kill 
@@ -199,11 +218,11 @@ $\forall M,N \in\termset, q,u \in \occ(M)$ such that $q \occin u$, and let $w=q/
 
 
 
-For any $M\in\termset$, any $U \subseteq \occ(M)$ such that $\forall u, w \in U \suchthat \bigl( M/u = M/w \logand u \occdiseq w\bigr)$, and any $N \in\termset$,
+For any $M\in\termset$, any $U \subseteq \occ(M)$ such that $\forall u, w \in U \suchthat u \occdiseq w$, and any $N \in\termset$,
 we define |tsubst M U N|
 to mean $(\cdots\tsubst{(\tsubst{(\tsubst{M}{u_1}{N})}{u_2}{N})\cdots)}{u_n}{N}$ for any arbitrarily chosen ordering $u_1, u_2, \ldots, u_n$ of the elements of $U$.
-The result is a copy of $M$ with any number of its subterms replaced by copies of $N$, but the subterms replaced must all be the same and their occurrences must be disjoint within $M$
-(these restrictions plus the commutativity property for replacement imply that the result is the same no matter what ordering is chosen for the elements of $U$).
+The result is a copy of $M$ with any number of its subterms replaced by copies of $N$, but the occurrences of those subterms must be disjoint within $M$
+(this restriction plus the commutativity property for replacement imply that the result is the same no matter what ordering is chosen for the elements of $U$).
 
 
 \begin{figure}
@@ -239,11 +258,15 @@ A rewrite rule may be given a name, which we write in small caps; we also use th
 that range over rule names. A rewrite rule describes a relation on terms: $(M,N)$ is a member of the relation iff
 $\exists \sigma \suchthat M = \sigma(\alpha) \logand N=\sigma(\beta)$.
 
-Let $\xgo{}$ be a relation on $\termset$. We say that $\xgo{}$ is \emph{stable} iff
+Let $\xgo{}$ be a relation on a set of terms $\termset$. We say that $\xgo{}$ is \emph{stable} iff
 for all substitutions $\sigma$ and all terms $M$ and $N$ in $\termset$, if $M \xgo{} N$ then $\sigma(M) \xgo{} \sigma(N)$ (that is, the relationship is unaffected
-if metavariables are renamed). We say that $\xgo{}$ is \emph{compatible} iff
-for all terms $M$, $N$, and $P$ in $\termset$ and all occurrences $u \in \occ(P)$, if $M \xgo{} N$ then $\tsubst{P}{u}{M} \xgo{} \tsubst{P}{u}{N}$ (that is, a subterm can be
-``rewritten in place'' in the same way as an entire term).
+if metavariables are renamed). We say that $\xgo{}$ is \emph{compatible} if and only if
+for all terms $M$, $N$, and $P$ in $\termset$ and all occurrences $u \in \occ(P)$, if $M \xgo{} N$ then $\tsubst{P}{u}{M} \xgo{} \tsubst{P}{u}{N}$ (that is, any subterm can be
+``rewritten in place'' in the same way as an entire term).\footnote{It might seem simpler to eliminate the variable $M$ by saying that
+$\xgo{}$ is compatible if and only if
+for all terms $N$ and $P$ in $\termset$ and all occurrences $u \in \occ(P)$, if $P/u \xgo{} N$ then $P \xgo{} \tsubst{P}{u}{N}$.
+However, the more complicated formulation we have chosen here is similar to the formulation used
+in the definition of \emph{disjoint parallel closure} in \cref{sec:disjoint-parallel}.}
 For any rewrite rule \rulename{r}, we write $\xrngo{r}$ to denote the smallest stable, compatible relation that contains the relation described by \rulename{r}.
 
 If $\rr$ is a set of names of rewrite rules, we write $\xgo{\rr}$ to mean $\bigcup_{\hbox{\rulename{r}}\in\rr} \xrngo{r}$.
@@ -251,6 +274,7 @@ If $\rr$ is a set of names of rewrite rules, we write $\xgo{\rr}$ to mean $\bigc
 When we use $\xrngo{r}$ or $\xgo{\rr}$ to describe a relationship between two terms $M$ and $N$,
 we sometimes annotate it to indicate explicitly the occurrence $u$ within $M$ of the subterm that is rewritten: $M \xrngosup{r}{u} N$ means
 $M \xrngo{r} N \logand \exists \sigma \suchthat M/u = \sigma(\alpha) \logand N = \tsubst{M}{u}{\sigma(\beta)}$.
+\guy{Explain how $\sigma$ is computed.}
 
 \begin{lemma}\label{lem:rewrite-basic-tsubst}
 For any rewrite rule $\langle\alpha \xgo{} \beta\rangle$ (call it \rulename{r}) and terms $M$ and $N$,
@@ -270,8 +294,9 @@ For any rewrite rule $\langle\alpha \xgo{} \beta\rangle$ (call it \rulename{r}) 
 We write $\xrngoeq{r}$ for the reflexive closure of $\xrngo{r}$, and we sometimes annotate it as $\xrngoeqsup{r}{u}$.
 
 We write $\xrngodbl{r}$ for the transitive reflexive closure of $\xrngo{r}$, and similarly write  $\xgodbl{\rr}$ for the transitive reflexive closure of $\xgo{\rr}$.
-We do not annotate such relations with occurrences $u$.\footnote{One could contemplate annotating them
-  with \emph{sequences} of occurrences, but we will not need such annotations for our purposes here.}
+We do not annotate such relations with occurrences $u$.\footnote{One could contemplate annotating $\xrngodbl{r}$
+  with a \emph{sequence} of occurrences, or annotating $\xgodbl{\rr}$
+  with a sequence of pairs (rulename, occurrence), but we will not need such annotations for our purposes here.}
 
 We notate the inverses of these relations as
 $\xrnungo{r}$ and
@@ -298,7 +323,7 @@ $\xrnbotheqsup{r}{u}$ and
 $\xbotheqsup{\rr}{u}$.
 
 
-\subsubsection{Disjoint Parallel Compatible Relations}
+\subsubsection{Disjoint Parallel Compatible Relations}\label{sec:disjoint-parallel}
 
 The \emph{disjoint parallel closure} of the stable compatible relation $\xrngo{r}$ defined by a rewrite rule \rulename{r} is written $\xprngo{r}$;
 it is the smallest relation containing $\xrngo{r}$ such that
@@ -313,8 +338,9 @@ we sometimes annotate it to indicate explicitly the set $U$ of occurrences withi
 $M \xprngo{r} N \logand \exists \sigma \suchthat \bigl(\forall u\in U\suchthat M/u = \sigma(\alpha)\bigr) \logand N = \tsubst{M}{U}{\sigma(\beta)}$.
 
 We write $\xprngodbl{r}$ for the transitive reflexive closure of $\xprngo{r}$, and similarly write  $\xpgodbl{\rr}$ for the transitive reflexive closure of $\xpgo{\rr}$.
-We do not annotate such relations with sets of occurrences $U$.\footnote{One could contemplate annotating them
-  with \emph{sequences} of sets of occurrences, but we will not need such annotations for our purposes here.}
+We do not annotate such relations with sets of occurrences $U$. \footnote{One could contemplate annotating $\xprngodbl{r}$
+  with a \emph{sequence} of occurrences, or annotating $\xpgodbl{\rr}$
+  with a sequence of pairs (rulename, occurrence), but we will not need such annotations for our purposes here.}
 
 We notate the inverses of these relations as
 $\xprnungo{r}$ and
@@ -378,7 +404,7 @@ if $\rstep{\rr}{|e_1|}{|e'|}$ and $\rstep{\rr}{|e_2|}{|e'|}$.
 This is useful because the $\rr$-normal form (if it exists) of any expression is if $\rr$ is confluent.
 
 But what can we say if $\rr$ is not confluent---for example, what if $\rr$ has the even-odd problem
-discussed in \cref{sec:even-odd}? Ariola and Blom introduced a notion of \emph{infinite normal form},
+discussed in \cref{sec:even-odd}? \citet[Section 5]{ariola:skew-confluence} introduced a notion of \emph{infinite normal form},
 which is a (possibly infinite) set of (possibly \emph{erased}) terms rather than a single term.
 We summarize this idea, using our own terminology, as follows:
 \begin{itemize}
@@ -468,7 +494,7 @@ so as to have at least as much information content (and in fact more, in this ex
 
 
 Why use skew confluence? Ordinary confluence is useful because if term |e| has an $\rr$-normal form, then that normal form is \emph{unique} if $\rr$ is confluent.
-Ariola and Blom define a related notion, which we will refer to as \emph{$\rr$-skew-normal form}\footnote{Ariola and Blom call it the ``infinite normal form''; this is a bit misleading because in fact not all such forms are infinite.}, and prove that under certain conditions, if term |e| has an $\rr$-skew-normal form, then that normal form is unique if $\rr$ is skew confluent.
+\citet[Section 5]{ariola:skew-confluence} define a related notion, which we will refer to as \emph{$\rr$-skew-normal form}\footnote{Ariola and Blom call it the ``infinite normal form''; this is a bit misleading because in fact not all such forms are infinite.}, and prove that under certain conditions, if term |e| has an $\rr$-skew-normal form, then that normal form is unique if $\rr$ is skew confluent.
 
 A  $\rr$-skew-normal form is not a single term, but rather a possibly infinite set of \emph{erased} terms.
 We summarize this idea, using our own terminology, as follows:

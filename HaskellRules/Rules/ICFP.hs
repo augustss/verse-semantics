@@ -40,7 +40,8 @@ allSystemsICFP = [ systemICFP,
                    systemICFPS,
                    systemICFPBX,
                    systemICFPBXP,
-                   systemICFPBXS
+                   systemICFPBXS,
+                   systemICFPGuy
                  ]
 
 systemICFP :: TRSystem Expr
@@ -50,7 +51,7 @@ systemICFP = TRSystem
   , ruleEnv             = defaultTRSFlags
   , preProcess          = const (check valid . anf)
   , postProcess         = const id
-  , rules               = (allRules -= "SEQ-SWAP") <> rulesSimonSwap
+  , rules               = allRules
   , rules2              = noRules
   , rulesHaveStructural = True
   , confluenceRules     = noRules
@@ -167,6 +168,14 @@ systemICFPS = s
   , postProcess = const dropStore
   }
   where s = systemICFPE
+
+systemICFPGuy :: TRSystem Expr
+systemICFPGuy = s
+  { sname = "ICFPGuy"
+  , description = "Guy's variant of ICFP rules"
+  , rules = rules s
+  }
+  where s = systemICFP
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid, validK :: Expr -> Bool
@@ -293,6 +302,13 @@ type Context = Expr -> Expr
 instance Free Context where
   -- Get free variables that are not in the hole.
   free ctx = free (ctx Fail)
+
+-- Allow substitution in contexts.
+-- Replace the hole by a temporary variable,
+-- then perform the substitution and re-establish the hole.
+instance Substitutable Context where
+  subst s ctx = \ x -> subst ((hole, x) : s) (ctx (Var hole))
+    where hole = Name "**HOLE**"
 
 -- scope contexts
 
@@ -616,6 +632,8 @@ rulesUnification env lhs =
                             (Ref k1,Ref k2) -> k1 /= k2
                             (Arr a1,Arr a2) -> length a1 /= length a2
                             _               -> True)
+     guard (not (isLam e1))
+     guard (not (isLam e2))
      pure Fail
  ++
    "U-OCCURS" `name`
@@ -624,8 +642,9 @@ rulesUnification env lhs =
       guard (x == x')
       pure Fail
  ++
+{-
   "SUBST" `name`
-  do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
+xxx  do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
      let freeX = free (ctx, e)
          freeV = free v
      let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
@@ -635,15 +654,35 @@ rulesUnification env lhs =
      -- guard (x `notElem` freeV)
      -- guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
+-}
+  "SUBST" `name`
+  do (ctx, xv@(Var x :=: Val v) :>: e) <- execX lhs
+     guard (not (x `isValueX` v))  -- check side condition
+     let sub = [(x, v)]
+         ctx' = subst sub ctx
+         e' = subst sub e
+     pure $ ctx' (xv :>: e')
  ++
   "HNF-SWAP" `name`
-  do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
-     pure ((x :=: hnf) :>: e)
+-- Old version, only swap with variables.
+-- This is non-confluent with lambda unification.
+-- do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
+  do (hnf@HNF{} :=: v@Val{}) :>: e <- [lhs]
+     pure ((v :=: hnf) :>: e)
  ++
   "VAR-SWAP" `name`
   do y@Var{} :=: x@Var{} <- [lhs]
      guard (ltExpr env x y)
      pure (x :=: y)
+ ++
+  "SEQ-SWAP" `name`
+  do e1 :>: (e2@(Var x :=: Val _) :>: e3) <- [lhs]
+     let bad =
+          case e1 of
+            Var y :=: Val _ -> leExpr env (Var y) (Var x)
+            _ -> False
+     guard (not bad)
+     pure $ e2 :>: (e1 :>: e3)
 
 rulesSubstX :: ERule
 rulesSubstX env lhs =
@@ -766,6 +805,11 @@ ltExpr env e1 e2 = comp vs vs e1 e2 == LT
   where
     vs = boundVars env
 
+leExpr :: TRSFlags -> Expr -> Expr -> Bool
+leExpr env e1 e2 = comp vs vs e1 e2 /= GT
+  where
+    vs = boundVars env
+
 rulesSubstRec :: ERule
 rulesSubstRec _ lhs =
   "SUBST-REC" `name`
@@ -796,7 +840,7 @@ rulesElimination _ lhs =
      pure (ctx e)
  ++
   "FAIL-ELIM" `name`
-  do (_cx, Fail) <- execX1 lhs
+  do (_cx, Fail) <- execX lhs
      pure Fail
 
 rulesFailElim12 :: ERule
@@ -855,12 +899,15 @@ rulesNormalization _ lhs =
   "EXI-SWAP" `name`
   do EXI x (EXI y e) <- [lhs]
      pure (EXI y (EXI x e))
+{-
  ++
+  --   e1; x=v; e3   -->   x=v; e1; e3    if not (eq is (y=v2) and y<x)
   "SEQ-SWAP" `name`
   do e1 :>: (e2 :>: e3) <- [lhs]
      -- Don't reorder effects
      guard (isEffFree e1 || isEffFree e2)
      pure $ e2 :>: (e1 :>: e3)
+-}
 
 rulesExiFloatBX :: ERule
 rulesExiFloatBX _ lhs =
@@ -878,33 +925,16 @@ rulesExiFloatBX _ lhs =
 
 rulesChoice :: ERule
 rulesChoice _ lhs =
-  "CHOOSE" `name`
-  do (sx, e)         <- scopeX lhs
-     (cx, e1 :|: e2) <- choiceX1 e
-     pure (sx (cx e1 :|: cx e2))
- ++
-  "CHOOSE-ASSOC" `name`
-  do (e1 :|: e2) :|: e3 <- [lhs]
-     pure (e1 :|: (e2 :|: e3))
- ++
-  "CHOOSE-R" `name`
-  do Fail :|: e <- [lhs]
-     pure e
- ++
-  "CHOOSE-L" `name`
-  do e :|: Fail <- [lhs]
-     pure e
- ++
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
  ++
-  "ONE-CHOICE" `name`
-  do One (Val v :|: _e) <- [lhs]
-     pure (Val v)
- ++
   "ONE-VALUE" `name`
   do One (Val v) <- [lhs]
+     pure (Val v)
+ ++
+  "ONE-CHOICE" `name`
+  do One (Val v :|: _e) <- [lhs]
      pure (Val v)
  ++
   "ALL-FAIL" `name`
@@ -922,6 +952,23 @@ rulesChoice _ lhs =
   "ALL-VALUE" `name`
   do All (Val v) <- [lhs]
      pure (Arr [v])
+ ++
+  "CHOOSE-R" `name`
+  do Fail :|: e <- [lhs]
+     pure e
+ ++
+  "CHOOSE-L" `name`
+  do e :|: Fail <- [lhs]
+     pure e
+ ++
+  "CHOOSE-ASSOC" `name`
+  do (e1 :|: e2) :|: e3 <- [lhs]
+     pure (e1 :|: (e2 :|: e3))
+ ++
+  "CHOOSE" `name`
+  do (sx, e)         <- scopeX lhs
+     (cx, e1 :|: e2) <- choiceX e  -- was choiceX1 to avoid nonsense rewrite
+     pure (sx (cx e1 :|: cx e2))
 
 rulesValEqualsChoice :: ERule
 rulesValEqualsChoice _ lhs =

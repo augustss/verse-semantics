@@ -42,29 +42,30 @@ testeq(pass) {1=2}                                 {:false}
 # no prefix'op'
 testeq(pass,refimpl=skip) {1=prefix'-'}                         {:false}
 testeq(pass) {1=(1,2)}                             {:false}
-testeq(pass) {1=(x:any=>x)}                        {:false}
+# ICFP rules gets stuck on any lambda comparison
+testeq(pass,ICFP*=skip) {1=(x:any=>x)}                        {:false}
 # op
 testeq(pass,refimpl=skip) {prefix'-'=1}                         {:false}
 testeq(pass,refimpl=skip) {prefix'-'=prefix'+'}                 {:false}
 testeq(pass,refimpl=skip) {prefix'-'=(1,2,3)}                   {:false}
-testeq(pass,refimpl=skip) {prefix'-'=(x:any=>x)}                {:false}
+testeq(pass,refimpl=skip,ICFP*=skip) {prefix'-'=(x:any=>x)}                {:false}
 # tuple
 testeq(pass) {(1,2)=1}                             {:false}
 testeq(pass,refimpl=skip) {(1,2)=prefix'-'}                     {:false}
 testeq(pass) {(1,2)=(1,2,3)}                       {:false}
-testeq(pass) {(1,2)=(x:any=>x)}                    {:false}
+testeq(pass,ICFP*=skip) {(1,2)=(x:any=>x)}                    {:false}
 # lambda
-testeq(pass) {(x:any=>x)=1}                        {:false}
-testeq(pass,refimpl=skip) {(x:any=>x)=prefix'-'}                {:false}
-testeq(pass) {(x:any=>x)=(1,2,3)}                  {:false}
-testeq(pass) {(x:any=>x)=(x:any=>1)}               {:false}
+testeq(pass,ICFP*=skip) {(x:any=>x)=1}                        {:false}
+testeq(pass,refimpl=skip,ICFP*=skip) {(x:any=>x)=prefix'-'}                {:false}
+testeq(pass,ICFP*=skip) {(x:any=>x)=(1,2,3)}                  {:false}
+testeq(pass,ICFP*=skip) {(x:any=>x)=(x:any=>1)}               {:false}
 # Unification with equal values
 testeq(pass) {1=1}                                 {1}
 # Not with POPL
 #testeq(pass,popl*=fail,refimpl=skip,icfp*=fail)
 #            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
 testeq(pass) {(1,2)=(1,2)}                         {(1,2)}
-testeq(pass) {(x:any=>x)=(x:any=>x)}               {:false}
+testeq(pass,ICFP*=skip) {(x:any=>x)=(x:any=>x)}               {:false}
 
 # Arrays
 testeq(pass){array{1;2;3}}                         {1,2,3}

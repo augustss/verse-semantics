@@ -87,7 +87,10 @@
    \mkern-7mu#6$%
  }}
 
-\newcommand\parbars{\raise0.336ex\hbox{$\scriptscriptstyle\shortparallel$}}
+%\newcommand\parbars{\raise0.336ex\hbox{$\scriptscriptstyle\shortparallel$}}
+%\newcommand\parbars{\raise0.336ex\hbox{$\rlap{$\mskip1mu\scriptscriptstyle\shortparallel$}\scriptscriptstyle\shortparallel\llap{$\scriptscriptstyle\shortparallel\mskip1mu$}$}}
+\newcommand{\oneparbar}{\vrule width 0.14ex height 0.7ex depth 0ex\relax}
+\newcommand\parbars{\raise0.25ex\hbox{\oneparbar\hskip0.2ex\oneparbar}}
 \newcommand\leftpararrowfill@@{\decoratedarrowfill@@30\leftarrow\relbar\parbars\arrowbar}
 \newcommand\rightpararrowfill@@{\decoratedarrowfill@@03\arrowbar\relbar\parbars\rightarrow}
 \newcommand\leftrightpararrowfill@@{\decoratedarrowfill@@33\leftarrow\relbar\parbars\rightarrow}
@@ -157,7 +160,7 @@
 % \newcommand\mastergo[5]{{\setbox\sksub\vbox to 0pt{\vskip-1.65ex\hbox{$\scriptstyle#4#1#5$}\vss}\setbox\sksup\vbox to 0pt{\vss\hbox{$\scriptstyle\mskip3mu#4#2#5\mskip-3mu$}\vskip-1.3ex}%
 %     \setbox\skwid\vbox{\copy\sksup\copy\sksub}%
 %     \mathbin{\smash{\mathop{#3{\hbox to \wd\skwid{\hss}}}\limits^{\copy\sksup}_{\copy\sksub}}}}}
-\newcommand\mastergo[5]{\mathrel{\setbox\sksub\vbox to 0pt{\vskip-1.5ex\hbox{$\scriptscriptstyle{#4}#1{#5}$}\vss}\setbox\sksup\vbox to 0pt{\vss\hbox{$\scriptscriptstyle\mskip3mu{#4}#2{#5}\mskip-3mu$}\vskip-1.3ex}%
+\newcommand\mastergo[5]{\mathrel{\setbox\sksub\vbox to 0pt{\vskip-1.5ex\hbox{$\scriptscriptstyle{#4}#1{#5}$}\vss}\setbox\sksup\vbox to 0pt{\vss\hbox{$\scriptscriptstyle\mskip2mu{#4}#2{#5}\mskip-2mu$}\vskip-1.1ex}%
     \setbox\skwid\vbox{\copy\sksup\copy\sksub}%
     \mathbin{\smash{\mathop{#3{\hbox to \wd\skwid{\hss}}}\limits^{\copy\sksup}_{\copy\sksub}}}}}
 
