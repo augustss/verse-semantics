@@ -10,20 +10,73 @@
 
 \subsection{Surface Syntax} \label{sec:syntax:surface}
 
+\begin{figure}
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textbf{Surface Terms}
+   & t & ::= & |x| \vb |k| \vb |myite t t t| \vb |tup (t_1,xdots,t_n)| \\
+   &   & \vb & |def x t| \vb |t = t| \vb |t; t| \vb |t choice t| \vb |one t| \vb |all t| \\
+   &   & \vb & |f^[x]| \\
+   &   & \vb & |f^(x)| \\
+   &   & \vb & |fndef x t (tup (fx)) t| \\
+   &   & \vb & |fndef x t (tup (fx) : t) t| \\[0.1in]
+\end{array}$$
+%
+$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textbf{Core Expressions}
+   & e & ::= & |x| \vb |k| \vb |myite e e e| \vb |tup (e_1,xdots,e_n)| \\
+   &   & \vb & |def x e| \vb |e = e| \vb |e; e| \vb |e choice e| \vb |one e| \vb |all e| \\
+   &   & \vb & |lam x e| \\
+   &   & \vb & |e^[e]| \\
+   &   & \vb & |succeed e| \vb |decide e| \\
+   &   & \vb & |assume e| \vb |verify e| \\[0.1in]
+\end{array}$$
+\caption{Surface and Core Verifier Syntax}
+\label{fig:surface-syntax}
+\label{fig:verifier-syntax}
+\end{figure}
+
+\begin{figure}
+$$\begin{array}{r@@{\;}c@@{\;}l@@{\;}l}
+|De x| & \doteq & |x| \\
+|De k|                     & \doteq & |k| \\
+|De (myite t_1 t_2 t_3)|   & \doteq & |myite (De t_1) (De t_2) (De t_3)| \\
+|De (tup (t_1,xdots,t_n))| & \doteq & |tup ((De t_1), xdots, (De t_n))| \\
+|De (def x t)|             & \doteq & |def x (De t)| \\
+|De (t_1 = t_2)|           & \doteq & |(De t_1) = (De t_2)| \\
+|De (t_1 ; t_2)|           & \doteq & |(De t_1) ; (De t_2)| \\
+|De (t_1 choice t_2)|      & \doteq & |(De t_1) choice (De t_2)| \\
+|De (one t)|               & \doteq & |one (De t)| \\
+|De (all t)|               & \doteq & |all (De t)| \\
+|De (f^[x])|               & \doteq & |f^[x]| \\
+|De (f^(x))|               & \doteq & |succeed (f^[x])| \\
+|De (fndef x t_1 (tup (fx)) t_2)|       & \doteq & |tlamx  fx x' x (x = (Me x' t_1)) (De t_2)| & |x'|\ \text{fresh} \\
+|De (fndef x t_1 (tup (fx) : t_3) t_2)| & \doteq & |tlamxt fx x' x (x = (Me x' t_1)) (De t_2) (De t_3)| & |x'|\ \text{fresh} \\[0.1in]
+% \end{array}$$
+%
+%$$\begin{array}{r@@{\;}c@@{\;}ll}
+|Me i (fndef x t_1 (tup (fx)) t_2)| & \doteq & |tlamx fx x' x (x = (Me x' t_1)) (def y (y= i^[x]; Me y t_2))| & |x'|\ \text{fresh} \\
+|Me i t| & \doteq & |(De t)^[i]| \\[0.1in]
+%\end{array}$$
+%
+%$$\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+|tlamx succeedKW x' x e_1 e_2|    & \doteq & |verify (lam x' (def x (assume e_1; succeed e_2)))|; \\
+                                  &        & |lam x' (def x (e_1; assume e_2))| \\
+|tlamx decideKW  x' x e_1 e_2|    & \doteq & |verify (lam x' (def x (assume e_1; decide e_2)))|; \\
+                                  &        & |lam x' (def x (e_1; e_2))| \\
+|tlamxt succeedKW x' x e_1 e_2 e| & \doteq & |verify (lam x' (def x (assume e_1; succeed (e^[e_2]))))|; \\
+                                  &        & |lam x' (def x (e_1; assume (def y e^[y])))| \\
+% |tlamxt decideKW  x' x e_1 e_2 e| & \doteq & \text{undefined} \\
+\end{array}$$
+\caption{Desugaring Surface to Core}
+\label{fig:desugaring}
+\end{figure}
+% \begin{comment}
+% D(fndef x t_1 (tup (fx)) BODY) = tlam x' (x) (x = M(x' |> t_1) (De BODY))))
+% \end{comment}
+
 \subsection{Core Syntax} \label{sec:syntax:core}
 
 % \figureSyntax
-
-\begin{figure}
-$$\begin{array}{lr@@{\;}c@@{\;}l}
-\text{Expressions} & e & ::= & \ldots \\
-                   &   & \vb & |myite e e e| \\
-                   &   & \vb & |succeed e| \vb |decide e| \\
-                   &   & \vb & |assume e| \vb |verify e| \\
-\end{array}$$
-\caption{Syntax of the extensions needed by the TRS Verifier.}
-\label{fig:verifier-syntax}
-\end{figure}
 
 The verifier's language is an extension of Core Verse
 -- as described in \cref{fig:syntax} -- with a few constructs

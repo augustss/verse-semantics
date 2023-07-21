@@ -40,6 +40,7 @@
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
 
 %format (De (x)) = "\De{" ^ x "}"
+%format (Fe (i) (e)) = "\Fe{" ^ i "}{" ^e "}"
 %format (Me (i) (e)) = "\Me{" ^ i "}{" ^e "}"
 %format (An (x)) = "\An{" ^ x "}"
 %format (Cr (x)) = "\Cr{" ^ x "}"
@@ -79,6 +80,8 @@
 %format thunk (e) = "\lambda \langle\rangle.\," e
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
+%format tlamx  (fx) (x) (y) (e1) (e2) = "\tlamFX{" fx "}" "(" x ")[" y "]\{" e1 "\}\{" e2 "\}"
+%format tlamxt (fx) (x) (y) (e1) (e2) (e3) = "\tlamFX{" fx "}" "(" x ")[" y "]\{" e1 "\}\{" e2 "\}\{" e3 "\}"
 %format tlam (x) (e1) (e2) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}"
 %format tlamt (x) (e1) (e2) (e3) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}\{" e3 "\}"
 %format tlamKW = "\textbf{tlam}"
@@ -228,6 +231,7 @@
 %format nat = "\textbf{nat}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
+%format fndef (x) (t) (out) (rhs) = functionKW "(" x : t ")" out "\{" rhs "\}"
 %format function (x)(rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionKW = "\textbf{function}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"

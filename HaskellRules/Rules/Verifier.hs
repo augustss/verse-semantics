@@ -51,6 +51,10 @@ verify sys e =
 --   done (Decide _) = False
 --   done _          = True
 
+-- | `isDone e` ignores "assert/decide" that occur under `verify` which are themselves
+--   under lambdas, as those are obligations for higher-order args that are checked at
+--   *callsites* of those lambdas. There is probably some clever way to do
+--   the below _just_ using `collect` but I thought I'd write this out first.
 isDone :: Expr -> Bool
 isDone = go False
  where
@@ -67,6 +71,7 @@ isDone = go False
   go lam (All e)          = go lam e
   go lam (Assume e)       = go lam e
   go _   (Assert _)       = False
+  go _   (Decide _)       = False
   go lam (Split x y z)    = go lam x && go lam y && go lam z
   go lam (Store h e)      = and (go lam <$> IM.elems h) && go lam e
   go _   _                = True
