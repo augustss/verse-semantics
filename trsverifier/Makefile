@@ -1,10 +1,10 @@
 .SUFFIXES: .pdf .ps .ltx $(.SUFFIXES)
 .PHONY: all clean realclean
 
-PAPER=main
+PAPER=trsverifier
 
 # Top-level target
-all: main.pdf
+all: trsverifier.pdf
 
 
 LATEX=pdflatex -halt-on-error
