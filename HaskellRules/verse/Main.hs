@@ -44,12 +44,13 @@ main = do
   args <- mainArgs
   let cmd =
         case rulesys args of
-          Nothing -> command
-          Just name -> command{ c_state = (c_state command){ esystem = either error id $ findSystem name } }
+          Nothing -> command{ c_nl = wslbug args }
+          Just name -> command{ c_state = (c_state command){ esystem = either error id $ findSystem name }, c_nl = wslbug args }
   runCommand cmd
 
 data MainFlags = MainFlags
   { rulesys  :: !(Maybe String)
+  , wslbug   :: !Bool
   }
 
 mainFlags :: Parser MainFlags
@@ -59,6 +60,9 @@ mainFlags = MainFlags
         <> short 'r'
         <> metavar "NAME"
         <> help "Use rule system NAME" ))
+  <*> switch
+         ( long "wsl"
+        <> help "Add extra NL to compensate for WSL bug" )
 
 mainArgs :: IO MainFlags
 mainArgs = do
@@ -150,6 +154,7 @@ command = Command
                      , prelude = Nothing, flags = defaultFlags{fSplit=True, fNoFuelStop=True, fSimplify=True}
                      , esystem = blockSystem }
   , c_history = Just ".versei"
+  , c_nl = False
   }
 
 updateLastExpr :: CState -> SomeExpr -> IO CState

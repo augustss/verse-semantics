@@ -24,6 +24,7 @@ data Command s = Command
   , c_prompt   :: String
   , c_state    :: s
   , c_history  :: Maybe FilePath
+  , c_nl       :: !Bool
   }
 
 runCommand :: forall s . Command s -> IO ()
@@ -36,7 +37,8 @@ runCommand Command{..} = do
     rpl = REPL { repl_init = pure (c_prompt, c_state)
                , repl_eval = eval
                , repl_exit = const $ putStrLn c_bye
-               , repl_hist = c_history }
+               , repl_hist = c_history
+               , repl_nl   = c_nl }
     help :: Run s
     help _ s = do
       putStrLn c_help
@@ -77,5 +79,6 @@ _testCommand = Command
   , c_prompt = "> "
   , c_state = 1
   , c_history = Nothing
+  , c_nl = False
   }
 
