@@ -182,7 +182,8 @@ systemICFPGuy :: TRSystem Expr
 systemICFPGuy = s
   { sname = "ICFPGuy"
   , description = "Guy's variant of ICFP rules"
-  , rules = rules s
+  , rules = rules s -= "SUBST" -= "VAR-SWAP" -= "SEQ-SWAP" -= "EQN-ELIM" -= "FAIL-ELIM" -= "EXI-FLOAT"
+            <> rulesGuy
   }
   where s = systemICFP
 
@@ -651,19 +652,6 @@ rulesUnification env lhs =
       guard (x == x')
       pure Fail
  ++
-{-
-  "SUBST" `name`
-xxx  do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
-     let freeX = free (ctx, e)
-         freeV = free v
-     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
-         sub   = [(x, v),(x0, Var x)]
-     guard (x `elem` freeX)
-     guard (not (x `isValueX` v))
-     -- guard (x `notElem` freeV)
-     -- guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
-     pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
--}
   "SUBST" `name`
   do (ctx, xv@(Var x :=: Val v) :>: e) <- execX lhs
      guard (not (x `isValueX` v))  -- check side condition
@@ -948,7 +936,11 @@ rulesChoice _ lhs =
  ++
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
-     pure (Arr [])
+     pure (Arr []) 
+ ++
+  "ALL-VALUE" `name`
+  do All (Val v) <- [lhs]
+     pure (Arr [v])
  ++
   "ALL-CHOICE" `name`
   do All ves@(_ :|: _) <- [lhs]
@@ -957,10 +949,6 @@ rulesChoice _ lhs =
          choiceVals _ = []
      vs <- choiceVals ves
      pure (Arr vs)
- ++
-  "ALL-VALUE" `name`
-  do All (Val v) <- [lhs]
-     pure (Arr [v])
  ++
   "CHOOSE-R" `name`
   do Fail :|: e <- [lhs]
@@ -1205,12 +1193,74 @@ rulesSection5_1 _ lhs =
   do y@Var{} :=: x@Var{} <- [lhs]
      pure (x :=: y)
  ++
+  "SEQ-SWAP'" `name`
+  do e1 :>: (e2@(Var _ :=: Val _) :>: e3) <- [lhs]
+     pure $ e2 :>: (e1 :>: e3)
+ ++
+  "EQN-ELIM'" `name`
+  do EXI x ((Var x' :=: Val v) :>: e) <- [lhs]
+     guard (x == x')
+     guard (x `notElem` free (v, e))
+     pure e
+
+alpha :: [Ident] -> Ident -> Expr -> (Ident, Expr)
+alpha is i e | i `notElem` is = (i, e)
+             | otherwise =
+  let v = identNotIn is
+  in  (v, subst [(i, Var v)] e)
+
+rulesGuy :: ERule
+rulesGuy _ lhs =
+  "SUBST" `name`
+  do xv@(Var x :=: Val v) :>: e <- [lhs]
+     guard (x `notElem` free v)
+     let e' = subst [(x, v)] e
+     pure $ xv :>: e'
+ ++
+  "VAR-SWAP" `name`
+  do y@Var{} :=: x@Var{} <- [lhs]
+     pure (x :=: y)
+ ++
   "SEQ-SWAP" `name`
   do e1 :>: (e2@(Var _ :=: Val _) :>: e3) <- [lhs]
      pure $ e2 :>: (e1 :>: e3)
+ ++
+  "UNROLL" `name`
+  do eqn@(Var x :=: Val v) :>: e' <- [lhs]
+     (ctx, elam@(LAM y e)) <- valueX v
+     guard (x `elem` free elam)
+     let n = LAM y $ EXI x $ eqn :>: e
+     pure $ (Var x :=: ctx n) :>: e'
  ++
   "EQN-ELIM" `name`
   do EXI x ((Var x' :=: Val v) :>: e) <- [lhs]
      guard (x == x')
      guard (x `notElem` free (v, e))
      pure e
+ ++
+  "FAIL-ELIM-EQ" `name`
+  do (Val _v :=: Fail) :>: _e <- [lhs]
+     pure Fail
+ ++
+  "FAIL-ELIM-L" `name`
+  do Fail :>: _e <- [lhs]
+     pure Fail
+ ++
+  "FAIL-ELIM-R" `name`
+  do _eq :>: Fail <- [lhs]
+     pure Fail
+ ++
+  "EXI-FLOAT-EQ" `name`
+  do (v :=: EXI x e) :>: e' <- [lhs]
+     let (ax, ae) = alpha (free (v, e')) x e
+     pure $ EXI ax $ (v :=: ae) :>: e'
+ ++
+  "EXI-FLOAT-L" `name`
+  do EXI x e :>: e' <- [lhs]
+     let (ax, ae) = alpha (free e') x e
+     pure $ EXI ax $ ae :>: e'
+ ++
+  "EXI-FLOAT-R" `name`
+  do eq :>: EXI x e <- [lhs]
+     let (ax, ae) = alpha (free eq) x e
+     pure $ EXI ax $ eq :>: ae

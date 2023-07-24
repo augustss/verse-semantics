@@ -21,10 +21,10 @@ testceq("Yikes2",pass) { exists x y. x=<1,2>; y=x; \w.<x,y> }
 testceq("QC1", pass)  { exists x . (exists y . x = y; x) | <> }
                      { exists x . x | <> }
 # There are too many existentials in Block for the structural rules to terminate.
-testceq("Ex1", pass, Block=Skip, POPLL=Skip, ICFP=Skip)
+testceq("Ex1", pass, Block=Skip, POPLL=Skip, ICFP=Skip, ICFPGuy=skip)
                      { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
                      { exists f g a b c d . f(a); g(b); one { exists x . a=c; b=d;  x = <c, d>; x } }
-testceq("Ex2", pass, ICFP=Skip)
+testceq("Ex2", pass, ICFP=Skip, ICFPGuy=skip)
                      { exists f g a b c d x . f(a); g(b); x = <a, b>; x = <c, d>; x }
                      { exists f g c d       . f(c); g(d); <c, d> }
 testceq("Wombat1a",pass){ x := <1>; one { exists y . x = y; < x > } }
