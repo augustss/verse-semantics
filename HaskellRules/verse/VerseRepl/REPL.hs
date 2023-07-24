@@ -1,4 +1,5 @@
 module VerseRepl.REPL(REPL(..), repl) where
+import Control.Monad
 import Control.Monad.Trans
 import System.Console.Haskeline
 
@@ -6,7 +7,8 @@ data REPL s = REPL {
     repl_init :: IO (String, s),                        -- prompt and initial state
     repl_eval :: s -> String -> IO (Bool, s),           -- quit flag and new state
     repl_exit :: s -> IO (),
-    repl_hist :: Maybe FilePath
+    repl_hist :: Maybe FilePath,
+    repl_nl   :: !Bool                                  -- extra NL to compensate for WSL bug
     }
 
 repl :: REPL s -> IO ()
@@ -14,6 +16,8 @@ repl p = do
     (prompt, state) <- repl_init p
     let loop s = do
             mline <- getInputLine prompt
+            when (repl_nl p) $
+              liftIO $ putStrLn ""
             case mline of
                 Nothing -> loop s
                 Just line -> do

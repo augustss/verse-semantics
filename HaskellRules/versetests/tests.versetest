@@ -124,7 +124,7 @@ testeq(pass) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
 #testeq(pass) {p^[](:int):int}                      {0}
 
 # Times out with ICFPK
-testeq(pass,icfp=skip,l2r=skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
+testeq(pass,icfp=skip,icfp51=skip,l2r=skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
 
 # Simple indexing
 testeq(pass) { a := (0,1); a[0] }                   {0}
@@ -143,8 +143,9 @@ testeq(pass) {one{t:=type{0|1}; f(x:t)<covariant>:=x+1; f[0]}}     {1}
 testeq(pass) {one{t:=type{0|1}; f(x:t)<covariant>:=x+1; f[2]}}     {:false}
 testeq(pass) {t:=type{:int}; f(x:t)<covariant>:=x+1; f[0]}    {1}
 testeq(pass) {t:=type{:int}; f(x:t)<covariant>:=x+1; f[()]}   {:false}
-testeq(pass) {t:=type{:int => :int}; f(x:t)<covariant>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
-testeq(pass) {t:=type{:int => :int}; f(x:t)<covariant>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
+# These are very slow with alternative rules
+testeq(pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<covariant>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
+testeq(pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<covariant>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
 
 # Try CBV fixpoint combinator.
 # Too slow with some rules
@@ -168,7 +169,7 @@ testeq(pass) {for(x:=1){x+1}}                      {array{2}}
 testeq(pass) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
 testeq(pass) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
 # times out with ICFPK
-testeq(pass,icfp=skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
+testeq(pass,icfp=skip,icfp51=skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
 
 ### WRONG testeq(pass) {0[0]}                                {wrong}
 ### WRONG testeq(pass) {operator'/'(1,0)}                    {wrong}

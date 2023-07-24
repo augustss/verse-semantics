@@ -41,7 +41,9 @@ allSystemsICFP = [ systemICFP,
                    systemICFPBX,
                    systemICFPBXP,
                    systemICFPBXS,
-                   systemICFPGuy
+                   systemICFP51,
+                   systemICFPGuy,
+                   systemICFPLR
                  ]
 
 systemICFP :: TRSystem Expr
@@ -169,13 +171,32 @@ systemICFPS = s
   }
   where s = systemICFPE
 
+systemICFP51 :: TRSystem Expr
+systemICFP51 = s
+  { sname = "ICFP51"
+  , description = description s ++ ", modified by section 5.1"
+  , rules = rules s -= "SUBST" -= "VAR-SWAP" -= "SEQ-SWAP" -= "EQN-ELIM" <> rulesSection5_1
+  }
+  where s = systemICFP
+
 systemICFPGuy :: TRSystem Expr
 systemICFPGuy = s
   { sname = "ICFPGuy"
   , description = "Guy's variant of ICFP rules"
-  , rules = rules s
+  , rules = rules s -= "SUBST" -= "VAR-SWAP" -= "SEQ-SWAP" -= "EQN-ELIM" -= "FAIL-ELIM" -= "EXI-FLOAT"
+            <> rulesGuy
   }
   where s = systemICFP
+
+systemICFPLR :: TRSystem Expr
+systemICFPLR = s
+  { sname = "ICFPLR"
+  , description = "Left-to-right variant of section 5.1 ICFP rules"
+  , rules = rules s -= "EQN-SWAP" -= "EQN-ELIM'" -= "EXI-FLOAT" -= "SEQ-ASSOC" -= "FAIL-ELIM" -= "CHOOSE"
+            <> rulesLR
+  , preProcess = const (check validK . anfK)
+  }
+  where s = systemICFP51
 
 -- Check that an expression is in the subset defined by the ICFP (PLDI) grammar.
 valid, validK :: Expr -> Bool
@@ -469,6 +490,29 @@ isValueX :: Ident -> Expr -> Bool
 isValueX x (Arr as) = Var x `elem` as || any (isValueX x) as
 isValueX _ _        = False
 
+
+evalX, evalX1 :: Ident -> Expr -> [(Context, Expr)]
+-- CX context
+evalX x lhs = evalX1 x lhs ++ [(id,lhs)]
+-- CX context, CX /= hole
+evalX1 x lhs =
+  do (Val v :=: cx) :>: e <- [lhs]
+     (ctx, hole) <- evalX x cx
+     pure ((\ h -> (v :=: h) :>: e) . ctx, hole)
+ ++
+  do eq@(Val _ :=: ef) :>: cx <- [lhs]
+     guard (effectFreeLR ef)
+     (ctx, hole) <- evalX x cx
+     pure ((eq :>:) . ctx, hole)
+ ++
+  do EXI x' cx <- [lhs]
+     guard (x /= x')
+     (ctx, hole) <- evalX x cx
+     pure (EXI x' . ctx, hole)
+
+evalX' :: Expr -> [(Context, Expr)]
+evalX' = evalX (Name "")  -- don't care about bound variables.
+
 --------------------------------------------------------------------------------
 
 allRules :: ERule
@@ -642,19 +686,6 @@ rulesUnification env lhs =
       guard (x == x')
       pure Fail
  ++
-{-
-  "SUBST" `name`
-xxx  do (ctx, (Var x :=: Val v) :>: e) <- execX lhs
-     let freeX = free (ctx, e)
-         freeV = free v
-     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
-         sub   = [(x, v),(x0, Var x)]
-     guard (x `elem` freeX)
-     guard (not (x `isValueX` v))
-     -- guard (x `notElem` freeV)
-     -- guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
-     pure (subst sub (ctx ((Var x0 :=: Val v) :>: e)))
--}
   "SUBST" `name`
   do (ctx, xv@(Var x :=: Val v) :>: e) <- execX lhs
      guard (not (x `isValueX` v))  -- check side condition
@@ -939,7 +970,11 @@ rulesChoice _ lhs =
  ++
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
-     pure (Arr [])
+     pure (Arr []) 
+ ++
+  "ALL-VALUE" `name`
+  do All (Val v) <- [lhs]
+     pure (Arr [v])
  ++
   "ALL-CHOICE" `name`
   do All ves@(_ :|: _) <- [lhs]
@@ -948,10 +983,6 @@ rulesChoice _ lhs =
          choiceVals _ = []
      vs <- choiceVals ves
      pure (Arr vs)
- ++
-  "ALL-VALUE" `name`
-  do All (Val v) <- [lhs]
-     pure (Arr [v])
  ++
   "CHOOSE-R" `name`
   do Fail :|: e <- [lhs]
@@ -1182,3 +1213,127 @@ rulesStore _ lhs =
 ctxAlpha :: (Free a) => a -> [Ident] -> b -> b
 ctxAlpha e is ctx | null (intersect (free e) is) = ctx
                   | otherwise = error "unimplemented"
+
+rulesSection5_1 :: ERule
+rulesSection5_1 _ lhs =
+  "SUBST'" `name`
+  do xv@(Var x :=: Val v) :>: e <- [lhs]
+     guard (not (x `isValueX` v))  -- check side condition
+     let sub = [(x, v)]
+         e' = subst sub e
+     pure $ xv :>: e'
+ ++
+  "VAR-SWAP'" `name`
+  do y@Var{} :=: x@Var{} <- [lhs]
+     pure (x :=: y)
+ ++
+  "SEQ-SWAP'" `name`
+  do e1 :>: (e2@(Var _ :=: Val _) :>: e3) <- [lhs]
+     pure $ e2 :>: (e1 :>: e3)
+ ++
+  "EQN-ELIM'" `name`
+  do EXI x ((Var x' :=: Val v) :>: e) <- [lhs]
+     guard (x == x')
+     guard (x `notElem` free (v, e))
+     pure e
+
+alpha :: [Ident] -> Ident -> Expr -> (Ident, Expr)
+alpha is i e | i `notElem` is = (i, e)
+             | otherwise =
+  let v = identNotIn is
+  in  (v, subst [(i, Var v)] e)
+
+rulesGuy :: ERule
+rulesGuy _ lhs =
+  "SUBST" `name`
+  do xv@(Var x :=: Val v) :>: e <- [lhs]
+     guard (x `notElem` free v)
+     let e' = subst [(x, v)] e
+     pure $ xv :>: e'
+ ++
+  "VAR-SWAP" `name`
+  do y@Var{} :=: x@Var{} <- [lhs]
+     pure (x :=: y)
+ ++
+  "SEQ-SWAP" `name`
+  do e1 :>: (e2@(Var _ :=: Val _) :>: e3) <- [lhs]
+     pure $ e2 :>: (e1 :>: e3)
+ ++
+  "UNROLL" `name`
+  do eqn@(Var x :=: Val v) :>: e' <- [lhs]
+     (ctx, elam@(LAM y e)) <- valueX v
+     guard (x `elem` free elam)
+     let n = LAM y $ EXI x $ eqn :>: e
+     pure $ (Var x :=: ctx n) :>: e'
+ ++
+  "EQN-ELIM" `name`
+  do EXI x ((Var x' :=: Val v) :>: e) <- [lhs]
+     guard (x == x')
+     guard (x `notElem` free (v, e))
+     pure e
+ ++
+  "FAIL-ELIM-EQ" `name`
+  do (Val _v :=: Fail) :>: _e <- [lhs]
+     pure Fail
+ ++
+  "FAIL-ELIM-L" `name`
+  do Fail :>: _e <- [lhs]
+     pure Fail
+ ++
+  "FAIL-ELIM-R" `name`
+  do _eq :>: Fail <- [lhs]
+     pure Fail
+ ++
+  "EXI-FLOAT-EQ" `name`
+  do (v :=: EXI x e) :>: e' <- [lhs]
+     let (ax, ae) = alpha (free (v, e')) x e
+     pure $ EXI ax $ (v :=: ae) :>: e'
+ ++
+  "EXI-FLOAT-L" `name`
+  do EXI x e :>: e' <- [lhs]
+     let (ax, ae) = alpha (free e') x e
+     pure $ EXI ax $ ae :>: e'
+ ++
+  "EXI-FLOAT-R" `name`
+  do eq :>: EXI x e <- [lhs]
+     let (ax, ae) = alpha (free eq) x e
+     pure $ EXI ax $ eq :>: ae
+
+effectFreeLR :: Expr -> Bool
+effectFreeLR (Val _) = True
+effectFreeLR (Op op :@: _) = isChoiceFreeOp op
+effectFreeLR (All _) = True    -- This is wrong, the expression can loop
+effectFreeLR (One _) = True    -- This is wrong, the expression can loop
+effectFreeLR _ = False
+
+rulesLR :: ERule
+rulesLR _ lhs =
+  "EQN-SWAP" `name`
+  do eqn1@(Val _ :=: ef) :>: (eqn2@(Val _ :=: Val _) :>: e) <- [lhs]
+     guard (effectFreeLR ef)
+     pure $ eqn2 :>: (eqn1 :>: e)
+ ++
+  "EQN-ELIM" `name`
+  do EXI x cx <- [lhs]
+     (ctx, (Var x' :=: Val v) :>: e) <- evalX x cx
+     guard (x == x')
+     guard (x `notElem` free (ctx, e))
+     guard (not (x `isValueX` v))
+     pure (ctx e)
+ ++
+  "EXI-FLOAT" `name`
+  do (ctx, EXI x e) <- evalX' lhs
+     let (ax, ae) = alpha (allVars (ctx Fail)) x e
+     pure $ EXI ax $ ctx ae
+ ++
+  "SEQ-ASSOC" `name`
+  do Val v2 :=: (eq1@(Val _ :=: _) :>: e2) :>: e3 <- [lhs]
+     pure $ eq1 :>: ((v2 :=: e2) :>: e3)
+ ++
+  "FAIL" `name`
+  do (_ctx, Fail) <- evalX' lhs
+     pure Fail
+ ++
+  "CHOICE" `name`
+  do (ctx, e1 :|: e2) <- evalX' lhs
+     pure $ ctx e1 :|: ctx e2

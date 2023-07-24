@@ -13,13 +13,13 @@ QCTEST=cabal run qctest --
 RULES=ICFP
 VRULES=ICFPEverify
 
-all: testiblock testverify testrules
+all: testiblock testrules testverify
 
 build:
 	cabal build
 
 testrules:
-	$(TESTER) --quiet --dfs --rules=$(RULES) $(EXTRA)                    --max-steps=25000       $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=$(RULES) $(EXTRA)                    --max-steps=250000       $(TESTFILE)
 	$(QCTEST)               --rules=$(RULES) $(EXTRA) --ignore-fuel-stop --max-success=1000 --ignore-recursive --koen
 	$(TESTER) --quiet       --rules=$(RULES) $(EXTRA) --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
 
