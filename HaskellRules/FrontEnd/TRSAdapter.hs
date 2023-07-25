@@ -10,11 +10,11 @@ import qualified Rules.Core as T
 import Rules.Equiv(normalForm)
 import Rules.Systems(ESystem)
 import TRS.NormalForm(normalFormFuelTrace, normalFormsFuelTrace, NormResult(..))
-import TRS.System(preProcess, postProcess, ruleEnv)
+import TRS.System(preProcess, postProcess, ruleEnv, sname)
 import TRS.Traced(Traced, term, toList)
 import FrontEnd.Expr
 import FrontEnd.Error
---import FrontEnd.Eval
+import FrontEnd.EvalBlock(runBlock)
 import FrontEnd.Flags
 import GHC.Stack
 
@@ -33,7 +33,7 @@ evaluate tflg e = [eval flg e]
 -}
 
 rewrite :: Flags -> ESystem -> Core -> [Core]
-rewrite flg asys --x | sname sys == "eval" = evaluate (ruleEnv sys)
+rewrite flg asys | sname sys == "iblock" = (:[]) . runBlock (ruleEnv sys)
                  | otherwise = force . map (trsToCore . sub flg sys . rtrace)
                 . map toList
                 . nrToList

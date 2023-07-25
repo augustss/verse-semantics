@@ -5,9 +5,11 @@ module FrontEnd.Desugar(
   primOps, covariantId, dsScope,
   exprToCore,
   simpCore,
+  getFree, substMany, getAllVars,
   ) where
 import Control.Monad
 import Control.Monad.State.Strict
+import Control.Monad.Writer
 import Data.Either
 import Data.List
 --import qualified Data.Map as M
@@ -1195,6 +1197,14 @@ getFree = Epic.List.nub . fvs
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
     fvs Fail = []
     fvs e = error $ "getFree: " ++ prettyShow e
+
+-- XXX binders
+getAllVars :: Core -> [Ident]
+getAllVars = Epic.List.nub . execWriter . vars
+  where vars e@(Variable i) = do tell [i]; pure e
+        vars e@(Lam i e') = do tell [i]; _ <- vars e'; pure e
+        vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
+        vars e = compos vars e
 
 substMany :: [(Ident, Core)] -> Core -> Core
 substMany [] = id

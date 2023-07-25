@@ -16,12 +16,15 @@ import Data.Maybe
 import Epic.Print
 import Epic.Uniplate
 import qualified Epic.SIntMap as IM
-import Rules.Core
-import TRS.Bind(Ident(Name), Subst, identNotIn, free)
+--import Rules.Core
+--import TRS.Bind(Ident(Name), Subst, identNotIn, free)
 --import GHC.Stack
 import Debug.Trace
 import System.IO
 import System.IO.Unsafe(unsafePerformIO)
+import Rules.Core(TRSFlags, RuleEnv(..))
+import FrontEnd.Expr(Expr(..), Ident(..), Lit(..), noLoc, seqE)
+import FrontEnd.Desugar(getFree, substMany, getAllVars)
 
 -- TODO:
 --  * Write down how evaluation works.
@@ -29,6 +32,42 @@ import System.IO.Unsafe(unsafePerformIO)
 --    - What checks are needed for higher order function passing?
 --  * Properly track effects
 --  * Check for effect violation
+
+type Op = String
+type Subst e = [(Ident, e)]
+
+opGt, opGe, opLt, opLe, opNe, opAdd, opSub, opMul, opDiv, opNeg, opPlus, opIsInt, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
+opGt    = "in'>'"
+opGe    = "in'>='"
+opLt    = "in'<'"
+opLe    = "in'<='"
+opNe    = "in'<>'"
+opAdd   = "in'+'"
+opSub   = "in'-'"
+opMul   = "in'*'"
+opDiv   = "in'/'"
+opNeg   = "pre'-'"
+opPlus  = "pre'+'"
+opIsInt = "isInt$"
+opMapAp = "mapAp$"
+opCons  = "cons$"
+opAlloc = "alloc$"
+opRead  = "read$"
+opWrite = "write$"
+opAddTo = "in'+='"
+opDotDot= "in'..'"
+opPrint = "print$"
+opAppend= "append$"
+
+pattern One :: Expr -> Expr
+pattern One x <- Macro1 (Ident _ "one") [] x
+pattern All :: Expr -> Expr
+pattern All x <- Macro1 (Ident _ "all") [] x
+
+identNotIn :: [Ident] -> Ident
+identNotIn vs = head $ [Ident noLoc ("$q" ++ show i) | i <- [1::Int ..]] \\ vs
+
+-----------------------------------------------
 
 subset :: (Eq a) => [a] -> [a] -> Bool
 subset xs ys = null (xs \\ ys)
@@ -487,37 +526,38 @@ choiceToCore :: BChoice -> Expr
 choiceToCore BCFail = Fail
 choiceToCore (BCWrong s) = Wrong s
 choiceToCore (BCBlk b) = blockToCore b
-choiceToCore (BCFork c1 c2) = choiceToCore c1 :|: choiceToCore c2
+choiceToCore (BCFork c1 c2) = choiceToCore c1 `Choice` choiceToCore c2
 choiceToCore (BCRBlk _ b) = blockToCore b
 --choiceToCore (BCRBlk h b) = error $ "choiceToCore: " ++ prettyShow (h, b)
 
 blockToCore :: BBlock -> Expr
 blockToCore (BBlock [v] [(BVar v', e)] (BVar v'')) | v == v' && v == v'' = exprToCore e
-blockToCore b = foldr EXI bs (map bIdentToIdent (vars b))
+blockToCore b = if null vs then bs else Exists vs bs
   where bs = foldr eqn (valueToCore (result b)) (binds b)
-        eqn (v, e) r = (valueToCore v :=: exprToCore e) :>: r
+        eqn (v, e) r = seqE [valueToCore v `Unify` exprToCore e, r]
+        vs = map bIdentToIdent (vars b)
 
 valueToCore :: BValue -> Expr
-valueToCore (BVar v) = Var (bIdentToIdent v)
+valueToCore (BVar v) = Variable (bIdentToIdent v)
 valueToCore (BHNF h) = hnfToCore h
 
 bIdentToIdent :: BIdent -> Ident
-bIdentToIdent (BIdent s) = Name s
+bIdentToIdent (BIdent s) = Ident noLoc s
 
 hnfToCore :: BHNF -> Expr
-hnfToCore (BInt i) = Int i
-hnfToCore (BRef r) = Ref (coerce r)
-hnfToCore (BArr vs) = Arr (map valueToCore vs)
+hnfToCore (BInt i) = Lit $ LitInt i
+hnfToCore (BRef r) = Lit $ LitPtr (coerce r)
+hnfToCore (BArr vs) = Array (map valueToCore vs)
 hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
-  where lam ii (f :@: Var i') | ii == i', ii `notElem` free f = f
-        lam ii ee = LAM ii ee
+  where lam ii (f `ApplyD` Variable i') | ii == i', ii `notElem` getFree f = f
+        lam ii ee = Lam ii ee
 #if EXT
-hnfToCore (BExt a r x) = LAM (Name "_") (Var (Name $ "EXT" ++ prettyShow (a, r, x)))
+hnfToCore (BExt a r x) = Lam (Ident noLoc "_") (Variable (Ident noLoc $ "EXT" ++ prettyShow (a, r, x)))
 #endif
 
 exprToCore :: BExpr -> Expr
-exprToCore (BPrimOp o v) = Op o :@: valueToCore v
-exprToCore (BApply f a) = valueToCore f :@: valueToCore a
+exprToCore (BPrimOp o v) = EPrim o `ApplyD` valueToCore v
+exprToCore (BApply f a) = valueToCore f `ApplyD` valueToCore a
 exprToCore (BSplit e f g) = Split (choiceToCore e) (valueToCore f) (valueToCore g)
 exprToCore (BChoice c) = choiceToCore c
 exprToCore (BVal v) = valueToCore v
@@ -528,7 +568,7 @@ exprToCore (BVal v) = valueToCore v
 type A a = State (([Ident], [BEqn]), [Ident]) a
 
 coreToChoice :: Expr -> BChoice
-coreToChoice e = evalState (cChoice e) (undefined, allVars e)
+coreToChoice e = evalState (cChoice e) (undefined, getAllVars e)
 
 addEqn :: BEqn -> A ()
 addEqn q = do
@@ -541,14 +581,14 @@ addExist x = do
   if x `elem` is then do
     let y = identNotIn vs
     put ((y:is, qs), y : vs)
-    pure [(x, Var y)]
+    pure [(x, Variable y)]
    else do
     put ((x:is, qs), vs)
     pure []
 
 addExpr :: Expr -> A BIdent
-addExpr (Var x) = pure $ cIdent x
-addExpr (Var x :=: e) = do
+addExpr (Variable x) = pure $ cIdent x
+addExpr (Variable x `Unify` e) = do
   e' <- cExpr e
   let bx = cIdent x
   addEqn (BVar bx, e')
@@ -565,7 +605,7 @@ cIdent :: Ident -> BIdent
 cIdent = BIdent . prettyShow
 
 cChoice :: Expr -> A BChoice
-cChoice (e1 :|: e2) = BCFork <$> cChoice e1 <*> cChoice e2
+cChoice (e1 `Choice` e2) = BCFork <$> cChoice e1 <*> cChoice e2
 cChoice Fail = pure BCFail
 cChoice (Wrong s) = pure $ BCWrong s
 cChoice e = BCBlk <$> cBlock e
@@ -584,60 +624,70 @@ cBlockV vs e = do
   pure $ BBlock (map cIdent $ drop (length vs) $ reverse xs) (reverse bs) v
 
 cValue :: Expr -> A BValue
-cValue (Var i) = pure $ BVar (cIdent i)
-cValue (Int i) = pure $ BHNF $ BInt i
-cValue (Ref i) = pure $ BHNF $ BRef $ coerce i
-cValue (Op o) = cValue $ LAM i (Op o :@: Var i) where i = Name "a"
-cValue (Arr es) = BHNF . BArr <$> mapM cValue es
-cValue (LAM x e) = BHNF . BHLam (cIdent x) <$> cBlockV [x] e
-cValue (e1 :>: e2) = addExpr e1 *> cValue e2
-cValue (EXI i e) = do s <- addExist i; cValue (subst s e)
+cValue (Variable i) = pure $ BVar (cIdent i)
+cValue (Lit (LitInt i)) = pure $ BHNF $ BInt i
+cValue (Lit (LitPtr i)) = pure $ BHNF $ BRef $ coerce i
+cValue (EPrim o) = cValue $ Lam i (EPrim o `ApplyD` Variable i) where i = Ident noLoc "a"
+cValue (Array es) = BHNF . BArr <$> mapM cValue es
+cValue (Lam x e) = BHNF . BHLam (cIdent x) <$> cBlockV [x] e
+cValue (Seq []) = undefined
+cValue (Seq [e]) = cValue e
+cValue (Seq (e : es)) = addExpr e *> cValue (Seq es)
+cValue (Exists is e) = do ss <- mapM addExist is; cValue (substMany(concat ss) e)
 cValue e = BVar <$> addExpr e
 
 cExpr :: Expr -> A BExpr
-cExpr e@Var{} = BVal <$> cValue e
-cExpr e@Int{} = BVal <$> cValue e
-cExpr e@Op{}  = BVal <$> cValue e
-cExpr e@Arr{} = BVal <$> cValue e
-cExpr e@LAM{} = BVal <$> cValue e
-cExpr (e1 :=: e2) = do
+cExpr e@Variable{} = BVal <$> cValue e
+cExpr e@Lit{} = BVal <$> cValue e
+cExpr e@EPrim{}  = BVal <$> cValue e
+cExpr e@Array{} = BVal <$> cValue e
+cExpr e@Lam{} = BVal <$> cValue e
+cExpr (e1 `Unify` e2) = do
   v <- cValue e1
   e <- cExpr e2
   addEqn (v, e)
   pure $ BVal v
-cExpr (e1 :>: e2) = addExpr e1 *> cExpr e2
-cExpr e@(_ :|: _) = BChoice <$> cChoice e
-cExpr (Op o :@: e) = BPrimOp o <$> cValue e
-cExpr (e1 :@: e2) = BApply <$> cValue e1 <*> cValue e2
-cExpr (EXI i e) = do s <- addExist i; cExpr (subst s e)
+cExpr (Seq []) = undefined
+cExpr (Seq [e]) = cExpr e
+cExpr (Seq (e : es)) = addExpr e *> cExpr (Seq es)
+cExpr e@(_ `Choice` _) = BChoice <$> cChoice e
+cExpr (EPrim o `ApplyD` e) = BPrimOp o <$> cValue e
+cExpr (e1 `ApplyD` e2) = BApply <$> cValue e1 <*> cValue e2
+cExpr (Exists is e) = do ss <- mapM addExist is; cExpr (substMany(concat ss) e)
 cExpr Fail = pure BFail
 cExpr (Wrong s) = pure $ BWrong s
 cExpr (Split e e1 e2) = BSplit <$> cChoice e <*> cValue e1 <*> cValue e2
-cExpr (One e) = cExpr $ Split e (LAM u Fail) (LAM v $ LAM u $ LAM u $ Var v)
-  where u = Name "_"; v = Name "v"
+cExpr (One e) = cExpr $ Split e (Lam u Fail) (Lam v $ Lam u $ Lam u $ Variable v)
+  where u = Ident noLoc "_"; v = Ident noLoc "v"
 cExpr (All e) =
-  let u = Name "_"; v = Name "v"; r = Name "r"; h = Name "h"
-      f = LAM u $ Arr []
-      g = LAM v $ LAM r $ LAM h $
-            let x = Split (Var r :@: Arr []) f (Var h)
-            in  Op Cons :@: Arr [Var v, x]
+  let u = Ident noLoc "_"; v = Ident noLoc "v"; r = Ident noLoc "r"; h = Ident noLoc "h"
+      f = Lam u $ Array []
+      g = Lam v $ Lam r $ Lam h $
+            let x = Split (Variable r `ApplyD` Array []) f (Variable h)
+            in  EPrim opCons `ApplyD` Array [Variable v, x]
   in  cExpr $ Split e f g
-cExpr e = error $ "cExpr: impossible: " ++ prettyShow e
+cExpr e = error $ "cExpr: impossible: " ++ prettyShow e ++ "\n" ++ show e
 {-
 cExpr (One e) = One <$> cBlock e
 cExpr (All e) = All <$> cBlock e
 -}
 
 primOpEffs :: Op -> Effects
-primOpEffs o | o `elem` [Gt, Ge, Lt, Le, Ne, IsInt] = [Efails]
-primOpEffs MapAp = allEffects  -- XXX can do better?
-primOpEffs Alloc = [Eallocates]
-primOpEffs Read  = [Ereads]
-primOpEffs Write = [Ewrites]
-primOpEffs AddTo = [Ereads, Ewrites]
-primOpEffs DotDot = [Eiterates]
-primOpEffs Print = [Einteracts]
-primOpEffs _ = []
+primOpEffs o = fromMaybe [] $ lookup o [
+  (opGt, [Efails]),
+  (opGe, [Efails]),
+  (opLt, [Efails]),
+  (opLe, [Efails]),
+  (opNe, [Efails]),
+  (opIsInt, [Efails]),
+  (opMapAp, allEffects),  -- XXX can do better?
+  (opAlloc, [Eallocates]),
+  (opRead,  [Ereads]),
+  (opWrite, [Ewrites]),
+  (opAddTo, [Ereads, Ewrites]),
+  (opDotDot, [Eiterates]),
+  (opPrint, [Einteracts])
+  ]
 
 -- XXX needs an environment
 funcEffs :: BValue -> Effects
@@ -851,7 +901,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         -- Examine the expression and evaluate if possible.
         dtrace aeffs ("sweep expr=" ++ take 10 (show expr)) $
         case expr of
-          BPrimOp Append (BVArr [a, b, c]) -> append a b c
+          BPrimOp ((== opAppend) -> True) (BVArr [a, b, c]) -> append a b c
           BPrimOp op v  | notAllowed (primOpEffs op) -> wrongs $ "effect not allowed: " ++ show (op, primOpEffs op)
                         | Just e <- evalPrimOp op v -> succeeds [(val, e)]
                         | Just (h, e) <- evalPrimHeapOp heap op v -> succeeds' h [(val, e)]
@@ -933,7 +983,7 @@ evalPrimOp op v | Just cmp <- lookup op compareOps =
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
 evalPrimOp op v | Just arith <- lookup op arithBinOps =
   case v of
-    BVArr [BVInt _, BVInt 0] | op == Div -> Just BFail
+    BVArr [BVInt _, BVInt 0] | op == opDiv -> Just BFail
     BVArr [BVInt a, BVInt b] -> Just $ BVal $ BVInt $ a `arith` b
     BVArr vs  | any isBVar vs -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
@@ -941,49 +991,49 @@ evalPrimOp op v | Just arith <- lookup op arithUnOps =
   case v of
     BVInt a -> Just $ BVal $ BVInt $ arith a
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
-evalPrimOp op v | op == IsInt =
+evalPrimOp op v | op == opIsInt =
   case v of
     a@(BVInt _) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
-evalPrimOp op v | op == Cons =
+evalPrimOp op v | op == opCons =
   case v of
     BVArr [a, BVArr as] -> Just $ BVal $ BVArr (a : as)
     BVArr vs | any isBVar vs -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
-evalPrimOp op v | op == DotDot =
+evalPrimOp op v | op == opDotDot =
   case v of
     BVArr [BVInt a, BVInt b] -> Just $ BChoice $ choices [ BlockValue [] (BVInt i) | i <- [a .. b] ]
     BVArr vs | any isBVar vs -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
-evalPrimOp op v | op == Print =
+evalPrimOp op v | op == opPrint =
   -- A temporary hack for printing.
   case v of
     BHNF h ->
       trace ("Print: " ++ prettyShow h) $
       Just $ BVal $ BVArr []
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
-evalPrimOp op _ | op == Append = Nothing
-evalPrimOp op _ | op `elem` [Alloc, Read, Write, AddTo] = Nothing
+evalPrimOp op _ | op == opAppend = Nothing
+evalPrimOp op _ | op `elem` [opAlloc, opRead, opWrite, opAddTo] = Nothing
 evalPrimOp op v = error $ "evalPrimOp: " ++ show (op, v)
 
 evalPrimHeapOp :: BHeap -> Op -> BValue -> Maybe (BHeap, BExpr)
-evalPrimHeapOp h Alloc v =
+evalPrimHeapOp h op v | op == opAlloc =
   case v of
     vv -> Just (h', BVal $ BVRef r) where (h', r) = heapAlloc h vv
 --    _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
-evalPrimHeapOp h op@Read v =
+evalPrimHeapOp h op v | op == opRead =
   case v of
     BVar _ -> Nothing
     BVRef r -> Just (h, BVal $ heapRead h r)
     _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
-evalPrimHeapOp h op@Write v =
+evalPrimHeapOp h op v | op == opWrite =
   case v of
     BVar _ -> Nothing
     BVArr [BVRef r, vv] -> Just (heapWrite h r vv, BVal $ BVArr [])
     BVArr vs | any isBVar vs -> Nothing
     _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
-evalPrimHeapOp h op@AddTo v =
+evalPrimHeapOp h op v | op == opAddTo =
   case v of
     BVar _ -> Nothing
     BVArr [BVRef r, BVInt i] | BVInt j <- heapRead h r, let vv = BVInt $ j + i -> Just (heapWrite h r vv, BVal vv)
@@ -992,13 +1042,13 @@ evalPrimHeapOp h op@AddTo v =
 evalPrimHeapOp _ _ _ = Nothing
 
 compareOps :: [(Op, Integer -> Integer -> Bool)]
-compareOps = [(Gt, (>)), (Ge, (>=)), (Lt, (<)), (Le, (<=)), (Ne, (/=))]
+compareOps = [(opGt, (>)), (opGe, (>=)), (opLt, (<)), (opLe, (<=)), (opNe, (/=))]
 
 arithBinOps :: [(Op, Integer -> Integer -> Integer)]
-arithBinOps = [(Add, (+)), (Sub, (-)), (Mul, (*)), (Div, div)]
+arithBinOps = [(opAdd, (+)), (opSub, (-)), (opMul, (*)), (opDiv, div)]
 
 arithUnOps :: [(Op, Integer -> Integer)]
-arithUnOps = [(Neg, negate), (Plus, id)]
+arithUnOps = [(opNeg, negate), (opPlus, id)]
 
 -- Do the two effects commute?
 effCommutes :: Effect -> Effect -> Bool

@@ -25,6 +25,7 @@ testrules:
 
 testiblock:
 	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TRICKY)
 	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTSTOREFILE)
 
 testverify:
