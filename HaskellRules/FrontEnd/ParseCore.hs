@@ -2,7 +2,6 @@ module FrontEnd.ParseCore(pCore, pCoreFile) where
 import Control.Monad(void)
 import Data.Maybe
 import Epic.Print
-import FrontEnd.Desugar(exprToCore)
 import FrontEnd.Expr
 import FrontEnd.Flags
 
@@ -15,7 +14,7 @@ pCoreFile :: P Core
 pCoreFile = skip *> pCore <* eof
 
 pCore :: P Core
-pCore = exprToCore flg . dsScope flg <$> pSeq
+pCore = dsScope flg <$> pSeq
   where flg = defaultFlags{ fSplit = False }
 
 -- XXX pDef, pLam

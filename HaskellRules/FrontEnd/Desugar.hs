@@ -3,8 +3,6 @@
 module FrontEnd.Desugar(
   desugar,
   primOps, covariantId, dsScope,
-  exprToCore,
-  simpCore,
   getFree, substMany, getAllVars,
   ) where
 import Control.Monad
@@ -1165,15 +1163,6 @@ eDecide = Macro1 (Ident noLoc "decide") []
 fvArray :: [Expr] -> Expr
 fvArray [e] = e
 fvArray es = Array es
-
------------
-
--- TODO? Add checks
-exprToCore :: Flags -> Expr -> Core
-exprToCore _ = id
-
-simpCore :: Core -> Core
-simpCore = id
 
 ----------------------
 

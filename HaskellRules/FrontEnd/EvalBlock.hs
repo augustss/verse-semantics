@@ -13,6 +13,8 @@ import Data.Data(Data)
 import Data.List
 import Data.Maybe
 --import qualified Data.Map as M
+import Data.Ratio
+import Data.Scientific
 import Epic.Print
 import Epic.Uniplate
 import qualified Epic.SIntMap as IM
@@ -119,8 +121,7 @@ evalChoiceFull h aeffs c =
 evalUnderLambda :: BChoice -> BChoice
 evalUnderLambda = transformBi ev
   where ev :: BHNF -> BHNF
-        ev v@BInt{} = v
-        ev v@BRef{} = v
+        ev v@BLit{} = v
         ev (BArr vs) = BArr (map (transformBi ev) vs)
         ev (BHLam i b) = BHLam i $ transformBi ev $ evalB b
 #if EXT
@@ -217,9 +218,25 @@ isBVar :: BValue -> Bool
 isBVar BVar{} = True
 isBVar _ = False
 
-data BHNF
-  = BInt Integer
+data BLiteral
+  = BRat Rational
+  | BF32 Float
+  | BF64 Double
+  | BStr String
+  | BChr Char
   | BRef BPtr
+  deriving (Show, Eq, Ord, Data)
+
+pattern BInt :: Integer -> BLiteral
+pattern BInt i <- (getInt -> Just i)
+  where BInt i = BRat (fromInteger i)
+
+getInt :: BLiteral -> Maybe Integer
+getInt (BRat r) | denominator r == 1 = Just (numerator r)
+getInt _ = Nothing
+
+data BHNF
+  = BLit BLiteral
   | BArr [BValue]
   | BHLam BIdent BBlock  -- invariant: the bound BIdent will not be among the vars in the block
 #if EXT
@@ -228,10 +245,13 @@ data BHNF
   deriving (Show, Eq, Ord, Data)
 
 pattern BVInt :: Integer -> BValue
-pattern BVInt i = BHNF (BInt i)
+pattern BVInt i = BVLit (BInt i)
+
+pattern BVLit :: BLiteral -> BValue
+pattern BVLit x = BHNF (BLit x)
 
 pattern BVRef :: BPtr -> BValue
-pattern BVRef i = BHNF (BRef i)
+pattern BVRef i = BHNF (BLit (BRef i))
 
 pattern BVArr :: [BValue] -> BValue
 pattern BVArr vs = BHNF (BArr vs)
@@ -339,8 +359,7 @@ instance Pretty BValue where
   pPrintPrec l p (BHNF h) = pPrintPrec l p h
 
 instance Pretty BHNF where
-  pPrintPrec l p (BInt i) = pPrintPrec l p i
-  pPrintPrec l p (BRef r) = pPrintPrec l p r
+  pPrintPrec l p (BLit x) = pPrintPrec l p x
   pPrintPrec l _ (BArr [v]) = parens (pPrintPrec l 0 v <> text ",")
   pPrintPrec l _ (BArr vs) = parens $ fsep (punctuate comma (map (pPrintPrec l 0) vs))
   pPrintPrec l p (BHLam x b) = maybeParens (p > 0) $ text "\\" <> pPrintPrec l 0 x <> text "." <+> pPrintPrec l 0 b
@@ -351,6 +370,16 @@ instance Pretty BHNF where
 
 instance Pretty Effect where
   pPrintPrec _ _ e = text $ tail $ show e
+
+instance Pretty BLiteral where
+  pPrintPrec l p (BRat r) = if denominator r == 1
+                            then pPrintPrec l p (numerator r)
+                            else text $ "(" ++ show (numerator r) ++ "/" ++ show (denominator r) ++ ")"
+  pPrintPrec l p (BF32 f) = pPrintPrec l p f <> text "f32"
+  pPrintPrec l p (BF64 f) = pPrintPrec l p f <> text "f64"
+  pPrintPrec l p (BStr s) = pPrintPrec l p s
+  pPrintPrec l p (BChr c) = pPrintPrec l p c
+  pPrintPrec l p (BRef r) = pPrintPrec l p r
 
 {-
 instance Pretty EffectType where
@@ -479,22 +508,19 @@ instance Bound BValue where
   bsubst' s (BHNF h) = BHNF (bsubst' s h)
   
 instance Bound BHNF where
-  allBVars (BInt _) = []
-  allBVars (BRef _) = []
+  allBVars (BLit _) = []
   allBVars (BArr vs) = unionMap allBVars vs
   allBVars (BHLam i b) = [i] `union` allBVars b
 #if EXT
   allBVars (BExt a r x) = allBVars (a, r, x)
 #endif
-  freeBVars (BInt _) = []
-  freeBVars (BRef _) = []
+  freeBVars (BLit _) = []
   freeBVars (BArr vs) = unionMap freeBVars vs
   freeBVars (BHLam i b) = freeBVars b \\ [i]
 #if EXT
   freeBVars (BExt a r x) = freeBVars (a, r, x)
 #endif
-  bsubst' _ h@(BInt _) = h
-  bsubst' _ h@(BRef _) = h
+  bsubst' _ h@(BLit _) = h
   bsubst' s (BArr vs) = BArr (map (bsubst' s) vs)
   bsubst' s h@(BHLam i b)
     | null s' = h
@@ -545,8 +571,7 @@ bIdentToIdent :: BIdent -> Ident
 bIdentToIdent (BIdent s) = Ident noLoc s
 
 hnfToCore :: BHNF -> Expr
-hnfToCore (BInt i) = Lit $ LitInt i
-hnfToCore (BRef r) = Lit $ LitPtr (coerce r)
+hnfToCore (BLit l) = Lit $ bLitToLit l
 hnfToCore (BArr vs) = Array (map valueToCore vs)
 hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
   where lam ii (f `ApplyD` Variable i') | ii == i', ii `notElem` getFree f = f
@@ -554,6 +579,16 @@ hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
 #if EXT
 hnfToCore (BExt a r x) = Lam (Ident noLoc "_") (Variable (Ident noLoc $ "EXT" ++ prettyShow (a, r, x)))
 #endif
+
+bLitToLit :: BLiteral -> Lit
+bLitToLit (BRat r) | denominator r == 1 = LitInt (numerator r)
+                   | otherwise = LitRat (fromRational r) "r"
+bLitToLit (BF32 f) = LitRat (fromRational $ toRational f) "f32"
+bLitToLit (BF64 f) = LitRat (fromRational $ toRational f) "f64"
+bLitToLit (BChr i) = LitChar i
+bLitToLit (BStr i) = LitStr i
+bLitToLit (BRef r) = LitPtr (coerce r)
+
 
 exprToCore :: BExpr -> Expr
 exprToCore (BPrimOp o v) = EPrim o `ApplyD` valueToCore v
@@ -625,8 +660,7 @@ cBlockV vs e = do
 
 cValue :: Expr -> A BValue
 cValue (Variable i) = pure $ BVar (cIdent i)
-cValue (Lit (LitInt i)) = pure $ BHNF $ BInt i
-cValue (Lit (LitPtr i)) = pure $ BHNF $ BRef $ coerce i
+cValue (Lit l) = pure $ BHNF $ BLit $ litToBLit l
 cValue (EPrim o) = cValue $ Lam i (EPrim o `ApplyD` Variable i) where i = Ident noLoc "a"
 cValue (Array es) = BHNF . BArr <$> mapM cValue es
 cValue (Lam x e) = BHNF . BHLam (cIdent x) <$> cBlockV [x] e
@@ -635,6 +669,16 @@ cValue (Seq [e]) = cValue e
 cValue (Seq (e : es)) = addExpr e *> cValue (Seq es)
 cValue (Exists is e) = do ss <- mapM addExist is; cValue (substMany(concat ss) e)
 cValue e = BVar <$> addExpr e
+
+litToBLit :: Lit -> BLiteral
+litToBLit (LitInt i) = BRat $ fromInteger i
+litToBLit (LitRat s "r") = BRat $ toRational s
+litToBLit (LitRat s "f32") = BF32 $ toRealFloat s
+litToBLit (LitRat s "f64") = BF64 $ toRealFloat s
+litToBLit (LitChar c) = BChr c
+litToBLit (LitStr s) = BStr s
+litToBLit (LitPtr i) = BRef $ coerce i
+litToBLit l = error $ "litToBLit: " ++ show l
 
 cExpr :: Expr -> A BExpr
 cExpr e@Variable{} = BVal <$> cValue e
@@ -830,8 +874,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         -- Swap so variable is first (v cannot be a variable, that's handled above)
         unify v (BVar x) = unify (BVar x) v
         -- Equal integers are ok
-        unify (BVInt i) (BVInt j) | i == j = succeeds []
-        unify (BVRef i) (BVRef j) | i == j = succeeds []
+        unify (BVLit i) (BVLit j) | i == j = succeeds []
         -- Replace equal length arrays with new equations
         unify (BVArr vs) (BVArr ws) | length vs == length ws = succeeds $ zipWith (\ v w -> (v, BVal w)) vs ws
         unify _x@(BVLam _ _) _y@(BVLam _ _) =
@@ -978,8 +1021,8 @@ evalPrimOp :: Op -> BValue -> Maybe BExpr
 evalPrimOp _ (BVar _) = Nothing
 evalPrimOp op v | Just cmp <- lookup op compareOps =
   case v of
-    BVArr [BVInt a, BVInt b] -> Just $ if cmp a b then BVal $ BVInt a else BFail
     BVArr vs | any isBVar vs -> Nothing
+    BVArr [BVInt a, BVInt b] -> Just $ if cmp a b then BVal $ BVInt a else BFail
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
 evalPrimOp op v | Just arith <- lookup op arithBinOps =
   case v of

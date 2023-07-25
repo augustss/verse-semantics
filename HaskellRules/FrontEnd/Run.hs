@@ -8,7 +8,6 @@ module FrontEnd.Run(
   ) where
 import Data.List
 import Epic.Print
-import FrontEnd.Desugar(simpCore)
 import FrontEnd.Expr(Core)
 import FrontEnd.Flags
 --import FrontEnd.RefImpl(evalRI)
@@ -25,9 +24,8 @@ run f s = one . runM f s
         one rs = error $ "run: multiple results from rewrite:\n" ++ intercalate "\n-----------------\n" (map prettyShow rs)
 
 runM :: Flags -> ESystem -> Core -> [Core]
-runM f s e = rewrite f s e'
-  where 
-        e' = if fSimplify f then simpCore e else e
+runM f s e = rewrite f s e
+
 
 --------------------
 

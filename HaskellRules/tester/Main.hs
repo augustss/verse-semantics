@@ -15,7 +15,6 @@ import System.IO(hFlush, stdout)
 import Text.Megaparsec(getSourcePos, sourceLine, unPos)
 
 import FrontEnd.Expr
-import FrontEnd.Desugar(exprToCore)
 import FrontEnd.Flags
 import FrontEnd.Parse hiding (many)
 import FrontEnd.ParseCore
@@ -153,7 +152,7 @@ data TestRes = Good | Bad | Many | None | Excn | Skip
 
 assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO TestRes
 assertEquivE ti flg e1 e2  = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
-  where toCore = exprToCore flags . desugar flags
+  where toCore = desugar flags
         flags = testFlagsToFlags flg
 
 assertEquivC :: HasCallStack => TestInfo -> TestFlags -> Core -> Core -> IO TestRes
@@ -253,7 +252,7 @@ assertVerify ti tflg e | typ == TSkip = do
   pure Skip
                        | otherwise = do
   let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False }
-      e' = preProcess sys (ruleEnv sys) . coreToTrs . exprToCore flags . desugar flags $ e
+      e' = preProcess sys (ruleEnv sys) . coreToTrs . desugar flags $ e
       shouldVerify = if typ == TBroken then testType ti == TFail else typ == TPass
 
   case verifyM sys e' of

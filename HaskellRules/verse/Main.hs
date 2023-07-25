@@ -85,13 +85,12 @@ data CState = CState
   }
 
 
-data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cored Core | Cores [Core]
+data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cores [Core]
 
 asParsed :: SomeExpr -> Expr
 asParsed NoExpr = error "No current expression"
 asParsed (Parsed e) = e
 asParsed (Desugared _) = error "Current expression is desugared"
-asParsed (Cored _) = error "Current expression is Core"
 asParsed (Cores _) = error "Current expression is [Core]"
 
 asExpr :: SomeExpr -> Expr
@@ -103,23 +102,20 @@ asDesugared f (Parsed e) = desugar f e
 asDesugared _ e = asExpr e
 
 asCore :: Flags -> SomeExpr -> Core
-asCore _ (Cored e) = e
 asCore _ (Cores [e]) = e
 asCore _ Cores{} = error "Not a singleton Core value"
-asCore s e = exprToCore s $ asDesugared s e
+asCore s e = asDesugared s e
 
 instance Show SomeExpr where
   show NoExpr = "No current expression"
   show (Parsed e) = show e
   show (Desugared e) = show e
-  show (Cored e) = show e
   show (Cores e) = show e
 
 instance Pretty SomeExpr where
   pPrintPrec _ _ NoExpr = text "No current expression"
   pPrintPrec l p (Parsed e) = pPrintPrec l p e
   pPrintPrec l p (Desugared e) = pPrintPrec l p e
-  pPrintPrec l p (Cored e) = pPrintPrec l p e
   pPrintPrec _ _ (Cores []) = text "No results"
   pPrintPrec l p (Cores [e]) = pPrintPrec l p e
   pPrintPrec l _ (Cores es) = vcat $ text "Multiple results:" :
@@ -131,7 +127,7 @@ command = Command
       [ Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
-      , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
+--      , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
 --      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
@@ -202,7 +198,7 @@ cRead afn s = do
 cParseLine :: Run CState
 cParseLine line s =
   tryIt (pure s) (updateLastExpr s) $ do
-    let prog = parseDie ((Parsed <$> P.try pFile) <|> (Cored <$> pCoreFile)) "<interactive>" line
+    let prog = parseDie ((Parsed <$> P.try pFile) <|> (Desugared <$> pCoreFile)) "<interactive>" line
     pp prog
     pure prog
 
@@ -223,15 +219,12 @@ cDesugar :: Run CState
 cDesugar c s = cTransform (Desugared . desugar (flags s) . asExpr) c s
 
 cPreprocess :: Run CState
-cPreprocess c s = cTransform (Cored . pre . asCore (flags s)) c s
+cPreprocess c s = cTransform (Desugared . pre . asCore (flags s)) c s
   where pre = trsToCore . preProcess sys (ruleEnv sys) . coreToTrs
         sys = esystem s
 
-cCore :: Run CState
-cCore c s = cTransform (Cored . asCore (flags s)) c s
-
 cEval :: Run CState
-cEval c s = cTransform (Cored . run flg (esystem s) . asCore flg) c s
+cEval c s = cTransform (Desugared . run flg (esystem s) . asCore flg) c s
   where flg = flags s
 
 cVerify :: Run CState

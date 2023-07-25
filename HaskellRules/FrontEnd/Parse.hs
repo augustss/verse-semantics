@@ -166,7 +166,7 @@ pLiteral = choice
   [ Lit . LitInt <$> pDecimal
   , Lit . LitChar <$> pChar
   -- Handle 1..2 incorrectly
-  , (Lit <$> (LitRat <$> L.scientific <*> many letterChar) <* skip)
+  , (Lit <$> (LitRat <$> L.scientific <*> ((:) <$> letterChar <*> many alphaNumChar)) <* skip)
   , pString
   ]
 

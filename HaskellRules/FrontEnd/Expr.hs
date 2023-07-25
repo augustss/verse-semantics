@@ -132,8 +132,7 @@ data Lit
   | LitRat Scientific String  -- d.d
   | LitChar Char              -- 'c'
   | LitStr String             -- "str"
-  -- These are used when translating back from Rules.Core.Expr
-  | LitPtr Ptr
+  | LitPtr Ptr                -- not a textual literal, just used when translating back.
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Lit where
