@@ -184,6 +184,12 @@ assumeAssertRules env lhs =
   do Assume (Verify _) <- [lhs]
      pure (Val (Arr []))
   ++
+  -- We *used* to get this from plain `HNF-SWAP` when it was of the form `hnf = x -> x = hnf`
+  -- Assume e = x ----> x = Assume e
+  "Assume-SWAP" `name`
+  do Assume e :=: x@Var{} <- [lhs]
+     pure (x :=: Assume e)
+  ++
   -- ASSERT --
   -- Assert { e } ----> e   if   e mustSucceed
   "Assert-Elim" `name`

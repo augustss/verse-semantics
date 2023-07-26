@@ -697,7 +697,7 @@ rulesUnification env lhs =
   "HNF-SWAP" `name`
 -- Old version, only swap with variables.
 -- This is non-confluent with lambda unification.
--- do (hnf@HNF{} :=: x@Var{}) :>: e <- [lhs]
+--   do (hnf@HNF{} :=: v@Var{}) :>: e <- [lhs]
   do (hnf@HNF{} :=: v@Val{}) :>: e <- [lhs]
      pure ((v :=: hnf) :>: e)
  ++
@@ -970,7 +970,7 @@ rulesChoice _ lhs =
  ++
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
-     pure (Arr []) 
+     pure (Arr [])
  ++
   "ALL-VALUE" `name`
   do All (Val v) <- [lhs]

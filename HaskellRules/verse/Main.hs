@@ -242,10 +242,8 @@ cVerify = do
       let flg = (flags s){ fVerify = True, fSplit = False }
           e1  = asCore flg e
           e2  = coreToTrs e1
-          e' = preProcess sys (ruleEnv sys) e2 -- $ coreToTrs $ asCore flg e
-      -- putStrLn $ "Desugared 1:\n" ++ prettyShow e1
-      -- putStrLn $ "Desugared 2:\n" ++ prettyShow e2
-      putStrLn $ "Desugared 3:\n" ++ prettyShow e'
+          e' = preProcess sys (ruleEnv sys) e2
+      -- putStrLn $ "Desugared 3:\n" ++ prettyShow e'
       let (done, trc) = verify sys e'
       when (fTraceVerify flg) $ do
         putStrLn "Verification trace:"
