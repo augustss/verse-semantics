@@ -1048,6 +1048,9 @@ preludeFuncs =
   [("any", typ [])                                             -- x => x
   ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (Lit (LitInt 0))]) -- x => int#[x]; x>=0; x
   ,("int", typ [app "isInt$" vx])                              -- x => int#[x]; x
+  ,("rat", typ [app "isRat$" vx])                              -- x => rat#[x]; x
+  ,("char", typ [app "isChr$" vx])                             -- x => char#[x]; x
+  ,("string", typ [app "isStr$" vx])                           -- x => string#[x]; x
   ,("in'->'", arrowV)
   ,("false", bare $ Array [])                                      -- ()
   ,("new", newV)

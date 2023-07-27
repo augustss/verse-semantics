@@ -38,7 +38,8 @@ import FrontEnd.Desugar(getFree, substMany, getAllVars)
 type Op = String
 type Subst e = [(Ident, e)]
 
-opGt, opGe, opLt, opLe, opNe, opAdd, opSub, opMul, opDiv, opNeg, opPlus, opIsInt, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
+opGt, opGe, opLt, opLe, opNe, opAdd, opSub, opMul, opDiv, opNeg, opPlus, opIsInt, opIsRat, opIsChr, opIsStr,
+      opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
 opGt    = "in'>'"
 opGe    = "in'>='"
 opLt    = "in'<'"
@@ -51,6 +52,9 @@ opDiv   = "in'/'"
 opNeg   = "pre'-'"
 opPlus  = "pre'+'"
 opIsInt = "isInt$"
+opIsRat = "isRat$"
+opIsChr = "isChr$"
+opIsStr = "isStr$"
 opMapAp = "mapAp$"
 opCons  = "cons$"
 opAlloc = "alloc$"
@@ -724,6 +728,9 @@ primOpEffs o = fromMaybe [] $ lookup o [
   (opLe, [Efails]),
   (opNe, [Efails]),
   (opIsInt, [Efails]),
+  (opIsRat, [Efails]),
+  (opIsChr, [Efails]),
+  (opIsStr, [Efails]),
   (opMapAp, allEffects),  -- XXX can do better?
   (opAlloc, [Eallocates]),
   (opRead,  [Ereads]),
@@ -1037,6 +1044,21 @@ evalPrimOp op v | Just arith <- lookup op arithUnOps =
 evalPrimOp op v | op == opIsInt =
   case v of
     a@(BVInt _) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsRat =
+  case v of
+    a@(BVLit (BRat _)) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsChr =
+  case v of
+    a@(BVLit (BChr _)) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsStr =
+  case v of
+    a@(BVLit (BStr _)) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opCons =
