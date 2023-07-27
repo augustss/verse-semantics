@@ -42,15 +42,20 @@ tryIt iob aiob ioa = do
 main :: IO ()
 main = do
   args <- mainArgs
-  let cmd =
-        case rulesys args of
-          Nothing -> command{ c_nl = wslbug args }
-          Just name -> command{ c_state = (c_state command){ esystem = either error id $ findSystem name }, c_nl = wslbug args }
-  runCommand cmd
+  let msys = fmap (either error id . findSystem) (rulesys args)
+  if null (fileNames args) then do
+    let cmd =
+          case msys of
+            Nothing -> command{ c_nl = wslbug args }
+            Just sys -> command{ c_state = (c_state command){ esystem = sys }, c_nl = wslbug args }
+    runCommand cmd
+   else
+    mapM_ (runFile msys) (fileNames args)
 
 data MainFlags = MainFlags
-  { rulesys  :: !(Maybe String)
-  , wslbug   :: !Bool
+  { rulesys   :: !(Maybe String)
+  , wslbug    :: !Bool
+  , fileNames :: ![FilePath]          -- input files
   }
 
 mainFlags :: Parser MainFlags
@@ -63,6 +68,7 @@ mainFlags = MainFlags
   <*> switch
          ( long "wsl"
         <> help "Add extra NL to compensate for WSL bug" )
+  <*> many (argument str (metavar "FILES..."))
 
 mainArgs :: IO MainFlags
 mainArgs = do
@@ -329,3 +335,17 @@ helpMsg = "\
   ++ "\n\
 \Commands (can be abbreviated):\
 \"
+
+--------------------------------------------------
+
+runFile :: Maybe ESystem -> FilePath -> IO ()
+runFile msys fn = do
+  putStrLn $ "running " ++ fn
+  file <- readFile fn
+  let sys = fromMaybe blockSystem msys
+      flg = maybe id id (lookup (sname sys) systemFlags) $
+            defaultFlags
+      e = parseDie pFile fn file
+      r = run flg sys . desugar flg $ e
+  putStrLn $ prettyShow r
+  putStrLn "done"
