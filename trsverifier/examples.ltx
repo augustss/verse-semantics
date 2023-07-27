@@ -11,36 +11,74 @@
 $$\begin{array}{ll}
 |f^(x:int) :== x+1|                           & \text{\# pass} \\
 |f^(x:int) :== x+1; f^(42)|                   & \text{\# pass} \\
-|f^(x:int) :== x+1; f^(arr (4,2))|            & \text{\# fail} \\
+|f^(x:int) :== x+1; f^(arr ())|               & \text{\# fail} \\
+
 |f^(x):int :== myite (int^[x]) (x + 1) 0|     & \text{\# pass} \\
 |f^(n):int :== myite (0 < n) (n + f^(n-1)) 0| & \text{\# pass} \\
 |f^(x:int) :== {x + 1}; g^(h^(z:int):int):int :== {h^(3)}; g^(f)| & \text{\# pass} \\
 |t^(x:int)(eff decides) :== {x = 666 choice x = 42}; f^(z:t):t :== {708 - z}| & \text{\# pass} \\
 \end{array}$$
 
-\mypara{Example 1} Consider the surface level function definition
+\mypara{Example 1} Consider the function definition |f^(x:int) :== x + 1|, represented as the surface term
 %
 \begin{align*}
-& |f^(x:int) :== x+1|
+& |def f (f = (fndef x int (tup (succeedKW)) (x+1)))|
 \intertext{Desugaring turns the definition of |f| into the verification goal}
-& |verify (lam y (def x (assume (int^(y); x = y; x); succeed (int^(x); int^(1); assume (def r (int^(r)))))))| \\
-% \intertext{which now rewrites via the sequence of steps}
+& |def f (verify (lam y (def x (assume (int^(y); x = y; x); succeed (applyN add (x, 1))))); f = xdots)| \\
+\intertext{where $|xdots|$ is the term $|lam x (int^[x]; (applyN add (x, 1)))|$. The above rewrites as}
+& |def f (verify (lam y (def x (assume (int^(y); x = y; x); succeed (int^(x); int^(1); assume (def r (int^(r))))))); f = xdots)| \\
 & \movestoR{subst}    \\
-& |verify (lam y (def x (assume (int^(y); x = y; y); succeed (int^(y); int^(1); assume (def r (int^(r)))))))| \\
+& |def f (verify (lam y (def x (assume (int^(y); x = y; y); succeed (int^(y); int^(1); assume (def r (int^(r))))))); f = xdots)| \\
 & \movestoR{eqn-elim} \\
-& |verify (lam y (assume (int^(y); y); succeed (int^(y); int^(1); assume (def r (int^(r))))))| \\
+& |def f (verify (lam y (assume (int^(y); y); succeed (int^(y); int^(1); assume (def r (int^(r)))))); f = xdots)| \\
 & \movestoR{asm-seq + seq-assoc} \\
-& |verify (lam y (assume (int^(y); assume y; succeed (int^(y); int^(1); assume (def r (int^(r)))))))| \\
+& |def f (verify (lam y (assume (int^(y); assume y; succeed (int^(y); int^(1); assume (def r (int^(r))))))); f = xdots)| \\
 & \movestoR{asm-intro} \\
-& |verify (lam y (assume (int^(y); assume y; succeed (assume (int^(y)); int^(1); assume (def r (int^(r)))))))| \\
+& |def f (verify (lam y (assume (int^(y); assume y; succeed (assume (int^(y)); int^(1); assume (def r (int^(r))))))); f = xdots)| \\
 & \movestoR{app-int} \\
-& |verify (lam y (assume (int^(y); assume y; succeed (assume (int^(y)); 1; assume (def r (int^(r)))))))| \\
+& |def f (verify (lam y (assume (int^(y); assume y; succeed (assume (int^(y)); 1; assume (def r (int^(r))))))); f = xdots)| \\
 & \movestoR{suc-elim} \\
-& |verify (lam y (assume (int^(y); assume y; assume (int^(y)); 1; assume (def r (int^(r))))))| \\
+& |def f (verify (lam y (assume (int^(y); assume y; assume (int^(y)); 1; assume (def r (int^(r)))))); f = xdots)| \\
 & \movestoR{prove-elim} \\
-& |arr ()|
+& |def f (arr (); f = xdots)|
 \end{align*}
 
+\mypara{Example 2} Next, consider |f^(x:int) :== {x + 1}; f^(42)|. This is represented as the surface term
+%
+\begin{align*}
+& |def f (f = (fndef x int (tup (succeedKW)) (x+1)); f^(42))| \\
+\intertext{which desugars into the below where the |verify (xdots)| is the same as above}
+& |def f (verify (xdots); f = (lam x (int^[x]; (applyN add(x,1)))); succeed (f^[42]))| \\
+& \movesto^{*} \text{many steps as in the previous example} \\
+& |def f (arr(); f = (lam x (int^[x]; (applyN add(x,1)))); succeed (f^[42]))| \\
+& \movestoR{val-elim} \\
+& |def f (f = (lam x (int^[x]; (applyN add(x,1)))); succeed (f^[42]))| \\
+& \movestoR{app-beta + subst + eqn-elim} \\
+& |succeed (int^[42]; (applyN add(42,1)))| \\
+& \movestoR{app-int + app-add} \\
+& |succeed (42; 43)| \\
+& \movestoR{val-elim} \\
+& |succeed (43)| \\
+& \movestoR{suc-elim}\\
+& |43|
+\end{align*}
+
+\mypara{Example 3} Suppose instead we have an ill-typed variant |f^(x:int) :== {x + 1}; f^(arr ())|. In the surface
+%
+\begin{align*}
+& |def f (f = (fndef x int (tup (succeedKW)) (x+1)); f^(arr ()))| \\
+\intertext{which desugars into the below where the |verify (xdots)| is the same as above}
+& |def f (verify (xdots); f = (lam x (int^[x]; (applyN add(x,1)))); succeed (f^[arr()]))| \\
+& \movesto^{*} \text{as before} \\
+& |succeed (int^[arr()]; (applyN add(arr(),1)))| \\
+& \movestoR{app-int + app-add} \\
+& |succeed (fail; fail)| \\
+& \movestoR{fail-elim} \\
+& |succeed (fail)|
+\end{align*}
+%
+The (final) normal form has a \emph{residual} obligation |succeed (xdots)|,
+so the verifier rejects the ill-typed program.
 
 \begin{comment}
 

@@ -171,13 +171,13 @@
 %format one (x) = "\textbf{one}\{" x "\}"
 %format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
 
-%format assumeKW = "\textbf{assume}"
+%format assumeKW = "\textbf{asm}"
 %format assertKW = "\textbf{assert}"
 %format succeedKW = "\textbf{suc}"
 %format verifyKW = "\textbf{prove}"
 %format decideKW = "\textbf{dec}"
 
-%format assume (x) = "\textbf{assume}\{" x "\}"
+%format assume (x) = "\textbf{asm}\{" x "\}"
 %format assert (x) = "\textbf{assert}\{" x "\}"
 %format succeed (x) = "\textbf{suc}\{" x "\}"
 %format verify (x) = "\textbf{prove}\{" x "\}"

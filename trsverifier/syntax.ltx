@@ -10,18 +10,72 @@
 
 \subsection{Surface Syntax} \label{sec:syntax:surface}
 
+The verifier takes as input programs written in the \emph{surface} syntax
+whose grammar is summarized in Figure~\ref{fig:surface-syntax}.
+%
+The terms $|t|$ of the surface language include the usual
+elements of Verse:
+variables $|x|$,
+integer constants $|k|$,
+branches $|myite t_1 t_2 t_3|$,
+tuples $|tup (t_1,xdots,t_n)|$,
+existential bindings $|def x t|$,
+unification equations $|t_1 = t_2|$,
+sequences $|t_1 ; t_2|$,
+choices $|t_1 choice t_2|$, $|one t|$ and $|all t|$ terms.
+%
+There are two kinds of function applications ---
+$|t_1^[t_2]|$ which indicates the call is allowed to |fail|, and
+$|t_1^(t_2)|$ which indicates the call must not |fail|.
+%
+Finally, we have two kinds of function definitions.
+%
+The first kind elides an explicit type for the function's output,
+while the second provides one.
+%
+In either case the function definition is annotated with a type
+for the input binder $|x:t|$ and an effect $|tup (fx)|$ which denotes
+if the function |succeedKW| (which is the default, if an annotation is elided),
+or |decideKW|.
+
+
+\subsection{Core Syntax} \label{sec:syntax:core}
+
+% \figureSyntax
+
+The verifier's language is an extension of Core Verse \cite{fullversepaper}
+with a few constructs that record the verification goals and the assumptions under which
+they must be proved.
+%
+These extensions are summarized in Figure~\ref{fig:verifier-syntax}.
+%
+The |myite e_1 e_2 e_3| construct makes it easier to use
+the information established by the branch (|e_1|) in the |then|
+expression |e_2|.
+%
+The |assume e| construct records an \emph{assumption} that
+the evaluation of |e| always produces a value \ie does not
+get stuck or |fail|.
+%
+Dually, the |succeed e| construct (perhaps better named |succeeds|)
+denotes an \emph{obligation} that the evaluation of |e| always
+produces a value \ie does not get stuck or fail.
+%
+The |decide e| construct denotes an \emph{obligation} that
+the evaluation of |e| does not get \emph{stuck} \ie either
+produces values or fails.
 \begin{figure}
 $$\begin{array}{lr@@{\;}c@@{\;}l}
 \textbf{Surface Terms}
    & t & ::= & |x| \vb |k| \vb |myite t t t| \vb |tup (t_1,xdots,t_n)| \\
    &   & \vb & |def x t| \vb |t = t| \vb |t; t| \vb |t choice t| \vb |one t| \vb |all t| \\
-   &   & \vb & |f^[x]| \\
-   &   & \vb & |f^(x)| \\
+   &   & \vb & |t^[t]| \\
+   &   & \vb & |t^(t)| \\
    &   & \vb & |fndef x t (tup (fx)) t| \\
    &   & \vb & |fndef x t (tup (fx) : t) t| \\[0.1in]
-\end{array}$$
+% \end{array}$$
 %
-$$\begin{array}{lr@@{\;}c@@{\;}l}
+%$$\begin{array}{lr@@{\;}c@@{\;}l}
 \textbf{Core Expressions}
    & e & ::= & |x| \vb |k| \vb |myite e e e| \vb |tup (e_1,xdots,e_n)| \\
    &   & \vb & |def x e| \vb |e = e| \vb |e; e| \vb |e choice e| \vb |one e| \vb |all e| \\
@@ -29,6 +83,11 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
    &   & \vb & |e^[e]| \\
    &   & \vb & |succeed e| \vb |decide e| \\
    &   & \vb & |assume e| \vb |verify e| \\[0.1in]
+%\end{array}$$
+%
+%$$\begin{array}{lr@@{\;}c@@{\;}l}
+\textbf{Effects}
+   & |fx| & ::= & |succeedKW| \vb |decideKW| \\[0.1in]
 \end{array}$$
 \caption{Surface and Core Verifier Syntax}
 \label{fig:surface-syntax}
@@ -47,15 +106,15 @@ $$\begin{array}{r@@{\;}c@@{\;}l@@{\;}l}
 |De (t_1 choice t_2)|      & \doteq & |(De t_1) choice (De t_2)| \\
 |De (one t)|               & \doteq & |one (De t)| \\
 |De (all t)|               & \doteq & |all (De t)| \\
-|De (f^[x])|               & \doteq & |f^[x]| \\
-|De (f^(x))|               & \doteq & |succeed (f^[x])| \\
+|De (t_1^[t_2])|           & \doteq & |(De t_1)^[De t_2]| \\
+|De (t_1^(t_2))|           & \doteq & |succeed ((De t_1)^[De t_2])| \\
 |De (fndef x t_1 (tup (fx)) t_2)|       & \doteq & |tlamx  fx x' x (x = (Me x' t_1)) (De t_2)| & |x'|\ \text{fresh} \\
 |De (fndef x t_1 (tup (fx) : t_3) t_2)| & \doteq & |tlamxt fx x' x (x = (Me x' t_1)) (De t_2) (De t_3)| & |x'|\ \text{fresh} \\[0.1in]
 % \end{array}$$
 %
 %$$\begin{array}{r@@{\;}c@@{\;}ll}
 |Me i (fndef x t_1 (tup (fx)) t_2)| & \doteq & |tlamx fx x' x (x = (Me x' t_1)) (def y (y= i^[x]; Me y t_2))| & |x'|\ \text{fresh} \\
-|Me i t| & \doteq & |(De t)^[i]| \\[0.1in]
+|Me i t| & \doteq & |(De t)^[i]| \quad \text{if}\ |t|\ \text{is}\ |int|\ \text{or}\ |string|\ \etc \\[0.1in]
 %\end{array}$$
 %
 %$$\begin{array}{r@@{\;\;}c@@{\;\;}ll}
@@ -74,33 +133,14 @@ $$\begin{array}{r@@{\;}c@@{\;}l@@{\;}l}
 % D(fndef x t_1 (tup (fx)) BODY) = tlam x' (x) (x = M(x' |> t_1) (De BODY))))
 % \end{comment}
 
-\subsection{Core Syntax} \label{sec:syntax:core}
-
-% \figureSyntax
-
-The verifier's language is an extension of Core Verse
--- as described in \cref{fig:syntax} -- with a few constructs
-that record the verification goals and the assumptions under which
-they must be proved.
-%
-These extensions are summarized in \cref{fig:verifier-syntax}.
-%
-The |myite e_1 e_2 e_3| construct makes it easier to use
-the information established by the branch (|e_1|) in the |then|
-expression |e_2|.
-%
-The |assume e| construct records an \emph{assumption} that
-the evaluation of |e| always produces a value \ie does not
-get stuck or |fail|.
-%
-Dually, the |succeed e| construct (perhaps better named |succeeds|)
-denotes an \emph{obligation} that the evaluation of |e| always
-produces a value \ie does not get stuck or fail.
-%
-The |decide e| construct denotes an \emph{obligation} that
-the evaluation of |e| does not get \emph{stuck} \ie either
-produces values or fails.
 
 \section{Desugaring Surface to Core} \label{sec:desugar}
 
-\ranjit{TODO: example}
+Figure~\ref{fig:desugaring} summarizes how surface terms |t|
+are desugared into verifier expressions |e| via
+%
+\begin{itemize}
+   \item |De t| which recursively \emph{desugars} surface terms |t| into core expressions |e| using the helpers,
+   \item |Me i t| which \emph{casts} binders (variables) |i| to the \emph{``type''} $|t|$,
+   \item |tlamx fx x' x e_1 e_2| which encodes the proof obligations and representation for functions.
+\end{itemize}

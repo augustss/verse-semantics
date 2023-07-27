@@ -3,6 +3,7 @@ verify("Trivial-pass", pass){1}
 verify("Trivial-fail", fail){succeeds{0=1}}
 #
 # Some simple tests
+verify(pass) {f(x:int):={x=x;x}}
 verify(pass) {f(x:int):=x+1}
 verify(fail) {f(x:int):=x+()}
 verify(pass) {f(x:int):=x+1; f(1)}

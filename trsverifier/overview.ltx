@@ -16,11 +16,20 @@ extended with
 (1) \emph{syntax} to record \emph{assumptions} and \emph{obligations},
 %
 (2) \emph{rewrite rules} that use the assumptions to discharge obligations.
+
+The verifier takes as input a surface term $t$ and desugars it into a
+verifier term $e$. Next, the verifier repeatedly applies \emph{all}
+the rewrite rules, that is, the ICFP23 rules \emph{and}
+the new verification rules, such that either
 %
-The job of the verifier is to \emph{rewrite} the (desugared)
-term using \emph{all} the rules, that is, the ICFP23 rules \emph{and}
-the new verification rules, until no obligations remain, at which point
-the term is deemed verified.
+(a)~we obtain a term |e'| such that $\isdone{e'}$, \ie which
+contains no obligations, in a covariant position, in which case
+|t| is \emph{accepted}, or
+%
+(b)~we obtain a normal form |e'| that still contains obligations
+in a covariant position, in which case |t| is \emph{rejected}, or
+%
+(c)~the rewriting times out, in which case |t| is \emph{rejected}.
 
 Next, we describe the extensions to the syntax \cref{sec:syntax},
 explain the desugaring by means of examples \cref{sec:desugaring},
@@ -31,7 +40,8 @@ end-to-end.
 \mypara{TODO} See google-doc notes
 %
 \begin{itemize}
-\item Desugaring (``Tim Sync'' TinyVerse on May 24)
-\item (July 19) WHY for |prove e| why do we need $|verify e|$ "subgoals"?
-\item (July 19) WHY not push |succeedKW| ``inside'' (instead of wrapping terms with |assumeKW|)?
+\item DISCUSS: WHY for |prove e| why do we need $|verify e|$ "subgoals"?
+\item DISCUSS: WHY not push |succeedKW| ``inside'' (instead of wrapping terms with |assumeKW|)?
+\item FIX: if |t| is semi, or |if| then |i| is pushed further inside (add more cases)
+\item FIX: add to the exact condition ``no PROVE/SUC/DEC left in a covariant position'' –--- not under lambda
 \end{itemize}

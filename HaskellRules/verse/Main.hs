@@ -242,7 +242,7 @@ cVerify = do
           e1  = asCore flg e
           e2  = coreToTrs e1
           e' = preProcess sys (ruleEnv sys) e2
-      -- putStrLn $ "Desugared 3:\n" ++ prettyShow e'
+      putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify sys e'
       when (fTraceVerify flg) $ do
         putStrLn "Verification trace:"
