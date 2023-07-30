@@ -80,7 +80,7 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
    & e & ::= & |x| \vb |k| \vb |myite e e e| \vb |tup (e_1,xdots,e_n)| \\
    &   & \vb & |def x e| \vb |e = e| \vb |e; e| \vb |e choice e| \vb |one e| \vb |all e| \\
    &   & \vb & |lam x e| \\
-   &   & \vb & |e^[e]| \\
+   &   & \vb & |apply1 e e| \\
    &   & \vb & |succeed e| \vb |decide e| \\
    &   & \vb & |assume e| \vb |verify e| \\[0.1in]
 %\end{array}$$
@@ -114,7 +114,7 @@ $$\begin{array}{r@@{\;}c@@{\;}l@@{\;}l}
 %
 %$$\begin{array}{r@@{\;}c@@{\;}ll}
 |Me i (fndef x t_1 (tup (fx)) t_2)| & \doteq & |tlamx fx x' x (x = (Me x' t_1)) (def y (y= i^[x]; Me y t_2))| & |x'|\ \text{fresh} \\
-|Me i t| & \doteq & |(De t)^[i]| \quad \text{if}\ |t|\ \text{is}\ |int|\ \text{or}\ |string|\ \etc \\[0.1in]
+|Me i t| & \doteq & |apply1 (De t) i| \quad \text{if}\ |t|\ \text{is}\ |int|\ \text{or}\ |string|\ \etc \\[0.1in]
 %\end{array}$$
 %
 %$$\begin{array}{r@@{\;\;}c@@{\;\;}ll}

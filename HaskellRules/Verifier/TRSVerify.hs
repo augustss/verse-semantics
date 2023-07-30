@@ -264,6 +264,29 @@ ex00 = Assert (Int 2 :=: Int 2 :>: Int 2)
 ex01 :: Expr
 ex01 = verse $ lam (\x -> Assert x)
 
+--  f(x:int, y:int, z:int, pf:type{x=y}) := { a := x; b := a; b = y }
+-- >  \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=x; b=a; b=y}
+-- SUBST x = y
+-- >  \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=y; b=a; b=y}
+-- SUBST a = y
+-- >  \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=y; b=a; b=y}
+-- exi-elim a
+-- >  \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists b. b=y; b=y}
+-- SUBST b=y
+-- >  \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists b. b=y; y=y}
+-- exi-elim b
+-- >  \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ y=y}
+-- asm-seq
+-- >  \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; succeeds{ y=y}
+-- prove y=y using assume {int[y]}
+-- >  \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; succeeds{ assume{y=y} }
+-- suc-elim
+-- >  \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; assume{y=y}
+
+--  f(x:int, y:int, z:int, pf:type{x=z}) := { a := x; b := a; b = y }
+--  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=y => succeeds{ exists a b. a=x; b=a; b=y}
+
+
 --  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=y => succeeds{ exists a b. a=x; b=a; b=y}
 ex0 :: Expr
 ex0 = LAM x (LAM y (LAM z (

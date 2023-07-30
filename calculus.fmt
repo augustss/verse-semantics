@@ -251,6 +251,7 @@
 %format tdots = "\!\!\!\cdots\!\!\!"
 %format emp = "\epsilon"
 %format plus = "\oplus"
+%format minus = "\ominus"
 %format hole = "\hole"
 %format lte = "\prec"
 
@@ -360,6 +361,8 @@
 %format e_x
 %format e_y
 %format e_i
+%format e_f
+%format v_f
 
 %format eu = "eu"
 %format eu_1 = "eu_1"
