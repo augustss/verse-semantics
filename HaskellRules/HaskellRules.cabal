@@ -54,8 +54,8 @@ library all
                       FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
-                      Verifier.Verify
-                      Verifier.FOL
+--                      Verifier.Verify
+--                      Verifier.FOL
                       Rules.ICFP
                       Rules.Verifier
                       --DenSem.DenSem
@@ -76,7 +76,7 @@ library all
                       text,
                       transformers,
                       unordered-containers,
-                      z3,
+--                      z3,
     hs-source-dirs:   .
 
 executable verse
