@@ -82,9 +82,9 @@ pName :: P Expr
 pName = do
   i@(Ident l s) <- pIdent
   let ops = [ ("fail", Fail)
-            , ("gt", vi "in'>'")
-            , ("lt", vi "in'<'")
-            , ("add", vi "in'+'")
+            , ("gt", vi "intGT$")
+            , ("lt", vi "intLT$")
+            , ("add", vi "intAdd$")
             , ("addto", vi "in'+='")
             , ("isInt", vi "isInt$")
             ]

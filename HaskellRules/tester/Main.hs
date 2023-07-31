@@ -18,6 +18,7 @@ import FrontEnd.Expr
 import FrontEnd.Flags
 import FrontEnd.Parse hiding (many)
 import FrontEnd.ParseCore
+import FrontEnd.Prelude
 import FrontEnd.TRSAdapter(coreToTrs)
 import Epic.Print (Pretty, prettyShow)
 import FrontEnd.Desugar(desugar)
@@ -51,6 +52,8 @@ data TestFlags = TestFlags
   , maxSteps       :: !Int                 -- max number of rewrite steps
   , maxNormSteps   :: !Int                 -- max number of normalization steps
   , ignoreFuelStop :: !Bool                -- ignore running out of fuel
+  , assumeVerified :: !Bool                -- turn succeeds into a no-op
+  , prelude        :: !String              -- use this prelude
   , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -151,7 +154,7 @@ data TestRes = Good | Bad | Many | None | Excn | Skip
   deriving (Eq, Show)
 
 assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO TestRes
-assertEquivE ti flg e1 e2  = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
+assertEquivE ti flg e1 e2 = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
   where toCore = desugar flags
         flags = testFlagsToFlags flg
 
@@ -460,6 +463,14 @@ testFlags = TestFlags
   <*> switch
          ( long "ignore-fuel-stop"
         <> help "Ignore running out of fuel" )
+  <*> switch
+         ( long "assume-verified"
+        <> help "succeeds{} is a no-op" )
+  <*> strOption
+         ( long "prelude"
+        <> metavar "NAME"
+        <> value defaultPrelude
+        <> help "use the given prelude" )
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
@@ -469,7 +480,9 @@ testFlagsToFlags t =
                 fDfs = dfs t, fFinalInline = finalInl t,
                 fUnderLambda = not (noUnderLam t),
                 fRewriteSteps = maxSteps t,
-                fNoFuelStop = ignoreFuelStop t
+                fNoFuelStop = ignoreFuelStop t,
+                fAssumeVerified = assumeVerified t,
+                fPrelude = either error id $ findPrelude (prelude t)
                 }
 main :: IO ()
 main = do

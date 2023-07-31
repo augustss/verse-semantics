@@ -13,29 +13,29 @@ QCTEST=cabal run qctest --
 RULES=ICFP
 VRULES=ICFPEverify
 
-all: testiblock testrules testverify
+all: build testiblock testverify testrules
 
 build:
 	cabal build
 
 testrules:
-	$(TESTER) --quiet --dfs --rules=$(RULES) $(EXTRA)                    --max-steps=250000       $(TESTFILE)
+	$(TESTER) --quiet --dfs --rules=$(RULES) $(EXTRA)                    --assume-verified --max-steps=250000       $(TESTFILE)
 	$(QCTEST)               --rules=$(RULES) $(EXTRA) --ignore-fuel-stop --max-success=1000 --ignore-recursive --koen
-	$(TESTER) --quiet       --rules=$(RULES) $(EXTRA) --max-steps=500000 --max-norm-steps=100000 $(TRICKY)
+	$(TESTER) --quiet       --rules=$(RULES) $(EXTRA) --max-steps=500000 --assume-verified --max-norm-steps=100000 $(TRICKY)
 
 testiblock:
-	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTFILE)
-	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TRICKY)
-	$(TESTER) --quiet --split --rules=iblock               --max-steps=25000    $(TESTSTOREFILE)
+	$(TESTER) --quiet --split --rules=iblock --assume-verified --max-steps=25000    $(TESTFILE)
+	$(TESTER) --quiet --split --rules=iblock --assume-verified --max-steps=25000    $(TRICKY)
+	$(TESTER) --quiet --split --rules=iblock --assume-verified --max-steps=25000    $(TESTSTOREFILE)
 
 testverify:
-	$(TESTER) --quiet --rules=$(VRULES) --max-norm-steps=100000 $(VERIFY)
+	$(TESTER) --quiet --rules=$(VRULES) --prelude=noprelude --max-norm-steps=100000 $(VERIFY)
 
 testicfpqc:
 	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive
 
 testtricky:
-	$(TESTER) --quiet --summary --no-error --all-rules --max-norm-steps=100000 --max-steps=4000 $(TRICKY)
+	$(TESTER) --quiet --summary --no-error --all-rules --assume-verified --max-norm-steps=100000 --max-steps=4000 $(TRICKY)
 
 clean:
 	cabal clean

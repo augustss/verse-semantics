@@ -1,5 +1,5 @@
 module FrontEnd.Parse(
-  parseDie, pFile,
+  parseDie, parseTry, pFile,
   -- Exports for further parsing
   pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
   pIdent, pExprSeq, pOp, pLiteral, pMacroName, try,
@@ -511,6 +511,9 @@ parseDie p fn file =
   case runP p fn file of
     Left err -> error $ errorBundlePretty err
     Right x -> x
+
+parseTry :: P a -> FilePath -> String -> Either String a
+parseTry p fn file = either (Left . errorBundlePretty) Right $ runP p fn file
 
 testp :: P a -> String -> a
 testp p = parseDie p "<string>"

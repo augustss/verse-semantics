@@ -38,19 +38,19 @@ import FrontEnd.Desugar(getFree, substMany, getAllVars)
 type Op = String
 type Subst e = [(Ident, e)]
 
-opGt, opGe, opLt, opLe, opNe, opAdd, opSub, opMul, opDiv, opNeg, opPlus, opIsInt, opIsRat, opIsChr, opIsStr,
+opIntGt, opIntGe, opIntLt, opIntLe, opIntNe, opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIsInt, opIsRat, opIsChr, opIsStr,
       opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
-opGt    = "in'>'"
-opGe    = "in'>='"
-opLt    = "in'<'"
-opLe    = "in'<='"
-opNe    = "in'<>'"
-opAdd   = "in'+'"
-opSub   = "in'-'"
-opMul   = "in'*'"
-opDiv   = "in'/'"
-opNeg   = "pre'-'"
-opPlus  = "pre'+'"
+opIntGt    = "intGT$"
+opIntGe    = "intGE$"
+opIntLt    = "intLT$"
+opIntLe    = "intLE$"
+opIntNe    = "intNE$"
+opIntAdd   = "intAdd$"
+opIntSub   = "intSub$"
+opIntMul   = "intMul$"
+opIntDiv   = "intDiv$"
+opIntNeg   = "intNeg$"
+opIntPlus  = "intPlus$"
 opIsInt = "isInt$"
 opIsRat = "isRat$"
 opIsChr = "isChr$"
@@ -103,12 +103,15 @@ runBlock :: TRSFlags -> Expr -> Expr
 runBlock flg e =
   let b = coreToChoice e
       b' = evalChoiceFull emptyHeap effs b
-      b'' = if tfUnderLambda flg then evalUnderLambda b' else b'
-      effs = [Etrace | tfTrace flg] ++ topEffects
+      b'' = if tfUnderLambda flg then evalUnderLambda trcEff b' else b'
+      trcEff = [Etrace | tfTrace flg]
+      effs = trcEff ++ topEffects
   in
       dtrace effs ("core: " ++ prettyShow e) $
       dtrace effs ("input: " ++ prettyShow b) $
       dtrace effs ("output: " ++ prettyShow b') $
+      dtrace effs ("output-lam: " ++ prettyShow b'') $
+      dtrace effs ("output-core: " ++ show (choiceToCore b'')) $
       choiceToCore b''
 
 evalChoiceFull :: BHeap -> AllowedEffects -> BChoice -> BChoice
@@ -122,8 +125,8 @@ evalChoiceFull h aeffs c =
     BCRBlk _ b -> BCBlk $ dropUnusedEx b  -- throw away the heap
     c' -> c'
 
-evalUnderLambda :: BChoice -> BChoice
-evalUnderLambda = transformBi ev
+evalUnderLambda :: AllowedEffects -> BChoice -> BChoice
+evalUnderLambda trcEffs = transformBi ev
   where ev :: BHNF -> BHNF
         ev v@BLit{} = v
         ev (BArr vs) = BArr (map (transformBi ev) vs)
@@ -132,7 +135,7 @@ evalUnderLambda = transformBi ev
         ev (BExt a r x) = BExt (ev a) (transformBi ev r) (transformBi ev x)
 #endif
         evalB b =
-          case evalBlock dummyHeap lambdaEffs [] b of
+          case evalBlock dummyHeap (trcEffs ++ lambdaEffs) [] b of
             BCBlk b' -> b'
             BCFail -> BlockFail
             BCWrong s -> BlockWrong s
@@ -722,11 +725,11 @@ cExpr (All e) = All <$> cBlock e
 
 primOpEffs :: Op -> Effects
 primOpEffs o = fromMaybe [] $ lookup o [
-  (opGt, [Efails]),
-  (opGe, [Efails]),
-  (opLt, [Efails]),
-  (opLe, [Efails]),
-  (opNe, [Efails]),
+  (opIntGt, [Efails]),
+  (opIntGe, [Efails]),
+  (opIntLt, [Efails]),
+  (opIntLe, [Efails]),
+  (opIntNe, [Efails]),
   (opIsInt, [Efails]),
   (opIsRat, [Efails]),
   (opIsChr, [Efails]),
@@ -949,7 +952,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
               in  succeeds'' heap (vars rhs) (binds rhs ++ [(val, BVal $ result rhs)])
         in
         -- Examine the expression and evaluate if possible.
-        dtrace aeffs ("sweep expr=" ++ take 10 (show expr)) $
+        dtrace aeffs ("sweep expr=" ++ take 30 (show expr)) $
         case expr of
           BPrimOp ((== opAppend) -> True) (BVArr [a, b, c]) -> append a b c
           BPrimOp op v  | notAllowed (primOpEffs op) -> wrongs $ "effect not allowed: " ++ show (op, primOpEffs op)
@@ -1025,15 +1028,16 @@ bChoices [] = BCFail
 bChoices cs = foldr1 BCFork cs
 
 evalPrimOp :: Op -> BValue -> Maybe BExpr
+evalPrimOp "any$" v = Just $ BVal v
 evalPrimOp _ (BVar _) = Nothing
 evalPrimOp op v | Just cmp <- lookup op compareOps =
   case v of
-    BVArr vs | any isBVar vs -> Nothing
     BVArr [BVInt a, BVInt b] -> Just $ if cmp a b then BVal $ BVInt a else BFail
+    BVArr vs | any isBVar vs -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
 evalPrimOp op v | Just arith <- lookup op arithBinOps =
   case v of
-    BVArr [BVInt _, BVInt 0] | op == opDiv -> Just BFail
+    BVArr [BVInt _, BVInt 0] | op == opIntDiv -> Just BFail
     BVArr [BVInt a, BVInt b] -> Just $ BVal $ BVInt $ a `arith` b
     BVArr vs  | any isBVar vs -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
@@ -1107,13 +1111,13 @@ evalPrimHeapOp h op v | op == opAddTo =
 evalPrimHeapOp _ _ _ = Nothing
 
 compareOps :: [(Op, Integer -> Integer -> Bool)]
-compareOps = [(opGt, (>)), (opGe, (>=)), (opLt, (<)), (opLe, (<=)), (opNe, (/=))]
+compareOps = [(opIntGt, (>)), (opIntGe, (>=)), (opIntLt, (<)), (opIntLe, (<=)), (opIntNe, (/=))]
 
 arithBinOps :: [(Op, Integer -> Integer -> Integer)]
-arithBinOps = [(opAdd, (+)), (opSub, (-)), (opMul, (*)), (opDiv, div)]
+arithBinOps = [(opIntAdd, (+)), (opIntSub, (-)), (opIntMul, (*)), (opIntDiv, div)]
 
 arithUnOps :: [(Op, Integer -> Integer)]
-arithUnOps = [(opNeg, negate), (opPlus, id)]
+arithUnOps = [(opIntNeg, negate), (opIntPlus, id)]
 
 -- Do the two effects commute?
 effCommutes :: Effect -> Effect -> Bool
