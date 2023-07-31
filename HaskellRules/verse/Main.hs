@@ -19,7 +19,7 @@ import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
 import FrontEnd.ParseCore
 import FrontEnd.Prelude
-import FrontEnd.Run(run, findSystem, blockSystem, everySystem)
+import FrontEnd.Run(run, findSystem, blockSystem, everySystem, adjustFlags)
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
@@ -49,7 +49,7 @@ main = do
         case msys of
           Nothing -> cs1
           Just sys -> cs1{ esystem = sys }
-  let cs3 = cs2{ flags = systemFlags (sname (esystem cs2)) flg }
+  let cs3 = cs2{ flags = adjustFlags (esystem cs2) flg }
       flg = (flags cs2){ fSimplify = simplify args }
   cs4 <- setPrelude (preludeName args) cs3
   let comm = command{ c_nl = wslbug args, c_state = cs4 }
@@ -280,24 +280,14 @@ cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ descripti
 cRules line s =
   case findSystem line of
     Left msg -> do putStrLn msg; pure s
-    Right e -> do
-      putStrLn $ "Selected: " ++ description e
-      pure s{ esystem = e,
-              flags = systemFlags (sname e) (flags s) }
+    Right sys -> do
+      putStrLn $ "Selected=" ++ sname sys ++ ": " ++ description sys
+      pure s{ esystem = sys,
+              flags = adjustFlags sys (flags s) }
 
 cPrelude :: Run CState
 cPrelude "" s = do putStrLn $ "current prelude: " ++ fst (fPrelude (flags s)); pure s
 cPrelude line s = setPrelude line s
-
--- Modify flags for a particular system
-systemFlags :: String -> (Flags -> Flags)
-systemFlags rn = fromMaybe d $ lookup rn
-  [ ("iblock", \ s -> s{ fSplit = True, fVerify = False })
-  , ("L2R",    \ s -> s{ fSplit = False, fDfs = True})
-  ]
-  where d = if "verify" `isSuffixOf` rn
-            then \ s -> s { fVerify = True, fAssumeVerified = False, fSplit = False }
-            else \ s -> s { fVerify = False }
 
 setPrelude :: String -> CState -> IO CState
 setPrelude pn cs =

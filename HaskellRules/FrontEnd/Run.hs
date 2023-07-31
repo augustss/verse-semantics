@@ -5,11 +5,13 @@ module FrontEnd.Run(
   blockSystem,
   findSystem,
   everySystem,
+  adjustFlags,
   ) where
 import Data.List
 import Epic.Print
 import FrontEnd.Expr(Core)
 import FrontEnd.Flags
+import FrontEnd.Prelude
 --import FrontEnd.RefImpl(evalRI)
 import FrontEnd.TRSAdapter(rewrite)
 import Rules.Systems(TRSystem(..), ESystem, lookupSystemEx, allSystems)
@@ -58,3 +60,17 @@ everySystem = allSystems ++ [blockSystem] -- , refiSystem]
 
 findSystem :: String -> Either String ESystem
 findSystem = lookupSystemEx everySystem
+
+adjustFlags :: ESystem -> Flags -> Flags
+adjustFlags sys flags =
+  case sname sys of
+    "iblock"      -> flags{ fSplit = True,  fVerify = False, fPrelude = mini }
+    "L2R"         -> flags{ fSplit = False, fVerify = False, fPrelude = mini, fDfs = True}
+    "ICFP"        -> flags{ fSplit = False, fVerify = False, fPrelude = mini }
+    "ICFPGuy"     -> flags{ fSplit = False, fVerify = False, fPrelude = mini }
+    "ICFPverify"  -> flags{ fSplit = False, fVerify = True,  fPrelude = verif, fAssumeVerified = False}
+    "ICFPEverify" -> flags{ fSplit = False, fVerify = True,  fPrelude = verif, fAssumeVerified = False}
+    _             -> flags
+  where
+    mini  = either error id $ findPrelude "miniprelude"
+    verif = either error id $ findPrelude "verifyprelude"
