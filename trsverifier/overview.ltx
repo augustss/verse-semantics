@@ -45,3 +45,39 @@ end-to-end.
 \item FIX: if |t| is semi, or |if| then |i| is pushed further inside (add more cases)
 \item FIX: add to the exact condition ``no PROVE/SUC/DEC left in a covariant position'' –--- not under lambda
 \end{itemize}
+
+\mypara{Why not push |succeedKW| inside?}
+%
+Currently, we verify a term |succeed e| (resp. |decide e|) by
+%
+(1)~using \rulename{asm-intro} to annotate sub-terms of |e| with |assumeKW|, and then,
+%
+(2)~using \rulename{suc-elim} (resp. \rulename{dec-elim}) to discharge the |succeedKW| (resp. |decideKW|).
+%
+An alternative approach might be to \emph{push} the |succeed| inside the term |e|, \eg via a rule like
+%
+$$\begin{array}{ll}
+    \rulename{suc-exi}   & |succeed (def x e)| \movesto |def x (succeed e)| \\
+    \rulename{suc-seq}   & |succeed (e_1; e_2)| \movesto |succeed e_1; succeed e_2| \\
+    \rulename{suc-elim'} & |P^[succeed e]| \movesto |P^[e]| \quad \text{if}\ \proves{P}{e} \\
+\end{array}$$
+%
+Unfortunately, this doesn't work as shown by the following example:
+%
+$$\begin{array}{ll}
+                   & |succeed (def x (x = 1; x))| \\
+\movestoR{suc-exi} & |def x (succeed (x = 1; x))| \\
+\movestoR{suc-seq} & |def x (succeed (x = 1); succeed x)| \\
+\end{array}$$
+%
+Now, unfortunately, we are stuck, as we cannot prove that the unification |x = 1| succeeds.
+%
+In contrast, with our current strategy, we get the following rewrite sequence that discharges the |succeedKW|:
+%
+$$\begin{array}{ll}
+                    & |succeed (def x (x = 1; x))| \\
+\movestoR{subst}    & |succeed (def x (x = 1; 1))| \\
+\movestoR{eqn-elim} & |succeed (1)| \\
+\movestoR{suc-elim} & |1|
+\end{array}$$
+%

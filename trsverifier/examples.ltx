@@ -224,7 +224,7 @@ Thus, via the above steps, (\ref{eq:hof:1}) rewrites to
 & \quad |verify(lam x (assume(int[x]); succeed (def y (y = g'[x]; int[y]; y))));| \\
 & \quad |g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y)));| \\
 & \quad |assume(g[10])|
-\intertext{which contains a |succeedKW| but in |verifyKW| that
+\intertext{which contains a |succeedKW| but in a  |verify| that
 is under a $\lambda$, so the verifier accepts the program.}
 \end{align*}
 %
