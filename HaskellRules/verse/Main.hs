@@ -292,10 +292,12 @@ cPrelude line s = setPrelude line s
 -- Modify flags for a particular system
 systemFlags :: String -> (Flags -> Flags)
 systemFlags rn = fromMaybe d $ lookup rn
-  [ ("iblock", \ s -> s{ fSplit = True })
+  [ ("iblock", \ s -> s{ fSplit = True, fVerify = False })
   , ("L2R",    \ s -> s{ fSplit = False, fDfs = True})
   ]
-  where d = if "verify" `isSuffixOf` rn then \ s -> s { fVerify = True, fAssumeVerified = False, fSplit = False } else id
+  where d = if "verify" `isSuffixOf` rn
+            then \ s -> s { fVerify = True, fAssumeVerified = False, fSplit = False }
+            else \ s -> s { fVerify = False }
 
 setPrelude :: String -> CState -> IO CState
 setPrelude pn cs =

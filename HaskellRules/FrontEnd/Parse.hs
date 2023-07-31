@@ -113,12 +113,13 @@ opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
 keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
-           , "in", "let", "not", "of", "or", "option", "ref", "return", "set", "then", "var", "where"]
+           , "in", "let", "not", "of", "or", "option", "ref", "return", "set", "then", "var", "where"
+           , "lambda"]
            ++ macros)
            \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "allow", "assert", "assume", "expect", "first", "last", "logic", "one", "type", "unify"]
+macros = ["all", "allow", "assert", "assume", "expect", "first", "last", "logic", "lowered", "one", "type", "unify"]
          ++ effects
 
 effects :: [String]
@@ -408,10 +409,14 @@ pReturn :: P Expr
 pReturn = pKeyword "return" *> (Return <$> pExpr2)
 
 pExpr1 :: P Expr
-pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn ]
+pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn, pLambda ]
 
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
+
+-- A hack for already lowered lambdas
+pLambda :: P Expr
+pLambda = pKeyword "lambda" *> (Lam <$> pParens pIdent <*> pBlockM)
 
 {-
 pTermPost :: P Expr

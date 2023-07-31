@@ -62,30 +62,22 @@ miniprelude = ("miniprelude", "\
 verifyprelude :: (String, String)
 verifyprelude = ("verifyprelude", "\
 \## Use FrontEnd/Makefile to update compiled prelude.\n\
-\## Small prelude with checking of arithmetic.\n\
+\## Small for verification.\n\
+\## The lowered{} macro stops insertion lowering from BigCore to Core,\n\
+\## i.e., stop assume{} being inserted.\n\
 \array{\n\
-\operator'+'(_x:int,_y:int)<succeeds> := intAdd$[_x,_y];\n\
-\operator'-'      := intSub$;\n\
-\operator'*'      := intMul$;\n\
-\operator'/'      := intDiv$;\n\
-\prefix'-'        := intNeg$;\n\
-\prefix'+'        := intPlus$;\n\
-\operator'<'      := intLT$;\n\
-\operator'<='     := intLE$;\n\
-\operator'>'      := intGT$;\n\
-\operator'>='     := intGE$;\n\
-\operator'<>'     := intNE$;\n\
-\any              := any$;\n\
-\int(_x:any$)<decides>         := { isInt$[_x]; _x };\n\
-\rational(_x:any$)<decides>    := { isRat$[_x]; _x };\n\
-\string(_x:any$)<decides>      := { isStr$[_x]; _x };\n\
-\char(_x:any$)<decides>        := { isChr$[_x]; _x };\n\
-\nat(_x:any$)<decides>         := { isInt$[_x]; intGE$[_x,0]; _x };\n\
-\operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
-\false                       := array{};\n\
-\postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
-\operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
-\new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };\n\
+\false                                  := array{};\n\
+\any(_x:any$)<succeeds>                 := _x;\n\
+\int(_x:any$)<decides>                  := { isInt$[_x]; _x };\n\
+\nat(_x:any$)<decides>                  := { isInt$[_x]; intGE$[_x,0]; _x };\n\
+\operator'+'  := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; assume { _z := intAdd$[_x,_y]; isInt$[_z]; _z } } };\n\
+\operator'-'  := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; assume { _z := intSub$[_x,_y]; isInt$[_z]; _z } } };\n\
+\operator'*'  := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; assume { _z := intMul$[_x,_y]; isInt$[_z]; _z } } };\n\
+\operator'/'  := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; intNE$[_y, 0]; assume { _z := intDiv$[_x,_y]; isInt$[_z]; _z } } };\n\
+\operator'<'  := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; intLT$[_x, _y]; assume { isInt$[_x]; _x } } };\n\
+\operator'<=' := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; intLE$[_x, _y]; assume { isInt$[_x]; _x } } };\n\
+\operator'>'  := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; intGT$[_x, _y]; assume { isInt$[_x]; _x } } };\n\
+\operator'>=' := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; intGE$[_x, _y]; assume { isInt$[_x]; _x } } };\n\
+\operator'<>' := lowered{ lambda(xy){ (_x,_y):=xy; isInt$[_x]; isInt$[_y]; intNE$[_x, _y]; assume { isInt$[_x]; _x } } };\n\
 \}\n\
-\\n\
 \")

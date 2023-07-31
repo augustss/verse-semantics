@@ -124,6 +124,7 @@ dsSmall = ds
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
     ds (InfixOp e1@Variable{} (Op "=") e2) = ds $ Unify e1 e2
+    ds (InfixOp e1 (Op "=") e2@Variable{}) = ds $ Unify e2 e1
     ds (InfixOp e1            (Op "=") e2) = do x <- newIdent (getLoc e1) "x"; ds $ seqE [DefineE x e1, Unify (Variable x) e2]
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
@@ -379,6 +380,7 @@ dsM i (Function [(t1, r)] t2) = do
 dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
+dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
 dsM _ e = impossible e
 
 dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
@@ -432,17 +434,10 @@ call p l s e = do
 ----------------------------------------------
 
 dsScope :: Flags -> Expr -> Expr
-dsScope flgs = eval flgs . (primops <=< addScope' primOps)
+dsScope flgs = eval flgs . (primops <=< addScope)
 
 addScope :: Expr -> D Expr
-addScope e = do
-  verif <- gets (fVerify . dflags)
-  let xprim = if verif then xverif else []
-      xverif = map (Ident noLoc) $ map fst preludeFuncs ++ map fst verifyPrelude  -- temporary hack
-  addScope' (xprim ++ primOps) e
-
-addScope' :: [Ident] -> Expr -> D Expr
-addScope' prim e = scope (S.fromList prim) (Do e)
+addScope e = scope (S.fromList primOps) (Do e)
 
 _knownEffects :: [Ident]
 _knownEffects = map (Ident noLoc) [
@@ -581,10 +576,6 @@ getVar (HasType e t) = getVar e ++ getVar t
 getVar Lam{} = []
 getVar Fail = []
 getVar e = impossible e
-
--- Definitions that should go in a Prelude
---preludeIds :: [Ident]
---preludeIds = map (Ident noLoc . fst) preludeFuncs
 
 -- Primitives
 primOps :: [Ident]
@@ -732,6 +723,7 @@ addDeref = pure . exprD S.empty
     expr s (Exists is e) = Exists is (expr s e)
     expr s (HasType e t) = HasType (expr s e) (expr s t)
     expr _ Fail = Fail
+    expr s (Lam i e) = Lam i (expr s e)
     expr _ e = impossible e
 
     exprD s e = expr (defs s e) e
@@ -771,6 +763,7 @@ lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
 lower (Macro1 (Ident _ "succeeds") [] e) = lowerSucceeds =<< lower e
 lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
 lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
+lower (Macro1 (Ident _ "lowered") [] e) = pure e
 lower (Exists is e) = lExists is <$> lower e
 lower (TLam i rs (Exists is e1) e2 me3) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2 <*> traverse lower me3
 lower (HasType e t) = join $ lowerHasType <$> lower e <*> lower t
@@ -1028,6 +1021,11 @@ lowerAssume e = pure $ eAssume e
 primops :: Expr -> D Expr
 primops = f
   where
+    f (Variable (Ident _ s)) | Ident noLoc s `elem` primOps = pure $ EPrim s
+    f e = compos f e
+
+{-
+  where
     f (ApplyD g@(Variable (Ident _ s)) v) = do
       mfunc <- lowerPrimOp s
       v' <- f v
@@ -1055,15 +1053,10 @@ primops = f
 -- For verification, we need a different expansion.
 lowerPrimOp :: String -> D (Maybe Func)
 lowerPrimOp s = do
-  verif <- gets (fVerify . dflags)
-  if verif then
-    lowerPrimOpVerif s
-   else
-    -- lowerPrimOpRun s
-    if Ident noLoc s `elem` primOps then
-      pure $ Just ([], [EPrim s])
-    else
-      pure $ Nothing
+  if Ident noLoc s `elem` primOps then
+    pure $ Just ([], [EPrim s])
+  else
+    pure $ Nothing
 
 type Func = ([Ident], [Core])
 
@@ -1084,6 +1077,10 @@ lowerPrimOpRun s =
         pure $ Just ([], [EPrim s])
       else
         pure $ Nothing
+
+-- Definitions that should go in a Prelude
+preludeIds :: [Ident]
+preludeIds = map (Ident noLoc . fst) preludeFuncs
 
 preludeFuncs :: [(String, Func)]
 preludeFuncs =
@@ -1153,7 +1150,7 @@ verifyPrelude =
     cmpBinOpInt' p = ([x, y],
       [ cInt vx, cInt vy, ApplyD (EPrim p) (Array [vx, vy]), eAssume (Seq [cInt vx, vx]) ])
 
-    yNe0 = ApplyD (EPrim "in'<>'") (Array [vy, Lit (LitInt 0)])
+    yNe0 = ApplyD (EPrim "intNE$") (Array [vy, Lit (LitInt 0)])
 
     arithUnOpInt p s =
       (p, ([x], [ cInt vx, eAssume (Exists [z] $ Seq [Unify vz (ApplyD (EPrim s) vx), cInt vz, vz]) ]))
@@ -1165,6 +1162,7 @@ verifyPrelude =
     vx = Variable x
     vy = Variable y
     vz = Variable z
+-}
 
 -----------------------------------------------
 
