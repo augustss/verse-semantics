@@ -84,3 +84,6 @@ verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo
 # currently fails
 # verify(pass,broken) { foo(x:any)<decides> := { x = 666 } }
 # verify(pass,broken) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
+
+verify(pass) {f(x:int)<succeeds>:=x/2}
+verify(fail) {f(x:int)<succeeds>:=x/0}

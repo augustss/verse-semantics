@@ -18,7 +18,8 @@ import VerseRepl.Command
 import FrontEnd.Flags
 --import qualified Parser.Testing as Testing
 import FrontEnd.ParseCore
-import FrontEnd.Run(run, findSystem, blockSystem, everySystem)
+import FrontEnd.Prelude
+import FrontEnd.Run(run, findSystem, blockSystem, everySystem, adjustFlags)
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
 --import DenSem.DenSem
 import Rules.Systems(ESystem, TRSystem(..))
@@ -43,19 +44,27 @@ main :: IO ()
 main = do
   args <- mainArgs
   let msys = fmap (either error id . findSystem) (rulesys args)
+  let cs1 = c_state command
+  let cs2 =
+        case msys of
+          Nothing -> cs1
+          Just sys -> cs1{ esystem = sys }
+  let cs3 = cs2{ flags = adjustFlags (esystem cs2) flg }
+      flg = (flags cs2){ fSimplify = simplify args }
+  cs4 <- setPrelude (preludeName args) cs3
+  let comm = command{ c_nl = wslbug args, c_state = cs4 }
   if null (fileNames args) then do
-    let cmd =
-          case msys of
-            Nothing -> command{ c_nl = wslbug args }
-            Just sys -> command{ c_state = (c_state command){ esystem = sys }, c_nl = wslbug args }
-    runCommand cmd
+    runCommand comm
    else
-    mapM_ (runFile msys) (fileNames args)
+    mapM_ (runFile (flags cs4) (esystem cs4) (dDesugar args)) (fileNames args)
 
 data MainFlags = MainFlags
-  { rulesys   :: !(Maybe String)
-  , wslbug    :: !Bool
-  , fileNames :: ![FilePath]          -- input files
+  { rulesys     :: !(Maybe String)
+  , wslbug      :: !Bool
+  , preludeName :: !String
+  , dDesugar    :: !Bool
+  , simplify    :: !Bool
+  , fileNames   :: ![FilePath]          -- input files
   }
 
 mainFlags :: Parser MainFlags
@@ -68,6 +77,18 @@ mainFlags = MainFlags
   <*> switch
          ( long "wsl"
         <> help "Add extra NL to compensate for WSL bug" )
+  <*> strOption
+         ( long "prelude"
+        <> short 'p'
+        <> metavar "NAME"
+        <> value "miniprelude"
+        <> help "Use built in prelude NAME" )
+  <*> switch
+         ( long "ddesugar"
+        <> help "Debug - show desugared" )
+  <*> switch
+         ( long "simplify"
+        <> help "simplify core" )
   <*> many (argument str (metavar "FILES..."))
 
 mainArgs :: IO MainFlags
@@ -85,7 +106,6 @@ data CState = CState
   { lastExpr    :: !SomeExpr
   , lastFile    :: !(Maybe FilePath)
   , definitions :: ![Expr]
-  , prelude     :: !(Maybe Expr)
   , flags       :: !Flags
   , esystem     :: !ESystem
   }
@@ -133,18 +153,17 @@ command = Command
       [ Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
---      , Cmd "core [EXPR]"          "Generate core for [last] expression"   cCore
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
 --      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
 --      , Cmd "clear"                "Clear global defs"                     cClear
 --      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
 --      , Cmd "display"              "Show current global defs"              cDisplay
---      , Cmd "prelude"              "Load prelude.verse"                    cPrelude
       , Cmd "preprocess"           "Preprocess for rule set"                 cPreprocess
       , Cmd "set"                  "Turn on flag"                          (cSet True)
       , Cmd "unset"                "Turn off flag"                         (cSet False)
       , Cmd "rules [NAME]"         "Select rule system"                    cRules
+      , Cmd "prelude [NAME]"       "Select prelude"                        cPrelude
       , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
       ]
   , c_exec = cParseLine
@@ -153,8 +172,9 @@ command = Command
   , c_bye = "Bye!"
   , c_prompt = "> "
   , c_state = CState { lastExpr = NoExpr, lastFile = Nothing, definitions = []
-                     , prelude = Nothing, flags = defaultFlags{fSplit=True, fNoFuelStop=True, fSimplify=True}
-                     , esystem = blockSystem }
+                     , flags = defaultFlags{fSplit=True, fNoFuelStop=True, fSimplify=True}
+                     , esystem = blockSystem
+                     }
   , c_history = Just ".versei"
   , c_nl = False
   }
@@ -188,6 +208,7 @@ flagTable =
   ,("finalInline", (fFinalInline,  \ b s -> s{fFinalInline=b}))
   ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
+  ,("assumeVerified", (fAssumeVerified, \ b s -> s{fAssumeVerified=b}))
   ]
 
 cRead :: Run CState
@@ -238,7 +259,7 @@ cVerify = do
   withLastExpr $ \ e s ->
     tryIt (pure s) (\ _ -> pure s) $ do
       let sys = icfpeVerifier
-      let flg = (flags s){ fVerify = True, fSplit = False }
+      let flg = (flags s){ fVerify = True, fSplit = False, fAssumeVerified = False }
           e1  = asCore flg e
           e2  = coreToTrs e1
           e' = preProcess sys (ruleEnv sys) e2
@@ -259,28 +280,23 @@ cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ descripti
 cRules line s =
   case findSystem line of
     Left msg -> do putStrLn msg; pure s
-    Right e -> do
-      putStrLn $ "Selected: " ++ description e
-      pure s{ esystem = e,
-              flags = maybe id id (lookup (sname e) systemFlags) (flags s) }
+    Right sys -> do
+      putStrLn $ "Selected=" ++ sname sys ++ ": " ++ description sys
+      pure s{ esystem = sys,
+              flags = adjustFlags sys (flags s) }
 
--- Modify flags for a particular system
-systemFlags :: [(String, Flags -> Flags)]
-systemFlags =
-  [ ("iblock", \ s -> s{ fSplit = True })
-  , ("L2R",    \ s -> s{ fSplit = False, fDfs = True})
-  ]
+cPrelude :: Run CState
+cPrelude "" s = do putStrLn $ "current prelude: " ++ fst (fPrelude (flags s)); pure s
+cPrelude line s = setPrelude line s
+
+setPrelude :: String -> CState -> IO CState
+setPrelude pn cs =
+  case findPrelude pn of
+    Left msg -> error $ "prelude failed " ++ msg
+    Right prel -> pure cs{ flags = (flags cs){ fPrelude = prel } }
+  
 
 {-
-cPrelude :: Run CState
-cPrelude fn s =
-  tryIt (pure s) (\ e -> pure s{ prelude = Just e }) $ do
-    file <- readFile $ if null fn then "prelude.verse" else fn
-    let prog = parseDie pFile fn file
-    when (prog == prog) $
-      putStrLn "OK"
-    pure prog
-
 cDefEval :: Run CState
 cDefEval c s = do
   let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
@@ -338,14 +354,14 @@ helpMsg = "\
 
 --------------------------------------------------
 
-runFile :: Maybe ESystem -> FilePath -> IO ()
-runFile msys fn = do
+runFile :: Flags -> ESystem -> Bool -> FilePath -> IO ()
+runFile flg sys ddesugar fn = do
   putStrLn $ "running " ++ fn
   file <- readFile fn
-  let sys = fromMaybe blockSystem msys
-      flg = maybe id id (lookup (sname sys) systemFlags) $
-            defaultFlags
-      e = parseDie pFile fn file
-      r = run flg sys . desugar flg $ e
+  let e = parseDie pFile fn file
+      d = desugar flg e
+  when ddesugar $
+      putStrLn $ "Desugared:\n" ++ prettyShow d
+  let r = run flg sys d
   putStrLn $ prettyShow r
   putStrLn "done"

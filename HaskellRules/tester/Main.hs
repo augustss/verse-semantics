@@ -18,10 +18,11 @@ import FrontEnd.Expr
 import FrontEnd.Flags
 import FrontEnd.Parse hiding (many)
 import FrontEnd.ParseCore
+import FrontEnd.Prelude
 import FrontEnd.TRSAdapter(coreToTrs)
 import Epic.Print (Pretty, prettyShow)
 import FrontEnd.Desugar(desugar)
-import FrontEnd.Run(run, runM, everySystem, findSystem, blockSystem)
+import FrontEnd.Run(run, runM, everySystem, findSystem, blockSystem, adjustFlags)
 import Rules.Core(RuleEnv(..))
 import Rules.Equiv
 import Rules.Systems(ESystem, TRSystem(..))
@@ -51,6 +52,8 @@ data TestFlags = TestFlags
   , maxSteps       :: !Int                 -- max number of rewrite steps
   , maxNormSteps   :: !Int                 -- max number of normalization steps
   , ignoreFuelStop :: !Bool                -- ignore running out of fuel
+  , assumeVerified :: !Bool                -- turn succeeds into a no-op
+  , prelude        :: !(Maybe String)      -- use this prelude
   , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -151,7 +154,7 @@ data TestRes = Good | Bad | Many | None | Excn | Skip
   deriving (Eq, Show)
 
 assertEquivE :: HasCallStack => TestInfo -> TestFlags -> Expr -> Expr -> IO TestRes
-assertEquivE ti flg e1 e2  = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
+assertEquivE ti flg e1 e2 = assertEquiv ti flg (e1, toCore e1) (e2, toCore e2)
   where toCore = desugar flags
         flags = testFlagsToFlags flg
 
@@ -460,17 +463,27 @@ testFlags = TestFlags
   <*> switch
          ( long "ignore-fuel-stop"
         <> help "Ignore running out of fuel" )
+  <*> switch
+         ( long "assume-verified"
+        <> help "succeeds{} is a no-op" )
+  <*> optional (strOption
+         ( long "prelude"
+        <> metavar "NAME"
+        <> help "use the given prelude" ))
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
-  defaultFlags{ fSplit = split t, fSimplify = simplify t,
-                fTrace = trace t,
-                fDfs = dfs t, fFinalInline = finalInl t,
-                fUnderLambda = not (noUnderLam t),
-                fRewriteSteps = maxSteps t,
-                fNoFuelStop = ignoreFuelStop t
-                }
+  let flags = adjustFlags (system t) defaultFlags
+  in  flags{ fSplit = split t, fSimplify = simplify t,
+             fTrace = trace t,
+             fDfs = dfs t, fFinalInline = finalInl t,
+             fUnderLambda = not (noUnderLam t),
+             fRewriteSteps = maxSteps t,
+             fNoFuelStop = ignoreFuelStop t,
+             fAssumeVerified = assumeVerified t,
+             fPrelude = maybe (fPrelude flags) (either error id . findPrelude) (prelude t)
+           }
 main :: IO ()
 main = do
   tflg <- testArgs
