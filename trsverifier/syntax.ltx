@@ -71,8 +71,11 @@ $$\begin{array}{lr@@{\;}c@@{\;}l}
    &   & \vb & |def x t| \vb |t = t| \vb |t; t| \vb |t choice t| \vb |one t| \vb |all t| \\
    &   & \vb & |t^[t]| \\
    &   & \vb & |t^(t)| \\
-   &   & \vb & |fndef x t (tup (fx)) t| \\
-   &   & \vb & |fndef x t (tup (fx) : t) t| \\[0.1in]
+   &   & \vb & |fndef x a (tup (fx)) t| \\
+   &   & \vb & |fndef x a (tup (fx) : t) t| \\
+\textbf{Args}
+   & a & ::= & |t| \vb |t where t| \\[0.1in]
+
 % \end{array}$$
 %
 %$$\begin{array}{lr@@{\;}c@@{\;}l}
@@ -108,12 +111,19 @@ $$\begin{array}{r@@{\;}c@@{\;}l@@{\;}l}
 |De (all t)|               & \doteq & |all (De t)| \\
 |De (t_1^[t_2])|           & \doteq & |(De t_1)^[De t_2]| \\
 |De (t_1^(t_2))|           & \doteq & |succeed ((De t_1)^[De t_2])| \\
-|De (fndef x t_1 (tup (fx)) t_2)|       & \doteq & |tlamx  fx x' x (x = (Me x' t_1)) (De t_2)| & |x'|\ \text{fresh} \\
-|De (fndef x t_1 (tup (fx) : t_3) t_2)| & \doteq & |tlamxt fx x' x (x = (Me x' t_1)) (De t_2) (De t_3)| & |x'|\ \text{fresh} \\[0.1in]
+% |De (fndef x t_1 (tup (fx)) t_2)|       & \doteq & |tlamx  fx x' x (x = (Me x' t_1)) (De t_2)| & |x'|\ \text{fresh} \\
+|De (fndef x a (tup (fx)) t)|  & \doteq & |tlamx  fx x' x (x = (Ae x' a)) (De t)| & |x'|\ \text{fresh} \\
+% |De (fndef x t_1 (tup (fx) : t_3) t_2)| & \doteq & |tlamxt fx x' x (x = (Me x' t_1)) (De t_2) (De t_3)| & |x'|\ \text{fresh} \\[0.1in]
+|De (fndef x a (tup (fx) : t') t)| & \doteq & |tlamxt fx x' x (x = (Ae x' a)) (De t) (De t')| & |x'|\ \text{fresh} \\[0.1in]
 % \end{array}$$
 %
 %$$\begin{array}{r@@{\;}c@@{\;}ll}
-|Me i (fndef x t_1 (tup (fx)) t_2)| & \doteq & |tlamx fx x' x (x = (Me x' t_1)) (def y (y= i^[x]; Me y t_2))| & |x'|\ \text{fresh} \\
+|Ae x t| & \doteq & |Me x t| \\
+|Ae x (t where t')| & \doteq & |(De t'); (Me x t)| \\[0.1in]
+% \end{array}$$
+%
+%$$\begin{array}{r@@{\;}c@@{\;}ll}
+|Me i (fndef x a (tup (fx)) t)| & \doteq & |tlamx fx x' x (x = (Ae x' a)) (def y (y= i^[x]; Me y t))| & |x'|\ \text{fresh} \\
 |Me i t| & \doteq & |apply1 (De t) i| \quad \text{if}\ |t|\ \text{is}\ |int|\ \text{or}\ |string|\ \etc \\[0.1in]
 %\end{array}$$
 %
@@ -141,6 +151,7 @@ are desugared into verifier expressions |e| via
 %
 \begin{itemize}
    \item |De t| which recursively \emph{desugars} surface terms |t| into core expressions |e| using the helpers,
+   \item |Ae x a| which \emph{casts} binders (variables) |x| to the \emph{``argument-type''} $|a|$,
    \item |Me i t| which \emph{casts} binders (variables) |i| to the \emph{``type''} $|t|$,
    \item |tlamx fx x' x e_1 e_2| which encodes the proof obligations and representation for functions.
 \end{itemize}
