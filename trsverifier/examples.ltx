@@ -19,6 +19,61 @@ $$\begin{array}{ll}
 |t^(x:int)(eff decides) :== {x = 666 choice x = 42}; f^(z:t):t :== {708 - z}| & \text{\# pass} \\
 \end{array}$$
 
+
+
+\mypara{Example 0: Unification} Consider the function definition |f^(x:int) :== x + 1|, represented as the surface term
+$$ |def f (f = (functionKW (x:int,y:int,z:int,pf:type{x=y})(tup (succeedKW)) { def (a, b) (a = x; b = a; b = y) }))| $$
+which desugars to the core expression
+$$ |def f (verify (lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def (a, b) (a = x; b = a; b = y) ))); f = xdots)| $$
+where we elide the actual $\lambda$-term defining |f| for brevity. The |verify ()| block corresponds to checking the
+body of |f| under the input types and rewrites as
+\begin{align*}
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def (a, b) (a = x; b = a; b = y))))| \\
+& \movestoR{subst}\ \text{with}\ |x = y| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def (a, b) (a = y; b = a; b = y))))| \\
+& \movestoR{subst}\ \text{with}\ |a = y| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def (a, b) (a = y; b = y; b = y))))| \\
+& \movestoR{exi-elim}\ text{the variable}\ |a| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def b (b = y; b = y))))| \\
+& \movestoR{subst}\ \text{with}\ |b = y| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def b (b = y; y = y))))| \\
+& \movestoR{exi-elim}\ text{the variable}\ |b| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (y = y)))| \\
+& \movestoR{assume-seq}\\
+& |verify(lam (x,y,z) (assume (apply1 int x); assume(apply1 int y); assume(apply1 int z); assume(x=y) ; succeed (y = y)))| \\
+& \movestoR{prove}\ \text{using}\ |assume (apply1 int y)| \\
+& |verify(lam (x,y,z) (assume (apply1 int x); assume(apply1 int y); assume(apply1 int z); assume(x=y) ; succeed (assume(y = y))))| \\
+& \movestoR{suc-elim} \\
+& |verify(lam (x,y,z) (assume (apply1 int x); assume(apply1 int y); assume(apply1 int z); assume(x=y) ; assume(y = y)))| \\
+& \movestoR{prove-elim} \\
+& |arr ()|
+\end{align*}
+
+% \begin{verbatim}
+% source
+%   f(x:int, y:int, z:int, pf:type{x=y}) := { a := x; b := a; b = y }
+% desugars to
+%   ex f. PROVE{ \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=x; b=a; b=y} }; f = ...
+% lets focus on the PROVE block
+%    \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=x; b=a; b=y}
+% --> SUBST x = y
+%    \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=y; b=a; b=y}
+% --> SUBST a = y
+%    \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=y; b=a; b=y}
+% --> exi-elim a
+%    \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists b. b=y; b=y}
+% --> SUBST b=y
+%    \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists b. b=y; y=y}
+% --> exi-elim b
+%    \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ y=y}
+% --> asm-seq
+%    \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; succeeds{ y=y}
+% --> prove y=y using assume {int[y]}
+%    \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; succeeds{ assume{y=y} }
+% --> suc-elim
+%    \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; assume{y=y}
+% \end{verbatim}
+
 \mypara{Primitive Operators}
 %
 In the sequel, we assume that the infix names |+| and |-| are bound to the following core expressions,
@@ -29,34 +84,6 @@ which test that that the inputs are |int| before invoking the respective primiti
 |(+)| & \doteq\ |(lam p (def (a, b) ( p = tup (a, b); (apply1 int a); (apply1 int b); assume (def r (r = a plus b; int[r])))))| \\
 |(-)| & \doteq\ |(lam p (def (a, b) ( p = tup (a, b); (apply1 int a); (apply1 int b); assume (def r (r = a minus b; int[r])))))| \\
 \end{align*}
-
-\mypara{Example 0: Unification} Consider the function definition |f^(x:int) :== x + 1|, represented as the surface term
-
-% TODO: typeset
-\begin{verbatim}
-source
-  f(x:int, y:int, z:int, pf:type{x=y}) := { a := x; b := a; b = y }
-desugars to
-  ex f. PROVE{ \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=x; b=a; b=y} }; f = ...
-lets focus on the PROVE block
-   \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=x; b=a; b=y}
---> SUBST x = y
-   \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=y; b=a; b=y}
---> SUBST a = y
-   \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists a b. a=y; b=a; b=y}
---> exi-elim a
-   \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists b. b=y; b=y}
---> SUBST b=y
-   \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ exists b. b=y; y=y}
---> exi-elim b
-   \x,y,z. assume{int[x]; int[y]; int[z]; x=y} ; succeeds{ y=y}
---> asm-seq
-   \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; succeeds{ y=y}
---> prove y=y using assume {int[y]}
-   \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; succeeds{ assume{y=y} }
---> suc-elim
-   \x,y,z. assume{int[x]}; assume{int[y]}; assume{int[z]}; assume{x=y} ; assume{y=y}
-\end{verbatim}
 
 \mypara{Example 1: Verifying Definitions} Consider the function definition |f^(x:int) :== x + 1|, represented as the surface term
 %
