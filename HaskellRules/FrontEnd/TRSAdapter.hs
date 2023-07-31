@@ -124,10 +124,11 @@ coreToTrs (Variable i) = T.Var $ coreToTrsI i
 coreToTrs (Lit (LitInt i)) = T.Int i
 coreToTrs (Lit (LitPtr p)) = T.Ref (T.Ptr p)
 coreToTrs Lit{} = undefined
+coreToTrs (EPrim "any$") = T.LAM x (T.Var x)  where x = T.Name "x"
 coreToTrs (EPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
   where ops = map (\ (x,y) -> (y, x)) allOps
 coreToTrs (Array vs) = T.Arr $ map coreToTrs vs
-coreToTrs (Lam x e) = T.Lam $ T.Bind (coreToTrsI x) (coreToTrs e)
+coreToTrs (Lam x e) = T.LAM (coreToTrsI x) (coreToTrs e)
 coreToTrs (Unify e1 e2) = coreToTrs e1 T.:=: coreToTrs e2
 coreToTrs (Seq []) = undefined
 coreToTrs (Seq [e]) = coreToTrs e
