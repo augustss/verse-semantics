@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.Desugar(
   desugar,
-  primOps, covariantId, dsScope,
+  dsScope,
   getFree, substMany, getAllVars,
   ) where
 import Control.Monad
@@ -58,7 +58,10 @@ desugar flgs = eval flgs .
 -- Assumes input expression is of the for exists is . < <prels>, e >
 dropUnusedIds :: [Ident] -> Expr -> Expr
 dropUnusedIds pids (Exists is (Array [Array ps, e])) =
-  let used = getFree e
+  let used = clos [] (getFree e)
+        where clos us [] = us
+              clos us (u : uis) = clos (u:us) (maybe [] getFree (lookup u pds) ++ uis)
+              pds = [(p, d) | Unify (Variable p) d <- ps ]
       unused = pids \\ used
       usedPrel (Unify (Variable p) _) = p `notElem` unused
       usedPrel _ = True
@@ -441,8 +444,8 @@ addScope e = scope (S.fromList primOps) (Do e)
 
 _knownEffects :: [Ident]
 _knownEffects = map (Ident noLoc) [
-  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "covariant"
-  ]
+  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts"
+  ] ++ [covariantId]
 
 _isLambdaEffect :: Ident -> Bool
 _isLambdaEffect i = elem i [
@@ -451,6 +454,9 @@ _isLambdaEffect i = elem i [
 
 covariantId :: Ident
 covariantId = Ident noLoc "covariant"
+
+openId :: Ident
+openId = Ident noLoc "open"
 
 errUndefined :: [Ident] -> D ()
 errUndefined =
@@ -581,9 +587,20 @@ getVar e = impossible e
 primOps :: [Ident]
 primOps = map (Ident noLoc)
   [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$", "isPtr$", "isArr$", "isFcn$"
-  , "intAdd$", "intSub$", "intMul$", "intDiv$"
-  , "intNeg$", "intPlus$"
+
+  , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
   , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
+
+  , "ratAdd$", "ratSub$", "ratMul$", "ratDiv$", "ratNeg$", "ratPlus$"
+  , "ratLT$", "ratLE$", "ratGT$", "ratGE$", "ratNE$"
+
+  , "f32Add$", "f32Sub$", "f32Mul$", "f32Div$", "f32Neg$", "f32Plus$"
+  , "f32LT$", "f32LE$", "f32GT$", "f32GE$", "f32NE$"
+
+  , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
+  , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
+
+
   , "post'?'"
   , "concat$", "cons$"
   , "length$"
@@ -909,7 +926,8 @@ lowerTLamVerifySucceeds i is e1 e2' e2'' =
 lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
 lowerTLamRun i rs is e1 e2 me3 = do
   e2' <- maybe (pure e2) (\ t -> lowerSucceeds (ApplyD t e2)) me3
-  let covariant = covariantId `elem` rs  || True -- XXX
+  let covariant = --covariantId `elem` rs  || True -- XXX
+                  openId `notElem` rs
   if null is && e1 == Array [] then
     pure $ Lam i e2'   -- Simple special case
    else
@@ -1021,8 +1039,9 @@ lowerAssume e = pure $ eAssume e
 primops :: Expr -> D Expr
 primops = f
   where
-    f (Variable (Ident _ s)) | Ident noLoc s `elem` primOps = pure $ EPrim s
+    f (Variable (Ident _ s)) | Ident noLoc s `S.member` prim = pure $ EPrim s
     f e = compos f e
+    prim = S.fromList primOps
 
 {-
   where
@@ -1228,6 +1247,7 @@ getFree = Epic.List.nub . fvs
     fvs (Split e1 e2 e3) = fvs e1 ++ fvs e2 ++ fvs e3
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
     fvs Fail = []
+    fvs DomainFail = []
     fvs e = error $ "getFree: " ++ prettyShow e
 
 -- XXX binders

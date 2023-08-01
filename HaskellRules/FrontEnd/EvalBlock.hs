@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns  #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -12,7 +12,7 @@ import Data.Coerce
 import Data.Data(Data)
 import Data.List
 import Data.Maybe
---import qualified Data.Map as M
+import qualified Data.Map as M
 import Data.Ratio
 import Data.Scientific
 import Epic.Print
@@ -38,8 +38,13 @@ import FrontEnd.Desugar(getFree, substMany, getAllVars)
 type Op = String
 type Subst e = [(Ident, e)]
 
-opIntGt, opIntGe, opIntLt, opIntLe, opIntNe, opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIsInt, opIsRat, opIsChr, opIsStr,
-      opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
+--opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIntGt, opIntGe, opIntLt, opIntLe, opIntNe :: Op
+opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, opRatLt, opRatLe, opRatNe :: Op
+opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
+opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
+opIsInt, opIsRat, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
+opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
+{-
 opIntGt    = "intGT$"
 opIntGe    = "intGE$"
 opIntLt    = "intLT$"
@@ -51,10 +56,48 @@ opIntMul   = "intMul$"
 opIntDiv   = "intDiv$"
 opIntNeg   = "intNeg$"
 opIntPlus  = "intPlus$"
+-}
+opRatGt    = "ratGT$"
+opRatGe    = "ratGE$"
+opRatLt    = "ratLT$"
+opRatLe    = "ratLE$"
+opRatNe    = "ratNE$"
+opRatAdd   = "ratAdd$"
+opRatSub   = "ratSub$"
+opRatMul   = "ratMul$"
+opRatDiv   = "ratDiv$"
+opRatNeg   = "ratNeg$"
+opRatPlus  = "ratPlus$"
+opF32Gt    = "f32GT$"
+opF32Ge    = "f32GE$"
+opF32Lt    = "f32LT$"
+opF32Le    = "f32LE$"
+opF32Ne    = "f32NE$"
+opF32Add   = "f32Add$"
+opF32Sub   = "f32Sub$"
+opF32Mul   = "f32Mul$"
+opF32Div   = "f32Div$"
+opF32Neg   = "f32Neg$"
+opF32Plus  = "f32Plus$"
+opF64Gt    = "f64GT$"
+opF64Ge    = "f64GE$"
+opF64Lt    = "f64LT$"
+opF64Le    = "f64LE$"
+opF64Ne    = "f64NE$"
+opF64Add   = "f64Add$"
+opF64Sub   = "f64Sub$"
+opF64Mul   = "f64Mul$"
+opF64Div   = "f64Div$"
+opF64Neg   = "f64Neg$"
+opF64Plus  = "f64Plus$"
+
 opIsInt = "isInt$"
 opIsRat = "isRat$"
+opIsF32 = "isF32$"
+opIsF64 = "isF64$"
 opIsChr = "isChr$"
 opIsStr = "isStr$"
+opIsFcn = "isFcn$"
 opMapAp = "mapAp$"
 opCons  = "cons$"
 opAlloc = "alloc$"
@@ -138,6 +181,7 @@ evalUnderLambda trcEffs = transformBi ev
           case evalBlock dummyHeap (trcEffs ++ lambdaEffs) [] b of
             BCBlk b' -> b'
             BCFail -> BlockFail
+            BCDomainFail -> BlockDomainFail
             BCWrong s -> BlockWrong s
             BCFork c1 c2 -> blkChoice (BCFork c1 (evalChoiceFull dummyHeap lambdaEffs c2))
             BCRBlk _ b' -> dropUnusedEx b'   -- XXX
@@ -164,6 +208,9 @@ data BBlock = BBlock
 
 pattern BlockFail :: BBlock
 pattern BlockFail = BBlock{ vars = [], binds = [(BAVar, BFail)], result = BAVar }
+
+pattern BlockDomainFail :: BBlock
+pattern BlockDomainFail = BBlock{ vars = [], binds = [(BAVar, BDomainFail)], result = BAVar }
 
 pattern BlockWrong :: String -> BBlock
 pattern BlockWrong s = BBlock{ vars = [], binds = [(BAVar, BWrong s)], result = BAVar }
@@ -203,6 +250,7 @@ data BChoice
   = BCFork BChoice BChoice
   | BCBlk BBlock
   | BCFail
+  | BCDomainFail
   | BCWrong String
   | BCRBlk BHeap BBlock    -- only in results
   deriving (Show, Eq, Ord, Data)
@@ -212,6 +260,9 @@ data BChoice
 
 pattern BFail :: BExpr
 pattern BFail = BChoice BCFail
+
+pattern BDomainFail :: BExpr
+pattern BDomainFail = BChoice BCDomainFail
 
 pattern BWrong :: String -> BExpr
 pattern BWrong s = BChoice (BCWrong s)
@@ -253,6 +304,15 @@ data BHNF
 
 pattern BVInt :: Integer -> BValue
 pattern BVInt i = BVLit (BInt i)
+
+pattern BVRat :: Rational -> BValue
+pattern BVRat i = BVLit (BRat i)
+
+pattern BVF32 :: Float -> BValue
+pattern BVF32 i = BVLit (BF32 i)
+
+pattern BVF64 :: Double -> BValue
+pattern BVF64 i = BVLit (BF64 i)
 
 pattern BVLit :: BLiteral -> BValue
 pattern BVLit x = BHNF (BLit x)
@@ -358,6 +418,7 @@ instance Pretty BChoice where
   pPrintPrec l p (BCFork e1 e2) = maybeParens (p > 1) $ pPrintPrec l 2 e1 <+> text "|" <+> pPrintPrec l 2 e2
   pPrintPrec l p (BCBlk b) = pPrintPrec l p b
   pPrintPrec _ _ BCFail = text "fail"
+  pPrintPrec _ _ BCDomainFail = text "domainfail"
   pPrintPrec _ _ (BCWrong s) = text ("WRONG(" ++ s ++ ")")
   pPrintPrec l _ (BCRBlk h b) = text "store" <+> parens (pPrintPrec l 0 h) <+> braces (pPrintPrec l 0 b)
 
@@ -492,16 +553,19 @@ instance Bound BChoice where
   allBVars (BCFork b1 b2) = allBVars b1 `union` allBVars b2
   allBVars (BCBlk b) = allBVars b
   allBVars BCFail = []
+  allBVars BCDomainFail = []
   allBVars (BCWrong _) = []
   allBVars (BCRBlk h b) = allBVars h `union` allBVars b
   freeBVars (BCFork b1 b2) = freeBVars b1 `union` freeBVars b2
   freeBVars (BCBlk b) = freeBVars b
   freeBVars BCFail = []
+  freeBVars BCDomainFail = []
   freeBVars (BCWrong _) = []
   freeBVars (BCRBlk h b) = freeBVars h `union` freeBVars b
   bsubst' s (BCFork b1 b2) = BCFork (bsubst' s b1) (bsubst' s b2)
   bsubst' s (BCBlk b) = BCBlk (bsubst' s b)
   bsubst' _ BCFail = BCFail
+  bsubst' _ BCDomainFail = BCDomainFail
   bsubst' _ e@(BCWrong _) = e
   bsubst' s (BCRBlk h b) = BCRBlk (bsubst' s h) (bsubst' s b)
 
@@ -557,6 +621,7 @@ instance Bound BHeap where
 
 choiceToCore :: BChoice -> Expr
 choiceToCore BCFail = Fail
+choiceToCore BCDomainFail = DomainFail
 choiceToCore (BCWrong s) = Wrong s
 choiceToCore (BCBlk b) = blockToCore b
 choiceToCore (BCFork c1 c2) = choiceToCore c1 `Choice` choiceToCore c2
@@ -717,6 +782,7 @@ cExpr (All e) =
             let x = Split (Variable r `ApplyD` Array []) f (Variable h)
             in  EPrim opCons `ApplyD` Array [Variable v, x]
   in  cExpr $ Split e f g
+cExpr DomainFail = pure BDomainFail
 cExpr e = error $ "cExpr: impossible: " ++ prettyShow e ++ "\n" ++ show e
 {-
 cExpr (One e) = One <$> cBlock e
@@ -724,16 +790,38 @@ cExpr (All e) = All <$> cBlock e
 -}
 
 primOpEffs :: Op -> Effects
-primOpEffs o = fromMaybe [] $ lookup o [
+primOpEffs o = fromMaybe [] $ M.lookup o $ M.fromList [
+{-
   (opIntGt, [Efails]),
   (opIntGe, [Efails]),
   (opIntLt, [Efails]),
   (opIntLe, [Efails]),
   (opIntNe, [Efails]),
+-}
+  (opRatGt, [Efails]),
+  (opRatGe, [Efails]),
+  (opRatLt, [Efails]),
+  (opRatLe, [Efails]),
+  (opRatNe, [Efails]),
+  (opF32Gt, [Efails]),
+  (opF32Ge, [Efails]),
+  (opF32Lt, [Efails]),
+  (opF32Le, [Efails]),
+  (opF32Ne, [Efails]),
+  (opF64Gt, [Efails]),
+  (opF64Ge, [Efails]),
+  (opF64Lt, [Efails]),
+  (opF64Le, [Efails]),
+  (opF64Ne, [Efails]),
+
   (opIsInt, [Efails]),
   (opIsRat, [Efails]),
+  (opIsF32, [Efails]),
+  (opIsF64, [Efails]),
   (opIsChr, [Efails]),
   (opIsStr, [Efails]),
+  (opIsFcn, [Efails]),
+
   (opMapAp, allEffects),  -- XXX can do better?
   (opAlloc, [Eallocates]),
   (opRead,  [Ereads]),
@@ -764,6 +852,7 @@ choiceEffs :: BChoice -> Effects
 choiceEffs (BCFork c1 c2) = [Eiterates] `union` choiceEffs c1 `union` choiceEffs c2
 choiceEffs (BCBlk b) = blockEffs b
 choiceEffs BCFail = [Efails]
+choiceEffs BCDomainFail = []  -- ???
 choiceEffs (BCWrong _) = [Ewrong]
 choiceEffs (BCRBlk _ b) = blockEffs b
 
@@ -802,6 +891,7 @@ evalChoice heap aeffs beffs (BCFork c1 c2) =
     _ -> error "impossible"
 evalChoice heap aeffs beffs (BCBlk b) = evalBlock heap aeffs beffs b
 evalChoice _ _ _ BCFail = BCFail
+evalChoice _ _ _ BCDomainFail = BCDomainFail
 evalChoice _ _ _ c@(BCWrong _) = c
 evalChoice heap aeffs beffs (BCRBlk h b) | heap == h = evalBlock heap aeffs beffs b
 evalChoice _ _ _ c@BCRBlk{} = error $ "evalChoice: " ++ prettyShow c
@@ -904,6 +994,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         -- Fail if it is allowed, otherwise suspend
         fails | notBlocked Efails beffs = BCFail
               | otherwise = suspend (BDummy, BFail)
+        domainfails = BCDomainFail
         -- Generate WRONG if allowed, otherwise suspend
         wrongs s | notBlocked Ewrong beffs = BCWrong s
                  | otherwise = suspend (BDummy, BWrong s)
@@ -1002,6 +1093,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
                         bb = BBlock{ vars = [vb, a1, a2, a3], binds = [b0,b1,b2,b3], result = BVar a3 }
                     in  succeeds'' h is [(val, BEBlk bb)]
           BChoice BCFail -> fails
+          BChoice BCDomainFail -> domainfails
           BChoice (BCWrong s) -> wrongs s
           BChoice (BCBlk b) -> succBlock b
           BChoice (BCFork x1 x2) | notAllowed [Eiterates] -> wrongs "iterates not allowed"
@@ -1030,21 +1122,72 @@ bChoices cs = foldr1 BCFork cs
 evalPrimOp :: Op -> BValue -> Maybe BExpr
 evalPrimOp "any$" v = Just $ BVal v
 evalPrimOp _ (BVar _) = Nothing
-evalPrimOp op v | Just cmp <- lookup op compareOps =
+{-
+evalPrimOp op v | Just cmp <- lookup op compareIntOps =
   case v of
     BVArr [BVInt a, BVInt b] -> Just $ if cmp a b then BVal $ BVInt a else BFail
     BVArr vs | any isBVar vs -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
-evalPrimOp op v | Just arith <- lookup op arithBinOps =
+evalPrimOp op v | Just arith <- lookup op arithBinIntOps =
   case v of
     BVArr [BVInt _, BVInt 0] | op == opIntDiv -> Just BFail
     BVArr [BVInt a, BVInt b] -> Just $ BVal $ BVInt $ a `arith` b
     BVArr vs  | any isBVar vs -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
-evalPrimOp op v | Just arith <- lookup op arithUnOps =
+evalPrimOp op v | Just arith <- lookup op arithUnIntOps =
   case v of
     BVInt a -> Just $ BVal $ BVInt $ arith a
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+-}
+-- rational
+evalPrimOp op v | Just cmp <- lookup op compareRatOps =
+  case v of
+    BVArr [BVRat a, BVRat b] -> Just $ if cmp a b then BVal $ BVRat a else BFail
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | Just arith <- lookup op arithBinRatOps =
+  case v of
+    BVArr [BVRat _, BVRat 0] | op == opRatDiv -> Just BFail
+    BVArr [BVRat a, BVRat b] -> Just $ BVal $ BVRat $ a `arith` b
+    BVArr vs  | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | Just arith <- lookup op arithUnRatOps =
+  case v of
+    BVRat a -> Just $ BVal $ BVRat $ arith a
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+-- f32
+evalPrimOp op v | Just cmp <- lookup op compareF32Ops =
+  case v of
+    BVArr [BVF32 a, BVF32 b] -> Just $ if cmp a b then BVal $ BVF32 a else BFail
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | Just arith <- lookup op arithBinF32Ops =
+  case v of
+    BVArr [BVF32 _, BVF32 0] | op == opF32Div -> Just BFail
+    BVArr [BVF32 a, BVF32 b] -> Just $ BVal $ BVF32 $ a `arith` b
+    BVArr vs  | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | Just arith <- lookup op arithUnF32Ops =
+  case v of
+    BVF32 a -> Just $ BVal $ BVF32 $ arith a
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+-- f64
+evalPrimOp op v | Just cmp <- lookup op compareF64Ops =
+  case v of
+    BVArr [BVF64 a, BVF64 b] -> Just $ if cmp a b then BVal $ BVF64 a else BFail
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | Just arith <- lookup op arithBinF64Ops =
+  case v of
+    BVArr [BVF64 _, BVF64 0] | op == opF64Div -> Just BFail
+    BVArr [BVF64 a, BVF64 b] -> Just $ BVal $ BVF64 $ a `arith` b
+    BVArr vs  | any isBVar vs -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+evalPrimOp op v | Just arith <- lookup op arithUnF64Ops =
+  case v of
+    BVF64 a -> Just $ BVal $ BVF64 $ arith a
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
+
 evalPrimOp op v | op == opIsInt =
   case v of
     a@(BVInt _) -> Just $ BVal a
@@ -1055,6 +1198,16 @@ evalPrimOp op v | op == opIsRat =
     a@(BVLit (BRat _)) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsF32 =
+  case v of
+    a@(BVLit (BF32 _)) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsF64 =
+  case v of
+    a@(BVLit (BF64 _)) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsChr =
   case v of
     a@(BVLit (BChr _)) -> Just $ BVal a
@@ -1063,6 +1216,11 @@ evalPrimOp op v | op == opIsChr =
 evalPrimOp op v | op == opIsStr =
   case v of
     a@(BVLit (BStr _)) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsFcn =
+  case v of
+    a@(BHNF (BHLam _ _)) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opCons =
@@ -1110,14 +1268,43 @@ evalPrimHeapOp h op v | op == opAddTo =
     _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
 evalPrimHeapOp _ _ _ = Nothing
 
-compareOps :: [(Op, Integer -> Integer -> Bool)]
-compareOps = [(opIntGt, (>)), (opIntGe, (>=)), (opIntLt, (<)), (opIntLe, (<=)), (opIntNe, (/=))]
+{-
+compareIntOps :: [(Op, Integer -> Integer -> Bool)]
+compareIntOps = [(opIntGt, (>)), (opIntGe, (>=)), (opIntLt, (<)), (opIntLe, (<=)), (opIntNe, (/=))]
 
-arithBinOps :: [(Op, Integer -> Integer -> Integer)]
-arithBinOps = [(opIntAdd, (+)), (opIntSub, (-)), (opIntMul, (*)), (opIntDiv, div)]
+arithBinIntOps :: [(Op, Integer -> Integer -> Integer)]
+arithBinIntOps = [(opIntAdd, (+)), (opIntSub, (-)), (opIntMul, (*)), (opIntDiv, div)]
 
-arithUnOps :: [(Op, Integer -> Integer)]
-arithUnOps = [(opIntNeg, negate), (opIntPlus, id)]
+arithUnIntOps :: [(Op, Integer -> Integer)]
+arithUnIntOps = [(opIntNeg, negate), (opIntPlus, id)]
+-}
+
+compareRatOps :: [(Op, Rational -> Rational -> Bool)]
+compareRatOps = [(opRatGt, (>)), (opRatGe, (>=)), (opRatLt, (<)), (opRatLe, (<=)), (opRatNe, (/=))]
+
+arithBinRatOps :: [(Op, Rational -> Rational -> Rational)]
+arithBinRatOps = [(opRatAdd, (+)), (opRatSub, (-)), (opRatMul, (*)), (opRatDiv, (/))]
+
+arithUnRatOps :: [(Op, Rational -> Rational)]
+arithUnRatOps = [(opRatNeg, negate), (opRatPlus, id)]
+
+compareF32Ops :: [(Op, Float -> Float -> Bool)]
+compareF32Ops = [(opF32Gt, (>)), (opF32Ge, (>=)), (opF32Lt, (<)), (opF32Le, (<=)), (opF32Ne, (/=))]
+
+arithBinF32Ops :: [(Op, Float -> Float -> Float)]
+arithBinF32Ops = [(opF32Add, (+)), (opF32Sub, (-)), (opF32Mul, (*)), (opF32Div, (/))]
+
+arithUnF32Ops :: [(Op, Float -> Float)]
+arithUnF32Ops = [(opF32Neg, negate), (opF32Plus, id)]
+
+compareF64Ops :: [(Op, Double -> Double -> Bool)]
+compareF64Ops = [(opF64Gt, (>)), (opF64Ge, (>=)), (opF64Lt, (<)), (opF64Le, (<=)), (opF64Ne, (/=))]
+
+arithBinF64Ops :: [(Op, Double -> Double -> Double)]
+arithBinF64Ops = [(opF64Add, (+)), (opF64Sub, (-)), (opF64Mul, (*)), (opF64Div, (/))]
+
+arithUnF64Ops :: [(Op, Double -> Double)]
+arithUnF64Ops = [(opF64Neg, negate), (opF64Plus, id)]
 
 -- Do the two effects commute?
 effCommutes :: Effect -> Effect -> Bool
