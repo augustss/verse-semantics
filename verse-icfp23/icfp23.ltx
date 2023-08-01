@@ -32,7 +32,7 @@
 
 % ---------------- Full Paper ----------------
 \newif\iffullpaper
-\fullpaperfalse %% include appendicies
+\fullpapertrue     %% include appendicies
 
 \RequirePackage[utf8]{inputenc}
 
@@ -175,7 +175,7 @@
 
 %% Title information
 \iffullpaper
-\title{The Verse Calculus: A Core Calculus for Deterministic Functional Logic Programming (Extended Varsion)}
+\title{The Verse Calculus: A Core Calculus for Deterministic Functional Logic Programming (Extended Version)}
 \else
 \title{The Verse Calculus: A Core Calculus for Deterministic Functional Logic Programming}
 \fi
@@ -337,6 +337,12 @@
   We~also show that the rewrite system is confluent for well-behaved terms. 
 %   This semantics elegantly fills the gap between very high level
 %  ``magical'' semantics, and very low-level operational semantics.
+
+\iffullpaper
+\emph{This is an extended version (with appendices) of the paper in the
+  Proceedings of the International Conference on Functional Programming (2023).}
+\else
+\fi
   \par
   \vspace{1em}
 \end{abstract}
