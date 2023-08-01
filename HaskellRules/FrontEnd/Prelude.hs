@@ -111,22 +111,24 @@ mediumprelude = ("mediumprelude", "\
 \## Medium prelude\n\
 \array{\n\
 \\n\
-\operator'+' (_x:rational, _y:rational)<succeeds>  := { ratAdd$[_x, _y] };\n\
-\operator'-' (_x:rational, _y:rational)<succeeds>  := { ratSub$[_x, _y] };\n\
-\operator'*' (_x:rational, _y:rational)<succeeds>  := { ratMul$[_x, _y] };\n\
-\operator'/' (_x:rational, _y:rational)<decides>   := { ratNE$[_y, 0]; ratDiv$[_x, _y] };\n\
-\prefix'-'   (_x:rational)             <succeeds>  := { ratNeg$[_x] };\n\
-\prefix'+'   (_x:rational)             <succeeds>  := { ratPlus$[_x] };\n\
-\operator'<' (_x:rational, _y:rational)<decides>   := { ratLT$[_x,_y] };\n\
-\operator'<='(_x:rational, _y:rational)<decides>   := { ratLE$[_x,_y] };\n\
-\operator'>' (_x:rational, _y:rational)<decides>   := { ratGT$[_x,_y] };\n\
-\operator'>='(_x:rational, _y:rational)<decides>   := { ratGE$[_x,_y] };\n\
-\operator'<>'(_x:rational, _y:rational)<decides>   := { ratNE$[_x,_y] };\n\
+\operator'+' (_x:rational, _y:rational)<open><succeeds>  := { ratAdd$[_x, _y] };\n\
+\operator'-' (_x:rational, _y:rational)<open><succeeds>  := { ratSub$[_x, _y] };\n\
+\operator'*' (_x:rational, _y:rational)<open><succeeds>  := { ratMul$[_x, _y] };\n\
+\operator'/' (_x:rational, _y:rational)<open><decides>   := { ratNE$[_y, 0]; ratDiv$[_x, _y] };\n\
+\prefix'-'   (_x:rational)             <open><succeeds>  := { ratNeg$[_x] };\n\
+\prefix'+'   (_x:rational)             <open><succeeds>  := { ratPlus$[_x] };\n\
+\operator'<' (_x:rational, _y:rational)<open><decides>   := { ratLT$[_x,_y] };\n\
+\operator'<='(_x:rational, _y:rational)<open><decides>   := { ratLE$[_x,_y] };\n\
+\operator'>' (_x:rational, _y:rational)<open><decides>   := { ratGT$[_x,_y] };\n\
+\operator'>='(_x:rational, _y:rational)<open><decides>   := { ratGE$[_x,_y] };\n\
+\operator'<>'(_x:rational, _y:rational)<open><decides>   := { ratNE$[_x,_y] };\n\
 \\n\
 \false                                             := array{};\n\
 \any                                               := any$;\n\
 \int         (_x:any$)                 <decides>   := { isInt$[_x]; _x };\n\
 \rational    (_x:any$)                 <decides>   := { isRat$[_x]; _x };\n\
+\f32         (_x:any$)                 <decides>   := { isF32$[_x]; _x };\n\
+\f64         (_x:any$)                 <decides>   := { isF64$[_x]; _x };\n\
 \string      (_x:any$)                 <decides>   := { isStr$[_x]; _x };\n\
 \char        (_x:any$)                 <decides>   := { isChr$[_x]; _x };\n\
 \nat         (_x:any$)                 <decides>   := { isInt$[_x]; ratGE$[_x,0]; _x };\n\
