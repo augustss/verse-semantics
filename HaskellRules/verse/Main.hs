@@ -49,9 +49,9 @@ main = do
         case msys of
           Nothing -> cs1
           Just sys -> cs1{ esystem = sys }
-  let cs3 = cs2{ flags = adjustFlags (esystem cs2) flg }
-      flg = (flags cs2){ fSimplify = simplify args }
-  cs4 <- setPrelude (preludeName args) cs3
+  cs3 <- setPrelude (preludeName args) cs2
+  let cs4 = cs3{ flags = adjustFlags (esystem cs3) flg }
+      flg = (flags cs3){ fSimplify = simplify args }
   let comm = command{ c_nl = wslbug args, c_state = cs4 }
   if null (fileNames args) then do
     runCommand comm
