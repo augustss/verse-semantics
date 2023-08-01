@@ -38,13 +38,13 @@ import FrontEnd.Desugar(getFree, substMany, getAllVars)
 type Op = String
 type Subst e = [(Ident, e)]
 
---opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIntGt, opIntGe, opIntLt, opIntLe, opIntNe :: Op
+opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIntGt, opIntGe, opIntLt, opIntLe, opIntNe :: Op
 opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, opRatLt, opRatLe, opRatNe :: Op
 opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
 opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
 opIsInt, opIsRat, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
 opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
-{-
+
 opIntGt    = "intGT$"
 opIntGe    = "intGE$"
 opIntLt    = "intLT$"
@@ -56,7 +56,7 @@ opIntMul   = "intMul$"
 opIntDiv   = "intDiv$"
 opIntNeg   = "intNeg$"
 opIntPlus  = "intPlus$"
--}
+
 opRatGt    = "ratGT$"
 opRatGe    = "ratGE$"
 opRatLt    = "ratLT$"
@@ -791,13 +791,13 @@ cExpr (All e) = All <$> cBlock e
 
 primOpEffs :: Op -> Effects
 primOpEffs o = fromMaybe [] $ M.lookup o $ M.fromList [
-{-
+
   (opIntGt, [Efails]),
   (opIntGe, [Efails]),
   (opIntLt, [Efails]),
   (opIntLe, [Efails]),
   (opIntNe, [Efails]),
--}
+
   (opRatGt, [Efails]),
   (opRatGe, [Efails]),
   (opRatLt, [Efails]),
@@ -1122,7 +1122,7 @@ bChoices cs = foldr1 BCFork cs
 evalPrimOp :: Op -> BValue -> Maybe BExpr
 evalPrimOp "any$" v = Just $ BVal v
 evalPrimOp _ (BVar _) = Nothing
-{-
+-- int
 evalPrimOp op v | Just cmp <- lookup op compareIntOps =
   case v of
     BVArr [BVInt a, BVInt b] -> Just $ if cmp a b then BVal $ BVInt a else BFail
@@ -1138,7 +1138,6 @@ evalPrimOp op v | Just arith <- lookup op arithUnIntOps =
   case v of
     BVInt a -> Just $ BVal $ BVInt $ arith a
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
--}
 -- rational
 evalPrimOp op v | Just cmp <- lookup op compareRatOps =
   case v of
@@ -1268,16 +1267,14 @@ evalPrimHeapOp h op v | op == opAddTo =
     _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
 evalPrimHeapOp _ _ _ = Nothing
 
-{-
 compareIntOps :: [(Op, Integer -> Integer -> Bool)]
 compareIntOps = [(opIntGt, (>)), (opIntGe, (>=)), (opIntLt, (<)), (opIntLe, (<=)), (opIntNe, (/=))]
 
 arithBinIntOps :: [(Op, Integer -> Integer -> Integer)]
-arithBinIntOps = [(opIntAdd, (+)), (opIntSub, (-)), (opIntMul, (*)), (opIntDiv, div)]
+arithBinIntOps = [(opIntAdd, (+)), (opIntSub, (-)), (opIntMul, (*)) {-, (opIntDiv, div)-}]
 
 arithUnIntOps :: [(Op, Integer -> Integer)]
 arithUnIntOps = [(opIntNeg, negate), (opIntPlus, id)]
--}
 
 compareRatOps :: [(Op, Rational -> Rational -> Bool)]
 compareRatOps = [(opRatGt, (>)), (opRatGe, (>=)), (opRatLt, (<)), (opRatLe, (<=)), (opRatNe, (/=))]

@@ -64,7 +64,7 @@ findSystem = lookupSystemEx everySystem
 adjustFlags :: ESystem -> Flags -> Flags
 adjustFlags sys flags =
   case sname sys of
-    "iblock"      -> flags{ fSplit = True,  fVerify = False, fPrelude = mini }
+    "iblock"      -> flags{ fSplit = True,  fVerify = False, fPrelude = medium }
     "L2R"         -> flags{ fSplit = False, fVerify = False, fPrelude = mini, fDfs = True}
     "ICFP"        -> flags{ fSplit = False, fVerify = False, fPrelude = mini }
     "ICFPGuy"     -> flags{ fSplit = False, fVerify = False, fPrelude = mini }
@@ -72,5 +72,6 @@ adjustFlags sys flags =
     "ICFPEverify" -> flags{ fSplit = False, fVerify = True,  fPrelude = verif, fAssumeVerified = False}
     _             -> flags
   where
-    mini  = either error id $ findPrelude "miniprelude"
-    verif = either error id $ findPrelude "verifyprelude"
+    mini   = either error id $ findPrelude "miniprelude"
+    medium = either error id $ findPrelude "mediumprelude"
+    verif  = either error id $ findPrelude "verifyprelude"

@@ -132,8 +132,8 @@ mediumprelude = ("mediumprelude", "\
 \nat         (_x:any$)                 <decides>   := { isInt$[_x]; ratGE$[_x,0]; _x };\n\
 \\n\
 \#operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
-\#postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
-\#operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
-\#new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };\n\
+\postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
+\operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
+\new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };\n\
 \}\n\
 \")

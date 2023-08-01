@@ -52,4 +52,5 @@ showFlags f = unwords
   , if fUnderLambda f then "under-lambda" else "no-under-lambda"
   , if fFinalInline f then "final-inlines" else ""
   , "max-steps=" ++ show (fRewriteSteps f)
+  , "prelude=" ++ show (fst (fPrelude f))
   ]

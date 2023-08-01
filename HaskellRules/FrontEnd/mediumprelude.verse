@@ -23,7 +23,7 @@ char        (_x:any$)                 <decides>   := { isChr$[_x]; _x };
 nat         (_x:any$)                 <decides>   := { isInt$[_x]; ratGE$[_x,0]; _x };
 
 #operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};
-#postfix'^'(_p:any$)<reads><decides>  := read$[_p];
-#operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];
-#new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };
+postfix'^'(_p:any$)<reads><decides>  := read$[_p];
+operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];
+new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };
 }
