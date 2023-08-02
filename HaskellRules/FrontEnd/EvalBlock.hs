@@ -519,7 +519,7 @@ instance Bound BBlock where
       b' = freshenBlock bnd b
 
 -- Change the initial existentials so they don't clash with vs.
-freshenBlock :: HasCallStack => [BIdent] -> BBlock -> BBlock
+freshenBlock :: [BIdent] -> BBlock -> BBlock
 freshenBlock vs b | null bad = b
                   | otherwise =
                     b{ vars = map subIdent (vars b)
