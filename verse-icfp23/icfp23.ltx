@@ -32,7 +32,7 @@
 
 % ---------------- Full Paper ----------------
 \newif\iffullpaper
-\fullpapertrue     %% include appendicies
+\fullpaperfalse     %% include appendicies
 
 \RequirePackage[utf8]{inputenc}
 
@@ -1599,7 +1599,7 @@ languages like Curry \cite{antoy:pull-tabbing}.
 % to be sequential---without, of course, prohibiting parallel evaluation.  The |SX| is less significant
 % for \rulename{fail-l} and \rulename{assoc-choice}, but we add it anyway for uniformity.
 
-\subsection{The Verse Calculus is Lenient} \label{sec:lenient}  \label{sec:laziness}
+\subsection{The Verse Calculus Is Lenient} \label{sec:lenient}  \label{sec:laziness}
 
 \versecalc{} is \emph{lenient} \cite{lenience},
 not lazy (call-by-need), nor strict (call-by-value).
@@ -1978,7 +1978,7 @@ is wrong anyway: we should not be attempting to unify lambdas.
 
 
 
-\subsubsection{Tiresome Challenge 2: Recursion and the Notorious Even/odd Problem}  \label{sec:even-odd}
+\subsubsection{Tiresome Challenge 2: Recursion and the Notorious Even/Odd Problem}  \label{sec:even-odd}
 %
 It is well known that adding {\bf letrec} to the lambda calculus
 makes it non-confluent, in a very tiresome, but hard-to-avoid, way \cite{ariola:skew-confluence}.
