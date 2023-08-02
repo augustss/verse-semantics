@@ -862,7 +862,7 @@ blockEffs b = unionMap (exprEffs . snd) (binds b)
 
 -- Effects that should not be blocked in the domain of an if/for
 domEffects :: Effects
-domEffects = [Efails, Eiterates] ++ heapEffects
+domEffects = [Efails, Eiterates] ++ heapEffects ++ [Etrace]
 
 -- Memory effects
 heapEffects :: Effects
@@ -880,7 +880,7 @@ notBlocked = all . effCommutes
 --   * BCBlk it has been evaluated as far as possible
 --   * BCFork the first fork is a BCBlk evaluated as far as possible
 evalChoice :: BHeap -> AllowedEffects -> BlockedEffects -> BChoice -> BChoice
-evalChoice _ aeffs _ c | dtrace aeffs ("evalChoice: " ++ prettyShow c) False = undefined
+evalChoice _ aeffs _ c | dtrace aeffs ("evalChoice: " ++ takeWhile (/= ' ') (show c) ++ "\n" ++ prettyShow c) False = undefined
 evalChoice heap aeffs beffs (BCFork c1 c2) =
   case evalChoice heap aeffs beffs c1 of
     BCFail -> evalChoice heap aeffs beffs c2
