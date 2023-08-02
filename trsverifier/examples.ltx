@@ -23,18 +23,18 @@ $$\begin{array}{ll}
 \begin{align*}
 & |def f (f = (fndef x int (tup (succeedKW) : int) x))| \\
 \intertext{Desugaring turns the definition of |f| into the verification goal}
-& |def f (verify (lam y (def x (assume (apply1 int y; x = y; x); succeed (apply1 int x)))); f = v_f)| \\
-\intertext{where $v_f \doteq |lam x (apply1 int x; assume (apply1 int x))|$. The above rewrites as}
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; x); succeed (apply1 int x)))); f = v)| \\
+\intertext{where $|v| \doteq |lam x (apply1 int x; assume (apply1 int x))|$. The above rewrites as}
 & \movestoR{subst}\ \text{with}\ |x = y| \\
-& |def f (verify (lam y (def x (assume (apply1 int y; x = y; y); succeed (apply1 int y)))); f = v_f)| \\
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; y); succeed (apply1 int y)))); f = v)| \\
 & \movestoR{asm-seq}\\
-& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); succeed (apply1 int y)))); f = v_f)| \\
+& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); succeed (apply1 int y)))); f = v)| \\
 & \movestoR{asm-intro}\\
-& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); succeed (assume (apply1 int y))))); f = v_f)| \\
+& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); succeed (assume (apply1 int y))))); f = v)| \\
 & \movestoR{suc-elim}\\
-& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); assume (apply1 int y)))); f = v_f)| \\
+& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); assume (apply1 int y)))); f = v)| \\
 & \movestoR{prove-elim}\\
-& |def f (arr (); f = v_f)| \\
+& |def f (arr (); f = v)| \\
 \intertext{at which point the verifier is done and accepts the program.}
 \end{align*}
 
