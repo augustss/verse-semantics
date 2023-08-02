@@ -510,15 +510,16 @@ instance Bound BBlock where
     (freeBVars (binds b) `union` freeBVars (result b)) \\ vars b
   bsubst' s b
     | null s' = b
-    | otherwise = (freshenBlock bnd b){
-        binds = bsubst s' (binds b),
-        result = bsubst s' (result b) }
+    | otherwise = b'{
+        binds = bsubst s' (binds b'),
+        result = bsubst s' (result b') }
     where
       bnd = freeBVars (map snd s')
       s' = filter ((`notElem` vars b) . fst) s
+      b' = freshenBlock bnd b
 
 -- Change the initial existentials so they don't clash with vs.
-freshenBlock :: [BIdent] -> BBlock -> BBlock
+freshenBlock :: HasCallStack => [BIdent] -> BBlock -> BBlock
 freshenBlock vs b | null bad = b
                   | otherwise =
                     b{ vars = map subIdent (vars b)
