@@ -3,7 +3,6 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE InstanceSigs #-}
 
 module Rules.Verifier(
   allSystemsVerify,
@@ -13,7 +12,7 @@ module Rules.Verifier(
   verifyM,
   ) where
 import TRS.Bind
-import TRS.TRS
+import TRS.TRS hiding (step)
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core hiding (Wrong)
@@ -153,60 +152,60 @@ generalizedIcfpRules env lhs =
 -- | Rules for `Assume` and `Assert` -------------------------------------------
 
 assumeAssertRules :: VRule
-assumeAssertRules env lhs =
+assumeAssertRules _env lhs =
   -- ASSUME --
-  "Assume-HNF" `name`
+  "asm-hnf" `name`
   do Assume (HNF v) <- [lhs]
      pure v
   ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
-  "Assume-Seq" `name`
+  "asm-seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assume e2)
   ++
   -- Assume { exi x . e } ----> exi x . Assume {e}
-  "Assume-Exi" `name`
+  "asm-exi" `name`
   do Assume (Exi (Bind x e)) <- [lhs]
      pure (Exi (Bind x (Assume e)))
   ++
   -- Assume {Assume{e}} ----> Assume{e}
-  "Assume-Assume" `name`
+  "asm-id" `name`
   do Assume (Assume e) <- [lhs]
      pure (Assume e)
   ++
   -- Assume { Assert {e} } ----> Assume {e}
-  "Assume-Assert" `name`
+  "asm-suc" `name`
   do Assume (Assert e) <- [lhs]
      pure (Assume e)
   ++
   -- Assume { Verify {e} } ----> ()
-  "Assume-Verify" `name`
+  "asm-ver" `name`
   do Assume (Verify _) <- [lhs]
      pure (Val (Arr []))
   ++
   -- We *used* to get this from plain `HNF-SWAP` when it was of the form `hnf = x -> x = hnf`
   -- Assume e = x ----> x = Assume e
-  "Assume-SWAP" `name`
+  "asm-swap" `name`
   do Assume e :=: x@Var{} <- [lhs]
      pure (x :=: Assume e)
   ++
-  -- ASSERT --
-  -- Assert { e } ----> e   if   e mustSucceed
-  "Assert-Elim" `name`
-  do Assert e <- [lhs]
-     guard (mustSucceed e)
-     pure e
-  ++
-  -- DECIDE --
-  -- Decide { e } ----> e   if   e mustDecide
-  "Decide-Elim" `name`
-  do Decide e <- [lhs]
-     guard (mustDecide (bndVars env) e)
-     pure e
-  ++
+--   -- ASSERT --
+--   -- Assert { e } ----> e   if   e mustSucceed
+--   "suc-elim" `name`
+--   do Assert e <- [lhs]
+--      guard (mustSucceed e)
+--      pure e
+--   ++
+--   -- DECIDE --
+--   -- Decide { e } ----> e   if   e mustDecide
+--   "dec-elim" `name`
+--   do Decide e <- [lhs]
+--      guard (mustDecide (bndVars env) e)
+--      pure e
+--   ++
   -- VERIFY --
   -- Verify { e } ----> ()  if   e no Assert/Decide in e
-  "Verify-Elim" `name`
+  "prove-elim" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
          verified (Decide _) = False
@@ -215,37 +214,53 @@ assumeAssertRules env lhs =
      pure (Val (Arr []))
   ++
   -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
-  "Assume-Choice" `name`
+  "asm-cas" `name`
   do Verify e                 <- [lhs]
      (cx, _, _, Assume (e1 :|: e2)) <-  eX e
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
 
-mustSucceed :: Expr -> Bool
-mustSucceed (Int _)          = True
-mustSucceed (Arr as)         = all mustSucceed as
-mustSucceed (Lam _)          = True
-mustSucceed (Assume _)       = True
-mustSucceed (One e)          = mustSucceed e
-mustSucceed (e1 :>: e2)      = mustSucceed e1 && mustSucceed e2
-mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
-mustSucceed (Exi (Bind _ e)) = mustSucceed e
-mustSucceed _                = False
+-- mustSucceed :: Expr -> Bool
+-- mustSucceed (Int _)          = True
+-- mustSucceed (Arr as)         = all mustSucceed as
+-- mustSucceed (Lam _)          = True
+-- mustSucceed (Assume _)       = True
+-- mustSucceed (One e)          = mustSucceed e
+-- mustSucceed (e1 :>: e2)      = mustSucceed e1 && mustSucceed e2
+-- mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
+-- mustSucceed (Exi (Bind _ e)) = mustSucceed e
+-- mustSucceed _                = False
 
-mustDecide :: [BndVar] -> Expr -> Bool
-mustDecide bs = go
+mustSucceed :: QContext -> Expr -> Bool
+mustSucceed g = go
+  where
+   go e = proves g e || step e
+   step (Int _)          = True
+   step (Arr as)         = all go as
+   step (Lam _)          = True
+   step (Assume _)       = True
+   step (One e)          = go e
+   step (e1 :>: e2)      = go e1 && go e2
+   step (e1 :|: e2)      = go e1 || go e2
+   step (Exi (Bind _ e)) = go e
+   step _                = False
+
+
+mustDecide :: QContext -> [BndVar] -> Expr -> Bool
+mustDecide q bs = go
   where
     lamBinds       = [x | BLam x <- bs]
-    go (Arr as)    = all go as
-    go (One e)     = go e
-    go (e1 :=: e2) = go e1 && go e2
-    go (e1 :|: e2) = go e1 && go e2
-    go (e1 :>: e2) = go e1 && go e2
-    go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
-    go (Assume _)  = True
-    go (Int _)     = True
-    go (Op _)      = True
-    go (Var x)     = x `elem` lamBinds
-    go _           = False
+    go e = proves q e || step e
+    step (Arr as)    = all go as
+    step (One e)     = step e
+    step (e1 :=: e2) = step e1 && step e2
+    step (e1 :|: e2) = step e1 && step e2
+    step (e1 :>: e2) = step e1 && step e2
+    step (e1 :@: e2) = step e1 && step e2 && isDecideOp e1
+    step (Assume _)  = True
+    step (Int _)     = True
+    step (Op _)      = True
+    step (Var x)     = x `elem` lamBinds
+    step _           = False
 
 isDecideOp :: Expr -> Bool
 isDecideOp (Op Le)    = True
@@ -262,12 +277,28 @@ isDecideOp _          = False
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules env lhs =
+   -- ASSERT --
+   -- P[Assert { e }] ----> e   if   mustSucceed(P, e)
+   "suc-elim" `name`
+   do (ctx, g,_, Assert e) <- eX lhs
+      guard (mustSucceed g e)
+      pure (ctx e)
+   ++
+   -- DECIDE --
+   -- Decide { e } ----> e   if   e mustDecide
+   "dec-elim" `name`
+   do (ctx, g, _, Decide e) <- eX lhs
+      guard (mustDecide g (bndVars env) e)
+      pure (ctx e)
+   ++
+   -- P[suc{e}] -> P[e] if mustSucceed(P, e)
+   -- "suc-intro" `name`
    -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
-   "Prove" `name`
-   do (ctx, g, _, e) <- eX lhs
-      guard (case e of Assume _ -> False; _ -> True)
-      guard (g `proves` e)
-      pure (ctx (Assume e))
+   -- "asm-intro" `name`
+   -- do (ctx, g, _, e) <- eX lhs
+   --    guard (case e of Assume _ -> False; _ -> True)
+   --    guard (g `proves` e)
+   --    pure (ctx (Assume e))
    -- ++
    -- -- if e1 e2 e3 ---> (assume{e1} ; e2) | (assume-fail{e1}; e3) IF mustDecides e1
    -- -- unsoundly verifies if foo(n:any):int := if int[n] then 0 else n
@@ -277,13 +308,13 @@ verifierRules env lhs =
    --    guard (mustDecide bs e1)
    --    let (eThen, eElse) = unfoldIte e1 e2 e3
    --    pure (eThen :|: eElse)
-   ++
+   -- ++
    -- Verify{CTX[if e1 e2 e3]} ---> Verify{CTX[(assume{e1} ; e2)}; Verify{CTX(e3)} IF CTX `mustDecide` e1
-   "Fork-If" `name`
+   "asm-if" `name`
    do Verify e <- [lhs]
-      (ctx, _, bs, If e1 e2 e3) <- eX e
+      (ctx, g, bs, If e1 e2 e3) <- eX e
       let bs0 = bndVars env
-      guard (mustDecide (bs0 ++ bs) e1)
+      guard (mustDecide g (bs0 ++ bs) e1)
       pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx e3))
 
 
