@@ -151,9 +151,10 @@ coreToTrs (Macro1 (Ident _ "decide") [] e) = T.Decide $ coreToTrs e
 coreToTrs e@Macro1{} = impossible e
 coreToTrs (If3 e1 e2 e3) = T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)
 coreToTrs (EStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
+coreToTrs DomainFail = T.Wrong "DomainFail"
 coreToTrs e = error $ "coreToTrs: " ++ prettyShow e
 
-coreToTrsV :: Core -> T.Value
+coreToTrsV :: HasCallStack => Core -> T.Value
 coreToTrsV e = case coreToTrs e of T.Val v -> v; _ -> undefined
 
 coreToTrsI :: Ident -> T.Ident
