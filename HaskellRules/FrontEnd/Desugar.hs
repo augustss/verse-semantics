@@ -552,6 +552,7 @@ getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
 getVisible TLam{} = []
 getVisible Lam{} = []
 getVisible Fail = []
+getVisible DomainFail = []
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
@@ -581,6 +582,7 @@ getVar (Exists _ e) = getVar e
 getVar (HasType e t) = getVar e ++ getVar t
 getVar Lam{} = []
 getVar Fail = []
+getVar DomainFail = []
 getVar e = impossible e
 
 -- Primitives
@@ -1283,6 +1285,7 @@ substMany sb = sub
       let (is', e1', e2') = if3Hack sub is e1 e2
       in  If3 (Exists is' e1') e2' (sub e3)
     sub Fail = Fail
+    sub DomainFail = DomainFail
     sub e = error $ "substMany: " ++ prettyShow e
 
     binder :: Ident -> (Expr -> Expr) -> Expr -> Expr
