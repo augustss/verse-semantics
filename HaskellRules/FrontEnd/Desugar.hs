@@ -602,7 +602,6 @@ primOps = map (Ident noLoc)
   , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
   , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
 
-
   , "post'?'"
   , "concat$", "cons$"
   , "length$"
@@ -613,6 +612,7 @@ primOps = map (Ident noLoc)
   , "append$"
   , "known$"  -- This is a horrible hack
   , "any$"
+  , "fail$"
   ]
 
 ------------------------
@@ -631,6 +631,7 @@ simpAny :: Expr -> D Expr
 simpAny = pure . f
   where f (ApplyD (Variable (Ident _ "any")) e) = f e  -- This should go away
         f (ApplyD (EPrim "any$") e) = f e
+        f (EPrim "fail$") = Fail
         f e = composOp f e
 
 -- Simplify x = (e1; ...; en)  -->  e1; ...; x = en
