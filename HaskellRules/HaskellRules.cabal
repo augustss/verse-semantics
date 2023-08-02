@@ -31,6 +31,7 @@ library all
                       Epic.SIntMap
                       Epic.SIntSet
                       Epic.String
+                      Epic.Trace
                       Epic.Uniplate
                       TRS.Bind
                       TRS.Graph
