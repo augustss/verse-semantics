@@ -231,18 +231,18 @@ assumeAssertRules _env lhs =
 -- mustSucceed _                = False
 
 mustSucceed :: QContext -> Expr -> Bool
-mustSucceed g = go
+mustSucceed = go
   where
-   go e = proves g e || step e
-   step (Int _)          = True
-   step (Arr as)         = all go as
-   step (Lam _)          = True
-   step (Assume _)       = True
-   step (One e)          = go e
-   step (e1 :>: e2)      = go e1 && go e2
-   step (e1 :|: e2)      = go e1 || go e2
-   step (Exi (Bind _ e)) = go e
-   step _                = False
+   go g e = proves g e || step g e
+   step _ (Int _)          = True
+   step g (Arr as)         = all (go g) as
+   step _ (Lam _)          = True
+   step _ (Assume _)       = True
+   step g (One e)          = go g e
+   step g (e1 :>: e2)      = go g e1 && go (g :>: e1) e2
+   step g (e1 :|: e2)      = go g e1 || go g e2
+   step g (Exi (Bind _ e)) = go g e
+   step _ _                = False
 
 
 mustDecide :: QContext -> [BndVar] -> Expr -> Bool
