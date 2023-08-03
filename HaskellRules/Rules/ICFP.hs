@@ -359,10 +359,10 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
- ++ -- extra rule for verifier
-  do (Assume x) :>: e <- [lhs]
-     (ctx, hole) <- execX x
-     pure ( \ a -> Assume (ctx a) :>: e, hole)
+--  ++ -- extra rule for verifier
+--   do (Assume x) :>: e <- [lhs]
+--      (ctx, hole) <- execX x
+--      pure ( \ a -> Assume (ctx a) :>: e, hole)
 
 substX :: Expr -> [(Context, Expr)]
 -- X context

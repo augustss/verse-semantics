@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 module Main where
 
 import Rules.Verifier
@@ -44,6 +46,9 @@ tests =
   , ("ex_if0", ex_if0, True)
   , ("ex_if1", ex_if1, False)
   , ("ex_if2", ex_if2, True)
+  , ("ex_tim_0", ex_tim_0, False)
+  , ("ex_tim_1", ex_tim_1, False)
+  , ("ex_asm_subst", ex_asm_subst, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -579,12 +584,40 @@ ex_inc = tlamOblig y [x]
     y = ident "y"
     r = ident "r"
 
-{-
-   verify {\$x2.
-           ex x.
-              assume {isint($x2); (x = $x2); x};
-              assert {assert {isint(x);
-                              isint(1);
-                              assume {ex $$z. ($$z = add(<x, 1>)); isint($$z); $$z}}}};
 
-                              -}
+
+-- example showing Tim's caution re: using assumes: make sure you cannot use a post-condition to prove its
+-- own precondition. The exact example from August 2nd https://docs.google.com/document/d/18zJNCViVEmj8NzjE-zKMV0T1BGkW4__i24mM0huwGTY/edit#heading=h.ah81el9ovz9v
+--   a&b:int => f(a=b):type{a=b} => exists x. x=f[x] # Must be rejected
+-- I can't quite replicate the unsoundness due to desugarer obfuscations, so here's a plain CORE version
+--   \a b f. assume {int[a]; int[b]; f = (\z. a = b; assume{a=b})}; assert {a = b; f[0]}
+
+ex_tim_0 :: Expr
+ex_tim_0 = lAMs [a, b, f] $
+             Assume (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>: Assume (Var a :=: Var b))))
+             :>:
+             Assert (Var a :=: Var b :>: (Var f :@: Int 0) :>: Int 0)
+  where
+    a = ident "a"
+    b = ident "b"
+    f = ident "f"
+    z = ident "z"
+
+ex_tim_1 :: Expr
+ex_tim_1 = lAMs [a, b, f] $
+             Assume (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>: Assume (Var a :=: Var b))))
+             :>:
+             Assert ((Var f :@: Int 0) :>: Var a :=: Var b :>:  Int 0)
+  where
+    a = ident "a"
+    b = ident "b"
+    f = ident "f"
+    z = ident "z"
+
+ex_asm_subst :: Expr
+ex_asm_subst = lAMs [a] $
+                 Assume (Var a :=: Int 10)
+                 :>:
+                 Assert (sub (Var a) (Int 1) :=: Int 9 :>: Int 0)
+  where
+    a = ident "a"
