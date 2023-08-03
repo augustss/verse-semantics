@@ -20,7 +20,7 @@ verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := 
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
 verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
-verify(fail,ICFPverify=skip) { f(x : int, y : int, g(x=y):type{x=y}) := {z := g[z]} }
+verify(fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
 
 # Ported tests from TRSVerify.hs
 verify(pass) { g() := (2 = 2; 2) }
