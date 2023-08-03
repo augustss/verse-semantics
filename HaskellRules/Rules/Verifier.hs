@@ -149,10 +149,11 @@ generalizedIcfpRules env lhs =
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx (Var x0 :=: Val v)))
 
+
 -- | Rules for `Assume` and `Assert` -------------------------------------------
 
 assumeAssertRules :: VRule
-assumeAssertRules _env lhs =
+assumeAssertRules env lhs =
   -- ASSUME --
   "asm-hnf" `name`
   do Assume (HNF v) <- [lhs]
@@ -218,6 +219,20 @@ assumeAssertRules _env lhs =
   do Verify e                 <- [lhs]
      (cx, _, _, Assume (e1 :|: e2)) <-  eX e
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
+  ++
+  "subst-asm" `name`
+  -- asm{X[x=v]}; e --> asm{X[x=v]} ; (subst x v e)
+  do (Assume e_asm) :>: e <- [lhs]
+     (_ctx, Var x :=: Val v) <- execX e_asm
+     let freeE = free e
+         freeV = free v
+     let -- x0    = identNotIn (freeE ++ freeV) -- replacing x temporarily
+         sub   = [(x, v)] -- ,(x0, Var x)]
+     guard (x `elem` freeE)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     pure (Assume e_asm :>: subst sub e)
+
 
 -- mustSucceed :: Expr -> Bool
 -- mustSucceed (Int _)          = True
