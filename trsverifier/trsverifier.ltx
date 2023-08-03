@@ -1,7 +1,8 @@
 %% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
-% \documentclass[acmsmall,review,anonymous,dvipsnames]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+\documentclass[acmsmall,review,anonymous,dvipsnames]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
 %% For double-blind review submission, w/ CCS and ACM Reference
-% \documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+%\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
 %% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
 %\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
 %% For single-blind review submission, w/ CCS and ACM Reference
@@ -9,36 +10,33 @@
 %% For final camera-ready submission, w/ required CCS and ACM Reference
 %\documentclass[acmsmall]{acmart}\settopmatter{}
 
-\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false,authorsperrow=2}
-
 \let\Bbbk\relax % polycode defines that again?
 %include lhs2TeX.fmt
 %include lhs2TeX.sty
 %include polycode.fmt
 %include ../calculus.fmt
 
-\newcommand{\ie}{\emph{i.e.}\xspace}	% \mbox keeps the last period from
-\newcommand{\Ie}{\emph{I.e.}\xspace}	% looking like an end-of-sentence.
-\newcommand{\eg}{\emph{e.g.}\xspace}
-\newcommand{\Eg}{\emph{E.g.}\xspace}
-\newcommand{\etc}{\emph{etc.}\xspace}
-\newcommand{\etal}{\emph{et al.}\xspace}
-\newcommand{\vs}{\emph{vs.}\xspace}
+\newcommand{\ie}{\emph{i.e.}}	% \mbox keeps the last period from
+\newcommand{\Ie}{\emph{I.e.}}	% looking like an end-of-sentence.
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\Eg}{\emph{E.g.}}
+\newcommand{\etc}{\emph{etc.}}
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\vs}{\emph{vs.}}
 
 \RequirePackage[utf8]{inputenc}
 
 %% Journal information
 %% Supplied to authors by publisher for camera-ready submission;
 %% use defaults for review submission.
-\acmConference{In submission}{March 2023}
-% \acmJournal{PACMPL}
-% \acmVolume{1}
-% \acmNumber{ICFP} % CONF = POPL or ICFP or OOPSLA
-% \acmArticle{1}
-% \acmYear{2023}
-% \acmMonth{1}
-% \acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
-% \startPage{1}
+\acmJournal{PACMPL}
+\acmVolume{1}
+\acmNumber{PLDI} % CONF = POPL or ICFP or OOPSLA
+\acmArticle{1}
+\acmYear{2023}
+\acmMonth{1}
+\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+\startPage{1}
 
 %% -------------- Copyright information ------------------
 %% Supplied to authors (based on authors' rights management selection;
@@ -121,7 +119,6 @@
 \newcommand{\koen}[1]{{\color{dkred} [{KC}: #1]}}
 \newcommand{\olin}[1]{{\color{dkgreen} [{OS}: #1]}}
 \newcommand{\ranjit}[1]{{\color{orange} [{RJ}: #1]}}
-\newcommand{\guy}[1]{{\color{red} [{GS}: #1]}}
 \else
 \newcommand{\simon}[1]{}
 \newcommand{\lennart}[1]{}
@@ -129,21 +126,14 @@
 \newcommand{\koen}[1]{}
 \newcommand{\olin}[1]{}
 \newcommand{\ranjit}[1]{}
-\newcommand{\guy}[1]{}
 \fi
 
 % ---------------- End of comments -----------------
 
-% Loads the rewrite figures.
-% They still need to be placed using \figureGeneralAxioms etc.
-\input{rewrites}
-
-
 \begin{document}
 
 %% Title information
-% \title{The essence of functional logic programming}
-\title{Left-to-right Verse calculus}
+\title{A TRS Verifier for Verse}
 
                                         %% [Short Title] is optional;
                                         %% when present, will be used in
@@ -169,44 +159,29 @@
 
 %% Author with single affiliation.
 \author{Lennart Augustsson}
-%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
 \affiliation{
-%  \position{Position1}
+  \position{Position1}
   \institution{Epic Games}            %% \institution is required
-%   \streetaddress{Street1 Address1}
-%  \city{City1}
-%  \state{State1}
-%  \postcode{Post-Code1}
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
   \country{Sweden}                    %% \country is recommended
 }
 \email{lennart.augustsson@@epicgames.com}          %% \email is recommended
 
-\author{Joachim Breitner}
-% \authornote{with author1 note}          %% \authornote is optional;
-%                                         %% can be repeated if necessary
-\orcid{0000-0003-3753-6821}             %% \orcid is optional
-\affiliation{}
-%  \position{Position1}
-%   \institution{Epic Games}            %% \institution is required
-%  \streetaddress{Street1 Address1}
-%  \city{City1}
-%  \state{State1}
-%  \postcode{Post-Code1}
-%  \country{Germany}                    %% \country is recommended
-% }
-\email{mail@@joachim-breitner.de}          %% \email is recommended
-
 \author{Koen Claessen}
 % \authornote{with author1 note}          %% \authornote is optional;
 %                                         %% can be repeated if necessary
-%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
 \affiliation{
-%  \position{Position1}
+  \position{Position1}
   \institution{Epic Games}            %% \institution is required
-%  \streetaddress{Street1 Address1}
-%  \city{City1}
-%  \state{State1}
-%  \postcode{Post-Code1}
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
   \country{Sweden}                    %% \country is recommended
 }
 \email{koen.claessen@@epicgames.com}          %% \email is recommended
@@ -214,14 +189,14 @@
 \author{Ranjit Jhala}
 % \authornote{with author1 note}          %% \authornote is optional;
 %                                         %% can be repeated if necessary
-%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
 \affiliation{
-%  \position{Position1}
+  \position{Position1}
   \institution{Epic Games}            %% \institution is required
-%  \streetaddress{Street1 Address1}
-%  \city{City1}
-%  \state{State1}
-%  \postcode{Post-Code1}
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
   \country{USA}                    %% \country is recommended
 }
 \email{ranjit.jhala@@epicgames.com}          %% \email is recommended
@@ -229,14 +204,14 @@
 \author{Simon Peyton Jones}
 % \authornote{with author1 note}          %% \authornote is optional;
 %                                         %% can be repeated if necessary
-%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
 \affiliation{
-%  \position{Position1}
+  \position{Position1}
   \institution{Epic Games}            %% \institution is required
-%  \streetaddress{Street1 Address1}
-%  \city{City1}
-%  \state{State1}
-%  \postcode{Post-Code1}
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
   \country{United Kingdom}                    %% \country is recommended
 }
 \email{simonpj@@epicgames.com}          %% \email is recommended
@@ -244,44 +219,29 @@
 \author{Olin Shivers}
 % \authornote{with author1 note}          %% \authornote is optional;
 %                                         %% can be repeated if necessary
-%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
 \affiliation{
-%  \position{Position1}
+  \position{Position1}
   \institution{Epic Games}            %% \institution is required
-%  \streetaddress{Street1 Address1}
-%  \city{City1}
-%  \state{State1}
-%  \postcode{Post-Code1}
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
   \country{USA}                    %% \country is recommended
 }
 \email{olin.shivers@@epicgames.com}          %% \email is recommended
 
-\author{Guy Steele}
-% \authornote{with author1 note}          %% \authornote is optional;
-%                                         %% can be repeated if necessary
-%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
-\affiliation{
-%  \position{Position1}
-  \institution{Oracle Labs}            %% \institution is required
-%  \streetaddress{Street1 Address1}
-%  \city{City1}
-%  \state{State1}
-%  \postcode{Post-Code1}
-  \country{USA}                    %% \country is recommended
-}
-\email{guy.steele@@oracle.com}          %% \email is recommended
-
 \author{Tim Sweeney}
 % \authornote{with author1 note}          %% \authornote is optional;
 %                                         %% can be repeated if necessary
-%\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
 \affiliation{
-  \position{CEO}
+  \position{Position1}
   \institution{Epic Games}            %% \institution is required
-%  \streetaddress{Street1 Address1}
-%  \city{City1}
-%  \state{State1}
-%  \postcode{Post-Code1}
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
   \country{USA}                    %% \country is recommended
 }
 \email{tim.sweeney@@epicgames.com}          %% \email is recommended
@@ -292,18 +252,8 @@
 %% Note: \begin{abstract}...\end{abstract} environment must come
 %% before \maketitle command
 \begin{abstract}
-  Functional logic languages have a rich literature, but it is tricky
-  to give them a satisfying semantics.  In this paper we describe the
-  Verse calculus, \versecalc{}, a new core calculus for functional
-  logic programming. Our main contribution is to equip \versecalc{} with a
-  small-step rewrite semantics, so that we can reason
-  about a \versecalc{} program in the same way as one does with lambda
-  calculus; that is, by applying successive rewrites to it.
-  We also show that the rewrite system is confluent.
-%   This semantics elegantly fills the gap between very high level
-%  ``magical'' semantics, and very low-level operational semantics.
-  \par
-  \vspace{1em}
+This paper describes a term-rewriting based verifier
+for the Verse language.
 \end{abstract}
 
 
@@ -333,65 +283,60 @@
 %% Keywords
 %% comma separated list
 % \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
-\keywords{%
-  confluence,
-  declarative programming,
-  functional programming,
-  lambda calculus,
-  logic programming,
-  rewrite rules,
-  skew confluence,
-  unification,
-  Verse calculus,
-  Verse language
-}
+
 
 %% \maketitle
 %% Note: \maketitle command must come after title commands, author
 %% commands, abstract environment, Computing Classification System
 %% environment and commands, and keywords command.
 \maketitle
-\renewcommand{\shortauthors}{Augustsson, Breitner, Claessen, Jhala, Peyton Jones, Shivers, Steele, Sweeney}
-
 
 % \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
 %   a work in progress.  So please don't share it; if there is anyone you think would be
 %   interested/helpful, do suggest them to us.}
 
-\section{Syntax}
+\newcommand{\asucceeds}[1]{\textbf{S}\{#1\}}
+\newcommand{\afails}[1]{\textbf{F}\{#1\}}
+\newcommand{\adecides}[1]{\textbf{D}\{#1\}}
+\newcommand{\awellformed}[1]{\textbf{W}\{#1\}}
+\newcommand{\aexists}[1]{|defKW^x|}
 
-\cite{fullversepaper}
+\newcommand{\jeffect}[2]{\ensuremath{#1 \vdash #2}}
+\newcommand{\jsucceeds}[2]{\jeffect{#1}{\asucceeds{#2}}}
+\newcommand{\jfails}[2]{\jeffect{#1}{\afails{#2}}}
+\newcommand{\jdecides}[2]{\jeffect{#1}{\adecides{#2}}}
+\newcommand{\jwellformed}[2]{\jeffect{#1}{\awellformed{#2}}}
 
-\figureSyntax
-\figureContexts
+\newcommand{\noassump}{\emptyset}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\mustSucceedKW}{\mathsf{Suc}}
+\newcommand{\mustSucceed}[1]{\ensuremath{\mustSucceedKW(#1)}}
+\newcommand{\mustDecideKW}{\mathsf{Dec}}
+\newcommand{\mustDecide}[2]{\ensuremath{\mustDecideKW(#1, #2)}}
+\newcommand{\mustVerifyKW}{\mathsf{Prove}}
+\newcommand{\mustVerify}[1]{\ensuremath{\mustVerifyKW(#1)}}
+\newcommand{\proves}[2]{\ensuremath{#1 \vdash #2}}
+\newcommand{\lamvars}[1]{\mathsf{lams}(#1)}
+\newcommand{\isdone}[1]{\mathsf{Verified}(#1)}
+\newcommand{\UnAssume}[1]{\ensuremath{\lfloor #1 \rfloor}}
+\newcommand{\FEnv}[1]{\ensuremath{\Gamma(#1)}}
+\newcommand{\Facts}[1]{\ensuremath{\mathsf{Facts}(#1)}}
 
-\section{Rewrite rules} \label{sec:rewrite-rules}
+\newcommand{\tlamFX}[1]{\ensuremath{\mathsf{tlam}_{#1}}}
+\newcommand{\De}[1]{\llbracket #1 \rrbracket}
+\newcommand{\Fe}[2]{\llbracket #1 \triangleright #2 \rrbracket}
+\newcommand{\Me}[2]{\llbracket #1 \blacktriangleright #2 \rrbracket}
+\newcommand{\Ae}[2]{\llbracket #1 \ \textbf{as}\ #2 \rrbracket}
 
-\figureRewriteRules
+% \newcommand{\dsm}[1]{{\mathcal M}\llbracket #1 \rrbracket}
+% \newcommand{\Me}[1]{#1}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\bibliography{../verse}
+\input{rewrites}
+\input{overview}
+\input{syntax}
+\input{rules}
+\input{examples}
 
 \end{document}
-
-% LocalWords:  Lennart Augustsson nnnn Peyton Joachim Breitner ccs ce
-% LocalWords:  desc tup optimise defunctionalization oneKW allKW lll
-% LocalWords:  distils metaverse Ariola subst utup elim Hanus lrcl sx
-% LocalWords:  residuation Primops isInt exprs CX SX rcl applyN defKW
-% LocalWords:  modelled hnf dlet ys xs emptytup lamhdr xr zs unary
-% LocalWords:  boolean un rcll ANF flatMap cartesian behavior fromTo
-% LocalWords:  featureful multivalued mapFlat powerset denotational
-% LocalWords:  Launchbury ulit ux localising uc seql seqr unifyl ary
-% LocalWords:  unifyr neighbourhood ariola deterministically bagof xy
-% LocalWords:  ReWrite CRWL fraguas formalization rhs dom fvs hanus
-% LocalWords:  launchbury fcase labelled splitKW lrcll SML emp Niklas
-% LocalWords:  updateable alloc storeTwoLines canCopy storeKW Koen ss
-% LocalWords:  subexpression Claessen equationally eliml fcn elimr
-% LocalWords:  rll redex Formalising equational stepX compositionally
-% LocalWords:  iff cuten stepXs stepXrs Rosser QuickCheck quickcheck
-% LocalWords:  joinability metatheory fixpoint liguoro det lago CRLW
-% LocalWords:  Smolka flavor FLC urefl onec obfuscatory opez Rodr
-% LocalWords:  transactional iguez Hortal Ranjit Jhala ojemo anches
-% LocalWords:  Hern andez Scheidecker stepA stepB stepAe stepArs cutr
-% LocalWords:  stepAs stepBr stepAr stepAB stepABrs stepABs stepUn
-% LocalWords:  Eqns ohlebusch

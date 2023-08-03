@@ -1,4 +1,6 @@
 module FrontEnd.Flags(Flags(..), defaultFlags, showFlags) where
+import FrontEnd.Expr
+import FrontEnd.Prelude
 
 data Flags = Flags
   { fTrace        :: !Bool
@@ -13,9 +15,11 @@ data Flags = Flags
   , fEvalSteps    :: !Int
   , fNoFuelStop   :: !Bool
   , fNoLambdaIf   :: !Bool
-  , fVerify       :: !Bool
+  , fVerify       :: !Bool   -- desugar for verification
+  , fAssumeVerified :: !Bool
   , fTraceDesugar :: !Bool
   , fTraceVerify  :: !Bool
+  , fPrelude      :: !(String, Expr)
   }
   deriving (Show)
 
@@ -34,8 +38,10 @@ defaultFlags = Flags
   , fNoFuelStop   = False
   , fNoLambdaIf   = False
   , fVerify       = False
+  , fAssumeVerified = False
   , fTraceDesugar = False
   , fTraceVerify  = False
+  , fPrelude      = either error id $ findPrelude defaultPrelude
   }
 
 showFlags :: Flags -> String
@@ -46,4 +52,5 @@ showFlags f = unwords
   , if fUnderLambda f then "under-lambda" else "no-under-lambda"
   , if fFinalInline f then "final-inlines" else ""
   , "max-steps=" ++ show (fRewriteSteps f)
+  , "prelude=" ++ show (fst (fPrelude f))
   ]

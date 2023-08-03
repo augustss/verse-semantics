@@ -1,5 +1,5 @@
 module FrontEnd.Parse(
-  parseDie, pFile,
+  parseDie, parseTry, pFile,
   -- Exports for further parsing
   pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
   pIdent, pExprSeq, pOp, pLiteral, pMacroName, try,
@@ -113,12 +113,13 @@ opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
 keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
-           , "in", "let", "not", "of", "or", "option", "ref", "return", "set", "then", "var", "where"]
+           , "in", "let", "not", "of", "or", "option", "ref", "return", "set", "then", "var", "where"
+           , "lambda"]
            ++ macros)
            \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "allow", "assert", "assume", "expect", "first", "last", "logic", "one", "type", "unify"]
+macros = ["all", "allow", "assert", "assume", "expect", "first", "last", "logic", "lowered", "one", "type", "unify"]
          ++ effects
 
 effects :: [String]
@@ -166,7 +167,7 @@ pLiteral = choice
   [ Lit . LitInt <$> pDecimal
   , Lit . LitChar <$> pChar
   -- Handle 1..2 incorrectly
-  , (Lit <$> (LitRat <$> L.scientific <*> many letterChar) <* skip)
+  , (Lit <$> (LitRat <$> L.scientific <*> ((:) <$> letterChar <*> many alphaNumChar)) <* skip)
   , pString
   ]
 
@@ -408,10 +409,14 @@ pReturn :: P Expr
 pReturn = pKeyword "return" *> (Return <$> pExpr2)
 
 pExpr1 :: P Expr
-pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn ]
+pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn, pLambda ]
 
 pExpr2 :: P Expr
 pExpr2 = makeExprParser pExpr1 operatorTable
+
+-- A hack for already lowered lambdas
+pLambda :: P Expr
+pLambda = pKeyword "lambda" *> (Lam <$> pParens pIdent <*> pBlockM)
 
 {-
 pTermPost :: P Expr
@@ -511,6 +516,9 @@ parseDie p fn file =
   case runP p fn file of
     Left err -> error $ errorBundlePretty err
     Right x -> x
+
+parseTry :: P a -> FilePath -> String -> Either String a
+parseTry p fn file = either (Left . errorBundlePretty) Right $ runP p fn file
 
 testp :: P a -> String -> a
 testp p = parseDie p "<string>"

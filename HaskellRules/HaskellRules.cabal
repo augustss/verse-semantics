@@ -31,6 +31,7 @@ library all
                       Epic.SIntMap
                       Epic.SIntSet
                       Epic.String
+                      Epic.Trace
                       Epic.Uniplate
                       TRS.Bind
                       TRS.Graph
@@ -51,11 +52,12 @@ library all
                       FrontEnd.Desugar
                       FrontEnd.Parse
                       FrontEnd.ParseCore
+                      FrontEnd.Prelude
                       FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
-                      Verifier.Verify
-                      Verifier.FOL
+--                      Verifier.Verify
+--                      Verifier.FOL
                       Rules.ICFP
                       Rules.Verifier
                       --DenSem.DenSem
@@ -76,7 +78,7 @@ library all
                       text,
                       transformers,
                       unordered-containers,
-                      z3,
+--                      z3,
     hs-source-dirs:   .
 
 executable verse
@@ -116,18 +118,18 @@ executable qctest
     hs-source-dirs:   qctest
     default-language: Haskell2010
 
-executable verifier
-    import:           shared-properties
-    build-depends:    all,
-                      optparse-applicative,
-                      QuickCheck,
-                      githash,
-                      z3
-
-    main-is:          Main.hs
-
-    hs-source-dirs:   verify
-    default-language: Haskell2010
+--executable verifier
+--    import:           shared-properties
+--    build-depends:    all,
+--                      optparse-applicative,
+--                      QuickCheck,
+--                      githash,
+--                      z3
+--
+--    main-is:          Main.hs
+--
+--    hs-source-dirs:   verify
+--    default-language: Haskell2010
 
 executable trsverifier
     import:           shared-properties

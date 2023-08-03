@@ -5,13 +5,13 @@ module FrontEnd.Run(
   blockSystem,
   findSystem,
   everySystem,
+  adjustFlags,
   ) where
 import Data.List
 import Epic.Print
-import FrontEnd.Desugar(simpCore)
-import FrontEnd.EvalBlock(runBlock)
 import FrontEnd.Expr(Core)
 import FrontEnd.Flags
+import FrontEnd.Prelude
 --import FrontEnd.RefImpl(evalRI)
 import FrontEnd.TRSAdapter(rewrite)
 import Rules.Systems(TRSystem(..), ESystem, lookupSystemEx, allSystems)
@@ -26,9 +26,8 @@ run f s = one . runM f s
         one rs = error $ "run: multiple results from rewrite:\n" ++ intercalate "\n-----------------\n" (map prettyShow rs)
 
 runM :: Flags -> ESystem -> Core -> [Core]
-runM f s e = rewrite f s e'
-  where 
-        e' = if fSimplify f then simpCore e else e
+runM f s e = rewrite f s e
+
 
 --------------------
 
@@ -37,26 +36,13 @@ runM f s e = rewrite f s e'
 -- so it's easier to reuse that framework.
 -- There are no rewrite rules, instead everything happens in the preprocessing stage.
 
-{-
-evalSystem :: ESystem
-evalSystem = TRSystem { sname = "eval", description = "single path shortcut POPL rules",
-  ruleEnv = defaultTRSFlags,
-  preProcess = evaluate, postProcess = const id, rules = noRules, rules2 = noRules, rulesHaveStructural = False,
-  confluenceRules = noRules, validExpr = \ _ _ -> True }
-  where
-    noRules _ _ = []
-    evaluate tflg = coreToTrs . eval flg . trsToCore
-      where flg = EFlags { underLambda = tfUnderLambda tflg, traceEval = tfTrace tflg, steps = tfRewriteSteps tflg }
--}
-
 blockSystem :: ESystem
 blockSystem = TRSystem { sname = "iblock", description = "left-to-right ICFP rules",
   ruleEnv = defaultTRSFlags,
-  preProcess = evaluate, postProcess = const id, rules = noRules, rules2 = noRules, rulesHaveStructural = False,
+  preProcess = const id, postProcess = const id, rules = noRules, rules2 = noRules, rulesHaveStructural = False,
   confluenceRules = noRules, validExpr = \ _ _ -> True, sortRewrites = id }
   where
     noRules _ _ = []
-    evaluate = runBlock
 
 {-
 refiSystem :: ESystem
@@ -74,3 +60,18 @@ everySystem = allSystems ++ [blockSystem] -- , refiSystem]
 
 findSystem :: String -> Either String ESystem
 findSystem = lookupSystemEx everySystem
+
+adjustFlags :: ESystem -> Flags -> Flags
+adjustFlags sys flags =
+  case sname sys of
+    "iblock"      -> flags{ fSplit = True,  fVerify = False, fPrelude = medium }
+    "L2R"         -> flags{ fSplit = False, fVerify = False, fPrelude = mini, fDfs = True}
+    "ICFP"        -> flags{ fSplit = False, fVerify = False, fPrelude = mini }
+    "ICFPGuy"     -> flags{ fSplit = False, fVerify = False, fPrelude = mini }
+    "ICFPverify"  -> flags{ fSplit = False, fVerify = True,  fPrelude = verif, fAssumeVerified = False}
+    "ICFPEverify" -> flags{ fSplit = False, fVerify = True,  fPrelude = verif, fAssumeVerified = False}
+    _             -> flags
+  where
+    mini   = either error id $ findPrelude "miniprelude"
+    medium = either error id $ findPrelude "mediumprelude"
+    verif  = either error id $ findPrelude "verifyprelude"

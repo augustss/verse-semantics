@@ -3,6 +3,7 @@ verify("Trivial-pass", pass){1}
 verify("Trivial-fail", fail){succeeds{0=1}}
 #
 # Some simple tests
+verify(pass) {f(x:int):={x=x;x}}
 verify(pass) {f(x:int):=x+1}
 verify(fail) {f(x:int):=x+()}
 verify(pass) {f(x:int):=x+1; f(1)}
@@ -17,6 +18,8 @@ verify(fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
 verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
+verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
+verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
 
 # Ported tests from TRSVerify.hs
 verify(pass) { g() := (2 = 2; 2) }
@@ -51,6 +54,11 @@ verify(fail) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { n } }
 verify(fail) { sum(n:any):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
 
 # higher-order functions
+verify(pass) { f(g(z:int):int) := {g(3)} }
+verify(fail) { f(g(z:int):int) := {g(())} }
+verify(pass) { f(g(z:int):int):int := {g(3)} }
+verify(fail) { f(g(z:int):int):int := {g(())} }
+
 verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 verify(fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 verify(pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
@@ -76,3 +84,6 @@ verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo
 # currently fails
 # verify(pass,broken) { foo(x:any)<decides> := { x = 666 } }
 # verify(pass,broken) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
+
+verify(pass) {f(x:int)<succeeds>:=x/2}
+verify(fail) {f(x:int)<succeeds>:=x/0}

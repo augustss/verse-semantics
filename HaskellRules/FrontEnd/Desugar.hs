@@ -2,12 +2,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.Desugar(
   desugar,
-  primOps, covariantId, dsScope,
-  exprToCore,
-  simpCore,
+  dsScope,
+  getFree, substMany, getAllVars,
   ) where
 import Control.Monad
 import Control.Monad.State.Strict
+import Control.Monad.Writer
 import Data.Either
 import Data.List
 --import qualified Data.Map as M
@@ -30,21 +30,44 @@ import FrontEnd.Flags
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
-            (traceDS "alias"      <=< simpAlias <=<
+            (traceDS "dropPrel"   <=< dropPrel  <=<
+             traceDS "alias"      <=< simpAlias <=<
              traceDS "simpler"    <=< simpler   <=<
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
              traceDS "addScope"   <=< addScope  <=<
-             traceDS "dsD"        <=< dsD       <=<
+             pass1                              <=<
+             traceDS "addPrelude" <=< addPrelude)
+  where
+    pass1 = (traceDS "dsD"        <=< dsD       <=<
              traceDS "addDeref"   <=< addDeref  <=<
              traceDS "dsSmall"    <=< dsSmall   <=<
              traceDS "dropParens" <=< dropParens)
-  where
+
     tr = fTraceDesugar flgs
     traceDS :: String -> Expr -> D Expr
     traceDS msg e | tr = trace ("---- " ++ msg ++ "\n" ++ prettyShow e) $
                          pure e
                   | otherwise = pure e
+    addPrelude e = pure $ Array [prel, e]
+    prel = snd $ fPrelude flgs
+    prelIds = getVisible $ eval flgs $ pass1 prel
+    dropPrel = pure . dropUnusedIds prelIds
+
+-- Drop unused prelude identifiers.
+-- Assumes input expression is of the for exists is . < <prels>, e >
+dropUnusedIds :: [Ident] -> Expr -> Expr
+dropUnusedIds pids (Exists is (Array [Array ps, e])) =
+  let used = clos [] (getFree e)
+        where clos us [] = us
+              clos us (u : uis) = clos (u:us) (maybe [] getFree (lookup u pds) ++ uis)
+              pds = [(p, d) | Unify (Variable p) d <- ps ]
+      unused = pids \\ used
+      usedPrel (Unify (Variable p) _) = p `notElem` unused
+      usedPrel _ = True
+  in  lExists (is \\ unused) $ seqE $ filter usedPrel ps ++ [e]
+dropUnusedIds _ (Array [Array [], e]) = e
+dropUnusedIds _ e = error $ "dropUnusedIds: " ++ show e
 
 ------
 
@@ -104,6 +127,7 @@ dsSmall = ds
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
     ds (InfixOp e1@Variable{} (Op "=") e2) = ds $ Unify e1 e2
+    ds (InfixOp e1 (Op "=") e2@Variable{}) = ds $ Unify e2 e1
     ds (InfixOp e1            (Op "=") e2) = do x <- newIdent (getLoc e1) "x"; ds $ seqE [DefineE x e1, Unify (Variable x) e2]
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
@@ -232,7 +256,7 @@ eFalse :: Expr
 eFalse = Array []
 
 eAny :: Expr
-eAny = Variable (Ident noLoc "any")
+eAny = Variable (Ident noLoc "any$")
 
 defnArray :: [Expr] -> Expr -> D Expr
 defnArray ps e = do
@@ -295,6 +319,13 @@ dsD e@(ApplyD f a) | isValue f && isValue a = pure e
 dsD e@(HasType f a) | isValue f && isValue a = pure e
 dsD (Unify x e) | isValue x = Unify x <$> dsD e
 dsD (DefineV x) = pure (DefineV x)
+dsD (DefineE x e@Function{}) = do
+  c <- gets context
+  case c of
+    -- In an evaluation context, just define the function normally.
+    -- This isn't necessary, but avoids an extra exists.
+    DEval ->     existsV [x] <$> dsM x e
+    DAbstract -> DefineE x <$> dsD e
 dsD (DefineE x e) = DefineE x <$> dsD e
 dsD (For2 e1 e2) = For2 <$> dsD e1 <*> dsD e2
 dsD (If3 e1 e2 e3) = If3 <$> dsD e1 <*> dsD e2 <*> dsD e3
@@ -352,6 +383,7 @@ dsM i (Function [(t1, r)] t2) = do
 dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
+dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
 dsM _ e = impossible e
 
 dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
@@ -385,7 +417,7 @@ existsV is e = --seqE $ map (\ i -> Define i AnyT) is ++ [e]
 -- Pick the appropriate form of apply for operators
 call :: String -> Loc -> String -> Expr -> D Expr
 call p l s e = do
-  ver <- gets (fVerify . dflags)
+  ver <- gets (not . fAssumeVerified . dflags)
   let
     -- For verification, use ApplyS.  At runtime, skip the test.
     con | ver && s' `elem` [
@@ -408,13 +440,12 @@ dsScope :: Flags -> Expr -> Expr
 dsScope flgs = eval flgs . (primops <=< addScope)
 
 addScope :: Expr -> D Expr
-addScope e = scope (S.fromList $ prel ++ primOps) (Do e)
- where prel = if Ident noLoc "PRELUDE" `elem` getVisible e then [] else preludeIds
+addScope e = scope (S.fromList primOps) (Do e)
 
 _knownEffects :: [Ident]
 _knownEffects = map (Ident noLoc) [
-  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "covariant"
-  ]
+  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts"
+  ] ++ [covariantId]
 
 _isLambdaEffect :: Ident -> Bool
 _isLambdaEffect i = elem i [
@@ -424,13 +455,16 @@ _isLambdaEffect i = elem i [
 covariantId :: Ident
 covariantId = Ident noLoc "covariant"
 
+openId :: Ident
+openId = Ident noLoc "open"
+
 errUndefined :: [Ident] -> D ()
 errUndefined =
   mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i))
 
-errShadow :: [Ident] -> D ()
+errShadow :: [(Ident, Ident)] -> D ()
 errShadow =
-  mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning shadowing " ++ prettyShow (l, i))
+  mapM_ (\ (i@(Ident li _), (Ident lj _)) -> traceM $ "scopeCheck: warning shadowing " ++ prettyShow (li, i, lj))
 
 errMultiple :: [[Ident]] -> D ()
 errMultiple =
@@ -484,7 +518,7 @@ scope sc = expr
     defs as e = do
       let is = getVisible e
           errM = filter ((> 1) . length) $ group $ sort is
-          errS = [ i | i <- is, i `S.member` sc ]
+          errS = [ (i, j) | i <- is, i `S.member` sc, j <- filter (== i) (S.toList sc) ]
           s' = foldr S.insert as is
       e' <- scope s' e
       errMultiple errM
@@ -518,6 +552,7 @@ getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
 getVisible TLam{} = []
 getVisible Lam{} = []
 getVisible Fail = []
+getVisible DomainFail = []
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
@@ -547,30 +582,37 @@ getVar (Exists _ e) = getVar e
 getVar (HasType e t) = getVar e ++ getVar t
 getVar Lam{} = []
 getVar Fail = []
+getVar DomainFail = []
 getVar e = impossible e
-
--- Definitions that should go in a Prelude
-preludeIds :: [Ident]
-preludeIds = map (Ident noLoc . fst) preludeFuncs
 
 -- Primitives
 primOps :: [Ident]
 primOps = map (Ident noLoc)
-  [ "isInt$", "isFlt$", "isStr$", "isPtr$", "isArr$", "isFcn$"
-  , "in'+'", "in'-'", "in'*'", "in'/'"
-  , "in'<'", "in'<='", "in'>'", "in'>='"
-  , "in'<>'"
-  , "pre'-'"
-  , "pre'+'"
+  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$", "isPtr$", "isArr$", "isFcn$"
+
+  , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
+  , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
+
+  , "ratAdd$", "ratSub$", "ratMul$", "ratDiv$", "ratNeg$", "ratPlus$"
+  , "ratLT$", "ratLE$", "ratGT$", "ratGE$", "ratNE$"
+
+  , "f32Add$", "f32Sub$", "f32Mul$", "f32Div$", "f32Neg$", "f32Plus$"
+  , "f32LT$", "f32LE$", "f32GT$", "f32GE$", "f32NE$"
+
+  , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
+  , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
+
   , "post'?'"
-  , "concat$", "takeL$", "dropL$", "takeR$", "dropR$", "cons$"
-  , "length"
-  , "known$"  -- This is a horrible hack
+  , "concat$", "cons$"
+  , "length$"
   , "alloc$", "read$", "write$"
   , "in'..'"
   , "in'+='", "in'-='", "in'*='", "in'/='"
   , "print$"
   , "append$"
+  , "known$"  -- This is a horrible hack
+  , "any$"
+  , "fail$"
   ]
 
 ------------------------
@@ -581,12 +623,15 @@ simpler expr = do
   if simpl then
     simpUnify <=< simpAny $ expr
    else
-    pure expr
+    -- Always remove silly uses of any$
+    simpAny expr
 
 -- Simplify any[e]  -->  e
 simpAny :: Expr -> D Expr
 simpAny = pure . f
-  where f (ApplyD (Variable (Ident _ "any")) e) = f e
+  where f (ApplyD (Variable (Ident _ "any")) e) = f e  -- This should go away
+        f (ApplyD (EPrim "any$") e) = f e
+        f (EPrim "fail$") = Fail
         f e = composOp f e
 
 -- Simplify x = (e1; ...; en)  -->  e1; ...; x = en
@@ -698,6 +743,7 @@ addDeref = pure . exprD S.empty
     expr s (Exists is e) = Exists is (expr s e)
     expr s (HasType e t) = HasType (expr s e) (expr s t)
     expr _ Fail = Fail
+    expr s (Lam i e) = Lam i (expr s e)
     expr _ e = impossible e
 
     exprD s e = expr (defs s e) e
@@ -737,6 +783,7 @@ lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
 lower (Macro1 (Ident _ "succeeds") [] e) = lowerSucceeds =<< lower e
 lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
 lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
+lower (Macro1 (Ident _ "lowered") [] e) = pure e
 lower (Exists is e) = lExists is <$> lower e
 lower (TLam i rs (Exists is e1) e2 me3) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2 <*> traverse lower me3
 lower (HasType e t) = join $ lowerHasType <$> lower e <*> lower t
@@ -882,7 +929,8 @@ lowerTLamVerifySucceeds i is e1 e2' e2'' =
 lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
 lowerTLamRun i rs is e1 e2 me3 = do
   e2' <- maybe (pure e2) (\ t -> lowerSucceeds (ApplyD t e2)) me3
-  let covariant = covariantId `elem` rs  || True -- XXX
+  let covariant = --covariantId `elem` rs  || True -- XXX
+                  openId `notElem` rs
   if null is && e1 == Array [] then
     pure $ Lam i e2'   -- Simple special case
    else
@@ -941,8 +989,11 @@ lowerSucceeds :: Expr -> D Expr
 lowerSucceeds e = do
   useSplit <- gets (fSplit . dflags)
   verif <- gets (fVerify . dflags)
+  asmVerif <- gets (fVerify . dflags)
   if verif then
     pure $ eAssert e
+   else if asmVerif then
+    pure $ e
    else if useSplit then
     lowerSucceedsSplit e
    else
@@ -991,6 +1042,12 @@ lowerAssume e = pure $ eAssume e
 primops :: Expr -> D Expr
 primops = f
   where
+    f (Variable (Ident _ s)) | Ident noLoc s `S.member` prim = pure $ EPrim s
+    f e = compos f e
+    prim = S.fromList primOps
+
+{-
+  where
     f (ApplyD g@(Variable (Ident _ s)) v) = do
       mfunc <- lowerPrimOp s
       v' <- f v
@@ -1018,11 +1075,10 @@ primops = f
 -- For verification, we need a different expansion.
 lowerPrimOp :: String -> D (Maybe Func)
 lowerPrimOp s = do
-  verif <- gets (fVerify . dflags)
-  if verif then
-    lowerPrimOpVerif s
-   else
-    lowerPrimOpRun s
+  if Ident noLoc s `elem` primOps then
+    pure $ Just ([], [EPrim s])
+  else
+    pure $ Nothing
 
 type Func = ([Ident], [Core])
 
@@ -1031,6 +1087,7 @@ lowerPrimOpVerif s = do
   me <- lowerPrimOpRun s
   case me of
     Just ([], [EPrim p]) | Just func <- lookup p verifyPrelude -> pure $ Just func
+    Nothing              | Just func <- lookup s verifyPrelude -> pure $ Just func
     r -> pure r
 
 lowerPrimOpRun :: String -> D (Maybe Func)
@@ -1043,11 +1100,18 @@ lowerPrimOpRun s =
       else
         pure $ Nothing
 
+-- Definitions that should go in a Prelude
+preludeIds :: [Ident]
+preludeIds = map (Ident noLoc . fst) preludeFuncs
+
 preludeFuncs :: [(String, Func)]
 preludeFuncs =
   [("any", typ [])                                             -- x => x
   ,("nat", typ [app "isInt$" vx, app2 "in'>='" vx (Lit (LitInt 0))]) -- x => int#[x]; x>=0; x
   ,("int", typ [app "isInt$" vx])                              -- x => int#[x]; x
+  ,("rat", typ [app "isRat$" vx])                              -- x => rat#[x]; x
+  ,("char", typ [app "isChr$" vx])                             -- x => char#[x]; x
+  ,("string", typ [app "isStr$" vx])                           -- x => string#[x]; x
   ,("in'->'", arrowV)
   ,("false", bare $ Array [])                                      -- ()
   ,("new", newV)
@@ -1085,33 +1149,33 @@ preludeFuncs =
 
 verifyPrelude :: [(String, Func)]
 verifyPrelude =
-  [ arithBinOpInt  "in'+'"
-  , arithBinOpInt  "in'-'"
-  , arithBinOpInt  "in'*'"
-  , arithBinOpIntC "in'/'" yNe0
-  , arithUnOpInt   "pre'-'"
-  , arithUnOpInt   "pre'+'"
-  , cmpBinOpInt    "in'<'"
-  , cmpBinOpInt    "in'<='"
-  , cmpBinOpInt    "in'>'"
-  , cmpBinOpInt    "in'>='"
-  , cmpBinOpInt    "in'<>'"
+  [ arithBinOpInt  "in'+'" "intAdd$"
+  , arithBinOpInt  "in'-'" "intSub$"
+  , arithBinOpInt  "in'*'" "intMul$"
+  , arithBinOpIntC "in'/'" "intDiv$" yNe0
+  , arithUnOpInt   "pre'-'" "intNeg$"
+  , arithUnOpInt   "pre'+'" "intPlus$"
+  , cmpBinOpInt    "in'<'"  "intLT$"
+  , cmpBinOpInt    "in'<='" "intLE$"
+  , cmpBinOpInt    "in'>'"  "intGT$"
+  , cmpBinOpInt    "in'>='" "intGE$"
+  , cmpBinOpInt    "in'<>'" "intNE$"
   ]
   where
-    arithBinOpInt  p = (p, arithBinOpInt' [] p)
-    arithBinOpIntC p c = (p, arithBinOpInt' [c] p)
+    arithBinOpInt  p s = (p, arithBinOpInt' [] s)
+    arithBinOpIntC p s c = (p, arithBinOpInt' [c] s)
     arithBinOpInt' c p = ([x, y],
       [ cInt vx, cInt vy] ++ c ++
       [ eAssume $ Exists [z] $ Seq [Unify vz (ApplyD (EPrim p) (Array [vx, vy])), cInt vz, vz] ])
 
-    cmpBinOpInt  p = (p, cmpBinOpInt' p)
+    cmpBinOpInt  p s = (p, cmpBinOpInt' s)
     cmpBinOpInt' p = ([x, y],
       [ cInt vx, cInt vy, ApplyD (EPrim p) (Array [vx, vy]), eAssume (Seq [cInt vx, vx]) ])
 
-    yNe0 = ApplyD (EPrim "in'<>'") (Array [vy, Lit (LitInt 0)])
+    yNe0 = ApplyD (EPrim "intNE$") (Array [vy, Lit (LitInt 0)])
 
-    arithUnOpInt p =
-      (p, ([x], [ cInt vx, eAssume (Exists [z] $ Seq [Unify vz (ApplyD (EPrim p) vx), cInt vz, vz]) ]))
+    arithUnOpInt p s =
+      (p, ([x], [ cInt vx, eAssume (Exists [z] $ Seq [Unify vz (ApplyD (EPrim s) vx), cInt vz, vz]) ]))
 
     cInt e = ApplyD (EPrim "isInt$") e
     x = Ident noLoc "$$x"
@@ -1120,6 +1184,7 @@ verifyPrelude =
     vx = Variable x
     vy = Variable y
     vz = Variable z
+-}
 
 -----------------------------------------------
 
@@ -1164,15 +1229,6 @@ fvArray :: [Expr] -> Expr
 fvArray [e] = e
 fvArray es = Array es
 
------------
-
--- TODO? Add checks
-exprToCore :: Flags -> Expr -> Core
-exprToCore _ = id
-
-simpCore :: Core -> Core
-simpCore = id
-
 ----------------------
 
 -- Functions that only work on the core subset of Expr
@@ -1194,7 +1250,16 @@ getFree = Epic.List.nub . fvs
     fvs (Split e1 e2 e3) = fvs e1 ++ fvs e2 ++ fvs e3
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
     fvs Fail = []
+    fvs DomainFail = []
     fvs e = error $ "getFree: " ++ prettyShow e
+
+-- XXX binders
+getAllVars :: Core -> [Ident]
+getAllVars = Epic.List.nub . execWriter . vars
+  where vars e@(Variable i) = do tell [i]; pure e
+        vars e@(Lam i e') = do tell [i]; _ <- vars e'; pure e
+        vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
+        vars e = compos vars e
 
 substMany :: [(Ident, Core)] -> Core -> Core
 substMany [] = id
@@ -1221,6 +1286,7 @@ substMany sb = sub
       let (is', e1', e2') = if3Hack sub is e1 e2
       in  If3 (Exists is' e1') e2' (sub e3)
     sub Fail = Fail
+    sub DomainFail = DomainFail
     sub e = error $ "substMany: " ++ prettyShow e
 
     binder :: Ident -> (Expr -> Expr) -> Expr -> Expr
