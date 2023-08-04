@@ -30,6 +30,7 @@ testiblock:
 
 testverify:
 	$(TESTER) --quiet --rules=$(VRULES) --max-norm-steps=100000 $(VERIFY)
+	cabal run trsverifier
 
 testicfpqc:
 	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive
