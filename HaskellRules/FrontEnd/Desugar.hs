@@ -384,6 +384,7 @@ dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
+dsM i (Let e1 e2) = Let <$> dsD e1 <*> dsM i e2
 dsM _ e = impossible e
 
 dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
@@ -459,16 +460,28 @@ openId :: Ident
 openId = Ident noLoc "open"
 
 errUndefined :: [Ident] -> D ()
-errUndefined =
-  mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i))
+errUndefined is = do
+  flg <- gets dflags
+  if fNoWarn flg then
+    case is of
+      [] -> pure ()
+      i@(Ident l _) : _ -> error $ "undefined: " ++ prettyShow (l, i)
+   else
+    mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)) is
 
 errShadow :: [(Ident, Ident)] -> D ()
-errShadow =
-  mapM_ (\ (i@(Ident li _), (Ident lj _)) -> traceM $ "scopeCheck: warning shadowing " ++ prettyShow (li, i, lj))
+errShadow is = do
+  flg <- gets dflags
+  if fNoWarn flg then
+    case is of
+      [] -> pure ()
+      (i@(Ident li _), (Ident lj _)) : _ -> error $ "shadowing: " ++ prettyShow (li, i, lj)
+   else
+    mapM_ (\ (i@(Ident li _), (Ident lj _)) -> traceM $ "warning shadowing " ++ prettyShow (li, i, lj)) is
 
 errMultiple :: [[Ident]] -> D ()
 errMultiple =
-  mapM_ (\ is -> error $ "scopeCheck: Multiply defined " ++ prettyShow (head is) ++
+  mapM_ (\ is -> error $ "multiply defined: " ++ prettyShow (head is) ++
                          prettyShow [ l | Ident l _ <- is ])
 
 scope :: S.Set Ident -> Expr -> D Expr

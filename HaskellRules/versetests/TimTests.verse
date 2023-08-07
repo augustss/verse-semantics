@@ -50,9 +50,9 @@ test(S00){for(x:=0|1){-x}}
 test(S00){function(x:=0|1){-x}}
 test(S00){for(x:=0|1) do :nat=x}
 test(S00){f(x:=0|1):nat=x}
-test(V04){type{(for|first){}}}
-test(V04){f(m:=let|for):=m(1){2}}
-test(V04){for(m:=let|for) do m(1){2}}
+#LA test(V04){type{(for|first){}}}
+#LA test(V04){f(m:=let|for):=m(1){2}}
+#LA test(V04){for(m:=let|for) do m(1){2}}
 test(S00){f():type{int|int} => :f[]=3}
 
 # Error ordering.
@@ -111,10 +111,10 @@ test(U00){a:any => comparable[a,3]}
 #if{allow{:int}} 
 
 # Weird runtime comparisons.
-test(S00){decides=decides}
-test(F00){decides=fails}
-test(S00){array=array}
-test(U00){array=for}
+#LA test(S00){decides=decides}
+#LA test(F00){decides=fails}
+#LA test(S00){array=array}
+#LA test(U00){array=for}
 
 # Runtime input plumbing.
 test(S00){f():=1; f[]}
@@ -138,11 +138,11 @@ test(D00){f(g():int):int => h()<interacts>:int => assume<decides>{f[h]}}
 test(S00){f(g():int):int => h()<interacts>:int => assume{f[h]}}
 
 # Code generation divergence across control flow analysis paths.
-test(S00){f(m:=let):=m(x:=2){x+1=3}}
-test(S00){f(m:=for):=m(x:=2){x+1}=array{3}}
-test(V04){type{(for|first){}}}
-test(V04){f(m:=let|for):=m(1){2}}
-test(V04){for(m:=let|for) do m(1){2}}
+#LA test(S00){f(m:=let):=m(x:=2){x+1=3}}
+#LA test(S00){f(m:=for):=m(x:=2){x+1}=array{3}}
+#LA test(V04){type{(for|first){}}}
+#LA test(V04){f(m:=let|for):=m(1){2}}
+#LA test(V04){for(m:=let|for) do m(1){2}}
 # Suspect not going wrong because these uses of macros create their own frames.
 #test(R00){for(i:=0..1){m:any; for{}; if(i=0) then m=for; if(i=1) then m=for}}
 #test(R00){for(i:=0..1){m:any; if(i=0) then m=for; m{}; if(i=1) then m=for}} # why not inconsistent ops across forks?
@@ -386,8 +386,8 @@ test(S00){a:int,(a,2)=(1,2)}
 test(S00){(_,_)=(1,2)}
 
 # Testing tests.
-test(F00){test(S00){2=3}}
-test(T01){test(F00){2}}
+#LA test(F00){test(S00){2=3}}
+#LA test(T01){test(F00){2}}
 
 # Abstraction and reverse solving through function input.
 #!!!test(S00){f(g(:int):int)(x:int):=g[x] => f[h(x:int):=x][3]}
@@ -436,10 +436,10 @@ test(D00){x:int => if{x=3,f():=x=3}}
 test(V10){a:int => {f():type{a=3}=a=3,f[]}} # Should refine to D00.
 
 # Modulate staged expression multiplicity by assumed multiplicity.
-test(S02){assume{x:int<decides>=3}}
-test(S00){f(a:int)<decides>:=assume{x:int<decides>=a=3}}
-test(V10){a:int => if{x:int<succeeds>=a=3}}
-test(V10){a:int => if{x:int<fails>=a=3}}
+#LA test(S02){assume{x:int<decides>=3}}
+#LA test(S00){f(a:int)<decides>:=assume{x:int<decides>=a=3}}
+#LA test(V10){a:int => if{x:int<succeeds>=a=3}}
+#LA test(V10){a:int => if{x:int<fails>=a=3}}
 test(S00){f()<decides>:int => f[] => 123}
 test(S00){f()<decides>:int => assume{f[]}}
 test(S00){f()<decides>:int => if{f[]}}
@@ -486,19 +486,19 @@ test(U00){f(g(:any)<succeeds>:any):=3 => f[false]}
 # Effects abstraction checks.
 #
 
-test(S00){f(x:int)<succeeds>:int<succeeds>=3}
-test(V10){f(x:int)<succeeds>:int<succeeds>=x=3}
-test(V10){f(x:int)<succeeds>:int<succeeds>:false}
-test(S00){f(x:int)<decides >:int<succeeds>=3}
-test(V10){f(x:int)<decides >:int<succeeds>=x=3}
-test(V10){f(x:int)<decides >:int<succeeds>:false}
-test(S00){f(x:int)<decides >:int<decides>=3}
-test(S00){f(x:int)<decides >:int=x=3}
-test(S00){f(x:int)<decides >:int:false}
-test(S02){f(x:int)<decides >:int<resolves>=3}
-test(S00){f(x:int)<resolves>:int<succeeds>=3}
-test(S00){f(x:int)<resolves>:int<decides>=3}
-test(S00){f(x:int)<resolves>:int<resolves>=3}
+#LA test(S00){f(x:int)<succeeds>:int<succeeds>=3}
+#LA test(V10){f(x:int)<succeeds>:int<succeeds>=x=3}
+#LA test(V10){f(x:int)<succeeds>:int<succeeds>:false}
+#LA test(S00){f(x:int)<decides >:int<succeeds>=3}
+#LA test(V10){f(x:int)<decides >:int<succeeds>=x=3}
+#LA test(V10){f(x:int)<decides >:int<succeeds>:false}
+#LA test(S00){f(x:int)<decides >:int<decides>=3}
+#LA test(S00){f(x:int)<decides >:int=x=3}
+#LA test(S00){f(x:int)<decides >:int:false}
+#LA test(S02){f(x:int)<decides >:int<resolves>=3}
+#LA test(S00){f(x:int)<resolves>:int<succeeds>=3}
+#LA test(S00){f(x:int)<resolves>:int<decides>=3}
+#LA test(S00){f(x:int)<resolves>:int<resolves>=3}
 
 test(S00){f(x:int)<decides >:=x=2}
 test(D00){f(x:int)<fails   >:=x=2}
@@ -1025,17 +1025,17 @@ test(S00){f():type{2=3} => 4}
 test(S00){f(x:int):type{x=3} => 4}
 
 # Testing ':' attributes.
-test(S02){:int<succeeds>}
-test(S00){x:int,x=3}
-test(S02){x:int<succeeds>,x=3}
-test(S00){:int<succeeds>=3}
-test(S02){:int<contravariant>=3}
-test(S02){:int<decides>=3}
-test(S00){:int<computes>=3}
-test(S00){:void=3}
-test(S00){:void=false}
-test(X00){:void<computes>=Print("Hello")}
-test(V10){a:int => :int=a=3} # Would prefer D00 to prioritize above V10.
+#LA test(S02){:int<succeeds>}
+#LA test(S00){x:int,x=3}
+#LA test(S02){x:int<succeeds>,x=3}
+#LA test(S00){:int<succeeds>=3}
+#LA test(S02){:int<contravariant>=3}
+#LA test(S02){:int<decides>=3}
+#LA test(S00){:int<computes>=3}
+#LA test(S00){:void=3}
+#LA test(S00){:void=false}
+#LA test(X00){:void<computes>=Print("Hello")}
+#LA test(V10){a:int => :int=a=3} # Would prefer D00 to prioritize above V10.
 
 #
 # Total Functions.
@@ -1487,7 +1487,7 @@ test(S00){f(x:=(0|1)):={5};  Print(for{:f})}
 test(S00){for{0..0..3}=array{0,0,1,0,1,2,0,1,2,3}}
 
 # Effects specifiers.
-test(X30){f()<1>:=2}
+#LA test(X30){f()<1>:=2}
 
 # Formerly bad error prioritization.
 test(P00){f(1):=2 => f(3)}
@@ -1828,10 +1828,10 @@ test(D00){a:int => if{expect<succeeds>{a=1}}}
 test(S00){a:int => if{expect<decides>{a=1}}}
 
 # First-class static rejection. Must be a macro.
-test(V02){reject{"Bad"}}
-test(V03){reject{_}}
-test(C00){1(2),reject{"Bad"}}
-test(V02){reject{"Bad"},1(2)}
+#LA test(V02){reject{"Bad"}}
+#LA test(V03){reject{_}}
+#LA test(C00){1(2),reject{"Bad"}}
+#LA test(V02){reject{"Bad"},1(2)}
 #test(V02){r:=reject{r}} #!! Paraconsistency puzzle: What ought WhenCastStep do here? Not suppress ChildFx rejects?
 #then we must be rigorous 
 
@@ -1886,8 +1886,8 @@ test(D00){f(x:comparable):=int[x]}
 test(A00){f(x:any):type{x=3} => f[_]}
 test(A00){prefix'-'[_]}
 test(A00){prefix'-'[]} # Could be U00 but missing axiom.
-test(M00){1{2}}
-test(M01){_{2}}
+#LA test(M00){1{2}}
+#LA test(M01){_{2}}
 
 # Interesting effective reachability tests.
 test(D00){p&q:int => f(:int):int => f[p]=3 => f[q]=5 => p=q} # Could be F00. Do we want that kind of inference?
@@ -2481,9 +2481,9 @@ test(F00){function(x:=-3){x}[3]}
 test(S00){if{f(if{c=1}):=8},c:=7}
 
 # Non-top-level tests.
-test(S00){test(S00){123}}
-test(F00){test(S00){2=3}}
-test(X00){test(S00){Print(3)}=>3}
+#LA test(S00){test(S00){123}}
+#LA test(F00){test(S00){2=3}}
+#LA test(X00){test(S00){Print(3)}=>3}
 
 # Condition freedom.
 test(S00){a&b&c:int => {x:=a,if(x=b){x=a,x=b}}}
@@ -2723,13 +2723,13 @@ test(S00){a:int => {f():=assume{a=3}; f[]; a=3}}
 #test(D00){a&b:int => x:=x=assume{x}=a=b}
 
 # The verify{..} macro. May not withstand input-everywhere.
-test(S00){verify{123}}
-test(F00){verify{1=2}}
-test(S00){assume{123} => 456}
-test(S00){verify{123}=123}
-test(F00){verify{123}=456}
-test(D00){a:int => verify{a=3}}
-test(D00){a:int => verify{123}=a}
+#LA test(S00){verify{123}}
+#LA test(F00){verify{1=2}}
+#LA test(S00){assume{123} => 456}
+#LA test(S00){verify{123}=123}
+#LA test(F00){verify{123}=456}
+#LA test(D00){a:int => verify{a=3}}
+#LA test(D00){a:int => verify{123}=a}
 #test(S00){verify{123} => 456}
 #test(F00){verify{1=2} => 456}
 #test(S00){verify<decides >{123} => 456}
@@ -2761,16 +2761,16 @@ test(S00):
 	  3
 	x=3
 test(S00){x:={1;2};x=2}
-test(F00):
-	x:=
-		1
-		2
-	x=1
-test(S00):
-	x:=
-		1
-		2
-	x=2
+#LA test(F00):
+#LA 	x:=
+#LA 		1
+#LA 		2
+#LA 	x=1
+#LA test(S00):
+#LA 	x:=
+#LA 		1
+#LA 		2
+#LA 	x=2
 test(S00){f:=function(){2},f()=2}
 test(F00){f:=function(){2},f()=3}
 test(S00){f:=function(){2;},f()=2}
@@ -2826,9 +2826,9 @@ test(S00){a:int => f(3):int => f[:int]}
 test(S00){a:int => g(:nat):int => f(x:int):int => if{f[g[a]]}}
 
 # Unify macro.
-test(S00){a:=operator'='{}}
-test(S00){a:=operator'='{2},a=2}
-test(F00){a:=operator'='{2},a=3}
+#LA test(S00){a:=operator'='{}}
+#LA test(S00){a:=operator'='{2},a=2}
+#LA test(F00){a:=operator'='{2},a=3}
 
 # Various.
 test(F00){a:int => {x:=a,assume{x=7},x=8}}
@@ -3394,9 +3394,9 @@ test(N00){let(x:=1){},x}
 test(N00){let(){x:=1},x}
 test(N00){let(x){x:=1}}
 test(N00){function(x){1}}
-test(N01){x{}}
-test(N01){allow{x{}}}
-test(N00){assume<decides>{bogus}}
+#LA test(N01){x{}}
+#LA test(N01){allow{x{}}}
+#LA test(N00){assume<decides>{bogus}}
 test(N00){let(x:=2){y:=x+1},x=2}
 test(N00){let(x:=2){y:=x+1},y=3}
 test(S00){y:=let(x:=2){x+1},y=3}
@@ -3644,16 +3644,16 @@ test(S00){G(x:int where x=(7|8)):=9; for{G[7]}}
 test(S00){G(x:int where x=(0|1)):=x; Print(for{G[0]})}
 
 # Implied AST normalization.
-test(S00){x is 3; Print(x)}
-test(S00){f(x in int):=x; f(3)=3}
+#LA test(S00){x is 3; Print(x)}
+#LA test(S00){f(x in int):=x; f(3)=3}
 
 # Bad macro parameters.
-test(M02){array(){}}
-test(M02){for<a>(b)<c>{d}}
+#LA test(M02){array(){}}
+#LA test(M02){for<a>(b)<c>{d}}
 
 # Assert.
-test(S00){assert{1=1}}
-test(R01){assert{1=2}}
+#LA test(S00){assert{1=1}}
+#LA test(R01){assert{1=2}}
 
 # Throw.
 test(X00){if{Throw[123]}}

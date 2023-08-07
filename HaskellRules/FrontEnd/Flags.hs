@@ -20,6 +20,7 @@ data Flags = Flags
   , fTraceDesugar :: !Bool
   , fTraceVerify  :: !Bool
   , fPrelude      :: !(String, Expr)
+  , fNoWarn       :: !Bool
   }
   deriving (Show)
 
@@ -42,6 +43,7 @@ defaultFlags = Flags
   , fTraceDesugar = False
   , fTraceVerify  = False
   , fPrelude      = either error id $ findPrelude defaultPrelude
+  , fNoWarn       = False
   }
 
 showFlags :: Flags -> String
