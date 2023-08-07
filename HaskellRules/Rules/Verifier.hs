@@ -245,12 +245,14 @@ assumeAssertRules env lhs =
 -- mustSucceed (Exi (Bind _ e)) = mustSucceed e
 -- mustSucceed _                = False
 
-mustSucceed :: QContext -> Expr -> Bool
-mustSucceed = go
+mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
+mustSucceed q bs = go q
   where
-   go g e = proves g e || step g e
+   lamBinds       = [x | BLam x <- bs]
+   go g e = {- proves g e || -} step g e
    step _ (Int _)          = True
    step g (Arr as)         = all (go g) as
+   step _ (Var x)          = x `elem` lamBinds
    step _ (Lam _)          = True
    step _ (Assume _)       = True
    step g (One e)          = go g e
@@ -261,10 +263,10 @@ mustSucceed = go
 
 
 mustDecide :: QContext -> [BndVar] -> Expr -> Bool
-mustDecide q bs = go
+mustDecide _q bs = go
   where
     lamBinds       = [x | BLam x <- bs]
-    go e = proves q e || step e
+    go e = {- proves q e || -} step e
     step (Arr as)    = all go as
     step (One e)     = step e
     step (e1 :=: e2) = step e1 && step e2
@@ -292,11 +294,18 @@ isDecideOp _          = False
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules env lhs =
+   -- PROVE --
+   -- P[e; e'] ----> P[e']   if   P |- e
+   "prove" `name`
+   do (ctx, g, bs, e :>: e') <- eX lhs
+      guard (proves g bs e)
+      pure (ctx e')
+   ++
    -- ASSERT --
    -- P[Assert { e }] ----> e   if   mustSucceed(P, e)
    "suc-elim" `name`
    do (ctx, g,_, Assert e) <- eX lhs
-      guard (mustSucceed g e)
+      guard (mustSucceed g (bndVars env) e)
       pure (ctx e)
    ++
    -- DECIDE --
@@ -337,8 +346,8 @@ verifierRules env lhs =
 -- | A simple "decision procedure"
 --------------------------------------------------------------------------------
 
-proves :: QContext -> Expr -> Bool
-g `proves` e = unAssume e `elem` facts g
+proves :: QContext -> [BndVar] -> Expr -> Bool
+proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
  where
   unAssume (e1 :>: e2) = unAssume e1 :>: unAssume e2
   unAssume (e1 :|: e2) = unAssume e1 :|: unAssume e2

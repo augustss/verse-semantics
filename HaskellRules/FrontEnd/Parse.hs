@@ -4,6 +4,7 @@ module FrontEnd.Parse(
   pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
   pIdent, pExprSeq, pOp, pLiteral, pMacroName, try,
   pString,
+  pBlockM,
   lexeme, string,
   P,
   testp, parseString) where

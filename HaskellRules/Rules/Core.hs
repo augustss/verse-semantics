@@ -35,7 +35,7 @@ module Rules.Core(
   check,
   substExp,
   BndVar(..),
-  boundVars, flexVars, rigidVars,
+  boundVars, flexVars, rigidVars, bndIds,
   ) where
 import qualified Epic.SIntMap as IM
 import Data.Char

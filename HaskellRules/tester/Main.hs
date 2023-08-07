@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main(main) where
 
 import Control.Exception
@@ -53,6 +54,7 @@ data TestFlags = TestFlags
   , maxNormSteps   :: !Int                 -- max number of normalization steps
   , ignoreFuelStop :: !Bool                -- ignore running out of fuel
   , assumeVerified :: !Bool                -- turn succeeds into a no-op
+  , tim            :: !Bool                -- assume Tim's verifier tests
   , prelude        :: !(Maybe String)      -- use this prelude
   , fileNames      :: ![FilePath]          -- input files
   }
@@ -466,6 +468,9 @@ testFlags = TestFlags
   <*> switch
          ( long "assume-verified"
         <> help "succeeds{} is a no-op" )
+  <*> switch
+         ( long "tim"
+        <> help "use Tim's test syntax" )
   <*> optional (strOption
          ( long "prelude"
         <> metavar "NAME"
@@ -492,7 +497,11 @@ main = do
     mapM_ ptest fns
    else
     case testExpr tflg of
-      Nothing -> mapM_ (\ fn -> do ts <- readTests fn; runTestFile tflg (fn, ts)) fns
+      Nothing ->
+        if tim tflg then
+          mapM_ (timTest tflg) fns
+        else
+          mapM_ (\ fn -> do ts <- readTests fn; runTestFile tflg (fn, ts)) fns
       Just s -> runTestFile tflg (fn, parseDie pTestFile fn s)  where fn = "<command-line>"
 
 testArgs :: IO TestFlags
@@ -514,3 +523,46 @@ verseTest = "tests.versetest"
 
 test1 :: FilePath
 test1     = "test1.verse"
+
+------------------
+
+data TimTest = TimTest { timTag :: Ident, timExpr :: Expr }
+  deriving (Show)
+
+timTest :: TestFlags -> FilePath -> IO ()
+timTest tflg fn = do
+  file <- readFile fn
+  let tests = parseDie pTimTestFile fn file
+  putStrLn $ "Number of tests: " ++ show (length tests)
+  mapM_ (runTimTest tflg) (take 100 tests)
+
+pTimTestFile :: P [TimTest]
+pTimTestFile = skip *> many pTimTest <* eof
+
+pTimTest :: P TimTest
+pTimTest =
+  pKeyword "test" *> do
+    TimTest <$> pParens pIdent <*> (pBlockM <* optional (pOp ";"))
+
+runTimTest :: TestFlags -> TimTest -> IO ()
+runTimTest tflg test = do
+  let sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
+      flg = (testFlagsToFlags tflg) { fNoWarn = True }
+      res = run flg sys $ desugar flg $ timExpr test
+  eres <- Control.Exception.try (evaluate (seq (res==res) res))
+--  print eres
+  let tag = timTag test
+      Ident loc stag = tag
+      ok = case take 1 stag of
+        "S" -> Just $ case eres of Left (_::SomeException) -> False; Right x -> x /= Fail
+        "F" -> Just $ case eres of Left _ -> False; Right x -> x == Fail
+        "N" -> Just $ case eres of Right _ -> False
+                                   Left m -> let s = show m in isPrefixOf "undefined:" s || isPrefixOf "shadowing:" s
+        _   -> Nothing
+  
+      outcome = case ok of
+                  Nothing    -> "unknown test type"
+                  Just True  -> "pass"
+                  Just False -> "fail"
+
+  putStrLn $ prettyShow loc ++ ": " ++ show tag ++ " " ++ outcome
