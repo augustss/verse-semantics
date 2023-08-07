@@ -1,4 +1,4 @@
-<#
+
 #f(g():any):=g[]; f[h():=6]
 
 # Abstraction propagation.
@@ -3736,15 +3736,3 @@ test(X00){function(1){2|3}} # Same.
 
 # Proofs as programs.
 # Note that we can construct converges proofs in imperative code by building up converges functions.
-
-#>
-test(S00){Print("start")}
-#test(S00){x:int; x*x=x*x*x}
-#test(S00){x:int; if(x=1)then 2 else (3|4); x=(1:2)}
-#test(S00){f(x:int):=-x; a:f = 5; Print(a)}
-#test(S00){ip(x:int)<interacts>:={Print("ip"); 0}; foo(x:int)<interacts>:={Print("foo"); 1}; foo(ip(99))}
-#test(S00){f()<interacts>:=Print(456); f()}
-#test(S00){foo1(x:int, add(:int,:int):int):int := add(x,1)}
-#test(S00){foo(x:any)<decides>:= { if(x=2)then x=2 else x=3 } }
-test(S00){baz(x:any)<decides> := int["blah"]}
-test(S00){Print("end")}
