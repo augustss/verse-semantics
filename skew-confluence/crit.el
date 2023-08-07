@@ -1,9 +1,10 @@
 ;;; TO DO
 ;;; contexts: match, join, and submatches
-;;; diagrams
-;;;   remove "u" from paths in diagrams (will need some Lambdas after all)
-;;; Flip diagrams that are too wide
+;;; Control for flipping a diagram
+;;; Row sep and column sep controls
 ;;; Check decreasing diagrams
+;;; Verify derivation of critical pairs deduced by joinable
+
 
 
 ;;; Compute all critical pairs for the Verse Calculus
@@ -67,11 +68,11 @@
 	    (make-rule :name 'eqn-elim :lhs '(exists x (seq (= x v) e)) :rhs 'e :cond '(if (not (elt x (fvs v e)))))
 	    (make-rule :name 'fail-elim-eq :lhs '(seq (= v (quote fail)) e) :rhs '(quote fail))
 	    (make-rule :name 'fail-elim-l :lhs '(seq (quote fail) e) :rhs '(quote fail))
-	    (make-rule :name 'fail-elim-r :lhs '(seq e (quote fail)) :rhs '(quote fail))
+	    (make-rule :name 'fail-elim-r :lhs '(seq eq (quote fail)) :rhs '(quote fail))
 	    (make-rule :name 'exi-float-eq :lhs '(seq (= v (exists x e1)) e2) :rhs '(exists x (seq (= v e1) e2)) :cond '(if (not (elt x (fvs v e2)))))
 	    (make-rule :name 'exi-float-l :lhs '(seq (exists x e1) e2) :rhs '(exists x (seq e1 e2)) :cond '(if (not (elt x (fvs e2)))))
 	    (make-rule :name 'exi-float-r :lhs '(seq eq (exists x e)) :rhs '(exists x (seq eq e)) :cond '(if (not (elt x (fvs eq)))))
-	    (make-rule :name 'eqn-float :lhs '(seq (= x (seq eq e1)) e2) :rhs '(seq eq (seq (= v1 v2) e2)))
+	    (make-rule :name 'eqn-float :lhs '(seq (= x (seq eq e1)) e2) :rhs '(seq eq (seq (= x e1) e2)))
 	    (make-rule :name 'seq-assoc :lhs '(seq (seq eq e1) e2) :rhs '(seq eq (seq e1 e2)))
 	    (make-rule :name 'exi-swap :lhs '(exists x1 (exists x2 e)) :rhs '(exists x2 (exists x1 e)))
 	    (make-rule :name 'one-fail :lhs '(one (quote fail)) :rhs '(quote fail))
@@ -91,211 +92,717 @@
 
 (defstruct rewrite rulename path ellipsis)
 
-;;;, A desired goal for tiles is that rewrites2 or alterewrites2 have at most one rewrite.
-(defstruct proof rulename1 rulename2 path1 rewrites1 rewrites2 altrewrites1 altrewrites2)
+(defstruct proof rulename1 rulename2 path1
+	   rowsep colsep difficult impossible
+	   rewrites1 rewrites2 altrewrites1 altrewrites2)
 
 ;;; The bulk of this was constructed automatically by function print-proof-skeletons (below).
 ;; (print-proof-skeletons the-proofs)
 
-(setq the-proofs                ;66 proofs
-      (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()
+(setq the-proofs                ;78 proofs
+      (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()      ;Proof 1
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-            (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()
+            (make-proof :rulename1 'u-lit :rulename2 'fail-elim-r :path1 '()      ;Proof 2
+                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'u-lit :path '())))
+            (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()      ;Proof 3
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-            (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)
+            (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)      ;Proof 4
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '())))
-            (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()
-                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-exclusive 2))) (make-rewrite :rulename 'seq-swap :path '((low-exclusive 2)) :ellipsis t))
+            (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()      ;Proof 5
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2)) :ellipsis t))
                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
-            (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-exclusive 2))) (make-rewrite :rulename 'exi-float-r :path '((low-exclusive 2)) :ellipsis t))
-                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
-            (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+            (make-proof :rulename1 'u-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 6
+                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()
-                        :rewrites1 ()
-                        :rewrites2 ())
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+            (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()      ;Proof 7
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2)) :ellipsis t))
+                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
+            (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 8
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2))) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2)) :ellipsis t))
+                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '())))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()      ;Proof 9
+                        :rewrites1 (list)
+                        :rewrites2 (list))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()      ;Proof 10
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'fail-elim-r :path1 '()      ;Proof 11
+                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-            (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()      ;Proof 12
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)      ;Proof 13
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '())))
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()      ;Proof 14
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'fail-elim-r :path1 '()      ;Proof 15
+			:rowsep "large"
+                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-            (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-            (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-            (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()      ;Proof 16
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)      ;Proof 17
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '())))
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()      ;Proof 18
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'fail-elim-r :path1 '()      ;Proof 19
+			:rowsep "large"
+                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-            (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-            (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-            (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()      ;Proof 20
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)      ;Proof 21
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '())))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()      ;Proof 22
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 23
+			:rowsep "large"
+                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-            (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-            (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-            (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()      ;Proof 24
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 25
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '())))
+            (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()      ;Proof 26
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
+            (make-proof :rulename1 'hnf-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 27
+			:rowsep "large"
+                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-            (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-            (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-            (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+            (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()      ;Proof 28
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
+            (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 29
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '())))
+            (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()      ;Proof 30
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
+            (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 31
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
+            (make-proof :rulename1 'var-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 32
+			:rowsep "large"
+                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-            (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)
+            (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()      ;Proof 33
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
+            (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 34
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
+            (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 35
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '()))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()      ;Proof 36
+			:rowsep "large"
+                        :rewrites1 (list 'X (make-rewrite :rulename 'val-elim :path '(2)))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'DUMMY :path '(2))))
+            (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()      ;Proof 37
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()      ;Proof 38
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-swap :path1 '(2)      ;Proof 39
+			:rowsep "large"
                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-            (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-            (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'val-elim :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-l :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()
+                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
+            (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()      ;Proof 40
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
+            (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()      ;Proof 41
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
+            (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)      ;Proof 42
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()) (make-rewrite :rulename 'seq-swap :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+            (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()      ;Proof 43
+			:rowsep "large"
                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-            (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-            (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-            (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()
+            (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()      ;Proof 44
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+            (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 45
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+            (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()      ;Proof 46
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list))
+            (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()      ;Proof 47
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'val-elim :path '(2))))
+            (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)      ;Proof 48
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'val-elim :path '())))
+            (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()      ;Proof 49
+			:rowsep "large"
                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
-            (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-            (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-            (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()
+            (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()      ;Proof 50
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 51
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '(2))))
+            (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 52
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'eqn-elim :path '(2))))
+            (make-proof :rulename1 'fail-elim-eq :rulename2 'fail-elim-r :path1 '()      ;Proof 53
+			:rowsep "large"
                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-            (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-            (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
+            (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()      ;Proof 54
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 55
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '())))
+            (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()      ;Proof 56
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list))
+            (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()      ;Proof 57
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 58
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '())))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-eq :path1 '()      ;Proof 59
+			:rowsep "large"
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()      ;Proof 60
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-float :path1 '()      ;Proof 61
+			:rowsep "large"
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-            (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-            (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-            (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-            (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()
+            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()      ;Proof 62
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 63
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+            (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()      ;Proof 64
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
+            (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 65
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '())))
+            (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()      ;Proof 66
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
+            (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 67
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '())))
+            (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()      ;Proof 68
+			:rowsep "large"
                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-            (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-            (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-            (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)
+            (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()      ;Proof 69
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+            (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 70
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+            (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)      ;Proof 71
+			:rowsep "large"
                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-            (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
-            (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
-            (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'choose-l :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-            (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-            (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()
-                        :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-            (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-            (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)
-                        :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-assoc :path '())))))
+            (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)      ;Proof 72
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '())))
+            (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)      ;Proof 73
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '())))
+            (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()      ;Proof 74
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list))
+            (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)      ;Proof 75
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'choose-r :path '())))
+            (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()      ;Proof 76
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'choose-l :path '(2))))
+            (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)      ;Proof 77
+			:rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'choose-r :path '(2))))
+            (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)      ;Proof 78
+			:rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '()) (make-rewrite :rulename 'choose-assoc :path '(2)))
+                        :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '())))))
+
+;; (setq the-proofs                ;66 proofs
+;;       (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()      ;Proof 1
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
+;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()      ;Proof 2
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
+;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)      ;Proof 3
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '())))
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()      ;Proof 4
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2))))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()      ;Proof 5
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2))))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 6
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2))) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2))))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()      ;Proof 7
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()      ;Proof 8
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()      ;Proof 9
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)      ;Proof 10
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()      ;Proof 11
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()      ;Proof 12
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)      ;Proof 13
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()      ;Proof 14
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()      ;Proof 15
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)      ;Proof 16
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()      ;Proof 17
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()      ;Proof 18
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 19
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '())))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()      ;Proof 20
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()      ;Proof 21
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 22
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()      ;Proof 23
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 24
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()      ;Proof 25
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 26
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 27
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()      ;Proof 28
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'val-elim :path '(2)))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'DUMMY :path '(2))))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()      ;Proof 29
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()      ;Proof 30
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()      ;Proof 31
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()      ;Proof 32
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)      ;Proof 33
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()) (make-rewrite :rulename 'seq-swap :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()      ;Proof 34
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()      ;Proof 35
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 36
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()      ;Proof 37
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()      ;Proof 38
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'val-elim :path '(2))))
+;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)      ;Proof 39
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'val-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()      ;Proof 40
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()      ;Proof 41
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 42
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '(2))))
+;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 43
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'eqn-elim :path '(2))))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()      ;Proof 44
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 45
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()      ;Proof 46
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()      ;Proof 47
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 48
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()      ;Proof 49
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()      ;Proof 50
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 51
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()      ;Proof 52
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 53
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()      ;Proof 54
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 55
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()      ;Proof 56
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()      ;Proof 57
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 58
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)      ;Proof 59
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
+;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)      ;Proof 60
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '())))
+;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)      ;Proof 61
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()      ;Proof 62
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)      ;Proof 63
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-r :path '())))
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()      ;Proof 64
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-l :path '(2))))
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)      ;Proof 65
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-r :path '(2))))
+;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)      ;Proof 66
+;;                         :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '()) (make-rewrite :rulename 'choose-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '())))))
+
+
+
+
+;; (setq the-proofs                ;66 proofs
+;;       (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
+;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
+;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '())))
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()
+;;                         :rewrites1 ()
+;;                         :rewrites2 ())
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'val-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
+;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
+;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
+;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
+;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-l :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-assoc :path '())))))
 
 
 
@@ -985,6 +1492,12 @@
 	((eq (first term) 'quote) '())
 	(t (reduce #'union (mapcar #'term-vars (rest term)) :initial-value '()))))
 
+;;; Compare canonical nonterminals: Is c1 a strict subtype of c2?
+(defun grammar-subtype (c1 c2)
+  (some #'(lambda (alt2) (and (atom alt2)
+			      (or (eq c1 alt2) (grammar-subtype c1 alt2))))
+	(nt-lookup c2)))
+
 (defstruct joinresult N sigma1 sigma2)
 
 ;;; On success, return 3-list (N, sigma1, sigma2) such that N = unify(t1, t2), sigma1(t1)=N, and sigma2(t2)=N.
@@ -993,8 +1506,16 @@
 (defun joinable (t1 t2)
   (unless t1 (error "joinable: null term t1"))
   (unless t2 (error "joinable: null term t2"))
-  (cond ((and (atom t1) (atom t2) (eq (canonical-nt t1) (canonical-nt t2)))
-         (make-joinresult :N t2 :sigma1 (list (cons t1 t2)) :sigma2 '()))
+  (cond ((and (atom t1) (atom t2))
+	 (let ((c1 (canonical-nt t1))
+	       (c2 (canonical-nt t2)))
+	   (cond ((eq c1 c2)
+		  (make-joinresult :N t2 :sigma1 (list (cons t1 t2)) :sigma2 '()))
+		 ((grammar-subtype c1 c2)
+		  (make-joinresult :N t1 :sigma1 '() :sigma2 (list (cons t2 t1))))
+		 ((grammar-subtype c2 c1)
+		  (make-joinresult :N t2 :sigma1 (list (cons t1 t2)) :sigma2 '()))
+		 (t nil))))
         ((atom t1)
          (let ((sj (find-if #'identity (mapcar #'(lambda (opt1) (joinable opt1 t2)) (nt-lookup t1)))))
            (and sj (make-joinresult :N t2 :sigma1 (list (cons t1 t2)) :sigma2 '()))))
@@ -1129,10 +1650,10 @@
   (apply #'append (mapcar #'(lambda (item)
 			      (cond ((numberp item) (list item))
 				    ((atom item) (error "Unknown path item %s" item))
-				    ((eq (first item) 'low-exclusive) (list))
-				    ((eq (first item) 'high-exclusive) (list (second item)))
-				    ((eq (first item) 'low-inclusive) (list (second item)))
-				    ((eq (first item) 'high-exclusive) (list (second item) (second item)))
+				    ((eq (first item) 'low-0-to-n-1) (list))
+				    ((eq (first item) 'high-0-to-n-1) (list (second item)))
+				    ((eq (first item) 'low-1-to-n) (list (second item)))
+				    ((eq (first item) 'high-1-to-n) (list (second item) (second item)))
 				    (t (error "Unknown path item %s" item))))
 			  path)))
 
@@ -1162,10 +1683,10 @@
 	 (mapcar #'(lambda (item)
 		     (cond ((numberp item) (format "\\%s" item))
 			   ((atom item) (error "Unknown path item %s" item))
-			   ((eq (first item) 'low-exclusive) (format "\\%s^{0}" (second item)))
-			   ((eq (first item) 'high-exclusive) (format "\\%s^{n-1}" (second item)))
-			   ((eq (first item) 'low-inclusive) (format "\\%s^{1}" (second item)))
-			   ((eq (first item) 'high-exclusive) (format "\\%s^{n}" (second item)))
+			   ((eq (first item) 'low-0-to-n-1) (format "\\%s^{0}" (second item)))
+			   ((eq (first item) 'high-0-to-n-1) (format "\\%s^{n-1}" (second item)))
+			   ((eq (first item) 'low-1-to-n) (format "\\%s^{1}" (second item)))
+			   ((eq (first item) 'high-1-to-n) (format "\\%s^{n}" (second item)))
 			   (t (error "Unknown path item %s" item))))
 		 path)))
 
@@ -1351,16 +1872,27 @@
 		     (format-term R) name1 (format-path path1) name2 (format-term P) linebreak))
       (let ((pf (proof-lookup name1 name2 path1)))
 	(cond ((null pf)
-	       (princ (format "{\\color{red}Can they be joined? $|t_1| \\xrngosup{%s}{\\emptypath} \\bigl(|t'|\\bigr) \\xrnungosup{%s}{%s} |t_2|$.%s}\n%s\n%s\n%s\n"
-			      name2 name1 (format-path path1) linebreak linebreak linebreak linebreak)))
+	       ;; (princ (format "{\\color{red}Can they be joined? $|t_1| \\xrngosup{%s}{\\emptypath} \\bigl(|t'|\\bigr) \\xrnungosup{%s}{%s} |t_2|$.%s}\n%s\n%s\n%s\n"
+	       ;; 		      name2 name1 (format-path path1) linebreak linebreak linebreak linebreak))
+	       (princ (format "{\\color{red}Can they be joined?%s}\n%s\n%s\n%s\n"
+			      linebreak linebreak linebreak linebreak))
+	       )
 	      ((and (eq (first (proof-rewrites1 pf)) 'X)
 		    (eq (first (proof-rewrites2 pf)) 'X))
-	       (princ (format "{\\color{purple}Can they be joined? $|t_1| %s \\bigl(|t'|\\bigr) %s |t_2|$.%s}\n%s\n%s\n%s\n"
-			      (format-rewrites (rest (proof-rewrites1 pf)) nil nil) (format-rewrites (rest (proof-rewrites2 pf)) t nil) linebreak linebreak linebreak linebreak)))
-	      (t (print-given-proof-rewrites "They can be joined" (proof-rewrites1 pf) R (proof-rewrites2 pf) P)
-		 (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf)))
-		 (print-tikzcd-diagram P Q R name1 name2 path1 (proof-rewrites1 pf) (proof-rewrites2 pf) k))))
-      (princ (format "Therefore rules \\rulename{%s} and \\rulename{%s} have the XXX property.\\par\n" name1 name2)))))
+	       ;; (princ (format "{\\color{purple}Can they be joined? $|t_1| %s \\bigl(|t'|\\bigr) %s |t_2|$.%s}\n%s\n%s\n%s\n"
+	       ;; 		      (format-rewrites (rest (proof-rewrites1 pf)) nil nil) (format-rewrites (rest (proof-rewrites2 pf)) t nil) linebreak linebreak linebreak linebreak))
+	       (princ (format "{\\color{purple}Can they be joined?%s}\n%s\n%s\n%s\n"
+			      linebreak linebreak linebreak linebreak))
+	       )
+	      (t
+	       ;; (print-given-proof-rewrites "They can be joined" (proof-rewrites1 pf) R (proof-rewrites2 pf) P)
+		 (print-tikzcd-diagram P Q R name1 name2 path1 (proof-rowsep pf) (proof-colsep pf) (proof-rewrites1 pf) (proof-rewrites2 pf) k)
+		 (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf))
+		   ;; (print-given-proof-rewrites "And also this way:" (proof-altrewrites1 pf) R (proof-altrewrites2 pf) P)
+		   (print-tikzcd-diagram P Q R name1 name2 path1 (proof-rowsep pf) (proof-colsep pf) (proof-altrewrites1 pf) (proof-altrewrites2 pf) k)))))
+      ;; (princ (format "Therefore rules \\rulename{%s} and \\rulename{%s} have the XXX property.\\par\n" name1 name2))
+      (princ (format "\\par\n"))
+      )))
 
 (defun print-given-proof-rewrites (prefix rw1 R rw2 P)
   (let ((fr (format-rewrites-pair rw1 R rw2 P)))
@@ -1417,14 +1949,20 @@
   (cond ((eq (rewrite-rulename rw) 'TRIVIAL) term)
 	(t (apply-rewrite-rule (rule-lookup (rewrite-rulename rw)) term (rewrite-path rw)))))
 
-(defun print-tikzcd-diagram (P Q R rulename1 rulename2 path1 rw1 rw2 k)
+(defun print-tikzcd-diagram (P Q R rulename1 rulename2 path1 rowsep colsep rw1 rw2 k)
 ;;   (cond ((< (length rw1) (length rw2))
 ;; 	 (print-least-wide-tikzcd-diagram P Q R rulename1 rulename2 path1 '() rw2 rw1 k))
 ;; 	(t (print-least-wide-tikzcd-diagram R Q P rulename2 rulename1 '() path1 rw2 rw1 k))))
 
 ;; (defun print-least-wide-tikzcd-diagram (P Q R rulename1 rulename2 path1 rw1 rw2 k)
-  (princ "\\[\n")
+  (princ "\\begin{center}\n")
   (princ "\\begin{tikzcd}\n")
+  (when (or rowsep colsep)
+    (princ "  [")
+    (when rowsep (princ (format "row sep=%s" rowsep)))
+    (when (and rowsep colsep) (princ ", "))
+    (when colsep (princ (format "column sep=%s" colsep)))
+    (princ "]\n"))
   (let ((wd (max 1 (length rw1)))
 	(ht (max 1 (length rw2)))
 	(trivial (list (make-rewrite :rulename 'TRIVIAL))))
@@ -1439,13 +1977,17 @@
 		    ((null y)
 		     (unless (equal bottom-term right-term) (error "print-tikzcd-diagram: Rewrites failed to join %s" (list bottom-term right-term)))
 		     (princ (format "{%s} \\\\\n" (format-rule-term bottom-term))))
-		  (princ (format "{%s} && " (format-rule-term bottom-term))))))
+		  (cond ((rewrite-ellipsis (first y))
+			 (princ "{\\mydots} && "))
+			(t (princ (format "{%s} && " (format-rule-term bottom-term))))))))
       (when (> j 0)
-	(princ (format "  %s %s %s %s \\\\\n"
+	(princ (format "  %s %s %s "
 		       (string-expt "&" wd)
-		       (if (= (* j 2)) ht) (format "{(%s)}" k) ""
-		       (string-expt "&" wd)
-		       (format-rule-term right-term))))	;; XXX or vdots (later)
+		       (if (= (* j 2) ht) (format "{(%s)}" k) "")
+		       (string-expt "&" wd)))
+	(cond ((rewrite-ellipsis (first z))
+	       (princ "{\\vdots} \\\\\n"))
+	      (t (princ (format "%s \\\\\n" (format-rule-term right-term))))))
       (princ (format "  %s %s %s \\\\\n"
 		     (string-expt "&" wd)
 		     (if (= (+ (* j 2) 1) ht) (format "{(%s)}" k) "")
@@ -1484,7 +2026,7 @@
 				right-edge)))))
       ))
   (princ "\\end{tikzcd}\n")
-  (princ "\\]\n"))
+  (princ "\\end{center}\n"))
   
 ;; \begin{tikzcd}
 ;; 	t && {t_2} \\
@@ -1587,6 +2129,13 @@
 	       (pf (proof-lookup name1 name2 path1)))
 	  (princ (format "%s(make-proof :rulename1 '%s :rulename2 '%s :path1 '%s      ;Proof %s"
 			 prefix name1 name2 (if (null path1) "()" path1) k))
+	  (when (or (proof-rowsep pf) (proof-colsep pf) (proof-difficult pf))
+	    (princ (format "\n%s           " prefix2))
+	    (when (proof-rowsep pf) (princ (format " :rowsep \"%s\"" (proof-rowsep pf))))
+	    (when (proof-colsep pf) (princ (format " :colsep \"%s\"" (proof-colsep pf))))
+	    (when (proof-difficult pf) (princ (format " :difficult \"%s\"" (proof-difficult pf)))))
+	  (when (proof-impossible pf)
+	    (princ (format "\n%s            :impossible \"%s\"" prefix2 (proof-impossible pf))))
 	  (cond ((null pf)
 		 (princ (format "\n%s            :rewrites1 (list 'X (make-rewrite :rulename '%s :path '()))"
 				prefix2 name2))
@@ -1625,15 +2174,14 @@
 
 
 S--------------
-The rules for \versecalc{} have 66 critical pairs, which are described here in detail.\par
+The rules for \versecalc{} have 78 critical pairs, which are described here in detail.\par
 \vskip 8pt plus 16pt\noindent
 \hbox to 5em{\rlap{(1)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; e')| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (k1 = k2; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{They can be joined: $|t_1| \equiv  \bigl(|x = v; e'|\bigr) \xrnungosup{u-lit}{\2}|(x = v; (k1 = k2; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\[
+\begin{center}
 \begin{tikzcd}
   {|k1 = k2; (x = v; e')|} && {|x = v; (k1 = k2; e')|} \\
   & {(1)} & \\
@@ -1643,765 +2191,1411 @@ obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\colo
 \arrow["{\equiv}", dashed, from=3-1, to=3-3]
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
 \end{tikzcd}
-\]
-Therefore rules \rulename{u-lit} and \rulename{seq-swap} have the XXX property.\par
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
 \hbox to 5em{\rlap{(2)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(3)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (e'))| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((k1 = k2; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{They can be joined: $|t_1| \equiv  \bigl(|def x (e')|\bigr) \xrnungosup{u-lit}{\2}|(def x ((k1 = k2; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\[
+\begin{center}
 \begin{tikzcd}
   {|k1 = k2; (def x (e'))|} && {|def x ((k1 = k2; e'))|} \\
-  & {(2)} & \\
+  & {(3)} & \\
   {|def x (e')|} && {|def x (e')|} \\
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
 \arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
 \arrow["{\equiv}", dashed, from=3-1, to=3-3]
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
 \end{tikzcd}
-\]
-Therefore rules \rulename{u-lit} and \rulename{exi-float-r} have the XXX property.\par
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(3)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(4)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((k1 = k2; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(e; e2)| \xrnungosup{u-lit}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(k1 = k2; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{They can be joined: $|t_1| \equiv  \bigl(|e; e2|\bigr) \xrnungosup{u-lit}{\emptypath}|(k1 = k2; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\[
+\begin{center}
 \begin{tikzcd}
   {|(k1 = k2; e); e2|} && {|k1 = k2; (e; e2)|} \\
-  & {(3)} & \\
+  & {(4)} & \\
   {|e; e2|} && {|e; e2|} \\
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
 \arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
 \arrow["{\equiv}", dashed, from=3-1, to=3-3]
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
 \end{tikzcd}
-\]
-Therefore rules \rulename{u-lit} and \rulename{seq-assoc} have the XXX property.\par
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(4)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(5)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; (x = v; e'))| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{They can be joined: $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; (x = v; e'))|\xrngosup{seq-swap}{\2^{n-1}}\mydots\xrngosup{seq-swap}{\2^{0}} {}$\vadjust{\penalty1000}\hfil\break\null\hskip 2em minus 1.95em$\bigl(|x = v; (v1 = v1'; xdots vn = vn'; e')|\bigr) \xrnungosup{u-tup}{\2}|(x = v; ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\[
+\begin{center}
 \begin{tikzcd}
   {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = v; e')|} &&&& {|x = v; ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e')|} \\
-  && {(4)} && \\
-  {|v1 = v1'; xdots vn = vn'; (x = v; e')|} && {|v1 = v1'; (x = v; xdots vn = vn'; e')|} && {|x = v; (v1 = v1'; xdots vn = vn'; e')|} \\
+  && {(5)} && \\
+  {|v1 = v1'; xdots vn = vn'; (x = v; e')|} && {\mydots} && {|x = v; (v1 = v1'; xdots vn = vn'; e')|} \\
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
 \arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
 \arrow["\rulename{seq-swap}"', "{u\2^{n-1}}", dashed, from=3-1, to=3-3]
 \arrow["\rulename{seq-swap}"', "{u\2^{0}}", dashed, from=3-3, to=3-5]
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
 \end{tikzcd}
-\]
-Therefore rules \rulename{u-tup} and \rulename{seq-swap} have the XXX property.\par
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(5)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(6)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; fail)| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(7)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; (def x (e')))| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x (((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{They can be joined: $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; (def x (e')))|\xrngosup{exi-float-r}{\2^{n-1}}\mydots\xrngosup{exi-float-r}{\2^{0}} {}$\vadjust{\penalty1000}\hfil\break\null\hskip 2em minus 1.95em$\bigl(|def x ((v1 = v1'; xdots vn = vn'; e'))|\bigr) \xrnungosup{u-tup}{\2}|(def x (((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\[
+\begin{center}
 \begin{tikzcd}
   {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (def x (e'))|} &&&& {|def x (((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e'))|} \\
-  && {(5)} && \\
-  {|v1 = v1'; xdots vn = vn'; (def x (e'))|} && {|v1 = v1'; (def x ((xdots vn = vn'; e')))|} && {|def x ((v1 = v1'; xdots vn = vn'; e'))|} \\
+  && {(7)} && \\
+  {|v1 = v1'; xdots vn = vn'; (def x (e'))|} && {\mydots} && {|def x ((v1 = v1'; xdots vn = vn'; e'))|} \\
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
 \arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-5]
 \arrow["\rulename{exi-float-r}"', "{u\2^{n-1}}", dashed, from=3-1, to=3-3]
 \arrow["\rulename{exi-float-r}"', "{u\2^{0}}", dashed, from=3-3, to=3-5]
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
 \end{tikzcd}
-\]
-Therefore rules \rulename{u-tup} and \rulename{exi-float-r} have the XXX property.\par
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(6)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(8)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((v1 = v1'; xdots vn = vn'; e); e2)| \xrnungosup{u-tup}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-tup}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-tup} and \rulename{seq-assoc} have the XXX property.\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(7)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d' = op'; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; e)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|d'|\mapsto |op|,\,|op'|\mapsto |d|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{u-fail-d-op}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{They can be joined: $|t_1| \equiv  \bigl(|fail|\bigr)  \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\[
+\begin{center}
 \begin{tikzcd}
-  {|op = d; e|} && {|fail|} \\
-  & {(7)} & \\
+  {|((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2|} &&&& {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (e; e2)|} \\
+  && {(8)} && \\
+  {|(v1 = v1'; xdots vn = vn'; e); e2|} && {\mydots} && {|v1 = v1'; xdots vn = vn'; (e; e2)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-assoc}"', "{u\2^{0}}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-assoc}"', "{u\2^{n-1}}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(9)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d' = op'; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = op'; e)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|d|\mapsto |op'|\,\}$} and {\color{blue}$\sigma_2=\{\,|d'|\mapsto |op|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{u-fail-d-op}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|op = op'; e|} && {|fail|} \\
+  & {(9)} & \\
   {|fail|} && {|fail|} \\
 \arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
 \arrow["\rulename{u-fail-d-op}"', "{u}", from=1-1, to=1-3]
 \arrow["{\equiv}", dashed, from=3-1, to=3-3]
 \arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
 \end{tikzcd}
-\]
-Therefore rules \rulename{u-fail-op-d} and \rulename{u-fail-d-op} have the XXX property.\par
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(8)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(10)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (op = d; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-op-d}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-op-d} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  {|op = d; (x = v; e')|} && {|x = v; (op = d; e')|} \\
+  &  & \\
+  & {(10)} & |x = v; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(9)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(11)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(12)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((op = d; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-op-d}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-op-d} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|op = d; (def x (e'))|} && {|def x ((op = d; e'))|} \\
+  &  & \\
+  & {(12)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(10)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(13)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((op = d; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-op-d}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(op = d; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-op-d}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-op-d} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  {|(op = d; e); e2|} && {|op = d; (e; e2)|} \\
+  & {(13)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(11)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(14)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (d = op; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-d-op}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-d-op} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|d = op; (x = v; e')|} && {|x = v; (d = op; e')|} \\
+  &  & \\
+  & {(14)} & |x = v; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(12)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(15)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(16)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((d = op; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-d-op}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-d-op} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|d = op; (def x (e'))|} && {|def x ((d = op; e'))|} \\
+  &  & \\
+  & {(16)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(13)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(17)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((d = op; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-d-op}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(d = op; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-d-op}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-d-op} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(d = op; e); e2|} && {|d = op; (e; e2)|} \\
+  & {(17)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(14)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(18)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; ((tup (v1,xdots,vn)) = k; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-tup-k}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-tup-k} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(tup (v1,xdots,vn)) = k; (x = v; e')|} && {|x = v; ((tup (v1,xdots,vn)) = k; e')|} \\
+  &  & \\
+  & {(18)} & |x = v; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(15)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(19)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(20)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x (((tup (v1,xdots,vn)) = k; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-tup-k}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-tup-k} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(tup (v1,xdots,vn)) = k; (def x (e'))|} && {|def x (((tup (v1,xdots,vn)) = k; e'))|} \\
+  &  & \\
+  & {(20)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(16)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(21)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((tup (v1,xdots,vn)) = k; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-tup-k}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((tup (v1,xdots,vn)) = k; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-tup-k}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-tup-k} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|((tup (v1,xdots,vn)) = k; e); e2|} && {|(tup (v1,xdots,vn)) = k; (e; e2)|} \\
+  & {(21)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(17)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(22)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (k = (tup (v1,xdots,vn)); e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-k-tup}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-k-tup} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|k = (tup (v1,xdots,vn)); (x = v; e')|} && {|x = v; (k = (tup (v1,xdots,vn)); e')|} \\
+  &  & \\
+  & {(22)} & |x = v; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(18)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(23)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(24)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((k = (tup (v1,xdots,vn)); e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-k-tup}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-k-tup} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|k = (tup (v1,xdots,vn)); (def x (e'))|} && {|def x ((k = (tup (v1,xdots,vn)); e'))|} \\
+  &  & \\
+  & {(24)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(19)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(25)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((k = (tup (v1,xdots,vn)); e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-k-tup}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(k = (tup (v1,xdots,vn)); (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{u-fail-k-tup}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{u-fail-k-tup} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(k = (tup (v1,xdots,vn)); e); e2|} && {|k = (tup (v1,xdots,vn)); (e; e2)|} \\
+  & {(25)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(20)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(26)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; (x' = v; e'))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x' = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; (x' = v; e'))| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v; (hnf = x; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{hnf-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{hnf-swap} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|hnf = x; (x' = v; e')|} && {|x' = v; (hnf = x; e')|} \\
+  & {(26)} & \\
+  {|x = hnf; (x' = v; e')|} && {|x' = v; (x = hnf; e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(21)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(27)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; fail)| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(28)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; (def x' (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x' (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; (def x' (e')))| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' ((hnf = x; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{hnf-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{hnf-swap} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|hnf = x; (def x' (e'))|} && {|def x' ((hnf = x; e'))|} \\
+  & {(28)} & \\
+  {|x = hnf; (def x' (e'))|} && {|def x' ((x = hnf; e'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(22)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(29)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((hnf = x; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((x = hnf; e); e2)| \xrnungosup{hnf-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(hnf = x; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{hnf-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{hnf-swap} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(hnf = x; e); e2|} && {|hnf = x; (e; e2)|} \\
+  & {(29)} & \\
+  {|(x = hnf; e); e2|} && {|x = hnf; (e; e2)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(23)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(30)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; (x = v; e'))| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (x1 = x2; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{var-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{var-swap} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|x1 = x2; (x = v; e')|} && {|x = v; (x1 = x2; e')|} \\
+  & {(30)} & \\
+  {|x2 = x1; (x = v; e')|} && {|x = v; (x2 = x1; e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(24)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(31)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq; (x1 = x2; e))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x|\mapsto |x1|,\,|v|\mapsto |x2|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(eq; (x2 = x1; e))| \xrnungosup{var-swap}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x1 = x2; (eq; e))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{var-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{var-swap} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|eq; (x1 = x2; e)|} && {|x1 = x2; (eq; e)|} \\
+  & {(31)} & \\
+  {|eq; (x2 = x1; e)|} && {|x2 = x1; (eq; e)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(25)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(32)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; fail)| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(33)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; (def x (e')))| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((x1 = x2; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{var-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{var-swap} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|x1 = x2; (def x (e'))|} && {|def x ((x1 = x2; e'))|} \\
+  & {(33)} & \\
+  {|x2 = x1; (def x (e'))|} && {|def x ((x2 = x1; e'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(26)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(34)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((x1 = x2; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((x2 = x1; e); e2)| \xrnungosup{var-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(x1 = x2; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{var-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{var-swap} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(x1 = x2; e); e2|} && {|x1 = x2; (e; e2)|} \\
+  & {(34)} & \\
+  {|(x2 = x1; e); e2|} && {|x2 = x1; (e; e2)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(27)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(35)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x' = v'; e')|}\quad$\movesto$\quad |x' = v'; (eq'; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x' = v'; (x = v; e)))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; (x = v; (x' = v'; e)))| \xrnungosup{seq-swap}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v'; (eq'; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|eq'; (x' = v'; (x = v; e))|} &&&& {|x' = v'; (eq'; (x = v; e))|} \\
+  && {(35)} && \\
+  {|eq'; (x = v; (x' = v'; e))|} && {|eq'; (x' = v'; (x = v; e))|} && {|x' = v'; (eq'; (x = v; e))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-swap}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(28)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(36)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v'; e'|}\quad$\movesto$\quad |e'|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|v'|\mapsto |eq|,\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (eq; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{val-elim}{\emptypath} |(x = v; e)| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{val-elim}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v'; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v'; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{val-elim}{\emptypath} |(x = v; e)| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{val-elim} have the XXX property.\par
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(29)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(37)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v' = fail; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v' = fail; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v' = fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v' = fail; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{fail-elim-eq}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{fail-elim-eq}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{fail-elim-eq} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|v' = fail; (x = v; e)|} &&&& {|fail|} \\
+  && {(37)} && \\
+  {|x = v; (v' = fail; e)|} && {|x = v; fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{fail-elim-eq}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{fail-elim-eq}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{fail-elim-r}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(30)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(38)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (fail; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{fail-elim-l}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{fail-elim-l}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{fail-elim-l} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|fail; (x = v; e)|} &&&& {|fail|} \\
+  && {(38)} && \\
+  {|x = v; (fail; e)|} && {|x = v; fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{fail-elim-l}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{fail-elim-l}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{fail-elim-r}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(31)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(39)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq'; e)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x = v; fail))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; fail)| \xrnungosup{fail-elim-r}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (eq'; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(40)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v' = (def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((v' = e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|v'|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v' = (def x' (e1)); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v' = (def x' (e1))|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v' = (def x' (e1)); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x' ((v' = e1; (x = v; e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-eq}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{exi-float-eq} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|v' = (def x' (e1)); (x = v; e)|} &&&& {|def x' ((v' = e1; (x = v; e)))|} \\
+  && {(40)} && \\
+  {|x = v; (v' = (def x' (e1)); e)|} && {|x = v; (def x' ((v' = e1; e)))|} && {|def x' ((x = v; (v' = e1; e)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-eq}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-eq}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(32)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(41)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x' (e1)); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |def x' (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; ((def x' (e1)); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{exi-float-l}{\emptypath} |(def x' ((e1; (x = v; e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-l}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{exi-float-l} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(def x' (e1)); (x = v; e)|} &&&& {|def x' ((e1; (x = v; e)))|} \\
+  && {(41)} && \\
+  {|x = v; ((def x' (e1)); e)|} && {|x = v; (def x' ((e1; e)))|} && {|def x' ((x = v; (e1; e)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-l}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-l}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(33)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(42)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq'; e')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x' = v; (def x (e))))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; (def x ((x' = v; e))))| \xrnungosup{exi-float-r}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v; (eq'; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-float-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-float-r} and \rulename{seq-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|eq'; (x' = v; (def x (e)))|} &&&& {|x' = v; (eq'; (def x (e)))|} \\
+  &&  && \\
+  && {(42)} && |x' = v; (def x ((eq'; e)))| \\
+  &&  && \\
+  {|eq'; (def x ((x' = v; e)))|} && {|def x ((eq'; (x' = v; e)))|} && {|def x ((x' = v; (eq'; e)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=5-1, to=5-3]
+\arrow["\rulename{seq-swap}"', "{u\2}", dashed, from=5-3, to=5-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(34)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (v1 = v2; e2)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(43)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x' = (eq'; e1); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (x' = (eq'; e1); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (v1 = v2; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{eqn-float}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (x' = (eq'; e1); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x' = e1; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{eqn-float} have the XXX property.\par
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(35)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(44)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; ((eq'; e1); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(eq'; e1); (x = v; e)|} && {|eq'; (e1; (x = v; e))|} \\
+  &  & \\
+  & {(44)} & |eq'; (x = v; (e1; e))| \\
+  &  & \\
+  {|x = v; ((eq'; e1); e)|} && {|x = v; (eq'; (e1; e))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(36)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(45)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; (x = v; e)); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((x = v; (eq; e)); e2)| \xrnungosup{seq-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; ((x = v; e); e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-swap} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(eq; (x = v; e)); e2|} &&&& {|eq; ((x = v; e); e2)|} \\
+  &&  && \\
+  && {(45)} && |eq; (x = v; (e; e2))| \\
+  &&  && \\
+  {|(x = v; (eq; e)); e2|} && {|x = v; ((eq; e); e2)|} && {|x = v; (eq; (e; e2))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=5-1, to=5-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-3, to=5-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(37)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |e'; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(46)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |v|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{val-elim}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{fail-elim-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{val-elim}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{val-elim} and \rulename{fail-elim-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|v; fail|} && {|fail|} \\
+  & {(46)} & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{fail-elim-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(38)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(47)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (e'))| \xrnungosup{val-elim}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((v; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{val-elim}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{val-elim} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|v; (def x (e'))|} && {|def x ((v; e'))|} \\
+  & {(47)} & \\
+  {|def x (e')|} && {|def x (e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(39)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(48)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(e; e2)| \xrnungosup{val-elim}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{val-elim}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{val-elim} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(v; e); e2|} && {|v; (e; e2)|} \\
+  & {(48)} & \\
+  {|e; e2|} && {|e; e2|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(40)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(49)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x' ((x' = v; e'))|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|v|,|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x ((x' = v; e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x' = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(x' = v; e')| \xrnungosup{exi-elim}{\emptypath} |t| \xrngosup{eqn-elim}{\emptypath} |e'| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{eqn-elim}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-elim}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-elim} and \rulename{eqn-elim} have the XXX property.\par
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(41)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(50)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x ((def x2 (e'))))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x2 (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|x1|\mapsto |x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x2 (e'))| \xrnungosup{exi-elim}{\emptypath} |t| \xrngosup{exi-swap}{\emptypath} |(def x2 ((def x (e'))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-elim}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-elim} and \rulename{exi-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|def x ((def x2 (e')))|} && {|def x2 ((def x (e')))|} \\
+  &  & \\
+  & {(50)} & |def x ((def x2 (e')))| \\
+  &  & \\
+  {|def x2 (e')|} && {|def x2 (e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(42)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(51)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1 ((def x (e))))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1 (e))| \xrnungosup{exi-elim}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x ((def x1 (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-elim}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-elim} and \rulename{exi-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|def x1 ((def x (e)))|} && {|def x ((def x1 (e)))|} \\
+  &  & \\
+  & {(51)} & |def x1 ((def x (e)))| \\
+  &  & \\
+  {|def x1 (e)|} && {|def x1 (e)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(43)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(52)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1 ((def x ((x = v; e)))))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2|\mapsto |x|,\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1 (e))| \xrnungosup{eqn-elim}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x ((def x1 ((x = v; e)))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{eqn-elim}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{eqn-elim} and \rulename{exi-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|def x1 ((def x ((x = v; e))))|} && {|def x ((def x1 ((x = v; e))))|} \\
+  &  & \\
+  & {(52)} & |def x1 ((def x ((x = v; e))))| \\
+  &  & \\
+  {|def x1 (e)|} && {|def x1 (e)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(44)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(53)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = fail; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-eq}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(54)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = fail; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-eq}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((v = fail; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{fail-elim-eq}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{fail-elim-eq} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|v = fail; (def x (e'))|} && {|def x ((v = fail; e'))|} \\
+  &  & \\
+  & {(54)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(45)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(55)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v = fail; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-eq}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v = fail; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{fail-elim-eq}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{fail-elim-eq} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(v = fail; e); e2|} && {|v = fail; (e; e2)|} \\
+  & {(55)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(46)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |e'; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(56)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-l}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{fail-elim-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{fail-elim-l}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{fail-elim-l} and \rulename{fail-elim-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|fail; fail|} && {|fail|} \\
+  & {(56)} & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{fail-elim-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(47)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(57)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-l}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((fail; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{fail-elim-l}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{fail-elim-l} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|fail; (def x (e'))|} && {|def x ((fail; e'))|} \\
+  &  & \\
+  & {(57)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(48)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(58)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((fail; e); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-l}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(fail; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{fail-elim-l}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{fail-elim-l} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(fail; e); e2|} && {|fail; (e; e2)|} \\
+  & {(58)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(49)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |e; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(59)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = (def x (e1)); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v = (def x (e1))|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x ((v = e1; fail)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(60)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x (e1)); fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |def x (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{exi-float-l}{\emptypath} |(def x ((e1; fail)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-l}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{fail-elim-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{fail-elim-r} and \rulename{exi-float-l} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(def x (e1)); fail|} && {|def x ((e1; fail))|} \\
+  &  & \\
+  & {(60)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-l}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(50)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |e; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; e1); fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |eq; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; (e1; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{fail-elim-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
+\hbox to 5em{\rlap{(61)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x = (eq'; e1); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x = e1; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{fail-elim-r} and \rulename{seq-assoc} have the XXX property.\par
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(51)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |e; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((e; fail); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |e|,\,|e1|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-r}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(e; (fail; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{fail-elim-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{fail-elim-r} and \rulename{seq-assoc} have the XXX property.\par
+\hbox to 5em{\rlap{(62)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(eq'; e1); fail|} && {|eq'; (e1; fail)|} \\
+  &  & \\
+  & {(62)} & |eq'; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(52)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(63)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; fail); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-r}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; (fail; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(eq; fail); e2|} && {|eq; (fail; e2)|} \\
+  &  & \\
+  & {(63)} & |eq; fail| \\
+  &  & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(64)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e))|}\quad$\movesto$\quad |def x' ((eq; e))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = (def x (e1)); (def x' (e)))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e2|\mapsto |def x' (e)|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((v = e1; (def x' (e)))))| \xrnungosup{exi-float-eq}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' ((v = (def x (e1)); e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-float-eq}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-float-eq} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|v = (def x (e1)); (def x' (e))|} && {|def x' ((v = (def x (e1)); e))|} \\
+  &  & \\
+  & {(64)} & |def x' ((def x ((v = e1; e))))| \\
+  &  & \\
+  {|def x ((v = e1; (def x' (e))))|} && {|def x ((def x' ((v = e1; e))))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-float-r}"', "{u\2}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(53)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(65)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1'); e2'|}\quad$\movesto$\quad |eq; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v = (def x (e1)); e2); e2')|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((v = e1; e2))); e2')| \xrnungosup{exi-float-eq}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v = (def x (e1)); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-float-eq}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-float-eq} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(v = (def x (e1)); e2); e2'|} &&&& {|v = (def x (e1)); (e2; e2')|} \\
+  && {(65)} && \\
+  {|(def x ((v = e1; e2))); e2'|} && {|def x (((v = e1; e2); e2'))|} && {|def x ((v = e1; (e2; e2')))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(54)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(66)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e))|}\quad$\movesto$\quad |def x' ((eq; e))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x (e1)); (def x' (e)))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e2|\mapsto |def x' (e)|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((e1; (def x' (e)))))| \xrnungosup{exi-float-l}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' (((def x (e1)); e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-float-r}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-float-l}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-float-l} and \rulename{exi-float-r} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(def x (e1)); (def x' (e))|} && {|def x' (((def x (e1)); e))|} \\
+  &  & \\
+  & {(66)} & |def x' ((def x ((e1; e))))| \\
+  &  & \\
+  {|def x ((e1; (def x' (e))))|} && {|def x ((def x' ((e1; e))))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-float-r}"', "{u\2}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(55)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(67)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1'); e2'|}\quad$\movesto$\quad |eq; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((def x (e1)); e2); e2')|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((e1; e2))); e2')| \xrnungosup{exi-float-l}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((def x (e1)); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-float-l}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-float-l} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|((def x (e1)); e2); e2'|} &&&& {|(def x (e1)); (e2; e2')|} \\
+  && {(67)} && \\
+  {|(def x ((e1; e2))); e2'|} && {|def x (((e1; e2); e2'))|} && {|def x ((e1; (e2; e2')))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(56)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (v1 = v2; e2)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(68)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x' = (eq'; e1); (def x (e)))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((x' = (eq'; e1); e)))| \xrnungosup{exi-float-r}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (v1 = v2; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{eqn-float}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-float-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((x' = (eq'; e1); e)))| \xrnungosup{exi-float-r}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x' = e1; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-float-r} and \rulename{eqn-float} have the XXX property.\par
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(57)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(69)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); (def x (e)))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (((eq'; e1); e)))| \xrnungosup{exi-float-r}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-float-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-float-r} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(eq'; e1); (def x (e))|} && {|eq'; (e1; (def x (e)))|} \\
+  &  & \\
+  & {(69)} & |eq'; (def x ((e1; e)))| \\
+  &  & \\
+  {|def x (((eq'; e1); e))|} && {|def x ((eq'; (e1; e)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(58)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(70)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; (def x (e))); e2)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((eq; e))); e2)| \xrnungosup{exi-float-r}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; ((def x (e)); e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-float-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-float-r} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(eq; (def x (e))); e2|} &&&& {|eq; ((def x (e)); e2)|} \\
+  &&  && \\
+  && {(70)} && |eq; (def x ((e; e2)))| \\
+  &&  && \\
+  {|(def x ((eq; e))); e2|} && {|def x (((eq; e); e2))|} && {|def x ((eq; (e; e2)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=5-1, to=5-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-3, to=5-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(59)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (v1 = v2; e2)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(71)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((x = (eq; e1); e2); e2')|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |x = (eq; e1)|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((eq; (v1 = v2; e2)); e2')| \xrnungosup{eqn-float}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(x = (eq; e1); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{eqn-float}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((eq; (x = e1; e2)); e2')| \xrnungosup{eqn-float}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(x = (eq; e1); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
 \vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{eqn-float} and \rulename{seq-assoc} have the XXX property.\par
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(60)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(72)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((eq; e1); e2); e2')|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq; e1|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((eq; (e1; e2)); e2')| \xrnungosup{seq-assoc}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((eq; e1); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{seq-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{seq-assoc}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{seq-assoc} and \rulename{seq-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|((eq; e1); e2); e2'|} &&&& {|(eq; e1); (e2; e2')|} \\
+  && {(72)} && \\
+  {|(eq; (e1; e2)); e2'|} && {|eq; ((e1; e2); e2')|} && {|eq; (e1; (e2; e2'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(61)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e)))|}\quad$\movesto$\quad |def x2 ((def x1 (e)))|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(73)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e)))|}\quad$\movesto$\quad |def x2 ((def x1 (e)))|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1' ((def x2' (e')))|}\quad$\movesto$\quad |def x2' ((def x1' (e')))|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1' ((def x1 ((def x2 (e))))))|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2'|\mapsto |x1|,\,|e'|\mapsto |def x2 (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1' ((def x2 ((def x1 (e))))))| \xrnungosup{exi-swap}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x1 ((def x1' ((def x2 (e))))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{exi-swap}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{exi-swap}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{exi-swap} and \rulename{exi-swap} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|def x1' ((def x1 ((def x2 (e)))))|} && {|def x1 ((def x1' ((def x2 (e)))))|} \\
+  & {(73)} & \\
+  {|def x1' ((def x2 ((def x1 (e)))))|} && {|def x1' ((def x1 ((def x2 (e)))))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-swap}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(62)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(74)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e' `choice` fail|}\quad$\movesto$\quad |e'|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail `choice` fail)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{choose-r}{\emptypath} |t| \xrngosup{choose-l}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{choose-l}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{choose-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{choose-r} and \rulename{choose-l} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|fail `choice` fail|} && {|fail|} \\
+  & {(74)} & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-l}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(63)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(75)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((fail `choice` e) `choice` e3)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1|\mapsto |fail|,\,|e2|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(e `choice` e3)| \xrnungosup{choose-r}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |(fail `choice` (e `choice` e3))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{choose-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{choose-r}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{choose-r} and \rulename{choose-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(fail `choice` e) `choice` e3|} && {|fail `choice` (e `choice` e3)|} \\
+  & {(75)} & \\
+  {|e `choice` e3|} && {|e `choice` e3|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(64)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(76)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((e1 `choice` e2) `choice` fail)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |e1 `choice` e2|\,\}$} and {\color{blue}$\sigma_2=\{\,|e3|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(e1 `choice` e2)| \xrnungosup{choose-l}{\emptypath} |t| \xrngosup{choose-assoc}{\emptypath} |(e1 `choice` (e2 `choice` fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{choose-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{choose-l}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{choose-l} and \rulename{choose-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(e1 `choice` e2) `choice` fail|} && {|e1 `choice` (e2 `choice` fail)|} \\
+  & {(76)} & \\
+  {|e1 `choice` e2|} && {|e1 `choice` e2|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(65)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(77)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((e `choice` fail) `choice` e3)|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1|\mapsto |e|,\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |(e `choice` e3)| \xrnungosup{choose-l}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |(e `choice` (fail `choice` e3))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{choose-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{choose-l}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{choose-l} and \rulename{choose-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|(e `choice` fail) `choice` e3|} && {|e `choice` (fail `choice` e3)|} \\
+  & {(77)} & \\
+  {|e `choice` e3|} && {|e `choice` e3|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
 \vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(66)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{\rlap{(78)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
 \hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1' `choice` e2') `choice` e3'|}\quad$\movesto$\quad |e1' `choice` (e2' `choice` e3')|\relax\vadjust{\penalty1000}\hfil\break
 have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((e1 `choice` e2) `choice` e3) `choice` e3')|$\vadjust{\penalty1000}\hfil\break
 obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1'|\mapsto |e1 `choice` e2|,\,|e2'|\mapsto |e3|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
 \null\hskip 2em minus 1.95em $|t_1| \equiv |((e1 `choice` (e2 `choice` e3)) `choice` e3')| \xrnungosup{choose-assoc}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |((e1 `choice` e2) `choice` (e3 `choice` e3'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined? $|t_1| (|nil|\xrngosup{choose-assoc}{\emptypath} nil) \bigl(|t'|\bigr) (\xrnungosup{choose-assoc}{\emptypath}|nil| nil) |t_2|$.\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-Therefore rules \rulename{choose-assoc} and \rulename{choose-assoc} have the XXX property.\par
+\begin{center}
+\begin{tikzcd}
+  [row sep=large  ]
+  {|((e1 `choice` e2) `choice` e3) `choice` e3'|} &&&& {|(e1 `choice` e2) `choice` (e3 `choice` e3')|} \\
+  && {(78)} && \\
+  {|(e1 `choice` (e2 `choice` e3)) `choice` e3'|} && {|e1 `choice` ((e2 `choice` e3) `choice` e3')|} && {|e1 `choice` (e2 `choice` (e3 `choice` e3'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{choose-assoc}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{choose-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-assoc}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
 
 E--------------
 done

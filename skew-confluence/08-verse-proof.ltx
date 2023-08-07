@@ -502,6 +502,72 @@ because $\omegavc(|SX^[CX^[e_1 choice e_2]]|) = |x| \leqomega |x| = \omegavc(|SX
 \end{itemize}
 \end{proof}
 
+\subsection{Analysis of Critical Pairs}
+
+For this purpose
+we regard each of the rewrite rules \rulename{app-tup}, \rulename{u-tup}, and \rulename{all-choice} as defining a denumerable set of rewrite rules, one for every value of $n$ where $n\geq 0$;
+we regard each of the rewrite rules \rulename{u-occurs} and \rulename{unroll}, and \rulename{choose} as defining a denumerable set of rewrite rules, one for every possible choice of context |V|; 
+and we regard the rewrite rule \rulename{choose} as defining a denumerable set of rewrite rules, one for every possible choice for the pair of contexts (|SX|, |CX|).
+
+The following rules have no critical pairs with any other rule:
+
+
+\rulename{app-add}
+\rulename{app-gt}
+\rulename{app-gt-fail}
+\rulename{app-beta}
+\rulename{app-tup}
+\rulename{app-tup-0}
+% (for each, \bnffnsym{|apply1N bnfhole bnfhole| is the LHS root function symbol, and no other rule LHS uses \bnffnsym{|apply1N bnfhole bnfhole|;
+%     the other function symbols used in these rules are \bnffnsym{|k|}, \bnffnsym{|tup (bnfhole, bnfhole)|}, and \bnffnsym{|lam bnfhole bnfhole|},
+%     none of which is a LHS root function symbol for any other rule)
+
+    
+
+
+
+\rulename{u-lit}
+\rulename{u-tup}
+\rulename{u-fail}
+\rulename{u-occurs}
+\rulename{unroll}
+\rulename{subst}
+\rulename{hnf-swap}
+\rulename{var-swap}
+\rulename{seq-swap}
+\rulename{val-elim}
+\rulename{exi-elim}
+\rulename{eqn-elim}
+\rulename{fail-elim-eq}
+\rulename{fail-elim-l}
+\rulename{fail-elim-r}
+\rulename{exi-float-eq}
+\rulename{exi-float-l}
+\rulename{exi-float-r}
+\rulename{eqn-float}
+\rulename{seq-assoc}
+\rulename{exi-swap}
+\rulename{one-fail}
+\rulename{one-value}
+\rulename{one-choice}
+\rulename{all-fail}
+\rulename{all-value}
+\rulename{all-choice}
+\rulename{choose-r}
+\rulename{choose-l}
+\rulename{choose-assoc}
+\rulename{choose}
+
+
+
+
+
+
+
+
+
+
+
 
 
 \subsection {Proof that \texorpdfstring{\versecalc{}}{VC} Is Skew Confluent}
@@ -649,3 +715,1429 @@ If $\xrngo{r}$ strongly commutes with $\xrngo{s}$, then $\xprngo{r}$ strongly co
   \end{description}
 \end{proof}
 
+\clearpage
+
+\subsection{Machine-Generated Critical Pairs}
+
+The rules for \versecalc{} have 78 critical pairs, which are described here in detail.\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(1)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; e')| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (k1 = k2; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|k1 = k2; (x = v; e')|} && {|x = v; (k1 = k2; e')|} \\
+  & {(1)} & \\
+  {|x = v; e'|} && {|x = v; e'|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(2)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(3)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (e'))| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((k1 = k2; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|k1 = k2; (def x (e'))|} && {|def x ((k1 = k2; e'))|} \\
+  & {(3)} & \\
+  {|def x (e')|} && {|def x (e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(4)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((k1 = k2; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(e; e2)| \xrnungosup{u-lit}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(k1 = k2; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|(k1 = k2; e); e2|} && {|k1 = k2; (e; e2)|} \\
+  & {(4)} & \\
+  {|e; e2|} && {|e; e2|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(5)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; (x = v; e'))| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = v; e')|} &&&& {|x = v; ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e')|} \\
+  && {(5)} && \\
+  {|v1 = v1'; xdots vn = vn'; (x = v; e')|} && {\mydots} && {|x = v; (v1 = v1'; xdots vn = vn'; e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-swap}"', "{u\2^{n-1}}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-swap}"', "{u\2^{0}}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(6)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; fail)| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(7)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; (def x (e')))| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x (((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (def x (e'))|} &&&& {|def x (((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e'))|} \\
+  && {(7)} && \\
+  {|v1 = v1'; xdots vn = vn'; (def x (e'))|} && {\mydots} && {|def x ((v1 = v1'; xdots vn = vn'; e'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-r}"', "{u\2^{n-1}}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{exi-float-r}"', "{u\2^{0}}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(8)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((v1 = v1'; xdots vn = vn'; e); e2)| \xrnungosup{u-tup}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2|} &&&& {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (e; e2)|} \\
+  && {(8)} && \\
+  {|(v1 = v1'; xdots vn = vn'; e); e2|} && {\mydots} && {|v1 = v1'; xdots vn = vn'; (e; e2)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-assoc}"', "{u\2^{0}}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-assoc}"', "{u\2^{n-1}}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(9)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d' = op'; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = op'; e)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|d|\mapsto |op'|\,\}$} and {\color{blue}$\sigma_2=\{\,|d'|\mapsto |op|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{u-fail-d-op}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|op = op'; e|} && {|fail|} \\
+  & {(9)} & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{u-fail-d-op}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(10)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (op = d; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|op = d; (x = v; e')|} && {|x = v; (op = d; e')|} \\
+  &  & \\
+  & {(10)} & |x = v; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(11)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(12)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((op = d; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|op = d; (def x (e'))|} && {|def x ((op = d; e'))|} \\
+  &  & \\
+  & {(12)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(13)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((op = d; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-op-d}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(op = d; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  {|(op = d; e); e2|} && {|op = d; (e; e2)|} \\
+  & {(13)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(14)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (d = op; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|d = op; (x = v; e')|} && {|x = v; (d = op; e')|} \\
+  &  & \\
+  & {(14)} & |x = v; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(15)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(16)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((d = op; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|d = op; (def x (e'))|} && {|def x ((d = op; e'))|} \\
+  &  & \\
+  & {(16)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(17)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((d = op; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-d-op}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(d = op; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(d = op; e); e2|} && {|d = op; (e; e2)|} \\
+  & {(17)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(18)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; ((tup (v1,xdots,vn)) = k; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(tup (v1,xdots,vn)) = k; (x = v; e')|} && {|x = v; ((tup (v1,xdots,vn)) = k; e')|} \\
+  &  & \\
+  & {(18)} & |x = v; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(19)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(20)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x (((tup (v1,xdots,vn)) = k; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(tup (v1,xdots,vn)) = k; (def x (e'))|} && {|def x (((tup (v1,xdots,vn)) = k; e'))|} \\
+  &  & \\
+  & {(20)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(21)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((tup (v1,xdots,vn)) = k; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-tup-k}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((tup (v1,xdots,vn)) = k; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|((tup (v1,xdots,vn)) = k; e); e2|} && {|(tup (v1,xdots,vn)) = k; (e; e2)|} \\
+  & {(21)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(22)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (k = (tup (v1,xdots,vn)); e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|k = (tup (v1,xdots,vn)); (x = v; e')|} && {|x = v; (k = (tup (v1,xdots,vn)); e')|} \\
+  &  & \\
+  & {(22)} & |x = v; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(23)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(24)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((k = (tup (v1,xdots,vn)); e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|k = (tup (v1,xdots,vn)); (def x (e'))|} && {|def x ((k = (tup (v1,xdots,vn)); e'))|} \\
+  &  & \\
+  & {(24)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(25)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((k = (tup (v1,xdots,vn)); e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-k-tup}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(k = (tup (v1,xdots,vn)); (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(k = (tup (v1,xdots,vn)); e); e2|} && {|k = (tup (v1,xdots,vn)); (e; e2)|} \\
+  & {(25)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(26)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; (x' = v; e'))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x' = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; (x' = v; e'))| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v; (hnf = x; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|hnf = x; (x' = v; e')|} && {|x' = v; (hnf = x; e')|} \\
+  & {(26)} & \\
+  {|x = hnf; (x' = v; e')|} && {|x' = v; (x = hnf; e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(27)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; fail)| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(28)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; (def x' (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x' (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; (def x' (e')))| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' ((hnf = x; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|hnf = x; (def x' (e'))|} && {|def x' ((hnf = x; e'))|} \\
+  & {(28)} & \\
+  {|x = hnf; (def x' (e'))|} && {|def x' ((x = hnf; e'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(29)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((hnf = x; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((x = hnf; e); e2)| \xrnungosup{hnf-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(hnf = x; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(hnf = x; e); e2|} && {|hnf = x; (e; e2)|} \\
+  & {(29)} & \\
+  {|(x = hnf; e); e2|} && {|x = hnf; (e; e2)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(30)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; (x = v; e'))| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (x1 = x2; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|x1 = x2; (x = v; e')|} && {|x = v; (x1 = x2; e')|} \\
+  & {(30)} & \\
+  {|x2 = x1; (x = v; e')|} && {|x = v; (x2 = x1; e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(31)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq; (x1 = x2; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x|\mapsto |x1|,\,|v|\mapsto |x2|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq; (x2 = x1; e))| \xrnungosup{var-swap}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x1 = x2; (eq; e))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|eq; (x1 = x2; e)|} && {|x1 = x2; (eq; e)|} \\
+  & {(31)} & \\
+  {|eq; (x2 = x1; e)|} && {|x2 = x1; (eq; e)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(32)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; fail)| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(33)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; (def x (e')))| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((x1 = x2; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|x1 = x2; (def x (e'))|} && {|def x ((x1 = x2; e'))|} \\
+  & {(33)} & \\
+  {|x2 = x1; (def x (e'))|} && {|def x ((x2 = x1; e'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(34)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((x1 = x2; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((x2 = x1; e); e2)| \xrnungosup{var-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(x1 = x2; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(x1 = x2; e); e2|} && {|x1 = x2; (e; e2)|} \\
+  & {(34)} & \\
+  {|(x2 = x1; e); e2|} && {|x2 = x1; (e; e2)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(35)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x' = v'; e')|}\quad$\movesto$\quad |x' = v'; (eq'; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x' = v'; (x = v; e)))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; (x = v; (x' = v'; e)))| \xrnungosup{seq-swap}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v'; (eq'; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|eq'; (x' = v'; (x = v; e))|} &&&& {|x' = v'; (eq'; (x = v; e))|} \\
+  && {(35)} && \\
+  {|eq'; (x = v; (x' = v'; e))|} && {|eq'; (x' = v'; (x = v; e))|} && {|x' = v'; (eq'; (x = v; e))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-swap}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(36)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v'; e'|}\quad$\movesto$\quad |e'|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v'; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v'; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{val-elim}{\emptypath} |(x = v; e)| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(37)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v' = fail; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v' = fail; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v' = fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v' = fail; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{fail-elim-eq}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|v' = fail; (x = v; e)|} &&&& {|fail|} \\
+  && {(37)} && \\
+  {|x = v; (v' = fail; e)|} && {|x = v; fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{fail-elim-eq}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{fail-elim-eq}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{fail-elim-r}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(38)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (fail; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{fail-elim-l}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|fail; (x = v; e)|} &&&& {|fail|} \\
+  && {(38)} && \\
+  {|x = v; (fail; e)|} && {|x = v; fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{fail-elim-l}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{fail-elim-l}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{fail-elim-r}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(39)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq'; e)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x = v; fail))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; fail)| \xrnungosup{fail-elim-r}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (eq'; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(40)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v' = (def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((v' = e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|v'|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v' = (def x' (e1)); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v' = (def x' (e1))|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v' = (def x' (e1)); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x' ((v' = e1; (x = v; e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|v' = (def x' (e1)); (x = v; e)|} &&&& {|def x' ((v' = e1; (x = v; e)))|} \\
+  && {(40)} && \\
+  {|x = v; (v' = (def x' (e1)); e)|} && {|x = v; (def x' ((v' = e1; e)))|} && {|def x' ((x = v; (v' = e1; e)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-eq}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-eq}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(41)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x' (e1)); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |def x' (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; ((def x' (e1)); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{exi-float-l}{\emptypath} |(def x' ((e1; (x = v; e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(def x' (e1)); (x = v; e)|} &&&& {|def x' ((e1; (x = v; e)))|} \\
+  && {(41)} && \\
+  {|x = v; ((def x' (e1)); e)|} && {|x = v; (def x' ((e1; e)))|} && {|def x' ((x = v; (e1; e)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-l}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-l}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(42)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq'; e')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x' = v; (def x (e))))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; (def x ((x' = v; e))))| \xrnungosup{exi-float-r}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v; (eq'; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|eq'; (x' = v; (def x (e)))|} &&&& {|x' = v; (eq'; (def x (e)))|} \\
+  &&  && \\
+  && {(42)} && |x' = v; (def x ((eq'; e)))| \\
+  &&  && \\
+  {|eq'; (def x ((x' = v; e)))|} && {|def x ((eq'; (x' = v; e)))|} && {|def x ((x' = v; (eq'; e)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=5-1, to=5-3]
+\arrow["\rulename{seq-swap}"', "{u\2}", dashed, from=5-3, to=5-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(43)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x' = (eq'; e1); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (x' = (eq'; e1); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x' = e1; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(44)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; ((eq'; e1); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(eq'; e1); (x = v; e)|} && {|eq'; (e1; (x = v; e))|} \\
+  &  & \\
+  & {(44)} & |eq'; (x = v; (e1; e))| \\
+  &  & \\
+  {|x = v; ((eq'; e1); e)|} && {|x = v; (eq'; (e1; e))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(45)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; (x = v; e)); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((x = v; (eq; e)); e2)| \xrnungosup{seq-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; ((x = v; e); e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(eq; (x = v; e)); e2|} &&&& {|eq; ((x = v; e); e2)|} \\
+  &&  && \\
+  && {(45)} && |eq; (x = v; (e; e2))| \\
+  &&  && \\
+  {|(x = v; (eq; e)); e2|} && {|x = v; ((eq; e); e2)|} && {|x = v; (eq; (e; e2))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=5-1, to=5-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-3, to=5-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(46)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{val-elim}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|v; fail|} && {|fail|} \\
+  & {(46)} & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{fail-elim-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(47)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (e'))| \xrnungosup{val-elim}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((v; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|v; (def x (e'))|} && {|def x ((v; e'))|} \\
+  & {(47)} & \\
+  {|def x (e')|} && {|def x (e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(48)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(e; e2)| \xrnungosup{val-elim}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(v; e); e2|} && {|v; (e; e2)|} \\
+  & {(48)} & \\
+  {|e; e2|} && {|e; e2|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(49)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x' ((x' = v; e'))|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|v|,|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x ((x' = v; e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x' = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(x' = v; e')| \xrnungosup{exi-elim}{\emptypath} |t| \xrngosup{eqn-elim}{\emptypath} |e'| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(50)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x ((def x2 (e'))))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x2 (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|x1|\mapsto |x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x2 (e'))| \xrnungosup{exi-elim}{\emptypath} |t| \xrngosup{exi-swap}{\emptypath} |(def x2 ((def x (e'))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|def x ((def x2 (e')))|} && {|def x2 ((def x (e')))|} \\
+  &  & \\
+  & {(50)} & |def x ((def x2 (e')))| \\
+  &  & \\
+  {|def x2 (e')|} && {|def x2 (e')|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(51)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1 ((def x (e))))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1 (e))| \xrnungosup{exi-elim}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x ((def x1 (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|def x1 ((def x (e)))|} && {|def x ((def x1 (e)))|} \\
+  &  & \\
+  & {(51)} & |def x1 ((def x (e)))| \\
+  &  & \\
+  {|def x1 (e)|} && {|def x1 (e)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(52)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1 ((def x ((x = v; e)))))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2|\mapsto |x|,\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1 (e))| \xrnungosup{eqn-elim}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x ((def x1 ((x = v; e)))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|def x1 ((def x ((x = v; e))))|} && {|def x ((def x1 ((x = v; e))))|} \\
+  &  & \\
+  & {(52)} & |def x1 ((def x ((x = v; e))))| \\
+  &  & \\
+  {|def x1 (e)|} && {|def x1 (e)|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(53)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = fail; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-eq}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(54)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = fail; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-eq}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((v = fail; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|v = fail; (def x (e'))|} && {|def x ((v = fail; e'))|} \\
+  &  & \\
+  & {(54)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(55)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v = fail; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-eq}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v = fail; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(v = fail; e); e2|} && {|v = fail; (e; e2)|} \\
+  & {(55)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(56)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-l}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|fail; fail|} && {|fail|} \\
+  & {(56)} & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{fail-elim-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(57)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-l}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((fail; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|fail; (def x (e'))|} && {|def x ((fail; e'))|} \\
+  &  & \\
+  & {(57)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(58)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((fail; e); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-l}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(fail; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(fail; e); e2|} && {|fail; (e; e2)|} \\
+  & {(58)} & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(59)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = (def x (e1)); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v = (def x (e1))|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x ((v = e1; fail)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(60)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x (e1)); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |def x (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{exi-float-l}{\emptypath} |(def x ((e1; fail)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(def x (e1)); fail|} && {|def x ((e1; fail))|} \\
+  &  & \\
+  & {(60)} & |def x (fail)| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-l}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(61)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x = (eq'; e1); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x = e1; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(62)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(eq'; e1); fail|} && {|eq'; (e1; fail)|} \\
+  &  & \\
+  & {(62)} & |eq'; fail| \\
+  &  & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(63)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; fail); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-r}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; (fail; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(eq; fail); e2|} && {|eq; (fail; e2)|} \\
+  &  & \\
+  & {(63)} & |eq; fail| \\
+  &  & \\
+  {|fail; e2|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(64)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e))|}\quad$\movesto$\quad |def x' ((eq; e))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = (def x (e1)); (def x' (e)))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e2|\mapsto |def x' (e)|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((v = e1; (def x' (e)))))| \xrnungosup{exi-float-eq}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' ((v = (def x (e1)); e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|v = (def x (e1)); (def x' (e))|} && {|def x' ((v = (def x (e1)); e))|} \\
+  &  & \\
+  & {(64)} & |def x' ((def x ((v = e1; e))))| \\
+  &  & \\
+  {|def x ((v = e1; (def x' (e))))|} && {|def x ((def x' ((v = e1; e))))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-float-r}"', "{u\2}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(65)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1'); e2'|}\quad$\movesto$\quad |eq; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v = (def x (e1)); e2); e2')|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((v = e1; e2))); e2')| \xrnungosup{exi-float-eq}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v = (def x (e1)); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(v = (def x (e1)); e2); e2'|} &&&& {|v = (def x (e1)); (e2; e2')|} \\
+  && {(65)} && \\
+  {|(def x ((v = e1; e2))); e2'|} && {|def x (((v = e1; e2); e2'))|} && {|def x ((v = e1; (e2; e2')))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(66)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e))|}\quad$\movesto$\quad |def x' ((eq; e))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x (e1)); (def x' (e)))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e2|\mapsto |def x' (e)|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((e1; (def x' (e)))))| \xrnungosup{exi-float-l}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' (((def x (e1)); e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(def x (e1)); (def x' (e))|} && {|def x' (((def x (e1)); e))|} \\
+  &  & \\
+  & {(66)} & |def x' ((def x ((e1; e))))| \\
+  &  & \\
+  {|def x ((e1; (def x' (e))))|} && {|def x ((def x' ((e1; e))))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-float-r}"', "{u\2}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(67)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1'); e2'|}\quad$\movesto$\quad |eq; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((def x (e1)); e2); e2')|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((e1; e2))); e2')| \xrnungosup{exi-float-l}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((def x (e1)); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|((def x (e1)); e2); e2'|} &&&& {|(def x (e1)); (e2; e2')|} \\
+  && {(67)} && \\
+  {|(def x ((e1; e2))); e2'|} && {|def x (((e1; e2); e2'))|} && {|def x ((e1; (e2; e2')))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(68)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x' = (eq'; e1); (def x (e)))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((x' = (eq'; e1); e)))| \xrnungosup{exi-float-r}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x' = e1; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(69)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); (def x (e)))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (((eq'; e1); e)))| \xrnungosup{exi-float-r}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(eq'; e1); (def x (e))|} && {|eq'; (e1; (def x (e)))|} \\
+  &  & \\
+  & {(69)} & |eq'; (def x ((e1; e)))| \\
+  &  & \\
+  {|def x (((eq'; e1); e))|} && {|def x ((eq'; (e1; e)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-1, to=5-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(70)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; (def x (e))); e2)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((eq; e))); e2)| \xrnungosup{exi-float-r}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; ((def x (e)); e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(eq; (def x (e))); e2|} &&&& {|eq; ((def x (e)); e2)|} \\
+  &&  && \\
+  && {(70)} && |eq; (def x ((e; e2)))| \\
+  &&  && \\
+  {|(def x ((eq; e))); e2|} && {|def x (((eq; e); e2))|} && {|def x ((eq; (e; e2)))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=5-1, to=5-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-3, to=5-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(71)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((x = (eq; e1); e2); e2')|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |x = (eq; e1)|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((eq; (x = e1; e2)); e2')| \xrnungosup{eqn-float}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(x = (eq; e1); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\vadjust{\penalty1000}\hfil\break
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(72)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((eq; e1); e2); e2')|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq; e1|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((eq; (e1; e2)); e2')| \xrnungosup{seq-assoc}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((eq; e1); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|((eq; e1); e2); e2'|} &&&& {|(eq; e1); (e2; e2')|} \\
+  && {(72)} && \\
+  {|(eq; (e1; e2)); e2'|} && {|eq; ((e1; e2); e2')|} && {|eq; (e1; (e2; e2'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(73)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e)))|}\quad$\movesto$\quad |def x2 ((def x1 (e)))|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1' ((def x2' (e')))|}\quad$\movesto$\quad |def x2' ((def x1' (e')))|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1' ((def x1 ((def x2 (e))))))|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2'|\mapsto |x1|,\,|e'|\mapsto |def x2 (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1' ((def x2 ((def x1 (e))))))| \xrnungosup{exi-swap}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x1 ((def x1' ((def x2 (e))))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|def x1' ((def x1 ((def x2 (e)))))|} && {|def x1 ((def x1' ((def x2 (e)))))|} \\
+  & {(73)} & \\
+  {|def x1' ((def x2 ((def x1 (e)))))|} && {|def x1' ((def x1 ((def x2 (e)))))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
+\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
+\arrow["\rulename{exi-swap}"', "{u\2}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(74)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e' `choice` fail|}\quad$\movesto$\quad |e'|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail `choice` fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{choose-r}{\emptypath} |t| \xrngosup{choose-l}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|fail `choice` fail|} && {|fail|} \\
+  & {(74)} & \\
+  {|fail|} && {|fail|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-l}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(75)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((fail `choice` e) `choice` e3)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1|\mapsto |fail|,\,|e2|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(e `choice` e3)| \xrnungosup{choose-r}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |(fail `choice` (e `choice` e3))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(fail `choice` e) `choice` e3|} && {|fail `choice` (e `choice` e3)|} \\
+  & {(75)} & \\
+  {|e `choice` e3|} && {|e `choice` e3|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(76)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((e1 `choice` e2) `choice` fail)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |e1 `choice` e2|\,\}$} and {\color{blue}$\sigma_2=\{\,|e3|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(e1 `choice` e2)| \xrnungosup{choose-l}{\emptypath} |t| \xrngosup{choose-assoc}{\emptypath} |(e1 `choice` (e2 `choice` fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(e1 `choice` e2) `choice` fail|} && {|e1 `choice` (e2 `choice` fail)|} \\
+  & {(76)} & \\
+  {|e1 `choice` e2|} && {|e1 `choice` e2|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(77)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((e `choice` fail) `choice` e3)|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1|\mapsto |e|,\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |(e `choice` e3)| \xrnungosup{choose-l}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |(e `choice` (fail `choice` e3))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|(e `choice` fail) `choice` e3|} && {|e `choice` (fail `choice` e3)|} \\
+  & {(77)} & \\
+  {|e `choice` e3|} && {|e `choice` e3|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
+\arrow["{\equiv}", dashed, from=3-1, to=3-3]
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
+\end{tikzcd}
+\end{center}
+\par
+\vskip 8pt plus 16pt\noindent
+\hbox to 5em{\rlap{(78)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
+\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1' `choice` e2') `choice` e3'|}\quad$\movesto$\quad |e1' `choice` (e2' `choice` e3')|\relax\vadjust{\penalty1000}\hfil\break
+have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((e1 `choice` e2) `choice` e3) `choice` e3')|$\vadjust{\penalty1000}\hfil\break
+obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1'|\mapsto |e1 `choice` e2|,\,|e2'|\mapsto |e3|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
+\null\hskip 2em minus 1.95em $|t_1| \equiv |((e1 `choice` (e2 `choice` e3)) `choice` e3')| \xrnungosup{choose-assoc}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |((e1 `choice` e2) `choice` (e3 `choice` e3'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
+\begin{center}
+\begin{tikzcd}
+  [row sep=large]
+  {|((e1 `choice` e2) `choice` e3) `choice` e3'|} &&&& {|(e1 `choice` e2) `choice` (e3 `choice` e3')|} \\
+  && {(78)} && \\
+  {|(e1 `choice` (e2 `choice` e3)) `choice` e3'|} && {|e1 `choice` ((e2 `choice` e3) `choice` e3')|} && {|e1 `choice` (e2 `choice` (e3 `choice` e3'))|} \\
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
+\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-5]
+\arrow["\rulename{choose-assoc}"', "{u}", dashed, from=3-1, to=3-3]
+\arrow["\rulename{choose-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
+\arrow["{\rotatebox{270}{\hbox{\rulename{choose-assoc}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
+\end{tikzcd}
+\end{center}
+\par
