@@ -6,7 +6,6 @@
 
 \newpage
 
-\section{Rewrite Rules}\label{sec:rewrite-rules}
 
 \begin{figure}[t]
 $\begin{array}{@@{}l}
@@ -25,13 +24,15 @@ $\begin{array}{@@{}l}
 \\[-0.6em]
 
 \rulegroupname{Succeed/Decide:}
-  \rulename{suc-elim}   & |succeed e|     & \movesto & |e|      & \text{if}\ $\mustSucceed{e}$ \\
+  \rulename{suc-elim}   & |P^[succeed e]| & \movesto & |e|      & \text{if}\ $\mustSucceed{P}{e}$ \\
   \rulename{dec-elim}   & |P^[decide e]|  & \movesto & |P^[e]|  & \text{if}\ $\mustDecide{P}{e}$ \\
   \rulename{prove-elim} & |verify e|      & \movesto & |tup ()| & \text{if}\ $e$\ \text{has no}\ |succeedKW|, |decideKW| \\
 \\[-0.6em]
 
 \rulegroupname{Prove:}
-  \rulename{asm-intro}  & |P^[e]|                          & \movesto & |P^[assume e]|                  & \text{if}\ \proves{P}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  %\rulename{asm-intro}  & |P^[e]|                          & \movesto & |P^[assume e]|                  & \text{if}\ \proves{P}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  \rulename{prove}      & |P^[e; e']|                      & \movesto & |P^[e']|                          & \text{if $\proves{P}{e}$} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  \rulename{asm-subst}  & |assume (X^[x = v]); e|          & \movesto & |assume (X^[x = v]); subst e x v| & \text{if $|v| \not= |V^[x]|$} \\
   \rulename{asm-if}     & |verify (P^[myite e_1 e_2 e_3])| & \movesto & |verify (P^[assume e_1; e_2]);| & \text{if}\ \mustDecide{P}{e_1} \\
                         &                                  &          & |verify (P^[e_3])|              & \\
 \end{array}\\
@@ -39,7 +40,7 @@ $\begin{array}{@@{}l}
 \\[0.1in]
 $\begin{array}{l}
   \begin{array}{lr@@{\;}c@@{\;}l}
-  \text{Prove contexts} & P & ::= & \hole \vb |v == P| \vb |P ; e| \vb |e; P| \vb |def x P| \vb |lam x P| \vb |apply1N P e| \vb |apply1N e P| \\
+  \text{Prove contexts} & P & ::= & \hole \vb |v == P| \vb |e; P| \vb |def x P| \vb |lam x P| \vb |apply1N P e| \vb |apply1N e P| \\
                         &   & \vb & |one P| \vb |all P| \vb |P choice e| \vb |e choice P| \\
                         &   & \vb & |myite P e e| \vb |succeed P| \vb |verify P| \\
   \end{array}\\
@@ -52,18 +53,19 @@ $\begin{array}{l}
 \begin{figure}
 $\begin{array}{lcl}
   \toprule
-  \mustSucceedKW & :: & e \rightarrow \{ \mathit{true}, \mathit{false} \} \\
+  \mustSucceedKW & :: & (P, e) \rightarrow \{ \mathit{true}, \mathit{false} \} \\
   \midrule
-   \mustSucceed{n}              & \doteq & \mathit{true} \\
-   \mustSucceed{|lam x e|}      & \doteq & \mathit{true} \\
-   \mustSucceed{|assume e|}     & \doteq & \mathit{true} \\
-   \mustSucceed{|arr (v_1, xdots, v_n) |} & \doteq & \mustSucceed{|v_1|} \wedge \dots \wedge \mustSucceed{|v_n|} \\
-   \mustSucceed{|def x e|}         & \doteq & \mustSucceed{e} \\
-   \mustSucceed{|e_1; e_2|}        & \doteq & \mustSucceed{e_1} \wedge \mustSucceed{e_2} \\
-   \mustSucceed{|one e|}           & \doteq & \mustSucceed{e} \\
-   \mustSucceed{|all e|}           & \doteq & \mustSucceed{e} \\
-   \mustSucceed{|e_1 choice e_2|}  & \doteq & \mustSucceed{e_1} \vee \mustSucceed{e_2} \\
-   \mustSucceed{|e|}               & \doteq & \mathit{false} \\
+   \mustSucceed{P}{n}                 & \doteq & \mathit{true} \\
+   \mustSucceed{P}{|arr (v_1, xdots, v_n) |} & \doteq & \mustSucceed{|v_1|} \wedge \dots \wedge \mustSucceed{|v_n|} \\
+   \mustSucceed{P}{|x|}               & \doteq & x \in \lamvars{P} \\
+   \mustSucceed{P}{|lam x e|}         & \doteq & \mathit{true} \\
+   \mustSucceed{P}{|assume e|}        & \doteq & \mathit{true} \\
+   \mustSucceed{P}{|one e|}           & \doteq & \mustSucceed{P}{e} \\
+   \mustSucceed{P}{|all e|}           & \doteq & \mustSucceed{P}{e} \\
+   \mustSucceed{P}{|e_1; e_2|}        & \doteq & \mustSucceed{P}{e_1} \wedge \mustSucceed{P}{e_2} \\
+   \mustSucceed{P}{|e_1 choice e_2|}  & \doteq & \mustSucceed{P}{e_1} \vee   \mustSucceed{P}{e_2} \\
+   \mustSucceed{P}{|def x e|}         & \doteq & \mustSucceed{P}{e} \\
+   \mustSucceed{P}{|e|}               & \doteq & \mathit{false} \\
    \bottomrule
 \end{array}$
 \caption{Definitions of the $\mustSucceedKW$ predicate used in \cref{fig:verifier-rewrite-rules}.}
@@ -75,16 +77,17 @@ $\begin{array}{lcl}
   \mustDecideKW & :: & (P, e) \rightarrow \{ \mathit{true}, \mathit{false} \} \\
   \midrule
   \mustDecide{P}{n}                 & \doteq & \mathit{true} \\
-  \mustDecide{P}{|op|}              & \doteq & \mathit{true} \\
-  \mustDecide{P}{|assume e|}        & \doteq & \mathit{true} \\
   \mustDecide{P}{|arr (v_1, xdots, v_n) |} & \doteq & \mustDecide{P}{|v_1|} \wedge \dots \wedge \mustDecide{P}{|v_n|} \\
   \mustDecide{P}{x}                 & \doteq & x \in \lamvars{P} \\
+  \mustDecide{P}{|lam x e|}         & \doteq & \mathit{true} \\
+  \mustDecide{P}{|assume e|}        & \doteq & \mathit{true} \\
   \mustDecide{P}{|one e|}           & \doteq & \mustDecide{P}{e} \\
   \mustDecide{P}{|all e|}           & \doteq & \mustDecide{P}{e} \\
-  \mustDecide{P}{|e_1 = e_2|}       & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
   \mustDecide{P}{|e_1; e_2|}        & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
   \mustDecide{P}{|e_1 choice e_2|}  & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
-  \mustDecide{P}{|apply1N op e|}    & \doteq & \mustDecide{P}{e} \\
+  \mustDecide{P}{|op|}              & \doteq & \mathit{true} \\
+  \mustDecide{P}{|e_1 = e_2|}       & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
+ \mustDecide{P}{|apply1N op e|}     & \doteq & \mustDecide{P}{e} \\
   \mustDecide{P}{|e|}               & \doteq & \mathit{false} \\
   \bottomrule
 \end{array}$
@@ -124,21 +127,5 @@ $\begin{array}{lcl}
 \Facts{|e|}         & \doteq & \emptyset \\
 \bottomrule
 \end{array}$
-\caption{Definitions for the \rulename{asm-intro} rule in \cref{fig:verifier-rewrite-rules}.}
+\caption{Definitions for the \rulename{prove} rule in \cref{fig:verifier-rewrite-rules}.}
 \end{figure}
-
-% Env(P; e)       = Env(P); e
-% Env(e; P)       = e; Env(P)
-% Env(lam x P)    = assume{x}; Env(P)
-% Env(...P...)    = Env(P)
-% Env(v = P)      = Env(P)
-% Env(def x P)    = Env(P)
-% Env(one P)      = Env(P)
-% Env(all P)      = Env(P)
-% Env(P | e)      = Env(P)
-% Env(e | P)      = Env(P)
-% Env(P e)        = env(P)
-% Env(e P)        = env(P)
-% Env(if P e1 e2) = Env(P)
-% Env(succeed P)  = Env(P)
-% Env(verify P)   = Env(P)

@@ -221,7 +221,7 @@ assumeAssertRules env lhs =
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
   ++
   "subst-asm" `name`
-  -- asm{X[x=v]}; e --> asm{X[x=v]} ; (subst x v e)
+  -- asm{X[x=v]}; e --> asm{X[x=v]} ; (subst x v e)         if x in FV(e), x not in FV(v)
   do (Assume e_asm) :>: e <- [lhs]
      (_ctx, Var x :=: Val v) <- execX e_asm
      let freeE = free e
@@ -234,50 +234,38 @@ assumeAssertRules env lhs =
      pure (Assume e_asm :>: subst sub e)
 
 
--- mustSucceed :: Expr -> Bool
--- mustSucceed (Int _)          = True
--- mustSucceed (Arr as)         = all mustSucceed as
--- mustSucceed (Lam _)          = True
--- mustSucceed (Assume _)       = True
--- mustSucceed (One e)          = mustSucceed e
--- mustSucceed (e1 :>: e2)      = mustSucceed e1 && mustSucceed e2
--- mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
--- mustSucceed (Exi (Bind _ e)) = mustSucceed e
--- mustSucceed _                = False
-
 mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
-mustSucceed q bs = go q
+mustSucceed _ bs = go
   where
-   lamBinds       = [x | BLam x <- bs]
-   go g e = {- proves g e || -} step g e
-   step _ (Int _)          = True
-   step g (Arr as)         = all (go g) as
-   step _ (Var x)          = x `elem` lamBinds
-   step _ (Lam _)          = True
-   step _ (Assume _)       = True
-   step g (One e)          = go g e
-   step g (e1 :>: e2)      = go g e1 && go (g :>: e1) e2
-   step g (e1 :|: e2)      = go g e1 || go g e2
-   step g (Exi (Bind _ e)) = go g e
-   step _ _                = False
+   lamBinds            = [x | BLam x <- bs]
+   go (Int _)          = True
+   go (Arr as)         = all go as
+   go (Var x)          = x `elem` lamBinds
+   go (Lam _)          = True
+   go (Assume _)       = True
+   go (One e)          = go e
+   go (e1 :>: e2)      = go e1 && go e2
+   go (e1 :|: e2)      = go e1 || go e2
+   go (Exi (Bind _ e)) = go e
+   go _                = False
 
 
 mustDecide :: QContext -> [BndVar] -> Expr -> Bool
-mustDecide _q bs = go
+mustDecide _ bs = go
   where
     lamBinds       = [x | BLam x <- bs]
-    go e = {- proves q e || -} step e
-    step (Arr as)    = all go as
-    step (One e)     = step e
-    step (e1 :=: e2) = step e1 && step e2
-    step (e1 :|: e2) = step e1 && step e2
-    step (e1 :>: e2) = step e1 && step e2
-    step (e1 :@: e2) = step e1 && step e2 && isDecideOp e1
-    step (Assume _)  = True
-    step (Int _)     = True
-    step (Op _)      = True
-    step (Var x)     = x `elem` lamBinds
-    step _           = False
+    go (Int _)     = True
+    go (Arr as)    = all go as
+    go (Var x)     = x `elem` lamBinds
+    go (Lam _)     = True
+    go (Assume _)  = True
+    go (One e)     = go e
+    go (e1 :>: e2) = go e1 && go e2
+    go (e1 :|: e2) = go e1 && go e2
+    go (e1 :=: e2) = go e1 && go e2
+    go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
+    go (Op _)      = True
+    go _           = False
 
 isDecideOp :: Expr -> Bool
 isDecideOp (Op Le)    = True
@@ -422,10 +410,11 @@ execEX1 bs lhs =
   do Lam (Bind y x) <- [lhs]
      (ctx, g, bs', hole) <- execEX (BLam y : bs) x
      pure (Lam . Bind y . ctx, Assume (Var y) :>: g, bs', hole)  -- y should be visible to e in g |- e
- ++
-  do x :@: e <- [lhs]
-     (ctx, g, bs', hole) <- execEX bs x
-     pure ((:@: e) . ctx, g, bs', hole)
+--  only use ASSUME to the left of the hole
+--  ++
+--   do x :@: e <- [lhs]
+--      (ctx, g, bs', hole) <- execEX bs x
+--      pure ((:@: e) . ctx, g, bs', hole)
  ++
   do e :@: x <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
