@@ -4,9 +4,6 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newpage
-
-
 \section{Overview}\label{sec:overview}
 
 The key idea is to \emph{desugar} the source verse
@@ -31,20 +28,81 @@ in a covariant position, in which case |t| is \emph{rejected}, or
 %
 (c)~the rewriting times out, in which case |t| is \emph{rejected}.
 
-Next, we describe the extensions to the syntax \cref{sec:syntax},
-explain the desugaring by means of examples \cref{sec:desugaring},
-present the verification rewrite rules \cref{sec:verification}, and
+Next, we describe the extensions to the syntax \S~\ref{sec:syntax},
+explain the desugaring by means of examples \S~\ref{sec:desugar},
+present the verification rewrite rules \S~\ref{sec:rules}, and
 finally show a few examples that show how the verifier works from
-end-to-end.
+end-to-end \S~\ref{sec:examples}.
 
 \mypara{TODO} See google-doc notes
 %
 \begin{itemize}
 \item DISCUSS: WHY for |prove e| why do we need $|verify e|$ "subgoals"?
-\item DISCUSS: WHY not push |succeedKW| ``inside'' (instead of wrapping terms with |assumeKW|)?
-\item FIX: if |t| is semi, or |if| then |i| is pushed further inside (add more cases)
+% \item DISCUSS: WHY not push |succeedKW| ``inside'' (instead of wrapping terms with |assumeKW|)?
+% \item FIX: if |t| is semi, or |if| then |i| is pushed further inside (add more cases)
 \item FIX: add to the exact condition ``no PROVE/SUC/DEC left in a covariant position'' –--- not under lambda
 \end{itemize}
+
+\mypara{Why do we need |verify|?} (In addition to |succeedKW| and |decideKW|?)
+%
+The TRS-verifier converts a function definition |f^(x:int):int :== x| into two things:
+%
+(1) An \emph{obligation} that in fact, the body of |f| returns an |int| when the input
+    parameter |x| is an |int|, and
+%
+(2) A \emph{definition} for the name |f| that can then be used by other code in the program.
+%
+This is done by desugaring the definition of |f| into
+%
+\begin{align*}
+%
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; x); succeed (apply1 int x; arr ())))); f = v_f)| \\
+%
+\intertext{where |v| is the desugared body of |f|, namely}
+|v_f| \doteq\ & |lam x (apply1 int x; assume (apply1 int x))| \\
+%
+\intertext{We use the |verify| to record the obligation.
+If we omitted it to desugar the above to}
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; x); succeed (apply1 int x; arr ())))); f = v_f)| \\
+\intertext{then the \rulename{val-elim} rewrite rule would let us \emph{unsoundly erase}
+the proof obligation without first in fact checking that it holds.
+%
+However, one might wonder: why not record obligations using a
+$\exists$ binder instead of $\lambda$?
+%
+In other words, why not instead desugar the verification of
+|f^(x:int):int :== x| as}
+%
+& |def f ((def y (def x (assume (apply1 int y; x = y; x); succeed (apply1 int x; arr ())))); f = v)|
+\end{align*}
+%
+where |v_f| is the desugared body of |f|, as shown above?
+%
+The reason is we want to distinguish between $\lambda$ and $\exists$
+binders as explained next.
+
+\mypara{Why distinguish between $\lambda$ and $\exists$ binders?}
+%
+Consider the following examples:
+%
+$$\begin{array}{ll}
+    |f^(x:int) := {y:any; if (x > 1) then { y = 1 } else { y = 2 }; y}| & \text{\# succeeds}\\
+    |g^(x:int) := {y:any; if (y > 1) then { y = 1 } else { y = 2 }; y}| & \text{\# stuck}\\
+\end{array}$$
+%
+The function |f| should be \emph{accepted} by the verifier as indeed,
+|f| succeeds producing either |1| or |2| depending on the value of |x|.
+%
+However |g| should be \emph{rejected} by the verifier as the guard depends
+upon |y| whose value cannot be determined without first executing the branches!
+%
+The key difference between |f| and |g| is that |f| uses the $\lambda$-bound |x|
+in the guard, while |g| uses the $\exists$-bound |y|.
+%
+Hence, the TRS verifier handles the former specially, to determine that
+a term can make progress (via the $\mustDecide{}{}$ predicate) when its
+free variables are $\lambda$-bound.
+
 
 \mypara{Why not push |succeedKW| inside?}
 %
@@ -70,7 +128,7 @@ $$\begin{array}{ll}
 \movestoR{suc-seq} & |def x (succeed (x = 1); succeed x)| \\
 \end{array}$$
 %
-Now, unfortunately, we are stuck, as we cannot prove that the unification |x = 1| succeeds.
+Now, we are stuck: we cannot prove that the unification |x = 1| succeeds.
 %
 In contrast, with our current strategy, we get the following rewrite sequence that discharges the |succeedKW|:
 %
