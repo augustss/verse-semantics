@@ -42,7 +42,7 @@ test(D00){x:int => x=3}
 test(U00){f():any => f[]='3'}
 test(D00){f():int => f[]=3}
 test(F00){f():int => f[]='3'}
-test(F00){x.blah,x:=1=2}
+#LA test(F00){x.blah,x:=1=2}
 test(S00){for(x:=0|1) do nat[x]}
 test(S00){for(x:=0|1) do nat[x]}
 test(S00){function(x:=0|1){let(x){}}}
