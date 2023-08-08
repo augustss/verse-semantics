@@ -110,6 +110,7 @@ dropParens = f
   where f (Parens e) = f e
         f (InfixOp (InfixOp (Variable i1) (Ident l2 ":") e2) (Ident l3  "=") e3) =
           f $ InfixOp (InfixOp (Variable i1) (Ident l2 ":") e2) (Ident l3 ":=") e3
+        f (Tuple es) = f (Array es)  -- Turn tuples into arrays
         f e = compos f e
 
 ---------------------
