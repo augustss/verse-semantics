@@ -6,16 +6,15 @@
 
 \section{Overview}\label{sec:overview}
 
-The key idea is to \emph{desugar} the source verse
-programs into a core language that is \vcshort (the ICFP23 calculus)
-extended with
+The \verifier takes as input a surface term $t$ in the source verse
+language and \emph{desugars} it into a verifier term $e$ in the core
+language that is \vcshort (the ICFP23 calculus) extended with
 %
 (1) \emph{syntax} to record \emph{assumptions} and \emph{obligations},
 %
 (2) \emph{rewrite rules} that use the assumptions to discharge obligations.
-
-The verifier takes as input a surface term $t$ and desugars it into a
-verifier term $e$. Next, the verifier repeatedly applies \emph{all}
+%
+Next, the \verifier repeatedly applies \emph{all}
 the rewrite rules, that is, the ICFP23 rules \emph{and}
 the new verification rules, such that either
 %
@@ -34,16 +33,10 @@ present the verification rewrite rules \S~\ref{sec:rules}, and
 finally show a few examples that show how the verifier works from
 end-to-end \S~\ref{sec:examples}.
 
-\mypara{TODO} See google-doc notes
-%
-\begin{itemize}
-\item DISCUSS: WHY for |prove e| why do we need $|verify e|$ "subgoals"?
-% \item DISCUSS: WHY not push |succeedKW| ``inside'' (instead of wrapping terms with |assumeKW|)?
-% \item FIX: if |t| is semi, or |if| then |i| is pushed further inside (add more cases)
-\item FIX: add to the exact condition ``no PROVE/SUC/DEC left in a covariant position'' –--- not under lambda
-\end{itemize}
 
-\mypara{Why do we need |verify|?} (In addition to |succeedKW| and |decideKW|?)
+\subsection{Why do we need |verify|?}
+%
+(In addition to |succeedKW| and |decideKW|?)
 %
 The TRS-verifier converts a function definition |f^(x:int):int :== x| into two things:
 %
@@ -81,7 +74,7 @@ where |v_f| is the desugared body of |f|, as shown above?
 The reason is we want to distinguish between $\lambda$ and $\exists$
 binders as explained next.
 
-\mypara{Why distinguish between $\lambda$ and $\exists$ binders?}
+\subsection{Why distinguish between $\lambda$ and $\exists$ binders?}
 %
 Consider the following examples:
 %
@@ -104,7 +97,7 @@ a term can make progress (via the $\mustDecide{}{}$ predicate) when its
 free variables are $\lambda$-bound.
 
 
-\mypara{Why not push |succeedKW| inside?}
+\subsection{Why not push |succeedKW| inside?}
 %
 Currently, we verify a term |succeed e| (resp. |decide e|) by
 %
