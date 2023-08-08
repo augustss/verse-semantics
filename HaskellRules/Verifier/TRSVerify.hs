@@ -88,8 +88,7 @@ runTest (testName, e, expected) =
 
 -------------------------------------------------------------------------------------------
 
-pattern INT :: Expr -> Expr
-pattern INT e = Op IsInt :@: e
+
 
 eXIs :: [Ident] -> Expr -> Expr
 eXIs xs e = foldr EXI e xs

@@ -283,11 +283,19 @@ isDecideOp _          = False
 verifierRules :: VRule
 verifierRules env lhs =
    -- PROVE --
-   -- P[e; e'] ----> P[e']   if   P |- e
-   "prove" `name`
-   do (ctx, g, bs, e :>: e') <- eX lhs
-      guard (proves g bs e)
-      pure (ctx e')
+   -- -- P[e; e'] ----> P[e']   if   P |- e
+   -- "prove" `name`
+   -- do (ctx, g, bs, e :>: e') <- eX lhs
+   --    guard (proves g bs e)
+   --    pure (ctx e')
+   -- ++
+   -- asm{e}; P[e; e'] ----> P[e']   if   fv(e) disjoint from bvars(P)
+   "implies" `name`
+   do (Assume e) :>: rhs <- [lhs]
+      (ctx, _, bs, e1 :>: e2) <- eX rhs
+      guard (null (free e1 `intersect` bndIds bs))
+      guard (implies e e1)
+      pure (Assume e :>: ctx e2)
    ++
    -- ASSERT --
    -- P[Assert { e }] ----> e   if   mustSucceed(P, e)
@@ -333,17 +341,26 @@ verifierRules env lhs =
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
 --------------------------------------------------------------------------------
+unAssume :: Expr -> Expr
+unAssume (e1 :>: e2) = unAssume e1 :>: unAssume e2
+unAssume (e1 :|: e2) = unAssume e1 :|: unAssume e2
+unAssume (f :@: x)   = unAssume f :@: unAssume x
+unAssume (Assume a)  = unAssume a
+unAssume (e1 :=: e2) = unAssume e1 :=: unAssume e2
+unAssume a           = a
 
-proves :: QContext -> [BndVar] -> Expr -> Bool
-proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
+implies :: Expr -> Expr -> Bool
+implies e1' e2'
+  | e1 == e2                       = True
+  | INT a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
+  | otherwise                      = False
+  where
+   e1 = unAssume e1'
+   e2 = unAssume e2'
+
+_proves :: QContext -> [BndVar] -> Expr -> Bool
+_proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
  where
-  unAssume (e1 :>: e2) = unAssume e1 :>: unAssume e2
-  unAssume (e1 :|: e2) = unAssume e1 :|: unAssume e2
-  unAssume (f :@: x)   = unAssume f :@: unAssume x
-  unAssume (Assume a)  = unAssume a
-  unAssume (e1 :=: e2) = unAssume e1 :=: unAssume e2
-  unAssume a           = a
-
   vs = free e
 
   facts (g1 :>: g2) = facts g1 ++ facts g2
@@ -355,7 +372,8 @@ proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
   assumes a = a : derives a
 
   -- special rules
-  derives (Op IsInt :@: a) = ( a :=: a ) : assumes a
+  -- derives (Op IsInt :@: a) = ( a :=: a ) : assumes a
+  derives (INT a) = ( a :=: a ) : assumes a
   derives _                = []
 
 ----------------------------------------------------------------------
