@@ -36,13 +36,16 @@ desugar flgs = eval flgs .
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
              traceDS "addScope"   <=< addScope  <=<
-             pass1                              <=<
-             traceDS "addPrelude" <=< addPrelude)
-  where
-    pass1 = (traceDS "dsD"        <=< dsD       <=<
+             traceDS "dsD"        <=< dsD       <=<
              traceDS "addDeref"   <=< addDeref  <=<
              traceDS "dsSmall"    <=< dsSmall   <=<
+             traceDS "addPrelude" <=< addPrelude<=<
              traceDS "dropParens" <=< dropParens)
+  where
+    hack = (traceDS "dsD"        <=< dsD       <=<
+            traceDS "addDeref"   <=< addDeref  <=<
+            traceDS "dsSmall"    <=< dsSmall   <=<
+            traceDS "dropParens" <=< dropParens)
 
     tr = fTraceDesugar flgs
     traceDS :: String -> Expr -> D Expr
@@ -50,8 +53,8 @@ desugar flgs = eval flgs .
                          pure e
                   | otherwise = pure e
     addPrelude e = pure $ Array [prel, e]
-    prel = snd $ fPrelude flgs
-    prelIds = getVisible $ eval flgs $ pass1 prel
+    prel = eval flgs $ dropParens $ snd $ fPrelude flgs
+    prelIds = getVisible $ eval flgs $ hack prel
     dropPrel = pure . dropUnusedIds prelIds
 
 -- Drop unused prelude identifiers.
@@ -67,7 +70,9 @@ dropUnusedIds pids (Exists is (Array [Array ps, e])) =
       usedPrel _ = True
   in  lExists (is \\ unused) $ seqE $ filter usedPrel ps ++ [e]
 dropUnusedIds _ (Array [Array [], e]) = e
-dropUnusedIds _ e = error $ "dropUnusedIds: " ++ show e
+dropUnusedIds _ e =
+  trace (prettyShow e) $
+  impossible e
 
 ------
 
@@ -105,14 +110,31 @@ withContext c da = do
 
 ---------------------
 
+-- Do various early changes:
+--  * (e)       -->  e             parens are there to stop the next from possibly firing
+--  * e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
+--  * (e1,...)  -->  array{e1,...} no need to distingush them anymore
+--  * x&y:e     -->  x:e; y:e      if outside an array/tuple
+--                   ..(x:e, y:e)  if inside an array/tuple
 dropParens :: Expr -> D Expr
-dropParens = f
-  where f (Parens e) = f e
-        f (InfixOp (InfixOp (Variable i1) (Ident l2 ":") e2) (Ident l3  "=") e3) =
-          f $ InfixOp (InfixOp (Variable i1) (Ident l2 ":") e2) (Ident l3 ":=") e3
-        f (Tuple es) = f (Array es)  -- Turn tuples into arrays
-        f e = compos f e
+dropParens = f False
+  where f a (Parens e) = f a e
+        f a (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
+          f a $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
+        f a (Tuple es) = f a (Array es)
+        f _ (Array es) = Array <$> mapM (f True) es
+        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":" ) e) = f a $ amp a p o e
+        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":=") e) = f a $ amp a p o e
+        f _ e = compos (f False) e
 
+        amp a p o e =
+          let es = map (\ x -> InfixOp x o e) (getAmp p)
+          in  if a then PrefixOp (Op "..") (Array es) else Seq es
+
+        getAmp (InfixOp p1 (Op "&") p2) = getAmp p1 ++ getAmp p2
+        getAmp x@(Variable _) = [x]
+        getAmp e = errorMessage $ "Bad use of & " ++ prettyShow e
+          
 ---------------------
 
 eval :: Flags -> D Expr -> Expr
@@ -242,7 +264,7 @@ defn (InfixOp p1 op@(Op "->") p2) e = do
   r1 <- defn p1 x1
   r  <- defn (InfixOp x1 op p2) e
   pure $ seqE [r1, r]
-defn p _ = error $ "Bad LHS to := " ++ prettyShow p
+defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 --defn p _ = impossible p
 
 -- Return function, argument, and attributes
@@ -291,10 +313,11 @@ arraySplice as =
         app r (e : es) = do
           t <- newIdent noLoc "t"
           rest <- app (Variable t) es
-          pure $ seqE [DefineV t, eAppend r e (Variable t), rest]
+          pure $ seqE [eAppend r e t, rest]
 
-eAppend :: Expr -> Expr -> Expr -> Expr
-eAppend x y z = ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, z])
+eAppend :: Expr -> Expr -> Ident -> Expr
+eAppend (Array xs) (Array ys) z = DefineE z (Array (xs ++ ys))
+eAppend x y z = Seq [DefineV z, ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, Variable z])]
 
 data ArrayElem = EElems [Expr] | ESplice Expr
   deriving (Show)
@@ -467,7 +490,7 @@ errUndefined is = do
   if fNoWarn flg then
     case is of
       [] -> pure ()
-      i@(Ident l _) : _ -> error $ "undefined: " ++ prettyShow (l, i)
+      i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
    else
     mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)) is
 
@@ -477,13 +500,13 @@ errShadow is = do
   if fNoWarn flg then
     case is of
       [] -> pure ()
-      (i@(Ident li _), (Ident lj _)) : _ -> error $ "shadowing: " ++ prettyShow (li, i, lj)
+      (i@(Ident li _), (Ident lj _)) : _ -> errorMessage $ "shadowing: " ++ prettyShow (li, i, lj)
    else
     mapM_ (\ (i@(Ident li _), (Ident lj _)) -> traceM $ "warning shadowing " ++ prettyShow (li, i, lj)) is
 
 errMultiple :: [[Ident]] -> D ()
 errMultiple =
-  mapM_ (\ is -> error $ "multiply defined: " ++ prettyShow (head is) ++
+  mapM_ (\ is -> errorMessage $ "multiply defined: " ++ prettyShow (head is) ++
                          prettyShow [ l | Ident l _ <- is ])
 
 scope :: S.Set Ident -> Expr -> D Expr
@@ -920,7 +943,7 @@ lowerTLamVerify i rs is e1 e2 me3 = do
    else if hasEff "decides" rs then
     pure $ lowerTLamVerifyDecides i is e1 e2' e2''
    else
-    error $ "No multiplicity effect: " ++ prettyShow rs
+    errorMessage $ "No multiplicity effect: " ++ prettyShow rs
 
 hasEff :: String -> [Ident] -> Bool
 hasEff r rs = Ident noLoc r `elem` rs
@@ -1266,7 +1289,7 @@ getFree = Epic.List.nub . fvs
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
     fvs Fail = []
     fvs DomainFail = []
-    fvs e = error $ "getFree: " ++ prettyShow e
+    fvs e = impossible e
 
 -- XXX binders
 getAllVars :: Core -> [Ident]
@@ -1302,7 +1325,7 @@ substMany sb = sub
       in  If3 (Exists is' e1') e2' (sub e3)
     sub Fail = Fail
     sub DomainFail = DomainFail
-    sub e = error $ "substMany: " ++ prettyShow e
+    sub e = impossible e
 
     binder :: Ident -> (Expr -> Expr) -> Expr -> Expr
     binder i con e | Just _ <- lookup i sb = substMany (filter ((/= i) . fst) sb) (con e)
@@ -1317,7 +1340,7 @@ if3Hack f is e1 e2 =
   case f (Exists is (Array [e1, e2])) of
     Exists is' (Array [e1', e2']) -> (is', e1', e2')
 --    Array [e1', e2'] -> ([], e1', e2')
-    e -> error $ "if3Hack: " ++ prettyShow e
+    e -> impossible e
 
 -- Alpha convert a term, avoiding vs as the names for bound
 -- variables.
@@ -1344,7 +1367,7 @@ alphaConvert vs = alpha []
       let (is', e1', e2') = if3Hack (alpha m) is e1 e2
       in  If3 (Exists is' e1') e2' (alpha m e3)
     alpha _ Fail = Fail
-    alpha _ e = error $ "alphaConvert: " ++ prettyShow e
+    alpha _ e = impossible e
 
     add ii@(i, i') m | i == i' = m
                      | otherwise = ii : m
