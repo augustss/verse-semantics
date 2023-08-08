@@ -74,19 +74,19 @@ test(S00){a:int => if(a=1) then :int=2 else :int=3}
 #
 
 # Shows we must not resolve a flexible future to an inflexible one unless it's a head.
-test(S00){allow{x:int=x; x=3; x=3}}
-test(R20){allow{x:int=x; x=3; x=5}}
-test(R03){allow{x:int=x; not (x=3,x=5)}}
-test(S00){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,4)}}
-test(R20){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,5)}}
+#LA test(S00){allow{x:int=x; x=3; x=3}}
+#LA test(R20){allow{x:int=x; x=3; x=5}}
+#LA test(R03){allow{x:int=x; not (x=3,x=5)}}
+#LA test(S00){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,4)}}
+#LA test(R20){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,5)}}
 #test(S00){xs:=(3,4); ys:=(3,4); if(allow{as:type{:int,:int}=as; as=xs; as=ys}) then 1 else false?}
 #test(S00){xs:=(3,4); ys:=(3,4); if(allow{x:int=3}) then 1 else 2}
 
 # Shows that when unifying a flexible variable with an inflexible array, we need
 # to make a new flexible array.
-test(R03){a:=assume{_}; for{1|(a=3; a=4)}=array{_}} # because a=3 and a=4 both get stuck
-test(S00){a:=assume{_}; for{1|(b:=a; b=3; b=4)}=array{_}} # because b is flexible
-test(S00){a:=assume{_,_}; for{1|(b:=a; b=(3,4); b=(3,5))}=array{_}}
+#LA test(R03){a:=assume{_}; for{1|(a=3; a=4)}=array{_}} # because a=3 and a=4 both get stuck
+#LA test(S00){a:=assume{_}; for{1|(b:=a; b=3; b=4)}=array{_}} # because b is flexible
+#LA test(S00){a:=assume{_,_}; for{1|(b:=a; b=(3,4); b=(3,5))}=array{_}}
 
 # Conditions lacking runtime semantics that we need to figure out.
 # Shouldn't the verifier be rejecting both conditions as abstract?

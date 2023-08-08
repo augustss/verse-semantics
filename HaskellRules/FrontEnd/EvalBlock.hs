@@ -979,9 +979,8 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         -- Replace equal length arrays with new equations
         unify (BVArr vs) (BVArr ws) | length vs == length ws = succeeds $ zipWith (\ v w -> (v, BVal w)) vs ws
         unify _x@(BVLam _ _) _y@(BVLam _ _) =
-          -- According to the ICFP paper this fails.  Being WRONG would be better
-          fails
-          -- wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
+          -- According to the ICFP paper this is stuck.  Being WRONG would be better
+          wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
 #if EXT
         unify (BVExt a1 r1 x1) (BVExt a2 r2 x2) | a1 == a2 = succeeds [(r1, BVal r2), (x1, BVal x2)]
         -- These are dubious

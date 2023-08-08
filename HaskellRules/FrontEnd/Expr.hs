@@ -325,6 +325,7 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inn "pre[]"  11
       , inn "macro"  12
       , inl "()"     13
+      , inl "&"      13
       ]
 
 compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr

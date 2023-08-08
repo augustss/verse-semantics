@@ -381,7 +381,8 @@ dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
 dsM i (Function [(t1, r)] t2) = do
   c <- gets context
   dsFunction c i t1 r t2
-dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
+--dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
+dsM i af@(HasType _ _) = pure $ unifyV i af   -- XXX not sure about this
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e

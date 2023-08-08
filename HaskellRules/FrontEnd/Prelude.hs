@@ -134,6 +134,7 @@ mediumprelude = ("mediumprelude", "\
 \string      (_x:any$)                 <decides>   := { isStr$[_x]; _x };\n\
 \char        (_x:any$)                 <decides>   := { isChr$[_x]; _x };\n\
 \nat         (_x:any$)                 <decides>   := { isInt$[_x]; ratGE$[_x,0]; _x };\n\
+\comparable  (_x:any$)                 <decides>   := { isInt$[_x] | isRat$[_x] | isF32$[_x] | isF64$[_x] | isStr$[_x] | isChr$[_x]; _x };\n\
 \\n\
 \#operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
 \postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
