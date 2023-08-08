@@ -590,6 +590,12 @@ rulesPrimOps _ lhs =
        Int _ -> pure hnf -- (Arr [])
        _     -> pure Fail
  ++
+  "APP-ISCHAR" `name`
+  do Op IsChar :@: (HNF hnf) <- [lhs]
+     case hnf of
+       Char _ -> pure hnf -- (Arr [])
+       _      -> pure Fail
+ ++
   "APP-MAPAP" `name`
   do Op MapAp :@: Arr vs <- [lhs]
      pure (mapAp vs)

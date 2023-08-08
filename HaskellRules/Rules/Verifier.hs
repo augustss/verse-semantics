@@ -268,6 +268,7 @@ mustDecide _ bs = go
     go _           = False
 
 isDecideOp :: Expr -> Bool
+<<<<<<< HEAD
 isDecideOp (Op Le)     = True
 isDecideOp (Op Lt)     = True
 isDecideOp (Op Ge)     = True
@@ -278,6 +279,19 @@ isDecideOp (Op IsInt)  = True
 isDecideOp (Op DotDot) = True
 isDecideOp (Op Append) = True
 isDecideOp _           = False
+=======
+isDecideOp (Op Le)    = True
+isDecideOp (Op Lt)    = True
+isDecideOp (Op Ge)    = True
+isDecideOp (Op Gt)    = True
+isDecideOp (Op Ne)    = True
+isDecideOp (Op Div)   = True
+isDecideOp (Op IsInt) = True
+isDecideOp (Op IsChar)= True
+isDecideOp (Op DotDot)= True
+isDecideOp (Op Append)= True
+isDecideOp _          = False
+>>>>>>> 908c6d7b (Add the basetype 'char' to Core.  Tim's tests use it.)
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
@@ -373,6 +387,7 @@ _proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
 
   -- special rules
   -- derives (Op IsInt :@: a) = ( a :=: a ) : assumes a
+  -- derives (Op IsChar :@: a) = ( a :=: a ) : assumes a
   derives (INT a) = ( a :=: a ) : assumes a
   derives _                = []
 

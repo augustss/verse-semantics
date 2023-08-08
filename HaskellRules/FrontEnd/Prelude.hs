@@ -69,6 +69,7 @@ verifyprelude = ("verifyprelude", "\
 \false        := array{};\n\
 \any          := lowered{ lambda(_x){                                                        assume { _x }}};\n\
 \int          := lowered{ lambda(_x){                isInt$[_x];                             assume { _x }}};\n\
+\char         := lowered{ lambda(_x){                isChr$[_x];                             assume { _x }}};\n\
 \nat          := lowered{ lambda(_x){                isInt$[_x];             intGE$[_x,0];   assume { _x }}};\n\
 \operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intAdd$[_x,_y]; isInt$[_z]; _z }}};\n\
 \operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intSub$[_x,_y]; isInt$[_z]; _z }}};\n\
@@ -92,6 +93,7 @@ verifyabsprelude = ("verifyabsprelude", "\
 \false                                  := array{};\n\
 \any(_x:any$)<succeeds>                 := _x;\n\
 \int(_x:any$)<decides>                  := { isInt$[_x]; _x };\n\
+\char(_x:any$)<decides>                 := { isChr$[_x]; _x };\n\
 \nat(_x:any$)<decides>                  := { isInt$[_x]; intGE$[_x,0]; _x };\n\
 \operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z : any$; isInt$[_z]; _z } } };\n\
 \operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z : any$; isInt$[_z]; _z } } };\n\

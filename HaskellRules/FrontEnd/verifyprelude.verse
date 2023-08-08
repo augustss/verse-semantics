@@ -6,6 +6,7 @@ array{
 false        := array{};
 any          := lowered{ lambda(_x){                                                        assume { _x }}};
 int          := lowered{ lambda(_x){                isInt$[_x];                             assume { _x }}};
+char         := lowered{ lambda(_x){                isChr$[_x];                             assume { _x }}};
 nat          := lowered{ lambda(_x){                isInt$[_x];             intGE$[_x,0];   assume { _x }}};
 operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intAdd$[_x,_y]; isInt$[_z]; _z }}};
 operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intSub$[_x,_y]; isInt$[_z]; _z }}};
