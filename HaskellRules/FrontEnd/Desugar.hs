@@ -123,14 +123,22 @@ dropParens = f False
           f a $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
         f a (Tuple es) = f a (Array es)
         f _ (Array es) = Array <$> mapM (f True) es
-        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":" ) e) = f a $ amp a p o e
-        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":=") e) = f a $ amp a p o e
+        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":" ) e) = f a =<< amp a p o e
+        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":=") e) = f a =<< amp a p o e
         f _ e = compos (f False) e
 
-        -- XXX should let bind e in case it's not a variable
-        amp a p o e =
+{- This code does not duplicate e, but it doesn't agree with Tim's implementation.
+        amp a p o e@Variable{} = do
           let es = Array $ map (\ x -> InfixOp x o e) (getAmp p)
-          in  if a then PrefixOp (Op "..") es else es
+          pure $ if a then PrefixOp (Op "..") es else es
+        amp a p o e = do
+          x <- newIdent (getLoc e) "x"
+          e' <- amp a p o (Variable x)
+          pure $ Let (DefineE x e) e'
+-}
+        amp a p o e = do
+          let es = Array $ map (\ x -> InfixOp x o e) (getAmp p)
+          pure $ if a then PrefixOp (Op "..") es else es
 
         getAmp (InfixOp p1 (Op "&") p2) = getAmp p1 ++ getAmp p2
         getAmp x@(Variable _) = [x]
