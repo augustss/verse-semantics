@@ -268,7 +268,6 @@ mustDecide _ bs = go
     go _           = False
 
 isDecideOp :: Expr -> Bool
-<<<<<<< HEAD
 isDecideOp (Op Le)     = True
 isDecideOp (Op Lt)     = True
 isDecideOp (Op Ge)     = True
@@ -276,22 +275,10 @@ isDecideOp (Op Gt)     = True
 isDecideOp (Op Ne)     = True
 isDecideOp (Op Div)    = True
 isDecideOp (Op IsInt)  = True
+isDecideOp (Op IsChar) = True
 isDecideOp (Op DotDot) = True
 isDecideOp (Op Append) = True
 isDecideOp _           = False
-=======
-isDecideOp (Op Le)    = True
-isDecideOp (Op Lt)    = True
-isDecideOp (Op Ge)    = True
-isDecideOp (Op Gt)    = True
-isDecideOp (Op Ne)    = True
-isDecideOp (Op Div)   = True
-isDecideOp (Op IsInt) = True
-isDecideOp (Op IsChar)= True
-isDecideOp (Op DotDot)= True
-isDecideOp (Op Append)= True
-isDecideOp _          = False
->>>>>>> 908c6d7b (Add the basetype 'char' to Core.  Tim's tests use it.)
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
