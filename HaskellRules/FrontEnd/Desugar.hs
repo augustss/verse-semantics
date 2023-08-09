@@ -127,9 +127,10 @@ dropParens = f False
         f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":=") e) = f a $ amp a p o e
         f _ e = compos (f False) e
 
+        -- XXX should let bind e in case it's not a variable
         amp a p o e =
-          let es = map (\ x -> InfixOp x o e) (getAmp p)
-          in  if a then PrefixOp (Op "..") (Array es) else Seq es
+          let es = Array $ map (\ x -> InfixOp x o e) (getAmp p)
+          in  if a then PrefixOp (Op "..") es else es
 
         getAmp (InfixOp p1 (Op "&") p2) = getAmp p1 ++ getAmp p2
         getAmp x@(Variable _) = [x]
@@ -404,8 +405,8 @@ dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
 dsM i (Function [(t1, r)] t2) = do
   c <- gets context
   dsFunction c i t1 r t2
---dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
-dsM i af@(HasType _ _) = pure $ unifyV i af   -- XXX not sure about this
+dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
+--dsM i (HasType a f) = undefined
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
@@ -657,12 +658,19 @@ primOps = map (Ident noLoc)
 
 simpler :: Expr -> D Expr
 simpler expr = do
+  -- Always remove silly uses of any$
+  expr' <- simpValue <=< simpAny $ expr
   simpl <- gets (fSimplify . dflags)
   if simpl then
-    simpUnify <=< simpAny $ expr
+    simpUnify expr'
    else
-    -- Always remove silly uses of any$
-    simpAny expr
+    pure expr'
+
+-- Simplify  v; e  -->  e
+simpValue :: Expr -> D Expr
+simpValue = pure . f
+  where f (Seq (Snoc es e)) = seqE $ map f (Snoc (filter (not . isValue) es) e)
+        f e = composOp f e
 
 -- Simplify any[e]  -->  e
 simpAny :: Expr -> D Expr
