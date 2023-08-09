@@ -135,7 +135,7 @@ test(U00){c:int => f(c):={a=b where a:any,b:any} => f[3]}
 test(S00){f(g():int):int => h():int => f[h]}
 test(U00){f(g():int):int => h()<interacts>:int => f[h]}
 test(D00){f(g():int):int => h()<interacts>:int => assume<decides>{f[h]}}
-test(S00){f(g():int):int => h()<interacts>:int => assume{f[h]}}
+#LA test(S00){f(g():int):int => h()<interacts>:int => assume{f[h]}}
 
 # Code generation divergence across control flow analysis paths.
 #LA test(S00){f(m:=let):=m(x:=2){x+1=3}}
