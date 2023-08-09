@@ -572,7 +572,7 @@ timTest tflg fn = do
   let tests = parseDie pTimTestFile fn file
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
   putStrLn $ "Number of tests: " ++ show (length tests)
-  (skips, oks, bads, dieds) <- unzip4 <$> mapM (runTimTest tflg) (take 1000 tests)
+  (skips, oks, bads, dieds) <- unzip4 <$> mapM (runTimTest tflg) (take 1000000 tests)
   printf "%5d skipped\n" (sum skips)
   printf "%5d OK\n"      (sum oks)
   printf "%5d bad\n"     (sum bads)
@@ -588,7 +588,7 @@ pTimTest =
 
 runTimTest :: TestFlags -> TimTest -> IO (Int, Int, Int, Int)
 runTimTest tflg test | Just s <- onlyTest tflg, s /= timTestName test = pure (0,0,0,0)
-runTimTest tflg test = do
+runTimTest tflg test | timRun tflg = do
   let sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
       flg = (testFlagsToFlags tflg) { fNoWarn = True }
       res = run flg sys $ desugar flg $ timExpr test
@@ -611,6 +611,29 @@ runTimTest tflg test = do
              Shadowing           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
              _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
     _                            -> do putStrLn "skip";      pure (1, 0, 0, 0)
+runTimTest tflg test | timVerify tflg = do
+  let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False, fNoWarn = True  }
+      e' = preProcess sys (ruleEnv sys) . coreToTrs . desugar flags . timExpr $ test
+      sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
+      res = verifyM sys e'
+      tag = timTag test
+      Ident loc stag = tag
+  tres <- tryResult tflg res
+  putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
+  case take 1 stag of
+    "S" -> case tres of
+             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (0, 0, 0, 1)
+             ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (0, 1, 0, 0)
+             ResOK (Just (False, _))-> do putStrLn "fail, bad";   pure (0, 0, 1, 0)
+             _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
+    "F" -> case tres of
+             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (0, 0, 0, 1)
+             ResOK (Just (True, _)) -> do putStrLn "pass, bad";   pure (0, 0, 1, 0)
+             ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (0, 1, 0, 0)
+             _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
+    _   -> do putStrLn "skip";        pure (1, 0, 0, 0)
+
+runTimTest _ _ = error "impossible"
 
 ---------------------
 
