@@ -480,15 +480,15 @@ addScope e = scope (S.fromList primOps) (Do e)
 _knownEffects :: [Ident]
 _knownEffects = map (Ident noLoc) [
   "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts"
-  ] ++ [covariantId]
+  ] ++ [invariantId]
 
 _isLambdaEffect :: Ident -> Bool
 _isLambdaEffect i = elem i [
-  covariantId
+  invariantId
   ]
 
-covariantId :: Ident
-covariantId = Ident noLoc "covariant"
+invariantId :: Ident
+invariantId = Ident noLoc "invariant"
 
 openId :: Ident
 openId = Ident noLoc "open"
@@ -983,12 +983,12 @@ lowerTLamVerifySucceeds i is e1 e2' e2'' =
 lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
 lowerTLamRun i rs is e1 e2 me3 = do
   e2' <- maybe (pure e2) (\ t -> lowerSucceeds (ApplyD t e2)) me3
-  let covariant = --covariantId `elem` rs  || True -- XXX
+  let invariant = --invariantId `elem` rs  || True -- XXX
                   openId `notElem` rs
   if null is && e1 == Array [] then
     pure $ Lam i e2'   -- Simple special case
    else
-    if covariant then
+    if invariant then
       pure $ Lam i $ lExists is (seqE [e1, e2])
     else
       Lam i <$> lowerIf is e1 e2 DomainFail

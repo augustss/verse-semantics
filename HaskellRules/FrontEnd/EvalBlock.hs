@@ -343,7 +343,7 @@ data Effect
   | Ethrows
   | Einteracts
   ---- 
-  | Ecovariant
+  | Einvariant
   ---- 
   | Etrace         -- not really an effect, used for debugging
   deriving (Eq, Ord, Show, Enum, Bounded)
@@ -1314,5 +1314,5 @@ effCommutes Ereads e = e `elem` [Efails, Eallocates, Ereads]
 effCommutes Ewrites e = e `elem` [Efails, Eallocates]
 effCommutes Ethrows e = e `elem` [Eallocates]
 effCommutes Einteracts e = e `elem` [Eallocates]
-effCommutes Ecovariant _ = undefined
+effCommutes Einvariant _ = undefined
 effCommutes Etrace _ = True
