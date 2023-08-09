@@ -572,10 +572,11 @@ timTest tflg fn = do
   let tests = parseDie pTimTestFile fn file
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
   putStrLn $ "Number of tests: " ++ show (length tests)
-  (skips, passs, fails) <- unzip3 <$> mapM (runTimTest tflg) (take 100 tests)
+  (skips, oks, bads, dieds) <- unzip4 <$> mapM (runTimTest tflg) (take 1000 tests)
   printf "%5d skipped\n" (sum skips)
-  printf "%5d passed\n"  (sum passs)
-  printf "%5d failed\n"  (sum fails)
+  printf "%5d OK\n"      (sum oks)
+  printf "%5d bad\n"     (sum bads)
+  printf "%5d died\n"    (sum dieds)
 
 pTimTestFile :: P [TimTest]
 pTimTestFile = skip *> many pTimTest <* eof
@@ -585,33 +586,63 @@ pTimTest =
   pKeyword "test" *> do
     TimTest <$> pParens pIdent <*> (pBlockM <* optional (pOp ";"))
 
-runTimTest :: TestFlags -> TimTest -> IO (Int, Int, Int)
-runTimTest tflg test | Just s <- onlyTest tflg, s /= timTestName test = pure (0,0,0)
+runTimTest :: TestFlags -> TimTest -> IO (Int, Int, Int, Int)
+runTimTest tflg test | Just s <- onlyTest tflg, s /= timTestName test = pure (0,0,0,0)
 runTimTest tflg test = do
   let sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
       flg = (testFlagsToFlags tflg) { fNoWarn = True }
       res = run flg sys $ desugar flg $ timExpr test
-  eres <- Control.Exception.try (evaluate (seq (res==res) res))
+      tag = timTag test
+      Ident loc stag = tag
+  tres <- tryResult tflg res
+  putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
+  case take 1 stag of
+    "S" -> case tres of
+             ResOK x | x /= Fail -> do putStrLn "pass, OK";  pure (0, 1, 0, 0)
+                     | otherwise -> do putStrLn "fail, bad"; pure (0, 0, 1, 0)
+             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
+    "F" -> case tres of
+             ResOK x | x == Fail -> do putStrLn "fail, OK";  pure (0, 1, 0, 0)
+                     | otherwise -> do putStrLn "pass, bad"; pure (0, 0, 1, 0)
+             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
+    "N" -> case tres of
+             ResOK _             -> do putStrLn "pass, bad"; pure (0, 0, 1, 0)
+             Undefined           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
+             Shadowing           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
+             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
+    _                            -> do putStrLn "skip";      pure (1, 0, 0, 0)
+
+---------------------
+
+-- Results of compile&run, with somewhat decoded error messages
+data Result a
+  = ResOK a
+  | Undefined
+  | Shadowing
+  | MultiplyDefined
+  | BadLHS
+  | SyntaxError
+  | OtherError String
+  deriving (Show)
+
+-- Evaluate argument and catch any errors.
+-- Use == to force the computation
+tryResult :: (Eq a) => TestFlags -> a -> IO (Result a)
+tryResult tflg a = do
+  mres <- Control.Exception.try (evaluate (seq (a==a) a))
   when (verbose tflg) $
-    case eres of
+    case mres of
       Left msg -> print msg
       _ -> pure ()
-  let tag = timTag test
-      Ident loc stag = tag
-      ok = case take 1 stag of
-        "S" -> Just $ case eres of Left (_::SomeException) -> False; Right x -> x /= Fail
-        "F" -> Just $ case eres of Left _ -> False; Right x -> x == Fail
-        "N" -> Just $ case eres of Right _ -> False
-                                   Left m -> let s = show m in isPrefixOf "undefined:" s || isPrefixOf "shadowing:" s
-        _   -> Nothing
-  
-      outcome = case ok of
-                  Nothing    -> "skip"
-                  Just True  -> "OK"
-                  Just False -> "bad"
-
-  putStrLn $ prettyShow loc ++ ": " ++ show tag ++ " " ++ outcome
-  pure $ case ok of
-           Nothing    -> (1, 0, 0)
-           Just True  -> (0, 1, 0)
-           Just False -> (0, 0, 1)
+  pure $
+    case mres of
+      Left exn ->
+        case stripPrefix "error: " (show (exn :: SomeException)) of
+          Nothing -> OtherError (show exn)
+          Just msg | isPrefixOf "undefined:"        msg -> Undefined
+                   | isPrefixOf "shadowing:"        msg -> Shadowing
+                   | isPrefixOf "multiply defined:" msg -> MultiplyDefined
+                   | isPrefixOf "Bad LHS"           msg -> BadLHS
+                   | isPrefixOf "syntax error:"     msg -> SyntaxError
+                   | otherwise                          -> OtherError msg
+      Right x -> ResOK x
