@@ -23,6 +23,12 @@ import FrontEnd.Expr
 import FrontEnd.Flags
 
 -- TODO:
+--  HasType with non-values, L63
+--  Add Length
+--  Don't require multiplicity effect, allow computes
+--  Add fails multiplicity
+
+-- TODO:
 --  x:t=v is syntactic sugar for x:=(:t=v) and 
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
