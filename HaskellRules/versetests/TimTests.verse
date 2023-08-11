@@ -2,12 +2,12 @@
 #f(g():any):=g[]; f[h():=6]
 
 # Abstraction propagation.
-test(S00){f():=for(1) do :int => 0}
-test(S00){f():=for(1|2) do :int => 0}
-test(S00){f():=if(1=1) then :int else :nat => 0}
-test(S00){f():=if(1=2) then :int else :nat => 0}
-test(S00){f():=let() do :int => 0}
-test(S00){f():type{(:nat)|(:int)} => 0}
+test(S00){f():=for(1) do :int => 0}						# NOTE:FOR
+test(S00){f():=for(1|2) do :int => 0}					# NOTE:FOR
+test(S00){f():=if(1=1) then :int else :nat => 0}		# NOTE:???
+test(S00){f():=if(1=2) then :int else :nat => 0}		# NOTE:???
+test(S00){f():=let() do :int => 0}						# NOTE:???
+test(S00){f():type{(:nat)|(:int)} => 0}					# NOTE:???
 
 # IsReady bug introduced by op::atom change.
 #test(F00){for{i where array{2,4,6}[i:int]=4}=array{2}}
@@ -18,7 +18,7 @@ test(S00){f():type{(:nat)|(:int)} => 0}
 # Bringing verifier back up with NEWREGS.
 test(S00){1}
 test(S00){1=1}
-test(F00){1=2}
+test(F00){1=2}		# NOTE:ASSERT
 test(S00){1,2}
 test(S00){1=>2}
 test(S00){x:=1}
@@ -108,7 +108,7 @@ test(U00){a:any => comparable[a,3]}
 #test(S00){a:comparable => comparable[a,3]}
 
 # This goes wrong because we have a decides context with Stops that holds effects.
-#if{allow{:int}} 
+#if{allow{:int}}
 
 # Weird runtime comparisons.
 #LA test(S00){decides=decides}
@@ -152,7 +152,7 @@ test(D00){f(g():int):int => h()<interacts>:int => assume<decides>{f[h]}}
 test(S00){type{3}?}
 test(A00){int?}
 test(S00){int?=3}
-test(F00){int?='3'}
+test(F00){int?='3'}	# NOTE:ASSERT
 
 # Solving functions with inputs or multiple function confusion.
 #test(F00){1=(2=>3)}
@@ -182,7 +182,7 @@ test(S00){h->f:=function(){_}; g:=function(){3}; h=g}
 test(S00){i->x:prefix'-',i=3,x=-3}
 test(S00){i->x:=1}
 test(S00){as->bs:=(1,2)}
-#Broken by FunctionMacro UncommittableNegotiable 
+#Broken by FunctionMacro UncommittableNegotiable
 #test(S00){for(i->x:function(j:=3|5){j+1}){i,x}=((3,4),(5,6))}
 #test(S00){(i->x,j->y):array{array{3,5}},i=0,j=1,x=3,y=5} # When we have tuple destructuring.
 #Range-No-IterateStep test(F00){f(x:int):=x=function(1){2}}
@@ -200,7 +200,7 @@ test(S00){as->bs:=(1,2)}
 test(S00){type{3}?}
 test(A00){int?}
 test(S00){int?=3}
-test(F00){int?='3'}
+test(F00){int?='3'}	# NOTE:ASSERT
 
 # Lack of function unification.
 #if we make function_variable flexible, becomes X00: test(U00){(1=>2)=(1=>2)}
@@ -211,7 +211,7 @@ test(S00){f():type{123} => f[]}
 test(S00){f():type{g():int} => 2}
 
 # Was broken by syntax.call not handling input properly.
-test(F00){W->X:=array{w->x:=any[3]} where w=4}
+test(F00){W->X:=array{w->x:=any[3]} where w=4}		# NOTE:???
 
 # Was broken by native Length taking array<> rather than array<unificand>.
 test(S00){as:=array{_} => Length[for{as[_]}]}
@@ -368,7 +368,7 @@ test(P00){allow{x:false},operator'+'(x)=7}   # Should be S00.
 
 # Array unification.
 test(S00){(1,2)=(1,2)}
-test(F00){(1,2)=(1,3)}
+test(F00){(1,2)=(1,3)}						# NOTE:ASSERT
 test(S00){f(x:int):=x => f(3)=3}
 test(S00){a&b&c&d:int => (a,b)=(1,2) => nat[a]}
 test(S00){f(x&y:int):=(y,x) => f(3,5)=(5,3)}
@@ -430,7 +430,7 @@ test(S00){type{x:int,if{x=2}}}
 
 # Interesting to consider. Was S00 before function PHAH.
 # Could probably evolve rules to support this without breaking test(V10){x:int => if{x=3,f():type{x=3}=x=3}}
-test(D00){x:int => if{x=3,f():=x=3}} 
+test(D00){x:int => if{x=3,f():=x=3}}
 
 # Stage+Function is unsound regardless of PHAA unless we modulate its strength when it's run.
 test(V10){a:int => {f():type{a=3}=a=3,f[]}} # Should refine to D00.
@@ -883,7 +883,7 @@ test(S00){f(x:int):int=x; f[4]}
 #needs non-<converges> special case: test(S00){f(x:int):int=f[x]}
 #test(S00){f(x:int):int=f[x]; f[3]} //need error code to say "don't run".
 
-# Stage evaluation equality inference.		
+# Stage evaluation equality inference.
 test(A00){f(x:int)<computes>:int; f[3]=f[3]}
 test(S00){f(x:int)<computes>:=(:int=4); f[3]=f[3]}
 #NEWABS test(S00){f(x:int)<computes>:=(:int,4) => f[3][0]=f[3][0]}
@@ -952,7 +952,7 @@ test(A00){as:=(1,(as,2))}
 test(A00){as:=array{as}}
 test(A00){as:=(1,as),bs:=(1,bs)}
 test(A00){as:=(1,as),bs:=(1,bs),as=bs}
-test(F00){as:=(1,as=2)}
+test(F00){as:=(1,as=2)}		#NOTE:ASSERT
 test(U00){a:any => as:=(1,as=a)}
 
 #
@@ -1136,12 +1136,12 @@ test(S00){f(a:comparable):=(3,a) => x:=f(2)}
 # Trivial tests.
 test(S00){3}
 test(S00){3=3}
-test(F00){3=5}
+test(F00){3=5}	#NOTE:ASSERT
 test(S00){-3}
 test(S00){if{123}=123}
-test(F00){if{123}=456}
+test(F00){if{123}=456}	#NOTE:ASSERT
 test(S00){if{2=3}}
-test(F00){if{2=3}=3}
+test(F00){if{2=3}=3}	#NOTE:ASSERT
 test(S00){if(1){2}else{3}=2}
 test(S00){if(1=2){3}else{4}=4}
 test(S00){if(1=2){3}else if(3){4} else{5}=4}
@@ -1159,10 +1159,10 @@ test(S00){f:=function(x:int){x},f(1)}
 test(S00){f:=function(x:=int[x]){x},f(1)}
 test(S00){f:=prefix'-',p:=3,f(p)}
 test(S00){(f:=prefix'-')(p:=3),f,p}
-test(F00){false[0]}
-test(F00){:false}
+test(F00){false[0]}		#NOTE:ASSERT
+test(F00){:false}		#NOTE:???
 test(S00){int[0]}
-test(F00){int['x']}
+test(F00){int['x']}		#NOTE:ASSERT
 test(F00){3 => {4=5}}
 test(S00){void()=array{}}
 test(S00){if{2=3}=false}
@@ -1191,9 +1191,9 @@ test(F00){as:=(3,5) => as[0]=5}
 
 # Trivial array flow tests.
 test(S00){123}
-test(F00){123=456}
+test(F00){123=456}	#NOTE:ASSERT
 test(S00){int[3]}
-test(F00){int['3']}
+test(F00){int['3']}	#NOTE:ASSERT
 test(A00){array{_}}
 test(S00){array{3}}
 test(S00){array{3}=array{3}}
@@ -1578,11 +1578,11 @@ test(F00){(1,2)[x]=3 where allow{x:false}}
 # Uninhabited dot expressions.
 test(N05){int.sym}
 test(S00){f(x:=1=2):=x.blah}
-test(S00){f(x:false):=x.blah} 
+test(S00){f(x:false):=x.blah}
 test(N05){f(x:false,y:int):=y.blah}
 test(S00){f(x:false,y:int):=x.blah}
 test(S00){as:=(1,2)=3 => as.blah}
-test(S00){as:=(1,2)=3 => as[1].blah} 
+test(S00){as:=(1,2)=3 => as[1].blah}
 test(F00){x:=1=2,x.blah}
 test(F00){x.blah,x:=1=2}
 test(F00){x:=allow{1=2},x.blah}
@@ -1833,7 +1833,7 @@ test(S00){a:int => if{expect<decides>{a=1}}}
 #LA test(C00){1(2),reject{"Bad"}}
 #LA test(V02){reject{"Bad"},1(2)}
 #test(V02){r:=reject{r}} #!! Paraconsistency puzzle: What ought WhenCastStep do here? Not suppress ChildFx rejects?
-#then we must be rigorous 
+#then we must be rigorous
 
 #
 # Unresolved unification blocking.
@@ -2084,7 +2084,7 @@ test(F00){f:any => f[_]='x' where assume{f=int}}
 test(A00){x:any,assume{x=2},x+3=5}
 test(F00){x:any,assume{x=2},x+3=6}
 
-# A call that doesn't succeed should block function equality. f[a]=b <=> f=function(a){b}. 
+# A call that doesn't succeed should block function equality. f[a]=b <=> f=function(a){b}.
 test(U00){a:any   => f(x:nat):any => g:=f where allow{g[a]}}
 test(D00){a:int   => f(x:nat):any => g:=f where allow{g[a]}}
 test(S00){a:nat   => f(x:nat):any => g:=f where allow{g[a]}}
@@ -2130,7 +2130,7 @@ test(F00){as:=array{a:=4} => bs:=as where allow{bs[0]=3}}
 test(D00){a&b:int => f(:int)<computes>:int => allow{a=b} where f[a]=f[b]}
 test(D00){a&b:int => f(:int)<computes>:int => allow{a=b} where f(a)=f(b)}
 test(D00){a:int => f(:int)<computes>:int => allow{a=3} where f[a]=f[3]}
-test(D00){a:int => f(:int)<computes>:int => allow{a=3} where if{f[a]}=f[3]} 
+test(D00){a:int => f(:int)<computes>:int => allow{a=3} where if{f[a]}=f[3]}
 
 # Assumption monotonicity.
 test(S00){a:int => if{x:=a=2,expect<succeeds>{x}}}
@@ -2963,7 +2963,7 @@ test(S00){for(x:=10|20,y:ys){x+y}=array{11,12,21,22},ys:=(1,2)}
 #unsound test(S00){for(x:xs,y:ys){x+y}=array{11,12,21,22},ys:=(1,2),xs:=(10,20)}
 test(S00){for(x:xs,y:ys){x+y}=array{11,12,21,22},xs:=(10,20),ys:=(1,2)}
 
-# Ranges. 
+# Ranges.
 test(S00){for{1..3}=array{1,2,3}}
 test(S00){for{3..7}=array{3,4,5,6,7}}
 test(S00){for{1|3..7|12}=array{1,3,4,5,6,7,12}}
@@ -3409,7 +3409,7 @@ test(N04){x:=0,y:int=>x:=1}
 # Not.
 test(S00){not 1=2}
 test(S00){not (1=2)}
-test(F00){not 1=1}
+test(F00){not 1=1}			#NOTE:ASSERT
 test(F00){not 1}
 test(F00){not 1|2}
 
@@ -3723,7 +3723,7 @@ test(X00){f():=Throw(3)}
 #test(S00){function(x:false|int){x}[3]=3}
 #test(S00){function(x:false|prefix'-'){x}[3]=-3}
 test(S00){(3,5,7)[i],i:=1}
-test(F00){(3,5,7)[i],i:=4}
+test(F00){(3,5,7)[i],i:=4}		#NOTE:ASSERT
 test(X00){1|2} # Improve error to I00.
 test(X00){function(1){2|3}} # Same.
 #test(S00){f(x:int,y:=if(x=2){3}else{4}):=(x,y),f[2,3|4]} # Join where fx::Fork disallowed should fall back to test.

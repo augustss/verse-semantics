@@ -10,6 +10,7 @@ module Rules.Verifier(
   icfpeVerifier,
   verify,
   verifyM,
+  wrapAssert,
   ) where
 import TRS.Bind
 import TRS.TRS hiding (step)
@@ -42,13 +43,16 @@ verify sys e =
         Just  x -> x
         Nothing -> undefined
 
--- isDone :: Expr -> Bool
--- isDone = collect done (&&)
---  where
---   -- done (Verify _) = False
---   done (Assert _) = False
---   done (Decide _) = False
---   done _          = True
+wrapAssert :: Expr -> Expr
+wrapAssert e
+  | noChecks e = Assert e
+  | otherwise  = e
+ where
+  -- done (Verify _) = False
+  noChecks        = collect done (&&)
+  done (Assert _) = False
+  done (Decide _) = False
+  done _          = True
 
 -- | `isDone e` ignores "assert/decide" that occur under `verify` which are themselves
 --   under lambdas, as those are obligations for higher-order args that are checked at

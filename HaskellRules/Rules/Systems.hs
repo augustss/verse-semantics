@@ -1,5 +1,5 @@
 module Rules.Systems(ESystem, allSystems, lookupSystemEx, lookupSystem,
-                     TRSystem(..), defaultTRSFlags, isRecursive) where
+                     TRSystem(..), defaultTRSFlags, isRecursive, systemDescr) where
 import Epic.String
 import TRS.System
 import Rules.Core
@@ -22,6 +22,9 @@ allSystems =
   ++ allSystemsBlock
   ++ allSystemsVerify
   ++ allSystemsLeftToRight
+
+systemDescr :: ESystem -> String
+systemDescr s = sname s ++ ": " ++ description s
 
 lookupSystem :: String -> Either String ESystem
 lookupSystem = lookupSystemEx allSystems

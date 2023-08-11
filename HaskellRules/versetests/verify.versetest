@@ -92,3 +92,8 @@ verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo
 
 verify(pass) {f(x:int)<succeeds>:=x/2}
 verify(fail) {f(x:int)<succeeds>:=x/0}
+
+# Tim examples 8/9/2023
+# verify(pass) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
+# verify(pass) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
+# forall x y . exists z . assume{z = x}; z = x; x = y

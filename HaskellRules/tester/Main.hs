@@ -27,8 +27,8 @@ import FrontEnd.Run(run, runM, everySystem, findSystem, blockSystem, adjustFlags
 import Rules.Core(RuleEnv(..))
 import qualified Rules.Core as R
 import Rules.Equiv
-import Rules.Systems(ESystem, TRSystem(..))
-import Rules.Verifier(verifyM)
+import Rules.Systems(ESystem, TRSystem(..), systemDescr)
+import Rules.Verifier(wrapAssert, verifyM)
 import TRS.Traced(Traced, showTrace)
 
 --------------
@@ -570,6 +570,7 @@ timTest :: TestFlags -> FilePath -> IO ()
 timTest tflg fn = do
   file <- readFile fn
   let tests = parseDie pTimTestFile fn file
+  putStrLn $ "Flags" ++ show tflg
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
   putStrLn $ "Number of tests: " ++ show (length tests)
   (skips, oks, bads, dieds) <- unzip4 <$> mapM (runTimTest tflg) (take 1000000 tests)
@@ -613,11 +614,12 @@ runTimTest tflg test | timRun tflg = do
     _                            -> do putStrLn "skip";      pure (1, 0, 0, 0)
 runTimTest tflg test | timVerify tflg = do
   let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False, fNoWarn = True  }
-      e' = preProcess sys (ruleEnv sys) . coreToTrs . desugar flags . timExpr $ test
+      e' = (if True then wrapAssert else id) . preProcess sys (ruleEnv sys) . coreToTrs . desugar flags . timExpr $ test
       sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
       res = verifyM sys e'
       tag = timTag test
       Ident loc stag = tag
+  -- putStrLn ("TRACE: Tim-Test " ++ systemDescr sys ++ " e' = " ++ prettyShow e')
   tres <- tryResult tflg res
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
   let disp trc =
