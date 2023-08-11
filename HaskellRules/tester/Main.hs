@@ -27,7 +27,7 @@ import FrontEnd.Run(run, runM, everySystem, findSystem, blockSystem, adjustFlags
 import Rules.Core(RuleEnv(..))
 import qualified Rules.Core as R
 import Rules.Equiv
-import Rules.Systems(ESystem, TRSystem(..), systemDescr)
+import Rules.Systems(ESystem, TRSystem(..))
 import Rules.Verifier(wrapAssert, verifyM)
 import TRS.Traced(Traced, showTrace)
 
@@ -573,11 +573,13 @@ timTest tflg fn = do
   putStrLn $ "Flags" ++ show tflg
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
   putStrLn $ "Number of tests: " ++ show (length tests)
-  (skips, oks, bads, dieds) <- unzip4 <$> mapM (runTimTest tflg) (take 1000000 tests)
-  printf "%5d skipped\n" (sum skips)
-  printf "%5d OK\n"      (sum oks)
-  printf "%5d bad\n"     (sum bads)
-  printf "%5d died\n"    (sum dieds)
+  status  <- mconcat <$> mapM (runTimTest tflg) (take 1000000 tests)
+  let badFail = sBadFail status
+  let badPass = sBadPass status
+  printf "%5d skipped\n" (sSkip status)
+  printf "%5d OK\n"      (sOK   status)
+  printf "%5d bad (fail=%d, pass=%d)\n" (badFail + badPass) badFail badPass
+  printf "%5d died\n"    (sDied status)
 
 pTimTestFile :: P [TimTest]
 pTimTestFile = skip *> many pTimTest <* eof
@@ -587,8 +589,10 @@ pTimTest =
   pKeyword "test" *> do
     TimTest <$> pParens pIdent <*> (pBlockM <* optional (pOp ";"))
 
-runTimTest :: TestFlags -> TimTest -> IO (Int, Int, Int, Int)
-runTimTest tflg test | Just s <- onlyTest tflg, s /= timTestName test = pure (0,0,0,0)
+
+-- runTimTest :: TestFlags -> TimTest -> IO (Int, Int, Int, Int)
+runTimTest :: TestFlags -> TimTest -> IO TimStatus
+runTimTest tflg test | Just s <- onlyTest tflg, s /= timTestName test = pure mempty
 runTimTest tflg test | timRun tflg = do
   let sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
       flg = (testFlagsToFlags tflg) { fNoWarn = True }
@@ -599,19 +603,19 @@ runTimTest tflg test | timRun tflg = do
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
   case take 1 stag of
     "S" -> case tres of
-             ResOK x | x /= Fail -> do putStrLn "pass, OK";  pure (0, 1, 0, 0)
-                     | otherwise -> do putStrLn "fail, bad"; pure (0, 0, 1, 0)
-             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
+             ResOK x | x /= Fail -> do putStrLn "pass, OK";  pure (mempty {sOK = 1})
+                     | otherwise -> do putStrLn "fail, bad"; pure (mempty {sBadFail = 1})
+             _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
     "F" -> case tres of
-             ResOK x | x == Fail -> do putStrLn "fail, OK";  pure (0, 1, 0, 0)
-                     | otherwise -> do putStrLn "pass, bad"; pure (0, 0, 1, 0)
-             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
+             ResOK x | x == Fail -> do putStrLn "fail, OK";  pure (mempty {sOK = 1})
+                     | otherwise -> do putStrLn "pass, bad"; pure (mempty {sBadPass = 1})
+             _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
     "N" -> case tres of
-             ResOK _             -> do putStrLn "pass, bad"; pure (0, 0, 1, 0)
-             Undefined           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
-             Shadowing           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
-             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
-    _                            -> do putStrLn "skip";      pure (1, 0, 0, 0)
+             ResOK _             -> do putStrLn "pass, bad"; pure (mempty {sBadPass = 1})
+             Undefined           -> do putStrLn "err,  OK";  pure (mempty {sOK = 1})
+             Shadowing           -> do putStrLn "err,  OK";  pure (mempty {sOK = 1})
+             _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
+    _                            -> do putStrLn "skip";      pure (mempty {sSkip = 1})
 runTimTest tflg test | timVerify tflg = do
   let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False, fNoWarn = True  }
       e' = (if True then wrapAssert else id) . preProcess sys (ruleEnv sys) . coreToTrs . desugar flags . timExpr $ test
@@ -627,19 +631,34 @@ runTimTest tflg test | timVerify tflg = do
           putStrLn $ unlines $ showTrace trc
   case take 1 stag of
     "S" -> case tres of
-             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (0, 0, 0, 1)
-             ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (0, 1, 0, 0)
-             ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (0, 0, 1, 0)
-             _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
+             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (mempty {sDied = 1})
+             ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (mempty {sOK = 1})
+             ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (mempty {sBadFail = 1})
+             _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
     "F" -> case tres of
-             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (0, 0, 0, 1)
-             ResOK (Just (True, _)) -> do putStrLn "pass, bad";   pure (0, 0, 1, 0)
-             ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (0, 1, 0, 0)
-             _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
-    _   -> do putStrLn "skip";        pure (1, 0, 0, 0)
+             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (mempty {sDied = 1})
+             ResOK (Just (True, _)) -> do putStrLn "pass, bad";   pure (mempty {sBadPass = 1})
+             ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (mempty {sOK = 1})
+             _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
+    _   -> do putStrLn "skip";        pure (mempty {sSkip = 1})
 
 runTimTest _ _ = error "impossible"
 
+data TimStatus = MkTimStatus {
+    sSkip    :: !Int
+  , sOK      :: !Int
+  , sBadFail :: !Int
+  , sBadPass :: !Int
+  , sDied    :: !Int
+  }
+  deriving (Show)
+
+instance Semigroup TimStatus where
+  MkTimStatus s1 s2 s3 s4 s5 <> MkTimStatus t1 t2 t3 t4 t5 =
+    MkTimStatus (s1+t1) (s2+t2) (s3+t3) (s4+t4) (s5+t5)
+
+instance Monoid TimStatus where
+  mempty = MkTimStatus 0 0 0 0 0
 ---------------------
 
 -- Results of compile&run, with somewhat decoded error messages

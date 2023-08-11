@@ -18,7 +18,7 @@ test(S00){f():type{(:nat)|(:int)} => 0}					# NOTE:???
 # Bringing verifier back up with NEWREGS.
 test(S00){1}
 test(S00){1=1}
-test(F00){1=2}		# NOTE:ASSERT
+test(F00){1=2}
 test(S00){1,2}
 test(S00){1=>2}
 test(S00){x:=1}
@@ -152,7 +152,7 @@ test(D00){f(g():int):int => h()<interacts>:int => assume<decides>{f[h]}}
 test(S00){type{3}?}
 test(A00){int?}
 test(S00){int?=3}
-test(F00){int?='3'}	# NOTE:ASSERT
+test(F00){int?='3'}
 
 # Solving functions with inputs or multiple function confusion.
 #test(F00){1=(2=>3)}
@@ -162,7 +162,7 @@ test(S00){(H->F)(1):=2}
 #test(...){(G->F)(1):=2; G=(1=>2)} # Loops and not a bug: g is identity, so 1=>2 calls self.
 test(S00){(G->F)(1):=2; H:=(1=>2); G=H}
 test(S00){(G->F)(1):int; H:=(1=>3); G=H}
-test(F00){(G->F)(1):=2; H:=(1=>3); G=H}
+test(F00){(G->F)(1):=2; H:=(1=>3); G=H}		#NOTE:TODO
 test(S00){h(1):=2 => {(H->F)(1):=2; H=h}}
 test(A00){(H->F)(1):=2; H[1]} # Can tighten to S00 by implementing input_lambda_variable.
 test(S00){f(g(1):=2):=7 => f[h(1):=2]}
@@ -200,7 +200,7 @@ test(S00){as->bs:=(1,2)}
 test(S00){type{3}?}
 test(A00){int?}
 test(S00){int?=3}
-test(F00){int?='3'}	# NOTE:ASSERT
+test(F00){int?='3'}
 
 # Lack of function unification.
 #if we make function_variable flexible, becomes X00: test(U00){(1=>2)=(1=>2)}
@@ -368,7 +368,7 @@ test(P00){allow{x:false},operator'+'(x)=7}   # Should be S00.
 
 # Array unification.
 test(S00){(1,2)=(1,2)}
-test(F00){(1,2)=(1,3)}						# NOTE:ASSERT
+test(F00){(1,2)=(1,3)}
 test(S00){f(x:int):=x => f(3)=3}
 test(S00){a&b&c&d:int => (a,b)=(1,2) => nat[a]}
 test(S00){f(x&y:int):=(y,x) => f(3,5)=(5,3)}
@@ -739,8 +739,8 @@ test(S00){f(x:int):=x}
 test(S00){f(x:int)<succeeds>:=x,f(3)}
 #
 test(S00){f(x:int)<decides>:=x,f(3)}
-test(F00){f(x:int)<decides>:false,f[3]}
-test(P00){f(x:int)<decides>:false,f(3)}
+test(F00){f(x:int)<decides>:false,f[3]}	#NOTE:FP
+test(P00){f(x:int)<decides>:false,f(3)}	#NOTE:FP
 test(S00){f(x:int)<decides>:=x=3}
 test(S00){f(x:int)<decides>:=x=3,f[3]}
 test(S00){f(x:int)<decides>:=x=3,f(3)}
@@ -771,7 +771,7 @@ test(D00){x:int=3,nat[x]}
 test(S00){x:nat=3,int[x]}
 test(F00){x:int => x=false}
 test(F00){x:int=3,x='c'}
-test(F00){x:int=3,x=false}
+test(F00){x:int=3,x=false}	#NOTE:ASCRIPTION
 
 # Staging with recursive references.
 test(S00){y:=(3,y[0])}
@@ -952,7 +952,7 @@ test(A00){as:=(1,(as,2))}
 test(A00){as:=array{as}}
 test(A00){as:=(1,as),bs:=(1,bs)}
 test(A00){as:=(1,as),bs:=(1,bs),as=bs}
-test(F00){as:=(1,as=2)}		#NOTE:ASSERT
+test(F00){as:=(1,as=2)}
 test(U00){a:any => as:=(1,as=a)}
 
 #
@@ -997,7 +997,7 @@ test(S00){f():int => int[f[]]}
 test(D00){f():int => nat[f[]]}
 
 test(S00){f(x:int)<decides>:=x=3, f[:int]}
-test(F00){f(x:int)<decides>:=x=3, f[:char]}
+test(F00){f(x:int)<decides>:=x=3, f[:char]}	#NOTE:FP
 test(D00){f(x:int)<decides>:=x=3, y:int=>f[y]}
 test(S00){f(x:int)<decides>:=x=3 => f[:int]}
 test(F00){f(x:int)<decides>:=x=3 => f[:char]}
@@ -1019,7 +1019,7 @@ test(D00){f():int=3; char[f[]]} # could be F00
 #test(V10){f():int=3 => int[f[]]} # could be S00
 #test(V10){f():int=3 => nat[f[]]} # could be D00
 #test(V10){f():int=3 => char[f[]]} # could be F00
-test(F00){f():=2=3 => 4}
+test(F00){f():=2=3 => 4}	#NOTE:FP
 test(D00){f(x:int):=x=3 => 4}
 test(S00){f():type{2=3} => 4}
 test(S00){f(x:int):type{x=3} => 4}
@@ -1136,12 +1136,12 @@ test(S00){f(a:comparable):=(3,a) => x:=f(2)}
 # Trivial tests.
 test(S00){3}
 test(S00){3=3}
-test(F00){3=5}	#NOTE:ASSERT
+test(F00){3=5}
 test(S00){-3}
 test(S00){if{123}=123}
-test(F00){if{123}=456}	#NOTE:ASSERT
+test(F00){if{123}=456}
 test(S00){if{2=3}}
-test(F00){if{2=3}=3}	#NOTE:ASSERT
+test(F00){if{2=3}=3}
 test(S00){if(1){2}else{3}=2}
 test(S00){if(1=2){3}else{4}=4}
 test(S00){if(1=2){3}else if(3){4} else{5}=4}
@@ -1150,7 +1150,7 @@ test(S00){if(x:=1){x=1}}
 test(S00){y:=2 where y=2}
 test(S00){y:=2,y=2}
 test(S00){function(1){2}}
-test(F00){f:=function(1){2},f[3]}
+test(F00){f:=function(1){2},f[3]}	#NOTE:ASSERT
 test(S00){int[123]}
 test(S00){int(123)}
 test(S00){int[123],int(123)}
@@ -1159,10 +1159,10 @@ test(S00){f:=function(x:int){x},f(1)}
 test(S00){f:=function(x:=int[x]){x},f(1)}
 test(S00){f:=prefix'-',p:=3,f(p)}
 test(S00){(f:=prefix'-')(p:=3),f,p}
-test(F00){false[0]}		#NOTE:ASSERT
+test(F00){false[0]}
 test(F00){:false}		#NOTE:???
 test(S00){int[0]}
-test(F00){int['x']}		#NOTE:ASSERT
+test(F00){int['x']}
 test(F00){3 => {4=5}}
 test(S00){void()=array{}}
 test(S00){if{2=3}=false}
@@ -1191,9 +1191,9 @@ test(F00){as:=(3,5) => as[0]=5}
 
 # Trivial array flow tests.
 test(S00){123}
-test(F00){123=456}	#NOTE:ASSERT
+test(F00){123=456}
 test(S00){int[3]}
-test(F00){int['3']}	#NOTE:ASSERT
+test(F00){int['3']}
 test(A00){array{_}}
 test(S00){array{3}}
 test(S00){array{3}=array{3}}
@@ -1219,7 +1219,7 @@ test(S00){operator'+'[1,2]}
 test(S00){1+2}
 test(S00){1/2}
 test(F00){1/0}
-test(F00){1+2=5}
+test(F00){1+2=5}	#NOTE:ASSERT
 test(S00){Length(1,2)=2}
 test(S00){void("XYZ")=array{}}
 test(S00){let(x:=1){y:=2,x+y}}
@@ -1348,7 +1348,7 @@ test(S00){type{3}}
 test(S00){type{:int}}
 test(N00){type{x}}
 test(S00){type{3}[3]}
-test(F00){type{3}[4]}
+test(F00){type{3}[4]}	#NOTE:ASSERT
 test(S00){type{:int}[3]}
 test(S00){type{:int}[4]}
 test(F00){type{:int}['c']}
@@ -1356,7 +1356,7 @@ test(S00){type{:prefix'-'}[3]}
 test(S00){type{:prefix'-'}[3]=-3}
 test(F00){type{:prefix'-'}[3]=3}
 test(S00){type{3,4}[3,4]}
-test(F00){type{3,4}[3,5]}
+test(F00){type{3,4}[3,5]}	#NOTE:ASSERT
 
 #
 # Non-Escalating WhenCastStep.
@@ -1686,7 +1686,7 @@ test(S00){x:=2=(3,4) => 1}
 test(S00){x:=2=(3,4) => 1,1}
 test(N00){2=3 => x}
 test(N00){2=3 => x,1}
-test(F00){92=93 => 94=95}
+test(F00){92=93 => 94=95}			# TODO:FP
 test(F00){92=93 => 94=95,91}
 test(F00){92 => 4=5}
 test(F00){92 => 94=95,1}
@@ -1741,7 +1741,6 @@ test(S00){x:=7=9 => x}
 test(S00){x:=7=9 => x=7}
 test(S00){x:=7=9 => x=9}
 test(S00){x:=7=9 => 7=9}
-test(F00){x:=7=9 => 6=8}
 test(F00){x:=7=9 => 6=8}
 
 # No loops.
@@ -3409,7 +3408,7 @@ test(N04){x:=0,y:int=>x:=1}
 # Not.
 test(S00){not 1=2}
 test(S00){not (1=2)}
-test(F00){not 1=1}			#NOTE:ASSERT
+test(F00){not 1=1}
 test(F00){not 1}
 test(F00){not 1|2}
 
@@ -3723,7 +3722,7 @@ test(X00){f():=Throw(3)}
 #test(S00){function(x:false|int){x}[3]=3}
 #test(S00){function(x:false|prefix'-'){x}[3]=-3}
 test(S00){(3,5,7)[i],i:=1}
-test(F00){(3,5,7)[i],i:=4}		#NOTE:ASSERT
+test(F00){(3,5,7)[i],i:=4}
 test(X00){1|2} # Improve error to I00.
 test(X00){function(1){2|3}} # Same.
 #test(S00){f(x:int,y:=if(x=2){3}else{4}):=(x,y),f[2,3|4]} # Join where fx::Fork disallowed should fall back to test.

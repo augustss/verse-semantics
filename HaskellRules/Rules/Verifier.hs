@@ -44,15 +44,15 @@ verify sys e =
         Nothing -> undefined
 
 wrapAssert :: Expr -> Expr
-wrapAssert e
-  | noChecks e = Assert e
-  | otherwise  = e
- where
-  -- done (Verify _) = False
-  noChecks        = collect done (&&)
-  done (Assert _) = False
-  done (Decide _) = False
-  done _          = True
+wrapAssert = Assert
+--  --  | noChecks e = Assert e
+--  --  | otherwise  = e
+--  where
+--   -- done (Verify _) = False
+--   noChecks        = collect done (&&)
+--   done (Assert _) = False
+--   done (Decide _) = False
+--   done _          = True
 
 -- | `isDone e` ignores "assert/decide" that occur under `verify` which are themselves
 --   under lambdas, as those are obligations for higher-order args that are checked at

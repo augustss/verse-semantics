@@ -27,8 +27,7 @@ import Rules.Systems(ESystem, TRSystem(..))
 --import Verifier.Verify
 import Rules.Verifier
 import TRS.Traced(toList, showTrace)
-stemDescr)
-S.Bind(free)
+-- import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
