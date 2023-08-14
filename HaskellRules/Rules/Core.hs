@@ -114,7 +114,7 @@ infix  5 :~:
 instance Pretty Expr where
   pPrintPrec l p (Var v)          = pPrintPrec l p v
   pPrintPrec l p (Int k)          = pPrintPrec l p k
-  pPrintPrec l p (Char k)         = pPrintPrec l p k
+  pPrintPrec _ _ (Char c)         = text (show c)
   pPrintPrec l p (Op o)           = pPrintPrec l p o
   pPrintPrec l _ (Arr es)         = text "<" <> fsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l p (LAM x e)        = maybeParens (p > 0) $ sep [text "\\" <> pPrintPrec l 0 x <> text ".", pPrintPrec l 0 e]
