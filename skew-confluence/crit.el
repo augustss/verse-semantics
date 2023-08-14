@@ -147,8 +147,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2) :id 4)))
             (make-proof :rulename1 'u-lit :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 13
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-lit :path '())))
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-lit :path '())))
             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 14
                         :rowsep "scriptsize"
                         :rewrites1 (list)
@@ -166,8 +166,8 @@
                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2)) :id 3) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2)) :ellipsis t :id 5))
                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2) :id 4)))
             (make-proof :rulename1 'u-tup :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 18
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '())))
             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 19
                         :rowsep "scriptsize"
                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2)) :id 3) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2)) :ellipsis t :id 5))
@@ -2280,24 +2280,27 @@
 	(assumption-conds (mapcar #'second assumptions)))
     ;; (progn (print (cons 'RAW-CONSEQUENT-CONDS consequent-conds)) t)
     ;; (progn (print (cons 'RAW-ASSUMPTION-CONDS assumption-conds)) t)
-    (and (every #'is-a-simple-if-not-in-fvs-condition consequent-conds)
-	 ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
-	 (let ((not-in-fvs-assumption-conds (remove-if-not #'is-a-simple-if-not-in-fvs-condition assumption-conds)))
-	   (and not-in-fvs-assumption-conds
-		;; (progn (print (cons 'NOT-IN-FVS-ASSUMPTION-CONDS not-in-fvs-assumption-conds)) t)
-		(every #'(lambda (cond)
-			   (let ((cvar (second (second (second cond))))
-				 (cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
-			     ;; (print (list 'CVAR cvar 'CFVARS cfvars))
-			     (every #'(lambda (cfvar) (some #'(lambda (assumption)
-								(let ((avar (second (second (second assumption))))
-								      (afvars (apply #'append (mapcar #'term-vars (rest (third (second (second assumption))))))))
-								  ;; (print (list 'AVAR avar 'AFVARS afvars))
-								  (and (eq avar cvar)
-								       (member cfvar afvars))))
-							    not-in-fvs-assumption-conds))
-				    cfvars)))
-		       consequent-conds))))))
+    ;; What follows is not very general (and in particular really doesn't allow for different conditions strategies),
+    ;; but it suffices for our purposes (it picks up "(= k1 k2)" when it needs to, and handles sets of fvs conditions).
+    (or (every #'(lambda (cond) (find-if #'(lambda (assump) (equal assump cond)) assumption-conds)) consequent-conds)
+	(and (every #'is-a-simple-if-not-in-fvs-condition consequent-conds)
+	     ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
+	     (let ((not-in-fvs-assumption-conds (remove-if-not #'is-a-simple-if-not-in-fvs-condition assumption-conds)))
+	       (and not-in-fvs-assumption-conds
+		    ;; (progn (print (cons 'NOT-IN-FVS-ASSUMPTION-CONDS not-in-fvs-assumption-conds)) t)
+		    (every #'(lambda (cond)
+			       (let ((cvar (second (second (second cond))))
+				     (cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
+				 ;; (print (list 'CVAR cvar 'CFVARS cfvars))
+				 (every #'(lambda (cfvar) (some #'(lambda (assumption)
+								    (let ((avar (second (second (second assumption))))
+									  (afvars (apply #'append (mapcar #'term-vars (rest (third (second (second assumption))))))))
+								      ;; (print (list 'AVAR avar 'AFVARS afvars))
+								      (and (eq avar cvar)
+									   (member cfvar afvars))))
+								not-in-fvs-assumption-conds))
+					cfvars)))
+			   consequent-conds)))))))
   
 (defun consequent-conditions (term rw)
   (cond ((null rw) '())
