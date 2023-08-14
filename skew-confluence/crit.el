@@ -1,10 +1,9 @@
 ;;; TO DO
 ;;; contexts: match, join, and submatches
-;;; Control for flipping a diagram
-;;; Row sep and column sep controls
 ;;; Check decreasing diagrams
 ;;; Verify derivation of critical pairs deduced by joinable
-
+;;; Add rewrite rule IDs
+;;; Generate and print substituted conditions
 
 
 ;;; Compute all critical pairs for the Verse Calculus
@@ -17,10 +16,10 @@
 	(op ((quote add) (quote gt)))	;operation
 	(d (k op (tup0) (tup2 v v)))	;data
 	(hnf (d (lam x e)))		;head normal form
-	(x ((quote var)))		;variable
+	(x ((quote var)))		;variable (may also use "y" or "z" or "f" or "g"---see function strip-decorations)
 	(v (x hnf))			;value
 	(eq (e (= v e)))		;expression or equation
-	(e (v (seq eq e) (exists x e) (quote fail) (choice e e) (app v v) (one e) (all e)))))			;expression
+	(e (v (seq eq e) (exists x e) (quote fail) (choice e e) (app v v) (one e) (all e) (replace e x x)))))			;expression
 
 (defstruct context name arg-type result-type alternatives)
 
@@ -40,12 +39,14 @@
 	    (make-context :name 'EX :arg-type 'e :result-type 'e
 			  :alternatives '(HOLE VX (seq EQX e) (seq eq EX) (exists x EX) (choice EX e) (choice e EX) (app VX v) (all v VX) (one EX) (all EX)))))
 
-(defstruct rule name lhs rhs cond (priority 0))
+(defstruct rule name lhs rhs cond)
 
 ;;; Note that primes are used only in rule U-TUP, and that is in conjunction with integer subscripts.
-;;; We may make use of that in function add-primes someday.
+;;; This matters in function add-primes.
 (setq the-rules
-      (list (make-rule :name 'app-add :lhs '(app (quote add) (tup2 k1 k2)) :rhs 'k3 :cond '(compute k3 (+ k1 k2)))
+      (list (make-rule :name 'lam-alpha :lhs '(lam x e) :rhs '(replace (lam x e) x z) :cond '(fresh (not (elt z (fvs e)))))
+            (make-rule :name 'exi-alpha :lhs '(exists x e) :rhs '(replace (exists x e) x z) :cond '(fresh (not (elt z (fvs e)))))
+            (make-rule :name 'app-add :lhs '(app (quote add) (tup2 k1 k2)) :rhs 'k3 :cond '(if (= k3 (+ k1 k2))))
 	    (make-rule :name 'app-gt :lhs '(app (quote gt) (tup2 k1 k2)) :rhs 'k1 :cond '(if (> k1 k2)))
 	    (make-rule :name 'app-gt-fail :lhs '(app (quote gt) (tup2 k1 k2)) :rhs '(quote fail) :cond '(if (not (> k1 k2))))
 	    (make-rule :name 'app-beta :lhs '(app (lam x e) v) :rhs '(exists x (seq (= x v) e)) :cond '(if (not (elt x (fvs v)))))
@@ -61,7 +62,7 @@
 	    ;; (make-rule :name 'unroll :lhs '() :rhs '())
 	    ;; (make-rule :name 'subst :lhs '(seq (= x v) e) :rhs '(seq (= x v) (subst e v x)))
 	    (make-rule :name 'hnf-swap :lhs '(seq (= hnf x) e) :rhs '(seq (= x hnf) e))
-	    (make-rule :name 'var-swap :lhs '(seq (= x1 x2) e) :rhs '(seq (= x2 x1) e))
+	    (make-rule :name 'var-swap :lhs '(seq (= x y) e) :rhs '(seq (= y x) e))
 	    (make-rule :name 'seq-swap :lhs '(seq eq (seq (= x v) e)) :rhs '(seq (= x v) (seq eq e)))
 	    (make-rule :name 'val-elim :lhs '(seq v e) :rhs 'e)
 	    (make-rule :name 'exi-elim :lhs '(exists x e) :rhs 'e :cond '(if (not (elt x (fvs e)))))
@@ -74,7 +75,7 @@
 	    (make-rule :name 'exi-float-r :lhs '(seq eq (exists x e)) :rhs '(exists x (seq eq e)) :cond '(if (not (elt x (fvs eq)))))
 	    (make-rule :name 'eqn-float :lhs '(seq (= x (seq eq e1)) e2) :rhs '(seq eq (seq (= x e1) e2)))
 	    (make-rule :name 'seq-assoc :lhs '(seq (seq eq e1) e2) :rhs '(seq eq (seq e1 e2)))
-	    (make-rule :name 'exi-swap :lhs '(exists x1 (exists x2 e)) :rhs '(exists x2 (exists x1 e)))
+	    (make-rule :name 'exi-swap :lhs '(exists x (exists y e)) :rhs '(exists y (exists x e)))
 	    (make-rule :name 'one-fail :lhs '(one (quote fail)) :rhs '(quote fail))
 	    (make-rule :name 'one-value :lhs '(one v) :rhs 'v)
 	    (make-rule :name 'one-choice :lhs '(one (choice v e)) :rhs 'v)
@@ -83,1359 +84,1542 @@
 	    (make-rule :name 'all-choice-2 :lhs '(all (choice v1 vn)) :rhs '(tup2 v1 vn))
 	    (make-rule :name 'all-choice-3 :lhs '(all (choice v1 (choice v2 v3))) :rhs '(tup3 v1 v2 v3))
 	    (make-rule :name 'all-choice-4 :lhs '(all (choice v1 (choice v2 (choice v3 v4)))) :rhs '(tup4 v1 v2 v3 v4))
+	    (make-rule :name 'split-fail :lhs '(split (quote fail) f g) :rhs '(app f (tup0)))
+	    (make-rule :name 'split-value :lhs '(split v f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) (quote fail))))) :cond '(fresh x))
+	    (make-rule :name 'split-choice :lhs '(split (choice v e) f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) e)))) :cond '(fresh (not (elt x (fvs e)))))
 	    (make-rule :name 'choose-r :lhs '(choice (quote fail) e) :rhs 'e)
 	    (make-rule :name 'choose-l :lhs '(choice e (quote fail)) :rhs 'e)
 	    (make-rule :name 'choose-assoc :lhs '(choice (choice e1 e2) e3) :rhs '(choice e1 (choice e2 e3)))
 	    ;; (make-rule :name 'choose :lhs '() :rhs '())
 	    ))
 
+;;; If members are added to this defstruct, be sure to update print-proof-skeletons and format-rewrites-list.
+(defstruct rewrite rulename path ellipsis id extra)
 
-(defstruct rewrite rulename path ellipsis)
-
+;;; If members are added to this defstruct, be sure to update print-proof-skeletons.
 (defstruct proof rulename1 rulename2 path1
-	   rowsep colsep difficult impossible
+	   id1 id2 extra1 extra2
+	   rowsep colsep flip-diagram difficult
 	   rewrites1 rewrites2 altrewrites1 altrewrites2)
 
-;;; The bulk of this was constructed automatically by function print-proof-skeletons (below).
-;; (print-proof-skeletons the-proofs)
+;;; Some of this was constructed automatically by function print-proof-skeletons (below).
+;;(print-proof-skeletons the-proofs)
 
-(setq the-proofs                ;78 proofs
-      (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()      ;Proof 1
+(setq the-proofs                ;120 proofs
+      (list (make-proof :rulename1 'lam-alpha :rulename2 'app-beta :path1 '(1) :id1 1 :id2 2      ;Proof 1
+			:extra1 'u
+                        :rewrites1 (list (make-rewrite :rulename 'app-beta :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-alpha :path '() :id 4 :extra 'z)))
+            (make-proof :rulename1 'exi-alpha :rulename2 'exi-elim :path1 '() :id1 1 :id2 2      ;Proof 2
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-elim :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+            (make-proof :rulename1 'exi-alpha :rulename2 'eqn-elim :path1 '() :id1 1 :id2 2      ;Proof 3
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+            (make-proof :rulename1 'exi-alpha :rulename2 'exi-float-eq :path1 '(1 2) :id1 1 :id2 2      ;Proof 4
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+            (make-proof :rulename1 'exi-alpha :rulename2 'exi-float-l :path1 '(1) :id1 1 :id2 2      ;Proof 5
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+            (make-proof :rulename1 'exi-alpha :rulename2 'exi-float-r :path1 '(2) :id1 1 :id2 2      ;Proof 6
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+            (make-proof :rulename1 'exi-alpha :rulename2 'exi-swap :path1 '() :id1 1 :id2 2      ;Proof 7
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+            (make-proof :rulename1 'exi-alpha :rulename2 'exi-swap :path1 '(2) :id1 1 :id2 2      ;Proof 8
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+            (make-proof :rulename1 'app-gt :rulename2 'app-gt-fail :path1 '() :id1 1 :id2 2      ;Proof 9
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-            (make-proof :rulename1 'u-lit :rulename2 'fail-elim-r :path1 '()      ;Proof 2
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '() :id1 1 :id2 2      ;Proof 10
+                        :rowsep "scriptsize"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2) :id 4)))
+            (make-proof :rulename1 'u-lit :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 11
+                        :rowsep "scriptsize"
+                        :rewrites1 (list)
+                        :rewrites2 (list))
+            (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 12
+                        :rowsep "scriptsize"
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2) :id 4)))
+            (make-proof :rulename1 'u-lit :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 13
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-lit :path '())))
-            (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()      ;Proof 3
+            (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 14
+                        :rowsep "scriptsize"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-            (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)      ;Proof 4
-                        :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-lit :path '())))
-            (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()      ;Proof 5
-                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2)) :ellipsis t))
-                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
-            (make-proof :rulename1 'u-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 6
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-lit :path '() :id 4)))
+            (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '() :id1 1 :id2 2      ;Proof 15
+                        :rowsep "large" :colsep "normal" :flip-diagram t
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2)) :id 3) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2)) :ellipsis t :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2) :id 4)))
+            (make-proof :rulename1 'u-tup :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 16
+                        :rowsep "scriptsize" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '((high-0-to-n-1 2)) :id 3) (make-rewrite :rulename 'fail-elim-r :path '((low-0-to-n-1 2)) :ellipsis t :id 5))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 17
+                        :rowsep "scriptsize"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2)) :id 3) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2)) :ellipsis t :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2) :id 4)))
+            (make-proof :rulename1 'u-tup :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 18
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-            (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()      ;Proof 7
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2)) :ellipsis t))
-                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
-            (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 8
-                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2))) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2)) :ellipsis t))
-                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '())))
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()      ;Proof 9
+            (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 19
+                        :rowsep "scriptsize"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2)) :id 3) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2)) :ellipsis t :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'u-tup :path '() :id 4)))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '() :id1 1 :id2 2      ;Proof 20
+                        :rowsep "large"
                         :rewrites1 (list)
                         :rewrites2 (list))
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()      ;Proof 10
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '() :id1 1 :id2 2      ;Proof 21
+                        :rowsep "large" :flip-diagram t
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'fail-elim-r :path1 '()      ;Proof 11
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2) :id 4) (make-rewrite :rulename 'fail-elim-r :path '() :id 6)))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 22
+                        :rowsep "normal"
+                        :rewrites1 (list)
+                        :rewrites2 (list))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 23
+                        :rowsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 24
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()      ;Proof 12
-			:rowsep "large"
+            (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 25
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '() :id 4)))
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '() :id1 1 :id2 2      ;Proof 26
+                        :rowsep "large" :colsep "large" :flip-diagram t
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)      ;Proof 13
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '())))
-            (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()      ;Proof 14
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2) :id 4) (make-rewrite :rulename 'fail-elim-r :path '() :id 6)))
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 27
+                        :rowsep "large"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'u-fail-d-op :rulename2 'fail-elim-r :path1 '()      ;Proof 15
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 28
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 29
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-            (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()      ;Proof 16
-			:rowsep "large"
+            (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 30
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '() :id 4)))
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '() :id1 1 :id2 2      ;Proof 31
+                        :rowsep "large" :colsep "large" :flip-diagram t
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)      ;Proof 17
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '())))
-            (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()      ;Proof 18
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2) :id 4) (make-rewrite :rulename 'fail-elim-r :path '() :id 6)))
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 32
+                        :rowsep "large"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'u-fail-tup-k :rulename2 'fail-elim-r :path1 '()      ;Proof 19
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 33
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 34
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-            (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()      ;Proof 20
-			:rowsep "large"
+            (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 35
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '() :id 4)))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '() :id1 1 :id2 2      ;Proof 36
+                        :rowsep "large" :colsep "large" :flip-diagram t
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)      ;Proof 21
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '())))
-            (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()      ;Proof 22
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2) :id 4) (make-rewrite :rulename 'fail-elim-r :path '() :id 6)))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 37
+                        :rowsep "large"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'u-fail-k-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 23
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 38
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 39
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-            (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()      ;Proof 24
-			:rowsep "large"
-                        :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 25
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '())))
-            (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()      ;Proof 26
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
-            (make-proof :rulename1 'hnf-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 27
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+            (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 40
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '() :id 4)))
+            (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '() :id1 1 :id2 2      ;Proof 41
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2) :id 4)))
+            (make-proof :rulename1 'hnf-swap :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 42
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '() :id 3))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 43
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2) :id 4)))
+            (make-proof :rulename1 'hnf-swap :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 44
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-            (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()      ;Proof 28
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
-            (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 29
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '())))
-            (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()      ;Proof 30
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
-            (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 31
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
-            (make-proof :rulename1 'var-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 32
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
+            (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 45
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '() :id 4)))
+            (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '() :id1 1 :id2 2      ;Proof 46
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2) :id 4)))
+            (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2) :id1 1 :id2 2      ;Proof 47
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '() :id 4)))
+            (make-proof :rulename1 'var-swap :rulename2 'eqn-elim :path1 '(2) :id1 1 :id2 2      ;Proof 48
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-            (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()      ;Proof 33
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
-            (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 34
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 35
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '()))
+            (make-proof :rulename1 'var-swap :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 49
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '() :id 3))
                         :rewrites2 (list))
-            (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()      ;Proof 36
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'val-elim :path '(2)))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'DUMMY :path '(2))))
-            (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()      ;Proof 37
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+            (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 50
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2) :id 4)))
+            (make-proof :rulename1 'var-swap :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 51
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+            (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 52
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '() :id 4)))
+            (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2) :id1 1 :id2 2      ;Proof 53
+                        :rowsep "large" :flip-diagram t
+                        :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '(2) :id 3) (make-rewrite :rulename 'seq-swap :path '() :id 5))
                         :rewrites2 (list))
-            (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()      ;Proof 38
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+            (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '() :id1 1 :id2 2      ;Proof 54
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'val-elim :path '(2) :id 3))
                         :rewrites2 (list))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-swap :path1 '(2)      ;Proof 39
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()      ;Proof 40
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
-            (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()      ;Proof 41
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
-            (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)      ;Proof 42
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()) (make-rewrite :rulename 'seq-swap :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()      ;Proof 43
-			:rowsep "large"
+            (make-proof :rulename1 'seq-swap :rulename2 'eqn-elim :path1 '(2) :id1 1 :id2 2      ;Proof 55
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+            (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '() :id1 1 :id2 2      ;Proof 56
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '(2) :id 3) (make-rewrite :rulename 'fail-elim-r :path '() :id 5))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '() :id1 1 :id2 2      ;Proof 57
+                        :rowsep "normal" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '(2) :id 3) (make-rewrite :rulename 'fail-elim-r :path '() :id 5))
+                        :rewrites2 (list))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-swap :path1 '(2) :id1 1 :id2 2      ;Proof 58
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2) :id 4) (make-rewrite :rulename 'fail-elim-r :path '() :id 6)))
+            (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '() :id1 1 :id2 2      ;Proof 59
+                        :rowsep "large" :colsep "normal" :flip-diagram t
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-eq :path '(2) :id 3) (make-rewrite :rulename 'exi-float-r :path '() :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2) :id 4)))
+            (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '() :id1 1 :id2 2      ;Proof 60
+                        :rowsep "large" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '(2) :id 3) (make-rewrite :rulename 'exi-float-r :path '() :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2) :id 4)))
+            (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2) :id1 1 :id2 2      ;Proof 61
+                        :rowsep "large" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '() :id 3) (make-rewrite :rulename 'seq-swap :path '(2) :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2) :id 4) (make-rewrite :rulename 'exi-float-r :path '() :id 6)))
+            (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '() :id1 1 :id2 2      ;Proof 62
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '(2) :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2) :id 4) (make-rewrite :rulename 'seq-swap :path '() :id 6)))
+            (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 63
                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()      ;Proof 44
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 45
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
-            (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()      ;Proof 46
-			:rowsep "large"
+            (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '() :id1 1 :id2 2      ;Proof 64
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2) :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2) :id 4) (make-rewrite :rulename 'seq-swap :path '() :id 6)))
+            (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 65
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3) (make-rewrite :rulename 'seq-assoc :path '(2) :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '(2) :id 4) (make-rewrite :rulename 'seq-swap :path '() :id 6)))
+            (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 66
+                        :rowsep "normal"
                         :rewrites1 (list)
                         :rewrites2 (list))
-            (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()      ;Proof 47
-			:rowsep "large"
+            (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 67
+                        :rowsep "normal"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'val-elim :path '(2))))
-            (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)      ;Proof 48
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'val-elim :path '(2) :id 4)))
+            (make-proof :rulename1 'val-elim :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 68
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
+            (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 69
+                        :rowsep "normal"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'val-elim :path '())))
-            (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()      ;Proof 49
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()      ;Proof 50
-			:rowsep "large"
-                        :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 51
-			:rowsep "large"
-                        :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '(2))))
-            (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 52
-			:rowsep "large"
-                        :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'eqn-elim :path '(2))))
-            (make-proof :rulename1 'fail-elim-eq :rulename2 'fail-elim-r :path1 '()      ;Proof 53
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-            (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()      ;Proof 54
-			:rowsep "large"
-                        :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 55
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '())))
-            (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()      ;Proof 56
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'val-elim :path '() :id 4)))
+            (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '() :id1 1 :id2 2      ;Proof 70
+                        :rowsep "large"
                         :rewrites1 (list)
                         :rewrites2 (list))
-            (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()      ;Proof 57
-			:rowsep "large"
-                        :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 58
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '())))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-eq :path1 '()      ;Proof 59
-			:rowsep "large"
+            (make-proof :rulename1 'exi-elim :rulename2 'exi-float-eq :path1 '(1 2) :id1 1 :id2 2      ;Proof 71
                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()      ;Proof 60
-			:rowsep "large"
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'exi-elim :rulename2 'exi-float-l :path1 '(1) :id1 1 :id2 2      ;Proof 72
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'exi-elim :rulename2 'exi-float-r :path1 '(2) :id1 1 :id2 2      ;Proof 73
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+            (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '() :id1 1 :id2 2      ;Proof 74
+                        :rowsep "large" :flip-diagram t
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-float :path1 '()      ;Proof 61
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '() :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2) :id1 1 :id2 2      ;Proof 75
+                        :rowsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '() :id 4) (make-rewrite :rulename 'exi-elim :path '(2) :id 6)))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-elim :path1 '(2) :id1 1 :id2 2      ;Proof 76
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
+            (make-proof :rulename1 'eqn-elim :rulename2 'exi-float-eq :path1 '(1 2) :id1 1 :id2 2      ;Proof 77
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
+            (make-proof :rulename1 'eqn-elim :rulename2 'exi-float-l :path1 '(1) :id1 1 :id2 2      ;Proof 78
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
+            (make-proof :rulename1 'eqn-elim :rulename2 'exi-float-r :path1 '(2) :id1 1 :id2 2      ;Proof 79
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
+            (make-proof :rulename1 'exi-float-r :rulename2 'eqn-elim :path1 '(2) :id1 1 :id2 2      ;Proof 80
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
+            (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2) :id1 1 :id2 2      ;Proof 81
+                        :rowsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '() :id 4) (make-rewrite :rulename 'eqn-elim :path '(2) :id 6)))
+            (make-proof :rulename1 'fail-elim-eq :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 82
+                        :rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list))
+            (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 83
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'fail-elim-eq :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 84
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
+            (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 85
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '() :id 4)))
+            (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '() :id1 1 :id2 2      ;Proof 86
+                        :rowsep "large"
+                        :rewrites1 (list)
+                        :rewrites2 (list))
+            (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 87
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'fail-elim-l :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 88
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
+            (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 89
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 4)))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-eq :path1 '() :id1 1 :id2 2      ;Proof 90
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '() :id1 1 :id2 2      ;Proof 91
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-float :path1 '() :id1 1 :id2 2      ;Proof 92
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list)
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2) :id 4) (make-rewrite :rulename 'fail-elim-r :path '() :id 6)))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 93
                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()      ;Proof 62
-			:rowsep "large"
+            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '() :id1 1 :id2 2      ;Proof 94
+                        :rowsep "large" :colsep "large" :flip-diagram t
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 63
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
-                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-            (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()      ;Proof 64
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
-            (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 65
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '())))
-            (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()      ;Proof 66
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
-            (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 67
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '())))
-            (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()      ;Proof 68
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2) :id 4) (make-rewrite :rulename 'fail-elim-r :path '() :id 6)))
+            (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 95
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2) :id 4) (make-rewrite :rulename 'fail-elim-r :path '() :id 6)))
+            (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 96
+                        :rowsep "large" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2) :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '(2) :id 4) (make-rewrite :rulename 'exi-swap :path '() :id 6)))
+            (make-proof :rulename1 'exi-float-eq :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 97
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
+            (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 98
+                        :rowsep "large" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '() :id 3) (make-rewrite :rulename 'seq-assoc :path '(2) :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '() :id 4)))
+            (make-proof :rulename1 'exi-swap :rulename2 'exi-float-eq :path1 '(1 2) :id1 1 :id2 2      ;Proof 99
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
+            (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '() :id1 1 :id2 2      ;Proof 100
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2) :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2) :id 4) (make-rewrite :rulename 'exi-swap :path '() :id 6)))
+            (make-proof :rulename1 'exi-float-l :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 101
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
+            (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 102
+                        :rowsep "large" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '() :id 3) (make-rewrite :rulename 'seq-assoc :path '(2) :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '() :id 4)))
+            (make-proof :rulename1 'exi-swap :rulename2 'exi-float-l :path1 '(1) :id1 1 :id2 2      ;Proof 103
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
+            (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '() :id1 1 :id2 2      ;Proof 104
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '(2) :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2) :id 4) (make-rewrite :rulename 'exi-float-r :path '() :id 6)))
+            (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 105
                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-            (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()      ;Proof 69
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
-            (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 70
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
-            (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)      ;Proof 71
-			:rowsep "large"
-                        :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+            (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '() :id1 1 :id2 2      ;Proof 106
+                        :rowsep "large" :colsep "large" :flip-diagram t
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2) :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2) :id 4) (make-rewrite :rulename 'exi-float-r :path '() :id 6)))
+            (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 107
+                        :rowsep "large" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '() :id 3) (make-rewrite :rulename 'seq-assoc :path '(2) :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2) :id 4) (make-rewrite :rulename 'exi-float-r :path '() :id 6)))
+            (make-proof :rulename1 'exi-swap :rulename2 'exi-float-r :path1 '(2) :id1 1 :id2 2      ;Proof 108
+                        :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
+            (make-proof :rulename1 'eqn-float :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 109
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-            (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)      ;Proof 72
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '())))
-            (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)      ;Proof 73
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '())))
-            (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()      ;Proof 74
-			:rowsep "large"
+            (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 110
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3) (make-rewrite :rulename 'seq-assoc :path '(2) :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'eqn-float :path '() :id 4)))
+            (make-proof :rulename1 'seq-assoc :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 111
+                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
+            (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 112
+                        :rowsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3) (make-rewrite :rulename 'seq-assoc :path '(2) :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '() :id 4)))
+            (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2) :id1 1 :id2 2      ;Proof 113
+                        :rowsep "normal"
+                        :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2) :id 3))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '() :id 4)))
+            (make-proof :rulename1 'choose-l :rulename2 'one-choice :path1 '(1) :id1 1 :id2 2      ;Proof 114
+                        :rewrites1 (list 'X (make-rewrite :rulename 'one-choice :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+            (make-proof :rulename1 'choose-l :rulename2 'split-choice :path1 '(1) :id1 1 :id2 2      ;Proof 115
+                        :rewrites1 (list 'X (make-rewrite :rulename 'split-choice :path '()))
+                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+            (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '() :id1 1 :id2 2      ;Proof 116
+                        :rowsep "normal"
                         :rewrites1 (list)
                         :rewrites2 (list))
-            (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)      ;Proof 75
-			:rowsep "large"
+            (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 117
+                        :rowsep "normal"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'choose-r :path '())))
-            (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()      ;Proof 76
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'choose-r :path '() :id 4)))
+            (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '() :id1 1 :id2 2      ;Proof 118
+                        :rowsep "normal"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'choose-l :path '(2))))
-            (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)      ;Proof 77
-			:rowsep "large"
+                        :rewrites2 (list (make-rewrite :rulename 'choose-l :path '(2) :id 4)))
+            (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 119
+                        :rowsep "normal"
                         :rewrites1 (list)
-                        :rewrites2 (list (make-rewrite :rulename 'choose-r :path '(2))))
-            (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)      ;Proof 78
-			:rowsep "large"
-                        :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '()) (make-rewrite :rulename 'choose-assoc :path '(2)))
-                        :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '())))))
+                        :rewrites2 (list (make-rewrite :rulename 'choose-r :path '(2) :id 4)))
+            (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 120
+                        :rowsep "large" :colsep "large"
+                        :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '() :id 3) (make-rewrite :rulename 'choose-assoc :path '(2) :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '() :id 4)))))
 
-;; (setq the-proofs                ;66 proofs
-;;       (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()      ;Proof 1
+;; (setq the-proofs                ;119 proofs
+;;       (list (make-proof :rulename1 'lam-alpha :rulename2 'app-beta :path1 '()      ;Proof 1
+;;                         :rewrites1 (list (make-rewrite :rulename 'app-beta :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-alpha :path '())))
+;;             (make-proof :rulename1 'exi-alpha :rulename2 'exi-elim :path1 '()      ;Proof 2
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+;;             (make-proof :rulename1 'exi-alpha :rulename2 'eqn-elim :path1 '()      ;Proof 3
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+;;             (make-proof :rulename1 'exi-alpha :rulename2 'exi-float-eq :path1 '(1 2)      ;Proof 4
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+;;             (make-proof :rulename1 'exi-alpha :rulename2 'exi-float-l :path1 '(1)      ;Proof 5
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+;;             (make-proof :rulename1 'exi-alpha :rulename2 'exi-float-r :path1 '(2)      ;Proof 6
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+;;             (make-proof :rulename1 'exi-alpha :rulename2 'exi-swap :path1 '()      ;Proof 7
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+;;             (make-proof :rulename1 'exi-alpha :rulename2 'exi-swap :path1 '(2)      ;Proof 8
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
+;;             (make-proof :rulename1 'app-gt :rulename2 'app-gt-fail :path1 '()      ;Proof 9
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()      ;Proof 10
+;;                         :rowsep "scriptsize"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()      ;Proof 2
+;;             (make-proof :rulename1 'u-lit :rulename2 'fail-elim-r :path1 '()      ;Proof 11
+;;                         :rowsep "scriptsize"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()      ;Proof 12
+;;                         :rowsep "scriptsize"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)      ;Proof 3
+;;             (make-proof :rulename1 'u-lit :rulename2 'eqn-float :path1 '(1 2)      ;Proof 13
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-lit :path '())))
+;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)      ;Proof 14
+;;                         :rowsep "scriptsize"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()      ;Proof 4
-;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()      ;Proof 15
+;;                         :rowsep "large" :colsep "normal" :flip-diagram t
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2)) :ellipsis t))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
-;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()      ;Proof 5
-;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 16
+;;                         :rowsep "scriptsize" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'fail-elim-r :path '((low-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()      ;Proof 17
+;;                         :rowsep "scriptsize"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2)) :ellipsis t))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 6
-;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2))) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'eqn-float :path1 '(1 2)      ;Proof 18
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 19
+;;                         :rowsep "scriptsize"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2))) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2)) :ellipsis t))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()      ;Proof 7
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()      ;Proof 20
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()      ;Proof 8
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()      ;Proof 21
+;;                         :rowsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()      ;Proof 9
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'fail-elim-r :path1 '()      ;Proof 22
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()      ;Proof 23
+;;                         :rowsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)      ;Proof 10
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'eqn-float :path1 '(1 2)      ;Proof 24
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)      ;Proof 25
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()      ;Proof 11
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()      ;Proof 26
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()      ;Proof 12
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'fail-elim-r :path1 '()      ;Proof 27
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()      ;Proof 28
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)      ;Proof 13
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'eqn-float :path1 '(1 2)      ;Proof 29
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)      ;Proof 30
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()      ;Proof 14
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()      ;Proof 31
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()      ;Proof 15
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'fail-elim-r :path1 '()      ;Proof 32
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()      ;Proof 33
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)      ;Proof 16
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'eqn-float :path1 '(1 2)      ;Proof 34
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)      ;Proof 35
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()      ;Proof 17
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()      ;Proof 36
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()      ;Proof 18
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 37
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()      ;Proof 38
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 19
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'eqn-float :path1 '(1 2)      ;Proof 39
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 40
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()      ;Proof 20
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()      ;Proof 41
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()      ;Proof 21
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 42
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()      ;Proof 43
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 22
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'eqn-float :path1 '(1 2)      ;Proof 44
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 45
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()      ;Proof 23
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()      ;Proof 46
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 24
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 47
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()      ;Proof 25
+;;             (make-proof :rulename1 'var-swap :rulename2 'eqn-elim :path1 '(2)      ;Proof 48
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 49
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()      ;Proof 50
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 26
+;;             (make-proof :rulename1 'var-swap :rulename2 'eqn-float :path1 '(1 2)      ;Proof 51
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 52
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 27
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 53
+;;                         :rowsep "large" :flip-diagram t
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '()))
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()      ;Proof 28
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'val-elim :path '(2)))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'DUMMY :path '(2))))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()      ;Proof 29
+;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()      ;Proof 54
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'val-elim :path '(2)))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-elim :path1 '(2)      ;Proof 55
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()      ;Proof 56
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()      ;Proof 30
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()      ;Proof 57
+;;                         :rowsep "normal" :colsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()      ;Proof 31
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-swap :path1 '(2)      ;Proof 58
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()      ;Proof 59
+;;                         :rowsep "large" :colsep "normal" :flip-diagram t
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()      ;Proof 32
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()      ;Proof 60
+;;                         :rowsep "large" :colsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)      ;Proof 33
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)      ;Proof 61
+;;                         :rowsep "large" :colsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()) (make-rewrite :rulename 'seq-swap :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()      ;Proof 34
+;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()      ;Proof 62
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '(1 2)      ;Proof 63
 ;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
 ;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()      ;Proof 35
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()      ;Proof 64
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 36
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 65
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()      ;Proof 37
+;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()      ;Proof 66
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()      ;Proof 38
+;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()      ;Proof 67
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'val-elim :path '(2))))
-;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)      ;Proof 39
+;;             (make-proof :rulename1 'val-elim :rulename2 'eqn-float :path1 '(1 2)      ;Proof 68
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
+;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)      ;Proof 69
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()      ;Proof 40
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()      ;Proof 70
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-float-eq :path1 '(1 2)      ;Proof 71
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
 ;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()      ;Proof 41
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-float-l :path1 '(1)      ;Proof 72
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-float-r :path1 '(2)      ;Proof 73
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()      ;Proof 74
+;;                         :rowsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 42
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 75
+;;                         :rowsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '(2))))
-;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 43
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-elim :path1 '(2)      ;Proof 76
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-float-eq :path1 '(1 2)      ;Proof 77
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
+;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-float-l :path1 '(1)      ;Proof 78
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
+;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-float-r :path1 '(2)      ;Proof 79
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-elim :path1 '(2)      ;Proof 80
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 81
+;;                         :rowsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'eqn-elim :path '(2))))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()      ;Proof 44
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'fail-elim-r :path1 '()      ;Proof 82
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()      ;Proof 83
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 45
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'eqn-float :path1 '(1 2)      ;Proof 84
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 85
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()      ;Proof 46
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()      ;Proof 86
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()      ;Proof 47
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()      ;Proof 87
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 48
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'eqn-float :path1 '(1 2)      ;Proof 88
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 89
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()      ;Proof 49
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-eq :path1 '()      ;Proof 90
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()      ;Proof 50
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()      ;Proof 91
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-float :path1 '()      ;Proof 92
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 51
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-float :path1 '(1 2)      ;Proof 93
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()      ;Proof 94
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 95
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()      ;Proof 52
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()      ;Proof 96
+;;                         :rowsep "large" :colsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 53
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'eqn-float :path1 '(1 2)      ;Proof 97
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 98
+;;                         :rowsep "large" :colsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()      ;Proof 54
+;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-float-eq :path1 '(1 2)      ;Proof 99
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()      ;Proof 100
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 55
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'eqn-float :path1 '(1 2)      ;Proof 101
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 102
+;;                         :rowsep "large" :colsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()      ;Proof 56
+;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-float-l :path1 '(1)      ;Proof 103
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()      ;Proof 104
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '(1 2)      ;Proof 105
 ;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
 ;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()      ;Proof 57
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()      ;Proof 106
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 58
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 107
+;;                         :rowsep "large" :colsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)      ;Proof 59
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
+;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-float-r :path1 '(2)      ;Proof 108
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'eqn-float :rulename2 'eqn-float :path1 '(1 2)      ;Proof 109
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
 ;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)      ;Proof 60
+;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)      ;Proof 110
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'eqn-float :path '())))
+;;             (make-proof :rulename1 'seq-assoc :rulename2 'eqn-float :path1 '(1 2)      ;Proof 111
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
+;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)      ;Proof 112
+;;                         :rowsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '())))
-;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)      ;Proof 61
+;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)      ;Proof 113
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()      ;Proof 62
+;;             (make-proof :rulename1 'choose-l :rulename2 'one-choice :path1 '(1)      ;Proof 114
+;;                         :rewrites1 (list 'X (make-rewrite :rulename 'one-choice :path '()))
+;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()      ;Proof 115
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)      ;Proof 63
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)      ;Proof 116
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()      ;Proof 64
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()      ;Proof 117
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'choose-l :path '(2))))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)      ;Proof 65
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)      ;Proof 118
+;;                         :rowsep "normal"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'choose-r :path '(2))))
-;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)      ;Proof 66
+;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)      ;Proof 119
+;;                         :rowsep "large" :colsep "large"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '()) (make-rewrite :rulename 'choose-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '())))))
 
-
-
-
-;; (setq the-proofs                ;66 proofs
-;;       (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()
+;; (setq the-proofs                ;79 proofs
+;;       (list (make-proof :rulename1 'app-gt :rulename2 'app-gt-fail :path1 '()      ;Proof 1
+;;                         :impossible "Rule \\rulename{app-gt} can apply to the common term only if $|k1 > k2|$,
+;;                                      but rule \\rulename{app-gt-fail} can apply to the common term only if $|k1 <= k2|$."
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()      ;Proof 2
+;; 			:rowsep "scriptsize"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()
+;;             (make-proof :rulename1 'u-lit :rulename2 'fail-elim-r :path1 '()      ;Proof 3
+;; 			:rowsep "scriptsize"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()      ;Proof 4
+;; 			:rowsep "scriptsize"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)
+;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)      ;Proof 5
+;; 			:rowsep "scriptsize"
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()      ;Proof 6
+;; 			:rowsep "large" :colsep "normal" :flip-diagram t
 ;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2)) :ellipsis t))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
-;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()
+;;             (make-proof :rulename1 'u-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 7
+;; 			:rowsep "scriptsize" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'fail-elim-r :path '((low-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()      ;Proof 8
+;; 			:rowsep "scriptsize"
 ;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2)) :ellipsis t))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()
-;;                         :rewrites1 ()
-;;                         :rewrites2 ())
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'val-elim :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
-;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-assoc :path '())))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 9
+;; 			:rowsep "scriptsize"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2))) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()      ;Proof 10
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()      ;Proof 11
+;;                         :rowsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'fail-elim-r :path1 '()      ;Proof 12
+;; 			:rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()      ;Proof 13
+;;                         :rowsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)      ;Proof 14
+;; 			:rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()      ;Proof 15
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'fail-elim-r :path1 '()      ;Proof 16
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()      ;Proof 17
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)      ;Proof 18
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()      ;Proof 19
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'fail-elim-r :path1 '()      ;Proof 20
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()      ;Proof 21
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)      ;Proof 22
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()      ;Proof 23
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 24
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()      ;Proof 25
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 26
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '())))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()      ;Proof 27
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 28
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()      ;Proof 29
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 30
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()      ;Proof 31
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 32
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 33
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()      ;Proof 34
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 35
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 36
+;;                         :rowsep "large" :flip-diagram t
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()      ;Proof 37
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'val-elim :path '(2)))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()      ;Proof 38
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()      ;Proof 39
+;;                         :rowsep "normal" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-swap :path1 '(2)      ;Proof 40
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()      ;Proof 41
+;;                         :rowsep "large" :colsep "normal" :flip-diagram t
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()      ;Proof 42
+;;                         :rowsep "large" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)      ;Proof 43
+;;                         :rowsep "large" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()) (make-rewrite :rulename 'seq-swap :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()      ;Proof 44
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()      ;Proof 45
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 46
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()      ;Proof 47
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()      ;Proof 48
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'val-elim :path '(2))))
+;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)      ;Proof 49
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'val-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()      ;Proof 50
+;;                         :rowsep "large"
+;;                         :impossible "Rule \\rulename{EQN-ELIM} can apply to the common term only if $|x| \\equiv |x'|$,
+;;                                      but rule \rulename{exi-elim} can apply to the common term only if $|x| \\not\\equiv |x'|$."
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()      ;Proof 51
+;;                         :rowsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 52
+;;                         :rowsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '(2))))
+;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 53
+;;                         :rowsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'eqn-elim :path '(2))))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'fail-elim-r :path1 '()      ;Proof 54
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()      ;Proof 55
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 56
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()      ;Proof 57
+;;                         :rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()      ;Proof 58
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 59
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-eq :path1 '()      ;Proof 60
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()      ;Proof 61
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-float :path1 '()      ;Proof 62
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()      ;Proof 63
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 64
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()      ;Proof 65
+;;                         :rowsep "large" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 66
+;;                         :rowsep "large" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()      ;Proof 67
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 68
+;;                         :rowsep "large" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()      ;Proof 69
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()      ;Proof 70
+;;                         :rowsep "large" :colsep "large" :flip-diagram t
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 71
+;;                         :rowsep "large" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)      ;Proof 72
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'eqn-float :path '())))
+;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)      ;Proof 73
+;;                         :rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '())))
+;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)      ;Proof 74
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()      ;Proof 75
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)      ;Proof 76
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-r :path '())))
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()      ;Proof 77
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-l :path '(2))))
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)      ;Proof 78
+;;                         :rowsep "normal"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-r :path '(2))))
+;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)      ;Proof 79
+;;                         :rowsep "large" :colsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '()) (make-rewrite :rulename 'choose-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '())))))
 
-
-
-;; (setq the-proofs                ;66 proofs
-;;       (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()
+;; (setq the-proofs                ;78 proofs
+;;       (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()      ;Proof 1
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+;;             (make-proof :rulename1 'u-lit :rulename2 'fail-elim-r :path1 '()      ;Proof 2
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()      ;Proof 3
+;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)
+;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)      ;Proof 4
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '())))
-;;             (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-lit :path '())))
-;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-lit :path '())))
-;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-lit :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()      ;Proof 5
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'seq-swap :path '((low-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 6
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'fail-elim-r :path '((low-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()      ;Proof 7
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '((high-0-to-n-1 2))) (make-rewrite :rulename 'exi-float-r :path '((low-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '(2))))
+;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 8
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '((low-0-to-n-1 2))) (make-rewrite :rulename 'seq-assoc :path '((high-0-to-n-1 2)) :ellipsis t))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-tup :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()      ;Proof 9
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'val-elim :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-eq :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
-;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-assoc :path '())))))
-
-
-
-;; (setq the-proofs                ;66 proofs
-;;       (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'u-lit :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 ())
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'u-tup :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()
-;;                         :rewrites1 ()
-;;                         :rewrites2 ())
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'hnf-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'var-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'var-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
-;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
-;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-assoc :path '())))))
-
-;; (setq the-proofs   ;; HAND DONE
-;;       (list (make-proof :rulename1 'u-lit :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list (make-rewrite :rulename 'u-lit :path '(2))))
-;;             (make-proof :rulename1 'u-lit :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-tup :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'u-fail-d-op :path1 '()
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap :path1 '()      ;Proof 10
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'fail-elim-r :path1 '()      ;Proof 11
 ;;                         :rewrites1 (list)
 ;;                         :rewrites2 (list))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap-s :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-s :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap-s :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-s :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap-n :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
-;;             (make-proof :rulename1 'seq-swap-s :rulename2 'seq-swap-s :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-s :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap-s :path '())))
-;;             (make-proof :rulename1 'seq-swap-s :rulename2 'seq-swap-n :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap-s :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap-s :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-s :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'seq-swap-s :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap-s :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap-n :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'exi-float-r :path1 '()      ;Proof 12
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1)      ;Proof 13
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-swap :path1 '()      ;Proof 14
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'fail-elim-r :path1 '()      ;Proof 15
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'exi-float-r :path1 '()      ;Proof 16
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1)      ;Proof 17
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-swap :path1 '()      ;Proof 18
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'fail-elim-r :path1 '()      ;Proof 19
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'exi-float-r :path1 '()      ;Proof 20
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1)      ;Proof 21
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-swap :path1 '()      ;Proof 22
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'fail-elim-r :path1 '()      ;Proof 23
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'exi-float-r :path1 '()      ;Proof 24
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1)      ;Proof 25
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '())))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-swap :path1 '()      ;Proof 26
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 27
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'exi-float-r :path1 '()      ;Proof 28
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2))))
+;;             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 29
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '()      ;Proof 30
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 31
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'var-swap :rulename2 'fail-elim-r :path1 '()      ;Proof 32
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'var-swap :rulename2 'exi-float-r :path1 '()      ;Proof 33
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2))))
+;;             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 34
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-swap :path1 '(2)      ;Proof 35
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'val-elim :path1 '()      ;Proof 36
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'val-elim :path '(2)))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-eq :path1 '()      ;Proof 37
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'fail-elim-l :path1 '()      ;Proof 38
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-swap :path1 '(2)      ;Proof 39
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-eq :path1 '()      ;Proof 40
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'exi-float-l :path1 '()      ;Proof 41
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2))))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-swap :path1 '(2)      ;Proof 42
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '()) (make-rewrite :rulename 'seq-swap :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'eqn-float :path1 '()      ;Proof 43
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '()      ;Proof 44
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-swap :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'seq-swap :rulename2 'seq-assoc :path1 '(1)      ;Proof 45
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '(2)) (make-rewrite :rulename 'seq-swap :path '())))
+;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()      ;Proof 46
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()      ;Proof 47
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'val-elim :path '(2))))
+;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)      ;Proof 48
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'val-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()      ;Proof 49
+;; 			:rowsep "large"
+;; 			:impossible "Rule \\rulename{EQN-ELIM} can apply to the common term only if $|x| \\equiv |x'|$,
+;;                                      but rule \\rulename{exi-elim} can apply to the common term only if $|x| \\not\\equiv |x'|$."
+;;                         :rewrites1 (list (make-rewrite :rulename 'eqn-elim :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()      ;Proof 50
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 51
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'exi-elim :path '(2))))
+;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)      ;Proof 52
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '()) (make-rewrite :rulename 'eqn-elim :path '(2))))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'fail-elim-r :path1 '()      ;Proof 53
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()      ;Proof 54
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 55
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-eq :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()      ;Proof 56
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()      ;Proof 57
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 58
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-eq :path1 '()      ;Proof 59
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()      ;Proof 60
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'exi-elim :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'eqn-float :path1 '()      ;Proof 61
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()      ;Proof 62
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-r :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 63
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '()))
+;;                         :rewrites2 (list (make-rewrite :rulename 'fail-elim-l :path '(2)) (make-rewrite :rulename 'fail-elim-r :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()      ;Proof 64
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)      ;Proof 65
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-eq :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()      ;Proof 66
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)      ;Proof 67
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()      ;Proof 68
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()      ;Proof 69
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-r :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)      ;Proof 70
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-float-l :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-float-l :path '(2)) (make-rewrite :rulename 'exi-float-r :path '())))
+;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)      ;Proof 71
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
 ;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-swap-n :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-swap-n :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
-;;             (make-proof :rulename1 'seq-swap-n :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-swap-n :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'fail-elim-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'val-elim :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'val-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'eqn-elim :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-elim :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'exi-elim :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-elim :path '())))
-;;             (make-proof :rulename1 'eqn-elim :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-elim :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-eq :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-eq :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'fail-elim-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'fail-elim-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-l :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-l :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'exi-float-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'fail-elim-r :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'fail-elim-r :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-eq :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-eq :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'exi-float-r :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-float-r :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-l :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-l :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'eqn-float :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'exi-float-r :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-float-r :path '())))
-;;             (make-proof :rulename1 'eqn-float :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'eqn-float :path '())))
-;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'seq-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'seq-assoc :path '())))
-;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-swap :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-swap :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-l :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-r :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
-;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)
-;;                         :rewrites1 (list 'X (make-rewrite :rulename 'choose-assoc :path '()))
-;;                         :rewrites2 (list 'X (make-rewrite :rulename 'choose-assoc :path '())))))
-
+;;             (make-proof :rulename1 'seq-assoc :rulename2 'seq-assoc :path1 '(1)      ;Proof 72
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '()) (make-rewrite :rulename 'seq-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'seq-assoc :path '())))
+;;             (make-proof :rulename1 'exi-swap :rulename2 'exi-swap :path1 '(2)      ;Proof 73
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '())))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '()      ;Proof 74
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list))
+;;             (make-proof :rulename1 'choose-r :rulename2 'choose-assoc :path1 '(1)      ;Proof 75
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-r :path '())))
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '()      ;Proof 76
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-l :path '(2))))
+;;             (make-proof :rulename1 'choose-l :rulename2 'choose-assoc :path1 '(1)      ;Proof 77
+;; 			:rowsep "large"
+;;                         :rewrites1 (list)
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-r :path '(2))))
+;;             (make-proof :rulename1 'choose-assoc :rulename2 'choose-assoc :path1 '(1)      ;Proof 78
+;; 			:rowsep "large"
+;;                         :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '()) (make-rewrite :rulename 'choose-assoc :path '(2)))
+;;                         :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '())))))
 
 (defun canonical-nt (nt)
   (intern (strip-decorations (symbol-name nt))))
 
 (defun strip-decorations (str)
   (let ((n (length str)))
-    (cond ((string= str "vn") "v")   ;; Support the special n-tuple hack
+    (cond ((string= str "vn") "v")   ; Support the special n-tuple hack
+	  ((or (string= str "y")     ; Special hack for variables:
+	       (string= str "z")     ;  "y" and "z" and "f" and "g"
+	       (string= str "f")     ;  are considered to be "decorated"
+	       (string= str "g"))    ;  versions of "x".
+	   "x")
 	  ((cl-digit-char-p (elt str (- n 1)))
            (strip-decorations (substring str 0 (- n 1))))
           ((and (> n 5) (string= (downcase (substring str (- n 5) n)) "prime"))
@@ -1503,9 +1687,32 @@
 ;;; On success, return 3-list (N, sigma1, sigma2) such that N = unify(t1, t2), sigma1(t1)=N, and sigma2(t2)=N.
 ;;; (When matching metavariables, prefers metavariables from t2 for use in the joined term N.)
 ;;; On failure, return nil.
+;;; Cleans up renamings of variables in the substitutions.
 (defun joinable (t1 t2)
-  (unless t1 (error "joinable: null term t1"))
-  (unless t2 (error "joinable: null term t2"))
+  (let ((res (subjoinable t1 t2)))
+    (and res
+	 (let ((sigma1
+		(remove-if #'(lambda (entry) (eq (car entry) (cdr entry)))
+			   (mapcar #'(lambda (entry) (cons (car entry)
+							   (sublis (joinresult-sigma2 res) (cdr entry))))
+				   (joinresult-sigma1 res))))
+	       (sigma2
+		(mapcar #'(lambda (entry) (if (atom (cdr entry))
+					      entry
+					    (cons (car entry)
+						  (sublis (joinresult-sigma1 res) (cdr entry)))))
+			(joinresult-sigma2 res))))
+	   ;; (print (list 'JOINABLE sigma1 sigma2 (joinresult-N res) (sublis sigma1 (sublis sigma2 (joinresult-N res)))))
+	   (make-joinresult :N (sublis sigma1 (sublis sigma2 (joinresult-N res)))
+			    :sigma1 sigma1
+			    :sigma2 sigma2)))))
+
+;;; On success, return 3-list (N, sigma1, sigma2) such that N = unify(t1, t2), sigma1(t1)=N, and sigma2(t2)=N.
+;;; (When matching metavariables, prefers metavariables from t2 for use in the joined term N.)
+;;; On failure, return nil.
+(defun subjoinable (t1 t2)  
+  (unless t1 (error "subjoinable: null term t1"))
+  (unless t2 (error "subjoinable: null term t2"))
   (cond ((and (atom t1) (atom t2))
 	 (let ((c1 (canonical-nt t1))
 	       (c2 (canonical-nt t2)))
@@ -1517,43 +1724,73 @@
 		  (make-joinresult :N t2 :sigma1 (list (cons t1 t2)) :sigma2 '()))
 		 (t nil))))
         ((atom t1)
-         (let ((sj (find-if #'identity (mapcar #'(lambda (opt1) (joinable opt1 t2)) (nt-lookup t1)))))
+         (let ((sj (find-if #'identity (mapcar #'(lambda (opt1) (subjoinable opt1 t2)) (nt-lookup t1)))))
            (and sj (make-joinresult :N t2 :sigma1 (list (cons t1 t2)) :sigma2 '()))))
         ((atom t2)
-         (let ((sj (find-if #'identity (mapcar #'(lambda (opt2) (joinable t1 opt2)) (nt-lookup t2)))))
+         (let ((sj (find-if #'identity (mapcar #'(lambda (opt2) (subjoinable t1 opt2)) (nt-lookup t2)))))
            (and sj (make-joinresult :N t1 :sigma1 '() :sigma2 (list (cons t2 t1))))))
         ((eq (first t1) (first t2))
          (cond ((eq (first t1) 'quote)
                 (and (eq (second t1) (second t2))
                      (make-joinresult :N t1 :sigma1 '() :sigma2 '())))
-	       (t (let ((sjs (cl-mapcar #'joinable (rest t1) (rest t2))))
+	       (t (let ((sjs (cl-mapcar #'subjoinable (rest t1) (rest t2))))
                     (and (every #'identity sjs)
                          (make-joinresult :N (cons (first t1) (mapcar #'joinresult-N sjs))
 					  :sigma1 (apply #'append (mapcar #'joinresult-sigma1 sjs))
 					  :sigma2 (apply #'append (mapcar #'joinresult-sigma2 sjs))))))))
 	(t nil)))
 
-(defstruct critpair rule1 rule2 path1 sigma1 sigma2 term term1 term2)
+(defun do-every-replace-or-subst (term)
+  (cond ((atom term) term)
+	((eq (first term) 'quote) term)
+	((eq (first term) 'replace)
+	 (do-one-replace (second term) (third term) (fourth term)))
+	((eq (first term) 'subst)
+	 (do-one-subst (second term) (third term) (fourth term)))
+	(t (cons (first term) (mapcar #'do-every-replace-or-subst (rest term))))))
+
+(defun do-one-replace (term x y)
+  (unless (atom x) (error "do-one-replace: non-atomic replacement variable %s" x))
+  (cond ((atom term) (if (eq term x) y (list 'replace term x y)))
+	((eq (first term) 'quote) term)
+	((memq (first term) '(replace subst))
+	 (error "do-one-replace: nested %s" term))
+	(t (cons (first term) (mapcar #'(lambda (tm) (do-one-replace tm x y)) (rest term))))))
+
+(defun do-one-subst (term x y)
+  (unless (atom x) (error "do-one-subst: non-atomic replacement variable %s" x))
+  (cond ((atom term) (if (eq term x) y (list 'subst term x y)))
+	((eq (first term) 'quote) term)
+	((memq (first term) '(replace subst))
+	 (error "do-one-subst: nested %s" term))
+	((memq (first term) '(lam exists))
+	 (cond ((eq (second term) x) term)
+	       (t (list 'subst term x y))))
+	(t (cons (first term) (mapcar #'(lambda (tm) (do-one-subst tm x y)) (rest term))))))
+
+(defstruct critpair rule1 rule2 path1 sigma1 sigma2 term term1 term2 cond1 cond2)
 
 (defun submatches (M rule1 rule2 path1 eqok)
-  (let ((name1 (rule-name rule1)) (alpha1 (rule-lhs rule1)) (beta1 (rule-rhs rule1))
-        (name2 (rule-name rule2)) (alpha2 (rule-lhs rule2)) (beta2 (rule-rhs rule2)))
+  (let ((name1 (rule-name rule1)) (alpha1 (rule-lhs rule1)) (beta1 (rule-rhs rule1)) (cond1 (rule-cond rule1))
+        (name2 (rule-name rule2)) (alpha2 (rule-lhs rule2)) (beta2 (rule-rhs rule2)) (cond2 (rule-cond rule2)))
     (and (not (atom M))
          (not (atom alpha2))
-         (eq (first M) (first alpha2))
          (append (and eqok
                       (let ((jn (joinable M alpha2)))
                         (and jn (let ((N (joinresult-N jn))
 				      (sigma1 (joinresult-sigma1 jn))
                                       (sigma2 (joinresult-sigma2 jn)))
+				  ;; (print (list 'CRITPAIR name1 name2 alpha1 N sigma1 sigma2 (replace-subterm alpha1 path1 N)))
                                   (list (make-critpair :rule1 rule2
 						       :rule2 rule1   ;Put rule1 second because it has the primes
 						       :path1 path1
 						       :sigma1 sigma2  ;Similarly swap the sigmas
 						       :sigma2 sigma1
 						       :term (replace-subterm alpha1 path1 N)
-						       :term1 (sublis sigma1 beta1)
-						       :term2 (replace-subterm (sublis sigma1 alpha1) path1 (sublis sigma2 beta2))))))))
+						       :term1 (do-every-replace-or-subst (sublis sigma1 beta1))
+						       :term2 (replace-subterm (sublis sigma1 alpha1) path1 (do-every-replace-or-subst (sublis sigma2 beta2)))
+						       :cond1 (and cond2 (do-every-replace-or-subst (sublis sigma2 cond2)))  ;Similarly swap the conds
+						       :cond2 (and cond1 (do-every-replace-or-subst (sublis sigma1 cond1)))))))))
 		 (and (not (eq (first M) 'quote))
                       (do ((z2 (rest M) (rest z2))
                            (k 1 (+ k 1))
@@ -1569,7 +1806,8 @@
 (defun all-submatches (rule1 rule2 same)
   (let ((rc1 (rule-cond rule1))
 	(rc2 (rule-cond rule2)))
-    (cond ((and (not (atom rc1))
+    (cond ((and nil  ;; Disable this trick for now
+		(not (atom rc1))
 		(not (atom rc2))
 		(eq (first rc1) 'if)
 		(eq (first rc2) 'if)
@@ -1581,16 +1819,10 @@
 	   '())
 	  (t (let ((rulehat1 (add-primes-to-rule rule1 (union (term-vars (rule-lhs rule2)) (term-vars (rule-rhs rule2))) ))
 		   (rulehat2 (add-primes-to-rule rule2 (union (term-vars (rule-lhs rule1)) (term-vars (rule-rhs rule1))))))
-	       (cond (same (submatches (rule-lhs rulehat2) rulehat2 rule1 '() nil)) 
-		     ((> (rule-priority rule1) (rule-priority rule2))
-		      (append (submatches (rule-lhs rulehat1) rulehat1 rule2 '() t)
-			      (submatches (rule-lhs rulehat2) rulehat2 rule1 '() nil)))
-		     ((> (rule-priority rule2) (rule-priority rule1))
-		      (append (submatches (rule-lhs rulehat2) rulehat2 rule1 '() t)
-			      (submatches (rule-lhs rulehat1) rulehat1 rule2 '() nil)))
+	       (cond (same (submatches (rule-lhs rulehat2) rulehat2 rule1 '() nil))
 		     (t (append (submatches (rule-lhs rulehat2) rulehat2 rule1 '() t)
 				(submatches (rule-lhs rulehat1) rulehat1 rule2 '() nil)))))))))
-	       
+
 (defun all-critical-pairs ()
   (do ((z the-rules (rest z))
        (result '() (append result (do ((y z (rest y))
@@ -1657,22 +1889,33 @@
 				    (t (error "Unknown path item %s" item))))
 			  path)))
 
+;;; Return just the substituted beta
 (defun apply-rewrite-rule (rule term path)
-  ;; (princ (format "$$$$ Applying rewrite rule %s to term %s / %s" (rule-name rule) term path))
   (let ((res (try-rewrite-rule rule term (canonical-path path))))
-    (or res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))))
+    (unless res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))
+    (do-every-replace-or-subst (first res))))
 
+;;; Return a 2-list of substituted beta and substituted cond
+(defun apply-rewrite-rule-with-cond (rule term path)
+  (let ((res (try-rewrite-rule rule term (canonical-path path))))
+    (unless res (error "Applying rewrite rule %s to term %s / %s (with cond) failed" (rule-name rule) term path))
+    (mapcar #'do-every-replace-or-subst res)))
+
+;;; Return a 2-list of substituted beta and substituted cond
 (defun try-rewrite-rule (rule term path)
   (cond ((null path)
 	 (let ((m (matches term (rule-lhs rule))))
 	   ;; (unless m (princ (format "\nFAILED MATCH of %s to %s of %s\n" term (rule-lhs rule) (rule-name rule))))
-	   (and m (sublis (matchresult-sigma m) (rule-rhs rule)))))
+	   (and m (list (sublis (matchresult-sigma m) (rule-rhs rule))
+			(and (rule-cond rule)
+			     (sublis (matchresult-sigma m) (rule-cond rule)))))))
 	((atom term) nil)
-	(t (let ((subterm (try-rewrite-rule rule (nth (first path) term) (rest path))))
-	     (and subterm
-		  (append (subseq term 0 (first path))
-			  (list subterm)
-			  (subseq term (+ (first path) 1))))))))
+	(t (let ((res (try-rewrite-rule rule (nth (first path) term) (rest path))))
+	     (and res
+		  (list (append (subseq term 0 (first path))
+				(list (first res))
+				(subseq term (+ (first path) 1)))
+			(second res)))))))
 
 (defun format-path (path)
   (cond ((null path) "\\emptypath")
@@ -1713,7 +1956,17 @@
 	(t (concat "(" (format-compound-subterm term) ")"))))
 
 (defun format-compound-subterm (term)
-  (cond ((eq (first term) 'seq)
+  (cond ((eq (first term) 'replace)
+	 (format "tsubst %s %s %s"
+		 (format-subterm (second term) t)
+		 (format-subterm (third term) nil)
+		 (format-subterm (fourth term) nil)))
+	((eq (first term) 'subst)
+	 (format "subst %s %s %s"
+		 (format-subterm (second term) t)
+		 (format-subterm (third term) nil)
+		 (format-subterm (fourth term) nil)))
+	((eq (first term) 'seq)
 	 (format "%s; %s"
 		 (format-subterm (second term) t)
 		 (format-subterm (third term) (and (not (atom (third term)))
@@ -1737,9 +1990,11 @@
 	((eq (first term) 'app)
 	 (format "%s %s" (format-subterm (second term) t) (format-subterm (third term) t)))
 	((eq (first term) 'one)
-	 (format "one{%s}" (format-subterm (second term) nil)))
+	 (format "one %s" (format-subterm (second term) nil)))
 	((eq (first term) 'all)
-	 (format "all{%s}" (format-subterm (second term) nil)))
+	 (format "all %s" (format-subterm (second term) nil)))
+	((eq (first term) 'split)
+	 (format "split (%s) %s %s" (format-subterm (second term) nil) (third term) (fourth term)))
 	((eq (first term) 'lam)
 	 (format "lam %s %s" (format-subterm (second term) nil) (format-subterm (third term) t)))
 	((eq (first term) 'tup0)
@@ -1758,22 +2013,28 @@
 	(t (error "format-compound-term: unknown term type %s" (first term)))))
 
 (defun format-rule-condition (rc)
+  (format-rule-condition-with-prefixes rc "where " "fresh " "if "))
+
+(defun format-condition-text (rc)
+  (format-rule-condition-with-prefixes rc "" "fresh " ""))
+
+(defun format-rule-condition-with-prefixes (rc compute-prefix fresh-prefix if-prefix)
   (cond ((atom rc) (error "format-rule-condition: unknown atomic condition %s" rc))
 	((eq (first rc) 'compute)
 	 (unless (= (length rc) 3)  (error "format-rule-condition: wrong number of arguments %s" rc))
-	 (format "\\text{where $%s=%s$}" (format-rule-condition-expression (second rc)) (format-rule-condition-expression (third rc))))
+	 (format "\\text{%s$%s=%s$}" compute-prefix (format-rule-condition-expression (second rc)) (format-rule-condition-expression (third rc))))
 	((eq (first rc) 'fresh)
 	 (unless (= (length rc) 2)  (error "format-rule-condition: wrong number of arguments %s" rc))
-	 (format "\\text{fresh $%s$}" (format-rule-condition-expression (second rc))))
+	 (format "\\text{%s$%s$}" fresh-prefix (format-rule-condition-expression (second rc))))
 	((eq (first rc) 'if)
 	 (unless (= (length rc) 2)  (error "format-rule-condition: wrong number of arguments %s" rc))
-	 (format "\\text{if $%s$}" (format-rule-condition-expression (second rc))))
+	 (format "\\text{%s$%s$}" if-prefix (format-rule-condition-expression (second rc))))
 	(t (error "format-rule-condition: unknown condition %s" rc))))
 
 (defun format-rule-condition-expression (rce)
   (cond ((atom rce) (format "|%s|" (format-nt rce)))
 	((eq (first rce) 'fvs)
-	 (format "\\freevars{%s}" (mapconcat #'format-rule-condition-expression (rest rce) ",")))
+	 (format "\\freevars{%s}" (mapconcat #'(lambda (term) (format-rule-term term)) (rest rce) ",")))
 	((eq (first rce) '=) (format "%s=%s" (format-rule-condition-expression (second rce)) (format-rule-condition-expression (third rce))))
 	((eq (first rce) '>) (format "%s>%s" (format-rule-condition-expression (second rce)) (format-rule-condition-expression (third rce))))
 	((eq (first rce) '+) (format "%s+%s" (format-rule-condition-expression (second rce)) (format-rule-condition-expression (third rce))))
@@ -1841,6 +2102,10 @@
 			      ",\\,")
 		   "\\,\\}"))))
 
+(defun print-problem-line (R name1 path1 name2 P)
+  (princ (format "\\leavevmode\\null\\hskip 2em minus 1.95em {\\color{green}$|t_1| \\equiv %s \\xrnungosup{%s}{%s} |t| \\xrngosup{%s}{\\emptypath} %s \\equiv |t_2|$}%s\n"
+		 (format-term R) name1 (format-path path1) name2 (format-term P) "\\par")))
+
 (defun print-critical-pair (cp k)
   (let ((rule1 (critpair-rule1 cp))
 	(rule2 (critpair-rule2 cp))
@@ -1849,7 +2114,9 @@
 	(sigma2 (critpair-sigma2 cp))
 	(P (critpair-term1 cp))
 	(Q (critpair-term cp))
-	(R (critpair-term2 cp)))
+	(R (critpair-term2 cp))
+	(cond1 (critpair-cond1 cp))
+	(cond2 (critpair-cond2 cp)))
     (let ((name1 (rule-name rule1))
 	  (name2 (rule-name rule2))
 	  (alpha1 (rule-lhs rule1))
@@ -1860,39 +2127,232 @@
 	  (rc2 (rule-cond rule2))
 	  (linebreak "\\vadjust{\\penalty1000}\\hfil\\break")) ;Use \\hfil here, and \\hfill in print-rule-line
       (princ (format "\\vskip 8pt plus 16pt\\noindent\n"))
-      (let ((weirdtext "and{\\hskip0.5em}rule"))
+      (let ((weirdtext (cond ((< k 10) "and{\\hskip0.2em}rule")
+			     ((< k 100) "and{\\hskip0.5em}rule")
+			     ((< k 1000) "and{\\hskip0.8em}rule")
+			     (t "and{\\hskip0.1.1em}rule"))))
 	(print-rule-line (format "\\rlap{(%s)}\\hphantom{%s}\\llap{Rule}" k weirdtext) name1 alpha1 beta1 rc1 linebreak)
 	(print-rule-line weirdtext name2 alpha2 beta2 rc2 linebreak))
-      (princ (format "have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \\equiv %s$%s\n"
-		     (format-term Q) linebreak))
-      (princ (format "obtained from {\\color{blue}$\\sigma_1=%s$} and {\\color{blue}$\\sigma_2=%s$}:\\hfill%s\n"
-		     (format-sigma sigma1) (format-sigma sigma2) linebreak))
+      (princ (format "have a critical pair derived from the common term {\\color{blue}$%s$}%s%s\n"
+		     (format-term Q) (if (or cond1 cond2) "," "") linebreak))
+      (cond ((and cond1 cond2)
+	     (princ (format "assuming {\\color{blue}%s} (for \\rulename{%s}) and {\\color{blue}%s} (for \\rulename{%s}) are satisfied,%s\n"
+			    (format-condition-text cond1) name1 (format-condition-text cond2) name2 linebreak)))
+	    ((or cond1 cond2)
+	     (princ (format "assuming the condition {\\color{blue}%s} (for \\rulename{%s}) is satisfied,%s\n"
+			    (format-condition-text (or cond1 cond2)) (if cond1 name1 name2) linebreak))))
+      (princ (format "using the substitutions {\\color{blue}$\\sigma_1=%s$} and {\\color{blue}$\\sigma_2=%s$}"
+		     (format-sigma sigma1) (format-sigma sigma2)))
+      ;; Note that punctuation has been left hanging at end of last line.
       ;; Note that name1 is on the left edge; name2 is on the top edge.
-      (princ (format "\\null\\hskip 2em minus 1.95em $|t_1| \\equiv %s \\xrnungosup{%s}{%s} |t| \\xrngosup{%s}{\\emptypath} %s \\equiv |t_2|$.%s\n"
-		     (format-term R) name1 (format-path path1) name2 (format-term P) linebreak))
       (let ((pf (proof-lookup name1 name2 path1)))
 	(cond ((null pf)
+	       (princ ":\\par")
+	       (print-problem-line R name1 path1 name2 P)
 	       ;; (princ (format "{\\color{red}Can they be joined? $|t_1| \\xrngosup{%s}{\\emptypath} \\bigl(|t'|\\bigr) \\xrnungosup{%s}{%s} |t_2|$.%s}\n%s\n%s\n%s\n"
 	       ;; 		      name2 name1 (format-path path1) linebreak linebreak linebreak linebreak))
-	       (princ (format "{\\color{red}Can they be joined?%s}\n%s\n%s\n%s\n"
+	       (princ (format "{\\noindent\\color{red}Can they be joined?%s}\n%s\n%s\n%s\n"
 			      linebreak linebreak linebreak linebreak))
 	       )
 	      ((and (eq (first (proof-rewrites1 pf)) 'X)
 		    (eq (first (proof-rewrites2 pf)) 'X))
+	       (princ ":\\par")
+	       (print-problem-line R name1 path1 name2 P)
 	       ;; (princ (format "{\\color{purple}Can they be joined? $|t_1| %s \\bigl(|t'|\\bigr) %s |t_2|$.%s}\n%s\n%s\n%s\n"
 	       ;; 		      (format-rewrites (rest (proof-rewrites1 pf)) nil nil) (format-rewrites (rest (proof-rewrites2 pf)) t nil) linebreak linebreak linebreak linebreak))
-	       (princ (format "{\\color{purple}Can they be joined?%s}\n%s\n%s\n%s\n"
+	       (princ (format "\\noindent{\\color{purple}Can they be joined?%s}\n%s\n%s\n%s\n"
 			      linebreak linebreak linebreak linebreak))
 	       )
-	      (t
-	       ;; (print-given-proof-rewrites "They can be joined" (proof-rewrites1 pf) R (proof-rewrites2 pf) P)
-		 (print-tikzcd-diagram P Q R name1 name2 path1 (proof-rowsep pf) (proof-colsep pf) (proof-rewrites1 pf) (proof-rewrites2 pf) k)
-		 (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf))
-		   ;; (print-given-proof-rewrites "And also this way:" (proof-altrewrites1 pf) R (proof-altrewrites2 pf) P)
-		   (print-tikzcd-diagram P Q R name1 name2 path1 (proof-rowsep pf) (proof-colsep pf) (proof-altrewrites1 pf) (proof-altrewrites2 pf) k)))))
+	      ((or (eq (first (proof-rewrites1 pf)) 'X)
+		   (eq (first (proof-rewrites2 pf)) 'X))
+	       (error "Proof has just one 'X entry"))
+	      (t (let* ((assumptions (list (list name1 cond1) (list name2 cond2)))
+			(ca-result (contradictory-assumptions assumptions)))
+		   (cond (ca-result 
+			  (princ (format ".%s\nBut %s, so this critical pair cannot occur in practice." linebreak ca-result)))
+			 (t (princ ":\\par")
+			    ;; (print-given-proof-rewrites "They can be joined" (proof-rewrites1 pf) R (proof-rewrites2 pf) P)
+			    (cond ((proof-flip-diagram pf)
+				   ;; Note: rowsep and colsep should NOT be flipped.
+				   (print-tikzcd-diagram R Q P name2 name1 '() path1 (proof-id2 pf) (proof-id1 pf) (proof-extra2 pf) (proof-extra1 pf)
+							 (proof-rowsep pf) (proof-colsep pf) (proof-rewrites2 pf) (proof-rewrites1 pf) (- k)))
+				  (t (print-tikzcd-diagram P Q R name1 name2 path1 '() (proof-id1 pf) (proof-id2 pf) (proof-extra1 pf) (proof-extra2 pf)
+							   (proof-rowsep pf) (proof-colsep pf) (proof-rewrites1 pf) (proof-rewrites2 pf) k)))
+			    (let ((consequents (append (consequent-conditions R (proof-rewrites1 pf))
+						       (consequent-conditions P (proof-rewrites2 pf)))))
+			      (print-new-fresh-conditions (new-fresh-conditions Q consequents) consequents)
+			      (print-consequent-conditions consequents assumptions))
+			    (princ (verify-decreasing-diagram cp))
+			    (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf))
+			      ;; (print-given-proof-rewrites "And also this way:" (proof-altrewrites1 pf) R (proof-altrewrites2 pf) P)
+			      (print-tikzcd-diagram P Q R name1 name2 path1 '() (proof-id1 pf) (proof-id2 pf) (proof-extra1 pf) (proof-extra2 pf)
+						    (proof-rowsep pf) (proof-colsep pf) (proof-altrewrites1 pf) (proof-altrewrites2 pf) k))))))))
       ;; (princ (format "Therefore rules \\rulename{%s} and \\rulename{%s} have the XXX property.\\par\n" name1 name2))
+      (princ "\n")
       (princ (format "\\par\n"))
       )))
+
+(defun is-a-simple-if-not-in-fvs-condition (cond)
+  (and (not (atom cond))
+       (eq (first cond) 'if)
+       (not (atom (second cond)))
+       (eq (first (second cond)) 'not)
+       (not (atom (second (second cond))))
+       (eq (first (second (second cond))) 'elt)
+       (atom (second (second (second cond))))
+       (not (atom (third (second (second cond)))))
+       (eq (first (third (second (second cond)))) 'fvs)))
+
+(defun is-a-simple-fresh-not-in-fvs-condition (cond)
+  (and (not (atom cond))
+       (eq (first cond) 'fresh)
+       (not (atom (second cond)))
+       (eq (first (second cond)) 'not)
+       (not (atom (second (second cond))))
+       (eq (first (second (second cond))) 'elt)
+       (atom (second (second (second cond))))
+       (not (atom (third (second (second cond)))))
+       (eq (first (third (second (second cond)))) 'fvs)))
+
+(defun contradictory-assumptions (assumptions)
+  (or (some #'self-contradictory-assumption assumptions)
+      (some #'(lambda (assump1) (some #'(lambda (assump2) (contradictory-assumption-pair assump1 assump2))
+				      assumptions))
+	    assumptions)))
+
+(defun self-contradictory-assumption (assumption)
+  (let ((assump (second assumption)))
+    (and (not (atom assump))
+	 (eq (first assump) 'if)
+	 (not (atom (second assump)))
+	 (eq (first (second assump)) 'not)
+	 (not (atom (second (second assump))))
+	 (eq (first (second (second assump))) 'elt)
+	 (atom (second (second (second assump))))
+	 (not (atom (third (second (second assump)))))
+	 (eq (first (third (second (second assump)))) 'fvs)
+	 (member (second (second (second assump)))
+		 (apply #'append (mapcar #'term-vars (rest (third (second (second assump)))))))
+	 (format "the assumption %s is always false" (format-condition-text assump)))))
+
+(defun contradictory-assumption-pair (assumption1 assumption2)
+  (let ((assump1 (second assumption1))
+	(assump2 (second assumption2)))
+    (and (not (atom assump1))
+	 (not (atom assump2))
+	 (eq (first assump1) 'if)
+	 (eq (first assump2) 'if)
+	 (not (atom (second assump1)))
+	 (not (atom (second assump2)))
+	 (or (and (eq (first (second assump1)) 'not)
+		  (equal (second (second assump1)) (second assump2)))
+	     (and (eq (first (second assump2)) 'not)
+		  (equal (second (second assump2)) (second assump1))))
+	 (format "the assumptions %s and %s cannot both be true"
+		 (format-condition-text assump1) (format-condition-text assump2)))))
+
+
+(defun consequent-conditions-trivially-follow (consequents)
+  (let ((consequent-conds (mapcar #'second consequents)))
+    (and (every #'is-a-simple-if-not-in-fvs-condition consequent-conds)
+	 (every #'(lambda (cond)
+		    (let ((cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
+		      (null cfvars)))
+		consequent-conds))))
+
+(defun consequent-conditions-follow (consequents assumptions)
+  ;; (progn (print (cons 'RAW-CONSEQUENTS consequents)) t)
+  ;; (progn (print (cons 'RAW-ASSUMPTIONS assumptions)) t)
+  (let ((consequent-conds (mapcar #'second consequents))
+	(assumption-conds (mapcar #'second assumptions)))
+    ;; (progn (print (cons 'RAW-CONSEQUENT-CONDS consequent-conds)) t)
+    ;; (progn (print (cons 'RAW-ASSUMPTION-CONDS assumption-conds)) t)
+    (and (every #'is-a-simple-if-not-in-fvs-condition consequent-conds)
+	 ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
+	 (let ((not-in-fvs-assumption-conds (remove-if-not #'is-a-simple-if-not-in-fvs-condition assumption-conds)))
+	   (and not-in-fvs-assumption-conds
+		;; (progn (print (cons 'NOT-IN-FVS-ASSUMPTION-CONDS not-in-fvs-assumption-conds)) t)
+		(every #'(lambda (cond)
+			   (let ((cvar (second (second (second cond))))
+				 (cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
+			     ;; (print (list 'CVAR cvar 'CFVARS cfvars))
+			     (every #'(lambda (cfvar) (some #'(lambda (assumption)
+								(let ((avar (second (second (second assumption))))
+								      (afvars (apply #'append (mapcar #'term-vars (rest (third (second (second assumption))))))))
+								  ;; (print (list 'AVAR avar 'AFVARS afvars))
+								  (and (eq avar cvar)
+								       (member cfvar afvars))))
+							    not-in-fvs-assumption-conds))
+				    cfvars)))
+		       consequent-conds))))))
+  
+(defun consequent-conditions (term rw)
+  (cond ((null rw) '())
+	(t (let ((rulename (rewrite-rulename (first rw))))
+	     (let ((res (apply-rewrite-rule-with-cond (rule-lookup rulename) term (rewrite-path (first rw)))))
+	       ;; (print (list 'CONSEQUENT-CONDITIONS term rw res))
+	       (let ((more (consequent-conditions (first res) (rest rw))))
+		 (if (second res)
+		     (cons (list rulename (second res)) more)
+		   more)))))))
+
+(defun new-fresh-conditions (Q consequents)
+  (let ((new-fresh-vars
+	 (remove-duplicates
+	  (apply #'append
+		 (mapcar #'(lambda (consequent)
+			     (and (is-a-simple-fresh-not-in-fvs-condition (second consequent))
+				  (list (second (second (second (second consequent)))))))
+			 consequents)))))
+    ;; (print (list 'NEW-FRESH-VARS new-fresh-vars))
+    (mapcar #'(lambda (nfv) (list 'fresh (list 'not (list 'elt nfv (cons 'fvs (term-vars Q)))))) new-fresh-vars)))
+
+(defun print-new-fresh-conditions (new-fresh-conditions consequents)
+  (when new-fresh-conditions
+    (let ((fresh-texts (apply #'append
+			      (mapcar #'(lambda (cd)
+					  (and (eq (first (second cd)) 'fresh)
+					       (list (list (first cd) (format-condition-text (second cd))))))
+				      consequents)))
+	  (new-fresh-texts (mapcar #'format-condition-text new-fresh-conditions)))
+      ;; (print (list 'NEW-FRESH new-fresh-conditions fresh-texts new-fresh-texts))
+      (princ "Alpha-conversion introduces new assumptions ")
+      (dolist (ft fresh-texts)
+	(princ (format "{\\color{blue}%s} (for \\rulename{%s}) and " (second ft) (first ft))))
+      (princ "(implicitly) ")
+      (princ (mapconcat #'(lambda (nft) (format "{\\color{blue}%s}" nft)) new-fresh-texts " and "))
+      (princ ".\n"))))      
+  
+;;; Each consequent or assumption is a 2-list (rulename cond).
+(defun print-consequent-conditions (consequents assumptions)
+  (when consequents
+    (let ((texts (apply #'append
+			(mapcar #'(lambda (cd)
+				    (and (eq (first (second cd)) 'if)
+					 (list (list (first cd) (format-condition-text (second cd))))))
+				consequents))))
+      (princ (if (= (length texts) 1) "The condition to be proved is " "Conditions to be proved are "))
+      (princ (cond ((= (length texts) 1)
+		    (format "{\\color{purple}%s} (for \\rulename{%s})"
+			    (second (first texts)) (first (first texts))))
+		   ((= (length texts) 2)
+		    (format "{\\color{purple}%s} (for \\rulename{%s}) and {\\color{purple}%s} (for \\rulename{%s})"
+			    (second (first texts)) (first (first texts)) (second (second texts)) (first (second texts))))
+		   (t (let ((revtexts (reverse texts)))
+			(concat (mapconcat #'(lambda (text) (format "{\\color{purple}%s} (for \\rulename{%s}), " (second text) (first text)))
+					   (reverse (rest revtexts))
+					   "")
+				(format "and {\\color{purple}%s} (for \\rulename{%s})" (second (first revtexts)) (first (first revtexts))))))))
+      (princ (cond ((consequent-conditions-trivially-follow consequents)
+		     (if (= (length texts) 1)
+			"; this is trivially true"
+		      "; these are trivially true"))
+		   ((consequent-conditions-follow consequents assumptions)
+		    (if (= (length texts) 1)
+			"; this follows easily from the assumptions"
+		      "; these follow easily from the assumptions"))
+		   (t "; {\\color{red}please provide the necessary proof}")))
+      (princ ".\\par\n"))))
 
 (defun print-given-proof-rewrites (prefix rw1 R rw2 P)
   (let ((fr (format-rewrites-pair rw1 R rw2 P)))
@@ -1932,9 +2392,13 @@
   (cond ((null rws) "(list)")
 	(t (concat "(list "
 		   (mapconcat #'(lambda (rw) (cond ((eq rw 'X) "'X")
-						   (t (format "(make-rewrite :rulename '%s :path '%s)"
+						   (t (format "(make-rewrite :rulename '%s :path '%s%s%s%s)"
 							      (rewrite-rulename rw)
-							      (format-list (rewrite-path rw))))))
+							      (format-list (rewrite-path rw))
+							      (if (rewrite-ellipsis rw) " :ellipsis t" "")
+							      (if (rewrite-id rw) (format " :id %S" (rewrite-id rw)) "")
+							      (if (rewrite-extra rw) (format " :extra '%S" (rewrite-extra rw)) "")
+							      ))))
 			      rws
 			      " ")
 		   ")"))))
@@ -1949,7 +2413,8 @@
   (cond ((eq (rewrite-rulename rw) 'TRIVIAL) term)
 	(t (apply-rewrite-rule (rule-lookup (rewrite-rulename rw)) term (rewrite-path rw)))))
 
-(defun print-tikzcd-diagram (P Q R rulename1 rulename2 path1 rowsep colsep rw1 rw2 k)
+;;; k negative means the diagram is flipped
+(defun print-tikzcd-diagram (P Q R rulename1 rulename2 path1 path2 id1 id2 extra1 extra2 rowsep colsep rw1 rw2 k)
 ;;   (cond ((< (length rw1) (length rw2))
 ;; 	 (print-least-wide-tikzcd-diagram P Q R rulename1 rulename2 path1 '() rw2 rw1 k))
 ;; 	(t (print-least-wide-tikzcd-diagram R Q P rulename2 rulename1 '() path1 rw2 rw1 k))))
@@ -1975,57 +2440,80 @@
 		(do ((y (or rw1 trivial) (rest y))
 		     (bottom-term R (rewrite-for-tikzcd (first y) bottom-term)))
 		    ((null y)
-		     (unless (equal bottom-term right-term) (error "print-tikzcd-diagram: Rewrites failed to join %s" (list bottom-term right-term)))
-		     (princ (format "{%s} \\\\\n" (format-rule-term bottom-term))))
+		     ;; (unless  (error "print-tikzcd-diagram: Rewrites failed to join %s" (list bottom-term right-term)))
+		     ;; The next expression carefully does NOT print a LaTeX "\\" to end the grid (it would make the diagram too tall).
+		     (cond ((equal bottom-term right-term)
+			    (princ (format "{%s}\n" (format-rule-term bottom-term))))
+			   (t (princ (format "{\\color{red}%s\\not\\equiv%s}\n" (format-rule-term bottom-term) (format-rule-term right-term))))))
 		  (cond ((rewrite-ellipsis (first y))
 			 (princ "{\\mydots} && "))
 			(t (princ (format "{%s} && " (format-rule-term bottom-term))))))))
       (when (> j 0)
 	(princ (format "  %s %s %s "
 		       (string-expt "&" wd)
-		       (if (= (* j 2) ht) (format "{(%s)}" k) "")
+		       (if (= (* j 2) ht) (format (if (< k 0) "{(%s')}" "{(%s)}") (abs k)) "")
 		       (string-expt "&" wd)))
 	(cond ((rewrite-ellipsis (first z))
-	       (princ "{\\vdots} \\\\\n"))
+	       (princ "{\\mytikzvdots} \\\\\n"))
 	      (t (princ (format "%s \\\\\n" (format-rule-term right-term))))))
       (princ (format "  %s %s %s \\\\\n"
 		     (string-expt "&" wd)
-		     (if (= (+ (* j 2) 1) ht) (format "{(%s)}" k) "")
+		     (if (= (+ (* j 2) 1) ht) (format (if (< k 0) "{(%s')}" "{(%s)}") (abs k)) "")
 		     (string-expt "&" wd))))
     (let ((right-edge (+ (* wd 2) 1))
 	  (bottom-edge (+ (* ht 2) 1)))
-      (princ (format "\\arrow[\"{\\rotatebox{270}{\\hbox{\\rulename{%s}}}}\"', \"{\\rotatebox{0}{\\hbox{$u%s$}}}\", from=1-1, to=%s-1]\n"
-		     rulename1 (format-partial-path path1) bottom-edge))
-      (princ (format "\\arrow[\"\\rulename{%s}\"', \"{u%s}\", from=1-1, to=1-%s]\n"
-		     rulename2 (format-partial-path '()) right-edge))
+      ;; The arrow on the left edge
+      (princ (format "\\arrow[\"{\\rotatebox{270}{\\hbox{\\rulename{%s}}}}\"', \"{\\hbox{|u|${%s}$}}\" {font=\\normalsize},"
+		     rulename1 (format-partial-path path1)))
+      (when id1 (princ (format " \"\\rewritelabel{%s}\" very near start," id1)))
+      (when extra1 (princ (format " \"{\\hbox{%s}}\" {pos=0.833, font=\\normalsize}," (format-rule-term extra1))))
+      (princ (format " from=1-1, to=%s-1]\n" bottom-edge))
+      ;; The arrow on the top edge
+      (princ (format "\\arrow[\"\\rulename{%s}\"', \"{\\hbox{|u|${%s}$}}\" {font=\\normalsize},"
+		     rulename2 (format-partial-path path2)))
+      (when id2 (princ (format " \"\\rewritelabel{%s}\" very near start," id2)))
+      (when extra2 (princ (format " \"{\\hbox{%s}}\" {pos=0.833, font=\\normalsize}," (format-rule-term extra2))))
+      (princ (format " from=1-1, to=1-%s]\n" right-edge))
+      ;; Arrows on the bottom edge
       (cond ((null rw1)
 	     (princ (format "\\arrow[\"{\\equiv}\", dashed, from=%s-%s, to=%s-%s]\n"
 			    bottom-edge 1 bottom-edge 3)))
 	    (t (do ((z rw1 (rest z))
 		    (j 0 (+ j 1)))
 		   ((null z))
-		 (princ (format "\\arrow[\"\\rulename{%s}\"', \"{u%s}\", dashed, from=%s-%s, to=%s-%s]\n"
+		 (princ (format "\\arrow[\"\\rulename{%s}\"', \"{\\hbox{|u|${%s}$}}\" {font=\\normalsize}, dashed,"
 				(rewrite-rulename (first z))
-				(format-partial-path (rewrite-path (first z)))
+				(format-partial-path (rewrite-path (first z)))))
+		 (when (rewrite-id (first z))
+		   (princ (format " \"\\rewritelabel{%s}\" very near start," (rewrite-id (first z)))))
+		 (when (rewrite-extra (first z))
+		   (princ (format " \"{\\hbox{%s}}\" {pos=0.833, font=\\normalsize}," (format-rule-term (rewrite-extra (first z))))))
+		 (princ (format " from=%s-%s, to=%s-%s]\n"
 				bottom-edge
 				(+ (* j 2) 1)
 				bottom-edge
 				(+ (* j 2) 3))))))
+      ;; Arrows on the right edge
       (cond ((null rw2)
-	     (princ (format "\\arrow[\"{\\rotatebox{0}{\\hbox{$\\equiv$}}}\", dashed, from=%s-%s, to=%s-%s]\n"
+	     (princ (format "\\arrow[\"\\equiv\", dashed, from=%s-%s, to=%s-%s]\n"
 			    1 right-edge 3 right-edge)))
 	    (t (do ((y rw2 (rest y))
 		    (j 0 (+ j 1)))
 		   ((null y))
-		 (princ (format "\\arrow[\"{\\rotatebox{270}{\\hbox{\\rulename{%s}}}}\"', \"{\\rotatebox{0}{\\hbox{$u%s$}}}\", dashed, from=%s-%s, to=%s-%s]\n"
+		 (princ (format "\\arrow[\"{\\rotatebox{270}{\\hbox{\\rulename{%s}}}}\"', \"{\\hbox{|u|${%s}$}}\" {font=\\normalsize}, dashed,"
 				(rewrite-rulename (first y))
-				(format-partial-path (rewrite-path (first y)))
+				(format-partial-path (rewrite-path (first y)))))
+		 (when (rewrite-id (first y))
+		   (princ (format " \"\\rewritelabel{%s}\" very near start," (rewrite-id (first y)))))
+		 (when (rewrite-extra (first y))
+		   (princ (format " \"{\\hbox{%s}}\" {pos=0.833, font=\\normalsize}," (format-rule-term (rewrite-extra (first y))))))
+		 (princ (format " from=%s-%s, to=%s-%s]\n"
 				(+ (* j 2) 1)
 				right-edge
 				(+ (* j 2) 3)
 				right-edge)))))
       ))
-  (princ "\\end{tikzcd}\n")
+  (princ "\\end{tikzcd}\\vskip6pt\n")
   (princ "\\end{center}\n"))
   
 ;; \begin{tikzcd}
@@ -2111,6 +2599,9 @@
 ;; 	\arrow["bottom2"', dashed, from=7-3, to=7-5]
 ;; \end{tikzcd}
 
+(defun repair-escapes (str)
+  (mapconcat #'(lambda (ch) (if (= ch ?\\) "\\\\" (string ch))) str ""))
+
 (defun print-proof-skeletons (the-previous-proofs)
   (let ((cps (all-critical-pairs)))
     (princ (format "(setq the-proofs                ;%s proofs\n" (length cps)))
@@ -2127,21 +2618,24 @@
 	       (name2 (rule-name rule2))
 	       (path1 (critpair-path1 cp))
 	       (pf (proof-lookup name1 name2 path1)))
-	  (princ (format "%s(make-proof :rulename1 '%s :rulename2 '%s :path1 '%s      ;Proof %s"
-			 prefix name1 name2 (if (null path1) "()" path1) k))
-	  (when (or (proof-rowsep pf) (proof-colsep pf) (proof-difficult pf))
-	    (princ (format "\n%s           " prefix2))
-	    (when (proof-rowsep pf) (princ (format " :rowsep \"%s\"" (proof-rowsep pf))))
-	    (when (proof-colsep pf) (princ (format " :colsep \"%s\"" (proof-colsep pf))))
-	    (when (proof-difficult pf) (princ (format " :difficult \"%s\"" (proof-difficult pf)))))
-	  (when (proof-impossible pf)
-	    (princ (format "\n%s            :impossible \"%s\"" prefix2 (proof-impossible pf))))
+	  (princ (format "%s(make-proof :rulename1 '%s :rulename2 '%s :path1 '%s%s%s     ;Proof %s"
+			 prefix name1 name2
+			 (if (null path1) "()" path1)
+			 (if (or (null pf) (null (proof-id1 pf))) "" (format " :id1 %S" (proof-id1 pf)))
+			 (if (or (null pf) (null (proof-id2 pf))) "" (format " :id2 %S" (proof-id2 pf)))
+			 k))
 	  (cond ((null pf)
-		 (princ (format "\n%s            :rewrites1 (list 'X (make-rewrite :rulename '%s :path '()))"
+		 (princ (format "\n%s            :rewrites1 (list 'X (make-rewrite :rulename '%s :path '() :id 3))"
 				prefix2 name2))
-		 (princ (format "\n%s            :rewrites2 (list 'X (make-rewrite :rulename '%s :path '()))"
+		 (princ (format "\n%s            :rewrites2 (list 'X (make-rewrite :rulename '%s :path '() :id 4))"
 				prefix2 name1)))
-		(t (princ (format "\n%s            :rewrites1 %s" prefix2 (format-rewrites-list (proof-rewrites1 pf))))
+		(t (when (or (proof-rowsep pf) (proof-colsep pf) (proof-difficult pf))
+		     (princ (format "\n%s           " prefix2))
+		     (when (proof-rowsep pf) (princ (format " :rowsep \"%s\"" (proof-rowsep pf))))
+		     (when (proof-colsep pf) (princ (format " :colsep \"%s\"" (proof-colsep pf))))
+		     (when (proof-flip-diagram pf) (princ (format " :flip-diagram t")))
+		     (when (proof-difficult pf) (princ (format " :difficult \"%s\"" (repair-escapes (proof-difficult pf))))))
+		   (princ (format "\n%s            :rewrites1 %s" prefix2 (format-rewrites-list (proof-rewrites1 pf))))
 		   (princ (format "\n%s            :rewrites2 %s" prefix2 (format-rewrites-list (proof-rewrites2 pf))))
 		   (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf))
 		     (princ (format "\n%s            :altrewrites1 %s" prefix2 (format-rewrites-list (proof-altrewrites1 pf))))
@@ -2150,1452 +2644,101 @@
     (princ "))\n"))
   'done)
 
+(setq the-partial-order
+      '((< fail-elim-r u-tup)
+	(< seq-assoc u-tup)
+	(< seq-swap u-tup)
+	(< exi-float-r eqn-float)
+	(< seq-swap eqn-float)
+	(< fail-elim-r seq-assoc)
+	(< exi-elim seq-assoc)
+	(< fail-elim-l seq-assoc)
+	(< exi-float-r seq-assoc)
+	(< exi-float-r seq-swap)
+	(< fail-elim-l seq-swap)
+	(< exi-elim seq-swap)
+	(< fail-elim-r exi-float-r)
+	(< fail-elim-l exi-float-r)
+	(< exi-swap exi-float-r)
+	(< exi-elim exi-float-r)
+	(< exi-float-l exi-float-r)
+	(< exi-float-l exi-float-eq)
+	(< exi-elim exi-float-l)))
+
+(defun verify-partial-order ()
+  ;; Ensure every entry well-formed, refers to existing rules, and is not part of a cycle
+  (every #'(lambda (cmp)
+	     (unless (and (= (length cmp) 3) (eq (first cmp) '<))
+	       (error "verify-partial-order: Malformed entry %s" cmp))
+	     (unless (rule-lookup (second cmp))
+	       (error "verify-partial-order: Nonexistent rule %s" (second cmp)))
+	     (unless (rule-lookup (third cmp))
+	       (error "verify-partial-order: Nonexistent rule %s" (third cmp)))
+	     (when (partial-order-cycle (list (second cmp)) (third cmp))
+	       (error "verify-partial-order: Cycle from %s" cmp)))
+	 the-partial-order))
+
+(defun partial-order-cycle (froms to)
+  (or (member to froms)
+      (some #'(lambda (cmp)
+		(and (eq (second cmp) to)
+		     (partial-order-cycle (cons to froms) (third cmp))))
+	    the-partial-order)))
+
+;; Verify that the proof for a critical pair has a decreasing diagram
+(defun verify-decreasing-diagram (cp)
+  (let ((rule1 (critpair-rule1 cp))
+	(rule2 (critpair-rule2 cp))
+	(path1 (critpair-path1 cp))
+	(sigma1 (critpair-sigma1 cp))
+	(sigma2 (critpair-sigma2 cp))
+	(P (critpair-term1 cp))
+	(Q (critpair-term cp))
+	(R (critpair-term2 cp)))
+    (let ((name1 (rule-name rule1))
+	  (name2 (rule-name rule2))
+	  (alpha1 (rule-lhs rule1))
+	  (alpha2 (rule-lhs rule2))
+	  (beta1 (rule-rhs rule1))
+	  (beta2 (rule-rhs rule2))
+	  (rc1 (rule-cond rule1))
+	  (rc2 (rule-cond rule2)))
+      (let ((pf (proof-lookup name1 name2 path1))
+	    (needproof "{\\color{red}Need a proof that this diagram is decreasing.}"))
+	(let ((rw1 (proof-rewrites1 pf))
+	      (rw2 (proof-rewrites2 pf)))
+	  (cond ((and (null rw1) (null rw2))
+		 "This is a trivial decreasing diagram.")
+		((and (null rw1) (null (rest rw2)))
+		 (cond ((eq (rewrite-rulename (first rw2)) name1)
+			"This is a simple decreasing diagram.")
+		       (t needproof)))
+		((and (null (rest rw1)) (null rw2))
+		 (cond ((eq (rewrite-rulename (first rw1)) name2)
+			"This is a simple decreasing diagram.")
+		       (t needproof)))
+		((and (null (rest rw1)) (null (rest rw2)))
+		 (cond ((and (eq (rewrite-rulename (first rw1)) name2)
+			     (eq (rewrite-rulename (first rw2)) name1))
+			"This is a simple decreasing diagram.")
+		       (t needproof)))
+		(t needproof)))))))
+
+
+(defun print-critical-pairs-text ()
+  (verify-partial-order)
+  (let ((cp (all-critical-pairs)))
+    (princ (format "\nS%s\n" "--------------"))
+    (princ (format "The rules for \\versecalc{} have %s critical pairs, which are described here in detail.\\par\n" (length cp)))
+    (do ((z cp (rest z))
+	 (k 1 (+ k 1)))
+	((null z))
+      (print-critical-pair (first z) k))
+    (princ "\nE--------------\n"))
+  'done)
+
 (setq eval-expression-print-level (setq eval-expression-print-length nil))
 (setq inhibit-debugger nil)
 
+(print-critical-pairs-text)
 
-
-(let ((cp (all-critical-pairs))) (cons (length cp) cp))
-
-(print-proof-skeletons)
-
-
-
-
-(let ((cp (all-critical-pairs)))
-  (princ "\nS--------------\n")
-  (princ (format "The rules for \\versecalc{} have %s critical pairs, which are described here in detail.\\par\n" (length cp)))
-  (do ((z cp (rest z))
-       (k 1 (+ k 1)))
-      ((null z))
-    (print-critical-pair (first z) k))
-  (princ "\nE--------------\n")
-  'done)
-
-
-S--------------
-The rules for \versecalc{} have 78 critical pairs, which are described here in detail.\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(1)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; e')| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (k1 = k2; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|k1 = k2; (x = v; e')|} && {|x = v; (k1 = k2; e')|} \\
-  & {(1)} & \\
-  {|x = v; e'|} && {|x = v; e'|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(2)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(3)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k1 = k2; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (e'))| \xrnungosup{u-lit}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((k1 = k2; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|k1 = k2; (def x (e'))|} && {|def x ((k1 = k2; e'))|} \\
-  & {(3)} & \\
-  {|def x (e')|} && {|def x (e')|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(4)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((k1 = k2; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(e; e2)| \xrnungosup{u-lit}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(k1 = k2; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|(k1 = k2; e); e2|} && {|k1 = k2; (e; e2)|} \\
-  & {(4)} & \\
-  {|e; e2|} && {|e; e2|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(5)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; (x = v; e'))| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = v; e')|} &&&& {|x = v; ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e')|} \\
-  && {(5)} && \\
-  {|v1 = v1'; xdots vn = vn'; (x = v; e')|} && {\mydots} && {|x = v; (v1 = v1'; xdots vn = vn'; e')|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{seq-swap}"', "{u\2^{n-1}}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{seq-swap}"', "{u\2^{0}}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(6)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; fail)| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(7)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(v1 = v1'; xdots vn = vn'; (def x (e')))| \xrnungosup{u-tup}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x (((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (def x (e'))|} &&&& {|def x (((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e'))|} \\
-  && {(7)} && \\
-  {|v1 = v1'; xdots vn = vn'; (def x (e'))|} && {\mydots} && {|def x ((v1 = v1'; xdots vn = vn'; e'))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{exi-float-r}"', "{u\2^{n-1}}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{exi-float-r}"', "{u\2^{0}}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(8)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((v1 = v1'; xdots vn = vn'; e); e2)| \xrnungosup{u-tup}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2|} &&&& {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (e; e2)|} \\
-  && {(8)} && \\
-  {|(v1 = v1'; xdots vn = vn'; e); e2|} && {\mydots} && {|v1 = v1'; xdots vn = vn'; (e; e2)|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{seq-assoc}"', "{u\2^{0}}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{u\2^{n-1}}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(9)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d' = op'; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = op'; e)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|d|\mapsto |op'|\,\}$} and {\color{blue}$\sigma_2=\{\,|d'|\mapsto |op|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{u-fail-d-op}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|op = op'; e|} && {|fail|} \\
-  & {(9)} & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{u-fail-d-op}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(10)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (op = d; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|op = d; (x = v; e')|} && {|x = v; (op = d; e')|} \\
-  &  & \\
-  & {(10)} & |x = v; fail| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(11)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(12)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(op = d; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-op-d}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((op = d; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|op = d; (def x (e'))|} && {|def x ((op = d; e'))|} \\
-  &  & \\
-  & {(12)} & |def x (fail)| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(13)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((op = d; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-op-d}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(op = d; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  {|(op = d; e); e2|} && {|op = d; (e; e2)|} \\
-  & {(13)} & \\
-  {|fail; e2|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(14)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (d = op; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|d = op; (x = v; e')|} && {|x = v; (d = op; e')|} \\
-  &  & \\
-  & {(14)} & |x = v; fail| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(15)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(16)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(d = op; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-d-op}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((d = op; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|d = op; (def x (e'))|} && {|def x ((d = op; e'))|} \\
-  &  & \\
-  & {(16)} & |def x (fail)| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(17)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((d = op; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-d-op}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(d = op; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(d = op; e); e2|} && {|d = op; (e; e2)|} \\
-  & {(17)} & \\
-  {|fail; e2|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(18)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; ((tup (v1,xdots,vn)) = k; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(tup (v1,xdots,vn)) = k; (x = v; e')|} && {|x = v; ((tup (v1,xdots,vn)) = k; e')|} \\
-  &  & \\
-  & {(18)} & |x = v; fail| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(19)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(20)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((tup (v1,xdots,vn)) = k; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-tup-k}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x (((tup (v1,xdots,vn)) = k; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(tup (v1,xdots,vn)) = k; (def x (e'))|} && {|def x (((tup (v1,xdots,vn)) = k; e'))|} \\
-  &  & \\
-  & {(20)} & |def x (fail)| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(21)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((tup (v1,xdots,vn)) = k; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-tup-k}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((tup (v1,xdots,vn)) = k; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|((tup (v1,xdots,vn)) = k; e); e2|} && {|(tup (v1,xdots,vn)) = k; (e; e2)|} \\
-  & {(21)} & \\
-  {|fail; e2|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(22)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (k = (tup (v1,xdots,vn)); e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|k = (tup (v1,xdots,vn)); (x = v; e')|} && {|x = v; (k = (tup (v1,xdots,vn)); e')|} \\
-  &  & \\
-  & {(22)} & |x = v; fail| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(23)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(24)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(k = (tup (v1,xdots,vn)); (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{u-fail-k-tup}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((k = (tup (v1,xdots,vn)); e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|k = (tup (v1,xdots,vn)); (def x (e'))|} && {|def x ((k = (tup (v1,xdots,vn)); e'))|} \\
-  &  & \\
-  & {(24)} & |def x (fail)| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(25)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((k = (tup (v1,xdots,vn)); e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{u-fail-k-tup}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(k = (tup (v1,xdots,vn)); (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(k = (tup (v1,xdots,vn)); e); e2|} && {|k = (tup (v1,xdots,vn)); (e; e2)|} \\
-  & {(25)} & \\
-  {|fail; e2|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(26)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; (x' = v; e'))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x' = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; (x' = v; e'))| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v; (hnf = x; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|hnf = x; (x' = v; e')|} && {|x' = v; (hnf = x; e')|} \\
-  & {(26)} & \\
-  {|x = hnf; (x' = v; e')|} && {|x' = v; (x = hnf; e')|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(27)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; fail)| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(28)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(hnf = x; (def x' (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x' (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = hnf; (def x' (e')))| \xrnungosup{hnf-swap}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' ((hnf = x; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|hnf = x; (def x' (e'))|} && {|def x' ((hnf = x; e'))|} \\
-  & {(28)} & \\
-  {|x = hnf; (def x' (e'))|} && {|def x' ((x = hnf; e'))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(29)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((hnf = x; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((x = hnf; e); e2)| \xrnungosup{hnf-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(hnf = x; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(hnf = x; e); e2|} && {|hnf = x; (e; e2)|} \\
-  & {(29)} & \\
-  {|(x = hnf; e); e2|} && {|x = hnf; (e; e2)|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(30)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; (x = v; e'))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; (x = v; e'))| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (x1 = x2; e'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|x1 = x2; (x = v; e')|} && {|x = v; (x1 = x2; e')|} \\
-  & {(30)} & \\
-  {|x2 = x1; (x = v; e')|} && {|x = v; (x2 = x1; e')|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(31)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq; (x1 = x2; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x|\mapsto |x1|,\,|v|\mapsto |x2|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq; (x2 = x1; e))| \xrnungosup{var-swap}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x1 = x2; (eq; e))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|eq; (x1 = x2; e)|} && {|x1 = x2; (eq; e)|} \\
-  & {(31)} & \\
-  {|eq; (x2 = x1; e)|} && {|x2 = x1; (eq; e)|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(32)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; fail)| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(33)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x1 = x2; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x2 = x1; (def x (e')))| \xrnungosup{var-swap}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((x1 = x2; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|x1 = x2; (def x (e'))|} && {|def x ((x1 = x2; e'))|} \\
-  & {(33)} & \\
-  {|x2 = x1; (def x (e'))|} && {|def x ((x2 = x1; e'))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(34)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x1 = x2; e|}\quad$\movesto$\quad |x2 = x1; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((x1 = x2; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x1 = x2|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((x2 = x1; e); e2)| \xrnungosup{var-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(x1 = x2; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(x1 = x2; e); e2|} && {|x1 = x2; (e; e2)|} \\
-  & {(34)} & \\
-  {|(x2 = x1; e); e2|} && {|x2 = x1; (e; e2)|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(35)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x' = v'; e')|}\quad$\movesto$\quad |x' = v'; (eq'; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x' = v'; (x = v; e)))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; (x = v; (x' = v'; e)))| \xrnungosup{seq-swap}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v'; (eq'; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|eq'; (x' = v'; (x = v; e))|} &&&& {|x' = v'; (eq'; (x = v; e))|} \\
-  && {(35)} && \\
-  {|eq'; (x = v; (x' = v'; e))|} && {|eq'; (x' = v'; (x = v; e))|} && {|x' = v'; (eq'; (x = v; e))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{seq-swap}"', "{u\2}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{seq-swap}"', "{u}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(36)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v'; e'|}\quad$\movesto$\quad |e'|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v'; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v'; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{val-elim}{\emptypath} |(x = v; e)| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(37)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v' = fail; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v' = fail; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v' = fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v' = fail; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{fail-elim-eq}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|v' = fail; (x = v; e)|} &&&& {|fail|} \\
-  && {(37)} && \\
-  {|x = v; (v' = fail; e)|} && {|x = v; fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-eq}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-eq}"', "{u\2}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{u}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(38)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; (x = v; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (fail; e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{fail-elim-l}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|fail; (x = v; e)|} &&&& {|fail|} \\
-  && {(38)} && \\
-  {|x = v; (fail; e)|} && {|x = v; fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-l}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-l}"', "{u\2}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{u}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(39)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq'; e)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x = v; fail))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; fail)| \xrnungosup{fail-elim-r}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x = v; (eq'; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(40)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v' = (def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((v' = e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|v'|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v' = (def x' (e1)); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v' = (def x' (e1))|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (v' = (def x' (e1)); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x' ((v' = e1; (x = v; e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|v' = (def x' (e1)); (x = v; e)|} &&&& {|def x' ((v' = e1; (x = v; e)))|} \\
-  && {(40)} && \\
-  {|x = v; (v' = (def x' (e1)); e)|} && {|x = v; (def x' ((v' = e1; e)))|} && {|def x' ((x = v; (v' = e1; e)))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{exi-float-eq}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{exi-float-eq}"', "{u\2}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(41)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x' (e1)); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |def x' (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; ((def x' (e1)); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{exi-float-l}{\emptypath} |(def x' ((e1; (x = v; e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(def x' (e1)); (x = v; e)|} &&&& {|def x' ((e1; (x = v; e)))|} \\
-  && {(41)} && \\
-  {|x = v; ((def x' (e1)); e)|} && {|x = v; (def x' ((e1; e)))|} && {|def x' ((x = v; (e1; e)))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{exi-float-l}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{u\2}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(42)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq'; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(eq'; (x' = v; (def x (e))))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(eq'; (def x ((x' = v; e))))| \xrnungosup{exi-float-r}{\2} |t| \xrngosup{seq-swap}{\emptypath} |(x' = v; (eq'; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|eq'; (x' = v; (def x (e)))|} &&&& {|x' = v; (eq'; (def x (e)))|} \\
-  &&  && \\
-  && {(42)} && |x' = v; (def x ((eq'; e)))| \\
-  &&  && \\
-  {|eq'; (def x ((x' = v; e)))|} && {|def x ((eq'; (x' = v; e)))|} && {|def x ((x' = v; (eq'; e)))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-swap}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{exi-float-r}"', "{u}", dashed, from=5-1, to=5-3]
-\arrow["\rulename{seq-swap}"', "{u\2}", dashed, from=5-3, to=5-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(43)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x' = (eq'; e1); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; (x' = (eq'; e1); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x' = e1; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(44)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); (x = v; e))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x = v; ((eq'; e1); e))| \xrnungosup{seq-swap}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; (x = v; e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(eq'; e1); (x = v; e)|} && {|eq'; (e1; (x = v; e))|} \\
-  &  & \\
-  & {(44)} & |eq'; (x = v; (e1; e))| \\
-  &  & \\
-  {|x = v; ((eq'; e1); e)|} && {|x = v; (eq'; (e1; e))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(45)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; (x = v; e)); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((x = v; (eq; e)); e2)| \xrnungosup{seq-swap}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; ((x = v; e); e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(eq; (x = v; e)); e2|} &&&& {|eq; ((x = v; e); e2)|} \\
-  &&  && \\
-  && {(45)} && |eq; (x = v; (e; e2))| \\
-  &&  && \\
-  {|(x = v; (eq; e)); e2|} && {|x = v; ((eq; e); e2)|} && {|x = v; (eq; (e; e2))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=5-1, to=5-3]
-\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-3, to=5-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(46)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{val-elim}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|v; fail|} && {|fail|} \\
-  & {(46)} & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(47)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (e'))| \xrnungosup{val-elim}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((v; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|v; (def x (e'))|} && {|def x ((v; e'))|} \\
-  & {(47)} & \\
-  {|def x (e')|} && {|def x (e')|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(48)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(e; e2)| \xrnungosup{val-elim}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(v; e); e2|} && {|v; (e; e2)|} \\
-  & {(48)} & \\
-  {|e; e2|} && {|e; e2|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(49)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x' ((x' = v; e'))|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|v|,|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x ((x' = v; e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |x' = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(x' = v; e')| \xrnungosup{exi-elim}{\emptypath} |t| \xrngosup{eqn-elim}{\emptypath} |e'| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(50)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x ((def x2 (e'))))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x2 (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|x1|\mapsto |x|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x2 (e'))| \xrnungosup{exi-elim}{\emptypath} |t| \xrngosup{exi-swap}{\emptypath} |(def x2 ((def x (e'))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|def x ((def x2 (e')))|} && {|def x2 ((def x (e')))|} \\
-  &  & \\
-  & {(50)} & |def x ((def x2 (e')))| \\
-  &  & \\
-  {|def x2 (e')|} && {|def x2 (e')|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(51)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1 ((def x (e))))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1 (e))| \xrnungosup{exi-elim}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x ((def x1 (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|def x1 ((def x (e)))|} && {|def x ((def x1 (e)))|} \\
-  &  & \\
-  & {(51)} & |def x1 ((def x (e)))| \\
-  &  & \\
-  {|def x1 (e)|} && {|def x1 (e)|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(52)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e')))|}\quad$\movesto$\quad |def x2 ((def x1 (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1 ((def x ((x = v; e)))))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2|\mapsto |x|,\,|e'|\mapsto |x = v; e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1 (e))| \xrnungosup{eqn-elim}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x ((def x1 ((x = v; e)))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|def x1 ((def x ((x = v; e))))|} && {|def x ((def x1 ((x = v; e))))|} \\
-  &  & \\
-  & {(52)} & |def x1 ((def x ((x = v; e))))| \\
-  &  & \\
-  {|def x1 (e)|} && {|def x1 (e)|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-elim}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(53)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = fail; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-eq}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(54)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = fail; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-eq}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((v = fail; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|v = fail; (def x (e'))|} && {|def x ((v = fail; e'))|} \\
-  &  & \\
-  & {(54)} & |def x (fail)| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(55)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v = fail; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-eq}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v = fail; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(v = fail; e); e2|} && {|v = fail; (e; e2)|} \\
-  & {(55)} & \\
-  {|fail; e2|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(56)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-l}{\emptypath} |t| \xrngosup{fail-elim-r}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|fail; fail|} && {|fail|} \\
-  & {(56)} & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(57)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail; (def x (e')))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-l}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((fail; e')))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|fail; (def x (e'))|} && {|def x ((fail; e'))|} \\
-  &  & \\
-  & {(57)} & |def x (fail)| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(58)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((fail; e); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|,\,|e1|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-l}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(fail; (e; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(fail; e); e2|} && {|fail; (e; e2)|} \\
-  & {(58)} & \\
-  {|fail; e2|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(59)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = (def x (e1)); fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v = (def x (e1))|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x ((v = e1; fail)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(60)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x (e1)); fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |def x (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{exi-float-l}{\emptypath} |(def x ((e1; fail)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(def x (e1)); fail|} && {|def x ((e1; fail))|} \\
-  &  & \\
-  & {(60)} & |def x (fail)| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-l}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-elim}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(61)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x = (eq'; e1); fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x = e1; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(62)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{fail-elim-r}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(eq'; e1); fail|} && {|eq'; (e1; fail)|} \\
-  &  & \\
-  & {(62)} & |eq'; fail| \\
-  &  & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(63)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; fail); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(fail; e2)| \xrnungosup{fail-elim-r}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; (fail; e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(eq; fail); e2|} && {|eq; (fail; e2)|} \\
-  &  & \\
-  & {(63)} & |eq; fail| \\
-  &  & \\
-  {|fail; e2|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{u}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(64)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e))|}\quad$\movesto$\quad |def x' ((eq; e))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(v = (def x (e1)); (def x' (e)))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e2|\mapsto |def x' (e)|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((v = e1; (def x' (e)))))| \xrnungosup{exi-float-eq}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' ((v = (def x (e1)); e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|v = (def x (e1)); (def x' (e))|} && {|def x' ((v = (def x (e1)); e))|} \\
-  &  & \\
-  & {(64)} & |def x' ((def x ((v = e1; e))))| \\
-  &  & \\
-  {|def x ((v = e1; (def x' (e))))|} && {|def x ((def x' ((v = e1; e))))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{exi-float-r}"', "{u\2}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(65)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1'); e2'|}\quad$\movesto$\quad |eq; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((v = (def x (e1)); e2); e2')|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((v = e1; e2))); e2')| \xrnungosup{exi-float-eq}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(v = (def x (e1)); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(v = (def x (e1)); e2); e2'|} &&&& {|v = (def x (e1)); (e2; e2')|} \\
-  && {(65)} && \\
-  {|(def x ((v = e1; e2))); e2'|} && {|def x (((v = e1; e2); e2'))|} && {|def x ((v = e1; (e2; e2')))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(66)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e))|}\quad$\movesto$\quad |def x' ((eq; e))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((def x (e1)); (def x' (e)))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e2|\mapsto |def x' (e)|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((e1; (def x' (e)))))| \xrnungosup{exi-float-l}{\emptypath} |t| \xrngosup{exi-float-r}{\emptypath} |(def x' (((def x (e1)); e)))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(def x (e1)); (def x' (e))|} && {|def x' (((def x (e1)); e))|} \\
-  &  & \\
-  & {(66)} & |def x' ((def x ((e1; e))))| \\
-  &  & \\
-  {|def x ((e1; (def x' (e))))|} && {|def x ((def x' ((e1; e))))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{exi-float-r}"', "{u\2}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(67)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1'); e2'|}\quad$\movesto$\quad |eq; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((def x (e1)); e2); e2')|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((e1; e2))); e2')| \xrnungosup{exi-float-l}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((def x (e1)); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|((def x (e1)); e2); e2'|} &&&& {|(def x (e1)); (e2; e2')|} \\
-  && {(67)} && \\
-  {|(def x ((e1; e2))); e2'|} && {|def x (((e1; e2); e2'))|} && {|def x ((e1; (e2; e2')))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(68)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(x' = (eq'; e1); (def x (e)))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x ((x' = (eq'; e1); e)))| \xrnungosup{exi-float-r}{\emptypath} |t| \xrngosup{eqn-float}{\emptypath} |(eq'; (x' = e1; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(69)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq'; e1); (def x (e)))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x (((eq'; e1); e)))| \xrnungosup{exi-float-r}{\emptypath} |t| \xrngosup{seq-assoc}{\emptypath} |(eq'; (e1; (def x (e))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(eq'; e1); (def x (e))|} && {|eq'; (e1; (def x (e)))|} \\
-  &  & \\
-  & {(69)} & |eq'; (def x ((e1; e)))| \\
-  &  & \\
-  {|def x (((eq'; e1); e))|} && {|def x ((eq'; (e1; e)))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-3, to=5-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(70)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((eq; (def x (e))); e2)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |def x (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((def x ((eq; e))); e2)| \xrnungosup{exi-float-r}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(eq; ((def x (e)); e2))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(eq; (def x (e))); e2|} &&&& {|eq; ((def x (e)); e2)|} \\
-  &&  && \\
-  && {(70)} && |eq; (def x ((e; e2)))| \\
-  &&  && \\
-  {|(def x ((eq; e))); e2|} && {|def x (((eq; e); e2))|} && {|def x ((eq; (e; e2)))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{u}", dashed, from=5-1, to=5-3]
-\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=5-3, to=5-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-5, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=3-5, to=5-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(71)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((x = (eq; e1); e2); e2')|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |x = (eq; e1)|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((eq; (x = e1; e2)); e2')| \xrnungosup{eqn-float}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |(x = (eq; e1); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(72)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((eq; e1); e2); e2')|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq; e1|,\,|e1'|\mapsto |e2|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((eq; (e1; e2)); e2')| \xrnungosup{seq-assoc}{\1} |t| \xrngosup{seq-assoc}{\emptypath} |((eq; e1); (e2; e2'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|((eq; e1); e2); e2'|} &&&& {|(eq; e1); (e2; e2')|} \\
-  && {(72)} && \\
-  {|(eq; (e1; e2)); e2'|} && {|eq; ((e1; e2); e2')|} && {|eq; (e1; (e2; e2'))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{seq-assoc}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(73)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1 ((def x2 (e)))|}\quad$\movesto$\quad |def x2 ((def x1 (e)))|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x1' ((def x2' (e')))|}\quad$\movesto$\quad |def x2' ((def x1' (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(def x1' ((def x1 ((def x2 (e))))))|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x2'|\mapsto |x1|,\,|e'|\mapsto |def x2 (e)|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(def x1' ((def x2 ((def x1 (e))))))| \xrnungosup{exi-swap}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x1 ((def x1' ((def x2 (e))))))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|def x1' ((def x1 ((def x2 (e)))))|} && {|def x1 ((def x1' ((def x2 (e)))))|} \\
-  & {(73)} & \\
-  {|def x1' ((def x2 ((def x1 (e)))))|} && {|def x1' ((def x1 ((def x2 (e)))))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", from=1-1, to=3-1]
-\arrow["\rulename{exi-swap}"', "{u}", from=1-1, to=1-3]
-\arrow["\rulename{exi-swap}"', "{u\2}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(74)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e' `choice` fail|}\quad$\movesto$\quad |e'|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(fail `choice` fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |fail| \xrnungosup{choose-r}{\emptypath} |t| \xrngosup{choose-l}{\emptypath} |fail| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|fail `choice` fail|} && {|fail|} \\
-  & {(74)} & \\
-  {|fail|} && {|fail|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{choose-l}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{0}{\hbox{$\equiv$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(75)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((fail `choice` e) `choice` e3)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1|\mapsto |fail|,\,|e2|\mapsto |e|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(e `choice` e3)| \xrnungosup{choose-r}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |(fail `choice` (e `choice` e3))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(fail `choice` e) `choice` e3|} && {|fail `choice` (e `choice` e3)|} \\
-  & {(75)} & \\
-  {|e `choice` e3|} && {|e `choice` e3|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(76)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((e1 `choice` e2) `choice` fail)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,|e|\mapsto |e1 `choice` e2|\,\}$} and {\color{blue}$\sigma_2=\{\,|e3|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(e1 `choice` e2)| \xrnungosup{choose-l}{\emptypath} |t| \xrngosup{choose-assoc}{\emptypath} |(e1 `choice` (e2 `choice` fail))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(e1 `choice` e2) `choice` fail|} && {|e1 `choice` (e2 `choice` fail)|} \\
-  & {(76)} & \\
-  {|e1 `choice` e2|} && {|e1 `choice` e2|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", from=1-1, to=3-1]
-\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(77)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |((e `choice` fail) `choice` e3)|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1|\mapsto |e|,\,|e2|\mapsto |fail|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |(e `choice` e3)| \xrnungosup{choose-l}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |(e `choice` (fail `choice` e3))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|(e `choice` fail) `choice` e3|} && {|e `choice` (fail `choice` e3)|} \\
-  & {(77)} & \\
-  {|e `choice` e3|} && {|e `choice` e3|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\rotatebox{0}{\hbox{$u\2$}}}", dashed, from=1-3, to=3-3]
-\end{tikzcd}
-\end{center}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(78)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1' `choice` e2') `choice` e3'|}\quad$\movesto$\quad |e1' `choice` (e2' `choice` e3')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair $(|t_1|, |t_2|)$ derived from the common term $|t| \equiv |(((e1 `choice` e2) `choice` e3) `choice` e3')|$\vadjust{\penalty1000}\hfil\break
-obtained from {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1'|\mapsto |e1 `choice` e2|,\,|e2'|\mapsto |e3|\,\}$}:\hfill\vadjust{\penalty1000}\hfil\break
-\null\hskip 2em minus 1.95em $|t_1| \equiv |((e1 `choice` (e2 `choice` e3)) `choice` e3')| \xrnungosup{choose-assoc}{\1} |t| \xrngosup{choose-assoc}{\emptypath} |((e1 `choice` e2) `choice` (e3 `choice` e3'))| \equiv |t_2|$.\vadjust{\penalty1000}\hfil\break
-\begin{center}
-\begin{tikzcd}
-  [row sep=large  ]
-  {|((e1 `choice` e2) `choice` e3) `choice` e3'|} &&&& {|(e1 `choice` e2) `choice` (e3 `choice` e3')|} \\
-  && {(78)} && \\
-  {|(e1 `choice` (e2 `choice` e3)) `choice` e3'|} && {|e1 `choice` ((e2 `choice` e3) `choice` e3')|} && {|e1 `choice` (e2 `choice` (e3 `choice` e3'))|} \\
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-assoc}}}}"', "{\rotatebox{0}{\hbox{$u\1$}}}", from=1-1, to=3-1]
-\arrow["\rulename{choose-assoc}"', "{u}", from=1-1, to=1-5]
-\arrow["\rulename{choose-assoc}"', "{u}", dashed, from=3-1, to=3-3]
-\arrow["\rulename{choose-assoc}"', "{u\2}", dashed, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-assoc}}}}"', "{\rotatebox{0}{\hbox{$u$}}}", dashed, from=1-5, to=3-5]
-\end{tikzcd}
-\end{center}
-\par
-
-E--------------
-done
