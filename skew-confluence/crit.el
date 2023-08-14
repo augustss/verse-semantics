@@ -1893,15 +1893,19 @@
 
 ;;; Return just the substituted beta
 (defun apply-rewrite-rule (rule term path)
-  (let ((res (try-rewrite-rule rule term (canonical-path path))))
-    (unless res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))
-    (do-every-replace-or-subst (first res))))
+  (let ((cp (canonical-path path)))
+    (cond ((eq cp 'DUMMY) term)
+	  (t (let ((res (try-rewrite-rule rule term cp)))
+	       (unless res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))
+	       (do-every-replace-or-subst (first res)))))))
 
 ;;; Return a 2-list of substituted beta and substituted cond
 (defun apply-rewrite-rule-with-cond (rule term path)
-  (let ((res (try-rewrite-rule rule term (canonical-path path))))
-    (unless res (error "Applying rewrite rule %s to term %s / %s (with cond) failed" (rule-name rule) term path))
-    (mapcar #'do-every-replace-or-subst res)))
+  (let ((cp (canonical-path path)))
+    (cond ((eq cp 'DUMMY) (list term nil))
+	  (t (let ((res (try-rewrite-rule rule term cp)))
+	       (unless res (error "Applying rewrite rule %s to term %s / %s (with cond) failed" (rule-name rule) term path))
+	       (mapcar #'do-every-replace-or-subst res))))))
 
 ;;; Return a 2-list of substituted beta and substituted cond
 (defun try-rewrite-rule (rule term path)
