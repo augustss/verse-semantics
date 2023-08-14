@@ -46,6 +46,10 @@ verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
 verify(fail) { ex_stuck1(x:any) := { y:any; y } }
 verify(fail) { ex_stuck2(x:any) := { y:any; z:any; y = (x, (x, y)); y } }
 verify(fail) { ex_stuck3(x:any) := { y:any; if (y = 3) then { y = 3 } else { y = 4 } } }
+verify(pass) { f(x:int) := {y:any; if (x > 1) then { y = 1 } else { y = 2 }; y} }
+verify(fail) { f(x:int) := {y:any; if (y > 1) then { y = 1 } else { y = 2 }; y} }
+
+
 
 # shows that Unfold-If is UNSOUND; instead use `Fork-If`
 verify(fail) { foo(n:any):int := if (int[n]) then { 0 } else { (1,2) } }
@@ -88,3 +92,8 @@ verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo
 
 verify(pass) {f(x:int)<succeeds>:=x/2}
 verify(fail) {f(x:int)<succeeds>:=x/0}
+
+# Tim examples 8/9/2023
+# verify(pass) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
+# verify(pass) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
+# forall x y . exists z . assume{z = x}; z = x; x = y

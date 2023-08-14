@@ -27,7 +27,7 @@ import Rules.Systems(ESystem, TRSystem(..))
 --import Verifier.Verify
 import Rules.Verifier
 import TRS.Traced(toList, showTrace)
---import TRS.Bind(free)
+-- import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
 tryIt iob aiob ioa = do
@@ -275,13 +275,17 @@ cVerify = do
         pp $ snd $ head $ toList trc
       pure ()
 
+systemDescr :: ESystem -> String
+systemDescr s = sname s ++ ": " ++ description s
+
+
 cRules :: Run CState
-cRules "" s = do putStrLn $ "rules: " ++ sname (esystem s) ++ " - " ++ description (esystem s); pure s
+cRules "" s = do putStrLn ("rules: " ++ systemDescr (esystem s)); pure s
 cRules line s =
   case findSystem line of
     Left msg -> do putStrLn msg; pure s
     Right sys -> do
-      putStrLn $ "Selected=" ++ sname sys ++ ": " ++ description sys
+      putStrLn $ "Selected=" ++ systemDescr sys
       pure s{ esystem = sys,
               flags = adjustFlags sys (flags s) }
 
@@ -294,7 +298,7 @@ setPrelude pn cs =
   case findPrelude pn of
     Left msg -> error $ "prelude failed " ++ msg
     Right prel -> pure cs{ flags = (flags cs){ fPrelude = prel } }
-  
+
 
 {-
 cDefEval :: Run CState

@@ -23,6 +23,10 @@ f64         (_x:any$)                 <decides>   := { isF64$[_x]; _x };
 string      (_x:any$)                 <decides>   := { isStr$[_x]; _x };
 char        (_x:any$)                 <decides>   := { isChr$[_x]; _x };
 nat         (_x:any$)                 <decides>   := { isInt$[_x]; ratGE$[_x,0]; _x };
+comparable  (_x:any$)                 <decides>   := { isInt$[_x] | isRat$[_x] | isF32$[_x] | isF64$[_x] | isStr$[_x] | isChr$[_x]; _x };
+void        (_x:any$)                             := array{};
+Length      (_x:any$)                 <decides>   := { isArr$[_x]; arrLen$[_x] };
+Err         (_x:any$)                             := { err$[_x] };
 
 #operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};
 postfix'^'(_p:any$)<reads><decides>  := read$[_p];

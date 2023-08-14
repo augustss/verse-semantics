@@ -64,7 +64,8 @@ data Expr
   = Lit Lit                   -- k
   | Variable Ident            -- x
   | QualVariable Expr Ident   -- (e:)x
-  | Array [Expr]              -- e1,e2,...
+  | Array [Expr]              -- array{e1;e2;...}
+  | Tuple [Expr]              -- e1,e2,...             -- will be turned into Array
   | ApplyS Expr Expr          -- f(e)
   | ApplyD Expr Expr          -- f[e]
   | ApplyEff [Eff] Expr       -- eff(rs){e}
@@ -189,6 +190,7 @@ instance Pretty Expr where
         case expr of
           Lit lit -> ppr p lit
           Array es -> text "array" <> braces (ppSeq l es)
+          Tuple es -> parens (ppEs es)
           Seq es -> maybeParens (p > 0) $ ppSeq l es
           Variable v -> ppr 0 v
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
@@ -251,7 +253,7 @@ instance Pretty Expr where
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
           HasType e t -> --ppNormal (InfixOp e (Op ":") t)
-                         text "ofType" <> parens (ppr 0 e) <> braces (ppr 0 t)
+                         text "hasType" <> parens (ppr 0 t) <> braces (ppr 0 e)
           TLam i rs e1 e2 me3 -> text "tlam" <> parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2) <>
             maybe empty (braces . ppr 0) me3
           DomainFail -> text "DomainFail"
@@ -323,6 +325,7 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inn "pre[]"  11
       , inn "macro"  12
       , inl "()"     13
+      , inl "&"      13
       ]
 
 compos :: (Applicative f) => (Expr -> f Expr) -> Expr -> f Expr
@@ -330,6 +333,7 @@ compos _ e@Lit{} = pure e
 compos _ e@Variable{} = pure e
 compos f (QualVariable e v) = QualVariable <$> f e <*> pure v
 compos f (Array es) = Array <$> traverse f es
+compos f (Tuple es) = Tuple <$> traverse f es
 compos f (Seq es) = Seq <$> traverse f es
 compos f (ApplyS e1 e2) = ApplyS <$> f e1 <*> f e2
 compos f (ApplyD e1 e2) = ApplyD <$> f e1 <*> f e2

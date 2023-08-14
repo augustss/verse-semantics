@@ -311,7 +311,7 @@ for the Verse language.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newcommand{\mustSucceedKW}{\mathsf{Suc}}
-\newcommand{\mustSucceed}[1]{\ensuremath{\mustSucceedKW(#1)}}
+\newcommand{\mustSucceed}[2]{\ensuremath{\mustSucceedKW(#1, #2)}}
 \newcommand{\mustDecideKW}{\mathsf{Dec}}
 \newcommand{\mustDecide}[2]{\ensuremath{\mustDecideKW(#1, #2)}}
 \newcommand{\mustVerifyKW}{\mathsf{Prove}}
@@ -320,6 +320,7 @@ for the Verse language.
 \newcommand{\lamvars}[1]{\mathsf{lams}(#1)}
 \newcommand{\isdone}[1]{\mathsf{Verified}(#1)}
 \newcommand{\UnAssume}[1]{\ensuremath{\lfloor #1 \rfloor}}
+\newcommand{\impl}[2]{\ensuremath{\UnAssume{#1} = \UnAssume{#2}}}
 \newcommand{\FEnv}[1]{\ensuremath{\Gamma(#1)}}
 \newcommand{\Facts}[1]{\ensuremath{\mathsf{Facts}(#1)}}
 
@@ -328,6 +329,7 @@ for the Verse language.
 \newcommand{\Fe}[2]{\llbracket #1 \triangleright #2 \rrbracket}
 \newcommand{\Me}[2]{\llbracket #1 \blacktriangleright #2 \rrbracket}
 \newcommand{\Ae}[2]{\llbracket #1 \ \textbf{as}\ #2 \rrbracket}
+\newcommand{\verifier}{\textsc{TRSVerifier}\xspace}
 
 % \newcommand{\dsm}[1]{{\mathcal M}\llbracket #1 \rrbracket}
 % \newcommand{\Me}[1]{#1}

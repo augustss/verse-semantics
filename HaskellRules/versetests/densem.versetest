@@ -24,7 +24,7 @@ testeq(pass) {all{:(1,2,3)}}                            {1,2,3}
 testeq(pass) {all{x:(1,2,3); x}}                        {1,2,3}
 testeq(pass) {all{x:= :(1,2,3); x}}                     {1,2,3}
 testeq(pass) {all{x:(1,2,3)}}                           {1,2,3}
-testeq(pass) {one{t:=type{0|1}; f(x:t)<covariant>:=x+1; f[0]}}     {1}
-testeq(pass) {one{t:=type{0|1}; f(x:t)<covariant>:=x+1; f[2]}}     {:false}
+testeq(pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[0]}}     {1}
+testeq(pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[2]}}     {:false}
 
 testeq(pass) { x := ((:any) => 1)[x+1] }           {1}

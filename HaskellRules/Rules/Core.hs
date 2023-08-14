@@ -17,6 +17,7 @@ module Rules.Core(
   pattern Val, getVal,
   pattern HNF, getHNF,
   pattern CON,
+  pattern INT,
   isHNF,
   isVal,
   isLam,
@@ -61,6 +62,7 @@ data Expr
   = Var Ident                   -- ^ x
     -- The following 4 are the old HNF type
   | Int Integer                 -- ^ k
+  | Char Char                   -- ^ 'c'
   | Op Op                       -- ^ op
   | Arr [Expr]                  -- ^ <e1,e2,...>
   | Lam (Bind Expr)             -- ^ \ x . e
@@ -112,6 +114,7 @@ infix  5 :~:
 instance Pretty Expr where
   pPrintPrec l p (Var v)          = pPrintPrec l p v
   pPrintPrec l p (Int k)          = pPrintPrec l p k
+  pPrintPrec _ _ (Char c)         = text (show c)
   pPrintPrec l p (Op o)           = pPrintPrec l p o
   pPrintPrec l _ (Arr es)         = text "<" <> fsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l p (LAM x e)        = maybeParens (p > 0) $ sep [text "\\" <> pPrintPrec l 0 x <> text ".", pPrintPrec l 0 e]
@@ -162,6 +165,10 @@ comp _xs _ys _       (Var _) = GT
 comp _xs _ys (Int a) (Int b) = compare a b
 comp _xs _ys (Int _) _       = LT
 comp _xs _ys _       (Int _) = GT
+
+comp _xs _ys (Char a) (Char b) = compare a b
+comp _xs _ys (Char _) _        = LT
+comp _xs _ys _        (Char _) = GT
 
 comp _xs _ys (Op a) (Op b) = compare a b
 comp _xs _ys (Op _) _      = LT
@@ -272,6 +279,8 @@ data Op
   | Neg
   | Plus
   | IsInt
+  | IsChar
+  | IsArr
   | MapAp
   | Cons
   | Alloc
@@ -281,13 +290,15 @@ data Op
   | DotDot
   | Print
   | Append
+  | Length
+  | Error
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where
   pPrintPrec _ _ = text . map toLower . show
 
 opArity :: Op -> Int
-opArity o | o `elem` [Neg, Plus, IsInt, MapAp, Alloc, Read, Print] = 1
+opArity o | o `elem` [Neg, Plus, IsInt, IsChar, IsArr, MapAp, Alloc, Read, Print, Length, Error] = 1
           | o == Append = 3
           | otherwise = 2
 
@@ -329,6 +340,7 @@ pattern HNF e <- (getHNF -> Just e)
 
 getHNF :: Expr -> Maybe Expr
 getHNF e@Int{} = Just e
+getHNF e@Char{} = Just e
 getHNF e@Op{}  = Just e
 getHNF e@Arr{} = Just e
 getHNF e@Ref{} = Just e
@@ -342,11 +354,15 @@ isLam :: Expr -> Bool
 isLam (LAM _ _) = True
 isLam _ = False
 
+pattern INT :: Expr -> Expr
+pattern INT e = Op IsInt :@: e
+
 pattern CON :: Expr -> Expr
 pattern CON e <- (getCON -> Just e)
 
 getCON :: Expr -> Maybe Expr
 getCON e@Int{} = Just e
+getCON e@Char{} = Just e
 getCON e@Op{} = Just e
 getCON e@Ref{} = Just e
 getCON _ = Nothing
@@ -477,6 +493,7 @@ bndIds (BBlk   : bs) =     bndIds bs
 instance Free Expr where
   free (Var v)   = [v]
   free Int{}     = []
+  free Char{}    = []
   free Op{}      = []
   free (Arr vs)  = free vs
   free (Lam bnd) = free bnd
@@ -517,6 +534,7 @@ instance Substitutable Expr where
   subst [] e = e
   subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
   subst _sub e@Int{}  = e
+  subst _sub e@Char{} = e
   subst _sub e@Op{}   = e
   subst sub (Arr vs)  = Arr (map (subst sub) vs)
   subst sub (Lam bnd) = Lam (substBind Var subst sub bnd)
@@ -582,6 +600,7 @@ instance Arbitrary Expr where
   -- shrink _ = []
   shrink (Var _)   = [ Int 0, Arr [] ]
   shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
+  shrink (Char n)  = [ Char n' | n' <- shrink n ] ++ [ Arr [] ]
   shrink (Op _)    = []
   shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
   shrink (Lam (Bind x e)) = [ Arr [] ] ++ [ e | x `notElem` free e] ++ [ Lam (Bind x e') | e' <- shrink e ]
@@ -713,6 +732,7 @@ substExp from to = sub
     sub e | e == from = to
     sub e@Var{}   = e
     sub e@Int{}   = e
+    sub e@Char{}  = e
     sub e@Op{}    = e
     sub (Arr vs)  = Arr (map sub vs)
 {-

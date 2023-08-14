@@ -253,10 +253,13 @@ pAtom = choice [ pMacro, Variable <$> pIdent, pQualVariable, pLiteral, pEmpty
 pQualVariable :: P Expr
 pQualVariable = try (QualVariable <$> pParens (pExprT <* char ':') <*> pIdent)
 
--- XXX This does not behave like TimVerse.  Without ';' the ',' is use as the delimiter.
+-- Try to mimic TimVerse by turning a tuple into an array
 -- A trailing ';' can be used, but not a trailing ','.
 pArray :: P Expr
-pArray = pKeyword "array" *> (Array <$> pBlockEs)
+pArray = pKeyword "array" *> (tArray <$> pBlockEs)
+  where
+    tArray [Tuple es] = Array es
+    tArray es = Array es
 
 --pTypedef :: P Expr
 --pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
@@ -494,6 +497,10 @@ operatorTable =
 
 pExprT :: P Expr
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
+  where
+    arrayS :: [Expr] -> Expr
+    arrayS [e] = e
+    arrayS es = Tuple es
 
 pFile :: P Expr
 --pFile = skip *> pExprSeq <* eof
@@ -502,10 +509,6 @@ pFile = skip *> p <* eof
     p = do
       S.modify $ \ ls -> ls{ blkIndent = [""] }
       seqS <$> pIndBlock'
-
-arrayS :: [Expr] -> Expr
-arrayS [e] = e
-arrayS es = Array es
 
 ------
 

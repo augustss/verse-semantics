@@ -10,6 +10,7 @@ module Rules.Verifier(
   icfpeVerifier,
   verify,
   verifyM,
+  wrapAssert,
   ) where
 import TRS.Bind
 import TRS.TRS hiding (step)
@@ -42,10 +43,13 @@ verify sys e =
         Just  x -> x
         Nothing -> undefined
 
--- isDone :: Expr -> Bool
--- isDone = collect done (&&)
+wrapAssert :: Expr -> Expr
+wrapAssert = Assert
+--  --  | noChecks e = Assert e
+--  --  | otherwise  = e
 --  where
 --   -- done (Verify _) = False
+--   noChecks        = collect done (&&)
 --   done (Assert _) = False
 --   done (Decide _) = False
 --   done _          = True
@@ -221,7 +225,7 @@ assumeAssertRules env lhs =
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
   ++
   "subst-asm" `name`
-  -- asm{X[x=v]}; e --> asm{X[x=v]} ; (subst x v e)
+  -- asm{X[x=v]}; e --> asm{X[x=v]} ; (subst x v e)         if x in FV(e), x not in FV(v)
   do (Assume e_asm) :>: e <- [lhs]
      (_ctx, Var x :=: Val v) <- execX e_asm
      let freeE = free e
@@ -234,72 +238,70 @@ assumeAssertRules env lhs =
      pure (Assume e_asm :>: subst sub e)
 
 
--- mustSucceed :: Expr -> Bool
--- mustSucceed (Int _)          = True
--- mustSucceed (Arr as)         = all mustSucceed as
--- mustSucceed (Lam _)          = True
--- mustSucceed (Assume _)       = True
--- mustSucceed (One e)          = mustSucceed e
--- mustSucceed (e1 :>: e2)      = mustSucceed e1 && mustSucceed e2
--- mustSucceed (e1 :|: e2)      = mustSucceed e1 || mustSucceed e2
--- mustSucceed (Exi (Bind _ e)) = mustSucceed e
--- mustSucceed _                = False
-
 mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
-mustSucceed q bs = go q
+mustSucceed _ bs = go
   where
-   lamBinds       = [x | BLam x <- bs]
-   go g e = {- proves g e || -} step g e
-   step _ (Int _)          = True
-   step g (Arr as)         = all (go g) as
-   step _ (Var x)          = x `elem` lamBinds
-   step _ (Lam _)          = True
-   step _ (Assume _)       = True
-   step g (One e)          = go g e
-   step g (e1 :>: e2)      = go g e1 && go (g :>: e1) e2
-   step g (e1 :|: e2)      = go g e1 || go g e2
-   step g (Exi (Bind _ e)) = go g e
-   step _ _                = False
+   lamBinds            = [x | BLam x <- bs]
+   go (Int _)          = True
+   go (Arr as)         = all go as
+   go (Lam _)          = True
+   go (Var x)          = x `elem` lamBinds
+   go (Assume _)       = True
+   go (e1 :>: e2)      = go e1 && go e2
+   -- go (One e)          = go e
+   -- go (e1 :|: e2)      = go e1 || go e2
+   go (Exi (Bind _ e)) = go e
+   go _                = False
 
 
 mustDecide :: QContext -> [BndVar] -> Expr -> Bool
-mustDecide _q bs = go
+mustDecide _ bs = go
   where
     lamBinds       = [x | BLam x <- bs]
-    go e = {- proves q e || -} step e
-    step (Arr as)    = all go as
-    step (One e)     = step e
-    step (e1 :=: e2) = step e1 && step e2
-    step (e1 :|: e2) = step e1 && step e2
-    step (e1 :>: e2) = step e1 && step e2
-    step (e1 :@: e2) = step e1 && step e2 && isDecideOp e1
-    step (Assume _)  = True
-    step (Int _)     = True
-    step (Op _)      = True
-    step (Var x)     = x `elem` lamBinds
-    step _           = False
+    go (Int _)     = True
+    go (Arr as)    = all go as
+    go (Lam _)     = True
+    go (Var x)     = x `elem` lamBinds
+    go (Assume _)  = True
+    -- go (One e)     = go e
+    go (e1 :|: e2) = go e1 && go e2
+    go (e1 :>: e2) = go e1 && go e2
+    go (e1 :=: e2) = go e1 && go e2
+    go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
+    go (Op _)      = True
+    go _           = False
 
 isDecideOp :: Expr -> Bool
-isDecideOp (Op Le)    = True
-isDecideOp (Op Lt)    = True
-isDecideOp (Op Ge)    = True
-isDecideOp (Op Gt)    = True
-isDecideOp (Op Ne)    = True
-isDecideOp (Op Div)   = True
-isDecideOp (Op IsInt) = True
-isDecideOp (Op DotDot)= True
-isDecideOp (Op Append)= True
-isDecideOp _          = False
+isDecideOp (Op Le)     = True
+isDecideOp (Op Lt)     = True
+isDecideOp (Op Ge)     = True
+isDecideOp (Op Gt)     = True
+isDecideOp (Op Ne)     = True
+isDecideOp (Op Div)    = True
+isDecideOp (Op IsInt)  = True
+isDecideOp (Op IsChar) = True
+isDecideOp (Op DotDot) = True
+isDecideOp (Op Append) = True
+isDecideOp _           = False
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules env lhs =
    -- PROVE --
-   -- P[e; e'] ----> P[e']   if   P |- e
-   "prove" `name`
-   do (ctx, g, bs, e :>: e') <- eX lhs
-      guard (proves g bs e)
-      pure (ctx e')
+   -- -- P[e; e'] ----> P[e']   if   P |- e
+   -- "prove" `name`
+   -- do (ctx, g, bs, e :>: e') <- eX lhs
+   --    guard (proves g bs e)
+   --    pure (ctx e')
+   -- ++
+   -- asm{e}; P[e; e'] ----> P[e']   if   fv(e) disjoint from bvars(P)
+   "implies" `name`
+   do (Assume e) :>: rhs <- [lhs]
+      (ctx, _, bs, e1 :>: e2) <- eX rhs
+      guard (null (free e1 `intersect` bndIds bs))
+      guard (implies e e1)
+      guard (e /= Fail)
+      pure (Assume e :>: ctx e2)
    ++
    -- ASSERT --
    -- P[Assert { e }] ----> e   if   mustSucceed(P, e)
@@ -345,17 +347,26 @@ verifierRules env lhs =
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
 --------------------------------------------------------------------------------
+unAssume :: Expr -> Expr
+unAssume (e1 :>: e2) = unAssume e1 :>: unAssume e2
+unAssume (e1 :|: e2) = unAssume e1 :|: unAssume e2
+unAssume (f :@: x)   = unAssume f :@: unAssume x
+unAssume (Assume a)  = unAssume a
+unAssume (e1 :=: e2) = unAssume e1 :=: unAssume e2
+unAssume a           = a
 
-proves :: QContext -> [BndVar] -> Expr -> Bool
-proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
+implies :: Expr -> Expr -> Bool
+implies e1' e2'
+  | e1 == e2                       = True
+  | INT a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
+  | otherwise                      = False
+  where
+   e1 = unAssume e1'
+   e2 = unAssume e2'
+
+_proves :: QContext -> [BndVar] -> Expr -> Bool
+_proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
  where
-  unAssume (e1 :>: e2) = unAssume e1 :>: unAssume e2
-  unAssume (e1 :|: e2) = unAssume e1 :|: unAssume e2
-  unAssume (f :@: x)   = unAssume f :@: unAssume x
-  unAssume (Assume a)  = unAssume a
-  unAssume (e1 :=: e2) = unAssume e1 :=: unAssume e2
-  unAssume a           = a
-
   vs = free e
 
   facts (g1 :>: g2) = facts g1 ++ facts g2
@@ -367,7 +378,9 @@ proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
   assumes a = a : derives a
 
   -- special rules
-  derives (Op IsInt :@: a) = ( a :=: a ) : assumes a
+  -- derives (Op IsInt :@: a) = ( a :=: a ) : assumes a
+  -- derives (Op IsChar :@: a) = ( a :=: a ) : assumes a
+  derives (INT a) = ( a :=: a ) : assumes a
   derives _                = []
 
 ----------------------------------------------------------------------

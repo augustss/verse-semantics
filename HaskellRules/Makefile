@@ -38,6 +38,9 @@ testicfpqc:
 testtricky:
 	$(TESTER) --quiet --summary --no-error --all-rules --assume-verified --max-norm-steps=100000 --max-steps=4000 $(TRICKY)
 
+testtimverify:
+	$(TESTER) --tim-verify --prelude=verifyprelude --rules ICFPEverify versetests/TimTests.verse
+
 clean:
 	cabal clean
 	rm -rf *~ objs-*

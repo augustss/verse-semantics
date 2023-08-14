@@ -233,6 +233,7 @@ valid' onlyEq = expr
     value Var{} = True
     value e = hnf e
     hnf Int{} = True
+    hnf Char{} = True
     hnf Op{}  = True
     hnf (Arr vs) = all value vs
     hnf (LAM _ e) = expr e
@@ -249,6 +250,7 @@ anf' onlyEq = expr
   where
     expr e@Var{} = e
     expr e@Int{} = e
+    expr e@Char{} = e
     expr e@Op{}  = e
     expr (Arr es) =
       let (ds, a) = arr es
@@ -291,7 +293,7 @@ anf' onlyEq = expr
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
     expr (If e1 e2 e3) = If (expr e1) (expr e2) (expr e3)
-    expr e = error $ "anf: " ++ prettyShow e
+    expr e = error $ "anf: cannot handle " ++ prettyShow e
 
     expru (e1 :=: e2) =
       case (expr e1, expr e2) of
@@ -548,7 +550,7 @@ rulesPrimOps _ lhs =
  ++
   "APP-NEG" `name`
   do Op Neg :@: Int k <- [lhs]
-     pure (Int k)
+     pure (Int (-k))
  ++
   "APP-PLUS" `name`
   do Op Plus :@: Int k <- [lhs]
@@ -590,6 +592,18 @@ rulesPrimOps _ lhs =
        Int _ -> pure hnf -- (Arr [])
        _     -> pure Fail
  ++
+  "APP-ISCHAR" `name`
+  do Op IsChar :@: (HNF hnf) <- [lhs]
+     case hnf of
+       Char _ -> pure hnf -- (Arr [])
+       _      -> pure Fail
+ ++
+  "APP-ISARR" `name`
+  do Op IsArr :@: (HNF hnf) <- [lhs]
+     case hnf of
+       Arr _ -> pure hnf -- (Arr [])
+       _     -> pure Fail
+ ++
   "APP-MAPAP" `name`
   do Op MapAp :@: Arr vs <- [lhs]
      pure (mapAp vs)
@@ -601,6 +615,10 @@ rulesPrimOps _ lhs =
   "APP-DOTDOT" `name`
   do Op DotDot :@: Arr [Int lo, Int hi] <- [lhs]
      pure (foldr (:|:) Fail (map Int [lo .. hi]))
+ ++
+  "APP-LENGTH" `name`
+  do Op Length :@: Arr vs <- [lhs]
+     pure (Int (toInteger (length vs)))
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr

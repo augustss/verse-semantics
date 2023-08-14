@@ -122,6 +122,7 @@ subsT sys = nubTraced (postProcess sys (ruleEnv sys))
 coreToTrs :: HasCallStack => Core -> T.Expr
 coreToTrs (Variable i) = T.Var $ coreToTrsI i
 coreToTrs (Lit (LitInt i)) = T.Int i
+coreToTrs (Lit (LitChar c)) = T.Char c
 coreToTrs (Lit (LitPtr p)) = T.Ref (T.Ptr p)
 coreToTrs Lit{} = undefined
 coreToTrs (EPrim "any$") = T.LAM x (T.Var x)  where x = T.Name "x"
@@ -163,6 +164,7 @@ coreToTrsI (Ident _ s) = T.Name s
 trsToCore :: T.Expr -> Core
 trsToCore (T.Var i) = Variable (trsToCoreI i)
 trsToCore (T.Int i) = Lit (LitInt i)
+trsToCore (T.Char c) = Lit (LitChar c)
 trsToCore (T.Op op) = EPrim $ fromMaybe undefined $ lookup op allOps
 trsToCore (T.Arr vs) = Array $ map trsToCore vs
 trsToCore (T.Lam (T.Bind x e)) = Lam (trsToCoreI x) (trsToCore e)
@@ -205,6 +207,8 @@ allOps = [
   (T.Neg,   "intNeg$"),
   (T.Plus,  "intPlus$"),
   (T.IsInt, "isInt$"),
+  (T.IsChar,"isChr$"),
+  (T.IsArr, "isArr$"),
   (T.MapAp, "mapAp$"),
   (T.Cons,  "cons$"),
   (T.Alloc, "alloc$"),
@@ -213,7 +217,9 @@ allOps = [
   (T.AddTo, "in'+='"),
   (T.DotDot,"in'..'"),
   (T.Print, "print$"),
-  (T.Append,"append$")
+  (T.Append,"append$"),
+  (T.Error, "err$"),
+  (T.Length,"arrLen$")
   ]
 
 ----------------------------------------------

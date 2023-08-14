@@ -4,8 +4,6 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newpage
-
 \section{Syntax}\label{sec:syntax}
 
 \subsection{Surface Syntax} \label{sec:syntax:surface}
@@ -128,11 +126,11 @@ $$\begin{array}{r@@{\;}c@@{\;}l@@{\;}l}
 %\end{array}$$
 %
 %$$\begin{array}{r@@{\;\;}c@@{\;\;}ll}
-|tlamx succeedKW x' x e_1 e_2|    & \doteq & |verify (lam x' (def x (assume e_1; succeed e_2)))|; \\
+|tlamx succeedKW x' x e_1 e_2|    & \doteq & |verify (lam x' (def x (assume e_1; succeed (e_2; arr()))))|; \\
                                   &        & |lam x' (def x (e_1; assume e_2))| \\
-|tlamx decideKW  x' x e_1 e_2|    & \doteq & |verify (lam x' (def x (assume e_1; decide e_2)))|; \\
+|tlamx decideKW  x' x e_1 e_2|    & \doteq & |verify (lam x' (def x (assume e_1; decide (e_2; arr()))))|; \\
                                   &        & |lam x' (def x (e_1; e_2))| \\
-|tlamxt succeedKW x' x e_1 e_2 e| & \doteq & |verify (lam x' (def x (assume e_1; succeed (e^[e_2]))))|; \\
+|tlamxt succeedKW x' x e_1 e_2 e| & \doteq & |verify (lam x' (def x (assume e_1; succeed (e^[e_2]; arr()))))|; \\
                                   &        & |lam x' (def x (e_1; assume (def y e^[y])))| \\
 % |tlamxt decideKW  x' x e_1 e_2 e| & \doteq & \text{undefined} \\
 \end{array}$$

@@ -6,6 +6,7 @@ array{
 false                                  := array{};
 any(_x:any$)<succeeds>                 := _x;
 int(_x:any$)<decides>                  := { isInt$[_x]; _x };
+char(_x:any$)<decides>                 := { isChr$[_x]; _x };
 nat(_x:any$)<decides>                  := { isInt$[_x]; intGE$[_x,0]; _x };
 operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z : any$; isInt$[_z]; _z } } };
 operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z : any$; isInt$[_z]; _z } } };
