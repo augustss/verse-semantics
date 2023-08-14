@@ -602,7 +602,7 @@ runTimTest tflg test | timRun tflg = do
 
   if take 1 stag `notElem` ["S", "F", "N"] then
     -- Fast path for unknown tests
-    do putStrLn "skip"; pure (1, 0, 0, 0)
+    do putStrLn "skip"; pure (mempty { sSkip = 1})
    else do
     tres <- tryResult tflg $ run flg sys $ desugar flg $ timExpr test
     case take 1 stag of
@@ -628,7 +628,7 @@ runTimTest tflg test | timVerify tflg = do
       tag = timTag test
       Ident loc stag = tag
   -- putStrLn ("TRACE: Tim-Test " ++ systemDescr sys ++ " e' = " ++ prettyShow e')
-  tres <- tryResult tflg res
+  tres <- tryResult tflg $ verifyM sys e'
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
   let disp trc =
         when (trace tflg) $
