@@ -233,6 +233,7 @@ valid' onlyEq = expr
     value Var{} = True
     value e = hnf e
     hnf Int{} = True
+    hnf Char{} = True
     hnf Op{}  = True
     hnf (Arr vs) = all value vs
     hnf (LAM _ e) = expr e
