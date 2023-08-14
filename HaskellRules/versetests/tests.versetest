@@ -107,10 +107,10 @@ testeq(pass) {i->x := 2; (i, x)}                   {2,2}
 testeq(pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
 testeq(pass) { x := ((:any) => 1)[x+1] }           {1}
 # Array LHS splicing
-### SPLICE testeq(pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
-### SPLICE testeq(pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-### SPLICE testeq(pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-### SPLICE testeq(pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq(skip,iblock=pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+testeq(skip,iblock=pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq(skip,iblock=pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq(skip,iblock=pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq(pass) {(x:int) = 5}                         {5}
