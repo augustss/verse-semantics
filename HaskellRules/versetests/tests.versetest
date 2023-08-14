@@ -13,6 +13,8 @@ testeq(pass) {3-4}                                 {0-1}
 testeq(pass) {3*4}                                 {12}
 testeq(pass) {32/4}                                {8}
 testeq(pass) {1/0}                                 {:false}
+testeq(pass) {-3}                                  {0-3}
+testeq(pass) {+3}                                  {0+3}
 
 # Comparison
 testeq(pass) {3<4}                                 {3}
