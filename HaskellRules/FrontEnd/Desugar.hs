@@ -22,11 +22,12 @@ import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
 
+-- QUESTIONS:
+--  x:int='a'   fail or wrong?, tests L93, L95
+
 -- TODO:
---  HasType with non-values, L63
 --  Add Length
---  Don't require multiplicity effect, allow computes
---  Add fails multiplicity
+--  Add Err
 
 -- TODO:
 --  x:t=v is syntactic sugar for x:=(:t=v) and 
@@ -258,10 +259,12 @@ defn (Variable i) e = pure $ DefineE i e
 -- Rule: (f(a) := e)  -->  (f := function(a){e})
 -- Rule: (p<a> := e)  -->  ...
 defn p e | Just (f, a, rs) <- getFun p = defn f (Function [(a, rs)] e)
--- Rule: (e1:e2 := e)  -->  (e1 := e:e2)
+-- Rule: (e1:e2 := e)  -->  (e1 := hasType(e2){e})
 defn (InfixOp e1 (Op ":") e2) e = defn e1 (HasType e e2)
--- Rule: (:e1) := e2  XXX Allowed?
-defn (PrefixOp (Op ":") e1) e2 = pure $ ApplyD e1 e2   -- ApplyD or ApplyS?
+-- Rule: (:e2) := e  -->  (x:e2) := e, x fresh
+defn (PrefixOp op@(Op ":") e2) e = do
+  u <- newIdent (getLoc e2) "u"
+  defn (InfixOp (Variable u) op e2) e
 --defn (EffAttr e1 r) e v = defn e1 (applyEff [r] e) v
 -- Rule: (p?) := e  -->  p := option{e}
 --defn (PostfixOp p (Ident _ "?")) e = defn p (Option $ Just e)
@@ -419,8 +422,8 @@ dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
 dsM i (Function [(t1, r)] t2) = do
   c <- gets context
   dsFunction c i t1 r t2
-dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
---dsM i (HasType a f) = undefined
+--dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
+dsM i (HasType a f) = unifyV i <$> (HasType <$> dsD a <*> dsD f)
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
@@ -666,6 +669,8 @@ primOps = map (Ident noLoc)
   , "known$"  -- This is a horrible hack
   , "any$"
   , "fail$"
+  , "err$"
+  , "arrLen$"
   ]
 
 ------------------------
@@ -968,15 +973,26 @@ lowerTLamVerify i rs is e1 e2 me3 = do
         pure (ApplyD t e2, Exists [x] $ ApplyD t (Variable x))
   -- XXX This whole thing is wrong.  Function effects should be handled in some
   -- consistent way.
-  if null rs || hasEff "succeeds" rs then
+  if hasEff "succeeds" rs then
     pure $ lowerTLamVerifySucceeds i is e1 e2' e2''
    else if hasEff "decides" rs then
     pure $ lowerTLamVerifyDecides i is e1 e2' e2''
+   else if hasEff "decides" rs then
+    pure $ lowerTLamVerifyFails i is e1 e2' e2''
    else
-    errorMessage $ "No multiplicity effect: " ++ prettyShow rs
+    -- Assume "succeeds"
+    pure $ lowerTLamVerifySucceeds i is e1 e2' e2''
 
 hasEff :: String -> [Ident] -> Bool
 hasEff r rs = Ident noLoc r `elem` rs
+
+lowerTLamVerifyFails :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
+lowerTLamVerifyFails i is e1 e2' e2'' =
+  -- Lam i $ lExists is $ Seq [ e1, eDecide e2'']
+  Seq
+    [ eVerify $ Lam i $ lExists is $ Seq [eAssume e1, eFails  e2']
+    ,           Lam i $ lExists is $ Seq [        e1,         e2'']
+    ]
 
 lowerTLamVerifyDecides :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
 lowerTLamVerifyDecides i is e1 e2' e2'' =
@@ -1289,6 +1305,9 @@ eVerify = Macro1 (Ident noLoc "verify") []
 
 eDecide :: Expr -> Expr
 eDecide = Macro1 (Ident noLoc "decide") []
+
+eFails :: Expr -> Expr
+eFails = Macro1 (Ident noLoc "fails") []
 
 
 -- Used to create the array of free variables passed from the domain to the range

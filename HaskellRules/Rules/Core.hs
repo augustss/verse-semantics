@@ -280,6 +280,7 @@ data Op
   | Plus
   | IsInt
   | IsChar
+  | IsArr
   | MapAp
   | Cons
   | Alloc
@@ -289,13 +290,15 @@ data Op
   | DotDot
   | Print
   | Append
+  | Length
+  | Error
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where
   pPrintPrec _ _ = text . map toLower . show
 
 opArity :: Op -> Int
-opArity o | o `elem` [Neg, Plus, IsInt, IsChar, MapAp, Alloc, Read, Print] = 1
+opArity o | o `elem` [Neg, Plus, IsInt, IsChar, IsArr, MapAp, Alloc, Read, Print, Length, Error] = 1
           | o == Append = 3
           | otherwise = 2
 

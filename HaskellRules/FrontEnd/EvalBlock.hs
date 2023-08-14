@@ -42,8 +42,8 @@ opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIntGt, opIntGe, o
 opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, opRatLt, opRatLe, opRatNe :: Op
 opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
 opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
-opIsInt, opIsRat, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
-opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
+opIsInt, opIsRat, opIsArr, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
+opErr, opArrLen, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
 
 opIntGt    = "intGT$"
 opIntGe    = "intGE$"
@@ -98,6 +98,8 @@ opIsF64 = "isF64$"
 opIsChr = "isChr$"
 opIsStr = "isStr$"
 opIsFcn = "isFcn$"
+opIsArr = "isArr$"
+opArrLen= "arrLen$"
 opMapAp = "mapAp$"
 opCons  = "cons$"
 opAlloc = "alloc$"
@@ -107,6 +109,7 @@ opAddTo = "in'+='"
 opDotDot= "in'..'"
 opPrint = "print$"
 opAppend= "append$"
+opErr   = "err$"
 
 pattern One :: Expr -> Expr
 pattern One x <- Macro1 (Ident _ "one") [] x
@@ -1187,6 +1190,10 @@ evalPrimOp op v | Just arith <- lookup op arithUnF64Ops =
     BVF64 a -> Just $ BVal $ BVF64 $ arith a
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)
 
+evalPrimOp op v | op == opArrLen =
+  case v of
+    BHNF (BArr xs) -> Just $ BVal $ BVInt $ toInteger $ length xs
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsInt =
   case v of
     a@(BVInt _) -> Just $ BVal a
@@ -1222,6 +1229,11 @@ evalPrimOp op v | op == opIsFcn =
     a@(BHNF (BHLam _ _)) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsArr =
+  case v of
+    a@(BHNF (BArr _)) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opCons =
   case v of
     BVArr [a, BVArr as] -> Just $ BVal $ BVArr (a : as)
@@ -1240,6 +1252,7 @@ evalPrimOp op v | op == opPrint =
       Just $ BVal $ BVArr []
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op _ | op == opAppend = Nothing
+evalPrimOp op _ | op == opErr = error "Err() called"
 evalPrimOp op _ | op `elem` [opAlloc, opRead, opWrite, opAddTo] = Nothing
 evalPrimOp op v = error $ "evalPrimOp: " ++ show (op, v)
 

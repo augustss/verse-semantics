@@ -596,31 +596,35 @@ runTimTest tflg test | Just s <- onlyTest tflg, s /= timTestName test = pure mem
 runTimTest tflg test | timRun tflg = do
   let sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
       flg = (testFlagsToFlags tflg) { fNoWarn = True }
-      res = run flg sys $ desugar flg $ timExpr test
       tag = timTag test
       Ident loc stag = tag
-  tres <- tryResult tflg res
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
-  case take 1 stag of
-    "S" -> case tres of
-             ResOK x | x /= Fail -> do putStrLn "pass, OK";  pure (mempty {sOK = 1})
-                     | otherwise -> do putStrLn "fail, bad"; pure (mempty {sBadFail = 1})
-             _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
-    "F" -> case tres of
-             ResOK x | x == Fail -> do putStrLn "fail, OK";  pure (mempty {sOK = 1})
-                     | otherwise -> do putStrLn "pass, bad"; pure (mempty {sBadPass = 1})
-             _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
-    "N" -> case tres of
-             ResOK _             -> do putStrLn "pass, bad"; pure (mempty {sBadPass = 1})
-             Undefined           -> do putStrLn "err,  OK";  pure (mempty {sOK = 1})
-             Shadowing           -> do putStrLn "err,  OK";  pure (mempty {sOK = 1})
-             _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
-    _                            -> do putStrLn "skip";      pure (mempty {sSkip = 1})
+
+  if take 1 stag `notElem` ["S", "F", "N"] then
+    -- Fast path for unknown tests
+    do putStrLn "skip"; pure (1, 0, 0, 0)
+   else do
+    tres <- tryResult tflg $ run flg sys $ desugar flg $ timExpr test
+    case take 1 stag of
+      "S" -> case tres of
+               ResOK x | x /= Fail -> do putStrLn "pass, OK";  pure (mempty {sOK = 1})
+                       | otherwise -> do putStrLn "fail, bad"; pure (mempty {sBadFail = 1})
+               _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
+      "F" -> case tres of
+               ResOK x | x == Fail -> do putStrLn "fail, OK";  pure (mempty {sOK = 1})
+                       | otherwise -> do putStrLn "pass, bad"; pure (mempty {sBadPass = 1})
+               _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
+      "N" -> case tres of
+               ResOK _             -> do putStrLn "pass, bad"; pure (mempty {sBadPass = 1})
+               Undefined           -> do putStrLn "err,  OK";  pure (mempty {sOK = 1})
+               Shadowing           -> do putStrLn "err,  OK";  pure (mempty {sOK = 1})
+               _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
+      _                            -> undefined
+
 runTimTest tflg test | timVerify tflg = do
   let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False, fNoWarn = True  }
       e' = (if True then wrapAssert else id) . preProcess sys (ruleEnv sys) . coreToTrs . desugar flags . timExpr $ test
       sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
-      res = verifyM sys e'
       tag = timTag test
       Ident loc stag = tag
   -- putStrLn ("TRACE: Tim-Test " ++ systemDescr sys ++ " e' = " ++ prettyShow e')
@@ -659,6 +663,7 @@ instance Semigroup TimStatus where
 
 instance Monoid TimStatus where
   mempty = MkTimStatus 0 0 0 0 0
+
 ---------------------
 
 -- Results of compile&run, with somewhat decoded error messages

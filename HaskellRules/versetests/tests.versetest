@@ -13,6 +13,8 @@ testeq(pass) {3-4}                                 {0-1}
 testeq(pass) {3*4}                                 {12}
 testeq(pass) {32/4}                                {8}
 testeq(pass) {1/0}                                 {:false}
+testeq(pass) {-3}                                  {0-3}
+testeq(pass) {+3}                                  {0+3}
 
 # Comparison
 testeq(pass) {3<4}                                 {3}
@@ -70,6 +72,9 @@ testeq(pass,ICFP*=skip,iblock=skip) {(x:any=>x)=(x:any=>x)}               {:fals
 # Arrays
 testeq(pass){array{1;2;3}}                         {1,2,3}
 testeq(pass){array{}}                              {()}
+testeq(pass){Length(array{1;2;3})}                 {3}
+testeq(pass){Length(array{})}                      {0}
+testeq(pass){Length(array{_;_})}                   {2}
 
 testeq(pass,pldi=fail)
            {x:=(1,2); y:=(1,3); one{x=y}}         {:false}
@@ -90,8 +95,9 @@ testeq(pass) {x:=1; x}                             {1}
 testeq(pass) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
 testeq(pass) {f(x:int)(y:int):=x*10+y; f[2][3]}    {23}
 testeq(pass) {:int:=5}                             {5}       # LA is this even allowed
-testeq(pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
+# fail/wrong? testeq(pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
 testeq(pass) {x:int:=1}                            {1}
+# fail/wrong? testeq(pass) {x:int:='a'}                          {:false}
 testeq(pass) {succ(x:any):=x+1; (y:succ):=1}       {2}   # XXX or 1?
 testeq(pass) {succ(x:any):=x+1; y:succ:=1; y}      {2}
 testeq(pass) {succ(x:any):int:=x+1; succ[5]}       {6}
@@ -103,10 +109,10 @@ testeq(pass) {i->x := 2; (i, x)}                   {2,2}
 testeq(pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
 testeq(pass) { x := ((:any) => 1)[x+1] }           {1}
 # Array LHS splicing
-### SPLICE testeq(pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
-### SPLICE testeq(pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-### SPLICE testeq(pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-### SPLICE testeq(pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq(skip,iblock=pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+testeq(skip,iblock=pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq(skip,iblock=pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq(skip,iblock=pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq(pass) {(x:int) = 5}                         {5}

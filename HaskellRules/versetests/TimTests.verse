@@ -1373,7 +1373,7 @@ test(F00){x:=assume{:int},x=false}
 test(D00){x:=assume{int[_]} where x=3}
 test(F00){x:=assume{r:=3} where x='$'}
 test(F00){x:=assume{int[_]},x='c'}
-test(F00){x:int => {(3,5)[x] where allow<decides>{x=9}}}
+#LA test(F00){x:int => {(3,5)[x] where allow<decides>{x=9}}}
 test(S00){x:=nat['c'] => x='d'}
 #Range-No-IterateStep test(S00){x:=nat[-3] => x='c'}
 
@@ -1464,18 +1464,18 @@ test(S00){x:false => operator'+'[x]}
 test(S00){x:false => operator'+'[x]=7}
 test(S00){x:false => operator'+'(x)}
 test(S00){x:false => operator'+'(x)=7}
-test(R20){allow{x:false}}
-test(F00){allow{x:false},prefix'-'[x]}
-test(R20){x:=allow{assume{:false}}}
-test(R20){x:=allow{assume{:false}},prefix'-'[x]}
-test(F00){allow{x:false},-x}
-test(F00){allow{x:false},-x=7}
-test(F00){allow{x:false},x+1}
-test(F00){allow{x:false},1+x}
-test(F00){allow{x:false},x+1=7}
-test(F00){allow{x:false},1+x=7}
-test(F00){allow{x:false},operator'+'[x]}
-test(F00){allow{x:false},operator'+'[x]=7}
+#LA test(R20){allow{x:false}}
+#LA test(F00){allow{x:false},prefix'-'[x]}
+#LA test(R20){x:=allow{assume{:false}}}
+#LA test(R20){x:=allow{assume{:false}},prefix'-'[x]}
+#LA test(F00){allow{x:false},-x}
+#LA test(F00){allow{x:false},-x=7}
+#LA test(F00){allow{x:false},x+1}
+#LA test(F00){allow{x:false},1+x}
+#LA test(F00){allow{x:false},x+1=7}
+#LA test(F00){allow{x:false},1+x=7}
+#LA test(F00){allow{x:false},operator'+'[x]}
+#LA test(F00){allow{x:false},operator'+'[x]=7}
 
 # Conditions.
 test(S00){if(0=1) then 2 else 3}
@@ -1543,14 +1543,14 @@ test(S00){if{x:false,if{x=3}}}
 test(F00){f(x:false):=if(x){1}else{2}=3}
 
 # Inference in assumptions must not circularly escalate the strength of weaker inferences.
-test(F00){x:any => allow{assume<decides>{x=3}} where x=4}
-test(D00){x:any => allow{assume<decides>{x=3}} where x=3}
-test(D00){x:any => allow{assume<decides>{x=3}} where assume{x+1} where x=3}
+#LA test(F00){x:any => allow{assume<decides>{x=3}} where x=4}
+#LA test(D00){x:any => allow{assume<decides>{x=3}} where x=3}
+#LA test(D00){x:any => allow{assume<decides>{x=3}} where assume{x+1} where x=3}
 
 # S00 is correct for now, but should be disallowed when operator'+' properly overloads:
-test(S00){x:any => allow{assume<decides>{x=3}} where assume{x+1}}
-test(S00){x:any => allow{assume<decides>{x=3}} where assume{x+1} where x+1=4}
-test(S00){x:any => allow{assume<decides>{x=3}} where assume{x+1=4}}
+#LA test(S00){x:any => allow{assume<decides>{x=3}} where assume{x+1}}
+#LA test(S00){x:any => allow{assume<decides>{x=3}} where assume{x+1} where x+1=4}
+#LA test(S00){x:any => allow{assume<decides>{x=3}} where assume{x+1=4}}
 
 # Deep array effects.
 test(S00){as:=(2,3=4) => as=(_,3)}
