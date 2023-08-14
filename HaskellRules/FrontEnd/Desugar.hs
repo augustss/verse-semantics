@@ -27,8 +27,7 @@ import FrontEnd.Flags
 
 -- TODO:
 --  Add Length
---  Don't require multiplicity effect, allow computes
---  Add fails multiplicity
+--  Add Err
 
 -- TODO:
 --  x:t=v is syntactic sugar for x:=(:t=v) and 
@@ -972,15 +971,26 @@ lowerTLamVerify i rs is e1 e2 me3 = do
         pure (ApplyD t e2, Exists [x] $ ApplyD t (Variable x))
   -- XXX This whole thing is wrong.  Function effects should be handled in some
   -- consistent way.
-  if null rs || hasEff "succeeds" rs then
+  if hasEff "succeeds" rs then
     pure $ lowerTLamVerifySucceeds i is e1 e2' e2''
    else if hasEff "decides" rs then
     pure $ lowerTLamVerifyDecides i is e1 e2' e2''
+   else if hasEff "decides" rs then
+    pure $ lowerTLamVerifyFails i is e1 e2' e2''
    else
-    errorMessage $ "No multiplicity effect: " ++ prettyShow rs
+    -- Assume "succeeds"
+    pure $ lowerTLamVerifySucceeds i is e1 e2' e2''
 
 hasEff :: String -> [Ident] -> Bool
 hasEff r rs = Ident noLoc r `elem` rs
+
+lowerTLamVerifyFails :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
+lowerTLamVerifyFails i is e1 e2' e2'' =
+  -- Lam i $ lExists is $ Seq [ e1, eDecide e2'']
+  Seq
+    [ eVerify $ Lam i $ lExists is $ Seq [eAssume e1, eFails  e2']
+    ,           Lam i $ lExists is $ Seq [        e1,         e2'']
+    ]
 
 lowerTLamVerifyDecides :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
 lowerTLamVerifyDecides i is e1 e2' e2'' =
@@ -1293,6 +1303,9 @@ eVerify = Macro1 (Ident noLoc "verify") []
 
 eDecide :: Expr -> Expr
 eDecide = Macro1 (Ident noLoc "decide") []
+
+eFails :: Expr -> Expr
+eFails = Macro1 (Ident noLoc "fails") []
 
 
 -- Used to create the array of free variables passed from the domain to the range
