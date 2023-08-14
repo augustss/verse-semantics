@@ -3288,10 +3288,10 @@ test(F00){f(x:int,x):=x,f[3,4]}
 test(S00){nat[123]}
 test(F00){nat[-123]}
 test(S00){nat[4/2]}
-test(F00){nat[2/3]}
+test(F00){nat[2/3]}		#TODO:RATIONALS
 test(S00){int[123]}
 test(S00){int[-123]}
-test(F00){int[2/3]}
+test(F00){int[2/3]}		#TODO:RATIONALS
 test(S00){rational[123]}
 test(S00){rational[-123]}
 test(S00){rational[2/3]}
