@@ -233,6 +233,7 @@ valid' onlyEq = expr
     value Var{} = True
     value e = hnf e
     hnf Int{} = True
+    hnf Char{} = True
     hnf Op{}  = True
     hnf (Arr vs) = all value vs
     hnf (LAM _ e) = expr e
@@ -249,6 +250,7 @@ anf' onlyEq = expr
   where
     expr e@Var{} = e
     expr e@Int{} = e
+    expr e@Char{} = e
     expr e@Op{}  = e
     expr (Arr es) =
       let (ds, a) = arr es
@@ -291,7 +293,7 @@ anf' onlyEq = expr
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
     expr (If e1 e2 e3) = If (expr e1) (expr e2) (expr e3)
-    expr e = error $ "anf: " ++ prettyShow e
+    expr e = error $ "anf: cannot handle " ++ prettyShow e
 
     expru (e1 :=: e2) =
       case (expr e1, expr e2) of

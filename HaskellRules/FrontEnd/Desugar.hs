@@ -686,6 +686,14 @@ simpValue = pure . f
   where f (Seq (Snoc es e)) = seqE $ map f (Snoc (filter (not . isValue) es) e)
         f e = composOp f e
 
+{- Cannot do this everywhere, e.g., If3 relies on existentials
+-- Simplify  exists . e  -->  e
+simpExists :: Expr -> D Expr
+simpExists = pure . f
+  where f (Exists [] e) = f e
+        f e = composOp f e
+-}
+
 -- Simplify any[e]  -->  e
 simpAny :: Expr -> D Expr
 simpAny = pure . f
@@ -1010,7 +1018,7 @@ lowerHasType e t = do
 lowerHasTypeVerify :: Expr -> Expr -> D Expr
 lowerHasTypeVerify e t = do
   x <- newIdent (getLoc t) "x"
-  pure $ Seq [ eVerify $ eAssert $ ApplyD t e, Exists [x] $ ApplyD t (Variable x) ]
+  pure $ Seq [ eVerify $ eAssert $ ApplyD t e, eAssume $ Exists [x] $ ApplyD t (Variable x) ]
 
 lowerAll :: Expr -> D Expr
 lowerAll e = do
