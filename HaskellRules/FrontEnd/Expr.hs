@@ -253,7 +253,7 @@ instance Pretty Expr where
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
           HasType e t -> --ppNormal (InfixOp e (Op ":") t)
-                         text "ofType" <> parens (ppr 0 e) <> braces (ppr 0 t)
+                         text "hasType" <> parens (ppr 0 t) <> braces (ppr 0 e)
           TLam i rs e1 e2 me3 -> text "tlam" <> parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2) <>
             maybe empty (braces . ppr 0) me3
           DomainFail -> text "DomainFail"
