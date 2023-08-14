@@ -598,6 +598,12 @@ rulesPrimOps _ lhs =
        Char _ -> pure hnf -- (Arr [])
        _      -> pure Fail
  ++
+  "APP-ISARR" `name`
+  do Op IsArr :@: (HNF hnf) <- [lhs]
+     case hnf of
+       Arr _ -> pure hnf -- (Arr [])
+       _     -> pure Fail
+ ++
   "APP-MAPAP" `name`
   do Op MapAp :@: Arr vs <- [lhs]
      pure (mapAp vs)
@@ -609,6 +615,10 @@ rulesPrimOps _ lhs =
   "APP-DOTDOT" `name`
   do Op DotDot :@: Arr [Int lo, Int hi] <- [lhs]
      pure (foldr (:|:) Fail (map Int [lo .. hi]))
+ ++
+  "APP-LENGTH" `name`
+  do Op Length :@: Arr vs <- [lhs]
+     pure (Int (toInteger (length vs)))
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr

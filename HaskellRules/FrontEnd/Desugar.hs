@@ -669,6 +669,8 @@ primOps = map (Ident noLoc)
   , "known$"  -- This is a horrible hack
   , "any$"
   , "fail$"
+  , "err$"
+  , "arrLen$"
   ]
 
 ------------------------

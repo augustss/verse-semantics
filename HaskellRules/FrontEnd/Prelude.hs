@@ -55,8 +55,8 @@ miniprelude = ("miniprelude", "\
 \postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
 \operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
 \new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };\n\
+\Length(_x:any$):=arrLen$[_x];\n\
 \}\n\
-\\n\
 \")
 
 verifyprelude :: (String, String)
@@ -138,6 +138,9 @@ mediumprelude = ("mediumprelude", "\
 \char        (_x:any$)                 <decides>   := { isChr$[_x]; _x };\n\
 \nat         (_x:any$)                 <decides>   := { isInt$[_x]; ratGE$[_x,0]; _x };\n\
 \comparable  (_x:any$)                 <decides>   := { isInt$[_x] | isRat$[_x] | isF32$[_x] | isF64$[_x] | isStr$[_x] | isChr$[_x]; _x };\n\
+\void        (_x:any$)                             := array{};\n\
+\Length      (_x:any$)                 <decides>   := { isArr$[_x]; arrLen$[_x] };\n\
+\Err         (_x:any$)                             := { err$[_x] };\n\
 \\n\
 \#operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
 \postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\

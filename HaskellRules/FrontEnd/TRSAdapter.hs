@@ -208,6 +208,7 @@ allOps = [
   (T.Plus,  "intPlus$"),
   (T.IsInt, "isInt$"),
   (T.IsChar,"isChr$"),
+  (T.IsArr, "isArr$"),
   (T.MapAp, "mapAp$"),
   (T.Cons,  "cons$"),
   (T.Alloc, "alloc$"),
@@ -216,7 +217,9 @@ allOps = [
   (T.AddTo, "in'+='"),
   (T.DotDot,"in'..'"),
   (T.Print, "print$"),
-  (T.Append,"append$")
+  (T.Append,"append$"),
+  (T.Error, "err$"),
+  (T.Length,"arrLen$")
   ]
 
 ----------------------------------------------
