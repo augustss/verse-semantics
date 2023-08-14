@@ -90,8 +90,9 @@ testeq(pass) {x:=1; x}                             {1}
 testeq(pass) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
 testeq(pass) {f(x:int)(y:int):=x*10+y; f[2][3]}    {23}
 testeq(pass) {:int:=5}                             {5}       # LA is this even allowed
-testeq(pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
+# fail/wrong? testeq(pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
 testeq(pass) {x:int:=1}                            {1}
+# fail/wrong? testeq(pass) {x:int:='a'}                          {:false}
 testeq(pass) {succ(x:any):=x+1; (y:succ):=1}       {2}   # XXX or 1?
 testeq(pass) {succ(x:any):=x+1; y:succ:=1; y}      {2}
 testeq(pass) {succ(x:any):int:=x+1; succ[5]}       {6}

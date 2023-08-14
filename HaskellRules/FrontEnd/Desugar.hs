@@ -22,8 +22,10 @@ import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
 
+-- QUESTIONS:
+--  x:int='a'   fail or wrong?, tests L93, L95
+
 -- TODO:
---  HasType with non-values, L63
 --  Add Length
 --  Don't require multiplicity effect, allow computes
 --  Add fails multiplicity
@@ -258,10 +260,12 @@ defn (Variable i) e = pure $ DefineE i e
 -- Rule: (f(a) := e)  -->  (f := function(a){e})
 -- Rule: (p<a> := e)  -->  ...
 defn p e | Just (f, a, rs) <- getFun p = defn f (Function [(a, rs)] e)
--- Rule: (e1:e2 := e)  -->  (e1 := e:e2)
+-- Rule: (e1:e2 := e)  -->  (e1 := hasType(e2){e})
 defn (InfixOp e1 (Op ":") e2) e = defn e1 (HasType e e2)
--- Rule: (:e1) := e2  XXX Allowed?
-defn (PrefixOp (Op ":") e1) e2 = pure $ ApplyD e1 e2   -- ApplyD or ApplyS?
+-- Rule: (:e2) := e  -->  (x:e2) := e, x fresh
+defn (PrefixOp op@(Op ":") e2) e = do
+  u <- newIdent (getLoc e2) "u"
+  defn (InfixOp (Variable u) op e2) e
 --defn (EffAttr e1 r) e v = defn e1 (applyEff [r] e) v
 -- Rule: (p?) := e  -->  p := option{e}
 --defn (PostfixOp p (Ident _ "?")) e = defn p (Option $ Just e)
@@ -419,8 +423,8 @@ dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
 dsM i (Function [(t1, r)] t2) = do
   c <- gets context
   dsFunction c i t1 r t2
-dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
---dsM i (HasType a f) = undefined
+--dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
+dsM i (HasType a f) = unifyV i <$> (HasType <$> dsD a <*> dsD f)
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
