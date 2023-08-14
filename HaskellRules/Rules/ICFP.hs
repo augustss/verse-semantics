@@ -550,7 +550,7 @@ rulesPrimOps _ lhs =
  ++
   "APP-NEG" `name`
   do Op Neg :@: Int k <- [lhs]
-     pure (Int k)
+     pure (Int (negate k))
  ++
   "APP-PLUS" `name`
   do Op Plus :@: Int k <- [lhs]

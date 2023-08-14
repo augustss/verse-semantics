@@ -300,6 +300,7 @@ verifierRules env lhs =
       (ctx, _, bs, e1 :>: e2) <- eX rhs
       guard (null (free e1 `intersect` bndIds bs))
       guard (implies e e1)
+      guard (e /= Fail)
       pure (Assume e :>: ctx e2)
    ++
    -- ASSERT --

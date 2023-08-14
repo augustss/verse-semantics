@@ -627,7 +627,7 @@ runTimTest tflg test | timVerify tflg = do
   tres <- tryResult tflg res
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
   let disp trc =
-        when (verbose tflg) $
+        when (trace tflg) $
           putStrLn $ unlines $ showTrace trc
   case take 1 stag of
     "S" -> case tres of
@@ -637,7 +637,7 @@ runTimTest tflg test | timVerify tflg = do
              _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
     "F" -> case tres of
              ResOK Nothing          -> do putStrLn "timeout, OK"; pure (mempty {sDied = 1})
-             ResOK (Just (True, _)) -> do putStrLn "pass, bad";   pure (mempty {sBadPass = 1})
+             ResOK (Just (True, t)) -> do putStrLn "pass, bad";   disp t; pure (mempty {sBadPass = 1})
              ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (mempty {sOK = 1})
              _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
     _   -> do putStrLn "skip";        pure (mempty {sSkip = 1})
