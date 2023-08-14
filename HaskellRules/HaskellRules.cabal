@@ -16,6 +16,7 @@ common shared-properties
                       containers,
                       mtl,
                       pretty,
+                      megaparsec,
                       haskeline
 
 -- Various utilities.

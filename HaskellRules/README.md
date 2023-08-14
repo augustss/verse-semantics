@@ -117,3 +117,25 @@ To get a summary for all the rules
 ```
 cabal run -- tester -r PLDIT --summary versetests/tricky.versetest
 ```
+
+## Running the Tim Test Suite through TRSVerifier
+
+
+To run all tests:
+
+```
+make testtimverify
+```
+
+Or run by hand
+
+```
+cabal run tester -- --tim-verify --prelude=verifyprelude versetests/TimTests.verse
+```
+
+To examine a single test where 252 is the line number of the test
+
+```
+cabal run tester -- --tim-verify versetests/TimTests.verse --only-test=L252 --verbose --prelude=verifyprelude
+```
+

@@ -26,7 +26,8 @@ main =
 
 tests :: [(String, Expr, Bool)]
 tests =
-  [ ("ex00", ex00, True)
+  [ ("ex_crash", ex_crash, True)
+  , ("ex00", ex00, True)
   , ("ex01", ex01, True)
   , ("ex0", ex0, True)
   , ("ex0'", ex0', False)
@@ -598,3 +599,6 @@ ex_asm_subst = lAMs [a] $
                  Assert (sub (Var a) (Int 1) :=: Int 9 :>: Int 0)
   where
     a = ident "a"
+
+ex_crash :: Expr
+ex_crash = Assert (Int 1)

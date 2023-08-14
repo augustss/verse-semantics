@@ -10,6 +10,7 @@ module Rules.Verifier(
   icfpeVerifier,
   verify,
   verifyM,
+  wrapAssert,
   ) where
 import TRS.Bind
 import TRS.TRS hiding (step)
@@ -42,10 +43,13 @@ verify sys e =
         Just  x -> x
         Nothing -> undefined
 
--- isDone :: Expr -> Bool
--- isDone = collect done (&&)
+wrapAssert :: Expr -> Expr
+wrapAssert = Assert
+--  --  | noChecks e = Assert e
+--  --  | otherwise  = e
 --  where
 --   -- done (Verify _) = False
+--   noChecks        = collect done (&&)
 --   done (Assert _) = False
 --   done (Decide _) = False
 --   done _          = True
@@ -296,6 +300,7 @@ verifierRules env lhs =
       (ctx, _, bs, e1 :>: e2) <- eX rhs
       guard (null (free e1 `intersect` bndIds bs))
       guard (implies e e1)
+      guard (e /= Fail)
       pure (Assume e :>: ctx e2)
    ++
    -- ASSERT --
