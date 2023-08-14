@@ -20,4 +20,5 @@ operator'>=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intG
 operator'<>' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_x, _y]; assume { isInt$[_x]; _x }}};
 prefix'-'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intNeg$[_x];    isInt$[_z]; _z }}};
 prefix'+'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intPlus$[_x];   isInt$[_z]; _z }}};
+Length       := lowered{ lambda(_x) {               isArr$[_x];                             assume { _z:any$; isInt$[_z]; intGE$[_z,0]; _z }}};
 }
