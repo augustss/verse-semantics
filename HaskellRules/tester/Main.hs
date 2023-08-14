@@ -621,7 +621,7 @@ runTimTest tflg test | timVerify tflg = do
       tag = timTag test
       Ident loc stag = tag
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
-  if take 1 stag `notElem` ["S", "F"] then
+  if take 1 stag `notElem` ("S" : verifierErrorCodes) then
     -- Fast path for unknown tests
     do putStrLn "skip"; pure (1, 0, 0, 0)
    else do
@@ -635,14 +635,16 @@ runTimTest tflg test | timVerify tflg = do
                ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (0, 1, 0, 0)
                ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (0, 0, 1, 0)
                _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
-      "F" -> case tres of
+      _   -> case tres of
                ResOK Nothing          -> do putStrLn "timeout";     pure (0, 0, 0, 1)
-               ResOK (Just (True, _)) -> do putStrLn "pass, bad";   pure (0, 0, 1, 0)
+               ResOK (Just (True, t)) -> do putStrLn "pass, bad";   disp t; pure (0, 0, 1, 0)
                ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (0, 1, 0, 0)
                _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
-      _   -> undefined
 
 runTimTest _ _ = error "impossible"
+
+verifierErrorCodes :: [String]
+verifierErrorCodes = ["A", "D", "F", "I", "U"]
 
 ---------------------
 
