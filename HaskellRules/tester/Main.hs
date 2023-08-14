@@ -625,12 +625,12 @@ runTimTest tflg test | timVerify tflg = do
           putStrLn $ unlines $ showTrace trc
   case take 1 stag of
     "S" -> case tres of
-             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (0, 0, 0, 1)
+             ResOK Nothing          -> do putStrLn "timeout";     pure (0, 0, 0, 1)
              ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (0, 1, 0, 0)
              ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (0, 0, 1, 0)
              _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
     "F" -> case tres of
-             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (0, 0, 0, 1)
+             ResOK Nothing          -> do putStrLn "timeout";     pure (0, 0, 0, 1)
              ResOK (Just (True, _)) -> do putStrLn "pass, bad";   pure (0, 0, 1, 0)
              ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (0, 1, 0, 0)
              _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
