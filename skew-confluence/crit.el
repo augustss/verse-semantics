@@ -189,8 +189,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
             (make-proof :rulename1 'u-fail-op-d :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 24
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '())))
             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 25
                         :rowsep "normal"
                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
@@ -208,8 +208,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
             (make-proof :rulename1 'u-fail-d-op :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 29
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '())))
             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 30
                         :rowsep "large"
                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
@@ -227,8 +227,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
             (make-proof :rulename1 'u-fail-tup-k :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 34
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '())))
             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 35
                         :rowsep "large"
                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
@@ -246,8 +246,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
             (make-proof :rulename1 'u-fail-k-tup :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 39
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '())))
             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 40
                         :rowsep "large"
                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
@@ -520,11 +520,11 @@
                         :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2) :id 3))
                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '() :id 4)))
             (make-proof :rulename1 'choose-l :rulename2 'one-choice :path1 '(1) :id1 1 :id2 2      ;Proof 114
-                        :rewrites1 (list 'X (make-rewrite :rulename 'one-choice :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'one-value :path '()))
+                        :rewrites2 (list))
             (make-proof :rulename1 'choose-l :rulename2 'split-choice :path1 '(1) :id1 1 :id2 2      ;Proof 115
-                        :rewrites1 (list 'X (make-rewrite :rulename 'split-choice :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+                        :rewrites1 (list 'X (make-rewrite :rulename 'split-value :path '()))
+                        :rewrites2 (list))
             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '() :id1 1 :id2 2      ;Proof 116
                         :rowsep "normal"
                         :rewrites1 (list)
