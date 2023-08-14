@@ -2170,7 +2170,8 @@
 			(ca-result (contradictory-assumptions assumptions)))
 		   (cond (ca-result 
 			  (princ (format ".%s\nBut %s, so this critical pair cannot occur in practice." linebreak ca-result)))
-			 (t (princ ":\\par")
+			 (t (cond ((proof-cond pf) (princ (format ". For the case when %s is true:\\par\n" (format-text-condition (proof-cond pf)))))
+				  (t (princ ":\\par\n")))
 			    ;; (print-given-proof-rewrites "They can be joined" (proof-rewrites1 pf) R (proof-rewrites2 pf) P)
 			    (cond ((proof-flip-diagram pf)
 				   ;; Note: rowsep and colsep should NOT be flipped.
@@ -2183,10 +2184,14 @@
 			      (print-new-fresh-conditions (new-fresh-conditions Q consequents) consequents)
 			      (print-consequent-conditions consequents assumptions))
 			    (princ (verify-decreasing-diagram cp))
+			    (when (proof-cond pf) (princ (format "\\par For the case when %s is false:\\par\n" (format-text-condition (proof-cond pf)))))
 			    (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf))
-			      ;; (print-given-proof-rewrites "And also this way:" (proof-altrewrites1 pf) R (proof-altrewrites2 pf) P)
-			      (print-tikzcd-diagram P Q R name1 name2 path1 '() (proof-id1 pf) (proof-id2 pf) (proof-extra1 pf) (proof-extra2 pf)
-						    (proof-rowsep pf) (proof-colsep pf) (proof-altrewrites1 pf) (proof-altrewrites2 pf) k))))))))
+			      (cond ((proof-flip-diagram pf)
+				     ;; Note: rowsep and colsep should NOT be flipped.
+				     (print-tikzcd-diagram R Q P name2 name1 '() path1 (proof-id2 pf) (proof-id1 pf) (proof-extra2 pf) (proof-extra1 pf)
+							   (proof-rowsep pf) (proof-colsep pf) (proof-altrewrites2 pf) (proof-altrewrites1 pf) (- k)))
+				    (t (print-tikzcd-diagram P Q R name1 name2 path1 '() (proof-id1 pf) (proof-id2 pf) (proof-extra1 pf) (proof-extra2 pf)
+							     (proof-rowsep pf) (proof-colsep pf) (proof-altrewrites1 pf) (proof-altrewrites2 pf) k))))))))))
       ;; (princ (format "Therefore rules \\rulename{%s} and \\rulename{%s} have the XXX property.\\par\n" name1 name2))
       (princ "\n")
       (princ (format "\\par\n"))
