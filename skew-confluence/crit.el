@@ -265,8 +265,8 @@
                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '() :id 3))
                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2) :id 4)))
             (make-proof :rulename1 'hnf-swap :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 44
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(1))))
             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 45
                         :rowsep "normal"
                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3))
@@ -291,8 +291,8 @@
                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '() :id 3))
                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2) :id 4)))
             (make-proof :rulename1 'var-swap :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 51
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 52
                         :rowsep "normal"
                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3))
