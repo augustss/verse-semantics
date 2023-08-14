@@ -10,7 +10,7 @@ PAPERSRC=$(PAPERTEX) $(REWRITES) 01-introduction.tex 02-languages.tex 03-prelimi
 pdf: $(PAPERSRC)
 	latexmk -pdf $(PAPERTEX)
 
-%.tex:   %.ltx   ../calculus.fmt
+%.tex:   %.ltx   ../calculus.fmt skew.fmt
 	lhs2TeX $< > $@
 
 ../verse-icfp23/rewrites.tex: ../verse-icfp23/rewrites.ltx

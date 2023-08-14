@@ -45,16 +45,18 @@ A nonnegative integer superscript $k$ may used to indicate $k$-fold composition 
 and for $k>0$, $R^{k} = R \relcomp R^{k-1}$ and ${\xgosup{}{k}} = {\xgo{}} \relcomp {\xgosup{}{k-1}}$.
 
 
-The \emph{inverse} of a relation $R$ is the set $R^{-1} = \setcomp{(x,y)}{(y,x) \in R}$; note that the inverse of the inverse of $R$ is $R$.
+The \emph{inverse} of a relation $R$ is the set $R^{-1} = \setcomp{(x,y)}{(y,x) \in R}$; note that $(R^{-1})^{-1}=R$.
 While the superscript $^{-1}$ could be applied to symbols as well as letters, we instead customarily notate the inverse of a relation
 that is named by a symbol by flipping the symbol left-to-right, so that $\supset$ denotes the inverse of $\subset$, $\geq$ denotes the inverse of $\leq$,
-and $\leftarrow$ denotes the inverse of $\rightarrow$. It follows that, for example, $|e_1| \leftarrow |e| \rightarrow |e_2|$, which abbreviates
+and $\leftarrow$ denotes the inverse of $\rightarrow$. This convention implies that, for example, $|e_1| \leftarrow |e| \rightarrow |e_2|$, which abbreviates
 $|e_1| \leftarrow |e| \logand |e| \rightarrow |e_2|$, means the same as $|e| \rightarrow |e_1| \logand |e| \rightarrow |e_2|$.
 
 
 A relation $R$ is said to be \emph{symmetric} if $R^{-1}=R$. It is customary to use symbols that are left-right symmetric, such as $\equiv$ and $\leftrightarrow$ and $\Leftrightarrow$, to denote symmetric relations.
 
 Arrows have different \emph{styles} if they have different shafts or different subscripts. For example, $\leftrightarrow$ and $\Leftrightarrow$ and $\xpgo{}$ have different styles, because their shafts are all different; $\xgo{}$ and $\xrngo{r}$ and $\xgo{\rr}$ and $\xrngo{subst}$ have different styles because their subscripts (or lack of subscript) are all different.
+But $\leftarrow$ and $\rightarrow$ and $\leftrightarrow$and $\uparrow$and $\downarrow$ all have the same style,
+and $\xrngo{r}$ and $\xrngodbl{r}$ and $\xrnungo{r}$ and $\xrnungodbl{r}$ all have the same style.
 
 Again, let $R$ and $\xgo{}$ be relations on $A$.
 We use a superscripted $\reflexivemarker$ on a relation to indicate its reflexive closure; thus
@@ -67,24 +69,88 @@ we use a leftward-and-rightward-pointing arrow of the same style to indicate the
 the symmetric closure of $\xgo{}$ is ${\xboth{}} = {\xungo{}} \cup {\xgo{}}$, and
 the symmetric transitive reflexive closure of $\xgo{}$ is ${\xbothdbl{}} = {\xungodbl{}} \cup {\xgodbl{}}$. 
 
-For a given relation denoted by a ri'ghtward arrow $\xgo{}$, we use a downward-pointing arrow of the same style to define the predicate $x \bothreduceto y$ to mean $\exists z \suchthat x \xgodbl{} z \xungodbl{} y$
+For a given relation denoted by a rightward arrow $\xgo{}$, we use a downward-pointing arrow of the same style to define the predicate $x \bothreduceto y$ to mean $\exists z \suchthat x \xgodbl{} z \xungodbl{} y$
 and we use an upward-pointing arrow of the same style to define the predicate $x \bothreducefrom y$ to mean $\exists z \suchthat x \xungodbl{} z \xgodbl{} y$.
 
-\subsubsection{Terms and Occurrences}
+\subsubsection{Metavariables, Terms, and BNF}
 
-Our definition of \emph{term} is specialized for the grammar of {\versecalc}. Briefly put, a term is the parse tree for any BNF nonterminal in the {\versecalc} grammar
-or any string into which such a nonterminal might be expanded, either partially or fully. For our purposes here, we require that terms be finite.
-Let {\metavars} be the set of of \emph{metavariables} (possibly decorated BNF nonterminals) and
-let {\termset} be the set of all possible terms.
-For any term $M \in \termset$, we define its \emph{set of metavariables} $\metavars(M) \subset \metavars$, as shown in \cref{fig:metavars}.
+We use certain symbols as \emph{metavariables}; the appearance of a metavariable is an abstract stand-in for any of a number of concrete possibilities.
+As is customary, we shall use $i$, $j$, $k$, $m$, and $n$ as \emph{integer metavariables}. 
 
+Any symbol that can be used as a metavariable may be \emph{decorated} with a prime mark ${}'$ or integer subscripts to produce a new metavariable having
+the same range of possibilities.
+An integer subscript may in turn be denoted by an integer metavariable or an arithmetic expression in integer metavariables.
+
+Let {\termvars} be a denumerable set of \emph{term variables}. In this paper, for term variables we shall use lowercase italic letters
+other than $i$, $j$, $k$, $m$, and $n$, and occasionally strings of lowercase italic letters (such as |hnf|), all possibly decorated.
+We will use the lowercase Greek letters $\xi$ and $\zeta$ as metavariables ranging over term variables.
+
+Let {\functionsyms} be a finite or denumerable set of \emph{function symbols} that are graded by an \emph{arity} function $a: \functionsyms \mathrel{\rightarrow} \mathbb{N}$,
+such that $\functionsyms \cap \termvars = \emptyset$. We use uppercase letters $F$, $G$, $H$ as metavariables ranging over function symbols.
+For every $n\geq 0$, we define $\functionsyms_n=\setcomp{F}{F \in \functionsyms \logand a(F)=n}$, the set of function symbols of arity $n$.
+
+The set $\termset$ of \emph{terms} is defined to be the free $a$-graded $\functionsyms$-algebra generated by $\termvars$; that is,
+every term either is a term variable (an element of $\termvars$) or is, for some $n \geq 0$, of the form $F M_1 M_2\cdots M_n$,
+where $F\in\functionsyms_n$ and $M_k\in\termvars$ for all $k$ such that $1\leq k\leq n$.
+We use uppercase letters $M$, $N$, $P$, $Q$ as metavariables ranging over terms.
+
+We identify parse trees generated by a BNF grammar with terms in the following manner.
+Every BNF nonterminal is a term variable. For any alternative on the right-hand side of a BNF rule,
+we may write it within the special brackets $\bnffnsym{\cdots}$, replacing every nonterminal within
+that alternative with the placeholder symbol $\bnfhole$, and treat the result as a function symbol;
+the arity of this function symbol is the number of occurrences of $\bnfhole$.
+Every subtree in the parse tree rooted at a tree node generated from a given BNF alternative corresponds to a term
+in which the function symbol is the one derived from that BNF alternative
+and each subterm is, or has been generated from, the corresponding BNF nonterminal
+within that BNF alternative.
+
+For example, one alternative in the rule for expressions |e| in the Verse Calculus is |fail|;
+therefore \bnffnsym{|fail|} is a function symbol of arity 0.
+Another alternative is |eq; e|; therefore \bnffnsym{|bnfhole; bnfhole|} is a function symbol of arity 2.
+The (incompletely expanded) {\versecalc} expression |x=0; y=3; e| corresponds to the term
+$\bnffnsym{|bnfhole; bnfhole|}\bnffnsym{|bnfhole=bnfhole|}\bnfmetavar{|x|}\bnffnsym{0}\bnffnsym{|bnfhole; bnfhole|}\bnffnsym{|bnfhole=bnfhole|}\bnfmetavar{|y|}\bnffnsym{3}\bnfmetavar{|e|}$
+because its parse tree looks like this:
+
+\begin{center}
+\begin{tikzpicture}
+\node{\bnffnsym{|bnfhole; bnfhole|}}
+   child {node {\bnffnsym{|bnfhole=bnfhole|}}
+      child { node {|x|}}
+      child { node {\bnffnsym{0}}}
+    }
+   child [missing] {}
+   child {node {\bnffnsym{|bnfhole; bnfhole|}}
+      child {node {\bnffnsym{|bnfhole=bnfhole|}}
+         child { node {|y|}}
+         child { node {\bnffnsym{3}}}
+      }
+      child {node {|e|}}
+   }
+;   
+\end{tikzpicture}
+\end{center}
+
+One of the alternatives for |hnf| in the Verse Calculus is |tup (v_1, xdots, v_n)|; we regard this as shorthand
+for the denumerable set of alternatives |tup ()|, |tup (v_1)|, |tup (v_1, v_2)|,  |tup (v_1, v_2, v_3)|, \ldots, which correspond
+to separate function symbols \bnffnsym{|tup ()|}, \bnffnsym{|tup (bnfhole)|}, \bnffnsym{|tup (bnfhole, bnfhole)|},  \bnffnsym{|tup (bnfhole, bnfhole, bnfhole)|}, \ldots,
+one for every possible tuple length $n$.
+
+It is possible, and useful, for the same function symbol to be derived from different BNF alternatives.
+For example, in {\versecalc}, one alternative for an expression $e$ is |def x e|, which corresponds to the term $\bnffnsym{|def bnfhole bnfhole|}\bnfmetavar{|x|}\bnfmetavar{|e|}$,
+and one alternative for a choice context $CX$ is |def x CX|, which corresponds to the term $\bnffnsym{|def bnfhole bnfhole|}\bnfmetavar{|x|}\bnfmetavar{|CX|}$; these terms
+contain the same function symbol $\bnffnsym{|def bnfhole bnfhole|}$.
+
+Henceforth we will freely write language expressions where terms might be expected, with the understanding that we mean the term derived by this correspondence
+from the parse tree for the expression.
+
+\subsubsection{Occurrences}
 We use elements of $\mathbb{N}_{+}^{*}$ (that is, tuples of any finite nonnegative length with elements that are positive integers) to represent the positions of the subterms of a term.
 Following \cite[Section 3.1]{Huet80}, we call such tuples \emph{occurrences}; we use variables $u$, $w$, $p$, and $q$ to refer to occurrences,
 and we use variables $U$, $W$, $P$, and $Q$ to refer to sets of occurrences.
 We use juxtaposition to concatenate such tuples; for example, if $u=(1,2)$ and $w=(2,1,3)$, then $uw =(1,2,2,1,3)$ and $w(2,2)u = (2,1,3,2,2,1,2)$.
 Furthermore we sometimes use juxtaposition to concatenate a tuple with every member of a set of tuples to form a new set of tuples;
 for example, if $U=\{(1,2),(2,1,3)\}$, then $(2,3,3)U = \{(2,3,3,1,2),(2,3,3,2,1,3)\}$.
-For notational convenience, we use single boldface digits as abbreviations for singleton tuples, for example $\1=(1)$ and $\2=(2)$;
+For notational convenience, we define $\emptyocc=\emptyocctuple$, and we use single boldface digits as abbreviations for singleton tuples, for example $\1=(1)$ and $\2=(2)$;
 thus $u=(1,2)$ can be written more concisely as $u=\1\2$, and $w(2,2)u$ can be written more concisely as $w\2\2u$.
 
 We say \emph{$u$ is within $w$}, written $u \occin w$,
@@ -92,7 +158,8 @@ iff $\exists q \in \mathbb{N}^{*}_{+} \suchthat u=wq$,
 in which case we also define $u/w = q$.\footnote{This use of the operator $/$ allows
   a very pretty definition of the distributivity property for replacement in \cref{sec:replacement}.}
 We say \emph{$u$ and $w$ are disjoint}, written $u \occdis w$, iff $\neg\bigl( u \occin w \logor w \occin u \bigr)$.
-Finally, $u \occstrictin w$ means $u \occin w \logand u \neq w$ and $u \occdiseq w$ means $u \occdis w \logor u = w$.
+Finally, $u \occstrictin w$ means $u \occin w \logand u \neq w$,  $u \occcontains w$ means $w \occin u$,  $u \occstrictcontains w$ means $w \occstrictin u$, 
+and $u \occdiseq w$ means $u \occdis w \logor u = w$.
 
 For any term $M \in \termset$, we define its \emph{set of occurrences} $\occ(M) \subset \mathbb{N}_{+}^{*}$, as shown in \cref{fig:occurrences}, and the \emph{subterm of $M$ at $u$},
 $M/u \in \termset$, where $u \in \occ(M)$, as shown in \cref{fig:selection}. We overload the relations $\occin$ and $\occstrictin$ to apply to terms:
@@ -102,39 +169,39 @@ and $M \occstrictin N$ means $\exists u \neq \emptyocc \suchthat M = N/u$.\footn
   on tuples: $w \preceq u$ iff $\exists q \in \mathbb{N}^{*}_{+} \suchthat u=wq$.
   The notion of occurrences unfortunately runs up against an irreconcilable conflict of terminology:
   the tuple representing occurrence $u$ is contained within the tuple representing occurrence $w$
-  if and only if the subterm $M/w$ is contained within $M/u$---note the unfortunate chiasmus.
+  if and only if the subterm $M/w$ is contained within $M/u$---note the unfortunate chiasmus of $u$ and $w$.
   We have chosen a notation for comparing occurrences that emphasizes the relationships of subterms
   selected by occurrences rather than the relationships of the tuple representation of occurrences.
   This allows us to say that $M/u \occin M/w$ if and only if $u \occin w$.}
 We also say that \emph{$u$ is an occurrence of the term $M/u$ in $M$}.
 
-We define $\occ(M,N)$ (the \emph{occurrences of $M$ in $N$} to mean $\setcomp{u}{u\in\occ(N) \logand N/u=M}$.  
-We define $\uniqueocc(M,N)$ (the \emph{unique occurrence of $M$ in $N$} to mean $u$ where $\occ(M,N) = \{u\}$;
+We define $\occ(M,N)$ (the \emph{occurrences of $M$ in $N$}) to mean $\setcomp{u}{u\in\occ(N) \logand N/u=M}$.  
+We define $\uniqueocc(M,N)$ (the \emph{unique occurrence of $M$ in $N$}) to mean $u$ where $\occ(M,N) = \{u\}$;
 $\uniqueocc(M,N)$ is undefined if $\left||\occ(M,N)\right|| \neq 1$.
-
+\guy{Consider the notations $N/M$ and $!(N/M)$.}
 
 \begin{figure}
 $
 \begin{array}{@@{}l@@{\qquad}l@@{\qquad}l@@{}}
-  \hbox{form of $M$} & \metavars(M) & \occ(M) \\[4pt] \hline
-  M \in \metavars & \{M\} & \{\emptyocc\} \\ \hline
+  \hbox{form of $M$} & \termvars(M) & \occ(M) \\[4pt] \hline
+  M \in \termvars & \{M\} & \{\emptyocc\} \\ \hline
   |x| & \{\,\} & \{\emptyocc\} \\ \hline
   |k| & \{\,\} & \{\emptyocc\} \\ \hline
   |op| & \{\,\} & \{\emptyocc\} \\ \hline
-  |tup (v_1, commadots, v_n)| & \bigcup_{1\leq i\leq n} \metavars(|v_i|)& \{\emptyocc\} \cup \bigcup_{1\leq i\leq n} (i)\occ(|v_i|) \\ \hline
-  |lam x e| & \metavars(|x|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
-  |mu x e| & \metavars(|x|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
-  |eq; e| & \metavars(|eq|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|eq|) \cup (2)\occ(|e|) \\ \hline
-  |v = e| & \metavars(|v|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|v|) \cup (2)\occ(|e|) \\ \hline
-  |def x e| & \metavars(|x|) \cup \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
+  |tup (v_1, commadots, v_n)| & \bigcup_{1\leq i\leq n} \termvars(|v_i|)& \{\emptyocc\} \cup \bigcup_{1\leq i\leq n} (i)\occ(|v_i|) \\ \hline
+  |lam x e| & \termvars(|x|) \cup \termvars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
+  |mu x e| & \termvars(|x|) \cup \termvars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
+  |eq; e| & \termvars(|eq|) \cup \termvars(|e|) & \{\emptyocc\} \cup (1)\occ(|eq|) \cup (2)\occ(|e|) \\ \hline
+  |v = e| & \termvars(|v|) \cup \termvars(|e|) & \{\emptyocc\} \cup (1)\occ(|v|) \cup (2)\occ(|e|) \\ \hline
+  |def x e| & \termvars(|x|) \cup \termvars(|e|) & \{\emptyocc\} \cup (1)\occ(|x|) \cup (2)\occ(|e|) \\ \hline
   |fail| & \{\,\} & \{\emptyocc\} \\ \hline
-  |e_1 choice e_2| & \metavars(|e_1|) \cup \metavars(|e_2|) & \{\emptyocc\} \cup (1)\occ(|e_1|) \cup (2)\occ(|e_2|) \\ \hline
-  |apply1N v_1 v_2| & \metavars(|v_1|) \cup \metavars(|v_2|) & \{\emptyocc\} \cup (1)\occ(|v_1|) \cup (2)\occ(|v_2|) \\ \hline
-  |one e| & \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|e|) \\ \hline
-  |all e| & \metavars(|e|) & \{\emptyocc\} \cup (1)\occ(|e|) \\ \hline
+  |e_1 choice e_2| & \termvars(|e_1|) \cup \termvars(|e_2|) & \{\emptyocc\} \cup (1)\occ(|e_1|) \cup (2)\occ(|e_2|) \\ \hline
+  |apply1N v_1 v_2| & \termvars(|v_1|) \cup \termvars(|v_2|) & \{\emptyocc\} \cup (1)\occ(|v_1|) \cup (2)\occ(|v_2|) \\ \hline
+  |one e| & \termvars(|e|) & \{\emptyocc\} \cup (1)\occ(|e|) \\ \hline
+  |all e| & \termvars(|e|) & \{\emptyocc\} \cup (1)\occ(|e|) \\ \hline
 \end{array}
 $
-\caption{Definitions of $\metavars(M)$ (set of metavariables within $M$) and $\occ(M)$ (the set of occurrences within $M$)}\label{fig:metavars}\label{fig:occurrences}
+\caption{Definitions of $\termvars(M)$ (set of metavariables within $M$) and $\occ(M)$ (the set of occurrences within $M$)}\label{fig:termvars}\label{fig:occurrences}
 \Description{Definition of notation for the set of occurrences of subterms within a term $M$}
 \end{figure}
 
@@ -192,25 +259,20 @@ $\forall M,N,P \in\termset, u,w \in \occ(M)$ such that $u \occin w$:
 
 We also propose names for two additional properties:
 
-\begin{lemma}
-$\forall M \in\termset, u \in \occ(M)$:
 \begin{quote}
+$\forall M \in\termset, u \in \occ(M)$: 
 \begin{tabbing}
 \qquad\=\hskip 3in\=\kill 
 \>$\tsubst{M}{u}{M/u} = M$\>{\rm\emph{consistency}}
 \end{tabbing}
-\end{quote}
-\end{lemma}
-
-\begin{lemma}
 $\forall M,N \in\termset, q,u \in \occ(M)$ such that $q \occin u$, and let $w=q/u$:
-\begin{quote}
 \begin{tabbing}
 \qquad\=\hskip 3in\=\kill 
 \>$\tsubst{M}{uw}{N} = \tsubst{M}{u}{\tsubst{(M/u)}{w}{N}}$\>{\rm\emph{factoring}}
 \end{tabbing}
 \end{quote}
-\end{lemma}
+
+Here is a proof of the factoring property:
 \begin{proof}
   $\tsubst{M}{uw}{N} = \tsubst{\tsubst{M}{u}{M/u}}{uw}{N} \BY{\emph{consistency}}$ \hfill\break \null\hskip1.35in${} = \tsubst{M}{u}{\tsubst{(M/u)}{w}{N}} \BY{\emph{associativity}}$.
 \end{proof}
@@ -252,7 +314,7 @@ $
 
 \subsubsection{Rewrite Rules on Terms}
 
-A \emph{rewrite rule} is a pair of terms, customarily written $\langle\alpha \xgo{} \beta\rangle$, such that $\metavars(\beta) \subseteq \metavars(\alpha)$.
+A \emph{rewrite rule} is a pair of terms, customarily written $\langle\alpha \xgo{} \beta\rangle$, such that $\termvars(\beta) \subseteq \termvars(\alpha)$.
 (When rewrite rules are listed in a table, the surrounding angle brackets are typically omitted.)
 A rewrite rule may be given a name, which we write in small caps; we also use the names \rulename{r} and \rulename{s} as metavariables
 that range over rule names. A rewrite rule describes a relation on terms: $(M,N)$ is a member of the relation iff
@@ -265,7 +327,7 @@ for all terms $M$, $N$, and $P$ in $\termset$ and all occurrences $u \in \occ(P)
 ``rewritten in place'' in the same way as an entire term).\footnote{It might seem simpler to eliminate the variable $M$ by saying that
 $\xgo{}$ is compatible if and only if
 for all terms $N$ and $P$ in $\termset$ and all occurrences $u \in \occ(P)$, if $P/u \xgo{} N$ then $P \xgo{} \tsubst{P}{u}{N}$.
-However, the more complicated formulation we have chosen here is similar to the formulation used
+However, the more complicated formulation we have chosen here allows a very similar formulation to be used
 in the definition of \emph{disjoint parallel closure} in \cref{sec:disjoint-parallel}.}
 For any rewrite rule \rulename{r}, we write $\xrngo{r}$ to denote the smallest stable, compatible relation that contains the relation described by \rulename{r}.
 

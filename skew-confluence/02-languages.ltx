@@ -13,7 +13,42 @@ TBD
 
 \subsection{Lambda-Letrec Calculus}
 
-TBD
+\guy{Ariola and Blom refer to this language variously as ``the lambda calculus with letrec'', ``the cyclic lambda calculus'', and ``$\lambda\circ$''; we will call it the ``lambda-letrec calculus'' and use ``$\lambda\circ$' in mathematical formulas
+  as a subscript to marking certain functions as beign related specifically to the lambda-letrec calculus.}
+
+
+  \begin{figure}
+    $\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l @@{\hspace{1em}} r @@{\;}c@@{\;} l @@{}}
+\rulegroupname{Beta reduction:}
+  \text{$\beta\circ$}          & |apply1N (lam x M) N| & \movesto & |letrec M (x=N)| \\
+\rulegroupname{Substitution (external or internal):}
+  \text{es}          & |letrec (C^[x]) (x=M,D)| & \movesto & |letrec (C^[M]) (x=M,D)| \\
+  \text{is}          & |letrec M (x=C^[y],y=N,D)| & \movesto & |letrec M (x=C^[N],y=N,D)| \\
+\rulegroupname{Merge (external or internal):}
+  \text{em}          & |letrec (letrec M D_1) D_2| & \movesto & |letrec M (D_1,D_2)| \\
+  \text{im}          & |letrec M (x=(letrec N D_1), D_2)| & \movesto & |letrec M (x=N,D_1,D_2)| \\
+\rulegroupname{Lift (of argument, function, or lambda):}
+  \text{lifta}          & |apply1NN (letrec M D) N| & \movesto & |letrec (apply1NN M N) D| \\
+  \text{liftf}          & |apply1NN M (letrec N D)| & \movesto & |letrec (apply1NN M N) D| \\
+  \text{lift$\lambda$}          & |lam x (letrec M (D_1,D_2))| & \movesto & |letrec (lam x (letrec M D_1))D_2|     \qquad\qquad\text{conditions} \\
+\rulegroupname{Garbage collection (of declaration or letrec):}
+  \text{gcd}          & |letrec M (D_1,D_2)| & \movesto & |letrec M D_1|     \qquad\qquad\text{conditions} \\
+  \text{gcl}          & |letrec M ()| & \movesto & |M| \\
+\rulegroupname{Copy:}
+  \text{cp}          & |M|^\sigma & \movesto & |M|     \qquad\qquad\text{conditions} \\
+\end{array} \\
+
+    \\[-1.1em]
+       
+       \text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
+      \\ \guy{Need to be explicit about side conditions.}
+\end{array}$
+\caption{\textbf{Rewrite rules for the Lambda-Letrec Calculus}} \label{fig:ruleslambdale}
+\Description{A table that exhibits the rewrite rules for the Lambda-Letrec Calculus}
+\end{figure}
+
+
 
 \subsection{Verse Calculus}
 
@@ -68,8 +103,8 @@ TBD
     \\[-1.0em]
 
 \rulegroupname{Normalization:}
-\rulename{exi-float-eq}\rlap{${}^{\alpha}$} & |v=(def x e); e'| & \movesto & \MC{2}{|def x (v=e;e')|} & \MC{3}{\text{if $x \notin \freevars{|v|,|e'|}$}} \\
-\rulename{exi-float-l}\rlap{${}^{\alpha}$} & |(def x e); e'| & \movesto & \MC{2}{|def x (e;e')|} & \MC{3}{\text{if $x \notin \freevars{|e'|}$}} \\
+\rulename{exi-float-eq}\rlap{${}^{\alpha}$} & |v=(def x e_1); e_2| & \movesto & \MC{2}{|def x (v=e_1;e_2)|} & \MC{3}{\text{if $x \notin \freevars{|v|,|e_2|}$}} \\
+\rulename{exi-float-l}\rlap{${}^{\alpha}$} & |(def x e_1); e_2| & \movesto & \MC{2}{|def x (e_1;e_2)|} & \MC{3}{\text{if $x \notin \freevars{|e_2|}$}} \\
 \rulename{exi-float-r}\rlap{${}^{\alpha}$} & |eq; (def x e)| & \movesto & \MC{2}{|def x (eq; e)|} & \MC{3}{\text{if $x \notin \freevars{|eq|}$}} \\
 \rulename{eqn-float} & |v == (eq ; e_1); e_2| & \movesto & \MC{2}{|eq ; (v == e_1; e_2)|} \\
 \rulename{seq-assoc} & |(eq ; e_1) ; e_2| & \movesto & \MC{2}{|eq ; (e_1 ; e_2)|} \\

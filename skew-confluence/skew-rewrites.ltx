@@ -1,8 +1,12 @@
 %% Additional rewrites and macros for skew confluence proof
 
-\newcommand{\1}{\hbox{\bf 1}}
-\newcommand{\2}{\hbox{\bf 2}}
+\newcommand\boldtupledigit[1]{{\mskip1mu\mathbf{#1}\mskip-9mu\mathbf{#1}\mskip-9mu\mathbf{#1}\mskip-9mu\mathbf{#1}\mskip-9mu\mathbf{#1}\mskip-9mu\mathbf{#1}\mskip-9mu\mathbf{#1}\mskip1mu}}
+\newcommand{\1}{\boldtupledigit{1}}
+\newcommand{\2}{\boldtupledigit{2}}
+\newcommand{\emptypath}{\Lambda}
 
+%%\newcommand{\rewritelabel}[1]{\fbox{#1}}
+\newcommand{\rewritelabel}[1]{{\setbox0\hbox{$\displaystyle\bigcirc$}\hbox to 0pt{\raise0.1ex\hbox to \wd0{\hss$\scriptstyle#1$\hss}\hss}\box0}}
 
 \newcommand{\CASE}[1]{\item[{\bf case} $#1${\rm :}]}
 \newcommand{\CASEIN}[2]{\item[{\bf case} {\rm $#1$ (within #2):}]}
@@ -31,12 +35,20 @@
 \newcommand{\bothreduceto}{\mathbin{\mskip-2.5mu\downarrow\mskip-2.5mu}}
 \newcommand{\bothreducefrom}{\mathbin{\mskip-2.5mu\uparrow \mskip-2.5mu}}
 \newcommand{\setcomp}[2]{\{\,#1\mid#2\,\}}
-\newcommand{\metavars}{\hbox{$\mathscr{V}$}}
+%\newcommand{\bnffnsym}[1]{\hbox{$\mskip1mu\llparenthesis\mskip1mu#1\mskip1mu\rrparenthesis\mskip1mu$}}
+
+\newcommand{\bnffnsym}[1]{\hbox{\hskip0.2ex\ovalbox{\rlap{\phantom{$:$}}$\smash{#1}$}\hskip0.2ex}}
+\newcommand{\bnfmetavar}[1]{\hbox{\hskip0.2ex$#1$\hskip0.2ex}}
+
+\newcommand{\bnfhole}{\mathord{\bullet}}
+\newcommand{\termvars}{\hbox{$\mathscr{V}$}}
+\newcommand{\functionsyms}{\hbox{$\mathscr{F}$}}
 \newcommand{\termset}{\hbox{$\mathscr{T}$}}
 \newcommand{\occ}{\hbox{$\mathscr{O}$}}
 \newcommand{\uniqueocc}{\hbox{$\mathscr{O}!$}}
-\newcommand{\freeocc}{\hbox{$\mathscr{F}$}}
-\newcommand{\emptyocc}{\hbox{$(\,)$}}
+\newcommand{\freeocc}{\hbox{$\mathscr{Free}$}}
+\newcommand{\emptyocc}{\hbox{$\Lambda$}}
+\newcommand{\emptyocctuple}{\hbox{$(\,)$}}
 \newcommand{\logand}{\mathrel{\,\wedge\,}}
 \newcommand{\logor}{\mathrel{\,\vee\,}}
 \newcommand{\biglogand}{\bigwedge}
@@ -82,15 +94,15 @@
   $\m@@th\thickmuskip0mu\medmuskip\thickmuskip\thinmuskip\thickmuskip
    \relax#7#3\mkern-7mu%
    \cleaders\hbox{$#7\mkern-2mu#4\mkern-2mu$}\hfill 
-   \if0#1\else\mkern#1mu\fi\hbox to 0pt{\hss#5\hss}\if0#2\else\mkern#2mu\fi
+   \if0#1\else\mkern#1mu\fi\hbox to 0pt{\hss#5\hss}\hbox to 0pt{\hss${#4\mkern-4mu#4}$\hss}\if0#2\else\mkern#2mu\fi
    \cleaders\hbox{$#7\mkern-2mu#4\mkern-2mu$}\hfill 
    \mkern-7mu#6$%
  }}
 
 %\newcommand\parbars{\raise0.336ex\hbox{$\scriptscriptstyle\shortparallel$}}
 %\newcommand\parbars{\raise0.336ex\hbox{$\rlap{$\mskip1mu\scriptscriptstyle\shortparallel$}\scriptscriptstyle\shortparallel\llap{$\scriptscriptstyle\shortparallel\mskip1mu$}$}}
-\newcommand{\oneparbar}{\vrule width 0.14ex height 0.7ex depth 0ex\relax}
-\newcommand\parbars{\raise0.25ex\hbox{\oneparbar\hskip0.2ex\oneparbar}}
+\newcommand{\oneparbar}{\vrule width 0.14ex height 0.6ex depth 0ex\relax}
+\newcommand\parbars{\raise0.30ex\hbox{\oneparbar\hskip0.2ex\oneparbar}}
 \newcommand\leftpararrowfill@@{\decoratedarrowfill@@30\leftarrow\relbar\parbars\arrowbar}
 \newcommand\rightpararrowfill@@{\decoratedarrowfill@@03\arrowbar\relbar\parbars\rightarrow}
 \newcommand\leftrightpararrowfill@@{\decoratedarrowfill@@33\leftarrow\relbar\parbars\rightarrow}
@@ -160,7 +172,7 @@
 % \newcommand\mastergo[5]{{\setbox\sksub\vbox to 0pt{\vskip-1.65ex\hbox{$\scriptstyle#4#1#5$}\vss}\setbox\sksup\vbox to 0pt{\vss\hbox{$\scriptstyle\mskip3mu#4#2#5\mskip-3mu$}\vskip-1.3ex}%
 %     \setbox\skwid\vbox{\copy\sksup\copy\sksub}%
 %     \mathbin{\smash{\mathop{#3{\hbox to \wd\skwid{\hss}}}\limits^{\copy\sksup}_{\copy\sksub}}}}}
-\newcommand\mastergo[5]{\mathrel{\setbox\sksub\vbox to 0pt{\vskip-1.5ex\hbox{$\scriptscriptstyle{#4}#1{#5}$}\vss}\setbox\sksup\vbox to 0pt{\vss\hbox{$\scriptscriptstyle\mskip2mu{#4}#2{#5}\mskip-2mu$}\vskip-1.1ex}%
+\newcommand\mastergo[5]{\mathrel{\setbox\sksub\vbox to 0pt{\vskip-1.6ex\hbox{$\scriptscriptstyle{#4}#1{#5}$}\vss}\setbox\sksup\vbox to 0pt{\vss\hbox{$\scriptscriptstyle\mskip2mu{#4}#2{#5}\mskip-2mu$}\vskip-1.25ex}%
     \setbox\skwid\vbox{\copy\sksup\copy\sksub}%
     \mathbin{\smash{\mathop{#3{\hbox to \wd\skwid{\hss}}}\limits^{\copy\sksup}_{\copy\sksub}}}}}
 
