@@ -591,50 +591,56 @@ runTimTest tflg test | Just s <- onlyTest tflg, s /= timTestName test = pure (0,
 runTimTest tflg test | timRun tflg = do
   let sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
       flg = (testFlagsToFlags tflg) { fNoWarn = True }
-      res = run flg sys $ desugar flg $ timExpr test
       tag = timTag test
       Ident loc stag = tag
-  tres <- tryResult tflg res
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
-  case take 1 stag of
-    "S" -> case tres of
-             ResOK x | x /= Fail -> do putStrLn "pass, OK";  pure (0, 1, 0, 0)
-                     | otherwise -> do putStrLn "fail, bad"; pure (0, 0, 1, 0)
-             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
-    "F" -> case tres of
-             ResOK x | x == Fail -> do putStrLn "fail, OK";  pure (0, 1, 0, 0)
-                     | otherwise -> do putStrLn "pass, bad"; pure (0, 0, 1, 0)
-             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
-    "N" -> case tres of
-             ResOK _             -> do putStrLn "pass, bad"; pure (0, 0, 1, 0)
-             Undefined           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
-             Shadowing           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
-             _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
-    _                            -> do putStrLn "skip";      pure (1, 0, 0, 0)
+  if take 1 stag `notElem` ["S", "F", "N"] then
+    -- Fast path for unknown tests
+    do putStrLn "skip"; pure (1, 0, 0, 0)
+   else do
+    tres <- tryResult tflg $ run flg sys $ desugar flg $ timExpr test
+    case take 1 stag of
+      "S" -> case tres of
+               ResOK x | x /= Fail -> do putStrLn "pass, OK";  pure (0, 1, 0, 0)
+                       | otherwise -> do putStrLn "fail, bad"; pure (0, 0, 1, 0)
+               _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
+      "F" -> case tres of
+               ResOK x | x == Fail -> do putStrLn "fail, OK";  pure (0, 1, 0, 0)
+                       | otherwise -> do putStrLn "pass, bad"; pure (0, 0, 1, 0)
+               _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
+      "N" -> case tres of
+               ResOK _             -> do putStrLn "pass, bad"; pure (0, 0, 1, 0)
+               Undefined           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
+               Shadowing           -> do putStrLn "err,  OK";  pure (0, 1, 0, 0)
+               _                   -> do putStrLn "exception"; pure (0, 0, 0, 1)
+      _                            -> undefined
 runTimTest tflg test | timVerify tflg = do
   let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False, fNoWarn = True  }
       e' = preProcess sys (ruleEnv sys) . coreToTrs . desugar flags . timExpr $ test
       sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
-      res = verifyM sys e'
       tag = timTag test
       Ident loc stag = tag
-  tres <- tryResult tflg res
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
-  let disp trc =
-        when (verbose tflg) $
-          putStrLn $ unlines $ showTrace trc
-  case take 1 stag of
-    "S" -> case tres of
-             ResOK Nothing          -> do putStrLn "timeout";     pure (0, 0, 0, 1)
-             ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (0, 1, 0, 0)
-             ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (0, 0, 1, 0)
-             _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
-    "F" -> case tres of
-             ResOK Nothing          -> do putStrLn "timeout";     pure (0, 0, 0, 1)
-             ResOK (Just (True, _)) -> do putStrLn "pass, bad";   pure (0, 0, 1, 0)
-             ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (0, 1, 0, 0)
-             _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
-    _   -> do putStrLn "skip";        pure (1, 0, 0, 0)
+  if take 1 stag `notElem` ["S", "F"] then
+    -- Fast path for unknown tests
+    do putStrLn "skip"; pure (1, 0, 0, 0)
+   else do
+    tres <- tryResult tflg $ verifyM sys e'
+    let disp trc =
+          when (verbose tflg) $
+            putStrLn $ unlines $ showTrace trc
+    case take 1 stag of
+      "S" -> case tres of
+               ResOK Nothing          -> do putStrLn "timeout";     pure (0, 0, 0, 1)
+               ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (0, 1, 0, 0)
+               ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (0, 0, 1, 0)
+               _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
+      "F" -> case tres of
+               ResOK Nothing          -> do putStrLn "timeout";     pure (0, 0, 0, 1)
+               ResOK (Just (True, _)) -> do putStrLn "pass, bad";   pure (0, 0, 1, 0)
+               ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (0, 1, 0, 0)
+               _                      -> do putStrLn "exception";   pure (0, 0, 0, 1)
+      _   -> undefined
 
 runTimTest _ _ = error "impossible"
 
