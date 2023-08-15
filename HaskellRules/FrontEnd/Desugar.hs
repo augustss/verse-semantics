@@ -165,9 +165,7 @@ dsSmall = ds
     ds (InfixOp e1 (Op "where") e2) = do
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
-    ds (InfixOp e1@Variable{} (Op "=") e2) = ds $ Unify e1 e2
-    ds (InfixOp e1 (Op "=") e2@Variable{}) = ds $ Unify e2 e1
-    ds (InfixOp e1            (Op "=") e2) = do x <- newIdent (getLoc e1) "x"; ds $ seqE [DefineE x e1, Unify (Variable x) e2]
+    ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU e1' e2'
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
@@ -228,6 +226,11 @@ dsSmall = ds
     ds (Macro1 (Ident _ "all") [] e) = ds $ For1 e
 
     ds x = compos ds x
+
+    dsU e1@Variable{} e2            = pure $ Unify e1 e2
+    dsU e1            e2@Variable{} = pure $ Unify e2 e1
+    dsU e1            e2            = do x <- newIdent (getLoc e1) "x"; pure $ Seq [DefineE x e1, Unify (Variable x) e2]
+
 
 type Value = Expr
 
