@@ -258,6 +258,9 @@ apply2 con x1 x2 = pure $ con x1 x2
 
 defn :: Expr -> Expr -> D Expr
 -- Rule: (i := e) -->  (i := e)
+defn (Variable (Ident _ "_")) e = do
+  x <- newIdent (getLoc e) "u"
+  pure $ DefineE x e
 defn (Variable i) e = pure $ DefineE i e
 -- Rule: (f(a) := e)  -->  (f := function(a){e})
 -- Rule: (p<a> := e)  -->  ...
