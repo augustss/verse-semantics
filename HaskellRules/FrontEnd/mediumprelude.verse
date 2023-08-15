@@ -28,6 +28,7 @@ void        (_x:any$)                             := array{};
 Length      (_x:any$)                 <decides>   := { isArr$[_x]; arrLen$[_x] };
 Err         (_x:any$)                             := { err$[_x] };
 Print       (_x:any$)               <interacts>   := { print$[_x] };
+Concatenate (_x:any$, _y:any$)        <decides>   := { arrConc$[_x,_y] };
 
 #operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};
 postfix'^'(_p:any$)<reads><decides>  := read$[_p];

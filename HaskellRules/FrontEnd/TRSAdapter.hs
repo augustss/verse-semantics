@@ -220,7 +220,8 @@ allOps = [
   (T.Print, "print$"),
   (T.Append,"append$"),
   (T.Error, "err$"),
-  (T.Length,"arrLen$")
+  (T.Length,"arrLen$"),
+  (T.Concat,"arrConc$")
   ]
 
 ----------------------------------------------

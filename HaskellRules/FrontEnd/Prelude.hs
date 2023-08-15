@@ -66,7 +66,8 @@ verifyprelude = ("verifyprelude", "\
 \## The lowered{} macro stops insertion lowering from BigCore to Core,\n\
 \## i.e., stop assume{} being inserted.\n\
 \\n\
-\# XXX How should possible effect be indicated?  Ispecially for Print.\n\
+\# XXX How should possible effect be indicated?  Especially for Print.\n\
+\# XXX What should the definition of Err() be?\n\
 \array{\n\
 \false        := array{};\n\
 \any          := lowered{ lambda(_x){                                                        assume { _x }}};\n\
@@ -88,6 +89,8 @@ verifyprelude = ("verifyprelude", "\
 \prefix'+'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intPlus$[_x];   isInt$[_z]; _z }}};\n\
 \Length       := lowered{ lambda(_x) {               isArr$[_x];                             assume { _z:any$; isInt$[_z]; intGE$[_z,0]; _z }}};\n\
 \Print        := lowered{ lambda(_x) { print$[_x];                                                    array{} }};\n\
+\Err          := lowered{ lambda(_x) {                                                       assume { _z:any$; _z }}};\n\
+\Concatenate  := lowered{ lambda(_xy){ (_x,_y):=_xy; isArr$[_x]; isArr$[_y];                 assume { _z:= arrConc$[_x,_y]; isArr$[_z]; _z }}};\n\
 \}\n\
 \")
 
@@ -147,6 +150,7 @@ mediumprelude = ("mediumprelude", "\
 \Length      (_x:any$)                 <decides>   := { isArr$[_x]; arrLen$[_x] };\n\
 \Err         (_x:any$)                             := { err$[_x] };\n\
 \Print       (_x:any$)               <interacts>   := { print$[_x] };\n\
+\Concatenate (_x:any$, _y:any$)        <decides>   := { arrConc$[_x,_y] };\n\
 \\n\
 \#operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
 \postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\

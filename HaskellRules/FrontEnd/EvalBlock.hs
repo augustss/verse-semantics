@@ -43,7 +43,7 @@ opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, o
 opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
 opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
 opIsInt, opIsRat, opIsArr, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
-opErr, opArrLen, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
+opErr, opArrLen, opArrConc, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
 
 opIntGt    = "intGT$"
 opIntGe    = "intGE$"
@@ -109,6 +109,7 @@ opAddTo = "in'+='"
 opDotDot= "in'..'"
 opPrint = "print$"
 opAppend= "append$"
+opArrConc="arrConc$"
 opErr   = "err$"
 
 pattern One :: Expr -> Expr
@@ -1193,6 +1194,11 @@ evalPrimOp op v | Just arith <- lookup op arithUnF64Ops =
 evalPrimOp op v | op == opArrLen =
   case v of
     BHNF (BArr xs) -> Just $ BVal $ BVInt $ toInteger $ length xs
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opArrConc =
+  case v of
+    BVArr [BVArr xs, BVArr ys] -> Just $ BVal $ BVArr $ xs ++ ys
+    BVArr vs  | any isBVar vs -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsInt =
   case v of

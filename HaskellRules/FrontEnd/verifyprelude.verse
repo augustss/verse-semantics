@@ -3,7 +3,8 @@
 ## The lowered{} macro stops insertion lowering from BigCore to Core,
 ## i.e., stop assume{} being inserted.
 
-# XXX How should possible effect be indicated?  Ispecially for Print.
+# XXX How should possible effect be indicated?  Especially for Print.
+# XXX What should the definition of Err() be?
 array{
 false        := array{};
 any          := lowered{ lambda(_x){                                                        assume { _x }}};
@@ -25,4 +26,6 @@ prefix'-'    := lowered{ lambda(_x) {               isInt$[_x];                 
 prefix'+'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intPlus$[_x];   isInt$[_z]; _z }}};
 Length       := lowered{ lambda(_x) {               isArr$[_x];                             assume { _z:any$; isInt$[_z]; intGE$[_z,0]; _z }}};
 Print        := lowered{ lambda(_x) { print$[_x];                                                    array{} }};
+Err          := lowered{ lambda(_x) {                                                       assume { _z:any$; _z }}};
+Concatenate  := lowered{ lambda(_xy){ (_x,_y):=_xy; isArr$[_x]; isArr$[_y];                 assume { _z:= arrConc$[_x,_y]; isArr$[_z]; _z }}};
 }

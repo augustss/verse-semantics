@@ -677,6 +677,7 @@ primOps = map (Ident noLoc)
   , "fail$"
   , "err$"
   , "arrLen$"
+  , "arrConc$"
   ]
 
 ------------------------

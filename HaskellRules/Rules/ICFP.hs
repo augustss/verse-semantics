@@ -619,6 +619,10 @@ rulesPrimOps _ lhs =
   "APP-LENGTH" `name`
   do Op Length :@: Arr vs <- [lhs]
      pure (Int (toInteger (length vs)))
+ ++
+  "APP-CONCAT" `name`
+  do Op Concat :@: Arr [Arr vs1, Arr vs2] <- [lhs]
+     pure (Arr (vs1 ++ vs2))
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
