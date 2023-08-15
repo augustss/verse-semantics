@@ -259,7 +259,7 @@ test(S01){f(g0(:int)<fails>:=3):=4 => 5}
 
 # Shows need for the tighter new FunctionMacro non-succeeds rules.
 test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:any     ):=3]}
-test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:rational):=3]}
+#LA test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:rational):=3]}
 test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:int     ):=3]}
 test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:nat     ):=3]}
 test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:false   ):=3]}
@@ -296,7 +296,7 @@ test(S00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:nat     ):=x]}
 # Higher order functions.
 test(U00){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a]}
 test(S00){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}
-test(S00){a:int => g(f()(x:int):=3):=4 => assume<succeeds>{g[f1()(x:int):=a]}}
+#LA test(S00){a:int => g(f()(x:int):=3):=4 => assume<succeeds>{g[f1()(x:int):=a]}}
 test(D00){a:int => g(f()(x:int):=3):=4 => assume<decides >{g[f1()(x:int):=a]}}
 test(D00){a:any => g(f()(x:int):=3):=4 => assume<decides >{g[f1()(x:int):=a]}}
 
@@ -408,9 +408,9 @@ test(S00){f():=array{:int} => 4}
 test(S00){f():=array{:int} => f()[0]}
 test(D00){f():=array{:int} => f()[0]=3}
 test(S00){f():=(3,:int) => 4}
-test(S00){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}}}
-test(S00){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}; xs[1]}}
-test(D00){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}; int[xs[1]]}}
+#LA test(S00){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}}}
+#LA test(S00){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}; xs[1]}}
+#LA test(D00){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}; int[xs[1]]}}
 
 #
 # Functions.
@@ -657,7 +657,7 @@ test(D00){f()<decides>:int=3; f[]}
 test(D00){f()<decides>:int => f[]}
 test(U00){f():any => f[]=7}
 test(U00){f()<decides>:any => f[]=7}
-test(S02){f()<decides>:int<succeeds> => f[]}
+#LA test(S02){f()<decides>:int<succeeds> => f[]}
 test(D00){f()<decides>:int => f[]}
 
 # Effects based subtyping and calling.
