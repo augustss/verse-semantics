@@ -567,7 +567,7 @@ scope sc = expr
     expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
     expr (TLam i r e1 e2 me3) = do
       (e1', sc') <- defs (S.insert i sc) e1
-      TLam i r e1' <$> scopeD sc' e2 <*> traverse exprD me3
+      TLam i r e1' <$> scopeD sc' e2 <*> traverse (scopeD sc') me3
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
     expr Fail = pure Fail
