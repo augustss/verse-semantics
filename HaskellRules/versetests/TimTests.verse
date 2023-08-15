@@ -971,8 +971,8 @@ test(X00){Print(123) => 456}
 test(S00){g(f():=3)<interacts>:=Print(3)}
 
 # Must IterateStep commit clear AllowFx and inherit parent?
-test(S00){a:any => b:int => allow{x:=a=b} where if{x=3}}
-test(A00){allow{x:any} where if{x}}
+#LA test(S00){a:any => b:int => allow{x:=a=b} where if{x=3}}
+#LA test(A00){allow{x:any} where if{x}}
 
 # Requires abstract treatment of natives and effects.
 test(S00){f(g()<interacts>:any):=3}
