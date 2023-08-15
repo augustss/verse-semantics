@@ -589,7 +589,7 @@ test(D00){a&b:int => f(a=b):type{a=b} => f[b]}
 test(D00){a&b:int => f(a=b):type{a=b} => f[a=b]}
 test(D00){a&b:int => f(a):type{a=b} => {x:=b,f[x]}}
 test(D00){a&b:int => f(a):type{a=b} => {f[x],x:=b}}
-test(QA00){f(x:int):int => {x:=f[x],first{int[x]}}}
+test(A00){f(x:int):int => {x:=f[x],first{int[x]}}}
 test(S00){a:int => f(x:nat):int => if{f[a]=3}}
 test(S00){a:int => f(x:int):int => if{int[f[a]]}}
 test(S00){a:int => f(x:nat):int => if{int[f[a]]}}
@@ -1643,7 +1643,7 @@ test(S00){f(x:=int['c']):=x=1}
 test(F00){f(x:=int[3  ]):=x=1}
 test(S00){f(x:=int[g(3):=4]):=x=1}
 test(S00){f(x:=(3,5)[7]):=x=1}
-test(QS00){f(x:=first{2=3}):=x=1}
+test(S00){f(x:=first{2=3}):=x=1}
 test(S00){f(x:=1/0):=x=1}
 test(F00){f(x:=(3,5)[0]):=x=1}
 test(U00){f(x:false,y:any):=y=1}
@@ -1708,9 +1708,9 @@ test(S00){x:=1..0 => x='x'}
 test(S00){x:=1/0 => x=7}
 test(D00){f(x:int):int => a:=f[2] => a=2}
 test(D00){f(g():=3):int => a:=f[h():=3] => a=4}
-test(QS00){x:=first{0} => x=0}
-test(QF00){x:=first{0} => x=1}
-test(QS00){x:=first{:false} => x=0}
+test(S00){x:=first{0} => x=0}
+test(F00){x:=first{0} => x=1}
+test(S00){x:=first{:false} => x=0}
 test(F00){not 3}
 test(S00){x:=(not 3) => x=0}
 test(S00){x:=not 3 => x=0}
@@ -2377,8 +2377,8 @@ test(U00){as:=(:int,:int) => bs:=(:int,:int) => cs:=as => ds:=bs => o:any => {es
 test(D00){a:int => if(a=1){a=1}else{a=1}}  # breaks withh fails-cancellation
 
 # Is this the NewExplorations timing problem?
-test(QF00){x:int => f():=x=1|2 => {f[],first{x=1}}}
-test(QF00){x:int => f():=x=1|2 => {first{x=1},f[]}}
+test(F00){x:int => f():=x=1|2 => {f[],first{x=1}}}
+test(F00){x:int => f():=x=1|2 => {first{x=1},f[]}}
 
 # Works, but why is performance not greatly improved by suspending DecidesFork?
 test(S00){as:=(:int,:int,:int,:int,:int) => for{a where i->a:as,a=i}}
@@ -2402,14 +2402,14 @@ test(F00){a:int=>{b:int=>if(a=2){c=4}else{c=3},assume{a=2}},c:=3}
 test(F00){a:int=>{b:int=>if(a=2){c=3}else{c=4},assume{a=1}},c:=3}
 
 # Adding assumptions to ExploreDecides.
-test(QF00){x:=1|2 => first{x=1}}
-test(QS00){x:int => f():type{x=1} => {first{x=1},f[]}}
-test(QF00){x:int => f():type{x=2} => {first{x=1},f[]}}
-test(QF00){x:int => f():type{x=2|1} => {first{x=1},f[]}}
-test(QF00){x:int => f():type{x=2|3} => {first{x=1},f[]}}
+test(F00){x:=1|2 => first{x=1}}
+test(S00){x:int => f():type{x=1} => {first{x=1},f[]}}
+test(F00){x:int => f():type{x=2} => {first{x=1},f[]}}
+test(F00){x:int => f():type{x=2|1} => {first{x=1},f[]}}
+test(F00){x:int => f():type{x=2|3} => {first{x=1},f[]}}
 test(S00){a:int=>if(a=2) then assume{3|4} else assume{5|6}} # Works, but shows Refork check is too early.
 #CHILDFX ABANDON test(S00){x:int => f():=1|2 => if(x=f()){1}else{2}}
-test(QF00){x:int => f():=x=1|2 => {first{x=1},f[]}}
+test(F00){x:int => f():=x=1|2 => {first{x=1},f[]}}
 
 # Nested comprehensions.
 test(S00){W->X:=for(0|1){2} where W}
@@ -2515,8 +2515,8 @@ test(S00){x:int => if(x=1|2){x=1 or x=3 or x=2}}
 test(F00){x:int => if(x=1|3|2){x=1 or x=2}}
 
 # Context promotion recognition.
-test(QS00){x:int => f():type{x=2} => {first{x=2},f[]}}
-test(QS00){x:int => f():type{x=2} => {first{x=2},if{f[]}}}
+test(S00){x:int => f():type{x=2} => {first{x=2},f[]}}
+test(S00){x:int => f():type{x=2} => {first{x=2},if{f[]}}}
 
 # Conditional stops.
 test(S00){x:int => f():type{x=0} => {if(x=0){1}else if(x=1){2}else{3}=1,f[]}}
@@ -2618,11 +2618,11 @@ test(S00){(:false or 2)=2}
 test(F00){(:false)or(:false)}
 
 # Find.
-test(QS00){first{3}=3}
-test(QF00){first{3=4}}
-test(QF00){first{3}=4}
-test(QS00){first(x:=1|2){x+1}=2}
-test(QF00){first(x:=1|2){x+1}=3}
+test(S00){first{3}=3}
+test(F00){first{3=4}}
+test(F00){first{3}=4}
+test(S00){first(x:=1|2){x+1}=2}
+test(F00){first(x:=1|2){x+1}=3}
 
 # Conditions and reachability, synchronous and asynchronous.
 test(S00){if(1){2}else{3}}

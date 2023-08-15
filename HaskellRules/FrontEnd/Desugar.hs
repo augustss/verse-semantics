@@ -226,6 +226,9 @@ dsSmall = ds
     ds (Macro1 (Ident _ "one") [] e) = ds $ If2E e Fail
     ds (Macro1 (Ident _ "all") [] e) = ds $ For1 e
 
+    ds (Macro1 (Ident _ "first") [] e) = ds $ If2E e Fail  -- same as one{}
+    ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
+
     ds x = compos ds x
 
     dsU e1@Variable{} e2            = pure $ Unify e1 e2
