@@ -65,6 +65,8 @@ verifyprelude = ("verifyprelude", "\
 \## Small prelude for verification; arithmetic functions are concrete.\n\
 \## The lowered{} macro stops insertion lowering from BigCore to Core,\n\
 \## i.e., stop assume{} being inserted.\n\
+\\n\
+\# XXX How should possible effect be indicated?  Ispecially for Print.\n\
 \array{\n\
 \false        := array{};\n\
 \any          := lowered{ lambda(_x){                                                        assume { _x }}};\n\
@@ -84,6 +86,7 @@ verifyprelude = ("verifyprelude", "\
 \prefix'-'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intNeg$[_x];    isInt$[_z]; _z }}};\n\
 \prefix'+'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intPlus$[_x];   isInt$[_z]; _z }}};\n\
 \Length       := lowered{ lambda(_x) {               isArr$[_x];                             assume { _z:any$; isInt$[_z]; intGE$[_z,0]; _z }}};\n\
+\Print        := lowered{ lambda(_x) { print$[_x];                                           assume { array{} }}};\n\
 \}\n\
 \")
 
@@ -142,6 +145,7 @@ mediumprelude = ("mediumprelude", "\
 \void        (_x:any$)                             := array{};\n\
 \Length      (_x:any$)                 <decides>   := { isArr$[_x]; arrLen$[_x] };\n\
 \Err         (_x:any$)                             := { err$[_x] };\n\
+\Print       (_x:any$)               <interacts>   := { print$[_x] };\n\
 \\n\
 \#operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
 \postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\

@@ -27,6 +27,7 @@ comparable  (_x:any$)                 <decides>   := { isInt$[_x] | isRat$[_x] |
 void        (_x:any$)                             := array{};
 Length      (_x:any$)                 <decides>   := { isArr$[_x]; arrLen$[_x] };
 Err         (_x:any$)                             := { err$[_x] };
+Print       (_x:any$)               <interacts>   := { print$[_x] };
 
 #operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};
 postfix'^'(_p:any$)<reads><decides>  := read$[_p];
