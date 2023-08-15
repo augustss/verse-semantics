@@ -24,7 +24,7 @@ instance Functor (VerseT m) where
 
 instance Applicative (VerseT m) where
   pure x = VerseT $ \ sk _ -> sk x
-  f <*> x = VerseT $ \ sk fk -> unVerseT f (\ f -> unVerseT x (\ x -> sk $ f x) fk) fk
+  f <*> x = VerseT $ \ sk fk -> unVerseT f (\ f -> unVerseT x (sk . f) fk) fk
 
 instance Monad (VerseT m) where
   x >>= f = VerseT $ \ sk fk -> unVerseT x (\ x -> unVerseT (f x) sk fk) fk

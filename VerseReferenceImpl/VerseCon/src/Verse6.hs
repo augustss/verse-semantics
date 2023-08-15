@@ -6,7 +6,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Verse6
   ( VerseT
   , runVerseT
@@ -441,7 +441,7 @@ resume p@Process {..} m = lift (msplit_ m Env { heap = Just heap, .. }) >>= \ ca
   Just (m', m'') -> VerseT $ \ _ r sk fk ek rk -> do
     m' <- (m' <|>) . (*> m) . fork <$> readRef right
     p <- (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
-      Just x -> pure . Right . writeIVar result . Just . (heap, , m') =<< freshen' x heap
+      Just x -> Right . writeIVar result . Just . (heap, , m') <$> freshen' x heap
       Nothing -> writeRef right m' $> Left p
     sk p r fk (\ r -> m'' *> ek r) (m'' *> rk)
 
@@ -454,7 +454,7 @@ resume' p@Process {..} m = do
     Nothing -> pure . Right $ writeIVar result Nothing
     Just (m', m'') -> VerseT $ \ _ r sk fk ek rk -> do
       p <- (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
-        Just x -> pure . Right . writeIVar result . Just . (heap, , m') =<< freshen' x heap
+        Just x -> Right . writeIVar result . Just . (heap, , m') <$> freshen' x heap
         Nothing -> writeRef right m' $> Left p
       sk p r fk (\ r -> m'' *> ek r) (m'' *> rk)
 
