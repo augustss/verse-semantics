@@ -43,6 +43,7 @@ desugar flgs = eval flgs .
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
              traceDS "addScope"   <=< addScope  <=<
+             traceDS "lowerApply" <=< lowerApply<=<
              traceDS "dsD"        <=< dsD       <=<
              traceDS "addDeref"   <=< addDeref  <=<
              traceDS "dsSmall"    <=< dsSmall   <=<
@@ -844,6 +845,20 @@ addDeref = pure . exprD S.empty
 
 ---------------------------------
 
+-- Applications have to be lowered before scope insertion
+-- so existential get inserted in the right place.
+lowerApply :: Expr -> D Expr
+lowerApply = f
+  where
+    f (ApplyS e1 e2) = Succeeds <$> (ApplyD <$> f e1 <*> f e2)
+    f (HasType e t) = do
+      verif <- gets (fVerify . dflags)
+      if verif then
+        HasType <$> f e <*> f t
+       else
+        Succeeds <$> (ApplyD <$> f t <*> f e)
+    f e = compos f e
+
 -- Convert Big Core to Core
 lower :: Expr -> D Expr
 lower e@Lit{} = pure e
@@ -851,7 +866,6 @@ lower e@Variable{} = pure e
 lower (Array es) = Array <$> mapM lower es
 lower e@Wrong{} = pure e
 lower (Seq es) = seqE <$> mapM lower es
-lower (ApplyS e1 e2) = lowerSucceeds =<< lower (ApplyD e1 e2)
 lower (ApplyD e1 e2) = ApplyD <$> lower e1 <*> lower e2
 lower (ApplyEff _rs _e) = undefined
 lower (Unify e1 e2) = Unify <$> lower e1 <*> lower e2
@@ -860,7 +874,7 @@ lower (For2 (Exists is e1) e2) = join $ lowerFor is <$> lower e1 <*> lower e2
 lower (If3 (Exists is e1) e2 e3) = join $ lowerIf is <$> lower e1 <*> lower e2 <*> lower e3
 lower (Macro1 (Ident _ "all") [] e) = lowerAll =<< lower e
 lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
-lower (Macro1 (Ident _ "succeeds") [] e) = lowerSucceeds =<< lower e
+lower (Succeeds e) = lowerSucceeds =<< lower e
 lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
 lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
 lower (Macro1 (Ident _ "lowered") [] e) = pure e
@@ -1019,6 +1033,8 @@ lowerTLamVerifySucceeds i is e1 e2' e2'' =
 -- XXX use all of rs
 lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
 lowerTLamRun i rs is e1 e2 me3 = do
+  -- XXX This inserts Succeeds late, and scope insertion has already happened.
+  -- XXX This might be wrong.
   e2' <- maybe (pure e2) (\ t -> lowerSucceeds (ApplyD t e2)) me3
   let invariant = --invariantId `elem` rs  || True -- XXX
                   openId `notElem` rs
@@ -1036,7 +1052,7 @@ lowerHasType e t = do
   if verif then
     lowerHasTypeVerify e t
    else
-    lowerSucceeds (ApplyD t e)
+    undefined -- lowerSucceeds (ApplyD t e)
 
 lowerHasTypeVerify :: Expr -> Expr -> D Expr
 lowerHasTypeVerify e t = do
@@ -1080,7 +1096,7 @@ lowerSucceeds :: Expr -> D Expr
 lowerSucceeds e = do
   useSplit <- gets (fSplit . dflags)
   verif <- gets (fVerify . dflags)
-  asmVerif <- gets (fVerify . dflags)
+  asmVerif <- gets (fAssumeVerified . dflags)
   if verif then
     pure $ eAssert e
    else if asmVerif then
@@ -1088,7 +1104,7 @@ lowerSucceeds e = do
    else if useSplit then
     lowerSucceedsSplit e
    else
-    pure $ Macro1 (Ident noLoc "succeeds") [] e
+    pure $ Succeeds e
 
 lowerSucceedsSplit :: Expr -> D Expr
 lowerSucceedsSplit e = do
@@ -1111,7 +1127,7 @@ lowerDecides e = do
    else if useSplit then
     lowerDecidesSplit e
    else
-    pure $ Macro1 (Ident noLoc "succeeds") [] e
+    pure $ Macro1 (Ident noLoc "decides") [] e
 
 lowerDecidesSplit :: Expr -> D Expr
 lowerDecidesSplit e = do
