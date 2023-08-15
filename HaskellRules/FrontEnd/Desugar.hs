@@ -561,7 +561,7 @@ scope sc = expr
     expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
     expr (TLam i r e1 e2 me3) = do
       (e1', sc') <- defs (S.insert i sc) e1
-      TLam i r e1' <$> scopeD sc' e2 <*> traverse expr me3
+      TLam i r e1' <$> scopeD sc' e2 <*> traverse exprD me3
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
     expr Fail = pure Fail
@@ -1346,6 +1346,7 @@ getAllVars = Epic.List.nub . execWriter . vars
   where vars e@(Variable i) = do tell [i]; pure e
         vars e@(Lam i e') = do tell [i]; _ <- vars e'; pure e
         vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
+        vars TLam{} = undefined
         vars e = compos vars e
 
 substMany :: [(Ident, Core)] -> Core -> Core
