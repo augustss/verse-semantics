@@ -580,6 +580,7 @@ timTest tflg fn = do
   printf "%5d OK\n"      (sOK   status)
   printf "%5d bad (fail=%d, pass=%d)\n" (badFail + badPass) badFail badPass
   printf "%5d died\n"    (sDied status)
+  printf "%5d unimplemented\n"    (sNotYet status)
 
 pTimTestFile :: P [TimTest]
 pTimTestFile = skip *> many pTimTest <* eof
@@ -630,23 +631,30 @@ runTimTest tflg test | timVerify tflg = do
   -- putStrLn ("TRACE: Tim-Test " ++ systemDescr sys ++ " e' = " ++ prettyShow e')
   tres <- tryResult tflg $ verifyM sys e'
   putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
-  let disp trc =
-        when (trace tflg) $
-          putStrLn $ unlines $ showTrace trc
-  case take 1 stag of
-    "S" -> case tres of
-             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (mempty {sDied = 1})
-             ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (mempty {sOK = 1})
-             ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (mempty {sBadFail = 1})
-             _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
-    "F" -> case tres of
-             ResOK Nothing          -> do putStrLn "timeout, OK"; pure (mempty {sDied = 1})
-             ResOK (Just (True, t)) -> do putStrLn "pass, bad";   disp t; pure (mempty {sBadPass = 1})
-             ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (mempty {sOK = 1})
-             _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
-    _   -> do putStrLn "skip";        pure (mempty {sSkip = 1})
+  if take 1 stag == "Q" then
+    do putStrLn "unimplemented"; pure (mempty {sNotYet = 1})
+  else if take 1 stag `notElem` ("S" : verifierErrorCodes) then
+    do putStrLn "skip";          pure (mempty {sSkip = 1})
+   else do
+    let disp trc =
+          when (trace tflg) $
+            putStrLn $ unlines $ showTrace trc
+    case take 1 stag of
+      "S" -> case tres of
+               ResOK Nothing          -> do putStrLn "timeout";     pure (mempty {sDied = 1})
+               ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (mempty {sOK = 1})
+               ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (mempty {sBadFail = 1})
+               _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
+      _   -> case tres of
+               ResOK Nothing          -> do putStrLn "timeout";     pure (mempty {sDied = 1})
+               ResOK (Just (True, t)) -> do putStrLn "pass, bad";   disp t; pure (mempty {sBadPass = 1})
+               ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (mempty {sOK = 1})
+               _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
 
 runTimTest _ _ = error "impossible"
+
+verifierErrorCodes :: [String]
+verifierErrorCodes = ["A", "D", "F", "I", "U"]
 
 data TimStatus = MkTimStatus {
     sSkip    :: !Int
@@ -654,15 +662,16 @@ data TimStatus = MkTimStatus {
   , sBadFail :: !Int
   , sBadPass :: !Int
   , sDied    :: !Int
+  , sNotYet  :: !Int
   }
   deriving (Show)
 
 instance Semigroup TimStatus where
-  MkTimStatus s1 s2 s3 s4 s5 <> MkTimStatus t1 t2 t3 t4 t5 =
-    MkTimStatus (s1+t1) (s2+t2) (s3+t3) (s4+t4) (s5+t5)
+  MkTimStatus s1 s2 s3 s4 s5 s6 <> MkTimStatus t1 t2 t3 t4 t5 t6 =
+    MkTimStatus (s1+t1) (s2+t2) (s3+t3) (s4+t4) (s5+t5) (s6+t6)
 
 instance Monoid TimStatus where
-  mempty = MkTimStatus 0 0 0 0 0
+  mempty = MkTimStatus 0 0 0 0 0 0
 
 ---------------------
 
