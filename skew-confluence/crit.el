@@ -39,20 +39,21 @@
 	    (make-context :name 'EX :arg-type 'e :result-type 'e
 			  :alternatives '(HOLE VX (seq EQX e) (seq eq EX) (exists x EX) (choice EX e) (choice e EX) (app VX v) (all v VX) (one EX) (all EX)))))
 
+;;; Add "if" and "fresh"; later take out "cond"
 (defstruct rule name lhs rhs cond)
 
 ;;; Note that primes are used only in rule U-TUP, and that is in conjunction with integer subscripts.
 ;;; This matters in function add-primes.
 (setq the-rules
-      (list (make-rule :name 'lam-alpha :lhs '(lam x e) :rhs '(replace (lam x e) x z) :cond '(fresh (not (elt z (fvs e)))))
-            (make-rule :name 'exi-alpha :lhs '(exists x e) :rhs '(replace (exists x e) x z) :cond '(fresh (not (elt z (fvs e)))))
-            (make-rule :name 'app-add :lhs '(app (quote add) (tup2 k1 k2)) :rhs 'k3 :cond '(if (= k3 (+ k1 k2))))
-	    (make-rule :name 'app-gt :lhs '(app (quote gt) (tup2 k1 k2)) :rhs 'k1 :cond '(if (> k1 k2)))
-	    (make-rule :name 'app-gt-fail :lhs '(app (quote gt) (tup2 k1 k2)) :rhs '(quote fail) :cond '(if (not (> k1 k2))))
-	    (make-rule :name 'app-beta :lhs '(app (lam x e) v) :rhs '(exists x (seq (= x v) e)) :cond '(if (not (elt x (fvs v)))))
-	    (make-rule :name 'app-tup :lhs '(app (tup2 v0 v1) v) :rhs '(exists x (seq (= x v) (choice (seq (= x (quote 0)) v0) (seq (= x (quote 1)) v1)))) :cond '(fresh (not (elt x (fvs v v0 v1)))))
+      (list (make-rule :name 'lam-alpha :lhs '(lam x e) :rhs '(replace (lam x e) x z) :cond '(fresh (not (elt z (fvs e)))) :fresh '(not (elt z (fvs e))))
+            (make-rule :name 'exi-alpha :lhs '(exists x e) :rhs '(replace (exists x e) x z) :cond '(fresh (not (elt z (fvs e)))) :fresh '(not (elt z (fvs e))))
+            (make-rule :name 'app-add :lhs '(app (quote add) (tup2 k1 k2)) :rhs 'k3 :cond '(if (= k3 (+ k1 k2))) :if '(= k3 (+ k1 k2)))
+	    (make-rule :name 'app-gt :lhs '(app (quote gt) (tup2 k1 k2)) :rhs 'k1 :cond '(if (> k1 k2)) :if '(> k1 k2))
+	    (make-rule :name 'app-gt-fail :lhs '(app (quote gt) (tup2 k1 k2)) :rhs '(quote fail) :cond '(if (not (> k1 k2))) :if '(not (> k1 k2)))
+	    (make-rule :name 'app-beta :lhs '(app (lam x e) v) :rhs '(exists x (seq (= x v) e)) :cond '(if (not (elt x (fvs v)))) :if '(not (elt x (fvs v))))
+	    (make-rule :name 'app-tup :lhs '(app (tup2 v0 v1) v) :rhs '(exists x (seq (= x v) (choice (seq (= x (quote 0)) v0) (seq (= x (quote 1)) v1)))) :cond '(fresh (not (elt x (fvs v v0 v1)))) :fresh '(not (elt x (fvs v v0 v1))))
 	    (make-rule :name 'app-tup-0 :lhs '(app (tup0) v) :rhs '(quote fail))
-	    (make-rule :name 'u-lit :lhs '(seq (= k1 k2) e) :rhs 'e :cond '(if (= k1 k2)))
+	    (make-rule :name 'u-lit :lhs '(seq (= k1 k2) e) :rhs 'e :cond '(if (= k1 k2)) :if '(= k1 k2))
 	    (make-rule :name 'u-tup :lhs '(seq (= (tup2 v1 vn) (tup2 v1prime vnprime)) e) :rhs '(seq (= v1 v1prime) (seq (= vn vnprime) e)))
 	    (make-rule :name 'u-fail-op-d :lhs '(seq (= op d) e) :rhs '(quote fail))
 	    (make-rule :name 'u-fail-d-op :lhs '(seq (= d op) e) :rhs '(quote fail))
@@ -65,14 +66,14 @@
 	    (make-rule :name 'var-swap :lhs '(seq (= x y) e) :rhs '(seq (= y x) e))
 	    (make-rule :name 'seq-swap :lhs '(seq eq (seq (= x v) e)) :rhs '(seq (= x v) (seq eq e)))
 	    (make-rule :name 'val-elim :lhs '(seq v e) :rhs 'e)
-	    (make-rule :name 'exi-elim :lhs '(exists x e) :rhs 'e :cond '(if (not (elt x (fvs e)))))
-	    (make-rule :name 'eqn-elim :lhs '(exists x (seq (= x v) e)) :rhs 'e :cond '(if (not (elt x (fvs v e)))))
+	    (make-rule :name 'exi-elim :lhs '(exists x e) :rhs 'e :cond '(if (not (elt x (fvs e)))) :if '(not (elt x (fvs e))))
+	    (make-rule :name 'eqn-elim :lhs '(exists x (seq (= x v) e)) :rhs 'e :cond '(if (not (elt x (fvs v e)))) :if '(not (elt x (fvs v e))))
 	    (make-rule :name 'fail-elim-eq :lhs '(seq (= v (quote fail)) e) :rhs '(quote fail))
 	    (make-rule :name 'fail-elim-l :lhs '(seq (quote fail) e) :rhs '(quote fail))
 	    (make-rule :name 'fail-elim-r :lhs '(seq eq (quote fail)) :rhs '(quote fail))
-	    (make-rule :name 'exi-float-eq :lhs '(seq (= v (exists x e1)) e2) :rhs '(exists x (seq (= v e1) e2)) :cond '(if (not (elt x (fvs v e2)))))
-	    (make-rule :name 'exi-float-l :lhs '(seq (exists x e1) e2) :rhs '(exists x (seq e1 e2)) :cond '(if (not (elt x (fvs e2)))))
-	    (make-rule :name 'exi-float-r :lhs '(seq eq (exists x e)) :rhs '(exists x (seq eq e)) :cond '(if (not (elt x (fvs eq)))))
+	    (make-rule :name 'exi-float-eq :lhs '(seq (= v (exists x e1)) e2) :rhs '(exists x (seq (= v e1) e2)) :cond '(if (not (elt x (fvs v e2)))) :if '(not (elt x (fvs v e2))))
+	    (make-rule :name 'exi-float-l :lhs '(seq (exists x e1) e2) :rhs '(exists x (seq e1 e2)) :cond '(if (not (elt x (fvs e2)))) :if '(not (elt x (fvs e2))))
+	    (make-rule :name 'exi-float-r :lhs '(seq eq (exists x e)) :rhs '(exists x (seq eq e)) :cond '(if (not (elt x (fvs eq)))) :if '(not (elt x (fvs eq))))
 	    (make-rule :name 'eqn-float :lhs '(seq (= x (seq eq e1)) e2) :rhs '(seq eq (seq (= x e1) e2)))
 	    (make-rule :name 'seq-assoc :lhs '(seq (seq eq e1) e2) :rhs '(seq eq (seq e1 e2)))
 	    (make-rule :name 'exi-swap :lhs '(exists x (exists y e)) :rhs '(exists y (exists x e)))
@@ -85,8 +86,8 @@
 	    (make-rule :name 'all-choice-3 :lhs '(all (choice v1 (choice v2 v3))) :rhs '(tup3 v1 v2 v3))
 	    (make-rule :name 'all-choice-4 :lhs '(all (choice v1 (choice v2 (choice v3 v4)))) :rhs '(tup4 v1 v2 v3 v4))
 	    (make-rule :name 'split-fail :lhs '(split (quote fail) f g) :rhs '(app f (tup0)))
-	    (make-rule :name 'split-value :lhs '(split v f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) (quote fail))))) :cond '(fresh x))
-	    (make-rule :name 'split-choice :lhs '(split (choice v e) f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) e)))) :cond '(fresh (not (elt x (fvs e)))))
+	    (make-rule :name 'split-value :lhs '(split v f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) (quote fail))))) :cond '(fresh x) :fresh 'x)
+	    (make-rule :name 'split-choice :lhs '(split (choice v e) f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) e)))) :cond '(fresh (not (elt x (fvs e)))) :fresh '(not (elt x (fvs e))))
 	    (make-rule :name 'choose-r :lhs '(choice (quote fail) e) :rhs 'e)
 	    (make-rule :name 'choose-l :lhs '(choice e (quote fail)) :rhs 'e)
 	    (make-rule :name 'choose-assoc :lhs '(choice (choice e1 e2) e3) :rhs '(choice e1 (choice e2 e3)))
@@ -1769,11 +1770,11 @@
 	       (t (list 'subst term x y))))
 	(t (cons (first term) (mapcar #'(lambda (tm) (do-one-subst tm x y)) (rest term))))))
 
-(defstruct critpair rule1 rule2 path1 sigma1 sigma2 term term1 term2 cond1 cond2)
+(defstruct critpair rule1 rule2 path1 sigma1 sigma2 term term1 term2 cond1 cond2 if1 if2 fresh1 fresh2)
 
 (defun submatches (M rule1 rule2 path1 eqok)
-  (let ((name1 (rule-name rule1)) (alpha1 (rule-lhs rule1)) (beta1 (rule-rhs rule1)) (cond1 (rule-cond rule1))
-        (name2 (rule-name rule2)) (alpha2 (rule-lhs rule2)) (beta2 (rule-rhs rule2)) (cond2 (rule-cond rule2)))
+  (let ((name1 (rule-name rule1)) (alpha1 (rule-lhs rule1)) (beta1 (rule-rhs rule1)) (cond1 (rule-cond rule1)) (if1 (rule-if rule1)) (fresh1 (rule-fresh rule1))
+        (name2 (rule-name rule2)) (alpha2 (rule-lhs rule2)) (beta2 (rule-rhs rule2)) (cond2 (rule-cond rule2)) (if2 (rule-if rule2)) (fresh2 (rule-fresh rule2)))
     (and (not (atom M))
          (not (atom alpha2))
          (append (and eqok
@@ -1790,8 +1791,12 @@
 						       :term (replace-subterm alpha1 path1 N)
 						       :term1 (do-every-replace-or-subst (sublis sigma1 beta1))
 						       :term2 (replace-subterm (sublis sigma1 alpha1) path1 (do-every-replace-or-subst (sublis sigma2 beta2)))
-						       :cond1 (and cond2 (do-every-replace-or-subst (sublis sigma2 cond2)))  ;Similarly swap the conds
-						       :cond2 (and cond1 (do-every-replace-or-subst (sublis sigma1 cond1)))))))))
+						       :cond1 (and cond2 (do-every-replace-or-subst (sublis sigma2 cond2))) ;Similarly swap the conds
+						       :cond2 (and cond1 (do-every-replace-or-subst (sublis sigma1 cond1)))
+						       :if1 (and if2 (do-every-replace-or-subst (sublis sigma2 if2))) ;Similarly swap the ifs
+						       :if2 (and if1 (do-every-replace-or-subst (sublis sigma1 if1)))
+						       :fresh1 (and fresh2 (do-every-replace-or-subst (sublis sigma2 fresh2))) ;Similarly swap the freshs
+						       :fresh2 (and fresh1 (do-every-replace-or-subst (sublis sigma1 fresh1)))))))))
 		 (and (not (eq (first M) 'quote))
                       (do ((z2 (rest M) (rest z2))
                            (k 1 (+ k 1))
@@ -1802,27 +1807,16 @@
   (make-rule :name (rule-name rule) 
 	     :lhs (add-primes (rule-lhs rule) vars-to-avoid)
 	     :rhs (add-primes (rule-rhs rule) vars-to-avoid)
-	     :cond (and (rule-cond rule) (add-primes (rule-cond rule) vars-to-avoid))))
+	     :cond (and (rule-cond rule) (add-primes (rule-cond rule) vars-to-avoid))
+	     :if (and (rule-if rule) (add-primes (rule-if rule) vars-to-avoid))
+	     :fresh (and (rule-fresh rule) (add-primes (rule-fresh rule) vars-to-avoid))))
 
 (defun all-submatches (rule1 rule2 same)
-  (let ((rc1 (rule-cond rule1))
-	(rc2 (rule-cond rule2)))
-    (cond ((and nil  ;; Disable this trick for now
-		(not (atom rc1))
-		(not (atom rc2))
-		(eq (first rc1) 'if)
-		(eq (first rc2) 'if)
-		(or (and (eq (first (second rc1)) 'not)
-			 (equal (second (second rc1)) (second rc2)))
-		    (and (eq (first (second rc2)) 'not)
-			 (equal (second (second rc2)) (second rc1)))))
-	   ;; Rules handle logically complementary cases, so no overlapping applications
-	   '())
-	  (t (let ((rulehat1 (add-primes-to-rule rule1 (union (term-vars (rule-lhs rule2)) (term-vars (rule-rhs rule2))) ))
-		   (rulehat2 (add-primes-to-rule rule2 (union (term-vars (rule-lhs rule1)) (term-vars (rule-rhs rule1))))))
-	       (cond (same (submatches (rule-lhs rulehat2) rulehat2 rule1 '() nil))
-		     (t (append (submatches (rule-lhs rulehat2) rulehat2 rule1 '() t)
-				(submatches (rule-lhs rulehat1) rulehat1 rule2 '() nil)))))))))
+  (let ((rulehat1 (add-primes-to-rule rule1 (union (term-vars (rule-lhs rule2)) (term-vars (rule-rhs rule2))) ))
+	(rulehat2 (add-primes-to-rule rule2 (union (term-vars (rule-lhs rule1)) (term-vars (rule-rhs rule1))))))
+    (cond (same (submatches (rule-lhs rulehat2) rulehat2 rule1 '() nil))
+	  (t (append (submatches (rule-lhs rulehat2) rulehat2 rule1 '() t)
+		     (submatches (rule-lhs rulehat1) rulehat1 rule2 '() nil))))))
 
 (defun all-critical-pairs ()
   (do ((z the-rules (rest z))
@@ -1899,6 +1893,9 @@
 	  (t (let ((res (try-rewrite-rule rule term cp)))
 	       (unless res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))
 	       (do-every-replace-or-subst (first res)))))))
+
+;;; XXX put this into effect
+(defstruct rewriting beta cond if fresh)
 
 ;;; Return a 2-list of substituted beta and substituted cond
 (defun apply-rewrite-rule-with-cond (rule term path)
