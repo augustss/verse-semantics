@@ -6,9 +6,9 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-module Par5
-  ( ParT
-  , runParT
+module Verse5
+  ( VerseT
+  , runVerseT
   , Var
   , freshVar
   , newVar
@@ -41,8 +41,8 @@ import Prelude (Int, Num (..), error, reverse, subtract)
 import Ref
 import Supply
 
-newtype ParT m a = ParT
-  { unParT :: forall r . Yield r m -> Logic r m a
+newtype VerseT m a = VerseT
+  { unVerseT :: forall r . Yield r m -> Logic r m a
   }
 
 newtype Yield r m = Yield
@@ -51,13 +51,17 @@ newtype Yield r m = Yield
 
 type AddSusp m a = Susp m a -> m (Fail () m)
 
-type Logic r m a = Env m -> Succeed r m a -> Fail r m -> m r
+type Logic r m a = Env m -> Succeed r m a -> Fail r m -> Empty r m -> Rollback m -> m r
 
-type Succeed r m a = a -> Env m -> Fail r m -> m r
+type Succeed r m a = a -> Env m -> Fail r m -> Empty r m -> Rollback m -> m r
 
 type Fail r m = Env m -> m r
 
-type Susp m a = a -> ParT m ()
+type Empty r m = Env m -> m r
+
+type Rollback m = m ()
+
+type Susp m a = a -> VerseT m ()
 
 data Env m = Env
   { heap :: !(Maybe Heap)
@@ -72,8 +76,8 @@ data Process m = forall a . Process
   , children :: !(Ref m (Processes m))
   , length :: !(Ref m Int)
   , left :: !(HeapRef m (Maybe a))
-  , right :: !(Ref m (ParT m ()))
-  , result :: !(Var m (Maybe (Heap, a, ParT m ())))
+  , right :: !(Ref m (VerseT m ()))
+  , result :: !(Var m (Maybe (Heap, a, VerseT m ())))
   }
 
 data Heap = Heap
@@ -98,63 +102,84 @@ data VarState m a
   = Val !a
   | Susp !(Susp m a)
 
-instance Functor (ParT m) where
-  fmap f m = ParT $ \ yk r sk -> unParT m yk r $ sk . f
+instance Functor (VerseT m) where
+  fmap f m = VerseT $ \ yk r sk -> unVerseT m yk r $ sk . f
 
-instance Applicative (ParT m) where
-  pure x = ParT $ \ _ r sk fk -> sk x r fk
-  f <*> x = ParT $ \ yk r sk -> unParT f yk r $ \ f r -> unParT x yk r $ sk . f
+instance Applicative (VerseT m) where
+  pure x = VerseT $ \ _ r sk fk ek rk -> sk x r fk ek rk
+  f <*> x = VerseT $ \ yk r sk -> unVerseT f yk r $ \ f r -> unVerseT x yk r $ sk . f
 
-instance (MonadRef m, MonadSupply Int m) => Alternative (ParT m) where
-  empty = ParT $ \ _ r _ fk -> fk r
-  x <|> y = ParT $ \ yk r sk fk -> do
+instance (MonadRef m, MonadSupply Int m) => Alternative (VerseT m) where
+  empty = VerseT $ \ _ r _ _ ek _ -> ek r
+  x <|> y = VerseT $ \ yk r sk fk ek rk -> do
     xs <- readRef r.children
     writeRef r.children =<< runReaderT (copyProcesses xs) r.heap
-    unParT x yk r sk $ \ r -> do
-      writeRef r.children xs
-      unParT y yk r sk fk
+    let f r = writeRef r.children xs
+    unVerseT x yk r
+      sk
+      (\ r -> f r *> unVerseT y yk r sk fk fk (pure ()))
+      (\ r -> f r *> unVerseT y yk r sk fk ek rk)
+      rk
 
-instance Monad (ParT m) where
-  x >>= f = ParT $ \ yk r sk fk -> unParT x yk r (\ x r -> unParT (f x) yk r sk) fk
+instance Monad (VerseT m) where
+  x >>= f = VerseT $ \ yk r sk fk ek rk -> unVerseT x yk r
+    (\ x r -> unVerseT (f x) yk r sk)
+    fk
+    ek
+    rk
 
-instance MonadTrans ParT where
-  lift m = ParT $ \ _ r sk fk -> m >>= \ x -> sk x r fk
+instance MonadTrans VerseT where
+  lift m = VerseT $ \ _ r sk fk ek rk -> m >>= \ x -> sk x r fk ek rk
 
-runParT :: MonadRef m => ParT m a -> m (Maybe [a])
-runParT m = do
+instance MonadRef m => MonadRef (VerseT m) where
+  type Ref (VerseT m) = Ref m
+
+  newRef = lift . newRef
+
+  readRef = lift . readRef
+
+  writeRef ref x = VerseT $ \ _ r sk fk ek rk -> do
+    y <- readRef ref
+    writeRef ref x
+    let m = writeRef ref y
+    sk () r fk (\ r -> m *> ek r) (m *> rk)
+
+runVerseT :: MonadRef m => VerseT m a -> m (Maybe [a])
+runVerseT m = do
   children <- newRef mempty
   length <- newRef 0
-  unParT m yk Env {..} sk fk
+  unVerseT m yk Env {..} sk fk fk $ pure ()
   where
-    yk = Yield $ \ _ _ _ _ -> pure Nothing
+    yk = Yield $ \ _ _ _ _ _ _ -> pure Nothing
     heap = Nothing
-    sk x r fk = readRef r.length >>= \ case
+    sk x r fk _ _ = readRef r.length >>= \ case
       0 -> fmap (x:) <$> fk r
       _ -> pure Nothing
     fk _ = pure $ Just []
 
-freshVar :: MonadRef m => ParT m (Var m a)
+freshVar :: MonadRef m => VerseT m (Var m a)
 freshVar = lift freshVar'
 
 freshVar' :: MonadRef m => m (Var m a)
 freshVar' = fmap Var . newRef . singleton . Susp . const $ pure ()
 
-newVar :: MonadRef m => a -> ParT m (Var m a)
+newVar :: MonadRef m => a -> VerseT m (Var m a)
 newVar = lift . newVar'
 
 newVar' :: MonadRef m => a -> m (Var m a)
 newVar' = fmap Var . newRef . singleton . Val
 
-readVar :: MonadRef m => Var m a -> ParT m a
-readVar v = ParT $ \ yk r sk fk -> readRef (unVar v) <&> lookupVarState r.heap >>= \ case
-  Val x -> sk x r fk
-  x@(Susp k) -> rotate (unYield yk) r sk fk $ \ k' ->
-    put (unVar v) r.heap (Susp $ \ x -> k x *> k' x) $> \ r ->
-    put (unVar v) r.heap x
+readVar :: MonadRef m => Var m a -> VerseT m a
+readVar v = VerseT $ \ yk r sk fk ek rk ->
+  readRef (unVar v) <&> lookupVarState r.heap >>= \ case
+    Val x -> sk x r fk ek rk
+    x@(Susp k) -> rotate (unYield yk) r sk fk ek rk $ \ k' ->
+      put (unVar v) r.heap (Susp $ \ x -> k x *> k' x) $> \ r ->
+      put (unVar v) r.heap x
   where
-    rotate f a b c d = f d a b c
+    rotate f x1 x2 x3 x4 x5 x6 = f x6 x1 x2 x3 x4 x5
 
-writeVar :: (MonadRef m, MonadSupply Int m) => Var m a -> a -> ParT m ()
+writeVar :: (MonadRef m, MonadSupply Int m) => Var m a -> a -> VerseT m ()
 writeVar v x = readVarState v >>= \ case
   Val _ -> error "writeVar"
   y@(Susp k) -> do
@@ -163,7 +188,7 @@ writeVar v x = readVarState v >>= \ case
     m
     k x
 
-writeVar' :: (MonadRef m, MonadSupply Int m) => Var m a -> a -> ParT m ()
+writeVar' :: (MonadRef m, MonadSupply Int m) => Var m a -> a -> VerseT m ()
 writeVar' v x = readVarState' v >>= \ case
   Val _ -> error "writeVar"
   y@(Susp k) -> do
@@ -172,60 +197,64 @@ writeVar' v x = readVarState' v >>= \ case
     m
     k x
 
-readVarState :: MonadRef m => Var m a -> ParT m (VarState m a)
+readVarState :: MonadRef m => Var m a -> VerseT m (VarState m a)
 readVarState v = liftSuccess $ \ r -> readRef (unVar v) <&> lookupVarState r.heap
 
-readVarState' :: MonadRef m => Var m a -> ParT m (VarState m a)
+readVarState' :: MonadRef m => Var m a -> VerseT m (VarState m a)
 readVarState' v = liftSuccess $ \ r -> readRef (unVar v) <&> lookupVarState' r.heap
 
-resumeChildren :: (MonadRef m, MonadSupply Int m) => ParT m () -> ParT m (ParT m ())
-resumeChildren m = liftSuccess $ \ r -> do
-  (xs, n) <- flip resumeAll m =<< readRef r.children
-  writeRef r.children xs
+resumeChildren :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m (VerseT m ())
+resumeChildren m = do
+  r <- ask'
+  (xs, n) <- flip resumeAll m =<< lift (readRef r.children)
+  lift $ writeRef r.children xs
   pure n
 
 resumeAll :: ( MonadRef m
              , MonadSupply Int m
-             ) => [Process m] -> ParT m () -> m ([Process m], ParT m ())
+             ) => [Process m] -> VerseT m () -> VerseT m ([Process m], VerseT m ())
 resumeAll xs m = fmap sequence_ . partitionEithers <$> traverse (flip resume m) xs
 
 resume :: ( MonadRef m
           , MonadSupply Int m
-          ) => Process m -> ParT m () -> m (Either (Process m) (ParT m ()))
-resume p@Process {..} m = msplit_ m Env { heap = Just heap, .. } >>= \ case
+          ) => Process m -> VerseT m () -> VerseT m (Either (Process m) (VerseT m ()))
+resume p@Process {..} m = lift (msplit_ m Env { heap = Just heap, .. }) >>= \ case
   Nothing -> resume' p m
-  Just m' -> do
+  Just (m', m'') -> VerseT $ \ _ r sk fk ek rk -> do
     m' <- (m' <|>) . (*> m) . fork <$> readRef right
-    (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
+    p <- (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
       Just x -> pure . Right . writeVar result $ Just (heap, x, m')
       Nothing -> writeRef right m' $> Left p
+    sk p r fk (\ r -> m'' *> ek r) (m'' *> rk)
 
 resume' :: ( MonadRef m
            , MonadSupply Int m
-           ) => Process m -> ParT m () -> m (Either (Process m) (ParT m ()))
+           ) => Process m -> VerseT m () -> VerseT m (Either (Process m) (VerseT m ()))
 resume' p@Process {..} m = do
-  m' <- readRef right
-  msplit_ (fork m' *> m) Env { heap = Just heap, .. } >>= \ case
+  m' <- lift $ readRef right
+  lift (msplit_ (fork m' *> m) Env { heap = Just heap, .. }) >>= \ case
     Nothing -> pure . Right $ writeVar result Nothing
-    Just m' -> (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
-      Just x -> pure . Right . writeVar result $ Just (heap, x, m')
-      Nothing -> writeRef right m' $> Left p
+    Just (m', m'') -> VerseT $ \ _ r sk fk ek rk -> do
+      p <- (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
+        Just x -> pure . Right . writeVar result $ Just (heap, x, m')
+        Nothing -> writeRef right m' $> Left p
+      sk p r fk (\ r -> m'' *> ek r) (m'' *> rk)
 
-fork :: (MonadRef m, MonadSupply Int m) => ParT m () -> ParT m ()
-fork m = liftSuccess (\ r -> unParT m yk r sk fk) >>= reflect_
+fork :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
+fork m = liftSuccess (\ r -> unVerseT m yk r sk fk fk $ pure ()) >>= reflect_
   where
-    yk = Yield $ \ addSusp r sk fk -> do
+    yk = Yield $ \ addSusp r sk fk _ rk -> do
       incr r.length
       removeSusp <- addSusp $ \ x -> do
-        liftSuccess (\ r -> sk x r fk) >>= reflect_
+        liftSuccess (\ r -> sk x r fk fk $ pure ()) >>= reflect_
         lift' (\ r -> decr r.length) (\ r -> incr r.length)
-      pure $ Just $ liftFail $ \ r -> do
+      pure $ Just $ (, rk) $ liftFail $ \ r -> do
         removeSusp r
         decr r.length
-    sk () _ fk = pure . Just $ liftSuccess fk >>= reflect_
+    sk () _ fk _ rk = pure . Just . (, rk) $ liftSuccess fk >>= reflect_
     fk _ = pure Nothing
 
-one :: (MonadRef m, MonadSupply Int m) => ParT m a -> ParT m (Var m a)
+one :: (MonadRef m, MonadSupply Int m) => VerseT m a -> VerseT m (Var m a)
 one m = do
   v <- freshVar
   fork $ do
@@ -238,7 +267,7 @@ one m = do
 
 if' :: ( MonadRef m
        , MonadSupply Int m
-       ) => ParT m a -> (a -> ParT m b) -> ParT m b -> ParT m (Var m b)
+       ) => VerseT m a -> (a -> VerseT m b) -> VerseT m b -> VerseT m (Var m b)
 if' p t e = do
   v <- freshVar
   fork $ do
@@ -249,7 +278,7 @@ if' p t e = do
       Just (_, x, _) -> t x >>= writeVar v
   pure v
 
-all :: (MonadRef m, MonadSupply Int m) => ParT m a -> ParT m (Var m [a])
+all :: (MonadRef m, MonadSupply Int m) => VerseT m a -> VerseT m (Var m [a])
 all m = do
   v <- freshVar
   fork $ do
@@ -262,7 +291,7 @@ all m = do
       Nothing -> pure $ reverse xs
       Just (h, x, m) -> loop h r m $ x:xs
 
-for :: (MonadRef m, MonadSupply Int m) => ParT m a -> (a -> ParT m b) -> ParT m (Var m [b])
+for :: (MonadRef m, MonadSupply Int m) => VerseT m a -> (a -> VerseT m b) -> VerseT m (Var m [b])
 for m f = do
   v <- freshVar
   fork $ do
@@ -276,57 +305,66 @@ for m f = do
       Just (h, x, m) -> loop h r m f . (:xs) =<< f x
 
 split :: (MonadRef m, MonadSupply Int m) =>
-         Heap -> HeapRef m (Maybe a) -> ParT m () ->
-         ParT m (Var m (Maybe (Heap, a, ParT m ())))
-split heap left m = liftSuccess $ \ r -> do
+         Heap -> HeapRef m (Maybe a) -> VerseT m () ->
+         VerseT m (Var m (Maybe (Heap, a, VerseT m ())))
+split heap left m = VerseT $ \ _ r sk fk ek rk -> do
   children <- newRef mempty
   length <- newRef 0
   msplit_ m Env { heap = Just heap, .. } >>= \ case
-    Nothing -> newVar' Nothing
-    Just m -> (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
-      Just x -> newVar' $ Just (heap, x, m)
+    Nothing -> do
+      v <- newVar' Nothing
+      sk v r fk ek rk
+    Just (m, m') -> (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
+      Just x -> do
+        v <- newVar' $ Just (heap, x, m)
+        sk v r fk (\ r -> m' *> ek r) (m' *> rk)
       Nothing -> do
         result <- freshVar'
         right <- newRef m
         modifyRef' r.children (Process {..}:)
-        pure result
+        sk result r fk (\ r -> m' *> ek r) (m' *> rk)
 
-msplit_ :: (MonadRef m, MonadSupply Int m) => ParT m () -> Env m -> m (Maybe (ParT m ()))
-msplit_ m r = unParT m yk r sk fk
+msplit_ :: ( MonadRef m
+           , MonadSupply Int m
+           ) => VerseT m () -> Env m -> m (Maybe (VerseT m (), m ()))
+msplit_ m r = unVerseT m yk r sk fk fk $ pure ()
   where
-    yk = Yield $ \ k _ sk fk ->
-      Just . liftFail <$> k (\ x -> liftSuccess (\ r -> sk x r fk) >>= reflect_)
-    sk () _ fk = pure . Just $ liftSuccess fk >>= reflect_
+    yk = Yield $ \ k _ sk fk _ rk ->
+      Just . (, rk) . liftFail <$>
+      k (\ x -> liftSuccess (\ r -> sk x r fk fk $ pure ()) >>= reflect_)
+    sk () _ fk _ rk = pure . Just . (, rk) $ liftSuccess fk >>= reflect_
     fk _ = pure Nothing
 
-newHeapRef :: MonadRef m => a -> ParT m (HeapRef m a)
+newHeapRef :: MonadRef m => a -> VerseT m (HeapRef m a)
 newHeapRef = lift . fmap HeapRef . newRef . singleton
 
 readHeapRef' :: MonadRef m => HeapRef m a -> Heap -> m a
 readHeapRef' r h = lookup (Just h) <$> readRef (unHeapRef r)
 
-writeHeapRef :: MonadRef m => HeapRef m a -> a -> ParT m ()
+writeHeapRef :: MonadRef m => HeapRef m a -> a -> VerseT m ()
 writeHeapRef ref x = do
   y <- liftSuccess $ \ r -> lookup r.heap <$> readRef (unHeapRef ref)
   lift' (\ r -> put (unHeapRef ref) r.heap x) (\ r -> put (unHeapRef ref) r.heap y)
 
-newHeap :: MonadSupply Int m => ParT m Heap
+newHeap :: MonadSupply Int m => VerseT m Heap
 newHeap =
   (\ label r -> Heap { label, tail = r.heap, pred = Nothing }) <$>
   lift supply <*>
   ask'
 
-ask' :: ParT m (Env m)
-ask' = ParT $ \ _ r sk -> sk r r
+ask' :: VerseT m (Env m)
+ask' = VerseT $ \ _ r sk -> sk r r
 
-liftSuccess :: Monad m => (Env m -> m a) -> ParT m a
-liftSuccess f = ParT $ \ _ r sk fk -> f r >>= \ x -> sk x r fk
+liftSuccess :: Monad m => (Env m -> m a) -> VerseT m a
+liftSuccess f = VerseT $ \ _ r sk fk ek rk -> f r >>= \ x -> sk x r fk ek rk
 
-liftFail :: Applicative m => (Env m -> m ()) -> ParT m ()
-liftFail f = ParT $ \ _ r _ fk -> f r *> fk r
+liftFail :: Applicative m => (Env m -> m ()) -> VerseT m ()
+liftFail f = VerseT $ \ _ r _ fk _ _ -> f r *> fk r
 
-lift' :: Monad m => (Env m -> m a) -> (Env m -> m ()) -> ParT m a
-lift' m n = ParT $ \ _ r sk fk -> m r >>= \ x -> sk x r $ \ r -> n r *> fk r
+lift' :: Monad m => (Env m -> m a) -> (Env m -> m ()) -> VerseT m a
+lift' m n = VerseT $ \ _ r sk fk ek rk -> do
+  x <- m r
+  sk x r (\ r -> n r *> fk r) (\ r -> n r *> ek r) rk
 
 type CopyT = ReaderT (Maybe Heap)
 
@@ -384,10 +422,13 @@ insert k v (HeapMap x xs) = case k of
   Nothing -> HeapMap v xs
   Just k -> HeapMap x $ IntMap.insert k.label v xs
 
-reflect_ :: Alternative m => Maybe (m ()) -> m ()
-reflect_ = \ case
-  Nothing -> empty
-  Just m -> pure () <|> m
+reflect_ :: Applicative m => Maybe (VerseT m (), m ()) -> VerseT m ()
+reflect_ x = VerseT $ \ yk r sk fk ek rk -> case x of
+  Nothing -> ek r
+  Just (m, m') -> sk () r
+    (\ r -> unVerseT m yk r sk fk fk $ pure ())
+    (\ r -> unVerseT m yk r sk fk (\ r -> m' *> ek r) (m' *> rk))
+    (m' *> rk)
 
 incr :: (MonadRef m, Num a) => Ref m a -> m ()
 incr = flip modifyRef' (+ 1)
