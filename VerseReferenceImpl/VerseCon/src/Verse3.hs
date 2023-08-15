@@ -24,8 +24,6 @@ newtype VerseT m a = VerseT
 
 type Logic r m a = (a -> m r -> m r) -> m r -> m r
 
-type Success r m a = a -> m r -> m r
-
 newtype Yield m r = Yield
   { unYield :: forall a . ((a -> VerseT m ()) -> m (m ())) -> Logic r m a
   }

@@ -76,15 +76,15 @@ newtype Yield r m = Yield
 
 type AddSusp m a = Susp m a -> m (Fail () m)
 
-type Logic r m a = Env m -> Succeed r m a -> Fail r m -> Empty r m -> Result r m
+type Logic r m a = Env m -> Succeed r m a -> Result r m
 
-type Succeed r m a = a -> Env m -> Fail r m -> Empty r m -> Result r m
+type Succeed r m a = a -> Env m -> Result r m
+
+type Result r m = Fail r m -> Empty r m -> Rollback m -> m r
 
 type Fail r m = Env m -> m r
 
 type Empty r m = Env m -> m r
-
-type Result r m = Rollback m -> m r
 
 type Commit m = FreshenT m ()
 

@@ -7,25 +7,25 @@ import Control.Monad ((<=<))
 
 import Prelude (Num (..), ($), (=<<))
 
-import Par6
+import Verse5
 import Ref
 import Supply
 
-test1 = runSupplyT $ runParT do
+test1 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   fork $ (writeVar y =<< readVar x) <|> writeVar y 1
   writeVar x 1 <|> writeVar y 2
   readVar y
 
-test2 = runSupplyT $ runParT do
+test2 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   fork $ writeVar y 1 <|> writeVar y 2
   writeVar x 1 <|> pure ()
   readVar y
 
-test3 = runSupplyT $ runParT do
+test3 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   (
@@ -39,7 +39,7 @@ test3 = runSupplyT $ runParT do
     )
   readVar y
 
-test4 = runSupplyT $ runParT do
+test4 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ readVar x <|> readVar y
@@ -47,7 +47,7 @@ test4 = runSupplyT $ runParT do
   writeVar y 2
   readVar z
 
-test5 = runSupplyT $ runParT do
+test5 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ readVar x <|> pure 5 <|> readVar y <|> pure 6
@@ -55,7 +55,7 @@ test5 = runSupplyT $ runParT do
   writeVar y =<< pure 3 <|> pure 4
   readVar z
 
-test6 = runSupplyT $ runParT do
+test6 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ pure 5 <|> readVar y <|> pure 6
@@ -63,31 +63,31 @@ test6 = runSupplyT $ runParT do
   writeVar y =<< pure 3 <|> pure 4
   readVar z
 
-test7 = runSupplyT $ runParT do
+test7 = runSupplyT $ runVerseT do
   x <- newRef 1
   all $ modifyRef' x (+ 1) <|> modifyRef' x (+ 2)
   readRef x
 
-test8 = runSupplyT $ runParT do
+test8 = runSupplyT $ runVerseT do
   x <- newRef 1
   all $ (modifyRef' x (+ 1) *> empty) <|> modifyRef' x (+ 2)
   readRef x
 
-test9 = runSupplyT $ runParT do
+test9 = runSupplyT $ runVerseT do
   x <- newRef 1
   all do
     modifyRef' x (+ 3)
     (modifyRef' x (+ 1) *> empty) <|> modifyRef' x (+ 2)
   readRef x
 
-test10 = runSupplyT $ runParT do
+test10 = runSupplyT $ runVerseT do
   x <- newRef 1
   all do
     modifyRef' x (+ 3)
     modifyRef' x (+ 1) <|> (modifyRef' x (+ 2) *> empty)
   readRef x
 
-test11 = runSupplyT $ runParT do
+test11 = runSupplyT $ runVerseT do
   x <- newRef 1
   all do
     modifyRef' x (+ 4)

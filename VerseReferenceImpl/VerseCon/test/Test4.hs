@@ -7,24 +7,24 @@ import Control.Monad ((<=<))
 
 import Prelude (($), (=<<))
 
-import Par5
+import Verse4
 import Supply
 
-test1 = runSupplyT $ runParT do
+test1 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   fork $ (writeVar y =<< readVar x) <|> writeVar y 1
   writeVar x 1 <|> writeVar y 2
   readVar y
 
-test2 = runSupplyT $ runParT do
+test2 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   fork $ writeVar y 1 <|> writeVar y 2
   writeVar x 1 <|> pure ()
   readVar y
 
-test3 = runSupplyT $ runParT do
+test3 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   (
@@ -38,7 +38,7 @@ test3 = runSupplyT $ runParT do
     )
   readVar y
 
-test4 = runSupplyT $ runParT do
+test4 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ readVar x <|> readVar y
@@ -46,7 +46,7 @@ test4 = runSupplyT $ runParT do
   writeVar y 2
   readVar z
 
-test5 = runSupplyT $ runParT do
+test5 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ readVar x <|> pure 5 <|> readVar y <|> pure 6
@@ -54,7 +54,7 @@ test5 = runSupplyT $ runParT do
   writeVar y =<< pure 3 <|> pure 4
   readVar z
 
-test6 = runSupplyT $ runParT do
+test6 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ pure 5 <|> readVar y <|> pure 6

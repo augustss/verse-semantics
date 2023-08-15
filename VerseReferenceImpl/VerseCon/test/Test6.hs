@@ -17,25 +17,25 @@ import Prelude (Eq (..), Foldable, Int, Integer, Num (..), Traversable, otherwis
 import Text.Show
 
 import Match
-import Par7
+import Verse6
 import Ref
 import Supply
 
-test1 = runSupplyT $ runParT do
+test1 = runSupplyT $ runVerseT do
   x <- freshIVar
   y <- freshIVar
   fork $ (writeIVar y =<< readIVar x) <|> writeIVar y 1
   writeIVar x 1 <|> writeIVar y 2
   readIVar y
 
-test2 = runSupplyT $ runParT do
+test2 = runSupplyT $ runVerseT do
   x <- freshIVar
   y <- freshIVar
   fork $ writeIVar y 1 <|> writeIVar y 2
   writeIVar x 1 <|> pure ()
   readIVar y
 
-test3 = runSupplyT $ runParT do
+test3 = runSupplyT $ runVerseT do
   x <- freshIVar
   y <- freshIVar
   (
@@ -49,7 +49,7 @@ test3 = runSupplyT $ runParT do
     )
   readIVar y
 
-test4 = runSupplyT $ runParT do
+test4 = runSupplyT $ runVerseT do
   x <- freshIVar
   y <- freshIVar
   z <- all $ readIVar x <|> readIVar y
@@ -57,7 +57,7 @@ test4 = runSupplyT $ runParT do
   writeIVar y 2
   readIVar z
 
-test5 = runSupplyT $ runParT do
+test5 = runSupplyT $ runVerseT do
   x <- freshIVar
   y <- freshIVar
   z <- all $ readIVar x <|> pure 5 <|> readIVar y <|> pure 6
@@ -65,7 +65,7 @@ test5 = runSupplyT $ runParT do
   writeIVar y =<< pure 3 <|> pure 4
   readIVar z
 
-test6 = runSupplyT $ runParT do
+test6 = runSupplyT $ runVerseT do
   x <- freshIVar
   y <- freshIVar
   z <- all $ pure 5 <|> readIVar y <|> pure 6
@@ -96,7 +96,7 @@ instance (Freshenable a m, Freshenable b m) => Freshenable (a, b) m where
 instance Monad m => Freshenable Integer m where
   freshen x = pure x
 
-test7 = runSupplyT $ runParT do
+test7 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   fork $ readVar x >>= \ case
@@ -105,44 +105,44 @@ test7 = runSupplyT $ runParT do
   unify x =<< newVar (Int 1)
   freezeVar y
 
-test8 = runSupplyT $ runParT do
+test8 = runSupplyT $ runVerseT do
   x <- newVar . Cons 1 =<< newVar . Cons 2 =<< freshVar
   y <- newVar . Cons 2 =<< newVar . Cons 3 =<< freshVar
   unify x y
   freezeVar y
 
-test9 = runSupplyT $ runParT do
+test9 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- all do
     unify x =<< newVar (Int 1)
     unify x =<< newVar (Int 2)
   readIVar y
 
-test10 = runSupplyT $ runParT do
+test10 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- all $ unify x =<< newVar (Int 1)
   readIVar y
 
-test11 = runSupplyT $ runParT do
+test11 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- all $ unify x =<< newVar (Int 1)
   unify x =<< newVar (Int 1)
   readIVar y
 
-test12 = runSupplyT $ runParT do
+test12 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- all $ unify x =<< newVar (Int 1)
   unify x =<< newVar (Int 2)
   readIVar y
 
-test13 = runSupplyT $ runParT do
+test13 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ unify x y
   unify x =<< newVar (Int 1)
   readIVar z
 
-test14 = runSupplyT $ runParT do
+test14 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ unify x y
@@ -150,7 +150,7 @@ test14 = runSupplyT $ runParT do
   unify y =<< newVar (Int 1)
   readIVar z
 
-test15 = runSupplyT $ runParT do
+test15 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- freshVar
   z <- all $ unify x y
@@ -158,7 +158,7 @@ test15 = runSupplyT $ runParT do
   unify y =<< newVar (Int 2)
   readIVar z
 
-test16 = runSupplyT $ runParT do
+test16 = runSupplyT $ runVerseT do
   x <- freshVar
   y <- all do
     unify x =<< newVar . Int =<< pure 1 <|> pure 2 <|> pure 3
@@ -166,17 +166,17 @@ test16 = runSupplyT $ runParT do
   unify x =<< newVar . Int =<< pure 1 <|> pure 2 <|> pure 3
   traverse freezeVar =<< readIVar y
 
-freshValVar :: (MonadRef m, MonadSupply Int m) => ParT m (Var m Val)
+freshValVar :: (MonadRef m, MonadSupply Int m) => VerseT m (Var m Val)
 freshValVar = freshVar
 
-test17 = runSupplyT $ runParT do
+test17 = runSupplyT $ runVerseT do
   x <- freshValVar
   y <- freshVar
   z <- all $ unify x y
   unify x y
   readIVar z
 
-test18 = runSupplyT $ runParT do
+test18 = runSupplyT $ runVerseT do
   x0 <- freshValVar
   x1 <- freshVar
   x2 <- freshVar
@@ -187,7 +187,7 @@ test18 = runSupplyT $ runParT do
   unify x0 x2
   readIVar y
 
-test19 = runSupplyT $ runParT do
+test19 = runSupplyT $ runVerseT do
   x0 <- freshValVar
   x1 <- freshVar
   x2 <- freshVar
