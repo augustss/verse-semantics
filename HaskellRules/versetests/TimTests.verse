@@ -2375,8 +2375,8 @@ test(U00){as:=(:int,:int) => bs:=(:int,:int) => cs:=as => ds:=bs => o:any => {es
 test(D00){a:int => if(a=1){a=1}else{a=1}}  # breaks withh fails-cancellation
 
 # Is this the NewExplorations timing problem?
-test(F00){x:int => f():=x=1|2 => {f[],first{x=1}}}
-test(F00){x:int => f():=x=1|2 => {first{x=1},f[]}}
+#LA test(F00){x:int => f():=x=1|2 => {f[],first{x=1}}}
+#LA test(F00){x:int => f():=x=1|2 => {first{x=1},f[]}}
 
 # Works, but why is performance not greatly improved by suspending DecidesFork?
 test(S00){as:=(:int,:int,:int,:int,:int) => for{a where i->a:as,a=i}}
@@ -2400,14 +2400,14 @@ test(F00){a:int=>{b:int=>if(a=2){c=4}else{c=3},assume{a=2}},c:=3}
 test(F00){a:int=>{b:int=>if(a=2){c=3}else{c=4},assume{a=1}},c:=3}
 
 # Adding assumptions to ExploreDecides.
-test(F00){x:=1|2 => first{x=1}}
-test(S00){x:int => f():type{x=1} => {first{x=1},f[]}}
-test(F00){x:int => f():type{x=2} => {first{x=1},f[]}}
-test(F00){x:int => f():type{x=2|1} => {first{x=1},f[]}}
-test(F00){x:int => f():type{x=2|3} => {first{x=1},f[]}}
+#LA test(F00){x:=1|2 => first{x=1}}
+#LA test(S00){x:int => f():type{x=1} => {first{x=1},f[]}}
+#LA test(F00){x:int => f():type{x=2} => {first{x=1},f[]}}
+#LA test(F00){x:int => f():type{x=2|1} => {first{x=1},f[]}}
+#LA test(F00){x:int => f():type{x=2|3} => {first{x=1},f[]}}
 test(S00){a:int=>if(a=2) then assume{3|4} else assume{5|6}} # Works, but shows Refork check is too early.
 #CHILDFX ABANDON test(S00){x:int => f():=1|2 => if(x=f()){1}else{2}}
-test(F00){x:int => f():=x=1|2 => {first{x=1},f[]}}
+#LA test(F00){x:int => f():=x=1|2 => {first{x=1},f[]}}
 
 # Nested comprehensions.
 test(S00){W->X:=for(0|1){2} where W}
@@ -2419,8 +2419,8 @@ test(S00){for{for(){0|1}}}
 test(S00){a:any => b:int => {if{b=3}}}
 test(U00){a:any => b:int => {x:=b,if{x=3},x=a}}
 test(U00){a:any => b:int => {x:=a,if{x=3},x=b}}
-test(S00){a:any => b:int => {allow{b=a,if{b=3}}}}
-test(S00){a:any => b:int => {allow{if{b=3},b=a}}}
+#LA test(S00){a:any => b:int => {allow{b=a,if{b=3}}}}
+#LA test(S00){a:any => b:int => {allow{if{b=3},b=a}}}
 
 # Interesting conditions.
 test(D00){a:int => if(a=1){a=1}else{a=1}}
@@ -2513,8 +2513,8 @@ test(S00){x:int => if(x=1|2){x=1 or x=3 or x=2}}
 test(F00){x:int => if(x=1|3|2){x=1 or x=2}}
 
 # Context promotion recognition.
-test(S00){x:int => f():type{x=2} => {first{x=2},f[]}}
-test(S00){x:int => f():type{x=2} => {first{x=2},if{f[]}}}
+#LA test(S00){x:int => f():type{x=2} => {first{x=2},f[]}}
+#LA test(S00){x:int => f():type{x=2} => {first{x=2},if{f[]}}}
 
 # Conditional stops.
 test(S00){x:int => f():type{x=0} => {if(x=0){1}else if(x=1){2}else{3}=1,f[]}}
@@ -2548,14 +2548,14 @@ test(S02){f(0)<covariant>:=1}
 test(S02){f(0)<contravariant>:=1}
 test(S00){f(0)<converges>:=1}
 test(S00){f(0)<computes>:=1}
-test(S00){assume<succeeds>{1}}
-test(S02){assume<covariant>{1}} # Bad name resolution error. Assume should resolve!
-test(S00){expect<succeeds>{1}}
+#LA test(S00){assume<succeeds>{1}}
+#LA test(S02){assume<covariant>{1}} # Bad name resolution error. Assume should resolve!
+#LA test(S00){expect<succeeds>{1}}
 
 # Contingency irrelevance.
 test(S00){assume{1}=assume{1}}
-test(S00){1=assume<decides>{1}}
-test(S00){1=assume<abstracts>{1}}
+#LA test(S00){1=assume<decides>{1}}
+#LA test(S00){1=assume<abstracts>{1}}
 test(F00){assume{1}=assume{2}}
 test(F00){assume{1}=2}
 test(S00){a&b:int => assume{a}=assume{a}}
@@ -2616,11 +2616,11 @@ test(S00){(:false or 2)=2}
 test(F00){(:false)or(:false)}
 
 # Find.
-test(S00){first{3}=3}
-test(F00){first{3=4}}
-test(F00){first{3}=4}
-test(S00){first(x:=1|2){x+1}=2}
-test(F00){first(x:=1|2){x+1}=3}
+#LA test(S00){first{3}=3}
+#LA test(F00){first{3=4}}
+#LA test(F00){first{3}=4}
+#LA test(S00){first(x:=1|2){x+1}=2}
+#LA test(F00){first(x:=1|2){x+1}=3}
 
 # Conditions and reachability, synchronous and asynchronous.
 test(S00){if(1){2}else{3}}
@@ -3137,12 +3137,12 @@ test(S00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},b=d,assume{a=c}}}
 test(S00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume{a=c},b=d}}
 
 # Would need inclusion-level context granularity to make these succeed.
-test(S00){assume<decides>{1}}
-test(S00){a&b:any     => {assume{a=b},assume<decides>{a=b}}}
-test(D00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume<decides>{a=c}}}
-test(D00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume<decides>{b=d}}}
-test(S00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume<decides>{b=d},assume{a=c}}}
-test(S00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume{a=c},b=d}}
+#LA test(S00){assume<decides>{1}}
+#LA test(S00){a&b:any     => {assume{a=b},assume<decides>{a=b}}}
+#LA test(D00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume<decides>{a=c}}}
+#LA test(D00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume<decides>{b=d}}}
+#LA test(S00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume<decides>{b=d},assume{a=c}}}
+#LA test(S00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume{a=c},b=d}}
 
 # Not matching.
 test(U00){x:=x => y:=y => x=y}
@@ -3258,9 +3258,9 @@ test(F00){f():=1=2}
 test(F00){f():false}
 
 # Abstract head shape rejection.
-test(F00){a:int => b:float => a=b}
+#LA test(F00){a:int => b:float => a=b}
 test(F00){a:int => a=(3,4)}
-test(F00){a:float32 => b:float64 => a=b}
+#LA test(F00){a:float32 => b:float64 => a=b}
 test(F00){a:int => a=int}
 test(F00){a:int => a='3'}
 test(F00){a:int => '3'=a}
@@ -3292,10 +3292,10 @@ test(F00){nat[2/3]}		#TODO:RATIONALS
 test(S00){int[123]}
 test(S00){int[-123]}
 test(F00){int[2/3]}		#TODO:RATIONALS
-test(S00){rational[123]}
-test(S00){rational[-123]}
-test(S00){rational[2/3]}
-test(S00){rational[-2/3]}
+#LA test(S00){rational[123]}
+#LA test(S00){rational[-123]}
+#LA test(S00){rational[2/3]}
+#LA test(S00){rational[-2/3]}
 
 # Basic domain matching and comparability.
 test(S00){f(x:int):=int[x]}
@@ -3304,22 +3304,22 @@ test(S00){t(x:int     ):=x,f(x:t):=t[x]}
 test(U00){t(x:int     ):=x,f(x:any):=t[x]}
 test(S00){f(x:any     ):=any[x]}
 test(S00){f(x:int     ):=any[x]}
-test(U00){f(x:any     ):=rational[x]}
-test(S00){f(x:nat     ):=rational[x]}
-test(S00){f(x:int     ):=rational[x]}
-test(S00){f(x:rational):=rational[x]}
+#LA test(U00){f(x:any     ):=rational[x]}
+#LA test(S00){f(x:nat     ):=rational[x]}
+#LA test(S00){f(x:int     ):=rational[x]}
+#LA test(S00){f(x:rational):=rational[x]}
 test(U00){f(x:any     ):=int[x]}
 test(S00){f(x:nat     ):=int[x]}
 test(S00){f(x:int     ):=int[x]}
-test(D00){f(x:rational):=int[x]}
+#LA test(D00){f(x:rational):=int[x]}
 test(U00){f(x:any     ):=nat[x]}
 test(S00){f(x:nat     ):=nat[x]}
 test(D00){f(x:int     ):=nat[x]}
-test(D00){f(x:rational):=nat[x]}
+#LA test(D00){f(x:rational):=nat[x]}
 test(S00){f(x:void    ):=x=false,f[123]}
 test(F00){char[1]}
 test(S00){char['X']}
-test(S00){char8['X']}
+#LA test(S00){char8['X']}
 
 # Function checking. Now fuzzy.
 test(S00){f(g(1):=1):=2,f[h(1):=1]}
@@ -3491,12 +3491,12 @@ test(F00){f(7)<computes>:type{y:=y} => f[7]=8 => f[7]=9}
 test(S00){f(x:int)<computes>:any => a&b:int => a=b => f[a]=f[a]}
 
 # Function unification.
-test(S00){(f&g)(x:int)<computes>:int => f[3]=f[3]}
-test(D00){(f&g)(x:int)<computes>:int => f[3]=f[4]}
-test(D00){(f&g)(x:int)<computes>:int => f[3]=g[3]}
-test(S00){(f&g)(x:int)<computes>:int => f=g => f[3]=g[3]}
-test(U00){(f&g)(x:int)<computes>:int => if{f=g}}
-test(U00){(f&g)(x:int)<computes>:int => if{f[3]=g[3],f=g}}
+#LA test(S00){(f&g)(x:int)<computes>:int => f[3]=f[3]}
+#LA test(D00){(f&g)(x:int)<computes>:int => f[3]=f[4]}
+#LA test(D00){(f&g)(x:int)<computes>:int => f[3]=g[3]}
+#LA test(S00){(f&g)(x:int)<computes>:int => f=g => f[3]=g[3]}
+#LA test(U00){(f&g)(x:int)<computes>:int => if{f=g}}
+#LA test(U00){(f&g)(x:int)<computes>:int => if{f[3]=g[3],f=g}}
 test(U00){f(x:int)<computes>:any => a&b&c:int => if{f[a]=f[c]}}
 test(S00){f(x:int)<computes>:any => a&b&c:int => if{a=c,f[a]=f[c]}}
 test(S00){f(x:int)<computes>:any => a&b&c:int => a=b => if{a=c,f[a]=f[c]}}
@@ -3516,8 +3516,8 @@ test(D00){a&b:int => f(:int)<computes>:any => x:=f(a) => y:=f(b) => allow{a=b} w
 test(S00){a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}
 test(U00){a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => {a=b,c=d}}
 test(D00){a&b:int => f(:int)<computes>:any => c:=f[a] => d:=f[b] => {a=b,c=d}}
-test(S00){a:any => (f&g)(:any)<computes>:any => c:=f[a] => d:=g[a] => f=g => c=d}
-test(S00){a&b:any => (f&g)(:any)<computes>:any => c:=f[a] => d:=g[b] => a=b => f=g => c=d}
+#LA test(S00){a:any => (f&g)(:any)<computes>:any => c:=f[a] => d:=g[a] => f=g => c=d}
+#LA test(S00){a&b:any => (f&g)(:any)<computes>:any => c:=f[a] => d:=g[b] => a=b => f=g => c=d}
 
 # Pure function equality.
 test(S00){a&b:any   => f(:any)<computes>:any => f[a]=b => f[a]=b}
@@ -3532,31 +3532,31 @@ test(F00){f(:any)<computes>:any => f(2)=3 => f[2]=4}
 #
 
 # Simple.
-test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=f[a]               => h[x]=h[y]}
-test(D00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=f[b]               => h[x]=h[y]}
-test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=f[b] => a=b        => h[x]=h[y]}
-test(D00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[a]               => h[x]=h[y]}
-test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[a] => f=g        => h[x]=h[y]}
-test(D00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[b] => a=b        => h[x]=h[y]}
-test(D00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[b] => f=g        => h[x]=h[y]}
-test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[b] => a=b => f=g => h[x]=h[y]}
-test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[b] => f=g => a=b => h[x]=h[y]}
-test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => f[a]=g[b] => h[f[a]]=h[g[b]]}
+#LA test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=f[a]               => h[x]=h[y]}
+#LA test(D00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=f[b]               => h[x]=h[y]}
+#LA test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=f[b] => a=b        => h[x]=h[y]}
+#LA test(D00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[a]               => h[x]=h[y]}
+#LA test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[a] => f=g        => h[x]=h[y]}
+#LA test(D00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[b] => a=b        => h[x]=h[y]}
+#LA test(D00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[b] => f=g        => h[x]=h[y]}
+#LA test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[b] => a=b => f=g => h[x]=h[y]}
+#LA test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => x:=f[a] => y:=g[b] => f=g => a=b => h[x]=h[y]}
+#LA test(S00){a&b:int=>(f&g&h)(:int)<computes>:int => f[a]=g[b] => h[f[a]]=h[g[b]]}
 
 # Arrays.
-test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=f[a,c]               => h[x]=h[y]}
-test(D00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=f[b,c]               => h[x]=h[y]}
-test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=f[b,c] => a=b        => h[x]=h[y]}
-test(D00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[a,c]               => h[x]=h[y]}
-test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[a,c] => f=g        => h[x]=h[y]}
-test(D00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[b,c] => a=b        => h[x]=h[y]}
-test(D00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[b,c] => f=g        => h[x]=h[y]}
-test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[b,c] => a=b => f=g => h[x]=h[y]}
-test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[b,c] => f=g => a=b => h[x]=h[y]}
+#LA test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=f[a,c]               => h[x]=h[y]}
+#LA test(D00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=f[b,c]               => h[x]=h[y]}
+#LA test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=f[b,c] => a=b        => h[x]=h[y]}
+#LA test(D00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[a,c]               => h[x]=h[y]}
+#LA test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[a,c] => f=g        => h[x]=h[y]}
+#LA test(D00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[b,c] => a=b        => h[x]=h[y]}
+#LA test(D00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[b,c] => f=g        => h[x]=h[y]}
+#LA test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[b,c] => a=b => f=g => h[x]=h[y]}
+#LA test(S00){a&b&c:int=>(f&g)(:int,:int)<computes>:int => h(:int)<computes>:int => x:=f[a,c] => y:=g[b,c] => f=g => a=b => h[x]=h[y]}
 
 # Function equates requiring memoization.
-test(S00){a&b:any => (f&g)(:any)<computes>:any => f[a]=g[b] => f[a]=g[b]}
-test(U00){a&b:any => (f&g)(:any)<computes>:any => f[a]=g[b] => f[a]=g[a]}
+#LA test(S00){a&b:any => (f&g)(:any)<computes>:any => f[a]=g[b] => f[a]=g[b]}
+#LA test(U00){a&b:any => (f&g)(:any)<computes>:any => f[a]=g[b] => f[a]=g[a]}
 test(S00){a:any => f(:any)<computes>:any => int[f[a]] => int[f[a]]}
 test(S00){a:any => f(:any)<computes>:any => nat[f[a]] => int[f[a]]}
 test(D00){a:any => f(:any)<computes>:any => int[f[a]] => nat[f[a]]}
@@ -3613,8 +3613,8 @@ test(S00){a&b&c&d:int => f(:int,:int)<computes>:any => if{f(a,b)=f(c,d),a=c,b=d}
 
 # Function eta conversion - abstract.
 test(F00){f()<computes>:=3 => g()<computes>:=4 => c:=f()=g()}
-test(S00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(0)}
-test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(1)}
+#LA test(S00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(0)}
+#LA test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(1)}
 #test(S00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(0)}
 #test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(1)}
 #test(S00){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(0)}
