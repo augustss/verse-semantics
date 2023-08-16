@@ -261,20 +261,6 @@ unify :: ( MonadRef m
          , RowMatchable f
          ) => Var m f -> Var m f -> VerseT m ()
 unify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
-  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) -> do
-    r <- ask'
-    case compare' n_x i_x n_y i_y of
-      EQ -> pure()
-      LT -> do
-        when (n_x < r.depth && n_y < r.depth) incrLength
-        writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
-        writeLink v_y v_x
-        resumeChildren $ subst v_x v_y
-      GT -> do
-        when (n_x < r.depth && n_y < r.depth) incrLength
-        writeLink v_x v_y
-        writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
-        resumeChildren $ subst v_y v_x
   (Found v_x (Unbound n_x k_x _), Found v_y r_y@(Bound y _)) -> do
     r <- ask'
     when (n_x < r.depth) incrLength
@@ -287,20 +273,33 @@ unify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
     writeRepr v_y r_x
     k_y x
     resumeChildren $ subst v_x v_y
-  (Found v_x (Bound x i_x), Found v_y (Bound y i_y))
-    | i_x == i_y -> pure ()
-    | otherwise -> case rowMatch x y of
-        Zip Nothing -> empty
-        Zip (Just z) -> do
-          writeLink v_y v_x
-          for_ z $ uncurry unify
-        Uncons f_x v_xs f_y v_ys -> do
-          writeLink v_y v_x
-          v_zs <- freshVar
-          v_xs' <- newVar $ f_x v_zs
-          unify v_xs' v_ys
-          v_ys' <- newVar $ f_y v_zs
-          unify v_xs v_ys'
+  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) -> do
+    r <- ask'
+    case compare' n_x i_x n_y i_y of
+      EQ -> pure ()
+      LT -> do
+        when (n_x < r.depth && n_y < r.depth) incrLength
+        writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
+        writeLink v_y v_x
+        resumeChildren $ subst v_x v_y
+      GT -> do
+        when (n_x < r.depth && n_y < r.depth) incrLength
+        writeLink v_x v_y
+        writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
+        resumeChildren $ subst v_y v_x
+  (Found v_x (Bound x i_x), Found v_y (Bound y i_y)) ->
+    when (i_x /= i_y) $ case rowMatch x y of
+      Zip Nothing -> empty
+      Zip (Just z) -> do
+        writeLink v_y v_x
+        for_ z $ uncurry unify
+      Uncons f_x v_xs f_y v_ys -> do
+        writeLink v_y v_x
+        v_zs <- freshVar
+        v_xs' <- newVar $ f_x v_zs
+        unify v_xs' v_ys
+        v_ys' <- newVar $ f_y v_zs
+        unify v_xs v_ys'
 
 subst :: ( MonadRef m
          , MonadSupply Int m
@@ -315,32 +314,31 @@ subst' :: ( MonadRef m
           , RowMatchable f
           ) => Var m f -> Found m f -> VerseT m ()
 subst' v_x y = findRepr v_x <&> (, y) >>= \ case
-  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound _ k_y i_y))
-    | i_x == i_y -> decrLength
-    | otherwise -> do
-        writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
-        writeLink v_y v_x
-        resumeChildren $ subst v_x v_y
   (Found _ Unbound {}, Found _ Bound {}) -> pure ()
   (Found v_x r_x@(Bound x _), Found v_y (Unbound _ k_y _)) -> do
     writeRepr v_y r_x
     k_y x
     resumeChildren $ subst v_x v_y
-  (Found v_x (Bound x i_x), Found v_y (Bound y i_y))
-    | i_x == i_y -> decrLength
-    | otherwise -> case rowMatch x y of
-        Zip Nothing -> empty
-        Zip (Just z) -> do
-          decrLength
-          writeLink v_y v_x
-          for_ z $ uncurry unify
-        Uncons f_x v_xs f_y v_ys -> do
-          decrLength
-          v_zs <- freshVar
-          v_xs' <- newVar $ f_x v_zs
-          unify v_xs' v_ys
-          v_ys' <- newVar $ f_y v_zs
-          unify v_xs v_ys'
+  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound _ k_y i_y)) ->
+    case i_x == i_y of
+      True -> decrLength
+      False -> do
+        writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
+        writeLink v_y v_x
+        resumeChildren $ subst v_x v_y
+  (Found v_x (Bound x i_x), Found v_y (Bound y i_y)) -> do
+    decrLength
+    when (i_x /= i_y) $ case rowMatch x y of
+      Zip Nothing -> empty
+      Zip (Just z) -> do
+        writeLink v_y v_x
+        for_ z $ uncurry unify
+      Uncons f_x v_xs f_y v_ys -> do
+        v_zs <- freshVar
+        v_xs' <- newVar $ f_x v_zs
+        unify v_xs' v_ys
+        v_ys' <- newVar $ f_y v_zs
+        unify v_xs v_ys'
 
 compare' :: Int -> Int -> Int -> Int -> Ordering
 compare' n_x i_x n_y i_y = compare (n_x, i_x) (n_y, i_y)
