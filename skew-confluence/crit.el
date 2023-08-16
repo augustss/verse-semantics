@@ -5,6 +5,9 @@
 ;;; Add rewrite rule IDs
 ;;; Generate and print substituted conditions
 
+;;; Temporary while switching over from cond to if/fresh
+(setq use-if-fresh nil)
+
 
 ;;; Compute all critical pairs for the Verse Calculus
 
@@ -2025,12 +2028,28 @@
 	 (format "tup (%s,%s,%s,%s)" (format-subterm (second term) nil) (format-subterm (third term) nil) (format-subterm (fourth term) nil) (format-subterm (fifth term) nil)))
 	(t (error "format-compound-term: unknown term type %s" (first term)))))
 
+;;; Format just the expression
+(defun format-if-condition (rif)
+  (format-rule-condition-expression rif))
+
+(defun format-if-condition-expand-ands (rif)
+  (cond ((and (not (atom rif)) (eq (first rif 'and)))
+	 (mapconcat #'format-if-condition-expand-ands (rest rif) " and "))
+	(t (format-rule-condition-expression rif<))))
+
+;;; Format just the expression
+(defun format-fresh-condition (rfresh)
+  (format-rule-condition-expression rfresh))
+
+;;; (Obsolete) Format expression with a possible text prefix
 (defun format-rule-condition (rc)
   (format-rule-condition-with-prefixes rc "fresh " "if "))
 
+;;; (Obsolete) Format expression with a possible text prefix
 (defun format-condition-text (rc)
   (format-rule-condition-with-prefixes rc "fresh " ""))
 
+;;; (Obsolete) Format expression with a possible text prefix
 (defun format-rule-condition-with-prefixes (rc fresh-prefix if-prefix)
   (cond ((atom rc) (error "format-rule-condition: unknown atomic condition %s" rc))
 	((eq (first rc) 'fresh)
@@ -2068,7 +2087,7 @@
 	   (concat (format-metavar (substring str 0 (- n 5))) "'"))
           (t str))))
 
-(defun print-rule-line (prefix name alpha beta cond linebreak)
+(defun print-rule-line (prefix name alpha beta cond rif rfresh linebreak)
   (princ (format "\\hbox to 5em{%s\\hfill}\\hbox to 6em{\\rulename{%s}\\hfill}\\hbox to 8em{\\hss %s}\\quad$\\movesto$\\quad %s"
 		 prefix name (format-rule-term alpha) (format-rule-term beta)))
   (when cond
@@ -2135,18 +2154,18 @@
 	  (beta2 (rule-rhs rule2))
 	  (rc1 (rule-cond rule1))
 	  (rc2 (rule-cond rule2))
-	  (ri1 (rule-if rule1))
-	  (ri2 (rule-if rule2))
-	  (rf1 (rule-fresh rule1))
-	  (rf2 (rule-fresh rule2))
+	  (rif1 (rule-if rule1))
+	  (rif2 (rule-if rule2))
+	  (rfresh1 (rule-fresh rule1))
+	  (rfresh2 (rule-fresh rule2))
 	  (linebreak "\\vadjust{\\penalty1000}\\hfil\\break")) ;Use \\hfil here, and \\hfill in print-rule-line
       (princ (format "\\vskip 8pt plus 16pt\\noindent\n"))
       (let ((weirdtext (cond ((< k 10) "and{\\hskip0.2em}rule")
 			     ((< k 100) "and{\\hskip0.5em}rule")
 			     ((< k 1000) "and{\\hskip0.8em}rule")
 			     (t "and{\\hskip0.1.1em}rule"))))
-	(print-rule-line (format "\\rlap{(%s)}\\hphantom{%s}\\llap{Rule}" k weirdtext) name1 alpha1 beta1 rc1 linebreak)
-	(print-rule-line weirdtext name2 alpha2 beta2 rc2 linebreak))
+	(print-rule-line (format "\\rlap{(%s)}\\hphantom{%s}\\llap{Rule}" k weirdtext) name1 alpha1 beta1 rc1 rif1 rfresh1 linebreak)
+	(print-rule-line weirdtext name2 alpha2 beta2 rc2 rif2 rfresh2 linebreak))
       (princ (format "have a critical pair derived from the common term {\\color{blue}$%s$}%s%s\n"
 		     (format-term Q) (if (or cond1 cond2) "," "") linebreak))
       (cond ((and cond1 cond2)
@@ -2731,10 +2750,10 @@
 	  (beta2 (rule-rhs rule2))
 	  (rc1 (rule-cond rule1))
 	  (rc2 (rule-cond rule2))
-	  (ri1 (rule-if rule1))
-	  (ri2 (rule-if rule2))
-	  (rf1 (rule-fresh rule1))
-	  (rf2 (rule-fresh rule2)))
+	  (rif1 (rule-if rule1))
+	  (rif2 (rule-if rule2))
+	  (rfresh1 (rule-fresh rule1))
+	  (rfresh2 (rule-fresh rule2)))
       (let ((pf (proof-lookup name1 name2 path1))
 	    (needproof "{\\color{red}Need a proof that this diagram is decreasing.}"))
 	(let ((rw1 (proof-rewrites1 pf))
