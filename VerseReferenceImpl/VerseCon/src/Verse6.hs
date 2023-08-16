@@ -211,17 +211,17 @@ writeIVar v x = readIVarState v >>= \ case
   Val _ -> error "writeIVar"
   y@(Susp k) -> do
     lift' (\ r -> put' (unIVar v) r.heap (Val x)) (\ r -> put' (unIVar v) r.heap y)
-    resumeChildren $ writeIVar' v x
+    resumeChildren $ writeLocalIVar v x
     k x
 
-writeIVar' :: (MonadRef m, MonadSupply Int m) => IVar m a -> a -> VerseT m ()
-writeIVar' v x = readLocalIVarState v >>= \ case
+writeLocalIVar :: (MonadRef m, MonadSupply Int m) => IVar m a -> a -> VerseT m ()
+writeLocalIVar v x = readLocalIVarState v >>= \ case
   Just (Val _) -> error "writeIVar"
   Just y@(Susp k) -> do
     lift' (\ r -> put' (unIVar v) r.heap (Val x)) (\ r -> put' (unIVar v) r.heap y)
-    resumeChildren $ writeIVar' v x
+    resumeChildren $ writeLocalIVar v x
     k x
-  Nothing -> resumeChildren $ writeIVar' v x
+  Nothing -> resumeChildren $ writeLocalIVar v x
 
 readIVarState :: MonadRef m => IVar m a -> VerseT m (IVarState m a)
 readIVarState v = liftSuccess $ \ r ->
