@@ -120,11 +120,12 @@ keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "
            \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "allow", "assert", "assume", "expect", "first", "last", "logic", "lowered", "one", "type", "unify", "verify"]
+macros = ["all", "allow", "assert", "assume", "expect", "first", "last",
+          "logic", "lowered", "one", "reject", "type", "unify", "verify"]
          ++ effects
 
 effects :: [String]
-effects = [ "decides", "diverges", "fails", "succeeds" ]
+effects = [ "decides", "diverges", "fails", "succeeds", "iterates" ]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do

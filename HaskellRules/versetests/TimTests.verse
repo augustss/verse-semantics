@@ -1830,10 +1830,10 @@ test(QD00){a:int => if{expect<succeeds>{a=1}}}
 test(QS00){a:int => if{expect<decides>{a=1}}}
 
 # First-class static rejection. Must be a macro.
-#LA test(V02){reject{"Bad"}}
-#LA test(V03){reject{_}}
-#LA test(C00){1(2),reject{"Bad"}}
-#LA test(V02){reject{"Bad"},1(2)}
+test(V02){reject{"Bad"}}
+test(V03){reject{_}}
+test(C00){1(2),reject{"Bad"}}
+test(V02){reject{"Bad"},1(2)}
 #test(V02){r:=reject{r}} #!! Paraconsistency puzzle: What ought WhenCastStep do here? Not suppress ChildFx rejects?
 #then we must be rigorous
 
