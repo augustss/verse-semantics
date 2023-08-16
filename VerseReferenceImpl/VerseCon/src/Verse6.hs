@@ -145,7 +145,7 @@ instance Functor (VerseT m) where
   fmap f m = VerseT $ \ yk r sk -> unVerseT m yk r $ sk . f
 
 instance Applicative (VerseT m) where
-  pure x = VerseT $ \ _ r sk fk ek rk -> sk x r fk ek rk
+  pure x = VerseT $ \ _ r sk -> sk x r
   f <*> x = VerseT $ \ yk r sk -> unVerseT f yk r $ \ f r -> unVerseT x yk r $ sk . f
 
 instance (MonadRef m, MonadSupply Int m) => Alternative (VerseT m) where
@@ -161,11 +161,8 @@ instance (MonadRef m, MonadSupply Int m) => Alternative (VerseT m) where
       rk
 
 instance Monad (VerseT m) where
-  x >>= f = VerseT $ \ yk r sk fk ek rk -> unVerseT x yk r
-    (\ x r -> unVerseT (f x) yk r sk)
-    fk
-    ek
-    rk
+  x >>= f = VerseT $ \ yk r sk -> unVerseT x yk r $ \ x r ->
+    unVerseT (f x) yk r sk
 
 instance MonadTrans VerseT where
   lift m = VerseT $ \ _ r sk fk ek rk -> m >>= \ x -> sk x r fk ek rk
