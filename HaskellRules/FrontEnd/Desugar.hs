@@ -43,6 +43,7 @@ desugar flgs = eval flgs .
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
              traceDS "addScope"   <=< addScope  <=<
+             traceDS "lowerApply" <=< lowerApply<=<
              traceDS "dsD"        <=< dsD       <=<
              traceDS "addDeref"   <=< addDeref  <=<
              traceDS "dsSmall"    <=< dsSmall   <=<
@@ -165,9 +166,8 @@ dsSmall = ds
     ds (InfixOp e1 (Op "where") e2) = do
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
-    ds (InfixOp e1@Variable{} (Op "=") e2) = ds $ Unify e1 e2
-    ds (InfixOp e1 (Op "=") e2@Variable{}) = ds $ Unify e2 e1
-    ds (InfixOp e1            (Op "=") e2) = do x <- newIdent (getLoc e1) "x"; ds $ seqE [DefineE x e1, Unify (Variable x) e2]
+    ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
+    ds (Macro1 (Ident _ "in'='") [] (Block es)) = dsU =<< mapM ds es
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
@@ -227,7 +227,22 @@ dsSmall = ds
     ds (Macro1 (Ident _ "one") [] e) = ds $ If2E e Fail
     ds (Macro1 (Ident _ "all") [] e) = ds $ For1 e
 
+    ds (Macro1 (Ident _ "first") [] e) = ds $ If2E e Fail  -- same as one{}
+    ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
+
     ds x = compos ds x
+
+    dsU [] = pure $ Range $ Variable $ Ident noLoc "any$"
+    dsU [e] = pure e
+    dsU ees@(e:es) = do
+      let findVar _ []= Nothing
+          findVar xs (y@(Variable _) : ys) = Just (y, xs ++ ys)
+          findVar xs (y:ys) = findVar (xs ++ [y]) ys
+      case findVar [] ees of
+        Nothing -> do
+          x <- newIdent (getLoc e) "x"
+          pure $ Seq $ DefineE x e : map (Unify (Variable x)) es
+        Just (x, xs) -> pure $ Seq $ map (Unify x) xs
 
 type Value = Expr
 
@@ -255,6 +270,9 @@ apply2 con x1 x2 = pure $ con x1 x2
 
 defn :: Expr -> Expr -> D Expr
 -- Rule: (i := e) -->  (i := e)
+defn (Variable (Ident _ "_")) e = do
+  x <- newIdent (getLoc e) "u"
+  pure $ DefineE x e
 defn (Variable i) e = pure $ DefineE i e
 -- Rule: (f(a) := e)  -->  (f := function(a){e})
 -- Rule: (p<a> := e)  -->  ...
@@ -561,7 +579,7 @@ scope sc = expr
     expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
     expr (TLam i r e1 e2 me3) = do
       (e1', sc') <- defs (S.insert i sc) e1
-      TLam i r e1' <$> scopeD sc' e2 <*> traverse expr me3
+      TLam i r e1' <$> scopeD sc' e2 <*> traverse (scopeD sc') me3
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
     expr Fail = pure Fail
@@ -671,6 +689,7 @@ primOps = map (Ident noLoc)
   , "fail$"
   , "err$"
   , "arrLen$"
+  , "arrConc$"
   ]
 
 ------------------------
@@ -837,6 +856,20 @@ addDeref = pure . exprD S.empty
 
 ---------------------------------
 
+-- Applications have to be lowered before scope insertion
+-- so existential get inserted in the right place.
+lowerApply :: Expr -> D Expr
+lowerApply = f
+  where
+    f (ApplyS e1 e2) = Succeeds <$> (ApplyD <$> f e1 <*> f e2)
+    f (HasType e t) = do
+      verif <- gets (fVerify . dflags)
+      if verif then
+        HasType <$> f e <*> f t
+       else
+        Succeeds <$> (ApplyD <$> f t <*> f e)
+    f e = compos f e
+
 -- Convert Big Core to Core
 lower :: Expr -> D Expr
 lower e@Lit{} = pure e
@@ -844,7 +877,6 @@ lower e@Variable{} = pure e
 lower (Array es) = Array <$> mapM lower es
 lower e@Wrong{} = pure e
 lower (Seq es) = seqE <$> mapM lower es
-lower (ApplyS e1 e2) = lowerSucceeds =<< lower (ApplyD e1 e2)
 lower (ApplyD e1 e2) = ApplyD <$> lower e1 <*> lower e2
 lower (ApplyEff _rs _e) = undefined
 lower (Unify e1 e2) = Unify <$> lower e1 <*> lower e2
@@ -853,7 +885,7 @@ lower (For2 (Exists is e1) e2) = join $ lowerFor is <$> lower e1 <*> lower e2
 lower (If3 (Exists is e1) e2 e3) = join $ lowerIf is <$> lower e1 <*> lower e2 <*> lower e3
 lower (Macro1 (Ident _ "all") [] e) = lowerAll =<< lower e
 lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
-lower (Macro1 (Ident _ "succeeds") [] e) = lowerSucceeds =<< lower e
+lower (Succeeds e) = lowerSucceeds =<< lower e
 lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
 lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
 lower (Macro1 (Ident _ "lowered") [] e) = pure e
@@ -1012,6 +1044,8 @@ lowerTLamVerifySucceeds i is e1 e2' e2'' =
 -- XXX use all of rs
 lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
 lowerTLamRun i rs is e1 e2 me3 = do
+  -- XXX This inserts Succeeds late, and scope insertion has already happened.
+  -- XXX This might be wrong.
   e2' <- maybe (pure e2) (\ t -> lowerSucceeds (ApplyD t e2)) me3
   let invariant = --invariantId `elem` rs  || True -- XXX
                   openId `notElem` rs
@@ -1029,7 +1063,7 @@ lowerHasType e t = do
   if verif then
     lowerHasTypeVerify e t
    else
-    lowerSucceeds (ApplyD t e)
+    undefined -- lowerSucceeds (ApplyD t e)
 
 lowerHasTypeVerify :: Expr -> Expr -> D Expr
 lowerHasTypeVerify e t = do
@@ -1073,7 +1107,7 @@ lowerSucceeds :: Expr -> D Expr
 lowerSucceeds e = do
   useSplit <- gets (fSplit . dflags)
   verif <- gets (fVerify . dflags)
-  asmVerif <- gets (fVerify . dflags)
+  asmVerif <- gets (fAssumeVerified . dflags)
   if verif then
     pure $ eAssert e
    else if asmVerif then
@@ -1081,7 +1115,7 @@ lowerSucceeds e = do
    else if useSplit then
     lowerSucceedsSplit e
    else
-    pure $ Macro1 (Ident noLoc "succeeds") [] e
+    pure $ Succeeds e
 
 lowerSucceedsSplit :: Expr -> D Expr
 lowerSucceedsSplit e = do
@@ -1104,7 +1138,7 @@ lowerDecides e = do
    else if useSplit then
     lowerDecidesSplit e
    else
-    pure $ Macro1 (Ident noLoc "succeeds") [] e
+    pure $ Macro1 (Ident noLoc "decides") [] e
 
 lowerDecidesSplit :: Expr -> D Expr
 lowerDecidesSplit e = do
@@ -1346,6 +1380,7 @@ getAllVars = Epic.List.nub . execWriter . vars
   where vars e@(Variable i) = do tell [i]; pure e
         vars e@(Lam i e') = do tell [i]; _ <- vars e'; pure e
         vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
+        vars TLam{} = undefined
         vars e = compos vars e
 
 substMany :: [(Ident, Core)] -> Core -> Core

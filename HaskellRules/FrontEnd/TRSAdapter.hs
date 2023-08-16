@@ -124,6 +124,7 @@ coreToTrs (Variable i) = T.Var $ coreToTrsI i
 coreToTrs (Lit (LitInt i)) = T.Int i
 coreToTrs (Lit (LitChar c)) = T.Char c
 coreToTrs (Lit (LitPtr p)) = T.Ref (T.Ptr p)
+coreToTrs (Lit (LitStr s)) = T.Arr (map T.Char s)  -- assume strings are arrays of characters
 coreToTrs Lit{} = undefined
 coreToTrs (EPrim "any$") = T.LAM x (T.Var x)  where x = T.Name "x"
 coreToTrs (EPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
@@ -219,7 +220,8 @@ allOps = [
   (T.Print, "print$"),
   (T.Append,"append$"),
   (T.Error, "err$"),
-  (T.Length,"arrLen$")
+  (T.Length,"arrLen$"),
+  (T.Concat,"arrConc$")
   ]
 
 ----------------------------------------------

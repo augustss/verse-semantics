@@ -292,6 +292,7 @@ data Op
   | Append
   | Length
   | Error
+  | Concat
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where

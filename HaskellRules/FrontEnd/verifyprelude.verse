@@ -2,12 +2,16 @@
 ## Small prelude for verification; arithmetic functions are concrete.
 ## The lowered{} macro stops insertion lowering from BigCore to Core,
 ## i.e., stop assume{} being inserted.
+
+# XXX How should possible effect be indicated?  Especially for Print.
+# XXX What should the definition of Err() be?
 array{
 false        := array{};
 any          := lowered{ lambda(_x){                                                        assume { _x }}};
 int          := lowered{ lambda(_x){                isInt$[_x];                             assume { _x }}};
 char         := lowered{ lambda(_x){                isChr$[_x];                             assume { _x }}};
 nat          := lowered{ lambda(_x){                isInt$[_x];             intGE$[_x,0];   assume { _x }}};
+void         := lowered{ lambda(_x){                                                                 array{} }};
 comparable   := lowered{ lambda(_x){                isInt$[_x] | isChr$[_x];                assume { _x }}};  # incomplete
 operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intAdd$[_x,_y]; isInt$[_z]; _z }}};
 operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intSub$[_x,_y]; isInt$[_z]; _z }}};
@@ -21,4 +25,7 @@ operator'<>' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intN
 prefix'-'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intNeg$[_x];    isInt$[_z]; _z }}};
 prefix'+'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intPlus$[_x];   isInt$[_z]; _z }}};
 Length       := lowered{ lambda(_x) {               isArr$[_x];                             assume { _z:any$; isInt$[_z]; intGE$[_z,0]; _z }}};
+Print        := lowered{ lambda(_x) { print$[_x];                                                    array{} }};
+Err          := lowered{ lambda(_x) {                                                       assume { _z:any$; _z }}};
+Concatenate  := lowered{ lambda(_xy){ (_x,_y):=_xy; isArr$[_x]; isArr$[_y];                 assume { _z:= arrConc$[_x,_y]; isArr$[_z]; _z }}};
 }
