@@ -2828,9 +2828,9 @@ test(S00){a:int => f(3):int => f[:int]}
 test(S00){a:int => g(:nat):int => f(x:int):int => if{f[g[a]]}}
 
 # Unify macro.
-#LA test(S00){a:=operator'='{}}
-#LA test(S00){a:=operator'='{2},a=2}
-#LA test(F00){a:=operator'='{2},a=3}
+test(S00){a:=operator'='{}}
+test(S00){a:=operator'='{2},a=2}
+test(F00){a:=operator'='{2},a=3}
 
 # Various.
 test(F00){a:int => {x:=a,assume{x=7},x=8}}
