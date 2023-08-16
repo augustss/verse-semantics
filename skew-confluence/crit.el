@@ -6,7 +6,7 @@
 ;;; Generate and print substituted conditions
 
 ;;; Temporary while switching over from cond to if/fresh
-(setq use-if-fresh nil)
+(setq use-if-fresh t)
 
 
 ;;; Compute all critical pairs for the Verse Calculus
@@ -2032,17 +2032,13 @@
 	(t (error "format-compound-term: unknown term type %s" (first term)))))
 
 ;;; Format just the expression
-(defun format-if-condition (rif)
-  (format-rule-condition-expression rif))
+(defun format-condition (if-or-fresh)
+  (format-rule-condition-expression if-or-fresh))
 
-(defun format-if-condition-expand-ands (rif)
-  (cond ((and (not (atom rif)) (eq (first rif 'and)))
-	 (mapconcat #'format-if-condition-expand-ands (rest rif) " and "))
-	(t (format-rule-condition-expression rif<))))
-
-;;; Format just the expression
-(defun format-fresh-condition (rfresh)
-  (format-rule-condition-expression rfresh))
+(defun format-condition-expand-ands (if-or-fresh)
+  (cond ((and (not (atom if-or-fresh)) (eq (first if-or-fresh 'and)))
+	 (mapconcat #'format-if-condition-expand-ands (rest if-or-fresh) " and "))
+	(t (format-rule-condition-expression if-or-fresh))))
 
 ;;; (Obsolete) Format expression with a possible text prefix
 (defun format-rule-condition (rc)
@@ -2089,13 +2085,6 @@
     (cond ((and (> n 5) (string= (downcase (substring str (- n 5) n)) "prime"))
 	   (concat (format-metavar (substring str 0 (- n 5))) "'"))
           (t str))))
-
-(defun print-rule-line (prefix name alpha beta cond rif rfresh linebreak)
-  (princ (format "\\hbox to 5em{%s\\hfill}\\hbox to 6em{\\rulename{%s}\\hfill}\\hbox to 8em{\\hss %s}\\quad$\\movesto$\\quad %s"
-		 prefix name (format-rule-term alpha) (format-rule-term beta)))
-  (when cond
-    (princ (format "\\hfill %s" (format-rule-condition cond))))
-  (princ (format "\\relax%s\n" linebreak)))
 
 (defun print-rule-line (prefix name alpha beta cond rif rfresh linebreak)
   (princ (format "\\hbox to 5em{%s\\hfill}\\hbox to 6em{\\rulename{%s}\\hfill}\\hbox to 8em{\\hss %s}\\quad$\\movesto$\\quad %s"
@@ -2162,7 +2151,7 @@
 	(cond1 (critpair-cond1 cp))
 	(cond2 (critpair-cond2 cp))
 	(if1 (critpair-if1 cp))
-	(if1 (critpair-if2 cp))
+	(if2 (critpair-if2 cp))
 	(fresh1 (critpair-fresh1 cp))
 	(fresh2 (critpair-fresh2 cp)))
     (let ((name1 (rule-name rule1))
@@ -2294,7 +2283,7 @@
 		(eq (first (third (second assump))) 'fvs)
 		(member (second (second assump))
 			(apply #'append (mapcar #'term-vars (rest (third (second assump))))))
-		(format "the assumption %s is always false" (format-condition-text assump)))))
+		(format "the assumption %s is always false" (format-condition assump)))))
 	(t 
 	 (let ((assump (second assumption-pair)))
 	   (and (not (atom assump))
@@ -2310,21 +2299,33 @@
 			(apply #'append (mapcar #'term-vars (rest (third (second (second assump)))))))
 		(format "the assumption %s is always false" (format-condition-text assump)))))))
 
-(defun contradictory-assumption-pair (assumption1 assumption2)
-  (let ((assump1 (second assumption1))
-	(assump2 (second assumption2)))
-    (and (not (atom assump1))
-	 (not (atom assump2))
-	 (eq (first assump1) 'if)
-	 (eq (first assump2) 'if)
-	 (not (atom (second assump1)))
-	 (not (atom (second assump2)))
-	 (or (and (eq (first (second assump1)) 'not)
-		  (equal (second (second assump1)) (second assump2)))
-	     (and (eq (first (second assump2)) 'not)
-		  (equal (second (second assump2)) (second assump1))))
-	 (format "the assumptions %s and %s cannot both be true"
-		 (format-condition-text assump1) (format-condition-text assump2)))))
+(defun contradictory-assumption-pair (assumption-pair1 assumption-pair2)
+  (cond (use-if-fresh
+	 (let ((assump1 (second assumption-pair1))
+	       (assump2 (second assumption-pair2)))
+	   (and (not (atom assump1))
+		(not (atom assump2))
+		(or (and (eq (first assump1) 'not)
+			 (equal (second assump1) assump2))
+		    (and (eq (first assump2) 'not)
+			 (equal (second assump2) assump1)))
+		(format "the assumptions %s and %s cannot both be true"
+			(format-condition assump1) (format-condition assump2)))))
+	(t 
+	 (let ((assump1 (second assumption-pair1))
+	       (assump2 (second assumption-pair2)))
+	   (and (not (atom assump1))
+		(not (atom assump2))
+		(eq (first assump1) 'if)
+		(eq (first assump2) 'if)
+		(not (atom (second assump1)))
+		(not (atom (second assump2)))
+		(or (and (eq (first (second assump1)) 'not)
+			 (equal (second (second assump1)) (second assump2)))
+		    (and (eq (first (second assump2)) 'not)
+			 (equal (second (second assump2)) (second assump1))))
+		(format "the assumptions %s and %s cannot both be true"
+			(format-condition-text assump1) (format-condition-text assump2)))))))
 
 
 (defun consequent-conditions-trivially-follow (consequents)
