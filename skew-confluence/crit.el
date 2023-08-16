@@ -1928,7 +1928,7 @@
 	(t (let ((res (try-rewrite-rule rule (nth (first path) term) (rest path))))
 	     (and res
 		  (make-rewriting :beta (append (subseq term 0 (first path))
-						(list (first res))
+						(list (rewriting-beta res))
 						(subseq term (+ (first path) 1)))
 				  :cond (rewriting-cond res)
 				  :if (rewriting-if res)
