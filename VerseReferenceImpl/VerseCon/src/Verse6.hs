@@ -314,7 +314,10 @@ subst' :: ( MonadRef m
           , RowMatchable f
           ) => Var m f -> Found m f -> VerseT m ()
 subst' v_x y = findRepr v_x <&> (, y) >>= \ case
-  (Found _ Unbound {}, Found _ Bound {}) -> pure ()
+  (Found _ (Unbound _ k_x _), Found v_y r_y@(Bound y _)) -> do
+    writeRepr v_x r_y
+    k_x y
+    resumeChildren $ subst v_y v_x
   (Found v_x r_x@(Bound x _), Found v_y (Unbound _ k_y _)) -> do
     writeRepr v_y r_x
     k_y x

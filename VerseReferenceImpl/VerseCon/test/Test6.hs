@@ -205,5 +205,13 @@ test20 = runSupplyT $ runVerseT do
   y <- freshVar
   z <- all $ unify y =<< newVar (Int 1)
   unify x y
+  unify x =<< newVar (Int 1)
+  readIVar z
+
+test21 = runSupplyT $ runVerseT do
+  x <- freshVar
+  y <- freshVar
+  z <- all $ unify y =<< newVar (Int 1)
+  unify x y
   unify x =<< newVar (Int 2)
   readIVar z
