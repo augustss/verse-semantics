@@ -166,7 +166,8 @@ dsSmall = ds
     ds (InfixOp e1 (Op "where") e2) = do
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
-    ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU e1' e2'
+    ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
+    ds (Macro1 (Ident _ "in'='") [] (Block es)) = dsU =<< mapM ds es
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
@@ -231,10 +232,17 @@ dsSmall = ds
 
     ds x = compos ds x
 
-    dsU e1@Variable{} e2            = pure $ Unify e1 e2
-    dsU e1            e2@Variable{} = pure $ Unify e2 e1
-    dsU e1            e2            = do x <- newIdent (getLoc e1) "x"; pure $ Seq [DefineE x e1, Unify (Variable x) e2]
-
+    dsU [] = pure $ Range $ Variable $ Ident noLoc "any$"
+    dsU [e] = pure e
+    dsU ees@(e:es) = do
+      let findVar _ []= Nothing
+          findVar xs (y@(Variable _) : ys) = Just (y, xs ++ ys)
+          findVar xs (y:ys) = findVar (xs ++ [y]) ys
+      case findVar [] ees of
+        Nothing -> do
+          x <- newIdent (getLoc e) "x"
+          pure $ Seq $ DefineE x e : map (Unify (Variable x)) es
+        Just (x, xs) -> pure $ Seq $ map (Unify x) xs
 
 type Value = Expr
 

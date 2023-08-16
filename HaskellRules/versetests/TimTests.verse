@@ -447,12 +447,12 @@ test(S00){f()<decides>:int => assume{f[]}}
 test(S00){f()<decides>:int => if{f[]}}
 test(U00){f()<resolves>:int => if{f[]}}
 test(S00){f(a:int):=if(a=3) then a=3}
-#UT test(S00){if{x:int<decides>=3}}
-#UT test(S00){a:int => if{x:int<decides>=a=3}}
-#UT test(D00){f(a:int):=if(:int=a=3) then a=3}
-#UT test(D00){f(a:int):=if(:int<decides>=a=3) then a=3}
-#UT test(S00){if{x:int<decides>=3}}
-#UT test(S00){if{x:int<decides>:false}}
+#LA test(S00){if{x:int<decides>=3}}
+#LA test(S00){a:int => if{x:int<decides>=a=3}}
+test(D00){f(a:int):=if(:int=a=3) then a=3}
+#LA test(D00){f(a:int):=if(:int<decides>=a=3) then a=3}
+#LA test(S00){if{x:int<decides>=3}}
+#LA test(S00){if{x:int<decides>:false}}
 
 # Assumption forks inside stage.
 test(S00){f():type{int|nat} => {x:f[]=3}}
@@ -1830,10 +1830,10 @@ test(QD00){a:int => if{expect<succeeds>{a=1}}}
 test(QS00){a:int => if{expect<decides>{a=1}}}
 
 # First-class static rejection. Must be a macro.
-#LA test(V02){reject{"Bad"}}
-#LA test(V03){reject{_}}
-#LA test(C00){1(2),reject{"Bad"}}
-#LA test(V02){reject{"Bad"},1(2)}
+test(V02){reject{"Bad"}}
+test(V03){reject{_}}
+test(C00){1(2),reject{"Bad"}}
+test(V02){reject{"Bad"},1(2)}
 #test(V02){r:=reject{r}} #!! Paraconsistency puzzle: What ought WhenCastStep do here? Not suppress ChildFx rejects?
 #then we must be rigorous
 
@@ -2828,9 +2828,9 @@ test(S00){a:int => f(3):int => f[:int]}
 test(S00){a:int => g(:nat):int => f(x:int):int => if{f[g[a]]}}
 
 # Unify macro.
-#LA test(S00){a:=operator'='{}}
-#LA test(S00){a:=operator'='{2},a=2}
-#LA test(F00){a:=operator'='{2},a=3}
+test(S00){a:=operator'='{}}
+test(S00){a:=operator'='{2},a=2}
+test(F00){a:=operator'='{2},a=3}
 
 # Various.
 test(F00){a:int => {x:=a,assume{x=7},x=8}}
