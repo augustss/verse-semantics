@@ -1899,15 +1899,18 @@
     (cond ((eq cp 'DUMMY) term)
 	  (t (let ((res (try-rewrite-rule rule term cp)))
 	       (unless res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))
-	       (do-every-replace-or-subst (first res)))))))
+	       (do-every-replace-or-subst (rewriting-beta res)))))))
 
 ;;; Returns a "rewriting" structure
 (defun apply-rewrite-rule-entire (rule term path)
   (let ((cp (canonical-path path)))
     (cond ((eq cp 'DUMMY) (list term nil))
 	  (t (let ((res (try-rewrite-rule rule term cp)))
-	       (unless res (error "Applying rewrite rule %s to term %s / %s (with cond) failed" (rule-name rule) term path))
-	       (mapcar #'do-every-replace-or-subst res))))))
+	       (unless res (error "Applying rewrite rule %s to term %s / %s (entire) failed" (rule-name rule) term path))
+	       (make-rewriting :beta (do-every-replace-or-subst (rewriting-beta res))
+			       :cond (do-every-replace-or-subst (rewriting-cond res))
+			       :if (do-every-replace-or-subst (rewriting-if res))
+			       :fresh (do-every-replace-or-subst (rewriting-fresh res))))))))
 
 ;;; Returns a "rewriting" structure
 (defun try-rewrite-rule (rule term path)
@@ -2804,4 +2807,3 @@
 (setq inhibit-debugger nil)
 
 (print-critical-pairs-text)
-
