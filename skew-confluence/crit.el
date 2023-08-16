@@ -2033,7 +2033,10 @@
 
 ;;; Format just the expression
 (defun format-condition (if-or-fresh)
-  (format-rule-condition-expression if-or-fresh))
+  (format "\\text{$%s$}" (format-rule-condition-expression if-or-fresh)))
+
+(defun format-condition-with-prefix (if-or-fresh prefix)
+  (format "\\text{%s $%s$}" prefix (format-rule-condition-expression if-or-fresh)))
 
 (defun format-condition-expand-ands (if-or-fresh)
   (cond ((and (not (atom if-or-fresh)) (eq (first if-or-fresh 'and)))
@@ -2090,10 +2093,10 @@
   (princ (format "\\hbox to 5em{%s\\hfill}\\hbox to 6em{\\rulename{%s}\\hfill}\\hbox to 8em{\\hss %s}\\quad$\\movesto$\\quad %s"
 		 prefix name (format-rule-term alpha) (format-rule-term beta)))
   (cond (use-if-fresh
-	 (cond (rif (princ (format "\\hfill if %s" (format-if-condition rif)))
+	 (cond (rif (princ (format "\\hfill %s" (format-condition-with-prefix rif "if")))
 		    (when rfresh	;not sure this is ever used
-		      (princ (format "; fresh %s" (format-if-condition rif)))))
-	       (rfresh (princ (format "\\hfill fresh %s" (format-if-condition rif))))))
+		      (princ (format "; %s" (format-condition-with-prefix rfresh "fresh")))))
+	       (rfresh (princ (format "\\hfill %s" (format-condition-with-prefix rfresh "fresh"))))))
 	(t (when cond
 	     (princ (format "\\hfill %s" (format-rule-condition cond))))))
   (princ (format "\\relax%s\n" linebreak)))
