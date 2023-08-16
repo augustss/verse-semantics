@@ -43,7 +43,7 @@
 			  :alternatives '(HOLE VX (seq EQX e) (seq eq EX) (exists x EX) (choice EX e) (choice e EX) (app VX v) (all v VX) (one EX) (all EX)))))
 
 ;;; Add "if" and "fresh"; later take out "cond"
-(defstruct rule name lhs rhs cond)
+(defstruct rule name lhs rhs cond if fresh)
 
 ;;; Note that primes are used only in rule U-TUP, and that is in conjunction with integer subscripts.
 ;;; This matters in function add-primes.
@@ -2092,6 +2092,18 @@
 		 prefix name (format-rule-term alpha) (format-rule-term beta)))
   (when cond
     (princ (format "\\hfill %s" (format-rule-condition cond))))
+  (princ (format "\\relax%s\n" linebreak)))
+
+(defun print-rule-line (prefix name alpha beta cond rif rfresh linebreak)
+  (princ (format "\\hbox to 5em{%s\\hfill}\\hbox to 6em{\\rulename{%s}\\hfill}\\hbox to 8em{\\hss %s}\\quad$\\movesto$\\quad %s"
+		 prefix name (format-rule-term alpha) (format-rule-term beta)))
+  (cond (use-if-fresh
+	 (cond (rif (princ (format "\\hfill if %s" (format-if-condition rif)))
+		    (when rfresh	;not sure this is ever used
+		      (princ (format "; fresh %s" (format-if-condition rif)))))
+	       (rfresh (princ (format "\\hfill fresh %s" (format-if-condition rif))))))
+	(t (when cond
+	     (princ (format "\\hfill %s" (format-rule-condition cond))))))
   (princ (format "\\relax%s\n" linebreak)))
 
 ;;; Returns a 3-list of (formatted-rewrites1 final-term formatted-rewrites2).
