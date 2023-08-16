@@ -58,10 +58,10 @@ instance MonadRef m => MonadRef (VerseT m) where
     sk () $ writeRef r y *> fk
 
 newtype Var m a = Var
-  { unVar :: Ref m (Contents m a)
+  { unVar :: Ref m (VarState m a)
   }
 
-data Contents m a
+data VarState m a
   = Val a
   | Susp (a -> VerseT m ())
 

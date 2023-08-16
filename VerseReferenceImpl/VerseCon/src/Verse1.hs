@@ -8,7 +8,6 @@ module Verse1
   , readVar
   , writeVar
   , fork
-  , yield
   ) where
 
 import Control.Monad.Trans.Class
@@ -61,6 +60,3 @@ writeVar v x = VerseT $ \ sk _ -> readRef (unVar v) >>= \ case
 
 fork :: Applicative m => VerseT m () -> VerseT m ()
 fork m = VerseT $ \ sk _ -> unVerseT m (const $ pure ()) (pure ()) *> sk ()
-
-yield :: VerseT m a
-yield = VerseT $ \ _ fk -> fk
