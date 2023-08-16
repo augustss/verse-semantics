@@ -91,13 +91,11 @@ symbol = L.symbol skip
 pWord :: P String
 pWord = lexeme ((:) <$> (letterChar <|> char '_') <*> many (alphaNumChar <|> char '_') <?> "identifier")
 
-pIdent :: P Ident
-pIdent = try $ do
-  l <- getSourcePos
+pWordOp :: P String
+pWordOp = do
   w0 <- pWord
   suf <- optional (char '$')
   let w = w0 ++ maybeToList suf
-  guard $ w `notElem` keywords
   if w `elem` ["operator", "prefix", "postfix", "infix"] then do
     _ <- char '\''
     op <- takeWhile1P Nothing (`elem` opChars)
@@ -105,9 +103,16 @@ pIdent = try $ do
     let w' = pre ++ "'" ++ op ++ "'"
         pre = if w == "postfix" then "post" else if w == "prefix" then "pre" else "in"
     skip
-    pure $ Ident l w'
+    pure w'
    else do
-    pure $ Ident l w
+    pure w
+
+pIdent :: P Ident
+pIdent = try $ do
+  l <- getSourcePos
+  w <- pWordOp
+  guard $ w `notElem` keywords
+  pure $ Ident l w
 
 opChars :: [Char]
 opChars = "!@#$%^&*-+=:<>?/[]."
@@ -124,6 +129,10 @@ macros = ["all", "allow", "assert", "assume", "expect", "first", "last",
           "logic", "lowered", "one", "reject", "type", "unify", "verify"]
          ++ effects
 
+macrosOp :: [String]
+macrosOp = ["in'='"]
+           ++ macros
+
 effects :: [String]
 effects = [ "decides", "diverges", "fails", "succeeds", "iterates" ]
 
@@ -135,8 +144,8 @@ pKeyword s = try $ do
 pMacroName :: P Ident
 pMacroName = try $ do
   l <- getSourcePos
-  w <- pWord
-  guard (w `elem` macros)
+  w <- pWordOp
+  guard (w `elem` macrosOp)
   pure $ Ident l w
 
 pEffectName :: P Ident
