@@ -287,14 +287,14 @@ unify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
         writeLink v_x v_y
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
         resumeChildren $ subst v_y v_x
-  (Found v_x (Bound x i_x), Found v_y (Bound y i_y)) ->
+  (Found _ r_x@(Bound x i_x), Found v_y (Bound y i_y)) ->
     when (i_x /= i_y) $ case rowMatch x y of
       Zip Nothing -> empty
       Zip (Just z) -> do
-        writeLink v_y v_x
+        writeRepr v_y r_x
         for_ z $ uncurry unify
       Uncons f_x v_xs f_y v_ys -> do
-        writeLink v_y v_x
+        writeRepr v_y r_x
         v_zs <- freshVar
         v_xs' <- newVar $ f_x v_zs
         unify v_xs' v_ys
@@ -326,14 +326,15 @@ subst' v_x y = findRepr v_x <&> (, y) >>= \ case
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
         resumeChildren $ subst v_x v_y
-  (Found v_x (Bound x i_x), Found v_y (Bound y i_y)) -> do
+  (Found _ r_x@(Bound x i_x), Found v_y (Bound y i_y)) -> do
     decrLength
     when (i_x /= i_y) $ case rowMatch x y of
       Zip Nothing -> empty
       Zip (Just z) -> do
-        writeLink v_y v_x
+        writeRepr v_y r_x
         for_ z $ uncurry unify
       Uncons f_x v_xs f_y v_ys -> do
+        writeRepr v_y r_x
         v_zs <- freshVar
         v_xs' <- newVar $ f_x v_zs
         unify v_xs' v_ys
