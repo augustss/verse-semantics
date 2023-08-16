@@ -184,22 +184,22 @@ writeVar v x = readVarState v >>= \ case
   Val _ -> error "writeVar"
   y@(Susp k) -> do
     lift' (\ r -> put (unVar v) r.heap (Val x)) (\ r -> put (unVar v) r.heap y)
-    resumeChildren $ writeVar' v x
+    resumeChildren $ writeLocalVar v x
     k x
 
-writeVar' :: (MonadRef m, MonadSupply Int m) => Var m a -> a -> VerseT m ()
-writeVar' v x = readVarState' v >>= \ case
+writeLocalVar :: (MonadRef m, MonadSupply Int m) => Var m a -> a -> VerseT m ()
+writeLocalVar v x = readLocalVarState v >>= \ case
   Val _ -> error "writeVar"
   y@(Susp k) -> do
     lift' (\ r -> put (unVar v) r.heap (Val x)) (\ r -> put (unVar v) r.heap y)
-    resumeChildren $ writeVar' v x
+    resumeChildren $ writeLocalVar v x
     k x
 
 readVarState :: MonadRef m => Var m a -> VerseT m (VarState m a)
 readVarState v = liftSuccess $ \ r -> readRef (unVar v) <&> lookupVarState r.heap
 
-readVarState' :: MonadRef m => Var m a -> VerseT m (VarState m a)
-readVarState' v = liftSuccess $ \ r -> readRef (unVar v) <&> lookupVarState' r.heap
+readLocalVarState :: MonadRef m => Var m a -> VerseT m (VarState m a)
+readLocalVarState v = liftSuccess $ \ r -> readRef (unVar v) <&> lookupLocalVarState r.heap
 
 resumeChildren :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
 resumeChildren m = do
@@ -390,8 +390,8 @@ lookupVarState k xs@(HeapMap y ys) = case k of
       Susp _ -> Susp (const $ pure ())
       x -> x
 
-lookupVarState' :: HeapKey -> HeapMap (VarState m a) -> VarState m a
-lookupVarState' k (HeapMap y ys) = case k of
+lookupLocalVarState :: HeapKey -> HeapMap (VarState m a) -> VarState m a
+lookupLocalVarState k (HeapMap y ys) = case k of
   Nothing -> y
   Just k ->
     IntMap.lookup k.label ys `or`
