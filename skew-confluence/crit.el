@@ -1886,6 +1886,10 @@
 				    (t (error "Unknown path item %s" item))))
 			  path)))
 
+
+;;; XXX put this into effect
+(defstruct rewriting beta cond if fresh)
+
 ;;; Return just the substituted beta
 (defun apply-rewrite-rule (rule term path)
   (let ((cp (canonical-path path)))
@@ -1894,32 +1898,35 @@
 	       (unless res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))
 	       (do-every-replace-or-subst (first res)))))))
 
-;;; XXX put this into effect
-(defstruct rewriting beta cond if fresh)
-
-;;; Return a 2-list of substituted beta and substituted cond
-(defun apply-rewrite-rule-with-cond (rule term path)
+;;; Returns a "rewriting" structure
+(defun apply-rewrite-rule-entire (rule term path)
   (let ((cp (canonical-path path)))
     (cond ((eq cp 'DUMMY) (list term nil))
 	  (t (let ((res (try-rewrite-rule rule term cp)))
 	       (unless res (error "Applying rewrite rule %s to term %s / %s (with cond) failed" (rule-name rule) term path))
 	       (mapcar #'do-every-replace-or-subst res))))))
 
-;;; Return a 2-list of substituted beta and substituted cond
+;;; Returns a "rewriting" structure
 (defun try-rewrite-rule (rule term path)
   (cond ((null path)
 	 (let ((m (matches term (rule-lhs rule))))
 	   ;; (unless m (princ (format "\nFAILED MATCH of %s to %s of %s\n" term (rule-lhs rule) (rule-name rule))))
-	   (and m (list (sublis (matchresult-sigma m) (rule-rhs rule))
-			(and (rule-cond rule)
-			     (sublis (matchresult-sigma m) (rule-cond rule)))))))
+	   (and m (make-rewriting :beta (sublis (matchresult-sigma m) (rule-rhs rule))
+				  :cond (and (rule-cond rule)
+					     (sublis (matchresult-sigma m) (rule-cond rule)))
+				  :if (and (rule-if rule)
+					     (sublis (matchresult-sigma m) (rule-if rule)))
+				  :fresh (and (rule-fresh rule)
+					     (sublis (matchresult-sigma m) (rule-fresh rule)))))))
 	((atom term) nil)
 	(t (let ((res (try-rewrite-rule rule (nth (first path) term) (rest path))))
 	     (and res
-		  (list (append (subseq term 0 (first path))
-				(list (first res))
-				(subseq term (+ (first path) 1)))
-			(second res)))))))
+		  (make-rewriting :beta (append (subseq term 0 (first path))
+						(list (first res))
+						(subseq term (+ (first path) 1)))
+				  :cond (rewriting-cond res)
+				  :if (rewriting-if res)
+				  :fresh (rewriting-fresh res)))))))
 
 (defun format-path (path)
   (cond ((null path) "\\emptypath")
@@ -2019,16 +2026,13 @@
 	(t (error "format-compound-term: unknown term type %s" (first term)))))
 
 (defun format-rule-condition (rc)
-  (format-rule-condition-with-prefixes rc "where " "fresh " "if "))
+  (format-rule-condition-with-prefixes rc "fresh " "if "))
 
 (defun format-condition-text (rc)
-  (format-rule-condition-with-prefixes rc "" "fresh " ""))
+  (format-rule-condition-with-prefixes rc "fresh " ""))
 
-(defun format-rule-condition-with-prefixes (rc compute-prefix fresh-prefix if-prefix)
+(defun format-rule-condition-with-prefixes (rc fresh-prefix if-prefix)
   (cond ((atom rc) (error "format-rule-condition: unknown atomic condition %s" rc))
-	((eq (first rc) 'compute)
-	 (unless (= (length rc) 3)  (error "format-rule-condition: wrong number of arguments %s" rc))
-	 (format "\\text{%s$%s=%s$}" compute-prefix (format-rule-condition-expression (second rc)) (format-rule-condition-expression (third rc))))
 	((eq (first rc) 'fresh)
 	 (unless (= (length rc) 2)  (error "format-rule-condition: wrong number of arguments %s" rc))
 	 (format "\\text{%s$%s$}" fresh-prefix (format-rule-condition-expression (second rc))))
@@ -2131,6 +2135,10 @@
 	  (beta2 (rule-rhs rule2))
 	  (rc1 (rule-cond rule1))
 	  (rc2 (rule-cond rule2))
+	  (ri1 (rule-if rule1))
+	  (ri2 (rule-if rule2))
+	  (rf1 (rule-fresh rule1))
+	  (rf2 (rule-fresh rule2))
 	  (linebreak "\\vadjust{\\penalty1000}\\hfil\\break")) ;Use \\hfil here, and \\hfill in print-rule-line
       (princ (format "\\vskip 8pt plus 16pt\\noindent\n"))
       (let ((weirdtext (cond ((< k 10) "and{\\hskip0.2em}rule")
@@ -2299,15 +2307,17 @@
 								not-in-fvs-assumption-conds))
 					cfvars)))
 			   consequent-conds)))))))
-  
+
+
+;;; XXX Should this be all conditions or just if conditions??
 (defun consequent-conditions (term rw)
   (cond ((null rw) '())
 	(t (let ((rulename (rewrite-rulename (first rw))))
-	     (let ((res (apply-rewrite-rule-with-cond (rule-lookup rulename) term (rewrite-path (first rw)))))
+	     (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path (first rw)))))
 	       ;; (print (list 'CONSEQUENT-CONDITIONS term rw res))
-	       (let ((more (consequent-conditions (first res) (rest rw))))
-		 (if (second res)
-		     (cons (list rulename (second res)) more)
+	       (let ((more (consequent-conditions (rewriting-beta res) (rest rw))))
+		 (if (rewriting-cond res)
+		     (cons (list rulename (rewriting-cond res)) more)
 		   more)))))))
 
 (defun new-fresh-conditions (Q consequents)
@@ -2720,7 +2730,11 @@
 	  (beta1 (rule-rhs rule1))
 	  (beta2 (rule-rhs rule2))
 	  (rc1 (rule-cond rule1))
-	  (rc2 (rule-cond rule2)))
+	  (rc2 (rule-cond rule2))
+	  (ri1 (rule-if rule1))
+	  (ri2 (rule-if rule2))
+	  (rf1 (rule-fresh rule1))
+	  (rf2 (rule-fresh rule2)))
       (let ((pf (proof-lookup name1 name2 path1))
 	    (needproof "{\\color{red}Need a proof that this diagram is decreasing.}"))
 	(let ((rw1 (proof-rewrites1 pf))
