@@ -447,12 +447,12 @@ test(S00){f()<decides>:int => assume{f[]}}
 test(S00){f()<decides>:int => if{f[]}}
 test(U00){f()<resolves>:int => if{f[]}}
 test(S00){f(a:int):=if(a=3) then a=3}
-#UT test(S00){if{x:int<decides>=3}}
-#UT test(S00){a:int => if{x:int<decides>=a=3}}
-#UT test(D00){f(a:int):=if(:int=a=3) then a=3}
-#UT test(D00){f(a:int):=if(:int<decides>=a=3) then a=3}
-#UT test(S00){if{x:int<decides>=3}}
-#UT test(S00){if{x:int<decides>:false}}
+#LA test(S00){if{x:int<decides>=3}}
+#LA test(S00){a:int => if{x:int<decides>=a=3}}
+test(D00){f(a:int):=if(:int=a=3) then a=3}
+#LA test(D00){f(a:int):=if(:int<decides>=a=3) then a=3}
+#LA test(S00){if{x:int<decides>=3}}
+#LA test(S00){if{x:int<decides>:false}}
 
 # Assumption forks inside stage.
 test(S00){f():type{int|nat} => {x:f[]=3}}
