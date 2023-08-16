@@ -2035,8 +2035,9 @@
 (defun format-condition (if-or-fresh)
   (format "\\text{$%s$}" (format-rule-condition-expression if-or-fresh)))
 
+;;; Prefix normally is empty or ends with a space
 (defun format-condition-with-prefix (if-or-fresh prefix)
-  (format "\\text{%s $%s$}" prefix (format-rule-condition-expression if-or-fresh)))
+  (format "\\text{%s$%s$}" prefix (format-rule-condition-expression if-or-fresh)))
 
 (defun format-condition-expand-ands (if-or-fresh)
   (cond ((and (not (atom if-or-fresh)) (eq (first if-or-fresh 'and)))
@@ -2093,10 +2094,10 @@
   (princ (format "\\hbox to 5em{%s\\hfill}\\hbox to 6em{\\rulename{%s}\\hfill}\\hbox to 8em{\\hss %s}\\quad$\\movesto$\\quad %s"
 		 prefix name (format-rule-term alpha) (format-rule-term beta)))
   (cond (use-if-fresh
-	 (cond (rif (princ (format "\\hfill %s" (format-condition-with-prefix rif "if")))
+	 (cond (rif (princ (format "\\hfill %s" (format-condition-with-prefix rif "if ")))
 		    (when rfresh	;not sure this is ever used
-		      (princ (format "; %s" (format-condition-with-prefix rfresh "fresh")))))
-	       (rfresh (princ (format "\\hfill %s" (format-condition-with-prefix rfresh "fresh"))))))
+		      (princ (format "; %s" (format-condition-with-prefix rfresh "fresh ")))))
+	       (rfresh (princ (format "\\hfill %s" (format-condition-with-prefix rfresh "fresh "))))))
 	(t (when cond
 	     (princ (format "\\hfill %s" (format-rule-condition cond))))))
   (princ (format "\\relax%s\n" linebreak)))
@@ -2177,14 +2178,7 @@
 			     (t "and{\\hskip0.1.1em}rule"))))
 	(print-rule-line (format "\\rlap{(%s)}\\hphantom{%s}\\llap{Rule}" k weirdtext) name1 alpha1 beta1 rc1 rif1 rfresh1 linebreak)
 	(print-rule-line weirdtext name2 alpha2 beta2 rc2 rif2 rfresh2 linebreak))
-      (princ (format "have a critical pair derived from the common term {\\color{blue}$%s$}%s%s\n"
-		     (format-term Q) (if (or cond1 cond2) "," "") linebreak))
-      (cond ((and cond1 cond2)
-	     (princ (format "assuming {\\color{blue}%s} (for \\rulename{%s}) and {\\color{blue}%s} (for \\rulename{%s}) are satisfied,%s\n"
-			    (format-condition-text cond1) name1 (format-condition-text cond2) name2 linebreak)))
-	    ((or cond1 cond2)
-	     (princ (format "assuming the condition {\\color{blue}%s} (for \\rulename{%s}) is satisfied,%s\n"
-			    (format-condition-text (or cond1 cond2)) (if cond1 name1 name2) linebreak))))
+      (print-assumptions Q name1 name2 cond1 cond2 if1 if2 fresh1 fresh2 linebreak)
       (princ (format "using the substitutions {\\color{blue}$\\sigma_1=%s$} and {\\color{blue}$\\sigma_2=%s$}"
 		     (format-sigma sigma1) (format-sigma sigma2)))
       ;; Note that punctuation has been left hanging at end of last line.
@@ -2210,12 +2204,11 @@
 	      ((or (eq (first (proof-rewrites1 pf)) 'X)
 		   (eq (first (proof-rewrites2 pf)) 'X))
 	       (error "Proof has just one 'X entry"))
-	      (t (let* ((assumption-pairs
-			 (cond (use-if-fresh (append (if if1 (list (list name1 if1)) '())
-						     (if if2 (list (list name2 if2)) '())
-						     (if cond1 (list (list name1 cond1)) '())
-						     (if cond2 (list (list name2 cond2)) '())))
-			       (t (list (list name1 cond1) (list name2 cond2)))))
+	      (t (let* ((assumption-pairs (cond (use-if-fresh (append (if if1 (list (list name1 if1)) '())
+								      (if if2 (list (list name2 if2)) '())
+								      (if fresh1 (list (list name1 fresh1)) '())
+								      (if fresh2 (list (list name2 fresh2)) '())))
+						(t (list (list name1 cond1) (list name2 cond2)))))
 			(ca-result (contradictory-assumptions assumption-pairs)))
 		   (cond (ca-result 
 			  (princ (format ".%s\nBut %s, so this critical pair cannot occur in practice." linebreak ca-result)))
@@ -2228,10 +2221,19 @@
 							 (proof-rowsep pf) (proof-colsep pf) (proof-rewrites2 pf) (proof-rewrites1 pf) (- k)))
 				  (t (print-tikzcd-diagram P Q R name1 name2 path1 '() (proof-id1 pf) (proof-id2 pf) (proof-extra1 pf) (proof-extra2 pf)
 							   (proof-rowsep pf) (proof-colsep pf) (proof-rewrites1 pf) (proof-rewrites2 pf) k)))
-			    (let ((consequent-pairs (append (consequent-conditions R (proof-rewrites1 pf))
-						       (consequent-conditions P (proof-rewrites2 pf)))))
-			      (print-new-fresh-conditions (new-fresh-conditions Q consequent-pairs) consequent-pairs)
-			      (print-consequent-conditions consequent-pairs assumption-pairs))
+			    (cond (use-if-fresh
+				   (let ((consequent-if-pairs (append (consequent-if-condition-pairs R (proof-rewrites1 pf))
+								      (consequent-if-condition-pairs P (proof-rewrites2 pf))))
+					 (consequent-fresh-pairs (append (consequent-fresh-condition-pairs R (proof-rewrites1 pf))
+									 (consequent-fresh-condition-pairs P (proof-rewrites2 pf))))
+					 (avoid-condition-pairs (append (new-fresh-avoid-condition-pairs (proof-rewrites1 pf))
+									(new-fresh-avoid-condition-pairs (proof-rewrites2 pf)))))
+				     (print-consequent-fresh-conditions avoid-condition-pairs consequent-if-pairs)
+				     (print-consequent-if-conditions consequent-if-pairs assumption-pairs)))
+				  (t (let ((consequent-pairs (append (consequent-conditions R (proof-rewrites1 pf))
+								     (consequent-conditions P (proof-rewrites2 pf)))))
+				       (print-new-fresh-conditions (new-fresh-conditions Q consequent-pairs) consequent-pairs)
+				       (print-consequent-conditions consequent-pairs assumption-pairs))))
 			    (princ (verify-decreasing-diagram cp))
 			    (when (proof-cond pf) (princ (format "\\par For the case when %s is false:\\par\n" (format-text-condition (proof-cond pf)))))
 			    (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf))
@@ -2246,6 +2248,49 @@
       (princ (format "\\par\n"))
       )))
 
+(defun print-assumptions (Q name1 name2 cond1 cond2 if1 if2 fresh1 fresh2 linebreak)
+  (let ((count (+ (if if1 1 0) (if if2 1 0) (if fresh1 1 0) (if fresh2 1 0))))
+    (cond (use-if-fresh
+	   (princ (format "have a critical pair derived from the common term {\\color{blue}$%s$}%s%s\n"
+			  (format-term Q) (if (> count 0) "," "") linebreak))
+	   (cond ((= count 1)
+		  (princ (format "assuming the condition {\\color{blue}%s} (for \\rulename{%s}) is satisfied,%s\n"
+				 (if (or if1 if2)
+				     (format-condition (or if1 if2))
+				   (format-condition-with-prefix (or fresh1 fresh2) "fresh "))
+				 (if (or if1 fresh1) name1 name2)
+				 linebreak)))
+		 ((> count 1)
+		  (cond ((and (not if2) (not fresh2))
+			 (princ (format "assuming {\\color{blue}%s} and {\\color{blue}%s} (for \\rulename{%s}) are satisfied,%s\n"
+					(format-condition if1) (format-condition fresh1) name1 linebreak)))
+			((and (not if2) (not fresh2))
+			 (princ (format "assuming {\\color{blue}%s} and {\\color{blue}%s} (for \\rulename{%s}) are satisfied,%s\n"
+					(format-condition if2) (format-condition fresh2) name2 linebreak)))
+			(t (princ (concat "assuming "
+					  (cond ((and if1 fresh1)
+						 (format "{\\color{blue}%s} and {\\color{blue}%s} (for \\rulename{%s})"
+							 (format-condition if1) (format-condition-with-prefix fresh1 "fresh ") name1))
+						(t (format "{\\color{blue}%s} (for \\rulename{%s})"
+							   (format-condition-with-prefix (or if1 fresh1) (if if1 "" "fresh ")) name1)))
+					  " and "
+					  (cond ((and if2 fresh2)
+						 (format "{\\color{blue}%s} and {\\color{blue}%s} (for \\rulename{%s})"
+							 (format-condition if2) (format-condition-with-prefix fresh2 "fresh ") name2))
+						(t (format "{\\color{blue}%s} (for \\rulename{%s})"
+							   (format-condition-with-prefix (or if2 fresh2) (if if2 "" "fresh ")) name2)))
+					  (format " are satisfied,%s\n" linebreak))))))))
+	  (t (princ (format "have a critical pair derived from the common term {\\color{blue}$%s$}%s%s\n"
+			    (format-term Q) (if (or cond1 cond2) "," "") linebreak))
+	     (cond ((and cond1 cond2)
+		    (princ (format "assuming {\\color{blue}%s} (for \\rulename{%s}) and {\\color{blue}%s} (for \\rulename{%s}) are satisfied,%s\n"
+				   (format-condition-text cond1) name1 (format-condition-text cond2) name2 linebreak)))
+		   ((or cond1 cond2)
+		    (princ (format "assuming the condition {\\color{blue}%s} (for \\rulename{%s}) is satisfied,%s\n"
+				   (format-condition-text (or cond1 cond2)) (if cond1 name1 name2) linebreak))))))))
+
+
+;;; Obsolete
 (defun is-a-simple-if-not-elt-fvs-condition (cond)
   (and (not (atom cond))
        (eq (first cond) 'if)
@@ -2257,6 +2302,7 @@
        (not (atom (third (second (second cond)))))
        (eq (first (third (second (second cond)))) 'fvs)))
 
+;;; Obsolete
 (defun is-a-simple-fresh-not-elt-fvs-condition (cond)
   (and (not (atom cond))
        (eq (first cond) 'fresh)
@@ -2267,6 +2313,15 @@
        (atom (second (second (second cond))))
        (not (atom (third (second (second cond)))))
        (eq (first (third (second (second cond)))) 'fvs)))
+
+(defun is-a-simple-not-elt-fvs-condition (cond)
+  (and (not (atom cond))
+       (eq (first cond) 'not)
+       (not (atom (second cond)))
+       (eq (first (second cond)) 'elt)
+       (atom (second (second cond)))
+       (not (atom (third (second cond))))
+       (eq (first (third (second cond))) 'fvs)))
 
 (defun contradictory-assumptions (assumption-pairs)
   (or (some #'self-contradictory-assumption assumption-pairs)
@@ -2333,11 +2388,18 @@
 
 (defun consequent-conditions-trivially-follow (consequents)
   (let ((consequent-conds (mapcar #'second consequents)))
-    (and (every #'is-a-simple-if-not-elt-fvs-condition consequent-conds)
-	 (every #'(lambda (cond)
-		    (let ((cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
-		      (null cfvars)))
-		consequent-conds))))
+    (cond (use-if-fresh
+	   (and (every #'is-a-simple-not-elt-fvs-condition consequent-conds)
+		(every #'(lambda (cond)
+			   (let ((cfvars (apply #'append (mapcar #'term-vars (rest (third (second cond)))))))
+			     (null cfvars)))
+		       consequent-conds)))
+	  (t 
+	   (and (every #'is-a-simple-if-not-elt-fvs-condition consequent-conds)
+		(every #'(lambda (cond)
+			   (let ((cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
+			     (null cfvars)))
+		       consequent-conds))))))
 
 (defun consequent-conditions-follow (consequents assumptions)
   ;; (progn (print (cons 'RAW-CONSEQUENTS consequents)) t)
@@ -2349,24 +2411,44 @@
     ;; What follows is not very general (and in particular really doesn't allow for different conditions strategies),
     ;; but it suffices for our purposes (it picks up "(= k1 k2)" when it needs to, and handles sets of fvs conditions).
     (or (every #'(lambda (cond) (find-if #'(lambda (assump) (equal assump cond)) assumption-conds)) consequent-conds)
-	(and (every #'is-a-simple-if-not-elt-fvs-condition consequent-conds)
-	     ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
-	     (let ((not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-if-not-elt-fvs-condition assumption-conds)))
-	       (and not-elt-fvs-assumption-conds
-		    ;; (progn (print (cons 'NOT-ELT-FVS-ASSUMPTION-CONDS not-elt-fvs-assumption-conds)) t)
-		    (every #'(lambda (cond)
-			       (let ((cvar (second (second (second cond))))
-				     (cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
-				 ;; (print (list 'CVAR cvar 'CFVARS cfvars))
-				 (every #'(lambda (cfvar) (some #'(lambda (assumption)
-								    (let ((avar (second (second (second assumption))))
-									  (afvars (apply #'append (mapcar #'term-vars (rest (third (second (second assumption))))))))
-								      ;; (print (list 'AVAR avar 'AFVARS afvars))
-								      (and (eq avar cvar)
-									   (member cfvar afvars))))
-								not-elt-fvs-assumption-conds))
-					cfvars)))
-			   consequent-conds)))))))
+	(cond (use-if-fresh
+	       (and (every #'is-a-simple-if-not-elt-fvs-condition consequent-conds)
+		    ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
+		    (let ((not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-not-elt-fvs-condition assumption-conds)))
+		      (and not-elt-fvs-assumption-conds
+			   ;; (progn (print (cons 'NOT-ELT-FVS-ASSUMPTION-CONDS not-elt-fvs-assumption-conds)) t)
+			   (every #'(lambda (cond)
+				      (let ((cvar (second (second cond)))
+					    (cfvars (apply #'append (mapcar #'term-vars (rest (third (second cond)))))))
+					;; (print (list 'CVAR cvar 'CFVARS cfvars))
+					(every #'(lambda (cfvar) (some #'(lambda (assumption)
+									   (let ((avar (second (second assumption)))
+										 (afvars (apply #'append (mapcar #'term-vars (rest (third (second assumption)))))))
+									     ;; (print (list 'AVAR avar 'AFVARS afvars))
+									     (and (eq avar cvar)
+										  (member cfvar afvars))))
+								       not-elt-fvs-assumption-conds))
+					       cfvars)))
+				  consequent-conds)))))
+	      (t 
+	       (and (every #'is-a-simple-if-not-elt-fvs-condition consequent-conds)
+		    ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
+		    (let ((not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-if-not-elt-fvs-condition assumption-conds)))
+		      (and not-elt-fvs-assumption-conds
+			   ;; (progn (print (cons 'NOT-ELT-FVS-ASSUMPTION-CONDS not-elt-fvs-assumption-conds)) t)
+			   (every #'(lambda (cond)
+				      (let ((cvar (second (second (second cond))))
+					    (cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
+					;; (print (list 'CVAR cvar 'CFVARS cfvars))
+					(every #'(lambda (cfvar) (some #'(lambda (assumption)
+									   (let ((avar (second (second (second assumption))))
+										 (afvars (apply #'append (mapcar #'term-vars (rest (third (second (second assumption))))))))
+									     ;; (print (list 'AVAR avar 'AFVARS afvars))
+									     (and (eq avar cvar)
+										  (member cfvar afvars))))
+								       not-elt-fvs-assumption-conds))
+					       cfvars)))
+				  consequent-conds)))))))))
 
 
 
@@ -2380,25 +2462,28 @@
 		   more)))))))
 
 ;;; Returns a list of 2-lists (rulename rif)
-(defun consequent-if-pairs (term rw)
-  (cond ((null rw) '())
-	(t (let ((rulename (rewrite-rulename (first rw))))
-	     (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path (first rw)))))
-	       (let ((more (consequent-conditions (rewriting-beta res) (rest rw))))
-		 (if (rewriting-if res)
-		     (cons (list rulename (rewriting-if res)) more)
-		   more)))))))
+(defun consequent-if-condition-pairs (term rws)
+  (cond ((null rws) '())
+	(t (let ((rw (first rws)))
+	     (let ((rulename (rewrite-rulename rw)))
+	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw))))
+		 (let ((more (consequent-conditions (rewriting-beta res) (rest rws))))
+		   (if (rewriting-if res)
+		       (cons (list rulename (rewriting-if res)) more)
+		     more))))))))
 
 ;;; Returns a list of 2-lists (rulename rfresh)
-(defun consequent-fresh-pairs (term rw)
-  (cond ((null rw) '())
-	(t (let ((rulename (rewrite-rulename (first rw))))
-	     (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path (first rw)))))
-	       (let ((more (consequent-conditions (rewriting-beta res) (rest rw))))
-		 (if (rewriting-fresh res)
-		     (cons (list rulename (rewriting-fresh res)) more)
-		   more)))))))
+(defun consequent-fresh-condition-pairs (term rws)
+  (cond ((null rws) '())
+	(t (let ((rw (first rws)))
+	     (let ((rulename (rewrite-rulename rw)))
+	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw))))
+		 (let ((more (consequent-conditions (rewriting-beta res) (rest rws))))
+		   (if (rewriting-fresh res)
+		       (cons (list rulename (rewriting-fresh res)) more)
+		     more))))))))
 
+;;; Obsolete
 (defun new-fresh-conditions (Q consequents)
   (let ((new-fresh-vars
 	 (remove-duplicates
@@ -2410,6 +2495,24 @@
     ;; (print (list 'NEW-FRESH-VARS new-fresh-vars))
     (mapcar #'(lambda (nfv) (list 'fresh (list 'not (list 'elt nfv (cons 'fvs (term-vars Q)))))) new-fresh-vars)))
 
+(defun relevant-fresh-var (rfresh)
+  (cond ((atom rfresh) rfresh)
+	((eq (first rfresh) 'not) (relevant-fresh-var (second rfresh)))
+	((eq (first rfresh) 'elt) (second rfresh))
+	(t (error "cannot find relevant fresh variable in fresh condition %s" rfresh))))
+
+(defun new-fresh-avoid-condition-pairs (rws)
+  (apply #'append
+	 (mapcar #'(lambda (rw) (and (rewrite-avoid rw)
+				     (cond ((rule-fresh (rewrite-rule rw))
+					    (list (list (rule-name (rewrite-rule rw))
+							(list 'not (list 'elt
+									 (relevant-fresh-var (rule-fresh (rewrite-rule rw)))
+									 (cons 'fvs (rewrite-avoid rw)))))))
+					   (t (error "rewrite rule has avoid but rule does not have a fresh" rw)))))
+		 rws)))
+  
+;;; Obsolete
 (defun print-new-fresh-conditions (new-fresh-conditions consequents)
   (when new-fresh-conditions
     (let ((fresh-texts (apply #'append
@@ -2425,7 +2528,8 @@
       (princ "(implicitly) ")
       (princ (mapconcat #'(lambda (nft) (format "{\\color{blue}%s}" nft)) new-fresh-texts " and "))
       (princ ".\n"))))      
-  
+
+;;; Obsolete
 ;;; Each consequent or assumption is a 2-list (rulename cond).
 (defun print-consequent-conditions (consequents assumptions)
   (when consequents
@@ -2451,6 +2555,46 @@
 			"; this is trivially true"
 		      "; these are trivially true"))
 		   ((consequent-conditions-follow consequents assumptions)
+		    (if (= (length texts) 1)
+			"; this follows easily from the assumptions"
+		      "; these follow easily from the assumptions"))
+		   (t "; {\\color{red}please provide the necessary proof}")))
+      (princ ".\\par\n"))))
+
+(defun print-consequent-fresh-conditions (new-fresh-conditions consequent-fresh-pairs)
+  (when new-fresh-conditions
+    (let ((fresh-texts (mapcar #'(lambda (cd) (list (first cd) (format-condition (second cd))))
+			       consequent-fresh-pairs))
+	  (new-fresh-texts (mapcar #'format-condition-text new-fresh-conditions)))
+      ;; (print (list 'NEW-FRESH new-fresh-conditions fresh-texts new-fresh-texts))
+      (princ "Alpha-conversion introduces new assumptions ")
+      (dolist (ft fresh-texts)
+	(princ (format "{\\color{blue}%s} (for \\rulename{%s}) and " (second ft) (first ft))))
+      (princ "(implicitly) ")
+      (princ (mapconcat #'(lambda (nft) (format "{\\color{blue}%s}" nft)) new-fresh-texts " and "))
+      (princ ".\n"))))
+
+;;; Each consequent or assumption is a 2-list (rulename cond).
+(defun print-consequent-if-conditions (consequent-pairs assumptions)
+  (when consequent-pairs
+    (let ((texts (mapcar #'(lambda (pair) (list (first pair) (format-condition (second pair)))) consequent-pairs)))
+      (princ (if (= (length texts) 1) "The condition to be proved is " "Conditions to be proved are "))
+      (princ (cond ((= (length texts) 1)
+		    (format "{\\color{purple}%s} (for \\rulename{%s})"
+			    (second (first texts)) (first (first texts))))
+		   ((= (length texts) 2)
+		    (format "{\\color{purple}%s} (for \\rulename{%s}) and {\\color{purple}%s} (for \\rulename{%s})"
+			    (second (first texts)) (first (first texts)) (second (second texts)) (first (second texts))))
+		   (t (let ((revtexts (reverse texts)))
+			(concat (mapconcat #'(lambda (text) (format "{\\color{purple}%s} (for \\rulename{%s}), " (second text) (first text)))
+					   (reverse (rest revtexts))
+					   "")
+				(format "and {\\color{purple}%s} (for \\rulename{%s})" (second (first revtexts)) (first (first revtexts))))))))
+      (princ (cond ((consequent-conditions-trivially-follow consequent-pairs)
+		     (if (= (length texts) 1)
+			"; this is trivially true"
+		      "; these are trivially true"))
+		   ((consequent-conditions-follow consequent-pairs assumptions)
 		    (if (= (length texts) 1)
 			"; this follows easily from the assumptions"
 		      "; these follow easily from the assumptions"))
