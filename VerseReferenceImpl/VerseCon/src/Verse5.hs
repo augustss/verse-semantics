@@ -183,18 +183,16 @@ writeVar :: (MonadRef m, MonadSupply Int m) => Var m a -> a -> VerseT m ()
 writeVar v x = readVarState v >>= \ case
   Val _ -> error "writeVar"
   y@(Susp k) -> do
-    m <- resumeChildren $ writeVar' v x
     lift' (\ r -> put (unVar v) r.heap (Val x)) (\ r -> put (unVar v) r.heap y)
-    m
+    resumeChildren $ writeVar' v x
     k x
 
 writeVar' :: (MonadRef m, MonadSupply Int m) => Var m a -> a -> VerseT m ()
 writeVar' v x = readVarState' v >>= \ case
   Val _ -> error "writeVar"
   y@(Susp k) -> do
-    m <- resumeChildren $ writeVar' v x
     lift' (\ r -> put (unVar v) r.heap (Val x)) (\ r -> put (unVar v) r.heap y)
-    m
+    resumeChildren $ writeVar' v x
     k x
 
 readVarState :: MonadRef m => Var m a -> VerseT m (VarState m a)
@@ -203,12 +201,12 @@ readVarState v = liftSuccess $ \ r -> readRef (unVar v) <&> lookupVarState r.hea
 readVarState' :: MonadRef m => Var m a -> VerseT m (VarState m a)
 readVarState' v = liftSuccess $ \ r -> readRef (unVar v) <&> lookupVarState' r.heap
 
-resumeChildren :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m (VerseT m ())
+resumeChildren :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
 resumeChildren m = do
   r <- ask'
   (xs, n) <- flip resumeAll m =<< lift (readRef r.children)
   lift $ writeRef r.children xs
-  pure n
+  n
 
 resumeAll :: ( MonadRef m
              , MonadSupply Int m
