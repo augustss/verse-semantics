@@ -87,6 +87,9 @@ instance RowMatchable Val where
     (Tuple xs, Tuple ys) -> Zip $ Tuple <$> zipMatch xs ys
     _ -> Zip Nothing
 
+instance Freshenable a m => Freshenable (Val a) m where
+  freshen = traverse freshen
+
 instance Monad m => Freshenable () m where
   freshen x = pure x
 
@@ -215,3 +218,9 @@ test21 = runSupplyT $ runVerseT do
   unify x y
   unify x =<< newVar (Int 2)
   readIVar z
+
+test22 = runSupplyT $ runVerseT do
+  x <- freshVar
+  y <- all $ readVar x
+  unify x =<< newVar (Int 1)
+  traverse (traverse freezeVar) =<< readIVar y

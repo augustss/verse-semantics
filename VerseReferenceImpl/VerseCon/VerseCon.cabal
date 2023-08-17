@@ -27,6 +27,7 @@ library
         Verse4
         Verse5
         Verse6
+        Verse7
     other-modules:
     -- other-extensions:
     build-depends:
