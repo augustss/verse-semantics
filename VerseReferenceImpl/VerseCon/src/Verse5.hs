@@ -66,7 +66,7 @@ type Susp m a = a -> VerseT m ()
 data Env m = Env
   { heap :: !(Maybe Heap)
   , children :: !(Ref m (Processes m))
-  , length :: !(Ref m Int)
+  , suspCount :: !(Ref m Int)
   }
 
 type Processes m = [Process m]
@@ -74,7 +74,7 @@ type Processes m = [Process m]
 data Process m = forall a . Process
   { heap :: !Heap
   , children :: !(Ref m (Processes m))
-  , length :: !(Ref m Int)
+  , suspCount :: !(Ref m Int)
   , left :: !(HeapRef m (Maybe a))
   , right :: !(Ref m (VerseT m ()))
   , result :: !(Var m (Maybe (Heap, a, VerseT m ())))
@@ -144,12 +144,12 @@ instance MonadRef m => MonadRef (VerseT m) where
 runVerseT :: MonadRef m => VerseT m a -> m (Maybe [a])
 runVerseT m = do
   children <- newRef mempty
-  length <- newRef 0
+  suspCount <- newRef 0
   unVerseT m yk Env {..} sk fk fk $ pure ()
   where
     yk = Yield $ \ _ _ _ _ _ _ -> pure Nothing
     heap = Nothing
-    sk x r fk _ _ = readRef r.length >>= \ case
+    sk x r fk _ _ = readRef r.suspCount >>= \ case
       0 -> fmap (x:) <$> fk r
       _ -> pure Nothing
     fk _ = pure $ Just []
@@ -217,7 +217,7 @@ resume p@Process {..} m = lift (msplit_ m Env { heap = Just heap, .. }) >>= \ ca
   Nothing -> resume' p m
   Just (m', m'') -> VerseT $ \ _ r sk fk ek rk -> do
     m' <- (m' <|>) . (*> m) . fork <$> readRef right
-    p <- (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
+    p <- (0 ==) <$> readRef suspCount `andM` readHeapRef' left heap >>= \ case
       Just x -> pure . Right . writeVar result $ Just (heap, x, m')
       Nothing -> writeRef right m' $> Left p
     sk p r fk (\ r -> m'' *> ek r) (m'' *> rk)
@@ -230,7 +230,7 @@ resume' p@Process {..} m = do
   lift (msplit_ (fork m' *> m) Env { heap = Just heap, .. }) >>= \ case
     Nothing -> pure . Right $ writeVar result Nothing
     Just (m', m'') -> VerseT $ \ _ r sk fk ek rk -> do
-      p <- (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
+      p <- (0 ==) <$> readRef suspCount `andM` readHeapRef' left heap >>= \ case
         Just x -> pure . Right . writeVar result $ Just (heap, x, m')
         Nothing -> writeRef right m' $> Left p
       sk p r fk (\ r -> m'' *> ek r) (m'' *> rk)
@@ -239,13 +239,13 @@ fork :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
 fork m = liftSuccess (\ r -> unVerseT m yk r sk fk fk $ pure ()) >>= reflect_
   where
     yk = Yield $ \ addSusp r sk fk _ rk -> do
-      incr r.length
+      incr r.suspCount
       removeSusp <- addSusp $ \ x -> do
         liftSuccess (\ r -> sk x r fk fk $ pure ()) >>= reflect_
-        lift' (\ r -> decr r.length) (\ r -> incr r.length)
+        lift' (\ r -> decr r.suspCount) (\ r -> incr r.suspCount)
       pure $ Just $ (, rk) $ liftFail $ \ r -> do
         removeSusp r
-        decr r.length
+        decr r.suspCount
     sk () _ fk _ rk = pure . Just . (, rk) $ liftSuccess fk >>= reflect_
     fk _ = pure Nothing
 
@@ -304,12 +304,12 @@ split :: (MonadRef m, MonadSupply Int m) =>
          VerseT m (Var m (Maybe (Heap, a, VerseT m ())))
 split heap left m = VerseT $ \ _ r sk fk ek rk -> do
   children <- newRef mempty
-  length <- newRef 0
+  suspCount <- newRef 0
   msplit_ m Env { heap = Just heap, .. } >>= \ case
     Nothing -> do
       v <- newVar' Nothing
       sk v r fk ek rk
-    Just (m, m') -> (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
+    Just (m, m') -> (0 ==) <$> readRef suspCount `andM` readHeapRef' left heap >>= \ case
       Just x -> do
         v <- newVar' $ Just (heap, x, m)
         sk v r fk (\ r -> m' *> ek r) (m' *> rk)
@@ -370,7 +370,7 @@ copyProcess :: (MonadRef m, MonadSupply Int m) => Process m -> CopyT m (Process 
 copyProcess Process {..} = do
   heap <- copyHeap heap
   children <- newRef =<< local (const $ Just heap) . copyProcesses  =<< readRef children
-  length <- newRef =<< readRef length
+  suspCount <- newRef =<< readRef suspCount
   right <- newRef =<< readRef right
   pure Process {..}
 
