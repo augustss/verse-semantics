@@ -6,7 +6,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Verse6
   ( VerseT
   , runVerseT
@@ -163,6 +162,19 @@ instance (MonadRef m, MonadSupply Int m) => Alternative (VerseT m) where
 instance Monad (VerseT m) where
   x >>= f = VerseT $ \ yk r sk -> unVerseT x yk r $ \ x r ->
     unVerseT (f x) yk r sk
+
+instance MonadRef m => MonadRef (VerseT m) where
+  type Ref (VerseT m) = Ref m
+
+  newRef = lift . newRef
+
+  readRef = lift . readRef
+
+  writeRef ref x = VerseT $ \ _ r sk fk ek rk -> do
+    y <- readRef ref
+    writeRef ref x
+    let m = writeRef ref y
+    sk () r fk (\ r -> m *> ek r) (m *> rk)
 
 instance MonadTrans VerseT where
   lift m = VerseT $ \ _ r sk fk ek rk -> m >>= \ x -> sk x r fk ek rk
