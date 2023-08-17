@@ -266,6 +266,15 @@ unify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
     writeRepr v_y r_x
     k_y x
     resumeChildren $ subst v_x v_y
+  (Found _ r_x@(Bound x i_x), Found v_y (Bound y i_y)) ->
+    when (i_x /= i_y) $ case rowMatch x y of
+      Zip Nothing -> empty
+      Zip (Just z) -> do
+        writeRepr v_y r_x
+        for_ z $ uncurry unify
+      Uncons f_x v_xs f_y v_ys -> do
+        writeRepr v_y r_x
+        unifyUncons f_x v_xs f_y v_ys
   (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) -> do
     r <- ask'
     case compare' n_x i_x n_y i_y of
@@ -280,19 +289,6 @@ unify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
         writeLink v_x v_y
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
         resumeChildren $ subst v_y v_x
-  (Found _ r_x@(Bound x i_x), Found v_y (Bound y i_y)) ->
-    when (i_x /= i_y) $ case rowMatch x y of
-      Zip Nothing -> empty
-      Zip (Just z) -> do
-        writeRepr v_y r_x
-        for_ z $ uncurry unify
-      Uncons f_x v_xs f_y v_ys -> do
-        writeRepr v_y r_x
-        v_zs <- freshVar
-        v_xs' <- newVar $ f_x v_zs
-        unify v_xs' v_ys
-        v_ys' <- newVar $ f_y v_zs
-        unify v_xs v_ys'
 
 subst :: ( MonadRef m
          , MonadSupply Int m
@@ -315,13 +311,6 @@ subst' v_x y = findRepr v_x <&> (, y) >>= \ case
     writeRepr v_y r_x
     k_y x
     resumeChildren $ subst v_x v_y
-  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound _ k_y i_y)) ->
-    case i_x == i_y of
-      True -> decrLength
-      False -> do
-        writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
-        writeLink v_y v_x
-        resumeChildren $ subst v_x v_y
   (Found _ r_x@(Bound x i_x), Found v_y (Bound y i_y)) -> do
     decrLength
     when (i_x /= i_y) $ case rowMatch x y of
@@ -331,11 +320,29 @@ subst' v_x y = findRepr v_x <&> (, y) >>= \ case
         for_ z $ uncurry unify
       Uncons f_x v_xs f_y v_ys -> do
         writeRepr v_y r_x
-        v_zs <- freshVar
-        v_xs' <- newVar $ f_x v_zs
-        unify v_xs' v_ys
-        v_ys' <- newVar $ f_y v_zs
-        unify v_xs v_ys'
+        unifyUncons f_x v_xs f_y v_ys
+  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) ->
+    case compare' n_x i_x n_y i_y of
+      EQ -> decrLength
+      LT -> do
+        writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
+        writeLink v_y v_x
+        resumeChildren $ subst v_x v_y
+      GT -> do
+        writeLink v_x v_y
+        writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
+        resumeChildren $ subst v_y v_x
+
+unifyUncons :: (MonadRef m, MonadSupply Int m, RowMatchable f)
+            => (Var m f -> f (Var m f)) -> Var m f
+            -> (Var m f -> f (Var m f)) -> Var m f
+            -> VerseT m ()
+unifyUncons f_x v_xs f_y v_ys = do
+  v_zs <- freshVar
+  v_xs' <- newVar $ f_x v_zs
+  unify v_xs' v_ys
+  v_ys' <- newVar $ f_y v_zs
+  unify v_xs v_ys'
 
 compare' :: Int -> Int -> Int -> Int -> Ordering
 compare' n_x i_x n_y i_y = compare (n_x, i_x) (n_y, i_y)
@@ -436,8 +443,8 @@ resume p@Process {..} m = lift (msplit_ m Env { heap = Just heap, .. }) >>= \ ca
   Just (m', m'') -> VerseT $ \ _ r sk fk ek rk -> do
     m' <- (m' <|>) . (*> m) . fork <$> readRef right
     p <- (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
-      Just x -> Right . writeIVar result . Just . (heap, , m') <$> freshen' x heap
       Nothing -> writeRef right m' $> Left p
+      Just x -> Right . writeIVar result . Just . (heap,, m') <$> freshen' x heap
     sk p r fk (\ r -> m'' *> ek r) (m'' *> rk)
 
 resume' :: (MonadRef m, MonadSupply Int m)
@@ -447,11 +454,11 @@ resume' p@Process {..} m = do
   m' <- lift $ readRef right
   lift (msplit_ (fork m' *> m) Env { heap = Just heap, .. }) >>= \ case
     Nothing -> pure . Right $ writeIVar result Nothing
-    Just (m', m'') -> VerseT $ \ _ r sk fk ek rk -> do
+    Just (m', rk') -> VerseT $ \ _ r sk fk ek rk -> do
       p <- (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
-        Just x -> Right . writeIVar result . Just . (heap, , m') <$> freshen' x heap
         Nothing -> writeRef right m' $> Left p
-      sk p r fk (\ r -> m'' *> ek r) (m'' *> rk)
+        Just x -> Right . writeIVar result . Just . (heap,, m') <$> freshen' x heap
+      sk p r fk (\ r -> rk' *> ek r) (rk' *> rk)
 
 fork :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
 fork m = liftSuccess (\ r -> unVerseT m yk r sk fk fk $ pure ()) >>= reflect_
@@ -540,7 +547,7 @@ split heap left m = VerseT $ \ _ r sk fk ek rk -> do
       sk v r fk ek rk
     Just (m, m') -> (0 ==) <$> readRef length `andM` readHeapRef' left heap >>= \ case
       Just x -> do
-        v <- newIVar' . Just . (heap, , m) =<< freshen' x heap
+        v <- newIVar' . Just . (heap,, m) =<< freshen' x heap
         sk v r fk (\ r -> m' *> ek r) (m' *> rk)
       Nothing -> do
         result <- freshIVar'
