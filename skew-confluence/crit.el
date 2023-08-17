@@ -1,12 +1,15 @@
 ;;; TO DO
+;;; The next big refactoring is to have a single mechanism for executing a list of rewrites,
+;;; accumulating all assumptions properly, and executing some piece of code on every iteration.
+;;; Parts of this mechanism are duplicated in too many places.
+
+;;; Remember that :avoid in a rewrite generates an assumption.
+
 ;;; contexts: match, join, and submatches
+;;; Type-checking pf rules and expressions.
 ;;; Check decreasing diagrams
 ;;; Verify derivation of critical pairs deduced by joinable
-;;; Add rewrite rule IDs
 ;;; Generate and print substituted conditions
-
-;;; Temporary while switching over from cond to if/fresh
-(setq use-if-fresh t)
 
 
 ;;; Compute all critical pairs for the Verse Calculus
@@ -2160,6 +2163,7 @@
 	  (rfresh1 (rule-fresh rule1))
 	  (rfresh2 (rule-fresh rule2))
 	  (linebreak "\\vadjust{\\penalty1000}\\hfil\\break")) ;Use \\hfil here, and \\hfill in print-rule-line
+      (princ (format "%s Proof %s %s\n" (string-expt "%" 40) k (string-expt "%" 20)))
       (princ (format "\\vskip 8pt plus 16pt\\noindent\n"))
       (let ((weirdtext (cond ((< k 10) "and{\\hskip0.2em}rule")
 			     ((< k 100) "and{\\hskip0.5em}rule")
@@ -2352,15 +2356,19 @@
 
 ;;; Right now this works only for conditions of the form "(not (elt (x (fvs ...))))".
 (defun condition-is-implied-by-assumptions (not-elt-fvs-cond not-elt-fvs-assumption-conds)
-  (let ((cvar (second (second not-elt-fvs-cond)))
-	(cfvars (apply #'append (mapcar #'term-vars (rest (third (second not-elt-fvs-cond)))))))
-    (every #'(lambda (cfvar) (some #'(lambda (assumption)
-				       (let ((avar (second (second assumption)))
-					     (afvars (apply #'append (mapcar #'term-vars (rest (third (second assumption)))))))
-					 (and (eq avar cvar)
-					      (member cfvar afvars))))
-				   not-elt-fvs-assumption-conds))
-	   cfvars)))
+  (let ((result
+	 (let ((cvar (second (second not-elt-fvs-cond)))
+	       (cfvars (apply #'append (mapcar #'term-vars (rest (third (second not-elt-fvs-cond)))))))
+	   (every #'(lambda (cfvar) (some #'(lambda (assumption)
+					      (let ((avar (second (second assumption)))
+						    (afvars (apply #'append (mapcar #'term-vars (rest (third (second assumption)))))))
+						(and (eq avar cvar)
+						     (member cfvar afvars))))
+					  not-elt-fvs-assumption-conds))
+		  cfvars))))
+    ;; (print (list 'CONDITION-IS-IMPLIED-BY-ASSUMPTIONS not-elt-fvs-cond not-elt-fvs-assumption-conds 'RETURNS result))
+    result))
+
 
 ;;; Returns a list of 2-lists (rulename rif)
 (defun consequent-if-condition-data-list (term rws not-elt-fvs-assumption-conds)
@@ -2414,19 +2422,19 @@
     (let ((texts (mapcar #'make-text-triple consequent-data-list)))
       (princ (if (= (length texts) 1) "The condition to be proved is " "Conditions to be proved are "))
       (princ (cond ((= (length texts) 1)
-		    (format "{\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s})"
-			    (second (first texts)) (first (first texts)) (third (first texts))))
+		    (format "{\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s})"
+			    (second (first texts)) (third (first texts)) (first (first texts))))
 		   ((= (length texts) 2)
-		    (format "{\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s}) and {\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s})"
-			    (second (first texts)) (first (first texts)) (third (first texts))
-			    (second (second texts)) (first (second texts)) (third (second texts))))
+		    (format "{\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s}) and {\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s})"
+			    (second (first texts)) (third (first texts)) (first (first texts))
+			    (second (second texts)) (third (second texts)) (first (second texts))))
 		   (t (let ((revtexts (reverse texts)))
-			(concat (mapconcat #'(lambda (text) (format "{\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s}), "
-								    (second text) (first text) (third text)))
+			(concat (mapconcat #'(lambda (text) (format "{\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s}), "
+								    (second text) (third text) (first text)))
 					   (reverse (rest revtexts))
 					   "")
-				(format "and {\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s})"
-					(second (first revtexts)) (first (first revtexts)) (third (first revtexts))))))))
+				(format "and {\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s})"
+					(second (first revtexts)) (third (first revtexts)) (first (first revtexts))))))))
       (princ (cond ((consequent-conditions-trivially-follow consequent-data-list)
 		    (if (= (length texts) 1)
 			"; this is trivially true"
@@ -2449,7 +2457,7 @@
 	       (princ "The diagram introduces a new assumption: "))
 	      (t (princ "The diagram introduces new assumptions: ")))
 	(princ (mapconcat #'(lambda (ft)
-			      (format "{\\color{blue}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s})" (second ft) (first ft) (third ft)))
+			      (format "{\\color{blue}%s} (for~\\rewritelabel{%s} \\rulename{%s})" (second ft) (third ft) (first ft)))
 			  fresh-texts
 			  " and "))
 	(princ ".\n")))))
