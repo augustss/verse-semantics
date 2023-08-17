@@ -111,8 +111,8 @@
 (setq the-proofs                ;120 proofs
       (list (make-proof :rulename1 'lam-alpha :rulename2 'app-beta :path1 '(1) :id1 1 :id2 2      ;Proof 1
 			:extra1 'z
-                        :rewrites1 (list (make-rewrite :rulename 'app-beta :path '() :id 3))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-alpha :path '() :id 4 :extra 'z :avoid '(v))))
+                        :rewrites1 (list (make-rewrite :rulename 'app-beta :path '() :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-alpha :path '() :id 4 :extra 'z)))
             (make-proof :rulename1 'exi-alpha :rulename2 'exi-elim :path1 '() :id1 1 :id2 2      ;Proof 2
                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-elim :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
@@ -2194,13 +2194,13 @@
 				  (t (print-tikzcd-diagram P Q R name1 name2 path1 '() (proof-id1 pf) (proof-id2 pf) (proof-extra1 pf) (proof-extra2 pf)
 							   (proof-rowsep pf) (proof-colsep pf) (proof-rewrites1 pf) (proof-rewrites2 pf) k)))
 			    (let ((consequent-if-data-list (append (consequent-if-condition-data-list R (proof-rewrites1 pf))
-							       (consequent-if-condition-data-list P (proof-rewrites2 pf))))
+								   (consequent-if-condition-data-list P (proof-rewrites2 pf))))
 				  (consequent-fresh-data-list (append (consequent-fresh-condition-data-list R (proof-rewrites1 pf))
-								  (consequent-fresh-condition-data-list P (proof-rewrites2 pf))))
+								      (consequent-fresh-condition-data-list P (proof-rewrites2 pf))))
 				  (avoid-condition-data-list (append (new-fresh-avoid-condition-data-list (proof-rewrites1 pf))
-								 (new-fresh-avoid-condition-data-list (proof-rewrites2 pf)))))
+								     (new-fresh-avoid-condition-data-list (proof-rewrites2 pf)))))
 			      (print-consequent-fresh-conditions avoid-condition-data-list consequent-fresh-data-list)
-			      (print-consequent-if-conditions consequent-if-data-list assumption-data-list))
+			      (print-consequent-if-conditions consequent-if-data-list assumption-data-list R (proof-rewrites1 pf) P (proof-rewrites2 pf)))
 			    (princ (verify-decreasing-diagram cp))
 			    (when (proof-cond pf) (princ (format "\\par For the case when %s is false:\\par\n" (format-text-condition (proof-cond pf)))))
 			    (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf))
@@ -2220,7 +2220,7 @@
     (princ (format "have a critical pair derived from the common term {\\color{blue}$%s$}%s%s\n"
 		   (format-term Q) (if (> count 0) "," "") linebreak))
     (cond ((= count 1)
-	   (princ (format "assuming the condition {\\color{blue}%s} (for \\rulename{%s}) is satisfied,%s\n"
+	   (princ (format "assuming the condition {\\color{blue}%s} (for~\\rulename{%s}) is satisfied,%s\n"
 			  (if (or if1 if2)
 			      (format-condition (or if1 if2))
 			    (format-condition-with-prefix (or fresh1 fresh2) "fresh "))
@@ -2228,22 +2228,22 @@
 			  linebreak)))
 	  ((> count 1)
 	   (cond ((and (not if2) (not fresh2))
-		  (princ (format "assuming {\\color{blue}%s} and {\\color{blue}%s} (for \\rulename{%s}) are satisfied,%s\n"
+		  (princ (format "assuming {\\color{blue}%s} and {\\color{blue}%s} (for~\\rulename{%s}) are satisfied,%s\n"
 				 (format-condition if1) (format-condition fresh1) name1 linebreak)))
 		 ((and (not if2) (not fresh2))
-		  (princ (format "assuming {\\color{blue}%s} and {\\color{blue}%s} (for \\rulename{%s}) are satisfied,%s\n"
+		  (princ (format "assuming {\\color{blue}%s} and {\\color{blue}%s} (for~\\rulename{%s}) are satisfied,%s\n"
 				 (format-condition if2) (format-condition fresh2) name2 linebreak)))
 		 (t (princ (concat "assuming "
 				   (cond ((and if1 fresh1)
-					  (format "{\\color{blue}%s} and {\\color{blue}%s} (for \\rulename{%s})"
+					  (format "{\\color{blue}%s} and {\\color{blue}%s} (for~\\rulename{%s})"
 						  (format-condition if1) (format-condition-with-prefix fresh1 "fresh ") name1))
-					 (t (format "{\\color{blue}%s} (for \\rulename{%s})"
+					 (t (format "{\\color{blue}%s} (for~\\rulename{%s})"
 						    (format-condition-with-prefix (or if1 fresh1) (if if1 "" "fresh ")) name1)))
 				   " and "
 				   (cond ((and if2 fresh2)
-					  (format "{\\color{blue}%s} and {\\color{blue}%s} (for \\rulename{%s})"
+					  (format "{\\color{blue}%s} and {\\color{blue}%s} (for~\\rulename{%s})"
 						  (format-condition if2) (format-condition-with-prefix fresh2 "fresh ") name2))
-					 (t (format "{\\color{blue}%s} (for \\rulename{%s})"
+					 (t (format "{\\color{blue}%s} (for~\\rulename{%s})"
 						    (format-condition-with-prefix (or if2 fresh2) (if if2 "" "fresh ")) name2)))
 				   (format " are satisfied,%s\n" linebreak)))))))))
 
@@ -2295,34 +2295,51 @@
 		      (null cfvars)))
 		consequent-conds))))
 
-(defun consequent-conditions-follow (consequent-data-list assumption-data-list)
+(defun all-consequent-conditions-are-assumptions (consequent-data-list assumption-data-list)
+  (let ((consequent-conds (mapcar #'condition-data-cond consequent-data-list))
+	(assumption-conds (mapcar #'condition-data-cond assumption-data-list)))
+    (every #'(lambda (cond) (find-if #'(lambda (assump) (equal assump cond)) assumption-conds)) consequent-conds)))
+	  
+(defun consequent-conditions-follow (consequent-data-list assumption-data-list term rws)
   ;; (progn (print (cons 'RAW-CONSEQUENTS consequent-data-list)) t)
   ;; (progn (print (cons 'RAW-ASSUMPTIONS assumption-data-list)) t)
   (let ((consequent-conds (mapcar #'condition-data-cond consequent-data-list))
 	(assumption-conds (mapcar #'condition-data-cond assumption-data-list)))
     ;; (progn (print (cons 'RAW-CONSEQUENT-CONDS consequent-conds)) t)
     ;; (progn (print (cons 'RAW-ASSUMPTION-CONDS assumption-conds)) t)
-    ;; What follows is not very general (and in particular really doesn't allow for different conditions strategies),
+    ;; What follows is not very general (and in particular really doesn't allow for mixing condition strategies),
     ;; but it suffices for our purposes (it picks up "(= k1 k2)" when it needs to, and handles sets of fvs conditions).
-    (or (every #'(lambda (cond) (find-if #'(lambda (assump) (equal assump cond)) assumption-conds)) consequent-conds)
 	(and (every #'is-a-simple-not-elt-fvs-condition consequent-conds)
 	     ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
 	     (let ((not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-not-elt-fvs-condition assumption-conds)))
 	       (and not-elt-fvs-assumption-conds
 		    ;; (progn (print (cons 'NOT-ELT-FVS-ASSUMPTION-CONDS not-elt-fvs-assumption-conds)) t)
-		    (every #'(lambda (cond)
-			       (let ((cvar (second (second cond)))
-				     (cfvars (apply #'append (mapcar #'term-vars (rest (third (second cond)))))))
-				 ;; (print (list 'CVAR cvar 'CFVARS cfvars))
-				 (every #'(lambda (cfvar) (some #'(lambda (assumption)
-								    (let ((avar (second (second assumption)))
-									  (afvars (apply #'append (mapcar #'term-vars (rest (third (second assumption)))))))
-								      ;; (print (list 'AVAR avar 'AFVARS afvars))
-								      (and (eq avar cvar)
-									   (member cfvar afvars))))
-								not-elt-fvs-assumption-conds))
-					cfvars)))
-			   consequent-conds)))))))
+		    (check-consequent-conditions not-elt-fvs-assumption-conds term rws))))))
+
+;;; Need to redo the rewrites, at each step checking the consequent if condition against the assumptions so far,
+;;; then possibly adding a fresh assumption to the set of assumptions to be used for later rewrites.
+(defun check-consequent-conditions (not-elt-fvs-assumption-conds term rws)
+  (or (null rws)
+      (let ((rw (first rws)))
+	(let ((rulename (rewrite-rulename rw)))
+	  (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw))))
+	    (let ((consequent (rewriting-if res)))
+	      (and (or (null consequent)
+		       (let ((cvar (second (second consequent)))
+			     (cfvars (apply #'append (mapcar #'term-vars (rest (third (second consequent)))))))
+			 (every #'(lambda (cfvar) (some #'(lambda (assumption)
+							    (let ((avar (second (second assumption)))
+								  (afvars (apply #'append (mapcar #'term-vars (rest (third (second assumption)))))))
+							      ;; (print (list 'AVAR avar 'AFVARS afvars))
+							      (and (eq avar cvar)
+								   (member cfvar afvars))))
+							not-elt-fvs-assumption-conds))
+				cfvars)))
+		   (check-consequent-conditions (if (rewriting-fresh res)
+						    (cons (rewriting-fresh res) not-elt-fvs-assumption-conds)
+						  not-elt-fvs-assumption-conds)
+						(rewriting-beta res)
+						(rest rws)))))))))
 
 ;;; Returns a list of 2-lists (rulename rif)
 (defun consequent-if-condition-data-list (term rws)
@@ -2371,29 +2388,31 @@
 	 (format-condition (condition-data-cond data))
 	 (condition-data-rewrite-id data)))
 
-(defun print-consequent-if-conditions (consequent-data-list assumption-data-list)
+(defun print-consequent-if-conditions (consequent-data-list assumption-data-list R rw1 P rw2)
   (when consequent-data-list
     (let ((texts (mapcar #'make-text-triple consequent-data-list)))
       (princ (if (= (length texts) 1) "The condition to be proved is " "Conditions to be proved are "))
       (princ (cond ((= (length texts) 1)
-		    (format "{\\color{purple}%s} (for \\rulename{%s}, step \\rewritelabel{%s})"
+		    (format "{\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s})"
 			    (second (first texts)) (first (first texts)) (third (first texts))))
 		   ((= (length texts) 2)
-		    (format "{\\color{purple}%s} (for \\rulename{%s}, step \\rewritelabel{%s}) and {\\color{purple}%s} (for \\rulename{%s}, step \\rewritelabel{%s})"
+		    (format "{\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s}) and {\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s})"
 			    (second (first texts)) (first (first texts)) (third (first texts))
 			    (second (second texts)) (first (second texts)) (third (second texts))))
 		   (t (let ((revtexts (reverse texts)))
-			(concat (mapconcat #'(lambda (text) (format "{\\color{purple}%s} (for \\rulename{%s}, step \\rewritelabel{%s}), "
+			(concat (mapconcat #'(lambda (text) (format "{\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s}), "
 								    (second text) (first text) (third text)))
 					   (reverse (rest revtexts))
 					   "")
-				(format "and {\\color{purple}%s} (for \\rulename{%s}, step \\rewritelabel{%s})"
+				(format "and {\\color{purple}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s})"
 					(second (first revtexts)) (first (first revtexts)) (third (first revtexts))))))))
       (princ (cond ((consequent-conditions-trivially-follow consequent-data-list)
-		     (if (= (length texts) 1)
+		    (if (= (length texts) 1)
 			"; this is trivially true"
 		      "; these are trivially true"))
-		   ((consequent-conditions-follow consequent-data-list assumption-data-list)
+		   ((or (all-consequent-conditions-are-assumptions consequent-data-list assumption-data-list)
+			(and (consequent-conditions-follow consequent-data-list assumption-data-list R rw1)
+			     (consequent-conditions-follow consequent-data-list assumption-data-list P rw2)))
 		    (if (= (length texts) 1)
 			"; this follows easily from the assumptions"
 		      "; these follow easily from the assumptions"))
@@ -2402,15 +2421,17 @@
 
 (defun print-consequent-fresh-conditions (new-fresh-condition-data-list consequent-fresh-data-list)
   (when new-fresh-condition-data-list
-    (let ((fresh-texts (mapcar #'make-text-triple consequent-fresh-data-list))
-	  (new-fresh-texts (mapcar #'make-text-triple new-fresh-condition-data-list)))
-      ;; (print (list 'NEW-FRESH new-fresh-condition-data-list fresh-texts new-fresh-texts))
-      (princ "Alpha-conversion introduces new assumptions ")
-      (dolist (ft fresh-texts)
-	(princ (format "{\\color{blue}%s} (for \\rulename{%s}) and " (second ft) (first ft))))
-      (princ "(implicitly) ")
-      (princ (mapconcat #'(lambda (nft) (format "{\\color{blue}%s}" nft)) new-fresh-texts " and "))
-      (princ ".\n"))))
+    (let ((fresh-texts (append (mapcar #'make-text-triple consequent-fresh-data-list)
+			       (mapcar #'make-text-triple new-fresh-condition-data-list))))
+      (when (> (length fresh-texts) 0)
+	(cond ((= (length fresh-texts) 1)
+	       (princ "The diagram introduces a new assumption: "))
+	      (t (princ "The diagram introduces new assumptions: ")))
+	(princ (mapconcat #'(lambda (ft)
+			      (format "{\\color{blue}%s} (for~\\rulename{%s}, step~\\rewritelabel{%s})" (second ft) (first ft) (third ft)))
+			  fresh-texts
+			  " and "))
+	(princ ".\n")))))
 
 (defun print-given-proof-rewrites (prefix rw1 R rw2 P)
   (let ((fr (format-rewrites-pair rw1 R rw2 P)))
