@@ -2412,7 +2412,7 @@
     ;; but it suffices for our purposes (it picks up "(= k1 k2)" when it needs to, and handles sets of fvs conditions).
     (or (every #'(lambda (cond) (find-if #'(lambda (assump) (equal assump cond)) assumption-conds)) consequent-conds)
 	(cond (use-if-fresh
-	       (and (every #'is-a-simple-if-not-elt-fvs-condition consequent-conds)
+	       (and (every #'is-a-simple-not-elt-fvs-condition consequent-conds)
 		    ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
 		    (let ((not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-not-elt-fvs-condition assumption-conds)))
 		      (and not-elt-fvs-assumption-conds
@@ -2467,7 +2467,7 @@
 	(t (let ((rw (first rws)))
 	     (let ((rulename (rewrite-rulename rw)))
 	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw))))
-		 (let ((more (consequent-conditions (rewriting-beta res) (rest rws))))
+		 (let ((more (consequent-if-condition-pairs (rewriting-beta res) (rest rws))))
 		   (if (rewriting-if res)
 		       (cons (list rulename (rewriting-if res)) more)
 		     more))))))))
@@ -2478,7 +2478,7 @@
 	(t (let ((rw (first rws)))
 	     (let ((rulename (rewrite-rulename rw)))
 	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw))))
-		 (let ((more (consequent-conditions (rewriting-beta res) (rest rws))))
+		 (let ((more (consequent-fresh-condition-pairs (rewriting-beta res) (rest rws))))
 		   (if (rewriting-fresh res)
 		       (cons (list rulename (rewriting-fresh res)) more)
 		     more))))))))
