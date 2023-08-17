@@ -111,8 +111,8 @@
 (setq the-proofs                ;120 proofs
       (list (make-proof :rulename1 'lam-alpha :rulename2 'app-beta :path1 '(1) :id1 1 :id2 2      ;Proof 1
 			:extra1 'z
-                        :rewrites1 (list (make-rewrite :rulename 'app-beta :path '() :id 5))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-alpha :path '() :id 4 :extra 'z)))
+                        :rewrites1 (list (make-rewrite :rulename 'lam-alpha :path '(1) :id 3 :extra 'zprime :avoid '(v)) (make-rewrite :rulename 'app-beta :path '() :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-alpha :path '() :id 4 :extra 'zprime)))
             (make-proof :rulename1 'exi-alpha :rulename2 'exi-elim :path1 '() :id1 1 :id2 2      ;Proof 2
                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-elim :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
@@ -1748,33 +1748,43 @@
 					  :sigma2 (apply #'append (mapcar #'joinresult-sigma2 sjs))))))))
 	(t nil)))
 
-(defun do-every-replace-or-subst (term)
-  (cond ((atom term) term)
-	((eq (first term) 'quote) term)
-	((eq (first term) 'replace)
-	 (do-one-replace (second term) (third term) (fourth term)))
-	((eq (first term) 'subst)
-	 (do-one-subst (second term) (third term) (fourth term)))
-	(t (cons (first term) (mapcar #'do-every-replace-or-subst (rest term))))))
+(defstruct replacing before after why)
 
-(defun do-one-replace (term x y)
+(defstruct replacement-data term replacings)
+
+;;; Returns a replacement-data.
+(defun do-every-replace-or-subst (term assumption-exprs)
+  (let ((not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-not-elt-fvs-condition assumption-exprs)))
+    (cond ((atom term) (make-replacement-data :term term :replacings '()))
+	  ((eq (first term) 'quote) (make-replacement-data :term term :replacings '()))
+	  ((eq (first term) 'replace)
+	   (do-one-replace (second term) (third term) (fourth term) not-elt-fvs-assumption-conds))
+	  (t (let ((subresults (mapcar #'(lambda (subterm) (do-every-replace-or-subst subterm not-elt-fvs-assumption-conds)) (rest term))))
+	       (make-replacement-data :term (cons (first term) (mapcar #'replacement-data-term subresults))
+				      :replacings (apply #'append (mapcar #'replacement-data-replacings subresults))))))))
+
+;;; There are three kinds of replacement simplifications:
+;;;     x[x <- z]    becomes     z
+;;;     y[x <- z]    becomes     y     provided you can prove (not (elt x (fvs y)))
+;;;     e[y <- x][x <- z]    becomes     e[y <- z]     provided you can prove (not (elt x (fvs e)))
+
+(defun do-one-replace (term x z not-elt-fvs-assumption-conds)
   (unless (atom x) (error "do-one-replace: non-atomic replacement variable %s" x))
-  (cond ((atom term) (if (eq term x) y (list 'replace term x y)))
-	((eq (first term) 'quote) term)
-	((memq (first term) '(replace subst))
-	 (error "do-one-replace: nested %s" term))
-	(t (cons (first term) (mapcar #'(lambda (tm) (do-one-replace tm x y)) (rest term))))))
-
-(defun do-one-subst (term x y)
-  (unless (atom x) (error "do-one-subst: non-atomic replacement variable %s" x))
-  (cond ((atom term) (if (eq term x) y (list 'subst term x y)))
-	((eq (first term) 'quote) term)
-	((memq (first term) '(replace subst))
-	 (error "do-one-subst: nested %s" term))
-	((memq (first term) '(lam exists))
-	 (cond ((eq (second term) x) term)
-	       (t (list 'subst term x y))))
-	(t (cons (first term) (mapcar #'(lambda (tm) (do-one-subst tm x y)) (rest term))))))
+  (let ((before-term (list 'replace term x z)))
+    (cond ((atom term)
+	   (cond ((eq term x) (make-replacement-data :term z :replacings (list (make-replacing :before before-term :after z :why nil))))
+		 (t (let ((query (list 'not (list 'elt x (list 'fvs term)))))
+		      (cond ((condition-is-implied-by-assumptions query not-elt-fvs-assumption-conds)
+			     (make-replacement-data :term term :replacings (list (make-replacing :before before-term :after term :why query))))
+			    (t (make-replacement-data :term before-term :replacings '())))))))
+	  ((eq (first term) 'quote) (make-replacement-data :term term :replacings '()))
+	  ((eq (first term) 'replace)
+	   (let ((query (list 'not (list 'elt x (list 'fvs (second term))))))
+	     (cond ((and (eq (third term) x)
+			 (condition-is-implied-by-assumptions query not-elt-fvs-assumption-conds))
+		    (make-replacement-data :term term :replacings (list (make-replacing :before before-term :after (list 'replace (second term) (third term) z) :why query))))
+		   (t (error "Nested replacements not allowed %s" (list 'replace term x z))))))
+	  (t (make-replacement-data :term term :replacings '())))))
 
 (defstruct critpair rule1 rule2 path1 sigma1 sigma2 term term1 term2 if1 if2 fresh1 fresh2)
 
@@ -1795,12 +1805,12 @@
 						       :sigma1 sigma2  ;Similarly swap the sigmas
 						       :sigma2 sigma1
 						       :term (replace-subterm alpha1 path1 N)
-						       :term1 (do-every-replace-or-subst (sublis sigma1 beta1))
-						       :term2 (replace-subterm (sublis sigma1 alpha1) path1 (do-every-replace-or-subst (sublis sigma2 beta2)))
-						       :if1 (and if2 (do-every-replace-or-subst (sublis sigma2 if2))) ;Similarly swap the ifs
-						       :if2 (and if1 (do-every-replace-or-subst (sublis sigma1 if1)))
-						       :fresh1 (and fresh2 (do-every-replace-or-subst (sublis sigma2 fresh2))) ;Similarly swap the freshs
-						       :fresh2 (and fresh1 (do-every-replace-or-subst (sublis sigma1 fresh1)))))))))
+						       :term1 (replacement-data-term (do-every-replace-or-subst (sublis sigma1 beta1) '()))
+						       :term2 (replace-subterm (sublis sigma1 alpha1) path1 (replacement-data-term (do-every-replace-or-subst (sublis sigma2 beta2) '())))
+						       :if1 (and if2 (replacement-data-term (do-every-replace-or-subst (sublis sigma2 if2) '()))) ;Similarly swap the ifs
+						       :if2 (and if1 (replacement-data-term (do-every-replace-or-subst (sublis sigma1 if1) '())))
+						       :fresh1 (and fresh2 (replacement-data-term (do-every-replace-or-subst (sublis sigma2 fresh2) '()))) ;Similarly swap the freshs
+						       :fresh2 (and fresh1 (replacement-data-term (do-every-replace-or-subst (sublis sigma1 fresh1) '())))))))))
 		 (and (not (eq (first M) 'quote))
                       (do ((z2 (rest M) (rest z2))
                            (k 1 (+ k 1))
@@ -1890,25 +1900,31 @@
 			  path)))
 
 
-(defstruct rewriting beta if fresh)
+(defstruct rewriting beta if fresh beta-replacings if-replacings fresh-replacings)
 
 ;;; Return just the substituted beta
-(defun apply-rewrite-rule (rule term path)
+(defun apply-rewrite-rule (rule term path assumption-exprs)
   (let ((cp (canonical-path path)))
     (cond ((eq cp 'DUMMY) term)
 	  (t (let ((res (try-rewrite-rule rule term cp)))
 	       (unless res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))
-	       (do-every-replace-or-subst (rewriting-beta res)))))))
+	       (replacement-data-term (do-every-replace-or-subst (rewriting-beta res) assumption-exprs)))))))
 
 ;;; Returns a "rewriting" structure
-(defun apply-rewrite-rule-entire (rule term path)
+(defun apply-rewrite-rule-entire (rule term path assumption-exprs)
   (let ((cp (canonical-path path)))
     (cond ((eq cp 'DUMMY) (list term nil))
 	  (t (let ((res (try-rewrite-rule rule term cp)))
 	       (unless res (error "Applying rewrite rule %s to term %s / %s (entire) failed" (rule-name rule) term path))
-	       (make-rewriting :beta (do-every-replace-or-subst (rewriting-beta res))
-			       :if (do-every-replace-or-subst (rewriting-if res))
-			       :fresh (do-every-replace-or-subst (rewriting-fresh res))))))))
+	       (let ((new-beta (do-every-replace-or-subst (rewriting-beta res) assumption-exprs))
+		     (new-if (do-every-replace-or-subst (rewriting-if res) assumption-exprs))
+		     (new-fresh (do-every-replace-or-subst (rewriting-fresh res) assumption-exprs)))
+		 (make-rewriting :beta (replacement-data-term new-beta)
+				 :if (replacement-data-term new-if)
+				 :fresh (replacement-data-term new-fresh)
+				 :beta-replacings (replacement-data-replacings new-beta)
+				 :if-replacings (replacement-data-replacings new-if)
+				 :fresh-replacings (replacement-data-replacings new-fresh))))))))
 
 ;;; Returns a "rewriting" structure
 (defun try-rewrite-rule (rule term path)
@@ -2088,7 +2104,7 @@
 (defun format-rewrites (rws rev term)
   (do ((z rws (rest z))
        (tm term (and term    ;Yes, "term", not "tm" here, in the "and"
-		     (apply-rewrite-rule (rule-lookup (rewrite-rulename (first z))) tm (rewrite-path (first z)))))
+		     (apply-rewrite-rule (rule-lookup (rewrite-rulename (first z))) tm (rewrite-path (first z)) '())))
        (result "" (concat result (format-one-rewrite (first z) rev tm))))
       ((null z) (list result tm))))
 
@@ -2181,6 +2197,7 @@
 						  (if if2 (list (make-condition-data :rulename name2 :cond if2 :rewrite-id (proof-id2 pf))) '())
 						  (if fresh1 (list (make-condition-data :rulename name1 :cond fresh1 :rewrite-id (proof-id1 pf))) '())
 						  (if fresh2 (list (make-condition-data :rulename name2 :cond fresh2 :rewrite-id (proof-id2 pf))) '())))
+			(not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-not-elt-fvs-condition (mapcar #'condition-data-cond assumption-data-list)))
 			(ca-result (contradictory-assumptions assumption-data-list)))
 		   (cond (ca-result 
 			  (princ (format ".%s\nBut %s, so this critical pair cannot occur in practice." linebreak ca-result)))
@@ -2193,10 +2210,10 @@
 							 (proof-rowsep pf) (proof-colsep pf) (proof-rewrites2 pf) (proof-rewrites1 pf) (- k)))
 				  (t (print-tikzcd-diagram P Q R name1 name2 path1 '() (proof-id1 pf) (proof-id2 pf) (proof-extra1 pf) (proof-extra2 pf)
 							   (proof-rowsep pf) (proof-colsep pf) (proof-rewrites1 pf) (proof-rewrites2 pf) k)))
-			    (let ((consequent-if-data-list (append (consequent-if-condition-data-list R (proof-rewrites1 pf))
-								   (consequent-if-condition-data-list P (proof-rewrites2 pf))))
-				  (consequent-fresh-data-list (append (consequent-fresh-condition-data-list R (proof-rewrites1 pf))
-								      (consequent-fresh-condition-data-list P (proof-rewrites2 pf))))
+			    (let ((consequent-if-data-list (append (consequent-if-condition-data-list R (proof-rewrites1 pf) not-elt-fvs-assumption-conds)
+								   (consequent-if-condition-data-list P (proof-rewrites2 pf) not-elt-fvs-assumption-conds)))
+				  (consequent-fresh-data-list (append (consequent-fresh-condition-data-list R (proof-rewrites1 pf) not-elt-fvs-assumption-conds)
+								      (consequent-fresh-condition-data-list P (proof-rewrites2 pf) not-elt-fvs-assumption-conds)))
 				  (avoid-condition-data-list (append (new-fresh-avoid-condition-data-list (proof-rewrites1 pf))
 								     (new-fresh-avoid-condition-data-list (proof-rewrites2 pf)))))
 			      (print-consequent-fresh-conditions avoid-condition-data-list consequent-fresh-data-list)
@@ -2322,43 +2339,47 @@
   (or (null rws)
       (let ((rw (first rws)))
 	(let ((rulename (rewrite-rulename rw)))
-	  (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw))))
+	  (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw) not-elt-fvs-assumption-conds)))
 	    (let ((consequent (rewriting-if res)))
 	      (and (or (null consequent)
-		       (let ((cvar (second (second consequent)))
-			     (cfvars (apply #'append (mapcar #'term-vars (rest (third (second consequent)))))))
-			 (every #'(lambda (cfvar) (some #'(lambda (assumption)
-							    (let ((avar (second (second assumption)))
-								  (afvars (apply #'append (mapcar #'term-vars (rest (third (second assumption)))))))
-							      ;; (print (list 'AVAR avar 'AFVARS afvars))
-							      (and (eq avar cvar)
-								   (member cfvar afvars))))
-							not-elt-fvs-assumption-conds))
-				cfvars)))
+		       (and (is-a-simple-not-elt-fvs-condition consequent)
+			    (condition-is-implied-by-assumptions consequent not-elt-fvs-assumption-conds)))
 		   (check-consequent-conditions (if (rewriting-fresh res)
 						    (cons (rewriting-fresh res) not-elt-fvs-assumption-conds)
 						  not-elt-fvs-assumption-conds)
 						(rewriting-beta res)
 						(rest rws)))))))))
 
+;;; Right now this works only for conditions of the form "(not (elt (x (fvs ...))))".
+(defun condition-is-implied-by-assumptions (not-elt-fvs-cond not-elt-fvs-assumption-conds)
+  (let ((cvar (second (second not-elt-fvs-cond)))
+	(cfvars (apply #'append (mapcar #'term-vars (rest (third (second not-elt-fvs-cond)))))))
+    (every #'(lambda (cfvar) (some #'(lambda (assumption)
+				       (let ((avar (second (second assumption)))
+					     (afvars (apply #'append (mapcar #'term-vars (rest (third (second assumption)))))))
+					 (and (eq avar cvar)
+					      (member cfvar afvars))))
+				   not-elt-fvs-assumption-conds))
+	   cfvars)))
+
 ;;; Returns a list of 2-lists (rulename rif)
-(defun consequent-if-condition-data-list (term rws)
+(defun consequent-if-condition-data-list (term rws not-elt-fvs-assumption-conds)
   (cond ((null rws) '())
 	(t (let ((rw (first rws)))
 	     (let ((rulename (rewrite-rulename rw)))
-	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw))))
-		 (let ((more (consequent-if-condition-data-list (rewriting-beta res) (rest rws))))
+	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw) not-elt-fvs-assumption-conds)))
+		 (let ((more (consequent-if-condition-data-list (rewriting-beta res) (rest rws) not-elt-fvs-assumption-conds)))
 		   (if (rewriting-if res)
 		       (cons (make-condition-data :rulename rulename :cond (rewriting-if res) :rewrite-id (rewrite-id rw)) more)
 		     more))))))))
 
 ;;; Returns a list of 2-lists (rulename rfresh)
-(defun consequent-fresh-condition-data-list (term rws)
+(defun consequent-fresh-condition-data-list (term rws not-elt-fvs-assumption-conds)
   (cond ((null rws) '())
 	(t (let ((rw (first rws)))
 	     (let ((rulename (rewrite-rulename rw)))
-	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw))))
-		 (let ((more (consequent-fresh-condition-data-list (rewriting-beta res) (rest rws))))
+	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw) not-elt-fvs-assumption-conds)))
+		 (let ((more (consequent-fresh-condition-data-list (rewriting-beta res) (rest rws) not-elt-fvs-assumption-conds)))
 		   (if (rewriting-fresh res)
 		       (cons (make-condition-data :rulename rulename :cond (rewriting-fresh res) :rewrite-id (rewrite-id rw)) more)
 		     more))))))))
@@ -2475,7 +2496,7 @@
 
 (defun rewrite-for-tikzcd (rw term)
   (cond ((eq (rewrite-rulename rw) 'TRIVIAL) term)
-	(t (apply-rewrite-rule (rule-lookup (rewrite-rulename rw)) term (rewrite-path rw)))))
+	(t (apply-rewrite-rule (rule-lookup (rewrite-rulename rw)) term (rewrite-path rw) '()))))
 
 ;;; k negative means the diagram is flipped
 (defun print-tikzcd-diagram (P Q R rulename1 rulename2 path1 path2 id1 id2 extra1 extra2 rowsep colsep rw1 rw2 k)
