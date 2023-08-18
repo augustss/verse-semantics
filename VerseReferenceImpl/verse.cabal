@@ -26,14 +26,9 @@ library
     Control.Monad.RST
     Control.Monad.Stuck
     Control.Monad.Supply
-    Control.Monad.Unify
-    Control.Monad.Var
     Control.Monad.Verse
-    Control.Monad.Verse.Class
     Data.Fix
-    Data.Freshenable
-    Data.Ref
-    Data.Unifiable
+    Data.Match
     Language.Verse
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp
@@ -71,7 +66,7 @@ library
     unordered-containers >= 0.2.6.0
   hs-source-dirs: src
   ghc-options: -Wall -Wno-name-shadowing
-  default-language: Haskell2010
+  default-language: GHC2021
 
 test-suite verse-test-suite
   type: exitcode-stdio-1.0
@@ -87,7 +82,7 @@ test-suite verse-test-suite
     verse
   hs-source-dirs: test
   ghc-options: -Wall -Wno-name-shadowing
-  default-language: Haskell2010
+  default-language: GHC2021
 
 executable versei
   main-is: Main.hs
@@ -99,7 +94,7 @@ executable versei
     verse
   hs-source-dirs: main
   ghc-options: -Wall -Wno-name-shadowing
-  default-language: Haskell2010
+  default-language: GHC2021
 
 executable versewasm
   main-is: Main.hs
@@ -116,7 +111,7 @@ executable versewasm
     -Wall -Wno-name-shadowing
     -no-hs-main -optl-mexec-model=reactor
     "-optl-Wl,--export=malloc,--export=calloc_ptr,--export=free,--export=verse_eval"
-  default-language: Haskell2010
+  default-language: GHC2021
 
 executable verselex
   main-is: Main.hs
@@ -129,4 +124,4 @@ executable verselex
     verse
   hs-source-dirs: lex
   ghc-options: -Wall
-  default-language: Haskell2010
+  default-language: GHC2021

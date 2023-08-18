@@ -10,10 +10,7 @@ module Language.Verse.Named
   ( Named (..)
   ) where
 
-import Control.Monad.Var
-
-import Data.Freshenable
-import Data.Unifiable
+import Control.Monad.Verse
 
 import Language.Verse.Pretty
 import Language.Verse.Val
