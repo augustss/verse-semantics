@@ -17,7 +17,7 @@ import Prelude (Eq (..), Foldable, Int, Integer, Num (..), Traversable, otherwis
 import Text.Show
 
 import Match
-import Verse6
+import Verse7
 import Ref
 import Supply
 
@@ -227,10 +227,10 @@ test22 = runSupplyT $ runVerseT do
 
 test23 = runSupplyT $ runVerseT $ do
   x <- freshVar
-  y <- newRef x
+  y <- newVarRef x
   all do
     z <- freshVar
-    writeRef y z
+    writeVarRef y z
     unify z x
   unify x =<< newVar (Int 1)
-  freezeVar =<< readRef y
+  freezeVar =<< readVarRef y

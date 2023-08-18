@@ -656,7 +656,7 @@ copyProcess :: (MonadRef m, MonadSupply Int m)
             -> CopyT m (Process m)
 copyProcess Process {..} = do
   heap <- copyHeap heap
-  children <- newRef =<< local (const $ Just heap) . copyProcesses  =<< readRef children
+  children <- newRef =<< local (const $ Just heap) . copyProcesses =<< readRef children
   suspCount <- newRef =<< readRef suspCount
   right <- newRef =<< readRef right
   pure Process {..}
