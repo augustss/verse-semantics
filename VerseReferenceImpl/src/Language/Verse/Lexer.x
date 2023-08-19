@@ -1,11 +1,7 @@
 {
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Language.Verse.Lexer
   ( Lexer
   , runLexer

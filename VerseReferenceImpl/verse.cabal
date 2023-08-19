@@ -24,7 +24,6 @@ library
     Control.Monad.Logic.State.Class
     Control.Monad.Ref
     Control.Monad.RST
-    Control.Monad.Stuck
     Control.Monad.Supply
     Control.Monad.Verse
     Data.Fix
@@ -41,8 +40,6 @@ library
     Language.Verse.Lexer
     Language.Verse.Loc
     Language.Verse.Name
-    Language.Verse.Named
-    Language.Verse.Overload
     Language.Verse.Parse
     Language.Verse.Parse.Exp
     Language.Verse.Pos

@@ -1,6 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 module Language.Verse.Desugar
   ( desugar
   ) where

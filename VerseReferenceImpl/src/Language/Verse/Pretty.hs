@@ -1,6 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Language.Verse.Pretty
   ( MonadPretty (..)
   ) where

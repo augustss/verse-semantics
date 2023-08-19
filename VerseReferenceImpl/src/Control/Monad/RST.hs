@@ -1,8 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Control.Monad.RST
   ( RST (..)
   , evalRST

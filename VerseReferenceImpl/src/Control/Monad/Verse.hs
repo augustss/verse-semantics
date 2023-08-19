@@ -41,6 +41,7 @@ import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.State.Strict
 import Control.Monad.Supply
+import Control.Monad.Throw
 
 import Data.Bool
 import Data.Either
@@ -136,6 +137,8 @@ newtype Var m f = Var
 newtype VarRef m f = VarRef
   { unVarRef :: Ref m (Var m f)
   }
+
+deriving instance Eq (Ref m (Var m f)) => Eq (VarRef m f)
 
 data HeapMap a = HeapMap !a !(IntMap a)
 

@@ -2,7 +2,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Ref
   ( MonadRef (..)
