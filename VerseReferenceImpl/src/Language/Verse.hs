@@ -6,7 +6,6 @@ module Language.Verse
   ) where
 
 import Control.Monad ((<=<))
-import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Supply

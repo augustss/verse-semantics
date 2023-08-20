@@ -14,13 +14,13 @@ import Control.Applicative
 import Control.Category ((>>>))
 import Control.Comonad
 import Control.Monad
-import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.Reader.Class
 import Control.Monad.Ref
 import Control.Monad.RST
 import Control.Monad.State.Class
 import Control.Monad.Supply
+import Control.Monad.Throw
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Verse
@@ -62,11 +62,13 @@ data S m = S
   , storeFree :: IVar m ()
   }
 
-type MonadEval m = (MonadError Error m, MonadSupply Label m)
+type Defaults m = HashMap Ident (VarVal m, Env m, L (Exp L Ident))
 
-type Defaults m = HashMap Ident (Var m (Val m), Env m, L (Exp L Ident))
+type Env m = HashMap Ident (Bool, VarVal m)
 
-type Env m = HashMap Ident (Bool, Var m (Val m))
+type VarVal m = Var m (Val (VarRef m))
+
+type FrozenVal = Frozen (Val Frozen)
 
 runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> VerseT m a
 runEvalT m = do
@@ -81,15 +83,15 @@ runEvalT' = runRST . evalWriterT
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
 
-eval :: ( MonadError Error m
+eval :: ( MonadThrow Error m
         , MonadFix m
         , MonadRef m
         , MonadSupply Label m
-        , Eq (Ref m (Var m (Val m)))
-        ) => L (Exp L Ident) -> VerseT m (Frozen (Val m))
-eval = freezeVar <=< runEvalT . eval'
+        , Eq (Ref m (VarVal m))
+        ) => L (Exp L Ident) -> VerseT m FrozenVal
+eval = freeze <=< runEvalT . eval'
 
-eval' :: ( MonadError Error m
+eval' :: ( MonadThrow Error m
          , MonadRef m
          , MonadSupply Label m
          , Eq (Ref m (Var m (Val m)))
@@ -696,13 +698,13 @@ newEnv = execWriterT $ do
 -- localNames :: (Semigroup r, MonadReader r m) => r -> m a -> m a
 -- localNames = local . (<>)
 
--- throwDomainError :: MonadError Error m => Loc -> m a
+-- throwDomainError :: MonadThrow Error m => Loc -> m a
 -- throwDomainError = throwError . DomainError
 
--- throwIdentError :: MonadError Error m => Loc -> Ident -> m a
+-- throwIdentError :: MonadThrow Error m => Loc -> Ident -> m a
 -- throwIdentError x = throwError . IdentError x
 
--- throwNameError :: MonadError Error m => Loc -> Name -> m a
+-- throwNameError :: MonadThrow Error m => Loc -> Name -> m a
 -- throwNameError x = throwError . NameError x
 
 -- fromIdents :: HashMap Ident a -> HashMap Name a

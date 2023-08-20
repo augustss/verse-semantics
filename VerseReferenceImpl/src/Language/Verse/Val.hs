@@ -13,7 +13,6 @@ module Language.Verse.Val
   ) where
 
 import Control.Monad
-import Control.Monad.Ref
 import Control.Monad.Verse
 
 import Data.Functor
@@ -29,7 +28,7 @@ import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
 
-data Val m a
+data Val ref a
   = Int !Integer
   | Float {-# UNPACK #-} !Double
   | Rational !Rational
@@ -39,9 +38,9 @@ data Val m a
   | StructInst {-# UNPACK #-} !Label !(HashMap Name a)
   | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(HashMap Name a)
   | Overloads !(Overload a) a
-  | Ptr !(VarRef m (Val m)) deriving (Functor, Foldable, Traversable)
+  | Ptr !(ref (Val ref)) deriving (Functor, Foldable, Traversable)
 
-instance Eq (Ref m (Var m (Val m))) => RowMatchable (Val m) where
+instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
   rowMatch = curry $ \ case
     (Truth x, Truth y) ->
       Zip . Just $ Truth (x, y)
@@ -69,6 +68,21 @@ instance Eq (Ref m (Var m (Val m))) => RowMatchable (Val m) where
     (Ptr x, Ptr y) -> Zip $ guard (x == y) $> Ptr x
     _ -> Zip Nothing
 
+instance ( Freezable a b m
+         , Freezable (f (Val f)) (g (Val g)) m
+         ) => Freezable (Val f a) (Val g b) m where
+  freeze = \ case
+    Int x -> pure $ Int x
+    Float x -> pure $ Float x
+    Rational x -> pure $ Rational x
+    Truth x -> Truth <$> freeze x
+    Tuple xs -> Tuple <$> traverse freeze xs
+    Module i xs -> Module i <$> traverse freeze xs
+    StructInst i xs -> StructInst i <$> traverse freeze xs
+    ClassInst i x xs -> ClassInst i <$> traverse freeze x <*> traverse freeze xs
+    Overloads x xs -> Overloads <$> freeze x <*> freeze xs
+    Ptr x -> Ptr <$> freeze x
+
 data Overload a
   = Function {-# UNPACK #-} !Label !(IdentMap a) !(IdentMap Bool) Exp Exp
   | Struct {-# UNPACK #-} !Label !(IdentMap a) !(IdentMap Bool) Exp
@@ -87,9 +101,20 @@ instance ZipMatchable Overload where
     (Struct i_x env_x xs e1, Struct i_y env_y _ _) ->
       guard (i_x == i_y) $>
       Struct i_x (HashMap.intersectionWith (,) env_x env_y) xs e1
-    (Class i_x env_x super_x xs e1, Class i_y env_y super_y _ _) ->
+    (Class i_x env_x x xs e1, Class i_y env_y y _ _) ->
       guard (i_x == i_y) $>
-      Class i_x (HashMap.intersectionWith (,) env_x env_y)
-      (liftA2 (,) super_x super_y) xs e1
+      Class i_x (HashMap.intersectionWith (,) env_x env_y) (liftA2 (,) x y) xs e1
     (Intrinsic x, Intrinsic y) -> guard (x == y) $> Intrinsic x
     _ -> Nothing
+
+instance Freezable a b m => Freezable (Overload a) (Overload b) m where
+  freeze = \ case
+    Function i env xs e1 e2 -> traverse freeze env <&> \ env ->
+      Function i env xs e1 e2
+    Struct i env xs e1 -> traverse freeze env <&> \ env ->
+      Struct i env xs e1
+    Class i env x xs e1 ->
+      (\ env x -> Class i env x xs e1) <$>
+      traverse freeze env <*>
+      traverse freeze x
+    Intrinsic x -> pure $ Intrinsic x

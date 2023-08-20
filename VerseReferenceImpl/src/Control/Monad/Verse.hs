@@ -3,9 +3,11 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Control.Monad.Verse
   ( VerseT
   , runVerseT
@@ -19,19 +21,21 @@ module Control.Monad.Verse
   , newVar
   , readVar
   , unify
-  , Frozen (..)
-  , freezeVar
   , VarRef
   , newVarRef
   , readVarRef
   , writeVarRef
-  , FreshenT
-  , Freshenable (..)
   , fork
   , one
   , if'
   , all
   , for
+  , Freezable (..)
+  , FreezeT
+  , freeze'
+  , Frozen (..)
+  , Freshenable (..)
+  , FreshenT
   ) where
 
 import Control.Applicative
@@ -64,6 +68,8 @@ import Data.Tuple
 import GHC.Exts (Any)
 
 import Prelude (Num (..), ($!), error, reverse, subtract)
+
+import Prettyprinter
 
 import Text.Show
 
@@ -179,6 +185,8 @@ instance Monad (VerseT m) where
 
 instance MonadTrans VerseT where
   lift m = VerseT $ \ _ sk fk ek rk r -> m >>= \ x -> sk x fk ek rk r
+
+instance MonadThrow e m => MonadThrow e (VerseT m)
 
 runVerseT :: MonadRef m => VerseT m a -> m (Maybe [a])
 runVerseT m = do
@@ -361,35 +369,6 @@ unifyUncons f_x v_xs f_y v_ys = do
 compare' :: Int -> Int -> Int -> Int -> Ordering
 compare' n_x i_x n_y i_y = compare (n_x, i_x) (n_y, i_y)
 
-data Frozen f
-  = Unknown
-  | Known (f (Frozen f))
-
-deriving instance Show (f (Frozen f)) => Show (Frozen f)
-
-freezeVar :: ( MonadFix m
-             , MonadRef m
-             , Traversable f
-             ) => Var m f -> VerseT m (Frozen f)
-freezeVar v = do
-  r <- ask'
-  lift $ runFreezeT (freezeVar' v) r.heap
-
-type FreezeT f m = ReaderT HeapKey (StateT (IntMap (Frozen f)) m)
-
-runFreezeT :: Monad m => FreezeT f m a -> Maybe Heap -> m a
-runFreezeT m = flip evalStateT mempty . runReaderT m
-
-freezeVar' :: ( MonadFix m
-              , MonadRef m
-              , Traversable f
-              ) => Var m f -> FreezeT f m (Frozen f)
-freezeVar' v = ask >>= lift . lift . readRepr' v >>= \ case
-  Unbound {} -> pure Unknown
-  Bound x i -> mfix $ \ x' -> state' (lookupInsert i x') >>= \ case
-    Just x' -> pure x'
-    Nothing -> Known <$> traverse freezeVar' x
-
 writeLink :: MonadRef m => Var m f -> Var m f -> VerseT m ()
 writeLink v_x v_y = do
   x <- readVarState v_x
@@ -476,7 +455,10 @@ newVarRef :: MonadRef m => Var m f -> VerseT m (VarRef m f)
 newVarRef = lift . fmap VarRef . newRef
 
 readVarRef :: MonadRef m => VarRef m f -> VerseT m (Var m f)
-readVarRef = lift . readRef . unVarRef
+readVarRef = lift . readVarRef'
+
+readVarRef' :: MonadRef m => VarRef m f -> m (Var m f)
+readVarRef' = readRef . unVarRef
 
 writeVarRef :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
             => VarRef m f -> Var m f -> VerseT m ()
@@ -586,6 +568,52 @@ split heap left m = VerseT $ \ _ sk fk ek rk r -> do
           right <- newRef m
           modifyRef' r.children (Process {..}:)
           sk result fk (\ r -> rk' r *> ek r) (rk' *> rk) r
+
+class Monad m => Freezable a b m | a -> b where
+  freeze :: a -> FreezeT m b
+
+newtype FreezeT m a = FreezeT
+  { unFreezeT :: ReaderT HeapKey (StateT (IntMap Any) m) a
+  } deriving ( Functor
+             , Applicative
+             , Monad
+             , MonadFix
+             )
+
+instance MonadTrans FreezeT where
+  lift = FreezeT . lift . lift
+
+instance ( MonadFix m
+         , MonadRef m
+         , Freezable (f (Var m f)) (g (Frozen g)) m
+         ) => Freezable (Var m f) (Frozen g) m where
+  freeze v = FreezeT ask >>= lift . readRepr' v >>= \ case
+    Unbound {} -> pure Unknown
+    Bound x i -> mfix $ FreezeT . state' . lookupInsert i . unsafeCoerce >=> \ case
+      Just x' -> pure $ unsafeCoerce x'
+      Nothing -> Known <$> freeze x
+
+instance ( MonadFix m
+         , MonadRef m
+         , Freezable (f (Var m f)) (g (Frozen g)) m
+         ) => Freezable (VarRef m f) (Frozen g) m where
+  freeze = freeze <=< lift . readVarRef'
+
+freeze' :: (Monad m, Freezable a b m) => a -> VerseT m b
+freeze' x = do
+  r <- ask'
+  lift $ evalStateT (runReaderT (unFreezeT (freeze x)) r.heap) mempty
+
+data Frozen f
+  = Unknown
+  | Known (f (Frozen f))
+
+deriving instance Show (f (Frozen f)) => Show (Frozen f)
+
+instance Pretty (f (Frozen f)) => Pretty (Frozen f) where
+  pretty = \ case
+    Unknown -> "_"
+    Known x -> pretty x
 
 class Monad m => Freshenable a m where
   freshen :: a -> FreshenT m a
