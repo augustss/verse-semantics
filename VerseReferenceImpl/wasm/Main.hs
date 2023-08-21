@@ -23,7 +23,6 @@ import Foreign.Storable
 
 import Language.Verse qualified as Verse
 import Language.Verse.Error
-import Language.Verse.Val (Val)
 
 import Prettyprinter
 import Prettyprinter.Render.Text

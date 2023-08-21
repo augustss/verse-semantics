@@ -4,7 +4,6 @@ module Main
   ( main
   ) where
 
-import Control.Monad
 import Control.Monad.Supply
 import Control.Monad.Trans.Except
 import Control.Monad.Verse

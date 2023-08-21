@@ -52,7 +52,7 @@ import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
 import Language.Verse.Loc (Loc, L, loc)
 import Language.Verse.Name
-import Language.Verse.Val (Val)
+import Language.Verse.Val (Val, VarVal, FrozenVal)
 import Language.Verse.Val qualified as Val
 
 type EvalT m = WriterT (Defaults m) (RST (Env m) (S m) (VerseT m))
@@ -65,10 +65,6 @@ data S m = S
 type Defaults m = HashMap Ident (VarVal m, Env m, L (Exp L Ident))
 
 type Env m = HashMap Ident (Bool, VarVal m)
-
-type VarVal m = Var m (Val (VarRef m))
-
-type FrozenVal = Frozen (Val Frozen)
 
 runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> VerseT m a
 runEvalT m = do
@@ -89,13 +85,13 @@ eval :: ( MonadThrow Error m
         , MonadSupply Label m
         , Eq (Ref m (VarVal m))
         ) => L (Exp L Ident) -> VerseT m FrozenVal
-eval = freeze <=< runEvalT . eval'
+eval = freeze' <=< runEvalT . eval'
 
 eval' :: ( MonadThrow Error m
          , MonadRef m
          , MonadSupply Label m
-         , Eq (Ref m (Var m (Val m)))
-         ) => L (Exp L Ident) -> EvalT m (Var m (Val m))
+         , Eq (Ref m (VarVal m))
+         ) => L (Exp L Ident) -> EvalT m (VarVal m)
 eval' e = case extract e of
   e1 :*>: e2 ->
     eval' e1 *> eval' e2

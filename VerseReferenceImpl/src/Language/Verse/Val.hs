@@ -9,17 +9,22 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Language.Verse.Val
   ( Val (..)
+  , VarVal
+  , FrozenVal
   , Overload (..)
+  , VarOverload
+  , FrozenOverload
   ) where
 
 import Control.Monad
-import Control.Monad.Verse
+import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen)
 
 import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Match
 import Data.Ratio
+import Data.Traversable
 
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
@@ -27,6 +32,8 @@ import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
+
+import Prettyprinter
 
 data Val ref a
   = Int !Integer
@@ -39,6 +46,10 @@ data Val ref a
   | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(HashMap Name a)
   | Overloads !(Overload a) a
   | Ptr !(ref (Val ref)) deriving (Functor, Foldable, Traversable)
+
+type VarVal m = Var m (Val (VarRef m))
+
+type FrozenVal = Frozen (Val Frozen)
 
 instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
   rowMatch = curry $ \ case
@@ -76,12 +87,64 @@ instance ( Freezable a b m
     Float x -> pure $ Float x
     Rational x -> pure $ Rational x
     Truth x -> Truth <$> freeze x
-    Tuple xs -> Tuple <$> traverse freeze xs
-    Module i xs -> Module i <$> traverse freeze xs
-    StructInst i xs -> StructInst i <$> traverse freeze xs
-    ClassInst i x xs -> ClassInst i <$> traverse freeze x <*> traverse freeze xs
+    Tuple xs -> Tuple <$> for xs freeze
+    Module i xs -> Module i <$> for xs freeze
+    StructInst i xs -> StructInst i <$> for xs freeze
+    ClassInst i x xs -> ClassInst i <$> for x freeze <*> for xs freeze
     Overloads x xs -> Overloads <$> freeze x <*> freeze xs
     Ptr x -> Ptr <$> freeze x
+
+instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
+  pretty = \ case
+    Int x -> pretty x
+    Float x -> pretty x
+    Rational x | denominator x == 1 -> pretty $ numerator x
+    Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+    Truth x -> align $ "truth" <> group (braces $ pretty x)
+    Overloads {} -> "function"
+    Tuple [] -> "false"
+    Tuple xs -> tupled $ pretty <$> xs
+    Module i xs ->
+      align $
+      "module#" <>
+      prettyLabel i <>
+      group (braced $ prettyNames xs)
+    StructInst i xs ->
+      align $
+      "struct#" <>
+      prettyLabel i <>
+      group (braced $ prettyNames xs)
+    ClassInst i Nothing xs ->
+      align $
+      "class#" <>
+      prettyLabel i <>
+      group (braced $ prettyNames xs)
+    ClassInst i (Just x) xs ->
+      align $
+      "class#" <>
+      prettyLabel i <>
+      parens (pretty x) <>
+      group (braced $ prettyNames xs)
+    Ptr x -> pretty x
+    where
+      prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
+        align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
+      tupled =
+        group .
+        encloseSep
+        (flatAlt "( " lparen)
+        (flatAlt (hardline <> rparen) rparen)
+        ", "
+      braces x =
+        flatAlt (hardline <> "{ ") lbrace <>
+        x <>
+        flatAlt (hardline <> rbrace) rbrace
+      braced =
+        group .
+        encloseSep
+        (flatAlt (hardline <> "{ ") lbrace)
+        (flatAlt (hardline <> rbrace) rbrace)
+        ", "
 
 data Overload a
   = Function {-# UNPACK #-} !Label !(IdentMap a) !(IdentMap Bool) Exp Exp
@@ -90,6 +153,10 @@ data Overload a
   | Intrinsic !Intrinsic deriving (Functor, Foldable, Traversable)
 
 type Exp = L (Desugar.Exp L Ident)
+
+type VarOverload m = Var m Overload
+
+type FrozenOverload = Frozen Overload
 
 instance RowMatchable Overload
 
@@ -109,12 +176,10 @@ instance ZipMatchable Overload where
 
 instance Freezable a b m => Freezable (Overload a) (Overload b) m where
   freeze = \ case
-    Function i env xs e1 e2 -> traverse freeze env <&> \ env ->
+    Function i env xs e1 e2 -> for env freeze <&> \ env ->
       Function i env xs e1 e2
-    Struct i env xs e1 -> traverse freeze env <&> \ env ->
+    Struct i env xs e1 -> for env freeze <&> \ env ->
       Struct i env xs e1
     Class i env x xs e1 ->
-      (\ env x -> Class i env x xs e1) <$>
-      traverse freeze env <*>
-      traverse freeze x
+      (\ env x -> Class i env x xs e1) <$> for env freeze <*> for x freeze
     Intrinsic x -> pure $ Intrinsic x

@@ -13,7 +13,6 @@ import Control.Monad.Throw
 import Control.Monad.Verse
 
 import Data.ByteString (ByteString)
-import Data.Fix
 
 import Language.Verse.Desugar
 import Language.Verse.Error
@@ -27,6 +26,6 @@ eval :: ( MonadFix m
         , MonadRef m
         , MonadSupply Label m
         , MonadThrow Error m
-        , Eq (Ref m (Var m (Val m)))
-        ) => ByteString -> VerseT m (Frozen (Val m))
+        , Eq (Ref m (VarVal m))
+        ) => ByteString -> VerseT m FrozenVal
 eval = Eval.eval <=< liftEither . (desugar <=< runLexer parse)
