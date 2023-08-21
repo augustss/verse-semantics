@@ -12,14 +12,14 @@ module Language.Verse.Val
   , VarVal
   , FrozenVal
   , Overload (..)
-  , VarOverload
-  , FrozenOverload
+  , Named (..)
   ) where
 
 import Control.Monad
 import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen)
 
 import Data.Functor
+import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Match
@@ -41,11 +41,10 @@ data Val ref a
   | Rational !Rational
   | Truth a
   | Tuple [a]
-  | Module {-# UNPACK #-} !Label !(HashMap Name a)
-  | StructInst {-# UNPACK #-} !Label !(HashMap Name a)
-  | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(HashMap Name a)
-  | Overloads !(Overload a) a
-  | Ptr !(ref (Val ref)) deriving (Functor, Foldable, Traversable)
+  | Module {-# UNPACK #-} !Label !(Env Name ref a)
+  | StructInst {-# UNPACK #-} !Label !(Env Name ref a)
+  | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(Env Name ref a)
+  | Overloads !(Overload ref a) a deriving (Functor, Foldable, Traversable)
 
 type VarVal m = Var m (Val (VarRef m))
 
@@ -69,18 +68,17 @@ instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
       Zip $ Tuple <$> zipMatch xs ys
     (StructInst i xs, StructInst j ys) ->
       Zip $ guard (i == j) $>
-      StructInst i (HashMap.intersectionWith (,) xs ys)
+      StructInst i (zipMatchEnv xs ys)
     (ClassInst i x xs, ClassInst j y ys) ->
       Zip $ guard (i == j) $>
-      ClassInst i (liftA2 (,) x y) (HashMap.intersectionWith (,) xs ys)
+      ClassInst i (liftA2 (,) x y) (zipMatchEnv xs ys)
     (Overloads x xs, Overloads y ys) -> case zipMatch x y of
       Just x -> Zip . Just $ Overloads x (xs, ys)
       Nothing -> Uncons (Overloads x) xs (Overloads y) ys
-    (Ptr x, Ptr y) -> Zip $ guard (x == y) $> Ptr x
     _ -> Zip Nothing
 
-instance ( Freezable a b m
-         , Freezable (f (Val f)) (g (Val g)) m
+instance ( Freezable (f (Val f)) (g (Val g)) m
+         , Freezable a b m
          ) => Freezable (Val f a) (Val g b) m where
   freeze = \ case
     Int x -> pure $ Int x
@@ -92,7 +90,6 @@ instance ( Freezable a b m
     StructInst i xs -> StructInst i <$> for xs freeze
     ClassInst i x xs -> ClassInst i <$> for x freeze <*> for xs freeze
     Overloads x xs -> Overloads <$> freeze x <*> freeze xs
-    Ptr x -> Ptr <$> freeze x
 
 instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
   pretty = \ case
@@ -125,7 +122,6 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
       prettyLabel i <>
       parens (pretty x) <>
       group (braced $ prettyNames xs)
-    Ptr x -> pretty x
     where
       prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
         align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
@@ -146,35 +142,33 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
 
-data Overload a
-  = Function {-# UNPACK #-} !Label !(IdentMap a) !(IdentMap Bool) Exp Exp
-  | Struct {-# UNPACK #-} !Label !(IdentMap a) !(IdentMap Bool) Exp
-  | Class {-# UNPACK #-} !Label !(IdentMap a) (Maybe a) !(IdentMap Bool) Exp
+data Overload ref a
+  = Function {-# UNPACK #-} !Label !(Env Ident ref a) !(IdentMap Bool) Exp Exp
+  | Struct {-# UNPACK #-} !Label !(Env Ident ref a) !(IdentMap Bool) Exp
+  | Class {-# UNPACK #-} !Label !(Env Ident ref a) (Maybe a) !(IdentMap Bool) Exp
   | Intrinsic !Intrinsic deriving (Functor, Foldable, Traversable)
 
 type Exp = L (Desugar.Exp L Ident)
 
-type VarOverload m = Var m Overload
+instance Eq (ref (Val ref)) => RowMatchable (Overload ref)
 
-type FrozenOverload = Frozen Overload
-
-instance RowMatchable Overload
-
-instance ZipMatchable Overload where
+instance Eq (ref (Val ref)) => ZipMatchable (Overload ref) where
   zipMatch = curry $ \ case
     (Function i_x env_x xs e1 e2, Function i_y env_y _ _ _) ->
       guard (i_x == i_y) $>
-      Function i_x (HashMap.intersectionWith (,) env_x env_y) xs e1 e2
+      Function i_x (zipMatchEnv env_x env_y) xs e1 e2
     (Struct i_x env_x xs e1, Struct i_y env_y _ _) ->
       guard (i_x == i_y) $>
-      Struct i_x (HashMap.intersectionWith (,) env_x env_y) xs e1
+      Struct i_x (zipMatchEnv env_x env_y) xs e1
     (Class i_x env_x x xs e1, Class i_y env_y y _ _) ->
       guard (i_x == i_y) $>
-      Class i_x (HashMap.intersectionWith (,) env_x env_y) (liftA2 (,) x y) xs e1
+      Class i_x (zipMatchEnv env_x env_y) (liftA2 (,) x y) xs e1
     (Intrinsic x, Intrinsic y) -> guard (x == y) $> Intrinsic x
     _ -> Nothing
 
-instance Freezable a b m => Freezable (Overload a) (Overload b) m where
+instance ( Freezable (f (Val f)) (g (Val g)) m
+         , Freezable a b m
+         ) => Freezable (Overload f a) (Overload g b) m where
   freeze = \ case
     Function i env xs e1 e2 -> for env freeze <&> \ env ->
       Function i env xs e1 e2
@@ -183,3 +177,35 @@ instance Freezable a b m => Freezable (Overload a) (Overload b) m where
     Class i env x xs e1 ->
       (\ env x -> Class i env x xs e1) <$> for env freeze <*> for x freeze
     Intrinsic x -> pure $ Intrinsic x
+
+data Named ref a
+  = Val a
+  | Ref (ref (Val ref)) deriving (Functor, Foldable, Traversable)
+
+instance Eq (ref (Val ref)) => RowMatchable (Named ref)
+
+instance Eq (ref (Val ref)) => ZipMatchable (Named ref) where
+  zipMatch = curry $ \ case
+    (Val x, Val y) -> Just $ Val (x, y)
+    (Ref x, Ref y) -> guard (x == y) $> Ref x
+    _ -> Nothing
+
+instance ( Freezable (f (Val f)) (g (Val g)) m
+         , Freezable a b m
+         ) => Freezable (Named f a) (Named g b) m where
+  freeze = \ case
+    Val x -> Val <$> freeze x
+    Ref x -> Ref <$> freeze x
+
+instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Named ref a) where
+  pretty = \ case
+    Val x -> pretty x
+    Ref x -> pretty x
+
+type Env k ref a = HashMap k (Named ref a)
+
+zipMatchEnv :: (Hashable k, Eq (ref (Val ref)))
+            => Env k ref a
+            -> Env k ref b
+            -> Env k ref (a, b)
+zipMatchEnv x y = HashMap.mapMaybe id $ HashMap.intersectionWith zipMatch x y

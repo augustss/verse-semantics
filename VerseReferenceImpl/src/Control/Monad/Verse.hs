@@ -40,12 +40,12 @@ module Control.Monad.Verse
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Abort
 import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.State.Strict
 import Control.Monad.Supply
-import Control.Monad.Throw
 
 import Data.Bool
 import Data.Either
@@ -186,7 +186,7 @@ instance Monad (VerseT m) where
 instance MonadTrans VerseT where
   lift m = VerseT $ \ _ sk fk ek rk r -> m >>= \ x -> sk x fk ek rk r
 
-instance MonadThrow e m => MonadThrow e (VerseT m)
+instance MonadAbort e m => MonadAbort e (VerseT m)
 
 runVerseT :: MonadRef m => VerseT m a -> m (Maybe [a])
 runVerseT m = do

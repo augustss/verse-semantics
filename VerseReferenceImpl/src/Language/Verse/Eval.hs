@@ -14,20 +14,19 @@ import Control.Applicative
 import Control.Category ((>>>))
 import Control.Comonad
 import Control.Monad
+import Control.Monad.Abort
 import Control.Monad.Fix
 import Control.Monad.Reader.Class
 import Control.Monad.Ref
 import Control.Monad.RST
 import Control.Monad.State.Class
 import Control.Monad.Supply
-import Control.Monad.Throw
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Verse
 
 import Data.Bool
 import Data.Eq
-import Data.Fix
 import Data.Function
 import Data.Functor
 import Data.Hashable
@@ -38,7 +37,7 @@ import Data.Kind
 import Data.Maybe
 import Data.Monoid
 import Data.Ratio
-import Data.Traversable (Traversable)
+import Data.Traversable (traverse)
 import Data.Tuple
 import Data.Semigroup
 
@@ -52,7 +51,7 @@ import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
 import Language.Verse.Loc (Loc, L, loc)
 import Language.Verse.Name
-import Language.Verse.Val (Val, VarVal, FrozenVal)
+import Language.Verse.Val (Val, VarVal, FrozenVal, Named (..))
 import Language.Verse.Val qualified as Val
 
 type EvalT m = WriterT (Defaults m) (RST (Env m) (S m) (VerseT m))
@@ -79,7 +78,7 @@ runEvalT' = runRST . evalWriterT
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
 
-eval :: ( MonadThrow Error m
+eval :: ( MonadAbort Error m
         , MonadFix m
         , MonadRef m
         , MonadSupply Label m
@@ -87,7 +86,7 @@ eval :: ( MonadThrow Error m
         ) => L (Exp L Ident) -> VerseT m FrozenVal
 eval = freeze' <=< runEvalT . eval'
 
-eval' :: ( MonadThrow Error m
+eval' :: ( MonadAbort Error m
          , MonadRef m
          , MonadSupply Label m
          , Eq (Ref m (VarVal m))
@@ -108,15 +107,11 @@ eval' e = case extract e of
     var <- lift' freshVar
     env <- ask
     s <- get
-    choiceFree <- lift' freshIVar
     storeFree <- lift' freshIVar
-    put S { choiceFree, storeFree }
+    put s { storeFree }
     lift' $ fork do
       readIVar s.choiceFree
       (x, s') <- runEvalT' (eval' e1 <|> eval' e2) env s
-      fork do
-        readIVar s'.choiceFree
-        writeIVar choiceFree ()
       fork do
         readIVar s'.storeFree
         writeIVar storeFree ()
@@ -156,22 +151,22 @@ eval' e = case extract e of
 --       (const empty)
 --       (pure ())
 --     newVar $ Val.Tuple []
---   Exp.Query e -> do
---     var_e <- eval' e
---     var <- freshVar
---     unify var_e =<< newVar (Val.Truth var)
---     pure var
---   Exp.Module i xs e -> do
---     xs <- for xs freshNamed
---     _ <- localNames xs $ eval' e
---     newVar . Val.Module i $ fromIdents xs
---   Exp.Struct i xs e -> do
---     env <- ask
---     newVar . Val.Overloads (Val.Struct i env xs e) =<< freshVar
---   Exp.Class i e_super xs e -> do
---     env <- ask
---     var_super <- for e_super eval'
---     newVar . Val.Overloads (Val.Class i env var_super xs e) =<< freshVar
+  Exp.Query e -> do
+    var_e <- eval' e
+    var <- lift' freshVar
+    lift' $ unify var_e =<< newVar (Val.Truth var)
+    pure var
+  Exp.Module i xs e -> do
+    xs <- lift' $ for xs freshNamed
+    _ <- localNames xs $ eval' e
+    newVar . Val.Module i $ fromIdents xs
+  Exp.Struct i xs e -> do
+    env <- ask
+    lift' $ newVar . Val.Overloads (Val.Struct i env xs e) =<< freshVar
+  Exp.Class i e_super xs e -> do
+    env <- ask
+    var_super <- for e_super eval'
+    lift' $ newVar . Val.Overloads (Val.Class i env var_super xs e) =<< freshVar
 --   Exp.Inst e1 xs e2 ->
 --     evalInst (loc e) e1 xs e2
 --   Exp.IfThenElse xs p t e -> do
@@ -205,38 +200,39 @@ eval' e = case extract e of
 --     putChoiceFree choiceFree'
 --     putStoreFree storeFree'
 --     pure var
---   Exp.Exists x e -> do
---     var <- freshVar
---     localName (extract x) (Val var) $ eval' e
---   Exp.Var x e -> do
---     ref <- lift freshVarRef
---     localName (extract x) (Ref ref) $ eval' e
---   Exp.Set x e -> lookupName' (extract x) >>= \ case
---     Nothing -> throwIdentError (loc x) (extract x)
---     Just (Val _) -> throwDomainError $ loc e
---     Just (Ref ref) -> do
---       var <- eval' e
---       writeVarRef' ref var
---       pure var
---   Exp.Function xs e1 e2 -> do
---     i <- supply
---     env <- ask
---     newVar . Val.Overloads (Val.Function i env xs e1 e2) =<< freshVar
+  Exp.Exists x e -> do
+    var <- lift' freshVar
+    localName (extract x) (Val var) $ eval' e
+  Exp.Var x e -> do
+    ref <- lift' $ newVarRef =<< freshVar
+    localName (extract x) (Ref ref) $ eval' e
+  Exp.Set x e -> lookupName' (extract x) >>= \ case
+    Nothing -> abortWithIdentError (loc x) (extract x)
+    Just (Val _) -> abortWithDomainError $ loc e
+    Just (Ref ref) -> do
+      var <- eval' e
+      writeVarRef' ref var
+      pure var
+  Exp.Function xs e1 e2 -> do
+    i <- supply
+    env <- ask
+    lift' $ newVar . Val.Overloads (Val.Function i env xs e1 e2) =<< freshVar
 --   Exp.ParenInvoke e1 e2 ->
 --     evalInvoke (loc e) e1 e2
 --   Exp.BracketInvoke e1 e2 ->
 --     evalInvoke (loc e) e1 e2
---   Exp.Tuple exps ->
---     newVar . Val.Tuple =<< traverse eval' exps
---   Exp.Truth e ->
---     newVar . Val.Truth =<< eval' e
---   Exp.Int x ->
---     newVar $ Val.Int x
---   Exp.Float x ->
---     newVar $ Val.Float x
---   Exp.Name x -> lookupName x >>= \ case
---     Nothing -> throwIdentError (loc e) x
---     Just var -> pure var
+  Exp.Tuple exps ->
+    lift' . newVar . Val.Tuple =<< traverse eval' exps
+  Exp.Truth e ->
+    lift' . newVar . Val.Truth =<< eval' e
+  Exp.Int x ->
+    lift' . newVar $ Val.Int x
+  Exp.Float x ->
+    lift' . newVar $ Val.Float x
+  Exp.Name x -> lookupName x >>= \ case
+    Nothing -> abortWithIdentError (loc e) x
+    Just (Val var) -> pure var
+    Just (Ref ref) -> readVarRef' ref
 --   Exp.Default x e1 e2 -> do
 --     var1 <- eval' e1
 --     env <- ask
@@ -256,18 +252,18 @@ eval' e = case extract e of
 --       case HashMap.lookup x xs of
 --         Just (Ref ref_x) -> readVarRef' ref_x $ unify var
 --         Just (Val var_x) -> unify var var_x
---         Nothing -> throwNameError loc x
+--         Nothing -> abortWithNameError loc x
 --     Val.StructInst _ xs ->
 --       case HashMap.lookup x xs of
 --         Just (Ref ref_x) -> readVarRef' ref_x $ unify var
 --         Just (Val var_x) -> unify var var_x
---         Nothing -> throwNameError loc x
+--         Nothing -> abortWithNameError loc x
 --     Val.ClassInst _ _ xs ->
 --       case HashMap.lookup x xs of
 --         Just (Ref ref_x) -> readVarRef' ref_x $ unify var
 --         Just (Val var_x) -> unify var var_x
---         Nothing -> throwNameError loc x
---     _ -> throwDomainError loc
+--         Nothing -> abortWithNameError loc x
+--     _ -> abortWithDomainError loc
 --   pure var
 
 -- evalDotDot :: MonadEval m =>
@@ -285,8 +281,8 @@ eval' e = case extract e of
 --       Val.Int val2 -> do
 --         unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
 --         unify choiceFree choiceFree'
---       _ -> throwDomainError $ loc e2
---     _ -> throwDomainError $ loc e1
+--       _ -> abortWithDomainError $ loc e2
+--     _ -> abortWithDomainError $ loc e1
 --   putChoiceFree choiceFree'
 --   pure var
 
@@ -328,8 +324,8 @@ eval' e = case extract e of
 --             unify var =<< newVar (Val.ClassInst i var_super ys')
 --         _ -> whenBound var1 $ \ case
 --           Val.Overloads overload var1 -> recur overload var1
---           _ -> throwDomainError loc) overload var1
---     _ -> throwDomainError loc
+--           _ -> abortWithDomainError loc) overload var1
+--     _ -> abortWithDomainError loc
 --   pure var
 
 -- evalInvoke :: MonadEval m =>
@@ -360,7 +356,7 @@ eval' e = case extract e of
 --               unify storeFree storeFree'
 --             Nothing -> whenBound var1 $ \ case
 --               Val.Overloads overload var1 -> recur overload var1
---               _ -> throwDomainError loc
+--               _ -> abortWithDomainError loc
 --         Val.Struct i env xs e -> do
 --           unify var var2
 --           invokeStruct i env xs e var2
@@ -379,8 +375,8 @@ eval' e = case extract e of
 --               unify storeFree storeFree'
 --             Nothing -> whenBound var1 $ \ case
 --               Val.Overloads overload var1 -> recur overload var1
---               _ -> throwDomainError loc) overload var1
---     _ -> throwDomainError loc
+--               _ -> abortWithDomainError loc) overload var1
+--     _ -> abortWithDomainError loc
 --   putChoiceFree choiceFree'
 --   putStoreFree storeFree'
 --   pure var
@@ -654,7 +650,7 @@ eval' e = case extract e of
 --         var' <- newVar $ Val.ClassInst i var_super ys'
 --         f var' (defs <> defs_super) ys
 --     _ -> instClass loc var xs f
---   _ -> throwDomainError loc
+--   _ -> abortWithDomainError loc
 
 -- instClass' :: MonadEval m =>
 --               Loc ->
@@ -670,7 +666,7 @@ eval' e = case extract e of
 --         var' <- newVar $ Val.ClassInst i var_super $ fromIdents ys
 --         f var' ys
 --     _ -> instClass' loc var f
---   _ -> throwDomainError loc
+--   _ -> abortWithDomainError loc
 
 newEnv :: (MonadRef m, MonadSupply Int m) => VerseT m (Env m)
 newEnv = execWriterT $ do
@@ -694,23 +690,23 @@ newEnv = execWriterT $ do
 -- localNames :: (Semigroup r, MonadReader r m) => r -> m a -> m a
 -- localNames = local . (<>)
 
--- throwDomainError :: MonadThrow Error m => Loc -> m a
--- throwDomainError = throwError . DomainError
+abortWithDomainError :: MonadAbort Error m => Loc -> m a
+abortWithDomainError = abort . DomainError
 
--- throwIdentError :: MonadThrow Error m => Loc -> Ident -> m a
--- throwIdentError x = throwError . IdentError x
+abortWithIdentError :: MonadAbort Error m => Loc -> Ident -> m a
+abortWithIdentError x = abort . IdentError x
 
--- throwNameError :: MonadThrow Error m => Loc -> Name -> m a
--- throwNameError x = throwError . NameError x
+abortWithNameError :: MonadAbort Error m => Loc -> Name -> m a
+abortWithNameError x = abort . NameError x
 
--- fromIdents :: HashMap Ident a -> HashMap Name a
--- fromIdents =
---   HashMap.fromList .
---   HashMap.foldrWithKey
---   (\ case
---       Ident.Name x -> \ y z -> (x, y) : z
---       Ident.Label _ -> \ _ z -> z)
---   []
+fromIdents :: HashMap Ident a -> HashMap Name a
+fromIdents =
+  HashMap.fromList .
+  HashMap.foldrWithKey
+  (\ case
+      Ident.Name x -> \ y z -> (x, y) : z
+      Ident.Label _ -> \ _ z -> z)
+  []
 
 -- if'' :: (MonadRef m, MonadSupply Int m, Freshenable a m)
 --      => EvalT m a -> (a -> EvalT m b) -> EvalT m b -> EvalT m (IVar m b)
@@ -744,6 +740,14 @@ newEnv = execWriterT $ do
 --       fork do
 --         readIVar storeFree'
 --         writeIVar storeFree ()
+
+freshNamed :: Bool -> VerseT m (Named (VarRef m) (VarVal m))
+freshNamed = \ case
+  False -> Val <$> freshVar
+  True -> Ref <$> freshVarRef
+
+freshVarRef :: VerseT m (VarRef m f)
+freshVarRef = newVarRef =<< freshVar
 
 getChoiceFree :: Monad m => EvalT m (IVar m ())
 getChoiceFree = gets choiceFree
