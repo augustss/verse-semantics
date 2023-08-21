@@ -63,7 +63,7 @@ data S m = S
 
 type Defaults m = HashMap Ident (VarVal m, Env m, L (Exp L Ident))
 
-type Env m = HashMap Ident (Bool, VarVal m)
+type Env m = HashMap Ident (Named (VarRef m) (VarVal m))
 
 runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> VerseT m a
 runEvalT m = do
@@ -683,12 +683,9 @@ newEnv = execWriterT $ do
   tell' "int" Intrinsic.Int
   where
     tell' x y =
-      tell . HashMap.singleton x . (False,) =<<
+      tell . HashMap.singleton x . Val =<<
       lift . newVar . Val.Overloads (Val.Intrinsic y) =<<
       lift freshVar
-
--- localNames :: (Semigroup r, MonadReader r m) => r -> m a -> m a
--- localNames = local . (<>)
 
 abortWithDomainError :: MonadAbort Error m => Loc -> m a
 abortWithDomainError = abort . DomainError
@@ -703,9 +700,9 @@ fromIdents :: HashMap Ident a -> HashMap Name a
 fromIdents =
   HashMap.fromList .
   HashMap.foldrWithKey
-  (\ case
-      Ident.Name x -> \ y z -> (x, y) : z
-      Ident.Label _ -> \ _ z -> z)
+  \ case
+    Ident.Name x -> \ y z -> (x, y) : z
+    Ident.Label _ -> \ _ z -> z
   []
 
 -- if'' :: (MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -741,13 +738,20 @@ fromIdents =
 --         readIVar storeFree'
 --         writeIVar storeFree ()
 
-freshNamed :: Bool -> VerseT m (Named (VarRef m) (VarVal m))
-freshNamed = \ case
-  False -> Val <$> freshVar
-  True -> Ref <$> freshVarRef
+lookupName :: Ident -> EvalT m (VarVal m)
+lookupName = lookupName' >=> \ case
+  Nothing -> pure Nothing
+  Just (Val x) -> pure $ Just x
+  Just (Ref x) -> Just <$> readVarRef' x
 
-freshVarRef :: VerseT m (VarRef m f)
-freshVarRef = newVarRef =<< freshVar
+lookupName' :: Ident -> EvalT m (Maybe (Named (VarRef m) (VarVal m)))
+lookupName' x = HashMap.lookup x <$> ask
+
+localName :: Ident -> Named (VarRef m) (VarVal m) -> EvalT m a -> EvalT m a
+localName x = local . HashMap.insert x
+
+localNames :: (Semigroup r, MonadReader r m) => r -> m a -> m a
+localNames = local . (<>)
 
 getChoiceFree :: Monad m => EvalT m (IVar m ())
 getChoiceFree = gets choiceFree
@@ -763,6 +767,14 @@ putStoreFree storeFree = modify $ \ s -> s { storeFree }
 
 lift' :: VerseT m a -> EvalT m a
 lift' = lift . lift
+
+freshNamed :: Bool -> VerseT m (Named (VarRef m) (VarVal m))
+freshNamed = \ case
+  False -> Val <$> freshVar
+  True -> Ref <$> freshVarRef
+
+freshVarRef :: VerseT m (VarRef m f)
+freshVarRef = newVarRef =<< freshVar
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
 (\\) = HashMap.difference
