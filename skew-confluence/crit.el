@@ -1,8 +1,14 @@
 ;;; TO DO
+;;; The next big refactoring is to have a single mechanism for executing a list of rewrites,
+;;; accumulating all assumptions properly, and executing some piece of code on every iteration.
+;;; Parts of this mechanism are duplicated in too many places.
+
+;;; Remember that :avoid in a rewrite generates an assumption.
+
 ;;; contexts: match, join, and submatches
+;;; Type-checking pf rules and expressions.
 ;;; Check decreasing diagrams
 ;;; Verify derivation of critical pairs deduced by joinable
-;;; Add rewrite rule IDs
 ;;; Generate and print substituted conditions
 
 
@@ -39,20 +45,20 @@
 	    (make-context :name 'EX :arg-type 'e :result-type 'e
 			  :alternatives '(HOLE VX (seq EQX e) (seq eq EX) (exists x EX) (choice EX e) (choice e EX) (app VX v) (all v VX) (one EX) (all EX)))))
 
-(defstruct rule name lhs rhs cond)
+(defstruct rule name lhs rhs if fresh)
 
 ;;; Note that primes are used only in rule U-TUP, and that is in conjunction with integer subscripts.
 ;;; This matters in function add-primes.
 (setq the-rules
-      (list (make-rule :name 'lam-alpha :lhs '(lam x e) :rhs '(replace (lam x e) x z) :cond '(fresh (not (elt z (fvs e)))))
-            (make-rule :name 'exi-alpha :lhs '(exists x e) :rhs '(replace (exists x e) x z) :cond '(fresh (not (elt z (fvs e)))))
-            (make-rule :name 'app-add :lhs '(app (quote add) (tup2 k1 k2)) :rhs 'k3 :cond '(if (= k3 (+ k1 k2))))
-	    (make-rule :name 'app-gt :lhs '(app (quote gt) (tup2 k1 k2)) :rhs 'k1 :cond '(if (> k1 k2)))
-	    (make-rule :name 'app-gt-fail :lhs '(app (quote gt) (tup2 k1 k2)) :rhs '(quote fail) :cond '(if (not (> k1 k2))))
-	    (make-rule :name 'app-beta :lhs '(app (lam x e) v) :rhs '(exists x (seq (= x v) e)) :cond '(if (not (elt x (fvs v)))))
-	    (make-rule :name 'app-tup :lhs '(app (tup2 v0 v1) v) :rhs '(exists x (seq (= x v) (choice (seq (= x (quote 0)) v0) (seq (= x (quote 1)) v1)))) :cond '(fresh (not (elt x (fvs v v0 v1)))))
+      (list (make-rule :name 'lam-alpha :lhs '(lam x e) :rhs '(replace (lam x e) x z) :fresh '(not (elt z (fvs e))))
+            (make-rule :name 'exi-alpha :lhs '(exists x e) :rhs '(replace (exists x e) x z) :fresh '(not (elt z (fvs e))))
+            (make-rule :name 'app-add :lhs '(app (quote add) (tup2 k1 k2)) :rhs 'k3 :if '(= k3 (+ k1 k2)))
+	    (make-rule :name 'app-gt :lhs '(app (quote gt) (tup2 k1 k2)) :rhs 'k1 :if '(> k1 k2))
+	    (make-rule :name 'app-gt-fail :lhs '(app (quote gt) (tup2 k1 k2)) :rhs '(quote fail) :if '(not (> k1 k2)))
+	    (make-rule :name 'app-beta :lhs '(app (lam x e) v) :rhs '(exists x (seq (= x v) e)) :if '(not (elt x (fvs v))))
+	    (make-rule :name 'app-tup :lhs '(app (tup2 v0 v1) v) :rhs '(exists x (seq (= x v) (choice (seq (= x (quote 0)) v0) (seq (= x (quote 1)) v1)))) :fresh '(not (elt x (fvs v v0 v1))))
 	    (make-rule :name 'app-tup-0 :lhs '(app (tup0) v) :rhs '(quote fail))
-	    (make-rule :name 'u-lit :lhs '(seq (= k1 k2) e) :rhs 'e :cond '(if (= k1 k2)))
+	    (make-rule :name 'u-lit :lhs '(seq (= k1 k2) e) :rhs 'e :if '(= k1 k2))
 	    (make-rule :name 'u-tup :lhs '(seq (= (tup2 v1 vn) (tup2 v1prime vnprime)) e) :rhs '(seq (= v1 v1prime) (seq (= vn vnprime) e)))
 	    (make-rule :name 'u-fail-op-d :lhs '(seq (= op d) e) :rhs '(quote fail))
 	    (make-rule :name 'u-fail-d-op :lhs '(seq (= d op) e) :rhs '(quote fail))
@@ -65,14 +71,14 @@
 	    (make-rule :name 'var-swap :lhs '(seq (= x y) e) :rhs '(seq (= y x) e))
 	    (make-rule :name 'seq-swap :lhs '(seq eq (seq (= x v) e)) :rhs '(seq (= x v) (seq eq e)))
 	    (make-rule :name 'val-elim :lhs '(seq v e) :rhs 'e)
-	    (make-rule :name 'exi-elim :lhs '(exists x e) :rhs 'e :cond '(if (not (elt x (fvs e)))))
-	    (make-rule :name 'eqn-elim :lhs '(exists x (seq (= x v) e)) :rhs 'e :cond '(if (not (elt x (fvs v e)))))
+	    (make-rule :name 'exi-elim :lhs '(exists x e) :rhs 'e :if '(not (elt x (fvs e))))
+	    (make-rule :name 'eqn-elim :lhs '(exists x (seq (= x v) e)) :rhs 'e :if '(not (elt x (fvs v e))))
 	    (make-rule :name 'fail-elim-eq :lhs '(seq (= v (quote fail)) e) :rhs '(quote fail))
 	    (make-rule :name 'fail-elim-l :lhs '(seq (quote fail) e) :rhs '(quote fail))
 	    (make-rule :name 'fail-elim-r :lhs '(seq eq (quote fail)) :rhs '(quote fail))
-	    (make-rule :name 'exi-float-eq :lhs '(seq (= v (exists x e1)) e2) :rhs '(exists x (seq (= v e1) e2)) :cond '(if (not (elt x (fvs v e2)))))
-	    (make-rule :name 'exi-float-l :lhs '(seq (exists x e1) e2) :rhs '(exists x (seq e1 e2)) :cond '(if (not (elt x (fvs e2)))))
-	    (make-rule :name 'exi-float-r :lhs '(seq eq (exists x e)) :rhs '(exists x (seq eq e)) :cond '(if (not (elt x (fvs eq)))))
+	    (make-rule :name 'exi-float-eq :lhs '(seq (= v (exists x e1)) e2) :rhs '(exists x (seq (= v e1) e2)) :if '(not (elt x (fvs v e2))))
+	    (make-rule :name 'exi-float-l :lhs '(seq (exists x e1) e2) :rhs '(exists x (seq e1 e2)) :if '(not (elt x (fvs e2))))
+	    (make-rule :name 'exi-float-r :lhs '(seq eq (exists x e)) :rhs '(exists x (seq eq e)) :if '(not (elt x (fvs eq))))
 	    (make-rule :name 'eqn-float :lhs '(seq (= x (seq eq e1)) e2) :rhs '(seq eq (seq (= x e1) e2)))
 	    (make-rule :name 'seq-assoc :lhs '(seq (seq eq e1) e2) :rhs '(seq eq (seq e1 e2)))
 	    (make-rule :name 'exi-swap :lhs '(exists x (exists y e)) :rhs '(exists y (exists x e)))
@@ -85,8 +91,8 @@
 	    (make-rule :name 'all-choice-3 :lhs '(all (choice v1 (choice v2 v3))) :rhs '(tup3 v1 v2 v3))
 	    (make-rule :name 'all-choice-4 :lhs '(all (choice v1 (choice v2 (choice v3 v4)))) :rhs '(tup4 v1 v2 v3 v4))
 	    (make-rule :name 'split-fail :lhs '(split (quote fail) f g) :rhs '(app f (tup0)))
-	    (make-rule :name 'split-value :lhs '(split v f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) (quote fail))))) :cond '(fresh x))
-	    (make-rule :name 'split-choice :lhs '(split (choice v e) f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) e)))) :cond '(fresh (not (elt x (fvs e)))))
+	    (make-rule :name 'split-value :lhs '(split v f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) (quote fail))))) :fresh 'x)
+	    (make-rule :name 'split-choice :lhs '(split (choice v e) f g) :rhs '(app g (tup2 v (lam x (seq (= x (tup0)) e)))) :fresh '(not (elt x (fvs e))))
 	    (make-rule :name 'choose-r :lhs '(choice (quote fail) e) :rhs 'e)
 	    (make-rule :name 'choose-l :lhs '(choice e (quote fail)) :rhs 'e)
 	    (make-rule :name 'choose-assoc :lhs '(choice (choice e1 e2) e3) :rhs '(choice e1 (choice e2 e3)))
@@ -108,8 +114,8 @@
 (setq the-proofs                ;120 proofs
       (list (make-proof :rulename1 'lam-alpha :rulename2 'app-beta :path1 '(1) :id1 1 :id2 2      ;Proof 1
 			:extra1 'z
-                        :rewrites1 (list (make-rewrite :rulename 'app-beta :path '() :id 3))
-                        :rewrites2 (list (make-rewrite :rulename 'exi-alpha :path '() :id 4 :extra 'z)))
+                        :rewrites1 (list (make-rewrite :rulename 'lam-alpha :path '(1) :id 3 :extra 'zprime :avoid '(v)) (make-rewrite :rulename 'app-beta :path '() :id 5))
+                        :rewrites2 (list (make-rewrite :rulename 'exi-alpha :path '() :id 4 :extra 'zprime)))
             (make-proof :rulename1 'exi-alpha :rulename2 'exi-elim :path1 '() :id1 1 :id2 2      ;Proof 2
                         :rewrites1 (list 'X (make-rewrite :rulename 'exi-elim :path '()))
                         :rewrites2 (list 'X (make-rewrite :rulename 'exi-alpha :path '())))
@@ -189,8 +195,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
             (make-proof :rulename1 'u-fail-op-d :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 24
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-op-d :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-op-d :path '())))
             (make-proof :rulename1 'u-fail-op-d :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 25
                         :rowsep "normal"
                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
@@ -208,8 +214,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
             (make-proof :rulename1 'u-fail-d-op :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 29
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-d-op :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-d-op :path '())))
             (make-proof :rulename1 'u-fail-d-op :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 30
                         :rowsep "large"
                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
@@ -227,8 +233,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
             (make-proof :rulename1 'u-fail-tup-k :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 34
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-tup-k :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-tup-k :path '())))
             (make-proof :rulename1 'u-fail-tup-k :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 35
                         :rowsep "large"
                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
@@ -246,8 +252,8 @@
                         :rewrites1 (list)
                         :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '(2) :id 4) (make-rewrite :rulename 'exi-elim :path '() :id 6)))
             (make-proof :rulename1 'u-fail-k-tup :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 39
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'u-fail-k-tup :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'fail-elim-eq :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'u-fail-k-tup :path '())))
             (make-proof :rulename1 'u-fail-k-tup :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 40
                         :rowsep "large"
                         :rewrites1 (list (make-rewrite :rulename 'fail-elim-l :path '() :id 3))
@@ -265,8 +271,8 @@
                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '() :id 3))
                         :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '(2) :id 4)))
             (make-proof :rulename1 'hnf-swap :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 44
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'hnf-swap :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'hnf-swap :path '())))
             (make-proof :rulename1 'hnf-swap :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 45
                         :rowsep "normal"
                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3))
@@ -291,8 +297,8 @@
                         :rewrites1 (list (make-rewrite :rulename 'exi-float-r :path '() :id 3))
                         :rewrites2 (list (make-rewrite :rulename 'var-swap :path '(2) :id 4)))
             (make-proof :rulename1 'var-swap :rulename2 'eqn-float :path1 '(1 2) :id1 1 :id2 2      ;Proof 51
-                        :rewrites1 (list 'X (make-rewrite :rulename 'eqn-float :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'var-swap :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'eqn-float :path '()))
+                        :rewrites2 (list (make-rewrite :rulename 'var-swap :path '())))
             (make-proof :rulename1 'var-swap :rulename2 'seq-assoc :path1 '(1) :id1 1 :id2 2      ;Proof 52
                         :rowsep "normal"
                         :rewrites1 (list (make-rewrite :rulename 'seq-assoc :path '() :id 3))
@@ -520,11 +526,11 @@
                         :rewrites1 (list (make-rewrite :rulename 'exi-swap :path '(2) :id 3))
                         :rewrites2 (list (make-rewrite :rulename 'exi-swap :path '() :id 4)))
             (make-proof :rulename1 'choose-l :rulename2 'one-choice :path1 '(1) :id1 1 :id2 2      ;Proof 114
-                        :rewrites1 (list 'X (make-rewrite :rulename 'one-choice :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'one-value :path '()))
+                        :rewrites2 (list))
             (make-proof :rulename1 'choose-l :rulename2 'split-choice :path1 '(1) :id1 1 :id2 2      ;Proof 115
-                        :rewrites1 (list 'X (make-rewrite :rulename 'split-choice :path '()))
-                        :rewrites2 (list 'X (make-rewrite :rulename 'choose-l :path '())))
+                        :rewrites1 (list (make-rewrite :rulename 'split-value :path '()))
+                        :rewrites2 (list))
             (make-proof :rulename1 'choose-r :rulename2 'choose-l :path1 '() :id1 1 :id2 2      ;Proof 116
                         :rowsep "normal"
                         :rewrites1 (list)
@@ -545,6 +551,7 @@
                         :rowsep "large" :colsep "large"
                         :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '() :id 3) (make-rewrite :rulename 'choose-assoc :path '(2) :id 5))
                         :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '() :id 4)))))
+
 
 ;; (setq the-proofs                ;119 proofs
 ;;       (list (make-proof :rulename1 'lam-alpha :rulename2 'app-beta :path1 '()      ;Proof 1
@@ -1609,6 +1616,10 @@
 ;;                         :rewrites1 (list (make-rewrite :rulename 'choose-assoc :path '()) (make-rewrite :rulename 'choose-assoc :path '(2)))
 ;;                         :rewrites2 (list (make-rewrite :rulename 'choose-assoc :path '())))))
 
+(defun demand-rewrite-id (rw)
+  (or (rewrite-id rw)
+      (error "Need a rewrite id for rewrite %s" rw)))
+
 (defun canonical-nt (nt)
   (intern (strip-decorations (symbol-name nt))))
 
@@ -1740,39 +1751,49 @@
 					  :sigma2 (apply #'append (mapcar #'joinresult-sigma2 sjs))))))))
 	(t nil)))
 
-(defun do-every-replace-or-subst (term)
-  (cond ((atom term) term)
-	((eq (first term) 'quote) term)
-	((eq (first term) 'replace)
-	 (do-one-replace (second term) (third term) (fourth term)))
-	((eq (first term) 'subst)
-	 (do-one-subst (second term) (third term) (fourth term)))
-	(t (cons (first term) (mapcar #'do-every-replace-or-subst (rest term))))))
+(defstruct replacing before after why)
 
-(defun do-one-replace (term x y)
+(defstruct replacement-data term replacings)
+
+;;; Returns a replacement-data.
+(defun do-every-replace-or-subst (term assumption-exprs)
+  (let ((not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-not-elt-fvs-condition assumption-exprs)))
+    (cond ((atom term) (make-replacement-data :term term :replacings '()))
+	  ((eq (first term) 'quote) (make-replacement-data :term term :replacings '()))
+	  ((eq (first term) 'replace)
+	   (do-one-replace (second term) (third term) (fourth term) not-elt-fvs-assumption-conds))
+	  (t (let ((subresults (mapcar #'(lambda (subterm) (do-every-replace-or-subst subterm not-elt-fvs-assumption-conds)) (rest term))))
+	       (make-replacement-data :term (cons (first term) (mapcar #'replacement-data-term subresults))
+				      :replacings (apply #'append (mapcar #'replacement-data-replacings subresults))))))))
+
+;;; There are three kinds of replacement simplifications:
+;;;     x[x <- z]    becomes     z
+;;;     y[x <- z]    becomes     y     provided you can prove (not (elt x (fvs y)))
+;;;     e[y <- x][x <- z]    becomes     e[y <- z]     provided you can prove (not (elt x (fvs e)))
+
+(defun do-one-replace (term x z not-elt-fvs-assumption-conds)
   (unless (atom x) (error "do-one-replace: non-atomic replacement variable %s" x))
-  (cond ((atom term) (if (eq term x) y (list 'replace term x y)))
-	((eq (first term) 'quote) term)
-	((memq (first term) '(replace subst))
-	 (error "do-one-replace: nested %s" term))
-	(t (cons (first term) (mapcar #'(lambda (tm) (do-one-replace tm x y)) (rest term))))))
+  (let ((before-term (list 'replace term x z)))
+    (cond ((atom term)
+	   (cond ((eq term x) (make-replacement-data :term z :replacings (list (make-replacing :before before-term :after z :why nil))))
+		 (t (let ((query (list 'not (list 'elt x (list 'fvs term)))))
+		      (cond ((condition-is-implied-by-assumptions query not-elt-fvs-assumption-conds)
+			     (make-replacement-data :term term :replacings (list (make-replacing :before before-term :after term :why query))))
+			    (t (make-replacement-data :term before-term :replacings '())))))))
+	  ((eq (first term) 'quote) (make-replacement-data :term term :replacings '()))
+	  ((eq (first term) 'replace)
+	   (let ((query (list 'not (list 'elt x (list 'fvs (second term))))))
+	     (cond ((and (eq (third term) x)
+			 (condition-is-implied-by-assumptions query not-elt-fvs-assumption-conds))
+		    (make-replacement-data :term term :replacings (list (make-replacing :before before-term :after (list 'replace (second term) (third term) z) :why query))))
+		   (t (error "Nested replacements not allowed %s" (list 'replace term x z))))))
+	  (t (make-replacement-data :term term :replacings '())))))
 
-(defun do-one-subst (term x y)
-  (unless (atom x) (error "do-one-subst: non-atomic replacement variable %s" x))
-  (cond ((atom term) (if (eq term x) y (list 'subst term x y)))
-	((eq (first term) 'quote) term)
-	((memq (first term) '(replace subst))
-	 (error "do-one-subst: nested %s" term))
-	((memq (first term) '(lam exists))
-	 (cond ((eq (second term) x) term)
-	       (t (list 'subst term x y))))
-	(t (cons (first term) (mapcar #'(lambda (tm) (do-one-subst tm x y)) (rest term))))))
-
-(defstruct critpair rule1 rule2 path1 sigma1 sigma2 term term1 term2 cond1 cond2)
+(defstruct critpair rule1 rule2 path1 sigma1 sigma2 term term1 term2 if1 if2 fresh1 fresh2)
 
 (defun submatches (M rule1 rule2 path1 eqok)
-  (let ((name1 (rule-name rule1)) (alpha1 (rule-lhs rule1)) (beta1 (rule-rhs rule1)) (cond1 (rule-cond rule1))
-        (name2 (rule-name rule2)) (alpha2 (rule-lhs rule2)) (beta2 (rule-rhs rule2)) (cond2 (rule-cond rule2)))
+  (let ((name1 (rule-name rule1)) (alpha1 (rule-lhs rule1)) (beta1 (rule-rhs rule1)) (if1 (rule-if rule1)) (fresh1 (rule-fresh rule1))
+        (name2 (rule-name rule2)) (alpha2 (rule-lhs rule2)) (beta2 (rule-rhs rule2)) (if2 (rule-if rule2)) (fresh2 (rule-fresh rule2)))
     (and (not (atom M))
          (not (atom alpha2))
          (append (and eqok
@@ -1787,10 +1808,12 @@
 						       :sigma1 sigma2  ;Similarly swap the sigmas
 						       :sigma2 sigma1
 						       :term (replace-subterm alpha1 path1 N)
-						       :term1 (do-every-replace-or-subst (sublis sigma1 beta1))
-						       :term2 (replace-subterm (sublis sigma1 alpha1) path1 (do-every-replace-or-subst (sublis sigma2 beta2)))
-						       :cond1 (and cond2 (do-every-replace-or-subst (sublis sigma2 cond2)))  ;Similarly swap the conds
-						       :cond2 (and cond1 (do-every-replace-or-subst (sublis sigma1 cond1)))))))))
+						       :term1 (replacement-data-term (do-every-replace-or-subst (sublis sigma1 beta1) '()))
+						       :term2 (replace-subterm (sublis sigma1 alpha1) path1 (replacement-data-term (do-every-replace-or-subst (sublis sigma2 beta2) '())))
+						       :if1 (and if2 (replacement-data-term (do-every-replace-or-subst (sublis sigma2 if2) '()))) ;Similarly swap the ifs
+						       :if2 (and if1 (replacement-data-term (do-every-replace-or-subst (sublis sigma1 if1) '())))
+						       :fresh1 (and fresh2 (replacement-data-term (do-every-replace-or-subst (sublis sigma2 fresh2) '()))) ;Similarly swap the freshs
+						       :fresh2 (and fresh1 (replacement-data-term (do-every-replace-or-subst (sublis sigma1 fresh1) '())))))))))
 		 (and (not (eq (first M) 'quote))
                       (do ((z2 (rest M) (rest z2))
                            (k 1 (+ k 1))
@@ -1801,27 +1824,15 @@
   (make-rule :name (rule-name rule) 
 	     :lhs (add-primes (rule-lhs rule) vars-to-avoid)
 	     :rhs (add-primes (rule-rhs rule) vars-to-avoid)
-	     :cond (and (rule-cond rule) (add-primes (rule-cond rule) vars-to-avoid))))
+	     :if (and (rule-if rule) (add-primes (rule-if rule) vars-to-avoid))
+	     :fresh (and (rule-fresh rule) (add-primes (rule-fresh rule) vars-to-avoid))))
 
 (defun all-submatches (rule1 rule2 same)
-  (let ((rc1 (rule-cond rule1))
-	(rc2 (rule-cond rule2)))
-    (cond ((and nil  ;; Disable this trick for now
-		(not (atom rc1))
-		(not (atom rc2))
-		(eq (first rc1) 'if)
-		(eq (first rc2) 'if)
-		(or (and (eq (first (second rc1)) 'not)
-			 (equal (second (second rc1)) (second rc2)))
-		    (and (eq (first (second rc2)) 'not)
-			 (equal (second (second rc2)) (second rc1)))))
-	   ;; Rules handle logically complementary cases, so no overlapping applications
-	   '())
-	  (t (let ((rulehat1 (add-primes-to-rule rule1 (union (term-vars (rule-lhs rule2)) (term-vars (rule-rhs rule2))) ))
-		   (rulehat2 (add-primes-to-rule rule2 (union (term-vars (rule-lhs rule1)) (term-vars (rule-rhs rule1))))))
-	       (cond (same (submatches (rule-lhs rulehat2) rulehat2 rule1 '() nil))
-		     (t (append (submatches (rule-lhs rulehat2) rulehat2 rule1 '() t)
-				(submatches (rule-lhs rulehat1) rulehat1 rule2 '() nil)))))))))
+  (let ((rulehat1 (add-primes-to-rule rule1 (union (term-vars (rule-lhs rule2)) (term-vars (rule-rhs rule2))) ))
+	(rulehat2 (add-primes-to-rule rule2 (union (term-vars (rule-lhs rule1)) (term-vars (rule-rhs rule1))))))
+    (cond (same (submatches (rule-lhs rulehat2) rulehat2 rule1 '() nil))
+	  (t (append (submatches (rule-lhs rulehat2) rulehat2 rule1 '() t)
+		     (submatches (rule-lhs rulehat1) rulehat1 rule2 '() nil))))))
 
 (defun all-critical-pairs ()
   (do ((z the-rules (rest z))
@@ -1891,37 +1902,51 @@
 				    (t (error "Unknown path item %s" item))))
 			  path)))
 
+
+(defstruct rewriting beta if fresh beta-replacings if-replacings fresh-replacings)
+
 ;;; Return just the substituted beta
-(defun apply-rewrite-rule (rule term path)
+(defun apply-rewrite-rule (rule term path assumption-exprs)
   (let ((cp (canonical-path path)))
     (cond ((eq cp 'DUMMY) term)
 	  (t (let ((res (try-rewrite-rule rule term cp)))
 	       (unless res (error "Applying rewrite rule %s to term %s / %s failed" (rule-name rule) term path))
-	       (do-every-replace-or-subst (first res)))))))
+	       (replacement-data-term (do-every-replace-or-subst (rewriting-beta res) assumption-exprs)))))))
 
-;;; Return a 2-list of substituted beta and substituted cond
-(defun apply-rewrite-rule-with-cond (rule term path)
+;;; Returns a "rewriting" structure
+(defun apply-rewrite-rule-entire (rule term path assumption-exprs)
   (let ((cp (canonical-path path)))
     (cond ((eq cp 'DUMMY) (list term nil))
 	  (t (let ((res (try-rewrite-rule rule term cp)))
-	       (unless res (error "Applying rewrite rule %s to term %s / %s (with cond) failed" (rule-name rule) term path))
-	       (mapcar #'do-every-replace-or-subst res))))))
+	       (unless res (error "Applying rewrite rule %s to term %s / %s (entire) failed" (rule-name rule) term path))
+	       (let ((new-beta (do-every-replace-or-subst (rewriting-beta res) assumption-exprs))
+		     (new-if (do-every-replace-or-subst (rewriting-if res) assumption-exprs))
+		     (new-fresh (do-every-replace-or-subst (rewriting-fresh res) assumption-exprs)))
+		 (make-rewriting :beta (replacement-data-term new-beta)
+				 :if (replacement-data-term new-if)
+				 :fresh (replacement-data-term new-fresh)
+				 :beta-replacings (replacement-data-replacings new-beta)
+				 :if-replacings (replacement-data-replacings new-if)
+				 :fresh-replacings (replacement-data-replacings new-fresh))))))))
 
-;;; Return a 2-list of substituted beta and substituted cond
+;;; Returns a "rewriting" structure
 (defun try-rewrite-rule (rule term path)
   (cond ((null path)
 	 (let ((m (matches term (rule-lhs rule))))
 	   ;; (unless m (princ (format "\nFAILED MATCH of %s to %s of %s\n" term (rule-lhs rule) (rule-name rule))))
-	   (and m (list (sublis (matchresult-sigma m) (rule-rhs rule))
-			(and (rule-cond rule)
-			     (sublis (matchresult-sigma m) (rule-cond rule)))))))
+	   (and m (make-rewriting :beta (sublis (matchresult-sigma m) (rule-rhs rule))
+				  :if (and (rule-if rule)
+					     (sublis (matchresult-sigma m) (rule-if rule)))
+				  :fresh (and (rule-fresh rule)
+					     (sublis (matchresult-sigma m) (rule-fresh rule)))))))
 	((atom term) nil)
 	(t (let ((res (try-rewrite-rule rule (nth (first path) term) (rest path))))
 	     (and res
-		  (list (append (subseq term 0 (first path))
-				(list (first res))
-				(subseq term (+ (first path) 1)))
-			(second res)))))))
+		  (make-rewriting :beta (append (subseq term 0 (first path))
+						(list (rewriting-beta res))
+						(subseq term (+ (first path) 1)))
+				  :if (rewriting-if res)
+				  :fresh (rewriting-fresh res)))))))
 
 (defun format-path (path)
   (cond ((null path) "\\emptypath")
@@ -2020,24 +2045,18 @@
 	 (format "tup (%s,%s,%s,%s)" (format-subterm (second term) nil) (format-subterm (third term) nil) (format-subterm (fourth term) nil) (format-subterm (fifth term) nil)))
 	(t (error "format-compound-term: unknown term type %s" (first term)))))
 
-(defun format-rule-condition (rc)
-  (format-rule-condition-with-prefixes rc "where " "fresh " "if "))
+;;; Format just the expression
+(defun format-condition (if-or-fresh)
+  (format "\\text{$%s$}" (format-rule-condition-expression if-or-fresh)))
 
-(defun format-condition-text (rc)
-  (format-rule-condition-with-prefixes rc "" "fresh " ""))
+;;; Prefix normally is empty or ends with a space
+(defun format-condition-with-prefix (if-or-fresh prefix)
+  (format "\\text{%s$%s$}" prefix (format-rule-condition-expression if-or-fresh)))
 
-(defun format-rule-condition-with-prefixes (rc compute-prefix fresh-prefix if-prefix)
-  (cond ((atom rc) (error "format-rule-condition: unknown atomic condition %s" rc))
-	((eq (first rc) 'compute)
-	 (unless (= (length rc) 3)  (error "format-rule-condition: wrong number of arguments %s" rc))
-	 (format "\\text{%s$%s=%s$}" compute-prefix (format-rule-condition-expression (second rc)) (format-rule-condition-expression (third rc))))
-	((eq (first rc) 'fresh)
-	 (unless (= (length rc) 2)  (error "format-rule-condition: wrong number of arguments %s" rc))
-	 (format "\\text{%s$%s$}" fresh-prefix (format-rule-condition-expression (second rc))))
-	((eq (first rc) 'if)
-	 (unless (= (length rc) 2)  (error "format-rule-condition: wrong number of arguments %s" rc))
-	 (format "\\text{%s$%s$}" if-prefix (format-rule-condition-expression (second rc))))
-	(t (error "format-rule-condition: unknown condition %s" rc))))
+(defun format-condition-expand-ands (if-or-fresh)
+  (cond ((and (not (atom if-or-fresh)) (eq (first if-or-fresh 'and)))
+	 (mapconcat #'format-if-condition-expand-ands (rest if-or-fresh) " and "))
+	(t (format-rule-condition-expression if-or-fresh))))
 
 (defun format-rule-condition-expression (rce)
   (cond ((atom rce) (format "|%s|" (format-nt rce)))
@@ -2066,11 +2085,13 @@
 	   (concat (format-metavar (substring str 0 (- n 5))) "'"))
           (t str))))
 
-(defun print-rule-line (prefix name alpha beta cond linebreak)
+(defun print-rule-line (prefix name alpha beta cond rif rfresh linebreak)
   (princ (format "\\hbox to 5em{%s\\hfill}\\hbox to 6em{\\rulename{%s}\\hfill}\\hbox to 8em{\\hss %s}\\quad$\\movesto$\\quad %s"
 		 prefix name (format-rule-term alpha) (format-rule-term beta)))
-  (when cond
-    (princ (format "\\hfill %s" (format-rule-condition cond))))
+  (cond (rif (princ (format "\\hfill %s" (format-condition-with-prefix rif "if ")))
+	     (when rfresh		;not sure this is ever used
+	       (princ (format "; %s" (format-condition-with-prefix rfresh "fresh ")))))
+	(rfresh (princ (format "\\hfill %s" (format-condition-with-prefix rfresh "fresh ")))))
   (princ (format "\\relax%s\n" linebreak)))
 
 ;;; Returns a 3-list of (formatted-rewrites1 final-term formatted-rewrites2).
@@ -2086,7 +2107,7 @@
 (defun format-rewrites (rws rev term)
   (do ((z rws (rest z))
        (tm term (and term    ;Yes, "term", not "tm" here, in the "and"
-		     (apply-rewrite-rule (rule-lookup (rewrite-rulename (first z))) tm (rewrite-path (first z)))))
+		     (apply-rewrite-rule (rule-lookup (rewrite-rulename (first z))) tm (rewrite-path (first z)) '())))
        (result "" (concat result (format-one-rewrite (first z) rev tm))))
       ((null z) (list result tm))))
 
@@ -2114,6 +2135,8 @@
   (princ (format "\\leavevmode\\null\\hskip 2em minus 1.95em {\\color{green}$|t_1| \\equiv %s \\xrnungosup{%s}{%s} |t| \\xrngosup{%s}{\\emptypath} %s \\equiv |t_2|$}%s\n"
 		 (format-term R) name1 (format-path path1) name2 (format-term P) "\\par")))
 
+(defstruct condition-data rulename cond rewrite-id)
+
 (defun print-critical-pair (cp k)
   (let ((rule1 (critpair-rule1 cp))
 	(rule2 (critpair-rule2 cp))
@@ -2123,8 +2146,10 @@
 	(P (critpair-term1 cp))
 	(Q (critpair-term cp))
 	(R (critpair-term2 cp))
-	(cond1 (critpair-cond1 cp))
-	(cond2 (critpair-cond2 cp)))
+	(if1 (critpair-if1 cp))
+	(if2 (critpair-if2 cp))
+	(fresh1 (critpair-fresh1 cp))
+	(fresh2 (critpair-fresh2 cp)))
     (let ((name1 (rule-name rule1))
 	  (name2 (rule-name rule2))
 	  (alpha1 (rule-lhs rule1))
@@ -2133,22 +2158,20 @@
 	  (beta2 (rule-rhs rule2))
 	  (rc1 (rule-cond rule1))
 	  (rc2 (rule-cond rule2))
+	  (rif1 (rule-if rule1))
+	  (rif2 (rule-if rule2))
+	  (rfresh1 (rule-fresh rule1))
+	  (rfresh2 (rule-fresh rule2))
 	  (linebreak "\\vadjust{\\penalty1000}\\hfil\\break")) ;Use \\hfil here, and \\hfill in print-rule-line
+      (princ (format "%s Proof %s %s\n" (string-expt "%" 40) k (string-expt "%" 20)))
       (princ (format "\\vskip 8pt plus 16pt\\noindent\n"))
       (let ((weirdtext (cond ((< k 10) "and{\\hskip0.2em}rule")
 			     ((< k 100) "and{\\hskip0.5em}rule")
 			     ((< k 1000) "and{\\hskip0.8em}rule")
 			     (t "and{\\hskip0.1.1em}rule"))))
-	(print-rule-line (format "\\rlap{(%s)}\\hphantom{%s}\\llap{Rule}" k weirdtext) name1 alpha1 beta1 rc1 linebreak)
-	(print-rule-line weirdtext name2 alpha2 beta2 rc2 linebreak))
-      (princ (format "have a critical pair derived from the common term {\\color{blue}$%s$}%s%s\n"
-		     (format-term Q) (if (or cond1 cond2) "," "") linebreak))
-      (cond ((and cond1 cond2)
-	     (princ (format "assuming {\\color{blue}%s} (for \\rulename{%s}) and {\\color{blue}%s} (for \\rulename{%s}) are satisfied,%s\n"
-			    (format-condition-text cond1) name1 (format-condition-text cond2) name2 linebreak)))
-	    ((or cond1 cond2)
-	     (princ (format "assuming the condition {\\color{blue}%s} (for \\rulename{%s}) is satisfied,%s\n"
-			    (format-condition-text (or cond1 cond2)) (if cond1 name1 name2) linebreak))))
+	(print-rule-line (format "\\rlap{(%s)}\\hphantom{%s}\\llap{Rule}" k weirdtext) name1 alpha1 beta1 rc1 rif1 rfresh1 linebreak)
+	(print-rule-line weirdtext name2 alpha2 beta2 rc2 rif2 rfresh2 linebreak))
+      (print-assumptions Q name1 name2 if1 if2 fresh1 fresh2 linebreak)
       (princ (format "using the substitutions {\\color{blue}$\\sigma_1=%s$} and {\\color{blue}$\\sigma_2=%s$}"
 		     (format-sigma sigma1) (format-sigma sigma2)))
       ;; Note that punctuation has been left hanging at end of last line.
@@ -2174,8 +2197,12 @@
 	      ((or (eq (first (proof-rewrites1 pf)) 'X)
 		   (eq (first (proof-rewrites2 pf)) 'X))
 	       (error "Proof has just one 'X entry"))
-	      (t (let* ((assumptions (list (list name1 cond1) (list name2 cond2)))
-			(ca-result (contradictory-assumptions assumptions)))
+	      (t (let* ((assumption-data-list (append (if if1 (list (make-condition-data :rulename name1 :cond if1 :rewrite-id (proof-id1 pf))) '())
+						  (if if2 (list (make-condition-data :rulename name2 :cond if2 :rewrite-id (proof-id2 pf))) '())
+						  (if fresh1 (list (make-condition-data :rulename name1 :cond fresh1 :rewrite-id (proof-id1 pf))) '())
+						  (if fresh2 (list (make-condition-data :rulename name2 :cond fresh2 :rewrite-id (proof-id2 pf))) '())))
+			(not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-not-elt-fvs-condition (mapcar #'condition-data-cond assumption-data-list)))
+			(ca-result (contradictory-assumptions assumption-data-list)))
 		   (cond (ca-result 
 			  (princ (format ".%s\nBut %s, so this critical pair cannot occur in practice." linebreak ca-result)))
 			 (t (cond ((proof-cond pf) (princ (format ". For the case when %s is true:\\par\n" (format-text-condition (proof-cond pf)))))
@@ -2187,10 +2214,14 @@
 							 (proof-rowsep pf) (proof-colsep pf) (proof-rewrites2 pf) (proof-rewrites1 pf) (- k)))
 				  (t (print-tikzcd-diagram P Q R name1 name2 path1 '() (proof-id1 pf) (proof-id2 pf) (proof-extra1 pf) (proof-extra2 pf)
 							   (proof-rowsep pf) (proof-colsep pf) (proof-rewrites1 pf) (proof-rewrites2 pf) k)))
-			    (let ((consequents (append (consequent-conditions R (proof-rewrites1 pf))
-						       (consequent-conditions P (proof-rewrites2 pf)))))
-			      (print-new-fresh-conditions (new-fresh-conditions Q consequents) consequents)
-			      (print-consequent-conditions consequents assumptions))
+			    (let ((consequent-if-data-list (append (consequent-if-condition-data-list R (proof-rewrites1 pf) not-elt-fvs-assumption-conds)
+								   (consequent-if-condition-data-list P (proof-rewrites2 pf) not-elt-fvs-assumption-conds)))
+				  (consequent-fresh-data-list (append (consequent-fresh-condition-data-list R (proof-rewrites1 pf) not-elt-fvs-assumption-conds)
+								      (consequent-fresh-condition-data-list P (proof-rewrites2 pf) not-elt-fvs-assumption-conds)))
+				  (avoid-condition-data-list (append (new-fresh-avoid-condition-data-list (proof-rewrites1 pf))
+								     (new-fresh-avoid-condition-data-list (proof-rewrites2 pf)))))
+			      (print-consequent-fresh-conditions avoid-condition-data-list consequent-fresh-data-list)
+			      (print-consequent-if-conditions consequent-if-data-list assumption-data-list R (proof-rewrites1 pf) P (proof-rewrites2 pf)))
 			    (princ (verify-decreasing-diagram cp))
 			    (when (proof-cond pf) (princ (format "\\par For the case when %s is false:\\par\n" (format-text-condition (proof-cond pf)))))
 			    (when (or (proof-altrewrites1 pf) (proof-altrewrites2 pf))
@@ -2205,170 +2236,231 @@
       (princ (format "\\par\n"))
       )))
 
-(defun is-a-simple-if-not-in-fvs-condition (cond)
+(defun print-assumptions (Q name1 name2 if1 if2 fresh1 fresh2 linebreak)
+  (let ((count (+ (if if1 1 0) (if if2 1 0) (if fresh1 1 0) (if fresh2 1 0))))
+    (princ (format "have a critical pair derived from the common term {\\color{blue}$%s$}%s%s\n"
+		   (format-term Q) (if (> count 0) "," "") linebreak))
+    (cond ((= count 1)
+	   (princ (format "assuming the condition {\\color{blue}%s} (for~\\rulename{%s}) is satisfied,%s\n"
+			  (if (or if1 if2)
+			      (format-condition (or if1 if2))
+			    (format-condition-with-prefix (or fresh1 fresh2) "fresh "))
+			  (if (or if1 fresh1) name1 name2)
+			  linebreak)))
+	  ((> count 1)
+	   (cond ((and (not if2) (not fresh2))
+		  (princ (format "assuming {\\color{blue}%s} and {\\color{blue}%s} (for~\\rulename{%s}) are satisfied,%s\n"
+				 (format-condition if1) (format-condition fresh1) name1 linebreak)))
+		 ((and (not if2) (not fresh2))
+		  (princ (format "assuming {\\color{blue}%s} and {\\color{blue}%s} (for~\\rulename{%s}) are satisfied,%s\n"
+				 (format-condition if2) (format-condition fresh2) name2 linebreak)))
+		 (t (princ (concat "assuming "
+				   (cond ((and if1 fresh1)
+					  (format "{\\color{blue}%s} and {\\color{blue}%s} (for~\\rulename{%s})"
+						  (format-condition if1) (format-condition-with-prefix fresh1 "fresh ") name1))
+					 (t (format "{\\color{blue}%s} (for~\\rulename{%s})"
+						    (format-condition-with-prefix (or if1 fresh1) (if if1 "" "fresh ")) name1)))
+				   " and "
+				   (cond ((and if2 fresh2)
+					  (format "{\\color{blue}%s} and {\\color{blue}%s} (for~\\rulename{%s})"
+						  (format-condition if2) (format-condition-with-prefix fresh2 "fresh ") name2))
+					 (t (format "{\\color{blue}%s} (for~\\rulename{%s})"
+						    (format-condition-with-prefix (or if2 fresh2) (if if2 "" "fresh ")) name2)))
+				   (format " are satisfied,%s\n" linebreak)))))))))
+
+(defun is-a-simple-not-elt-fvs-condition (cond)
   (and (not (atom cond))
-       (eq (first cond) 'if)
+       (eq (first cond) 'not)
        (not (atom (second cond)))
-       (eq (first (second cond)) 'not)
-       (not (atom (second (second cond))))
-       (eq (first (second (second cond))) 'elt)
-       (atom (second (second (second cond))))
-       (not (atom (third (second (second cond)))))
-       (eq (first (third (second (second cond)))) 'fvs)))
+       (eq (first (second cond)) 'elt)
+       (atom (second (second cond)))
+       (not (atom (third (second cond))))
+       (eq (first (third (second cond))) 'fvs)))
 
-(defun is-a-simple-fresh-not-in-fvs-condition (cond)
-  (and (not (atom cond))
-       (eq (first cond) 'fresh)
-       (not (atom (second cond)))
-       (eq (first (second cond)) 'not)
-       (not (atom (second (second cond))))
-       (eq (first (second (second cond))) 'elt)
-       (atom (second (second (second cond))))
-       (not (atom (third (second (second cond)))))
-       (eq (first (third (second (second cond)))) 'fvs)))
+(defun contradictory-assumptions (assumption-data-list)
+  (or (some #'self-contradictory-assumption assumption-data-list)
+      (some #'(lambda (assump1) (some #'(lambda (assump2) (contradictory-assumption-data assump1 assump2))
+				      assumption-data-list))
+	    assumption-data-list)))
 
-(defun contradictory-assumptions (assumptions)
-  (or (some #'self-contradictory-assumption assumptions)
-      (some #'(lambda (assump1) (some #'(lambda (assump2) (contradictory-assumption-pair assump1 assump2))
-				      assumptions))
-	    assumptions)))
-
-(defun self-contradictory-assumption (assumption)
-  (let ((assump (second assumption)))
+(defun self-contradictory-assumption (assumption-data)
+  (let ((assump (condition-data-cond assumption-data)))
     (and (not (atom assump))
-	 (eq (first assump) 'if)
+	 (eq (first assump) 'not)
 	 (not (atom (second assump)))
-	 (eq (first (second assump)) 'not)
-	 (not (atom (second (second assump))))
-	 (eq (first (second (second assump))) 'elt)
-	 (atom (second (second (second assump))))
-	 (not (atom (third (second (second assump)))))
-	 (eq (first (third (second (second assump)))) 'fvs)
-	 (member (second (second (second assump)))
-		 (apply #'append (mapcar #'term-vars (rest (third (second (second assump)))))))
-	 (format "the assumption %s is always false" (format-condition-text assump)))))
+	 (eq (first (second assump)) 'elt)
+	 (atom (second (second assump)))
+	 (not (atom (third (second assump))))
+	 (eq (first (third (second assump))) 'fvs)
+	 (member (second (second assump))
+		 (apply #'append (mapcar #'term-vars (rest (third (second assump))))))
+	 (format "the assumption %s is always false" (format-condition assump)))))
 
-(defun contradictory-assumption-pair (assumption1 assumption2)
-  (let ((assump1 (second assumption1))
-	(assump2 (second assumption2)))
+(defun contradictory-assumption-data (assumption-data1 assumption-data2)
+  (let ((assump1 (condition-data-cond assumption-data1))
+	(assump2 (condition-data-cond assumption-data2)))
     (and (not (atom assump1))
 	 (not (atom assump2))
-	 (eq (first assump1) 'if)
-	 (eq (first assump2) 'if)
-	 (not (atom (second assump1)))
-	 (not (atom (second assump2)))
-	 (or (and (eq (first (second assump1)) 'not)
-		  (equal (second (second assump1)) (second assump2)))
-	     (and (eq (first (second assump2)) 'not)
-		  (equal (second (second assump2)) (second assump1))))
+	 (or (and (eq (first assump1) 'not)
+		  (equal (second assump1) assump2))
+	     (and (eq (first assump2) 'not)
+		  (equal (second assump2) assump1)))
 	 (format "the assumptions %s and %s cannot both be true"
-		 (format-condition-text assump1) (format-condition-text assump2)))))
+		 (format-condition assump1) (format-condition assump2)))))
 
-
-(defun consequent-conditions-trivially-follow (consequents)
-  (let ((consequent-conds (mapcar #'second consequents)))
-    (and (every #'is-a-simple-if-not-in-fvs-condition consequent-conds)
+(defun consequent-conditions-trivially-follow (consequent-data-list)
+  (let ((consequent-conds (mapcar #'condition-data-cond consequent-data-list)))
+    (and (every #'is-a-simple-not-elt-fvs-condition consequent-conds)
 	 (every #'(lambda (cond)
-		    (let ((cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
+		    (let ((cfvars (apply #'append (mapcar #'term-vars (rest (third (second cond)))))))
 		      (null cfvars)))
 		consequent-conds))))
 
-(defun consequent-conditions-follow (consequents assumptions)
-  ;; (progn (print (cons 'RAW-CONSEQUENTS consequents)) t)
-  ;; (progn (print (cons 'RAW-ASSUMPTIONS assumptions)) t)
-  (let ((consequent-conds (mapcar #'second consequents))
-	(assumption-conds (mapcar #'second assumptions)))
+(defun all-consequent-conditions-are-assumptions (consequent-data-list assumption-data-list)
+  (let ((consequent-conds (mapcar #'condition-data-cond consequent-data-list))
+	(assumption-conds (mapcar #'condition-data-cond assumption-data-list)))
+    (every #'(lambda (cond) (find-if #'(lambda (assump) (equal assump cond)) assumption-conds)) consequent-conds)))
+	  
+(defun consequent-conditions-follow (consequent-data-list assumption-data-list term rws)
+  ;; (progn (print (cons 'RAW-CONSEQUENTS consequent-data-list)) t)
+  ;; (progn (print (cons 'RAW-ASSUMPTIONS assumption-data-list)) t)
+  (let ((consequent-conds (mapcar #'condition-data-cond consequent-data-list))
+	(assumption-conds (mapcar #'condition-data-cond assumption-data-list)))
     ;; (progn (print (cons 'RAW-CONSEQUENT-CONDS consequent-conds)) t)
     ;; (progn (print (cons 'RAW-ASSUMPTION-CONDS assumption-conds)) t)
-    ;; What follows is not very general (and in particular really doesn't allow for different conditions strategies),
+    ;; What follows is not very general (and in particular really doesn't allow for mixing condition strategies),
     ;; but it suffices for our purposes (it picks up "(= k1 k2)" when it needs to, and handles sets of fvs conditions).
-    (or (every #'(lambda (cond) (find-if #'(lambda (assump) (equal assump cond)) assumption-conds)) consequent-conds)
-	(and (every #'is-a-simple-if-not-in-fvs-condition consequent-conds)
+	(and (every #'is-a-simple-not-elt-fvs-condition consequent-conds)
 	     ;; (progn (print (cons 'TESTED-CONSEQUENT-CONDS consequent-conds)) t)
-	     (let ((not-in-fvs-assumption-conds (remove-if-not #'is-a-simple-if-not-in-fvs-condition assumption-conds)))
-	       (and not-in-fvs-assumption-conds
-		    ;; (progn (print (cons 'NOT-IN-FVS-ASSUMPTION-CONDS not-in-fvs-assumption-conds)) t)
-		    (every #'(lambda (cond)
-			       (let ((cvar (second (second (second cond))))
-				     (cfvars (apply #'append (mapcar #'term-vars (rest (third (second (second cond))))))))
-				 ;; (print (list 'CVAR cvar 'CFVARS cfvars))
-				 (every #'(lambda (cfvar) (some #'(lambda (assumption)
-								    (let ((avar (second (second (second assumption))))
-									  (afvars (apply #'append (mapcar #'term-vars (rest (third (second (second assumption))))))))
-								      ;; (print (list 'AVAR avar 'AFVARS afvars))
-								      (and (eq avar cvar)
-									   (member cfvar afvars))))
-								not-in-fvs-assumption-conds))
-					cfvars)))
-			   consequent-conds)))))))
-  
-(defun consequent-conditions (term rw)
-  (cond ((null rw) '())
-	(t (let ((rulename (rewrite-rulename (first rw))))
-	     (let ((res (apply-rewrite-rule-with-cond (rule-lookup rulename) term (rewrite-path (first rw)))))
-	       ;; (print (list 'CONSEQUENT-CONDITIONS term rw res))
-	       (let ((more (consequent-conditions (first res) (rest rw))))
-		 (if (second res)
-		     (cons (list rulename (second res)) more)
-		   more)))))))
+	     (let ((not-elt-fvs-assumption-conds (remove-if-not #'is-a-simple-not-elt-fvs-condition assumption-conds)))
+	       (and not-elt-fvs-assumption-conds
+		    ;; (progn (print (cons 'NOT-ELT-FVS-ASSUMPTION-CONDS not-elt-fvs-assumption-conds)) t)
+		    (check-consequent-conditions not-elt-fvs-assumption-conds term rws))))))
 
-(defun new-fresh-conditions (Q consequents)
-  (let ((new-fresh-vars
-	 (remove-duplicates
-	  (apply #'append
-		 (mapcar #'(lambda (consequent)
-			     (and (is-a-simple-fresh-not-in-fvs-condition (second consequent))
-				  (list (second (second (second (second consequent)))))))
-			 consequents)))))
-    ;; (print (list 'NEW-FRESH-VARS new-fresh-vars))
-    (mapcar #'(lambda (nfv) (list 'fresh (list 'not (list 'elt nfv (cons 'fvs (term-vars Q)))))) new-fresh-vars)))
+;;; Need to redo the rewrites, at each step checking the consequent if condition against the assumptions so far,
+;;; then possibly adding a fresh assumption to the set of assumptions to be used for later rewrites.
+(defun check-consequent-conditions (not-elt-fvs-assumption-conds term rws)
+  (or (null rws)
+      (let ((rw (first rws)))
+	(let ((rulename (rewrite-rulename rw)))
+	  (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw) not-elt-fvs-assumption-conds)))
+	    (let ((consequent (rewriting-if res)))
+	      (and (or (null consequent)
+		       (and (is-a-simple-not-elt-fvs-condition consequent)
+			    (condition-is-implied-by-assumptions consequent not-elt-fvs-assumption-conds)))
+		   (check-consequent-conditions (if (rewriting-fresh res)
+						    (cons (rewriting-fresh res) not-elt-fvs-assumption-conds)
+						  not-elt-fvs-assumption-conds)
+						(rewriting-beta res)
+						(rest rws)))))))))
 
-(defun print-new-fresh-conditions (new-fresh-conditions consequents)
-  (when new-fresh-conditions
-    (let ((fresh-texts (apply #'append
-			      (mapcar #'(lambda (cd)
-					  (and (eq (first (second cd)) 'fresh)
-					       (list (list (first cd) (format-condition-text (second cd))))))
-				      consequents)))
-	  (new-fresh-texts (mapcar #'format-condition-text new-fresh-conditions)))
-      ;; (print (list 'NEW-FRESH new-fresh-conditions fresh-texts new-fresh-texts))
-      (princ "Alpha-conversion introduces new assumptions ")
-      (dolist (ft fresh-texts)
-	(princ (format "{\\color{blue}%s} (for \\rulename{%s}) and " (second ft) (first ft))))
-      (princ "(implicitly) ")
-      (princ (mapconcat #'(lambda (nft) (format "{\\color{blue}%s}" nft)) new-fresh-texts " and "))
-      (princ ".\n"))))      
-  
-;;; Each consequent or assumption is a 2-list (rulename cond).
-(defun print-consequent-conditions (consequents assumptions)
-  (when consequents
-    (let ((texts (apply #'append
-			(mapcar #'(lambda (cd)
-				    (and (eq (first (second cd)) 'if)
-					 (list (list (first cd) (format-condition-text (second cd))))))
-				consequents))))
+;;; Right now this works only for conditions of the form "(not (elt (x (fvs ...))))".
+(defun condition-is-implied-by-assumptions (not-elt-fvs-cond not-elt-fvs-assumption-conds)
+  (let ((result
+	 (let ((cvar (second (second not-elt-fvs-cond)))
+	       (cfvars (apply #'append (mapcar #'term-vars (rest (third (second not-elt-fvs-cond)))))))
+	   (every #'(lambda (cfvar) (some #'(lambda (assumption)
+					      (let ((avar (second (second assumption)))
+						    (afvars (apply #'append (mapcar #'term-vars (rest (third (second assumption)))))))
+						(and (eq avar cvar)
+						     (member cfvar afvars))))
+					  not-elt-fvs-assumption-conds))
+		  cfvars))))
+    ;; (print (list 'CONDITION-IS-IMPLIED-BY-ASSUMPTIONS not-elt-fvs-cond not-elt-fvs-assumption-conds 'RETURNS result))
+    result))
+
+
+;;; Returns a list of 2-lists (rulename rif)
+(defun consequent-if-condition-data-list (term rws not-elt-fvs-assumption-conds)
+  (cond ((null rws) '())
+	(t (let ((rw (first rws)))
+	     (let ((rulename (rewrite-rulename rw)))
+	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw) not-elt-fvs-assumption-conds)))
+		 (let ((more (consequent-if-condition-data-list (rewriting-beta res) (rest rws) not-elt-fvs-assumption-conds)))
+		   (if (rewriting-if res)
+		       (cons (make-condition-data :rulename rulename :cond (rewriting-if res) :rewrite-id (rewrite-id rw)) more)
+		     more))))))))
+
+;;; Returns a list of 2-lists (rulename rfresh)
+(defun consequent-fresh-condition-data-list (term rws not-elt-fvs-assumption-conds)
+  (cond ((null rws) '())
+	(t (let ((rw (first rws)))
+	     (let ((rulename (rewrite-rulename rw)))
+	       (let ((res (apply-rewrite-rule-entire (rule-lookup rulename) term (rewrite-path rw) not-elt-fvs-assumption-conds)))
+		 (let ((more (consequent-fresh-condition-data-list (rewriting-beta res) (rest rws) not-elt-fvs-assumption-conds)))
+		   (if (rewriting-fresh res)
+		       (cons (make-condition-data :rulename rulename :cond (rewriting-fresh res) :rewrite-id (rewrite-id rw)) more)
+		     more))))))))
+
+(defun relevant-fresh-var (rfresh)
+  (cond ((atom rfresh) rfresh)
+	((eq (first rfresh) 'not) (relevant-fresh-var (second rfresh)))
+	((eq (first rfresh) 'elt) (second rfresh))
+	(t (error "cannot find relevant fresh variable in fresh condition %s" rfresh))))
+
+(defun new-fresh-avoid-condition-data-list (rws)
+  (apply #'append
+	 (mapcar #'(lambda (rw) (and (rewrite-avoid rw)
+				     (let ((rule (rule-lookup (rewrite-rulename rw))))
+				       (cond ((rule-fresh rule)
+					      (list ( make-condition-data :rulename (rewrite-rulename rw)
+									  :cond (list 'not (list 'elt
+												 (relevant-fresh-var (rule-fresh rule))
+												 (cons 'fvs (rewrite-avoid rw))))
+									  :rewrite-id (rewrite-id rw))))
+					     (t (error "rewrite rule has avoid but rule does not have a fresh" rw))))))
+		 rws)))
+
+;;; Result is a 3-list (rulename text id)
+(defun make-text-triple (data)
+   (list (condition-data-rulename data)
+	 (format-condition (condition-data-cond data))
+	 (condition-data-rewrite-id data)))
+
+(defun print-consequent-if-conditions (consequent-data-list assumption-data-list R rw1 P rw2)
+  (when consequent-data-list
+    (let ((texts (mapcar #'make-text-triple consequent-data-list)))
       (princ (if (= (length texts) 1) "The condition to be proved is " "Conditions to be proved are "))
       (princ (cond ((= (length texts) 1)
-		    (format "{\\color{purple}%s} (for \\rulename{%s})"
-			    (second (first texts)) (first (first texts))))
+		    (format "{\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s})"
+			    (second (first texts)) (third (first texts)) (first (first texts))))
 		   ((= (length texts) 2)
-		    (format "{\\color{purple}%s} (for \\rulename{%s}) and {\\color{purple}%s} (for \\rulename{%s})"
-			    (second (first texts)) (first (first texts)) (second (second texts)) (first (second texts))))
+		    (format "{\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s}) and {\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s})"
+			    (second (first texts)) (third (first texts)) (first (first texts))
+			    (second (second texts)) (third (second texts)) (first (second texts))))
 		   (t (let ((revtexts (reverse texts)))
-			(concat (mapconcat #'(lambda (text) (format "{\\color{purple}%s} (for \\rulename{%s}), " (second text) (first text)))
+			(concat (mapconcat #'(lambda (text) (format "{\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s}), "
+								    (second text) (third text) (first text)))
 					   (reverse (rest revtexts))
 					   "")
-				(format "and {\\color{purple}%s} (for \\rulename{%s})" (second (first revtexts)) (first (first revtexts))))))))
-      (princ (cond ((consequent-conditions-trivially-follow consequents)
-		     (if (= (length texts) 1)
+				(format "and {\\color{purple}%s} (for~\\rewritelabel{%s} \\rulename{%s})"
+					(second (first revtexts)) (third (first revtexts)) (first (first revtexts))))))))
+      (princ (cond ((consequent-conditions-trivially-follow consequent-data-list)
+		    (if (= (length texts) 1)
 			"; this is trivially true"
 		      "; these are trivially true"))
-		   ((consequent-conditions-follow consequents assumptions)
+		   ((or (all-consequent-conditions-are-assumptions consequent-data-list assumption-data-list)
+			(and (consequent-conditions-follow consequent-data-list assumption-data-list R rw1)
+			     (consequent-conditions-follow consequent-data-list assumption-data-list P rw2)))
 		    (if (= (length texts) 1)
 			"; this follows easily from the assumptions"
 		      "; these follow easily from the assumptions"))
 		   (t "; {\\color{red}please provide the necessary proof}")))
       (princ ".\\par\n"))))
+
+(defun print-consequent-fresh-conditions (new-fresh-condition-data-list consequent-fresh-data-list)
+  (when new-fresh-condition-data-list
+    (let ((fresh-texts (append (mapcar #'make-text-triple consequent-fresh-data-list)
+			       (mapcar #'make-text-triple new-fresh-condition-data-list))))
+      (when (> (length fresh-texts) 0)
+	(cond ((= (length fresh-texts) 1)
+	       (princ "The diagram introduces a new assumption: "))
+	      (t (princ "The diagram introduces new assumptions: ")))
+	(princ (mapconcat #'(lambda (ft)
+			      (format "{\\color{blue}%s} (for~\\rewritelabel{%s} \\rulename{%s})" (second ft) (third ft) (first ft)))
+			  fresh-texts
+			  " and "))
+	(princ ".\n")))))
 
 (defun print-given-proof-rewrites (prefix rw1 R rw2 P)
   (let ((fr (format-rewrites-pair rw1 R rw2 P)))
@@ -2412,7 +2504,7 @@
 
 (defun rewrite-for-tikzcd (rw term)
   (cond ((eq (rewrite-rulename rw) 'TRIVIAL) term)
-	(t (apply-rewrite-rule (rule-lookup (rewrite-rulename rw)) term (rewrite-path rw)))))
+	(t (apply-rewrite-rule (rule-lookup (rewrite-rulename rw)) term (rewrite-path rw) '()))))
 
 ;;; k negative means the diagram is flipped
 (defun print-tikzcd-diagram (P Q R rulename1 rulename2 path1 path2 id1 id2 extra1 extra2 rowsep colsep rw1 rw2 k)
@@ -2722,7 +2814,11 @@
 	  (beta1 (rule-rhs rule1))
 	  (beta2 (rule-rhs rule2))
 	  (rc1 (rule-cond rule1))
-	  (rc2 (rule-cond rule2)))
+	  (rc2 (rule-cond rule2))
+	  (rif1 (rule-if rule1))
+	  (rif2 (rule-if rule2))
+	  (rfresh1 (rule-fresh rule1))
+	  (rfresh2 (rule-fresh rule2)))
       (let ((pf (proof-lookup name1 name2 path1))
 	    (needproof "{\\color{red}Need a proof that this diagram is decreasing.}"))
 	(let ((rw1 (proof-rewrites1 pf))
@@ -2761,2112 +2857,3 @@
 (setq inhibit-debugger nil)
 
 (print-critical-pairs-text)
-
-
-S--------------
-The rules for \versecalc{} have 120 critical pairs, which are described here in detail.\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(1)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{lam-alpha}\hfill}\hbox to 8em{\hss |lam x e|}\quad$\movesto$\quad |tsubst (lam x e) x z|\hfill \text{fresh $|z|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{app-beta}\hfill}\hbox to 8em{\hss |(lam x' e') v|}\quad$\movesto$\quad |def x' ((x' = v; e'))|\hfill \text{if $|x'|\not\in \freevars{|v|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((lam x e) v)|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{fresh $|z|\not\in \freevars{|e|}$}} (for \rulename{lam-alpha}) and {\color{blue}\text{$|x|\not\in \freevars{|v|}$}} (for \rulename{app-beta}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  {|(lam x e) v|} && {|def x ((x = v; e))|} \\
-  & {(1)} & \\
-  {|(lam z (tsubst e x z)) v|} && {\color{red}|def z ((z = v; (tsubst e x z)))|\not\equiv|def z ((z = (tsubst v x z); (tsubst e x z)))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{lam-alpha}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, "{\hbox{|z|}}" {pos=0.833, font=\normalsize}, from=1-1, to=3-1]
-\arrow["\rulename{app-beta}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{app-beta}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-alpha}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, "{\hbox{|z|}}" {pos=0.833, font=\normalsize}, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-Alpha-conversion introduces new assumptions {\color{blue}\text{fresh $|z|\not\in \freevars{|x = v; e|}$}} (for \rulename{exi-alpha}) and (implicitly) {\color{blue}\text{fresh $|z|\not\in \freevars{|v|,|e|,|x|}$}}.
-The condition to be proved is {\color{purple}\text{$|z|\not\in \freevars{|v|}$}} (for \rulename{app-beta}); {\color{red}please provide the necessary proof}.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(2)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-alpha}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |tsubst (def x (e)) x z|\hfill \text{fresh $|z|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x' (e')|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x (e))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{fresh $|z|\not\in \freevars{|e|}$}} (for \rulename{exi-alpha}) and {\color{blue}\text{$|x|\not\in \freevars{|e|}$}} (for \rulename{exi-elim}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(def z ((tsubst e x z)))| \xrnungosup{exi-alpha}{\emptypath} |t| \xrngosup{exi-elim}{\emptypath} |e| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(3)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-alpha}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |tsubst (def x (e)) x z|\hfill \text{fresh $|z|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x' ((x' = v; e'))|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|v|,|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x ((x = v; e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{fresh $|z|\not\in \freevars{|x = v; e'|}$}} (for \rulename{exi-alpha}) and {\color{blue}\text{$|x|\not\in \freevars{|v|,|e'|}$}} (for \rulename{eqn-elim}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(def z ((z = (tsubst v x z); (tsubst e' x z))))| \xrnungosup{exi-alpha}{\emptypath} |t| \xrngosup{eqn-elim}{\emptypath} |e'| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(4)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-alpha}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |tsubst (def x (e)) x z|\hfill \text{fresh $|z|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((v = e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v = (def x (e)); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{fresh $|z|\not\in \freevars{|e|}$}} (for \rulename{exi-alpha}) and {\color{blue}\text{$|x|\not\in \freevars{|v|,|e2|}$}} (for \rulename{exi-float-eq}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(v = (def z ((tsubst e x z))); e2)| \xrnungosup{exi-alpha}{\1\2} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x ((v = e; e2)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(5)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-alpha}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |tsubst (def x (e)) x z|\hfill \text{fresh $|z|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((def x (e)); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{fresh $|z|\not\in \freevars{|e|}$}} (for \rulename{exi-alpha}) and {\color{blue}\text{$|x|\not\in \freevars{|e2|}$}} (for \rulename{exi-float-l}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |((def z ((tsubst e x z))); e2)| \xrnungosup{exi-alpha}{\1} |t| \xrngosup{exi-float-l}{\emptypath} |(def x ((e; e2)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(6)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-alpha}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |tsubst (def x (e)) x z|\hfill \text{fresh $|z|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(eq; (def x (e)))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{fresh $|z|\not\in \freevars{|e|}$}} (for \rulename{exi-alpha}) and {\color{blue}\text{$|x|\not\in \freevars{|eq|}$}} (for \rulename{exi-float-r}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(eq; (def z ((tsubst e x z))))| \xrnungosup{exi-alpha}{\2} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((eq; e)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(7)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-alpha}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |tsubst (def x (e)) x z|\hfill \text{fresh $|z|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x' ((def y (e')))|}\quad$\movesto$\quad |def y ((def x' (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x ((def y (e'))))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{fresh $|z|\not\in \freevars{|def y (e')|}$}} (for \rulename{exi-alpha}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def y (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(def z ((def (tsubst y x z) ((tsubst e' x z)))))| \xrnungosup{exi-alpha}{\emptypath} |t| \xrngosup{exi-swap}{\emptypath} |(def y ((def x (e'))))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(8)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-alpha}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |tsubst (def x (e)) x z|\hfill \text{fresh $|z|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x' ((def y (e')))|}\quad$\movesto$\quad |def y ((def x' (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x' ((def x (e))))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{fresh $|z|\not\in \freevars{|e|}$}} (for \rulename{exi-alpha}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|y|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(def x' ((def z ((tsubst e x z)))))| \xrnungosup{exi-alpha}{\2} |t| \xrngosup{exi-swap}{\emptypath} |(def x ((def x' (e))))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(9)}\hphantom{and{\hskip0.2em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{app-gt}\hfill}\hbox to 8em{\hss |gt (tup (k1,k2))|}\quad$\movesto$\quad |k1|\hfill \text{if $|k1|>|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.2em}rule\hfill}\hbox to 6em{\rulename{app-gt-fail}\hfill}\hbox to 8em{\hss |gt (tup (k1',k2'))|}\quad$\movesto$\quad |fail|\hfill \text{if $|k1'|\leq |k2'|$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(gt (tup (k1,k2)))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|k1|>|k2|$}} (for \rulename{app-gt}) and {\color{blue}\text{$|k1|\leq |k2|$}} (for \rulename{app-gt-fail}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|k1'|\mapsto |k1|,\,|k2'|\mapsto |k2|\,\}$}.\vadjust{\penalty1000}\hfil\break
-But the assumptions \text{$|k1|>|k2|$} and \text{$|k1|\leq |k2|$} cannot both be true, so this critical pair cannot occur in practice.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(10)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(k1 = k2; (x = v; e'))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|k1|=|k2|$}} (for \rulename{u-lit}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=scriptsize]
-  {|k1 = k2; (x = v; e')|} && {|x = v; (k1 = k2; e')|} \\
-  & {(10)} & \\
-  {|x = v; e'|} && {|x = v; e'|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|k1|=|k2|$}} (for \rulename{u-lit}); this follows easily from the assumptions.\par
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(11)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(k1 = k2; fail)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|k1|=|k2|$}} (for \rulename{u-lit}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=scriptsize]
-  {|k1 = k2; fail|} && {|fail|} \\
-  & {(11)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(12)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(k1 = k2; (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|k1|=|k2|$}} (for \rulename{u-lit}) and {\color{blue}\text{$|x|\not\in \freevars{|k1 = k2|}$}} (for \rulename{exi-float-r}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=scriptsize]
-  {|k1 = k2; (def x (e'))|} && {|def x ((k1 = k2; e'))|} \\
-  & {(12)} & \\
-  {|def x (e')|} && {|def x (e')|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|k1|=|k2|$}} (for \rulename{u-lit}); this follows easily from the assumptions.\par
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(13)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (k1 = k2; e); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|k1|=|k2|$}} (for \rulename{u-lit}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  {|x = (k1 = k2; e); e2|} && {|k1 = k2; (x = e; e2)|} \\
-  & {(13)} & \\
-  {|x = e; e2|} && {|x = e; e2|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${\1\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{eqn-float}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|k1|=|k2|$}} (for \rulename{u-lit}); this follows easily from the assumptions.\par
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(14)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-lit}\hfill}\hbox to 8em{\hss |k1 = k2; e|}\quad$\movesto$\quad |e|\hfill \text{if $|k1|=|k2|$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((k1 = k2; e); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|k1|=|k2|$}} (for \rulename{u-lit}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k1 = k2|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=scriptsize]
-  {|(k1 = k2; e); e2|} && {|k1 = k2; (e; e2)|} \\
-  & {(14)} & \\
-  {|e; e2|} && {|e; e2|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-lit}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|k1|=|k2|$}} (for \rulename{u-lit}); this follows easily from the assumptions.\par
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(15)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = v; e'))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=normal]
-  {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = v; e')|} && {|v1 = v1'; xdots vn = vn'; (x = v; e')|} \\
-  &  & \\
-  & {(15')} & {\mytikzvdots} \\
-  &  & \\
-  {|x = v; ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e')|} && {|x = v; (v1 = v1'; xdots vn = vn'; e')|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{u-tup}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{u-tup}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${\2^{n-1}}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${\2^{0}}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=5-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(16)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=scriptsize, column sep=large]
-  {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); fail|} &&&& {|fail|} \\
-  && {(16)} && \\
-  {|v1 = v1'; xdots vn = vn'; fail|} && {\mydots} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\2^{n-1}}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\2^{0}}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(17)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=scriptsize]
-  {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (def x (e'))|} &&&& {|def x (((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e'))|} \\
-  && {(17)} && \\
-  {|v1 = v1'; xdots vn = vn'; (def x (e'))|} && {\mydots} && {|def x ((v1 = v1'; xdots vn = vn'; e'))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${\2^{n-1}}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${\2^{0}}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x|\not\in \freevars{|xdots vn = vn'|}$}} (for \rulename{exi-float-r}) and {\color{purple}\text{$|x|\not\in \freevars{|v1 = v1'|}$}} (for \rulename{exi-float-r}); these follow easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(18)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  {|x = ((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2|} && {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (x = e; e2)|} \\
-  & {(18)} & \\
-  {|x = (v1 = v1'; xdots vn = vn'; e); e2|} && {\color{red}|x = (v1 = v1'; xdots vn = vn'; e); e2|\not\equiv|v1 = v1'; xdots vn = vn'; (x = e; e2)|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\hbox{|u|${\1\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{eqn-float}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(19)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-tup}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e|}\quad$\movesto$\quad |v1 = v1'; xdots vn = vn'; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = (tup (v1',xdots,vn'))|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=scriptsize]
-  {|((tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); e); e2|} &&&& {|(tup (v1,xdots,vn)) = (tup (v1',xdots,vn')); (e; e2)|} \\
-  && {(19)} && \\
-  {|(v1 = v1'; xdots vn = vn'; e); e2|} && {\mydots} && {|v1 = v1'; xdots vn = vn'; (e; e2)|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2^{0}}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2^{n-1}}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-tup}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(20)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d' = op'; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(op = op'; e)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|d|\mapsto |op'|\,\}$} and {\color{blue}$\sigma_2=\{\,|d'|\mapsto |op|,\,|e'|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|op = op'; e|} && {|fail|} \\
-  & {(20)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-d-op}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(21)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(op = d; (x = v; e'))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|op = d; (x = v; e')|} &&&& {|fail|} \\
-  && {(21')} && \\
-  {|x = v; (op = d; e')|} && {|x = v; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-op-d}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{u-fail-op-d}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(22)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(op = d; fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|op = d; fail|} && {|fail|} \\
-  & {(22)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(23)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(op = d; (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|op = d|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|op = d; (def x (e'))|} &&&& {|fail|} \\
-  && {(23')} && \\
-  {|def x ((op = d; e'))|} && {|def x (fail)|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-op-d}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{u-fail-op-d}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-elim}); this is trivially true.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(24)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (op = d; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = fail; e2)| \xrnungosup{u-fail-op-d}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(op = d; (x = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(25)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-op-d}\hfill}\hbox to 8em{\hss |op = d; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((op = d; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |op = d|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|(op = d; e); e2|} && {|op = d; (e; e2)|} \\
-  & {(25)} & \\
-  {|fail; e2|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-op-d}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(26)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(d = op; (x = v; e'))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|d = op; (x = v; e')|} &&&& {|fail|} \\
-  && {(26')} && \\
-  {|x = v; (d = op; e')|} && {|x = v; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-d-op}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{u-fail-d-op}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(27)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(d = op; fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|d = op; fail|} && {|fail|} \\
-  & {(27)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(28)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(d = op; (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|d = op|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|d = op; (def x (e'))|} &&&& {|fail|} \\
-  && {(28')} && \\
-  {|def x ((d = op; e'))|} && {|def x (fail)|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-d-op}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{u-fail-d-op}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-elim}); this is trivially true.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(29)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (d = op; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = fail; e2)| \xrnungosup{u-fail-d-op}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(d = op; (x = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(30)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-d-op}\hfill}\hbox to 8em{\hss |d = op; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((d = op; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |d = op|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|(d = op; e); e2|} && {|d = op; (e; e2)|} \\
-  & {(30)} & \\
-  {|fail; e2|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-d-op}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(31)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((tup (v1,xdots,vn)) = k; (x = v; e'))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(tup (v1,xdots,vn)) = k; (x = v; e')|} &&&& {|fail|} \\
-  && {(31')} && \\
-  {|x = v; ((tup (v1,xdots,vn)) = k; e')|} && {|x = v; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-tup-k}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{u-fail-tup-k}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(32)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((tup (v1,xdots,vn)) = k; fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|(tup (v1,xdots,vn)) = k; fail|} && {|fail|} \\
-  & {(32)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(33)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((tup (v1,xdots,vn)) = k; (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|(tup (v1,xdots,vn)) = k|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(tup (v1,xdots,vn)) = k; (def x (e'))|} &&&& {|fail|} \\
-  && {(33')} && \\
-  {|def x (((tup (v1,xdots,vn)) = k; e'))|} && {|def x (fail)|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-tup-k}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{u-fail-tup-k}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-elim}); this is trivially true.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(34)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = ((tup (v1,xdots,vn)) = k; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = fail; e2)| \xrnungosup{u-fail-tup-k}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |((tup (v1,xdots,vn)) = k; (x = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(35)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-tup-k}\hfill}\hbox to 8em{\hss |(tup (v1,xdots,vn)) = k; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(((tup (v1,xdots,vn)) = k; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |(tup (v1,xdots,vn)) = k|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|((tup (v1,xdots,vn)) = k; e); e2|} && {|(tup (v1,xdots,vn)) = k; (e; e2)|} \\
-  & {(35)} & \\
-  {|fail; e2|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-tup-k}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(36)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e')|}\quad$\movesto$\quad |x = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(k = (tup (v1,xdots,vn)); (x = v; e'))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|k = (tup (v1,xdots,vn)); (x = v; e')|} &&&& {|fail|} \\
-  && {(36')} && \\
-  {|x = v; (k = (tup (v1,xdots,vn)); e')|} && {|x = v; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-k-tup}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{u-fail-k-tup}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(37)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(k = (tup (v1,xdots,vn)); fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|k = (tup (v1,xdots,vn)); fail|} && {|fail|} \\
-  & {(37)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(38)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(k = (tup (v1,xdots,vn)); (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|k = (tup (v1,xdots,vn))|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|k = (tup (v1,xdots,vn)); (def x (e'))|} &&&& {|fail|} \\
-  && {(38')} && \\
-  {|def x ((k = (tup (v1,xdots,vn)); e'))|} && {|def x (fail)|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{u-fail-k-tup}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{u-fail-k-tup}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-elim}); this is trivially true.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(39)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (k = (tup (v1,xdots,vn)); e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = fail; e2)| \xrnungosup{u-fail-k-tup}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(k = (tup (v1,xdots,vn)); (x = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(40)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{u-fail-k-tup}\hfill}\hbox to 8em{\hss |k = (tup (v1,xdots,vn)); e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((k = (tup (v1,xdots,vn)); e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |k = (tup (v1,xdots,vn))|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|(k = (tup (v1,xdots,vn)); e); e2|} && {|k = (tup (v1,xdots,vn)); (e; e2)|} \\
-  & {(40)} & \\
-  {|fail; e2|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{u-fail-k-tup}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(41)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(hnf = x; (x' = v; e'))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x' = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|hnf = x; (x' = v; e')|} && {|x' = v; (hnf = x; e')|} \\
-  & {(41)} & \\
-  {|x = hnf; (x' = v; e')|} && {|x' = v; (x = hnf; e')|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(42)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(hnf = x; fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|hnf = x; fail|} && {|fail|} \\
-  & {(42)} & \\
-  {|x = hnf; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(43)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(hnf = x; (def x' (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x'|\not\in \freevars{|hnf = x|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x' (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|hnf = x; (def x' (e'))|} && {|def x' ((hnf = x; e'))|} \\
-  & {(43)} & \\
-  {|x = hnf; (def x' (e'))|} && {|def x' ((x = hnf; e'))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x'|\not\in \freevars{|x = hnf|}$}} (for \rulename{exi-float-r}); this follows easily from the assumptions.\par
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(44)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = (hnf = x; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x' = (x = hnf; e); e2)| \xrnungosup{hnf-swap}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(hnf = x; (x' = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(45)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{hnf-swap}\hfill}\hbox to 8em{\hss |hnf = x; e|}\quad$\movesto$\quad |x = hnf; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((hnf = x; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |hnf = x|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|(hnf = x; e); e2|} && {|hnf = x; (e; e2)|} \\
-  & {(45)} & \\
-  {|(x = hnf; e); e2|} && {|x = hnf; (e; e2)|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{hnf-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(46)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x = y; e|}\quad$\movesto$\quad |y = x; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = y; (x' = v; e'))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x' = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x = y|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|x = y; (x' = v; e')|} && {|x' = v; (x = y; e')|} \\
-  & {(46)} & \\
-  {|y = x; (x' = v; e')|} && {|x' = v; (y = x; e')|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(47)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x = y; e|}\quad$\movesto$\quad |y = x; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(eq; (x = y; e))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|v|\mapsto |y|,\,|e'|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|eq; (x = y; e)|} && {|x = y; (eq; e)|} \\
-  & {(47)} & \\
-  {|eq; (y = x; e)|} && {|y = x; (eq; e)|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(48)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x = y; e|}\quad$\movesto$\quad |y = x; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x' ((x' = v; e'))|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|v|,|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x' ((x = y; e)))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|y|,|e|}$}} (for \rulename{eqn-elim}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|v|\mapsto |y|,\,|e'|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(def x ((y = x; e)))| \xrnungosup{var-swap}{\2} |t| \xrngosup{eqn-elim}{\emptypath} |e| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(49)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x = y; e|}\quad$\movesto$\quad |y = x; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = y; fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x = y|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|x = y; fail|} && {|fail|} \\
-  & {(49)} & \\
-  {|y = x; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(50)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x = y; e|}\quad$\movesto$\quad |y = x; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = y; (def x' (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x'|\not\in \freevars{|x = y|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x' (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x = y|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|x = y; (def x' (e'))|} && {|def x' ((x = y; e'))|} \\
-  & {(50)} & \\
-  {|y = x; (def x' (e'))|} && {|def x' ((y = x; e'))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x'|\not\in \freevars{|y = x|}$}} (for \rulename{exi-float-r}); this follows easily from the assumptions.\par
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(51)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x = y; e|}\quad$\movesto$\quad |y = x; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = (x = y; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x = y|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x' = (y = x; e); e2)| \xrnungosup{var-swap}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(x = y; (x' = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(52)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{var-swap}\hfill}\hbox to 8em{\hss |x = y; e|}\quad$\movesto$\quad |y = x; e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((x = y; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |x = y|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|(x = y; e); e2|} && {|x = y; (e; e2)|} \\
-  & {(52)} & \\
-  {|(y = x; e); e2|} && {|y = x; (e; e2)|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{var-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(53)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x' = v'; e')|}\quad$\movesto$\quad |x' = v'; (eq'; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(eq'; (x' = v'; (x = v; e)))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|eq'; (x' = v'; (x = v; e))|} && {|eq'; (x = v; (x' = v'; e))|} \\
-  &  & \\
-  & {(53')} & |eq'; (x' = v'; (x = v; e))| \\
-  &  & \\
-  {|x' = v'; (eq'; (x = v; e))|} && {|x' = v'; (eq'; (x = v; e))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=5-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(54)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v'; e'|}\quad$\movesto$\quad |e'|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v'; (x = v; e))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|v'; (x = v; e)|} && {|x = v; e|} \\
-  & {(54)} & \\
-  {|x = v; (v'; e)|} && {|x = v; e|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{val-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{val-elim}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(55)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x' ((x' = v'; e'))|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|v'|,|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x' ((x' = v'; (x = v; e))))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x'|\not\in \freevars{|v'|,|x = v; e|}$}} (for \rulename{eqn-elim}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v'|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(def x' ((x = v; (x' = v'; e))))| \xrnungosup{seq-swap}{\2} |t| \xrngosup{eqn-elim}{\emptypath} |(x = v; e)| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(56)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v' = fail; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v' = fail; (x = v; e))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v' = fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|v' = fail; (x = v; e)|} &&&& {|fail|} \\
-  && {(56)} && \\
-  {|x = v; (v' = fail; e)|} && {|x = v; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-eq}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-eq}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(57)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e'|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(fail; (x = v; e))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal, column sep=large]
-  {|fail; (x = v; e)|} &&&& {|fail|} \\
-  && {(57)} && \\
-  {|x = v; (fail; e)|} && {|x = v; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(58)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq'; e)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(eq'; (x = v; fail))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|eq'; (x = v; fail)|} &&&& {|eq'; fail|} \\
-  && {(58')} && \\
-  {|x = v; (eq'; fail)|} && {|x = v; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(59)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v' = (def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((v' = e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|v'|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v' = (def x' (e1)); (x = v; e))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x'|\not\in \freevars{|v'|,|x = v; e|}$}} (for \rulename{exi-float-eq}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v' = (def x' (e1))|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=normal]
-  {|v' = (def x' (e1)); (x = v; e)|} && {|x = v; (v' = (def x' (e1)); e)|} \\
-  &  & \\
-  & {(59')} & |x = v; (def x' ((v' = e1; e)))| \\
-  &  & \\
-  {|def x' ((v' = e1; (x = v; e)))|} && {|def x' ((x = v; (v' = e1; e)))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=5-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x'|\not\in \freevars{|v'|,|e|}$}} (for \rulename{exi-float-eq}) and {\color{purple}\text{$|x'|\not\in \freevars{|x = v|}$}} (for \rulename{exi-float-r}); these follow easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(60)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((def x' (e1)); (x = v; e))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x'|\not\in \freevars{|x = v; e|}$}} (for \rulename{exi-float-l}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |def x' (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(def x' (e1)); (x = v; e)|} &&&& {|def x' ((e1; (x = v; e)))|} \\
-  && {(60)} && \\
-  {|x = v; ((def x' (e1)); e)|} && {|x = v; (def x' ((e1; e)))|} && {|def x' ((x = v; (e1; e)))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-float-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x'|\not\in \freevars{|e|}$}} (for \rulename{exi-float-l}) and {\color{purple}\text{$|x'|\not\in \freevars{|x = v|}$}} (for \rulename{exi-float-r}); these follow easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(61)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq'; (x' = v; e')|}\quad$\movesto$\quad |x' = v; (eq'; e')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(eq'; (x' = v; (def x (e))))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|x' = v|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |def x (e)|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|eq'; (x' = v; (def x (e)))|} &&&& {|x' = v; (eq'; (def x (e)))|} \\
-  &&  && \\
-  && {(61)} && |x' = v; (def x ((eq'; e)))| \\
-  &&  && \\
-  {|eq'; (def x ((x' = v; e)))|} && {|def x ((eq'; (x' = v; e)))|} && {|def x ((x' = v; (eq'; e)))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=5-1, to=5-3]
-\arrow["\rulename{seq-swap}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=5-3, to=5-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-5, to=5-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x|\not\in \freevars{|eq'|}$}} (for \rulename{exi-float-r}), {\color{purple}\text{$|x|\not\in \freevars{|eq'|}$}} (for \rulename{exi-float-r}), and {\color{purple}\text{$|x|\not\in \freevars{|x' = v|}$}} (for \rulename{exi-float-r}); {\color{red}please provide the necessary proof}.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(62)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = (eq'; e1); (x = v; e))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|x' = (eq'; e1); (x = v; e)|} && {|eq'; (x' = e1; (x = v; e))|} \\
-  &  & \\
-  & {(62)} & |eq'; (x = v; (x' = e1; e))| \\
-  &  & \\
-  {|x = v; (x' = (eq'; e1); e)|} && {|x = v; (eq'; (x' = e1; e))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{eqn-float}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{eqn-float}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=5-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(63)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = (eq; (x = v; e)); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |x = v; e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x' = (x = v; (eq; e)); e2)| \xrnungosup{seq-swap}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(eq; (x' = (x = v; e); e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(64)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((eq'; e1); (x = v; e))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|(eq'; e1); (x = v; e)|} && {|eq'; (e1; (x = v; e))|} \\
-  &  & \\
-  & {(64)} & |eq'; (x = v; (e1; e))| \\
-  &  & \\
-  {|x = v; ((eq'; e1); e)|} && {|x = v; (eq'; (e1; e))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=5-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(65)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-swap}\hfill}\hbox to 8em{\hss |eq; (x = v; e)|}\quad$\movesto$\quad |x = v; (eq; e)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((eq; (x = v; e)); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|(eq; (x = v; e)); e2|} &&&& {|eq; ((x = v; e); e2)|} \\
-  &&  && \\
-  && {(65)} && |eq; (x = v; (e; e2))| \\
-  &&  && \\
-  {|(x = v; (eq; e)); e2|} && {|x = v; ((eq; e); e2)|} && {|x = v; (eq; (e; e2))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=5-1, to=5-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=5-3, to=5-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-5, to=5-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(66)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v; fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|v; fail|} && {|fail|} \\
-  & {(66)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(67)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v; (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|v|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|v; (def x (e'))|} && {|def x ((v; e'))|} \\
-  & {(67)} & \\
-  {|def x (e')|} && {|def x (e')|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(68)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (v; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = e; e2)| \xrnungosup{val-elim}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(v; (x = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(69)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{val-elim}\hfill}\hbox to 8em{\hss |v; e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((v; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|(v; e); e2|} && {|v; (e; e2)|} \\
-  & {(69)} & \\
-  {|e; e2|} && {|e; e2|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{val-elim}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(70)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x' ((x' = v; e'))|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|v|,|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x ((x = v; e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|x = v; e'|}$}} (for \rulename{exi-elim}) and {\color{blue}\text{$|x|\not\in \freevars{|v|,|e'|}$}} (for \rulename{eqn-elim}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |x = v; e'|\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|\,\}$}.\vadjust{\penalty1000}\hfil\break
-But the assumption \text{$|x|\not\in \freevars{|x = v; e'|}$} is always false, so this critical pair cannot occur in practice.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(71)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((v = e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v = (def x (e)); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|e|}$}} (for \rulename{exi-elim}) and {\color{blue}\text{$|x|\not\in \freevars{|v|,|e2|}$}} (for \rulename{exi-float-eq}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(v = e; e2)| \xrnungosup{exi-elim}{\1\2} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x ((v = e; e2)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(72)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((def x (e)); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|e|}$}} (for \rulename{exi-elim}) and {\color{blue}\text{$|x|\not\in \freevars{|e2|}$}} (for \rulename{exi-float-l}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(e; e2)| \xrnungosup{exi-elim}{\1} |t| \xrngosup{exi-float-l}{\emptypath} |(def x ((e; e2)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(73)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(eq; (def x (e)))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|e|}$}} (for \rulename{exi-elim}) and {\color{blue}\text{$|x|\not\in \freevars{|eq|}$}} (for \rulename{exi-float-r}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(eq; e)| \xrnungosup{exi-elim}{\2} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((eq; e)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(74)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x' ((def y (e')))|}\quad$\movesto$\quad |def y ((def x' (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x ((def y (e'))))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|def y (e')|}$}} (for \rulename{exi-elim}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def y (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|def x ((def y (e')))|} &&&& {|def y (e')|} \\
-  && {(74')} && \\
-  {|def y ((def x (e')))|} && {|def x ((def y (e')))|} && {|def y (e')|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|def y (e')|}$}} (for \rulename{exi-elim}); this follows easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(75)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-elim}\hfill}\hbox to 8em{\hss |def x (e)|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x' ((def y (e')))|}\quad$\movesto$\quad |def y ((def x' (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x' ((def x (e))))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|e|}$}} (for \rulename{exi-elim}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|y|\mapsto |x|,\,|e'|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|def x' ((def x (e)))|} &&&& {|def x' (e)|} \\
-  && {(75')} && \\
-  {|def x ((def x' (e)))|} && {|def x' ((def x (e)))|} && {|def x' (e)|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|e|}$}} (for \rulename{exi-elim}); this follows easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(76)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x ((x = v; fail)))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|v|,|fail|}$}} (for \rulename{eqn-elim}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e|\mapsto |fail|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(def x (fail))| \xrnungosup{fail-elim-r}{\2} |t| \xrngosup{eqn-elim}{\emptypath} |fail| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(77)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v' = (def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((v' = e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|v'|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v' = (def x ((x = v; e))); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|v|,|e|}$}} (for \rulename{eqn-elim}) and {\color{blue}\text{$|x|\not\in \freevars{|v'|,|e2|}$}} (for \rulename{exi-float-eq}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e1|\mapsto |x = v; e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(v' = e; e2)| \xrnungosup{eqn-elim}{\1\2} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x ((v' = (x = v; e); e2)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(78)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((def x ((x = v; e))); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|v|,|e|}$}} (for \rulename{eqn-elim}) and {\color{blue}\text{$|x|\not\in \freevars{|e2|}$}} (for \rulename{exi-float-l}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e1|\mapsto |x = v; e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(e; e2)| \xrnungosup{eqn-elim}{\1} |t| \xrngosup{exi-float-l}{\emptypath} |(def x (((x = v; e); e2)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(79)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(eq; (def x ((x = v; e))))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|v|,|e|}$}} (for \rulename{eqn-elim}) and {\color{blue}\text{$|x|\not\in \freevars{|eq|}$}} (for \rulename{exi-float-r}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e'|\mapsto |x = v; e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(eq; e)| \xrnungosup{eqn-elim}{\2} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((eq; (x = v; e))))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(80)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x' ((x' = v; e'))|}\quad$\movesto$\quad |e'|\hfill \text{if $|x'|\not\in \freevars{|v|,|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x' ((x' = v; (def x (e)))))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|x' = v|}$}} (for \rulename{exi-float-r}) and {\color{blue}\text{$|x'|\not\in \freevars{|v|,|def x (e)|}$}} (for \rulename{eqn-elim}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |def x (e)|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(def x' ((def x ((x' = v; e)))))| \xrnungosup{exi-float-r}{\2} |t| \xrngosup{eqn-elim}{\emptypath} |(def x (e))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(81)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-elim}\hfill}\hbox to 8em{\hss |def x ((x = v; e))|}\quad$\movesto$\quad |e|\hfill \text{if $|x|\not\in \freevars{|v|,|e|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x' ((def y (e')))|}\quad$\movesto$\quad |def y ((def x' (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x' ((def x ((x = v; e)))))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|v|,|e|}$}} (for \rulename{eqn-elim}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|y|\mapsto |x|,\,|e'|\mapsto |x = v; e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|def x' ((def x ((x = v; e))))|} &&&& {|def x' (e)|} \\
-  && {(81')} && \\
-  {|def x ((def x' ((x = v; e))))|} && {|def x' ((def x ((x = v; e))))|} && {|def x' (e)|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{eqn-elim}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{eqn-elim}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|v|,|e|}$}} (for \rulename{eqn-elim}); this follows easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(82)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v = fail; fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|v = fail; fail|} && {|fail|} \\
-  & {(82)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(83)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v = fail; (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|v = fail|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|v = fail; (def x (e'))|} &&&& {|fail|} \\
-  && {(83')} && \\
-  {|def x ((v = fail; e'))|} && {|def x (fail)|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-eq}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-eq}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-elim}); this is trivially true.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(84)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (v = fail; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = fail; e2)| \xrnungosup{fail-elim-eq}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(v = fail; (x = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(85)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-eq}\hfill}\hbox to 8em{\hss |v = fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((v = fail; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = fail|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|(v = fail; e); e2|} && {|v = fail; (e; e2)|} \\
-  & {(85)} & \\
-  {|fail; e2|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-eq}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(86)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(fail; fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|fail; fail|} && {|fail|} \\
-  & {(86)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(87)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e'))|}\quad$\movesto$\quad |def x ((eq; e'))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(fail; (def x (e')))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |def x (e')|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|fail; (def x (e'))|} &&&& {|fail|} \\
-  && {(87')} && \\
-  {|def x ((fail; e'))|} && {|def x (fail)|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-elim}); this is trivially true.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(88)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (fail; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|,\,|e1|\mapsto |e|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = fail; e2)| \xrnungosup{fail-elim-l}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(fail; (x = e; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(89)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-l}\hfill}\hbox to 8em{\hss |fail; e|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((fail; e); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |fail|,\,|e1|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|(fail; e); e2|} && {|fail; (e; e2)|} \\
-  & {(89)} & \\
-  {|fail; e2|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(90)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v = (def x (e1)); fail)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|v|,|fail|}$}} (for \rulename{exi-float-eq}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |v = (def x (e1))|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|v = (def x (e1)); fail|} &&&& {|fail|} \\
-  && {(90')} && \\
-  {|def x ((v = e1; fail))|} && {|def x (fail)|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-elim}); this is trivially true.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(91)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((def x (e1)); fail)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-float-l}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |def x (e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(def x (e1)); fail|} &&&& {|fail|} \\
-  && {(91')} && \\
-  {|def x ((e1; fail))|} && {|def x (fail)|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-elim}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-The condition to be proved is {\color{purple}\text{$|x|\not\in \freevars{|fail|}$}} (for \rulename{exi-elim}); this is trivially true.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(92)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (eq'; e1); fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|x = (eq'; e1); fail|} &&&& {|fail|} \\
-  && {(92')} && \\
-  {|eq'; (x = e1; fail)|} && {|eq'; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-float}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(93)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = (eq; fail); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |fail|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = fail; e2)| \xrnungosup{fail-elim-r}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(eq; (x = fail; e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(94)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((eq'; e1); fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(eq'; e1); fail|} &&&& {|fail|} \\
-  && {(94')} && \\
-  {|eq'; (e1; fail)|} && {|eq'; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["\equiv", dashed, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(95)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{fail-elim-r}\hfill}\hbox to 8em{\hss |eq; fail|}\quad$\movesto$\quad |fail|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((eq; fail); e2)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(eq; fail); e2|} &&&& {|fail; e2|} \\
-  && {(95')} && \\
-  {|eq; (fail; e2)|} && {|eq; fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{fail-elim-l}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{fail-elim-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{fail-elim-l}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(96)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e))|}\quad$\movesto$\quad |def x' ((eq; e))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v = (def x (e1)); (def x' (e)))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|v|,|def x' (e)|}$}} (for \rulename{exi-float-eq}) and {\color{blue}\text{$|x'|\not\in \freevars{|v = (def x (e1))|}$}} (for \rulename{exi-float-r}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e2|\mapsto |def x' (e)|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|v = (def x (e1)); (def x' (e))|} && {|def x' ((v = (def x (e1)); e))|} \\
-  &  & \\
-  & {(96)} & |def x' ((def x ((v = e1; e))))| \\
-  &  & \\
-  {|def x ((v = e1; (def x' (e))))|} && {|def x ((def x' ((v = e1; e))))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=5-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x'|\not\in \freevars{|v = e1|}$}} (for \rulename{exi-float-r}) and {\color{purple}\text{$|x|\not\in \freevars{|v|,|e|}$}} (for \rulename{exi-float-eq}); these follow easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(97)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq; e1'); e2'|}\quad$\movesto$\quad |eq; (x' = e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = (v = (def x (e1)); e2); e2')|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|v|,|e2|}$}} (for \rulename{exi-float-eq}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|,\,|e1'|\mapsto |e2|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x' = (def x ((v = e1; e2))); e2')| \xrnungosup{exi-float-eq}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(v = (def x (e1)); (x' = e2; e2'))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(98)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x (e1)); e2|}\quad$\movesto$\quad |def x ((v = e1; e2))|\hfill \text{if $|x|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1'); e2'|}\quad$\movesto$\quad |eq; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((v = (def x (e1)); e2); e2')|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|v|,|e2|}$}} (for \rulename{exi-float-eq}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |v = (def x (e1))|,\,|e1'|\mapsto |e2|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(v = (def x (e1)); e2); e2'|} &&&& {|v = (def x (e1)); (e2; e2')|} \\
-  && {(98)} && \\
-  {|(def x ((v = e1; e2))); e2'|} && {|def x (((v = e1; e2); e2'))|} && {|def x ((v = e1; (e2; e2')))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-eq}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x|\not\in \freevars{|e2'|}$}} (for \rulename{exi-float-l}) and {\color{purple}\text{$|x|\not\in \freevars{|v|,|e2; e2'|}$}} (for \rulename{exi-float-eq}); {\color{red}please provide the necessary proof}.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(99)}\hphantom{and{\hskip0.5em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x ((def y (e)))|}\quad$\movesto$\quad |def y ((def x (e)))|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.5em}rule\hfill}\hbox to 6em{\rulename{exi-float-eq}\hfill}\hbox to 8em{\hss |v = (def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((v = e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|v|,|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(v = (def x ((def y (e)))); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|v|,|e2|}$}} (for \rulename{exi-float-eq}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e1|\mapsto |def y (e)|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(v = (def y ((def x (e)))); e2)| \xrnungosup{exi-swap}{\1\2} |t| \xrngosup{exi-float-eq}{\emptypath} |(def x ((v = (def y (e)); e2)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(100)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e))|}\quad$\movesto$\quad |def x' ((eq; e))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((def x (e1)); (def x' (e)))|$},\vadjust{\penalty1000}\hfil\break
-assuming {\color{blue}\text{$|x|\not\in \freevars{|def x' (e)|}$}} (for \rulename{exi-float-l}) and {\color{blue}\text{$|x'|\not\in \freevars{|def x (e1)|}$}} (for \rulename{exi-float-r}) are satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e2|\mapsto |def x' (e)|\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(def x (e1)); (def x' (e))|} &&&& {|def x ((e1; (def x' (e))))|} \\
-  && {(100')} && \\
-  {|def x' (((def x (e1)); e))|} && {|def x' ((def x ((e1; e))))|} && {|def x ((def x' ((e1; e))))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-float-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x'|\not\in \freevars{|e1|}$}} (for \rulename{exi-float-r}) and {\color{purple}\text{$|x|\not\in \freevars{|e|}$}} (for \rulename{exi-float-l}); these follow easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(101)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq; e1'); e2'|}\quad$\movesto$\quad |eq; (x' = e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = ((def x (e1)); e2); e2')|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|e2|}$}} (for \rulename{exi-float-l}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|,\,|e1'|\mapsto |e2|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x' = (def x ((e1; e2))); e2')| \xrnungosup{exi-float-l}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |((def x (e1)); (x' = e2; e2'))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(102)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x (e1)); e2|}\quad$\movesto$\quad |def x ((e1; e2))|\hfill \text{if $|x|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1'); e2'|}\quad$\movesto$\quad |eq; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(((def x (e1)); e2); e2')|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|e2|}$}} (for \rulename{exi-float-l}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq|\mapsto |def x (e1)|,\,|e1'|\mapsto |e2|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|((def x (e1)); e2); e2'|} &&&& {|(def x (e1)); (e2; e2')|} \\
-  && {(102)} && \\
-  {|(def x ((e1; e2))); e2'|} && {|def x (((e1; e2); e2'))|} && {|def x ((e1; (e2; e2')))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x|\not\in \freevars{|e2'|}$}} (for \rulename{exi-float-l}) and {\color{purple}\text{$|x|\not\in \freevars{|e2; e2'|}$}} (for \rulename{exi-float-l}); {\color{red}please provide the necessary proof}.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(103)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x ((def y (e)))|}\quad$\movesto$\quad |def y ((def x (e)))|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{exi-float-l}\hfill}\hbox to 8em{\hss |(def x' (e1)); e2|}\quad$\movesto$\quad |def x' ((e1; e2))|\hfill \text{if $|x'|\not\in \freevars{|e2|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((def x ((def y (e)))); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|e2|}$}} (for \rulename{exi-float-l}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e1|\mapsto |def y (e)|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |((def y ((def x (e)))); e2)| \xrnungosup{exi-swap}{\1} |t| \xrngosup{exi-float-l}{\emptypath} |(def x (((def y (e)); e2)))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(104)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = (eq'; e1); (def x (e)))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|x' = (eq'; e1)|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |x' = (eq'; e1)|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |def x (e)|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|x' = (eq'; e1); (def x (e))|} && {|eq'; (x' = e1; (def x (e)))|} \\
-  &  & \\
-  & {(104)} & |eq'; (def x ((x' = e1; e)))| \\
-  &  & \\
-  {|def x ((x' = (eq'; e1); e))|} && {|def x ((eq'; (x' = e1; e)))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{eqn-float}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{eqn-float}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=5-1, to=5-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=5-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x|\not\in \freevars{|x' = e1|}$}} (for \rulename{exi-float-r}) and {\color{purple}\text{$|x|\not\in \freevars{|eq'|}$}} (for \rulename{exi-float-r}); these follow easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(105)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1); e2|}\quad$\movesto$\quad |eq'; (x' = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = (eq; (def x (e))); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|eq|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |def x (e)|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x' = (def x ((eq; e))); e2)| \xrnungosup{exi-float-r}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(eq; (x' = (def x (e)); e2))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(106)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((eq'; e1); (def x (e)))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|eq'; e1|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|eq|\mapsto |eq'; e1|\,\}$} and {\color{blue}$\sigma_2=\{\,|e2|\mapsto |def x (e)|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(eq'; e1); (def x (e))|} &&&& {|def x (((eq'; e1); e))|} \\
-  && {(106')} && \\
-  {|eq'; (e1; (def x (e)))|} && {|eq'; (def x ((e1; e)))|} && {|def x ((eq'; (e1; e)))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{exi-float-r}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x|\not\in \freevars{|e1|}$}} (for \rulename{exi-float-r}) and {\color{purple}\text{$|x|\not\in \freevars{|eq'|}$}} (for \rulename{exi-float-r}); these follow easily from the assumptions.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(107)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x (e))|}\quad$\movesto$\quad |def x ((eq; e))|\hfill \text{if $|x|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1); e2|}\quad$\movesto$\quad |eq'; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((eq; (def x (e))); e2)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|eq|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq|,\,|e1|\mapsto |def x (e)|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|(eq; (def x (e))); e2|} &&&& {|eq; ((def x (e)); e2)|} \\
-  &&  && \\
-  && {(107)} && |eq; (def x ((e; e2)))| \\
-  &&  && \\
-  {|(def x ((eq; e))); e2|} && {|def x (((eq; e); e2))|} && {|def x ((eq; (e; e2)))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=5-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{exi-float-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=5-1, to=5-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=5-3, to=5-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-l}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-float-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{6}" very near start, from=3-5, to=5-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-Conditions to be proved are {\color{purple}\text{$|x|\not\in \freevars{|e2|}$}} (for \rulename{exi-float-l}), {\color{purple}\text{$|x|\not\in \freevars{|e2|}$}} (for \rulename{exi-float-l}), and {\color{purple}\text{$|x|\not\in \freevars{|eq|}$}} (for \rulename{exi-float-r}); {\color{red}please provide the necessary proof}.\par
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(108)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x ((def y (e)))|}\quad$\movesto$\quad |def y ((def x (e)))|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{exi-float-r}\hfill}\hbox to 8em{\hss |eq; (def x' (e'))|}\quad$\movesto$\quad |def x' ((eq; e'))|\hfill \text{if $|x'|\not\in \freevars{|eq|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(eq; (def x ((def y (e)))))|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{$|x|\not\in \freevars{|eq|}$}} (for \rulename{exi-float-r}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|x'|\mapsto |x|,\,|e'|\mapsto |def y (e)|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(eq; (def y ((def x (e)))))| \xrnungosup{exi-swap}{\2} |t| \xrngosup{exi-float-r}{\emptypath} |(def x ((eq; (def y (e)))))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(109)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x' = (eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (x' = e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x' = (x = (eq; e1); e2); e2')|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |x = (eq; e1)|,\,|e1'|\mapsto |e2|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x' = (eq; (x = e1; e2)); e2')| \xrnungosup{eqn-float}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |(x = (eq; e1); (x' = e2; e2'))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(110)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq; e1); e2|}\quad$\movesto$\quad |eq; (x = e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((x = (eq; e1); e2); e2')|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |x = (eq; e1)|,\,|e1'|\mapsto |e2|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|(x = (eq; e1); e2); e2'|} &&&& {|x = (eq; e1); (e2; e2')|} \\
-  && {(110)} && \\
-  {|(eq; (x = e1; e2)); e2'|} && {|eq; ((x = e1; e2); e2')|} && {|eq; (x = e1; (e2; e2'))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-float}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{eqn-float}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(111)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{eqn-float}\hfill}\hbox to 8em{\hss |x = (eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (x = e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(x = ((eq; e1); e2); e2')|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq; e1|,\,|e1'|\mapsto |e2|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(x = (eq; (e1; e2)); e2')| \xrnungosup{seq-assoc}{\1\2} |t| \xrngosup{eqn-float}{\emptypath} |((eq; e1); (x = e2; e2'))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(112)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq; e1); e2|}\quad$\movesto$\quad |eq; (e1; e2)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{seq-assoc}\hfill}\hbox to 8em{\hss |(eq'; e1'); e2'|}\quad$\movesto$\quad |eq'; (e1'; e2')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(((eq; e1); e2); e2')|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|eq'|\mapsto |eq; e1|,\,|e1'|\mapsto |e2|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large]
-  {|((eq; e1); e2); e2'|} &&&& {|(eq; e1); (e2; e2')|} \\
-  && {(112)} && \\
-  {|(eq; (e1; e2)); e2'|} && {|eq; ((e1; e2); e2')|} && {|eq; (e1; (e2; e2'))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{seq-assoc}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{seq-assoc}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(113)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x ((def y (e)))|}\quad$\movesto$\quad |def y ((def x (e)))|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{exi-swap}\hfill}\hbox to 8em{\hss |def x' ((def y' (e')))|}\quad$\movesto$\quad |def y' ((def x' (e')))|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(def x' ((def x ((def y (e))))))|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|y'|\mapsto |x|,\,|e'|\mapsto |def y (e)|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|def x' ((def x ((def y (e)))))|} && {|def x ((def x' ((def y (e)))))|} \\
-  & {(113)} & \\
-  {|def x' ((def y ((def x (e)))))|} && {|def x' ((def x ((def y (e)))))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{exi-swap}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["\rulename{exi-swap}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{exi-swap}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(114)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{one-choice}\hfill}\hbox to 8em{\hss |one v `choice` e'|}\quad$\movesto$\quad |v|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|one v `choice` fail|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |fail|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |one v| \xrnungosup{choose-l}{\1} |t| \xrngosup{one-choice}{\emptypath} |v| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(115)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{split-choice}\hfill}\hbox to 8em{\hss |split (v `choice` e') f g|}\quad$\movesto$\quad |g (tup (v,lam x (x = (tup ()); e')))|\hfill \text{fresh $|x|\not\in \freevars{|e'|}$}\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(split (v `choice` fail) f g)|$},\vadjust{\penalty1000}\hfil\break
-assuming the condition {\color{blue}\text{fresh $|x|\not\in \freevars{|fail|}$}} (for \rulename{split-choice}) is satisfied,\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |v|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |fail|\,\}$}:\par\leavevmode\null\hskip 2em minus 1.95em {\color{green}$|t_1| \equiv |(split (v) f g)| \xrnungosup{choose-l}{\1} |t| \xrngosup{split-choice}{\emptypath} |(g (tup (v,lam x (x = (tup ()); fail))))| \equiv |t_2|$}\par
-\noindent{\color{purple}Can they be joined?\vadjust{\penalty1000}\hfil\break}
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-\vadjust{\penalty1000}\hfil\break
-
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(116)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e' `choice` fail|}\quad$\movesto$\quad |e'|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(fail `choice` fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |fail|\,\}$} and {\color{blue}$\sigma_2=\{\,|e'|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|fail `choice` fail|} && {|fail|} \\
-  & {(116)} & \\
-  {|fail|} && {|fail|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{choose-l}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["\equiv", dashed, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a trivial decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(117)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-r}\hfill}\hbox to 8em{\hss |fail `choice` e|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((fail `choice` e) `choice` e3)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1|\mapsto |fail|,\,|e2|\mapsto |e|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|(fail `choice` e) `choice` e3|} && {|fail `choice` (e `choice` e3)|} \\
-  & {(117)} & \\
-  {|e `choice` e3|} && {|e `choice` e3|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{choose-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(118)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((e1 `choice` e2) `choice` fail)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,|e|\mapsto |e1 `choice` e2|\,\}$} and {\color{blue}$\sigma_2=\{\,|e3|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|(e1 `choice` e2) `choice` fail|} && {|e1 `choice` (e2 `choice` fail)|} \\
-  & {(118)} & \\
-  {|e1 `choice` e2|} && {|e1 `choice` e2|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{choose-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-This is a simple decreasing diagram.
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(119)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-l}\hfill}\hbox to 8em{\hss |e `choice` fail|}\quad$\movesto$\quad |e|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|((e `choice` fail) `choice` e3)|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1|\mapsto |e|,\,|e2|\mapsto |fail|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=normal]
-  {|(e `choice` fail) `choice` e3|} && {|e `choice` (fail `choice` e3)|} \\
-  & {(119)} & \\
-  {|e `choice` e3|} && {|e `choice` e3|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-l}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{choose-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-3]
-\arrow["{\equiv}", dashed, from=3-1, to=3-3]
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-r}}}}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-3, to=3-3]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-\vskip 8pt plus 16pt\noindent
-\hbox to 5em{\rlap{(120)}\hphantom{and{\hskip0.8em}rule}\llap{Rule}\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1 `choice` e2) `choice` e3|}\quad$\movesto$\quad |e1 `choice` (e2 `choice` e3)|\relax\vadjust{\penalty1000}\hfil\break
-\hbox to 5em{and{\hskip0.8em}rule\hfill}\hbox to 6em{\rulename{choose-assoc}\hfill}\hbox to 8em{\hss |(e1' `choice` e2') `choice` e3'|}\quad$\movesto$\quad |e1' `choice` (e2' `choice` e3')|\relax\vadjust{\penalty1000}\hfil\break
-have a critical pair derived from the common term {\color{blue}$|(((e1 `choice` e2) `choice` e3) `choice` e3')|$}\vadjust{\penalty1000}\hfil\break
-using the substitutions {\color{blue}$\sigma_1=\{\,\}$} and {\color{blue}$\sigma_2=\{\,|e1'|\mapsto |e1 `choice` e2|,\,|e2'|\mapsto |e3|\,\}$}:\par
-\begin{center}
-\begin{tikzcd}
-  [row sep=large, column sep=large]
-  {|((e1 `choice` e2) `choice` e3) `choice` e3'|} &&&& {|(e1 `choice` e2) `choice` (e3 `choice` e3')|} \\
-  && {(120)} && \\
-  {|(e1 `choice` (e2 `choice` e3)) `choice` e3'|} && {|e1 `choice` ((e2 `choice` e3) `choice` e3')|} && {|e1 `choice` (e2 `choice` (e3 `choice` e3'))|}
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-assoc}}}}"', "{\hbox{|u|${\1}$}}" {font=\normalsize}, "\rewritelabel{1}" very near start, from=1-1, to=3-1]
-\arrow["\rulename{choose-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, "\rewritelabel{2}" very near start, from=1-1, to=1-5]
-\arrow["\rulename{choose-assoc}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{3}" very near start, from=3-1, to=3-3]
-\arrow["\rulename{choose-assoc}"', "{\hbox{|u|${\2}$}}" {font=\normalsize}, dashed, "\rewritelabel{5}" very near start, from=3-3, to=3-5]
-\arrow["{\rotatebox{270}{\hbox{\rulename{choose-assoc}}}}"', "{\hbox{|u|${}$}}" {font=\normalsize}, dashed, "\rewritelabel{4}" very near start, from=1-5, to=3-5]
-\end{tikzcd}\vskip6pt
-\end{center}
-{\color{red}Need a proof that this diagram is decreasing.}
-\par
-
-E--------------
-done
-
