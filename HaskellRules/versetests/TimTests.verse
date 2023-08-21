@@ -918,8 +918,8 @@ test(S00){x:int:int=3}
 # Relevance.
 #
 
-test(A00){1 where a:any} # Could tighten to S00.
-test(A00){1 where a:=a}  # Could tighten to S00.
+test(A00){1 where a:any} # Could tighten to S00.	#NOTE:???
+test(A00){1 where a:=a}  # Could tighten to S00.	#NOTE:???
 
 #
 # Cycles.
@@ -1110,7 +1110,7 @@ test(P00){f(a:any):any => x:=f(x)}
 test(U00){f(a:any):any => x:=f[x]=2}
 test(S00){f(a:any):=a  => x:=f[x]=2}
 test(S00){f(a:any):=(3,a) => x:=f(2)}
-test(A00){f(a:any):=(3,a) => x:=f[x]}
+test(A00){f(a:any):=(3,a) => x:=f[x]}	#NOTE:CHECK
 test(P00){f(a:any):=(3,a) => x:=f(x)}
 #
 test(S00){f(a:int):int => x:=f[2]}
@@ -2083,7 +2083,7 @@ test(S00){x:any => x+3=5 where assume{x=2}}
 test(F00){x:any => x+3=5 where assume{x=3}}
 test(S00){f:any => f[_]='x' where assume{f=char}}
 test(F00){f:any => f[_]='x' where assume{f=int}}
-test(A00){x:any,assume{x=2},x+3=5}
+test(A00){x:any,assume{x=2},x+3=5}	# NOTE: duplicate with L2071 above
 test(F00){x:any,assume{x=2},x+3=6}
 
 # A call that doesn't succeed should block function equality. f[a]=b <=> f=function(a){b}.
@@ -2534,7 +2534,7 @@ test(D00){a:int => f():=a=3}
 test(D00){a&b:int => if{a=3,f():=b=4}}
 test(D00){x:int=>if{x=3,f():=x=3}} # Was S00 before UncommittableNegotiable.
 test(S00){f(if{c=1}):=8,c:=7}
-test(U00){a:any=>{f(if{c=1}):=8,c:=a}}
+test(U00){a:any=>{f(if{c=1}):=8,c:=a}}	#NOTE:???
 test(S00){if{f(if{c=1}):=8},c:=7,c=7}
 test(S00){if{f(if{c=1}):=8},c:=7}
 test(S00){g(9):=8,f(9 where for{x:=1}):=8,f[9],-1}
