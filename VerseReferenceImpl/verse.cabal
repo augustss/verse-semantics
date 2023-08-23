@@ -64,9 +64,9 @@ library
   ghc-options: -Wall -Wno-name-shadowing
   default-language: GHC2021
 
-test-suite verse-test-suite
+test-suite golden-files
   type: exitcode-stdio-1.0
-  main-is: TestSuite.hs
+  main-is: Golden.hs
   build-depends:
     base >= 4.16.0.0,
     bytestring,
@@ -75,6 +75,17 @@ test-suite verse-test-suite
     HUnit,
     prettyprinter,
     transformers,
+    verse
+  hs-source-dirs: test
+  ghc-options: -Wall -Wno-name-shadowing
+  default-language: GHC2021
+
+test-suite hunit
+  type: exitcode-stdio-1.0
+  main-is: HUnit.hs
+  build-depends:
+    base >= 4.16.0.0,
+    HUnit,
     verse
   hs-source-dirs: test
   ghc-options: -Wall -Wno-name-shadowing

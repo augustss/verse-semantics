@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 module Main
   ( main
   ) where
@@ -14,7 +13,6 @@ import Data.List
 import Data.Traversable
 
 import Language.Verse
-import Language.Verse.Pretty
 
 import Prettyprinter
 

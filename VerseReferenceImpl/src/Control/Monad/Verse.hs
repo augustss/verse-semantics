@@ -30,12 +30,13 @@ module Control.Monad.Verse
   , if'
   , all
   , for
-  , Freezable (..)
   , FreezeT
-  , freeze'
+  , runFreezeT
   , Frozen (..)
-  , Freshenable (..)
+  , Freezable (..)
+  , freeze'
   , FreshenT
+  , Freshenable (..)
   ) where
 
 import Control.Applicative
@@ -571,9 +572,6 @@ split heap left m = VerseT $ \ _ sk fk ek rk r -> do
           modifyRef' r.children (Process {..}:)
           sk result fk (\ r -> rk' r *> ek r) (rk' *> rk) r
 
-class Monad m => Freezable a b m | a -> b where
-  freeze :: a -> FreezeT m b
-
 newtype FreezeT m a = FreezeT
   { unFreezeT :: ReaderT HeapKey (StateT (IntMap Any) m) a
   } deriving ( Functor
@@ -582,8 +580,29 @@ newtype FreezeT m a = FreezeT
              , MonadFix
              )
 
+runFreezeT :: Monad m => FreezeT m a -> VerseT m a
+runFreezeT m = do
+  r <- ask'
+  lift $ evalStateT (runReaderT (unFreezeT m) r.heap) mempty
+
 instance MonadTrans FreezeT where
   lift = FreezeT . lift . lift
+
+class Monad m => Freezable a b m | a -> b where
+  freeze :: a -> FreezeT m b
+
+data Frozen f
+  = Unknown
+  | Known (f (Frozen f))
+
+deriving instance Show (f (Frozen f)) => Show (Frozen f)
+
+deriving instance Eq (f (Frozen f)) => Eq (Frozen f)
+
+instance Pretty (f (Frozen f)) => Pretty (Frozen f) where
+  pretty = \ case
+    Unknown -> "_"
+    Known x -> pretty x
 
 instance ( MonadFix m
          , MonadRef m
@@ -602,23 +621,28 @@ instance ( MonadFix m
   freeze = freeze <=< lift . readVarRef'
 
 freeze' :: (Monad m, Freezable a b m) => a -> VerseT m b
-freeze' x = do
-  r <- ask'
-  lift $ evalStateT (runReaderT (unFreezeT (freeze x)) r.heap) mempty
+freeze' = runFreezeT . freeze
 
-data Frozen f
-  = Unknown
-  | Known (f (Frozen f))
+newtype FreshenT m a = FreshenT
+  { unFreshenT :: ReaderT HeapKey (StateT (IntMap Any) m) a
+  } deriving ( Functor
+             , Applicative
+             , Monad
+             )
 
-deriving instance Show (f (Frozen f)) => Show (Frozen f)
+runFreshenT :: Monad m => FreshenT m a -> Maybe Heap -> m a
+runFreshenT m = flip evalStateT mempty . runReaderT (unFreshenT m)
 
-instance Pretty (f (Frozen f)) => Pretty (Frozen f) where
-  pretty = \ case
-    Unknown -> "_"
-    Known x -> pretty x
+instance MonadTrans FreshenT where
+  lift = FreshenT . lift . lift
+
+instance MonadRef m => MonadRef (FreshenT m)
 
 class Monad m => Freshenable a m where
   freshen :: a -> FreshenT m a
+
+instance Monad m => Freshenable () m where
+  freshen = pure
 
 instance ( MonadFix m
          , MonadRef m
@@ -633,21 +657,6 @@ instance ( MonadFix m
           state' (lookupInsert i $ unsafeCoerce x') >>= \ case
             Just x' -> pure $ unsafeCoerce x'
             Nothing -> lift . lift . newVar' =<< traverse loop x
-
-newtype FreshenT m a = FreshenT
-  { unFreshenT :: ReaderT HeapKey (StateT (IntMap Any) m) a
-  } deriving ( Functor
-             , Applicative
-             , Monad
-             )
-
-instance MonadTrans FreshenT where
-  lift = FreshenT . lift . lift
-
-instance MonadRef m => MonadRef (FreshenT m)
-
-runFreshenT :: Monad m => FreshenT m a -> Maybe Heap -> m a
-runFreshenT m = flip evalStateT mempty . runReaderT (unFreshenT m)
 
 msplit_ :: (MonadRef m, MonadSupply Int m)
         => VerseT m () -> Env m -> m (Maybe (VerseT m (), Rollback m))
