@@ -188,6 +188,8 @@ instance MonadTrans VerseT where
 
 instance MonadAbort e m => MonadAbort e (VerseT m)
 
+instance MonadSupply s m => MonadSupply s (VerseT m)
+
 runVerseT :: MonadRef m => VerseT m a -> m (Maybe [a])
 runVerseT m = do
   children <- newRef mempty

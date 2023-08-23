@@ -34,10 +34,11 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
 import Data.Kind
+import Data.Match
 import Data.Maybe
 import Data.Monoid
 import Data.Ratio
-import Data.Traversable (traverse)
+import Data.Traversable (Traversable, traverse)
 import Data.Tuple
 import Data.Semigroup
 
@@ -87,6 +88,7 @@ eval :: ( MonadAbort Error m
 eval = freeze' <=< runEvalT . eval'
 
 eval' :: ( MonadAbort Error m
+         , MonadFix m
          , MonadRef m
          , MonadSupply Label m
          , Eq (Ref m (VarVal m))
@@ -107,11 +109,15 @@ eval' e = case extract e of
     var <- lift' freshVar
     env <- ask
     s <- get
+    choiceFree <- lift' freshIVar
     storeFree <- lift' freshIVar
-    put s { storeFree }
+    put S { choiceFree, storeFree }
     lift' $ fork do
       readIVar s.choiceFree
       (x, s') <- runEvalT' (eval' e1 <|> eval' e2) env s
+      fork do
+        readIVar s'.choiceFree
+        writeIVar choiceFree ()
       fork do
         readIVar s'.storeFree
         writeIVar storeFree ()
@@ -157,16 +163,16 @@ eval' e = case extract e of
     lift' $ unify var_e =<< newVar (Val.Truth var)
     pure var
   Exp.Module i xs e -> do
-    xs <- lift' $ for xs freshNamed
+    xs <- lift' $ traverse freshNamed xs
     _ <- localNames xs $ eval' e
-    newVar . Val.Module i $ fromIdents xs
+    lift' . newVar . Val.Module i $ filterNames xs
   Exp.Struct i xs e -> do
     env <- ask
     lift' $ newVar . Val.Overloads (Val.Struct i env xs e) =<< freshVar
-  Exp.Class i e_super xs e -> do
+  Exp.Class i e_sup xs e -> do
     env <- ask
-    var_super <- for e_super eval'
-    lift' $ newVar . Val.Overloads (Val.Class i env var_super xs e) =<< freshVar
+    var_sup <- traverse eval' e_sup
+    lift' $ newVar . Val.Overloads (Val.Class i env var_sup xs e) =<< freshVar
 --   Exp.Inst e1 xs e2 ->
 --     evalInst (loc e) e1 xs e2
 --   Exp.IfThenElse xs p t e -> do
@@ -221,8 +227,8 @@ eval' e = case extract e of
 --     evalInvoke (loc e) e1 e2
 --   Exp.BracketInvoke e1 e2 ->
 --     evalInvoke (loc e) e1 e2
-  Exp.Tuple exps ->
-    lift' . newVar . Val.Tuple =<< traverse eval' exps
+  Exp.Tuple xs ->
+    lift' . newVar . Val.Tuple =<< traverse eval' xs
   Exp.Truth e ->
     lift' . newVar . Val.Truth =<< eval' e
   Exp.Int x ->
@@ -231,8 +237,7 @@ eval' e = case extract e of
     lift' . newVar $ Val.Float x
   Exp.Name x -> lookupName x >>= \ case
     Nothing -> abortWithIdentError (loc e) x
-    Just (Val var) -> pure var
-    Just (Ref ref) -> readVarRef' ref
+    Just var -> pure var
 --   Exp.Default x e1 e2 -> do
 --     var1 <- eval' e1
 --     env <- ask
@@ -696,8 +701,8 @@ abortWithIdentError x = abort . IdentError x
 abortWithNameError :: MonadAbort Error m => Loc -> Name -> m a
 abortWithNameError x = abort . NameError x
 
-fromIdents :: HashMap Ident a -> HashMap Name a
-fromIdents =
+filterNames :: HashMap Ident a -> HashMap Name a
+filterNames =
   HashMap.fromList .
   HashMap.foldrWithKey
   \ case
@@ -738,7 +743,8 @@ fromIdents =
 --         readIVar storeFree'
 --         writeIVar storeFree ()
 
-lookupName :: Ident -> EvalT m (VarVal m)
+lookupName :: (MonadRef m, MonadSupply Int m, Eq (Ref m (VarVal m)))
+           => Ident -> EvalT m (Maybe (VarVal m))
 lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing
   Just (Val x) -> pure $ Just x
@@ -768,13 +774,38 @@ putStoreFree storeFree = modify $ \ s -> s { storeFree }
 lift' :: VerseT m a -> EvalT m a
 lift' = lift . lift
 
-freshNamed :: Bool -> VerseT m (Named (VarRef m) (VarVal m))
+freshNamed :: (MonadRef m, MonadSupply Int m)
+           => Bool -> VerseT m (Named (VarRef m) (VarVal m))
 freshNamed = \ case
   False -> Val <$> freshVar
   True -> Ref <$> freshVarRef
 
-freshVarRef :: VerseT m (VarRef m f)
+freshVarRef :: (MonadRef m, MonadSupply Int m) => VerseT m (VarRef m f)
 freshVarRef = newVarRef =<< freshVar
+
+readVarRef' :: (MonadRef m, MonadSupply Int m, RowMatchable f)
+            => VarRef m f -> EvalT m (Var m f)
+readVarRef' r = do
+  x <- lift' freshVar
+  s <- get
+  storeFree <- lift' freshIVar
+  put s { storeFree }
+  lift' $ fork do
+    readIVar s.storeFree
+    unify x =<< readVarRef r
+    writeIVar storeFree ()
+  pure x
+
+writeVarRef' :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
+             => VarRef m f -> Var m f -> EvalT m ()
+writeVarRef' r x = do
+  s <- get
+  storeFree <- lift' freshIVar
+  put s { storeFree }
+  lift' $ fork do
+    readIVar s.storeFree
+    writeVarRef r x
+    writeIVar storeFree ()
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
 (\\) = HashMap.difference

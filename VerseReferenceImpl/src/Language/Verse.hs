@@ -6,10 +6,10 @@ module Language.Verse
   ) where
 
 import Control.Monad ((<=<))
+import Control.Monad.Abort
 import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Supply
-import Control.Monad.Throw
 import Control.Monad.Verse
 
 import Data.ByteString (ByteString)
@@ -22,10 +22,10 @@ import Language.Verse.Lexer
 import Language.Verse.Parse
 import Language.Verse.Val
 
-eval :: ( MonadFix m
+eval :: ( MonadAbort Error m
+        , MonadFix m
         , MonadRef m
         , MonadSupply Label m
-        , MonadThrow Error m
         , Eq (Ref m (VarVal m))
         ) => ByteString -> VerseT m FrozenVal
 eval = Eval.eval <=< liftEither . (desugar <=< runLexer parse)

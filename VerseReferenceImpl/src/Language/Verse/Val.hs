@@ -160,9 +160,9 @@ instance Eq (ref (Val ref)) => ZipMatchable (Overload ref) where
     (Struct i_x env_x xs e1, Struct i_y env_y _ _) ->
       guard (i_x == i_y) $>
       Struct i_x (zipMatchEnv env_x env_y) xs e1
-    (Class i_x env_x x xs e1, Class i_y env_y y _ _) ->
+    (Class i_x env_x sup_x xs e1, Class i_y env_y sup_y _ _) ->
       guard (i_x == i_y) $>
-      Class i_x (zipMatchEnv env_x env_y) (liftA2 (,) x y) xs e1
+      Class i_x (zipMatchEnv env_x env_y) (liftA2 (,) sup_x sup_y) xs e1
     (Intrinsic x, Intrinsic y) -> guard (x == y) $> Intrinsic x
     _ -> Nothing
 
@@ -174,8 +174,8 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
       Function i env xs e1 e2
     Struct i env xs e1 -> for env freeze <&> \ env ->
       Struct i env xs e1
-    Class i env x xs e1 ->
-      (\ env x -> Class i env x xs e1) <$> for env freeze <*> for x freeze
+    Class i env sup xs e1 ->
+      (\ env sup -> Class i env sup xs e1) <$> for env freeze <*> for sup freeze
     Intrinsic x -> pure $ Intrinsic x
 
 data Named ref a

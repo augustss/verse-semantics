@@ -10,6 +10,7 @@ module Control.Monad.Abort
 import Control.Monad.Except (ExceptT (..))
 import Control.Monad.Supply
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer.CPS qualified as CPS
 
 class Monad m => MonadAbort e m | m -> e where
   abort :: e -> m a
@@ -20,6 +21,8 @@ instance Monad m => MonadAbort e (ExceptT e m) where
   abort = ExceptT . pure . Left
 
 instance MonadAbort e m => MonadAbort e (SupplyT s m)
+
+instance MonadAbort e m => MonadAbort e (CPS.WriterT w m)
 
 liftEither :: MonadAbort e m => Either e a -> m a
 liftEither = \ case

@@ -7,6 +7,7 @@ module Control.Monad.RST
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Abort
 import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.IO.Class
@@ -51,7 +52,8 @@ instance MonadFail m => MonadFail (RST r s m) where
 
 instance MonadError e m => MonadError e (RST r s m) where
   throwError = lift . throwError
-  x `catchError` f = RST $ \ r s -> runRST x r s `catchError` \ e -> runRST (f e) r s
+  x `catchError` f = RST $ \ r s ->
+    runRST x r s `catchError` \ e -> runRST (f e) r s
 
 instance MonadLogic m => MonadLogic (RST r s m) where
   msplit m = RST $ \ r s -> msplit (runRST m r s) >>= \ case
@@ -59,12 +61,9 @@ instance MonadLogic m => MonadLogic (RST r s m) where
     Just ((a, s'), m) -> pure (Just (a, RST $ \ _ _ -> m), s')
 
 instance Monad m => MonadReader r (RST r s m) where
-  ask = RST $ \ r s ->
-    pure (r, s)
-  local f x = RST $ \ r ->
-    runRST x (f r)
-  reader f = RST $ \ r s ->
-    pure (f r, s)
+  ask = RST $ \ r s -> pure (r, s)
+  local f x = RST $ \ r -> runRST x (f r)
+  reader f = RST $ \ r s -> pure (f r, s)
 
 instance Monad m => MonadState s (RST r s m) where
   get = RST $ \ _ s -> pure (s, s)
@@ -79,6 +78,8 @@ instance MonadFix m => MonadFix (RST r s m) where
 
 instance MonadIO m => MonadIO (RST r s m) where
   liftIO m = RST $ \ _ s -> (, s) <$> liftIO m
+
+instance MonadAbort e m => MonadAbort e (RST r s m)
 
 instance MonadRef m => MonadRef (RST r s m)
 
