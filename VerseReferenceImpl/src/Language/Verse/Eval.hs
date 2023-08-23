@@ -62,12 +62,15 @@ data S m = S
   , storeFree :: IVar m ()
   }
 
+instance Monad m => Freshenable (S n) m where
+  freshen = pure
+
 type Defaults m = HashMap Ident (VarVal m, Env m, L (Exp L Ident))
 
 type Env m = HashMap Ident (Named (VarRef m) (VarVal m))
 
-runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> VerseT m a
-runEvalT m = do
+evalEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> VerseT m a
+evalEvalT m = do
   env <- newEnv
   choiceFree <- newIVar ()
   storeFree <- newIVar ()
@@ -75,6 +78,9 @@ runEvalT m = do
 
 runEvalT' :: EvalT m a -> Env m -> S m -> VerseT m (a, S m)
 runEvalT' = runRST . evalWriterT
+
+evalEvalT' :: EvalT m a -> Env m -> S m -> VerseT m a
+evalEvalT' = evalRST . evalWriterT
 
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
@@ -85,7 +91,7 @@ eval :: ( MonadAbort Error m
         , MonadSupply Label m
         , Eq (Ref m (VarVal m))
         ) => L (Exp L Ident) -> VerseT m FrozenVal
-eval = freeze' <=< runEvalT . eval'
+eval = freeze' <=< evalEvalT . eval'
 
 eval' :: ( MonadAbort Error m
          , MonadFix m
@@ -125,32 +131,32 @@ eval' e = case extract e of
     pure var
   Exp.Fail ->
     empty
-  -- Exp.One e -> do
-  --   var <- lift' freshVar
-  --   env <- ask
-  --   s@S { storeFree } <- get
-  --   storeFree' <- lift' freshIVar
-  --   lift' $ fork do
-  --     (x, choiceFree, storeFree) <- readIVar =<< one do
-  --       choiceFree' <- newIVar ()
-  --       runEvalT' (eval' e) env s { choiceFree = choiceFree' }
-  --     writeIVar storeFree' ()
-  --     unify var x
-  --   modify s { storeFree = storeFree' }
-  --   pure var
---   Exp.All e -> do
---     var <- freshVar
---     storeFree' <- freshIVar
---     env <- ask
---     s <- get
---     lift' $ fork do
---       xs <- readIVar =<< all do
---         choiceFree' <- newIVar ()
---         runEvalT' (eval' e) env s { choiceFree = choiceFree' }
---       writeIVar storeFree' ()
---       unify var =<< newVar (Val.Tuple xs)
---     modify s { storeFree = storeFree' }
---     pure var
+  Exp.One e -> do
+    var <- lift' freshVar
+    env <- ask
+    s <- get
+    storeFree <- lift' freshIVar
+    put s { storeFree }
+    lift' $ fork do
+      x <- readIVar =<< one do
+        choiceFree <- newIVar ()
+        evalEvalT' (eval' e) env s { choiceFree }
+      writeIVar storeFree ()
+      unify var x
+    pure var
+  Exp.All e -> do
+    var <- lift' freshVar
+    env <- ask
+    s <- get
+    storeFree <- lift' freshIVar
+    put s { storeFree }
+    lift' $ fork do
+      xs <- readIVar =<< all do
+        choiceFree <- newIVar ()
+        evalEvalT' (eval' e) env s { choiceFree }
+      writeIVar storeFree ()
+      unify var =<< newVar (Val.Tuple xs)
+    pure var
 --   Exp.Not e -> do
 --     if''
 --       (eval' e)
