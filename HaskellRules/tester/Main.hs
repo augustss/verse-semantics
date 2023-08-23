@@ -639,6 +639,8 @@ runTimTest tflg test | timVerify tflg = do
     let disp trc =
           when (trace tflg) $
             putStrLn $ unlines $ showTrace trc
+    when (verbose tflg) $
+      putStrLn $ "test expr: " ++ prettyShow (timExpr test)
     case take 1 stag of
       "S" -> case tres of
                ResOK Nothing          -> do putStrLn "timeout";     pure (mempty {sDied = 1})

@@ -17,7 +17,7 @@ import Prelude (Eq (..), Foldable, Int, Integer, Num (..), Traversable, otherwis
 import Text.Show
 
 import Match
-import Verse6
+import Verse7
 import Ref
 import Supply
 
@@ -169,29 +169,15 @@ test16 = runSupplyT $ runVerseT do
   unify x =<< newVar . Int =<< pure 1 <|> pure 2 <|> pure 3
   traverse freezeVar =<< readIVar y
 
-test16' = runSupplyT $ runVerseT do
-  x <- freshVar
-  y <- all do
-    unify x =<< newVar (Int 1)
-    unify x =<< newVar (Int 2)
-  readIVar y
-
-test16'' = runSupplyT $ runVerseT do
-  x <- freshVar
-  unify x =<< newVar (Int 1)
-  y <- all $ unify x =<< newVar (Int 1)
-  z <- all $ unify x =<< newVar (Int 2)
-  readIVar y
-
 freshValVar :: (MonadRef m, MonadSupply Int m) => VerseT m (Var m Val)
 freshValVar = freshVar
 
 test17 = runSupplyT $ runVerseT do
   x <- freshValVar
   y <- freshVar
-  z <- all $ unify x y *> pure x
+  z <- all $ unify x y
   unify x y
-  traverse freezeVar =<< readIVar z
+  readIVar z
 
 test18 = runSupplyT $ runVerseT do
   x0 <- freshValVar
@@ -241,10 +227,10 @@ test22 = runSupplyT $ runVerseT do
 
 test23 = runSupplyT $ runVerseT $ do
   x <- freshVar
-  y <- newRef x
+  y <- newVarRef x
   all do
     z <- freshVar
-    writeRef y z
+    writeVarRef y z
     unify z x
   unify x =<< newVar (Int 1)
-  freezeVar =<< readRef y
+  freezeVar =<< readVarRef y
