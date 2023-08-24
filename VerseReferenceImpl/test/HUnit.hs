@@ -21,6 +21,7 @@ main :: IO ()
 main = runTestTTAndExit $ TestList
   [ test1
   , test2
+  , test3
   ]
 
 data Val a
@@ -51,11 +52,21 @@ test1 = TestCase $ do
 test2 :: Test
 test2 = TestCase $ do
   z <- runSupplyT $ runVerseT $ do
-    x <- freshVar
-    y <- freshVar
+    x <- freshIVar
+    y <- freshIVar
     fork $ do
-      xs <- readIVar =<< all (x <$ (unify x =<< newVar (Int 1)))
-      unify y =<< newVar (Tuple xs)
-    unify x =<< newVar =<< pure (Int 1) <|> pure (Int 2)
-    freeze' y
-  z @?= Just [Known (Tuple [Known (Int 1)])]
+      xs <- readIVar =<< one (readIVar x)
+      writeIVar y xs
+    writeIVar x =<< pure (1 :: Int) <|> pure 2
+    readIVar y
+  z @?= Just [1, 2]
+
+test3 :: Test
+test3 = TestCase $ do
+  z <- runSupplyT $ runVerseT $ do
+    x <- freshIVar
+    y <- freshIVar
+    fork $ writeIVar y =<< readIVar x
+    writeIVar x =<< pure (1 :: Int) <|> pure 2
+    readIVar y
+  z @?= Just [1, 2]
