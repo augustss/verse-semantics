@@ -225,20 +225,22 @@ $$
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Application and unification}} \\
   |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
-  |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1| not variable, fresh |x|}\\
+  |t_1 == x| & \rightarrow & |x == t_1|  & \text{|t_1| not variable}\\
+  |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1|,|t_2| not variable, fresh |x|}\\
   |t_1^[t_2]| & \rightarrow & |f := t_1; x := t_2; f^[x]| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
   |t_1^(t_2)| & \rightarrow & |f := t_1; x := t_2; succeeds^{f^[x]}| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
 \end{array} \\
 \\
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Bindings |p := t|}} \\
+  |_ : t| & \rightarrow & |x : t| & \text{fresh |x|} \\
   |p : t| & \rightarrow & |p := (: t)| \\
   |p^(a) := t| & \rightarrow & |p := function a t| \\
   |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
-  %%  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
+  |(: t_1) := t_2| & \rightarrow & |(x : t_1) := t_2| & \text{fresh |x|} \\
   %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
   |(p_1 squiggt p_2) := t| & \rightarrow & |p_1 := (x_1:any); p_2 := (x_2:any); (x_1 squiggt x_2) := t| & \text{if |p_1| or |p_2| not a variable} \\
-  |array (p_1 xdots p_n) := t| & \rightarrow & |array(x_1:any,xdots,x_n:any)=t; p_1 := x_1; xdots; p_n := x_n | \\[2mm]
+  |array (p_1; xdots; p_n) := t| & \rightarrow & |array(x_1:any;xdots;x_n:any)=t; p_1 := x_1; xdots; p_n := x_n | \\[2mm]
 \\
 \multicolumn{4}{l}{\textbf{Array notation}} \\
   |()| & \rightarrow & |array ()| \\
