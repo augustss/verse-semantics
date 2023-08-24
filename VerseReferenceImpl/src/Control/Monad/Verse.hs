@@ -68,13 +68,15 @@ import Data.Tuple
 
 import GHC.Exts (Any)
 
-import Prelude (Num (..), ($!), error, reverse, subtract)
+import Prelude (Num (..), ($!), error, reverse, subtract, (++))
 
 import Prettyprinter
 
 import Text.Show
 
 import Unsafe.Coerce (unsafeCoerce)
+
+import Debug.Trace
 
 newtype VerseT m a = VerseT
   { unVerseT :: forall r . Yield r m -> Logic r m a
@@ -172,12 +174,12 @@ instance Applicative (VerseT m) where
 
 instance (MonadRef m, MonadSupply Int m) => Alternative (VerseT m) where
   empty = VerseT $ \ _ _ _ ek _ r -> ek r
-  x <|> y = VerseT $ \ yk sk fk ek rk r -> do
+  x <|> y = trace "<|>" $ VerseT $ \ yk sk fk ek rk r -> do
     xs <- readRef r.children
     writeRef r.children =<< runReaderT (copyProcesses xs) r.heap
     let
       f r = writeRef r.children xs
-      fk' r = f r *> unVerseT y yk sk fk fk (const $ pure ()) r
+      fk' r = trace "_ <|> y" $ f r *> unVerseT y yk sk fk fk (const $ pure ()) r
       ek' r = f r *> unVerseT y yk sk fk ek rk r
     unVerseT x yk sk fk' ek' rk r
 
@@ -198,12 +200,12 @@ runVerseT m = do
   commit <- newRef $ pure ()
   unVerseT m yk sk fk fk (const $ pure ()) Env {..}
   where
-    yk = Yield $ \ _ _ _ _ _ _ -> pure Nothing
+    yk = Yield $ \ _ _ _ _ _ _ -> trace "runVerseT Yield" $ pure Nothing
     heap = Nothing
     splitDepth = 0
     sk x fk _ _ r = readRef r.suspCount >>= \ case
       0 -> fmap (x:) <$> fk r
-      _ -> pure Nothing
+      n -> trace ("\nrunVerseT n: " ++ show n ++ "\n") $ pure Nothing
     fk _ = pure $ Just []
 
 freshIVar :: MonadRef m => VerseT m (IVar m a)
@@ -223,13 +225,13 @@ readIVar v = VerseT $ \ yk sk fk ek rk r ->
   readRef (unIVar v) <&> lookupIVarState r.heap >>= \ case
     Val x -> sk x fk ek rk r
     x@(Susp k) -> rotate (unYield yk) sk fk ek rk r $ \ k' ->
-      put' (unIVar v) r.heap (Susp $ \ x -> k x *> k' x) $> \ r ->
+      put' (unIVar v) r.heap (Susp $ \ x -> k' x *> k x) $> \ r ->
       put' (unIVar v) r.heap x
   where
     rotate f x1 x2 x3 x4 x5 x6 = f x6 x1 x2 x3 x4 x5
 
 writeIVar :: (MonadRef m, MonadSupply Int m) => IVar m a -> a -> VerseT m ()
-writeIVar v x = readIVarState v >>= \ case
+writeIVar v x = trace "writeIVar" $ readIVarState v >>= \ case
   Val _ -> error "writeIVar"
   y@(Susp k) -> do
     lift' (\ r -> put' (unIVar v) r.heap (Val x)) (\ r -> put' (unIVar v) r.heap y)
@@ -476,14 +478,14 @@ writeVarRef (VarRef ref) x = VerseT $ \ _ sk fk ek rk r -> do
 fork :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
 fork m = liftSuccess (unVerseT m yk sk fk fk rk) >>= reflect_
   where
-    yk = Yield $ \ addSusp sk fk _ rk r -> do
-      incr r.suspCount
+    yk = Yield $ \ addSusp sk fk ek rk r -> do
+      trace "fork incr" $ incr r.suspCount
       removeSusp <- addSusp $ \ x -> do
-        decrSuspCount
-        liftSuccess (sk x fk fk (const $ pure ())) >>= reflect_
+        trace "fork decrSuspCount" decrSuspCount
+        liftSuccess (sk x fk ek (const $ pure ())) >>= reflect_
       pure $ Just $ (, rk) $ liftFail $ \ r -> do
         removeSusp r
-        decr r.suspCount
+        trace "fork decr" $ decr r.suspCount
     sk () fk _ rk _ = pure . Just . (, rk) $ liftSuccess fk >>= reflect_
     fk _ = pure Nothing
     rk _ = pure ()
@@ -644,6 +646,9 @@ class Monad m => Freshenable a m where
 instance Monad m => Freshenable () m where
   freshen = pure
 
+instance Monad m => Freshenable Int m where
+  freshen = pure
+
 instance ( MonadFix m
          , MonadRef m
          , MonadSupply Int m
@@ -692,7 +697,7 @@ incrSuspCount :: MonadRef m => VerseT m ()
 incrSuspCount = lift' (\ r -> incr r.suspCount) (\ r -> decr r.suspCount)
 
 decrSuspCount :: MonadRef m => VerseT m ()
-decrSuspCount = lift' (\ r -> decr r.suspCount) (\ r -> incr r.suspCount)
+decrSuspCount = trace "decrSuspCount" $ lift' (\ r -> decr r.suspCount) (\ r -> trace "undo decrSuspCount" $ incr r.suspCount)
 
 ask' :: VerseT m (Env m)
 ask' = VerseT $ \ _ sk fk ek rk r -> sk r fk ek rk r
@@ -783,17 +788,19 @@ reflect_ :: Applicative m
          -> VerseT m ()
 reflect_ x = VerseT $ \ yk sk fk ek rk r -> case x of
   Nothing -> ek r
-  Just (m, rk') -> sk ()
-    (\ r -> unVerseT m yk sk fk fk (const $ pure ()) r)
-    (\ r -> unVerseT m yk sk fk (\ r -> rk' r *> ek r) (\ r -> rk' r *> rk r) r)
+  Just (m, rk') ->
+    sk
+    ()
+    (unVerseT m yk sk fk fk (const $ pure ()))
+    (\ r -> rk' r *> unVerseT m yk sk fk ek rk r)
     (\ r -> rk' r *> rk r)
     r
 
 incr :: (MonadRef m, Num a) => Ref m a -> m ()
-incr = flip modifyRef' (+ 1)
+incr = trace "incr" . flip modifyRef' (+ 1)
 
 decr :: (MonadRef m, Num a) => Ref m a -> m ()
-decr = flip modifyRef' $ subtract 1
+decr = trace "decr" . flip modifyRef' $ subtract 1
 
 or :: Maybe a -> a -> a
 or = flip fromMaybe
