@@ -152,6 +152,7 @@ command = Command
   { c_commands =
       [ Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
+      , Cmd "vdesugar [EXPR]"      "Desugar (for verification) [last] expression"             cDesugarVerify
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
@@ -252,6 +253,15 @@ cTransform tr =
 
 cDesugar :: Run CState
 cDesugar c s = cTransform (Desugared . desugar (flags s) . asExpr) c s
+
+cDesugarVerify :: Run CState
+cDesugarVerify c s = cTransform (Desugared . des . asExpr) c s
+  where
+    des e =
+      let
+        flg = (flags s){ fVerify = True, fSplit = False, fAssumeVerified = False }
+        e1  = desugar flg e
+      in e1
 
 cPreprocess :: Run CState
 cPreprocess c s = cTransform (Desugared . pre . asCore (flags s)) c s
