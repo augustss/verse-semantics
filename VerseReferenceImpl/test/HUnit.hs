@@ -22,6 +22,7 @@ main = runTestTTAndExit $ TestList
   [ test1
   , test2
   , test3
+  , test4
   ]
 
 data Val a
@@ -70,3 +71,13 @@ test3 = TestCase $ do
     writeIVar x =<< pure (1 :: Int) <|> pure 2
     readIVar y
   z @?= Just [1, 2]
+
+test4 :: Test
+test4 = TestCase $ do
+  z <- runSupplyT $ runVerseT $ do
+    x <- freshIVar
+    fork $ do
+      fork $ void $ readIVar x
+      void $ readIVar x
+    writeIVar x =<< pure (1 :: Int) <|> pure 2
+  z @?= Just [(), ()]
