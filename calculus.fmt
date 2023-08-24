@@ -153,6 +153,7 @@
 %format if = "\textbf{if}"
 %format collect = "\textbf{collect}"
 %format orElse = "\textbf{orElse}"
+%format append = "\textbf{append}"
 
 %% Arrays and tuples
 %format array (x) = "\textbf{array}\{" x "\}"
@@ -419,6 +420,7 @@
 %format p_0
 %format p_1
 %format p_2
+%format p_i
 %format p_n
 
 %format t_0
@@ -427,6 +429,8 @@
 %format t_3
 %format t_k
 %format t_n
+%format t_km1 = "t_{k-1}"
+%format t_kp1 = "t_{k+1}"
 
 %format r_0
 %format r_1

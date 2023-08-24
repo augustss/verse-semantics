@@ -202,9 +202,12 @@ $$
   |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx| \\
 \\
 \multicolumn{4}{l}{\text{{\bf Patterns: left hand side of a definition |(p := t)| or |(p:t)|}. Subset of |t|.}} \\
-     |p| & ::= & x \vb |p a| %% \vb |p^hat|  \vb |p^?|
+     |p| & ::= & |xsl| \vb |p a| %% \vb |p^hat|  \vb |p^?|
      \vb  |p_1 squiggt p_2| \\
      & \vb & |: t| \vb |p : t|  \vb |p_1, dots, p_n| \\
+     & \vb & |..p| & \text{array splice, only allowed in arrays} \\
+     |xsl| & ::= & x \\
+           & \vb & |xsl&x| & \text{multiple variables} \\
   \\
 
 \multicolumn{4}{l}{\text{\bf Operators}} \\
@@ -240,11 +243,20 @@ $$
   |(: t_1) := t_2| & \rightarrow & |(x : t_1) := t_2| & \text{fresh |x|} \\
   %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
   |(p_1 squiggt p_2) := t| & \rightarrow & |p_1 := (x_1:any); p_2 := (x_2:any); (x_1 squiggt x_2) := t| & \text{if |p_1| or |p_2| not a variable} \\
-  |array (p_1; xdots; p_n) := t| & \rightarrow & |array(x_1:any;xdots;x_n:any)=t; p_1 := x_1; xdots; p_n := x_n | \\[2mm]
+  |array (p_1; xdots; p_n) := t| & \rightarrow &
+  \begin{array}{ll}
+    |array(x_1:any;xdots;x_n:any) == t;|\\
+    |p_1 := x_1; xdots; p_n := x_n | & \text{none of |p_i| is |..p|}
+  \end{array} \\[2mm]
+\\
+\multicolumn{4}{l}{\textbf{Array splice (terms and patterns)}} \\
+  \multicolumn{3}{l}{\quad|array (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
+  & \rightarrow & |append[array(t_1; xdots; t_km1), t_k, array(t_kp1; xdots; t_n)]|\\
+  & \multicolumn{2}{l}{\text{where |append| is a reversible function appending 3 arrays}} \\
 \\
 \multicolumn{4}{l}{\textbf{Array notation}} \\
   |()| & \rightarrow & |array ()| \\
-  |t_1, dots, t_n| & \rightarrow & |array (t_1, dots, t_n)| \\
+  |t_1, dots, t_n| & \rightarrow & |array (t_1; dots; t_n)| \\
 \\
 \multicolumn{4}{l}{\textbf{Function notation}} \\
   |type^{t}| & \rightarrow & |function (x:=t) x| & \text{fresh |x|}\\
