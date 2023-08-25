@@ -19,7 +19,10 @@ import Test.HUnit
 
 main :: IO ()
 main = runTestTTAndExit $ TestList
-  [ test4
+  [ test1
+  , test2
+  , test3
+  , test4
   ]
 
 data Val a
