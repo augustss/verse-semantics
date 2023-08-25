@@ -6,7 +6,7 @@ module Main
 import Control.Monad
 import Control.Monad.Supply
 import Control.Monad.Trans.Except
-import Control.Monad.Verse
+import Control.Monad.Verse (runVerseT)
 
 import Data.ByteString qualified as ByteString
 import Data.List
