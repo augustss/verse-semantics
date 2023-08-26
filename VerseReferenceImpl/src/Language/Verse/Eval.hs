@@ -40,6 +40,7 @@ import Data.List (zip)
 import Data.Match
 import Data.Maybe
 import Data.Monoid
+import Data.Ord
 import Data.Ratio
 import Data.Traversable (Traversable, traverse)
 import Data.Tuple
@@ -58,7 +59,7 @@ import Language.Verse.Name
 import Language.Verse.Val (Val, VarVal, FrozenVal, Named (..))
 import Language.Verse.Val qualified as Val
 
-import Prelude (Integer)
+import Prelude (Integer, Num (..))
 
 type EvalT m = WriterT (Defaults m) (RST (Env m) (S m) (VerseT m))
 
@@ -208,8 +209,8 @@ eval' e = case extract e of
     ref <- lift' $ newVarRef =<< freshVar
     localName (extract x) (Ref ref) $ eval' e
   Exp.Set x e -> lookupName' (extract x) >>= \ case
-    Nothing -> abortWithIdentError (loc x) (extract x)
-    Just (Val _) -> abortWithDomainError $ loc e
+    Nothing -> abort $ IdentError (loc x) (extract x)
+    Just (Val _) -> abort $ DomainError $ loc e
     Just (Ref ref) -> do
       var <- eval' e
       writeVarRef' ref var
@@ -231,7 +232,7 @@ eval' e = case extract e of
   Exp.Float x ->
     lift' . newVar $ Val.Float x
   Exp.Name x -> lookupName x >>= \ case
-    Nothing -> abortWithIdentError (loc e) x
+    Nothing -> abort $ IdentError (loc e) x
     Just var -> pure var
   Exp.Default x e1 e2 -> do
     var1 <- eval' e1
@@ -279,7 +280,7 @@ evalDotDot e1 e2 = do
     (Int val1, Int val2) -> do
       unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
       writeIVar choiceFree ()
-    _ -> abortWithDomainError $ loc e1 <> loc e2
+    _ -> abort . DomainError $ loc e1 <> loc e2
   pure var
 
 pattern Int :: Integer -> Val f a
@@ -380,37 +381,15 @@ evalInvoke loc e1 e2 = do
       fork do
         readIVar s.storeFree
         writeIVar storeFree ()
-    -- Val.Overloads overload var1 ->
-    --   fix (\ recur overload var1 -> case overload of
-    --     Val.Function _ env xs e_domain e ->
-    --       invokeFunction env xs e_domain e var2 $ \ case
-    --         Just var' -> do
-    --           unify var var'
-    --           unify choiceFree choiceFree'
-    --           unify storeFree storeFree'
-    --         Nothing -> whenBound var1 $ \ case
-    --           Val.Overloads overload var1 -> recur overload var1
-    --           _ -> abortWithDomainError loc
-    --     Val.Struct i env xs e -> do
-    --       unify var var2
-    --       invokeStruct i env xs e var2
-    --       unify choiceFree choiceFree'
-    --       unify storeFree storeFree'
-    --     Val.Class i env var_super xs e -> do
-    --       unify var var2
-    --       invokeClass loc i env var_super xs e var2
-    --       unify choiceFree choiceFree'
-    --       unify storeFree storeFree'
-    --     Val.Intrinsic intrinsic ->
-    --       invokeIntrinsic intrinsic var2 $ \ case
-    --         Just var' -> do
-    --           unify var var'
-    --           unify choiceFree choiceFree'
-    --           unify storeFree storeFree'
-    --         Nothing -> whenBound var1 $ \ case
-    --           Val.Overloads overload var1 -> recur overload var1
-    --           _ -> abortWithDomainError loc) overload var1
-    _ -> abortWithDomainError loc
+    Val.Overloads head tail -> do
+      unify var =<< invokeOverloads loc head tail var2
+      fork do
+        readIVar s.choiceFree
+        writeIVar choiceFree ()
+      fork do
+        readIVar s.storeFree
+        writeIVar storeFree ()
+    _ -> abort $ DomainError loc
   pure var
 
 invokeTuple :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
@@ -419,24 +398,36 @@ invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
   unify var =<< newVar (Val.Int i)
   pure x
 
--- invokeFunction :: MonadEval m =>
---                   Env m ->
+invokeOverloads :: (MonadAbort Error m, MonadRef m, MonadSupply Int m)
+                => Loc
+                -> Val.Overload (VarRef m) (VarVal m)
+                -> VarVal m
+                -> VarVal m
+                -> VerseT m (VarVal m)
+invokeOverloads loc head tail arg = case head of
+  Val.Intrinsic intrinsic -> invokeIntrinsic intrinsic arg >>= \ case
+    Just result -> pure result
+    Nothing -> readVar tail >>= \case
+      Val.Overloads head tail -> invokeOverloads loc head tail arg
+      _ -> abort $ DomainError loc
+
+-- invokeFunction :: Env m ->
 --                   IdentMap Bool ->
 --                   L (Exp L Ident) ->
 --                   L (Exp L Ident) ->
 --                   Var m (Val m) ->
 --                   (Maybe (Var m (Val m)) -> EvalT m ()) ->
 --                   EvalT m ()
--- invokeFunction env xs e_domain e var_domain k =
---   ifte''
---   (do
---       xs <- for xs freshNamed
---       let env' = xs <> env
---       unify var_domain =<< local (const env') (eval' e_domain)
---       pure $ Many xs)
---   (\ (Many xs) -> do
---       let env' = xs <> env
---       k . Just =<< local (const env') (eval' e))
+-- invokeFunction env xs e_domain e var_domain =
+--   if''
+--   do
+--     xs <- for xs freshNamed
+--     let env' = xs <> env
+--     unify var_domain =<< local (const env') (eval' e_domain)
+--     pure xs
+--   \ xs -> do
+--     let env' = xs <> env
+--     Just =<< local (const env') (eval' e)
 --   (k Nothing)
 
 -- invokeStruct :: MonadEval m =>
@@ -469,22 +460,20 @@ invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
 --   Val.ClassInst _ (Just var_domain) _ -> invokeClass loc i env var_super xs e var_domain
 --   _ -> empty
 
--- invokeIntrinsic :: Intrinsic ->
---                    VarVal m ->
---                    (Maybe (VarVal m) -> EvalT m ()) ->
---                    EvalT m ()
--- invokeIntrinsic = \ case
---   Intrinsic.Less -> liftOrd (<)
---   Intrinsic.LessEqual -> liftOrd (<=)
---   Intrinsic.Greater -> liftOrd (>)
---   Intrinsic.GreaterEqual -> liftOrd (>=)
---   Intrinsic.Plus -> liftNum (+)
---   Intrinsic.PrefixPlus -> prefixPlus
---   Intrinsic.Minus -> liftNum (-)
---   Intrinsic.PrefixMinus -> prefixMinus
---   Intrinsic.Multiply -> liftNum (*)
---   Intrinsic.Divide -> div'
---   Intrinsic.Int -> int
+invokeIntrinsic :: (MonadRef m, MonadSupply Int m)
+                => Intrinsic -> VarVal m -> VerseT m (Maybe (VarVal m))
+invokeIntrinsic = \ case
+  -- Intrinsic.Less -> liftOrd (<)
+  -- Intrinsic.LessEqual -> liftOrd (<=)
+  -- Intrinsic.Greater -> liftOrd (>)
+  -- Intrinsic.GreaterEqual -> liftOrd (>=)
+  -- Intrinsic.Plus -> liftNum (+)
+  Intrinsic.PrefixPlus -> prefixPlus
+  -- Intrinsic.Minus -> liftNum (-)
+  Intrinsic.PrefixMinus -> prefixMinus
+  -- Intrinsic.Multiply -> liftNum (*)
+  -- Intrinsic.Divide -> div'
+  Intrinsic.Int -> int
 
 -- liftOrd :: (forall a . Ord a => a -> a -> Bool) ->
 --            Var m (Val m) ->
@@ -555,19 +544,21 @@ invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
 --   (k . Just . getOne)
 --   (k Nothing)
 
--- prefixPlus :: VarVal m -> EvalT m (Maybe (VarVal m))
--- prefixPlus var = do
---   s <- get
---   choiceFree <- freshIVar
---   storeFree <- freshIVar
---   if''
---   (readVar var >>= \ case
---       Val.Int _ -> pure var
---       Val.Float _ -> pure var
---       Val.Rational _ -> pure var
---       _ -> empty)
---   (pure . Just)
---   (pure Nothing)
+prefixPlus :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
+prefixPlus var = readVar var >>= \ case
+  Val.Int _ -> pure $ Just var
+  Val.Float _ -> pure $ Just var
+  Val.Rational _ -> pure $ Just var
+  _ -> pure Nothing
+
+prefixMinus :: (MonadRef m, MonadSupply Int m)
+            => VarVal m -> VerseT m (Maybe (VarVal m))
+prefixMinus var = readVar var >>= \ case
+  Val.Int x -> Just <$> newVar (Val.Int $ negate x)
+  Val.Float x -> Just <$> newVar (Val.Float $ negate x)
+  Val.Rational x -> Just <$> newVar (Val.Rational $ negate x)
+  _ -> pure Nothing
+
 
 -- prefixMinus :: Var m (Val m) ->
 --                (Maybe (Var m (Val m)) -> EvalT m ()) ->
@@ -630,19 +621,10 @@ invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
 --       Just (Rational x) -> k . Just =<< newVar (Val.Rational x))
 --   (k Nothing)
 
--- int :: Var m (Val m) ->
---        (Maybe (Var m (Val m)) -> EvalT m ()) ->
---        EvalT m ()
--- int var k =
---   ifte''
---   (do
---       whenBound var $ \ case
---         Val.Int _ -> pure ()
---         Val.Rational x | denominator x == 1 -> pure ()
---         _ -> empty
---       pure $ One var)
---   (k . Just . getOne)
---   (k Nothing)
+int :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
+int var = readVar var >>= \ case
+  Int _ -> pure $ Just var
+  _ -> pure Nothing
 
 -- instSuper :: MonadEval m =>
 --              Loc ->
@@ -715,15 +697,6 @@ newEnv = execWriterT $ do
       tell . HashMap.singleton x . Val =<<
       lift . newVar . Val.Overloads (Val.Intrinsic y) =<<
       lift freshVar
-
-abortWithDomainError :: MonadAbort Error m => Loc -> m a
-abortWithDomainError = abort . DomainError
-
-abortWithIdentError :: MonadAbort Error m => Loc -> Ident -> m a
-abortWithIdentError x = abort . IdentError x
-
-abortWithNameError :: MonadAbort Error m => Loc -> Name -> m a
-abortWithNameError x = abort . NameError x
 
 filterNames :: HashMap Ident a -> HashMap Name a
 filterNames =
