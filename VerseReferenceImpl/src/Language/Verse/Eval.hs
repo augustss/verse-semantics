@@ -18,7 +18,7 @@ import Control.Monad.Abort
 import Control.Monad.Fix
 import Control.Monad.Reader.Class
 import Control.Monad.Ref
-import Control.Monad.RST
+import Control.Monad.RS
 import Control.Monad.State.Class
 import Control.Monad.Supply
 import Control.Monad.Trans.Class
@@ -89,7 +89,7 @@ eval :: ( MonadAbort Error m
         , MonadFix m
         , MonadRef m
         , MonadSupply Label m
-        , Eq (Ref m (VarVal m))
+        , EqRef (Ref m)
         ) => L (Exp L Ident) -> VerseT m FrozenVal
 eval = freeze' <=< evalEvalT . eval'
 
@@ -97,7 +97,7 @@ eval' :: ( MonadAbort Error m
          , MonadFix m
          , MonadRef m
          , MonadSupply Label m
-         , Eq (Ref m (VarVal m))
+         , EqRef (Ref m)
          ) => L (Exp L Ident) -> EvalT m (VarVal m)
 eval' e = case extract e of
   e1 :*>: e2 ->
@@ -749,7 +749,7 @@ filterNames =
 --         readIVar storeFree'
 --         writeIVar storeFree ()
 
-lookupName :: (MonadRef m, MonadSupply Int m, Eq (Ref m (VarVal m)))
+lookupName :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
            => Ident -> EvalT m (Maybe (VarVal m))
 lookupName = lookupName' >=> \ case
   Nothing -> pure Nothing

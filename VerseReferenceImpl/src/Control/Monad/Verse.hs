@@ -45,8 +45,8 @@ import Control.Monad.Abort
 import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
+import Control.Monad.RS
 import Control.Monad.RWS.CPS
-import Control.Monad.State.Strict
 import Control.Monad.Supply
 
 import Data.Bool
@@ -140,10 +140,11 @@ newtype Var m f = Var
   }
 
 newtype VarRef m f = VarRef
-  { unVarRef :: Ref m (Var m f)
+  { unVarRef :: Ref m (HeapMap (Var m f))
   }
 
-deriving instance Eq (Ref m (Var m f)) => Eq (VarRef m f)
+instance EqRef (Ref m) => Eq (VarRef m f) where
+  (==) = eqRef `on` unVarRef
 
 data HeapMap a = HeapMap !a !(IntMap a)
 
@@ -443,9 +444,9 @@ resume p@Process {..} m = lift (msplit_ m Env { heap = Just heap, .. }) >>= \ ca
       m_empty'' = m_empty' <|> fork m_empty *> m
     lift ((0 ==) <$> readRef suspCount `andM` readHeapRef' left heap) >>= \ case
       Nothing -> lift $ writeRef right (m_fail'', m_empty'') $> Left p
-      Just x ->
+      Just x -> ask' >>= \ r ->
         Right . writeIVar result . Just . (heap,, m_fail'') <$>
-        runFreshenT (readRef commit *> freshen x) (Just heap)
+        runFreshenT (readRef commit *> freshen x) (Just heap) r.heap
 
 resume' :: (MonadRef m, MonadSupply Int m)
         => Process m -> VerseT m ()
@@ -457,30 +458,37 @@ resume' p@Process {..} m = do
     Just m@(m_fail, _) -> do
       lift ((0 ==) <$> readRef suspCount `andM` readHeapRef' left heap) >>= \ case
         Nothing -> lift $ writeRef right m $> Left p
-        Just x ->
+        Just x -> ask' >>= \ r ->
           Right . writeIVar result . Just . (heap,, m_fail) <$>
-          runFreshenT (readRef commit *> freshen x) (Just heap)
+          runFreshenT (readRef commit *> freshen x) (Just heap) r.heap
 
 newVarRef :: MonadRef m => Var m f -> VerseT m (VarRef m f)
-newVarRef = lift . fmap VarRef . newRef
+newVarRef = lift . fmap VarRef . newRef . singleton
 
 readVarRef :: MonadRef m => VarRef m f -> VerseT m (Var m f)
-readVarRef = lift . readVarRef'
+readVarRef ref = do
+  r <- ask'
+  lift $ readVarRef' ref r.heap
 
-readVarRef' :: MonadRef m => VarRef m f -> m (Var m f)
-readVarRef' = readRef . unVarRef
+readVarRef' :: MonadRef m => VarRef m f -> HeapKey -> m (Var m f)
+readVarRef' ref = get' (unVarRef ref)
 
 writeVarRef :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
             => VarRef m f -> Var m f -> VerseT m ()
-writeVarRef (VarRef ref) x = do
-  y <- lift $ readRef ref
-  liftEmpty $
-    writeRef ref x $> \ _ ->
-    writeRef ref y
+writeVarRef ref x = do
   r <- ask'
+  y <- lift $ get' (unVarRef ref) r.heap
+  liftEmpty $
+    put' (unVarRef ref) r.heap x $> \ r ->
+    put' (unVarRef ref) r.heap y
   ck <- lift $ readRef r.commit
-  liftAlt $
-    writeRef r.commit (ck >> readRef ref >>= freshen >>= writeRef ref) $> \ r ->
+  let
+    ck' = do
+      ck
+      (h, h') <- FreshenT ask
+      put' (unVarRef ref) h' =<< freshen =<< get' (unVarRef ref) h
+  liftEmpty $
+    writeRef r.commit ck' $> \ r ->
     writeRef r.commit ck
 
 fork :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
@@ -579,7 +587,7 @@ split heap left m = do
     Just m@(m_fail, _) ->
       lift ((0 ==) <$> readRef suspCount `andM` readHeapRef' left heap) >>= \ case
         Just x ->
-          runFreshenT (join (readRef commit) *> freshen x) (Just heap) >>=
+          runFreshenT (join (readRef commit) *> freshen x) (Just heap) r.heap >>=
           newIVar . Just . (heap,, m_fail)
         Nothing -> do
           result <- freshIVar
@@ -588,7 +596,7 @@ split heap left m = do
           pure result
 
 newtype FreezeT m a = FreezeT
-  { unFreezeT :: ReaderT HeapKey (StateT (IntMap GHC.Exts.Any) m) a
+  { unFreezeT :: RST HeapKey (IntMap GHC.Exts.Any) m a
   } deriving ( Functor
              , Applicative
              , Monad
@@ -598,10 +606,10 @@ newtype FreezeT m a = FreezeT
 runFreezeT :: Monad m => FreezeT m a -> VerseT m a
 runFreezeT m = do
   r <- ask'
-  lift $ evalStateT (runReaderT (unFreezeT m) r.heap) mempty
+  lift $ evalRST (unFreezeT m) r.heap mempty
 
 instance MonadTrans FreezeT where
-  lift = FreezeT . lift . lift
+  lift = FreezeT . lift
 
 class Monad m => Freezable a b m | a -> b where
   freeze :: a -> FreezeT m b
@@ -633,13 +641,13 @@ instance ( MonadFix m
          , MonadRef m
          , Freezable (f (Var m f)) (g (Frozen g)) m
          ) => Freezable (VarRef m f) (Frozen g) m where
-  freeze = freeze <=< lift . readVarRef'
+  freeze ref = freeze =<< lift . readVarRef' ref =<< FreezeT ask
 
 freeze' :: (Monad m, Freezable a b m) => a -> VerseT m b
 freeze' = runFreezeT . freeze
 
 newtype FreshenT m a = FreshenT
-  { unFreshenT :: RWST HeapKey (Rollback m) (IntMap GHC.Exts.Any) m a
+  { unFreshenT :: RWST (HeapKey, HeapKey) (Rollback m) (IntMap GHC.Exts.Any) m a
   } deriving ( Functor
              , Applicative
              , Monad
@@ -653,9 +661,9 @@ instance Applicative m => Semigroup (Rollback m) where
 instance Applicative m => Monoid (Rollback m) where
   mempty = Rollback . const $ pure ()
 
-runFreshenT :: Monad m => FreshenT m a -> Maybe Heap -> VerseT m a
-runFreshenT m h = do
-  (x, w) <- lift $ evalRWST (unFreshenT m) h mempty
+runFreshenT :: Monad m => FreshenT m a -> HeapKey -> HeapKey -> VerseT m a
+runFreshenT m h h' = do
+  (x, w) <- lift $ evalRWST (unFreshenT m) (h, h') mempty
   addEmpty $ getRollback w
   pure x
 
@@ -680,7 +688,7 @@ instance ( MonadFix m
          ) => Freshenable (Var m f) m where
   freshen = FreshenT . loop
     where
-      loop v = ask >>= lift . findRepr' v >>= \ case
+      loop v = ask >>= lift . findRepr' v . fst >>= \ case
         Found v Unbound {} -> pure v
         Found _ (Bound x i) -> mfix $ \ x' ->
           state' (lookupInsert i $ unsafeCoerce x') >>= \ case
@@ -707,12 +715,12 @@ newHeapRef :: MonadRef m => a -> VerseT m (HeapRef m a)
 newHeapRef = lift . fmap HeapRef . newRef . singleton
 
 readHeapRef' :: MonadRef m => HeapRef m a -> Heap -> m a
-readHeapRef' r h = lookup (Just h) <$> readRef (unHeapRef r)
+readHeapRef' r = get' (unHeapRef r) . Just
 
 writeHeapRef :: MonadRef m => HeapRef m a -> a -> VerseT m ()
 writeHeapRef ref x = do
   r <- ask'
-  y <- lift $ lookup r.heap <$> readRef (unHeapRef ref)
+  y <- lift $ get' (unHeapRef ref) r.heap
   liftAlt $
     put' (unHeapRef ref) r.heap x $> \ r ->
     put' (unHeapRef ref) r.heap y
@@ -813,6 +821,9 @@ lookupLocalState k (HeapMap y ys) = case k of
   Just k ->
     IntMap.lookup k.label ys <|>
     lookupPred k.pred ys
+
+get' :: MonadRef m => Ref m (HeapMap a) -> HeapKey -> m a
+get' r k = lookup k <$> readRef r
 
 put' :: MonadRef m => Ref m (HeapMap a) -> HeapKey -> a -> m ()
 put' r k = modifyRef' r . insert k

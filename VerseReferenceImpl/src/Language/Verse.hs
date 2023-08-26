@@ -26,6 +26,6 @@ eval :: ( MonadAbort Error m
         , MonadFix m
         , MonadRef m
         , MonadSupply Label m
-        , Eq (Ref m (VarVal m))
+        , EqRef (Ref m)
         ) => ByteString -> VerseT m FrozenVal
 eval = Eval.eval <=< liftEither . (desugar <=< runLexer parse)

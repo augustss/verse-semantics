@@ -7,7 +7,7 @@ module Language.Verse.Desugar
 import Control.Comonad
 import Control.Monad.Except
 import Control.Monad.Reader.Class
-import Control.Monad.RST
+import Control.Monad.RS
 import Control.Monad.State.Class
 import Control.Monad.Supply
 import Control.Monad.Trans.Class

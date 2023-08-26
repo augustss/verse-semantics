@@ -13,6 +13,7 @@ import Data.List
 import Data.Traversable
 
 import Language.Verse
+import Language.Verse.Error
 
 import Prettyprinter
 
@@ -33,19 +34,22 @@ getTest = do
 
 mkTestCase :: FilePath -> Test
 mkTestCase verseFile = TestLabel verseFile . TestCase $
-  ByteString.readFile ("test" </> verseFile) >>= runExceptT . runSupplyT . runVerseT . (prettyM <=< eval) >>= \ case
-    Left e -> do
+  ByteString.readFile ("test" </> verseFile) >>= runExceptT . runSupplyT . runVerseT . eval >>= \ case
+    Left e -> handleError e
+    Right Nothing -> handleError StuckError
+    Right (Just xs) -> do
+      let outFile = replaceExtension verseFile "out"
+      expected <- (readFile $ "test" </> outFile) `catchIOError` \ e ->
+        if isDoesNotExistError e then pure "" else ioError e
+      let actual = show $ foldr (\ x z -> pretty x <> line <> z) mempty xs
+      assertEqual outFile expected actual
+  where
+    handleError e = do
       let errFile = replaceExtension verseFile "err"
       expected <- (readFile $ "test" </> errFile) `catchIOError` \ e ->
         if isDoesNotExistError e then pure "" else ioError e
       let actual = show $ pretty e <> line
       assertEqual errFile expected actual
-    Right xs -> do
-      let outFile = replaceExtension verseFile "out"
-      expected <- (readFile $ "test" </> outFile) `catchIOError` \ e ->
-        if isDoesNotExistError e then pure "" else ioError e
-      let actual = show $ foldr (\ x z -> x <> line <> z) mempty xs
-      assertEqual outFile expected actual
 
 listDirectory' :: FilePath -> IO [FilePath]
 listDirectory' x = do

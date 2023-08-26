@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE UndecidableInstances #-}
-module Control.Monad.RST
+module Control.Monad.RS
   ( RST (..)
   , evalRST
   ) where

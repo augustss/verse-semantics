@@ -21,10 +21,8 @@ maintainer: andy.sonnenburg@epicgames.com
 library
   exposed-modules:
     Control.Monad.Abort
-    Control.Monad.Logic.State
-    Control.Monad.Logic.State.Class
     Control.Monad.Ref
-    Control.Monad.RST
+    Control.Monad.RS
     Control.Monad.Supply
     Control.Monad.Verse
     Data.Match

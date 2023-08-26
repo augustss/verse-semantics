@@ -7,6 +7,7 @@ module Control.Monad.Ref
   ( MonadRef (..)
   , modifyRef
   , modifyRef'
+  , EqRef (..)
   ) where
 
 import Control.Monad.Logic
@@ -74,3 +75,12 @@ instance MonadRef m => MonadRef (Lazy.StateT s m)
 instance MonadRef m => MonadRef (Strict.StateT s m)
 
 instance MonadRef m => MonadRef (CPS.WriterT w m)
+
+class EqRef ref where
+  eqRef :: ref a -> ref a -> Bool
+
+instance EqRef IORef where
+  eqRef = (==)
+
+instance EqRef (STRef s) where
+  eqRef = (==)
