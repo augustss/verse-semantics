@@ -59,7 +59,7 @@ import Language.Verse.Name
 import Language.Verse.Val (Val, VarVal, FrozenVal, Named (..))
 import Language.Verse.Val qualified as Val
 
-import Prelude (Integer, Num (..))
+import Prelude (Integer, Num (..), fromRational, toRational)
 
 type EvalT m = WriterT (Defaults m) (RST (Env m) (S m) (VerseT m))
 
@@ -463,86 +463,60 @@ invokeOverloads loc head tail arg = case head of
 invokeIntrinsic :: (MonadRef m, MonadSupply Int m)
                 => Intrinsic -> VarVal m -> VerseT m (Maybe (VarVal m))
 invokeIntrinsic = \ case
-  -- Intrinsic.Less -> liftOrd (<)
-  -- Intrinsic.LessEqual -> liftOrd (<=)
-  -- Intrinsic.Greater -> liftOrd (>)
-  -- Intrinsic.GreaterEqual -> liftOrd (>=)
-  -- Intrinsic.Plus -> liftNum (+)
+  Intrinsic.Less -> liftOrd (<)
+  Intrinsic.LessEqual -> liftOrd (<=)
+  Intrinsic.Greater -> liftOrd (>)
+  Intrinsic.GreaterEqual -> liftOrd (>=)
+  Intrinsic.Plus -> liftNum (+)
   Intrinsic.PrefixPlus -> prefixPlus
-  -- Intrinsic.Minus -> liftNum (-)
+  Intrinsic.Minus -> liftNum (-)
   Intrinsic.PrefixMinus -> prefixMinus
-  -- Intrinsic.Multiply -> liftNum (*)
+  Intrinsic.Multiply -> liftNum (*)
   -- Intrinsic.Divide -> div'
   Intrinsic.Int -> int
 
--- liftOrd :: (forall a . Ord a => a -> a -> Bool) ->
---            Var m (Val m) ->
---            (Maybe (Var m (Val m)) -> EvalT m ()) ->
---            EvalT m ()
--- liftOrd f var k =
---   ifte''
---   (do
---       var_x <- freshVar
---       var_y <- freshVar
---       unify var =<< newVar (Val.Tuple [var_x, var_y])
---       var_p <- freshVar
---       whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
---         unify var_p =<< case (val_x, val_y) of
---           (Val.Int x, Val.Int y) -> newBool $ f x y
---           (Val.Int x, Val.Float y) -> newBool $ f (fromInteger x) y
---           (Val.Int x, Val.Rational y) -> newBool $ f (fromInteger x) y
---           (Val.Float x, Val.Int y) -> newBool $ f x (fromInteger y)
---           (Val.Float x, Val.Float y) -> newBool $ f x y
---           (Val.Float x, Val.Rational y) -> newBool $ f (toRational x) y
---           (Val.Rational x, Val.Int y) -> newBool $ f x (fromInteger y)
---           (Val.Rational x, Val.Float y) -> newBool $ f x (toRational y)
---           (Val.Rational x, Val.Rational y) -> newBool $ f x y
---           _ -> empty
---       pure (One var_p, One var_x))
---   (\ (One var_p, One var_x) ->
---       whenBound var_p $ getConst >>> \ case
---         True -> k $ Just var_x
---         False -> empty)
---   (k Nothing)
+liftOrd :: (MonadRef m, MonadSupply Int m)
+        => (forall a . Ord a => a -> a -> Bool)
+        -> VarVal m -> VerseT m (Maybe (VarVal m))
+liftOrd f var = readVar var >>= \ case
+  Val.Tuple [var_x, var_y] -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+    (Val.Int x, Val.Int y) -> guard (f x y) $> Just var_x
+    (Val.Int x, Val.Float y) -> guard (f (fromInteger x) y) $> Just var_x
+    (Val.Int x, Val.Rational y) -> guard (f (fromInteger x) y) $> Just var_x
+    (Val.Float x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
+    (Val.Float x, Val.Float y) -> guard (f x y) $> Just var_x
+    (Val.Float x, Val.Rational y) -> guard (f (toRational x) y) $> Just var_x
+    (Val.Rational x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
+    (Val.Rational x, Val.Float y) -> guard (f x (toRational y)) $> Just var_x
+    (Val.Rational x, Val.Rational y) -> guard (f x y) $> Just var_x
+    _ -> pure Nothing
+  _ -> pure Nothing
 
--- newBool :: MonadVar m => Bool -> EvalT m (Var m (Const Bool))
--- newBool = newVar . Const
-
--- liftNum :: (forall a . Num a => a -> a -> a) ->
---            Var m (Val m) ->
---            (Maybe (Var m (Val m)) -> EvalT m ()) ->
---            EvalT m ()
--- liftNum f var k =
---   ifte''
---   (do
---       var_x <- freshVar
---       var_y <- freshVar
---       unify var =<< newVar (Val.Tuple [var_x, var_y])
---       var' <- freshVar
---       whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
---         unify var' =<< case (val_x, val_y) of
---           (Val.Int x, Val.Int y) ->
---             newVar . Val.Int $ f x y
---           (Val.Int x, Val.Float y) ->
---             newVar . Val.Float $ f (fromInteger x) y
---           (Val.Int x, Val.Rational y) ->
---             newVar . Val.Rational $ f (fromInteger x) y
---           (Val.Float x, Val.Int y) ->
---             newVar . Val.Float $ f x (fromInteger y)
---           (Val.Float x, Val.Float y) ->
---             newVar . Val.Float $ f x y
---           (Val.Float x, Val.Rational y) ->
---             newVar . Val.Float $ fromRational $ f (toRational x) y
---           (Val.Rational x, Val.Int y) ->
---             newVar . Val.Rational $ f x (fromInteger y)
---           (Val.Rational x, Val.Float y) ->
---             newVar . Val.Float $ fromRational $ f x (toRational y)
---           (Val.Rational x, Val.Rational y) ->
---             newVar . Val.Rational $ f x y
---           _ -> empty
---       pure $ One var')
---   (k . Just . getOne)
---   (k Nothing)
+liftNum :: (MonadRef m, MonadSupply Int m)
+        => (forall a . Num a => a -> a -> a)
+        -> VarVal m -> VerseT m (Maybe (VarVal m))
+liftNum f var = readVar var >>= \ case
+  Val.Tuple [var_x, var_y] -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+    (Val.Int x, Val.Int y) ->
+      fmap Just . newVar . Val.Int $ f x y
+    (Val.Int x, Val.Float y) ->
+      fmap Just . newVar . Val.Float $ f (fromInteger x) y
+    (Val.Int x, Val.Rational y) ->
+      fmap Just . newVar . Val.Rational $ f (fromInteger x) y
+    (Val.Float x, Val.Int y) ->
+      fmap Just . newVar . Val.Float $ f x (fromInteger y)
+    (Val.Float x, Val.Float y) ->
+      fmap Just . newVar . Val.Float $ f x y
+    (Val.Float x, Val.Rational y) ->
+      fmap Just . newVar . Val.Float $ fromRational $ f (toRational x) y
+    (Val.Rational x, Val.Int y) ->
+      fmap Just . newVar . Val.Rational $ f x (fromInteger y)
+    (Val.Rational x, Val.Float y) ->
+      fmap Just . newVar . Val.Float $ fromRational $ f x (toRational y)
+    (Val.Rational x, Val.Rational y) ->
+      fmap Just . newVar . Val.Rational $ f x y
+    _ -> pure Nothing
+  _ -> pure Nothing
 
 prefixPlus :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
 prefixPlus var = readVar var >>= \ case
