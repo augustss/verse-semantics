@@ -27,6 +27,7 @@ import Control.Monad.Verse
 
 import Data.Bool
 import Data.Eq
+import Data.Foldable (foldr)
 import Data.Function
 import Data.Functor
 import Data.Hashable
@@ -107,28 +108,12 @@ eval' e = case extract e of
     var2 <- eval' e2
     lift' $ unify var1 var2
     pure var1
-  -- e1 :.: x ->
-  --   evalDot (loc e) e1 x
-  -- e1 :..: e2 ->
-  --   evalDotDot e1 e2
-  e1 :|: e2 -> do
-    var <- lift' freshVar
-    env <- ask
-    s <- get
-    choiceFree <- lift' freshIVar
-    storeFree <- lift' freshIVar
-    put S { choiceFree, storeFree }
-    lift' $ fork do
-      readIVar s.choiceFree
-      (x, s') <- runEvalT' (eval' e1 <|> eval' e2) env s
-      fork do
-        readIVar s'.choiceFree
-        writeIVar choiceFree ()
-      fork do
-        readIVar s'.storeFree
-        writeIVar storeFree ()
-      unify var x
-    pure var
+  e1 :.: x ->
+    evalDot (loc e) e1 x
+  e1 :..: e2 ->
+    evalDotDot e1 e2
+  e1 :|: e2 ->
+    evalChoice e1 e2
   Exp.Fail ->
     empty
   Exp.One e -> do
@@ -229,10 +214,10 @@ eval' e = case extract e of
     i <- supply
     env <- ask
     lift' $ newVar . Val.Overloads (Val.Function i env xs e1 e2) =<< freshVar
---   Exp.ParenInvoke e1 e2 ->
---     evalInvoke (loc e) e1 e2
---   Exp.BracketInvoke e1 e2 ->
---     evalInvoke (loc e) e1 e2
+  -- Exp.ParenInvoke e1 e2 ->
+  --   evalInvoke (loc e) e1 e2
+  -- Exp.BracketInvoke e1 e2 ->
+  --   evalInvoke (loc e) e1 e2
   Exp.Tuple xs ->
     lift' . newVar . Val.Tuple =<< traverse eval' xs
   Exp.Truth e ->
@@ -244,21 +229,17 @@ eval' e = case extract e of
   Exp.Name x -> lookupName x >>= \ case
     Nothing -> abortWithIdentError (loc e) x
     Just var -> pure var
---   Exp.Default x e1 e2 -> do
---     var1 <- eval' e1
---     env <- ask
---     tell $ HashMap.singleton (extract x) (var1, env, e2)
---     pure var1
+  Exp.Default x e1 e2 -> do
+    var1 <- eval' e1
+    env <- ask
+    tell $ HashMap.singleton (extract x) (var1, env, e2)
+    pure var1
 
--- evalDot :: MonadEval m =>
---            Loc ->
---            L (Exp L Ident) ->
---            Name ->
---            EvalT m (Var m (Val m))
+-- evalDot :: Loc -> L (Exp L Ident) -> Name -> EvalT m (VarVal m)
 -- evalDot loc e x = do
 --   var_e <- eval' e
---   var <- freshVar
---   whenBound var_e $ \ case
+--   var <- lift' freshVar
+--   lift' . fork $ readVar var_e >>= \ case
 --     Val.Module _ xs ->
 --       case HashMap.lookup x xs of
 --         Just (Ref ref_x) -> readVarRef' ref_x $ unify var
@@ -277,25 +258,52 @@ eval' e = case extract e of
 --     _ -> abortWithDomainError loc
 --   pure var
 
--- evalDotDot :: MonadEval m =>
---               L (Exp L Ident) ->
---               L (Exp L Ident) ->
---               EvalT m (Var m (Val m))
--- evalDotDot e1 e2 = do
---   choiceFree <- getChoiceFree
---   choiceFree' <- freshVar
---   var1 <- eval' e1
---   var2 <- eval' e2
---   var <- freshVar
---   lift $ whenBound var1 $ \ case
---     Val.Int val1 -> whenBound var2 $ \ case
---       Val.Int val2 -> do
---         unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
---         unify choiceFree choiceFree'
---       _ -> abortWithDomainError $ loc e2
---     _ -> abortWithDomainError $ loc e1
---   putChoiceFree choiceFree'
---   pure var
+evalDotDot :: ( MonadAbort Error m
+              , MonadFix m
+              , MonadRef m
+              , MonadSupply Int m
+              , EqRef (Ref m)
+              ) => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalDotDot e1 e2 = do
+  var1 <- eval' e1
+  var2 <- eval' e2
+  var <- lift' freshVar
+  s <- get
+  choiceFree <- lift' freshIVar
+  put s { choiceFree }
+  lift' . fork $ readVar var1 >>= \ case
+    Val.Int val1 -> readVar var2 >>= \ case
+      Val.Int val2 -> do
+        unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
+        writeIVar choiceFree ()
+      _ -> abortWithDomainError $ loc e2
+    _ -> abortWithDomainError $ loc e1
+  pure var
+
+evalChoice :: ( MonadAbort Error m
+              , MonadFix m
+              , MonadRef m
+              , MonadSupply Int m
+              , EqRef (Ref m)
+              ) => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalChoice e1 e2 = do
+  var <- lift' freshVar
+  env <- ask
+  s <- get
+  choiceFree <- lift' freshIVar
+  storeFree <- lift' freshIVar
+  put S { choiceFree, storeFree }
+  lift' $ fork do
+    readIVar s.choiceFree
+    (x, s') <- runEvalT' (eval' e1 <|> eval' e2) env s
+    fork do
+      readIVar s'.choiceFree
+      writeIVar choiceFree ()
+    fork do
+      readIVar s'.storeFree
+      writeIVar storeFree ()
+      unify var x
+  pure var
 
 -- evalInst :: MonadEval m =>
 --             Loc ->
@@ -451,8 +459,8 @@ eval' e = case extract e of
 --   _ -> empty
 
 -- invokeIntrinsic :: Intrinsic ->
---                    Var m (Val m) ->
---                    (Maybe (Var m (Val m)) -> EvalT m ()) ->
+--                    VarVal m ->
+--                    (Maybe (VarVal m) -> EvalT m ()) ->
 --                    EvalT m ()
 -- invokeIntrinsic = \ case
 --   Intrinsic.Less -> liftOrd (<)
