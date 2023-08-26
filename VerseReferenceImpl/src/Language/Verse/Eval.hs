@@ -1,7 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -35,6 +36,7 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
 import Data.Kind
+import Data.List (zip)
 import Data.Match
 import Data.Maybe
 import Data.Monoid
@@ -55,6 +57,8 @@ import Language.Verse.Loc (Loc, L, loc)
 import Language.Verse.Name
 import Language.Verse.Val (Val, VarVal, FrozenVal, Named (..))
 import Language.Verse.Val qualified as Val
+
+import Prelude (Integer)
 
 type EvalT m = WriterT (Defaults m) (RST (Env m) (S m) (VerseT m))
 
@@ -108,8 +112,8 @@ eval' e = case extract e of
     var2 <- eval' e2
     lift' $ unify var1 var2
     pure var1
-  e1 :.: x ->
-    evalDot (loc e) e1 x
+  -- e1 :.: x ->
+  --   evalDot (loc e) e1 x
   e1 :..: e2 ->
     evalDotDot e1 e2
   e1 :|: e2 ->
@@ -214,10 +218,10 @@ eval' e = case extract e of
     i <- supply
     env <- ask
     lift' $ newVar . Val.Overloads (Val.Function i env xs e1 e2) =<< freshVar
-  -- Exp.ParenInvoke e1 e2 ->
-  --   evalInvoke (loc e) e1 e2
-  -- Exp.BracketInvoke e1 e2 ->
-  --   evalInvoke (loc e) e1 e2
+  Exp.ParenInvoke e1 e2 ->
+    evalInvoke (loc e) e1 e2
+  Exp.BracketInvoke e1 e2 ->
+    evalInvoke (loc e) e1 e2
   Exp.Tuple xs ->
     lift' . newVar . Val.Tuple =<< traverse eval' xs
   Exp.Truth e ->
@@ -271,14 +275,21 @@ evalDotDot e1 e2 = do
   s <- get
   choiceFree <- lift' freshIVar
   put s { choiceFree }
-  lift' . fork $ readVar var1 >>= \ case
-    Val.Int val1 -> readVar var2 >>= \ case
-      Val.Int val2 -> do
-        unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
-        writeIVar choiceFree ()
-      _ -> abortWithDomainError $ loc e2
-    _ -> abortWithDomainError $ loc e1
+  lift' . fork $ (,) <$> readVar var1 <*> readVar var2 >>= \ case
+    (Int val1, Int val2) -> do
+      unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
+      writeIVar choiceFree ()
+    _ -> abortWithDomainError $ loc e1 <> loc e2
   pure var
+
+pattern Int :: Integer -> Val f a
+pattern Int x <- (getInt -> Just x)
+
+getInt :: Val f a -> Maybe Integer
+getInt = \ case
+  Val.Int x -> pure x
+  Val.Rational x | denominator x == 1 -> pure $ numerator x
+  _ -> empty
 
 evalChoice :: ( MonadAbort Error m
               , MonadFix m
@@ -302,7 +313,7 @@ evalChoice e1 e2 = do
     fork do
       readIVar s'.storeFree
       writeIVar storeFree ()
-      unify var x
+    unify var x
   pure var
 
 -- evalInst :: MonadEval m =>
@@ -347,66 +358,66 @@ evalChoice e1 e2 = do
 --     _ -> abortWithDomainError loc
 --   pure var
 
--- evalInvoke :: MonadEval m =>
---               Loc ->
---               L (Exp L Ident) ->
---               L (Exp L Ident) ->
---               EvalT m (Var m (Val m))
--- evalInvoke loc e1 e2 = do
---   var1 <- eval' e1
---   var2 <- eval' e2
---   var <- freshVar
---   choiceFree <- getChoiceFree
---   choiceFree' <- freshVar
---   storeFree <- getStoreFree
---   storeFree' <- freshVar
---   whenBound var1 $ \ case
---     Val.Tuple xs -> do
---       unify var =<< invokeTuple xs var2
---       unify choiceFree choiceFree'
---       unify storeFree storeFree'
---     Val.Overloads overload var1 ->
---       fix (\ recur overload var1 -> case overload of
---         Val.Function _ env xs e_domain e ->
---           invokeFunction env xs e_domain e var2 $ \ case
---             Just var' -> do
---               unify var var'
---               unify choiceFree choiceFree'
---               unify storeFree storeFree'
---             Nothing -> whenBound var1 $ \ case
---               Val.Overloads overload var1 -> recur overload var1
---               _ -> abortWithDomainError loc
---         Val.Struct i env xs e -> do
---           unify var var2
---           invokeStruct i env xs e var2
---           unify choiceFree choiceFree'
---           unify storeFree storeFree'
---         Val.Class i env var_super xs e -> do
---           unify var var2
---           invokeClass loc i env var_super xs e var2
---           unify choiceFree choiceFree'
---           unify storeFree storeFree'
---         Val.Intrinsic intrinsic ->
---           invokeIntrinsic intrinsic var2 $ \ case
---             Just var' -> do
---               unify var var'
---               unify choiceFree choiceFree'
---               unify storeFree storeFree'
---             Nothing -> whenBound var1 $ \ case
---               Val.Overloads overload var1 -> recur overload var1
---               _ -> abortWithDomainError loc) overload var1
---     _ -> abortWithDomainError loc
---   putChoiceFree choiceFree'
---   putStoreFree storeFree'
---   pure var
+evalInvoke :: ( MonadAbort Error m
+              , MonadFix m
+              , MonadRef m
+              , MonadSupply Int m
+              , EqRef (Ref m)
+              ) => Loc -> L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalInvoke loc e1 e2 = do
+  var1 <- eval' e1
+  var2 <- eval' e2
+  var <- lift' freshVar
+  s <- get
+  choiceFree <- lift' freshIVar
+  storeFree <- lift' freshIVar
+  put S { choiceFree, storeFree }
+  lift' . fork $ readVar var1 >>= \ case
+    Val.Tuple xs -> do
+      readIVar s.choiceFree
+      unify var =<< invokeTuple xs var2
+      writeIVar choiceFree ()
+      fork do
+        readIVar s.storeFree
+        writeIVar storeFree ()
+    -- Val.Overloads overload var1 ->
+    --   fix (\ recur overload var1 -> case overload of
+    --     Val.Function _ env xs e_domain e ->
+    --       invokeFunction env xs e_domain e var2 $ \ case
+    --         Just var' -> do
+    --           unify var var'
+    --           unify choiceFree choiceFree'
+    --           unify storeFree storeFree'
+    --         Nothing -> whenBound var1 $ \ case
+    --           Val.Overloads overload var1 -> recur overload var1
+    --           _ -> abortWithDomainError loc
+    --     Val.Struct i env xs e -> do
+    --       unify var var2
+    --       invokeStruct i env xs e var2
+    --       unify choiceFree choiceFree'
+    --       unify storeFree storeFree'
+    --     Val.Class i env var_super xs e -> do
+    --       unify var var2
+    --       invokeClass loc i env var_super xs e var2
+    --       unify choiceFree choiceFree'
+    --       unify storeFree storeFree'
+    --     Val.Intrinsic intrinsic ->
+    --       invokeIntrinsic intrinsic var2 $ \ case
+    --         Just var' -> do
+    --           unify var var'
+    --           unify choiceFree choiceFree'
+    --           unify storeFree storeFree'
+    --         Nothing -> whenBound var1 $ \ case
+    --           Val.Overloads overload var1 -> recur overload var1
+    --           _ -> abortWithDomainError loc) overload var1
+    _ -> abortWithDomainError loc
+  pure var
 
--- invokeTuple :: ( MonadUnify m
---                , EqVarRef (VarRef m)
---                ) => [Var m f] -> Var m (Val m) -> EvalT m (Var m f)
--- invokeTuple xs var = do
---   asum $ zip xs [0 ..] <&> \ (x, i) -> do
---     unify var =<< newVar (Val.Int i)
---     pure x
+invokeTuple :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
+            => [Var m f] -> VarVal m -> VerseT m (Var m f)
+invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
+  unify var =<< newVar (Val.Int i)
+  pure x
 
 -- invokeFunction :: MonadEval m =>
 --                   Env m ->
@@ -544,20 +555,19 @@ evalChoice e1 e2 = do
 --   (k . Just . getOne)
 --   (k Nothing)
 
--- prefixPlus :: Var m (Val f) ->
---               (Maybe (Var m (Val f)) -> EvalT m ()) ->
---               EvalT m ()
--- prefixPlus var k =
---   ifte''
---   (do
---       whenBound var $ \ case
---         Val.Int _ -> pure ()
---         Val.Float _ -> pure ()
---         Val.Rational _ -> pure ()
---         _ -> empty
---       pure $ One var)
---   (k . Just . getOne)
---   (k Nothing)
+-- prefixPlus :: VarVal m -> EvalT m (Maybe (VarVal m))
+-- prefixPlus var = do
+--   s <- get
+--   choiceFree <- freshIVar
+--   storeFree <- freshIVar
+--   if''
+--   (readVar var >>= \ case
+--       Val.Int _ -> pure var
+--       Val.Float _ -> pure var
+--       Val.Rational _ -> pure var
+--       _ -> empty)
+--   (pure . Just)
+--   (pure Nothing)
 
 -- prefixMinus :: Var m (Val m) ->
 --                (Maybe (Var m (Val m)) -> EvalT m ()) ->
