@@ -8,7 +8,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 module Language.Verse.Eval
-  ( eval
+  ( MonadEval
+  , eval
   ) where
 
 import Control.Applicative
@@ -91,20 +92,18 @@ evalEvalT' = evalRST . evalWriterT
 evalWriterT :: (Monoid w, Functor m) => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
 
-eval :: ( MonadAbort Error m
-        , MonadFix m
-        , MonadRef m
-        , MonadSupply Label m
-        , EqRef (Ref m)
-        ) => L (Exp L Ident) -> VerseT m FrozenVal
+type MonadEval m =
+  ( MonadAbort Error m
+  , MonadFix m
+  , MonadRef m
+  , MonadSupply Label m
+  , EqRef (Ref m)
+  )
+
+eval :: MonadEval m => L (Exp L Ident) -> VerseT m FrozenVal
 eval = freeze' <=< evalEvalT . eval'
 
-eval' :: ( MonadAbort Error m
-         , MonadFix m
-         , MonadRef m
-         , MonadSupply Label m
-         , EqRef (Ref m)
-         ) => L (Exp L Ident) -> EvalT m (VarVal m)
+eval' :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
 eval' e = case extract e of
   e1 :*>: e2 ->
     eval' e1 *> eval' e2
@@ -229,12 +228,7 @@ eval' e = case extract e of
 --     _ -> abortWithDomainError loc
 --   pure var
 
-evalDotDot :: ( MonadAbort Error m
-              , MonadFix m
-              , MonadRef m
-              , MonadSupply Int m
-              , EqRef (Ref m)
-              ) => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalDotDot :: MonadEval m => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
 evalDotDot e1 e2 = do
   var1 <- eval' e1
   var2 <- eval' e2
@@ -258,12 +252,7 @@ getInt = \ case
   Val.Rational x | denominator x == 1 -> pure $ numerator x
   _ -> empty
 
-evalChoice :: ( MonadAbort Error m
-              , MonadFix m
-              , MonadRef m
-              , MonadSupply Int m
-              , EqRef (Ref m)
-              ) => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalChoice :: MonadEval m => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
 evalChoice e1 e2 = do
   var <- lift' freshVar
   env <- ask
@@ -283,12 +272,7 @@ evalChoice e1 e2 = do
     unify var x
   pure var
 
-evalOne :: ( MonadAbort Error m
-           , MonadFix m
-           , MonadRef m
-           , MonadSupply Int m
-           , EqRef (Ref m)
-           ) => L (Exp L Ident) -> EvalT m (VarVal m)
+evalOne :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
 evalOne e = do
   var <- lift' freshVar
   env <- ask
@@ -302,12 +286,7 @@ evalOne e = do
     writeIVar storeFree ()
   pure var
 
-evalAll :: ( MonadAbort Error m
-           , MonadFix m
-           , MonadRef m
-           , MonadSupply Int m
-           , EqRef (Ref m)
-           ) => L (Exp L Ident) -> EvalT m (VarVal m)
+evalAll :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
 evalAll e = do
   var <- lift' freshVar
   env <- ask
@@ -321,12 +300,7 @@ evalAll e = do
     writeIVar storeFree ()
   pure var
 
-evalNot :: ( MonadAbort Error m
-           , MonadFix m
-           , MonadRef m
-           , MonadSupply Int m
-           , EqRef (Ref m)
-           ) => L (Exp L Ident) -> EvalT m (VarVal m)
+evalNot :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
 evalNot e = do
   env <- ask
   s <- get
@@ -344,7 +318,7 @@ evalNot e = do
   lift' . newVar $ Val.Tuple []
 
 evalIfThenElse
-  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: MonadEval m
   => HashMap Ident Bool
   -> L (Exp L Ident)
   -> L (Exp L Ident)
@@ -459,7 +433,7 @@ invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
   pure x
 
 invokeOverloads
-  :: (MonadFix m, MonadAbort Error m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: MonadEval m
   => Loc
   -> Val.Overload (VarRef m) (VarVal m)
   -> VarVal m
@@ -474,7 +448,7 @@ invokeOverloads loc head tail arg s s' = invokeOverload head arg s s' >>= \ case
     _ -> abort $ DomainError loc
 
 invokeOverload
-  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: MonadEval m
   => Val.Overload (VarRef m) (VarVal m)
   -> VarVal m
   -> S m
@@ -494,7 +468,7 @@ invokeOverload overload arg s s' = case overload of
       pure x
 
 invokeFunction
-  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: MonadEval m
   => Env m
   -> IdentMap Bool
   -> L (Exp L Ident)
