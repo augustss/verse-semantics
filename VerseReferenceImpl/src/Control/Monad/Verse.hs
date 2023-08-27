@@ -55,6 +55,7 @@ import Data.Eq
 import Data.Foldable (for_)
 import Data.Function
 import Data.Functor
+import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Int
 import Data.IntMap.Internal qualified as IntMap.Internal
 import Data.IntMap.Strict (IntMap)
@@ -696,6 +697,9 @@ instance Monad m => Freshenable () m where
 
 instance Monad m => Freshenable Int m where
   freshen = pure
+
+instance Freshenable v m => Freshenable (Strict.HashMap k v) m where
+  freshen = traverse freshen
 
 instance ( MonadFix m
          , MonadRef m

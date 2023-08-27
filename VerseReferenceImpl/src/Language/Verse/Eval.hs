@@ -370,25 +370,18 @@ evalInvoke loc e1 e2 = do
   var2 <- eval' e2
   var <- lift' freshVar
   s <- get
-  choiceFree <- lift' freshIVar
-  storeFree <- lift' freshIVar
-  put S { choiceFree, storeFree }
+  s' <- S <$> lift' freshIVar <*> lift' freshIVar
+  put s'
   lift' . fork $ readVar var1 >>= \ case
     Val.Tuple xs -> do
+      fork do
+        readIVar s.storeFree
+        writeIVar s'.storeFree ()
       readIVar s.choiceFree
       unify var =<< invokeTuple xs var2
-      writeIVar choiceFree ()
-      fork do
-        readIVar s.storeFree
-        writeIVar storeFree ()
-    Val.Overloads head tail -> do
-      unify var =<< invokeOverloads loc head tail var2
-      fork do
-        readIVar s.choiceFree
-        writeIVar choiceFree ()
-      fork do
-        readIVar s.storeFree
-        writeIVar storeFree ()
+      writeIVar s'.choiceFree ()
+    Val.Overloads head tail ->
+      unify var =<< invokeOverloads loc head tail var2 s s'
     _ -> abort $ DomainError loc
   pure var
 
@@ -398,37 +391,69 @@ invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
   unify var =<< newVar (Val.Int i)
   pure x
 
-invokeOverloads :: (MonadFix m, MonadAbort Error m, MonadRef m, MonadSupply Int m)
-                => Loc
-                -> Val.Overload (VarRef m) (VarVal m)
-                -> VarVal m
-                -> VarVal m
-                -> VerseT m (VarVal m)
-invokeOverloads loc head tail arg = case head of
-  Val.Intrinsic intrinsic -> invokeIntrinsic intrinsic arg >>= \ case
-    Just result -> pure result
-    Nothing -> readVar tail >>= \case
-      Val.Overloads head tail -> invokeOverloads loc head tail arg
-      _ -> abort $ DomainError loc
+invokeOverloads
+  :: (MonadFix m, MonadAbort Error m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => Loc
+  -> Val.Overload (VarRef m) (VarVal m)
+  -> VarVal m
+  -> VarVal m
+  -> S m
+  -> S m
+  -> VerseT m (VarVal m)
+invokeOverloads loc head tail arg s s' = invokeOverload head arg s s' >>= \ case
+  Just result -> pure result
+  Nothing -> readVar tail >>= \ case
+    Val.Overloads head tail -> invokeOverloads loc head tail arg s s'
+    _ -> abort $ DomainError loc
 
--- invokeFunction :: Env m ->
---                   IdentMap Bool ->
---                   L (Exp L Ident) ->
---                   L (Exp L Ident) ->
---                   Var m (Val m) ->
---                   (Maybe (Var m (Val m)) -> EvalT m ()) ->
---                   EvalT m ()
--- invokeFunction env xs e_domain e var_domain =
---   if''
---   do
---     xs <- for xs freshNamed
---     let env' = xs <> env
---     unify var_domain =<< local (const env') (eval' e_domain)
---     pure xs
---   \ xs -> do
---     let env' = xs <> env
---     Just =<< local (const env') (eval' e)
---   (k Nothing)
+invokeOverload
+  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => Val.Overload (VarRef m) (VarVal m)
+  -> VarVal m
+  -> S m
+  -> S m
+  -> VerseT m (Maybe (VarVal m))
+invokeOverload overload arg s s' = case overload of
+  Val.Function _ env xs e_domain e -> invokeFunction env xs e_domain e arg s s'
+  Val.Intrinsic intrinsic -> invokeIntrinsic intrinsic arg >>= \ case
+    Nothing -> pure Nothing
+    x@Just {} -> do
+      fork do
+        readIVar s.choiceFree
+        writeIVar s'.choiceFree ()
+      fork do
+        readIVar s.storeFree
+        writeIVar s'.storeFree ()
+      pure x
+
+invokeFunction
+  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => Env m
+  -> IdentMap Bool
+  -> L (Exp L Ident)
+  -> L (Exp L Ident)
+  -> VarVal m
+  -> S m
+  -> S m
+  -> VerseT m (Maybe (VarVal m))
+invokeFunction env xs e_domain e arg s s' = readIVar =<< if'
+  do
+    xs <- traverse freshNamed xs
+    unify arg =<< evalEvalT' (eval' e_domain) (xs <> env) s
+    pure xs
+  do
+    \ xs -> do
+      let env' = xs <> env
+      (result, s'') <- runEvalT' (eval' e) env' s
+      fork do
+        readIVar s''.choiceFree
+        writeIVar s'.choiceFree ()
+      fork do
+        readIVar s''.storeFree
+        writeIVar s'.storeFree ()
+      pure $ Just result
+  do
+    pure Nothing
 
 -- invokeStruct :: MonadEval m =>
 --                 Label ->

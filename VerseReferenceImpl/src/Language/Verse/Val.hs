@@ -16,7 +16,7 @@ module Language.Verse.Val
   ) where
 
 import Control.Monad
-import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen)
+import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen, Freshenable (..))
 
 import Data.Functor
 import Data.Hashable
@@ -189,6 +189,11 @@ instance Eq (ref (Val ref)) => ZipMatchable (Named ref) where
     (Val x, Val y) -> Just $ Val (x, y)
     (Ref x, Ref y) -> guard (x == y) $> Ref x
     _ -> Nothing
+
+instance Freshenable a m => Freshenable (Named ref a) m where
+  freshen = \ case
+    Val x -> Val <$> freshen x
+    Ref x -> pure $ Ref x
 
 instance ( Freezable (f (Val f)) (g (Val g)) m
          , Freezable a b m
