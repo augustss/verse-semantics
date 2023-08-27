@@ -753,13 +753,14 @@ putStoreFree storeFree = modify $ \ s -> s { storeFree }
 lift' :: VerseT m a -> EvalT m a
 lift' = lift . lift
 
-freshNamed :: (MonadRef m, MonadSupply Int m)
+freshNamed :: (MonadFix m, MonadRef m, MonadSupply Int m)
            => Bool -> VerseT m (Named (VarRef m) (VarVal m))
 freshNamed = \ case
   False -> Val <$> freshVar
   True -> Ref <$> freshVarRef
 
-freshVarRef :: (MonadRef m, MonadSupply Int m) => VerseT m (VarRef m f)
+freshVarRef :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
+            => VerseT m (VarRef m f)
 freshVarRef = newVarRef =<< freshVar
 
 readVarRef' :: (MonadRef m, MonadSupply Int m, RowMatchable f)

@@ -466,8 +466,17 @@ resume' p@Process {..} m = do
           Right . writeIVar result . Just . (heap,, m_fail) <$>
           runFreshenT (join (readRef commit) *> freshen x) (Just heap)
 
-newVarRef :: MonadRef m => Var m f -> VerseT m (VarRef m f)
-newVarRef = lift . fmap VarRef . newRef . singleton
+newVarRef :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
+          => Var m f -> VerseT m (VarRef m f)
+newVarRef x = do
+  r <- ask'
+  ref <- lift . fmap VarRef . newRef $ singleton x
+  lift . modifyRef' r.commit $ \ commit -> do
+    commit
+    (h, h') <- FreshenT ask
+    x <- freshen =<< get' (unVarRef ref) h
+    put' (unVarRef ref) h x *> put' (unVarRef ref) h' x
+  pure ref
 
 readVarRef :: MonadRef m => VarRef m f -> VerseT m (Var m f)
 readVarRef ref = do
