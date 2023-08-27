@@ -29,7 +29,7 @@ import Control.Monad.Verse
 
 import Data.Bool
 import Data.Eq
-import Data.Foldable (foldr)
+import Data.Foldable (foldr, traverse_)
 import Data.Function
 import Data.Functor
 import Data.Hashable
@@ -37,7 +37,7 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
 import Data.Kind
-import Data.List (zip)
+import Data.List (unzip, zip)
 import Data.Match
 import Data.Maybe
 import Data.Monoid
@@ -146,27 +146,8 @@ eval' e = case extract e of
 --     evalInst (loc e) e1 xs e2
   Exp.IfThenElse xs p t e ->
     evalIfThenElse xs p t e
---   Exp.ForDo xs e1 e2 -> do
---     var <- freshVar
---     choiceFree <- getChoiceFree
---     choiceFree' <- freshVar
---     storeFree <- getStoreFree
---     storeFree' <- freshVar
---     for'
---       (do
---           putChoiceFree =<< newVar ChoiceFree
---           xs <- for xs freshNamed
---           _ <- localNames xs $ eval' e1
---           pure $ Many xs)
---       (\ (Many xs) ->
---           localNames xs $ One <$> eval' e2)
---       (\ vars -> do
---           unify var =<< newVar (Val.Tuple $ getOne <$> vars)
---           unify choiceFree choiceFree'
---           unify storeFree storeFree')
---     putChoiceFree choiceFree'
---     putStoreFree storeFree'
---     pure var
+  Exp.ForDo xs e1 e2 ->
+    evalForDo xs e1 e2
   Exp.Exists x e -> do
     var <- lift' freshVar
     localName (extract x) (Val var) $ eval' e
@@ -331,31 +312,55 @@ evalIfThenElse xs p t e = do
   choiceFree <- lift' freshIVar
   storeFree <- lift' freshIVar
   put S { choiceFree, storeFree }
-  lift' . fork $ unify var =<< readIVar =<< if'
-    do
-      xs <- traverse freshNamed xs
-      choiceFree <- newIVar ()
-      _ <- runEvalT' (eval' p) (xs <> env) s { choiceFree }
-      pure xs
-    do
-      \ xs -> do
-        (var, s) <- runEvalT' (eval' t) (xs <> env) s
-        fork do
-          readIVar s.choiceFree
-          writeIVar choiceFree ()
-        fork do
-          readIVar s.storeFree
-          writeIVar storeFree ()
-        pure var
-    do
-      (var, s) <- runEvalT' (eval' e) env s
-      fork do
-        readIVar s.choiceFree
-        writeIVar choiceFree ()
-      fork do
-        readIVar s.storeFree
-        writeIVar storeFree ()
-      pure var
+  lift' $ fork do
+    (var', s) <- readIVar =<< if'
+      do
+        xs <- traverse freshNamed xs
+        choiceFree <- newIVar ()
+        _ <- runEvalT' (eval' p) (xs <> env) s { choiceFree }
+        pure xs
+      do
+        \ xs -> runEvalT' (eval' t) (xs <> env) s
+      do
+        runEvalT' (eval' e) env s
+    unify var var'
+    fork do
+      readIVar s.choiceFree
+      writeIVar choiceFree ()
+    fork do
+      readIVar s.storeFree
+      writeIVar storeFree ()
+  pure var
+
+evalForDo
+  :: MonadEval m
+  => HashMap Ident Bool
+  -> L (Exp L Ident)
+  -> L (Exp L Ident)
+  -> EvalT m (VarVal m)
+evalForDo xs e1 e2 = do
+  var <- lift' freshVar
+  env <- ask
+  s <- get
+  choiceFree <- lift' freshIVar
+  storeFree <- lift' freshIVar
+  put S { choiceFree, storeFree }
+  lift' $ fork $ do
+    (vars, s) <- fmap unzip . readIVar =<< for
+      do
+        xs <- traverse freshNamed xs
+        choiceFree <- newIVar ()
+        _ <- runEvalT' (eval' e1) (xs <> env) s { choiceFree }
+        pure xs
+      do
+        \ xs -> runEvalT' (eval' e2) (xs <> env) s
+    unify var =<< newVar (Val.Tuple vars)
+    fork do
+      traverse_ (readIVar . (.choiceFree)) s
+      writeIVar choiceFree ()
+    fork do
+      traverse_ (readIVar . (.storeFree)) s
+      writeIVar storeFree ()
   pure var
 
 -- evalInst :: MonadEval m =>
