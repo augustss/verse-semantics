@@ -59,7 +59,7 @@ import Language.Verse.Name
 import Language.Verse.Val (Val, VarVal, FrozenVal, Named (..))
 import Language.Verse.Val qualified as Val
 
-import Prelude (Integer, Num (..), fromRational, toRational)
+import Prelude (Integer, Num (..), Fractional (..), fromRational, toRational)
 
 type EvalT m = WriterT (Defaults m) (RST (Env m) (S m) (VerseT m))
 
@@ -497,7 +497,7 @@ invokeIntrinsic = \ case
   Intrinsic.Minus -> liftNum (-)
   Intrinsic.PrefixMinus -> prefixMinus
   Intrinsic.Multiply -> liftNum (*)
-  -- Intrinsic.Divide -> div'
+  Intrinsic.Divide -> div'
   Intrinsic.Int -> int
 
 liftOrd :: (MonadRef m, MonadSupply Int m)
@@ -558,50 +558,32 @@ prefixMinus var = readVar var >>= \ case
   Val.Rational x -> Just <$> newVar (Val.Rational $ negate x)
   _ -> pure Nothing
 
--- data Div = Int !Integer | Float !Double | Rational !Rational deriving Eq
-
--- div' :: Var m (Val m) ->
---         (Maybe (Var m (Val m)) -> EvalT m ()) ->
---         EvalT m ()
--- div' var k =
---   ifte''
---   (do
---       var_x <- freshVar
---       var_y <- freshVar
---       unify var =<< newVar (Val.Tuple [var_x, var_y])
---       var' <- freshVar
---       whenBound var_x $ \ val_x -> whenBound var_y $ \ val_y ->
---         unify var' =<< case (val_x, val_y) of
---           (Val.Int _, Val.Int 0) -> do
---             newVar $ Const Nothing
---           (Val.Int x, Val.Int y) ->
---             newVar . Const . Just . Rational $ x % y
---           (Val.Int x, Val.Float y) ->
---             newVar . Const . Just . Float $ fromInteger x / y
---           (Val.Int x, Val.Rational y) ->
---             newVar . Const . Just . Rational $ fromInteger x / y
---           (Val.Float x, Val.Int y) ->
---             newVar . Const . Just . Float $ x / fromInteger y
---           (Val.Float x, Val.Float y) ->
---             newVar . Const . Just . Float $ x / y
---           (Val.Float x, Val.Rational y) ->
---             newVar . Const . Just . Float $ fromRational $ toRational x / y
---           (Val.Rational x, Val.Int y) ->
---             newVar . Const . Just . Rational $ x / fromInteger y
---           (Val.Rational x, Val.Float y) ->
---             newVar . Const . Just . Float $ fromRational $ x / toRational y
---           (Val.Rational _, Val.Rational 0) ->
---             newVar $ Const Nothing
---           (Val.Rational x, Val.Rational y) ->
---             newVar . Const . Just . Rational $ x / y
---           _ -> empty
---       pure $ One var')
---   (\ (One var) -> whenBound var $ getConst >>> \ case
---       Nothing -> empty
---       Just (Int x) -> k . Just =<< newVar (Val.Int x)
---       Just (Float x) -> k . Just =<< newVar (Val.Float x)
---       Just (Rational x) -> k . Just =<< newVar (Val.Rational x))
---   (k Nothing)
+div' :: (MonadRef m, MonadSupply Int m)
+     => VarVal m -> VerseT m (Maybe (VarVal m))
+div' var = readVar var >>= \ case
+  Val.Tuple [var_x, var_y] -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+    (Val.Int _, Val.Int 0) -> empty
+    (Val.Rational _, Val.Rational 0) -> empty
+    (Val.Int x, Val.Int y) ->
+      fmap Just . newVar . Val.Rational $ x % y
+    (Val.Int x, Val.Float y) ->
+      fmap Just . newVar . Val.Float $ fromInteger x / y
+    (Val.Int x, Val.Rational y) ->
+      fmap Just . newVar . Val.Rational $ fromInteger x / y
+    (Val.Float x, Val.Int y) ->
+      fmap Just . newVar . Val.Float $ x / fromInteger y
+    (Val.Float x, Val.Float y) ->
+      fmap Just . newVar . Val.Float $ x / y
+    (Val.Float x, Val.Rational y) ->
+      fmap Just . newVar . Val.Float $ fromRational $ toRational x / y
+    (Val.Rational x, Val.Int y) ->
+      fmap Just . newVar . Val.Rational $ x / fromInteger y
+    (Val.Rational x, Val.Float y) ->
+      fmap Just . newVar . Val.Float $ fromRational $ x / toRational y
+    (Val.Rational x, Val.Rational y) ->
+      fmap Just . newVar . Val.Rational $ x / y
+    _ -> pure Nothing
+  _ -> pure Nothing
 
 int :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
 int var = readVar var >>= \ case
@@ -688,39 +670,6 @@ filterNames =
     Ident.Name x -> \ y z -> (x, y) : z
     Ident.Label _ -> \ _ z -> z
   []
-
--- if'' :: (MonadRef m, MonadSupply Int m, Freshenable a m)
---      => EvalT m a -> (a -> EvalT m b) -> EvalT m b -> EvalT m (IVar m b)
--- if'' p t e = do
---   env <- ask
---   s <- get
---   choiceFree <- freshIVar
---   storeFree <- freshIVar
---   put S { choiceFree, storeFree }
---   lift' $ if'
---     do
---       choiceFree <- newIVar ()
---       (x, choiceFree', storeFree') <- runEvalT' p env s { choiceFree }
---       fork do
---         readIVar storeFree'
---         writeIVar storeFree ()
---       pure x
---     \ x -> do
---       (y, choiceFree', storeFree') <- runEvalT' (t x) env s
---       fork do
---         readIVar choiceFree'
---         writeIVar choiceFree ()
---       fork do
---         readIVar storeFree'
---         writeIVar storeFree'
---     do
---       (y, choiceFree', storeFree') <- runEvalT' e env s
---       fork do
---         readIVar choiceFree'
---         writeIVar choiceFree ()
---       fork do
---         readIVar storeFree'
---         writeIVar storeFree ()
 
 lookupName :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
            => Ident -> EvalT m (Maybe (VarVal m))
