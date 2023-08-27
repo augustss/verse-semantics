@@ -533,23 +533,6 @@ prefixMinus var = readVar var >>= \ case
   Val.Rational x -> Just <$> newVar (Val.Rational $ negate x)
   _ -> pure Nothing
 
-
--- prefixMinus :: Var m (Val m) ->
---                (Maybe (Var m (Val m)) -> EvalT m ()) ->
---                EvalT m ()
--- prefixMinus var k =
---   ifte''
---   (do
---       var' <- freshVar
---       whenBound var $ \ val -> unify var' =<< case val of
---         Val.Int x -> newVar . Val.Int $ negate x
---         Val.Float x -> newVar . Val.Float $ negate x
---         Val.Rational x -> newVar . Val.Rational $ negate x
---         _ -> empty
---       pure $ One var')
---   (k . Just . getOne)
---   (k Nothing)
-
 -- data Div = Int !Integer | Float !Double | Rational !Rational deriving Eq
 
 -- div' :: Var m (Val m) ->

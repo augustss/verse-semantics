@@ -447,9 +447,9 @@ resume p@Process {..} m = lift (msplit_ m Env { heap = Just heap, .. }) >>= \ ca
       m_empty'' = m_empty' <|> fork m_empty *> m
     lift ((0 ==) <$> readRef suspCount `andM` readHeapRef' left heap) >>= \ case
       Nothing -> lift $ writeRef right (m_fail'', m_empty'') $> Left p
-      Just x -> ask' >>= \ r ->
+      Just x ->
         Right . writeIVar result . Just . (heap,, m_fail'') <$>
-        runFreshenT (join (readRef commit) *> freshen x) (Just heap) r.heap
+        runFreshenT (join (readRef commit) *> freshen x) (Just heap)
 
 resume' :: (MonadRef m, MonadSupply Int m)
         => Process m -> VerseT m ()
@@ -461,9 +461,9 @@ resume' p@Process {..} m = do
     Just m@(m_fail, _) -> do
       lift ((0 ==) <$> readRef suspCount `andM` readHeapRef' left heap) >>= \ case
         Nothing -> lift $ writeRef right m $> Left p
-        Just x -> ask' >>= \ r ->
+        Just x ->
           Right . writeIVar result . Just . (heap,, m_fail) <$>
-          runFreshenT (join (readRef commit) *> freshen x) (Just heap) r.heap
+          runFreshenT (join (readRef commit) *> freshen x) (Just heap)
 
 newVarRef :: MonadRef m => Var m f -> VerseT m (VarRef m f)
 newVarRef = lift . fmap VarRef . newRef . singleton
@@ -489,7 +489,8 @@ writeVarRef ref x = do
     commit' = do
       commit
       (h, h') <- FreshenT ask
-      put' (unVarRef ref) h' =<< freshen =<< get' (unVarRef ref) h
+      x <- freshen =<< get' (unVarRef ref) h
+      put' (unVarRef ref) h x *> put' (unVarRef ref) h' x
   liftEmpty $
     writeRef r.commit commit' $> \ r ->
     writeRef r.commit commit
@@ -590,7 +591,7 @@ split heap left m = do
     Just m@(m_fail, _) ->
       lift ((0 ==) <$> readRef suspCount `andM` readHeapRef' left heap) >>= \ case
         Just x ->
-          runFreshenT (join (readRef commit) *> freshen x) (Just heap) r.heap >>=
+          runFreshenT (join (readRef commit) *> freshen x) (Just heap) >>=
           newIVar . Just . (heap,, m_fail)
         Nothing -> do
           result <- freshIVar
@@ -672,9 +673,10 @@ instance Applicative m => Semigroup (Rollback m) where
 instance Applicative m => Monoid (Rollback m) where
   mempty = Rollback . const $ pure ()
 
-runFreshenT :: Monad m => FreshenT m a -> HeapKey -> HeapKey -> VerseT m a
-runFreshenT m h h' = do
-  (x, w) <- lift $ evalRWST (unFreshenT m) (h, h') mempty
+runFreshenT :: Monad m => FreshenT m a -> HeapKey -> VerseT m a
+runFreshenT m heap = do
+  r <- ask'
+  (x, w) <- lift $ evalRWST (unFreshenT m) (heap, r.heap) mempty
   addEmpty $ getRollback w
   pure x
 
