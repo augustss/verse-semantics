@@ -7,6 +7,12 @@ module Data.Match
   , ZipMatchable (..)
   ) where
 
+import Control.Monad
+
+import Data.Coerce
+import Data.Functor
+import Data.Functor.Const
+
 data RowMatch f a b
   = Zip (ZipMatch f a b)
   | Uncons (a -> f a) a (b -> f b) b
@@ -28,3 +34,8 @@ instance ZipMatchable [] where
     ([], []) -> Just []
     (x:xs, y:ys) -> ((x, y):) <$> zipMatch xs ys
     _ -> Nothing
+
+instance Eq a => RowMatchable (Const a)
+
+instance Eq a => ZipMatchable (Const a) where
+  zipMatch x y = guard (getConst x == getConst y) $> coerce x

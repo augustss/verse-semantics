@@ -201,7 +201,10 @@ runVerseT m = do
     heap = Nothing
     splitDepth = 0
     sk x fk _ r = readRef r.suspCount >>= \ case
-      0 -> fmap (x:) <$> fk r
+      0 -> do
+        commit <- readRef r.commit
+        runFreshenT' commit r.heap
+        fmap (x:) <$> fk r
       _ -> pure Nothing
     fk _ = pure $ Just []
 
@@ -446,7 +449,7 @@ resume p@Process {..} m = lift (msplit_ m Env { heap = Just heap, .. }) >>= \ ca
       Nothing -> lift $ writeRef right (m_fail'', m_empty'') $> Left p
       Just x -> ask' >>= \ r ->
         Right . writeIVar result . Just . (heap,, m_fail'') <$>
-        runFreshenT (readRef commit *> freshen x) (Just heap) r.heap
+        runFreshenT (join (readRef commit) *> freshen x) (Just heap) r.heap
 
 resume' :: (MonadRef m, MonadSupply Int m)
         => Process m -> VerseT m ()
@@ -460,7 +463,7 @@ resume' p@Process {..} m = do
         Nothing -> lift $ writeRef right m $> Left p
         Just x -> ask' >>= \ r ->
           Right . writeIVar result . Just . (heap,, m_fail) <$>
-          runFreshenT (readRef commit *> freshen x) (Just heap) r.heap
+          runFreshenT (join (readRef commit) *> freshen x) (Just heap) r.heap
 
 newVarRef :: MonadRef m => Var m f -> VerseT m (VarRef m f)
 newVarRef = lift . fmap VarRef . newRef . singleton
@@ -481,15 +484,15 @@ writeVarRef ref x = do
   liftEmpty $
     put' (unVarRef ref) r.heap x $> \ r ->
     put' (unVarRef ref) r.heap y
-  ck <- lift $ readRef r.commit
+  commit <- lift $ readRef r.commit
   let
-    ck' = do
-      ck
+    commit' = do
+      commit
       (h, h') <- FreshenT ask
       put' (unVarRef ref) h' =<< freshen =<< get' (unVarRef ref) h
   liftEmpty $
-    writeRef r.commit ck' $> \ r ->
-    writeRef r.commit ck
+    writeRef r.commit commit' $> \ r ->
+    writeRef r.commit commit
 
 fork :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
 fork m = liftSucceed (unVerseT m yield succeed fail fail) >>= reflect_
@@ -627,6 +630,14 @@ instance Pretty (f (Frozen f)) => Pretty (Frozen f) where
     Unknown -> "_"
     Known x -> pretty x
 
+instance Monad m => Freezable Int Int m where
+  freeze = pure
+
+instance ( Freezable a b m
+         , Freezable c d m
+         ) => Freezable (Const a c) (Const b d) m where
+  freeze = fmap Const . freeze . getConst
+
 instance ( MonadFix m
          , MonadRef m
          , Freezable (f (Var m f)) (g (Frozen g)) m
@@ -666,6 +677,9 @@ runFreshenT m h h' = do
   (x, w) <- lift $ evalRWST (unFreshenT m) (h, h') mempty
   addEmpty $ getRollback w
   pure x
+
+runFreshenT' :: Monad m => FreshenT m () -> HeapKey -> m ()
+runFreshenT' m h = fst <$> evalRWST (unFreshenT m) (h, h) mempty
 
 instance MonadTrans FreshenT where
   lift = FreshenT . lift

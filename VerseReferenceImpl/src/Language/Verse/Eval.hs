@@ -398,7 +398,7 @@ invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
   unify var =<< newVar (Val.Int i)
   pure x
 
-invokeOverloads :: (MonadAbort Error m, MonadRef m, MonadSupply Int m)
+invokeOverloads :: (MonadFix m, MonadAbort Error m, MonadRef m, MonadSupply Int m)
                 => Loc
                 -> Val.Overload (VarRef m) (VarVal m)
                 -> VarVal m
