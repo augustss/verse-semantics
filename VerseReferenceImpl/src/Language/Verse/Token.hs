@@ -53,6 +53,7 @@ data Token
   | Exists
   | Function
   | Truth
+  | Option
   | Array
   | False
   | True
@@ -111,6 +112,7 @@ instance Pretty Token where
     Exists -> "exists"
     Function -> "function"
     Truth -> "truth"
+    Option -> "option"
     Array -> "array"
     False -> "false"
     True -> "true"

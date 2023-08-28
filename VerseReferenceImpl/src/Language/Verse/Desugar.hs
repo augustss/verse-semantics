@@ -90,9 +90,9 @@ desugar' e = for e $ \ case
     All <$> exists (desugar' e)
   Parse.Not e ->
     Not <$> desugar' e
-  Parse.ArrayType e ->
+  Parse.PrefixBracket e ->
     desugarOperator1 "prefix'[]'" e
-  Parse.OptionType e ->
+  Parse.PrefixQuery e ->
     desugarOperator1 "prefix'?'" e
   Parse.Query e ->
     Query <$> desugar' e
@@ -161,6 +161,8 @@ desugar' e = for e $ \ case
     Tuple <$> traverse desugar' es
   Parse.Truth e ->
     Truth <$> exists (desugar' e)
+  Parse.Option e ->
+    Option <$> exists (desugar' e)
   Parse.True ->
     pure $ Truth (Tuple [] <$ e)
   Parse.False ->

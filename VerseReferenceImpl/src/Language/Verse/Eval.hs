@@ -171,6 +171,8 @@ eval' e = case extract e of
     lift' . newVar . Val.Tuple =<< traverse eval' xs
   Exp.Truth e ->
     lift' . newVar . Val.Truth =<< eval' e
+  Exp.Option e ->
+    evalOption e
   Exp.Int x ->
     lift' . newVar $ Val.Int x
   Exp.Float x ->
@@ -691,6 +693,25 @@ int var = readVar var >>= \ case
 --         f var' ys
 --     _ -> instClass' loc var f
 --   _ -> abortWithDomainError loc
+
+evalOption :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
+evalOption e = do
+  var <- lift' freshVar
+  env <- ask
+  s <- get
+  storeFree <- lift' freshIVar
+  put s { storeFree }
+  lift' $ fork do
+    unify var =<< readIVar =<< if'
+      do
+        choiceFree <- newIVar ()
+        evalEvalT' (eval' e) env s { choiceFree }
+      do
+        newVar . Val.Truth
+      do
+        newVar $ Val.Tuple []
+    writeIVar storeFree ()
+  pure var
 
 newEnv :: (MonadRef m, MonadSupply Int m) => VerseT m (Env m)
 newEnv = execWriterT $ do

@@ -34,6 +34,7 @@ data Exp f a
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
+  | Option (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
   | Name a

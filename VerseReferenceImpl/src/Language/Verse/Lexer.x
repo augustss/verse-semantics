@@ -184,6 +184,7 @@ $space = [\ \t]
   "then" { token Token.Then }
   "true" { token Token.True }
   "truth" { token Token.Truth }
+  "option" { token Token.Option }
   "var" { token Token.Var }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
