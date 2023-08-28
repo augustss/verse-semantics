@@ -13,7 +13,6 @@ module Language.Verse.Eval
   ) where
 
 import Control.Applicative
-import Control.Category ((>>>))
 import Control.Comonad
 import Control.Monad
 import Control.Monad.Abort
@@ -31,12 +30,11 @@ import Data.Bool
 import Data.Eq
 import Data.Foldable (foldr, traverse_)
 import Data.Function
-import Data.Functor
+import Data.Functor ((<&>))
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
-import Data.Kind
 import Data.List (unzip, zip)
 import Data.Match
 import Data.Maybe
@@ -732,18 +730,6 @@ localName x = local . HashMap.insert x
 
 localNames :: (Semigroup r, MonadReader r m) => r -> m a -> m a
 localNames = local . (<>)
-
-getChoiceFree :: Monad m => EvalT m (IVar m ())
-getChoiceFree = gets choiceFree
-
-putChoiceFree :: Monad m => IVar m () -> EvalT m ()
-putChoiceFree choiceFree = modify $ \ s -> s { choiceFree }
-
-getStoreFree :: Monad m => EvalT m (IVar m ())
-getStoreFree = gets storeFree
-
-putStoreFree :: Monad m => IVar m () -> EvalT m ()
-putStoreFree storeFree = modify $ \ s -> s { storeFree }
 
 lift' :: VerseT m a -> EvalT m a
 lift' = lift . lift
