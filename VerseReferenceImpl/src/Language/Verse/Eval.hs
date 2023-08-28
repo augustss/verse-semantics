@@ -110,8 +110,8 @@ eval' e = case extract e of
     var2 <- eval' e2
     lift' $ unify var1 var2
     pure var1
-  -- e1 :.: x ->
-  --   evalDot (loc e) e1 x
+  e1 :.: x ->
+    evalDot (loc e) e1 x
   e1 :..: e2 ->
     evalDotDot e1 e2
   e1 :|: e2 ->
@@ -184,28 +184,33 @@ eval' e = case extract e of
     tell $ HashMap.singleton (extract x) (var1, env, e2)
     pure var1
 
--- evalDot :: Loc -> L (Exp L Ident) -> Name -> EvalT m (VarVal m)
--- evalDot loc e x = do
---   var_e <- eval' e
---   var <- lift' freshVar
---   lift' . fork $ readVar var_e >>= \ case
---     Val.Module _ xs ->
---       case HashMap.lookup x xs of
---         Just (Ref ref_x) -> readVarRef' ref_x $ unify var
---         Just (Val var_x) -> unify var var_x
---         Nothing -> abortWithNameError loc x
---     Val.StructInst _ xs ->
---       case HashMap.lookup x xs of
---         Just (Ref ref_x) -> readVarRef' ref_x $ unify var
---         Just (Val var_x) -> unify var var_x
---         Nothing -> abortWithNameError loc x
---     Val.ClassInst _ _ xs ->
---       case HashMap.lookup x xs of
---         Just (Ref ref_x) -> readVarRef' ref_x $ unify var
---         Just (Val var_x) -> unify var var_x
---         Nothing -> abortWithNameError loc x
---     _ -> abortWithDomainError loc
---   pure var
+evalDot :: MonadEval m => Loc -> L (Exp L Ident) -> Name -> EvalT m (VarVal m)
+evalDot loc e x = do
+  var_e <- eval' e
+  var <- lift' freshVar
+  s <- get
+  storeFree <- lift' freshIVar
+  put s { storeFree }
+  lift' $ fork do
+    xs <- readVar var_e >>= \ case
+      Val.Module _ xs -> pure xs
+      Val.StructInst _ xs -> pure xs
+      Val.ClassInst _ _ xs -> pure xs
+      _ -> abort $ DomainError loc
+    unify var =<< case HashMap.lookup x xs of
+      Just y -> readNamed s.storeFree storeFree y
+      Nothing -> abort $ NameError loc x
+  pure var
+
+readNamed
+  :: (MonadRef m, MonadSupply Int m)
+  => IVar m ()
+  -> IVar m ()
+  -> Named (VarRef m) (VarVal m)
+  -> VerseT m (VarVal m)
+readNamed storeFree storeFree' = \ case
+  Ref x -> readIVar storeFree *> readVarRef x <* writeIVar storeFree' ()
+  Val x -> pure x
 
 evalDotDot :: MonadEval m => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
 evalDotDot e1 e2 = do
@@ -746,26 +751,26 @@ freshVarRef = newVarRef =<< freshVar
 
 readVarRef' :: (MonadRef m, MonadSupply Int m, RowMatchable f)
             => VarRef m f -> EvalT m (Var m f)
-readVarRef' r = do
+readVarRef' ref = do
   x <- lift' freshVar
   s <- get
   storeFree <- lift' freshIVar
   put s { storeFree }
   lift' $ fork do
     readIVar s.storeFree
-    unify x =<< readVarRef r
+    unify x =<< readVarRef ref
     writeIVar storeFree ()
   pure x
 
 writeVarRef' :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
              => VarRef m f -> Var m f -> EvalT m ()
-writeVarRef' r x = do
+writeVarRef' ref x = do
   s <- get
   storeFree <- lift' freshIVar
   put s { storeFree }
   lift' $ fork do
     readIVar s.storeFree
-    writeVarRef r x
+    writeVarRef ref x
     writeIVar storeFree ()
 
 (\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
