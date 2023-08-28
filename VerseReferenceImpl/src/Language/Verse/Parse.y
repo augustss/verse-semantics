@@ -62,6 +62,7 @@ import Language.Verse.Token qualified as Token
 %nonassoc '{'
 %nonassoc name
 %nonassoc ':'
+%left PREFIX_BRACKET
 %left '(' '['
 
 %token
@@ -242,6 +243,12 @@ Exp :: { L (Exp L Name) }
     }
   | Exp '/' Scan Exp {
       (:/:) <\$> duplicate $1 <.> duplicate $4
+    }
+  | '[' ']' Exp %prec PREFIX_BRACKET {
+      Exp.ArrayType <\$ $1 <. $2 <.> duplicate $3
+    }
+  | '?' Exp {
+      Exp.OptionType <\$ $1 <.> duplicate $2
     }
   | Exp '?' {
       Exp.Query <\$> duplicate $1 <. $2

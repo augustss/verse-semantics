@@ -27,6 +27,8 @@ data Exp f a
   | One (f (Exp f a))
   | All (f (Exp f a))
   | Not (f (Exp f a))
+  | ArrayType (f (Exp f a))
+  | OptionType (f (Exp f a))
   | Query (f (Exp f a))
   | Module (f (Exp f a))
   | Struct (f (Exp f a))

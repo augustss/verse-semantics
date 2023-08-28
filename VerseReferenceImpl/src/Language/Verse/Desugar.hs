@@ -90,6 +90,10 @@ desugar' e = for e $ \ case
     All <$> exists (desugar' e)
   Parse.Not e ->
     Not <$> desugar' e
+  Parse.ArrayType e ->
+    desugarOperator1 "prefix'[]'" e
+  Parse.OptionType e ->
+    desugarOperator1 "prefix'?'" e
   Parse.Query e ->
     Query <$> desugar' e
   Parse.Module e -> do
