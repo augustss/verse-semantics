@@ -125,54 +125,6 @@ Our plan is
 % ----------------------------------------------------------------
 \section{Source Verse}
 
-\Cref{fig:source-verse-expr} gives the syntax of Source Verse.
-
-\Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version into simpler
-Source Verse, ready for \Cref{fig:desugar-expr1}.
-
-
-\begin{figure}
-$$
-\begin{array}{rcll}
-  |t| & ::= & |x|               & \text{Variable} \\
-      & \vb & |k|               & \text{Constant} \\
-      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
-      & \vb & |t_1^[t_2]|       & \text{Function application} \\
-      & \vb & |t_1^(t_2)|       & \text{Non-failing function application} \\
-      & \vb & |def x t|         & \text{Existential} \\
-      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
-      & \vb & |t_1 = t_2|       & \text{Unification} \\
-      & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
-      & \vb & |for(t) do b|     & \text{Finite loop} \\
-      & \vb & |check fx t|     & \text{Effects check} \\
-      & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |t_1, dots, t_n|  & \text{Array}, n \geq 2 \\
-      & \vb & |()|              & \text{Empty array} \\
-      & \vb & |t_1 eqgt t_2|    & \text{Lambda expression} \\
-      & \vb & |p := t|          & \text{General definition} \\
-      & \vb & |p : t|           & \text{Type ascription} \\
-      & \vb & |op_b t|          & \text{Prefix operator} \\
-      & \vb & |t op_a|          & \text{Postfix operator} \\
-      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
-      & \vb & |: t|             & \text{Range} \\
-      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
-      & \vb & |function (a_1 dots a_n) t|    & \text{Function} \\
-      & \vb & |if(t) then b|    & \text{Conditional expression} \\
-      & \vb & |if(t) else b|    & \text{Conditional expression} \\
-      & \vb & |if{t}|           & \text{Conditional expression} \\
-      & \vb & |for{t}|          & \text{Finite loop} \\
-      & \vb & |let(t) in b|     & \text{Local binding} \\
-      & \vb & |block b|         & \text{Scope delimiter} \\
-      & \vb & |case(t) of {t_1; dots t_n}|    & \text{Case expression} \\
-      & \vb & |case{t_1; dots t_n}| & \text{Case expression} \\
-      & \vb & |type^{t}|         & \text{Type definition} \\
-      & \vb & |option^{}|        & \text{Create an option} \\
-      & \vb & |option^{t}|       & \text{Create an option} \\
-\end{array}
-$$
-\caption{Source Verse expressions} \label{fig:source-verse-expr}
-\end{figure}
-
 \begin{figure}
 $$
 \begin{array}{rcll}
@@ -187,34 +139,20 @@ $$
       & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
       & \vb & |x = t|           & \text{Unification} \\
       & \vb & |x := t|          & \text{Definition} \\
+      & \vb & |x squiggt y := t| & \text{Definition} \\
       & \vb & |t_1 `choice` t_2| & \text{Choice} \\
       & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
       & \vb & |for(t) do b|     & \text{Finite loop} \\
       & \vb & |check fx t|      & \text{Effects check} \\
       & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
       & \vb & |function a t|    & \text{Function} \\
-      & \vb & |oftype a t|      & \text{Type annotation}
-\\
+      & \vb & |oftype t_1 t_2|  & \text{Type annotation}
+\\[2mm]
 \multicolumn{4}{l}{\text{\bf Blocks}} \\
-  |b| & ::= & |t| \vb |{t_1; dots ; t_n}|  \\
-\\
-\multicolumn{4}{l}{\text{\bf Function arguments}} \\
-  |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx| \\
-\\
-\multicolumn{4}{l}{\text{{\bf Patterns: left hand side of a definition |(p := t)| or |(p:t)|}. Subset of |t|.}} \\
-     |p| & ::= & |xsl| \vb |p a| %% \vb |p^hat|  \vb |p^?|
-     \vb  |p_1 squiggt p_2| \\
-     & \vb & |: t| \vb |p : t|  \vb |p_1, dots, p_n| \\
-     & \vb & |..p| & \text{array splice, only allowed in arrays} \\
-     |xsl| & ::= & x \\
-           & \vb & |xsl&x| & \text{multiple variables} \\
-  \\
-
-\multicolumn{4}{l}{\text{\bf Operators}} \\
- |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty|  & \text{Prefix}\\
- |op_a| & ::= &  ? \vb |hat| \vb ..  & \text{Postfix}\\
- |op_i| & ::= &  + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb .. & \text{Infix} \\
-        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
+ |b| & ::= & |t| \vb |{t_1; dots ; t_n}|
+\\[2mm]
+\multicolumn{4}{l}{\text{\bf Arguments}} \\
+ |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
 \end{array}
 $$
 \\
@@ -222,9 +160,82 @@ Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator
 \caption{Small Source Verse} \label{fig:small-source-verse}
 \end{figure}
 
+
+\begin{figure}
+$$
+\begin{array}{lrcll}
+\textbf{Terms} & |t| & ::= & |x|               & \text{Variable} \\
+&      & \vb & |k|               & \text{Constant} \\
+&      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
+&      & \vb & |t_1^[t_2]|       & \text{Function application} \\
+&      & \vb & |t_1^(t_2)|       & \text{Non-failing function application} \\
+&      & \vb & |def x t|         & \text{Existential} \\
+&      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
+&      & \vb & |t_1 = t_2|       & \text{Unification} \\
+&      & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
+&      & \vb & |for(t) do b|     & \text{Finite loop} \\
+&      & \vb & |check fx t|     & \text{Effects check} \\
+&      & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
+&      & \vb & |t_1, dots, t_n|  & \text{Array}, n \geq 2 \\
+&      & \vb & |()|              & \text{Empty array} \\
+&      & \vb & |t_1 eqgt t_2|    & \text{Lambda expression} \\
+&      & \vb & |p := t|          & \text{General definition} \\
+&      & \vb & |p : t|           & \text{Type ascription} \\
+&      & \vb & |op_b t|          & \text{Prefix operator} \\
+&      & \vb & |t op_a|          & \text{Postfix operator} \\
+&      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
+&      & \vb & |: t|             & \text{Range} \\
+&      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
+&      & \vb & |function (a_1 dots a_n) t|    & \text{Function} \\
+&      & \vb & |if(t) then b|    & \text{Conditional expression} \\
+&      & \vb & |if(t) else b|    & \text{Conditional expression} \\
+&      & \vb & |if{t}|           & \text{Conditional expression} \\
+&      & \vb & |for{t}|          & \text{Finite loop} \\
+&      & \vb & |let(t) in b|     & \text{Local binding} \\
+&      & \vb & |block b|         & \text{Scope delimiter} \\
+&      & \vb & |case(t) of {t_1; dots t_n}|    & \text{Case expression} \\
+&      & \vb & |case{t_1; dots t_n}| & \text{Case expression} \\
+&      & \vb & |type^{t}|         & \text{Type definition} \\
+&      & \vb & |option^{}|        & \text{Create an option} \\
+&      & \vb & |option^{t}|       & \text{Create an option}
+\\[2mm]
+\text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |p_1 squiggt p_2| \\
+&     & \vb & |: t| \vb |p : t|  \vb |p_1, dots, p_n| \vb |..p| \\
+& |xsl| & ::= & x \vb  |xsl&x|
+\\[2mm]
+\text{\bf Operators} &
+ |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \vb ..  & \text{Prefix}\\
+& |op_a| & ::= &  ? \vb |hat| & \text{Postfix}\\
+& |op_i| & ::= &  + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb .. & \text{Infix} \\
+&        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
+\end{array}
+$$
+\caption{Source Verse expressions} \label{fig:source-verse-expr}
+\end{figure}
+
 \begin{figure}
 $$
 \begin{array}{@@{}l}
+\begin{array}{rcll}
+\multicolumn{4}{l}{\textbf{Bindings |p := t|}} \\
+  |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
+  |p^(a) := t| & \rightarrow & |p := function a t| \\
+  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
+  |(: t_1) := t_2| & \rightarrow & |(x : t_1) := t_2| & \text{fresh |x|} \\
+  %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
+  |(p_1 squiggt p_2) := t| & \rightarrow &
+  \begin{array}[t]{@@{}l}
+    |p_1 := (x_1:any); p_2 := (x_2:any);| \\
+    |(x_1 squiggt x_2) := t|
+  \end{array}  & \text{if |p_1| or |p_2| not a variable} \\
+  |array (p_1; xdots; p_n) := t| & \rightarrow &
+      \begin{array}[t]{@@{}l}
+        |array(x_1:any;xdots;x_n:any) == t;|\\
+        |p_1 := x_1; xdots; p_n := x_n |
+      \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
+  |p : t| & \rightarrow & |p := (: t)|
+\end{array} \\
+\\
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Application and unification}} \\
   |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
@@ -235,29 +246,19 @@ $$
 \end{array} \\
 \\
 \begin{array}{rcll}
-\multicolumn{4}{l}{\textbf{Bindings |p := t|}} \\
-  |_ : t| & \rightarrow & |x : t| & \text{fresh |x|} \\
-  |p : t| & \rightarrow & |p := (: t)| \\
-  |p^(a) := t| & \rightarrow & |p := function a t| \\
-  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
-  |(: t_1) := t_2| & \rightarrow & |(x : t_1) := t_2| & \text{fresh |x|} \\
-  %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
-  |(p_1 squiggt p_2) := t| & \rightarrow & |p_1 := (x_1:any); p_2 := (x_2:any); (x_1 squiggt x_2) := t| & \text{if |p_1| or |p_2| not a variable} \\
-  |array (p_1; xdots; p_n) := t| & \rightarrow &
-  \begin{array}{ll}
-    |array(x_1:any;xdots;x_n:any) == t;|\\
-    |p_1 := x_1; xdots; p_n := x_n | & \text{none of |p_i| is |..p|}
-  \end{array} \\[2mm]
-\\
 \multicolumn{4}{l}{\textbf{Array splice (terms and patterns)}} \\
   \multicolumn{3}{l}{\quad|array (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
-  & \rightarrow & |append[array(t_1; xdots; t_km1), t_k, array(t_kp1; xdots; t_n)]|\\
-  & \multicolumn{2}{l}{\text{where |append| is a reversible function appending 3 arrays}} \\
+  & \rightarrow & \multicolumn{2}{l}{|append[array(t_1; xdots; t_km1), t_k, array(t_kp1; xdots; t_n)]|}\\
+  & \multicolumn{3}{l}{\text{where |append| is a reversible function appending 3 arrays}} \\
+\end{array} \\
 \\
+\begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Array notation}} \\
   |()| & \rightarrow & |array ()| \\
   |t_1, dots, t_n| & \rightarrow & |array (t_1; dots; t_n)| \\
+\end{array} \\
 \\
+\begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Function notation}} \\
   |type^{t}| & \rightarrow & |function (x:=t) x| & \text{fresh |x|}\\
   |e_1 eqgt e_2| & \rightarrow & |function e_1 e_2| \\
@@ -309,6 +310,45 @@ A more robust desugaring could \textalpha-convert such clashes.
 \end{figure}
 
 
+\subsection{Small Source Verse}
+
+\Cref{fig:small-source-verse} gives the syntax of Small Source Verse.  Things to note:
+\begin{itemize}
+\item Applications |f^[x]| are in ANF: the function and argument are both variables. \simon{Why?}
+\item A definition |x := t| brings the variable |x| into scope at the beginning of the innermost enclosing block.
+(Blocks are part of the syntax in \Cref{fig:small-source-verse}.)
+\item \simon{What is the difference between |function( () ) t| and |function((())) t|, using the |(t)| and |()| productions for |a|?}
+\item \simon{Do we really need |x squiggt y := t| in Small Source Verse?}
+\end{itemize}
+
+\subsection{Source Verse and its rewriting into Small Source Verse}
+
+\Cref{fig:source-verse-expr} gives the syntax of Source Verse.
+\Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version
+into Small Source Verse.
+Small Source Verse is a subset of Source Verse, which is why we us the same non-terminals for terms |t|, arguments |a|, and blocks |b| in both.
+
+Points to note
+\begin{itemize}
+\item Real Source Verse uses the keyword \textbf{function}, but in this document we use |functionKW| to make our examples smaller.
+\item
+  Source Verse has bindings |p := t|, where |p| is a \emph{pattern}.
+  These patterns are completely removed by the source-to-source rewrites in \Cref{fig:sv-to-sv-1}, to bindings of the form |x := t|, where |x| is a variable.
+\item Source Verse also has the term |p:t|, which immediately rewrites to |p := (:t)|.
+\item \simon{How does |(:t)| rewrite?  Or is it in Small Source Verse?}
+\end{itemize}
+
+\subsection{Example rewriting}
+$$
+\begin{array}{rcl}
+  \text{Source Verse}  & & \text{Small Source Verse} \\
+  \hline
+  |x:int|  & \longrightarrow & |x := (:int)| \\
+  |f(x:int) := t| & \longrightarrow & |f := function( (x := (:int)) )(t)| \\
+  |f(x:int):int := t| & \longrightarrow & |f := function( (x := (:int)) )(oftype t int)| \\
+\end{array}
+$$
+
 % ----------------------------------------------------------------
 \section{Big Core Verse}
 
@@ -338,6 +378,7 @@ $$
       & \vb & |for(e){b}|                 & \text{Finite loop} \\
       & \vb & |tlam x e_1 e_2|             & \text{Tim lambda, without type} \\
       & \vb & |tlamt x e_1 e_2 e_3|        & \text{Tim lambda, with type} \\
+      & \vb & |oftype e t|                & \text{Type ascription}
     \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
 |fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
@@ -355,10 +396,10 @@ $$
 \begin{figure}
 $$
 \begin{array}{@@{}l}
-\begin{array}{r@@{\;}c@@{\;}ll}
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring expressions}} \\
-  |De e| & = & |def x (Me x e)| \quad \quad |x| \not\in |e|\\
-\multicolumn{4}{l}{\quad Optional (derived) rules} \\
+  |De e| & = & |def i (Me i e)| \quad \quad |i| \not\in |e|\\
+\multicolumn{4}{l}{\quad \text{Optional (derived) rules}} \\
 |De k| & = & |k| \\
 |De x| & = & |x| \\
 |De (f^[x])| & = & |f^[x]| \\
