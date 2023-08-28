@@ -24,18 +24,18 @@ test(F00){1=2}
 test(S00){1,2}
 test(S00){1=>2}
 test(S00){x:=1}
-test(S00){let(x:=1). x+1}
+test(S00){let(x:=1). x+1}				# TODO:FIX
 test(N00){x}
 test(S00){f(1):=2}
 test(S00){f(x:int):int=x}
 test(V10){f(x:int):char=x}
 test(S00){for{}}
 test(S00){for{1|2}=array{1,2}}
-test(S00){if(1) then 2 else 3}
-test(S00){if(1=2) then 2 else 3}
-test(S00){2=if(1) then 2 else 3}
-test(S00){3=if(1=2) then 2 else 3}
-test(S00){if(1+1) then 2+1 else 3+1}
+test(S00){if(1) then 2 else 3}			# TODO:FIX
+test(S00){if(1=2) then 2 else 3}		# TODO:FIX
+test(S00){2=if(1) then 2 else 3}		# TODO:FIX
+test(S00){3=if(1=2) then 2 else 3}		# TODO:FIX
+test(S00){if(1+1) then 2+1 else 3+1}	# TODO:FIX
 test(S00){f(x:int):=x; f[3]=3}
 test(D00){f()<decides>:int => f[]}
 test(S00){f():=3 => f[]=3}
@@ -50,12 +50,12 @@ test(S00){for(x:=0|1) do nat[x]}
 test(S00){function(x:=0|1){let(x){}}}
 test(S00){for(x:=0|1){-x}}
 test(S00){function(x:=0|1){-x}}
-test(S00){for(x:=0|1) do :nat=x}
+test(S00){for(x:=0|1) do :nat=x}		#TODO:???
 test(S00){f(x:=0|1):nat=x}
 #LA test(V04){type{(for|first){}}}
 #LA test(V04){f(m:=let|for):=m(1){2}}
 #LA test(V04){for(m:=let|for) do m(1){2}}
-test(S00){f():type{int|int} => :f[]=3}
+test(S00){f():type{int|int} => :f[]=3}	#TODO:???
 
 # Error ordering.
 test(N04){f(g():any):=g[]; f(g():=6)}
@@ -64,11 +64,11 @@ test(N04){f(x:int)<decides>:=x=3, f[x:int]}
 # Open world + conditionals.
 test(S00){x:int=if(1) then 1 else 2}
 test(S00){x:int=if(1=2) then 1 else 2}
-test(S00){a:int => :int=3}
-test(S00){a:int => :int=a}
-test(S00){a:int => :int=if(1) then 2 else 3}
-test(S00){a:int => :int=if(1=2) then 2 else 3}
-test(S00){a:int => if(a=1) then :int=2 else :int=3}
+test(S00){a:int => :int=3}							#TODO:FIX
+test(S00){a:int => :int=a}							#TODO:FIX
+test(S00){a:int => :int=if(1) then 2 else 3}		#TODO:FIX
+test(S00){a:int => :int=if(1=2) then 2 else 3}		#TODO:FIX
+test(S00){a:int => if(a=1) then :int=2 else :int=3}	#TODO:FIX
 #test(S00){a:int => :int=if(a=1) then 2 else 3} #!! MUST FIX
 
 #

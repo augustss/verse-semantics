@@ -8,6 +8,7 @@ module Rules.Verifier(
   allSystemsVerify,
   icfpVerifier,
   icfpeVerifier,
+  l2rVerifier,
   verify,
   verifyM,
   wrapAssert,
@@ -18,11 +19,17 @@ import TRS.Traced
 import TRS.Tarjan
 import Rules.Core hiding (Wrong)
 import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr)
+import Rules.LeftToRight
 import Control.Monad (guard)
 import Data.List( intersect )
 import qualified Epic.SIntMap as IM
+import Epic.Print (prettyShow, Pretty)
+import qualified Debug.Trace as Debug
 
 -- | Run verification rules.
+_traceShow :: (Pretty a) => String -> a -> a
+_traceShow msg x = Debug.trace ("TRACE: " ++ msg ++ prettyShow x) x
+
 
 verifyM :: TRSystem Expr -> Expr -> Maybe (Bool, Traced Expr)
 verifyM sys e = res
@@ -31,7 +38,8 @@ verifyM sys e = res
      case tarjan1 (tfNormSteps (ruleEnv sys)) arrow (start e) of -- (preProcess sys (ruleEnv sys) e :<-- [])
        Just (tr@(x :<-- _):_) -> Just (isDone x, tr)
        _ -> Nothing
-   arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
+   arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- next a ]
+   next a = {- traceShow ("STEPS: " ++ prettyShow a) $ -} stepS sys a
 
   --norms           = normalFormsFuelTracePlain sys (-1) e
   --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
@@ -88,7 +96,7 @@ icfpVerifier :: TRSystem Expr
 icfpVerifier = icfp
   { sname = "ICFPverify"
   , description = "ICFP + extra verifier rules"
-  , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
+  , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL" -= "U-TUP")
               <> generalizedIcfpRules
               <> assumeAssertRules
               <> verifierRules
@@ -100,14 +108,27 @@ icfpeVerifier = icfp
   { sname = "ICFPEverify"
   , description = "ICFPE + extra verifier rules"
   , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
-              <> generalizedIcfpRules
+              <> (generalizedIcfpRules -= "SUBST-GEN")
+              <> l2rSubstRules
               <> assumeAssertRules
               <> verifierRules
   }
   where icfp = systemICFPE
 
+l2rVerifier :: TRSystem Expr
+l2rVerifier = l2r
+  { sname = "L2Rverify"
+  , description = "L2R + extra verifier rules"
+  , rules = (rules l2r -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL" -= "VAL-SWAP")
+              <> (generalizedIcfpRules -= "SUBST-GEN")
+              <> generalizedL2RRules
+              <> assumeAssertRules
+              <> verifierRules
+  }
+  where [l2r] = allSystemsLeftToRight
+
 allSystemsVerify :: [TRSystem Expr]
-allSystemsVerify = [icfpVerifier, icfpeVerifier]
+allSystemsVerify = [icfpVerifier, icfpeVerifier, l2rVerifier]
 
 --------------------------------------------------------------------------------------
 -- | The "Context" in which a subsumption must hold; Tim's "G" -- set of "known facts"
@@ -120,8 +141,15 @@ type QContext = Expr
 --------------------------------------------------------------------------------
 type VRule = Rule Expr
 
--- | ICFP rules generalized to remove the trailing `e :>: ...` pattern
+l2rSubstRules :: VRule
+l2rSubstRules _env lhs =
+  "SUBST-SIMP" `name`
+  do -- guard (not recursiveSubstitution)
+     (Var x :=: Val v) :>: e <- [lhs]
+     guard (x `notElem` free v)
+     pure ((Var x :=: v) :>: subst [(x,v)] e)
 
+-- | ICFP rules generalized to remove the trailing `e :>: ...` pattern
 generalizedIcfpRules :: VRule
 generalizedIcfpRules env lhs =
   "EQN-FLOAT-GEN" `name`
@@ -132,6 +160,11 @@ generalizedIcfpRules env lhs =
   do (Int k1 :=: Int k2) <- [lhs]
      guard (k1 == k2)
      pure (Int k1)
+  ++
+  "U-TUP-GEN" `name`
+  do (Arr vs :=: Arr vs') <- [lhs]
+     guard (length vs == length vs')
+     pure (foldr (:>:) (Arr[]) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
   ++
   "U-FAIL-GEN" `name`
   do HNF e1 :=: HNF e2 <- [lhs]
@@ -152,6 +185,25 @@ generalizedIcfpRules env lhs =
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx (Var x0 :=: Val v)))
+   -- copied from ICFP (but the variant in L2R make `TRSVerify.ex0` fail...?)
+
+generalizedL2RRules :: VRule
+generalizedL2RRules env lhs =
+  "HNF-SWAP" `name`
+-- Old version, only swap with variables.
+-- This is non-confluent with lambda unification.
+--   do (hnf@HNF{} :=: v@Var{}) :>: e <- [lhs]
+   do (hnf@HNF{} :=: v@Val{}) :>: e <- [lhs]
+      pure ((v :=: hnf) :>: e)
+   ++
+   "VAR-SWAP" `name`
+   do y@Var{} :=: x@Var{} <- [lhs]
+      guard (ltExpr env x y)
+      pure (x :=: y)
+   ++
+   "SEQ-ASSOC-GEN" `name`
+   do (e1 :>: e2) :>: e3 <- [lhs]
+      pure (e1 :>: (e2 :>: e3))
 
 
 -- | Rules for `Assume` and `Assert` -------------------------------------------
@@ -160,7 +212,8 @@ assumeAssertRules :: VRule
 assumeAssertRules env lhs =
   -- ASSUME --
   "asm-hnf" `name`
-  do Assume (HNF v) <- [lhs]
+  do -- Assume (HNF v) <- [lhs]
+     Assume (Val v) <- [lhs]
      pure v
   ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
@@ -248,8 +301,9 @@ mustSucceed _ bs = go
    go (Var x)          = x `elem` lamBinds
    go (Assume _)       = True
    go (e1 :>: e2)      = go e1 && go e2
-   -- go (One e)          = go e
-   -- go (e1 :|: e2)      = go e1 || go e2
+   go (One e)          = go e
+   go (All e)          = go e
+   go (e1 :|: e2)      = go e1 || go e2
    go (Exi (Bind _ e)) = go e
    go _                = False
 
@@ -451,8 +505,7 @@ execEX1 bs lhs =
   do Assert x <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
      pure (Assert . ctx, g, bs', hole)
--- TODO: try this
---  ++
---   do Verify x <- [lhs]
---      (ctx, g, bs', hole) <- execEX bs x
---      pure (Verify . ctx, g, bs', hole)
+ ++
+  do Verify x <- [lhs]
+     (ctx, g, bs', hole) <- execEX bs x
+     pure (Verify . ctx, g, bs', hole)

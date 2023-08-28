@@ -24,8 +24,11 @@ main =
 -- | Verifier tests
 ---------------------------------------------------------------------------------------------------
 
+takeL :: Int -> [a] -> [a]
+takeL n xs = [xs!!n]
+
 tests :: [(String, Expr, Bool)]
-tests =
+tests = -- take 6
   [ ("ex_crash", ex_crash, True)
   , ("ex00", ex00, True)
   , ("ex01", ex01, True)
@@ -50,6 +53,11 @@ tests =
   , ("ex_tim_0", ex_tim_0, False)
   , ("ex_tim_1", ex_tim_1, False)
   , ("ex_asm_subst", ex_asm_subst, True)
+  -- , ("ex_f_3", ex_f_3, False)
+  -- , ("ex_f_3'", ex_f_3', False)
+  -- , ("ex_cmp", ex_cmp, True)
+  , ("ex_asm_race", ex_asm_race, True)
+  , ("ex_asm_race'", ex_asm_race', False)
   ]
 
 --------------------------------------------------------------------------------
@@ -57,7 +65,8 @@ tests =
 --------------------------------------------------------------------------------
 
 sys :: TRSystem Expr
-sys = icfpVerifier
+sys = icfpeVerifier
+-- sys = l2rVerifier
 
 runTests :: IO Bool
 runTests = and <$> mapM runTest tests
@@ -66,7 +75,7 @@ runTest :: (String, Expr, Bool) -> IO Bool
 runTest (testName, e, expected) =
   do putStr $ "Running test: " ++ testName ++ " ..."
      --P.pp e
-     case Rules.Verifier.verify icfpeVerifier e of
+     case Rules.Verifier.verify sys e of
        (True, _) | expected ->
          do putStrLn " OK (verified)"
             return True
@@ -135,109 +144,6 @@ tlamAbs x ys e1 e2 = Lam $ Bind x $ exis ys (e1 :>: Assume e2)
 tlam :: Ident -> [Ident] -> Expr -> Expr -> Expr
 tlam x ys e1 e2 = tlamOblig x ys e1 e2 :>: tlamAbs x ys e1 e2
 
-{-
-
-ex00 / True
-g() := (2 = 2; 2)
-
-ex01 / True
-g(x:int) := x
-
-ex02 / True
-g(x:int):int := x
-
-ex0 / True
-g(x:int, y:int where x = y) := { a := x; b := a; b = y }
-
-ex0' / True
-:verify g(x:int, y:int) := { a := x; b := a; b = y }
-
-ex0 / True (ideally but this hangs!)
-:verify g(x:int, y:int, z:int where x = y) := { a := x; b := a; b = y }
-
-ex0' / False (ideally but this hangs!)
-:verify g(x:int, y:int, z:int where x = z) := { a := x; b := a; b = y }
-
-ex5 /True
-:verify g(x:any):int := { if int[x] then 10 else 20 }
-
-ex5' / False (note: int(x) means call should succeed which, in this case, may not happen!)
-:verify g(x:any):int := { if int(x) then 10 else 20 }
-
-> :verify g(x:int, y:int) := { a := x; b := a; b = y }
-g(x : int, y : int) := {a := x; b := a; b = y}
-Desugared:
-ex g $i1.
-   (g = (($i1 = (verify {\$x2.
-                         ex $x3 $x4 x y.
-                            assume {(x = (\$$x. isint($$x); $$x)($x3));
-                                    (y = (\$$x. isint($$x); $$x)($x4));
-                                    ($x2 = <$x3, $x4>);
-                                    $x2};
-                            assert {ex a b. (a = x); (b = a); (b = y); b}};
-                 (\$x2.
-                  ex $x3 $x4 x y.
-                     ((x = (\$$x. isint($$x); $$x)($x3));
-                      (y = (\$$x. isint($$x); $$x)($x4));
-                      ($x2 = <$x3, $x4>);
-                      $x2);
-                     assume {ex a b. (a = x); (b = a); (b = y); b})));
-         $i1));
-   g
-
-
-> :verify g(x:int, y:int, z:int) := { a := x; b := a; b = y }
-g(x : int, y : int, z : int) := {a := x; b := a; b = y}
-Desugared:
-ex g $i1.
-   (g = (($i1 = (verify {\$x2.
-                         ex $x3 $x4 $x5 x y z.
-                            assume {(x = (\$$x. isint($$x); $$x)($x3));
-                                    (y = (\$$x. isint($$x); $$x)($x4));
-                                    (z = (\$$x. isint($$x); $$x)($x5));
-                                    ($x2 = <$x3, $x4, $x5>);
-                                    $x2};
-                            assert {ex a b. (a = x); (b = a); (b = y); b}};
-                 (\$x2.
-                  ex $x3 $x4 $x5 x y z.
-                     ((x = (\$$x. isint($$x); $$x)($x3));
-                      (y = (\$$x. isint($$x); $$x)($x4));
-                      (z = (\$$x. isint($$x); $$x)($x5));
-                      ($x2 = <$x3, $x4, $x5>);
-                      $x2);
-                     assume {ex a b. (a = x); (b = a); (b = y); b})));
-         $i1));
-   g
-
-
-> :verify g(x:int, y:int where x = y) := { a := x; b := a; b = y }
-g(x : int, y : int where x = y) := {a := x; b := a; b = y}
-Desugared:
-ex g $i2.
-   (g = (($i2 = (verify {\$x3.
-                         ex $x4 $x5 x $x1 y $i6.
-                            assume {(x = (\$$x. isint($$x); $$x)($x4));
-                                    ($x1 = ((y = (\$$x. isint($$x); $$x)($i6)); y));
-                                    (x = y);
-                                    ($x5 = $x1);
-                                    ($x3 = <$x4, $x5>);
-                                    $x3};
-                            assert {ex a b. (a = x); (b = a); (b = y); b}};
-                 (\$x3.
-                  ex $x4 $x5 x $x1 y $i6.
-                     ((x = (\$$x. isint($$x); $$x)($x4));
-                      ($x1 = ((y = (\$$x. isint($$x); $$x)($i6)); y));
-                      (x = y);
-                      ($x5 = $x1);
-                      ($x3 = <$x4, $x5>);
-                      $x3);
-                     assume {ex a b. (a = x); (b = a); (b = y); b})));
-         $i2));
-   g
-Verified
-
--}
-
 exNotValid :: Expr
 exNotValid = eXIs [g, i1] $ (Var g :=: (blob1 :>: blob2) :>: Var i1) :>: Var g
     where
@@ -271,6 +177,37 @@ ex01 = verse $ lam (\x -> Assert x)
 
 
 --  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=y => succeeds{ exists a b. a=x; b=a; b=y}
+ex0_aa :: Expr
+ex0_aa = lAMs [x, y] (
+              Assume (INT (Var x))
+              :>:
+              Assume (INT (Var y))
+              :>:
+              Assume (Var y :=: Var x)
+              :>:
+              Assert (Var x :=: Var x :>: Int 0)
+            )
+   where
+     x = ident "x"
+     y = ident "y"
+
+
+ex0_bb :: Expr
+ex0_bb = lAMs [x,y] $
+              -- Assume (INT (Var x))
+              -- :>:
+              -- Assume (INT (Var y))
+              -- :>:
+              -- Assume (Var y :=: Var x)
+              Assume (INT (Var x) :>: INT (Var y) :>: (Var y :=: Var x))
+              :>:
+              Assert (Var y :=: Var x :>: Int 0)
+
+   where
+     x = ident "x"
+     y = ident "y"
+
+
 ex0 :: Expr
 ex0 = LAM x (LAM y (LAM z (
         Assume (INT (Var x) :>: INT (Var y) :>: INT (Var z) :>: Var x :=: Var y)
@@ -602,3 +539,51 @@ ex_asm_subst = lAMs [a] $
 
 ex_crash :: Expr
 ex_crash = Assert (Int 1)
+
+-- f():int => 3 = f[]
+
+-- exi f, g.
+--    g = \a. assume {exi x. x = f(); int(x); x};
+--    succ { g() = 3 }
+
+ex_f_3 :: Expr
+ex_f_3 = eXIs [f, g] $
+          ( Var g :=: LAM a (Assume (EXI x (Var x :=: Var f :@: Arr []) :>: iNT (Var x) :>: Var x) ) )
+          :>:
+          Assert ( (Var g :@: Arr [] :=: Int 3 ) :>: Int 3)
+  where
+    f = ident "f"
+    g = ident "g"
+    a = ident "a"
+    x = ident "x"
+
+
+-- assert {(3 = (ex $y29.                                                      // CHECKPOINT2
+--                 assume {($y29 = $x27(<>)); (\_x. isint(_x); assume {_x})($y29)}));
+--        3}};
+
+ex_f_3' :: Expr
+ex_f_3' = Assert (Int 3 :=: EXI y (Assume (Var y :=: Var f :@: Arr [] :>:  iNT (Var y) :>: Var y)) :>: Int 3)
+  where
+    f = ident "f"
+    y = ident "y"
+
+ex_cmp :: Expr
+ex_cmp = LAM a $ Assume (INT (Var a))
+                 :>:
+                 Assert (EXI b (( Var b :=: INT (Var a) ) :>: Int 10))
+  where
+    a = ident "a"
+    b = ident "b"
+
+ex_asm_race :: Expr
+ex_asm_race = lAMs [b, a] $ Assume(INT (Var a)) :>: Assume(INT (Var b)) :>:  Assert ( Assume (Var a :=: Var b) :>: (Var a :=: Var b) :>: Int 10)
+  where
+    a = ident "a"
+    b = ident "b"
+
+ex_asm_race' :: Expr
+ex_asm_race' = lAMs [b, a] $ Assume(INT (Var a)) :>: Assume(INT (Var b)) :>: Assert ((Var a :=: Var b) :>: Assume (Var a :=: Var b) :>: Int 10)
+  where
+    a = ident "a"
+    b = ident "b"

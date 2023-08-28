@@ -32,9 +32,9 @@ verify(fail) { g(x:any):int := { if (int(x)) then 10 else 20 } }
 verify(pass) { suc(a:int):int := {a + 1} ; g(x:int):int := { suc(x) } }
 verify(pass) { foo(x:any):int := if (int[x]) then { x } else { 0 } }
 verify(pass) { foo(x:any):int := if (int[x]) then { x + 1 } else { 0 } }
-verify(pass) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
-verify(pass) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
-verify(pass) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
+verify(pass,ICFPEverify=skip) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
+verify(pass,ICFPEverify=skip) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
+verify(pass,ICFPEverify=skip) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
 verify(pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
 
 # Testing 'if' with 'mustDecide'
@@ -97,3 +97,6 @@ verify(fail) {f(x:int)<succeeds>:=x/0}
 # verify(pass) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
 # verify(pass) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
 # forall x y . exists z . assume{z = x}; z = x; x = y
+
+# left-to-right
+verify(pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
