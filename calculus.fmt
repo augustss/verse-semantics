@@ -143,7 +143,7 @@
 %format srcand = "\textbf{and}"
 %format srcor = "\textbf{or}"
 %format hat = "\hat{\hspace{0.8em}}"
-%format amp = "\!\!\textbf{\&}\!\!"
+%format amp = "\!\textbf{\&}\!"
 
 %format hchoice = "\|"
 %format he = "he"
@@ -240,7 +240,7 @@
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"
-%format function (x) (rhs) = functionKW "\;" x "\;\{" rhs "\}"
+%format function (x) (rhs) = functionKW "\," x "\,\{" rhs "\}"
 %format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionKW = "\textbf{fun}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
@@ -291,8 +291,8 @@
 %% %format squiggt = "\!\leadsto\!"
 %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format (eff x) = "\!\!<\!\!" x "\!\!>\!\!"
-%format apeff g x = g "\!\!<\!\!" x "\!\!>\!\!"
+%format (eff x) = "\langle" x "\rangle"
+%format apeff g x = g "\langle" x "\rangle"
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 %format arrayty = "[]"
