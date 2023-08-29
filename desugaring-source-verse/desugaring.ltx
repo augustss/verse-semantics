@@ -247,10 +247,10 @@ $$
 \end{array} \\
 \\
 \begin{array}{rcll}
-\multicolumn{4}{l}{\textbf{Array splice (terms and patterns)}} \\
+\multicolumn{4}{l}{\textbf{Array splice}} \\
   \multicolumn{3}{l}{\quad|array (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
-  & \rightarrow & \multicolumn{2}{l}{|append[array(t_1; xdots; t_km1), t_k, array(t_kp1; xdots; t_n)]|}\\
-  & \multicolumn{3}{l}{\text{where |append| is a reversible function appending 3 arrays}} \\
+  & \rightarrow & \multicolumn{2}{l}{|^append[array(t_1; xdots; t_km1), append^[t_k, array(t_kp1; xdots; t_n)]]|}\\
+  & \multicolumn{3}{l}{\text{where |append| is a reversible function appending two arrays}} \\
 \end{array} \\
 \\
 \begin{array}{rcll}
@@ -355,6 +355,31 @@ These patterns are completely removed by the source-to-source rewrites in \Cref{
 yielding Small Source Verse bindings of the form |x := t|, where |x| is a variable.
 
 Source Verse also has the term |p:t|, which immediately rewrites to |p := (:t)|.
+
+\subsection{Array splicing}
+In an array expression, i.e., in the elements of |array| or comma separated elements,
+a special syntactic form |..x| is allowed.  It indicates an \emph{array slice}, and it has its own desugaring rules,
+\cref{fig:sv-to-sv-1}.
+
+Here are a few examples to illustrate how it can be used.
+The |append| function takes two array arguments and returns the appended arrays.
+The |append| function is reversible so it can be used with uninstantiated logical variables as inputs.
+The |append| function as been abbreviated to |app| and |array()| to |ar()|.
+
+{\small
+$$
+\begin{array}{rclcl}
+  \text{Source Verse}  & & \text{Small Source Verse} & & \text{Evaluates to} \\
+  \hline
+  |(1,..(2,3))|  & \longrightarrow & |app^[ar(1),ar(2;3)]| & \rightarrow & |ar(1;2;3)| \\
+  |(..(1,2),3)|  & \longrightarrow & |app^[ar(1;2),ar(3)]| & \rightarrow & |ar(1;2;3)| \\
+  |(x,..y)==(1,2,3)| & \longrightarrow & |app^[ar(x),y]==ar(1;2;3)| & \rightarrow &|x=1; y=ar(2;3)|\\
+  |(1,..y)==(1,2,3)| & \longrightarrow & |app^[ar(1),y]==ar(1;2;3)| & \rightarrow &|y=ar(2;3)|\\
+  |(5,..y)==(1,2,3)| & \longrightarrow & |app^[ar(5),y]==ar(1;2;3)| & \rightarrow &|fail|\\
+  |(..x,..y)==ar(1)| & \longrightarrow & |app^[x,y]==ar(1)| & \rightarrow &|(x=ar();y=ar(1)) `choice` (x=ar(1); y=ar())|\\
+\end{array}
+$$
+}
 
 \subsection{Example rewriting}
 $$

@@ -154,9 +154,11 @@
 %format collect = "\textbf{collect}"
 %format orElse = "\textbf{orElse}"
 %format append = "\textbf{append}"
+%format app = "\textbf{app}"
 
 %% Arrays and tuples
 %format array (x) = "\textbf{array}\{" x "\}"
+%format ar (x) = "\textbf{ar}\{" x "\}"
 %% %format arrKW = "\textbf{arr}"
 %% %format arr (x) = arrKW "\{" x "\}"
 %format arr (x) = "\langle" x "\rangle"
