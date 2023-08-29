@@ -145,12 +145,12 @@ $$
       & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
       & \vb & |for(t) do b|     & \text{Finite loop} \\
       & \vb & |check fx t|      & \text{Effects check} \\
-      & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
+      & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
       & \vb & |function ((t_1)) t_2|    & \text{Function} \\
       & \vb & |oftype t_1 t_2|  & \text{Type annotation}
 \\[2mm]
 \multicolumn{4}{l}{\text{\bf Blocks}} \\
- |b| & ::= & |t| \vb |{t_1; dots ; t_n}|
+ |b| & ::= & |t| \vb |{t_1; xdots ; t_n}|
 \\[2mm]
 \multicolumn{4}{l}{\text{\bf Arguments}} \\
  |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
@@ -176,8 +176,8 @@ $$
 &      & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
 &      & \vb & |for(t) do b|     & \text{Finite loop} \\
 &      & \vb & |check fx t|     & \text{Effects check} \\
-&      & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
-&      & \vb & |t_1, dots, t_n|  & \text{Array}, n \geq 2 \\
+&      & \vb & |array (t_1; xdots; t_n)| & \text{Array}, n \geq 0 \\
+&      & \vb & |t_1, xdots, t_n|  & \text{Array}, n \geq 2 \\
 &      & \vb & |()|              & \text{Empty array} \\
 &      & \vb & |t_1 eqgt t_2|    & \text{Lambda expression} \\
 &      & \vb & |p := t|          & \text{General definition} \\
@@ -187,21 +187,21 @@ $$
 &      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
 &      & \vb & |: t|             & \text{Range} \\
 &      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
-&      & \vb & |function (a_1 dots a_n) t|    & \text{Function} \\
+&      & \vb & |function (a_1 xdots a_n) t|    & \text{Function} \\
 &      & \vb & |if(t) then b|    & \text{Conditional expression} \\
 &      & \vb & |if(t) else b|    & \text{Conditional expression} \\
 &      & \vb & |if{t}|           & \text{Conditional expression} \\
 &      & \vb & |for{t}|          & \text{Finite loop} \\
 &      & \vb & |let(t) in b|     & \text{Local binding} \\
 &      & \vb & |block b|         & \text{Scope delimiter} \\
-&      & \vb & |case(t) of {t_1; dots t_n}|    & \text{Case expression} \\
-&      & \vb & |case{t_1; dots t_n}| & \text{Case expression} \\
+&      & \vb & |case(t) of {t_1; xdots t_n}|    & \text{Case expression} \\
+&      & \vb & |case{t_1; xdots t_n}| & \text{Case expression} \\
 &      & \vb & |type^{t}|         & \text{Type definition} \\
 &      & \vb & |option^{}|        & \text{Create an option} \\
 &      & \vb & |option^{t}|       & \text{Create an option}
 \\[2mm]
 \text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |p_1 squiggt p_2| \\
-&     & \vb & |: t| \vb |p : t|  \vb |p_1, dots, p_n| \vb |..p| \\
+&     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
 & |xsl| & ::= & x \vb  |xsl&x|
 \\[2mm]
 \text{\bf Operators} &
@@ -256,7 +256,7 @@ $$
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Array notation}} \\
   |()| & \rightarrow & |array ()| \\
-  |t_1, dots, t_n| & \rightarrow & |array (t_1; dots; t_n)| \\
+  |t_1, xdots, t_n| & \rightarrow & |array (t_1; xdots; t_n)| \\
 \end{array} \\
 \\
 \begin{array}{rcll}
@@ -295,8 +295,8 @@ $$
   \multicolumn{1}{l}{\textbf{Let, block, case}} \\
   |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
   |block b| & \rightarrow & |b| & \textit{see note}  \\
-  |case{e_1; dots e_n}| & \rightarrow & |(x:any) => case(x){e_1; dots e_n}| & \text{|x| fresh} \\
-  |case(e){e_1; dots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor dots srcor e_n^[x]| & \text{|x| fresh} \\
+  |case{e_1; xdots e_n}| & \rightarrow & |(x:any) => case(x){e_1; xdots e_n}| & \text{|x| fresh} \\
+  |case(e){e_1; xdots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor xdots srcor e_n^[x]| & \text{|x| fresh} \\
   \multicolumn{4}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
   \\
   \multicolumn{1}{l}{\textbf{Misc}} \\
