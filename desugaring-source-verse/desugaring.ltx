@@ -202,7 +202,7 @@ $$
 \\[2mm]
 \text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |p_1 squiggt p_2| \\
 &     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
-& |xsl| & ::= & x \vb  |xsl&x|
+& |xsl| & ::= & x \vb  |xsl amp x|
 \\[2mm]
 \text{\bf Operators} &
  |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \vb ..  & \text{Prefix}\\
@@ -234,7 +234,9 @@ $$
         |array(x_1:any;xdots;x_n:any) == t;|\\
         |p_1 := x_1; xdots; p_n := x_n |
       \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
-\rulename{pcolon2} &  |p : t| & \rightarrow & |p := (: t)|
+\rulename{pcolon2} &  |p : t| & \rightarrow & |p := (: t)| \\
+\rulename{pamp1} & |xsl amp x := t| & \rightarrow & |array(xsl amp x := t)| & \text{outside of an array}\\
+\rulename{pamp2} & |array(xdots; xsl amp x := t; xdots)| & \rightarrow & |array(xdots; xsl := t; x := t; xdots)| & \text{inside of an array}\\
 \end{array} \\
 \\
 \begin{array}{rcll}
@@ -352,7 +354,7 @@ One other note: real Source Verse uses the keyword \textbf{function}, but in thi
 
 Source Verse has bindings |p := t|, where |p| is a \emph{pattern}.
 These patterns are completely removed by the source-to-source rewrites in \Cref{fig:sv-to-sv-1},
-yielding Small Source Verse bindings of the form |x := t|, where |x| is a variable.
+yielding Small Source Verse bindings of the form |x := t|, or |x squiggt y := t| where |x|,|y| are variables.
 
 Source Verse also has the term |p:t|, which immediately rewrites to |p := (:t)|.
 

@@ -142,6 +142,7 @@
 %format srcand = "\&\&"
 %format srcor = "||"
 %format hat = "\hat{\hspace{0.8em}}"
+%format amp = "\!\!\textbf{\&}\!\!"
 
 %format hchoice = "\|"
 %format he = "he"
