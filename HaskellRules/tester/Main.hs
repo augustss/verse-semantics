@@ -569,7 +569,7 @@ timTestName test = "L" ++ show (unPos (sourceLine loc))
 timTest :: TestFlags -> FilePath -> IO ()
 timTest tflg fn = do
   file <- readFile fn
-  let tests = parseDie pTimTestFile fn file
+  let tests = {- take 1000 $ -} parseDie pTimTestFile fn file
   putStrLn $ "Flags" ++ show tflg
   putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
   putStrLn $ "Number of tests: " ++ show (length tests)

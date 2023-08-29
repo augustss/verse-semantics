@@ -704,7 +704,7 @@ test(U00){g(f(x:int)<computes><resolves  >:any) := if{f[3]=f[3]}}
 # Abstract functions: effects declaration says what effects the assumed range may have.
 test(S00){f(x:int)           :int => f[3]}
 test(D00){f(x:int)<decides  >:int => f[3]}
-test(U00){f(x:int)<resolves >:int => f[3]}
+test(U00){f(x:int)<resolves >:int => f[3]}		#TODO:EFF-RESOLVES
 test(P00){f(x:int)<decides  >:int => f(3)}
 test(P00){f(x:int)<resolves >:int => f(3)}
 test(S00){f(x:int)<interacts>:int => 3}
@@ -1021,8 +1021,8 @@ test(D00){f():int=3; char[f[]]} # could be F00
 #test(V10){f():int=3 => int[f[]]} # could be S00
 #test(V10){f():int=3 => nat[f[]]} # could be D00
 #test(V10){f():int=3 => char[f[]]} # could be F00
-test(F00){f():=2=3 => 4}	#NOTE:FP
-test(D00){f(x:int):=x=3 => 4}
+test(F00){f():=2=3 => 4}							#TODO:RANGE
+test(D00){f(x:int):=x=3 => 4}						#TODO:RANGE
 test(S00){f():type{2=3} => 4}
 test(S00){f(x:int):type{x=3} => 4}
 
@@ -1885,7 +1885,7 @@ test(D00){f(x:comparable):=int[x]}
 #
 
 # WhenCastStep.
-test(A00){f(x:any):type{x=3} => f[_]}
+test(A00){f(x:any):type{x=3} => f[_]}		# TODO:RANGE???
 test(A00){prefix'-'[_]}
 test(A00){prefix'-'[]} # Could be U00 but missing axiom.
 #LA test(M00){1{2}}
@@ -2068,13 +2068,13 @@ test(S00){p:any => p=2 => p+3=5}
 test(F00){p:any => p=2 => p+3=6}
 test(A00){x:any,x+3=5}
 test(A00){x:any,operator'+'[x,3]=5}
-test(A00){x:any,assume{x=2},x+3=5}
+test(A00){x:any,assume{x=2},x+3=5}		#TODO:ASSUME
 test(F00){x:any,assume{x=2},x+3=6}
 test(A00){x:any,int[x]}
-test(A00){x:any,assume{x=2},int[x]}
+test(A00){x:any,assume{x=2},int[x]}		#TODO:ASSUME
 test(S00){x:any,assume{x=2},x=2}
 test(R20){x:any,assume{x=2},x=3}
-test(A00){x:any,assume{x=2},x+3=5}
+test(A00){x:any,assume{x=2},x+3=5}		#TODO:ASSUME
 test(S00){x:any => x=2 => x=2}
 test(F00){x:any => x=2 => x=3}
 test(S00){x:any => x=2 => x+3=5}
@@ -2083,7 +2083,7 @@ test(S00){x:any => x+3=5 where assume{x=2}}
 test(F00){x:any => x+3=5 where assume{x=3}}
 test(S00){f:any => f[_]='x' where assume{f=char}}
 test(F00){f:any => f[_]='x' where assume{f=int}}
-test(A00){x:any,assume{x=2},x+3=5}	# NOTE: duplicate with L2071 above
+test(A00){x:any,assume{x=2},x+3=5}	# NOTE: duplicate with L2071 above	TODO:ASSUME
 test(F00){x:any,assume{x=2},x+3=6}
 
 # A call that doesn't succeed should block function equality. f[a]=b <=> f=function(a){b}.
@@ -2573,9 +2573,9 @@ test(R00){x:=assume{:int},int[x]}
 test(D00){x:=assume{:int},x=3}
 test(D00){x:=assume{:int},nat[x]}
 test(D00){x:int => nat[x]}
-test(U00){x:=assume{:any},y:=assume{:int},x=y}
-test(U00){x:=assume{:int},y:=assume{:any},x=y}
-test(U00){x:=assume{:any},x=3}
+test(U00){x:=assume{:any},y:=assume{:int},x=y}		#TODO:ASSUME
+test(U00){x:=assume{:int},y:=assume{:any},x=y}		#TODO:ASSUME
+test(U00){x:=assume{:any},x=3}						#TODO:ASSUME
 
 # Consider information parity and soundness.
 test(S00){a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}
@@ -2676,7 +2676,7 @@ test(S00){a&b:int => if{a=b}}
 test(D00){a&b:int => a=b where if{a=b}}
 
 # Decidable conditions.
-test(U00){f(x:any):=if(x=2){3}else{4}}
+test(U00){f(x:any):=if(x=2){3}else{4}}	#TODO:COMPARE-ANY
 test(S00){f(x:int):=if(x=2){3}else{4}}
 test(N00){f(x:int):=if(x=1){y}else{2}}
 test(N00){f(x:int):=if(x=1){1}else{y}}

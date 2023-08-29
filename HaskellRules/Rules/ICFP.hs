@@ -210,6 +210,7 @@ valid' onlyEq = expr
     expr (Assert e) = expr e
     expr (Decide e) = expr e
     expr (Verify e) = expr e
+    expr (Fails  e) = expr e
     expr e@Val{} = value e
     expr (LAM _ e) = expr e
     expr (_ :=: _) = False
@@ -422,7 +423,9 @@ scopeX lhs =
  ++
   do Assume hole <- [lhs]
      choices Assume hole
-
+ ++
+  do Fails hole <- [lhs]
+     choices Fails hole
 
  where
   choices ctx e =

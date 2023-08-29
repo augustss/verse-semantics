@@ -58,6 +58,8 @@ tests = -- take 6
   -- , ("ex_cmp", ex_cmp, True)
   , ("ex_asm_race", ex_asm_race, True)
   , ("ex_asm_race'", ex_asm_race', False)
+  , ("ex_if_else_only", ex_if_else_only, True)
+  , ("ex_if_then_only", ex_if_then_only, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -587,3 +589,9 @@ ex_asm_race' = lAMs [b, a] $ Assume(INT (Var a)) :>: Assume(INT (Var b)) :>: Ass
   where
     a = ident "a"
     b = ident "b"
+
+ex_if_then_only :: Expr
+ex_if_then_only = Verify (Assert (Int 2 :=: If (Int 10) (Int 2) (Int 99)))
+
+ex_if_else_only :: Expr
+ex_if_else_only = Verify (Assert (Int 2 :=: If (Int 10 :=: Int 20) (Int 99) (Int 2)))

@@ -18,8 +18,8 @@ import TRS.TRS hiding (step)
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core hiding (Wrong)
-import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr)
-import Rules.LeftToRight
+import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr, isChoiceFreeOp)
+import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
 import Data.List( intersect )
 import qualified Epic.SIntMap as IM
@@ -81,6 +81,7 @@ isDone = go False
   go lam (One e)          = go lam e
   go lam (All e)          = go lam e
   go lam (Assume e)       = go lam e
+  go lam (Fails  e)       = go lam e
   go _   (Assert _)       = False
   go _   (Decide _)       = False
   go lam (Split x y z)    = go lam x && go lam y && go lam z
@@ -107,7 +108,7 @@ icfpeVerifier :: TRSystem Expr
 icfpeVerifier = icfp
   { sname = "ICFPEverify"
   , description = "ICFPE + extra verifier rules"
-  , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL")
+  , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
               <> (generalizedIcfpRules -= "SUBST-GEN")
               <> l2rSubstRules
               <> assumeAssertRules
@@ -186,6 +187,26 @@ generalizedIcfpRules env lhs =
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      pure (subst sub (ctx (Var x0 :=: Val v)))
    -- copied from ICFP (but the variant in L2R make `TRSVerify.ex0` fail...?)
+   -- restricted/effect-compatible variants of FAIL-ELIM
+   ++
+   "FAIL-ELIM-R" `name`
+   do Fail :>: _ <- [lhs]
+      pure Fail
+   ++
+   "FAIL-ELIM-L" `name`
+   do e :>: Fail <- [lhs]
+      guard (effectFree e)
+      pure Fail
+
+effectFree :: Expr -> Bool
+effectFree (Val _)       = True
+effectFree (One _)       = True
+effectFree (All _)       = True
+effectFree (Op op :@: _) = isChoiceFreeOp op
+effectFree (e1 :=: e2)   = effectFree e1 && effectFree e2
+effectFree _             = False
+
+
 
 generalizedL2RRules :: VRule
 generalizedL2RRules env lhs =
@@ -300,6 +321,8 @@ mustSucceed _ bs = go
    go (Lam _)          = True
    go (Var x)          = x `elem` lamBinds
    go (Assume _)       = True
+   go (Fails _)        = True
+   go (Assume Fail :>: _) = True       -- HACK
    go (e1 :>: e2)      = go e1 && go e2
    go (One e)          = go e
    go (All e)          = go e
@@ -395,8 +418,12 @@ verifierRules env lhs =
       (ctx, g, bs, If e1 e2 e3) <- eX e
       let bs0 = bndVars env
       guard (mustDecide g (bs0 ++ bs) e1)
-      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx e3))
-
+      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx (Fails e1 :>: e3)))
+   ++
+   -- Fails {hnf} ---> Assume {fail}
+   "fails-hnf" `name`
+   do Fails (HNF _) <- [lhs]
+      pure (Assume Fail)
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"

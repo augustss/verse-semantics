@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-unused-matches -Wno-name-shadowing #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-module Rules.LeftToRight(allSystemsLeftToRight) where
+module Rules.LeftToRight(allSystemsLeftToRight, effectFree) where
 
 import TRS.Bind
 import TRS.System
@@ -100,7 +100,7 @@ validE = ok
   ok _                = True
 
   okeq (v :=: e)      = isVal v && ok e
-  okeq _              = False 
+  okeq _              = False
 
 --------------------------------------------------------------------------------
 
@@ -331,4 +331,3 @@ rulesOneAndAll _ lhs =
   choices e           = [e]
 
 --------------------------------------------------------------------------------
-
