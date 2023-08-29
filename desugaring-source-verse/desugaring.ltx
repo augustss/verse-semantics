@@ -263,8 +263,8 @@ $$
 \\
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Function notation}} \\
-  |type^{t}| & \rightarrow & |function (x:=t) x| & \text{fresh |x|}\\
-  |t_1 eqgt t_2| & \rightarrow & |function t_1 t_2| \\
+  |type^{t}| & \rightarrow & |function ((x:=t)) x| & \text{fresh |x|}\\
+  |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
   |function (()) b| & \rightarrow & |functionKW (()) b| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
@@ -386,7 +386,7 @@ $$
 \subsection{Example rewriting}
 $$
 \begin{array}{lrcl}
-  \text{Source Verse}  & & \text{Small Source Verse} \\
+  & \text{Source Verse}  & & \text{Small Source Verse} \\
   \hline
 (E1) &  |x:int|  & \longrightarrow & |x := (:int)| \\
 (E2) &  |x:abs := -3|  & \longrightarrow & |x := oftype (-3) abs| \\

@@ -31,6 +31,7 @@
 %format fails = "\textbf{fails}"
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
+%format closed = "\textbf{closed}"
 
 
 %% ----------------------
@@ -139,8 +140,8 @@
 %format hastype (x) (y) = x "\," hastypeKW "\," y
 %format hastypeKW = "{\bf hastype}"
 
-%format srcand = "\&\&"
-%format srcor = "||"
+%format srcand = "\textbf{and}"
+%format srcor = "\textbf{or}"
 %format hat = "\hat{\hspace{0.8em}}"
 %format amp = "\!\!\textbf{\&}\!\!"
 
@@ -288,7 +289,7 @@
 %% %format squiggt = "\!\leadsto\!"
 %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format (eff x) = "\!\!<\!\!" x "\!\!>"
+%format (eff x) = "\!\!<\!\!" x "\!\!>\!\!"
 %format apeff g x = g "\!\!<\!\!" x "\!\!>\!\!"
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
