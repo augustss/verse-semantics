@@ -470,6 +470,11 @@ $$
 & |De k| & = & |k| \\
 & |De x| & = & |x| \\
 & |De (f^[x])| & = & |f^[x]| \\
+& |De (e_1 == e_2)| & = & |De e_1 == De e_2| \\
+& |De (x := e)| & = & |x := De e| \\
+& |De (t_1 ; t_2)| & = & |De t_1 ; De t_2| \\
+& |De (array(e_1; xdots; e_n))| & = & |array(De e_1 ; xdots; De e_n)| \\
+& \text{and so on ...} \\
 
 \\
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
@@ -505,7 +510,7 @@ and |e| is a BigCore expression}} \\[1mm]
 %%  |Me i (function t_1 t_2)| & = & |lam x (z := Me x t_1; y := i^[z]; Me y t_2)| \\
 |Me i (functionP t_1 t_2)| & = & |tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)| \\
 & \multicolumn{3}{l}{\text{Note: This does not work for actual function definitions.}} \\
-& \multicolumn{3}{l}{\text{Perhaps these work?}} \\
+& \multicolumn{3}{l}{\text{Perhaps this works?}} \\
 |Me i (functionP t_1 t_2)| & = & |i == tlam x (Me x t_1) (De t_2)| \\
 \end{array}
 \end{array}
