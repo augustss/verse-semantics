@@ -496,7 +496,8 @@ and |e| is a BigCore expression}} \\[1mm]
     |def (x_1 xdots x_n) (Me x_1 t_1; xdots; Me x_n t_n;|\\
     |i == arr (x_1, xdots, x_n))|
    \end{array}} \\
-\rulename{mfor} &  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e2}| \\
+\rulename{mfor} &  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e_2}| \\
+\rulename{mtype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
@@ -639,7 +640,7 @@ $$
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring for verification}} \\
-|oftype e t| & = & |def x t^[x]| & \text{fresh |x|} \\
+|oftype e t| & = & |verify (assert (t^[e])); def x t^[x]| & \text{XXX this is wrong!!!} \\
 |tlam x e_1 e_2| & = & |verify (lam x (assume e_1; assert e_2)); lam x (e_1; assume e_2)| \\
 |tlamt x e_1 e_2 t| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (def y (t^[y])))| & \text{fresh |y|} \\
 |if(e_1) then e_2 else e_3| & = & ... \\
