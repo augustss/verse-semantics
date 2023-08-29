@@ -3,6 +3,7 @@
 module Control.Monad.RS
   ( RST (..)
   , evalRST
+  , execRST
   ) where
 
 import Control.Applicative
@@ -24,6 +25,9 @@ newtype RST r s m a = RST { runRST :: r -> s -> m (a, s) }
 
 evalRST :: Functor m => RST r s m a -> r -> s -> m a
 evalRST x r = fmap fst . runRST x r
+
+execRST :: Functor m => RST r s m a -> r -> s -> m s
+execRST x r = fmap snd . runRST x r
 
 instance Functor m => Functor (RST r s m) where
   fmap f m = RST $ \ r s ->
