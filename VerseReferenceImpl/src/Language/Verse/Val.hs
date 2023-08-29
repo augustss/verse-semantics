@@ -13,6 +13,7 @@ module Language.Verse.Val
   , FrozenVal
   , Overload (..)
   , Named (..)
+  , Env
   ) where
 
 import Control.Monad
@@ -209,8 +210,8 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Named ref a) where
 
 type Env k ref a = HashMap k (Named ref a)
 
-zipMatchEnv :: (Hashable k, Eq (ref (Val ref)))
-            => Env k ref a
-            -> Env k ref b
-            -> Env k ref (a, b)
+zipMatchEnv :: (Hashable k, ZipMatchable f)
+            => HashMap k (f a)
+            -> HashMap k (f b)
+            -> HashMap k (f (a, b))
 zipMatchEnv x y = HashMap.mapMaybe id $ HashMap.intersectionWith zipMatch x y

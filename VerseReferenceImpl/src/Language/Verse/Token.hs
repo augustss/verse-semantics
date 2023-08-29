@@ -47,6 +47,7 @@ data Token
   | For
   | Do
   | Block
+  | Where
   | Class
   | Struct
   | Module
@@ -106,6 +107,7 @@ instance Pretty Token where
     For -> "for"
     Do -> "do"
     Block -> "block"
+    Where -> "where"
     Class -> "class"
     Struct -> "struct"
     Module -> "module"
