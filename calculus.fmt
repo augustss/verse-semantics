@@ -86,8 +86,8 @@
 %format tlam (x) (e1) (e2) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}"
 %format tlamt (x) (e1) (e2) (e3) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}\{" e3 "\}"
 %format tlamKW = "\textbf{tlam}"
-%format oftype (e) (t) = oftypeKW "(" e ")\{" t "\}"
-%format oftypeKW = "\textbf{ofType}"
+%format oftype (e) (t) = e "\vartriangleright" t
+%format oftypeKW = "\vartriangleright"
 %format at = "\, @\!\!"
 %format dot = "\! ."
 %format alpha = "\alpha"
@@ -231,6 +231,7 @@
 %format wrong = "\textbf{wrong}"
 %format int = "\textbf{int}"
 %format nat = "\textbf{nat}"
+%format abs = "\textbf{abs}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"

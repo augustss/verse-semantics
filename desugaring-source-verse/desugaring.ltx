@@ -140,6 +140,7 @@ $$
       & \vb & |x = t|           & \text{Unification} \\
       & \vb & |x := t|          & \text{Definition} \\
       & \vb & |x squiggt y := t| & \text{Definition} \\
+      & \vb & |:t|               & \text{Range} \\
       & \vb & |t_1 `choice` t_2| & \text{Choice} \\
       & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
       & \vb & |for(t) do b|     & \text{Finite loop} \\
@@ -216,24 +217,24 @@ $$
 \begin{figure}
 $$
 \begin{array}{@@{}l}
-\begin{array}{rcll}
-\multicolumn{4}{l}{\textbf{Bindings |p := t|}} \\
-  |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
-  |p^(a) := t| & \rightarrow & |p := function a t| \\
-  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
-  |(: t_1) := t_2| & \rightarrow & |(x : t_1) := t_2| & \text{fresh |x|} \\
+\begin{array}{lrcll}
+\multicolumn{4}{l}{\textbf{Rewriting patterns: |p := t| and |p:t|}} \\
+\rulename{pwild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
+\rulename{pwild2} &  |(: t_1) := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
+\rulename{pcolon1} &  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
+\rulename{papp} &   |p a := t| & \rightarrow & |p := function a t| \\
   %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
-  |(p_1 squiggt p_2) := t| & \rightarrow &
+\rulename{pfun} &  |(p_1 squiggt p_2) := t| & \rightarrow &
   \begin{array}[t]{@@{}l}
     |p_1 := (x_1:any); p_2 := (x_2:any);| \\
     |(x_1 squiggt x_2) := t|
   \end{array}  & \text{if |p_1| or |p_2| not a variable} \\
-  |array (p_1; xdots; p_n) := t| & \rightarrow &
+\rulename{parr} &  |array (p_1; xdots; p_n) := t| & \rightarrow &
       \begin{array}[t]{@@{}l}
         |array(x_1:any;xdots;x_n:any) == t;|\\
         |p_1 := x_1; xdots; p_n := x_n |
       \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
-  |p : t| & \rightarrow & |p := (: t)|
+\rulename{pcolon2} &  |p : t| & \rightarrow & |p := (: t)|
 \end{array} \\
 \\
 \begin{array}{rcll}
@@ -261,12 +262,12 @@ $$
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Function notation}} \\
   |type^{t}| & \rightarrow & |function (x:=t) x| & \text{fresh |x|}\\
-  |e_1 eqgt e_2| & \rightarrow & |function e_1 e_2| \\
+  |t_1 eqgt t_2| & \rightarrow & |function t_1 t_2| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
   |function () b| & \rightarrow & |functionKW (()) b| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
-\multicolumn{4}{l}{\textbf{Conditionals and for-loops}} \\
+\multicolumn{4}{l}{\textbf{Conditional and for-loop notation}} \\
   |if{e}| & \rightarrow & |if(e) else false| \\
   |if(e_1) then e_2| & \rightarrow & |if(e_1) then e_2 else false| \\
   |if(e_1) else e_2| & \rightarrow & |if (x := e_1) then x else e_2| & \text{|x| fresh} \\
@@ -309,6 +310,10 @@ A more robust desugaring could \textalpha-convert such clashes.
 \caption{Source Verse to Source Verse rewriting (2)} \label{fig:sv-to-sv-2}
 \end{figure}
 
+\Cref{fig:source-verse-expr} gives the syntax of Source Verse.
+\Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version
+into Small Source Verse, whose syntax is given in \Cref{fig:small-source-verse}.
+Small Source Verse is a subset of Source Verse, which is why we us the same non-terminals for terms |t|, arguments |a|, and blocks |b| in both.
 
 \subsection{Small Source Verse}
 
@@ -319,46 +324,82 @@ A more robust desugaring could \textalpha-convert such clashes.
 (Blocks are part of the syntax in \Cref{fig:small-source-verse}.)
 \item \simon{What is the difference between |function( () ) t| and |function((())) t|, using the |(t)| and |()| productions for |a|?}
 \item \simon{Do we really need |x squiggt y := t| in Small Source Verse?}
+\item \simon{I added |:t| to Small Source Verse}
 \end{itemize}
 
-\subsection{Source Verse and its rewriting into Small Source Verse}
+\subsection{Source Verse: preliminaries}
 
 \Cref{fig:source-verse-expr} gives the syntax of Source Verse.
 \Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version
-into Small Source Verse.
-Small Source Verse is a subset of Source Verse, which is why we us the same non-terminals for terms |t|, arguments |a|, and blocks |b| in both.
+into Small Source Verse.  These rewrite rules should be repeatedly applied until none
+are applicable; at that point the program will be in the Small Source Verse subset.
 
-Points to note
+Much of this source-to-source rewriting simply removes simple syntactic sugar or
+notational abbreviations.
+For example:
 \begin{itemize}
-\item Real Source Verse uses the keyword \textbf{function}, but in this document we use |functionKW| to make our examples smaller.
-\item
-  Source Verse has bindings |p := t|, where |p| is a \emph{pattern}.
-  These patterns are completely removed by the source-to-source rewrites in \Cref{fig:sv-to-sv-1}, to bindings of the form |x := t|, where |x| is a variable.
-\item Source Verse also has the term |p:t|, which immediately rewrites to |p := (:t)|.
-\item \simon{How does |(:t)| rewrite?  Or is it in Small Source Verse?}
+\item |()| is short for |array ()|
+\item The lambda notation |t_1 eqgt t_2| is short for |function t_1 t_2|.
+\item A multi-argument lambda |function (a_1 dots a_n) b| is short for the explicitly-curried \\
+      |function a_1 (function a_2 (dots {function a_n b}))|.
 \end{itemize}
+\noindent
+One other note: real Source Verse uses the keyword \textbf{function}, but in this document we use |functionKW| to make our examples smaller.
+
+\subsection{Rewriting Source Verse patterns}
+
+Source Verse has bindings |p := t|, where |p| is a \emph{pattern}.
+These patterns are completely removed by the source-to-source rewrites in \Cref{fig:sv-to-sv-1},
+yielding Small Source Verse bindings of the form |x := t|, where |x| is a variable.
+
+Source Verse also has the term |p:t|, which immediately rewrites to |p := (:t)|.
 
 \subsection{Example rewriting}
 $$
-\begin{array}{rcl}
+\begin{array}{lrcl}
   \text{Source Verse}  & & \text{Small Source Verse} \\
   \hline
-  |x:int|  & \longrightarrow & |x := (:int)| \\
-  |f(x:int) := t| & \longrightarrow & |f := function( (x := (:int)) )(t)| \\
-  |f(x:int):int := t| & \longrightarrow & |f := function( (x := (:int)) )(oftype t int)| \\
+(E1) &  |x:int|  & \longrightarrow & |x := (:int)| \\
+(E2) &  |x:abs := -3|  & \longrightarrow & |x := oftype (-3) abs| \\
+(E3) &  |f^(x:int) := t| & \longrightarrow & |f := function( (x := (:int)) )(t)| \\
+(E4) &  |f^(x:int):int := t| & \longrightarrow & |f := function( (x := (:int)) )(oftype t int)| \\
 \end{array}
 $$
+Notice that
+\begin{itemize}
+\item The term |(:t)| in Small Source Verse, pronounced ``range |t|'' or ``colon |t|'',
+  denotes the (possibly-infinite)
+  set of all values in the range of the function\footnote{Remember, in Verse types are simply functions.} |t|.
+  So in example (E1), (|x:int|) brings |x| into scope and
+  constrains its value to be among those in the range of the function |int|; that is, to be an integer.
+\item In Small Source Verse, the term |oftype t_1 t_2|, pronounced ``|t_1| has type |t_2|''
+  means roughly\footnote{More precisely, this is its \emph{execution semantics}; its \emph{verification semantics}
+  is slightly different; see \Cref{sec:verification}} |t_2^[t_2]|;
+  that is, the result
+  of applying the type |t_2| to |t_1|. So in example (E2), |(x:abs := -3)| rewrites to |(x := oftype(-3)abs)|, which later desugars to |x := abs^[-3]|, thereby binding |x| to |3|.  Note that the value of the original right-hand
+  side (namely |-3|) is thereby ``fed through'' the type |abs| to give the value of |x|.
+\item An argument |a| is a \emph{term} not a \emph{pattern}.
+  In (E3), for example, the argument |(x:int)| rewrites (by \rulename{pcolon2}) to |(x := (:int))|.
+  In |function a t| the argument (term) |a| is called the \emph{domain expression} of the function.
+\end{itemize}
 
 % ----------------------------------------------------------------
-\section{Big Core Verse}
+\section{Desugaring Small Source Verse into Big Core Verse}
 
-\Cref{fig:core-verse} gives the BigCore language into which we desugar.
-It's slightly larger than the core language of the ICFP 23 paper, but
+\Cref{fig:core-verse} gives the Big Core Verse language into which we desugar.
+while Cref{fig:desugar-expr1} desugars Small Source Verse into Big Core Verse.
+
+\subsection{Big Core Verse}
+
+Big Core Verse is slightly larger than the core language of the ICFP 23 paper, but
 can very easily be desugared into it.  Specifically:
 \begin{itemize}
 \item It includes |x := e|.  This means |x=e|, plus an existential for |x | added at the
   top of the enclosing scope.
 \end{itemize}
+
+\subsection{Desugaring from source to core}
+
 
 \begin{figure}
 $$
@@ -387,43 +428,42 @@ $$
 \caption{BigCore Verse expressions} \label{fig:core-verse}
 \end{figure}
 
-% ----------------------------------------------------------------
-\section{Desugaring Source Verse}
-
-\Cref{fig:desugar-expr1} desugars Small Source Verse into Core Verse.
-
-
 \begin{figure}
 $$
 \begin{array}{@@{}l}
-\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring expressions}} \\
-  |De e| & = & |def i (Me i e)| \quad \quad |i| \not\in |e|\\
-\multicolumn{4}{l}{\quad \text{Optional (derived) rules}} \\
-|De k| & = & |k| \\
-|De x| & = & |x| \\
-|De (f^[x])| & = & |f^[x]| \\
+&  |De e| & = & |def i (Me i e)| \quad \quad |i| \not\in |e|\\
+\multicolumn{5}{l}{\quad \text{Optional (derived) rules}} \\
+& |De k| & = & |k| \\
+& |De x| & = & |x| \\
+& |De (f^[x])| & = & |f^[x]| \\
 
 \\
-\multicolumn{4}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
-\multicolumn{4}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
-and |e| is a BigCore expression}} \\
-  |Me i k| & = & |i==k| \\
-  |Me i x| & = & |i==x| \\
-  |Me i (f^[x])| & = & |i==f^[x]| \\
-  |Me i (x=t)| & = & |x = Me i t| \\
-  |Me i (x:=t)| & = & |x := Me i t| \\
-  |Me i ((y squiggt x):=t)| & = & |y := i; x := Me i t| \\
-  |Me i (:t)| & = & |(De t)^(i)| & \\
-  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
-  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
-  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\
-  |Me i (array(t_1, xdots, t_n))| & = &
-    \multicolumn{2}{l}{|def (x_1 xdots x_n)
-      (Me x_1 t_1; xdots; Me x_n t_n;  i == arr (x_1, xdots, x_n))|} \\
-  |Me i (if(e_1) then e_2 else e_3)| & = &
-    \multicolumn{2}{l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
-  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e2}| \\
+\multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
+\multicolumn{5}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
+and |e| is a BigCore expression}} \\[1mm]
+\rulename{mtype} &  |Me i (:t)| & = & |(De t)^(i)| & \\
+\rulename{mfun}  &  |Me i ((y squiggt x):=t)| & = & |y := i; x := Me i t| \\[1mm]
+
+\rulename{meq} &  |Me i (x=t)| & = & |x = Me i t| \\
+\rulename{mbind} &  |Me i (x:=t)| & = & |x := Me i t| \\
+\rulename{msemi} &  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
+\rulename{mchoice} &  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
+\rulename{mif} &  |Me i (if(e_1) then e_2 else e_3)| & = &
+    \multicolumn{2}{@@{}l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
+\rulename{mcheck} &  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\[1mm]
+
+\rulename{mconst} &  |Me i k| & = & |i==k| \\
+\rulename{mvar} &  |Me i x| & = & |i==x| \\
+\rulename{mapply} &  |Me i (f^[x])| & = & |i==f^[x]| \\
+\rulename{marray} &  |Me i (array(t_1, xdots, t_n))| & = &
+\multicolumn{2}{@@{}l}{
+  \begin{array}[t]{@@{}l}
+    |def (x_1 xdots x_n) (Me x_1 t_1; xdots; Me x_n t_n;|\\
+    |i == arr (x_1, xdots, x_n))|
+   \end{array}} \\
+\rulename{mfor} &  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e2}| \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
@@ -532,11 +572,12 @@ $$
 any    = (x => x)
 int    = (x => applyx isInt x; x)
 nat    = (x => applyx isInt x; x > (-1); x)
+abs    = (x => applyx isInt x; if x < 0 then (-x) else x)
 false  = array()
 arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \end{code}
 
-\caption{Core prelude} \label{fig:core-prelude}
+\caption{Core Verse prelude} \label{fig:core-prelude}
 \end{figure}
 
 \begin{figure}
