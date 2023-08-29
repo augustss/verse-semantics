@@ -31,6 +31,7 @@
 %format fails = "\textbf{fails}"
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
+%format closed = "\textbf{closed}"
 
 
 %% ----------------------
@@ -86,8 +87,8 @@
 %format tlam (x) (e1) (e2) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}"
 %format tlamt (x) (e1) (e2) (e3) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}\{" e3 "\}"
 %format tlamKW = "\textbf{tlam}"
-%format oftype (e) (t) = oftypeKW "(" e ")\{" t "\}"
-%format oftypeKW = "\textbf{ofType}"
+%format oftype (e) (t) = e "\vartriangleright" t
+%format oftypeKW = "\vartriangleright"
 %format at = "\, @\!\!"
 %format dot = "\! ."
 %format alpha = "\alpha"
@@ -139,9 +140,10 @@
 %format hastype (x) (y) = x "\," hastypeKW "\," y
 %format hastypeKW = "{\bf hastype}"
 
-%format srcand = "\&\&"
-%format srcor = "||"
+%format srcand = "\textbf{and}"
+%format srcor = "\textbf{or}"
 %format hat = "\hat{\hspace{0.8em}}"
+%format amp = "\!\!\textbf{\&}\!\!"
 
 %format hchoice = "\|"
 %format he = "he"
@@ -153,9 +155,12 @@
 %format if = "\textbf{if}"
 %format collect = "\textbf{collect}"
 %format orElse = "\textbf{orElse}"
+%format append = "\textbf{append}"
+%format app = "\textbf{app}"
 
 %% Arrays and tuples
 %format array (x) = "\textbf{array}\{" x "\}"
+%format ar (x) = "\textbf{ar}\{" x "\}"
 %% %format arrKW = "\textbf{arr}"
 %% %format arr (x) = arrKW "\{" x "\}"
 %format arr (x) = "\langle" x "\rangle"
@@ -193,6 +198,7 @@
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
 %format def (x) (y) = "\exists" x ".\," y
+%format forallKW = "\forall{}"
 %format forall (x) (y) = "\forall" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
 %format llet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\," b
@@ -230,11 +236,13 @@
 %format wrong = "\textbf{wrong}"
 %format int = "\textbf{int}"
 %format nat = "\textbf{nat}"
+%format abs = "\textbf{abs}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"
-%format function (x)(rhs) = functionKW "(" x ")\{" rhs "\}"
-%format functionKW = "\textbf{function}"
+%format function (x) (rhs) = functionKW "\;" x "\;\{" rhs "\}"
+%format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
+%format functionKW = "\textbf{fun}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
@@ -283,7 +291,7 @@
 %% %format squiggt = "\!\leadsto\!"
 %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format (eff x) = "\!\!<\!\!" x "\!\!>"
+%format (eff x) = "\!\!<\!\!" x "\!\!>\!\!"
 %format apeff g x = g "\!\!<\!\!" x "\!\!>\!\!"
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
@@ -419,6 +427,7 @@
 %format p_0
 %format p_1
 %format p_2
+%format p_i
 %format p_n
 
 %format t_0
@@ -427,6 +436,8 @@
 %format t_3
 %format t_k
 %format t_n
+%format t_km1 = "t_{k-1}"
+%format t_kp1 = "t_{k+1}"
 
 %format r_0
 %format r_1

@@ -568,8 +568,9 @@ scope sc = expr
     expr (Do e) = exprD e
     expr (Let e1 e2) = do
       (e1', sc') <- defs sc e1
+      let Exists is e1'' = e1'
       e2' <- scope sc' e2
-      pure $ seqE [e1', e2']
+      pure $ Exists is $ seqE [e1'', e2']
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
     expr (DefineV i) = pure $ Variable i
     expr (DefineE i e) = Unify (Variable i) <$> expr e

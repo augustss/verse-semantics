@@ -24,7 +24,7 @@
 \usepackage{textgreek}
 
 
-\renewcommand{\arraystretch}{1.1}
+% \renewcommand{\arraystretch}{1.1}
 \newcommand{\vb}{\; |vbar| \;}
 \newcommand{\textquote}{'}
 
@@ -125,54 +125,6 @@ Our plan is
 % ----------------------------------------------------------------
 \section{Source Verse}
 
-\Cref{fig:source-verse-expr} gives the syntax of Source Verse.
-
-\Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version into simpler
-Source Verse, ready for \Cref{fig:desugar-expr1}.
-
-
-\begin{figure}
-$$
-\begin{array}{rcll}
-  |t| & ::= & |x|               & \text{Variable} \\
-      & \vb & |k|               & \text{Constant} \\
-      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
-      & \vb & |t_1^[t_2]|       & \text{Function application} \\
-      & \vb & |t_1^(t_2)|       & \text{Non-failing function application} \\
-      & \vb & |def x t|         & \text{Existential} \\
-      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
-      & \vb & |t_1 = t_2|       & \text{Unification} \\
-      & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
-      & \vb & |for(t) do b|     & \text{Finite loop} \\
-      & \vb & |check fx t|     & \text{Effects check} \\
-      & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |t_1, dots, t_n|  & \text{Array}, n \geq 2 \\
-      & \vb & |()|              & \text{Empty array} \\
-      & \vb & |t_1 eqgt t_2|    & \text{Lambda expression} \\
-      & \vb & |p := t|          & \text{General definition} \\
-      & \vb & |p : t|           & \text{Type ascription} \\
-      & \vb & |op_b t|          & \text{Prefix operator} \\
-      & \vb & |t op_a|          & \text{Postfix operator} \\
-      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
-      & \vb & |: t|             & \text{Range} \\
-      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
-      & \vb & |function (a_1 dots a_n) t|    & \text{Function} \\
-      & \vb & |if(t) then b|    & \text{Conditional expression} \\
-      & \vb & |if(t) else b|    & \text{Conditional expression} \\
-      & \vb & |if{t}|           & \text{Conditional expression} \\
-      & \vb & |for{t}|          & \text{Finite loop} \\
-      & \vb & |let(t) in b|     & \text{Local binding} \\
-      & \vb & |block b|         & \text{Scope delimiter} \\
-      & \vb & |case(t) of {t_1; dots t_n}|    & \text{Case expression} \\
-      & \vb & |case{t_1; dots t_n}| & \text{Case expression} \\
-      & \vb & |type^{t}|         & \text{Type definition} \\
-      & \vb & |option^{}|        & \text{Create an option} \\
-      & \vb & |option^{t}|       & \text{Create an option} \\
-\end{array}
-$$
-\caption{Source Verse expressions} \label{fig:source-verse-expr}
-\end{figure}
-
 \begin{figure}
 $$
 \begin{array}{rcll}
@@ -187,31 +139,21 @@ $$
       & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
       & \vb & |x = t|           & \text{Unification} \\
       & \vb & |x := t|          & \text{Definition} \\
+      & \vb & |x squiggt y := t| & \text{Definition} \\
+      & \vb & |:t|               & \text{Range} \\
       & \vb & |t_1 `choice` t_2| & \text{Choice} \\
       & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
       & \vb & |for(t) do b|     & \text{Finite loop} \\
       & \vb & |check fx t|      & \text{Effects check} \\
-      & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |function a t|    & \text{Function} \\
-      & \vb & |oftype a t|      & \text{Type annotation}
-\\
+      & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
+      & \vb & |functionP t_1 t_2|    & \text{Function} \\
+      & \vb & |oftype t_1 t_2|  & \text{Type annotation}
+\\[2mm]
 \multicolumn{4}{l}{\text{\bf Blocks}} \\
-  |b| & ::= & |t| \vb |{t_1; dots ; t_n}|  \\
-\\
-\multicolumn{4}{l}{\text{\bf Function arguments}} \\
-  |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx| \\
-\\
-\multicolumn{4}{l}{\text{{\bf Patterns: left hand side of a definition |(p := t)| or |(p:t)|}. Subset of |t|.}} \\
-     |p| & ::= & x \vb |p a| %% \vb |p^hat|  \vb |p^?|
-     \vb  |p_1 squiggt p_2| \\
-     & \vb & |: t| \vb |p : t|  \vb |p_1, dots, p_n| \\
-  \\
-
-\multicolumn{4}{l}{\text{\bf Operators}} \\
- |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty|  & \text{Prefix}\\
- |op_a| & ::= &  ? \vb |hat| \vb ..  & \text{Postfix}\\
- |op_i| & ::= &  + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb .. & \text{Infix} \\
-        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
+ |b| & ::= & |t| \vb |{t_1; xdots ; t_n}|
+\\[2mm]
+\multicolumn{4}{l}{\text{\bf Arguments}} \\
+ |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
 \end{array}
 $$
 \\
@@ -219,39 +161,115 @@ Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator
 \caption{Small Source Verse} \label{fig:small-source-verse}
 \end{figure}
 
+
+\begin{figure}
+$$
+\begin{array}{lrcll}
+\textbf{Terms} & |t| & ::= & |x|               & \text{Variable} \\
+&      & \vb & |k|               & \text{Constant} \\
+&      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
+&      & \vb & |t_1^[t_2]|       & \text{Function application} \\
+&      & \vb & |t_1^(t_2)|       & \text{Non-failing function application} \\
+&      & \vb & |def x t|         & \text{Existential} \\
+&      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
+&      & \vb & |t_1 = t_2|       & \text{Unification} \\
+&      & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
+&      & \vb & |for(t) do b|     & \text{Finite loop} \\
+&      & \vb & |check fx t|     & \text{Effects check} \\
+&      & \vb & |array (t_1; xdots; t_n)| & \text{Array}, n \geq 0 \\
+&      & \vb & |t_1, xdots, t_n|  & \text{Array}, n \geq 2 \\
+&      & \vb & |()|              & \text{Empty array} \\
+&      & \vb & |t_1 eqgt t_2|    & \text{Lambda expression} \\
+&      & \vb & |p := t|          & \text{General definition} \\
+&      & \vb & |p : t|           & \text{Type ascription} \\
+&      & \vb & |op_b t|          & \text{Prefix operator} \\
+&      & \vb & |t op_a|          & \text{Postfix operator} \\
+&      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
+&      & \vb & |: t|             & \text{Range} \\
+&      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
+&      & \vb & |function (a_1 xdots a_n) t|    & \text{Function} \\
+&      & \vb & |if(t) then b|    & \text{Conditional expression} \\
+&      & \vb & |if(t) else b|    & \text{Conditional expression} \\
+&      & \vb & |if{t}|           & \text{Conditional expression} \\
+&      & \vb & |for{t}|          & \text{Finite loop} \\
+&      & \vb & |let(t) in b|     & \text{Local binding} \\
+&      & \vb & |block b|         & \text{Scope delimiter} \\
+&      & \vb & |case(t) of {t_1; xdots t_n}|    & \text{Case expression} \\
+&      & \vb & |case{t_1; xdots t_n}| & \text{Case expression} \\
+&      & \vb & |type^{t}|         & \text{Type definition} \\
+&      & \vb & |option^{}|        & \text{Create an option} \\
+&      & \vb & |option^{t}|       & \text{Create an option}
+\\[2mm]
+\text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |p_1 squiggt p_2| \\
+&     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
+& |xsl| & ::= & x \vb  |xsl amp x|
+\\[2mm]
+\text{\bf Operators} &
+ |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \vb ..  & \text{Prefix}\\
+& |op_a| & ::= &  ? \vb |hat| & \text{Postfix}\\
+& |op_i| & ::= &  + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb .. & \text{Infix} \\
+&        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
+\end{array}
+$$
+\caption{Source Verse expressions} \label{fig:source-verse-expr}
+\end{figure}
+
 \begin{figure}
 $$
 \begin{array}{@@{}l}
+\begin{array}{lrcll}
+\multicolumn{4}{l}{\textbf{Rewriting patterns: |p := t| and |p:t|}} \\
+\rulename{pwild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
+\rulename{pwild2} &  |(: t_1) := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
+\rulename{pcolon1} &  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
+\rulename{papp} &   |p a := t| & \rightarrow & |p := function a t| \\
+  %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
+\rulename{pfun} &  |(p_1 squiggt p_2) := t| & \rightarrow &
+  \begin{array}[t]{@@{}l}
+    |p_1 := (x_1:any); p_2 := (x_2:any);| \\
+    |(x_1 squiggt x_2) := t|
+  \end{array}  & \text{if |p_1| or |p_2| not a variable} \\
+\rulename{parr} &  |array (p_1; xdots; p_n) := t| & \rightarrow &
+      \begin{array}[t]{@@{}l}
+        |array(x_1:any;xdots;x_n:any) == t;|\\
+        |p_1 := x_1; xdots; p_n := x_n |
+      \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
+\rulename{pcolon2} &  |p : t| & \rightarrow & |p := (: t)| \\
+\rulename{pamp1} & |xsl amp x := t| & \rightarrow & |array(xsl amp x := t)| & \text{outside of an array}\\
+\rulename{pamp2} & |array(xdots; xsl amp x := t; xdots)| & \rightarrow & |array(xdots; xsl := t; x := t; xdots)| & \text{inside of an array}\\
+\end{array} \\
+\\
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Application and unification}} \\
   |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
-  |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1| not variable, fresh |x|}\\
+  |t_1 == x| & \rightarrow & |x == t_1|  & \text{|t_1| not variable}\\
+  |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1|,|t_2| not variable, fresh |x|}\\
   |t_1^[t_2]| & \rightarrow & |f := t_1; x := t_2; f^[x]| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
   |t_1^(t_2)| & \rightarrow & |f := t_1; x := t_2; succeeds^{f^[x]}| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
 \end{array} \\
 \\
 \begin{array}{rcll}
-\multicolumn{4}{l}{\textbf{Bindings |p := t|}} \\
-  |p : t| & \rightarrow & |p := (: t)| \\
-  |p^(a) := t| & \rightarrow & |p := function a t| \\
-  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
-  %%  |(: t_1) := t_2| & \rightarrow & |t_1^(t_2) | \\
-  %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
-  |(p_1 squiggt p_2) := t| & \rightarrow & |p_1 := (x_1:any); p_2 := (x_2:any); (x_1 squiggt x_2) := t| & \text{if |p_1| or |p_2| not a variable} \\
-  |array (p_1 xdots p_n) := t| & \rightarrow & |array(x_1:any,xdots,x_n:any)=t; p_1 := x_1; xdots; p_n := x_n | \\[2mm]
+\multicolumn{4}{l}{\textbf{Array splice}} \\
+  \multicolumn{3}{l}{\quad|array (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
+  & \rightarrow & \multicolumn{2}{l}{|^append[array(t_1; xdots; t_km1), append^[t_k, array(t_kp1; xdots; t_n)]]|}\\
+  & \multicolumn{3}{l}{\text{where |append| is a reversible function appending two arrays}} \\
+\end{array} \\
 \\
+\begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Array notation}} \\
   |()| & \rightarrow & |array ()| \\
-  |t_1, dots, t_n| & \rightarrow & |array (t_1, dots, t_n)| \\
+  |t_1, xdots, t_n| & \rightarrow & |array (t_1; xdots; t_n)| \\
+\end{array} \\
 \\
+\begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Function notation}} \\
-  |type^{t}| & \rightarrow & |function (x:=t) x| & \text{fresh |x|}\\
-  |e_1 eqgt e_2| & \rightarrow & |function e_1 e_2| \\
+  |type^{t}| & \rightarrow & |functionP (x:=t) x| & \text{fresh |x|}\\
+  |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
-  |function () b| & \rightarrow & |functionKW (()) b| & \\
+  |function (()) b| & \rightarrow & |functionP () b| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
-\multicolumn{4}{l}{\textbf{Conditionals and for-loops}} \\
+\multicolumn{4}{l}{\textbf{Conditional and for-loop notation}} \\
   |if{e}| & \rightarrow & |if(e) else false| \\
   |if(e_1) then e_2| & \rightarrow & |if(e_1) then e_2 else false| \\
   |if(e_1) else e_2| & \rightarrow & |if (x := e_1) then x else e_2| & \text{|x| fresh} \\
@@ -279,8 +297,8 @@ $$
   \multicolumn{1}{l}{\textbf{Let, block, case}} \\
   |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
   |block b| & \rightarrow & |b| & \textit{see note}  \\
-  |case{e_1; dots e_n}| & \rightarrow & |(x:any) => case(x){e_1; dots e_n}| & \text{|x| fresh} \\
-  |case(e){e_1; dots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor dots srcor e_n^[x]| & \text{|x| fresh} \\
+  |case{e_1; xdots e_n}| & \rightarrow & |(x:any) => case(x){e_1; xdots e_n}| & \text{|x| fresh} \\
+  |case(e){e_1; xdots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor xdots srcor e_n^[x]| & \text{|x| fresh} \\
   \multicolumn{4}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
   \\
   \multicolumn{1}{l}{\textbf{Misc}} \\
@@ -294,16 +312,131 @@ A more robust desugaring could \textalpha-convert such clashes.
 \caption{Source Verse to Source Verse rewriting (2)} \label{fig:sv-to-sv-2}
 \end{figure}
 
+\Cref{fig:source-verse-expr} gives the syntax of Source Verse.
+\Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version
+into Small Source Verse, whose syntax is given in \Cref{fig:small-source-verse}.
+Small Source Verse is a subset of Source Verse, which is why we us the same non-terminals for terms |t|, arguments |a|, and blocks |b| in both.
+
+\subsection{Small Source Verse}
+
+\Cref{fig:small-source-verse} gives the syntax of Small Source Verse.  Things to note:
+\begin{itemize}
+\item Applications |f^[x]| are in ANF: the function and argument are both variables. \simon{Why?}
+\item A definition |x := t| brings the variable |x| into scope at the beginning of the innermost enclosing block.
+(Blocks are part of the syntax in \Cref{fig:small-source-verse}.)
+\item \simon{What is the difference between |function( () ) t| and |function((())) t|, using the |(t)| and |()| productions for |a|?}
+\item \simon{Do we really need |x squiggt y := t| in Small Source Verse?}
+\item \simon{I added |:t| to Small Source Verse}
+\item \simon{can we restrict |functionKW| in Small Source Verse to simply |function t_1 t_2|?  We have dealt with
+  the empty case and with |eff fx|.}
+\end{itemize}
+
+\subsection{Source Verse: preliminaries}
+
+\Cref{fig:source-verse-expr} gives the syntax of Source Verse.
+\Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version
+into Small Source Verse.  These rewrite rules should be repeatedly applied until none
+are applicable; at that point the program will be in the Small Source Verse subset.
+
+Much of this source-to-source rewriting simply removes simple syntactic sugar or
+notational abbreviations.
+For example:
+\begin{itemize}
+\item |()| is short for |array ()|
+\item The lambda notation |t_1 eqgt t_2| is short for |functionP t_1 t_2|.
+\item A multi-argument lambda |function (a_1 dots a_n) b| is short for the explicitly-curried \\
+      |function a_1 (function a_2 (dots {function a_n b}))|.
+\end{itemize}
+\noindent
+One other note: real Source Verse uses the keyword \textbf{function}, but in this document we use |functionKW| to make our examples smaller.
+
+\subsection{Rewriting Source Verse patterns}
+
+Source Verse has bindings |p := t|, where |p| is a \emph{pattern}.
+These patterns are completely removed by the source-to-source rewrites in \Cref{fig:sv-to-sv-1},
+yielding Small Source Verse bindings of the form |x := t|, or |x squiggt y := t| where |x|,|y| are variables.
+
+Source Verse also has the term |p:t|, which immediately rewrites to |p := (:t)|.
+
+\subsection{Array splicing}
+In an array expression, i.e., in the elements of |array| or comma separated elements,
+a special syntactic form |..x| is allowed.  It indicates an \emph{array slice}, and it has its own desugaring rules,
+\cref{fig:sv-to-sv-1}.
+
+Here are a few examples to illustrate how it can be used.
+The |append| function takes two array arguments and returns the appended arrays.
+The |append| function is reversible so it can be used with uninstantiated logical variables as inputs.
+The |append| function as been abbreviated to |app| and |array()| to |ar()|.
+
+{\small
+$$
+\begin{array}{rclcl}
+  \text{Source Verse}  & & \text{Small Source Verse} & & \text{Evaluates to} \\
+  \hline
+  |(1,..(2,3))|  & \longrightarrow & |app^[ar(1),ar(2;3)]| & \rightarrow & |ar(1;2;3)| \\
+  |(..(1,2),3)|  & \longrightarrow & |app^[ar(1;2),ar(3)]| & \rightarrow & |ar(1;2;3)| \\
+  |(x,..y)==(1,2,3)| & \longrightarrow & |app^[ar(x),y]==ar(1;2;3)| & \rightarrow &|x=1; y=ar(2;3)|\\
+  |(1,..y)==(1,2,3)| & \longrightarrow & |app^[ar(1),y]==ar(1;2;3)| & \rightarrow &|y=ar(2;3)|\\
+  |(5,..y)==(1,2,3)| & \longrightarrow & |app^[ar(5),y]==ar(1;2;3)| & \rightarrow &|fail|\\
+  |(..x,..y)==ar(1)| & \longrightarrow & |app^[x,y]==ar(1)| & \rightarrow &|(x=ar();y=ar(1)) `choice` (x=ar(1); y=ar())|\\
+\end{array}
+$$
+}
+
+\subsection{Example rewriting}
+$$
+\begin{array}{lrcl}
+  & \text{Source Verse}  & & \text{Small Source Verse} \\
+  \hline
+(E1) &  |x:int|  & \longrightarrow & |x := (:int)| \\
+(E2) &  |x:abs := -3|  & \longrightarrow & |x := oftype (-3) abs| \\
+(E3) &  |f^(x:int) := t| & \longrightarrow & |f := functionP(x := (:int)) (t)| \\
+(E4) &  |f^(x:int):int := t| & \longrightarrow & |f := functionP(x := (:int)) (oftype t int)| \\
+\end{array}
+$$
+Notice that
+\begin{itemize}
+\item The term |(:t)| in Small Source Verse, pronounced ``range |t|'' or ``colon |t|'',
+  denotes the (possibly-infinite)
+  set of all values in the range of the function\footnote{Remember, in Verse types are simply functions.} |t|.
+  So in example (E1), (|x:int|) brings |x| into scope and
+  constrains its value to be among those in the range of the function |int|; that is, to be an integer.
+\item In Small Source Verse, the term |oftype t_1 t_2|, pronounced ``|t_1| has type |t_2|''
+  means roughly\footnote{More precisely, this is its \emph{execution semantics}; its \emph{verification semantics}
+  is slightly different; see \Cref{sec:verification}} |t_2^[t_1]|;
+  that is, the result
+  of applying the type |t_2| to |t_1|. So in example (E2), |(x:abs := -3)| rewrites to |(x := oftype(-3)abs)|, which later desugars to |x := abs^[-3]|, thereby binding |x| to |3|.  Note that the value of the original right-hand
+  side (namely |-3|) is thereby ``fed through'' the type |abs| to give the value of |x|.
+\item An argument |a| is a \emph{term} not a \emph{pattern}.
+  In (E3), for example, the argument |(x:int)| rewrites (by \rulename{pcolon2}) to |(x := (:int))|.
+  In |functionP t_1 t_2| the argument (term) |t_1| is called the \emph{domain expression} of the function.
+\end{itemize}
 
 % ----------------------------------------------------------------
-\section{Big Core Verse}
+\section{Desugaring Small Source Verse into Big Core Verse}
 
-\Cref{fig:core-verse} gives the BigCore language into which we desugar.
-It's slightly larger than the core language of the ICFP 23 paper, but
+\Cref{fig:core-verse} gives the Big Core Verse language into which we desugar.
+while Cref{fig:desugar-expr1} desugars Small Source Verse into Big Core Verse.
+
+\subsection{Big Core Verse}
+
+Big Core Verse is slightly larger than the core language of the ICFP 23 paper, but
 can very easily be desugared into it.  Specifically:
 \begin{itemize}
-\item It includes |x := e|.  This means |x=e|, plus an existential for |x | added at the
+\item It includes |x := e|.  This means |x=e|, plus an existential for |x| added at the
   top of the enclosing scope.
+\item In |if (e_1) then e_2 else e_3| each of the |e_i| has its own scope, but existentials
+  at the top of |e_1| also scope over |e_2|.  So |if (x:=f^[0]) { y:=x+1; y*y } else 0| gets turned into
+  |if (def x (x==f^[0])) then (def y (y==x+1; y*y)) else 0|.
+\item In |for (e_1) {e_2}| both expressions have their own scope, but with top existential in |e_1| scoping over |e_2|.
+\end{itemize}
+
+
+\subsection{Desugaring from source to core}
+
+In desugaring from Source Verse into Core Verse, there are two big features to watch:
+\begin{itemize}
+\item We desugar certain constructs in two different ways, one for \emph{execution} and one for \emph{verification}.
 \end{itemize}
 
 \begin{figure}
@@ -322,8 +455,8 @@ $$
       & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
       & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
       & \vb & |for(e){b}|                 & \text{Finite loop} \\
-      & \vb & |tlam x e_1 e_2|             & \text{Tim lambda, without type} \\
-      & \vb & |tlamt x e_1 e_2 e_3|        & \text{Tim lambda, with type} \\
+      & \vb & |tlam x e_1 e_2|             & \text{Tim lambda} \\
+      & \vb & |oftype e t|                & \text{Type ascription}
     \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
 |fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
@@ -332,55 +465,58 @@ $$
 \caption{BigCore Verse expressions} \label{fig:core-verse}
 \end{figure}
 
-% ----------------------------------------------------------------
-\section{Desugaring Source Verse}
-
-\Cref{fig:desugar-expr1} desugars Small Source Verse into Core Verse.
-
-
 \begin{figure}
 $$
 \begin{array}{@@{}l}
-\begin{array}{r@@{\;}c@@{\;}ll}
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring expressions}} \\
-  |De e| & = & |def x (Me x e)| \quad \quad |x| \not\in |e|\\
-\multicolumn{4}{l}{\quad Optional (derived) rules} \\
-|De k| & = & |k| \\
-|De x| & = & |x| \\
-|De (f^[x])| & = & |f^[x]| \\
+&  |De e| & = & |def i (Me i e)| \quad \quad |i| \not\in |e|\\
+\multicolumn{5}{l}{\quad \text{Optional (derived) rules}} \\
+& |De k| & = & |k| \\
+& |De x| & = & |x| \\
+& |De (f^[x])| & = & |f^[x]| \\
+& |De (e_1 == e_2)| & = & |De e_1 == De e_2| \\
+& |De (x := e)| & = & |x := De e| \\
+& |De (t_1 ; t_2)| & = & |De t_1 ; De t_2| \\
+& |De (array(e_1; xdots; e_n))| & = & |array(De e_1 ; xdots; De e_n)| \\
+& \text{and so on ...} \\
 
 \\
-\multicolumn{4}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
-\multicolumn{4}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
-and |e| is a BigCore expression}} \\
-  |Me i k| & = & |i==k| \\
-  |Me i x| & = & |i==x| \\
-  |Me i (f^[x])| & = & |i==f^[x]| \\
-  |Me i (x=t)| & = & |x = Me i t| \\
-  |Me i (x:=t)| & = & |x := Me i t| \\
-  |Me i ((y squiggt x):=t)| & = & |y := i; x := Me i t| \\
-  |Me i (:t)| & = & |(De t)^(i)| & \\
-  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
-  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
-  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\
-  |Me i (array(t_1, xdots, t_n))| & = &
-    \multicolumn{2}{l}{|def (x_1 xdots x_n)
-      (Me x_1 t_1; xdots; Me x_n t_n;  i == arr (x_1, xdots, x_n))|} \\
-  |Me i (if(e_1) then e_2 else e_3)| & = &
-    \multicolumn{2}{l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
-  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e2}| \\
+\multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
+\multicolumn{5}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
+and |e| is a BigCore expression}} \\[1mm]
+\rulename{mtype} &  |Me i (:t)| & = & |(De t)^(i)| & \\
+\rulename{mfun}  &  |Me i ((y squiggt x):=t)| & = & |y := i; x := Me i t| \\[1mm]
+
+\rulename{meq} &  |Me i (x=t)| & = & |x = Me i t| \\
+\rulename{mbind} &  |Me i (x:=t)| & = & |x := Me i t| \\
+\rulename{msemi} &  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
+\rulename{mchoice} &  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
+\rulename{mif} &  |Me i (if(e_1) then e_2 else e_3)| & = &
+    \multicolumn{2}{@@{}l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
+\rulename{mcheck} &  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\[1mm]
+
+\rulename{mconst} &  |Me i k| & = & |i==k| \\
+\rulename{mvar} &  |Me i x| & = & |i==x| \\
+\rulename{mapply} &  |Me i (f^[x])| & = & |i==f^[x]| \\
+\rulename{marray} &  |Me i (array(t_1, xdots, t_n))| & = &
+\multicolumn{2}{@@{}l}{
+  \begin{array}[t]{@@{}l}
+    |def (x_1 xdots x_n) (Me x_1 t_1; xdots; Me x_n t_n;|\\
+    |i == arr (x_1, xdots, x_n))|
+   \end{array}} \\
+\rulename{mfor} &  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e_2}| \\
+\rulename{mtype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\text{\bf Function translations}} \\    
 %%  |Me i (function t_1 t_2)| & = & |i == (lam x (Me x t_1; De t_2))|) \\
 %%  |Me i (function t_1 t_2)| & = & |lam x (z := Me x t_1; y := i^[z]; Me y t_2)| \\
-|Me i (function t_1 (oftype t_2 t_3))| & = & |tlamt x (z := Me x t_1) (y := i^[z]; Me y t_2) (De t_3)| \\
-|Me i (function t_1 t_2)| & = & |tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)| \\
+|Me i (functionP t_1 t_2)| & = & |tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)| \\
 & \multicolumn{3}{l}{\text{Note: This does not work for actual function definitions.}} \\
-& \multicolumn{3}{l}{\text{Perhaps these work?}} \\
-|Me i (function t_1 (oftype t_2 t_3)| & = & |i == tlamt x (Me x t_1) (De t_2) (De t_3)| \\
-|Me i (function t_1 t_2)| & = & |i == tlam x (Me x t_1) (De t_2)| \\
+& \multicolumn{3}{l}{\text{Perhaps this works?}} \\
+|Me i (functionP t_1 t_2)| & = & |i == tlam x (Me x t_1) (De t_2)| \\
 \end{array}
 \end{array}
 $$
@@ -477,11 +613,12 @@ $$
 any    = (x => x)
 int    = (x => applyx isInt x; x)
 nat    = (x => applyx isInt x; x > (-1); x)
+abs    = (x => applyx isInt x; if x < 0 then (-x) else x)
 false  = array()
 arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \end{code}
 
-\caption{Core prelude} \label{fig:core-prelude}
+\caption{Core Verse prelude} \label{fig:core-prelude}
 \end{figure}
 
 \begin{figure}
@@ -503,18 +640,18 @@ $$
 \multicolumn{4}{l}{\textbf{Desugaring for execution}} \\
 |oftype e t| & = & |succeeds^{t^[e]}| \\
 |tlam x e_1 e_2| & = & |lam x (e_1; e_2)| \\
-|tlamt x e_1 e_2 t| & = & |lam x (e_1; succeeds^{t^[e_2]})| \\
-|if(e_1) then e_2 else e_3| & = & ... \\
-|for(e_1){e_2}| & = & ... \\
+|if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+|for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring for verification}} \\
-|oftype e t| & = & |def x t^[x]| & \text{fresh |x|} \\
+\multicolumn{4}{l}{\textbf{NOTE(Lennart): I added |forallKW|}} \\
+|oftype e t| & = & |verify (assert (t^[e])); assume (forall x t^[x])| & \text{fresh |x|} \\
+|tlam x e_1 (oftype e_2 t)| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (forall y (t^[y])))| & \text{fresh |y|} \\
 |tlam x e_1 e_2| & = & |verify (lam x (assume e_1; assert e_2)); lam x (e_1; assume e_2)| \\
-|tlamt x e_1 e_2 t| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (def y (t^[y])))| & \text{fresh |y|} \\
-|if(e_1) then e_2 else e_3| & = & ... \\
-|for(e_1){e_2}| & = & ... \\
+|if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+|for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 \end{array}
 
 \end{array}
@@ -523,262 +660,5 @@ $$
 \end{figure}
 
 % --------------------------------------
-\clearpage
-\section{Tim's Core language}
-
-Tim's verifier works like this.
-\begin{itemize}
-\item \textbf{Desugaring} (\Cref{sec:tim-core-syntax}) transforms Source Verse into TimCore.
-\item \textbf{Ingestion} (\Cref{sec:ingestion}) successively rewrites the TimCore term, keeping its
-  structure but:
-  \begin{itemize}
-  \item Augmenting the inferences |G| that are attached to each scope node.
-  \item Performing beta reductions
-  \end{itemize}
-  Only when ingestion has reached a fixpoint do we move on to the next step.
-\item \textbf{Inference saturation} (\Cref{sec:inf-sat}) does dominator analysis on each
-  inference set |G| separately, and successively rewrites the |G| to reflect the result of this analysis.
-
-\item \textbf{Effect analysis} (\Cref{sec:effect-anal}) checks each sub-term |check fx e| to ensure
-  that the effects of |e| are indeed covered by |fx|.
-\end{itemize}
-
-Questions:
-\begin{itemize}
-\item Could inference saturation give rise to new ingestion opportunities?  We think no.
-\end{itemize}
-
-\subsection{Syntax} \label{sec:tim-core-syntax}
-
-\begin{figure}
-$$
-\begin{array}{rcll}
-\multicolumn{4}{l}{\text{\bf Vertices}} \\
-|vt|  & ::= & |x| \vb |tup (x_1, xdots, x_n)| \\
-|vv|  & ::= & |vt| \vb |k| \vb |f^[x]| \\
-|v|   & ::= & |vv| \vb |lam x e| \\
-\\
-\multicolumn{4}{l}{\text{\bf Scopes}} \\
-|s| & ::= & |scope (x_1, xdots, x_n) G e| \\
-\\
-\multicolumn{4}{l}{\text{\bf Expressions}} \\
-|e| & ::= & |x = vv| \\
-    & \vb & |x = timlam h fx i x s_0 j y s_1| \\
-%    & \vb & |y=length^[x]| \\
-    & \vb & |x = fail| \\
-    & \vb & |s_1 `choice` s_2| \\
-    & \vb & |e_1 ; e_2| \\
-    & \vb & |check fx e|           & \text{Effects check} \\
-\multicolumn{4}{l}{\text{Omitting for now: cast, error, in, iterate, next}} \\
-\\
-\multicolumn{4}{l}{\text{\bf Inferences}} \\
-|G| & ::= & |emp| \vb |G, g| \\
-|g| & ::= & |edge vt w|  & \text{Data flow from |w| to |v|} \\
-    & \vb & |equals S x fail|   & \text{|v| is unified with failure}\\
-    & \vb & |equals S x w| & \\
-%   & \vb & |lengthis S y z| &  \\
-   & \vb & |dominates S vt w| & \text{|w| dominates |v|} \\
-\\
-\multicolumn{4}{l}{\text{\bf Strengths}} \\
-|S,T| & ::= &  |succeeds| \vb |decides| \vb |resolves| \\
-\\
-\multicolumn{4}{l}{\text{\bf Effects}} \\
-|fx| & ::= & S \vb |iterates| \vb |fails| \vb |contradicts| \vb |abstracts|
-\end{array}
-$$
-\caption{Tim Core Verse} \label{fig:tim-core-verse}
-\end{figure}
-
-Things to note:
-\begin{itemize}
-\item A \emph{scope} |scope xs G e| binds some existentials |xs|, has a collection of inferences |G| (initially empty), and wraps an expression |e|.
-\item |v| stands for ``vertex'' rather than ``value''.  (The form |f^[x]| isn't really a value.)
-\item In a vertex we have an ordinary (POPL) lambda |lam x e|.  Only in an expression do we have a TimLambda.
-\item In a TimLambda |timlam h fx i x s_0 j y s_1|:
-  \begin{itemize}
-  \item |h| is a (bound) occurrence of a variable, presumably already in scope.
-  \item |s_0| is called the \emph{domain scope} and |s_1| is the \emph{range scope}.
-  \item |i| and |x| are binders, and scope over |s_0| and |s_1|.
-  \item |j| and |y| are binders, and scope over |s_1|.
-  \end{itemize}
-\end{itemize}
-
-Questions:
-\begin{itemize}
-\item In the edge |(edge v w)| isn't the LHS, |v|, always a (flexible) variable?
-\item Why |x=fail|?
-\item Does |dominates S v w| have a strength? Why?
-\end{itemize}
-
-\subsection{Ingestion} \label{sec:ingestion}
-
-\begin{figure}
-$$
-\begin{array}{l}
-\begin{array}{rcl}
-X & ::= & |hole| \vb |X ; e| \vb |e ; X|
-\end{array}\\
-\\
-\multicolumn{1}{c}{\large \fbox{
-$|scope xs G_1 e_1| \quad \rightarrow \quad |scope xs G_2 e_2|$
-}} \\
-\\
-\begin{array}{lrcll}
-\rulename{res} & |scope xs G (X^[x=vv])| & \rightarrow & |scope xs (G,equals resolves x vv) (X^[x=vv])| \\
-\end{array}
-\end{array}
-$$
-\caption{Ingestion rules} \label{fig:tim-ingestion}
-\end{figure}
-
-\Cref{fig:tim-ingestion} gives the ``ingestion'' rules.  Generally they simply augment the inferences |G|
-in (any of) the scope-expression |s| in the program.  Points to note:
-\begin{itemize}
-\item The context |X| looks inside a nested tree of ``|;|'' compositions; but it does not look inside
-  nested scopes or choices.  So only the innermost |G| is affected.
-\end{itemize}
-\noindent
-Questions:
-\begin{itemize}
-\item To avoid lots of duplication, I used vertices |v| in \rulename{lflex}. But that does not
-  account for the POPL-lambda vs Tim-lambda difference between expresions |e| and inferences |g|.
-  Maybe \rulename{lflex} would be better written as a G-to-G rewrite
-  $$ |xs; equals resolves x v| \; \rightarrow \; |xs; equals resolves x v, edge x v| \quad \text{if $|x| \in |xs|$}$$
-\item Beta reduction may not reach a fixpoint.  Ditto iteration?
-\item Can \rulename{res} be generalised  |x=v|?
- \end{itemize}
-
-\subsection{Inference saturation} \label{sec:inf-sat}
-
-\newcommand{\satarrow}{\rightarrow^{+}}
-
-\begin{figure}
-$$
-\begin{array}{l}
-\multicolumn{1}{c}{\large \fbox{
-$|xs; G_1| \satarrow |G_2|$
-}} \\
-\multicolumn{1}{c}{\text{Extend |G_1| with new (implied) inferences |G_2|}}
-\\ \\
-\begin{array}{lrcll}
-\rulename{trans} & |xs; G, equals resolves v_1 v_2, equals resolves v_2 v_3| & \satarrow & |equals resolves v_1 v_3| \\
-\rulename{lflex} & |xs; G, equals resolves x vv| & \satarrow & |edge x vv| 
-     & \text{if $x \in |xs|$} \\
-\rulename{rflex} & |xs; G, equals resolves x y| & \satarrow & |edge y x| 
-     & \text{if $|y| \in |xs|$} \\
-\end{array}
-\end{array}
-$$
-\caption{Inference saturation} \label{fig:infernce-saturation}
-\end{figure}
-
-\subsection{Effect analysis} \label{sec:effect-anal}
-
-\begin{figure}
-$$
-\begin{array}{l}
-\multicolumn{1}{c}{\large \fbox{
-$|effects G e| = |fx|$
-}} \\
-\\
-\begin{array}{rcll}
-  |effects G_1 (scope xs G_2 e)| & = & |effects ((G_1,G_2)) e| \\
-  |effects G (e_1 ; e_2)| & = & |andeffects (effects G e_1) (effects G e_2)| \\
-  |effects G (x=v)| & = & S & \text{if $|equals S x v| \in |G|$} \\
-  |effects G (x=k)| & = & |fails| & \text{if $|equals resolves x k'| \in |G|$ and $k \not= k'$}
-\end{array} \\
-\\
-\multicolumn{1}{c}{\large \fbox{
-$|andeffects fx_1 fx_2| = |fx|$
-}} \\
-\\
-\begin{array}{lrcl}
-\multicolumn{4}{c}{\text{All equations also apply with arguments swapped, and apply top-to-bottom}} \\
-(E1) & |andeffects contradicts fx| & = & |contradicts| \\
-(E2) & |andeffects fails fx|       & = & |fails| \\
-(E3) & |andeffects succeeds fx|     & = & |fx| \\
-(E4) & |andeffects abstracts fx|  & = & |abstracts| \\
-(E5) & |andeffects iterates fx|   & = & |iterates| \\
-(E6) & |andeffects resolves iterates| & = & |abstracts| \\
-(E7) & |andeffects resolves fx|  & = & |resolves| \\
-(E8) & |andeffects decides fx|   & = &  |decides|
-\end{array}
-\end{array}
-$$
-\caption{Effect analysis} \label{fig:effect-analysis}
-\end{figure}
-Quesions:
-\begin{itemize}
-\item E5 wins over E6?
-\item Where does |contradicts| come from?
-\end{itemize}
-
-
-\begin{figure}
-% https://q.uiver.app/?q=WzAsMTUsWzQsMCwiXFxtYXRoc2Z7QWJzdHJhY3RzfSJdLFszLDEsIlxcbWF0aHNme0V2YWx1YXRlc30iXSxbMiwyLCJcXG1hdGhzZntSZXNvbHZlc30iXSxbNCw0LCJcXG1hdGhzZntJdGVyYXRlc30iXSxbNCw3LCJcXG1hdGhzZntGYWlsc30iXSxbMiw3LCJcXG1hdGhzZntTdWNjZWVkc30iXSxbMyw4LCJcXG1hdGhzZntEaXZlcmdlc30iXSxbMCwzXSxbNywzXSxbMCw2XSxbNyw2XSxbMiw1LCJcXG1hdGhzZntEZWNpZGVzfSJdLFs2LDIsIlxcbWF0aGJme1VuZGVjaWRhYmxlfSJdLFs2LDQsIlxcbWF0aGJme0RlY2lkYWJsZX0iXSxbNiw3LCJcXG1hdGhiZntEZWNpZGVkfSJdLFswLDEsIiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSwyLCIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzAsMywiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDYsIiIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNCw2LCIiLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzcsOCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbOSwxMCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMywxMSwiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFsyLDExLCIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzExLDUsIiIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMTEsNCwiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
-\[\begin{tikzcd}
-	&&&& {\mathsf{Abstracts}} \\
-	&&& {\mathsf{Evaluates}} \\
-	&& {\mathsf{Resolves}} &&&& {\mathbf{Undecidable}} \\
-	{} &&&&&&& {} \\
-	&&&& {\mathsf{Iterates}} && {\mathbf{Decidable}} \\
-	&& {\mathsf{Decides}} \\
-	{} &&&&&&& {} \\
-	&& {\mathsf{Succeeds}} && {\mathsf{Fails}} && {\mathbf{Decided}} \\
-	&&& {\mathsf{Diverges}}
-	\arrow[no head, from=1-5, to=2-4]
-	\arrow[no head, from=2-4, to=3-3]
-	\arrow[no head, from=1-5, to=5-5]
-	\arrow[no head, from=8-3, to=9-4]
-	\arrow[no head, from=8-5, to=9-4]
-	\arrow[dashed, no head, from=4-1, to=4-8]
-	\arrow[dashed, no head, from=7-1, to=7-8]
-	\arrow[no head, from=5-5, to=6-3]
-	\arrow[no head, from=3-3, to=6-3]
-	\arrow[no head, from=6-3, to=8-3]
-	\arrow[no head, from=6-3, to=8-5]
-\end{tikzcd}\]
-\end{figure}
-
-\begin{figure}
-\begin{verbatim}
-                          abstracts
-                           /    |
-                     evaluates  |
-                         /      |     UNDECIDABLE
-                  resolves      |
-              ========|=========|================
-                      |    iterates
-                      |   /     |       DECIDABLE
-                     decides    |
-                      |     \   |
-              ========|======\==|================
-                  succeeds   fails        DECIDED
-                      \        /
-                       diverges
-\end{verbatim}
-\caption{Multiplicity effects} \label{fig:mult-effects}
-\end{figure}
 
 \end{document}
-
-    Expressions e      ::== x=n
-                       |    x=y
-                       |    y=f[x]
-                       |    x=<y,..> -- an n-tuple
-
-                       |    x=length[y] -- says y is a tuple of length x
-                       |    x=fail
-
-                       |    e0; e1
-                       |    f=lambda(fx,h) c i x. e0; range d j y. e1
-                       |    e0 | e1
-                       |    exists xs. e0
-                       |    cast(err,x) {h0=>e0; ...; otherwise=>e1}
-                       |    scope c. e0
-                       |    error(err). e0
-                       |    in(abs,i,x) d j y. e0 [value e z. e1 [upon. e2]]
-                       |    iterate(x) c. e0 {succeeds d y. e1} {fails d y. e2}
-                       |    next(c,y)
-                       |    S(c,i,x,s)
-                       |    err

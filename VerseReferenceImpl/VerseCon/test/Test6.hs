@@ -169,15 +169,29 @@ test16 = runSupplyT $ runVerseT do
   unify x =<< newVar . Int =<< pure 1 <|> pure 2 <|> pure 3
   traverse freezeVar =<< readIVar y
 
+test16' = runSupplyT $ runVerseT do
+  x <- freshVar
+  y <- all do
+    unify x =<< newVar (Int 1)
+    unify x =<< newVar (Int 2)
+  readIVar y
+
+test16'' = runSupplyT $ runVerseT do
+  x <- freshVar
+  unify x =<< newVar (Int 1)
+  y <- all $ unify x =<< newVar (Int 1)
+  z <- all $ unify x =<< newVar (Int 2)
+  readIVar y
+
 freshValVar :: (MonadRef m, MonadSupply Int m) => VerseT m (Var m Val)
 freshValVar = freshVar
 
 test17 = runSupplyT $ runVerseT do
   x <- freshValVar
   y <- freshVar
-  z <- all $ unify x y
+  z <- all $ unify x y *> pure x
   unify x y
-  readIVar z
+  traverse freezeVar =<< readIVar z
 
 test18 = runSupplyT $ runVerseT do
   x0 <- freshValVar

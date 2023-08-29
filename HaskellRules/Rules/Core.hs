@@ -419,7 +419,7 @@ instance Rec Expr where
     , tfNormSteps   :: !Int      -- Maximum normalization steps
     , tfTrace       :: !Bool     -- trace evaluation
     , bndVars       :: ![BndVar] -- temporary during reduction
-    }
+    } deriving (Show)
   rec r s ae =
     r s ae ++
     case ae of
