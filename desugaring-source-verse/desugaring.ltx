@@ -347,6 +347,7 @@ One other note: real Source Verse uses the keyword \textbf{function}, but in thi
 \simon{Consider |f(x:int) := (y:int; ..)|.  Presumably the scope of |y| is the RHS, \emph{not} the entire enclosing block.
   So is the RHS of |p := t| actually a block |p := b|?  Maybe not because a block can have curly braces and I don't think we can ssay |x:int := { t_1; t_2 }|, say.}
 \simon{What about |x := y:int; ... |.  Now what is the scope of `y`? Just the RHS, or the whole enclosing block?}
+\lennart{I'm not sure using |b| for blocks is fruitful.  I think we need a set of rewrite rules (we used to have inference rules for this) that descibes it in detail.  There are subtle things like the veriables bound in the condition of an |if| scoping over the |then| expression.}
 
 \subsection{Rewriting Source Verse patterns}
 
@@ -465,7 +466,7 @@ can very easily be desugared into it.  Specifically:
 
 In desugaring from Source Verse into Core Verse, there are two big features to watch:
 \begin{description}
-\item[Functions.] We desugar Verse's lambdas |function t_1 t_2|, which (very unusually) have a domain \emph{expression} |t_1| rather
+\item[Functions.] We desugar Verse's lambdas |functionP t_1 t_2|, which (very unusually) have a domain \emph{expression} |t_1| rather
   than a (conventional) domain \emph{variable}.
 \item[Verification.] We desugar certain constructs in two different ways, one for \emph{execution} and one for \emph{verification}.
 \end{description}
@@ -478,7 +479,9 @@ We concentrate first on desugaring functions for execution.
 
 Consider the Source Verse lambda |functionP 3 t|. This is a function that takes an
 argument |i|\footnote{The name ``|i|'' connotes ``input''}, checks that it is
-equal to 3 (failing if not), and returns |t|.  So this Big Core term does the job: |lam i (i=3; t)|.
+equal to 3 (failing
+(\lennart{A closed function (application) fails at runtime.  An open function (application) fails at verification time,})
+if not), and returns |t|.  So this Big Core term does the job: |lam i (i=3; t)|.
 
 Now consider |x:=3; functionP x t|.  Here the |x| in |(functionP x t)| is an \emph{occurrence} of the |x|
 bound by |x:=3|; it is \emph{not} a binding of |x|.  So this term desugars to
@@ -495,8 +498,9 @@ $$
 |functionP t_1 t_2|  \quad\quad \text{desugars to} \quad\quad |lam i (i=t_1; t_2)|
 $$
 That is the right idea, but we need more.  In particular, how \emph{can} we bind parameters?
-Consider the Source Verse lambda |function ((x:abs)) t|. It
-desugars to the Big Core term |lam i (x := abs^[i]; t)|.
+Consider the Source Verse lambda |function ((x:abs)) t|.
+\lennart{Perhaps start with something less weird than |abs|.}
+It desugars to the Big Core term |lam i (x := abs^[i]; t)|.
 That is, the function takes an input argument |i|, applies the type |abs| to it
 (which might fail), binds |x| to the result of |abs^[i]|, and evaluates |t| with that value of |x|.
 
@@ -523,10 +527,14 @@ $$
 $$
 Here you can see \rulename{mtype} in action.
 
+\subsubsection{Desugaring functions for verification}
+\lennart{Stuff here.}
+
 \subsection{Loose ends}
 
 \begin{itemize}
 \item \simon{Rule \rulename{meq} is assymetrical, which looks wrong.}
+  \lennart{Hmmm, yes, maybe it's wrong.  |(:succ) == (:pred)| probably should have |Me| on both sides.}
 \item \simon{Is \rulename{mtype} right?}
 \end{itemize}
 \begin{figure}
