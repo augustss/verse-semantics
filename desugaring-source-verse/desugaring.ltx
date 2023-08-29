@@ -24,7 +24,7 @@
 \usepackage{textgreek}
 
 
-\renewcommand{\arraystretch}{1.1}
+% \renewcommand{\arraystretch}{1.1}
 \newcommand{\vb}{\; |vbar| \;}
 \newcommand{\textquote}{'}
 
@@ -146,7 +146,7 @@ $$
       & \vb & |for(t) do b|     & \text{Finite loop} \\
       & \vb & |check fx t|      & \text{Effects check} \\
       & \vb & |array (t_1, dots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |function a t|    & \text{Function} \\
+      & \vb & |function ((t_1)) t_2|    & \text{Function} \\
       & \vb & |oftype t_1 t_2|  & \text{Type annotation}
 \\[2mm]
 \multicolumn{4}{l}{\text{\bf Blocks}} \\
@@ -264,7 +264,7 @@ $$
   |type^{t}| & \rightarrow & |function (x:=t) x| & \text{fresh |x|}\\
   |t_1 eqgt t_2| & \rightarrow & |function t_1 t_2| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
-  |function () b| & \rightarrow & |functionKW (()) b| & \\
+  |function (()) b| & \rightarrow & |functionKW (()) b| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
 \multicolumn{4}{l}{\textbf{Conditional and for-loop notation}} \\
@@ -325,6 +325,8 @@ Small Source Verse is a subset of Source Verse, which is why we us the same non-
 \item \simon{What is the difference between |function( () ) t| and |function((())) t|, using the |(t)| and |()| productions for |a|?}
 \item \simon{Do we really need |x squiggt y := t| in Small Source Verse?}
 \item \simon{I added |:t| to Small Source Verse}
+\item \simon{can we restrict |functionKW| in Small Source Verse to simply |function t_1 t_2|?  We have dealt with
+  the empty case and with |eff fx|.}
 \end{itemize}
 
 \subsection{Source Verse: preliminaries}
@@ -400,6 +402,10 @@ can very easily be desugared into it.  Specifically:
 
 \subsection{Desugaring from source to core}
 
+In desugaring from Source Verse into Core Verse, there are two big features to watch:
+\begin{itemize}
+\item We desugar certain constructs in two differnet ways, one for \emph{execution} and one for \emph{verification}
+\end{itemize}
 
 \begin{figure}
 $$
