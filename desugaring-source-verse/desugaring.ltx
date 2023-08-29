@@ -403,13 +403,13 @@ Notice that
   constrains its value to be among those in the range of the function |int|; that is, to be an integer.
 \item In Small Source Verse, the term |oftype t_1 t_2|, pronounced ``|t_1| has type |t_2|''
   means roughly\footnote{More precisely, this is its \emph{execution semantics}; its \emph{verification semantics}
-  is slightly different; see \Cref{sec:verification}} |t_2^[t_2]|;
+  is slightly different; see \Cref{sec:verification}} |t_2^[t_1]|;
   that is, the result
   of applying the type |t_2| to |t_1|. So in example (E2), |(x:abs := -3)| rewrites to |(x := oftype(-3)abs)|, which later desugars to |x := abs^[-3]|, thereby binding |x| to |3|.  Note that the value of the original right-hand
   side (namely |-3|) is thereby ``fed through'' the type |abs| to give the value of |x|.
 \item An argument |a| is a \emph{term} not a \emph{pattern}.
   In (E3), for example, the argument |(x:int)| rewrites (by \rulename{pcolon2}) to |(x := (:int))|.
-  In |function a t| the argument (term) |a| is called the \emph{domain expression} of the function.
+  In |functionP t_1 t_2| the argument (term) |t_1| is called the \emph{domain expression} of the function.
 \end{itemize}
 
 % ----------------------------------------------------------------
@@ -423,15 +423,20 @@ while Cref{fig:desugar-expr1} desugars Small Source Verse into Big Core Verse.
 Big Core Verse is slightly larger than the core language of the ICFP 23 paper, but
 can very easily be desugared into it.  Specifically:
 \begin{itemize}
-\item It includes |x := e|.  This means |x=e|, plus an existential for |x | added at the
+\item It includes |x := e|.  This means |x=e|, plus an existential for |x| added at the
   top of the enclosing scope.
+\item In |if (e_1) then e_2 else e_3| each of the |e_i| has its own scope, but existentials
+  at the top of |e_1| also scope over |e_2|.  So |if (x:=f^[0]) { y:=x+1; y*y } else 0| gets turned into
+  |if (def x (x==f^[0])) then (def y (y==x+1; y*y)) else 0|.
+\item In |for (e_1) {e_2}| both expressions have their own scope, but with top existential in |e_1| scoping over |e_2|.
 \end{itemize}
+
 
 \subsection{Desugaring from source to core}
 
 In desugaring from Source Verse into Core Verse, there are two big features to watch:
 \begin{itemize}
-\item We desugar certain constructs in two differnet ways, one for \emph{execution} and one for \emph{verification}
+\item We desugar certain constructs in two different ways, one for \emph{execution} and one for \emph{verification}.
 \end{itemize}
 
 \begin{figure}
@@ -635,8 +640,8 @@ $$
 \multicolumn{4}{l}{\textbf{Desugaring for execution}} \\
 |oftype e t| & = & |succeeds^{t^[e]}| \\
 |tlam x e_1 e_2| & = & |lam x (e_1; e_2)| \\
-|if(e_1) then e_2 else e_3| & = & ... \\
-|for(e_1){e_2}| & = & ... \\
+|if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+|for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
@@ -645,8 +650,8 @@ $$
 |oftype e t| & = & |verify (assert (t^[e])); assume (forall x t^[x])| & \text{fresh |x|} \\
 |tlam x e_1 (oftype e_2 t)| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (forall y (t^[y])))| & \text{fresh |y|} \\
 |tlam x e_1 e_2| & = & |verify (lam x (assume e_1; assert e_2)); lam x (e_1; assume e_2)| \\
-|if(e_1) then e_2 else e_3| & = & ... \\
-|for(e_1){e_2}| & = & ... \\
+|if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+|for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 \end{array}
 
 \end{array}
