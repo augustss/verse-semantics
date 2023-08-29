@@ -146,7 +146,7 @@ $$
       & \vb & |for(t) do b|     & \text{Finite loop} \\
       & \vb & |check fx t|      & \text{Effects check} \\
       & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |function ((t_1)) t_2|    & \text{Function} \\
+      & \vb & |functionP t_1 t_2|    & \text{Function} \\
       & \vb & |oftype t_1 t_2|  & \text{Type annotation}
 \\[2mm]
 \multicolumn{4}{l}{\text{\bf Blocks}} \\
@@ -263,10 +263,10 @@ $$
 \\
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Function notation}} \\
-  |type^{t}| & \rightarrow & |function ((x:=t)) x| & \text{fresh |x|}\\
+  |type^{t}| & \rightarrow & |functionP (x:=t) x| & \text{fresh |x|}\\
   |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
-  |function (()) b| & \rightarrow & |functionKW (()) b| & \\
+  |function (()) b| & \rightarrow & |functionP () b| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
 \multicolumn{4}{l}{\textbf{Conditional and for-loop notation}} \\
@@ -343,7 +343,7 @@ notational abbreviations.
 For example:
 \begin{itemize}
 \item |()| is short for |array ()|
-\item The lambda notation |t_1 eqgt t_2| is short for |function t_1 t_2|.
+\item The lambda notation |t_1 eqgt t_2| is short for |functionP t_1 t_2|.
 \item A multi-argument lambda |function (a_1 dots a_n) b| is short for the explicitly-curried \\
       |function a_1 (function a_2 (dots {function a_n b}))|.
 \end{itemize}
@@ -390,8 +390,8 @@ $$
   \hline
 (E1) &  |x:int|  & \longrightarrow & |x := (:int)| \\
 (E2) &  |x:abs := -3|  & \longrightarrow & |x := oftype (-3) abs| \\
-(E3) &  |f^(x:int) := t| & \longrightarrow & |f := function( (x := (:int)) )(t)| \\
-(E4) &  |f^(x:int):int := t| & \longrightarrow & |f := function( (x := (:int)) )(oftype t int)| \\
+(E3) &  |f^(x:int) := t| & \longrightarrow & |f := functionP(x := (:int)) (t)| \\
+(E4) &  |f^(x:int):int := t| & \longrightarrow & |f := functionP(x := (:int)) (oftype t int)| \\
 \end{array}
 $$
 Notice that
@@ -503,10 +503,10 @@ and |e| is a BigCore expression}} \\[1mm]
 \multicolumn{4}{l}{\text{\bf Function translations}} \\    
 %%  |Me i (function t_1 t_2)| & = & |i == (lam x (Me x t_1; De t_2))|) \\
 %%  |Me i (function t_1 t_2)| & = & |lam x (z := Me x t_1; y := i^[z]; Me y t_2)| \\
-|Me i (function t_1 t_2)| & = & |tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)| \\
+|Me i (functionP t_1 t_2)| & = & |tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)| \\
 & \multicolumn{3}{l}{\text{Note: This does not work for actual function definitions.}} \\
 & \multicolumn{3}{l}{\text{Perhaps these work?}} \\
-|Me i (function t_1 t_2)| & = & |i == tlam x (Me x t_1) (De t_2)| \\
+|Me i (functionP t_1 t_2)| & = & |i == tlam x (Me x t_1) (De t_2)| \\
 \end{array}
 \end{array}
 $$
