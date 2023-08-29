@@ -450,8 +450,7 @@ $$
       & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
       & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
       & \vb & |for(e){b}|                 & \text{Finite loop} \\
-      & \vb & |tlam x e_1 e_2|             & \text{Tim lambda, without type} \\
-      & \vb & |tlamt x e_1 e_2 e_3|        & \text{Tim lambda, with type} \\
+      & \vb & |tlam x e_1 e_2|             & \text{Tim lambda} \\
       & \vb & |oftype e t|                & \text{Type ascription}
     \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
@@ -504,11 +503,9 @@ and |e| is a BigCore expression}} \\[1mm]
 \multicolumn{4}{l}{\text{\bf Function translations}} \\    
 %%  |Me i (function t_1 t_2)| & = & |i == (lam x (Me x t_1; De t_2))|) \\
 %%  |Me i (function t_1 t_2)| & = & |lam x (z := Me x t_1; y := i^[z]; Me y t_2)| \\
-|Me i (function t_1 (oftype t_2 t_3))| & = & |tlamt x (z := Me x t_1) (y := i^[z]; Me y t_2) (De t_3)| \\
 |Me i (function t_1 t_2)| & = & |tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)| \\
 & \multicolumn{3}{l}{\text{Note: This does not work for actual function definitions.}} \\
 & \multicolumn{3}{l}{\text{Perhaps these work?}} \\
-|Me i (function t_1 (oftype t_2 t_3)| & = & |i == tlamt x (Me x t_1) (De t_2) (De t_3)| \\
 |Me i (function t_1 t_2)| & = & |i == tlam x (Me x t_1) (De t_2)| \\
 \end{array}
 \end{array}
@@ -633,16 +630,16 @@ $$
 \multicolumn{4}{l}{\textbf{Desugaring for execution}} \\
 |oftype e t| & = & |succeeds^{t^[e]}| \\
 |tlam x e_1 e_2| & = & |lam x (e_1; e_2)| \\
-|tlamt x e_1 e_2 t| & = & |lam x (e_1; succeeds^{t^[e_2]})| \\
 |if(e_1) then e_2 else e_3| & = & ... \\
 |for(e_1){e_2}| & = & ... \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring for verification}} \\
-|oftype e t| & = & |verify (assert (t^[e])); def x t^[x]| & \text{XXX this is wrong!!!} \\
+\multicolumn{4}{l}{\textbf{NOTE(Lennart): I added |forallKW|}} \\
+|oftype e t| & = & |verify (assert (t^[e])); assume (forall x t^[x])| & \text{fresh |x|} \\
+|tlam x e_1 (oftype e_2 t)| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (forall y (t^[y])))| & \text{fresh |y|} \\
 |tlam x e_1 e_2| & = & |verify (lam x (assume e_1; assert e_2)); lam x (e_1; assume e_2)| \\
-|tlamt x e_1 e_2 t| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (def y (t^[y])))| & \text{fresh |y|} \\
 |if(e_1) then e_2 else e_3| & = & ... \\
 |for(e_1){e_2}| & = & ... \\
 \end{array}
