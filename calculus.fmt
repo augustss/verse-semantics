@@ -198,6 +198,7 @@
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
 %format def (x) (y) = "\exists" x ".\," y
+%format forallKW = "\forall{}"
 %format forall (x) (y) = "\forall" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
 %format llet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\," b
