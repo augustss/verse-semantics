@@ -498,7 +498,7 @@ instClass'
 instClass' loc i env sup xs e archetype s = do
   (sup, xs_sup, s) <- instSup loc sup archetype s
   xs <- traverse freshNamed xs
-  let xs' = xs <> xs_sup
+  let xs' = xs_sup <> xs
   s <- execEvalT' (eval' e) R { env = xs' <> env, archetype } s
   newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs', s)
 
