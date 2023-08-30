@@ -142,15 +142,12 @@ $$
       & \vb & |x squiggt y := t| & \text{Definition} \\
       & \vb & |:t|               & \text{Range} \\
       & \vb & |t_1 `choice` t_2| & \text{Choice} \\
-      & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
-      & \vb & |for(t) do b|     & \text{Finite loop} \\
+      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+      & \vb & |for(t_1) do t_2|     & \text{Finite loop} \\
       & \vb & |check fx t|      & \text{Effects check} \\
       & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |functionP t b|    & \text{Function} \\
+      & \vb & |functionP t_1 t_2|    & \text{Function} \\
       & \vb & |oftype t_1 t_2|  & \text{Type annotation}
-\\[2mm]
-\multicolumn{4}{l}{\text{\bf Blocks}} \\
- |b| & ::= & |t| \vb |{t_1; xdots ; t_n}|
 \end{array}
 $$
 \\
@@ -170,8 +167,8 @@ $$
 &      & \vb & |def x t|         & \text{Existential} \\
 &      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
 &      & \vb & |t_1 = t_2|       & \text{Unification} \\
-&      & \vb & |if(t) then b_1 else b_2| & \text{Conditional expression} \\
-&      & \vb & |for(t) do b|     & \text{Finite loop} \\
+&      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+&      & \vb & |for(t_1) do t_2|     & \text{Finite loop} \\
 &      & \vb & |check fx t|     & \text{Effects check} \\
 &      & \vb & |array (t_1; xdots; t_n)| & \text{Array}, n \geq 0 \\
 &      & \vb & |t_1, xdots, t_n|  & \text{Array}, n \geq 2 \\
@@ -184,13 +181,13 @@ $$
 &      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
 &      & \vb & |: t|             & \text{Range} \\
 &      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
-&      & \vb & |function (a_1 xdots a_n) b|    & \text{Function}\;(n\geq 1) \\
-&      & \vb & |if(t) then b|    & \text{Conditional expression} \\
-&      & \vb & |if(t) else b|    & \text{Conditional expression} \\
+&      & \vb & |function (a_1 xdots a_n) t|    & \text{Function}\;(n\geq 1) \\
+&      & \vb & |if(t) then t|    & \text{Conditional expression} \\
+&      & \vb & |if(t) else t|    & \text{Conditional expression} \\
 &      & \vb & |if{t}|           & \text{Conditional expression} \\
 &      & \vb & |for{t}|          & \text{Finite loop} \\
-&      & \vb & |let(t) in b|     & \text{Local binding} \\
-&      & \vb & |block b|         & \text{Scope delimiter} \\
+&      & \vb & |let(t) in t|     & \text{Local binding} \\
+&      & \vb & |block t|         & \text{Scope delimiter} \\
 &      & \vb & |case(t) of {t_1; xdots t_n}|    & \text{Case expression} \\
 &      & \vb & |case{t_1; xdots t_n}| & \text{Case expression} \\
 &      & \vb & |type^{t}|         & \text{Type definition} \\
@@ -256,8 +253,8 @@ $$
 \multicolumn{4}{l}{\textbf{Function notation}} \\
   |type^{t}| & \rightarrow & |functionP (x:=t) x| & \text{fresh |x|}\\
   |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
-  |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
-  |function (()) b| & \rightarrow & |function ((ar ())) b| & \\
+  |function (a_1 a_2 xdots a_n) t| & \rightarrow & |function a_1 (function (a_2 xdots a_n) t| \\
+  |function (()) t| & \rightarrow & |function ((ar ())) t| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
 \multicolumn{4}{l}{\textbf{Conditional and for-loop notation}} \\
@@ -312,9 +309,23 @@ Small Source Verse is a subset of Source Verse, which is why we us the same non-
 
 \Cref{fig:small-source-verse} gives the syntax of Small Source Verse.  Things to note:
 \begin{itemize}
-\item Applications |f^[x]| are in ANF: the function and argument are both variables. \simon{Why?}
-\item A definition |x := t| brings the variable |x| into scope at the beginning of the innermost enclosing block.
-(Blocks are part of the syntax in \Cref{fig:small-source-verse}.)
+\item \emph{Scoping.}
+  In Small Source Verse, a variable is brought into scope by |x := t|.  The scope of
+  the binding depends on the \emph{innermost} scope-limiting construct:
+  \begin{center}
+    \begin{tabular}{ll}
+      Innermost scope-limiting & Scope of |x| \\
+      construct in which |x:=t| appears \\
+      \hline
+      Arm of a choice |t_1 `choice` t_2| & The entire arm \\
+      Body of a |functionKW| & The entire body \\
+      Scrutinee of an |if| & The scrutinee and |then| branch \\
+      |then| or |else| branch of an |if| & That whole branch \\
+      First argument of |for| & Both arguments of the |for| \\
+      Second argument of |for| & That whole argument \\
+    \end{tabular}
+    \end{center}
+
 \item Anonymous lambdas take the form |function((t))b|, where, unusually for a programming language, the
   ``bound variable'' is an arbitrary term |t_1|.
 \end{itemize}
@@ -322,6 +333,9 @@ Small Source Verse is a subset of Source Verse, which is why we us the same non-
 \subsection{Source Verse: preliminaries}
 
 \Cref{fig:source-verse-expr} gives the syntax of Source Verse.
+Source Verse uses the same scoping rules as Small Source Verse (\Cref{sec:small-source-verse}),
+extended to account for the fact that \emph{patterns} bring variables into scope. \simon{Do we need to spell this out?}
+
 \Cref{fig:sv-to-sv-1} and \Cref{fig:sv-to-sv-2} rewrite Source Version
 into Small Source Verse.  These rewrite rules should be repeatedly applied until none
 are applicable; at that point the program will be in the Small Source Verse subset.
@@ -336,14 +350,6 @@ For example:
       |function a_1 (function a_2 (dots {function a_n b}))|.
 \end{itemize}
 \noindent
-One other note: real Source Verse uses the keyword \textbf{function},
-but in this document we use |functionKW| to make our examples smaller.
-Similarly we often abbreviate |array t| to |ar t|.
-
-\simon{Consider |f(x:int) := (y:int; ..)|.  Presumably the scope of |y| is the RHS, \emph{not} the entire enclosing block.
-  So is the RHS of |p := t| actually a block |p := b|?  Maybe not because a block can have curly braces and I don't think we can ssay |x:int := { t_1; t_2 }|, say.}
-\simon{What about |x := y:int; ... |.  Now what is the scope of `y`? Just the RHS, or the whole enclosing block?}
-\lennart{I'm not sure using |b| for blocks is fruitful.  I think we need a set of rewrite rules (we used to have inference rules for this) that descibes it in detail.  There are subtle things like the veriables bound in the condition of an |if| scoping over the |then| expression.}
 
 \subsection{Rewriting Source Verse patterns}
 
@@ -478,45 +484,62 @@ argument |i|\footnote{The name ``|i|'' connotes ``input''}, checks that it is
 equal to 3 (failing
 (\lennart{A closed function (application) fails at runtime.  An open function (application) fails at verification time,})
 if not), and returns |t|.  So this Big Core term does the job: |lam i (i=3; t)|.
-
-Now consider |x:=3; functionP x t|.  Here the |x| in |(functionP x t)| is an \emph{occurrence} of the |x|
-bound by |x:=3|; it is \emph{not} a binding of |x|.  So this term desugars to
+This desugaring works fine if the argument is an otherwise-unconstrained unification variable.
+For example, consider this code:
 $$
-|x:=3; (lam i (i=x; t))|
+|x:int; f := functionP 3 99; f^[x]; x|
+$$
+The call |f^[x]| will constrain |x| to be |3|, so the expression returns |3|.
+
+Now consider |x:=3; functionP x t|.  Here the |x| in |functionP x t| is an \emph{occurrence} of the |x|
+bound by |x:=3|; it is \emph{not} a binding of |x|.  So
+$$
+|x:=3; functionP x t|  \quad\quad \text{desugars to} \quad\quad |x:=3; (lam i (i=x; t))|
 $$
 which (since we can substitute for |x|) means the same as the previous term.
 
 Next, consider |functionP (3 `choice` 4) t|.  Just as before, this desugars to |lam i (i=(3 `choice` 4); t)|,
 a function returns |t| if called with |3| or |4|, and fails otherwise.
-
 So it is begining to look as if the general rule is:
 $$
-|functionP t_1 t_2|  \quad\quad \text{desugars to} \quad\quad |lam i (i=t_1; t_2)|
+|functionP t_1 t_2|  \quad\quad \text{desugars to (not right yet)} \quad\quad |lam i (i=t_1; t_2)|
 $$
 That is the right idea, but we need more.  In particular, how \emph{can} we bind parameters?
-Consider the Source Verse lambda |function ((x:abs)) t|.
-\lennart{Perhaps start with something less weird than |abs|.}
-It desugars to the Big Core term |lam i (x := abs^[i]; t)|.
+Consider |function(x:int) t|.  We might imagine that
+$$
+|functionP (x:int) t|  \quad\quad \text{desugars to} \quad\quad |lam i (x := i; int^[x]; t)|
+$$
+The idea is that the |int^[x]| checks that |x| is indeed an |int|.  But in Verse a ``type''
+is an arbitraray function, not necessarily an \emph{identity} function.
+Consider the Source Verse lambda |function ((x:abs)) t|.  Then it would be wrong to say
+$$
+|functionP (x:abs) t|  \quad\quad \text{desugars to (wrong)} \quad\quad |lam i (x := i; abs^[x]; t)|
+$$
+because we want to feed the input |i| \emph{through} |abs|, like this:
+$$
+|functionP (x:abs) t|  \quad\quad \text{desugars to} \quad\quad |lam i (x := abs^[i]; t)|
+$$
 That is, the function takes an input argument |i|, applies the type |abs| to it
 (which might fail), binds |x| to the result of |abs^[i]|, and evaluates |t| with that value of |x|.
 
-In Small Source Verse the lambda desugars to |function ((x := :abs)) t|.
-Given an input variable |i|, we want to desugar the domain expression |(x := :abs)| in such
+In Small Source Verse |(functionP (x:abs) t)| rewrites to |functionP (x := :abs) t|.
+So, given an input variable |i|, we want to desugar the domain expression |(x := :abs)| in such
 a way that we feed |i| through |abs| to give the value of |x|.
 In general, for a domain expression |t_1| we say that we want to \emph{match |t_1| against |i|};
 we write |Me i t_1|, and its rules are given in \Cref{fig:desugar-match}.  Now we can desugar a function
 as follows
 $$
-|functionP t_1 t_2|  \quad\quad \text{desugars to} \quad\quad |lam i (Me i t_1; t_2)|
+|functionP t_1 t_2|  \quad\quad \text \quad\quad |lam i (Me i t_1; t_2)|
 $$
-
+(Note: we say ``desugars to'' here, rather than citing a desugaring rule because it still
+is not the whole story.  But it is close, and gives an accurate intuition for |(Me i t)|.)
 This matching process is very like unification |(i = t_1)|, except for the single rule \rulename{mtype}.
 \emph{This one rule is the entire difference between ``matching'' and regular unification.}
 All the other rules exist only to make this one work. Let us see what happens for our example
 |functionP (x := :abs) t|:
 $$
 \begin{array}{lll}
-  |functionP (x := :abs) t| & \rightarrow & |lam i (Me i (x := :abs); t| \\
+  |functionP (x := :abs) t| & \rightarrow \text{``desugars to''} & |lam i (Me i (x := :abs); t| \\
   & \rightarrow \{\rulename{mbind}\} & |lam i (x := Me i (:abs)); t| \\
   & \rightarrow \{\rulename{mtype}\} & |lam i (x := abs^[i]; t)|
 \end{array}
@@ -539,7 +562,7 @@ This is useful for arrays.  Suppose |a| is an array.  Consider the Source Verse 
 |x:a| and |x := :a|.
 The two are equivalent; remember rule \rulename{pcolon2}.
 Both use |a| as a type, but arrays are functions, so that's fine. \simon{Its not an idempotent function though!
-  Here we are usefully using a non-idempotent fucntion as a type.}
+  Here we are usefully using a non-idempotent function as a type.}
 Then |(x := :a)| desugars (via \rulename{dexpr} and \rulename{mtype}) to |x := def i (a^[i])|.
 Then our execution semantics for arrays rewrites thus:
 $$
@@ -570,9 +593,17 @@ Clever!
 \subsection{Loose ends}
 
 \begin{itemize}
-\item \simon{Rule \rulename{meq} is assymetrical, which looks wrong.}
-  \lennart{Hmmm, yes, maybe it's wrong.  |(:succ) == (:pred)| probably should have |Me| on both sides.}
-\item \simon{Is \rulename{mtype} right?}
+\item Is \rulename{meq} right. E.g. |functionP ( x:= (:nat = :even) ) t| should
+  check that both |nat^[i]| and |even^[i]| succeed \emph{and} that they give the same result.
+\item \simon{Is \rulename{moftype} right?}
+\item Koen points out that \rulename{mfor} is awkwardly different to \rulename{mif}.
+\item |(Me i t)| is very syntatic. It treats |:t| and |id (:t)| differently for example.
+  Ditto$$
+  \begin{array}{l}
+    |f (:abs,:abs) := ...| \\
+    |f ( for(1 `choice` 2){:abs} ) := ...|
+    \end{array}
+  $$
 \end{itemize}
 \begin{figure}
 $$
@@ -623,12 +654,12 @@ and |e| is a BigCore expression}} \\[1mm]
 \rulename{mtype} &  |Me i (:t)| & = & |(De t)^[i]| & \\[2mm]
 \rulename{mfun}  &  |Me i ((y squiggt x):=t)| & = & |x := Me i t; y := i| \\
 \rulename{mbind} &  |Me i (x:=t)| & = & |x := Me i t| \\[2mm]
-\rulename{meq} &  |Me i (t_1=t_2)| & = & |De t_1 = Me i t_2| \\
+\rulename{meq} &  |Me i (t_1=t_2)| & = & |(Me i t_1) = (Me i t_2)| \\
 \rulename{msemi} &  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
 \rulename{mchoice} &  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
 \rulename{mif} &  |Me i (if(e_1) then e_2 else e_3)| & = &
     \multicolumn{2}{@@{}l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
-\rulename{mtype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
+\rulename{moftype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
 \rulename{mcheck} &  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\[2mm]
 
 \rulename{mconst} &  |Me i k| & = & |i==k| \\
@@ -638,7 +669,7 @@ and |e| is a BigCore expression}} \\[1mm]
 \multicolumn{2}{@@{}l}{
   \begin{array}[t]{@@{}l}
     |def (x_1 xdots x_n) (Me x_1 t_1; xdots; Me x_n t_n;|\\
-    |i == arr (x_1, xdots, x_n))|
+    |i == arr (x_1, xdots, x_n)|
    \end{array}} \\
 \rulename{mfor} &  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e_2}| \\
 \end{array} \\
