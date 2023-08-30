@@ -225,45 +225,39 @@ $$
 \rulename{papp} &   |p a := t| & \rightarrow & |p := function a t| \\
   %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
 \rulename{pfun} &  |(p_1 squiggt p_2) := t| & \rightarrow &
-  \begin{array}[t]{@@{}l}
+\begin{array}[t]{@@{}l@@{}}
     |p_1 := (x_1:any); p_2 := (x_2:any);| \\
     |(x_1 squiggt x_2) := t|
-  \end{array}  & \text{if |p_1| or |p_2| not a variable} \\
-\rulename{parr} &  |array (p_1; xdots; p_n) := t| & \rightarrow &
-      \begin{array}[t]{@@{}l}
-        |array(x_1:any;xdots;x_n:any) == t;|\\
+  \end{array}  & \text{|p_1| or |p_2| not a variable} \\
+\rulename{parr} &  |ar (p_1; xdots; p_n) := t| & \rightarrow &
+      \begin{array}[t]{@@{}l@@{}}
+        |ar(x_1:any;xdots;x_n:any) == t;|\\
         |p_1 := x_1; xdots; p_n := x_n |
       \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
 \rulename{pcolon2} &  |p : t| & \rightarrow & |p := (: t)| \\
-\rulename{pamp1} & |xsl amp x := t| & \rightarrow & |array(xsl amp x := t)| & \text{outside an array}\\
-\rulename{pamp2} & |array(xdots; xsl amp x := t; xdots)| & \rightarrow & |array(xdots; xsl := t; x := t; xdots)| & \text{inside an array}\\
+\rulename{pamp1} & |xsl amp x := t| & \rightarrow & |ar(xsl amp x := t)| & \text{outside an array}\\
+\rulename{pamp2} & |ar(xdots; xsl amp x := t; xdots)| & \rightarrow & |ar(xdots; xsl := t; x := t; xdots)| & \text{inside an array}\\
 \end{array} \\
 \\
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Application and unification}} \\
   |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
   |t_1^(t_2)| & \rightarrow & |succeeds^{t_1^[t_2]}| \\
-\end{array} \\
 \\
-\begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Array splice}} \\
-  \multicolumn{3}{l}{\quad|array (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
-  & \rightarrow & \multicolumn{2}{l}{|^append[array(t_1; xdots; t_km1), append^[t_k, array(t_kp1; xdots; t_n)]]|}\\
+  \multicolumn{3}{l}{\quad|ar (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
+  & \rightarrow & \multicolumn{2}{l}{|^append[ar(t_1; xdots; t_km1), append^[t_k, ar(t_kp1; xdots; t_n)]]|}\\
   & \multicolumn{3}{l}{\text{where |append| is a reversible function appending two arrays}} \\
-\end{array} \\
 \\
-\begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Array notation}} \\
-  |()| & \rightarrow & |array ()| \\
-  |t_1, xdots, t_n| & \rightarrow & |array (t_1; xdots; t_n)| \\
-\end{array} \\
+  |()| & \rightarrow & |ar ()| \\
+  |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
 \\
-\begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Function notation}} \\
   |type^{t}| & \rightarrow & |functionP (x:=t) x| & \text{fresh |x|}\\
   |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
-  |function (()) b| & \rightarrow & |function ((array ())) b| & \\
+  |function (()) b| & \rightarrow & |function ((ar ())) b| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
 \multicolumn{4}{l}{\textbf{Conditional and for-loop notation}} \\
@@ -342,7 +336,9 @@ For example:
       |function a_1 (function a_2 (dots {function a_n b}))|.
 \end{itemize}
 \noindent
-One other note: real Source Verse uses the keyword \textbf{function}, but in this document we use |functionKW| to make our examples smaller.
+One other note: real Source Verse uses the keyword \textbf{function},
+but in this document we use |functionKW| to make our examples smaller.
+Similarly we often abbreviate |array t| to |ar t|.
 
 \simon{Consider |f(x:int) := (y:int; ..)|.  Presumably the scope of |y| is the RHS, \emph{not} the entire enclosing block.
   So is the RHS of |p := t| actually a block |p := b|?  Maybe not because a block can have curly braces and I don't think we can ssay |x:int := { t_1; t_2 }|, say.}
@@ -530,6 +526,47 @@ Here you can see \rulename{mtype} in action.
 \subsubsection{Desugaring functions for verification}
 \lennart{Stuff here.}
 
+\subsection{The pattern |y squiggt x|}
+
+What does the strange pattern |y squiggt x| do?  As you can see from rule \rulename{mfun}, it
+allows you access to the \emph{input} of the match as well as the \emph{output}.  So in
+$$
+|f( (y squiggt x) : abs ) := dots|
+$$
+in a call |f(-4)|, |x| gets bound to |4|, but |y| gets bound to the original input, |(-4)|.
+
+This is useful for arrays.  Suppose |a| is an array.  Consider the Source Verse terms
+|x:a| and |x := :a|.
+The two are equivalent; remember rule \rulename{pcolon2}.
+Both use |a| as a type, but arrays are functions, so that's fine. \simon{Its not an idempotent function though!
+  Here we are usefully using a non-idempotent fucntion as a type.}
+Then |(x := :a)| desugars (via \rulename{dexpr} and \rulename{mtype}) to |x := def i (a^[i])|.
+Then our execution semantics for arrays rewrites thus:
+$$
+|a^[i]| \longrightarrow |(i=0; v_1) `choice` dots `choice` (i=n; v_n)|
+$$
+where the elements of |a| are |v_0, dots, v_n|.  So the net effect is that |x:a| binds |x| successively
+to the elements of |a|; it is an implicit for-loop.
+We can use |forKW| to build a new array; thus |for(x:a){x+1}| returns an array the same size as |a| but
+with each element increased by 1.
+
+Now consider |(i squiggt x):a|.  That binds |i| and |x| successively to the \emph{index/value} pairs of |a|.
+How does that happen?  Consider
+$$
+\begin{array}{ll}
+  |De ((i squiggt x) := :a)| \\
+  \rightarrow \{\rulename{dexpr}\} &
+    |def j (Me j ((i squiggt x) := :a))| \\
+  \rightarrow \{\rulename{mfun}\} &
+    |def j (x := (Me j (:a)); i := j| \\
+  \rightarrow \{\rulename{mtype}\} &
+    |def j (x := a^[j]; i := j| \\
+  \rightarrow \{\text{bind |x| and |i| and rewrite}\} &
+  |def (i x) (dots (x = a^[i]) dots)|
+\end{array}
+$$
+Clever!
+
 \subsection{Loose ends}
 
 \begin{itemize}
@@ -568,7 +605,7 @@ $$
 \begin{array}{@@{}l}
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring expressions}} \\
-&  |De e| & = & |def i (Me i e)| \quad \quad |i| \not\in |e|\\
+\rulename{dexpr} &  |De e| & = & |def i (Me i e)| \quad \quad |i| \not\in |e|\\
 \multicolumn{5}{l}{\quad \text{Optional (derived) rules}} \\
 & |De k| & = & |k| \\
 & |De x| & = & |x| \\
@@ -583,7 +620,7 @@ $$
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
 \multicolumn{5}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
 and |e| is a BigCore expression}} \\[1mm]
-\rulename{mtype} &  |Me i (:t)| & = & |(De t)^(i)| & \\[2mm]
+\rulename{mtype} &  |Me i (:t)| & = & |(De t)^[i]| & \\[2mm]
 \rulename{mfun}  &  |Me i ((y squiggt x):=t)| & = & |x := Me i t; y := i| \\
 \rulename{mbind} &  |Me i (x:=t)| & = & |x := Me i t| \\[2mm]
 \rulename{meq} &  |Me i (t_1=t_2)| & = & |De t_1 = Me i t_2| \\
