@@ -883,8 +883,16 @@ readNamed'
   -> Named (VarRef m) (VarVal m)
   -> VerseT m (VarVal m)
 readNamed' storeFree storeFree' = \ case
-  Ref x -> readIVar storeFree *> readVarRef x <* writeIVar storeFree' ()
-  Val x -> pure x
+  Ref ref -> do
+    readIVar storeFree
+    x <- readVarRef ref
+    writeIVar storeFree' ()
+    pure x
+  Val x -> do
+    fork do
+      readIVar storeFree
+      writeIVar storeFree' ()
+    pure x
 
 localName :: Ident -> Named (VarRef m) (VarVal m) -> EvalT m a -> EvalT m a
 localName k v = local $ \ r -> r { env = HashMap.insert k v r.env }
