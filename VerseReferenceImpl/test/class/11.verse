@@ -5,6 +5,6 @@ x := class:
 y := class(x):
   Y:int = 1
 
-Y := y{}
+Z := y{}
 
-Y.X, Y.Y
+Z.X, Z.Y

@@ -476,15 +476,15 @@ instClass
   -> S m
   -> VerseT m (Maybe (VarVal m))
 instClass loc i env sup xs e archetype s s' = do
-  (var, xs_all) <- instFreshClass loc i sup xs
-  s <- evalClass loc env sup xs e archetype xs_all s
+  (inst, _) <- instFreshClass loc i sup xs
+  s <- evalClass loc env sup xs e archetype inst s
   fork do
     readIVar s.choiceFree
     writeIVar s'.choiceFree ()
   fork do
     readIVar s.storeFree
     writeIVar s'.storeFree ()
-  pure $ Just var
+  pure $ Just inst
 
 instFreshClass
   :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m)
@@ -519,27 +519,29 @@ evalClass
   -> IdentMap Bool
   -> L (Exp L Ident)
   -> Archetype m
-  -> Env m
+  -> VarVal m
   -> S m
   -> VerseT m (S m)
-evalClass loc env sup xs e archetype xs_all s = do
-  s <- execEvalT' (eval' e) R { env = xs_all <> env, archetype } s
-  let archetype_sup = (xs_all /\ void xs) <> archetype
-  evalSup loc sup archetype_sup xs_all s
+evalClass loc env sup xs e archetype inst s = do
+  (_, inst_sup, inst_xs) <- readClassInst loc inst
+  let inst_xs' = toIdentMap inst_xs
+  s <- execEvalT' (eval' e) R { env = inst_xs' <> env, archetype } s
+  let archetype_sup = (inst_xs' /\ xs) <> archetype
+  evalSup loc sup archetype_sup inst_sup s
 
 evalSup
   :: MonadEval m
   => Loc
   -> Maybe (VarVal m)
   -> Archetype m
-  -> Env m
+  -> Maybe (VarVal m)
   -> S m
   -> VerseT m (S m)
-evalSup loc sup archetype xs_all s = case sup of
+evalSup loc sup archetype inst_sup s = case (,) <$> sup <*> inst_sup of
   Nothing -> pure s
-  Just sup -> do
+  Just (sup, inst_sup) -> do
     (_, env, sup, xs, e) <- readClass loc sup
-    evalClass loc env sup xs e archetype xs_all s
+    evalClass loc env sup xs e archetype inst_sup s
 
 readClass
   :: (MonadAbort Error m, MonadRef m)
@@ -550,6 +552,15 @@ readClass loc = readVar >=> \ case
   Val.Overloads head tail -> case head of
     Val.Class i env sup xs e -> pure (i, env, sup, xs, e)
     _ -> readClass loc tail
+  _ -> abort $ DomainError loc
+
+readClassInst
+  :: (MonadAbort Error m, MonadRef m)
+  => Loc
+  -> VarVal m
+  -> VerseT m (Label, Maybe (VarVal m), Val.Env Name (VarRef m) (VarVal m))
+readClassInst loc = readVar >=> \ case
+  Val.ClassInst i sup xs -> pure (i, sup, xs)
   _ -> abort $ DomainError loc
 
 findClassInst :: (MonadRef m, MonadSupply Int m)
@@ -876,12 +887,19 @@ newEnv = execWriterT $ do
       lift . newVar . Val.Overloads (Val.Intrinsic y) =<<
       lift freshVar
 
-filterNames :: HashMap Ident a -> HashMap Name a
+toIdentMap :: HashMap Name a -> IdentMap a
+toIdentMap =
+  HashMap.fromList .
+  HashMap.foldrWithKey
+  (\ k v z -> (Ident.Name k, v) : z)
+  []
+
+filterNames :: IdentMap a -> HashMap Name a
 filterNames =
   HashMap.fromList .
   HashMap.foldrWithKey
   \ case
-    Ident.Name x -> \ y z -> (x, y) : z
+    Ident.Name k -> \ v z -> (k, v) : z
     Ident.Label _ -> \ _ z -> z
   []
 
