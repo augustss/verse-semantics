@@ -31,7 +31,6 @@ import Data.Eq
 import Data.Foldable (foldr, traverse_)
 import Data.Function
 import Data.Functor ((<&>))
-import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
@@ -72,8 +71,6 @@ instance Semigroup (R m) where
 instance Monoid (R m) where
   mempty = R { env = mempty, archetype = mempty }
 
-type Archetype m = HashMap Name (VarVal m)
-
 data S m = S
   { choiceFree :: IVar m ()
   , storeFree :: IVar m ()
@@ -83,6 +80,8 @@ instance Monad m => Freshenable (S n) m where
   freshen = pure
 
 type Env m = Val.Env Ident (VarRef m) (VarVal m)
+
+type Archetype m = Env m
 
 evalEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> VerseT m a
 evalEvalT m = do
@@ -125,26 +124,26 @@ eval' e = case extract e of
     r <- ask
     var_x <- evalIdent x
     var_e <- eval' e
-    var_arg <- case extract x of
-      Ident.Name x' | Just var_arg <- HashMap.lookup x' r.archetype -> pure var_arg
-      _ -> lift freshVar
+    var_arg <- case HashMap.lookup (extract x) r.archetype of
+      Just named_arg -> readNamed named_arg
+      Nothing -> lift freshVar
     lift . unify var_x =<< evalInvoke (loc e) var_e var_arg
     pure var_arg
   Exp.InfixColonEqual x e -> do
     r <- ask
     var_x <- evalIdent x
-    var_y <- case extract x of
-      Ident.Name x' | Just var_y <- HashMap.lookup x' r.archetype -> pure var_y
-      _ -> eval' e
+    var_y <- case HashMap.lookup (extract x) r.archetype of
+      Just named_y -> readNamed named_y
+      Nothing -> eval' e
     lift $ unify var_x var_y
     pure var_x
   Exp.MixfixColonEqual x e1 e2 -> do
     r <- ask
     var_x <- evalIdent x
-    var_e <- eval' e
-    var_arg <- case extract x of
-      Ident.Name x' | Just var_arg <- HashMap.lookup x' r.archetype -> pure var_arg
-      _ -> eval' e
+    var_e <- eval' e1
+    var_arg <- case HashMap.lookup (extract x) r.archetype of
+      Just named_arg -> readNamed named_arg
+      Nothing -> eval' e2
     lift . unify var_x =<< evalInvoke (loc e1 <> loc e2) var_e var_arg
     pure var_x
   e1 :.: x ->
@@ -404,14 +403,13 @@ evalInst loc e1 xs e2 = do
   var1 <- eval' e1
   xs <- lift $ traverse freshNamed xs
   _ <- localEnv xs $ eval' e2
-  archetype <- getArchetype xs
   var <- lift freshVar
   s <- get
   s' <- S <$> lift freshIVar <*> lift freshIVar
   put s'
   lift . fork $ readVar var1 >>= \ case
     Val.Overloads head tail ->
-      unify var =<< instOverloads loc head tail archetype s s'
+      unify var =<< instOverloads loc head tail xs s s'
     _ -> abort $ DomainError loc
   pure var
 
@@ -424,7 +422,7 @@ instOverloads
   -> S m
   -> S m
   -> VerseT m (VarVal m)
-instOverloads loc head tail archetype s s' = instOverload head archetype s s' >>= \ case
+instOverloads loc head tail archetype s s' = instOverload loc head archetype s s' >>= \ case
   Just result -> pure result
   Nothing -> readVar tail >>= \ case
     Val.Overloads head tail -> instOverloads loc head tail archetype s s'
@@ -432,13 +430,15 @@ instOverloads loc head tail archetype s s' = instOverload head archetype s s' >>
 
 instOverload
   :: MonadEval m
-  => Val.Overload (VarRef m) (VarVal m)
+  => Loc
+  -> Val.Overload (VarRef m) (VarVal m)
   -> Archetype m
   -> S m
   -> S m
   -> VerseT m (Maybe (VarVal m))
-instOverload overload archetype s s' = case overload of
+instOverload loc overload archetype s s' = case overload of
   Val.Struct i env xs e -> instStruct i env xs e archetype s s'
+  Val.Class i env sup xs e -> instClass loc i env sup xs e archetype s s'
   _ -> pure Nothing
 
 instStruct
@@ -462,16 +462,70 @@ instStruct i env xs e archetype s s' = do
     writeIVar s'.storeFree ()
   Just <$> newVar (Val.StructInst i $ filterNames xs)
 
-getArchetype :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
-             => Env m -> EvalT m (Archetype m)
-getArchetype =
-  fmap HashMap.fromList .
-  traverse (traverse readNamed) .
-  mapMaybe f .
-  HashMap.toList
-  where
-    f (Ident.Name k, v) = Just (k, v)
-    f _ = Nothing
+instClass
+  :: MonadEval m
+  => Loc
+  -> Label
+  -> Env m
+  -> Maybe (VarVal m)
+  -> IdentMap Bool
+  -> L (Exp L Ident)
+  -> Archetype m
+  -> S m
+  -> S m
+  -> VerseT m (Maybe (VarVal m))
+instClass loc i env sup xs e archetype s s' = do
+  (var, _, s) <- instClass' loc i env sup xs e archetype s
+  fork do
+    readIVar s.choiceFree
+    writeIVar s'.choiceFree ()
+  fork do
+    readIVar s.storeFree
+    writeIVar s'.storeFree ()
+  pure $ Just var
+
+instSup
+  :: MonadEval m
+  => Loc
+  -> Maybe (VarVal m)
+  -> Archetype m
+  -> S m
+  -> VerseT m (Maybe (VarVal m), Archetype m, S m)
+instSup loc sup archetype s = case sup of
+  Nothing -> pure (Nothing, archetype, s)
+  Just sup -> do
+    (i, env, sup, xs, e) <- readClass loc sup
+    (sup, xs, s) <- instClass' loc i env sup xs e archetype s
+    pure (Just sup, xs, s)
+
+instClass'
+  :: MonadEval m
+  => Loc
+  -> Label
+  -> Env m
+  -> Maybe (VarVal m)
+  -> IdentMap Bool
+  -> L (Exp L Ident)
+  -> Archetype m
+  -> S m
+  -> VerseT m (VarVal m, Env m, S m)
+instClass' loc i env sup xs e archetype s = do
+  (sup, xs_sup, s) <- instSup loc sup archetype s
+  xs <- traverse freshNamed xs
+  let xs' = xs <> xs_sup
+  s <- execEvalT' (eval' e) R { env = xs' <> env, archetype } s
+  newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs <> archetype, s)
+
+readClass
+  :: (MonadAbort Error m, MonadRef m)
+  => Loc
+  -> VarVal m
+  -> VerseT m (Label, Env m, Maybe (VarVal m), IdentMap Bool, L (Exp L Ident))
+readClass loc = readVar >=> \ case
+  Val.Overloads head tail -> case head of
+    Val.Class i env sup xs e -> pure (i, env, sup, xs, e)
+    _ -> readClass loc tail
+  _ -> abort $ DomainError loc
 
 -- evalInst :: MonadEval m =>
 --             Loc ->
@@ -631,18 +685,6 @@ invokeStruct i env xs e arg s s' = do
     writeIVar s'.storeFree ()
   pure $ Just arg
 
--- invokeStruct :: MonadEval m =>
---                 Label ->
---                 IdentMap (Named m (Var m (Val m))) ->
---                 IdentMap Bool ->
---                 L (Exp L Ident) ->
---                 Var m (Val m) ->
---                 EvalT m ()
--- invokeStruct i env xs e var_domain = do
---   xs <- for xs freshNamed
---   _ <- local (const $ xs <> env) . lift . evalWriterT $ eval' e
---   unify var_domain =<< newVar (Val.StructInst i $ fromIdents xs)
-
 -- invokeClass :: MonadEval m =>
 --                Loc ->
 --                Label ->
@@ -766,59 +808,6 @@ int var = readVar var >>= \ case
   Int _ -> pure $ Just var
   _ -> pure Nothing
 
--- instSuper :: MonadEval m =>
---              Loc ->
---              Maybe (Var m (Val m)) -> HashMap Name (Named m (Var m (Val m))) ->
---              (Maybe (Var m (Val m)) -> Defaults m -> Env m -> EvalT m ()) ->
---              EvalT m ()
--- instSuper loc var_super xs f = case var_super of
---   Nothing -> f Nothing mempty mempty
---   Just var_super -> instClass loc var_super xs $ f . Just
-
--- instSuper' :: MonadEval m =>
---               Loc ->
---               Maybe (Var m (Val m)) ->
---               (Maybe (Var m (Val m)) -> Env m -> EvalT m ()) ->
---               EvalT m ()
--- instSuper' loc var_super f = case var_super of
---   Nothing -> f Nothing mempty
---   Just var_super -> instClass' loc var_super $ f . Just
-
--- instClass :: MonadEval m =>
---              Loc ->
---              Var m (Val m) -> HashMap Name (Named m (Var m (Val m))) ->
---              (Var m (Val m) -> Defaults m -> Env m -> EvalT m ()) ->
---              EvalT m ()
--- instClass loc var xs f = whenBound var $ \ case
---   Val.Overloads overload var -> case overload of
---     Val.Class i env var_super ys e ->
---       instSuper loc var_super xs $ \ var_super defs_super ys_super -> do
---         ys <- (ys_super <>) <$> for (ys \\ ys_super) freshNamed
---         defs <- local (const $ ys <> env) . lift . execWriterT $ eval' e
---         let ys' = fromIdents ys
---         for_ (HashMap.intersectionWith (,) ys' xs) $
---           uncurry unifyNamed
---         var' <- newVar $ Val.ClassInst i var_super ys'
---         f var' (defs <> defs_super) ys
---     _ -> instClass loc var xs f
---   _ -> abortWithDomainError loc
-
--- instClass' :: MonadEval m =>
---               Loc ->
---               Var m (Val m) ->
---               (Var m (Val m)-> Env m -> EvalT m ()) ->
---               EvalT m ()
--- instClass' loc var f = whenBound var $ \ case
---   Val.Overloads overload var -> case overload of
---     Val.Class i env var_super ys e ->
---       instSuper' loc var_super $ \ var_super ys_super -> do
---         ys <- (ys_super <>) <$> for (ys \\ ys_super) freshNamed
---         _ <- local (const $ ys <> env) . lift . evalWriterT $ eval' e
---         var' <- newVar $ Val.ClassInst i var_super $ fromIdents ys
---         f var' ys
---     _ -> instClass' loc var f
---   _ -> abortWithDomainError loc
-
 evalOption :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
 evalOption e = do
   var <- lift freshVar
@@ -936,6 +925,3 @@ writeVarRef' ref x = do
     readIVar s.storeFree
     writeVarRef ref x
     writeIVar storeFree ()
-
-(\\) :: Hashable k => HashMap k a -> HashMap k b -> HashMap k a
-(\\) = HashMap.difference
