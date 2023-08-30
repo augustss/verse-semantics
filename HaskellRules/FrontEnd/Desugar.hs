@@ -441,7 +441,7 @@ dsM i (Function [(t1, r)] t2) = do
   c <- gets context
   dsFunction c i t1 r t2
 --dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
-dsM i (HasType a f) = unifyV i <$> (HasType <$> dsD a <*> dsD f)
+dsM i (HasType a f) = HasType <$> dsM i a <*> dsD f
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
@@ -449,25 +449,20 @@ dsM i (Let e1 e2) = Let <$> dsD e1 <*> dsM i e2
 dsM _ e = impossible e
 
 dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
+-- This is highly dubious
 dsFunction DEval i t1 effs t2 = do
   x <- newIdent (getLoc t1) "x"
   t1' <- withContext DAbstract $ dsM x t1
-  (t2', mt3) <-
-    case t2 of
-      HasType e t -> (,) <$> dsD e  <*> (Just <$> dsD t)
-      _           -> (,) <$> dsD t2 <*> pure Nothing
+  t2' <- dsD t2
   pure $ unifyV i $  -- Do the unification?
-         TLam x effs t1' t2' mt3
+         TLam x effs t1' t2'
 dsFunction DAbstract i t1 effs t2 = do
   x <- newIdent (getLoc t1) "x"
   y <- newIdent (getLoc t1) "y"
   z <- newIdent (getLoc t1) "z"
   t1' <- dsM x t1
-  (t2', mt3) <- withContext DEval $
-    case t2 of
-      HasType e t -> (,) <$> dsM y e  <*> (Just <$> dsD t)
-      _           -> (,) <$> dsM y t2 <*> pure Nothing
-  pure $ TLam x effs (DefineE z t1') (Seq [DefineE y (ApplyD (Variable i) (Variable z)), t2']) mt3
+  t2' <- dsM y t2
+  pure $ TLam x effs (DefineE z t1') (Seq [DefineE y (ApplyD (Variable i) (Variable z)), t2'])
 
 unifyV :: Ident -> Expr -> Expr
 unifyV i e = Unify (Variable i) e
@@ -578,9 +573,9 @@ scope sc = expr
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
     expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
-    expr (TLam i r e1 e2 me3) = do
+    expr (TLam i r e1 e2) = do
       (e1', sc') <- defs (S.insert i sc) e1
-      TLam i r e1' <$> scopeD sc' e2 <*> traverse (scopeD sc') me3
+      TLam i r e1' <$> scopeD sc' e2
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
     expr Fail = pure Fail
@@ -623,6 +618,7 @@ getVisible Choice{} = []
 getVisible (Range e) = getVisible e
 getVisible Function{} = []
 getVisible (Exists is e) = is ++ getVisible e
+getVisible (Forall is e) = is ++ getVisible e
 getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
 getVisible TLam{} = []
 getVisible Lam{} = []
@@ -654,6 +650,7 @@ getVar (Range e) = getVar e
 getVar Function{} = []
 getVar TLam{} = []
 getVar (Exists _ e) = getVar e
+getVar (Forall _ e) = getVar e
 getVar (HasType e t) = getVar e ++ getVar t
 getVar Lam{} = []
 getVar Fail = []
@@ -831,7 +828,7 @@ addDeref = pure . exprD S.empty
     expr s (Range e1) = Range (expr s e1)
 --    expr s (Typedef e1) = Typedef (exprD s e1)
     expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)
-    expr s (TLam i rs e1 e2 me3) = TLam i rs (expr s' e1) (expr s' e2) (expr s' <$> me3)
+    expr s (TLam i rs e1 e2) = TLam i rs (expr s' e1) (expr s' e2)
       where s' = defs s e1
     expr s (Exists is e) = Exists is (expr s e)
     expr s (HasType e t) = HasType (expr s e) (expr s t)
@@ -891,7 +888,7 @@ lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
 lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
 lower (Macro1 (Ident _ "lowered") [] e) = pure e
 lower (Exists is e) = lExists is <$> lower e
-lower (TLam i rs (Exists is e1) e2 me3) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2 <*> traverse lower me3
+lower (TLam i rs (Exists is e1) e2) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2
 lower (HasType e t) = join $ lowerHasType <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
 lower Fail = pure Fail
@@ -987,23 +984,23 @@ lowerIfOne is e1 e2 e3 = do
   let e1e2 = lExists is $ Seq [e1, eThunk e2]
   pure $ eForce $ eOne $ Choice e1e2 (eThunk e3)
 
-lowerTLam :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
-lowerTLam i rs is e1 e2 me3 = do
+lowerTLam :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
+lowerTLam i rs is e1 e2 = do
   verif <- gets (fVerify . dflags)
   if verif then
-    lowerTLamVerify i rs is e1 e2 me3
+    lowerTLamVerify i rs is e1 e2
    else
-    lowerTLamRun i rs is e1 e2 me3
+    lowerTLamRun i rs is e1 e2
 
 -- XXX what about _rs
-lowerTLamVerify :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
-lowerTLamVerify i rs is e1 e2 me3 = do
+lowerTLamVerify :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
+lowerTLamVerify i rs is e1 e2 = do
   (e2', e2'') <-
-    case me3 of
-      Nothing -> pure (e2, e2)
-      Just t -> do
+    case e2 of
+      HasType e t -> do
         x <- newIdent (getLoc t) "x"
-        pure (ApplyD t e2, Exists [x] $ ApplyD t (Variable x))
+        pure (ApplyD t e, Exists [x] $ ApplyD t (Variable x))
+      _ -> pure (e2, e2)
   -- XXX This whole thing is wrong.  Function effects should be handled in some
   -- consistent way.
   if hasEff "succeeds" rs then
@@ -1043,15 +1040,14 @@ lowerTLamVerifySucceeds i is e1 e2' e2'' =
     ]
 
 -- XXX use all of rs
-lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> Maybe Expr -> D Expr
-lowerTLamRun i rs is e1 e2 me3 = do
+lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
+lowerTLamRun i rs is e1 e2 = do
   -- XXX This inserts Succeeds late, and scope insertion has already happened.
   -- XXX This might be wrong.
-  e2' <- maybe (pure e2) (\ t -> lowerSucceeds (ApplyD t e2)) me3
   let invariant = --invariantId `elem` rs  || True -- XXX
                   openId `notElem` rs
   if null is && e1 == Array [] then
-    pure $ Lam i e2'   -- Simple special case
+    pure $ Lam i e2   -- Simple special case
    else
     if invariant then
       pure $ Lam i $ lExists is (seqE [e1, e2])
@@ -1064,12 +1060,12 @@ lowerHasType e t = do
   if verif then
     lowerHasTypeVerify e t
    else
-    undefined -- lowerSucceeds (ApplyD t e)
+    lowerSucceeds (ApplyD t e)
 
 lowerHasTypeVerify :: Expr -> Expr -> D Expr
 lowerHasTypeVerify e t = do
   x <- newIdent (getLoc t) "x"
-  pure $ Seq [ eVerify $ eAssert $ ApplyD t e, eAssume $ Exists [x] $ ApplyD t (Variable x) ]
+  pure $ Seq [ eVerify $ eAssert $ ApplyD t e, eAssume $ Forall [x] $ ApplyD t (Variable x) ]
 
 lowerAll :: Expr -> D Expr
 lowerAll e = do
@@ -1367,6 +1363,7 @@ getFree = Epic.List.nub . fvs
     fvs (Seq es) = concatMap fvs es
     fvs (Choice e1 e2) = fvs e1 ++ fvs e2
     fvs (Exists is e) = filter (`notElem` is) (fvs e)
+    fvs (Forall is e) = filter (`notElem` is) (fvs e)
     fvs (Wrong _) = []
     fvs (Macro1 _ _ e) = fvs e
     fvs (Split e1 e2 e3) = fvs e1 ++ fvs e2 ++ fvs e3
@@ -1381,6 +1378,7 @@ getAllVars = Epic.List.nub . execWriter . vars
   where vars e@(Variable i) = do tell [i]; pure e
         vars e@(Lam i e') = do tell [i]; _ <- vars e'; pure e
         vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
+        vars e@(Forall is e') = do tell is; _ <- vars e'; pure e
         vars TLam{} = undefined
         vars e = compos vars e
 
