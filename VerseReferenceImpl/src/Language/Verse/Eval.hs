@@ -500,7 +500,7 @@ instClass' loc i env sup xs e archetype s = do
   xs <- traverse freshNamed xs
   let xs' = xs <> xs_sup
   s <- execEvalT' (eval' e) R { env = xs' <> env, archetype } s
-  newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs <> archetype, s)
+  newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs', s)
 
 instSup
   :: MonadEval m
