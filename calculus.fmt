@@ -177,16 +177,18 @@
 %format one (x) = "\textbf{one}\{" x "\}"
 %format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
 
+%% assert = succeed, abbreviated to suc
+
 %format assumeKW = "\textbf{asm}"
-%format assertKW = "\textbf{assert}"
+%format assertKW = "\textbf{suc}"
 %format succeedKW = "\textbf{suc}"
-%format verifyKW = "\textbf{prove}"
+%format verifyKW = "\textbf{verify}"
 %format decideKW = "\textbf{dec}"
 
 %format assume (x) = "\textbf{asm}\{" x "\}"
-%format assert (x) = "\textbf{assert}\{" x "\}"
+%format assert (x) = "\textbf{suc}\{" x "\}"
 %format succeed (x) = "\textbf{suc}\{" x "\}"
-%format verify (x) = "\textbf{prove}\{" x "\}"
+%format verify (x) = "\textbf{verify}\{" x "\}"
 %format decide (x) = "\textbf{dec}\{" x "\}"
 
 %format allKW = "\textbf{all}"
