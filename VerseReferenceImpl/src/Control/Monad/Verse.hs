@@ -204,7 +204,7 @@ runVerseT m = do
     sk x fk _ r = readRef r.suspCount >>= \ case
       0 -> do
         commit <- readRef r.commit
-        runFreshenT' commit r.heap
+        runFreshenT' commit r.heap splitDepth
         fmap (x:) <$> fk r
       _ -> pure Nothing
     fk _ = pure $ Just []
@@ -263,8 +263,10 @@ readLocalIVarState v = liftSucceed $ \ r ->
   readRef (unIVar v) <&> lookupLocalState r.heap
 
 freshVar :: (MonadRef m, MonadSupply Int m) => VerseT m (Var m f)
-freshVar = liftSucceed $ \ r ->
-  fmap Var . newRef . singleton . Repr . Unbound r.splitDepth (const $ pure ()) =<< supply
+freshVar = liftSucceed $ \ r -> freshVar' r.splitDepth
+
+freshVar' :: (MonadRef m, MonadSupply Int m) => Int -> m (Var m f)
+freshVar' n = fmap Var . newRef . singleton . Repr . Unbound n (const $ pure ()) =<< supply
 
 newVar :: (MonadRef m, MonadSupply Int m) => f (Var m f) -> VerseT m (Var m f)
 newVar = lift . newVar'
@@ -473,7 +475,7 @@ newVarRef x = do
   ref <- lift . fmap VarRef . newRef $ singleton x
   lift . modifyRef' r.commit $ \ commit -> do
     commit
-    (h, h') <- FreshenT ask
+    (h, h', _) <- FreshenT ask
     x <- freshen =<< get' (unVarRef ref) h
     put' (unVarRef ref) h x *> put' (unVarRef ref) h' x
   pure ref
@@ -498,7 +500,7 @@ writeVarRef ref x = do
   let
     commit' = do
       commit
-      (h, h') <- FreshenT ask
+      (h, h', _) <- FreshenT ask
       x <- freshen =<< get' (unVarRef ref) h
       put' (unVarRef ref) h x *> put' (unVarRef ref) h' x
   liftEmpty $
@@ -649,6 +651,9 @@ instance ( Freezable a b m
          ) => Freezable (Const a c) (Const b d) m where
   freeze = fmap Const . freeze . getConst
 
+instance Freezable a b m => Freezable [a] [b] m where
+  freeze = traverse freeze
+
 instance ( MonadFix m
          , MonadRef m
          , Freezable (f (Var m f)) (g (Frozen g)) m
@@ -669,7 +674,7 @@ freeze' :: (Monad m, Freezable a b m) => a -> VerseT m b
 freeze' = runFreezeT . freeze
 
 newtype FreshenT m a = FreshenT
-  { unFreshenT :: RWST (HeapKey, HeapKey) (Rollback m) (IntMap GHC.Exts.Any) m a
+  { unFreshenT :: RWST (HeapKey, HeapKey, Int) (Rollback m) (IntMap GHC.Exts.Any) m a
   } deriving ( Functor
              , Applicative
              , Monad
@@ -686,12 +691,13 @@ instance Applicative m => Monoid (Rollback m) where
 runFreshenT :: Monad m => FreshenT m a -> HeapKey -> VerseT m a
 runFreshenT m heap = do
   r <- ask'
-  (x, w) <- lift $ evalRWST (unFreshenT m) (heap, r.heap) mempty
+  (x, w) <- lift $ evalRWST (unFreshenT m) (heap, r.heap, r.splitDepth) mempty
   addEmpty $ getRollback w
   pure x
 
-runFreshenT' :: Monad m => FreshenT m () -> HeapKey -> m ()
-runFreshenT' m h = fst <$> evalRWST (unFreshenT m) (h, h) mempty
+runFreshenT' :: Monad m => FreshenT m () -> HeapKey -> Int -> m ()
+runFreshenT' m h splitDepth =
+  fst <$> evalRWST (unFreshenT m) (h, h, splitDepth) mempty
 
 instance MonadTrans FreshenT where
   lift = FreshenT . lift
@@ -707,6 +713,9 @@ instance Monad m => Freshenable () m where
 instance Monad m => Freshenable Int m where
   freshen = pure
 
+instance Freshenable a m => Freshenable [a] m where
+  freshen = traverse freshen
+
 instance Freshenable v m => Freshenable (Strict.HashMap k v) m where
   freshen = traverse freshen
 
@@ -717,12 +726,19 @@ instance ( MonadFix m
          ) => Freshenable (Var m f) m where
   freshen = FreshenT . loop
     where
-      loop v = ask >>= lift . findRepr' v . fst >>= \ case
-        Found v Unbound {} -> pure v
-        Found _ (Bound x i) -> mfix $ \ x' ->
-          state' (lookupInsert i $ unsafeCoerce x') >>= \ case
-            Just x' -> pure $ unsafeCoerce x'
-            Nothing -> lift . newVar' =<< traverse loop x
+      loop v = do
+        (h, _, splitDepth) <- ask
+        lift (findRepr' v h) >>= \ case
+          Found _ (Bound x i) -> mfix $ \ x' ->
+            state' (lookupInsert i $ unsafeCoerce x') >>= \ case
+              Just x' -> pure $ unsafeCoerce x'
+              Nothing -> lift . newVar' =<< traverse loop x
+          Found v (Unbound n _ i) -> mfix $ \ x' ->
+            state' (lookupInsert i $ unsafeCoerce x') >>= \ case
+              Just x' -> pure $ unsafeCoerce x'
+              Nothing -> case n > splitDepth of
+                False -> pure v
+                True -> lift $ freshVar' splitDepth
 
 msplit_ :: (MonadRef m, MonadSupply Int m)
         => VerseT m () -> Env m -> m (Maybe (VerseT m (), VerseT m ()))

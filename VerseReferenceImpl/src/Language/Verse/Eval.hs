@@ -293,7 +293,7 @@ evalOne e = do
   lift $ fork do
     unify var =<< readIVar =<< one do
       choiceFree <- newIVar ()
-      evalEvalT' (eval' e) r s { choiceFree }
+      evalEvalT' (eval' e) mempty { env = r.env } s { choiceFree }
     writeIVar storeFree ()
   pure var
 
@@ -307,7 +307,7 @@ evalAll e = do
   lift $ fork do
     unify var =<< newVar . Val.Tuple =<< readIVar =<< all do
       choiceFree <- newIVar ()
-      evalEvalT' (eval' e) r s { choiceFree }
+      evalEvalT' (eval' e) mempty { env = r.env } s { choiceFree }
     writeIVar storeFree ()
   pure var
 
@@ -321,7 +321,7 @@ evalNot e = do
     void $ readIVar =<< if'
     do
       choiceFree <- newIVar ()
-      void $ runEvalT' (eval' e) r s { choiceFree }
+      void $ runEvalT' (eval' e) mempty { env = r.env } s { choiceFree }
     do
       const empty
     do
@@ -758,6 +758,7 @@ invokeIntrinsic = \ case
   Intrinsic.Multiply -> liftNum (*)
   Intrinsic.Divide -> div'
   Intrinsic.Int -> int
+  Intrinsic.Float -> float
 
 liftOrd :: (MonadRef m, MonadSupply Int m)
         => (forall a . Ord a => a -> a -> Bool)
@@ -847,6 +848,11 @@ div' var = readVar var >>= \ case
 int :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
 int var = readVar var >>= \ case
   Int _ -> pure $ Just var
+  _ -> pure Nothing
+
+float :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
+float var = readVar var >>= \ case
+  Val.Float _ -> pure $ Just var
   _ -> pure Nothing
 
 evalOption :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
