@@ -562,7 +562,7 @@ This is useful for arrays.  Suppose |a| is an array.  Consider the Source Verse 
 |x:a| and |x := :a|.
 The two are equivalent; remember rule \rulename{pcolon2}.
 Both use |a| as a type, but arrays are functions, so that's fine. \simon{Its not an idempotent function though!
-  Here we are usefully using a non-idempotent fucntion as a type.}
+  Here we are usefully using a non-idempotent function as a type.}
 Then |(x := :a)| desugars (via \rulename{dexpr} and \rulename{mtype}) to |x := def i (a^[i])|.
 Then our execution semantics for arrays rewrites thus:
 $$
@@ -593,9 +593,9 @@ Clever!
 \subsection{Loose ends}
 
 \begin{itemize}
-\item \simon{Rule \rulename{meq} is assymetrical, which looks wrong.}
-  \lennart{Hmmm, yes, maybe it's wrong.  |(:succ) == (:pred)| probably should have |Me| on both sides.}
-\item \simon{Is \rulename{mtype} right?}
+\item Is \rulename{meq} right. E.g. |functionP ( x:= (:nat = :even) ) t| should
+  check that both |nat^[i]| and |even^[i]| succeed \emph{and} that they give the same result.
+\item \simon{Is \rulename{moftype} right?}
 \item Koen points out that \rulename{mfor} is awkwardly different to \rulename{mif}.
 \item |(Me i t)| is very syntatic. It treats |:t| and |id (:t)| differently for example.
   Ditto$$
@@ -654,12 +654,12 @@ and |e| is a BigCore expression}} \\[1mm]
 \rulename{mtype} &  |Me i (:t)| & = & |(De t)^[i]| & \\[2mm]
 \rulename{mfun}  &  |Me i ((y squiggt x):=t)| & = & |x := Me i t; y := i| \\
 \rulename{mbind} &  |Me i (x:=t)| & = & |x := Me i t| \\[2mm]
-\rulename{meq} &  |Me i (t_1=t_2)| & = & |De t_1 = Me i t_2| \\
+\rulename{meq} &  |Me i (t_1=t_2)| & = & |(Me i t_1) = (Me i t_2)| \\
 \rulename{msemi} &  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
 \rulename{mchoice} &  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
 \rulename{mif} &  |Me i (if(e_1) then e_2 else e_3)| & = &
     \multicolumn{2}{@@{}l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
-\rulename{mtype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
+\rulename{moftype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
 \rulename{mcheck} &  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\[2mm]
 
 \rulename{mconst} &  |Me i k| & = & |i==k| \\
