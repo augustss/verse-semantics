@@ -50,6 +50,7 @@ tests = -- take 6
   , ("ex_if0", ex_if0, True)
   , ("ex_if1", ex_if1, False)
   , ("ex_if2", ex_if2, True)
+  , ("ex_inc", ex_inc, True)
   , ("ex_tim_0", ex_tim_0, False)
   , ("ex_tim_1", ex_tim_1, False)
   , ("ex_asm_subst", ex_asm_subst, True)
@@ -103,8 +104,6 @@ runTest (testName, e, expected) =
 
 -------------------------------------------------------------------------------------------
 
-
-
 eXIs :: [Ident] -> Expr -> Expr
 eXIs xs e = foldr EXI e xs
 
@@ -128,16 +127,6 @@ leq e1 e2 = Op Le :@: Arr [e1, e2]
 
 ite :: Expr -> Expr -> Expr -> Expr
 ite = If
--- ite e1 e2 e3 = (Assume e1 :>: e2) :|: e3
-
---ite e1 e2 e3 = One( (e1 :>: Lam (Bind x e2)) :|: Lam (Bind x e3) ) :@: Arr []
--- where
---  x = identNotIn (free (e2,e3))
---ite e1 e2 e3 = Exi (Bind x ( Var x :=: One( (e1 :>: Arr []) :|: Int 0 )
---                         :>: (((Var x :=: Arr []) :>: e2) :|: ((Var x :=: Int 0) :>: e3))
---                           ))
--- where
---  x = identNotIn (free (e2,e3))
 
 tlamOblig :: Ident -> [Ident] -> Expr -> Expr -> Expr
 tlamOblig x ys e1 e2 = Verify (Lam $ Bind x $ exis ys (Assume e1 :>: Assert e2))
@@ -199,11 +188,6 @@ ex0_aa = lAMs [x, y] (
 
 ex0_bb :: Expr
 ex0_bb = lAMs [x,y] $
-              -- Assume (INT (Var x))
-              -- :>:
-              -- Assume (INT (Var y))
-              -- :>:
-              -- Assume (Var y :=: Var x)
               Assume (INT (Var x) :>: INT (Var y) :>: (Var y :=: Var x))
               :>:
               Assert (Var y :=: Var x :>: Int 0)
@@ -241,22 +225,6 @@ ex0' = LAM x (LAM y (LAM z (
     b = ident "b"
 
 
-{-
-"hanging" desugared version of
-
-g(x:int, y:int, z:int) := { a := x; b := a; b = y }
-
-\xt.
-    ex $x3 $x4 $x5 x y z.
-      assume {(x  = (\$$x. isint($$x); $$x)($x3));
-              (y  = (\$$x. isint($$x); $$x)($x4));
-              (z  = (\$$x. isint($$x); $$x)($x5));
-              (xt = <$x3, $x4, $x5>);
-              xt};
-      assert {ex a b. (a = x); (b = a); (b = y); b}
-
--}
-
 -- hangs the icfpVerifier due to EXI-SWAP blowup, but not icfpeVerifier
 ex00_hang :: Expr
 ex00_hang =
@@ -270,7 +238,6 @@ ex00_hang =
               Var xt
              )
       :>: Assert (Int 0)
-      -- :>: Assert (eXIs [a, b] ( (Var a :=: Var x) :>:  (Var b :=: Var a) :>: (Var b :=: Var y) :>: Var b))
   where
     x3 = ident "x3"
     x4 = ident "x4"
@@ -291,8 +258,6 @@ ex01_hang =
               (Var y  :=: iNT (Var x4)) :>:
               (Var z  :=: iNT (Var x5)) :>:
               Arr []
-              -- (Var xt :=: Arr [Var x3, Var x4, Var x5]) :>:
-              -- Var xt
              )
       :>: Assert (eXIs [a, b] ((Var a :=: Var x) :>: (Var b :=: Var a) :>: (Var b :=: Var y) :>: Var b))
   where
@@ -311,11 +276,11 @@ ex01_hang =
 -- ex1' (andy's variant with x = suc x)
 {-
 exi suc.
-  suc = \a. INT[a]; assume { EXI b. INT[b]; b }
+  suc = \a. INT[a]; assume { UNI b. INT[b]; b }
   (\v. assume {int[x]} ; assert { exi r. r = succ(x); INT[r]; r }
 -}
 ex1 ::Expr
-ex1 = lET succ (LAM a (iNT (Var a) :>: Assume (EXI b (iNT (Var b)))))
+ex1 = lET succ (LAM a (iNT (Var a) :>: Assume (UNI b (iNT (Var b)))))
         (LAM x (Assume (iNT (Var x)) :>: Assert (EXI r (Var r :=: Var succ :@: Var x :>: iNT (Var r) ))))
   where
     succ = ident "succ"
@@ -378,17 +343,17 @@ sum(x:any):int := if nat(x) then add(x, sum(dec(x))) else 0
 ex4 :: Expr
 ex4 =  lETs
           [ (nat, LAM x (iNT (Var x) :>: leq (Int 0) (Var x) :>: Var x) )
-          , (add, LAM x (LAM y (iNT (Var x) :>: iNT (Var y) :>: Assume (EXI r (iNT (Var r))))))
-          , (dec, LAM x (iNT (Var x) :>: Assume (EXI r (iNT (Var r)))))
-          , (sum, LAM x (Assume (EXI r (iNT (Var r)))))
+          , (add, LAM x (LAM y (iNT (Var x) :>: iNT (Var y) :>: Assume (UNI r (iNT (Var r))))))
+          , (dec, LAM x (iNT (Var x) :>: Assume (UNI r (iNT (Var r)))))
+          , (sum, LAM x (Assume (UNI r (iNT (Var r)))))
           ]
           (Verify (LAM x (Assert (EXI r ((Var r :=: ite (Var nat :@: Var x)
-                                              (Assert (lETs
+                                                      (lETs
                                                         [ (t0, Var dec :@: Var x)
                                                         , (t1, Var sum :@: Var t0)
                                                         ]
                                                         ((Var add :@: Var x) :@: Var t1)
-                                                      ))
+                                                      )
                                               (Int 0))
                                   :>: iNT (Var r))))))
   where
@@ -491,14 +456,14 @@ ex_if1 = verse $
                   def (ite b (Int 3) (Int 4)))
 
 ex_if2 :: Expr
-ex_if2 = Verify $ LAM x $ (Assume (iNT (Var x))) :>: Assert (ite (leq (Int 0) (Var x)) (Int 1) (Int 2))
+ex_if2 = Verify $ LAM x $ Assume (iNT (Var x)) :>: Assert (ite (leq (Int 0) (Var x)) (Int 1) (Int 2))
   where
     x = ident "x"
 
 ex_inc :: Expr
 ex_inc = tlamOblig y [x]
             (INT (Var y) :>: (Var x :=: Var y) :>: Var x)
-            (INT (Var x) :>: INT (Int 1) :>: Assume (EXI r (INT (Var r) ) ))
+            (INT (Var x) :>: INT (Int 1) :>: Assume (UNI r (INT (Var r) ) ))
   where
     x = ident "x"
     y = ident "y"
@@ -614,17 +579,17 @@ asType e t = Verify (Assert (t :@: e)) :>: Assume (UNI a (t :@: Var a))
 
 -- exi x. x = 2; x = 2; 100  (ACCEPT)
 ex_hide_00 :: Expr
-ex_hide_00 = Assert $ EXI x ((Var x :=: (Int 2 {- `asType` tINT -})) :>: Var x :=: Int 2)
+ex_hide_00 = Assert $ EXI x ((Var x :=: Int 2) :>: Var x :=: Int 2)
   where
     x = ident "x"
 
--- exi x. x = (2 >> int); x = 2; 100  (REJECT)
+-- exi x. x = (2 |> int); x = 2; 100  (REJECT)
 ex_hide_01 :: Expr
 ex_hide_01 = Assert $ EXI x ((Var x :=: (Int 2 `asType` tINT)) :>: Var x :=: Int 2)
   where
     x = ident "x"
 
--- exi x,y. x = (2 >> int); y = x; int[y]
+-- exi x,y. x = (2 |> int); y = x; int[y]   (ACCEPT)
 ex_hide_02 :: Expr
 ex_hide_02 = Assert $ eXIs [x,y] ((Var x :=: (Int 2 `asType` tINT)) :>: Var y :=: Var x :>: iNT (Var y))
   where
