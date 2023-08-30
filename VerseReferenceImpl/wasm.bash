@@ -2,8 +2,6 @@
 set -eux
 wasm32-wasi-cabal install \
   --allow-newer \
-  --with-alex=/home/andy/.cabal/bin/alex \
-  --with-happy=/home/andy/.cabal/bin/happy \
   --installdir=www/static \
   --overwrite-policy=always
 wizer \
