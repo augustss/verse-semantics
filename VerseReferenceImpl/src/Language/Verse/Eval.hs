@@ -31,6 +31,7 @@ import Data.Eq
 import Data.Foldable (foldr, traverse_)
 import Data.Function
 import Data.Functor ((<&>))
+import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
@@ -475,7 +476,8 @@ instClass
   -> S m
   -> VerseT m (Maybe (VarVal m))
 instClass loc i env sup xs e archetype s s' = do
-  (var, _, s) <- instClass' loc i env sup xs e archetype s
+  (var, xs_all) <- instFreshClass loc i sup xs
+  s <- evalClass loc env sup xs e archetype xs_all s
   fork do
     readIVar s.choiceFree
     writeIVar s'.choiceFree ()
@@ -484,37 +486,60 @@ instClass loc i env sup xs e archetype s s' = do
     writeIVar s'.storeFree ()
   pure $ Just var
 
-instClass'
-  :: MonadEval m
+instFreshClass
+  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m)
   => Loc
   -> Label
+  -> Maybe (VarVal m)
+  -> IdentMap Bool
+  -> VerseT m (VarVal m, Env m)
+instFreshClass loc i sup xs = do
+  (sup, xs_sup) <- instFreshSup loc sup
+  xs <- traverse freshNamed xs
+  let xs' = xs_sup <> xs
+  newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs')
+
+instFreshSup
+  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m)
+  => Loc
+  -> Maybe (VarVal m)
+  -> VerseT m (Maybe (VarVal m), Env m)
+instFreshSup loc sup = case sup of
+  Nothing -> pure (Nothing, mempty)
+  Just sup -> do
+    (i, _, sup, xs, _) <- readClass loc sup
+    (sup, xs) <- instFreshClass loc i sup xs
+    pure (Just sup, xs)
+
+evalClass
+  :: MonadEval m
+  => Loc
   -> Env m
   -> Maybe (VarVal m)
   -> IdentMap Bool
   -> L (Exp L Ident)
   -> Archetype m
+  -> Env m
   -> S m
-  -> VerseT m (VarVal m, Env m, S m)
-instClass' loc i env sup xs e archetype s = do
-  (sup, xs_sup, s) <- instSup loc sup archetype s
-  xs <- traverse freshNamed xs
-  let xs' = xs_sup <> xs
-  s <- execEvalT' (eval' e) R { env = xs' <> env, archetype } s
-  newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs', s)
+  -> VerseT m (S m)
+evalClass loc env sup xs e archetype xs_all s = do
+  s <- execEvalT' (eval' e) R { env = xs_all <> env, archetype } s
+  let archetype_sup = (xs_all /\ void xs) <> archetype
+  evalSup loc sup archetype_sup xs_all s
 
-instSup
+evalSup
   :: MonadEval m
   => Loc
   -> Maybe (VarVal m)
   -> Archetype m
+  -> Env m
   -> S m
-  -> VerseT m (Maybe (VarVal m), Archetype m, S m)
-instSup loc sup archetype s = case sup of
-  Nothing -> pure (Nothing, archetype, s)
+  -> VerseT m (S m)
+evalSup loc sup archetype xs_all s = case sup of
+  Nothing -> pure s
   Just sup -> do
-    (i, env, sup, xs, e) <- readClass loc sup
-    (sup, xs, s) <- instClass' loc i env sup xs e archetype s
-    pure (Just sup, xs, s)
+    (_, env, sup, xs, e) <- readClass loc sup
+    evalClass loc env sup xs e archetype xs_all s
 
 readClass
   :: (MonadAbort Error m, MonadRef m)
@@ -938,3 +963,6 @@ writeVarRef' ref x = do
     readIVar s.storeFree
     writeVarRef ref x
     writeIVar storeFree ()
+
+(/\) :: Hashable k => HashMap k v -> HashMap k w -> HashMap k v
+(/\) = HashMap.intersection
