@@ -547,7 +547,7 @@ $$
 $$
 where the elements of |a| are |v_0, dots, v_n|.  So the net effect is that |x:a| binds |x| successively
 to the elements of |a|; it is an implicit for-loop.
-We can use |forKW| to build a new array; thus |for(x:a){x+1}| returns an array the same size as |a| but
+We can use |for| to build a new array; thus |for(x:a){x+1}| returns an array the same size as |a| but
 with each element increased by 1.
 
 Now consider |(i squiggt x):a|.  That binds |i| and |x| successively to the \emph{index/value} pairs of |a|.
