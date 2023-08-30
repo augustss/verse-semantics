@@ -667,7 +667,7 @@ invokeClass
   -> S m
   -> VerseT m (Maybe (VarVal m))
 invokeClass loc i sup env xs e arg s s' = do
-  (inst, s) <- instEmptyClass loc i sup env xs e s
+  (inst, _, s) <- instEmptyClass loc i sup env xs e s
   unify inst =<< findClassInst i arg
   fork do
     readIVar s.choiceFree
@@ -686,26 +686,27 @@ instEmptyClass
   -> IdentMap Bool
   -> L (Exp L Ident)
   -> S m
-  -> VerseT m (VarVal m, S m)
+  -> VerseT m (VarVal m, Env m, S m)
 instEmptyClass loc i env sup xs e s = do
-  (sup, s) <- instEmptySup loc sup s
+  (sup, xs_sup, s) <- instEmptySup loc sup s
   archetype <- traverse freshNamed xs
   xs <- traverse freshNamed xs
-  s <- execEvalT' (eval' e) mempty { env = xs <> env, archetype } s
-  newVar (Val.ClassInst i sup $ filterNames xs) <&> (, s)
+  let xs' = xs_sup <> xs
+  s <- execEvalT' (eval' e) mempty { env = xs' <> env, archetype } s
+  newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs', s)
 
 instEmptySup
   :: MonadEval m
   => Loc
   -> Maybe (VarVal m)
   -> S m
-  -> VerseT m (Maybe (VarVal m), S m)
+  -> VerseT m (Maybe (VarVal m), Env m, S m)
 instEmptySup loc sup s = case sup of
-  Nothing -> pure (Nothing, s)
+  Nothing -> pure (Nothing, mempty, s)
   Just sup -> do
     (i, env, sup, xs, e) <- readClass loc sup
-    (sup, s) <- instEmptyClass loc i env sup xs e s
-    pure (Just sup, s)
+    (sup, xs, s) <- instEmptyClass loc i env sup xs e s
+    pure (Just sup, xs, s)
 
 invokeIntrinsic :: (MonadRef m, MonadSupply Int m)
                 => Intrinsic -> VarVal m -> VerseT m (Maybe (VarVal m))
