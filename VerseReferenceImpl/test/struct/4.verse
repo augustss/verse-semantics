@@ -3,7 +3,7 @@ any(exists X) := X
 
 type := any
 
-list(t:type) := X:any => X = false|truth{:any}
+list(t:type) := (X:any => X = false|truth{:any})
 
 cons(t:type) := struct:
   Head:t

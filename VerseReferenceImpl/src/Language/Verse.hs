@@ -6,13 +6,13 @@ module Language.Verse
   ) where
 
 import Control.Monad ((<=<))
-import Control.Monad.Error.Class
+import Control.Monad.Abort
+import Control.Monad.Fix
+import Control.Monad.Ref
 import Control.Monad.Supply
-import Control.Monad.Var
-import Control.Monad.Verse.Class
+import Control.Monad.Verse
 
 import Data.ByteString (ByteString)
-import Data.Fix
 
 import Language.Verse.Desugar
 import Language.Verse.Error
@@ -22,9 +22,10 @@ import Language.Verse.Lexer
 import Language.Verse.Parse
 import Language.Verse.Val
 
-eval :: ( MonadError Error m
+eval :: ( MonadAbort Error m
+        , MonadFix m
+        , MonadRef m
         , MonadSupply Label m
-        , MonadVerse m
-        , EqVarRef (VarRef m)
-        ) => ByteString -> m (Fix (Val m))
+        , EqRef (Ref m)
+        ) => ByteString -> VerseT m FrozenVal
 eval = Eval.eval <=< liftEither . (desugar <=< runLexer parse)

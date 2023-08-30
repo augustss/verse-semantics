@@ -5,6 +5,8 @@ import Control.Applicative
 
 import Control.Monad ((<=<))
 
+import Data.Functor
+
 import Prelude (($), (=<<))
 
 import Verse4
@@ -61,3 +63,10 @@ test6 = runSupplyT $ runVerseT do
   writeVar x =<< pure 1 <|> pure 2
   writeVar y =<< pure 3 <|> pure 4
   readVar z
+
+test7 = runSupplyT $ runVerseT $ do
+  x <- freshVar
+  fork $ do
+    fork $ void $ readVar x
+    void $ readVar x
+  writeVar x =<< pure 1 <|> pure 2

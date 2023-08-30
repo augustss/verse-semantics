@@ -9,159 +9,123 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Language.Verse.Val
   ( Val (..)
-  , prettyM
+  , VarVal
+  , FrozenVal
+  , Overload (..)
+  , Named (..)
+  , Env
   ) where
 
-import Control.Applicative
-import Control.Monad.Trans.Maybe
-import Control.Monad.Var
-import Control.Monad.Writer.CPS
+import Control.Monad
+import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen, Freshenable (..))
 
-import Data.Foldable
 import Data.Functor
+import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Data.Match
 import Data.Ratio
-import Data.Unifiable
+import Data.Traversable
 
+import Language.Verse.Desugar.Exp qualified as Desugar
+import Language.Verse.Ident
+import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Label
+import Language.Verse.Loc
 import Language.Verse.Name
-import {-# SOURCE #-} Language.Verse.Named (Named)
-import Language.Verse.Overload (Overload)
-import Language.Verse.Pretty
 
 import Prettyprinter
 
-data Val m a
+data Val ref a
   = Int !Integer
   | Float {-# UNPACK #-} !Double
   | Rational !Rational
   | Truth a
   | Tuple [a]
-  | Module {-# UNPACK #-} !Label !(HashMap Name (Named m a))
-  | StructInst {-# UNPACK #-} !Label !(HashMap Name (Named m a))
-  | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(HashMap Name (Named m a))
-  | Overloads !(Overload m a) a deriving (Functor, Foldable, Traversable)
+  | Module {-# UNPACK #-} !Label !(Env Name ref a)
+  | StructInst {-# UNPACK #-} !Label !(Env Name ref a)
+  | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(Env Name ref a)
+  | Overloads !(Overload ref a) a deriving (Functor, Foldable, Traversable)
 
-instance EqVarRef (VarRef m) => Unifiable (Val m) where
-  zipMatchM = curry $ \ case
+type VarVal m = Var m (Val (VarRef m))
+
+type FrozenVal = Frozen (Val Frozen)
+
+instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
+  rowMatch = curry $ \ case
     (Truth x, Truth y) ->
-      pure $ Just [(x, y)]
-    (Int x, Int y) | x == y ->
-      pure $ Just []
-    (Int x, Rational y) | 1 == denominator y && x == numerator y->
-      pure $ Just []
-    (Rational x, Int y) | denominator x == 1 && numerator x == y ->
-      pure $ Just []
-    (Rational x, Rational y) | x == y ->
-      pure $ Just []
-    (Float x, Float y) | if isNaN x then isNaN y else x == y ->
-      pure $ Just []
+      Zip . Just $ Truth (x, y)
+    (Int x, Int y) ->
+      Zip $ guard (x == y) $> Int x
+    (Int x, Rational y) ->
+      Zip $ guard (1 == denominator y && x == numerator y) $> Int x
+    (Rational x, Int y) ->
+      Zip $ guard (denominator x == 1 && numerator x == y) $> Int y
+    (Rational x, Rational y) ->
+      Zip $ guard (x == y) $> Rational x
+    (Float x, Float y) ->
+      Zip $ guard (if isNaN x then isNaN y else x == y) $> Float x
     (Tuple xs, Tuple ys) ->
-      pure $ zipMatch xs ys
-    (StructInst i xs, StructInst j ys) | i == j -> runMaybeT . execWriterT $
-      for_ (HashMap.intersectionWith (,) xs ys) $
-        maybe empty tell . uncurry zipMatch
-    (ClassInst i x xs, ClassInst j y ys) | i == j -> runMaybeT . execWriterT $ do
-      maybe empty tell $ zipMatch x y
-      for_ (HashMap.intersectionWith (,) xs ys) $
-        maybe empty tell . uncurry zipMatch
-    (Overloads x xs, Overloads y ys) ->
-      runMaybeT . execWriterT $ zipCons x xs y ys
-    _ -> pure Nothing
+      Zip $ Tuple <$> zipMatch xs ys
+    (StructInst i xs, StructInst j ys) ->
+      Zip $ guard (i == j) $>
+      StructInst i (zipMatchEnv xs ys)
+    (ClassInst i x xs, ClassInst j y ys) ->
+      Zip $ guard (i == j) $>
+      ClassInst i (liftA2 (,) x y) (zipMatchEnv xs ys)
+    (Overloads x xs, Overloads y ys) -> case zipMatch x y of
+      Just x -> Zip . Just $ Overloads x (xs, ys)
+      Nothing -> Uncons (Overloads x) xs (Overloads y) ys
+    _ -> Zip Nothing
 
-type ZipMatchT f m = WriterT [(Var m f, Var m f)] (MaybeT m)
+instance ( Freezable (f (Val f)) (g (Val g)) m
+         , Freezable a b m
+         ) => Freezable (Val f a) (Val g b) m where
+  freeze = \ case
+    Int x -> pure $ Int x
+    Float x -> pure $ Float x
+    Rational x -> pure $ Rational x
+    Truth x -> Truth <$> freeze x
+    Tuple xs -> Tuple <$> for xs freeze
+    Module i xs -> Module i <$> for xs freeze
+    StructInst i xs -> StructInst i <$> for xs freeze
+    ClassInst i x xs -> ClassInst i <$> for x freeze <*> for xs freeze
+    Overloads x xs -> Overloads <$> freeze x <*> freeze xs
 
-zipCons :: MonadVar m =>
-           Overload f (Var m (Val f)) -> Var m (Val f) ->
-           Overload f (Var m (Val f)) -> Var m (Val f) ->
-           ZipMatchT (Val f) m ()
-zipCons x xs y ys = zipList xs =<< findCons x y ys
-
-zipList :: MonadVar m => Var m (Val f) -> Var m (Val f) -> ZipMatchT (Val f) m ()
-zipList xs ys = uncons xs >>= \ case
-  Just (x, xs) -> zipList xs =<< findList x ys
-  Nothing -> tell [(xs, ys)]
-
-findCons :: MonadVar m =>
-            Overload f (Var m (Val f)) ->
-            Overload f (Var m (Val f)) -> Var m (Val f) ->
-            ZipMatchT (Val f) m (Var m (Val f))
-findCons x y ys =
-  if x == y then pure ys
-  else newVar . Overloads y =<< findList x ys
-
-findList :: MonadVar m =>
-            Overload f (Var m (Val f)) ->
-            Var m (Val f) ->
-            ZipMatchT (Val f) m (Var m (Val f))
-findList x ys = uncons ys >>= \ case
-  Just (y, ys) -> findCons x y ys
-  Nothing -> do
-    zs <- freshVar
-    ys' <- newVar $ Overloads x zs
-    tell [(ys, ys')]
-    pure zs
-
-uncons :: ( Alternative m
-          , MonadVar m
-          ) => Var m (Val f) -> m (Maybe (Overload f (Var m (Val f)), Var m (Val f)))
-uncons xs = readVar xs >>= \ case
-  Just (Overloads x xs) -> pure $ Just (x, xs)
-  Just _ -> empty
-  _ -> pure Nothing
-
-instance ( MonadVarRef m
-         , MonadPretty a m
-         ) => MonadPretty (Val m a) m where
-  prettyM = \ case
-    Int x ->
-      pure $ pretty x
-    Float x ->
-      pure $ pretty x
-    Rational x | denominator x == 1 ->
-      pure $ pretty $ numerator x
-    Rational x ->
-      pure $ pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    Truth x ->
-      prettyM x <&> \ doc -> align $ "truth" <> group (braces doc)
-    Overloads {} ->
-      pure "function"
-    Tuple [] ->
-      pure "false"
-    Tuple xs ->
-      align . tupled <$> traverse prettyM xs
+instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
+  pretty = \ case
+    Int x -> pretty x
+    Float x -> pretty x
+    Rational x | denominator x == 1 -> pretty $ numerator x
+    Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+    Truth x -> align $ "truth" <> group (braces $ pretty x)
+    Overloads {} -> "function"
+    Tuple [] -> "false"
+    Tuple xs -> tupled $ pretty <$> xs
     Module i xs ->
-      namesM xs <&> \ docs ->
       align $
       "module#" <>
       prettyLabel i <>
-      group (braced docs)
+      group (braced $ prettyNames xs)
     StructInst i xs ->
-      namesM xs <&> \ docs ->
       align $
       "struct#" <>
       prettyLabel i <>
-      group (braced docs)
+      group (braced $ prettyNames xs)
     ClassInst i Nothing xs ->
-      namesM xs <&> \ docs ->
       align $
       "class#" <>
       prettyLabel i <>
-      group (braced docs)
-    ClassInst i (Just x) xs -> do
-      doc <- prettyM x
-      docs <- namesM xs
-      pure . align $
-        "class#" <>
-        prettyLabel i <>
-        parens doc <>
-        group (braced docs)
+      group (braced $ prettyNames xs)
+    ClassInst i (Just x) xs ->
+      align $
+      "class#" <>
+      prettyLabel i <>
+      parens (pretty x) <>
+      group (braced $ prettyNames xs)
     where
-      namesM xs =
-        traverse
-        (\ (k, v) -> prettyM v <&> \ doc -> align $ pretty k <+> ":=" <> group (nest 2 $ line <> doc))
-        (HashMap.toList xs)
+      prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
+        align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
       tupled =
         group .
         encloseSep
@@ -178,3 +142,76 @@ instance ( MonadVarRef m
         (flatAlt (hardline <> "{ ") lbrace)
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
+
+data Overload ref a
+  = Function {-# UNPACK #-} !Label !(Env Ident ref a) !(IdentMap Bool) Exp Exp
+  | Struct {-# UNPACK #-} !Label !(Env Ident ref a) !(IdentMap Bool) Exp
+  | Class {-# UNPACK #-} !Label !(Env Ident ref a) (Maybe a) !(IdentMap Bool) Exp
+  | Intrinsic !Intrinsic deriving (Functor, Foldable, Traversable)
+
+type Exp = L (Desugar.Exp L Ident)
+
+instance Eq (ref (Val ref)) => RowMatchable (Overload ref)
+
+instance Eq (ref (Val ref)) => ZipMatchable (Overload ref) where
+  zipMatch = curry $ \ case
+    (Function i_x env_x xs e1 e2, Function i_y env_y _ _ _) ->
+      guard (i_x == i_y) $>
+      Function i_x (zipMatchEnv env_x env_y) xs e1 e2
+    (Struct i_x env_x xs e1, Struct i_y env_y _ _) ->
+      guard (i_x == i_y) $>
+      Struct i_x (zipMatchEnv env_x env_y) xs e1
+    (Class i_x env_x sup_x xs e1, Class i_y env_y sup_y _ _) ->
+      guard (i_x == i_y) $>
+      Class i_x (zipMatchEnv env_x env_y) (liftA2 (,) sup_x sup_y) xs e1
+    (Intrinsic x, Intrinsic y) -> guard (x == y) $> Intrinsic x
+    _ -> Nothing
+
+instance ( Freezable (f (Val f)) (g (Val g)) m
+         , Freezable a b m
+         ) => Freezable (Overload f a) (Overload g b) m where
+  freeze = \ case
+    Function i env xs e1 e2 -> for env freeze <&> \ env ->
+      Function i env xs e1 e2
+    Struct i env xs e1 -> for env freeze <&> \ env ->
+      Struct i env xs e1
+    Class i env sup xs e1 ->
+      (\ env sup -> Class i env sup xs e1) <$> for env freeze <*> for sup freeze
+    Intrinsic x -> pure $ Intrinsic x
+
+data Named ref a
+  = Val a
+  | Ref (ref (Val ref)) deriving (Functor, Foldable, Traversable)
+
+instance Eq (ref (Val ref)) => RowMatchable (Named ref)
+
+instance Eq (ref (Val ref)) => ZipMatchable (Named ref) where
+  zipMatch = curry $ \ case
+    (Val x, Val y) -> Just $ Val (x, y)
+    (Ref x, Ref y) -> guard (x == y) $> Ref x
+    _ -> Nothing
+
+instance Freshenable a m => Freshenable (Named ref a) m where
+  freshen = \ case
+    Val x -> Val <$> freshen x
+    Ref x -> pure $ Ref x
+
+instance ( Freezable (f (Val f)) (g (Val g)) m
+         , Freezable a b m
+         ) => Freezable (Named f a) (Named g b) m where
+  freeze = \ case
+    Val x -> Val <$> freeze x
+    Ref x -> Ref <$> freeze x
+
+instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Named ref a) where
+  pretty = \ case
+    Val x -> pretty x
+    Ref x -> pretty x
+
+type Env k ref a = HashMap k (Named ref a)
+
+zipMatchEnv :: (Hashable k, ZipMatchable f)
+            => HashMap k (f a)
+            -> HashMap k (f b)
+            -> HashMap k (f (a, b))
+zipMatchEnv x y = HashMap.mapMaybe id $ HashMap.intersectionWith zipMatch x y

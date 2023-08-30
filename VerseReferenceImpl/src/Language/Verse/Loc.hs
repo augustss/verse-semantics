@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Language.Verse.Loc
   ( Loc (..)
   , minBound

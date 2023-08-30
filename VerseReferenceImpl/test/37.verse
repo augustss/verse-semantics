@@ -1,6 +1,6 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 exists logic
-logic = exists X => X = false|true
+logic = (exists X => X = false|true)
 exists struct1
 struct1 = struct:
   Property:logic

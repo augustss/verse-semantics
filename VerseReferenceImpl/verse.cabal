@@ -20,20 +20,12 @@ maintainer: andy.sonnenburg@epicgames.com
 
 library
   exposed-modules:
-    Control.Monad.Logic.State
-    Control.Monad.Logic.State.Class
+    Control.Monad.Abort
     Control.Monad.Ref
-    Control.Monad.RST
-    Control.Monad.Stuck
+    Control.Monad.RS
     Control.Monad.Supply
-    Control.Monad.Unify
-    Control.Monad.Var
     Control.Monad.Verse
-    Control.Monad.Verse.Class
-    Data.Fix
-    Data.Freshenable
-    Data.Ref
-    Data.Unifiable
+    Data.Match
     Language.Verse
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp
@@ -46,12 +38,9 @@ library
     Language.Verse.Lexer
     Language.Verse.Loc
     Language.Verse.Name
-    Language.Verse.Named
-    Language.Verse.Overload
     Language.Verse.Parse
     Language.Verse.Parse.Exp
     Language.Verse.Pos
-    Language.Verse.Pretty
     Language.Verse.Token
     Language.Verse.Val
   build-tool-depends:
@@ -71,11 +60,11 @@ library
     unordered-containers >= 0.2.6.0
   hs-source-dirs: src
   ghc-options: -Wall -Wno-name-shadowing
-  default-language: Haskell2010
+  default-language: GHC2021
 
-test-suite verse-test-suite
+test-suite golden-files
   type: exitcode-stdio-1.0
-  main-is: TestSuite.hs
+  main-is: Golden.hs
   build-depends:
     base >= 4.16.0.0,
     bytestring,
@@ -87,7 +76,18 @@ test-suite verse-test-suite
     verse
   hs-source-dirs: test
   ghc-options: -Wall -Wno-name-shadowing
-  default-language: Haskell2010
+  default-language: GHC2021
+
+test-suite hunit
+  type: exitcode-stdio-1.0
+  main-is: HUnit.hs
+  build-depends:
+    base >= 4.16.0.0,
+    HUnit,
+    verse
+  hs-source-dirs: test
+  ghc-options: -Wall -Wno-name-shadowing
+  default-language: GHC2021
 
 executable versei
   main-is: Main.hs
@@ -99,7 +99,7 @@ executable versei
     verse
   hs-source-dirs: main
   ghc-options: -Wall -Wno-name-shadowing
-  default-language: Haskell2010
+  default-language: GHC2021
 
 executable versewasm
   main-is: Main.hs
@@ -116,7 +116,7 @@ executable versewasm
     -Wall -Wno-name-shadowing
     -no-hs-main -optl-mexec-model=reactor
     "-optl-Wl,--export=malloc,--export=calloc_ptr,--export=free,--export=verse_eval"
-  default-language: Haskell2010
+  default-language: GHC2021
 
 executable verselex
   main-is: Main.hs
@@ -129,4 +129,4 @@ executable verselex
     verse
   hs-source-dirs: lex
   ghc-options: -Wall
-  default-language: Haskell2010
+  default-language: GHC2021

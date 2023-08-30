@@ -135,9 +135,9 @@ $$
 \multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
   |t| & ::= & |x|               & \text{Variable} \\
       & \vb & |k|               & \text{Constant} \\
-      & \vb & |f^[x]|           & \text{Function application} \\
+      & \vb & |t_1^[t_2]|       & \text{Function application} \\
       & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
-      & \vb & |x = t|           & \text{Unification} \\
+      & \vb & |t_1 = t_2|       & \text{Unification} \\
       & \vb & |x := t|          & \text{Definition} \\
       & \vb & |x squiggt y := t| & \text{Definition} \\
       & \vb & |:t|               & \text{Range} \\
@@ -146,14 +146,11 @@ $$
       & \vb & |for(t) do b|     & \text{Finite loop} \\
       & \vb & |check fx t|      & \text{Effects check} \\
       & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |functionP t_1 t_2|    & \text{Function} \\
+      & \vb & |functionP t b|    & \text{Function} \\
       & \vb & |oftype t_1 t_2|  & \text{Type annotation}
 \\[2mm]
 \multicolumn{4}{l}{\text{\bf Blocks}} \\
  |b| & ::= & |t| \vb |{t_1; xdots ; t_n}|
-\\[2mm]
-\multicolumn{4}{l}{\text{\bf Arguments}} \\
- |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
 \end{array}
 $$
 \\
@@ -187,7 +184,7 @@ $$
 &      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
 &      & \vb & |: t|             & \text{Range} \\
 &      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
-&      & \vb & |function (a_1 xdots a_n) t|    & \text{Function} \\
+&      & \vb & |function (a_1 xdots a_n) b|    & \text{Function}\;(n\geq 1) \\
 &      & \vb & |if(t) then b|    & \text{Conditional expression} \\
 &      & \vb & |if(t) else b|    & \text{Conditional expression} \\
 &      & \vb & |if{t}|           & \text{Conditional expression} \\
@@ -199,6 +196,9 @@ $$
 &      & \vb & |type^{t}|         & \text{Type definition} \\
 &      & \vb & |option^{}|        & \text{Create an option} \\
 &      & \vb & |option^{t}|       & \text{Create an option}
+\\[2mm]
+\text{\bf Arguments} &
+ |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
 \\[2mm]
 \text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |p_1 squiggt p_2| \\
 &     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
@@ -235,17 +235,14 @@ $$
         |p_1 := x_1; xdots; p_n := x_n |
       \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
 \rulename{pcolon2} &  |p : t| & \rightarrow & |p := (: t)| \\
-\rulename{pamp1} & |xsl amp x := t| & \rightarrow & |array(xsl amp x := t)| & \text{outside of an array}\\
-\rulename{pamp2} & |array(xdots; xsl amp x := t; xdots)| & \rightarrow & |array(xdots; xsl := t; x := t; xdots)| & \text{inside of an array}\\
+\rulename{pamp1} & |xsl amp x := t| & \rightarrow & |array(xsl amp x := t)| & \text{outside an array}\\
+\rulename{pamp2} & |array(xdots; xsl amp x := t; xdots)| & \rightarrow & |array(xdots; xsl := t; x := t; xdots)| & \text{inside an array}\\
 \end{array} \\
 \\
 \begin{array}{rcll}
 \multicolumn{4}{l}{\textbf{Application and unification}} \\
   |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
-  |t_1 == x| & \rightarrow & |x == t_1|  & \text{|t_1| not variable}\\
-  |t_1 == t_2| & \rightarrow & |x := t_1; x = t_2|  & \text{|t_1|,|t_2| not variable, fresh |x|}\\
-  |t_1^[t_2]| & \rightarrow & |f := t_1; x := t_2; f^[x]| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
-  |t_1^(t_2)| & \rightarrow & |f := t_1; x := t_2; succeeds^{f^[x]}| & \text{|t_1| or |t_2| not variable, fresh |f,x|} \\
+  |t_1^(t_2)| & \rightarrow & |succeeds^{t_1^[t_2]}| \\
 \end{array} \\
 \\
 \begin{array}{rcll}
@@ -266,7 +263,7 @@ $$
   |type^{t}| & \rightarrow & |functionP (x:=t) x| & \text{fresh |x|}\\
   |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
   |function (a_1 a_2 xdots a_n) b| & \rightarrow & |function a_1 (function (a_2 xdots a_n) b| \\
-  |function (()) b| & \rightarrow & |functionP () b| & \\
+  |function (()) b| & \rightarrow & |function ((array ())) b| & \\
   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
 \multicolumn{4}{l}{\textbf{Conditional and for-loop notation}} \\
@@ -324,11 +321,8 @@ Small Source Verse is a subset of Source Verse, which is why we us the same non-
 \item Applications |f^[x]| are in ANF: the function and argument are both variables. \simon{Why?}
 \item A definition |x := t| brings the variable |x| into scope at the beginning of the innermost enclosing block.
 (Blocks are part of the syntax in \Cref{fig:small-source-verse}.)
-\item \simon{What is the difference between |function( () ) t| and |function((())) t|, using the |(t)| and |()| productions for |a|?}
-\item \simon{Do we really need |x squiggt y := t| in Small Source Verse?}
-\item \simon{I added |:t| to Small Source Verse}
-\item \simon{can we restrict |functionKW| in Small Source Verse to simply |function t_1 t_2|?  We have dealt with
-  the empty case and with |eff fx|.}
+\item Anonymous lambdas take the form |function((t))b|, where, unusually for a programming language, the
+  ``bound variable'' is an arbitrary term |t_1|.
 \end{itemize}
 
 \subsection{Source Verse: preliminaries}
@@ -350,6 +344,11 @@ For example:
 \noindent
 One other note: real Source Verse uses the keyword \textbf{function}, but in this document we use |functionKW| to make our examples smaller.
 
+\simon{Consider |f(x:int) := (y:int; ..)|.  Presumably the scope of |y| is the RHS, \emph{not} the entire enclosing block.
+  So is the RHS of |p := t| actually a block |p := b|?  Maybe not because a block can have curly braces and I don't think we can ssay |x:int := { t_1; t_2 }|, say.}
+\simon{What about |x := y:int; ... |.  Now what is the scope of `y`? Just the RHS, or the whole enclosing block?}
+\lennart{I'm not sure using |b| for blocks is fruitful.  I think we need a set of rewrite rules (we used to have inference rules for this) that descibes it in detail.  There are subtle things like the veriables bound in the condition of an |if| scoping over the |then| expression.}
+
 \subsection{Rewriting Source Verse patterns}
 
 Source Verse has bindings |p := t|, where |p| is a \emph{pattern}.
@@ -357,6 +356,29 @@ These patterns are completely removed by the source-to-source rewrites in \Cref{
 yielding Small Source Verse bindings of the form |x := t|, or |x squiggt y := t| where |x|,|y| are variables.
 
 Source Verse also has the term |p:t|, which immediately rewrites to |p := (:t)|.
+
+\simon{Questions that Lennart and I tripped over}
+Consider |((x:int):nat) := t_1| and |((y:nat):int) := t_2| .  Are these legal at all?
+Can you have a |(x:int)| to the left of a colon?
+
+If so, they desugar using \rulename{pcolon1} twice to
+\begin{itemize}
+  \item $ |((x:int):nat) := t_1| \longrightarrow  |x := oftype (oftype t_1 nat) int|$
+  \item $ |((y:nat):int) := t_2| \longrightarrow  |y := oftype (oftype t_2 int) nat|$
+\end{itemize}
+So |(x:t_1):t_2| means the same as |x : (t_1 . t_2)|, where |.| is function composition. \simon{How do you write function composition in Verse?}
+
+
+Now consider the terms |((x:int):nat)| and |((y:nat):int)| .  Again, are these legal at all?  They desugar strangely.  Consdier
+the first.  It desugars using \rulename{pcolon2} to |(x:int) := (:nat)|, and then by \rulename{pcolon1} to |x := oftype (:nat) int|.
+It is strange that we use two different rules, with two different constructs on the RHS, to build the result.
+Is this what we want?
+
+We wondered about replacing \rulename{pcolon2} with
+$$
+\rulename{pcolon2'} \quad |p : t| \longrightarrow |(p:t) := (:any)|
+$$
+\simon{End of questions}
 
 \subsection{Array splicing}
 In an array expression, i.e., in the elements of |array| or comma separated elements,
@@ -412,6 +434,14 @@ Notice that
   In |functionP t_1 t_2| the argument (term) |t_1| is called the \emph{domain expression} of the function.
 \end{itemize}
 
+\subsection{Not done yet}
+
+This is a list of things we have not yet covered:
+\begin{itemize}
+\item In the desugaring of |t_1 eqgt t_2| there should be something about |eff closed|.
+\item What does |x:int (eff fx)| mean?
+\end{itemize}
+
 % ----------------------------------------------------------------
 \section{Desugaring Small Source Verse into Big Core Verse}
 
@@ -435,10 +465,78 @@ can very easily be desugared into it.  Specifically:
 \subsection{Desugaring from source to core}
 
 In desugaring from Source Verse into Core Verse, there are two big features to watch:
-\begin{itemize}
-\item We desugar certain constructs in two different ways, one for \emph{execution} and one for \emph{verification}.
-\end{itemize}
+\begin{description}
+\item[Functions.] We desugar Verse's lambdas |functionP t_1 t_2|, which (very unusually) have a domain \emph{expression} |t_1| rather
+  than a (conventional) domain \emph{variable}.
+\item[Verification.] We desugar certain constructs in two different ways, one for \emph{execution} and one for \emph{verification}.
+\end{description}
+\noindent
 
+
+\subsubsection{Desugaring functions for execution}
+
+We concentrate first on desugaring functions for execution.
+
+Consider the Source Verse lambda |functionP 3 t|. This is a function that takes an
+argument |i|\footnote{The name ``|i|'' connotes ``input''}, checks that it is
+equal to 3 (failing
+(\lennart{A closed function (application) fails at runtime.  An open function (application) fails at verification time,})
+if not), and returns |t|.  So this Big Core term does the job: |lam i (i=3; t)|.
+
+Now consider |x:=3; functionP x t|.  Here the |x| in |(functionP x t)| is an \emph{occurrence} of the |x|
+bound by |x:=3|; it is \emph{not} a binding of |x|.  So this term desugars to
+$$
+|x:=3; (lam i (i=x; t))|
+$$
+which (since we can substitute for |x|) means the same as the previous term.
+
+Next, consider |functionP (3 `choice` 4) t|.  Just as before, this desugars to |lam i (i=(3 `choice` 4); t)|,
+a function returns |t| if called with |3| or |4|, and fails otherwise.
+
+So it is begining to look as if the general rule is:
+$$
+|functionP t_1 t_2|  \quad\quad \text{desugars to} \quad\quad |lam i (i=t_1; t_2)|
+$$
+That is the right idea, but we need more.  In particular, how \emph{can} we bind parameters?
+Consider the Source Verse lambda |function ((x:abs)) t|.
+\lennart{Perhaps start with something less weird than |abs|.}
+It desugars to the Big Core term |lam i (x := abs^[i]; t)|.
+That is, the function takes an input argument |i|, applies the type |abs| to it
+(which might fail), binds |x| to the result of |abs^[i]|, and evaluates |t| with that value of |x|.
+
+In Small Source Verse the lambda desugars to |function ((x := :abs)) t|.
+Given an input variable |i|, we want to desugar the domain expression |(x := :abs)| in such
+a way that we feed |i| through |abs| to give the value of |x|.
+In general, for a domain expression |t_1| we say that we want to \emph{match |t_1| against |i|};
+we write |Me i t_1|, and its rules are given in \Cref{fig:desugar-match}.  Now we can desugar a function
+as follows
+$$
+|functionP t_1 t_2|  \quad\quad \text{desugars to} \quad\quad |lam i (Me i t_1; t_2)|
+$$
+
+This matching process is very like unification |(i = t_1)|, except for the single rule \rulename{mtype}.
+\emph{This one rule is the entire difference between ``matching'' and regular unification.}
+All the other rules exist only to make this one work. Let us see what happens for our example
+|functionP (x := :abs) t|:
+$$
+\begin{array}{lll}
+  |functionP (x := :abs) t| & \rightarrow & |lam i (Me i (x := :abs); t| \\
+  & \rightarrow \{\rulename{mbind}\} & |lam i (x := Me i (:abs)); t| \\
+  & \rightarrow \{\rulename{mtype}\} & |lam i (x := abs^[i]; t)|
+\end{array}
+$$
+Here you can see \rulename{mtype} in action.
+
+\subsubsection{Desugaring functions for verification}
+\lennart{Stuff here.}
+
+\subsection{Loose ends}
+
+\begin{itemize}
+\item \simon{Rule \rulename{meq} is assymetrical, which looks wrong.}
+  \lennart{Hmmm, yes, maybe it's wrong.  |(:succ) == (:pred)| probably should have |Me| on both sides.}
+\item \simon{Is \rulename{mtype} right?}
+\end{itemize}
 \begin{figure}
 $$
 \begin{array}{rcll}
@@ -485,20 +583,20 @@ $$
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
 \multicolumn{5}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
 and |e| is a BigCore expression}} \\[1mm]
-\rulename{mtype} &  |Me i (:t)| & = & |(De t)^(i)| & \\
-\rulename{mfun}  &  |Me i ((y squiggt x):=t)| & = & |y := i; x := Me i t| \\[1mm]
-
-\rulename{meq} &  |Me i (x=t)| & = & |x = Me i t| \\
-\rulename{mbind} &  |Me i (x:=t)| & = & |x := Me i t| \\
+\rulename{mtype} &  |Me i (:t)| & = & |(De t)^(i)| & \\[2mm]
+\rulename{mfun}  &  |Me i ((y squiggt x):=t)| & = & |x := Me i t; y := i| \\
+\rulename{mbind} &  |Me i (x:=t)| & = & |x := Me i t| \\[2mm]
+\rulename{meq} &  |Me i (t_1=t_2)| & = & |De t_1 = Me i t_2| \\
 \rulename{msemi} &  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
 \rulename{mchoice} &  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
 \rulename{mif} &  |Me i (if(e_1) then e_2 else e_3)| & = &
     \multicolumn{2}{@@{}l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
-\rulename{mcheck} &  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\[1mm]
+\rulename{mtype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
+\rulename{mcheck} &  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\[2mm]
 
 \rulename{mconst} &  |Me i k| & = & |i==k| \\
 \rulename{mvar} &  |Me i x| & = & |i==x| \\
-\rulename{mapply} &  |Me i (f^[x])| & = & |i==f^[x]| \\
+\rulename{mapply} &  |Me i (t_1^[t_2])| & = & |i==(De t_1)^[De t_2]| \\
 \rulename{marray} &  |Me i (array(t_1, xdots, t_n))| & = &
 \multicolumn{2}{@@{}l}{
   \begin{array}[t]{@@{}l}
@@ -506,7 +604,6 @@ and |e| is a BigCore expression}} \\[1mm]
     |i == arr (x_1, xdots, x_n))|
    \end{array}} \\
 \rulename{mfor} &  |Me i (for(e_1){e_2}| & = & |i == for(De e_1){De e_2}| \\
-\rulename{mtype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
@@ -520,7 +617,7 @@ and |e| is a BigCore expression}} \\[1mm]
 \end{array}
 \end{array}
 $$
-\caption{Desugaring of expressions (1)} \label{fig:desugar-expr1}
+\caption{Desugaring of expressions (1)} \label{fig:desugar-expr1} \label{fig:desugar-match}
 \end{figure}
 
 

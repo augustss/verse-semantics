@@ -46,10 +46,11 @@ import Language.Verse.Token qualified as Token
 
 %left ';' newline
 %left ','
+%right '=>'
 %nonassoc DOT_SPACE
 %left IF IF_THEN FOR
 %left then else do
-%right '=' ':=' '=>'
+%right '=' ':='
 %nonassoc '<>'
 %right '<' '<=' '>' '>='
 %nonassoc not
@@ -62,6 +63,7 @@ import Language.Verse.Token qualified as Token
 %nonassoc '{'
 %nonassoc name
 %nonassoc ':'
+%left PREFIX_BRACKET
 %left '(' '['
 
 %token
@@ -117,6 +119,7 @@ import Language.Verse.Token qualified as Token
   then { L _ Token.Then }
   true { L _ Token.True }
   truth { L _ Token.Truth }
+  option { L _ Token.Option }
   var { L _ Token.Var }
 
 %%
@@ -243,6 +246,12 @@ Exp :: { L (Exp L Name) }
   | Exp '/' Scan Exp {
       (:/:) <\$> duplicate $1 <.> duplicate $4
     }
+  | '[' ']' Exp %prec PREFIX_BRACKET {
+      Exp.PrefixBracket <\$ $1 <. $2 <.> duplicate $3
+    }
+  | '?' Exp {
+      Exp.PrefixQuery <\$ $1 <.> duplicate $2
+    }
   | Exp '?' {
       Exp.Query <\$> duplicate $1 <. $2
     }
@@ -257,6 +266,9 @@ Exp :: { L (Exp L Name) }
     }
   | truth Block {
       Exp.Truth <\$ $1 <.> duplicate $2
+    }
+  | option Block {
+      Exp.Option <\$ $1 <.> duplicate $2
     }
   | false {
       Exp.False <\$ $1
