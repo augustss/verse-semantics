@@ -80,12 +80,12 @@ isDone = go False
   go lam (e1 :@: e2)      = go lam e1 && go lam e2
   go lam (One e)          = go lam e
   go lam (All e)          = go lam e
-  go lam (Assume e)       = go lam e
   go lam (Fails  e)       = go lam e
   go _   (Assert _)       = False
   go _   (Decide _)       = False
   go lam (Split x y z)    = go lam x && go lam y && go lam z
   go lam (Store h e)      = and (go lam <$> IM.elems h) && go lam e
+  -- go _lam (Assume e)       = True -- go lam e
   go _   _                = True
 
 
