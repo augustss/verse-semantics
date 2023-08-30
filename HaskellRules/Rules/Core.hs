@@ -273,7 +273,14 @@ comp  _   _  If{}           _            = LT
 comp  _   _  _              If{}         = GT
 
 comp  xs  ys (EXI x a) (EXI y b) = comp (x:xs) (y:ys) a b
+comp _xs _ys EXI {}    _         = LT
+comp _xs _ys _         EXI {}    = GT
+
 comp  xs  ys (UNI x a) (UNI y b) = comp (x:xs) (y:ys) a b
+comp _xs _ys UNI {}    _         = LT
+comp _xs _ys _         UNI {}    = GT
+
+-- comp _ _ a b = error $ "comp: " ++ prettyShow (a, b) -- undefined -- GHC bug
 
 comp _ _ _ _ = undefined -- GHC bug
 
@@ -459,6 +466,9 @@ instance Rec Expr where
       Exi (Bind x a) ->
            [ (n, Exi (Bind x a')) | (n,a') <- rec r (addBound (BExi x) s) a ]
 
+      Uni (Bind x a) ->
+           [ (n, Uni (Bind x a')) | (n,a') <- rec r (addBound (BUni x) s) a ]
+
       f :@: a ->
            [ (n,f' :@: a)  | (n,f') <- rec r s f ]
         ++ [ (n,f  :@: a') | (n,a') <- rec r s a ]
@@ -489,7 +499,7 @@ instance Rec Expr where
       _     -> []
      where addBound x tf = tf{ bndVars = x : bndVars tf }
 
-data BndVar = BExi Ident | BLam Ident | BBlk
+data BndVar = BExi Ident | BUni Ident | BLam Ident | BBlk
   deriving (Show)
 
 boundVars :: TRSFlags -> [Ident]
@@ -510,6 +520,7 @@ bndIds [] = []
 bndIds (BExi x : bs) = x : bndIds bs
 bndIds (BLam x : bs) = x : bndIds bs
 bndIds (BBlk   : bs) =     bndIds bs
+bndIds (BUni x : bs) = x : bndIds bs
 
 --------------------------------------------------------------------------------
 

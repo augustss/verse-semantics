@@ -62,7 +62,7 @@ tests = -- take 6
   , ("ex_if_then_only", ex_if_then_only, True)
   , ("ex_hide_00", ex_hide_00, True)
   , ("ex_hide_01", ex_hide_01, False)
-  , ("ex_hide_02", ex_hide_01, True)
+  , ("ex_hide_02", ex_hide_02, True)
   ]
 
 --------------------------------------------------------------------------------

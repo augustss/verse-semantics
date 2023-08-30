@@ -111,6 +111,7 @@ icfpeVerifier = icfp
   , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
               <> (generalizedIcfpRules -= "SUBST-GEN")
               <> l2rSubstRules
+              <> uniRules
               <> assumeAssertRules
               <> verifierRules
   }
@@ -149,6 +150,29 @@ l2rSubstRules _env lhs =
      (Var x :=: Val v) :>: e <- [lhs]
      guard (x `notElem` free v)
      pure ((Var x :=: v) :>: subst [(x,v)] e)
+
+uniRules :: VRule
+uniRules _env lhs =
+  -- Assume { uni x . e } ----> uni x . Assume {e}
+  "asm-uni" `name`
+  do Assume (Uni (Bind x e)) <- [lhs]
+     pure (Uni (Bind x (Assume e)))
+  ++
+  -- X[uni x. e] ---> uni x. X[e]
+  "uni-float" `name`
+  do (ctx, UNI x e) <- execX lhs  -- Note: Store not allowed in ctx
+     -- guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
+     let freeX = free ctx
+         x'    = identNotIn (freeX ++ free e)
+     if x `elem` freeX
+       then pure (UNI x' (ctx (subst [(x,Var x')] e)))
+       else pure (UNI x (ctx e))
+  ++
+  -- exi x. uni y. e ---> uni y. exi x. e
+  "uni-hop" `name`
+  do  EXI x (UNI y e) <- [lhs]
+      guard (x /= y)
+      pure (UNI y (EXI x e))
 
 -- | ICFP rules generalized to remove the trailing `e :>: ...` pattern
 generalizedIcfpRules :: VRule
@@ -313,22 +337,22 @@ assumeAssertRules env lhs =
 
 
 mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
-mustSucceed _ bs = go
+mustSucceed _ bvars = go [x | BLam x <- bvars]
   where
-   lamBinds            = [x | BLam x <- bs]
-   go (Int _)          = True
-   go (Arr as)         = all go as
-   go (Lam _)          = True
-   go (Var x)          = x `elem` lamBinds
-   go (Assume _)       = True
-   go (Fails _)        = True
-   go (Assume Fail :>: _) = True       -- HACK
-   go (e1 :>: e2)      = go e1 && go e2
-   go (One e)          = go e
-   go (All e)          = go e
-   go (e1 :|: e2)      = go e1 || go e2
-   go (Exi (Bind _ e)) = go e
-   go _                = False
+   go _  (Int _)          = True
+   go bs (Arr as)         = all (go bs) as
+   go _  (Lam _)          = True
+   go bs (Var x)          = x `elem` bs
+   go _  (Assume _)       = True
+   go _  (Fails _)        = True
+   go _  (Assume Fail :>: _) = True       -- HACK
+   go bs (e1 :>: e2)      = go bs e1 && go bs e2
+   go bs (One e)          = go bs e
+   go bs (All e)          = go bs e
+   go bs (e1 :|: e2)      = go bs e1 || go bs e2
+   go bs (Exi (Bind _ e)) = go bs e
+   go bs (Uni (Bind x e)) = go (x:bs) e
+   go _  _                = False
 
 
 mustDecide :: QContext -> [BndVar] -> Expr -> Bool
