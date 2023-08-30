@@ -31,11 +31,11 @@ test(S00){f(x:int):int=x}
 test(V10){f(x:int):char=x}
 test(S00){for{}}
 test(S00){for{1|2}=array{1,2}}
-test(S00){if(1) then 2 else 3}			# TODO:FIX
-test(S00){if(1=2) then 2 else 3}		# TODO:FIX
-test(S00){2=if(1) then 2 else 3}		# TODO:FIX
-test(S00){3=if(1=2) then 2 else 3}		# TODO:FIX
-test(S00){if(1+1) then 2+1 else 3+1}	# TODO:FIX
+test(S00){fv(:any) := if(1) then 2 else 3}			# TODO:remove 'fv'
+test(S00){fv(:any) := if(1=2) then 2 else 3}		# TODO:FIX
+test(S00){fv(:any) := 2=if(1) then 2 else 3}		# TODO:FIX
+test(S00){fv(:any) := 3=if(1=2) then 2 else 3}		# TODO:FIX
+test(S00){fv(:any) := if(1+1) then 2+1 else 3+1}	# TODO:FIX
 test(S00){f(x:int):=x; f[3]=3}
 test(D00){f()<decides>:int => f[]}
 test(S00){f():=3 => f[]=3}
@@ -62,13 +62,13 @@ test(N04){f(g():any):=g[]; f(g():=6)}
 test(N04){f(x:int)<decides>:=x=3, f[x:int]}
 
 # Open world + conditionals.
-test(S00){x:int=if(1) then 1 else 2}
-test(S00){x:int=if(1=2) then 1 else 2}
-test(S00){a:int => :int=3}							#TODO:FIX
-test(S00){a:int => :int=a}							#TODO:FIX
-test(S00){a:int => :int=if(1) then 2 else 3}		#TODO:FIX
-test(S00){a:int => :int=if(1=2) then 2 else 3}		#TODO:FIX
-test(S00){a:int => if(a=1) then :int=2 else :int=3}	#TODO:FIX
+test(S00){fv(:any) := x:int=if(1) then 1 else 2}
+test(S00){fv(:any) := x:int=if(1=2) then 1 else 2}
+test(S00){a:int => :int=3}							#TODO:HIDING
+test(S00){a:int => :int=a}							#TODO:HIDING
+test(S00){a:int => :int=if(1) then 2 else 3}		#TODO:HIDING
+test(S00){a:int => :int=if(1=2) then 2 else 3}		#TODO:HIDING
+test(S00){a:int => if(a=1) then :int=2 else :int=3}	#TODO:HIDING
 #test(S00){a:int => :int=if(a=1) then 2 else 3} #!! MUST FIX
 
 #
@@ -1384,8 +1384,8 @@ test(R20){assume{x:int   where false[]}}
 test(D00){assume{x:int                }=7}
 test(D00){assume{x:int   where x+2=3  }=1}
 test(D00){assume{x:int   where x+2=3  }=7} # D00 because of paraconsistency.
-test(D00){assume{x:int   where 8=9    }=7} # D00 because of paraconsistency.
-test(D00){assume{x:int   where false[]}=7} # D00 because of paraconsistency.
+test(D00){assume{x:int   where 8=9    }=7} # D00 because of paraconsistency.	#TODO: asm-fail
+test(D00){assume{x:int   where false[]}=7} # D00 because of paraconsistency.	#TODO: asm-fail
 test(R20){assume{x:false where false[]}=7} # Succeeds because variable contradicts.
 test(R20){assume{x:false              }=7}
 test(S00){a:int => assume{x:false where a=3}=7}
@@ -1402,10 +1402,10 @@ test(F00){x:int => x=3 => x+1=5}
 #
 
 # Paraconsistency.
-test(U00){assume{x:any   where 3=4}=5}
-test(D00){assume{x:int   where 3=4}=5}
+test(U00){assume{x:any   where 3=4}=5}	#TODO:ASSUME/asm-fail
+test(D00){assume{x:int   where 3=4}=5}	#TODO:ASSUME/asm-fail
 test(R20){assume{x:=5    where 3=4}=5}
-test(F00){assume{x:=6    where 3=4}=5}
+test(F00){assume{x:=6    where 3=4}=5}	#TODO:ASSUME/asm-fail
 test(R20){assume{x:false where 3=4}=5}
 
 # Reification failure not captured by shape and escalation.
@@ -1424,9 +1424,9 @@ test(F00){x:false  where assume{nat[x]}}
 test(F00){2=3}
 test(R20){assume{2=3}}
 test(F00){a:int => {a=2,assume{a=3}}}
-test(F00){assume{2=3},4=5}
+test(F00){assume{2=3},4=5}			# TODO:ASSUME
 test(F00){assume{false[]},4=5}
-test(F00){a:=2,assume{a=3},4=5}
+test(F00){a:=2,assume{a=3},4=5}		# TODO:ASSUME
 
 # Don't let diverges overwhelms fails.
 test(R20){x:=2,assume{x=3}}

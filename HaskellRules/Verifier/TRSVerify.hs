@@ -60,6 +60,9 @@ tests = -- take 6
   , ("ex_asm_race'", ex_asm_race', False)
   , ("ex_if_else_only", ex_if_else_only, True)
   , ("ex_if_then_only", ex_if_then_only, True)
+  , ("ex_hide_00", ex_hide_00, True)
+  , ("ex_hide_01", ex_hide_01, False)
+  , ("ex_hide_02", ex_hide_01, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -595,3 +598,35 @@ ex_if_then_only = Verify (Assert (Int 2 :=: If (Int 10) (Int 2) (Int 99)))
 
 ex_if_else_only :: Expr
 ex_if_else_only = Verify (Assert (Int 2 :=: If (Int 10 :=: Int 20) (Int 99) (Int 2)))
+
+---------------------------------------------------------------------------------------------
+-- | `asType` (aka |> from `desugaring.pdf`)
+---------------------------------------------------------------------------------------------
+
+tINT :: Expr
+tINT = LAM z (iNT (Var z))
+  where z = ident "z"
+
+asType :: Expr -> Expr -> Expr
+asType e t = Verify (Assert (t :@: e)) :>: Assume (UNI a (t :@: Var a))
+  where
+    a = ident "a"
+
+-- exi x. x = 2; x = 2; 100  (ACCEPT)
+ex_hide_00 :: Expr
+ex_hide_00 = Assert $ EXI x ((Var x :=: (Int 2 {- `asType` tINT -})) :>: Var x :=: Int 2)
+  where
+    x = ident "x"
+
+-- exi x. x = (2 >> int); x = 2; 100  (REJECT)
+ex_hide_01 :: Expr
+ex_hide_01 = Assert $ EXI x ((Var x :=: (Int 2 `asType` tINT)) :>: Var x :=: Int 2)
+  where
+    x = ident "x"
+
+-- exi x,y. x = (2 >> int); y = x; int[y]
+ex_hide_02 :: Expr
+ex_hide_02 = Assert $ eXIs [x,y] ((Var x :=: (Int 2 `asType` tINT)) :>: Var y :=: Var x :>: iNT (Var y))
+  where
+    x = ident "x"
+    y = ident "y"

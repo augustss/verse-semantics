@@ -22,6 +22,7 @@ module Rules.Core(
   isVal,
   isLam,
   pattern EXI,
+  pattern UNI,
   pattern LAM,
   pattern Block, Eqn,
   getExis,
@@ -73,6 +74,7 @@ data Expr
   | Expr :|: Expr               -- ^ e1 | e2
   | Expr :@: Expr               -- ^ v1(v2)
   | Exi (Bind Expr)             -- ^ ex x. e
+  | Uni (Bind Expr)             -- ^ all x. e
   | One Expr                    -- ^ one { e }
   | All Expr                    -- ^ all { e }
   | Fail                        -- ^ fail
@@ -129,6 +131,10 @@ instance Pretty Expr where
   pPrintPrec l p e@(EXI{})        = maybeParens (p > 0) $ text "ex" <+> sep [hcat (punctuate (text " ") (map (pPrintPrec l 0) xs)) P.<> text ".",
                                                                              pPrintPrec l 0 a]
                                     where (xs, a) = getExis e
+  pPrintPrec l p e@(UNI{})        = maybeParens (p > 0) $ text "un" <+> sep [hcat (punctuate (text " ") (map (pPrintPrec l 0) xs)) P.<> text ".",
+                                                                             pPrintPrec l 0 a]
+                                    where (xs, a) = getUnis e
+
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
@@ -267,6 +273,7 @@ comp  _   _  If{}           _            = LT
 comp  _   _  _              If{}         = GT
 
 comp  xs  ys (EXI x a) (EXI y b) = comp (x:xs) (y:ys) a b
+comp  xs  ys (UNI x a) (UNI y b) = comp (x:xs) (y:ys) a b
 
 comp _ _ _ _ = undefined -- GHC bug
 
@@ -314,6 +321,11 @@ getExis = get []
   where get vs (EXI v b) = get (v:vs) b
         get vs b = (reverse vs, b)
 
+getUnis :: Expr -> ([Ident], Expr)
+getUnis = get []
+  where get vs (UNI v b) = get (v:vs) b
+        get vs b = (reverse vs, b)
+
 exis :: [Ident] -> Expr -> Expr
 exis is e = foldr EXI e is
 
@@ -324,6 +336,9 @@ exis is e = foldr EXI e is
 
 pattern EXI :: Ident -> Expr -> Expr
 pattern EXI x e = Exi (Bind x e)
+
+pattern UNI :: Ident -> Expr -> Expr
+pattern UNI x e = Uni (Bind x e)
 
 pattern LAM :: Ident -> Expr -> Expr
 pattern LAM x e = Lam (Bind x e)
@@ -511,6 +526,7 @@ instance Free Expr where
   free (a :|: b) = free a `union` free b
   free (a :@: b) = free a `union` free b
   free (Exi bnd) = free bnd
+  free (Uni bnd) = free bnd
   free (One a)   = free a
   free (All a)   = free a
   free (Assume a) = free a
@@ -556,6 +572,7 @@ instance Substitutable Expr where
   subst _sub Fail     = Fail
   subst _sub e@Wrong{}= e
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
+  subst sub (Uni bnd) = Uni (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Assume a) = Assume (subst sub a)
@@ -631,6 +648,10 @@ instance Arbitrary Expr where
   shrink (Exi (Bind x a)) = [a |x `notElem` ys]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
+  shrink (Uni (Bind x a)) = [a |x `notElem` ys]
+                         ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
+                         ++ [Uni (Bind x a') | a' <- shrink a] where ys = free a
+
   shrink (Split e f g) = [e, f, g] ++ [Split e' f g | e' <- shrink e]
                                    ++ [Split e f' g | f' <- shrink f]
                                    ++ [Split e f g' | g' <- shrink g]
@@ -691,6 +712,7 @@ collect here (\/) = col
   recr a (Arr es)         = foldr (\/) a (map col es)
   recr a (Lam (Bind _ e)) = a \/ col e
   recr a (Exi (Bind _ e)) = a \/ col e
+  recr a (Uni (Bind _ e)) = a \/ col e
   recr a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :|: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
@@ -698,6 +720,7 @@ collect here (\/) = col
   recr a (One e)          = a \/ col e
   recr a (All e)          = a \/ col e
   recr a (Assume e)       = a \/ col e
+  recr a (Fails e)        = a \/ col e
   recr a (Assert e)       = a \/ col e
   recr a (Verify e)       = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
@@ -713,12 +736,14 @@ allVars = nub . expr
     expr (Arr es) = concatMap expr es
     expr (LAM i e) = i : expr e
     expr (EXI i e) = i : expr e
+    expr (UNI i e) = i : expr e
     expr (e1 :=: e2) = expr e1 ++ expr e2
     expr (e1 :@: e2) = expr e1 ++ expr e2
     expr (e1 :>: e2) = expr e1 ++ expr e2
     expr (One e) = expr e
     expr (All e) = expr e
     expr (Assume e) = expr e
+    expr (Fails e)  = expr e
     expr (Assert e) = expr e
     expr (Verify e) = expr e
     expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
@@ -771,6 +796,12 @@ substExp from to = sub
       | x `elem` fvs = Exi bnd
       | otherwise    = Exi (Bind x (sub e))
      where Bind x e = alphaRename tvs bnd
+
+    sub (Uni bnd)
+      | x `elem` fvs = Uni bnd
+      | otherwise    = Uni (Bind x (sub e))
+     where Bind x e = alphaRename tvs bnd
+
     sub (One a)   = One (sub a)
     sub (All a)   = All (sub a)
     sub (Assume a) = Assume (sub a)
