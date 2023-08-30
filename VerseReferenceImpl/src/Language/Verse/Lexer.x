@@ -1,11 +1,7 @@
 {
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Language.Verse.Lexer
   ( Lexer
   , runLexer
@@ -188,6 +184,7 @@ $space = [\ \t]
   "then" { token Token.Then }
   "true" { token Token.True }
   "truth" { token Token.Truth }
+  "option" { token Token.Option }
   "var" { token Token.Var }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }

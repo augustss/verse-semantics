@@ -47,12 +47,14 @@ data Token
   | For
   | Do
   | Block
+  | Where
   | Class
   | Struct
   | Module
   | Exists
   | Function
   | Truth
+  | Option
   | Array
   | False
   | True
@@ -105,12 +107,14 @@ instance Pretty Token where
     For -> "for"
     Do -> "do"
     Block -> "block"
+    Where -> "where"
     Class -> "class"
     Struct -> "struct"
     Module -> "module"
     Exists -> "exists"
     Function -> "function"
     Truth -> "truth"
+    Option -> "option"
     Array -> "array"
     False -> "false"
     True -> "true"

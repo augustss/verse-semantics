@@ -27,6 +27,8 @@ data Exp f a
   | One (f (Exp f a))
   | All (f (Exp f a))
   | Not (f (Exp f a))
+  | PrefixBracket (f (Exp f a))
+  | PrefixQuery (f (Exp f a))
   | Query (f (Exp f a))
   | Module (f (Exp f a))
   | Struct (f (Exp f a))
@@ -47,6 +49,7 @@ data Exp f a
   | Overload (f a) (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
+  | Option (f (Exp f a))
   | True
   | False
   | Int !Integer

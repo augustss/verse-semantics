@@ -34,9 +34,12 @@ data Exp f a
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
+  | Option (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
   | Name a
-  | Default (f a) (f (Exp f a)) (f (Exp f a))
+  | InfixColon (f a) (f (Exp f a))
+  | InfixColonEqual (f a) (f (Exp f a))
+  | MixfixColonEqual (f a) (f (Exp f a)) (f (Exp f a))
 
 deriving instance (Show (f (Exp f a)), Show (f a), Show a) => Show (Exp f a)

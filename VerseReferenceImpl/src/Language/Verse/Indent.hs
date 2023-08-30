@@ -12,5 +12,5 @@ data White = Space | Tab deriving (Show, Eq)
 
 instance Pretty White where
   pretty = \ case
-    Space ->space
+    Space -> space
     Tab -> backslash <> pretty 't'
