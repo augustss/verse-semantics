@@ -476,72 +476,46 @@ instClass
   -> S m
   -> VerseT m (Maybe (VarVal m))
 instClass loc i env sup xs e archetype s s' = do
-  (inst, _) <- instFreshClass loc i sup xs
-  s <- evalClass loc env sup xs e archetype inst s
+  (var, _, f) <- instClass' loc i env sup xs e
+  s <- f archetype s
   fork do
     readIVar s.choiceFree
     writeIVar s'.choiceFree ()
   fork do
     readIVar s.storeFree
     writeIVar s'.storeFree ()
-  pure $ Just inst
+  pure $ Just var
 
-instFreshClass
-  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m)
-  => Loc
-  -> Label
-  -> Maybe (VarVal m)
-  -> IdentMap Bool
-  -> VerseT m (VarVal m, Env m)
-instFreshClass loc i sup xs = do
-  (sup, xs_sup) <- instFreshSup loc sup
-  xs <- traverse freshNamed xs
-  let xs' = xs_sup <> xs
-  newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs')
-
-instFreshSup
-  :: (MonadAbort Error m, MonadFix m, MonadRef m, MonadSupply Int m)
-  => Loc
-  -> Maybe (VarVal m)
-  -> VerseT m (Maybe (VarVal m), Env m)
-instFreshSup loc sup = case sup of
-  Nothing -> pure (Nothing, mempty)
-  Just sup -> do
-    (i, _, sup, xs, _) <- readClass loc sup
-    (sup, xs) <- instFreshClass loc i sup xs
-    pure (Just sup, xs)
-
-evalClass
+instClass'
   :: MonadEval m
   => Loc
+  -> Label
   -> Env m
   -> Maybe (VarVal m)
   -> IdentMap Bool
   -> L (Exp L Ident)
-  -> Archetype m
-  -> VarVal m
-  -> S m
-  -> VerseT m (S m)
-evalClass loc env sup xs e archetype inst s = do
-  (_, inst_sup, inst_xs) <- readClassInst loc inst
-  let inst_xs' = toIdentMap inst_xs
-  s <- execEvalT' (eval' e) R { env = inst_xs' <> env, archetype } s
-  let archetype_sup = (inst_xs' /\ xs) <> archetype
-  evalSup loc sup archetype_sup inst_sup s
+  -> VerseT m (VarVal m, Env m, Archetype m -> S m -> VerseT m (S m))
+instClass' loc i env sup xs e = do
+  (sup, vars_sup, f_sup) <- instSup loc sup
+  vars <- (vars_sup <>) <$> traverse freshNamed xs
+  let
+    f archetype s = do
+      s <- execEvalT' (eval' e) R { env = vars <> env, archetype } s
+      let archetype_sup = (vars /\ xs) <> archetype
+      f_sup archetype_sup s
+  newVar (Val.ClassInst i sup $ filterNames vars) <&> (, vars, f)
 
-evalSup
+instSup
   :: MonadEval m
   => Loc
   -> Maybe (VarVal m)
-  -> Archetype m
-  -> Maybe (VarVal m)
-  -> S m
-  -> VerseT m (S m)
-evalSup loc sup archetype inst_sup s = case (,) <$> sup <*> inst_sup of
-  Nothing -> pure s
-  Just (sup, inst_sup) -> do
-    (_, env, sup, xs, e) <- readClass loc sup
-    evalClass loc env sup xs e archetype inst_sup s
+  -> VerseT m (Maybe (VarVal m), Env m, Archetype m -> S m -> VerseT m (S m))
+instSup loc sup = case sup of
+  Nothing -> pure (Nothing, mempty, const pure)
+  Just sup -> do
+    (i, env, sup, xs, e) <- readClass loc sup
+    (sup, xs, f) <- instClass' loc i env sup xs e
+    pure (Just sup, xs, f)
 
 readClass
   :: (MonadAbort Error m, MonadRef m)
@@ -552,15 +526,6 @@ readClass loc = readVar >=> \ case
   Val.Overloads head tail -> case head of
     Val.Class i env sup xs e -> pure (i, env, sup, xs, e)
     _ -> readClass loc tail
-  _ -> abort $ DomainError loc
-
-readClassInst
-  :: (MonadAbort Error m, MonadRef m)
-  => Loc
-  -> VarVal m
-  -> VerseT m (Label, Maybe (VarVal m), Val.Env Name (VarRef m) (VarVal m))
-readClassInst loc = readVar >=> \ case
-  Val.ClassInst i sup xs -> pure (i, sup, xs)
   _ -> abort $ DomainError loc
 
 findClassInst :: (MonadRef m, MonadSupply Int m)
@@ -892,13 +857,6 @@ newEnv = execWriterT $ do
       tell . HashMap.singleton x . Val =<<
       lift . newVar . Val.Overloads (Val.Intrinsic y) =<<
       lift freshVar
-
-toIdentMap :: HashMap Name a -> IdentMap a
-toIdentMap =
-  HashMap.fromList .
-  HashMap.foldrWithKey
-  (\ k v z -> (Ident.Name k, v) : z)
-  []
 
 filterNames :: IdentMap a -> HashMap Name a
 filterNames =
