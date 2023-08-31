@@ -167,7 +167,7 @@ dsSmall = ds
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
     ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
-    ds (Macro1 (Ident _ "in'='") [] (Block es)) = dsU =<< mapM ds es
+    ds (Macro1 (Ident _ "in'='") [] (Blk es)) = dsU =<< mapM ds es
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
@@ -210,7 +210,7 @@ dsSmall = ds
       x <- Variable <$> newIdent l "x"
       ds $ Function [(InfixOp x (Op ":") eAny, [])] $ Case2 x b
     ds (Case2 _ _) = undefined
-    ds (Block es) = ds $ seqE es
+    ds (Blk es) = ds $ seqE es
 
     ds (Seq es) = seqE <$> mapM ds es
     ds (OfType e1 e2) = OfType <$> ds e1 <*> ds e2

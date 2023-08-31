@@ -314,11 +314,11 @@ pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) 
 pBlockEs :: P [Expr]
 pBlockEs = pBraces (sepEndBy pExprT (pOp ";"))
 
-pBlock :: P Block
+pBlock :: P Blk
 pBlock = pBlockM <|> pExprT
 
-pBlockM :: P Block
-pBlockM = Block <$> (pBlockEs  <|> pIndBlock)
+pBlockM :: P Blk
+pBlockM = Blk <$> (pBlockEs  <|> pIndBlock)
 
 pIndBlock :: P [Expr]
 pIndBlock = do

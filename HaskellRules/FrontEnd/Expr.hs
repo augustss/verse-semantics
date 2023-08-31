@@ -15,7 +15,7 @@ module FrontEnd.Expr(
   pattern Succeeds,
 --  pattern Range,
   Store(..), Ptr,
-  Block,
+  Blk,
   Eff,
   Op,
   pattern Op,
@@ -73,19 +73,19 @@ data Expr
   | PrefixOp Op Expr          -- op e
   | PostfixOp Expr Op         -- e op
   | InfixOp Expr Op Expr      -- e1 op e2
-  | If1 Block                 -- if{e}
-  | If2 Expr Block            -- if(e1) then e2
-  | If2E Expr Block           -- if(e1) else e2
-  | If3 Expr Block Block      -- if(e1) then e2 else e3
-  | For1 Block                -- for{e}
-  | For2 Expr Block           -- for(e1) in e2
-  | Let Expr Block            -- let(e1) in e2
-  | Do Block                  -- do e
-  | Case1 Block               -- case{e1; e2; ... } block treated in a non-standard way
-  | Case2 Expr Block          -- case(e) of {e1; e2; ... } block treated in a non-standard way
-  | Function [(Expr, [Eff])] Block -- function(e)<eff>...{e}
---  | Typedef Block             -- type{e}
-  | Block [Expr]              -- { e1; e2; ... }
+  | If1 Blk                 -- if{e}
+  | If2 Expr Blk            -- if(e1) then e2
+  | If2E Expr Blk           -- if(e1) else e2
+  | If3 Expr Blk Blk      -- if(e1) then e2 else e3
+  | For1 Blk                -- for{e}
+  | For2 Expr Blk           -- for(e1) in e2
+  | Let Expr Blk            -- let(e1) in e2
+  | Do Blk                  -- do e
+  | Case1 Blk               -- case{e1; e2; ... } block treated in a non-standard way
+  | Case2 Expr Blk          -- case(e) of {e1; e2; ... } block treated in a non-standard way
+  | Function [(Expr, [Eff])] Blk -- function(e)<eff>...{e}
+--  | Typedef Blk             -- type{e}
+  | Blk [Expr]              -- { e1; e2; ... }
   | Option (Maybe Expr)       -- option{e}
   | Parens Expr               -- (e)
   | Set Expr Ident Expr       -- set e1 = e2
@@ -93,8 +93,8 @@ data Expr
   | MRef Ident (Maybe Expr) (Maybe Expr)      -- ref i : t = e
   | MAlias Ident (Maybe Expr) (Maybe Expr)    -- alias i : t = e
   -- Some 1-argument macros
-  | Macro1 Ident [Eff] Block  -- m<a>{e}
-  | Macro2 Ident Expr Block   -- m(e1){e2}
+  | Macro1 Ident [Eff] Blk  -- m<a>{e}
+  | Macro2 Ident Expr Blk   -- m(e1){e2}
   | Return Expr               -- return e
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
@@ -152,10 +152,10 @@ instance Pretty Lit where
 --pattern Range e = ApplyD e AnyT
 pattern Unit :: Expr
 pattern Unit = Array []
-pattern Typedef :: Block -> Expr
+pattern Typedef :: Blk -> Expr
 pattern Typedef e <- Macro1 (Ident _ "type") [] e
   where Typedef e = Macro1 (Ident noLoc "type") [] e
-pattern Succeeds :: Block -> Expr
+pattern Succeeds :: Blk -> Expr
 pattern Succeeds e <- Macro1 (Ident _ "succeeds") [] e
   where Succeeds e = Macro1 (Ident noLoc "succeeds") [] e
 
@@ -166,7 +166,7 @@ pattern Op :: String -> Op
 pattern Op s <- Ident _ s
   where Op s = Ident noLoc s
 
-type Block = Expr
+type Blk = Expr
 
 instance Pretty Expr where
   pPrintPrec l p
@@ -175,7 +175,7 @@ instance Pretty Expr where
     where
       ppA (Array es) = ppEs es
       ppA e = ppr 0 e
-      ppB (Block es) = braces $ ppSeq l es
+      ppB (Blk es) = braces $ ppSeq l es
       ppB e = braces (ppr 0 e)
       ppEs = fsep . punctuate comma . map (pPrintPrec l 1)
       ppEffs rs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
@@ -231,7 +231,7 @@ instance Pretty Expr where
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $ text "function" <> hcat (map ppArs ars) <> ppB b
             where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
-          Block es -> braces $ ppSeq l es
+          Blk es -> braces $ ppSeq l es
 --          Typedef e -> text "type" <> ppB e
           Option me -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e -> parens (ppr 0 e)
@@ -356,7 +356,7 @@ compos f (Case1 b) = Case1 <$> f b
 compos f (Case2 e b) = Case2 <$> f e <*> f b
 compos f (Function ers b) = Function <$> traverse g ers <*> f b
   where g (e, r) = (,) <$> f e <*> pure r
-compos f (Block es) = Block <$> traverse f es
+compos f (Blk es) = Blk <$> traverse f es
 compos f (Option me) = Option <$> traverse f me
 --compos f (Typedef b) = Typedef <$> f b
 compos f (Parens e) = Parens <$> f e

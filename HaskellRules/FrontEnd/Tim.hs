@@ -230,7 +230,7 @@ dsExpr sc h f (Function [(s0, _fx)] s1) = do
   op1 <- scope sc0 q w s1
   pure [f :=: Lambd x y [op0] y w [ExistsOp [q] $ [q :=: App h y] ++ [op1]]]
 dsExpr _ _ _ e@(Function _ _) = error $ "Function " ++ show e
-dsExpr sc i x (Block es) = dsExprs sc i x es
+dsExpr sc i x (Blk es) = dsExprs sc i x es
 dsExpr sc i x (Seq es) = dsExprs sc i x es
 --dsExpr _ _ _ (Option _) = undefined
 dsExpr sc i x (Parens e) = dsExpr sc i x e
