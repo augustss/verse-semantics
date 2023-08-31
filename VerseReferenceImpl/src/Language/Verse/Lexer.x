@@ -186,6 +186,7 @@ $space = [\ \t]
   "truth" { token Token.Truth }
   "option" { token Token.Option }
   "var" { token Token.Var }
+  "where" { token Token.Where }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
   $alpha $alnum* ("'" @operator "'")? { name }

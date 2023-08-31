@@ -47,6 +47,7 @@ import Language.Verse.Token qualified as Token
 %left ';' newline
 %left ','
 %right '=>'
+%left where
 %nonassoc DOT_SPACE
 %left IF IF_THEN FOR
 %left then else do
@@ -121,6 +122,7 @@ import Language.Verse.Token qualified as Token
   truth { L _ Token.Truth }
   option { L _ Token.Option }
   var { L _ Token.Var }
+  where { L _ Token.Where }
 
 %%
 
@@ -153,6 +155,9 @@ Commas :: { L [L (Exp L Name)] }
 
 Exp :: { L (Exp L Name) }
   : Paren { $1 }
+  | Exp where Exp {
+      Exp.Where <\$> duplicate $1 <.> duplicate $3
+    }
   | Exp '=' Scan Exp {
       (:=:) <\$> duplicate $1 <.> duplicate $4
     }

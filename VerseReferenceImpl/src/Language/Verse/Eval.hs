@@ -330,7 +330,7 @@ evalNot e = do
 
 evalIfThenElse
   :: MonadEval m
-  => HashMap Ident Bool
+  => IdentMap Bool
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> L (Exp L Ident)
@@ -364,7 +364,7 @@ evalIfThenElse xs p t e = do
 
 evalForDo
   :: MonadEval m
-  => HashMap Ident Bool
+  => IdentMap Bool
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
@@ -397,7 +397,7 @@ evalInst
   :: MonadEval m
   => Loc
   -> L (Exp L Ident)
-  -> HashMap Ident Bool
+  -> IdentMap Bool
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
 evalInst loc e1 xs e2 = do

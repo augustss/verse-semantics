@@ -43,10 +43,10 @@ desugar' e = for e $ \ case
   (Parse.:=:) (extract -> Parse.InfixColon x e1) e2 -> do
     tellName x False
     MixfixColonEqual (Ident.Name <$> x) <$> desugar' e1 <*> desugar' e2
-  Parse.PrefixColon e -> do
-    e <- desugar' e
-    e_i <- (e $>) . Name <$> freshIdent (loc e) False
-    pure $ BracketInvoke e e_i
+  Parse.PrefixColon e' -> do
+    e' <- desugar' e'
+    x <- freshIdent (loc e) False
+    pure $ BracketInvoke e' $ Name x <$ e
   Parse.InfixColon x e -> do
     tellName x False
     InfixColon (Ident.Name <$> x) <$> desugar' e
@@ -97,6 +97,14 @@ desugar' e = for e $ \ case
     e <- desugar' e
     es <- traverse desugar' es
     pure $ foldl' (\ z x -> (:*>:) <$> duplicate z <.> duplicate x) e es
+  Parse.Where e1 e2 -> do
+    x <- freshIdent (loc e1) False
+    e1 <- desugar' e1
+    e2 <- desugar' e2
+    let
+      e1' = InfixColonEqual (x <$ e1) <$> duplicate e1
+      e = (:*>:) <$> duplicate e1' <.> duplicate e2
+    pure $ e :*>: (Name x <$ e1)
   Parse.Fail ->
     pure Fail
   Parse.One e -> do
