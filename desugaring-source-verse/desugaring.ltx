@@ -831,6 +831,13 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 \begin{figure}
 $$
 \begin{array}{@@{}l}
+  \begin{array}{r@@{\;\;}c@@{\;\;}ll}
+    \multicolumn{4}{l}{\textbf{ANF (where needed)}} \\
+      |tup (e_1, xdots, e_n)| & = & |def (x_1 xdots x_n) (x_1==e_1; xdots; x_n==e_n; tup (x_1; xdots; x_n)| & \text{fresh |x_i|}  \\
+      |e_1 = e_2| & = & |def x (x == e_1; x==e_2)| & \text{fresh |x|} \\
+      |e_1 e_2| & = & |def (f x) (f==e_1; x==e_2; f x)| & \text{fresh |f|,|x|}  \\
+  \end{array} \\
+  \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring for execution}} \\
 |oftype e t| & = & |succeeds^{t^[e]}| \\
