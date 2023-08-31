@@ -293,7 +293,7 @@
 %% %format squiggt = "\!\leadsto\!"
 %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format (eff x) = "\langle" x "\rangle"
+%format (eff x) = "\!\langle" x "\rangle\!"
 %format apeff g x = g "\langle" x "\rangle"
 %  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots

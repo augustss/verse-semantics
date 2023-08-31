@@ -252,7 +252,7 @@ $$
   |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
 \\
 \multicolumn{4}{l}{\textbf{Function notation}} \\
-  |type^{t}| & \rightarrow & |functionP (x:=t) x| & \text{fresh |x|}\\
+  |type^{t}| & \rightarrow & |function ((x:=t) (eff closed)) x| & \text{fresh |x|}\\
   |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
   |function (a_1 a_2 xdots a_n) t| & \rightarrow & |function a_1 (function (a_2 xdots a_n) t| \\
   |function (()) t| & \rightarrow & |function ((ar ())) t| & \\
