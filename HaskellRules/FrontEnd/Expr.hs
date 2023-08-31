@@ -107,7 +107,7 @@ data Expr
   | Wrong String              -- wrong
   | Exists [Ident] Expr       -- exists xs . e
   | Forall [Ident] Expr       -- forall xs . e
-  | HasType Expr Expr         -- e:t, but only type known to verifier
+  | OfType Expr Expr         -- e:t, but only type known to verifier
   | TLam Ident [Eff] Expr Expr
                               -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
                               -- The last argument is a possible type, (e2:t)  
@@ -254,8 +254,8 @@ instance Pretty Expr where
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
           Forall is e -> maybeParens (p > 0) $ sep [text "forall" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
-          HasType e t -> --ppNormal (InfixOp e (Op ":") t)
-                         text "hasType" <> parens (ppr 0 t) <> braces (ppr 0 e)
+          OfType e t -> --ppNormal (InfixOp e (Op ":") t)
+                         text "ofType" <> parens (ppr 0 e) <> braces (ppr 0 t)
           TLam i rs e1 e2 -> text "tlam" <>
                                  parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2)
           DomainFail -> text "DomainFail"
@@ -376,7 +376,7 @@ compos f (Range e) = Range <$> f e
 compos _ e@Wrong{} = pure e
 compos f (Exists is e) = Exists is <$> f e
 compos f (Forall is e) = Forall is <$> f e
-compos f (HasType e1 e2) = HasType <$> f e1 <*> f e2
+compos f (OfType e1 e2) = OfType <$> f e1 <*> f e2
 compos f (TLam i rs e1 e2) = TLam i rs <$> f e1 <*> f e2
 compos _ e@DomainFail = pure e
 compos _ e@EPrim{} = pure e

@@ -213,7 +213,7 @@ dsSmall = ds
     ds (Block es) = ds $ seqE es
 
     ds (Seq es) = seqE <$> mapM ds es
-    ds (HasType e1 e2) = HasType <$> ds e1 <*> ds e2
+    ds (OfType e1 e2) = OfType <$> ds e1 <*> ds e2
 
     -- Misc
     ds (Variable (Ident l "_")) = DefineV <$> newIdent l "u"
@@ -278,7 +278,7 @@ defn (Variable i) e = pure $ DefineE i e
 -- Rule: (p<a> := e)  -->  ...
 defn p e | Just (f, a, rs) <- getFun p = defn f (Function [(a, rs)] e)
 -- Rule: (e1:e2 := e)  -->  (e1 := hasType(e2){e})
-defn (InfixOp e1 (Op ":") e2) e = defn e1 (HasType e e2)
+defn (InfixOp e1 (Op ":") e2) e = defn e1 (OfType e e2)
 -- Rule: (:e2) := e  -->  (x:e2) := e, x fresh
 defn (PrefixOp op@(Op ":") e2) e = do
   u <- newIdent (getLoc e2) "u"
@@ -376,7 +376,7 @@ arrayElems = grp . map cls
 dsD :: Expr -> D Expr
 dsD e | isValue e = pure e
 dsD e@(ApplyD f a) | isValue f && isValue a = pure e
-dsD e@(HasType f a) | isValue f && isValue a = pure e
+dsD e@(OfType f a) | isValue f && isValue a = pure e
 dsD (Unify x e) | isValue x = Unify x <$> dsD e
 dsD (DefineV x) = pure (DefineV x)
 dsD (DefineE x e@Function{}) = do
@@ -440,8 +440,8 @@ dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
 dsM i (Function [(t1, r)] t2) = do
   c <- gets context
   dsFunction c i t1 r t2
---dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
-dsM i (HasType a f) = HasType <$> dsM i a <*> dsD f
+--dsM i af@(OfType a f) | isValue f && isValue a = pure $ unifyV i af
+dsM i (OfType a f) = OfType <$> dsM i a <*> dsD f
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
@@ -493,12 +493,6 @@ call p l s e = do
 
 ----------------------------------------------
 
-dsScope :: Flags -> Expr -> Expr
-dsScope flgs = eval flgs . (primops <=< addScope)
-
-addScope :: Expr -> D Expr
-addScope e = scope (S.fromList primOps) (Do e)
-
 _knownEffects :: [Ident]
 _knownEffects = map (Ident noLoc) [
   "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts"
@@ -540,6 +534,12 @@ errMultiple =
   mapM_ (\ is -> errorMessage $ "multiply defined: " ++ prettyShow (head is) ++
                          prettyShow [ l | Ident l _ <- is ])
 
+dsScope :: Flags -> Expr -> Expr
+dsScope flgs = eval flgs . (primops <=< addScope)
+
+addScope :: Expr -> D Expr
+addScope e = scope (S.fromList primOps) (Do e)
+
 scope :: S.Set Ident -> Expr -> D Expr
 scope sc = expr
   where
@@ -572,7 +572,7 @@ scope sc = expr
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
-    expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
+    expr (OfType e1 e2) = OfType <$> exprD e1 <*> exprD e2
     expr (TLam i r e1 e2) = do
       (e1', sc') <- defs (S.insert i sc) e1
       TLam i r e1' <$> scopeD sc' e2
@@ -619,7 +619,7 @@ getVisible (Range e) = getVisible e
 getVisible Function{} = []
 getVisible (Exists is e) = is ++ getVisible e
 getVisible (Forall is e) = is ++ getVisible e
-getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
+getVisible (OfType _ _) = []
 getVisible TLam{} = []
 getVisible Lam{} = []
 getVisible Fail = []
@@ -651,7 +651,7 @@ getVar Function{} = []
 getVar TLam{} = []
 getVar (Exists _ e) = getVar e
 getVar (Forall _ e) = getVar e
-getVar (HasType e t) = getVar e ++ getVar t
+getVar (OfType e t) = getVar e ++ getVar t
 getVar Lam{} = []
 getVar Fail = []
 getVar DomainFail = []
@@ -831,7 +831,7 @@ addDeref = pure . exprD S.empty
     expr s (TLam i rs e1 e2) = TLam i rs (expr s' e1) (expr s' e2)
       where s' = defs s e1
     expr s (Exists is e) = Exists is (expr s e)
-    expr s (HasType e t) = HasType (expr s e) (expr s t)
+    expr s (OfType e t) = OfType (expr s e) (expr s t)
     expr _ Fail = Fail
     expr s (Lam i e) = Lam i (expr s e)
     expr _ e = impossible e
@@ -860,10 +860,10 @@ lowerApply :: Expr -> D Expr
 lowerApply = f
   where
     f (ApplyS e1 e2) = Succeeds <$> (ApplyD <$> f e1 <*> f e2)
-    f (HasType e t) = do
+    f (OfType e t) = do
       verif <- gets (fVerify . dflags)
       if verif then
-        HasType <$> f e <*> f t
+        OfType <$> f e <*> f t
        else
         Succeeds <$> (ApplyD <$> f t <*> f e)
     f e = compos f e
@@ -889,7 +889,7 @@ lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
 lower (Macro1 (Ident _ "lowered") [] e) = pure e
 lower (Exists is e) = lExists is <$> lower e
 lower (TLam i rs (Exists is e1) e2) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2
-lower (HasType e t) = join $ lowerHasType <$> lower e <*> lower t
+lower (OfType e t) = join $ lowerOfType <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
 lower Fail = pure Fail
 lower e = impossible e
@@ -997,7 +997,7 @@ lowerTLamVerify :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
 lowerTLamVerify i rs is e1 e2 = do
   (e2', e2'') <-
     case e2 of
-      HasType e t -> do
+      OfType e t -> do
         x <- newIdent (getLoc t) "x"
         pure (ApplyD t e, Exists [x] $ ApplyD t (Variable x))
       _ -> pure (e2, e2)
@@ -1054,16 +1054,16 @@ lowerTLamRun i rs is e1 e2 = do
     else
       Lam i <$> lowerIf is e1 e2 DomainFail
 
-lowerHasType :: Expr -> Expr -> D Expr
-lowerHasType e t = do
+lowerOfType :: Expr -> Expr -> D Expr
+lowerOfType e t = do
   verif <- gets (fVerify . dflags)
   if verif then
-    lowerHasTypeVerify e t
+    lowerOfTypeVerify e t
    else
     lowerSucceeds (ApplyD t e)
 
-lowerHasTypeVerify :: Expr -> Expr -> D Expr
-lowerHasTypeVerify e t = do
+lowerOfTypeVerify :: Expr -> Expr -> D Expr
+lowerOfTypeVerify e t = do
   x <- newIdent (getLoc t) "x"
   pure $ Seq [ eVerify $ eAssert $ ApplyD t e, eAssume $ Forall [x] $ ApplyD t (Variable x) ]
 
