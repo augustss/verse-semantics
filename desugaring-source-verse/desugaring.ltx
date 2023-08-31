@@ -161,6 +161,7 @@ Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator
 $$
 \begin{array}{lrcll}
 \textbf{Terms} & |t| & ::= & |x|               & \text{Variable} \\
+&      & \vb & |_|               & \text{Wildcard} \\
 &      & \vb & |k|               & \text{Constant} \\
 &      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
 &      & \vb & |t_1^[t_2]|       & \text{Function application} \\
@@ -291,6 +292,7 @@ $$
   \multicolumn{4}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
   \\
   \multicolumn{1}{l}{\textbf{Misc}} \\
+  |_| & \rightarrow & |x:any| & \text{|x| fresh} \\
   |option^{}| & \rightarrow & |false| \\
   |option^{e}| & \rightarrow & |if(x:=e)then truth(x) else false| & \text{|x| fresh} \\
 \end{array}
