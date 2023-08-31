@@ -179,7 +179,6 @@ dsExpr sc i x (Array ss) = do
   pure [ExistsOp (j: y: js ++ ys) $ [j :=: Arr js, y :=: Arr ys, i :=: Var j, x :=: Var y] ++ concat opss]
 dsExpr sc i x (ApplyS s1 s2) = apply sc i x (VerifyOp "succeeds") s1 s2
 dsExpr sc i x (ApplyD s1 s2) = apply sc i x                    id s1 s2
---dsExpr _ _ _ (ApplyEff _ _) = undefined
 --dsExpr _ _ _ (EffAttr _ _) = undefined
 dsExpr sc i x (PrefixOp (Op ":") s0) = do
   ~[h, f] <- newIds ["h", "f"]

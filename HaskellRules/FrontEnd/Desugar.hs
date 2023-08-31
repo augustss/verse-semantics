@@ -541,11 +541,6 @@ scope sc = expr
     expr (Array es) = Array <$> mapM expr es
     expr (Seq es) = seqE <$> mapM expr es
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
-{-
-    expr (ApplyEff is e) = do
-      errUndefined (is \\ knownEffects)
-      ApplyEff is <$> expr e
--}
     expr (If3 e1 e2 e3) = do
       (e1', sc') <- defs sc e1
       If3 e1' <$> scopeD sc' e2 <*> exprD e3
@@ -596,7 +591,6 @@ getVisible (Array es) = concatMap getVisible es
 getVisible (Seq es) = concatMap getVisible es
 getVisible (ApplyS e1 e2) = getVisible e1 ++ getVisible e2
 getVisible (ApplyD e1 e2) = getVisible e1 ++ getVisible e2
-getVisible (ApplyEff _ _e) = [] -- getVisible e
 getVisible If3{} = []
 getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
@@ -625,7 +619,6 @@ getVar (Array es) = concatMap getVar es
 getVar (Seq es) = concatMap getVar es
 getVar (ApplyS e1 e2) = getVar e1 ++ getVar e2
 getVar (ApplyD e1 e2) = getVar e1 ++ getVar e2
-getVar (ApplyEff _ _e) = [] -- getVar e
 getVar If3{} = []
 getVar For2{} = []
 getVar (Let _ e) = getVar e
@@ -799,7 +792,6 @@ addDeref = pure . exprD S.empty
     expr s (Seq es) = Seq $ map (expr s) es
     expr s (ApplyS e1 e2) = ApplyS (expr s e1) (expr s e2)
     expr s (ApplyD e1 e2) = ApplyD (expr s e1) (expr s e2)
-    expr s (ApplyEff is e) = ApplyEff is (expr s e)
     expr s (If3 e1 e2 e3) = If3 (expr s' e1) (expr s' e2) (exprD s e3)
       where s' = defs s e1
     expr s (For2 e1 e2) = For2 (expr s' e1) (exprD s' e2)
@@ -868,7 +860,6 @@ lower (Array es) = Array <$> mapM lower es
 lower e@Wrong{} = pure e
 lower (Seq es) = seqE <$> mapM lower es
 lower (ApplyD e1 e2) = ApplyD <$> lower e1 <*> lower e2
-lower (ApplyEff _rs _e) = undefined
 lower (Unify e1 e2) = Unify <$> lower e1 <*> lower e2
 lower (Choice e1 e2) = Choice <$> lower e1 <*> lower e2
 lower (For2 (Exists is e1) e2) = join $ lowerFor is <$> lower e1 <*> lower e2
