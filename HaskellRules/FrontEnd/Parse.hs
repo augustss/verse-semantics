@@ -392,7 +392,7 @@ pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq) <*> (pKeyword
         mkCase (Just e1) e2 = Case2 e1 e2
 
 pDo :: P Expr
-pDo = pKeyword "block" *> (Do <$> pBlockM)
+pDo = pKeyword "block" *> (Block <$> pBlockM)
 
 pOption :: P Expr
 pOption = pKeyword "option" *> (Option <$> optional pExprSeq)

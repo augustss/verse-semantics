@@ -80,7 +80,7 @@ data Expr
   | For1 Blk                -- for{e}
   | For2 Expr Blk           -- for(e1) in e2
   | Let Expr Blk            -- let(e1) in e2
-  | Do Blk                  -- do e
+  | Block Blk                  -- do e
   | Case1 Blk               -- case{e1; e2; ... } block treated in a non-standard way
   | Case2 Expr Blk          -- case(e) of {e1; e2; ... } block treated in a non-standard way
   | Function [(Expr, [Eff])] Blk -- function(e)<eff>...{e}
@@ -223,7 +223,7 @@ instance Pretty Expr where
           Let e1 e2 -> maybeParens (p > 0) $ sep [text "let" <+> parens (ppr 0 e1),
                                                    text "do",
                                                      indent $ ppr 0 e2]
-          Do e1 -> maybeParens (p > 0) $ sep [text "block" <+> indent (ppr 0 e1)]
+          Block e1 -> maybeParens (p > 0) $ sep [text "block" <+> indent (ppr 0 e1)]
           Case1 bs ->
             maybeParens (p > 0) $ sep [ text "case", indent $ ppr 0 bs ]
           Case2 e bs ->
@@ -351,7 +351,7 @@ compos f (If3 e b1 b2) = If3 <$> f e <*> f b1 <*> f b2
 compos f (For1 b) = For1 <$> f b
 compos f (For2 e b) = For2 <$> f e <*> f b
 compos f (Let e b) = Let <$> f e <*> f b
-compos f (Do b) = Do <$> f b
+compos f (Block b) = Block <$> f b
 compos f (Case1 b) = Case1 <$> f b
 compos f (Case2 e b) = Case2 <$> f e <*> f b
 compos f (Function ers b) = Function <$> traverse g ers <*> f b

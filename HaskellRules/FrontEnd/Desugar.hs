@@ -538,7 +538,7 @@ dsScope :: Flags -> Expr -> Expr
 dsScope flgs = eval flgs . (primops <=< addScope)
 
 addScope :: Expr -> D Expr
-addScope e = scope (S.fromList primOps) (Do e)
+addScope e = scope (S.fromList primOps) (Block e)
 
 scope :: S.Set Ident -> Expr -> D Expr
 scope sc = expr
@@ -560,7 +560,7 @@ scope sc = expr
     expr (For2 e1 e2) = do
       (e1', sc') <- defs sc e1
       For2 e1' <$> scopeD sc' e2
-    expr (Do e) = exprD e
+    expr (Block e) = exprD e
     expr (Let e1 e2) = do
       (e1', sc') <- defs sc e1
       let Exists is e1'' = e1'
@@ -608,7 +608,7 @@ getVisible (ApplyEff _ _e) = [] -- getVisible e
 getVisible If3{} = []
 getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
-getVisible Do{} = []
+getVisible Block{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
 getVisible Macro1 {} = []
@@ -637,7 +637,7 @@ getVar (ApplyEff _ _e) = [] -- getVar e
 getVar If3{} = []
 getVar For2{} = []
 getVar (Let _ e) = getVar e
-getVar Do{} = []
+getVar Block{} = []
 getVar (Unify e1 e2) = getVar e1 ++ getVar e2
 getVar Macro1 {} = []
 getVar (DefineV _) = []
@@ -814,7 +814,7 @@ addDeref = pure . exprD S.empty
       where s' = defs s e1
     expr s (Let e1 e2) = Let (expr s' e1) (exprD s' e2)
       where s' = defs s e1
-    expr s (Do e) = Do (exprD s e)
+    expr s (Block e) = Block (exprD s e)
     expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
       where s' = defs s a
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)

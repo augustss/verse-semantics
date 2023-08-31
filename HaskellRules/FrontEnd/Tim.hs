@@ -220,7 +220,7 @@ dsExpr _ _ _ (If3 _ _ _) = undefined
 dsExpr _ _ _ (For1 _) = undefined
 dsExpr _ _ _ (For2 _ _) = undefined
 dsExpr _ _ _ (Let _ _) = undefined
-dsExpr _ _ _ (Do _) = undefined
+dsExpr _ _ _ (Block _) = undefined
 dsExpr _ _ _ (Case1 _) = undefined
 dsExpr _ _ _ (Case2 _ _) = undefined
 -}
