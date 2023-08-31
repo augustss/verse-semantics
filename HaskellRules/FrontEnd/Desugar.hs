@@ -156,22 +156,24 @@ dsSmall = ds
     ds (InfixOp e1 (Op "where") e2) = do
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
-    ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
-    ds (Macro1 (Ident _ "in'='") [] (Blk es)) = dsU =<< mapM ds es
-    ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
 
+    -- n-ary unification
+    ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
+    ds (Macro1 (Ident _ "in'='") [] (Blk es)) = dsU =<< mapM ds es
+    ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
+
     -- Bindings
-    ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)
+    ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)  -- PCOLONT
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Function notation
-    ds (Typedef e) = do y <- newIdent (getLoc e) "y"; ds $ Function [(DefineE y e, [])] (Variable y)
-    ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [])] e2
+    ds (Typedef e) = do x <- newIdent (getLoc e) "x"; ds $ Function [(DefineE x e, [invariantId])] (Variable x)
+    ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [invariantId])] e2
     ds (Function (a:as@(_:_)) b) = ds $ Function [a] $ Function as b
-    -- ds Function [] ...
-    -- XXX effects
+
+    -- Conditional and foor-loop notation
     ds (If1 e) = ds $ If2E e eFalse
     ds (If2 e1 e2) = ds $ If3 e1 e2 eFalse
     ds (If2E e1 e2) = do x <- newIdent (getLoc e1) "x"; ds $ If3 (DefineE x e1) (Variable x) e2
@@ -494,7 +496,7 @@ _isLambdaEffect i = elem i [
   ]
 
 invariantId :: Ident
-invariantId = Ident noLoc "invariant"
+invariantId = Ident noLoc "closed"
 
 openId :: Ident
 openId = Ident noLoc "open"
