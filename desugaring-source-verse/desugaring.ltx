@@ -307,6 +307,27 @@ into Small Source Verse, whose syntax is given in \Cref{fig:small-source-verse}.
 Small Source Verse is a subset of Source Verse, which is why we us the same non-terminals
 for terms |t| in both.
 
+\subsection{Missing features}
+There are still many language features missing from the desugaring.
+\begin{itemize}
+\item Paths.  New primitive type.
+\item More numeric types: |rational|, |float|, ...
+\item Maps (i.e., finite mappings from values to values).
+\item Loop construct, |loop|.
+\item Imperative features.  These desugar into pointer manipulation:
+  \begin{itemize}
+  \item |var| create an assignable variable
+  \item |set| set an assignable variable
+  \item |alias|
+  \item |ref|
+  \end{itemize}
+\item Records. |struct| desugars into a mapping from paths to values.
+\item Object oriented features. |class| desugars similarely to |struct|, but with inheritance.
+\item Enumeration types.
+\item Union types.
+\item Concurrency operations: |race|, |rush|, |sync|, |branch|, |spawn|.
+\end{itemize}
+
 \subsection{Small Source Verse}
 
 \Cref{fig:small-source-verse} gives the syntax of Small Source Verse.  Things to note:
@@ -378,7 +399,7 @@ If so, they desugar using \rulename{pcolonb} twice to
   \item $ |((x:int):nat) := t_1| \longrightarrow  |x := oftype (oftype t_1 nat) int|$
   \item $ |((y:nat):int) := t_2| \longrightarrow  |y := oftype (oftype t_2 int) nat|$
 \end{itemize}
-So |(x:t_1):t_2| means the same as |x : (t_1 . t_2)|, where |.| is function composition. \simon{How do you write function composition in Verse?}
+So |(x:t_1):t_2| means the same as |x : (t_1 . t_2)|, where |.| is function composition. \simon{How do you write function composition in Verse?}\lennart{There is no operator for function composition.}
 
 
 Now consider the terms |((x:int):nat)| and |((y:nat):int)| .  Again, are these legal at all?  They desugar strangely.  Consdier
@@ -458,7 +479,7 @@ This is a list of things we have not yet covered:
 \section{Desugaring Small Source Verse into Big Core Verse}
 
 \Cref{fig:core-verse} gives the Big Core Verse language into which we desugar.
-while Cref{fig:desugar-expr1} desugars Small Source Verse into Big Core Verse.
+while \Cref{fig:desugar-expr1} desugars Small Source Verse into Big Core Verse.
 
 \subsection{Big Core Verse}
 
@@ -572,7 +593,8 @@ This is useful for arrays.  Suppose |a| is an array.  Consider the Source Verse 
 |x:a| and |x := :a|.
 The two are equivalent; remember rule \rulename{pcolont}.
 Both use |a| as a type, but arrays are functions, so that's fine. \simon{Its not an idempotent function though!
-  Here we are usefully using a non-idempotent function as a type.}
+  Here we are usefully using a non-idempotent function as a ``type''.}\lennart{I think it's worth pointing out that
+  types are idempotent functions, but the the |t| in |:t| does not have to be a type.  It can be any function.}
 Then |(x := :a)| desugars (via \rulename{dexpr} and \rulename{mtype}) to |x := def i (a^[i])|.
 Then our execution semantics for arrays rewrites thus:
 $$
@@ -651,8 +673,10 @@ $$
 \multicolumn{4}{l}{\textbf{Desugaring expressions}} \\
 \rulename{dconst} & |De k| & = & |k| \\
 \rulename{dvar}   & |De x| & = & |x| \\
-\rulename{dapp}   & |De (t_1^[t_2])| & = & |((De t_1)^[De t_2]| \\
+\rulename{dapp}   & |De (t_1^[t_2])| & = & |((De t_1))^[De t_2]| \\
 \rulename{dfor}   & |De (for(e_1){e_2}| & = & |for(De e_1){De e_2}| \\
+\rulename{dif}    & |De (if(e_1) then e_2 else e_3)| & = &
+    \multicolumn{2}{@@{}l}{|if (De e_1) then De e_2 else De e_3|} \\
 \rulename{dfun}   & |De (functionP t_1 t_2)| & = & |tlam x (Me x t_1) (De t_2)| \\
 
 \rulename{dexpr}  &  |De t| & = & |def i (Me i t)| & \text{otherwise} \\[2mm]
@@ -676,16 +700,17 @@ and |e| is a BigCore expression}} \\[1mm]
 \rulename{mchoice} &  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
 \rulename{mif} &  |Me i (if(e_1) then e_2 else e_3)| & = &
     \multicolumn{2}{@@{}l}{|if (De e_1) then Me i e_2 else Me i e_3|} \\
-\rulename{moftype} & |Me i ((oftype e_1 e_2))| & = & |oftype (Me i e_1) (De e_2)| \\
+\rulename{moftype} & |Me i ((oftype e_1 e_2))| & = & |oftype ((Me i e_1)) (De e_2)| \\
 \rulename{mcheck} &  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\
 \rulename{marray} &  |Me i (array(t_1, xdots, t_n))| & = &
 \multicolumn{2}{@@{}l}{
   \begin{array}[t]{@@{}l}
-    |def (x_1 xdots x_n) (Me x_1 t_1; xdots; Me x_n t_n;|\\
-    |i == arr (x_1, xdots, x_n)|
-   \end{array}} \\[2mm]
+    |def (x_1 xdots x_n) (i == arr (x_1, xdots, x_n))| \\
+    |array (Me x_1 t_1; xdots; Me x_n t_n)|
+   \end{array}
+    }\\[2mm]
 
-\rulename{mfun} & |Me i (functionP t_1 t_2)| & = & \multicolumn{2}{l}{|tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)|} \\
+\rulename{mfun} & |Me i (functionP t_1 t_2)| & = & \multicolumn{2}{@@{}l}{|tlam x (z := Me x t_1) (y := i^[z]; Me y t_2)|} \\
 \rulename{munify} &  |Me i t| & = & |i==De t| & \text{otherwise}
 \end{array}
 \end{array}
@@ -797,7 +822,7 @@ arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
   \item turning |:=| into |defKW|
   \item handle |let|
   \item handle |block|
-  \item insert |defKW| in |for|,|if|,|tlamKW|
+  \item insert top level |defKW| in |for|,|if|,|tlamKW|
   \end{itemize}
 
 \caption{Scope} \label{fig:scope}
@@ -809,7 +834,7 @@ $$
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\textbf{Desugaring for execution}} \\
 |oftype e t| & = & |succeeds^{t^[e]}| \\
-|tlam x e_1 e_2| & = & |lam x (e_1; e_2)| \\
+|tlam x (def xs e_1) e_2| & = & |lam x (def xs (e_1; e_2))| & \text{The |xs| scope over |e_1| and |e_2|} \\
 |if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 |for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 \end{array} \\
@@ -820,7 +845,8 @@ $$
 |oftype e t| & = & |verify (assert (t^[e])); assume (forall x t^[x])| & \text{fresh |x|} \\
 % Omitting the oftype equation
 % |tlam x e_1 (oftype e_2 t)| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (forall y (t^[y])))| & \text{fresh |y|} \\
-|tlam x e_1 e_2| & = & |verify (lam x (assume e_1; assert e_2)); lam x (e_1; assume e_2)| \\
+|tlam x (def xs e_1) e_2| & = & |verify (lam x (def xs (assume e_1; assert e_2))); lam x (def xs (e_1; assume e_2))|
+            & \text{The |xs| scope over |e_1| and |e_2|} \\
 |if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 |for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 \end{array}
