@@ -48,12 +48,12 @@ desugar flgs = eval flgs .
              traceDS "addDeref"   <=< addDeref  <=<
              traceDS "dsSmall"    <=< dsSmall   <=<
              traceDS "addPrelude" <=< addPrelude<=<
-             traceDS "dropParens" <=< dropParens)
+             traceDS "syntaxFixes" <=< syntaxFixes)
   where
     hack = (traceDS "dsD"        <=< dsD       <=<
             traceDS "addDeref"   <=< addDeref  <=<
             traceDS "dsSmall"    <=< dsSmall   <=<
-            traceDS "dropParens" <=< dropParens)
+            traceDS "syntaxFixes" <=< syntaxFixes)
 
     tr = fTraceDesugar flgs
     traceDS :: String -> Expr -> D Expr
@@ -61,7 +61,7 @@ desugar flgs = eval flgs .
                          pure e
                   | otherwise = pure e
     addPrelude e = pure $ Array [prel, e]
-    prel = eval flgs $ dropParens $ snd $ fPrelude flgs
+    prel = eval flgs $ syntaxFixes $ snd $ fPrelude flgs
     prelIds = getVisible $ eval flgs $ hack prel
     dropPrel = pure . dropUnusedIds prelIds
 
@@ -122,36 +122,26 @@ withContext c da = do
 --  * (e)       -->  e             parens are there to stop the next from possibly firing
 --  * e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
 --  * (e1,...)  -->  array{e1,...} no need to distingush them anymore
---  * x&y:e     -->  x:e; y:e      if outside an array/tuple
---                   ..(x:e, y:e)  if inside an array/tuple
-dropParens :: Expr -> D Expr
-dropParens = f False
-  where f a (Parens e) = f a e
-        f a (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
-          f a $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
-        f a (Tuple es) = f a (Array es)
-        f _ (Array es) = Array <$> mapM (f True) es
-        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":" ) e) = f a =<< amp a p o e
-        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":=") e) = f a =<< amp a p o e
-        f _ e = compos (f False) e
+--  * x&y:e     -->  array{x&y:e}  if outside an array
+--                   x:e; y:e      if inside an array
+syntaxFixes :: Expr -> D Expr
+syntaxFixes = pure . f
+  where f :: Expr -> Expr
+        f (Parens e) = f e
+        f (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
+          f $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
+        f (Tuple es) = f (Array es)
+        f (Array es) = Array $ concatMap g es
+        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":" ) _) = f (Array [e])  -- PAMP1
+        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":=") _) = f (Array [e])  -- PAMP1
+        f e = composOp f e
 
-{- This code does not duplicate e, but it doesn't agree with Tim's implementation.
-        amp a p o e@Variable{} = do
-          let es = Array $ map (\ x -> InfixOp x o e) (getAmp p)
-          pure $ if a then PrefixOp (Op "..") es else es
-        amp a p o e = do
-          x <- newIdent (getLoc e) "x"
-          e' <- amp a p o (Variable x)
-          pure $ Let (DefineE x e) e'
--}
-        amp a p o e = do
-          let es = Array $ map (\ x -> InfixOp x o e) (getAmp p)
-          pure $ if a then PrefixOp (Op "..") es else es
+        -- PAMP2
+        g :: Expr -> [Expr]
+        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
+        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
+        g e = [f e]
 
-        getAmp (InfixOp p1 (Op "&") p2) = getAmp p1 ++ getAmp p2
-        getAmp x@(Variable _) = [x]
-        getAmp e = errorMessage $ "Bad use of & " ++ prettyShow e
-          
 ---------------------
 
 eval :: Flags -> D Expr -> Expr
