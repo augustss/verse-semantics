@@ -15,7 +15,8 @@ data Intrinsic
   | PrefixMinus
   | Multiply
   | Divide
-  | Int deriving (Show, Eq)
+  | Int
+  | Float deriving (Show, Eq)
 
 instance Pretty Intrinsic where
   pretty = unsafeViaShow

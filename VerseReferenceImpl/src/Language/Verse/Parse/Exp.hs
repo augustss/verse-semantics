@@ -23,6 +23,7 @@ data Exp f a
   | f (Exp f a) :*: f (Exp f a)
   | f (Exp f a) :/: f (Exp f a)
   | List [f (Exp f a)]
+  | Where (f (Exp f a)) (f (Exp f a))
   | Fail
   | One (f (Exp f a))
   | All (f (Exp f a))

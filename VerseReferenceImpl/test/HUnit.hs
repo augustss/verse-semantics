@@ -26,6 +26,8 @@ main = runTestTTAndExit $ TestList
   , test4
   , test5
   , test6
+  , test7
+  , test8
   ]
 
 data Val a
@@ -112,3 +114,27 @@ test6 = TestCase do
         writeVarRef x =<< newVar (Const $ getConst y + 2)
     freeze' x
   z @?= Just [Known (Const 1), Known (Const 3)]
+
+test7 :: Test
+test7 = TestCase do
+  z <- runSupplyT $ runVerseT do
+    x <- readIVar =<< all do
+      pure () <|> pure ()
+      readIVar =<< all do
+        pure () <|> pure ()
+        freshVar
+    unify (head $ head x) =<< newVar (Int 0)
+    freeze' x
+  z @?= Just [[[Known (Int 0), Unknown], [Unknown, Unknown]]]
+
+test8 :: Test
+test8 = TestCase do
+  z <- runSupplyT $ runVerseT do
+    x <- readIVar =<< all do
+      readIVar =<< all do
+        freshVar
+    y <- readIVar =<< all do
+      pure $ head x
+    unify (head $ head y) =<< newVar (Int 0)
+    freeze' x
+  z @?= Just [[[Known (Int 0)]]]

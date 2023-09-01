@@ -1,16 +1,26 @@
 #!/bin/bash
 set -eux
+nix shell \
+  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz \
+  --extra-experimental-features nix-command \
+  --extra-experimental-features flakes \
+  --command \
 wasm32-wasi-cabal install \
   --allow-newer \
-  --with-alex=/home/andy/.cabal/bin/alex \
-  --with-happy=/home/andy/.cabal/bin/happy \
   --installdir=www/static \
   --overwrite-policy=always
+
+nix shell \
+  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz \
+  --extra-experimental-features nix-command \
+  --extra-experimental-features flakes \
+  --command \
 wizer \
   --allow-wasi \
   --wasm-bulk-memory true \
   www/static/versewasm.wasm \
   -o www/static/versewasm.wizer.wasm
+
 cd www
 npm install
 npx webpack serve

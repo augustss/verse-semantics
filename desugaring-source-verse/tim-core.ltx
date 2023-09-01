@@ -1,0 +1,260 @@
+\begin{document}
+\section{Tim's Core language}
+
+Tim's verifier works like this.
+\begin{itemize}
+\item \textbf{Desugaring} (\Cref{sec:tim-core-syntax}) transforms Source Verse into TimCore.
+\item \textbf{Ingestion} (\Cref{sec:ingestion}) successively rewrites the TimCore term, keeping its
+  structure but:
+  \begin{itemize}
+  \item Augmenting the inferences |G| that are attached to each scope node.
+  \item Performing beta reductions
+  \end{itemize}
+  Only when ingestion has reached a fixpoint do we move on to the next step.
+\item \textbf{Inference saturation} (\Cref{sec:inf-sat}) does dominator analysis on each
+  inference set |G| separately, and successively rewrites the |G| to reflect the result of this analysis.
+
+\item \textbf{Effect analysis} (\Cref{sec:effect-anal}) checks each sub-term |check fx e| to ensure
+  that the effects of |e| are indeed covered by |fx|.
+\end{itemize}
+
+Questions:
+\begin{itemize}
+\item Could inference saturation give rise to new ingestion opportunities?  We think no.
+\end{itemize}
+
+\subsection{Syntax} \label{sec:tim-core-syntax}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+\multicolumn{4}{l}{\text{\bf Vertices}} \\
+|vt|  & ::= & |x| \vb |tup (x_1, xdots, x_n)| \\
+|vv|  & ::= & |vt| \vb |k| \vb |f^[x]| \\
+|v|   & ::= & |vv| \vb |lam x e| \\
+\\
+\multicolumn{4}{l}{\text{\bf Scopes}} \\
+|s| & ::= & |scope (x_1, xdots, x_n) G e| \\
+\\
+\multicolumn{4}{l}{\text{\bf Expressions}} \\
+|e| & ::= & |x = vv| \\
+    & \vb & |x = timlam h fx i x s_0 j y s_1| \\
+%    & \vb & |y=length^[x]| \\
+    & \vb & |x = fail| \\
+    & \vb & |s_1 `choice` s_2| \\
+    & \vb & |e_1 ; e_2| \\
+    & \vb & |check fx e|           & \text{Effects check} \\
+\multicolumn{4}{l}{\text{Omitting for now: cast, error, in, iterate, next}} \\
+\\
+\multicolumn{4}{l}{\text{\bf Inferences}} \\
+|G| & ::= & |emp| \vb |G, g| \\
+|g| & ::= & |edge vt w|  & \text{Data flow from |w| to |v|} \\
+    & \vb & |equals S x fail|   & \text{|v| is unified with failure}\\
+    & \vb & |equals S x w| & \\
+%   & \vb & |lengthis S y z| &  \\
+   & \vb & |dominates S vt w| & \text{|w| dominates |v|} \\
+\\
+\multicolumn{4}{l}{\text{\bf Strengths}} \\
+|S,T| & ::= &  |succeeds| \vb |decides| \vb |resolves| \\
+\\
+\multicolumn{4}{l}{\text{\bf Effects}} \\
+|fx| & ::= & S \vb |iterates| \vb |fails| \vb |contradicts| \vb |abstracts|
+\end{array}
+$$
+\caption{Tim Core Verse} \label{fig:tim-core-verse}
+\end{figure}
+
+Things to note:
+\begin{itemize}
+\item A \emph{scope} |scope xs G e| binds some existentials |xs|, has a collection of inferences |G| (initially empty), and wraps an expression |e|.
+\item |v| stands for ``vertex'' rather than ``value''.  (The form |f^[x]| isn't really a value.)
+\item In a vertex we have an ordinary (POPL) lambda |lam x e|.  Only in an expression do we have a TimLambda.
+\item In a TimLambda |timlam h fx i x s_0 j y s_1|:
+  \begin{itemize}
+  \item |h| is a (bound) occurrence of a variable, presumably already in scope.
+  \item |s_0| is called the \emph{domain scope} and |s_1| is the \emph{range scope}.
+  \item |i| and |x| are binders, and scope over |s_0| and |s_1|.
+  \item |j| and |y| are binders, and scope over |s_1|.
+  \end{itemize}
+\end{itemize}
+
+Questions:
+\begin{itemize}
+\item In the edge |(edge v w)| isn't the LHS, |v|, always a (flexible) variable?
+\item Why |x=fail|?
+\item Does |dominates S v w| have a strength? Why?
+\end{itemize}
+
+\subsection{Ingestion} \label{sec:ingestion}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\begin{array}{rcl}
+X & ::= & |hole| \vb |X ; e| \vb |e ; X|
+\end{array}\\
+\\
+\multicolumn{1}{c}{\large \fbox{
+$|scope xs G_1 e_1| \quad \rightarrow \quad |scope xs G_2 e_2|$
+}} \\
+\\
+\begin{array}{lrcll}
+\rulename{res} & |scope xs G (X^[x=vv])| & \rightarrow & |scope xs (G,equals resolves x vv) (X^[x=vv])| \\
+\end{array}
+\end{array}
+$$
+\caption{Ingestion rules} \label{fig:tim-ingestion}
+\end{figure}
+
+\Cref{fig:tim-ingestion} gives the ``ingestion'' rules.  Generally they simply augment the inferences |G|
+in (any of) the scope-expression |s| in the program.  Points to note:
+\begin{itemize}
+\item The context |X| looks inside a nested tree of ``|;|'' compositions; but it does not look inside
+  nested scopes or choices.  So only the innermost |G| is affected.
+\end{itemize}
+\noindent
+Questions:
+\begin{itemize}
+\item To avoid lots of duplication, I used vertices |v| in \rulename{lflex}. But that does not
+  account for the POPL-lambda vs Tim-lambda difference between expresions |e| and inferences |g|.
+  Maybe \rulename{lflex} would be better written as a G-to-G rewrite
+  $$ |xs; equals resolves x v| \; \rightarrow \; |xs; equals resolves x v, edge x v| \quad \text{if $|x| \in |xs|$}$$
+\item Beta reduction may not reach a fixpoint.  Ditto iteration?
+\item Can \rulename{res} be generalised  |x=v|?
+ \end{itemize}
+
+\subsection{Inference saturation} \label{sec:inf-sat}
+
+\newcommand{\satarrow}{\rightarrow^{+}}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\multicolumn{1}{c}{\large \fbox{
+$|xs; G_1| \satarrow |G_2|$
+}} \\
+\multicolumn{1}{c}{\text{Extend |G_1| with new (implied) inferences |G_2|}}
+\\ \\
+\begin{array}{lrcll}
+\rulename{trans} & |xs; G, equals resolves v_1 v_2, equals resolves v_2 v_3| & \satarrow & |equals resolves v_1 v_3| \\
+\rulename{lflex} & |xs; G, equals resolves x vv| & \satarrow & |edge x vv| 
+     & \text{if $x \in |xs|$} \\
+\rulename{rflex} & |xs; G, equals resolves x y| & \satarrow & |edge y x| 
+     & \text{if $|y| \in |xs|$} \\
+\end{array}
+\end{array}
+$$
+\caption{Inference saturation} \label{fig:infernce-saturation}
+\end{figure}
+
+\subsection{Effect analysis} \label{sec:effect-anal}
+
+\begin{figure}
+$$
+\begin{array}{l}
+\multicolumn{1}{c}{\large \fbox{
+$|effects G e| = |fx|$
+}} \\
+\\
+\begin{array}{rcll}
+  |effects G_1 (scope xs G_2 e)| & = & |effects ((G_1,G_2)) e| \\
+  |effects G (e_1 ; e_2)| & = & |andeffects (effects G e_1) (effects G e_2)| \\
+  |effects G (x=v)| & = & S & \text{if $|equals S x v| \in |G|$} \\
+  |effects G (x=k)| & = & |fails| & \text{if $|equals resolves x k'| \in |G|$ and $k \not= k'$}
+\end{array} \\
+\\
+\multicolumn{1}{c}{\large \fbox{
+$|andeffects fx_1 fx_2| = |fx|$
+}} \\
+\\
+\begin{array}{lrcl}
+\multicolumn{4}{c}{\text{All equations also apply with arguments swapped, and apply top-to-bottom}} \\
+(E1) & |andeffects contradicts fx| & = & |contradicts| \\
+(E2) & |andeffects fails fx|       & = & |fails| \\
+(E3) & |andeffects succeeds fx|     & = & |fx| \\
+(E4) & |andeffects abstracts fx|  & = & |abstracts| \\
+(E5) & |andeffects iterates fx|   & = & |iterates| \\
+(E6) & |andeffects resolves iterates| & = & |abstracts| \\
+(E7) & |andeffects resolves fx|  & = & |resolves| \\
+(E8) & |andeffects decides fx|   & = &  |decides|
+\end{array}
+\end{array}
+$$
+\caption{Effect analysis} \label{fig:effect-analysis}
+\end{figure}
+Quesions:
+\begin{itemize}
+\item E5 wins over E6?
+\item Where does |contradicts| come from?
+\end{itemize}
+
+
+\begin{figure}
+% https://q.uiver.app/?q=WzAsMTUsWzQsMCwiXFxtYXRoc2Z7QWJzdHJhY3RzfSJdLFszLDEsIlxcbWF0aHNme0V2YWx1YXRlc30iXSxbMiwyLCJcXG1hdGhzZntSZXNvbHZlc30iXSxbNCw0LCJcXG1hdGhzZntJdGVyYXRlc30iXSxbNCw3LCJcXG1hdGhzZntGYWlsc30iXSxbMiw3LCJcXG1hdGhzZntTdWNjZWVkc30iXSxbMyw4LCJcXG1hdGhzZntEaXZlcmdlc30iXSxbMCwzXSxbNywzXSxbMCw2XSxbNyw2XSxbMiw1LCJcXG1hdGhzZntEZWNpZGVzfSJdLFs2LDIsIlxcbWF0aGJme1VuZGVjaWRhYmxlfSJdLFs2LDQsIlxcbWF0aGJme0RlY2lkYWJsZX0iXSxbNiw3LCJcXG1hdGhiZntEZWNpZGVkfSJdLFswLDEsIiIsMCx7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMSwyLCIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzAsMywiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFs1LDYsIiIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbNCw2LCIiLDEseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzcsOCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbOSwxMCwiIiwwLHsic3R5bGUiOnsiYm9keSI6eyJuYW1lIjoiZGFzaGVkIn0sImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMywxMSwiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dLFsyLDExLCIiLDAseyJzdHlsZSI6eyJoZWFkIjp7Im5hbWUiOiJub25lIn19fV0sWzExLDUsIiIsMix7InN0eWxlIjp7ImhlYWQiOnsibmFtZSI6Im5vbmUifX19XSxbMTEsNCwiIiwyLHsic3R5bGUiOnsiaGVhZCI6eyJuYW1lIjoibm9uZSJ9fX1dXQ==&macro_url=https%3A%2F%2Fgist.githubusercontent.com%2Franjitjhala%2F463b2ed2e80d26d1ec1ef240b077b5ba%2Fraw%2Fce6f925cb4d1f0f91e4bc751f00e60bdb33e381f%2Ffresh_macros.tex
+\[\begin{tikzcd}
+	&&&& {\mathsf{Abstracts}} \\
+	&&& {\mathsf{Evaluates}} \\
+	&& {\mathsf{Resolves}} &&&& {\mathbf{Undecidable}} \\
+	{} &&&&&&& {} \\
+	&&&& {\mathsf{Iterates}} && {\mathbf{Decidable}} \\
+	&& {\mathsf{Decides}} \\
+	{} &&&&&&& {} \\
+	&& {\mathsf{Succeeds}} && {\mathsf{Fails}} && {\mathbf{Decided}} \\
+	&&& {\mathsf{Diverges}}
+	\arrow[no head, from=1-5, to=2-4]
+	\arrow[no head, from=2-4, to=3-3]
+	\arrow[no head, from=1-5, to=5-5]
+	\arrow[no head, from=8-3, to=9-4]
+	\arrow[no head, from=8-5, to=9-4]
+	\arrow[dashed, no head, from=4-1, to=4-8]
+	\arrow[dashed, no head, from=7-1, to=7-8]
+	\arrow[no head, from=5-5, to=6-3]
+	\arrow[no head, from=3-3, to=6-3]
+	\arrow[no head, from=6-3, to=8-3]
+	\arrow[no head, from=6-3, to=8-5]
+\end{tikzcd}\]
+\end{figure}
+
+\begin{figure}
+\begin{verbatim}
+                          abstracts
+                           /    |
+                     evaluates  |
+                         /      |     UNDECIDABLE
+                  resolves      |
+              ========|=========|================
+                      |    iterates
+                      |   /     |       DECIDABLE
+                     decides    |
+                      |     \   |
+              ========|======\==|================
+                  succeeds   fails        DECIDED
+                      \        /
+                       diverges
+\end{verbatim}
+\caption{Multiplicity effects} \label{fig:mult-effects}
+\end{figure}
+
+\end{document}
+
+
+    Expressions e      ::== x=n
+                       |    x=y
+                       |    y=f[x]
+                       |    x=<y,..> -- an n-tuple
+
+                       |    x=length[y] -- says y is a tuple of length x
+                       |    x=fail
+
+                       |    e0; e1
+                       |    f=lambda(fx,h) c i x. e0; range d j y. e1
+                       |    e0 | e1
+                       |    exists xs. e0
+                       |    cast(err,x) {h0=>e0; ...; otherwise=>e1}
+                       |    scope c. e0
+                       |    error(err). e0
+                       |    in(abs,i,x) d j y. e0 [value e z. e1 [upon. e2]]
+                       |    iterate(x) c. e0 {succeeds d y. e1} {fails d y. e2}
+                       |    next(c,y)
+                       |    S(c,i,x,s)
+                       |    err

@@ -48,12 +48,12 @@ desugar flgs = eval flgs .
              traceDS "addDeref"   <=< addDeref  <=<
              traceDS "dsSmall"    <=< dsSmall   <=<
              traceDS "addPrelude" <=< addPrelude<=<
-             traceDS "dropParens" <=< dropParens)
+             traceDS "syntaxFixes" <=< syntaxFixes)
   where
     hack = (traceDS "dsD"        <=< dsD       <=<
             traceDS "addDeref"   <=< addDeref  <=<
             traceDS "dsSmall"    <=< dsSmall   <=<
-            traceDS "dropParens" <=< dropParens)
+            traceDS "syntaxFixes" <=< syntaxFixes)
 
     tr = fTraceDesugar flgs
     traceDS :: String -> Expr -> D Expr
@@ -61,7 +61,7 @@ desugar flgs = eval flgs .
                          pure e
                   | otherwise = pure e
     addPrelude e = pure $ Array [prel, e]
-    prel = eval flgs $ dropParens $ snd $ fPrelude flgs
+    prel = eval flgs $ syntaxFixes $ snd $ fPrelude flgs
     prelIds = getVisible $ eval flgs $ hack prel
     dropPrel = pure . dropUnusedIds prelIds
 
@@ -122,36 +122,26 @@ withContext c da = do
 --  * (e)       -->  e             parens are there to stop the next from possibly firing
 --  * e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
 --  * (e1,...)  -->  array{e1,...} no need to distingush them anymore
---  * x&y:e     -->  x:e; y:e      if outside an array/tuple
---                   ..(x:e, y:e)  if inside an array/tuple
-dropParens :: Expr -> D Expr
-dropParens = f False
-  where f a (Parens e) = f a e
-        f a (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
-          f a $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
-        f a (Tuple es) = f a (Array es)
-        f _ (Array es) = Array <$> mapM (f True) es
-        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":" ) e) = f a =<< amp a p o e
-        f a (InfixOp p@(InfixOp _ (Op "&") _) o@(Op ":=") e) = f a =<< amp a p o e
-        f _ e = compos (f False) e
+--  * x&y:e     -->  array{x&y:e}  if outside an array
+--                   x:e; y:e      if inside an array
+syntaxFixes :: Expr -> D Expr
+syntaxFixes = pure . f
+  where f :: Expr -> Expr
+        f (Parens e) = f e
+        f (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
+          f $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
+        f (Tuple es) = f (Array es)
+        f (Array es) = Array $ concatMap g es
+        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":" ) _) = f (Array [e])  -- PAMP1
+        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":=") _) = f (Array [e])  -- PAMP1
+        f e = composOp f e
 
-{- This code does not duplicate e, but it doesn't agree with Tim's implementation.
-        amp a p o e@Variable{} = do
-          let es = Array $ map (\ x -> InfixOp x o e) (getAmp p)
-          pure $ if a then PrefixOp (Op "..") es else es
-        amp a p o e = do
-          x <- newIdent (getLoc e) "x"
-          e' <- amp a p o (Variable x)
-          pure $ Let (DefineE x e) e'
--}
-        amp a p o e = do
-          let es = Array $ map (\ x -> InfixOp x o e) (getAmp p)
-          pure $ if a then PrefixOp (Op "..") es else es
+        -- PAMP2
+        g :: Expr -> [Expr]
+        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
+        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
+        g e = [f e]
 
-        getAmp (InfixOp p1 (Op "&") p2) = getAmp p1 ++ getAmp p2
-        getAmp x@(Variable _) = [x]
-        getAmp e = errorMessage $ "Bad use of & " ++ prettyShow e
-          
 ---------------------
 
 eval :: Flags -> D Expr -> Expr
@@ -166,22 +156,24 @@ dsSmall = ds
     ds (InfixOp e1 (Op "where") e2) = do
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
-    ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
-    ds (Macro1 (Ident _ "in'='") [] (Block es)) = dsU =<< mapM ds es
-    ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
 
+    -- n-ary unification
+    ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
+    ds (Macro1 (Ident _ "in'='") [] (Blk es)) = dsU =<< mapM ds es
+    ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
+
     -- Bindings
-    ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)
+    ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)  -- PCOLONT
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Function notation
-    ds (Typedef e) = do y <- newIdent (getLoc e) "y"; ds $ Function [(DefineE y e, [])] (Variable y)
-    ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [])] e2
+    ds (Typedef e) = do x <- newIdent (getLoc e) "x"; ds $ Function [(DefineE x e, [invariantId])] (Variable x)
+    ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [invariantId])] e2
     ds (Function (a:as@(_:_)) b) = ds $ Function [a] $ Function as b
-    -- ds Function [] ...
-    -- XXX effects
+
+    -- Conditional and foor-loop notation
     ds (If1 e) = ds $ If2E e eFalse
     ds (If2 e1 e2) = ds $ If3 e1 e2 eFalse
     ds (If2E e1 e2) = do x <- newIdent (getLoc e1) "x"; ds $ If3 (DefineE x e1) (Variable x) e2
@@ -210,10 +202,10 @@ dsSmall = ds
       x <- Variable <$> newIdent l "x"
       ds $ Function [(InfixOp x (Op ":") eAny, [])] $ Case2 x b
     ds (Case2 _ _) = undefined
-    ds (Block es) = ds $ seqE es
+    ds (Blk es) = ds $ seqE es
 
     ds (Seq es) = seqE <$> mapM ds es
-    ds (HasType e1 e2) = HasType <$> ds e1 <*> ds e2
+    ds (OfType e1 e2) = OfType <$> ds e1 <*> ds e2
 
     -- Misc
     ds (Variable (Ident l "_")) = DefineV <$> newIdent l "u"
@@ -278,7 +270,7 @@ defn (Variable i) e = pure $ DefineE i e
 -- Rule: (p<a> := e)  -->  ...
 defn p e | Just (f, a, rs) <- getFun p = defn f (Function [(a, rs)] e)
 -- Rule: (e1:e2 := e)  -->  (e1 := hasType(e2){e})
-defn (InfixOp e1 (Op ":") e2) e = defn e1 (HasType e e2)
+defn (InfixOp e1 (Op ":") e2) e = defn e1 (OfType e e2)
 -- Rule: (:e2) := e  -->  (x:e2) := e, x fresh
 defn (PrefixOp op@(Op ":") e2) e = do
   u <- newIdent (getLoc e2) "u"
@@ -376,7 +368,7 @@ arrayElems = grp . map cls
 dsD :: Expr -> D Expr
 dsD e | isValue e = pure e
 dsD e@(ApplyD f a) | isValue f && isValue a = pure e
-dsD e@(HasType f a) | isValue f && isValue a = pure e
+dsD e@(OfType f a) | isValue f && isValue a = pure e
 dsD (Unify x e) | isValue x = Unify x <$> dsD e
 dsD (DefineV x) = pure (DefineV x)
 dsD (DefineE x e@Function{}) = do
@@ -440,8 +432,8 @@ dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
 dsM i (Function [(t1, r)] t2) = do
   c <- gets context
   dsFunction c i t1 r t2
---dsM i af@(HasType a f) | isValue f && isValue a = pure $ unifyV i af
-dsM i (HasType a f) = HasType <$> dsM i a <*> dsD f
+--dsM i af@(OfType a f) | isValue f && isValue a = pure $ unifyV i af
+dsM i (OfType a f) = OfType <$> dsM i a <*> dsD f
 dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
@@ -493,12 +485,6 @@ call p l s e = do
 
 ----------------------------------------------
 
-dsScope :: Flags -> Expr -> Expr
-dsScope flgs = eval flgs . (primops <=< addScope)
-
-addScope :: Expr -> D Expr
-addScope e = scope (S.fromList primOps) (Do e)
-
 _knownEffects :: [Ident]
 _knownEffects = map (Ident noLoc) [
   "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts"
@@ -510,7 +496,7 @@ _isLambdaEffect i = elem i [
   ]
 
 invariantId :: Ident
-invariantId = Ident noLoc "invariant"
+invariantId = Ident noLoc "closed"
 
 openId :: Ident
 openId = Ident noLoc "open"
@@ -540,6 +526,12 @@ errMultiple =
   mapM_ (\ is -> errorMessage $ "multiply defined: " ++ prettyShow (head is) ++
                          prettyShow [ l | Ident l _ <- is ])
 
+dsScope :: Flags -> Expr -> Expr
+dsScope flgs = eval flgs . (primops <=< addScope)
+
+addScope :: Expr -> D Expr
+addScope e = scope (S.fromList primOps) (Block e)
+
 scope :: S.Set Ident -> Expr -> D Expr
 scope sc = expr
   where
@@ -549,18 +541,13 @@ scope sc = expr
     expr (Array es) = Array <$> mapM expr es
     expr (Seq es) = seqE <$> mapM expr es
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
-{-
-    expr (ApplyEff is e) = do
-      errUndefined (is \\ knownEffects)
-      ApplyEff is <$> expr e
--}
     expr (If3 e1 e2 e3) = do
       (e1', sc') <- defs sc e1
       If3 e1' <$> scopeD sc' e2 <*> exprD e3
     expr (For2 e1 e2) = do
       (e1', sc') <- defs sc e1
       For2 e1' <$> scopeD sc' e2
-    expr (Do e) = exprD e
+    expr (Block e) = exprD e
     expr (Let e1 e2) = do
       (e1', sc') <- defs sc e1
       let Exists is e1'' = e1'
@@ -572,7 +559,7 @@ scope sc = expr
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
-    expr (HasType e1 e2) = HasType <$> expr e1 <*> expr e2
+    expr (OfType e1 e2) = OfType <$> exprD e1 <*> exprD e2
     expr (TLam i r e1 e2) = do
       (e1', sc') <- defs (S.insert i sc) e1
       TLam i r e1' <$> scopeD sc' e2
@@ -604,11 +591,10 @@ getVisible (Array es) = concatMap getVisible es
 getVisible (Seq es) = concatMap getVisible es
 getVisible (ApplyS e1 e2) = getVisible e1 ++ getVisible e2
 getVisible (ApplyD e1 e2) = getVisible e1 ++ getVisible e2
-getVisible (ApplyEff _ _e) = [] -- getVisible e
 getVisible If3{} = []
 getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
-getVisible Do{} = []
+getVisible Block{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
 getVisible Macro1 {} = []
@@ -619,7 +605,7 @@ getVisible (Range e) = getVisible e
 getVisible Function{} = []
 getVisible (Exists is e) = is ++ getVisible e
 getVisible (Forall is e) = is ++ getVisible e
-getVisible (HasType e1 e2) = getVisible e1 ++ getVisible e2
+getVisible (OfType _ _) = []
 getVisible TLam{} = []
 getVisible Lam{} = []
 getVisible Fail = []
@@ -633,11 +619,10 @@ getVar (Array es) = concatMap getVar es
 getVar (Seq es) = concatMap getVar es
 getVar (ApplyS e1 e2) = getVar e1 ++ getVar e2
 getVar (ApplyD e1 e2) = getVar e1 ++ getVar e2
-getVar (ApplyEff _ _e) = [] -- getVar e
 getVar If3{} = []
 getVar For2{} = []
 getVar (Let _ e) = getVar e
-getVar Do{} = []
+getVar Block{} = []
 getVar (Unify e1 e2) = getVar e1 ++ getVar e2
 getVar Macro1 {} = []
 getVar (DefineV _) = []
@@ -651,7 +636,7 @@ getVar Function{} = []
 getVar TLam{} = []
 getVar (Exists _ e) = getVar e
 getVar (Forall _ e) = getVar e
-getVar (HasType e t) = getVar e ++ getVar t
+getVar (OfType e t) = getVar e ++ getVar t
 getVar Lam{} = []
 getVar Fail = []
 getVar DomainFail = []
@@ -807,14 +792,13 @@ addDeref = pure . exprD S.empty
     expr s (Seq es) = Seq $ map (expr s) es
     expr s (ApplyS e1 e2) = ApplyS (expr s e1) (expr s e2)
     expr s (ApplyD e1 e2) = ApplyD (expr s e1) (expr s e2)
-    expr s (ApplyEff is e) = ApplyEff is (expr s e)
     expr s (If3 e1 e2 e3) = If3 (expr s' e1) (expr s' e2) (exprD s e3)
       where s' = defs s e1
     expr s (For2 e1 e2) = For2 (expr s' e1) (exprD s' e2)
       where s' = defs s e1
     expr s (Let e1 e2) = Let (expr s' e1) (exprD s' e2)
       where s' = defs s e1
-    expr s (Do e) = Do (exprD s e)
+    expr s (Block e) = Block (exprD s e)
     expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
       where s' = defs s a
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
@@ -831,7 +815,7 @@ addDeref = pure . exprD S.empty
     expr s (TLam i rs e1 e2) = TLam i rs (expr s' e1) (expr s' e2)
       where s' = defs s e1
     expr s (Exists is e) = Exists is (expr s e)
-    expr s (HasType e t) = HasType (expr s e) (expr s t)
+    expr s (OfType e t) = OfType (expr s e) (expr s t)
     expr _ Fail = Fail
     expr s (Lam i e) = Lam i (expr s e)
     expr _ e = impossible e
@@ -860,10 +844,10 @@ lowerApply :: Expr -> D Expr
 lowerApply = f
   where
     f (ApplyS e1 e2) = Succeeds <$> (ApplyD <$> f e1 <*> f e2)
-    f (HasType e t) = do
+    f (OfType e t) = do
       verif <- gets (fVerify . dflags)
       if verif then
-        HasType <$> f e <*> f t
+        OfType <$> f e <*> f t
        else
         Succeeds <$> (ApplyD <$> f t <*> f e)
     f e = compos f e
@@ -876,7 +860,6 @@ lower (Array es) = Array <$> mapM lower es
 lower e@Wrong{} = pure e
 lower (Seq es) = seqE <$> mapM lower es
 lower (ApplyD e1 e2) = ApplyD <$> lower e1 <*> lower e2
-lower (ApplyEff _rs _e) = undefined
 lower (Unify e1 e2) = Unify <$> lower e1 <*> lower e2
 lower (Choice e1 e2) = Choice <$> lower e1 <*> lower e2
 lower (For2 (Exists is e1) e2) = join $ lowerFor is <$> lower e1 <*> lower e2
@@ -889,7 +872,7 @@ lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
 lower (Macro1 (Ident _ "lowered") [] e) = pure e
 lower (Exists is e) = lExists is <$> lower e
 lower (TLam i rs (Exists is e1) e2) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2
-lower (HasType e t) = join $ lowerHasType <$> lower e <*> lower t
+lower (OfType e t) = join $ lowerOfType <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
 lower Fail = pure Fail
 lower e = impossible e
@@ -997,7 +980,7 @@ lowerTLamVerify :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
 lowerTLamVerify i rs is e1 e2 = do
   (e2', e2'') <-
     case e2 of
-      HasType e t -> do
+      OfType e t -> do
         x <- newIdent (getLoc t) "x"
         pure (ApplyD t e, Exists [x] $ ApplyD t (Variable x))
       _ -> pure (e2, e2)
@@ -1054,16 +1037,16 @@ lowerTLamRun i rs is e1 e2 = do
     else
       Lam i <$> lowerIf is e1 e2 DomainFail
 
-lowerHasType :: Expr -> Expr -> D Expr
-lowerHasType e t = do
+lowerOfType :: Expr -> Expr -> D Expr
+lowerOfType e t = do
   verif <- gets (fVerify . dflags)
   if verif then
-    lowerHasTypeVerify e t
+    lowerOfTypeVerify e t
    else
     lowerSucceeds (ApplyD t e)
 
-lowerHasTypeVerify :: Expr -> Expr -> D Expr
-lowerHasTypeVerify e t = do
+lowerOfTypeVerify :: Expr -> Expr -> D Expr
+lowerOfTypeVerify e t = do
   x <- newIdent (getLoc t) "x"
   pure $ Seq [ eVerify $ eAssert $ ApplyD t e, eAssume $ Forall [x] $ ApplyD t (Variable x) ]
 

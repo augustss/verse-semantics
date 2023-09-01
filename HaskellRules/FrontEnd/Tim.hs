@@ -179,7 +179,6 @@ dsExpr sc i x (Array ss) = do
   pure [ExistsOp (j: y: js ++ ys) $ [j :=: Arr js, y :=: Arr ys, i :=: Var j, x :=: Var y] ++ concat opss]
 dsExpr sc i x (ApplyS s1 s2) = apply sc i x (VerifyOp "succeeds") s1 s2
 dsExpr sc i x (ApplyD s1 s2) = apply sc i x                    id s1 s2
---dsExpr _ _ _ (ApplyEff _ _) = undefined
 --dsExpr _ _ _ (EffAttr _ _) = undefined
 dsExpr sc i x (PrefixOp (Op ":") s0) = do
   ~[h, f] <- newIds ["h", "f"]
@@ -220,7 +219,7 @@ dsExpr _ _ _ (If3 _ _ _) = undefined
 dsExpr _ _ _ (For1 _) = undefined
 dsExpr _ _ _ (For2 _ _) = undefined
 dsExpr _ _ _ (Let _ _) = undefined
-dsExpr _ _ _ (Do _) = undefined
+dsExpr _ _ _ (Block _) = undefined
 dsExpr _ _ _ (Case1 _) = undefined
 dsExpr _ _ _ (Case2 _ _) = undefined
 -}
@@ -230,7 +229,7 @@ dsExpr sc h f (Function [(s0, _fx)] s1) = do
   op1 <- scope sc0 q w s1
   pure [f :=: Lambd x y [op0] y w [ExistsOp [q] $ [q :=: App h y] ++ [op1]]]
 dsExpr _ _ _ e@(Function _ _) = error $ "Function " ++ show e
-dsExpr sc i x (Block es) = dsExprs sc i x es
+dsExpr sc i x (Blk es) = dsExprs sc i x es
 dsExpr sc i x (Seq es) = dsExprs sc i x es
 --dsExpr _ _ _ (Option _) = undefined
 dsExpr sc i x (Parens e) = dsExpr sc i x e

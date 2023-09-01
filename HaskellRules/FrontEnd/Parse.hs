@@ -257,7 +257,7 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 pAtom :: P Expr
 pAtom = choice [ pMacro, Variable <$> pIdent, pQualVariable, pLiteral, pEmpty
                , Parens <$> pParens pExprSeq, pArray
-               , pOption, pFunction, pBlockM, pEffects ]
+               , pOption, pFunction, pBlockM ]
   where pEmpty = try $ pParens (pure (Array []))
 
 pQualVariable :: P Expr
@@ -286,9 +286,6 @@ pAttr = pAngles pEffectId
 pEffectId :: P Ident
 pEffectId = pIdent <|> pEffectName
 
-pEffects :: P Expr
-pEffects = pKeyword "effects" *> (ApplyEff <$> pParens (many pEffectId) <*> pBlockM)
-
 pTerm :: P Expr
 pTerm = do
   fn <- pAtom
@@ -314,11 +311,11 @@ pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) 
 pBlockEs :: P [Expr]
 pBlockEs = pBraces (sepEndBy pExprT (pOp ";"))
 
-pBlock :: P Block
+pBlock :: P Blk
 pBlock = pBlockM <|> pExprT
 
-pBlockM :: P Block
-pBlockM = Block <$> (pBlockEs  <|> pIndBlock)
+pBlockM :: P Blk
+pBlockM = Blk <$> (pBlockEs  <|> pIndBlock)
 
 pIndBlock :: P [Expr]
 pIndBlock = do
@@ -392,7 +389,7 @@ pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq) <*> (pKeyword
         mkCase (Just e1) e2 = Case2 e1 e2
 
 pDo :: P Expr
-pDo = pKeyword "block" *> (Do <$> pBlockM)
+pDo = pKeyword "block" *> (Block <$> pBlockM)
 
 pOption :: P Expr
 pOption = pKeyword "option" *> (Option <$> optional pExprSeq)

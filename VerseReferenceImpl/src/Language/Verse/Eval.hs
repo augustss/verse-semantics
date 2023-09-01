@@ -31,6 +31,7 @@ import Data.Eq
 import Data.Foldable (foldr, traverse_)
 import Data.Function
 import Data.Functor ((<&>))
+import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
@@ -292,7 +293,7 @@ evalOne e = do
   lift $ fork do
     unify var =<< readIVar =<< one do
       choiceFree <- newIVar ()
-      evalEvalT' (eval' e) r s { choiceFree }
+      evalEvalT' (eval' e) mempty { env = r.env } s { choiceFree }
     writeIVar storeFree ()
   pure var
 
@@ -306,7 +307,7 @@ evalAll e = do
   lift $ fork do
     unify var =<< newVar . Val.Tuple =<< readIVar =<< all do
       choiceFree <- newIVar ()
-      evalEvalT' (eval' e) r s { choiceFree }
+      evalEvalT' (eval' e) mempty { env = r.env } s { choiceFree }
     writeIVar storeFree ()
   pure var
 
@@ -320,7 +321,7 @@ evalNot e = do
     void $ readIVar =<< if'
     do
       choiceFree <- newIVar ()
-      void $ runEvalT' (eval' e) r s { choiceFree }
+      void $ runEvalT' (eval' e) mempty { env = r.env } s { choiceFree }
     do
       const empty
     do
@@ -329,7 +330,7 @@ evalNot e = do
 
 evalIfThenElse
   :: MonadEval m
-  => HashMap Ident Bool
+  => IdentMap Bool
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> L (Exp L Ident)
@@ -363,7 +364,7 @@ evalIfThenElse xs p t e = do
 
 evalForDo
   :: MonadEval m
-  => HashMap Ident Bool
+  => IdentMap Bool
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
@@ -396,7 +397,7 @@ evalInst
   :: MonadEval m
   => Loc
   -> L (Exp L Ident)
-  -> HashMap Ident Bool
+  -> IdentMap Bool
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
 evalInst loc e1 xs e2 = do
@@ -475,7 +476,8 @@ instClass
   -> S m
   -> VerseT m (Maybe (VarVal m))
 instClass loc i env sup xs e archetype s s' = do
-  (var, _, s) <- instClass' loc i env sup xs e archetype s
+  (var, _, f) <- instClass' loc i env sup xs e
+  s <- f archetype s
   fork do
     readIVar s.choiceFree
     writeIVar s'.choiceFree ()
@@ -492,29 +494,28 @@ instClass'
   -> Maybe (VarVal m)
   -> IdentMap Bool
   -> L (Exp L Ident)
-  -> Archetype m
-  -> S m
-  -> VerseT m (VarVal m, Env m, S m)
-instClass' loc i env sup xs e archetype s = do
-  (sup, xs_sup, s) <- instSup loc sup archetype s
-  xs <- traverse freshNamed xs
-  let xs' = xs_sup <> xs
-  s <- execEvalT' (eval' e) R { env = xs' <> env, archetype } s
-  newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs', s)
+  -> VerseT m (VarVal m, Env m, Archetype m -> S m -> VerseT m (S m))
+instClass' loc i env sup xs e = do
+  (sup, vars_sup, f_sup) <- instSup loc sup
+  vars <- (vars_sup <>) <$> traverse freshNamed xs
+  let
+    f archetype s = do
+      s <- execEvalT' (eval' e) R { env = vars <> env, archetype } s
+      let archetype_sup = (vars /\ xs) <> archetype
+      f_sup archetype_sup s
+  newVar (Val.ClassInst i sup $ filterNames vars) <&> (, vars, f)
 
 instSup
   :: MonadEval m
   => Loc
   -> Maybe (VarVal m)
-  -> Archetype m
-  -> S m
-  -> VerseT m (Maybe (VarVal m), Archetype m, S m)
-instSup loc sup archetype s = case sup of
-  Nothing -> pure (Nothing, archetype, s)
+  -> VerseT m (Maybe (VarVal m), Env m, Archetype m -> S m -> VerseT m (S m))
+instSup loc sup = case sup of
+  Nothing -> pure (Nothing, mempty, const pure)
   Just sup -> do
     (i, env, sup, xs, e) <- readClass loc sup
-    (sup, xs, s) <- instClass' loc i env sup xs e archetype s
-    pure (Just sup, xs, s)
+    (sup, xs, f) <- instClass' loc i env sup xs e
+    pure (Just sup, xs, f)
 
 readClass
   :: (MonadAbort Error m, MonadRef m)
@@ -722,6 +723,7 @@ invokeIntrinsic = \ case
   Intrinsic.Multiply -> liftNum (*)
   Intrinsic.Divide -> div'
   Intrinsic.Int -> int
+  Intrinsic.Float -> float
 
 liftOrd :: (MonadRef m, MonadSupply Int m)
         => (forall a . Ord a => a -> a -> Bool)
@@ -813,6 +815,11 @@ int var = readVar var >>= \ case
   Int _ -> pure $ Just var
   _ -> pure Nothing
 
+float :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
+float var = readVar var >>= \ case
+  Val.Float _ -> pure $ Just var
+  _ -> pure Nothing
+
 evalOption :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
 evalOption e = do
   var <- lift freshVar
@@ -851,12 +858,12 @@ newEnv = execWriterT $ do
       lift . newVar . Val.Overloads (Val.Intrinsic y) =<<
       lift freshVar
 
-filterNames :: HashMap Ident a -> HashMap Name a
+filterNames :: IdentMap a -> HashMap Name a
 filterNames =
   HashMap.fromList .
   HashMap.foldrWithKey
   \ case
-    Ident.Name x -> \ y z -> (x, y) : z
+    Ident.Name k -> \ v z -> (k, v) : z
     Ident.Label _ -> \ _ z -> z
   []
 
@@ -938,3 +945,6 @@ writeVarRef' ref x = do
     readIVar s.storeFree
     writeVarRef ref x
     writeIVar storeFree ()
+
+(/\) :: Hashable k => HashMap k v -> HashMap k w -> HashMap k v
+(/\) = HashMap.intersection
