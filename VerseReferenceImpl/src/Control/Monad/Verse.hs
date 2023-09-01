@@ -30,6 +30,7 @@ module Control.Monad.Verse
   , if'
   , all
   , for
+  , succeeds
   , FreezeT
   , runFreezeT
   , Frozen (..)
@@ -589,9 +590,28 @@ for m f = do
       Nothing -> pure $ reverse xs
       Just (h, x, m) -> loop h r m f . (:xs) =<< f x
 
-split :: (MonadRef m, MonadSupply Int m, Freshenable a m)
-      => Heap -> HeapRef m (Maybe a) -> VerseT m ()
-      -> VerseT m (IVar m (Maybe (Heap, a, VerseT m ())))
+succeeds :: ( MonadRef m
+            , MonadSupply Int m
+            , Freshenable a m
+            ) => VerseT m a -> VerseT m (IVar m (Maybe a))
+succeeds m = do
+  v <- freshIVar
+  fork $ do
+    h <- newHeap
+    r <- newHeapRef Nothing
+    split h r (m >>= writeHeapRef r . Just) >>= readIVar >>= \ case
+      Nothing -> writeIVar v Nothing
+      Just (h, x, m) -> split h r m >>= readIVar >>= \ case
+        Nothing -> writeIVar v $ Just x
+        Just _ -> writeIVar v Nothing
+  pure v
+
+split
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => Heap
+  -> HeapRef m (Maybe a)
+  -> VerseT m ()
+  -> VerseT m (IVar m (Maybe (Heap, a, VerseT m ())))
 split heap left m = do
   r <- ask'
   children <- lift $ newRef mempty
@@ -709,6 +729,11 @@ class Monad m => Freshenable a m where
 
 instance Monad m => Freshenable () m where
   freshen = pure
+
+instance ( Freshenable a m
+         , Freshenable b m
+         ) => Freshenable (a, b) m where
+  freshen (x, y) = (,) <$> freshen x <*> freshen y
 
 instance Monad m => Freshenable Int m where
   freshen = pure

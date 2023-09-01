@@ -144,9 +144,23 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
         ", "
 
 data Overload ref a
-  = Function {-# UNPACK #-} !Label !(Env Ident ref a) !(IdentMap Bool) Exp Exp
-  | Struct {-# UNPACK #-} !Label !(Env Ident ref a) !(IdentMap Bool) Exp
-  | Class {-# UNPACK #-} !Label !(Env Ident ref a) (Maybe a) !(IdentMap Bool) Exp
+  = Function
+    {-# UNPACK #-} !Label
+    !(Env Ident ref a)
+    !(IdentMap Bool)
+    !Exp
+    !(Maybe Exp)
+    !Exp
+  | Struct
+    {-# UNPACK #-}
+    !Label
+    !(Env Ident ref a)
+    !(IdentMap Bool) Exp
+  | Class {-# UNPACK #-}
+    !Label
+    !(Env Ident ref a)
+    !(Maybe a)
+    !(IdentMap Bool) Exp
   | Intrinsic !Intrinsic deriving (Functor, Foldable, Traversable)
 
 type Exp = L (Desugar.Exp L Ident)
@@ -155,9 +169,9 @@ instance Eq (ref (Val ref)) => RowMatchable (Overload ref)
 
 instance Eq (ref (Val ref)) => ZipMatchable (Overload ref) where
   zipMatch = curry $ \ case
-    (Function i_x env_x xs e1 e2, Function i_y env_y _ _ _) ->
+    (Function i_x env_x xs e1 e2 e3, Function i_y env_y _ _ _ _) ->
       guard (i_x == i_y) $>
-      Function i_x (zipMatchEnv env_x env_y) xs e1 e2
+      Function i_x (zipMatchEnv env_x env_y) xs e1 e2 e3
     (Struct i_x env_x xs e1, Struct i_y env_y _ _) ->
       guard (i_x == i_y) $>
       Struct i_x (zipMatchEnv env_x env_y) xs e1
@@ -171,8 +185,8 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
          , Freezable a b m
          ) => Freezable (Overload f a) (Overload g b) m where
   freeze = \ case
-    Function i env xs e1 e2 -> for env freeze <&> \ env ->
-      Function i env xs e1 e2
+    Function i env xs e1 e2 e3 -> for env freeze <&> \ env ->
+      Function i env xs e1 e2 e3
     Struct i env xs e1 -> for env freeze <&> \ env ->
       Struct i env xs e1
     Class i env sup xs e1 ->

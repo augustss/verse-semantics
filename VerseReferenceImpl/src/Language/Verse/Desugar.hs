@@ -30,12 +30,15 @@ type Desugar = StateT Env (SupplyT Label (Except Error))
 
 type Env = IdentMap (Loc, Bool)
 
-runDesugar :: Desugar a -> SupplyT Label (Except Error) (a, Env)
-runDesugar m = runStateT m mempty
+runDesugar :: Desugar a -> SupplyT Label (Except Error) (a, IdentMap Bool)
+runDesugar = fmap (fmap (fmap snd)) . runDesugar'
+
+runDesugar' :: Desugar a -> SupplyT Label (Except Error) (a, Env)
+runDesugar' m = runStateT m mempty
 
 desugar :: L (Parse.Exp L Name) -> Either Error (L (Exp L Ident))
 desugar e = runExcept . runSupplyT $ do
-  (e, xs) <- runDesugar $ desugar' e
+  (e, xs) <- runDesugar' $ desugar' e
   pure $ exists' xs e
 
 desugar' :: L (Parse.Exp L Name) -> Desugar (L (Exp L Ident))
@@ -55,12 +58,12 @@ desugar' e = for e $ \ case
     InfixColonEqual (Ident.Name <$> x) <$> desugar' e
   Parse.ArrowInfixColon x y e -> do
     tellName x False
-    let e3 = Name . Ident.Name <$> x
+    let e_x = Name . Ident.Name <$> x
     tellName y False
-    let e1 = Name . Ident.Name <$> y
+    let e_y = Name . Ident.Name <$> y
     e <- desugar' e
-    let e2 = BracketInvoke <$> duplicate e <.> duplicate e3
-    pure $ ((:=:) <$> duplicate e1 <.> duplicate e2) :*>: e3
+    let e' = BracketInvoke e e_x <$ e <. e_x
+    pure $ (e_y :=: e' <$ e_y <. e') :*>: e_x
   (Parse.:=:) e1 e2 ->
     (:=:) <$> desugar' e1 <*> desugar' e2
   (Parse.:<>:) e1 e2 -> do
@@ -96,14 +99,14 @@ desugar' e = for e $ \ case
   Parse.List (e:es) -> extract <$> do
     e <- desugar' e
     es <- traverse desugar' es
-    pure $ foldl' (\ z x -> (:*>:) <$> duplicate z <.> duplicate x) e es
+    pure $ foldl' (\ z x -> z :*>: x <$ z <. x) e es
   Parse.Where e1 e2 -> do
     x <- freshIdent (loc e1) False
     e1 <- desugar' e1
     e2 <- desugar' e2
     let
-      e1' = InfixColonEqual (x <$ e1) <$> duplicate e1
-      e = (:*>:) <$> duplicate e1' <.> duplicate e2
+      e1' = InfixColonEqual (x <$ e1) e1 <$ e1
+      e = e1' :*>: e2 <$ e1' <. e2
     pure $ e :*>: (Name x <$ e1)
   Parse.Fail ->
     pure Fail
@@ -122,38 +125,38 @@ desugar' e = for e $ \ case
   Parse.Module e -> do
     i <- supply
     (e, xs) <- lift . runDesugar $ desugar' e
-    pure $ Module i (snd <$> xs) e
+    pure $ Module i xs e
   Parse.Struct e -> do
     i <- supply
     (e, xs) <- lift . runDesugar $ desugar' e
-    pure $ Struct i (snd <$> xs) e
+    pure $ Struct i xs e
   Parse.Class e1 e2 -> do
     i <- supply
     e1 <- traverse desugar' e1
     (e2, xs) <- lift . runDesugar $ desugar' e2
-    pure $ Class i e1 (snd <$> xs) e2
+    pure $ Class i e1 xs e2
   Parse.Inst e1 e2 -> do
     e1 <- desugar' e1
     (e2, xs) <- lift . runDesugar $ desugar' e2
-    pure $ Inst e1 (snd <$> xs) e2
+    pure $ Inst e1 xs e2
   Parse.If p -> do
     (p, xs) <- lift . runDesugar $ desugar' p
-    pure $ IfThenElse (snd <$> xs) p (Tuple [] <$ p) (Tuple [] <$ p)
+    pure $ IfThenElse xs p (Tuple [] <$ p) (Tuple [] <$ p)
   Parse.IfThen p t -> do
     (p, xs) <- lift . runDesugar $ desugar' p
-    IfThenElse (snd <$> xs) p <$>
+    IfThenElse xs p <$>
       exists (desugar' t) <*>
       pure (Tuple [] <$ p <. t)
   Parse.IfThenElse p t e -> do
     (p, xs) <- lift . runDesugar $ desugar' p
-    IfThenElse (snd <$> xs) p <$>
+    IfThenElse xs p <$>
       exists (desugar' t) <*>
       exists (desugar' e)
   Parse.For e ->
     All <$> exists (desugar' e)
   Parse.ForDo e1 e2 -> do
     (e1, xs) <- lift . runDesugar $ desugar' e1
-    ForDo (snd <$> xs) e1 <$> exists (desugar' e2)
+    ForDo xs e1 <$> exists (desugar' e2)
   Parse.Block e ->
     extract <$> exists (desugar' e)
   Parse.Exists x -> do
@@ -164,15 +167,17 @@ desugar' e = for e $ \ case
     pure . Name . Ident.Name $ extract x
   Parse.Set x e ->
     Set (Ident.Name <$> x) <$> desugar' e
-  Parse.Function e1 e2 -> do
-    (e1, xs) <- lift . runDesugar $ desugar' e1
-    Function (snd <$> xs) e1 <$> exists (desugar' e2)
-  Parse.Overload x e1 e2 -> do
+  Parse.Function e_domain e_range e -> do
+    (e_domain, xs) <- lift . runDesugar $ desugar' e_domain
+    e_range <- traverse (exists . desugar') e_range
+    Function xs e_domain e_range <$> exists (desugar' e)
+  Parse.Overload x e_domain e_range e -> do
     tellName' x False
-    (e1, xs) <- lift . runDesugar $ desugar' e1
-    e2 <- exists $ desugar' e2
-    let e = Function (snd <$> xs) <$> duplicate e1 <.> duplicate e2
-    pure $ InfixColonEqual (Ident.Name <$> x) e
+    (e_domain, xs) <- lift . runDesugar $ desugar' e_domain
+    e_range <- traverse (exists . desugar') e_range
+    e <- exists $ desugar' e
+    let e' = Function xs e_domain e_range e <$ e_domain <. e
+    pure $ InfixColonEqual (Ident.Name <$> x) e'
   Parse.ParenInvoke e1 e2 ->
     ParenInvoke <$> desugar' e1 <*> desugar' e2
   Parse.BracketInvoke e1 e2 ->
@@ -231,7 +236,7 @@ tellName' x var =
 
 exists :: Desugar (L (Exp L Ident)) -> Desugar (L (Exp L Ident))
 exists m = lift $ do
-  (e, xs) <- runDesugar m
+  (e, xs) <- runDesugar' m
   pure $ exists' xs e
 
 exists' :: Env -> L (Exp L Ident) -> L (Exp L Ident)

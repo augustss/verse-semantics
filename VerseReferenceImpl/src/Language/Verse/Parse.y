@@ -183,10 +183,10 @@ Exp :: { L (Exp L Name) }
       Exp.ParenInvoke <\$> duplicate (Exp.Name <\$> $1) <.> duplicate $2
     }
   | name Paren ':=' Exp {
-      Exp.Overload <\$> duplicate $1 <.> duplicate $2 <.> duplicate $4
+      Exp.Overload $1 $2 Nothing $4 <\$ $1 <. $4
     }
   | name Paren ':=' BraceInd {
-      Exp.Overload <\$> duplicate $1 <.> duplicate $2 <.> duplicate $4
+      Exp.Overload $1 $2 Nothing $4 <\$ $1 <. $4
     }
   | name ':' Exp {
       Exp.InfixColon <\$> duplicate $1 <.> duplicate $3
@@ -204,10 +204,10 @@ Exp :: { L (Exp L Name) }
       Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $4 <. $5)
     }
   | Exp '=>' Exp {
-      Exp.Function <\$> duplicate $1 <.> duplicate $3
+      Exp.Function $1 Nothing $3 <\$ $1 <. $3
     }
   | Exp '=>' BraceInd {
-      Exp.Function <\$> duplicate $1 <.> duplicate $3
+      Exp.Function $1 Nothing $3 <\$ $1 <. $3
     }
   | Exp '<>' Scan Exp {
       (:<>:) <\$> duplicate $1 <.> duplicate $4
@@ -368,7 +368,7 @@ Exists :: { L (Exp L Name) }
 
 Function :: { L (Exp L Name) }
   : function Paren Block {
-      Exp.Function <\$ $1 <.> duplicate $2 <.> duplicate $3
+      Exp.Function $2 Nothing $3 <\$ $1 <. $3
     }
 
 Paren :: { L (Exp L Name) }

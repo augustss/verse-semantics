@@ -22,6 +22,7 @@ data Error
   | NameError !Loc !Name
   | IdentError !Loc !Ident
   | DomainError !Loc
+  | WrongError !Loc
   | StuckError deriving Show
 
 instance Pretty Error where
@@ -48,6 +49,8 @@ instance Pretty Error where
       varNotInScope x y
     DomainError x ->
       pretty x <> colon <+> "unexpected" <+> "value"
+    WrongError x ->
+      pretty x <> colon <+> "wrong"
     StuckError -> "stuck"
     where
       varNotInScope x y =
