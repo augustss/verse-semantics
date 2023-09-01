@@ -371,9 +371,6 @@ arrayElems = grp . map cls
 -- They are just there to avoid introducing unused existentials.
 dsD :: Expr -> D Expr
 dsD e | isValue e = pure e  -- DCONST DVAR
---dsD e@(ApplyD f a) | isValue f && isValue a = pure e
---dsD e@(OfType f a) | isValue f && isValue a = pure e
---dsD (Unify x e) | isValue x = Unify x <$> dsD e
 dsD (Choice e1 e2) = Choice <$> dsD e1 <*> dsD e2
 dsD (ApplyD e1 e2) = ApplyD <$> dsD e1 <*> dsD e2
 dsD (Unify e1 e2) = Unify <$> dsD e1 <*> dsD e2
