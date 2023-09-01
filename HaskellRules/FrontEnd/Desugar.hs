@@ -108,6 +108,7 @@ newIdent l s = do
   n <- newInt
   pure $ Ident l $ "$" ++ s ++ show n
 
+{-
 withContext :: DContext -> D a -> D a
 withContext c da = do
   oldc <- gets context
@@ -115,6 +116,7 @@ withContext c da = do
   a <- da
   modify $ \ ds->ds{ context = oldc }
   pure a
+-}
 
 ---------------------
 
@@ -172,6 +174,8 @@ dsSmall = ds
     ds (Typedef e) = do x <- newIdent (getLoc e) "x"; ds $ Function [(DefineE x e, [invariantId])] (Variable x)
     ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [invariantId])] e2
     ds (Function (a:as@(_:_)) b) = ds $ Function [a] $ Function as b
+-- not yet
+--  ds (Function [(e, ps@(_:_))] b) = ds $ Function [(e, [])] $ Check ps b
 
     -- Conditional and foor-loop notation
     ds (If1 e) = ds $ If2E e eFalse
@@ -366,18 +370,11 @@ arrayElems = grp . map cls
 -- All cases, but the last, can be removed.
 -- They are just there to avoid introducing unused existentials.
 dsD :: Expr -> D Expr
-dsD e | isValue e = pure e
-dsD e@(ApplyD f a) | isValue f && isValue a = pure e
-dsD e@(OfType f a) | isValue f && isValue a = pure e
-dsD (Unify x e) | isValue x = Unify x <$> dsD e
+dsD e | isValue e = pure e  -- DCONST DVAR
+dsD (Choice e1 e2) = Choice <$> dsD e1 <*> dsD e2
+dsD (ApplyD e1 e2) = ApplyD <$> dsD e1 <*> dsD e2
+dsD (Unify e1 e2) = Unify <$> dsD e1 <*> dsD e2
 dsD (DefineV x) = pure (DefineV x)
-dsD (DefineE x e@Function{}) = do
-  c <- gets context
-  case c of
-    -- In an evaluation context, just define the function normally.
-    -- This isn't necessary, but avoids an extra exists.
-    DEval ->     existsV [x] <$> dsM x e
-    DAbstract -> DefineE x <$> dsD e
 dsD (DefineE x e) = DefineE x <$> dsD e
 dsD (For2 e1 e2) = For2 <$> dsD e1 <*> dsD e2
 dsD (If3 e1 e2 e3) = If3 <$> dsD e1 <*> dsD e2 <*> dsD e3
@@ -386,7 +383,21 @@ dsD (Array ts) = Array <$> mapM dsD ts
 dsD (Seq []) = pure (Array [])
 dsD (Seq [t]) = dsD t
 dsD (Seq (t:ts)) = seqE <$> sequence [dsD t, dsD (Seq ts)]
-dsD e = do
+dsD (OfType e t) = OfType <$> dsD e <*> dsD t
+dsD Fail = pure Fail
+dsD (Function [(t1, effs)] t2) = do
+  x <- newIdent (getLoc t1) "x"
+  t1' <- dsM x t1
+  t2' <- dsD t2
+  pure $ TLam x effs t1' t2'
+dsD e@Range{} = dsDM e
+dsD e@DefineIE{} = dsDM e
+dsD (Lam x e) = Lam x <$> dsD e
+dsD e = impossible e
+
+-- Use M to desugar
+dsDM :: Expr -> D Expr
+dsDM e = do
   x <- newIdent (getLoc e) "i"
   existsV [x] <$> dsM x e
 
@@ -401,7 +412,7 @@ dsM i x@Variable{} = pure $ unifyV i x
 --                     | otherwise = undefined -- invariant broken
 dsM i (ApplyD f a) = unifyV i <$> (ApplyD <$> dsD f <*> dsD a)
 -- Rule:  i |> x = t   -->  x = (i |> t)
-dsM i (Unify x t) | isValue x = Unify x <$> dsM i t
+dsM i (Unify t1 t2) = Unify <$> dsM i t1 <*> dsM i t2
 -- Rule:  i |> x:any  --> x := i
 dsM i (DefineV x) = pure $ DefineE x (Variable i)
 -- Rule:  i |> x := t  -->  x := (i |> t)
@@ -418,28 +429,31 @@ dsM i (Seq [t]) = dsM i t
 dsM i (Seq (t:ts)) = seqE <$> sequence [dsD t, dsM i (Seq ts)]
 -- Rule:  i |> t1 | t2 -->  (i |> t1) | (i |> t2)
 dsM i (Choice t1 t2) = Choice <$> dsM i t1 <*> dsM i t2
--- XXX verify
-
 -- Rule:  i |> (t1,...,tn)  -->  exists x1 ... xn . x1 |> t1; ...; xn |> tn; i = (x1,...,xn)
 dsM i (Array ts) = do
   xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
   bs <- zipWithM dsM xs ts
-  pure $ existsV xs $ seqE $ bs ++ [unifyV i $ Array $ map Variable xs]
+  pure $ existsV xs $ seqE [ unifyV i $ Array $ map Variable xs, Array bs]
 
---dsM i (Array ts) = (unifyV i . Array) <$> mapM dsD ts
 dsM i (If3 e1 e2 e3) = If3 <$> dsD e1 <*> dsM i e2 <*> dsM i e3
 dsM i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD e1 <*> dsD e2)
-dsM i (Function [(t1, r)] t2) = do
-  c <- gets context
-  dsFunction c i t1 r t2
---dsM i af@(OfType a f) | isValue f && isValue a = pure $ unifyV i af
+
+dsM i (Function [(t1, effs)] t2) = do
+  x <- newIdent (getLoc t1) "x"
+  y <- newIdent (getLoc t1) "y"
+  z <- newIdent (getLoc t1) "z"
+  t1' <- dsM x t1
+  t2' <- dsM y t2
+  pure $ TLam x effs (DefineE z t1') (Seq [DefineE y (ApplyD (Variable i) (Variable z)), t2'])
+
 dsM i (OfType a f) = OfType <$> dsM i a <*> dsD f
-dsM i (Macro1 m rs e) = unifyV i . Macro1 m rs <$> dsD e  -- XXX
+dsM i (Macro1 m rs e) = Macro1 m rs <$> dsM i e  -- XXX really?
 dsM i Fail = pure $ unifyV i Fail
 dsM i (Lam x e) = unifyV i . Lam x <$> dsD e
 dsM i (Let e1 e2) = Let <$> dsD e1 <*> dsM i e2
 dsM _ e = impossible e
 
+{-
 dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
 -- This is highly dubious
 dsFunction DEval i t1 effs t2 = do
@@ -455,6 +469,7 @@ dsFunction DAbstract i t1 effs t2 = do
   t1' <- dsM x t1
   t2' <- dsM y t2
   pure $ TLam x effs (DefineE z t1') (Seq [DefineE y (ApplyD (Variable i) (Variable z)), t2'])
+-}
 
 unifyV :: Ident -> Expr -> Expr
 unifyV i e = Unify (Variable i) e

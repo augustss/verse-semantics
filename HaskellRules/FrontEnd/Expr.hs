@@ -13,6 +13,7 @@ module FrontEnd.Expr(
   pattern Unit,
   pattern Typedef,
   pattern Succeeds,
+  pattern Check,
 --  pattern Range,
   Store(..), Ptr,
   Blk,
@@ -157,6 +158,9 @@ pattern Typedef e <- Macro1 (Ident _ "type") [] e
 pattern Succeeds :: Blk -> Expr
 pattern Succeeds e <- Macro1 (Ident _ "succeeds") [] e
   where Succeeds e = Macro1 (Ident noLoc "succeeds") [] e
+pattern Check :: [Ident] -> Expr -> Expr
+pattern Check ps e <- Macro1 (Ident _ "check") ps e
+  where Check ps e = Macro1 (Ident noLoc "succeeds") ps e
 
 type Eff = Ident
 
