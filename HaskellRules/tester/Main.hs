@@ -262,7 +262,7 @@ data VerifyResult
 verifyIt :: TestFlags -> Expr -> IO VerifyResult
 verifyIt tflg e = do
   let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False }
-      e' = preProcess sys (ruleEnv sys) . coreToTrs . desugar flags $ e
+      e' = wrapAssert . preProcess sys (ruleEnv sys) . coreToTrs . desugar flags $ e
       sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
       vres = verifyM sys e'
   eres <- Control.Exception.try (evaluate (seq (vres==vres) vres))

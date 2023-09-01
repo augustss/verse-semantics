@@ -280,7 +280,7 @@ cVerify = do
       let flg = (flags s){ fVerify = True, fSplit = False, fAssumeVerified = False }
           e1  = asCore flg e
           e2  = coreToTrs e1
-          e' = (if True then wrapAssert else id) $ preProcess sys (ruleEnv sys) e2
+          e' = (if True then wrapAssert else id)  $  preProcess sys (ruleEnv sys) e2
       putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify sys e'
       when (fTraceVerify flg) $ do

@@ -352,6 +352,7 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
    go bs (e1 :|: e2)      = go bs e1 || go bs e2
    go bs (Exi (Bind _ e)) = go bs e
    go bs (Uni (Bind x e)) = go (x:bs) e
+   -- go _  (Verify _)       = True          -- HACK
    go _  _                = False
 
 
