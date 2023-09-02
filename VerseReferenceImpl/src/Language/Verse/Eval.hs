@@ -619,17 +619,17 @@ invokeFunction
   -> S m
   -> S m
   -> VerseT m (Maybe (VarVal m))
-invokeFunction loc env xs e_domain e_range e var_arg s s' = readIVar =<< if'
+invokeFunction loc env xs e_domain e_range e v_arg s s' = readIVar =<< if'
   do
     xs <- traverse freshNamed xs
     let r = mempty { env = xs <> env }
-    unify var_arg =<< evalEvalT' (eval' e_domain) r s
+    unify v_arg =<< evalEvalT' (eval' e_domain) r s
     pure xs
   do
     \ xs -> do
       let r = mempty { env = xs <> env }
-      (var_e, s) <- runEvalT' (eval' e) r s
-      succeeds (runEvalT' (invokeRange e_range var_e) r s) >>= readIVar >>= \ case
+      (var, s) <- runEvalT' (eval' e) r s
+      succeeds (runEvalT' (invokeRange e_range var) r s) >>= readIVar >>= \ case
         Nothing -> abort $ WrongError loc
         Just (var, s) -> do
           fork do
@@ -641,7 +641,6 @@ invokeFunction loc env xs e_domain e_range e var_arg s s' = readIVar =<< if'
           pure $ Just var
   do
     pure Nothing
-  where
 
 invokeRange
   :: MonadEval m
