@@ -175,7 +175,7 @@ instance (MonadRef m, MonadSupply Int m) => Alternative (VerseT m) where
   empty = VerseT $ \ _ _ _ ek r -> ek r
   x <|> y = VerseT $ \ yk sk fk ek r -> do
     xs <- readRef r.children
-    writeRef r.children =<< runReaderT (copyProcesses xs) r.heap
+    writeRef r.children =<< runCopyT (copyProcesses xs) r.heap
     let
       f r = writeRef r.children xs
       fk' r = f r *> unVerseT y yk sk fk fk r
@@ -845,6 +845,9 @@ addEmpty f = VerseT $ \ _ sk fk ek ->
   sk () fk (\ r -> f r *> ek r)
 
 type CopyT = ReaderT (Maybe Heap)
+
+runCopyT :: CopyT m a -> Maybe Heap -> m a
+runCopyT = runReaderT
 
 copyProcesses :: (MonadRef m, MonadSupply Int m)
               => Processes m

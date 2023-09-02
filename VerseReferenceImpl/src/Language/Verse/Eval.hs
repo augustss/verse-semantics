@@ -549,9 +549,10 @@ evalInvoke loc var1 var2 = do
   put s'
   lift . fork $ readVar var1 >>= \ case
     Val.Tuple xs -> do
-      readIVar s.choiceFree
-      unify var =<< invokeTuple xs var2
-      writeIVar s'.choiceFree ()
+      fork do
+        readIVar s.choiceFree
+        unify var =<< invokeTuple xs var2
+        writeIVar s'.choiceFree ()
       fork do
         readIVar s.storeFree
         writeIVar s'.storeFree ()
@@ -604,7 +605,7 @@ invokeOverload loc overload arg s s' = case overload of
         writeIVar s'.choiceFree ()
       fork do
         readIVar s.storeFree
-        writeIVar s'.storeFree ()
+      writeIVar s'.storeFree ()
       pure x
 
 invokeFunction
@@ -631,7 +632,7 @@ invokeFunction loc env xs e_domain e_range e v_arg s s' = readIVar =<< if'
       (var, s) <- runEvalT' (eval' e) r s
       succeeds (runEvalT' (invokeRange e_range var) r s) >>= readIVar >>= \ case
         Nothing -> abort $ WrongError loc
-        Just (var, s) -> do
+        Just (var, _) -> do
           fork do
             readIVar s.choiceFree
             writeIVar s'.choiceFree ()
