@@ -176,7 +176,7 @@
       \text{Expressions} & e & ::= & |v| \vb |v==e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e| \\
-      \text{Primops} & op  & ::= & |gt| \vb |add|
+      \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt|
   \end{array}
       $$
   \caption{Syntax}
@@ -257,9 +257,7 @@
 
 \rulegroupname{Normalization:}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x E^[x==v; e]| & \movesto &
-   \multicolumn{2}{l}{|E^[e]| \hspace{1cm} 
-        \text{if $|x| \notin \freevars{|E,e|}, |x| \notin \boundvars{|E|}$, and $|v|\ne|V^[x]|$}} \\
+\rulename{eqn-elim} & |def x E^[x==v; e]| & \movesto & |E^[e]| & \hspace{-4em} \text{if $|x| \notin \freevars{|E,e|}, |x| \notin \boundvars{|E|}$, and $|v|\ne|V^[x]|$} \\
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|}, |x| \notin \boundvars{|E|}$} \\
 %\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
 %\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\

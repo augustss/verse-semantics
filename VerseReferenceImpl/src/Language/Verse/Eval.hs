@@ -187,7 +187,7 @@ eval' e = case extract e of
     var <- lift freshVar
     localName (extract x) (Val var) $ eval' e
   Exp.Var x e -> do
-    ref <- lift $ newVarRef =<< freshVar
+    ref <- lift $ freshVarRef
     localName (extract x) (Ref ref) $ eval' e
   Exp.Set x e -> lookupNamed (extract x) >>= \ case
     Nothing -> abort $ IdentError (loc x) (extract x)
@@ -196,10 +196,10 @@ eval' e = case extract e of
       var <- eval' e
       writeVarRef' ref var
       pure var
-  Exp.Function xs e1 e2 -> do
+  Exp.Function xs e_domain e_range e -> do
     i <- supply
     r <- ask
-    lift $ newVar . Val.Overloads (Val.Function i r.env xs e1 e2) =<< freshVar
+    lift $ newVar . Val.Overloads (Val.Function i r.env xs e_domain e_range e) =<< freshVar
   Exp.ParenInvoke e1 e2 -> do
     var1 <- eval' e1
     var2 <- eval' e2
@@ -549,9 +549,10 @@ evalInvoke loc var1 var2 = do
   put s'
   lift . fork $ readVar var1 >>= \ case
     Val.Tuple xs -> do
-      readIVar s.choiceFree
-      unify var =<< invokeTuple xs var2
-      writeIVar s'.choiceFree ()
+      fork do
+        readIVar s.choiceFree
+        unify var =<< invokeTuple xs var2
+        writeIVar s'.choiceFree ()
       fork do
         readIVar s.storeFree
         writeIVar s'.storeFree ()
@@ -590,9 +591,12 @@ invokeOverload
   -> S m
   -> VerseT m (Maybe (VarVal m))
 invokeOverload loc overload arg s s' = case overload of
-  Val.Function _ env xs e_domain e -> invokeFunction env xs e_domain e arg s s'
-  Val.Struct i env xs e -> invokeStruct i env xs e arg s s'
-  Val.Class i env sup xs e -> invokeClass loc i env sup xs e arg s s'
+  Val.Function _ env xs e_domain e_range e ->
+    invokeFunction loc env xs e_domain e_range e arg s s'
+  Val.Struct i env xs e ->
+    invokeStruct i env xs e arg s s'
+  Val.Class i env sup xs e ->
+    invokeClass loc i env sup xs e arg s s'
   Val.Intrinsic intrinsic -> invokeIntrinsic intrinsic arg >>= \ case
     Nothing -> pure Nothing
     x@Just {} -> do
@@ -601,36 +605,54 @@ invokeOverload loc overload arg s s' = case overload of
         writeIVar s'.choiceFree ()
       fork do
         readIVar s.storeFree
-        writeIVar s'.storeFree ()
+      writeIVar s'.storeFree ()
       pure x
 
 invokeFunction
   :: MonadEval m
-  => Env m
+  => Loc
+  -> Env m
   -> IdentMap Bool
   -> L (Exp L Ident)
+  -> Maybe (L (Exp L Ident))
   -> L (Exp L Ident)
   -> VarVal m
   -> S m
   -> S m
   -> VerseT m (Maybe (VarVal m))
-invokeFunction env xs e_domain e arg s s' = readIVar =<< if'
+invokeFunction loc env xs e_domain e_range e v_arg s s' = readIVar =<< if'
   do
     xs <- traverse freshNamed xs
-    unify arg =<< evalEvalT' (eval' e_domain) mempty { env = xs <> env } s
+    let r = mempty { env = xs <> env }
+    unify v_arg =<< evalEvalT' (eval' e_domain) r s
     pure xs
   do
     \ xs -> do
-      (result, s) <- runEvalT' (eval' e) mempty { env = xs <> env } s
-      fork do
-        readIVar s.choiceFree
-        writeIVar s'.choiceFree ()
-      fork do
-        readIVar s.storeFree
-        writeIVar s'.storeFree ()
-      pure $ Just result
+      let r = mempty { env = xs <> env }
+      (var, s) <- runEvalT' (eval' e) r s
+      succeeds (runEvalT' (invokeRange e_range var) r s) >>= readIVar >>= \ case
+        Nothing -> abort $ WrongError loc
+        Just (var, _) -> do
+          fork do
+            readIVar s.choiceFree
+            writeIVar s'.choiceFree ()
+          fork do
+            readIVar s.storeFree
+            writeIVar s'.storeFree ()
+          pure $ Just var
   do
     pure Nothing
+
+invokeRange
+  :: MonadEval m
+  => Maybe (L (Exp L Ident))
+  -> VarVal m
+  -> EvalT m (VarVal m )
+invokeRange = \ case
+  Nothing -> pure
+  Just f -> \ var_x -> do
+    var_f <- eval' f
+    evalInvoke (loc f) var_f var_x
 
 invokeStruct
   :: MonadEval m
@@ -810,15 +832,21 @@ div' var = readVar var >>= \ case
     _ -> pure Nothing
   _ -> pure Nothing
 
-int :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
-int var = readVar var >>= \ case
-  Int _ -> pure $ Just var
-  _ -> pure Nothing
+int :: (MonadRef m, MonadSupply Int m)
+    => VarVal m -> VerseT m (Maybe (VarVal m))
+int var = do
+  fork $ readVar var >>= \ case
+    Int _ -> pure ()
+    _ -> empty
+  pure $ Just var
 
-float :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
-float var = readVar var >>= \ case
-  Val.Float _ -> pure $ Just var
-  _ -> pure Nothing
+float :: (MonadRef m, MonadSupply Int m)
+      => VarVal m -> VerseT m (Maybe (VarVal m))
+float var = do
+  fork $ readVar var >>= \ case
+    Val.Float _ -> pure ()
+    _ -> empty
+  pure $ Just var
 
 evalOption :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
 evalOption e = do
@@ -852,6 +880,7 @@ newEnv = execWriterT $ do
   tell' "operator'*'" Intrinsic.Multiply
   tell' "operator'/'" Intrinsic.Divide
   tell' "int" Intrinsic.Int
+  tell' "float" Intrinsic.Float
   where
     tell' x y =
       tell . HashMap.singleton x . Val =<<

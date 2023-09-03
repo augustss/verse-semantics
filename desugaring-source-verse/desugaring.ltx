@@ -680,15 +680,14 @@ $$
 \rulename{dchoice}& |De (t_1 `choice` t_2)| & = & |De t_1 `choice`De t_2| \\
 \rulename{dbind}  & |De (x := e)| & = & |x := De e| \\
 \rulename{dseq}   & |De (t_1 ; t_2)| & = & |De t_1 ; De t_2| \\
-\rulename{darray} & |De (array(t_1; xdots; t_n))| & = & |array(De t_1 ; xdots; De t_n)| \\
+\rulename{darray} & |De (array(t_1; xdots; t_n))| & = & |arr(De t_1 ; xdots; De t_n)| \\
 \rulename{dfor}   & |De (for(t_1){t_2}| & = & |for(De t_1){De t_2}| \\
 \rulename{dif}    & |De (if(t_1) then t_2 else t_3)| & = &
     \multicolumn{2}{@@{}l}{|if (De t_1) then De t_2 else De t_3|} \\
 \rulename{doftype}& |De (oftype t_1 t_2)| & = & |oftype (De t_1) (De t_2)| \\
 \rulename{dfun}   & |De (functionP t_1 t_2)| & = & |tlam x (Me x t_1) (De t_2)| \\
-
-\rulename{dexpr}  & |De t| & = & |def i (Me i t)| & \hspace{-5em} \text{otherwise (only |:t|, |(y squiggt x):=t|)} \\[2mm]
-\multicolumn{4}{l}{\text{\lennart{I think we should expand the two remaining dexpr cases:}}}\\
+%%\rulename{dexpr}  & |De t| & = & |def i (Me i t)| & \hspace{-5em} \text{otherwise (only |:t|, |(y squiggt x):=t|)} \\[2mm]
+%%\multicolumn{4}{l}{\text{\lennart{I think we should expand the two remaining dexpr cases:}}}\\
 \rulename{dtype}  & |De (:t)| & = & |def i (((De t))^[i])| \\
 \rulename{dsquig} & |De (y squiggt x) := t| & = & | x:= Me y t | \\[2mm]
 
@@ -710,7 +709,7 @@ and |e| is a BigCore expression}} \\[1mm]
 \multicolumn{2}{@@{}l}{
   \begin{array}[t]{@@{}l}
     |def (x_1 xdots x_n) (i == arr (x_1, xdots, x_n))| \\
-    |array (Me x_1 t_1; xdots; Me x_n t_n)|
+    |arr (Me x_1 t_1; xdots; Me x_n t_n)|
    \end{array}
     }\\[2mm]
 

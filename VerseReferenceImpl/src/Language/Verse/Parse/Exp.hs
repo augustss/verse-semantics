@@ -46,8 +46,8 @@ data Exp f a
   | Exists (f a)
   | Var (f a)
   | Set (f a) (f (Exp f a))
-  | Function (f (Exp f a)) (f (Exp f a))
-  | Overload (f a) (f (Exp f a)) (f (Exp f a))
+  | Function (f (Exp f a)) (Maybe (f (Exp f a))) (f (Exp f a))
+  | Overload (f a) (f (Exp f a)) (Maybe (f (Exp f a))) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
   | Option (f (Exp f a))

@@ -30,6 +30,7 @@ module Control.Monad.Verse
   , if'
   , all
   , for
+  , succeeds
   , FreezeT
   , runFreezeT
   , Frozen (..)
@@ -174,7 +175,7 @@ instance (MonadRef m, MonadSupply Int m) => Alternative (VerseT m) where
   empty = VerseT $ \ _ _ _ ek r -> ek r
   x <|> y = VerseT $ \ yk sk fk ek r -> do
     xs <- readRef r.children
-    writeRef r.children =<< runReaderT (copyProcesses xs) r.heap
+    writeRef r.children =<< runCopyT (copyProcesses xs) r.heap
     let
       f r = writeRef r.children xs
       fk' r = f r *> unVerseT y yk sk fk fk r
@@ -589,9 +590,28 @@ for m f = do
       Nothing -> pure $ reverse xs
       Just (h, x, m) -> loop h r m f . (:xs) =<< f x
 
-split :: (MonadRef m, MonadSupply Int m, Freshenable a m)
-      => Heap -> HeapRef m (Maybe a) -> VerseT m ()
-      -> VerseT m (IVar m (Maybe (Heap, a, VerseT m ())))
+succeeds :: ( MonadRef m
+            , MonadSupply Int m
+            , Freshenable a m
+            ) => VerseT m a -> VerseT m (IVar m (Maybe a))
+succeeds m = do
+  v <- freshIVar
+  fork $ do
+    h <- newHeap
+    r <- newHeapRef Nothing
+    split h r (m >>= writeHeapRef r . Just) >>= readIVar >>= \ case
+      Nothing -> writeIVar v Nothing
+      Just (h, x, m) -> split h r m >>= readIVar >>= \ case
+        Nothing -> writeIVar v $ Just x
+        Just _ -> writeIVar v Nothing
+  pure v
+
+split
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => Heap
+  -> HeapRef m (Maybe a)
+  -> VerseT m ()
+  -> VerseT m (IVar m (Maybe (Heap, a, VerseT m ())))
 split heap left m = do
   r <- ask'
   children <- lift $ newRef mempty
@@ -710,6 +730,11 @@ class Monad m => Freshenable a m where
 instance Monad m => Freshenable () m where
   freshen = pure
 
+instance ( Freshenable a m
+         , Freshenable b m
+         ) => Freshenable (a, b) m where
+  freshen (x, y) = (,) <$> freshen x <*> freshen y
+
 instance Monad m => Freshenable Int m where
   freshen = pure
 
@@ -820,6 +845,9 @@ addEmpty f = VerseT $ \ _ sk fk ek ->
   sk () fk (\ r -> f r *> ek r)
 
 type CopyT = ReaderT (Maybe Heap)
+
+runCopyT :: CopyT m a -> Maybe Heap -> m a
+runCopyT = runReaderT
 
 copyProcesses :: (MonadRef m, MonadSupply Int m)
               => Processes m
