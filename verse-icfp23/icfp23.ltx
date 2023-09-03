@@ -32,7 +32,7 @@
 
 % ---------------- Full Paper ----------------
 \newif\iffullpaper
-\fullpaperfalse     %% include appendicies
+\fullpaperfalse%% include appendicies
 
 \RequirePackage[utf8]{inputenc}
 
@@ -506,7 +506,7 @@ Like any functional logic language,
   addresses higher-order features via an encoding called defunctionalization~\citetext{\citealp{defunctionalization}; \citealp{hanus:survey}, 3.3}.
 \item \emph{Deterministic, with native encapsulation}.  \versecalc{} is \emph{deterministic}, in the sense that when an expression yields more than one value
   (as is often the case in functional logic programs), those values are returned in a well-specified order.
-  This makes it easy to solve the\hbox{notoriously} tricky issue \cite{bernd-hanus:encapsulating-workshop,bernd-hanus:encapsulating} of
+  This makes it easy to solve the \hbox{notoriously} tricky issue \cite{bernd-hanus:encapsulating-workshop,bernd-hanus:encapsulating} of
   how to \emph{encapsulate} the result of a search as a data structure, using the |allKW| operator (see \cref{sec:all}).
   It opens up a new approach to dealing with so-called ``flexible'' {\vs} ``rigid'' variables
   (see \cref{sec:one}).  It supports an elegant economy of concepts: for example,
