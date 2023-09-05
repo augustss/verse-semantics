@@ -41,8 +41,12 @@
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
 
 %format (De (x)) = "\De{" ^ x "}"
+%format (Ve (x)) = "\Ve{" ^ x "}"
+%format (Ie (x)) = "\Ie{" ^ x "}"
 %format (Fe (i) (e)) = "\Fe{" ^ i "}{" ^e "}"
 %format (Me (i) (e)) = "\Me{" ^ i "}{" ^e "}"
+%format (MMe (m) (i) (e)) = "\MMe{" ^ i "}{" ^e "}{" ^m "}"
+
 %format (Ae (i) (e)) = "\Ae{" ^ i "}{" ^e "}"
 %format (An (x)) = "\An{" ^ x "}"
 %format (Cr (x)) = "\Cr{" ^ x "}"

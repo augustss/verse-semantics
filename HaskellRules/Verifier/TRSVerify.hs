@@ -8,10 +8,11 @@ import Rules.Verifier
 import TRS.Bind
 import TRS.TRS
 import TRS.Traced
-import Rules.Core
+import Rules.Core hiding (def)
 import Rules.CoreEDSL
 import qualified Epic.Print as P
 import Prelude hiding (succ, sum)
+import qualified Verifier.TRSDesugar as DS()
 
 --------------------------------------------------------------------------------
 
@@ -105,7 +106,7 @@ runTest (testName, e, expected) =
 -------------------------------------------------------------------------------------------
 
 eXIs :: [Ident] -> Expr -> Expr
-eXIs xs e = foldr EXI e xs
+eXIs = exis
 
 lAMs :: [Ident] -> Expr -> Expr
 lAMs xs e = foldr LAM e xs

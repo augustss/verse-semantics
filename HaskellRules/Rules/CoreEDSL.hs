@@ -1,6 +1,6 @@
 module Rules.CoreEDSL where
 
-import Rules.Core
+import Rules.Core hiding (def)
 import TRS.Bind
 
 --------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ instance Applicative Verse where
 
 instance Monad Verse where
   return = pure
-  
+
   V m >>= k =
     V (\i vs -> let (ws1, es1, x, j1) = m i vs
                     V m'              = k x
@@ -180,5 +180,3 @@ verse :: Program a => a -> Expr
 verse a = let V m           = block a
               (_ , _, e, _) = m "_" []
            in e
-
-

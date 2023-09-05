@@ -57,7 +57,7 @@ library all
                       FrontEnd.RefImpl
                       FrontEnd.Run
                       FrontEnd.TRSAdapter
---                      Verifier.Verify
+                      Verifier.TRSDesugar
 --                      Verifier.FOL
                       Rules.ICFP
                       Rules.Verifier

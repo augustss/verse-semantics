@@ -58,8 +58,11 @@
 
 \ifdesugarops
 \newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
+\newcommand{\Ve}[1]{{\mathcal V}\llbracket #1 \rrbracket}
+\newcommand{\Ie}[1]{{\mathcal I}\llbracket #1 \rrbracket}
 % \newcommand{\Me}[2]{{\mathcal M}\llbracket #1 \blacktriangleright #2 \rrbracket}
 \newcommand{\Me}[2]{{\mathcal M}\llbracket #2 \rrbracket #1}
+\newcommand{\MMe}[3]{{\mathcal M}_{#3}\llbracket #2 \rrbracket #1}
 \newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
 \newcommand{\Pd}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
 \else
@@ -723,7 +726,7 @@ $$
 
 
 % \begin{figure}
-% 
+%
 % $$
 %   \begin{array}{rcll}
 %     |Cr|   & \multicolumn{3}{l}{ \text{ converts the limited Source Verse to Core.} } \\
@@ -774,9 +777,9 @@ $$
 %   $$
 % \caption{Core conversion} \label{fig:core-conversion}
 % \end{figure}
-% 
-% 
-% 
+%
+%
+%
 % \begin{figure}
 % $$
 % \begin{array}{rclll}
@@ -866,6 +869,65 @@ $$
 \caption{Translation of BigCore to Core}
 \end{figure}
 
+\begin{figure}
+% $$
+% \begin{array}{@@{}l}
+% \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+
+% \multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
+% \multicolumn{5}{l}{\quad \text{|i| is a variable, |t| is a Small Source Verse term,
+% and |e| is a BigCore expression}} \\[1mm]
+% \rulename{mtype} &  |Me i (:t)| & = & |((De t))^[i]| & \\[2mm]
+% \rulename{msquig}  &  |Me i ((y squiggt x):=t)| & = & |x := Me i t; y := i| \\
+% \rulename{mbind} &  |Me i (x:=t)| & = & |x := Me i t| \\[2mm]
+% \rulename{meq} &  |Me i (t_1=t_2)| & = & |(Me i t_1) = (Me i t_2)| \\
+% \rulename{msemi} &  |Me i (t_1 ; t_2)| & = & |De t_1 ; Me i t_2| \\
+% \rulename{mchoice} &  |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
+% \rulename{mif} &  |Me i (if(t_1) then t_2 else t_3)| & = &
+%     \multicolumn{2}{@@{}l}{|if (De t_1) then Me i t_2 else Me i t_3|} \\
+% \rulename{moftype} & |Me i ((oftype t_1 t_2))| & = & |oftype ((Me i t_1)) (De t_2)| \\
+% \rulename{mcheck} &  |Me i (check fx t)| & = & |check fx (Me i t)|  & \text{Is this right?}\\
+% $$
+
+$$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\textbf{Desugaring expressions}} \\
+\rulename{dconst}  & |De k|                   & = & |k| \\
+\rulename{dvar}    & |De x|                   & = & |x| \\
+\rulename{dapp}    & |De (t_1^[t_2])|         & = & |((De t_1))^[De t_2]| \\
+\rulename{deq}     & |De (t_1==t_2)|          & = & |De t_1==De t_2| \\
+\rulename{dchoice} & |De (t_1 `choice` t_2)|  & = & |De t_1 `choice`De t_2| \\
+\rulename{dbind}   & |De (x := e)|            & = & |x := De e| \\
+\rulename{dseq}    & |De (t_1 ; t_2)|         & = & |De t_1 ; De t_2| \\
+\rulename{doftype} & |De (oftype t_1 t_2)|    & = & |oftype (De t_1) (De t_2)| \\
+\rulename{dtype}   & |De (:t)|                & = & |MMe I i t| & \text{|i| fresh} \\
+\rulename{dfun}    & |De (functionP t_1 t_2)| & = & |verify (Ve (functionP t_1 t_2)); (Ie (functionP t_1 t_2))| \\
+\rulename{vfun}    & |Ve (functionP t_1 t_2)| & = & |lam y (assume (MMe V i t_1); (Ve t_2))| & \text{|i| fresh}  \\
+\rulename{vother}  & |Ve t|                   & = & |assert (De t)| \\
+\rulename{ifun}    & |Ie (functionP t_1 t_2)| & = & |lam y (MMe I i t_1; (Ie t_2))| & \text{|i| fresh}  \\
+\rulename{iother}  & |Ie t|                   & = & |assume (De t)| \\[0.04in]
+
+\multicolumn{5}{l}{\textbf{The heavy lifting:} $|MMe m i t| = |e|$} \\[0.02in]
+\rulename{mvfnty}  & |MMe V f (:(functionP t_1 t_2))|
+                                              & = & \multicolumn{2}{@@{}l}{|lam i' (i := (MMe I i' t_1); assume (z := f^[i]; (MMe V z t_2)))|} \\
+\rulename{mifnty}  & |MMe I f (:(functionP t_1 t_2))|
+                                              & = & \multicolumn{2}{@@{}l}{|verify (lam i' (assume(i := (MMe V i' t_1)); assert (z := f^[i]; (MMe I z t_2))))|} \\
+\rulename{mtype}   & |MMe m i (:t)|           & = & |((De t))^[i]| \\
+\rulename{mbind}   & |MMe m i (x:=t)|         & = & |x := MMe m i t| \\
+\rulename{meq}     & |MMe m i (t_1=t_2)|      & = & |(MMe t_1 i m) = (MMe t_2 i m)| \\
+\rulename{msemi}   & |MMe m i (t_1 ; t_2)|    & = & |De t_1 ; MMe m i t_2| \\
+\rulename{mchoice} & |MMe m i ((t_1 `choice` t_2))| & = & |(MMe m i t_1) `choice` (MMe m i t_2)| \\
+\rulename{mif}     & |MMe m i (if(t_1) then t_2 else t_3)| & = &
+    \multicolumn{2}{@@{}l}{|if (De t_1) then MMe m i t_2 else MMe m i t_3|} \\
+\rulename{moftype} & |MMe m i ((oftype t_1 t_2))| & = & |oftype ((MMe m i t_1)) (De t_2)| \\
+\rulename{mother}  & |MMe m i t|              & = & |i = (De t)| \\[0.02in]
+                   & |oftype e t| & = & |verify (assert (t^[e])); assume (forall x t^[x])| & \text{fresh |x|} \\
+\end{array}$$
+
+\caption{Mode-based Translation from SmallSource to Core.
+In the ``match'' rules $|MMe m i t| = e$,
+|m| is |V| (``verify'') or |I| (``implement''), |i| is a variable, |t| is a Small Source, and |e| is a Big Core term.
+}
+\end{figure}
 % --------------------------------------
 
 \end{document}

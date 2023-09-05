@@ -21,6 +21,7 @@ module Rules.Core(
   isHNF,
   isVal,
   isLam,
+  def,
   pattern EXI,
   pattern UNI,
   pattern LAM,
@@ -340,6 +341,8 @@ exis is e = foldr EXI e is
 -- patterns
 
 -- Expr
+def :: Ident -> Expr -> Expr -> Expr
+def x e1 e2 = Exi (Bind x ((Var x :=: e1) :>: e2))
 
 pattern EXI :: Ident -> Expr -> Expr
 pattern EXI x e = Exi (Bind x e)
