@@ -128,6 +128,11 @@ desugarExp e = for e $ \ case
     i <- supply
     (e, xs) <- lift . runDesugar $ desugarExp e
     pure $ Module i xs e
+  Parse.Enum e -> do
+    i <- supply
+    ((L _ nes), xs) <- lift . runDesugar $ fixEnum' i e
+    let (ns, es) = Prelude.unzip $ map ( \ (L p (n,e)) -> (n, L p e)) nes
+    pure $ Language.Verse.Desugar.Exp.Enum i xs ns es
   Parse.Struct e -> do
     i <- supply
     (e, xs) <- lift . runDesugar $ desugarExp e
@@ -388,6 +393,28 @@ desugarInfixArrowDef funName p1 p2 m_i = desugarDef' funName p2 $ do
   x <- freshIdent (loc p1) False
   e1 <- desugarDef p1 (pure $ Name x <$ p1)
   pure (bracketInvoke e_i e1, check_i)
+
+fixEnum' :: Label -> L (Parse.Exp L Name) -> Desugar (L [L (Ident, (Exp L Ident))])
+fixEnum' i e = for e $ \ case
+  Parse.List [] ->
+    pure []
+  Parse.List (e:es) -> do
+    e <- fixEnum'' i (0, e)
+    es <- traverse (fixEnum'' i) (zip [1..] es)
+    let ees = e:es
+    pure ees
+  _ -> abort $ EnumError (loc e)
+
+fixEnum''  :: Label -> (Integer, L (Parse.Exp L Name)) -> Desugar (L (Ident, Exp L Ident))
+fixEnum'' i (index, e) = for e $ \ case
+  Parse.Pat(Parse.Name x) -> do
+    let lx = e $> x
+    tellName lx False
+    let x' = Ident.Name x
+    y <- freshIdent (loc e) False
+    e <- pure (L (loc e) (EnumValue i index))
+    pure (x',) <*> (pure $ (ArchetypeName x' <$ e) :=: ifArchetypeName x' y (Name y <$ e) e)
+  _ -> abort $ EnumError (loc e)
 
 desugarOperator1 :: Name
                  -> L (Parse.Exp L Name)

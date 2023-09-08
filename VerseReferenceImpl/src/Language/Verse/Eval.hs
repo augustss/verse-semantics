@@ -167,6 +167,12 @@ evalExp e = case extract e of
     xs <- lift $ traverse freshNamed xs
     _ <- localEnv xs $ evalExp e
     lift . newVar . Val.Module i $ filterNames xs
+  Exp.Enum i xs ns es -> do
+    xs <- lift $ traverse freshNamed xs
+    es <- localEnv xs $ traverse evalExp es
+    lift $ newVar $ Val.Enum i (filterNames xs) ns es
+  Exp.EnumValue i c -> do
+    lift . newVar $ Val.EnumValue i c
   Exp.Struct i xs e -> do
     r <- ask
     lift $ newVar . Val.Overloads (Val.Struct i r.env xs e) =<< freshVar
@@ -244,6 +250,7 @@ evalDot loc e x = do
   lift $ fork do
     xs <- readVar var_e >>= \ case
       Val.Module _ xs -> pure xs
+      Val.Enum _ xs _ _ -> pure xs
       Val.StructInst _ xs -> pure xs
       Val.ClassInst _ _ xs -> pure xs
       _ -> abort $ DomainError loc
@@ -556,6 +563,12 @@ invoke loc var1 var2 s s' = readVar var1 >>= \ case
     var <- invokeTuple xs var2
     unify s.choiceFree s'.choiceFree
     pure var
+  Val.Enum i _xs _ns es -> do
+    unify s.storeFree s'.storeFree
+    _ <- readVar s.choiceFree
+    var <- invokeEnum i es var2
+    unify s.choiceFree s'.choiceFree
+    pure var
   Val.Overloads head tail ->
     invokeOverloads loc head tail var2 s s'
   _ -> abort $ DomainError loc
@@ -564,6 +577,12 @@ invokeTuple :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
             => [Var m f] -> VarVal m -> VerseT m (Var m f)
 invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
   unify var =<< newVar (Val.Int i)
+  pure x
+
+invokeEnum :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
+            => Label -> [Var m f] -> VarVal m -> VerseT m (Var m f)
+invokeEnum i xs var = asum $ zip xs [0 ..] <&> \ (x, c) -> do
+  unify var =<< newVar (Val.EnumValue i c)
   pure x
 
 invokeOverloads
@@ -728,6 +747,7 @@ liftOrd f var = readVar var >>= \ case
     (Val.Rational x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
     (Val.Rational x, Val.Float y) -> guard (f x (toRational y)) $> Just var_x
     (Val.Rational x, Val.Rational y) -> guard (f x y) $> Just var_x
+    (Val.EnumValue x x', Val.EnumValue y y') | x == y -> guard (f x' y') $> Just var_x
     _ -> pure Nothing
   _ -> pure Nothing
 
