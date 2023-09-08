@@ -13,120 +13,122 @@ import Prelude (Double, Integer, Rational, fromRational)
 import Text.Show
 
 data Token
-  = LeftParen
-  | RightParen
-  | LeftBrace
-  | Indent
-  | RightBrace
-  | Dedent
-  | LeftBracket
-  | RightBracket
-  | Semi
+  = All
+  | Array
+  | Block
+  | Class
   | Colon
+  | ColonEOL
+  | ColonEqual
   | Comma
+  | Dedent
+  | Divide
+  | Do
   | Dot
   | DotDot
+  | EOF
+  | Else
   | Equal
-  | NotEqual
-  | Less
-  | LessEqual
+  | Exists
+  | Fail
+  | False
+  | FatArrow
+  | Float !Rational
+  | For
+  | Function
   | Greater
   | GreaterEqual
-  | Pipe
-  | ColonEqual
-  | ThinArrow
-  | FatArrow
-  | QuestionMark
-  | Plus
-  | Minus
-  | Multiply
-  | Divide
   | If
-  | Then
-  | Else
-  | For
-  | Do
-  | Block
-  | Where
-  | Class
-  | Struct
+  | Indent
+  | Int !Integer
+  | LeftBrace
+  | LeftBracket
+  | LeftParen
+  | Less
+  | LessEqual
+  | Minus
   | Module
-  | Exists
-  | Function
-  | Truth
-  | Option
-  | Array
-  | False
-  | True
-  | Var
-  | Set
-  | Fail
-  | All
-  | One
-  | Not
-  | Sync
-  | Int Integer
-  | Float Rational
+  | Multiply
   | Name Name
   | Newline
-  | EOF deriving Show
+  | Not
+  | NotEqual
+  | One
+  | Option
+  | Pipe
+  | Plus
+  | QuestionMark
+  | RightBrace
+  | RightBracket
+  | RightParen
+  | Semi
+  | Set
+  | Struct
+  | Sync
+  | Then
+  | ThinArrow
+  | True
+  | Truth
+  | Var
+  | Where deriving Show
 
 instance Pretty Token where
   pretty = \ case
-    LeftParen -> lparen
-    RightParen -> rparen
-    LeftBrace -> lbrace
-    Indent -> "indent"
-    RightBrace -> rbrace
-    Dedent -> "dedent"
-    LeftBracket -> lbracket
-    RightBracket -> rbracket
-    Semi -> semi
+    All -> "all"
+    Array -> "array"
+    Block -> "block"
+    Class -> "class"
     Colon -> colon
+    ColonEOL -> colon
+    ColonEqual -> colon <> equals
     Comma -> comma
+    Dedent -> "dedent"
+    Divide -> pretty '/'
+    Do -> "do"
     Dot -> dot
     DotDot -> ".."
+    EOF -> "end" <+> "of" <+> "file"
+    Else -> "else"
     Equal -> equals
-    NotEqual -> "<>"
-    Less -> pretty '<'
-    LessEqual -> "<="
+    Exists -> "exists"
+    Fail -> "fail"
+    False -> "false"
+    FatArrow -> equals <> rangle
+    Float x -> pretty (fromRational x :: Double)
+    For -> "for"
+    Function -> "function"
     Greater -> pretty '>'
     GreaterEqual -> ">="
-    Pipe -> pipe
-    ColonEqual -> colon <> equals
-    ThinArrow -> pretty '-' <> rangle
-    FatArrow -> equals <> rangle
-    QuestionMark -> pretty '?'
-    Plus -> pretty '+'
-    Minus -> pretty '-'
-    Multiply -> pretty '*'
-    Divide -> pretty '/'
     If -> "if"
-    Then -> "then"
-    Else -> "else"
-    For -> "for"
-    Do -> "do"
-    Block -> "block"
-    Where -> "where"
-    Class -> "class"
-    Struct -> "struct"
-    Module -> "module"
-    Exists -> "exists"
-    Function -> "function"
-    Truth -> "truth"
-    Option -> "option"
-    Array -> "array"
-    False -> "false"
-    True -> "true"
-    Var -> "var"
-    Set -> "set"
-    Fail -> "fail"
-    All -> "all"
-    One -> "one"
-    Not -> "not"
-    Sync -> "sync"
+    Indent -> "indent"
     Int x -> pretty x
-    Float x -> pretty (fromRational x :: Double)
+    LeftBrace -> lbrace
+    LeftBracket -> lbracket
+    LeftParen -> lparen
+    Less -> pretty '<'
+    LessEqual -> "<="
+    Minus -> pretty '-'
+    Module -> "module"
+    Multiply -> pretty '*'
     Name x -> pretty x
     Newline -> "newline"
-    EOF -> "end" <+> "of" <+> "file"
+    Not -> "not"
+    NotEqual -> "<>"
+    One -> "one"
+    Option -> "option"
+    Pipe -> pipe
+    Plus -> pretty '+'
+    QuestionMark -> pretty '?'
+    RightBrace -> rbrace
+    RightBracket -> rbracket
+    RightParen -> rparen
+    Semi -> semi
+    Set -> "set"
+    Struct -> "struct"
+    Sync -> "sync"
+    Then -> "then"
+    ThinArrow -> pretty '-' <> rangle
+    True -> "true"
+    Truth -> "truth"
+    Var -> "var"
+    Where -> "where"

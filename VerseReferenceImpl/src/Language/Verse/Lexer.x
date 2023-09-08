@@ -420,7 +420,7 @@ colonIndented = action $ do
   getToken
 
 newlineColon :: Action
-newlineColon = newlineToken nesting Token.Colon
+newlineColon = newlineToken nesting Token.ColonEOL
 
 emptyColon :: Action
 emptyColon = emptyToken Token.Colon

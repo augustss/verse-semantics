@@ -4,7 +4,7 @@ any := function (exists X). X
 Tail := function (exists Xs):
   all:
     I:any
-    Xs(I)
+    Xs[I]
     I > 0
 
 Tail(all{1})

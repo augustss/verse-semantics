@@ -29,7 +29,7 @@ data Exp f a
   | Exists (f a) (f (Exp f a))
   | Var (f a) (f (Exp f a))
   | Set (f a) (f (Exp f a))
-  | Function !(HashMap a Bool) (f (Exp f a)) (Maybe (f (Exp f a))) (f (Exp f a))
+  | Fun !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
@@ -38,8 +38,10 @@ data Exp f a
   | Int !Integer
   | Float {-# UNPACK #-} !Double
   | Name a
-  | InfixColon (f a) (f (Exp f a))
-  | InfixColonEqual (f a) (f (Exp f a))
-  | MixfixColonEqual (f a) (f (Exp f a)) (f (Exp f a))
+  | IfArchetypeName a a (f (Exp f a)) (f (Exp f a))
+  | ArchetypeName a
 
-deriving instance (Show (f (Exp f a)), Show (f a), Show a) => Show (Exp f a)
+deriving instance ( Show (f (Exp f a))
+                  , Show (f a)
+                  , Show a
+                  ) => Show (Exp f a)

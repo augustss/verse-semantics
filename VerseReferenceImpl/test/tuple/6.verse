@@ -1,9 +1,7 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 exists X
+exists I
 exists Y
-Y = all {
-  exists I
-  X[I]
-};
-X = ();
+Y = X[I];
+X = (1, 2, 3);
 Y

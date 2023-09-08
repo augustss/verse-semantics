@@ -8,6 +8,7 @@ module Control.Monad.Abort
   ) where
 
 import Control.Monad.Except (ExceptT (..))
+import Control.Monad.State.Strict qualified as Strict
 import Control.Monad.Supply
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.CPS qualified as CPS
@@ -19,6 +20,8 @@ class Monad m => MonadAbort e m | m -> e where
 
 instance Monad m => MonadAbort e (ExceptT e m) where
   abort = ExceptT . pure . Left
+
+instance MonadAbort e m => MonadAbort e (Strict.StateT s m)
 
 instance MonadAbort e m => MonadAbort e (SupplyT s m)
 

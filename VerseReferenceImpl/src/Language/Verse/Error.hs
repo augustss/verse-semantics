@@ -18,11 +18,10 @@ data Error
   | IndentError !Pos !Indent !Indent
   | ParseError !Loc !Token
   | DefError !Loc !Loc !Name
-  | AnonError !Loc
   | NameError !Loc !Name
   | IdentError !Loc !Ident
   | DomainError !Loc
-  | WrongError !Loc
+  | SucceedsError !Loc
   | StuckError deriving Show
 
 instance Pretty Error where
@@ -40,17 +39,14 @@ instance Pretty Error where
       pretty x <+> "and" <+> pretty y <> colon <+>
       "conflicting" <+> "definitions" <> colon <+>
       pretty z
-    AnonError x ->
-      pretty x <> colon <+>
-      "unnamed" <+> "value" <+> "in" <+> "abstraction" <+> "context"
     NameError x y ->
       varNotInScope x y
     IdentError x y ->
       varNotInScope x y
     DomainError x ->
-      pretty x <> colon <+> "unexpected" <+> "value"
-    WrongError x ->
-      pretty x <> colon <+> "wrong"
+      pretty x <> colon <+> "unexpected" <+> "argument"
+    SucceedsError x ->
+      pretty x <> colon <+> "expected" <+> "one" <+> "value"
     StuckError -> "stuck"
     where
       varNotInScope x y =
