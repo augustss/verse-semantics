@@ -205,7 +205,7 @@ desugarDef'
   -> Desugar (Exp L Ident)
 desugarDef' funName p m_i = case extract p of
   Parse.Name x -> do
-    if funName then tellFunName (x <$ p) False else tellName (x <$ p) False
+    (if funName then tellFunName else tellName) (x <$ p) False
     let x' = Ident.Name x
     y <- freshIdent (loc p) False
     (e_i, check_i) <- m_i
@@ -227,10 +227,11 @@ desugarDef' funName p m_i = case extract p of
         check_i .
         parenInvoke e $ Name y <$ e
     desugarDef' True p $ pure (e_i', check_i')
-  Parse.InfixColon p e -> desugarDef' funName p $ do
-    (e_i, check_i) <- m_i
-    e <- desugarExp e
-    pure (bracketInvoke e e_i, bracketInvoke e . check_i)
+  Parse.InfixColon p e ->
+    desugarDef' funName p $ do
+      (e_i, check_i) <- m_i
+      e <- desugarExp e
+      pure (bracketInvoke e e_i, bracketInvoke e . check_i)
   Parse.Invoke p e_domain -> do
     (e_domain, xs) <- lift . runDesugar $ desugarExp e_domain
     (e_i, check_i) <- exists' m_i
@@ -244,11 +245,12 @@ desugarDef' funName p m_i = case extract p of
         check_i .
         parenInvoke e $ Name y <$ e
     desugarDef' True p $ pure (e_i', check_i')
-  p1 :->: p2 -> desugarDef' funName p2 $ do
-    (e_i, check_i) <- m_i
-    x <- freshIdent (loc p1) False
-    e1 <- desugarDef p1 (pure $ Name x <$ p1)
-    pure (bracketInvoke e_i e1, check_i)
+  p1 :->: p2 ->
+    desugarDef' funName p2 $ do
+      (e_i, check_i) <- m_i
+      x <- freshIdent (loc p1) False
+      e1 <- desugarDef p1 (pure $ Name x <$ p1)
+      pure (bracketInvoke e_i e1, check_i)
 
 desugarPat :: L (Parse.Pat L Name) -> Desugar (L (Exp L Ident))
 desugarPat p = for p $ \ case
