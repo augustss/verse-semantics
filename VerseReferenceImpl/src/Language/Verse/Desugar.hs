@@ -253,13 +253,12 @@ desugarDef' funName p m_i = case extract p of
 desugarPat :: L (Parse.Pat L Name) -> Desugar (L (Exp L Ident))
 desugarPat p = for p $ \ case
   Parse.Name x -> pure . Name $ Ident.Name x
-  Parse.InfixColon (extract -> p1 :->: p2) e -> do
-    x <- freshIdent (loc p1) False
-    e1 <- desugarDef p1 (pure $ Name x <$ p1)
-    e2 <- desugarDef' False p2 $ do
+  Parse.InfixColon (extract -> p1 :->: p2) e ->
+    desugarDef' False p2 $ do
       e <- desugarExp e
-      pure (bracketInvoke e $ Name x <$ e, bracketInvoke e)
-    pure $ (e2 <$ p2 <. e) :*>: e1
+      x <- freshIdent (loc p1) False
+      e1 <- desugarDef p1 (pure $ Name x <$ p1)
+      pure (bracketInvoke e e1, bracketInvoke e)
   Parse.InfixColon p e -> do
     x <- freshIdent (loc e) False
     e_def <- desugarDef' False p $ do
