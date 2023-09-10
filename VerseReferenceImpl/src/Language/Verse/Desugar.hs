@@ -425,7 +425,7 @@ exists m = lift $ do
   pure $ exists'' xs e
 
 exists' :: Desugar (L (Exp L Ident), L (Exp L Ident) -> L (Exp L Ident))
-         -> Desugar (L (Exp L Ident), L (Exp L Ident) -> L (Exp L Ident))
+        -> Desugar (L (Exp L Ident), L (Exp L Ident) -> L (Exp L Ident))
 exists' m = lift $ do
   ((e, f), xs) <- runDesugar' m
   pure (exists'' xs e, exists'' xs . f)
