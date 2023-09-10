@@ -59,6 +59,8 @@ library
     transformers,
     unordered-containers >= 0.2.6.0
   hs-source-dirs: src
+  alex-options: --ghc
+  happy-options: --array --ghc --coerce
   ghc-options: -Wall -Wno-name-shadowing
   default-language: GHC2021
 

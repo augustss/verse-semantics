@@ -23,6 +23,7 @@ data Exp f a
   | f (Exp f a) :-: f (Exp f a)
   | f (Exp f a) :*: f (Exp f a)
   | f (Exp f a) :/: f (Exp f a)
+  | f (Exp f a) :->: f (Exp f a)
   | List [f (Exp f a)]
   | f (Exp f a) `Where` f (Exp f a)
   | Fail
@@ -54,7 +55,6 @@ data Exp f a
   | False
   | Int !Integer
   | Float {-# UNPACK #-} !Double
-  | PrefixColon (f (Exp f a))
   | InfixColonEqual (f (Pat f a)) (f (Exp f a))
   | Function (f (Exp f a)) (f (Exp f a))
   | Pat (Pat f a)
@@ -67,9 +67,10 @@ deriving instance ( Show (f (Exp f a))
 
 data Pat f a
   = Name a
+  | PrefixColon (f (Exp f a))
   | InfixColon (f (Pat f a)) (f (Exp f a))
+  | InfixArrow (f (Pat f a)) (f (Pat f a))
   | Invoke (f (Pat f a)) (f (Exp f a))
-  | f (Pat f a) :->: f (Pat f a)
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f (Pat f a))

@@ -58,16 +58,14 @@ desugarExp :: L (Parse.Exp L Name) -> Desugar (L (Exp L Ident))
 desugarExp e = for e $ \ case
   Parse.InfixColonEqual p e ->
     extract <$> desugarDef p (desugarExp e)
+  (Parse.:=:) e1@(extract -> Parse.Pat p@Parse.PrefixColon {}) e2 ->
+    extract <$> desugarDef (p <$ e1) (desugarExp e2)
   (Parse.:=:) e1@(extract -> Parse.Pat p@Parse.InfixColon {}) e2 ->
     extract <$> desugarDef (p <$ e1) (desugarExp e2)
   (Parse.:=:) e1 e2 ->
     (:=:) <$> desugarExp e1 <*> desugarExp e2
   Parse.Pat p ->
     extract <$> desugarPat (p <$ e)
-  Parse.PrefixColon e -> do
-    e <- desugarExp e
-    x <- freshIdent (loc e) False
-    pure $ BracketInvoke e $ Name x <$ e
   e1 :<>: e2 -> do
     Not . (<$ e) <$> ((:=:) <$> desugarExp e1 <*> desugarExp e2)
   (Parse.:.:) e x ->
@@ -96,6 +94,8 @@ desugarExp e = for e $ \ case
     desugarOperator2 "operator'*'" e1 e2
   e1 :/: e2 ->
     desugarOperator2 "operator'/'" e1 e2
+  e1 :->: e2 ->
+    desugarOperator2 "operator'->'" e1 e2
   Parse.List es ->
     extract <$> desugarList (es <$ e)
   Parse.Where e1 e2 -> do
@@ -205,6 +205,7 @@ desugarDef' funName p m_i = case extract p of
     y <- freshIdent (loc p) False
     (e_i, check_i) <- m_i
     pure $ (ArchetypeName x' <$ p) :=: ifArchetypeName x' y (check_i $ Name y <$ p) e_i
+  Parse.PrefixColon e -> desugarPrefixColonDef e m_i
   Parse.InfixColon (extract -> Parse.Invoke p e_domain) e_range -> do
     (e_domain, xs) <- lift . runDesugar $ desugarDomain e_domain
     e_range <- exists $ desugarExp e_range
@@ -223,6 +224,7 @@ desugarDef' funName p m_i = case extract p of
         parenInvoke e $ Name y <$ e
     desugarDef' True p $ pure (e_i', check_i')
   Parse.InfixColon p e -> desugarInfixColonDef funName p e m_i
+  Parse.InfixArrow p1 p2 -> desugarInfixArrowDef funName p1 p2 m_i
   Parse.Invoke p e_domain -> do
     (e_domain, xs) <- lift . runDesugar $ desugarDomain e_domain
     (e_i, check_i) <- exists' m_i
@@ -236,22 +238,6 @@ desugarDef' funName p m_i = case extract p of
         check_i .
         parenInvoke e $ Name y <$ e
     desugarDef' True p $ pure (e_i', check_i')
-  p1 :->: p2 -> desugarInfixArrowDef funName p1 p2 m_i
-
-desugarDomain :: L (Parse.Exp L Name) -> Desugar (L (Exp L Ident))
-desugarDomain e = for e $ \ case
-  Parse.Pat p -> do
-    x <- freshIdent (loc e) False
-    let e_x = Name x <$ e
-    e <- desugarDef (p <$ e) $ pure e_x
-    pure $ e :*>: e_x
-  Parse.List es -> extract <$> desugarDomainList (es <$ e)
-  _ -> extract <$> desugarExp e
-
-desugarDomainList :: L [L (Parse.Exp L Name)] -> Desugar (L (Exp L Ident))
-desugarDomainList = traverse $ \ case
-  [] -> pure $ Tuple []
-  e:es -> extract <$> desugarDomainNonEmpty e es
 
 desugarList :: L [L (Parse.Exp L Name)] -> Desugar (L (Exp L Ident))
 desugarList = traverse $ \ case
@@ -269,34 +255,91 @@ desugarNonEmpty e = \ case
     e2 <- desugarNonEmpty x xs
     pure $ e1 :*>: e2 <$ e1 <. e2
 
-desugarDomainNonEmpty
+desugarDomain :: L (Parse.Exp L Name) -> Desugar (L (Exp L Ident))
+desugarDomain e = do
+  x <- freshIdent (loc e) False
+  let i = Name x <$ e
+  e <- desugarDomain' e i
+  pure $ e :*>: i <$ e
+
+desugarDomain'
   :: L (Parse.Exp L Name)
+  -> L (Exp L Ident)
+  -> Desugar (L (Exp L Ident))
+desugarDomain' e i = for e $ \ case
+  Parse.Pat p -> extract <$> desugarDef (p <$ e) (pure i)
+  Parse.Tuple es -> do
+    (is, es) <- desugarDomainTuple es
+    pure $ (i :=: (Tuple is <$ e) <$ e) :*>: (Tuple es <$ e)
+  Parse.List es -> extract <$> desugarDomainList i (es <$ e)
+  _ -> do
+    e <- desugarExp e
+    pure $ i :=: e
+
+desugarDomainTuple
+  :: [L (Parse.Exp L Name)]
+  -> Desugar ([L (Exp L Ident)], [L (Exp L Ident)])
+desugarDomainTuple = \ case
+  [] -> pure ([], [])
+  e:es -> do
+    x <- freshIdent (loc e) False
+    let i = Name x <$ e
+    e <- desugarDomain' e i
+    (is, es) <- desugarDomainTuple es
+    pure (i:is, e:es)
+
+desugarDomainList
+  :: L (Exp L Ident)
+  -> L [L (Parse.Exp L Name)]
+  -> Desugar (L (Exp L Ident))
+desugarDomainList i = traverse $ \ case
+  [] -> pure $ Tuple []
+  e:es -> extract <$> desugarDomainNonEmpty i e es
+
+desugarDomainNonEmpty
+  :: L (Exp L Ident)
+  -> L (Parse.Exp L Name)
   -> [L (Parse.Exp L Name)]
   -> Desugar (L (Exp L Ident))
-desugarDomainNonEmpty e = \ case
-  [] -> desugarDomain e
-  (x:xs) -> do
+desugarDomainNonEmpty i e = \ case
+  [] -> desugarDomain' e i
+  x:xs -> do
     e1 <- desugarExp e
-    e2 <- desugarDomainNonEmpty x xs
+    e2 <- desugarDomainNonEmpty i x xs
     pure $ e1 :*>: e2 <$ e1 <. e2
 
 desugarPat :: L (Parse.Pat L Name) -> Desugar (L (Exp L Ident))
 desugarPat p = for p $ \ case
   Parse.Name x -> pure . Name $ Ident.Name x
-  Parse.InfixColon (extract -> p1 :->: p2) e -> desugarInfixArrowDef False p1 p2 $ do
-    e <- desugarExp e
-    pure (e, id)
-  Parse.InfixColon p e -> desugarInfixColonDef False p e $ do
-    x <- freshIdent (loc e) False
-    pure (Name x <$ e, id)
+  Parse.PrefixColon e ->
+    desugarPrefixColonDef e $ do
+      x <- freshIdent (loc e) False
+      pure (Name x <$ e, id)
+  Parse.InfixColon (extract -> Parse.InfixArrow p1 p2) e ->
+    desugarInfixArrowDef False p1 p2 $ do
+      e <- desugarExp e
+      pure (e, id)
+  Parse.InfixColon p e ->
+    desugarInfixColonDef False p e $ do
+      x <- freshIdent (loc e) False
+      pure (Name x <$ e, id)
+  Parse.InfixArrow p1 p2 -> do
+    p1 <- desugarPat p1
+    p2 <- desugarPat p2
+    pure $ bracketInvoke2 "operator'->'" p1 p2
   Parse.Invoke p e -> do
     p <- desugarPat p
     e <- desugarExp e
     pure $ ParenInvoke p e
-  p1 :->: p2 -> do
-    p1 <- desugarPat p1
-    p2 <- desugarPat p2
-    pure $ bracketInvoke2 "operator'->'" p1 p2
+
+desugarPrefixColonDef
+  :: L (Parse.Exp L Name)
+  -> Desugar (L (Exp L Ident), L (Exp L Ident) -> L (Exp L Ident))
+  -> Desugar (Exp L Ident)
+desugarPrefixColonDef e m_i = do
+  (e_i, _) <- m_i
+  e <- desugarExp e
+  pure $ BracketInvoke e e_i
 
 desugarInfixColonDef
   :: Bool

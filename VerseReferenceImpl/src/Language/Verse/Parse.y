@@ -246,9 +246,6 @@ Exp :: { L (Exp L Name) }
   | Exp '?' {
       Exp.Query <\$> duplicate $1 <. $2
     }
-  | ':' Exp {
-      Exp.PrefixColon <\$ $1 <.> duplicate $2
-    }
   | truth Block {
       Exp.Truth <\$ $1 <.> duplicate $2
     }
@@ -294,6 +291,9 @@ Exp :: { L (Exp L Name) }
   | Exp '[' List ']' {
       Exp.BracketInvoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
     }
+  | Exp '->' Exp {
+      $1 :->: $3 <\$ $1 <. $3
+    }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | If { $1 }
@@ -304,17 +304,23 @@ Exp :: { L (Exp L Name) }
 
 Pat :: { L (Pat L Name) }
   : name { Pat.Name <\$> $1 }
+  | ':' Pat {
+      Pat.PrefixColon <\$ $1 <.> duplicate (Exp.Pat <\$> $2)
+    }
+  | ':' Exp {
+      Pat.PrefixColon <\$ $1 <.> duplicate $2
+    }
   | Pat ':' Pat {
       Pat.InfixColon $1 (Exp.Pat <\$> $3) <\$ $1 <. $3
     }
   | Pat ':' Exp {
       Pat.InfixColon <\$> duplicate $1 <.> duplicate $3
     }
+  | Pat '->' Pat {
+      Pat.InfixArrow $1 $3 <\$ $1 <. $3
+    }
   | Pat '(' List ')' {
       Pat.Invoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
-    }
-  | Pat '->' Pat {
-      $1 :->: $3 <\$ $1 <. $3
     }
 
 If :: { L (Exp L Name) }
