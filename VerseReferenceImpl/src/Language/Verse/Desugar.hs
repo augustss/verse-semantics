@@ -268,6 +268,8 @@ desugarDomain'
   -> Desugar (L (Exp L Ident))
 desugarDomain' e i = for e $ \ case
   Parse.Pat p -> extract <$> desugarDef (p <$ e) (pure i)
+  Parse.InfixColonEqual p e ->
+    extract <$> desugarDef p (desugarDomain' e i)
   Parse.Tuple es -> do
     (is, es) <- desugarDomainTuple es
     pure $ (i :=: (Tuple is <$ e) <$ e) :*>: (Tuple es <$ e)
