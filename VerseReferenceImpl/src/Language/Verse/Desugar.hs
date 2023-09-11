@@ -272,6 +272,12 @@ desugarDomain' e i = for e $ \ case
     (is, es) <- desugarDomainTuple es
     pure $ (i :=: (Tuple is <$ e) <$ e) :*>: (Tuple es <$ e)
   Parse.List es -> extract <$> desugarDomainList i (es <$ e)
+  Parse.Where e1 e2 -> do
+    x <- freshIdent (loc e1) False
+    e1 <- desugarDomain' e1 i
+    e2 <- desugarExp e2
+    let e_x = Name x <$ e1
+    pure $ ((e_x :=: e1 <$ e1) :*>: e2 <$ e1 <. e2) :*>: e_x
   _ -> do
     e <- desugarExp e
     pure $ i :=: e
