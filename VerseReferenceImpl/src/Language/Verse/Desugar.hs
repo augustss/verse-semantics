@@ -56,6 +56,12 @@ desugar e = runExcept . runSupplyT $ do
 
 desugarExp :: L (Parse.Exp L Name) -> Desugar (L (Exp L Ident))
 desugarExp e = for e $ \ case
+  Parse.InfixColonEqual (extract -> Parse.InfixArrow p1 p2) e -> do
+    x <- freshIdent (loc p2) False
+    let i = Name x <$ p1
+    p1 <- desugarDef p1 $ pure i
+    p2 <- desugarDef p2 $ desugarDomain' e i
+    pure $ p1 :*>: p2
   Parse.InfixColonEqual p e ->
     extract <$> desugarDef p (desugarExp e)
   (Parse.:=:) e1@(extract -> Parse.Pat p@Parse.PrefixColon {}) e2 ->
@@ -268,8 +274,16 @@ desugarDomain'
   -> Desugar (L (Exp L Ident))
 desugarDomain' e i = for e $ \ case
   Parse.Pat p -> extract <$> desugarDef (p <$ e) (pure i)
+  Parse.InfixColonEqual (extract -> Parse.InfixArrow p1 p2) e2 -> do
+    p1 <- desugarDef p1 $ pure i
+    p2 <- desugarDef p2 $ desugarDomain' e2 i
+    pure $ p1 :*>: p2
   Parse.InfixColonEqual p e ->
     extract <$> desugarDef p (desugarDomain' e i)
+  (Parse.:=:) e1@(extract -> Parse.Pat p@Parse.PrefixColon {}) e2 ->
+    extract <$> desugarDef (p <$ e1) (desugarDomain' e2 i)
+  (Parse.:=:) e1@(extract -> Parse.Pat p@Parse.InfixColon {}) e2 ->
+    extract <$> desugarDef (p <$ e1) (desugarDomain' e2 i)
   Parse.Tuple es -> do
     (is, es) <- desugarDomainTuple es
     pure $ (i :=: (Tuple is <$ e) <$ e) :*>: (Tuple es <$ e)
