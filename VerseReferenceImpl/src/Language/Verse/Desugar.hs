@@ -273,6 +273,9 @@ desugarDomain'
   -> L (Exp L Ident)
   -> Desugar (L (Exp L Ident))
 desugarDomain' e i = for e $ \ case
+  Parse.Pat (Parse.Name {}) -> do
+    e <- desugarExp e
+    pure $ i :=: e
   Parse.Pat p -> extract <$> desugarDef (p <$ e) (pure i)
   Parse.InfixColonEqual (extract -> Parse.InfixArrow p1 p2) e2 -> do
     p1 <- desugarDef p1 $ pure i
