@@ -2,6 +2,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Supply
@@ -46,7 +47,6 @@ example2 = runVerseT' do
 -- Choice
 example3 = runVerseT' do
   x <- freshVar
-  y <- freshVar
   unify x =<< newVar . Int =<< pure 1 <|> pure 2 <|> pure 3
   freeze' x
 
