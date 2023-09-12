@@ -615,7 +615,7 @@ invokeOverload loc overload arg s s' = case overload of
         writeIVar s'.choiceFree ()
       fork do
         readIVar s.storeFree
-      writeIVar s'.storeFree ()
+        writeIVar s'.storeFree ()
       pure x
 
 invokeFunction
