@@ -10,7 +10,6 @@ module Control.Monad.Ref
   , EqRef (..)
   ) where
 
-import Control.Monad.Logic
 import Control.Monad.ST
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -65,8 +64,6 @@ instance MonadRef (ST s) where
   writeRef = writeSTRef
 
 instance MonadRef m => MonadRef (ExceptT e m)
-
-instance MonadRef m => MonadRef (LogicT m)
 
 instance MonadRef m => MonadRef (ReaderT r m)
 

@@ -55,7 +55,6 @@ library
     comonad,
     containers,
     hashable,
-    logict,
     mtl >= 2.3.1,
     prettyprinter,
     semigroupoids,

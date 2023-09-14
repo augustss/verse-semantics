@@ -12,7 +12,6 @@ import Control.Monad.Abort
 import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.IO.Class
-import Control.Monad.Logic.Class
 import Control.Monad.Reader.Class
 import Control.Monad.Ref
 import Control.Monad.State.Class
@@ -58,11 +57,6 @@ instance MonadError e m => MonadError e (RST r s m) where
   throwError = lift . throwError
   x `catchError` f = RST $ \ r s ->
     runRST x r s `catchError` \ e -> runRST (f e) r s
-
-instance MonadLogic m => MonadLogic (RST r s m) where
-  msplit m = RST $ \ r s -> msplit (runRST m r s) >>= \ case
-    Nothing -> pure (Nothing, s)
-    Just ((a, s'), m) -> pure (Just (a, RST $ \ _ _ -> m), s')
 
 instance Monad m => MonadReader r (RST r s m) where
   ask = RST $ \ r s -> pure (r, s)
