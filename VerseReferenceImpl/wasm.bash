@@ -7,6 +7,7 @@ nix shell \
   --command \
 wasm32-wasi-cabal install \
   --allow-newer \
+  --flag wasm \
   --installdir=www/static \
   --overwrite-policy=always
 

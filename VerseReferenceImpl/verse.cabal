@@ -18,6 +18,10 @@ author: Andy Sonnenburg
 
 maintainer: andy.sonnenburg@epicgames.com
 
+flag wasm
+  manual: True
+  default: False
+
 library
   exposed-modules:
     Control.Monad.Abort
@@ -59,8 +63,6 @@ library
     transformers,
     unordered-containers >= 0.2.6.0
   hs-source-dirs: src
-  alex-options: --ghc
-  happy-options: --array --ghc --coerce
   ghc-options: -Wall -Wno-name-shadowing
   default-language: GHC2021
 
@@ -77,6 +79,8 @@ test-suite golden-files
     transformers,
     verse
   hs-source-dirs: test
+  if flag(wasm)
+    buildable: False
   ghc-options: -Wall -Wno-name-shadowing
   default-language: GHC2021
 
@@ -88,6 +92,8 @@ test-suite hunit
     HUnit,
     verse
   hs-source-dirs: test
+  if flag(wasm)
+    buildable: False
   ghc-options: -Wall -Wno-name-shadowing
   default-language: GHC2021
 
@@ -100,6 +106,8 @@ executable versei
     transformers,
     verse
   hs-source-dirs: main
+  if flag(wasm)
+    buildable: False
   ghc-options: -Wall -Wno-name-shadowing
   default-language: GHC2021
 
@@ -114,6 +122,8 @@ executable versewasm
     transformers,
     verse
   hs-source-dirs: wasm
+  if !flag(wasm)
+    buildable: False
   ghc-options:
     -Wall -Wno-name-shadowing
     -no-hs-main -optl-mexec-model=reactor
@@ -130,5 +140,7 @@ executable verselex
     transformers,
     verse
   hs-source-dirs: lex
+  if flag(wasm)
+    buildable: False
   ghc-options: -Wall
   default-language: GHC2021
