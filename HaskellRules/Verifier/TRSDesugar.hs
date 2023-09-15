@@ -110,6 +110,8 @@ data Mode
 add :: Expr -> Expr -> Expr
 add e1 e2 = Op Add :@: Arr [e1, e2]
 
+
+
 dsDump :: SExpr -> IO ()
 dsDump = putStrLn . prettyShow . desugar
 
