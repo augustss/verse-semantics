@@ -40,6 +40,8 @@
 
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
 
+%format (Ane (x)) = "\Ane{" ^ x "}"
+%format (Fne (x)) = "\Fne{" ^ x "}"
 %format (De (x)) = "\De{" ^ x "}"
 %format (Ve (x)) = "\Ve{" ^ x "}"
 %format (Ie (x)) = "\Ie{" ^ x "}"
