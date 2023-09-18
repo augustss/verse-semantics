@@ -636,6 +636,7 @@ ubiquitously useful that we include it in our syntax.
 \subsection{Loose ends}
 
 \begin{itemize}
+\item \simon{Lennart, why did you duplicate all of M into D?}
 \item Is \rulename{meq} right. E.g. |functionP ( x:= (:nat = :even) ) t| should
   check that both |nat^[i]| and |even^[i]| succeed \emph{and} that they give the same result.
 \item \simon{Is \rulename{moftype} right?}
@@ -695,7 +696,7 @@ $$
 %%\rulename{dexpr}  & |De t| & = & |def i (Me i t)| & \hspace{-5em} \text{otherwise (only |:t|, |(y squiggt x):=t|)} \\[2mm]
 %%\multicolumn{4}{l}{\text{\lennart{I think we should expand the two remaining dexpr cases:}}}\\
 \rulename{dtype}  & |De (:t)| & = & |def i (((De t))^[i])| \\
-\rulename{dsquig} & |De (y squiggt x) := t| & = & | x:= Me y t | \\[2mm]
+\rulename{dsquig} & |De ((y squiggt x) := t)| & = & | x:= Me y t | \\[2mm]
 
 \\
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\
@@ -886,11 +887,13 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \rulename{doftype} & |De (oftype t_1 t_2)|    & = & |oftype (De t_1) (De t_2)| \\
 \rulename{dtype}   & |De (:t)|                & = & |def i (MMe I i t)| & \text{|i| fresh} \\
 \rulename{dfun}    & |De (functionP t_1 t_2)| & = & |verify (Ve (functionP t_1 t_2)); (Ie (functionP t_1 t_2))| \\
+\\
 \rulename{vfun}    & |Ve (functionP t_1 t_2)| & = & |lam i (assume (MMe V i t_1); (Ve t_2))| & \text{|i| fresh}  \\
 \rulename{vother}  & |Ve t|                   & = & |assert (De t)| \\
+\\
 \rulename{ifun}    & |Ie (functionP t_1 t_2)| & = & |lam y (MMe I i t_1; (Ie t_2))| & \text{|i| fresh}  \\
 \rulename{iother}  & |Ie t|                   & = & |assume (De t)| \\[0.04in]
-
+\\
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|MMe m i t| = |e|$} \\[0.02in]
 \rulename{mvfnty}  & |MMe V f (:(functionP t_1 t_2))|
                                               & = & \multicolumn{2}{@@{}l}{|lam i' (i := (MMe I i' t_1); assume (z := f^[i]; (MMe V z t_2)))|} \\
