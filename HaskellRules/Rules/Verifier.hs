@@ -114,6 +114,7 @@ icfpeVerifier = icfp
               <> uniRules
               <> assumeAssertRules
               <> verifierRules
+              <> directRules
   }
   where icfp = systemICFPE
 
@@ -385,6 +386,18 @@ isDecideOp (Op IsChar) = True
 isDecideOp (Op DotDot) = True
 isDecideOp (Op Append) = True
 isDecideOp _           = False
+
+-- | Rules that are like `verifier` but don't require explicit ASSUME but work under left-to-right evaluation order
+
+directRules :: VRule
+directRules _env lhs =
+   "implies-direct" `name`
+   do e :>: rhs <- [lhs]
+      (ctx, _, bs, e1 :>: e2) <- eX rhs
+      guard (null (free e1 `intersect` bndIds bs))
+      guard (implies e e1)
+      guard (e /= Fail)
+      pure (Assume e :>: ctx e2)
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule

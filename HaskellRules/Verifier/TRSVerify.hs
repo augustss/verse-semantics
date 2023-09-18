@@ -65,6 +65,7 @@ tests = -- take 6
   , ("ex_hide_00", ex_hide_00, True)
   , ("ex_hide_01", ex_hide_01, False)
   , ("ex_hide_02", ex_hide_02, True)
+  , ("ex_direct00", ex_direct00, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -596,3 +597,9 @@ ex_hide_02 = Assert $ eXIs [x,y] ((Var x :=: (Int 2 `asType` tINT)) :>: Var y :=
   where
     x = ident "x"
     y = ident "y"
+
+-- verify { \x. isInt[x]; assert{isInt[x]}}
+ex_direct00 :: Expr
+ex_direct00 = Verify $ LAM x (iNT (Var x) :>: Assert (iNT (Var x)))
+  where
+    x = ident "x"
