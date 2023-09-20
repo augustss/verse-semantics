@@ -44,7 +44,7 @@ desugar flgs = eval flgs .
              traceDS "lower"      <=< lower     <=<
              traceDS "addScope"   <=< addScope  <=<
              traceDS "lowerApply" <=< lowerApply<=<
-             traceDS "dsD"        <=< dsD       <=<
+             traceDS "dsD"        <=< dsDx      <=<
              traceDS "addDeref"   <=< addDeref  <=<
              traceDS "dsSmall"    <=< dsSmall   <=<
              traceDS "addPrelude" <=< addPrelude<=<
@@ -86,14 +86,11 @@ dropUnusedIds _ e =
 
 type D = State DState
 
--- XXX Do we really need the distinction between abstracttion and evaluation
--- context?
--- Right now it is used to guide desugaring to avoid an uninstantiated exist
--- in the function desugaring.
-
 data DState = DState { nextNo :: !Int, context :: !DContext, dflags :: !Flags }
   deriving (Show)
-data DContext = DAbstract | DEval
+
+-- Different desugaring styles.
+data DContext = DFig6 | DFig11
   deriving (Show)
 
 newInt :: D Int
@@ -147,7 +144,9 @@ syntaxFixes = pure . f
 ---------------------
 
 eval :: Flags -> D Expr -> Expr
-eval flgs = flip evalState DState{ nextNo = 1, context = DEval, dflags = flgs }
+eval flgs = flip evalState DState{ nextNo = 1, context = ctx, dflags = flgs }
+  where
+    ctx = if fVerify flgs && not (fOldDesugar flgs) then DFig11 else DFig6
 
 -- Desugar into Small Source Verse
 dsSmall :: Expr -> D Expr
@@ -367,6 +366,13 @@ arrayElems = grp . map cls
 
 ---------------------------------------------------------------------------------
 
+dsDx :: Expr -> D Expr
+dsDx e = do
+  how <- gets context
+  case how of
+    DFig6  -> dsD e
+    DFig11 -> dsD11 e
+
 -- All cases, but the last, can be removed.
 -- They are just there to avoid introducing unused existentials.
 dsD :: Expr -> D Expr
@@ -581,6 +587,7 @@ scope sc = expr
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
     expr Fail = pure Fail
+    expr (Forall _ e) = expr e
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -1103,8 +1110,11 @@ lowerSucceeds e = do
   useSplit <- gets (fSplit . dflags)
   verif <- gets (fVerify . dflags)
   asmVerif <- gets (fAssumeVerified . dflags)
+  how <- gets context
   if verif then
-    pure $ eAssert e
+    case how of
+      DFig6  -> pure $ eAssert e
+      DFig11 -> pure $ Succeeds e
    else if asmVerif then
     pure $ e
    else if useSplit then
@@ -1455,3 +1465,71 @@ alphaConvert vs = alpha []
 
     fresh i@(Ident l s) | i `notElem` vs = i
                         | otherwise = fresh $ Ident l (s ++ "'")
+
+-------------------------------------------------------------------
+
+dsD11 :: Expr -> D Expr
+dsD11 e@Lit{} = pure e
+dsD11 e@Variable{} = pure e
+dsD11 (ApplyD e1 e2) = ApplyD <$> dsD11 e1 <*> dsD11 e2
+dsD11 (Unify e1 e2) = Unify <$> dsD11 e1 <*> dsD11 e2
+dsD11 (Choice e1 e2) = Choice <$> dsD11 e1 <*> dsD11 e2
+dsD11 e@(DefineV _) = pure e
+dsD11 (DefineE x e) = DefineE x <$> dsD11 e
+dsD11 (Seq []) = pure (Array [])
+dsD11 (Seq [t]) = dsD11 t
+dsD11 (Seq (t:ts)) = seqE <$> sequence [dsD11 t, dsD11 (Seq ts)]
+dsD11 (Array ts) = Array <$> mapM dsD11 ts
+dsD11 (OfType t1 t2) = OfType <$> dsD11 t1 <*> dsD11 t2
+dsD11 e@Fail = pure e
+dsD11 (Range t) = do
+  i <- newIdent (getLoc t) "i"
+  existsV [i] <$> dsM11 t i
+dsD11 e@Function{} = dsF11 e
+-- Added
+dsD11 (If3 e1 e2 e3) = If3 <$> dsD11 e1 <*> dsD11 e2 <*> dsD11 e3
+dsD11 (Macro1 m rs e) = Macro1 m rs <$> dsD11 e
+dsD11 (Lam x e) = Lam x <$> dsD11 e
+dsD11 e = impossible e
+
+dsF11 :: Expr -> D Expr
+dsF11 (Function [(t1, _effs)] t2) = do
+  y <- newIdent (getLoc t1) "y"
+  t1' <- dsM11 t1 y
+  t2' <- dsF11 t2
+  pure $ Lam y $ seqE [t1', t2']
+dsF11 (OfType t ty) = do
+  ty' <- dsD11 ty
+  t'  <- dsD11 t
+  aty <- dsA11 ty
+  pure $ seqE [Succeeds (ApplyD ty' t'), aty]
+dsF11 t = do
+  t' <- dsD11 t
+  pure $ seqE [Succeeds t', t']
+
+dsA11 :: Expr -> D Expr
+dsA11 t = do
+  r <- newIdent (getLoc t) "r"
+  t' <- dsD11 (Range t)
+  pure $ Forall [r] $ seqE [eAssume (Unify (Variable r) t'), Variable r]
+
+dsM11 :: Expr -> Ident -> D Expr
+dsM11 (Range (Function [(t1, _effs)] t2)) f = do
+  i <- newIdent (getLoc t1) "i"
+  i' <- newIdent (getLoc t1) "i'"
+  z <- newIdent (getLoc t2) "z"
+  t1' <- dsM11 t1 i'
+  t2' <- dsM11 t2 z
+  pure $ seqE [eVerify $ Lam i' $ seqE [DefineE i t1', Succeeds $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+              ,          Lam i' $ seqE [DefineE i t1', eAssume  $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+              ]
+dsM11 (Range t) i = ApplyD <$> dsD11 t <*> pure (Variable i)
+dsM11 (DefineE x t) i = DefineE x <$> dsM11 t i
+dsM11 (Unify t1 t2) i = Unify <$> dsM11 t1 i <*> dsM11 t2 i
+dsM11 (Seq []) i = dsM11 (Array []) i
+dsM11 (Seq [t]) i = dsM11 t i
+dsM11 (Seq (t:ts)) i = seqE <$> sequence [dsD11 t, dsM11 (Seq ts) i]
+dsM11 (Choice t1 t2) i = Choice <$> dsM11 t1 i <*> dsM11 t2 i
+dsM11 (If3 e1 e2 e3) i = If3 <$> dsD11 e1 <*> dsM11 e2 i <*> dsM11 e3 i
+dsM11 (OfType t1 t2) i = OfType <$> dsM11 t1 i <*> dsD11 t2
+dsM11 t i = unifyV i <$> dsD11 t
