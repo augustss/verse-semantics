@@ -30,7 +30,7 @@ import FrontEnd.Flags
 --  Add Err
 
 -- TODO:
---  x:t=v is syntactic sugar for x:=(:t=v) and 
+--  x:t=v is syntactic sugar for x:=(:t=v) and
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
 
@@ -891,6 +891,8 @@ lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
 lower (Succeeds e) = lowerSucceeds =<< lower e
 lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
 lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
+lower (Macro1 (Ident _ "verify") [] e) = lowerVerify =<< lower e
+lower (Macro1 (Ident _ "assert") [] e) = lowerAssert =<< lower e
 lower (Macro1 (Ident _ "lowered") [] e) = pure e
 lower (Exists is e) = lExists is <$> lower e
 lower (TLam i rs (Exists is e1) e2) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2
@@ -1159,6 +1161,14 @@ lowerDecidesSplit e = do
 
 lowerAssume :: Expr -> D Expr
 lowerAssume e = pure $ eAssume e
+
+lowerVerify :: Expr -> D Expr
+lowerVerify e = pure $ eVerify e
+
+lowerAssert :: Expr -> D Expr
+lowerAssert e = pure $ eAssert e
+
+
 
 -----------------
 
@@ -1483,9 +1493,9 @@ dsD11 (Array ts) = Array <$> mapM dsD11 ts
 dsD11 (OfType t1 t2) = OfType <$> dsD11 t1 <*> dsD11 t2
 dsD11 e@Fail = pure e
 dsD11 (Range t) = do
-  i <- newIdent (getLoc t) "i"
-  existsV [i] <$> dsM11 t i
-dsD11 e@Function{} = dsF11 e
+  i  <- newIdent (getLoc t) "i"
+  existsV [i] <$> dsM11 (Range t) i
+dsD11 e@Function{} = eVerify <$> dsF11 e
 -- Added
 dsD11 (If3 e1 e2 e3) = If3 <$> dsD11 e1 <*> dsD11 e2 <*> dsD11 e3
 dsD11 (Macro1 m rs e) = Macro1 m rs <$> dsD11 e
@@ -1498,14 +1508,14 @@ dsF11 (Function [(t1, _effs)] t2) = do
   t1' <- dsM11 t1 y
   t2' <- dsF11 t2
   pure $ Lam y $ seqE [t1', t2']
-dsF11 (OfType t ty) = do
-  ty' <- dsD11 ty
+dsF11 _z@(OfType t ty) = do
   t'  <- dsD11 t
+  ty' <- dsD11 ty
   aty <- dsA11 ty
-  pure $ seqE [Succeeds (ApplyD ty' t'), aty]
+  pure $ seqE [eAssert (ApplyD ty' t'), {- trace ("dsF11: " ++ prettyShow z ++ " aty = " ++ prettyShow aty) -} aty]
 dsF11 t = do
   t' <- dsD11 t
-  pure $ seqE [Succeeds t', t']
+  pure $ seqE [eAssert t', t']
 
 dsA11 :: Expr -> D Expr
 dsA11 t = do

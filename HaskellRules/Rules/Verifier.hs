@@ -315,7 +315,8 @@ assumeAssertRules env lhs =
          verified (Decide _) = False
          verified _          = True
      guard (collect verified (&&) e)
-     pure (Val (Arr []))
+     -- (old-style) pure (Val (Arr []))
+     pure e
   ++
   -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
   "asm-cas" `name`
@@ -397,7 +398,7 @@ directRules _env lhs =
       guard (null (free e1 `intersect` bndIds bs))
       guard (implies e e1)
       guard (e /= Fail)
-      pure (Assume e :>: ctx e2)
+      pure (e :>: ctx e2)
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
@@ -423,7 +424,8 @@ verifierRules env lhs =
    "suc-elim" `name`
    do (ctx, g,_, Assert e) <- eX lhs
       guard (mustSucceed g (bndVars env) e)
-      pure (ctx e)
+      -- (old-style) pure (ctx e)
+      pure (ctx (Arr []))
    ++
    -- DECIDE --
    -- Decide { e } ----> e   if   e mustDecide
