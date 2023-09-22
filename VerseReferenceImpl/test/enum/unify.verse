@@ -2,10 +2,11 @@
 
 exists X
 
-E := enum:
-       A
-       B
-       C
+E := enum {
+  A,
+  B,
+  C
+}
 
 X = E.A
 

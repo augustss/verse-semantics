@@ -280,8 +280,8 @@ Exp :: { L (Exp L Name) }
   | struct Block {
       Exp.Struct <\$ $1 <.> duplicate $2
     }
-  | enum Block {
-     Exp.Enum <\$ $1 <.> duplicate $2
+  | enum NameBlock {
+     Exp.Enum <\$ $1 <.> $2
     }
   | class Block {
       Exp.Class Nothing <\$ $1 <.> duplicate $2
@@ -403,6 +403,25 @@ Block :: { L (Exp L Name) }
   : Brace { $1 }
   | '.' Exp %prec DOT_SPACE { $1 .> $2 }
   | ':\n' indent List dedent { $1 \$> Exp.List $3 <. $4 }
+
+NameBlock :: { L [Name] }
+  : Scan '{' Scan NameList '}' { $2 \$> $4 <. $5 }
+  | '.' name %prec DOT_SPACE { $1 .> ((:[]) <\$> $2) }
+  | ':\n' indent Scan NameList dedent { $1 \$> $4 <. $5 }
+
+NameList :: { [Name] }
+  : { [] }
+  | name { [extract $1] }
+  | name ',' Scan ReversedNameCommas Scan { extract $1 : reverse $4 }
+  | name Separator ReversedNameList MaybeSeparator { extract $1 : reverse $3 }
+
+ReversedNameCommas :: { [Name] }
+  : name { [extract $1] }
+  | ReversedNameCommas ',' Scan name { extract $4 : $1 }
+
+ReversedNameList :: { [Name] }
+  : name { [extract $1] }
+  | ReversedNameList Separator name { extract $3 : $1 }
 
 Scan :: { () }
   : { () }

@@ -83,11 +83,9 @@ desugarExp e = for e $ \ case
     i <- supply
     (e, xs) <- lift . runDesugarT $ desugarExp e
     pure $ Module i xs e
-  Rewrite.Enum e -> do
+  Rewrite.Enum xs -> do
     i <- supply
-    ((L _ nes), xs) <- lift . runDesugarT $ desugarEnum i e
-    let (ns, es) = Prelude.unzip $ map ( \ (L p (n,e)) -> (n, L p e)) nes
-    pure $ Language.Verse.Desugar.Exp.Enum i xs ns es
+    pure $ Enum i xs
   Rewrite.Struct e -> do
     i <- supply
     (e, xs) <- lift . runDesugarT $ desugarExp e
@@ -259,41 +257,11 @@ desugarDomainNonEmpty i e = \ case
     e2 <- desugarDomainNonEmpty i x xs
     pure $ e1 `then'` e2
 
-desugarEnum
-  :: (MonadAbort Error m, MonadSupply Label m)
-  => Label
-  -> L (Rewrite.Exp L Ident)
-  -> DesugarT m (L [L (Ident, Exp L Ident)])
-desugarEnum i e = for e $ \ case
-  Rewrite.List [] ->
-    pure []
-  Rewrite.List (e:es) -> do
-    e <- desugarEnum' i (0, e)
-    es <- traverse (desugarEnum' i) (zip [1 ..] es)
-    pure $ e:es
-  _ -> abort $ EnumError (loc e)
-
-desugarEnum'
-  :: (MonadAbort Error m, MonadSupply Label m)
-  => Label
-  -> (Integer, L (Rewrite.Exp L Ident))
-  -> DesugarT m (L (Ident, Exp L Ident))
-desugarEnum' i (index, e) = for e $ \ case
-  Rewrite.Name x -> do
-    tellName (x <$ e) False
-    y <- freshIdent $ loc e
-    let e' = EnumValue i index <$ e
-    pure $ (x, (ArchetypeName x <$ e') :=: ifArchetypeName x (extract y) (Name <$> y) e')
-  _ -> abort . EnumError $ loc e
-
 unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 unify = liftL2 (:=:)
 
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
-
-ifArchetypeName :: Apply f => a -> a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-ifArchetypeName x y = liftL2 $ IfArchetypeName x y
 
 liftL2 :: Apply f => (f a -> f b -> c) -> f a -> f b -> f c
 liftL2 f x y = f x y <$ x <. y

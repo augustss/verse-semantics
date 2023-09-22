@@ -17,7 +17,7 @@ import Prettyprinter
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
   | f (Exp f a) :=: f (Exp f a)
-  | f (Exp f a) :.: !Name
+  | f (Exp f a) :.: {-# UNPACK #-} !Name
   | f (Exp f a) :|: f (Exp f a)
   | Fail
   | One (f (Exp f a))
@@ -28,8 +28,7 @@ data Exp f a
   | Struct {-# UNPACK #-} !Label !(HashMap a Bool) (f (Exp f a))
   | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(HashMap a Bool) (f (Exp f a))
   | Inst (f (Exp f a)) !(HashMap a Bool) (f (Exp f a))
-  | Enum {-# UNPACK #-} !Label !(HashMap a Bool) [a] [(f (Exp f a))] -- [a] and [(f (Exp f a))] are in "definition order" this is important for pretty printing and :enum
-  | EnumValue {-# UNPACK #-} !Label !Integer
+  | Enum {-# UNPACK #-} !Label [Name]
   | IfThenElse !(HashMap a Bool) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
   | Exists !Bool (f a) (f (Exp f a))

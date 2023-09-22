@@ -11,7 +11,7 @@ data Exp f a
   = f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :<>: f (Exp f a)
   | f (Exp f a) :|: f (Exp f a)
-  | f (Exp f a) :.: !Name
+  | f (Exp f a) :.: {-# UNPACK #-} !Name
   | f (Exp f a) :..: f (Exp f a)
   | f (Exp f a) :<: f (Exp f a)
   | f (Exp f a) :<=: f (Exp f a)
@@ -36,7 +36,7 @@ data Exp f a
   | Module (f (Exp f a))
   | Struct (f (Exp f a))
   | Class (Maybe (f (Exp f a))) (f (Exp f a))
-  | Enum (f (Exp f a))
+  | Enum [a]
   | Inst (f (Exp f a)) (f (Exp f a))
   | If (f (Exp f a))
   | IfThen (f (Exp f a)) (f (Exp f a))

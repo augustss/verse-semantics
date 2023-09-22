@@ -124,8 +124,8 @@ rewriteExp e = for e $ \ case
     Class <$> traverse rewriteExp e1 <*> rewriteExp e2
   Parse.Inst e1 e2 ->
     Inst <$> rewriteExp e1 <*> rewriteExp e2
-  Parse.Enum e ->
-    Enum <$> rewriteExp e
+  Parse.Enum xs ->
+    pure $ Enum xs
   If e' -> do
     e' <- rewriteExp e'
     pure $ IfThenElse e' (Tuple [] <$ e) (Tuple [] <$ e)

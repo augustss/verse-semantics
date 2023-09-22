@@ -28,7 +28,7 @@ import Control.Monad.Verse
 
 import Data.Bool
 import Data.Eq
-import Data.Foldable (Foldable, foldr, traverse_)
+import Data.Foldable (Foldable, foldr, foldrM, traverse_)
 import Data.Function
 import Data.Functor ((<&>))
 import Data.HashMap.Strict (HashMap)
@@ -166,12 +166,12 @@ evalExp e = case extract e of
     xs <- lift $ traverse freshNamed xs
     _ <- localEnv xs $ evalExp e
     lift . newVar . Val.Module i $ filterNames xs
-  Exp.Enum i xs ns es -> do
-    xs <- lift $ traverse freshNamed xs
-    es <- localEnv xs $ traverse evalExp es
-    lift $ newVar $ Val.Enum i (filterNames xs) ns es
-  Exp.EnumValue i c -> do
-    lift . newVar $ Val.EnumValue i c
+  Exp.Enum i xs -> lift $ do
+    let foldrM' xs f = foldrM f mempty xs
+    (xs, xs') <- foldrM' xs $ \ x (xs, xs') ->
+      newVar (Val.EnumValue i x) <&> \ var ->
+      (HashMap.insert x (Val var) xs, var:xs')
+    newVar $ Val.Enum i xs xs'
   Exp.Struct i xs e -> do
     r <- ask
     lift $ newVar . Val.Overloads (Val.Struct i r.env xs e) =<< freshVar
@@ -247,7 +247,7 @@ evalDot loc e x = do
   lift $ fork do
     xs <- readVar var_e >>= \ case
       Val.Module _ xs -> pure xs
-      Val.Enum _ xs _ _ -> pure xs
+      Val.Enum _ xs _ -> pure xs
       Val.StructInst _ xs -> pure xs
       Val.ClassInst _ _ xs -> pure xs
       _ -> abort $ DomainError loc
@@ -545,10 +545,10 @@ invoke loc var1 var2 s s' = readVar var1 >>= \ case
     var <- invokeTuple xs var2
     unify s.choiceFree s'.choiceFree
     pure var
-  Val.Enum i _xs _ns es -> do
+  Val.Enum _ _ xs -> do
     unify s.storeFree s'.storeFree
     _ <- readVar s.choiceFree
-    var <- invokeEnum i es var2
+    var <- invokeEnum xs var2
     unify s.choiceFree s'.choiceFree
     pure var
   Val.Overloads head tail ->
@@ -562,9 +562,9 @@ invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
   pure x
 
 invokeEnum :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
-            => Label -> [Var m f] -> VarVal m -> VerseT m (Var m f)
-invokeEnum i xs var = asum $ zip xs [0 ..] <&> \ (x, c) -> do
-  unify var =<< newVar (Val.EnumValue i c)
+           => [VarVal m] -> VarVal m -> VerseT m (VarVal m)
+invokeEnum xs var = asum $ xs <&> \ x -> do
+  unify var x
   pure x
 
 invokeOverloads

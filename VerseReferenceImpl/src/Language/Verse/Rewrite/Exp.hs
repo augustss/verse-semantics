@@ -12,7 +12,7 @@ import Prettyprinter
 
 data Exp f a
   = f (Exp f a) :=: f (Exp f a)
-  | f (Exp f a) :.: !Name
+  | f (Exp f a) :.: {-# UNPACK #-} !Name
   | f (Exp f a) :|: f (Exp f a)
   | List [f (Exp f a)]
   | f (Exp f a) `Where` f (Exp f a)
@@ -25,7 +25,7 @@ data Exp f a
   | Struct (f (Exp f a))
   | Class (Maybe (f (Exp f a))) (f (Exp f a))
   | Inst (f (Exp f a)) (f (Exp f a))
-  | Enum (f (Exp f a))
+  | Enum [Name]
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo (f (Exp f a)) (f (Exp f a))
   | Block (f (Exp f a))

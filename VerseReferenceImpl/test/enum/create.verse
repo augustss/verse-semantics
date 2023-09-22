@@ -1,8 +1,8 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 
 E := enum:
-       A
-       B
-       C
+  A,
+  B,
+  C
 
 (E, E.B)
