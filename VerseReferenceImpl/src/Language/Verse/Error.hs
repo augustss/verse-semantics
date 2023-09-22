@@ -20,6 +20,8 @@ data Error
   | DefError !Loc !Loc !Name
   | NameError !Loc !Name
   | IdentError !Loc !Ident
+  | EnumError !Loc
+  | AnyError !Loc String
   | DomainError !Loc
   | SucceedsError !Loc
   | StuckError deriving Show
@@ -34,23 +36,27 @@ instance Pretty Error where
       "does" <+> "not" <+> "match" <+> "previous" <+> "indentation" <+>
       prettyIndent y
     ParseError x y ->
-      pretty x <> colon <+> "unexpected" <+> pretty y
+      pretty x <> colon <+> "parse" <+> "error" <> colon <+> "unexpected" <+> pretty y
     DefError x y z ->
       pretty x <+> "and" <+> pretty y <> colon <+>
       "conflicting" <+> "definitions" <> colon <+>
       pretty z
     NameError x y ->
-      varNotInScope x y
+      varNotInScope ("name" <+> "error") x y
     IdentError x y ->
-      varNotInScope x y
+      varNotInScope ("identifier" <+> "error") x y
+    EnumError x ->
+      pretty x <> colon <+> "only" <+> "identifier" <+> "allowed"
     DomainError x ->
       pretty x <> colon <+> "unexpected" <+> "argument"
     SucceedsError x ->
       pretty x <> colon <+> "expected" <+> "one" <+> "value"
     StuckError -> "stuck"
+    AnyError x str ->
+      pretty x <> colon <+> pretty str
     where
-      varNotInScope x y =
-         pretty x <> colon <+>
+      varNotInScope msg x y =
+         pretty x <> colon <+> msg <> colon <+>
          "variable" <+> "not" <+> "in" <+> "scope" <> colon <+> pretty y
 
 prettyIndent :: Indent -> Doc ann

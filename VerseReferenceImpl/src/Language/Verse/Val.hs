@@ -18,6 +18,7 @@ module Language.Verse.Val
 
 import Control.Monad
 import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen, Freshenable (..))
+import Control.Applicative (Applicative(..))
 
 import Data.Functor
 import Data.Hashable
@@ -43,6 +44,8 @@ data Val ref a
   | Truth a
   | Tuple [a]
   | Module {-# UNPACK #-} !Label !(Env Name ref a)
+  | Enum {-# UNPACK #-} !Label !(Env Name ref a) [Ident] [a]
+  | EnumValue {-# UNPACK #-} !Label !Integer   -- !Label for the Enum, Integer counts from 0 and up
   | StructInst {-# UNPACK #-} !Label !(Env Name ref a)
   | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(Env Name ref a)
   | Overloads !(Overload ref a) a deriving (Functor, Foldable, Traversable)
@@ -67,6 +70,8 @@ instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
       Zip $ guard (if isNaN x then isNaN y else x == y) $> Float x
     (Tuple xs, Tuple ys) ->
       Zip $ Tuple <$> zipMatch xs ys
+    (EnumValue i count, EnumValue j count') ->
+      Zip $ guard (i == j && count == count') $> EnumValue i count
     (StructInst i xs, StructInst j ys) ->
       Zip $ guard (i == j) $>
       StructInst i (zipMatchEnv xs ys)
@@ -88,6 +93,8 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
     Truth x -> Truth <$> freeze x
     Tuple xs -> Tuple <$> for xs freeze
     Module i xs -> Module i <$> for xs freeze
+    Enum i xs ns es -> Enum i <$> for xs freeze <*> pure ns <*> for es freeze
+    EnumValue i count -> pure $ EnumValue i count
     StructInst i xs -> StructInst i <$> for xs freeze
     ClassInst i x xs -> ClassInst i <$> for x freeze <*> for xs freeze
     Overloads x xs -> Overloads <$> freeze x <*> freeze xs
@@ -107,6 +114,13 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
       "module#" <>
       prettyLabel i <>
       group (braced $ prettyNames xs)
+    Enum i _xs ns es ->
+      align $
+      "enum#" <>
+      prettyLabel i <>
+      group (braced $ prettyEnums (zip ns es))
+    EnumValue i count ->
+      "enum_value#" <> prettyLabel i <> colon <> pretty count
     StructInst i xs ->
       align $
       "struct#" <>
@@ -125,6 +139,8 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
       group (braced $ prettyNames xs)
     where
       prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
+        align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
+      prettyEnums xs = xs <&> \ (k, v) ->
         align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
       tupled =
         group .

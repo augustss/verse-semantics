@@ -8,6 +8,7 @@ import Data.HashMap.Strict (HashMap)
 
 import Language.Verse.Label
 import Language.Verse.Name
+import Language.Verse.Ident (Ident)
 
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
@@ -24,6 +25,8 @@ data Exp f a
   | Struct {-# UNPACK #-} !Label !(HashMap a Bool) (f (Exp f a))
   | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(HashMap a Bool) (f (Exp f a))
   | Inst (f (Exp f a)) !(HashMap a Bool) (f (Exp f a))
+  | Enum {-# UNPACK #-} !Label !(HashMap a Bool) [Ident] [(f (Exp f a))] -- [Ident] and [(f (Exp f a))] are in "definition order" this is important for pretty printing and :enum
+  | EnumValue {-# UNPACK #-} !Label !Integer
   | IfThenElse !(HashMap a Bool) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
   | Exists (f a) (f (Exp f a))

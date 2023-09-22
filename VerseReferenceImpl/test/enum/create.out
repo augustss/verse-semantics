@@ -1,0 +1,3 @@
+( enum#1{A := enum_value#1:0, B := enum_value#1:1, C := enum_value#1:2}
+, enum_value#1:1
+)

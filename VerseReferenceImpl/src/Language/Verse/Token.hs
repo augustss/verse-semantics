@@ -28,6 +28,7 @@ data Token
   | DotDot
   | EOF
   | Else
+  | Enum
   | Equal
   | Exists
   | Fail
@@ -89,6 +90,7 @@ instance Pretty Token where
     DotDot -> ".."
     EOF -> "end" <+> "of" <+> "file"
     Else -> "else"
+    Enum -> "enum"
     Equal -> equals
     Exists -> "exists"
     Fail -> "fail"

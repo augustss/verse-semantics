@@ -124,6 +124,7 @@ import Language.Verse.Token qualified as Token
   option { L _ Token.Option }
   set { L _ Token.Set }
   struct { L _ Token.Struct }
+  enum { L _ Token.Enum }
   sync { L _ Token.Sync }
   then { L _ Token.Then }
   true { L _ Token.True }
@@ -278,6 +279,9 @@ Exp :: { L (Exp L Name) }
     }
   | struct Block {
       Exp.Struct <\$ $1 <.> duplicate $2
+    }
+  | enum Block {
+     Exp.Enum <\$ $1 <.> duplicate $2
     }
   | class Block {
       Exp.Class Nothing <\$ $1 <.> duplicate $2

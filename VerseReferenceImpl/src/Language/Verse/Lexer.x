@@ -169,6 +169,7 @@ $space = [\ \t]
   "class" { token Token.Class }
   "do" { token Token.Do }
   "else" { token Token.Else }
+  "enum" { token Token.Enum }
   "exists" { token Token.Exists }
   "function" { token Token.Function }
   "fail" { token Token.Fail }
