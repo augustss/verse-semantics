@@ -1498,6 +1498,7 @@ dsD11 (Range t) = do
 dsD11 e@Function{} = eVerify <$> dsF11 e
 -- Added
 dsD11 (If3 e1 e2 e3) = If3 <$> dsD11 e1 <*> dsD11 e2 <*> dsD11 e3
+dsD11 (Succeeds e)   = eAssert <$> dsD11 e
 dsD11 (Macro1 m rs e) = Macro1 m rs <$> dsD11 e
 dsD11 (Lam x e) = Lam x <$> dsD11 e
 dsD11 e = impossible e
