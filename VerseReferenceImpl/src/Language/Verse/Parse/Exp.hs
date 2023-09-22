@@ -10,13 +10,13 @@ import Language.Verse.Name
 data Exp f a
   = f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :<>: f (Exp f a)
+  | f (Exp f a) :|: f (Exp f a)
   | f (Exp f a) :.: !Name
   | f (Exp f a) :..: f (Exp f a)
   | f (Exp f a) :<: f (Exp f a)
   | f (Exp f a) :<=: f (Exp f a)
   | f (Exp f a) :>: f (Exp f a)
   | f (Exp f a) :>=: f (Exp f a)
-  | f (Exp f a) :|: f (Exp f a)
   | PrefixPlus (f (Exp f a))
   | f (Exp f a) :+: f (Exp f a)
   | PrefixMinus (f (Exp f a))
@@ -40,6 +40,7 @@ data Exp f a
   | Inst (f (Exp f a)) (f (Exp f a))
   | If (f (Exp f a))
   | IfThen (f (Exp f a)) (f (Exp f a))
+  | IfElse (f (Exp f a)) (f (Exp f a))
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | For (f (Exp f a))
   | ForDo (f (Exp f a)) (f (Exp f a))
@@ -56,8 +57,8 @@ data Exp f a
   | False
   | Int !Integer
   | Float {-# UNPACK #-} !Double
+  | Fun (f (Exp f a)) (f (Exp f a))
   | InfixColonEqual (f (Pat f a)) (f (Exp f a))
-  | Function (f (Exp f a)) (f (Exp f a))
   | Pat (Pat f a)
 
 deriving instance ( Show (f (Exp f a))

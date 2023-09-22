@@ -17,7 +17,7 @@ data Error
   = LexError !Pos
   | IndentError !Pos !Indent !Indent
   | ParseError !Loc !Token
-  | DefError !Loc !Loc !Name
+  | DefError !Loc !Loc !Ident
   | NameError !Loc !Name
   | IdentError !Loc !Ident
   | EnumError !Loc

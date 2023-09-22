@@ -42,8 +42,9 @@ import Data.Ord
 import Data.Ratio
 import Data.Traversable (Traversable, traverse)
 import Data.Semigroup
+import Data.String
 
-import Language.Verse.Desugar.Exp (Exp ((:*>:), (:=:), (:.:), (:..:), (:|:)))
+import Language.Verse.Desugar.Exp (Exp ((:*>:), (:=:), (:.:), (:|:)))
 import Language.Verse.Desugar.Exp qualified as Exp
 import Language.Verse.Error
 import Language.Verse.Ident (Ident, IdentMap)
@@ -146,8 +147,6 @@ evalExp e = case extract e of
     pure var1
   e1 :.: x ->
     evalDot (loc e) e1 x
-  e1 :..: e2 ->
-    evalDotDot e1 e2
   e1 :|: e2 ->
     evalChoice e1 e2
   Exp.Fail ->
@@ -186,10 +185,10 @@ evalExp e = case extract e of
     evalIfThenElse xs p t e
   Exp.ForDo xs e1 e2 ->
     evalForDo xs e1 e2
-  Exp.Exists x e -> do
+  Exp.Exists False x e -> do
     var <- lift freshVar
     localName (extract x) (Val var) $ evalExp e
-  Exp.Var x e -> do
+  Exp.Exists True x e -> do
     ref <- lift $ freshVarRef
     localName (extract x) (Ref ref) $ evalExp e
   Exp.Set x e -> lookupNamed (extract x) >>= \ case
@@ -225,8 +224,6 @@ evalExp e = case extract e of
     lift . newVar . Val.Tuple =<< traverse evalExp xs
   Exp.Truth e ->
     lift . newVar . Val.Truth =<< evalExp e
-  Exp.Option e ->
-    evalOption e
   Exp.Int x ->
     lift . newVar $ Val.Int x
   Exp.Float x ->
@@ -257,21 +254,6 @@ evalDot loc e x = do
     unify var =<< case HashMap.lookup x xs of
       Just y -> readNamed' s.storeFree storeFree y
       Nothing -> abort $ NameError loc x
-  pure var
-
-evalDotDot :: MonadEval m => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
-evalDotDot e1 e2 = do
-  var1 <- evalExp e1
-  var2 <- evalExp e2
-  var <- lift freshVar
-  s <- get
-  choiceFree <- lift freshVar
-  put s { choiceFree }
-  lift . fork $ (,) <$> readVar var1 <*> readVar var2 >>= \ case
-    (Int val1, Int val2) -> do
-      unify var =<< foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
-      unify choiceFree s.choiceFree
-    _ -> abort . DomainError $ loc e1 <> loc e2
   pure var
 
 pattern Int :: Integer -> Val f a
@@ -615,12 +597,8 @@ invokeOverload loc overload arg s s' = case overload of
     invokeStruct i env xs e arg s s'
   Val.Class i env sup xs e ->
     invokeClass loc i env sup xs e arg s s'
-  Val.Intrinsic intrinsic -> invokeIntrinsic intrinsic arg >>= \ case
-    Nothing -> pure Nothing
-    x@Just {} -> do
-      unify s.choiceFree s'.choiceFree
-      unify s.storeFree s'.storeFree
-      pure x
+  Val.Intrinsic intrinsic ->
+    invokeIntrinsic intrinsic arg s s'
 
 invokeFun
   :: MonadEval m
@@ -717,21 +695,23 @@ instEmptySup loc sup s = case sup of
     (sup, xs, s) <- instEmptyClass loc i env sup xs e s
     pure (Just sup, xs, s)
 
-invokeIntrinsic :: (MonadRef m, MonadSupply Int m)
-                => Intrinsic -> VarVal m -> VerseT m (Maybe (VarVal m))
+invokeIntrinsic
+  :: (MonadRef m, MonadSupply Int m)
+  => Intrinsic -> VarVal m -> S m -> S m -> VerseT m (Maybe (VarVal m))
 invokeIntrinsic = \ case
-  Intrinsic.Less -> liftOrd (<)
-  Intrinsic.LessEqual -> liftOrd (<=)
-  Intrinsic.Greater -> liftOrd (>)
-  Intrinsic.GreaterEqual -> liftOrd (>=)
-  Intrinsic.Plus -> liftNum (+)
-  Intrinsic.PrefixPlus -> prefixPlus
-  Intrinsic.Minus -> liftNum (-)
-  Intrinsic.PrefixMinus -> prefixMinus
-  Intrinsic.Multiply -> liftNum (*)
-  Intrinsic.Divide -> div'
-  Intrinsic.Int -> int
-  Intrinsic.Float -> float
+  Intrinsic.Less -> liftPrim $ liftOrd (<)
+  Intrinsic.LessEqual -> liftPrim $ liftOrd (<=)
+  Intrinsic.Greater -> liftPrim $ liftOrd (>)
+  Intrinsic.GreaterEqual -> liftPrim $ liftOrd (>=)
+  Intrinsic.Plus -> liftPrim $ liftNum (+)
+  Intrinsic.PrefixPlus -> liftPrim prefixPlus
+  Intrinsic.Minus -> liftPrim $ liftNum (-)
+  Intrinsic.PrefixMinus -> liftPrim prefixMinus
+  Intrinsic.Multiply -> liftPrim $ liftNum (*)
+  Intrinsic.Divide -> liftPrim div'
+  Intrinsic.To -> to
+  Intrinsic.Int -> liftPrim int
+  Intrinsic.Float -> liftPrim float
 
 liftOrd :: (MonadRef m, MonadSupply Int m)
         => (forall a . Ord a => a -> a -> Bool)
@@ -819,6 +799,21 @@ div' var = readVar var >>= \ case
     _ -> pure Nothing
   _ -> pure Nothing
 
+to :: (MonadRef m, MonadSupply Int m)
+   => VarVal m
+   -> S m
+   -> S m
+   -> VerseT m (Maybe (VarVal m))
+to var s s' = readVar var >>= \ case
+  Val.Tuple [var_x, var_y] -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+    (Int val1, Int val2) -> do
+      unify s.storeFree s'.storeFree
+      var <- foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
+      unify s.choiceFree s'.choiceFree
+      pure $ Just var
+    _ -> pure Nothing
+  _ -> pure Nothing
+
 int :: (MonadRef m, MonadSupply Int m)
     => VarVal m -> VerseT m (Maybe (VarVal m))
 int var = do
@@ -835,43 +830,36 @@ float var = do
     _ -> empty
   pure $ Just var
 
-evalOption :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
-evalOption e = do
-  var <- lift freshVar
-  r <- ask
-  s <- get
-  storeFree <- lift freshVar
-  put s { storeFree }
-  lift $ fork do
-    unify var =<< readIVar =<< if'
-      do
-        choiceFree <- newVar ChoiceFree
-        evalEvalT' (evalExp e) r s { choiceFree }
-      do
-        newVar . Val.Truth
-      do
-        newVar $ Val.Tuple []
-    unify storeFree s.storeFree
-  pure var
+liftPrim
+  :: (MonadRef m, MonadSupply Int m)
+  => (VarVal m -> VerseT m (Maybe (VarVal m)))
+  -> VarVal m -> S m -> S m -> VerseT m (Maybe (VarVal m))
+liftPrim f var s s' = f var >>= \ case
+  Nothing -> pure Nothing
+  x@Just {} -> do
+    unify s.choiceFree s'.choiceFree
+    unify s.storeFree s'.storeFree
+    pure x
 
 newEnv :: (MonadRef m, MonadSupply Int m) => VerseT m (Env m)
 newEnv = execWriterT $ do
-  tell' "operator'<'" Intrinsic.Less
-  tell' "operator'<='" Intrinsic.LessEqual
-  tell' "operator'>'" Intrinsic.Greater
-  tell' "operator'>='" Intrinsic.GreaterEqual
-  tell' "operator'+'" Intrinsic.Plus
-  tell' "prefix'+'" Intrinsic.PrefixPlus
-  tell' "operator'-'" Intrinsic.Minus
-  tell' "prefix'-'" Intrinsic.PrefixMinus
-  tell' "operator'*'" Intrinsic.Multiply
-  tell' "operator'/'" Intrinsic.Divide
-  tell' "int" Intrinsic.Int
-  tell' "float" Intrinsic.Float
+  tell' Intrinsic.Less
+  tell' Intrinsic.LessEqual
+  tell' Intrinsic.Greater
+  tell' Intrinsic.GreaterEqual
+  tell' Intrinsic.Plus
+  tell' Intrinsic.PrefixPlus
+  tell' Intrinsic.Minus
+  tell' Intrinsic.PrefixMinus
+  tell' Intrinsic.Multiply
+  tell' Intrinsic.Divide
+  tell' Intrinsic.To
+  tell' Intrinsic.Int
+  tell' Intrinsic.Float
   where
-    tell' x y =
-      tell . HashMap.singleton x . Val =<<
-      lift . newVar . Val.Overloads (Val.Intrinsic y) =<<
+    tell' x =
+      tell . HashMap.singleton (fromString $ Intrinsic.toString x) . Val =<<
+      lift . newVar . Val.Overloads (Val.Intrinsic x) =<<
       lift freshVar
 
 filterNames :: IdentMap a -> HashMap Name a

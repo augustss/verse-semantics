@@ -18,7 +18,6 @@ module Language.Verse.Val
 
 import Control.Monad
 import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen, Freshenable (..))
-import Control.Applicative (Applicative(..))
 
 import Data.Functor
 import Data.Hashable

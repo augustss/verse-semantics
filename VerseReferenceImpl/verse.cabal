@@ -45,6 +45,8 @@ library
     Language.Verse.Parse
     Language.Verse.Parse.Exp
     Language.Verse.Pos
+    Language.Verse.Rewrite
+    Language.Verse.Rewrite.Exp
     Language.Verse.Token
     Language.Verse.Val
   build-tool-depends:

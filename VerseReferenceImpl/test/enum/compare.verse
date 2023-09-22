@@ -7,4 +7,4 @@ E := enum:
 X:E
 Y:E
 
-(all {X<Y}, all{X<=Y}, all{X>Y}, all{X>=Y})
+(all{X<Y}, all{X<=Y}, all{X>Y}, all{X>=Y})

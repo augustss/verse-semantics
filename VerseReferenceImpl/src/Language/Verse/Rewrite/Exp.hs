@@ -2,48 +2,49 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
-module Language.Verse.Desugar.Exp
+module Language.Verse.Rewrite.Exp
   ( Exp (..)
   ) where
 
-import Data.HashMap.Strict (HashMap)
-import Data.HashMap.Strict qualified as HashMap
-
-import Language.Verse.Label
 import Language.Verse.Name
 
 import Prettyprinter
 
 data Exp f a
-  = f (Exp f a) :*>: f (Exp f a)
-  | f (Exp f a) :=: f (Exp f a)
+  = f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :.: !Name
   | f (Exp f a) :|: f (Exp f a)
+  | List [f (Exp f a)]
+  | f (Exp f a) `Where` f (Exp f a)
   | Fail
   | One (f (Exp f a))
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Query (f (Exp f a))
-  | Module {-# UNPACK #-} !Label !(HashMap a Bool) (f (Exp f a))
-  | Struct {-# UNPACK #-} !Label !(HashMap a Bool) (f (Exp f a))
-  | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(HashMap a Bool) (f (Exp f a))
-  | Inst (f (Exp f a)) !(HashMap a Bool) (f (Exp f a))
-  | Enum {-# UNPACK #-} !Label !(HashMap a Bool) [a] [(f (Exp f a))] -- [a] and [(f (Exp f a))] are in "definition order" this is important for pretty printing and :enum
-  | EnumValue {-# UNPACK #-} !Label !Integer
-  | IfThenElse !(HashMap a Bool) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
-  | ForDo !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
-  | Exists !Bool (f a) (f (Exp f a))
-  | Set (f a) (f (Exp f a))
+  | Module (f (Exp f a))
+  | Struct (f (Exp f a))
+  | Class (Maybe (f (Exp f a))) (f (Exp f a))
+  | Inst (f (Exp f a)) (f (Exp f a))
+  | Enum (f (Exp f a))
+  | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
+  | ForDo (f (Exp f a)) (f (Exp f a))
+  | Block (f (Exp f a))
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
+  | Exists (f a)
+  | Var (f a)
+  | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
-  | Fun !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
+  | Fun (f (Exp f a)) (f (Exp f a))
+  | InfixColonEqual !Bool (f a) (f (Exp f a))
+  | PrefixColon (f (Exp f a))
+  | MixfixArrowColonEqual (f a) (f a) (f (Exp f a))
   | Name a
   | IfArchetypeName a a (f (Exp f a)) (f (Exp f a))
-  | ArchetypeName a
+  | f (Exp f a) :|>: f (Exp f a)
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f a)
@@ -58,29 +59,34 @@ instance ( Pretty (f (Exp f a))
     e1 :=: e2 -> pretty e1 <+> equals <+> pretty e2
     e :.: x -> pretty e <> dot <> pretty x
     e1 :|: e2 -> pretty e1 <+> pipe <+> pretty e2
-    e1 :*>: e2 -> align $ pretty e1 <> flatAlt hardline (semi <> space) <> pretty e2
+    List es -> vcat $ pretty <$> es
+    e1 `Where` e2 -> pretty e1 <+> "where" <+> pretty e2
     Fail -> "fail"
     One e -> "one" <+> braces (pretty e)
     All e -> "all" <+> braces (pretty e)
     Not e -> "not" <+> parens (pretty e)
     Query e -> parens (pretty e) <> pretty '?'
-    Class i e1 xs e2 ->
-      "class" <> pretty '#' <> prettyLabel i <>
+    Class e1 e2 ->
+      "class" <>
       maybe mempty (parens . pretty) e1 <+>
-      braces (exists xs $ pretty e2)
-    Inst e1 xs e2 -> parens (pretty e1) <+> braces (exists xs $ pretty e2)
+      braces (pretty e2)
+    Inst e1 e2 -> parens (pretty e1) <+> braces (pretty e2)
     ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
-    Exists var x e -> align $ "exists" <+> prettyName x var <+> dot <> line <> pretty e
+    Exists x -> "exists" <+> pretty x
     Tuple es -> tupled $ pretty <$> es
     Int x -> pretty x
-    Fun xs e1 e2 -> "fun" <> parens (exists xs $ pretty e1) <+> braces (pretty e2)
+    Fun e1 e2 -> "fun" <> parens (pretty e1) <+> braces (pretty e2)
+    InfixColonEqual _ x e -> pretty x <+> ":=" <+> pretty e
+    PrefixColon e -> colon <> pretty e
+    MixfixArrowColonEqual x y e ->
+      pretty x <+> "->" <+> pretty y <+> ":=" <+> pretty e
     Name x -> pretty x
     IfArchetypeName x y e1 e2 ->
       "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
       braces (pretty e1) <+>
       "else" <+> braces (pretty e2)
-    ArchetypeName x -> "archetype" <> parens (pretty x)
+    e1 :|>: e2 -> pretty e1 <+> "|>" <+> pretty e2
     _ -> "unimplemented"
     where
       tupled =
@@ -92,9 +98,3 @@ instance ( Pretty (f (Exp f a))
       braces x =
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
-      exists xs y = align $
-        "exists" <+> hsep (uncurry prettyName <$> HashMap.toList xs) <+> dot <> line <>
-        y
-      prettyName x = \ case
-        False -> pretty x
-        True -> parens ("var" <+> pretty x)

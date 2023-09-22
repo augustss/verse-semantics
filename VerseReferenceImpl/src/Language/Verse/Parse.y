@@ -191,10 +191,10 @@ Exp :: { L (Exp L Name) }
       Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $4 <. $5)
     }
   | Exp '=>' Exp {
-      Exp.Function $1 $3 <\$ $1 <. $3
+      Exp.Fun $1 $3 <\$ $1 <. $3
     }
   | Exp '=>' BraceInd {
-      Exp.Function $1 $3 <\$ $1 <. $3
+      Exp.Fun $1 $3 <\$ $1 <. $3
     }
   | Exp '<>' Scan Exp {
       (:<>:) <\$> duplicate $1 <.> duplicate $4
@@ -349,6 +349,12 @@ If :: { L (Exp L Name) }
   | if Block Then Else {
       Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
     }
+  | if Paren Else {
+      Exp.IfElse <\$ $1 <.> duplicate $2 <.> duplicate $3
+    }
+  | if Block Else {
+      Exp.IfElse <\$ $1 <.> duplicate $2 <.> duplicate $3
+    }
 
 Then :: { L (Exp L Name) }
   : then Block { $1 .> $2 }
@@ -380,7 +386,7 @@ Exists :: { L (Exp L Name) }
 
 Function :: { L (Exp L Name) }
   : function Paren Block {
-      Exp.Function $2 $3 <\$ $1 <. $3
+      Exp.Fun $2 $3 <\$ $1 <. $3
     }
 
 Paren :: { L (Exp L Name) }
