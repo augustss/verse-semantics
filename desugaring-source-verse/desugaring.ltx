@@ -940,7 +940,7 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 
 
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\[0.02in]
-\rulename{mvfnty}  & |Me f (:(functionP t_1 t_2))|
+\rulename{mfun}  & |Me f (:(functionP t_1 t_2))|
      & = & \multicolumn{2}{@@{}l}{|verify(lam i' (i := (Me i' t_1); assert (z := f^[i]; (Me z t_2)))); |} \\
    & &   & \multicolumn{2}{@@{}l}{|lam i' (i := (Me i' t_1); assume (z := f^[i]; (Me z t_2)))|} \\
 \rulename{mtype}   & |Me i (:t)|           & = & |((De t))^[i]| \\
@@ -968,13 +968,13 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \rulename{dbind}   & |De (x := e)|            & = & |x := De e| \\
 \rulename{dseq}    & |De (t_1 ; t_2)|         & = & |De t_1 ; De t_2| \\
 \rulename{dtype}   & |De (:t)|                & = & |def i (Me i t)| & \text{|i| fresh} \\
-\rulename{doftype} & |De (oftype t_1 t_2)|    & = & |y:=De t_1; Me y t_2; forall r (assume (r = (De (:t_2))); r)|  & \text{|y| fresh} \\
+\rulename{doftype} & |De (oftype t_1 t_2)|    & = & |y:=De t_1; verify (assert (Me y t_2)); forall r (assume (r = (De (:t_2))); r)|  & \text{|y| fresh} \\
 \rulename{dfun}    & |De (functionP t_1 t_2)| & = & |verify (lam y (Me y t_1); assert (De t_2); De t_2)| & \text{|y| fresh} \\
 \\
 
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\[0.02in]
-\rulename{mvfnty}  & |Me f (functionP t_1 t_2)|
-     & = & \multicolumn{2}{@@{}l}{|verify(forall i' (assume(i := (Me i' t_1)); assert (z := f^[i]; (Me z t_2))))); |} \\
+\rulename{mfun}  & |Me f (functionP t_1 t_2)|
+     & = & \multicolumn{2}{@@{}l}{|verify(lam i' (i := (Me i' t_1); assert (z := f^[i]; (Me z t_2))))); |} \\
    & &   & \multicolumn{2}{@@{}l}{|lam y (Me y t_1; forall r (assume (r = (De (:t_2))); r))|} \\
 \rulename{mtype}   & |Me i (:t)|           & = & |((De t))^[i]| \\
 \rulename{mbind}   & |Me i (x:=t)|         & = & |x := Me i t| \\
