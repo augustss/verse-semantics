@@ -131,7 +131,8 @@ desugarExp e = for e $ \ case
     pure $ Float x
   Rewrite.Fun e_domain e -> do
     (e_domain, xs) <- lift . runDesugarT $ desugarDomain e_domain
-    Fun xs e_domain <$> exists (desugarExp e)
+    e <- exists $ desugarExp e
+    pure $ Fun xs e_domain e
   InfixColonEqual funName x e -> do
     if funName then tellFunName x else tellName x False
     e <- desugarExp e
@@ -208,6 +209,17 @@ desugarDomain' e i = for e $ \ case
     pure $ (unify i $ Tuple is <$ e) :*>: (Tuple es <$ e)
   Rewrite.Name x ->
     pure $ i :=: (Name x <$ e)
+  Rewrite.Fun e_domain e -> do
+    ((e_domain, x), xs) <- lift . runDesugarT $ do
+      x <- fmap Name <$> freshIdent (loc e_domain)
+      j <- fmap Name <$> freshIdent (loc e_domain)
+      e_domain <- desugarDomain' e_domain j
+      pure (unify x e_domain `then'` j, x)
+    e <- exists $ do
+      y <- fmap Name <$> freshIdent (loc e)
+      e <- desugarDomain' e y
+      pure $ unify y (bracketInvoke i x) `then'` e
+    pure $ Fun xs e_domain e
   InfixColonEqual funName x e -> do
     if funName then tellFunName x else tellName x False
     e <- desugarDomain' e i
@@ -262,6 +274,9 @@ unify = liftL2 (:=:)
 
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
+
+bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+bracketInvoke = liftL2 BracketInvoke
 
 liftL2 :: Apply f => (f a -> f b -> c) -> f a -> f b -> f c
 liftL2 f x y = f x y <$ x <. y

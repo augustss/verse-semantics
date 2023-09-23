@@ -20,8 +20,6 @@ data Error
   | DefError !Loc !Loc !Ident
   | NameError !Loc !Name
   | IdentError !Loc !Ident
-  | EnumError !Loc
-  | AnyError !Loc String
   | DomainError !Loc
   | SucceedsError !Loc
   | StuckError deriving Show
@@ -36,28 +34,21 @@ instance Pretty Error where
       "does" <+> "not" <+> "match" <+> "previous" <+> "indentation" <+>
       prettyIndent y
     ParseError x y ->
-      pretty x <> colon <+> "parse" <+> "error" <> colon <+> "unexpected" <+> pretty y
+      pretty x <> colon <+> "parse" <+> "error" <> colon <+>
+      "unexpected" <+> pretty y
     DefError x y z ->
       pretty x <+> "and" <+> pretty y <> colon <+>
       "conflicting" <+> "definitions" <> colon <+>
       pretty z
     NameError x y ->
-      varNotInScope ("name" <+> "error") x y
+      pretty x <> colon <+> "name" <+> pretty y <+> "not" <+> "in" <+> "scope"
     IdentError x y ->
-      varNotInScope ("identifier" <+> "error") x y
-    EnumError x ->
-      pretty x <> colon <+> "only" <+> "identifier" <+> "allowed"
+      pretty x <> colon <+> "identifier" <+> pretty y <+> "not" <+> "in" <+> "scope"
     DomainError x ->
       pretty x <> colon <+> "unexpected" <+> "argument"
     SucceedsError x ->
       pretty x <> colon <+> "expected" <+> "one" <+> "value"
     StuckError -> "stuck"
-    AnyError x str ->
-      pretty x <> colon <+> pretty str
-    where
-      varNotInScope msg x y =
-         pretty x <> colon <+> msg <> colon <+>
-         "variable" <+> "not" <+> "in" <+> "scope" <> colon <+> pretty y
 
 prettyIndent :: Indent -> Doc ann
 prettyIndent = dquotes . hcat . fmap pretty
