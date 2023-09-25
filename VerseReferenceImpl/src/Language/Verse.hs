@@ -20,6 +20,7 @@ import Language.Verse.Eval qualified as Eval
 import Language.Verse.Label
 import Language.Verse.Lexer
 import Language.Verse.Parse
+import Language.Verse.Rewrite
 import Language.Verse.Val
 
 eval :: ( MonadAbort Error m
@@ -28,4 +29,4 @@ eval :: ( MonadAbort Error m
         , MonadSupply Label m
         , EqRef (Ref m)
         ) => ByteString -> VerseT m FrozenVal
-eval = Eval.eval <=< liftEither . (desugar <=< runLexer parse)
+eval = Eval.eval <=< liftEither . (runSupplyT . (desugar <=< rewrite) <=< runLexer parse)

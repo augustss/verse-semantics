@@ -1,12 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Language.Verse.Val
   ( Val (..)
   , VarVal
@@ -43,6 +39,8 @@ data Val ref a
   | Truth a
   | Tuple [a]
   | Module {-# UNPACK #-} !Label !(Env Name ref a)
+  | Enum {-# UNPACK #-} !Label !(Env Name ref a) [a]
+  | EnumValue {-# UNPACK #-} !Label {-# UNPACK #-} !Name
   | StructInst {-# UNPACK #-} !Label !(Env Name ref a)
   | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(Env Name ref a)
   | Overloads !(Overload ref a) a deriving (Functor, Foldable, Traversable)
@@ -67,6 +65,10 @@ instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
       Zip $ guard (if isNaN x then isNaN y else x == y) $> Float x
     (Tuple xs, Tuple ys) ->
       Zip $ Tuple <$> zipMatch xs ys
+    (Enum i xs xs', Enum j ys ys') ->
+      Zip $ guard (i == j) $> Enum i (zipMatchEnv xs ys) <*> zipMatch xs' ys'
+    (EnumValue i x, EnumValue j y) ->
+      Zip $ guard (i == j && x == y) $> EnumValue i x
     (StructInst i xs, StructInst j ys) ->
       Zip $ guard (i == j) $>
       StructInst i (zipMatchEnv xs ys)
@@ -88,6 +90,8 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
     Truth x -> Truth <$> freeze x
     Tuple xs -> Tuple <$> for xs freeze
     Module i xs -> Module i <$> for xs freeze
+    Enum i xs xs' -> Enum i <$> for xs freeze <*> for xs' freeze
+    EnumValue i x -> pure $ EnumValue i x
     StructInst i xs -> StructInst i <$> for xs freeze
     ClassInst i x xs -> ClassInst i <$> for x freeze <*> for xs freeze
     Overloads x xs -> Overloads <$> freeze x <*> freeze xs
@@ -107,6 +111,13 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
       "module#" <>
       prettyLabel i <>
       group (braced $ prettyNames xs)
+    Enum i _ xs ->
+      align $
+      "enum#" <>
+      prettyLabel i <>
+      group (braced $ pretty <$> xs)
+    EnumValue i x ->
+      "enum#" <> prettyLabel i <> dot <> pretty x
     StructInst i xs ->
       align $
       "struct#" <>
@@ -147,19 +158,18 @@ data Overload ref a
   = Fun
     {-# UNPACK #-} !Label
     !(Env Ident ref a)
-    !(IdentMap Bool)
+    !(IdentMap (Maybe Ident))
     !Exp
     !Exp
   | Struct
-    {-# UNPACK #-}
-    !Label
+    {-# UNPACK #-} !Label
     !(Env Ident ref a)
-    !(IdentMap Bool) Exp
-  | Class {-# UNPACK #-}
-    !Label
+    !(IdentMap (Maybe Ident)) Exp
+  | Class
+    {-# UNPACK #-} !Label
     !(Env Ident ref a)
     !(Maybe a)
-    !(IdentMap Bool) Exp
+    !(IdentMap (Maybe Ident)) Exp
   | Intrinsic !Intrinsic deriving (Functor, Foldable, Traversable)
 
 type Exp = L (Desugar.Exp L Ident)
@@ -184,42 +194,46 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
          , Freezable a b m
          ) => Freezable (Overload f a) (Overload g b) m where
   freeze = \ case
-    Fun i env xs e1 e2 -> for env freeze <&> \ env ->
-      Fun i env xs e1 e2
-    Struct i env xs e1 -> for env freeze <&> \ env ->
-      Struct i env xs e1
-    Class i env sup xs e1 ->
-      (\ env sup -> Class i env sup xs e1) <$> for env freeze <*> for sup freeze
+    Fun i env xs e1 e2 -> do
+      env <- for env freeze
+      pure $ Fun i env xs e1 e2
+    Struct i env xs e -> do
+      env <- for env freeze
+      pure $ Struct i env xs e
+    Class i env sup xs e -> do
+      env <- for env freeze
+      sup <- for sup freeze
+      pure $ Class i env sup xs e
     Intrinsic x -> pure $ Intrinsic x
 
 data Named ref a
   = Val a
-  | Ref (ref (Val ref)) deriving (Functor, Foldable, Traversable)
+  | Ref (ref (Val ref)) a deriving (Functor, Foldable, Traversable)
 
 instance Eq (ref (Val ref)) => RowMatchable (Named ref)
 
 instance Eq (ref (Val ref)) => ZipMatchable (Named ref) where
   zipMatch = curry $ \ case
     (Val x, Val y) -> Just $ Val (x, y)
-    (Ref x, Ref y) -> guard (x == y) $> Ref x
+    (Ref x x', Ref y y') -> guard (x == y) $> Ref x (x', y')
     _ -> Nothing
 
 instance Freshenable a m => Freshenable (Named ref a) m where
   freshen = \ case
     Val x -> Val <$> freshen x
-    Ref x -> pure $ Ref x
+    Ref x y -> Ref x <$> freshen y
 
 instance ( Freezable (f (Val f)) (g (Val g)) m
          , Freezable a b m
          ) => Freezable (Named f a) (Named g b) m where
   freeze = \ case
     Val x -> Val <$> freeze x
-    Ref x -> Ref <$> freeze x
+    Ref x y -> Ref <$> freeze x <*> freeze y
 
 instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Named ref a) where
   pretty = \ case
     Val x -> pretty x
-    Ref x -> pretty x
+    Ref x _ -> pretty x
 
 type Env k ref a = HashMap k (Named ref a)
 

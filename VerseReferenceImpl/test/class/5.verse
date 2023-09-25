@@ -2,10 +2,10 @@
 any(exists X) := X
 
 x := class:
-  F() := 1
+  F():int = 1
 
 y := class(x):
-  F() := 2
+  F():int = 2
 
 Y := y{}
 

@@ -124,6 +124,7 @@ import Language.Verse.Token qualified as Token
   option { L _ Token.Option }
   set { L _ Token.Set }
   struct { L _ Token.Struct }
+  enum { L _ Token.Enum }
   sync { L _ Token.Sync }
   then { L _ Token.Then }
   true { L _ Token.True }
@@ -174,9 +175,6 @@ Exp :: { L (Exp L Name) }
   | set name '=' Exp {
       Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | var name {
-      Exp.Var <\$ $1 <.> duplicate $2
-    }
   | Pat ':=' Exp {
       Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
     }
@@ -190,10 +188,10 @@ Exp :: { L (Exp L Name) }
       Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $4 <. $5)
     }
   | Exp '=>' Exp {
-      Exp.Function $1 $3 <\$ $1 <. $3
+      Exp.Fun $1 $3 <\$ $1 <. $3
     }
   | Exp '=>' BraceInd {
-      Exp.Function $1 $3 <\$ $1 <. $3
+      Exp.Fun $1 $3 <\$ $1 <. $3
     }
   | Exp '<>' Scan Exp {
       (:<>:) <\$> duplicate $1 <.> duplicate $4
@@ -244,7 +242,7 @@ Exp :: { L (Exp L Name) }
       Exp.PrefixQuery <\$ $1 <.> duplicate $2
     }
   | Exp '?' {
-      Exp.Query <\$> duplicate $1 <. $2
+      Exp.PostfixQuery <\$> duplicate $1 <. $2
     }
   | truth Block {
       Exp.Truth <\$ $1 <.> duplicate $2
@@ -279,6 +277,9 @@ Exp :: { L (Exp L Name) }
   | struct Block {
       Exp.Struct <\$ $1 <.> duplicate $2
     }
+  | enum NameBlock {
+     Exp.Enum <\$ $1 <.> $2
+    }
   | class Block {
       Exp.Class Nothing <\$ $1 <.> duplicate $2
     }
@@ -304,6 +305,9 @@ Exp :: { L (Exp L Name) }
 
 Pat :: { L (Pat L Name) }
   : name { Pat.Name <\$> $1 }
+  | var name ':' Exp {
+      Pat.Var <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
   | ':' Pat {
       Pat.PrefixColon <\$ $1 <.> duplicate (Exp.Pat <\$> $2)
     }
@@ -345,6 +349,12 @@ If :: { L (Exp L Name) }
   | if Block Then Else {
       Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
     }
+  | if Paren Else {
+      Exp.IfElse <\$ $1 <.> duplicate $2 <.> duplicate $3
+    }
+  | if Block Else {
+      Exp.IfElse <\$ $1 <.> duplicate $2 <.> duplicate $3
+    }
 
 Then :: { L (Exp L Name) }
   : then Block { $1 .> $2 }
@@ -376,7 +386,7 @@ Exists :: { L (Exp L Name) }
 
 Function :: { L (Exp L Name) }
   : function Paren Block {
-      Exp.Function $2 $3 <\$ $1 <. $3
+      Exp.Fun $2 $3 <\$ $1 <. $3
     }
 
 Paren :: { L (Exp L Name) }
@@ -393,6 +403,25 @@ Block :: { L (Exp L Name) }
   : Brace { $1 }
   | '.' Exp %prec DOT_SPACE { $1 .> $2 }
   | ':\n' indent List dedent { $1 \$> Exp.List $3 <. $4 }
+
+NameBlock :: { L [Name] }
+  : Scan '{' Scan NameList '}' { $2 \$> $4 <. $5 }
+  | '.' name %prec DOT_SPACE { $1 .> ((:[]) <\$> $2) }
+  | ':\n' indent Scan NameList dedent { $1 \$> $4 <. $5 }
+
+NameList :: { [Name] }
+  : { [] }
+  | name { [extract $1] }
+  | name ',' Scan ReversedNameCommas Scan { extract $1 : reverse $4 }
+  | name Separator ReversedNameList MaybeSeparator { extract $1 : reverse $3 }
+
+ReversedNameCommas :: { [Name] }
+  : name { [extract $1] }
+  | ReversedNameCommas ',' Scan name { extract $4 : $1 }
+
+ReversedNameList :: { [Name] }
+  : name { [extract $1] }
+  | ReversedNameList Separator name { extract $3 : $1 }
 
 Scan :: { () }
   : { () }

@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -17,6 +18,9 @@ class Monad m => MonadAbort e m | m -> e where
   abort :: e -> m a
   default abort :: (m ~ t n, MonadTrans t, MonadAbort e n) => e -> m a
   abort = lift . abort
+
+instance MonadAbort e (Either e) where
+  abort = Left
 
 instance Monad m => MonadAbort e (ExceptT e m) where
   abort = ExceptT . pure . Left

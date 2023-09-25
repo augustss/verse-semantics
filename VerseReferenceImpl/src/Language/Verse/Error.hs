@@ -17,7 +17,7 @@ data Error
   = LexError !Pos
   | IndentError !Pos !Indent !Indent
   | ParseError !Loc !Token
-  | DefError !Loc !Loc !Name
+  | DefError !Loc !Loc !Ident
   | NameError !Loc !Name
   | IdentError !Loc !Ident
   | DomainError !Loc
@@ -34,24 +34,21 @@ instance Pretty Error where
       "does" <+> "not" <+> "match" <+> "previous" <+> "indentation" <+>
       prettyIndent y
     ParseError x y ->
-      pretty x <> colon <+> "unexpected" <+> pretty y
+      pretty x <> colon <+> "parse" <+> "error" <> colon <+>
+      "unexpected" <+> pretty y
     DefError x y z ->
       pretty x <+> "and" <+> pretty y <> colon <+>
       "conflicting" <+> "definitions" <> colon <+>
       pretty z
     NameError x y ->
-      varNotInScope x y
+      pretty x <> colon <+> "name" <+> pretty y <+> "not" <+> "in" <+> "scope"
     IdentError x y ->
-      varNotInScope x y
+      pretty x <> colon <+> "identifier" <+> pretty y <+> "not" <+> "in" <+> "scope"
     DomainError x ->
       pretty x <> colon <+> "unexpected" <+> "argument"
     SucceedsError x ->
       pretty x <> colon <+> "expected" <+> "one" <+> "value"
     StuckError -> "stuck"
-    where
-      varNotInScope x y =
-         pretty x <> colon <+>
-         "variable" <+> "not" <+> "in" <+> "scope" <> colon <+> pretty y
 
 prettyIndent :: Indent -> Doc ann
 prettyIndent = dquotes . hcat . fmap pretty

@@ -13,6 +13,7 @@ import Control.Comonad.Env
 import Data.Bool
 import Data.Eq
 import Data.Foldable
+import Data.Function
 import Data.Functor.Apply
 import Data.Ord
 import Data.Semigroup
@@ -49,6 +50,9 @@ instance Comonad L where
 
 instance ComonadEnv Loc L where
   ask = loc
+
+instance Pretty a => Pretty (L a) where
+  pretty = pretty . extract
 
 loc :: L a -> Loc
 loc (L x _) = x

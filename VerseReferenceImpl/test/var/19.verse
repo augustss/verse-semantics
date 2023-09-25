@@ -1,5 +1,7 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-Fold(exists F, var Z, exists Xs) :=
+any(exists X) := X
+
+Fold(F:any, var Z:any, Xs:any) :=
   all. set Z = F(:Xs, Z)
   Z
 

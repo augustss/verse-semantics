@@ -1,5 +1,5 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-var Y = 0
+var Y:int = 0
 exists X
 Z := all. all. all:
   set Y = Y + 1

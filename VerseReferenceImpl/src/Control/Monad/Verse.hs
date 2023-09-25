@@ -674,6 +674,9 @@ instance ( Freezable a b m
 instance Freezable a b m => Freezable [a] [b] m where
   freeze = traverse freeze
 
+instance Freezable a b m => Freezable (Maybe a) (Maybe b) m where
+  freeze = traverse freeze
+
 instance ( MonadFix m
          , MonadRef m
          , Freezable (f (Var m f)) (g (Frozen g)) m
