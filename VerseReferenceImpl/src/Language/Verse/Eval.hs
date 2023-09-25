@@ -157,11 +157,6 @@ evalExp e = case extract e of
     evalAll e
   Exp.Not e ->
     evalNot e
-  Exp.Query e -> do
-    var_e <- evalExp e
-    var <- lift freshVar
-    lift $ unify var_e =<< newVar (Val.Truth var)
-    pure var
   Exp.Module i xs e -> do
     xs <- lift $ freshEnv xs
     _ <- localEnv xs $ evalExp e
@@ -697,7 +692,7 @@ instEmptySup loc sup s = case sup of
     pure (Just sup, xs, s)
 
 invokeIntrinsic
-  :: (MonadRef m, MonadSupply Int m)
+  :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
   => Intrinsic -> VarVal m -> S m -> S m -> VerseT m (Maybe (VarVal m))
 invokeIntrinsic = \ case
   Intrinsic.Less -> liftPrim $ liftOrd (<)
@@ -713,6 +708,7 @@ invokeIntrinsic = \ case
   Intrinsic.To -> to
   Intrinsic.Int -> liftPrim int
   Intrinsic.Float -> liftPrim float
+  Intrinsic.Query -> liftPrim query
 
 liftOrd :: (MonadRef m, MonadSupply Int m)
         => (forall a . Ord a => a -> a -> Bool)
@@ -831,6 +827,15 @@ float var = do
     _ -> empty
   pure $ Just var
 
+query :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
+      => VarVal m -> VerseT m (Maybe (VarVal m))
+query var = do
+  var' <- freshVar
+  fork $ readVar var >>= \ case
+    Val.Truth var -> unify var var'
+    _ -> empty
+  pure $ Just var'
+
 liftPrim
   :: (MonadRef m, MonadSupply Int m)
   => (VarVal m -> VerseT m (Maybe (VarVal m)))
@@ -857,6 +862,7 @@ newEnv = execWriterT $ do
   tell' Intrinsic.To
   tell' Intrinsic.Int
   tell' Intrinsic.Float
+  tell' Intrinsic.Query
   where
     tell' x =
       tell . HashMap.singleton (fromString $ Intrinsic.toString x) . Val =<<

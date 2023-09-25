@@ -21,7 +21,8 @@ data Intrinsic
   | Divide
   | To
   | Int
-  | Float deriving (Show, Eq)
+  | Float
+  | Query deriving (Show, Eq)
 
 toString :: Intrinsic -> String
 toString = \ case
@@ -38,6 +39,7 @@ toString = \ case
   To -> "operator'..'"
   Int -> "int"
   Float -> "float"
+  Query -> "postfix'?'"
 
 instance Pretty Intrinsic where
   pretty = fromString . toString

@@ -32,7 +32,7 @@ data Exp f a
   | Not (f (Exp f a))
   | PrefixBracket (f (Exp f a))
   | PrefixQuery (f (Exp f a))
-  | Query (f (Exp f a))
+  | PostfixQuery (f (Exp f a))
   | Module (f (Exp f a))
   | Struct (f (Exp f a))
   | Class (Maybe (f (Exp f a))) (f (Exp f a))

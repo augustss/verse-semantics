@@ -24,7 +24,6 @@ data Exp f a
   | One (f (Exp f a))
   | All (f (Exp f a))
   | Not (f (Exp f a))
-  | Query (f (Exp f a))
   | Module {-# UNPACK #-} !Label !(Env a) (f (Exp f a))
   | Struct {-# UNPACK #-} !Label !(Env a) (f (Exp f a))
   | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(Env a) (f (Exp f a))
@@ -63,7 +62,6 @@ instance ( Pretty (f (Exp f a))
     One e -> "one" <+> braces (pretty e)
     All e -> "all" <+> braces (pretty e)
     Not e -> "not" <+> parens (pretty e)
-    Query e -> parens (pretty e) <> pretty '?'
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
       maybe mempty (parens . pretty) e1 <+>

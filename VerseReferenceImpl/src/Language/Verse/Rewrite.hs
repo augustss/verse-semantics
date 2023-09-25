@@ -38,6 +38,7 @@ import Language.Verse.Parse.Exp ( pattern (:<>:)
                                 , pattern (:->:)
                                 , pattern PrefixBracket
                                 , pattern PrefixQuery
+                                , pattern PostfixQuery
                                 , pattern If
                                 , pattern IfThen
                                 , pattern IfElse
@@ -105,6 +106,8 @@ rewriteExp e = for e $ \ case
     rewriteOperator1 "prefix'[]'" e
   PrefixQuery e ->
     rewriteOperator1 "prefix'?'" e
+  PostfixQuery e ->
+    rewriteOperator1 "postfix'?'" e
   Parse.List es ->
     List <$> traverse rewriteExp es
   Parse.Where e1 e2 ->
@@ -117,8 +120,6 @@ rewriteExp e = for e $ \ case
     All <$> rewriteExp e
   Parse.Not e ->
     Not <$> rewriteExp e
-  Parse.Query e ->
-    Query <$> rewriteExp e
   Parse.Module e ->
     Module <$> rewriteExp e
   Parse.Struct e ->

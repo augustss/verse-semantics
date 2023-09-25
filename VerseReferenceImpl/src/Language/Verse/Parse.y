@@ -242,7 +242,7 @@ Exp :: { L (Exp L Name) }
       Exp.PrefixQuery <\$ $1 <.> duplicate $2
     }
   | Exp '?' {
-      Exp.Query <\$> duplicate $1 <. $2
+      Exp.PostfixQuery <\$> duplicate $1 <. $2
     }
   | truth Block {
       Exp.Truth <\$ $1 <.> duplicate $2

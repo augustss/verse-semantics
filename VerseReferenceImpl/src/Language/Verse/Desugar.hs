@@ -78,8 +78,6 @@ desugarExp e = for e $ \ case
     All <$> exists (desugarExp e)
   Rewrite.Not e ->
     Not <$> desugarExp e
-  Rewrite.Query e ->
-    Query <$> desugarExp e
   Rewrite.Module e -> do
     i <- supply
     (e, xs) <- lift . runDesugarT $ desugarExp e
