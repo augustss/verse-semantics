@@ -727,7 +727,7 @@ liftOrd f var = readVar var >>= \ case
     (Val.Rational x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
     (Val.Rational x, Val.Float y) -> guard (f x (toRational y)) $> Just var_x
     (Val.Rational x, Val.Rational y) -> guard (f x y) $> Just var_x
-    (Val.EnumValue x x', Val.EnumValue y y') | x == y -> guard (f x' y') $> Just var_x
+    -- EnumValue is considered unordered in Verse
     _ -> pure Nothing
   _ -> pure Nothing
 

@@ -1,4 +1,0 @@
-(false, (enum#3.A), false, (enum#3.A))
-((enum#3.A), (enum#3.A), false, false)
-(false, false, (enum#3.B), (enum#3.B))
-(false, (enum#3.B), false, (enum#3.B))
