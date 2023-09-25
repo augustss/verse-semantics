@@ -90,7 +90,7 @@ data DState = DState { nextNo :: !Int, context :: !DContext, dflags :: !Flags }
   deriving (Show)
 
 -- Different desugaring styles.
-data DContext = DFig6 | DFig11
+data DContext = DFig6 | DFig10 | DFig11
   deriving (Show)
 
 newInt :: D Int
@@ -146,7 +146,7 @@ syntaxFixes = pure . f
 eval :: Flags -> D Expr -> Expr
 eval flgs = flip evalState DState{ nextNo = 1, context = ctx, dflags = flgs }
   where
-    ctx = if fVerify flgs && not (fOldDesugar flgs) then DFig11 else DFig6
+    ctx = if fVerify flgs && not (fOldDesugar flgs) then {- DFig11 -} DFig10 else DFig6
 
 -- Desugar into Small Source Verse
 dsSmall :: Expr -> D Expr
@@ -371,7 +371,8 @@ dsDx e = do
   how <- gets context
   case how of
     DFig6  -> dsD e
-    DFig11 -> dsD11 (trace ("dsDx e = " ++ prettyShow e) e)
+    DFig11 -> dsD11 e
+    DFig10 -> dsD10 e
 
 -- All cases, but the last, can be removed.
 -- They are just there to avoid introducing unused existentials.
@@ -1116,6 +1117,7 @@ lowerSucceeds e = do
   if verif then
     case how of
       DFig6  -> pure $ eAssert e
+      DFig10 -> pure $ eAssert e
       DFig11 -> pure $ Succeeds e
    else if asmVerif then
     pure $ e
@@ -1508,7 +1510,7 @@ dsF11 (Function [(t1, _effs)] t2) = do
   y <- newIdent (getLoc t1) "y"
   t1' <- dsM11 t1 y
   t2' <- dsF11 t2
-  pure $ Lam y $ seqE ( trace ("dsF11: (t1, t1') = " ++ prettyShow (t1, t1')) [t1', t2'])
+  pure $ Lam y $ seqE [t1', t2']
 dsF11 _z@(OfType t ty) = do
   t'  <- dsD11 t
   ty' <- dsD11 ty
@@ -1553,3 +1555,103 @@ dsM11 (Choice t1 t2) i = Choice <$> dsM11 t1 i <*> dsM11 t2 i
 dsM11 (If3 e1 e2 e3) i = If3 <$> dsD11 e1 <*> dsM11 e2 i <*> dsM11 e3 i
 dsM11 (OfType t1 t2) i = OfType <$> dsM11 t1 i <*> dsD11 t2
 dsM11 t i = unifyV i <$> dsD11 t
+
+------------------------------------------------------------------------------------
+-- | Adding DS for "fig 10: Mode-based Translation from SmallSource to Core."
+------------------------------------------------------------------------------------
+
+data DsMode = I | V deriving (Eq, Ord, Show)
+
+dsD10 :: Expr -> D Expr
+dsD10 e@Lit{} = pure e
+dsD10 e@Variable{}   = pure e
+dsD10 (ApplyD e1 e2) = ApplyD <$> dsD10 e1 <*> dsD10 e2
+dsD10 (Unify e1 e2)  = Unify  <$> dsD10 e1 <*> dsD10 e2
+dsD10 (Choice e1 e2) = Choice <$> dsD10 e1 <*> dsD10 e2
+dsD10 e@(DefineV _)  = pure e
+dsD10 (DefineE x e)  = DefineE x <$> dsD10 e
+dsD10 (Seq [])       = pure (Array [])
+dsD10 (Seq [t])      = dsD10 t
+dsD10 (Seq (t:ts))   = seqE <$> sequence [dsD10 t, dsD10 (Seq ts)]
+dsD10 (Array ts)     = Array <$> mapM dsD10 ts
+dsD10 (OfType t1 t2) = do {e <- dsD10 t1; ofType10 e t2 }
+dsD10 e@Fail         = pure e
+dsD10 (Range t)      = do i  <- newIdent (getLoc t) "i"
+                          existsV [i] <$> dsM10 I (Range t) i
+dsD10 t@Function{}   = seqE <$> sequence [ eVerify <$> dsV10 t, dsI10 t ]
+-- Added
+dsD10 (If3 e1 e2 e3)  = If3 <$> dsD10 e1 <*> dsD10 e2 <*> dsD10 e3
+dsD10 (Succeeds e)    = eAssert <$> dsD10 e
+dsD10 (Macro1 m rs e) = Macro1 m rs <$> dsD10 e
+dsD10 (Lam x e)       = Lam x <$> dsD10 e
+dsD10 e               = impossible e
+
+dsV10 :: Expr -> D Expr
+dsV10 (Function [(t1,_effs)] t2) = do
+   i <- newIdent (getLoc t1) "i"
+   t1' <- dsM10 V t1 i
+   t2' <- dsV10 t2
+   pure $ Lam i $ seqE [t1', t2']
+dsV10 (OfType  t1 t2)  = do { e <- dsD10 t1; vOfType10 e t2 }
+dsV10 t                = eAssert <$> dsD10 t  -- TODO: "decides"
+
+dsI10 :: Expr -> D Expr
+dsI10 (Function [(t1,_effs)] t2) = do
+   i <- newIdent (getLoc t1) "i"
+   t1' <- dsM10 I t1 i
+   t2' <- dsI10 t2
+   pure $ Lam i $ seqE [t1', t2']
+dsI10 (OfType _ t2)    = iOfType10 t2
+dsI10 t                = eAssume <$> dsD10 t  -- TODO: "decides"
+
+ofType10 :: Expr -> Expr -> D Expr
+ofType10 e t = seqE <$> sequence [vOfType10 e t, iOfType10 t]
+
+vOfType10 :: Expr -> Expr -> D Expr
+vOfType10 e t = do
+  t' <- dsD10 t
+  pure $ eVerify (eAssert (ApplyD t' e))
+
+iOfType10 :: Expr -> D Expr
+iOfType10 t = do
+  r <- newIdent (getLoc t) "r"
+  t' <- dsD10 (Range t)
+  pure $ Forall [r] $ seqE [eAssume (Unify (Variable r) t'), Variable r]
+
+
+dsM10 :: DsMode -> Expr -> Ident -> D Expr
+dsM10 V ((Function [(t1, _effs)] t2)) f = do
+  i <- newIdent (getLoc t1) "i"
+  i' <- newIdent (getLoc t1) "i'"
+  z <- newIdent (getLoc t2) "z"
+  t1' <- dsM10 I t1 i'
+  t2' <- dsM10 V t2 z
+  pure $ Lam i' $ seqE [DefineE i t1', eAssume $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+
+dsM10 I ((Function [(t1, _effs)] t2)) f = do
+  i <- newIdent (getLoc t1) "i"
+  i' <- newIdent (getLoc t1) "i'"
+  z <- newIdent (getLoc t2) "z"
+  t1' <- dsM10 V t1 i'
+  t2' <- dsM10 I t2 z
+  pure $ eVerify $ Lam i' $ seqE [{- TODO:ask-lennart:  eAssume -} (DefineE i t1'), eAssert $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+
+-- dsM10 ((Function [(Range t1, _effs)] (Range t2))) f = do
+--   i <- newIdent (getLoc t1) "i"
+--   i' <- newIdent (getLoc t1) "i'"
+--   z <- newIdent (getLoc t2) "z"
+--   t1' <- dsM11 (Range t1) i'
+--   t2' <- dsM11 (Range t2) z
+--   pure $ seqE [eVerify $ Lam i' $ seqE [DefineE i t1', Succeeds $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+--               ,          Lam i' $ seqE [DefineE i t1', eAssume  $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+--               ]
+dsM10 _ (Range t)       i = ApplyD    <$> dsD10 t <*> pure (Variable i)
+dsM10 m (DefineE x t)   i = DefineE x <$> dsM10 m t i
+dsM10 m (Unify t1 t2)   i = Unify     <$> dsM10 m t1 i <*> dsM10 m t2 i
+dsM10 m (Seq [])        i = dsM10 m (Array []) i
+dsM10 m (Seq [t])       i = dsM10 m t i
+dsM10 m (Seq (t:ts))    i = seqE      <$> sequence [dsD10 t, dsM10 m (Seq ts) i]
+dsM10 m (Choice t1 t2)  i = Choice    <$> dsM10 m t1 i <*> dsM10 m t2 i
+dsM10 m (If3 e1 e2 e3)  i = If3       <$> dsD10 e1     <*> dsM10 m e2 i <*> dsM10 m e3 i
+dsM10 _ (OfType _t1 _t2)  _i = error "TODO" -- OfType    <$> dsM11 t1 i <*> dsD11 t2
+dsM10 _ t               i = unifyV i <$> dsD11 t

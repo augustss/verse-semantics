@@ -46,7 +46,7 @@ verifyM sys e = res
 
 verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
 verify sys e =
-  let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = 10000 } }
+  let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = 20000 } }
   in  case verifyM sys' e of
         Just  x -> x
         Nothing -> undefined
@@ -293,10 +293,10 @@ assumeAssertRules env lhs =
   do Assume e :=: x@Var{} <- [lhs]
      pure (x :=: Assume e)
   ++
-  "asm-asm-swap" `name`
-  do Assume e1 :>: (Assume e2 :>: e) <- [lhs]
-     pure (Assume e2 :>: (Assume e1 :>: e))
-  ++
+--   "asm-asm-swap" `name`
+--   do Assume e1 :>: (Assume e2 :>: e) <- [lhs]
+--      pure (Assume e2 :>: (Assume e1 :>: e))
+--   ++
 --   -- ASSERT --
 --   -- Assert { e } ----> e   if   e mustSucceed
 --   "suc-elim" `name`
@@ -428,8 +428,9 @@ verifierRules env lhs =
    "suc-elim" `name`
    do (ctx, g,_, Assert e) <- eX lhs
       guard (mustSucceed g (bndVars env) e)
-      -- (old-style) pure (ctx e)
-      pure (ctx (Arr []))
+      -- (old-style)
+      pure (ctx e)      -- # old-style
+      -- pure (ctx (Arr []))  -- # spj-style
    ++
    -- DECIDE --
    -- Decide { e } ----> e   if   e mustDecide

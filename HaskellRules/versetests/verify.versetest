@@ -3,6 +3,7 @@ verify("Trivial-pass", pass){1}
 verify("Trivial-fail", fail){succeeds{0=1}}
 #
 # Some simple tests
+verify(pass) {foo(z:any) := { x:int = 1; int[x] } }
 verify(pass) {f(x:int):={x=x;x}}
 verify(pass) {f(x:int):=x+1}
 verify(fail) {f(x:int):=x+()}
@@ -10,6 +11,7 @@ verify(pass) {f(x:int):=x; f(1)}
 verify(pass) {f(x:int):=x+1; f(1)}
 verify(fail) {f(x:int):=x; f()}
 verify(fail) {f(x:int):=x+1; f()}
+verify(pass) {f(x:int):int=x}
 verify(pass) {f(x:int):int=x+1; f(1)}
 verify(fail) {f(x:int):int=x+1; f()}
 verify(pass) {f(x:int):int = x; a := f(1); int[a] }
