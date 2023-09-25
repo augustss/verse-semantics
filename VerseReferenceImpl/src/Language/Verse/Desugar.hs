@@ -42,7 +42,10 @@ runDesugarT :: Functor m => DesugarT m a -> m (a, IdentMap (Maybe Ident))
 runDesugarT = fmap (fmap (fmap (fmap extract . snd))) . runDesugarT'
 
 runDesugarT' :: DesugarT m a -> m (a, Env)
-runDesugarT' m = runStateT m mempty
+runDesugarT' m = runDesugarT'' m mempty
+
+runDesugarT'' :: DesugarT m a -> Env -> m (a, Env)
+runDesugarT'' = runStateT
 
 desugar
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -151,8 +154,10 @@ desugarExp e = for e $ \ case
     pure $ Name x
   Rewrite.IfArchetypeName x e1 e2 -> do
     y <- (e $>) . Ident.Label <$> supply
-    e1 <- desugarDomain' e1 $ Name <$> y
-    e2 <- desugarExp e2
+    xs <- get
+    (e1, xs1) <- lift $ runDesugarT'' (desugarDomain' e1 $ Name <$> y) xs
+    (e2, xs2) <- lift $ runDesugarT'' (desugarExp e2) xs
+    put $ xs1 <> xs2
     pure $ IfArchetypeName x y e1 e2
   e1 :|>: e2 -> do
     e1 <- desugarExp e1
@@ -236,8 +241,10 @@ desugarDomain' e i = for e $ \ case
     pure $ unify (ArchetypeName <$> y) e :*>: unify (Name <$> x) i
   Rewrite.IfArchetypeName x e1 e2 -> do
     y <- (e $>) . Ident.Label <$> supply
-    e1 <- desugarDomain' e1 $ Name <$> y
-    e2 <- desugarDomain' e2 i
+    xs <- get
+    (e1, xs1) <- lift $ runDesugarT'' (desugarDomain' e1 $ Name <$> y) xs
+    (e2, xs2) <- lift $ runDesugarT'' (desugarDomain' e2 i) xs
+    put $ xs1 <> xs2
     pure $ IfArchetypeName x y e1 e2
   e1 :|>: e2 -> do
     e1 <- desugarDomain' e1 i
