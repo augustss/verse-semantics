@@ -2,12 +2,11 @@
 any(exists X) := X
 
 x := class:
-  F():int = 1
+  F()():int = 1
 
 y := class(x):
-  F():int = 2
+  F()():int = 2
 
-Y := y:
-  F():int = 3
+Y := y{}
 
-Y.F()
+Y.F()()

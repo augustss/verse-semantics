@@ -48,7 +48,6 @@ data Exp f a
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
-  | Var (f a)
   | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
@@ -69,6 +68,7 @@ deriving instance ( Show (f (Exp f a))
 
 data Pat f a
   = Name a
+  | Var (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
   | InfixColon (f (Pat f a)) (f (Exp f a))
   | InfixArrow (f (Pat f a)) (f (Pat f a))
@@ -76,5 +76,6 @@ data Pat f a
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f (Pat f a))
+                  , Show (f a)
                   , Show a
                   ) => Show (Pat f a)

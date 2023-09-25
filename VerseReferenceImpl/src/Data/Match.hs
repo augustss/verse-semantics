@@ -35,6 +35,14 @@ instance ZipMatchable [] where
     (x:xs, y:ys) -> ((x, y):) <$> zipMatch xs ys
     _ -> Nothing
 
+instance RowMatchable Maybe
+
+instance ZipMatchable Maybe where
+  zipMatch = curry $ \ case
+    (Nothing, Nothing) -> Just Nothing
+    (Just x, Just y) -> Just (Just (x, y))
+    _ -> Nothing
+
 instance Eq a => RowMatchable (Const a)
 
 instance Eq a => ZipMatchable (Const a) where

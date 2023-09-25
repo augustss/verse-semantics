@@ -32,18 +32,18 @@ data Exp f a
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
-  | Var (f a)
   | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
   | Fun (f (Exp f a)) (f (Exp f a))
+  | MixfixVarColonEqual (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | InfixColonEqual !Bool (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
   | MixfixArrowColonEqual (f a) (f a) (f (Exp f a))
   | Name a
-  | IfArchetypeName a a (f (Exp f a)) (f (Exp f a))
+  | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
   | f (Exp f a) :|>: f (Exp f a)
 
 deriving instance ( Show (f (Exp f a))
@@ -74,17 +74,22 @@ instance ( Pretty (f (Exp f a))
     ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     Exists x -> "exists" <+> pretty x
+    Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
     Int x -> pretty x
+    Float x -> pretty x
     Fun e1 e2 -> "fun" <> parens (pretty e1) <+> braces (pretty e2)
+    MixfixVarColonEqual x y e1 e2 ->
+      "var" <+> pretty x <> colon <>
+      parens (pretty y <+> equals <+> pretty e1) <+>
+      equals <+> pretty e2
     InfixColonEqual _ x e -> pretty x <+> ":=" <+> pretty e
     PrefixColon e -> colon <> pretty e
     MixfixArrowColonEqual x y e ->
       pretty x <+> "->" <+> pretty y <+> ":=" <+> pretty e
     Name x -> pretty x
-    IfArchetypeName x y e1 e2 ->
-      "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
-      braces (pretty e1) <+>
+    IfArchetypeName x e1 e2 ->
+      "if" <+> parens ("archetype" <> parens (pretty x)) <+> braces (pretty e1) <+>
       "else" <+> braces (pretty e2)
     e1 :|>: e2 -> pretty e1 <+> "|>" <+> pretty e2
     _ -> "unimplemented"

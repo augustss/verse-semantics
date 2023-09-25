@@ -4,6 +4,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Desugar.Exp
   ( Exp (..)
+  , Env
   ) where
 
 import Data.HashMap.Strict (HashMap)
@@ -24,14 +25,14 @@ data Exp f a
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Query (f (Exp f a))
-  | Module {-# UNPACK #-} !Label !(HashMap a Bool) (f (Exp f a))
-  | Struct {-# UNPACK #-} !Label !(HashMap a Bool) (f (Exp f a))
-  | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(HashMap a Bool) (f (Exp f a))
-  | Inst (f (Exp f a)) !(HashMap a Bool) (f (Exp f a))
+  | Module {-# UNPACK #-} !Label !(Env a) (f (Exp f a))
+  | Struct {-# UNPACK #-} !Label !(Env a) (f (Exp f a))
+  | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(Env a) (f (Exp f a))
+  | Inst (f (Exp f a)) !(Env a) (f (Exp f a))
   | Enum {-# UNPACK #-} !Label [Name]
-  | IfThenElse !(HashMap a Bool) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
-  | ForDo !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
-  | Exists !Bool (f a) (f (Exp f a))
+  | IfThenElse !(Env a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
+  | ForDo !(Env a) (f (Exp f a)) (f (Exp f a))
+  | Exists (f a) (Maybe (f a)) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
@@ -39,9 +40,9 @@ data Exp f a
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
-  | Fun !(HashMap a Bool) (f (Exp f a)) (f (Exp f a))
+  | Fun !(Env a) (f (Exp f a)) (f (Exp f a))
   | Name a
-  | IfArchetypeName a a (f (Exp f a)) (f (Exp f a))
+  | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
 
 deriving instance ( Show (f (Exp f a))
@@ -70,9 +71,11 @@ instance ( Pretty (f (Exp f a))
     Inst e1 xs e2 -> parens (pretty e1) <+> braces (exists xs $ pretty e2)
     ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
-    Exists var x e -> align $ "exists" <+> prettyName x var <+> dot <> line <> pretty e
+    Exists x y e -> align $ "exists" <+> prettyName x y <+> dot <> line <> pretty e
+    Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
     Int x -> pretty x
+    Float x -> pretty x
     Fun xs e1 e2 -> "fun" <> parens (exists xs $ pretty e1) <+> braces (pretty e2)
     Name x -> pretty x
     IfArchetypeName x y e1 e2 ->
@@ -95,5 +98,7 @@ instance ( Pretty (f (Exp f a))
         "exists" <+> hsep (uncurry prettyName <$> HashMap.toList xs) <+> dot <> line <>
         y
       prettyName x = \ case
-        False -> pretty x
-        True -> parens ("var" <+> pretty x)
+        Nothing -> pretty x
+        Just y -> parens ("var" <+> pretty x <> colon <> pretty y)
+
+type Env a = HashMap a (Maybe a)

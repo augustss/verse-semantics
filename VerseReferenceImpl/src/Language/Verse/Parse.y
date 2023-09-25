@@ -175,9 +175,6 @@ Exp :: { L (Exp L Name) }
   | set name '=' Exp {
       Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | var name {
-      Exp.Var <\$ $1 <.> duplicate $2
-    }
   | Pat ':=' Exp {
       Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
     }
@@ -308,6 +305,9 @@ Exp :: { L (Exp L Name) }
 
 Pat :: { L (Pat L Name) }
   : name { Pat.Name <\$> $1 }
+  | var name ':' Exp {
+      Pat.Var <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
   | ':' Pat {
       Pat.PrefixColon <\$ $1 <.> duplicate (Exp.Pat <\$> $2)
     }

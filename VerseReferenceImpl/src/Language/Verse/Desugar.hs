@@ -18,7 +18,7 @@ import Data.HashMap.Strict (foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
 import Data.Traversable
 
-import Language.Verse.Desugar.Exp
+import Language.Verse.Desugar.Exp (Exp (..))
 import Language.Verse.Error
 import Language.Verse.Ident (Ident, IdentMap)
 import Language.Verse.Ident qualified as Ident
@@ -26,6 +26,7 @@ import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Rewrite.Exp ( pattern List
                                   , pattern Where
+                                  , pattern MixfixVarColonEqual
                                   , pattern InfixColonEqual
                                   , pattern PrefixColon
                                   , pattern MixfixArrowColonEqual
@@ -35,10 +36,10 @@ import Language.Verse.Rewrite.Exp qualified as Rewrite
 
 type DesugarT m = StateT Env m
 
-type Env = IdentMap (Loc, Bool)
+type Env = IdentMap (Loc, Maybe (L Ident))
 
-runDesugarT :: Functor m => DesugarT m a -> m (a, IdentMap Bool)
-runDesugarT = fmap (fmap (fmap snd)) . runDesugarT'
+runDesugarT :: Functor m => DesugarT m a -> m (a, IdentMap (Maybe Ident))
+runDesugarT = fmap (fmap (fmap (fmap extract . snd))) . runDesugarT'
 
 runDesugarT' :: DesugarT m a -> m (a, Env)
 runDesugarT' m = runStateT m mempty
@@ -110,10 +111,7 @@ desugarExp e = for e $ \ case
   Rewrite.Block e ->
     extract <$> exists (desugarExp e)
   Rewrite.Exists x -> do
-    tellName x False
-    pure $ Name $ extract x
-  Rewrite.Var x -> do
-    tellName x True
+    tellName x Nothing
     pure $ Name $ extract x
   Rewrite.Set x e ->
     Set x <$> desugarExp e
@@ -133,8 +131,13 @@ desugarExp e = for e $ \ case
     (e_domain, xs) <- lift . runDesugarT $ desugarDomain e_domain
     e <- exists $ desugarExp e
     pure $ Fun xs e_domain e
+  MixfixVarColonEqual x y e1 e2 -> do
+    tellName x $ Just y
+    e1 <- desugarExp e1
+    e2 <- desugarExp e2
+    pure $ unify (Name <$> y) e1 :*>: unify (Name <$> x) e2
   InfixColonEqual funName x e -> do
-    if funName then tellFunName x else tellName x False
+    if funName then tellFunName x else tellName x Nothing
     e <- desugarExp e
     pure $ (ArchetypeName <$> x) :=: e
   PrefixColon e -> do
@@ -142,14 +145,15 @@ desugarExp e = for e $ \ case
     x <- freshIdent $ loc e
     pure $ BracketInvoke e (Name <$> x)
   MixfixArrowColonEqual x y e -> do
-    tellName x False
-    tellName y False
+    tellName x Nothing
+    tellName y Nothing
     e <- desugarDomain' e $ Name <$> x
     pure $ (ArchetypeName <$> y) :=: e
   Rewrite.Name x ->
     pure $ Name x
-  Rewrite.IfArchetypeName x y e1 e2 -> do
-    e1 <- desugarExp e1
+  Rewrite.IfArchetypeName x e1 e2 -> do
+    y <- (e $>) . Ident.Label <$> supply
+    e1 <- desugarDomain' e1 $ Name <$> y
     e2 <- desugarExp e2
     pure $ IfArchetypeName x y e1 e2
   e1 :|>: e2 -> do
@@ -192,7 +196,7 @@ desugarDomain' e i = for e $ \ case
     e1 <- desugarDomain' e1 i
     e2 <- desugarDomain' e2 i
     pure $ e1 :|: e2
-  List [] -> pure $ Tuple []
+  List [] -> pure $ i :=: (Tuple [] <$ e)
   List (e:es) -> extract <$> desugarDomainNonEmpty i e es
   e1 `Where` e2 -> do
     x <- fmap Name <$> freshIdent (loc e1)
@@ -221,19 +225,20 @@ desugarDomain' e i = for e $ \ case
       pure $ unify y (bracketInvoke i x) `then'` e
     pure $ Fun xs e_domain e
   InfixColonEqual funName x e -> do
-    if funName then tellFunName x else tellName x False
+    if funName then tellFunName x else tellName x Nothing
     e <- desugarDomain' e i
     pure $ (ArchetypeName <$> x) :=: e
   PrefixColon e -> do
     e <- desugarExp e
     pure $ BracketInvoke e i
   MixfixArrowColonEqual x y e -> do
-    tellName x False
-    tellName y False
+    tellName x Nothing
+    tellName y Nothing
     e <- desugarDomain' e i
     pure $ unify (ArchetypeName <$> y) e :*>: unify (Name <$> x) i
-  Rewrite.IfArchetypeName x y e1 e2 -> do
-    e1 <- desugarDomain' e1 i
+  Rewrite.IfArchetypeName x e1 e2 -> do
+    y <- (e $>) . Ident.Label <$> supply
+    e1 <- desugarDomain' e1 $ Name <$> y
     e2 <- desugarDomain' e2 i
     pure $ IfArchetypeName x y e1 e2
   e1 :|>: e2 -> do
@@ -284,22 +289,22 @@ liftL2 f x y = f x y <$ x <. y
 freshIdent :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
 freshIdent loc = do
   x <- Ident.Label <$> supply
-  modify $ HashMap.insert x (loc, False)
+  modify $ HashMap.insert x (loc, Nothing)
   pure $ L loc x
 
-tellName :: MonadAbort Error m => L Ident -> Bool -> DesugarT m ()
-tellName x var =
+tellName :: MonadAbort Error m => L Ident -> Maybe (L Ident) -> DesugarT m ()
+tellName x y =
   put =<<
   HashMap.alterF
   (\ case
-      Nothing -> pure $ Just (loc x, var)
+      Nothing -> pure $ Just (loc x, y)
       Just (y, _) -> abort $ DefError y (loc x) (extract x))
   (extract x) =<<
   get
 
 tellFunName :: Monad m => L Ident -> DesugarT m ()
 tellFunName x =
-  modify $ HashMap.insertWith (\ _ x -> x) (extract x) (loc x, False)
+  modify $ HashMap.insertWith (\ _ x -> x) (extract x) (loc x, Nothing)
 
 exists :: Monad m => DesugarT m (L (Exp L Ident)) -> DesugarT m (L (Exp L Ident))
 exists m = do
@@ -309,4 +314,4 @@ exists m = do
 exists' :: Env -> L (Exp L Ident) -> L (Exp L Ident)
 exists' xs e = foldlWithKey' f e xs
   where
-    f z x (loc, var) = Exists var (L loc x) z <$ z
+    f z x (loc, y) = Exists (L loc x) y z <$ z

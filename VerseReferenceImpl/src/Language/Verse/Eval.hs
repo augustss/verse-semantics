@@ -163,7 +163,7 @@ evalExp e = case extract e of
     lift $ unify var_e =<< newVar (Val.Truth var)
     pure var
   Exp.Module i xs e -> do
-    xs <- lift $ traverse freshNamed xs
+    xs <- lift $ freshEnv xs
     _ <- localEnv xs $ evalExp e
     lift . newVar . Val.Module i $ filterNames xs
   Exp.Enum i xs -> lift $ do
@@ -185,17 +185,18 @@ evalExp e = case extract e of
     evalIfThenElse xs p t e
   Exp.ForDo xs e1 e2 ->
     evalForDo xs e1 e2
-  Exp.Exists False x e -> do
+  Exp.Exists x Nothing e -> do
     var <- lift freshVar
     localName (extract x) (Val var) $ evalExp e
-  Exp.Exists True x e -> do
+  Exp.Exists x (Just y) e -> do
     ref <- lift $ freshVarRef
-    localName (extract x) (Ref ref) $ evalExp e
+    var <- lift $ freshVar
+    localName (extract x) (Ref ref var) $ localName (extract y) (Val var) $ evalExp e
   Exp.Set x e -> lookupNamed (extract x) >>= \ case
     Nothing -> abort $ IdentError (loc x) (extract x)
     Just (Val _) -> abort $ DomainError $ loc e
-    Just (Ref ref) -> do
-      var <- evalExp e
+    Just (Ref ref var) -> do
+      var <- evalInvoke (loc e) var =<< evalExp e
       writeVarRef' ref var
       pure var
   Exp.Fun xs e_domain e -> do
@@ -230,9 +231,9 @@ evalExp e = case extract e of
     lift . newVar $ Val.Float x
   Exp.Name x ->
     evalIdent $ x <$ e
-  Exp.IfArchetypeName x y e1 e2 -> asks archetype <&> HashMap.lookup x >>= \ case
+  Exp.IfArchetypeName x y e1 e2 -> asks archetype <&> HashMap.lookup (extract x) >>= \ case
     Nothing -> evalExp e2
-    Just var -> local (\ r -> r { env = HashMap.insert y var r.env }) $ evalExp e1
+    Just var -> local (\ r -> r { env = HashMap.insert (extract y) var r.env }) $ evalExp e1
   Exp.ArchetypeName x -> asks archetype' <&> HashMap.lookup x >>= \ case
     Nothing -> evalIdent $ x <$ e
     Just x -> readNamed x
@@ -327,7 +328,7 @@ evalNot e = do
 
 evalIfThenElse
   :: MonadEval m
-  => IdentMap Bool
+  => IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> L (Exp L Ident)
@@ -342,7 +343,7 @@ evalIfThenElse xs p t e = do
   lift $ fork do
     (var', s) <- readIVar =<< if'
       do
-        xs <- traverse freshNamed xs
+        xs <- freshEnv xs
         choiceFree <- newVar ChoiceFree
         _ <- runEvalT' (evalExp p) mempty { env = xs <> r.env } s { choiceFree }
         pure xs
@@ -357,7 +358,7 @@ evalIfThenElse xs p t e = do
 
 evalForDo
   :: MonadEval m
-  => IdentMap Bool
+  => IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
@@ -370,7 +371,7 @@ evalForDo xs e1 e2 = do
   lift $ fork do
     (vars, s) <- fmap unzip . readIVar =<< for
       do
-        xs <- traverse freshNamed xs
+        xs <- freshEnv xs
         choiceFree <- newVar ChoiceFree
         _ <- runEvalT' (evalExp e1) mempty { env = xs <> r.env } s { choiceFree }
         pure xs
@@ -385,12 +386,12 @@ evalInst
   :: MonadEval m
   => Loc
   -> L (Exp L Ident)
-  -> IdentMap Bool
+  -> IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
 evalInst loc e1 xs e2 = do
   var1 <- evalExp e1
-  xs <- lift $ traverse freshNamed xs
+  xs <- lift $ freshEnv xs
   _ <- localEnv xs $ evalExp e2
   var <- lift freshVar
   s <- get
@@ -434,14 +435,14 @@ instStruct
   :: MonadEval m
   => Label
   -> Env m
-  -> IdentMap Bool
+  -> IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> Archetype m
   -> S m
   -> S m
   -> VerseT m (Maybe (VarVal m))
 instStruct i env xs e archetype s s' = do
-  archetype' <- traverse freshNamed xs
+  archetype' <- freshEnv xs
   s <- execEvalT' (evalExp e) R { env = archetype' <> env, archetype, archetype' } s
   unify s.choiceFree s'.choiceFree
   unify s.storeFree s'.storeFree
@@ -453,7 +454,7 @@ instClass
   -> Label
   -> Env m
   -> Maybe (VarVal m)
-  -> IdentMap Bool
+  -> IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> Archetype m
   -> S m
@@ -472,12 +473,12 @@ allocClass
   -> Label
   -> Env m
   -> Maybe (VarVal m)
-  -> IdentMap Bool
+  -> IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> VerseT m (VarVal m, Env m, Archetype m -> S m -> VerseT m (S m))
 allocClass loc i env sup xs e = do
   (sup, vars_sup, initSup) <- allocSup loc sup
-  archetype' <- traverse freshNamed xs
+  archetype' <- freshEnv xs
   let
     vars = vars_sup <> archetype'
     initClass archetype s = do
@@ -501,7 +502,7 @@ readClass
   :: (MonadAbort Error m, MonadRef m)
   => Loc
   -> VarVal m
-  -> VerseT m (Label, Env m, Maybe (VarVal m), IdentMap Bool, L (Exp L Ident))
+  -> VerseT m (Label, Env m, Maybe (VarVal m), IdentMap (Maybe Ident), L (Exp L Ident))
 readClass loc = readVar >=> \ case
   Val.Overloads head tail -> case head of
     Val.Class i env sup xs e -> pure (i, env, sup, xs, e)
@@ -603,7 +604,7 @@ invokeOverload loc overload arg s s' = case overload of
 invokeFun
   :: MonadEval m
   => Env m
-  -> IdentMap Bool
+  -> IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> VarVal m
@@ -612,7 +613,7 @@ invokeFun
   -> VerseT m (Maybe (VarVal m))
 invokeFun env xs e_domain e v_arg s s' = readIVar =<< if'
   do
-    xs <- traverse freshNamed xs
+    xs <- freshEnv xs
     let r = mempty { env = xs <> env }
     unify v_arg =<< evalEvalT' (evalExp e_domain) r s
     pure xs
@@ -630,15 +631,15 @@ invokeStruct
   :: MonadEval m
   => Label
   -> Env m
-  -> IdentMap Bool
+  -> IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> VarVal m
   -> S m
   -> S m
   -> VerseT m (Maybe (VarVal m))
 invokeStruct i env xs e arg s s' = do
-  archetype <- traverse freshNamed xs
-  xs <- traverse freshNamed xs
+  archetype <- freshEnv xs
+  xs <- freshEnv xs
   s <- execEvalT' (evalExp e) mempty { env = xs <> env, archetype } s
   unify arg =<< newVar (Val.StructInst i $ filterNames xs)
   unify s.choiceFree s'.choiceFree
@@ -651,7 +652,7 @@ invokeClass
   -> Label
   -> Env m
   -> Maybe (VarVal m)
-  -> IdentMap Bool
+  -> IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> VarVal m
   -> S m
@@ -670,14 +671,14 @@ instEmptyClass
   -> Label
   -> Env m
   -> Maybe (VarVal m)
-  -> IdentMap Bool
+  -> IdentMap (Maybe Ident)
   -> L (Exp L Ident)
   -> S m
   -> VerseT m (VarVal m, Env m, S m)
 instEmptyClass loc i env sup xs e s = do
   (sup, xs_sup, s) <- instEmptySup loc sup s
-  archetype <- traverse freshNamed xs
-  xs <- traverse freshNamed xs
+  archetype <- freshEnv xs
+  xs <- freshEnv xs
   let xs' = xs_sup <> xs
   s <- execEvalT' (evalExp e) mempty { env = xs' <> env, archetype } s
   newVar (Val.ClassInst i sup $ filterNames xs') <&> (, xs', s)
@@ -889,7 +890,7 @@ lookupNamed x = asks $ \ r -> HashMap.lookup x r.env
 readNamed :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
           => Named (VarRef m) (VarVal m) -> EvalT m (VarVal m)
 readNamed = \ case
-  Ref x -> readVarRef' x
+  Ref x _ -> readVarRef' x
   Val x -> pure x
 
 readNamed'
@@ -899,7 +900,7 @@ readNamed'
   -> Named (VarRef m) (VarVal m)
   -> VerseT m (VarVal m)
 readNamed' storeFree storeFree' = \ case
-  Ref ref -> do
+  Ref ref _ -> do
     _ <- readVar storeFree
     x <- readVarRef ref
     unify storeFree storeFree'
@@ -914,11 +915,17 @@ localName k v = local $ \ r -> r { env = HashMap.insert k v r.env }
 localEnv :: Env m -> EvalT m a -> EvalT m a
 localEnv env = local $ \ r -> mempty { env = env <> r.env }
 
-freshNamed :: (MonadFix m, MonadRef m, MonadSupply Int m)
-           => Bool -> VerseT m (Named (VarRef m) (VarVal m))
-freshNamed = \ case
-  False -> Val <$> freshVar
-  True -> Ref <$> freshVarRef
+freshEnv
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => Exp.Env Ident -> VerseT m (Env m)
+freshEnv = getAp . HashMap.foldMapWithKey f
+  where
+    f k = \ case
+      Nothing -> Ap $ HashMap.singleton k . Val <$> freshVar
+      Just k' -> Ap $ do
+        ref <- freshVarRef
+        var <- freshVar
+        pure $ HashMap.singleton k (Ref ref var) <> HashMap.singleton k' (Val var)
 
 freshVarRef :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
             => VerseT m (VarRef m f)
