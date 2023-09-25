@@ -293,10 +293,10 @@ assumeAssertRules env lhs =
   do Assume e :=: x@Var{} <- [lhs]
      pure (x :=: Assume e)
   ++
---   "asm-asm-swap" `name`
---   do Assume e1 :>: (Assume e2 :>: e) <- [lhs]
---      pure (Assume e2 :>: (Assume e1 :>: e))
---   ++
+  "asm-asm-swap" `name`
+  do Assume e1 :>: (Assume e2 :>: e) <- [lhs]
+     pure (Assume e2 :>: (Assume e1 :>: e))
+  ++
 --   -- ASSERT --
 --   -- Assert { e } ----> e   if   e mustSucceed
 --   "suc-elim" `name`
