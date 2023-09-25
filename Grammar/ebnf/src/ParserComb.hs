@@ -10,6 +10,7 @@ module ParserComb(
   (<?>),
   notFollowedBy, lookAhead,
   )where
+import Control.Monad
 import Control.Monad.State.Strict
 import Data.Char(isSpace)
 import Data.List
