@@ -1,7 +1,1 @@
 *~
-!*.out
-node_modules
-package.json
-src/Language/Verse/Lexer.hs
-www/package-lock.json
-www/static/*.wasm
