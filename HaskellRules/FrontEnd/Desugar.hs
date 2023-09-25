@@ -371,7 +371,7 @@ dsDx e = do
   how <- gets context
   case how of
     DFig6  -> dsD e
-    DFig11 -> dsD11 e
+    DFig11 -> dsD11 (trace ("dsDx e = " ++ prettyShow e) e)
 
 -- All cases, but the last, can be removed.
 -- They are just there to avoid introducing unused existentials.
@@ -1498,6 +1498,7 @@ dsD11 (Range t) = do
 dsD11 e@Function{} = eVerify <$> dsF11 e
 -- Added
 dsD11 (If3 e1 e2 e3) = If3 <$> dsD11 e1 <*> dsD11 e2 <*> dsD11 e3
+dsD11 (Succeeds e)   = eAssert <$> dsD11 e
 dsD11 (Macro1 m rs e) = Macro1 m rs <$> dsD11 e
 dsD11 (Lam x e) = Lam x <$> dsD11 e
 dsD11 e = impossible e
@@ -1507,7 +1508,7 @@ dsF11 (Function [(t1, _effs)] t2) = do
   y <- newIdent (getLoc t1) "y"
   t1' <- dsM11 t1 y
   t2' <- dsF11 t2
-  pure $ Lam y $ seqE [t1', t2']
+  pure $ Lam y $ seqE ( trace ("dsF11: (t1, t1') = " ++ prettyShow (t1, t1')) [t1', t2'])
 dsF11 _z@(OfType t ty) = do
   t'  <- dsD11 t
   ty' <- dsD11 ty
@@ -1524,15 +1525,24 @@ dsA11 t = do
   pure $ Forall [r] $ seqE [eAssume (Unify (Variable r) t'), Variable r]
 
 dsM11 :: Expr -> Ident -> D Expr
-dsM11 (Range (Function [(t1, _effs)] t2)) f = do
+dsM11 ((Function [(Range t1, _effs)] (Range t2))) f = do
   i <- newIdent (getLoc t1) "i"
   i' <- newIdent (getLoc t1) "i'"
   z <- newIdent (getLoc t2) "z"
-  t1' <- dsM11 t1 i'
-  t2' <- dsM11 t2 z
+  t1' <- dsM11 (Range t1) i'
+  t2' <- dsM11 (Range t2) z
   pure $ seqE [eVerify $ Lam i' $ seqE [DefineE i t1', Succeeds $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
               ,          Lam i' $ seqE [DefineE i t1', eAssume  $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
               ]
+-- dsM11 (Range (Function [(t1, _effs)] t2)) f = do
+--   i <- newIdent (getLoc t1) "i"
+--   i' <- newIdent (getLoc t1) "i'"
+--   z <- newIdent (getLoc t2) "z"
+--   t1' <- dsM11 t1 i'
+--   t2' <- dsM11 t2 z
+--   pure $ seqE [eVerify $ Lam i' $ seqE [DefineE i t1', Succeeds $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+--               ,          Lam i' $ seqE [DefineE i t1', eAssume  $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+--               ]
 dsM11 (Range t) i = ApplyD <$> dsD11 t <*> pure (Variable i)
 dsM11 (DefineE x t) i = DefineE x <$> dsM11 t i
 dsM11 (Unify t1 t2) i = Unify <$> dsM11 t1 i <*> dsM11 t2 i

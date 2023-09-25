@@ -94,6 +94,8 @@
 %format tlamt (x) (e1) (e2) (e3) = tlamKW "(" x ")\{" e1 "\}\{" e2 "\}\{" e3 "\}"
 %format tlamKW = "\textbf{tlam}"
 %format oftype (e) (t) = e "\vartriangleright" t
+%format voftype (e) (t) = e "\vartriangleright_V" t
+%format ioftype (e) (t) = e "\vartriangleright_I" t
 %format oftypeKW = "\vartriangleright"
 %format at = "\, @\!\!"
 %format dot = "\! ."
