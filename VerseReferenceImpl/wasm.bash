@@ -9,7 +9,8 @@ wasm32-wasi-cabal install \
   --allow-newer \
   --flag wasm \
   --installdir=www/static \
-  --overwrite-policy=always
+  --overwrite-policy=always \
+  -O2
 
 nix shell \
   https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz \
@@ -21,6 +22,13 @@ wizer \
   --wasm-bulk-memory true \
   www/static/versewasm.wasm \
   -o www/static/versewasm.wizer.wasm
+
+nix shell \
+  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz \
+  --extra-experimental-features nix-command \
+  --extra-experimental-features flakes \
+  --command \
+wasm-opt www/static/versewasm.wizer.wasm -o www/static/versewasm.wizer.wasm -Oz
 
 cd www
 npm install
