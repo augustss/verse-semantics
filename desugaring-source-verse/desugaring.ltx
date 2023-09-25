@@ -889,15 +889,17 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \rulename{dfun}    & |De (functionP t_1 t_2)| & = & |verify (Ve (functionP t_1 t_2)); (Ie (functionP t_1 t_2))| \\
 \\
 \rulename{vfun}    & |Ve (functionP t_1 t_2)| & = & |lam i (assume (MMe V i t_1); (Ve t_2))| & \text{|i| fresh}  \\
+\rulename{voftype} & |Ve (oftype t_1 t_2)|    & = & |voftype (De t_1) (De t_2)| \\
 \rulename{vother}  & |Ve t|                   & = & |assert (De t)| \\
 \\
 \rulename{ifun}    & |Ie (functionP t_1 t_2)| & = & |lam y (MMe I i t_1; (Ie t_2))| & \text{|i| fresh}  \\
+\rulename{ioftype} & |Ie (oftype t_1 t_2)|    & = & |ioftype (De t_1) (De t_2)| \\
 \rulename{iother}  & |Ie t|                   & = & |assume (De t)| \\[0.04in]
 \\
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|MMe m i t| = |e|$} \\[0.02in]
-\rulename{mvfnty}  & |MMe V f (:(functionP t_1 t_2))|
+\rulename{mvfnty}  & |MMe V f (functionP t_1 t_2)|
                                               & = & \multicolumn{2}{@@{}l}{|lam i' (i := (MMe I i' t_1); assume (z := f^[i]; (MMe V z t_2)))|} \\
-\rulename{mifnty}  & |MMe I f (:(functionP t_1 t_2))|
+\rulename{mifnty}  & |MMe I f (functionP t_1 t_2)|
                                               & = & \multicolumn{2}{@@{}l}{|verify (lam i' (assume(i := (MMe V i' t_1)); assert (z := f^[i]; (MMe I z t_2))))|} \\
 \rulename{mtype}   & |MMe m i (:t)|           & = & |((De t))^[i]| \\
 \rulename{mbind}   & |MMe m i (x:=t)|         & = & |x := MMe m i t| \\
@@ -908,7 +910,9 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
     \multicolumn{2}{@@{}l}{|if (De t_1) then MMe m i t_2 else MMe m i t_3|} \\
 \rulename{moftype} & |MMe m i ((oftype t_1 t_2))| & = & |oftype ((MMe m i t_1)) (De t_2)| \\
 \rulename{mother}  & |MMe m i t|              & = & |i = (De t)| \\[0.02in]
-                   & |oftype e t| & = & |verify (assert (t^[e])); assume (forall x t^[x])| & \text{fresh |x|} \\
+                   & |oftype e t|             & = & |(voftype e t); (ioftype e t)| & \text{fresh |x|} \\
+                   & |voftype e t|            & = & |verify (assert (t^[e]))|  \\
+                   & |ioftype e t|            & = & |assume (forall x t^[x])| & \text{fresh |x|} \\
 \end{array}$$
 
 \caption{Mode-based Translation from SmallSource to Core.
@@ -940,9 +944,9 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 
 
 \multicolumn{5}{l}{\textbf{The heavy lifting:} $|Me i t| = |e|$} \\[0.02in]
-\rulename{mvfnty}  & |Me f (:(functionP t_1 t_2))|
-     & = & \multicolumn{2}{@@{}l}{|verify(lam i' (i := (Me i' t_1); assert (z := f^[i]; (Me z t_2)))); |} \\
-   & &   & \multicolumn{2}{@@{}l}{|lam i' (i := (Me i' t_1); assume (z := f^[i]; (Me z t_2)))|} \\
+\rulename{mvfnty}  & |Me f ((functionP (:t_1) (:t_2)))|
+     & = & \multicolumn{2}{@@{}l}{|verify(lam i' (i := (Me i' (:t_1)); assert (z := f^[i]; (Me z (:t_2))))); |} \\
+   & &   & \multicolumn{2}{@@{}l}{|lam i' (i := (Me i' (:t_1)); assume (z := f^[i]; (Me z (:t_2))))|} \\
 \rulename{mtype}   & |Me i (:t)|           & = & |((De t))^[i]| \\
 \rulename{mbind}   & |Me i (x:=t)|         & = & |x := Me i t| \\
 \rulename{meq}     & |Me i (t_1=t_2)|      & = & |(Me i t_1) = (Me i t_2)| \\
