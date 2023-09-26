@@ -336,6 +336,15 @@ instance Substitutable Context where
   subst s ctx = \ x -> subst ((hole, x) : s) (ctx (Var hole))
     where hole = Name "**HOLE**"
 
+
+-- | [NOTE:verifer-assume] In the verifier, we often want the EXI-FLOAT rule to work *under* an assume,
+--   e.g. to rewrite
+--       assume { x = (exi y. e1; e2) } -> assume {exi y. e1; x = e2}
+--   and we want this to work _even_ when the equation is NOT followed by a ;...
+--   because the asm-seq rule will decompose
+--       assume { x = (exi y. ...) ; e } --> assume {x = (exi y...) }; assume { e }
+--   hence I'm generalizing the execX1 case to not require something to the right of the equation.
+
 -- scope contexts
 
 execX, execX1 :: Expr -> [(Context, Expr)]
@@ -345,7 +354,7 @@ execX lhs = execX1 lhs ++ [(id,lhs)]
 execX1 lhs =
   do (v :=: x) :>: e <- [lhs]
      (ctx, hole) <- execX x
-     pure (\ a -> (v :=: ctx a) :>: e, hole)
+     pure (\ a -> (v :=: ctx a) :>: e , hole)
  ++
   do x :>: e <- [lhs]
      (ctx, hole) <- execX x
@@ -474,6 +483,7 @@ isChoiceFree (Split _ (LAM _ f) (Var _)) = isChoiceFree f
 isChoiceFree e@Split{} = error $ "bad split: " ++ prettyShow e
 isChoiceFree Wrong{}   = True
 isChoiceFree (EXI _ e) = isChoiceFree e  -- necessary when using split
+isChoiceFree (Assume e) = isChoiceFree e
 isChoiceFree _         = False
 
 isChoiceFreeOp :: Op -> Bool

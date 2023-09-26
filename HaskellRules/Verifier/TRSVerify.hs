@@ -66,6 +66,8 @@ tests = -- take 6
   , ("ex_hide_01", ex_hide_01, False)
   , ("ex_hide_02", ex_hide_02, True)
   , ("ex_direct00", ex_direct00, True)
+  , ("ex_ty_00", ex_ty_00, True)
+  , ("ex_ty_01", ex_ty_01, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -603,3 +605,34 @@ ex_direct00 :: Expr
 ex_direct00 = Verify $ LAM x (iNT (Var x) :>: Assert (iNT (Var x)))
   where
     x = ident "x"
+
+ex_ty_00 :: Expr
+ex_ty_00 = Verify (lAMs [a] (
+              Assume (INT (Var a))
+              :>:
+              Assert (Var a :=: Var a :>: Int 99)
+             )
+           )
+  where
+    a = ident "a"
+
+ex_ty_01 :: Expr
+ex_ty_01 = Verify (lAMs [a] (eXIs [x] (
+            Assume (Var x :=: (
+              eXIs [y] (
+                Assume (Var a :=: Int 99)
+                :>:
+                Assume (Var y :=: Int 200)
+                :>:
+                Int 10
+              )
+             )
+             :>:
+             Int 66
+            ) :>:
+            Assert (Var a :=: Int 99)
+            )))
+  where
+    x = ident "x"
+    y = ident "y"
+    a = ident "a"

@@ -293,9 +293,19 @@ assumeAssertRules env lhs =
   do Assume e :=: x@Var{} <- [lhs]
      pure (x :=: Assume e)
   ++
-  "asm-asm-swap" `name`
-  do Assume e1 :>: (Assume e2 :>: e) <- [lhs]
-     pure (Assume e2 :>: (Assume e1 :>: e))
+--   -- TODO: HORRIBLY SLOW!!!!!
+--   "asm-asm-swap" `name`
+--   do Assume e1 :>: (Assume e2@(Var _ :=: _) :>: e) <- [lhs]
+--      pure (Assume e2 :>: (Assume e1 :>: e))
+--   ++
+  "EXI-FLOAT-GEN" `name`
+  do Assume (Val v :=: EXI x e) <- [lhs]
+     let freeX = free v
+         x'    = identNotIn (freeX ++ free e)
+     if x `elem` freeX
+       then pure (Assume (EXI x' (Val v :=: subst [(x, Var x')] e)))
+       else pure (Assume (EXI x  (Val v :=: e)))
+     -- pure (Assume (EXI x (Val v :=: e)))
   ++
 --   -- ASSERT --
 --   -- Assert { e } ----> e   if   e mustSucceed
@@ -414,6 +424,7 @@ verifierRules env lhs =
    --    guard (proves g bs e)
    --    pure (ctx e')
    -- ++
+   -- asm{e}; P[e; e'] ----> P[e']   if   fv(e) disjoint from bvars(P)
    -- asm{e}; P[e; e'] ----> P[e']   if   fv(e) disjoint from bvars(P)
    "implies" `name`
    do (Assume e) :>: rhs <- [lhs]
