@@ -1510,7 +1510,7 @@ dsF11 (Function [(t1, _effs)] t2) = do
   y <- newIdent (getLoc t1) "y"
   t1' <- dsM11 t1 y
   t2' <- dsF11 t2
-  pure $ Lam y $ seqE ( trace ("dsF11: (t1, t1') = " ++ prettyShow (t1, t1')) [t1', t2'])
+  pure $ Lam y $ seqE [eAssume t1', t2']
 dsF11 _z@(OfType t ty) = do
   t'  <- dsD11 t
   ty' <- dsD11 ty
