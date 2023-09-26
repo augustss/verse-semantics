@@ -579,6 +579,7 @@ scope sc = expr
     expr (DefineV i) = pure $ Variable i
     expr (DefineE i e) = Unify (Variable i) <$> expr e
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
+    expr (Macro1 (Ident l "assume") [] e1) = Macro1 (Ident l "assume") [] <$> expr e1
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
     expr (OfType e1 e2) = OfType <$> exprD e1 <*> exprD e2
@@ -620,6 +621,7 @@ getVisible (Let _ e) = getVisible e
 getVisible Block{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
+getVisible (Macro1 (Ident _ "assume") _ e) = getVisible e
 getVisible Macro1 {} = []
 getVisible (DefineV i) = [i]
 getVisible (DefineE i e) = i : getVisible e
@@ -1511,7 +1513,7 @@ dsF11 (Function [(t1, _effs)] t2) = do
   y <- newIdent (getLoc t1) "y"
   t1' <- dsM11 t1 y
   t2' <- dsF11 t2
-  pure $ Lam y $ seqE [t1', t2']
+  pure $ Lam y $ seqE [eAssume t1', t2']
 dsF11 _z@(OfType t ty) = do
   t'  <- dsD11 t
   ty' <- dsD11 ty

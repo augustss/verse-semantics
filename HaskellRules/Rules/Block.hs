@@ -3,6 +3,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 module Rules.Block(allSystemsBlock, anf, valid) where
+import Control.Monad
 import Control.Monad.State.Strict
 import Data.List(delete)
 import Epic.List(pick, pickLR)

@@ -7,6 +7,7 @@
 #define EXT 0
 module FrontEnd.EvalBlock(runBlock) where
 import Prelude hiding ((<>))
+import Control.Monad
 import Control.Monad.State.Strict
 import Data.Coerce
 import Data.Data(Data)
