@@ -293,11 +293,10 @@ assumeAssertRules env lhs =
   do Assume e :=: x@Var{} <- [lhs]
      pure (x :=: Assume e)
   ++
---   -- TODO: HORRIBLY SLOW!!!!!
---   "asm-asm-swap" `name`
---   do Assume e1 :>: (Assume e2@(Var _ :=: _) :>: e) <- [lhs]
---      pure (Assume e2 :>: (Assume e1 :>: e))
---   ++
+  "asm-asm-swap" `name`
+  do Assume e1@(_ :@: _) :>: (Assume e2@(Var _ :=: _) :>: e) <- [lhs]
+     pure (Assume e2 :>: (Assume e1 :>: e))
+  ++
   "EXI-FLOAT-GEN" `name`
   do Assume (Val v :=: EXI x e) <- [lhs]
      let freeX = free v
