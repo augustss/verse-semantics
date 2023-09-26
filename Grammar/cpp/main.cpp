@@ -70,8 +70,7 @@ res; };
   result_t Units(const snippet& Snippet, const syntax_t& Num, text Units) const { return res; };
   result_t NumHex(const snippet& Snippet, text Digits) const { return res; };
   result_t Num(const snippet& Snippet, text Digits, text Fraction, text ExponentSign, text Exponent) const { return res; };
-  result_t PrefixToken(const snippet& Snippet, mode Mode, text Symbol, const block_t& RightBlock, bool bLift, const syntaxes_t& Specifiers = { }) const { retur
-n res; };
+  result_t PrefixToken(const snippet& Snippet, mode Mode, text Symbol, const block_t& RightBlock, bool bLift, const syntaxes_t& Specifiers = { }) const { return res; };
   result_t PrefixBrackets(const snippet& Snippet, const block_t& LeftBlock, const block_t& RightBlock) const { return res; };
   result_t StringInterpolate(const snippet& Snippet, place Place, bool bBrace, const block_t& Block) const { return res; };
   void StringBackslash(capture_t& Capture, const snippet& Snippet, place Place, char Backslashed) const {} ;
@@ -85,8 +84,7 @@ n res; };
   void MarkupStop(capture_t& Capture, const snippet& Snippet) const {};
   result_t PostfixToken(const snippet& Snippet, mode Mode, const syntax_t& Left, text Symbol) const { return res; };
   result_t Content(const snippet& Snippet, const syntaxes_t& Splices) const { return res; };
-  result_t InvokeMarkup(const snippet& Snippet, text StartToken, const capture_t& Leading, const syntax_t& Macro, block_t* Clause1, block_t* DoClause, const ca
-pture_t& TokenLeading, const capture_t& PreContent, const syntax_t& Content, const capture_t& PostContent) const { return res; };
+  result_t InvokeMarkup(const snippet& Snippet, text StartToken, const capture_t& Leading, const syntax_t& Macro, block_t* Clause1, block_t* DoClause, const capture_t& TokenLeading, const capture_t& PreContent, const syntax_t& Content, const capture_t& PostContent) const { return res; };
   result_t InSpecifiers(const snippet& Snippet, const syntax_t& In, const syntaxes_t& InSpecifiers) const { return res; };
   result_t Contents(const snippet& Snippet, const capture_t& Leading, const syntaxes_t& Splices) const { return res; };
   static nat SyntaxesLength(const syntaxes_t& As) { return 0; };
