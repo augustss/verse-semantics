@@ -1607,9 +1607,7 @@ dsV10 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM10 V t1 i
    t2' <- dsV10 (bodyEff fx _effs) t2
-   -- TODO:SCOPE-ASM let (is, e1) = domainExpr t1'
-   -- TODO:SCOPE-ASM pure $ trace ("domain-expr" ++ prettyShow (t1', is, e1)) $  Lam i $ lExists is $ seqE [eAssume e1, t2']
-   pure $ Lam i $ seqE [{- TODO:SCOPE-ASM eAssume -} t1', t2']
+   pure $ Lam i $ seqE [eAssume t1', t2']
 dsV10 _  (OfType  t1 t2)  = do { e <- dsD10 t1; vOfType10 e t2 }
 dsV10 Suc t               = eAssert <$> dsD10 t
 dsV10 Dec t               = eDecide <$> dsD10 t
@@ -1619,7 +1617,6 @@ bodyEff fx rs
   | hasEff "succeeds" rs = Suc
   | hasEff "decides"  rs = Dec
   | otherwise            = fx
-
 
 dsI10 :: DsEff -> Expr -> D Expr
 dsI10 fx (Function [(t1,_effs)] t2) = do
