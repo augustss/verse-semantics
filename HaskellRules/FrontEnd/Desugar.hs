@@ -1142,12 +1142,13 @@ lowerDecides :: Expr -> D Expr
 lowerDecides e = do
   useSplit <- gets (fSplit . dflags)
   verif <- gets (fVerify . dflags)
-  if verif then
-    unimplemented "verify-decides"
-   else if useSplit then
+  -- if verif then
+  --   unimplemented "verify-decides"
+  --  else
+  if useSplit && not verif then
     lowerDecidesSplit e
-   else
-    pure $ Macro1 (Ident noLoc "decides") [] e
+  else
+    pure $ eDecide  e
 
 lowerDecidesSplit :: Expr -> D Expr
 lowerDecidesSplit e = do
@@ -1355,7 +1356,7 @@ eVerify :: Expr -> Expr
 eVerify = Macro1 (Ident noLoc "verify") []
 
 eDecide :: Expr -> Expr
-eDecide = Macro1 (Ident noLoc "decide") []
+eDecide = Macro1 (Ident noLoc "decides") []
 
 eFails :: Expr -> Expr
 eFails = Macro1 (Ident noLoc "fails") []
@@ -1561,6 +1562,7 @@ dsM11 t i = unifyV i <$> dsD11 t
 ------------------------------------------------------------------------------------
 
 data DsMode = I | V deriving (Eq, Ord, Show)
+data DsEff  = Suc | Dec deriving (Eq, Ord, Show)
 
 dsD10 :: Expr -> D Expr
 dsD10 e@Lit{} = pure e
@@ -1578,7 +1580,7 @@ dsD10 (OfType t1 t2) = do {e <- dsD10 t1; ofType10 e t2 }
 dsD10 e@Fail         = pure e
 dsD10 (Range t)      = do i  <- newIdent (getLoc t) "i"
                           existsV [i] <$> dsM10 I (Range t) i
-dsD10 t@Function{}   = seqE <$> sequence [ eVerify <$> dsV10 t, dsI10 t ]
+dsD10 t@Function{}   = seqE <$> sequence [ eVerify <$> dsV10 Suc t, dsI10 Suc t ]
 -- Added
 dsD10 (If3 e1 e2 e3)  = If3 <$> dsD10 e1 <*> dsD10 e2 <*> dsD10 e3
 dsD10 (Succeeds e)    = eAssert <$> dsD10 e
@@ -1586,23 +1588,46 @@ dsD10 (Macro1 m rs e) = Macro1 m rs <$> dsD10 e
 dsD10 (Lam x e)       = Lam x <$> dsD10 e
 dsD10 e               = impossible e
 
-dsV10 :: Expr -> D Expr
-dsV10 (Function [(t1,_effs)] t2) = do
+_domainExpr :: Expr -> ([Ident], Expr)
+_domainExpr = go
+  where
+    go (Exists xs e) = (ys, Exists xs e')            where (ys, e')   = go e
+    go (Seq es)      = (concat xss, Seq es')         where (xss, es') = unzip (go <$> es)
+    go (Blk es)      = (concat xss, Blk es')         where (xss, es') = unzip (go <$> es)
+    go (DefineE x e) = (x:ys, Unify (Variable x) e') where (ys, e')   = go e
+    go (Unify e1 e2) = (xs1 ++ xs2, Unify e1' e2')   where (xs1, e1') = go e1
+                                                           (xs2, e2') = go e2
+    go e             = ([], e)
+
+
+dsV10 :: DsEff -> Expr -> D Expr
+dsV10 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM10 V t1 i
-   t2' <- dsV10 t2
-   pure $ Lam i $ seqE [t1', t2']
-dsV10 (OfType  t1 t2)  = do { e <- dsD10 t1; vOfType10 e t2 }
-dsV10 t                = eAssert <$> dsD10 t  -- TODO: "decides"
+   t2' <- dsV10 (bodyEff fx _effs) t2
+   -- TODO:SCOPE-ASM let (is, e1) = domainExpr t1'
+   -- TODO:SCOPE-ASM pure $ trace ("domain-expr" ++ prettyShow (t1', is, e1)) $  Lam i $ lExists is $ seqE [eAssume e1, t2']
+   pure $ Lam i $ seqE [{- TODO:SCOPE-ASM eAssume -} t1', t2']
+dsV10 _  (OfType  t1 t2)  = do { e <- dsD10 t1; vOfType10 e t2 }
+dsV10 Suc t               = eAssert <$> dsD10 t
+dsV10 Dec t               = eDecide <$> dsD10 t
 
-dsI10 :: Expr -> D Expr
-dsI10 (Function [(t1,_effs)] t2) = do
+bodyEff :: DsEff -> [Eff] -> DsEff
+bodyEff fx rs
+  | hasEff "succeeds" rs = Suc
+  | hasEff "decides"  rs = Dec
+  | otherwise            = fx
+
+
+dsI10 :: DsEff -> Expr -> D Expr
+dsI10 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM10 I t1 i
-   t2' <- dsI10 t2
+   t2' <- dsI10 (bodyEff fx _effs) t2
    pure $ Lam i $ seqE [t1', t2']
-dsI10 (OfType _ t2)    = iOfType10 t2
-dsI10 t                = eAssume <$> dsD10 t  -- TODO: "decides"
+dsI10 _ (OfType _ t2)    = iOfType10 t2
+dsI10 Suc t              = eAssume <$> dsD10 t
+dsI10 Dec t              =             dsD10 t
 
 ofType10 :: Expr -> Expr -> D Expr
 ofType10 e t = seqE <$> sequence [vOfType10 e t, iOfType10 t]

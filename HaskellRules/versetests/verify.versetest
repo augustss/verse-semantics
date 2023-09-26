@@ -80,6 +80,7 @@ verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
 verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
 
 # decides
+verify(pass) { three(x:any)<decides> := { x = 3 } }
 verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {x} }
 verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {3} }
 verify(fail) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {4} }
