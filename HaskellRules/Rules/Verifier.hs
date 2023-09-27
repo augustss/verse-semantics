@@ -18,7 +18,7 @@ import TRS.TRS hiding (step)
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core hiding (Wrong)
-import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr, isChoiceFreeOp)
+import Rules.ICFP (systemICFP, systemICFPE, execX, choiceX, ltExpr, isChoiceFreeOp)
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
 import Data.List( intersect )
@@ -222,6 +222,13 @@ generalizedIcfpRules env lhs =
    do e :>: Fail <- [lhs]
       guard (effectFree e)
       pure Fail
+   ++
+   -- Generalize `CHOOSE` to use lambda as an SX
+   -- \z.CX[e1|e2] --> \z.CX[e1]|CX[e2]
+   "CHOOSE-GEN" `name`
+   do LAM z e <- [lhs]
+      (cx, e1 :|: e2) <- choiceX e
+      pure (LAM z (cx e1 :|: cx e2))
 
 effectFree :: Expr -> Bool
 effectFree (Val _)       = True

@@ -68,6 +68,8 @@ tests = -- take 6
   , ("ex_direct00", ex_direct00, True)
   , ("ex_ty_00", ex_ty_00, True)
   , ("ex_ty_01", ex_ty_01, True)
+  , ("ex_choice_00", ex_choice_00, True)
+  , ("ex_choice_01", ex_choice_01, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -635,4 +637,26 @@ ex_ty_01 = Verify (lAMs [a] (eXIs [x] (
   where
     x = ident "x"
     y = ident "y"
+    a = ident "a"
+
+ex_choice_00 :: Expr
+ex_choice_00 =
+  Verify (lAMs [a] (
+    Assume ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
+    :>:
+    Assert ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
+    )
+  )
+  where
+    a = ident "a"
+
+ex_choice_01 :: Expr
+ex_choice_01 =
+  Verify (lAMs [a] (
+    {- Assume -} ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
+    :>:
+    Assert       ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
+    )
+  )
+  where
     a = ident "a"
