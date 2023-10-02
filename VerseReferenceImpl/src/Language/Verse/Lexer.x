@@ -303,7 +303,7 @@ stringText i _j n xs = do
   getToken
   where
     extract ['"', x, '"'] = x
-    extract xs = error (show i ++ ":not a string character: " ++ xs)
+    extract xs = error (show i ++ ": not a string character: " ++ xs)
 
 stringTextEscaped :: Action
 stringTextEscaped i _j n xs = do

@@ -57,7 +57,6 @@ data Exp f a
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
   | Option (f (Exp f a))
-  | Path !String !String [f (Exp f a)]
   | True
   | False
   | Char {-# UNPACK #-} !Char
@@ -122,7 +121,7 @@ instance ( Pretty (f String)
     Not e -> "not" <+> parens (pretty e)
     PrefixBracket e -> "[]" <> pretty e
     PrefixQuery e -> "?" <> pretty e
-    Query e -> parens (pretty e) <> pretty '?'
+    PostfixQuery e -> parens (pretty e) <> pretty '?'
     Module e -> "module" <> braces (pretty e)
     Struct e -> "struct" <> braces (pretty e)
     Class e1 e2 ->
@@ -150,7 +149,6 @@ instance ( Pretty (f String)
     Float x -> pretty x
     String x [] -> "\"" <> pretty x <> "\"" -- FIXME add escape
     String x xs -> "\"" <> pretty x <> "{" <+> stringCont xs
-    Path l lc xs -> pretty l <> pretty lc <> pretty xs
     Fun e1 e2 -> "fun" <> parens (pretty e1) <+> braces (pretty e2)
     InfixColonEqual p e -> pretty p <+> ":=" <+> pretty e
     Pat p -> pretty p
