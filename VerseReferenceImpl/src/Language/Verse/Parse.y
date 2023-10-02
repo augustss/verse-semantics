@@ -119,8 +119,6 @@ import Language.Verse.Token qualified as Token
   if { L _ Token.If }
   indent { L _ Token.Indent }
   int { (int -> Just $$) }
-  label { (label -> Just $$) }
-  labelCont { (labelCont -> Just $$) }
   module { L _ Token.Module }
   name { (name -> Just $$) }
   newline { L _ Token.Newline }
@@ -476,17 +474,6 @@ stringEnd :: L Token -> Maybe (L String)
 stringEnd = \ case
   L x (Token.String Token.Brace y Token.Quote) -> Just $ L x y
   _ -> Nothing
-
-label :: L Token -> Maybe (L String)
-label = \ case
-  L x (Token.Label y) -> Just $ L x y
-  _ -> Nothing
-
-labelCont :: L Token -> Maybe (L String)
-labelCont = \ case
-  L x (Token.LabelCont y) -> Just $ L x y
-  _ -> Nothing
-
 
 
 int :: L Token -> Maybe (L Integer)

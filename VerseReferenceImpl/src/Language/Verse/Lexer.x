@@ -320,21 +320,19 @@ stringTextEscaped i _j n xs = do
 
 
 stringValue :: Action
-stringValue i j n xs = do
-  let text = Text.decodeUtf8 $ ByteString.take n xs
+stringValue i j _n _xs = do
   popStates
   (begin, str) <- getString
   pushBrace
   pure $ L (Loc i j) (Token.String begin str Token.Brace)
 
 rightBraceOrString :: Action
-rightBraceOrString i j n xs = do
+rightBraceOrString i j _n _xs = do
     bs <- peekBrace
     if bs > 0 then do
       decBrace
       pure $ L (Loc i j) Token.RightBrace
     else do
-      let text = Text.decodeUtf8 $ ByteString.take n xs
       pushStates insideString
       setBeginString Token.Brace
       popBrace

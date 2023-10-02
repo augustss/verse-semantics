@@ -25,7 +25,7 @@ data Token
   | Block
   | Caret
   | Catch
-  | Char Char
+  | Char {-# UNPACK #-} !Char
   | Class
   | Colon
   | ColonEOL
@@ -53,8 +53,6 @@ data Token
   | If
   | Indent
   | Int !Integer
-  | Label String
-  | LabelCont String
   | LeftBrace
   | LeftBracket
   | LeftParen
@@ -126,8 +124,6 @@ instance Pretty Token where
     If -> "if"
     Indent -> "indent"
     Int x -> pretty x
-    Label p -> pretty p
-    LabelCont p -> pretty p
     LeftBrace -> lbrace
     LeftBracket -> lbracket
     LeftParen -> lparen

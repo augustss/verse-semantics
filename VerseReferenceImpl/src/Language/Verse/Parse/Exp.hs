@@ -147,8 +147,8 @@ instance ( Pretty (f String)
     Char x -> "'" <> pretty x <> "'"  -- FIXME add escape
     Int x -> pretty x
     Float x -> pretty x
-    String x [] -> "\"" <> pretty x <> "\"" -- FIXME add escape
-    String x xs -> "\"" <> pretty x <> "{" <+> stringCont xs
+    String s [] -> "\"" <> pretty s <> "\"" -- FIXME add escape
+    String s (x:xs) -> "\"" <> pretty s <> "{" <+> stringCont x xs
     Fun e1 e2 -> "fun" <> parens (pretty e1) <+> braces (pretty e2)
     InfixColonEqual p e -> pretty p <+> ":=" <+> pretty e
     Pat p -> pretty p
@@ -164,9 +164,8 @@ instance ( Pretty (f String)
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
 
-      stringCont [] = error "stringCont: Only to silence the compiler warning"
-      stringCont [(e, x)] = pretty e <+> "}" <> pretty x <> "\"" -- FIXME add escape
-      stringCont ((e, x):xs) = pretty e <+> "}" <> pretty x <> "{" <+> stringCont xs -- FIXME add escape
+      stringCont (e, s) [] = pretty e <+> "}" <> pretty s <> "\"" -- FIXME add escape
+      stringCont (e, s) (x:xs) = pretty e <+> "}" <> pretty s <> "{" <+> stringCont x xs -- FIXME add escape
 
 
 
