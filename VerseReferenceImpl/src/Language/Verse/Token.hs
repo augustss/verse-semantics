@@ -2,24 +2,35 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Verse.Token
-  ( Token (..)
+  ( StringDelimiter(..), Token (..)
   ) where
 
 import Language.Verse.Name
 
 import Prettyprinter
-import Prelude (Double, Integer, Rational, fromRational)
+import Prelude (Char, String, Double, Integer, Rational, fromRational)
 
 import Text.Show
 
+data StringDelimiter
+  = Quote
+  | Brace
+  deriving Show
+
 data Token
   = All
+  | Ampersand
   | Array
+  | At
   | Block
+  | Caret
+  | Catch
+  | Char {-# UNPACK #-} !Char
   | Class
   | Colon
   | ColonEOL
   | ColonEqual
+  | ColonRightParen
   | Comma
   | Dedent
   | Divide
@@ -64,24 +75,33 @@ data Token
   | RightParen
   | Semi
   | Set
+  | String StringDelimiter String StringDelimiter
   | Struct
   | Sync
   | Then
   | ThinArrow
+  | Tilde
   | True
   | Truth
+  | Until
   | Var
   | Where deriving Show
 
 instance Pretty Token where
   pretty = \ case
     All -> "all"
+    Ampersand -> "&"
     Array -> "array"
+    At -> "@"
     Block -> "block"
+    Caret -> "^"
+    Catch -> "catch"
     Class -> "class"
+    Char x -> pretty ['\'', x, '\'']
     Colon -> colon
     ColonEOL -> colon
     ColonEqual -> colon <> equals
+    ColonRightParen -> colon <> rparen
     Comma -> comma
     Dedent -> "dedent"
     Divide -> pretty '/'
@@ -126,11 +146,20 @@ instance Pretty Token where
     RightParen -> rparen
     Semi -> semi
     Set -> "set"
+    String begin x end -> prettyBegin begin <> pretty x <> prettyEnd end
     Struct -> "struct"
     Sync -> "sync"
     Then -> "then"
     ThinArrow -> pretty '-' <> rangle
+    Tilde -> "~"
     True -> "true"
     Truth -> "truth"
+    Until -> "until"
     Var -> "var"
     Where -> "where"
+    where
+      prettyBegin Quote = "\""
+      prettyBegin Brace = "}"
+
+      prettyEnd Quote = "\""
+      prettyEnd Brace = "{"
