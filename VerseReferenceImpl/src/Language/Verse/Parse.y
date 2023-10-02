@@ -86,6 +86,7 @@ import Language.Verse.Token qualified as Token
   '/' { L _ Token.Divide }
   ':' { L _ Token.Colon }
   ':=' { L _ Token.ColonEqual }
+  ':)' { L _ Token.ColonRightParen }
   ':\n' { L _ Token.ColonEOL }
   ';' { L _ Token.Semi }
   '<' { L _ Token.Less }
@@ -103,7 +104,9 @@ import Language.Verse.Token qualified as Token
   '}' { L _ Token.RightBrace }
   all { L _ Token.All }
   block { L _ Token.Block }
+  catch { L _ Token.Catch }
   class { L _ Token.Class }
+  char { (char -> Just $$) }
   dedent { L _ Token.Dedent }
   do { L _ Token.Do }
   else { L _ Token.Else }
@@ -116,6 +119,8 @@ import Language.Verse.Token qualified as Token
   if { L _ Token.If }
   indent { L _ Token.Indent }
   int { (int -> Just $$) }
+  label { (label -> Just $$) }
+  labelCont { (labelCont -> Just $$) }
   module { L _ Token.Module }
   name { (name -> Just $$) }
   newline { L _ Token.Newline }
@@ -125,11 +130,16 @@ import Language.Verse.Token qualified as Token
   set { L _ Token.Set }
   struct { L _ Token.Struct }
   enum { L _ Token.Enum }
+  string { (string -> Just $$) }
+  stringBegin { (stringBegin -> Just $$) }
+  stringCont { (stringCont -> Just $$) }
+  stringEnd { (stringEnd -> Just $$) }
   sync { L _ Token.Sync }
   then { L _ Token.Then }
   true { L _ Token.True }
   truth { L _ Token.Truth }
   var { L _ Token.Var }
+  until { L _ Token.Until }
   where { L _ Token.Where }
 
 %%
@@ -297,14 +307,25 @@ Exp :: { L (Exp L Name) }
     }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
+  | char { Exp.Char <\$> $1 }
+  | string { ( \ x -> Exp.String x []) <\$> $1 }
+  | stringBegin StringCont { Exp.String <\$> $1 <.> $2 }
   | If { $1 }
   | For { $1 }
   | Exists { $1 }
   | Function { $1 }
   | Pat %shift { Exp.Pat <\$> $1 }
 
+
+StringCont :: { L [(L (Exp L Name), L String)] }
+  : File stringEnd { ( \ e s -> [(e,s)]) <\$> duplicate $1 <.> duplicate $2 }
+  | File stringCont StringCont { ( \ e s es -> (e,s):es) <\$> duplicate $1 <.> duplicate $2 <.> $3 }
+
 Pat :: { L (Pat L Name) }
   : name { Pat.Name <\$> $1 }
+  | '(' List ':)' name {
+      Pat.QualName $2 <\$> $4
+    }
   | var name ':' Exp {
       Pat.Var <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
@@ -430,6 +451,43 @@ Scan :: { () }
 {
 lexer :: (L Token -> Lexer a) -> Lexer a
 lexer = (Lexer.getToken >>=)
+
+char :: L Token -> Maybe (L Char)
+char = \ case
+  L x (Token.Char y) -> Just $ L x y
+  _ -> Nothing
+
+string :: L Token -> Maybe (L String)
+string = \ case
+  L x (Token.String Token.Quote y Token.Quote) -> Just $ L x y
+  _ -> Nothing
+
+stringBegin :: L Token -> Maybe (L String)
+stringBegin = \ case
+  L x (Token.String Token.Quote y Token.Brace) -> Just $ L x y
+  _ -> Nothing
+
+stringCont :: L Token -> Maybe (L String)
+stringCont = \ case
+  L x (Token.String Token.Brace y Token.Brace) -> Just $ L x y
+  _ -> Nothing
+
+stringEnd :: L Token -> Maybe (L String)
+stringEnd = \ case
+  L x (Token.String Token.Brace y Token.Quote) -> Just $ L x y
+  _ -> Nothing
+
+label :: L Token -> Maybe (L String)
+label = \ case
+  L x (Token.Label y) -> Just $ L x y
+  _ -> Nothing
+
+labelCont :: L Token -> Maybe (L String)
+labelCont = \ case
+  L x (Token.LabelCont y) -> Just $ L x y
+  _ -> Nothing
+
+
 
 int :: L Token -> Maybe (L Integer)
 int = \ case

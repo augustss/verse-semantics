@@ -16,18 +16,20 @@ import Control.Monad.Trans.Except (Except, runExcept)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as ByteString
 import Data.ByteString.Internal qualified as ByteString (w2c)
-import Data.Char (ord)
+import Data.Char (chr, ord)
 import Data.List
 import Data.Ratio
 import Data.Text.Encoding qualified as Text
+import Data.Text qualified as Text
 import Data.Word
 
 import Language.Verse.Error
 import Language.Verse.Indent
 import Language.Verse.Loc
 import Language.Verse.Pos as Pos
-import Language.Verse.Token (Token)
+import Language.Verse.Token (Token, StringDelimiter)
 import Language.Verse.Token qualified as Token
+-- import Debug.Trace(trace)
 }
 
 $alpha = [A-Za-z\_]
@@ -143,8 +145,9 @@ $space = [\ \t]
   "=>" { fatArrowIndented }
   "(" { token Token.LeftParen }
   ")" { token Token.RightParen }
-  "{" { token Token.LeftBrace }
-  "}" { token Token.RightBrace }
+  ":)" { token Token.ColonRightParen }
+  "{" { tokenDo incBrace Token.LeftBrace }
+  "}" { rightBraceOrString }
   "[" { token Token.LeftBracket }
   "]" { token Token.RightBracket }
   ";" { token Token.Semi }
@@ -163,9 +166,15 @@ $space = [\ \t]
   "-" { token Token.Minus }
   "*" { token Token.Multiply }
   "/" { token Token.Divide }
+  "^" { token Token.Caret }
+  "&" { token Token.Ampersand }
+  "@" { token Token.At }
+  "~" { token Token.Tilde }
   "all" { token Token.All }
   "array" { token Token.Array }
   "block" { token Token.Block }
+  "do" { token Token.Do }
+  "catch" { token Token.Catch }
   "class" { token Token.Class }
   "do" { token Token.Do }
   "else" { token Token.Else }
@@ -179,6 +188,7 @@ $space = [\ \t]
   "module" { token Token.Module }
   "not" { token Token.Not }
   "one" { token Token.One }
+  "until" { token Token.Until }
   "set" { token Token.Set }
   "struct" { token Token.Struct }
   "sync" { token Token.Sync }
@@ -190,8 +200,23 @@ $space = [\ \t]
   "where" { token Token.Where }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
+  \" { stringBegin }
+  "'"[^'\n]"'" { char }
+  "'\"[rnt'\"\\\{\}\#\<\>&\~]"'" { charEscaped }
+  "0o"[0-7A-F]+ { charHex }
+  "0u"[0-7A-F]+ { charHex }
+
   $alpha $alnum* ("'" @operator "'")? { name }
 }
+
+<insideString> {
+  \{  { stringValue }
+  \"  { stringEnd }
+  \\[rnt'\"\\\{\}\#\<\>&\~] { stringTextEscaped }
+  [^"\n] { stringText }
+}
+
+
 
 {
 newtype Lexer a = Lexer
@@ -205,6 +230,10 @@ runLexer m = runExcept . evalStateT (getLexer m) . mkS
       { alexInput = AlexInput { pos = Pos.minBound, input }
       , indent = []
       , indents = []
+      , brace = 0
+      , braces = []
+      , beginString = Token.Quote
+      , reverseString = []
       , states = []
       }
 
@@ -212,6 +241,10 @@ data S = S
   { alexInput :: !AlexInput
   , indent :: !Indent
   , indents :: ![Indent]
+  , brace :: !Int      -- keep track of open braces, use for "abc{ whatever } def", if a string ends with { then return StringBegin, accepting } as start of string when braces is 0.
+  , braces :: ![Int]
+  , beginString :: !Token.StringDelimiter
+  , reverseString :: ![Char]
   , states :: ![State]
   }
 
@@ -256,6 +289,63 @@ newline :: Action
 newline = action $ do
   putIndent []
   getToken
+
+stringBegin :: Action
+stringBegin _i _j n xs = do
+  let text = Text.decodeUtf8 $ ByteString.take n xs
+  pushStates insideString
+  getToken
+
+stringText :: Action
+stringText i _j n xs = do
+  let text = Text.decodeUtf8 $ ByteString.take n xs
+  addReverseString $ extract $ show text
+  getToken
+  where
+    extract ['"', x, '"'] = x
+    extract xs = error (show i ++ ":not a string character: " ++ xs)
+
+stringTextEscaped :: Action
+stringTextEscaped i _j n xs = do
+  let text = Text.decodeUtf8 $ ByteString.take n xs
+  addReverseString $ extract $ show text
+  getToken
+  where
+    extract ['"', '\\', '\\', 'r', '"'] = '\r'
+    extract ['"', '\\', '\\', 'n', '"'] = '\n'
+    extract ['"', '\\', '\\', 't', '"'] = '\t'
+    extract ['"', '\\', '\\', '\\', '\\', '"'] = '\\'
+    extract ['"', '\\', '\\',  x , '"'] = x
+    extract xs = error (show i ++ ":not a string escape character: " ++ xs)
+
+
+stringValue :: Action
+stringValue i j n xs = do
+  let text = Text.decodeUtf8 $ ByteString.take n xs
+  popStates
+  (begin, str) <- getString
+  pushBrace
+  pure $ L (Loc i j) (Token.String begin str Token.Brace)
+
+rightBraceOrString :: Action
+rightBraceOrString i j n xs = do
+    bs <- peekBrace
+    if bs > 0 then do
+      decBrace
+      pure $ L (Loc i j) Token.RightBrace
+    else do
+      let text = Text.decodeUtf8 $ ByteString.take n xs
+      pushStates insideString
+      setBeginString Token.Brace
+      popBrace
+      getToken
+
+stringEnd :: Action
+stringEnd i j n xs = do
+  let text = Text.decodeUtf8 $ ByteString.take n xs
+  popStates
+  (begin, str) <- getString
+  pure $ L (Loc i j) (Token.String begin str Token.Quote)
 
 empty0 :: Action
 empty0 = action $ do
@@ -368,7 +458,11 @@ maybeNewlineAction x i j _ _ = do
   pure $ L (Loc i j) x
 
 leftBraceMaybeNewline :: Action
-leftBraceMaybeNewline = maybeNewlineAction Token.LeftBrace
+leftBraceMaybeNewline i j _ _ = do
+  popStates
+  pushStates indented
+  incBrace
+  pure $ L (Loc i j) Token.LeftBrace
 
 doMaybeNewline :: Action
 doMaybeNewline = maybeNewlineAction Token.Do
@@ -387,6 +481,7 @@ leftBraceMaybeNesting i j _ _ = do
   popStates
   popIndents
   pushStates indented
+  incBrace
   pure $ L (Loc i j) Token.LeftBrace
 
 emptyNesting :: Action
@@ -462,6 +557,12 @@ emptyFatArrow = emptyToken Token.FatArrow
 token :: Token -> Action
 token x i j _ _ = pure $ L (Loc i j) x
 
+tokenDo :: Lexer () -> Token -> Action
+tokenDo todo x i j _ _ =
+  do
+    todo
+    pure $ L (Loc i j) x
+
 int :: Action
 int i j n xs =
   pure . L (Loc i j) . Token.Int .
@@ -479,6 +580,55 @@ float i j n xs =
       | otherwise = (z0, z1 * 10 + (toInteger $ x - ord' '0'), n1 * 10)
     toRational (z0, z1, n1) =
       (z0 * n1 + z1) % n1
+
+
+{-
+string :: Action
+string i j n xs =
+  pure . L (Loc i j) . Token.String .
+  extract $ show $ Text.decodeUtf8 $ ByteString.take (n-2) $ ByteString.tail xs
+  where
+    extract [] = []
+    extract ('\\':'r':xs) = '\r' : extract xs
+    extract ('\\':'n':xs) = '\n' : extract xs
+    extract ('\\':'t':xs) = '\t' : extract xs
+    extract ('\\':x:xs) = x : extract xs
+    extract (x:xs) = x : extract xs
+-}
+
+
+char :: Action
+char i j 3 xs =
+  pure . L (Loc i j) . Token.Char .
+  extract $ Text.decodeUtf8 $ ByteString.take 3 xs
+  where
+    extract txt = Text.index txt 1
+char i _j _n _xs =
+  throwError' $ LexError i
+
+charEscaped :: Action
+charEscaped i j 4 xs =
+  pure . L (Loc i j) . Token.Char .
+  toCharEscaped $ extract $ Text.decodeUtf8 $ ByteString.take 4 xs
+  where
+    extract txt = Text.index txt 2
+    toCharEscaped 'r'  = '\r'
+    toCharEscaped 'n'  = '\n'
+    toCharEscaped 't'  = '\t'
+    toCharEscaped c  = c
+charEscaped i _j _n _xs =
+  throwError' $ LexError i
+
+charHex :: Action
+charHex i j n xs =
+  pure . L (Loc i j) . Token.Char . chr . fromInteger .
+  ByteString.foldl' f 0 $ ByteString.take (n-2) $ ByteString.drop 2 xs
+  where
+    toDigit x = if x <= ord' '9' then x - ord' '0'
+                else if x <= ord' 'F' then x - ord' 'A'
+                else x - ord' 'a'
+    f z x = z * 16 + (toInteger $ toDigit x)
+
 
 ord' :: Char -> Word8
 ord' = fromIntegral . ord
@@ -541,6 +691,39 @@ getIndent = gets' indent
 
 putIndent :: Indent -> Lexer ()
 putIndent indent = modify' $ \ s -> s { indent }
+
+pushBrace :: Lexer ()
+pushBrace = modify' $ \ s -> s { brace = 0, reverseString = [], braces = s.brace:s.braces }
+
+peekBrace :: Lexer Int
+peekBrace = do
+  s <- get'
+  pure $ s.brace
+
+popBrace :: Lexer ()
+popBrace = do
+  s <- get'
+  case s.braces of
+    [] -> pure ()
+    brace:braces -> modify' $ \ s -> s { brace, braces }
+
+incBrace :: Lexer ()
+incBrace = modify' $ \ s -> s { brace = s.brace + 1 }
+
+decBrace :: Lexer ()
+decBrace = modify' $ \ s -> s { brace = s.brace - 1 }
+
+setBeginString :: StringDelimiter -> Lexer ()
+setBeginString delimiter = modify' $ \ s -> s { beginString = delimiter }
+
+addReverseString :: Char -> Lexer ()
+addReverseString c = modify' $ \ s -> s { reverseString = c:s.reverseString }
+
+getString :: Lexer (Token.StringDelimiter, String)
+getString = do
+  s <- get'
+  modify' $ \ s -> s { beginString = Token.Quote, reverseString = [] }
+  pure $ (s.beginString, reverse s.reverseString)
 
 get' :: Lexer S
 get' = Lexer get

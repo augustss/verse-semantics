@@ -52,6 +52,7 @@ import Language.Verse.Parse.Exp ( pattern (:<>:)
                                 )
 import Language.Verse.Parse.Exp qualified as Parse
 import Language.Verse.Rewrite.Exp
+import Prelude(error)
 
 rewrite
   :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
@@ -179,6 +180,7 @@ rewriteExp e = for e $ \ case
     Fun <$> rewriteExp e1 <*> rewriteExp e2
   Pat p ->
     rewritePat p
+  _ -> error "rewriteExp FIXME"
 
 rewritePat
   :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
@@ -206,6 +208,7 @@ rewritePat = \ case
     p <- traverse rewritePat p
     e <- rewriteExp e
     pure $ ParenInvoke p e
+  _ -> error "rewritePat FIXME"
 
 rewriteDef
   :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
@@ -247,6 +250,7 @@ rewriteDef p e = case extract p of
     e_domain <- rewriteExp e_domain
     let e' = fun e_domain e
     rewriteDef' True p e' e'
+  _ -> error "rewriteDef FIXME"
 
 rewriteDef'
   :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
@@ -288,6 +292,7 @@ rewriteDef' funName p e1 e2 = case extract p of
   Invoke p e_domain -> do
     e_domain <- rewriteExp e_domain
     rewriteDef' True p (fun e_domain e1) (fun e_domain e2)
+  _ -> error "rewriteDef' FIXME"
 
 rewriteOperator1
   :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)

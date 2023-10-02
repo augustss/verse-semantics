@@ -147,3 +147,18 @@ executable verselex
     buildable: False
   ghc-options: -Wall
   default-language: GHC2021
+
+executable verseparse
+  main-is: Main.hs
+  build-depends:
+    base >= 4.16.0.0,
+    bytestring,
+    comonad,
+    prettyprinter,
+    transformers,
+    verse
+  hs-source-dirs: parse
+  if flag(wasm)
+    buildable: False
+  ghc-options: -Wall
+  default-language: GHC2021
