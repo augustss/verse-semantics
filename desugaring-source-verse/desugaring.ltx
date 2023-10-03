@@ -995,23 +995,25 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \end{figure}
 
 \begin{figure}
-$$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+$$\begin{array}{@@{}l}
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|De t| = |e|$}} \\[0.02in]
 \rulename{dconst}  & |De k|                  & = & |k| \\
 \rulename{dvar}    & |De x|                  & = & |x| \\
 \rulename{dapp}    & |De (t_1^[t_2])|         & = & |((De t_1))^[De t_2]| \\[2mm]
 \rulename{dfun}    & |De (functionP t_1 t_2)|
-  & = & |verify (forall i (Me i t_1); assert (De t_2));| \\
-  &&&   |lam i (verify (assert (Me i t_1 )); De t_2)| \\[2mm]
+  & = & |verify (lam i (Me i t_1); assert (De t_2));| & \mbox{[verify definition]} \\
+  &&&   |lam i (verify (assert (Me i t_1 )); De t_2)|  & \mbox{[verify call sites]} \\[2mm]
 
 \rulename{doftype} & |De (oftype t_1 t_2)|
          & = & |y:=De t_1; verify (assert (Me y t_2));|  & \text{|y| fresh} \\
          &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
 
 \rulename{dother}   & |De e|                  & = & |def i (Me i e)|  & \mbox{otherwise} \\
+  \end{array}
+\\ \\
 
-
-\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Transformation:} $|Me i t| = |e|$}} \\[0.02in]
 \rulename{mtype}   & |Me i (:t)|           & = & |((De t))^[i]| \\[2mm]
 \rulename{mbind}   & |Me i (x:=t)|         & = & |x := Me i t| \\
@@ -1027,7 +1029,7 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \rulename{dchoice} & |De (t_1 `choice` t_2)|  & = & |De t_1 `choice`De t_2| \\
 \rulename{dbind}   & |De (x := e)|            & = & |x := De e| \\
 \rulename{dseq}    & |De (t_1 ; t_2)|         & = & |De t_1 ; De t_2| \\
-\rulename{dmif}     & |ee (if(t_1) then t_2 else t_3)| & = &
+\rulename{dmif}     & |De (if(t_1) then t_2 else t_3)| & = &
     \multicolumn{2}{@@{}l}{|if (De t_1) then De t_2 else De t_3|} \\
     \\
 \multicolumn{5}{l}{\mbox{\bf Desugaring for execution:}} \\[0.02in]
@@ -1048,9 +1050,8 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
     \multicolumn{2}{@@{}l}{|if (De t_1) then Me i t_2 else Me i t_3|} \\[2mm]
 \rulename{mother'}  & |Me i t|              & = & |i| & \mbox{otherwise}
 
+\end{array}
 \end{array}$$
-
-
 \caption{SPJ new version (3 Oct): being careful about arg-equality vs arg-transformation.}
 \end{figure}
 
