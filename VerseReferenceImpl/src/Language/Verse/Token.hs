@@ -19,9 +19,11 @@ data StringDelimiter
 
 data Token
   = All
+  | And
   | Ampersand
   | Array
   | At
+  | AtSign
   | Block
   | Caret
   | Catch
@@ -34,6 +36,7 @@ data Token
   | Comma
   | Dedent
   | Divide
+  | DivideEqual
   | Do
   | Dot
   | DotDot
@@ -59,16 +62,21 @@ data Token
   | Less
   | LessEqual
   | Minus
+  | MinusEqual
   | Module
   | Multiply
+  | MultiplyEqual
   | Name Name
   | Newline
   | Not
   | NotEqual
+  | Of
   | One
   | Option
+  | Or
   | Pipe
   | Plus
+  | PlusEqual
   | QuestionMark
   | RightBrace
   | RightBracket
@@ -90,14 +98,16 @@ data Token
 instance Pretty Token where
   pretty = \ case
     All -> "all"
+    And -> "and"
     Ampersand -> "&"
     Array -> "array"
-    At -> "@"
+    At -> "at"
+    AtSign -> "@"
     Block -> "block"
     Caret -> "^"
     Catch -> "catch"
-    Class -> "class"
     Char x -> pretty ['\'', x, '\'']
+    Class -> "class"
     Colon -> colon
     ColonEOL -> colon
     ColonEqual -> colon <> equals
@@ -105,6 +115,7 @@ instance Pretty Token where
     Comma -> comma
     Dedent -> "dedent"
     Divide -> pretty '/'
+    DivideEqual -> "/="
     Do -> "do"
     Dot -> dot
     DotDot -> ".."
@@ -130,16 +141,21 @@ instance Pretty Token where
     Less -> pretty '<'
     LessEqual -> "<="
     Minus -> pretty '-'
+    MinusEqual -> "-="
     Module -> "module"
     Multiply -> pretty '*'
+    MultiplyEqual -> "*="
     Name x -> pretty x
     Newline -> "newline"
     Not -> "not"
     NotEqual -> "<>"
+    Of -> "of"
     One -> "one"
     Option -> "option"
+    Or -> "or"
     Pipe -> pipe
     Plus -> pretty '+'
+    PlusEqual -> "+="
     QuestionMark -> pretty '?'
     RightBrace -> rbrace
     RightBracket -> rbracket

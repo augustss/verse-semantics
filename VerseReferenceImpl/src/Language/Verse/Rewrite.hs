@@ -156,8 +156,8 @@ rewriteExp e = for e $ \ case
     BracketInvoke <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Exists x ->
     pure . Exists $ Ident.Name <$> x
-  Parse.Set x e ->
-    Set (Ident.Name <$> x) <$> rewriteExp e
+  Parse.Set e1@(extract -> Pat (Parse.Name x)) e2 -> -- Only Pat.Name implemented
+    Set (Ident.Name x <$ e1) <$> rewriteExp e2
   Parse.Tuple es ->
     Tuple <$> traverse rewriteExp es
   Parse.Truth e ->
