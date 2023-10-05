@@ -373,10 +373,11 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
---  ++ -- extra rule for verifier
---   do (Assume x) :>: e <- [lhs]
---      (ctx, hole) <- execX x
---      pure ( \ a -> Assume (ctx a) :>: e, hole)
+  -- extra rule for verifier to elim stuff like `exi x. assume { x = 2 }; 99`
+ ++
+  do Assume e <- [lhs]
+     (ctx, hole) <- execX e
+     return (Assume . ctx, hole)
 
 substX :: Expr -> [(Context, Expr)]
 -- X context
@@ -933,7 +934,7 @@ ruleElimL _ lhs =
      guard (x `notElem` freeV)
      pure (ctx (Val v))
 
--- X context, or exist x . defX
+-- X context, or exist x, or assume . . defX
 defX :: Ident -> Expr -> [(Context, Expr)]
 defX xx lhs =
   do execX lhs
@@ -942,6 +943,7 @@ defX xx lhs =
      guard (x /= xx)
      (ctx, hole) <- defX xx dx
      return (Exi . Bind x . ctx, hole)
+
 
 --------------------------------------------------------------------------------
 

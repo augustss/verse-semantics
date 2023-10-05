@@ -70,6 +70,7 @@ tests = -- take 6
   , ("ex_ty_01", ex_ty_01, True)
   , ("ex_choice_00", ex_choice_00, True)
   , ("ex_choice_01", ex_choice_01, True)
+  , ("ex_if_asm_00", ex_if_asm_00, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -660,3 +661,10 @@ ex_choice_01 =
   )
   where
     a = ident "a"
+
+ex_if_asm_00 :: Expr
+ex_if_asm_00 =
+  Verify (Assert (ite (EXI z (Assume (Var z :=: Int 199) :>: Int 2)) (Int 1) (Int 2)))
+  -- Verify (Assert (One (EXI z (Assume (Var z :=: Int 199) :>: Int 2)) ))
+  where
+    z = ident "z"
