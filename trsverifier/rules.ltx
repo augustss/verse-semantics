@@ -31,7 +31,7 @@ $\begin{array}{@@{}l}
 \rulegroupname{Prove:}
   %\rulename{asm-intro}  & |P^[e]|                          & \movesto & |P^[assume e]|                  & \text{if}\ \proves{P}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
   % \rulename{prove}      & |P^[e; e']|                      & \movesto & |P^[e']|                        & \text{if $\proves{P}{e}$} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
-  \rulename{implies}    & |assume e_1; P^[e_2; e_3]|       & \movesto & |assume e_1; P^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  \rulename{implies}    & |assume e_1; P^[e_2; e_3]|       & \movesto & |assume e_1; P^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$} \\
   \rulename{asm-subst}  & |assume (X^[x = v]); e|          & \movesto & |assume (X^[x = v]); subst e x v| & \text{if $|v| \not= |V^[x]|$} \\
   \rulename{asm-if}     & |verify (P^[myite e_1 e_2 e_3])| & \movesto & |verify (P^[assume e_1; e_2]);| & \text{if}\ \mustDecide{P}{e_1} \\
                         &                                  &          & |verify (P^[e_3])|              & \\
@@ -51,8 +51,19 @@ $\begin{array}{l}
 \end{figure}
 
 \begin{figure}
+$\begin{array}{ll}
+\inferrule[\rulename{imp-refl}]{}{\impl{|isInt x|}{x = x}}
+&
+\inferrule[\rulename{imp-asm}]{\UnAssume{e_1} = \UnAssume{e_2}}{\impl{e_1}{e_2}}
+\end{array}$
+\caption{Definition of the $\impl{e_1}{e_2}$ predicate used in \cref{fig:verifier-rewrite-rules}.}
+\end{figure}
+
+\begin{figure}
 $\begin{array}{lcl}
   \toprule
+  % \impl{e_1}{e_2} & \doteq & \ensuremath{\UnAssume{e_1} = \UnAssume{e_2}} \vee (e_1 \equiv |isInt x| \wedge e_2 \equiv |x = x|) \\
+  % \midrule
   \mustSucceedKW & :: & (P, e) \rightarrow \{ \mathit{true}, \mathit{false} \} \\
   \midrule
    \mustSucceed{P}{n}                 & \doteq & \mathit{true} \\
@@ -68,7 +79,7 @@ $\begin{array}{lcl}
    \mustSucceed{P}{|e|}               & \doteq & \mathit{false} \\
    \bottomrule
 \end{array}$
-\caption{Definitions of the $\mustSucceedKW$ predicate used in \cref{fig:verifier-rewrite-rules}.}
+\caption{Definition of the $\mustSucceedKW$ predicate used in \cref{fig:verifier-rewrite-rules}.}
 \end{figure}
 
 \begin{figure}

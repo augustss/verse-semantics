@@ -65,8 +65,7 @@ public:
   result_t QualIdent(const snippet& Snippet, const block_t& QualifierBlock, text Name) const { return res; };
   result_t Ident(const snippet& Snippet, const text& NameA, const text& NameB, const text& NameC) const { return res; };
   result_t Native(const snippet& Snippet, const text& Name) const { return res; };
-  result_t Invoke(const snippet& Snippet, const syntax_t& MacroCommand, const block_t& Clause1, const block_t* Clause2, const block_t* Clause3) const { return
-res; };
+  result_t Invoke(const snippet& Snippet, const syntax_t& MacroCommand, const block_t& Clause1, const block_t* Clause2, const block_t* Clause3) const { return res; };
   result_t Units(const snippet& Snippet, const syntax_t& Num, text Units) const { return res; };
   result_t NumHex(const snippet& Snippet, text Digits) const { return res; };
   result_t Num(const snippet& Snippet, text Digits, text Fraction, text ExponentSign, text Exponent) const { return res; };
