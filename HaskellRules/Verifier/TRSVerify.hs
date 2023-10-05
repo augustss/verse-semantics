@@ -65,12 +65,13 @@ tests = -- take 6
   , ("ex_hide_00", ex_hide_00, True)
   , ("ex_hide_01", ex_hide_01, False)
   , ("ex_hide_02", ex_hide_02, True)
-  , ("ex_direct00", ex_direct00, True)
+  --, ("ex_direct00", ex_direct00, True)
   , ("ex_ty_00", ex_ty_00, True)
   , ("ex_ty_01", ex_ty_01, True)
   , ("ex_choice_00", ex_choice_00, True)
   , ("ex_choice_01", ex_choice_01, True)
   , ("ex_if_asm_00", ex_if_asm_00, True)
+  , ("ex1_mini", ex1_mini, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -668,3 +669,13 @@ ex_if_asm_00 =
   -- Verify (Assert (One (EXI z (Assume (Var z :=: Int 199) :>: Int 2)) ))
   where
     z = ident "z"
+
+ex1_mini :: Expr
+ex1_mini = lAMs [x] (
+              Assume (INT (Var x))
+              :>:
+              Assert (UNI b (INT (Var x) :>: Int 3))
+           )
+           where
+            x = ident "x"
+            b = ident "b"

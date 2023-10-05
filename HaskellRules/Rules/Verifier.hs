@@ -25,6 +25,7 @@ import Data.List( intersect )
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
+import qualified Control.Monad.RWS as unsound
 
 -- | Run verification rules.
 _traceShow :: (Pretty a) => String -> a -> a
@@ -114,7 +115,7 @@ icfpeVerifier = icfp
               <> uniRules
               <> assumeAssertRules
               <> verifierRules
-              <> directRules
+              -- <> directRules
   }
   where icfp = systemICFPE
 
@@ -409,9 +410,19 @@ isDecideOp (Op Append) = True
 isDecideOp _           = False
 
 -- | Rules that are like `verifier` but don't require explicit ASSUME but work under left-to-right evaluation order
+--   commenting out, as too STRONG, lets us prove stuff like below, regardless of effect, as they are desugared to
+--          ... succ{ exi x. x = f(3); x = f(3); ... }
+--   and the second x = f(3) is "implied" and hence, gobbled up by the first which is unsound...
+--     test(D00){f(:int):int=>{f(3)=f(3)}} 					#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)            :any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<converges >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<reads     >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<writes    >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<varies    >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<transacts >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
 
-directRules :: VRule
-directRules _env lhs =
+_directRules :: VRule
+_directRules _env lhs =
    "implies-direct" `name`
    do e :>: rhs <- [lhs]
       (ctx, _, bs, e1 :>: e2) <- eX rhs
@@ -430,7 +441,6 @@ verifierRules env lhs =
    --    guard (proves g bs e)
    --    pure (ctx e')
    -- ++
-   -- asm{e}; P[e; e'] ----> P[e']   if   fv(e) disjoint from bvars(P)
    -- asm{e}; P[e; e'] ----> P[e']   if   fv(e) disjoint from bvars(P)
    "implies" `name`
    do (Assume e) :>: rhs <- [lhs]
@@ -557,6 +567,11 @@ execEX1 bs lhs =
   do EXI y x <- [lhs]
      (ctx, g, bs', hole) <- execEX (BExi y : bs) x
      pure (EXI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
+ ++
+   -- Uni y HOLE
+  do UNI y x <- [lhs]
+     (ctx, g, bs', hole) <- execEX (BUni y : bs) x
+     pure (UNI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
  ++
    -- ONE HOLE
   do One x <- [lhs]

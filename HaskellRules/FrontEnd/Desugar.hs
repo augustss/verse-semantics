@@ -1607,7 +1607,7 @@ dsV10 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM10 V t1 i
    t2' <- dsV10 (bodyEff fx _effs) t2
-   pure $ Lam i $ seqE [{- eAssume -} t1', t2']
+   pure $ Lam i $ seqE [{- ASSUME-INPUT? -} eAssume t1', t2']
 dsV10 _  (OfType  t1 t2)  = do { e <- dsD10 t1; vOfType10 e t2 }
 dsV10 Suc t               = eAssert <$> dsD10 t
 dsV10 Dec t               = eDecide <$> dsD10 t
@@ -1658,7 +1658,7 @@ dsM10 I ((Function [(t1, _effs)] t2)) f = do
   z <- newIdent (getLoc t2) "z"
   t1' <- dsM10 V t1 i'
   t2' <- dsM10 I t2 z
-  pure $ eVerify $ Lam i' $ seqE [{- TODO:ask-lennart:  eAssume -} (DefineE i t1'), eAssert $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+  pure $ eVerify $ Lam i' $ seqE [{- ASSUME-INPUT? -} eAssume (DefineE i t1'), eAssert $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
 
 -- dsM10 ((Function [(Range t1, _effs)] (Range t2))) f = do
 --   i <- newIdent (getLoc t1) "i"
