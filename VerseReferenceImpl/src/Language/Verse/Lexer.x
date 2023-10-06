@@ -48,11 +48,11 @@ $space = [\ \t]
   "<#>" { indCmt0 }
 }
 
-<0, nested, maybeNesting, indCmt, indented, colon, equal, colonEqual, fatArrow> {
+<0, nested, maybeNesting, indCmt, indented, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow> {
   "#" .* ;
 }
 
-<indented, colon, equal, colonEqual, fatArrow> {
+<indented, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow> {
   "<#>" { indCmtIndented }
 }
 
@@ -82,7 +82,7 @@ $space = [\ \t]
   . { textBlockCmt }
 }
 
-<indented, colon, equal, colonEqual, fatArrow, indentedBlockCmt, indentedIndCmt> {
+<indented, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow, indentedBlockCmt, indentedIndCmt> {
   "<#" { leftBlockCmtIndented }
 }
 
@@ -114,7 +114,7 @@ $space = [\ \t]
 
 <nesting> "" { emptyNesting }
 
-<indented, colon, equal, colonEqual, fatArrow> {
+<indented, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow> {
   [\ \t]+ ;
 }
 
@@ -133,6 +133,26 @@ $space = [\ \t]
   "" { emptyColonEqual }
 }
 
+<plusEqual> {
+  @newline { newlinePlusEqual }
+  "" { emptyPlusEqual }
+}
+
+<minusEqual> {
+  @newline { newlineMinusEqual }
+  "" { emptyMinusEqual }
+}
+
+<multiplyEqual> {
+  @newline { newlineMultiplyEqual }
+  "" { emptyMultiplyEqual }
+}
+
+<divideEqual> {
+  @newline { newlineDivideEqual }
+  "" { emptyDivideEqual }
+}
+
 <fatArrow> {
   @newline { newlineFatArrow }
   "" { emptyFatArrow }
@@ -142,6 +162,10 @@ $space = [\ \t]
   ":" { colonIndented }
   "=" { equalIndented }
   ":=" { colonEqualIndented }
+  "+=" { plusEqualIndented }
+  "-=" { minusEqualIndented }
+  "*=" { multiplyEqualIndented }
+  "/=" { divideEqualIndented }
   "=>" { fatArrowIndented }
   "(" { token Token.LeftParen }
   ")" { token Token.RightParen }
@@ -168,10 +192,12 @@ $space = [\ \t]
   "/" { token Token.Divide }
   "^" { token Token.Caret }
   "&" { token Token.Ampersand }
-  "@" { token Token.At }
+  "@" { token Token.AtSign }
   "~" { token Token.Tilde }
   "all" { token Token.All }
+  "and" { token Token.And }
   "array" { token Token.Array }
+  "at" { token Token.At }
   "block" { token Token.Block }
   "do" { token Token.Do }
   "catch" { token Token.Catch }
@@ -186,6 +212,7 @@ $space = [\ \t]
   "for" { token Token.For }
   "if" { token Token.If }
   "module" { token Token.Module }
+  "of" { token Token.Of }
   "not" { token Token.Not }
   "one" { token Token.One }
   "until" { token Token.Until }
@@ -196,6 +223,7 @@ $space = [\ \t]
   "true" { token Token.True }
   "truth" { token Token.Truth }
   "option" { token Token.Option }
+  "or" { token Token.Or }
   "var" { token Token.Var }
   "where" { token Token.Where }
   [0-9]+ { int }
@@ -535,11 +563,56 @@ colonEqualIndented = action $ do
   pushStates colonEqual
   getToken
 
+plusEqualIndented :: Action
+plusEqualIndented = action $ do
+  pushStates plusEqual
+  getToken
+
+minusEqualIndented :: Action
+minusEqualIndented = action $ do
+  pushStates minusEqual
+  getToken
+
+multiplyEqualIndented :: Action
+multiplyEqualIndented = action $ do
+  pushStates multiplyEqual
+  getToken
+
+divideEqualIndented :: Action
+divideEqualIndented = action $ do
+  pushStates divideEqual
+  getToken
+
 newlineColonEqual :: Action
 newlineColonEqual = newlineToken maybeNesting Token.ColonEqual
 
+newlinePlusEqual :: Action
+newlinePlusEqual = newlineToken maybeNesting Token.PlusEqual
+
+newlineMinusEqual :: Action
+newlineMinusEqual = newlineToken maybeNesting Token.MinusEqual
+
+newlineMultiplyEqual :: Action
+newlineMultiplyEqual = newlineToken maybeNesting Token.MultiplyEqual
+
+newlineDivideEqual :: Action
+newlineDivideEqual = newlineToken maybeNesting Token.DivideEqual
+
 emptyColonEqual :: Action
 emptyColonEqual = emptyToken Token.ColonEqual
+
+emptyPlusEqual :: Action
+emptyPlusEqual = emptyToken Token.PlusEqual
+
+emptyMinusEqual :: Action
+emptyMinusEqual = emptyToken Token.MinusEqual
+
+emptyMultiplyEqual :: Action
+emptyMultiplyEqual = emptyToken Token.MultiplyEqual
+
+emptyDivideEqual :: Action
+emptyDivideEqual = emptyToken Token.DivideEqual
+
 
 fatArrowIndented :: Action
 fatArrowIndented = action $ do

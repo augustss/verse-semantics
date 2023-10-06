@@ -12,8 +12,10 @@ import Control.Comonad
 import Data.Foldable (foldl')
 import Data.Functor
 import Data.Functor.Apply
+import Data.Text qualified as Text
 
 import Language.Verse.Parse.Exp (Exp
+                                , CatchUntil
                                 , pattern (:=:)
                                 , pattern (:<>:)
                                 , pattern (:.:)
@@ -55,9 +57,14 @@ import Language.Verse.Token qualified as Token
 %right '=>'
 %left where
 %nonassoc DOT_SPACE
-%left IF IF_THEN FOR
+%left IF IF_THEN FOR INVOKE
 %left then else do
-%right '=' ':='
+%left until catch
+%left or
+%left and
+%right '=' ':=' '+=' '-=' '*=' '/='
+%nonassoc SET
+%left NO_COLON
 %left ':'
 %nonassoc '<>'
 %right '<' '<=' '>' '>='
@@ -67,7 +74,7 @@ import Language.Verse.Token qualified as Token
 %left '+' '-'
 %left '*' '/'
 %left '.'
-%nonassoc '?'
+%nonassoc '?' '^' at of
 %nonassoc '{'
 %left PREFIX_BRACKET
 %left '(' '['
@@ -86,6 +93,10 @@ import Language.Verse.Token qualified as Token
   '/' { L _ Token.Divide }
   ':' { L _ Token.Colon }
   ':=' { L _ Token.ColonEqual }
+  '+=' { L _ Token.PlusEqual }
+  '-=' { L _ Token.MinusEqual }
+  '*=' { L _ Token.MultiplyEqual }
+  '/=' { L _ Token.DivideEqual }
   ':)' { L _ Token.ColonRightParen }
   ':\n' { L _ Token.ColonEOL }
   ';' { L _ Token.Semi }
@@ -97,6 +108,12 @@ import Language.Verse.Token qualified as Token
   '>' { L _ Token.Greater }
   '>=' { L _ Token.GreaterEqual }
   '?' { L _ Token.QuestionMark }
+  '^' { L _ Token.Caret }
+  '@' { L _ Token.AtSign }
+  and { L _ Token.And }
+  or { L _ Token.Or }
+  at { L _ Token.At }
+  of { L _ Token.Of }
   '[' { L _ Token.LeftBracket }
   ']' { L _ Token.RightBracket }
   '{' { L _ Token.LeftBrace }
@@ -180,17 +197,41 @@ Exp :: { L (Exp L Name) }
   | Exp '=' BraceInd {
       (:=:) <\$> duplicate $1 <.> duplicate $3
     }
-  | set name '=' Exp {
+  | set Pat '=' Scan Exp %prec SET {
+      Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $5
+    }
+  | set Pat '=' BraceInd %prec SET {
       Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | Pat ':=' Exp {
-      Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
+  | set Pat '+=' Scan Exp %prec SET{
+      Exp.InfixPlusEqual <\$ $1 <.> duplicate $2 <.> duplicate $5
+    }
+  | set Pat '+=' BraceInd %prec SET {
+      Exp.InfixPlusEqual <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | set Pat '-=' Scan Exp %prec SET {
+      Exp.InfixMinusEqual <\$ $1 <.> duplicate $2 <.> duplicate $5
+    }
+  | set Pat '-=' BraceInd %prec SET {
+      Exp.InfixMinusEqual <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | set Pat '*=' Scan Exp %prec SET{
+      Exp.InfixMultiplyEqual <\$ $1 <.> duplicate $2 <.> duplicate $5
+    }
+  | set Pat '*=' BraceInd %prec SET {
+      Exp.InfixMultiplyEqual <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | set Pat '/=' Scan Exp %prec SET {
+      Exp.InfixDivideEqual <\$ $1 <.> duplicate $2 <.> duplicate $5
+    }
+  | set Pat '/=' BraceInd %prec SET {
+      Exp.InfixDivideEqual <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | Pat ':=' Scan Exp {
+      Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $4
     }
   | Pat ':=' BraceInd {
       Exp.InfixColonEqual <\$> duplicate $1 <.> duplicate $3
-    }
-  | Exp '{' List '}' {
-      Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
     }
   | Exp ':\n' indent List dedent {
       Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $4 <. $5)
@@ -243,14 +284,26 @@ Exp :: { L (Exp L Name) }
   | Exp '/' Scan Exp {
       (:/:) <\$> duplicate $1 <.> duplicate $4
     }
+  | Exp and Scan Exp {
+      Exp.And <\$> duplicate $1 <.> duplicate $4
+    }
+  | Exp or Scan Exp {
+      Exp.Or <\$> duplicate $1 <.> duplicate $4
+    }
   | '[' ']' Exp %prec PREFIX_BRACKET {
       Exp.PrefixBracket <\$ $1 <. $2 <.> duplicate $3
     }
   | '?' Exp {
       Exp.PrefixQuery <\$ $1 <.> duplicate $2
     }
+  | '^' Exp {
+      Exp.PrefixCaret <\$ $1 <.> duplicate $2
+    }
   | Exp '?' {
       Exp.PostfixQuery <\$> duplicate $1 <. $2
+    }
+  | Exp '^' {
+      Exp.PostfixCaret <\$> duplicate $1 <. $2
     }
   | truth Block {
       Exp.Truth <\$ $1 <.> duplicate $2
@@ -300,6 +353,18 @@ Exp :: { L (Exp L Name) }
   | Exp '[' List ']' {
       Exp.BracketInvoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
     }
+  | Exp at Block {
+      Exp.ParenInvoke <\$> duplicate $1 <.> duplicate $3
+    }
+  | Exp at Exp {
+      Exp.ParenInvoke <\$> duplicate $1 <.> duplicate $3
+    }
+  | Exp of Block {
+      Exp.BracketInvoke <\$> duplicate $1 <.> duplicate $3 -- Same as ShipVerse
+    }
+  | Exp of Exp {
+      Exp.BracketInvoke <\$> duplicate $1 <.> duplicate $3 -- Same as ShipVerse
+    }
   | Exp '->' Exp {
       $1 :->: $3 <\$ $1 <. $3
     }
@@ -312,7 +377,25 @@ Exp :: { L (Exp L Name) }
   | For { $1 }
   | Exists { $1 }
   | Function { $1 }
+  | Invoke %prec INVOKE { $1 }
   | Pat %shift { Exp.Pat <\$> $1 }
+
+
+
+Invoke :: { L (Exp L Name) }
+  : Exp '{' List '}' Do Until %prec until {
+      Exp.InstDo <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4) <.> (Just <\$> duplicate $5) <.> (Just <\$> duplicate $6)
+    }
+  | Exp '{' List '}' Until %prec until {
+      Exp.InstDo <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4) <.> (Nothing <$ $5) <.> (Just <\$> duplicate $5)
+    }
+  | Exp '{' List '}' Do %prec do {
+      Exp.InstDo <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4) <.> (Just <\$> duplicate $5) <.> (Nothing <$ $5)
+    }
+  | Exp '{' List '}' %prec INVOKE {
+      Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
+  }
+
 
 
 StringCont :: { L [(L (Exp L Name), L String)] }
@@ -326,6 +409,9 @@ Pat :: { L (Pat L Name) }
     }
   | var name ':' Exp {
       Pat.Var <\$ $1 <.> duplicate $2 <.> duplicate $4
+    }
+  | var name %prec NO_COLON {
+      Pat.Var0 <\$ $1 <.> duplicate $2
     }
   | ':' Pat {
       Pat.PrefixColon <\$ $1 <.> duplicate (Exp.Pat <\$> $2)
@@ -342,9 +428,19 @@ Pat :: { L (Pat L Name) }
   | Pat '->' Pat {
       Pat.InfixArrow $1 $3 <\$ $1 <. $3
     }
-  | Pat '(' List ')' {
+  | Pat '(' List ')' Do Until %prec until {
+      Pat.InvokeDo <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4) <.> (Just <\$> duplicate $5) <.> (Just <\$> duplicate $6)
+    }
+  | Pat '(' List ')' Until %prec until {
+      Pat.InvokeDo <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4) <.> (Nothing <$ $5) <.> (Just <\$> duplicate $5)
+    }
+  | Pat '(' List ')' Do %prec do {
+    Pat.InvokeDo <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4) <.> (Just <\$> duplicate $5) <.> (Nothing <$ $5)
+    }
+  | Pat '(' List ')' %prec INVOKE {
       Pat.Invoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
     }
+
 
 If :: { L (Exp L Name) }
   : if Block %prec IF {
@@ -397,6 +493,11 @@ For :: { L (Exp L Name) }
 Do :: { L (Exp L Name) }
   : do Block { $1 .> $2 }
   | do Exp { $1 .> $2 }
+
+Until :: { L (CatchUntil L Name) }
+  : until Block { Exp.Until <\$ $1 <.> duplicate $2}
+  | until Exp { Exp.Until <\$ $1 <.> duplicate $2 }
+  | catch Invoke %prec catch { Exp.Catch <\$ $1 <.> duplicate $2 }
 
 Exists :: { L (Exp L Name) }
   : exists name {
@@ -489,5 +590,8 @@ float = \ case
 name :: L Token -> Maybe (L Name)
 name = \ case
   L x (Token.Name y) -> Just $ L x y
+  L x Token.At -> Just $ L x $ Text.pack "at"
+  L x Token.Of -> Just $ L x $ Text.pack "of"
   _ -> Nothing
+
 }
