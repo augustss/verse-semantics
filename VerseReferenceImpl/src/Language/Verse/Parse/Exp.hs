@@ -9,7 +9,7 @@ module Language.Verse.Parse.Exp
   ) where
 
 import Language.Verse.Name
-import Prettyprinter hiding(braces)
+import Prettyprinter (Pretty(..), Doc, (<+>), vcat, parens, brackets, encloseSep, flatAlt, nest, hardline, group, equals, pipe, dot, colon, lparen, rparen, lbrace, rbrace)
 import Prelude hiding(True, False)
 
 data Exp f a
@@ -57,7 +57,7 @@ data Exp f a
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
-  | Set (f (Exp f a)) (f (Exp f a))
+  | Set (f (Pat f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
   | Option (f (Exp f a))
@@ -70,10 +70,10 @@ data Exp f a
   | String !String [(f (Exp f a), f String)] -- the list is for the more complicated strings, e.g., "abc{ whatever }def"
   | Fun (f (Exp f a)) (f (Exp f a))
   | InfixColonEqual (f (Pat f a)) (f (Exp f a))
-  | InfixPlusEqual (f (Exp f a)) (f (Exp f a))
-  | InfixMinusEqual (f (Exp f a)) (f (Exp f a))
-  | InfixMultiplyEqual (f (Exp f a)) (f (Exp f a))
-  | InfixDivideEqual (f (Exp f a)) (f (Exp f a))
+  | InfixPlusEqual (f (Pat f a)) (f (Exp f a))
+  | InfixMinusEqual (f (Pat f a)) (f (Exp f a))
+  | InfixMultiplyEqual (f (Pat f a)) (f (Exp f a))
+  | InfixDivideEqual (f (Pat f a)) (f (Exp f a))
   | Pat (Pat f a)
 
 deriving instance ( Show (f String)
@@ -223,7 +223,7 @@ instance ( Pretty (f (Exp f a))
          ) => Pretty (CatchUntil f a) where
   pretty = \ case
     Catch e -> "catch" <+> pretty e
-    Until e -> "until" <+> braces (pretty e)
+    Until e -> "until" <> braces (pretty e)
 
 
 

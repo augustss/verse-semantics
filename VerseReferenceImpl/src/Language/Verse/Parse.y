@@ -60,8 +60,8 @@ import Language.Verse.Token qualified as Token
 %left IF IF_THEN FOR INVOKE
 %left then else do
 %left until catch
-%left 'or'
-%left 'and'
+%left or
+%left and
 %right '=' ':=' '+=' '-=' '*=' '/='
 %nonassoc SET
 %left NO_COLON
@@ -74,7 +74,7 @@ import Language.Verse.Token qualified as Token
 %left '+' '-'
 %left '*' '/'
 %left '.'
-%nonassoc '?' '^' 'at' 'of'
+%nonassoc '?' '^' at of
 %nonassoc '{'
 %left PREFIX_BRACKET
 %left '(' '['
@@ -110,10 +110,10 @@ import Language.Verse.Token qualified as Token
   '?' { L _ Token.QuestionMark }
   '^' { L _ Token.Caret }
   '@' { L _ Token.AtSign }
-  'and' { L _ Token.And }
-  'or' { L _ Token.Or }
-  'at' { L _ Token.At }
-  'of' { L _ Token.Of }
+  and { L _ Token.And }
+  or { L _ Token.Or }
+  at { L _ Token.At }
+  of { L _ Token.Of }
   '[' { L _ Token.LeftBracket }
   ']' { L _ Token.RightBracket }
   '{' { L _ Token.LeftBrace }
@@ -197,34 +197,34 @@ Exp :: { L (Exp L Name) }
   | Exp '=' BraceInd {
       (:=:) <\$> duplicate $1 <.> duplicate $3
     }
-  | set Exp '=' Scan Exp %prec SET {
+  | set Pat '=' Scan Exp %prec SET {
       Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $5
     }
-  | set Exp '=' BraceInd %prec SET {
+  | set Pat '=' BraceInd %prec SET {
       Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | set Exp '+=' Scan Exp %prec SET{
+  | set Pat '+=' Scan Exp %prec SET{
       Exp.InfixPlusEqual <\$ $1 <.> duplicate $2 <.> duplicate $5
     }
-  | set Exp '+=' BraceInd %prec SET {
+  | set Pat '+=' BraceInd %prec SET {
       Exp.InfixPlusEqual <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | set Exp '-=' Scan Exp %prec SET {
+  | set Pat '-=' Scan Exp %prec SET {
       Exp.InfixMinusEqual <\$ $1 <.> duplicate $2 <.> duplicate $5
     }
-  | set Exp '-=' BraceInd %prec SET {
+  | set Pat '-=' BraceInd %prec SET {
       Exp.InfixMinusEqual <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | set Exp '*=' Scan Exp %prec SET{
+  | set Pat '*=' Scan Exp %prec SET{
       Exp.InfixMultiplyEqual <\$ $1 <.> duplicate $2 <.> duplicate $5
     }
-  | set Exp '*=' BraceInd %prec SET {
+  | set Pat '*=' BraceInd %prec SET {
       Exp.InfixMultiplyEqual <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
-  | set Exp '/=' Scan Exp %prec SET {
+  | set Pat '/=' Scan Exp %prec SET {
       Exp.InfixDivideEqual <\$ $1 <.> duplicate $2 <.> duplicate $5
     }
-  | set Exp '/=' BraceInd %prec SET {
+  | set Pat '/=' BraceInd %prec SET {
       Exp.InfixDivideEqual <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
   | Pat ':=' Scan Exp {
@@ -284,10 +284,10 @@ Exp :: { L (Exp L Name) }
   | Exp '/' Scan Exp {
       (:/:) <\$> duplicate $1 <.> duplicate $4
     }
-  | Exp 'and' Scan Exp {
+  | Exp and Scan Exp {
       Exp.And <\$> duplicate $1 <.> duplicate $4
     }
-  | Exp 'or' Scan Exp {
+  | Exp or Scan Exp {
       Exp.Or <\$> duplicate $1 <.> duplicate $4
     }
   | '[' ']' Exp %prec PREFIX_BRACKET {
@@ -353,16 +353,16 @@ Exp :: { L (Exp L Name) }
   | Exp '[' List ']' {
       Exp.BracketInvoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
     }
-  | Exp 'at' Block {
+  | Exp at Block {
       Exp.ParenInvoke <\$> duplicate $1 <.> duplicate $3
     }
-  | Exp 'at' Exp {
+  | Exp at Exp {
       Exp.ParenInvoke <\$> duplicate $1 <.> duplicate $3
     }
-  | Exp 'of' Block {
+  | Exp of Block {
       Exp.BracketInvoke <\$> duplicate $1 <.> duplicate $3 -- Same as ShipVerse
     }
-  | Exp 'of' Exp {
+  | Exp of Exp {
       Exp.BracketInvoke <\$> duplicate $1 <.> duplicate $3 -- Same as ShipVerse
     }
   | Exp '->' Exp {
@@ -590,8 +590,8 @@ float = \ case
 name :: L Token -> Maybe (L Name)
 name = \ case
   L x (Token.Name y) -> Just $ L x y
-  L x (Token.At) -> Just $ L x $ Text.pack "at"
-  L x (Token.Of) -> Just $ L x $ Text.pack "of"
+  L x Token.At -> Just $ L x $ Text.pack "at"
+  L x Token.Of -> Just $ L x $ Text.pack "of"
   _ -> Nothing
 
 }
