@@ -19,10 +19,9 @@ data StringDelimiter
 
 data Token
   = All
-  | And
   | Ampersand
+  | And
   | Array
-  | Assume
   | At
   | AtSign
   | Block
@@ -35,13 +34,13 @@ data Token
   | ColonEqual
   | ColonRightParen
   | Comma
-  | Decides
   | Dedent
   | Divide
   | DivideEqual
   | Do
   | Dot
   | DotDot
+  | DotSpace
   | EOF
   | Else
   | Enum
@@ -71,6 +70,7 @@ data Token
   | Multiply
   | MultiplyEqual
   | Name Name
+  | Path Name
   | Newline
   | Not
   | NotEqual
@@ -82,6 +82,7 @@ data Token
   | Plus
   | PlusEqual
   | QuestionMark
+  | Return
   | RightBrace
   | RightBracket
   | RightParen
@@ -89,7 +90,6 @@ data Token
   | Set
   | String StringDelimiter String StringDelimiter
   | Struct
-  | Succeeds
   | Sync
   | Then
   | ThinArrow
@@ -98,16 +98,14 @@ data Token
   | Truth
   | Until
   | Var
-  | Verify
   | Where deriving Show
 
 instance Pretty Token where
   pretty = \ case
     All -> "all"
-    And -> "and"
     Ampersand -> "&"
+    And -> "and"
     Array -> "array"
-    Assume -> "assume"
     At -> "at"
     AtSign -> "@"
     Block -> "block"
@@ -120,13 +118,13 @@ instance Pretty Token where
     ColonEqual -> colon <> equals
     ColonRightParen -> colon <> rparen
     Comma -> comma
-    Decides -> "decides"
     Dedent -> "dedent"
     Divide -> pretty '/'
     DivideEqual -> "/="
     Do -> "do"
     Dot -> dot
     DotDot -> ".."
+    DotSpace -> "."
     EOF -> "end" <+> "of" <+> "file"
     Else -> "else"
     Enum -> "enum"
@@ -156,6 +154,7 @@ instance Pretty Token where
     Multiply -> pretty '*'
     MultiplyEqual -> "*="
     Name x -> pretty x
+    Path x -> pretty x
     Newline -> "newline"
     Not -> "not"
     NotEqual -> "<>"
@@ -167,6 +166,7 @@ instance Pretty Token where
     Plus -> pretty '+'
     PlusEqual -> "+="
     QuestionMark -> pretty '?'
+    Return -> "return"
     RightBrace -> rbrace
     RightBracket -> rbracket
     RightParen -> rparen
@@ -174,7 +174,6 @@ instance Pretty Token where
     Set -> "set"
     String begin x end -> prettyBegin begin <> pretty x <> prettyEnd end
     Struct -> "struct"
-    Succeeds -> "succeeds"
     Sync -> "sync"
     Then -> "then"
     ThinArrow -> pretty '-' <> rangle
@@ -183,7 +182,6 @@ instance Pretty Token where
     Truth -> "truth"
     Until -> "until"
     Var -> "var"
-    Verify -> "verify"
     Where -> "where"
     where
       prettyBegin Quote = "\""

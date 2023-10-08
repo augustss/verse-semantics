@@ -2,7 +2,7 @@
 any(exists X) := X
 
 Cons(X:any)(Xs:any) := all:
-  X|:Xs
+  X|(:Xs)
 
 class1 := class:
   X:Cons(1)
