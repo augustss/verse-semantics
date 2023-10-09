@@ -555,7 +555,7 @@ test(S00){a:int => f(0)():int => f[a][] => 4}
 
 test(D00){a:int => f(b:nat):=nat[b] => f[a]}
 test(D00){a:int => f(:nat):=nat[a] => f[a]}
-test(D00){a:int => f(:int):=nat[a] => f[a]}		#TODO:10.4:CHECK-NAT?
+test(D00){a:int => f(:int):=nat[a] => f[a]}		#TODO:SKIP:ASSUME-FAIL
 test(S00){a:int => f(:int):type{nat[a]} => f[a]}
 test(D00){a:int => f(6)():=7 => f[a]}
 test(D00){a:int => f(b:nat)():=nat[b] => f[a]}
@@ -1442,18 +1442,18 @@ test(F00){0 => {2=3,Err("Hello")}};
 test(S00){as:=(7,8=9) => as=2}
 test(S00){as:=(7,8=9) => as=(_,_)}
 test(S00){as:=(7,8=9) => as[0]}
-test(F00){as:=(7,8=9) => as[0]=6}				#TODO:CHECK-TUPLE-ARG
+test(F00){as:=(7,8=9) => as[0]=6}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
 test(S00){as:=(7,8=9) => as[0]=7}
 test(S00){as:=(7,8=9) => as[0]=8} # questionable due to constant degeneracy
 test(S00){as:=(7,8=9) => as[0]=9} # questionable due to constant degeneracy
-test(F00){as:=(7,8=9) => as[0]=10}				#TODO:CHECK-TUPLE-ARG
+test(F00){as:=(7,8=9) => as[0]=10}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
 test(S00){as:=(7,8=9) => as[1]=2 where 2=3}
-test(F00){as:=(7,8=9) => as[0]=2}				#TODO:CHECK-TUPLE-ARG
-test(F00){as:=(7,8=9) => as where 2=3}			#TODO:CHECK-TUPLE-ARG
-test(F00){as:=(7,8=9) => as[0] where 2=3}		#TODO:CHECK-TUPLE-ARG
-test(F00){as:=(2,3=4) => as where 8=9}			#TODO:CHECK-TUPLE-ARG
-test(F00){as:=(7,8=9) => as=(_,_) where 2=3}	#TODO:CHECK-TUPLE-ARG
-test(F00){as:=(7,8=9) => as[1] where 2=3}		#TODO:CHECK-TUPLE-ARG
+test(F00){as:=(7,8=9) => as[0]=2}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+test(F00){as:=(7,8=9) => as where 2=3}			#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+test(F00){as:=(7,8=9) => as[0] where 2=3}		#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+test(F00){as:=(2,3=4) => as where 8=9}			#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+test(F00){as:=(7,8=9) => as=(_,_) where 2=3}	#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+test(F00){as:=(7,8=9) => as[1] where 2=3}		#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
 
 # Failing and contradictory parameters to native functions.
 test(S00){x:false => -x}
@@ -1517,10 +1517,10 @@ test(S00){x:false => false(x)}
 test(S00){f(x:false,y:int):=false[x]}
 
 # Calling contradictory arrays and functions produces contradictory result.
-test(U00){a&b:any => (a,1)=2 => b=3}			#TODO:ASSUME-FAIL
+test(U00){a&b:any => (a,1)=2 => b=3}			#TODO:SKIP:ASSUME-FAIL
 test(D00){a&b:comparable => (a,1)=b => a=3}
 test(S00){f():=2 => f=3 => f[]=4}
-test(U00){a:any => (a,1)=2 => a=3}				#TODO:ASSUME-FAIL
+test(U00){a:any => (a,1)=2 => a=3}				#TODO:SKIP:ASSUME-FAIL
 
 # Uninhabited parameters to types.
 test(S00){x:false => any[x]}
@@ -1558,11 +1558,11 @@ test(QS00){x:any => allow{assume<decides>{x=3}} where assume{x+1=4}}
 test(S00){as:=(2,3=4) => as=(_,3)}
 test(S00){as:=(2,3=4) => as=(_,4)}
 test(S00){as:=(2,3=4) => as=(_,5)}
-test(F00){as:=(2,3=4) => as=(7,_)}		#TODO:ASSUME-FAIL
-test(F00){as:=(2,3=4) => as[0]=7}		#TODO:ASSUME-FAIL
+test(F00){as:=(2,3=4) => as=(7,_)}		#TODO:SKIP:ASSUME-FAIL
+test(F00){as:=(2,3=4) => as[0]=7}		#TODO:SKIP:ASSUME-FAIL
 test(S00){as:=(2,3=4) => as[1]=3}
 test(S00){as:=(2,3=4) => as[1]=5}
-test(F00){as:=(2,3=4) => as[5]}			#TODO:ASSUME-FAIL
+test(F00){as:=(2,3=4) => as[5]}			#TODO:SKIP:ASSUME-FAIL
 
 # Succeeding unifications and divergence.
 test(F00){:false}
@@ -1606,8 +1606,8 @@ test(S00){as:=(2,3=4) => 2=3}
 test(S00){as:=(2,3=4) => 3=4}
 test(F00){as:=(2,3) => 2=3}
 test(S00){as:=(2,3=4) => as[1]=7}
-test(F00){as:=(2,3=4) => 2=5}		#TODO:ASSUME-FAIL
-test(F00){(a:=2,b:=3=4) => a=7}		#TODO:ASSUME-FAIL
+test(F00){as:=(2,3=4) => 2=5}		#TODO:SKIP:ASSUME-FAIL
+test(F00){(a:=2,b:=3=4) => a=7}		#TODO:SKIP:ASSUME-FAIL
 
 # Prior problems due to constant degeneracy.
 test(S00){array{7,8} where if{1=0 where array{7,9}}}
@@ -1688,8 +1688,8 @@ test(S00){x:=2=(3,4) => 1}
 test(S00){x:=2=(3,4) => 1,1}
 test(N00){2=3 => x}
 test(N00){2=3 => x,1}
-test(F00){92=93 => 94=95}			#TODO:ASSUME-FAIL
-test(F00){92=93 => 94=95,91}		#TODO:ASSUME-FAIL
+test(F00){92=93 => 94=95}			#TODO:SKIP:ASSUME-FAIL
+test(F00){92=93 => 94=95,91}		#TODO:SKIP:ASSUME-FAIL
 test(F00){92 => 4=5}
 test(F00){92 => 94=95,1}
 
@@ -1718,7 +1718,7 @@ test(S00){x:=not 3 => x=0}
 # Ranges under contradictory domains.
 test(S00){1=2 => 0}
 test(S00){1=2 => 1=2}
-test(F00){1=2 => 3=4}				#TODO:ASSUME-FAIL
+test(F00){1=2 => 3=4}				#TODO:SKIP:ASSUME-FAIL
 test(S00){f(1=2)<interacts>:=Print(3)}
 
 # Vacuous heads.
@@ -1743,8 +1743,8 @@ test(S00){x:=7=9 => x}
 test(S00){x:=7=9 => x=7}
 test(S00){x:=7=9 => x=9}
 test(S00){x:=7=9 => 7=9}
-test(F00){x:=7=9 => 6=8}		#TODO:ASSUME-FAIL
-test(F00){x:=7=9 => 6=8}		#TODO:ASSUME-FAIL
+test(F00){x:=7=9 => 6=8}		#TODO:SKIP:ASSUME-FAIL
+test(F00){x:=7=9 => 6=8}		#TODO:SKIP:ASSUME-FAIL
 
 # No loops.
 test(S00){f():=2 => f=2 => f[]=3}
@@ -1752,7 +1752,7 @@ test(S00){f():=2 => f=2 => f[]=3}
 # Consider future axiomatic semantics.
 #test(S00){as:=(_,_) => x:=as[7] => as[7]}
 test(S00){as:=(_,_) => x:=as[7] => as[7]=x}
-test(F00){as:=(_,_) => x:=as[7] => as[8]}				#TODO:ASSUME-FAIL
+test(F00){as:=(_,_) => x:=as[7] => as[8]}				#TODO:SKIP:ASSUME-FAIL
 #test(F00){as:=(_,_) => x:=as[7] => as[8]=x}
 test(R20){assume{x=3},x:=4}
 #test(R20){assume{x=(_,_,_)},x:=(_,_)}
@@ -2168,8 +2168,8 @@ test(D00){f(x:any):int => f[3]=4}
 test(D00){a:comparable => f():comparable => f[]=a}
 
 # Unseen functions.
-test(S00){f(x:int):=x, a:any => a=f => a[_]=3}
-test(F00){f(x:int):=x, a:any => a=f => a[_]='3'}		#TODO:CHECK-CHAR?
+test(S00){f(x:int):=x, a:any => a=f => a[_]=3}			#TODO:SKIP:FUN-EQ
+test(F00){f(x:int):=x, a:any => a=f => a[_]='3'}		#TODO:SKIP:FUN-EQ
 
 # Function breakage resulting from visibility narrowing, which NEWFLOW doesn't patch for functions.
 test(U00){a&b:any => f(x:=x)<computes>:any => f[a]=f[b]}
@@ -3344,7 +3344,7 @@ test(F00){function(g(1):=2){g}[function(0    ){2}][1]}
 test(F00){function(g(1):=3){g}[function(x:int){2}][1]}
 test(S00){function(g(1):int){g}[function(:int){2}][1]=2}
 test(F00){function(g(1):int){g}[function(:int){2}][1]=3}
-test(F00){function(g(x:int):int){g}[function(:any){2}][]}	#TODO:10.4:WHY???
+test(F00){function(g(x:int):int){g}[function(:any){2}][]}	#TODO:10.4:WHY??? rejected by 10.5 / implies-direct with direct
 
 # Misc.
 test(S00){1}

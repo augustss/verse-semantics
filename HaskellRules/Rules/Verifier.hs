@@ -25,7 +25,6 @@ import Data.List( intersect )
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
-import qualified Control.Monad.RWS as unsound
 
 -- | Run verification rules.
 _traceShow :: (Pretty a) => String -> a -> a
@@ -115,7 +114,7 @@ icfpeVerifier = icfp
               <> uniRules
               <> assumeAssertRules
               <> verifierRules
-              -- <> directRules
+              <> directRules
   }
   where icfp = systemICFPE
 
@@ -391,7 +390,7 @@ mustDecide _ bs = go
     -- go (One e)     = go e
     go (e1 :|: e2) = go e1 && go e2
     go (e1 :>: e2) = go e1 && go e2
-    go (e1 :=: e2) = go e1 && go e2
+    go (e1 :=: e2) = go e1 && go e2    -- TODO:COMPARE-ANY!
     go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
     go (Op _)      = True
     go _           = False
@@ -421,15 +420,27 @@ isDecideOp _           = False
 --     test(U00){f(x:any)<varies    >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
 --     test(U00){f(x:any)<transacts >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
 
-_directRules :: VRule
-_directRules _env lhs =
+--     e; E1[succ{E2[e1;e2]}] --> e; E1[succ{E2[e2]}]    if e `implies` e1
+directRules :: VRule
+directRules _env lhs =
    "implies-direct" `name`
    do e :>: rhs <- [lhs]
-      (ctx, _, bs, e1 :>: e2) <- eX rhs
-      guard (null (free e1 `intersect` bndIds bs))
+      (ctx1, _, bs1, Assert e') <- eX rhs
+      (ctx2, _, bs2, e1 :>: e2) <- eX e'
+      guard (null (free e1 `intersect` bndIds (bs1 ++ bs2)))
       guard (implies e e1)
       guard (e /= Fail)
-      pure (e :>: ctx e2)
+      pure (e :>: ctx1 (Assert (ctx2 e2)))
+
+
+   --     e; E[e1;e2] --> e; E[e2]     if e `implies` e1
+   -- "implies-direct" `name`
+   -- do e :>: rhs <- [lhs]
+   --    (ctx, _, bs, e1 :>: e2) <- eX rhs
+   --    guard (null (free e1 `intersect` bndIds bs))
+   --    guard (implies e e1)
+   --    guard (e /= Fail)
+   --    pure (e :>: ctx e2)
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
