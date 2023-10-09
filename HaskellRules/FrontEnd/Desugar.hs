@@ -564,7 +564,10 @@ scope sc = expr
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
     expr (If3 e1 e2 e3) = do
       (e1', sc') <- defs sc e1
-      If3 e1' <$> scopeD sc' e2 <*> exprD e3
+      let Exists _is e1'' = e1'
+      e2' <- scopeD sc' e2
+      e3' <- exprD e3
+      pure (If3 e1'' e2' e3')
     expr (For2 e1 e2) = do
       (e1', sc') <- defs sc e1
       For2 e1' <$> scopeD sc' e2
@@ -614,7 +617,8 @@ getVisible (Array es) = concatMap getVisible es
 getVisible (Seq es) = concatMap getVisible es
 getVisible (ApplyS e1 e2) = getVisible e1 ++ getVisible e2
 getVisible (ApplyD e1 e2) = getVisible e1 ++ getVisible e2
-getVisible If3{} = []
+-- getVisible (If3 {}) = []
+getVisible (If3 e _ _) = getVisible e
 getVisible For2{} = []
 getVisible (Let _ e) = getVisible e
 getVisible Block{} = []
@@ -643,7 +647,8 @@ getVar (Array es) = concatMap getVar es
 getVar (Seq es) = concatMap getVar es
 getVar (ApplyS e1 e2) = getVar e1 ++ getVar e2
 getVar (ApplyD e1 e2) = getVar e1 ++ getVar e2
-getVar If3{} = []
+-- getVar If3{} = []
+getVar (If3 e _ _) = getVar e
 getVar For2{} = []
 getVar (Let _ e) = getVar e
 getVar Block{} = []
@@ -888,6 +893,7 @@ lower (Unify e1 e2) = Unify <$> lower e1 <*> lower e2
 lower (Choice e1 e2) = Choice <$> lower e1 <*> lower e2
 lower (For2 (Exists is e1) e2) = join $ lowerFor is <$> lower e1 <*> lower e2
 lower (If3 (Exists is e1) e2 e3) = join $ lowerIf is <$> lower e1 <*> lower e2 <*> lower e3
+lower (If3 e1 e2 e3)                = join $ lowerIf [] <$> lower e1 <*> lower e2 <*> lower e3
 lower (Macro1 (Ident _ "all") [] e) = lowerAll =<< lower e
 lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
 lower (Succeeds e) = lowerSucceeds =<< lower e
