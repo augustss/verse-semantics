@@ -64,6 +64,7 @@
 \newcommand{\Ie}[1]{{\mathcal I}\llbracket #1 \rrbracket}
 % \newcommand{\Me}[2]{{\mathcal M}\llbracket #1 \blacktriangleright #2 \rrbracket}
 \newcommand{\Me}[2]{{\mathcal M}\llbracket #2 \rrbracket #1}
+\newcommand{\DMe}[2]{{\mathcal M}\llbracket #2 \rrbracket #1}
 \newcommand{\Fe}[2]{{\mathcal F}\llbracket #2 \rrbracket #1}
 \newcommand{\MMe}[3]{{\mathcal M}_{#3}\llbracket #2 \rrbracket #1}
 \newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
@@ -996,63 +997,76 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 
 \begin{figure}
 $$\begin{array}{@@{}l}
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|De t| = |e|$}} \\[0.02in]
-\rulename{dconst}  & |De k|                  & = & |k| \\
-\rulename{dvar}    & |De x|                  & = & |x| \\
-\rulename{dapp}    & |De (t_1^[t_2])|         & = & |((De t_1))^[De t_2]| \\[2mm]
-\rulename{dfun}    & |De (functionP t_1 t_2)|
-  & = & |verify (lam i (Me i t_1); assert (De t_2));| & \mbox{[verify definition]} \\
-  &&&   |lam i (verify (assert (Me i t_1 )); De t_2)|  & \mbox{[verify call sites]} \\[2mm]
+\multicolumn{1}{c}{
+\begin{array}{rcll}
+  |i| & ::= & |bullet| \vb x & \text{Inputs}
+\end{array}} \\[2mm]
 
-\rulename{doftype} & |De (oftype t_1 t_2)|
-         & = & |y:=De t_1; verify (assert (Me y t_2));|  & \text{|y| fresh} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|De t| = |e|$ and $|DMe i t| = |e|$}} \\[0.02in]
+\rulename{dinit}   & |De t | & = & |DMe bullet t| \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Function rules, for open functions}} \\
+\rulename{dfun}    & |DMe bullet (functionP t_1 t_2)|
+  & = & |verify (lam i (Me i t_1); assert (De t_2));| & \mbox{[verify definition]} \\
+%  &&&   |lam i (verify (assert (Me i t_1 )); De t_2)|  & \mbox{[verify call sites]} \\[2mm]
+& &   & |lamhdr i| \begin{array}[t]{l}
+    |if (Me i t_1)| \\
+    |then (forall r (assume (r = Me bullet (t_2)); r))| \\
+    |else (verify (assert fail)))|
+   \end{array} & \mbox{[verify calls]} \\[4mm]
+\rulename{mfun}  & |DMe f (functionP t_1 t_2)|
+     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
+%   & &   & \multicolumn{2}{@@{}l}{|lam i (Me i t_1; forall r (assume (r = (De (:t_2))); r))|} \\[2mm]
+& &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
+    |if (j := Me i t_1)| \\
+    |then (forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\
+    |else (f^[i]))|
+   \end{array}} \\[4mm]
+
+\rulename{doftype} & |DMe i (oftype t_1 t_2)|
+         & = & |y:=DMe i t_1; verify (assert ((De t_2)^[y]));|  & \text{|y| fresh} \\
          &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
 
-\rulename{dother}   & |De e|                  & = & |def i (Me i e)|  & \mbox{otherwise} \\
-  \end{array}
-\\ \\
+\multicolumn{4}{l}{\mbox{\it Type rules}} \\
+\rulename{dtype}   & |DMe bullet (:t)|           & = & |def x (((De t))^[x])| \\
+\rulename{mtype}   & |DMe x (:t)|           & = & |((De t))^[x]| \\[2mm]
 
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{5}{l}{\mbox{{\bf Transformation:} $|Me i t| = |e|$}} \\[0.02in]
-\rulename{mtype}   & |Me i (:t)|           & = & |((De t))^[i]| \\[2mm]
-\rulename{mbind}   & |Me i (x:=t)|         & = & |x := Me i t| \\
-\rulename{meq}     & |Me i (t_1=t_2)|      & = & |(Me i t_1) = (Me i t_2)| \\
-\rulename{msemi}   & |Me i (t_1 ; t_2)|    & = & |De t_1 ; Me i t_2| \\
-\rulename{mchoice} & |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
-\rulename{mif}     & |Me i (if(t_1) then t_2 else t_3)| & = &
-    \multicolumn{2}{@@{}l}{|if (De t_1) then Me i t_2 else Me i t_3|} \\[2mm]
-\rulename{mother}  & |Me i t|              & = & |i = (De t)| & \mbox{otherwise}\\[0.02in]
-\\
-\multicolumn{4}{l}{\textbf{Derived facts}} \\
-\rulename{deq}     & |De (t_1==t_2)|          & = & |De t_1==De t_2| \\
-\rulename{dchoice} & |De (t_1 `choice` t_2)|  & = & |De t_1 `choice`De t_2| \\
-\rulename{dbind}   & |De (x := e)|            & = & |x := De e| \\
-\rulename{dseq}    & |De (t_1 ; t_2)|         & = & |De t_1 ; De t_2| \\
-\rulename{dmif}     & |De (if(t_1) then t_2 else t_3)| & = &
-    \multicolumn{2}{@@{}l}{|if (De t_1) then De t_2 else De t_3|} \\
-    \\
-\multicolumn{5}{l}{\mbox{\bf Desugaring for execution:}} \\[0.02in]
-\rulename{dconst}  & |De k|                  & = & |k| \\
-\rulename{dvar}    & |De x|                  & = & |x| \\
-\rulename{dapp}    & |De (t_1^[t_2])|         & = & |((De t_1))^[De t_2]| \\
-\rulename{dfun'}    & |De (functionP t_1 t_2)| & = & |lam i (Me i t_1; De t_2)| \\
-\rulename{doftype'} & |De (oftype t_1 t_2)|
-         & = & |y:=De t_1; Me y t_2|  & \text{|y| fresh} \\
-\rulename{dother}   & |De e|                  & = & |def i (Me i e)|  & \mbox{otherwise} \\[2mm]
+\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
+\rulename{mbind}   & |DMe i (x:=t)|         & = & |x := DMe i t| \\
+\rulename{meq}     & |DMe i (t_1=t_2)|      & = & |(DMe i t_1) = (DMe i t_2)| \\
+\rulename{msemi}   & |DMe i (t_1 ; t_2)|    & = & |De t_1 ; DMe i t_2| \\
+\rulename{mchoice} & |DMe i ((t_1 `choice` t_2))| & = & |(DMe i t_1) `choice` (DMe i t_2)| \\
+\multicolumn{2}{l}{\rulename{mif}\; |DMe i (if(t_1) then t_2 else t_3)|} & = &
+    \multicolumn{2}{@@{}l}{|if (De t_1) then DMe i t_2 else DMe i t_3|} \\[2mm]
 
-\rulename{mtype}   & |Me i (:t)|           & = & |((De t))^[i]| \\[2mm]
-\rulename{mbind}   & |Me i (x:=t)|         & = & |x := Me i t| \\
-\rulename{meq}     & |Me i (t_1=t_2)|      & = & |(Me i t_1) = (Me i t_2)| \\
-\rulename{msemi}   & |Me i (t_1 ; t_2)|    & = & |De t_1 ; Me i t_2| \\
-\rulename{mchoice} & |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
-\rulename{mif}     & |Me i (if(t_1) then t_2 else t_3)| & = &
-    \multicolumn{2}{@@{}l}{|if (De t_1) then Me i t_2 else Me i t_3|} \\[2mm]
-\rulename{mother'}  & |Me i t|              & = & |i| & \mbox{otherwise}
+\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
+\rulename{dother}  & |DMe x t|              & = & |x = (DMe bullet t)| & \mbox{otherwise}\\[0.02in]
+\rulename{dconst}  & |DMe bullet k|                  & = & |k| \\
+\rulename{dvar}    & |DMe bullet x|                  & = & |x| \\
+\rulename{dapp}    & |DMe bullet (t_1^[t_2])|         & = & |((De t_1))^[De t_2]|
+
+% \multicolumn{5}{l}{\mbox{\bf Desugaring for execution:}} \\[0.02in]
+% \rulename{dconst}  & |De k|                  & = & |k| \\
+% \rulename{dvar}    & |De x|                  & = & |x| \\
+% \rulename{dapp}    & |De (t_1^[t_2])|         & = & |((De t_1))^[De t_2]| \\
+% \rulename{dfun'}    & |De (functionP t_1 t_2)| & = & |lam i (Me i t_1; De t_2)| \\
+% \rulename{doftype'} & |De (oftype t_1 t_2)|
+%          & = & |y:=De t_1; Me y t_2|  & \text{|y| fresh} \\
+% \rulename{dother}   & |De e|                  & = & |def i (Me i e)|  & \mbox{otherwise} \\[2mm]
+%
+% \rulename{mtype}   & |Me i (:t)|           & = & |((De t))^[i]| \\[2mm]
+% \rulename{mbind}   & |Me i (x:=t)|         & = & |x := Me i t| \\
+% \rulename{meq}     & |Me i (t_1=t_2)|      & = & |(Me i t_1) = (Me i t_2)| \\
+% \rulename{msemi}   & |Me i (t_1 ; t_2)|    & = & |De t_1 ; Me i t_2| \\
+% \rulename{mchoice} & |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
+% \rulename{mif}     & |Me i (if(t_1) then t_2 else t_3)| & = &
+%    \multicolumn{2}{@@{}l}{|if (De t_1) then Me i t_2 else Me i t_3|} \\[2mm]
+%\rulename{mother'}  & |Me i t|              & = & |i| & \mbox{otherwise}
 
 \end{array}
 \end{array}$$
-\caption{SPJ new version (3 Oct): being careful about arg-equality vs arg-transformation.}
+\caption{SPJ new version (6 Oct)}
 \end{figure}
 
 \end{document}

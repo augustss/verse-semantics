@@ -46,7 +46,8 @@
 %format (Ve (x)) = "\Ve{" ^ x "}"
 %format (Ie (x)) = "\Ie{" ^ x "}"
 %format (Fe (i) (e)) = "\Fe{" ^ i "}{" ^e "}"
-%format (Me (i) (e)) = "\Me{" ^ i "}{" ^e "}"
+%format (Me  (i) (e)) = "\Me{"  ^ i "}{" ^e "}"
+%format (DMe (i) (e)) = "\DMe{" ^ i "}{" ^e "}"
 %format (MMe (m) (i) (e)) = "\MMe{" ^ i "}{" ^e "}{" ^m "}"
 
 %format (Ae (i) (e)) = "\Ae{" ^ i "}{" ^e "}"
@@ -198,6 +199,7 @@
 %format succeed (x) = "\textbf{suc}\{" x "\}"
 %format verify (x) = "\textbf{verify}\{" x "\}"
 %format decide (x) = "\textbf{dec}\{" x "\}"
+%format bullet = "\bullet"
 
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"

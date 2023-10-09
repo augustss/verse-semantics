@@ -44,31 +44,33 @@ x;
 
 ## Postfix
 f(0){1};
-# f(0)do{1}; NOT YET
-# f(0)do 1;
+f(0)do{2; 3};
+f(0)do. 4;
+f(0)do 5;
 f{1};
-# f{1}do{2};
-# f{1}until{2};
-# f{1}until 2;
-# f{1}catch(2){3};
+f{1}do{2};
+f{1}until{2};
+f{1}until 2;
+f{1}catch(2){3};
 f(0);
-#f at {1};
-#f at 1;
-#f of {1};
-#f of 1;
-#x^;
+g(1){1}catch(2){3};
+f at {1};
+f at 1;
+f of {1};
+f of 1;
+x^;
 x?;
 x[1];
 x.y;
-#x^[1](2); NOT YET
+x^[1](2);
 ## Prefix
-#^x;
+^x;
 ?x;
 #[1]x; NOT YET
 +x;
 -x;
 # *x; NOT YET
-# -^x;
+-^x;
 #+{1;2};
 ## Mul
 x*y;
@@ -105,26 +107,39 @@ x=y=z;
 not x;
 not not x;
 ## And
-#x and y;
-#x and y and z;
+x and y;
+x and y and z;
 ## Or
-#x or y;
-#x or y or z;
+x or y;
+x or y or z;
 ## Def 1
-### In
+## In
 #in x;
 :x;
 ### Var
-#var x;
+var x;
 #set x;
 #ref x;
 #alias x;
-#var x = 1;
-#var x := 1;
-#var x += 1;
-#var x *= 1;
-#var x /= 1;
-#var x = {1};
+var x = 1;
+var x := 1;
+set x += 1;
+set x *= 1;
+set x /= 1;
+set x = {1};
+set x = {1; 2};
+var x =
+  1
+  2;
+set x =
+  1
+  2;
+var x :=
+  1
+  2;
+set x +=
+  1
+  2;
 ###
 x:=y;
 x:=y:=z;
