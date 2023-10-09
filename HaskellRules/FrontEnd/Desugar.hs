@@ -1659,15 +1659,6 @@ dsM10 I ((Function [(t1, _effs)] t2)) f = do
   t2' <- dsM10 I t2 z
   pure $ eVerify $ Lam i' $ seqE [{- ASSUME-INPUT-direct-implies  eAssume -} (DefineE i t1'), eAssert $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
 
--- dsM10 ((Function [(Range t1, _effs)] (Range t2))) f = do
---   i <- newIdent (getLoc t1) "i"
---   i' <- newIdent (getLoc t1) "i'"
---   z <- newIdent (getLoc t2) "z"
---   t1' <- dsM11 (Range t1) i'
---   t2' <- dsM11 (Range t2) z
---   pure $ seqE [eVerify $ Lam i' $ seqE [DefineE i t1', Succeeds $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
---               ,          Lam i' $ seqE [DefineE i t1', eAssume  $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
---               ]
 dsM10 _ (Range t)       i = ApplyD    <$> dsD10 t <*> pure (Variable i)
 dsM10 m (DefineE x t)   i = DefineE x <$> dsM10 m t i
 dsM10 m (Unify t1 t2)   i = Unify     <$> dsM10 m t1 i <*> dsM10 m t2 i
