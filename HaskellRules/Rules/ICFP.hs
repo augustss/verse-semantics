@@ -354,7 +354,7 @@ execX lhs = execX1 lhs ++ [(id,lhs)]
 execX1 lhs =
   do (v :=: x) :>: e <- [lhs]
      (ctx, hole) <- execX x
-     pure (\ a -> (v :=: ctx a) :>: e , hole)
+     pure (\ a -> (v :=: ctx a) :>: e, hole)
  ++
   do x :>: e <- [lhs]
      (ctx, hole) <- execX x

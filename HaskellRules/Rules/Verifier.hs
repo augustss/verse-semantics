@@ -409,7 +409,7 @@ isDecideOp (Op Append) = True
 isDecideOp _           = False
 
 -- | Rules that are like `verifier` but don't require explicit ASSUME but work under left-to-right evaluation order
---   commenting out, as too STRONG, lets us prove stuff like below, regardless of effect, as they are desugared to
+--   have to be careful as they can be too STRONG, lets us prove stuff like below, regardless of effect, as they are desugared to
 --          ... succ{ exi x. x = f(3); x = f(3); ... }
 --   and the second x = f(3) is "implied" and hence, gobbled up by the first which is unsound...
 --     test(D00){f(:int):int=>{f(3)=f(3)}} 					#TODO:FUN-OUT-EQ
