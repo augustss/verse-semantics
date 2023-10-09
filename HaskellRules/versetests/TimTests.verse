@@ -2168,8 +2168,8 @@ test(D00){f(x:any):int => f[3]=4}
 test(D00){a:comparable => f():comparable => f[]=a}
 
 # Unseen functions.
-test(S00){f(x:int):=x, a:any => a=f => a[_]=3}			#TODO:SKIP:FUN-EQ
-test(F00){f(x:int):=x, a:any => a=f => a[_]='3'}		#TODO:SKIP:FUN-EQ
+test(S00){f(x:int):=x, a:any => a=f => a[_]=3}			#TODO:SKIP:rejected by L2R
+test(F00){f(x:int):=x, a:any => a=f => a[_]='3'}		#TODO:SKIP:rejected by L2R
 
 # Function breakage resulting from visibility narrowing, which NEWFLOW doesn't patch for functions.
 test(U00){a&b:any => f(x:=x)<computes>:any => f[a]=f[b]}

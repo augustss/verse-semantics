@@ -1661,7 +1661,8 @@ dsM10 I ((Function [(t1, _effs)] t2)) f = do
 
 dsM10 _ (Range t)       i = ApplyD    <$> dsD10 t <*> pure (Variable i)
 dsM10 m (DefineE x t)   i = DefineE x <$> dsM10 m t i
-dsM10 m (Unify t1 t2)   i = Unify     <$> dsM10 m t1 i <*> dsM10 m t2 i
+-- dsM10 m (Unify t1 t2)   i = Unify     <$> dsM10 m t1 i <*> dsM10 m t2 i
+dsM10 m (Unify t1 t2)   i = do { t1' <- dsM10 m t1 i; t2' <- dsM10 m t2 i; pure (Seq [t1', t2'])}
 dsM10 m (Seq [])        i = dsM10 m (Array []) i
 dsM10 m (Seq [t])       i = dsM10 m t i
 dsM10 m (Seq (t:ts))    i = seqE      <$> sequence [dsD10 t, dsM10 m (Seq ts) i]
