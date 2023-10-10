@@ -368,8 +368,9 @@ dsDx e = do
   how <- gets context
   case how of
     DFig6  -> dsD e
-    DFig11 -> dsD11 e
     DFig10 -> dsD10 e
+    DFig11 -> dsD11 e
+    DFig13 -> dsD13 e
 
 -- All cases, but the last, can be removed.
 -- They are just there to avoid introducing unused existentials.
@@ -1128,6 +1129,7 @@ lowerSucceeds e = do
       DFig6  -> pure $ eAssert e
       DFig10 -> pure $ eAssert e
       DFig11 -> pure $ Succeeds e
+      DFig13 -> pure $ eAssert e  -- XXX ???
    else if asmVerif then
     pure $ e
    else if useSplit then
@@ -1678,3 +1680,33 @@ dsM10 m (Choice t1 t2)  i = Choice    <$> dsM10 m t1 i <*> dsM10 m t2 i
 dsM10 m (If3 e1 e2 e3)  i = If3       <$> dsD10 e1     <*> dsM10 m e2 i <*> dsM10 m e3 i
 dsM10 _ (OfType _t1 _t2)  _i = error "TODO" -- OfType    <$> dsM11 t1 i <*> dsD11 t2
 dsM10 _ t               i = unifyV i <$> dsD11 t
+
+dsD13 :: Expr -> D Expr
+dsD13 e = dsM13 e Nothing
+
+dsM13 :: Expr -> Maybe Ident -> D Expr
+dsM13 ((Function [(t1, _effs)] t2)) Nothing = do
+  i <- newIdent (getLoc t1) "i"
+  r <- newIdent (getLoc t2) "r"
+  t1' <- dsM13 t1 (Just i)
+  t2' <- dsD13 t2
+  t2'' <- dsM13 t2 Nothing
+  pure $ seqE [eVerify $ Lam i $ seqE [t1', eAssert t2'],
+               Lam i $ If3 (Exists [] t1')
+                           (Forall [r] $ seqE [eAssume (unifyV r t2''), Variable r])
+                           (eVerify (eAssert Fail))
+              ]
+dsM13 ((Function [(t1, _effs)] t2)) (Just f) = do
+  i <- newIdent (getLoc t1) "i"
+  j <- newIdent (getLoc t1) "j"
+  r <- newIdent (getLoc t2) "r"
+  z <- newIdent (getLoc t2) "z"
+  t1' <- dsM13 t1 (Just i)
+  t2' <- dsM13 t2 (Just z)
+  let defZ = DefineE z $ ApplyD (Variable f) (Variable j)
+  pure $ seqE [eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']],
+               Lam i $ If3 (Exists [j] (unifyV j t1'))
+                           (Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r])
+                           (ApplyD (Variable f) (Variable i))
+              ]
+dsM13 _ _ = undefined
