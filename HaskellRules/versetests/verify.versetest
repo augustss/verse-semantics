@@ -3,6 +3,8 @@ verify("Trivial-pass", pass){1}
 verify("Trivial-fail", fail){succeeds{0=1}}
 #
 # Some simple tests
+verify(pass) {foo(z:int) := { z = z } }
+verify(pass) {foo(z:any) := { x:int = 1; int[x] } }
 verify(pass) {f(x:int):={x=x;x}}
 verify(pass) {f(x:int):=x+1}
 verify(fail) {f(x:int):=x+()}
@@ -10,6 +12,7 @@ verify(pass) {f(x:int):=x; f(1)}
 verify(pass) {f(x:int):=x+1; f(1)}
 verify(fail) {f(x:int):=x; f()}
 verify(fail) {f(x:int):=x+1; f()}
+verify(pass) {f(x:int):int=x}
 verify(pass) {f(x:int):int=x+1; f(1)}
 verify(fail) {f(x:int):int=x+1; f()}
 verify(pass) {f(x:int):int = x; a := f(1); int[a] }
@@ -78,6 +81,7 @@ verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
 verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
 
 # decides
+verify(pass) { three(x:any)<decides> := { x = 3 } }
 verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {x} }
 verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {3} }
 verify(fail) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {4} }
@@ -89,9 +93,9 @@ verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo
 verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
 
 
-# currently fails
-# verify(pass,broken) { foo(x:any)<decides> := { x = 666 } }
-# verify(pass,broken) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
+# disallow any to unify with int?
+verify(pass) { foo(x:any)<decides> := { x = 666 } }
+verify(pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
 
 verify(pass) {f(x:int)<succeeds>:=x/2}
 verify(fail) {f(x:int)<succeeds>:=x/0}
@@ -112,5 +116,10 @@ verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
 
 # if-then-else (binders)
 
-# LA: marked as broken, should pass
+# LA: marked as broken, should pass RJ: need to desugar so 'x' in scope outside
 verify(broken) { f(:any) := { if (x:=1) then {x} else {2} } }
+
+verify(pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
+verify(fail) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
+verify(pass) { gg(x:any) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be accepted
+verify(fail) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } } # because f expects g to return an int, and it doesn't

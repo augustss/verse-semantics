@@ -6,7 +6,7 @@ module Rules.ICFP(
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, anf, anfK, execX, ltExpr) where
+  isRecursive, anf, anfK, execX, choiceX, ltExpr) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe
@@ -336,6 +336,15 @@ instance Substitutable Context where
   subst s ctx = \ x -> subst ((hole, x) : s) (ctx (Var hole))
     where hole = Name "**HOLE**"
 
+
+-- | [NOTE:verifer-assume] In the verifier, we often want the EXI-FLOAT rule to work *under* an assume,
+--   e.g. to rewrite
+--       assume { x = (exi y. e1; e2) } -> assume {exi y. e1; x = e2}
+--   and we want this to work _even_ when the equation is NOT followed by a ;...
+--   because the asm-seq rule will decompose
+--       assume { x = (exi y. ...) ; e } --> assume {x = (exi y...) }; assume { e }
+--   hence I'm generalizing the execX1 case to not require something to the right of the equation.
+
 -- scope contexts
 
 execX, execX1 :: Expr -> [(Context, Expr)]
@@ -364,10 +373,11 @@ execX1 lhs =
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
---  ++ -- extra rule for verifier
---   do (Assume x) :>: e <- [lhs]
---      (ctx, hole) <- execX x
---      pure ( \ a -> Assume (ctx a) :>: e, hole)
+  -- extra rule for verifier to elim stuff like `exi x. assume { x = 2 }; 99`
+ ++
+  do Assume e <- [lhs]
+     (ctx, hole) <- execX e
+     return (Assume . ctx, hole)
 
 substX :: Expr -> [(Context, Expr)]
 -- X context
@@ -474,6 +484,7 @@ isChoiceFree (Split _ (LAM _ f) (Var _)) = isChoiceFree f
 isChoiceFree e@Split{} = error $ "bad split: " ++ prettyShow e
 isChoiceFree Wrong{}   = True
 isChoiceFree (EXI _ e) = isChoiceFree e  -- necessary when using split
+isChoiceFree (Assume e) = isChoiceFree e
 isChoiceFree _         = False
 
 isChoiceFreeOp :: Op -> Bool
@@ -923,7 +934,7 @@ ruleElimL _ lhs =
      guard (x `notElem` freeV)
      pure (ctx (Val v))
 
--- X context, or exist x . defX
+-- X context, or exist x, or assume . . defX
 defX :: Ident -> Expr -> [(Context, Expr)]
 defX xx lhs =
   do execX lhs
@@ -932,6 +943,7 @@ defX xx lhs =
      guard (x /= xx)
      (ctx, hole) <- defX xx dx
      return (Exi . Bind x . ctx, hole)
+
 
 --------------------------------------------------------------------------------
 

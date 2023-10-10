@@ -18,7 +18,7 @@ import TRS.TRS hiding (step)
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core hiding (Wrong)
-import Rules.ICFP (systemICFP, systemICFPE, execX, ltExpr, isChoiceFreeOp)
+import Rules.ICFP (systemICFP, systemICFPE, execX, choiceX, ltExpr, isChoiceFreeOp)
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
 import Data.List( intersect )
@@ -46,7 +46,7 @@ verifyM sys e = res
 
 verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
 verify sys e =
-  let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = 10000 } }
+  let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = 20000 } }
   in  case verifyM sys' e of
         Just  x -> x
         Nothing -> undefined
@@ -222,6 +222,13 @@ generalizedIcfpRules env lhs =
    do e :>: Fail <- [lhs]
       guard (effectFree e)
       pure Fail
+   ++
+   -- Generalize `CHOOSE` to use lambda as an SX
+   -- \z.CX[e1|e2] --> \z.CX[e1]|CX[e2]
+   "CHOOSE-GEN" `name`
+   do LAM z e <- [lhs]
+      (cx, e1 :|: e2) <- choiceX e
+      pure (LAM z (cx e1 :|: cx e2))
 
 effectFree :: Expr -> Bool
 effectFree (Val _)       = True
@@ -294,8 +301,17 @@ assumeAssertRules env lhs =
      pure (x :=: Assume e)
   ++
   "asm-asm-swap" `name`
-  do Assume e1 :>: (Assume e2 :>: e) <- [lhs]
+  do Assume e1@(_ :@: _) :>: (Assume e2@(Var _ :=: _) :>: e) <- [lhs]
      pure (Assume e2 :>: (Assume e1 :>: e))
+  ++
+  "EXI-FLOAT-GEN" `name`
+  do Assume (Val v :=: EXI x e) <- [lhs]
+     let freeX = free v
+         x'    = identNotIn (freeX ++ free e)
+     if x `elem` freeX
+       then pure (Assume (EXI x' (Val v :=: subst [(x, Var x')] e)))
+       else pure (Assume (EXI x  (Val v :=: e)))
+     -- pure (Assume (EXI x (Val v :=: e)))
   ++
 --   -- ASSERT --
 --   -- Assert { e } ----> e   if   e mustSucceed
@@ -374,9 +390,10 @@ mustDecide _ bs = go
     -- go (One e)     = go e
     go (e1 :|: e2) = go e1 && go e2
     go (e1 :>: e2) = go e1 && go e2
-    go (e1 :=: e2) = go e1 && go e2
+    go (e1 :=: e2) = go e1 && go e2    -- TODO:COMPARE-ANY!
     go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
     go (Op _)      = True
+    go Fail        = True
     go _           = False
 
 isDecideOp :: Expr -> Bool
@@ -393,16 +410,38 @@ isDecideOp (Op Append) = True
 isDecideOp _           = False
 
 -- | Rules that are like `verifier` but don't require explicit ASSUME but work under left-to-right evaluation order
+--   have to be careful as they can be too STRONG, lets us prove stuff like below, regardless of effect, as they are desugared to
+--          ... succ{ exi x. x = f(3); x = f(3); ... }
+--   and the second x = f(3) is "implied" and hence, gobbled up by the first which is unsound...
+--     test(D00){f(:int):int=>{f(3)=f(3)}} 					#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)            :any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<converges >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<reads     >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<writes    >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<varies    >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
+--     test(U00){f(x:any)<transacts >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
 
+--     e; E1[succ{E2[e1;e2]}] --> e; E1[succ{E2[e2]}]    if e `implies` e1
 directRules :: VRule
 directRules _env lhs =
    "implies-direct" `name`
    do e :>: rhs <- [lhs]
-      (ctx, _, bs, e1 :>: e2) <- eX rhs
-      guard (null (free e1 `intersect` bndIds bs))
+      (ctx1, _, bs1, Assert e') <- eX rhs
+      (ctx2, _, bs2, e1 :>: e2) <- eX e'
+      guard (null (free e1 `intersect` bndIds (bs1 ++ bs2)))
       guard (implies e e1)
       guard (e /= Fail)
-      pure (e :>: ctx e2)
+      pure (e :>: ctx1 (Assert (ctx2 e2)))
+
+
+   --     e; E[e1;e2] --> e; E[e2]     if e `implies` e1
+   -- "implies-direct" `name`
+   -- do e :>: rhs <- [lhs]
+   --    (ctx, _, bs, e1 :>: e2) <- eX rhs
+   --    guard (null (free e1 `intersect` bndIds bs))
+   --    guard (implies e e1)
+   --    guard (e /= Fail)
+   --    pure (e :>: ctx e2)
 
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
@@ -428,8 +467,9 @@ verifierRules env lhs =
    "suc-elim" `name`
    do (ctx, g,_, Assert e) <- eX lhs
       guard (mustSucceed g (bndVars env) e)
-      -- (old-style) pure (ctx e)
-      pure (ctx (Arr []))
+      -- (old-style)
+      pure (ctx e)      -- # old-style
+      -- pure (ctx (Arr []))  -- # spj-style
    ++
    -- DECIDE --
    -- Decide { e } ----> e   if   e mustDecide
@@ -456,18 +496,32 @@ verifierRules env lhs =
    --    let (eThen, eElse) = unfoldIte e1 e2 e3
    --    pure (eThen :|: eElse)
    -- ++
-   -- Verify{CTX[if e1 e2 e3]} ---> Verify{CTX[(assume{e1} ; e2)}; Verify{CTX(e3)} IF CTX `mustDecide` e1
+--   -- Verify{CTX[if e1 e2 e3]} ---> Verify{CTX[(assume{e1} ; e2)}; Verify{CTX(e3)} IF CTX `mustDecide` e1
+--   "asm-if" `name`
+--   do Verify e <- [lhs]
+--      (ctx, g, bs, If e1 e2 e3) <- eX e
+--      let bs0 = bndVars env
+--      guard (mustDecide g (bs0 ++ bs) e1)
+--      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx (Fails e1 :>: e3)))
+--   ++
+   -- Verify{CTX[exi xs. if e1 e2 e3]} ---> Verify{CTX[exi xs. assume{e1} ; e2]}; Verify{CTX(Fails (exis xs e1); e3)} IF CTX + xs `mustDecide` e1
    "asm-if" `name`
    do Verify e <- [lhs]
-      (ctx, g, bs, If e1 e2 e3) <- eX e
+      (ctx, g, bs, e') <- eX e
+      (xs, If e1 e2 e3) <- splitIf e'
       let bs0 = bndVars env
-      guard (mustDecide g (bs0 ++ bs) e1)
-      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx (Fails e1 :>: e3)))
+      guard (mustDecide g (bs0 ++ bs ++ (BLam <$> xs)) e1)  -- TODO: new binder type for if-definitions
+      pure (Verify (ctx (exis xs (Assume e1 :>: e2))) :>: Verify (ctx (Fails (exis xs e1) :>: e3)))
    ++
    -- Fails {hnf} ---> Assume {fail}
    "fails-hnf" `name`
    do Fails (HNF _) <- [lhs]
       pure (Assume Fail)
+
+splitIf :: Expr -> [([Ident], Expr)]
+splitIf e@If{}    = pure ([], e )
+splitIf (EXI x e) = do (xs, e') <- splitIf e; pure (x:xs, e')
+splitIf _         = []
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
@@ -539,6 +593,11 @@ execEX1 bs lhs =
   do EXI y x <- [lhs]
      (ctx, g, bs', hole) <- execEX (BExi y : bs) x
      pure (EXI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
+ ++
+   -- Uni y HOLE
+  do UNI y x <- [lhs]
+     (ctx, g, bs', hole) <- execEX (BUni y : bs) x
+     pure (UNI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
  ++
    -- ONE HOLE
   do One x <- [lhs]
