@@ -393,6 +393,7 @@ mustDecide _ bs = go
     go (e1 :=: e2) = go e1 && go e2    -- TODO:COMPARE-ANY!
     go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
     go (Op _)      = True
+    go Fail        = True
     go _           = False
 
 isDecideOp :: Expr -> Bool
@@ -495,18 +496,32 @@ verifierRules env lhs =
    --    let (eThen, eElse) = unfoldIte e1 e2 e3
    --    pure (eThen :|: eElse)
    -- ++
-   -- Verify{CTX[if e1 e2 e3]} ---> Verify{CTX[(assume{e1} ; e2)}; Verify{CTX(e3)} IF CTX `mustDecide` e1
+--   -- Verify{CTX[if e1 e2 e3]} ---> Verify{CTX[(assume{e1} ; e2)}; Verify{CTX(e3)} IF CTX `mustDecide` e1
+--   "asm-if" `name`
+--   do Verify e <- [lhs]
+--      (ctx, g, bs, If e1 e2 e3) <- eX e
+--      let bs0 = bndVars env
+--      guard (mustDecide g (bs0 ++ bs) e1)
+--      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx (Fails e1 :>: e3)))
+--   ++
+   -- Verify{CTX[exi xs. if e1 e2 e3]} ---> Verify{CTX[exi xs. assume{e1} ; e2]}; Verify{CTX(Fails (exis xs e1); e3)} IF CTX + xs `mustDecide` e1
    "asm-if" `name`
    do Verify e <- [lhs]
-      (ctx, g, bs, If e1 e2 e3) <- eX e
+      (ctx, g, bs, e') <- eX e
+      (xs, If e1 e2 e3) <- splitIf e'
       let bs0 = bndVars env
-      guard (mustDecide g (bs0 ++ bs) e1)
-      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx (Fails e1 :>: e3)))
+      guard (mustDecide g (bs0 ++ bs ++ (BLam <$> xs)) e1)  -- TODO: new binder type for if-definitions
+      pure (Verify (ctx (exis xs (Assume e1 :>: e2))) :>: Verify (ctx (Fails (exis xs e1) :>: e3)))
    ++
    -- Fails {hnf} ---> Assume {fail}
    "fails-hnf" `name`
    do Fails (HNF _) <- [lhs]
       pure (Assume Fail)
+
+splitIf :: Expr -> [([Ident], Expr)]
+splitIf e@If{}    = pure ([], e )
+splitIf (EXI x e) = do (xs, e') <- splitIf e; pure (x:xs, e')
+splitIf _         = []
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
