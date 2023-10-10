@@ -86,11 +86,7 @@ dropUnusedIds _ e =
 
 type D = State DState
 
-data DState = DState { nextNo :: !Int, context :: !DContext, dflags :: !Flags }
-  deriving (Show)
-
--- Different desugaring styles.
-data DContext = DFig6 | DFig10 | DFig11
+data DState = DState { nextNo :: !Int, dflags :: !Flags }
   deriving (Show)
 
 newInt :: D Int
@@ -144,9 +140,7 @@ syntaxFixes = pure . f
 ---------------------
 
 eval :: Flags -> D Expr -> Expr
-eval flgs = flip evalState DState{ nextNo = 1, context = ctx, dflags = flgs }
-  where
-    ctx = if fVerify flgs && not (fOldDesugar flgs) then {- DFig11 -} DFig10 else DFig6
+eval flgs = flip evalState DState{ nextNo = 1, dflags = flgs }
 
 -- Desugar into Small Source Verse
 dsSmall :: Expr -> D Expr
@@ -365,6 +359,10 @@ arrayElems = grp . map cls
           in  EElems [ e | Right e <- rs ] : grp bs
 
 ---------------------------------------------------------------------------------
+
+context :: DState -> Desugar
+context = fDesugar . dflags
+
 dsDx :: Expr -> D Expr
 dsDx e = do
   how <- gets context

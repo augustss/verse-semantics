@@ -1,6 +1,11 @@
-module FrontEnd.Flags(Flags(..), defaultFlags, showFlags) where
+module FrontEnd.Flags(Flags(..), Desugar(..), defaultFlags, showFlags) where
 import FrontEnd.Expr
 import FrontEnd.Prelude
+
+-- Different desugaring styles.
+-- The names refer to the figures in the desugaring paper.
+data Desugar = DFig6 | DFig10 | DFig11
+  deriving (Show, Read)
 
 data Flags = Flags
   { fTrace        :: !Bool
@@ -21,7 +26,7 @@ data Flags = Flags
   , fTraceVerify  :: !Bool
   , fPrelude      :: !(String, Expr)
   , fNoWarn       :: !Bool
-  , fOldDesugar   :: !Bool
+  , fDesugar      :: !Desugar
   }
   deriving (Show)
 
@@ -45,7 +50,7 @@ defaultFlags = Flags
   , fTraceVerify  = False
   , fPrelude      = either error id $ findPrelude defaultPrelude
   , fNoWarn       = False
-  , fOldDesugar   = False
+  , fDesugar      = DFig6
   }
 
 showFlags :: Flags -> String

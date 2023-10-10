@@ -189,9 +189,12 @@ cSet _ "" s = do
   let f (d,(g,_)) = printf "  %-12s %s\n" d $ if g (flags s) then "on" else "off"
   putStr $ concatMap f flagTable
   printf "  %-12s %d\n" "steps" (fRewriteSteps (flags s))
+  printf "  %-12s %s\n" "desugar" (show (fDesugar (flags s)))
   pure s
 cSet True l s | Just l' <- stripPrefix "steps=" l, Just n <- readMaybe l' =
   pure $ s{ flags = (flags s){fRewriteSteps = n} }
+cSet True l s | Just l' <- stripPrefix "desugar=" l, Just d <- readMaybe l' =
+  pure $ s{ flags = (flags s){fDesugar = d} }
 cSet b l s =
   case filter (isPrefixOf l . fst) flagTable of
     [] -> do putStrLn "Unknown flag"; pure s
@@ -211,7 +214,6 @@ flagTable =
   ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
   ,("assumeVerified", (fAssumeVerified, \ b s -> s{fAssumeVerified=b}))
-  ,("olddesugar",  (fOldDesugar,   \ b s -> s{fOldDesugar=b}))
   ]
 
 cRead :: Run CState
@@ -253,16 +255,22 @@ cTransform tr =
       pure e'
 
 cDesugar :: Run CState
-cDesugar c s = cTransform (Desugared . desugar (flags s) . asExpr) c s
+cDesugar c s = do
+  let flg = flags s
+  putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
+  cTransform (Desugared . desugar flg . asExpr) c s
+
+isVerifyPrelude :: (String, Expr) -> Bool
+isVerifyPrelude (pn, _) = "verify" `isPrefixOf` pn
 
 cDesugarVerify :: Run CState
-cDesugarVerify c s = cTransform (Desugared . des . asExpr) c s
-  where
-    des e =
-      let
-        flg = (flags s){ fVerify = True, fSplit = False, fAssumeVerified = False }
-        e1  = desugar flg e
-      in e1
+cDesugarVerify c s = do
+  let aflg = flags s
+      -- This is a hack to avoid the default prelude for verification.
+      prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
+      flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel }
+  putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
+  cTransform (Desugared . desugar flg . asExpr) c s
 
 cPreprocess :: Run CState
 cPreprocess c s = cTransform (Desugared . pre . asCore (flags s)) c s
@@ -278,10 +286,13 @@ cVerify = do
   withLastExpr $ \ e s ->
     tryIt (pure s) (\ _ -> pure s) $ do
       let sys = icfpeVerifier
-      let flg = (flags s){ fVerify = True, fSplit = False, fAssumeVerified = False }
+          aflg = flags s
+          flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel }
+          prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
           e1  = asCore flg e
           e2  = coreToTrs e1
-          e' = (if True then wrapAssert else id)  $  preProcess sys (ruleEnv sys) e2
+          e' = (if True then wrapAssert else id) $ preProcess sys (ruleEnv sys) e2
+      putStrLn $ "Verify: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
       putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify sys e'
       when (fTraceVerify flg) $ do

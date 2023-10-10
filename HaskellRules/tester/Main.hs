@@ -520,7 +520,8 @@ testFlagsToFlags t =
              fRewriteSteps = maxSteps t,
              fNoFuelStop = ignoreFuelStop t,
              fAssumeVerified = assumeVerified t,
-             fPrelude = maybe (fPrelude flags) (either error id . findPrelude) (prelude t)
+             fPrelude = maybe (fPrelude flags) (either error id . findPrelude) (prelude t),
+             fDesugar = DFig6
            }
 main :: IO ()
 main = do
