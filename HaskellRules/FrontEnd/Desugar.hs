@@ -1685,7 +1685,7 @@ dsD13 :: Expr -> D Expr
 dsD13 e = dsM13 e Nothing
 
 dsM13 :: Expr -> Maybe Ident -> D Expr
-dsM13 ((Function [(t1, _effs)] t2)) Nothing = do
+dsM13 (Function [(t1, _effs)] t2) Nothing = do
   i <- newIdent (getLoc t1) "i"
   r <- newIdent (getLoc t2) "r"
   t1' <- dsM13 t1 (Just i)
@@ -1696,7 +1696,7 @@ dsM13 ((Function [(t1, _effs)] t2)) Nothing = do
                            (Forall [r] $ seqE [eAssume (unifyV r t2''), Variable r])
                            (eVerify (eAssert Fail))
               ]
-dsM13 ((Function [(t1, _effs)] t2)) (Just f) = do
+dsM13 (Function [(t1, _effs)] t2) (Just f) = do
   i <- newIdent (getLoc t1) "i"
   j <- newIdent (getLoc t1) "j"
   r <- newIdent (getLoc t2) "r"
@@ -1709,4 +1709,45 @@ dsM13 ((Function [(t1, _effs)] t2)) (Just f) = do
                            (Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r])
                            (ApplyD (Variable f) (Variable i))
               ]
-dsM13 _ _ = undefined
+dsM13 (OfType t1 t2) i = do
+  y <- newIdent (getLoc t1) "y"
+  r <- newIdent (getLoc t2) "r"
+  t1' <- dsM13 t1 i
+  t2' <- dsD13 t2
+  t2'' <- dsD13 (Range t2)
+  pure $ seqE [DefineE y t1',
+               eVerify $ eAssert $ ApplyD t2' (Variable y),
+               Forall [r] $ seqE [eAssume $ DefineE r t2'', Variable r]
+              ]
+dsM13 (Range t) Nothing = do
+  x <- newIdent (getLoc t) "x"
+  t' <- dsD13 t
+  pure $ Exists [x] $ ApplyD t' (Variable x)
+dsM13 (Range t) (Just x) = do
+  t' <- dsD13 t
+  pure $ Exists [x] $ ApplyD t' (Variable x)
+
+dsM13 (DefineE x t) i = DefineE x <$> dsM13 t i
+dsM13 (Unify t1 t2) i = Unify <$> dsM13 t1 i <*> dsM13 t2 i
+dsM13 (Seq [])      i = dsM13 (Array []) i
+dsM13 (Seq (Snoc ts t)) i = seqE <$> sequence (Snoc (map dsD13 ts) (dsM13 t i))
+dsM13 (Choice t1 t2) i = Choice <$> dsM13 t1 i <*> dsM13 t2 i
+dsM13 (If3 e1 e2 e3) i = If3    <$> dsD13 e1   <*> dsM13 e2 i <*> dsM13 e3 i
+
+dsM13 (Array ts) Nothing = Array <$> mapM dsD10 ts
+dsM13 (Array ts) (Just x) = do
+  xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
+  bs <- zipWithM dsM xs ts
+  pure $ Exists xs $ seqE [ unifyV x $ Array $ map Variable xs, Array bs]
+
+dsM13 (DefineIE j x t) (Just i) = do
+  t' <- dsM13 t (Just i)
+  pure $ seqE [DefineE j (Variable i), DefineE x t']
+dsM13 (DefineIE j x t) Nothing = do
+  Exists [j] <$> dsM13 (DefineE x t) (Just j)
+
+dsM13 t (Just x) = unifyV x <$> dsD13 t
+dsM13 e@(Lit _) Nothing = pure e
+dsM13 e@(Variable _) Nothing = pure e
+dsM13 (ApplyD t1 t2) Nothing = ApplyD <$> dsD13 t1 <*> dsD13 t2
+dsM13 e _ = error $ "dsM13: unimplemented " ++ show e

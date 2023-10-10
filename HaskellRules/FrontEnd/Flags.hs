@@ -62,4 +62,5 @@ showFlags f = unwords
   , if fFinalInline f then "final-inlines" else ""
   , "max-steps=" ++ show (fRewriteSteps f)
   , "prelude=" ++ show (fst (fPrelude f))
+  , "desugar=" ++ show (fDesugar f)
   ]

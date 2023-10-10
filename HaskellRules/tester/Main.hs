@@ -59,6 +59,7 @@ data TestFlags = TestFlags
   , timRun         :: !Bool                -- run Tim's verifier tests
   , timVerify      :: !Bool                -- verify Tim's verifier tests
   , prelude        :: !(Maybe String)      -- use this prelude
+  , desugarRules   :: !Desugar             -- desugaring rules
   , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -508,6 +509,11 @@ testFlags = TestFlags
          ( long "prelude"
         <> metavar "NAME"
         <> help "use the given prelude" ))
+  <*> option auto
+         ( long "desugar"
+        <> metavar "Name"
+        <> value (fDesugar defaultFlags)
+        <> help "Desugaring rules to use" )
   <*> many (argument str (metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
@@ -521,7 +527,7 @@ testFlagsToFlags t =
              fNoFuelStop = ignoreFuelStop t,
              fAssumeVerified = assumeVerified t,
              fPrelude = maybe (fPrelude flags) (either error id . findPrelude) (prelude t),
-             fDesugar = DFig6
+             fDesugar = desugarRules t
            }
 main :: IO ()
 main = do
