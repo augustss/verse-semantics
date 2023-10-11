@@ -225,52 +225,55 @@ $$
 \begin{array}{@@{}l}
 \begin{array}{lrcll}
 \multicolumn{4}{l}{\textbf{Rewriting terms that use patterns:  |p:t| and |p := t|}} \\
-\rulename{pcolont} &  |p : t| & \rightarrow & |p := (: t)| \\[1mm]
-\rulename{pwild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
-\rulename{pwild2} &  |(: t_1) := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
-\rulename{pcolonb} &  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
-\rulename{papp} &   |p a := t| & \rightarrow & |p := function a t| \\
+\rulename{dscolont} &  |p : t| & \rightarrow & |p := (: t)| \\[1mm]
+\rulename{dswild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
+\rulename{dswild2} &  |(: t_1) := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
+\rulename{dscolonb} &  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
+\rulename{dspapp} &   |p a := t| & \rightarrow & |p := function a t| \\
   %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
-\rulename{pfun} &  |(p_1 squiggt p_2) := t| & \rightarrow &
-\begin{array}[t]{@@{}l@@{}}
-    |p_1 := (x_1:any); p_2 := (x_2:any);| \\
-    |(x_1 squiggt x_2) := t|
-  \end{array}  & \text{|p_1| or |p_2| not a variable} \\
-\rulename{parr} &  |ar (p_1; xdots; p_n) := t| & \rightarrow &
+\rulename{dspfun1} &  |(p_1 squiggt p_2) := t| & \rightarrow
+    & |p_1 := (x_1:any); (x_1 squiggt p_2) := t| & \text{|p_1| not a variable} \\
+\rulename{dspfun2} &  |(p_1 squiggt p_2) := t| & \rightarrow
+    & |p_2 := (x_2:any); (p_1 squiggt x_2) := t| & \text{|p_2| not a variable} \\
+% \begin{array}[t]{@@{}l@@{}}
+%    |p_1 := (x_1:any); p_2 := (x_2:any);| \\
+%    |(x_1 squiggt x_2) := t|
+%  \end{array}  & \text{|p_1| or |p_2| not a variable} \\
+\rulename{dsparr} &  |ar (p_1; xdots; p_n) := t| & \rightarrow &
       \begin{array}[t]{@@{}l@@{}}
         |ar(x_1:any;xdots;x_n:any) == t;|\\
         |p_1 := x_1; xdots; p_n := x_n |
       \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
-\rulename{pamp1} & |xsl amp x := t| & \rightarrow & |ar(xsl amp x := t)| & \text{outside an array}\\
-\rulename{pamp2} & |ar(xdots; xsl amp x := t; xdots)| & \rightarrow & |ar(xdots; xsl := t; x := t; xdots)| & \text{inside an array}\\
+\rulename{dspamp1} & |xsl amp x := t| & \rightarrow & |ar(xsl amp x := t)| & \text{outside an array}\\
+\rulename{dspamp2} & |ar(xdots; xsl amp x := t; xdots)| & \rightarrow & |ar(xdots; xsl := t; x := t; xdots)| & \text{inside an array}\\
 \end{array} \\
 \\
-\begin{array}{rcll}
-\multicolumn{4}{l}{\textbf{Application and unification}} \\
-  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
-  |t_1^(t_2)| & \rightarrow & |succeeds^{t_1^[t_2]}| \\
+\begin{array}{lrcll}
+\multicolumn{5}{l}{\textbf{Application and unification}} \\
+\rulename{dswhere} &  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
+\rulename{dsapp}   & |t_1^(t_2)| & \rightarrow & |succeeds^{t_1^[t_2]}| \\
 \\
-\multicolumn{4}{l}{\textbf{Array splice}} \\
-  \multicolumn{3}{l}{\quad|ar (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
-  & \rightarrow & \multicolumn{2}{l}{|^append[ar(t_1; xdots; t_km1), append^[t_k, ar(t_kp1; xdots; t_n)]]|}\\
-  & \multicolumn{3}{l}{\text{where |append| is a reversible function appending two arrays}} \\
+\multicolumn{5}{l}{\textbf{Array splice}} \\
+\rulename{dssplice} & \multicolumn{3}{l}{\quad|ar (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
+&  & \rightarrow & \multicolumn{2}{l}{|^append[ar(t_1; xdots; t_km1), append^[t_k, ar(t_kp1; xdots; t_n)]]|}\\
+&  & \multicolumn{3}{l}{\text{where |append| is a reversible function appending two arrays}} \\
 \\
-\multicolumn{4}{l}{\textbf{Array notation}} \\
-  |()| & \rightarrow & |ar ()| \\
-  |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
+\multicolumn{5}{l}{\textbf{Array notation}} \\
+\rulename{dsunit} &  |()| & \rightarrow & |ar ()| \\
+\rulename{dstuple} &  |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
 \\
-\multicolumn{4}{l}{\textbf{Function notation}} \\
-  |type^{t}| & \rightarrow & |function ((x:=t) (eff closed)) x| & \text{fresh |x|}\\
-  |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
-  |function (a_1 a_2 xdots a_n) t| & \rightarrow & |function a_1 (function (a_2 xdots a_n) t| \\
-  |function (()) t| & \rightarrow & |function ((ar ())) t| & \\
-  |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
+\multicolumn{5}{l}{\textbf{Function notation}} \\
+\rulename{dstype} &  |type^{t}| & \rightarrow & |function ((x:=t) (eff closed)) x| & \text{fresh |x|}\\
+\rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |function ((t_1) (eff closed)) t_2| \\
+\rulename{dsfun1} &  |function (a_1 a_2 xdots a_n) t| & \rightarrow & |function a_1 (function (a_2 xdots a_n) t| \\
+\rulename{dsfun2}  & |function (()) t| & \rightarrow & |function ((ar ())) t| & \\
+\rulename{dsfun3}  &   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
 \\
-\multicolumn{4}{l}{\textbf{Conditional and for-loop notation}} \\
-  |if{e}| & \rightarrow & |if(e) else false| \\
-  |if(e_1) then e_2| & \rightarrow & |if(e_1) then e_2 else false| \\
-  |if(e_1) else e_2| & \rightarrow & |if (x := e_1) then x else e_2| & \text{|x| fresh} \\
-  |for{e}| & \rightarrow & |for (x := e) { x }| & \text{|x| fresh} \\
+\multicolumn{5}{l}{\textbf{Conditional and for-loop notation}} \\
+\rulename{dsif1} & |if{e}| & \rightarrow & |if(e) else false| \\
+\rulename{dsif2} &  |if(e_1) then e_2| & \rightarrow & |if(e_1) then e_2 else false| \\
+\rulename{dsif3} &  |if(e_1) else e_2| & \rightarrow & |if (x := e_1) then x else e_2| & \text{|x| fresh} \\
+\rulename{dsfor} &  |for{e}| & \rightarrow & |for (x := e) { x }| & \text{|x| fresh} \\
 \end{array}
 \end{array}
 $$
