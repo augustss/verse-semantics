@@ -1011,7 +1011,7 @@ $$\begin{array}{@@{}l}
   & = & |verify (lam i (Me i t_1); assert (De t_2));| & \mbox{[verify definition]} \\
 %  &&&   |lam i (verify (assert (Me i t_1 )); De t_2)|  & \mbox{[verify call sites]} \\[2mm]
 & &   & |lamhdr i| \begin{array}[t]{l}
-    |if (Me i t_1)| \\
+    |if ((Me i t_1))| \\
     |then (forall r (assume (r = Me bullet (t_2)); r))| \\
     |else (verify (assert fail)))|
    \end{array} & \mbox{[verify calls]} \\[4mm]
