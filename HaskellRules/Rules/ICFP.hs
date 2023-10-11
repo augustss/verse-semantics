@@ -219,6 +219,7 @@ valid' onlyEq = expr
     expr (e1 :@: e2) = value e1 && value e2
     expr (EXI _ e) = expr e
     expr (UNI _ e) = expr e
+    expr (IFB _ e) = expr e
     expr (One e) = expr e
     expr (All e) = expr e
     expr Fail = True
@@ -281,6 +282,7 @@ anf' onlyEq = expr
       in  binds ds (v1 :@: v2)
     expr (EXI i e) = EXI i (expr e)
     expr (UNI i e) = UNI i (expr e)
+    expr (IFB i e) = IFB i (expr e)
     expr (One e) = One $ expr e
     expr (All e) = All $ expr e
     expr (Assume e) = Assume $ expr e
