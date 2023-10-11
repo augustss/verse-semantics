@@ -198,6 +198,7 @@ generalizedIcfpRules env lhs =
      guard (case (e1,e2) of (Int k1,Int k2) -> k1 /= k2
                             (Ref k1,Ref k2) -> k1 /= k2
                             (Arr a1,Arr a2) -> length a1 /= length a2
+                            (Lam _, Lam _)  -> False  -- LAM comparisons "stuck"
                             _               -> True)
      pure Fail
   ++

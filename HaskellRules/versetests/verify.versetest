@@ -122,3 +122,7 @@ verify(pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg 
 verify(fail) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
 verify(pass) { gg(x:any) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be accepted
 verify(fail) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } } # because f expects g to return an int, and it doesn't
+
+# simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
+verify(pass) { f(x:int) := x; foo(:any) := {f[_]=3} }
+verify(fail) { f(x:int) := x; foo(:any) := {f[_]='3'} }
