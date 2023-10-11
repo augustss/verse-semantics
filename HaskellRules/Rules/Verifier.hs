@@ -520,7 +520,7 @@ verifierRules env lhs =
 
 splitIf :: Expr -> [([Ident], Expr)]
 splitIf e@If{}    = pure ([], e )
-splitIf (EXI x e) = do (xs, e') <- splitIf e; pure (x:xs, e')
+splitIf (IFB x e) = do (xs, e') <- splitIf e; pure (x:xs, e')
 splitIf _         = []
 
 --------------------------------------------------------------------------------

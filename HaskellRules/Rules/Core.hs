@@ -22,6 +22,7 @@ module Rules.Core(
   isVal,
   isLam,
   def,
+  pattern IFB,
   pattern EXI,
   pattern UNI,
   pattern LAM,
@@ -81,7 +82,7 @@ data Expr
   | Fail                        -- ^ fail
   | Wrong String                -- ^ wrong
   | If Expr Expr Expr           -- ^ if e1 e2 e3
-
+  | IfB (Bind Expr)             -- ^ ifb x1 (ifb x2 (ifb x3 (if e1 e2 e3))) denotes if e1 e2 e3 with binders x1,x2,x3
   -- used for verification (experimental)
   | Assert Expr                 -- ^ assert{ e }
   | Assume Expr                 -- ^ assume{ e }
@@ -143,7 +144,8 @@ instance Pretty Expr where
   pPrintPrec l _ (Assert a)       = text "assert {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Decide a)       = text "decide {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Verify a)       = text "verify {" <> pPrintPrec l 0 a <> text "}"
-  pPrintPrec l _ (If a b c)       = text "if" <+> parens (pPrintPrec l 0 a) <+> braces (pPrintPrec l 0 b) <+> text "else" <+> braces (pPrintPrec l 0 c)
+  pPrintPrec l _ e@(IFB {})       = ppIf l xs a b c where (xs, a, b, c) = splitIfB e
+  -- pPrintPrec l _ (If a b c)       = text "if" <+> parens (pPrintPrec l 0 a) <+> braces (pPrintPrec l 0 b) <+> text "else" <+> braces (pPrintPrec l 0 c)
   pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
   pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
                                                              pPrintPrec l 0 v1 P.<> text ",",
@@ -153,6 +155,14 @@ instance Pretty Expr where
                                                              pPrintPrec l 0 e] P.<> text "}"
   pPrintPrec l p (Ref r)          = pPrintPrec l p r
   pPrintPrec _ _ _                = undefined -- GHC bug
+
+ppIf :: PrettyLevel -> [Ident] -> Expr -> Expr -> Expr -> Doc
+ppIf l xs a b c = text "if" <+> parens (pPrintPrec l 0 (exis xs a)) <+> braces (pPrintPrec l 0 b) <+> text "else" <+> braces (pPrintPrec l 0 c)
+
+splitIfB :: Expr -> ([Ident], Expr, Expr, Expr)
+splitIfB (IFB x e)  = (x:xs, a, b, c) where (xs, a, b, c) = splitIfB e
+splitIfB (If a b c) = ([], a, b, c)
+splitIfB _          = error "unexpected: splitIfB"
 
 instance Eq Expr where
   a == b = a `compare` b == EQ
@@ -273,6 +283,10 @@ comp  xs  ys (If a1 a2 a3) (If b1 b2 b3) = comp xs ys a1 b1 <> comp xs ys a2 b2 
 comp  _   _  If{}           _            = LT
 comp  _   _  _              If{}         = GT
 
+comp  xs  ys (IFB x a) (IFB y b) = comp (x:xs) (y:ys) a b
+comp _xs _ys IFB {}    _         = LT
+comp _xs _ys _         IFB {}    = GT
+
 comp  xs  ys (EXI x a) (EXI y b) = comp (x:xs) (y:ys) a b
 comp _xs _ys EXI {}    _         = LT
 comp _xs _ys _         EXI {}    = GT
@@ -343,6 +357,9 @@ exis is e = foldr EXI e is
 -- Expr
 def :: Ident -> Expr -> Expr -> Expr
 def x e1 e2 = Exi (Bind x ((Var x :=: e1) :>: e2))
+
+pattern IFB :: Ident -> Expr -> Expr
+pattern IFB x e = IfB (Bind x e)
 
 pattern EXI :: Ident -> Expr -> Expr
 pattern EXI x e = Exi (Bind x e)
@@ -466,6 +483,9 @@ instance Rec Expr where
           ++ [ (n, If a b' c) | (n,b') <- rec r s b ]
           ++ [ (n, If a b c') | (n,c') <- rec r s c ]
 
+      IfB (Bind x a) ->
+           [ (n, IfB (Bind x a')) | (n,a') <- rec r (addBound (BIf x) s) a ]
+
       Exi (Bind x a) ->
            [ (n, Exi (Bind x a')) | (n,a') <- rec r (addBound (BExi x) s) a ]
 
@@ -502,7 +522,7 @@ instance Rec Expr where
       _     -> []
      where addBound x tf = tf{ bndVars = x : bndVars tf }
 
-data BndVar = BExi Ident | BUni Ident | BLam Ident | BBlk
+data BndVar = BExi Ident | BUni Ident | BLam Ident | BIf Ident | BBlk
   deriving (Show)
 
 boundVars :: TRSFlags -> [Ident]
@@ -522,6 +542,7 @@ bndIds :: [BndVar] -> [Ident]
 bndIds [] = []
 bndIds (BExi x : bs) = x : bndIds bs
 bndIds (BLam x : bs) = x : bndIds bs
+bndIds (BIf  x : bs) = x : bndIds bs
 bndIds (BBlk   : bs) =     bndIds bs
 bndIds (BUni x : bs) = x : bndIds bs
 
@@ -541,6 +562,7 @@ instance Free Expr where
   free (a :@: b) = free a `union` free b
   free (Exi bnd) = free bnd
   free (Uni bnd) = free bnd
+  free (IfB bnd) = free bnd
   free (One a)   = free a
   free (All a)   = free a
   free (Assume a) = free a
@@ -587,6 +609,7 @@ instance Substitutable Expr where
   subst _sub e@Wrong{}= e
   subst sub (Exi bnd) = Exi (substBind Var subst sub bnd)
   subst sub (Uni bnd) = Uni (substBind Var subst sub bnd)
+  subst sub (IfB bnd) = IfB (substBind Var subst sub bnd)
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Assume a) = Assume (subst sub a)
@@ -665,6 +688,9 @@ instance Arbitrary Expr where
   shrink (Uni (Bind x a)) = [a |x `notElem` ys]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Uni (Bind x a') | a' <- shrink a] where ys = free a
+  shrink (IfB (Bind x a)) = [a |x `notElem` ys]
+                         ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
+                         ++ [IfB (Bind x a') | a' <- shrink a] where ys = free a
 
   shrink (Split e f g) = [e, f, g] ++ [Split e' f g | e' <- shrink e]
                                    ++ [Split e f' g | f' <- shrink f]
