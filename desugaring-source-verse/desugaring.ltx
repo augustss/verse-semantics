@@ -282,29 +282,29 @@ $$
 
 \begin{figure}
 $$
-\begin{array}{rcll}
-  \multicolumn{1}{l}{\textbf{Operators}} \\
-  |op_b e| & \rightarrow & |prefix op_b [e]| & \text{if |op_b| can fail}\\
-  |op_b e| & \rightarrow & |prefix op_b (e)| \\
-  |e op_a| & \rightarrow & |postfix op_a [e]| & \text{if |op_a| can fail}\\
-  |e op_a| & \rightarrow & |postfix op_a (e)| \\
-  |e_1 srcand e_2| & \rightarrow & |e_1; e_2| \\
-  |e_1 srcor e_2| & \rightarrow & |if(e_1) else if (e_2) else :false| \\
-  |!e| & \rightarrow & |if e then :false else false| \\
-  |e_1 op_i e_2| & \rightarrow & |operator op_i [e_1, e_2]| & \text{if |op_i| can fail}\\
-  |e_1 op_i e_2| & \rightarrow & |operator op_i (e_1, e_2)| \\
+\begin{array}{lrcll}
+  \multicolumn{5}{l}{\textbf{Operators}} \\
+\rulename{dsop1} &   |op_b e| & \rightarrow & |prefix op_b [e]| & \text{if |op_b| can fail}\\
+\rulename{dsop2} &   |op_b e| & \rightarrow & |prefix op_b (e)| \\
+\rulename{dsop3} &   |e op_a| & \rightarrow & |postfix op_a [e]| & \text{if |op_a| can fail}\\
+\rulename{dsop4} &   |e op_a| & \rightarrow & |postfix op_a (e)| \\
+\rulename{dsop5} &   |e_1 op_i e_2| & \rightarrow & |operator op_i [e_1, e_2]| & \text{if |op_i| can fail}\\
+\rulename{dsop6} &   |e_1 op_i e_2| & \rightarrow & |operator op_i (e_1, e_2)| \\
+\rulename{dsand} &   |e_1 srcand e_2| & \rightarrow & |e_1; e_2| \\
+\rulename{dsor} &   |e_1 srcor e_2| & \rightarrow & |if(e_1) else if (e_2) else :false| \\
+\rulename{dsbang} &   |!e| & \rightarrow & |if e then :false else false| \\
   \\
-  \multicolumn{1}{l}{\textbf{Let, block, case}} \\
-  |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
-  |block b| & \rightarrow & |b| & \textit{see note}  \\
-  |case{e_1; xdots e_n}| & \rightarrow & |(x:any) => case(x){e_1; xdots e_n}| & \text{|x| fresh} \\
-  |case(e){e_1; xdots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor xdots srcor e_n^[x]| & \text{|x| fresh} \\
-  \multicolumn{4}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
+  \multicolumn{5}{l}{\textbf{Let, block, case}} \\
+\rulename{dslet} &    |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
+\rulename{dsblock} &    |block b| & \rightarrow & |b| & \textit{see note}  \\
+\rulename{dscase1} &    |case{e_1; xdots e_n}| & \rightarrow & |(x:any) => case(x){e_1; xdots e_n}| & \text{|x| fresh} \\
+\rulename{dscase2} &    |case(e){e_1; xdots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor xdots srcor e_n^[x]| & \text{|x| fresh} \\
+  \multicolumn{5}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
   \\
-  \multicolumn{1}{l}{\textbf{Misc}} \\
-  |_| & \rightarrow & |x:any| & \text{|x| fresh} \\
-  |option^{}| & \rightarrow & |false| \\
-  |option^{e}| & \rightarrow & |if(x:=e)then truth(x) else false| & \text{|x| fresh} \\
+  \multicolumn{5}{l}{\textbf{Misc}} \\
+\rulename{dswild} &  |_| & \rightarrow & |x:any| & \text{|x| fresh} \\
+\rulename{dsopt1} &   |option^{}| & \rightarrow & |false| \\
+\rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then truth(x) else false| & \text{|x| fresh} \\
 \end{array}
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
@@ -1044,11 +1044,12 @@ $$\begin{array}{@@{}l}
     \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe i t_2 else DMe i t_3|} \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Misc.}} \\
-\rulename{dsquig} & |DMe bullet (y squiggt i := t)| & = & |def x (DMe x (i:=t))| \\
-\rulename{msquig} & |DMe x (y squiggt i := t)| & = & |y := x; DMe x (i := t)| \\
+% \rulename{dsquig} & |DMe bullet ((y squiggt i) := t)| & = & |def x (DMe x (i:=t))| \\
+\rulename{dsquig} & |DMe bullet ((y squiggt i) := t)| & = & |def y (DMe y (i:=t))| \\
+\rulename{msquig} & |DMe x ((y squiggt i) := t)| & = & |y := x; DMe y (i := t)| \\
 \rulename{darray} & |DMe bullet (arr(t_1, xdots, t_n))| & = & |arr(De t_1 , xdots, De t_n)| \\
 \rulename{marray} & |DMe x (arr(t_1, xdots, t_n))| & = &
-    |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n))| 
+    |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n));| 
     |arr (Me x_1 t_1, xdots, Me x_n t_n)|
     \\[2mm]
 
