@@ -1082,4 +1082,72 @@ $$\begin{array}{@@{}l}
 \caption{SPJ new version (6 Oct)}
 \end{figure}
 
+\begin{figure}
+$$\begin{array}{@@{}l}
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe i t| = |e|$}} \\[0.02in]
+\rulename{dinit}   & |De t | & = & |def i (DMe i t)| \\
+\rulename{dinit-alt}   & |De t | & = & |DMe ((def i i)) t| \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Function rules, for open functions}} \\
+\rulename{mfun}  & |DMe f (functionP t_1 t_2)|
+     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
+%   & &   & \multicolumn{2}{@@{}l}{|lam i (Me i t_1; forall r (assume (r = (De (:t_2))); r))|} \\[2mm]
+& &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
+    |if (j := Me i t_1)| \\
+    |then (forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\
+    |else (f^[i]))|
+   \end{array}} \\[4mm]
+
+\rulename{moftype} & |DMe i (oftype t_1 t_2)|
+         & = & |y:=DMe i t_1; verify (assert ((De t_2)^[y]));|  & \text{|y| fresh} \\
+         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Type rules}} \\
+\rulename{mtype}   & |DMe i (:t)|           & = & |((De t))^[i]| \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
+\rulename{mbind}   & |DMe i (x:=t)|         & = & |x := DMe i t| \\
+\rulename{meq}     & |DMe i (t_1=t_2)|      & = & |(DMe i t_1) = (DMe i t_2)| \\
+\rulename{msemi}   & |DMe i (t_1 ; t_2)|    & = & |De t_1 ; DMe i t_2| \\
+\rulename{mchoice} & |DMe i ((t_1 `choice` t_2))| & = & |(DMe i t_1) `choice` (DMe i t_2)| \\
+\multicolumn{2}{l}{\rulename{mif}\; |DMe i (if(t_1) then t_2 else t_3)|} & = &
+    \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe i t_2 else DMe i t_3|} \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Misc.}} \\
+\rulename{msquig} & |DMe i (y squiggt x := t)| & = & |y := i; DMe i (x := t)| \\
+\rulename{marray} & |DMe i (arr(t_1, xdots, t_n))| & = &
+    |def (x_1 xdots x_n) (i == arr (x_1, xdots, x_n));
+     arr (Me x_1 t_1, xdots, Me x_n t_n)|
+    \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
+\rulename{mconst}  & |DMe i k|                  & = & |i = k| \\
+\rulename{mvar}    & |DMe i x|                  & = & |i = x| \\
+\rulename{mapp}    & |DMe i (t_1^[t_2])|        & = & |i = ((De t_1))^[De t_2]| \\
+
+% \multicolumn{5}{l}{\mbox{\bf Desugaring for execution:}} \\[0.02in]
+% \rulename{dconst}  & |De k|                  & = & |k| \\
+% \rulename{dvar}    & |De x|                  & = & |x| \\
+% \rulename{dapp}    & |De (t_1^[t_2])|         & = & |((De t_1))^[De t_2]| \\
+% \rulename{dfun'}    & |De (functionP t_1 t_2)| & = & |lam i (Me i t_1; De t_2)| \\
+% \rulename{doftype'} & |De (oftype t_1 t_2)|
+%          & = & |y:=De t_1; Me y t_2|  & \text{|y| fresh} \\
+% \rulename{dother}   & |De e|                  & = & |def i (Me i e)|  & \mbox{otherwise} \\[2mm]
+%
+% \rulename{mtype}   & |Me i (:t)|           & = & |((De t))^[i]| \\[2mm]
+% \rulename{mbind}   & |Me i (x:=t)|         & = & |x := Me i t| \\
+% \rulename{meq}     & |Me i (t_1=t_2)|      & = & |(Me i t_1) = (Me i t_2)| \\
+% \rulename{msemi}   & |Me i (t_1 ; t_2)|    & = & |De t_1 ; Me i t_2| \\
+% \rulename{mchoice} & |Me i ((t_1 `choice` t_2))| & = & |(Me i t_1) `choice` (Me i t_2)| \\
+% \rulename{mif}     & |Me i (if(t_1) then t_2 else t_3)| & = &
+%    \multicolumn{2}{@@{}l}{|if (De t_1) then Me i t_2 else Me i t_3|} \\[2mm]
+%\rulename{mother'}  & |Me i t|              & = & |i| & \mbox{otherwise}
+
+\end{array}
+\end{array}$$
+\caption{Koen \& Lennart version}
+\end{figure}
+
 \end{document}
