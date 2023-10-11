@@ -50,6 +50,7 @@ data Token
   | FatArrow
   | Float !Rational
   | For
+  | Forall
   | Function
   | Greater
   | GreaterEqual
@@ -85,6 +86,7 @@ data Token
   | Set
   | String StringDelimiter String StringDelimiter
   | Struct
+  | Succeeds
   | Sync
   | Then
   | ThinArrow
@@ -93,6 +95,7 @@ data Token
   | Truth
   | Until
   | Var
+  | Verify
   | Where deriving Show
 
 instance Pretty Token where
@@ -129,6 +132,7 @@ instance Pretty Token where
     FatArrow -> equals <> rangle
     Float x -> pretty (fromRational x :: Double)
     For -> "for"
+    Forall -> "forall"
     Function -> "function"
     Greater -> pretty '>'
     GreaterEqual -> ">="
@@ -164,6 +168,7 @@ instance Pretty Token where
     Set -> "set"
     String begin x end -> prettyBegin begin <> pretty x <> prettyEnd end
     Struct -> "struct"
+    Succeeds -> "succeeds"
     Sync -> "sync"
     Then -> "then"
     ThinArrow -> pretty '-' <> rangle
@@ -172,6 +177,7 @@ instance Pretty Token where
     Truth -> "truth"
     Until -> "until"
     Var -> "var"
+    Verify -> "verify"
     Where -> "where"
     where
       prettyBegin Quote = "\""

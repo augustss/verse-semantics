@@ -14,7 +14,7 @@ import Data.Functor
 import Data.Functor.Apply
 import Data.Text qualified as Text
 
-import Language.Verse.Parse.Exp (Exp
+import Language.Verse.Parse.Exp ( Exp
                                 , CatchUntil
                                 , pattern (:=:)
                                 , pattern (:<>:)
@@ -127,11 +127,13 @@ import Language.Verse.Token qualified as Token
   dedent { L _ Token.Dedent }
   do { L _ Token.Do }
   else { L _ Token.Else }
+  enum { L _ Token.Enum }
   exists { L _ Token.Exists }
   fail { L _ Token.Fail }
   false { L _ Token.False }
   float { (float -> Just $$) }
   for { L _ Token.For }
+  forall { L _ Token.Forall }
   function { L _ Token.Function }
   if { L _ Token.If }
   indent { L _ Token.Indent }
@@ -144,17 +146,18 @@ import Language.Verse.Token qualified as Token
   option { L _ Token.Option }
   set { L _ Token.Set }
   struct { L _ Token.Struct }
-  enum { L _ Token.Enum }
   string { (string -> Just $$) }
   stringBegin { (stringBegin -> Just $$) }
   stringCont { (stringCont -> Just $$) }
   stringEnd { (stringEnd -> Just $$) }
+  succeeds { L _ Token.Succeeds }
   sync { L _ Token.Sync }
   then { L _ Token.Then }
   true { L _ Token.True }
   truth { L _ Token.Truth }
-  var { L _ Token.Var }
   until { L _ Token.Until }
+  var { L _ Token.Var }
+  verify { L _ Token.Verify }
   where { L _ Token.Where }
 
 %%
@@ -329,6 +332,12 @@ Exp :: { L (Exp L Name) }
   | not Exp {
       Exp.Not <\$ $1 <.> duplicate $2
     }
+  | verify Block {
+      Exp.Verify <\$ $1 <.> duplicate $2
+    }
+  | succeeds Block {
+      Exp.Succeeds <\$ $1 <.> duplicate $2
+    }
   | block Block {
       Exp.Block <\$ $1 <.> duplicate $2
     }
@@ -376,6 +385,7 @@ Exp :: { L (Exp L Name) }
   | If { $1 }
   | For { $1 }
   | Exists { $1 }
+  | Forall { $1 }
   | Function { $1 }
   | Invoke %prec INVOKE { $1 }
   | Pat %shift { Exp.Pat <\$> $1 }
@@ -502,6 +512,11 @@ Until :: { L (CatchUntil L Name) }
 Exists :: { L (Exp L Name) }
   : exists name {
       Exp.Exists <\$ $1 <.> duplicate $2
+    }
+
+Forall :: { L (Exp L Name) }
+  : forall name {
+      Exp.Forall <\$ $1 <.> duplicate $2
     }
 
 Function :: { L (Exp L Name) }

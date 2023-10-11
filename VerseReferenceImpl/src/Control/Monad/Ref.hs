@@ -5,6 +5,7 @@ module Control.Monad.Ref
   ( MonadRef (..)
   , modifyRef
   , modifyRef'
+  , stateRef'
   , EqRef (..)
   ) where
 
@@ -48,6 +49,12 @@ modifyRef' :: MonadRef m => Ref m a -> (a -> a) -> m ()
 modifyRef' ref f = do
   x <- f <$> readRef ref
   x `seq` writeRef ref x
+
+stateRef' :: MonadRef m => Ref m s -> (s -> (a, s)) -> m a
+stateRef' ref f = do
+  (x, s) <- f <$> readRef ref
+  s `seq` writeRef ref s
+  pure x
 
 instance MonadRef IO where
   type Ref IO = IORef

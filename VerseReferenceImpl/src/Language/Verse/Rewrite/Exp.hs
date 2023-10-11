@@ -20,6 +20,8 @@ data Exp f a
   | One (f (Exp f a))
   | All (f (Exp f a))
   | Not (f (Exp f a))
+  | Verify (f (Exp f a))
+  | Succeeds (f (Exp f a))
   | Module (f (Exp f a))
   | Struct (f (Exp f a))
   | Class (Maybe (f (Exp f a))) (f (Exp f a))
@@ -28,9 +30,9 @@ data Exp f a
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo (f (Exp f a)) (f (Exp f a))
   | Block (f (Exp f a))
-  | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
+  | Forall (f a)
   | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
@@ -64,14 +66,16 @@ instance ( Pretty (f (Exp f a))
     One e -> "one" <+> braces (pretty e)
     All e -> "all" <+> braces (pretty e)
     Not e -> "not" <+> parens (pretty e)
+    Verify e -> "verify" <+> braces (pretty e)
+    Succeeds e -> "succeeds" <+> braces (pretty e)
     Class e1 e2 ->
       "class" <>
       maybe mempty (parens . pretty) e1 <+>
       braces (pretty e2)
     Inst e1 e2 -> parens (pretty e1) <+> braces (pretty e2)
-    ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     Exists x -> "exists" <+> pretty x
+    Forall x -> "forall" <+> pretty x
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
     Int x -> pretty x

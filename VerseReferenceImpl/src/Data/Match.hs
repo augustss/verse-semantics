@@ -9,12 +9,13 @@ module Data.Match
 
 import Control.Monad
 
-import Data.Coerce
 import Data.Functor
 import Data.Functor.Const
 
 data RowMatch f a b
-  = Zip (ZipMatch f a b)
+  = Zip (ZipMatch a b)
+  | LE [(a, f b)]
+  | GE [(f a, b)]
   | Uncons (a -> f a) a (b -> f b) b
 
 class Traversable f => RowMatchable f where
@@ -22,10 +23,10 @@ class Traversable f => RowMatchable f where
   default rowMatch :: ZipMatchable f => f a -> f b -> RowMatch f a b
   rowMatch x y = Zip $ zipMatch x y
 
-type ZipMatch f a b = Maybe (f (a, b))
+type ZipMatch a b = Maybe [(a, b)]
 
 class RowMatchable f => ZipMatchable f where
-  zipMatch :: f a -> f b -> ZipMatch f a b
+  zipMatch :: f a -> f b -> ZipMatch a b
 
 instance RowMatchable []
 
@@ -39,11 +40,11 @@ instance RowMatchable Maybe
 
 instance ZipMatchable Maybe where
   zipMatch = curry $ \ case
-    (Nothing, Nothing) -> Just Nothing
-    (Just x, Just y) -> Just (Just (x, y))
+    (Nothing, Nothing) -> Just []
+    (Just x, Just y) -> Just [(x, y)]
     _ -> Nothing
 
 instance Eq a => RowMatchable (Const a)
 
 instance Eq a => ZipMatchable (Const a) where
-  zipMatch x y = guard (getConst x == getConst y) $> coerce x
+  zipMatch x y = guard (getConst x == getConst y) $> []

@@ -90,14 +90,14 @@ data ChoiceFree a = ChoiceFree deriving (Functor, Foldable, Traversable)
 instance RowMatchable ChoiceFree
 
 instance ZipMatchable ChoiceFree where
-  zipMatch _ _ = Just ChoiceFree
+  zipMatch _ _ = Just []
 
 data StoreFree a = StoreFree deriving (Functor, Foldable, Traversable)
 
 instance RowMatchable StoreFree
 
 instance ZipMatchable StoreFree where
-  zipMatch _ _ = Just StoreFree
+  zipMatch _ _ = Just []
 
 instance Monad m => Freshenable (S n) m where
   freshen = pure
@@ -157,6 +157,24 @@ evalExp e = case extract e of
     evalAll e
   Exp.Not e ->
     evalNot e
+  Exp.Verify e ->
+    evalVerify e
+  Exp.Succeeds e -> do
+    var <- lift freshVar
+    r <- ask
+    s <- get
+    storeFree <- lift freshVar
+    put s { storeFree }
+    lift . fork $
+      succeeds do
+        choiceFree <- newVar ChoiceFree
+        evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
+      >>= readIVar >>= \ case
+        Nothing -> abort . SucceedsError $ loc e
+        Just var' -> do
+          unify var var'
+          unify storeFree s.storeFree
+    pure var
   Exp.Module i xs e -> do
     xs <- lift $ freshEnv xs
     _ <- localEnv xs $ evalExp e
@@ -180,10 +198,13 @@ evalExp e = case extract e of
     evalIfThenElse xs p t e
   Exp.ForDo xs e1 e2 ->
     evalForDo xs e1 e2
-  Exp.Exists x Nothing e -> do
+  Exp.Def Exp.Exists x e -> do
     var <- lift freshVar
     localName (extract x) (Val var) $ evalExp e
-  Exp.Exists x (Just y) e -> do
+  Exp.Def Exp.Forall x e -> do
+    var <- lift $ newVar Val.Any
+    localName (extract x) (Val var) $ evalExp e
+  Exp.Def (Exp.Var y) x e -> do
     ref <- lift $ freshVarRef
     var <- lift $ freshVar
     localName (extract x) (Ref ref var) $ localName (extract y) (Val var) $ evalExp e
@@ -198,20 +219,6 @@ evalExp e = case extract e of
     i <- supply
     r <- ask
     lift $ newVar . Val.Overloads (Val.Fun i r.env xs e_domain e) =<< freshVar
-  Exp.ParenInvoke e1 e2 -> do
-    var1 <- evalExp e1
-    var2 <- evalExp e2
-    var <- lift freshVar
-    s <- get
-    s' <- lift freshS
-    put s'
-    lift . fork $ succeeds (freshS >>= invoke (loc e) var1 var2 s) >>= readIVar >>= \ case
-      Nothing -> abort . SucceedsError $ loc e
-      Just var' -> do
-        unify var var'
-        unify s.choiceFree s'.choiceFree
-        unify s.storeFree s'.storeFree
-    pure var
   Exp.BracketInvoke e1 e2 -> do
     var1 <- evalExp e1
     var2 <- evalExp e2
@@ -251,15 +258,6 @@ evalDot loc e x = do
       Just y -> readNamed' s.storeFree storeFree y
       Nothing -> abort $ NameError loc x
   pure var
-
-pattern Int :: Integer -> Val f a
-pattern Int x <- (getInt -> Just x)
-
-getInt :: Val f a -> Maybe Integer
-getInt = \ case
-  Val.Int x -> pure x
-  Val.Rational x | denominator x == 1 -> pure $ numerator x
-  _ -> empty
 
 evalChoice :: MonadEval m => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
 evalChoice e1 e2 = do
@@ -321,9 +319,22 @@ evalNot e = do
       unify storeFree s.storeFree
   lift . newVar $ Val.Tuple []
 
+evalVerify :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
+evalVerify e = do
+  r <- ask
+  s <- get
+  storeFree <- lift freshVar
+  put s { storeFree }
+  lift $ fork do
+    readIVar =<< verify do
+      choiceFree <- newVar ChoiceFree
+      void $ evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
+    unify storeFree s.storeFree
+  lift . newVar $ Val.Tuple []
+
 evalIfThenElse
   :: MonadEval m
-  => IdentMap (Maybe Ident)
+  => Exp.Env L Ident
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> L (Exp L Ident)
@@ -353,7 +364,7 @@ evalIfThenElse xs p t e = do
 
 evalForDo
   :: MonadEval m
-  => IdentMap (Maybe Ident)
+  => Exp.Env L Ident
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
@@ -381,7 +392,7 @@ evalInst
   :: MonadEval m
   => Loc
   -> L (Exp L Ident)
-  -> IdentMap (Maybe Ident)
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
 evalInst loc e1 xs e2 = do
@@ -407,11 +418,12 @@ instOverloads
   -> S m
   -> S m
   -> VerseT m (VarVal m)
-instOverloads loc head tail archetype s s' = instOverload loc head archetype s s' >>= \ case
-  Just result -> pure result
-  Nothing -> readVar tail >>= \ case
-    Val.Overloads head tail -> instOverloads loc head tail archetype s s'
-    _ -> abort $ DomainError loc
+instOverloads loc head tail archetype s s' =
+  instOverload loc head archetype s s' >>= \ case
+    Just result -> pure result
+    Nothing -> readVar tail >>= \ case
+      Val.Overloads head tail -> instOverloads loc head tail archetype s s'
+      _ -> abort $ DomainError loc
 
 instOverload
   :: MonadEval m
@@ -430,7 +442,7 @@ instStruct
   :: MonadEval m
   => Label
   -> Env m
-  -> IdentMap (Maybe Ident)
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> Archetype m
   -> S m
@@ -449,7 +461,7 @@ instClass
   -> Label
   -> Env m
   -> Maybe (VarVal m)
-  -> IdentMap (Maybe Ident)
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> Archetype m
   -> S m
@@ -468,7 +480,7 @@ allocClass
   -> Label
   -> Env m
   -> Maybe (VarVal m)
-  -> IdentMap (Maybe Ident)
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> VerseT m (VarVal m, Env m, Archetype m -> S m -> VerseT m (S m))
 allocClass loc i env sup xs e = do
@@ -497,15 +509,16 @@ readClass
   :: (MonadAbort Error m, MonadRef m)
   => Loc
   -> VarVal m
-  -> VerseT m (Label, Env m, Maybe (VarVal m), IdentMap (Maybe Ident), L (Exp L Ident))
+  -> VerseT m (Label, Env m, Maybe (VarVal m), Exp.Env L Ident, L (Exp L Ident))
 readClass loc = readVar >=> \ case
   Val.Overloads head tail -> case head of
     Val.Class i env sup xs e -> pure (i, env, sup, xs, e)
     _ -> readClass loc tail
   _ -> abort $ DomainError loc
 
-findClassInst :: (MonadRef m, MonadSupply Int m)
-              => Label -> VarVal m -> VerseT m (VarVal m)
+findClassInst
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => Label -> VarVal m -> VerseT m (VarVal m)
 findClassInst i var = readVar var >>= \ case
   Val.ClassInst j sup _
     | i == j -> pure var
@@ -551,14 +564,16 @@ invoke loc var1 var2 s s' = readVar var1 >>= \ case
     invokeOverloads loc head tail var2 s s'
   _ -> abort $ DomainError loc
 
-invokeTuple :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
-            => [Var m f] -> VarVal m -> VerseT m (Var m f)
+invokeTuple
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => [Var m f] -> VarVal m -> VerseT m (Var m f)
 invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
   unify var =<< newVar (Val.Int i)
   pure x
 
-invokeEnum :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
-           => [VarVal m] -> VarVal m -> VerseT m (VarVal m)
+invokeEnum
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => [VarVal m] -> VarVal m -> VerseT m (VarVal m)
 invokeEnum xs var = asum $ xs <&> \ x -> do
   unify var x
   pure x
@@ -572,11 +587,12 @@ invokeOverloads
   -> S m
   -> S m
   -> VerseT m (VarVal m)
-invokeOverloads loc head tail arg s s' = invokeOverload loc head arg s s' >>= \ case
-  Just result -> pure result
-  Nothing -> readVar tail >>= \ case
-    Val.Overloads head tail -> invokeOverloads loc head tail arg s s'
-    _ -> abort $ DomainError loc
+invokeOverloads loc head tail arg s s' =
+  invokeOverload loc head arg s s' >>= \ case
+    Just result -> pure result
+    Nothing -> readVar tail >>= \ case
+      Val.Overloads head tail -> invokeOverloads loc head tail arg s s'
+      _ -> abort $ DomainError loc
 
 invokeOverload
   :: MonadEval m
@@ -599,7 +615,7 @@ invokeOverload loc overload arg s s' = case overload of
 invokeFun
   :: MonadEval m
   => Env m
-  -> IdentMap (Maybe Ident)
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> VarVal m
@@ -626,7 +642,7 @@ invokeStruct
   :: MonadEval m
   => Label
   -> Env m
-  -> IdentMap (Maybe Ident)
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> VarVal m
   -> S m
@@ -647,7 +663,7 @@ invokeClass
   -> Label
   -> Env m
   -> Maybe (VarVal m)
-  -> IdentMap (Maybe Ident)
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> VarVal m
   -> S m
@@ -666,7 +682,7 @@ instEmptyClass
   -> Label
   -> Env m
   -> Maybe (VarVal m)
-  -> IdentMap (Maybe Ident)
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> S m
   -> VerseT m (VarVal m, Env m, S m)
@@ -692,7 +708,7 @@ instEmptySup loc sup s = case sup of
     pure (Just sup, xs, s)
 
 invokeIntrinsic
-  :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
   => Intrinsic -> VarVal m -> S m -> S m -> VerseT m (Maybe (VarVal m))
 invokeIntrinsic = \ case
   Intrinsic.Less -> liftPrim $ liftOrd (<)
@@ -710,134 +726,225 @@ invokeIntrinsic = \ case
   Intrinsic.Float -> liftPrim float
   Intrinsic.Query -> liftPrim query
 
-liftOrd :: (MonadRef m, MonadSupply Int m)
-        => (forall a . Ord a => a -> a -> Bool)
-        -> VarVal m -> VerseT m (Maybe (VarVal m))
-liftOrd f var = readVar var >>= \ case
-  Val.Tuple [var_x, var_y] -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+liftOrd
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => (forall a . Ord a => a -> a -> Bool)
+  -> VarVal m -> VerseT m (Maybe (VarVal m))
+liftOrd f var = readPair var >>= \ case
+  Just (var_x, var_y) -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+    (Val.AnyRational, AnyNumber) -> decide $> Just var_x
+    (Val.Rational x, Val.Rational y) -> guard (f x y) $> Just var_x
+    (Val.Rational x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
+    (Val.Rational x, Val.Float y) -> guard (f (fromRational x) y) $> Just var_x
+    (Val.Rational _, AnyNumber) -> decide $> Just var_x
+    (Val.AnyInt, AnyNumber) -> decide $> Just var_x
+    (Val.Int x, Val.Rational y) -> guard (f (fromInteger x) y) $> Just var_x
     (Val.Int x, Val.Int y) -> guard (f x y) $> Just var_x
     (Val.Int x, Val.Float y) -> guard (f (fromInteger x) y) $> Just var_x
-    (Val.Int x, Val.Rational y) -> guard (f (fromInteger x) y) $> Just var_x
+    (Val.Int _, AnyNumber) -> decide $> Just var_x
+    (Val.AnyFloat, AnyNumber) -> decide $> Just var_x
+    (Val.Float x, Val.Rational y) -> guard (f (toRational x) y) $> Just var_x
     (Val.Float x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
     (Val.Float x, Val.Float y) -> guard (f x y) $> Just var_x
-    (Val.Float x, Val.Rational y) -> guard (f (toRational x) y) $> Just var_x
-    (Val.Rational x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
-    (Val.Rational x, Val.Float y) -> guard (f x (toRational y)) $> Just var_x
-    (Val.Rational x, Val.Rational y) -> guard (f x y) $> Just var_x
-    -- EnumValue is considered unordered in Verse
+    (Val.Float _, AnyNumber) -> decide $> Just var_x
     _ -> pure Nothing
   _ -> pure Nothing
 
-liftNum :: (MonadRef m, MonadSupply Int m)
-        => (forall a . Num a => a -> a -> a)
-        -> VarVal m -> VerseT m (Maybe (VarVal m))
-liftNum f var = readVar var >>= \ case
-  Val.Tuple [var_x, var_y] -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
-    (Val.Int x, Val.Int y) ->
-      fmap Just . newVar . Val.Int $ f x y
-    (Val.Int x, Val.Float y) ->
-      fmap Just . newVar . Val.Float $ f (fromInteger x) y
-    (Val.Int x, Val.Rational y) ->
-      fmap Just . newVar . Val.Rational $ f (fromInteger x) y
-    (Val.Float x, Val.Int y) ->
-      fmap Just . newVar . Val.Float $ f x (fromInteger y)
-    (Val.Float x, Val.Float y) ->
-      fmap Just . newVar . Val.Float $ f x y
-    (Val.Float x, Val.Rational y) ->
-      fmap Just . newVar . Val.Float $ fromRational $ f (toRational x) y
-    (Val.Rational x, Val.Int y) ->
-      fmap Just . newVar . Val.Rational $ f x (fromInteger y)
-    (Val.Rational x, Val.Float y) ->
-      fmap Just . newVar . Val.Float $ fromRational $ f x (toRational y)
-    (Val.Rational x, Val.Rational y) ->
-      fmap Just . newVar . Val.Rational $ f x y
+liftNum
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => (forall a . Num a => a -> a -> a)
+  -> VarVal m -> VerseT m (Maybe (VarVal m))
+liftNum f var = readPair var >>= \ case
+  Just (var_x, var_y) -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+    (Val.AnyRational, Val.AnyRational) -> Just <$> newVar Val.AnyRational
+    (Val.AnyRational, Val.Rational _) -> Just <$> newVar Val.AnyRational
+    (Val.AnyRational, Val.AnyInt) -> Just <$> newVar Val.AnyRational
+    (Val.AnyRational, Val.Int _) -> Just <$> newVar Val.AnyRational
+    (Val.AnyRational, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyRational, Val.Float _) -> Just <$> newVar Val.AnyFloat
+    (Val.Rational _, Val.AnyRational) -> Just <$> newVar Val.AnyRational
+    (Val.Rational x, Val.Rational y) -> fmap Just . newVar . Val.Rational $ f x y
+    (Val.Rational _, Val.AnyInt) -> Just <$> newVar Val.AnyRational
+    (Val.Rational x, Val.Int y) -> fmap Just . newVar . Val.Rational $ f x (fromInteger y)
+    (Val.Rational _, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.Rational x, Val.Float y) -> fmap Just . newVar . Val.Float $ f (fromRational x) y
+    (Val.AnyInt, Val.AnyRational) -> Just <$> newVar Val.AnyRational
+    (Val.AnyInt, Val.Rational _) -> Just <$> newVar Val.AnyRational
+    (Val.AnyInt, Val.AnyInt) -> Just <$> newVar Val.AnyInt
+    (Val.AnyInt, Val.Int _) -> Just <$> newVar Val.AnyInt
+    (Val.AnyInt, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyInt, Val.Float _) -> Just <$> newVar Val.AnyFloat
+    (Val.Int _, Val.AnyRational) -> Just <$> newVar Val.AnyRational
+    (Val.Int x, Val.Rational y) -> fmap Just . newVar . Val.Rational $ f (fromInteger x) y
+    (Val.Int _, Val.AnyInt) -> Just <$> newVar Val.AnyInt
+    (Val.Int x, Val.Int y) -> fmap Just . newVar . Val.Int $ f x y
+    (Val.Int _, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.Int x, Val.Float y) -> fmap Just . newVar . Val.Float $ f (fromInteger x) y
+    (Val.AnyFloat, Val.AnyRational) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.Rational _) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.AnyInt) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.Int _) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.Float _) -> Just <$> newVar Val.AnyFloat
+    (Val.Float _, Val.AnyRational) -> Just <$> newVar Val.AnyFloat
+    (Val.Float x, Val.Rational y) -> fmap Just . newVar . Val.Float $ f x (fromRational y)
+    (Val.Float _, Val.AnyInt) -> Just <$> newVar Val.AnyFloat
+    (Val.Float x, Val.Int y) -> fmap Just . newVar . Val.Float $ f x (fromInteger y)
+    (Val.Float _, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.Float x, Val.Float y) -> fmap Just . newVar . Val.Float $ f x y
     _ -> pure Nothing
   _ -> pure Nothing
 
 prefixPlus :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
 prefixPlus var = readVar var >>= \ case
-  Val.Int _ -> pure $ Just var
-  Val.Float _ -> pure $ Just var
-  Val.Rational _ -> pure $ Just var
+  AnyNumber -> pure $ Just var
   _ -> pure Nothing
 
-prefixMinus :: (MonadRef m, MonadSupply Int m)
-            => VarVal m -> VerseT m (Maybe (VarVal m))
+prefixMinus
+  :: (MonadRef m, MonadSupply Int m)
+  => VarVal m -> VerseT m (Maybe (VarVal m))
 prefixMinus var = readVar var >>= \ case
-  Val.Int x -> Just <$> newVar (Val.Int $ negate x)
-  Val.Float x -> Just <$> newVar (Val.Float $ negate x)
+  Val.AnyRational -> Just <$> newVar Val.AnyRational
   Val.Rational x -> Just <$> newVar (Val.Rational $ negate x)
+  Val.AnyInt -> Just <$> newVar Val.AnyInt
+  Val.Int x -> Just <$> newVar (Val.Int $ negate x)
+  Val.AnyFloat -> Just <$> newVar Val.AnyFloat
+  Val.Float x -> Just <$> newVar (Val.Float $ negate x)
   _ -> pure Nothing
 
-div' :: (MonadRef m, MonadSupply Int m)
-     => VarVal m -> VerseT m (Maybe (VarVal m))
-div' var = readVar var >>= \ case
-  Val.Tuple [var_x, var_y] -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
-    (Val.Int _, Val.Int 0) -> empty
+div'
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => VarVal m -> VerseT m (Maybe (VarVal m))
+div' var = readPair var >>= \ case
+  Just (var_x, var_y) -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+    (Val.AnyRational, Val.AnyRational) -> decide *> (Just <$> newVar Val.AnyRational)
+    (Val.AnyRational, Val.Rational 0) -> empty
+    (Val.AnyRational, Val.Rational _) -> Just <$> newVar Val.AnyRational
+    (Val.AnyRational, Val.AnyInt) -> decide *> (Just <$> newVar Val.AnyRational)
+    (Val.AnyRational, Val.Int 0) -> empty
+    (Val.AnyRational, Val.Int _) -> Just <$> newVar Val.AnyRational
+    (Val.AnyRational, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyRational, Val.Float _) -> Just <$> newVar Val.AnyFloat
+    (Val.Rational _, Val.AnyRational) -> decide *> (Just <$> newVar Val.AnyRational)
     (Val.Rational _, Val.Rational 0) -> empty
-    (Val.Int x, Val.Int y) ->
-      fmap Just . newVar . Val.Rational $ x % y
-    (Val.Int x, Val.Float y) ->
-      fmap Just . newVar . Val.Float $ fromInteger x / y
-    (Val.Int x, Val.Rational y) ->
-      fmap Just . newVar . Val.Rational $ fromInteger x / y
-    (Val.Float x, Val.Int y) ->
-      fmap Just . newVar . Val.Float $ x / fromInteger y
-    (Val.Float x, Val.Float y) ->
-      fmap Just . newVar . Val.Float $ x / y
-    (Val.Float x, Val.Rational y) ->
-      fmap Just . newVar . Val.Float $ fromRational $ toRational x / y
-    (Val.Rational x, Val.Int y) ->
-      fmap Just . newVar . Val.Rational $ x / fromInteger y
-    (Val.Rational x, Val.Float y) ->
-      fmap Just . newVar . Val.Float $ fromRational $ x / toRational y
-    (Val.Rational x, Val.Rational y) ->
-      fmap Just . newVar . Val.Rational $ x / y
+    (Val.Rational x, Val.Rational y) -> fmap Just . newVar . Val.Rational $ x / y
+    (Val.Rational _, Val.AnyInt) -> decide *> (Just <$> newVar Val.AnyRational)
+    (Val.Rational _, Val.Int 0) -> empty
+    (Val.Rational x, Val.Int y) -> fmap Just . newVar . Val.Rational $ x / fromInteger y
+    (Val.Rational _, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.Rational x, Val.Float y) -> fmap Just . newVar . Val.Float $ fromRational x / y
+    (Val.AnyInt, Val.AnyRational) -> decide *> (Just <$> newVar Val.AnyRational)
+    (Val.AnyInt, Val.Rational 0) -> empty
+    (Val.AnyInt, Val.Rational _) -> Just <$> newVar Val.AnyRational
+    (Val.AnyInt, Val.AnyInt) -> decide *> (Just <$> newVar Val.AnyRational)
+    (Val.AnyInt, Val.Int 0) -> empty
+    (Val.AnyInt, Val.Int _) -> Just <$> newVar Val.AnyRational
+    (Val.AnyInt, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyInt, Val.Float _) -> Just <$> newVar Val.AnyFloat
+    (Val.Int _, Val.AnyRational) -> decide *> (Just <$> newVar Val.AnyRational)
+    (Val.Int _, Val.Rational 0) -> empty
+    (Val.Int x, Val.Rational y) -> fmap Just . newVar . Val.Rational $ fromInteger x / y
+    (Val.Int _, Val.AnyInt) -> decide *> (Just <$> newVar Val.AnyRational)
+    (Val.Int _, Val.Int 0) -> empty
+    (Val.Int x, Val.Int y) -> fmap Just . newVar . Val.Rational $ x % y
+    (Val.Int _, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.Int x, Val.Float y) -> fmap Just . newVar . Val.Float $ fromInteger x / y
+    (Val.AnyFloat, Val.AnyRational) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.Rational _) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.AnyInt) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.Int _) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.AnyFloat, Val.Float _) -> Just <$> newVar Val.AnyFloat
+    (Val.Float _, Val.AnyRational) -> decide *> (Just <$> newVar Val.AnyFloat)
+    (Val.Float x, Val.Rational y) -> fmap Just . newVar . Val.Float $ x / fromRational y
+    (Val.Float _, Val.AnyInt) -> Just <$> newVar Val.AnyFloat
+    (Val.Float x, Val.Int y) -> fmap Just . newVar . Val.Float $ x / fromInteger y
+    (Val.Float _, Val.AnyFloat) -> Just <$> newVar Val.AnyFloat
+    (Val.Float x, Val.Float y) -> fmap Just . newVar . Val.Float $ x / y
     _ -> pure Nothing
   _ -> pure Nothing
 
-to :: (MonadRef m, MonadSupply Int m)
-   => VarVal m
-   -> S m
-   -> S m
-   -> VerseT m (Maybe (VarVal m))
-to var s s' = readVar var >>= \ case
-  Val.Tuple [var_x, var_y] -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
-    (Int val1, Int val2) -> do
-      unify s.storeFree s'.storeFree
-      var <- foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
-      unify s.choiceFree s'.choiceFree
-      pure $ Just var
+to
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => VarVal m
+  -> S m
+  -> S m
+  -> VerseT m (Maybe (VarVal m))
+to var s s' = readPair var >>= \ case
+  Just (var_x, var_y) -> (,) <$> readVar var_x <*> readVar var_y >>= \ case
+    (Int val1, Int val2) -> to' val1 val2 s s'
     _ -> pure Nothing
   _ -> pure Nothing
 
-int :: (MonadRef m, MonadSupply Int m)
-    => VarVal m -> VerseT m (Maybe (VarVal m))
+to'
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => Integer
+  -> Integer
+  -> S m
+  -> S m
+  -> VerseT m (Maybe (VarVal m))
+to' val1 val2 s s' = do
+  unify s.storeFree s'.storeFree
+  var <- foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
+  unify s.choiceFree s'.choiceFree
+  pure $ Just var
+
+pattern AnyNumber :: Val f a
+pattern AnyNumber <- (number -> True)
+
+number :: Val f a -> Bool
+number = \ case
+  Val.AnyRational -> True
+  Val.Rational _ -> True
+  Val.AnyInt -> True
+  Val.Int _ -> True
+  Val.AnyFloat -> True
+  Val.Float _ -> True
+  _ -> False
+
+pattern Int :: Integer -> Val f a
+pattern Int x <- (getInt -> Just x)
+
+getInt :: Val f a -> Maybe Integer
+getInt = \ case
+  Val.Rational x | denominator x == 1 -> pure $ numerator x
+  Val.Int x -> pure x
+  _ -> empty
+
+int
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => VarVal m -> VerseT m (Maybe (VarVal m))
 int var = do
   fork $ readVar var >>= \ case
-    Int _ -> pure ()
+    Val.Any -> unify var =<< newVar Val.AnyInt
+    Val.AnyRational -> unify var =<< newVar Val.AnyInt
+    Val.Rational x | denominator x == 1 -> pure ()
+    Val.AnyInt -> pure ()
+    Val.Int _ -> pure ()
     _ -> empty
   pure $ Just var
 
-float :: (MonadRef m, MonadSupply Int m)
-      => VarVal m -> VerseT m (Maybe (VarVal m))
+float
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => VarVal m -> VerseT m (Maybe (VarVal m))
 float var = do
   fork $ readVar var >>= \ case
+    Val.Any -> unify var =<< newVar Val.AnyFloat
+    Val.AnyFloat -> pure ()
     Val.Float _ -> pure ()
     _ -> empty
   pure $ Just var
 
-query :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
-      => VarVal m -> VerseT m (Maybe (VarVal m))
+query
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => VarVal m -> VerseT m (Maybe (VarVal m))
 query var = do
   var' <- freshVar
-  fork $ readVar var >>= \ case
-    Val.Truth var -> unify var var'
-    _ -> empty
+  unify var =<< newVar (Val.Truth var')
   pure $ Just var'
 
 liftPrim
-  :: (MonadRef m, MonadSupply Int m)
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => (VarVal m -> VerseT m (Maybe (VarVal m)))
   -> VarVal m -> S m -> S m -> VerseT m (Maybe (VarVal m))
 liftPrim f var s s' = f var >>= \ case
@@ -846,6 +953,21 @@ liftPrim f var s s' = f var >>= \ case
     unify s.choiceFree s'.choiceFree
     unify s.storeFree s'.storeFree
     pure x
+
+readPair
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => VarVal m
+  -> VerseT m (Maybe (VarVal m, VarVal m))
+readPair var = readVar var <&> \ case
+  Val.Tuple [var1, var2] -> Just (var1, var2)
+  _ -> Nothing
+
+evalIdent
+  :: MonadEval m
+  => L Ident -> EvalT m (VarVal m)
+evalIdent x = lookupVar (extract x) >>= \ case
+  Nothing -> abort $ IdentError (loc x) (extract x)
+  Just var -> pure var
 
 newEnv :: (MonadRef m, MonadSupply Int m) => VerseT m (Env m)
 newEnv = execWriterT $ do
@@ -878,14 +1000,9 @@ filterNames =
     Ident.Label _ -> \ _ z -> z
   []
 
-evalIdent :: (MonadAbort Error m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-          => L Ident -> EvalT m (VarVal m)
-evalIdent x = lookupVar (extract x) >>= \ case
-  Nothing -> abort $ IdentError (loc x) (extract x)
-  Just var -> pure var
-
-lookupVar :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
-          => Ident -> EvalT m (Maybe (VarVal m))
+lookupVar
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => Ident -> EvalT m (Maybe (VarVal m))
 lookupVar = lookupNamed >=> \ case
   Nothing -> pure Nothing
   Just x -> Just <$> readNamed x
@@ -893,14 +1010,15 @@ lookupVar = lookupNamed >=> \ case
 lookupNamed :: Ident -> EvalT m (Maybe (Named (VarRef m) (VarVal m)))
 lookupNamed x = asks $ \ r -> HashMap.lookup x r.env
 
-readNamed :: (MonadRef m, MonadSupply Int m, EqRef (Ref m))
-          => Named (VarRef m) (VarVal m) -> EvalT m (VarVal m)
+readNamed
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  => Named (VarRef m) (VarVal m) -> EvalT m (VarVal m)
 readNamed = \ case
   Ref x _ -> readVarRef' x
   Val x -> pure x
 
 readNamed'
-  :: (MonadRef m, MonadSupply Int m)
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => Var m StoreFree
   -> Var m StoreFree
   -> Named (VarRef m) (VarVal m)
@@ -923,22 +1041,27 @@ localEnv env = local $ \ r -> mempty { env = env <> r.env }
 
 freshEnv
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Exp.Env Ident -> VerseT m (Env m)
+  => Exp.Env L Ident -> VerseT m (Env m)
 freshEnv = getAp . HashMap.foldMapWithKey f
   where
     f k = \ case
-      Nothing -> Ap $ HashMap.singleton k . Val <$> freshVar
-      Just k' -> Ap $ do
+      Exp.Exists -> Ap $ HashMap.singleton k . Val <$> freshVar
+      Exp.Forall -> Ap $ HashMap.singleton k . Val <$> newVar Val.Any
+      Exp.Var k' -> Ap $ do
         ref <- freshVarRef
         var <- freshVar
-        pure $ HashMap.singleton k (Ref ref var) <> HashMap.singleton k' (Val var)
+        pure $
+          HashMap.singleton k (Ref ref var) <>
+          HashMap.singleton (extract k') (Val var)
 
-freshVarRef :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
-            => VerseT m (VarRef m f)
+freshVarRef
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
+  => VerseT m (VarRef m f)
 freshVarRef = newVarRef =<< freshVar
 
-readVarRef' :: (MonadRef m, MonadSupply Int m, RowMatchable f)
-            => VarRef m f -> EvalT m (Var m f)
+readVarRef'
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
+  => VarRef m f -> EvalT m (Var m f)
 readVarRef' ref = do
   x <- lift freshVar
   s <- get

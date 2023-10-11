@@ -18,7 +18,7 @@ import Data.HashMap.Strict (foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
 import Data.Traversable
 
-import Language.Verse.Desugar.Exp (Exp (..))
+import Language.Verse.Desugar.Exp (Exp (..), Quantifier (..))
 import Language.Verse.Error
 import Language.Verse.Ident (Ident, IdentMap)
 import Language.Verse.Ident qualified as Ident
@@ -36,10 +36,10 @@ import Language.Verse.Rewrite.Exp qualified as Rewrite
 
 type DesugarT m = StateT Env m
 
-type Env = IdentMap (Loc, Maybe (L Ident))
+type Env = IdentMap (Loc, Quantifier L Ident)
 
-runDesugarT :: Functor m => DesugarT m a -> m (a, IdentMap (Maybe Ident))
-runDesugarT = fmap (fmap (fmap (fmap extract . snd))) . runDesugarT'
+runDesugarT :: Functor m => DesugarT m a -> m (a, IdentMap (Quantifier L Ident))
+runDesugarT = fmap (fmap (fmap snd)) . runDesugarT'
 
 runDesugarT' :: DesugarT m a -> m (a, Env)
 runDesugarT' m = runDesugarT'' m mempty
@@ -81,6 +81,10 @@ desugarExp e = for e $ \ case
     All <$> exists (desugarExp e)
   Rewrite.Not e ->
     Not <$> desugarExp e
+  Rewrite.Verify e ->
+    Verify <$> exists (desugarExp e)
+  Rewrite.Succeeds e ->
+    Succeeds <$> exists (desugarExp e)
   Rewrite.Module e -> do
     i <- supply
     (e, xs) <- lift . runDesugarT $ desugarExp e
@@ -112,12 +116,13 @@ desugarExp e = for e $ \ case
   Rewrite.Block e ->
     extract <$> exists (desugarExp e)
   Rewrite.Exists x -> do
-    tellName x Nothing
+    tellName x Exists
+    pure $ Name $ extract x
+  Rewrite.Forall x -> do
+    tellName x Forall
     pure $ Name $ extract x
   Rewrite.Set x e ->
     Set x <$> desugarExp e
-  Rewrite.ParenInvoke e1 e2 ->
-    ParenInvoke <$> desugarExp e1 <*> desugarExp e2
   Rewrite.BracketInvoke e1 e2 ->
     BracketInvoke <$> desugarExp e1 <*> desugarExp e2
   Rewrite.Tuple es ->
@@ -133,12 +138,12 @@ desugarExp e = for e $ \ case
     e <- exists $ desugarExp e
     pure $ Fun xs e_domain e
   MixfixVarColonEqual x y e1 e2 -> do
-    tellName x $ Just y
+    tellName x $ Var y
     e1 <- desugarExp e1
     e2 <- desugarExp e2
     pure $ unify (Name <$> y) e1 :*>: unify (Name <$> x) e2
   InfixColonEqual funName x e -> do
-    if funName then tellFunName x else tellName x Nothing
+    if funName then tellFunName x else tellName x Exists
     e <- desugarExp e
     pure $ (ArchetypeName <$> x) :=: e
   PrefixColon e -> do
@@ -146,8 +151,8 @@ desugarExp e = for e $ \ case
     x <- freshIdent $ loc e
     pure $ BracketInvoke e (Name <$> x)
   MixfixArrowColonEqual x y e -> do
-    tellName x Nothing
-    tellName y Nothing
+    tellName x Exists
+    tellName y Exists
     e <- desugarDomain' e $ Name <$> x
     pure $ (ArchetypeName <$> y) :=: e
   Rewrite.Name x ->
@@ -228,15 +233,15 @@ desugarDomain' e i = for e $ \ case
       pure $ unify y (bracketInvoke i x) `then'` e
     pure $ Fun xs e_domain e
   InfixColonEqual funName x e -> do
-    if funName then tellFunName x else tellName x Nothing
+    if funName then tellFunName x else tellName x Exists
     e <- desugarDomain' e i
     pure $ (ArchetypeName <$> x) :=: e
   PrefixColon e -> do
     e <- desugarExp e
     pure $ BracketInvoke e i
   MixfixArrowColonEqual x y e -> do
-    tellName x Nothing
-    tellName y Nothing
+    tellName x Exists
+    tellName y Exists
     e <- desugarDomain' e i
     pure $ unify (ArchetypeName <$> y) e :*>: unify (Name <$> x) i
   Rewrite.IfArchetypeName x e1 e2 -> do
@@ -294,10 +299,10 @@ liftL2 f x y = f x y <$ x <. y
 freshIdent :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
 freshIdent loc = do
   x <- Ident.Label <$> supply
-  modify $ HashMap.insert x (loc, Nothing)
+  modify $ HashMap.insert x (loc, Exists)
   pure $ L loc x
 
-tellName :: MonadAbort Error m => L Ident -> Maybe (L Ident) -> DesugarT m ()
+tellName :: MonadAbort Error m => L Ident -> Quantifier L Ident -> DesugarT m ()
 tellName x y =
   put =<<
   HashMap.alterF
@@ -309,7 +314,7 @@ tellName x y =
 
 tellFunName :: Monad m => L Ident -> DesugarT m ()
 tellFunName x =
-  modify $ HashMap.insertWith (\ _ x -> x) (extract x) (loc x, Nothing)
+  modify $ HashMap.insertWith (\ _ x -> x) (extract x) (loc x, Exists)
 
 exists :: Monad m => DesugarT m (L (Exp L Ident)) -> DesugarT m (L (Exp L Ident))
 exists m = do
@@ -319,4 +324,4 @@ exists m = do
 exists' :: Env -> L (Exp L Ident) -> L (Exp L Ident)
 exists' xs e = foldlWithKey' f e xs
   where
-    f z x (loc, y) = Exists (L loc x) y z <$ z
+    f z x (loc, y) = Def y (L loc x) z <$ z

@@ -1,16 +1,46 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Parse.Exp
   ( Exp (..)
   , Pat (..)
-  , CatchUntil(..)
+  , CatchUntil (..)
   ) where
 
+import Data.Char
+import Data.Function
+import Data.Functor
+import Data.Maybe
+import Data.Monoid (mempty)
+
 import Language.Verse.Name
-import Prettyprinter (Pretty(..), Doc, (<+>), vcat, parens, brackets, encloseSep, flatAlt, nest, hardline, group, equals, pipe, dot, colon, lparen, rparen, lbrace, rbrace)
-import Prelude hiding(True, False)
+
+import Prelude (Double, Integer, String)
+import Prettyprinter ( Pretty (..)
+                     , Doc
+                     , (<>)
+                     , (<+>)
+                     , brackets
+                     , colon
+                     , dot
+                     , encloseSep
+                     , equals
+                     , flatAlt
+                     , group
+                     , hardline
+                     , lbrace
+                     , lparen
+                     , nest
+                     , parens
+                     , pipe
+                     , rbrace
+                     , rparen
+                     , vcat
+                     )
+
+import Text.Show (Show)
 
 data Exp f a
   = f (Exp f a) :=: f (Exp f a)
@@ -36,6 +66,8 @@ data Exp f a
   | All (f (Exp f a))
   | And (f (Exp f a)) (f (Exp f a))
   | Not (f (Exp f a))
+  | Verify (f (Exp f a))
+  | Succeeds (f (Exp f a))
   | PrefixBracket (f (Exp f a))
   | PrefixQuery (f (Exp f a))
   | PostfixQuery (f (Exp f a))
@@ -57,6 +89,7 @@ data Exp f a
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
+  | Forall (f a)
   | Set (f (Pat f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
@@ -76,10 +109,10 @@ data Exp f a
   | InfixDivideEqual (f (Pat f a)) (f (Exp f a))
   | Pat (Pat f a)
 
-deriving instance ( Show (f String)
-                  , Show (f (Exp f a))
+deriving instance ( Show (f (Exp f a))
                   , Show (f (Pat f a))
                   , Show (f (CatchUntil f a))
+                  , Show (f String)
                   , Show (f a)
                   , Show a
                   ) => Show (Exp f a)
@@ -110,11 +143,10 @@ data CatchUntil f a
 deriving instance ( Show (f (Exp f a))
                   ) => Show (CatchUntil f a)
 
-
-instance ( Pretty (f String)
-         , Pretty (f (Pat f a))
+instance ( Pretty (f (Pat f a))
          , Pretty (f (Exp f a))
          , Pretty (f (CatchUntil f a))
+         , Pretty (f String)
          , Pretty (f a)
          , Pretty a
          ) => Pretty (Exp f a) where
@@ -156,11 +188,21 @@ instance ( Pretty (f String)
       braces (pretty e2)
     Enum e -> "enum" <> braces (pretty e) -- FIXME should use ,
     Inst e1 e2 -> parens (pretty e1) <> braces (pretty e2)
-    InstDo e1 e2 e3 e4 -> parens (pretty e1) <> braces (pretty e2) <+> maybe "" (\ e -> "do" <> braces (pretty e)) e3 <+> maybe "" pretty e4
-    If e1 -> "if" <> parens (pretty e1)
-    IfThen e1 e2 -> "if" <> parens (pretty e1) <> braces (pretty e2)
-    IfElse e1 e3 -> "if" <> parens (pretty e1) <> "{}" <+> "else" <> braces (pretty e3)
-    IfThenElse e1 e2 e3 -> "if" <> parens (pretty e1) <> braces (pretty e2) <+> "else" <> braces (pretty e3)
+    InstDo e1 e2 e3 e4 ->
+      parens (pretty e1) <> braces (pretty e2) <+>
+      maybe mempty (\ e -> "do" <> braces (pretty e)) e3 <+>
+      maybe mempty pretty e4
+    If e1 ->
+      "if" <+> parens (pretty e1)
+    IfThen e1 e2 ->
+      "if" <+> parens (pretty e1) <> braces (pretty e2)
+    IfElse e1 e3 ->
+      "if" <+> braces (pretty e1) <+>
+      "else" <+> braces (pretty e3)
+    IfThenElse e1 e2 e3 ->
+      "if" <+> parens (pretty e1) <+>
+      braces (pretty e2) <+>
+      "else" <+> braces (pretty e3)
     For e1 -> "for" <> parens (pretty e1)
     ForDo e1 e2 -> "for" <> parens (pretty e1) <> braces (pretty e2)
     Block e -> braces (pretty e)
@@ -191,11 +233,10 @@ instance ( Pretty (f String)
         (flatAlt "( " lparen)
         (flatAlt (hardline <> rparen) rparen)
         ", "
-
-      stringCont (e, s) [] = pretty e <+> "}" <> pretty s <> "\"" -- FIXME add escape
-      stringCont (e, s) (x:xs) = pretty e <+> "}" <> pretty s <> "{" <+> stringCont x xs -- FIXME add escape
-
-
+      stringCont (e, s) [] =
+        pretty e <+> "}" <> pretty s <> "\"" -- FIXME add escape
+      stringCont (e, s) (x:xs) =
+        pretty e <+> "}" <> pretty s <> "{" <+> stringCont x xs -- FIXME add escape
 
 instance ( Pretty (f (Pat f a))
          , Pretty (f (Exp f a))
@@ -212,20 +253,20 @@ instance ( Pretty (f (Pat f a))
     InfixColon p e -> pretty p <> colon <> pretty e
     InfixArrow p1 p2 -> pretty p1 <> colon <> pretty p2
     Invoke p e1 -> pretty p <> parens (pretty e1)
-    InvokeDo p e1 e2 e3 -> pretty p <> parens (pretty e1) <+> maybe "" (\ e -> "do" <> braces (pretty e)) e2 <+> maybe "" pretty e3
+    InvokeDo p e1 e2 e3 ->
+      pretty p <> parens (pretty e1) <+>
+      maybe mempty (\ e -> "do" <> braces (pretty e)) e2 <+>
+      maybe mempty pretty e3
     where
-      list [] = ""
+      list [] = mempty
       list (x:[]) = pretty x
       list (x:xs) = pretty x <> ";" <+> list xs
-
 
 instance ( Pretty (f (Exp f a))
          ) => Pretty (CatchUntil f a) where
   pretty = \ case
     Catch e -> "catch" <+> pretty e
-    Until e -> "until" <> braces (pretty e)
-
-
+    Until e -> "until" <+> braces (pretty e)
 
 braces :: Doc a -> Doc a
 braces x =

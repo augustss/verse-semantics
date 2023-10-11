@@ -15,6 +15,7 @@ module Language.Verse.Val
 import Control.Monad
 import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen, Freshenable (..))
 
+import Data.Foldable
 import Data.Functor
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
@@ -33,9 +34,13 @@ import Language.Verse.Name
 import Prettyprinter
 
 data Val ref a
-  = Int !Integer
-  | Float {-# UNPACK #-} !Double
+  = Any
+  | AnyRational
   | Rational !Rational
+  | AnyInt
+  | Int !Integer
+  | AnyFloat
+  | Float {-# UNPACK #-} !Double
   | Truth a
   | Tuple [a]
   | Module {-# UNPACK #-} !Label !(Env Name ref a)
@@ -51,32 +56,45 @@ type FrozenVal = Frozen (Val Frozen)
 
 instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
   rowMatch = curry $ \ case
-    (Truth x, Truth y) ->
-      Zip . Just $ Truth (x, y)
-    (Int x, Int y) ->
-      Zip $ guard (x == y) $> Int x
-    (Int x, Rational y) ->
-      Zip $ guard (1 == denominator y && x == numerator y) $> Int x
-    (Rational x, Int y) ->
-      Zip $ guard (denominator x == 1 && numerator x == y) $> Int y
-    (Rational x, Rational y) ->
-      Zip $ guard (x == y) $> Rational x
-    (Float x, Float y) ->
-      Zip $ guard (if isNaN x then isNaN y else x == y) $> Float x
-    (Tuple xs, Tuple ys) ->
-      Zip $ Tuple <$> zipMatch xs ys
-    (Enum i xs xs', Enum j ys ys') ->
-      Zip $ guard (i == j) $> Enum i (zipMatchEnv xs ys) <*> zipMatch xs' ys'
-    (EnumValue i x, EnumValue j y) ->
-      Zip $ guard (i == j && x == y) $> EnumValue i x
-    (StructInst i xs, StructInst j ys) ->
-      Zip $ guard (i == j) $>
-      StructInst i (zipMatchEnv xs ys)
-    (ClassInst i x xs, ClassInst j y ys) ->
-      Zip $ guard (i == j) $>
-      ClassInst i (liftA2 (,) x y) (zipMatchEnv xs ys)
+    (x, Any) -> LE $ toList x <&> (, Any)
+    (Any, x) -> GE $ (Any,) <$> toList x
+    (AnyRational, AnyRational) -> LE []
+    (AnyRational, Rational _) -> GE []
+    (AnyRational, AnyInt) -> GE []
+    (AnyRational, Int _) -> GE []
+    (Rational _, AnyRational) -> LE []
+    (Rational x, Rational y) -> Zip $ guard (x == y) $> []
+    (Rational x, AnyInt) | denominator x == 1 -> LE []
+    (Rational x, Int y) | denominator x == 1 -> Zip $ guard (numerator x == y) $> []
+    (Rational x, Rational y) -> Zip $ guard (x == y) $> []
+    (AnyInt, AnyRational) -> LE []
+    (AnyInt, Rational y) | 1 == denominator y -> GE []
+    (AnyInt, AnyInt) -> LE []
+    (AnyInt, Int _) -> GE []
+    (Int _, AnyRational) -> LE []
+    (Int x, Rational y) | 1 == denominator y -> Zip $ guard (x == numerator y) $> []
+    (Int _, AnyInt) -> LE []
+    (Int x, Int y) -> Zip $ guard (x == y) $> []
+    (AnyFloat, AnyFloat) -> LE []
+    (AnyFloat, Float _) -> GE []
+    (Float _, AnyFloat) -> LE []
+    (Float x, Float y) -> Zip $ guard (if isNaN x then isNaN y else x == y) $> []
+    (Truth x, Truth y) -> Zip $ Just [(x, y)]
+    (Tuple xs, Tuple ys) -> Zip $ zipMatch xs ys
+    (Enum i xs xs', Enum j ys ys') -> Zip $ do
+      guard (i == j)
+      zs <- zipMatchEnv xs ys
+      zs' <- zipMatch xs' ys'
+      pure $ zs ++ zs'
+    (EnumValue i x, EnumValue j y) -> Zip $ guard (i == j && x == y) $> []
+    (StructInst i xs, StructInst j ys) -> Zip $ guard (i == j) *> zipMatchEnv xs ys
+    (ClassInst i x xs, ClassInst j y ys) -> Zip $ do
+      guard (i == j)
+      z <- zipMatch x y
+      zs <- zipMatchEnv xs ys
+      pure $ z ++ zs
     (Overloads x xs, Overloads y ys) -> case zipMatch x y of
-      Just x -> Zip . Just $ Overloads x (xs, ys)
+      Just z -> Zip . Just $ (xs, ys):z
       Nothing -> Uncons (Overloads x) xs (Overloads y) ys
     _ -> Zip Nothing
 
@@ -84,9 +102,13 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
          , Freezable a b m
          ) => Freezable (Val f a) (Val g b) m where
   freeze = \ case
-    Int x -> pure $ Int x
-    Float x -> pure $ Float x
+    Any -> pure Any
+    AnyRational -> pure AnyRational
     Rational x -> pure $ Rational x
+    AnyInt -> pure AnyInt
+    Int x -> pure $ Int x
+    AnyFloat -> pure AnyFloat
+    Float x -> pure $ Float x
     Truth x -> Truth <$> freeze x
     Tuple xs -> Tuple <$> for xs freeze
     Module i xs -> Module i <$> for xs freeze
@@ -98,10 +120,14 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
 
 instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
   pretty = \ case
-    Int x -> pretty x
-    Float x -> pretty x
+    Any -> "any"
+    AnyRational -> "rational" <> lbracket <> pretty '_' <> rbracket
     Rational x | denominator x == 1 -> pretty $ numerator x
     Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
+    AnyInt -> "int" <> lbracket <> pretty '_' <> rbracket
+    Int x -> pretty x
+    AnyFloat -> "float" <> lbracket <> pretty '_' <> rbracket
+    Float x -> pretty x
     Truth x -> align $ "truth" <> group (braces $ pretty x)
     Overloads {} -> "function"
     Tuple [] -> "false"
@@ -158,18 +184,20 @@ data Overload ref a
   = Fun
     {-# UNPACK #-} !Label
     !(Env Ident ref a)
-    !(IdentMap (Maybe Ident))
+    !(Desugar.Env L Ident)
     !Exp
     !Exp
   | Struct
     {-# UNPACK #-} !Label
     !(Env Ident ref a)
-    !(IdentMap (Maybe Ident)) Exp
+    !(Desugar.Env L Ident)
+    !Exp
   | Class
     {-# UNPACK #-} !Label
     !(Env Ident ref a)
     !(Maybe a)
-    !(IdentMap (Maybe Ident)) Exp
+    !(Desugar.Env L Ident)
+    !Exp
   | Intrinsic !Intrinsic deriving (Functor, Foldable, Traversable)
 
 type Exp = L (Desugar.Exp L Ident)
@@ -178,16 +206,18 @@ instance Eq (ref (Val ref)) => RowMatchable (Overload ref)
 
 instance Eq (ref (Val ref)) => ZipMatchable (Overload ref) where
   zipMatch = curry $ \ case
-    (Fun i_x env_x xs e1 e2, Fun i_y env_y _ _ _) ->
-      guard (i_x == i_y) $>
-      Fun i_x (zipMatchEnv env_x env_y) xs e1 e2
-    (Struct i_x env_x xs e1, Struct i_y env_y _ _) ->
-      guard (i_x == i_y) $>
-      Struct i_x (zipMatchEnv env_x env_y) xs e1
-    (Class i_x env_x sup_x xs e1, Class i_y env_y sup_y _ _) ->
-      guard (i_x == i_y) $>
-      Class i_x (zipMatchEnv env_x env_y) (liftA2 (,) sup_x sup_y) xs e1
-    (Intrinsic x, Intrinsic y) -> guard (x == y) $> Intrinsic x
+    (Fun i_x env_x _ _ _, Fun i_y env_y _ _ _) ->
+      guard (i_x == i_y) *>
+      zipMatchEnv env_x env_y
+    (Struct i_x env_x _ _, Struct i_y env_y _ _) ->
+      guard (i_x == i_y) *>
+      zipMatchEnv env_x env_y
+    (Class i_x env_x sup_x _ _, Class i_y env_y sup_y _ _) -> do
+      guard (i_x == i_y)
+      sup_z <- zipMatch sup_x sup_y
+      env_z <- zipMatchEnv env_x env_y
+      pure $ sup_z ++ env_z
+    (Intrinsic x, Intrinsic y) -> guard (x == y) $> []
     _ -> Nothing
 
 instance ( Freezable (f (Val f)) (g (Val g)) m
@@ -214,8 +244,8 @@ instance Eq (ref (Val ref)) => RowMatchable (Named ref)
 
 instance Eq (ref (Val ref)) => ZipMatchable (Named ref) where
   zipMatch = curry $ \ case
-    (Val x, Val y) -> Just $ Val (x, y)
-    (Ref x x', Ref y y') -> guard (x == y) $> Ref x (x', y')
+    (Val x, Val y) -> Just [(x, y)]
+    (Ref x _, Ref y _) -> guard (x == y) $> []
     _ -> Nothing
 
 instance Freshenable a m => Freshenable (Named ref a) m where
@@ -237,8 +267,9 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Named ref a) where
 
 type Env k ref a = HashMap k (Named ref a)
 
-zipMatchEnv :: (Hashable k, ZipMatchable f)
-            => HashMap k (f a)
-            -> HashMap k (f b)
-            -> HashMap k (f (a, b))
-zipMatchEnv x y = HashMap.mapMaybe id $ HashMap.intersectionWith zipMatch x y
+zipMatchEnv
+  :: (Hashable k, ZipMatchable f)
+  => HashMap k (f a)
+  -> HashMap k (f b)
+  -> Maybe [(a, b)]
+zipMatchEnv x y = fmap concat . sequenceA . toList $ HashMap.intersectionWith zipMatch x y

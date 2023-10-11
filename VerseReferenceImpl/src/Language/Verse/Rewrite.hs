@@ -52,7 +52,8 @@ import Language.Verse.Parse.Exp ( pattern (:<>:)
                                 )
 import Language.Verse.Parse.Exp qualified as Parse
 import Language.Verse.Rewrite.Exp
-import Prelude(error)
+
+import Prelude (error)
 
 rewrite
   :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
@@ -121,6 +122,10 @@ rewriteExp e = for e $ \ case
     All <$> rewriteExp e
   Parse.Not e ->
     Not <$> rewriteExp e
+  Parse.Verify e ->
+    Verify <$> rewriteExp e
+  Parse.Succeeds e ->
+    Succeeds <$> rewriteExp e
   Parse.Module e ->
     Module <$> rewriteExp e
   Parse.Struct e ->
@@ -150,12 +155,16 @@ rewriteExp e = for e $ \ case
     ForDo <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Block e ->
     Block <$> rewriteExp e
-  Parse.ParenInvoke e1 e2 ->
-    ParenInvoke <$> rewriteExp e1 <*> rewriteExp e2
+  Parse.ParenInvoke e1 e2 -> do
+    e1 <- rewriteExp e1
+    e2 <- rewriteExp e2
+    parenInvokeM e1 e2
   Parse.BracketInvoke e1 e2 ->
     BracketInvoke <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Exists x ->
     pure . Exists $ Ident.Name <$> x
+  Parse.Forall x ->
+    pure . Forall $ Ident.Name <$> x
   Parse.Set p@(extract -> Parse.Name x) e2 -> -- Only Pat.Name implemented
     Set (Ident.Name x <$ p) <$> rewriteExp e2
   Parse.Tuple es ->
@@ -205,9 +214,9 @@ rewritePat = \ case
     p2 <- traverse rewritePat p2
     pure $ bracketInvoke2 "operator'->'" p1 p2
   Invoke p e -> do
-    p <- traverse rewritePat p
-    e <- rewriteExp e
-    pure $ ParenInvoke p e
+    e1 <- traverse rewritePat p
+    e2 <- rewriteExp e
+    parenInvokeM e1 e2
   _ -> error "rewritePat FIXME"
 
 rewriteDef
@@ -311,9 +320,26 @@ rewriteOperator2
   -> m (Exp f Ident)
 rewriteOperator2 x e1 e2 = bracketInvoke2 x <$> rewriteExp e1 <*> rewriteExp e2
 
+parenInvokeM
+  :: (MonadSupply Label m, Apply f)
+  => f (Exp f Ident)
+  -> f (Exp f Ident)
+  -> m (Exp f Ident)
+parenInvokeM e1 e2 = do
+  x1 <- (e1 $>) . Ident.Label <$> supply
+  x2 <- (e2 $>) . Ident.Label <$> supply
+  pure $ List
+    [ infixColonEqual False x1 e1
+    , infixColonEqual False x2 e2
+    , succeeds $ bracketInvoke (Name <$> x1) (Name <$> x2)
+    ]
+
 bracketInvoke2 :: Apply f => Name -> f (Exp f Ident) -> f (Exp f Ident) -> Exp f Ident
 bracketInvoke2 x e1 e2 =
   BracketInvoke (Name (Ident.Name x) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
+
+bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+bracketInvoke = liftL2 BracketInvoke
 
 infixColonEqual :: Apply f => Bool -> f a -> f (Exp f a) -> f (Exp f a)
 infixColonEqual funName = liftL2 $ InfixColonEqual funName
@@ -332,11 +358,17 @@ mixfixArrowColonEqual = liftL3 MixfixArrowColonEqual
 fun :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 fun = liftL2 Fun
 
+succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
+succeeds = liftL1 Succeeds
+
 ifArchetypeName :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 ifArchetypeName = liftL3 IfArchetypeName
 
 ofType :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 ofType = liftL2 (:|>:)
+
+liftL1 :: Functor f => (f a -> b) -> f a -> f b
+liftL1 f x = f x <$ x
 
 liftL2 :: Apply f => (f a -> f b -> c) -> f a -> f b -> f c
 liftL2 f x y = f x y <$ x <. y

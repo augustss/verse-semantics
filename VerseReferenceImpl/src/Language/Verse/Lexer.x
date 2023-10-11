@@ -210,6 +210,7 @@ $space = [\ \t]
   "fail" { token Token.Fail }
   "false" { token Token.False }
   "for" { token Token.For }
+  "forall" { token Token.Forall }
   "if" { token Token.If }
   "module" { token Token.Module }
   "of" { token Token.Of }
@@ -218,6 +219,7 @@ $space = [\ \t]
   "until" { token Token.Until }
   "set" { token Token.Set }
   "struct" { token Token.Struct }
+  "succeeds" { token Token.Succeeds }
   "sync" { token Token.Sync }
   "then" { token Token.Then }
   "true" { token Token.True }
@@ -225,6 +227,7 @@ $space = [\ \t]
   "option" { token Token.Option }
   "or" { token Token.Or }
   "var" { token Token.Var }
+  "verify" { token Token.Verify }
   "where" { token Token.Where }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
