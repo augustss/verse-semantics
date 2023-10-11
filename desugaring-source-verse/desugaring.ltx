@@ -1044,8 +1044,8 @@ $$\begin{array}{@@{}l}
     \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe i t_2 else DMe i t_3|} \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Misc.}} \\
-\rulename{dsquig} & |DMe bullet (y squiggt i) := t| & = & |def x (DMe x (i:=t))| \\
-\rulename{msquig} & |DMe x (y squiggt i) := t| & = & |y := x; DMe x (i := t)| \\
+\rulename{dsquig} & |DMe bullet (y squiggt i := t)| & = & |def x (DMe x (i:=t))| \\
+\rulename{msquig} & |DMe x (y squiggt i := t)| & = & |y := x; DMe x (i := t)| \\
 \rulename{darray} & |DMe bullet (arr(t_1, xdots, t_n))| & = & |arr(De t_1 , xdots, De t_n)| \\
 \rulename{marray} & |DMe x (arr(t_1, xdots, t_n))| & = &
     |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n))| 
