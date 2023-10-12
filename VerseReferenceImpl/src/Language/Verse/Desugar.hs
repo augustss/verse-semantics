@@ -85,6 +85,12 @@ desugarExp e = for e $ \ case
     Verify <$> exists (desugarExp e)
   Rewrite.Succeeds e ->
     Succeeds <$> exists (desugarExp e)
+  Rewrite.Fails e ->
+    Fails <$> exists (desugarExp e)
+  Rewrite.Decides e ->
+    Decides <$> exists (desugarExp e)
+  Rewrite.Assume e ->
+    Assume <$> exists (desugarExp e)
   Rewrite.Module e -> do
     i <- supply
     (e, xs) <- lift . runDesugarT $ desugarExp e

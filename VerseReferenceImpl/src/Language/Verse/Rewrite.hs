@@ -126,6 +126,12 @@ rewriteExp e = for e $ \ case
     Verify <$> rewriteExp e
   Parse.Succeeds e ->
     Succeeds <$> rewriteExp e
+  Parse.Fails e ->
+    Fails <$> rewriteExp e
+  Parse.Decides e ->
+    Decides <$> rewriteExp e
+  Parse.Assume e ->
+    Assume <$> rewriteExp e
   Parse.Module e ->
     Module <$> rewriteExp e
   Parse.Struct e ->

@@ -66,7 +66,6 @@ instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
     (Rational x, Rational y) -> Zip $ guard (x == y) $> []
     (Rational x, AnyInt) | denominator x == 1 -> LE []
     (Rational x, Int y) | denominator x == 1 -> Zip $ guard (numerator x == y) $> []
-    (Rational x, Rational y) -> Zip $ guard (x == y) $> []
     (AnyInt, AnyRational) -> LE []
     (AnyInt, Rational y) | 1 == denominator y -> GE []
     (AnyInt, AnyInt) -> LE []

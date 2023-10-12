@@ -159,22 +159,14 @@ evalExp e = case extract e of
     evalNot e
   Exp.Verify e ->
     evalVerify e
-  Exp.Succeeds e -> do
-    var <- lift freshVar
-    r <- ask
-    s <- get
-    storeFree <- lift freshVar
-    put s { storeFree }
-    lift . fork $
-      succeeds do
-        choiceFree <- newVar ChoiceFree
-        evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
-      >>= readIVar >>= \ case
-        Nothing -> abort . SucceedsError $ loc e
-        Just var' -> do
-          unify var var'
-          unify storeFree s.storeFree
-    pure var
+  Exp.Succeeds e ->
+    evalSucceeds e
+  Exp.Fails e ->
+    evalFails e
+  Exp.Decides e ->
+    evalDecides e
+  Exp.Assume e ->
+    evalAssume e
   Exp.Module i xs e -> do
     xs <- lift $ freshEnv xs
     _ <- localEnv xs $ evalExp e
@@ -331,6 +323,69 @@ evalVerify e = do
       void $ evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
     unify storeFree s.storeFree
   lift . newVar $ Val.Tuple []
+
+evalSucceeds :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
+evalSucceeds e = do
+  var <- lift freshVar
+  r <- ask
+  s <- get
+  storeFree <- lift freshVar
+  put s { storeFree }
+  lift . fork $ succeeds
+    do
+      choiceFree <- newVar ChoiceFree
+      evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
+    >>= readIVar >>= \ case
+      Nothing -> abort . SucceedsError $ loc e
+      Just var' -> do
+        unify var var'
+        unify storeFree s.storeFree
+  pure var
+
+evalFails :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
+evalFails e = do
+  r <- ask
+  s <- get
+  storeFree <- lift freshVar
+  put s { storeFree }
+  lift $ fork do
+    _ <- readIVar =<< one do
+      choiceFree <- newVar ChoiceFree
+      evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
+    abort . FailsError $ loc e
+  lift freshVar
+
+evalDecides :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
+evalDecides e = do
+  var <- lift freshVar
+  r <- ask
+  s <- get
+  storeFree <- lift freshVar
+  put s { storeFree }
+  lift . fork $ decides
+    do
+      choiceFree <- newVar ChoiceFree
+      evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
+    >>= readIVar >>= \ case
+      Nothing -> abort . DecidesError $ loc e
+      Just var' -> do
+        unify var var'
+        unify storeFree s.storeFree
+  pure var
+
+evalAssume :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
+evalAssume e = do
+  var <- lift freshVar
+  r <- ask
+  s <- get
+  storeFree <- lift freshVar
+  put s { storeFree }
+  lift $ fork do
+    unify var =<< readIVar =<< assume do
+      choiceFree <- newVar ChoiceFree
+      evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
+    unify storeFree s.storeFree
+  pure var
 
 evalIfThenElse
   :: MonadEval m

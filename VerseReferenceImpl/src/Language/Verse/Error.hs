@@ -22,6 +22,8 @@ data Error
   | IdentError !Loc !Ident
   | DomainError !Loc
   | SucceedsError !Loc
+  | FailsError !Loc
+  | DecidesError !Loc
   | StuckError deriving Show
 
 instance Pretty Error where
@@ -48,6 +50,10 @@ instance Pretty Error where
       pretty x <> colon <+> "unexpected" <+> "argument"
     SucceedsError x ->
       pretty x <> colon <+> "expected" <+> "one" <+> "value"
+    FailsError x ->
+      pretty x <> colon <+> "expected" <+> "zero" <+> "values"
+    DecidesError x ->
+      pretty x <> colon <+> "expected" <+> "zero" <+> "or" <+> "one" <+> "value"
     StuckError -> "stuck"
 
 prettyIndent :: Indent -> Doc ann
