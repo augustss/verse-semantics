@@ -1088,20 +1088,24 @@ $$\begin{array}{@@{}l}
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe i t| = |e|$}} \\[0.02in]
 \rulename{dinit}   & |De t | & = & |def i (DMe i t)| \\
-\rulename{dinit-alt}   & |De t | & = & |DMe ((def i i)) t| \\[2mm]
+% \rulename{dinit-alt}   & |De t | & = & |DMe ((def i i)) t| \\[2mm]
 
-\multicolumn{4}{l}{\mbox{\it Function rules, for open functions}} \\
-\rulename{mfun}  & |DMe f (functionP t_1 t_2)|
+\multicolumn{4}{l}{\mbox{\it Function rules}} \\
+\rulename{mfunc}  & |DMe f (functionX t_1 (closed) t_2)|
+     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
+& &   & |lam i (j := Me i t_1; forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\[2mm]
+
+\rulename{mfuno}  & |DMe f (functionX t_1 (open) t_2)|
      & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
 %   & &   & \multicolumn{2}{@@{}l}{|lam i (Me i t_1; forall r (assume (r = (De (:t_2))); r))|} \\[2mm]
 & &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
     |if (j := Me i t_1)| \\
     |then (forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\
     |else (f^[i]))|
-   \end{array}} \\[4mm]
+   \end{array}} \\[10mm]
 
 \rulename{moftype} & |DMe i (oftype t_1 t_2)|
-         & = & |y:=DMe i t_1; verify (assert ((De t_2)^[y]));|  & \text{|y| fresh} \\
+         & = & \multicolumn{2}{@@{}l}{|y:=DMe i t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
          &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
@@ -1112,7 +1116,7 @@ $$\begin{array}{@@{}l}
 \rulename{meq}     & |DMe i (t_1=t_2)|      & = & |(DMe i t_1) = (DMe i t_2)| \\
 \rulename{msemi}   & |DMe i (t_1 ; t_2)|    & = & |De t_1 ; DMe i t_2| \\
 \rulename{mchoice} & |DMe i ((t_1 `choice` t_2))| & = & |(DMe i t_1) `choice` (DMe i t_2)| \\
-\multicolumn{2}{l}{\rulename{mif}\; |DMe i (if(t_1) then t_2 else t_3)|} & = &
+\multicolumn{2}{l}{\rulename{mif}\hspace{1cm} |DMe i (if(t_1) then t_2 else t_3)|} & = &
     \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe i t_2 else DMe i t_3|} \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Misc.}} \\

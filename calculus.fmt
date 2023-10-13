@@ -32,6 +32,7 @@
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
 %format closed = "\textbf{closed}"
+%format open = "\textbf{open}"
 
 
 %% ----------------------
@@ -254,6 +255,7 @@
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"
 %format function (x) (rhs) = functionKW "\," x "\,\{" rhs "\}"
 %format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
+%format functionX (x) (fx) (rhs) = functionKW "(" x ")\langle" fx "\rangle\{" rhs "\}"
 %format functionKW = "\textbf{fun}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
@@ -303,9 +305,9 @@
 %% %format squiggt = "\!\leadsto\!"
 %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format (eff x) = "\!\langle" x "\rangle\!"
+%format eff (x) = "\!\langle" x "\rangle\!"
 %format apeff g x = g "\langle" x "\rangle"
-%  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
+%format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 %format arrayty = "[]"
 
