@@ -319,7 +319,7 @@ unify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
     writeLink v_x v_y
     k_x y
     resumeChildren $ subst v_y v_x
-  (Found _ repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) ->
+  (Found v_x repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) ->
     when (i_x /= i_y) $ case rowMatch x y of
       Zip Nothing -> empty
       Zip (Just z) -> do
@@ -374,7 +374,7 @@ subst' v_x y = findRepr v_x <&> (, y) >>= \ case
     writeLink v_x v_y
     k_x y
     resumeChildren $ subst v_y v_x
-  (Found _ repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) -> do
+  (Found v_x repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) -> do
     decrSuspCount
     when (i_x /= i_y) $ case rowMatch x y of
       Zip Nothing -> empty
