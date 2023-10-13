@@ -1,8 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Language.Verse.Desugar
   ( desugar
   ) where
@@ -75,7 +73,7 @@ desugarExp e = for e $ \ case
     pure $ unify (Name <$> x) e1 `then'` e2 :*>: (Name <$> x)
   Rewrite.Fail ->
     pure Fail
-  Rewrite.One e -> do
+  Rewrite.One e ->
     One <$> exists (desugarExp e)
   Rewrite.All e ->
     All <$> exists (desugarExp e)
@@ -224,7 +222,7 @@ desugarDomain' e i = for e $ \ case
       exists (desugarDomain' e i)
   Rewrite.Tuple es -> do
     (is, es) <- desugarDomainTuple es
-    pure $ (unify i $ Tuple is <$ e) :*>: (Tuple es <$ e)
+    pure $ unify i (Tuple is <$ e) :*>: (Tuple es <$ e)
   Rewrite.Name x ->
     pure $ i :=: (Name x <$ e)
   Rewrite.Fun e_domain e -> do

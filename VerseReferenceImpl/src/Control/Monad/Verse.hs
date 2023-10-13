@@ -1049,7 +1049,7 @@ copyEnv
   -> CopyT m (Env m)
 copyEnv Env {..} = do
   heap <- traverse copyHeap heap
-  decisions <- if isAbstract heap then newRef =<< readRef decisions else snd <$> ask
+  decisions <- if isAbstract heap then newRef =<< readRef decisions else asks snd
   let r = (heap, decisions)
   children <- newRef =<< local (const r) . copyProcesses =<< readRef children
   suspCount <- newRef =<< readRef suspCount
@@ -1059,7 +1059,7 @@ copyEnv Env {..} = do
 copyHeap :: (MonadFix m, MonadSupply Int m) => Heap -> CopyT m Heap
 copyHeap pred = do
   label <- supply
-  tail <- fst <$> ask
+  tail <- asks fst
   let abstract = pred.abstract
   pure $ Heap { pred = Just pred, .. }
 

@@ -5,7 +5,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 module Language.Verse.Eval
   ( MonadEval
@@ -197,8 +196,8 @@ evalExp e = case extract e of
     var <- lift $ newVar Val.Any
     localName (extract x) (Val var) $ evalExp e
   Exp.Def (Exp.Var y) x e -> do
-    ref <- lift $ freshVarRef
-    var <- lift $ freshVar
+    ref <- lift freshVarRef
+    var <- lift freshVar
     localName (extract x) (Ref ref var) $ localName (extract y) (Val var) $ evalExp e
   Exp.Set x e -> lookupNamed (extract x) >>= \ case
     Nothing -> abort $ IdentError (loc x) (extract x)

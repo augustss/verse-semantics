@@ -122,7 +122,7 @@ deriving instance ( Show (f (Exp f a))
 
 data Pat f a
   = Name a
-  | QualName [(f (Exp f a))] a
+  | QualName [f (Exp f a)] a
   | Var (f a) (f (Exp f a))
   | Var0 (f a)
   | PrefixColon (f (Exp f a))
@@ -262,7 +262,7 @@ instance ( Pretty (f (Pat f a))
       maybe mempty pretty e3
     where
       list [] = mempty
-      list (x:[]) = pretty x
+      list [x] = pretty x
       list (x:xs) = pretty x <> ";" <+> list xs
 
 instance ( Pretty (f (Exp f a))
