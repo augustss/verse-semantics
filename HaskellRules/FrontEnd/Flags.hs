@@ -50,7 +50,7 @@ defaultFlags = Flags
   , fTraceVerify  = False
   , fPrelude      = either error id $ findPrelude defaultPrelude
   , fNoWarn       = False
-  , fDesugar      = DFig6
+  , fDesugar      = {- DFig6 -} {- DFig10 -} DFig13
   }
 
 showFlags :: Flags -> String

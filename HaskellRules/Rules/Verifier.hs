@@ -88,7 +88,11 @@ isDone = go False
   -- go _lam (Assume e)       = True -- go lam e
   go _   _                = True
 
+-- write a liquidhaskell specification for a function that
+-- takes as input non-negative integers i and j and returns a list of
+-- values between i and j
 
+{-@ range ::  @-}
 
 
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
@@ -363,6 +367,7 @@ mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
 mustSucceed _ bvars = go [x | BLam x <- bvars]
   where
    go _  (Int _)          = True
+   go _  (Char _)         = True
    go bs (Arr as)         = all (go bs) as
    go _  (Lam _)          = True
    go bs (Var x)          = x `elem` bs
