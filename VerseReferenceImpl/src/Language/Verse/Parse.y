@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 module Language.Verse.Parse
   ( parse
@@ -120,16 +121,19 @@ import Language.Verse.Token qualified as Token
   '|' { L _ Token.Pipe }
   '}' { L _ Token.RightBrace }
   all { L _ Token.All }
+  assume { L _ Token.Assume }
   block { L _ Token.Block }
   catch { L _ Token.Catch }
   class { L _ Token.Class }
   char { (char -> Just $$) }
+  decides { L _ Token.Decides }
   dedent { L _ Token.Dedent }
   do { L _ Token.Do }
   else { L _ Token.Else }
   enum { L _ Token.Enum }
   exists { L _ Token.Exists }
   fail { L _ Token.Fail }
+  fails { L _ Token.Fails }
   false { L _ Token.False }
   float { (float -> Just $$) }
   for { L _ Token.For }
@@ -338,6 +342,15 @@ Exp :: { L (Exp L Name) }
   | succeeds Block {
       Exp.Succeeds <\$ $1 <.> duplicate $2
     }
+  | fails Block {
+      Exp.Fails <\$ $1 <.> duplicate $2
+    }
+  | decides Block {
+      Exp.Decides <\$ $1 <.> duplicate $2
+    }
+  | assume Block {
+      Exp.Assume <\$ $1 <.> duplicate $2
+    }
   | block Block {
       Exp.Block <\$ $1 <.> duplicate $2
     }
@@ -390,8 +403,6 @@ Exp :: { L (Exp L Name) }
   | Invoke %prec INVOKE { $1 }
   | Pat %shift { Exp.Pat <\$> $1 }
 
-
-
 Invoke :: { L (Exp L Name) }
   : Exp '{' List '}' Do Until %prec until {
       Exp.InstDo <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4) <.> (Just <\$> duplicate $5) <.> (Just <\$> duplicate $6)
@@ -405,8 +416,6 @@ Invoke :: { L (Exp L Name) }
   | Exp '{' List '}' %prec INVOKE {
       Exp.Inst <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
   }
-
-
 
 StringCont :: { L [(L (Exp L Name), L String)] }
   : File stringEnd { ( \ e s -> [(e,s)]) <\$> duplicate $1 <.> duplicate $2 }
@@ -450,7 +459,6 @@ Pat :: { L (Pat L Name) }
   | Pat '(' List ')' %prec INVOKE {
       Pat.Invoke <\$> duplicate $1 <.> duplicate ($2 \$> Exp.List $3 <. $4)
     }
-
 
 If :: { L (Exp L Name) }
   : if Block %prec IF {
@@ -605,8 +613,7 @@ float = \ case
 name :: L Token -> Maybe (L Name)
 name = \ case
   L x (Token.Name y) -> Just $ L x y
-  L x Token.At -> Just $ L x $ Text.pack "at"
-  L x Token.Of -> Just $ L x $ Text.pack "of"
+  L x Token.At -> Just $ L x "at"
+  L x Token.Of -> Just $ L x "of"
   _ -> Nothing
-
 }

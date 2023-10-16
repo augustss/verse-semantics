@@ -197,15 +197,17 @@ $space = [\ \t]
   "all" { token Token.All }
   "and" { token Token.And }
   "array" { token Token.Array }
+  "assume" { token Token.Assume }
   "at" { token Token.At }
   "block" { token Token.Block }
-  "do" { token Token.Do }
   "catch" { token Token.Catch }
   "class" { token Token.Class }
+  "decides" { token Token.Decides }
   "do" { token Token.Do }
   "else" { token Token.Else }
   "enum" { token Token.Enum }
   "exists" { token Token.Exists }
+  "fails" { token Token.Fails }
   "function" { token Token.Function }
   "fail" { token Token.Fail }
   "false" { token Token.False }

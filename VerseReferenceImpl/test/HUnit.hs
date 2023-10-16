@@ -28,6 +28,10 @@ main = runTestTTAndExit $ TestList
   , test6
   , test7
   , test8
+  , test9
+  , test10
+  , test11
+  , test12
   ]
 
 data Val a
@@ -38,8 +42,8 @@ instance RowMatchable Val
 
 instance ZipMatchable Val where
   zipMatch = curry $ \ case
-    (Int x, Int y) -> guard (x == y) $> Int x
-    (Tuple x, Tuple y) -> Tuple <$> zipMatch x y
+    (Int x, Int y) -> guard (x == y) $> []
+    (Tuple x, Tuple y) -> zipMatch x y
     _ -> Nothing
 
 instance Freezable a b m => Freezable (Val a) (Val b) m where
@@ -138,3 +142,60 @@ test8 = TestCase do
     unify (head $ head y) =<< newVar (Int 0)
     freeze' x
   z @?= Just [[[Known (Int 0)]]]
+
+data Sub a
+  = Any
+  | AnyInt
+  | AnInt !Integer deriving (Show, Eq, Functor, Foldable, Traversable)
+
+instance RowMatchable Sub where
+  rowMatch = curry $ \ case
+    (Any, Any) -> LE []
+    (Any, AnyInt) -> GE []
+    (Any, AnInt _) -> GE []
+    (AnyInt, Any) -> LE []
+    (AnyInt, AnyInt) -> LE []
+    (AnyInt, AnInt _) -> GE []
+    (AnInt _, Any) -> LE []
+    (AnInt _, AnyInt) -> LE []
+    (AnInt x, AnInt y) -> Zip $ guard (x == y) $> []
+
+instance Freezable a b m => Freezable (Sub a) (Sub b) m where
+  freeze = traverse freeze
+
+test9 :: Test
+test9 = TestCase do
+  z <- runSupplyT $ runVerseT do
+    x <- newVar Any
+    y <- newVar AnyInt
+    unify x y
+    freeze' x
+  z @?= Just [Known AnyInt]
+
+test10 :: Test
+test10 = TestCase do
+  z <- runSupplyT $ runVerseT do
+    x <- newVar Any
+    y <- newVar AnyInt
+    unify x y
+    freeze' x
+  z @?= Just [Known AnyInt]
+
+test11 :: Test
+test11 = TestCase do
+  z <- runSupplyT $ runVerseT do
+    x <- newVar Any
+    y <- newVar $ AnInt 1
+    unify x y
+    freeze' x
+  z @?= Just [Known $ AnInt 1]
+
+test12 :: Test
+test12 = TestCase do
+  z <- runSupplyT $ runVerseT do
+    x <- newVar Any
+    y <- freshVar
+    unify x y
+    unify y =<< newVar (AnInt 1)
+    freeze' x
+  z @?= Just [Known $ AnInt 1]

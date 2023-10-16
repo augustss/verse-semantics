@@ -17,6 +17,7 @@ import Debug.Trace
 import GHC.Stack
 import Epic.List
 import Epic.Print
+import Epic.Uniplate(universeBi, transform)
 --import FrontEnd.Desugar
 import FrontEnd.Error
 import FrontEnd.Expr
@@ -37,8 +38,7 @@ import FrontEnd.Flags
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
-            (traceDS "dropPrel"   <=< dropPrel  <=<
-             traceDS "alias"      <=< simpAlias <=<
+            (traceDS "alias"      <=< simpAlias <=<
              traceDS "simpler"    <=< simpler   <=<
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
@@ -47,40 +47,57 @@ desugar flgs = eval flgs .
              traceDS "dsD"        <=< dsDx      <=<
              traceDS "addDeref"   <=< addDeref  <=<
              traceDS "dsSmall"    <=< dsSmall   <=<
-             traceDS "addPrelude" <=< addPrelude<=<
+             traceDS "addPrelude" <=< addPrelude <=<
              traceDS "syntaxFixes" <=< syntaxFixes)
   where
+{-
     hack = (traceDS "dsD"        <=< dsD       <=<
             traceDS "addDeref"   <=< addDeref  <=<
             traceDS "dsSmall"    <=< dsSmall   <=<
             traceDS "syntaxFixes" <=< syntaxFixes)
-
+-}
     tr = fTraceDesugar flgs
     traceDS :: String -> Expr -> D Expr
     traceDS msg e | tr = trace ("---- " ++ msg ++ "\n" ++ prettyShow e) $
                          pure e
                   | otherwise = pure e
-    addPrelude e = pure $ Array [prel, e]
-    prel = eval flgs $ syntaxFixes $ snd $ fPrelude flgs
-    prelIds = getVisible $ eval flgs $ hack prel
-    dropPrel = pure . dropUnusedIds prelIds
+    addPrelude e = pure $ addUsed prel e
+    prel = spl $ eval flgs $ syntaxFixes $ snd $ fPrelude flgs
 
--- Drop unused prelude identifiers.
--- Assumes input expression is of the for exists is . < <prels>, e >
-dropUnusedIds :: [Ident] -> Expr -> Expr
-dropUnusedIds pids (Exists is (Array [Array ps, e])) =
-  let used = clos [] (getFree e)
-        where clos us [] = us
-              clos us (u : uis) = clos (u:us) (maybe [] getFree (lookup u pds) ++ uis)
-              pds = [(p, d) | Unify (Variable p) d <- ps ]
-      unused = pids \\ used
-      usedPrel (Unify (Variable p) _) = p `notElem` unused
-      usedPrel _ = True
-  in  lExists (is \\ unused) $ seqE $ filter usedPrel ps ++ [e]
-dropUnusedIds _ (Array [Array [], e]) = e
-dropUnusedIds _ e =
-  trace (prettyShow e) $
-  impossible e
+    -- Split the prelude into an association list
+    spl (Array ds) = map (\ e -> (nameOf e, e)) ds
+    spl e = impossible e
+
+    -- Find the name of a definition
+    nameOf (InfixOp lhs (Ident _ ":=") _) = lhsName lhs
+    nameOf e = impossible e
+    lhsName :: Expr -> Ident
+    lhsName (EffAttr e _) = lhsName e
+    lhsName (ApplyS e _) = lhsName e
+    lhsName (Variable i) = i
+    lhsName e = impossible e
+
+-- Hackily add prelude identifiers used in e
+addUsed :: [(Ident, Expr)] -> Expr -> Expr
+addUsed prel = loop []
+  where
+    loop vs e =
+      let is = allIdents e
+          ps = filter (\ (i, _) -> i `elem` is && i `notElem` vs) prel
+      in  case ps of
+            [] -> e
+            ies -> loop (map fst ies ++ vs) $ seqE (map snd ies ++ [e])
+
+allIdents :: Expr -> [Ident]
+allIdents = universeBi . transform fixops
+  where
+    -- Fix operator names
+    fixops (InfixOp e1 (Ident l s) e2) = InfixOp e1 (Ident l ("in'" ++ s ++ "'")) e2
+    fixops (PrefixOp (Ident l s) e2) = PrefixOp (Ident l ("pre'" ++ s ++ "'")) e2
+    fixops (PostfixOp e1 (Ident l s)) = PostfixOp e1 (Ident l ("post'" ++ s ++ "'"))
+    -- If there's an MVar, we need "new"
+    fixops e@MVar{} = ApplyS (Variable (Ident noLoc "new")) e
+    fixops e = e
 
 ------
 
@@ -371,6 +388,7 @@ dsDx e = do
     DFig10 -> dsD10 e
     DFig11 -> dsD11 e
     DFig13 -> dsD13 e
+    DFig14 -> dsD14 e
 
 -- All cases, but the last, can be removed.
 -- They are just there to avoid introducing unused existentials.
@@ -563,17 +581,10 @@ scope sc = expr
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
     expr (If3 e1 e2 e3) = do
       (e1', sc') <- defs sc e1
-      If3 e1' <$> scopeD sc' e2 <*> exprD e3
-{-  Why this change, Ranjit?
-    It ruins the invariant that e1 always starts with an Exists after the scope pass.
-      let Exists _is e1'' = e1'
-      e2' <- scopeD sc' e2
-      e3' <- exprD e3
-      pure (If3 e1'' e2' e3')
--}
+      If3 e1' <$> scopeD' sc' e2 <*> exprD e3
     expr (For2 e1 e2) = do
       (e1', sc') <- defs sc e1
-      For2 e1' <$> scopeD sc' e2
+      For2 e1' <$> scopeD' sc' e2
     expr (Block e) = exprD e
     expr (Let e1 e2) = do
       (e1', sc') <- defs sc e1
@@ -585,6 +596,7 @@ scope sc = expr
     expr (DefineE i e) = Unify (Variable i) <$> expr e
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
     expr (Macro1 (Ident l "assume") [] e1) = Macro1 (Ident l "assume") [] <$> expr e1
+    expr (Macro1 m@(Ident _ "lowered") [] e1) = Macro1 m [] <$> exprD' e1
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
     expr (OfType e1 e2) = OfType <$> exprD e1 <*> exprD e2
@@ -592,13 +604,20 @@ scope sc = expr
       (e1', sc') <- defs (S.insert i sc) e1
       TLam i r e1' <$> scopeD sc' e2
     expr (Exists _ e) = expr e
-    expr (Lam i e) = Lam i <$> scopeD (S.insert i sc) e
+    expr (Lam i e) = Lam i <$> scopeD' (S.insert i sc) e
     expr Fail = pure Fail
     expr (Forall _ e) = expr e
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
     scopeD s e = fst <$> defs s e
+
+    -- Like scopeD, but does not return a top level Exists []
+    scopeD' s e = dropEmptyExists <$> scopeD s e
+    exprD' e = dropEmptyExists <$> exprD e
+
+    dropEmptyExists (Exists [] e) = e
+    dropEmptyExists e = e
 
     defs :: S.Set Ident -> Expr -> D (Expr, S.Set Ident)
     defs as e = do
@@ -1130,6 +1149,7 @@ lowerSucceeds e = do
       DFig10 -> pure $ eAssert e
       DFig11 -> pure $ Succeeds e
       DFig13 -> pure $ eAssert e  -- XXX ???
+      DFig14 -> pure $ eAssert e  -- XXX ???
    else if asmVerif then
     pure $ e
    else if useSplit then
@@ -1725,7 +1745,7 @@ dsM13 (Range t) Nothing = do
   pure $ Exists [x] $ ApplyD t' (Variable x)
 dsM13 (Range t) (Just x) = do
   t' <- dsD13 t
-  pure $ Exists [x] $ ApplyD t' (Variable x)
+  pure $ ApplyD t' (Variable x)
 
 dsM13 (DefineE x t) i = DefineE x <$> dsM13 t i
 dsM13 (Unify t1 t2) i = Unify <$> dsM13 t1 i <*> dsM13 t2 i
@@ -1751,3 +1771,83 @@ dsM13 e@(Lit _) Nothing = pure e
 dsM13 e@(Variable _) Nothing = pure e
 dsM13 (ApplyD t1 t2) Nothing = ApplyD <$> dsD13 t1 <*> dsD13 t2
 dsM13 e _ = error $ "dsM13: unimplemented " ++ show e
+
+----------------------------------------
+
+dsD14 :: Expr -> D Expr
+dsD14 e = do
+  x <- newIdent (getLoc e) "x"
+  Exists [x] <$> dsM14 e x
+
+dsM14 :: Expr -> Ident -> D Expr
+dsM14 (Function [(t1, _effs)] t2) f = do
+  i <- newIdent (getLoc t1) "i"
+  j <- newIdent (getLoc t1) "j"
+  r <- newIdent (getLoc t2) "r"
+  z <- newIdent (getLoc t2) "z"
+  t1' <- dsM14 t1 i
+  t2' <- dsM14 t2 z
+  let defZ = DefineE z $ ApplyD (Variable f) (Variable j)
+  verif <- gets (fVerify . dflags)
+  if verif then
+    pure $ seqE [eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']],
+                 Lam i $ If3 (Exists [j] (unifyV j t1'))
+                             (Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r])
+                             (ApplyD (Variable f) (Variable i))
+                ]
+  else
+    -- A hack to simplify function(x:any$){e} to simply \ x . ... e ...
+    -- This is only to make things more readable.
+    case t1 of
+      DefineE x (Range (Variable (Ident _ "any$"))) -> do
+        let defZ' = DefineE z $ ApplyD (Variable f) (Variable x)
+        pure $ Lam x $ seqE [defZ', t2']
+      _ ->
+        pure $ Lam i $ If3 (Exists [j] (unifyV j t1'))
+                           (seqE [defZ, t2'])
+                           (ApplyD (Variable f) (Variable i))
+dsM14 (OfType t1 t2) i = do
+  y <- newIdent (getLoc t1) "y"
+  t1' <- dsM14 t1 i
+  t2' <- dsD14 t2
+  verif <- gets (fVerify . dflags)
+  if verif then do
+    r <- newIdent (getLoc t2) "r"
+    t2'' <- dsD14 (Range t2)
+    pure $ seqE [DefineE y t1',
+                 eVerify $ eAssert $ ApplyD t2' (Variable y),
+                 Forall [r] $ seqE [eAssume $ DefineE r t2'', Variable r]
+                ]
+  else
+    pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' t1')]
+
+dsM14 (Range t) x = do
+  t' <- dsD14 t
+  pure $ ApplyD t' (Variable x)
+
+dsM14 (DefineE x t) i = DefineE x <$> dsM14 t i
+dsM14 (Unify t1 t2) i = Unify <$> dsM14 t1 i <*> dsM14 t2 i
+dsM14 (Seq [])      i = dsM14 (Array []) i
+dsM14 (Seq (Snoc ts t)) i = seqE <$> sequence (Snoc (map dsD14 ts) (dsM14 t i))
+dsM14 (Choice t1 t2) i = Choice <$> dsM14 t1 i <*> dsM14 t2 i
+dsM14 (If3 e1 e2 e3) i = If3    <$> dsD14 e1   <*> dsM14 e2 i <*> dsM14 e3 i
+
+dsM14 (Array ts) i = do
+  xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
+  bs <- zipWithM dsM xs ts
+  pure $ Exists xs $ seqE [ unifyV i $ Array $ map Variable xs, Array bs]
+
+dsM14 (DefineIE j x t) i = do
+  t' <- dsM14 t i
+  pure $ seqE [DefineE j (Variable i), DefineE x t']
+
+dsM14 e@(Lit _) i = pure $ unifyV i e
+dsM14 e@(Variable _) i = pure $ unifyV i e
+dsM14 e@(ApplyD _ _) i = pure $ unifyV i e
+
+dsM14 (Succeeds e) i = eAssert <$> dsM14 e i
+dsM14 e@(Macro1 (Ident _ "lowered") [] _) i = pure $ unifyV i e
+dsM14 (Macro1 m rs e) i = Macro1 m rs <$> dsM14 e i
+
+dsM14 e _ = error $ "dsM14: unimplemented " ++ show e
+

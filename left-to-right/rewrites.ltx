@@ -232,7 +232,7 @@
 \rulename{app-lam}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
                                                   & \text{if $x \not\in \freevars{|v|}$} \\
 \rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
-                              |(v == 0^^^ v_0) choice xdots choice (v == n^^^ v_n)| \\
+                            \multicolumn{2}{@@{}l}{|(v == 0^^^ v_0) choice xdots choice (v == n^^^ v_n)|} \\
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
 
     \\[-0.6em]
@@ -257,8 +257,10 @@
 
 \rulegroupname{Normalization:}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{eqn-elim} & |def x E^[x==v; e]| & \movesto & |E^[e]| & \hspace{-4em} \text{if $|x| \notin \freevars{|E,e|}, |x| \notin \boundvars{|E|}$, and $|v|\ne|V^[x]|$} \\
-\rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|}, |x| \notin \boundvars{|E|}$} \\
+% \rulename{exi-app} & |def f E^[apply1 f v]| & \movesto & |def y E^[y]| & \text{if $|f| \notin \freevars{|E,v|} \cup \boundvars{|E|}$} \\
+\rulename{exi-app} & |def f E^[apply1 f v]| & \movesto & |def f E^[def y y]|
+  & \text{if $|f|$ appears only in calls |apply1 f v| in |E|} \\
+\rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 %\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
 %\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
 %\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\

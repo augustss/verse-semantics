@@ -22,6 +22,7 @@ data Token
   | And
   | Ampersand
   | Array
+  | Assume
   | At
   | AtSign
   | Block
@@ -34,6 +35,7 @@ data Token
   | ColonEqual
   | ColonRightParen
   | Comma
+  | Decides
   | Dedent
   | Divide
   | DivideEqual
@@ -46,6 +48,7 @@ data Token
   | Equal
   | Exists
   | Fail
+  | Fails
   | False
   | FatArrow
   | Float !Rational
@@ -104,6 +107,7 @@ instance Pretty Token where
     And -> "and"
     Ampersand -> "&"
     Array -> "array"
+    Assume -> "assume"
     At -> "at"
     AtSign -> "@"
     Block -> "block"
@@ -116,6 +120,7 @@ instance Pretty Token where
     ColonEqual -> colon <> equals
     ColonRightParen -> colon <> rparen
     Comma -> comma
+    Decides -> "decides"
     Dedent -> "dedent"
     Divide -> pretty '/'
     DivideEqual -> "/="
@@ -128,6 +133,7 @@ instance Pretty Token where
     Equal -> equals
     Exists -> "exists"
     Fail -> "fail"
+    Fails -> "fails"
     False -> "false"
     FatArrow -> equals <> rangle
     Float x -> pretty (fromRational x :: Double)

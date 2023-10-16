@@ -50,7 +50,7 @@ miniprelude = ("miniprelude", "\
 \string(_x:any$)<decides>      := { isStr$[_x]; _x };\n\
 \char(_x:any$)<decides>        := { isChr$[_x]; _x };\n\
 \nat(_x:any$)<decides>         := { isInt$[_x]; intGE$[_x,0]; _x };\n\
-\operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
+\## operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
 \false                       := array{};\n\
 \postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
 \operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
