@@ -1788,21 +1788,33 @@ dsM14 (Function [(t1, _effs)] t2) f = do
   t1' <- dsM14 t1 i
   t2' <- dsM14 t2 z
   let defZ = DefineE z $ ApplyD (Variable f) (Variable j)
-  pure $ seqE [eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']],
-               Lam i $ If3 (Exists [j] (unifyV j t1'))
-                           (Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r])
-                           (ApplyD (Variable f) (Variable i))
-              ]
+  verif <- gets (fVerify . dflags)
+  if verif then
+    pure $ seqE [eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']],
+                 Lam i $ If3 (Exists [j] (unifyV j t1'))
+                             (Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r])
+                             (ApplyD (Variable f) (Variable i))
+                ]
+  else
+    pure $ seqE [Lam i $ If3 (Exists [j] (unifyV j t1'))
+                             (seqE [defZ, t2'])
+                             (ApplyD (Variable f) (Variable i))
+                ]
 dsM14 (OfType t1 t2) i = do
   y <- newIdent (getLoc t1) "y"
-  r <- newIdent (getLoc t2) "r"
   t1' <- dsM14 t1 i
   t2' <- dsD14 t2
-  t2'' <- dsD14 (Range t2)
-  pure $ seqE [DefineE y t1',
-               eVerify $ eAssert $ ApplyD t2' (Variable y),
-               Forall [r] $ seqE [eAssume $ DefineE r t2'', Variable r]
-              ]
+  verif <- gets (fVerify . dflags)
+  if verif then do
+    r <- newIdent (getLoc t2) "r"
+    t2'' <- dsD14 (Range t2)
+    pure $ seqE [DefineE y t1',
+                 eVerify $ eAssert $ ApplyD t2' (Variable y),
+                 Forall [r] $ seqE [eAssume $ DefineE r t2'', Variable r]
+                ]
+  else
+    pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' t1')]
+
 dsM14 (Range t) x = do
   t' <- dsD14 t
   pure $ ApplyD t' (Variable x)
