@@ -91,9 +91,12 @@ addUsed prel = loop []
 allIdents :: Expr -> [Ident]
 allIdents = universeBi . transform fixops
   where
+    -- Fix operator names
     fixops (InfixOp e1 (Ident l s) e2) = InfixOp e1 (Ident l ("in'" ++ s ++ "'")) e2
     fixops (PrefixOp (Ident l s) e2) = PrefixOp (Ident l ("pre'" ++ s ++ "'")) e2
     fixops (PostfixOp e1 (Ident l s)) = PostfixOp e1 (Ident l ("post'" ++ s ++ "'"))
+    -- If there's an MVar, we need "new"
+    fixops e@MVar{} = ApplyS (Variable (Ident noLoc "new")) e
     fixops e = e
 
 ------
