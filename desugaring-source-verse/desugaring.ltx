@@ -679,6 +679,7 @@ $$
 \caption{BigCore Verse expressions} \label{fig:core-verse}
 \end{figure}
 
+
 \begin{figure}
 $$
 \begin{array}{@@{}l}
@@ -729,7 +730,33 @@ and |e| is a BigCore expression}} \\[1mm]
 \end{array}
 \end{array}
 $$
-\caption{Desugaring of expressions (1)} \label{fig:desugar-expr1} \label{fig:desugar-match}
+\caption{{\bf DS1}: SmallSource to BigCore using tlam} \label{fig:desugar-expr1} \label{fig:desugar-match}
+\end{figure}
+
+
+\begin{figure}
+\begin{code}
+any    = (x => x)
+int    = (x => applyx isInt x; x)
+nat    = (x => applyx isInt x; x > (-1); x)
+abs    = (x => applyx isInt x; if x > 0 then x else (-x))
+false  = array()
+\end{code}
+%%arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
+
+\caption{Core Verse prelude} \label{fig:core-prelude}
+\end{figure}
+
+\begin{figure}
+  We need a description of scope handling.
+  \begin{itemize}
+  \item turning |:=| into |defKW|
+  \item handle |let|
+  \item handle |block|
+  \item insert top level |defKW| in |for|,|if|,|tlamKW|
+  \end{itemize}
+
+\caption{Scope} \label{fig:scope}
 \end{figure}
 
 
@@ -818,31 +845,6 @@ $$
 % \end{figure}
 
 \begin{figure}
-\begin{code}
-any    = (x => x)
-int    = (x => applyx isInt x; x)
-nat    = (x => applyx isInt x; x > (-1); x)
-abs    = (x => applyx isInt x; if x > 0 then x else (-x))
-false  = array()
-\end{code}
-%%arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
-
-\caption{Core Verse prelude} \label{fig:core-prelude}
-\end{figure}
-
-\begin{figure}
-  We need a description of scope handling.
-  \begin{itemize}
-  \item turning |:=| into |defKW|
-  \item handle |let|
-  \item handle |block|
-  \item insert top level |defKW| in |for|,|if|,|tlamKW|
-  \end{itemize}
-
-\caption{Scope} \label{fig:scope}
-\end{figure}
-
-\begin{figure}
 $$
 \begin{array}{@@{}l}
   \begin{array}{r@@{\;\;}c@@{\;\;}ll}
@@ -919,7 +921,7 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
                    & |ioftype e t|            & = & |assume (forall x t^[x])| & \text{fresh |x|} \\
 \end{array}$$
 
-\caption{Mode-based Translation from SmallSource to Core.
+\caption{{\bf DS2}: Mode-based Translation from SmallSource to BigCore.
 In the ``match'' rules $|MMe m i t| = e$,
 |m| is |V| (``verify'') or |I| (``implement''), |i| is a variable, |t| is a Small Source, and |e| is a Big Core term.
 }
@@ -962,7 +964,7 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \rulename{mother}  & |Me i t|              & = & |i = (De t)| \\[0.02in]
 \end{array}$$
 
-\caption{Direct-style (no-tlam) Translation from SmallSource to Core.}
+\caption{{\bf DS3}: Direct-style (no-tlam) Translation from SmallSource to Core.}
 \end{figure}
 
 \begin{figure}
@@ -995,7 +997,7 @@ $$\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \rulename{mother}  & |Me i t|              & = & |i = (De t)| \\[0.02in]
 \end{array}$$
 
-\caption{SPJ-version: Direct-style (no-tlam) Translation from SmallSource to Core.}
+\caption{{\bf DS4}: Direct-style (no-tlam) Translation from SmallSource to Core.}
 \end{figure}
 
 \begin{figure}
@@ -1079,7 +1081,7 @@ $$\begin{array}{@@{}l}
 
 \end{array}
 \end{array}$$
-\caption{SPJ new version (6 Oct)}
+\caption{{\bf DS5}: SPJ new version (6 Oct)}
 \end{figure}
 
 \begin{figure}
@@ -1151,7 +1153,7 @@ $$\begin{array}{@@{}l}
 
 \end{array}
 \end{array}$$
-\caption{Koen \& Lennart version}
+\caption{{\bf DS6}: using just M, with no D}
 \end{figure}
 
 \end{document}
