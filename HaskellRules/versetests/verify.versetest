@@ -127,9 +127,6 @@ verify(fail) { bar2(x:int):type{_(:int):char} := { (y:int) => { 3  } } } # REJEC
 verify(fail) { bar3(x:int):type{_(:int):char} := { (y:nat) => { 'a'} } } # REJECT the function only works on naturals but is supposed to work on ints
 verify(pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEPT the function works on more than ints
 
-
-
-
 # simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
 # verify(pass) { f(x:int) := x; foo(:any) := {f[_]=3} }
 # verify(fail) { f(x:int) := x; foo(:any) := {f[_]='3'} }
