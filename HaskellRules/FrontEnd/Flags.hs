@@ -4,7 +4,7 @@ import FrontEnd.Prelude
 
 -- Different desugaring styles.
 -- The names refer to the figures in the desugaring paper.
-data Desugar = DFig6 | DFig10 | DFig11 | DFig13
+data Desugar = DFig6 | DFig10 | DFig11 | DFig13 | DFig14
   deriving (Show, Read)
 
 data Flags = Flags

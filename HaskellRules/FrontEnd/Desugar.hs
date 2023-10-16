@@ -371,6 +371,7 @@ dsDx e = do
     DFig10 -> dsD10 e
     DFig11 -> dsD11 e
     DFig13 -> dsD13 e
+    DFig14 -> dsD14 e
 
 -- All cases, but the last, can be removed.
 -- They are just there to avoid introducing unused existentials.
@@ -1130,6 +1131,7 @@ lowerSucceeds e = do
       DFig10 -> pure $ eAssert e
       DFig11 -> pure $ Succeeds e
       DFig13 -> pure $ eAssert e  -- XXX ???
+      DFig14 -> pure $ eAssert e  -- XXX ???
    else if asmVerif then
     pure $ e
    else if useSplit then
@@ -1751,3 +1753,60 @@ dsM13 e@(Lit _) Nothing = pure e
 dsM13 e@(Variable _) Nothing = pure e
 dsM13 (ApplyD t1 t2) Nothing = ApplyD <$> dsD13 t1 <*> dsD13 t2
 dsM13 e _ = error $ "dsM13: unimplemented " ++ show e
+
+----------------------------------------
+
+dsD14 :: Expr -> D Expr
+dsD14 e = do
+  x <- newIdent (getLoc e) "x"
+  Exists [x] <$> dsM14 e x
+
+dsM14 :: Expr -> Ident -> D Expr
+dsM14 (Function [(t1, _effs)] t2) f = do
+  i <- newIdent (getLoc t1) "i"
+  j <- newIdent (getLoc t1) "j"
+  r <- newIdent (getLoc t2) "r"
+  z <- newIdent (getLoc t2) "z"
+  t1' <- dsM14 t1 i
+  t2' <- dsM14 t2 z
+  let defZ = DefineE z $ ApplyD (Variable f) (Variable j)
+  pure $ seqE [eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']],
+               Lam i $ If3 (Exists [j] (unifyV j t1'))
+                           (Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r])
+                           (ApplyD (Variable f) (Variable i))
+              ]
+dsM14 (OfType t1 t2) i = do
+  y <- newIdent (getLoc t1) "y"
+  r <- newIdent (getLoc t2) "r"
+  t1' <- dsM14 t1 i
+  t2' <- dsD14 t2
+  t2'' <- dsD14 (Range t2)
+  pure $ seqE [DefineE y t1',
+               eVerify $ eAssert $ ApplyD t2' (Variable y),
+               Forall [r] $ seqE [eAssume $ DefineE r t2'', Variable r]
+              ]
+dsM14 (Range t) x = do
+  t' <- dsD14 t
+  pure $ Exists [x] $ ApplyD t' (Variable x)
+
+dsM14 (DefineE x t) i = DefineE x <$> dsM14 t i
+dsM14 (Unify t1 t2) i = Unify <$> dsM14 t1 i <*> dsM14 t2 i
+dsM14 (Seq [])      i = dsM14 (Array []) i
+dsM14 (Seq (Snoc ts t)) i = seqE <$> sequence (Snoc (map dsD14 ts) (dsM14 t i))
+dsM14 (Choice t1 t2) i = Choice <$> dsM14 t1 i <*> dsM14 t2 i
+dsM14 (If3 e1 e2 e3) i = If3    <$> dsD14 e1   <*> dsM14 e2 i <*> dsM14 e3 i
+
+dsM14 (Array ts) i = do
+  xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
+  bs <- zipWithM dsM xs ts
+  pure $ Exists xs $ seqE [ unifyV i $ Array $ map Variable xs, Array bs]
+
+dsM14 (DefineIE j x t) i = do
+  t' <- dsM14 t i
+  pure $ seqE [DefineE j (Variable i), DefineE x t']
+
+dsM14 e@(Lit _) i = pure $ unifyV i e
+dsM14 e@(Variable _) i = pure $ unifyV i e
+dsM14 e@(ApplyD _ _) i = pure $ unifyV i e
+dsM14 e _ = error $ "dsM14: unimplemented " ++ show e
+
