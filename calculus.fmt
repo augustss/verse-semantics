@@ -51,6 +51,12 @@
 %format (DMe (i) (e)) = "\DMe{" ^ i "}{" ^e "}"
 %format (MMe (m) (i) (e)) = "\MMe{" ^ i "}{" ^e "}{" ^m "}"
 
+%format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket" m "\rrbracket" i "^{" u "}"
+%format (XAe (f) (u) (x)) = "{\mathcal A}\llbracket" x "\rrbracket" f "^{" u "}"
+%format solve = "\circ"
+%format infer = "\bullet"
+
+
 %format (Ae (i) (e)) = "\Ae{" ^ i "}{" ^e "}"
 %format (An (x)) = "\An{" ^ x "}"
 %format (Cr (x)) = "\Cr{" ^ x "}"
@@ -255,7 +261,7 @@
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"
 %format function (x) (rhs) = functionKW "\," x "\,\{" rhs "\}"
 %format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
-%format functionX (x) (fx) (rhs) = functionKW "(" x ")\langle" fx "\rangle\{" rhs "\}"
+%format functionX (x) (fx) (rhs) = functionKW "(" x ")" fx "\{" rhs "\}"
 %format functionKW = "\textbf{fun}"
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
@@ -277,6 +283,8 @@
 %format minus = "\ominus"
 %format hole = "\hole"
 %format lte = "\prec"
+
+%format appexi (f) (x) = "{\mathcal A" "\fbox{$" x "$}"
 
 %% Effects checking, like succeeds{e}
 %format check (r) (b) = "{\bf check}(" r ")\{" b "\}"
