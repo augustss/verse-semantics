@@ -1,6 +1,7 @@
 module Language.Verse
   ( eval
   , eval'
+  , eval2'
   ) where
 
 import Control.Monad ((<=<))
@@ -20,7 +21,8 @@ import Language.Verse.Eval qualified as Eval
 import Language.Verse.Label
 import Language.Verse.Lexer
 import Language.Verse.Mode
-import Language.Verse.Parse
+import Language.Verse.Parse as P
+import Language.Verse.Parse2 as P2
 import Language.Verse.Rewrite
 import Language.Verse.Val
 
@@ -33,9 +35,10 @@ eval :: ( MonadAbort Error m
         , MonadSupply Label m
         , EqRef (Ref m)
         ) => ByteString -> VerseT m FrozenVal
+
 eval xs = do
   (e1, e2) <- liftEither $ runSupplyT $ do
-    e <- rewrite =<< lift (runLexer parse xs)
+    e <- rewrite =<< lift (runLexer P.parse xs)
     (,) <$> desugar Verification e <*> desugar Execution e
   traceM . show $ pretty e1
   Eval.eval $ verify (succeeds e1) `then'` e2
@@ -48,4 +51,14 @@ eval' :: ( MonadAbort Error m
          ) => Mode -> ByteString -> VerseT m FrozenVal
 eval' mode =
   Eval.eval <=<
-  liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< runLexer parse)
+  liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< runLexer P.parse)
+
+eval2' :: ( MonadAbort Error m
+          , MonadFix m
+          , MonadRef m
+          , MonadSupply Label m
+          , EqRef (Ref m)
+          ) => String -> Mode -> ByteString -> VerseT m FrozenVal
+eval2' path mode =
+  Eval.eval <=<
+  liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< P2.parse2 path)

@@ -24,6 +24,8 @@ data Error
   | SucceedsError !Loc
   | FailsError !Loc
   | DecidesError !Loc
+  | OtherError !Pos String -- Used for Parsec error type
+  | NotImplemented String -- Used for Parsec error type
   | StuckError deriving Show
 
 instance Pretty Error where
@@ -54,6 +56,10 @@ instance Pretty Error where
       pretty x <> colon <+> "expected" <+> "zero" <+> "values"
     DecidesError x ->
       pretty x <> colon <+> "expected" <+> "zero" <+> "or" <+> "one" <+> "value"
+    OtherError x msg ->
+      pretty x <> colon <+> pretty msg
+    NotImplemented msg ->
+      "Not" <+> "implemented" <+> pretty msg
     StuckError -> "stuck"
 
 prettyIndent :: Indent -> Doc ann
