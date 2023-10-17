@@ -347,11 +347,13 @@ evalFails e = do
   s <- get
   storeFree <- lift freshVar
   put s { storeFree }
-  lift $ fork do
-    _ <- readIVar =<< one do
+  lift $ fork $ fails
+    do
       choiceFree <- newVar ChoiceFree
       evalEvalT' (evalExp e) mempty { env = r.env } s { choiceFree }
-    abort . FailsError $ loc e
+    >>= readIVar >>= \ case
+      False -> abort . FailsError $ loc e
+      True -> empty
   lift freshVar
 
 evalDecides :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)

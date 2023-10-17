@@ -33,6 +33,7 @@ module Control.Monad.Verse
   , verify
   , decide
   , succeeds
+  , fails
   , decides
   , assume
   , FreezeT
@@ -106,6 +107,7 @@ type Abort r m = m r
 
 data Env m = Env
   { heap :: !HeapKey
+  , assumed :: !Bool
   , decisions :: !(Ref m Decisions)
   , children :: !(Ref m (Processes m))
   , suspCount :: !(Ref m Int)
@@ -214,6 +216,7 @@ runVerseT m = do
     yk = Yield $ \ _ _ _ _ _ -> pure Nothing
     ak = pure $ Just []
     heap = Nothing
+    assumed = False
     splitDepth = 0
     sk x fk _ r = readRef r.suspCount >>= \ case
       0 -> do
@@ -657,10 +660,12 @@ for m f = do
 verify
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VerseT m () -> VerseT m (IVar m ())
-verify m = do
-  v <- freshIVar
-  fork $ loop emptyDecisions m >>= writeIVar v
-  pure v
+verify m = ask' <&> (.assumed) >>= \ case
+  True -> newIVar ()
+  False -> do
+    v <- freshIVar
+    fork $ loop emptyDecisions m >>= writeIVar v
+    pure v
   where
     loop decisions m = verifyAll decisions m >>= readIVar <&> succ >>= \ case
       Nothing -> pure ()
@@ -678,7 +683,7 @@ verifyAll decisions m = do
     loop h decisions ref m >>= writeIVar v
   pure v
   where
-    loop h decisions ref m = split' h decisions ref m >>= readIVar >>= \ case
+    loop h decisions ref m = split' h False decisions ref m >>= readIVar >>= \ case
       Fail -> lift $ readRef decisions
       Abort -> lift $ readRef decisions
       Succeed (h, decisions, (), m) -> loop h decisions ref m
@@ -686,36 +691,56 @@ verifyAll decisions m = do
 succeeds
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => VerseT m a -> VerseT m (IVar m (Maybe a))
-succeeds m = do
-  v <- freshIVar
-  fork $ do
-    h <- Just <$> newHeap
-    ref <- newHeapRef Nothing
-    split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
-      Fail -> writeIVar v Nothing
-      Abort -> abort
-      Succeed (h, _, x, m) -> split h ref m >>= readIVar >>= \ case
-        Fail -> writeIVar v $ Just x
+succeeds m = ask' <&> (.assumed) >>= \ case
+  True -> newIVar . Just =<< m
+  False -> do
+    v <- freshIVar
+    fork $ do
+      h <- Just <$> newHeap
+      ref <- newHeapRef Nothing
+      split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+        Fail -> writeIVar v Nothing
         Abort -> abort
-        Succeed _ -> writeIVar v Nothing
-  pure v
+        Succeed (h, _, x, m) -> split h ref m >>= readIVar >>= \ case
+          Fail -> writeIVar v $ Just x
+          Abort -> abort
+          Succeed _ -> writeIVar v Nothing
+    pure v
+
+fails
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VerseT m a -> VerseT m (IVar m Bool)
+fails m = ask' <&> (.assumed) >>= \ case
+  True -> newIVar True
+  False -> do
+    v <- freshIVar
+    fork $ do
+      h <- Just <$> newHeap
+      ref <- newHeapRef Nothing
+      split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+        Fail -> writeIVar v True
+        Abort -> abort
+        Succeed _ -> writeIVar v False
+    pure v
 
 decides
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => VerseT m a -> VerseT m (IVar m (Maybe a))
-decides m = do
-  v <- freshIVar
-  fork $ do
-    h <- Just <$> newHeap
-    ref <- newHeapRef Nothing
-    split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
-      Fail -> empty
-      Abort -> abort
-      Succeed (h, _, x, m) -> split h ref m >>= readIVar >>= \ case
-        Fail -> writeIVar v $ Just x
+decides m = ask' <&> (.assumed) >>= \ case
+  True -> newIVar . Just =<< m
+  False -> do
+    v <- freshIVar
+    fork $ do
+      h <- Just <$> newHeap
+      ref <- newHeapRef Nothing
+      split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+        Fail -> empty
         Abort -> abort
-        Succeed _ -> writeIVar v Nothing
-  pure v
+        Succeed (h, _, x, m) -> split h ref m >>= readIVar >>= \ case
+          Fail -> writeIVar v $ Just x
+          Abort -> abort
+          Succeed _ -> writeIVar v Nothing
+    pure v
 
 assume
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -725,8 +750,9 @@ assume m = do
   v <- freshIVar
   fork $ do
     h <- Just <$> newHeap
+    decisions <- ask' <&> (.decisions)
     ref <- newHeapRef Nothing
-    split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    split' h True decisions ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
       Fail -> abort
       Abort -> abort
       Succeed (_, _, x, _) -> writeIVar v x
@@ -743,16 +769,17 @@ split
   -> VerseT m (IVar m (Split (HeapKey, Ref m Decisions, a, VerseT m ())))
 split heap left m = do
   r <- ask'
-  split' heap r.decisions left m
+  split' heap r.assumed r.decisions left m
 
 split'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => HeapKey
+  -> Bool
   -> Ref m Decisions
   -> HeapRef m (Maybe a)
   -> VerseT m ()
   -> VerseT m (IVar m (Split (HeapKey, Ref m Decisions, a, VerseT m ())))
-split' heap decisions left m = do
+split' heap assumed decisions left m = do
   r <- ask'
   children <- lift $ newRef mempty
   suspCount <- lift $ newRef 0
