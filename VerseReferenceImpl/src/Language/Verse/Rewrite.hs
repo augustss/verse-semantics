@@ -45,7 +45,6 @@ import Language.Verse.Parse.Exp ( pattern (:<>:)
                                 , pattern For
                                 , pattern Pat
                                 , Pat
-                                , pattern Var
                                 , pattern InfixColon
                                 , pattern InfixArrow
                                 , pattern Invoke
@@ -53,21 +52,19 @@ import Language.Verse.Parse.Exp ( pattern (:<>:)
 import Language.Verse.Parse.Exp qualified as Parse
 import Language.Verse.Rewrite.Exp
 
-import Prelude (error)
+import Prelude (error, (==), Maybe(..), (++), show, Show(..), String)
 
 rewrite
-  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
+  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f, Show (f (Parse.Exp f Name)), Show (f (Parse.Pat f Name)), Show (f (Parse.AttributePart f Name)), Show (f String), Show (f Name))
   => f (Parse.Exp f Name)
   -> m (f (Exp f Ident))
 rewrite = rewriteExp
 
 rewriteExp
-  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
+  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f, Show (f (Parse.Exp f Name)), Show (f (Parse.Pat f Name)), Show (f (Parse.AttributePart f Name)), Show (f String), Show (f Name))
   => f (Parse.Exp f Name)
   -> m (f (Exp f Ident))
 rewriteExp e = for e $ \ case
-  (Parse.:=:) e1@(extract -> Pat p@Parse.Var {}) e2 ->
-    rewriteDef (p <$ e1) =<< rewriteExp e2
   (Parse.:=:) e1@(extract -> Pat p@Parse.PrefixColon {}) e2 ->
     rewriteDef (p <$ e1) =<< rewriteExp e2
   (Parse.:=:) e1@(extract -> Pat p@InfixColon {}) e2 ->
@@ -78,7 +75,7 @@ rewriteExp e = for e $ \ case
     Not . (e $>) <$> ((:=:) <$> rewriteExp e1 <*> rewriteExp e2)
   (Parse.:|:) e1 e2 ->
     (:|:) <$> rewriteExp e1 <*> rewriteExp e2
-  (Parse.:.:) e x ->
+  (Parse.:.:) e ([], x) -> -- qualified names are not implemented
     rewriteExp e <&> (:.: x)
   e1 :..: e2 ->
     rewriteOperator2 "operator'..'" e1 e2
@@ -104,7 +101,7 @@ rewriteExp e = for e $ \ case
     rewriteOperator2 "operator'/'" e1 e2
   e1 :->: e2 ->
     rewriteOperator2 "operator'->'" e1 e2
-  PrefixBracket e ->
+  PrefixBracket _s e ->
     rewriteOperator1 "prefix'[]'" e
   PrefixQuery e ->
     rewriteOperator1 "prefix'?'" e
@@ -112,35 +109,55 @@ rewriteExp e = for e $ \ case
     rewriteOperator1 "postfix'?'" e
   Parse.List es ->
     List <$> traverse rewriteExp es
+  Parse.Paren e -> do
+    e <- rewriteExp e
+    pure $ extract e
+  Parse.Brace e -> do
+    e <- rewriteExp e
+    pure $ extract e
   Parse.Where e1 e2 ->
     Where <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Fail ->
     pure Fail
-  Parse.One e ->
-    One <$> rewriteExp e
-  Parse.All e ->
-    All <$> rewriteExp e
   Parse.Not e ->
     Not <$> rewriteExp e
-  Parse.Verify e ->
-    Verify <$> rewriteExp e
-  Parse.Succeeds e ->
-    Succeeds <$> rewriteExp e
   Parse.Fails e ->
     Fails <$> rewriteExp e
-  Parse.Decides e ->
-    Decides <$> rewriteExp e
-  Parse.Assume e ->
-    Assume <$> rewriteExp e
-  Parse.Module e ->
-    Module <$> rewriteExp e
   Parse.Struct e ->
     Struct <$> rewriteExp e
   Parse.Class e1 e2 ->
     Class <$> traverse rewriteExp e1 <*> rewriteExp e2
+  Parse.Inst _e1@(isMacroParensBraces "class" -> Just (arg, _attributes)) e2 ->   -- Ignore attributes for now
+    Class <$> traverse rewriteExp arg <*> rewriteExp e2
+  Parse.Inst _e1@(isMacroParensBraces "struct"  -> Just (Nothing, _attributes)) e2 ->   -- Ignore attributes for now
+    Struct <$> rewriteExp e2
+  Parse.Inst _e1@(isMacroParensBraces "function" -> Just (Just e1, [])) e2 ->
+    Fun <$> rewriteExp e1 <*> rewriteExp e2
+  Parse.Inst _e1@(isMacroParensBraces "module"  -> Just (Nothing, _attributes)) e2 ->   -- Ignore attributes for now
+    Module <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "decides" e1 ->
+    Decides <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "assume" e1 ->
+    Assume <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "succeeds" e1 ->
+    Succeeds <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "verify" e1 ->
+    Verify <$> rewriteExp e2
+--  Parse.Inst e1 e2 | isPredefined "array" e1 ->  -- No Array node available in Rewrite/Exp
+--    Array <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "one" e1 ->
+    One <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "all" e1 ->
+    All <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "truth" e1 ->
+    Truth <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "option" e1 -> do
+    x <- (e $>) . Ident.Label <$> supply
+    e' <- rewriteExp e2
+    pure $ IfThenElse (infixColonEqual False x e') (Name <$> x) (Tuple [] <$ e)
   Parse.Inst e1 e2 ->
     Inst <$> rewriteExp e1 <*> rewriteExp e2
-  Parse.Enum xs ->
+  Parse.Enum _attributes xs -> -- Ignore attributes
     pure $ Enum xs
   If e' -> do
     e' <- rewriteExp e'
@@ -157,6 +174,8 @@ rewriteExp e = for e $ \ case
     IfThenElse <$> rewriteExp e1 <*> rewriteExp e2 <*> rewriteExp e3
   For e ->
     All <$> rewriteExp e
+  Parse.Do (extract -> For e1) e2 ->
+    ForDo <$> rewriteExp e1 <*> rewriteExp e2
   Parse.ForDo e1 e2 ->
     ForDo <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Block e ->
@@ -171,16 +190,10 @@ rewriteExp e = for e $ \ case
     pure . Exists $ Ident.Name <$> x
   Parse.Forall x ->
     pure . Forall $ Ident.Name <$> x
-  Parse.Set p@(extract -> Parse.Name x) e2 -> -- Only Pat.Name implemented
-    Set (Ident.Name x <$ p) <$> rewriteExp e2
+  Parse.Set e@(extract -> Parse.Pat (Parse.Name [] x)) e2 -> -- Only unqualified names are implemented
+    Set (Ident.Name x <$ e) <$> rewriteExp e2
   Parse.Tuple es ->
     Tuple <$> traverse rewriteExp es
-  Parse.Truth e ->
-    Truth <$> rewriteExp e
-  Parse.Option e' -> do
-    x <- (e $>) . Ident.Label <$> supply
-    e' <- rewriteExp e'
-    pure $ IfThenElse (infixColonEqual False x e') (Name <$> x) (Tuple [] <$ e)
   Parse.True ->
     pure $ Truth (Tuple [] <$ e)
   Parse.False ->
@@ -195,22 +208,45 @@ rewriteExp e = for e $ \ case
     Fun <$> rewriteExp e1 <*> rewriteExp e2
   Pat p ->
     rewritePat p
-  _ -> error "rewriteExp FIXME"
+  Parse.SpecEnd _e ->
+    error "Unexpected '>'"
+  e -> error $ "rewriteExp FIXME: " ++ show e
+
+
+
+isMacroParensBraces :: (Comonad f) => Name -> f (Parse.Exp f Name)  -> Maybe (Maybe (f (Parse.Exp f Name)), [f (Parse.Exp f Name)])
+isMacroParensBraces  macro (extract -> Parse.ParenInvoke (extract -> Parse.Pat (Parse.Name [] name)) args) | name == macro = Just (Just args, [])
+isMacroParensBraces  macro (extract -> Parse.Pat (Parse.Invoke (stripSpecs' -> (extract -> Parse.Name [] name, specs)) args)) | name == macro = Just (Just args, specs)
+isMacroParensBraces  macro (stripSpecs -> (_inner@(extract -> Parse.Pat _pat@(Parse.Name [] name)), specs)) | name == macro = Just (Nothing, specs)
+isMacroParensBraces _macro  _ = Nothing
+
+isPredefined :: (Comonad f) => Name -> f (Parse.Exp f Name)  -> Bool
+isPredefined predefined _exp@(extract -> Parse.Pat _pat@(Parse.Name [] name)) = name == predefined
+isPredefined _predefined _exp = False
+
+stripSpecs :: (Comonad f) => f (Parse.Exp f Name)  -> (f (Parse.Exp f Name), [f (Parse.Exp f Name)])
+stripSpecs (extract -> Parse.Pat (Parse.Spec _pat@(stripSpecs' -> (pat, specs)) spec)) = (Parse.Pat <$> pat, specs ++ [spec])
+stripSpecs exp = (exp, [])
+
+stripSpecs' :: (Comonad f) => f (Parse.Pat f Name)  -> (f (Parse.Pat f Name), [f (Parse.Exp f Name)])
+stripSpecs' _pat@(extract -> Parse.Spec _inner@(stripSpecs' -> (pat, specs)) spec) = (pat, specs ++ [spec])
+stripSpecs' pat = (pat, [])
+
 
 rewritePat
-  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
+  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f, Show (f (Parse.Exp f Name)), Show (f (Parse.Pat f Name)), Show (f (Parse.AttributePart f Name)), Show (f String), Show (f Name))
   => Pat f Name
   -> m (Exp f Ident)
 rewritePat = \ case
-  Parse.Name x -> pure . Name $ Ident.Name x
-  Var x e -> do
-    let x' = Ident.Name <$> x
-    y <- (e $>) . Ident.Label <$> supply
-    e <- rewriteExp e
-    let e' = prefixColon $ Name <$> y
-    pure $
-      MixfixVarColonEqual x' y e $
-      ifArchetypeName x' e' e'
+  Parse.Name [] x -> pure . Name $ Ident.Name x -- qualified names are not implemented
+  InfixColon (extract -> Parse.Var _ x) e -> do -- ignore attributes
+     let x' = Ident.Name <$> x
+     y <- (e $>) . Ident.Label <$> supply
+     e <- rewriteExp e
+     let e' = prefixColon $ Name <$> y
+     pure $
+       MixfixVarColonEqual x' y e $
+       ifArchetypeName x' e' e'
   Parse.PrefixColon e -> PrefixColon <$> rewriteExp e
   InfixColon p e -> do
     e <- rewriteExp e
@@ -223,20 +259,20 @@ rewritePat = \ case
     e1 <- traverse rewritePat p
     e2 <- rewriteExp e
     parenInvokeM e1 e2
-  _ -> error "rewritePat FIXME"
+  e -> error $ "rewritePat FIXME: " ++ show e
 
 rewriteDef
-  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
+  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f, Show (f (Parse.Exp f Name)), Show (f (Parse.Pat f Name)), Show (f (Parse.AttributePart f Name)), Show (f String), Show (f Name))
   => f (Pat f Name)
   -> f (Exp f Ident)
   -> m (Exp f Ident)
 rewriteDef p e = case extract p of
-  Parse.Name x -> do
+  Parse.Name [] x -> do -- qualified names are not implemented
     let x' = Ident.Name x <$ p
     pure $
       InfixColonEqual False x' $
       ifArchetypeName x' e e
-  Var x e' -> do
+  InfixColon (extract -> Parse.Var _ x) e' -> do -- ignore attributes
     let x' = Ident.Name <$> x
     y <- (e' $>) . Ident.Label <$> supply
     e' <- rewriteExp e'
@@ -265,28 +301,28 @@ rewriteDef p e = case extract p of
     e_domain <- rewriteExp e_domain
     let e' = fun e_domain e
     rewriteDef' True p e' e'
-  _ -> error "rewriteDef FIXME"
+  e -> error $ "rewriteDef FIXME: " ++ show e
 
 rewriteDef'
-  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
+  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f, Show (f (Parse.Exp f Name)), Show (f (Parse.Pat f Name)), Show (f (Parse.AttributePart f Name)), Show (f String), Show (f Name))
   => Bool
   -> f (Pat f Name)
   -> f (Exp f Ident)
   -> f (Exp f Ident)
   -> m (Exp f Ident)
 rewriteDef' funName p e1 e2 = case extract p of
-  Parse.Name x -> do
+  Parse.Name [] x -> do -- qualified names are not implemented
     let x' = Ident.Name x <$ p
     pure $
       InfixColonEqual funName x' $
       ifArchetypeName x' e1 e2
-  Var x e' -> do
-    let x' = Ident.Name <$> x
-    y <- (e' $>) . Ident.Label <$> supply
-    e' <- rewriteExp e'
-    pure $
-      MixfixVarColonEqual x' y e' $
-      ifArchetypeName x' (e1 `ofType` (Name <$> y)) (e2 `ofType` (Name <$> y))
+  InfixColon (extract -> Parse.Var _ x) e' -> do -- ignore attributes
+   let x' = Ident.Name <$> x
+   y <- (e' $>) . Ident.Label <$> supply
+   e' <- rewriteExp e'
+   pure $
+     MixfixVarColonEqual x' y e' $
+     ifArchetypeName x' (e1 `ofType` (Name <$> y)) (e2 `ofType` (Name <$> y))
   Parse.PrefixColon e' -> (e2 :|>:) <$> rewriteExp e'
   InfixColon (extract -> Invoke p e_domain) e_range -> do
     e_domain <- rewriteExp e_domain
@@ -307,10 +343,10 @@ rewriteDef' funName p e1 e2 = case extract p of
   Invoke p e_domain -> do
     e_domain <- rewriteExp e_domain
     rewriteDef' True p (fun e_domain e1) (fun e_domain e2)
-  _ -> error "rewriteDef' FIXME"
+  e -> error $ "rewriteDef' FIXME: " ++ show e
 
 rewriteOperator1
-  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
+  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f, Show (f (Parse.Exp f Name)), Show (f (Parse.Pat f Name)), Show (f (Parse.AttributePart f Name)), Show (f String), Show (f Name))
   => Name
   -> f (Parse.Exp f Name)
   -> m (Exp f Ident)
@@ -319,7 +355,7 @@ rewriteOperator1 x e =
   BracketInvoke (Name (Ident.Name x) <$ e) e
 
 rewriteOperator2
-  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f)
+  :: (MonadSupply Label m, Apply f, Traversable f, Comonad f, Show (f (Parse.Exp f Name)), Show (f (Parse.Pat f Name)), Show (f (Parse.AttributePart f Name)), Show (f String), Show (f Name))
   => Name
   -> f (Parse.Exp f Name)
   -> f (Parse.Exp f Name)

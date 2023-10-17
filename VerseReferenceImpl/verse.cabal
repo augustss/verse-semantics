@@ -153,6 +153,8 @@ executable verseparse
   build-depends:
     base >= 4.16.0.0,
     bytestring,
+    directory,
+    filepath,
     comonad,
     prettyprinter,
     transformers,

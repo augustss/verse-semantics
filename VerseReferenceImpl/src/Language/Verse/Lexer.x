@@ -15,7 +15,7 @@ import Control.Monad.Trans.Except (Except, runExcept)
 
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as ByteString
-import Data.ByteString.Internal qualified as ByteString (w2c)
+import Data.ByteString.Internal qualified as ByteString (w2c, c2w)
 import Data.Char (chr, ord)
 import Data.List
 import Data.Ratio
@@ -34,6 +34,7 @@ import Language.Verse.Token qualified as Token
 
 $alpha = [A-Za-z\_]
 $alnum = [A-Za-z\_0-9]
+$alnumextra = [A-Za-z\_0-9\-\.]
 $space = [\ \t]
 @newline = (\r \n?) | \n
 @operator = ([\x20-\x7E] # [\# \\ \{ \} \" \'])*
@@ -52,7 +53,7 @@ $space = [\ \t]
   "#" .* ;
 }
 
-<indented, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow> {
+<indented, indentedPathOk, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow> {
   "<#>" { indCmtIndented }
 }
 
@@ -61,7 +62,7 @@ $space = [\ \t]
   "<#" { leftBlockCmt }
 }
 
-<indented, indentedIndCmt> {
+<indented, indentedPathOk, indentedIndCmt> {
   @newline { newlineIndented }
 }
 
@@ -82,7 +83,7 @@ $space = [\ \t]
   . { textBlockCmt }
 }
 
-<indented, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow, indentedBlockCmt, indentedIndCmt> {
+<indented, indentedPathOk, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow, indentedBlockCmt, indentedIndCmt> {
   "<#" { leftBlockCmtIndented }
 }
 
@@ -114,7 +115,7 @@ $space = [\ \t]
 
 <nesting> "" { emptyNesting }
 
-<indented, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow> {
+<indented, indentedPathOk, colon, equal, colonEqual, plusEqual, minusEqual, multiplyEqual, divideEqual, fatArrow> {
   [\ \t]+ ;
 }
 
@@ -159,6 +160,15 @@ $space = [\ \t]
 }
 
 <indented> {
+  "/" { token Token.Divide }
+}
+
+<indentedPathOk> {
+ "/" $alnum $alnumextra* ('@' $alnum $alnumextra*)? ("/" $alpha $alnum*)* { path }
+}
+
+
+<indented, indentedPathOk> {
   ":" { colonIndented }
   "=" { equalIndented }
   ":=" { colonEqualIndented }
@@ -167,17 +177,19 @@ $space = [\ \t]
   "*=" { multiplyEqualIndented }
   "/=" { divideEqualIndented }
   "=>" { fatArrowIndented }
-  "(" { token Token.LeftParen }
+  "(" { tokenDo pathOk Token.LeftParen }
   ")" { token Token.RightParen }
   ":)" { token Token.ColonRightParen }
   "{" { tokenDo incBrace Token.LeftBrace }
   "}" { rightBraceOrString }
-  "[" { token Token.LeftBracket }
+  "[" { tokenDo pathOk Token.LeftBracket }
   "]" { token Token.RightBracket }
   ";" { token Token.Semi }
   "," { token Token.Comma }
   "." { token Token.Dot }
   ".." { token Token.DotDot }
+  ".\t" { token Token.DotSpace }
+  ". " { token Token.DotSpace }
   "<>" { token Token.NotEqual }
   "<" { token Token.Less }
   "<=" { token Token.LessEqual }
@@ -189,47 +201,34 @@ $space = [\ \t]
   "+" { token Token.Plus }
   "-" { token Token.Minus }
   "*" { token Token.Multiply }
-  "/" { token Token.Divide }
   "^" { token Token.Caret }
   "&" { token Token.Ampersand }
   "@" { token Token.AtSign }
   "~" { token Token.Tilde }
-  "all" { token Token.All }
   "and" { token Token.And }
-  "array" { token Token.Array }
-  "assume" { token Token.Assume }
   "at" { token Token.At }
   "block" { token Token.Block }
   "catch" { token Token.Catch }
-  "class" { token Token.Class }
-  "decides" { token Token.Decides }
   "do" { token Token.Do }
   "else" { token Token.Else }
   "enum" { token Token.Enum }
   "exists" { token Token.Exists }
   "fails" { token Token.Fails }
-  "function" { token Token.Function }
   "fail" { token Token.Fail }
   "false" { token Token.False }
   "for" { token Token.For }
   "forall" { token Token.Forall }
   "if" { token Token.If }
-  "module" { token Token.Module }
   "of" { token Token.Of }
   "not" { token Token.Not }
-  "one" { token Token.One }
   "until" { token Token.Until }
+  "return" { token Token.Return }
   "set" { token Token.Set }
-  "struct" { token Token.Struct }
-  "succeeds" { token Token.Succeeds }
   "sync" { token Token.Sync }
   "then" { token Token.Then }
   "true" { token Token.True }
-  "truth" { token Token.Truth }
-  "option" { token Token.Option }
   "or" { token Token.Or }
   "var" { token Token.Var }
-  "verify" { token Token.Verify }
   "where" { token Token.Where }
   [0-9]+ { int }
   [0-9]+"."[0-9]+ { float }
@@ -238,7 +237,6 @@ $space = [\ \t]
   "'\"[rnt'\"\\\{\}\#\<\>&\~]"'" { charEscaped }
   "0o"[0-7A-F]+ { charHex }
   "0u"[0-7A-F]+ { charHex }
-
   $alpha $alnum* ("'" @operator "'")? { name }
 }
 
@@ -248,8 +246,6 @@ $space = [\ \t]
   \\[rnt'\"\\\{\}\#\<\>&\~] { stringTextEscaped }
   [^"\n] { stringText }
 }
-
-
 
 {
 newtype Lexer a = Lexer
@@ -364,6 +360,7 @@ rightBraceOrString i j _n _xs = do
     bs <- peekBrace
     if bs > 0 then do
       decBrace
+      pathNotOk
       pure $ L (Loc i j) Token.RightBrace
     else do
       pushStates insideString
@@ -491,7 +488,7 @@ maybeNewlineAction x i j _ _ = do
 leftBraceMaybeNewline :: Action
 leftBraceMaybeNewline i j _ _ = do
   popStates
-  pushStates indented
+  pushStates indentedPathOk
   incBrace
   pure $ L (Loc i j) Token.LeftBrace
 
@@ -631,25 +628,29 @@ emptyFatArrow :: Action
 emptyFatArrow = emptyToken Token.FatArrow
 
 token :: Token -> Action
-token x i j _ _ = pure $ L (Loc i j) x
+token x i j _ _ = do
+  pathNotOk
+  pure $ L (Loc i j) x
 
 tokenDo :: Lexer () -> Token -> Action
-tokenDo todo x i j _ _ =
-  do
-    todo
-    pure $ L (Loc i j) x
+tokenDo todo x i j _ _ =  do
+  pathNotOk
+  todo
+  pure $ L (Loc i j) x
 
 int :: Action
-int i j n xs =
+int i j n xs = do
+  pathNotOk
   pure . L (Loc i j) . Token.Int .
-  ByteString.foldl' f 0 $ ByteString.take n xs
+    ByteString.foldl' f 0 $ ByteString.take n xs
   where
     f z x = z * 10 + (toInteger $ x - ord' '0')
 
 float :: Action
-float i j n xs =
+float i j n xs = do
+  pathNotOk
   pure . L (Loc i j) . Token.Float . toRational .
-  ByteString.foldl' f (0, 0, 0) $ ByteString.take n xs
+    ByteString.foldl' f (0, 0, 0) $ ByteString.take n xs
   where
     f (!z0, !z1, !n1) x
       | x == ord' '.' = (z1, z0, 1)
@@ -657,35 +658,21 @@ float i j n xs =
     toRational (z0, z1, n1) =
       (z0 * n1 + z1) % n1
 
-
-{-
-string :: Action
-string i j n xs =
-  pure . L (Loc i j) . Token.String .
-  extract $ show $ Text.decodeUtf8 $ ByteString.take (n-2) $ ByteString.tail xs
-  where
-    extract [] = []
-    extract ('\\':'r':xs) = '\r' : extract xs
-    extract ('\\':'n':xs) = '\n' : extract xs
-    extract ('\\':'t':xs) = '\t' : extract xs
-    extract ('\\':x:xs) = x : extract xs
-    extract (x:xs) = x : extract xs
--}
-
-
 char :: Action
-char i j 3 xs =
+char i j 3 xs = do
+  pathNotOk
   pure . L (Loc i j) . Token.Char .
-  extract $ Text.decodeUtf8 $ ByteString.take 3 xs
+    extract $ Text.decodeUtf8 $ ByteString.take 3 xs
   where
     extract txt = Text.index txt 1
 char i _j _n _xs =
   throwError' $ LexError i
 
 charEscaped :: Action
-charEscaped i j 4 xs =
+charEscaped i j 4 xs = do
+  pathNotOk
   pure . L (Loc i j) . Token.Char .
-  toCharEscaped $ extract $ Text.decodeUtf8 $ ByteString.take 4 xs
+    toCharEscaped $ extract $ Text.decodeUtf8 $ ByteString.take 4 xs
   where
     extract txt = Text.index txt 2
     toCharEscaped 'r'  = '\r'
@@ -696,9 +683,10 @@ charEscaped i _j _n _xs =
   throwError' $ LexError i
 
 charHex :: Action
-charHex i j n xs =
+charHex i j n xs = do
+  pathNotOk
   pure . L (Loc i j) . Token.Char . chr . fromInteger .
-  ByteString.foldl' f 0 $ ByteString.take (n-2) $ ByteString.drop 2 xs
+    ByteString.foldl' f 0 $ ByteString.take (n-2) $ ByteString.drop 2 xs
   where
     toDigit x = if x <= ord' '9' then x - ord' '0'
                 else if x <= ord' 'F' then x - ord' 'A'
@@ -710,8 +698,14 @@ ord' :: Char -> Word8
 ord' = fromIntegral . ord
 
 name :: Action
-name i j n xs =
+name i j n xs = do
+  pathNotOk
   pure . L (Loc i j) . Token.Name . Text.decodeUtf8 $ ByteString.take n xs
+
+path :: Action
+path i j n xs = do
+  pathNotOk
+  pure . L (Loc i j) . Token.Path . Text.decodeUtf8 $ ByteString.take n xs
 
 throwError :: Loc -> Token -> Lexer a
 throwError loc = throwError' . ParseError loc
@@ -741,6 +735,22 @@ popStates = do
   case s.states of
     [] -> pure ()
     _:states -> modify' $ \ s -> s { states }
+
+pathOk :: Lexer ()
+pathOk = do
+  s <- get'
+  case s.states of
+    (s:states) | s == indented -> modify' $ \ s -> s { states = indentedPathOk:states }
+    _-> pure ()
+
+pathNotOk :: Lexer ()
+pathNotOk = do
+  s <- get'
+  case s.states of
+    (s:states) | s == indentedPathOk -> modify' $ \ s -> s { states = indented:states }
+    _-> pure ()
+
+
 
 peekIndents :: Lexer Indent
 peekIndents = do
@@ -784,7 +794,9 @@ popBrace = do
     brace:braces -> modify' $ \ s -> s { brace, braces }
 
 incBrace :: Lexer ()
-incBrace = modify' $ \ s -> s { brace = s.brace + 1 }
+incBrace = do
+  modify' $ \ s -> s { brace = s.brace + 1 }
+  pathOk
 
 decBrace :: Lexer ()
 decBrace = modify' $ \ s -> s { brace = s.brace - 1 }
@@ -815,7 +827,8 @@ modify' = Lexer . modify
 
 alexGetByte :: AlexInput -> Maybe (Word8, AlexInput)
 alexGetByte AlexInput {..} = case ByteString.uncons input of
-  Nothing -> Nothing
+  Nothing | column pos == 1-> Nothing
+  Nothing -> Just (ByteString.c2w '\n', AlexInput { pos = movePos pos '\n', .. }) -- Ensure files end with \n to undent all indents
   Just (x, input) -> Just (x, AlexInput { pos = movePos pos (ByteString.w2c x), .. })
 
 movePos :: Pos -> Char -> Pos
