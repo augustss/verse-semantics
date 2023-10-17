@@ -639,8 +639,8 @@ $$
 \mbox{\bf Syntax} \\
 \multicolumn{1}{c}{\begin{array}{rcll}
   |si| & ::= &  |solve|  \vb |infer| & \text{``solve'' and ``infer'' respectively.}\\
-  |inpw| & ::= & |x|^{|si|}
-\end{array}} \\[3mm]
+  |inpw| & ::= & |x|^{|si|} & \text{If $|si|=|solve|$ then |x| is a unification variable}
+\end{array}} \\[4mm]
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De t| = |e|$, $|DAe inpw x| = |e|$}} \\[0.02in]
