@@ -659,10 +659,10 @@ $$
 
 
 \rulename{mofun}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
-     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := Me (inp i solve) t_1; assert (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
+     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := Me (inp i infer) t_1; assert (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
 %   & &   & \multicolumn{2}{@@{}l}{|lam i (Me i t_1; forall r (assume (r = (De (:t_2))); r))|} \\[2mm]
 & &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
-    |if (j := Me (inp i solve) t_1)| \\
+    |if (j := Me (inp i infer) t_1)| \\
     |then (forall r (assume (z := DAe (inp f si) j; r = Me (inp z si) (t_2)); r))| \\
     |else (DAe (inp f si) i))|
    \end{array}} \\[10mm]
