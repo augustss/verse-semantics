@@ -41,6 +41,10 @@
 
 %format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
 
+%% --------------------------
+%%        Desugaring rules
+%% --------------------------
+
 %format (Ane (x)) = "\Ane{" ^ x "}"
 %format (Fne (x)) = "\Fne{" ^ x "}"
 %format (De (x)) = "\De{" ^ x "}"
@@ -51,11 +55,15 @@
 %format (DMe (i) (e)) = "\DMe{" ^ i "}{" ^e "}"
 %format (MMe (m) (i) (e)) = "\MMe{" ^ i "}{" ^e "}{" ^m "}"
 
-%format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket" m "\rrbracket" i "^{" u "}"
-%format (XAe (f) (u) (x)) = "{\mathcal A}\llbracket" x "\rrbracket" f "^{" u "}"
+%format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
+%format (DAe (i) (x)) = "{\mathcal A}\llbracket{}" x "\rrbracket{}" i
+
+%% 'si' is short for "solve or infer" or "unification variable or not" resp
+%format si = "\pi"
 %format solve = "\circ"
 %format infer = "\bullet"
-
+%format inpw  = "w"
+%format inp x u = x "^{" u "}"
 
 %format (Ae (i) (e)) = "\Ae{" ^ i "}{" ^e "}"
 %format (An (x)) = "\An{" ^ x "}"
