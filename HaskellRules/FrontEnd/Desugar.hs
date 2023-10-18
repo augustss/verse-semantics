@@ -1780,7 +1780,7 @@ dsD_6 e = do
   Exists [x] <$> dsM_6 e x
 
 dsM_6 :: Expr -> Ident -> D Expr
-dsM_6 (Function [(t1, _effs)] t2) f = do
+dsM_6 (Function [(t1, effs)] t2) f = do
   i <- newIdent (getLoc t1) "i"
   j <- newIdent (getLoc t1) "j"
   r <- newIdent (getLoc t2) "r"
@@ -1788,24 +1788,36 @@ dsM_6 (Function [(t1, _effs)] t2) f = do
   t1' <- dsM_6 t1 i
   t2' <- dsM_6 t2 z
   let defZ = DefineE z $ ApplyD (Variable f) (Variable j)
+      defVerif = eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']]
+      defForall = Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r]
   verif <- gets (fVerify . dflags)
-  if verif then
-    pure $ seqE [eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']],
-                 Lam i $ If3 (Exists [j] (unifyV j t1'))
-                             (Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r])
+  if invariantId `elem` effs then
+    -- MCFUN
+    if verif then do
+      pure $ seqE [defVerif,
+                   Lam i $ seqE [ DefineE j t1', defForall ]
+                  ]
+     else do
+      pure $ Lam i $ seqE [ DefineE j t1', defZ, t2' ]
+   else do
+    -- MOFUN
+    if verif then
+      pure $ seqE [defVerif,
+                   Lam i $ If3 (Exists [j] (unifyV j t1'))
+                               defForall
+                               (ApplyD (Variable f) (Variable i))
+                  ]
+     else
+      -- A hack to simplify function(x:any$){e} to simply \ x . ... e ...
+      -- This is only to make things more readable.
+      case t1 of
+        DefineE x (Range (Variable (Ident _ "any$"))) -> do
+          let defZ' = DefineE z $ ApplyD (Variable f) (Variable x)
+          pure $ Lam x $ seqE [defZ', t2']
+        _ ->
+          pure $ Lam i $ If3 (Exists [j] (unifyV j t1'))
+                             (seqE [defZ, t2'])
                              (ApplyD (Variable f) (Variable i))
-                ]
-  else
-    -- A hack to simplify function(x:any$){e} to simply \ x . ... e ...
-    -- This is only to make things more readable.
-    case t1 of
-      DefineE x (Range (Variable (Ident _ "any$"))) -> do
-        let defZ' = DefineE z $ ApplyD (Variable f) (Variable x)
-        pure $ Lam x $ seqE [defZ', t2']
-      _ ->
-        pure $ Lam i $ If3 (Exists [j] (unifyV j t1'))
-                           (seqE [defZ, t2'])
-                           (ApplyD (Variable f) (Variable i))
 dsM_6 (OfType t1 t2) i = do
   y <- newIdent (getLoc t1) "y"
   t1' <- dsM_6 t1 i
