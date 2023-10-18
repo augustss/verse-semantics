@@ -399,6 +399,7 @@ seqE = mk . concatMap flat
         mk [e] = e
         mk es = Seq es
 
+-- XXX fix this
 getLoc :: Expr -> Loc
 getLoc _ = noLoc
 

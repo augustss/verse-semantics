@@ -389,6 +389,7 @@ dsDx e = do
     DS3 -> dsD_3 e
     DS5 -> dsD_5 e
     DS6 -> dsD_6 e
+    DS7 -> dsD_7 e
 
 -- All cases, but the last, can be removed.
 -- They are just there to avoid introducing unused existentials.
@@ -1145,11 +1146,12 @@ lowerSucceeds e = do
   how <- gets context
   if verif then
     case how of
-      DS1  -> pure $ eAssert e
+      DS1 -> pure $ eAssert e
       DS2 -> pure $ eAssert e
       DS3 -> pure $ Succeeds e
       DS5 -> pure $ eAssert e  -- XXX ???
       DS6 -> pure $ eAssert e  -- XXX ???
+      DS7 -> pure $ eAssert e  -- XXX ???
    else if asmVerif then
     pure $ e
    else if useSplit then
@@ -1528,8 +1530,8 @@ dsD_3 (OfType t1 t2) = OfType <$> dsD_3 t1 <*> dsD_3 t2
 dsD_3 e@Fail = pure e
 dsD_3 (Range t) = do
   i  <- newIdent (getLoc t) "i"
-  existsV [i] <$> dsM11 (Range t) i
-dsD_3 e@Function{} = eVerify <$> dsF11 e
+  existsV [i] <$> dsM_3 (Range t) i
+dsD_3 e@Function{} = eVerify <$> dsF_3 e
 -- Added
 dsD_3 (If3 e1 e2 e3) = If3 <$> dsD_3 e1 <*> dsD_3 e2 <*> dsD_3 e3
 dsD_3 (Succeeds e)   = eAssert <$> dsD_3 e
@@ -1537,56 +1539,56 @@ dsD_3 (Macro1 m rs e) = Macro1 m rs <$> dsD_3 e
 dsD_3 (Lam x e) = Lam x <$> dsD_3 e
 dsD_3 e = impossible e
 
-dsF11 :: Expr -> D Expr
-dsF11 (Function [(t1, _effs)] t2) = do
+dsF_3 :: Expr -> D Expr
+dsF_3 (Function [(t1, _effs)] t2) = do
   y <- newIdent (getLoc t1) "y"
-  t1' <- dsM11 t1 y
-  t2' <- dsF11 t2
+  t1' <- dsM_3 t1 y
+  t2' <- dsF_3 t2
   pure $ Lam y $ seqE [eAssume t1', t2']
-dsF11 _z@(OfType t ty) = do
+dsF_3 _z@(OfType t ty) = do
   t'  <- dsD_3 t
   ty' <- dsD_3 ty
-  aty <- dsA11 ty
-  pure $ seqE [eAssert (ApplyD ty' t'), {- trace ("dsF11: " ++ prettyShow z ++ " aty = " ++ prettyShow aty) -} aty]
-dsF11 t = do
+  aty <- dsA_3 ty
+  pure $ seqE [eAssert (ApplyD ty' t'), {- trace ("dsF_3: " ++ prettyShow z ++ " aty = " ++ prettyShow aty) -} aty]
+dsF_3 t = do
   t' <- dsD_3 t
   pure $ seqE [eAssert t', t']
 
-dsA11 :: Expr -> D Expr
-dsA11 t = do
+dsA_3 :: Expr -> D Expr
+dsA_3 t = do
   r <- newIdent (getLoc t) "r"
   t' <- dsD_3 (Range t)
   pure $ Forall [r] $ seqE [eAssume (Unify (Variable r) t'), Variable r]
 
-dsM11 :: Expr -> Ident -> D Expr
-dsM11 ((Function [(Range t1, _effs)] (Range t2))) f = do
+dsM_3 :: Expr -> Ident -> D Expr
+dsM_3 ((Function [(Range t1, _effs)] (Range t2))) f = do
   i <- newIdent (getLoc t1) "i"
   i' <- newIdent (getLoc t1) "i'"
   z <- newIdent (getLoc t2) "z"
-  t1' <- dsM11 (Range t1) i'
-  t2' <- dsM11 (Range t2) z
+  t1' <- dsM_3 (Range t1) i'
+  t2' <- dsM_3 (Range t2) z
   pure $ seqE [eVerify $ Lam i' $ seqE [DefineE i t1', Succeeds $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
               ,          Lam i' $ seqE [DefineE i t1', eAssume  $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
               ]
--- dsM11 (Range (Function [(t1, _effs)] t2)) f = do
+-- dsM_3 (Range (Function [(t1, _effs)] t2)) f = do
 --   i <- newIdent (getLoc t1) "i"
 --   i' <- newIdent (getLoc t1) "i'"
 --   z <- newIdent (getLoc t2) "z"
---   t1' <- dsM11 t1 i'
---   t2' <- dsM11 t2 z
+--   t1' <- dsM_3 t1 i'
+--   t2' <- dsM_3 t2 z
 --   pure $ seqE [eVerify $ Lam i' $ seqE [DefineE i t1', Succeeds $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
 --               ,          Lam i' $ seqE [DefineE i t1', eAssume  $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
 --               ]
-dsM11 (Range t) i = ApplyD <$> dsD_3 t <*> pure (Variable i)
-dsM11 (DefineE x t) i = DefineE x <$> dsM11 t i
-dsM11 (Unify t1 t2) i = Unify <$> dsM11 t1 i <*> dsM11 t2 i
-dsM11 (Seq []) i = dsM11 (Array []) i
-dsM11 (Seq [t]) i = dsM11 t i
-dsM11 (Seq (t:ts)) i = seqE <$> sequence [dsD_3 t, dsM11 (Seq ts) i]
-dsM11 (Choice t1 t2) i = Choice <$> dsM11 t1 i <*> dsM11 t2 i
-dsM11 (If3 e1 e2 e3) i = If3 <$> dsD_3 e1 <*> dsM11 e2 i <*> dsM11 e3 i
-dsM11 (OfType t1 t2) i = OfType <$> dsM11 t1 i <*> dsD_3 t2
-dsM11 t i = unifyV i <$> dsD_3 t
+dsM_3 (Range t) i = ApplyD <$> dsD_3 t <*> pure (Variable i)
+dsM_3 (DefineE x t) i = DefineE x <$> dsM_3 t i
+dsM_3 (Unify t1 t2) i = Unify <$> dsM_3 t1 i <*> dsM_3 t2 i
+dsM_3 (Seq []) i = dsM_3 (Array []) i
+dsM_3 (Seq [t]) i = dsM_3 t i
+dsM_3 (Seq (t:ts)) i = seqE <$> sequence [dsD_3 t, dsM_3 (Seq ts) i]
+dsM_3 (Choice t1 t2) i = Choice <$> dsM_3 t1 i <*> dsM_3 t2 i
+dsM_3 (If3 e1 e2 e3) i = If3 <$> dsD_3 e1 <*> dsM_3 e2 i <*> dsM_3 e3 i
+dsM_3 (OfType t1 t2) i = OfType <$> dsM_3 t1 i <*> dsD_3 t2
+dsM_3 t i = unifyV i <$> dsD_3 t
 
 ------------------------------------------------------------------------------------
 -- | Adding DS for "fig 10: Mode-based Translation from SmallSource to Core."
@@ -1698,7 +1700,7 @@ dsM_2 m (Seq [t])       i = dsM_2 m t i
 dsM_2 m (Seq (t:ts))    i = seqE      <$> sequence [dsD_2 t, dsM_2 m (Seq ts) i]
 dsM_2 m (Choice t1 t2)  i = Choice    <$> dsM_2 m t1 i <*> dsM_2 m t2 i
 dsM_2 m (If3 e1 e2 e3)  i = If3       <$> dsD_2 e1     <*> dsM_2 m e2 i <*> dsM_2 m e3 i
-dsM_2 _ (OfType _t1 _t2)  _i = error "TODO" -- OfType    <$> dsM11 t1 i <*> dsD_3 t2
+dsM_2 _ (OfType _t1 _t2)  _i = error "TODO" -- OfType    <$> dsM_3 t1 i <*> dsD_3 t2
 dsM_2 _ t               i = unifyV i <$> dsD_2 t
 
 dsD_5 :: Expr -> D Expr
@@ -1767,6 +1769,7 @@ dsM_5 (DefineIE j x t) Nothing = do
   Exists [j] <$> dsM_5 (DefineE x t) (Just j)
 
 dsM_5 t (Just x) = unifyV x <$> dsD_5 t
+dsM_5 Fail Nothing = pure Fail
 dsM_5 e@(Lit _) Nothing = pure e
 dsM_5 e@(Variable _) Nothing = pure e
 dsM_5 (ApplyD t1 t2) Nothing = ApplyD <$> dsD_5 t1 <*> dsD_5 t2
@@ -1853,6 +1856,7 @@ dsM_6 (DefineIE j x t) i = do
   t' <- dsM_6 t i
   pure $ seqE [DefineE j (Variable i), DefineE x t']
 
+dsM_6 Fail i = pure $ unifyV i Fail
 dsM_6 e@(Lit _) i = pure $ unifyV i e
 dsM_6 e@(Variable _) i = pure $ unifyV i e
 dsM_6 e@(ApplyD _ _) i = pure $ unifyV i e
@@ -1863,3 +1867,120 @@ dsM_6 (Macro1 m rs e) i = Macro1 m rs <$> dsM_6 e i
 
 dsM_6 e _ = error $ "dsM_6: unimplemented " ++ show e
 
+-----------
+
+data Ident_7 = Solve_7 Ident | Infer_7 Ident
+
+-- Copy solve/infer to a new identifier
+as_7 :: Ident_7 -> Ident -> Ident_7
+as_7 (Solve_7 _) i = Solve_7 i
+as_7 (Infer_7 _) i = Infer_7 i
+
+identOf_7 :: Ident_7 -> Ident
+identOf_7 (Solve_7 i) = i
+identOf_7 (Infer_7 i) = i
+
+dsD_7 :: Expr -> D Expr
+dsD_7 e = do
+  x <- newIdent (getLoc e) "x"
+  Exists [x] <$> dsM_7 e (Solve_7 x)
+
+dsA_7 :: Ident -> Ident_7 -> D Expr
+dsA_7 _ (Solve_7 f) = (\ z -> Exists [z] $ Variable z) <$> newIdent (getLoc (Variable f)) "z"
+dsA_7 x (Infer_7 f) = pure $ ApplyD (Variable f) (Variable x)
+
+dsM_7 :: Expr -> Ident_7 -> D Expr
+dsM_7 (Function [(t1, effs)] t2) f = do
+  i <- newIdent (getLoc t1) "i"
+  j <- newIdent (getLoc t1) "j"
+  r <- newIdent (getLoc t2) "r"
+  z <- newIdent (getLoc t2) "z"
+  t1' <- dsM_7 t1 (Infer_7 i)
+  t2' <- dsM_7 t2 (as_7 f  z)
+  defZ <- DefineE z <$> dsA_7 j f
+  apFtoI <- dsA_7 i f
+  let defVerif = eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']]
+      defForall = Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r]
+  verif <- gets (fVerify . dflags)
+  if invariantId `elem` effs then
+    -- MCFUN
+    if verif then do
+      pure $ seqE [defVerif,
+                   Lam i $ seqE [ DefineE j t1', defForall ]
+                  ]
+     else do
+      pure $ Lam i $ seqE [ DefineE j t1', defZ, t2' ]
+   else do
+    -- MOFUN
+    if verif then
+      pure $ seqE [defVerif,
+                   Lam i $ If3 (Exists [j] (unifyV j t1'))
+                               defForall
+                               apFtoI
+                  ]
+     else
+      -- A hack to simplify function(x:any$){e} to simply \ x . ... e ...
+      -- This is only to make things more readable.
+{-
+      case t1 of
+        DefineE x (Range (Variable (Ident _ "any$"))) -> do
+          let defZ' = DefineE z $ ApplyD (Variable f) (Variable x)
+          pure $ Lam x $ seqE [defZ', t2']
+        _ ->
+-}
+          pure $ Lam i $ If3 (Exists [j] (unifyV j t1'))
+                             (seqE [defZ, t2'])
+                             apFtoI
+dsM_7 (OfType t1 t2) i = do
+  y <- newIdent (getLoc t1) "y"
+  t1' <- dsM_7 t1 i
+  t2' <- dsD_7 t2
+  verif <- gets (fVerify . dflags)
+  if verif then do
+    r <- newIdent (getLoc t2) "r"
+    t2'' <- dsD_7 (Range t2)
+    pure $ seqE [DefineE y t1',
+                 eVerify $ eAssert $ ApplyD t2' (Variable y),
+                 Forall [r] $ seqE [eAssume $ DefineE r t2'', Variable r]
+                ]
+  else
+    pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' t1')]
+
+dsM_7 (Range t) x = do
+  t' <- dsD_7 t
+  pure $ ApplyD t' (Variable (identOf_7 x))
+
+dsM_7 (DefineV x)   i = pure $ DefineE x (Variable (identOf_7 i))
+dsM_7 (DefineE x t) i = DefineE x <$> dsM_7 t i
+dsM_7 (Unify t1 t2) i = Unify <$> dsM_7 t1 i <*> dsM_7 t2 i
+dsM_7 (Seq [])      i = dsM_7 (Array []) i
+dsM_7 (Seq (Snoc ts t)) i = seqE <$> sequence (Snoc (map dsD_7 ts) (dsM_7 t i))
+dsM_7 (Choice t1 t2) i = Choice <$> dsM_7 t1 i <*> dsM_7 t2 i
+dsM_7 (If3 e1 e2 e3) i = If3    <$> dsD_7 e1   <*> dsM_7 e2 i <*> dsM_7 e3 i
+
+dsM_7 (Array ts) i = do
+  xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
+  bs <- zipWithM dsM_1 xs ts
+  pure $ Exists xs $ seqE [ unifyV (identOf_7 i) $ Array $ map Variable xs, Array bs]
+
+dsM_7 (DefineIE j x t) i = do
+  t' <- dsM_7 t i
+  pure $ seqE [DefineE j (Variable (identOf_7 i)), DefineE x t']
+
+dsM_7 (For2 t1 t2) i = do
+  t1' <- dsD_7 t1
+  t2' <- dsD_7 t2
+  pure $ unifyV (identOf_7 i) $ For2 t1' t2'
+
+dsM_7 Fail i = pure $ unifyV (identOf_7 i) Fail
+dsM_7 e@(Lit _) i = pure $ unifyV (identOf_7 i) e
+dsM_7 e@(Variable _) i = pure $ unifyV (identOf_7 i) e
+dsM_7 e@(ApplyD _ _) i = pure $ unifyV (identOf_7 i) e
+
+dsM_7 (Succeeds e) i = do
+  e' <- dsM_7 e i
+  lowerSucceeds e'
+dsM_7 e@(Macro1 (Ident _ "lowered") [] _) i = pure $ unifyV (identOf_7 i) e
+dsM_7 (Macro1 m rs e) i = Macro1 m rs <$> dsM_7 e i
+
+dsM_7 e _ = error $ "dsM_7: unimplemented " ++ show e
