@@ -9,8 +9,8 @@
 \begin{figure}[t]
 $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
-\multicolumn{5}{l}{\textit{Assume:}} \\
-    \rulename{asm-hnf} & |assume hnf|         & \movesto & |hnf|                    & \\
+\rulegroupname{Assume:}
+  \rulename{asm-hnf} & |assume hnf|         & \movesto & |hnf|                    & \\
   \rulename{asm-seq} & |assume (e_1; e_2)|  & \movesto & |assume e_1; assume e_2| & \\
   \rulename{asm-exi} & |assume (def x e)|   & \movesto & |def x (assume e)|       & \\
   % \rulename{asm-cas} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & \multicolumn{2}{@@{}l}{|verify (E^[assume e_1]) ; verify (E^[assume e_2])|}  \\
@@ -22,18 +22,17 @@ $\begin{array}{@@{}l}
   \rulename{asm-ver} & |assume (verify e)|  & \movesto & |tup ()|                 & \\
 \\[-0.6em]
 
-\multicolumn{5}{l}{\textit{Succeed/Decide:}} \\
+\rulegroupname{Succeed/Decide:}
   \rulename{suc-elim}   & |P^[succeed e]| & \movesto & |e|      & \text{if}\ $\mustSucceed{P}{e}$ \\
   \rulename{dec-elim}   & |P^[decide e]|  & \movesto & |P^[e]|  & \text{if}\ $\mustDecide{P}{e}$ \\
   \rulename{prove-elim} & |verify e|      & \movesto & |tup ()| & \text{if}\ $e$\ \text{has no}\ |succeedKW|, |decideKW| \\
 \\[-0.6em]
 
-\multicolumn{5}{l}{\textit{Prove:}} \\
-  %\rulename{asm-intro} & |P^[e]|                          & \movesto & |P^[assume e]|                  & \text{if}\ \proves{P}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
-  % \rulename{prove}    & |P^[e; e']|                      & \movesto & |P^[e']|                        & \text{if $\proves{P}{e}$} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
-  % \rulename{implies}  & |assume e_1; P^[e_2; e_3]|       & \movesto & |assume e_1; P^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$} \\
-  \rulename{implies-dir} & |e_1; P^[e_2; e_3]|       & \movesto & |e_1; P^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$} \\
-  \rulename{subst-asm}  & |assume (X^[x = v]); e|          & \movesto & |assume (X^[x = v]); subst e x v| & \text{if $|v| \not= |V^[x]|$} \\
+\rulegroupname{Prove:}
+  %\rulename{asm-intro}  & |P^[e]|                          & \movesto & |P^[assume e]|                  & \text{if}\ \proves{P}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  % \rulename{prove}      & |P^[e; e']|                      & \movesto & |P^[e']|                        & \text{if $\proves{P}{e}$} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  \rulename{implies}    & |assume e_1; P^[e_2; e_3]|       & \movesto & |assume e_1; P^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$} \\
+  \rulename{asm-subst}  & |assume (X^[x = v]); e|          & \movesto & |assume (X^[x = v]); subst e x v| & \text{if $|v| \not= |V^[x]|$} \\
   \rulename{asm-if}     & |verify (P^[myite e_1 e_2 e_3])| & \movesto & |verify (P^[assume e_1; e_2]);| & \text{if}\ \mustDecide{P}{e_1} \\
                         &                                  &          & |verify (P^[e_3])|              & \\
 \end{array}\\

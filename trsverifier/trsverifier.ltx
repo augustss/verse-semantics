@@ -330,14 +330,37 @@ for the Verse language.
 \newcommand{\Me}[2]{\llbracket #1 \blacktriangleright #2 \rrbracket}
 \newcommand{\Ae}[2]{\llbracket #1 \ \textbf{as}\ #2 \rrbracket}
 \newcommand{\verifier}{\textsc{TRSVerifier}\xspace}
+\newcommand{\mypara}[1]{\vskip\smallskipamount\noindent\textbf{#1}\xspace}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\vcshort}{VC\xspace}
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+\newcommand{\movesto}{\longrightarrow}
+% Arrows with explanation, including the common cases of one, two or a repeated rule
+\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+\newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
+\newcommand{\vb}{\; \ensuremath{\mathop{\mid}} \;}    % Vertical bar
+
+% \newcommand{\rulegroupname}[1]{\multicolumn{5}{@{}l}{\textit{#1}}\\}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+% \newcommand{\freevarsoutsidelambdas}[1]{\mathsf{fvsol}(#1)}
+% \newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+% \newcommand{\disjoint}{\;\#\;}
+% \newcommand{\hnf}{\mathit{hnf}}  % head-normal form
+% \newcommand{\op}{\mathit{op}}
+\newcommand{\subst}[3]{#1\{#3/#2\}}
+\newcommand{\hole}{\square}
 
 % \newcommand{\dsm}[1]{{\mathcal M}\llbracket #1 \rrbracket}
 % \newcommand{\Me}[1]{#1}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\input{rewrites}
+% \input{rewrites}
 \input{overview}
-\input{syntax}
+% \input{syntax}
 \input{rules}
 \input{examples}
 
