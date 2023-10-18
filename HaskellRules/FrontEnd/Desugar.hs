@@ -1870,7 +1870,7 @@ dsM_6 (DefineIE j x t) i = do
 dsM_6 Fail i = pure $ unifyV i Fail
 dsM_6 e@(Lit _) i = pure $ unifyV i e
 dsM_6 e@(Variable _) i = pure $ unifyV i e
-dsM_6 e@(ApplyD _ _) i = pure $ unifyV i e
+dsM_6 (ApplyD t1 t2) i = unifyV i <$> (ApplyD <$> dsD_6 t1 <*> dsD_6 t2)
 
 dsM_6 (Succeeds e) i = eAssert <$> dsM_6 e i
 dsM_6 e@(Macro1 (Ident _ "lowered") [] _) i = pure $ unifyV i e
@@ -1988,11 +1988,20 @@ dsM_7 (For2 t1 t2) i = do
 dsM_7 Fail i = pure $ unifyV (identOf_7 i) Fail
 dsM_7 e@(Lit _) i = pure $ unifyV (identOf_7 i) e
 dsM_7 e@(Variable _) i = pure $ unifyV (identOf_7 i) e
-dsM_7 e@(ApplyD _ _) i = pure $ unifyV (identOf_7 i) e
+dsM_7 (ApplyD t1 t2) i = unifyV (identOf_7 i) <$> (ApplyD <$> dsD_7 t1 <*> dsD_7 t2)
+-- This is a hack for succeeds of applications
+dsM_7 (Succeeds (ApplyD t1 t2)) i = do
+  t1' <- dsD_7 t1
+  t2' <- dsD_7 t2
+  pure $ unifyV (identOf_7 i) $ Succeeds $ ApplyD t1' t2'
 
+-- This isn't right.  We might have to keep ApplyS around longer.
+{-
 dsM_7 (Succeeds e) i = do
   e' <- dsM_7 e i
   lowerSucceeds e'
+-}
+
 dsM_7 e@(Macro1 (Ident _ "lowered") [] _) i = pure $ unifyV (identOf_7 i) e
 dsM_7 (Macro1 m rs e) i = Macro1 m rs <$> dsM_7 e i
 
