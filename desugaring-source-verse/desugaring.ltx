@@ -19,6 +19,7 @@
 \let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
 \usepackage{ amssymb }
 \usepackage{cleveref}   % \Cref etc
+\usepackage{mathpartir}
 \usepackage{stmaryrd}
 \usepackage{conteq}
 \usepackage{textgreek}
@@ -104,6 +105,7 @@
 \definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
 \newcommand{\lennart}{\coloredtext{dkcyan}{LA}}
 \newcommand{\simon}{\coloredtext{red}{SPJ}}
+\newcommand{\ranjit}{\coloredtext{green}{RJ}}
 \definecolor{dkblue}{rgb}{0.0, 0.0, 0.6}
 \newcommand{\joachim}{\coloredtext{dkblue}{JB}}
 
@@ -117,7 +119,7 @@
 
 \begin{document}
 
-\title{Desugaring Source Verse}
+\title{Desugaring \& Verifying Source Verse}
 \author{Simon, Lennart, Koen, Ranjit \today}
 \maketitle
 
@@ -880,6 +882,10 @@ ubiquitously useful that we include it in our syntax.
 %The Core Verse rewrite rules are given in \Cref{fig:rules}.
 
 % ------------------------------------------------
+% TRSVerifier
+\input{verifier}
+% ------------------------------------------------
+
 
 \clearpage
 \appendix
@@ -1158,12 +1164,5 @@ $$\begin{array}{@@{}l}
 \end{array}$$
 \caption{{\bf DS5} [old Fig 13]: using bullet (6 Oct)} \label{fig:ds5}
 \end{figure}
-
-TOODLE
-
-% \input{verifer_overview}
-% \input{verifer_rules}
-% \input{verifer_examples}
-
 
 \end{document}

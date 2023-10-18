@@ -1,13 +1,14 @@
 LATEX=pdflatex -halt-on-error
 
-# verifier_overview.ltx verifier_rules.ltx verifier_examples.ltx 
+PAPER=desugaring
+PAPERTEX = $(PAPER).tex
+PAPERSRC = $(PAPERTEX) verifier.tex ../trsverifier/overview.tex ../trsverifier/rules.tex ../trsverifier/examples.tex ../calculus.fmt
 
-desugaring.pdf: desugaring.ltx ../calculus.fmt
-#	lhs2TeX core.ltx > core.tex
-	lhs2TeX desugaring.ltx > desugaring.tex
-	$(LATEX) desugaring
-	$(LATEX) desugaring
-	$(LATEX) desugaring
+$(PAPER).pdf: $(PAPERSRC)
+	$(LATEX) $(PAPER)
+
+%.tex:   %.ltx   ../calculus.fmt
+	lhs2TeX $< > $@
 
 clean:
 	rm -f desugaring.aux desugaring.log desugaring.out desugaring.pdf desugaring.tex

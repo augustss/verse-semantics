@@ -4,7 +4,7 @@
 %include ../calculus.fmt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Overview}\label{sec:overview}
+\subsection{Overview}\label{sec:overview}
 
 The \verifier takes as input a surface term $t$ in the source verse
 language and \emph{desugars} it into a verifier term $e$ in the core
@@ -34,7 +34,7 @@ finally show a few examples that show how the verifier works from
 end-to-end \S~\ref{sec:examples}.
 
 
-\subsection{Why do we need |verify|?}
+\subsubsection{Why do we need |verify|?}
 %
 (In addition to |succeedKW| and |decideKW|?)
 %
@@ -74,7 +74,7 @@ where |v_f| is the desugared body of |f|, as shown above?
 The reason is we want to distinguish between $\lambda$ and $\exists$
 binders as explained next.
 
-\subsection{Why distinguish between $\lambda$ and $\exists$ binders?}
+\subsubsection{Why distinguish between $\lambda$ and $\exists$ binders?}
 %
 Consider the following examples:
 %
@@ -97,7 +97,7 @@ a term can make progress (via the $\mustDecide{}{}$ predicate) when its
 free variables are $\lambda$-bound.
 
 
-\subsection{Why not push |succeedKW| inside?}
+\subsubsection{Why not push |succeedKW| inside?}
 %
 Currently, we verify a term |succeed e| (resp. |decide e|) by
 %
