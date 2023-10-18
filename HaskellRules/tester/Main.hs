@@ -250,7 +250,8 @@ equivValue :: ESystem -> Core -> Core -> Bool
 --equivValue sys e1 e2 | sname sys == "iblock" = e1 == e2  -- XXX temporary hack
 equivValue sys e1 e2 =
   coreToTrs e1 == coreToTrs e2 ||        -- fast test first
-  equiv sys (coreToTrs e1) (coreToTrs e2)
+  sname sys /= "iblock" &&               -- cannot convert to core
+    equiv sys (coreToTrs e1) (coreToTrs e2)
 
 --------------
 

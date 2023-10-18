@@ -186,6 +186,11 @@ dsSmall = ds
     ds (Function (a:as@(_:_)) b) = ds $ Function [a] $ Function as b
 -- not yet
 --  ds (Function [(e, ps@(_:_))] b) = ds $ Function [(e, [])] $ Check ps b
+    ds (Function [(e1, effs)] e2) = do
+           e1' <- ds e1
+           e2' <- ds e2
+           effs' <- checkEffs effs
+           pure $ Function [(e1', effs')] e2'
 
     -- Conditional and foor-loop notation
     ds (If1 e) = ds $ If2E e eFalse
@@ -249,6 +254,12 @@ dsSmall = ds
           x <- newIdent (getLoc e) "x"
           pure $ Seq $ DefineE x e : map (Unify (Variable x)) es
         Just (x, xs) -> pure $ Seq $ map (Unify x) xs
+
+checkEffs :: [Eff] -> D [Eff]
+checkEffs = mapM checkEff
+  where checkEff (Ident _ "invariant") = pure invariantId
+        checkEff e | e `elem` knownEffects = pure e
+                   | otherwise = errorMessage $ "unknown effect: " ++ show e
 
 type Value = Expr
 
@@ -524,9 +535,9 @@ call p l s e = do
 
 ----------------------------------------------
 
-_knownEffects :: [Ident]
-_knownEffects = map (Ident noLoc) [
-  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts"
+knownEffects :: [Ident]
+knownEffects = map (Ident noLoc) [
+  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "transacts", "open"
   ] ++ [invariantId]
 
 _isLambdaEffect :: Ident -> Bool
