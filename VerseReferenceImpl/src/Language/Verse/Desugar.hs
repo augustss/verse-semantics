@@ -145,7 +145,7 @@ desugarExp e = for e $ \ case
     tellName x $ Var y
     e1 <- desugarExp e1
     e2 <- desugarExp e2
-    pure $ unify (Name <$> y) e1 :*>: unify (Name <$> x) e2
+    pure $ unify (Name <$> y) e1 :*>: unify (ArchetypeName <$> x) e2
   InfixColonEqual funName x e -> do
     if funName then tellFunName x else tellName x Exists
     e <- desugarExp e
@@ -236,6 +236,11 @@ desugarDomain' e i = for e $ \ case
       e <- desugarDomain' e y
       pure $ unify y (bracketInvoke i x) `then'` e
     pure $ Fun xs e_domain e
+  MixfixVarColonEqual x y e1 e2 -> do
+    tellName x $ Var y
+    e1 <- desugarExp e1
+    e2 <- desugarDomain' e2 i
+    pure $ unify (Name <$> y) e1 :*>: unify (ArchetypeName <$> x) e2
   InfixColonEqual funName x e -> do
     if funName then tellFunName x else tellName x Exists
     e <- desugarDomain' e i
