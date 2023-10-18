@@ -4,7 +4,7 @@ import FrontEnd.Prelude
 
 -- Different desugaring styles.
 -- The names refer to the figures in the desugaring paper.
-data Desugar = DFig6 | DFig10 | DFig11 | DFig13 | DFig14
+data Desugar = DS1 | DS2 | DS3 {- | DS4 unimplemented-} | DS5 | DS6
   deriving (Show, Read)
 
 data Flags = Flags
@@ -50,7 +50,7 @@ defaultFlags = Flags
   , fTraceVerify  = False
   , fPrelude      = either error id $ findPrelude defaultPrelude
   , fNoWarn       = False
-  , fDesugar      = DFig6 {- DFig10 -} {- DFig13 -}
+  , fDesugar      = DS1
   }
 
 showFlags :: Flags -> String
