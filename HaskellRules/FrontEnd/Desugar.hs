@@ -1881,6 +1881,7 @@ dsM_6 e _ = error $ "dsM_6: unimplemented " ++ show e
 -----------
 
 data Ident_7 = Solve_7 Ident | Infer_7 Ident
+  deriving (Show)
 
 -- Copy solve/infer to a new identifier
 as_7 :: Ident_7 -> Ident -> Ident_7
@@ -1975,8 +1976,9 @@ dsM_7 (Array ts) i = do
   pure $ Exists xs $ seqE [ unifyV (identOf_7 i) $ Array $ map Variable xs, Array bs]
 
 dsM_7 (DefineIE j x t) i = do
-  t' <- dsM_7 t i
-  pure $ seqE [DefineE j (Variable (identOf_7 i)), DefineE x t']
+  --traceM (show (j, x, t, i))
+  t' <- dsM_7 (DefineE x t) i
+  pure $ seqE [DefineE j (Variable (identOf_7 i)), t']
 
 dsM_7 (For2 t1 t2) i = do
   t1' <- dsD_7 t1
