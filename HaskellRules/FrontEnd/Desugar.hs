@@ -1770,7 +1770,7 @@ dsM_5 (If3 e1 e2 e3) i = If3    <$> dsD_5 e1   <*> dsM_5 e2 i <*> dsM_5 e3 i
 dsM_5 (Array ts) Nothing = Array <$> mapM dsD_5 ts
 dsM_5 (Array ts) (Just x) = do
   xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
-  bs <- zipWithM dsM_1 xs ts
+  bs <- zipWithM dsM_5 ts (map Just xs)
   pure $ Exists xs $ seqE [ unifyV x $ Array $ map Variable xs, Array bs]
 
 dsM_5 (DefineIE j x t) (Just i) = do
@@ -1860,7 +1860,7 @@ dsM_6 (If3 e1 e2 e3) i = If3    <$> dsD_6 e1   <*> dsM_6 e2 i <*> dsM_6 e3 i
 
 dsM_6 (Array ts) i = do
   xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
-  bs <- zipWithM dsM_1 xs ts
+  bs <- zipWithM dsM_6 ts xs
   pure $ Exists xs $ seqE [ unifyV i $ Array $ map Variable xs, Array bs]
 
 dsM_6 (DefineIE j x t) i = do
@@ -1971,7 +1971,7 @@ dsM_7 (If3 e1 e2 e3) i = If3    <$> dsD_7 e1   <*> dsM_7 e2 i <*> dsM_7 e3 i
 
 dsM_7 (Array ts) i = do
   xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
-  bs <- zipWithM dsM_1 xs ts
+  bs <- zipWithM dsM_7 ts (map (as_7 i) xs)
   pure $ Exists xs $ seqE [ unifyV (identOf_7 i) $ Array $ map Variable xs, Array bs]
 
 dsM_7 (DefineIE j x t) i = do
