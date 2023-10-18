@@ -22,6 +22,6 @@ nat(_x:any$)<decides>         := { isInt$[_x]; intGE$[_x,0]; _x };
 false                       := array{};
 postfix'^'(_p:any$)<reads><decides>  := read$[_p];
 operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];
-new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };
+new := function(_t:any$)(_x:any$)<allocates><decides>{ alloc$[_t[_x]] };
 Length(_x:any$):=arrLen$[_x];
 }

@@ -54,7 +54,7 @@ miniprelude = ("miniprelude", "\
 \false                       := array{};\n\
 \postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
 \operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
-\new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };\n\
+\new := function(_t:any$)(_x:any$)<allocates><decides>{ alloc$[_t[_x]] };\n\
 \Length(_x:any$):=arrLen$[_x];\n\
 \}\n\
 \")
@@ -155,6 +155,6 @@ mediumprelude = ("mediumprelude", "\
 \#operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
 \postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
 \operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
-\new := function(_t:any$)(_x:any$)<alloc><decides>{ alloc$[_t[_x]] };\n\
+\new := function(_t:any$)(_x:any$)<allocates><decides>{ alloc$[_t[_x]] };\n\
 \}\n\
 \")

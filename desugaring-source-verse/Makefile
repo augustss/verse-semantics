@@ -2,8 +2,8 @@ LATEX=pdflatex -halt-on-error
 
 # verifier_overview.ltx verifier_rules.ltx verifier_examples.ltx 
 
-desugaring.pdf: desugaring.ltx ../calculus.fmt core.ltx
-	lhs2TeX core.ltx > core.tex
+desugaring.pdf: desugaring.ltx ../calculus.fmt
+#	lhs2TeX core.ltx > core.tex
 	lhs2TeX desugaring.ltx > desugaring.tex
 	$(LATEX) desugaring
 	$(LATEX) desugaring
