@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Language.Verse.Desugar
   ( desugar
@@ -18,6 +19,7 @@ import Data.HashMap.Strict qualified as HashMap
 import Data.Traversable
 
 import Language.Verse.Desugar.Exp (Exp (..), Quantifier (..))
+import Language.Verse.Desugar.Exp qualified as Exp
 import Language.Verse.Error
 import Language.Verse.Ident (Ident, IdentMap)
 import Language.Verse.Ident qualified as Ident
@@ -139,10 +141,8 @@ desugarExp e = for e $ \ case
     pure $ Int x
   Rewrite.Float x ->
     pure $ Float x
-  Rewrite.Fun e_domain e -> do
-    (e_domain, xs) <- lift . runDesugarT $ desugarDomain e_domain
-    e <- exists $ desugarExp e
-    pure $ Fun xs e_domain e
+  Rewrite.Fun e_domain e ->
+    desugarFun e_domain e
   MixfixVarColonEqual x f e1 e2 -> do
     tellName x $ Var f
     e1 <- desugarExp e1
@@ -174,6 +174,43 @@ desugarExp e = for e $ \ case
     e1 <- desugarExp e1
     e2 <- desugarExp e2
     extract <$> e1 `ofTypeM` e2
+
+desugarFun
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> DesugarT m (Exp L Ident)
+desugarFun e_domain e = ask >>= \ case
+  Execution -> do
+    (e_domain, xs) <- lift . runDesugarT $ desugarDomain e_domain
+    e <- exists $ desugarExp e
+    pure $ Fun xs e_domain e
+  Verification -> do
+    e1 <- verifyFunM e_domain e
+    e2 <- assumeFunM e_domain e
+    pure $ e1 :*>: e2
+
+verifyFunM
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+verifyFunM e_domain e = do
+  i <- freshIdent' $ loc e_domain
+  verify . forall' i <$> exists do
+    e_domain <- desugarDomain' e_domain $ name i
+    e <- desugarExp e
+    pure $ e_domain `then'` succeeds e
+
+assumeFunM
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+assumeFunM e_domain e = do
+  (e_domain, xs) <- lift . runDesugarT $ desugarDomain e_domain
+  r <- freshIdent' $ loc e
+  fun xs e_domain . forall' r . assume <$> exists (desugarDomain' e $ name r)
 
 desugarNonEmpty
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -329,6 +366,9 @@ e1 `ofTypeM` e2 = ask >>= \ case
 
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
+
+fun :: Apply f => Exp.Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+fun = liftL2 . Fun
 
 name :: Functor f => f a -> f (Exp f a)
 name = fmap Name

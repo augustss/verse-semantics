@@ -1,4 +1,3 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 verify. succeeds:
-  X:int = 1
-  X = 1
+  F(X:int):int = 1.0
