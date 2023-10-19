@@ -7,6 +7,7 @@ module Language.Verse.Desugar
 
 import Control.Comonad
 import Control.Monad.Abort
+import Control.Monad.Reader
 import Control.Monad.State.Strict
 import Control.Monad.Supply
 
@@ -22,6 +23,7 @@ import Language.Verse.Ident (Ident, IdentMap)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
 import Language.Verse.Loc
+import Language.Verse.Mode
 import Language.Verse.Rewrite.Exp ( pattern List
                                   , pattern Where
                                   , pattern MixfixVarColonEqual
@@ -32,26 +34,26 @@ import Language.Verse.Rewrite.Exp ( pattern List
                                   )
 import Language.Verse.Rewrite.Exp qualified as Rewrite
 
-type DesugarT m = StateT Env m
+type DesugarT m = StateT Env (ReaderT Mode m)
 
 type Env = IdentMap (Loc, Quantifier L Ident)
 
-runDesugarT :: Functor m => DesugarT m a -> m (a, IdentMap (Quantifier L Ident))
+runDesugarT
+  :: Functor m
+  => DesugarT m a
+  -> ReaderT Mode m (a, IdentMap (Quantifier L Ident))
 runDesugarT = fmap (fmap (fmap snd)) . runDesugarT'
 
-runDesugarT' :: DesugarT m a -> m (a, Env)
-runDesugarT' m = runDesugarT'' m mempty
-
-runDesugarT'' :: DesugarT m a -> Env -> m (a, Env)
-runDesugarT'' = runStateT
+runDesugarT' :: DesugarT m a -> ReaderT Mode m (a, Env)
+runDesugarT' m = runStateT m mempty
 
 desugar
   :: (MonadAbort Error m, MonadSupply Label m)
-  => L (Rewrite.Exp L Ident)
+  => Mode
+  -> L (Rewrite.Exp L Ident)
   -> m (L (Exp L Ident))
-desugar e = do
-  (e, xs) <- runDesugarT' $ desugarExp e
-  pure $ exists' xs e
+desugar mode e =
+  runReaderT (runDesugarT' (desugarExp e) <&> \ (e, xs) -> exists' xs e) mode
 
 desugarExp
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -70,7 +72,7 @@ desugarExp e = for e $ \ case
     x <- freshIdent $ loc e1
     e1 <- desugarExp e1
     e2 <- desugarExp e2
-    pure $ unify (Name <$> x) e1 `then'` e2 :*>: (Name <$> x)
+    pure $ unify (name x) e1 `then'` e2 :*>: name x
   Rewrite.Fail ->
     pure Fail
   Rewrite.One e ->
@@ -141,11 +143,11 @@ desugarExp e = for e $ \ case
     (e_domain, xs) <- lift . runDesugarT $ desugarDomain e_domain
     e <- exists $ desugarExp e
     pure $ Fun xs e_domain e
-  MixfixVarColonEqual x y e1 e2 -> do
-    tellName x $ Var y
+  MixfixVarColonEqual x f e1 e2 -> do
+    tellName x $ Var f
     e1 <- desugarExp e1
     e2 <- desugarExp e2
-    pure $ unify (Name <$> y) e1 :*>: unify (ArchetypeName <$> x) e2
+    pure $ unify (name f) e1 :*>: unify (ArchetypeName <$> x) e2
   InfixColonEqual funName x e -> do
     if funName then tellFunName x else tellName x Exists
     e <- desugarExp e
@@ -153,25 +155,25 @@ desugarExp e = for e $ \ case
   PrefixColon e -> do
     e <- desugarExp e
     x <- freshIdent $ loc e
-    pure $ BracketInvoke e (Name <$> x)
+    pure $ BracketInvoke e (name x)
   MixfixArrowColonEqual x y e -> do
     tellName x Exists
     tellName y Exists
-    e <- desugarDomain' e $ Name <$> x
+    e <- desugarDomain' e $ name x
     pure $ (ArchetypeName <$> y) :=: e
   Rewrite.Name x ->
     pure $ Name x
   Rewrite.IfArchetypeName x e1 e2 -> do
     y <- (e $>) . Ident.Label <$> supply
     xs <- get
-    (e1, xs1) <- lift $ runDesugarT'' (desugarDomain' e1 $ Name <$> y) xs
-    (e2, xs2) <- lift $ runDesugarT'' (desugarExp e2) xs
+    (e1, xs1) <- lift $ runStateT (desugarDomain' e1 $ name y) xs
+    (e2, xs2) <- lift $ runStateT (desugarExp e2) xs
     put $ xs1 <> xs2
     pure $ IfArchetypeName x y e1 e2
   e1 :|>: e2 -> do
     e1 <- desugarExp e1
     e2 <- desugarExp e2
-    pure $ BracketInvoke e2 e1
+    extract <$> e1 `ofTypeM` e2
 
 desugarNonEmpty
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -190,7 +192,7 @@ desugarDomain
   => L (Rewrite.Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
 desugarDomain e = do
-  x <- fmap Name <$> freshIdent (loc e)
+  x <- name <$> freshIdent (loc e)
   e <- desugarDomain' e x
   pure $ e `then'` x
 
@@ -211,7 +213,7 @@ desugarDomain' e i = for e $ \ case
   List [] -> pure $ i :=: (Tuple [] <$ e)
   List (e:es) -> extract <$> desugarDomainNonEmpty i e es
   e1 `Where` e2 -> do
-    x <- fmap Name <$> freshIdent (loc e1)
+    x <- name <$> freshIdent (loc e1)
     e1 <- desugarDomain' e1 i
     e2 <- desugarExp e2
     pure $ unify x e1 `then'` e2 :*>: x
@@ -227,12 +229,12 @@ desugarDomain' e i = for e $ \ case
     pure $ i :=: (Name x <$ e)
   Rewrite.Fun e_domain e -> do
     ((e_domain, x), xs) <- lift . runDesugarT $ do
-      x <- fmap Name <$> freshIdent (loc e_domain)
-      j <- fmap Name <$> freshIdent (loc e_domain)
+      x <- name <$> freshIdent (loc e_domain)
+      j <- name <$> freshIdent (loc e_domain)
       e_domain <- desugarDomain' e_domain j
       pure (unify x e_domain `then'` j, x)
     e <- exists $ do
-      y <- fmap Name <$> freshIdent (loc e)
+      y <- name <$> freshIdent (loc e)
       e <- desugarDomain' e y
       pure $ unify y (bracketInvoke i x) `then'` e
     pure $ Fun xs e_domain e
@@ -252,18 +254,18 @@ desugarDomain' e i = for e $ \ case
     tellName x Exists
     tellName y Exists
     e <- desugarDomain' e i
-    pure $ unify (ArchetypeName <$> y) e :*>: unify (Name <$> x) i
+    pure $ unify (ArchetypeName <$> y) e :*>: unify (name x) i
   Rewrite.IfArchetypeName x e1 e2 -> do
     y <- (e $>) . Ident.Label <$> supply
     xs <- get
-    (e1, xs1) <- lift $ runDesugarT'' (desugarDomain' e1 $ Name <$> y) xs
-    (e2, xs2) <- lift $ runDesugarT'' (desugarDomain' e2 i) xs
+    (e1, xs1) <- lift $ runStateT (desugarDomain' e1 $ name y) xs
+    (e2, xs2) <- lift $ runStateT (desugarDomain' e2 i) xs
     put $ xs1 <> xs2
     pure $ IfArchetypeName x y e1 e2
   e1 :|>: e2 -> do
     e1 <- desugarDomain' e1 i
     e2 <- desugarExp e2
-    pure $ BracketInvoke e2 e1
+    extract <$> e1 `ofTypeM` e2
   _ -> do
     e <- desugarExp e
     pure $ i :=: e
@@ -275,7 +277,7 @@ desugarDomainTuple
 desugarDomainTuple = \ case
   [] -> pure ([], [])
   e:es -> do
-    x <- fmap Name <$> freshIdent (loc e)
+    x <- name <$> freshIdent (loc e)
     e <- desugarDomain' e x
     (xs, es) <- desugarDomainTuple es
     pure (x:xs, e:es)
@@ -299,8 +301,43 @@ unify = liftL2 (:=:)
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
 
+verify :: Functor f => f (Exp f a) -> f (Exp f a)
+verify = liftL1 Verify
+
+succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
+succeeds = liftL1 Succeeds
+
+assumeM
+  :: (MonadSupply Label m)
+  => L (Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+assumeM e =
+  freshIdent' (loc e) <&> \ x ->
+  assume (forall' x $ bracketInvoke e (name x))
+
+assume :: Functor f => f (Exp f a) -> f (Exp f a)
+assume = liftL1 Assume
+
+ofTypeM
+  :: MonadSupply Label m
+  => L (Exp L Ident)
+  -> L (Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+e1 `ofTypeM` e2 = ask >>= \ case
+  Execution -> pure $ bracketInvoke e2 e1
+  Verification -> (verify (succeeds $ bracketInvoke e2 e1) `then'`) <$> assumeM e2
+
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
+
+name :: Functor f => f a -> f (Exp f a)
+name = fmap Name
+
+forall' :: Apply f => f a -> f (Exp f a) -> f (Exp f a)
+forall' = liftL2 (Def Forall)
+
+liftL1 :: Functor f => (f a -> b) -> f a -> f b
+liftL1 f x = f x <$ x
 
 liftL2 :: Apply f => (f a -> f b -> c) -> f a -> f b -> f c
 liftL2 f x y = f x y <$ x <. y
@@ -310,6 +347,9 @@ freshIdent loc = do
   x <- Ident.Label <$> supply
   modify $ HashMap.insert x (loc, Exists)
   pure $ L loc x
+
+freshIdent' :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
+freshIdent' loc = L loc . Ident.Label <$> supply
 
 tellName :: MonadAbort Error m => L Ident -> Quantifier L Ident -> DesugarT m ()
 tellName x y =

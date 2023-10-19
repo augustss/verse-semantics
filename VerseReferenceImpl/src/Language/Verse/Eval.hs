@@ -16,12 +16,9 @@ import Control.Comonad
 import Control.Monad
 import Control.Monad.Abort
 import Control.Monad.Fix
-import Control.Monad.Reader.Class
 import Control.Monad.Ref
 import Control.Monad.RS
-import Control.Monad.State.Class
 import Control.Monad.Supply
-import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Verse
 

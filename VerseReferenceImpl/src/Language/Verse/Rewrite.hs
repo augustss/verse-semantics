@@ -212,8 +212,6 @@ rewriteExp e = for e $ \ case
     error "Unexpected '>'"
   e -> error $ "rewriteExp FIXME: " ++ show e
 
-
-
 isMacroParensBraces :: (Comonad f) => Name -> f (Parse.Exp f Name)  -> Maybe (Maybe (f (Parse.Exp f Name)), [f (Parse.Exp f Name)])
 isMacroParensBraces  macro (extract -> Parse.ParenInvoke (extract -> Parse.Pat (Parse.Name [] name)) args) | name == macro = Just (Just args, [])
 isMacroParensBraces  macro (extract -> Parse.Pat (Parse.Invoke (stripSpecs' -> (extract -> Parse.Name [] name, specs)) args)) | name == macro = Just (Just args, specs)
