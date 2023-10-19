@@ -23,6 +23,7 @@ import Foreign.Storable
 
 import Language.Verse qualified as Verse
 import Language.Verse.Error
+import Language.Verse.Mode
 
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -47,7 +48,7 @@ eval' xs = eval'' xs <&> \ case
   Right xs -> renderStrict . layoutSmart layoutOptions $ vsep xs
 
 eval'' :: ByteString -> IO (Either Error [Doc ann])
-eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval >=> \ case
+eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval Execution >=> \ case
   Right (Just xs) -> pure . Right $ pretty <$> xs
   Right Nothing -> pure $ Left StuckError
   Left e -> pure $ Left e
