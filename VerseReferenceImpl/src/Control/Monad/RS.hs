@@ -1,6 +1,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.RS
-  ( RST (..)
+  ( module Control.Monad.Reader.Class
+  , module Control.Monad.State.Class
+  , module Control.Monad.Trans.Class
+  , RST (..)
   , evalRST
   , execRST
   ) where

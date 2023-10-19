@@ -7,7 +7,7 @@ import Control.Monad.Abort
 import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Supply
-import Control.Monad.Verse
+import Control.Monad.Verse (VerseT)
 
 import Data.ByteString (ByteString)
 
@@ -16,6 +16,7 @@ import Language.Verse.Error
 import Language.Verse.Eval qualified as Eval
 import Language.Verse.Label
 import Language.Verse.Lexer
+import Language.Verse.Mode
 import Language.Verse.Parse
 import Language.Verse.Rewrite
 import Language.Verse.Val
@@ -25,5 +26,7 @@ eval :: ( MonadAbort Error m
         , MonadRef m
         , MonadSupply Label m
         , EqRef (Ref m)
-        ) => ByteString -> VerseT m FrozenVal
-eval = Eval.eval <=< liftEither . (runSupplyT . (desugar <=< rewrite) <=< runLexer parse)
+        ) => Mode -> ByteString -> VerseT m FrozenVal
+eval mode =
+  Eval.eval <=<
+  liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< runLexer parse)

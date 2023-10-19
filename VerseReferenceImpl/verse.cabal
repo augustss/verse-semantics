@@ -41,6 +41,7 @@ library
     Language.Verse.Label
     Language.Verse.Lexer
     Language.Verse.Loc
+    Language.Verse.Mode
     Language.Verse.Name
     Language.Verse.Parse
     Language.Verse.Parse.Exp

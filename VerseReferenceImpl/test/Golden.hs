@@ -14,6 +14,7 @@ import Data.Traversable
 
 import Language.Verse
 import Language.Verse.Error
+import Language.Verse.Mode
 
 import Prettyprinter
 
@@ -24,29 +25,33 @@ import System.IO.Error
 import Test.HUnit
 
 main :: IO ()
-main = runTestTTAndExit =<< getTest
+main = do
+  executionTest <- getTest Execution $ "test" </> "execution"
+  verificationTest <- getTest Verification $ "test" </> "verification"
+  runTestTTAndExit $ TestList [executionTest, verificationTest]
 
-getTest :: IO Test
-getTest = do
-  filePaths <- listDirectory' "test"
+getTest :: Mode -> FilePath -> IO Test
+getTest mode directory = do
+  filePaths <- listDirectory' directory
   let verseFiles = sort $ filter ((== ".verse") . takeExtension) filePaths
-  pure . TestList $ mkTestCase <$> verseFiles
+  pure . TestList $ mkTestCase mode . (directory </>) <$> verseFiles
 
-mkTestCase :: FilePath -> Test
-mkTestCase verseFile = TestLabel verseFile . TestCase $
-  ByteString.readFile ("test" </> verseFile) >>= runExceptT . runSupplyT . runVerseT . eval >>= \ case
+mkTestCase :: Mode -> FilePath -> Test
+mkTestCase mode verseFile = TestLabel verseFile . TestCase $
+  ByteString.readFile verseFile >>=
+  runExceptT . runSupplyT . runVerseT . eval mode >>= \ case
     Left e -> handleError e
     Right Nothing -> handleError StuckError
     Right (Just xs) -> do
       let outFile = replaceExtension verseFile "out"
-      expected <- (readFile $ "test" </> outFile) `catchIOError` \ e ->
+      expected <- readFile outFile `catchIOError` \ e ->
         if isDoesNotExistError e then pure "" else ioError e
       let actual = show $ foldr (\ x z -> pretty x <> line <> z) mempty xs
       assertEqual outFile expected actual
   where
     handleError e = do
       let errFile = replaceExtension verseFile "err"
-      expected <- (readFile $ "test" </> errFile) `catchIOError` \ e ->
+      expected <- readFile errFile `catchIOError` \ e ->
         if isDoesNotExistError e then pure "" else ioError e
       let actual = show $ pretty e <> line
       assertEqual errFile expected actual

@@ -708,7 +708,7 @@ succeeds m = ask' <&> (.assumed) >>= \ case
     pure v
 
 fails
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VerseT m a -> VerseT m (IVar m Bool)
 fails m = ask' <&> (.assumed) >>= \ case
   True -> newIVar True
@@ -717,7 +717,7 @@ fails m = ask' <&> (.assumed) >>= \ case
     fork $ do
       h <- Just <$> newHeap
       ref <- newHeapRef Nothing
-      split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+      split h ref (m >> writeHeapRef ref (Just ())) >>= readIVar >>= \ case
         Fail -> writeIVar v True
         Abort -> abort
         Succeed _ -> writeIVar v False

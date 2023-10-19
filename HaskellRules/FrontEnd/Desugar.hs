@@ -618,7 +618,7 @@ scope sc = expr
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD' (S.insert i sc) e
     expr Fail = pure Fail
-    expr (Forall _ e) = expr e
+    expr (Forall i e) = Forall i <$> expr e
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -941,6 +941,7 @@ lower (TLam i rs (Exists is e1) e2) = join $ lowerTLam i rs is <$> lower e1 <*> 
 lower (OfType e t) = join $ lowerOfType <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
 lower Fail = pure Fail
+lower (Forall is e) = Forall is <$> lower e
 lower e = impossible e
 
 -- Lower a for loop
@@ -1893,6 +1894,13 @@ identOf_7 (Solve_7 i) = i
 identOf_7 (Infer_7 i) = i
 
 dsD_7 :: Expr -> D Expr
+-- To not make the desugared version ridiculosely large,
+-- do some minor short-cuts here.
+dsD_7 e@(Lit _) = pure e
+dsD_7 e@(Variable _) = pure e
+dsD_7 (Array ts) = Array <$> mapM dsD_7 ts
+--dsD_7 (Unify t1 t2) = Unify <$> dsD_7 t1 <*> dsD_7 t2
+-- End short-cuts
 dsD_7 e = do
   x <- newIdent (getLoc e) "x"
   Exists [x] <$> dsM_7 e (Solve_7 x)
@@ -1900,6 +1908,12 @@ dsD_7 e = do
 dsA_7 :: Ident -> Ident_7 -> D Expr
 dsA_7 _ (Solve_7 f) = (\ z -> Exists [z] $ Variable z) <$> newIdent (getLoc (Variable f)) "z"
 dsA_7 x (Infer_7 f) = pure $ ApplyD (Variable f) (Variable x)
+
+-- dsA_7def x j f  ===  DefineE z (dsA_7 j f)
+-- but eliminating an existential.
+dsA_7def :: Ident -> Ident -> Ident_7 -> D Expr
+dsA_7def z _ (Solve_7 _) = pure $ DefineV z
+dsA_7def z x (Infer_7 f) = pure $ DefineE z $ ApplyD (Variable f) (Variable x)
 
 dsM_7 :: Expr -> Ident_7 -> D Expr
 dsM_7 (Function [(t1, effs)] t2) f = do
@@ -1909,7 +1923,7 @@ dsM_7 (Function [(t1, effs)] t2) f = do
   z <- newIdent (getLoc t2) "z"
   t1' <- dsM_7 t1 (Infer_7 i)
   t2' <- dsM_7 t2 (as_7 f  z)
-  defZ <- DefineE z <$> dsA_7 j f
+  defZ <- dsA_7def z j f
   apFtoI <- dsA_7 i f
   let defVerif = eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']]
       defForall = Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r]
@@ -1953,7 +1967,7 @@ dsM_7 (OfType t1 t2) i = do
     t2'' <- dsD_7 (Range t2)
     pure $ seqE [DefineE y t1',
                  eVerify $ eAssert $ ApplyD t2' (Variable y),
-                 Forall [r] $ seqE [eAssume $ DefineE r t2'', Variable r]
+                 Forall [r] $ seqE [eAssume $ unifyV r t2'', Variable r]
                 ]
   else
     pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' t1')]
