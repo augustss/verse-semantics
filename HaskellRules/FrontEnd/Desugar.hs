@@ -618,7 +618,7 @@ scope sc = expr
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD' (S.insert i sc) e
     expr Fail = pure Fail
-    expr (Forall _ e) = expr e
+    expr (Forall i e) = Forall i <$> expr e
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -941,6 +941,7 @@ lower (TLam i rs (Exists is e1) e2) = join $ lowerTLam i rs is <$> lower e1 <*> 
 lower (OfType e t) = join $ lowerOfType <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
 lower Fail = pure Fail
+lower (Forall is e) = Forall is <$> lower e
 lower e = impossible e
 
 -- Lower a for loop
@@ -1898,6 +1899,7 @@ dsD_7 :: Expr -> D Expr
 dsD_7 e@(Lit _) = pure e
 dsD_7 e@(Variable _) = pure e
 dsD_7 (Array ts) = Array <$> mapM dsD_7 ts
+--dsD_7 (Unify t1 t2) = Unify <$> dsD_7 t1 <*> dsD_7 t2
 -- End short-cuts
 dsD_7 e = do
   x <- newIdent (getLoc e) "x"
@@ -1965,7 +1967,7 @@ dsM_7 (OfType t1 t2) i = do
     t2'' <- dsD_7 (Range t2)
     pure $ seqE [DefineE y t1',
                  eVerify $ eAssert $ ApplyD t2' (Variable y),
-                 Forall [r] $ seqE [eAssume $ DefineE r t2'', Variable r]
+                 Forall [r] $ seqE [eAssume $ unifyV r t2'', Variable r]
                 ]
   else
     pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' t1')]
