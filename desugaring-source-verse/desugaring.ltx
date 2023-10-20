@@ -181,7 +181,7 @@ $$
 \rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |functionX (t_1) (eff closed) t_2| \\
 \rulename{dsfun1} &  |function (a_1 a_2 xdots a_n) t| & \rightarrow & |function a_1 (function (a_2 xdots a_n) t| \\
 \rulename{dsfun2}  & |function (()) t| & \rightarrow & |function ((ar ())) t| & \\
-\rulename{dsfun3}  &   |function (a (eff fx)) b| & \rightarrow & |function a (check fx b)| & \\
+\rulename{dsfun3}  &   |functionX a (eff fx) b| & \rightarrow & |function a (check fx b)| & \\
 \\
 \multicolumn{5}{l}{\textbf{Conditional and for-loop notation}} \\
 \rulename{dsif1} & |if{e}| & \rightarrow & |if(e) else false| \\
@@ -533,18 +533,18 @@ $$
          &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Function rules (execution)}} \\
-\multicolumn{2}{l}{\rulename{mcfun}\hspace{4mm} |DMe (inp f si) (functionX t_1 (eff closed) t_2)|}
+\multicolumn{2}{l}{\rulename{mcfunx}\hspace{4mm} |DMe (inp f si) (functionX t_1 (eff closed) t_2)|}
   & = & |lam i (j := Me (inp i (flipsi si)) t_1; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\[2mm]
 
 
-\rulename{mofun}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
+\rulename{mofunx}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
  & =  & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
     |if (j := Me (inp i (flipsi si)) t_1)| \\
     |then (z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
     |else (DAe (inp f si) i)|
    \end{array}} \\[10mm]
 
-\rulename{moftype} & |DMe inpw (oftype t_1 t_2)| & = & |y:=DMe inpw t_1; ((De t_2))^[y]| \\[2mm]
+\rulename{moftypex} & |DMe inpw (oftype t_1 t_2)| & = & |y:=DMe inpw t_1; ((De t_2))^[y]| \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
 \rulename{mtype}   & |DMe (inp i si) (:t)|           & = & |((De t))^[i]| \\
