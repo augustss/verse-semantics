@@ -7,8 +7,6 @@
 %include polycode.fmt
 %include forall.fmt
 %include ../calculus.fmt
-%format cons (x) (y) = "\textbf{cons}(" x "," y ")"
-%format applyx a b = a "(" b ")"
 
 % Boxed figures
 \floatstyle{boxed}
@@ -27,95 +25,8 @@
 
 
 % \renewcommand{\arraystretch}{1.1}
-\newcommand{\vb}{\; |vbar| \;}
-\newcommand{\textquote}{'}
 
-% Get rid of this lot -------------------
-\newcommand{\vtt}[1]{\text{\tt #1}}
-\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
-\newcommand{\clamx}[2]{lam (#1) in #2}
-\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
-\newif\ifmatch
-\matchtrue
-\ifmatch
-\newcommand{\pmatch}[2]{$#1 \vtt{ :- } #2$}
-\else
-\newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
-\fi
-\newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
-% ---------------------------------------
-
-% Desugaring
-\newcommand{\An}[1]{{\mathcal A}\llbracket #1 \rrbracket}
-\newcommand{\Cr}[1]{{\mathcal C}\llbracket #1 \rrbracket}
-\newcommand{\Bi}[1]{{\mathcal B}\llbracket #1 \rrbracket}
-\newcommand{\Vr}[1]{{\mathcal V}\llbracket #1 \rrbracket}
-\newcommand{\Vl}[1]{{\mathcal S}\llbracket #1 \rrbracket}
-\newcommand{\Th}[1]{{\mathcal H}\llbracket #1 \rrbracket}
-
-% Control if desugaring has named transformations or not
-\newif\ifdesugarops
-\desugaropstrue
-% \desugaropsfalse
-
-\ifdesugarops
-\newcommand{\Ane}[1]{{\mathcal A}\llbracket #1 \rrbracket}
-\newcommand{\Fne}[1]{{\mathcal F}\llbracket #1 \rrbracket}
-\newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
-\newcommand{\Ve}[1]{{\mathcal V}\llbracket #1 \rrbracket}
-\newcommand{\Ie}[1]{{\mathcal I}\llbracket #1 \rrbracket}
-% \newcommand{\Me}[2]{{\mathcal M}\llbracket #1 \blacktriangleright #2 \rrbracket}
-\newcommand{\Me}[2]{{\mathcal M}\llbracket #2 \rrbracket #1}
-\newcommand{\DMe}[2]{{\mathcal M}\llbracket #2 \rrbracket #1}
-\newcommand{\Fe}[2]{{\mathcal F}\llbracket #2 \rrbracket #1}
-\newcommand{\MMe}[3]{{\mathcal M}_{#3}\llbracket #2 \rrbracket #1}
-\newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
-\newcommand{\Pd}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
-\else
-\newcommand{\De}[1]{#1}
-\newcommand{\Me}[1]{#1}
-\newcommand{\Ld}[2]{#1 : #2}
-\newcommand{\Pd}[2]{#1 := #2}
-\fi
-
-% Names of rules
-\newcommand{\rulename}[1]{\textsc{\small #1}}
-
-% Right arrow for rewrites
-\newcommand{\movesto}{\longrightarrow}
-\newcommand{\movesfrom}{\longleftarrow}
-\newcommand{\convertible}{\longleftrightarrow^{\ast}}
-
-% Hole in context
-\newcommand{\hole}{\square}
-\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
-\newcommand{\freevarsoutsidelambdas}[1]{\mathsf{fvsol}(#1)}
-\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
-\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
-\newcommand{\disjoint}{\;\#\;}
-\newcommand{\hnf}{\mathit{hnf}}  % Head normal form
-\newcommand{\subst}[3]{#1\{#3/#2\}}
-
-\newcommand{\hexp}{h-expression}
-\newcommand{\Hexp}{H-expression}
-
-\newcommand{\coloredtext}[3]{\strut\ifmmode\text{\color{#1} [{#2}: #3]}\else{\color{#1} [{#2}: #3]}\fi}
-% \text in text mode implies a mbox and prevents wrapping, so only use \text in math mode
-% The strut is needed somehow, else \iffmode does not work in an \begin{array} cell?
-\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
-\newcommand{\lennart}{\coloredtext{dkcyan}{LA}}
-\newcommand{\simon}{\coloredtext{red}{SPJ}}
-\newcommand{\ranjit}{\coloredtext{green}{RJ}}
-\definecolor{dkblue}{rgb}{0.0, 0.0, 0.6}
-\newcommand{\joachim}{\coloredtext{dkblue}{JB}}
-
-\newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
-\newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
-
-% Example environment
-\newcounter{example}
-\newenvironment{example}[1][]{\refstepcounter{example}\par\medskip
-   \noindent\textbf{Example~\theexample. #1} \rmfamily}{\medskip}
+\input{verse-macros}
 
 \begin{document}
 
@@ -580,60 +491,6 @@ $$
 \end{figure}
 
 
-\begin{figure}
-$$\begin{array}{@@{}l}
-
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe i t| = |e|$}} \\[0.02in]
-\rulename{dinit}   & |De t | & = & |def i (DMe i t)| \\
-% \rulename{dinit-alt}   & |De t | & = & |DMe ((def i i)) t| \\[2mm]
-
-\multicolumn{4}{l}{\mbox{\it Function rules}} \\
-\rulename{mcfun}  & |DMe f (functionX t_1 (closed) t_2)|
-     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
-& &   & |lam i (j := Me i t_1; forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\[2mm]
-
-\rulename{mofun}  & |DMe f (functionX t_1 (open) t_2)|
-     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
-%   & &   & \multicolumn{2}{@@{}l}{|lam i (Me i t_1; forall r (assume (r = (De (:t_2))); r))|} \\[2mm]
-& &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
-    |if (j := Me i t_1)| \\
-    |then (forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\
-    |else (f^[i]))|
-   \end{array}} \\[10mm]
-
-\rulename{moftype} & |DMe i (oftype t_1 t_2)|
-         & = & \multicolumn{2}{@@{}l}{|y:=DMe i t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
-         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
-
-\multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{mtype}   & |DMe i (:t)|           & = & |((De t))^[i]| \\[2mm]
-
-\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
-\rulename{mbind}   & |DMe i (x:=t)|         & = & |x := DMe i t| \\
-\rulename{meq}     & |DMe i (t_1=t_2)|      & = & |(DMe i t_1) = (DMe i t_2)| \\
-\rulename{msemi}   & |DMe i (t_1 ; t_2)|    & = & |De t_1 ; DMe i t_2| \\
-\rulename{mchoice} & |DMe i ((t_1 `choice` t_2))| & = & |(DMe i t_1) `choice` (DMe i t_2)| \\
-\multicolumn{2}{l}{\rulename{mif}\hspace{1cm} |DMe i (if(t_1) then t_2 else t_3)|} & = &
-    \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe i t_2 else DMe i t_3|} \\[2mm]
-
-\multicolumn{4}{l}{\mbox{\it Misc.}} \\
-\rulename{msquig} & |DMe i (y squiggt x := t)| & = & |y := i; DMe i (x := t)| \\
-\rulename{marray} & |DMe i (arr(t_1, xdots, t_n))| & = &
-    |def (x_1 xdots x_n) (i == arr (x_1, xdots, x_n));
-     arr (Me x_1 t_1, xdots, Me x_n t_n)|
-    \\[2mm]
-
-\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
-\rulename{mconst}  & |DMe i k|                  & = & |i = k| \\
-\rulename{mvar}    & |DMe i x|                  & = & |i = x| \\
-\rulename{mapp}    & |DMe i (t_1^[t_2])|        & = & |i = ((De t_1))^[De t_2]| \\
-
-\end{array}
-\end{array}$$
-\caption{{\bf DS6} [old Fig 14]: using just M, with no D} \label{fig:ds6}
-\end{figure}
-
 % -------------------------------------------
 \begin{figure}
 $$
@@ -717,7 +574,7 @@ can very easily be desugared into it.  Specifically:
 
 \subsection{Desugaring from SmallSource to BigCore}
 
-\Cref{fig:ds6} desugars Small Source Verse into Big Core Verse.
+\Cref{fig:ds7} desugars Small Source Verse into Big Core Verse.
 In desugaring from SmallSource Verse into BigCore Verse, there are two big features to watch:
 \begin{description}
 \item[Functions.] We desugar Verse's lambdas |functionP t_1 t_2|, which (very unusually) have a domain \emph{expression} |t_1| rather
@@ -869,21 +726,27 @@ ubiquitously useful that we include it in our syntax.
 \section{Core: syntax and rewrite rules}
 
 % core.ltx contains the Core syntax and rewrite rules
-% \input{core}
-%
-%\subsection{Syntax}
-%
-% \figureSyntax
-%The syntax of Core Verse expressions is in \Cref{fig:vc-syntax}.
-%
-%\subsection{Rewrite rules} \label{sec:rewrite-rules}
-%
-% \figureRewriteRules
-%The Core Verse rewrite rules are given in \Cref{fig:rules}.
+\input{core}
+
+\subsection{Syntax}
+
+ \figureSyntax
+The syntax of Core Verse expressions is in \Cref{fig:vc-syntax}.
+
+\subsection{Rewrite rules} \label{sec:rewrite-rules}
+
+ \figureRewriteRules
+The Core Verse rewrite rules are given in \Cref{fig:rules}.
 
 % ------------------------------------------------
 % TRSVerifier
-\input{verifier}
+
+\section{Verifier}
+
+\input{../trsverifier/overview}
+\input{../trsverifier/rules}
+\input{../trsverifier/examples}
+
 % ------------------------------------------------
 
 
@@ -892,15 +755,16 @@ ubiquitously useful that we include it in our syntax.
 
 \section{Out dated rules}
 
-This Appendix collects Figures for earlier iteraions of our desugaring.
+This Appendix collects Figures for earlier iterations of our desugaring.
 
 Out-dated rules:
 \begin{itemize}
-\item \Cref{fig:ds1}
-\item \Cref{fig:ds2}
-\item \Cref{fig:ds3}
-\item \Cref{fig:ds4}
-\item \Cref{fig:ds5}
+\item DS1: \Cref{fig:ds1}
+\item DS2: \Cref{fig:ds2}
+\item DS3: \Cref{fig:ds3}
+\item DS4: \Cref{fig:ds4}
+\item DS5: \Cref{fig:ds5}
+\item DS6: \Cref{fig:ds6}
 \end{itemize}
 
 \begin{figure}
@@ -1163,6 +1027,61 @@ $$\begin{array}{@@{}l}
 \end{array}
 \end{array}$$
 \caption{{\bf DS5} [old Fig 13]: using bullet (6 Oct)} \label{fig:ds5}
+\end{figure}
+
+
+\begin{figure}
+$$\begin{array}{@@{}l}
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe i t| = |e|$}} \\[0.02in]
+\rulename{dinit}   & |De t | & = & |def i (DMe i t)| \\
+% \rulename{dinit-alt}   & |De t | & = & |DMe ((def i i)) t| \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Function rules}} \\
+\rulename{mcfun}  & |DMe f (functionX t_1 (closed) t_2)|
+     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
+& &   & |lam i (j := Me i t_1; forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\[2mm]
+
+\rulename{mofun}  & |DMe f (functionX t_1 (open) t_2)|
+     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
+%   & &   & \multicolumn{2}{@@{}l}{|lam i (Me i t_1; forall r (assume (r = (De (:t_2))); r))|} \\[2mm]
+& &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
+    |if (j := Me i t_1)| \\
+    |then (forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\
+    |else (f^[i]))|
+   \end{array}} \\[10mm]
+
+\rulename{moftype} & |DMe i (oftype t_1 t_2)|
+         & = & \multicolumn{2}{@@{}l}{|y:=DMe i t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
+         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Type rules}} \\
+\rulename{mtype}   & |DMe i (:t)|           & = & |((De t))^[i]| \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
+\rulename{mbind}   & |DMe i (x:=t)|         & = & |x := DMe i t| \\
+\rulename{meq}     & |DMe i (t_1=t_2)|      & = & |(DMe i t_1) = (DMe i t_2)| \\
+\rulename{msemi}   & |DMe i (t_1 ; t_2)|    & = & |De t_1 ; DMe i t_2| \\
+\rulename{mchoice} & |DMe i ((t_1 `choice` t_2))| & = & |(DMe i t_1) `choice` (DMe i t_2)| \\
+\multicolumn{2}{l}{\rulename{mif}\hspace{1cm} |DMe i (if(t_1) then t_2 else t_3)|} & = &
+    \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe i t_2 else DMe i t_3|} \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Misc.}} \\
+\rulename{msquig} & |DMe i (y squiggt x := t)| & = & |y := i; DMe i (x := t)| \\
+\rulename{marray} & |DMe i (arr(t_1, xdots, t_n))| & = &
+    |def (x_1 xdots x_n) (i == arr (x_1, xdots, x_n));
+     arr (Me x_1 t_1, xdots, Me x_n t_n)|
+    \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
+\rulename{mconst}  & |DMe i k|                  & = & |i = k| \\
+\rulename{mvar}    & |DMe i x|                  & = & |i = x| \\
+\rulename{mapp}    & |DMe i (t_1^[t_2])|        & = & |i = ((De t_1))^[De t_2]| \\
+
+\end{array}
+\end{array}$$
+\caption{{\bf DS6} [old Fig 14]: using just M, with no D} \label{fig:ds6}
 \end{figure}
 
 \end{document}
