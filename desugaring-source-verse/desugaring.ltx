@@ -498,8 +498,10 @@ $$
 \mbox{\bf Syntax} \\
 \multicolumn{1}{c}{\begin{array}{rcll}
   |si| & ::= &  |solve|  \vb |infer| & \text{``solve'' and ``infer'' respectively.}\\
-  |inpw| & ::= & |x|^{|si|} & \text{If $|si|=|solve|$ then |x| is a unification variable}
-\end{array}} \\[4mm]
+  |inpw| & ::= & |x|^{|si|} & \text{If $|si|=|solve|$ then |x| is a unification variable} \\[1mm]
+  |flipsi infer| & = & |solve| \\
+  |flipsi solve| & = & |infer| \\
+\end{array}} \\ \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De t| = |e|$, $|DAe inpw x| = |e|$}} \\[0.02in]
@@ -509,29 +511,48 @@ $$
 
 \multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
 
-\multicolumn{4}{l}{\mbox{\it Function rules}} \\
+\multicolumn{4}{l}{\mbox{\it Function rules (verification)}} \\
 \multicolumn{2}{l}{\rulename{mcfun}\hspace{4mm} |DMe (inp f si) (functionX t_1 (eff closed) t_2)|}
-& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i infer) t_1);
+& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i (flipsi si)) t_1);
                                             assert (z := DAe (inp f si) j; Me (inp z si) t_2))); |} \\
-& &   & |lam i (j := Me (inp i infer) t_1; forall r (assume (z :=  DAe (inp f si) j;
+& &   & |lam i (j := Me (inp i (flipsi si)) t_1; forall r (assume (z :=  DAe (inp f si) j;
                                              r = Me (inp z si) t_2); r))| \\[2mm]
 
 
 \rulename{mofun}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
-     & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := Me (inp i infer) t_1; assert (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
-%   & &   & \multicolumn{2}{@@{}l}{|lam i (Me i t_1; forall r (assume (r = (De (:t_2))); r))|} \\[2mm]
+& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := Me (inp i (flipsi si)) t_1;
+                                            assert (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
 & &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
-    |if (j := Me (inp i infer) t_1)| \\
+    |if (j := Me (inp i (flipsi si)) t_1)| \\
     |then (forall r (assume (z := DAe (inp f si) j; r = Me (inp z si) (t_2)); r))| \\
-    |else (DAe (inp f si) i))|
+    |else (DAe (inp f si) i)|
    \end{array}} \\[10mm]
 
 \rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
          & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
          &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
 
+\multicolumn{4}{l}{\mbox{\it Function rules (execution)}} \\
+\multicolumn{2}{l}{\rulename{mcfun}\hspace{4mm} |DMe (inp f si) (functionX t_1 (eff closed) t_2)|}
+  & = & |lam i (j := Me (inp i (flipsi si)) t_1; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\[2mm]
+
+
+\rulename{mofun}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
+ & =  & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
+    |if (j := Me (inp i (flipsi si)) t_1)| \\
+    |then (z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
+    |else (DAe (inp f si) i)|
+   \end{array}} \\[10mm]
+
+\rulename{moftype} & |DMe inpw (oftype t_1 t_2)| & = & |y:=DMe inpw t_1; ((De t_2))^[y]| \\[2mm]
+
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{mtype}   & |DMe (inp i si) (:t)|           & = & |((De t))^[i]| \\[2mm]
+\rulename{mtype}   & |DMe (inp i si) (:t)|           & = & |((De t))^[i]| \\
+\rulename{msquig} & |DMe (inp z si) (y squiggt x := t)| & = & |y := z; DMe (inp z si) (x := t)| \\
+\rulename{marray} & |DMe (inp x si) (arr(t_1, xdots, t_n))| & = &
+    |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n));
+     arr (DMe (inp x_1 si) t_1, xdots, DMe (inp x_n si) t_n)|
+    \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
 \rulename{mbind}   & |DMe inpw (x:=t)|         & = & |x := DMe inpw t| \\
@@ -540,13 +561,6 @@ $$
 \rulename{mchoice} & |DMe inpw ((t_1 `choice` t_2))| & = & |(DMe inpw t_1) `choice` (DMe inpw t_2)| \\
 \multicolumn{2}{l}{\rulename{mif}\hspace{6mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
     \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe inpw t_2 else DMe inpw t_3|} \\[2mm]
-
-\multicolumn{4}{l}{\mbox{\it Misc.}} \\
-\rulename{msquig} & |DMe (inp z si) (y squiggt x := t)| & = & |y := z; DMe (inp z si) (x := t)| \\
-\rulename{marray} & |DMe (inp x si) (arr(t_1, xdots, t_n))| & = &
-    |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n));
-     arr (DMe (inp x_1 si) t_1, xdots, DMe (inp x_n si) t_n)|
-    \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Equality rules}} \\
 \rulename{mconst}  & |DMe (inp x si) k|                  & = & |x = k| \\
@@ -1045,7 +1059,6 @@ $$\begin{array}{@@{}l}
 
 \rulename{mofun}  & |DMe f (functionX t_1 (open) t_2)|
      & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
-%   & &   & \multicolumn{2}{@@{}l}{|lam i (Me i t_1; forall r (assume (r = (De (:t_2))); r))|} \\[2mm]
 & &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
     |if (j := Me i t_1)| \\
     |then (forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\

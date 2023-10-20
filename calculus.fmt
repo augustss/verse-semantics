@@ -65,7 +65,8 @@
 %format solve = "\circ"
 %format infer = "\bullet"
 %format inpw  = "w"
-%format inp x u = x "^{" u "}"
+%format inp (x) (u) = x "^{" u "}"
+%format flipsi (si) = "\overline{" si "}"
 
 %format (Ae (i) (e)) = "\Ae{" ^ i "}{" ^e "}"
 %format (An (x)) = "\An{" ^ x "}"
