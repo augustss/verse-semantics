@@ -2011,7 +2011,7 @@ dsM_7 (OfType t1 t2) i = do
                  Forall [r] $ seqE [eAssume $ unifyV r t2'', Variable r]
                 ]
   else
-    pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' t1')]
+    pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' (Variable y))]
 
 dsM_7 (Range t) x = do
   t' <- dsD_7 t
