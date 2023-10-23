@@ -39,7 +39,9 @@ import FrontEnd.Flags
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
-            (traceDS "alias"      <=< simpAlias <=<
+            (traceDS "addExist"   <=< addExist  <=<
+             traceDS "elimExist"  <=< elimExist <=<
+             traceDS "alias"      <=< simpAlias <=<
              traceDS "simpler"    <=< simpler   <=<
              traceDS "elimExist"  <=< elimExist <=<
              traceDS "primops"    <=< primops   <=<
@@ -743,6 +745,22 @@ primOps = map (Ident noLoc)
 
 ------------------------
 
+-- The invariant for generating core is that there is always an Exists
+-- in the following constructs:
+--  If3
+--  For2
+-- If there isn't, this pass will insert an empty exists.
+addExist :: Expr -> D Expr
+addExist = pure . f
+  where
+    f (If3 e1 e2 e3) = If3 (ex (f e1)) (f e2) (f e3)
+    f (For2 e1 e2)   = For2 (ex (f e1)) (f e2)
+    f e = composOp f e
+    ex e@Exists{} = e
+    ex e = Exists [] e
+
+------------------------
+
 -- Eliminate existentials of the form
 --  Exists x . ... x=e ...
 -- where the x=e is the only occurrence of x.
@@ -755,14 +773,11 @@ elimExist expr = do
    else
     pure expr
   where
-    exi x (Exists xs e) = Exists (x:xs) e
-    exi _ e             = impossible e
-
-    elimE (Exists [] e) = Exists [] $ elimE e
+    elimE (Exists [] e) = elimE e
     elimE (Exists (x:xs) e) =
       let e' = elimE (Exists xs e)
       in  case elimX x e' of
-            Nothing  -> exi x e'
+            Nothing  -> lExists [x] e'
             Just e'' -> e''
     elimE e = composOp elimE e
 
