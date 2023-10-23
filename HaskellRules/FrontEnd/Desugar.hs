@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-type-defaults #-}
 {-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.Desugar(
   desugar,
@@ -12,6 +12,7 @@ import Data.Either
 import Data.List
 --import qualified Data.Map as M
 import Data.Maybe
+import Data.Monoid
 import qualified Data.Set as S
 import Debug.Trace
 import GHC.Stack
@@ -34,12 +35,13 @@ import FrontEnd.Flags
 --  x:t=v is syntactic sugar for x:=(:t=v) and
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
-
+  
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
             (traceDS "alias"      <=< simpAlias <=<
              traceDS "simpler"    <=< simpler   <=<
+             traceDS "elimExist"  <=< elimExist <=<
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
              traceDS "addScope"   <=< addScope  <=<
@@ -741,6 +743,40 @@ primOps = map (Ident noLoc)
 
 ------------------------
 
+-- Eliminate existentials of the form
+--  Exists x . ... x=e ...
+-- where the x=e is the only occurrence of x.
+elimExist :: Expr -> D Expr
+elimExist expr = do
+  simpl <- gets (fSimplify . dflags)
+  if simpl then
+    -- XXX should iterate until we reach a fixpoint
+    pure $ elimE $ simpValue' $ elimE $ simpValue' $ elimE expr
+   else
+    pure expr
+  where
+    exi x (Exists xs e) = Exists (x:xs) e
+    exi _ e             = impossible e
+
+    elimE (Exists [] e) = Exists [] $ elimE e
+    elimE (Exists (x:xs) e) =
+      let e' = elimE (Exists xs e)
+      in  case elimX x e' of
+            Nothing  -> exi x e'
+            Just e'' -> e''
+    elimE e = composOp elimE e
+
+--    elimX x _ | trace ("----------------" ++ prettyShow x) False = undefined
+    elimX x ex =
+      let --elm e | unIdent x == "$z16", trace ("e=" ++ prettyShow e) False = undefined
+          elm (Unify (Variable y) e) | x == y = do tell (Sum 1); elm e
+          elm e@(Variable y) | x == y = do tell (Sum 2); pure e
+          elm e = compos elm e
+      in  case runWriter (elm ex) of
+--            xxx | unIdent x == "$z16", trace ("runWriter " ++ show xxx) False -> undefined
+            (e', Sum n) | n <= 1 -> Just e'
+            _                    -> Nothing
+
 simpler :: Expr -> D Expr
 simpler expr = do
   -- Always remove silly uses of any$
@@ -753,7 +789,10 @@ simpler expr = do
 
 -- Simplify  v; e  -->  e
 simpValue :: Expr -> D Expr
-simpValue = pure . f
+simpValue = pure . simpValue'
+
+simpValue' :: Expr -> Expr
+simpValue' = f
   where f (Seq (Snoc es e)) = seqE $ map f (Snoc (filter (not . isValue) es) e)
         f e = composOp f e
 
@@ -1895,13 +1934,14 @@ identOf_7 (Solve_7 i) = i
 identOf_7 (Infer_7 i) = i
 
 dsD_7 :: Expr -> D Expr
+{-
 -- To not make the desugared version ridiculosely large,
 -- do some minor short-cuts here.
 dsD_7 e@(Lit _) = pure e
 dsD_7 e@(Variable _) = pure e
 dsD_7 (Array ts) = Array <$> mapM dsD_7 ts
---dsD_7 (Unify t1 t2) = Unify <$> dsD_7 t1 <*> dsD_7 t2
 -- End short-cuts
+-}
 dsD_7 e = do
   x <- newIdent (getLoc e) "x"
   Exists [x] <$> dsM_7 e (Solve_7 x)
