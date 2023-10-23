@@ -1948,6 +1948,10 @@ identOf_7 :: Ident_7 -> Ident
 identOf_7 (Solve_7 i) = i
 identOf_7 (Infer_7 i) = i
 
+opposite :: Ident_7 -> Ident -> Ident_7
+opposite (Solve_7 _) i = Infer_7 i
+opposite (Infer_7 _) i = Solve_7 i
+
 dsD_7 :: Expr -> D Expr
 {-
 -- To not make the desugared version ridiculosely large,
@@ -1965,7 +1969,7 @@ dsA_7 :: Ident -> Ident_7 -> D Expr
 dsA_7 _ (Solve_7 f) = (\ z -> Exists [z] $ Variable z) <$> newIdent (getLoc (Variable f)) "z"
 dsA_7 x (Infer_7 f) = pure $ ApplyD (Variable f) (Variable x)
 
--- dsA_7def x j f  ===  DefineE z (dsA_7 j f)
+-- dsA_7def z x f  ===  DefineE z (dsA_7 x f)
 -- but eliminating an existential.
 dsA_7def :: Ident -> Ident -> Ident_7 -> D Expr
 dsA_7def z _ (Solve_7 _) = pure $ DefineV z
@@ -1977,7 +1981,7 @@ dsM_7 (Function [(t1, effs)] t2) f = do
   j <- newIdent (getLoc t1) "j"
   r <- newIdent (getLoc t2) "r"
   z <- newIdent (getLoc t2) "z"
-  t1' <- dsM_7 t1 (Infer_7 i)
+  t1' <- dsM_7 t1 (opposite f i)
   t2' <- dsM_7 t2 (as_7 f  z)
   defZ <- dsA_7def z j f
   apFtoI <- dsA_7 i f
