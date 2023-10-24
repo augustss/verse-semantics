@@ -26,6 +26,7 @@ module Rules.Core(
   pattern EXI,
   pattern UNI,
   pattern LAM,
+  pattern VAR,
   pattern Block, Eqn,
   getExis,
   exis,
@@ -145,7 +146,7 @@ instance Pretty Expr where
   pPrintPrec l _ (Decide a)       = text "decide {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Verify a)       = text "verify {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ e@(IFB {})       = ppIf l xs a b c where (xs, a, b, c) = splitIfB e
-  -- pPrintPrec l _ (If a b c)       = text "if" <+> parens (pPrintPrec l 0 a) <+> braces (pPrintPrec l 0 b) <+> text "else" <+> braces (pPrintPrec l 0 c)
+  pPrintPrec l _ (If a b c)       = ppIf l [] a b c
   pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
   pPrintPrec l _ (Split e v1 v2)  = text "split {" P.<> sep [pPrintPrec l 0 e P.<> text ",",
                                                              pPrintPrec l 0 v1 P.<> text ",",
@@ -154,7 +155,7 @@ instance Pretty Expr where
   pPrintPrec l _ (Store h e)      = text "store {" P.<> sep [pPrintPrec l 0 (IM.toList h) P.<> text ",",
                                                              pPrintPrec l 0 e] P.<> text "}"
   pPrintPrec l p (Ref r)          = pPrintPrec l p r
-  pPrintPrec _ _ _                = undefined -- GHC bug
+  pPrintPrec _ _ e                = error ("CRASH: " ++ show e) -- undefined -- GHC bug
 
 ppIf :: PrettyLevel -> [Ident] -> Expr -> Expr -> Expr -> Doc
 ppIf l xs a b c = text "if" <+> parens (pPrintPrec l 0 (exis xs a)) <+> braces (pPrintPrec l 0 b) <+> text "else" <+> braces (pPrintPrec l 0 c)
@@ -369,6 +370,14 @@ pattern UNI x e = Uni (Bind x e)
 
 pattern LAM :: Ident -> Expr -> Expr
 pattern LAM x e = Lam (Bind x e)
+
+pattern VAR :: Ident -> Expr
+pattern VAR x <- (getVar -> Just x)
+
+getVar :: Expr -> Maybe Ident
+getVar (Var x)          = Just x
+getVar (Assume (Var x)) = Just x
+getVar _                = Nothing
 
 pattern Val :: Expr -> Expr
 pattern Val e <- (getVal -> Just e)

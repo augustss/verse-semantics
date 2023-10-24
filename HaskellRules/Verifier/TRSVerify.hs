@@ -72,6 +72,7 @@ tests = -- take 6
   , ("ex_choice_01", ex_choice_01, True)
   , ("ex_if_asm_00", ex_if_asm_00, True)
   , ("ex1_mini", ex1_mini, True)
+  , ("ex_asm_var", ex_asm_var, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -679,3 +680,12 @@ ex1_mini = lAMs [x] (
            where
             x = ident "x"
             b = ident "b"
+
+ex_asm_var :: Expr
+ex_asm_var = Verify $ lAMs [x] (
+                ((Assume (Var x)) :=: Int 10)
+                :>:
+                (Verify (Assert (Var x :=: Int 10)) )
+             )
+             where
+              x = ident "x"
