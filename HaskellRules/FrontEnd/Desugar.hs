@@ -1920,6 +1920,7 @@ dsA_7 x (Infer_7 f) = pure $ ApplyD (Variable f) (Variable x)
 -- dsA_7def x j f  ===  DefineE z (dsA_7 j f)
 -- but eliminating an existential.
 dsA_7def :: Ident -> Ident -> Ident_7 -> D Expr
+--dsA_7def z x f = Define z <$> dsA_7 x f
 dsA_7def z _ (Solve_7 _) = pure $ DefineV z
 dsA_7def z x (Infer_7 f) = pure $ DefineE z $ ApplyD (Variable f) (Variable x)
 
@@ -1929,7 +1930,12 @@ dsM_7 (Function [(t1, effs)] t2) f = do
   j <- newIdent (getLoc t1) "j"
   r <- newIdent (getLoc t2) "r"
   z <- newIdent (getLoc t2) "z"
-  t1' <- dsM_7 t1 (Infer_7 i)
+  inv <- gets (fInvert . dflags)
+  t1' <-
+    if inv then
+      dsM_7 t1 (opposite f i)
+    else
+      dsM_7 t1 (Infer_7 i)
   t2' <- dsM_7 t2 (as_7 f  z)
   defZ <- dsA_7def z j f
   apFtoI <- dsA_7 i f

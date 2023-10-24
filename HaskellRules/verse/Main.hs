@@ -214,6 +214,7 @@ flagTable =
   ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
   ,("assumeVerified", (fAssumeVerified, \ b s -> s{fAssumeVerified=b}))
+  ,("invert",      (fInvert,       \ b s -> s{fInvert=b}))
   ]
 
 cRead :: Run CState
