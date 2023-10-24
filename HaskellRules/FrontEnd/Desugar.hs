@@ -936,6 +936,7 @@ addDeref = pure . exprD S.empty
     expr s (OfType e t) = OfType (expr s e) (expr s t)
     expr _ Fail = Fail
     expr s (Lam i e) = Lam i (expr s e)
+    expr _ e@EPrim{} = e
     expr _ e = impossible e
 
     exprD s e = expr (defs s e) e
