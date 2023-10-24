@@ -171,9 +171,13 @@ dsSmall = ds
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
 
+{-
     -- n-ary unification
     ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
     ds (Macro1 (Ident _ "in'='") [] (Blk es)) = dsU =<< mapM ds es
+-}
+    ds (InfixOp e1 (Op "=") e2) = Unify <$> ds e1 <*> ds e2
+
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
 
     -- Bindings
@@ -243,6 +247,7 @@ dsSmall = ds
 
     ds x = compos ds x
 
+{- no n-ary unification for now
     dsU [] = pure $ Range $ Variable $ Ident noLoc "any$"
     dsU [e] = pure e
     dsU ees@(e:es) = do
@@ -254,6 +259,7 @@ dsSmall = ds
           x <- newIdent (getLoc e) "x"
           pure $ Seq $ DefineE x e : map (Unify (Variable x)) es
         Just (x, xs) -> pure $ Seq $ map (Unify x) xs
+-}
 
 checkEffs :: [Eff] -> D [Eff]
 checkEffs = mapM checkEff
@@ -1883,6 +1889,8 @@ dsM_6 e _ = error $ "dsM_6: unimplemented " ++ show e
 
 data Ident_7 = Solve_7 Ident | Infer_7 Ident
   deriving (Show)
+
+instance Pretty Ident_7 where pPrint = text . show
 
 -- Copy solve/infer to a new identifier
 as_7 :: Ident_7 -> Ident -> Ident_7
