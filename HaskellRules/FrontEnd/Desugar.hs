@@ -1901,6 +1901,10 @@ identOf_7 :: Ident_7 -> Ident
 identOf_7 (Solve_7 i) = i
 identOf_7 (Infer_7 i) = i
 
+opposite :: Ident_7 -> Ident -> Ident_7
+opposite (Solve_7 _) i = Infer_7 i
+opposite (Infer_7 _) i = Solve_7 i
+
 dsD_7 :: Expr -> D Expr
 -- To not make the desugared version ridiculosely large,
 -- do some minor short-cuts here.
