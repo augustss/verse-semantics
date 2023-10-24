@@ -55,8 +55,6 @@ verify(fail) { ex_stuck3(x:any) := { y:any; if (y = 3) then { y = 3 } else { y =
 verify(pass) { f(x:int) := {y:any; if (x > 1) then { y = 1 } else { y = 2 }; y} }
 verify(fail) { f(x:int) := {y:any; if (y > 1) then { y = 1 } else { y = 2 }; y} }
 
-
-
 # shows that Unfold-If is UNSOUND; instead use `Fork-If`
 verify(fail) { foo(n:any):int := if (int[n]) then { 0 } else { (1,2) } }
 verify(fail) { foo(n:any):int := if (int[n]) then { n } else { (1,2) } }
@@ -74,6 +72,7 @@ verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) 
 verify(fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 verify(pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 verify(fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; ex6(suc) }
+verify(fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
 
 # flex/rigid tests
 verify(pass) { ex_rigid2flex(x:int) := {y := x; y} }

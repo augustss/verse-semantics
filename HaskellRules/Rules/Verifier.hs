@@ -17,7 +17,7 @@ import TRS.Bind
 import TRS.TRS hiding (step)
 import TRS.Traced
 import TRS.Tarjan
-import Rules.Core hiding (Wrong)
+import Rules.Core -- hiding (Wrong)
 import Rules.ICFP (systemICFP, systemICFPE, execX, choiceX, ltExpr, isChoiceFreeOp)
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
@@ -63,30 +63,46 @@ wrapAssert = Assert
 --   done _          = True
 
 -- | `isDone e` ignores "assert/decide" that occur under `verify` which are themselves
---   under lambdas, as those are obligations for higher-order args that are checked at
+--   under TOP-LEVEL lambdas, as those are obligations for higher-order args that are checked at
 --   *callsites* of those lambdas. There is probably some clever way to do
 --   the below _just_ using `collect` but I thought I'd write this out first.
 isDone :: Expr -> Bool
-isDone = go False
+isDone = go False False
  where
-  go :: Bool -> Expr -> Bool
-  go _   (Lam (Bind _ e)) = go True e
-  go lam (Verify e)       = lam || go lam e
-  go lam (Arr es)         = and (go lam <$> es)
-  go lam (Exi (Bind _ e)) = go lam e
-  go lam (e1 :=: e2)      = go lam e1 && go lam e2
-  go lam (e1 :|: e2)      = go lam e1 && go lam e2
-  go lam (e1 :>: e2)      = go lam e1 && go lam e2
-  go lam (e1 :@: e2)      = go lam e1 && go lam e2
-  go lam (One e)          = go lam e
-  go lam (All e)          = go lam e
-  go lam (Fails  e)       = go lam e
-  go _   (Assert _)       = False
-  go _   (Decide _)       = False
-  go lam (Split x y z)    = go lam x && go lam y && go lam z
-  go lam (Store h e)      = and (go lam <$> IM.elems h) && go lam e
+  go :: Bool -> Bool -> Expr -> Bool
+  go _   _   (Assert _)       = False
+  go _   _   (Decide _)       = False
+  go _   lam (Verify e)       = lam || go True False e
+  go ver _   (Lam (Bind _ e)) = go ver (not ver) e
+
+  go ver lam (Arr es)         = all (go ver lam) es
+  go ver lam (Exi (Bind _ e)) = go ver lam e
+  go ver lam (Uni (Bind _ e)) = go ver lam e
+  go ver lam (e1 :=: e2)      = go ver lam e1 && go ver lam e2
+  go ver lam (e1 :|: e2)      = go ver lam e1 && go ver lam e2
+  go ver lam (e1 :>: e2)      = go ver lam e1 && go ver lam e2
+  go ver lam (e1 :@: e2)      = go ver lam e1 && go ver lam e2
+  go ver lam (One e)          = go ver lam e
+  go ver lam (All e)          = go ver lam e
+  go ver lam (Fails  e)       = go ver lam e
+  go ver lam (Split x y z)    = all (go ver lam) [x,y,z]
+  go ver lam (Store h e)      = all (go ver lam) (IM.elems h) && go ver lam e
+  go ver lam (If e1 e2 e3)   = all (go ver lam) [e1, e2, e3]
+  go ver lam (BlockC e)       = go ver lam e
+  go ver lam (IfB (Bind _ e)) = go ver lam e
+  go _   _   (Var _)          = True
+  go _   _   (Int _)          = True
+  go _   _   (Char _ )        = True
+  go _   _   (Op _)           = True
+  go _   _   (_ :~:  _)       = True
+  go _   _   Fail             = True
+  go _   _   (Assume _)       = True
+  go _   _   (Ref _)          = True
+  go _  _    (Wrong _)        = False -- should this be True?
+
+  -- go _ Wrong = True
   -- go _lam (Assume e)       = True -- go lam e
-  go _   _                = True
+  -- go _   _                = True
 
 -- | Top-level "Verifier" rewrite system based on ICFP rules -------------------------
 
@@ -148,6 +164,13 @@ l2rSubstRules _env lhs =
      (Var x :=: Val v) :>: e <- [lhs]
      guard (x `notElem` free v)
      pure ((Var x :=: v) :>: subst [(x,v)] e)
+  ++
+  "SUBST-ASM-SIMP" `name`
+  do -- guard (not recursiveSubstitution)
+     ( Assume (Var x) :=: Val v) :>: e <- [lhs]
+     guard (x `notElem` free v)
+     pure ((Assume (Var x) :=: v) :>: subst [(x,v)] e)
+
 
 uniRules :: VRule
 uniRules _env lhs =
@@ -263,14 +286,18 @@ assumeAssertRules :: VRule
 assumeAssertRules env lhs =
   -- ASSUME --
   "asm-hnf" `name`
-  do -- Assume (HNF v) <- [lhs]
-     Assume (Val v) <- [lhs]
+  do Assume (HNF v) <- [lhs]
      pure v
   ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
   "asm-seq" `name`
   do Assume (e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assume e2)
+  ++
+  -- Assert {e1; e2} ---> Assert e1; Assert e2
+  "suc-seq" `name`
+  do Assert (e1 :>: e2) <- [lhs]
+     pure (Assert e1 :>: Assert e2)
   ++
   -- Assume { exi x . e } ----> exi x . Assume {e}
   "asm-exi" `name`
@@ -345,11 +372,10 @@ assumeAssertRules env lhs =
   "subst-asm" `name`
   -- asm{X[x=v]}; e --> asm{X[x=v]} ; (subst x v e)         if x in FV(e), x not in FV(v)
   do (Assume e_asm) :>: e <- [lhs]
-     (_ctx, Var x :=: Val v) <- execX e_asm
+     (_ctx, VAR x :=: Val v) <- execX e_asm
      let freeE = free e
          freeV = free v
-     let -- x0    = identNotIn (freeE ++ freeV) -- replacing x temporarily
-         sub   = [(x, v)] -- ,(x0, Var x)]
+     let sub   = [(x, v)]
      guard (x `elem` freeE)
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
@@ -366,14 +392,13 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
    go bs (Var x)          = x `elem` bs
    go _  (Assume _)       = True
    go _  (Fails _)        = True
-   go _  (Assume Fail :>: _) = True       -- HACK
-   go bs (e1 :>: e2)      = go bs e1 && go bs e2
+   -- go _  (Assume Fail :>: _) = True       -- alternative to "implies-fail"
+   -- go bs (e1 :>: e2)      = go bs e1 && go bs e2
+   go bs (Uni (Bind x e)) = go (x:bs) e
    go bs (One e)          = go bs e
    go bs (All e)          = go bs e
    go bs (e1 :|: e2)      = go bs e1 || go bs e2
    go bs (Exi (Bind _ e)) = go bs e
-   go bs (Uni (Bind x e)) = go (x:bs) e
-   -- go _  (Verify _)       = True          -- HACK
    go _  _                = False
 
 
@@ -461,7 +486,12 @@ verifierRules env lhs =
       guard (e /= Fail)
       pure (Assume e :>: ctx e2)
    ++
+   "implies-fail" `name`
+   do e@(Assume Fail) :>: rhs <- [lhs]
+      (ctx, _, _, Fail) <- eX rhs
+      pure (e :>: ctx (Arr []))
    -- ASSERT --
+   ++
    -- P[Assert { e }] ----> e   if   mustSucceed(P, e)
    "suc-elim" `name`
    do (ctx, g,_, Assert e) <- eX lhs
@@ -535,7 +565,8 @@ unAssume a           = a
 
 implies :: Expr -> Expr -> Bool
 implies e1' e2'
-  | e1 == e2                       = True
+  | e1  == e2                       = True
+  | e1' == Fail                    = True
   | INT a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
   | otherwise                      = False
   where
