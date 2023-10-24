@@ -4,6 +4,7 @@ module Main
   ( main
   ) where
 
+import Control.Exception
 import Control.Monad
 import Control.Monad.Supply
 import Control.Monad.Trans.Except
@@ -13,7 +14,8 @@ import Data.ByteString (ByteString)
 import Data.ByteString.Unsafe (unsafePackCStringLen)
 import Data.Functor
 import Data.Text (Text)
-import Data.Text.Foreign as Text
+import Data.Text qualified as Text
+import Data.Text.Foreign qualified as Text
 
 import Foreign.C
 import Foreign.Marshal.Alloc
@@ -47,15 +49,18 @@ eval inPtr n outPtrPtr =
     pure n
 
 eval' :: ByteString -> IO Text
-eval' xs = eval'' xs <&> \ case
+eval' xs = catch' $ eval'' xs <&> \ case
   Left e -> renderStrict . layoutSmart layoutOptions $ pretty e
   Right xs -> renderStrict . layoutSmart layoutOptions $ vsep xs
 
 eval'' :: ByteString -> IO (Either Error [Doc ann])
-eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval >=> \ case
+eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval' Execution >=> \ case
   Right (Just xs) -> pure . Right $ pretty <$> xs
   Right Nothing -> pure $ Left StuckError
   Left e -> pure $ Left e
+
+catch' :: IO Text -> IO Text
+catch' m = catch m $ \ (e :: SomeException) -> pure . Text.pack $ displayException e
 
 layoutOptions :: LayoutOptions
 layoutOptions = defaultLayoutOptions
