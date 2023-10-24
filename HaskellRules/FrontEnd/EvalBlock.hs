@@ -44,7 +44,7 @@ opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, o
 opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
 opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
 opIsInt, opIsRat, opIsArr, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
-opErr, opArrLen, opArrConc, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opDotDot,opPrint, opAppend :: Op
+opErr, opArrLen, opArrConc, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opSubFrom, opDotDot,opPrint, opAppend :: Op
 
 opIntGt    = "intGT$"
 opIntGe    = "intGE$"
@@ -107,6 +107,7 @@ opAlloc = "alloc$"
 opRead  = "read$"
 opWrite = "write$"
 opAddTo = "in'+='"
+opSubFrom = "in'-='"
 opDotDot= "in'..'"
 opPrint = "print$"
 opAppend= "append$"
@@ -833,6 +834,7 @@ primOpEffs o = fromMaybe [] $ M.lookup o $ M.fromList [
   (opRead,  [Ereads]),
   (opWrite, [Ewrites]),
   (opAddTo, [Ereads, Ewrites]),
+  (opSubFrom, [Ereads, Ewrites]),
   (opDotDot, [Eiterates]),
   (opPrint, [Einteracts])
   ]
@@ -1260,7 +1262,7 @@ evalPrimOp op v | op == opPrint =
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op _ | op == opAppend = Nothing
 evalPrimOp op _ | op == opErr = error "Err() called"
-evalPrimOp op _ | op `elem` [opAlloc, opRead, opWrite, opAddTo] = Nothing
+evalPrimOp op _ | op `elem` [opAlloc, opRead, opWrite, opAddTo, opSubFrom] = Nothing
 evalPrimOp op v = error $ "evalPrimOp: " ++ show (op, v)
 
 evalPrimHeapOp :: BHeap -> Op -> BValue -> Maybe (BHeap, BExpr)
@@ -1283,6 +1285,12 @@ evalPrimHeapOp h op v | op == opAddTo =
   case v of
     BVar _ -> Nothing
     BVArr [BVRef r, BVInt i] | BVInt j <- heapRead h r, let vv = BVInt $ j + i -> Just (heapWrite h r vv, BVal vv)
+    BVArr vs | any isBVar vs -> Nothing
+    _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
+evalPrimHeapOp h op v | op == opSubFrom =
+  case v of
+    BVar _ -> Nothing
+    BVArr [BVRef r, BVInt i] | BVInt j <- heapRead h r, let vv = BVInt $ j - i -> Just (heapWrite h r vv, BVal vv)
     BVArr vs | any isBVar vs -> Nothing
     _ -> Just (h, BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v))
 evalPrimHeapOp _ _ _ = Nothing
