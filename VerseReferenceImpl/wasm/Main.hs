@@ -31,7 +31,11 @@ import Prettyprinter.Render.Text
 main :: IO ()
 main = pure ()
 
-foreign export ccall "verse_eval" eval :: Ptr CChar -> Int -> Ptr (Ptr CChar) -> IO Int
+foreign export ccall "verse_eval" eval
+  :: Ptr CChar
+  -> Int
+  -> Ptr (Ptr CChar)
+  -> IO Int
 
 eval :: Ptr CChar -> Int -> Ptr (Ptr CChar) -> IO Int
 eval inPtr n outPtrPtr =
@@ -48,7 +52,7 @@ eval' xs = eval'' xs <&> \ case
   Right xs -> renderStrict . layoutSmart layoutOptions $ vsep xs
 
 eval'' :: ByteString -> IO (Either Error [Doc ann])
-eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval Execution >=> \ case
+eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval >=> \ case
   Right (Just xs) -> pure . Right $ pretty <$> xs
   Right Nothing -> pure $ Left StuckError
   Left e -> pure $ Left e

@@ -63,10 +63,9 @@ import Data.Function
 import Data.Functor
 import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Int
-import Data.IntMap.Internal qualified as IntMap.Internal
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Data.IntMap.Lazy qualified as IntMap.Lazy
+import Data.IntMap.Lazy.Extras qualified as IntMap.Lazy
 import Data.Match
 import Data.Maybe
 import Data.Monoid
@@ -77,7 +76,7 @@ import Data.Tuple
 
 import GHC.Exts qualified
 
-import Prelude (Num (..), ($!), error, reverse, subtract)
+import Prelude (Num (..), error, reverse, subtract)
 
 import Prettyprinter
 
@@ -109,7 +108,8 @@ data Env m = Env
   { heap :: !HeapKey
   , assumed :: !Bool
   , decisions :: !(Ref m Decisions)
-  , children :: !(Ref m (Processes m))
+  , processes :: !(Ref m (Processes m))
+  , heaps :: !(Ref m (IntMap HeapKey))
   , suspCount :: !(Ref m Int)
   , commit :: !(Ref m (Commit m))
   , splitDepth :: {-# UNPACK #-} !Int
@@ -187,10 +187,15 @@ instance ( MonadFix m
          ) => Alternative (VerseT m) where
   empty = VerseT $ \ _ _ _ _ ek r -> ek r
   x <|> y = VerseT $ \ yk ak sk fk ek r -> do
-    xs <- readRef r.children
-    writeRef r.children =<< runCopyT (copyProcesses xs) r
+    processes <- readRef r.processes
+    heaps <- readRef r.heaps
+    flip runCopyT r $ do
+      writeRef r.processes =<< copyProcesses processes
+      writeRef r.heaps =<< copyHeaps heaps
     let
-      f r = writeRef r.children xs
+      f r = do
+        writeRef r.processes processes
+        writeRef r.heaps heaps
       fk' r = f r *> unVerseT y yk ak sk fk fk r
       ek' r = f r *> unVerseT y yk ak sk fk ek r
     unVerseT x yk ak sk fk' ek' r
@@ -207,7 +212,8 @@ instance MonadSupply s m => MonadSupply s (VerseT m)
 
 runVerseT :: MonadRef m => VerseT m a -> m (Maybe [a])
 runVerseT m = do
-  children <- newRef mempty
+  processes <- newRef mempty
+  heaps <- newRef mempty
   suspCount <- newRef 0
   commit <- newRef $ pure ()
   decisions <- newRef emptyDecisions
@@ -258,7 +264,7 @@ writeIVar v x = readIVarState v >>= \ case
     liftAlt $
       put' (unIVar v) r.heap (Val x) $> \ r ->
       put' (unIVar v) r.heap y
-    resumeChildren $ writeLocalIVar v x
+    resumeProcesses $ writeLocalIVar v x
     k x
 
 writeLocalIVar
@@ -271,9 +277,9 @@ writeLocalIVar v x = readLocalIVarState v >>= \ case
     liftAlt $
       put' (unIVar v) r.heap (Val x) $> \ r ->
       put' (unIVar v) r.heap y
-    resumeChildren $ writeLocalIVar v x
+    resumeProcesses $ writeLocalIVar v x
     k x
-  Nothing -> resumeChildren $ writeLocalIVar v x
+  Nothing -> resumeProcesses $ writeLocalIVar v x
 
 readIVarState :: MonadRef m => IVar m a -> VerseT m (IVarState m a)
 readIVarState v = liftSucceed $ \ r ->
@@ -315,13 +321,13 @@ unify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
     when (n_y < r.splitDepth) incrSuspCount
     writeLink v_y v_x
     k_y x
-    resumeChildren $ subst v_x v_y
+    resumeProcesses $ subst v_x v_y
   (Found v_x (Unbound n_x k_x _), Found v_y (Bound y _)) -> do
     r <- ask'
     when (n_x < r.splitDepth) incrSuspCount
     writeLink v_x v_y
     k_x y
-    resumeChildren $ subst v_y v_x
+    resumeProcesses $ subst v_y v_x
   (Found v_x repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) ->
     when (i_x /= i_y) $ case rowMatch x y of
       Zip Nothing -> empty
@@ -351,18 +357,18 @@ unify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
         when (n_y < r.splitDepth) incrSuspCount
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
-        resumeChildren $ subst v_x v_y
+        resumeProcesses $ subst v_x v_y
       GT -> do
         when (n_x < r.splitDepth) incrSuspCount
         writeLink v_x v_y
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
-        resumeChildren $ subst v_y v_x
+        resumeProcesses $ subst v_y v_x
 
 subst
   :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
   => Var m f -> Var m f -> VerseT m ()
 subst v_x v_y = findLocalRepr v_y >>= \ case
-  Nothing -> resumeChildren $ subst v_x v_y
+  Nothing -> resumeProcesses $ subst v_x v_y
   Just y -> subst' v_x y
 
 subst'
@@ -372,11 +378,11 @@ subst' v_x y = findRepr v_x <&> (, y) >>= \ case
   (Found v_x (Bound x _), Found v_y (Unbound _ k_y _)) -> do
     writeLink v_y v_x
     k_y x
-    resumeChildren $ subst v_x v_y
+    resumeProcesses $ subst v_x v_y
   (Found _ (Unbound _ k_x _), Found v_y (Bound y _)) -> do
     writeLink v_x v_y
     k_x y
-    resumeChildren $ subst v_y v_x
+    resumeProcesses $ subst v_y v_x
   (Found v_x repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) -> do
     decrSuspCount
     when (i_x /= i_y) $ case rowMatch x y of
@@ -405,11 +411,11 @@ subst' v_x y = findRepr v_x <&> (, y) >>= \ case
       LT -> do
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
-        resumeChildren $ subst v_x v_y
+        resumeProcesses $ subst v_x v_y
       GT -> do
         writeLink v_x v_y
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
-        resumeChildren $ subst v_y v_x
+        resumeProcesses $ subst v_y v_x
 
 unifyUncons
   :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
@@ -479,13 +485,13 @@ readVarState :: MonadRef m => Var m f -> VerseT m (VarState m f)
 readVarState v = liftSucceed $ \ r ->
   readRef (unVar v) <&> lookupVarState r.heap
 
-resumeChildren
+resumeProcesses
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VerseT m () -> VerseT m ()
-resumeChildren m = do
+resumeProcesses m = do
   r <- ask'
-  (xs, n) <- flip resumeAll m =<< lift (readRef r.children)
-  lift $ writeRef r.children xs
+  (xs, n) <- flip resumeAll m =<< lift (readRef r.processes)
+  lift $ writeRef r.processes xs
   n
 
 resumeAll
@@ -649,13 +655,19 @@ for m f = do
   fork $ do
     h <- Just <$> newHeap
     ref <- newHeapRef Nothing
-    loop h ref (m >>= writeHeapRef ref . Just) f [] >>= writeIVar v
+    loop ref (m >>= writeHeapRef ref . Just) f [] h >>= writeIVar v
   pure v
   where
-    loop h ref m f xs = split h ref m >>= readIVar >>= \ case
+    loop ref m f xs h = split h ref m >>= readIVar >>= \ case
       Fail -> pure $ reverse xs
       Abort -> abort
-      Succeed (h, _, x, m) -> loop h ref m f . (:xs) =<< f x
+      Succeed (h, _, x, m) -> do
+        r <- ask'
+        i <- lift $ supply
+        lift . modifyRef' r.heaps $ IntMap.insert i h
+        xs <- (:xs) <$> f x
+        h <- lift . stateRef' r.heaps $ IntMap.Lazy.findDelete i
+        loop ref m f xs h
 
 verify
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -781,7 +793,8 @@ split'
   -> VerseT m (IVar m (Split (HeapKey, Ref m Decisions, a, VerseT m ())))
 split' heap assumed decisions left m = do
   r <- ask'
-  children <- lift $ newRef mempty
+  processes <- lift $ newRef mempty
+  heaps <- lift $ newRef mempty
   suspCount <- lift $ newRef 0
   commit <- lift . newRef $ pure ()
   let
@@ -798,7 +811,7 @@ split' heap assumed decisions left m = do
         Nothing -> do
           result <- freshIVar
           right <- lift $ newRef m
-          lift $ modifyRef' r.children (Process {..}:)
+          lift $ modifyRef' r.processes (Process {..}:)
           pure result
 
 newtype FreezeT m a = FreezeT
@@ -853,9 +866,14 @@ instance ( MonadFix m
          ) => Freezable (Var m f) (Frozen g) m where
   freeze v = FreezeT ask >>= lift . readRepr' v >>= \ case
     Unbound {} -> pure Unknown
-    Bound x i -> mfix $ FreezeT . state' . lookupInsert i . unsafeCoerce >=> \ case
-      Just x' -> pure $ unsafeCoerce x'
-      Nothing -> Known <$> freeze x
+    Bound x i ->
+      mfix $
+      FreezeT .
+      state' .
+      IntMap.Lazy.lookupInsert i .
+      unsafeCoerce >=> \ case
+        Just x' -> pure $ unsafeCoerce x'
+        Nothing -> Known <$> freeze x
 
 instance ( MonadFix m
          , MonadRef m
@@ -928,11 +946,11 @@ instance ( MonadFix m
         (h, _, splitDepth) <- ask
         lift (findRepr' v h) >>= \ case
           Found _ (Bound x i) -> mfix $ \ x' ->
-            state' (lookupInsert i $ unsafeCoerce x') >>= \ case
+            state' (IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
               Just x' -> pure $ unsafeCoerce x'
               Nothing -> lift . newVar' =<< traverse loop x
           Found v (Unbound n _ i) -> mfix $ \ x' ->
-            state' (lookupInsert i $ unsafeCoerce x') >>= \ case
+            state' (IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
               Just x' -> pure $ unsafeCoerce x'
               Nothing -> case n > splitDepth of
                 False -> pure v
@@ -1038,10 +1056,15 @@ alts
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VerseT m a -> VerseT m a -> VerseT m a -> VerseT m a
 alts x y z = VerseT $ \ yk ak sk fk ek r -> do
-  xs <- readRef r.children
-  writeRef r.children =<< runCopyT (copyProcesses xs) r
+  processes <- readRef r.processes
+  heaps <- readRef r.heaps
+  flip runCopyT r $ do
+    writeRef r.processes =<< copyProcesses processes
+    writeRef r.heaps =<< copyHeaps heaps
   let
-    f r = writeRef r.children xs
+    f r = do
+      writeRef r.processes processes
+      writeRef r.heaps heaps
     fk' r = f r *> unVerseT y yk ak sk fk fk r
     ek' r = f r *> unVerseT z yk ak sk fk ek r
   unVerseT x yk ak sk fk' ek' r
@@ -1056,9 +1079,9 @@ runCopyT :: CopyT m a -> Env m -> m a
 runCopyT m r = runReaderT m (r.heap, r.decisions)
 
 copyProcesses
-  :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Processes m
-  -> CopyT m (Processes m)
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
+  => f (Process m)
+  -> CopyT m (f (Process m))
 copyProcesses = traverse copyProcess
 
 copyProcess
@@ -1078,10 +1101,16 @@ copyEnv Env {..} = do
   heap <- traverse copyHeap heap
   decisions <- if isAbstract heap then newRef =<< readRef decisions else asks snd
   let r = (heap, decisions)
-  children <- newRef =<< local (const r) . copyProcesses =<< readRef children
+  processes <- newRef =<< local (const r) . copyProcesses =<< readRef processes
+  heaps <- newRef =<< copyHeaps =<< readRef heaps
   suspCount <- newRef =<< readRef suspCount
   commit <- newRef =<< readRef commit
   pure $ Env {..}
+
+copyHeaps
+  :: (MonadFix m, MonadSupply Int m, Traversable f)
+  => f HeapKey -> CopyT m (f HeapKey)
+copyHeaps = traverse (traverse copyHeap)
 
 copyHeap :: (MonadFix m, MonadSupply Int m) => Heap -> CopyT m Heap
 copyHeap pred = do
@@ -1179,25 +1208,6 @@ state' :: MonadState s m => (s -> Either a s) -> m (Maybe a)
 state' f = state $ \ s -> case f s of
   Left x -> (Just x, s)
   Right s -> (Nothing, s)
-
-lookupInsert :: IntMap.Key -> a -> IntMap a -> Either a (IntMap a)
-lookupInsert !k0 x0 t0 = loop k0 x0 t0
-  where
-    loop k x = \ case
-      t@(IntMap.Internal.Bin p m l r)
-        | IntMap.Internal.nomatch k p m ->
-          Right $! IntMap.Internal.link k (IntMap.Lazy.singleton k x) p t
-        | IntMap.Internal.zero k m -> case loop k x l of
-          Right l -> Right $! IntMap.Internal.Bin p m l r
-          l@(Left _) -> l
-        | otherwise -> case loop k x r of
-          Right r -> Right $! IntMap.Internal.Bin p m l r
-          r@(Left _) -> r
-      t@(IntMap.Internal.Tip k' y)
-        | k == k' -> Left y
-        | otherwise ->
-          Right $! IntMap.Internal.link k (IntMap.Lazy.singleton k x) k' t
-      IntMap.Internal.Nil -> Right $! IntMap.Lazy.singleton k x
 
 data Split a = Fail | Abort | Succeed a
 

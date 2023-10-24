@@ -29,6 +29,7 @@ library
     Control.Monad.RS
     Control.Monad.Supply
     Control.Monad.Verse
+    Data.IntMap.Lazy.Extras
     Data.Match
     Language.Verse
     Language.Verse.Desugar

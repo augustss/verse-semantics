@@ -32,6 +32,7 @@ main = runTestTTAndExit $ TestList
   , test10
   , test11
   , test12
+  , test13
   ]
 
 data Val a
@@ -199,3 +200,21 @@ test12 = TestCase do
     unify y =<< newVar (AnInt 1)
     freeze' x
   z @?= Just [Known $ AnInt 1]
+
+test13 :: Test
+test13 = TestCase do
+  z <- runSupplyT $ runVerseT do
+    x <- freshVar
+    y <- freshVar
+    fork $ unify y =<< newVar . Tuple =<< readIVar =<< for
+      do
+        t <- freshVar
+        unify t x
+        (unify x =<< newVar (Int 1)) <|> (unify t =<< newVar (Int 2))
+        pure t
+      do
+        \ _ ->
+          newVar . Int =<< pure 1 <|> pure 2
+    unify x =<< newVar (Int 1)
+    freeze' y
+  z @?= Just [Known (Tuple [Known (Int 1)]), Known (Tuple [Known (Int 2)])]

@@ -13,7 +13,6 @@ import Data.Foldable
 
 import Language.Verse
 import Language.Verse.Error
-import Language.Verse.Mode
 
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -21,7 +20,7 @@ import Prettyprinter.Render.Text
 import System.IO
 
 main :: IO ()
-main = ByteString.getContents >>= runExceptT . runSupplyT . runVerseT . eval Execution >>= \ case
+main = ByteString.getContents >>= runExceptT . runSupplyT . runVerseT . eval >>= \ case
   Right (Just xs) -> for_ xs $ putDoc . (<> line) . pretty
   Right Nothing -> hPutDoc stderr $ pretty StuckError <> line
   Left e -> hPutDoc stderr $ pretty e <> line
