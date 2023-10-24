@@ -60,7 +60,8 @@ eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval' Execution >=> \ case
   Left e -> pure $ Left e
 
 catch' :: IO Text -> IO Text
-catch' m = catch m $ \ (_ :: SomeException) -> pure "exception"
+catch' m = m `catch` \ (_ :: SomeException) ->
+  pure . renderStrict . layoutSmart layoutOptions $ "internal" <+> "error"
 
 layoutOptions :: LayoutOptions
 layoutOptions = defaultLayoutOptions
