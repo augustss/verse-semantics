@@ -345,7 +345,7 @@ assumeFunM'
   -> Bool
   -> DesugarT m (L (Exp L Ident))
 assumeFunM' e1 e2 pi = do
-  (e1, xs) <- lift . runDesugarT $ desugarExp' e1 (not pi) =<< freshIdent (loc e1)
+  (e1, xs) <- lift . runDesugarT $ desugarExp' e1 (not pi) . name =<< freshIdent (loc e1)
   r <- freshIdent' $ loc e2
   fun xs e1 . forall' r <$> assumeM (abstractM $ desugarExp e2)
 
