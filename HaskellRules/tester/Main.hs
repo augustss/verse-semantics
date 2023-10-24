@@ -58,6 +58,7 @@ data TestFlags = TestFlags
   , assumeVerified :: !Bool                -- turn succeeds into a no-op
   , timRun         :: !Bool                -- run Tim's verifier tests
   , timVerify      :: !Bool                -- verify Tim's verifier tests
+  , showDesugared  :: !Bool                -- show desugared version just before evaluation
   , prelude        :: !(Maybe String)      -- use this prelude
   , desugarRules   :: !Desugar             -- desugaring rules
   , fileNames      :: ![FilePath]          -- input files
@@ -173,6 +174,9 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
     putStrLn $ pos ++ " skipped"
   pure Skip
                                       | otherwise = do
+  when showD $
+    putStrLn $ "desugared:\n" ++ prettyShow c1
+
   let expectOK = typ == TPass
   let vs1 = runM flg sys c1  -- May return multiple answers
   let v2  = run flg sys c2   -- Returns just one
@@ -237,6 +241,7 @@ assertEquiv ti tflg (p1, c1) (p2, c2) | typ == TSkip = do
   where
     loc = testLocn ti
     noisy = not (quiet tflg)
+    showD = showDesugared tflg
     pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
     sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
     typ = maybe (testType ti) snd $ find (\ (s,_) -> match s (sname sys)) (testExcn ti)
@@ -506,6 +511,9 @@ testFlags = TestFlags
   <*> switch
          ( long "tim-verify"
         <> help "verify Tim test" )
+  <*> switch
+         ( long "show-desugared"
+        <> help "show desugared version" )
   <*> optional (strOption
          ( long "prelude"
         <> metavar "NAME"

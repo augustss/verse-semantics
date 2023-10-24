@@ -409,6 +409,7 @@ isLiteral _ = False
 
 isValue :: Expr -> Bool
 isValue Variable{} = True
+isValue EPrim{} = True
 isValue (Array es) = all isValue es
 isValue e = isLiteral e
 

@@ -166,7 +166,7 @@ command = Command
       , Cmd "rules [NAME]"         "Select rule system"                    cRules
       , Cmd "prelude [NAME]"       "Select prelude"                        cPrelude
       , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
-      , Cmd "core EXPR"            "Core expression"                       cCore
+      , Cmd "pcore EXPR"           "parse core expression"                 cPcore
       ]
   , c_exec = cParseLine
   , c_help = helpMsg
@@ -234,8 +234,8 @@ cParseLine line s =
     pp prog
     pure prog
 
-cCore :: Run CState
-cCore line s =
+cPcore :: Run CState
+cPcore line s =
   tryIt (pure s) (updateLastExpr s) $ do
     let prog = parseDie (Desugared <$> pCoreFile) "<interactive>" line
     pp prog

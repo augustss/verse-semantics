@@ -34,6 +34,8 @@
 %format closed = "\textbf{closed}"
 %format open = "\textbf{open}"
 
+%format cons (x) (y) = "\textbf{cons}(" x "," y ")"
+%format applyx a b = a "(" b ")"
 
 %% ----------------------
 %format ^ = " "
@@ -63,7 +65,8 @@
 %format solve = "\circ"
 %format infer = "\bullet"
 %format inpw  = "w"
-%format inp x u = x "^{" u "}"
+%format inp (x) (u) = x "^{" u "}"
+%format flipsi (si) = "\overline{" si "}"
 
 %format (Ae (i) (e)) = "\Ae{" ^ i "}{" ^e "}"
 %format (An (x)) = "\An{" ^ x "}"

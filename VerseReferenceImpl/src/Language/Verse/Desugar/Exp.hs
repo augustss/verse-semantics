@@ -6,8 +6,18 @@ module Language.Verse.Desugar.Exp
   ( Exp (..)
   , Quantifier (..)
   , Env
+  , unify
+  , verify
+  , succeeds
+  , assume
+  , forall'
+  , bracketInvoke
+  , fun
+  , name
+  , then'
   ) where
 
+import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 
@@ -15,6 +25,8 @@ import Language.Verse.Label
 import Language.Verse.Name
 
 import Prettyprinter
+
+infixl 4 :*>:
 
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
@@ -64,9 +76,9 @@ instance ( Pretty (f (Exp f a))
          , Pretty a
          ) => Pretty (Exp f a) where
   pretty = \ case
-    e1 :=: e2 -> pretty e1 <+> equals <+> pretty e2
+    e1 :=: e2 -> parens $ pretty e1 <+> equals <+> pretty e2
     e :.: x -> pretty e <> dot <> pretty x
-    e1 :|: e2 -> pretty e1 <+> pipe <+> pretty e2
+    e1 :|: e2 -> parens $ pretty e1 <+> pipe <+> pretty e2
     e1 :*>: e2 ->
       align $
       pretty e1 <> separator <>
@@ -77,15 +89,18 @@ instance ( Pretty (f (Exp f a))
     Not e -> "not" <+> parens (pretty e)
     Verify e -> "verify" <+> braces (pretty e)
     Succeeds e -> "succeeds" <+> braces (pretty e)
+    Assume e -> "assume" <+> braces (pretty e)
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
       maybe mempty (parens . pretty) e1 <+>
       braces (quantified xs $ pretty e2)
     Inst e1 xs e2 -> parens (pretty e1) <+> braces (quantified xs $ pretty e2)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
+    ForDo xs e1 e2 ->
+      "for" <+> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
     Def q x e ->
       align $
-      prettyQuantified x q <+> dot <> separator <>
+      prettyQuantified x q <> separator <>
       pretty e
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
@@ -122,3 +137,37 @@ instance ( Pretty (f (Exp f a))
         Forall -> "forall" <+> pretty x
 
 type Env f a = HashMap a (Quantifier f a)
+
+unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+unify = liftL2 (:=:)
+
+verify :: Functor f => f (Exp f a) -> f (Exp f a)
+verify = liftL1 Verify
+
+succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
+succeeds = liftL1 Succeeds
+
+assume :: Functor f => f (Exp f a) -> f (Exp f a)
+assume = liftL1 Assume
+
+forall' :: Apply f => f a -> f (Exp f a) -> f (Exp f a)
+forall' = liftL2 (Def Forall)
+
+bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+bracketInvoke = liftL2 BracketInvoke
+
+fun :: Apply f => Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+fun = liftL2 . Fun
+
+name :: Functor f => f a -> f (Exp f a)
+name = fmap Name
+
+infixl 4 `then'`
+then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+then' = liftL2 (:*>:)
+
+liftL1 :: Functor f => (f a -> b) -> f a -> f b
+liftL1 f x = f x <$ x
+
+liftL2 :: Apply f => (f a -> f b -> c) -> f a -> f b -> f c
+liftL2 f x y = f x y <$ x <. y
