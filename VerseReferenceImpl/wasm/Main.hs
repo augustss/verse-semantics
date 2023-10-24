@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 module Main
   ( main
@@ -14,7 +15,6 @@ import Data.ByteString (ByteString)
 import Data.ByteString.Unsafe (unsafePackCStringLen)
 import Data.Functor
 import Data.Text (Text)
-import Data.Text qualified as Text
 import Data.Text.Foreign qualified as Text
 
 import Foreign.C
@@ -60,7 +60,7 @@ eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval' Execution >=> \ case
   Left e -> pure $ Left e
 
 catch' :: IO Text -> IO Text
-catch' m = catch m $ \ (e :: SomeException) -> pure . Text.pack $ displayException e
+catch' m = catch m $ \ (_ :: SomeException) -> pure "exception"
 
 layoutOptions :: LayoutOptions
 layoutOptions = defaultLayoutOptions
