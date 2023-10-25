@@ -45,7 +45,7 @@ data TestFlags = TestFlags
   , quiet          :: !Bool                -- Less noisy
   , verbose        :: !Bool                -- More noisy
   , noError        :: !Bool                -- Don't show error message
-  , finalInl       :: !Bool                -- No final inlining
+  , postProc       :: !Bool                -- Post processing
   , system         :: !ESystem             -- rule system
   , summary        :: !Bool                -- produce a summary
   , trace          :: !Bool                -- Show traces
@@ -453,8 +453,8 @@ testFlags = TestFlags
       <> help "Do not show error message on failure"
       )
   <*> switch
-      (  long "final-inline"
-      <> help "Do final normalization"
+      (  long "post-process"
+      <> help "Do post processing"
       )
   <*> option (eitherReader findSystem)
          ( long "rules"
@@ -530,7 +530,7 @@ testFlagsToFlags t =
   let flags = adjustFlags (system t) defaultFlags
   in  flags{ fSplit = split t, fSimplify = simplify t,
              fTrace = trace t,
-             fDfs = dfs t, fFinalInline = finalInl t,
+             fDfs = dfs t, fPostProcess = postProc t,
              fUnderLambda = not (noUnderLam t),
              fRewriteSteps = maxSteps t,
              fNoFuelStop = ignoreFuelStop t,

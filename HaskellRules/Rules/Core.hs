@@ -706,7 +706,7 @@ instance Arbitrary Expr where
                                    ++ [Split e f g' | g' <- shrink g]
   shrink (_ :~: _) = error "impossible"
   shrink (BlockC e)  = BlockC <$> shrink e
-  shrink (Store _ _) = undefined
+  shrink (Store h e) = Store h <$> shrink e
   shrink (Ref _)   = []
   shrink Wrong{}   = []
   shrink If{} = undefined

@@ -89,9 +89,10 @@ prop_Confluence1 flags sys =
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
-    [ p'
+    [ p''
     | p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
-    , validExpr sys (ruleEnv sys) p'
+    , let p'' = postProcess sys (ruleEnv sys) p'
+    , validExpr sys (ruleEnv sys) p''
     ]
 
 prop_Confluence2 :: TestFlags -> TRSystem Expr -> Property

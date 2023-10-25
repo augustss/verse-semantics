@@ -31,7 +31,7 @@
 %format fails = "\textbf{fails}"
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
-%format closed = "\textbf{closed}"
+%format closed = "\textbf{clos}"
 %format open = "\textbf{open}"
 
 %format cons (x) (y) = "\textbf{cons}(" x "," y ")"
@@ -66,7 +66,9 @@
 %format infer = "\bullet"
 %format inpw  = "w"
 %format inp (x) (u) = x "^{" u "}"
-%format flipsi (si) = "\overline{" si "}"
+
+%% flipsi is a no-op for now
+%format flipsi (si) = "\bullet"
 
 %format (Ae (i) (e)) = "\Ae{" ^ i "}{" ^e "}"
 %format (An (x)) = "\An{" ^ x "}"

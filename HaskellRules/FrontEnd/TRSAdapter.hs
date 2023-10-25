@@ -68,7 +68,7 @@ rewrite flg asys | sname sys == "iblock" = (:[]) . runBlock (ruleEnv sys)
   force xs = if xs==xs then xs else undefined
 
 sub :: Flags -> ESystem -> T.Expr -> T.Expr
-sub flg sys | fFinalInline flg = postProcess sys (ruleEnv sys)
+sub flg sys | fPostProcess flg = postProcess sys (ruleEnv sys)
             | otherwise = id
 
 moreTrace :: Bool
@@ -113,7 +113,7 @@ nubTraced f = map snd . nubBy ((==) `on` fst) . map (\ t -> (f (term t), t))
 -- Eliminate duplicates in the 'done' results by possibly using
 -- a final normalization step.
 subsNR :: Flags -> ESystem -> NormResult T.Expr -> NormResult T.Expr
-subsNR flg sys nr | not (fFinalInline flg) = nr
+subsNR flg sys nr | not (fPostProcess flg) = nr
                   | otherwise = nr{ nrDone = subsT sys (nrDone nr) }
 
 subsT :: ESystem -> [Traced T.Expr] -> [Traced T.Expr]
@@ -154,7 +154,7 @@ coreToTrs (Macro1 (Ident _ "assume") [] e) = T.Assume $ coreToTrs e
 coreToTrs (Macro1 (Ident _ "decide") [] e) = T.Decide $ coreToTrs e
 coreToTrs (Macro1 (Ident _ "decides") [] e) = T.Decide $ coreToTrs e
 coreToTrs e@Macro1{} = impossible e
-coreToTrs (If3 (Exists xs e1) e2 e3) =  foldr T.IFB (T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)) (coreToTrsI <$> xs)
+coreToTrs (If3B xs e1 e2 e3) = foldr T.IFB (T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)) (coreToTrsI <$> xs)
 -- coreToTrs (If3 e1 e2 e3) = T.If (coreToTrs e1) (coreToTrs e2) (coreToTrs e3)
 coreToTrs (EStore h e) = T.Store (SIM.fromList $ map (\ (p,c) -> (T.Ptr p, coreToTrs c)) $ IM.toList $ refMap h) (coreToTrs e)
 coreToTrs DomainFail = T.Wrong "DomainFail"
