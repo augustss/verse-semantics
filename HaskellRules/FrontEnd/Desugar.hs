@@ -889,7 +889,7 @@ elimExist expr = do
           elm e = compos elm e
           occurs e = execWriter (elm e) /= 0  -- does x occur in e
       in  case runWriter (elm ex) of
-            xxx | unIdent x == "$x18", trace ("runWriter " ++ prettyShow (x, xxx)) False -> undefined
+--            xxx | unIdent x == "$x18", trace ("runWriter " ++ prettyShow (x, xxx)) False -> undefined
             (e', Sum n) | n <= 1 -> Just e'
             _                    -> Nothing
 
