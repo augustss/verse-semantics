@@ -407,6 +407,7 @@ isLiteral :: Expr -> Bool
 isLiteral Lit{} = True
 isLiteral _ = False
 
+-- Values, except lambda
 isValue :: Expr -> Bool
 isValue Variable{} = True
 isValue EPrim{} = True
