@@ -68,7 +68,7 @@ rewrite flg asys | sname sys == "iblock" = (:[]) . runBlock (ruleEnv sys)
   force xs = if xs==xs then xs else undefined
 
 sub :: Flags -> ESystem -> T.Expr -> T.Expr
-sub flg sys | fFinalInline flg = postProcess sys (ruleEnv sys)
+sub flg sys | fPostProcess flg = postProcess sys (ruleEnv sys)
             | otherwise = id
 
 moreTrace :: Bool
@@ -113,7 +113,7 @@ nubTraced f = map snd . nubBy ((==) `on` fst) . map (\ t -> (f (term t), t))
 -- Eliminate duplicates in the 'done' results by possibly using
 -- a final normalization step.
 subsNR :: Flags -> ESystem -> NormResult T.Expr -> NormResult T.Expr
-subsNR flg sys nr | not (fFinalInline flg) = nr
+subsNR flg sys nr | not (fPostProcess flg) = nr
                   | otherwise = nr{ nrDone = subsT sys (nrDone nr) }
 
 subsT :: ESystem -> [Traced T.Expr] -> [Traced T.Expr]
