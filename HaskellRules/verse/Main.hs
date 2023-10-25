@@ -10,6 +10,7 @@ import Text.Read(readMaybe)
 import Options.Applicative hiding (command)
 
 import Epic.Print hiding ((<>))
+import Epic.Uniplate
 import FrontEnd.Desugar
 import FrontEnd.Expr
 import FrontEnd.Parse(parseDie, pFile)
@@ -152,7 +153,9 @@ command = Command
   { c_commands =
       [ Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
+      , Cmd "pdesugar [EXPR]"      "Desugar [last] expression pretty"      cPDesugar
       , Cmd "vdesugar [EXPR]"      "Desugar (for verification) [last] expression"             cDesugarVerify
+      , Cmd "pvdesugar [EXPR]"     "Desugar (for verification) [last] expression pretty"      cPDesugarVerify
       , Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
@@ -261,6 +264,19 @@ cDesugar c s = do
   putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
   cTransform (Desugared . desugar flg . asExpr) c s
 
+cPDesugar :: Run CState
+cPDesugar c s = do
+  let flg = (flags s){ fSimplify = True, fSplit = False, fAssumeVerified = True,
+                       fPrelude = either error id $ findPrelude "miniprelude" }
+  putStrLn $ "Desugar for execution, prettyfied: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
+  cTransform (Desugared . dropDollar . desugar flg . asExpr) c s
+
+dropDollar :: Expr -> Expr
+dropDollar = transform f . transformBi g
+  where g (Ident l s) = Ident l $ filter (/= '$') s
+        f (EPrim s) = EPrim $ filter (/= '$') s
+        f x = x
+
 isVerifyPrelude :: (String, Expr) -> Bool
 isVerifyPrelude (pn, _) = "verify" `isPrefixOf` pn
 
@@ -272,6 +288,15 @@ cDesugarVerify c s = do
       flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel }
   putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
   cTransform (Desugared . desugar flg . asExpr) c s
+
+cPDesugarVerify :: Run CState
+cPDesugarVerify c s = do
+  let aflg = flags s
+      -- This is a hack to avoid the default prelude for verification.
+      prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
+      flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel, fSimplify = True }
+  putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
+  cTransform (Desugared . dropDollar . desugar flg . asExpr) c s
 
 cPreprocess :: Run CState
 cPreprocess c s = cTransform (Desugared . pre . asCore (flags s)) c s
