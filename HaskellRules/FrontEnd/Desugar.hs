@@ -40,7 +40,8 @@ desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
             (-- simplification
-             traceDS "simplify"   <=< simplify <=<
+             traceDS "simpler"    <=< simpler   <=<  -- verifier breaks without this
+             traceDS "simplify"   <=< simplify  <=<
              -- desugaring
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
@@ -798,7 +799,8 @@ oneSimplifyPass expr = do
   (traceDS "elimExist"  <=< elimExist <=<
    traceDS "alias"      <=< simpAlias <=<
    traceDS "simpler"    <=< simpler   <=<
-   traceDS "inlineVal"  <=< inlineVal) expr
+   traceDS "inlineVal"  <=< inlineVal <=<
+   pure ) expr
 
 inlineVal :: Expr -> D Expr
 inlineVal expr = do
