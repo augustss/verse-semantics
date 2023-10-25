@@ -217,7 +217,6 @@ flagTable =
   ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
   ,("assumeVerified", (fAssumeVerified, \ b s -> s{fAssumeVerified=b}))
-  ,("invert",      (fInvert,       \ b s -> s{fInvert=b}))
   ]
 
 cRead :: Run CState
@@ -266,7 +265,7 @@ cDesugar c s = do
 
 cPDesugar :: Run CState
 cPDesugar c s = do
-  let flg = (flags s){ fSimplify = True, fSplit = False, fAssumeVerified = True,
+  let flg = (flags s){ fSimplify = True, fSplit = False, fAssumeVerified = True, fKeepIf = True,
                        fPrelude = either error id $ findPrelude "miniprelude" }
   putStrLn $ "Desugar for execution, prettyfied: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
   cTransform (Desugared . dropDollar . desugar flg . asExpr) c s

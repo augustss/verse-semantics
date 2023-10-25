@@ -869,19 +869,27 @@ elimExist expr = do
       in  case elimX x e' of
             Nothing  -> lExists [x] e'
             Just e'' -> e''
+    elimE (If3B [] e1 e2 e3) = If3B [] (elimE e1) (elimE e2) (elimE e3)
+    elimE (If3B (x:xs) e1 e2 e3) =
+      let If3B xs' e1' e2' e3' = elimE (If3B xs e1 e2 e3)
+      in  case elimX x (Choice e1' e2') of   -- just a random binary constructor
+            Just (Choice e1'' e2'') -> If3B xs' e1'' e2'' e3'
+            _ -> If3B (x:xs') e1' e2' e3'
+    elimE For2B{} = error "unimplemented"
     elimE e = composOp elimE e
 
---    elimX x _ | trace ("----------------" ++ prettyShow x) False = undefined
+    --elimX x _ | trace ("----------------" ++ prettyShow x) False = undefined
     elimX x ex =
-      let --elm e | unIdent x == "in'+'", trace ("e=" ++ prettyShow e) False = undefined
+      let -- elm e | unIdent x == "$x18", trace ("e=" ++ prettyShow e) False = undefined
           elm (Unify (Variable y) e) | x == y = do tell (Sum (1::Int)); elm e
           elm e@(Variable y) | x == y = do tell (Sum 2); pure e
-          elm e@(If3 e1 _ _) | occurs e1 = do tell (Sum 2); pure e
+          elm e@(If3B _ e1 _ _) | occurs e1 = do tell (Sum 2); pure e
+          elm e@(For2B _ e1 _) | occurs e1 = do tell (Sum 2); pure e
           elm e@(Split e1 _ _) | occurs e1 = do tell (Sum 2); pure e
           elm e = compos elm e
           occurs e = execWriter (elm e) /= 0  -- does x occur in e
       in  case runWriter (elm ex) of
---            xxx | unIdent x == "in'+'", trace ("runWriter " ++ prettyShow (x, xxx)) False -> undefined
+            xxx | unIdent x == "$x18", trace ("runWriter " ++ prettyShow (x, xxx)) False -> undefined
             (e', Sum n) | n <= 1 -> Just e'
             _                    -> Nothing
 
@@ -1142,7 +1150,8 @@ lowerIf is e1 e2 e3 = do
   noLambdaIf <- gets (fNoLambdaIf . dflags)
   useSplit <- gets (fSplit . dflags)
   verif <- gets (fVerify . dflags)
-  if verif then
+  keepIf <- gets (fKeepIf . dflags)
+  if verif || keepIf then
     lowerIfVerify is e1 e2 e3
    else if noLambdaIf then
     lowerIfNoLambda is e1 e2 e3
@@ -1628,9 +1637,10 @@ substMany sb = sub
     sub e@Wrong{} = e
     sub (Macro1 i rs e) = Macro1 i rs (sub e)
     sub (Split e1 e2 e3) = Split (sub e1) (sub e2) (sub e3)
-    sub (If3 (Exists is e1) e2 e3) =
+    sub (If3 e1 e2 e3) = If3 (sub e1) (sub e2) (sub e3)
+    sub (If3B is e1 e2 e3) =
       let (is', e1', e2') = if3Hack sub is e1 e2
-      in  If3 (Exists is' e1') e2' (sub e3)
+      in  If3B is' e1' e2' (sub e3)
     sub Fail = Fail
     sub DomainFail = DomainFail
     sub e = impossible e
@@ -2057,10 +2067,6 @@ identOf_7 :: Ident_7 -> Ident
 identOf_7 (Solve_7 i) = i
 identOf_7 (Infer_7 i) = i
 
-opposite :: Ident_7 -> Ident -> Ident_7
-opposite (Solve_7 _) i = Infer_7 i
-opposite (Infer_7 _) i = Solve_7 i
-
 dsD_7 :: Expr -> D Expr
 {-
 -- To not make the desugared version ridiculosely large,
@@ -2091,12 +2097,7 @@ dsM_7 (Function [(t1, effs)] t2) f = do
   j <- newIdent (getLoc t1) "j"
   r <- newIdent (getLoc t2) "r"
   z <- newIdent (getLoc t2) "z"
-  inv <- gets (fInvert . dflags)
-  t1' <-
-    if inv then
-      dsM_7 t1 (opposite f i)
-    else
-      dsM_7 t1 (Infer_7 i)
+  t1' <- dsM_7 t1 (Infer_7 i)
   t2' <- dsM_7 t2 (as_7 f  z)
   defZ <- dsA_7def z j f
   apFtoI <- dsA_7 i f

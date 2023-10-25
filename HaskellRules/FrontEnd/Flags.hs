@@ -27,7 +27,7 @@ data Flags = Flags
   , fPrelude      :: !(String, Expr)
   , fNoWarn       :: !Bool
   , fDesugar      :: !Desugar
-  , fInvert       :: !Bool
+  , fKeepIf       :: !Bool
   }
   deriving (Show)
 
@@ -52,7 +52,7 @@ defaultFlags = Flags
   , fPrelude      = either error id $ findPrelude defaultPrelude
   , fNoWarn       = False
   , fDesugar      = DS1
-  , fInvert       = False
+  , fKeepIf       = False
   }
 
 showFlags :: Flags -> String
