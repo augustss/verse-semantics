@@ -163,6 +163,7 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
       prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
         align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
       tupled =
+        align .
         group .
         encloseSep
         (flatAlt "( " lparen)
