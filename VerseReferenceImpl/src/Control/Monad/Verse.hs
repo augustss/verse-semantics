@@ -662,11 +662,10 @@ for m f = do
       Fail -> pure $ reverse xs
       Abort -> abort
       Succeed (h, _, x, m) -> do
-        r <- ask'
         i <- lift $ supply
-        lift . modifyRef' r.heaps $ IntMap.insert i h
-        xs <- (:xs) <$> f x
-        h <- lift . stateRef' r.heaps $ IntMap.Lazy.findDelete i
+        liftSucceed $ \ r -> modifyRef' r.heaps $ IntMap.insert i h
+        xs <- f x <&> (:xs)
+        h <- liftSucceed $ \ r -> stateRef' r.heaps $ IntMap.Lazy.findDelete i
         loop ref m f xs h
 
 verify
