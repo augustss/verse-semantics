@@ -601,11 +601,11 @@ scope sc = expr
     expr (Seq es) = seqE <$> mapM expr es
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
     expr (If3 e1 e2 e3) = do
-      (e1', sc') <- defs sc e1
-      If3 e1' <$> scopeD' sc' e2 <*> exprD e3
+      (is, e1', sc') <- defs' sc e1
+      If3B is e1' <$> scopeD' sc' e2 <*> exprD e3
     expr (For2 e1 e2) = do
-      (e1', sc') <- defs sc e1
-      For2 e1' <$> scopeD' sc' e2
+      (is, e1', sc') <- defs' sc e1
+      For2B is e1' <$> scopeD' sc' e2
     expr (Block e) = exprD e
     expr (Let e1 e2) = do
       (e1', sc') <- defs sc e1
@@ -643,6 +643,11 @@ scope sc = expr
 
     defs :: S.Set Ident -> Expr -> D (Expr, S.Set Ident)
     defs as e = do
+      (is, e', s) <- defs' as e
+      pure (Exists is e', s)
+
+    defs' :: S.Set Ident -> Expr -> D ([Ident], Expr, S.Set Ident)
+    defs' as e = do
       let is = getVisible e
           errM = filter ((> 1) . length) $ group $ sort is
           errS = [ (i, j) | i <- is, i `S.member` sc, j <- filter (== i) (S.toList sc) ]
@@ -650,8 +655,7 @@ scope sc = expr
       e' <- scope s' e
       errMultiple errM
       errShadow errS
-      pure (Exists is e', s')
-
+      pure (is, e', s')
 
 -- Get all visible identifiers from i := e
 getVisible :: HasCallStack => Expr -> [Ident]
@@ -1074,9 +1078,8 @@ lower (Seq es) = seqE <$> mapM lower es
 lower (ApplyD e1 e2) = ApplyD <$> lower e1 <*> lower e2
 lower (Unify e1 e2) = Unify <$> lower e1 <*> lower e2
 lower (Choice e1 e2) = Choice <$> lower e1 <*> lower e2
-lower (For2 (Exists is e1) e2) = join $ lowerFor is <$> lower e1 <*> lower e2
-lower (If3 (Exists is e1) e2 e3) = join $ lowerIf is <$> lower e1 <*> lower e2 <*> lower e3
---lower (If3 e1 e2 e3)                = join $ lowerIf [] <$> lower e1 <*> lower e2 <*> lower e3
+lower (For2B is e1 e2) = join $ lowerFor is <$> lower e1 <*> lower e2
+lower (If3B is e1 e2 e3) = join $ lowerIf is <$> lower e1 <*> lower e2 <*> lower e3
 lower (Macro1 (Ident _ "all") [] e) = lowerAll =<< lower e
 lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
 lower (Succeeds e) = lowerSucceeds =<< lower e
@@ -1147,7 +1150,7 @@ lowerIf is e1 e2 e3 = do
     lowerIfOne is e1 e2 e3
 
 lowerIfVerify :: [Ident] -> Expr -> Expr -> Expr -> D Expr
-lowerIfVerify is e1 e2 e3 = pure $ If3 (Exists is e1) e2 e3
+lowerIfVerify is e1 e2 e3 = pure $ If3B is e1 e2 e3
 
 lowerIfNoLambda :: [Ident] -> Expr -> Expr -> Expr -> D Expr
 lowerIfNoLambda vs e1 e2 e3 = do
