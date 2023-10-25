@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.Desugar(
   desugar,
@@ -12,6 +12,7 @@ import Data.Either
 import Data.List
 --import qualified Data.Map as M
 import Data.Maybe
+import Data.Monoid
 import qualified Data.Set as S
 import Debug.Trace
 import GHC.Stack
@@ -34,12 +35,13 @@ import FrontEnd.Flags
 --  x:t=v is syntactic sugar for x:=(:t=v) and
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
-
+  
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
-            (traceDS "alias"      <=< simpAlias <=<
-             traceDS "simpler"    <=< simpler   <=<
+            (-- simplification
+             traceDS "simplify"   <=< simplify <=<
+             -- desugaring
              traceDS "primops"    <=< primops   <=<
              traceDS "lower"      <=< lower     <=<
              traceDS "addScope"   <=< addScope  <=<
@@ -411,8 +413,6 @@ dsDx e = do
     DS6 -> dsD_6 e
     DS7 -> dsD_7 e
 
--- All cases, but the last, can be removed.
--- They are just there to avoid introducing unused existentials.
 dsD_1 :: Expr -> D Expr
 dsD_1 e | isValue e = pure e  -- DCONST DVAR
 dsD_1 (Choice e1 e2) = Choice <$> dsD_1 e1 <*> dsD_1 e2
@@ -627,7 +627,8 @@ scope sc = expr
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD' (S.insert i sc) e
     expr Fail = pure Fail
-    expr (Forall i e) = Forall i <$> expr e
+    expr (Forall is e) = Forall is <$> scopeD' sc' e
+      where sc' = foldr S.insert sc is
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -675,7 +676,7 @@ getVisible Choice{} = []
 getVisible (Range e) = getVisible e
 getVisible Function{} = []
 getVisible (Exists is e) = is ++ getVisible e
-getVisible (Forall is e) = is ++ getVisible e
+getVisible (Forall _is _e) = []  -- Forall is a new scope
 getVisible (OfType _ _) = []
 getVisible TLam{} = []
 getVisible Lam{} = []
@@ -749,6 +750,138 @@ primOps = map (Ident noLoc)
 
 ------------------------
 
+{-
+-- The invariant for generating core is that there is always an Exists
+-- in the following constructs:
+--  If3
+--  For2
+-- If there isn't, this pass will insert an empty exists.
+addExist :: Expr -> D Expr
+addExist = pure . f
+  where
+    f (If3 e1 e2 e3) = If3 (ex (f e1)) (f e2) (f e3)
+    f (For2 e1 e2)   = For2 (ex (f e1)) (f e2)
+    f e = composOp f e
+    ex e@Exists{} = e
+    ex e = Exists [] e
+-}
+
+------------------------
+
+simplify :: Expr -> D Expr
+simplify expr = do
+  simpl <- gets (fSimplify . dflags)
+  if not simpl then
+    pure expr
+   else do
+    let loop :: Int -> Expr -> D Expr
+        loop 0 e = trace "simplifier timed out" $ pure e
+        loop n e = do
+          e' <- oneSimplifyPass e
+          if e == e' then
+            pure e
+           else
+            loop (n-1) e'
+    loop 25 expr
+
+oneSimplifyPass :: Expr -> D Expr
+oneSimplifyPass expr = do
+  tr <- gets (fTraceDesugar . dflags)
+  let traceDS :: String -> Expr -> D Expr
+      traceDS msg e | tr = trace ("---- " ++ msg ++ "\n" ++ prettyShow e) $
+                           pure e
+                    | otherwise = pure e
+  (traceDS "elimExist"  <=< elimExist <=<
+   traceDS "alias"      <=< simpAlias <=<
+   traceDS "simpler"    <=< simpler   <=<
+   traceDS "inlineVal"  <=< inlineVal) expr
+
+inlineVal :: Expr -> D Expr
+inlineVal expr = do
+  simpl <- gets (fSimplify . dflags)
+  if simpl then
+    pure $ inlineVal' expr
+   else
+    pure expr
+    
+inlineVal' :: Expr -> Expr
+inlineVal' expr = evalState (inl expr) []
+  where
+    inl :: Expr -> State [(Ident, Expr)] Expr
+    inl (Seq (e@(Unify (Variable x) v) : es)) | shouldInline x v = do
+--      traceM $ "extend " ++ prettyShow (x, v)
+      v' <- inl v
+      es' <- withVal (x, v') (inl (Seq es))
+      pure $ seqE [e, es']
+    inl e@(Variable x) = do
+      m <- get
+      case lookup x m of
+--        Just v | trace ("found " ++ prettyShow (x, v)) False -> undefined
+        Just v | not (isLam v) -> pure v
+        _                      -> pure e
+    inl (ApplyD f@(Variable x) a) = do
+      m <- get
+      case lookup x m of
+        Just elam@(Lam i e) | closed elam && i /= x ->
+          inl $ Exists [i] $ Seq [ Unify (Variable i) a, e]
+        _ -> ApplyD <$> inl f <*> inl a
+    inl (Exists is e) = Exists is <$> withNotIn is  (inl e)
+    inl (Forall is e) = Forall is <$> withNotIn is  (inl e)
+    inl (Lam i e)     = Lam    i  <$> withNotIn [i] (inl e)
+    inl e = compos inl e
+
+    isLam Lam{} = True
+    isLam _ = False
+    shouldInline x (Lam _ _) = unIdent x `elem` ["int", "any"]
+    shouldInline _ e = isValue e
+
+    withVal :: (Ident, Expr) -> State [(Ident, Expr)] a -> State [(Ident, Expr)] a
+    withVal b ma = do
+      m <- get
+      pure $ evalState ma (b:m)
+    withNotIn :: [Ident] -> State [(Ident, Expr)] a -> State [(Ident, Expr)] a
+    withNotIn is ma = do
+      m <- get
+      let m' = filter ((`notElem` is) . fst) m
+--      when (m /= m') $ traceM $ "dropped " ++ prettyShow (m, m')
+      pure $ evalState ma m'
+
+-- Eliminate existentials of the form
+--  Exists x . ... x=e ...
+-- where the x=e is the only occurrence of x.
+elimExist :: Expr -> D Expr
+elimExist expr = do
+  simpl <- gets (fSimplify . dflags)
+  if simpl then
+    pure $ elimE expr
+   else
+    pure expr
+  where
+    elimE (Exists [] e) = elimE e
+    elimE (Exists (x:xs) e) =
+      let e' = elimE (Exists xs e)
+      in  case elimX x e' of
+            Nothing  -> lExists [x] e'
+            Just e'' -> e''
+    elimE e = composOp elimE e
+
+--    elimX x _ | trace ("----------------" ++ prettyShow x) False = undefined
+    elimX x ex =
+      let --elm e | unIdent x == "in'+'", trace ("e=" ++ prettyShow e) False = undefined
+          elm (Unify (Variable y) e) | x == y = do tell (Sum (1::Int)); elm e
+          elm e@(Variable y) | x == y = do tell (Sum 2); pure e
+          elm e@(If3 e1 _ _) | occurs e1 = do tell (Sum 2); pure e
+          elm e@(Split e1 _ _) | occurs e1 = do tell (Sum 2); pure e
+          elm e = compos elm e
+          occurs e = execWriter (elm e) /= 0  -- does x occur in e
+      in  case runWriter (elm ex) of
+--            xxx | unIdent x == "in'+'", trace ("runWriter " ++ prettyShow (x, xxx)) False -> undefined
+            (e', Sum n) | n <= 1 -> Just e'
+            _                    -> Nothing
+
+instance Pretty a => Pretty (Sum a) where
+  pPrint (Sum a) = text "Sum" <+> pPrint a
+
 simpler :: Expr -> D Expr
 simpler expr = do
   -- Always remove silly uses of any$
@@ -761,9 +894,14 @@ simpler expr = do
 
 -- Simplify  v; e  -->  e
 simpValue :: Expr -> D Expr
-simpValue = pure . f
-  where f (Seq (Snoc es e)) = seqE $ map f (Snoc (filter (not . isValue) es) e)
+simpValue = pure . simpValue'
+
+simpValue' :: Expr -> Expr
+simpValue' = f
+  where f (Seq (Snoc es e)) = seqE $ map f (Snoc (filter (not . isValue') es) e)
         f e = composOp f e
+        isValue' Lam{} = True   -- Also remove useless lambdas
+        isValue' e = isValue e
 
 {- Cannot do this everywhere, e.g., If3 relies on existentials
 -- Simplify  exists . e  -->  e
@@ -822,6 +960,7 @@ simpAlias expr = do
               lExists is' e'
         -- Special hack to keep existentials in If3
         f (If3 (Exists is e1) e2 e3) = If3 (Exists is (f e1)) (f e2) (f e3)
+        f (If3 e1 e2 e3) = If3 (f e1) (f e2) (f e3)
         f e = composOp f e
 
 uniq :: [Ident] -> [(Ident, Ident)] -> [(Ident, Ident)]
@@ -890,6 +1029,7 @@ addDeref = pure . exprD S.empty
     expr s (OfType e t) = OfType (expr s e) (expr s t)
     expr _ Fail = Fail
     expr s (Lam i e) = Lam i (expr s e)
+    expr _ e@EPrim{} = e
     expr _ e = impossible e
 
     exprD s e = expr (defs s e) e
@@ -1447,6 +1587,9 @@ getFree = Epic.List.nub . fvs
     fvs DomainFail = []
     fvs e = impossible e
 
+closed :: Core -> Bool
+closed = null . getFree
+
 -- XXX binders
 getAllVars :: Core -> [Ident]
 getAllVars = Epic.List.nub . execWriter . vars
@@ -1475,6 +1618,8 @@ substMany sb = sub
     sub (Choice e1 e2) = Choice (sub e1) (sub e2)
     sub (Exists [] e) = Exists [] (sub e)
     sub (Exists (i:is) e) = binder i (exists1 i) (Exists is e)
+    sub (Forall [] e) = Forall [] (sub e)
+    sub (Forall (i:is) e) = binder i (forall1 i) (Forall is e)
     sub e@Wrong{} = e
     sub (Macro1 i rs e) = Macro1 i rs (sub e)
     sub (Split e1 e2 e3) = Split (sub e1) (sub e2) (sub e3)
@@ -1492,6 +1637,9 @@ substMany sb = sub
 
     exists1 i (Exists is e) = Exists (i:is) e
     exists1 _ _ = undefined
+
+    forall1 i (Forall is e) = Forall (i:is) e
+    forall1 _ _ = undefined
 
 if3Hack :: (Expr -> Expr) -> [Ident] -> Expr -> Expr -> ([Ident], Expr, Expr)
 if3Hack f is e1 e2 =
@@ -1909,13 +2057,14 @@ opposite (Solve_7 _) i = Infer_7 i
 opposite (Infer_7 _) i = Solve_7 i
 
 dsD_7 :: Expr -> D Expr
+{-
 -- To not make the desugared version ridiculosely large,
 -- do some minor short-cuts here.
 dsD_7 e@(Lit _) = pure e
 dsD_7 e@(Variable _) = pure e
 dsD_7 (Array ts) = Array <$> mapM dsD_7 ts
---dsD_7 (Unify t1 t2) = Unify <$> dsD_7 t1 <*> dsD_7 t2
 -- End short-cuts
+-}
 dsD_7 e = do
   x <- newIdent (getLoc e) "x"
   Exists [x] <$> dsM_7 e (Solve_7 x)
@@ -1924,7 +2073,7 @@ dsA_7 :: Ident -> Ident_7 -> D Expr
 dsA_7 _ (Solve_7 f) = (\ z -> Exists [z] $ Variable z) <$> newIdent (getLoc (Variable f)) "z"
 dsA_7 x (Infer_7 f) = pure $ ApplyD (Variable f) (Variable x)
 
--- dsA_7def x j f  ===  DefineE z (dsA_7 j f)
+-- dsA_7def z x f  ===  DefineE z (dsA_7 x f)
 -- but eliminating an existential.
 dsA_7def :: Ident -> Ident -> Ident_7 -> D Expr
 --dsA_7def z x f = Define z <$> dsA_7 x f
@@ -1991,7 +2140,7 @@ dsM_7 (OfType t1 t2) i = do
                  Forall [r] $ seqE [eAssume $ unifyV r t2'', Variable r]
                 ]
   else
-    pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' t1')]
+    pure $ seqE [DefineE y t1', Succeeds (ApplyD t2' (Variable y))]
 
 dsM_7 (Range t) x = do
   t' <- dsD_7 t
