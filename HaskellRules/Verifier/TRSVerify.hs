@@ -73,6 +73,7 @@ tests = -- take 6
   , ("ex_if_asm_00", ex_if_asm_00, True)
   , ("ex1_mini", ex1_mini, True)
   , ("ex_asm_var", ex_asm_var, True)
+  , ("ex_ifb", ex_ifb, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -136,6 +137,9 @@ leq e1 e2 = Op Le :@: Arr [e1, e2]
 
 ite :: Expr -> Expr -> Expr -> Expr
 ite = If
+
+iteB :: [Ident] -> Expr -> Expr -> Expr -> Expr
+iteB xs e1 e2 e3 = foldr (\x e -> IfB (Bind x e)) (If e1 e2 e3) xs
 
 tlamOblig :: Ident -> [Ident] -> Expr -> Expr -> Expr
 tlamOblig x ys e1 e2 = Verify (Lam $ Bind x $ exis ys (Assume e1 :>: Assert e2))
@@ -689,3 +693,9 @@ ex_asm_var = Verify $ lAMs [x] (
              )
              where
               x = ident "x"
+
+ex_ifb :: Expr
+ex_ifb = Verify $ Assert (iteB [x, y] (Var x :=: Int 1 :>: Var y :=: Int 1 :>: Int 1) (Var x) (Int 9 :=: Int 10))
+  where
+    x = ident "x"
+    y = ident "y"
