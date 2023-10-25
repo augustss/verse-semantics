@@ -498,9 +498,9 @@ $$
 \mbox{\bf Syntax} \\
 \multicolumn{1}{c}{\begin{array}{rcll}
   |si| & ::= &  |solve|  \vb |infer| & \text{``solve'' and ``infer'' respectively.}\\
-  |inpw| & ::= & |x|^{|si|} & \text{If $|si|=|solve|$ then |x| is a unification variable} \\[1mm]
-  |flipsi infer| & = & |solve| \\
-  |flipsi solve| & = & |infer| \\
+  |inpw| & ::= & |x|^{|si|} & \text{If $|x|$ is a unification variable then $|si|=|solve|$} \\[1mm]
+%  |flipsi infer| & = & |solve| \\
+%  |flipsi solve| & = & |infer| \\
 \end{array}} \\ \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
@@ -508,11 +508,13 @@ $$
 \rulename{dinit}   & |De t | & = & |def x (XMe x solve t)| \\[1mm]
 \rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| \\
 \rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[2mm]
+\end{array} \\
 
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
 
 \multicolumn{4}{l}{\mbox{\it Function rules (verification)}} \\
-\multicolumn{2}{l}{\rulename{mcfun}\hspace{4mm} |DMe (inp f si) (functionX t_1 (eff closed) t_2)|}
+\rulename{mcfun} &  |DMe (inp f si) (functionX t_1 (eff closed) t_2)|
 & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i (flipsi si)) t_1);
                                             assert (z := DAe (inp f si) j; Me (inp z si) t_2))); |} \\
 & &   & |lam i (j := Me (inp i (flipsi si)) t_1; forall r (assume (z :=  DAe (inp f si) j;
@@ -528,13 +530,19 @@ $$
     |else (DAe (inp f si) i)|
    \end{array}} \\[10mm]
 
+\end{array} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+
 \rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
          & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
          &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Function rules (execution)}} \\
+
+
 \multicolumn{2}{l}{\rulename{mcfunx}\hspace{4mm} |DMe (inp f si) (functionX t_1 (eff closed) t_2)|}
   & = & |lam i (j := Me (inp i (flipsi si)) t_1; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\[2mm]
+
 
 
 \rulename{mofunx}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
@@ -559,7 +567,7 @@ $$
 \rulename{meq}     & |DMe inpw (t_1=t_2)|      & = & |(DMe inpw t_1) = (DMe inpw t_2)| \\
 \rulename{msemi}   & |DMe inpw (t_1 ; t_2)|    & = & |De t_1 ; DMe inpw t_2| \\
 \rulename{mchoice} & |DMe inpw ((t_1 `choice` t_2))| & = & |(DMe inpw t_1) `choice` (DMe inpw t_2)| \\
-\multicolumn{2}{l}{\rulename{mif}\hspace{6mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
+\multicolumn{2}{l}{\rulename{mif}\hspace{3mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
     \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe inpw t_2 else DMe inpw t_3|} \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Equality rules}} \\
