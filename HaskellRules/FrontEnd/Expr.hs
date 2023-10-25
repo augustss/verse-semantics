@@ -73,19 +73,19 @@ data Expr
   | PrefixOp Op Expr          -- op e
   | PostfixOp Expr Op         -- e op
   | InfixOp Expr Op Expr      -- e1 op e2
-  | If1 Blk                 -- if{e}
-  | If2 Expr Blk            -- if(e1) then e2
-  | If2E Expr Blk           -- if(e1) else e2
-  | If3 Expr Blk Blk      -- if(e1) then e2 else e3
-  | For1 Blk                -- for{e}
-  | For2 Expr Blk           -- for(e1) in e2
-  | Let Expr Blk            -- let(e1) in e2
-  | Block Blk                  -- do e
-  | Case1 Blk               -- case{e1; e2; ... } block treated in a non-standard way
-  | Case2 Expr Blk          -- case(e) of {e1; e2; ... } block treated in a non-standard way
+  | If1 Blk                   -- if{e}
+  | If2 Expr Blk              -- if(e1) then e2
+  | If2E Expr Blk             -- if(e1) else e2
+  | If3 Expr Blk Blk          -- if(e1) then e2 else e3
+  | For1 Blk                  -- for{e}
+  | For2 Expr Blk             -- for(e1) in e2
+  | Let Expr Blk              -- let(e1) in e2
+  | Block Blk                 -- do e
+  | Case1 Blk                 -- case{e1; e2; ... } block treated in a non-standard way
+  | Case2 Expr Blk            -- case(e) of {e1; e2; ... } block treated in a non-standard way
   | Function [(Expr, [Eff])] Blk -- function(e)<eff>...{e}
 --  | Typedef Blk             -- type{e}
-  | Blk [Expr]              -- { e1; e2; ... }
+  | Blk [Expr]                -- { e1; e2; ... }
   | Option (Maybe Expr)       -- option{e}
   | Parens Expr               -- (e)
   | Set Expr Ident Expr       -- set e1 = e2
@@ -93,8 +93,8 @@ data Expr
   | MRef Ident (Maybe Expr) (Maybe Expr)      -- ref i : t = e
   | MAlias Ident (Maybe Expr) (Maybe Expr)    -- alias i : t = e
   -- Some 1-argument macros
-  | Macro1 Ident [Eff] Blk  -- m<a>{e}
-  | Macro2 Ident Expr Blk   -- m(e1){e2}
+  | Macro1 Ident [Eff] Blk    -- m<a>{e}
+  | Macro2 Ident Expr Blk     -- m(e1){e2}
   | Return Expr               -- return e
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
@@ -107,7 +107,7 @@ data Expr
   | Wrong String              -- wrong
   | Exists [Ident] Expr       -- exists xs . e
   | Forall [Ident] Expr       -- forall xs . e
-  | OfType Expr Expr         -- e:t, but only type known to verifier
+  | OfType Expr Expr          -- e:t, but only type known to verifier
   | TLam Ident [Eff] Expr Expr
                               -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
                               -- The last argument is a possible type, (e2:t)  
@@ -115,7 +115,7 @@ data Expr
   | EPrim String              -- primop
   | Lam Ident Expr            -- \ x . e
   | Split Expr Expr Expr      -- split(e1){e2}{e3}
-  | Fail
+  | Fail                      -- :false
   -- These are used when translating back from Rules.Core.Expr
   | EStore Store Expr
   deriving (Eq, Ord, Show, Data)

@@ -198,7 +198,7 @@ dsSmall = ds
            effs' <- checkEffs effs
            pure $ Function [(e1', effs')] e2'
 
-    -- Conditional and foor-loop notation
+    -- Conditional and for-loop notation
     ds (If1 e) = ds $ If2E e eFalse
     ds (If2 e1 e2) = ds $ If3 e1 e2 eFalse
     ds (If2E e1 e2) = do x <- newIdent (getLoc e1) "x"; ds $ If3 (DefineE x e1) (Variable x) e2
