@@ -239,11 +239,14 @@ dsSmall = ds
       ds $ If2 (DefineE t e) (Array [Variable t])
 
     -- one, all
+    -- XXX why do we do this?
     ds (Macro1 (Ident _ "one") [] e) = ds $ If2E e Fail
     ds (Macro1 (Ident _ "all") [] e) = ds $ For1 e
 
     ds (Macro1 (Ident _ "first") [] e) = ds $ If2E e Fail  -- same as one{}
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
+
+    ds (Exists xs b) = ds $ foldr (\ v e -> seqE [DefineV v, e]) b xs
 
     ds x = compos ds x
 
