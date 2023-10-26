@@ -336,7 +336,7 @@ assumeFunM
   -> L (Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
 assumeFunM e1 e2 pi f = do
-  ((e1, j), xs) <- lift $ runDesugarT do
+  ((e1, j), xs) <- lift $ runDesugarT $ do
     i <- name <$> freshIdent (loc e1)
     j <- name <$> freshIdent (loc e1)
     e1 <- desugarExp' e1 True i
@@ -352,9 +352,11 @@ assumeFunM'
   -> L (Rewrite.Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
 assumeFunM' e1 e2 = do
-  (e1, xs) <- lift . runDesugarT $ desugarExp' e1 True . name =<< freshIdent (loc e1)
-  r <- freshIdent' $ loc e2
-  fun xs e1 . forall' r <$> assumeM (abstractM $ desugarExp e2)
+  (e1, xs) <- lift . runDesugarT $ do
+    i <- name <$> freshIdent (loc e1)
+    e1 <- desugarExp' e1 True i
+    pure $ e1 `then'` i
+  fun xs e1 <$> abstractM (desugarExp e2)
 
 abstractM
   :: MonadSupply Int m
