@@ -15,7 +15,7 @@ import Data.Functor
 import Data.Functor.Apply
 import Data.Text qualified as Text
 
-import Language.Verse.Parse.Exp (Exp
+import Language.Verse.Parse.Exp ( Exp
                                 , AttributePart
                                 , pattern (:=:)
                                 , pattern (:<>:)
@@ -201,7 +201,6 @@ Defs :: { L [L (Exp L Name)] }
   : Defs ',' Scan Def { (\ xs x -> x:xs) <\$> $1 <.> duplicate $4 }
   | Def %shift { (:[]) <\$> duplicate $1 }
 
-
 Base :: { L (Exp L Name) }
   : Paren { Exp.Paren <\$> duplicate $1 }
   | int { Exp.Int <\$> $1 }
@@ -225,7 +224,6 @@ Base :: { L (Exp L Name) }
       (:.:) <\$> duplicate $1 <.> (($4, extract $6) <\$ $6)
     }
   | PatName %shift { Exp.Pat <\$> $1 }
-
 
 Call :: { L (Exp L Name) }
   : Call Paren {
@@ -291,7 +289,6 @@ Call :: { L (Exp L Name) }
   | Exists { $1 }
   | Base %shift { $1 }
 
-
 Attribute :: { L (Exp L Name) }
   : '<' PrefixColon '>' {
       $2 <. $1 <. $3
@@ -299,9 +296,7 @@ Attribute :: { L (Exp L Name) }
 
 Attributes :: { [L (Exp L Name)] }
   : Attributes Attribute { (\ xs x -> x : xs) $1 $2 }
-  |     { ([]) }
-
-
+  | { ([]) }
 
 Prefix :: { L (Exp L Name) }
   : '[' List ']' Prefix {
@@ -359,9 +354,6 @@ To :: { L (Exp L Name) }
        $1
   }
 
-
-
-
 Choose :: { L (Exp L Name) }
   : To '|' Scan Choose {
       (:|:) <\$> duplicate $1 <.> duplicate $4
@@ -383,7 +375,7 @@ PrefixColon :: { L (Exp L Name) }
       Exp.Pat <\$> (Pat.PrefixColon <\$ $1 <.> duplicate $3)
     }
   | InfixColon %shift {
-       $1
+      $1
     }
 
 ComparePart :: { L (AttributePart L Name) }
@@ -418,8 +410,8 @@ CompareParts :: { L [L (AttributePart L Name)] }
 
 Less :: { L (Exp L Name) }
   : CompareParts %shift {
-    fixCompare $1
-  }
+      fixCompare $1
+    }
 
 Invoke :: { L (Exp L Name) }
   : Invoke Until {
@@ -434,7 +426,6 @@ Invoke :: { L (Exp L Name) }
   | Less %shift {
        $1
     }
-
 
 NotEq :: { L (Exp L Name) }
   : NotEq '<>' Scan Invoke {
@@ -454,7 +445,6 @@ Return :: { L (Exp L Name) }
   | NotEq %shift {
        $1
     }
-
 
 Eq :: { L (Exp L Name) }
   : NotEq '=' Eq {
@@ -493,7 +483,7 @@ Or :: { L (Exp L Name) }
 
 Where :: { L (Exp L Name) }
   : Where where Defs {
-    Exp.Where <\$> duplicate $1 <.> duplicate ((Exp.List \$ reverse \$ extract $3) <\$ $3)
+      Exp.Where <\$> duplicate $1 <.> duplicate ((Exp.List \$ reverse \$ extract $3) <\$ $3)
     }
   | Or %shift {
        $1
@@ -556,27 +546,26 @@ Fun :: { L (Exp L Name) }
 
 Exp :: { L (Exp L Name) }
   : Fun %shift {
-       $1
+      $1
     }
 
 StringCont :: { L [(L (Exp L Name), L String)] }
   : File stringEnd { ( \ e s -> [(e,s)]) <\$> duplicate $1 <.> duplicate $2 }
   | File stringCont StringCont { ( \ e s es -> (e,s):es) <\$> duplicate $1 <.> duplicate $2 <.> $3 }
 
-
 PatName :: { L (Pat L Name) }
   : name {
-     Pat.Name [] <\$> $1
-  }
+      Pat.Name [] <\$> $1
+    }
   | '(' List ':)' name {
       Pat.Name $2 <\$> $4
-  }
+    }
   | var Attributes name {
-     Pat.Var (fixAttributes $2) <\$ $1 <.> duplicate $3
-  }
+      Pat.Var (fixAttributes $2) <\$ $1 <.> duplicate $3
+    }
   | path {
-     Pat.Path <\$> $1
-  }
+      Pat.Path <\$> $1
+    }
 
 If :: { L (Exp L Name) }
   : if Block %prec IF {
@@ -592,7 +581,7 @@ If :: { L (Exp L Name) }
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
   | if Paren Brace %prec IF_THEN {
-     Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate (Exp.List <\$> $3)
+      Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate (Exp.List <\$> $3)
     }
   | if Paren '. ' Def %prec IF_THEN {
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $4
@@ -607,16 +596,16 @@ If :: { L (Exp L Name) }
       Exp.IfThen <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
   | if Brace Then %prec IF_THEN {
-    Exp.IfThen <\$ $1 <.> duplicate (Exp.List <\$> $2) <.> duplicate $3
+      Exp.IfThen <\$ $1 <.> duplicate (Exp.List <\$> $2) <.> duplicate $3
     }
   | if Paren Block Else {
       Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
     }
   | if Paren Brace Else {
-    Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate (Exp.List <\$> $3) <.> duplicate $4
+      Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate (Exp.List <\$> $3) <.> duplicate $4
     }
   | if Paren '. ' Def Else {
-    Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $4 <.> duplicate $5
+      Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $4 <.> duplicate $5
     }
   | if Paren Then Else {
       Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
@@ -625,7 +614,7 @@ If :: { L (Exp L Name) }
       Exp.IfThenElse <\$ $1 <.> duplicate $2 <.> duplicate $3 <.> duplicate $4
     }
   | if Brace Then Else {
-    Exp.IfThenElse <\$ $1 <.> duplicate (Exp.List <\$> $2) <.> duplicate $3 <.> duplicate $4
+      Exp.IfThenElse <\$ $1 <.> duplicate (Exp.List <\$> $2) <.> duplicate $3 <.> duplicate $4
     }
   | if '. ' Def Then Else {
       Exp.IfThenElse <\$ $1 <.> duplicate $3 <.> duplicate $4 <.> duplicate $5
@@ -637,7 +626,7 @@ If :: { L (Exp L Name) }
       Exp.IfElse <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
   | if Brace Else {
-    Exp.IfElse <\$ $1 <.> duplicate (Exp.List <\$> $2) <.> duplicate $3
+      Exp.IfElse <\$ $1 <.> duplicate (Exp.List <\$> $2) <.> duplicate $3
     }
 
 Then :: { L (Exp L Name) }
@@ -653,7 +642,7 @@ For :: { L (Exp L Name) }
       Exp.For <\$ $1 <.> duplicate $2
     }
   | for Brace %prec FOR {
-    Exp.For <\$ $1 <.> duplicate (Exp.List <\$> $2)
+      Exp.For <\$ $1 <.> duplicate (Exp.List <\$> $2)
     }
   | for Paren Block {
       Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $3
@@ -670,7 +659,7 @@ For :: { L (Exp L Name) }
 
 Do :: { L (Exp L Name) }
   : do Exp { $1 .> $2 }
-  | do '.' Exp %prec DOT_SPACE { $1 .> $3 }
+  | do '. ' Exp %prec DOT_SPACE { $1 .> $3 }
 
 Until :: { L (Exp L Name) }
   : until Exp { $1 .> $2 }
@@ -690,13 +679,13 @@ Forall :: { L (Exp L Name) }
 
 Paren0 :: { L[L (Exp L Name)] }
   : '(' List ')' {
-          $2 <\$ $1 <. $3
-     }
+      $2 <\$ $1 <. $3
+    }
 
 Paren :: { L (Exp L Name) }
   : Paren0 {
-          Exp.List <\$> $1
-     }
+      Exp.List <\$> $1
+    }
 
 Brace :: { L [L (Exp L Name)] }
   : '{' List '}' { $2 <\$ $1 <. $3 }
@@ -760,7 +749,6 @@ stringEnd = \ case
   L x (Token.String Token.Brace y Token.Quote) -> Just $ L x y
   _ -> Nothing
 
-
 int :: L Token -> Maybe (L Integer)
 int = \ case
   L x (Token.Int y) -> Just $ L x y
@@ -774,7 +762,6 @@ float = \ case
 name :: L Token -> Maybe (L Name)
 name = \ case
   L x (Token.Name y) -> Just $ L x y
-
   L x Token.At -> Just $ L x "at"
   L x Token.Of -> Just $ L x "of"
   _ -> Nothing
@@ -783,7 +770,6 @@ path :: L Token -> Maybe (L Name)
 path = \ case
   L x (Token.Path y) -> Just $ L x y
   _ -> Nothing
-
 
 expToPat :: L (Exp L a) -> Maybe (L (Pat L a))
 expToPat exp@(extract -> Exp.Pat pat) = Just (pat <$ exp)
