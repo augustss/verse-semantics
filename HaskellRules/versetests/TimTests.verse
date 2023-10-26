@@ -575,31 +575,31 @@ test(P00){a&b:int => f(g():int):=g() => {h()<decides>:=a=b,f(h)}}
 test(U00){a&b:any => f(a=b):=a=b => f[a=b]}
 test(D00){a&b:int => f(a=b):=a=b => f[a=b]}
 test(U00){a&b:any => f(a=b):=a=b => if{f[a=b]}}
-test(S00){a&b:int => f(a=b):=a=b => if{f[a=b]}}	#FP:10.4:CHECK:STRENGTH:UNSOUND
+test(S00){a&b:int => f(a=b):=a=b => if{f[a=b]}}			#FP:10.4:CHECK:STRENGTH:IF
 test(U00){a:any => f(nat[a]):=nat[a] => f[a]}
 test(D00){a:int => f(nat[a]):=nat[a] => f[a]}
 test(U00){a:any => f(nat[a]):=nat[a] => if{f[a]}}
-test(S00){a:int => f(nat[a]):=nat[a] => if{f[a]}}
+test(S00){a:int => f(nat[a]):=nat[a] => if{f[a]}} 		#FP:10.4:CHECK:STRENGTH:IF
 test(D00){a&b:int => f():type{a=b} => a=b}
 test(S00){a&b:int => f():type{a=b} => {f[],a=b}}
-test(S00){a&b:int => f():type{a=b} => {a=b,f[]}}
+test(S00){a&b:int => f():type{a=b} => {a=b,f[]}}		#FP:10.4:UNSOUND?
 test(D00){a&b:int => f(a):type{a=b} => f[b]}
 test(D00){a&b:int => f(a=b):type{a=b} => f[a]}
 test(D00){a&b:int => f(a=b):type{a=b} => f[b]}
 test(D00){a&b:int => f(a=b):type{a=b} => f[a=b]}
 test(D00){a&b:int => f(a):type{a=b} => {x:=b,f[x]}}
-test(D00){a&b:int => f(a):type{a=b} => {f[x],x:=b}}		#TODO:10.4:CHECK-STRENGTH:TYPE
+test(D00){a&b:int => f(a):type{a=b} => {f[x],x:=b}}
 test(A00){f(x:int):int => {x:=f[x],first{int[x]}}}
-test(S00){a:int => f(x:nat):int => if{f[a]=3}}
-test(S00){a:int => f(x:int):int => if{int[f[a]]}}
-test(S00){a:int => f(x:nat):int => if{int[f[a]]}}
-test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}
+test(S00){a:int => f(x:nat):int => if{f[a]=3}}			#FP:10.4:IF
+test(S00){a:int => f(x:int):int => if{int[f[a]]}}		#FP:10.4:IF
+test(S00){a:int => f(x:nat):int => if{int[f[a]]}}		#FP:10.4:IF
+test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}		#FP:10.4:IF
 test(U00){a:any => f(x:nat):int => if{int[f[a]]}}
 test(U00){a:int => f(x:nat):any => if{int[f[a]]}}
-test(S00){a&b:int => f(x:nat):int => if{f[a]=f[b]}}
-test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}
+test(S00){a&b:int => f(x:nat):int => if{f[a]=f[b]}}     #FP:10.4:IF
+test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}		#FP:10.4:IF
 test(U00){a:int => f(x:nat):any => if{f[a]=1}}
-test(S00){a:int => f(x:nat):int => if{f[a]=1}}
+test(S00){a:int => f(x:nat):int => if{f[a]=1}}			#FP:10.4:IF
 test(S00){a:int => f(x:nat):type{let(y&z:any){y=z}} => if{f[a]}}
 test(A00){f(:int):int => for{f[x:int]=x}}
 test(D00){a&b&c&d:int => f(a):type{c=d} => g(c):=a=b => {f[x],g[d],x:=b}}	#TODO:10.4:CHECK-STRENGTH:TYPE
