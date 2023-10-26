@@ -454,7 +454,7 @@ Eq :: { L (Exp L Name) }
       (:=:) <\$> duplicate $1 <.> duplicate $3
     }
   | Return %shift {
-       $1
+      $1
     }
 
 Not :: { L (Exp L Name) }
@@ -462,15 +462,15 @@ Not :: { L (Exp L Name) }
       Exp.Not <\$ $1 <.> duplicate $2
     }
   | Eq %shift {
-       $1
-  }
+      $1
+    }
 
 And :: { L (Exp L Name) }
   : Not and Scan And {
       Exp.And <\$> duplicate $1 <.> duplicate $4
     }
   | Not %shift {
-       $1
+      $1
     }
 
 Or :: { L (Exp L Name) }
@@ -530,7 +530,7 @@ Def :: { L (Exp L Name) }
       (:=:) <\$> duplicate $1 <.> duplicate $3
     }
   | Where %shift {
-       $1
+      $1
     }
 
 Fun :: { L (Exp L Name) }
@@ -541,7 +541,7 @@ Fun :: { L (Exp L Name) }
       Exp.Fun $1 $3 <\$ $1 <. $3
     }
   | Def %shift {
-       $1
+      $1
     }
 
 Exp :: { L (Exp L Name) }
