@@ -64,7 +64,15 @@ desugar
   -> L (Rewrite.Exp L Ident)
   -> m (L (Exp L Ident))
 desugar mode e =
-  runReaderT (runDesugarT' (desugarExp e) <&> \ (e, xs) -> exists' xs e) mode
+  runReaderT (runDesugarT' (desugar' e) <&> \ (e, xs) -> exists' xs e) mode
+
+desugar'
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+desugar' e = ask >>= \ case
+  Execution -> desugarExp e
+  Verification -> verifyM . succeedsM $ desugarExp e
 
 desugarExp
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -283,7 +291,7 @@ desugarFun e_domain e pi f = ask >>= \ case
   Verification ->
     verifyFunM e_domain e pi f `thenM'`
     case extract e of
-      _ :|>: e_range -> assumeFunM' e_domain e_range pi
+      _ :|>: e_range -> assumeFunM' e_domain e_range
       _ -> assumeFunM e_domain e pi f
 
 desugarFunX
@@ -297,7 +305,7 @@ desugarFunX e1 e2 pi f = do
   ((e1, j), xs) <- lift . runDesugarT $ do
     i <- name <$> freshIdent (loc e1)
     j <- name <$> freshIdent (loc e1)
-    e1 <- desugarExp' e1 (not pi) i
+    e1 <- desugarExp' e1 True i
     pure (unify j e1 `then'` i, j)
   e2 <- exists $
     name <$> freshIdent (loc e2) >>= \ z ->
@@ -316,7 +324,7 @@ verifyFunM e1 e2 pi f = do
   i <- freshIdent' $ loc e1
   verifyM $ forall' i <$> do
     j <- name <$> freshIdent (loc e1)
-    unify j <$> desugarExp' e1 (not pi) (name i) `thenM` succeedsM do
+    unify j <$> desugarExp' e1 True (name i) `thenM` succeedsM do
       z <- name <$> freshIdent (loc e1)
       unify z <$> invokeM j pi f `thenM` desugarExp' e2 pi z
 
@@ -331,7 +339,7 @@ assumeFunM e1 e2 pi f = do
   ((e1, j), xs) <- lift $ runDesugarT do
     i <- name <$> freshIdent (loc e1)
     j <- name <$> freshIdent (loc e1)
-    e1 <- desugarExp' e1 (not pi) i
+    e1 <- desugarExp' e1 True i
     pure (unify j e1 `then'` i, j)
   r <- freshIdent' $ loc e2
   fun xs e1 . forall' r <$> assumeM do
@@ -342,10 +350,9 @@ assumeFunM'
   :: (MonadAbort Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
-  -> Bool
   -> DesugarT m (L (Exp L Ident))
-assumeFunM' e1 e2 pi = do
-  (e1, xs) <- lift . runDesugarT $ desugarExp' e1 (not pi) . name =<< freshIdent (loc e1)
+assumeFunM' e1 e2 = do
+  (e1, xs) <- lift . runDesugarT $ desugarExp' e1 True . name =<< freshIdent (loc e1)
   r <- freshIdent' $ loc e2
   fun xs e1 . forall' r <$> assumeM (abstractM $ desugarExp e2)
 
@@ -393,21 +400,21 @@ assumeM
   -> DesugarT m (L (Exp L Ident))
 assumeM m = assume <$> exists m
 
-infixl 4 `thenM`
 thenM
   :: (Applicative m, Apply f)
   => m (f (Exp f a))
   -> m (f (Exp f a))
   -> m (f (Exp f a))
 thenM = liftA2 then'
+infixl 4 `thenM`
 
-infixl 4 `thenM'`
 thenM'
   :: Applicative m
   => m (f (Exp f a))
   -> m (f (Exp f a))
   -> m (Exp f a)
 thenM' = liftA2 (:*>:)
+infixl 4 `thenM'`
 
 forall'' :: Functor f => a -> f (Exp f a) -> f (Exp f a)
 forall'' x e = Def Forall (x <$ e) e <$ e
