@@ -117,6 +117,7 @@ verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
 verify(pass) { f(:any) := { if (x:=1) then {x} else {2} } }
 
 # koen's hof examples
+verify(pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
 verify(fail) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
 verify(pass) { gg(x:any) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be accepted
 verify(fail) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } } # because f expects g to return an int, and it doesn't

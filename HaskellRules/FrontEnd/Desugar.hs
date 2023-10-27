@@ -12,7 +12,7 @@ import Data.Either
 import Data.List
 --import qualified Data.Map as M
 import Data.Maybe
-import Data.Monoid
+-- import Data.Monoid
 import qualified Data.Set as S
 import Debug.Trace
 import GHC.Stack
@@ -35,7 +35,7 @@ import FrontEnd.Flags
 --  x:t=v is syntactic sugar for x:=(:t=v) and
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
-  
+
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
@@ -809,7 +809,7 @@ inlineVal expr = do
     pure $ inlineVal' expr
    else
     pure expr
-    
+
 inlineVal' :: Expr -> Expr
 inlineVal' expr = evalState (inl expr) []
   where
