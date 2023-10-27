@@ -37,7 +37,7 @@ test(S00){fv(:any) := 2=if(1) then 2 else 3}
 test(S00){fv(:any) := 3=if(1=2) then 2 else 3}
 test(S00){fv(:any) := if(1+1) then 2+1 else 3+1}
 test(S00){f(x:int):=x; f[3]=3}
-test(D00){f()<decides>:int => f[]}					#TODO:10.4:EFF-DECIDES
+test(D00){f()<decides>:int => f[]}					#TODO:10.4:EFF:DECIDES
 test(S00){f():=3 => f[]=3}
 test(F00){f():=3 => f[]=4}
 test(D00){x:int => x=3}
@@ -240,7 +240,7 @@ test(U00){g(f(3):=4):=5, a:int => g[f(a):=4]}      # Input test doesn't assume o
 
 # Assuming range:
 test(S00){f(x:int)<decides>:=x=3, a:int => f[a] => a=3} # Range assumes as strong as caller (mod stage).
-test(D00){f(x:int)<decides>:=x=3 => a:int => f[a]}      # Range doesn't assume otherwise.	#TODO:10.4:EFF-DECIDES
+test(D00){f(x:int)<decides>:=x=3 => a:int => f[a]}      # Range doesn't assume otherwise.	#TODO:10.4:EFF:DECIDES
 test(S00){f(x:int)<decides>:=x=3 => a:=3  => f[a]}
 
 # Must Abstraction.FunctionDepth strength contribute to verifier_context strength?
@@ -263,19 +263,19 @@ test(S01){f(g0(:int)<fails>:=3):=4 => 5}
 test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:any     ):=3]}
 test(QS00){f(g0(:int)<decides>:int):=3 => f[g1(x:rational):=3]}
 test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:int     ):=3]}
-test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:nat     ):=3]}		#FP:10.4:EFF-DECIDES:SUBTYPING???
-test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:false   ):=3]}		#FP:10.4:EFF-DECIDES:SUBTYPING???
+test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:nat     ):=3]}		#FP:10.4:EFF:DECIDES:SUBTYPING???
+test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:false   ):=3]}		#FP:10.4:EFF:DECIDES:SUBTYPING???
 #
 #test(U00){f(g0(:int)<decides>:false):=3 => f[g1(x:any     ):=3]}
 #test(U00){f(g0(:int)<decides>:false):=3 => f[g1(x:rational):=3]}
 #test(U00){f(g0(:int)<decides>:false):=3 => f[g1(x:int     ):=3]}
 #test(U00){f(g0(:int)<decides>:false):=3 => f[g1(x:nat     ):=3]}
-test(S00){f(g0(:int)<decides>:false):=3 => f[g1(x:false   ):=3]}    	#FP:10.4:EFF-DECIDES:SUBTYPING???
+test(S00){f(g0(:int)<decides>:false):=3 => f[g1(x:false   ):=3]}    	#FP:10.4:EFF:DECIDES:SUBTYPING???
 #
 test(S00){f(g0(-3)<decides>:int):=3 => f[g1(x:any     ):=3]}
 test(S00){f(g0(-3)<decides>:int):=3 => f[g1(x:int     ):=3]}
 #test(U00){f(g0(-3)<decides>:int):=3 => f[g1(x:nat     ):=3]}
-test(S00){f(g0(-3)<decides>:int):=3 => f[g1(x:false   ):=3]}			#FP:10.4:EFF-DECIDES:SUBTYPING???
+test(S00){f(g0(-3)<decides>:int):=3 => f[g1(x:false   ):=3]}			#FP:10.4:EFF:DECIDES:SUBTYPING???
 #
 test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:any     ):=2]}
 test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:int     ):=2]}
@@ -287,11 +287,11 @@ test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:int     ):=2]}
 #test(U00){f(g0(:int)<decides>:=2):=3 => f[g1(x:int     ):=3]}
 #test(U00){f(g0(:int)<decides>:=2):=3 => f[g1(x:nat     ):=3]}
 #test(U00){f(g0(:int)<decides>:=2):=3 => f[g1(x:=2      ):=3]}
-test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:false   ):=3]} 			#FP:10.4:EFF-DECIDES:SUBTYPING???
+test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:false   ):=3]} 			#FP:10.4:EFF:DECIDES:SUBTYPING???
 #
 #test(U00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:any     ):=x]}
 #test(U00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:int     ):=x]}
-test(S00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:nat     ):=x]}  	#FP:10.4:EFF-DECIDES:SUBTYPING???
+test(S00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:nat     ):=x]}  	#FP:10.4:EFF:DECIDES:SUBTYPING???
 #test(U00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:=2      ):=x]}
 #test(U00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:false   ):=x]}
 
@@ -444,7 +444,7 @@ test(V10){a:int => {f():type{a=3}=a=3,f[]}} # Should refine to D00.
 #LA test(QV10){a:int => if{x:int<fails>=a=3}}
 test(S00){f()<decides>:int => f[] => 123}
 test(S00){f()<decides>:int => assume{f[]}}
-test(S00){f()<decides>:int => if{f[]}}	#FP:10.4:EFF-DECIDES
+test(S00){f()<decides>:int => if{f[]}}	#FP:10.4:EFF:DECIDES
 test(U00){f()<resolves>:int => if{f[]}}
 test(S00){f(a:int):=if(a=3) then a=3}
 #LA test(S00){if{x:int<decides>=3}}
@@ -465,12 +465,12 @@ test(S00){f(x:=0|1):nat=x}
 #test(V10){f(x:=-1..1):nat=x, nat[f[1]]}
 
 # Proper explore.UnpromotableNegotiable effects propagation.
-test(S00){f(g(:int)<decides>:int):int => f[false]}	#FP:10.4:FALSE:EFF-DECIDES
+test(S00){f(g(:int)<decides>:int):int => f[false]}	#FP:10.4:FALSE:EFF:DECIDES
 test(U00){f(g(:int)<succeeds>:int):int => f[false]}
 test(S00){f(g(:int)<fails>:int):int => f[false]} 	#FP:10.4:EFF-FAILS
 
 # Have we introduced unsoundness by masking out h but allowing granular :t<x>? Seems not.
-test(S00){f(g(:any)<decides >:any):=3 => f[false]} #FP:10.4:FALSE:EFF-DECIDES
+test(S00){f(g(:any)<decides >:any):=3 => f[false]} #FP:10.4:FALSE:EFF:DECIDES
 test(U00){f(g(:any)<succeeds>:any):=3 => f[false]}
 
 #
@@ -631,7 +631,7 @@ test(D00){a:int => f(x:nat):any => f[a]}
 test(U00){a:any => f(x:nat):any => f[a]=f[a]}
 test(S00){a&b:int => f():type{a=b} => f[]}
 test(S00){a&b:int => f():type{a=b} => f[] where a=b}
-test(S00){a&b:int => f():type{a=b} => a=b where f[]}
+test(S00){a&b:int => f():type{a=b} => a=b where f[]}				#FP:10.4:L2R:UNSOUND
 test(U00){a&b:any => f(a=b):type{a=b} => f[a=b] where a=b}
 test(D00){a&b:int => f(a=b):type{a=b} => f[a=b] where a=b}
 test(D00){a&b:int => f(x:nat):any => {x:=f[a],y:=f[b]}}
@@ -652,18 +652,18 @@ test(S00){f(x:int):int=x}
 test(V10){f(x:int):int=x=3} # V10 is a weird choice of error, prefer D00
 test(V10){f(x:int):int=3=4} # V10 is a weird choice of error, prefer F00
 test(S00){f(x:int)<decides>:int=3}
-test(S00){f(x:int)<decides>:int=x=3}
-test(S00){f(x:int)<decides>:int=3=4}
+test(S00){f(x:int)<decides>:int=x=3}	#FP:10.4:EFF:DECIDES
+test(S00){f(x:int)<decides>:int=3=4}	#FP:10.4:EFF:DECIDES
 test(S00){f()<decides>:=3 => f[]}
-test(D00){f()<decides>:int=3; f[]}	#TODO:10.4:EFF-DECIDES
-test(D00){f()<decides>:int => f[]}	#TODO:10.4:EFF-DECIDES
+test(D00){f()<decides>:int=3; f[]}	#TODO:10.4:EFF:DECIDES
+test(D00){f()<decides>:int => f[]}	#TODO:10.4:EFF:DECIDES
 test(U00){f():any => f[]=7}
 test(U00){f()<decides>:any => f[]=7}
 test(QS02){f()<decides>:int<succeeds> => f[]}
-test(D00){f()<decides>:int => f[]}	#TODO:10.4:EFF-DECIDES (same as l659)
+test(D00){f()<decides>:int => f[]}	#TODO:10.4:EFF:DECIDES (same as l659)
 
 # Effects based subtyping and calling.
-test(S00){f(a:int,b:int):=1,f(3,5)}
+test(S00){f(a:int,b:int):=1,f(3,5)}			#FP:10.4:CHECK:OK?
 test(S00){f(g(:int)          :int):int => f(g(x:int):=x)}
 test(S00){f(g(:int)          :int):int => f(g(x:int):int=x)}
 test(P00){f(g(:int)<computes>:int):int => f(g(x:int):type{x}=x)}
@@ -677,7 +677,7 @@ test(P00){f(g(:int)          :int):int => f(g(x:int)<decides>:type{x}=x)}
 test(S00){f(g(:int)<decides> :int):int => f(g(x:int)         :=x)}
 test(S00){f(g(:int)<decides> :int):int => f(g(x:int)<decides>:=x)}
 test(S00){f(g(:int)<decides>:int)<decides>:=g[3] => f(g(x:int):=x)}
-test(D00){f(g(:int)<decides>:int)<decides>:=g[3] => g(x:int)<decides>:int => f[g]}	#TODO:10.4:EFF-DECIDES
+test(D00){f(g(:int)<decides>:int)<decides>:=g[3] => g(x:int)<decides>:int => f[g]}	#TODO:10.4:EFF:DECIDES
 test(S00){f(g(:int)<decides>:int)<decides>:=g[3] => f[g(x:int):int=4]}
 test(D00){f(g(:int)<decides>:int)<decides>:=g[3] => f[g(x:int)<decides>:int=4]}
 test(P00){f(g(:int)<decides>:int)<decides>:=g[3] => f(g(x:int)<decides>:int=4)}
@@ -685,25 +685,25 @@ test(P00){f(g(:int)<decides>:int)<decides>:=g[3] => f(g(x:int)<decides>:int=4)}
 # Equalty inference and effects abstraction.
 test(U00){f(x:any)            :any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
 test(U00){f(x:any)<converges >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
-test(S00){f(x:any)<computes  >:any => f(3)=f(3)}
+test(S00){f(x:any)<computes  >:any => f(3)=f(3)}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
 test(U00){f(x:any)<reads     >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
 test(U00){f(x:any)<writes    >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
 test(U00){f(x:any)<varies    >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
 test(U00){f(x:any)<transacts >:any => f(3)=f(3)}	#TODO:FUN-OUT-EQ
-test(S00){f(x:int)<computes><diverges >:any => if{f[3]=f[3]}}
-test(S00){f(x:int)<computes><succeeds >:any => if{f[3]=f[3]}}
+test(S00){f(x:int)<computes><diverges >:any => if{f[3]=f[3]}}	#FP:10.4:IF
+test(S00){f(x:int)<computes><succeeds >:any => if{f[3]=f[3]}}	#FP:10.4:IF
 test(U00){g(f(x:any)<throws_any>:any)<throws_any>:=f(3)=f(3)}	#TODO:FUN-OUT-EQ-EFF-THROWS
-test(S00){g(f(x:any)<computes><throws_any>:any)<throws_any>:=f(3)=f(3)}
+test(S00){g(f(x:any)<computes><throws_any>:any)<throws_any>:=f(3)=f(3)}	#FP:10.4:IF
 test(U00){g(f(x:any)<interacts           >:any)<interacts>:=f(3)=f(3)}	#TODO:FUN-OUT-EQ-EFF-INTERACTS
-test(S00){g(f(x:int)<computes><fails     >:any) := if{f[3]=f[3]}}
-test(S00){g(f(x:int)<computes><decides   >:any) := if{f[3]=f[3]}}
+test(S00){g(f(x:int)<computes><fails     >:any) := if{f[3]=f[3]}} #FP:10.4:IF
+test(S00){g(f(x:int)<computes><decides   >:any) := if{f[3]=f[3]}} #FP:10.4:IF
 test(U00){g(f(x:int)<computes><resolves  >:any) := if{f[3]=f[3]}}
 #!!error order only test(S02){g(f(x:int)<computes><iterates  >:any) := if{f[3]=f[3]}}
 #!!error order only test(S02){g(f(x:int)<computes><abstracts >:any) := if{f[3]=f[3]}}
 
 # Abstract functions: effects declaration says what effects the assumed range may have.
 test(S00){f(x:int)           :int => f[3]}
-test(D00){f(x:int)<decides  >:int => f[3]}		#TODO:10.4:EFF-DECIDES
+test(D00){f(x:int)<decides  >:int => f[3]}		#TODO:10.4:EFF:DECIDES
 test(U00){f(x:int)<resolves >:int => f[3]}		#TODO:10.4:EFF-RESOLVES
 test(P00){f(x:int)<decides  >:int => f(3)}
 test(P00){f(x:int)<resolves >:int => f(3)}
@@ -726,7 +726,7 @@ test(X00){f(x:int)<succeeds>:=2|3}
 test(A00){f(x:int)<succeeds>:int}
 
 test(S00){f(x:int)<decides>:=x}
-test(S00){f(x:int)<decides>:false}
+test(S00){f(x:int)<decides>:false}	#FP:10.4:EFF:DECIDES
 test(S00){f(x:int)<decides>:=x=3}
 test(X00){f(x:int)<decides>:=2|3}
 test(A00){f(x:int)<decides>:int}
@@ -760,7 +760,7 @@ test(P00){f(x:int)<decides>:=x=3,f(4)}
 #test(S00){a:any=f():=a}
 
 # Staging.
-test(S00){:int=2}
+test(S00){:int=2}						#FP:10.4:DESUGAR:HIDING
 test(V10){:int='c'}
 test(V10){x:int=(2=3)}
 test(V10){a:int => x:int=(a=2)}
@@ -776,9 +776,9 @@ test(F00){x:int=3,x='c'}
 test(F00){x:int=3,x=false}	#NOTE:ASCRIPTION
 
 # Staging with recursive references.
-test(S00){y:=(3,y[0])}
-test(S00){x:any=y:=7}
-test(S00){x:any=y:=(3,y[0])}
+test(S00){y:=(3,y[0])}			#FP:10.4:RECURSION
+test(S00){x:any=y:=7}			#FP:10.4:CHECK
+test(S00){x:any=y:=(3,y[0])}	#FP:10.4:RECURSION
 
 # Stage recursion and circularity.
 test(S00){x:int => y:int=x}
@@ -787,17 +787,17 @@ test(S00){x:int=3,y:int=4}
 test(S00){(x:int=3) where int[x]}
 test(S00){(x:int=3) where y:int=x}
 test(S00){x:int=3,y:int=x}
-test(S00){x:int=y,y:int=3}
-test(S00){x:int=y,y:int=3,int[x],int[y]}
+test(S00){x:int=y,y:int=3}						#FP:10.4:CHECK:ISINT-SWAP
+test(S00){x:int=y,y:int=3,int[x],int[y]}		#FP:10.4:CHECK:ISINT-SWAP
 test(V10){x:int=y,y:int=x}
 
 # Stage recursion and arrays.
-test(S00){xs:type{3,:int}=(3,5)}
-test(S00){xs:type{3,:int}=(3,5); xs}
-test(S00){xs:type{3,:int}=(3,5); xs[0]}
-test(S00){xs:type{3,:int}=(3,5); xs[0]=3}
+test(S00){xs:type{3,:int}=(3,5)}				#FP:10.4:TYPE:ARRAY
+test(S00){xs:type{3,:int}=(3,5); xs}			#FP:10.4:TYPE:ARRAY
+test(S00){xs:type{3,:int}=(3,5); xs[0]}			#FP:10.4:TYPE:ARRAY
+test(S00){xs:type{3,:int}=(3,5); xs[0]=3}		#FP:10.4:TYPE:ARRAY
 test(F00){xs:type{3,:int}=(3,5); xs[0]=4}
-test(S00){xs:type{3,:int}=(3,5); xs[0]=3}
+test(S00){xs:type{3,:int}=(3,5); xs[0]=3}		#FP:10.4:TYPE:ARRAY
 test(F00){xs:type{3,:int}=(3,5); xs[0]=4}
 
 # Recursive reference out of stage. Require tighter <abstracts>.
@@ -1003,7 +1003,7 @@ test(F00){f(x:int)<decides>:=x=3, f[:char]}	#NOTE:FP
 test(D00){f(x:int)<decides>:=x=3, y:int=>f[y]}
 test(S00){f(x:int)<decides>:=x=3 => f[:int]}
 test(F00){f(x:int)<decides>:=x=3 => f[:char]}
-test(D00){f(x:int)<decides>:=x=3 => y:int=>f[y]}	#TODO:10.4:EFF-DECIDES
+test(D00){f(x:int)<decides>:=x=3 => y:int=>f[y]}	#TODO:10.4:EFF:DECIDES
 
 test(S00){x:int => int[x]}
 test(D00){x:int => nat[x]}
