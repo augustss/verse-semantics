@@ -6,7 +6,7 @@
 # Abstraction propagation.
 test(S00){f():=for(1) do :int => 0}						# NOTE:FOR
 test(S00){f():=for(1|2) do :int => 0}					# NOTE:FOR
-test(S00){f():=if(1=1) then :int else :nat => 0}		# NOTE:???
+test(S00){f():=if(1=1) then :int else :nat => 0}		# FP:10.4:PARSE:DESUGAR
 test(S00){f():=if(1=2) then :int else :nat => 0}		# NOTE:???
 test(S00){f():=let() do :int => 0}						# NOTE:???
 test(S00){f():type{(:nat)|(:int)} => 0}					# NOTE:???
@@ -55,7 +55,7 @@ test(S00){f(x:=0|1):nat=x}
 #LA test(V04){type{(for|first){}}}
 #LA test(V04){f(m:=let|for):=m(1){2}}
 #LA test(V04){for(m:=let|for) do m(1){2}}
-test(S00){f():type{int|int} => :f[]=3}	#TODO:???
+test(S00){f():type{int|int} => :f[]=3}	#FP:10.4:???
 
 # Error ordering.
 test(N04){f(g():any):=g[]; f(g():=6)}
@@ -64,11 +64,11 @@ test(N04){f(x:int)<decides>:=x=3, f[x:int]}
 # Open world + conditionals.
 test(S00){fv(:any) := x:int=if(1) then 1 else 2}
 test(S00){fv(:any) := x:int=if(1=2) then 1 else 2}
-test(S00){a:int => :int=3}							#TODO:HIDING
-test(S00){a:int => :int=a}							#TODO:HIDING
-test(S00){a:int => :int=if(1) then 2 else 3}		#TODO:HIDING
-test(S00){a:int => :int=if(1=2) then 2 else 3}		#TODO:HIDING
-test(S00){a:int => if(a=1) then :int=2 else :int=3}	#TODO:HIDING
+test(S00){a:int => :int=3}							#FP:10.4:DESUGAR:HIDING
+test(S00){a:int => :int=a}							#FP:10.4:DESUGAR:HIDING
+test(S00){a:int => :int=if(1) then 2 else 3}		#FP:10.4:DESUGAR:HIDING
+test(S00){a:int => :int=if(1=2) then 2 else 3}		#FP:10.4:DESUGAR:HIDING
+test(S00){a:int => if(a=1) then :int=2 else :int=3}	#FP:10.4:DESUGAR:HIDING
 #test(S00){a:int => :int=if(a=1) then 2 else 3} #!! MUST FIX
 
 #
@@ -121,15 +121,15 @@ test(U00){a:any => comparable[a,3]}
 # Runtime input plumbing.
 test(S00){f():=1; f[]}
 test(R00){allow{f():=allow{:nat}; f[]}}
-test(S00){f():=3,f=f}
-test(S00){f():=3,if{f=f}}
+#RJ:FN-COMP! test(S00){f():=3,f=f}					#FP:10.4:FN-COMP
+#RJ:FN-COMP! test(S00){f():=3,if{f=f}}				#FP:10.4:FN-COMP
 
 # Weird error.
 #test(U00){operator'-'[3]}
 
 # Depends on Abstraction propagation policy.
 test(D00){f()<computes>:=a=b where a&b:int => f[]=f[]}		#TODO:10.4:CHECK-STRENGTH
-test(S00){f()<computes>:type{a=b where a&b:int} => f[]=f[]}
+test(S00){f()<computes>:type{a=b where a&b:int} => f[]=f[]}	#FP:10.4:DESUGAR:EFF-COMPUTES
 test(D00){f():type{a=b where a&b:int} => f[]=f[]}
 test(U00){c:int => f(c):={a=b where a:any,b:any} => f[3]}
 
@@ -153,7 +153,7 @@ test(QS00){f(g():int):int => h()<interacts>:int => assume{f[h]}}
 # Testing operator'?'.
 test(S00){type{3}?}
 test(A00){int?}
-test(S00){int?=3}
+test(S00){int?=3}	#FP:10.4:DESUGAR:HIDING
 test(F00){int?='3'}
 
 # Solving functions with inputs or multiple function confusion.
@@ -198,11 +198,11 @@ test(S00){as->bs:=(1,2)}
 #as:=array{a:int} => bs:=for{W->X:=(:as,a=1)} where bs=array{} or bs=array{_}
 #as:=array{a:int} => n:=Length[for{W->X:=(:as,a=1)}] where n=0 or n=1
 
-# Testing operator'?'.
-test(S00){type{3}?}
-test(A00){int?}
-test(S00){int?=3}
-test(F00){int?='3'}
+# Testing operator'?'.    #RJ:duplicate with 153
+# test(S00){type{3}?}
+# test(A00){int?}
+# test(S00){int?=3}
+# test(F00){int?='3'}
 
 # Lack of function unification.
 #if we make function_variable flexible, becomes X00: test(U00){(1=>2)=(1=>2)}
@@ -223,7 +223,7 @@ test(S00){a->b:=()}
 test(S00){let(){2}}
 
 # Conditions with range inputs.
-test(S00){t:=type{a:int,b:if(a=1) then int else char}; t[1,3]; t[2,'x']; not t[1,'3']; not t[2,3]}
+test(S00){t:=type{a:int,b:if(a=1) then int else char}; t[1,3]; t[2,'x']; not t[1,'3']; not t[2,3]}	#FP:10.4:DESUGAR:???
 
 # Functions with complex effects.
 test(S00){f()<decides>:int => f[] => 1}
@@ -235,7 +235,7 @@ test(S00){f(x:int)<reads><reads><reads>:=x}
 
 # Assuming input test (and, if function, capturing function strength).
 test(D00){a:int => f(3)():=4 => f[a]}              # Input test assumes as strong as function Abstraction.
-test(S00){g(f(3):=4):=5, a:int => g[f(a):=4] => 5} # Input test assumes as strong as caller.
+test(S00){g(f(3):=4):=5, a:int => g[f(a):=4] => 5} # Input test assumes as strong as caller.		#FP:10.4:STRENGTH:???
 test(U00){g(f(3):=4):=5, a:int => g[f(a):=4]}      # Input test doesn't assume otherwise.
 
 # Assuming range:
@@ -247,15 +247,15 @@ test(S00){f(x:int)<decides>:=x=3 => a:=3  => f[a]}
 # Can't find any example.
 test(S00){a:int => f(:int)():type{nat[a]} => f[a]}
 test(D00){a:int => f(:nat)():type{nat[a]} => f[a]}
-test(S00){a:int => f(:int):type{g():type{nat[a]}} => f[a]}
+test(S00){a:int => f(:int):type{g():type{nat[a]}} => f[a]}			#FP:10.4:CHECK
 test(D00){a:int => f(:nat):type{g():type{nat[a]}} => f[a]}
 
 # Shows need for the tighter new FunctionMacro fails rules.
 test(S01){g0(:int)<fails>:=3}
-test(S00){g0(:int)<fails>:false}
+test(S00){g0(:int)<fails>:false}									#FP:10.4:DESUGAR:EFF-FAILS:FALSE
 test(S00){g0(:false):=3}
-test(S00){f(g0(:int)<fails>:false):=4 => f(false)}
-test(S00){f(g0(:int)<fails>:false):=4 => f(g1(x:false):=3)}
+test(S00){f(g0(:int)<fails>:false):=4 => f(false)} 					#FP:10.4:DESUGAR:EFF-FAILS:FALSE
+test(S00){f(g0(:int)<fails>:false):=4 => f(g1(x:false):=3)}			#FP:10.4:DESUGAR:EFF-FAILS:FALSE
 #test(P00){f(g0(:int)<fails>:false):=4 => f(g1(x:int):=3)}
 test(S01){f(g0(:int)<fails>:=3):=4 => 5}
 
@@ -263,19 +263,19 @@ test(S01){f(g0(:int)<fails>:=3):=4 => 5}
 test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:any     ):=3]}
 test(QS00){f(g0(:int)<decides>:int):=3 => f[g1(x:rational):=3]}
 test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:int     ):=3]}
-test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:nat     ):=3]}
-test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:false   ):=3]}
+test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:nat     ):=3]}		#FP:10.4:EFF-DECIDES:SUBTYPING???
+test(S00){f(g0(:int)<decides>:int):=3 => f[g1(x:false   ):=3]}		#FP:10.4:EFF-DECIDES:SUBTYPING???
 #
 #test(U00){f(g0(:int)<decides>:false):=3 => f[g1(x:any     ):=3]}
 #test(U00){f(g0(:int)<decides>:false):=3 => f[g1(x:rational):=3]}
 #test(U00){f(g0(:int)<decides>:false):=3 => f[g1(x:int     ):=3]}
 #test(U00){f(g0(:int)<decides>:false):=3 => f[g1(x:nat     ):=3]}
-test(S00){f(g0(:int)<decides>:false):=3 => f[g1(x:false   ):=3]}
+test(S00){f(g0(:int)<decides>:false):=3 => f[g1(x:false   ):=3]}    	#FP:10.4:EFF-DECIDES:SUBTYPING???
 #
 test(S00){f(g0(-3)<decides>:int):=3 => f[g1(x:any     ):=3]}
 test(S00){f(g0(-3)<decides>:int):=3 => f[g1(x:int     ):=3]}
 #test(U00){f(g0(-3)<decides>:int):=3 => f[g1(x:nat     ):=3]}
-test(S00){f(g0(-3)<decides>:int):=3 => f[g1(x:false   ):=3]}
+test(S00){f(g0(-3)<decides>:int):=3 => f[g1(x:false   ):=3]}			#FP:10.4:EFF-DECIDES:SUBTYPING???
 #
 test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:any     ):=2]}
 test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:int     ):=2]}
@@ -287,17 +287,17 @@ test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:int     ):=2]}
 #test(U00){f(g0(:int)<decides>:=2):=3 => f[g1(x:int     ):=3]}
 #test(U00){f(g0(:int)<decides>:=2):=3 => f[g1(x:nat     ):=3]}
 #test(U00){f(g0(:int)<decides>:=2):=3 => f[g1(x:=2      ):=3]}
-test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:false   ):=3]}
+test(S00){f(g0(:int)<decides>:=2):=3 => f[g1(x:false   ):=3]} 			#FP:10.4:EFF-DECIDES:SUBTYPING???
 #
 #test(U00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:any     ):=x]}
 #test(U00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:int     ):=x]}
-test(S00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:nat     ):=x]}
+test(S00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:nat     ):=x]}  	#FP:10.4:EFF-DECIDES:SUBTYPING???
 #test(U00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:=2      ):=x]}
 #test(U00){f(g0(x:int)<decides>:=nat[x]):=3 => f[g1(x:false   ):=x]}
 
 # Higher order functions.
 test(U00){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a]}
-test(S00){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}
+test(S00){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}		#FP:10.4:STRENGTH???
 test(QS00){a:int => g(f()(x:int):=3):=4 => assume<succeeds>{g[f1()(x:int):=a]}}
 test(QD00){a:int => g(f()(x:int):=3):=4 => assume<decides >{g[f1()(x:int):=a]}}
 test(QD00){a:any => g(f()(x:int):=3):=4 => assume<decides >{g[f1()(x:int):=a]}}
@@ -373,18 +373,18 @@ test(S00){(1,2)=(1,2)}
 test(F00){(1,2)=(1,3)}
 test(S00){f(x:int):=x => f(3)=3}
 test(S00){a&b&c&d:int => (a,b)=(1,2) => nat[a]}
-test(S00){f(x&y:int):=(y,x) => f(3,5)=(5,3)}
+test(S00){f(x&y:int):=(y,x) => f(3,5)=(5,3)}	#FP:10.4:CHECK:DESUGAR&
 test(F00){f(x&y:int):=(y,x) => f[3,5]=(5,5)}
 test(F00){f(x&y:int):=(y,x) => f[3,5]=(3,3)}
 test(S00){a&b:int => c:=(a,b) => c=(a,b)}
 test(D00){a&b:int => c:=(a,b) => c=(b,a)}
 test(U00){a&b:int => c:any => f():type{c=(a,b)} => {c=(a,b)}}
 test(S00){a&b:int => c:any => f():type{c=(a,b)} => {f[],c=(a,b)}}
-test(S00){a&b:int => c:any => f():type{c=(a,b)} => {c=(a,b),f[]}}
+test(S00){a&b:int => c:any => f():type{c=(a,b)} => {c=(a,b),f[]}}	#FP:10.4:CHECK:L2R
 test(S00){a&b&c&d:int => (a,b)=(1,2) => nat[a]}
 test(S00){a&b&c&d:int => (a,b)=(c,d) => {a=c,b=d}}
 test(S00){(a,2)=(1,2),a:int}
-test(S00){a:int,(a,2)=(1,2)}
+test(S00){a:int,(a,2)=(1,2)}		#FP:10.4:CHECK
 test(S00){(_,_)=(1,2)}
 
 # Testing tests.
@@ -404,7 +404,7 @@ test(S00){f():=(:int) => 4}
 test(S00){f():=array{3} => 4}
 test(A00){f():=array{_} => 4}		#TODO:10.4:ARRAY-UNDERSCORE
 test(S00){f():=array{:any} => 4}
-test(S00){f():=array{:any} => f()[0]}
+test(S00){f():=array{:any} => f()[0]}	#FP:10.4:CHECK:DESUGAR:ARRAY?
 test(U00){f():=array{:any} => f()[0]=3}
 test(S00){f():=array{:int} => 4}
 test(S00){f():=array{:int} => f()[0]}
@@ -444,7 +444,7 @@ test(V10){a:int => {f():type{a=3}=a=3,f[]}} # Should refine to D00.
 #LA test(QV10){a:int => if{x:int<fails>=a=3}}
 test(S00){f()<decides>:int => f[] => 123}
 test(S00){f()<decides>:int => assume{f[]}}
-test(S00){f()<decides>:int => if{f[]}}
+test(S00){f()<decides>:int => if{f[]}}	#FP:10.4:EFF-DECIDES
 test(U00){f()<resolves>:int => if{f[]}}
 test(S00){f(a:int):=if(a=3) then a=3}
 #LA test(S00){if{x:int<decides>=3}}
@@ -455,8 +455,8 @@ test(D00){f(a:int):=if(:int=a=3) then a=3}
 #LA test(S00){if{x:int<decides>:false}}
 
 # Assumption forks inside stage.
-test(S00){f():type{int|nat} => {x:f[]=3}}
-test(S00){f():type{int|int} => {x:f[]=-3}}
+test(S00){f():type{int|nat} => {x:f[]=3}}	#FP:10.4:DESUGAR:HIDING
+test(S00){f():type{int|int} => {x:f[]=-3}}	#FP:10.4:DESUGAR:HIDING
 test(V10){f():type{int|nat} => {x:f[]=-3}}
 test(V10){f():type{nat|int} => {x:f[]=-3}}
 test(S00){f(x:=0|1):nat=x}
@@ -465,12 +465,12 @@ test(S00){f(x:=0|1):nat=x}
 #test(V10){f(x:=-1..1):nat=x, nat[f[1]]}
 
 # Proper explore.UnpromotableNegotiable effects propagation.
-test(S00){f(g(:int)<decides>:int):int => f[false]}
+test(S00){f(g(:int)<decides>:int):int => f[false]}	#FP:10.4:FALSE:EFF-DECIDES
 test(U00){f(g(:int)<succeeds>:int):int => f[false]}
-test(S00){f(g(:int)<fails>:int):int => f[false]}
+test(S00){f(g(:int)<fails>:int):int => f[false]} 	#FP:10.4:EFF-FAILS
 
 # Have we introduced unsoundness by masking out h but allowing granular :t<x>? Seems not.
-test(S00){f(g(:any)<decides >:any):=3 => f[false]}
+test(S00){f(g(:any)<decides >:any):=3 => f[false]} #FP:10.4:FALSE:EFF-DECIDES
 test(U00){f(g(:any)<succeeds>:any):=3 => f[false]}
 
 #
@@ -520,7 +520,7 @@ test(S00){f(5)(6):=7 => f[5]}
 # Contingency stacking. Shows f[a] strength is the weaker of f[a] domain match and f op_function.
 test(U00){a&b:any => f(a=b)():=a=b => f[a=b]}
 test(D00){a&b:int => f(a=b)():=a=b => f[a=b]}
-test(S00){a&b:int => f(a=b)():=a=b => if{f[a=b]}}
+test(S00){a&b:int => f(a=b)():=a=b => if{f[a=b]}} #FP:10.4:STRENGTH:???
 test(D00){a&b:int => f(a):=a=3 => f[3]}
 test(D00){a&b:int => f(a,b):=a=3 => f[3,b]}
 test(S00){a&b:int => f(a):=4 => g(b):type{f[3]} => g[b]}
@@ -536,12 +536,12 @@ test(D00){a&b:int => f(:nat):=a=b => f[a]}
 test(D00){a&b:int => f(:nat):=a=b => {f[a],a=b}}
 test(D00){a&b:int => f(:nat):=nat[a] => f[a]}
 test(D00){a&b:int => f(:nat)():=nat[a] => f[a][]}
-test(S00){a&b:any => c:int => f(:int):type{a=b} => {f[c], a=b}}
+test(S00){a&b:any => c:int => f(:int):type{a=b} => {f[c], a=b}}	#FP:10.4:CHECK
 test(D00){a&b:any => c:int => f(:nat):type{a=b} => {f[c], a=b}}
 test(D00){a&b:int => f(a)(b):type{a=3} => f[3][b]}
 test(D00){a&b:int => f(a)(b):type{b=3} => f[a][3]}
 test(D00){a&b:int => g(b):=4 => f(a):=g => f[3][b]}
-test(S00){a&b:int => g(b):type{a=3} => f(a):=g => f[3][b]}
+test(S00){a&b:int => g(b):type{a=3} => f(a):=g => f[3][b]}		#FP:10.4:CHECK:L2R:STRENGTH:UNSOUND
 test(D00){a&b&c:int => f(:nat):=b=c => f[a]}
 test(U00){a:int => b&c:any => f(:nat):=b=c => 7}		#TODO:10.4:WHY
 test(D00){a:int => b&c:any => f(:nat):type{b=c} => f[a]} # not being forced?
@@ -575,31 +575,31 @@ test(P00){a&b:int => f(g():int):=g() => {h()<decides>:=a=b,f(h)}}
 test(U00){a&b:any => f(a=b):=a=b => f[a=b]}
 test(D00){a&b:int => f(a=b):=a=b => f[a=b]}
 test(U00){a&b:any => f(a=b):=a=b => if{f[a=b]}}
-test(S00){a&b:int => f(a=b):=a=b => if{f[a=b]}}
+test(S00){a&b:int => f(a=b):=a=b => if{f[a=b]}}			#FP:10.4:CHECK:STRENGTH:IF
 test(U00){a:any => f(nat[a]):=nat[a] => f[a]}
 test(D00){a:int => f(nat[a]):=nat[a] => f[a]}
 test(U00){a:any => f(nat[a]):=nat[a] => if{f[a]}}
-test(S00){a:int => f(nat[a]):=nat[a] => if{f[a]}}
+test(S00){a:int => f(nat[a]):=nat[a] => if{f[a]}} 		#FP:10.4:CHECK:STRENGTH:IF
 test(D00){a&b:int => f():type{a=b} => a=b}
 test(S00){a&b:int => f():type{a=b} => {f[],a=b}}
-test(S00){a&b:int => f():type{a=b} => {a=b,f[]}}
+test(S00){a&b:int => f():type{a=b} => {a=b,f[]}}		#FP:10.4:UNSOUND?
 test(D00){a&b:int => f(a):type{a=b} => f[b]}
 test(D00){a&b:int => f(a=b):type{a=b} => f[a]}
 test(D00){a&b:int => f(a=b):type{a=b} => f[b]}
 test(D00){a&b:int => f(a=b):type{a=b} => f[a=b]}
 test(D00){a&b:int => f(a):type{a=b} => {x:=b,f[x]}}
-test(D00){a&b:int => f(a):type{a=b} => {f[x],x:=b}}		#TODO:10.4:CHECK-STRENGTH:TYPE
+test(D00){a&b:int => f(a):type{a=b} => {f[x],x:=b}}
 test(A00){f(x:int):int => {x:=f[x],first{int[x]}}}
-test(S00){a:int => f(x:nat):int => if{f[a]=3}}
-test(S00){a:int => f(x:int):int => if{int[f[a]]}}
-test(S00){a:int => f(x:nat):int => if{int[f[a]]}}
-test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}
+test(S00){a:int => f(x:nat):int => if{f[a]=3}}			#FP:10.4:IF
+test(S00){a:int => f(x:int):int => if{int[f[a]]}}		#FP:10.4:IF
+test(S00){a:int => f(x:nat):int => if{int[f[a]]}}		#FP:10.4:IF
+test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}		#FP:10.4:IF
 test(U00){a:any => f(x:nat):int => if{int[f[a]]}}
 test(U00){a:int => f(x:nat):any => if{int[f[a]]}}
-test(S00){a&b:int => f(x:nat):int => if{f[a]=f[b]}}
-test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}
+test(S00){a&b:int => f(x:nat):int => if{f[a]=f[b]}}     #FP:10.4:IF
+test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}		#FP:10.4:IF
 test(U00){a:int => f(x:nat):any => if{f[a]=1}}
-test(S00){a:int => f(x:nat):int => if{f[a]=1}}
+test(S00){a:int => f(x:nat):int => if{f[a]=1}}			#FP:10.4:IF
 test(S00){a:int => f(x:nat):type{let(y&z:any){y=z}} => if{f[a]}}
 test(A00){f(:int):int => for{f[x:int]=x}}
 test(D00){a&b&c&d:int => f(a):type{c=d} => g(c):=a=b => {f[x],g[d],x:=b}}	#TODO:10.4:CHECK-STRENGTH:TYPE

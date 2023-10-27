@@ -403,10 +403,12 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
 
 
 mustDecide :: QContext -> [BndVar] -> Expr -> Bool
-mustDecide _ bs = go
+mustDecide _ bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} res
   where
+    res = go e
     lamBinds       = [x | BLam x <- bs]
     go (Int _)     = True
+    go (Char _)    = True
     go (Arr as)    = all go as
     go (Lam _)     = True
     go (Var x)     = x `elem` lamBinds

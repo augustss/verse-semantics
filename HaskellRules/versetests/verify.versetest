@@ -129,3 +129,6 @@ verify(pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEP
 # simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
 # verify(pass) { f(x:int) := x; foo(:any) := {f[_]=3} }
 # verify(fail) { f(x:int) := x; foo(:any) := {f[_]='3'} }
+
+# subtyping (passes, but apparently, should be rejected!)
+verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }
