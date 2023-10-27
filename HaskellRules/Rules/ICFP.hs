@@ -230,6 +230,7 @@ valid' onlyEq = expr
       expr e && expr e1
     expr e@Split{} = error $ "malformed split: " ++ prettyShow e
     expr (If e1 e2 e3) = expr e1 && expr e2 && expr e3
+    expr (Store _ e) = valid e   -- XXX this case seems to happen with QC
     expr e = error $ "valid: unexpected " ++ show e
     expru (v :=: e) = value v && expr e
     expru e = not onlyEq && expr e
@@ -1117,7 +1118,7 @@ addStore e = Store storeEmpty e
 -- and any existentials that are no longer needed.
 dropStore :: Expr -> Expr
 dropStore ee | hasStoreOps ee = ee
-            | otherwise = drops ee
+             | otherwise = drops ee
   where drops (Store _ e) = e
         drops (EXI x e) | x `elem` free e' = EXI x e'
                         | otherwise = e'

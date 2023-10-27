@@ -26,8 +26,6 @@ import Language.Verse.Name
 
 import Prettyprinter
 
-infixl 4 :*>:
-
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
   | f (Exp f a) :=: f (Exp f a)
@@ -60,6 +58,8 @@ data Exp f a
   | Name a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
+
+infixl 4 :*>:
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f a)
@@ -162,9 +162,9 @@ fun = liftL2 . Fun
 name :: Functor f => f a -> f (Exp f a)
 name = fmap Name
 
-infixl 4 `then'`
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
+infixl 4 `then'`
 
 liftL1 :: Functor f => (f a -> b) -> f a -> f b
 liftL1 f x = f x <$ x

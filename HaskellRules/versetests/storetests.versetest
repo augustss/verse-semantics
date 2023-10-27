@@ -175,3 +175,14 @@ testeq(pass) { var a:any=0; for{for( 0 | (set a+=1) ) { y:=10|20; (a, y) } } }
 testeq(pass) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[0]] } { 10 }
 testeq(pass) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; read$[a[1]] } { x:any }
 testeq(pass) { a := for(1|2) {alloc$[:any]}; a[0] .= 10; r:=(read$[a[0]], read$[a[1]]); read$[a[1]] = 99; r } { (10,99) }
+
+# This illustrates that the choice captures the delimited continuation.
+# The A+=10000 runs a total of 3 times, since it is in the continuation
+# that iterates 3 in the body.
+testeq(pass) {
+  var A:int = 0;
+  for { for ((set A += 1000) | (set A += 10000)) { (set A += 1) | (set A += 10) | (set A += 100); } }
+  } {
+  ((1001, 11002), (1001, 11012), (1001, 11112), (11122, 21123), (11122, 21133),
+   (11122, 21233), (21333, 31334), (21333, 31344), (21333, 31444))
+  }

@@ -227,7 +227,7 @@ runVerseT m = do
     sk x fk _ r = readRef r.suspCount >>= \ case
       0 -> do
         commit <- readRef r.commit
-        runFreshenT' commit r.heap splitDepth
+        evalFreshenT commit r.heap
         fmap (x:) <$> fk r
       _ -> pure Nothing
     fk _ = pure $ Just []
@@ -544,7 +544,7 @@ newVarRef x = do
   ref <- lift . fmap VarRef . newRef $ singleton x
   lift . modifyRef' r.commit $ \ commit -> do
     commit
-    (h, h', _) <- FreshenT ask
+    (h, h') <- FreshenT ask
     x <- freshen =<< get' (unVarRef ref) h
     put' (unVarRef ref) h x *> put' (unVarRef ref) h' x
   pure ref
@@ -570,7 +570,7 @@ writeVarRef ref x = do
   let
     commit' = do
       commit
-      (h, h', _) <- FreshenT ask
+      (h, h') <- FreshenT ask
       x <- freshen =<< get' (unVarRef ref) h
       put' (unVarRef ref) h x *> put' (unVarRef ref) h' x
   liftEmpty $
@@ -662,12 +662,13 @@ for m f = do
       Fail -> pure $ reverse xs
       Abort -> abort
       Succeed (h, _, x, m) -> do
-        r <- ask'
         i <- lift $ supply
-        lift . modifyRef' r.heaps $ IntMap.insert i h
-        xs <- (:xs) <$> f x
-        h <- lift . stateRef' r.heaps $ IntMap.Lazy.findDelete i
-        loop ref m f xs h
+        liftSucceed $ \ r -> modifyRef' r.heaps $ IntMap.insert i h
+        xs <- f x <&> (:xs)
+        loop ref m f xs <=< liftSucceed $ \ r -> do
+          h <- stateRef' r.heaps $ IntMap.Lazy.findDelete i
+          evalFreshenT' (join $ readRef r.commit) r.heap h
+          pure h
 
 verify
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -885,7 +886,7 @@ freeze' :: (Monad m, Freezable a b m) => a -> VerseT m b
 freeze' = runFreezeT . freeze
 
 newtype FreshenT m a = FreshenT
-  { unFreshenT :: RWST (HeapKey, HeapKey, Int) (Rollback m) (IntMap GHC.Exts.Any) m a
+  { unFreshenT :: RWST (HeapKey, HeapKey) (Rollback m) (IntMap GHC.Exts.Any) m a
   } deriving ( Functor
              , Applicative
              , Monad
@@ -902,13 +903,15 @@ instance Applicative m => Monoid (Rollback m) where
 runFreshenT :: Monad m => FreshenT m a -> HeapKey -> VerseT m a
 runFreshenT m heap = do
   r <- ask'
-  (x, w) <- lift $ evalRWST (unFreshenT m) (heap, r.heap, r.splitDepth) mempty
+  (x, w) <- lift $ evalRWST (unFreshenT m) (heap, r.heap) mempty
   addEmpty $ getRollback w
   pure x
 
-runFreshenT' :: Monad m => FreshenT m () -> HeapKey -> Int -> m ()
-runFreshenT' m h splitDepth =
-  fst <$> evalRWST (unFreshenT m) (h, h, splitDepth) mempty
+evalFreshenT :: Monad m => FreshenT m () -> HeapKey -> m ()
+evalFreshenT m h = evalFreshenT' m h h
+
+evalFreshenT' :: Monad m => FreshenT m a -> HeapKey -> HeapKey -> m a
+evalFreshenT' m h h' = fst <$> evalRWST (unFreshenT m) (h, h') mempty
 
 instance MonadTrans FreshenT where
   lift = FreshenT . lift
@@ -943,18 +946,16 @@ instance ( MonadFix m
   freshen = FreshenT . loop
     where
       loop v = do
-        (h, _, splitDepth) <- ask
+        (h, _) <- ask
         lift (findRepr' v h) >>= \ case
           Found _ (Bound x i) -> mfix $ \ x' ->
             state' (IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
               Just x' -> pure $ unsafeCoerce x'
               Nothing -> lift . newVar' =<< traverse loop x
-          Found v (Unbound n _ i) -> mfix $ \ x' ->
+          Found v (Unbound _ _ i) -> mfix $ \ x' ->
             state' (IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
               Just x' -> pure $ unsafeCoerce x'
-              Nothing -> case n > splitDepth of
-                False -> pure v
-                True -> lift $ freshVar' splitDepth
+              Nothing -> pure v
 
 msplit_
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -1071,7 +1072,7 @@ alts x y z = VerseT $ \ yk ak sk fk ek r -> do
 
 addEmpty :: Applicative m => (Env m -> m ()) -> VerseT m ()
 addEmpty f = VerseT $ \ _ _ sk fk ek ->
-  sk () fk (\ r -> f r *> ek r)
+  sk () fk $ \ r -> f r *> ek r
 
 type CopyT m = ReaderT (HeapKey, Ref m Decisions) m
 

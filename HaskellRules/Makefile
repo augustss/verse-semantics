@@ -40,6 +40,12 @@ testverify:
 testicfpqc:
 	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive
 
+testicfpstore:
+	$(TESTER) --quiet --dfs --split --rules=ICFPS --post-process --assume-verified --max-steps=25000 $(TESTSTOREFILE)
+
+testicfpstoreqc:
+	$(QCTEST) --rules=ICFPS --ignore-fuel-stop --max-success=100000 --ignore-recursive
+
 testtricky:
 	$(TESTER) --quiet --summary --no-error --all-rules --assume-verified --max-norm-steps=100000 --max-steps=4000 $(TRICKY)
 

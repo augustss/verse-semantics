@@ -15,7 +15,7 @@ data Flags = Flags
 --  , fDenSem       :: !Bool
   , fDfs          :: !Bool
   , fLatex        :: !Bool
-  , fFinalInline  :: !Bool
+  , fPostProcess  :: !Bool
   , fRewriteSteps :: !Int
   , fEvalSteps    :: !Int
   , fNoFuelStop   :: !Bool
@@ -27,6 +27,7 @@ data Flags = Flags
   , fPrelude      :: !(String, Expr)
   , fNoWarn       :: !Bool
   , fDesugar      :: !Desugar
+  , fKeepIf       :: !Bool
   }
   deriving (Show)
 
@@ -39,7 +40,7 @@ defaultFlags = Flags
 --  , fDenSem       = False
   , fDfs          = False
   , fLatex        = False
-  , fFinalInline  = True
+  , fPostProcess  = True
   , fRewriteSteps = 25000
   , fEvalSteps    = 1000
   , fNoFuelStop   = False
@@ -51,6 +52,7 @@ defaultFlags = Flags
   , fPrelude      = either error id $ findPrelude defaultPrelude
   , fNoWarn       = False
   , fDesugar      = DS1
+  , fKeepIf       = False
   }
 
 showFlags :: Flags -> String
@@ -59,7 +61,7 @@ showFlags f = unwords
   , if fSplit f then "split" else "no-split"
   , if fSimplify f then "simplify" else "no-simplify"
   , if fUnderLambda f then "under-lambda" else "no-under-lambda"
-  , if fFinalInline f then "final-inlines" else ""
+  , if fPostProcess f then "post-process" else ""
   , "max-steps=" ++ show (fRewriteSteps f)
   , "prelude=" ++ show (fst (fPrelude f))
   , "desugar=" ++ show (fDesugar f)
