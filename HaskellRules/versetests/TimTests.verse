@@ -802,7 +802,7 @@ test(F00){xs:type{3,:int}=(3,5); xs[0]=4}
 
 # Recursive reference out of stage. Require tighter <abstracts>.
 #test(V10){x:int=3 where int[x]}
-test(S00){x:type{3}=x}
+test(S00){x:type{3}=x}	 						#FP:10.4:RECURSION:TYPE:UNSOUND
 #test(S00){x:int=3 where x}
 #test(S00){xs:type{3,:int}=let(xs) do (3,5)}
 #test(S00){xs:type{3,:int}=(xs[0],7)}
@@ -810,8 +810,8 @@ test(S00){x:type{3}=x}
 
 # Stage recursion: Checking context doesn't have priveleged information that's available outside.
 # We could tighten this in the future with a different structure.
-test(S00){xs:type{:int,:int}=ys:=(3,ys[0])}
-test(S00){xs:type{:int,:int}=ys:=(ys[1],3)}
+test(S00){xs:type{:int,:int}=ys:=(3,ys[0])}		#FP:10.4:RECURSION
+test(S00){xs:type{:int,:int}=ys:=(ys[1],3)} 	#FP:10.4:RECURSION
 test(V10){xs:type{:int,:int}=(3,xs[0])}
 test(V10){xs:type{:int,:int}=(xs[1],3)}
 
@@ -830,35 +830,35 @@ test(D00){a&b:int => {a=b => 1; a=b}} # Verifying Uncommittable aren't committin
 test(S00){x:type{3}=3}
 test(V10){x:type{3}=4}
 test(V10){x:type{3}='c'}
-test(S00){x:type{3}=x}
+test(S00){x:type{3}=x} 					#FP:10.4:RECURSION:TYPE:UNSOUND:DUPLICATE:805
 test(S00){x:type{:int}=3}
 test(S00){x:type{:int}=4}
 test(V10){x:type{:int}='c'}
 test(S00){type{3,4}[3,4]}
 test(S00){x:function(y:=(3,4)){y}=(3,4)}
 test(S00){x:type{3,4}=(3,4)}
-test(S00){x:type{3,4}=(x[0],x[1])}
+test(S00){x:type{3,4}=(x[0],x[1])}		#FP:10.4:TYPE:RECURSION
 test(V10){x:type{3,:int}=(x[0],x[1])}
 test(V10){x:type{:int,:int}=(x[0],x[0])}
-test(S00){x:type{a:int,a+1}=(3,4)}
+test(S00){x:type{a:int,a+1}=(3,4)}		#FP:10.4:TYPE
 test(V10){x:type{a:int,a+1}=(3,5)}
-test(S00){x:type{a:int,a+1}=(3,_)}
+test(S00){x:type{a:int,a+1}=(3,_)} 		#FP:10.4:TYPE
 test(V10){x:type{a:int,a+1}=(_,5)}
 test(S00){x:type{_}=3}
 test(S00){x:type{_}=(3,3)}
 test(S00){x:type{_,_}=(3,3)}
 test(S00){x:type{}=()}
 test(S00){x:type{_}=3}
-test(S00){x:any=(3,3)}
-test(S00){x:any=array{3}}
+test(S00){x:any=(3,3)}					#FP:10.4:CHECK
+test(S00){x:any=array{3}}				#FP:10.4:CHECK:ARRAY
 
 # Stage value should take input because it may be part of a layered approximation.
 test(S00){x:prefix'-'=3}
 test(V10){x:int:prefix'-'=3} # Will tighten S00 natives have type approximations.
 
 # Conditions trying to cheat stage.
-test(S00){a:int => :int=if(8=9) then 3 else 4}
-test(S00){a:int => :int=if(8=9) then 3 else 4}
+test(S00){a:int => :int=if(8=9) then 3 else 4}	 	#FP:10.4:CHECK:ISINT-SWAP
+test(S00){a:int => :int=if(8=9) then 3 else 4}		#FP:10.4:CHECK:ISINT-SWAP
 #!!test(S00){a:int => :int=if(a=3) then 3 else 4}
 #Explore-UncommittableNegotiable test(V10){x:int=if(x=3) then 3 else 4} # Could accept this.
 #Explore-UncommittableNegotiable test(V10){x:int=if(x=3) then 4 else 5} # Must reject this.
@@ -887,7 +887,7 @@ test(S00){f(x:int):int=x; f[4]}
 
 # Stage evaluation equality inference.
 test(A00){f(x:int)<computes>:int; f[3]=f[3]}
-test(S00){f(x:int)<computes>:=(:int=4); f[3]=f[3]}
+test(S00){f(x:int)<computes>:=(:int=4); f[3]=f[3]}		#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
 #NEWABS test(S00){f(x:int)<computes>:=(:int,4) => f[3][0]=f[3][0]}
 #Broken prior to NEWABS test(S00){f(x:int)<computes>:=(:int=3,4); f[3][0]=f[3][0]}
 
@@ -926,25 +926,25 @@ test(A00){1 where a:=a}  # Could tighten to S00.	#TODO:10.4:WHY
 #
 
 # Convergence of circular function definitions.
-test(S00){f(1):=f}
-test(S00){f(f):=1}
-test(S00){f(f):=f}
-test(S00){f(x:=f):=x}
-test(S00){f(1):=f,f}
-test(S00){f(1):=f,f[1]}
-test(S00){f(1):=f,f(1)}
-test(S00){f(f):=1,f[f]}
-test(S00){f(f):=1,f(f)}
-test(S00){f(f):=f,f[f]}
-test(S00){f(f):=f,f(f)}
-test(S00){f(x:=f):=x,f[f]}
-test(S00){f(x:=f):=x,f(f)}
+test(S00){f(1):=f}						#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(f):=1}					  	#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(f):=f}						#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(x:=f):=x}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(1):=f,f}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(1):=f,f[1]}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(1):=f,f(1)}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(f):=1,f[f]}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(f):=1,f(f)}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(f):=f,f[f]}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(f):=f,f(f)}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(x:=f):=x,f[f]}				#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(x:=f):=x,f(f)}				#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
 
 # Bidirectional calls.
 test(S00){f(x:any):=x      => f[3]=3}
 test(F00){f(x:any):=x      => f[3]=4}
 test(S00){f(x:any):=x      => f[3]=_}
-test(S00){f(x:any):=x      => f[_]=4}
+test(S00){f(x:any):=x      => f[_]=4}	#FP:10.4:BACKPROP:SWAP-EQ-OVER-ASSUME
 test(A00){f(x:any):type{x} => f[_]=4}
 
 # Cyclic arrays.
@@ -964,22 +964,23 @@ test(U00){a:any => as:=(1,as=a)}
 # Call effects allowability.
 test(X00){if{Print(123)}}
 test(X00){for{Print(123)}}
-test(S00){f(123)<interacts>:=Print(456)}
+test(S00){f(123)<interacts>:=Print(456)}		#FP:10.4:EFF:INTERACTS
 test(X00){Print[123] => 456}
 test(X00){Print(123) => 456}
 test(X00){if{Print[123]}}
 test(X00){for{Print[123]}}
 test(X00){Print(123) => 456}
-test(S00){g(f():=3)<interacts>:=Print(3)}
+test(S00){g(f():=3)<interacts>:=Print(3)}		FP:10.4:EFF:INTERACTS
+
 
 # Must IterateStep commit clear AllowFx and inherit parent?
 test(QS00){a:any => b:int => allow{x:=a=b} where if{x=3}}
 test(QA00){allow{x:any} where if{x}}
 
 # Requires abstract treatment of natives and effects.
-test(S00){f(g()<interacts>:any):=3}
-test(S00){f(g(:any)<interacts>:any):=4 => f[Print]}
-test(S00){h(f(g(:any)<interacts>:any)<interacts>:=g[4])<interacts>:=f[Print]}
+test(S00){f(g()<interacts>:any):=3}													#FP:10.4:EFF:INTERACTS
+test(S00){f(g(:any)<interacts>:any):=4 => f[Print]}									#FP:10.4:EFF:INTERACTS
+test(S00){h(f(g(:any)<interacts>:any)<interacts>:=g[4])<interacts>:=f[Print]}		#FP:10.4:EFF:INTERACTS
 test(S00){h(f(g(:any)<interacts>:any)<interacts>:=g[4])<interacts>:=f(Print)}
 test(U00){h(f(g(:any):any)<interacts>:=g[4])<interacts>:=f[Print]}
 test(P00){h(f(g(:any):any)<interacts>:=g[4])<interacts>:=f(Print)}
@@ -999,7 +1000,7 @@ test(S00){f():int => int[f[]]}
 test(D00){f():int => nat[f[]]}
 
 test(S00){f(x:int)<decides>:=x=3, f[:int]}
-test(F00){f(x:int)<decides>:=x=3, f[:char]}	#NOTE:FP
+test(F00){f(x:int)<decides>:=x=3, f[:char]}			#NOTE:FP
 test(D00){f(x:int)<decides>:=x=3, y:int=>f[y]}
 test(S00){f(x:int)<decides>:=x=3 => f[:int]}
 test(F00){f(x:int)<decides>:=x=3 => f[:char]}

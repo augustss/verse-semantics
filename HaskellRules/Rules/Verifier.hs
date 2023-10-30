@@ -420,6 +420,7 @@ mustDecide _ bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} re
     go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
     go (Op _)      = True
     go Fail        = True
+    go (Exi (Bind _ e1)) = go e1
     go _           = False
 
 isDecideOp :: Expr -> Bool
@@ -548,6 +549,11 @@ verifierRules env lhs =
    "fails-hnf" `name`
    do Fails (HNF _) <- [lhs]
       pure (Assume Fail)
+   -- Fails {fail} ---> ()
+   ++
+   "fails-fail" `name`
+   do Fails Fail <- [lhs]
+      pure (Arr [])
 
 splitIf :: Expr -> [([Ident], Expr)]
 splitIf e@If{}    = pure ([], e )
