@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans -Wno-dodgy-imports #-}
 {-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.Desugar(
   desugar,
