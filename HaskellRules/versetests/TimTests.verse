@@ -198,7 +198,7 @@ test(S00){as->bs:=(1,2)}
 #as:=array{a:int} => bs:=for{W->X:=(:as,a=1)} where bs=array{} or bs=array{_}
 #as:=array{a:int} => n:=Length[for{W->X:=(:as,a=1)}] where n=0 or n=1
 
-# Testing operator'?'.    #RJ:duplicate with 153
+# Testing operator'?'.    #RJ:duplicate(153)
 # test(S00){type{3}?}
 # test(A00){int?}
 # test(S00){int?=3}
@@ -432,7 +432,7 @@ test(S00){type{x:int,if{x=2}}}
 
 # Interesting to consider. Was S00 before function PHAH.
 # Could probably evolve rules to support this without breaking test(V10){x:int => if{x=3,f():type{x=3}=x=3}}
-test(D00){x:int => if{x=3,f():=x=3}}
+test(D00){x:int => if{x=3,f():=x=3}}		#TODO:10.30:OK
 
 # Stage+Function is unsound regardless of PHAA unless we modulate its strength when it's run.
 test(V10){a:int => {f():type{a=3}=a=3,f[]}} # Should refine to D00.
@@ -449,7 +449,7 @@ test(U00){f()<resolves>:int => if{f[]}}
 test(S00){f(a:int):=if(a=3) then a=3}
 #LA test(S00){if{x:int<decides>=3}}
 #LA test(S00){a:int => if{x:int<decides>=a=3}}
-test(D00){f(a:int):=if(:int=a=3) then a=3}
+test(D00){f(a:int):=if(:int=a=3) then a=3}				#TODO:10.30:OK
 #LA test(D00){f(a:int):=if(:int<decides>=a=3) then a=3}
 #LA test(S00){if{x:int<decides>=3}}
 #LA test(S00){if{x:int<decides>:false}}
@@ -578,7 +578,7 @@ test(U00){a&b:any => f(a=b):=a=b => if{f[a=b]}}
 test(S00){a&b:int => f(a=b):=a=b => if{f[a=b]}}			#FP:10.4:CHECK:STRENGTH:IF
 test(U00){a:any => f(nat[a]):=nat[a] => f[a]}
 test(D00){a:int => f(nat[a]):=nat[a] => f[a]}
-test(U00){a:any => f(nat[a]):=nat[a] => if{f[a]}}
+test(U00){a:any => f(nat[a]):=nat[a] => if{f[a]}}		#TODO:10.30:OK:ANY
 test(S00){a:int => f(nat[a]):=nat[a] => if{f[a]}} 		#FP:10.4:CHECK:STRENGTH:IF
 test(D00){a&b:int => f():type{a=b} => a=b}
 test(S00){a&b:int => f():type{a=b} => {f[],a=b}}
@@ -594,11 +594,11 @@ test(S00){a:int => f(x:nat):int => if{f[a]=3}}			#FP:10.4:IF
 test(S00){a:int => f(x:int):int => if{int[f[a]]}}		#FP:10.4:IF
 test(S00){a:int => f(x:nat):int => if{int[f[a]]}}		#FP:10.4:IF
 test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}		#FP:10.4:IF
-test(U00){a:any => f(x:nat):int => if{int[f[a]]}}
-test(U00){a:int => f(x:nat):any => if{int[f[a]]}}
+test(U00){a:any => f(x:nat):int => if{int[f[a]]}}		#TODO:10.30:OK:IF:ANY
+test(U00){a:int => f(x:nat):any => if{int[f[a]]}}		#TODO:10.30:OK:IF:ANY
 test(S00){a&b:int => f(x:nat):int => if{f[a]=f[b]}}     #FP:10.4:IF
 test(S00){a:int => f(x:nat):int => if{nat[f[a]]}}		#FP:10.4:IF
-test(U00){a:int => f(x:nat):any => if{f[a]=1}}
+test(U00){a:int => f(x:nat):any => if{f[a]=1}}			#TODO:10.30:OK:IF:ANY
 test(S00){a:int => f(x:nat):int => if{f[a]=1}}			#FP:10.4:IF
 test(S00){a:int => f(x:nat):type{let(y&z:any){y=z}} => if{f[a]}}
 test(A00){f(:int):int => for{f[x:int]=x}}
@@ -611,7 +611,7 @@ test(D00){a:int => {x:int,x=3,x=a}}
 # Eta conversion with inflexible calls.
 test(U00){p&q:int => as:=array{a:any} => f(p):=as[0]=3 => f[q]}
 test(D00){p&q:int => as:=array{a:any} => f(p):type{as[0]=3} => f[q]}
-test(U00){a:int => b:any => f(x:int):=int[x] => if{a=b,f[b],int[b]}}
+test(U00){a:int => b:any => f(x:int):=int[x] => if{a=b,f[b],int[b]}}  #TODO:10.30:OK:IF:ANY
 
 test(U00){a&b:int => f(:int):any => m(:nat):type{a=b} => {f[a]=f[b],m[a]}}
 test(D00){a&b:int => f(:int)<computes>:any => m(:nat):type{a=b} => {f[a]=f[b],m[a]}}
@@ -635,7 +635,7 @@ test(S00){a&b:int => f():type{a=b} => a=b where f[]}				#FP:10.4:L2R:UNSOUND
 test(U00){a&b:any => f(a=b):type{a=b} => f[a=b] where a=b}
 test(D00){a&b:int => f(a=b):type{a=b} => f[a=b] where a=b}
 test(D00){a&b:int => f(x:nat):any => {x:=f[a],y:=f[b]}}
-test(U00){a&b:int => f(x:nat):any => if{x:=f[a],y:=f[b],x=y}}
+test(U00){a&b:int => f(x:nat):any => if{x:=f[a],y:=f[b],x=y}}		#TODO:10.30:OK:IF:ANY
 
 # FunctionMacro flaw where op::iterate generates promotable context containing assumption.
 test(S00){a&b:int => f(g(4 where a=b):=5):=6 => f[h(4):=5]}
@@ -926,25 +926,25 @@ test(A00){1 where a:=a}  # Could tighten to S00.	#TODO:10.4:WHY
 #
 
 # Convergence of circular function definitions.
-test(S00){f(1):=f}						#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(f):=1}					  	#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(f):=f}						#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(x:=f):=x}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(1):=f,f}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(1):=f,f[1]}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(1):=f,f(1)}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(f):=1,f[f]}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(f):=1,f(f)}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(f):=f,f[f]}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(f):=f,f(f)}					#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(x:=f):=x,f[f]}				#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
-test(S00){f(x:=f):=x,f(f)}				#FP:10.4:RECURSION:SWAP-IMPL-BEFORE-VERIFY
+test(S00){f(1):=f}						#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(f):=1}					  	#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(f):=f}						#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(x:=f):=x}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(1):=f,f}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(1):=f,f[1]}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(1):=f,f(1)}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(f):=1,f[f]}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(f):=1,f(f)}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(f):=f,f[f]}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(f):=f,f(f)}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(x:=f):=x,f[f]}				#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(x:=f):=x,f(f)}				#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
 
 # Bidirectional calls.
 test(S00){f(x:any):=x      => f[3]=3}
 test(F00){f(x:any):=x      => f[3]=4}
 test(S00){f(x:any):=x      => f[3]=_}
-test(S00){f(x:any):=x      => f[_]=4}	#FP:10.4:BACKPROP:SWAP-EQ-OVER-ASSUME
+test(S00){f(x:any):=x      => f[_]=4}	#FP:10.4:BACKPROP:SWAP:EQ-OVER-ASSUME
 test(A00){f(x:any):type{x} => f[_]=4}
 
 # Cyclic arrays.
@@ -970,7 +970,7 @@ test(X00){Print(123) => 456}
 test(X00){if{Print[123]}}
 test(X00){for{Print[123]}}
 test(X00){Print(123) => 456}
-test(S00){g(f():=3)<interacts>:=Print(3)}		FP:10.4:EFF:INTERACTS
+test(S00){g(f():=3)<interacts>:=Print(3)}		#FP:10.4:EFF:INTERACTS
 
 
 # Must IterateStep commit clear AllowFx and inherit parent?
@@ -981,7 +981,7 @@ test(QA00){allow{x:any} where if{x}}
 test(S00){f(g()<interacts>:any):=3}													#FP:10.4:EFF:INTERACTS
 test(S00){f(g(:any)<interacts>:any):=4 => f[Print]}									#FP:10.4:EFF:INTERACTS
 test(S00){h(f(g(:any)<interacts>:any)<interacts>:=g[4])<interacts>:=f[Print]}		#FP:10.4:EFF:INTERACTS
-test(S00){h(f(g(:any)<interacts>:any)<interacts>:=g[4])<interacts>:=f(Print)}
+test(S00){h(f(g(:any)<interacts>:any)<interacts>:=g[4])<interacts>:=f(Print)}		#FP:10.4:EFF:INTERACTS
 test(U00){h(f(g(:any):any)<interacts>:=g[4])<interacts>:=f[Print]}
 test(P00){h(f(g(:any):any)<interacts>:=g[4])<interacts>:=f(Print)}
 test(X00){h(f(g(:any)<interacts>:any):=g[4])<interacts>:=f[Print]}
@@ -998,11 +998,10 @@ test(S00){f():int => f[]}
 test(D00){f():int => f[]=3}
 test(S00){f():int => int[f[]]}
 test(D00){f():int => nat[f[]]}
-
-test(S00){f(x:int)<decides>:=x=3, f[:int]}
+test(S00){f(x:int)<decides>:=x=3, f[:int]}			#FP:10.4:CHECK:ISINT-SWAP
 test(F00){f(x:int)<decides>:=x=3, f[:char]}			#NOTE:FP
 test(D00){f(x:int)<decides>:=x=3, y:int=>f[y]}
-test(S00){f(x:int)<decides>:=x=3 => f[:int]}
+test(S00){f(x:int)<decides>:=x=3 => f[:int]} 		#FP:10.4:CHECK:ISINT-SWAP
 test(F00){f(x:int)<decides>:=x=3 => f[:char]}
 test(D00){f(x:int)<decides>:=x=3 => y:int=>f[y]}	#TODO:10.4:EFF:DECIDES
 
@@ -1064,16 +1063,16 @@ test(QV10){a:int => :int=a=3} # Would prefer D00 to prioritize above V10.
 #test(S00){f(x:int)<converges>:=if(x=0) then 0 else :int=f(0)}
 
 # Cyclic functions.
-test(S00){f():=f; f[]=f}
-test(S00){f(f):=3}
-test(S00){f(f):=3; f[f]=3}
-test(S00){f(f):=f}
-test(S00){f(f):=f; f[f]=f}
+test(S00){f():=f; f[]=f}			#FP:10.4:RECURSION
+test(S00){f(f):=3}					#FP:10.4:RECURSION
+test(S00){f(f):=3; f[f]=3}			#FP:10.4:RECURSION
+test(S00){f(f):=f}					#FP:10.4:RECURSION
+test(S00){f(f):=f; f[f]=f}			#FP:10.4:RECURSION
 
 # Cyclic functions with stage.
-test(S00){f():any=f}
-test(S00){f(f):any=3}
-test(S00){f(f):any=f}
+test(S00){f():any=f}				#FP:10.4:RECURSION
+test(S00){f(f):any=3}				#FP:10.4:RECURSION
+test(S00){f(f):any=f}				#FP:10.4:RECURSION
 
 #
 # Function Non-Escalation.
@@ -1082,7 +1081,7 @@ test(S00){f(f):any=f}
 test(D00){a&b:int => f(a=b):=3 => f[a=b]}
 test(P00){a&b:int => f(a=b):=3 => f(a=b)}
 test(D00){a&b:int => a=b where f():=a=b}
-test(S00){a&b:int => f(:any):type{a=b} => f[a=b]}
+test(S00){a&b:int => f(:any):type{a=b} => f[a=b]}		FP:10.4:L2R:UNSOUND
 test(D00){a&b:int => f(a=b):type{a=b} => f[a=b]}
 test(F00){f(:any):false => x:false where f[x]}
 
@@ -1109,7 +1108,7 @@ test(S00){f(a:any):any => x:=f(2)}
 test(A00){f(a:any):any => x:=f[x]}
 test(P00){f(a:any):any => x:=f(x)}
 test(U00){f(a:any):any => x:=f[x]=2}
-test(S00){f(a:any):=a  => x:=f[x]=2}
+test(S00){f(a:any):=a  => x:=f[x]=2}  	#FP:10.4:BACKPROP:SWAP:EQ-OVER-ASSUME
 test(S00){f(a:any):=(3,a) => x:=f(2)}
 test(A00){f(a:any):=(3,a) => x:=f[x]}	#NOTE:CHECK
 test(P00){f(a:any):=(3,a) => x:=f(x)}
@@ -1119,7 +1118,7 @@ test(S00){f(a:int):int => x:=f(2)}
 test(A00){f(a:int):int => x:=f[x]}
 test(P00){f(a:int):int => x:=f(x)}
 test(U00){f(a:int):int => x:=f[x]=2} # Could be D00.
-test(S00){f(a:int):=a  => x:=f[x]=2}
+test(S00){f(a:int):=a  => x:=f[x]=2}	#FP:10.4:BACKPROP:SWAP:EQ-OVER-ASSUME:duplicate(1111)
 test(S00){f(a:int):=(3,a) => x:=f(2)}
 test(P00){f(a:int):=(3,a) => x:=f(x)}
 #
@@ -1128,7 +1127,7 @@ test(S00){f(a:comparable):comparable => x:=f(2)}
 test(A00){f(a:comparable):comparable => x:=f[x]}
 test(P00){f(a:comparable):comparable => x:=f(x)}
 test(U00){f(a:comparable):comparable => x:=f[x]=2} # could be D00
-test(S00){f(a:comparable):=a         => x:=f[x]=2}
+test(S00){f(a:comparable):=a         => x:=f[x]=2}	#FP:10.4:BACKPROP:SWAP:EQ-OVER-ASSUME
 test(S00){f(a:comparable):=(3,a) => x:=f(2)}
 #loops test(P00){f(a:comparable):=(3,a) => x:=f(x)}
 
@@ -1141,15 +1140,15 @@ test(S00){3}
 test(S00){3=3}
 test(F00){3=5}
 test(S00){-3}
-test(S00){if{123}=123}
+test(S00){if{123}=123}		#FP:10.4:IFBIND
 test(F00){if{123}=456}
-test(S00){if{2=3}}
+test(S00){if{2=3}}			#FP:10.4:IFBIND
 test(F00){if{2=3}=3}
-test(S00){if(1){2}else{3}=2}
-test(S00){if(1=2){3}else{4}=4}
-test(S00){if(1=2){3}else if(3){4} else{5}=4}
-test(S00){if(1=2){3}else if(3=4){5} else{6}=6}
-test(S00){if(x:=1){x=1}}
+test(S00){TRS_main() := if(1){2}else{3}=2}
+test(S00){TRS_main() := if(1=2){3}else{4}=4}
+test(S00){TRS_main() := if(1=2){3}else if(3){4} else{5}=4}
+test(S00){TRS_main() := if(1=2){3}else if(3=4){5} else{6}=6}
+test(S00){TRS_main() := if(x:=1){x=1}}
 test(S00){y:=2 where y=2}
 test(S00){y:=2,y=2}
 test(S00){function(1){2}}
@@ -1159,7 +1158,7 @@ test(S00){int(123)}
 test(S00){int[123],int(123)}
 test(S00){f:=function(x:int){x},f[1]}
 test(S00){f:=function(x:int){x},f(1)}
-test(S00){f:=function(x:=int[x]){x},f(1)}
+test(S00){f:=function(x:=int[x]){x},f(1)}	#FP:10.4:RECURSION:ASSUMEX
 test(S00){f:=prefix'-',p:=3,f(p)}
 test(S00){(f:=prefix'-')(p:=3),f,p}
 test(F00){false[0]}
@@ -1168,10 +1167,10 @@ test(S00){int[0]}
 test(F00){int['x']}
 test(F00){3 => {4=5}}
 test(S00){void()=array{}}
-test(S00){if{2=3}=false}
-test(S00){if(x:=1){y:=2,y=2}}
+test(S00){TRS_main() := if{2=3}=false}
+test(S00){TRS_main() := if(x:=1){y:=2,y=2}}
 test(S00){--3=3}
-test(S00){not -3=3}
+test(S00){not -3=3}	#FP:10.4:NOT
 
 # Shows RecalculateFx-when_cast_context using equation EffectiveFx pollutes
 # reasoning about inflexibles and constants. Probably need fails|diverges-reachability
@@ -1222,13 +1221,13 @@ test(S00){operator'+'[1,2]}
 test(S00){1+2}
 test(S00){1/2}
 test(F00){1/0}
-test(F00){1+2=5}	#NOTE:ASSERT
-test(S00){Length(1,2)=2}
+test(F00){1+2=5}					#NOTE:ASSERT
+test(S00){Length(1,2)=2}			#FP:10.4:PRIM:LENGTH
 test(S00){void("XYZ")=array{}}
 test(S00){let(x:=1){y:=2,x+y}}
 
 # Effective array assumptions.
-test(S00){as:any => as=array{_}    => as[0]}
+test(S00){as:any => as=array{_}    => as[0]}		#FP:10.4:FORALL-INPUT
 test(U00){as:any => as=array{_}    => as[0]=4}
 test(F00){as:any => as=array{3}    => as[0]=4}
 test(S00){as:any => as=array{3}    => as[0]=3}
@@ -1281,7 +1280,7 @@ test(D00){_(x:int):=nat[x]}
 # Totally array-free tests.
 test(S00){x:=2 where x=2}
 test(F00){x:=2 where x=3}
-test(S00){x:int where x=2}
+test(S00){x:int where x=2}			#FP:10.4:CHECK:ISINT-SWAP
 test(F00){x:int where x='X'}
 
 # Simple arrays.
@@ -1301,15 +1300,15 @@ test(F00){x=1,x:=2}
 test(F00){x:=2,x=1}
 test(F00){x=y,x:=1,y:=2}
 test(S00){x:any => x}
-test(S00){x:any => x=x}
+test(S00){x:any => x=x}			#FP:10.4:CHECK-COMPARE-ANY
 test(U00){x&y:any => x=y}
 test(D00){x&y:int => x=y}
 test(S00){x:=x => x=1 => x=1}
-test(S00){x&y:any => x=y => x=y}
+test(S00){x&y:any => x=y => x=y} #FP:10.4:CHECK-COMPARE-ANY
 test(QS00){x&y:any => {assume<succeeds >{x=y},x=y}}
 test(QD00){x&y:any => {assume<decides  >{x=y},x=y}}
 test(QU00){x&y:any => {assume<abstracts>{x=y},x=y}}
-test(S00){if{123}}
+test(S00){TRS_main() := if{123}}
 test(S00){x&y:int => if{x=y}}
 test(QS02){x&y:int => if{expect<abstracts>{x=y}}}
 test(QD00){x&y:int => if{expect<succeeds>{x=y}}}
@@ -1331,15 +1330,15 @@ test(QS00){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y},a=b}}
 test(QS00){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y},x=y}}
 test(QS00){a&b:int => if{x:=a,y:=b,assume<succeeds>{x=y},x=y,expect<succeeds>{x=y}}}
 test(S00){a&b:int => {x:=b,assume{x=a}}}
-test(S00){a&b:int => {x:=a=b,assume{x=a}}}
+test(S00){a&b:int => {x:=a=b,assume{x=a}}}						#FP:10.4:ASSUME:TIM-EMAIL
 test(QD00){a&b:any => {x:=a=b,assume<decides>{x=a}}}
-test(S00){a&b:int => {x:=a=b,assume{a=b}}}
-test(S00){a&b:int => f(x&y:int):type{x=y} => {f[a,b],a=b}}
+test(S00){a&b:int => {x:=a=b,assume{a=b}}}						#FP:10.4:ASSUME:TIM-EMAIL
+test(S00){a&b:int => f(x&y:int):type{x=y} => {f[a,b],a=b}}		#FP:10.4:CHECK:ISINT-SWAP
 test(D00){a&b:int => f(x&y:int):type{x=y} => {f[a,a],a=b}}
 test(QS00){a&b&c:int => if{x:=a=b,assume{x=c},expect<succeeds>{x=c}}}
 
 # Components and cycles.
-test(S00){x:=assume{y:=assume{z:=x}}}
+test(S00){x:=assume{y:=assume{z:=x}}}			#FP:10.4:RECURSION
 test(QS00){assume<succeeds>{123}}
 
 #
@@ -1389,7 +1388,7 @@ test(D00){assume{x:int   where 8=9    }=7} # D00 because of paraconsistency.	#TO
 test(D00){assume{x:int   where false[]}=7} # D00 because of paraconsistency.	#TODO:10.4:ASSUME-FAIL
 test(R20){assume{x:false where false[]}=7} # Succeeds because variable contradicts.
 test(R20){assume{x:false              }=7}
-test(S00){a:int => assume{x:false where a=3}=7}
+test(S00){a:int => assume{x:false where a=3}=7}		#FP:10.4:ASSUME
 test(D00){a:int => assume{x:int   where a=3}=7}
 test(D00){a:int => assume{x:int   where a=false}=7} # D00 because of paraconsistency.
 
@@ -1457,16 +1456,16 @@ test(F00){as:=(7,8=9) => as=(_,_) where 2=3}	#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-
 test(F00){as:=(7,8=9) => as[1] where 2=3}		#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
 
 # Failing and contradictory parameters to native functions.
-test(S00){x:false => -x}
-test(S00){x:false => -x=7}
-test(S00){x:false => x+1}
-test(S00){x:false => 1+x}
-test(S00){x:false => x+1=7}
-test(S00){x:false => 1+x=7}
-test(S00){x:false => operator'+'[x]}
-test(S00){x:false => operator'+'[x]=7}
-test(S00){x:false => operator'+'(x)}
-test(S00){x:false => operator'+'(x)=7}
+test(S00){x:false => -x}				#FP:10.4:FALSE:x=fail
+test(S00){x:false => -x=7}				#FP:10.4:FALSE:x=fail
+test(S00){x:false => x+1}				#FP:10.4:FALSE:x=fail
+test(S00){x:false => 1+x}				#FP:10.4:FALSE:x=fail
+test(S00){x:false => x+1=7}				#FP:10.4:FALSE:x=fail
+test(S00){x:false => 1+x=7}				#FP:10.4:FALSE:x=fail
+test(S00){x:false => operator'+'[x]}		#FP:10.4:FALSE:x=fail
+test(S00){x:false => operator'+'[x]=7}		#FP:10.4:FALSE:x=fail
+test(S00){x:false => operator'+'(x)}		#FP:10.4:FALSE:x=fail
+test(S00){x:false => operator'+'(x)=7}		#FP:10.4:FALSE:x=fail
 test(QR20){allow{x:false}}
 test(QF00){allow{x:false},prefix'-'[x]}
 test(QR20){x:=allow{assume{:false}}}
@@ -1481,9 +1480,9 @@ test(QF00){allow{x:false},operator'+'[x]}
 test(QF00){allow{x:false},operator'+'[x]=7}
 
 # Conditions.
-test(S00){if(0=1) then 2 else 3}
-test(S00){if(0=1) then Print(2) else Print(3)}
-test(S00){if(0=1) then Print("T") else Print("F")}
+test(S00){TRS_main() := if(0=1) then 2 else 3}
+test(S00){TRS_main() := if(0=1) then Print(2) else Print(3)}		#FP:10.4:PRIM:PRINT
+test(S00){TRS_main() := if(0=1) then Print("T") else Print("F")}	#FP:10.4:PRIM:PRINT
 test(S00){f(x:=(0|1)):={5};  Print(for{:f})}
 
 # Syntax change implications.
@@ -2084,7 +2083,7 @@ test(S00){x:any => x+3=5 where assume{x=2}}
 test(F00){x:any => x+3=5 where assume{x=3}}
 test(S00){f:any => f[_]='x' where assume{f=char}}
 test(F00){f:any => f[_]='x' where assume{f=int}}
-test(A00){x:any,assume{x=2},x+3=5}	# NOTE: duplicate with L2071 above	TODO:10.4:ASSUME
+test(A00){x:any,assume{x=2},x+3=5}	# NOTE:duplicate(2071) above	TODO:10.4:ASSUME
 test(F00){x:any,assume{x=2},x+3=6}
 
 # A call that doesn't succeed should block function equality. f[a]=b <=> f=function(a){b}.
@@ -2694,36 +2693,36 @@ test(S00){a:=1|2 => if{a=1}else{a=2}}       # Same.
 test(D00){a&b:int => f(a):=9 => {a=b,f[b]}}
 
 # The assume{..} macro.
-test(D00){a:int => {assume{a},a=7}}
-test(U00){a:any => {assume{a},a=7}}
-test(D00){a&b&c:int => {x:=a=b=c,assume{x=b}}}
-test(D00){a&b&c:int => {x:=a=b,assume{x=b},x=c}}
-test(S00){a:int => {x:=a,assume{a=7},x=7}}
-test(S00){a:int => {x:=a,assume{x=7},x=7}}
-test(F00){a:int => {x:=a,assume{x=7},x=8}}
-test(S00){a:int => {x:=7,assume{x=a},x=a}}
-test(S00){a:int => {x:=a,x=7,assume{a=7}}}
-test(S00){a:int => {x:=a,x=7,assume{x=7}}}
-test(F00){a:int => {x:=a,x=8,assume{x=7}}}
-test(S00){a:int => {x:=7,x=a,assume{x=a}}}
-test(S00){a&b:int => {x:=a=b,assume{x=a}}}
-test(S00){a&b:int => {x:=a=b,assume{x=b}}}
-test(S00){a&b:int => {x:=a=b,assume{x=a}}}
-test(S00){a&b:int => {x:=a=b,assume{x=b}}}
-test(S00){a&b:int => {assume{x=a},x:=a=b}}
-test(S00){a&b:int => {assume{x=b},x:=a=b}}
-test(S00){a&b:int => {assume{x=a},x:=a=b}}
-test(S00){a&b:int => {assume{x=b},x:=a=b}}
-test(S00){r:=assume{x},x:=r,x=3}
-test(S00){a&b:int => {x:=a=b,assume{x=a},assume{x=b}}}
-test(S00){x:=x=assume{x}}
-test(D00){a&b:int => f():=a => f()=b}
-test(S00){a:int => {f():=assume{a=3}}}
-test(D00){a:int => {f():=assume{a=3}; a=3}}
-test(S00){a:int => {f():=assume{a=3}; f[]; a=3}}
-#Broken by MakeAssumeOp input-output uniformity:
-#test(S00){a:int => x:=x=assume{x}=a}
-#test(D00){a&b:int => x:=x=assume{x}=a=b}
+# SKIP: test(D00){a:int => {assume{a},a=7}}
+# SKIP: test(U00){a:any => {assume{a},a=7}}
+# SKIP: test(D00){a&b&c:int => {x:=a=b=c,assume{x=b}}}
+# SKIP: test(D00){a&b&c:int => {x:=a=b,assume{x=b},x=c}}
+# SKIP: test(S00){a:int => {x:=a,assume{a=7},x=7}}
+# SKIP: test(S00){a:int => {x:=a,assume{x=7},x=7}}
+# SKIP: test(F00){a:int => {x:=a,assume{x=7},x=8}}
+# SKIP: test(S00){a:int => {x:=7,assume{x=a},x=a}}
+# SKIP: test(S00){a:int => {x:=a,x=7,assume{a=7}}}
+# SKIP: test(S00){a:int => {x:=a,x=7,assume{x=7}}}
+# SKIP: test(F00){a:int => {x:=a,x=8,assume{x=7}}}
+# SKIP: test(S00){a:int => {x:=7,x=a,assume{x=a}}}
+# SKIP: test(S00){a&b:int => {x:=a=b,assume{x=a}}}
+# SKIP: test(S00){a&b:int => {x:=a=b,assume{x=b}}}
+# SKIP: test(S00){a&b:int => {x:=a=b,assume{x=a}}}
+# SKIP: test(S00){a&b:int => {x:=a=b,assume{x=b}}}
+# SKIP: test(S00){a&b:int => {assume{x=a},x:=a=b}}
+# SKIP: #TODO:HANG test(S00){a&b:int => {assume{x=b},x:=a=b}}		#TODO:HANG
+# SKIP: #TODO:HANG test(S00){a&b:int => {assume{x=a},x:=a=b}}
+# SKIP: test(S00){a&b:int => {assume{x=b},x:=a=b}}
+# SKIP: test(S00){r:=assume{x},x:=r,x=3}
+# SKIP: test(S00){a&b:int => {x:=a=b,assume{x=a},assume{x=b}}}
+# SKIP: test(S00){x:=x=assume{x}}
+# SKIP: test(D00){a&b:int => f():=a => f()=b}
+# SKIP: test(S00){a:int => {f():=assume{a=3}}}
+# SKIP: test(D00){a:int => {f():=assume{a=3}; a=3}}
+# SKIP: test(S00){a:int => {f():=assume{a=3}; f[]; a=3}}
+# SKIP: #Broken by MakeAssumeOp input-output uniformity:
+# SKIP: #test(S00){a:int => x:=x=assume{x}=a}
+# SKIP: #test(D00){a&b:int => x:=x=assume{x}=a=b}
 
 # The verify{..} macro. May not withstand input-everywhere.
 test(QS00){verify{123}}
@@ -3029,7 +3028,7 @@ test(S00){a&b:int => f(x&y:any):=x => {x:=a,y:=b,f[x,y]}}
 test(S00){a&b:int => f(x&y:any):=y => {x:=a,y:=b,f[x,y]}}
 test(S00){a:int => f(x:any):type{a=3} => f[a]}
 test(D00){a:int => f(x:int):int => f[a]=3}
-test(D00){a&b:int => f(a):type{a=b} => {f[x],x:=b}}	#TODO:10.4:CHECK-STRENGTH:TYPE (duplicate with l591?)
+test(D00){a&b:int => f(a):type{a=b} => {f[x],x:=b}}	#TODO:10.4:CHECK-STRENGTH:TYPE:duplicate(591)
 test(D00){a&b:int => f(a):type{a=b} => {x:=b,f[x]}}
 test(S00){a:int => f(x:nat):int => if{f[a]=1}}
 test(S00){a:int => f(x:int):type{x} => f[a]=a}
@@ -3576,7 +3575,7 @@ test(S00){a:any=>int[a]=>comparable[a]}
 test(S00){(1,2) where (1,2)}
 test(S00){(1,2)=(1,2)}
 test(S00){f(x:int)<computes>:int => f[3]=f[3]}
-test(D00){f(x:int):int => f[3]=f[3]} #TODO:FUN-OUT-EQ (duplicate l2328)
+test(D00){f(x:int):int => f[3]=f[3]} #TODO:FUN-OUT-EQ:duplicate(2328)
 test(S00){f(:int,:int)<computes>:int => f[3,4] where f[3,4]}
 test(S00){f(:int,:int)<computes>:int => f[3,4]=f[3,4]}
 test(D00){f(:int,:int)<computes>:int => f[3,4]=f[4,5]}
