@@ -1170,7 +1170,7 @@ test(S00){void()=array{}}
 test(S00){TRS_main() := if{2=3}=false}
 test(S00){TRS_main() := if(x:=1){y:=2,y=2}}
 test(S00){--3=3}
-test(S00){not -3=3}	#FP:10.4:NOT
+test(S00){TRS_main() := not (-3=3)}
 
 # Shows RecalculateFx-when_cast_context using equation EffectiveFx pollutes
 # reasoning about inflexibles and constants. Probably need fails|diverges-reachability
@@ -1495,7 +1495,7 @@ test(S00){for{0..0..3}=array{0,0,1,0,1,2,0,1,2,3}}
 test(P00){f(1):=2 => f(3)}
 
 # Calling contradictory functions.
-test(S00){xs:false => xs[0]}
+test(S00){xs:false => xs[0]}		#FP:10.4:FALSE:x=fail
 test(S00){xs:=1=2 => xs[0]}
 test(S00){xs:=(0,1)=2 => xs[0]}
 test(S00){xs:=2=(0,1) => xs[0]}
