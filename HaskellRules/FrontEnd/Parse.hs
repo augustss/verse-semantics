@@ -459,12 +459,13 @@ operatorTablePost =
 -- XXX Add more operators
 operatorTable :: [[Operator P Expr]]
 operatorTable =
-  [ [preOp ":", preOp "not", preOp "?", preOp "[]", preOp "-", preOp "^", preOp "+"],
+  [ [preOp ":", preOp "?", preOp "[]", preOp "-", preOp "^", preOp "+"],
     [op InfixL "*", op InfixL "/", op InfixL "&"],
     [op InfixL "+", op InfixL "-"],
     [op InfixR "->", op InfixR ".."],
     [op InfixR "|", op InfixL ":"],
     [op InfixR ">=", op InfixR "<=", op InfixR "<", op InfixR ">", op InfixL "<>", op InfixL "="],
+    [preOp "not"],
     [op InfixR "and"],
     [op InfixR "or"],
     [op InfixR ":=", op InfixR ">>"
