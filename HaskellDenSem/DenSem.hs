@@ -20,12 +20,14 @@ data Exp
   | Exp :>: Exp               -- ^ e1; e2
   | Exp :|: Exp               -- ^ e1 | e2
   | Exp :@: Exp               -- ^ v1(v2)
+  -- To make it executable, give a list of values for Exi
+  -- to iterate over.
   | Exi [W] (Bind Exp)        -- ^ ex x. e
   | One Exp                   -- ^ one { e }
   | All Exp                   -- ^ all { e }
   | Fail                      -- ^ fail
-  -- This is for convenience only
-  | Def Exp (Bind Exp)        -- ^ x := e1; e2
+  -- This is for convenience only.
+  | Def Exp (Bind Exp)        -- ^ ex x . x = e1; e2
   deriving (Show, Eq)
   
 pattern ELam :: Ident -> Exp -> Exp
@@ -113,7 +115,7 @@ optable =
   , (Gt,  WLam $ Fcn "gt"  gt)
   ]
   where add (WArr [WInt i, WInt j]) = unit $ WInt (i + j)
-        add _                       = Wrong
+        add _                       = Wrong   -- XXX This should probably be empty
         gt  (WArr [WInt i, WInt j]) = unit $ WInt (i + j)
         gt  _                       = empty
 
@@ -127,10 +129,10 @@ evalE rho (Val v1 :@: Val v2) = apply (evalV rho v1) (evalV rho v2)
 evalE rho (Exi ws (Bind x e)) = wbigunion [ evalE (extEnv rho x w) e | w <- ws ]
 evalE rho (One e)             = wone (evalE rho e)
 evalE rho (All e)             = wall (evalE rho e)
-evalE rho (Def e1 (Bind x e2))= do
-  s <- evalE rho e1
-  ss <- sequence [ P [wl] `wsequence` evalE (extEnv rho x w) e2 | wl@(_,w) <- s ]
-  pure (concat ss)
+evalE rho (Def e1 (Bind x e2))=
+  case evalE rho e1 of
+    Wrong -> Wrong
+    P s   -> wbigunion [ P [wl] `wsequence` evalE (extEnv rho x w) e2 | wl@(_,w) <- s ]
 evalE _ _ = error "evalE"
 
 evalV :: Env -> Val -> W
@@ -154,11 +156,15 @@ apply _ _ = empty     -- this "works"
 
 ----------------------------------------
 
+{-
 type Wstar = Maybe [(Lbl, W)]
 pattern Wrong :: Wstar
 pattern Wrong = Nothing
 pattern P :: [(Lbl, W)] -> Wstar
 pattern P x   = Just x
+-}
+data Wstar = Wrong | P [(Lbl, W)]
+  deriving (Show)
 
 type Lbl = [LR]
 
@@ -171,6 +177,7 @@ unit w = P [([], w)]
 empty :: Wstar
 empty = P []
 
+-- Maybe wbigunion should remove Wrong?
 wbigunion :: [Wstar] -> Wstar
 wbigunion = foldr f empty
   where f (P s1) (P s2) = P (s1 ++ s2)
@@ -308,3 +315,7 @@ etest10 = All $
     add2 = WLam $ Fcn (show vadd2) (\ (WInt i) -> unit $ WInt (i+2))
     vadd1 = Lam $ Bind "a" $ "a" + 1
     vadd2 = Lam $ Bind "a" $ "a" + 2
+
+-- This should be Wrong (== Nothing)
+etest11 = All $
+  EExi [1,2,3] "x" $ "x"
