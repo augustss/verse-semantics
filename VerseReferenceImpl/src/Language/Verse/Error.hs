@@ -24,6 +24,7 @@ data Error
   | SucceedsError !Loc
   | FailsError !Loc
   | DecidesError !Loc
+  | UndecidableError !Loc
   | StuckError deriving Show
 
 instance Pretty Error where
@@ -54,6 +55,7 @@ instance Pretty Error where
       pretty x <> colon <+> "expected" <+> "zero" <+> "values"
     DecidesError x ->
       pretty x <> colon <+> "expected" <+> "zero" <+> "or" <+> "one" <+> "value"
+    UndecidableError x -> pretty x <> colon <+> "undecidable" <+> "unification"
     StuckError -> "stuck"
 
 prettyIndent :: Indent -> Doc ann

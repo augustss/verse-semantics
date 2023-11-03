@@ -22,6 +22,7 @@ data Intrinsic
   | To
   | Int
   | Float
+  | Function
   | Query deriving (Show, Eq)
 
 toString :: Intrinsic -> String
@@ -39,6 +40,7 @@ toString = \ case
   To -> "operator'..'"
   Int -> "int"
   Float -> "float"
+  Function -> "function"
   Query -> "postfix'?'"
 
 instance Pretty Intrinsic where
