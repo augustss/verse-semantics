@@ -102,9 +102,11 @@
 %% ----------- End of Applications --------------
 
 %format space = "\hspace{0.3em}"
-%format lam x (e) = "\lambda" x".\," e
+%format olam x (y) = olamKW "(" x "," y ")"
+%format olamKW = "\textbf{olam}"
+%format lam (x) (e) = "\lambda" x".\," e
 %format lam2 x r e = "\lambda"x"\!\shortrightarrow{}\!"r".\," e
-%format lamhdr x = "\lambda" x".\,"
+%format lamhdr (x) = "\lambda" x".\,"
 %format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
 %format thunk (e) = "\lambda \langle\rangle.\," e
 %format lambda = "\lambda\!"
@@ -229,6 +231,7 @@
 %format split (x) (y) (z) = "\textbf{split}\{" x "\}\langle" y "," z "\rangle"
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
+%format defhdr (x) = "\exists" x ".\,"
 %format def (x) (y) = "\exists" x ".\," y
 %format forallKW = "\forall{}"
 %format forall (x) (y) = "\forall" x ".\," y
@@ -361,6 +364,11 @@
 
 %format y1
 %format y2
+
+%format z_0
+%format z_1
+%format z_2
+%format z_3
 
 %format k_1
 %format k_2
