@@ -2,6 +2,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Language.Verse.Desugar
   ( desugar
   ) where
@@ -24,6 +25,7 @@ import Language.Verse.Desugar.Exp ( Exp (..)
                                   , succeeds
                                   , assume
                                   , forall'
+                                  , fun
                                   , bracketInvoke
                                   , name
                                   , then'
@@ -340,11 +342,22 @@ verifyFunM
   -> DesugarT m (L (Exp L Ident))
 verifyFunM e1 e2 pi f = do
   i <- freshIdent' $ loc e1
-  verifyM $ forall' i <$> do
+  functionM (loc e1) pi f $ verifyM $ forall' i <$> do
     j <- name <$> freshIdent (loc e1)
     unify j <$> givenM (desugarExp' e1 True (name i)) `thenM` succeedsM do
       z <- name <$> freshIdent (loc e1)
       unify z <$> invokeM j pi f `thenM` desugarExp' e2 pi z
+
+functionM
+  :: Functor m
+  => Loc
+  -> Bool
+  -> L (Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+  -> DesugarT m (L (Exp L Ident))
+functionM loc pi f m = case pi of
+  False -> m
+  True -> (bracketInvoke (L loc $ Name "function") f `then'`) <$> m
 
 assumeFunM
   :: (MonadAbort Error m, MonadSupply Label m)

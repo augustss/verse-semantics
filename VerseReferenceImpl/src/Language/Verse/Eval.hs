@@ -783,7 +783,7 @@ invokeIntrinsic loc = \ case
   Intrinsic.To -> to
   Intrinsic.Int -> liftPrim $ int loc
   Intrinsic.Float -> liftPrim $ float loc
-  Intrinsic.Function -> liftPrim function
+  Intrinsic.Function -> liftPrim $ function loc
   Intrinsic.Query -> liftPrim $ query loc
 
 liftOrd
@@ -996,10 +996,11 @@ float loc var = do
   pure $ Just var
 
 function
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => VarVal m -> VerseT m (Maybe (VarVal m))
-function var = do
+  :: MonadEval m
+  => Loc -> VarVal m -> VerseT m (Maybe (VarVal m))
+function loc var = do
   fork $ readVar var >>= \ case
+    Val.Any -> rowUnify' loc var =<< newVar Val.AnyOverloads
     Val.Tuple _ -> pure ()
     Val.Enum {} -> pure ()
     Val.AnyOverloads -> pure ()
@@ -1056,6 +1057,7 @@ newEnv = execWriterT $ do
   tell' Intrinsic.To
   tell' Intrinsic.Int
   tell' Intrinsic.Float
+  tell' Intrinsic.Function
   tell' Intrinsic.Query
   where
     tell' x =

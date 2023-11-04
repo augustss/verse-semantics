@@ -271,8 +271,8 @@ writeIVar v x = readIVarState v >>= \ case
     liftAlt $
       put' (unIVar v) r.heap (Val x) $> \ r ->
       put' (unIVar v) r.heap y
-    resumeProcesses $ writeLocalIVar v x
     k x
+    resumeProcesses $ writeLocalIVar v x
 
 writeLocalIVar
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -284,8 +284,8 @@ writeLocalIVar v x = readLocalIVarState v >>= \ case
     liftAlt $
       put' (unIVar v) r.heap (Val x) $> \ r ->
       put' (unIVar v) r.heap y
-    resumeProcesses $ writeLocalIVar v x
     k x
+    resumeProcesses $ writeLocalIVar v x
   Nothing -> resumeProcesses $ writeLocalIVar v x
 
 readIVarState :: MonadRef m => IVar m a -> VerseT m (IVarState m a)

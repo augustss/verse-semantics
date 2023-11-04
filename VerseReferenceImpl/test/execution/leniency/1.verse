@@ -1,4 +1,5 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-F(G(:int):int):int = G(0)
-F():int = 0
-F()
+exists X
+one. X.F
+int[X]
+X = 0.0
