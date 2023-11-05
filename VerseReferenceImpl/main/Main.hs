@@ -6,13 +6,11 @@ module Main
 
 import Control.Monad.Supply
 import Control.Monad.Trans.Except
-import Control.Monad.Verse
 
 import Data.ByteString qualified as ByteString
 import Data.Foldable
 
 import Language.Verse
-import Language.Verse.Error
 
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -20,7 +18,6 @@ import Prettyprinter.Render.Text
 import System.IO
 
 main :: IO ()
-main = ByteString.getContents >>= runExceptT . runSupplyT . runVerseT . eval >>= \ case
-  Right (Just xs) -> for_ xs $ putDoc . (<> line) . pretty
-  Right Nothing -> hPutDoc stderr $ pretty StuckError <> line
+main = ByteString.getContents >>= runExceptT . runSupplyT . eval >>= \ case
+  Right xs -> for_ xs $ putDoc . (<> line) . pretty
   Left e -> hPutDoc stderr $ pretty e <> line
