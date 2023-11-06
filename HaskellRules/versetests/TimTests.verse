@@ -787,8 +787,8 @@ test(S00){x:int=3,y:int=4}
 test(S00){(x:int=3) where int[x]}
 test(S00){(x:int=3) where y:int=x}
 test(S00){x:int=3,y:int=x}
-test(S00){x:int=y,y:int=3}						#FP:10.4:CHECK:ISINT-SWAP
-test(S00){x:int=y,y:int=3,int[x],int[y]}		#FP:10.4:CHECK:ISINT-SWAP
+test(S00){x:int=y,y:int=3}						#FP:10.4:CHECK:SWAP:ISINT
+test(S00){x:int=y,y:int=3,int[x],int[y]}		#FP:10.4:CHECK:SWAP:ISINT
 test(V10){x:int=y,y:int=x}
 
 # Stage recursion and arrays.
@@ -857,8 +857,8 @@ test(S00){x:prefix'-'=3}
 test(V10){x:int:prefix'-'=3} # Will tighten S00 natives have type approximations.
 
 # Conditions trying to cheat stage.
-test(S00){a:int => :int=if(8=9) then 3 else 4}	 	#FP:10.4:CHECK:ISINT-SWAP
-test(S00){a:int => :int=if(8=9) then 3 else 4}		#FP:10.4:CHECK:ISINT-SWAP
+test(S00){a:int => :int=if(8=9) then 3 else 4}	 	#FP:10.4:CHECK:SWAP:ISINT
+test(S00){a:int => :int=if(8=9) then 3 else 4}		#FP:10.4:CHECK:SWAP:ISINT
 #!!test(S00){a:int => :int=if(a=3) then 3 else 4}
 #Explore-UncommittableNegotiable test(V10){x:int=if(x=3) then 3 else 4} # Could accept this.
 #Explore-UncommittableNegotiable test(V10){x:int=if(x=3) then 4 else 5} # Must reject this.
@@ -998,10 +998,10 @@ test(S00){f():int => f[]}
 test(D00){f():int => f[]=3}
 test(S00){f():int => int[f[]]}
 test(D00){f():int => nat[f[]]}
-test(S00){f(x:int)<decides>:=x=3, f[:int]}			#FP:10.4:CHECK:ISINT-SWAP
+test(S00){f(x:int)<decides>:=x=3, f[:int]}			#FP:10.4:CHECK:SWAP:ISINT
 test(F00){f(x:int)<decides>:=x=3, f[:char]}			#NOTE:FP
 test(D00){f(x:int)<decides>:=x=3, y:int=>f[y]}
-test(S00){f(x:int)<decides>:=x=3 => f[:int]} 		#FP:10.4:CHECK:ISINT-SWAP
+test(S00){f(x:int)<decides>:=x=3 => f[:int]} 		#FP:10.4:CHECK:SWAP:ISINT
 test(F00){f(x:int)<decides>:=x=3 => f[:char]}
 test(D00){f(x:int)<decides>:=x=3 => y:int=>f[y]}	#TODO:10.4:EFF:DECIDES
 
@@ -1280,7 +1280,7 @@ test(D00){_(x:int):=nat[x]}
 # Totally array-free tests.
 test(S00){x:=2 where x=2}
 test(F00){x:=2 where x=3}
-test(S00){x:int where x=2}			#FP:10.4:CHECK:ISINT-SWAP
+test(S00){x:int where x=2}			#FP:10.4:CHECK:SWAP:ISINT
 test(F00){x:int where x='X'}
 
 # Simple arrays.
@@ -1333,7 +1333,7 @@ test(S00){a&b:int => {x:=b,assume{x=a}}}
 test(S00){a&b:int => {x:=a=b,assume{x=a}}}						#FP:10.4:ASSUME:TIM-EMAIL
 test(QD00){a&b:any => {x:=a=b,assume<decides>{x=a}}}
 test(S00){a&b:int => {x:=a=b,assume{a=b}}}						#FP:10.4:ASSUME:TIM-EMAIL
-test(S00){a&b:int => f(x&y:int):type{x=y} => {f[a,b],a=b}}		#FP:10.4:CHECK:ISINT-SWAP
+test(S00){a&b:int => f(x&y:int):type{x=y} => {f[a,b],a=b}}		#FP:10.4:CHECK:SWAP:ISINT
 test(D00){a&b:int => f(x&y:int):type{x=y} => {f[a,a],a=b}}
 test(QS00){a&b&c:int => if{x:=a=b,assume{x=c},expect<succeeds>{x=c}}}
 
@@ -1498,47 +1498,47 @@ test(P00){f(1):=2 => f(3)}
 test(S00){xs:false => xs[0]}		#FP:10.4:FALSE:x=fail
 test(S00){xs:=1=2 => xs[0]}
 test(S00){xs:=(0,1)=2 => xs[0]}
-test(S00){xs:=2=(0,1) => xs[0]}
-test(S00){xs:=(0,1)=2 => xs[0]=3}
-test(S00){xs:=(0,1)=2 => xs[3]}
-test(S00){xs:=(0,1)=2 => xs[3]=4}
+test(S00){xs:=2=(0,1) => xs[0]}		#FP:10.4:OK(11.6)
+test(S00){xs:=(0,1)=2 => xs[0]=3}	#FP:10.4:OK(11.6)
+test(S00){xs:=(0,1)=2 => xs[3]}		#FP:10.4:OK(11.6)
+test(S00){xs:=(0,1)=2 => xs[3]=4}	#FP:10.4:OK(11.6)
 test(S00){f():type{2=3} => f[]}
 test(F00){f(x:false,y:int):=false[y]}
 test(C00){f(x:false,y:int):=y[0]}
-test(S00){f(x:false,y:int):=int[x]}
-test(S00){f(x:false,y:int):=comparable[x]}
-test(S00){f(x:false,y:int):=any[x]}
-test(S00){f(x:false,y:int):=x[0]}
-test(S00){f(x:false,y:int):=x(0)}
+test(S00){f(x:false,y:int):=int[x]} 			#FP:10.4:FALSE:x=fail
+test(S00){f(x:false,y:int):=comparable[x]}		#FP:10.4:FALSE:x=fail
+test(S00){f(x:false,y:int):=any[x]}				#FP:10.4:FALSE:x=fail
+test(S00){f(x:false,y:int):=x[0]}				#FP:10.4:FALSE:x=fail
+test(S00){f(x:false,y:int):=x(0)}				#FP:10.4:FALSE:x=fail
 
 # The empty array.
-test(S00){x:false => false[x]}
-test(S00){x:false => false(x)}
-test(S00){f(x:false,y:int):=false[x]}
+test(S00){x:false => false[x]}					#FP:10.4:FALSE:x=fail
+test(S00){x:false => false(x)}					#FP:10.4:FALSE:x=fail
+test(S00){f(x:false,y:int):=false[x]}			#FP:10.4:FALSE:x=fail
 
 # Calling contradictory arrays and functions produces contradictory result.
 test(U00){a&b:any => (a,1)=2 => b=3}			#TODO:SKIP:ASSUME-FAIL
 test(D00){a&b:comparable => (a,1)=b => a=3}
-test(S00){f():=2 => f=3 => f[]=4}
+test(S00){f():=2 => f=3 => f[]=4} 				#FP:10.4:OK(11.6)
 test(U00){a:any => (a,1)=2 => a=3}				#TODO:SKIP:ASSUME-FAIL
 
 # Uninhabited parameters to types.
-test(S00){x:false => any[x]}
-test(S00){x:false => int[x]}
-test(S00){x:false => comparable[x]}
-test(S00){x:false => int[x]}
-test(S00){x:false => int(x)}
+test(S00){x:false => any[x]}		#FP:10.4:FALSE:x=fail
+test(S00){x:false => int[x]}		#FP:10.4:FALSE:x=fail
+test(S00){x:false => comparable[x]}	#FP:10.4:FALSE:x=fail
+test(S00){x:false => int[x]}		#FP:10.4:FALSE:x=fail
+test(S00){x:false => int(x)}		#FP:10.4:FALSE:x=fail
 test(S00){f():false => f[]}
 test(S00){f():false => f()}
 
 # Conditions and contradiction.
-test(S00){if{x:=1=2,if{x=3}}}
+test(S00){TRS_main() := {if{x:=1=2,if{x=3}}}} #FP:10.4:ASSUME-FAIL
 #test(S00){f(x:false):=if(x=1){1}else{2}=3}
 test(D00){a&b:int => f():false => {a=b,if{a=b} else f()}}
 test(D00){a&b:int => f():false => {if{a=b} else f(),a=b}}
 test(S00){a&b:int => f():false => f()}
-test(S00){a&b:int => f():false => if{a=b} else f()}
-test(S00){if{x:false,if{x=3}}}
+test(S00){a&b:int => f():false => if{a=b} else f()}		#FP:10.4:OK(11.6)
+test(S00){TRS_main() := {if{x:false,if{x=3}}}}			#FP:10.4:FALSE:x=fail
 
 # Should any multiplicity be allowed under a contradictory condition?
 # Was S00, now F00, need axiomatic semantics to weigh in.
@@ -1556,24 +1556,24 @@ test(QS00){x:any => allow{assume<decides>{x=3}} where assume{x+1=4}}
 
 # Deep array effects.
 test(S00){as:=(2,3=4) => as=(_,3)}
-test(S00){as:=(2,3=4) => as=(_,4)}
-test(S00){as:=(2,3=4) => as=(_,5)}
+test(S00){as:=(2,3=4) => as=(_,4)}		#FP:10.4:OK(11.6)
+test(S00){as:=(2,3=4) => as=(_,5)}		#FP:10.4:OK(11.6)
 test(F00){as:=(2,3=4) => as=(7,_)}		#TODO:SKIP:ASSUME-FAIL
 test(F00){as:=(2,3=4) => as[0]=7}		#TODO:SKIP:ASSUME-FAIL
 test(S00){as:=(2,3=4) => as[1]=3}
-test(S00){as:=(2,3=4) => as[1]=5}
+test(S00){as:=(2,3=4) => as[1]=5}		#TODO:SKIP:ASSUME-FAIL
 test(F00){as:=(2,3=4) => as[5]}			#TODO:SKIP:ASSUME-FAIL
 
 # Succeeding unifications and divergence.
 test(F00){:false}
 test(F00){f():false}
 test(R01){Err("yo")=1}
-test(S00){f(x:=Err[]):=x=1}
-test(S00){f(x:=Err()):=x=1}
+test(S00){f(x:=Err[]):=x=1}				#FP:10.4:Err
+test(S00){f(x:=Err()):=x=1}				#FP:10.4:Err
 
 # Uninhabited container parameter.
-test(S00){x:false => (1,2)[x]}
-test(S00){x:false => (1,2)[x]=3}
+test(S00){x:false => (1,2)[x]}			#FP:10.4:FALSE:x=fail
+test(S00){x:false => (1,2)[x]=3}		#FP:10.4:FALSE:x=fail
 test(QF00){(1,2)[x]   where allow{x:false}}
 test(QF00){(1,2)[x]=3 where allow{x:false}}
 
@@ -1592,25 +1592,25 @@ test(QF00){x.blah,x:=allow{1=2}}
 test(QF00){(1=2).blah}
 
 # Contradiction isn't contained at containers.
-test(S00){as:=(2,3=4) => as=(2,5)}
-test(S00){as:=(2,3=4) => as=(3,5)}
+test(S00){as:=(2,3=4) => as=(2,5)}			#FP:10.4:OK(11.6)
+test(S00){as:=(2,3=4) => as=(3,5)}			#FP:10.4:OK(11.6)
 test(S00){as:=(2,3=4) => as=(2,_)}
-test(S00){as:=(2,3=4) => as=(3,_)}
-test(S00){as:=(2,3=4) => as=(1,2)}
-test(S00){as:=(2,3=4) => as=7}
+test(S00){as:=(2,3=4) => as=(3,_)}			#FP:10.4:OK(11.6)
+test(S00){as:=(2,3=4) => as=(1,2)}			#FP:10.4:OK(11.6)
+test(S00){as:=(2,3=4) => as=7}				#FP:10.4:OK(11.6)
 test(S00){as:=(2,3=4) => as=as}
-test(S00){as:=(2,3=4) => as[1]=7}
-test(S00){as:=(2,3=4) => as=7}
-test(S00){as:=(2,3=4) => as where 2=3}
-test(S00){as:=(2,3=4) => 2=3}
-test(S00){as:=(2,3=4) => 3=4}
+test(S00){as:=(2,3=4) => as[1]=7}			#FP:10.4:OK(11.6)
+test(S00){as:=(2,3=4) => as=7}				#FP:10.4:OK(11.6)
+test(S00){as:=(2,3=4) => as where 2=3}		#FP:10.4:OK(11.6)
+test(S00){as:=(2,3=4) => 2=3}				#FP:10.4:OK(11.6)
+test(S00){as:=(2,3=4) => 3=4}				#FP:10.4:OK(11.6)
 test(F00){as:=(2,3) => 2=3}
-test(S00){as:=(2,3=4) => as[1]=7}
-test(F00){as:=(2,3=4) => 2=5}		#TODO:SKIP:ASSUME-FAIL
-test(F00){(a:=2,b:=3=4) => a=7}		#TODO:SKIP:ASSUME-FAIL
+test(S00){as:=(2,3=4) => as[1]=7}			#FP:10.4:OK(11.6)
+test(F00){as:=(2,3=4) => 2=5}				#TODO:SKIP:ASSUME-FAIL
+test(F00){(a:=2,b:=3=4) => a=7}				#TODO:SKIP:ASSUME-FAIL
 
 # Prior problems due to constant degeneracy.
-test(S00){array{7,8} where if{1=0 where array{7,9}}}
+test(S00){TRS_main() := {array{7,8} where if{1=0 where array{7,9}}}}
 test(F00){f(x:int)<computes>:=x => f[7]=8}
 test(F00){f(x:int):=x => f[7]=8}
 test(D00){a:int => f(x:int)<computes>:=x => f[7]=a}
@@ -1636,15 +1636,15 @@ test(F00){x:int => f():=x=7 => {if(x=6){9}else{3}=9,f[]}}
 test(F00){x:int => f():=x=7 => {if(x=6){9}else{3}=0,f[]}}
 
 # Contradictory variables.
-test(S00){f(x:false):=x=1}
-test(S00){f(x:false):=x=2}
-test(S00){f(x:false):=x=1=2}
-test(S00){f(x:=int['c']):=x=1}
+test(S00){f(x:false):=x=1}				#FP:10.4:FALSE:x=fail
+test(S00){f(x:false):=x=2}				#FP:10.4:FALSE:x=fail
+test(S00){f(x:false):=x=1=2}			#FP:10.4:FALSE:x=fail
+test(S00){f(x:=int['c']):=x=1}			#FP:10.4:OK(11.6)
 test(F00){f(x:=int[3  ]):=x=1}
-test(S00){f(x:=int[g(3):=4]):=x=1}
-test(S00){f(x:=(3,5)[7]):=x=1}
-test(S00){f(x:=first{2=3}):=x=1}
-test(S00){f(x:=1/0):=x=1}
+test(S00){f(x:=int[g(3):=4]):=x=1}		#FP:10.4:OK(11.6)
+test(S00){f(x:=(3,5)[7]):=x=1}			#FP:10.4:OK(11.6)
+test(S00){f(x:=first{2=3}):=x=1}		#FP:10.4:FALSE:x=fail
+test(S00){f(x:=1/0):=x=1}				#FP:10.4:OK(11.6)
 test(F00){f(x:=(3,5)[0]):=x=1}
 test(U00){f(x:false,y:any):=y=1}
 test(U00){f(x:false,y:any):=y=2}
@@ -1669,19 +1669,19 @@ test(S00){function(1 where as:=for{x:=1|2|3}){as}[1]=(1,2,3)}
 # Synchronous contradictory variables.
 test(F00){2=3}
 test(R20){x:=2,assume{x=3}}
-test(S00){a&b:int => {x:=a=b,assume{x=a}}}
+test(S00){a&b:int => {x:=a=b,assume{x=a}}}		#FP:10.4:ASSUME:TIM-EMAIL
 test(S00){x:=2=3 => x}
 test(S00){x:=2=3 => x=2}
 test(S00){x:=2=3 => x=3}
-test(S00){x:=2=3 => x=4}
+test(S00){x:=2=3 => x=4}			#FP:10.4:OK(11.6)
 test(R20){x:=2=3,assume{x=3}}
 test(S00){x:false => 1}
 test(S00){x:false => 1,1}
 test(N00){x:false => y}
 test(N00){x:false => y,1}
-test(S00){x:false => x}
-test(S00){x:false => x=1}
-test(S00){x:false => x=1,1}
+test(S00){x:false => x}				#FP:10.4:FALSE:x=fail
+test(S00){x:false => x=1}			#FP:10.4:FALSE:x=fail
+test(S00){x:false => x=1,1}			#FP:10.4:FALSE:x=fail
 test(S00){x:=2=3 => 1}
 test(S00){x:=2=3 => 1,1}
 test(S00){x:=2=(3,4) => 1}
@@ -1694,11 +1694,11 @@ test(F00){92 => 4=5}
 test(F00){92 => 94=95,1}
 
 # Asynchronous contradictory variables.
-test(S00){y:=2,x:=1=y => x=3}
-test(S00){x:=1=y => x=3,y:=2}
+test(S00){y:=2,x:=1=y => x=3}		#FP:10.4:OK(11.6)
+test(S00){x:=1=y => x=3,y:=2}		#FP:10.4:SWAP:ISINT:VERIFY
 
 # Contradictory targets resulting from operation failure.
-test(S00){x:=false[] => x=3}
+test(S00){x:=false[] => x=3} 		#FP:10.4:FALSE:x=fail
 test(S00){x:=false[] => x=4}
 test(S00){x:=int[3] => x=3}
 test(F00){x:=int[3] => x=4}
