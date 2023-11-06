@@ -64,7 +64,7 @@ traceChar msg = do
   where
   pAny :: Parser Word8
   pAny = tokenPrim
-    (\c -> show [c])
+    (\c -> showW8s [c])
     (\pos w _ws -> updatePosWord pos w)
     (\w -> Just w)
 -}
@@ -1258,12 +1258,12 @@ wrapLoc :: PPos.SourcePos -> a -> PPos.SourcePos -> L a
 wrapLoc p1 x p2 = L (toLoc p1 p2) x
 
 satisfy :: (Word8 -> Bool) -> Parser Word8
-satisfy f   = tokenPrim (\c -> show [c])
+satisfy f   = tokenPrim (\c -> showW8s [c])
                         (\pos c _cs -> updatePosWord pos c)
                         (\w -> if f w then Just w else Nothing)
 
 string :: String -> Parser (L String)
-string s = P.try $ wrapLoc <$> pos <*> (s <$ tokens show updatePosWords (map c2w s)) <*> pos
+string s = P.try $ wrapLoc <$> pos <*> (s <$ tokens showW8s updatePosWords (map c2w s)) <*> pos
 
 updatePosWord :: PPos.SourcePos -> Word8 -> PPos.SourcePos
 updatePosWord pos w =
@@ -1272,3 +1272,9 @@ updatePosWord pos w =
 updatePosWords :: PPos.SourcePos -> [Word8] -> PPos.SourcePos
 updatePosWords pos ws =
   foldl updatePosWord pos ws
+
+
+showW8s :: [Word8] -> String
+showW8s ws = case Text.decodeUtf8' $ ByteString.pack ws of
+  Left _err -> show ws
+  Right txt -> show txt
