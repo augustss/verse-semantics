@@ -121,8 +121,8 @@ test(U00){a:any => comparable[a,3]}
 # Runtime input plumbing.
 test(S00){f():=1; f[]}
 test(R00){allow{f():=allow{:nat}; f[]}}
-#RJ:FN-COMP! test(S00){f():=3,f=f}					#FP:10.4:FN-COMP
-#RJ:FN-COMP! test(S00){f():=3,if{f=f}}				#FP:10.4:FN-COMP
+#RJ:FN-UNIFY! test(S00){f():=3,f=f}					#FP:10.4:FN-UNIFY
+#RJ:FN-UNIFY! test(S00){f():=3,if{f=f}}				#FP:10.4:FN-UNIFY
 
 # Weird error.
 #test(U00){operator'-'[3]}
@@ -1699,27 +1699,27 @@ test(S00){x:=1=y => x=3,y:=2}		#FP:10.4:SWAP:ISINT:VERIFY
 
 # Contradictory targets resulting from operation failure.
 test(S00){x:=false[] => x=3} 		#FP:10.4:FALSE:x=fail
-test(S00){x:=false[] => x=4}
+test(S00){x:=false[] => x=4}		#FP:10.4:FALSE:x=fail
 test(S00){x:=int[3] => x=3}
 test(F00){x:=int[3] => x=4}
-test(S00){x:=int['x'] => x=4}
+test(S00){x:=int['x'] => x=4}		#FP:10.4:OK(11.6)
 test(S00){x:=int['x'] => x='x'}
-test(S00){x:=1..0 => x='x'}
-test(S00){x:=1/0 => x=7}
+test(S00){x:=1..0 => x='x'}			#FP:10.4:FALSE:x=fail
+test(S00){x:=1/0 => x=7}			#FP:10.4:OK(11.6)
 test(D00){f(x:int):int => a:=f[2] => a=2}
 test(D00){f(g():=3):int => a:=f[h():=3] => a=4}
-test(S00){x:=first{0} => x=0}
+test(S00){x:=first{0} => x=0} 		#FP:10.4:OK(11.6)
 test(F00){x:=first{0} => x=1}
-test(S00){x:=first{:false} => x=0}
+test(S00){x:=first{:false} => x=0} 	#FP:10.4:FALSE:x=fail
 test(F00){not 3}
-test(S00){x:=(not 3) => x=0}
-test(S00){x:=not 3 => x=0}
+test(S00){x:=(not 3) => x=0}		#FP:10.4:FALSE:x=fail
+test(S00){x:=not 3 => x=0}			#FP:10.4:FALSE:x=fail
 
 # Ranges under contradictory domains.
 test(S00){1=2 => 0}
-test(S00){1=2 => 1=2}
+test(S00){1=2 => 1=2} 				#FP:10.4:OK(11.6)
 test(F00){1=2 => 3=4}				#TODO:SKIP:ASSUME-FAIL
-test(S00){f(1=2)<interacts>:=Print(3)}
+test(S00){f(1=2)<interacts>:=Print(3)}	#FP:10.4:OK(11.6)
 
 # Vacuous heads.
 test(S00){x:=2=3 => x}
@@ -1729,7 +1729,7 @@ test(S00){x:=2=(3,4) => x,1}
 
 # Vacuous array unification.
 test(S00){as:=(10,20) => bs:=(11,20) => as=bs => as=bs}
-test(S00){as:=(10,20) => bs:=(11,20) => as=bs => as(0)=bs(0)}
+test(S00){as:=(10,20) => bs:=(11,20) => as=bs => as(0)=bs(0)} #FP:10.4:OK(11.6)
 test(S00){as:=(10,20) => bs:=(11,20) => as=bs => as(1)=bs(1)}
 
 # Decidability in the presence of uninhabited variables.
@@ -1742,12 +1742,12 @@ test(S00){x:=7=9 => x}
 test(S00){x:=7=9 => x}
 test(S00){x:=7=9 => x=7}
 test(S00){x:=7=9 => x=9}
-test(S00){x:=7=9 => 7=9}
+test(S00){x:=7=9 => 7=9}		#FP:10.4:OK(11.6)
 test(F00){x:=7=9 => 6=8}		#TODO:SKIP:ASSUME-FAIL
 test(F00){x:=7=9 => 6=8}		#TODO:SKIP:ASSUME-FAIL
 
 # No loops.
-test(S00){f():=2 => f=2 => f[]=3}
+test(S00){f():=2 => f=2 => f[]=3} #FP:10.4:OK(11.6)
 
 # Consider future axiomatic semantics.
 #test(S00){as:=(_,_) => x:=as[7] => as[7]}
@@ -1768,7 +1768,7 @@ test(QA00){f(:any):any => allow<abstracts>{x:any} where f[x]}
 test(QP00){f(:any):any => allow<abstracts>{x:any} where f(x)}
 
 # Flow variable strength.
-test(S00){a&b:int => f(:any):type{a=b} => f[a=b]} # D00 with variable strength.
+test(S00){a&b:int => f(:any):type{a=b} => f[a=b]} # D00 with variable strength. #FP:10.4:CHECK:L2R:STRENGTH:UNSOUND
 test(F00){f(:any):false => x:false where f[x]}    # F00 with variable strength.
 test(S00){a&b:int => assume{a=b}}
 test(QS00){a:int => allow{x:=a=3} where assume{x}}
@@ -1867,8 +1867,8 @@ test(F00){f[array{5}]=5 where f(array{5}):=3}
 #
 
 # Runtime error: fails where disallowed.
-test(S00){f(x:=(:prefix'-') where x = (:nat)):={x}; if(a:=f[3]) then Print(a) else Print("no")}
-test(S00){f(x:prefix'-' where nat[x]):=x; if(f[3]) then 0 else Print[0]}
+test(S00){f(x:=(:prefix'-') where x = (:nat)):={x}; TRS_main() := {if(a:=f[3]) then Print(a) else Print("no")} }	#FP:10.4:SWAP:neg-backwards
+test(S00){f(x:prefix'-' where nat[x]):=x; TRS_main() := {if(f[3]) then 0 else Print[0]}}							#FP:10.4:SWAP:neg-backwards
 
 #
 # Context strengths and resolves.
@@ -1958,16 +1958,16 @@ test(S00){y:=2 where y=2}
 test(U00){a&b:any => f(x:=x)<computes>:any => f[a]=f[b]}
 
 # Invisible dominators and projection blocking.
-test(S00){as:any => as=array{_} => as[0]}
-test(S00){a:any => a=(_,_) => a=(_,_)}
-test(S00){as:any => as=array{_} => as[0]}
+test(S00){as:any => as=array{_} => as[0]}				#FP:10.4:ASSERT:VAR
+test(S00){a:any => a=(_,_) => a=(_,_)}					#FP:10.4:ASSERT:VAR
+#test(S00){as:any => as=array{_} => as[0]}               #FP:10.4:ASSERT:VAR:DUPLICATE(1961)
 test(U00){as:any => as=array{_} => as[0]=4}
 test(F00){as:=array{3} => as=array{4}}
 test(F00){as:=array{3} => as[0]=4}
 test(U00){a:any => a=(_,_) => a=(4,_)}
 test(U00){as:any => as=array{_} => as[0]=4}
 test(S00){a:=(3,7) => a=(_,_)}
-test(S00){a:any => a=(_,_) => a=(_,_)}
+#test(S00){a:any => a=(_,_) => a=(_,_)}					#FP:10.4:ASSERT:VAR:DUPLICATE(1962)
 test(F00){c:any => c=array{8} => c=array{9}}
 test(U00){c:any => c=array{9}}
 test(F00){c:any => c=3 => c=4}
@@ -1984,14 +1984,14 @@ test(F00){f(:any)<computes>:any => f(2)=(_,_) => f[2]=(_,_,_)}
 test(QS00){as:=array{a:=3 } => bs:=as where allow{bs[0]=3}}
 test(QD00){as:=array{a:int} => bs:=as where allow{bs[0]=3}}
 test(QU00){as:=array{a:any} => bs:=as where allow{bs[0]=3}}
-test(S00){a:any => a=array{_} => a[0]}
+#test(S00){as:any => as=array{_} => as[0]} 				#FP:10.4:ASSERT:VAR:DUPLICATE(1961)
 test(U00){a:any => a=array{_} => a[0]=2}
 test(S00){a:any => a=array{3} => a[0]=3}
 test(F00){a:any => a=array{3} => a[0]=4}
 test(S00){a:any => a=array{3} => a=array{_}}
-test(S00){f(:any)<computes>:any => as:=(_,_) => f[2]=as => f[2]=(_,_)}
-test(S00){f(:any)<computes>:any => f[2]=(_,_) => f[2]=(_,_)}
-test(S00){f(:any)<computes>:any => f(2)=(_,_) => f[2]=(_,_)}
+test(S00){f(:any)<computes>:any => as:=(_,_) => f[2]=as => f[2]=(_,_)}	#FP:10.4:ASSERT:VAR
+test(S00){f(:any)<computes>:any => f[2]=(_,_) => f[2]=(_,_)}			#FP:10.4:ASSERT:VAR
+test(S00){f(:any)<computes>:any => f(2)=(_,_) => f[2]=(_,_)}			#FP:10.4:ASSERT:VAR
 
 # Eta Conversion.
 test(F00){as:=array{a:=8} => c:=as[0]=9}
@@ -2061,9 +2061,9 @@ test(QS00){as:=(:int,:int) => bs:=(:int,:int) => xs:=allow{as=bs} where xs[0]}
 
 # Functions and parameters not seen by direct visibility.
 test(C00){f:any => f[_]=3}
-test(S00){f:any => f=int => f[_]=3}
-test(F00){f:any => f=int => f[_]='x'}		#TODO:CHECK-CHAR?
-test(S00){f:any => f[_]=3 where assume{f=int}}
+#RJ:FN-UNIFY test(S00){f:any => f=int => f[_]=3}			#FP:10.4:FN-UNIFY
+test(F00){f:any => f=int => f[_]='x'}						#TODO:CHECK-CHAR?
+#RJ:FN-UNIFY test(S00){f:any => f[_]=3 where assume{f=int}}	#FP:10.4:FN-UNIFY
 test(S00){p:any => p=2 => p+3=5}
 test(F00){p:any => p=2 => p+3=6}
 test(A00){x:any,x+3=5}
@@ -2079,9 +2079,9 @@ test(S00){x:any => x=2 => x=2}
 test(F00){x:any => x=2 => x=3}
 test(S00){x:any => x=2 => x+3=5}
 test(F00){x:any => x=3 => x+3=5}
-test(S00){x:any => x+3=5 where assume{x=2}}
+test(S00){x:any => x+3=5 where assume{x=2}}	      	#FP:10.4:BACKPROP:SWAP:EQ-OVER-ASSUME
 test(F00){x:any => x+3=5 where assume{x=3}}
-test(S00){f:any => f[_]='x' where assume{f=char}}
+test(S00){f:any => f[_]='x' where assume{f=char}} 	#FP:10.4:BACKPROP:SWAP:EQ-OVER-ASSUME
 test(F00){f:any => f[_]='x' where assume{f=int}}
 test(A00){x:any,assume{x=2},x+3=5}	# NOTE:duplicate(2071) above	TODO:10.4:ASSUME
 test(F00){x:any,assume{x=2},x+3=6}
@@ -2142,10 +2142,10 @@ test(S00){a:int => if{x:=a=2,assume{a=1}}}
 test(D00){f(x:int):int => f[7]=7}
 
 # Vector dominators on function.
-test(S00){as:=array{a:any} => {bs:=as,bs[0]}}
+test(S00){as:=array{a:any} => {bs:=as,bs[0]}}			#FP:10.4:ASSERT:VAR
 test(QU00){as:=array{a:any} => {bs:=as,allow{bs[0]=3}}}
 test(S00){f(3):=4 => f[3]}
-test(S00){a:comparable => a=a}
+test(S00){a:comparable => a=a}				#FP:10.4:OK(11.6)
 test(U00){a&b:any => a=b}
 test(D00){a&b:comparable => a=b}
 test(U00){f(x:any):any => f[3]=f[3]}		#TODO:FUN-OUT-EQ
@@ -2168,7 +2168,7 @@ test(D00){f(x:any):int => f[3]=4}
 test(D00){a:comparable => f():comparable => f[]=a}
 
 # Unseen functions.
-test(S00){f(x:int):=x, a:any => a=f => a[_]=3}			#TODO:SKIP:rejected by L2R
+test(S00){f(x:int):=x, a:any => a=f => a[_]=3}			#FP:10.4:SWAP:ISINT
 test(F00){f(x:int):=x, a:any => a=f => a[_]='3'}		#TODO:SKIP:rejected by L2R
 
 # Function breakage resulting from visibility narrowing, which NEWFLOW doesn't patch for functions.
@@ -2256,9 +2256,9 @@ test(D00){a&b:int => f(x:int)<computes>:=x => f[a]=f[b]}
 test(D00){a&b:int => f(x:int):=x => f[a]=f[b]}
 test(S00){a:int => f(x:int):type{x=3} => f[a]}
 test(QD00){a:int => {x:=int[a],allow{x=3}}}
-test(S00){a&b:int => f(x&y:int):type{x=y} => f[a,b]}
-test(S00){a&b:int => f(x&y:int):type{x=y} => {a=b,f[a,b]}}
-test(S00){a&b:int => f(x&y:int):type{x=y} => {f[a,b],a=b}}
+test(S00){a&b:int => f(x&y:int):type{x=y} => f[a,b]}			#FP:10.4:SWAP:ISINT
+test(S00){a&b:int => f(x&y:int):type{x=y} => {a=b,f[a,b]}}		#FP:10.4:CHECK:L2R:STRENGTH:UNSOUND
+test(S00){a&b:int => f(x&y:int):type{x=y} => {f[a,b],a=b}}		#FP:10.4:SWAP:ASSUME:VAR:TIM-EMAIL:ISH
 test(S00){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,y],a=b}}
 test(QD00){a&b&c&d:any => {b=c,assume{a=b},assume{c=d},assume<decides>{a=c}}}
 test(QS00){a:int => b:any => f(x:int):=int[x] => expect<succeeds>{f[a]}}
@@ -2291,7 +2291,7 @@ test(QD00){x&y:int => f(:int):int => f[x] => {a:=allow{x=y},f[a]}}
 # Concatenation tests.
 test(S00){array{}=array{}}
 test(S00){for{}=for{}}
-test(S00){array{}=Concatenate[]}
+test(S00){array{}=Concatenate[]}			#FP:10.4:CONCATENATE
 test(S00){Concatenate[array{},array{}]}
 test(S00){Concatenate[array{},array{7}]}
 test(S00){Concatenate[array{2},array{3}]=array{2,3}}

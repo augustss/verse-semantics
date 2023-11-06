@@ -18,6 +18,7 @@ module Rules.Core(
   pattern HNF, getHNF,
   pattern CON,
   pattern INT,
+  pattern CHAR,
   isHNF,
   isVal,
   isLam,
@@ -414,6 +415,10 @@ isLam _ = False
 
 pattern INT :: Expr -> Expr
 pattern INT e = Op IsInt :@: e
+
+pattern CHAR :: Expr -> Expr
+pattern CHAR e = Op IsChar :@: e
+
 
 pattern CON :: Expr -> Expr
 pattern CON e <- (getCON -> Just e)

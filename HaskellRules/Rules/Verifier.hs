@@ -574,9 +574,10 @@ unAssume a           = a
 implies :: Expr -> Expr -> Bool
 implies e1' e2'
   | e1  == e2                       = True
-  | e1' == Fail                    = True
-  | INT a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
-  | otherwise                      = False
+  | e1' == Fail                     = True
+  | INT  a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
+  | CHAR a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
+  | otherwise                       = False
   where
    e1 = unAssume e1'
    e2 = unAssume e2'
