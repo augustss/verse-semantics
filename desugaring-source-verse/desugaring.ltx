@@ -598,8 +598,8 @@ $$
 \rulename{mofun}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
   & = & |olamKW^ (f, lamhdr (f i)| \begin{array}[t]{@@{}l}
     |if (j := Me (inp i (flipsi si)) t_1)| \\
-    |then (z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
-    |else (DAe (inp f si) i) )|
+    |then (inapplicable(f,i); z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
+    |else f^[i])|
    \end{array}
 \end{array}
 
@@ -766,8 +766,8 @@ $$
   \multicolumn{2}{l}{|f^(x:int) := x+1; f^(x:float) := x*0.2; f^[2.4]|} \\[1mm]
   \movesto & \mbox{\{desugar\}} \\
   & |defhdr f| \begin{array}[t]{l}
-    |(f = def z_1 (olam z_1 (lam i (if (j:=int^[i]) then (x+1) else z_1 ^ [i]))));| \\
-    |(f = def z_2 (olam z_2 (lam i (if (j:=float^[i]) then (x*0.2) else z_2 ^ [i]))));| \\
+    |(f = def z_1 (olam z_1 (lam (z i) (if (j:=int^[i]) then (x+1) else z ^ [i]))));| \\
+    |(f = def z_2 (olam z_2 (lam (z i) (if (j:=float^[i]) then (x*0.2) else z ^ [i]))));| \\
     |f^[2.4]|
     \end{array} \\[10mm]
   \movesto & \mbox{\{substitute for f, and discard f\}} \\
