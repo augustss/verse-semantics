@@ -25,7 +25,8 @@ data Error
   | FailsError !Loc
   | DecidesError !Loc
   | OtherError !Pos String -- Used for Parsec error type
-  | NotImplemented String -- Used for Parsec error type
+  | NotImplemented String
+  | UndecidableError !Loc
   | StuckError deriving Show
 
 instance Pretty Error where
@@ -60,6 +61,7 @@ instance Pretty Error where
       pretty x <> colon <+> pretty msg
     NotImplemented msg ->
       "Not" <+> "implemented" <+> pretty msg
+    UndecidableError x -> pretty x <> colon <+> "undecidable" <+> "unification"
     StuckError -> "stuck"
 
 prettyIndent :: Indent -> Doc ann

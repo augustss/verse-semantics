@@ -35,6 +35,7 @@ import Prettyprinter
 
 data Val ref a
   = Any
+  | Comparable
   | AnyRational
   | Rational !Rational
   | AnyInt
@@ -48,6 +49,7 @@ data Val ref a
   | EnumValue {-# UNPACK #-} !Label {-# UNPACK #-} !Name
   | StructInst {-# UNPACK #-} !Label !(Env Name ref a)
   | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(Env Name ref a)
+  | AnyOverloads
   | Overloads !(Overload ref a) a deriving (Functor, Foldable, Traversable)
 
 type VarVal m = Var m (Val (VarRef m))
@@ -55,46 +57,67 @@ type VarVal m = Var m (Val (VarRef m))
 type FrozenVal = Frozen (Val Frozen)
 
 instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
-  rowMatch = curry $ \ case
-    (x, Any) -> LE $ toList x <&> (, Any)
-    (Any, x) -> GE $ (Any,) <$> toList x
-    (AnyRational, AnyRational) -> LE []
-    (AnyRational, Rational _) -> GE []
-    (AnyRational, AnyInt) -> GE []
-    (AnyRational, Int _) -> GE []
-    (Rational _, AnyRational) -> LE []
+  rowMatch assumed = curry $ \ case
+    (Any, Overloads _ xs) | assumed -> Superset [(AnyOverloads, xs)]
+    (Any, x) | assumed -> Superset $ (Any,) <$> toList x
+    (Any, _) -> Undecidable
+    (Comparable, Any) | assumed -> Subset []
+    (Comparable, Any) -> Undecidable
+    (Comparable, AnyOverloads) -> Undecidable
+    (Comparable, Overloads {}) -> Undecidable
+    (Comparable, x) -> Superset $ (Comparable,) <$> toList x
+    (AnyRational, AnyRational) -> Subset []
+    (AnyRational, Rational _) -> Superset []
+    (AnyRational, AnyInt) -> Superset []
+    (AnyRational, Int _) -> Superset []
+    (Rational _, AnyRational) -> Subset []
     (Rational x, Rational y) -> Zip $ guard (x == y) $> []
-    (Rational x, AnyInt) | denominator x == 1 -> LE []
+    (Rational x, AnyInt) | denominator x == 1 -> Subset []
     (Rational x, Int y) | denominator x == 1 -> Zip $ guard (numerator x == y) $> []
-    (AnyInt, AnyRational) -> LE []
-    (AnyInt, Rational y) | 1 == denominator y -> GE []
-    (AnyInt, AnyInt) -> LE []
-    (AnyInt, Int _) -> GE []
-    (Int _, AnyRational) -> LE []
+    (AnyInt, AnyRational) -> Subset []
+    (AnyInt, Rational y) | 1 == denominator y -> Superset []
+    (AnyInt, AnyInt) -> Subset []
+    (AnyInt, Int _) -> Superset []
+    (Int _, AnyRational) -> Subset []
     (Int x, Rational y) | 1 == denominator y -> Zip $ guard (x == numerator y) $> []
-    (Int _, AnyInt) -> LE []
+    (Int _, AnyInt) -> Subset []
     (Int x, Int y) -> Zip $ guard (x == y) $> []
-    (AnyFloat, AnyFloat) -> LE []
-    (AnyFloat, Float _) -> GE []
-    (Float _, AnyFloat) -> LE []
+    (AnyFloat, AnyFloat) -> Subset []
+    (AnyFloat, Float _) -> Superset []
+    (Float _, AnyFloat) -> Subset []
     (Float x, Float y) -> Zip $ guard (if isNaN x then isNaN y else x == y) $> []
     (Truth x, Truth y) -> Zip $ Just [(x, y)]
     (Tuple xs, Tuple ys) -> Zip $ zipMatch xs ys
     (Enum i xs xs', Enum j ys ys') -> Zip $ do
-      guard (i == j)
+      guard $ i == j
       zs <- zipMatchEnv xs ys
       zs' <- zipMatch xs' ys'
       pure $ zs ++ zs'
     (EnumValue i x, EnumValue j y) -> Zip $ guard (i == j && x == y) $> []
     (StructInst i xs, StructInst j ys) -> Zip $ guard (i == j) *> zipMatchEnv xs ys
     (ClassInst i x xs, ClassInst j y ys) -> Zip $ do
-      guard (i == j)
+      guard $ i == j
       z <- zipMatch x y
       zs <- zipMatchEnv xs ys
       pure $ z ++ zs
+    (AnyOverloads, Any) | assumed -> Subset []
+    (AnyOverloads, Any) -> Undecidable
+    (AnyOverloads, Comparable) -> Undecidable
+    (AnyOverloads, AnyOverloads) | assumed -> Subset []
+    (AnyOverloads, AnyOverloads) -> Undecidable
+    (AnyOverloads, Overloads _ y) | assumed -> Superset [(AnyOverloads, y)]
+    (AnyOverloads, Overloads {}) -> Undecidable
+    (Overloads _ xs, Any) | assumed -> Subset [(xs, AnyOverloads)]
+    (Overloads {}, Any) -> Undecidable
+    (Overloads {}, Comparable) -> Undecidable
+    (Overloads _ xs, AnyOverloads) | assumed -> Subset [(xs, AnyOverloads)]
+    (Overloads {}, AnyOverloads) -> Undecidable
     (Overloads x xs, Overloads y ys) -> case zipMatch x y of
       Just z -> Zip . Just $ (xs, ys):z
       Nothing -> Uncons (Overloads x) xs (Overloads y) ys
+    (x, Any) | assumed -> Subset $ toList x <&> (, Any)
+    (_, Any) -> Undecidable
+    (x, Comparable) -> Subset $ toList x <&> (, Comparable)
     _ -> Zip Nothing
 
 instance ( Freezable (f (Val f)) (g (Val g)) m
@@ -102,6 +125,7 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
          ) => Freezable (Val f a) (Val g b) m where
   freeze = \ case
     Any -> pure Any
+    Comparable -> pure Comparable
     AnyRational -> pure AnyRational
     Rational x -> pure $ Rational x
     AnyInt -> pure AnyInt
@@ -115,11 +139,13 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
     EnumValue i x -> pure $ EnumValue i x
     StructInst i xs -> StructInst i <$> for xs freeze
     ClassInst i x xs -> ClassInst i <$> for x freeze <*> for xs freeze
+    AnyOverloads -> pure AnyOverloads
     Overloads x xs -> Overloads <$> freeze x <*> freeze xs
 
 instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
   pretty = \ case
     Any -> "any"
+    Comparable -> "comparable"
     AnyRational -> "rational" <> lbracket <> pretty '_' <> rbracket
     Rational x | denominator x == 1 -> pretty $ numerator x
     Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
@@ -128,6 +154,7 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
     AnyFloat -> "float" <> lbracket <> pretty '_' <> rbracket
     Float x -> pretty x
     Truth x -> align $ "truth" <> group (braces $ pretty x)
+    AnyOverloads -> "function"
     Overloads {} -> "function"
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs
@@ -213,7 +240,7 @@ instance Eq (ref (Val ref)) => ZipMatchable (Overload ref) where
       guard (i_x == i_y) *>
       zipMatchEnv env_x env_y
     (Class i_x env_x sup_x _ _, Class i_y env_y sup_y _ _) -> do
-      guard (i_x == i_y)
+      guard $ i_x == i_y
       sup_z <- zipMatch sup_x sup_y
       env_z <- zipMatchEnv env_x env_y
       pure $ sup_z ++ env_z

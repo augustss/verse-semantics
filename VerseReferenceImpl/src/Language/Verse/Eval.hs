@@ -133,30 +133,30 @@ evalExp e = case extract e of
   e1 :=: e2 -> do
     var1 <- evalExp e1
     var2 <- evalExp e2
-    lift $ unify var1 var2
+    lift $ rowUnify' (loc e) var1 var2
     pure var1
   e1 :.: x ->
     evalDot (loc e) e1 x
   e1 :|: e2 ->
-    evalChoice e1 e2
+    evalChoice (loc e) e1 e2
   Exp.Fail ->
     empty
-  Exp.One e ->
-    evalOne e
-  Exp.All e ->
-    evalAll e
+  Exp.One e' ->
+    evalOne (loc e) e'
+  Exp.All e' ->
+    evalAll (loc e) e'
   Exp.Not e ->
     evalNot e
   Exp.Verify e ->
     evalVerify e
-  Exp.Succeeds e ->
-    evalSucceeds e
+  Exp.Succeeds e' ->
+    evalSucceeds (loc e) e'
   Exp.Fails e ->
     evalFails e
-  Exp.Decides e ->
-    evalDecides e
-  Exp.Assume e ->
-    evalAssume e
+  Exp.Decides e' ->
+    evalDecides (loc e) e'
+  Exp.Assume e' ->
+    evalAssume (loc e) e'
   Exp.Module i xs e -> do
     xs <- lift $ freshEnv xs
     _ <- localEnv xs $ evalExp e
@@ -177,9 +177,9 @@ evalExp e = case extract e of
   Exp.Inst e1 xs e2 ->
     evalInst (loc e) e1 xs e2
   Exp.IfThenElse xs p t e ->
-    evalIfThenElse xs p t e
+    evalIfThenElse (loc e) xs p t e
   Exp.ForDo xs e1 e2 ->
-    evalForDo xs e1 e2
+    evalForDo (loc e) xs e1 e2
   Exp.Def Exp.Exists x e -> do
     var <- lift freshVar
     localName (extract x) (Val var) $ evalExp e
@@ -217,10 +217,11 @@ evalExp e = case extract e of
     evalIdent $ x <$ e
   Exp.IfArchetypeName x y e1 e2 -> asks archetype <&> HashMap.lookup (extract x) >>= \ case
     Nothing -> evalExp e2
-    Just var -> local (\ r -> r { env = HashMap.insert (extract y) var r.env }) $ evalExp e1
+    Just var -> local (\ r -> r { env = HashMap.insert (extract y) var r.env }) $
+      evalExp e1
   Exp.ArchetypeName x -> asks archetype' <&> HashMap.lookup x >>= \ case
     Nothing -> evalIdent $ x <$ e
-    Just x -> readNamed x
+    Just x -> readNamed (loc e) x
 
 evalDot :: MonadEval m => Loc -> L (Exp L Ident) -> Name -> EvalT m (VarVal m)
 evalDot loc e x = do
@@ -236,13 +237,15 @@ evalDot loc e x = do
       Val.StructInst _ xs -> pure xs
       Val.ClassInst _ _ xs -> pure xs
       _ -> abort $ DomainError loc
-    unify var =<< case HashMap.lookup x xs of
+    rowUnify' loc var =<< case HashMap.lookup x xs of
       Just y -> readNamed' s.storeFree storeFree y
       Nothing -> abort $ NameError loc x
   pure var
 
-evalChoice :: MonadEval m => L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
-evalChoice e1 e2 = do
+evalChoice
+  :: MonadEval m
+  => Loc -> L (Exp L Ident) -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalChoice loc e1 e2 = do
   var <- lift freshVar
   r <- ask
   s <- get
@@ -251,13 +254,13 @@ evalChoice e1 e2 = do
   lift $ fork do
     _ <- readVar s.choiceFree
     (x, s) <- runRST (evalExp e1 <|> evalExp e2) r s
-    unify s.choiceFree s'.choiceFree
-    unify s.storeFree s'.storeFree
-    unify var x
+    zipUnify s.choiceFree s'.choiceFree
+    zipUnify s.storeFree s'.storeFree
+    rowUnify' loc var x
   pure var
 
-evalOne :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
-evalOne e = do
+evalOne :: MonadEval m => Loc -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalOne loc e = do
   var <- lift freshVar
   r <- ask
   s <- get
@@ -267,12 +270,12 @@ evalOne e = do
     (var', s) <- readIVar =<< one do
       choiceFree <- newVar ChoiceFree
       runRST (evalExp e) mempty { env = r.env } s { choiceFree }
-    unify var var'
-    unify storeFree s.storeFree
+    rowUnify' loc var var'
+    zipUnify storeFree s.storeFree
   pure var
 
-evalAll :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
-evalAll e = do
+evalAll :: MonadEval m => Loc -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalAll loc e = do
   var <- lift freshVar
   r <- ask
   s <- get
@@ -282,8 +285,8 @@ evalAll e = do
     (xs, s') <- fmap unzip . readIVar =<< all do
       choiceFree <- newVar ChoiceFree
       runRST (evalExp e) mempty { env = r.env } s { choiceFree }
-    unify var =<< newVar (Val.Tuple xs)
-    unify storeFree =<< getUnified (s' <&> (.storeFree)) s.storeFree
+    rowUnify' loc var =<< newVar (Val.Tuple xs)
+    zipUnify storeFree =<< getZipUnified (s' <&> (.storeFree)) s.storeFree
   pure var
 
 evalNot :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
@@ -300,7 +303,7 @@ evalNot e = do
     do
       const empty
     do
-      unify storeFree s.storeFree
+      zipUnify storeFree s.storeFree
   lift . newVar $ Val.Tuple []
 
 evalVerify :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
@@ -313,11 +316,11 @@ evalVerify e = do
     readIVar =<< verify do
       choiceFree <- newVar ChoiceFree
       void $ evalRST (evalExp e) mempty { env = r.env } s { choiceFree }
-    unify storeFree s.storeFree
+    zipUnify storeFree s.storeFree
   lift . newVar $ Val.Tuple []
 
-evalSucceeds :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
-evalSucceeds e = do
+evalSucceeds :: MonadEval m => Loc -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalSucceeds loc' e = do
   var <- lift freshVar
   r <- ask
   s <- get
@@ -330,8 +333,8 @@ evalSucceeds e = do
     >>= readIVar >>= \ case
       Nothing -> abort . SucceedsError $ loc e
       Just (var', s) -> do
-        unify var var'
-        unify storeFree s.storeFree
+        rowUnify' loc' var var'
+        zipUnify storeFree s.storeFree
   pure var
 
 evalFails :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
@@ -349,8 +352,8 @@ evalFails e = do
       True -> empty
   lift freshVar
 
-evalDecides :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
-evalDecides e = do
+evalDecides :: MonadEval m => Loc -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalDecides loc' e = do
   var <- lift freshVar
   r <- ask
   s <- get
@@ -363,12 +366,12 @@ evalDecides e = do
     >>= readIVar >>= \ case
       Nothing -> abort . DecidesError $ loc e
       Just (var', s) -> do
-        unify var var'
-        unify storeFree s.storeFree
+        rowUnify' loc' var var'
+        zipUnify storeFree s.storeFree
   pure var
 
-evalAssume :: MonadEval m => L (Exp L Ident) -> EvalT m (VarVal m)
-evalAssume e = do
+evalAssume :: MonadEval m => Loc -> L (Exp L Ident) -> EvalT m (VarVal m)
+evalAssume loc e = do
   var <- lift freshVar
   r <- ask
   s <- get
@@ -378,18 +381,19 @@ evalAssume e = do
     (var', s) <- readIVar =<< assume do
       choiceFree <- newVar ChoiceFree
       runRST (evalExp e) mempty { env = r.env } s { choiceFree }
-    unify var var'
-    unify storeFree s.storeFree
+    rowUnify' loc var var'
+    zipUnify storeFree s.storeFree
   pure var
 
 evalIfThenElse
   :: MonadEval m
-  => Exp.Env L Ident
+  => Loc
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
-evalIfThenElse xs p t e = do
+evalIfThenElse loc xs p t e = do
   var <- lift freshVar
   r <- ask
   s <- get
@@ -407,18 +411,19 @@ evalIfThenElse xs p t e = do
         \ (xs, s) -> runRST (evalExp t) mempty { env = xs <> r.env } s
       do
         runRST (evalExp e) r s
-    unify var var'
-    unify choiceFree s.choiceFree
-    unify storeFree s.storeFree
+    rowUnify' loc var var'
+    zipUnify choiceFree s.choiceFree
+    zipUnify storeFree s.storeFree
   pure var
 
 evalForDo
   :: MonadEval m
-  => Exp.Env L Ident
+  => Loc
+  -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> EvalT m (VarVal m)
-evalForDo xs e1 e2 = do
+evalForDo loc xs e1 e2 = do
   var <- lift freshVar
   r <- ask
   s <- get
@@ -433,9 +438,9 @@ evalForDo xs e1 e2 = do
         pure (xs, s)
       do
         \ (xs, s) -> runRST (evalExp e2) mempty { env = xs <> r.env } s
-    unify var =<< newVar (Val.Tuple vars)
-    unify s'.choiceFree =<< getUnified (s'' <&> (.choiceFree)) s.choiceFree
-    unify s'.storeFree =<< getUnified (s'' <&> (.storeFree)) s.storeFree
+    rowUnify' loc var =<< newVar (Val.Tuple vars)
+    zipUnify s'.choiceFree =<< getZipUnified (s'' <&> (.choiceFree)) s.choiceFree
+    zipUnify s'.storeFree =<< getZipUnified (s'' <&> (.storeFree)) s.storeFree
   pure var
 
 evalInst
@@ -455,7 +460,7 @@ evalInst loc e1 xs e2 = do
   put s'
   lift . fork $ readVar var1 >>= \ case
     Val.Overloads head tail ->
-      unify var =<< instOverloads loc head tail xs s s'
+      rowUnify' loc var =<< instOverloads loc head tail xs s s'
     _ -> abort $ DomainError loc
   pure var
 
@@ -501,8 +506,8 @@ instStruct
 instStruct i env xs e archetype s s' = do
   archetype' <- freshEnv xs
   s <- execRST (evalExp e) R { env = archetype' <> env, archetype, archetype' } s
-  unify s.choiceFree s'.choiceFree
-  unify s.storeFree s'.storeFree
+  zipUnify s.choiceFree s'.choiceFree
+  zipUnify s.storeFree s'.storeFree
   Just <$> newVar (Val.StructInst i $ filterNames archetype')
 
 instClass
@@ -520,8 +525,8 @@ instClass
 instClass loc i env sup xs e archetype s s' = do
   (var, _, initClass) <- allocClass loc i env sup xs e
   s <- initClass archetype s
-  unify s.choiceFree s'.choiceFree
-  unify s.storeFree s'.storeFree
+  zipUnify s.choiceFree s'.choiceFree
+  zipUnify s.storeFree s'.storeFree
   pure $ Just var
 
 allocClass
@@ -586,7 +591,7 @@ evalInvoke loc var1 var2 = do
   s <- get
   s' <- lift freshS
   put s'
-  lift . fork $ unify var =<< invoke loc var1 var2 s s'
+  lift . fork $ rowUnify' loc var =<< invoke loc var1 var2 s s'
   pure var
 
 invoke
@@ -599,33 +604,33 @@ invoke
   -> VerseT m (VarVal m)
 invoke loc var1 var2 s s' = readVar var1 >>= \ case
   Val.Tuple xs -> do
-    unify s.storeFree s'.storeFree
+    zipUnify s.storeFree s'.storeFree
     _ <- readVar s.choiceFree
-    var <- invokeTuple xs var2
-    unify s.choiceFree s'.choiceFree
+    var <- invokeTuple loc xs var2
+    zipUnify s.choiceFree s'.choiceFree
     pure var
   Val.Enum _ _ xs -> do
-    unify s.storeFree s'.storeFree
+    zipUnify s.storeFree s'.storeFree
     _ <- readVar s.choiceFree
-    var <- invokeEnum xs var2
-    unify s.choiceFree s'.choiceFree
+    var <- invokeEnum loc xs var2
+    zipUnify s.choiceFree s'.choiceFree
     pure var
   Val.Overloads head tail ->
     invokeOverloads loc head tail var2 s s'
   _ -> abort $ DomainError loc
 
 invokeTuple
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => [Var m f] -> VarVal m -> VerseT m (Var m f)
-invokeTuple xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
-  unify var =<< newVar (Val.Int i)
+  :: MonadEval m
+  => Loc -> [Var m f] -> VarVal m -> VerseT m (Var m f)
+invokeTuple loc xs var = asum $ zip xs [0 ..] <&> \ (x, i) -> do
+  rowUnify' loc var =<< newVar (Val.Int i)
   pure x
 
 invokeEnum
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => [VarVal m] -> VarVal m -> VerseT m (VarVal m)
-invokeEnum xs var = asum $ xs <&> \ x -> do
-  unify var x
+  :: MonadEval m
+  => Loc -> [VarVal m] -> VarVal m -> VerseT m (VarVal m)
+invokeEnum loc xs var = asum $ xs <&> \ x -> do
+  rowUnify' loc var x
   pure x
 
 invokeOverloads
@@ -642,6 +647,7 @@ invokeOverloads loc head tail arg s s' =
     Just result -> pure result
     Nothing -> readVar tail >>= \ case
       Val.Overloads head tail -> invokeOverloads loc head tail arg s s'
+      Val.AnyOverloads -> yield
       _ -> abort $ DomainError loc
 
 invokeOverload
@@ -654,17 +660,18 @@ invokeOverload
   -> VerseT m (Maybe (VarVal m))
 invokeOverload loc overload arg s s' = case overload of
   Val.Fun _ env xs e_domain e ->
-    invokeFun env xs e_domain e arg s s'
+    invokeFun loc env xs e_domain e arg s s'
   Val.Struct i env xs e ->
-    invokeStruct i env xs e arg s s'
+    invokeStruct loc i env xs e arg s s'
   Val.Class i env sup xs e ->
     invokeClass loc i env sup xs e arg s s'
   Val.Intrinsic intrinsic ->
-    invokeIntrinsic intrinsic arg s s'
+    invokeIntrinsic loc intrinsic arg s s'
 
 invokeFun
   :: MonadEval m
-  => Env m
+  => Loc
+  -> Env m
   -> Exp.Env L Ident
   -> L (Exp L Ident)
   -> L (Exp L Ident)
@@ -672,26 +679,27 @@ invokeFun
   -> S m
   -> S m
   -> VerseT m (Maybe (VarVal m))
-invokeFun env xs e_domain e v_arg s s' = readIVar =<< if'
+invokeFun loc env xs e_domain e v_arg s s' = readIVar =<< if'
   do
     xs <- freshEnv xs
     let r = mempty { env = xs <> env }
     (v_domain, s) <- runRST (evalExp e_domain) r s
-    unify v_arg v_domain
+    rowUnify' loc v_arg v_domain
     pure (xs, s)
   do
     \ (xs, s) -> do
       let r = mempty { env = xs <> env }
       (var, s) <- runRST (evalExp e) r s
-      unify s.choiceFree s'.choiceFree
-      unify s.storeFree s'.storeFree
+      zipUnify s.choiceFree s'.choiceFree
+      zipUnify s.storeFree s'.storeFree
       pure $ Just var
   do
     pure Nothing
 
 invokeStruct
   :: MonadEval m
-  => Label
+  => Loc
+  -> Label
   -> Env m
   -> Exp.Env L Ident
   -> L (Exp L Ident)
@@ -699,13 +707,13 @@ invokeStruct
   -> S m
   -> S m
   -> VerseT m (Maybe (VarVal m))
-invokeStruct i env xs e arg s s' = do
+invokeStruct loc i env xs e arg s s' = do
   archetype <- freshEnv xs
   xs <- freshEnv xs
   s <- execRST (evalExp e) mempty { env = xs <> env, archetype } s
-  unify arg =<< newVar (Val.StructInst i $ filterNames xs)
-  unify s.choiceFree s'.choiceFree
-  unify s.storeFree s'.storeFree
+  rowUnify' loc arg =<< newVar (Val.StructInst i $ filterNames xs)
+  zipUnify s.choiceFree s'.choiceFree
+  zipUnify s.storeFree s'.storeFree
   pure $ Just arg
 
 invokeClass
@@ -722,9 +730,9 @@ invokeClass
   -> VerseT m (Maybe (VarVal m))
 invokeClass loc i sup env xs e arg s s' = do
   (inst, _, s) <- instEmptyClass loc i sup env xs e s
-  unify inst =<< findClassInst i arg
-  unify s.choiceFree s'.choiceFree
-  unify s.storeFree s'.storeFree
+  rowUnify' loc inst =<< findClassInst i arg
+  zipUnify s.choiceFree s'.choiceFree
+  zipUnify s.storeFree s'.storeFree
   pure $ Just arg
 
 instEmptyClass
@@ -759,9 +767,9 @@ instEmptySup loc sup s = case sup of
     pure (Just sup, xs, s)
 
 invokeIntrinsic
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => Intrinsic -> VarVal m -> S m -> S m -> VerseT m (Maybe (VarVal m))
-invokeIntrinsic = \ case
+  :: MonadEval m
+  => Loc -> Intrinsic -> VarVal m -> S m -> S m -> VerseT m (Maybe (VarVal m))
+invokeIntrinsic loc = \ case
   Intrinsic.Less -> liftPrim $ liftOrd (<)
   Intrinsic.LessEqual -> liftPrim $ liftOrd (<=)
   Intrinsic.Greater -> liftPrim $ liftOrd (>)
@@ -773,9 +781,10 @@ invokeIntrinsic = \ case
   Intrinsic.Multiply -> liftPrim $ liftNum (*)
   Intrinsic.Divide -> liftPrim div'
   Intrinsic.To -> to
-  Intrinsic.Int -> liftPrim int
-  Intrinsic.Float -> liftPrim float
-  Intrinsic.Query -> liftPrim query
+  Intrinsic.Int -> liftPrim $ int loc
+  Intrinsic.Float -> liftPrim $ float loc
+  Intrinsic.Function -> liftPrim $ function loc
+  Intrinsic.Query -> liftPrim $ query loc
 
 liftOrd
   :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
@@ -935,9 +944,9 @@ to'
   -> S m
   -> VerseT m (Maybe (VarVal m))
 to' val1 val2 s s' = do
-  unify s.storeFree s'.storeFree
+  zipUnify s.storeFree s'.storeFree
   var <- foldr (\ x z -> newVar (Val.Int x) <|> z) empty [val1 .. val2]
-  unify s.choiceFree s'.choiceFree
+  zipUnify s.choiceFree s'.choiceFree
   pure $ Just var
 
 pattern AnyNumber :: Val f a
@@ -963,12 +972,12 @@ getInt = \ case
   _ -> empty
 
 int
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => VarVal m -> VerseT m (Maybe (VarVal m))
-int var = do
+  :: MonadEval m
+  => Loc -> VarVal m -> VerseT m (Maybe (VarVal m))
+int loc var = do
   fork $ readVar var >>= \ case
-    Val.Any -> unify var =<< newVar Val.AnyInt
-    Val.AnyRational -> unify var =<< newVar Val.AnyInt
+    Val.Any -> rowUnify' loc var =<< newVar Val.AnyInt
+    Val.AnyRational -> rowUnify' loc var =<< newVar Val.AnyInt
     Val.Rational x | denominator x == 1 -> pure ()
     Val.AnyInt -> pure ()
     Val.Int _ -> pure ()
@@ -976,22 +985,35 @@ int var = do
   pure $ Just var
 
 float
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => VarVal m -> VerseT m (Maybe (VarVal m))
-float var = do
+  :: MonadEval m
+  => Loc -> VarVal m -> VerseT m (Maybe (VarVal m))
+float loc var = do
   fork $ readVar var >>= \ case
-    Val.Any -> unify var =<< newVar Val.AnyFloat
+    Val.Any -> rowUnify' loc var =<< newVar Val.AnyFloat
     Val.AnyFloat -> pure ()
     Val.Float _ -> pure ()
     _ -> empty
   pure $ Just var
 
+function
+  :: MonadEval m
+  => Loc -> VarVal m -> VerseT m (Maybe (VarVal m))
+function loc var = do
+  fork $ readVar var >>= \ case
+    Val.Any -> rowUnify' loc var =<< newVar Val.AnyOverloads
+    Val.Tuple _ -> pure ()
+    Val.Enum {} -> pure ()
+    Val.AnyOverloads -> pure ()
+    Val.Overloads {} -> pure ()
+    _ -> empty
+  pure $ Just var
+
 query
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => VarVal m -> VerseT m (Maybe (VarVal m))
-query var = do
+  :: MonadEval m
+  => Loc -> VarVal m -> VerseT m (Maybe (VarVal m))
+query loc var = do
   var' <- freshVar
-  unify var =<< newVar (Val.Truth var')
+  rowUnify' loc var =<< newVar (Val.Truth var')
   pure $ Just var'
 
 liftPrim
@@ -1001,8 +1023,8 @@ liftPrim
 liftPrim f var s s' = f var >>= \ case
   Nothing -> pure Nothing
   x@Just {} -> do
-    unify s.choiceFree s'.choiceFree
-    unify s.storeFree s'.storeFree
+    zipUnify s.choiceFree s'.choiceFree
+    zipUnify s.storeFree s'.storeFree
     pure x
 
 readPair
@@ -1016,7 +1038,7 @@ readPair var = readVar var <&> \ case
 evalIdent
   :: MonadEval m
   => L Ident -> EvalT m (VarVal m)
-evalIdent x = lookupVar (extract x) >>= \ case
+evalIdent x = lookupVar (loc x) (extract x) >>= \ case
   Nothing -> abort $ IdentError (loc x) (extract x)
   Just var -> pure var
 
@@ -1035,6 +1057,7 @@ newEnv = execWriterT $ do
   tell' Intrinsic.To
   tell' Intrinsic.Int
   tell' Intrinsic.Float
+  tell' Intrinsic.Function
   tell' Intrinsic.Query
   where
     tell' x =
@@ -1052,20 +1075,20 @@ filterNames =
   []
 
 lookupVar
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => Ident -> EvalT m (Maybe (VarVal m))
-lookupVar = lookupNamed >=> \ case
+  :: MonadEval m
+  => Loc -> Ident -> EvalT m (Maybe (VarVal m))
+lookupVar loc = lookupNamed >=> \ case
   Nothing -> pure Nothing
-  Just x -> Just <$> readNamed x
+  Just x -> Just <$> readNamed loc x
 
 lookupNamed :: Ident -> EvalT m (Maybe (Named (VarRef m) (VarVal m)))
 lookupNamed x = asks $ \ r -> HashMap.lookup x r.env
 
 readNamed
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => Named (VarRef m) (VarVal m) -> EvalT m (VarVal m)
-readNamed = \ case
-  Ref x _ -> readVarRef' x
+  :: MonadEval m
+  => Loc -> Named (VarRef m) (VarVal m) -> EvalT m (VarVal m)
+readNamed loc = \ case
+  Ref x _ -> readVarRef' loc x
   Val x -> pure x
 
 readNamed'
@@ -1078,10 +1101,10 @@ readNamed' storeFree storeFree' = \ case
   Ref ref _ -> do
     _ <- readVar storeFree
     x <- readVarRef ref
-    unify storeFree storeFree'
+    zipUnify storeFree storeFree'
     pure x
   Val x -> do
-    unify storeFree storeFree'
+    zipUnify storeFree storeFree'
     pure x
 
 localName :: Ident -> Named (VarRef m) (VarVal m) -> EvalT m a -> EvalT m a
@@ -1111,21 +1134,22 @@ freshVarRef
 freshVarRef = newVarRef =<< freshVar
 
 readVarRef'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
-  => VarRef m f -> EvalT m (Var m f)
-readVarRef' ref = do
+  :: (MonadEval m, RowMatchable f)
+  => Loc -> VarRef m f -> EvalT m (Var m f)
+readVarRef' loc ref = do
   x <- lift freshVar
   s <- get
   storeFree <- lift freshVar
   put s { storeFree }
   lift $ fork do
     _ <- readVar s.storeFree
-    unify x =<< readVarRef ref
-    unify storeFree s.storeFree
+    rowUnify' loc x =<< readVarRef ref
+    zipUnify storeFree s.storeFree
   pure x
 
-writeVarRef' :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
-             => VarRef m f -> Var m f -> EvalT m ()
+writeVarRef'
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
+  => VarRef m f -> Var m f -> EvalT m ()
 writeVarRef' ref x = do
   s <- get
   storeFree <- lift freshVar
@@ -1133,21 +1157,25 @@ writeVarRef' ref x = do
   lift $ fork do
     _ <- readVar s.storeFree
     writeVarRef ref x
-    unify storeFree s.storeFree
+    zipUnify storeFree s.storeFree
 
-getUnified
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
+rowUnify'
+  :: (MonadEval m, RowMatchable f)
+  => Loc -> Var m f -> Var m f -> VerseT m ()
+rowUnify' loc = rowUnify $ abort $ UndecidableError loc
+
+getZipUnified
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, ZipMatchable f)
   => [Var m f] -> Var m f -> VerseT m (Var m f)
-getUnified = \ case
+getZipUnified = \ case
   [] -> pure
-  x:xs -> const $ getUnified1 x xs
-  where
+  x:xs -> const $ getZipUnified1 x xs
 
-getUnified1
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
+getZipUnified1
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, ZipMatchable f)
   => Var m f -> [Var m f] -> VerseT m (Var m f)
-getUnified1 x = \ case
+getZipUnified1 x = \ case
   [] -> pure x
   y:xs -> do
-    unify x y
-    getUnified1 x xs
+    zipUnify x y
+    getZipUnified1 x xs

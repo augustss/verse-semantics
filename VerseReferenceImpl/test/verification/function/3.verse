@@ -1,5 +1,2 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-assume:
-  verify:
-    succeeds:
-      fail
+Ap1(F(:int):float):int = F(1)

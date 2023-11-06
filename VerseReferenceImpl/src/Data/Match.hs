@@ -14,14 +14,15 @@ import Data.Functor.Const
 
 data RowMatch f a b
   = Zip (ZipMatch a b)
-  | LE [(a, f b)]
-  | GE [(f a, b)]
+  | Subset [(a, f b)]
+  | Superset [(f a, b)]
+  | Undecidable
   | Uncons (a -> f a) a (b -> f b) b
 
 class Traversable f => RowMatchable f where
-  rowMatch :: f a -> f b -> RowMatch f a b
-  default rowMatch :: ZipMatchable f => f a -> f b -> RowMatch f a b
-  rowMatch x y = Zip $ zipMatch x y
+  rowMatch :: Bool -> f a -> f b -> RowMatch f a b
+  default rowMatch :: ZipMatchable f => Bool -> f a -> f b -> RowMatch f a b
+  rowMatch _ x y = Zip $ zipMatch x y
 
 type ZipMatch a b = Maybe [(a, b)]
 

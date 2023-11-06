@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Verse
   ( eval
   , eval'
@@ -10,9 +11,10 @@ import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Supply
 import Control.Monad.Trans.Class
-import Control.Monad.Verse (VerseT)
+import Control.Monad.Verse (VerseT, runVerseT)
 
 import Data.ByteString (ByteString)
+import Data.Functor
 
 import Language.Verse.Desugar
 import Language.Verse.Desugar.Exp
@@ -26,22 +28,18 @@ import Language.Verse.Parse2 as P2
 import Language.Verse.Rewrite
 import Language.Verse.Val
 
-import Debug.Trace
-import Prettyprinter
-
 eval :: ( MonadAbort Error m
         , MonadFix m
         , MonadRef m
         , MonadSupply Label m
         , EqRef (Ref m)
-        ) => ByteString -> VerseT m FrozenVal
-
+        ) => ByteString -> m [FrozenVal]
 eval xs = do
   (e1, e2) <- liftEither $ runSupplyT $ do
     e <- rewrite =<< lift (runLexer P.parse xs)
     (,) <$> desugar Verification e <*> desugar Execution e
-  traceM . show $ pretty e1
-  Eval.eval $ verify (succeeds e1) `then'` e2
+  whenNothingM_ (runVerseT . Eval.eval . verify $ succeeds e1) $ abort StuckError
+  whenNothingM (runVerseT $ Eval.eval e2) $ abort StuckError
 
 eval' :: ( MonadAbort Error m
          , MonadFix m
@@ -53,6 +51,7 @@ eval' mode =
   Eval.eval <=<
   liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< runLexer P.parse)
 
+
 eval2' :: ( MonadAbort Error m
           , MonadFix m
           , MonadRef m
@@ -62,3 +61,13 @@ eval2' :: ( MonadAbort Error m
 eval2' path mode =
   Eval.eval <=<
   liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< P2.parse2 path)
+
+whenNothingM :: Monad m => m (Maybe a) -> m a -> m a
+whenNothingM m n = m >>= \ case
+  Nothing -> n
+  Just x -> pure x
+
+whenNothingM_ :: Monad m => m (Maybe a) -> m a -> m ()
+whenNothingM_ m n = m >>= \ case
+  Nothing -> void n
+  Just _ -> pure ()
