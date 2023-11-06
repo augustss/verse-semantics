@@ -6,5 +6,5 @@ verify:
   succeeds. t[X + 1]
 F := function(t := int|float; X:t):
   forall R
-  assume. R = :t
+  assume. R = (:t)
 verify. succeeds. int[F[1]]

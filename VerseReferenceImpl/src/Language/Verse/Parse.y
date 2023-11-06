@@ -13,6 +13,7 @@ import Control.Comonad
 import Data.Foldable (foldl')
 import Data.Functor
 import Data.Functor.Apply
+import Data.Text(Text)
 import Data.Text qualified as Text
 
 import Language.Verse.Parse.Exp ( Exp
@@ -30,6 +31,7 @@ import Language.Verse.Parse.Exp ( Exp
                                 , pattern (:-:)
                                 , pattern (:*:)
                                 , pattern (:/:)
+                                , expToPat
                                 )
 import Language.Verse.Parse.Exp qualified as Exp
 import Language.Verse.Parse.Exp ( Pat
@@ -206,8 +208,8 @@ Base :: { L (Exp L Name) }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | char { Exp.Char <\$> $1 }
-  | string { ( \ x -> Exp.String x []) <\$> $1 }
-  | stringBegin StringCont { Exp.String <\$> $1 <.> $2 }
+  | string { ( \ x -> Exp.String (Text.pack x) []) <\$> $1 }
+  | stringBegin StringCont { Exp.String <\$> (fmap Text.pack $1) <.> $2 }
   | false {
       Exp.False <\$ $1
     }
@@ -276,7 +278,7 @@ Call :: { L (Exp L Name) }
       Exp.Struct <\$ $1 <.> duplicate $2
     }
   | enum Attributes NameBlock {
-      Exp.Enum (fixAttributes $2) <\$ $1 <.> $3
+    Exp.Enum (fixAttributes $2) (map ([],) $3) <\$ $1
     }
   | class Block {
       Exp.Class Nothing <\$ $1 <.> duplicate $2
@@ -549,9 +551,9 @@ Exp :: { L (Exp L Name) }
       $1
     }
 
-StringCont :: { L [(L (Exp L Name), L String)] }
-  : File stringEnd { ( \ e s -> [(e,s)]) <\$> duplicate $1 <.> duplicate $2 }
-  | File stringCont StringCont { ( \ e s es -> (e,s):es) <\$> duplicate $1 <.> duplicate $2 <.> $3 }
+StringCont :: { L [(L (Exp L Name), L Text)] }
+  : File stringEnd { ( \ e s -> [(e, fmap Text.pack s)]) <\$> duplicate $1 <.> duplicate $2 }
+  | File stringCont StringCont { ( \ e s es -> (e, fmap Text.pack s):es) <\$> duplicate $1 <.> duplicate $2 <.> $3 }
 
 PatName :: { L (Pat L Name) }
   : name {
@@ -697,24 +699,24 @@ Block :: { L (Exp L Name) }
   : '.' Exp %prec DOT_SPACE { $1 .> $2 }
   | ':\n' indent List dedent { $1 \$> Exp.List $3 <. $4 }
 
-NameBlock :: { L [Name] }
-  : Scan '{' Scan NameList '}' { $2 \$> $4 <. $5 }
-  | '.' name %prec DOT_SPACE { $1 .> ((:[]) <\$> $2) }
-  | ':\n' indent Scan NameList dedent { $1 \$> $4 <. $5 }
+NameBlock :: { [L Name] }
+  : Scan '{' Scan NameList '}' { $4 }
+  | '.' name %prec DOT_SPACE { [$2] }
+  | ':\n' indent Scan NameList dedent { $4 }
 
-NameList :: { [Name] }
+NameList :: { [L Name] }
   : { [] }
-  | name { [extract $1] }
-  | name ',' Scan ReversedNameCommas Scan { extract $1 : reverse $4 }
-  | name Separator ReversedNameList MaybeSeparator { extract $1 : reverse $3 }
+  | name { [$1] }
+  | name ',' Scan ReversedNameCommas Scan { $1 : reverse $4 }
+  | name Separator ReversedNameList MaybeSeparator { $1 : reverse $3 }
 
-ReversedNameCommas :: { [Name] }
-  : name { [extract $1] }
-  | ReversedNameCommas ',' Scan name { extract $4 : $1 }
+ReversedNameCommas :: { [L Name] }
+  : name { [$1] }
+  | ReversedNameCommas ',' Scan name { $4 : $1 }
 
-ReversedNameList :: { [Name] }
-  : name { [extract $1] }
-  | ReversedNameList Separator name { extract $3 : $1 }
+ReversedNameList :: { [L Name] }
+  : name { [$1] }
+  | ReversedNameList Separator name { $3 : $1 }
 
 Scan :: { () }
   : { () }
@@ -771,17 +773,8 @@ path = \ case
   L x (Token.Path y) -> Just $ L x y
   _ -> Nothing
 
-expToPat :: L (Exp L a) -> Maybe (L (Pat L a))
-expToPat exp@(extract -> Exp.Pat pat) = Just (pat <$ exp)
-expToPat _ex@(extract -> Exp.Paren e) = expToPat e
-expToPat _ex@(extract -> Exp.List [e]) = expToPat e
-expToPat exp@(extract -> Exp.ParenInvoke e1@(expToPat -> Just p1) e2) = Just (Pat.Invoke <$> duplicate p1 <.> duplicate e2 <. exp)
-expToPat exp@(extract -> Exp.ExpInfixColon e1@(expToPat -> Just p1) e2) = Just (Pat.InfixColon <$> duplicate p1 <.> duplicate e2 <. exp)
-expToPat exp@(extract -> e1@(expToPat -> Just p1) :->: e2@(expToPat -> Just p2)) = Just (Pat.InfixArrow <$> duplicate p1 <.> duplicate p2 <. exp)
-expToPat exp = Nothing
-
 fixInfixColonEqual :: L (Exp L Name) -> L (Exp L Name) -> L (Exp L Name)
-fixInfixColonEqual lhs@(expToPat -> Just pat) rhs = Exp.InfixColonEqual <$> duplicate pat <.> duplicate rhs
+fixInfixColonEqual lhs rhs = Exp.InfixColonEqual <$> duplicate lhs <.> duplicate rhs
 fixInfixColonEqual lhs rhs = error (show (pretty (extract lhs)) ++ ": fixInfixColonEqual must have a Pat as lhs, got:" ++ show lhs)
 
 fixInfixColon :: L (Exp L Name) -> L (Exp L Name) -> L (Exp L Name)
@@ -832,7 +825,7 @@ buildCompare (e2:e1:es) (op:ops) = buildCompare (apply e1 (extract op) e2:es) op
 buildAttribute :: (Show a, Pretty a) => L (Pat L a) -> [L (AttributePart L a)] -> L (Exp L a)
 buildAttribute pat  [] = Exp.Pat <$> pat
 buildAttribute pat (rp@(L _ Exp.LessThan) : L _ (Exp.Part e) : lp@(L _ Exp.GreaterThan) : xs) =
-  buildAttribute (Exp.Spec <$> duplicate pat <.> duplicate e <. lp) xs
+  buildAttribute (Exp.Specs <$> duplicate pat <.> ([e] <$ e) <. lp) xs
 buildAttribute pat ((extract -> Exp.Part (extract -> Exp.Pat (Pat.PrefixColon e))) : xs) =
   buildAttribute (Pat.InfixColon <$> duplicate pat <.> duplicate e) xs
 buildAttribute pat ((extract -> Exp.Part (extract -> Exp.ExpInfixColon (extract -> Exp.Paren args) e)) : xs) =

@@ -45,6 +45,7 @@ library
     Language.Verse.Mode
     Language.Verse.Name
     Language.Verse.Parse
+    Language.Verse.Parse2
     Language.Verse.Parse.Exp
     Language.Verse.Pos
     Language.Verse.Rewrite
@@ -66,7 +67,8 @@ library
     semigroupoids,
     text,
     transformers,
-    unordered-containers >= 0.2.6.0
+    unordered-containers >= 0.2.6.0,
+    parsec >= 3.1.16.1
   hs-source-dirs: src
   ghc-options: -Wall -Wno-name-shadowing
   default-language: GHC2021

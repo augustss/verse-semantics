@@ -54,7 +54,7 @@ eval' xs = catch' $ eval'' xs <&> \ case
   Right xs -> renderStrict . layoutSmart layoutOptions $ vsep xs
 
 eval'' :: ByteString -> IO (Either Error [Doc ann])
-eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval' Execution >=> \ case
+eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval2' "<web page>" Execution >=> \ case
   Right (Just xs) -> pure . Right $ pretty <$> xs
   Right Nothing -> pure $ Left StuckError
   Left e -> pure $ Left e

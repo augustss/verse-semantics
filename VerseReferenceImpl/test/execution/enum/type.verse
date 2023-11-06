@@ -2,6 +2,6 @@
 
 E := enum:
   A
-  B;
+  B
 
 :E

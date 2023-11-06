@@ -1,6 +1,6 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 
-E := enum{B; A; C}
+E := enum{B, A, C}
 
 X:E
 Y:E

@@ -1,30 +1,39 @@
+set a|b += 1;
+set Object.Variable += 1;
++{1;2};
+
+
+x(a){b}
+a^,  (c:)b
+1
+0x10
+1.5
+1
+x[a]
+/apa?
+/a-d
+
+/apa@bepa/xyz
+/apa@bepa/(/another@label:)z
+
+x.y
+d
+verylongidentifier
+ .(c:)b
+
 var X:int = 1
-prefix'[]'(t:type)(Xs:any) := for (X:Xs). t[X]
+ prefix'[]'(t:type)(Xs:any) := for (X:Xs). t[X]
 
 a<b>. c where d
 a => b where c
 
-set a|b += 1;
-
-set Object.Variable += 1;
-
-
-
 all . 1 +2 where 3
 all. set Z = F(:Xs, Z)
-
-
 
 f():int = return;
 f()<x>:int = return;
 f3(o:O0)<transacts><decides>:int = (return o?)
 for(X:=1..2 where 3){4}
-
-
-
-
-
-
 
 Cons := function (Y:int, Z:int). all{Y | (:Z)}
 all{Y | (:Z)}
@@ -50,12 +59,8 @@ class<internal>(xxx){x<public>:int}
 class<internal>(xxx):
    x<public>:int
 
-X = :C
-
-
-
 set pat /= :C
-X := :C
+X := (:C)
 X or (:C)
 
 
@@ -125,10 +130,10 @@ X > Y < Z
 x;
 (y:)x
 
-## Specs  NOT YET
+## Specs
 x<a>;
 x<a><b>;
-#a with <a>;
+a with<a>;
 
 ## If
 if(0){0}else x;
@@ -143,25 +148,29 @@ if(0)then 1 else if (2) then 3;
 if(0). 1;
 if(0). 1 else 2;
 if{fail};
+if(0):
+ 1
+else:
+ 2
 ## Base
 (0);
 0;
-### Char
+## Char
 'a';
 '\n';
 '\'';
 0o21;
 0u00022;
-#/apa;    Can't recognise this path
+/apa;
 (/path:)apa
-### String
+## String
 "a";
 "abc";
 "";
 "a\nb\\c";
 "a{2}b";
 "a{"c"}b";
-#Markup
+##Markup
 if(0). 1;
 x;
 0
@@ -195,18 +204,18 @@ x^[1](2);
 -x;
 *x;
 -^x;
-#+{1;2};
++{1;2};
 ## Mul
 x*y;
 x/y;
-#x&y;
+#x&y;  # is this one deprecated?
 x*y*z;
 ## Add
 x+y;
 x-y;
 x-y-z;
 ## To
-#x to y;
+x to y;
 x..y;
 x->y;
 x->y->z;
@@ -238,13 +247,13 @@ x or y;
 x or y or z;
 ## Def 1
 ## In
-#in x;
+in x;
 :x;
-### Var
-#var x;
-#set x;
-#ref x;
-#alias x;
+## Var
+var x;
+set x;
+ref x;
+alias x;
 var x = 1;
 var x := 1;
 set x += 1;
@@ -268,21 +277,21 @@ set x +=
 x:=y;
 x:=y:=z;
 x:={y};
-#x where {y};
-#x where y;
-#x where y,z;
-#x is {y};
-#x is y;
+x where {y};
+x where y;
+x where y,z;
+x is {y};
+x is y;
 ## Def 2
-#..x;
-#&x;
+..x;
+&x;
 ## Def 3
 return;
 yield;
 break;
 continue;
-#return x;
-#return {x;y};
+return x;
+return {x;y};
 ## Fun
 #x over {y};
 #x when {y};
@@ -293,10 +302,10 @@ x => y;
 x => {y};
 #x next y;
 ## Expr
-#x @f();
-#x @f() @g();
-#@f() x;
-#@f() @g() x;
+x @f();
+x @f() @g();
+@f() x;
+@f() @g() x;
 ## Commas
 1,2,3;
 ##
