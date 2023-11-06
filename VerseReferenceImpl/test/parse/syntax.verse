@@ -145,7 +145,7 @@ A:
   D
   E
 
-A { B = (C=D); E }
+A { B:X = (C=D); E }
 
 
 # Some other unepected things to parse
@@ -168,6 +168,15 @@ A:
     E
 
 A { B = (C = D);  E }
+
+
+# These two are quivalent
+
+X = 1
+
+X =
+  1
+
 
 
 # Which comnbinations are ok?
@@ -230,3 +239,29 @@ x.field
 0.field
 1.field
 2.field
+
+# The enum macro is special since it allows ',' in addition to ';' between its subexpressions.
+
+X := enum { A; B, C }
+
+Y := enum:
+  A, B
+  C; D
+
+Z := enum:
+  A
+  B
+  C
+
+# Attributes are also allowed
+# These are used in code and therefore allowed.
+
+Z := enum<whatever>:
+  A
+  @deprecated B
+  @deprecated
+  C
+
+# I guess this one shold also be allowed
+#Z := enum:
+#  A<whatever>

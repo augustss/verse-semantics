@@ -13,6 +13,7 @@ import Control.Comonad
 import Data.Foldable (foldl')
 import Data.Functor
 import Data.Functor.Apply
+import Data.Text(Text)
 import Data.Text qualified as Text
 
 import Language.Verse.Parse.Exp ( Exp
@@ -207,8 +208,8 @@ Base :: { L (Exp L Name) }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
   | char { Exp.Char <\$> $1 }
-  | string { ( \ x -> Exp.String x []) <\$> $1 }
-  | stringBegin StringCont { Exp.String <\$> $1 <.> $2 }
+  | string { ( \ x -> Exp.String (Text.pack x) []) <\$> $1 }
+  | stringBegin StringCont { Exp.String <\$> (fmap Text.pack $1) <.> $2 }
   | false {
       Exp.False <\$ $1
     }
@@ -550,9 +551,9 @@ Exp :: { L (Exp L Name) }
       $1
     }
 
-StringCont :: { L [(L (Exp L Name), L String)] }
-  : File stringEnd { ( \ e s -> [(e,s)]) <\$> duplicate $1 <.> duplicate $2 }
-  | File stringCont StringCont { ( \ e s es -> (e,s):es) <\$> duplicate $1 <.> duplicate $2 <.> $3 }
+StringCont :: { L [(L (Exp L Name), L Text)] }
+  : File stringEnd { ( \ e s -> [(e, fmap Text.pack s)]) <\$> duplicate $1 <.> duplicate $2 }
+  | File stringCont StringCont { ( \ e s es -> (e, fmap Text.pack s):es) <\$> duplicate $1 <.> duplicate $2 <.> $3 }
 
 PatName :: { L (Pat L Name) }
   : name {

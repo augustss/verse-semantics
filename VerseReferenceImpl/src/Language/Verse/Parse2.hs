@@ -4,7 +4,7 @@
 module Language.Verse.Parse2( parse, parse2, toPos ) where
 
 import Control.Comonad
-import Control.Monad(when)
+import Control.Monad(when, void)
 import Control.Monad.Identity(runIdentity)
 
 import Data.ByteString qualified as ByteString
@@ -14,6 +14,7 @@ import Data.Char qualified as Char
 import Data.Char(isAlpha, isAlphaNum)
 import Data.Functor.Apply
 import Data.Text qualified as Text
+import Data.Text(Text)
 import Data.Text.Encoding qualified as Text
 import Data.Word (Word8)
 
@@ -148,7 +149,7 @@ pUTF8 =
 
 -- Printable := 0o09 | !("<#" | "#>" | 0o0..0o1F | 0o7F | 0oC2 0o80..0o9F | 0oE2 0o80 0oA8..0oA9 ) UTF8
 pPrintable :: Parser [Word8]
-pPrintable = ((:[]) <$> byte 0x09) <|> P.notFollowedBy (hide pLessHash <|> hide pHashGreater <|> hide (bounds 0x00 0x1f) <|> hide (byte 0x7f)) *> pUTF8
+pPrintable = ((:[]) <$> byte 0x09) <|> P.notFollowedBy (void pLessHash <|> void pHashGreater <|> void (bounds 0x00 0x1f) <|> void (byte 0x7f)) *> pUTF8
 
 -- -- NO UTF32          |  0u09 | !("<#" | "#>" | 0u0..0u1F | 0o7F..0o9F             | 0u2028 | 0u2029      ) UTF32
 
@@ -161,14 +162,14 @@ pNewline :: Parser (L String)
 pNewline =
   match '\n'
   <|>
-  match '\r' <* P.option () (hide $ match '\n')
+  match '\r' <* P.option () (void $ match '\n')
 --  )
 --  <?>
 --  "end of line"
 
 -- Ending    := &(NewLine | end)
 pEnding :: Parser (L String)
-pEnding = wrapLoc <$> pos <*> ("<end of line/file>" <$ P.lookAhead (hide pNewline <|> P.eof)) <*> pos
+pEnding = wrapLoc <$> pos <*> ("<end of line/file>" <$ P.lookAhead (void pNewline <|> P.eof)) <*> pos
 
 -- Ind       := Ending Line push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 pInd :: Parser ()
@@ -224,14 +225,14 @@ pScan :: Parser ()
 pScan = pSpace *> pScanNS
 
 pScanNS :: Parser ()
-pScanNS = hide $ P.many pLine
+pScanNS = void $ P.many pLine
 
 -- ScanKey   := Space (&NewLine Scan LinePrefix Space | !NewLine)
 pScanKey :: Parser ()
 pScanKey = pSpace *> pScanKeyNS
 
 pScanKeyNS :: Parser ()
-pScanKeyNS = P.lookAhead pNewline *> pScan *> pLinePrefix *> hide pSpace
+pScanKeyNS = P.lookAhead pNewline *> pScan *> pLinePrefix *> void pSpace
              <|>
              P.notFollowedBy pNewline
 
@@ -241,7 +242,7 @@ pLineCmt = () <$ pHash <* P.manyTill pText (P.lookAhead pEnding)
 
 -- BlockCmt  := "<#" !'>' {Text|NewLine} !'<' "#>"
 pBlockCmt :: Parser ()
-pBlockCmt = () <$ pLessHash <* P.many (pText <|> hide pNewline) <* pHashGreater
+pBlockCmt = () <$ pLessHash <* P.many (pText <|> void pNewline) <* pHashGreater
 
 -- IndCmt    := "<#>"     {Text        } Ind {Text|Line} Ded
 pIndCmt :: Parser ()
@@ -253,13 +254,13 @@ pComment = wrapLoc <$> pos <*> ("<comment>" <$ (pLineCmt <|> pBlockCmt <|> pIndC
 
 -- Text      := Printable | BlockCmt | "<#>"
 pText :: Parser ()
-pText = ((hide $ string "<#>") <|> hide pPrintable <|> hide pBlockCmt)
+pText = ((void $ string "<#>") <|> void pPrintable <|> void pBlockCmt)
 
 -- Exp       := ['e' ['+'|'-'] Digits] !('e' ('+'|'-'|Digit))
 pExp :: Parser (Char, [Word8])
 pExp = match 'e' *> ( match '-' *> (('-',) <$> pDigits)
                       <|>
-                      P.option () (hide $ match '+') *> (('+',) <$> pDigits) )
+                      P.option () (void $ match '+') *> (('+',) <$> pDigits) )
 
 -- Units     := [Alpha {Alpha}] !Alpha
 -- Above does not agree with Shipverse
@@ -301,8 +302,6 @@ pNumT =
   )
   <|>
   (mkNum <$> pos <*> pDigits <*> P.optionMaybe (P.try (pDot *> pDigits)) <*> P.optionMaybe pExp <*> P.optionMaybe pUnits <*> pos)
-
-
  where
    mkHex p1 xs p2 = L (toLoc p1 p2)  $ Exp.Int . fst . head . readHex . map w2c $ xs
    mkBin p1 xs p2 = L (toLoc p1 p2)  $ Exp.Int . fst . head . readBin . map w2c $ xs
@@ -475,10 +474,10 @@ pString = do
   p2 <- pos
   return $ L (toLoc p1 p2) $ Exp.String (extract s1) xs
 
-pStringText :: Parser (L String)
-pStringText = ( \ p1 xs p2 -> L (toLoc p1 p2) xs) <$> pos <*> P.many (pCharEsc <|> pStringChar) <*> pos
+pStringText :: Parser (L Text)
+pStringText = ( \ p1 xs p2 -> L (toLoc p1 p2) (Text.pack xs)) <$> pos <*> P.many (pCharEsc <|> pStringChar) <*> pos
 
-pStringRest  :: Parser [(L (Exp L Name), L String)]
+pStringRest  :: Parser [(L (Exp L Name), L Text)]
 pStringRest =
   ( \ e s xs -> (e,s):xs) <$> pInterp <*> pStringText <*> pStringRest
   <|>
@@ -954,7 +953,7 @@ pAtName =
   (,) <$> P.many ( (.>) <$> pAt <* pSpace <*> pCall <* pScan) <*> pIdent
 
 pNameSeparator :: Parser ()
-pNameSeparator = (pComma <|> pEnding) *> pScan
+pNameSeparator = (pSemi <|> pComma <|> pEnding) *> pScan
 
 
 -- The pSeparator and pItem must not consume any characters if they fail
@@ -1159,11 +1158,6 @@ fromTo f t p = do
         Just x -> do
           xs <- fromTo' (n-1)
           return $ x:xs
-
-
-hide :: Parser a -> Parser ()
-hide p = p >>= \ _ -> return ()
-
 
 ---------------------------------- Parser state
 

@@ -11,15 +11,15 @@ module Language.Verse.Parse.Exp
   , expToPat
   ) where
 
+import Control.Comonad
 import Data.Char
 import Data.Function
-import Data.Functor
+import Data.Functor.Apply
 import Data.Maybe
 import Data.Monoid (mempty)
-import Control.Comonad
-import Data.Functor.Apply
+import Data.Text(Text)
 
-import Prelude (Double, Integer, String, foldr, error, (++), show)
+import Prelude (Double, Integer, foldr, error, (++), show)
 import Prettyprinter ( Pretty (..)
                      , Doc
                      , (<>)
@@ -127,7 +127,7 @@ data Exp f a
   | ExpSpecs (f (Exp f a)) [f (Exp f a)]
   | AtSpec (f (Exp f a)) (f (Exp f a))     -- @attribute e
   | SpecAt (f (Exp f a)) (f (Exp f a))     -- e @attribute
-  | String !String [(f (Exp f a), f String)] -- the list is for the more complicated strings, e.g., "abc{ whatever }def"
+  | String !Text [(f (Exp f a), f Text)] -- the list is for the more complicated strings, e.g., "abc{ whatever }def"
   | Struct (f (Exp f a))
   | True
   | Truth (f (Exp f a))
@@ -139,7 +139,7 @@ data Exp f a
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f (Pat f a))
-                  , Show (f String)
+                  , Show (f Text)
                   , Show (f (AttributePart f a))
                   , Show (f a)
                   , Show a
@@ -160,7 +160,7 @@ data Pat f a
 deriving instance ( Show (f (Exp f a))
                   , Show (f (Pat f a))
                   , Show (f a)
-                  , Show (f String)
+                  , Show (f Text)
                   , Show (f (AttributePart f a))
                   , Show a
                   ) => Show (Pat f a)
@@ -178,7 +178,7 @@ deriving instance ( Show (f (Exp f a))
 
 
 
-instance ( Pretty (f String)
+instance ( Pretty (f Text)
          , Pretty (f (Pat f a))
          , Pretty (f (Exp f a))
          , Pretty (f (AttributePart f a))
@@ -187,7 +187,7 @@ instance ( Pretty (f String)
          , Show (f (AttributePart f a))
          , Show (f (Exp f a))
          , Show (f (Pat f a))
-         , Show (f String)
+         , Show (f Text)
          , Show (f a)
          , Show a
          ) => Pretty (Exp f a) where
@@ -318,12 +318,12 @@ instance ( Pretty (f (Pat f a))
          , Pretty (f (Exp f a))
          , Pretty (f a)
          , Pretty (f (AttributePart f a))
-         , Pretty (f String)
+         , Pretty (f Text)
          , Pretty a
          , Show (f (AttributePart f a))
          , Show (f (Exp f a))
          , Show (f (Pat f a))
-         , Show (f String)
+         , Show (f Text)
          , Show (f a)
          , Show a
          ) => Pretty (Pat f a) where
