@@ -2291,7 +2291,7 @@ test(QD00){x&y:int => f(:int):int => f[x] => {a:=allow{x=y},f[a]}}
 # Concatenation tests.
 test(S00){array{}=array{}}
 test(S00){for{}=for{}}
-test(S00){array{}=Concatenate[]}			#FP:10.4:CONCATENATE
+test(S00){array{}=Concatenate[]}									#FP:10.4:CONCATENATE
 test(S00){Concatenate[array{},array{}]}
 test(S00){Concatenate[array{},array{7}]}
 test(S00){Concatenate[array{2},array{3}]=array{2,3}}
@@ -2316,7 +2316,7 @@ test(S00){Concatenate[Concatenate[array{},array{3}],array{4}]=array{3,4}}
 test(F00){Concatenate[Concatenate[array{},array{3}],array{4}]=array{3,3}}
 test(F00){Concatenate[Concatenate[array{},array{3}],array{4}]=array{4,4}}
 test(S00){as:=array{a:=3},cs:=Concatenate[array{},as] where A:=a,cs}
-test(S00){Concatenate("ABC","def")="ABCdef"}
+test(S00){TRS_main() := {Concatenate("ABC","def")="ABCdef"}}		#FP:10.4:CONCATENATE
 
 # Past ForVisible breakage.
 test(A00){array{a:=a,b:=b}[1]=9}
@@ -2355,21 +2355,21 @@ test(F00){as:=(:int,:int,:int) => {bs:=for(a:as,a=1){a},n:=Length[bs],n=0 or n=1
 
 # Unification as macro taking inputs.
 test(S00){f(x:prefix'-'):=x,f(3)=-3}
-test(S00){f(x:=(:prefix'-')=(:prefix'-')):=x,f(3)=-3}
+test(S00){f(x:=(:prefix'-')=(:prefix'-')):=x,f(3)=-3}		#FP:10.4:OK(11.6)
 test(P00){f(x:=(:prefix'-')=(:int)):=x,f(3)}
-test(S00){f(x:=(:prefix'-')=(:int)):=x,f(0)}
+test(S00){f(x:=(:prefix'-')=(:int)):=x,f(0)}				#FP:10.4:OK(11.6)
 
 # Broke with ArrayMacro input improvements, now fixed.
 test(D00){a&b:int => f(x&y:int):=x=y => g(a):int => h(b):int => f[g[1],h[2]]}
 test(F00){a&b&c:int => f(a,x&y:int):type{x=y} => g(b):int => h(c):int => f[3,g[1],h[2]]}
 
 # Arrays with inputs.
-test(S00){f(a:prefix'-',b:int):=(b,a),f[3,7]=(7,-3)}
+test(S00){f(a:prefix'-',b:int):=(b,a),f[3,7]=(7,-3)}		#FP:10.4:SWAP:ISINT
 test(F00){f(a:prefix'-',b:int):=(b,a),f[3,7]=(7,3)}
 
 # Can we construct a test to show that ForVisibleHelper use of Global flag is essential?
 test(D00){as:=(:int,:int) => bs:=as => bs=(3,5)}
-test(S00){as:=(:int,:int) => bs:=as => bs=(:int,:int)}
+test(S00){as:=(:int,:int) => bs:=as => bs=(:int,:int)}		#FP:10.4:SWAP:ISINT:ASSUME:VAR
 test(U00){as:=(:int,:int) => bs:=(:int,:int) => cs:=as => ds:=bs => o:any => {es:=cs=ds,es=(o,o)}}
 
 # Fails-cancellation.
@@ -2388,13 +2388,13 @@ test(F00){function(g(1):=2){g}[function(0){2}][1]}
 test(F00){function(g(1):=2){g}[function(0){2}][1]}
 
 # Iteration-stop coverage.
-test(S00){a:int=>{b:int=>if(a=2){c=3}else{c=3},assume{a=2}},c:=3}
-test(S00){a:int=>{b:int=>if(a=2){c=3}else{c=3},assume{a=1}},c:=3}
-test(S00){a:any=>{b:int=>if(a=2){c=3}else{c=4},assume{a=2}},c:=3}
-test(S00){a:=2=>{b:int=>if(a=2){c=3}else{c=4}},c:=3}
-test(S00){a:=1=>{b:int=>if(a=2){c=4}else{c=3}},c:=3}
-test(S00){a:int=>{b:int=>if(a=2){c=3}else{c=4},assume{a=2}},c:=3}
-test(S00){a:int=>{b:int=>if(a=2){c=4}else{c=3},assume{a=1}},c:=3}
+test(S00){a:int=>{b:int=>if(a=2){c=3}else{c=3},assume{a=2}},c:=3}		#FP:10.4:SWAP:ISINT:IMPL-BEFORE-VERIFY:ASSUME:L2R(c:=3)
+test(S00){a:int=>{b:int=>if(a=2){c=3}else{c=3},assume{a=1}},c:=3}		#FP:10.4:SWAP:ISINT:IMPL-BEFORE-VERIFY:ASSUME:L2R(c:=3)
+test(S00){a:any=>{b:int=>if(a=2){c=3}else{c=4},assume{a=2}},c:=3}		#FP:10.4:SWAP:ISINT:IMPL-BEFORE-VERIFY:ASSUME:L2R(c:=3)
+test(S00){a:=2=>{b:int=>if(a=2){c=3}else{c=4}},c:=3}					#FP:10.4:SWAP:ISINT:IMPL-BEFORE-VERIFY:ASSUME:L2R(c:=3)
+test(S00){a:=1=>{b:int=>if(a=2){c=4}else{c=3}},c:=3}					#FP:10.4:SWAP:ISINT:IMPL-BEFORE-VERIFY:ASSUME:L2R(c:=3)
+test(S00){a:int=>{b:int=>if(a=2){c=3}else{c=4},assume{a=2}},c:=3}		#FP:10.4:SWAP:ISINT:IMPL-BEFORE-VERIFY:ASSUME:L2R(c:=3)
+test(S00){a:int=>{b:int=>if(a=2){c=4}else{c=3},assume{a=1}},c:=3}       #FP:10.4:SWAP:ISINT:IMPL-BEFORE-VERIFY:ASSUME:L2R(c:=3)
 test(F00){0=>c=4,c:=3}
 test(F00){a:=2=>{b:int=>if(a=2){c=4}else{c=3}},c:=3}
 test(F00){a:=1=>{b:int=>if(a=2){c=3}else{c=4}},c:=3}
@@ -2403,7 +2403,7 @@ test(F00){a:int=>{b:int=>if(a=2){c=3}else{c=4},assume{a=1}},c:=3}
 
 # Adding assumptions to ExploreDecides.
 test(F00){x:=1|2 => first{x=1}}
-test(S00){x:int => f():type{x=1} => {first{x=1},f[]}}
+test(S00){x:int => f():type{x=1} => {first{x=1},f[]}}					#FP:10.4:FALSE:x=fail
 test(F00){x:int => f():type{x=2} => {first{x=1},f[]}}
 test(F00){x:int => f():type{x=2|1} => {first{x=1},f[]}}
 test(F00){x:int => f():type{x=2|3} => {first{x=1},f[]}}
@@ -2418,7 +2418,7 @@ test(S00){for{for(){0|1}}}
 #!!ReduceIdentifierStep simple timing change trigger new bug test(S00){for{for(x:=2|1){0|x}}=((0,0),(0,1),(2,0),(2,1))}
 
 # Condition transitions must be monotonic.
-test(S00){a:any => b:int => {if{b=3}}}
+test(S00){a:any => b:int => {if{b=3}}}						#FP:10.4:OK(11.6)
 test(U00){a:any => b:int => {x:=b,if{x=3},x=a}}
 test(U00){a:any => b:int => {x:=a,if{x=3},x=b}}
 test(QS00){a:any => b:int => {allow{b=a,if{b=3}}}}
@@ -2465,22 +2465,22 @@ test(S00){as:=(:int,:int) => as=(as(0),as(1))}
 test(D00){as:=(:int,:int) => as=(as(0),as(0))}
 test(F00){as:=(:int,3) => as=(x:=x,4)}
 test(S00){a:=(2,3),a=(x:any,y:any)}
-test(S00){a:=(2,3),a=(x:=x,y:any)}
-test(S00){a:=(2,3),a=(x:any,y:=y)}
-test(S00){a:=(2,3),a=(x:=x,y:=y)}
-test(S00){a:=2,a=(x:=x)}
-test(S00){a:=2=>a=(x:=x)}
+test(S00){a:=(2,3),a=(x:=x,y:any)}					#FP:10.4:SWAP:ISINT:L2R
+test(S00){a:=(2,3),a=(x:any,y:=y)} 					#FP:10.4:SWAP:ISINT:L2R
+test(S00){a:=(2,3),a=(x:=x,y:=y)} 					#FP:10.4:SWAP:ISINT:L2R
+test(S00){a:=2,a=(x:=x)}  							#FP:10.4:SWAP:ISINT:L2R
+test(S00){a:=2=>a=(x:=x)}							#FP:10.4:SWAP:ISINT:L2R
 test(S00){as:=array{2} => as=array{x:=2}}
 test(S00){as:=array{2} => as=array{x:any}}
-test(S00){as:=array{2} => as(0)=(x:=x)}
-test(S00){as:=(:int,:int) => as=(x:=x,y:=y)}
-test(S00){as:=(2,3) => as=(x:=x,y:=y)}
-test(S00){as:=array{2} => as=array{x:=x}}
+test(S00){as:=array{2} => as(0)=(x:=x)}				#FP:10.4:SWAP:ISINT:L2R
+test(S00){as:=(:int,:int) => as=(x:=x,y:=y)}		#FP:10.4:SWAP:ISINT:L2R
+test(S00){as:=(2,3) => as=(x:=x,y:=y)}				#FP:10.4:SWAP:ISINT:L2R
+test(S00){as:=array{2} => as=array{x:=x}}			#FP:10.4:SWAP:ISINT:L2R
 
 # Timing change to syntax.call broke some surprising stuff:
-test(S00){f:=function(x:=int[x]){x},f(1)}
+test(S00){f:=function(x:=int[x]){x},f(1)}			#FP:10:4:ASSERT:VAR:SWAP:ISINT
 test(F00){function(x:=-3){x}[3]}
-test(S00){if{f(if{c=1}):=8},c:=7}
+test(S00){TRS_main() := {if{f(if{c=1}):=8},c:=7}}
 
 # Non-top-level tests.
 #LA test(S00){test(S00){123}}
@@ -2493,9 +2493,9 @@ test(S00){a:int => if(nat[a]) then nat[a]}
 test(S00){a:int => {x:=a,if(nat[x]) then nat[x]}}
 test(D00){a&b&c:int => {x:=a,if(x=b){x=a,x=b,x=c}}}
 test(S00){a&b:int => {x:=a,if(x=a){1}else{2}}}      # succeeds
-test(S00){a&b:int => {if(x=a){1}else{2},x:=a}}      # waits for decidable, succeeds
+test(S00){a&b:int => {if(x=a){1}else{2},x:=a}}     	#FP:10.4:SWAP:IF:ASSUME:VAR 	# waits for decidable, succeeds
 test(S00){a&b:int => {x:=b,if(x=a){a=b}else{2}}}    # decidable; assumes and succeeds
-test(S00){a&b:int => {if(x=a){a=b}else{2},x:=b}}    # waits for decidable; assumes and succeeds; succeeds
+test(S00){a&b:int => {if(x=a){a=b}else{2},x:=b}}    #FP:10.4:SWAP:IF:ASSUME:VAR 	# waits for decidable; assumes and succeeds; succeeds
 test(D00){a&b:int => {x:=a,if(x=a){1}else{2},x=b}}  # succeeds, may fail
 test(D00){a&b:int => {x:=b,if(x=a){1}else{2},x=a}}  # decidable; assumes and succeeds; may fail
 

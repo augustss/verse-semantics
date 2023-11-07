@@ -132,3 +132,6 @@ verify(pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEP
 
 # subtyping (passes, but apparently, should be rejected!)
 verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }
+
+# currently fails, as we need a way to swap x = 2 over x = x.
+verify(pass) { main(:any) := { x := x; x = 2 } }
