@@ -215,7 +215,7 @@ desugarExp'' e pi i = case extract e of
     tellName x Exists
     tellName y Exists
     e <- desugarExp' e pi i
-    pure $ unify (ArchetypeName <$> y) e :*>: unify (name x) i
+    pure $ unify (name x) i :*>: unify (ArchetypeName <$> y) e
   Rewrite.IfArchetypeName x e1 e2 -> do
     y <- (e $>) . Ident.Label <$> supply
     xs <- get
