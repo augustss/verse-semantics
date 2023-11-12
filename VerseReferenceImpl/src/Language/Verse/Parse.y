@@ -16,23 +16,24 @@ import Data.Functor.Apply
 import Data.Text(Text)
 import Data.Text qualified as Text
 
-import Language.Verse.Parse.Exp ( Exp
-                                , AttributePart
-                                , pattern (:=:)
-                                , pattern (:<>:)
-                                , pattern (:.:)
-                                , pattern (:..:)
-                                , pattern (:<:)
-                                , pattern (:<=:)
-                                , pattern (:>:)
-                                , pattern (:>=:)
-                                , pattern (:|:)
-                                , pattern (:+:)
-                                , pattern (:-:)
-                                , pattern (:*:)
-                                , pattern (:/:)
-                                , expToPat
-                                )
+import Language.Verse.Parse.Exp
+  ( Exp
+  , AttributePart
+  , pattern (:=:)
+  , pattern (:<>:)
+  , pattern (:.:)
+  , pattern (:..:)
+  , pattern (:<:)
+  , pattern (:<=:)
+  , pattern (:>:)
+  , pattern (:>=:)
+  , pattern (:|:)
+  , pattern (:+:)
+  , pattern (:-:)
+  , pattern (:*:)
+  , pattern (:/:)
+  , expToPat
+  )
 import Language.Verse.Parse.Exp qualified as Exp
 import Language.Verse.Parse.Exp ( Pat
                                 , pattern (:->:)
@@ -46,9 +47,8 @@ import Language.Verse.Name
 import Language.Verse.Pos qualified as Pos
 import Language.Verse.Token (Token)
 import Language.Verse.Token qualified as Token
-import Prettyprinter
-import Debug.Trace(trace)
 
+import Prettyprinter
 }
 
 %expect 0

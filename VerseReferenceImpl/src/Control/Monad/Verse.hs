@@ -21,8 +21,9 @@ module Control.Monad.Verse
   , freshVar
   , newVar
   , readVar
-  , rowUnify
-  , zipUnify
+  , Match (..)
+  , unify
+  , unifyEq
   , VarRef
   , newVarRef
   , readVarRef
@@ -40,7 +41,6 @@ module Control.Monad.Verse
   , assume
   , FreezeT
   , runFreezeT
-  , Frozen (..)
   , Freezable (..)
   , freeze'
   , FreshenT
@@ -54,35 +54,29 @@ import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.RS
-import Control.Monad.RWS.CPS
 import Control.Monad.Supply
 
 import Data.Bool
 import Data.Either
 import Data.Eq
-import Data.Foldable (for_)
+import Data.Fix
 import Data.Function
 import Data.Functor
+import Data.Functor.Compose
 import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Int
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntMap.Lazy.Extras qualified as IntMap.Lazy
-import Data.Match
 import Data.Maybe
 import Data.Monoid
 import Data.Ord
-import Data.Semigroup
 import Data.Traversable (Traversable, traverse)
 import Data.Tuple
 
 import GHC.Exts qualified
 
 import Prelude (Num (..), error, reverse, subtract)
-
-import Prettyprinter
-
-import Text.Show
 
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -108,7 +102,6 @@ type Abort r m = m r
 
 data Env m = Env
   { heap :: !HeapKey
-  , assumed :: !Bool
   , decisions :: !(Ref m Decisions)
   , processes :: !(Ref m (Processes m))
   , heaps :: !(Ref m (IntMap HeapKey))
@@ -144,15 +137,15 @@ newtype IVar m a = IVar
   { unIVar :: Ref m (HeapMap (IVarState m a))
   }
 
-newtype Var m f = Var
-  { unVar :: Ref m (HeapMap (VarState m f))
+newtype Var m a = Var
+  { unVar :: Ref m (HeapMap (VarState m a))
   }
 
-newtype VarRef m f = VarRef
-  { unVarRef :: Ref m (HeapMap (Var m f))
+newtype VarRef m a = VarRef
+  { unVarRef :: Ref m (HeapMap (Var m a))
   }
 
-instance EqRef (Ref m) => Eq (VarRef m f) where
+instance EqRef (Ref m) => Eq (VarRef m a) where
   (==) = eqRef `on` unVarRef
 
 data HeapMap a = HeapMap !a !(IntMap a)
@@ -163,18 +156,13 @@ data IVarState m a
   = Val !a
   | Susp !(Susp m a)
 
-data VarState m f
-  = Link !(Var m f)
-  | Repr !(Repr m f)
+data VarState m a
+  = Link !(Var m a)
+  | Repr !(Repr m a)
 
-data Repr m f
-  = Bound
-    !(f (Var m f))
-    {-# UNPACK #-} !Int
-  | Unbound
-    {-# UNPACK #-} !Int
-    !(Susp m (f (Var m f)))
-    {-# UNPACK #-} !Int
+data Repr m a
+  = Bound !a {-# UNPACK #-} !Int
+  | Unbound {-# UNPACK #-} !Int !(Susp m a) {-# UNPACK #-} !Int
 
 instance Functor (VerseT m) where
   fmap f m = VerseT $ \ yk ak sk -> unVerseT m yk ak $ sk . f
@@ -224,7 +212,6 @@ runVerseT m = do
     yk = Yield $ \ _ _ _ _ _ -> pure Nothing
     ak = pure $ Just []
     heap = Nothing
-    assumed = False
     splitDepth = 0
     sk x fk _ r = readRef r.suspCount >>= \ case
       0 -> do
@@ -296,19 +283,19 @@ readLocalIVarState :: MonadRef m => IVar m a -> VerseT m (Maybe (IVarState m a))
 readLocalIVarState v = liftSucceed $ \ r ->
   readRef (unIVar v) <&> lookupLocal r.heap
 
-freshVar :: (MonadRef m, MonadSupply Int m) => VerseT m (Var m f)
+freshVar :: (MonadRef m, MonadSupply Int m) => VerseT m (Var m a)
 freshVar = liftSucceed $ \ r -> freshVar' r.splitDepth
 
 freshVar' :: (MonadRef m, MonadSupply Int m) => Int -> m (Var m f)
 freshVar' n = fmap Var . newRef . singleton . Repr . Unbound n emptySusp =<< supply
 
-newVar :: (MonadRef m, MonadSupply Int m) => f (Var m f) -> VerseT m (Var m f)
+newVar :: (MonadRef m, MonadSupply Int m) => a -> VerseT m (Var m a)
 newVar = lift . newVar'
 
-newVar' :: (MonadRef m, MonadSupply Int m) => f (Var m f) -> m (Var m f)
+newVar' :: (MonadRef m, MonadSupply Int m) => a -> m (Var m a)
 newVar' x = fmap Var . newRef . singleton . Repr . Bound x =<< supply
 
-readVar :: MonadRef m => Var m f -> VerseT m (f (Var m f))
+readVar :: MonadRef m => Var m a -> VerseT m a
 readVar v = readVarState v >>= \ case
   Link v -> readVar v
   Repr (Bound x _) -> pure x
@@ -319,22 +306,25 @@ readVar v = readVarState v >>= \ case
   where
     rotate f x1 x2 x3 x4 x5 = f x5 x1 x2 x3 x4
 
-rowUnify
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
-  => (forall a . m a) -> Var m f -> Var m f -> VerseT m ()
-rowUnify m v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
+data Match = SEQ | LE | GE
+
+unify
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => (a -> a -> VerseT m (Match, VerseT m ()))
+  -> Var m a -> Var m a -> VerseT m ()
+unify f v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
   (Found v_x (Bound x _), Found v_y (Unbound n_y k_y _)) -> do
     r <- ask'
     when (n_y < r.splitDepth) incrSuspCount
     writeLink v_y v_x
     k_y x
-    resumeProcesses $ rowSubst m v_x v_y
+    resumeProcesses $ subst f v_x v_y
   (Found v_x (Unbound n_x k_x _), Found v_y (Bound y _)) -> do
     r <- ask'
     when (n_x < r.splitDepth) incrSuspCount
     writeLink v_x v_y
     k_x y
-    resumeProcesses $ rowSubst m v_y v_x
+    resumeProcesses $ subst f v_y v_x
   (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) -> do
     r <- ask'
     case compare' n_x i_x n_y i_y of
@@ -343,180 +333,77 @@ rowUnify m v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
         when (n_y < r.splitDepth) incrSuspCount
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
-        resumeProcesses $ rowSubst m v_x v_y
+        resumeProcesses $ subst f v_x v_y
       GT -> do
         when (n_x < r.splitDepth) incrSuspCount
         writeLink v_x v_y
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
-        resumeProcesses $ rowSubst m v_y v_x
+        resumeProcesses $ subst f v_y v_x
   (Found v_x repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) ->
-    when (i_x /= i_y) $ do
-      r <- ask'
-      case rowMatch r.assumed x y of
-        Zip Nothing -> empty
-        Zip (Just z) -> do
-          writeRepr v_y repr_x
-          for_ z . uncurry $ rowUnify m
-        Subset z -> do
-          decide
-          writeAbstractRepr v_y repr_x
-          for_ z $ \ (v_x, y) -> do
-            v_y <- newVar y
-            rowUnify m v_x v_y
-        Superset z -> do
-          decide
-          writeAbstractRepr v_x repr_y
-          for_ z $ \ (x, v_y) -> do
-            v_x <- newVar x
-            rowUnify m v_x v_y
-        Undecidable -> lift m
-        Uncons f_x v_xs f_y v_ys -> do
-          writeRepr v_y repr_x
-          rowUnifyUncons m f_x v_xs f_y v_ys
+    when (i_x /= i_y) $ f x y >>= \ case
+      (SEQ, m) -> do
+        writeRepr v_y repr_x
+        m
+      (LE, m) -> do
+        decide
+        writeAbstractRepr v_y repr_x
+        m
+      (GE, m) -> do
+        decide
+        writeAbstractRepr v_x repr_y
+        m
 
-rowSubst
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
-  => (forall a . m a) -> Var m f -> Var m f -> VerseT m ()
-rowSubst m v_x v_y = findLocalRepr v_y >>= \ case
-  Nothing -> resumeProcesses $ rowSubst m v_x v_y
-  Just y -> rowSubst' m v_x y
+subst
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => (a -> a -> VerseT m (Match, VerseT m ()))
+  -> Var m a -> Var m a -> VerseT m ()
+subst f v_x v_y = findLocalRepr v_y >>= \ case
+  Nothing -> resumeProcesses $ subst f v_x v_y
+  Just y -> subst' f v_x y
 
-rowSubst'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
-  => (forall a . m a) -> Var m f -> Found m f -> VerseT m ()
-rowSubst' m v_x y = findRepr v_x <&> (, y) >>= \ case
+subst'
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => (a -> a -> VerseT m (Match, VerseT m ()))
+  -> Var m a -> Found m a -> VerseT m ()
+subst' f v_x y = findRepr v_x <&> (, y) >>= \ case
   (Found v_x (Bound x _), Found v_y (Unbound _ k_y _)) -> do
     writeLink v_y v_x
     k_y x
-    resumeProcesses $ rowSubst m v_x v_y
+    resumeProcesses $ subst f v_x v_y
   (Found _ (Unbound _ k_x _), Found v_y (Bound y _)) -> do
     writeLink v_x v_y
     k_x y
-    resumeProcesses $ rowSubst m v_y v_x
+    resumeProcesses $ subst f v_y v_x
   (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) ->
     case compare' n_x i_x n_y i_y of
       EQ -> decrSuspCount
       LT -> do
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
-        resumeProcesses $ rowSubst m v_x v_y
+        resumeProcesses $ subst f v_x v_y
       GT -> do
         writeLink v_x v_y
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
-        resumeProcesses $ rowSubst m v_y v_x
+        resumeProcesses $ subst f v_y v_x
   (Found v_x repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) -> do
     decrSuspCount
-    when (i_x /= i_y) $ do
-      r <- ask'
-      case rowMatch r.assumed x y of
-        Zip Nothing -> empty
-        Zip (Just z) -> do
-          writeRepr v_y repr_x
-          for_ z . uncurry $ rowUnify m
-        Subset z -> do
-          decide
-          writeAbstractRepr v_y repr_x
-          for_ z $ \ (v_x, y) -> do
-            v_y <- newVar y
-            rowUnify m v_x v_y
-        Superset z -> do
-          decide
-          writeAbstractRepr v_x repr_y
-          for_ z $ \ (x, v_y) -> do
-            v_x <- newVar x
-            rowUnify m v_x v_y
-        Undecidable -> lift m
-        Uncons f_x v_xs f_y v_ys -> do
-          writeRepr v_y repr_x
-          rowUnifyUncons m f_x v_xs f_y v_ys
-
-rowUnifyUncons
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
-  => (forall a . m a)
-  -> (Var m f -> f (Var m f)) -> Var m f
-  -> (Var m f -> f (Var m f)) -> Var m f
-  -> VerseT m ()
-rowUnifyUncons m f_x v_xs f_y v_ys = do
-  v_zs <- freshVar
-  v_xs' <- newVar $ f_x v_zs
-  rowUnify m v_xs' v_ys
-  v_ys' <- newVar $ f_y v_zs
-  rowUnify m v_xs v_ys'
-
-zipUnify
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, ZipMatchable f)
-  => Var m f -> Var m f -> VerseT m ()
-zipUnify v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
-  (Found v_x (Bound x _), Found v_y (Unbound n_y k_y _)) -> do
-    r <- ask'
-    when (n_y < r.splitDepth) incrSuspCount
-    writeLink v_y v_x
-    k_y x
-    resumeProcesses $ zipSubst v_x v_y
-  (Found v_x (Unbound n_x k_x _), Found v_y (Bound y _)) -> do
-    r <- ask'
-    when (n_x < r.splitDepth) incrSuspCount
-    writeLink v_x v_y
-    k_x y
-    resumeProcesses $ zipSubst v_y v_x
-  (Found _ repr_x@(Bound x i_x), Found v_y (Bound y i_y)) ->
-    when (i_x /= i_y) $ case zipMatch x y of
-      Nothing -> empty
-      Just z -> do
+    when (i_x /= i_y) $ f x y >>= \ case
+      (SEQ, m) -> do
         writeRepr v_y repr_x
-        for_ z $ uncurry zipUnify
-  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) -> do
-    r <- ask'
-    case compare' n_x i_x n_y i_y of
-      EQ -> pure ()
-      LT -> do
-        when (n_y < r.splitDepth) incrSuspCount
-        writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
-        writeLink v_y v_x
-        resumeProcesses $ zipSubst v_x v_y
-      GT -> do
-        when (n_x < r.splitDepth) incrSuspCount
-        writeLink v_x v_y
-        writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
-        resumeProcesses $ zipSubst v_y v_x
+        m
+      (LE, m) -> do
+        decide
+        writeAbstractRepr v_y repr_x
+        m
+      (GE, m) -> do
+        decide
+        writeAbstractRepr v_x repr_y
+        m
 
-zipSubst
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, ZipMatchable f)
-  => Var m f -> Var m f -> VerseT m ()
-zipSubst v_x v_y = findLocalRepr v_y >>= \ case
-  Nothing -> resumeProcesses $ zipSubst v_x v_y
-  Just y -> zipSubst' v_x y
-
-zipSubst'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, ZipMatchable f)
-  => Var m f -> Found m f -> VerseT m ()
-zipSubst' v_x y = findRepr v_x <&> (, y) >>= \ case
-  (Found v_x (Bound x _), Found v_y (Unbound _ k_y _)) -> do
-    writeLink v_y v_x
-    k_y x
-    resumeProcesses $ zipSubst v_x v_y
-  (Found _ (Unbound _ k_x _), Found v_y (Bound y _)) -> do
-    writeLink v_x v_y
-    k_x y
-    resumeProcesses $ zipSubst v_y v_x
-  (Found _ repr_x@(Bound x i_x), Found v_y (Bound y i_y)) -> do
-    decrSuspCount
-    when (i_x /= i_y) $ case zipMatch x y of
-      Nothing -> empty
-      Just z -> do
-        writeRepr v_y repr_x
-        for_ z $ uncurry zipUnify
-  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) ->
-    case compare' n_x i_x n_y i_y of
-      EQ -> decrSuspCount
-      LT -> do
-        writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
-        writeLink v_y v_x
-        resumeProcesses $ zipSubst v_x v_y
-      GT -> do
-        writeLink v_x v_y
-        writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
-        resumeProcesses $ zipSubst v_y v_x
+unifyEq
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Eq a)
+  => Var m a -> Var m a -> VerseT m ()
+unifyEq = unify $ \ x y -> guard (x == y) $> (SEQ, pure ())
 
 decide :: (MonadFix m, MonadRef m, MonadSupply Int m) => VerseT m ()
 decide = do
@@ -552,17 +439,17 @@ readRepr' v h = readRef (unVar v) <&> lookupVarState h >>= \ case
   Link v -> readRepr' v h
   Repr x -> pure x
 
-data Found m f = Found !(Var m f) !(Repr m f)
+data Found m a = Found !(Var m a) !(Repr m a)
 
-findRepr :: MonadRef m => Var m f -> VerseT m (Found m f)
+findRepr :: MonadRef m => Var m a -> VerseT m (Found m a)
 findRepr v = liftSucceed $ \ r -> findRepr' v r.heap
 
-findRepr' :: MonadRef m => Var m f -> HeapKey -> m (Found m f)
+findRepr' :: MonadRef m => Var m a -> HeapKey -> m (Found m a)
 findRepr' v h = readRef (unVar v) <&> lookupVarState h >>= \ case
   Link v -> findRepr' v h
   Repr x -> pure $ Found v x
 
-findLocalRepr :: MonadRef m => Var m f -> VerseT m (Maybe (Found m f))
+findLocalRepr :: MonadRef m => Var m a -> VerseT m (Maybe (Found m a))
 findLocalRepr v = liftSucceed $ \ r -> loop v r.heap
   where
     loop v h = readRef (unVar v) <&> lookupLocal h >>= \ case
@@ -570,7 +457,7 @@ findLocalRepr v = liftSucceed $ \ r -> loop v r.heap
       Just (Link v) -> Just <$> findRepr' v h
       Just (Repr x) -> pure . Just $ Found v x
 
-readVarState :: MonadRef m => Var m f -> VerseT m (VarState m f)
+readVarState :: MonadRef m => Var m a -> VerseT m (VarState m a)
 readVarState v = liftSucceed $ \ r ->
   readRef (unVar v) <&> lookupVarState r.heap
 
@@ -626,8 +513,8 @@ resume' Process { env = Env {..}, .. } m = do
           pure $ Just $ writeIVar result $ Succeed (heap, decisions, x, m_fail)
 
 newVarRef
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
-  => Var m f -> VerseT m (VarRef m f)
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
+  => Var m a -> VerseT m (VarRef m a)
 newVarRef x = do
   r <- ask'
   ref <- lift . fmap VarRef . newRef $ singleton x
@@ -638,17 +525,17 @@ newVarRef x = do
     put' (unVarRef ref) h x *> put' (unVarRef ref) h' x
   pure ref
 
-readVarRef :: MonadRef m => VarRef m f -> VerseT m (Var m f)
+readVarRef :: MonadRef m => VarRef m a -> VerseT m (Var m a)
 readVarRef ref = do
   r <- ask'
   lift $ readVarRef' ref r.heap
 
-readVarRef' :: MonadRef m => VarRef m f -> HeapKey -> m (Var m f)
+readVarRef' :: MonadRef m => VarRef m a -> HeapKey -> m (Var m a)
 readVarRef' ref = get' (unVarRef ref)
 
 writeVarRef
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
-  => VarRef m f -> Var m f -> VerseT m ()
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VarRef m a -> Var m a -> VerseT m ()
 writeVarRef ref x = do
   r <- ask'
   y <- lift $ get' (unVarRef ref) r.heap
@@ -783,7 +670,7 @@ verifyAll decisions m = do
     loop h decisions ref m >>= writeIVar v
   pure v
   where
-    loop h decisions ref m = split' h True decisions ref m >>= readIVar >>= \ case
+    loop h decisions ref m = split' h decisions ref m >>= readIVar >>= \ case
       Fail -> lift $ readRef decisions
       Abort -> lift $ readRef decisions
       Succeed (h, decisions, (), m) -> loop h decisions ref m
@@ -797,10 +684,10 @@ succeeds m = do
     h <- Just <$> newHeap
     decisions <- ask' <&> (.decisions)
     ref <- newHeapRef Nothing
-    split' h False decisions ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    split' h decisions ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
       Fail -> writeIVar v Nothing
       Abort -> abort
-      Succeed (h, _, x, m) -> split' h False decisions ref m >>= readIVar >>= \ case
+      Succeed (h, _, x, m) -> split' h decisions ref m >>= readIVar >>= \ case
         Fail -> writeIVar v $ Just x
         Abort -> abort
         Succeed _ -> writeIVar v Nothing
@@ -815,7 +702,7 @@ fails m = do
     h <- Just <$> newHeap
     decisions <- ask' <&> (.decisions)
     ref <- newHeapRef Nothing
-    split' h False decisions ref (m >> writeHeapRef ref (Just ())) >>= readIVar >>= \ case
+    split' h decisions ref (m >> writeHeapRef ref (Just ())) >>= readIVar >>= \ case
       Fail -> writeIVar v True
       Abort -> abort
       Succeed _ -> writeIVar v False
@@ -830,10 +717,10 @@ decides m = do
     h <- Just <$> newHeap
     decisions <- ask' <&> (.decisions)
     ref <- newHeapRef Nothing
-    split' h False decisions ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    split' h decisions ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
       Fail -> empty
       Abort -> abort
-      Succeed (h, _, x, m) -> split' h False decisions ref m >>= readIVar >>= \ case
+      Succeed (h, _, x, m) -> split' h decisions ref m >>= readIVar >>= \ case
         Fail -> writeIVar v $ Just x
         Abort -> abort
         Succeed _ -> writeIVar v Nothing
@@ -849,7 +736,7 @@ assume m = do
     h <- Just <$> newHeap
     decisions <- ask' <&> (.decisions)
     ref <- newHeapRef Nothing
-    split' h True decisions ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    split' h decisions ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
       Fail -> abort
       Abort -> abort
       Succeed (_, _, x, _) -> writeIVar v x
@@ -866,17 +753,16 @@ split
   -> VerseT m (IVar m (Split (HeapKey, Ref m Decisions, a, VerseT m ())))
 split heap left m = do
   r <- ask'
-  split' heap r.assumed r.decisions left m
+  split' heap r.decisions left m
 
 split'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => HeapKey
-  -> Bool
   -> Ref m Decisions
   -> HeapRef m (Maybe a)
   -> VerseT m ()
   -> VerseT m (IVar m (Split (HeapKey, Ref m Decisions, a, VerseT m ())))
-split' heap assumed decisions left m = do
+split' heap decisions left m = do
   r <- ask'
   processes <- lift $ newRef mempty
   heaps <- lift $ newRef mempty
@@ -918,19 +804,6 @@ instance MonadTrans FreezeT where
 class Monad m => Freezable a b m | a -> b where
   freeze :: a -> FreezeT m b
 
-data Frozen f
-  = Unknown
-  | Known (f (Frozen f))
-
-deriving instance Show (f (Frozen f)) => Show (Frozen f)
-
-deriving instance Eq (f (Frozen f)) => Eq (Frozen f)
-
-instance Pretty (f (Frozen f)) => Pretty (Frozen f) where
-  pretty = \ case
-    Unknown -> "_"
-    Known x -> pretty x
-
 instance Monad m => Freezable Int Int m where
   freeze = pure
 
@@ -945,12 +818,22 @@ instance Freezable a b m => Freezable [a] [b] m where
 instance Freezable a b m => Freezable (Maybe a) (Maybe b) m where
   freeze = traverse freeze
 
+instance ( Monad m
+         , Freezable (f (Fix f)) (f' (Fix f')) m
+         ) => Freezable (Fix f) (Fix f') m where
+  freeze = fmap Fix . freeze . getFix
+
+instance ( Monad m
+         , Freezable (f (g a)) (f' (g' a')) m
+         ) => Freezable (Compose f g a) (Compose f' g' a') m where
+  freeze = fmap Compose . freeze . getCompose
+
 instance ( MonadFix m
          , MonadRef m
-         , Freezable (f (Var m f)) (g (Frozen g)) m
-         ) => Freezable (Var m f) (Frozen g) m where
+         , Freezable a b m
+         ) => Freezable (Var m a) (Maybe b) m where
   freeze v = FreezeT ask >>= lift . readRepr' v >>= \ case
-    Unbound {} -> pure Unknown
+    Unbound {} -> pure Nothing
     Bound x i ->
       mfix $
       FreezeT .
@@ -958,44 +841,35 @@ instance ( MonadFix m
       IntMap.Lazy.lookupInsert i .
       unsafeCoerce >=> \ case
         Just x' -> pure $ unsafeCoerce x'
-        Nothing -> Known <$> freeze x
+        Nothing -> Just <$> freeze x
 
 instance ( MonadFix m
          , MonadRef m
-         , Freezable (f (Var m f)) (g (Frozen g)) m
-         ) => Freezable (VarRef m f) (Frozen g) m where
+         , Freezable a b m
+         ) => Freezable (VarRef m a) (Maybe b) m where
   freeze ref = freeze =<< lift . readVarRef' ref =<< FreezeT ask
 
 freeze' :: (Monad m, Freezable a b m) => a -> VerseT m b
 freeze' = runFreezeT . freeze
 
 newtype FreshenT m a = FreshenT
-  { unFreshenT :: RWST (HeapKey, HeapKey) (Rollback m) (IntMap GHC.Exts.Any) m a
+  { unFreshenT :: RST (HeapKey, HeapKey) (IntMap GHC.Exts.Any) m a
   } deriving ( Functor
              , Applicative
              , Monad
+             , MonadFix
              )
-
-newtype Rollback m = Rollback { getRollback :: Env m -> m () }
-
-instance Applicative m => Semigroup (Rollback m) where
-  f <> g = Rollback $ \ r -> getRollback f r *> getRollback g r
-
-instance Applicative m => Monoid (Rollback m) where
-  mempty = Rollback . const $ pure ()
 
 runFreshenT :: Monad m => FreshenT m a -> HeapKey -> VerseT m a
 runFreshenT m heap = do
   r <- ask'
-  (x, w) <- lift $ evalRWST (unFreshenT m) (heap, r.heap) mempty
-  addEmpty $ getRollback w
-  pure x
+  lift $ evalRST (unFreshenT m) (heap, r.heap) mempty
 
 evalFreshenT :: Monad m => FreshenT m () -> HeapKey -> m ()
 evalFreshenT m h = evalFreshenT' m h h
 
 evalFreshenT' :: Monad m => FreshenT m a -> HeapKey -> HeapKey -> m a
-evalFreshenT' m h h' = fst <$> evalRWST (unFreshenT m) (h, h') mempty
+evalFreshenT' m h h' = evalRST (unFreshenT m) (h, h') mempty
 
 instance MonadTrans FreshenT where
   lift = FreshenT . lift
@@ -1022,24 +896,32 @@ instance Freshenable a m => Freshenable [a] m where
 instance Freshenable v m => Freshenable (Strict.HashMap k v) m where
   freshen = traverse freshen
 
+instance ( Monad m
+         , Freshenable (f (g a)) m
+         ) => Freshenable (Compose f g a) m where
+  freshen = fmap Compose . freshen . getCompose
+
+instance ( Monad m
+         , Freshenable (f (Fix f)) m
+         ) => Freshenable (Fix f) m where
+  freshen = fmap Fix . freshen . getFix
+
 instance ( MonadFix m
          , MonadRef m
          , MonadSupply Int m
-         , Traversable f
-         ) => Freshenable (Var m f) m where
-  freshen = FreshenT . loop
-    where
-      loop v = do
-        (h, _) <- ask
-        lift (findRepr' v h) >>= \ case
-          Found _ (Bound x i) -> mfix $ \ x' ->
-            state' (IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
-              Just x' -> pure $ unsafeCoerce x'
-              Nothing -> lift . newVar' =<< traverse loop x
-          Found v (Unbound _ _ i) -> mfix $ \ x' ->
-            state' (IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
-              Just x' -> pure $ unsafeCoerce x'
-              Nothing -> pure v
+         , Freshenable a m
+         ) => Freshenable (Var m a) m where
+  freshen v = do
+    (h, _) <- FreshenT ask
+    lift (findRepr' v h) >>= \ case
+      Found _ (Bound x i) -> mfix $ \ x' ->
+        FreshenT (state' . IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
+          Just x' -> pure $ unsafeCoerce x'
+          Nothing -> lift . newVar' =<< freshen x
+      Found v (Unbound _ _ i) -> mfix $ \ x' ->
+        FreshenT (state' . IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
+          Just x' -> pure $ unsafeCoerce x'
+          Nothing -> pure v
 
 msplit_
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -1153,10 +1035,6 @@ alts x y z = VerseT $ \ yk ak sk fk ek r -> do
     fk' r = f r *> unVerseT y yk ak sk fk fk r
     ek' r = f r *> unVerseT z yk ak sk fk ek r
   unVerseT x yk ak sk fk' ek' r
-
-addEmpty :: Applicative m => (Env m -> m ()) -> VerseT m ()
-addEmpty f = VerseT $ \ _ _ sk fk ek ->
-  sk () fk $ \ r -> f r *> ek r
 
 type CopyT m = ReaderT (HeapKey, Ref m Decisions) m
 

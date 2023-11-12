@@ -30,7 +30,8 @@ library
     Control.Monad.Supply
     Control.Monad.Verse
     Data.IntMap.Lazy.Extras
-    Data.Match
+    Data.Fix
+    Data.Functor.Compose.Instances
     Language.Verse
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp

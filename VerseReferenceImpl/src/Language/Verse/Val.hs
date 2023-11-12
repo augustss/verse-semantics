@@ -5,22 +5,29 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Val
   ( Val (..)
+  , forVal_
   , VarVal
+  , VarRefVal
   , FrozenVal
   , Overload (..)
+  , forOverload_
   , Named (..)
+  , VarNamed
+  , forNamed_
   , Env
+  , forEnv_
+  , VarEnv
   ) where
 
-import Control.Monad
-import Control.Monad.Verse (Var, VarRef, Freezable (..), Frozen, Freshenable (..))
+import Control.Monad.Verse (Var, VarRef, Freezable (..), Freshenable (..))
 
-import Data.Foldable
+import Data.Fix
+import Data.Foldable (for_)
 import Data.Functor
-import Data.Hashable
+import Data.Functor.Compose
+import Data.Functor.Compose.Instances ()
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
-import Data.Match
 import Data.Ratio
 import Data.Traversable
 
@@ -50,77 +57,55 @@ data Val ref a
   | StructInst {-# UNPACK #-} !Label !(Env Name ref a)
   | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(Env Name ref a)
   | AnyOverloads
-  | Overloads !(Overload ref a) a deriving (Functor, Foldable, Traversable)
+  | Overloads !(Overload ref a) a
 
-type VarVal m = Var m (Val (VarRef m))
+forVal_ :: Applicative m => Val ref a -> (a -> m b) -> m ()
+forVal_ x f = case x of
+  Any -> pure ()
+  Comparable -> pure ()
+  AnyRational -> pure ()
+  Rational _ -> pure ()
+  AnyInt -> pure ()
+  Int _ -> pure ()
+  AnyFloat -> pure ()
+  Float _ -> pure ()
+  Truth x -> void $ f x
+  Tuple xs -> for_ xs f
+  Module _ env -> forEnv_ env f
+  Enum _ env xs -> forEnv_ env f *> for_ xs f
+  EnumValue {} -> pure ()
+  StructInst _ env -> forEnv_ env f
+  ClassInst _ sup env -> for_ sup f *> forEnv_ env f
+  AnyOverloads -> pure ()
+  Overloads x xs -> forOverload_ x f *> void (f xs)
 
-type FrozenVal = Frozen (Val Frozen)
+type VarVal m = Fix (Compose (Var m) (Val (VarRef m)))
 
-instance Eq (ref (Val ref)) => RowMatchable (Val ref) where
-  rowMatch assumed = curry $ \ case
-    (Any, Overloads _ xs) | assumed -> Superset [(AnyOverloads, xs)]
-    (Any, x) | assumed -> Superset $ (Any,) <$> toList x
-    (Any, _) -> Undecidable
-    (Comparable, Any) | assumed -> Subset []
-    (Comparable, Any) -> Undecidable
-    (Comparable, AnyOverloads) -> Undecidable
-    (Comparable, Overloads {}) -> Undecidable
-    (Comparable, x) -> Superset $ (Comparable,) <$> toList x
-    (AnyRational, AnyRational) -> Subset []
-    (AnyRational, Rational _) -> Superset []
-    (AnyRational, AnyInt) -> Superset []
-    (AnyRational, Int _) -> Superset []
-    (Rational _, AnyRational) -> Subset []
-    (Rational x, Rational y) -> Zip $ guard (x == y) $> []
-    (Rational x, AnyInt) | denominator x == 1 -> Subset []
-    (Rational x, Int y) | denominator x == 1 -> Zip $ guard (numerator x == y) $> []
-    (AnyInt, AnyRational) -> Subset []
-    (AnyInt, Rational y) | 1 == denominator y -> Superset []
-    (AnyInt, AnyInt) -> Subset []
-    (AnyInt, Int _) -> Superset []
-    (Int _, AnyRational) -> Subset []
-    (Int x, Rational y) | 1 == denominator y -> Zip $ guard (x == numerator y) $> []
-    (Int _, AnyInt) -> Subset []
-    (Int x, Int y) -> Zip $ guard (x == y) $> []
-    (AnyFloat, AnyFloat) -> Subset []
-    (AnyFloat, Float _) -> Superset []
-    (Float _, AnyFloat) -> Subset []
-    (Float x, Float y) -> Zip $ guard (if isNaN x then isNaN y else x == y) $> []
-    (Truth x, Truth y) -> Zip $ Just [(x, y)]
-    (Tuple xs, Tuple ys) -> Zip $ zipMatch xs ys
-    (Enum i xs xs', Enum j ys ys') -> Zip $ do
-      guard $ i == j
-      zs <- zipMatchEnv xs ys
-      zs' <- zipMatch xs' ys'
-      pure $ zs ++ zs'
-    (EnumValue i x, EnumValue j y) -> Zip $ guard (i == j && x == y) $> []
-    (StructInst i xs, StructInst j ys) -> Zip $ guard (i == j) *> zipMatchEnv xs ys
-    (ClassInst i x xs, ClassInst j y ys) -> Zip $ do
-      guard $ i == j
-      z <- zipMatch x y
-      zs <- zipMatchEnv xs ys
-      pure $ z ++ zs
-    (AnyOverloads, Any) | assumed -> Subset []
-    (AnyOverloads, Any) -> Undecidable
-    (AnyOverloads, Comparable) -> Undecidable
-    (AnyOverloads, AnyOverloads) | assumed -> Subset []
-    (AnyOverloads, AnyOverloads) -> Undecidable
-    (AnyOverloads, Overloads _ y) | assumed -> Superset [(AnyOverloads, y)]
-    (AnyOverloads, Overloads {}) -> Undecidable
-    (Overloads _ xs, Any) | assumed -> Subset [(xs, AnyOverloads)]
-    (Overloads {}, Any) -> Undecidable
-    (Overloads {}, Comparable) -> Undecidable
-    (Overloads _ xs, AnyOverloads) | assumed -> Subset [(xs, AnyOverloads)]
-    (Overloads {}, AnyOverloads) -> Undecidable
-    (Overloads x xs, Overloads y ys) -> case zipMatch x y of
-      Just z -> Zip . Just $ (xs, ys):z
-      Nothing -> Uncons (Overloads x) xs (Overloads y) ys
-    (x, Any) | assumed -> Subset $ toList x <&> (, Any)
-    (_, Any) -> Undecidable
-    (x, Comparable) -> Subset $ toList x <&> (, Comparable)
-    _ -> Zip Nothing
+type VarRefVal m = VarRef m (Val (VarRef m) (VarVal m))
 
-instance ( Freezable (f (Val f)) (g (Val g)) m
+type FrozenVal = Fix (Compose Maybe (Val Maybe))
+
+instance Freshenable a m => Freshenable (Val f a) m where
+  freshen x = case x of
+    Any -> pure x
+    Comparable -> pure x
+    AnyRational -> pure x
+    Rational _ -> pure x
+    AnyInt -> pure x
+    Int _ -> pure x
+    AnyFloat -> pure x
+    Float _ -> pure x
+    Truth x -> Truth <$> freshen x
+    Tuple xs -> Tuple <$> for xs freshen
+    Module i xs -> Module i <$> for xs freshen
+    Enum i xs xs' -> Enum i <$> for xs freshen <*> for xs' freshen
+    EnumValue {} -> pure x
+    StructInst i xs -> StructInst i <$> for xs freshen
+    ClassInst i x xs -> ClassInst i <$> for x freshen <*> for xs freshen
+    AnyOverloads -> pure x
+    Overloads x xs -> Overloads <$> freshen x <*> freshen xs
+
+instance ( Freezable (f (Val f a)) (g (Val g b)) m
          , Freezable a b m
          ) => Freezable (Val f a) (Val g b) m where
   freeze = \ case
@@ -142,7 +127,7 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
     AnyOverloads -> pure AnyOverloads
     Overloads x xs -> Overloads <$> freeze x <*> freeze xs
 
-instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
+instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
   pretty = \ case
     Any -> "any"
     Comparable -> "comparable"
@@ -209,7 +194,6 @@ instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Val ref a) where
 
 data Overload ref a
   = Fun
-    {-# UNPACK #-} !Label
     !(Env Ident ref a)
     !(Desugar.Env L Ident)
     !Exp
@@ -225,35 +209,38 @@ data Overload ref a
     !(Maybe a)
     !(Desugar.Env L Ident)
     !Exp
-  | Intrinsic !Intrinsic deriving (Functor, Foldable, Traversable)
+  | Intrinsic !Intrinsic
 
 type Exp = L (Desugar.Exp L Ident)
 
-instance Eq (ref (Val ref)) => RowMatchable (Overload ref)
+forOverload_ :: Applicative m => Overload ref a -> (a -> m b) -> m ()
+forOverload_ x f = case x of
+  Fun env _ _ _ -> forEnv_ env f
+  Struct _ env _ _ -> forEnv_ env f
+  Class _ env sup _ _ -> forEnv_ env f *> for_ sup f
+  Intrinsic _ -> pure ()
 
-instance Eq (ref (Val ref)) => ZipMatchable (Overload ref) where
-  zipMatch = curry $ \ case
-    (Fun i_x env_x _ _ _, Fun i_y env_y _ _ _) ->
-      guard (i_x == i_y) *>
-      zipMatchEnv env_x env_y
-    (Struct i_x env_x _ _, Struct i_y env_y _ _) ->
-      guard (i_x == i_y) *>
-      zipMatchEnv env_x env_y
-    (Class i_x env_x sup_x _ _, Class i_y env_y sup_y _ _) -> do
-      guard $ i_x == i_y
-      sup_z <- zipMatch sup_x sup_y
-      env_z <- zipMatchEnv env_x env_y
-      pure $ sup_z ++ env_z
-    (Intrinsic x, Intrinsic y) -> guard (x == y) $> []
-    _ -> Nothing
+instance Freshenable a m => Freshenable (Overload f a) m where
+  freshen x = case x of
+    Fun env xs e1 e2 -> do
+      env <- for env freshen
+      pure $ Fun env xs e1 e2
+    Struct i env xs e -> do
+      env <- for env freshen
+      pure $ Struct i env xs e
+    Class i env sup xs e -> do
+      env <- for env freshen
+      sup <- for sup freshen
+      pure $ Class i env sup xs e
+    Intrinsic _ -> pure x
 
-instance ( Freezable (f (Val f)) (g (Val g)) m
+instance ( Freezable (f (Val f a)) (g (Val g b)) m
          , Freezable a b m
          ) => Freezable (Overload f a) (Overload g b) m where
   freeze = \ case
-    Fun i env xs e1 e2 -> do
+    Fun env xs e1 e2 -> do
       env <- for env freeze
-      pure $ Fun i env xs e1 e2
+      pure $ Fun env xs e1 e2
     Struct i env xs e -> do
       env <- for env freeze
       pure $ Struct i env xs e
@@ -265,38 +252,35 @@ instance ( Freezable (f (Val f)) (g (Val g)) m
 
 data Named ref a
   = Val a
-  | Ref (ref (Val ref)) a deriving (Functor, Foldable, Traversable)
+  | Ref (ref (Val ref a)) a
 
-instance Eq (ref (Val ref)) => RowMatchable (Named ref)
+forNamed_ :: Applicative m => Named ref a -> (a -> m b) -> m ()
+forNamed_ x f = case x of
+  Val x -> void $ f x
+  Ref _ x -> void $ f x
 
-instance Eq (ref (Val ref)) => ZipMatchable (Named ref) where
-  zipMatch = curry $ \ case
-    (Val x, Val y) -> Just [(x, y)]
-    (Ref x _, Ref y _) -> guard (x == y) $> []
-    _ -> Nothing
+type VarNamed m = Named (VarRef m) (VarVal m)
 
 instance Freshenable a m => Freshenable (Named ref a) m where
   freshen = \ case
     Val x -> Val <$> freshen x
     Ref x y -> Ref x <$> freshen y
 
-instance ( Freezable (f (Val f)) (g (Val g)) m
+instance ( Freezable (f (Val f a)) (g (Val g b)) m
          , Freezable a b m
          ) => Freezable (Named f a) (Named g b) m where
   freeze = \ case
     Val x -> Val <$> freeze x
     Ref x y -> Ref <$> freeze x <*> freeze y
 
-instance (Pretty (ref (Val ref)), Pretty a) => Pretty (Named ref a) where
+instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Named ref a) where
   pretty = \ case
     Val x -> pretty x
     Ref x _ -> pretty x
 
 type Env k ref a = HashMap k (Named ref a)
 
-zipMatchEnv
-  :: (Hashable k, ZipMatchable f)
-  => HashMap k (f a)
-  -> HashMap k (f b)
-  -> Maybe [(a, b)]
-zipMatchEnv x y = fmap concat . sequenceA . toList $ HashMap.intersectionWith zipMatch x y
+forEnv_ :: Applicative m => Env k ref a -> (a -> m b) -> m ()
+forEnv_ x f = for_ x $ \ x -> forNamed_ x f
+
+type VarEnv k m = Env k (VarRef m) (VarVal m)

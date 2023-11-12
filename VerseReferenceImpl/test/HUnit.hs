@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Main
@@ -13,8 +14,11 @@ import Control.Monad.Ref
 import Control.Monad.Supply
 import Control.Monad.Verse
 
+import Data.Coerce
+import Data.Fix
+import Data.Function
 import Data.Functor
-import Data.Match
+import Data.Functor.Compose
 
 import Prelude hiding (all)
 
@@ -38,27 +42,57 @@ main = runTestTTAndExit $ TestList
   , test14
   ]
 
+pattern Known :: f (Fix (Compose Maybe f)) -> Fix (Compose Maybe f)
+pattern Known x = Fix (Compose (Just x))
+
+pattern Unknown :: Fix (Compose Maybe f)
+pattern Unknown = Fix (Compose Nothing)
+
+type VarVal m = Fix (Compose (Var m) Val)
+
 data Val a
   = Int {-# UNPACK #-} !Int
   | Tuple [a] deriving (Show, Eq, Functor, Foldable, Traversable)
 
-instance RowMatchable Val
-
-instance ZipMatchable Val where
-  zipMatch = curry $ \ case
-    (Int x, Int y) -> guard (x == y) $> []
-    (Tuple x, Tuple y) -> zipMatch x y
-    _ -> Nothing
+instance Freshenable a m => Freshenable (Val a) m where
+  freshen = traverse freshen
 
 instance Freezable a b m => Freezable (Val a) (Val b) m where
   freeze = traverse freeze
 
+unifyVal
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => VarVal m
+  -> VarVal m
+  -> VerseT m ()
+unifyVal = unify matchVal `on` coerce
+
+matchVal
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => Val (VarVal m)
+  -> Val (VarVal m)
+  -> VerseT m (Match, VerseT m ())
+matchVal = curry $ \ case
+  (Int x, Int y) -> guard (x == y) $> (SEQ, pure ())
+  (Tuple xs, Tuple ys) -> pure (SEQ, unifyValList xs ys)
+  _ -> empty
+
+unifyValList
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => [VarVal m]
+  -> [VarVal m]
+  -> VerseT m ()
+unifyValList = curry $ \ case
+  ([], []) -> pure ()
+  (x:xs, y:ys) -> unifyVal x y *> unifyValList xs ys
+  _ -> empty
+
 test1 :: Test
 test1 = TestCase $ do
   z <- runSupplyT $ runVerseT do
-    x <- freshVar
-    y <- all $ zipUnify x =<< newVar (Int 1)
-    zipUnify x =<< newVar =<< pure (Int 1) <|> pure (Int 2)
+    x <- coerce <$> freshVar
+    y <- all $ unifyVal x . coerce =<< newVar (Int 1)
+    unifyVal x . coerce =<< newVar =<< pure (Int 1) <|> pure (Int 2)
     _ <- readIVar y
     freeze' x
   z @?= Just [Known (Int 1), Known (Int 2)]
@@ -98,7 +132,7 @@ test4 = TestCase do
 test5 :: Test
 test5 = TestCase do
   z <- runSupplyT $ runVerseT do
-    x <- newVarRef =<< newVar (Const (0 :: Int))
+    x <- newVarRef =<< newVar (0 :: Int)
     (<|>)
       do
         y <- readVar =<< readVarRef x
@@ -107,21 +141,21 @@ test5 = TestCase do
         y <- readVar =<< readVarRef x
         writeVarRef x =<< newVar y
     freeze' x
-  z @?= Just [Known (Const 0), Known (Const 0)]
+  z @?= Just [Just 0, Just 0]
 
 test6 :: Test
 test6 = TestCase do
   z <- runSupplyT $ runVerseT do
-    x <- newVarRef =<< newVar (Const (0 :: Int))
+    x <- newVarRef =<< newVar (0 :: Int)
     (<|>)
       do
         y <- readVar =<< readVarRef x
-        writeVarRef x =<< newVar (Const $ getConst y + 1)
+        writeVarRef x =<< newVar (y + 1)
       do
         y <- readVar =<< readVarRef x
-        writeVarRef x =<< newVar (Const $ getConst y + 2)
+        writeVarRef x =<< newVar (y + 2)
     freeze' x
-  z @?= Just [Known (Const 1), Known (Const 3)]
+  z @?= Just [Just 1, Just 3]
 
 test7 :: Test
 test7 = TestCase do
@@ -130,8 +164,8 @@ test7 = TestCase do
       pure () <|> pure ()
       readIVar =<< all do
         pure () <|> pure ()
-        freshVar
-    zipUnify (head $ head x) =<< newVar (Int 0)
+        coerce <$> freshVar
+    unifyVal (head $ head x) . coerce =<< newVar (Int 0)
     freeze' x
   z @?= Just [[[Known (Int 0), Unknown], [Unknown, Unknown]]]
 
@@ -140,85 +174,100 @@ test8 = TestCase do
   z <- runSupplyT $ runVerseT do
     x <- readIVar =<< all do
       readIVar =<< all do
-        freshVar
+        coerce <$> freshVar
     y <- readIVar =<< all do
       pure $ head x
-    zipUnify (head $ head y) =<< newVar (Int 0)
+    unifyVal (head $ head y) . coerce =<< newVar (Int 0)
     freeze' x
   z @?= Just [[[Known (Int 0)]]]
 
-data Sub a
+data Sub
   = Any
   | AnyInt
-  | AnInt !Integer deriving (Show, Eq, Functor, Foldable, Traversable)
+  | AnInt !Integer deriving (Show, Eq)
 
-instance RowMatchable Sub where
-  rowMatch _ = curry $ \ case
-    (Any, Any) -> Subset []
-    (Any, AnyInt) -> Superset []
-    (Any, AnInt _) -> Superset []
-    (AnyInt, Any) -> Subset []
-    (AnyInt, AnyInt) -> Subset []
-    (AnyInt, AnInt _) -> Superset []
-    (AnInt _, Any) -> Subset []
-    (AnInt _, AnyInt) -> Subset []
-    (AnInt x, AnInt y) -> Zip $ guard (x == y) $> []
+instance Monad m => Freshenable Sub m where
+  freshen = pure
 
-instance Freezable a b m => Freezable (Sub a) (Sub b) m where
-  freeze = traverse freeze
+instance Monad m => Freezable Sub Sub m where
+  freeze = pure
+
+unifySub
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => Var m Sub
+  -> Var m Sub
+  -> VerseT m ()
+unifySub = unify matchSub
+
+matchSub
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => Sub
+  -> Sub
+  -> VerseT m (Match, VerseT m ())
+matchSub = curry $ \ case
+  (Any, Any) -> pure (LE, pure ())
+  (Any, AnyInt) -> pure (GE, pure ())
+  (Any, AnInt _) -> pure (GE, pure ())
+  (AnyInt, Any) -> pure (LE, pure ())
+  (AnyInt, AnyInt) -> pure (LE, pure ())
+  (AnyInt, AnInt _) -> pure (GE, pure ())
+  (AnInt _, Any) -> pure (LE, pure ())
+  (AnInt _, AnyInt) -> pure (LE, pure ())
+  (AnInt x, AnInt y) -> guard (x == y) $> (SEQ, pure ())
 
 test9 :: Test
 test9 = TestCase do
   z <- runSupplyT $ runVerseT do
     x <- newVar Any
     y <- newVar AnyInt
-    rowUnify' x y
+    unifySub x y
     freeze' x
-  z @?= Just [Known AnyInt]
+  z @?= Just [Just AnyInt]
 
 test10 :: Test
 test10 = TestCase do
   z <- runSupplyT $ runVerseT do
     x <- newVar Any
     y <- newVar AnyInt
-    rowUnify' x y
+    unifySub x y
     freeze' x
-  z @?= Just [Known AnyInt]
+  z @?= Just [Just AnyInt]
 
 test11 :: Test
 test11 = TestCase do
   z <- runSupplyT $ runVerseT do
     x <- newVar Any
     y <- newVar $ AnInt 1
-    rowUnify' x y
+    unifySub x y
     freeze' x
-  z @?= Just [Known $ AnInt 1]
+  z @?= Just [Just $ AnInt 1]
 
 test12 :: Test
 test12 = TestCase do
   z <- runSupplyT $ runVerseT do
     x <- newVar Any
     y <- freshVar
-    rowUnify' x y
-    rowUnify' y =<< newVar (AnInt 1)
+    unifySub x y
+    unifySub y =<< newVar (AnInt 1)
     freeze' x
-  z @?= Just [Known $ AnInt 1]
+  z @?= Just [Just $ AnInt 1]
 
 test13 :: Test
 test13 = TestCase do
   z <- runSupplyT $ runVerseT do
-    x <- freshVar
-    y <- freshVar
-    fork $ zipUnify y =<< newVar . Tuple =<< readIVar =<< for
+    x <- coerce <$> freshVar
+    y <- coerce <$> freshVar
+    fork $ unifyVal y . coerce =<< newVar . Tuple =<< readIVar =<< for
       do
-        t <- freshVar
-        zipUnify t x
-        (zipUnify x =<< newVar (Int 1)) <|> (zipUnify t =<< newVar (Int 2))
+        t <- coerce <$> freshVar
+        unifyVal t x
+        (unifyVal x . coerce =<< newVar (Int 1)) <|>
+          (unifyVal t . coerce =<< newVar (Int 2))
         pure t
       do
         \ _ ->
-          newVar . Int =<< pure 1 <|> pure 2
-    zipUnify x =<< newVar (Int 1)
+          fmap coerce . newVar . Int =<< pure 1 <|> pure 2
+    unifyVal x . coerce =<< newVar (Int 1)
     freeze' y
   z @?= Just [Known (Tuple [Known (Int 1)]), Known (Tuple [Known (Int 2)])]
 
@@ -227,8 +276,3 @@ test14 = TestCase do
   void $ runSupplyT $ runVerseT $ void $ readIVar =<< all do
     void $ readIVar =<< for (void $ pure ()) do
       \ _ -> pure () <|> pure ()
-
-rowUnify'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, RowMatchable f)
-  => Var m f -> Var m f -> VerseT m ()
-rowUnify' = rowUnify (error "undecidable")
