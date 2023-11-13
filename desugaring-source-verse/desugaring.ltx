@@ -49,37 +49,6 @@ Our plan is
 
 \begin{figure}
 $$
-\begin{array}{rcll}
-  |x,y,f| &     & \textit{Variable} \\
-  |k| &     & \textit{Integer constant} \\
-      \\
-
-\multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
-  |t| & ::= & |x|               & \text{Variable} \\
-      & \vb & |k|               & \text{Constant} \\
-      & \vb & |t_1^[t_2]|       & \text{Function application} \\
-      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
-      & \vb & |t_1 = t_2|       & \text{Unification} \\
-      & \vb & |x := t|          & \text{Definition} \\
-      & \vb & |x squiggt y := t| & \text{Definition} \\
-      & \vb & |:t|               & \text{Range} \\
-      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
-      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
-      & \vb & |for(t_1) do t_2|     & \text{Finite loop} \\
-      & \vb & |check fx t|      & \text{Effects check} \\
-      & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |functionP t_1 t_2|    & \text{Function} \\
-      & \vb & |oftype t_1 t_2|  & \text{Type annotation}
-\end{array}
-$$
-\\
-Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
-\caption{Small Source Verse} \label{fig:small-source-verse}
-\end{figure}
-
-
-\begin{figure}
-$$
 \begin{array}{lrcll}
 \textbf{Terms} & |t| & ::= & |x|               & \text{Variable} \\
 &      & \vb & |_|               & \text{Wildcard} \\
@@ -104,7 +73,7 @@ $$
 &      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
 &      & \vb & |: t|             & \text{Range} \\
 &      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
-&      & \vb & |function (a_1 xdots a_n) t|    & \text{Function}\;(n\geq 1) \\
+&      & \vb & |functionOC oc (a_1 xdots a_n) t|    & \text{Function}\;(n\geq 1) \\
 &      & \vb & |if(t) then t|    & \text{Conditional expression} \\
 &      & \vb & |if(t) else t|    & \text{Conditional expression} \\
 &      & \vb & |if{t}|           & \text{Conditional expression} \\
@@ -133,6 +102,39 @@ $$
 $$
 \caption{Source Verse expressions} \label{fig:source-verse-expr}
 \end{figure}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+  |x,y,f| &     & \textit{Variable} \\
+  |k| &     & \textit{Integer constant} \\
+      \\
+
+\multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
+  |t| & ::= & |x|               & \text{Variable} \\
+      & \vb & |k|               & \text{Constant} \\
+      & \vb & |t_1^[t_2]|       & \text{Function application} \\
+      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
+      & \vb & |t_1 = t_2|       & \text{Unification} \\
+      & \vb & |x := t|          & \text{Definition} \\
+      & \vb & |x squiggt y := t| & \text{Definition} \\
+      & \vb & |:t|               & \text{Range} \\
+      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
+      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+      & \vb & |for(t_1) do t_2|     & \text{Finite loop} \\
+      & \vb & |check fx t|      & \text{Effects check} \\
+      & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
+      & \vb & |functionOC oc t_1 t_2|    & \text{Function} \\
+      & \vb & |oftype t_1 t_2|  & \text{Type annotation}\\
+\\
+  |oc| & ::=  & |open| \vb |closed| & \text{Open vs closed functions}
+\end{array}
+$$
+\\
+Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
+\caption{Small Source Verse} \label{fig:small-source-verse}
+\end{figure}
+
 
 \begin{figure}
 $$
@@ -177,11 +179,11 @@ $$
 \rulename{dstuple} &  |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
 \\
 \multicolumn{5}{l}{\textbf{Function notation}} \\
-\rulename{dstype} &  |type^{t}| & \rightarrow & |functionX (x:=t) (eff closed) x| & \text{fresh |x|}\\
-\rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |functionX (t_1) (eff closed) t_2| \\
-\rulename{dsfun1} &  |function (a_1 a_2 xdots a_n) t| & \rightarrow & |function a_1 (function (a_2 xdots a_n) t| \\
-\rulename{dsfun2}  & |function (()) t| & \rightarrow & |function ((ar ())) t| & \\
-\rulename{dsfun3}  &   |functionX a (eff fx) b| & \rightarrow & |function a (check fx b)| & \\
+\rulename{dstype} &  |type^{t}| & \rightarrow & |functionOC closed (x:=t) x| & \text{fresh |x|}\\
+\rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |functionOC closed (t_1) t_2| \\
+\rulename{dsfun1} &  |functionOC oc (a_1 a_2 xdots a_n) t| & \rightarrow & |functionOC oc a_1 (functionOC oc (a_2 xdots a_n) t| \\
+\rulename{dsfun2}  & |functionOC oc (()) t| & \rightarrow & |functionOC oc (ar ()) t| & \\
+\rulename{dsfun3}  &   |functionOCX oc a (eff fx) b| & \rightarrow & |functionOC oc a (check fx b)| & \\
 \\
 \multicolumn{5}{l}{\textbf{Conditional and for-loop notation}} \\
 \rulename{dsif1} & |if{e}| & \rightarrow & |if(e) else false| \\
@@ -514,14 +516,14 @@ $$
 \multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
 
 \multicolumn{4}{l}{\mbox{\it Function rules (verification)}} \\
-\rulename{mcfun} &  |DMe (inp f si) (functionX t_1 (eff closed) t_2)|
+\rulename{mcfun} &  |DMe (inp f si) (functionOC closed t_1 t_2)|
 & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i (flipsi si)) t_1);
                                             assert (z := DAe (inp f si) j; Me (inp z si) t_2))); |} \\
 & &   & |lam i (j := Me (inp i (flipsi si)) t_1; forall r (assume (z :=  DAe (inp f si) j;
                                              r = Me (inp z si) t_2); r))| \\[2mm]
 
 
-\rulename{mofun}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
+\rulename{mofun}  & |DMe (inp f si) (functionOC open t_1 t_2)|
 & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := Me (inp i (flipsi si)) t_1;
                                             assert (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
 & &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
@@ -540,12 +542,12 @@ $$
 \multicolumn{4}{l}{\mbox{\it Function rules (execution)}} \\
 
 
-\multicolumn{2}{l}{\rulename{mcfunx}\hspace{4mm} |DMe (inp f si) (functionX t_1 (eff closed) t_2)|}
+\multicolumn{2}{l}{\rulename{mcfunx}\hspace{4mm} |DMe (inp f si) (functionOC closed t_1 t_2)|}
   & = & |lam i (j := Me (inp i (flipsi si)) t_1; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\[2mm]
 
 
 
-\rulename{mofunx}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
+\rulename{mofunx}  & |DMe (inp f si) (functionOC open t_1 t_2)|
  & =  & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
     |if (j := Me (inp i (flipsi si)) t_1)| \\
     |then (z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
@@ -566,6 +568,7 @@ $$
 \rulename{mbind}   & |DMe inpw (x:=t)|         & = & |x := DMe inpw t| \\
 \rulename{meq}     & |DMe inpw (t_1=t_2)|      & = & |(DMe inpw t_1) = (DMe inpw t_2)| \\
 \rulename{msemi}   & |DMe inpw (t_1 ; t_2)|    & = & |De t_1 ; DMe inpw t_2| \\
+\rulename{mcheck}   & |DMe inpw (check fx t)|    & = & |check fx (DMe inpw t)| \\
 \rulename{mchoice} & |DMe inpw ((t_1 `choice` t_2))| & = & |(DMe inpw t_1) `choice` (DMe inpw t_2)| \\
 \multicolumn{2}{l}{\rulename{mif}\hspace{3mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
     \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe inpw t_2 else DMe inpw t_3|} \\[2mm]
@@ -583,24 +586,33 @@ $$
   $$
 \begin{array}{l}
 \mbox{\em Core Syntax} \\
-\begin{array}{lr@@{\;}c@@{\;}l@@{}}
-      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e|  \vb |olam v hnf| \\ 
-\end{array} \\[2mm]
+\begin{array}{lr@@{\;}c@@{\;}l@@{}l}
+      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e|  \vb |olam v ol| \\
+      \text{Open lambda} & ol & ::= & |arr (lam x e_1, lam y e_2)|   & \text{Domain and range}
+\end{array} \\[4mm]
 
 \mbox{\em Rewrite rules} \\
 \begin{array}{@@{\hskip0.5em} l r c l l}
-\rulename{u-olam}          & |olam v_1 hnf_1 == olam v_2 hnf_2| & \movesto & |def z (v_1 == olam z hnf_2; v_2 == olam z hnf_1| \\
-\rulename{app-olam} & |apply1 (olam v_1 hnf) v_2| & \movesto & |hnf^[v_1]^ [v_2]| \\[2mm]
-\end{array}\\[2mm]
+\rulename{u-olam}          & |olam v_1 ol_1 == olam v_2 ol_2| & \movesto & |def z (v_1 == olam z ol_2; v_2 == olam z ol_1| \\
+\rulename{app-olam} & |apply1N (olam g (arr (dom, rng))) v| & \movesto & \begin{array}[t]{@@{}l}
+  |if (x := dom^[v])| \\
+  |then inapplic g v; rng^[x]| \\
+  |else g^[v]|
+  \end{array} \\
+\rulename{inapplic1} & |inapplic (olam g (arr (dom,_))) v| & \movesto & |check (eff fails) (apply1N dom v); inapplic g v| \\
+\rulename{inapplic2} & |def g (E^[inapplic g v])| & \movesto & \multicolumn{2}{l}{|E^[arr ()]|  \hspace{4mm} \mbox{if $|g| \not\in \freevars{E}$} }
+\end{array}\\
+\\
 
 \mbox{\em Desugaring rules (for execution)} \\
 \begin{array}{@@{}lr@@{\;}c@@{\;}l}
-\rulename{mofun}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
-  & = & |olamKW^ (f, lamhdr (f i)| \begin{array}[t]{@@{}l}
-    |if (j := Me (inp i (flipsi si)) t_1)| \\
-    |then (inapplicable(f,i); z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
-    |else f^[i])|
-   \end{array}
+\rulename{mofun}  & |DMe (inp f si) (functionOC open t_1 t_2)|
+& = & |olamKW| \left( \begin{array}{l}
+    |f,| \\
+    |lam i (j := Me (inp i (flipsi si)) t_1; arr (j, x_1, dots, x_n)),| \\
+    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
+   \end{array} \right) \\
+&& \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
 \end{array}
 
 \end{array}
@@ -1128,11 +1140,11 @@ $$\begin{array}{@@{}l}
 % \rulename{dinit-alt}   & |De t | & = & |DMe ((def i i)) t| \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Function rules}} \\
-\rulename{mcfun}  & |DMe f (functionX t_1 (closed) t_2)|
+\rulename{mcfun}  & |DMe f (functionOC closed t_1 t_2)|
      & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
 & &   & |lam i (j := Me i t_1; forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\[2mm]
 
-\rulename{mofun}  & |DMe f (functionX t_1 (open) t_2)|
+\rulename{mofun}  & |DMe f (functionOC open t_1 t_2)|
      & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
 & &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
     |if (j := Me i t_1)| \\

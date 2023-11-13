@@ -31,8 +31,8 @@
 %format fails = "\textbf{fails}"
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
-%format closed = "\textbf{clos}"
-%format open = "\textbf{open}"
+%format closed = "\textbf{c}"
+%format open = "\textbf{o}"
 
 %format cons (x) (y) = "\textbf{cons}(" x "," y ")"
 %format applyx a b = a "(" b ")"
@@ -94,7 +94,7 @@
 %format apply1 a (b) = a "(" b ")"
 
 %% Function application with 1 argument, without parenthesis
-%format apply1N a b = a "\," b
+%format apply1N a b = a^ "[" b "]"
 
 %% Function application with many arguments
 %format applyN a (b) = a "\langle" b "\rangle"
@@ -102,8 +102,10 @@
 %% ----------- End of Applications --------------
 
 %format space = "\hspace{0.3em}"
-%format olam x (y) = olamKW "(" x "," y ")"
+%format olam (x) (y) = olamKW "(" x "," y ")"
 %format olamKW = "\textbf{olam}"
+%format inapplic (x) (y) = "\textbf{inapplic}(" x "," y ")"
+
 %format lam (x) (e) = "\lambda" x".\," e
 %format lam2 x r e = "\lambda"x"\!\shortrightarrow{}\!"r".\," e
 %format lamhdr (x) = "\lambda" x".\,"
@@ -274,11 +276,21 @@
 %format abs = "\textbf{abs}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
+
+%% -------Functions ---------------
+%format functionKW = "\textbf{fun}"
+
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"
 %format function (x) (rhs) = functionKW "\," x "\,\{" rhs "\}"
 %format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionX (x) (fx) (rhs) = functionKW "(" x ")" fx "\{" rhs "\}"
-%format functionKW = "\textbf{fun}"
+
+%% functionOC has open/closed subscript
+%format functionOC (oc) (x) (rhs) = functionKW "_{" oc "}(" x ")\{" rhs "\}"
+%format functionOCX (oc) (x) (fx) (rhs) = functionKW "_{" oc "}(" x ")" fx "\{" rhs "\}"
+
+%% -------End of f unctions ---------------
+
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
@@ -303,7 +315,7 @@
 %format appexi (f) (x) = "{\mathcal A" "\fbox{$" x "$}"
 
 %% Effects checking, like succeeds{e}
-%format check (r) (b) = "{\bf check}(" r ")\{" b "\}"
+%format check (r) (b) = "{\bf check}" r "\{" b "\}"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
@@ -329,7 +341,7 @@
 %% %format squiggt = "\!\leadsto\!"
 %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format eff (x) = "\!\langle" x "\rangle\!"
+%format eff (x) = "\langle" x "\rangle"
 %format apeff g x = g "\langle" x "\rangle"
 %format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
@@ -361,6 +373,11 @@
 
 %format hnf_1 = "\mathit{hnf}_{\!1}"
 %format hnf_2= "\mathit{hnf}_{\!2}"
+%format hnf_d= "\mathit{hnf}_{\!d}"
+%format hnf_r= "\mathit{hnf}_{\!r}"
+
+%format ol_1= "\mathit{ol}_1"
+%format ol_2= "\mathit{ol}_2"
 
 %format y1
 %format y2
