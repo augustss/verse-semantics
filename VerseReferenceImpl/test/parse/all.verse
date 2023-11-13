@@ -293,14 +293,14 @@ continue;
 return x;
 return {x;y};
 ## Fun
-#x over {y};
-#x when {y};
-#x while {y};
-#x over y;
-#x over y, z;
+x over {y};
+x when {y};
+x while {y};
+x over y;
+x over y, z;
 x => y;
 x => {y};
-#x next y;
+x next y;
 ## Expr
 x @f();
 x @f() @g();

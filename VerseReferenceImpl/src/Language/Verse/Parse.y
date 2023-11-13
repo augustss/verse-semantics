@@ -35,8 +35,10 @@ import Language.Verse.Parse.Exp
   , expToPat
   )
 import Language.Verse.Parse.Exp qualified as Exp
+import Language.Verse.Parse.Exp qualified as IdentExp
 import Language.Verse.Parse.Exp ( Pat
                                 , pattern (:->:)
+                                , IdentExp
                                 )
 import Language.Verse.Parse.Exp qualified as Pat
 import Language.Verse.Lexer (Lexer)
@@ -220,10 +222,10 @@ Base :: { L (Exp L Name) }
       Exp.Fail <\$ $1
     }
   | Call '.' name {
-      (:.:) <\$> duplicate $1 <.> (([], extract $3) <\$ $3)
+    (:.:) <\$> duplicate $1 <.> duplicate (IdentExp.IdentName <\$> $3)
     }
   | Call '.' '(' List ':)' name {
-      (:.:) <\$> duplicate $1 <.> (($4, extract $6) <\$ $6)
+    (:.:) <\$> duplicate $1 <.> duplicate (IdentExp.IdentQualName $4 <\$> duplicate $6)
     }
   | PatName %shift { Exp.Pat <\$> $1 }
 
@@ -557,16 +559,16 @@ StringCont :: { L [(L (Exp L Name), L Text)] }
 
 PatName :: { L (Pat L Name) }
   : name {
-      Pat.Name [] <\$> $1
+    Pat.Name <\$> (IdentExp.IdentName <\$> $1)
     }
   | '(' List ':)' name {
-      Pat.Name $2 <\$> $4
+    Pat.Name <\$> (IdentExp.IdentQualName $2 <\$> duplicate $4)
     }
   | var Attributes name {
-      Pat.Var (fixAttributes $2) <\$ $1 <.> duplicate $3
+    Pat.Var (fixAttributes $2) <\$ $1 <.> duplicate (IdentExp.IdentName <\$> $3)
     }
   | path {
-      Pat.Path <\$> $1
+      Pat.Name <\$> $1
     }
 
 If :: { L (Exp L Name) }
@@ -768,9 +770,9 @@ name = \ case
   L x Token.Of -> Just $ L x "of"
   _ -> Nothing
 
-path :: L Token -> Maybe (L Name)
+path :: L Token -> Maybe (L (IdentExp L Name))
 path = \ case
-  L x (Token.Path y) -> Just $ L x y
+  L x (Token.Path y) -> Just $ L x (IdentExp.IdentPath y)
   _ -> Nothing
 
 fixInfixColonEqual :: L (Exp L Name) -> L (Exp L Name) -> L (Exp L Name)

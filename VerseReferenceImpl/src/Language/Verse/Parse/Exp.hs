@@ -7,6 +7,7 @@
 module Language.Verse.Parse.Exp
   ( Exp (..)
   , Pat (..)
+  , IdentExp(..)
   , AttributePart(..)
   , expToPat
   ) where
@@ -48,7 +49,7 @@ data Exp f a
   = f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :<>: f (Exp f a)
   | f (Exp f a) :|: f (Exp f a)
-  | f (Exp f a) :.: ([f (Exp f a)], a) -- list is for qualifications
+  | f (Exp f a) :.: f (IdentExp f a)
   | f (Exp f a) :..: f (Exp f a)
   | f (Exp f a) :<: f (Exp f a)
   | f (Exp f a) :<=: f (Exp f a)
@@ -134,10 +135,15 @@ data Exp f a
   | Tuple [f (Exp f a)]
   | Until (f (Exp f a)) (f (Exp f a))
   | Yield
+  | Next (f (Exp f a)) (f (Exp f a))
+  | Over (f (Exp f a)) (f (Exp f a))
+  | When (f (Exp f a)) (f (Exp f a))
+  | While (f (Exp f a)) (f (Exp f a))
   | f (Exp f a) `Where` f (Exp f a)
   | f (Exp f a) `Is` f (Exp f a)
 
 deriving instance ( Show (f (Exp f a))
+                  , Show (f (IdentExp f a))
                   , Show (f (Pat f a))
                   , Show (f Text)
                   , Show (f (AttributePart f a))
@@ -146,9 +152,8 @@ deriving instance ( Show (f (Exp f a))
                   ) => Show (Exp f a)
 
 data Pat f a
-  = Name [(f (Exp f a))] a -- list is for qualification
-  | Path a
-  | Var [f (Exp f a)] (f a)   -- expression list is for attributes
+  = Name (IdentExp f a)
+  | Var [f (Exp f a)] (f (IdentExp f a))   -- expression list is for attributes
   | PrefixColon (f (Exp f a))
   | InfixColon (f (Pat f a)) (f (Exp f a))
   | InfixArrow (f (Pat f a)) (f (Pat f a))
@@ -158,12 +163,25 @@ data Pat f a
   | Hack (Exp f a)
 
 deriving instance ( Show (f (Exp f a))
+                  , Show (f (IdentExp f a))
                   , Show (f (Pat f a))
                   , Show (f a)
                   , Show (f Text)
                   , Show (f (AttributePart f a))
                   , Show a
                   ) => Show (Pat f a)
+
+
+data IdentExp f a
+ = IdentName a
+ | IdentQualName [(f (Exp f a))] (f a)
+ | IdentPath a
+
+deriving instance ( Show a,
+                    Show (f a),
+                    Show (f (Exp f a))
+                  ) => Show (IdentExp f a)
+
 
 
 data AttributePart f a
@@ -181,11 +199,13 @@ deriving instance ( Show (f (Exp f a))
 instance ( Pretty (f Text)
          , Pretty (f (Pat f a))
          , Pretty (f (Exp f a))
+         , Pretty (f (IdentExp f a))
          , Pretty (f (AttributePart f a))
          , Pretty (f a)
          , Pretty a
          , Show (f (AttributePart f a))
          , Show (f (Exp f a))
+         , Show (f (IdentExp f a))
          , Show (f (Pat f a))
          , Show (f Text)
          , Show (f a)
@@ -195,8 +215,7 @@ instance ( Pretty (f Text)
     e1 :=: e2 -> pretty e1 <+> equals <+> pretty e2
     e1 :<>: e2 -> parens (pretty e1 <+> "<>" <+> pretty e2)
     e1 :|: e2 -> parens (pretty e1 <+> pipe <+> pretty e2)
-    e :.: ([],x) -> pretty e <+> dot <> pretty x
-    e :.: (es,x) -> pretty e <+> dot <> "(" <> list es <> ":)" <> pretty x
+    e :.: x -> pretty e <+> dot <> pretty x
     e :..: x -> pretty e <> ".." <> pretty x
     e :<: x -> parens (pretty e <+> "<" <+> pretty x)
     e :<=: x -> parens (pretty e <+> "<=" <+> pretty x)
@@ -290,6 +309,10 @@ instance ( Pretty (f Text)
     AtSpec e1 e2 -> "@" <> pretty e1 <+> pretty e2
     SpecAt e1 e2 -> pretty e1 <+> "@" <> pretty e2
     Yield -> "yield"
+    Next e1 e2 -> pretty e1 <+> "next" <+> pretty e2
+    Over e1 e2 -> pretty e1 <+> "over" <+> braces (pretty e2)
+    When e1 e2 -> pretty e1 <+> "when" <+> braces (pretty e2)
+    While e1 e2 -> pretty e1 <+> "while" <+> braces (pretty e2)
     Continue -> "continue"
     Break -> "break"
     Pat p -> pretty p
@@ -316,6 +339,41 @@ instance ( Pretty (f Text)
 
 instance ( Pretty (f (Pat f a))
          , Pretty (f (Exp f a))
+         , Pretty (f (IdentExp f a))
+         , Pretty (f a)
+         , Pretty (f (AttributePart f a))
+         , Pretty (f Text)
+         , Pretty a
+         , Show (f (AttributePart f a))
+         , Show (f (Exp f a))
+         , Show (f (IdentExp f a))
+         , Show (f (Pat f a))
+         , Show (f Text)
+         , Show (f a)
+         , Show a
+         ) => Pretty (Pat f a) where
+  pretty = \ case
+    Name ident -> pretty ident
+    Var es x -> "var" <+> specs es <> pretty x
+    PrefixColon e -> parens(colon <> pretty e)
+    InfixColon p e -> parens (pretty p <> colon <> pretty e)
+    InfixArrow p1 p2 -> parens( pretty p1 <+> "->" <+> pretty p2)
+    Invoke p e1 -> pretty p <> parens (pretty e1)
+    Specs p ss -> pretty p <> specs ss
+    Extension e p -> parens (pretty e) <> "." <> pretty p
+    Hack e -> pretty e
+
+braces :: Doc a -> Doc a
+braces x =
+  nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
+  flatAlt (hardline <> rbrace) " }"
+
+specs :: (Pretty a) => [a] -> Doc ann
+specs es = foldr ( \ e doc -> "<" <> pretty e <> ">" <> doc ) mempty es
+
+
+instance ( Pretty (f (Pat f a))
+         , Pretty (f (Exp f a))
          , Pretty (f a)
          , Pretty (f (AttributePart f a))
          , Pretty (f Text)
@@ -326,32 +384,16 @@ instance ( Pretty (f (Pat f a))
          , Show (f Text)
          , Show (f a)
          , Show a
-         ) => Pretty (Pat f a) where
+         ) => Pretty (IdentExp f a) where
   pretty = \ case
-    Name [] x -> pretty x
-    Name es x -> "(" <> list es <> ":)" <> pretty x
-    Path x -> pretty x
-    Var es x -> "var" <+> specs es <> pretty x
-    PrefixColon e -> parens(colon <> pretty e)
-    InfixColon p e -> parens (pretty p <> colon <> pretty e)
-    InfixArrow p1 p2 -> parens( pretty p1 <+> "->" <+> pretty p2)
-    Invoke p e1 -> pretty p <> parens (pretty e1)
-    Specs p ss -> pretty p <> specs ss
-    Extension e p -> parens (pretty e) <> "." <> pretty p
-    Hack e -> pretty e
+    IdentName x -> pretty x
+    IdentQualName es x -> "(" <> list es <> ":)" <> pretty x
+    IdentPath x -> pretty x
 
 list :: Pretty a => [a] -> Doc ann
 list [] = mempty
 list (x:[]) = pretty x
 list (x:xs) = pretty x <> ";" <+> list xs
-
-braces :: Doc a -> Doc a
-braces x =
-  nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
-  flatAlt (hardline <> rbrace) " }"
-
-specs :: (Pretty a) => [a] -> Doc ann
-specs es = foldr ( \ e doc -> "<" <> pretty e <> ">" <> doc ) mempty es
 
 instance ( Pretty (f (Exp f a))
          ) => Pretty (AttributePart f a) where
@@ -368,6 +410,6 @@ expToPat _ex@(extract -> Paren e) = expToPat e
 expToPat _ex@(extract -> List [e]) = expToPat e
 expToPat exp@(extract -> ParenInvoke (expToPat -> Just p1) e2) = Just (Invoke <$> duplicate p1 <.> duplicate e2 <. exp)
 expToPat exp@(extract -> ExpInfixColon (expToPat -> Just p1) e2) = Just (InfixColon <$> duplicate p1 <.> duplicate e2 <. exp)
-expToPat exp@(extract -> ExpVar (expToPat -> Just p@(extract -> Name qual name))) = Just (Var qual (name <$ p) <$ exp)
+expToPat _exp@(extract -> ExpVar (expToPat -> Just p@(extract -> Name name))) = Just (Var [] <$> duplicate (name <$ p))
 expToPat exp@(extract -> (expToPat -> Just p1) :->: (expToPat -> Just p2)) = Just (InfixArrow <$> duplicate p1 <.> duplicate p2 <. exp)
 expToPat _exp = Nothing

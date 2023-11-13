@@ -37,10 +37,11 @@ import Language.Verse.Parse.Exp (Exp
                                 , pattern (:/:)
                                 )
 import Language.Verse.Parse.Exp qualified as Exp
-import Language.Verse.Parse.Exp ( Pat
-                                , pattern (:->:)
+import Language.Verse.Parse.Exp ( pattern (:->:)
                                 )
 import Language.Verse.Parse.Exp qualified as Pat
+import Language.Verse.Parse.Exp (IdentExp)
+import Language.Verse.Parse.Exp qualified as IdentExp
 import Language.Verse.Pos qualified as Pos
 
 import Numeric(readHex, readBin)
@@ -443,8 +444,8 @@ pPathT = do
    fixIdent (Nothing, extract -> name) = Text.pack "/" <> name
    fixIdent (Just path, extract -> name) = Text.pack "/(" <> path <> Text.pack ":)" <> name
 
-pPath :: Parser (L (Pat L Name))
-pPath = wrapLoc <$> pos <*> (Pat.Path <$> pPathT) <*> pos <* pSpace
+pPath :: Parser (L (IdentExp L Name))
+pPath = wrapLoc <$> pos <*> (IdentExp.IdentPath <$> pPathT) <*> pos <* pSpace
 
 -- Label     := Alnum {Alnum|'-'|'.'} !(Alnum|'-'|'.')
 pLabel :: Parser Name
@@ -514,6 +515,7 @@ pReturn =
 reserved :: [Text.Text]
 reserved = ["catch", "do", "else", "if", "in", "is", "not", "then", "until", "where", "with", "alias", "const", "live", "mutable", "ref", "set", "var", "return", "yield", "break", "continue"
            , "enum", "not", "block", "all", "one", "forall", "true", "false", "fail"  -- TODO added these to reserved words for refimpl
+           , "next", "over", "while", "when" -- TODO shouldn't these also be reserved?
            ]
 
 -- DotSpace  := '.' &(0o09 | 0o20 | Ending)
@@ -571,14 +573,14 @@ pParen :: Parser (L (Exp L Name))
 pParen = mkListPos  <$> pLParen <*> pList <*> pRParen <* pSpace
 
 -- QualIdent := ['(' List ":)" Space] Ident
-pQualIdent :: Parser (L (Pat L Name))
+pQualIdent :: Parser (L (IdentExp L Name))
 pQualIdent =
   fixQual <$> P.optionMaybe ( char '(' *> pSpace *> pList <* pColonParen) <* pSpace <*> pIdent
   where
   fixQual qQual n =
     case qQual of
-      Nothing -> Pat.Name [] <$> n
-      Just qs -> Pat.Name <$> qs <.> n
+      Nothing -> IdentExp.IdentName <$> n
+      Just qs -> IdentExp.IdentQualName <$> qs <.> (duplicate n)
 
 
 -- Use when it can be either a pParen or a pQualIdent. Needed to get rid of a P.try that is otherwise needed.
@@ -589,12 +591,12 @@ pParenOrQualIdent = do
   p2 <- pos
   _ <- pSpace
   case qParens of
-    Nothing -> ((Exp.Pat <$>) . (Pat.Name [] <$>)) <$> pIdent
+    Nothing -> ((Exp.Pat <$>) . (Pat.Name <$>) . (IdentExp.IdentName <$>)) <$> pIdent
     Just (es, True) -> return $ wrapLoc p1 (extract $ mkList es) p2
     Just (es, False) -> do
       n <- pIdent
       _ <- pSpace
-      return $ (Exp.Pat <$>) $ wrapLoc p1 (extract $ Pat.Name <$> es <.> n) p2
+      return $ (Exp.Pat <$>) $ (Pat.Name <$>) $ wrapLoc p1 (extract $ IdentExp.IdentQualName <$> es <.> duplicate n) p2
 
 -- Specs     := [ScanKey "with" Key] '<' Scan Choose Space '>' Space (Specs | !Specs)
 pSpecs :: Parser [L (Exp L Name)]
@@ -704,7 +706,7 @@ pBase =
   <|>
   pEnum
   <|>
-  (Exp.Pat <$>) <$> pPath
+  ((Exp.Pat <$>) . (Pat.Name<$>)) <$> pPath
   <|>
   pString
   <|>
@@ -730,7 +732,7 @@ pPostfix base = pSpace *> (
                     , \ a -> (Exp.PostfixCaret <$> duplicate a) <$ match '^'
                     , \ a -> (Exp.PostfixQuery <$> duplicate a) <$ match '?'
                     , \ a -> (\ p1 b p2 -> Exp.BracketInvoke <$> duplicate a <.> duplicate (mkList b) <. p1 <. p2) <$> pLBracket <*> pList <*> pRBracket
-                    , \ a -> (\ b@(extract -> Pat.Name es n) -> (a :.: (es, n)) <$ a <. b) <$ pScanKey <* pDot <*> pQualIdent
+                    , \ a -> (\ b -> (:.:) <$> duplicate a <.> duplicate b) <$ pScanKey <* pDot <*> pQualIdent
                     ])
 
 -- Prefix    := Call    | ('^' | '?' | '[' List ']' | '+' | '-' | '*') Space (Brace | Prefix)
@@ -892,6 +894,10 @@ pFun = pDef <* pSpace >>= pFun'
 pFun' :: L (Exp L Name) -> Parser (L (Exp L Name))
 pFun' e1 =
   repeatChoiceNoTry e1 [ \e1 -> (\ e2 -> Exp.Fun <$> duplicate e1 <.> duplicate e2) <$ pFatArrow <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
+                       , \e1 -> (\ e2 -> Exp.Next <$> duplicate e1 <.> duplicate e2) <$ pKeyword "next" <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
+                       , \e1 -> (\ e2 -> Exp.Over <$> duplicate e1 <.> duplicate e2) <$ pKeyword "over" <* pSpace <*> (pKeyBlock <|> pDefs) <* pSpace
+                       , \e1 -> (\ e2 -> Exp.When <$> duplicate e1 <.> duplicate e2) <$ pKeyword "when" <* pSpace <*> (pKeyBlock <|> pDefs) <* pSpace
+                       , \e1 -> (\ e2 -> Exp.While <$> duplicate e1 <.> duplicate e2) <$ pKeyword "while" <* pSpace <*> (pKeyBlock <|> pDefs) <* pSpace
                   ]
 
 
@@ -1195,7 +1201,9 @@ push :: Parser ()
 push = P.modifyState $ \ s -> s { stack = active s : stack s }
 
 pop :: Parser ()
-pop = P.modifyState $ \ s -> let (x:xs) = stack s in s { active = x, stack = xs }
+pop = P.modifyState $ \ s -> case stack s of
+                               (x:xs) -> s { active = x, stack = xs }
+                               _ -> error "Unbalanced push/pop in Parse2"
 
 getActive :: (Context -> a) -> Parser a
 getActive f = do
