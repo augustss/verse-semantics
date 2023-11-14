@@ -12,7 +12,7 @@ module FrontEnd.Parse(
 import Control.Monad
 import qualified Control.Monad.State.Strict as S
 import Epic.OpParser
-import Data.Char ( isSpace, isPrint, isAlpha )
+import Data.Char ( isSpace, isPrint, isAlpha, isDigit )
 import Data.Functor
 import Data.List
 import Data.Maybe
@@ -119,7 +119,8 @@ opChars = "!@#$%^&*-+=:<>?/[]."
 
 keywords :: [String]
 keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
-           , "in", "let", "not", "of", "or", "option", "ref", "return", "set", "then", "var", "where"
+           , "in", "let", "map", "not", "of", "or", "option", "ref", "return", "set", "then"
+           , "truth",  "var", "where"
            , "lambda"]
            ++ macros)
            \\ ["logic"] -- Allowed both as a type and a macro
@@ -179,6 +180,7 @@ pLiteral = choice
   , Lit . LitChar <$> pChar
   -- Handle 1..2 incorrectly
   , (Lit <$> (LitRat <$> L.scientific <*> ((:) <$> letterChar <*> many alphaNumChar)) <* skip)
+  , Lit . LitPath <$> pPath
   , pString
   ]
 
@@ -215,6 +217,14 @@ pBackslashChar = do
 -- A character without quotes
 --pCharCode :: P Char
 --pCharCode = fail "unimplemented pCharCode"
+
+-- Simplified paths
+pPath :: P Path
+pPath = try $ do
+  c1 <- char '/'
+  c2 <- satisfy isAlpha
+  cs <- some (satisfy (\ c -> isAlpha c || isDigit c || c == '_' || c == '/'))
+  pure $ Path $ c1 : c2 : cs
 
 pString :: P Expr
 pString = do
@@ -256,12 +266,18 @@ pOp' s ex = (lexeme . try) (string s <* notFollowedBy (choice $ map char ex))
 
 pAtom :: P Expr
 pAtom = choice [ pMacro, Variable <$> pIdent, pQualVariable, pLiteral, pEmpty
-               , Parens <$> pParens pExprSeq, pArray
+               , Parens <$> pParens pExprSeq, pArray, pMap, pTruth
                , pOption, pFunction, pBlockM ]
   where pEmpty = try $ pParens (pure (Array []))
 
 pQualVariable :: P Expr
 pQualVariable = try (QualVariable <$> pParens (pExprT <* char ':') <*> pIdent)
+
+pMap :: P Expr
+pMap = pKeyword "map" *> (Map <$> pBlockEs)
+
+pTruth :: P Expr
+pTruth = pKeyword "truth" *> (Truth <$> pBraces pExpr1)
 
 -- Try to mimic TimVerse by turning a tuple into an array
 -- A trailing ';' can be used, but not a trailing ','.
@@ -392,7 +408,7 @@ pDo :: P Expr
 pDo = pKeyword "block" *> (Block <$> pBlockM)
 
 pOption :: P Expr
-pOption = pKeyword "option" *> (Option <$> optional pExprSeq)
+pOption = pKeyword "option" *> (Option <$> pBraces (optional pExpr1))
 
 pSet :: P Expr
 pSet = pKeyword "set" *> do
