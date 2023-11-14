@@ -780,36 +780,39 @@ ubiquitously useful that we include it in our syntax.
 Rule \rulename{u-olam} comes directly from rule \rulename{c-mutatate-ll} in Fig 10-13 of the extendded version of the extended version of ``The essence of ML type inference'' (Pottier and Remy) \url{http://cristal.inria.fr/attapl/}.
 
 Here is an example. Assume the function definitions are open:
+\lennart{Needs updating for new |olamKW|}
 $$
 \begin{array}{ll}
   \multicolumn{2}{l}{|f^(x:int) := x+1; f^(x:float) := x*0.2; f^[2.4]|} \\[1mm]
   \movesto & \mbox{\{desugar\}} \\
   & |defhdr f| \begin{array}[t]{l}
-    |(f = def z_1 (olam z_1 (lam (z i) (if (j:=int^[i]) then (x+1) else z ^ [i]))));| \\
-    |(f = def z_2 (olam z_2 (lam (z i) (if (j:=float^[i]) then (x*0.2) else z ^ [i]))));| \\
+    |(f = def z_1 (olam z_1 (lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i]))));| \\
+    |(f = def z_2 (olam z_2 (lam (z i) (if (x:=float^[i]) then (x*0.2) else z ^ [i]))));| \\
     |f^[2.4]|
     \end{array} \\[10mm]
   \movesto & \mbox{\{substitute for f, and discard f\}} \\
   & |defhdr (z_1 z_2)| \begin{array}[t]{l}
-    |(olam z_1 (lam (z i) (if (j:=int^[i]) then (x+1) else z ^ [i])))| \\
-    \;\;\;\;|== (olam z_2 (lam (z i) (if (j:=float^[i]) then (x*0.2) else z ^ [i])));| \\
-    |(olam z_1 (lam (z i) (if (j:=int^[i]) then (x+1) else z ^ [i])))^[2.4]|
+    |(olam z_1 (lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i])))| \\
+    \;\;\;\;|== (olam z_2 (lam (z i) (if (x:=float^[i]) then (x*0.2) else z ^ [i])));| \\
+    |(olam z_1 (lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i])))^[2.4]|
     \end{array}\\[10mm]
   \movesto & \mbox{\{\rulename{u-olam} and \rulename{app-olam}\}} \\
   & |defhdr (z_1 z_2 z_3)| \begin{array}[t]{l}
-    |z_2 == (olam z_3 (lam (z i) (if (j:=int^[i]) then (x+1) else z ^ [i])))| \\
-    |z_1 == (olam z_3 (lam (z i) (if (j:=float^[i]) then (x*0.2) else z ^ [i])));| \\
-    |(lam (z i) (if (j:=int^[i]) then (x+1) else z ^ [i]))^[z_1]^[2.4]|
+    |z_2 == (olam z_3 (lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i])))| \\
+    |z_1 == (olam z_3 (lam (z i) (if (x:=float^[i]) then (x*0.2) else z ^ [i])));| \\
+    |(lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i]))^[z_1]^[2.4]|
     \end{array}\\[10mm]
   \movesto & \mbox{\{\rulename{app-lam}, then simplify |if|, discard |z_2|\}} \\
   & |defhdr (z_1 z_3)| \begin{array}[t]{l}
-    |z_1 == (olam z_3 (lam (z i) (if (j:=float^[i]) then (x*0.2) else z ^ [i])));| \\
+    |z_1 == (olam z_3 (lam (z i) (if (x:=float^[i]) then (x*0.2) else z ^ [i])));| \\
     |z_1 ^ [2.4]|
     \end{array}\\[7mm]
   \movesto & \mbox{\{substitute for |z_1|, then discard |z_1|, and \rulename{app-olam}\}} \\
-  & |def (z_3) ((lam (z i) (if (j:=float^[i]) then (x*0.2) else z ^ [i]))^[z_3]^ [2.4])| \\[2mm]
+  & |def (z_3) ((lam (z i) (if (x:=float^[i]) then (x*0.2) else z ^ [i]))^[z_3]^ [2.4])| \\[2mm]
  \movesto & \mbox{\{\rulename{app-lam} and simplify |if|\}} \\
   & |def (z_3) (2.4 * 0.2)| \\
+ \movesto & \mbox{\{arithmetic and GC\}} \\
+  & |0.48| \\
 \end{array}
 $$
 \subsection{Loose ends}
