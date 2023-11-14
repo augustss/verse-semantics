@@ -35,8 +35,10 @@ import Language.Verse.Parse.Exp
   , expToPat
   )
 import Language.Verse.Parse.Exp qualified as Exp
+import Language.Verse.Parse.Exp qualified as IdentExp
 import Language.Verse.Parse.Exp ( Pat
                                 , pattern (:->:)
+                                , IdentExp
                                 )
 import Language.Verse.Parse.Exp qualified as Pat
 import Language.Verse.Lexer (Lexer)
@@ -172,14 +174,14 @@ import Prettyprinter
 
 %%
 
-File :: { L (Exp L Name) }
+File :: { L (Exp Name) }
   : List { L (foldl' (\ z x -> z <> loc x) Loc.minBound $1) (Exp.List $1) }
 
-List :: { [L (Exp L Name)] }
+List :: { [L (Exp Name)] }
   : Scan { [] }
   | Scan ReversedList MaybeSeparator { reverse $2 }
 
-ReversedList :: { [L (Exp L Name)] }
+ReversedList :: { [L (Exp Name)] }
   : MaybeCommas { [$1] }
   | ReversedList Separator MaybeCommas { $3 : $1 }
 
@@ -191,19 +193,19 @@ Separator
   : ';' Scan { $1 }
   | newline Scan { $1 }
 
-MaybeCommas :: { L (Exp L Name) }
+MaybeCommas :: { L (Exp Name) }
   : Commas { Exp.Tuple . reverse <\$> $1 }
   | Exp { $1 }
 
-Commas :: { L [L (Exp L Name)] }
+Commas :: { L [L (Exp Name)] }
   : Exp ',' Scan Exp { (\ x y -> [x, y]) <\$> duplicate $4 <.> duplicate $1 }
   | Commas ',' Scan Exp { (:) <\$> duplicate $4 <.> $1 }
 
-Defs :: { L [L (Exp L Name)] }
+Defs :: { L [L (Exp Name)] }
   : Defs ',' Scan Def { (\ xs x -> x:xs) <\$> $1 <.> duplicate $4 }
   | Def %shift { (:[]) <\$> duplicate $1 }
 
-Base :: { L (Exp L Name) }
+Base :: { L (Exp Name) }
   : Paren { Exp.Paren <\$> duplicate $1 }
   | int { Exp.Int <\$> $1 }
   | float { Exp.Float <\$> $1 }
@@ -220,14 +222,14 @@ Base :: { L (Exp L Name) }
       Exp.Fail <\$ $1
     }
   | Call '.' name {
-      (:.:) <\$> duplicate $1 <.> (([], extract $3) <\$ $3)
+    (:.:) <\$> duplicate $1 <.> duplicate (IdentExp.IdentName <\$> $3)
     }
   | Call '.' '(' List ':)' name {
-      (:.:) <\$> duplicate $1 <.> (($4, extract $6) <\$ $6)
+    (:.:) <\$> duplicate $1 <.> duplicate (IdentExp.IdentQualName $4 <\$> duplicate $6)
     }
   | PatName %shift { Exp.Pat <\$> $1 }
 
-Call :: { L (Exp L Name) }
+Call :: { L (Exp Name) }
   : Call Paren {
       Exp.ParenInvoke <\$> duplicate $1 <.> duplicate $2
     }
@@ -291,16 +293,16 @@ Call :: { L (Exp L Name) }
   | Exists { $1 }
   | Base %shift { $1 }
 
-Attribute :: { L (Exp L Name) }
+Attribute :: { L (Exp Name) }
   : '<' PrefixColon '>' {
       $2 <. $1 <. $3
     }
 
-Attributes :: { [L (Exp L Name)] }
+Attributes :: { [L (Exp Name)] }
   : Attributes Attribute { (\ xs x -> x : xs) $1 $2 }
   | { ([]) }
 
-Prefix :: { L (Exp L Name) }
+Prefix :: { L (Exp Name) }
   : '[' List ']' Prefix {
       Exp.PrefixBracket $2 <\$ $1 <.> duplicate $4
     }
@@ -323,7 +325,7 @@ Prefix :: { L (Exp L Name) }
        $1
     }
 
-Mul :: { L (Exp L Name) }
+Mul :: { L (Exp Name) }
   : Prefix '*' Scan Mul {
       (:*:) <\$> duplicate $1 <.> duplicate $4
     }
@@ -334,7 +336,7 @@ Mul :: { L (Exp L Name) }
        $1
     }
 
-Add :: { L (Exp L Name) }
+Add :: { L (Exp Name) }
   : Mul '+' Scan Add {
       (:+:) <\$> duplicate $1 <.> duplicate $4
     }
@@ -345,7 +347,7 @@ Add :: { L (Exp L Name) }
        $1
     }
 
-To :: { L (Exp L Name) }
+To :: { L (Exp Name) }
   : Add '->' To {
       $1 :->: $3 <\$ $1 <. $3
     }
@@ -356,7 +358,7 @@ To :: { L (Exp L Name) }
        $1
   }
 
-Choose :: { L (Exp L Name) }
+Choose :: { L (Exp Name) }
   : To '|' Scan Choose {
       (:|:) <\$> duplicate $1 <.> duplicate $4
     }
@@ -364,7 +366,7 @@ Choose :: { L (Exp L Name) }
        $1
   }
 
-InfixColon :: { L (Exp L Name) }
+InfixColon :: { L (Exp Name) }
   : InfixColon ':' Choose {
       fixInfixColon $1 $3
     }
@@ -372,7 +374,7 @@ InfixColon :: { L (Exp L Name) }
        $1
     }
 
-PrefixColon :: { L (Exp L Name) }
+PrefixColon :: { L (Exp Name) }
   : ':' Scan InfixColon {
       Exp.Pat <\$> (Pat.PrefixColon <\$ $1 <.> duplicate $3)
     }
@@ -380,7 +382,7 @@ PrefixColon :: { L (Exp L Name) }
       $1
     }
 
-ComparePart :: { L (AttributePart L Name) }
+ComparePart :: { L (AttributePart Name) }
   : '>' Scan {
       Exp.GreaterThan <\$ $1
     }
@@ -406,16 +408,16 @@ ComparePart :: { L (AttributePart L Name) }
       Exp.Part <\$> duplicate $1
     }
 
-CompareParts :: { L [L (AttributePart L Name)] }
+CompareParts :: { L [L (AttributePart Name)] }
   : CompareParts ComparePart { (\ xs x -> x : xs) <\$> $1 <.> duplicate $2 }
   | ComparePart %shift { (:[]) <\$> duplicate $1 }
 
-Less :: { L (Exp L Name) }
+Less :: { L (Exp Name) }
   : CompareParts %shift {
       fixCompare $1
     }
 
-Invoke :: { L (Exp L Name) }
+Invoke :: { L (Exp Name) }
   : Invoke Until {
       Exp.Until <\$> duplicate $1 <.> duplicate $2
     }
@@ -429,7 +431,7 @@ Invoke :: { L (Exp L Name) }
        $1
     }
 
-NotEq :: { L (Exp L Name) }
+NotEq :: { L (Exp Name) }
   : NotEq '<>' Scan Invoke {
       (:<>:) <\$> duplicate $1 <.> duplicate $4
     }
@@ -437,7 +439,7 @@ NotEq :: { L (Exp L Name) }
        $1
     }
 
-Return :: { L (Exp L Name) }
+Return :: { L (Exp Name) }
   : return Scan Def {
      Exp.Return . Just <\$ $1 <.> duplicate $3
     }
@@ -448,7 +450,7 @@ Return :: { L (Exp L Name) }
        $1
     }
 
-Eq :: { L (Exp L Name) }
+Eq :: { L (Exp Name) }
   : NotEq '=' Eq {
       (:=:) <\$> duplicate $1 <.> duplicate $3
     }
@@ -459,7 +461,7 @@ Eq :: { L (Exp L Name) }
       $1
     }
 
-Not :: { L (Exp L Name) }
+Not :: { L (Exp Name) }
   : not Not {
       Exp.Not <\$ $1 <.> duplicate $2
     }
@@ -467,7 +469,7 @@ Not :: { L (Exp L Name) }
       $1
     }
 
-And :: { L (Exp L Name) }
+And :: { L (Exp Name) }
   : Not and Scan And {
       Exp.And <\$> duplicate $1 <.> duplicate $4
     }
@@ -475,7 +477,7 @@ And :: { L (Exp L Name) }
       $1
     }
 
-Or :: { L (Exp L Name) }
+Or :: { L (Exp Name) }
   : And or Scan Or {
       Exp.Or <\$> duplicate $1 <.> duplicate $4
     }
@@ -483,7 +485,7 @@ Or :: { L (Exp L Name) }
        $1
     }
 
-Where :: { L (Exp L Name) }
+Where :: { L (Exp Name) }
   : Where where Defs {
       Exp.Where <\$> duplicate $1 <.> duplicate ((Exp.List \$ reverse \$ extract $3) <\$ $3)
     }
@@ -491,7 +493,7 @@ Where :: { L (Exp L Name) }
        $1
     }
 
-Def :: { L (Exp L Name) }
+Def :: { L (Exp Name) }
   : set Choose '=' Def {
       Exp.Set <\$ $1 <.> duplicate $2 <.> duplicate $4
     }
@@ -535,7 +537,7 @@ Def :: { L (Exp L Name) }
       $1
     }
 
-Fun :: { L (Exp L Name) }
+Fun :: { L (Exp Name) }
   : Def '=>' Fun {
       Exp.Fun $1 $3 <\$ $1 <. $3
     }
@@ -546,30 +548,30 @@ Fun :: { L (Exp L Name) }
       $1
     }
 
-Exp :: { L (Exp L Name) }
+Exp :: { L (Exp Name) }
   : Fun %shift {
       $1
     }
 
-StringCont :: { L [(L (Exp L Name), L Text)] }
+StringCont :: { L [(L (Exp Name), L Text)] }
   : File stringEnd { ( \ e s -> [(e, fmap Text.pack s)]) <\$> duplicate $1 <.> duplicate $2 }
   | File stringCont StringCont { ( \ e s es -> (e, fmap Text.pack s):es) <\$> duplicate $1 <.> duplicate $2 <.> $3 }
 
-PatName :: { L (Pat L Name) }
+PatName :: { L (Pat Name) }
   : name {
-      Pat.Name [] <\$> $1
+      Pat.Name <\$> (IdentExp.IdentName <\$> $1)
     }
   | '(' List ':)' name {
-      Pat.Name $2 <\$> $4
+      Pat.Name <\$> (IdentExp.IdentQualName $2 <\$> duplicate $4)
     }
   | var Attributes name {
-      Pat.Var (fixAttributes $2) <\$ $1 <.> duplicate $3
+      Pat.Var (fixAttributes $2) <\$ $1 <.> duplicate (IdentExp.IdentName <\$> $3)
     }
   | path {
-      Pat.Path <\$> $1
+      Pat.Name <\$> $1
     }
 
-If :: { L (Exp L Name) }
+If :: { L (Exp Name) }
   : if Block %prec IF {
       Exp.If <\$ $1 <.> duplicate $2
     }
@@ -631,15 +633,15 @@ If :: { L (Exp L Name) }
       Exp.IfElse <\$ $1 <.> duplicate (Exp.List <\$> $2) <.> duplicate $3
     }
 
-Then :: { L (Exp L Name) }
+Then :: { L (Exp Name) }
   : then Exp { $1 .> $2 }
   | then '. ' Exp %prec DOT_SPACE { $1 .> $3 }
 
-Else :: { L (Exp L Name) }
+Else :: { L (Exp Name) }
   : else Exp { $1 .> $2 }
   | else '. ' Exp %prec DOT_SPACE { $1 .> $3 }
 
-For :: { L (Exp L Name) }
+For :: { L (Exp Name) }
   : for Block %prec FOR {
       Exp.For <\$ $1 <.> duplicate $2
     }
@@ -659,43 +661,43 @@ For :: { L (Exp L Name) }
       Exp.ForDo <\$ $1 <.> duplicate $2 <.> duplicate $3
     }
 
-Do :: { L (Exp L Name) }
+Do :: { L (Exp Name) }
   : do Exp { $1 .> $2 }
   | do '. ' Exp %prec DOT_SPACE { $1 .> $3 }
 
-Until :: { L (Exp L Name) }
+Until :: { L (Exp Name) }
   : until Exp { $1 .> $2 }
 
-Catch :: { L (Exp L Name) }
+Catch :: { L (Exp Name) }
   : catch Invoke { $1 .> $2 }
 
-Exists :: { L (Exp L Name) }
+Exists :: { L (Exp Name) }
   : exists name {
       Exp.Exists <\$ $1 <.> duplicate $2
     }
 
-Forall :: { L (Exp L Name) }
+Forall :: { L (Exp Name) }
   : forall name {
       Exp.Forall <\$ $1 <.> duplicate $2
     }
 
-Paren0 :: { L[L (Exp L Name)] }
+Paren0 :: { L[L (Exp Name)] }
   : '(' List ')' {
       $2 <\$ $1 <. $3
     }
 
-Paren :: { L (Exp L Name) }
+Paren :: { L (Exp Name) }
   : Paren0 {
       Exp.List <\$> $1
     }
 
-Brace :: { L [L (Exp L Name)] }
+Brace :: { L [L (Exp Name)] }
   : '{' List '}' { $2 <\$ $1 <. $3 }
 
-BraceInd :: { L (Exp L Name) }
+BraceInd :: { L (Exp Name) }
   : indent List dedent { Exp.List $2 <\$ $1 <. $3 }
 
-Block :: { L (Exp L Name) }
+Block :: { L (Exp Name) }
   : '.' Exp %prec DOT_SPACE { $1 .> $2 }
   | ':\n' indent List dedent { $1 \$> Exp.List $3 <. $4 }
 
@@ -768,34 +770,34 @@ name = \ case
   L x Token.Of -> Just $ L x "of"
   _ -> Nothing
 
-path :: L Token -> Maybe (L Name)
+path :: L Token -> Maybe (L (IdentExp Name))
 path = \ case
-  L x (Token.Path y) -> Just $ L x y
+  L x (Token.Path y) -> Just $ L x (IdentExp.IdentPath y)
   _ -> Nothing
 
-fixInfixColonEqual :: L (Exp L Name) -> L (Exp L Name) -> L (Exp L Name)
+fixInfixColonEqual :: L (Exp Name) -> L (Exp Name) -> L (Exp Name)
 fixInfixColonEqual lhs rhs = Exp.InfixColonEqual <$> duplicate lhs <.> duplicate rhs
 fixInfixColonEqual lhs rhs = error (show (pretty (extract lhs)) ++ ": fixInfixColonEqual must have a Pat as lhs, got:" ++ show lhs)
 
-fixInfixColon :: L (Exp L Name) -> L (Exp L Name) -> L (Exp L Name)
+fixInfixColon :: L (Exp Name) -> L (Exp Name) -> L (Exp Name)
 fixInfixColon lhs@(expToPat -> Just pat) rhs = Exp.Pat <$> (Pat.InfixColon <$> duplicate pat <.> duplicate rhs)
 fixInfixColon lhs rhs = Exp.ExpInfixColon <$> duplicate lhs <.> duplicate rhs
 
-fixAttributes :: [L (Exp L Name) ] -> [L (Exp L Name)]
+fixAttributes :: [L (Exp Name) ] -> [L (Exp Name)]
 fixAttributes parts = reverse parts
 
 
-fixCompare :: L [L (AttributePart L Name) ] -> L (Exp L Name)
+fixCompare :: L [L (AttributePart Name) ] -> L (Exp Name)
 fixCompare parts = scanGreater [] [] $ reverse $ extract parts
 
-scanGreater :: (Show a, Pretty a) => [L (Exp L a)] -> [L (AttributePart L a)] -> [L (AttributePart L a)] -> L (Exp L a)
+scanGreater :: (Show a, Pretty a) => [L (Exp a)] -> [L (AttributePart a)] -> [L (AttributePart a)] -> L (Exp a)
 scanGreater [] [] (L _ (Exp.Part e) : []) = e
 scanGreater es ops (L _ (Exp.Part e) : []) = buildCompare (e:es) ops
 scanGreater es ops (L _ (Exp.Part e) : op@(L _ Exp.GreaterEqual) : xs) = scanGreater (e:es) (op : ops) xs
 scanGreater es ops (L _ (Exp.Part e) : op@(L _ Exp.GreaterThan) : xs) = scanGreater (e:es) (op : ops) xs
 scanGreater es ops xs = scanLess es ops xs
 
-scanLess :: (Show a, Pretty a) => [L (Exp L a)] -> [L (AttributePart L a)] -> [L (AttributePart L a)] -> L (Exp L a)
+scanLess :: (Show a, Pretty a) => [L (Exp a)] -> [L (AttributePart a)] -> [L (AttributePart a)] -> L (Exp a)
 scanLess es ops (L _ (Exp.Part e) : []) = buildCompare (e:es) ops
 scanLess es ops (L _ (Exp.Part e) : op@(L _ Exp.LessEqual) : xs) = scanLess (e:es) (op : ops) xs
 scanLess es ops (L _ (Exp.Part e) : op@(L _ Exp.LessThan) : xs) = scanLess (e:es) (op : ops) xs
@@ -818,11 +820,11 @@ scanLess [] [] (L l e: xs) = error (show (pretty l <> ": scanLess[] [] can not p
 scanLess es ops (_exp@(L l e): xs) = error (show (pretty l <> ": scanLess can not parse \nes = " <+> pretty es <> "\ne=" <+> pretty e <+> "\nxs =" <+> pretty xs <+> "\nops =" <+> pretty ops))
 scanLess es ops [] = error ("Can not parse expression with < and >")
 
-buildCompare :: [L (Exp L a)] -> [L (AttributePart L a)] -> L (Exp L a)
+buildCompare :: [L (Exp a)] -> [L (AttributePart a)] -> L (Exp a)
 buildCompare [e] [] = e
 buildCompare (e2:e1:es) (op:ops) = buildCompare (apply e1 (extract op) e2:es) ops
 
-buildAttribute :: (Show a, Pretty a) => L (Pat L a) -> [L (AttributePart L a)] -> L (Exp L a)
+buildAttribute :: (Show a, Pretty a) => L (Pat a) -> [L (AttributePart a)] -> L (Exp a)
 buildAttribute pat  [] = Exp.Pat <$> pat
 buildAttribute pat (rp@(L _ Exp.LessThan) : L _ (Exp.Part e) : lp@(L _ Exp.GreaterThan) : xs) =
   buildAttribute (Exp.Specs <$> duplicate pat <.> ([e] <$ e) <. lp) xs
@@ -838,7 +840,7 @@ buildAttribute pat [extract ->  Exp.Part lp@(extract -> Exp.Brace es)] =
   Exp.Inst <$> duplicate (Exp.Pat <$> pat) <.> duplicate es
 buildAttribute exp xs = error $ show ( pretty (loc exp) <> ":buildAttribute exp =" <+> pretty exp <+> ", xs =") ++ show xs
 
-apply :: L (Exp L a) -> AttributePart L a -> L (Exp L a) -> L (Exp L a)
+apply :: L (Exp a) -> AttributePart a -> L (Exp a) -> L (Exp a)
 apply e1 Exp.LessThan e2 = (:<:) <$> duplicate e1 <.> duplicate e2
 apply e1 Exp.LessEqual e2 = (:<=:) <$> duplicate e1 <.> duplicate e2
 apply e1 Exp.GreaterEqual e2 = (:>=:) <$> duplicate e1 <.> duplicate e2
