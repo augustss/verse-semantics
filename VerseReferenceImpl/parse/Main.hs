@@ -27,7 +27,7 @@ import System.IO
 import System.IO.Error
 
 data Options = Options {
-  getParser :: String -> ByteString -> Either Error (L (Exp L Name)),
+  getParser :: String -> ByteString -> Either Error (L (Exp Name)),
   getWorker :: Options -> FilePath -> ByteString -> IO (),
   progress :: Bool,
   verbose :: Bool,
@@ -47,10 +47,10 @@ noOptions = Options {
 
 
 -- old and new parser
-parser :: String -> ByteString -> Either Error (L (Exp L Name))
+parser :: String -> ByteString -> Either Error (L (Exp Name))
 parser _ contents = runLexer P.parse contents
 
-parser2 :: String -> ByteString -> Either Error (L (Exp L Name))
+parser2 :: String -> ByteString -> Either Error (L (Exp Name))
 parser2 path contents = P2.parse2 path contents
 
 -- only parse or path and rewrite
