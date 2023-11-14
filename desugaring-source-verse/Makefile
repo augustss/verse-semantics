@@ -9,6 +9,7 @@ $(PAPER).pdf: $(PAPERSRC)
 
 %.tex:   %.ltx   ../calculus.fmt
 	lhs2TeX $< > $@
+	lhs2TeX $< > $@
 
 clean:
 	rm -f desugaring.aux desugaring.log desugaring.out desugaring.pdf desugaring.tex

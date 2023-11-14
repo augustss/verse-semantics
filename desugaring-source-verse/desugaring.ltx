@@ -84,7 +84,9 @@ $$
 &      & \vb & |case{t_1; xdots t_n}| & \text{Case expression} \\
 &      & \vb & |type^{t}|         & \text{Type definition} \\
 &      & \vb & |option^{}|        & \text{Create an option} \\
-&      & \vb & |option^{t}|       & \text{Create an option}
+&      & \vb & |option^{t}|       & \text{Create an option} \\
+&      & \vb & |truth^{t} |       & \text{Singleton map} \\
+&      & \vb & |amap (t_1; xdots; t_n) | & \text{Map}, n \geq 0 \\
 \\[2mm]
 \text{\bf Arguments} &
  |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
@@ -111,21 +113,22 @@ $$
       \\
 
 \multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
-  |t| & ::= & |x|               & \text{Variable} \\
-      & \vb & |k|               & \text{Constant} \\
-      & \vb & |t_1^[t_2]|       & \text{Function application} \\
-      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
-      & \vb & |t_1 = t_2|       & \text{Unification} \\
-      & \vb & |x := t|          & \text{Definition} \\
-      & \vb & |x squiggt y := t| & \text{Definition} \\
-      & \vb & |:t|               & \text{Range} \\
-      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
+  |t| & ::= & |x|                        & \text{Variable} \\
+      & \vb & |k|                        & \text{Constant} \\
+      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
+      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
+      & \vb & |t_1 = t_2|                 & \text{Unification} \\
+      & \vb & |x := t|                    & \text{Definition} \\
+      & \vb & |x squiggt y := t|          & \text{Definition} \\
+      & \vb & |:t|                        & \text{Range} \\
+      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
       & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
-      & \vb & |for(t_1) do t_2|     & \text{Finite loop} \\
-      & \vb & |check fx t|      & \text{Effects check} \\
-      & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |functionOC oc t_1 t_2|    & \text{Function} \\
-      & \vb & |oftype t_1 t_2|  & \text{Type annotation}\\
+      & \vb & |for(t_1) do t_2|           & \text{Finite loop} \\
+      & \vb & |check fx t|                & \text{Effects check} \\
+      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
+      & \vb & |functionOC oc t_1 t_2|     & \text{Function} \\
+      & \vb & |oftype t_1 t_2|            & \text{Type annotation}\\
+      & \vb & |amap (t_1, xdots, t_n) |   & \text{Map}, n \geq 0 \\
 \\
   |oc| & ::=  & |open| \vb |closed| & \text{Open vs closed functions}
 \end{array}
@@ -200,6 +203,8 @@ $$
 $$
 \begin{array}{lrcll}
   \multicolumn{5}{l}{\textbf{Operators}} \\
+\rulename{dspreq} &  |?e|     & \rightarrow & |type{false `choice` let (x:e){truth^{x}}}| & \text{|x| fresh} \\
+\rulename{dspostq} & |e?|     & \rightarrow & |e^[_]| \\  
 \rulename{dsop1} &   |op_b e| & \rightarrow & |prefix op_b [e]| & \text{if |op_b| can fail}\\
 \rulename{dsop2} &   |op_b e| & \rightarrow & |prefix op_b (e)| \\
 \rulename{dsop3} &   |e op_a| & \rightarrow & |postfix op_a [e]| & \text{if |op_a| can fail}\\
@@ -207,11 +212,11 @@ $$
 \rulename{dsop5} &   |e_1 op_i e_2| & \rightarrow & |operator op_i [e_1, e_2]| & \text{if |op_i| can fail}\\
 \rulename{dsop6} &   |e_1 op_i e_2| & \rightarrow & |operator op_i (e_1, e_2)| \\
 \rulename{dsand} &   |e_1 srcand e_2| & \rightarrow & |e_1; e_2| \\
-\rulename{dsor} &   |e_1 srcor e_2| & \rightarrow & |if(e_1) else if (e_2) else :false| \\
+\rulename{dsor}  &   |e_1 srcor e_2| & \rightarrow & |if(e_1) else if (e_2) else :false| \\
 \rulename{dsbang} &   |!e| & \rightarrow & |if e then :false else false| \\
   \\
   \multicolumn{5}{l}{\textbf{Let, block, case}} \\
-\rulename{dslet} &    |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
+\rulename{dslet}   &    |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
 \rulename{dsblock} &    |block b| & \rightarrow & |b| & \textit{see note}  \\
 \rulename{dscase1} &    |case{e_1; xdots e_n}| & \rightarrow & |(x:any) => case(x){e_1; xdots e_n}| & \text{|x| fresh} \\
 \rulename{dscase2} &    |case(e){e_1; xdots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor xdots srcor e_n^[x]| & \text{|x| fresh} \\
@@ -220,7 +225,8 @@ $$
   \multicolumn{5}{l}{\textbf{Misc}} \\
 \rulename{dswild} &  |_| & \rightarrow & |x:any| & \text{|x| fresh} \\
 \rulename{dsopt1} &   |option^{}| & \rightarrow & |false| \\
-\rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then truth(x) else false| & \text{|x| fresh} \\
+\rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then truth^{x} else false| & \text{|x| fresh} \\
+\rulename{dstruth} &  |truth^{e}| & \rightarrow & |amap(e eqgt e)| \\
 \end{array}
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
@@ -439,6 +445,7 @@ int    = (x => applyx isInt x; x)
 nat    = (x => applyx isInt x; x > (-1); x)
 abs    = (x => applyx isInt x; if x > 0 then x else (-x))
 false  = array()
+true   = (truth^{:any} => truth^{false})
 \end{code}
 %%arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 
@@ -609,8 +616,8 @@ $$
 \rulename{mofun}  & |DMe (inp f si) (functionOC open t_1 t_2)|
 & = & |olamKW| \left( \begin{array}{l}
     |f,| \\
-    |lam i (j := Me (inp i (flipsi si)) t_1; arr (j, x_1, dots, x_n)),| \\
-    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
+    \langle      |lam i (j := Me (inp i (flipsi si)) t_1; arr (j, x_1, dots, x_n)), | \\
+    \hspace{0.3em} |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \rangle \\
    \end{array} \right) \\
 && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
 \end{array}

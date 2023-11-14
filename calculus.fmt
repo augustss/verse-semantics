@@ -199,6 +199,10 @@
 %format arr (x) = "\langle" x "\rangle"
 %format (tup (x)) = "\langle{}" x "\rangle"
 %format emptytup = "\langle" "\rangle"
+%format arropen = "\langle"
+%format arrclose = "\rangle"
+
+%format amap (x) = "\textbf{map}\{" x "\}"
 
 %format left (x)  = "L \triangleright" x
 %format right (x)  = "R \triangleright" x
@@ -337,7 +341,7 @@
 %format , = ","
 %format X = "X"
 %format CX = "CX"
-%format eqgt = "=>"
+%format eqgt = "\!=>\!\!"
 %% %format squiggt = "\!\leadsto\!"
 %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
