@@ -223,7 +223,8 @@ pPath :: P Path
 pPath = try $ do
   c1 <- char '/'
   c2 <- satisfy isAlpha
-  cs <- some (satisfy (\ c -> isAlpha c || isDigit c || c == '_' || c == '/'))
+  cs <- many (satisfy (\ c -> isAlpha c || isDigit c || c == '_' || c == '/'))
+  skip
   pure $ Path $ c1 : c2 : cs
 
 pString :: P Expr

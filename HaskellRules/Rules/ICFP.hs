@@ -238,6 +238,7 @@ valid' onlyEq = expr
     value e = hnf e
     hnf Int{} = True
     hnf Char{} = True
+    hnf Path{} = True
     hnf Op{}  = True
     hnf (Arr vs) = all value vs
     hnf (LAM _ e) = expr e
@@ -255,6 +256,7 @@ anf' onlyEq = expr
     expr e@Var{} = e
     expr e@Int{} = e
     expr e@Char{} = e
+    expr e@Path{} = e
     expr e@Op{}  = e
     expr (Arr es) =
       let (ds, a) = arr es
@@ -615,6 +617,12 @@ rulesPrimOps _ lhs =
   do Op IsChar :@: (HNF hnf) <- [lhs]
      case hnf of
        Char _ -> pure hnf -- (Arr [])
+       _      -> pure Fail
+ ++
+  "APP-ISPATH" `name`
+  do Op IsPath :@: (HNF hnf) <- [lhs]
+     case hnf of
+       Path _ -> pure hnf -- (Arr [])
        _      -> pure Fail
  ++
   "APP-ISARR" `name`

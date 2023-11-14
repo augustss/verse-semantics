@@ -27,6 +27,7 @@ import System.IO
 import System.IO.Unsafe(unsafePerformIO)
 import Rules.Core(TRSFlags, RuleEnv(..))
 import FrontEnd.Expr(Expr(..), Ident(..), Lit(..), noLoc, seqE)
+import qualified FrontEnd.Expr as Expr
 import FrontEnd.Desugar(getFree, substMany, getAllVars)
 
 -- TODO:
@@ -43,7 +44,7 @@ opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIntGt, opIntGe, o
 opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, opRatLt, opRatLe, opRatNe :: Op
 opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
 opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
-opIsInt, opIsRat, opIsArr, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
+opIsInt, opIsRat, opIsArr, opIsPath, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
 opErr, opArrLen, opArrConc, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opSubFrom, opDotDot,opPrint, opAppend :: Op
 
 opIntGt    = "intGT$"
@@ -100,6 +101,7 @@ opIsChr = "isChr$"
 opIsStr = "isStr$"
 opIsFcn = "isFcn$"
 opIsArr = "isArr$"
+opIsPath = "isPath$"
 opArrLen= "arrLen$"
 opMapAp = "mapAp$"
 opCons  = "cons$"
@@ -282,6 +284,8 @@ isBVar :: BValue -> Bool
 isBVar BVar{} = True
 isBVar _ = False
 
+type Path = String
+
 data BLiteral
   = BRat Rational
   | BF32 Float
@@ -289,6 +293,7 @@ data BLiteral
   | BStr String
   | BChr Char
   | BRef BPtr
+  | BPth Path
   deriving (Show, Eq, Ord, Data)
 
 pattern BInt :: Integer -> BLiteral
@@ -310,6 +315,9 @@ data BHNF
 
 pattern BVInt :: Integer -> BValue
 pattern BVInt i = BVLit (BInt i)
+
+pattern BVPath :: Path -> BValue
+pattern BVPath i = BVLit (BPth i)
 
 pattern BVRat :: Rational -> BValue
 pattern BVRat i = BVLit (BRat i)
@@ -454,6 +462,7 @@ instance Pretty BLiteral where
   pPrintPrec l p (BStr s) = pPrintPrec l p s
   pPrintPrec l p (BChr c) = pPrintPrec l p c
   pPrintPrec l p (BRef r) = pPrintPrec l p r
+  pPrintPrec _ _ (BPth s) = text s
 
 {-
 instance Pretty EffectType where
@@ -667,6 +676,7 @@ bLitToLit (BF64 f) = LitRat (fromRational $ toRational f) "f64"
 bLitToLit (BChr i) = LitChar i
 bLitToLit (BStr i) = LitStr i
 bLitToLit (BRef r) = LitPtr (coerce r)
+bLitToLit (BPth i) = LitPath (Expr.Path i)
 
 
 exprToCore :: BExpr -> Expr
@@ -757,6 +767,7 @@ litToBLit (LitRat s "f64") = BF64 $ toRealFloat s
 litToBLit (LitChar c) = BChr c
 litToBLit (LitStr s) = BStr s
 litToBLit (LitPtr i) = BRef $ coerce i
+litToBLit (LitPath (Expr.Path i)) = BPth i
 litToBLit l = error $ "litToBLit: " ++ show l
 
 cExpr :: Expr -> A BExpr
@@ -822,6 +833,7 @@ primOpEffs o = fromMaybe [] $ M.lookup o $ M.fromList [
   (opF64Ne, [Efails]),
 
   (opIsInt, [Efails]),
+  (opIsPath,[Efails]),
   (opIsRat, [Efails]),
   (opIsF32, [Efails]),
   (opIsF64, [Efails]),
@@ -1206,6 +1218,11 @@ evalPrimOp op v | op == opArrConc =
 evalPrimOp op v | op == opIsInt =
   case v of
     a@(BVInt _) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsPath =
+  case v of
+    a@(BVPath _) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsRat =

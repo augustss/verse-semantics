@@ -731,7 +731,7 @@ getVar e = impossible e
 -- Primitives
 primOps :: [Ident]
 primOps = map (Ident noLoc)
-  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$", "isPtr$", "isArr$", "isFcn$"
+  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$", "isPtr$", "isArr$", "isFcn$", "isPath$"
 
   , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
   , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
