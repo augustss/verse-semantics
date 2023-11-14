@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns  #-}
+{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns -Wno-unrecognised-warning-flags -Wno-x-partial #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
