@@ -174,6 +174,7 @@ trsToCore (T.Char c) = Lit (LitChar c)
 trsToCore (T.Path p) = Lit (LitPath (Path p))
 trsToCore (T.Op op) = EPrim $ fromMaybe undefined $ lookup op allOps
 trsToCore (T.Arr vs) = Array $ map trsToCore vs
+trsToCore (T.Map kvs) = Map $ map (\ (k, v) -> Function [(trsToCore k,[])] (trsToCore v)) kvs
 trsToCore (T.Lam (T.Bind x e)) = Lam (trsToCoreI x) (trsToCore e)
 trsToCore (e1 T.:=: e2) = Unify (trsToCore e1) (trsToCore e2)
 trsToCore ee@(_ T.:>: _) = Seq $ map trsToCore $ flat ee
@@ -231,7 +232,8 @@ allOps = [
   (T.Append,"append$"),
   (T.Error, "err$"),
   (T.Length,"arrLen$"),
-  (T.Concat,"arrConc$")
+  (T.Concat,"arrConc$"),
+  (T.MkMap, "mkMap$")
   ]
 
 ----------------------------------------------

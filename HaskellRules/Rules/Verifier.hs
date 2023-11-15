@@ -76,6 +76,7 @@ isDone = go False False
   go ver _   (Lam (Bind _ e)) = go ver (not ver) e
 
   go ver lam (Arr es)         = all (go ver lam) es
+  go _ _ (Map _) = error "isDone: Map not implemented"
   go ver lam (Exi (Bind _ e)) = go ver lam e
   go ver lam (Uni (Bind _ e)) = go ver lam e
   go ver lam (e1 :=: e2)      = go ver lam e1 && go ver lam e2

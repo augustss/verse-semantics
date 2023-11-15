@@ -45,7 +45,7 @@ module Rules.Core(
 import qualified Epic.SIntMap as IM
 import Data.Char
 import Data.Data(Data)
-import Data.List( union, elemIndex )
+import Data.List( union, elemIndex, sort )
 import Data.Maybe
 import GHC.Stack(HasCallStack)
 
@@ -72,6 +72,7 @@ data Expr
   | Path Path                   -- ^ /a/b
   | Op Op                       -- ^ op
   | Arr [Expr]                  -- ^ <e1,e2,...>
+  | Map [(Expr, Expr)]          -- ^ map{...}
   | Lam (Bind Expr)             -- ^ \ x . e
   --
   | Expr :=: Expr               -- ^ e1 = e2
@@ -127,6 +128,7 @@ instance Pretty Expr where
   pPrintPrec _ _ (Path s)         = text s
   pPrintPrec l p (Op o)           = pPrintPrec l p o
   pPrintPrec l _ (Arr es)         = text "<" <> fsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
+  pPrintPrec l _ (Map vks)        = text "map{" <> fsep (punctuate (text ";") (map (\ (k,v) -> parens(pPrintPrec l 0 k <> text "," <> pPrintPrec l 0 v)) vks)) <> text ">"
   pPrintPrec l p (LAM x e)        = maybeParens (p > 0) $ sep [text "\\" <> pPrintPrec l 0 x <> text ".", pPrintPrec l 0 e]
   pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ sep [pPrintPrec l 4 a <+> text "|", pPrintPrec l 4 b]
   pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
@@ -210,6 +212,16 @@ comp  xs  ys (Arr vs) (Arr ws)
   m  = length ws
 comp _xs _ys (Arr _) _       = LT
 comp _xs _ys _       (Arr _) = GT
+
+comp  xs  ys (Map vs) (Map ws)
+  | n == m    = foldr (<>) EQ (zipWith f (sort vs) (sort ws))
+  | otherwise = n `compare` m
+ where
+  n  = length vs
+  m  = length ws
+  f (kv, vv) (kw, vw) = comp xs ys kv kw <> comp xs ys vv vw
+comp _xs _ys (Map _) _       = LT
+comp _xs _ys _       (Map _) = GT
 
 comp  xs  ys (LAM x a) (LAM y b) = comp (x:xs) (y:ys) a b
 comp _xs _ys (Lam _) _       = LT
@@ -338,6 +350,7 @@ data Op
   | Length
   | Error
   | Concat
+  | MkMap
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where
@@ -575,6 +588,7 @@ instance Free Expr where
   free Path{}    = []
   free Op{}      = []
   free (Arr vs)  = free vs
+  free (Map vs)  = free vs
   free (Lam bnd) = free bnd
   free (a :=: b) = free a `union` free b
   free (a :~: b) = free a `union` free b
@@ -620,6 +634,7 @@ instance Substitutable Expr where
   subst _sub e@Path{} = e
   subst _sub e@Op{}   = e
   subst sub (Arr vs)  = Arr (map (subst sub) vs)
+  subst sub (Map vs)  = Map (map (\ (k,v) -> (subst sub k, subst sub v)) vs)
   subst sub (Lam bnd) = Lam (substBind Var subst sub bnd)
   subst sub (a :=: b) = subst sub a :=: subst sub b
   subst sub (a :~: b) = substVar sub a :~: substVar sub b
@@ -691,6 +706,7 @@ instance Arbitrary Expr where
   shrink (Path _)  = [ Int 0, Arr [] ]
   shrink (Op _)    = []
   shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
+  shrink (Map vs)  = [ Map vs' | vs' <- shrink vs ]
   shrink (Lam (Bind x e)) = [ Arr [] ] ++ [ e | x `notElem` free e] ++ [ Lam (Bind x e') | e' <- shrink e ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]

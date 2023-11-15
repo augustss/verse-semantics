@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 module Rules.ICFP(
   allSystemsICFP,
   systemICFP,
@@ -650,6 +651,21 @@ rulesPrimOps _ lhs =
   "APP-CONCAT" `name`
   do Op Concat :@: Arr [Arr vs1, Arr vs2] <- [lhs]
      pure (Arr (vs1 ++ vs2))
+ ++
+  "APP-MKMAP" `name`
+  do Op MkMap :@: Arr (getMap -> Just vks) <- [lhs]
+     pure (Map $ orderMap vks)
+
+getMap :: [Expr] -> Maybe [(Expr, Expr)]
+getMap [] = Just []
+getMap (Arr [HNF hnf, e] : as) = ((hnf, e) :) <$> getMap as
+getMap _ = Nothing
+
+-- Last inserted kv wins
+orderMap :: [(Expr, Expr)] -> [(Expr, Expr)]
+orderMap = foldr f []
+  where f kv@(k, _) m | isJust (lookup k m) = m
+                      | otherwise           = kv : m
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
@@ -695,6 +711,17 @@ rulesApplication env lhs =
      let x = identNotIn (free (vs, v))
          vx = Var x
      pure (EXI x ((vx :=: v) :>: (foldr1 (:|:) [ (vx :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])))
+
+ <>
+  "APP-MAP-0" `name`
+  do Map [] :@: _ <- [lhs]
+     pure Fail
+ <>
+  "APP-MAP" `name`
+  do Map vks@(_:_) :@: v <- [lhs]
+     let x = identNotIn (free (vks, v))
+         vx = Var x
+     pure (EXI x ((vx :=: v) :>: (foldr1 (:|:) [ (vx :=: i) :>: Val vi | (i,vi) <- vks ])))
 
  <>
   rulesPrimOps env lhs

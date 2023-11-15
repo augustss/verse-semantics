@@ -186,7 +186,7 @@ evalUnderLambda trcEffs = transformBi ev
 #if EXT
         ev (BExt a r x) = BExt (ev a) (transformBi ev r) (transformBi ev x)
 #endif
-        ev (BMap kvs) = BMap $ M.fromList $ map (\ (k,v) -> (transformBi ev k, transformBi ev v)) $ M.toList kvs
+        ev (BMap kvs) = BMap $ map (\ (k,v) -> (transformBi ev k, transformBi ev v)) kvs
         evalB b =
           case evalBlock dummyHeap (trcEffs ++ lambdaEffs) [] b of
             BCBlk b' -> b'
@@ -313,7 +313,7 @@ data BHNF
 #if EXT
   | BExt BHNF BValue BValue
 #endif
-  | BMap (M.Map BHNF BValue)    -- XXX should bit map to a BExpr?
+  | BMap [(BHNF, BValue)]
   deriving (Show, Eq, Ord, Data)
 
 pattern BVInt :: Integer -> BValue
@@ -340,7 +340,7 @@ pattern BVRef i = BHNF (BLit (BRef i))
 pattern BVArr :: [BValue] -> BValue
 pattern BVArr vs = BHNF (BArr vs)
 
-pattern BVMap :: M.Map BHNF BValue -> BValue
+pattern BVMap :: [(BHNF, BValue)] -> BValue
 pattern BVMap vs = BHNF (BMap vs)
 
 pattern BVLam :: BIdent -> BBlock -> BValue
@@ -455,7 +455,7 @@ instance Pretty BHNF where
   pPrintPrec l _ (BExt a r x) = parens $
     text "\\ arg . IF arg=" <> pPrintPrec l 0 a <+> text "THEN" <+> pPrintPrec l 0 r <+> text "ELSE" <+> pPrintPrec l 0 x
 #endif
-  pPrintPrec l _ (BMap kvs) = text "mkMap" <> parens (fsep (punctuate comma (map (pPrintPrec l 0) (M.toList kvs))))
+  pPrintPrec l _ (BMap kvs) = text "mkMap" <> parens (fsep (punctuate comma (map (pPrintPrec l 0) kvs)))
 
 instance Pretty Effect where
   pPrintPrec _ _ e = text $ tail $ show e
@@ -608,14 +608,14 @@ instance Bound BHNF where
 #if EXT
   allBVars (BExt a r x) = allBVars (a, r, x)
 #endif
-  allBVars (BMap vs) = unionMap allBVars $ M.toList vs
+  allBVars (BMap vs) = unionMap allBVars vs
   freeBVars (BLit _) = []
   freeBVars (BArr vs) = unionMap freeBVars vs
   freeBVars (BHLam i b) = freeBVars b \\ [i]
 #if EXT
   freeBVars (BExt a r x) = freeBVars (a, r, x)
 #endif
-  freeBVars (BMap vs) = unionMap freeBVars $ M.toList vs
+  freeBVars (BMap vs) = unionMap freeBVars vs
   bsubst' _ h@(BLit _) = h
   bsubst' s (BArr vs) = BArr (map (bsubst' s) vs)
   bsubst' s h@(BHLam i b)
@@ -627,7 +627,7 @@ instance Bound BHNF where
 #if EXT
   bsubst' s (BExt a r x) = BExt (bsubst' s a) (bsubst' s r) (bsubst' s x)
 #endif
-  bsubst' s (BMap kvs) = BMap $ M.fromList $ map (\ (k, v) -> (bsubst' s k, bsubst' s v)) $ M.toList kvs
+  bsubst' s (BMap kvs) = BMap $ map (\ (k, v) -> (bsubst' s k, bsubst' s v)) kvs
 
 freshenLambda :: [BIdent] -> (BIdent, BBlock) -> (BIdent, BBlock)
 freshenLambda bnd (i, b) | i `notElem` bnd = (i, b)
@@ -677,7 +677,7 @@ hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
 #if EXT
 hnfToCore (BExt a r x) = Lam (Ident noLoc "_") (Variable (Ident noLoc $ "EXT" ++ prettyShow (a, r, x)))
 #endif
-hnfToCore (BMap kvs) = Map $ map mkFun $ M.toList kvs
+hnfToCore (BMap kvs) = Map $ map mkFun kvs
   where mkFun (k, v) = Function [(hnfToCore k, [])] (valueToCore v)
 
 bLitToLit :: BLiteral -> Lit
@@ -1105,7 +1105,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
 #endif
               BVMap kvs ->
                 let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BHNF k)], result = v }
-                                          | (k, v) <- M.toList kvs ]
+                                          | (k, v) <- kvs ]
                 in  succeeds [(val, e)]
               BHNF _ -> wrongs $ "bad function " ++ prettyShow f
           BSplit c f g ->
@@ -1280,7 +1280,7 @@ evalPrimOp op v | op == opIsArr =
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opMkMap =
   case v of
-    (BHNF (BArr a)) | Just kvs <- chkMap a -> Just $ BVal $ BVMap $ M.fromList kvs
+    (BHNF (BArr a)) | Just kvs <- chkMap a -> Just $ BVal $ BVMap $ orderMap kvs
                     | otherwise -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opCons =
@@ -1311,6 +1311,12 @@ chkMap (BHNF (BArr [BHNF k, v]) : a) = do
   kvs <- chkMap a
   return $ (k, v) : kvs
 chkMap _ = Nothing
+
+-- Last inserted kv wins
+orderMap :: [(BHNF, BValue)] -> [(BHNF, BValue)]
+orderMap = foldr f []
+  where f kv@(k, _) m | isJust (lookup k m) = m
+                      | otherwise           = kv : m
 
 evalPrimHeapOp :: BHeap -> Op -> BValue -> Maybe (BHeap, BExpr)
 evalPrimHeapOp h op v | op == opAlloc =
