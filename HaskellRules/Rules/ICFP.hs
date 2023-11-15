@@ -512,6 +512,7 @@ valueX1 lhs =
 
 isValueX :: Ident -> Expr -> Bool
 isValueX x (Arr as) = Var x `elem` as || any (isValueX x) as
+isValueX x (Map vks) = let as = map snd vks in Var x `elem` as ||  any (isValueX x) as
 isValueX _ _        = False
 
 
@@ -653,12 +654,11 @@ rulesPrimOps _ lhs =
      pure (Arr (vs1 ++ vs2))
  ++
   "APP-MKMAP" `name`
-  do Op MkMap :@: Arr (getMap -> Just vks) <- [lhs]
+  do Op MkMap :@: Arr (mapM getMap -> Just vks) <- [lhs]
      pure (Map $ orderMap vks)
 
-getMap :: [Expr] -> Maybe [(Expr, Expr)]
-getMap [] = Just []
-getMap (Arr [HNF hnf, e] : as) = ((hnf, e) :) <$> getMap as
+getMap :: Expr -> Maybe (Expr, Expr)
+getMap (Arr [HNF hnf, e]) = Just (hnf, e)
 getMap _ = Nothing
 
 -- Last inserted kv wins
@@ -744,6 +744,11 @@ rulesUnification env lhs =
   do (Arr vs :=: Arr vs') :>: e <- [lhs]
      guard (length vs == length vs')
      pure (foldr (:>:) e [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
+ ++
+  "U-MAP" `name`
+  do (Map kvs :=: Map kvs') :>: e <- [lhs]
+     guard (map fst kvs == map fst kvs')
+     pure (foldr (:>:) e [ Val v :=: Val v' | ((_,v),(_,v')) <- kvs `zip` kvs' ])
  ++
   "U-FAIL" `name`
   do (HNF e1 :=: HNF e2) :>: _ <- [lhs]

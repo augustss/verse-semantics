@@ -256,6 +256,9 @@ dsSmall = ds
 
     ds (Exists xs b) = ds $ foldr (\ v e -> seqE [DefineV v, e]) b xs
 
+    ds (Map es) | Just kvs <- mapM simpleMapEntry es =
+      ds $ ApplyD (eMkMap noLoc) $ Array [ Array [k, v] | (k, v) <- kvs ]
+
     ds emap@(Map es) = do
       let loc = getLoc emap
       f <- Variable <$> newIdent loc "f"
@@ -287,6 +290,10 @@ checkEffs = mapM checkEff
   where checkEff (Ident _ "invariant") = pure invariantId
         checkEff e | e `elem` knownEffects = pure e
                    | otherwise = errorMessage $ "unknown effect: " ++ show e
+
+simpleMapEntry :: Expr -> Maybe (Expr, Expr)
+simpleMapEntry (InfixOp k (Op "=>") v) = Just (k, v)
+simpleMapEntry _ = Nothing
 
 type Value = Expr
 

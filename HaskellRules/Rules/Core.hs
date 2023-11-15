@@ -424,6 +424,7 @@ getHNF e@Char{} = Just e
 getHNF e@Path{} = Just e
 getHNF e@Op{}  = Just e
 getHNF e@Arr{} = Just e
+getHNF e@Map{} = Just e
 getHNF e@Ref{} = Just e
 getHNF e@Lam{} = Just e
 getHNF _ = Nothing

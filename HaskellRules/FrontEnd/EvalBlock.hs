@@ -1012,6 +1012,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         unify (BVLit i) (BVLit j) | i == j = succeeds []
         -- Replace equal length arrays with new equations
         unify (BVArr vs) (BVArr ws) | length vs == length ws = succeeds $ zipWith (\ v w -> (v, BVal w)) vs ws
+        unify (BVMap vs) (BVMap ws) | map fst vs == map fst ws = succeeds $ zipWith (\ (_,v) (_,w) -> (v, BVal w)) vs ws
         unify _x@(BVLam _ _) _y@(BVLam _ _) =
           -- According to the ICFP paper this is stuck.  Being WRONG would be better
           wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
@@ -1281,7 +1282,7 @@ evalPrimOp op v | op == opIsArr =
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opMkMap =
   case v of
-    (BHNF (BArr a)) | Just kvs <- chkMap a -> Just $ BVal $ BVMap $ orderMap kvs
+    (BHNF (BArr a)) | Just kvs <- mapM chkMap a -> Just $ BVal $ BVMap $ orderMap kvs
                     | otherwise -> Nothing
     _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opCons =
@@ -1306,11 +1307,8 @@ evalPrimOp op _ | op == opErr = error "Err() called"
 evalPrimOp op _ | op `elem` [opAlloc, opRead, opWrite, opAddTo, opSubFrom] = Nothing
 evalPrimOp op v = error $ "evalPrimOp: " ++ show (op, v)
 
-chkMap :: [BValue] -> Maybe [(BHNF, BValue)]
-chkMap [] = Just []
-chkMap (BHNF (BArr [BHNF k, v]) : a) = do
-  kvs <- chkMap a
-  return $ (k, v) : kvs
+chkMap :: BValue -> Maybe (BHNF, BValue)
+chkMap (BHNF (BArr [BHNF k, v])) = Just (k, v)
 chkMap _ = Nothing
 
 -- Last inserted kv wins
