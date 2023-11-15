@@ -416,6 +416,17 @@ The \rulename{app-map} is analogous to \rulename{app-tup}.  It make a choice whe
 The \rulename{u-map} is analogous to \rulename{u-tup}.  For a unification to succeed all the keys have to be identical, and if they are
 then all the values are unified.
 
+\subsubsection{Example}
+~\\
+
+$$
+\begin{array}{l}
+|amap{1 `choice` 2=>11; 3=>33}| \longrightarrow \\
+|mkMap(for(f:(1 `choice` 2=>11, 3=>33); i->a:f){(i,a)})| \longrightarrow \\
+|mkMap(for(f:(functionP (1 `choice` 2) 11, functionP 3 33); i->a:f){(i,a)})| \longrightarrow \\
+\end{array} \\
+$$
+
 \subsection{Example rewriting}
 $$
 \begin{array}{lrcl}
