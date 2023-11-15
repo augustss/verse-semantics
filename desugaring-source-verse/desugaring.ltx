@@ -181,6 +181,10 @@ $$
 \rulename{dsunit} &  |()| & \rightarrow & |ar ()| \\
 \rulename{dstuple} &  |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
 \\
+\multicolumn{5}{l}{\textbf{Map notation}} \\
+\rulename{dsmap}  &  |amap (t_1, xdots, t_n)| & \rightarrow & \multicolumn{2}{l}{|mkMap^(for(f : ar (t_1; xdots; t_n); i squiggt a : f){(i,a)})|} \\
+                  &                           &             & & \text{fresh |f|,|i|,|a|}
+\\
 \multicolumn{5}{l}{\textbf{Function notation}} \\
 \rulename{dstype} &  |type^{t}| & \rightarrow & |functionOC closed (x:=t) x| & \text{fresh |x|}\\
 \rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |functionOC closed (t_1) t_2| \\
@@ -371,6 +375,19 @@ $$
 \end{array}
 $$
 }
+
+\subsection{Maps}
+Verse maps a finite maps from values to values.  We need a primitive type (similar to array).
+Values of this primitive type are constructed by the primitive function |mkMap| which takes
+an array of key-value pairs as input.  So, e.g., |mkMap^(('a', 1), ('b',5))| creates a map
+that map the character 'a' to 1 and the character 'b' to 5.
+
+Like arrays, you can index into maps using regular function application.  The rewrite rules
+need to be extended to handle that in a similar way to how array application works.
+
+In the source language maps are written like this |amap('a' => 1; 'b' =>5)| for the example above.
+The desugaring rule \rulename{dsmap} handles this, and many more cases.
+The elements in |amap| can be functions, maps, or arrays.
 
 \subsection{Example rewriting}
 $$

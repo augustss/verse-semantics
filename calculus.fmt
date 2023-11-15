@@ -203,6 +203,7 @@
 %format arrclose = "\rangle"
 
 %format amap (x) = "\textbf{map}\{" x "\}"
+%format mkMap = "\textbf{mkMap}"
 
 %format left (x)  = "L \triangleright" x
 %format right (x)  = "R \triangleright" x
