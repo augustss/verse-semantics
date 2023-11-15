@@ -389,6 +389,33 @@ In the source language maps are written like this |amap('a' => 1; 'b' =>5)| for 
 The desugaring rule \rulename{dsmap} handles this, and many more cases.
 The elements in |amap| can be functions, maps, or arrays.
 
+\subsubsection{Changes to the ICFP rewrite rules}
+We will use the syntax |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| to denote a map that maps
+|hnf_1| to |v_1| etc.  Note that the keys are always in |hnf|.\\
+\textbf{Syntax} \\
+$$
+  \begin{array}{lr@@{\;}c@@{\;}l@@{}}
+    \text{Head values} & \hnf & ::= & \cdots \vb |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| \\
+  \end{array} \\
+$$ \\
+\textbf{Rewrite rules} \\
+$$
+\begin{array}{@@{\;} l @@{\;} r @@{\;}c@@{\;} l l@@{}}
+\rulename{app-mkmap}          & |apply1 mkMap (arr (arr (hnf_1, v_1), xdots, arr(hnf_n, v_n)))| & \movesto & |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| \\[2mm]
+\rulename{app-map}          & |apply1 (vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))) v| & \movesto &
+                              \multicolumn{2}{@@{}l}{| (v == hnf_1^^^ v_1) choice xdots choice (v == hnf_n^^^ v_n)|
+                              } \\[2mm]
+\rulename{u-map} & \hspace{-1.0em} |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n')) == vmap ((hnf_1, v_1), xdots, (hnf_n, v_n')); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
+\end{array}
+$$
+The \rulename{app-mkmap} make a map from an array of key-value pairs.
+The key has to be in |hnf|, but the value can also be a variable.
+
+The \rulename{app-map} is analogous to \rulename{app-tup}.  It make a choice where the argument is unified with each of the keys.
+
+The \rulename{u-map} is analogous to \rulename{u-tup}.  For a unification to succeed all the keys have to be identical, and if they are
+then all the values are unified.
+
 \subsection{Example rewriting}
 $$
 \begin{array}{lrcl}

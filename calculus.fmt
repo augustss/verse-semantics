@@ -204,6 +204,7 @@
 
 %format amap (x) = "\textbf{map}\{" x "\}"
 %format mkMap = "\textbf{mkMap}"
+%format vmap (x) = "\langle\!\langle" x "\rangle\!\rangle"
 
 %format left (x)  = "L \triangleright" x
 %format right (x)  = "R \triangleright" x
@@ -376,10 +377,12 @@
 %format y_i
 %format y_n
 
+%format hnf_0 = "\mathit{hnf}_{\!0}"
 %format hnf_1 = "\mathit{hnf}_{\!1}"
 %format hnf_2= "\mathit{hnf}_{\!2}"
 %format hnf_d= "\mathit{hnf}_{\!d}"
 %format hnf_r= "\mathit{hnf}_{\!r}"
+%format hnf_n= "\mathit{hnf}_{\!n}"
 
 %format ol_1= "\mathit{ol}_1"
 %format ol_2= "\mathit{ol}_2"
