@@ -678,7 +678,8 @@ hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
 hnfToCore (BExt a r x) = Lam (Ident noLoc "_") (Variable (Ident noLoc $ "EXT" ++ prettyShow (a, r, x)))
 #endif
 hnfToCore (BMap kvs) = Map $ map mkFun kvs
-  where mkFun (k, v) = Function [(hnfToCore k, [])] (valueToCore v)
+  where mkFun (k, v) = --Function [(hnfToCore k, [])] (valueToCore v)
+                       InfixOp (hnfToCore k) (Ident noLoc "=>") (valueToCore v)
 
 bLitToLit :: BLiteral -> Lit
 bLitToLit (BRat r) | denominator r == 1 = LitInt (numerator r)
