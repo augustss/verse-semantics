@@ -44,7 +44,7 @@ opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIntGt, opIntGe, o
 opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, opRatLt, opRatLe, opRatNe :: Op
 opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
 opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
-opIsInt, opIsRat, opIsArr, opIsPath, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
+opIsInt, opIsRat, opIsArr, opIsPath, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn, opMkMap :: Op
 opErr, opArrLen, opArrConc, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opSubFrom, opDotDot,opPrint, opAppend :: Op
 
 opIntGt    = "intGT$"
@@ -103,6 +103,7 @@ opIsFcn = "isFcn$"
 opIsArr = "isArr$"
 opIsPath = "isPath$"
 opArrLen= "arrLen$"
+opMkMap = "mkMap$"
 opMapAp = "mapAp$"
 opCons  = "cons$"
 opAlloc = "alloc$"
@@ -185,6 +186,7 @@ evalUnderLambda trcEffs = transformBi ev
 #if EXT
         ev (BExt a r x) = BExt (ev a) (transformBi ev r) (transformBi ev x)
 #endif
+        ev (BMap kvs) = BMap $ M.fromList $ map (\ (k,v) -> (transformBi ev k, transformBi ev v)) $ M.toList kvs
         evalB b =
           case evalBlock dummyHeap (trcEffs ++ lambdaEffs) [] b of
             BCBlk b' -> b'
@@ -311,6 +313,7 @@ data BHNF
 #if EXT
   | BExt BHNF BValue BValue
 #endif
+  | BMap (M.Map BHNF BValue)    -- XXX should bit map to a BExpr?
   deriving (Show, Eq, Ord, Data)
 
 pattern BVInt :: Integer -> BValue
@@ -336,6 +339,9 @@ pattern BVRef i = BHNF (BLit (BRef i))
 
 pattern BVArr :: [BValue] -> BValue
 pattern BVArr vs = BHNF (BArr vs)
+
+pattern BVMap :: M.Map BHNF BValue -> BValue
+pattern BVMap vs = BHNF (BMap vs)
 
 pattern BVLam :: BIdent -> BBlock -> BValue
 pattern BVLam i b = BHNF (BHLam i b)
@@ -449,6 +455,7 @@ instance Pretty BHNF where
   pPrintPrec l _ (BExt a r x) = parens $
     text "\\ arg . IF arg=" <> pPrintPrec l 0 a <+> text "THEN" <+> pPrintPrec l 0 r <+> text "ELSE" <+> pPrintPrec l 0 x
 #endif
+  pPrintPrec l _ (BMap kvs) = text "mkMap" <> parens (fsep (punctuate comma (map (pPrintPrec l 0) (M.toList kvs))))
 
 instance Pretty Effect where
   pPrintPrec _ _ e = text $ tail $ show e
@@ -601,12 +608,14 @@ instance Bound BHNF where
 #if EXT
   allBVars (BExt a r x) = allBVars (a, r, x)
 #endif
+  allBVars (BMap vs) = unionMap allBVars $ M.toList vs
   freeBVars (BLit _) = []
   freeBVars (BArr vs) = unionMap freeBVars vs
   freeBVars (BHLam i b) = freeBVars b \\ [i]
 #if EXT
   freeBVars (BExt a r x) = freeBVars (a, r, x)
 #endif
+  freeBVars (BMap vs) = unionMap freeBVars $ M.toList vs
   bsubst' _ h@(BLit _) = h
   bsubst' s (BArr vs) = BArr (map (bsubst' s) vs)
   bsubst' s h@(BHLam i b)
@@ -618,6 +627,7 @@ instance Bound BHNF where
 #if EXT
   bsubst' s (BExt a r x) = BExt (bsubst' s a) (bsubst' s r) (bsubst' s x)
 #endif
+  bsubst' s (BMap kvs) = BMap $ M.fromList $ map (\ (k, v) -> (bsubst' s k, bsubst' s v)) $ M.toList kvs
 
 freshenLambda :: [BIdent] -> (BIdent, BBlock) -> (BIdent, BBlock)
 freshenLambda bnd (i, b) | i `notElem` bnd = (i, b)
@@ -667,6 +677,8 @@ hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
 #if EXT
 hnfToCore (BExt a r x) = Lam (Ident noLoc "_") (Variable (Ident noLoc $ "EXT" ++ prettyShow (a, r, x)))
 #endif
+hnfToCore (BMap kvs) = Map $ map mkFun $ M.toList kvs
+  where mkFun (k, v) = Function [(hnfToCore k, [])] (valueToCore v)
 
 bLitToLit :: BLiteral -> Lit
 bLitToLit (BRat r) | denominator r == 1 = LitInt (numerator r)
@@ -840,6 +852,8 @@ primOpEffs o = fromMaybe [] $ M.lookup o $ M.fromList [
   (opIsChr, [Efails]),
   (opIsStr, [Efails]),
   (opIsFcn, [Efails]),
+
+  (opMkMap, []),  -- XXX is this true?
 
   (opMapAp, allEffects),  -- XXX can do better?
   (opAlloc, [Eallocates]),
@@ -1089,6 +1103,10 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
               BVExt i o x | BHNF h <- a -> if i == h then unify val o else succeeds [(val, BApply x a)]
                           | otherwise -> suspend eqn
 #endif
+              BVMap kvs ->
+                let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BHNF k)], result = v }
+                                          | (k, v) <- M.toList kvs ]
+                in  succeeds [(val, e)]
               BHNF _ -> wrongs $ "bad function " ++ prettyShow f
           BSplit c f g ->
             case evalChoice heap (aeffs `intersect` domEffects) (beffs \\ domEffects) c of
@@ -1260,6 +1278,11 @@ evalPrimOp op v | op == opIsArr =
     a@(BHNF (BArr _)) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opMkMap =
+  case v of
+    (BHNF (BArr a)) | Just kvs <- chkMap a -> Just $ BVal $ BVMap $ M.fromList kvs
+                    | otherwise -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opCons =
   case v of
     BVArr [a, BVArr as] -> Just $ BVal $ BVArr (a : as)
@@ -1281,6 +1304,13 @@ evalPrimOp op _ | op == opAppend = Nothing
 evalPrimOp op _ | op == opErr = error "Err() called"
 evalPrimOp op _ | op `elem` [opAlloc, opRead, opWrite, opAddTo, opSubFrom] = Nothing
 evalPrimOp op v = error $ "evalPrimOp: " ++ show (op, v)
+
+chkMap :: [BValue] -> Maybe [(BHNF, BValue)]
+chkMap [] = Just []
+chkMap (BHNF (BArr [BHNF k, v]) : a) = do
+  kvs <- chkMap a
+  return $ (k, v) : kvs
+chkMap _ = Nothing
 
 evalPrimHeapOp :: BHeap -> Op -> BValue -> Maybe (BHeap, BExpr)
 evalPrimHeapOp h op v | op == opAlloc =

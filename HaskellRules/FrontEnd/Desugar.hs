@@ -256,6 +256,16 @@ dsSmall = ds
 
     ds (Exists xs b) = ds $ foldr (\ v e -> seqE [DefineV v, e]) b xs
 
+    ds emap@(Map es) = do
+      let loc = getLoc emap
+      f <- Variable <$> newIdent loc "f"
+      i <- Variable <$> newIdent loc "i"
+      a <- Variable <$> newIdent loc "a"
+      ds $ ApplyD (eMkMap loc) $
+                  For2 (Seq [InfixOp f (Ident loc ":") (Array es),
+                             InfixOp (InfixOp i (Ident loc "->") a) (Ident loc ":") f])
+                       (Array [i, a])
+
     ds x = compos ds x
 
 {- no n-ary unification for now
@@ -351,6 +361,9 @@ eFalse = Array []
 eAny :: Expr
 eAny = Variable (Ident noLoc "any$")
 
+eMkMap :: Loc -> Expr
+eMkMap l = Variable (Ident l "mkMap$")
+
 defnArray :: [Expr] -> Expr -> D Expr
 defnArray ps e = do
   let var p = do
@@ -443,7 +456,7 @@ dsD_1 (Function [(t1, effs)] t2) = do
 dsD_1 e@Range{} = dsDM e
 dsD_1 e@DefineIE{} = dsDM e
 dsD_1 (Lam x e) = Lam x <$> dsD_1 e
-dsD_1 (Map ts) = Map <$> mapM dsD_1 ts
+--dsD_1 (Map ts) = Map <$> mapM dsD_1 ts
 dsD_1 e = impossible e
 
 -- Use M to desugar
@@ -538,7 +551,7 @@ call p l s e = do
     con | ver && s' `elem` [
                      "pre'+'","pre'-'",
                      "in'+'","in'-'","in'*'"] = ApplyS
-        | s' `elem` ["in'/'","pre'!'","post'?'",
+        | s' `elem` ["in'/'","pre'!'",
                      "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
                      "pre'+'","pre'-'",  -- XXX not really right
                      "in'+'","in'-'","in'*'",  -- XXX not really right
@@ -636,7 +649,7 @@ scope sc = expr
     expr Fail = pure Fail
     expr (Forall is e) = Forall is <$> scopeD' sc' e
       where sc' = foldr S.insert sc is
-    expr (Map es) = Map <$> mapM expr es
+--    expr (Map es) = Map <$> mapM expr es
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -694,7 +707,7 @@ getVisible TLam{} = []
 getVisible Lam{} = []
 getVisible Fail = []
 getVisible DomainFail = []
-getVisible (Map es) = concatMap getVisible es
+--getVisible (Map es) = concatMap getVisible es
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
@@ -745,7 +758,8 @@ primOps = map (Ident noLoc)
   , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
   , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
 
-  , "post'?'"
+
+  , "mkMap$"
   , "concat$", "cons$"
   , "length$"
   , "alloc$", "read$", "write$"
@@ -1052,7 +1066,7 @@ addDeref = pure . exprD S.empty
     expr _ Fail = Fail
     expr s (Lam i e) = Lam i (expr s e)
     expr _ e@EPrim{} = e
-    expr s (Map es) = Map $ map (expr s) es
+--    expr s (Map es) = Map $ map (expr s) es
     expr _ e = impossible e
 
     exprD s e = expr (defs s e) e
@@ -1113,7 +1127,7 @@ lower (OfType e t) = join $ lowerOfType <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
 lower Fail = pure Fail
 lower (Forall is e) = Forall is <$> lower e
-lower (Map es) = Map <$> mapM lower es
+--lower (Map es) = Map <$> mapM lower es
 lower e = impossible e
 
 -- Lower a for loop
@@ -1609,7 +1623,7 @@ getFree = Epic.List.nub . fvs
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
     fvs Fail = []
     fvs DomainFail = []
-    fvs (Map es) = concatMap fvs es
+--    fvs (Map es) = concatMap fvs es
     fvs e = impossible e
 
 closed :: Core -> Bool
