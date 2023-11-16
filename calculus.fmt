@@ -93,6 +93,9 @@
 %% Function application with 1 argument
 %format apply1 a (b) = a "(" b ")"
 
+%% Function application with 1 argument, no parens
+%format apply1np (a) (b) = a "(" b ")"
+
 %% Function application with 1 argument, without parenthesis
 %format apply1N a b = a^ "[" b "]"
 
@@ -197,6 +200,7 @@
 %% %format arrKW = "\textbf{arr}"
 %% %format arr (x) = arrKW "\{" x "\}"
 %format arr (x) = "\langle" x "\rangle"
+%format arrsp (x) = "\langle\;" x "\;\rangle"
 %format (tup (x)) = "\langle{}" x "\rangle"
 %format emptytup = "\langle" "\rangle"
 %format arropen = "\langle"
@@ -204,7 +208,8 @@
 
 %format amap (x) = "\textbf{map}\{" x "\}"
 %format mkMap = "\textbf{mkMap}"
-%format vmap (x) = "\langle\!\langle" x "\rangle\!\rangle"
+%format vmap (x) = "\langle\hspace{-0.25em}\langle" x "\rangle\hspace{-0.25em}\rangle"
+%% %format vmap (x) = "\llangle" x "\rrangle"
 
 %format left (x)  = "L \triangleright" x
 %format right (x)  = "R \triangleright" x

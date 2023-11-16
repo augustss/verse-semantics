@@ -23,7 +23,6 @@
 \usepackage{textgreek}
 \usepackage{xspace}
 
-
 % \renewcommand{\arraystretch}{1.1}
 
 \input{verse-macros}
@@ -395,22 +394,26 @@ The elements in |amap| can be functions, maps, or arrays.
 \subsubsection{Changes to the ICFP rewrite rules}
 We will use the syntax |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| to denote a map that maps
 |hnf_1| to |v_1| etc.  Note that the keys are always in |hnf|.\\
-\textbf{Syntax} \\
+\begin{figure}
+\textbf{Syntax}
 $$
   \begin{array}{lr@@{\;}c@@{\;}l@@{}}
     \text{Head values} & \hnf & ::= & \cdots \vb |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| \\
-  \end{array} \\
-$$ \\
-\textbf{Rewrite rules} \\
+  \end{array}
+$$ \\[3mm]
+\textbf{Rewrite rules}
 $$
 \begin{array}{@@{\;} l @@{\;} r @@{\;}c@@{\;} l l@@{}}
-\rulename{app-mkmap}          & |apply1 mkMap (arr (arr (hnf_1, v_1), xdots, arr(hnf_n, v_n)))| & \movesto & |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| \\[2mm]
-\rulename{app-map}          & |apply1 (vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))) v| & \movesto &
+\rulename{app-mkmap}          & |apply1 mkMap (arrsp (arr (hnf_1, v_1), xdots, arr(hnf_n, v_n)))| & \movesto & |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| \\[2mm]
+\rulename{app-map}          & |apply1np (vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))) v| & \movesto &
                               \multicolumn{2}{@@{}l}{| (v == hnf_1^^^ v_1) choice xdots choice (v == hnf_n^^^ v_n)|
                               } \\[2mm]
 \rulename{u-map} & \hspace{-1.0em} |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n')) == vmap ((hnf_1, v_1), xdots, (hnf_n, v_n')); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
 \end{array}
 $$
+\caption{Extensions for maps} \label{fig:map-ext}
+\end{figure}
+
 The \rulename{app-mkmap} make a map from an array of key-value pairs.
 The key has to be in |hnf|, but the value can also be a variable.
 
@@ -420,8 +423,25 @@ The \rulename{u-map} is analogous to \rulename{u-tup}.  For a unification to suc
 then all the values are unified.
 
 \subsubsection{Example}
-~\\
+The |amap| construct is very flexible.  Here are some example:\\
+$$
+\begin{array}{ll}
+|amap(1 `choice` 2=>11; 3=>33)| & \text{create a map from some lambdas} \\
+|amap(m; 'a' => 99)| & \text{``update'' the map |m| with a new value for key |'a'|} \\
+|amap(m1; m2)| & \text{concatenate the maps |m1| and |m2|, right biased} \\
+|amap(a)| & \text{turn the array |a| into a map} \\
+\end{array} \\
+$$
 
+Just like with arrays, maps can be used in a |for| to iterate over all elements.
+$$
+\begin{array}{ll}
+|m:=amap(1 `choice` 2=>11; 3=>33); for(k squiggt v:m){k}| & \text{computes the keys |1,2,3|} \\
+|m:=amap(1 `choice` 2=>11; 3=>33); for(k squiggt v:m){v}| & \text{computes the values |11,11,33|} \\
+\end{array} \\
+$$
+
+Sample desugaring
 $$
 \begin{array}{l}
 |amap{1 `choice` 2=>11; 3=>33}| \longrightarrow \\
