@@ -667,6 +667,45 @@ $$
 \caption{{\bf DS7} 16 Oct new attempt at getting rid of EXI-APP} \label{fig:ds7}
 \end{figure}
 
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Function rules (verification)}} \\
+\rulename{mcfun} &  |DMe (inp f si) (functionOC closed t_1 t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i (flipsi si)) t_1);
+                                            z := DAe (inp f si) j; Me (inp z si) t_2)); |} \\
+& &   & |lam i (j := Me (inp i (flipsi si)) t_1; assume (z :=  DAe (inp f si) j;
+                                             Me (inp z si) t_2))| \\[2mm]
+\end{array} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+
+\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
+         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; (De t_2)^[y];| \hspace{5mm} \text{|y| fresh}} \\
+         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+\\
+\rulename{asm-semi} & |assume (v == e_1; e_2)| & \movesto & |v == (assume e_1); assume e_2| \\
+\rulename{check-semi} & |check fx (v=e_1; e_2)| & \movesto & |v = (check fx e_1); check fx e_2| \\
+ & & \multicolumn{2}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
+\rulename{asm-verify} & |assume (E^[verify e_1; e_2]| & \movesto & |E^[e_2]| \\
+\rulename{asm-val} & |assume v| & \movesto & |v| \\
+\rulename{verify-gc} & |verify e_1; e_2| & \movesto
+   & \multicolumn{2}{l}{|e_2| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e_1|}}
+\end{array} \\
+\\
+\begin{minipage}{12cm}
+  \begin{itemize}
+  \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
+  \item |verify e| checks that |e| neither gets stuck nor goes wrong.
+\end{itemize}
+Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
+\end{minipage}
+\end{array}$$
+\caption{\bf DS7-new: SPJ attempt to simplify}
+\end{figure}
+
+
 \begin{figure}[t]
   $$
 \begin{array}{l}
@@ -684,7 +723,7 @@ $$
   |then inapplic g v; rng^[x]| \\
   |else g^[v]|
   \end{array} \\
-\rulename{inapplic1} & |inapplic (olam g (arr (dom,_))) v| & \movesto & |check (eff fails) (apply1N dom v); inapplic g v| \\
+\rulename{inapplic1} & |inapplic (olam g (arr (dom,_))) v| & \movesto & |check fails (apply1N dom v); inapplic g v| \\
 \rulename{inapplic2} & |def g (E^[inapplic g v])| & \movesto & \multicolumn{2}{l}{|E^[arr ()]|  \hspace{4mm} \mbox{if $|g| \not\in \freevars{E}$} }
 \end{array}\\
 \\

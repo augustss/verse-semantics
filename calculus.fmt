@@ -326,7 +326,8 @@
 %format appexi (f) (x) = "{\mathcal A" "\fbox{$" x "$}"
 
 %% Effects checking, like succeeds{e}
-%format check (r) (b) = "{\bf check}" r "\{" b "\}"
+%format checkKW = "{\bf check}"
+%format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
