@@ -337,6 +337,7 @@ data Op
   | IsInt
   | IsChar
   | IsArr
+  | IsMap
   | IsPath
   | MapAp
   | Cons

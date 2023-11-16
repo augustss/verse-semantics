@@ -44,7 +44,7 @@ opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIntGt, opIntGe, o
 opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, opRatLt, opRatLe, opRatNe :: Op
 opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
 opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
-opIsInt, opIsRat, opIsArr, opIsPath, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn, opMkMap :: Op
+opIsInt, opIsRat, opIsArr, opIsPath, opIsMap, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn, opMkMap :: Op
 opErr, opArrLen, opArrConc, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opSubFrom, opDotDot,opPrint, opAppend :: Op
 
 opIntGt    = "intGT$"
@@ -101,6 +101,7 @@ opIsChr = "isChr$"
 opIsStr = "isStr$"
 opIsFcn = "isFcn$"
 opIsArr = "isArr$"
+opIsMap = "isMap$"
 opIsPath = "isPath$"
 opArrLen= "arrLen$"
 opMkMap = "mkMap$"
@@ -847,6 +848,7 @@ primOpEffs o = fromMaybe [] $ M.lookup o $ M.fromList [
 
   (opIsInt, [Efails]),
   (opIsPath,[Efails]),
+  (opIsMap, [Efails]),
   (opIsRat, [Efails]),
   (opIsF32, [Efails]),
   (opIsF64, [Efails]),
@@ -1243,6 +1245,11 @@ evalPrimOp op v | op == opIsInt =
 evalPrimOp op v | op == opIsPath =
   case v of
     a@(BVPath _) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsMap =
+  case v of
+    a@(BVMap _) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsRat =

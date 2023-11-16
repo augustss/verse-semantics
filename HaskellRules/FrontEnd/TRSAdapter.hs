@@ -222,6 +222,7 @@ allOps = [
   (T.IsInt, "isInt$"),
   (T.IsChar,"isChr$"),
   (T.IsArr, "isArr$"),
+  (T.IsMap, "isMap$"),
   (T.IsPath,"isPath$"),
   (T.MapAp, "mapAp$"),
   (T.Cons,  "cons$"),
