@@ -189,17 +189,14 @@ evalExp e = case extract e of
       (HashMap.insert x (Val var) xs, var:xs')
     unifyS s s'
     newVar' $ Val.Enum i xs xs'
-  Exp.Struct i xs e -> \ s s' -> do
-    r <- ask
-    lift $ unifyS s s'
-    lift $ newVar' . Val.Overloads (Val.Struct i r.env xs e) =<< freshVar'
+  Exp.Struct i xs e -> \ s s' -> ask >>= \ r -> lift $ do
+    unifyS s s'
+    newVar' . Val.Overloads (Val.Struct i r.env xs e) =<< freshVar'
   Exp.Class i e_sup xs e -> \ s s' -> do
     r <- ask
     var_sup <- case e_sup of
+      Nothing -> lift $ Nothing <$ unifyS s s'
       Just e_sup -> Just <$> evalExp e_sup s s'
-      Nothing -> do
-        lift $ unifyS s s'
-        pure Nothing
     lift $ newVar' . Val.Overloads (Val.Class i r.env var_sup xs e) =<< freshVar'
   Exp.Inst e1 xs e2 ->
     evalInst (loc e) e1 xs e2
@@ -227,10 +224,9 @@ evalExp e = case extract e of
       var <- invoke (loc e) var var_e s'' s'''
       writeVarRef' ref (coerce var) s''' s'
       pure var
-  Exp.Fun xs e_domain e -> \ s s' -> do
-    r <- ask
-    lift $ unifyS s s'
-    lift $ newVar' . Val.Overloads (Val.Fun r.env xs e_domain e) =<< freshVar'
+  Exp.Fun xs e_domain e -> \ s s' -> ask >>= \ r -> lift $ do
+    unifyS s s'
+    newVar' . Val.Overloads (Val.Fun r.env xs e_domain e) =<< freshVar'
   Exp.BracketInvoke e1 e2 -> \ s s' -> do
     s'' <- lift freshS
     var1 <- evalExp e1 s s''
@@ -269,16 +265,9 @@ evalDot loc e x s s' = do
   s'' <- lift freshS
   var_e <- evalExp e s s''
   var <- lift freshVar'
-  fork' do
-    xs <- lift (readVar' var_e) >>= \ case
-      Val.Module _ xs -> pure xs
-      Val.Enum _ xs _ -> pure xs
-      Val.StructInst _ xs -> pure xs
-      Val.ClassInst _ _ xs -> pure xs
-      _ -> abort $ DomainError loc
-    unify' loc var =<< case HashMap.lookup x xs of
-      Just x -> lift $ evalNamed' x s'' s'
-      Nothing -> abort $ NameError loc x
+  fork' $ lift (readVar' var_e) >>= getNameEnv loc <&> HashMap.lookup x >>= \ case
+    Nothing -> abort $ NameError loc x
+    Just x -> unify' loc var =<< lift (evalNamed' x s'' s')
   pure var
 
 evalChoice
@@ -392,6 +381,7 @@ evalForDo
 evalForDo loc xs e1 e2 s s' = do
   var <- lift freshVar'
   fork' $ do
+    s'' <- lift freshS
     vars <- lift . readIVar =<< for'
       do
         xs <- lift $ freshEnv xs
@@ -400,7 +390,8 @@ evalForDo loc xs e1 e2 s s' = do
         _ <- localNames xs $ evalExp e1 s { choiceFree } s'
         pure xs
       do
-        \ xs -> localNames xs $ evalExp e2 s s'
+        \ xs -> localNames xs $ evalExp e2 s s''
+    lift $ unifyS s'' s'
     unify' loc var =<< lift (newVar' $ Val.Tuple vars)
   pure var
 
@@ -428,7 +419,7 @@ evalAssume
 evalAssume loc e s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
   var <- lift freshVar'
-  fork' do
+  fork' $ do
     var' <- lift . readIVar =<< assume' do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
@@ -670,7 +661,6 @@ invokeOverloads loc head tail arg s s' =
     Just result -> pure result
     Nothing -> lift (readVar' tail) >>= \ case
       Val.Overloads head tail -> invokeOverloads loc head tail arg s s'
-      Val.AnyOverloads -> lift yield
       _ -> abort $ DomainError loc
 
 invokeOverload
@@ -724,8 +714,9 @@ invokeStruct
   -> EvalT m (Maybe (VarVal m))
 invokeStruct loc i env xs e arg s s' = do
   archetype <- lift $ freshEnv xs
+  let archetype' = mempty
   xs <- lift $ freshEnv xs
-  _ <- local (\ r -> r { env = xs <> env, archetype }) $ evalExp e s s'
+  _ <- local (\ r -> r { env = xs <> env, archetype, archetype' }) $ evalExp e s s'
   unify' loc arg =<< lift (newVar' . Val.StructInst i $ filterNames xs)
   pure $ Just arg
 
@@ -761,9 +752,10 @@ instEmptyClass loc i env sup xs e s s' = do
   s'' <- lift freshS
   (sup, xs_sup) <- instEmptySup loc sup s s''
   archetype <- lift $ freshEnv xs
+  let archetype' = mempty
   xs <- lift $ freshEnv xs
   let xs' = xs_sup <> xs
-  _ <- local (\ r -> r { env = xs' <> env, archetype }) $ evalExp e s'' s'
+  _ <- local (\ r -> r { env = xs' <> env, archetype, archetype' }) $ evalExp e s'' s'
   lift $ newVar' (Val.ClassInst i sup $ filterNames xs') <&> (, xs')
 
 instEmptySup
@@ -1389,6 +1381,14 @@ unifyNamed loc = curry $ \ case
 
 eqFloat :: Double -> Double -> Bool
 eqFloat x y = if isNaN x then isNaN y else x == y
+
+getNameEnv :: MonadAbort Error m => Loc -> Val ref a -> m (Val.Env Name ref a)
+getNameEnv loc = \ case
+  Val.Module _ xs -> pure xs
+  Val.Enum _ xs _ -> pure xs
+  Val.StructInst _ xs -> pure xs
+  Val.ClassInst _ _ xs -> pure xs
+  _ -> abort $ DomainError loc
 
 fork'
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
