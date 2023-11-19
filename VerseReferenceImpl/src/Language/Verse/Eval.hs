@@ -956,7 +956,7 @@ div' var = readPair var >>= \ case
     (Val.Rational x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ x / fromInteger y
     (Val.Rational _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
     (Val.Rational x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ fromRational x / y
-    (Val.AnyInt, Val.AnyRational) -> decide *> (domMatch_' $ newVar' Val.AnyRational)
+    (Val.AnyInt, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyRational
     (Val.AnyInt, Val.Rational 0) -> domMatch_' empty
     (Val.AnyInt, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
     (Val.AnyInt, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
@@ -964,7 +964,7 @@ div' var = readPair var >>= \ case
     (Val.AnyInt, Val.Int _) -> domMatch_' $ newVar' Val.AnyRational
     (Val.AnyInt, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
     (Val.AnyInt, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Int _, Val.AnyRational) -> decide *> (domMatch_' $ newVar' Val.AnyRational)
+    (Val.Int _, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyRational
     (Val.Int _, Val.Rational 0) -> domMatch_' empty
     (Val.Int x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ fromInteger x / y
     (Val.Int _, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational

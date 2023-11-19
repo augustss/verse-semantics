@@ -170,7 +170,7 @@ deriving instance ( Show a
 
 data IdentExp a
  = IdentName a
- | IdentQualName [(L (Exp a))] (L a)
+ | IdentQualName [L (Exp a)] (L a)
  | IdentPath a
 
 deriving instance ( Show a
@@ -356,7 +356,7 @@ braces x =
   flatAlt (hardline <> rbrace) " }"
 
 specs :: (Pretty a) => [a] -> Doc ann
-specs es = foldr ( \ e doc -> "<" <> pretty e <> ">" <> doc ) mempty es
+specs = foldr ( \ e doc -> "<" <> pretty e <> ">" <> doc ) mempty
 
 
 instance ( Pretty a
@@ -375,7 +375,7 @@ instance ( Pretty a
 
 list :: Pretty a => [a] -> Doc ann
 list [] = mempty
-list (x:[]) = pretty x
+list [x] = pretty x
 list (x:xs) = pretty x <> ";" <+> list xs
 
 instance ( Pretty (Exp a)

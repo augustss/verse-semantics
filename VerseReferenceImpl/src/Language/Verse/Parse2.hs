@@ -21,7 +21,7 @@ import Data.Word (Word8)
 import Language.Verse.Error qualified as E
 import Language.Verse.Loc (L (..), Loc(..))
 import Language.Verse.Name(Name)
-import Language.Verse.Parse.Exp (Exp
+import Language.Verse.Parse.Exp ( Exp
                                 , pattern (:=:)
                                 , pattern (:<>:)
                                 , pattern (:.:)
@@ -212,7 +212,7 @@ pLine = P.try $ do -- This P.try is needed since it will fail if the next line i
     let i = ByteString.pack prefix
     nest <- getNest
     ind <- getBlockInd
-    _ <- (pEnding <|> pSpace)
+    _ <- pEnding <|> pSpace
     if deeper i ind {- || nest && ind == i-} then do
       setNest True
       setLineInd i
@@ -243,15 +243,15 @@ pScanKeyNS = P.lookAhead pNewline *> pScan *> pLinePrefix *> void pSpace
 
 -- LineCmt   :=  "#" !'>' {Text        } Ending
 pLineCmt :: Parser ()
-pLineCmt = () <$ pHash <* P.manyTill pText (P.lookAhead pEnding)
+pLineCmt = void pHash <* P.manyTill pText (P.lookAhead pEnding)
 
 -- BlockCmt  := "<#" !'>' {Text|NewLine} !'<' "#>"
 pBlockCmt :: Parser ()
-pBlockCmt = () <$ pLessHash <* P.many (pText <|> void pNewline) <* pHashGreater
+pBlockCmt = void pLessHash <* P.many (pText <|> void pNewline) <* pHashGreater
 
 -- IndCmt    := "<#>"     {Text        } Ind {Text|Line} Ded
 pIndCmt :: Parser ()
-pIndCmt = () <$ pLessHashGreater <* P.many pText <* pInd <* P.many (pLine <|> pText) <* pDed
+pIndCmt = void pLessHashGreater <* P.many pText <* pInd <* P.many (pLine <|> pText) <* pDed
 
 -- Comment   := LineCmt   | BlockCmt | IndCmt
 pComment :: Parser (L String)
@@ -259,7 +259,7 @@ pComment = wrapLoc <$> pos <*> ("<comment>" <$ (pLineCmt <|> pBlockCmt <|> pIndC
 
 -- Text      := Printable | BlockCmt | "<#>"
 pText :: Parser ()
-pText = ((void $ string "<#>") <|> void pPrintable <|> void pBlockCmt)
+pText = void (string "<#>") <|> void pPrintable <|> void pBlockCmt
 
 -- Exp       := ['e' ['+'|'-'] Digits] !('e' ('+'|'-'|Digit))
 pExp :: Parser (Char, [Word8])
@@ -312,9 +312,9 @@ pNumT =
    mkBin p1 xs p2 = L (toLoc p1 p2)  $ Exp.Int . fst . head . readBin . map w2c $ xs
 
    mkNum :: PPos.SourcePos -> [Word8] -> Maybe [Word8] -> Maybe (Char, [Word8]) -> Maybe (L Name) -> PPos.SourcePos -> L (Exp Name)
-   mkNum p1 is Nothing   Nothing units p2 =  addUnits units $ (Exp.Int $ wsToInteger is) <$ unitLoc p1 p2
-   mkNum p1 is Nothing   (Just ('+', es)) units p2 =  addUnits units $ (Exp.Int $ wsToInteger is * (10 ^ wsToInteger es)) <$ unitLoc p1 p2
-   mkNum p1 is fs es units p2 = addUnits units $ (mkFloat is (qFractionToWords fs) (qExpToWords es) <$ unitLoc p1 p2)
+   mkNum p1 is Nothing   Nothing units p2 =  addUnits units $ Exp.Int (wsToInteger is) <$ unitLoc p1 p2
+   mkNum p1 is Nothing   (Just ('+', es)) units p2 =  addUnits units $ Exp.Int (wsToInteger is * (10 ^ wsToInteger es)) <$ unitLoc p1 p2
+   mkNum p1 is fs es units p2 = addUnits units $ mkFloat is (qFractionToWords fs) (qExpToWords es) <$ unitLoc p1 p2
 
    wsToInteger :: [Word8] -> Integer
    wsToInteger ws = read $ '0': map w2c ws
@@ -334,7 +334,7 @@ pNumT =
    addUnits Nothing e = e
    addUnits (Just u) e = Exp.Units e <$> duplicate u
 
-   mkFloat :: [Word8] -> [Word8] -> [Word8] -> (Exp Name)
+   mkFloat :: [Word8] -> [Word8] -> [Word8] -> Exp Name
    mkFloat is fs es =
      let s = map w2c (is ++ c2w '.':fs ++ es)
      in case reads s of
@@ -419,7 +419,7 @@ pIdentT = P.try $ do  -- This P.try is needed for now since it will fail for key
   special :: Text.Text
   special = "\\{}\"'"
 
-  ok = P.notFollowedBy ( string "<#" <|> string "#>" ) *> satisfy ( \ w8 -> (w8 >= 0x20 && w8 <= 0x7E && not (Text.elem (w2c w8) special)))
+  ok = P.notFollowedBy ( string "<#" <|> string "#>" ) *> satisfy ( \ w8 -> w8 >= 0x20 && w8 <= 0x7E && not (Text.elem (w2c w8) special))
 
   fix w8s = c2w '\'' : w8s ++ [c2w '\'']
 
@@ -435,7 +435,7 @@ pPathT = do
   label <- pLabel
   atLabel <- P.optionMaybe pAtLabel
   idents <- P.many $ (,) <$ pSlash <*> P.optionMaybe (pLParen *> pPathT <* pColonParen) <*> pIdentT
-  return $ Text.pack "/" <> label <> fixAt atLabel <> (Text.concat $ map fixIdent idents)
+  return $ Text.pack "/" <> label <> fixAt atLabel <> Text.concat (map fixIdent idents)
  where
    pAtLabel :: Parser Name
    pAtLabel = pAt *> pLabel
@@ -584,7 +584,7 @@ pQualIdent =
   fixQual qQual n =
     case qQual of
       Nothing -> IdentExp.IdentName <$> n
-      Just qs -> IdentExp.IdentQualName <$> qs <.> (duplicate n)
+      Just qs -> IdentExp.IdentQualName <$> qs <.> duplicate n
 
 
 -- Use when it can be either a pParen or a pQualIdent. Needed to get rid of a P.try that is otherwise needed.
@@ -726,8 +726,8 @@ pCall = do
 
 -- Postfix   := Invoke  | !Invoke (Paren | Specs) | ("at"|"of") Key (KeyBlock | Fun)
 --                      | ('^' | '?' | '[' List ']' | ScanKey '.' QualIdent)
-pPostfix :: (L (Exp Name)) -> Parser (L (Exp Name))
-pPostfix base = pSpace *> (
+pPostfix :: L (Exp Name) -> Parser (L (Exp Name))
+pPostfix base = pSpace *>
   repeatChoice base [ pInvoke
                     , \ a -> liftL2 Exp.ParenInvoke a <$> pParen
                     , \ a -> (\ b -> addSpecs b a) <$> pSpecs1
@@ -736,8 +736,8 @@ pPostfix base = pSpace *> (
                     , \ a -> (Exp.PostfixCaret <$> duplicate a) <$ match '^'
                     , \ a -> (Exp.PostfixQuery <$> duplicate a) <$ match '?'
                     , \ a -> (\ p1 b p2 -> Exp.BracketInvoke <$> duplicate a <.> duplicate (mkList b) <. p1 <. p2) <$> pLBracket <*> pList <*> pRBracket
-                    , \ a -> (liftL2 (:.:) a <$ pScanKey <* pDot <*> pQualIdent)
-                    ])
+                    , \ a -> liftL2 (:.:) a <$ pScanKey <* pDot <*> pQualIdent
+                    ]
 
 -- Prefix    := Call    | ('^' | '?' | '[' List ']' | '+' | '-' | '*') Space (Brace | Prefix)
 pPrefix :: Parser (L (Exp Name))
@@ -835,7 +835,7 @@ pDef = pDef' Nothing
 pDef' :: Maybe (L (Exp Name)) -> Parser (L (Exp Name))
 pDef' qE =
   (((maybeInfix <$> (pIn qE <|> pVar) <* pSpace
-     <*> P.optionMaybe ( ( \ op e2 -> (op, e2)) <$>
+     <*> P.optionMaybe ( (,) <$>
                          (
                            (:=:) <$ pEqual
                            <|>
@@ -1209,9 +1209,7 @@ pop = P.modifyState $ \ s -> case stack s of
                                _ -> error "Unbalanced push/pop in Parse2"
 
 getActive :: (Context -> a) -> Parser a
-getActive f = do
-  s <- P.getState
-  return $ f $ active s
+getActive f = f . active <$> P.getState
 
 modifyActive :: (Context -> Context) -> Parser ()
 modifyActive f = P.modifyState $ \ s -> s { active = f (active s) }
@@ -1281,8 +1279,7 @@ updatePosWord pos w =
   PPos.updatePosChar pos (if w < 127 then w2c w else ' ')
 
 updatePosWords :: PPos.SourcePos -> [Word8] -> PPos.SourcePos
-updatePosWords pos ws =
-  foldl updatePosWord pos ws
+updatePosWords = foldl updatePosWord
 
 
 showW8s :: [Word8] -> String
