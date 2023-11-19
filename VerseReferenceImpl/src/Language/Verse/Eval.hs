@@ -50,6 +50,7 @@ import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
 import Language.Verse.Loc (Loc, L, loc)
+import Language.Verse.Mode
 import Language.Verse.Name
 import Language.Verse.Val
   ( Val
@@ -75,7 +76,8 @@ import Prelude
 type EvalT m = ReaderT (R m) (VerseT m)
 
 data R m = R
-  { env :: !(Env m)
+  { mode :: !Mode
+  , env :: !(Env m)
   , assumed :: !Bool
   , archetype :: !(Archetype m)
   , archetype' :: !(Archetype m)
@@ -121,8 +123,8 @@ type Env m = Val.VarEnv Ident m
 
 type Archetype m = Env m
 
-runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> VerseT m a
-runEvalT m = do
+runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> Mode -> VerseT m a
+runEvalT m mode = do
   env <- newEnv
   runReaderT m R {..}
   where
@@ -138,11 +140,11 @@ type MonadEval m =
   , EqRef (Ref m)
   )
 
-eval :: MonadEval m => L (Exp L Ident) -> VerseT m FrozenVal
-eval e = do
+eval :: MonadEval m => Mode -> L (Exp L Ident) -> VerseT m FrozenVal
+eval mode e = do
   s <- newS
   s' <- freshS
-  freeze' =<< runEvalT (evalExp e s s')
+  freeze' =<< runEvalT (evalExp e s s') mode
 
 evalExp :: MonadEval m => L (Exp L Ident) -> S m -> S m -> EvalT m (VarVal m)
 evalExp e = case extract e of
@@ -1347,12 +1349,15 @@ match loc x y = ask >>= \ r -> case (x, y) of
         unify' loc xs ys
     | otherwise -> abort $ UndecidableError loc
   (Val.Overloads x xs, Val.Overloads y ys) -> pure $ (SEQ,) do
-    fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
-      i <- lift $ newVar' Val.Any
-      _ <- invokeOverloadDom loc x i
-      fails' (invokeOverloadDom loc y i) >>= lift . readIVar >>= \ case
-        False -> abort $ FailsError loc
-        True -> empty
+    asks (.mode) >>= \ case
+      Execution -> pure ()
+      Verification -> do
+        fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
+          i <- lift $ newVar' Val.Any
+          _ <- invokeOverloadDom loc x i
+          fails' (invokeOverloadDom loc y i) >>= lift . readIVar >>= \ case
+            False -> abort $ FailsError loc
+            True -> empty
     zs <- lift freshVar'
     unify' loc xs =<< lift (newVar' $ Val.Overloads y zs)
     unify' loc ys =<< lift (newVar' $ Val.Overloads x zs)

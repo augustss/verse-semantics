@@ -38,8 +38,10 @@ eval xs = do
   (e1, e2) <- liftEither $ runSupplyT $ do
     e <- rewrite =<< lift (runLexer P.parse xs)
     (,) <$> desugar Verification e <*> desugar Execution e
-  whenNothingM_ (runVerseT . Eval.eval . verify $ succeeds e1) $ abort StuckError
-  whenNothingM (runVerseT $ Eval.eval e2) $ abort StuckError
+  whenNothingM_ (runVerseT . Eval.eval Verification . verify $ succeeds e1) $
+    abort StuckError
+  whenNothingM (runVerseT $ Eval.eval Execution e2) $
+    abort StuckError
 
 eval' :: ( MonadAbort Error m
          , MonadFix m
@@ -48,7 +50,7 @@ eval' :: ( MonadAbort Error m
          , EqRef (Ref m)
          ) => Mode -> ByteString -> VerseT m FrozenVal
 eval' mode =
-  Eval.eval <=<
+  Eval.eval mode <=<
   liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< runLexer P.parse)
 
 
@@ -59,7 +61,7 @@ eval2' :: ( MonadAbort Error m
           , EqRef (Ref m)
           ) => String -> Mode -> ByteString -> VerseT m FrozenVal
 eval2' path mode =
-  Eval.eval <=<
+  Eval.eval mode <=<
   liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< P2.parse2 path)
 
 whenNothingM :: Monad m => m (Maybe a) -> m a -> m a
