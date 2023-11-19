@@ -402,11 +402,12 @@ evalVerify
   -> S m
   -> EvalT m (VarVal m)
 evalVerify e s s' = do
-  lift $ unifyS s s'
-  fork' $ lift . readIVar =<< verify' do
-    s <- lift newS
-    s' <- lift freshS
-    void . local (\ r -> r { assumed = True }) $ evalExp e s s'
+  whenM (asks $ not . (.assumed)) $ do
+    lift $ unifyS s s'
+    fork' $ lift . readIVar =<< verify' do
+      s <- lift newS
+      s' <- lift freshS
+      void . local (\ r -> r { assumed = True }) $ evalExp e s s'
   lift . newVar' $ Val.Tuple []
 
 evalAssume
@@ -656,12 +657,26 @@ invokeOverloads
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeOverloads loc head tail arg s s' =
-  invokeOverload loc head arg s s' >>= \ case
-    Just result -> pure result
-    Nothing -> lift (readVar' tail) >>= \ case
+invokeOverloads loc head tail arg s s' = lift . readIVar =<< if''
+  do
+    invokeOverload loc head arg s s'
+  do
+    runDomMatch
+  do
+    lift (readVar' tail) >>= \ case
       Val.Overloads head tail -> invokeOverloads loc head tail arg s s'
       _ -> abort $ DomainError loc
+
+invokeOverloadDom
+  :: MonadEval m
+  => Loc
+  -> Val.Overload (VarRef m) (VarVal m)
+  -> VarVal m
+  -> EvalT m ()
+invokeOverloadDom loc f arg = do
+  s <- lift newS
+  s' <- lift freshS
+  void $ invokeOverload loc f arg s s'
 
 invokeOverload
   :: MonadEval m
@@ -670,12 +685,28 @@ invokeOverload
   -> VarVal m
   -> S m
   -> S m
-  -> EvalT m (Maybe (VarVal m))
+  -> EvalT m (DomMatch m)
 invokeOverload loc = \ case
   Val.Fun env xs e_domain e -> invokeFun loc env xs e_domain e
   Val.Struct i env xs e -> invokeStruct loc i env xs e
   Val.Class i env sup xs e -> invokeClass loc i env sup xs e
   Val.Intrinsic intrinsic -> invokeIntrinsic loc intrinsic
+
+data DomMatch m = forall a . Freshenable a m => DomMatch
+  a
+  (a -> EvalT m (VarVal m))
+
+runDomMatch :: DomMatch m -> EvalT m (VarVal m)
+runDomMatch (DomMatch x f) = f x
+
+domMatch_ :: Monad m => EvalT m (VarVal m) -> EvalT m (DomMatch m)
+domMatch_ m = pure $ DomMatch () $ \ () -> m
+
+domMatch_' :: Monad m => VerseT m (VarVal m) -> VerseT m (DomMatch m)
+domMatch_' m = pure $ DomMatch () $ \ () -> lift m
+
+instance Monad m => Freshenable (DomMatch m) m where
+  freshen (DomMatch x f) = freshen x <&> \ x -> DomMatch x f
 
 invokeFun
   :: MonadEval m
@@ -687,19 +718,14 @@ invokeFun
   -> VarVal m
   -> S m
   -> S m
-  -> EvalT m (Maybe (VarVal m))
-invokeFun loc env xs e_domain e v_arg s s' = lift . readIVar =<< if''
-  do
-    xs <- lift $ freshEnv xs
-    choiceFree <- lift $ newVar ChoiceFree
-    s' <- lift freshS
-    v_domain <- localEnv (xs <> env) $ evalExp e_domain s { choiceFree } s'
-    unify' loc v_arg v_domain
-    pure xs
-  do
-    \ xs -> localEnv (xs <> env) $ Just <$> evalExp e s s'
-  do
-    pure Nothing
+  -> EvalT m (DomMatch m)
+invokeFun loc env xs e_domain e v_arg s s' = do
+  xs <- lift $ freshEnv xs
+  choiceFree <- lift $ newVar ChoiceFree
+  s'' <- lift freshS
+  v_domain <- localEnv (xs <> env) $ evalExp e_domain s { choiceFree } s''
+  unify' loc v_arg v_domain
+  pure . DomMatch xs $ \ xs -> localEnv (xs <> env) $ evalExp e s s'
 
 invokeStruct
   :: MonadEval m
@@ -711,14 +737,14 @@ invokeStruct
   -> VarVal m
   -> S m
   -> S m
-  -> EvalT m (Maybe (VarVal m))
-invokeStruct loc i env xs e arg s s' = do
+  -> EvalT m (DomMatch m)
+invokeStruct loc i env xs e arg s s' = pure . DomMatch () $ \ () -> do
   archetype <- lift $ freshEnv xs
   let archetype' = mempty
   xs <- lift $ freshEnv xs
   _ <- local (\ r -> r { env = xs <> env, archetype, archetype' }) $ evalExp e s s'
   unify' loc arg =<< lift (newVar' . Val.StructInst i $ filterNames xs)
-  pure $ Just arg
+  pure arg
 
 invokeClass
   :: MonadEval m
@@ -731,11 +757,11 @@ invokeClass
   -> VarVal m
   -> S m
   -> S m
-  -> EvalT m (Maybe (VarVal m))
-invokeClass loc i sup env xs e arg s s' = do
+  -> EvalT m (DomMatch m)
+invokeClass loc i sup env xs e arg s s' = domMatch_ $ do
   (inst, _) <- instEmptyClass loc i sup env xs e s s'
   unify' loc inst =<< lift (findClassInst i arg)
-  pure $ Just arg
+  pure arg
 
 instEmptyClass
   :: MonadEval m
@@ -801,7 +827,7 @@ invokeIntrinsic
   -> VarVal m
   -> S m
   -> S m
-  -> EvalT m (Maybe (VarVal m))
+  -> EvalT m (DomMatch m)
 invokeIntrinsic loc = \ case
   Intrinsic.Less -> liftPrim $ lift . liftOrd (<)
   Intrinsic.LessEqual -> liftPrim $ lift . liftOrd (<=)
@@ -822,152 +848,154 @@ invokeIntrinsic loc = \ case
 liftOrd
   :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
   => (forall a . Ord a => a -> a -> Bool)
-  -> VarVal m -> VerseT m (Maybe (VarVal m))
+  -> VarVal m -> VerseT m (DomMatch m)
 liftOrd f var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Val.AnyRational, AnyNumber) -> decide $> Just var_x
-    (Val.Rational x, Val.Rational y) -> guard (f x y) $> Just var_x
-    (Val.Rational x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
-    (Val.Rational x, Val.Float y) -> guard (f (fromRational x) y) $> Just var_x
-    (Val.Rational _, AnyNumber) -> decide $> Just var_x
-    (Val.AnyInt, AnyNumber) -> decide $> Just var_x
-    (Val.Int x, Val.Rational y) -> guard (f (fromInteger x) y) $> Just var_x
-    (Val.Int x, Val.Int y) -> guard (f x y) $> Just var_x
-    (Val.Int x, Val.Float y) -> guard (f (fromInteger x) y) $> Just var_x
-    (Val.Int _, AnyNumber) -> decide $> Just var_x
-    (Val.AnyFloat, AnyNumber) -> decide $> Just var_x
-    (Val.Float x, Val.Rational y) -> guard (f (toRational x) y) $> Just var_x
-    (Val.Float x, Val.Int y) -> guard (f x (fromInteger y)) $> Just var_x
-    (Val.Float x, Val.Float y) -> guard (f x y) $> Just var_x
-    (Val.Float _, AnyNumber) -> decide $> Just var_x
-    _ -> pure Nothing
-  _ -> pure Nothing
+    (Val.AnyRational, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.Rational x, Val.Rational y) -> domMatch_' $ guard (f x y) $> var_x
+    (Val.Rational x, Val.Int y) -> domMatch_' $ guard (f x (fromInteger y)) $> var_x
+    (Val.Rational x, Val.Float y) -> domMatch_' $ guard (f (fromRational x) y) $> var_x
+    (Val.Rational _, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.AnyInt, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.Int x, Val.Rational y) -> domMatch_' $ guard (f (fromInteger x) y) $> var_x
+    (Val.Int x, Val.Int y) -> domMatch_' $ guard (f x y) $> var_x
+    (Val.Int x, Val.Float y) -> domMatch_' $ guard (f (fromInteger x) y) $> var_x
+    (Val.Int _, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.AnyFloat, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.Float x, Val.Rational y) -> domMatch_' $ guard (f (toRational x) y) $> var_x
+    (Val.Float x, Val.Int y) -> domMatch_' $ guard (f x (fromInteger y)) $> var_x
+    (Val.Float x, Val.Float y) -> domMatch_' $ guard (f x y) $> var_x
+    (Val.Float _, AnyNumber) -> domMatch_' $ decide $> var_x
+    _ -> empty
+  _ -> empty
 
 liftNum
   :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
   => (forall a . Num a => a -> a -> a)
-  -> VarVal m -> VerseT m (Maybe (VarVal m))
+  -> VarVal m -> VerseT m (DomMatch m)
 liftNum f var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Val.AnyRational, Val.AnyRational) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyRational, Val.Rational _) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyInt) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyRational, Val.Int _) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyRational, Val.Float _) -> Just <$> newVar' Val.AnyFloat
-    (Val.Rational _, Val.AnyRational) -> Just <$> newVar' Val.AnyRational
-    (Val.Rational x, Val.Rational y) -> fmap Just . newVar' . Val.Rational $ f x y
-    (Val.Rational _, Val.AnyInt) -> Just <$> newVar' Val.AnyRational
-    (Val.Rational x, Val.Int y) -> fmap Just . newVar' . Val.Rational $ f x (fromInteger y)
-    (Val.Rational _, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.Rational x, Val.Float y) -> fmap Just . newVar' . Val.Float $ f (fromRational x) y
-    (Val.AnyInt, Val.AnyRational) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyInt, Val.Rational _) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyInt) -> Just <$> newVar' Val.AnyInt
-    (Val.AnyInt, Val.Int _) -> Just <$> newVar' Val.AnyInt
-    (Val.AnyInt, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyInt, Val.Float _) -> Just <$> newVar' Val.AnyFloat
-    (Val.Int _, Val.AnyRational) -> Just <$> newVar' Val.AnyRational
-    (Val.Int x, Val.Rational y) -> fmap Just . newVar' . Val.Rational $ f (fromInteger x) y
-    (Val.Int _, Val.AnyInt) -> Just <$> newVar' Val.AnyInt
-    (Val.Int x, Val.Int y) -> fmap Just . newVar' . Val.Int $ f x y
-    (Val.Int _, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.Int x, Val.Float y) -> fmap Just . newVar' . Val.Float $ f (fromInteger x) y
-    (Val.AnyFloat, Val.AnyRational) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Rational _) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyInt) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Int _) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Float _) -> Just <$> newVar' Val.AnyFloat
-    (Val.Float _, Val.AnyRational) -> Just <$> newVar' Val.AnyFloat
-    (Val.Float x, Val.Rational y) -> fmap Just . newVar' . Val.Float $ f x (fromRational y)
-    (Val.Float _, Val.AnyInt) -> Just <$> newVar' Val.AnyFloat
-    (Val.Float x, Val.Int y) -> fmap Just . newVar' . Val.Float $ f x (fromInteger y)
-    (Val.Float _, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.Float x, Val.Float y) -> fmap Just . newVar' . Val.Float $ f x y
-    _ -> pure Nothing
-  _ -> pure Nothing
+    (Val.AnyRational, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyRational, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyRational, Val.Int _) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyRational, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Rational _, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.Rational x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ f x y
+    (Val.Rational _, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.Rational x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ f x (fromInteger y)
+    (Val.Rational _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Rational x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f (fromRational x) y
+    (Val.AnyInt, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyInt, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyInt, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyInt
+    (Val.AnyInt, Val.Int _) -> domMatch_' $ newVar' Val.AnyInt
+    (Val.AnyInt, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyInt, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Int _, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.Int x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ f (fromInteger x) y
+    (Val.Int _, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyInt
+    (Val.Int x, Val.Int y) -> domMatch_' . newVar' . Val.Int $ f x y
+    (Val.Int _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Int x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f (fromInteger x) y
+    (Val.AnyFloat, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Rational _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Int _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float _, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float x, Val.Rational y) -> domMatch_' . newVar' . Val.Float $ f x (fromRational y)
+    (Val.Float _, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float x, Val.Int y) -> domMatch_' . newVar' . Val.Float $ f x (fromInteger y)
+    (Val.Float _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f x y
+    _ -> empty
+  _ -> empty
 
-prefixPlus :: MonadRef m => VarVal m -> VerseT m (Maybe (VarVal m))
+prefixPlus
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => VarVal m -> VerseT m (DomMatch m)
 prefixPlus var = readVar' var >>= \ case
-  AnyNumber -> pure $ Just var
-  _ -> pure Nothing
+  AnyNumber -> domMatch_' $ pure var
+  _ -> empty
 
 prefixMinus
-  :: (MonadRef m, MonadSupply Int m)
-  => VarVal m -> VerseT m (Maybe (VarVal m))
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => VarVal m -> VerseT m (DomMatch m)
 prefixMinus var = readVar' var >>= \ case
-  Val.AnyRational -> Just <$> newVar' Val.AnyRational
-  Val.Rational x -> Just <$> newVar' (Val.Rational $ negate x)
-  Val.AnyInt -> Just <$> newVar' Val.AnyInt
-  Val.Int x -> Just <$> newVar' (Val.Int $ negate x)
-  Val.AnyFloat -> Just <$> newVar' Val.AnyFloat
-  Val.Float x -> Just <$> newVar' (Val.Float $ negate x)
-  _ -> pure Nothing
+  Val.AnyRational -> domMatch_' $ newVar' Val.AnyRational
+  Val.Rational x -> domMatch_' $ newVar' (Val.Rational $ negate x)
+  Val.AnyInt -> domMatch_' $ newVar' Val.AnyInt
+  Val.Int x -> domMatch_' $ newVar' (Val.Int $ negate x)
+  Val.AnyFloat -> domMatch_' $ newVar' Val.AnyFloat
+  Val.Float x -> domMatch_' $ newVar' (Val.Float $ negate x)
+  _ -> empty
 
 div'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => VarVal m -> VerseT m (Maybe (VarVal m))
+  => VarVal m -> VerseT m (DomMatch m)
 div' var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Val.AnyRational, Val.AnyRational) -> decide *> (Just <$> newVar' Val.AnyRational)
-    (Val.AnyRational, Val.Rational 0) -> empty
-    (Val.AnyRational, Val.Rational _) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyInt) -> decide *> (Just <$> newVar' Val.AnyRational)
-    (Val.AnyRational, Val.Int 0) -> empty
-    (Val.AnyRational, Val.Int _) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyRational, Val.Float _) -> Just <$> newVar' Val.AnyFloat
-    (Val.Rational _, Val.AnyRational) -> decide *> (Just <$> newVar' Val.AnyRational)
-    (Val.Rational _, Val.Rational 0) -> empty
-    (Val.Rational x, Val.Rational y) -> fmap Just . newVar' . Val.Rational $ x / y
-    (Val.Rational _, Val.AnyInt) -> decide *> (Just <$> newVar' Val.AnyRational)
-    (Val.Rational _, Val.Int 0) -> empty
-    (Val.Rational x, Val.Int y) -> fmap Just . newVar' . Val.Rational $ x / fromInteger y
-    (Val.Rational _, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.Rational x, Val.Float y) -> fmap Just . newVar' . Val.Float $ fromRational x / y
-    (Val.AnyInt, Val.AnyRational) -> decide *> (Just <$> newVar' Val.AnyRational)
-    (Val.AnyInt, Val.Rational 0) -> empty
-    (Val.AnyInt, Val.Rational _) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyInt) -> decide *> (Just <$> newVar' Val.AnyRational)
-    (Val.AnyInt, Val.Int 0) -> empty
-    (Val.AnyInt, Val.Int _) -> Just <$> newVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyInt, Val.Float _) -> Just <$> newVar' Val.AnyFloat
-    (Val.Int _, Val.AnyRational) -> decide *> (Just <$> newVar' Val.AnyRational)
-    (Val.Int _, Val.Rational 0) -> empty
-    (Val.Int x, Val.Rational y) -> fmap Just . newVar' . Val.Rational $ fromInteger x / y
-    (Val.Int _, Val.AnyInt) -> decide *> (Just <$> newVar' Val.AnyRational)
-    (Val.Int _, Val.Int 0) -> empty
-    (Val.Int x, Val.Int y) -> fmap Just . newVar' . Val.Rational $ x % y
-    (Val.Int _, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.Int x, Val.Float y) -> fmap Just . newVar' . Val.Float $ fromInteger x / y
-    (Val.AnyFloat, Val.AnyRational) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Rational _) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyInt) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Int _) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Float _) -> Just <$> newVar' Val.AnyFloat
-    (Val.Float _, Val.AnyRational) -> decide *> (Just <$> newVar' Val.AnyFloat)
-    (Val.Float x, Val.Rational y) -> fmap Just . newVar' . Val.Float $ x / fromRational y
-    (Val.Float _, Val.AnyInt) -> Just <$> newVar' Val.AnyFloat
-    (Val.Float x, Val.Int y) -> fmap Just . newVar' . Val.Float $ x / fromInteger y
-    (Val.Float _, Val.AnyFloat) -> Just <$> newVar' Val.AnyFloat
-    (Val.Float x, Val.Float y) -> fmap Just . newVar' . Val.Float $ x / y
-    _ -> pure Nothing
-  _ -> pure Nothing
+    (Val.AnyRational, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyRational
+    (Val.AnyRational, Val.Rational 0) -> domMatch_' empty
+    (Val.AnyRational, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
+    (Val.AnyRational, Val.Int 0) -> domMatch_' empty
+    (Val.AnyRational, Val.Int _) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyRational, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Rational _, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyRational
+    (Val.Rational _, Val.Rational 0) -> domMatch_' empty
+    (Val.Rational x, Val.Rational y) -> domMatch_' $ newVar' . Val.Rational $ x / y
+    (Val.Rational _, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
+    (Val.Rational _, Val.Int 0) -> domMatch_' empty
+    (Val.Rational x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ x / fromInteger y
+    (Val.Rational _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Rational x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ fromRational x / y
+    (Val.AnyInt, Val.AnyRational) -> decide *> (domMatch_' $ newVar' Val.AnyRational)
+    (Val.AnyInt, Val.Rational 0) -> domMatch_' empty
+    (Val.AnyInt, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyInt, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
+    (Val.AnyInt, Val.Int 0) -> domMatch_' empty
+    (Val.AnyInt, Val.Int _) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyInt, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyInt, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Int _, Val.AnyRational) -> decide *> (domMatch_' $ newVar' Val.AnyRational)
+    (Val.Int _, Val.Rational 0) -> domMatch_' empty
+    (Val.Int x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ fromInteger x / y
+    (Val.Int _, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
+    (Val.Int _, Val.Int 0) -> domMatch_' empty
+    (Val.Int x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ x % y
+    (Val.Int _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Int x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ fromInteger x / y
+    (Val.AnyFloat, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Rational _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Int _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float _, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyFloat
+    (Val.Float x, Val.Rational y) -> domMatch_' . newVar' . Val.Float $ x / fromRational y
+    (Val.Float _, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float x, Val.Int y) -> domMatch_' . newVar' . Val.Float $ x / fromInteger y
+    (Val.Float _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ x / y
+    _ -> empty
+  _ -> empty
 
 to
   :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
   => VarVal m
   -> S m
   -> S m
-  -> EvalT m (Maybe (VarVal m))
+  -> EvalT m (DomMatch m)
 to var s s' = lift $ readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Int val1, Int val2) -> to' val1 val2 s s'
-    _ -> pure Nothing
-  _ -> pure Nothing
+    (Int val1, Int val2) -> domMatch_' $ to' val1 val2 s s'
+    _ -> empty
+  _ -> empty
 
 to'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
@@ -975,13 +1003,13 @@ to'
   -> Integer
   -> S m
   -> S m
-  -> VerseT m (Maybe (VarVal m))
+  -> VerseT m (VarVal m)
 to' val1 val2 s s' = do
   unifyEq s.storeFree s'.storeFree
   _ <- readVar s.choiceFree
   var <- foldr (\ x z -> newVar' (Val.Int x) <|> z) empty [val1 .. val2]
   unifyEq s.choiceFree s'.choiceFree
-  pure $ Just var
+  pure var
 
 pattern AnyNumber :: Val f a
 pattern AnyNumber <- (number -> True)
@@ -1007,8 +1035,8 @@ getInt = \ case
 
 int
   :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (Maybe (VarVal m))
-int loc var = do
+  => Loc -> VarVal m -> EvalT m (DomMatch m)
+int loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
     Val.Any -> unify' loc var =<< lift (newVar' Val.AnyInt)
     Val.AnyRational -> unify' loc var =<< lift (newVar' Val.AnyInt)
@@ -1016,23 +1044,23 @@ int loc var = do
     Val.AnyInt -> pure ()
     Val.Int _ -> pure ()
     _ -> empty
-  pure $ Just var
+  pure var
 
 float
   :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (Maybe (VarVal m))
-float loc var = do
+  => Loc -> VarVal m -> EvalT m (DomMatch m)
+float loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
     Val.Any -> unify' loc var =<< lift (newVar' Val.AnyFloat)
     Val.AnyFloat -> pure ()
     Val.Float _ -> pure ()
     _ -> empty
-  pure $ Just var
+  pure var
 
 function
   :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (Maybe (VarVal m))
-function loc var = do
+  => Loc -> VarVal m -> EvalT m (DomMatch m)
+function loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
     Val.Any -> unify' loc var =<< lift (newVar' Val.AnyOverloads)
     Val.Tuple _ -> pure ()
@@ -1040,25 +1068,22 @@ function loc var = do
     Val.AnyOverloads -> pure ()
     Val.Overloads {} -> pure ()
     _ -> empty
-  pure $ Just var
+  pure var
 
 query
   :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (Maybe (VarVal m))
-query loc var = do
+  => Loc -> VarVal m -> EvalT m (DomMatch m)
+query loc var = domMatch_ $ do
   var' <- lift freshVar'
   unify' loc var =<< lift (newVar' $ Val.Truth var')
-  pure $ Just var'
+  pure var'
 
 liftPrim
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => (VarVal m -> EvalT m (Maybe (VarVal m)))
-  -> VarVal m -> S m -> S m -> EvalT m (Maybe (VarVal m))
-liftPrim f var s s' = f var >>= \ case
-  Nothing -> pure Nothing
-  x@Just {} -> lift $ do
-    unifyS s s'
-    pure x
+  => (VarVal m -> EvalT m (DomMatch m))
+  -> VarVal m -> S m -> S m -> EvalT m (DomMatch m)
+liftPrim f var s s' = f var <&> \ (DomMatch x f) ->
+  DomMatch x $ \ x -> f x <* lift (unifyS s s')
 
 readPair
   :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
@@ -1322,6 +1347,12 @@ match loc x y = ask >>= \ r -> case (x, y) of
         unify' loc xs ys
     | otherwise -> abort $ UndecidableError loc
   (Val.Overloads x xs, Val.Overloads y ys) -> pure $ (SEQ,) do
+    fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
+      i <- lift $ newVar' Val.Any
+      _ <- invokeOverloadDom loc x i
+      fails' (invokeOverloadDom loc y i) >>= lift . readIVar >>= \ case
+        False -> abort $ FailsError loc
+        True -> empty
     zs <- lift freshVar'
     unify' loc xs =<< lift (newVar' $ Val.Overloads y zs)
     unify' loc ys =<< lift (newVar' $ Val.Overloads x zs)
@@ -1469,3 +1500,8 @@ decides'
   => EvalT m a
   -> EvalT m (IVar m (Maybe a))
 decides' m = ReaderT $ decides . runReaderT m
+
+whenM :: Monad m => m Bool -> m () -> m ()
+whenM m n = m >>= \ case
+  False -> pure ()
+  True -> n
