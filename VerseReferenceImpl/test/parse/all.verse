@@ -1,3 +1,4 @@
+# Copyright Epic Games, Inc. All Rights Reserved.
 set a|b += 1;
 set Object.Variable += 1;
 +{1;2};
