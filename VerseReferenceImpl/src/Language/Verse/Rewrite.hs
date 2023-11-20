@@ -24,39 +24,40 @@ import Language.Verse.Error
 import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
-import Language.Verse.Loc(L(..))
+import Language.Verse.Loc (L (..))
 import Language.Verse.Name
-import Language.Verse.Parse.Exp ( pattern (:<>:)
-                                , pattern (:..:)
-                                , pattern (:<:)
-                                , pattern (:<=:)
-                                , pattern (:>:)
-                                , pattern (:>=:)
-                                , pattern PrefixPlus
-                                , pattern (:+:)
-                                , pattern PrefixMinus
-                                , pattern (:-:)
-                                , pattern (:*:)
-                                , pattern (:/:)
-                                , pattern (:->:)
-                                , pattern PrefixBracket
-                                , pattern PrefixQuery
-                                , pattern PostfixQuery
-                                , pattern If
-                                , pattern IfThen
-                                , pattern IfElse
-                                , pattern For
-                                , pattern Pat
-                                , Pat
-                                , pattern InfixColon
-                                , pattern InfixArrow
-                                , pattern Invoke
-                                , expToPat
-                                )
+import Language.Verse.Parse.Exp
+  ( pattern (:<>:)
+  , pattern (:..:)
+  , pattern (:<:)
+  , pattern (:<=:)
+  , pattern (:>:)
+  , pattern (:>=:)
+  , pattern PrefixPlus
+  , pattern (:+:)
+  , pattern PrefixMinus
+  , pattern (:-:)
+  , pattern (:*:)
+  , pattern (:/:)
+  , pattern (:->:)
+  , pattern PrefixBracket
+  , pattern PrefixQuery
+  , pattern PostfixQuery
+  , pattern If
+  , pattern IfThen
+  , pattern IfElse
+  , pattern For
+  , pattern Pat
+  , Pat
+  , pattern InfixColon
+  , pattern InfixArrow
+  , pattern Invoke
+  , expToPat
+  )
 import Language.Verse.Parse.Exp qualified as Parse
 import Language.Verse.Rewrite.Exp
 
-import Prelude ((==), Maybe(..), (++), show, Show(..), String, map, snd)
+import Prelude (Maybe (..), Show (..), String, (==), (++), map, snd)
 
 rewrite
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -75,12 +76,10 @@ rewriteExp e = for e $ \ case
     rewriteDef (p <$ e1) =<< rewriteExp e2
   (Parse.:=:) (extract -> Parse.ExpInfixColon (expToPat -> Just p1) e1) e2 ->
     rewriteDef (Parse.InfixColon <$> duplicate p1 <.> duplicate e1) =<< rewriteExp e2
-
   (Parse.:=:) (extract -> Parse.ExpSet e@(extract -> Parse.Pat (Parse.Name (Parse.IdentName x)))) e2 ->
     Set (Ident.Name x <$ e) <$> rewriteExp e2
   Parse.Set e@(extract -> Parse.Pat (Parse.Name (Parse.IdentName x))) e2 -> -- Only unqualified names are implemented
     Set (Ident.Name x <$ e) <$> rewriteExp e2
-
   (Parse.:=:) e1 e2 ->
     (:=:) <$> rewriteExp e1 <*> rewriteExp e2
   e1 :<>: e2 ->
@@ -236,7 +235,6 @@ rewriteExp e = for e $ \ case
     rewritePat p
   Parse.ExpInfixColon (Parse.expToPat -> Just pat) e2 ->  -- Try to fix Parse2 so that we can get rid of this
     rewritePat $ Parse.InfixColon pat e2
-
   e -> notImplemented "rewriteExp" e
 
 notImplemented :: (MonadAbort Error m, Show a) => String -> a -> m b

@@ -18,31 +18,33 @@ import Data.Functor.Apply
 import Data.HashMap.Strict (foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
 
-import Language.Verse.Desugar.Exp ( Exp (..)
-                                  , Quantifier (..)
-                                  , unify
-                                  , verify
-                                  , succeeds
-                                  , assume
-                                  , forall'
-                                  , bracketInvoke
-                                  , name
-                                  , then'
-                                  )
+import Language.Verse.Desugar.Exp
+  ( Exp (..)
+  , Quantifier (..)
+  , unify
+  , verify
+  , succeeds
+  , assume
+  , forall'
+  , bracketInvoke
+  , name
+  , then'
+  )
 import Language.Verse.Error
 import Language.Verse.Ident (Ident, IdentMap)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Mode
-import Language.Verse.Rewrite.Exp ( pattern List
-                                  , pattern Where
-                                  , pattern MixfixVarColonEqual
-                                  , pattern InfixColonEqual
-                                  , pattern PrefixColon
-                                  , pattern MixfixArrowColonEqual
-                                  , pattern (:|>:)
-                                  )
+import Language.Verse.Rewrite.Exp
+  ( pattern List
+  , pattern Where
+  , pattern MixfixVarColonEqual
+  , pattern InfixColonEqual
+  , pattern PrefixColon
+  , pattern MixfixArrowColonEqual
+  , pattern (:|>:)
+  )
 import Language.Verse.Rewrite.Exp qualified as Rewrite
 
 type DesugarT m = StateT Env (ReaderT R m)
@@ -201,9 +203,11 @@ desugarExp'' e pi i = case extract e of
     pure $ i :=: (Name x <$ e)
   MixfixVarColonEqual x y e1 e2 -> do
     tellName x $ Var y
-    e1 <- desugarExp e1
+    e1 <- unify (name y) <$> desugarExp e1
     e2 <- desugarExp' e2 pi i
-    pure $ unify (Name <$> y) e1 :*>: unify (ArchetypeName <$> x) e2
+    ask >>= \ case
+      Exec -> pure $ e1 :*>: unify (ArchetypeName <$> x) e2
+      _ -> pure $ e1 :*>: e2
   InfixColonEqual funName x e -> do
     if funName then tellFunName x else tellName x Exists
     e <- desugarExp' e pi i

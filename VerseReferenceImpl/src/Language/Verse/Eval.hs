@@ -53,12 +53,13 @@ import Language.Verse.Loc (Loc, L, loc)
 import Language.Verse.Mode
 import Language.Verse.Name
 import Language.Verse.Val
-  ( Val
+  ( FrozenVal
+  , Named (..)
+  , Val
   , VarEnv
   , VarNamed
+  , VarRefVal
   , VarVal
-  , FrozenVal
-  , Named (..)
   , forVal_
   )
 import Language.Verse.Val qualified as Val
@@ -269,7 +270,7 @@ evalDot loc e x s s' = do
   var <- lift freshVar'
   fork' $ lift (readVar' var_e) >>= getNameEnv loc <&> HashMap.lookup x >>= \ case
     Nothing -> abort $ NameError loc x
-    Just x -> unify' loc var =<< lift (evalNamed' x s'' s')
+    Just x -> unify' loc var =<< evalNamed' loc x s'' s'
   pure var
 
 evalChoice
@@ -587,7 +588,7 @@ allocClass loc i env sup xs e = do
   let
     vars = vars_sup <> archetype'
     initClass archetype s s' = do
-      s'' <- lift $ freshS
+      s'' <- lift freshS
       _ <- local (\ r -> r { env = vars <> env, archetype, archetype' }) $ evalExp e  s s''
       initSup (archetype' <> archetype) s'' s'
   lift $ newVar' (Val.ClassInst i sup $ filterNames vars) <&> (, vars, initClass)
@@ -1101,20 +1102,9 @@ evalIdent
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-evalIdent x s s' = do
-  lift $ unifyEq s.choiceFree s'.choiceFree
-  lookupNamed (extract x) >>= \ case
-    Nothing -> abort $ IdentError (loc x) (extract x)
-    Just (Val var) -> lift $ do
-      unifyEq s.storeFree s'.storeFree
-      pure var
-    Just (Ref ref _) -> do
-      var <- lift freshVar'
-      fork' $ do
-        _ <- lift $ readVar s.storeFree
-        unify' (loc x) var . coerce =<< lift (readVarRef ref)
-        lift $ unifyEq s.storeFree s'.storeFree
-      pure var
+evalIdent x s s' = lookupNamed (extract x) >>= \ case
+  Nothing -> abort $ IdentError (loc x) (extract x)
+  Just y -> evalNamed (loc x) y s s'
 
 evalNamed
   :: MonadEval m
@@ -1123,37 +1113,45 @@ evalNamed
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-evalNamed loc x s s' = do
-  lift $ unifyEq s.choiceFree s'.choiceFree
-  case x of
-    Val var -> lift $ do
-      unifyEq s.storeFree s'.storeFree
-      pure var
-    Ref ref _ -> do
-      var <- lift freshVar'
-      fork' $ do
-        _ <- lift $ readVar s.storeFree
-        unify' loc var . coerce =<< lift (readVarRef ref)
-        lift $ unifyEq s.storeFree s'.storeFree
-      pure var
+evalNamed loc x s s' = case x of
+  Val var -> lift $ unifyS s s' $> var
+  Ref ref var -> do
+    var' <- lift freshVar'
+    fork' $ unify' loc var' =<< readRef' loc ref var s s'
+    pure var'
 
 evalNamed'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => VarNamed m
+  :: MonadEval m
+  => Loc
+  -> VarNamed m
   -> S m
   -> S m
-  -> VerseT m (VarVal m)
-evalNamed' x s s' = do
-  unifyEq s.choiceFree s'.choiceFree
-  case x of
-    Val var -> do
-      unifyEq s.storeFree s'.storeFree
-      pure var
-    Ref ref _ -> do
-      _ <- readVar s.storeFree
-      x <- coerce <$> readVarRef ref
-      unifyEq s.storeFree s'.storeFree
-      pure x
+  -> EvalT m (VarVal m)
+evalNamed' loc x s s' = case x of
+  Val var -> lift $ unifyS s s' $> var
+  Ref ref var -> readRef' loc ref var s s'
+
+readRef'
+  :: MonadEval m
+  => Loc
+  -> VarRefVal m
+  -> VarVal m
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+readRef' loc ref var s s' = do
+  lift $ unifyEq s.choiceFree s'.choiceFree
+  _ <- lift $ readVar s.storeFree
+  x <- asks (.mode) >>= \ case
+    Execution -> lift $ coerce <$> readVarRef ref
+    Verification -> do
+      i <- lift $ newVar' Val.Any
+      lift . readIVar <=< assume' . local (\ r -> r { assumed = True }) $ do
+        s <- lift newS
+        s' <- lift freshS
+        invoke loc var i s s'
+  lift $ unifyEq s.storeFree s'.storeFree
+  pure x
 
 evalExpList
   :: MonadEval m
