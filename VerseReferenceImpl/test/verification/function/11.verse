@@ -1,2 +1,3 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-all{X:any} = all{1}
+F(0):int = 1
+F(0):int = 2

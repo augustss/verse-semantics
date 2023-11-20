@@ -9,6 +9,7 @@ module Language.Verse.Desugar.Exp
   , unify
   , verify
   , succeeds
+  , decides
   , assume
   , forall'
   , bracketInvoke
@@ -89,6 +90,7 @@ instance ( Pretty (f (Exp f a))
     Not e -> "not" <+> parens (pretty e)
     Verify e -> "verify" <+> braces (pretty e)
     Succeeds e -> "succeeds" <+> braces (pretty e)
+    Decides e -> "decides" <+> braces (pretty e)
     Assume e -> "assume" <+> braces (pretty e)
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
@@ -146,6 +148,9 @@ verify = liftL1 Verify
 
 succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
 succeeds = liftL1 Succeeds
+
+decides :: Functor f => f (Exp f a) -> f (Exp f a)
+decides = liftL1 Decides
 
 assume :: Functor f => f (Exp f a) -> f (Exp f a)
 assume = liftL1 Assume

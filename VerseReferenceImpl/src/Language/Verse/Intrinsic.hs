@@ -20,6 +20,7 @@ data Intrinsic
   | Multiply
   | Divide
   | To
+  | Any
   | Int
   | Float
   | Function
@@ -38,6 +39,7 @@ toString = \ case
   Multiply -> "operator'*'"
   Divide -> "operator'/'"
   To -> "operator'..'"
+  Any -> "any"
   Int -> "int"
   Float -> "float"
   Function -> "function"

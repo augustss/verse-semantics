@@ -1,2 +1,2 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-all{X:any} = all{1}
+F(X := 2|2) := X

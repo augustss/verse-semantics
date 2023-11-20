@@ -841,6 +841,7 @@ invokeIntrinsic loc = \ case
   Intrinsic.Multiply -> liftPrim $ lift . liftNum (*)
   Intrinsic.Divide -> liftPrim $ lift . div'
   Intrinsic.To -> to
+  Intrinsic.Any -> liftPrim $ lift . any
   Intrinsic.Int -> liftPrim $ int loc
   Intrinsic.Float -> liftPrim $ float loc
   Intrinsic.Function -> liftPrim $ function loc
@@ -1034,6 +1035,13 @@ getInt = \ case
   Val.Int x -> pure x
   _ -> empty
 
+any
+  :: MonadEval m
+  => VarVal m -> VerseT m (DomMatch m)
+any var = domMatch_' $ do
+  fork . void $ readVar' var
+  pure var
+
 int
   :: MonadEval m
   => Loc -> VarVal m -> EvalT m (DomMatch m)
@@ -1208,6 +1216,7 @@ newEnv = execWriterT $ do
   tell' Intrinsic.Multiply
   tell' Intrinsic.Divide
   tell' Intrinsic.To
+  tell' Intrinsic.Any
   tell' Intrinsic.Int
   tell' Intrinsic.Float
   tell' Intrinsic.Function
