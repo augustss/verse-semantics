@@ -223,10 +223,8 @@ evalExp e = case extract e of
     Just (Ref ref var) -> do
       s'' <- lift freshS
       var_e <- evalExp e s s''
-      s''' <- lift freshS
-      var <- invoke (loc e) var var_e s'' s'''
-      writeVarRef' ref (coerce var) s''' s'
-      pure var
+      writeRef' (loc x) ref var var_e s'' s'
+      pure var_e
   Exp.Fun xs e_domain e -> \ s s' -> ask >>= \ r -> lift $ do
     unifyS s s'
     newVar' . Val.Overloads (Val.Fun r.env xs e_domain e) =<< freshVar'
@@ -1131,6 +1129,34 @@ evalNamed' loc x s s' = case x of
   Val var -> lift $ unifyS s s' $> var
   Ref ref var -> readRef' loc ref var s s'
 
+writeRef'
+  :: MonadEval m
+  => Loc
+  -> VarRefVal m
+  -> VarVal m
+  -> VarVal m
+  -> S m
+  -> S m
+  -> EvalT m ()
+writeRef' loc ref var x s s' = asks (.mode) >>= \ case
+  Execution -> do
+    s'' <- lift freshS
+    x <- invoke loc var x s s''
+    lift $ do
+      unifyEq s''.choiceFree s'.choiceFree
+      fork $ do
+        _ <- readVar s''.storeFree
+        writeVarRef ref $ coerce x
+        unifyEq s''.storeFree s'.storeFree
+  Verification -> do
+    s'' <- lift freshS
+    _ <- invoke loc var x s s''
+    lift $ do
+      unifyEq s''.choiceFree s'.choiceFree
+      fork $ do
+        _ <- readVar s''.storeFree
+        unifyEq s''.storeFree s'.storeFree
+
 readRef'
   :: MonadEval m
   => Loc
@@ -1234,20 +1260,6 @@ freshVarRef
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => VerseT m (VarRef m a)
 freshVarRef = newVarRef =<< freshVar
-
-writeVarRef'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
-  => VarRef m a
-  -> Var m a
-  -> S m
-  -> S m
-  -> EvalT m ()
-writeVarRef' ref x s s' = lift $ do
-  unifyEq s.choiceFree s'.choiceFree
-  fork $ do
-    _ <- readVar s.storeFree
-    writeVarRef ref x
-    unifyEq s.storeFree s'.storeFree
 
 unify'
   :: MonadEval m
