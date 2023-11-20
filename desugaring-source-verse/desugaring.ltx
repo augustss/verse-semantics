@@ -708,23 +708,21 @@ Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
 
 \begin{figure}[t]
   $$
-\begin{array}{l}
+\begin{array}{@@{}l}
 \mbox{\em Core Syntax} \\
-\begin{array}{lr@@{\;}c@@{\;}l@@{}l}
-      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e|  \vb |olam v ol| \\
-      \text{Open lambda} & ol & ::= & |arr (lam x e_1, lam y e_2)|   & \text{Domain and range}
+\begin{array}{@@{}lr@@{\;}c@@{\;}l@@{}l}
+      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e|  \vb |olam v (lam x e_1) (lam y e_2)| \\
 \end{array} \\[4mm]
 
 \mbox{\em Rewrite rules} \\
-\begin{array}{@@{\hskip0.5em} l r c l l}
-\rulename{u-olam}          & |olam v_1 ol_1 == olam v_2 ol_2| & \movesto & |def z (v_1 == olam z ol_2; v_2 == olam z ol_1| \\
-\rulename{app-olam} & |apply1N (olam g (arr (dom, rng))) v| & \movesto & \begin{array}[t]{@@{}l}
-  |if (x := dom^[v])| \\
-  |then inapplic g v; rng^[x]| \\
-  |else g^[v]|
-  \end{array} \\
-\rulename{inapplic1} & |inapplic (olam g (arr (dom,_))) v| & \movesto & |check fails (apply1N dom v); inapplic g v| \\
-\rulename{inapplic2} & |def g (E^[inapplic g v])| & \movesto & \multicolumn{2}{l}{|E^[arr ()]|  \hspace{4mm} \mbox{if $|g| \not\in \freevars{E}$} }
+\begin{array}{@@{} l r c l l}
+  \rulename{u-olam}          & \multicolumn{3}{l}{|olam v_1 dom_1 rng_1 == olam v_2 dom_2 rng_2|} \\
+  & \multicolumn{3}{l}{\hspace{5mm} \movesto |defKW z|.
+  \begin{array}[t]{l}
+        |v_1 == olam z ((lam i (x:=apply1N dom_2 i; check fails (apply1N dom_1 i); x))) rng_2;| \\
+        |v_2 == olam z ((lam i (x:=apply1N dom_1 i; check fails (apply1N dom_2 i); x))) rng_1;| \\
+   \end{array}} \\[5mm]
+\rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &  |if (x := apply1N dom v) then apply1N rng x else apply1N g v|
 \end{array}\\
 \\
 
@@ -733,8 +731,8 @@ Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
 \rulename{mofun}  & |DMe (inp f si) (functionOC open t_1 t_2)|
 & = & |olamKW| \left( \begin{array}{l}
     |f,| \\
-    \langle      |lam i (j := Me (inp i (flipsi si)) t_1; arr (j, x_1, dots, x_n)), | \\
-    \hspace{0.3em} |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \rangle \\
+    |lam i (j := Me (inp i (flipsi si)) t_1; arr (j, x_1, dots, x_n)), | \\
+    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
    \end{array} \right) \\
 && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
 \end{array}
@@ -896,23 +894,23 @@ ubiquitously useful that we include it in our syntax.
 
 Rule \rulename{u-olam} comes directly from rule \rulename{c-mutatate-ll} in Fig 10-13 of the extendded version of the extended version of ``The essence of ML type inference'' (Pottier and Remy) \url{http://cristal.inria.fr/attapl/}.
 
-Here is an example. Assume the function definitions are open:
-\lennart{Needs updating for new |olamKW|}
+Here is an example. Assume the function definitions are open.  To reduce clutter, this presentation omits the |check fails dom_i|
+part of \rulename{u-olam}, since it is just concerned with checking non-overlap.
 $$
 \begin{array}{ll}
   \multicolumn{2}{l}{|f^(x:int) := x+1; f^(x:float) := x*0.2; f^[2.4]|} \\[1mm]
   \movesto & \mbox{\{desugar\}} \\
   & |defhdr f| \begin{array}[t]{l}
-    |(f = def z_1 (olam z_1 (lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i]))));| \\
-    |(f = def z_2 (olam z_2 (lam (z i) (if (x:=float^[i]) then (x*0.2) else z ^ [i]))));| \\
+    |f = def z_1 (olam z_1 (lam i (apply1N int i)) (lam x (x+1)));| \\
+    |f = def z_2 (olam z_2 (lam i (apply1N float i)) (lam x (x*0.2)));| \\
     |f^[2.4]|
     \end{array} \\[10mm]
   \movesto & \mbox{\{substitute for f, and discard f\}} \\
   & |defhdr (z_1 z_2)| \begin{array}[t]{l}
-    |(olam z_1 (lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i])))| \\
-    \;\;\;\;|== (olam z_2 (lam (z i) (if (x:=float^[i]) then (x*0.2) else z ^ [i])));| \\
-    |(olam z_1 (lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i])))^[2.4]|
-    \end{array}\\[10mm]
+    |(olam z_1 (lam i (apply1N int i)) (lam x (x+1)))
+      == (olam z_2 (lam i (apply1N float i)) (lam x (x*0.2)));| \\
+    |(olam z_1 (lam i (apply1N int i)) (lam x (x+1)))^[2.4]|
+    \end{array}\\[6mm]
   \movesto & \mbox{\{\rulename{u-olam} and \rulename{app-olam}\}} \\
   & |defhdr (z_1 z_2 z_3)| \begin{array}[t]{l}
     |z_2 == (olam z_3 (lam (z i) (if (x:=int^[i]) then (x+1) else z ^ [i])))| \\

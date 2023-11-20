@@ -97,7 +97,7 @@
 %format apply1np (a) (b) = a "(" b ")"
 
 %% Function application with 1 argument, without parenthesis
-%format apply1N a b = a^ "[" b "]"
+%format apply1N a b = a^ "[\!" b "]"
 
 %% Function application with many arguments
 %format applyN a (b) = a "\langle" b "\rangle"
@@ -105,7 +105,7 @@
 %% ----------- End of Applications --------------
 
 %format space = "\hspace{0.3em}"
-%format olam (x) (y) = olamKW "(" x "," y ")"
+%format olam (x) (y) (z) = olamKW "(" x "," y "," z ")"
 %format olamKW = "\textbf{olam}"
 %format inapplic (x) (y) = "\textbf{inapplic}(" x "," y ")"
 
@@ -485,6 +485,11 @@
 %format v_m'
 %format v_x
 %format v_y
+
+%format dom_1
+%format dom_2
+%format rng_1
+%format rng_2
 
 %format he_1
 %format he_2
