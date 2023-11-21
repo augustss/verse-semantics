@@ -311,11 +311,8 @@ desugarFun
   -> DesugarT m (Exp L Ident)
 desugarFun loc e_domain e pi f = ask >>= \ case
   Exec -> desugarFunX loc e_domain e pi f
-  Given -> assumeFunM e_domain e pi
-  Prove -> do
-    e1 <- verifyFunM loc e_domain e pi f
-    e2 <- assumeFunM e_domain e pi
-    pure $ e1 :*>: L loc e2
+  Given -> givenFunM e_domain e
+  Prove -> proveFunM loc e_domain e pi f
 
 desugarFunX
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -336,6 +333,19 @@ desugarFunX loc' e1 e2 pi f = do
     unify z <$> invokeM j pi f `thenM`
     desugarExp' e2 pi z
   pure . function' loc' pi f $ Fun xs e1 e2
+
+proveFunM
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => Loc
+  -> L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> Bool
+  -> L (Exp L Ident)
+  -> DesugarT m (Exp L Ident)
+proveFunM loc e_domain e pi f = do
+  e1 <- verifyFunM loc e_domain e pi f
+  e2 <- assumeFunM e_domain e pi f
+  pure $ e1 :*>: L loc e2
 
 verifyFunM
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -358,8 +368,24 @@ assumeFunM
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> Bool
+  -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
-assumeFunM e1 e2 pi = do
+assumeFunM e1 e2 pi f = do
+  ((e1, j), xs) <- lift $ runDesugarT $ do
+    i <- name <$> freshIdent (loc e1)
+    j <- name <$> freshIdent (loc e1)
+    e1 <- proveM $ desugarExp' e1 True i
+    pure (unify j e1 `then'` i, j)
+  Fun xs e1 <$> exists do
+    z <- name <$> freshIdent (loc e2)
+    unify z <$> invokeM j pi f `thenM` givenM (desugarExp' e2 pi z)
+
+givenFunM
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> DesugarT m (Exp L Ident)
+givenFunM e1 e2 = do
   (e1, xs) <- lift $ runDesugarT $ do
     i <- name <$> freshIdent (loc e1)
     e1 <- proveM $ desugarExp' e1 True i
@@ -367,7 +393,7 @@ assumeFunM e1 e2 pi = do
   r <- freshIdent' $ loc e2
   Fun xs e1 . forall' r <$> assumeM do
     z <- name <$> freshIdent (loc e2)
-    unify (name r) <$> givenM (desugarExp' e2 pi z)
+    unify (name r) <$> givenM (desugarExp' e2 False z)
 
 givenM :: MonadReader R m => m a -> m a
 givenM = local (const Given)
