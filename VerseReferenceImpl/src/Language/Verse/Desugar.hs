@@ -51,12 +51,12 @@ type DesugarT m = StateT Env (ReaderT R m)
 
 type Env = IdentMap (Loc, Quantifier L Ident)
 
-data R = Exec | Given | Prove
+data R = Exec | Neg | Pos
 
 fromMode :: Mode -> R
 fromMode = \ case
   Execution -> Exec
-  Verification -> Prove
+  Verification -> Pos
 
 runDesugarT
   :: Functor m
@@ -82,8 +82,8 @@ desugar'
   -> DesugarT m (L (Exp L Ident))
 desugar' e = ask >>= \ case
   Exec -> desugarExp e
-  Prove -> verifyM . succeedsM $ proveM $ desugarExp e
-  Given -> desugarExp e
+  Pos -> verifyM . succeedsM $ posM $ desugarExp e
+  Neg -> desugarExp e
 
 desugarExp
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -230,14 +230,6 @@ desugarExp'' e pi i = case extract e of
   e1 :|>: e2 ->
     desugarOfType e1 e2 pi i
 
-valM
-  :: Functor m
-  => f (Exp f a)
-  -> (b -> f (Exp f a))
-  -> m b
-  -> m (Exp f a)
-valM i f m = (i :=:) . f <$> m
-
 desugarNonEmpty
   :: (MonadAbort Error m, MonadSupply Label m)
   => Bool
@@ -281,25 +273,49 @@ desugarOfType
   -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
 desugarOfType e1 e2 pi x = ask >>= \ case
-  Exec -> do
-    y <- name <$> freshIdent (loc e1)
-    e1 <- desugarExp' e1 pi x
-    e2 <- desugarExp e2
-    pure $ unify y e1 :*>: bracketInvoke e2 y
-  Given -> do
-    z <- name <$> freshIdent (loc e2)
-    e2 <- unify z <$> desugarExp e2
-    r <- freshIdent' $ loc e2
-    e3 <- forall' r <$> assumeM (unify (name r) <$> prefixColonM z)
-    pure $ e2 :*>: e3
-  Prove -> do
-    y <- name <$> freshIdent (loc e1)
-    e1 <- unify y <$> desugarExp' e1 pi x
-    z <- name <$> freshIdent (loc e2)
-    e2 <- unify z <$> desugarExp e2
-    r <- freshIdent' $ loc e2
-    e3 <- forall' r <$> assumeM (unify (name r) <$> prefixColonM z)
-    pure $ e1 `then'` e2 `then'` verify (succeeds $ bracketInvoke z y) :*>: e3
+  Exec -> execOfType e1 e2 pi x
+  Neg -> negOfType e2
+  Pos -> posOfType e1 e2 pi x
+
+execOfType
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> Bool
+  -> L (Exp L Ident)
+  -> DesugarT m (Exp L Ident)
+execOfType e1 e2 pi x = do
+  y <- name <$> freshIdent (loc e1)
+  e1 <- desugarExp' e1 pi x
+  e2 <- desugarExp e2
+  pure $ unify y e1 :*>: bracketInvoke e2 y
+
+negOfType
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> DesugarT m (Exp L Ident)
+negOfType e2 = do
+  z <- name <$> freshIdent (loc e2)
+  e2 <- unify z <$> desugarExp e2
+  r <- freshIdent' $ loc e2
+  e3 <- forall' r <$> assumeM (unify (name r) <$> prefixColonM z)
+  pure $ e2 :*>: e3
+
+posOfType
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> Bool
+  -> L (Exp L Ident)
+  -> DesugarT m (Exp L Ident)
+posOfType e1 e2 pi x = do
+  y <- name <$> freshIdent (loc e1)
+  e1 <- unify y <$> desugarExp' e1 pi x
+  z <- name <$> freshIdent (loc e2)
+  e2 <- unify z <$> desugarExp e2
+  r <- freshIdent' $ loc e2
+  e3 <- forall' r <$> assumeM (unify (name r) <$> prefixColonM z)
+  pure $ e1 `then'` e2 `then'` verify (succeeds $ bracketInvoke z y) :*>: e3
 
 desugarFun
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -310,11 +326,11 @@ desugarFun
   -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
 desugarFun loc e_domain e pi f = ask >>= \ case
-  Exec -> desugarFunX loc e_domain e pi f
-  Given -> givenFunM e_domain e
-  Prove -> proveFunM loc e_domain e pi f
+  Exec -> execFun loc e_domain e pi f
+  Neg -> negFun e_domain e
+  Pos -> posFun loc e_domain e pi f
 
-desugarFunX
+execFun
   :: (MonadAbort Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
@@ -322,7 +338,7 @@ desugarFunX
   -> Bool
   -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
-desugarFunX loc' e1 e2 pi f = do
+execFun loc' e1 e2 pi f = do
   ((e1, j), xs) <- lift . runDesugarT $ do
     i <- name <$> freshIdent (loc e1)
     j <- name <$> freshIdent (loc e1)
@@ -334,7 +350,7 @@ desugarFunX loc' e1 e2 pi f = do
     desugarExp' e2 pi z
   pure . function' loc' pi f $ Fun xs e1 e2
 
-proveFunM
+posFun
   :: (MonadAbort Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
@@ -342,12 +358,12 @@ proveFunM
   -> Bool
   -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
-proveFunM loc e_domain e pi f = do
-  e1 <- verifyFunM loc e_domain e pi f
-  e2 <- assumeFunM e_domain e pi f
+posFun loc e_domain e pi f = do
+  e1 <- verifyPosFun loc e_domain e pi f
+  e2 <- assumePosFun e_domain e pi f
   pure $ e1 :*>: L loc e2
 
-verifyFunM
+verifyPosFun
   :: (MonadAbort Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
@@ -355,51 +371,76 @@ verifyFunM
   -> Bool
   -> L (Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
-verifyFunM loc' e1 e2 pi f = do
+verifyPosFun loc' e1 e2 pi f = do
   i <- freshIdent' $ loc e1
   functionM loc' pi f $ verifyM $ forall' i <$> do
     j <- name <$> freshIdent (loc e1)
-    unify j <$> givenM (desugarExp' e1 True (name i)) `thenM` succeedsM do
+    unify j <$> negM (desugarExp' e1 True (name i)) `thenM` succeedsM do
       z <- name <$> freshIdent (loc e1)
       unify z <$> invokeM j pi f `thenM` desugarExp' e2 pi z
 
-assumeFunM
+assumePosFun
   :: (MonadAbort Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> Bool
   -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
-assumeFunM e1 e2 pi f = do
+assumePosFun e1 e2 pi f = do
   ((e1, j), xs) <- lift $ runDesugarT $ do
     i <- name <$> freshIdent (loc e1)
     j <- name <$> freshIdent (loc e1)
-    e1 <- proveM $ desugarExp' e1 True i
+    e1 <- posM $ desugarExp' e1 True i
     pure (unify j e1 `then'` i, j)
   Fun xs e1 <$> exists do
     z <- name <$> freshIdent (loc e2)
-    unify z <$> invokeM j pi f `thenM` givenM (desugarExp' e2 pi z)
+    unify z <$> invokeM j pi f `thenM` negM (desugarExp' e2 pi z)
 
-givenFunM
+negFun
   :: (MonadAbort Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> DesugarT m (Exp L Ident)
-givenFunM e1 e2 = do
+negFun = assumeNegFun
+
+assumeNegFun
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> DesugarT m (Exp L Ident)
+assumeNegFun e1 e2 = do
   (e1, xs) <- lift $ runDesugarT $ do
     i <- name <$> freshIdent (loc e1)
-    e1 <- proveM $ desugarExp' e1 True i
+    e1 <- posM $ desugarExp' e1 True i
     pure $ e1 `then'` i
   r <- freshIdent' $ loc e2
   Fun xs e1 . forall' r <$> assumeM do
     z <- name <$> freshIdent (loc e2)
-    unify (name r) <$> givenM (desugarExp' e2 False z)
+    unify (name r) <$> negM (desugarExp' e2 False z)
 
-givenM :: MonadReader R m => m a -> m a
-givenM = local (const Given)
+valM
+  :: Functor m
+  => f (Exp f a)
+  -> (b -> f (Exp f a))
+  -> m b
+  -> m (Exp f a)
+valM i f m = (i :=:) . f <$> m
 
-proveM :: MonadReader R m => m a -> m a
-proveM = local (const Prove)
+invokeM
+  :: MonadSupply Label m
+  => L (Exp L Ident)
+  -> Bool
+  -> L (Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+invokeM x pi f = case pi of
+  False -> name <$> freshIdent (loc x <> loc f)
+  True -> pure $ bracketInvoke f x
+
+negM :: MonadReader R m => m a -> m a
+negM = local (const Neg)
+
+posM :: MonadReader R m => m a -> m a
+posM = local (const Pos)
 
 functionM
   :: Functor m
@@ -421,16 +462,6 @@ function'
 function' loc pi f e = case pi of
   False -> e
   True -> bracketInvoke (L loc $ Name "function") f :*>: L loc e
-
-invokeM
-  :: MonadSupply Label m
-  => L (Exp L Ident)
-  -> Bool
-  -> L (Exp L Ident)
-  -> DesugarT m (L (Exp L Ident))
-invokeM x pi f = case pi of
-  False -> name <$> freshIdent (loc x <> loc f)
-  True -> pure $ bracketInvoke f x
 
 prefixColonM
   :: MonadSupply Label m
