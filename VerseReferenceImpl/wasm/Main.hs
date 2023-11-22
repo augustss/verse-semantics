@@ -26,6 +26,7 @@ import Foreign.Storable
 import Language.Verse qualified as Verse
 import Language.Verse.Error
 import Language.Verse.Mode
+import Language.Verse.Val (FrozenVal)
 
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -49,15 +50,12 @@ eval inPtr n outPtrPtr =
     pure n
 
 eval' :: ByteString -> IO Text
-eval' xs = catch' $ eval'' xs <&> \ case
-  Left e -> renderStrict . layoutSmart layoutOptions $ pretty e
-  Right xs -> renderStrict . layoutSmart layoutOptions $ vsep xs
+eval' xs = catch' $ eval'' xs <&> renderStrict . layoutSmart layoutOptions . \ case
+  Left e -> pretty e
+  Right xs -> vsep $ pretty <$> xs
 
-eval'' :: ByteString -> IO (Either Error [Doc ann])
-eval'' = runExceptT . runSupplyT . runVerseT . Verse.eval2' "<web page>" Execution >=> \ case
-  Right (Just xs) -> pure . Right $ pretty <$> xs
-  Right Nothing -> pure $ Left StuckError
-  Left e -> pure $ Left e
+eval'' :: ByteString -> IO (Either Error [FrozenVal])
+eval'' = runExceptT . runSupplyT . Verse.eval2 "<web page>"
 
 catch' :: IO Text -> IO Text
 catch' m = m `catch` \ (_ :: SomeException) ->
