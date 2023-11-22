@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Language.Verse
   ( eval
+  , eval2
   , eval'
   , eval2'
   ) where
@@ -43,6 +44,21 @@ eval xs = do
   whenNothingM (runVerseT $ Eval.eval Execution e2) $
     abort StuckError
 
+eval2 :: ( MonadAbort Error m
+         , MonadFix m
+         , MonadRef m
+         , MonadSupply Label m
+         , EqRef (Ref m)
+         ) => String -> ByteString -> m [FrozenVal]
+eval2 path xs = do
+  (e1, e2) <- liftEither $ runSupplyT $ do
+    e <- rewrite =<< lift (P2.parse2 path xs)
+    (,) <$> desugar Verification e <*> desugar Execution e
+  whenNothingM_ (runVerseT . Eval.eval Verification . verify $ succeeds e1) $
+    abort StuckError
+  whenNothingM (runVerseT $ Eval.eval Execution e2) $
+    abort StuckError
+
 eval' :: ( MonadAbort Error m
          , MonadFix m
          , MonadRef m
@@ -52,7 +68,6 @@ eval' :: ( MonadAbort Error m
 eval' mode =
   Eval.eval mode <=<
   liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< runLexer P.parse)
-
 
 eval2' :: ( MonadAbort Error m
           , MonadFix m
