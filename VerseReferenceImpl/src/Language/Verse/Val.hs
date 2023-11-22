@@ -55,6 +55,7 @@ data Val ref a
   | Char {-# UNPACK #-} !Word8
   | AnyChar32
   | Char32 {-# UNPACK #-} !Char
+  | Path [Name]
   | Truth a
   | Tuple [a]
   | Ptr (ref (Val ref a)) a
@@ -113,6 +114,7 @@ forVal_ x f = case x of
   Char _ -> pure ()
   AnyChar32 -> pure ()
   Char32 _ -> pure ()
+  Path _ -> pure ()
   Truth x -> void $ f x
   Tuple xs -> for_ xs f
   Ptr _ x -> void $ f x
@@ -142,6 +144,7 @@ instance Freshenable a m => Freshenable (Val f a) m where
     Char _ -> pure x
     AnyChar32 -> pure x
     Char32 _ -> pure x
+    Path _ -> pure x
     Truth x -> Truth <$> freshen x
     Tuple xs -> Tuple <$> for xs freshen
     Ptr ref x -> Ptr ref <$> freshen x
@@ -183,6 +186,7 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
     Char x -> pure $ Char x
     AnyChar32 -> pure AnyChar32
     Char32 x -> pure $ Char32 x
+    Path x -> pure $ Path x
     Truth x -> Truth <$> freeze x
     Tuple xs -> Tuple <$> for xs freeze
     Ptr ref x -> Ptr <$> freeze ref <*> freeze x
@@ -221,6 +225,7 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
     Char x -> "'" <> pretty (w2c x) <> "'"
     AnyChar32 -> "char32" <> lbracket <> pretty '_' <> rbracket
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
+    Path xs ->  prettyPath xs
     Truth x -> align $ "truth" <> group (braces $ pretty x)
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs
@@ -266,6 +271,7 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
     OLam {} -> "function"
     Intrinsic {} -> "function"
     where
+      prettyPath xs = foldr ( \ a b -> "/" <> pretty a <> b ) mempty xs
       prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
         align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
       tupled =
