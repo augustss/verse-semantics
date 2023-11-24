@@ -199,6 +199,10 @@ desugarExp'' e pi i = case extract e of
     pure $ i :=: (Int x <$ e)
   Rewrite.Float x ->
     pure $ i :=: (Float x <$ e)
+  Rewrite.Char x ->
+    pure $ i :=: (Char x <$ e)
+  Rewrite.Char32 x ->
+    pure $ i :=: (Char32 x <$ e)
   Rewrite.Name x ->
     pure $ i :=: (Name x <$ e)
   MixfixVarColonEqual x y e1 e2 -> do

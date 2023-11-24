@@ -286,11 +286,11 @@ pUnits = do
 pNumT :: Parser (L (Exp Name))
 pNumT =
   (pos <* match '0' >>= \ p1 ->
-                          (fixHexChar p1 <$ match 'u' <*> fromTo 1 6 pHex <*> pos <* P.notFollowedBy pAlnum -- HACK accept all 6 digits hex nuumbers, not only 0-10ffff
+                          (fixHexChar Exp.Char32 p1 <$ match 'u' <*> fromTo 1 6 pHex <*> pos <* P.notFollowedBy pAlnum -- HACK accept all 6 digits hex nuumbers, not only 0-10ffff
                            <?>
                             ("a hex number in the range 0-10ffff after '0u' for character literal at " ++ toStr p1))
                           <|>
-                          (fixHexChar p1 <$ match 'o' <*> fromTo 1 2 pHex <*> pos <* P.notFollowedBy pAlnum
+                          (fixHexChar Exp.Char p1 <$ match 'o' <*> fromTo 1 2 pHex <*> pos <* P.notFollowedBy pAlnum
                             <?>
                            ("a hex number in the range 0-ff after '0o' for character literal at " ++ toStr p1))
                          <|>
@@ -327,9 +327,9 @@ pNumT =
    qExpToWords Nothing = []
    qExpToWords (Just (sgn, es)) = map c2w ['e', sgn] ++ es
 
-   fixHexChar :: PPos.SourcePos -> [Word8] -> PPos.SourcePos -> L (Exp Name)
-   fixHexChar p1 ws p2 =
-     L (toLoc p1 p2) $ Exp.Char $ Char.chr $ fst $ head $ readHex $ map w2c ws
+   fixHexChar :: (Char->Exp Name) -> PPos.SourcePos -> [Word8] -> PPos.SourcePos -> L (Exp Name)
+   fixHexChar c p1 ws p2 =
+     L (toLoc p1 p2) $ c $ Char.chr $ fst $ head $ readHex $ map w2c ws
 
    addUnits Nothing e = e
    addUnits (Just u) e = Exp.Units e <$> duplicate u
@@ -489,7 +489,7 @@ pStringRest =
   return []
 
 pStringChar :: Parser Char
-pStringChar = w2c <$> satisfy (not . (`Text.elem` "\\{}\"") . w2c)
+pStringChar = P.notFollowedBy (match '"' <|> match '{') *> pPrintable'
 
 
 -- Content   :=     {Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text}

@@ -7,6 +7,9 @@ module Language.Verse.Rewrite.Exp
   ) where
 
 import Language.Verse.Name
+import Data.Char
+import Data.Text(Text)
+import Numeric (showHex)
 
 import Prettyprinter
 
@@ -41,6 +44,8 @@ data Exp f a
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
+  | Char {-# UNPACK #-} !Char
+  | Char32 {-# UNPACK #-} !Char
   | Fun (f (Exp f a)) (f (Exp f a))
   | MixfixVarColonEqual (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | InfixColonEqual !Bool (f a) (f (Exp f a))
@@ -51,11 +56,13 @@ data Exp f a
   | f (Exp f a) :|>: f (Exp f a)
 
 deriving instance ( Show (f (Exp f a))
+                  , Show (f Text)
                   , Show (f a)
                   , Show a
                   ) => Show (Exp f a)
 
 instance ( Pretty (f (Exp f a))
+         , Pretty (f Text)
          , Pretty (f a)
          , Pretty a
          ) => Pretty (Exp f a) where
@@ -83,6 +90,8 @@ instance ( Pretty (f (Exp f a))
     Tuple es -> tupled $ pretty <$> es
     Int x -> pretty x
     Float x -> pretty x
+    Char x -> "'" <> pretty x <> "'"  -- FIXME add escape
+    Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Fun e1 e2 -> "fun" <> parens (pretty e1) <+> braces (pretty e2)
     MixfixVarColonEqual x y e1 e2 ->
       "var" <+> pretty x <> colon <>

@@ -19,12 +19,16 @@ import Data.Function
 import Data.Functor
 import Data.Functor.Apply
 import Data.Traversable
+import Data.Text.Encoding qualified as Text
+import Data.ByteString qualified as ByteString
+import Data.ByteString.Internal(w2c)
 
 import Language.Verse.Error
 import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
-import Language.Verse.Loc (L (..))
+import Language.Verse.Loc(L(..), Loc(..), loc)
+import Language.Verse.Pos(Pos(..))
 import Language.Verse.Name
 import Language.Verse.Parse.Exp
   ( pattern (:<>:)
@@ -57,7 +61,7 @@ import Language.Verse.Parse.Exp
 import Language.Verse.Parse.Exp qualified as Parse
 import Language.Verse.Rewrite.Exp
 
-import Prelude (Maybe (..), Show (..), String, (==), (++), map, snd)
+import Prelude (Maybe (..), Show (..), String, (==), (++), map, snd, (+), zip)
 
 rewrite
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -227,6 +231,16 @@ rewriteExp e = for e $ \ case
     pure $ Int x
   Parse.Float x ->
     pure $ Float x
+  Parse.Char x ->
+    pure $ Char x
+  Parse.Char32 x ->
+    pure $ Char32 x
+  Parse.String txt [] ->
+    case loc e of
+      Loc p _ ->
+        pure $ Tuple $ map (\ (i,x) -> L (Loc p{column = column p + i} p{column = column p + i + 1}) (Char $ w2c x)) $ zip [1..] $ ByteString.unpack $ Text.encodeUtf8 txt
+  e@(Parse.String _txt _txts) ->
+    notImplemented "rewriteExp on string with {}" e
   Parse.InfixColonEqual (expToPat -> Just p) e ->
     rewriteDef p =<< rewriteExp e
   Parse.Fun e1 e2 ->

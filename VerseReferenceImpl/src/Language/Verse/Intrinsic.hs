@@ -23,6 +23,8 @@ data Intrinsic
   | Any
   | Int
   | Float
+  | Char
+  | Char32
   | Function
   | Query deriving (Show, Eq)
 
@@ -42,6 +44,8 @@ toString = \ case
   Any -> "any"
   Int -> "int"
   Float -> "float"
+  Char -> "char"
+  Char32 -> "char32"
   Function -> "function"
   Query -> "postfix'?'"
 

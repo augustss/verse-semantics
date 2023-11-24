@@ -21,6 +21,9 @@ module Language.Verse.Val
 
 import Control.Monad.Verse (Var, VarRef, Freezable (..), Freshenable (..))
 
+import Data.Char
+import Data.Word
+import Data.Maybe(isJust, fromJust)
 import Data.Fix
 import Data.Foldable (for_)
 import Data.Functor
@@ -30,6 +33,9 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Ratio
 import Data.Traversable
+import Data.ByteString qualified as ByteString
+import Data.ByteString.Internal(c2w)
+import Data.Text.Encoding qualified as Text
 
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
@@ -38,6 +44,7 @@ import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
 
+import Numeric (showHex)
 import Prettyprinter
 
 data Val ref a
@@ -49,6 +56,10 @@ data Val ref a
   | Int !Integer
   | AnyFloat
   | Float {-# UNPACK #-} !Double
+  | AnyChar
+  | Char {-# UNPACK #-} !Char
+  | AnyChar32
+  | Char32 {-# UNPACK #-} !Char
   | Truth a
   | Tuple [a]
   | Module {-# UNPACK #-} !Label !(Env Name ref a)
@@ -69,6 +80,10 @@ forVal_ x f = case x of
   Int _ -> pure ()
   AnyFloat -> pure ()
   Float _ -> pure ()
+  AnyChar -> pure ()
+  Char _ -> pure ()
+  AnyChar32 -> pure ()
+  Char32 _ -> pure ()
   Truth x -> void $ f x
   Tuple xs -> for_ xs f
   Module _ env -> forEnv_ env f
@@ -95,6 +110,10 @@ instance Freshenable a m => Freshenable (Val f a) m where
     Int _ -> pure x
     AnyFloat -> pure x
     Float _ -> pure x
+    AnyChar -> pure x
+    Char _ -> pure x
+    AnyChar32 -> pure x
+    Char32 _ -> pure x
     Truth x -> Truth <$> freshen x
     Tuple xs -> Tuple <$> for xs freshen
     Module i xs -> Module i <$> for xs freshen
@@ -117,6 +136,10 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
     Int x -> pure $ Int x
     AnyFloat -> pure AnyFloat
     Float x -> pure $ Float x
+    AnyChar -> pure AnyChar
+    Char x -> pure $ Char x
+    AnyChar32 -> pure AnyChar32
+    Char32 x -> pure $ Char32 x
     Truth x -> Truth <$> freeze x
     Tuple xs -> Tuple <$> for xs freeze
     Module i xs -> Module i <$> for xs freeze
@@ -127,7 +150,29 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
     AnyOverloads -> pure AnyOverloads
     Overloads x xs -> Overloads <$> freeze x <*> freeze xs
 
-instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
+
+class Hack a where
+  maybeChar :: a -> Maybe Word8
+
+instance Hack (f (Fix f)) => Hack (Fix f) where
+  maybeChar = maybeChar . getFix
+
+instance Hack (f (g a)) => Hack (Compose f g a) where
+  maybeChar = maybeChar . getCompose
+
+instance Hack a => Hack (Maybe a) where
+  maybeChar Nothing = Nothing
+  maybeChar (Just x) = maybeChar x
+
+instance Hack (Val ref a) where
+  maybeChar = \ case
+    Char x -> Just (c2w x)
+--    Char32 x -> Just x
+    _ -> Nothing
+
+
+
+instance (Hack a, Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
   pretty = \ case
     Any -> "any"
     Comparable -> "comparable"
@@ -138,11 +183,22 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
     Int x -> pretty x
     AnyFloat -> "float" <> lbracket <> pretty '_' <> rbracket
     Float x -> pretty x
+    AnyChar -> "char" <> lbracket <> pretty '_' <> rbracket
+    Char x -> "'" <> pretty x <> "'"
+    AnyChar32 -> "char32" <> lbracket <> pretty '_' <> rbracket
+    Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Truth x -> align $ "truth" <> group (braces $ pretty x)
     AnyOverloads -> "function"
     Overloads {} -> "function"
     Tuple [] -> "false"
-    Tuple xs -> tupled $ pretty <$> xs
+    Tuple xs ->
+      let qChar = map maybeChar xs
+      in if all isJust qChar then
+        case Text.decodeUtf8' $ ByteString.pack $ map fromJust qChar of
+          Left _err -> tupled $ pretty <$> xs
+          Right txt -> "\"" <> pretty txt <> "\""
+         else
+          tupled $ pretty <$> xs
     Module i xs ->
       align $
       "module#" <>

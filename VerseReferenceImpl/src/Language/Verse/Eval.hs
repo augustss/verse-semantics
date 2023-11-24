@@ -68,6 +68,7 @@ import Prelude
   ( Double
   , Integer
   , Num (..)
+  , Enum(..)
   , Fractional (..)
   , fromRational
   , isNaN
@@ -244,6 +245,12 @@ evalExp e = case extract e of
   Exp.Float x -> \ s s' -> lift $ do
     unifyS s s'
     newVar' $ Val.Float x
+  Exp.Char x -> \ s s' -> lift $ do
+    unifyS s s'
+    newVar' $ Val.Char x
+  Exp.Char32 x -> \ s s' -> lift $ do
+    unifyS s s'
+    newVar' $ Val.Char32 x
   Exp.Name x ->
     evalIdent $ x <$ e
   Exp.IfArchetypeName x y e1 e2 -> \ s s' ->
@@ -844,6 +851,8 @@ invokeIntrinsic loc = \ case
   Intrinsic.Any -> liftPrim $ lift . any
   Intrinsic.Int -> liftPrim $ int loc
   Intrinsic.Float -> liftPrim $ float loc
+  Intrinsic.Char -> liftPrim $ char loc
+  Intrinsic.Char32 -> liftPrim $ char32 loc
   Intrinsic.Function -> liftPrim $ function loc
   Intrinsic.Query -> liftPrim $ query loc
 
@@ -868,6 +877,10 @@ liftOrd f var = readPair var >>= \ case
     (Val.Float x, Val.Int y) -> domMatch_' $ guard (f x (fromInteger y)) $> var_x
     (Val.Float x, Val.Float y) -> domMatch_' $ guard (f x y) $> var_x
     (Val.Float _, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.Char x, Val.Char y) -> domMatch_' $ guard (f x y) $> var_x
+    (Val.Char _, Val.AnyChar) -> domMatch_' $ decide $> var_x
+    (Val.Char32 x, Val.Char32 y) -> domMatch_' $ guard (f x y) $> var_x
+    (Val.Char32 _, Val.AnyChar32) -> domMatch_' $ decide $> var_x
     _ -> empty
   _ -> empty
 
@@ -995,21 +1008,23 @@ to
   -> EvalT m (DomMatch m)
 to var s s' = lift $ readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Int val1, Int val2) -> domMatch_' $ to' val1 val2 s s'
+    (Int val1, Int val2) -> domMatch_' $ to' Val.Int val1 val2 s s'
+    (Val.Char val1, Val.Char val2) -> domMatch_' $ to' Val.Char val1 val2 s s'
+    (Val.Char32 val1, Val.Char32 val2) -> domMatch_' $ to' Val.Char32 val1 val2 s s'
     _ -> empty
   _ -> empty
 
-to'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
-  => Integer
-  -> Integer
-  -> S m
-  -> S m
-  -> VerseT m (VarVal m)
-to' val1 val2 s s' = do
+to' :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m), Enum a)
+    => (a -> f (Fix (Compose (Var m) f)))
+    -> a
+    -> a
+    -> S m
+    -> S m
+    -> VerseT m (Fix (Compose (Var m) f))
+to' c val1 val2 s s' = do
   unifyEq s.storeFree s'.storeFree
   _ <- readVar s.choiceFree
-  var <- foldr (\ x z -> newVar' (Val.Int x) <|> z) empty [val1 .. val2]
+  var <- foldr (\ x z -> newVar' (c x) <|> z) empty [val1 .. val2]
   unifyEq s.choiceFree s'.choiceFree
   pure var
 
@@ -1065,6 +1080,29 @@ float loc var = domMatch_ $ do
     Val.Float _ -> pure ()
     _ -> empty
   pure var
+
+char
+  :: MonadEval m
+  => Loc -> VarVal m -> EvalT m (DomMatch m)
+char loc var = domMatch_ $ do
+  fork' $ lift (readVar' var) >>= \ case
+    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyChar)
+    Val.AnyChar -> pure ()
+    Val.Char _ -> pure ()
+    _ -> empty
+  pure var
+
+char32
+  :: MonadEval m
+  => Loc -> VarVal m -> EvalT m (DomMatch m)
+char32 loc var = domMatch_ $ do
+  fork' $ lift (readVar' var) >>= \ case
+    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyChar32)
+    Val.AnyChar32 -> pure ()
+    Val.Char32 _ -> pure ()
+    _ -> empty
+  pure var
+
 
 function
   :: MonadEval m
@@ -1219,6 +1257,8 @@ newEnv = execWriterT $ do
   tell' Intrinsic.Any
   tell' Intrinsic.Int
   tell' Intrinsic.Float
+  tell' Intrinsic.Char
+  tell' Intrinsic.Char32
   tell' Intrinsic.Function
   tell' Intrinsic.Query
   where
@@ -1332,6 +1372,16 @@ match loc x y = ask >>= \ r -> case (x, y) of
   (Val.Float _, Val.AnyFloat) -> pure (LE, pure ())
   (Val.Float x, Val.Float y) ->
     guard (eqFloat x y) $> (SEQ, pure ())
+  (Val.AnyChar, Val.AnyChar) -> pure (LE, pure ())
+  (Val.AnyChar, Val.Char _) -> pure (GE, pure ())
+  (Val.Char _, Val.AnyChar) -> pure (LE, pure ())
+  (Val.Char x, Val.Char y) ->
+    guard (x == y) $> (SEQ, pure ())
+  (Val.AnyChar32, Val.AnyChar32) -> pure (LE, pure ())
+  (Val.AnyChar32, Val.Char32 _) -> pure (GE, pure ())
+  (Val.Char32 _, Val.AnyChar32) -> pure (LE, pure ())
+  (Val.Char32 x, Val.Char32 y) ->
+    guard (x == y) $> (SEQ, pure ())
   (Val.Truth x, Val.Truth y) -> pure . (SEQ,) $ unify' loc x y
   (Val.Tuple xs, Val.Tuple ys) -> pure . (SEQ,) $ unifyList loc xs ys
   (Val.Enum i xs xs', Val.Enum j ys ys') -> guard (i == j) $> (SEQ,) do

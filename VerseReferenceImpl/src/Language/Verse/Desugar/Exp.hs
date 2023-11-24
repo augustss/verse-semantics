@@ -18,9 +18,11 @@ module Language.Verse.Desugar.Exp
   , then'
   ) where
 
+import Data.Char(ord)
 import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Numeric(showHex)
 
 import Language.Verse.Label
 import Language.Verse.Name
@@ -55,6 +57,8 @@ data Exp f a
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
+  | Char {-# UNPACK #-} !Char
+  | Char32 {-# UNPACK #-} !Char
   | Fun !(Env f a) (f (Exp f a)) (f (Exp f a))
   | Name a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
@@ -109,6 +113,8 @@ instance ( Pretty (f (Exp f a))
     Truth e -> "truth" <+> braces (pretty e)
     Int x -> pretty x
     Float x -> pretty x
+    Char x -> "'" <> pretty x <> "'"  -- FIXME add escape
+    Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Fun xs e1 e2 ->
       "fun" <> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
     Name x -> pretty x
