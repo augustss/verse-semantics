@@ -879,8 +879,10 @@ liftOrd f var = readPair var >>= \ case
     (Val.Float _, AnyNumber) -> domMatch_' $ decide $> var_x
     (Val.Char x, Val.Char y) -> domMatch_' $ guard (f x y) $> var_x
     (Val.Char _, Val.AnyChar) -> domMatch_' $ decide $> var_x
+    (Val.AnyChar, Val.Char _) -> domMatch_' $ decide $> var_x
     (Val.Char32 x, Val.Char32 y) -> domMatch_' $ guard (f x y) $> var_x
     (Val.Char32 _, Val.AnyChar32) -> domMatch_' $ decide $> var_x
+    (Val.AnyChar32, Val.Char32 _) -> domMatch_' $ decide $> var_x
     _ -> empty
   _ -> empty
 

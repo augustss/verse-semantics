@@ -15,13 +15,13 @@ import Control.Monad.Abort
 import Control.Monad.Supply
 
 import Data.Bool
+import Data.ByteString qualified as ByteString
+import Data.ByteString.Internal(c2w)
 import Data.Function
 import Data.Functor
 import Data.Functor.Apply
-import Data.Traversable
 import Data.Text.Encoding qualified as Text
-import Data.ByteString qualified as ByteString
-import Data.ByteString.Internal(w2c)
+import Data.Traversable
 
 import Language.Verse.Error
 import Language.Verse.Ident (Ident)
@@ -232,13 +232,13 @@ rewriteExp e = for e $ \ case
   Parse.Float x ->
     pure $ Float x
   Parse.Char x ->
-    pure $ Char x
+    pure $ Char $ c2w x
   Parse.Char32 x ->
     pure $ Char32 x
   Parse.String txt [] ->
     case loc e of
       Loc p _ ->
-        pure $ Tuple $ map (\ (i,x) -> L (Loc p{column = column p + i} p{column = column p + i + 1}) (Char $ w2c x)) $ zip [1..] $ ByteString.unpack $ Text.encodeUtf8 txt
+        pure $ Tuple $ map (\ (i,x) -> L (Loc p{column = column p + i} p{column = column p + i + 1}) (Char x)) $ zip [1..] $ ByteString.unpack $ Text.encodeUtf8 txt
   e@(Parse.String _txt _txts) ->
     notImplemented "rewriteExp on string with {}" e
   Parse.InfixColonEqual (expToPat -> Just p) e ->
