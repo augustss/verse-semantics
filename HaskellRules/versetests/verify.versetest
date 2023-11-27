@@ -133,5 +133,20 @@ verify(pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEP
 # subtyping (passes, but apparently, should be rejected!)
 verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }
 
-# currently fails, as we need a way to swap x = 2 over x = x.
+# TODO: we need a way to swap x = 2 over x = x.
 verify(pass) { main(:any) := { x := x; x = 2 } }
+verify(pass) { a := (_,_) => a=(_,_) }
+
+verify(pass) { main(:any) := { if(a:=1|2){a=1} } }  # TODO:IF:CHOICE
+verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
+verify(pass) {x:int => f():type{x=0} => {x=0;f[]}}  # TODO: SWAP assume over verify
+verify(pass) {x:int => f():type{x=0} => {f[],x=0}}  #TODO:TYPEWOES:OK
+verify(pass) {x:int => f():type{x=0} => {x=0,f[]}}  #TODO:TYPEWOES:FAILS
+
+verify(pass) {a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
+verify(pass) {a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
+verify(pass) {a:int => b:any => f(a   ):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
+verify(pass) {a:int => b:any => f(a   ):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
+verify(pass) {a:=(1;2;),a=(1,2)}		#FP:10.4:DESUGARING?
+verify(pass) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
+verify(pass) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}			#FP:10.4:CHECK:DESUGAR

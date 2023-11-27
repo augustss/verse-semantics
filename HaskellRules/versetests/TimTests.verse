@@ -2504,30 +2504,30 @@ test(D00){a&b:int => {x:=b,if(x=a){1}else{2},x=a}}  # decidable; assumes and suc
 #
 
 # Conditions with choice.
-test(S00){if(a:=1|2){a=1}}
+test(S00){TRS_main() := if(a:=1|2){a=1}}			#FP:10.4:IF:CHOICE
 test(F00){if(a:=1|2){a=2}}
 test(F00){x:int => if(x=1|2){x=1}}
 test(F00){x:int => if(x=1|2){x=2}}
 test(F00){x:int => if(x=1|2){x=3}}
-test(S00){x:int => if(x=1|2){if{x=1}else{x=2}}}
-test(S00){x:int => if(x=1|2){x=1 or x=2}}
-test(S00){x:int => if(x=1|2){x=1 or x=3 or x=2}}
+test(S00){x:int => if(x=1|2){if{x=1}else{x=2}}}		#FP:10.4:IF:CHOICE
+test(S00){x:int => if(x=1|2){x=1 or x=2}}			#FP:10.4:IF:CHOICE
+test(S00){x:int => if(x=1|2){x=1 or x=3 or x=2}}	#FP:10.4:IF:CHOICE
 test(F00){x:int => if(x=1|3|2){x=1 or x=2}}
 
 # Context promotion recognition.
-test(S00){x:int => f():type{x=2} => {first{x=2},f[]}}
-test(S00){x:int => f():type{x=2} => {first{x=2},if{f[]}}}
+test(S00){x:int => f():type{x=2} => {first{x=2},f[]}}		#FP:10.4:FIRST:FALSE:x=fail
+test(S00){x:int => f():type{x=2} => {first{x=2},if{f[]}}} 	#FP:10.4:FIRST:FALSE:x=fail
 
 # Conditional stops.
-test(S00){x:int => f():type{x=0} => {if(x=0){1}else if(x=1){2}else{3}=1,f[]}}
+test(S00){x:int => f():type{x=0} => {if(x=0){1}else if(x=1){2}else{3}=1,f[]}}		#FP:10.4:TYPEWOES
 test(F00){x:int => f():type{x=1} => {if(x=0){1}else if(x=1){2}else{3}=1,f[]}}
 test(F00){x:int => f():type{x=2} => {if(x=0){1}else if(x=1){2}else{3}=9,f[]}}
 test(F00){x:int => f():type{x=0} => {if(x=0){1}else if(x=1){2}else{3}=2,f[]}}
-test(S00){x:int => f():type{x=1} => {if(x=0){1}else if(x=1){2}else{3}=2,f[]}}
+test(S00){x:int => f():type{x=1} => {if(x=0){1}else if(x=1){2}else{3}=2,f[]}}		#FP:10.4:TYPEWOES
 test(F00){x:int => f():type{x=2} => {if(x=0){1}else if(x=1){2}else{3}=2,f[]}}
 test(F00){x:int => f():type{x=0} => {if(x=0){1}else if(x=1){2}else{3}=3,f[]}}
 test(F00){x:int => f():type{x=1} => {if(x=0){1}else if(x=1){2}else{3}=3,f[]}}
-test(S00){x:int => f():type{x=2} => {if(x=0){1}else if(x=1){2}else{3}=3,f[]}}
+test(S00){x:int => f():type{x=2} => {if(x=0){1}else if(x=1){2}else{3}=3,f[]}}		#FP:10.4:TYPEWOES
 
 # Function verification held <abstracts> until verified to hide lost notification problem.
 test(D00){a:int => f():=a=3}
@@ -2535,14 +2535,14 @@ test(D00){a&b:int => if{a=3,f():=b=4}}
 test(D00){x:int=>if{x=3,f():=x=3}} # Was S00 before UncommittableNegotiable.
 test(S00){f(if{c=1}):=8,c:=7}
 test(U00){a:any=>{f(if{c=1}):=8,c:=a}}	#TODO:10.4:WHY???
-test(S00){if{f(if{c=1}):=8},c:=7,c=7}
-test(S00){if{f(if{c=1}):=8},c:=7}
+test(S00){TRS_main() := if{f(if{c=1}):=8},c:=7,c=7}
+test(S00){TRS_main() := if{f(if{c=1}):=8},c:=7}
 test(S00){g(9):=8,f(9 where for{x:=1}):=8,f[9],-1}
 
 # Function range verification failure.
 test(F00){f():false}
-test(S00){if(f():=1){1}else{2}=1}
-test(F00){if(f():false){1}else{2}}
+test(S00){TRS_main() := if(f():=1){1}else{2}=1}
+test(F00){TRS_main() := if(f():false){1}else{2}}
 
 # Function specifier allowance.
 test(S00){f(0)<invariant>:=1}
@@ -2579,9 +2579,9 @@ test(U00){x:=assume{:any},x=3}						#TODO:10.4:ASSUME
 
 # Consider information parity and soundness.
 test(S00){a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}
-test(S00){a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}
+test(S00){a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
 test(S00){a:int => b:any => f(a   ):type{a=b} => {f[a],a=b}}
-test(S00){a:int => b:any => f(a   ):type{a=b} => {a=b,f[a]}}
+test(S00){a:int => b:any => f(a   ):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
 test(U00){a:int => b:any => f(:int):type{a=b} => f[a=b]}
 test(U00){a:int => b:any => f(a):type{a=b} => f[a=b]}
 test(S00){b:any => f(x:any):type{int[x]} => {f[b],int[b]}}
@@ -2602,41 +2602,41 @@ test(R00){g:=assume<decides>{f(:int):int},g[3]} # Assumes by convention.
 # Conditions and assumptions.
 test(D00){a:int => {a=3,if{a=3}}}
 test(D00){a:int => {if{a=3},a=3}}
-test(S00){a&b:int => f():type{a=b} => {if{a=b} else f[]}}
+test(S00){a&b:int => f():type{a=b} => {if{a=b} else f[]}}			#FP:10.4:OK
 #!!!!test(S00){a&b:int => f():type{a=b} => {if{a=b,f[]} else f[],a=b}}
 #!!!!test(S00){a&b:int => f():type{a=b} => {if{f[],a=b} else f[],a=b}}
 test(D00){a&b:int => f():type{a=b} => {if{a=b} else f[],a=b}} # Could be S00
 test(D00){a&b:int => f():type{a=b} => {a=b,if{a=b} else f[]}} # Could be S00
 
 # operator'or'.
-test(S00){1 or 2}
-test(S00){(1 or 2)=1}
-test(F00){(1 or 2)=2}
-test(S00){:false or 2}
-test(F00){(:false or 2)=1}
-test(S00){(:false or 2)=2}
-test(F00){(:false)or(:false)}
+test(S00){TRS_main() := 1 or 2}
+test(S00){TRS_main() := (1 or 2)=1}
+test(F00){TRS_main() := (1 or 2)=2}
+test(S00){TRS_main() := :false or 2}			#FP:10.4:FALSE:x=fail:ASSUME-FAIL
+test(F00){TRS_main() := (:false or 2)=1}
+test(S00){TRS_main() := (:false or 2)=2}		#FP:10.4:FALSE:x=fail:ASSUME-FAIL
+test(F00){TRS_main() := (:false)or(:false)}
 
 # Find.
-test(S00){first{3}=3}
+test(S00){TRS_main() := first{3}=3}
 test(F00){first{3=4}}
 test(F00){first{3}=4}
-test(S00){first(x:=1|2){x+1}=2}
+test(S00){TRS_main() := first(x:=1|2){x+1}=2}	#FP:10.4:FIRST:FALSE:x=fail
 test(F00){first(x:=1|2){x+1}=3}
 
 # Conditions and reachability, synchronous and asynchronous.
-test(S00){if(1){2}else{3}}
-test(S00){if(1=2){2}else{3}}
-test(S00){if(1){2}else{3=4}}
-test(S00){if(1=2){2=3}else{3}}
-test(S00){if(1){2}else{3}=2}
-test(F00){if(1){2}else{3}=3}
-test(S00){if(1=2){2}else{3}=3}
-test(F00){if(1=2){2}else{3}=2}
-test(S00){if(x=1){2}else{3}=2,x:=1}
-test(F00){if(x=1){2}else{3}=3,x:=1}
-test(S00){if(x=2){2}else{3}=3,x:=1}
-test(F00){if(x=2){2}else{3}=2,x:=1}
+test(S00){TRS_main() := if(1){2}else{3}}
+test(S00){TRS_main() := if(1=2){2}else{3}}
+test(S00){TRS_main() := if(1){2}else{3=4}}
+test(S00){TRS_main() := if(1=2){2=3}else{3}}
+test(S00){TRS_main() := if(1){2}else{3}=2}
+test(F00){TRS_main() := if(1){2}else{3}=3}
+test(S00){TRS_main() := if(1=2){2}else{3}=3}
+test(F00){TRS_main() := if(1=2){2}else{3}=2}
+test(S00){TRS_main() := {if(x=1){2}else{3}=2,x:=1}}		#FP:10.4:SWAP:IF
+test(F00){TRS_main() := {if(x=1){2}else{3}=3,x:=1}}
+test(S00){TRS_main() := {if(x=2){2}else{3}=3,x:=1}}		#FP:10.4:SWAP:IF
+test(F00){TRS_main() := {if(x=2){2}else{3}=2,x:=1}}
 test(D00){a&b    :int => {if{a=b}     else {},a=b}}
 test(D00){a&b&c&d:int => {if{a=b,c=d} else {},a=b}}
 test(D00){a&b&c&d:int => {if{a=b}     else {},a=b,c=d}}
@@ -2645,7 +2645,7 @@ test(D00){a&b&c&d:int => {if{a=b}     else {},a=b,c=d}}
 test(D00){a&b:int => {if{a=b},a=b}}
 test(D00){a&b:int => {a=b,if{a=b}}}
 
-# Decidable condition confluence.
+# Decidable condition confluence.												#FP:10.4:TYPEWOES
 test(S00){x  :int => f():type{x=1} => {    if(x=1){}                }}
 test(S00){x  :int => f():type{x=1} => {f[],if(x=1){}                }}
 test(S00){x  :int => f():type{x=1} => {    if(x=1){}            ,f[]}}
@@ -2664,15 +2664,15 @@ test(S00){x&y:int => f():type{x=y} => {    if(x=y){}else{:false},f[]}}
 
 # Conditions and assumptions.
 test(D00){x:int => f():type{x=1} => {x=1    }}
-test(S00){x:int => f():type{x=1} => {x=1,f[]}}
+test(S00){x:int => f():type{x=1} => {x=1,f[]}}		#FP:10.4:TYPEWOES:DUPLICATE
 
 # Dependent conditions.
-test(S00){x:int => {i:=if(x=1){2}else{3},if{i=2}}}
+test(S00){x:int => {i:=if(x=1){2}else{3},if{i=2}}}	#FP:10.4:OK
 
 # Conditional promote-assuming.
-test(S00){a:int => if{a=1}}
-test(S00){a:int => if(x:=a=1){x}}
-test(S00){a&b:int => if{a=b}}
+test(S00){a:int => if{a=1}}					#FP:10.4:OK
+test(S00){a:int => if(x:=a=1){x}}			#FP:10.4:OK
+test(S00){a&b:int => if{a=b}}				#FP:10.4:OK
 test(D00){a&b:int => a=b where if{a=b}}
 
 # Decidable conditions.
@@ -2685,9 +2685,9 @@ test(F00){f(x:int):=if(x=1){1}else{2}=2}
 test(F00){f(x:int):=if(x=10){20}else{30}=30}
 test(S00){f(x:int):=nat[if(x=1){1}else{2}]}
 test(S00){a:=1|2 => if(a=1){a=1}}
-test(S00){a:=1|2 => if(a=1){a=1}else{not a=1}} # S00 because exact.
+test(S00){a:=1|2 => if(a=1){a=1}else{not a=1}} #FP:10.4:x=fail # S00 because exact.
 test(S00){a:=1|2 => if(a=1){a=1}else{a=2}}  # Same.
-test(S00){a:=1|2 => if{a=1}else{a=2}}       # Same.
+test(S00){a:=1|2 => if{a=1}else{a=2}}    #FP:10.4:OK   # Same.
 
 # Domain decidability.
 test(D00){a&b:int => f(a):=9 => {a=b,f[b]}}
@@ -2744,7 +2744,7 @@ test(S00){a:=(1),a=1}
 test(S00){a:=(1;),a=1}
 test(S00){a:=(1,2),a=(1,2)}
 test(S00){a:=(1,2;),a=(1,2)}
-test(S00){a:=(1;2;),a=(1,2)}
+test(S00){a:=(1;2;),a=(1,2)}		#FP:10.4:DESUGARING?
 test(S00){for(0){1}=array{1}}
 test(S00){for(0|1){3,4}=((3,4),(3,4))}
 test(S00){let(){2,3}=(2,3)}
@@ -2784,17 +2784,17 @@ test(F00){f:=function(){2;3;},f()=2}
 test(S00){Length(for{array{2,4,6}[i:int]=4})=1}
 test(S00){Length(for{array{2,4,6}[i:int]=5})=0}
 test(S00){Length(for{array{2,4,6}[a:any]=5})=0}
-test(S00){if{i where array{2,4,6}[i:int]=4}=1}
+test(S00){TRS_main() := {if{i where array{2,4,6}[i:int]=4}=1}}	#FP:10.4:IF:CHOICE
 
 # Decidable conditions that later succeed.
-test(S00){a:int => f():type{a=3} => {if(a=3) then 123 else :false, f()}}
+test(S00){a:int => f():type{a=3} => {if(a=3) then 123 else :false, f()}} #FP:10.4:TYPEWOES
 test(F00){a:int => f():type{a=3} => {if(a=4) then 123 else :false, f()}}
 test(F00){a:int => f():type{a=3} => {if(a=3) then :false else 123, f()}}
-test(S00){a:int => f():type{a=3} => {if(a=4) then :false else 123, f()}}
+test(S00){a:int => f():type{a=3} => {if(a=4) then :false else 123, f()}} #FP:10.4:TYPEWOES
 
 # Dependence on parent domain resolves effect.
 test(P00){f(x:int):=x => f(:int)=3}
-test(S00){a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}
+test(S00){a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
 test(A00){f(:int):int => {x:=f[x],if(int[x]) then assume{x=3}}}
 
 # Allow.
@@ -2824,12 +2824,12 @@ test(A00){if{x:=nat[y],y:=nat[x]}}
 
 # Interesting conditions.
 test(S00){a:int => f(x:int):int => f(a)}
-test(S00){a:int => f(3):int => f[:int]}
-test(S00){a:int => g(:nat):int => f(x:int):int => if{f[g[a]]}}
+test(S00){a:int => f(3):int => f[:int]}							#FP:10.4:SWAP:ISINT
+test(S00){a:int => g(:nat):int => f(x:int):int => if{f[g[a]]}}	#FP:10.4:OK
 
 # Unify macro.
-test(S00){a:=operator'='{}}
-test(S00){a:=operator'='{2},a=2}
+test(S00){a:=operator'='{}}				#TODO:FP:10.4:DESUGAR:MACRO
+test(S00){a:=operator'='{2},a=2}		#TODO:FP:10.4:DESUGAR:MACRO
 test(F00){a:=operator'='{2},a=3}
 
 # Various.
@@ -2842,8 +2842,8 @@ test(F00){x:int => if(x=1|2){x=1}}
 test(F00){x:int => if(x=1|2){x=2}}
 test(F00){x:int => if(x=1|2){x=3}}
 test(F00){x:int => if(x=1|3|2){x=1 or x=2}}
-test(S00){x:int => f():type{x=1} => {    if(x=2){:false}else{},f[]}}
-test(S00){x:int => f():type{x=1} => {    if(x=2){:false}else{},f[]}}
+test(S00){x:int => f():type{x=1} => {    if(x=2){:false}else{},f[]}}	#FP:10.4:TYPEWOES
+test(S00){x:int => f():type{x=1} => {    if(x=2){:false}else{},f[]}}	#FP:10.4:TYPEWOES
 test(F00){a:int => f():type{a=1} => {a=2,f[]}}
 
 # Array heads.
@@ -2864,7 +2864,7 @@ test(D00){a:int => (10,20)=(10,a)}
 test(U00){a:any => (10,20)=(10,a)}
 test(F00){(10,20)=(11,20)}
 test(F00){(10,20)=(10,21)}
-test(S00){as:=(:int,:int) => bs:=(11,21) => as(0)=bs(0) => as(0)=bs(0)}
+test(S00){as:=(:int,:int) => bs:=(11,21) => as(0)=bs(0) => as(0)=bs(0)}		#FP:10.4:OK
 test(D00){as:=(:int,:int) => bs:=(11,21) => as(0)=bs(0) => as(1)=bs(1)}
 test(S00){as:=(:int,:int) => bs:=(11,21) => as=bs => as=bs}
 test(S00){as:=(:int,:int) => bs:=(11,21) => as=bs => as(0)=bs(0)}
@@ -2940,7 +2940,7 @@ test(F00){function(-3){4}[3]}
 test(S00){function(let(1){2}){4}[2]}
 test(F00){function(let(1){2}){4}[3]}
 test(S00){a:=2,function(a){3}[2]=3}
-test(S00){function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}
+test(S00){function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}			#FP:10.4:CHECK:DESUGAR
 test(S00){function(for(x:=3|4){5}){6}[5,5]=6}
 test(S00){function(for(x:=3|4){x+1}){7}[4,5]=7}
 test(S00){function(for{3|4}){8}[3,4]}
