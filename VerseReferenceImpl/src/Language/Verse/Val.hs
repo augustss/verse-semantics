@@ -21,6 +21,9 @@ module Language.Verse.Val
 
 import Control.Monad.Verse (Var, VarRef, Freezable (..), Freshenable (..))
 
+import Data.ByteString qualified as ByteString
+import Data.ByteString.Internal(c2w, w2c)
+import Data.Char
 import Data.Fix
 import Data.Foldable (for_)
 import Data.Functor
@@ -28,8 +31,12 @@ import Data.Functor.Compose
 import Data.Functor.Compose.Instances ()
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Data.Maybe(isJust, fromJust)
 import Data.Ratio
+import Data.Text.Encoding qualified as Text
 import Data.Traversable
+import Data.Word
+import Data.Word (Word8)
 
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
@@ -38,6 +45,7 @@ import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Name
 
+import Numeric (showHex)
 import Prettyprinter
 
 data Val ref a
@@ -49,6 +57,10 @@ data Val ref a
   | Int !Integer
   | AnyFloat
   | Float {-# UNPACK #-} !Double
+  | AnyChar
+  | Char {-# UNPACK #-} !Word8
+  | AnyChar32
+  | Char32 {-# UNPACK #-} !Char
   | Truth a
   | Tuple [a]
   | Module {-# UNPACK #-} !Label !(Env Name ref a)
@@ -69,6 +81,10 @@ forVal_ x f = case x of
   Int _ -> pure ()
   AnyFloat -> pure ()
   Float _ -> pure ()
+  AnyChar -> pure ()
+  Char _ -> pure ()
+  AnyChar32 -> pure ()
+  Char32 _ -> pure ()
   Truth x -> void $ f x
   Tuple xs -> for_ xs f
   Module _ env -> forEnv_ env f
@@ -95,6 +111,10 @@ instance Freshenable a m => Freshenable (Val f a) m where
     Int _ -> pure x
     AnyFloat -> pure x
     Float _ -> pure x
+    AnyChar -> pure x
+    Char _ -> pure x
+    AnyChar32 -> pure x
+    Char32 _ -> pure x
     Truth x -> Truth <$> freshen x
     Tuple xs -> Tuple <$> for xs freshen
     Module i xs -> Module i <$> for xs freshen
@@ -117,6 +137,10 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
     Int x -> pure $ Int x
     AnyFloat -> pure AnyFloat
     Float x -> pure $ Float x
+    AnyChar -> pure AnyChar
+    Char x -> pure $ Char x
+    AnyChar32 -> pure AnyChar32
+    Char32 x -> pure $ Char32 x
     Truth x -> Truth <$> freeze x
     Tuple xs -> Tuple <$> for xs freeze
     Module i xs -> Module i <$> for xs freeze
@@ -126,6 +150,7 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
     ClassInst i x xs -> ClassInst i <$> for x freeze <*> for xs freeze
     AnyOverloads -> pure AnyOverloads
     Overloads x xs -> Overloads <$> freeze x <*> freeze xs
+
 
 instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
   pretty = \ case
@@ -138,6 +163,10 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
     Int x -> pretty x
     AnyFloat -> "float" <> lbracket <> pretty '_' <> rbracket
     Float x -> pretty x
+    AnyChar -> "char" <> lbracket <> pretty '_' <> rbracket
+    Char x -> "'" <> pretty (w2c x) <> "'"
+    AnyChar32 -> "char32" <> lbracket <> pretty '_' <> rbracket
+    Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Truth x -> align $ "truth" <> group (braces $ pretty x)
     AnyOverloads -> "function"
     Overloads {} -> "function"

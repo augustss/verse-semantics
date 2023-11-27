@@ -10,7 +10,9 @@ import Control.Monad.Supply
 import Data.ByteString qualified as ByteString
 import Data.ByteString(ByteString)
 import Data.List(sort, find, isSuffixOf)
+import Language.Verse.Desugar qualified as D
 import Language.Verse.Lexer
+import Language.Verse.Mode
 import Language.Verse.Parse qualified as P
 import Language.Verse.Parse2  qualified as P2
 import Language.Verse.Rewrite qualified as R
@@ -32,7 +34,8 @@ data Options = Options {
   progress :: Bool,
   verbose :: Bool,
   useShow :: Bool,
-  skiplist :: [(String, String)]
+  skiplist :: [(String, String)],
+  mode :: Mode
   }
 
 noOptions :: Options
@@ -42,7 +45,8 @@ noOptions = Options {
   progress = False,
   verbose = False,
   useShow = False,
-  skiplist = []
+  skiplist = [],
+  mode = Execution
   }
 
 
@@ -53,12 +57,16 @@ parser _ contents = runLexer P.parse contents
 parser2 :: String -> ByteString -> Either Error (L (Exp Name))
 parser2 path contents = P2.parse2 path contents
 
--- only parse or path and rewrite
+-- how much to do, parse, rewrite, desugar
 parse :: Options -> FilePath -> ByteString -> IO ()
 parse options path contents = report options path $ getParser options path contents
 
 rewrite :: Options -> FilePath -> ByteString -> IO ()
 rewrite options path contents = report options path $ liftEither . (runSupplyT . R.rewrite <=< getParser options path) $ contents
+
+desugar :: Options -> FilePath -> ByteString -> IO ()
+desugar options path contents = report options path $ liftEither . (runSupplyT . (D.desugar (mode options) <=< R.rewrite) <=< getParser options path) $ contents
+
 
 -- generic reporter for the result
 report :: (Show a, Pretty a) => Options -> FilePath -> Either Error a -> IO ()
@@ -112,6 +120,9 @@ extractFlags options ("--skiplist":path:paths) = do
   extractFlags options{ skiplist = sl } paths
 extractFlags options ("--new":paths)       = extractFlags options{ getParser = parser2 } paths
 extractFlags options ("--old":paths)       = extractFlags options{ getParser = parser } paths
+extractFlags options ("--desugar":paths)  = extractFlags options{ getWorker = desugar } paths
+extractFlags options ("--desugar-verification":paths) = extractFlags options{ getWorker = desugar, mode = Verification } paths
+extractFlags options ("--desugar-execution":paths) = extractFlags options{ getWorker = desugar, mode = Execution } paths
 extractFlags options (flag@('-':_):paths)  =  do
   hPutStrLn stderr $ "Ignoring unknown flag '" ++ flag ++ "'"
   extractFlags options paths

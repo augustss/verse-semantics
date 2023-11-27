@@ -20,6 +20,7 @@ import Data.Maybe
 import Data.Monoid (mempty)
 import Data.Text(Text)
 import Language.Verse.Loc(L(..))
+import Numeric (showHex)
 
 import Prelude (Double, Integer, foldr, error, (++), show)
 import Prettyprinter ( Pretty (..)
@@ -71,6 +72,7 @@ data Exp a
   | Break
   | Catch (L (Exp a)) (L (Exp a))
   | Char {-# UNPACK #-} !Char
+  | Char32 {-# UNPACK #-} !Char
   | Class (Maybe (L (Exp a))) (L (Exp a))
   | Continue
   | Do (L (Exp a)) (L (Exp a))
@@ -281,6 +283,7 @@ instance ( Pretty a
     True -> "true"
     False -> "false"
     Char x -> "'" <> pretty x <> "'"  -- FIXME add escape
+    Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Int x -> pretty x
     Float x -> pretty x
     Units e u -> pretty e <> pretty u

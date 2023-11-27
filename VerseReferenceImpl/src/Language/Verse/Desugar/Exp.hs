@@ -9,7 +9,6 @@ module Language.Verse.Desugar.Exp
   , unify
   , verify
   , succeeds
-  , decides
   , assume
   , forall'
   , bracketInvoke
@@ -18,9 +17,13 @@ module Language.Verse.Desugar.Exp
   , then'
   ) where
 
+import Data.ByteString.Internal(w2c)
+import Data.Char(ord)
 import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Data.Word (Word8)
+import Numeric(showHex)
 
 import Language.Verse.Label
 import Language.Verse.Name
@@ -55,6 +58,8 @@ data Exp f a
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
+  | Char {-# UNPACK #-} !Word8
+  | Char32 {-# UNPACK #-} !Char
   | Fun !(Env f a) (f (Exp f a)) (f (Exp f a))
   | Name a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
@@ -90,7 +95,6 @@ instance ( Pretty (f (Exp f a))
     Not e -> "not" <+> parens (pretty e)
     Verify e -> "verify" <+> braces (pretty e)
     Succeeds e -> "succeeds" <+> braces (pretty e)
-    Decides e -> "decides" <+> braces (pretty e)
     Assume e -> "assume" <+> braces (pretty e)
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
@@ -109,6 +113,8 @@ instance ( Pretty (f (Exp f a))
     Truth e -> "truth" <+> braces (pretty e)
     Int x -> pretty x
     Float x -> pretty x
+    Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape
+    Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Fun xs e1 e2 ->
       "fun" <> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
     Name x -> pretty x
@@ -148,9 +154,6 @@ verify = liftL1 Verify
 
 succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
 succeeds = liftL1 Succeeds
-
-decides :: Functor f => f (Exp f a) -> f (Exp f a)
-decides = liftL1 Decides
 
 assume :: Functor f => f (Exp f a) -> f (Exp f a)
 assume = liftL1 Assume
