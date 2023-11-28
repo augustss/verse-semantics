@@ -304,8 +304,7 @@ negOfType e2 = do
   z <- name <$> freshIdent (loc e2)
   e2 <- unify z <$> desugarExp e2
   r <- freshIdent' $ loc e2
-  e3 <- forall' r <$> assumeM (unify (name r) <$> prefixColonM z)
-  pure $ e2 :*>: e3
+  pure $ e2 :*>: forall' r (assume $ bracketInvoke z (name r))
 
 posOfType
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -320,8 +319,11 @@ posOfType e1 e2 pi x = do
   z <- name <$> freshIdent (loc e2)
   e2 <- unify z <$> desugarExp e2
   r <- freshIdent' $ loc e2
-  e3 <- forall' r <$> assumeM (unify (name r) <$> prefixColonM z)
-  pure $ e1 `then'` e2 `then'` verify (succeeds $ bracketInvoke z y) :*>: e3
+  pure $
+    e1 `then'`
+    e2 `then'`
+    verify (succeeds $ bracketInvoke z y) :*>:
+    forall' r (assume $ bracketInvoke z (name r))
 
 desugarLam
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -399,9 +401,7 @@ assumeNegLam e1 e2 = do
     name <$> freshIdent (loc e1) >>= \ j ->
     freshIdent' (loc e2) >>= \ r ->
     unify j <$> posM (desugarExp' e1 True (name i)) `thenM`
-    forall' r <$> assumeM do
-      z <- name <$> freshIdent (loc e2)
-      unify (name r) <$> negM (desugarExp' e2 False z)
+    forall' r <$> assumeM (negM $ desugarExp' e2 False (name r))
 
 desugarOLam
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -484,9 +484,7 @@ assumeNegOLam e1 e2 = do
     e1 <- posM $ desugarExp' e1 True i
     pure $ e1 `then'` i
   r <- freshIdent' $ loc e2
-  OLam xs e1 . forall' r <$> assumeM do
-    z <- name <$> freshIdent (loc e2)
-    unify (name r) <$> negM (desugarExp' e2 False z)
+  OLam xs e1 . forall' r <$> assumeM (negM $ desugarExp' e2 False (name r))
 
 verifyPosLam'
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -548,12 +546,6 @@ function'
 function' loc pi f e = case pi of
   False -> e
   True -> bracketInvoke (L loc $ Name "function") f :*>: L loc e
-
-prefixColonM
-  :: MonadSupply Label m
-  => L (Exp L Ident)
-  -> DesugarT m (L (Exp L Ident))
-prefixColonM e = bracketInvoke e . name <$> freshIdent (loc e)
 
 verifyM
   :: (MonadSupply Label m)
