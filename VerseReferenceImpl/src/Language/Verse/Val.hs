@@ -9,8 +9,6 @@ module Language.Verse.Val
   , VarVal
   , VarRefVal
   , FrozenVal
-  , Overload (..)
-  , forOverload_
   , Named (..)
   , VarNamed
   , forNamed_
@@ -21,8 +19,7 @@ module Language.Verse.Val
 
 import Control.Monad.Verse (Var, VarRef, Freezable (..), Freshenable (..))
 
-import Data.ByteString qualified as ByteString
-import Data.ByteString.Internal(c2w, w2c)
+import Data.ByteString.Internal (w2c)
 import Data.Char
 import Data.Fix
 import Data.Foldable (for_)
@@ -31,12 +28,9 @@ import Data.Functor.Compose
 import Data.Functor.Compose.Instances ()
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
-import Data.Maybe(isJust, fromJust)
 import Data.Ratio
-import Data.Text.Encoding qualified as Text
 import Data.Traversable
 import Data.Word
-import Data.Word (Word8)
 
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
@@ -63,13 +57,46 @@ data Val ref a
   | Char32 {-# UNPACK #-} !Char
   | Truth a
   | Tuple [a]
-  | Module {-# UNPACK #-} !Label !(Env Name ref a)
-  | Enum {-# UNPACK #-} !Label !(Env Name ref a) [a]
-  | EnumValue {-# UNPACK #-} !Label {-# UNPACK #-} !Name
-  | StructInst {-# UNPACK #-} !Label !(Env Name ref a)
-  | ClassInst {-# UNPACK #-} !Label !(Maybe a) !(Env Name ref a)
-  | AnyOverloads
-  | Overloads !(Overload ref a) a
+  | Module
+    {-# UNPACK #-} !Label
+    !(Env Name ref a)
+  | Enum
+    {-# UNPACK #-} !Label
+    !(Env Name ref a) [a]
+  | EnumValue
+    {-# UNPACK #-} !Label
+    {-# UNPACK #-} !Name
+  | Struct
+    {-# UNPACK #-} !Label
+    !(Env Ident ref a)
+    !(Desugar.Env L Ident)
+    !Exp
+  | StructInst
+    {-# UNPACK #-}
+    !Label
+    !(Env Name ref a)
+  | Class
+    {-# UNPACK #-} !Label
+    !(Env Ident ref a)
+    !(Maybe a)
+    !(Desugar.Env L Ident)
+    !Exp
+  | ClassInst
+    {-# UNPACK #-} !Label
+    !(Maybe a)
+    !(Env Name ref a)
+  | Lam
+    !(Env Ident ref a)
+    !Ident
+    !Exp
+  | AnyOLam
+  | OLam
+    !(Env Ident ref a)
+    !(Desugar.Env L Ident)
+    !Exp
+    !Exp
+    a
+  | Intrinsic !Intrinsic a
 
 forVal_ :: Applicative m => Val ref a -> (a -> m b) -> m ()
 forVal_ x f = case x of
@@ -90,10 +117,14 @@ forVal_ x f = case x of
   Module _ env -> forEnv_ env f
   Enum _ env xs -> forEnv_ env f *> for_ xs f
   EnumValue {} -> pure ()
+  Struct _ env _ _ -> forEnv_ env f
   StructInst _ env -> forEnv_ env f
+  Class _ env sup _ _ -> forEnv_ env f *> for_ sup f
   ClassInst _ sup env -> for_ sup f *> forEnv_ env f
-  AnyOverloads -> pure ()
-  Overloads x xs -> forOverload_ x f *> void (f xs)
+  Lam env _ _ -> forEnv_ env f
+  AnyOLam -> pure ()
+  OLam _ _ _ _ tail -> void $ f tail
+  Intrinsic _ tail -> void $ f tail
 
 type VarVal m = Fix (Compose (Var m) (Val (VarRef m)))
 
@@ -117,13 +148,27 @@ instance Freshenable a m => Freshenable (Val f a) m where
     Char32 _ -> pure x
     Truth x -> Truth <$> freshen x
     Tuple xs -> Tuple <$> for xs freshen
-    Module i xs -> Module i <$> for xs freshen
-    Enum i xs xs' -> Enum i <$> for xs freshen <*> for xs' freshen
+    Module i env -> Module i <$> for env freshen
+    Enum i env xs -> Enum i <$> for env freshen <*> for xs freshen
     EnumValue {} -> pure x
-    StructInst i xs -> StructInst i <$> for xs freshen
-    ClassInst i x xs -> ClassInst i <$> for x freshen <*> for xs freshen
-    AnyOverloads -> pure x
-    Overloads x xs -> Overloads <$> freshen x <*> freshen xs
+    Struct i env xs e -> do
+      env <- for env freshen
+      pure $ Struct i env xs e
+    StructInst i env -> StructInst i <$> for env freshen
+    Class i env sup xs e -> do
+      env <- for env freshen
+      sup <- for sup freshen
+      pure $ Class i env sup xs e
+    ClassInst i sup env -> ClassInst i <$> for sup freshen <*> for env freshen
+    Lam env x e -> do
+      env <- for env freshen
+      pure $ Lam env x e
+    AnyOLam -> pure x
+    OLam env xs e1 e2 tail -> do
+      env <- freshen env
+      tail <- freshen tail
+      pure $ OLam env xs e1 e2 tail
+    Intrinsic i tail -> Intrinsic i <$> freshen tail
 
 instance ( Freezable (f (Val f a)) (g (Val g b)) m
          , Freezable a b m
@@ -143,13 +188,25 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
     Char32 x -> pure $ Char32 x
     Truth x -> Truth <$> freeze x
     Tuple xs -> Tuple <$> for xs freeze
-    Module i xs -> Module i <$> for xs freeze
-    Enum i xs xs' -> Enum i <$> for xs freeze <*> for xs' freeze
+    Module i env -> Module i <$> for env freeze
+    Enum i env xs -> Enum i <$> for env freeze <*> for xs freeze
     EnumValue i x -> pure $ EnumValue i x
-    StructInst i xs -> StructInst i <$> for xs freeze
-    ClassInst i x xs -> ClassInst i <$> for x freeze <*> for xs freeze
-    AnyOverloads -> pure AnyOverloads
-    Overloads x xs -> Overloads <$> freeze x <*> freeze xs
+    Struct i env xs e -> do
+      env <- for env freeze
+      pure $ Struct i env xs e
+    StructInst i env -> StructInst i <$> for env freeze
+    Class i env sup xs e -> do
+      env <- for env freeze
+      sup <- for sup freeze
+      pure $ Class i env sup xs e
+    ClassInst i sup env -> ClassInst i <$> for sup freeze <*> for env freeze
+    Lam env x e -> for env freeze <&> \ env -> Lam env x e
+    AnyOLam -> pure AnyOLam
+    OLam env xs e1 e2 tail -> do
+      env <- for env freeze
+      tail <- freeze tail
+      pure $ OLam env xs e1 e2 tail
+    Intrinsic i tail -> Intrinsic i <$> freeze tail
 
 
 instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
@@ -168,15 +225,13 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
     AnyChar32 -> "char32" <> lbracket <> pretty '_' <> rbracket
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Truth x -> align $ "truth" <> group (braces $ pretty x)
-    AnyOverloads -> "function"
-    Overloads {} -> "function"
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs
-    Module i xs ->
+    Module i env ->
       align $
       "module#" <>
       prettyLabel i <>
-      group (braced $ prettyNames xs)
+      group (braced $ prettyNames env)
     Enum i _ xs ->
       align $
       "enum#" <>
@@ -184,22 +239,34 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
       group (braced $ pretty <$> xs)
     EnumValue i x ->
       "enum#" <> prettyLabel i <> dot <> pretty x
-    StructInst i xs ->
+    Struct i _ _ _ ->
+      align $
+      "struct#" <>
+      prettyLabel i
+    StructInst i env ->
       align $
       "struct#" <>
       prettyLabel i <>
-      group (braced $ prettyNames xs)
-    ClassInst i Nothing xs ->
+      group (braced $ prettyNames env)
+    Class i _ _ _ _ ->
+      align $
+      "class#" <>
+      prettyLabel i
+    ClassInst i Nothing env ->
       align $
       "class#" <>
       prettyLabel i <>
-      group (braced $ prettyNames xs)
-    ClassInst i (Just x) xs ->
+      group (braced $ prettyNames env)
+    ClassInst i (Just x) env ->
       align $
       "class#" <>
       prettyLabel i <>
       parens (pretty x) <>
-      group (braced $ prettyNames xs)
+      group (braced $ prettyNames env)
+    Lam {} -> "function"
+    AnyOLam -> "function"
+    OLam {} -> "function"
+    Intrinsic {} -> "function"
     where
       prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
         align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
@@ -221,63 +288,7 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
 
-data Overload ref a
-  = Fun
-    !(Env Ident ref a)
-    !(Desugar.Env L Ident)
-    !Exp
-    !Exp
-  | Struct
-    {-# UNPACK #-} !Label
-    !(Env Ident ref a)
-    !(Desugar.Env L Ident)
-    !Exp
-  | Class
-    {-# UNPACK #-} !Label
-    !(Env Ident ref a)
-    !(Maybe a)
-    !(Desugar.Env L Ident)
-    !Exp
-  | Intrinsic !Intrinsic
-
 type Exp = L (Desugar.Exp L Ident)
-
-forOverload_ :: Applicative m => Overload ref a -> (a -> m b) -> m ()
-forOverload_ x f = case x of
-  Fun env _ _ _ -> forEnv_ env f
-  Struct _ env _ _ -> forEnv_ env f
-  Class _ env sup _ _ -> forEnv_ env f *> for_ sup f
-  Intrinsic _ -> pure ()
-
-instance Freshenable a m => Freshenable (Overload f a) m where
-  freshen x = case x of
-    Fun env xs e1 e2 -> do
-      env <- for env freshen
-      pure $ Fun env xs e1 e2
-    Struct i env xs e -> do
-      env <- for env freshen
-      pure $ Struct i env xs e
-    Class i env sup xs e -> do
-      env <- for env freshen
-      sup <- for sup freshen
-      pure $ Class i env sup xs e
-    Intrinsic _ -> pure x
-
-instance ( Freezable (f (Val f a)) (g (Val g b)) m
-         , Freezable a b m
-         ) => Freezable (Overload f a) (Overload g b) m where
-  freeze = \ case
-    Fun env xs e1 e2 -> do
-      env <- for env freeze
-      pure $ Fun env xs e1 e2
-    Struct i env xs e -> do
-      env <- for env freeze
-      pure $ Struct i env xs e
-    Class i env sup xs e -> do
-      env <- for env freeze
-      sup <- for sup freeze
-      pure $ Class i env sup xs e
-    Intrinsic x -> pure $ Intrinsic x
 
 data Named ref a
   = Val a

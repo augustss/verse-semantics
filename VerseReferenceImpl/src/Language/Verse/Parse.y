@@ -539,10 +539,10 @@ Def :: { L (Exp Name) }
 
 Fun :: { L (Exp Name) }
   : Def '=>' Fun {
-      Exp.Fun $1 $3 <\$ $1 <. $3
+      Exp.Lam $1 $3 <\$ $1 <. $3
     }
   | Def '=>' BraceInd {
-      Exp.Fun $1 $3 <\$ $1 <. $3
+      Exp.Lam $1 $3 <\$ $1 <. $3
     }
   | Def %shift {
       $1

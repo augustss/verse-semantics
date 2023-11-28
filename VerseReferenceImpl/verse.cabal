@@ -71,7 +71,7 @@ library
     unordered-containers >= 0.2.6.0,
     parsec >= 3.1.16.1
   hs-source-dirs: src
-  ghc-options: -Wall -Wno-name-shadowing
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 test-suite golden-files
@@ -89,7 +89,7 @@ test-suite golden-files
   hs-source-dirs: test
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall -Wno-name-shadowing
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 test-suite hunit
@@ -102,7 +102,7 @@ test-suite hunit
   hs-source-dirs: test
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall -Wno-name-shadowing
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 executable versei
@@ -116,7 +116,7 @@ executable versei
   hs-source-dirs: main
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall -Wno-name-shadowing
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 executable versewasm
@@ -133,7 +133,7 @@ executable versewasm
   if !flag(wasm)
     buildable: False
   ghc-options:
-    -Wall -Wno-name-shadowing
+    -Wall -Wno-name-shadowing -Werror
     -no-hs-main -optl-mexec-model=reactor
     "-optl-Wl,--export=malloc,--export=calloc_ptr,--export=free,--export=verse_eval"
   default-language: GHC2021
@@ -150,7 +150,7 @@ executable verselex
   hs-source-dirs: lex
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 executable verseparse
@@ -167,5 +167,5 @@ executable verseparse
   hs-source-dirs: parse
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   default-language: GHC2021

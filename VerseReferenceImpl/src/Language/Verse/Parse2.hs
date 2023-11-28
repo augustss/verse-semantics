@@ -897,7 +897,7 @@ pFun = pDef <* pSpace >>= pFun'
 -- TODO Not all implmented
 pFun' :: L (Exp Name) -> Parser (L (Exp Name))
 pFun' e1 =
-  repeatChoiceNoTry e1 [ \e1 -> liftL2 Exp.Fun e1 <$ pFatArrow <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
+  repeatChoiceNoTry e1 [ \e1 -> liftL2 Exp.Lam e1 <$ pFatArrow <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
                        , \e1 -> liftL2 Exp.Next e1 <$ pKeyword "next" <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
                        , \e1 -> liftL2 Exp.Over e1 <$ pKeyword "over" <* pSpace <*> (pKeyBlock <|> pDefs) <* pSpace
                        , \e1 -> liftL2 Exp.When e1 <$ pKeyword "when" <* pSpace <*> (pKeyBlock <|> pDefs) <* pSpace

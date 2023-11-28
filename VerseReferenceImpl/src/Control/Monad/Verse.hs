@@ -695,7 +695,7 @@ succeeds m = do
 
 fails
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => VerseT m a -> VerseT m (IVar m Bool)
+  => VerseT m a -> VerseT m (IVar m ())
 fails m = do
   v <- freshIVar
   fork $ do
@@ -703,9 +703,9 @@ fails m = do
     decisions <- ask' <&> (.decisions)
     ref <- newHeapRef Nothing
     split' h decisions ref (m >> writeHeapRef ref (Just ())) >>= readIVar >>= \ case
-      Fail -> writeIVar v True
+      Fail -> empty
       Abort -> abort
-      Succeed _ -> writeIVar v False
+      Succeed _ -> writeIVar v ()
   pure v
 
 decides

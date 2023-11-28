@@ -6,9 +6,9 @@ module Language.Verse.Rewrite.Exp
   ( Exp (..)
   ) where
 
-import Data.ByteString.Internal(w2c)
+import Data.ByteString.Internal (w2c)
 import Data.Char
-import Data.Text(Text)
+import Data.Text (Text)
 import Language.Verse.Name
 import Data.Word (Word8)
 import Numeric (showHex)
@@ -48,7 +48,8 @@ data Exp f a
   | Float {-# UNPACK #-} !Double
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
-  | Fun (f (Exp f a)) (f (Exp f a))
+  | Lam (f (Exp f a)) (f (Exp f a))
+  | OLam (f (Exp f a)) (f (Exp f a))
   | MixfixVarColonEqual (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | InfixColonEqual !Bool (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
@@ -94,7 +95,8 @@ instance ( Pretty (f (Exp f a))
     Float x -> pretty x
     Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
-    Fun e1 e2 -> "fun" <> parens (pretty e1) <+> braces (pretty e2)
+    Lam e1 e2 -> "lam" <> parens (pretty e1) <+> braces (pretty e2)
+    OLam e1 e2 -> "olam" <> parens (pretty e1) <+> braces (pretty e2)
     MixfixVarColonEqual x y e1 e2 ->
       "var" <+> pretty x <> colon <>
       parens (pretty y <+> equals <+> pretty e1) <+>

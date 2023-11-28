@@ -12,7 +12,7 @@ module Language.Verse.Desugar.Exp
   , assume
   , forall'
   , bracketInvoke
-  , fun
+  , olam
   , name
   , then'
   ) where
@@ -23,7 +23,7 @@ import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Word (Word8)
-import Numeric(showHex)
+import Numeric (showHex)
 
 import Language.Verse.Label
 import Language.Verse.Name
@@ -60,12 +60,13 @@ data Exp f a
   | Float {-# UNPACK #-} !Double
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
-  | Fun !(Env f a) (f (Exp f a)) (f (Exp f a))
+  | Lam a (f (Exp f a))
+  | OLam !(Env f a) (f (Exp f a)) (f (Exp f a))
   | Name a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
 
-infixl 4 :*>:
+infixl 1 :*>:
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f a)
@@ -115,8 +116,10 @@ instance ( Pretty (f (Exp f a))
     Float x -> pretty x
     Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
-    Fun xs e1 e2 ->
-      "fun" <> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
+    Lam x e2 ->
+      backslash <+> pretty x <+> braces (pretty e2)
+    OLam xs e1 e2 ->
+      "olam" <> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
     Name x -> pretty x
     IfArchetypeName x y e1 e2 ->
       "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
@@ -164,15 +167,15 @@ forall' = liftL2 (Def Forall)
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
 
-fun :: Apply f => Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-fun = liftL2 . Fun
+olam :: Apply f => Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+olam = liftL2 . OLam
 
 name :: Functor f => f a -> f (Exp f a)
 name = fmap Name
 
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
-infixl 4 `then'`
+infixl 1 `then'`
 
 liftL1 :: Functor f => (f a -> b) -> f a -> f b
 liftL1 f x = f x <$ x

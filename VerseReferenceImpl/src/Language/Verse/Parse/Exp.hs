@@ -87,7 +87,7 @@ data Exp a
   | For (L (Exp a))
   | ForDo (L (Exp a)) (L (Exp a))
   | Forall (L a)
-  | Fun (L (Exp a)) (L (Exp a))
+  | Lam (L (Exp a)) (L (Exp a))
   | If (L (Exp a))
   | IfElse (L (Exp a)) (L (Exp a))
   | IfThen (L (Exp a)) (L (Exp a))
@@ -289,7 +289,7 @@ instance ( Pretty a
     Units e u -> pretty e <> pretty u
     String s [] -> "\"" <> pretty s <> "\"" -- FIXME add escape
     String s (x:xs) -> "\"" <> pretty s <> "{" <+> stringCont x xs
-    Fun e1 e2 -> parens (pretty e1) <+> "=>" <+> braces (pretty e2)
+    Lam e1 e2 -> parens (pretty e1) <+> "=>" <+> braces (pretty e2)
     InfixColonEqual p e -> pretty p <+> ":=" <+> pretty e
     InfixPlusEqual p e -> pretty p <+> "+=" <+> pretty e
     InfixMinusEqual p e -> pretty p <+> "-=" <+> pretty e

@@ -20,14 +20,22 @@ data Error
   | DefError !Loc !Loc !Ident
   | NameError !Loc !Name
   | IdentError !Loc !Ident
-  | DomainError !Loc
   | SucceedsError !Loc
   | FailsError !Loc
   | DecidesError !Loc
-  | OtherError !Pos String -- Used for Parsec error type
-  | NotImplemented String
   | UndecidableError !Loc
-  | StuckError deriving Show
+  | UnknownInvokeError !Loc
+  | InvokeError !Loc
+  | InstError !Loc
+  | ClassError !Loc
+  | SetError !Loc
+  | EnvError !Loc
+  | DomError !Loc !Loc
+  | OLamDomError !Loc !Loc !Loc
+  | IntrinsicDomError !Loc
+  | StuckError
+  | OtherError !Pos String -- Used for Parsec error type
+  | NotImplemented String deriving Show
 
 instance Pretty Error where
   pretty = \ case
@@ -49,20 +57,41 @@ instance Pretty Error where
       pretty x <> colon <+> "name" <+> pretty y <+> "not" <+> "in" <+> "scope"
     IdentError x y ->
       pretty x <> colon <+> "identifier" <+> pretty y <+> "not" <+> "in" <+> "scope"
-    DomainError x ->
-      pretty x <> colon <+> "unexpected" <+> "argument"
     SucceedsError x ->
       pretty x <> colon <+> "expected" <+> "one" <+> "value"
     FailsError x ->
       pretty x <> colon <+> "expected" <+> "zero" <+> "values"
     DecidesError x ->
       pretty x <> colon <+> "expected" <+> "zero" <+> "or" <+> "one" <+> "value"
+    UndecidableError x ->
+      pretty x <> colon <+> "undecidable" <+> "unification"
+    UnknownInvokeError x ->
+      pretty x <> colon <+> "unknown" <+> "invocable"
+    InvokeError x ->
+      pretty x <> colon <+> "expected" <+> "invocable"
+    InstError x ->
+      pretty x <> colon <+> "expected" <+> "class" <+> "or" <+> "struct"
+    ClassError x ->
+      pretty x <> colon <+> "expected" <+> "class"
+    SetError x ->
+      pretty x <> colon <+> "expected" <+> "var"
+    EnvError x ->
+      pretty x <> colon <+> "expected" <+> "environment"
+    DomError x y ->
+      pretty x <+> "and" <+> pretty y <> colon <+>
+      "overlapping" <+> "function" <+> "domains"
+    OLamDomError x y z ->
+      pretty x <+> "and" <+> pretty y <+> "and" <+> pretty z <> colon <+>
+      "overlapping" <+> "function" <+> "domains"
+    IntrinsicDomError x ->
+      pretty x <> colon <+>
+      "overlapping" <+> "function" <+> "domains"
+    StuckError ->
+      "stuck"
     OtherError x msg ->
       pretty x <> colon <+> pretty msg
     NotImplemented msg ->
       "Not" <+> "implemented" <+> pretty msg
-    UndecidableError x -> pretty x <> colon <+> "undecidable" <+> "unification"
-    StuckError -> "stuck"
 
 prettyIndent :: Indent -> Doc ann
 prettyIndent = dquotes . hcat . fmap pretty

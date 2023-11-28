@@ -1,5 +1,4 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-exists F
-F(1) := 2
-F(2) := 3
-F(1), F(2)
+Identity := (X:int => X)
+X:Identity = 1
+X + 1

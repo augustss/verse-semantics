@@ -188,20 +188,20 @@ evalExp e = case extract e of
     lift . newVar' . Val.Module i $ filterNames xs
   Exp.Enum i xs -> \ s s' -> lift $ do
     let foldrM' xs f = foldrM f mempty xs
-    (xs, xs') <- foldrM' xs $ \ x (xs, xs') ->
+    (env, xs) <- foldrM' xs $ \ x (env, xs) ->
       newVar' (Val.EnumValue i x) <&> \ var ->
-      (HashMap.insert x (Val var) xs, var:xs')
+      (HashMap.insert x (Val var) env, var:xs)
     unifyS s s'
-    newVar' $ Val.Enum i xs xs'
+    newVar' $ Val.Enum i env xs
   Exp.Struct i xs e -> \ s s' -> ask >>= \ r -> lift $ do
     unifyS s s'
-    newVar' . Val.Overloads (Val.Struct i r.env xs e) =<< freshVar'
+    newVar' $ Val.Struct i r.env xs e
   Exp.Class i e_sup xs e -> \ s s' -> do
     r <- ask
     var_sup <- case e_sup of
       Nothing -> lift $ Nothing <$ unifyS s s'
       Just e_sup -> Just <$> evalExp e_sup s s'
-    lift $ newVar' . Val.Overloads (Val.Class i r.env var_sup xs e) =<< freshVar'
+    lift $ newVar' $ Val.Class i r.env var_sup xs e
   Exp.Inst e1 xs e2 ->
     evalInst (loc e) e1 xs e2
   Exp.IfThenElse xs p t e ->
@@ -220,15 +220,18 @@ evalExp e = case extract e of
     localName (extract x) (Ref ref var) $ localName (extract y) (Val var) $ evalExp e s s'
   Exp.Set x e -> \ s s' -> lookupNamed (extract x) >>= \ case
     Nothing -> abort $ IdentError (loc x) (extract x)
-    Just (Val _) -> abort $ DomainError $ loc e
+    Just (Val _) -> abort $ SetError $ loc e
     Just (Ref ref var) -> do
       s'' <- lift freshS
       var_e <- evalExp e s s''
       writeRef' (loc x) ref var var_e s'' s'
       pure var_e
-  Exp.Fun xs e_domain e -> \ s s' -> ask >>= \ r -> lift $ do
+  Exp.Lam x e -> \ s s' -> ask >>= \ r -> lift $ do
     unifyS s s'
-    newVar' . Val.Overloads (Val.Fun r.env xs e_domain e) =<< freshVar'
+    newVar' $ Val.Lam r.env x e
+  Exp.OLam xs e_domain e -> \ s s' -> ask >>= \ r -> lift $ do
+    unifyS s s'
+    newVar' . Val.OLam r.env xs e_domain e =<< freshVar'
   Exp.BracketInvoke e1 e2 -> \ s s' -> do
     s'' <- lift freshS
     var1 <- evalExp e1 s s''
@@ -467,14 +470,12 @@ evalFails
   -> EvalT m (VarVal m)
 evalFails e s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
-  fork' $ fails'
-    do
+  fork' $ do
+    lift . readIVar =<< fails' do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
       local (\ r -> r { assumed = False }) $ evalExp e s { choiceFree } s'
-    >>= lift . readIVar >>= \ case
-      False -> abort . FailsError $ loc e
-      True -> empty
+    abort . FailsError $ loc e
   lift freshVar'
 
 evalDecides
@@ -512,39 +513,12 @@ evalInst loc e1 xs e2 s s' = do
   _ <- localNames xs $ evalExp e2 s'' s'''
   var <- lift freshVar'
   fork' $ lift (readVar' var1) >>= \ case
-    Val.Overloads head tail ->
-      unify' loc var =<< instOverloads loc head tail xs s''' s'
-    _ -> abort $ DomainError loc
+    Val.Struct i env ys e ->
+      unify' loc var =<< instStruct i env ys e xs s''' s'
+    Val.Class i env sup ys e ->
+      unify' loc var =<< instClass loc i env sup ys e xs s''' s'
+    _ -> abort $ InstError loc
   pure var
-
-instOverloads
-  :: MonadEval m
-  => Loc
-  -> Val.Overload (VarRef m) (VarVal m)
-  -> VarVal m
-  -> Archetype m
-  -> S m
-  -> S m
-  -> EvalT m (VarVal m)
-instOverloads loc head tail archetype s s' =
-  instOverload loc head archetype s s' >>= \ case
-    Just result -> pure result
-    Nothing -> lift (readVar' tail) >>= \ case
-      Val.Overloads head tail -> instOverloads loc head tail archetype s s'
-      _ -> abort $ DomainError loc
-
-instOverload
-  :: MonadEval m
-  => Loc
-  -> Val.Overload (VarRef m) (VarVal m)
-  -> Archetype m
-  -> S m
-  -> S m
-  -> EvalT m (Maybe (VarVal m))
-instOverload loc overload archetype = case overload of
-  Val.Struct i env xs e -> instStruct i env xs e archetype
-  Val.Class i env sup xs e -> instClass loc i env sup xs e archetype
-  _ -> \ _ _ -> pure Nothing
 
 instStruct
   :: MonadEval m
@@ -555,11 +529,11 @@ instStruct
   -> Archetype m
   -> S m
   -> S m
-  -> EvalT m (Maybe (VarVal m))
+  -> EvalT m (VarVal m)
 instStruct i env xs e archetype s s' = do
   archetype' <- lift $ freshEnv xs
   _ <- local (\ r -> r { env = archetype' <> env, archetype, archetype' }) $ evalExp e s s'
-  Just <$> lift (newVar' $ Val.StructInst i $ filterNames archetype')
+  lift $ newVar' $ Val.StructInst i $ filterNames archetype'
 
 instClass
   :: MonadEval m
@@ -572,11 +546,11 @@ instClass
   -> Archetype m
   -> S m
   -> S m
-  -> EvalT m (Maybe (VarVal m))
+  -> EvalT m (VarVal m)
 instClass loc i env sup xs e archetype s s' = do
   (var, _, initClass) <- allocClass loc i env sup xs e
   initClass archetype s s'
-  pure $ Just var
+  pure var
 
 allocClass
   :: MonadEval m
@@ -631,9 +605,18 @@ invoke loc var1 var2 s s' = do
       _ <- lift $ readVar s.choiceFree
       unify' loc var =<< invokeEnum loc xs var2
       lift $ unifyEq s.choiceFree s'.choiceFree
-    Val.Overloads head tail ->
-      unify' loc var =<< invokeOverloads loc head tail var2 s s'
-    _ -> abort $ DomainError loc
+    Val.Lam env x e ->
+      unify' loc var <=< localNames env . localName x (Val var2) $ evalExp e s s'
+    Val.OLam env xs e1 e2 tail ->
+      unify' loc var =<< invokeOLam loc env xs e1 e2 tail var2 s s'
+    Val.Struct i env xs e ->
+      unify' loc var =<< invokeStruct loc i env xs e var2 s s'
+    Val.Class i env sup xs e ->
+      unify' loc var =<< invokeClass loc i env sup xs e var2 s s'
+    Val.Intrinsic x tail ->
+      unify' loc var =<< invokeIntrinsic loc x tail var2 s s'
+    Val.AnyOLam -> abort $ UnknownInvokeError loc
+    _ -> abort $ InvokeError loc
   pure var
 
 invokeTuple
@@ -656,49 +639,43 @@ invokeEnum loc xs var = asum $ xs <&> \ x -> do
   unify' loc var x
   pure x
 
-invokeOverloads
+invokeOLam
   :: MonadEval m
   => Loc
-  -> Val.Overload (VarRef m) (VarVal m)
+  -> Env m
+  -> Exp.Env L Ident
+  -> L (Exp L Ident)
+  -> L (Exp L Ident)
   -> VarVal m
   -> VarVal m
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeOverloads loc head tail arg s s' = lift . readIVar =<< if''
+invokeOLam loc env xs e1 e2 tail arg s s' = lift . readIVar =<< if''
   do
-    invokeOverload loc head arg s s'
+    invokeOLamDom loc env xs e1 e2 arg s s'
   do
     runDomMatch
   do
     lift (readVar' tail) >>= \ case
-      Val.Overloads head tail -> invokeOverloads loc head tail arg s s'
-      _ -> abort $ DomainError loc
+      Val.AnyOLam -> abort $ UnknownInvokeError loc
+      Val.OLam env xs e1 e2 tail -> invokeOLam loc env xs e1 e2 tail arg s s'
+      Val.Intrinsic x tail -> invokeIntrinsic loc x tail arg s s'
+      _ -> abort $ InvokeError loc
 
-invokeOverloadDom
+invokeOLamDom_
   :: MonadEval m
   => Loc
-  -> Val.Overload (VarRef m) (VarVal m)
+  -> Env m
+  -> Exp.Env L Ident
+  -> L (Exp L Ident)
+  -> L (Exp L Ident)
   -> VarVal m
   -> EvalT m ()
-invokeOverloadDom loc f arg = do
+invokeOLamDom_ loc env xs e1 e2 arg = do
   s <- lift newS
   s' <- lift freshS
-  void $ invokeOverload loc f arg s s'
-
-invokeOverload
-  :: MonadEval m
-  => Loc
-  -> Val.Overload (VarRef m) (VarVal m)
-  -> VarVal m
-  -> S m
-  -> S m
-  -> EvalT m (DomMatch m)
-invokeOverload loc = \ case
-  Val.Fun env xs e_domain e -> invokeFun loc env xs e_domain e
-  Val.Struct i env xs e -> invokeStruct loc i env xs e
-  Val.Class i env sup xs e -> invokeClass loc i env sup xs e
-  Val.Intrinsic intrinsic -> invokeIntrinsic loc intrinsic
+  void $ invokeOLamDom loc env xs e1 e2 arg s s'
 
 data DomMatch m = forall a . Freshenable a m => DomMatch
   a
@@ -716,7 +693,7 @@ domMatch_' m = pure $ DomMatch () $ \ () -> lift m
 instance Monad m => Freshenable (DomMatch m) m where
   freshen (DomMatch x f) = freshen x <&> \ x -> DomMatch x f
 
-invokeFun
+invokeOLamDom
   :: MonadEval m
   => Loc
   -> Env m
@@ -727,13 +704,13 @@ invokeFun
   -> S m
   -> S m
   -> EvalT m (DomMatch m)
-invokeFun loc env xs e_domain e v_arg s s' = do
+invokeOLamDom loc env xs e1 e2 v_arg s s' = do
   xs <- lift $ freshEnv xs
   choiceFree <- lift $ newVar ChoiceFree
   s'' <- lift freshS
-  v_domain <- localEnv (xs <> env) $ evalExp e_domain s { choiceFree } s''
+  v_domain <- localEnv (xs <> env) $ evalExp e1 s { choiceFree } s''
   unify' loc v_arg v_domain
-  pure . DomMatch xs $ \ xs -> localEnv (xs <> env) $ evalExp e s s'
+  pure . DomMatch xs $ \ xs -> localEnv (xs <> env) $ evalExp e2 s s'
 
 invokeStruct
   :: MonadEval m
@@ -745,8 +722,8 @@ invokeStruct
   -> VarVal m
   -> S m
   -> S m
-  -> EvalT m (DomMatch m)
-invokeStruct loc i env xs e arg s s' = pure . DomMatch () $ \ () -> do
+  -> EvalT m (VarVal m)
+invokeStruct loc i env xs e arg s s' = do
   archetype <- lift $ freshEnv xs
   let archetype' = mempty
   xs <- lift $ freshEnv xs
@@ -765,8 +742,8 @@ invokeClass
   -> VarVal m
   -> S m
   -> S m
-  -> EvalT m (DomMatch m)
-invokeClass loc i sup env xs e arg s s' = domMatch_ $ do
+  -> EvalT m (VarVal m)
+invokeClass loc i sup env xs e arg s s' = do
   (inst, _) <- instEmptyClass loc i sup env xs e s s'
   unify' loc inst =<< lift (findClassInst i arg)
   pure arg
@@ -814,10 +791,8 @@ readClass
   -> VarVal m
   -> VerseT m (Label, Env m, Maybe (VarVal m), Exp.Env L Ident, L (Exp L Ident))
 readClass loc = readVar' >=> \ case
-  Val.Overloads head tail -> case head of
-    Val.Class i env sup xs e -> pure (i, env, sup, xs, e)
-    _ -> readClass loc tail
-  _ -> abort $ DomainError loc
+  Val.Class i env sup xs e -> pure (i, env, sup, xs, e)
+  _ -> abort $ ClassError loc
 
 findClassInst
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -833,10 +808,42 @@ invokeIntrinsic
   => Loc
   -> Intrinsic
   -> VarVal m
+  -> VarVal m
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+invokeIntrinsic loc x tail arg s s' = lift . readIVar =<< if''
+  do
+    invokeIntrinsicDom loc x arg s s'
+  do
+    runDomMatch
+  do
+    lift (readVar' tail) >>= \ case
+      Val.AnyOLam -> abort $ UnknownInvokeError loc
+      Val.OLam env xs e1 e2 tail -> invokeOLam loc env xs e1 e2 tail arg s s'
+      Val.Intrinsic x tail -> invokeIntrinsic loc x tail arg s s'
+      _ -> abort $ InvokeError loc
+
+invokeIntrinsicDom_
+  :: MonadEval m
+  => Loc
+  -> Intrinsic
+  -> VarVal m
+  -> EvalT m ()
+invokeIntrinsicDom_ loc x arg = do
+  s <- lift newS
+  s' <- lift freshS
+  void $ invokeIntrinsicDom loc x arg s s'
+
+invokeIntrinsicDom
+  :: MonadEval m
+  => Loc
+  -> Intrinsic
+  -> VarVal m
   -> S m
   -> S m
   -> EvalT m (DomMatch m)
-invokeIntrinsic loc = \ case
+invokeIntrinsicDom loc = \ case
   Intrinsic.Less -> liftPrim $ lift . liftOrd (<)
   Intrinsic.LessEqual -> liftPrim $ lift . liftOrd (<=)
   Intrinsic.Greater -> liftPrim $ lift . liftOrd (>)
@@ -1111,11 +1118,12 @@ function
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 function loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyOverloads)
+    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyOLam)
     Val.Tuple _ -> pure ()
     Val.Enum {} -> pure ()
-    Val.AnyOverloads -> pure ()
-    Val.Overloads {} -> pure ()
+    Val.Lam {} -> pure ()
+    Val.AnyOLam -> pure ()
+    Val.OLam {} -> pure ()
     _ -> empty
   pure var
 
@@ -1266,7 +1274,7 @@ newEnv = execWriterT $ do
   where
     tell' x =
       tell . HashMap.singleton (fromString $ Intrinsic.toString x) . Val =<<
-      lift . newVar' . Val.Overloads (Val.Intrinsic x) =<<
+      lift . newVar' . Val.Intrinsic x =<<
       lift freshVar'
 
 filterNames :: IdentMap a -> HashMap Name a
@@ -1328,25 +1336,34 @@ match
   -> Val (VarRef m) (VarVal m)
   -> Val (VarRef m) (VarVal m)
   -> EvalT m (Match, EvalT m ())
-match loc x y = ask >>= \ r -> case (x, y) of
-  (Val.Any, Val.Overloads _ ys)
+match loc' x y = ask >>= \ r -> case (x, y) of
+  (Val.Any, Val.Lam {})
+    | r.assumed -> pure $ (GE, pure ())
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.Any, Val.OLam _ _ _ _ ys)
     | r.assumed -> pure $ (GE,) do
-        xs <- lift $ newVar' Val.AnyOverloads
-        unify' loc xs ys
-    | otherwise -> abort $ UndecidableError loc
+        xs <- lift $ newVar' Val.AnyOLam
+        unify' loc' xs ys
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.Any, Val.Intrinsic _ ys)
+    | r.assumed -> pure $ (GE,) do
+        xs <- lift $ newVar' Val.AnyOLam
+        unify' loc' xs ys
+    | otherwise -> abort $ UndecidableError loc'
   (Val.Any, y)
     | r.assumed -> pure . (GE,) . forVal_ y $ \ y -> do
         x <- lift $ newVar' Val.Any
-        unify' loc x y
-    | otherwise -> abort $ UndecidableError loc
+        unify' loc' x y
+    | otherwise -> abort $ UndecidableError loc'
   (Val.Comparable, Val.Any)
     | r.assumed -> pure (LE, pure ())
-    | otherwise -> abort $ UndecidableError loc
-  (Val.Comparable, Val.AnyOverloads) -> abort $ UndecidableError loc
-  (Val.Comparable, Val.Overloads {}) -> abort $ UndecidableError loc
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.Comparable, Val.AnyOLam) -> abort $ UndecidableError loc'
+  (Val.Comparable, Val.OLam {}) -> abort $ UndecidableError loc'
+  (Val.Comparable, Val.Intrinsic {}) -> abort $ UndecidableError loc'
   (Val.Comparable, y) -> pure . (GE,) . forVal_ y $ \ y -> do
     x <- lift $ newVar' Val.Comparable
-    unify' loc x y
+    unify' loc' x y
   (Val.AnyRational, Val.AnyRational) -> pure (LE, pure ())
   (Val.AnyRational, Val.Rational _) -> pure (GE, pure ())
   (Val.AnyRational, Val.AnyInt) -> pure (GE, pure ())
@@ -1377,69 +1394,123 @@ match loc x y = ask >>= \ r -> case (x, y) of
   (Val.AnyChar, Val.AnyChar) -> pure (LE, pure ())
   (Val.AnyChar, Val.Char _) -> pure (GE, pure ())
   (Val.Char _, Val.AnyChar) -> pure (LE, pure ())
-  (Val.Char x, Val.Char y) ->
-    guard (x == y) $> (SEQ, pure ())
+  (Val.Char x, Val.Char y) -> guard (x == y) $> (SEQ, pure ())
   (Val.AnyChar32, Val.AnyChar32) -> pure (LE, pure ())
   (Val.AnyChar32, Val.Char32 _) -> pure (GE, pure ())
   (Val.Char32 _, Val.AnyChar32) -> pure (LE, pure ())
-  (Val.Char32 x, Val.Char32 y) ->
-    guard (x == y) $> (SEQ, pure ())
-  (Val.Truth x, Val.Truth y) -> pure . (SEQ,) $ unify' loc x y
-  (Val.Tuple xs, Val.Tuple ys) -> pure . (SEQ,) $ unifyList loc xs ys
-  (Val.Enum i xs xs', Val.Enum j ys ys') -> guard (i == j) $> (SEQ,) do
-    unifyEnv loc xs ys
-    unifyList loc xs' ys'
+  (Val.Char32 x, Val.Char32 y) -> guard (x == y) $> (SEQ, pure ())
+  (Val.Truth x, Val.Truth y) -> pure . (SEQ,) $ unify' loc' x y
+  (Val.Tuple xs, Val.Tuple ys) -> pure . (SEQ,) $ unifyList loc' xs ys
+  (Val.Enum i env_x xs, Val.Enum j env_y ys) -> guard (i == j) $> (SEQ,) do
+    unifyEnv loc' env_x env_y
+    unifyList loc' xs ys
   (Val.EnumValue i x, Val.EnumValue j y) ->
     guard (i == j && x == y) $> (SEQ, pure ())
   (Val.StructInst i xs, Val.StructInst j ys) -> do
-    guard (i == j) $> (SEQ, unifyEnv loc xs ys)
+    guard (i == j) $> (SEQ, unifyEnv loc' xs ys)
   (Val.ClassInst i x xs, Val.ClassInst j y ys) -> guard (i == j) $> (SEQ,) do
-    unifyMaybe loc x y
-    unifyEnv loc xs ys
-  (Val.AnyOverloads, Val.Any)
+    unifyMaybe loc' x y
+    unifyEnv loc' xs ys
+  (Val.Lam {}, Val.Any)
     | r.assumed -> pure (LE, pure ())
-    | otherwise -> abort $ UndecidableError loc
-  (Val.AnyOverloads, Val.Comparable) -> abort $ UndecidableError loc
-  (Val.AnyOverloads, Val.AnyOverloads)
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.Lam {}, Val.Comparable) -> abort $ UndecidableError loc'
+  (Val.Lam {}, Val.Lam {}) -> abort $ UndecidableError loc'
+  (Val.Lam {}, Val.AnyOLam) -> abort $ UndecidableError loc'
+  (Val.Lam {}, Val.OLam {}) -> abort $ UndecidableError loc'
+  (Val.AnyOLam, Val.Any)
     | r.assumed -> pure (LE, pure ())
-    | otherwise -> abort $ UndecidableError loc
-  (Val.AnyOverloads, Val.Overloads _ ys)
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.AnyOLam, Val.Comparable) -> abort $ UndecidableError loc'
+  (Val.AnyOLam, Val.Lam {}) -> abort $ UndecidableError loc'
+  (Val.AnyOLam, Val.AnyOLam)
+    | r.assumed -> pure (LE, pure ())
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.AnyOLam, Val.OLam _ _ _ _ ys)
     | r.assumed -> pure . (GE,) $ do
-        xs <- lift $ newVar' Val.AnyOverloads
-        unify' loc xs ys
-    | otherwise -> abort $ UndecidableError loc
-  (Val.Overloads _ xs, Val.Any)
+        xs <- lift $ newVar' Val.AnyOLam
+        unify' loc' xs ys
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.AnyOLam, Val.Intrinsic _ ys)
+    | r.assumed -> pure . (GE,) $ do
+        xs <- lift $ newVar' Val.AnyOLam
+        unify' loc' xs ys
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.OLam _ _ _ _ xs, Val.Any)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVar' Val.AnyOverloads
-        unify' loc xs ys
-    | otherwise -> abort $ UndecidableError loc
-  (Val.Overloads {}, Val.Comparable) -> abort $ UndecidableError loc
-  (Val.Overloads _ xs, Val.AnyOverloads)
+        ys <- lift $ newVar' Val.AnyOLam
+        unify' loc' xs ys
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.OLam {}, Val.Comparable) -> abort $ UndecidableError loc'
+  (Val.OLam {}, Val.Lam {}) -> abort $ UndecidableError loc'
+  (Val.OLam _ _ _ _ xs, Val.AnyOLam)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVar' Val.AnyOverloads
-        unify' loc xs ys
-    | otherwise -> abort $ UndecidableError loc
-  (Val.Overloads x xs, Val.Overloads y ys) -> pure $ (SEQ,) do
-    asks (.mode) >>= \ case
-      Execution -> pure ()
-      Verification -> do
+        ys <- lift $ newVar' Val.AnyOLam
+        unify' loc' xs ys
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.OLam env_x xs dom_x rng_x tail_x, Val.OLam env_y ys dom_y rng_y tail_y) ->
+    pure $ (SEQ,) do
+      whenVerifying $ do
         fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
           i <- lift $ newVar' Val.Any
-          _ <- invokeOverloadDom loc x i
-          fails' (invokeOverloadDom loc y i) >>= lift . readIVar >>= \ case
-            False -> abort $ FailsError loc
-            True -> empty
-    zs <- lift freshVar'
-    unify' loc xs =<< lift (newVar' $ Val.Overloads y zs)
-    unify' loc ys =<< lift (newVar' $ Val.Overloads x zs)
+          invokeOLamDom_ loc' env_x xs dom_x rng_x i
+          lift . readIVar <=< fails' $ invokeOLamDom_ loc' env_y ys dom_y rng_y i
+          abort $ OLamDomError loc' (loc dom_x) (loc dom_y)
+      zs <- lift freshVar'
+      unify' loc' tail_x =<< lift (newVar' $ Val.OLam env_y ys dom_y rng_y zs)
+      unify' loc' tail_y =<< lift (newVar' $ Val.OLam env_x xs dom_x rng_x zs)
+  (Val.OLam env_x xs dom_x rng_x tail_x, Val.Intrinsic y tail_y) ->
+    pure $ (SEQ,) do
+      whenVerifying $ do
+        fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
+          i <- lift $ newVar' Val.Any
+          invokeOLamDom_ loc' env_x xs dom_x rng_x i
+          lift . readIVar <=< fails' $ invokeIntrinsicDom_ loc' y i
+          abort $ DomError loc' (loc dom_x)
+      zs <- lift freshVar'
+      unify' loc' tail_x =<< lift (newVar' $ Val.Intrinsic y zs)
+      unify' loc' tail_y =<< lift (newVar' $ Val.OLam env_x xs dom_x rng_x zs)
+  (Val.Intrinsic _ xs, Val.Any)
+    | r.assumed -> pure $ (LE,) do
+        ys <- lift $ newVar' Val.AnyOLam
+        unify' loc' xs ys
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.Intrinsic {}, Val.Comparable) -> abort $ UndecidableError loc'
+  (Val.Intrinsic _ xs, Val.AnyOLam)
+    | r.assumed -> pure $ (LE,) do
+        ys <- lift $ newVar' Val.AnyOLam
+        unify' loc' xs ys
+    | otherwise -> abort $ UndecidableError loc'
+  (Val.Intrinsic x tail_x, Val.OLam env_y ys dom_y rng_y tail_y) ->
+    pure $ (SEQ,) do
+      whenVerifying $ do
+        fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
+          i <- lift $ newVar' Val.Any
+          invokeIntrinsicDom_ loc' x i
+          lift . readIVar <=< fails' $ invokeOLamDom_ loc' env_y ys dom_y rng_y i
+          abort $ DomError loc' (loc dom_y)
+      zs <- lift freshVar'
+      unify' loc' tail_x =<< lift (newVar' $ Val.OLam env_y ys dom_y rng_y zs)
+      unify' loc' tail_y =<< lift (newVar' $ Val.Intrinsic x zs)
+  (Val.Intrinsic x tail_x, Val.Intrinsic y tail_y) ->
+    pure $ (SEQ,) do
+      whenVerifying $ do
+        fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
+          i <- lift $ newVar' Val.Any
+          invokeIntrinsicDom_ loc' x i
+          lift . readIVar <=< fails' $ invokeIntrinsicDom_ loc' y i
+          abort $ IntrinsicDomError loc'
+      zs <- lift freshVar'
+      unify' loc' tail_x =<< lift (newVar' $ Val.Intrinsic y zs)
+      unify' loc' tail_y =<< lift (newVar' $ Val.Intrinsic x zs)
   (x, Val.Any)
     | r.assumed -> pure . (LE,) $ forVal_ x $ \ x -> do
         y <- lift $ newVar' Val.Any
-        unify' loc x y
-    | otherwise -> abort $ UndecidableError loc
+        unify' loc' x y
+    | otherwise -> abort $ UndecidableError loc'
   (x, Val.Comparable) -> pure . (LE,) . forVal_ x $ \ x -> do
     y <- lift $ newVar' Val.Comparable
-    unify' loc x y
+    unify' loc' x y
   _ -> empty
 
 unifyMaybe
@@ -1495,7 +1566,7 @@ getNameEnv loc = \ case
   Val.Enum _ xs _ -> pure xs
   Val.StructInst _ xs -> pure xs
   Val.ClassInst _ _ xs -> pure xs
-  _ -> abort $ DomainError loc
+  _ -> abort $ EnvError loc
 
 fork'
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -1568,7 +1639,7 @@ succeeds' m = ReaderT $ succeeds . runReaderT m
 fails'
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => EvalT m a
-  -> EvalT m (IVar m Bool)
+  -> EvalT m (IVar m ())
 fails' m = ReaderT $ fails . runReaderT m
 
 decides'
@@ -1576,6 +1647,11 @@ decides'
   => EvalT m a
   -> EvalT m (IVar m (Maybe a))
 decides' m = ReaderT $ decides . runReaderT m
+
+whenVerifying :: EvalT m () -> EvalT m ()
+whenVerifying m = asks (.mode) >>= \ case
+  Execution -> pure ()
+  Verification -> m
 
 whenM :: Monad m => m Bool -> m () -> m ()
 whenM m n = m >>= \ case

@@ -147,7 +147,7 @@ rewriteExp e = for e $ \ case
   Parse.Inst _e1@(isMacroParensBraces "struct"  -> Just (Nothing, _attributes)) e2 ->   -- Ignore attributes for now
     Struct <$> rewriteExp e2
   Parse.Inst _e1@(isMacroParensBraces "function" -> Just (Just e1, [])) e2 ->
-    Fun <$> rewriteExp e1 <*> rewriteExp e2
+    Lam <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Inst _e1@(isMacroParensBraces "module"  -> Just (Nothing, _attributes)) e2 ->   -- Ignore attributes for now
     Module <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "decides" e1 ->
@@ -243,8 +243,8 @@ rewriteExp e = for e $ \ case
     notImplemented "rewriteExp on string with {}" e
   Parse.InfixColonEqual (expToPat -> Just p) e ->
     rewriteDef p =<< rewriteExp e
-  Parse.Fun e1 e2 ->
-    Fun <$> rewriteExp e1 <*> rewriteExp e2
+  Parse.Lam e1 e2 ->
+    Lam <$> rewriteExp e1 <*> rewriteExp e2
   Pat p ->
     rewritePat p
   Parse.ExpInfixColon (Parse.expToPat -> Just pat) e2 ->  -- Try to fix Parse2 so that we can get rid of this
@@ -321,8 +321,8 @@ rewriteDef p e = case extract p of
     e_domain <- rewriteExp e_domain
     e_range <- rewriteExp e_range
     rewriteDef' True p
-      (fun e_domain $ prefixColon e_range)
-      (fun e_domain $ e `ofType` e_range)
+      (olam e_domain $ prefixColon e_range)
+      (olam e_domain $ e `ofType` e_range)
   InfixColon p e' -> do
     e' <- rewriteExp e'
     rewriteDef' False p
@@ -336,7 +336,7 @@ rewriteDef p e = case extract p of
     pure $ List [e1 <$ p1, e2 <$ p2, mixfixArrowColonEqual x1 x2 e]
   Invoke p e_domain -> do
     e_domain <- rewriteExp e_domain
-    let e' = fun e_domain e
+    let e' = olam e_domain e
     rewriteDef' True p e' e'
   e -> notImplemented "rewriteDef" e
 
@@ -365,8 +365,8 @@ rewriteDef' funName p e1 e2 = case extract p of
     e_domain <- rewriteExp e_domain
     e_range <- rewriteExp e_range
     rewriteDef' True p
-      (fun e_domain $ e1 `ofType` e_range)
-      (fun e_domain $ e2 `ofType` e_range)
+      (olam e_domain $ e1 `ofType` e_range)
+      (olam e_domain $ e2 `ofType` e_range)
   InfixColon p e' -> do
     e' <- rewriteExp e'
     rewriteDef' funName p (e1 `ofType` e') (e2 `ofType` e')
@@ -379,7 +379,7 @@ rewriteDef' funName p e1 e2 = case extract p of
     pure $ List [e1' <$ p1, e2' <$ p2, mixfixArrowColonEqual x1 x2 e2]
   Invoke p e_domain -> do
     e_domain <- rewriteExp e_domain
-    rewriteDef' True p (fun e_domain e1) (fun e_domain e2)
+    rewriteDef' True p (olam e_domain e1) (olam e_domain e2)
   e -> notImplemented "rewriteDef'" e
 
 rewriteOperator1
@@ -434,8 +434,8 @@ mixfixArrowColonEqual
   -> f (Exp f a)
 mixfixArrowColonEqual = liftL3 MixfixArrowColonEqual
 
-fun :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-fun = liftL2 Fun
+olam :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+olam = liftL2 OLam
 
 succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
 succeeds = liftL1 Succeeds
