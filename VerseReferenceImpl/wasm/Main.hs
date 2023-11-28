@@ -6,10 +6,8 @@ module Main
   ) where
 
 import Control.Exception
-import Control.Monad
 import Control.Monad.Supply
 import Control.Monad.Trans.Except
-import Control.Monad.Verse
 
 import Data.ByteString (ByteString)
 import Data.ByteString.Unsafe (unsafePackCStringLen)
@@ -25,7 +23,6 @@ import Foreign.Storable
 
 import Language.Verse qualified as Verse
 import Language.Verse.Error
-import Language.Verse.Mode
 import Language.Verse.Val (FrozenVal)
 
 import Prettyprinter
