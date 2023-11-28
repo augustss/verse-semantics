@@ -147,7 +147,7 @@ rewriteExp e = for e $ \ case
   Parse.Inst _e1@(isMacroParensBraces "struct"  -> Just (Nothing, _attributes)) e2 ->   -- Ignore attributes for now
     Struct <$> rewriteExp e2
   Parse.Inst _e1@(isMacroParensBraces "function" -> Just (Just e1, [])) e2 ->
-    Lam <$> rewriteExp e1 <*> rewriteExp e2
+    OLam <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Inst _e1@(isMacroParensBraces "module"  -> Just (Nothing, _attributes)) e2 ->   -- Ignore attributes for now
     Module <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "decides" e1 ->
