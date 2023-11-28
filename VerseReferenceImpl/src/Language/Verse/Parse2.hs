@@ -363,29 +363,30 @@ pCharEsc = fixChar <$ match '\\' <*> satisfy (`elem` charEsc)
     charEsc = map c2w ['r', 'n', 't'] ++ special
 
 -- CharLit   := ''' Printable ''' !''' | ''' CharEsc '''
-pCharLit :: Parser (L Char)
+pCharLit :: Parser (L (Exp Name))
 pCharLit = do
   p1 <- pos
-  c <- match '\'' *> (pCharEsc <|> pPrintable') <* match '\''
+  c <- match '\'' *> ((Exp.Char <$> pCharEsc) <|> pPrintable') <* match '\''
   p2 <- pos
   return $ L (toLoc p1 p2) c
 
 -- Utility function to get the correct return type
-pPrintable' :: Parser Char
+pPrintable' :: Parser (Exp Name)
 pPrintable' = pPrintable >>= fix
   where
-    fix :: [Word8] -> Parser Char
+    fix :: [Word8] -> Parser (Exp Name)
+    fix [w] = return $ Exp.Char $ w2c w
     fix ws =
       case Text.decodeUtf8' $ ByteString.pack ws of
-        Left err -> fail $ "illegal char " ++ show ws ++ ":" ++ show err
+        Left err -> fail $ "illegal char " ++ show ws ++ ": " ++ show err
         Right txt ->
           case Text.uncons txt of
-            Nothing -> fail $ "utf8 decoder returned empty text for:" ++ show ws
+            Nothing -> fail $ "utf8 decoder returned empty text for: " ++ show ws
             Just (c,ws) ->
               if ws == Text.empty then
-                return c
+                return $ Exp.Char32 c
               else
-                fail $ "utf8 decoder returned more than one character for" ++ show ws
+                fail $ "utf8 decoder returned more than one character for: " ++ show ws
 
 -- Char8     := "0o" (       Hex) [Hex]                    !Alnum
 -- Embedded in pNum since both starts with a digit
@@ -395,7 +396,7 @@ pPrintable' = pPrintable >>= fix
 
 -- Char      := CharLit | Char8 | Char32
 pChar :: Parser (L (Exp Name))
-pChar = (Exp.Char <$>) <$> pCharLit   -- <|> pChar8 <|> pChar32) included in pNum instead
+pChar = pCharLit   -- <|> pChar8 <|> pChar32) included in pNum instead
 
 -- Ident     := Alpha {Alnum} !Alnum ["'" {!('<#'|'#>'|'\'|'{'|'}'|'"'|''') 0o20-0o7E} "'"]
 pIdentT :: Parser (L Name)
@@ -489,7 +490,24 @@ pStringRest =
   return []
 
 pStringChar :: Parser Char
-pStringChar = P.notFollowedBy (match '"' <|> match '{') *> pPrintable'
+pStringChar = P.notFollowedBy (match '"' <|> match '{') *> pPrintable''
+
+-- Utility function to get the correct return type
+pPrintable'' :: Parser Char
+pPrintable'' = pPrintable >>= fix
+  where
+    fix :: [Word8] -> Parser Char
+    fix ws =
+      case Text.decodeUtf8' $ ByteString.pack ws of
+        Left err -> fail $ "illegal char " ++ show ws ++ ": " ++ show err
+        Right txt ->
+          case Text.uncons txt of
+            Nothing -> fail $ "utf8 decoder returned empty text for: " ++ show ws
+            Just (c,ws) ->
+              if ws == Text.empty then
+                return c
+              else
+                fail $ "utf8 decoder returned more than one character for: " ++ show ws
 
 
 -- Content   :=     {Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text}
@@ -992,7 +1010,7 @@ doList pItem pSeparator = do
 -- File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
 pFile :: Parser (L (Exp Name))  -- no need to set state since it's done in the parse function
 pFile = do
-  xs <- pList <* P.eof
+  xs <- P.optionMaybe (string "\xEF\xBB\xBF") *> pList <* P.eof
   return $ mkList xs
 
 mkList :: L[L (Exp Name)] -> L (Exp Name)

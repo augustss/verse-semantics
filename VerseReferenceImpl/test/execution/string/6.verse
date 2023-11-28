@@ -1,4 +1,4 @@
-# Copyright Epic Games, Inc. All Rights Reserved.
+﻿# Copyright Epic Games, Inc. All Rights Reserved.
 # Some handcoding in preparation for strings with {} in them"
 
 any(exists X) := X
