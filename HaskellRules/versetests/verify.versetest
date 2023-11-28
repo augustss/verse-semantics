@@ -150,3 +150,7 @@ verify(pass) {a:int => b:any => f(a   ):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:ST
 verify(pass) {a:=(1;2;),a=(1,2)}		#FP:10.4:DESUGARING?
 verify(pass) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
 verify(pass) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}			#FP:10.4:CHECK:DESUGAR
+verify(pass) {x:int,x=3}                                            #FP:10.4:UNASSUME / assume{x} --> x
+verify(pass) {a:any => b:any => {x:=b; x=a; assume{x=a}; assume{x=b}}}
+verify(pass) {a:any => b:any => {x:=(a=b) ; assume{x=a}; assume{x=b}}}
+verify(pass) {a:any => b:any => {x:=b; x=a; assume{x=a}; assume{x=b}}}

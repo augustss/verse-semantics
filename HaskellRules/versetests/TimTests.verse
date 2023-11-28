@@ -2993,27 +2993,27 @@ test(S00){a&b:int => {x:=a,if(x=b){x=b}}}
 test(S00){a&b&c:int => {x:=a,if(x=b){x=a,x=b}}}
 
 # Flexible assumptions.
-test(S00){a&b:any => {x:=a=b,assume{x=a}}}
+test(S00){a&b:any => {x:=a=b,assume{x=a}}}					#FP:10.4:ASSUME:DATAFLOW:UNSOUND
 test(QD00){a&b:any => {x:=a=b,assume<decides>{x=a}}}
-test(S00){a&b:any => {x:=a=b,assume{a=b}}}
+test(S00){a&b:any => {x:=a=b,assume{a=b}}}       			#FP:10.4:SWAP:ASSUME
 test(QD00){a&b:any => {x:=a=b,assume<decides>{a=b}}}
 
 # Misc.
-test(S00){a:int => f(x:int):int => if{f[a]=1}}
-test(S00){a:int => f(x:nat):int => if{f[a]}}
-test(S00){a:int => f(x:nat):int => if{f[0]=1}}
-test(S00){a:int => f(7    ):int => if{f[a]}}
-test(S00){a:int => f(7    ):int => if{f[7]=1}}
+test(S00){a:int => f(x:int):int => if{f[a]=1}} 				#FP:10.4:OK
+test(S00){a:int => f(x:nat):int => if{f[a]}}				#FP:10.4:OK
+test(S00){a:int => f(x:nat):int => if{f[0]=1}}				#FP:10.4:OK
+test(S00){a:int => f(7    ):int => if{f[a]}}				#FP:10.4:OK
+test(S00){a:int => f(7    ):int => if{f[7]=1}}				#FP:10.4:OK
 test(D00){f(:int):int => f[0]=f[1]}
-test(S00){a:int => f(7):int => if{f[a]=1}}
-test(S00){a:int => f(x:nat):int => if{f[a]=1}}
+test(S00){a:int => f(7    ):int => if{f[a]=1}}				#FP:10.4:OK:DUPLICATE(l3006)
+test(S00){a:int => f(x:nat):int => if{f[a]=1}}				#FP:10.4:OK
 
 # Assumed and unassumed native types.
-test(S00){x:int,x=3}
+test(S00){x:int,x=3}					#FP:10.4:UNASSUME
 test(F00){x:int,x=()}
 test(S00){x:int => int[x]}
 test(D00){x:int => nat[x]}
-test(S00){a:int => {x:int,x=a}}
+test(S00){a:int => {x:int,x=a}}			#FP:10.4:UNASSUME
 test(D00){a:int => {x:nat,x=a}}
 test(F00){x:int,x='x'}
 
@@ -3030,7 +3030,7 @@ test(S00){a:int => f(x:any):type{a=3} => f[a]}
 test(D00){a:int => f(x:int):int => f[a]=3}
 test(D00){a&b:int => f(a):type{a=b} => {f[x],x:=b}}	#TODO:10.4:CHECK-STRENGTH:TYPE:duplicate(591)
 test(D00){a&b:int => f(a):type{a=b} => {x:=b,f[x]}}
-test(S00){a:int => f(x:nat):int => if{f[a]=1}}
+test(S00){a:int => f(x:nat):int => if{f[a]=1}}		#FP:10.4:OK
 test(S00){a:int => f(x:int):type{x} => f[a]=a}
 test(D00){a:int => f(x:int):=x => f[a]=3}
 test(S00){a:int => f(x:any):type{x=3} => f[a]}
@@ -3053,21 +3053,21 @@ test(S00){x:any => any[x]}
 test(U00){x:any => int[x]}
 
 # Assumptions about flexible unificands.
-test(S00){a&b:any => {x:=b,     assume{x=a}}}
-test(S00){a&b:any => {x:=a=b,   assume{x=a}}}
-test(S00){a&b:any => {x:=a=b,   assume{x=b}}}
-test(S00){a&b:any => {x:=b,x=a, assume{x=a}}}
-test(S00){a&b:any => {x:=b,x=a, assume{x=b}}}
-test(S00){a&b:any => {x:=a=b,   assume{x=a},assume{x=b}}}
-test(S00){a&b:any => {x:=b,x=a, assume{x=a},assume{x=b}}}
+test(S00){a&b:any => {x:=b,     assume{x=a}}}				#FP:10.4:DESUGAR:&
+test(S00){a&b:any => {x:=a=b,   assume{x=a}}} 				#FP:10.4:ASSUME:DATAFLOW:UNSOUND
+test(S00){a&b:any => {x:=a=b,   assume{x=b}}}				#FP:10.4:ASSUME:DATAFLOW:UNSOUND
+test(S00){a&b:any => {x:=b,x=a, assume{x=a}}}				#FP:10.4:ASSUME:DATAFLOW:UNSOUND
+test(S00){a&b:any => {x:=b,x=a, assume{x=b}}}				#FP:10.4:ASSUME:DATAFLOW:UNSOUND
+test(S00){a&b:any => {x:=a=b,   assume{x=a},assume{x=b}}}	#FP:10.4:ASSUME:SUBST
+test(S00){a&b:any => {x:=b,x=a, assume{x=a},assume{x=b}}}	#FP:10.4:ASSUME:SUBST
 
 # Cyclic contingencies.
 test(S00){a:int => f(x:int):=x => {x:=a,f[x]}}
 test(S00){a:int => f(x:int):=x => {f[x],x:=a}}
 
 # Nesting.
-test(S00){a:int => f(x:nat):int => if{x:=f[a]}}
-test(S00){a:nat => f(x:nat):int => if{x:=f[a],int[x]}}
+test(S00){a:int => f(x:nat):int => if{x:=f[a]}}			#FP:10.4:OK
+test(S00){a:nat => f(x:nat):int => if{x:=f[a],int[x]}}	#FP:10.4:OK
 
 # Flex Assumptions.
 test(D00){a&b:int => f(x&y:int):=x=y => {f[a,a],a=b}}
@@ -3086,10 +3086,10 @@ test(D00){f(:int):int => f[3]=f[4]}
 
 # Decidability Propagation.
 test(U00){a&b:int => f(:int)<computes>:any => x:=f(a) => y:=f(b) => if{f(a)=f(b)}}
-test(S00){a&b:int => f(:int)<computes>:any => x:=f(a) => y:=f(b) => if{a=b,f(a)=f(b)}}
+test(S00){a&b:int => f(:int)<computes>:any => x:=f(a) => y:=f(b) => if{a=b,f(a)=f(b)}}		#FP:10.4:EFF:COMPUTES
 
 # Simple comparability.
-test(S00){a:int   => f(x:nat):int => if{f[a]=1}}
+test(S00){a:int   => f(x:nat):int => if{f[a]=1}}	#FP:10.4:OK
 test(D00){a&b:int => f(x:int):=x => {f[a]=f[b]}}
 test(D00){a&b:int => f(x:int):=x => {a=b,f[a]=f[b]}}
 
@@ -3112,7 +3112,7 @@ test(D00){i:int => i=2}
 test(S00){f(x:int):=x,f[3]+1=4}
 test(S00){f(x:int):=x,f[3]=3}
 test(F00){f(x:int):=x,f[3]=4}
-test(S00){f(x:int,y:int):=0 => f(3,5)}
+test(S00){f(x:int,y:int):=0 => f(3,5)}		#FP:10.4:UNASSUME
 test(S00){()=()}
 test(S00){(1,2)=(1,2)}
 
@@ -3127,7 +3127,7 @@ test(D00){a&b:int => f(x:int):=x => {a=b,f[a]=f[b]}}
 test(D00){f(x:int):=x => a&b:int => {f[a]=f[b],a=b}}
 
 # Synthetic.
-test(S00){a&b:any => {assume{a=b},a=b}}
+test(S00){a&b:any => {assume{a=b},a=b}}		#FP:10.4:DESUGAR:&
 test(S00){a&b:any => {a=b,assume{a=b}}}
 test(QD00){a&b:any => {assume<decides>{a=b}}}
 test(QD00){a&b:any => {assume<decides>{a=b},a=b}}
