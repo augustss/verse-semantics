@@ -378,15 +378,15 @@ pPrintable' = pPrintable >>= fix
     fix [w] = return $ Exp.Char $ w2c w
     fix ws =
       case Text.decodeUtf8' $ ByteString.pack ws of
-        Left err -> fail $ "illegal char " ++ show ws ++ ":" ++ show err
+        Left err -> fail $ "illegal char " ++ show ws ++ ": " ++ show err
         Right txt ->
           case Text.uncons txt of
-            Nothing -> fail $ "utf8 decoder returned empty text for:" ++ show ws
+            Nothing -> fail $ "utf8 decoder returned empty text for: " ++ show ws
             Just (c,ws) ->
               if ws == Text.empty then
                 return $ Exp.Char32 c
               else
-                fail $ "utf8 decoder returned more than one character for" ++ show ws
+                fail $ "utf8 decoder returned more than one character for: " ++ show ws
 
 -- Char8     := "0o" (       Hex) [Hex]                    !Alnum
 -- Embedded in pNum since both starts with a digit
@@ -499,15 +499,15 @@ pPrintable'' = pPrintable >>= fix
     fix :: [Word8] -> Parser Char
     fix ws =
       case Text.decodeUtf8' $ ByteString.pack ws of
-        Left err -> fail $ "illegal char " ++ show ws ++ ":" ++ show err
+        Left err -> fail $ "illegal char " ++ show ws ++ ": " ++ show err
         Right txt ->
           case Text.uncons txt of
-            Nothing -> fail $ "utf8 decoder returned empty text for:" ++ show ws
+            Nothing -> fail $ "utf8 decoder returned empty text for: " ++ show ws
             Just (c,ws) ->
               if ws == Text.empty then
                 return c
               else
-                fail $ "utf8 decoder returned more than one character for" ++ show ws
+                fail $ "utf8 decoder returned more than one character for: " ++ show ws
 
 
 -- Content   :=     {Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text}
