@@ -195,6 +195,7 @@ systemICFPLR = s
   , description = "Left-to-right variant of section 5.1 ICFP rules"
   , rules = rules s -= "EQN-SWAP" -= "EQN-ELIM'" -= "EXI-FLOAT" -= "SEQ-ASSOC" -= "FAIL-ELIM" -= "CHOOSE"
             <> rulesLR
+            <> rulesOLam
   , preProcess = const (check validK . anfK)
   }
   where s = systemICFP51
@@ -756,6 +757,7 @@ rulesUnification env lhs =
      guard (case (e1,e2) of (Int k1,Int k2) -> k1 /= k2
                             (Ref k1,Ref k2) -> k1 /= k2
                             (Arr a1,Arr a2) -> length a1 /= length a2
+                            (OLam{},OLam{}) -> False   -- handled by U-OLAM
                             _               -> True)
      guard (not (isLam e1))
      guard (not (isLam e2))
@@ -1419,3 +1421,28 @@ rulesLR _ lhs =
   "CHOICE" `name`
   do (ctx, e1 :|: e2) <- evalX' lhs
      pure $ ctx e1 :|: ctx e2
+
+-- OLam reduction rules
+rulesOLam :: ERule
+rulesOLam _ lhs =
+  "U-OLAM" `name`
+  do ee@(OLam v1 d1 r1 :=: OLam v2 d2 r2) :>: e <- [lhs]
+     let z  = identNotIn (free ee)
+         i1 = identNotIn (free d1)
+         i2 = identNotIn (free d2)
+         b1 = v1 :=: OLam (Var z) (Bind i1 $ Fails (Lam d1 :@: Var i1) :>: Lam d2) r2
+         b2 = v2 :=: OLam (Var z) (Bind i2 $ Fails (Lam d2 :@: Var i2) :>: Lam d1) r1
+     pure $ (EXI z $ b1 :>: b2) :>: e
+ ++
+  "APP-OLAM" `name`
+  do ee@(OLam (Val g) d r :@: Val v) <- [lhs]
+     let x = identNotIn (free ee)
+     pure $ One $ (EXI x $ (Lam d :@: v) :>: (Lam r :@: Var x)) :|: (g :@: v)
+ ++
+  "FAILS-FAIL" `name`
+  do Fails Fail <- [lhs]
+     pure $ Arr []
+ ++
+  "FAILS-VAL" `name`
+  do Fails (Val _) <- [lhs]
+     pure Fail
