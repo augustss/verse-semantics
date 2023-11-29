@@ -37,12 +37,12 @@ import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Mode
 import Language.Verse.Rewrite.Exp
-  ( pattern List
-  , pattern Where
-  , pattern MixfixVarColonEqual
-  , pattern InfixColonEqual
-  , pattern PrefixColon
+  ( pattern InfixColonEqual
+  , pattern List
   , pattern MixfixArrowColonEqual
+  , pattern MixfixVarColonEqual
+  , pattern PrefixColon
+  , pattern Where
   , pattern (:|>:)
   )
 import Language.Verse.Rewrite.Exp qualified as Rewrite
@@ -108,10 +108,6 @@ desugarExp''
   -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
 desugarExp'' e pi i = case extract e of
-  Rewrite.Lam e1 e2 ->
-    desugarLam (loc e) e1 e2 pi i
-  Rewrite.OLam e1 e2 ->
-    desugarOLam (loc e) e1 e2 pi i
   (Rewrite.:=:) e1 e2 -> do
     e1 <- desugarExp' e1 pi i
     e2 <- desugarExp' e2 pi i
@@ -205,6 +201,10 @@ desugarExp'' e pi i = case extract e of
     pure $ i :=: (Char x <$ e)
   Rewrite.Char32 x ->
     pure $ i :=: (Char32 x <$ e)
+  Rewrite.Lam e1 e2 ->
+    desugarLam (loc e) e1 e2 pi i
+  Rewrite.OLam e1 e2 ->
+    desugarOLam (loc e) e1 e2 pi i
   Rewrite.Name x ->
     pure $ i :=: (Name x <$ e)
   MixfixVarColonEqual x y e1 e2 -> do
