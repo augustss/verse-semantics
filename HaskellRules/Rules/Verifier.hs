@@ -101,6 +101,7 @@ isDone = go False False
   go _   _   (Assume _)       = True
   go _   _   (Ref _)          = True
   go _  _    (Wrong _)        = False -- should this be True?
+  go _  _    OLam{}           = error "isDone: OLam not implemented"
 
   -- go _ Wrong = True
   -- go _lam (Assume e)       = True -- go lam e
