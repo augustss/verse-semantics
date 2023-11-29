@@ -188,8 +188,8 @@ dsSmall = ds
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Function notation
-    ds (Typedef e) = do x <- newIdent (getLoc e) "x"; ds $ Function [(DefineE x e, [invariantId])] (Variable x)
-    ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [invariantId])] e2
+    ds (Typedef e) = do x <- newIdent (getLoc e) "x"; ds $ Function [(DefineE x e, [closedId])] (Variable x)
+    ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [closedId])] e2
     ds (Function (a:as@(_:_)) b) = ds $ Function [a] $ Function as b
 -- not yet
 --  ds (Function [(e, ps@(_:_))] b) = ds $ Function [(e, [])] $ Check ps b
@@ -287,7 +287,7 @@ dsSmall = ds
 
 checkEffs :: [Eff] -> D [Eff]
 checkEffs = mapM checkEff
-  where checkEff (Ident _ "invariant") = pure invariantId
+  where checkEff (Ident _ "invariant") = pure closedId
         checkEff e | e `elem` knownEffects = pure e
                    | otherwise = errorMessage $ "unknown effect: " ++ show e
 
@@ -574,15 +574,15 @@ call p l s e = do
 knownEffects :: [Ident]
 knownEffects = map (Ident noLoc) [
   "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "transacts", "open"
-  ] ++ [invariantId]
+  ] ++ [closedId]
 
 _isLambdaEffect :: Ident -> Bool
 _isLambdaEffect i = elem i [
-  invariantId
+  closedId
   ]
 
-invariantId :: Ident
-invariantId = Ident noLoc "closed"
+closedId :: Ident
+closedId = Ident noLoc "closed"
 
 openId :: Ident
 openId = Ident noLoc "open"
@@ -1289,7 +1289,7 @@ lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
 lowerTLamRun i rs is e1 e2 = do
   -- XXX This inserts Succeeds late, and scope insertion has already happened.
   -- XXX This might be wrong.
-  let invariant = --invariantId `elem` rs  || True -- XXX
+  let invariant = --closedId `elem` rs  || True -- XXX
                   openId `notElem` rs
   if null is && e1 == Array [] then
     pure $ Lam i e2   -- Simple special case
@@ -2011,7 +2011,7 @@ dsM_6 (Function [(t1, effs)] t2) f = do
       defVerif = eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']]
       defForall = Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r]
   verif <- gets (fVerify . dflags)
-  if invariantId `elem` effs then
+  if closedId `elem` effs then
     -- MCFUN
     if verif then do
       pure $ seqE [defVerif,
@@ -2137,7 +2137,7 @@ dsM_7 (Function [(t1, effs)] t2) f = do
   let defVerif = eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']]
       defForall = Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r]
   verif <- gets (fVerify . dflags)
-  if invariantId `elem` effs then
+  if closedId `elem` effs then
     -- MCFUN
     if verif then do
       pure $ seqE [defVerif,
