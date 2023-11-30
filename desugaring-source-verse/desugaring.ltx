@@ -492,32 +492,6 @@ This is a list of things we have not yet covered:
 \section{Desugaring Small Source Verse into Big Core Verse}
 
 \begin{figure}
-$$
-\begin{array}{rcll}
-\multicolumn{4}{l}{\text{\bf Expressions}} \\
-|e| & ::= & |x| \vb |k|
-    \vb |e_1 `choice` e_2| \vb |def x e| & \text{Just as in Core} \\
-      & \vb & |lam x e| \\
-      & \vb & |tup (e_1, xdots, e_n)| \\
-      & \vb & |e_1 ; e_2| \\
-      & \vb & |e_1 = e_2|                 & \text{Not only on lhs of ``|;|''} \\
-      & \vb & |e_1 e_2|                   & \text{Not flattened to values} \\
-
-      & \vb & |check fx e|                & \text{Effects check} \\
-      & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
-      & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
-      & \vb & |for(e){b}|                 & \text{Finite loop} \\
-      & \vb & |tlam x e_1 e_2|             & \text{Tim lambda} \\
-      & \vb & |oftype e t|                & \text{Type ascription}
-    \\
-\multicolumn{4}{l}{\text{\bf Effects}} \\
-|fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
-\end{array}
-$$
-\caption{BigCore Verse expressions} \label{fig:core-verse}
-\end{figure}
-
-\begin{figure}
 \begin{code}
 any    = (x => x)
 int    = (x => applyx isInt x; x)
@@ -755,24 +729,27 @@ $$
 \caption{Extra stuff for open functions (temporary figure)} \label{fig:open}
 \end{figure}
 
-\subsection{Big Core Verse}
 
-\Cref{fig:core-verse} gives the Big Core Verse language into which we desugar,
-Big Core Verse is slightly larger than the core language of the ICFP 23 paper, but
-can very easily be desugared into it.  Specifically:
+\Cref{fig:ds8} desugars Small Source Verse into Big Core Verse. (See \Cref{sec:big-core} for the syntax of
+Big Core.)
+The key function is |DMe (inp2 i si md) t|, which desugars a Small Source term |t| to produce a
+Big Core expression |e|. Desugaring takes:
 \begin{itemize}
-\item It includes |x := e|.  This means |x=e|, plus an existential for |x| added at the
-  top of the enclosing scope.
-\item In |if (e_1) then e_2 else e_3| each of the |e_i| has its own scope, but existentials
-  at the top of |e_1| also scope over |e_2|.  So |if (x:=f^[0]) { y:=x+1; y*y } else 0| gets turned into
-  |if (def x (x==f^[0])) then (def y (y==x+1; y*y)) else 0|.
-\item In |for (e_1) {e_2}| both expressions have their own scope, but with top existential in |e_1| scoping over |e_2|.
+\item An \emph{input variable}, |i|.
+\item A \emph{mode}, |md|, which has three possibilities:
+  \begin{itemize}
+  \item |md = mdx|: desugar for execution. Generates no verification checks.
+    \item |md = mdneg|: generate enough |verify xdots| blocks for |t| to verify |t|'s \emph{context}.
+  \item |md = mdpos|: like |md = mdneg|, but also generate |verify xdots| blocks for |t| that verify |t| itself.
+\end{itemize}
+\item A \emph{wrapping flag}, |si|, which takes the form:
+  \begin{itemize}
+  \item |si = solve|: do not generate wrapper calls to |i|.
+  \item |si = infer|: generate wrapper calls to |i|.
+  \item |si = solvex|: fail outright on |functionKW| terms.
+  \end{itemize}
 \end{itemize}
 
-
-\subsection{Desugaring from SmallSource to BigCore}
-
-\Cref{fig:ds7} desugars Small Source Verse into Big Core Verse.
 In desugaring from SmallSource Verse into BigCore Verse, there are two big features to watch:
 \begin{description}
 \item[Functions.] We desugar Verse's lambdas |functionP t_1 t_2|, which (very unusually) have a domain \emph{expression} |t_1| rather
@@ -782,7 +759,7 @@ In desugaring from SmallSource Verse into BigCore Verse, there are two big featu
 \noindent
 
 
-\subsubsection{Desugaring functions for execution}
+\subsection{Desugaring functions for execution}
 
 We concentrate first on desugaring functions for execution.
 
@@ -853,7 +830,7 @@ $$
 $$
 Here you can see \rulename{mtype} in action.
 
-\subsubsection{Desugaring functions for verification}
+\subsection{Desugaring functions for verification}
 \lennart{Stuff here.}
 
 \subsection{The pattern |y squiggt x|}
@@ -956,6 +933,48 @@ $$
     |f ( for(1 `choice` 2){:abs} ) := ...|
     \end{array}
   $$
+\end{itemize}
+
+%----------------------------------------------------------
+
+\section{Big Core Verse} \label{sec:big-core}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+\multicolumn{4}{l}{\text{\bf Expressions}} \\
+|e| & ::= & |x| \vb |k|
+    \vb |e_1 `choice` e_2| \vb |def x e| & \text{Just as in Core} \\
+      & \vb & |lam x e| \\
+      & \vb & |tup (e_1, xdots, e_n)| \\
+      & \vb & |e_1 ; e_2| \\
+      & \vb & |e_1 = e_2|                 & \text{Not only on lhs of ``|;|''} \\
+      & \vb & |e_1 e_2|                   & \text{Not flattened to values} \\
+
+      & \vb & |check fx e|                & \text{Effects check} \\
+      & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
+      & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
+      & \vb & |for(e){b}|                 & \text{Finite loop} \\
+      & \vb & |tlam x e_1 e_2|             & \text{Tim lambda} \\
+      & \vb & |oftype e t|                & \text{Type ascription}
+    \\
+\multicolumn{4}{l}{\text{\bf Effects}} \\
+|fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
+\end{array}
+$$
+\caption{BigCore Verse expressions} \label{fig:core-verse}
+\end{figure}
+
+\Cref{fig:core-verse} gives the Big Core Verse language into which we desugar,
+Big Core Verse is slightly larger than the core language of the ICFP 23 paper, but
+can very easily be desugared into it.  Specifically:
+\begin{itemize}
+\item It includes |x := e|.  This means |x=e|, plus an existential for |x| added at the
+  top of the enclosing scope.
+\item In |if (e_1) then e_2 else e_3| each of the |e_i| has its own scope, but existentials
+  at the top of |e_1| also scope over |e_2|.  So |if (x:=f^[0]) { y:=x+1; y*y } else 0| gets turned into
+  |if (def x (x==f^[0])) then (def y (y==x+1; y*y)) else 0|.
+\item In |for (e_1) {e_2}| both expressions have their own scope, but with top existential in |e_1| scoping over |e_2|.
 \end{itemize}
 
 
