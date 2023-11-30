@@ -59,13 +59,24 @@
 
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
 %format (DAe (i) (x)) = "{\mathcal A}\llbracket{}" x "\rrbracket{}" i
+%format De2 md (x) = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
+%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
 
 %% 'si' is short for "solve or infer" or "unification variable or not" resp
 %format si = "\pi"
+%format sip = si "\rq"
 %format solve = "\circ"
 %format infer = "\bullet"
+%format solvex = "\diamond"
 %format inpw  = "w"
 %format inp (x) (u) = x "^{" u "}"
+%format inp2 (x) (u) (md) = x "^{" u "}_{" md "}"
+
+%% 'md' is short for "mode" or "unification variable or not" resp
+%format md = "\sigma"
+%format mdx   = "\textbf{x}"
+%format mdpos = "+"
+%format mdneg = "-"
 
 %% flipsi is a no-op for now
 %format flipsi (si) = "\bullet"
@@ -298,7 +309,7 @@
 
 %% functionOC has open/closed subscript
 %format functionOC (oc) (x) (rhs) = functionKW "_{" oc "}(" x ")\{" rhs "\}"
-%format functionOCX (oc) (x) (fx) (rhs) = functionKW "_{" oc "}(" x ")" fx "\{" rhs "\}"
+%format functionOCX (oc) (x) (fx) (rhs) = functionKW "_{" oc "}(" x ")\langle" fx "\rangle\{" rhs "\}"
 
 %% -------End of f unctions ---------------
 
@@ -326,8 +337,10 @@
 %format appexi (f) (x) = "{\mathcal A" "\fbox{$" x "$}"
 
 %% Effects checking, like succeeds{e}
-%format checkKW = "{\bf check}"
+%format checkKW = "{\bf chk}"
 %format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
+%format havocKW = "\textbf{havoc}"
+%format havoc (fx) = "\textbf{havoc}" "\langle" fx "\rangle"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
