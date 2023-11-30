@@ -566,14 +566,15 @@ $$
 
 %  |flipsi infer| & = & |solve| \\
 %  |flipsi solve| & = & |infer| \\
-\end{array}} \\ \\
+\end{array}} \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DAe (inp f si) x| = |e|, |Hide e|$}} \\[0.02in]
 \rulename{dinit}   & |De2 md t | & = & |def x (DMe (inp2 x solve md) t)| \\[1mm]
-\rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| \\
+\rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| & \text{NB: no case for |si = solvex|}\\
 \rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[1mm]
-\rulename{hide}     & |Hide e|  & = & |forall r (assume (r == e); r)| \\[1mm]
+\rulename{hide}     & |Hide e|  & = & |forall r (assume (r == e); r)|
+  & \text{Just an abbreviation; BigCore to BigCore}\\[1mm]
 \end{array} \\
 
 \begin{array}{lr@@{\;}c@@{\;}ll}
@@ -750,17 +751,19 @@ Big Core expression |e|. Desugaring takes:
   \end{itemize}
 \end{itemize}
 
-In desugaring from SmallSource Verse into BigCore Verse, there are two big features to watch:
-\begin{description}
-\item[Functions.] We desugar Verse's lambdas |functionP t_1 t_2|, which (very unusually) have a domain \emph{expression} |t_1| rather
-  than a (conventional) domain \emph{variable}.
-\item[Verification.] We desugar certain constructs in two different ways, one for \emph{execution} and one for \emph{verification}.
-\end{description}
-\noindent
+\subsection{Hiding, forall, and assume}
 
+The auxiliary function |Hide e|, pronounced ``hide |e|'', returns a \emph{single value} drawn from |e|.
+A typical use is for a function that returns an |int|; when verifying \emph{calls} to such a function
+we want it to return an |int|, but we don't know which one, so we return |Hide (:int)|, or equivalently
+|Hide (def x (apply1N int x))|.
+
+As \Cref{fig:ds8} shows, |Hide e| is just an abreviation for |forall r (assume (r == e); r)|, and \emph{this is the only way that |forallKW| and |assumeKW| are introduced in the desugaring}.
 
 \subsection{Desugaring functions for execution}
 
+Verse functions, |functionOCX oc t_1 dx t_2|, are unusual in having a domain \emph{expression} |t_1| rather
+than a (conventional) domain \emph{variable} or \emph{pattern}.
 We concentrate first on desugaring functions for execution.
 
 Consider the Source Verse lambda |functionP 3 t|. This is a function that takes an
