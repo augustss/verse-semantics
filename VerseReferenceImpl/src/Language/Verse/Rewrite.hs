@@ -416,9 +416,6 @@ rewriteOperator2
   -> m (Exp L Ident)
 rewriteOperator2 x e1 e2 = bracketInvoke2 x <$> rewriteExp e1 <*> rewriteExp e2
 
-freshIdent :: MonadSupply Label m => Loc -> m (L Ident)
-freshIdent loc = L loc . Ident.Label <$> supply
-
 unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 unify = liftL2 (:=:)
 
