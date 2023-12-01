@@ -1,23 +1,26 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module Main
   ( main
   ) where
 
+import Control.Monad
 import Control.Monad.Supply
 import Control.Monad.Trans.Except
 
-import Data.ByteString qualified as ByteString
+import Data.ByteString (getContents)
+import Data.Either
 import Data.Foldable
+import Data.Function
 
 import Language.Verse
 
 import Prettyprinter
 import Prettyprinter.Render.Text
 
-import System.IO
+import System.IO (IO, stderr)
 
 main :: IO ()
-main = ByteString.getContents >>= runExceptT . runSupplyT . eval >>= \ case
+main = getContents >>= runExceptT . runSupplyT . eval2 "<command line>" >>= \ case
   Right xs -> for_ xs $ putDoc . (<> line) . pretty
   Left e -> hPutDoc stderr $ pretty e <> line

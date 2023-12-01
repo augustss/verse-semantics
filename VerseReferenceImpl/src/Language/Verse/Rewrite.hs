@@ -158,6 +158,10 @@ rewriteExp e = for e $ \ case
     OLam <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Inst _e1@(isMacroParensBraces "module"  -> Just (Nothing, _attributes)) e2 ->   -- Ignore attributes for now
     Module <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "type" e1 -> do
+    x <- freshIdent $ loc e2
+    e2 <- rewriteExp e2
+    pure $ Lam (infixColonEqual False x e2) (Name <$> x)
   Parse.Inst e1 e2 | isPredefined "decides" e1 ->
     Decides <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "assume" e1 ->
@@ -191,7 +195,7 @@ rewriteExp e = for e $ \ case
     All <$> rewriteExp e2
 
   Parse.Inst e1 e2 | isPredefined "option" e1 -> do
-    x <- (e $>) . Ident.Label <$> supply
+    x <- freshIdent $ loc e
     e' <- rewriteExp e2
     pure $ IfThenElse (infixColonEqual False x e') (Name <$> x) (Tuple [] <$ e)
   Parse.Inst e1 e2 ->
@@ -243,10 +247,14 @@ rewriteExp e = for e $ \ case
     pure $ Char $ c2w x
   Parse.Char32 x ->
     pure $ Char32 x
-  Parse.String txt [] ->
-    case loc e of
-      Loc p _ ->
-        pure $ Tuple $ map (\ (i,x) -> L (Loc p{column = column p + i} p{column = column p + i + 1}) (Char x)) $ zip [1..] $ ByteString.unpack $ Text.encodeUtf8 txt
+  Parse.String txt [] -> case loc e of
+    Loc p _ ->
+      pure .
+      Tuple .
+      map (\ (i,x) -> L (Loc p { column = column p + i } p { column = column p + i + 1 }) (Char x)) .
+      zip [1 ..] .
+      ByteString.unpack $
+      Text.encodeUtf8 txt
   e@(Parse.String _txt _txts) ->
     notImplemented "rewriteExp on string with {}" e
   Parse.InfixColonEqual (expToPat -> Just p) e ->
@@ -262,8 +270,10 @@ rewriteExp e = for e $ \ case
 notImplemented :: (MonadAbort Error m, Show a) => String -> a -> m b
 notImplemented fun e = abort $ NotImplemented $ fun ++ " on: " ++ show e
 
-
-isMacroParensBraces :: Name -> L (Parse.Exp Name)  -> Maybe (Maybe (L (Parse.Exp Name)), [L (Parse.Exp Name)])
+isMacroParensBraces
+  :: Name
+  -> L (Parse.Exp Name)
+  -> Maybe (Maybe (L (Parse.Exp Name)), [L (Parse.Exp Name)])
 isMacroParensBraces  macro (extract -> Parse.ParenInvoke (extract -> Parse.Pat (Parse.Name (Parse.IdentName name))) args) | name == macro = Just (Just args, [])
 isMacroParensBraces  macro (stripSpecs -> (_inner@(extract -> Parse.Pat _pat@(Parse.Name (Parse.IdentName name))), specs)) | name == macro = Just (Nothing, specs)
 isMacroParensBraces _macro  _ = Nothing
@@ -274,7 +284,7 @@ isPredefined _predefined _exp = False
 
 stripSpecs :: L (Parse.Exp Name)  -> (L (Parse.Exp Name), [L (Parse.Exp Name)])
 stripSpecs (extract -> Parse.ExpSpecs exp specs) = case stripSpecs exp of
-                                                  (exp', specs') -> (exp', specs ++ specs')
+  (exp', specs') -> (exp', specs ++ specs')
 stripSpecs exp = (exp, [])
 
 rewritePat
@@ -284,13 +294,13 @@ rewritePat
 rewritePat = \ case
   Parse.Name (Parse.IdentName x) -> pure . Name $ Ident.Name x
   InfixColon (extract -> Parse.Var _ p@(extract -> Parse.IdentName x)) e -> do -- ignore attributes
-     let x' = Ident.Name <$> (x <$ p)
-     y <- (e $>) . Ident.Label <$> supply
-     e <- rewriteExp e
-     let e' = prefixColon $ Name <$> y
-     pure $
-       MixfixVarColonEqual x' y e $
-       ifArchetypeName x' e' e'
+    let x' = Ident.Name <$> (x <$ p)
+    y <- freshIdent $ loc e
+    e <- rewriteExp e
+    let e' = prefixColon $ Name <$> y
+    pure $
+      MixfixVarColonEqual x' y e $
+      ifArchetypeName x' e' e'
   Parse.PrefixColon e -> PrefixColon <$> rewriteExp e
   InfixColon p e -> do
     e <- rewriteExp e
@@ -305,7 +315,6 @@ rewritePat = \ case
     parenInvokeM e1 e2
   e -> notImplemented "rewritePat" e
 
-
 rewriteDef
   :: (MonadAbort Error m, MonadSupply Label m)
   => L (Pat Name)
@@ -319,7 +328,7 @@ rewriteDef p e = case extract p of
       ifArchetypeName x' e e
   InfixColon (extract -> Parse.Var _ p@(extract -> Parse.IdentName x)) e' -> do -- ignore attributes
     let x' = Ident.Name <$> (x <$ p)
-    y <- (e' $>) . Ident.Label <$> supply
+    y <- freshIdent $ loc e'
     e' <- rewriteExp e'
     pure $
       MixfixVarColonEqual x' y e' $
@@ -337,8 +346,8 @@ rewriteDef p e = case extract p of
       (prefixColon e')
       (e `ofType` e')
   InfixArrow p1 p2 -> do
-    x1 <- (p1 $>) . Ident.Label <$> supply
-    x2 <- (p2 $>) . Ident.Label <$> supply
+    x1 <- freshIdent $ loc p1
+    x2 <- freshIdent $ loc p2
     e1 <- rewriteDef p1 $ Name <$> x1
     e2 <- rewriteDef p2 $ Name <$> x2
     pure $ List [e1 <$ p1, e2 <$ p2, mixfixArrowColonEqual x1 x2 e]
@@ -362,12 +371,12 @@ rewriteDef' funName p e1 e2 = case extract p of
       InfixColonEqual funName x' $
       ifArchetypeName x' e1 e2
   InfixColon (extract -> Parse.Var _ p@(extract -> Parse.IdentName x)) e' -> do -- ignore attributes
-   let x' = Ident.Name <$> (x <$ p)
-   y <- (e' $>) . Ident.Label <$> supply
-   e' <- rewriteExp e'
-   pure $
-     MixfixVarColonEqual x' y e' $
-     ifArchetypeName x' (e1 `ofType` (Name <$> y)) (e2 `ofType` (Name <$> y))
+    let x' = Ident.Name <$> (x <$ p)
+    y <- freshIdent $ loc e'
+    e' <- rewriteExp e'
+    pure $
+      MixfixVarColonEqual x' y e' $
+      ifArchetypeName x' (e1 `ofType` (Name <$> y)) (e2 `ofType` (Name <$> y))
   Parse.PrefixColon e' -> (e2 :|>:) <$> rewriteExp e'
   InfixColon (extract -> Invoke p e_domain) e_range -> do
     e_domain <- rewriteExp e_domain
@@ -379,8 +388,8 @@ rewriteDef' funName p e1 e2 = case extract p of
     e' <- rewriteExp e'
     rewriteDef' funName p (e1 `ofType` e') (e2 `ofType` e')
   InfixArrow p1 p2 -> do
-    x1 <- (p1 $>) . Ident.Label <$> supply
-    x2 <- (p2 $>) . Ident.Label <$> supply
+    x1 <- freshIdent $ loc p1
+    x2 <- freshIdent $ loc p2
     e1' <- rewriteDef p1 $ Name <$> x1
     let x2' = Name <$> x2
     e2' <- rewriteDef' funName p2 x2' x2'
@@ -420,18 +429,21 @@ succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
 succeeds = liftL1 Succeeds
 
 parenInvokeM
-  :: (MonadSupply Label m, Apply f)
-  => f (Exp f Ident)
-  -> f (Exp f Ident)
-  -> m (Exp f Ident)
+  :: (MonadSupply Label m)
+  => L (Exp L Ident)
+  -> L (Exp L Ident)
+  -> m (Exp L Ident)
 parenInvokeM e1 e2 = do
-  x1 <- (e1 $>) . Ident.Label <$> supply
-  x2 <- (e2 $>) . Ident.Label <$> supply
+  x1 <- freshIdent $ loc e1
+  x2 <- freshIdent $ loc e2
   pure $ List
     [ infixColonEqual False x1 e1
     , infixColonEqual False x2 e2
     , succeeds $ bracketInvoke (Name <$> x1) (Name <$> x2)
     ]
+
+freshIdent :: MonadSupply Label m => Loc -> m (L Ident)
+freshIdent loc = L loc . Ident.Label <$> supply
 
 bracketInvoke2 :: Apply f => Name -> f (Exp f Ident) -> f (Exp f Ident) -> Exp f Ident
 bracketInvoke2 x e1 e2 =

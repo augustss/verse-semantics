@@ -74,6 +74,7 @@ data Expr
   | Arr [Expr]                  -- ^ <e1,e2,...>
   | Map [(Expr, Expr)]          -- ^ map{...}
   | Lam (Bind Expr)             -- ^ \ x . e
+  | OLam Expr (Bind Expr) (Bind Expr) -- ^ olam (v, \x.e1, \y.e2)
   --
   | Expr :=: Expr               -- ^ e1 = e2
   | Ident :~: Ident             -- ^ e1 ~ e2
@@ -130,6 +131,9 @@ instance Pretty Expr where
   pPrintPrec l _ (Arr es)         = text "<" <> fsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
   pPrintPrec l _ (Map vks)        = text "map{" <> fsep (punctuate (text ";") (map (\ (k,v) -> parens(pPrintPrec l 0 k <> text "," <> pPrintPrec l 0 v)) vks)) <> text ">"
   pPrintPrec l p (LAM x e)        = maybeParens (p > 0) $ sep [text "\\" <> pPrintPrec l 0 x <> text ".", pPrintPrec l 0 e]
+  pPrintPrec l _ (OLam x d r)     = text "olam" <> parens (pPrintPrec l 0 x P.<> text "," <+>
+                                                           pPrintPrec l 0 (Lam d) P.<> text "," <+>
+                                                           pPrintPrec l 0 (Lam r))
   pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ sep [pPrintPrec l 4 a <+> text "|", pPrintPrec l 4 b]
   pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
@@ -226,6 +230,11 @@ comp _xs _ys _       (Map _) = GT
 comp  xs  ys (LAM x a) (LAM y b) = comp (x:xs) (y:ys) a b
 comp _xs _ys (Lam _) _       = LT
 comp _xs _ys _       (Lam _) = GT
+
+comp  xs  ys (OLam ax ad ar) (OLam bx bd br) =
+  comp xs ys ax bx <> comp xs ys (Lam ad) (Lam bd) <> comp xs ys (Lam ar) (Lam br)
+comp _xs _ys (OLam _ _ _) _       = LT
+comp _xs _ys _       (OLam _ _ _) = GT
 
 comp _xs _ys Wrong{} Wrong{} = EQ
 comp _xs _ys Wrong{} _       = LT
@@ -428,6 +437,7 @@ getHNF e@Arr{} = Just e
 getHNF e@Map{} = Just e
 getHNF e@Ref{} = Just e
 getHNF e@Lam{} = Just e
+getHNF e@OLam{} = Just e
 getHNF _ = Nothing
 
 isHNF :: Expr -> Bool
@@ -538,6 +548,11 @@ instance Rec Expr where
       Lam (Bind x e)
         | tfUnderLambda s -> [ (n,Lam (Bind x e')) | (n,e') <- rec r (addBound (BLam x) s) e ]
 
+      OLam x (Bind a ea) (Bind b eb)
+        | tfUnderLambda s -> [ (n,OLam x' (Bind a ea ) (Bind b eb )) | (n,x')  <- rec r                    s  x  ] ++
+                             [ (n,OLam x  (Bind a ea') (Bind b eb )) | (n,ea') <- rec r (addBound (BLam a) s) ea ] ++
+                             [ (n,OLam x  (Bind a ea ) (Bind b eb')) | (n,eb') <- rec r (addBound (BLam b) s) eb ]
+
       One a -> [ (n, One a') | (n,a') <- rec r (addBound BBlk s) a ]
       All a -> [ (n, All a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assume a -> [ (n, Assume a') | (n,a') <- rec r (addBound BBlk s) a ]
@@ -592,6 +607,7 @@ instance Free Expr where
   free (Arr vs)  = free vs
   free (Map vs)  = free vs
   free (Lam bnd) = free bnd
+  free (OLam x d r) = free x `union` free d `union` free r
   free (a :=: b) = free a `union` free b
   free (a :~: b) = free a `union` free b
   free (a :>: b) = free a `union` free b
@@ -630,7 +646,7 @@ alphaRename xs bnd@(Bind x e)
 
 instance Substitutable Expr where
   subst [] e = e
-  subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
+  subst sub e@(Var x) = fromMaybe e (lookup x sub)
   subst _sub e@Int{}  = e
   subst _sub e@Char{} = e
   subst _sub e@Path{} = e
@@ -638,6 +654,7 @@ instance Substitutable Expr where
   subst sub (Arr vs)  = Arr (map (subst sub) vs)
   subst sub (Map vs)  = Map (map (\ (k,v) -> (subst sub k, subst sub v)) vs)
   subst sub (Lam bnd) = Lam (substBind Var subst sub bnd)
+  subst sub (OLam x d r) = OLam (subst sub x) (substBind Var subst sub d) (substBind Var subst sub r)
   subst sub (a :=: b) = subst sub a :=: subst sub b
   subst sub (a :~: b) = substVar sub a :~: substVar sub b
   subst sub (a :>: b) = subst sub a :>: subst sub b
@@ -742,6 +759,11 @@ instance Arbitrary Expr where
   shrink (Ref _)   = []
   shrink Wrong{}   = []
   shrink If{} = undefined
+  shrink (OLam x d@(Bind xd ed) r@(Bind xr er)) =
+    [x] ++ [ ed | xd `notElem` free ed] ++ [er | xr `notElem` free er] ++
+    [OLam x' d r | x'<-shrink x] ++
+    [OLam x (Bind xd ed') r | ed'<-shrink ed] ++
+    [OLam x d (Bind xr er') | er'<-shrink er]
 
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
@@ -806,6 +828,7 @@ collect here (\/) = col
   recr a (Verify e)       = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
   recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
+  recr a (OLam x (Bind _ d) (Bind _ r)) = a \/ col x \/ col d \/ col r
   recr a _                = a
 
 --------------------------------------------------------------------------------
@@ -829,6 +852,7 @@ allVars = nub . expr
     expr (Verify e) = expr e
     expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
     expr (BlockC e) = expr e
+    expr (OLam x (Bind i d) (Bind j r)) = i : j : expr x ++ expr d ++ expr r
     expr _ = []
 
 --------------------------------------------------------------------------------
@@ -893,4 +917,5 @@ substExp from to = sub
     sub (BlockC e) = BlockC (sub e)
     sub (Store h e) = Store (IM.map sub h) (sub e)
     sub e@Ref{}   = e
+    sub OLam{}    = error "substExp: OLam not implemented"
     sub _         = undefined
