@@ -86,8 +86,16 @@ rewriteExp e = for e $ \ case
     Set (Ident.Name x <$ e) <$> rewriteExp e2
   (Parse.:=:) e1 e2 ->
     (:=:) <$> rewriteExp e1 <*> rewriteExp e2
-  e1 :<>: e2 ->
-    Not . (e $>) <$> ((:=:) <$> rewriteExp e1 <*> rewriteExp e2)
+  e1 :<>: e2 -> do
+    x <- freshIdent $ loc e1
+    e1 <- rewriteExp e1
+    y <- freshIdent $ loc e2
+    e2 <- rewriteExp e2
+    pure $ List
+      [ infixColonEqual False x e1
+      , infixColonEqual False y e2
+      , not' $ unify (name x) (name y)
+      ]
   (Parse.:|:) e1 e2 ->
     (:|:) <$> rewriteExp e1 <*> rewriteExp e2
   (Parse.:.:) e (extract -> Parse.IdentName x) ->
@@ -399,6 +407,18 @@ rewriteOperator2
   -> m (Exp L Ident)
 rewriteOperator2 x e1 e2 = bracketInvoke2 x <$> rewriteExp e1 <*> rewriteExp e2
 
+freshIdent :: MonadSupply Label m => Loc -> m (L Ident)
+freshIdent loc = L loc . Ident.Label <$> supply
+
+unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+unify = liftL2 (:=:)
+
+not' :: Functor f => f (Exp f a) -> f (Exp f a)
+not' = liftL1 Not
+
+succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
+succeeds = liftL1 Succeeds
+
 parenInvokeM
   :: (MonadSupply Label m, Apply f)
   => f (Exp f Ident)
@@ -437,8 +457,8 @@ mixfixArrowColonEqual = liftL3 MixfixArrowColonEqual
 olam :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 olam = liftL2 OLam
 
-succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
-succeeds = liftL1 Succeeds
+name :: Functor f => f a -> f (Exp f a)
+name = fmap Name
 
 ifArchetypeName :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 ifArchetypeName = liftL3 IfArchetypeName
