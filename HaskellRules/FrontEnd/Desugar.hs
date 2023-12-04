@@ -5,6 +5,7 @@ module FrontEnd.Desugar(
   dsScope,
   getFree, substMany, getAllVars,
   ) where
+import Data.Monoid
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Writer
@@ -12,7 +13,6 @@ import Data.Either
 import Data.List
 --import qualified Data.Map as M
 import Data.Maybe
-import Data.Monoid
 import qualified Data.Set as S
 import Debug.Trace
 import GHC.Stack
