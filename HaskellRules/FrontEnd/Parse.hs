@@ -476,22 +476,23 @@ operatorTablePost =
 -- XXX Add more operators
 operatorTable :: [[Operator P Expr]]
 operatorTable =
-  [ [preOp ":", preOp "?", preOp "[]", preOp "-", preOp "^", preOp "+"],
-    [op InfixL "*", op InfixL "/", op InfixL "&"],
-    [op InfixL "+", op InfixL "-"],
-    [op InfixR "->", op InfixR ".."],
-    [op InfixR "|", op InfixL ":"],
-    [op InfixR ">=", op InfixR "<=", op InfixR "<", op InfixR ">", op InfixL "<>", op InfixL "="],
-    [preOp "not"],
-    [op InfixR "and"],
-    [op InfixR "or"],
-    [op InfixR ":=", op InfixR ">>"
-    ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/=", op InfixN ".="
-    ,InfixR defOp
-    ],
-    [op InfixL "where"],  -- XXX precedence
-    [preOp ".."],
-    [op InfixR "=>"]
+  [
+{-13-}   [preOp ":", preOp "?", preOp "[]", preOp "-", preOp "^", preOp "+"],
+{-12-}   [op InfixL "*", op InfixL "/", op InfixL "&"],
+{-11-}   [op InfixL "+", op InfixL "-"],
+{-10-}   [op InfixR "->", op InfixR ".."],
+{-9-}    [op InfixR "|", op InfixL ":"],
+{-8-}    [op InfixR ">=", op InfixR "<=", op InfixR "<", op InfixR ">", op InfixL "<>", op InfixL "="],
+{-7-}    [preOp "not"],
+{-6-}    [op InfixR "and"],
+{-5-}    [op InfixR "or"],
+{-4-}    [op InfixR ":=", op InfixR ">>"
+         ,op InfixN "+=", op InfixN "-=", op InfixN "*=", op InfixN "/=", op InfixN ".="
+         ,InfixR defOp
+         ],
+{-3-}    [op InfixL "where"],  -- XXX precedence
+{-2-}    [preOp ".."],
+{-1-}    [op InfixR "=>"]
 --  , [op InfixN ":-"]
   ]
   where
