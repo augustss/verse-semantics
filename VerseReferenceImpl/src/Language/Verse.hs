@@ -19,6 +19,7 @@ import Data.Functor
 
 import Language.Verse.Desugar
 import Language.Verse.Desugar.Exp
+import Language.Verse.Effect.Split qualified as Effect
 import Language.Verse.Error
 import Language.Verse.Eval qualified as Eval
 import Language.Verse.Label
@@ -39,7 +40,7 @@ eval xs = do
   (e1, e2) <- liftEither $ runSupplyT $ do
     e <- rewrite =<< lift (runLexer P.parse xs)
     (,) <$> desugar Verification e <*> desugar Execution e
-  whenNothingM_ (runVerseT . Eval.eval Verification . verify $ succeeds e1) $
+  whenNothingM_ (runVerseT . Eval.eval Verification . verify $ check Effect.Succeeds e1) $
     abort StuckError
   whenNothingM (runVerseT $ Eval.eval Execution e2) $
     abort StuckError
@@ -54,7 +55,7 @@ eval2 path xs = do
   (e1, e2) <- liftEither $ runSupplyT $ do
     e <- rewrite =<< lift (P2.parse2 path xs)
     (,) <$> desugar Verification e <*> desugar Execution e
-  whenNothingM_ (runVerseT . Eval.eval Verification . verify $ succeeds e1) $
+  whenNothingM_ (runVerseT . Eval.eval Verification . verify $ check Effect.Succeeds e1) $
     abort StuckError
   whenNothingM (runVerseT $ Eval.eval Execution e2) $
     abort StuckError

@@ -1,5 +1,5 @@
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -12,17 +12,23 @@ module Language.Verse.Parse.Exp
   , expToPat
   ) where
 
+import Control.Applicative
 import Control.Comonad
+
 import Data.Char
 import Data.Function
-import Data.Functor.Apply
+import Data.Functor
 import Data.Maybe
 import Data.Monoid (mempty)
-import Data.Text(Text)
-import Language.Verse.Loc(L(..))
+import Data.Text (Text)
+import Data.Traversable (traverse)
+
+import Language.Verse.Loc (L (..))
+
 import Numeric (showHex)
 
-import Prelude (Double, Integer, foldr, error, (++), show)
+import Prelude (Double, Integer, error, foldr, show, (++))
+
 import Prettyprinter ( Pretty (..)
                      , Doc
                      , (<>)
@@ -169,7 +175,6 @@ deriving instance ( Show a
                   , Show (Pat a)
                   ) => Show (Pat a)
 
-
 data IdentExp a
  = IdentName a
  | IdentQualName [L (Exp a)] (L a)
@@ -178,8 +183,6 @@ data IdentExp a
 deriving instance ( Show a
                   , Show (Exp a)
                   ) => Show (IdentExp a)
-
-
 
 data AttributePart a
   = LessThan
@@ -190,8 +193,6 @@ data AttributePart a
 
 deriving instance ( Show (Exp a)
                   ) => Show (AttributePart a)
-
-
 
 instance ( Pretty a
          , Pretty (AttributePart a)
@@ -328,9 +329,6 @@ instance ( Pretty a
 
       prettyAt a = "@" <> pretty a
 
-
-
-
 instance ( Pretty a
          , Pretty (AttributePart a)
          , Pretty (Exp a)
@@ -361,7 +359,6 @@ braces x =
 specs :: (Pretty a) => [a] -> Doc ann
 specs = foldr ( \ e doc -> "<" <> pretty e <> ">" <> doc ) mempty
 
-
 instance ( Pretty a
          , Pretty (AttributePart a)
          , Pretty (Exp a)
@@ -391,11 +388,13 @@ instance ( Pretty (Exp a)
     Part e -> pretty e
 
 expToPat :: L (Exp a) -> Maybe (L (Pat a))
-expToPat exp@(extract -> Pat pat) = Just (pat <$ exp)
-expToPat _ex@(extract -> Paren e) = expToPat e
-expToPat _ex@(extract -> List [e]) = expToPat e
-expToPat exp@(extract -> ParenInvoke (expToPat -> Just p1) e2) = Just (Invoke <$> duplicate p1 <.> duplicate e2 <. exp)
-expToPat exp@(extract -> ExpInfixColon (expToPat -> Just p1) e2) = Just (InfixColon <$> duplicate p1 <.> duplicate e2 <. exp)
-expToPat _exp@(extract -> ExpVar (expToPat -> Just p@(extract -> Name name))) = Just (Var [] <$> duplicate (name <$ p))
-expToPat exp@(extract -> (expToPat -> Just p1) :->: (expToPat -> Just p2)) = Just (InfixArrow <$> duplicate p1 <.> duplicate p2 <. exp)
-expToPat _exp = Nothing
+expToPat = traverse $ \ case
+  Pat p -> Just p
+  Paren e -> extract <$> expToPat e
+  List [e] -> extract <$> expToPat e
+  ParenInvoke e1 e2 -> expToPat e1 <&> \ p1 -> Invoke p1 e2
+  ExpInfixColon e1 e2 -> expToPat e1 <&> \ p1 -> InfixColon p1 e2
+  ExpVar (expToPat -> Just p@(extract -> Name x)) -> Just . Var [] $ x <$ p
+  ExpSpecs e es -> expToPat e <&> \ p -> Specs p es
+  e1 :->: e2 -> InfixArrow <$> expToPat e1 <*> expToPat e2
+  _ -> Nothing

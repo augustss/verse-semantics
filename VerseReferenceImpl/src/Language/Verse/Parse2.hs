@@ -46,7 +46,7 @@ import Language.Verse.Pos qualified as Pos
 
 import Numeric(readHex, readBin)
 import Text.Parsec qualified as P
-import Text.Parsec((<|>), (<?>), ParseError, tokenPrim, tokens)
+import Text.Parsec (ParseError, (<|>), (<?>), tokenPrim, tokens)
 import Text.Parsec.Error qualified as PE
 import Text.Parsec.Pos qualified as PPos
 import Text.Parsec.Prim qualified as PPrim

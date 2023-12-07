@@ -8,7 +8,7 @@ module Language.Verse.Desugar.Exp
   , Env
   , unify
   , verify
-  , succeeds
+  , check
   , assume
   , forall'
   , bracketInvoke
@@ -23,8 +23,10 @@ import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Word (Word8)
+
 import Numeric (showHex)
 
+import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Label
 import Language.Verse.Name
 
@@ -40,10 +42,8 @@ data Exp f a
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Verify (f (Exp f a))
-  | Succeeds (f (Exp f a))
-  | Fails (f (Exp f a))
-  | Decides (f (Exp f a))
-  | Assume (f (Exp f a))
+  | Check !Split.Effect (f (Exp f a))
+  | Assume !Split.Effect (f (Exp f a))
   | Module {-# UNPACK #-} !Label !(Env f a) (f (Exp f a))
   | Struct {-# UNPACK #-} !Label !(Env f a) (f (Exp f a))
   | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(Env f a) (f (Exp f a))
@@ -95,8 +95,8 @@ instance ( Pretty (f (Exp f a))
     All e -> "all" <+> braces (pretty e)
     Not e -> "not" <+> parens (pretty e)
     Verify e -> "verify" <+> braces (pretty e)
-    Succeeds e -> "succeeds" <+> braces (pretty e)
-    Assume e -> "assume" <+> braces (pretty e)
+    Check eff e -> "check" <> angles (pretty eff) <+> braces (pretty e)
+    Assume eff e -> "assume" <> angles (pretty eff) <+> braces (pretty e)
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
       maybe mempty (parens . pretty) e1 <+>
@@ -155,11 +155,11 @@ unify = liftL2 (:=:)
 verify :: Functor f => f (Exp f a) -> f (Exp f a)
 verify = liftL1 Verify
 
-succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
-succeeds = liftL1 Succeeds
+check :: Functor f => Split.Effect -> f (Exp f a) -> f (Exp f a)
+check = liftL1 . Check
 
-assume :: Functor f => f (Exp f a) -> f (Exp f a)
-assume = liftL1 Assume
+assume :: Functor f => Split.Effect -> f (Exp f a) -> f (Exp f a)
+assume = liftL1 . Assume
 
 forall' :: Apply f => f a -> f (Exp f a) -> f (Exp f a)
 forall' = liftL2 (Def Forall)

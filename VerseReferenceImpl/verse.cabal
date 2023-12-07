@@ -35,6 +35,7 @@ library
     Language.Verse
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp
+    Language.Verse.Effect.Split
     Language.Verse.Error
     Language.Verse.Eval
     Language.Verse.Ident

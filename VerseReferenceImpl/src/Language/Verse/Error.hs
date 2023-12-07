@@ -17,6 +17,9 @@ data Error
   = LexError !Pos
   | IndentError !Pos !Indent !Indent
   | ParseError !Loc !Token
+  | OpenClosedError !Loc !Loc
+  | SplitEffectError !Loc !Loc
+  | SpecError !Loc
   | DefError !Loc !Loc !Ident
   | NameError !Loc !Name
   | IdentError !Loc !Ident
@@ -49,6 +52,14 @@ instance Pretty Error where
     ParseError x y ->
       pretty x <> colon <+> "parse" <+> "error" <> colon <+>
       "unexpected" <+> pretty y
+    OpenClosedError x y ->
+      pretty x <+> "and" <+> pretty y <> colon <+>
+      "multiple" <+> "open" <+> "or" <+> "closed" <+> "specifiers"
+    SplitEffectError x y ->
+      pretty x <+> "and" <+> pretty y <> colon <+>
+      "multiple" <+> "effect" <+> "specifiers"
+    SpecError x ->
+      pretty x <> colon <+> "unexpected" <+> "specifier"
     DefError x y z ->
       pretty x <+> "and" <+> pretty y <> colon <+>
       "conflicting" <+> "definitions" <> colon <+>

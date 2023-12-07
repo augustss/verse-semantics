@@ -1,16 +1,22 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Rewrite.Exp
   ( Exp (..)
+  , OC (..)
   ) where
 
 import Data.ByteString.Internal (w2c)
 import Data.Char
 import Data.Text (Text)
+
+import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Name
+
 import Data.Word (Word8)
+
 import Numeric (showHex)
 
 import Prettyprinter
@@ -26,9 +32,8 @@ data Exp f a
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Verify (f (Exp f a))
-  | Succeeds (f (Exp f a))
-  | Fails (f (Exp f a))
-  | Decides (f (Exp f a))
+  | Check Split.Effect (f (Exp f a))
+  | f (Exp f a) `OfType` f (Exp f a)
   | Assume (f (Exp f a))
   | Module (f (Exp f a))
   | Struct (f (Exp f a))
@@ -48,15 +53,13 @@ data Exp f a
   | Float {-# UNPACK #-} !Double
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
-  | Lam (f (Exp f a)) (f (Exp f a))
-  | OLam (f (Exp f a)) (f (Exp f a))
+  | Lam (f (Exp f a)) !OC !Split.Effect !(Maybe (f (Exp f a))) (f (Exp f a))
   | MixfixVarColonEqual (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | InfixColonEqual !Bool (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
   | MixfixArrowColonEqual (f a) (f a) (f (Exp f a))
   | Name a
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
-  | f (Exp f a) :|>: f (Exp f a)
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f Text)
@@ -80,7 +83,8 @@ instance ( Pretty (f (Exp f a))
     All e -> "all" <+> braces (pretty e)
     Not e -> "not" <+> parens (pretty e)
     Verify e -> "verify" <+> braces (pretty e)
-    Succeeds e -> "succeeds" <+> braces (pretty e)
+    Check eff e -> "check" <> angles (pretty eff) <+> braces (pretty e)
+    e1 `OfType` e2 -> parens (pretty e1) <+> "|>" <+> parens (pretty e2)
     Class e1 e2 ->
       "class" <>
       maybe mempty (parens . pretty) e1 <+>
@@ -95,8 +99,13 @@ instance ( Pretty (f (Exp f a))
     Float x -> pretty x
     Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
-    Lam e1 e2 -> "lam" <> parens (pretty e1) <+> braces (pretty e2)
-    OLam e1 e2 -> "olam" <> parens (pretty e1) <+> braces (pretty e2)
+    Lam e1 oc eff e2 e3 ->
+      "function" <>
+      parens (pretty e1) <>
+      angles (pretty oc) <>
+      angles (pretty eff) <>
+      maybe mempty (\ e2 -> colon <> pretty e2) e2 <+>
+      braces (pretty e3)
     MixfixVarColonEqual x y e1 e2 ->
       "var" <+> pretty x <> colon <>
       parens (pretty y <+> equals <+> pretty e1) <+>
@@ -109,7 +118,6 @@ instance ( Pretty (f (Exp f a))
     IfArchetypeName x e1 e2 ->
       "if" <+> parens ("archetype" <> parens (pretty x)) <+> braces (pretty e1) <+>
       "else" <+> braces (pretty e2)
-    e1 :|>: e2 -> pretty e1 <+> "|>" <+> pretty e2
     _ -> "unimplemented"
     where
       tupled =
@@ -121,3 +129,10 @@ instance ( Pretty (f (Exp f a))
       braces x =
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
+
+data OC = O | C deriving Show
+
+instance Pretty OC where
+  pretty = \ case
+    O -> "open"
+    C -> "closed"

@@ -43,6 +43,8 @@ import Data.String
 
 import Language.Verse.Desugar.Exp (Exp ((:*>:), (:=:), (:.:), (:|:)))
 import Language.Verse.Desugar.Exp qualified as Exp
+import Language.Verse.Effect.Split qualified as Split (Effect)
+import Language.Verse.Effect.Split qualified as Effect
 import Language.Verse.Error
 import Language.Verse.Ident (Ident, IdentMap)
 import Language.Verse.Ident qualified as Ident
@@ -174,14 +176,13 @@ evalExp e = case extract e of
     evalNot e
   Exp.Verify e ->
     evalVerify e
-  Exp.Succeeds e' ->
-    evalSucceeds (loc e) e'
-  Exp.Fails e ->
+  Exp.Check Effect.Fails e ->
     evalFails e
-  Exp.Decides e' ->
+  Exp.Check Effect.Succeeds e' ->
+    evalSucceeds (loc e) e'
+  Exp.Check Effect.Decides e' ->
     evalDecides (loc e) e'
-  Exp.Assume e' ->
-    evalAssume (loc e) e'
+  Exp.Assume eff e' -> evalAssume (loc e) eff e'
   Exp.Module i xs e -> \ s s' -> do
     xs <- lift $ freshEnv xs
     _ <- localNames xs $ evalExp e s s'
@@ -424,11 +425,24 @@ evalVerify e s s' = do
 evalAssume
   :: MonadEval m
   => Loc
+  -> Split.Effect
   -> L (Exp L Ident)
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-evalAssume loc e s s' = do
+evalAssume loc eff e s s' = case eff of
+  Effect.Fails -> empty
+  Effect.Succeeds -> evalAssume' loc e s s'
+  Effect.Decides -> lift decide *> evalAssume' loc e s s'
+
+evalAssume'
+  :: MonadEval m
+  => Loc
+  -> L (Exp L Ident)
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+evalAssume' loc e s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
   var <- lift freshVar'
   fork' $ do
