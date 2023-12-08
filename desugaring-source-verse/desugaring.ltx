@@ -583,7 +583,7 @@ $$
 \multicolumn{4}{l}{\mbox{\it Closed functions}} \\
 \rulename{mcfun+} &  |DMe (inp2 f si mdpos) (functionOCX closed t_1 fx t_2)|
 & = & \multicolumn{2}{@@{}l}{|verify(forall i (j := (Me (inp2 i solve mdneg) t_1);
-                                            check fx (z := DAe (inp f si) j; Me (inp z si) t_2))); |} \\
+                                            check fx (z := DAe (inp f si) j; Me (inp2 z si mdpos) t_2))); |} \\
 & &   & |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)| \\[1mm]
 \rulename{mcfun-} &  |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)|
 & = & |lam i (j := Me (inp2 i infer mdpos) t_1;
