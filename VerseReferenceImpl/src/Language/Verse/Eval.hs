@@ -871,6 +871,7 @@ invokeIntrinsicDom loc = \ case
   Intrinsic.To -> to
   Intrinsic.Any -> liftPrim $ lift . any
   Intrinsic.Int -> liftPrim $ int loc
+  Intrinsic.Rational -> liftPrim $ rational loc
   Intrinsic.Float -> liftPrim $ float loc
   Intrinsic.Char -> liftPrim $ char loc
   Intrinsic.Char32 -> liftPrim $ char32 loc
@@ -1088,6 +1089,19 @@ int loc var = domMatch_ $ do
     Val.Any -> unify' loc var =<< lift (newVar' Val.AnyInt)
     Val.AnyRational -> unify' loc var =<< lift (newVar' Val.AnyInt)
     Val.Rational x | denominator x == 1 -> pure ()
+    Val.AnyInt -> pure ()
+    Val.Int _ -> pure ()
+    _ -> empty
+  pure var
+
+rational
+  :: MonadEval m
+  => Loc -> VarVal m -> EvalT m (DomMatch m)
+rational loc var = domMatch_ $ do
+  fork' $ lift (readVar' var) >>= \ case
+    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyRational)
+    Val.AnyRational -> pure ()
+    Val.Rational _ -> pure ()
     Val.AnyInt -> pure ()
     Val.Int _ -> pure ()
     _ -> empty

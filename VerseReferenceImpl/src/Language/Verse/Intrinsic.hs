@@ -22,6 +22,7 @@ data Intrinsic
   | To
   | Any
   | Int
+  | Rational
   | Float
   | Char
   | Char32
@@ -43,6 +44,7 @@ toString = \ case
   To -> "operator'..'"
   Any -> "any"
   Int -> "int"
+  Rational -> "rational"
   Float -> "float"
   Char -> "char"
   Char32 -> "char32"

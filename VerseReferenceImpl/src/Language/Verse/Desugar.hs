@@ -642,6 +642,7 @@ unifyEnv loc =
   , Intrinsic.To
   , Intrinsic.Any
   , Intrinsic.Int
+  , Intrinsic.Rational
   , Intrinsic.Float
   , Intrinsic.Char
   , Intrinsic.Char32
