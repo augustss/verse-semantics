@@ -19,7 +19,6 @@ import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Reader
 import Control.Monad.Supply
-import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Verse
 
 import Data.Bool
@@ -39,7 +38,6 @@ import Data.Monoid
 import Data.Ord
 import Data.Ratio
 import Data.Tuple
-import Data.String
 
 import Language.Verse.Desugar.Exp (Exp ((:*>:), (:=:), (:.:), (:|:)))
 import Language.Verse.Desugar.Exp qualified as Exp
@@ -128,10 +126,9 @@ type Env m = Val.VarEnv Ident m
 type Archetype m = Env m
 
 runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> Mode -> VerseT m a
-runEvalT m mode = do
-  env <- newEnv
-  runReaderT m R {..}
+runEvalT m mode = runReaderT m R {..}
   where
+    env = mempty
     assumed = False
     archetype = mempty
     archetype' = mempty
@@ -233,6 +230,9 @@ evalExp e = case extract e of
   Exp.OLam xs e_domain e -> \ s s' -> ask >>= \ r -> lift $ do
     unifyS s s'
     newVar' . Val.OLam r.env xs e_domain e =<< freshVar'
+  Exp.Intrinsic x -> \ s s' -> lift $ do
+    unifyS s s'
+    newVar' . Val.Intrinsic x =<< freshVar'
   Exp.BracketInvoke e1 e2 -> \ s s' -> do
     s'' <- lift freshS
     var1 <- evalExp e1 s s''
@@ -1264,32 +1264,6 @@ evalExpList xs s s' = case xs of
     var <- evalExp x s s''
     vars <- evalExpList xs s'' s'
     pure $ var:vars
-
-newEnv :: (MonadRef m, MonadSupply Int m) => VerseT m (Env m)
-newEnv = execWriterT $ do
-  tell' Intrinsic.Less
-  tell' Intrinsic.LessEqual
-  tell' Intrinsic.Greater
-  tell' Intrinsic.GreaterEqual
-  tell' Intrinsic.Plus
-  tell' Intrinsic.PrefixPlus
-  tell' Intrinsic.Minus
-  tell' Intrinsic.PrefixMinus
-  tell' Intrinsic.Multiply
-  tell' Intrinsic.Divide
-  tell' Intrinsic.To
-  tell' Intrinsic.Any
-  tell' Intrinsic.Int
-  tell' Intrinsic.Float
-  tell' Intrinsic.Char
-  tell' Intrinsic.Char32
-  tell' Intrinsic.Function
-  tell' Intrinsic.Query
-  where
-    tell' x =
-      tell . HashMap.singleton (fromString $ Intrinsic.toString x) . Val =<<
-      lift . newVar' . Val.Intrinsic x =<<
-      lift freshVar'
 
 filterNames :: IdentMap a -> HashMap Name a
 filterNames =

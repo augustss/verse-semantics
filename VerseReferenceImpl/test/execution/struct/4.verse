@@ -1,15 +1,15 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-any(exists X) := X
+Any(exists X) := X
 
-type := any
+type := Any
 
-list(t:type) := (X:any => X = false|truth{:any})
+list(t:type) := (X:Any => X = false|truth{:Any})
 
 cons(t:type) := struct:
   Head:t
   Tail:list(t)
 
-logic(X:any) := X = false|true
+logic(X:Any) := X = false|true
 
 X := cons(logic):
   Head := true

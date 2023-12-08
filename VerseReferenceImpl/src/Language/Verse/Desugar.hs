@@ -17,6 +17,7 @@ import Data.Functor
 import Data.Functor.Apply
 import Data.HashMap.Strict (foldlWithKey')
 import Data.HashMap.Strict qualified as HashMap
+import Data.String
 
 import Language.Verse.Desugar.Exp
   ( Exp (..)
@@ -35,6 +36,7 @@ import Language.Verse.Effect.Split qualified as Effect
 import Language.Verse.Error
 import Language.Verse.Ident (Ident, IdentMap)
 import Language.Verse.Ident qualified as Ident
+import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Mode
@@ -84,9 +86,15 @@ desugar'
   => L (Rewrite.Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
 desugar' e = ask >>= \ case
-  Exec -> desugarExp e
-  Pos -> verifyM . checkM Effect.Succeeds $ posM $ desugarExp e
-  Neg -> desugarExp e
+  Exec -> desugar'' e
+  Pos -> verifyM . checkM Effect.Succeeds . posM $ desugar'' e
+  Neg -> desugar'' e
+
+desugar''
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+desugar'' e = unifyEnv (loc e) `thenM` desugarExp e
 
 desugarExp
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -617,6 +625,37 @@ invokeM
 invokeM x pi f = case pi of
   False -> name <$> freshIdent (loc x <> loc f)
   True -> pure $ bracketInvoke f x
+
+unifyEnv :: Monad m => Loc -> DesugarT m (L (Exp L Ident))
+unifyEnv loc =
+  list <$> traverse f
+  [ Intrinsic.Less
+  , Intrinsic.LessEqual
+  , Intrinsic.Greater
+  , Intrinsic.GreaterEqual
+  , Intrinsic.Plus
+  , Intrinsic.PrefixPlus
+  , Intrinsic.Minus
+  , Intrinsic.PrefixMinus
+  , Intrinsic.Multiply
+  , Intrinsic.Divide
+  , Intrinsic.To
+  , Intrinsic.Any
+  , Intrinsic.Int
+  , Intrinsic.Float
+  , Intrinsic.Char
+  , Intrinsic.Char32
+  , Intrinsic.Function
+  , Intrinsic.Query
+  ]
+  where
+    list = \ case
+      [] -> L loc $ Tuple []
+      x:xs -> foldr then' x xs
+    f x = do
+      let x' = L loc . Ident.Name . fromString $ Intrinsic.toString x
+      tellFunName x'
+      pure $ unify (name x') (L loc $ Intrinsic x)
 
 negM :: MonadReader R m => m a -> m a
 negM = local (const Neg)

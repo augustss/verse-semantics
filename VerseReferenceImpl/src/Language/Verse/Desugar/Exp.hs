@@ -17,8 +17,8 @@ module Language.Verse.Desugar.Exp
   , then'
   ) where
 
-import Data.ByteString.Internal(w2c)
-import Data.Char(ord)
+import Data.ByteString.Internal (w2c)
+import Data.Char (ord)
 import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
@@ -27,6 +27,7 @@ import Data.Word (Word8)
 import Numeric (showHex)
 
 import Language.Verse.Effect.Split qualified as Split
+import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Label
 import Language.Verse.Name
 
@@ -62,6 +63,7 @@ data Exp f a
   | Char32 {-# UNPACK #-} !Char
   | Lam a (f (Exp f a))
   | OLam !(Env f a) (f (Exp f a)) (f (Exp f a))
+  | Intrinsic !Intrinsic
   | Name a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
@@ -120,6 +122,7 @@ instance ( Pretty (f (Exp f a))
       backslash <+> pretty x <+> braces (pretty e2)
     OLam xs e1 e2 ->
       "olam" <> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
+    Intrinsic x -> pretty x
     Name x -> pretty x
     IfArchetypeName x y e1 e2 ->
       "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
