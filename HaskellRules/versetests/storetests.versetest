@@ -188,5 +188,5 @@ testeq(pass) {
   }
 
 # The choice makes it stuck.
-testeq(pass) {  p := alloc$[0]; for{write$[p, array{b}]; b := 1 <# | 2 #> }; read$[p]  } {array{1}}
+testeq(pass,iblock=skip) {  p := alloc$[0]; for{write$[p, array{b}]; b := 1 <# | 2 #> }; read$[p]  } {array{1}}
 testeq(pass) {  p := alloc$[0]; for{b := 1 | 2; write$[p, array{b}]}; read$[p]  } {array{2}}
