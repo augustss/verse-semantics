@@ -239,6 +239,8 @@
 %format succeedKW = "\textbf{suc}"
 %format verifyKW = "\textbf{verify}"
 %format decideKW = "\textbf{dec}"
+%format forallKW = "\forall{}"
+%format guard    = "\blacktriangleright{}"
 
 %format assume (x) = "\textbf{asm}\{" x "\}"
 %format assert (x) = "\textbf{suc}\{" x "\}"
@@ -246,6 +248,7 @@
 %format verify (x) = "\textbf{verify}\{" x "\}"
 %format decide (x) = "\textbf{dec}\{" x "\}"
 %format bullet = "\bullet"
+%format forall (x) (y) = "\forall" x ".\," y
 
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"
@@ -257,8 +260,6 @@
 %format defKW = "\exists{}"
 %format defhdr (x) = "\exists" x ".\,"
 %format def (x) (y) = "\exists" x ".\," y
-%format forallKW = "\forall{}"
-%format forall (x) (y) = "\forall" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
 %format llet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\," b
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
