@@ -120,7 +120,7 @@ desugarExp''
   -> DesugarT m (Exp L Ident)
 desugarExp'' e pi i = case extract e of
   (Rewrite.:=:) e1 e2 -> do
-    e1 <- desugarExp' e1 pi i
+    e1 <- desugarExp e1
     e2 <- desugarExp' e2 pi i
     pure $ e1 :=: e2
   (Rewrite.:.:) e' x ->
@@ -395,7 +395,7 @@ desugarOLam
   -> DesugarT m (Exp L Ident)
 desugarOLam loc e1 eff e2 e3 pi f = ask >>= \ case
   Exec -> execOLam loc e1 e2 e3 pi f
-  Neg -> negOLam e1 eff e2 e3
+  Neg -> negOLam loc e1 eff e2 e3 pi f
   Pos -> posOLam loc e1 eff e2 e3 pi f
 
 execOLam
@@ -413,7 +413,7 @@ execOLam loc' e1 e2 e3 pi f = do
     b <- name <$> freshIdent (loc e1)
     e1 <- desugarExp' e1 True b
     pure (unify a e1 `then'` b, a)
-  function' loc' pi f . OLam xs e1 <$> exists do
+  function' loc' pi f . OLam f xs e1 <$> exists do
     b <- name <$> freshIdent (loc e3)
     unify b <$> invokeM a pi f `thenM` case e2 of
       Just e2 -> ofTypeD e3 e2 pi b
@@ -448,7 +448,7 @@ assumePosOLam e1 eff e2 e3 pi f = do
     b <- name <$> freshIdent (loc e1)
     e1 <- desugarExp' e1 True b
     pure (unify a e1 `then'` b, a)
-  OLam xs e1 <$> case e2 of
+  OLam f xs e1 <$> case e2 of
     Just e2 -> negM $ abstractD eff e2
     Nothing -> exists do
       b <- name <$> freshIdent (loc e3)
@@ -456,26 +456,32 @@ assumePosOLam e1 eff e2 e3 pi f = do
 
 negOLam
   :: (MonadAbort Error m, MonadSupply Label m)
-  => L (Rewrite.Exp L Ident)
+  => Loc
+  -> L (Rewrite.Exp L Ident)
   -> Split.Effect
   -> Maybe (L (Rewrite.Exp L Ident))
   -> L (Rewrite.Exp L Ident)
+  -> Bool
+  -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
 negOLam = assumeNegOLam
 
 assumeNegOLam
   :: (MonadAbort Error m, MonadSupply Label m)
-  => L (Rewrite.Exp L Ident)
+  => Loc
+  -> L (Rewrite.Exp L Ident)
   -> Split.Effect
   -> Maybe (L (Rewrite.Exp L Ident))
   -> L (Rewrite.Exp L Ident)
+  -> Bool
+  -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
-assumeNegOLam e1 eff e2 e3 = do
+assumeNegOLam loc' e1 eff e2 e3 pi f = do
   (e1, xs) <- lift $ runDesugarT $ do
     i <- name <$> freshIdent (loc e1)
     e1 <- posM $ desugarExp' e1 True i
     pure $ e1 `then'` i
-  OLam xs e1 <$> case e2 of
+  function' loc' pi f . OLam f xs e1 <$> case e2 of
     Just e2 -> abstractD eff e2
     Nothing -> concreteD eff e3
 

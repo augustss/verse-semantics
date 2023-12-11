@@ -227,9 +227,9 @@ evalExp e = case extract e of
   Exp.Lam x e -> \ s s' -> ask >>= \ r -> lift $ do
     unifyS s s'
     newVar' $ Val.Lam r.env x e
-  Exp.OLam xs e_domain e -> \ s s' -> ask >>= \ r -> lift $ do
-    unifyS s s'
-    newVar' . Val.OLam r.env xs e_domain e =<< freshVar'
+  Exp.OLam f xs e_domain e -> \ s s' -> ask >>= \ r -> do
+    var_f <- evalExp f s s'
+    lift . newVar' $ Val.OLam r.env xs e_domain e var_f
   Exp.Intrinsic x -> \ s s' -> lift $ do
     unifyS s s'
     newVar' . Val.Intrinsic x =<< freshVar'

@@ -62,7 +62,7 @@ data Exp f a
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
   | Lam a (f (Exp f a))
-  | OLam !(Env f a) (f (Exp f a)) (f (Exp f a))
+  | OLam (f (Exp f a)) !(Env f a) (f (Exp f a)) (f (Exp f a))
   | Intrinsic !Intrinsic
   | Name a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
@@ -120,8 +120,8 @@ instance ( Pretty (f (Exp f a))
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Lam x e2 ->
       backslash <+> pretty x <+> braces (pretty e2)
-    OLam xs e1 e2 ->
-      "olam" <> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
+    OLam f xs e1 e2 ->
+      "olam" <+> pretty f <+> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
     Intrinsic x -> pretty x
     Name x -> pretty x
     IfArchetypeName x y e1 e2 ->
@@ -170,8 +170,8 @@ forall' = liftL2 (Def Forall)
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
 
-olam :: Apply f => Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-olam = liftL2 . OLam
+olam :: Apply f => f (Exp f a) -> Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+olam f env e1 e2 = OLam f env e1 e2 <$ f <. e1 <. e2
 
 name :: Functor f => f a -> f (Exp f a)
 name = fmap Name
