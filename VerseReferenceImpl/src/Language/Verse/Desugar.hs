@@ -119,10 +119,15 @@ desugarExp''
   -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
 desugarExp'' e pi i = case extract e of
-  (Rewrite.:=:) e1 e2 -> do
-    e1 <- desugarExp e1
-    e2 <- desugarExp' e2 pi i
-    pure $ e1 :=: e2
+  (Rewrite.:=:) e1 e2 -> case pi of
+    False -> valM i (e $>) $ do
+      e1 <- desugarExp e1
+      e2 <- desugarExp e2
+      pure $ e1 :=: e2
+    True -> do
+      e1 <- desugarExp' e1 pi i
+      e2 <- desugarExp' e2 pi i
+      pure $ e1 :=: e2
   (Rewrite.:.:) e' x ->
     valM i (e $>) $ desugarExp e' <&> (:.: x)
   (Rewrite.:|:) e1 e2 -> do
