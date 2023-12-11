@@ -1152,6 +1152,7 @@ function loc var = domMatch_ $ do
     Val.Lam {} -> pure ()
     Val.AnyOLam -> pure ()
     Val.OLam {} -> pure ()
+    Val.Intrinsic {} -> pure ()
     _ -> empty
   pure var
 
