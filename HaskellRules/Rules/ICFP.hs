@@ -7,7 +7,9 @@ module Rules.ICFP(
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, anf, anfK, execX, choiceX, ltExpr) where
+  isRecursive, anf, anfK, execX, execX1, choiceX, ltExpr,
+  hasStore, isChoiceFree
+  ) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe

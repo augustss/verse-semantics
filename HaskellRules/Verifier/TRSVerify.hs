@@ -72,8 +72,9 @@ tests = -- take 6
   , ("ex_choice_01", ex_choice_01, True)
   , ("ex_if_asm_00", ex_if_asm_00, True)
   , ("ex1_mini", ex1_mini, True)
-  , ("ex_asm_var", ex_asm_var, True)
+  -- not needed, asm's should only have uni-vars, ("ex_asm_var", ex_asm_var, True)
   , ("ex_ifb", ex_ifb, True)
+  , ("ex_L1", ex_L1, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -687,9 +688,9 @@ ex1_mini = lAMs [x] (
 
 ex_asm_var :: Expr
 ex_asm_var = Verify $ lAMs [x] (
-                ((Assume (Var x)) :=: Int 10)
+                (Assume (Var x) :=: Int 10)
                 :>:
-                (Verify (Assert (Var x :=: Int 10)) )
+                Verify (Assert (Var x :=: Int 10))
              )
              where
               x = ident "x"
@@ -699,3 +700,24 @@ ex_ifb = Verify $ Assert (iteB [x, y] (Var x :=: Int 1 :>: Var y :=: Int 1 :>: I
   where
     x = ident "x"
     y = ident "y"
+
+
+-- See "Verse: tricky cases" https://docs.google.com/document/d/17Ytcy9I_fDzW-a1FGYQkLh3oObFg47Ge6GdRy-FZjLM/edit
+
+{- L1
+
+    f():int := 0;  # or loop()
+    check<succeeds>{ y:any; int[y]; y=f() }
+
+-}
+
+ex_L1 :: Expr
+ex_L1 = eXIs [f] $
+          (Var f :=: LAM x (Arr [] :>>: UNI r (Assume (iNT (Var r)) :>: Var r)))
+          :>:
+          Verify (Assert (EXI y (iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0)))
+  where
+    f = ident "f"
+    x = ident "x"
+    y = ident "y"
+    r = ident "r"
