@@ -75,6 +75,7 @@ tests = -- take 6
   -- not needed, asm's should only have uni-vars, ("ex_asm_var", ex_asm_var, True)
   , ("ex_ifb", ex_ifb, True)
   , ("ex_L1", ex_L1, True)
+  , ("ex_L2", ex_L2, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -716,6 +717,24 @@ ex_L1 = eXIs [f] $
           (Var f :=: LAM x (Arr [] :>>: UNI r (Assume (iNT (Var r)) :>: Var r)))
           :>:
           Verify (Assert (EXI y (iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0)))
+  where
+    f = ident "f"
+    x = ident "x"
+    y = ident "y"
+    r = ident "r"
+
+{- L2
+
+    f():int := 0;  # or loop()
+    check<succeeds>{ y:any; y='m'; int[y]; y=f() }
+
+-}
+
+ex_L2 :: Expr
+ex_L2 = eXIs [f] $
+          (Var f :=: LAM x (Arr [] :>>: UNI r (Assume (iNT (Var r)) :>: Var r)))
+          :>:
+          Verify (Assert (EXI y (Var y :=: Char 'm' :>: iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0)))
   where
     f = ident "f"
     x = ident "x"
