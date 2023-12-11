@@ -536,6 +536,11 @@ instance Rec Expr where
            [ (n, a' :>: b)  | (n,a') <- rec r s a ]
         ++ [ (n, a  :>: b') | (n,b') <- rec r s b ]
 
+      a :>>: b ->
+           [ (n, a' :>>: b)  | (n,a') <- rec r s a ]
+        ++ [ (n, a  :>>: b') | (n,b') <- rec r s b ]
+
+
       If a b c ->
             [ (n, If a' b c) | (n,a') <- rec r s a ]
           ++ [ (n, If a b' c) | (n,b') <- rec r s b ]

@@ -128,7 +128,7 @@ icfpeVerifier = icfp
   , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
               <> generalizedIcfpRules
               <> uniRules
-              <> assumeAssertRules
+              <> (assumeAssertRules -= "suc-seq")
               <> verifierRules
               <> directRules
   }
@@ -269,6 +269,10 @@ generalizedIcfpRules env lhs =
    ++
    "FAIL-ELIM-R" `name`
    do Fail :>: _ <- [lhs]
+      pure Fail
+   ++
+   "FAIL-ELIM-R'" `name`
+   do Fail :>>: _ <- [lhs]
       pure Fail
    ++
    "FAIL-ELIM-L" `name`

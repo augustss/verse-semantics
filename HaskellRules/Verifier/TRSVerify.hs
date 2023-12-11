@@ -75,7 +75,8 @@ tests = -- take 6
   -- not needed, asm's should only have uni-vars, ("ex_asm_var", ex_asm_var, True)
   , ("ex_ifb", ex_ifb, True)
   , ("ex_L1", ex_L1, True)
-  , ("ex_L2", ex_L2, True)
+  , ("ex_L2", ex_L2, False)
+  , ("ex_PC1", ex_PC1, False)
   ]
 
 --------------------------------------------------------------------------------
@@ -739,4 +740,23 @@ ex_L2 = eXIs [f] $
     f = ident "f"
     x = ident "x"
     y = ident "y"
+    r = ident "r"
+
+{- PC1
+
+  foo(x:int)<succeeds> := int[x]    # No result signature
+  check<succeeds> { z := "monkey" ; foo[z] }
+
+-}
+
+ex_PC1 :: Expr
+ex_PC1 = eXIs [f] $
+          (Var f :=: LAM i (EXI x ((Var x :=: iNT (Var i) :>: Int 0) :>>: UNI r (Assume (Var r :=: iNT (Var x) :>: Int 0) :>: Var r))))
+          :>:
+          Verify (Assert (EXI y (Var y :=: Char 'm' :>: (Var y :=: Var f :@: Var y) :>: Int 0)))
+  where
+    f = ident "f"
+    x = ident "x"
+    y = ident "y"
+    i = ident "i"
     r = ident "r"
