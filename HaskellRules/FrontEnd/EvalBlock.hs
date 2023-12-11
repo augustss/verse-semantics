@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns  #-}
+{-# OPTIONS_GHC -Wall -Wno-incomplete-uni-patterns -Wno-unrecognised-warning-flags -Wno-x-partial #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -27,6 +27,7 @@ import System.IO
 import System.IO.Unsafe(unsafePerformIO)
 import Rules.Core(TRSFlags, RuleEnv(..))
 import FrontEnd.Expr(Expr(..), Ident(..), Lit(..), noLoc, seqE)
+import qualified FrontEnd.Expr as Expr
 import FrontEnd.Desugar(getFree, substMany, getAllVars)
 
 -- TODO:
@@ -43,7 +44,7 @@ opIntAdd, opIntSub, opIntMul, opIntDiv, opIntNeg, opIntPlus, opIntGt, opIntGe, o
 opRatAdd, opRatSub, opRatMul, opRatDiv, opRatNeg, opRatPlus, opRatGt, opRatGe, opRatLt, opRatLe, opRatNe :: Op
 opF32Add, opF32Sub, opF32Mul, opF32Div, opF32Neg, opF32Plus, opF32Gt, opF32Ge, opF32Lt, opF32Le, opF32Ne :: Op
 opF64Add, opF64Sub, opF64Mul, opF64Div, opF64Neg, opF64Plus, opF64Gt, opF64Ge, opF64Lt, opF64Le, opF64Ne :: Op
-opIsInt, opIsRat, opIsArr, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn :: Op
+opIsInt, opIsRat, opIsArr, opIsPath, opIsMap, opIsF32, opIsF64, opIsChr, opIsStr, opIsFcn, opMkMap :: Op
 opErr, opArrLen, opArrConc, opMapAp, opCons, opAlloc, opRead, opWrite, opAddTo, opSubFrom, opDotDot,opPrint, opAppend :: Op
 
 opIntGt    = "intGT$"
@@ -100,7 +101,10 @@ opIsChr = "isChr$"
 opIsStr = "isStr$"
 opIsFcn = "isFcn$"
 opIsArr = "isArr$"
+opIsMap = "isMap$"
+opIsPath = "isPath$"
 opArrLen= "arrLen$"
+opMkMap = "mkMap$"
 opMapAp = "mapAp$"
 opCons  = "cons$"
 opAlloc = "alloc$"
@@ -183,6 +187,7 @@ evalUnderLambda trcEffs = transformBi ev
 #if EXT
         ev (BExt a r x) = BExt (ev a) (transformBi ev r) (transformBi ev x)
 #endif
+        ev (BMap kvs) = BMap $ map (\ (k,v) -> (transformBi ev k, transformBi ev v)) kvs
         evalB b =
           case evalBlock dummyHeap (trcEffs ++ lambdaEffs) [] b of
             BCBlk b' -> b'
@@ -282,6 +287,8 @@ isBVar :: BValue -> Bool
 isBVar BVar{} = True
 isBVar _ = False
 
+type Path = String
+
 data BLiteral
   = BRat Rational
   | BF32 Float
@@ -289,6 +296,7 @@ data BLiteral
   | BStr String
   | BChr Char
   | BRef BPtr
+  | BPth Path
   deriving (Show, Eq, Ord, Data)
 
 pattern BInt :: Integer -> BLiteral
@@ -306,10 +314,14 @@ data BHNF
 #if EXT
   | BExt BHNF BValue BValue
 #endif
+  | BMap [(BHNF, BValue)]
   deriving (Show, Eq, Ord, Data)
 
 pattern BVInt :: Integer -> BValue
 pattern BVInt i = BVLit (BInt i)
+
+pattern BVPath :: Path -> BValue
+pattern BVPath i = BVLit (BPth i)
 
 pattern BVRat :: Rational -> BValue
 pattern BVRat i = BVLit (BRat i)
@@ -328,6 +340,9 @@ pattern BVRef i = BHNF (BLit (BRef i))
 
 pattern BVArr :: [BValue] -> BValue
 pattern BVArr vs = BHNF (BArr vs)
+
+pattern BVMap :: [(BHNF, BValue)] -> BValue
+pattern BVMap vs = BHNF (BMap vs)
 
 pattern BVLam :: BIdent -> BBlock -> BValue
 pattern BVLam i b = BHNF (BHLam i b)
@@ -441,6 +456,7 @@ instance Pretty BHNF where
   pPrintPrec l _ (BExt a r x) = parens $
     text "\\ arg . IF arg=" <> pPrintPrec l 0 a <+> text "THEN" <+> pPrintPrec l 0 r <+> text "ELSE" <+> pPrintPrec l 0 x
 #endif
+  pPrintPrec l _ (BMap kvs) = text "mkMap" <> parens (fsep (punctuate comma (map (pPrintPrec l 0) kvs)))
 
 instance Pretty Effect where
   pPrintPrec _ _ e = text $ tail $ show e
@@ -454,6 +470,7 @@ instance Pretty BLiteral where
   pPrintPrec l p (BStr s) = pPrintPrec l p s
   pPrintPrec l p (BChr c) = pPrintPrec l p c
   pPrintPrec l p (BRef r) = pPrintPrec l p r
+  pPrintPrec _ _ (BPth s) = text s
 
 {-
 instance Pretty EffectType where
@@ -592,12 +609,14 @@ instance Bound BHNF where
 #if EXT
   allBVars (BExt a r x) = allBVars (a, r, x)
 #endif
+  allBVars (BMap vs) = unionMap allBVars vs
   freeBVars (BLit _) = []
   freeBVars (BArr vs) = unionMap freeBVars vs
   freeBVars (BHLam i b) = freeBVars b \\ [i]
 #if EXT
   freeBVars (BExt a r x) = freeBVars (a, r, x)
 #endif
+  freeBVars (BMap vs) = unionMap freeBVars vs
   bsubst' _ h@(BLit _) = h
   bsubst' s (BArr vs) = BArr (map (bsubst' s) vs)
   bsubst' s h@(BHLam i b)
@@ -609,6 +628,7 @@ instance Bound BHNF where
 #if EXT
   bsubst' s (BExt a r x) = BExt (bsubst' s a) (bsubst' s r) (bsubst' s x)
 #endif
+  bsubst' s (BMap kvs) = BMap $ map (\ (k, v) -> (bsubst' s k, bsubst' s v)) kvs
 
 freshenLambda :: [BIdent] -> (BIdent, BBlock) -> (BIdent, BBlock)
 freshenLambda bnd (i, b) | i `notElem` bnd = (i, b)
@@ -658,6 +678,9 @@ hnfToCore (BHLam i e) = lam (bIdentToIdent i) (blockToCore e)
 #if EXT
 hnfToCore (BExt a r x) = Lam (Ident noLoc "_") (Variable (Ident noLoc $ "EXT" ++ prettyShow (a, r, x)))
 #endif
+hnfToCore (BMap kvs) = Map $ map mkFun kvs
+  where mkFun (k, v) = --Function [(hnfToCore k, [])] (valueToCore v)
+                       InfixOp (hnfToCore k) (Ident noLoc "=>") (valueToCore v)
 
 bLitToLit :: BLiteral -> Lit
 bLitToLit (BRat r) | denominator r == 1 = LitInt (numerator r)
@@ -667,6 +690,7 @@ bLitToLit (BF64 f) = LitRat (fromRational $ toRational f) "f64"
 bLitToLit (BChr i) = LitChar i
 bLitToLit (BStr i) = LitStr i
 bLitToLit (BRef r) = LitPtr (coerce r)
+bLitToLit (BPth i) = LitPath (Expr.Path i)
 
 
 exprToCore :: BExpr -> Expr
@@ -757,6 +781,7 @@ litToBLit (LitRat s "f64") = BF64 $ toRealFloat s
 litToBLit (LitChar c) = BChr c
 litToBLit (LitStr s) = BStr s
 litToBLit (LitPtr i) = BRef $ coerce i
+litToBLit (LitPath (Expr.Path i)) = BPth i
 litToBLit l = error $ "litToBLit: " ++ show l
 
 cExpr :: Expr -> A BExpr
@@ -822,12 +847,16 @@ primOpEffs o = fromMaybe [] $ M.lookup o $ M.fromList [
   (opF64Ne, [Efails]),
 
   (opIsInt, [Efails]),
+  (opIsPath,[Efails]),
+  (opIsMap, [Efails]),
   (opIsRat, [Efails]),
   (opIsF32, [Efails]),
   (opIsF64, [Efails]),
   (opIsChr, [Efails]),
   (opIsStr, [Efails]),
   (opIsFcn, [Efails]),
+
+  (opMkMap, []),  -- XXX is this true?
 
   (opMapAp, allEffects),  -- XXX can do better?
   (opAlloc, [Eallocates]),
@@ -985,6 +1014,7 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
         unify (BVLit i) (BVLit j) | i == j = succeeds []
         -- Replace equal length arrays with new equations
         unify (BVArr vs) (BVArr ws) | length vs == length ws = succeeds $ zipWith (\ v w -> (v, BVal w)) vs ws
+        unify (BVMap vs) (BVMap ws) | map fst vs == map fst ws = succeeds $ zipWith (\ (_,v) (_,w) -> (v, BVal w)) vs ws
         unify _x@(BVLam _ _) _y@(BVLam _ _) =
           -- According to the ICFP paper this is stuck.  Being WRONG would be better
           wrongs $ "unify lambda: " ++ prettyShow (_x, _y)
@@ -1077,6 +1107,10 @@ evalBlock' aheap aeffs bbeffs ablk = startSweep aheap (vars ablk) (binds ablk) (
               BVExt i o x | BHNF h <- a -> if i == h then unify val o else succeeds [(val, BApply x a)]
                           | otherwise -> suspend eqn
 #endif
+              BVMap kvs ->
+                let e = BChoice $ choices [ BBlock { vars = [], binds = [(a, BVal $ BHNF k)], result = v }
+                                          | (k, v) <- kvs ]
+                in  succeeds [(val, e)]
               BHNF _ -> wrongs $ "bad function " ++ prettyShow f
           BSplit c f g ->
             case evalChoice heap (aeffs `intersect` domEffects) (beffs \\ domEffects) c of
@@ -1208,6 +1242,16 @@ evalPrimOp op v | op == opIsInt =
     a@(BVInt _) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsPath =
+  case v of
+    a@(BVPath _) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opIsMap =
+  case v of
+    a@(BVMap _) -> Just $ BVal a
+    BHNF _ -> Just BFail
+--    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsRat =
   case v of
     a@(BVLit (BRat _)) -> Just $ BVal a
@@ -1243,6 +1287,11 @@ evalPrimOp op v | op == opIsArr =
     a@(BHNF (BArr _)) -> Just $ BVal a
     BHNF _ -> Just BFail
 --    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+evalPrimOp op v | op == opMkMap =
+  case v of
+    (BHNF (BArr a)) | Just kvs <- mapM chkMap a -> Just $ BVal $ BVMap $ orderMap kvs
+                    | otherwise -> Nothing
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opCons =
   case v of
     BVArr [a, BVArr as] -> Just $ BVal $ BVArr (a : as)
@@ -1264,6 +1313,16 @@ evalPrimOp op _ | op == opAppend = Nothing
 evalPrimOp op _ | op == opErr = error "Err() called"
 evalPrimOp op _ | op `elem` [opAlloc, opRead, opWrite, opAddTo, opSubFrom] = Nothing
 evalPrimOp op v = error $ "evalPrimOp: " ++ show (op, v)
+
+chkMap :: BValue -> Maybe (BHNF, BValue)
+chkMap (BHNF (BArr [BHNF k, v])) = Just (k, v)
+chkMap _ = Nothing
+
+-- Last inserted kv wins
+orderMap :: [(BHNF, BValue)] -> [(BHNF, BValue)]
+orderMap = foldr f []
+  where f kv@(k, _) m | isJust (lookup k m) = m
+                      | otherwise           = kv : m
 
 evalPrimHeapOp :: BHeap -> Op -> BValue -> Maybe (BHeap, BExpr)
 evalPrimHeapOp h op v | op == opAlloc =

@@ -9,6 +9,7 @@ module FrontEnd.Expr(
   Ident(..), unIdent,
   Expr(..),
   Lit(..),
+  Path(..),
   Core,
   pattern Unit,
   pattern Typedef,
@@ -118,6 +119,8 @@ data Expr
   | Lam Ident Expr            -- \ x . e
   | Split Expr Expr Expr      -- split(e1){e2}{e3}
   | Fail                      -- :false
+  | Map [Expr]                -- map{e1;e2; ... }
+  | Truth Expr                -- truth{e}
   -- These are used when translating back from Rules.Core.Expr
   | EStore Store Expr
   deriving (Eq, Ord, Show, Data)
@@ -136,11 +139,12 @@ data Lit
   | LitRat Scientific String  -- d.d
   | LitChar Char              -- 'c'
   | LitStr String             -- "str"
+  | LitPath Path              -- /path/to/something
   | LitPtr Ptr                -- not a textual literal, just used when translating back.
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Lit where
-  pPrintPrec _ p lit =
+  pPrintPrec l p lit =
     case lit of
       LitInt i
         | i >= 0 -> text $ show i
@@ -148,7 +152,14 @@ instance Pretty Lit where
       LitRat r s -> text (show r ++ s)
       LitChar c -> text (show c)
       LitStr s -> text (show s)
+      LitPath s -> pPrintPrec l p s
       LitPtr ptr -> text ("R#" ++ show ptr)
+
+newtype Path = Path String
+  deriving (Eq, Ord, Show, Data)
+
+instance Pretty Path where
+  pPrintPrec _ _ (Path s) = text s
 
 --pattern Range :: Expr -> Expr
 --pattern Range e = ApplyD e AnyT
@@ -268,6 +279,8 @@ instance Pretty Expr where
           EPrim s -> ppNormal (Variable (Ident noLoc s))
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
+          Map es -> text "map" <> braces (ppSeq l es)
+          Truth e -> text "truth" <> braces (ppr 0 e)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
       ppVRA _ _ Nothing  Nothing  = undefined
@@ -390,6 +403,8 @@ compos _ e@EPrim{} = pure e
 compos f (Lam i e) = Lam i <$> f e
 compos f (Split e1 e2 e3) = Split <$> f e1 <*> f e2 <*> f e3
 compos _ e@Fail = pure e
+compos f (Map es) = Map <$> traverse f es
+compos f (Truth e) = Truth <$> f e
 compos f (EStore s e) = EStore <$> storeMapA f s <*> f e
 
 storeMapA :: (Applicative a) => (Value -> a Value) -> Store -> a Store

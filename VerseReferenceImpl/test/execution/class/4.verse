@@ -1,14 +1,12 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-any(exists X) := X
+One(X:any)<closed> := X = 1
 
-one_(X:any) := X = 1
-
-two(X:any) := X = 2
+Two(X:any)<closed> := X = 2
 
 x := class:
-  X:one_
+  X:One
 
 y := class(x):
-  X:two
+  X:Two
 
 Y := y{}

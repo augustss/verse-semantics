@@ -46,7 +46,7 @@ module Rules.Core(
 import qualified Epic.SIntMap as IM
 import Data.Char
 import Data.Data(Data)
-import Data.List( union, elemIndex )
+import Data.List( union, elemIndex, sort )
 import Data.Maybe
 import GHC.Stack(HasCallStack)
 
@@ -62,15 +62,20 @@ type EContext = Expr -> Expr
 
 --------------------------------------------------------------------------------
 
+type Path = String
+
 data Expr
     -- The following 5 are the old Value type
   = Var Ident                   -- ^ x
     -- The following 4 are the old HNF type
   | Int Integer                 -- ^ k
   | Char Char                   -- ^ 'c'
+  | Path Path                   -- ^ /a/b
   | Op Op                       -- ^ op
   | Arr [Expr]                  -- ^ <e1,e2,...>
+  | Map [(Expr, Expr)]          -- ^ map{...}
   | Lam (Bind Expr)             -- ^ \ x . e
+  | OLam Expr (Bind Expr) (Bind Expr) -- ^ olam (v, \x.e1, \y.e2)
   --
   | Expr :=: Expr               -- ^ e1 = e2
   | Ident :~: Ident             -- ^ e1 ~ e2
@@ -122,9 +127,14 @@ instance Pretty Expr where
   pPrintPrec l p (Var v)          = pPrintPrec l p v
   pPrintPrec l p (Int k)          = pPrintPrec l p k
   pPrintPrec _ _ (Char c)         = text (show c)
+  pPrintPrec _ _ (Path s)         = text s
   pPrintPrec l p (Op o)           = pPrintPrec l p o
   pPrintPrec l _ (Arr es)         = text "<" <> fsep (punctuate (text ",") (map (pPrintPrec l 0) es)) <> text ">"
+  pPrintPrec l _ (Map vks)        = text "map{" <> fsep (punctuate (text ";") (map (\ (k,v) -> parens(pPrintPrec l 0 k <> text "," <> pPrintPrec l 0 v)) vks)) <> text ">"
   pPrintPrec l p (LAM x e)        = maybeParens (p > 0) $ sep [text "\\" <> pPrintPrec l 0 x <> text ".", pPrintPrec l 0 e]
+  pPrintPrec l _ (OLam x d r)     = text "olam" <> parens (pPrintPrec l 0 x P.<> text "," <+>
+                                                           pPrintPrec l 0 (Lam d) P.<> text "," <+>
+                                                           pPrintPrec l 0 (Lam r))
   pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ sep [pPrintPrec l 4 a <+> text "|", pPrintPrec l 4 b]
   pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
@@ -191,6 +201,10 @@ comp _xs _ys (Char a) (Char b) = compare a b
 comp _xs _ys (Char _) _        = LT
 comp _xs _ys _        (Char _) = GT
 
+comp _xs _ys (Path a) (Path b) = compare a b
+comp _xs _ys (Path _) _        = LT
+comp _xs _ys _        (Path _) = GT
+
 comp _xs _ys (Op a) (Op b) = compare a b
 comp _xs _ys (Op _) _      = LT
 comp _xs _ys _      (Op _) = GT
@@ -204,9 +218,24 @@ comp  xs  ys (Arr vs) (Arr ws)
 comp _xs _ys (Arr _) _       = LT
 comp _xs _ys _       (Arr _) = GT
 
+comp  xs  ys (Map vs) (Map ws)
+  | n == m    = foldr (<>) EQ (zipWith f (sort vs) (sort ws))
+  | otherwise = n `compare` m
+ where
+  n  = length vs
+  m  = length ws
+  f (kv, vv) (kw, vw) = comp xs ys kv kw <> comp xs ys vv vw
+comp _xs _ys (Map _) _       = LT
+comp _xs _ys _       (Map _) = GT
+
 comp  xs  ys (LAM x a) (LAM y b) = comp (x:xs) (y:ys) a b
 comp _xs _ys (Lam _) _       = LT
 comp _xs _ys _       (Lam _) = GT
+
+comp  xs  ys (OLam ax ad ar) (OLam bx bd br) =
+  comp xs ys ax bx <> comp xs ys (Lam ad) (Lam bd) <> comp xs ys (Lam ar) (Lam br)
+comp _xs _ys (OLam _ _ _) _       = LT
+comp _xs _ys _       (OLam _ _ _) = GT
 
 comp _xs _ys Wrong{} Wrong{} = EQ
 comp _xs _ys Wrong{} _       = LT
@@ -318,6 +347,8 @@ data Op
   | IsInt
   | IsChar
   | IsArr
+  | IsMap
+  | IsPath
   | MapAp
   | Cons
   | Alloc
@@ -330,13 +361,14 @@ data Op
   | Length
   | Error
   | Concat
+  | MkMap
  deriving ( Show, Eq, Ord, Data )
 
 instance Pretty Op where
   pPrintPrec _ _ = text . map toLower . show
 
 opArity :: Op -> Int
-opArity o | o `elem` [Neg, Plus, IsInt, IsChar, IsArr, MapAp, Alloc, Read, Print, Length, Error] = 1
+opArity o | o `elem` [Neg, Plus, IsInt, IsChar, IsArr, IsPath, MapAp, Alloc, Read, Print, Length, Error] = 1
           | o == Append = 3
           | otherwise = 2
 
@@ -400,10 +432,13 @@ pattern HNF e <- (getHNF -> Just e)
 getHNF :: Expr -> Maybe Expr
 getHNF e@Int{} = Just e
 getHNF e@Char{} = Just e
+getHNF e@Path{} = Just e
 getHNF e@Op{}  = Just e
 getHNF e@Arr{} = Just e
+getHNF e@Map{} = Just e
 getHNF e@Ref{} = Just e
 getHNF e@Lam{} = Just e
+getHNF e@OLam{} = Just e
 getHNF _ = Nothing
 
 isHNF :: Expr -> Bool
@@ -426,6 +461,7 @@ pattern CON e <- (getCON -> Just e)
 getCON :: Expr -> Maybe Expr
 getCON e@Int{} = Just e
 getCON e@Char{} = Just e
+getCON e@Path{} = Just e
 getCON e@Op{} = Just e
 getCON e@Ref{} = Just e
 getCON _ = Nothing
@@ -517,6 +553,11 @@ instance Rec Expr where
       Lam (Bind x e)
         | tfUnderLambda s -> [ (n,Lam (Bind x e')) | (n,e') <- rec r (addBound (BLam x) s) e ]
 
+      OLam x (Bind a ea) (Bind b eb)
+        | tfUnderLambda s -> [ (n,OLam x' (Bind a ea ) (Bind b eb )) | (n,x')  <- rec r                    s  x  ] ++
+                             [ (n,OLam x  (Bind a ea') (Bind b eb )) | (n,ea') <- rec r (addBound (BLam a) s) ea ] ++
+                             [ (n,OLam x  (Bind a ea ) (Bind b eb')) | (n,eb') <- rec r (addBound (BLam b) s) eb ]
+
       One a -> [ (n, One a') | (n,a') <- rec r (addBound BBlk s) a ]
       All a -> [ (n, All a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assume a -> [ (n, Assume a') | (n,a') <- rec r (addBound BBlk s) a ]
@@ -566,9 +607,12 @@ instance Free Expr where
   free (Var v)   = [v]
   free Int{}     = []
   free Char{}    = []
+  free Path{}    = []
   free Op{}      = []
   free (Arr vs)  = free vs
+  free (Map vs)  = free vs
   free (Lam bnd) = free bnd
+  free (OLam x d r) = free x `union` free d `union` free r
   free (a :=: b) = free a `union` free b
   free (a :~: b) = free a `union` free b
   free (a :>: b) = free a `union` free b
@@ -607,12 +651,15 @@ alphaRename xs bnd@(Bind x e)
 
 instance Substitutable Expr where
   subst [] e = e
-  subst sub (Var x)   = fromMaybe (Var x) (lookup x sub)
+  subst sub e@(Var x) = fromMaybe e (lookup x sub)
   subst _sub e@Int{}  = e
   subst _sub e@Char{} = e
+  subst _sub e@Path{} = e
   subst _sub e@Op{}   = e
   subst sub (Arr vs)  = Arr (map (subst sub) vs)
+  subst sub (Map vs)  = Map (map (\ (k,v) -> (subst sub k, subst sub v)) vs)
   subst sub (Lam bnd) = Lam (substBind Var subst sub bnd)
+  subst sub (OLam x d r) = OLam (subst sub x) (substBind Var subst sub d) (substBind Var subst sub r)
   subst sub (a :=: b) = subst sub a :=: subst sub b
   subst sub (a :~: b) = substVar sub a :~: substVar sub b
   subst sub (a :>: b) = subst sub a :>: subst sub b
@@ -679,9 +726,11 @@ instance Arbitrary Expr where
   -- shrink _ = []
   shrink (Var _)   = [ Int 0, Arr [] ]
   shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
-  shrink (Char n)  = [ Char n' | n' <- shrink n ] ++ [ Arr [] ]
+  shrink (Char _)  = [ Int 0, Arr [] ]
+  shrink (Path _)  = [ Int 0, Arr [] ]
   shrink (Op _)    = []
   shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
+  shrink (Map vs)  = [ Map vs' | vs' <- shrink vs ]
   shrink (Lam (Bind x e)) = [ Arr [] ] ++ [ e | x `notElem` free e] ++ [ Lam (Bind x e') | e' <- shrink e ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
@@ -715,6 +764,11 @@ instance Arbitrary Expr where
   shrink (Ref _)   = []
   shrink Wrong{}   = []
   shrink If{} = undefined
+  shrink (OLam x d@(Bind xd ed) r@(Bind xr er)) =
+    [x] ++ [ ed | xd `notElem` free ed] ++ [er | xr `notElem` free er] ++
+    [OLam x' d r | x'<-shrink x] ++
+    [OLam x (Bind xd ed') r | ed'<-shrink ed] ++
+    [OLam x d (Bind xr er') | er'<-shrink er]
 
 arbExpr :: Int -> [Ident] -> Gen Expr
 arbExpr n xs =
@@ -779,6 +833,7 @@ collect here (\/) = col
   recr a (Verify e)       = a \/ col e
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
   recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
+  recr a (OLam x (Bind _ d) (Bind _ r)) = a \/ col x \/ col d \/ col r
   recr a _                = a
 
 --------------------------------------------------------------------------------
@@ -802,6 +857,7 @@ allVars = nub . expr
     expr (Verify e) = expr e
     expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
     expr (BlockC e) = expr e
+    expr (OLam x (Bind i d) (Bind j r)) = i : j : expr x ++ expr d ++ expr r
     expr _ = []
 
 --------------------------------------------------------------------------------
@@ -824,6 +880,7 @@ substExp from to = sub
     sub e@Var{}   = e
     sub e@Int{}   = e
     sub e@Char{}  = e
+    sub e@Path{}  = e
     sub e@Op{}    = e
     sub (Arr vs)  = Arr (map sub vs)
 {-
@@ -865,4 +922,5 @@ substExp from to = sub
     sub (BlockC e) = BlockC (sub e)
     sub (Store h e) = Store (IM.map sub h) (sub e)
     sub e@Ref{}   = e
+    sub OLam{}    = error "substExp: OLam not implemented"
     sub _         = undefined

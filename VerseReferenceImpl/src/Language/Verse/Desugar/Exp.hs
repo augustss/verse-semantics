@@ -8,19 +8,26 @@ module Language.Verse.Desugar.Exp
   , Env
   , unify
   , verify
-  , succeeds
+  , check
   , assume
   , forall'
   , bracketInvoke
-  , fun
+  , olam
   , name
   , then'
   ) where
 
+import Data.ByteString.Internal (w2c)
+import Data.Char (ord)
 import Data.Functor.Apply
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Data.Word (Word8)
 
+import Numeric (showHex)
+
+import Language.Verse.Effect.Split qualified as Split
+import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Label
 import Language.Verse.Name
 
@@ -36,10 +43,8 @@ data Exp f a
   | All (f (Exp f a))
   | Not (f (Exp f a))
   | Verify (f (Exp f a))
-  | Succeeds (f (Exp f a))
-  | Fails (f (Exp f a))
-  | Decides (f (Exp f a))
-  | Assume (f (Exp f a))
+  | Check !Split.Effect (f (Exp f a))
+  | Assume !Split.Effect (f (Exp f a))
   | Module {-# UNPACK #-} !Label !(Env f a) (f (Exp f a))
   | Struct {-# UNPACK #-} !Label !(Env f a) (f (Exp f a))
   | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(Env f a) (f (Exp f a))
@@ -54,12 +59,16 @@ data Exp f a
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
-  | Fun !(Env f a) (f (Exp f a)) (f (Exp f a))
+  | Char {-# UNPACK #-} !Word8
+  | Char32 {-# UNPACK #-} !Char
+  | Lam a (f (Exp f a))
+  | OLam (f (Exp f a)) !(Env f a) (f (Exp f a)) (f (Exp f a))
+  | Intrinsic !Intrinsic
   | Name a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
 
-infixl 4 :*>:
+infixl 1 :*>:
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f a)
@@ -88,8 +97,8 @@ instance ( Pretty (f (Exp f a))
     All e -> "all" <+> braces (pretty e)
     Not e -> "not" <+> parens (pretty e)
     Verify e -> "verify" <+> braces (pretty e)
-    Succeeds e -> "succeeds" <+> braces (pretty e)
-    Assume e -> "assume" <+> braces (pretty e)
+    Check eff e -> "check" <> angles (pretty eff) <+> braces (pretty e)
+    Assume eff e -> "assume" <> angles (pretty eff) <+> braces (pretty e)
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
       maybe mempty (parens . pretty) e1 <+>
@@ -107,8 +116,13 @@ instance ( Pretty (f (Exp f a))
     Truth e -> "truth" <+> braces (pretty e)
     Int x -> pretty x
     Float x -> pretty x
-    Fun xs e1 e2 ->
-      "fun" <> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
+    Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape
+    Char32 x -> "0u" <> pretty (showHex (ord x) "")
+    Lam x e2 ->
+      backslash <+> pretty x <+> braces (pretty e2)
+    OLam f xs e1 e2 ->
+      "olam" <+> pretty f <+> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
+    Intrinsic x -> pretty x
     Name x -> pretty x
     IfArchetypeName x y e1 e2 ->
       "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
@@ -144,11 +158,11 @@ unify = liftL2 (:=:)
 verify :: Functor f => f (Exp f a) -> f (Exp f a)
 verify = liftL1 Verify
 
-succeeds :: Functor f => f (Exp f a) -> f (Exp f a)
-succeeds = liftL1 Succeeds
+check :: Functor f => Split.Effect -> f (Exp f a) -> f (Exp f a)
+check = liftL1 . Check
 
-assume :: Functor f => f (Exp f a) -> f (Exp f a)
-assume = liftL1 Assume
+assume :: Functor f => Split.Effect -> f (Exp f a) -> f (Exp f a)
+assume = liftL1 . Assume
 
 forall' :: Apply f => f a -> f (Exp f a) -> f (Exp f a)
 forall' = liftL2 (Def Forall)
@@ -156,15 +170,15 @@ forall' = liftL2 (Def Forall)
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
 
-fun :: Apply f => Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-fun = liftL2 . Fun
+olam :: Apply f => f (Exp f a) -> Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+olam f env e1 e2 = OLam f env e1 e2 <$ f <. e1 <. e2
 
 name :: Functor f => f a -> f (Exp f a)
 name = fmap Name
 
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
-infixl 4 `then'`
+infixl 1 `then'`
 
 liftL1 :: Functor f => (f a -> b) -> f a -> f b
 liftL1 f x = f x <$ x

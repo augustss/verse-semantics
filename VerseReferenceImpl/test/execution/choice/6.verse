@@ -1,18 +1,18 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-any(exists Arg) := Arg
+Any(exists Arg) := Arg
 
-Fresh() := :any
+Fresh() := :Any
 
 FreshTuple(N:any) := for (0..N). Fresh[]
 
-FreshSubTuples(Xs:any) :=
-  false | (Xs[I:any]; FreshTuple[I])
+FreshSubTuples(Xs:Any) :=
+  false | (Xs[I:Any]; FreshTuple[I])
 
-Append(Xs:any, Ys:any) :=
+Append(Xs:Any, Ys:Any) :=
   Xs = FreshSubTuples[Result]
   Ys = FreshSubTuples[Result]
   Result:any = all{(:Xs) | (:Ys)}
 
-Append[As:any, Bs:any] = (1, 2, 3, 4)
+Append[As:Any, Bs:Any] = (1, 2, 3, 4)
 
 As, Bs

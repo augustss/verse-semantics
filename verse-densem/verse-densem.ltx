@@ -925,6 +925,30 @@ $$
 $$
 The label $RL$ occurs in two completely unrelated places.
 
+\subsection{Bugs and problems}
+\begin{itemize}
+\item The |apply| function needs to label its result when used with an array since it is really a choice.
+
+  $
+  \begin{array}{rcll}
+    apply( \tuple{v_0, \ldots, v_n}, k) & = & \munit(label(k),v_k) & 0 \leq k \leq n \\
+    label(k) & = & R^kL & \text{i.e., $k$ Rs followed by one L}
+  \end{array}
+  $
+\item The $apply(k,w)$ should be $empty$ rather than |wrong|, otherwise the application will
+  always have |wrong| when the existential iterates over all possibilities.
+\item The labels are still problematic.  Perhaps a sequence of labels works together with Koen's
+  observation that sort should not strip the labels, but keep them.
+  This is the troublesome expression
+
+  $
+  \begin{array}{rcll}
+   |if (x==1) then (2 `choice` 3) else 4 ; x==(1 `choice` 2) ; if (x==1) then 5 else (6 `choice` 7)|
+  \end{array}
+  $
+\end{itemize}
+
+
 % -------------------------------------
 \section{A simpler order-sensitive denotational semantics} \label{sec:simple-order-sensitive}
 

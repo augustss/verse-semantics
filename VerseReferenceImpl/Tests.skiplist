@@ -1,0 +1,7 @@
+[ ("Tests/Attributes/InvalidAttributeLocations.versetest", "enum and block with <effect>")
+, ("Tests/Classes/ClassBlockClause.versetest", "enum with block")
+, ("Tests/Enum.versetest", "redefine true")
+, ("Tests/FlowControl/Break.versetest", "Illegal use of break")
+, ("Tests/Modules/Using.versetest", "enum with using")
+, ("Tests/Super.versetest", "qualification on block")
+]

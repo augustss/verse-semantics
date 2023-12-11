@@ -76,6 +76,7 @@ isDone = go False False
   go ver _   (Lam (Bind _ e)) = go ver (not ver) e
 
   go ver lam (Arr es)         = all (go ver lam) es
+  go _ _ (Map _) = error "isDone: Map not implemented"
   go ver lam (Exi (Bind _ e)) = go ver lam e
   go ver lam (Uni (Bind _ e)) = go ver lam e
   go ver lam (e1 :=: e2)      = go ver lam e1 && go ver lam e2
@@ -93,12 +94,14 @@ isDone = go False False
   go _   _   (Var _)          = True
   go _   _   (Int _)          = True
   go _   _   (Char _ )        = True
+  go _   _   (Path _ )        = True
   go _   _   (Op _)           = True
   go _   _   (_ :~:  _)       = True
   go _   _   Fail             = True
   go _   _   (Assume _)       = True
   go _   _   (Ref _)          = True
   go _  _    (Wrong _)        = False -- should this be True?
+  go _  _    OLam{}           = error "isDone: OLam not implemented"
 
   -- go _ Wrong = True
   -- go _lam (Assume e)       = True -- go lam e
@@ -387,6 +390,7 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
   where
    go _  (Int _)          = True
    go _  (Char _)         = True
+   go _  (Path _)         = True
    go bs (Arr as)         = all (go bs) as
    go _  (Lam _)          = True
    go bs (Var x)          = x `elem` bs
@@ -409,6 +413,7 @@ mustDecide _ bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} re
     lamBinds       = [x | BLam x <- bs]
     go (Int _)     = True
     go (Char _)    = True
+    go (Path _)    = True
     go (Arr as)    = all go as
     go (Lam _)     = True
     go (Var x)     = x `elem` lamBinds

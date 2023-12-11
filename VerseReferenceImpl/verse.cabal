@@ -30,10 +30,12 @@ library
     Control.Monad.Supply
     Control.Monad.Verse
     Data.IntMap.Lazy.Extras
-    Data.Match
+    Data.Fix
+    Data.Functor.Compose.Instances
     Language.Verse
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp
+    Language.Verse.Effect.Split
     Language.Verse.Error
     Language.Verse.Eval
     Language.Verse.Ident
@@ -45,6 +47,7 @@ library
     Language.Verse.Mode
     Language.Verse.Name
     Language.Verse.Parse
+    Language.Verse.Parse2
     Language.Verse.Parse.Exp
     Language.Verse.Pos
     Language.Verse.Rewrite
@@ -66,9 +69,12 @@ library
     semigroupoids,
     text,
     transformers,
-    unordered-containers >= 0.2.6.0
+    unordered-containers >= 0.2.6.0,
+    parsec >= 3.1.16.1
   hs-source-dirs: src
   ghc-options: -Wall -Wno-name-shadowing
+  if !flag(wasm)
+    ghc-options: -Werror
   default-language: GHC2021
 
 test-suite golden-files
@@ -86,7 +92,7 @@ test-suite golden-files
   hs-source-dirs: test
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall -Wno-name-shadowing
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 test-suite hunit
@@ -99,7 +105,7 @@ test-suite hunit
   hs-source-dirs: test
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall -Wno-name-shadowing
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 executable versei
@@ -113,7 +119,7 @@ executable versei
   hs-source-dirs: main
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall -Wno-name-shadowing
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 executable versewasm
@@ -130,7 +136,7 @@ executable versewasm
   if !flag(wasm)
     buildable: False
   ghc-options:
-    -Wall -Wno-name-shadowing
+    -Wall -Wno-name-shadowing -Werror
     -no-hs-main -optl-mexec-model=reactor
     "-optl-Wl,--export=malloc,--export=calloc_ptr,--export=free,--export=verse_eval"
   default-language: GHC2021
@@ -147,7 +153,7 @@ executable verselex
   hs-source-dirs: lex
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall
+  ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
 executable verseparse
@@ -164,5 +170,5 @@ executable verseparse
   hs-source-dirs: parse
   if flag(wasm)
     buildable: False
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   default-language: GHC2021

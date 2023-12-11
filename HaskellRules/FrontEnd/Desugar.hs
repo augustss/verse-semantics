@@ -1,10 +1,11 @@
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans -Wno-dodgy-imports #-}
 {-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.Desugar(
   desugar,
   dsScope,
   getFree, substMany, getAllVars,
   ) where
+import Data.Monoid
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Writer
@@ -12,7 +13,6 @@ import Data.Either
 import Data.List
 --import qualified Data.Map as M
 import Data.Maybe
--- import Data.Monoid
 import qualified Data.Set as S
 import Debug.Trace
 import GHC.Stack
@@ -188,8 +188,8 @@ dsSmall = ds
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Function notation
-    ds (Typedef e) = do x <- newIdent (getLoc e) "x"; ds $ Function [(DefineE x e, [invariantId])] (Variable x)
-    ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [invariantId])] e2
+    ds (Typedef e) = do x <- newIdent (getLoc e) "x"; ds $ Function [(DefineE x e, [closedId])] (Variable x)
+    ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [closedId])] e2
     ds (Function (a:as@(_:_)) b) = ds $ Function [a] $ Function as b
 -- not yet
 --  ds (Function [(e, ps@(_:_))] b) = ds $ Function [(e, [])] $ Check ps b
@@ -208,8 +208,12 @@ dsSmall = ds
     -- Operators
     ds (PrefixOp (Op "not") e) = do e' <- ds e; pure $ If3 e' Fail eFalse
     ds (PrefixOp (Op ":") e) = Range <$> ds e
+    ds (PrefixOp (Op "?") e) = do
+      x <- Variable <$> newIdent (getLoc e) "x"
+      let ee = Let (InfixOp x (Op ":") e) (Truth x)
+      ds $ Typedef $ InfixOp eFalse (Op "|") ee
     ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
-    ds (PostfixOp e (Op "?")) = Range <$> ds e
+    ds (PostfixOp e (Ident l "?")) = ds $ ApplyD e (Variable (Ident l "_"))
     ds (PostfixOp e (Ident l op)) = ds =<< call "post" l op e
     ds (InfixOp e1 (Op "|") e2) = Choice <$> ds e1 <*> ds e2
     ds (InfixOp e1 (Op "and") e2) = ds $ Seq [e1, e2]                  -- XXX multiplicity?
@@ -239,7 +243,8 @@ dsSmall = ds
     -- option{e}  -->  if(x:=e)then truth(e)
     ds (Option (Just e)) = do
       t <- newIdent (getLoc e) "t"
-      ds $ If2 (DefineE t e) (Array [Variable t])
+      ds $ If2 (DefineE t e) (Truth (Variable t))
+    ds (Truth e) = ds $ Map [(InfixOp e (Op "=>") e)]
 
     -- one, all
     -- XXX why do we do this?
@@ -250,6 +255,19 @@ dsSmall = ds
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
 
     ds (Exists xs b) = ds $ foldr (\ v e -> seqE [DefineV v, e]) b xs
+
+    ds (Map es) | Just kvs <- mapM simpleMapEntry es =
+      ds $ ApplyD (eMkMap noLoc) $ Array [ Array [k, v] | (k, v) <- kvs ]
+
+    ds emap@(Map es) = do
+      let loc = getLoc emap
+      f <- Variable <$> newIdent loc "f"
+      i <- Variable <$> newIdent loc "i"
+      a <- Variable <$> newIdent loc "a"
+      ds $ ApplyD (eMkMap loc) $
+                  For2 (Seq [InfixOp f (Ident loc ":") (Array es),
+                             InfixOp (InfixOp i (Ident loc "->") a) (Ident loc ":") f])
+                       (Array [i, a])
 
     ds x = compos ds x
 
@@ -269,9 +287,13 @@ dsSmall = ds
 
 checkEffs :: [Eff] -> D [Eff]
 checkEffs = mapM checkEff
-  where checkEff (Ident _ "invariant") = pure invariantId
+  where checkEff (Ident _ "invariant") = pure closedId
         checkEff e | e `elem` knownEffects = pure e
                    | otherwise = errorMessage $ "unknown effect: " ++ show e
+
+simpleMapEntry :: Expr -> Maybe (Expr, Expr)
+simpleMapEntry (InfixOp k (Op "=>") v) = Just (k, v)
+simpleMapEntry _ = Nothing
 
 type Value = Expr
 
@@ -345,6 +367,9 @@ eFalse = Array []
 
 eAny :: Expr
 eAny = Variable (Ident noLoc "any$")
+
+eMkMap :: Loc -> Expr
+eMkMap l = Variable (Ident l "mkMap$")
 
 defnArray :: [Expr] -> Expr -> D Expr
 defnArray ps e = do
@@ -438,6 +463,7 @@ dsD_1 (Function [(t1, effs)] t2) = do
 dsD_1 e@Range{} = dsDM e
 dsD_1 e@DefineIE{} = dsDM e
 dsD_1 (Lam x e) = Lam x <$> dsD_1 e
+--dsD_1 (Map ts) = Map <$> mapM dsD_1 ts
 dsD_1 e = impossible e
 
 -- Use M to desugar
@@ -532,7 +558,7 @@ call p l s e = do
     con | ver && s' `elem` [
                      "pre'+'","pre'-'",
                      "in'+'","in'-'","in'*'"] = ApplyS
-        | s' `elem` ["in'/'","pre'!'","post'?'",
+        | s' `elem` ["in'/'","pre'!'",
                      "pre'^'", "pre'[]'", "post'^'",  -- no need for succeeds
                      "pre'+'","pre'-'",  -- XXX not really right
                      "in'+'","in'-'","in'*'",  -- XXX not really right
@@ -548,15 +574,15 @@ call p l s e = do
 knownEffects :: [Ident]
 knownEffects = map (Ident noLoc) [
   "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "transacts", "open"
-  ] ++ [invariantId]
+  ] ++ [closedId]
 
 _isLambdaEffect :: Ident -> Bool
 _isLambdaEffect i = elem i [
-  invariantId
+  closedId
   ]
 
-invariantId :: Ident
-invariantId = Ident noLoc "closed"
+closedId :: Ident
+closedId = Ident noLoc "closed"
 
 openId :: Ident
 openId = Ident noLoc "open"
@@ -630,6 +656,7 @@ scope sc = expr
     expr Fail = pure Fail
     expr (Forall is e) = Forall is <$> scopeD' sc' e
       where sc' = foldr S.insert sc is
+--    expr (Map es) = Map <$> mapM expr es
     expr e = impossible e
 
     exprD e = fst <$> defs sc e
@@ -687,6 +714,7 @@ getVisible TLam{} = []
 getVisible Lam{} = []
 getVisible Fail = []
 getVisible DomainFail = []
+--getVisible (Map es) = concatMap getVisible es
 getVisible e = impossible e
 
 getVar :: HasCallStack => Expr -> [Ident]
@@ -723,7 +751,8 @@ getVar e = impossible e
 -- Primitives
 primOps :: [Ident]
 primOps = map (Ident noLoc)
-  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$", "isPtr$", "isArr$", "isFcn$"
+  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$"
+  , "isPtr$", "isArr$", "isFcn$", "isPath$", "isMap$"
 
   , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
   , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
@@ -737,7 +766,8 @@ primOps = map (Ident noLoc)
   , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
   , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
 
-  , "post'?'"
+
+  , "mkMap$"
   , "concat$", "cons$"
   , "length$"
   , "alloc$", "read$", "write$"
@@ -1044,6 +1074,7 @@ addDeref = pure . exprD S.empty
     expr _ Fail = Fail
     expr s (Lam i e) = Lam i (expr s e)
     expr _ e@EPrim{} = e
+--    expr s (Map es) = Map $ map (expr s) es
     expr _ e = impossible e
 
     exprD s e = expr (defs s e) e
@@ -1104,6 +1135,7 @@ lower (OfType e t) = join $ lowerOfType <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
 lower Fail = pure Fail
 lower (Forall is e) = Forall is <$> lower e
+--lower (Map es) = Map <$> mapM lower es
 lower e = impossible e
 
 -- Lower a for loop
@@ -1257,7 +1289,7 @@ lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
 lowerTLamRun i rs is e1 e2 = do
   -- XXX This inserts Succeeds late, and scope insertion has already happened.
   -- XXX This might be wrong.
-  let invariant = --invariantId `elem` rs  || True -- XXX
+  let invariant = --closedId `elem` rs  || True -- XXX
                   openId `notElem` rs
   if null is && e1 == Array [] then
     pure $ Lam i e2   -- Simple special case
@@ -1599,6 +1631,7 @@ getFree = Epic.List.nub . fvs
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
     fvs Fail = []
     fvs DomainFail = []
+--    fvs (Map es) = concatMap fvs es
     fvs e = impossible e
 
 closed :: Core -> Bool
@@ -1978,7 +2011,7 @@ dsM_6 (Function [(t1, effs)] t2) f = do
       defVerif = eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']]
       defForall = Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r]
   verif <- gets (fVerify . dflags)
-  if invariantId `elem` effs then
+  if closedId `elem` effs then
     -- MCFUN
     if verif then do
       pure $ seqE [defVerif,
@@ -2104,7 +2137,7 @@ dsM_7 (Function [(t1, effs)] t2) f = do
   let defVerif = eVerify $ Lam i $ seqE [DefineE j t1', eAssert $ seqE [defZ, t2']]
       defForall = Forall [r] $ seqE [eAssume $ seqE [defZ, unifyV r t2'], Variable r]
   verif <- gets (fVerify . dflags)
-  if invariantId `elem` effs then
+  if closedId `elem` effs then
     -- MCFUN
     if verif then do
       pure $ seqE [defVerif,

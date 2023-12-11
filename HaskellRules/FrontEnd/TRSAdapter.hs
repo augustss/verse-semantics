@@ -125,6 +125,7 @@ coreToTrs (Lit (LitInt i)) = T.Int i
 coreToTrs (Lit (LitChar c)) = T.Char c
 coreToTrs (Lit (LitPtr p)) = T.Ref (T.Ptr p)
 coreToTrs (Lit (LitStr s)) = T.Arr (map T.Char s)  -- assume strings are arrays of characters
+coreToTrs (Lit (LitPath (Path p))) = T.Path p
 coreToTrs Lit{} = undefined
 coreToTrs (EPrim "any$") = T.LAM x (T.Var x)  where x = T.Name "x"
 coreToTrs (EPrim s) = T.Op $ fromMaybe (error $ "unknown op: " ++ s) $ lookup s ops
@@ -170,8 +171,12 @@ trsToCore :: T.Expr -> Core
 trsToCore (T.Var i) = Variable (trsToCoreI i)
 trsToCore (T.Int i) = Lit (LitInt i)
 trsToCore (T.Char c) = Lit (LitChar c)
+trsToCore (T.Path p) = Lit (LitPath (Path p))
 trsToCore (T.Op op) = EPrim $ fromMaybe undefined $ lookup op allOps
 trsToCore (T.Arr vs) = Array $ map trsToCore vs
+trsToCore (T.Map kvs) = Map $ map f kvs
+  where f (k, v) = --Function [(trsToCore k,[])] (trsToCore v)
+                   InfixOp (trsToCore k) (Ident noLoc "=>") (trsToCore v)
 trsToCore (T.Lam (T.Bind x e)) = Lam (trsToCoreI x) (trsToCore e)
 trsToCore (e1 T.:=: e2) = Unify (trsToCore e1) (trsToCore e2)
 trsToCore ee@(_ T.:>: _) = Seq $ map trsToCore $ flat ee
@@ -217,6 +222,8 @@ allOps = [
   (T.IsInt, "isInt$"),
   (T.IsChar,"isChr$"),
   (T.IsArr, "isArr$"),
+  (T.IsMap, "isMap$"),
+  (T.IsPath,"isPath$"),
   (T.MapAp, "mapAp$"),
   (T.Cons,  "cons$"),
   (T.Alloc, "alloc$"),
@@ -228,7 +235,8 @@ allOps = [
   (T.Append,"append$"),
   (T.Error, "err$"),
   (T.Length,"arrLen$"),
-  (T.Concat,"arrConc$")
+  (T.Concat,"arrConc$"),
+  (T.MkMap, "mkMap$")
   ]
 
 ----------------------------------------------

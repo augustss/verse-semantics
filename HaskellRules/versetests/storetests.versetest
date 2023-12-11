@@ -186,3 +186,7 @@ testeq(pass) {
   ((1001, 11002), (1001, 11012), (1001, 11112), (11122, 21123), (11122, 21133),
    (11122, 21233), (21333, 31334), (21333, 31344), (21333, 31444))
   }
+
+# The choice makes it stuck.
+testeq(pass,iblock=skip) {  p := alloc$[0]; for{write$[p, array{b}]; b := 1 <# | 2 #> }; read$[p]  } {array{1}}
+testeq(pass) {  p := alloc$[0]; for{b := 1 | 2; write$[p, array{b}]}; read$[p]  } {array{2}}

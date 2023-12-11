@@ -20,8 +20,13 @@ data Intrinsic
   | Multiply
   | Divide
   | To
+  | Any
   | Int
+  | Rational
   | Float
+  | Char
+  | Char32
+  | Function
   | Query deriving (Show, Eq)
 
 toString :: Intrinsic -> String
@@ -37,8 +42,13 @@ toString = \ case
   Multiply -> "operator'*'"
   Divide -> "operator'/'"
   To -> "operator'..'"
+  Any -> "any"
   Int -> "int"
+  Rational -> "rational"
   Float -> "float"
+  Char -> "char"
+  Char32 -> "char32"
+  Function -> "function"
   Query -> "postfix'?'"
 
 instance Pretty Intrinsic where

@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 module Rules.ICFP(
   allSystemsICFP,
   systemICFP,
@@ -194,6 +195,7 @@ systemICFPLR = s
   , description = "Left-to-right variant of section 5.1 ICFP rules"
   , rules = rules s -= "EQN-SWAP" -= "EQN-ELIM'" -= "EXI-FLOAT" -= "SEQ-ASSOC" -= "FAIL-ELIM" -= "CHOOSE"
             <> rulesLR
+            <> rulesOLam
   , preProcess = const (check validK . anfK)
   }
   where s = systemICFP51
@@ -238,6 +240,7 @@ valid' onlyEq = expr
     value e = hnf e
     hnf Int{} = True
     hnf Char{} = True
+    hnf Path{} = True
     hnf Op{}  = True
     hnf (Arr vs) = all value vs
     hnf (LAM _ e) = expr e
@@ -255,6 +258,7 @@ anf' onlyEq = expr
     expr e@Var{} = e
     expr e@Int{} = e
     expr e@Char{} = e
+    expr e@Path{} = e
     expr e@Op{}  = e
     expr (Arr es) =
       let (ds, a) = arr es
@@ -509,6 +513,7 @@ valueX1 lhs =
 
 isValueX :: Ident -> Expr -> Bool
 isValueX x (Arr as) = Var x `elem` as || any (isValueX x) as
+isValueX x (Map vks) = let as = map snd vks in Var x `elem` as ||  any (isValueX x) as
 isValueX _ _        = False
 
 
@@ -617,6 +622,12 @@ rulesPrimOps _ lhs =
        Char _ -> pure hnf -- (Arr [])
        _      -> pure Fail
  ++
+  "APP-ISPATH" `name`
+  do Op IsPath :@: (HNF hnf) <- [lhs]
+     case hnf of
+       Path _ -> pure hnf -- (Arr [])
+       _      -> pure Fail
+ ++
   "APP-ISARR" `name`
   do Op IsArr :@: (HNF hnf) <- [lhs]
      case hnf of
@@ -642,6 +653,20 @@ rulesPrimOps _ lhs =
   "APP-CONCAT" `name`
   do Op Concat :@: Arr [Arr vs1, Arr vs2] <- [lhs]
      pure (Arr (vs1 ++ vs2))
+ ++
+  "APP-MKMAP" `name`
+  do Op MkMap :@: Arr (mapM getMap -> Just vks) <- [lhs]
+     pure (Map $ orderMap vks)
+
+getMap :: Expr -> Maybe (Expr, Expr)
+getMap (Arr [HNF hnf, e]) = Just (hnf, e)
+getMap _ = Nothing
+
+-- Last inserted kv wins
+orderMap :: [(Expr, Expr)] -> [(Expr, Expr)]
+orderMap = foldr f []
+  where f kv@(k, _) m | isJust (lookup k m) = m
+                      | otherwise           = kv : m
 
 -- Turn array{f1, ... fn} into array{f1(), ... fn()}
 mapAp :: [Value] -> Expr
@@ -689,6 +714,17 @@ rulesApplication env lhs =
      pure (EXI x ((vx :=: v) :>: (foldr1 (:|:) [ (vx :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])))
 
  <>
+  "APP-MAP-0" `name`
+  do Map [] :@: _ <- [lhs]
+     pure Fail
+ <>
+  "APP-MAP" `name`
+  do Map vks@(_:_) :@: v <- [lhs]
+     let x = identNotIn (free (vks, v))
+         vx = Var x
+     pure (EXI x ((vx :=: v) :>: (foldr1 (:|:) [ (vx :=: i) :>: Val vi | (i,vi) <- vks ])))
+
+ <>
   rulesPrimOps env lhs
 
 --------------------------------------------------------------------------------
@@ -710,12 +746,18 @@ rulesUnification env lhs =
      guard (length vs == length vs')
      pure (foldr (:>:) e [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
  ++
+  "U-MAP" `name`
+  do (Map kvs :=: Map kvs') :>: e <- [lhs]
+     guard (map fst kvs == map fst kvs')
+     pure (foldr (:>:) e [ Val v :=: Val v' | ((_,v),(_,v')) <- kvs `zip` kvs' ])
+ ++
   "U-FAIL" `name`
   do (HNF e1 :=: HNF e2) :>: _ <- [lhs]
      -- Avoid the cases handled above
      guard (case (e1,e2) of (Int k1,Int k2) -> k1 /= k2
                             (Ref k1,Ref k2) -> k1 /= k2
                             (Arr a1,Arr a2) -> length a1 /= length a2
+                            (OLam{},OLam{}) -> False   -- handled by U-OLAM
                             _               -> True)
      guard (not (isLam e1))
      guard (not (isLam e2))
@@ -1379,3 +1421,28 @@ rulesLR _ lhs =
   "CHOICE" `name`
   do (ctx, e1 :|: e2) <- evalX' lhs
      pure $ ctx e1 :|: ctx e2
+
+-- OLam reduction rules
+rulesOLam :: ERule
+rulesOLam _ lhs =
+  "U-OLAM" `name`
+  do ee@(OLam v1 d1 r1 :=: OLam v2 d2 r2) :>: e <- [lhs]
+     let z  = identNotIn (free ee)
+         i1 = identNotIn (free d1)
+         i2 = identNotIn (free d2)
+         b1 = v1 :=: OLam (Var z) (Bind i1 $ Fails (Lam d1 :@: Var i1) :>: Lam d2) r2
+         b2 = v2 :=: OLam (Var z) (Bind i2 $ Fails (Lam d2 :@: Var i2) :>: Lam d1) r1
+     pure $ (EXI z $ b1 :>: b2) :>: e
+ ++
+  "APP-OLAM" `name`
+  do ee@(OLam (Val g) d r :@: Val v) <- [lhs]
+     let x = identNotIn (free ee)
+     pure $ One $ (EXI x $ (Lam d :@: v) :>: (Lam r :@: Var x)) :|: (g :@: v)
+ ++
+  "FAILS-FAIL" `name`
+  do Fails Fail <- [lhs]
+     pure $ Arr []
+ ++
+  "FAILS-VAL" `name`
+  do Fails (Val _) <- [lhs]
+     pure Fail

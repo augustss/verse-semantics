@@ -23,7 +23,6 @@
 \usepackage{textgreek}
 \usepackage{xspace}
 
-
 % \renewcommand{\arraystretch}{1.1}
 
 \input{verse-macros}
@@ -31,7 +30,7 @@
 \begin{document}
 
 \title{Desugaring \& Verifying Source Verse}
-\author{Simon, Lennart, Koen, Ranjit \today}
+\author{Andy S, Simon, Lennart, Koen, Ranjit \today}
 \maketitle
 
 \section{Overview}
@@ -46,37 +45,6 @@ Our plan is
 
 % ----------------------------------------------------------------
 \section{Source Verse}
-
-\begin{figure}
-$$
-\begin{array}{rcll}
-  |x,y,f| &     & \textit{Variable} \\
-  |k| &     & \textit{Integer constant} \\
-      \\
-
-\multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
-  |t| & ::= & |x|               & \text{Variable} \\
-      & \vb & |k|               & \text{Constant} \\
-      & \vb & |t_1^[t_2]|       & \text{Function application} \\
-      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
-      & \vb & |t_1 = t_2|       & \text{Unification} \\
-      & \vb & |x := t|          & \text{Definition} \\
-      & \vb & |x squiggt y := t| & \text{Definition} \\
-      & \vb & |:t|               & \text{Range} \\
-      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
-      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
-      & \vb & |for(t_1) do t_2|     & \text{Finite loop} \\
-      & \vb & |check fx t|      & \text{Effects check} \\
-      & \vb & |array (t_1, xdots, t_n)| & \text{Array}, n \geq 0 \\
-      & \vb & |functionP t_1 t_2|    & \text{Function} \\
-      & \vb & |oftype t_1 t_2|  & \text{Type annotation}
-\end{array}
-$$
-\\
-Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
-\caption{Small Source Verse} \label{fig:small-source-verse}
-\end{figure}
-
 
 \begin{figure}
 $$
@@ -104,7 +72,7 @@ $$
 &      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
 &      & \vb & |: t|             & \text{Range} \\
 &      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
-&      & \vb & |function (a_1 xdots a_n) t|    & \text{Function}\;(n\geq 1) \\
+&      & \vb & |functionOC oc (a_1 xdots a_n) t|    & \text{Function}\;(n\geq 1) \\
 &      & \vb & |if(t) then t|    & \text{Conditional expression} \\
 &      & \vb & |if(t) else t|    & \text{Conditional expression} \\
 &      & \vb & |if{t}|           & \text{Conditional expression} \\
@@ -115,10 +83,15 @@ $$
 &      & \vb & |case{t_1; xdots t_n}| & \text{Case expression} \\
 &      & \vb & |type^{t}|         & \text{Type definition} \\
 &      & \vb & |option^{}|        & \text{Create an option} \\
-&      & \vb & |option^{t}|       & \text{Create an option}
+&      & \vb & |option^{t}|       & \text{Create an option} \\
+&      & \vb & |truth^{t} |       & \text{Singleton map} \\
+&      & \vb & |amap (t_1; xdots; t_n) | & \text{Map}, n \geq 0 \\
 \\[2mm]
 \text{\bf Arguments} &
  |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
+\\[2mm]
+\text{\bf Constants} &
+ |k| & ::= & |i| \vb |r| \vb |pa| \vb |s| \vb |c| & \text{integer, rational, path, string, character}
 \\[2mm]
 \text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |p_1 squiggt p_2| \\
 &     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
@@ -133,6 +106,40 @@ $$
 $$
 \caption{Source Verse expressions} \label{fig:source-verse-expr}
 \end{figure}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+  |x,y,f| &     & \textit{Variable} \\
+  |k| &     & \textit{Integer constant} \\
+      \\
+
+\multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
+  |t| & ::= & |x|                        & \text{Variable} \\
+      & \vb & |k|                        & \text{Constant} \\
+      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
+      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
+      & \vb & |t_1 = t_2|                 & \text{Unification} \\
+      & \vb & |x := t|                    & \text{Definition} \\
+      & \vb & |x squiggt y := t|          & \text{Definition} \\
+      & \vb & |:t|                        & \text{Range} \\
+      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
+      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+      & \vb & |for(t_1) do t_2|           & \text{Finite loop} \\
+      & \vb & |check fx t|                & \text{Effects check} \\
+      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
+      & \vb & |functionOC oc t_1 t_2|     & \text{Function} \\
+      & \vb & |oftype t_1 t_2|            & \text{Type annotation}\\
+      & \vb & |amap (t_1, xdots, t_n) |   & \text{Map}, n \geq 0 \\
+\\
+  |oc| & ::=  & |open| \vb |closed| & \text{Open vs closed functions}
+\end{array}
+$$
+\\
+Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
+\caption{Small Source Verse} \label{fig:small-source-verse}
+\end{figure}
+
 
 \begin{figure}
 $$
@@ -165,7 +172,7 @@ $$
 \begin{array}{lrcll}
 \multicolumn{5}{l}{\textbf{Application and unification}} \\
 \rulename{dswhere} &  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
-\rulename{dsapp}   & |t_1^(t_2)| & \rightarrow & |succeeds^{t_1^[t_2]}| \\
+\rulename{dsapp}   & |t_1^(t_2)| & \rightarrow & |check succeeds (t_1^[t_2])| \\
 \\
 \multicolumn{5}{l}{\textbf{Array splice}} \\
 \rulename{dssplice} & \multicolumn{3}{l}{\quad|ar (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
@@ -176,12 +183,17 @@ $$
 \rulename{dsunit} &  |()| & \rightarrow & |ar ()| \\
 \rulename{dstuple} &  |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
 \\
+\multicolumn{5}{l}{\textbf{Map notation}} \\
+\rulename{dsmap}  &  |amap (t_1, xdots, t_n)| & \rightarrow & \multicolumn{2}{l}{|mkMap^(for(f : ar (t_1; xdots; t_n); i squiggt a : f){(i,a)})|} \\
+                  &                           &             & & \text{fresh |f|,|i|,|a|}
+\\
 \multicolumn{5}{l}{\textbf{Function notation}} \\
-\rulename{dstype} &  |type^{t}| & \rightarrow & |functionX (x:=t) (eff closed) x| & \text{fresh |x|}\\
-\rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |functionX (t_1) (eff closed) t_2| \\
-\rulename{dsfun1} &  |function (a_1 a_2 xdots a_n) t| & \rightarrow & |function a_1 (function (a_2 xdots a_n) t| \\
-\rulename{dsfun2}  & |function (()) t| & \rightarrow & |function ((ar ())) t| & \\
-\rulename{dsfun3}  &   |functionX a (eff fx) b| & \rightarrow & |function a (check fx b)| & \\
+\rulename{dstype} &  |type^{t}| & \rightarrow & |functionOCX closed (x:=t) succeeds x| & \text{fresh |x|}\\
+\rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |functionOCX closed (t_1) succeeds t_2| \\
+\rulename{dsfun1} &  |functionOC oc (a_1 a_2 xdots a_n) t| & \rightarrow & |functionOC oc a_1 (functionOC oc (a_2 xdots a_n) t| \\
+\rulename{dsfun2a}  &   |functionOC oc (apeff a fx) b| & \rightarrow & |functionOCX oc a fx b| & \\
+\rulename{dsfun2b}  &   |functionOC oc a b| & \rightarrow & |functionOCX oc a succeeds b| & \\
+% \rulename{dsfun3}  &   |functionOCX oc a (eff fx) b| & \rightarrow & |functionOC oc a (check fx b)| & \\
 \\
 \multicolumn{5}{l}{\textbf{Conditional and for-loop notation}} \\
 \rulename{dsif1} & |if{e}| & \rightarrow & |if(e) else false| \\
@@ -198,6 +210,8 @@ $$
 $$
 \begin{array}{lrcll}
   \multicolumn{5}{l}{\textbf{Operators}} \\
+\rulename{dspreq} &  |?e|     & \rightarrow & |type{false `choice` let (x:e){truth^{x}}}| & \text{|x| fresh} \\
+\rulename{dspostq} & |e?|     & \rightarrow & |e^[_]| \\
 \rulename{dsop1} &   |op_b e| & \rightarrow & |prefix op_b [e]| & \text{if |op_b| can fail}\\
 \rulename{dsop2} &   |op_b e| & \rightarrow & |prefix op_b (e)| \\
 \rulename{dsop3} &   |e op_a| & \rightarrow & |postfix op_a [e]| & \text{if |op_a| can fail}\\
@@ -205,11 +219,11 @@ $$
 \rulename{dsop5} &   |e_1 op_i e_2| & \rightarrow & |operator op_i [e_1, e_2]| & \text{if |op_i| can fail}\\
 \rulename{dsop6} &   |e_1 op_i e_2| & \rightarrow & |operator op_i (e_1, e_2)| \\
 \rulename{dsand} &   |e_1 srcand e_2| & \rightarrow & |e_1; e_2| \\
-\rulename{dsor} &   |e_1 srcor e_2| & \rightarrow & |if(e_1) else if (e_2) else :false| \\
+\rulename{dsor}  &   |e_1 srcor e_2| & \rightarrow & |if(e_1) else if (e_2) else :false| \\
 \rulename{dsbang} &   |!e| & \rightarrow & |if e then :false else false| \\
   \\
   \multicolumn{5}{l}{\textbf{Let, block, case}} \\
-\rulename{dslet} &    |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
+\rulename{dslet}   &    |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
 \rulename{dsblock} &    |block b| & \rightarrow & |b| & \textit{see note}  \\
 \rulename{dscase1} &    |case{e_1; xdots e_n}| & \rightarrow & |(x:any) => case(x){e_1; xdots e_n}| & \text{|x| fresh} \\
 \rulename{dscase2} &    |case(e){e_1; xdots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor xdots srcor e_n^[x]| & \text{|x| fresh} \\
@@ -218,7 +232,8 @@ $$
   \multicolumn{5}{l}{\textbf{Misc}} \\
 \rulename{dswild} &  |_| & \rightarrow & |x:any| & \text{|x| fresh} \\
 \rulename{dsopt1} &   |option^{}| & \rightarrow & |false| \\
-\rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then truth(x) else false| & \text{|x| fresh} \\
+\rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then truth^{x} else false| & \text{|x| fresh} \\
+\rulename{dstruth} &  |truth^{e}| & \rightarrow & |amap(e eqgt e)| \\
 \end{array}
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.
@@ -364,6 +379,78 @@ $$
 $$
 }
 
+\subsection{Maps}
+Verse maps a finite maps from values to values.  We need a primitive type (similar to array).
+Values of this primitive type are constructed by the primitive function |mkMap| which takes
+an array of key-value pairs as input.  So, e.g., |mkMap^(('a', 1), ('b',5))| creates a map
+that map the character 'a' to 1 and the character 'b' to 5.
+
+Like arrays, you can index into maps using regular function application.  The rewrite rules
+need to be extended to handle that in a similar way to how array application works.
+
+In the source language maps are written like this |amap('a' => 1; 'b' =>5)| for the example above.
+The desugaring rule \rulename{dsmap} handles this, and many more cases.
+The elements in |amap| can be functions, maps, or arrays.
+
+\subsubsection{Changes to the ICFP rewrite rules}
+We will use the syntax |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| to denote a map that maps
+|hnf_1| to |v_1| etc.  Note that the keys are always in |hnf|.\\
+\begin{figure}
+\textbf{Syntax}
+$$
+  \begin{array}{lr@@{\;}c@@{\;}l@@{}}
+    \text{Head values} & \hnf & ::= & \cdots \vb |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| \\
+  \end{array}
+$$ \\[3mm]
+\textbf{Rewrite rules}
+$$
+\begin{array}{@@{\;} l @@{\;} r @@{\;}c@@{\;} l l@@{}}
+\rulename{app-mkmap}          & |apply1 mkMap (arrsp (arr (hnf_1, v_1), xdots, arr(hnf_n, v_n)))| & \movesto & |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))| \\[2mm]
+\rulename{app-map}          & |apply1np (vmap ((hnf_1, v_1), xdots, (hnf_n, v_n))) v| & \movesto &
+                              \multicolumn{2}{@@{}l}{| (v == hnf_1^^^ v_1) choice xdots choice (v == hnf_n^^^ v_n)|
+                              } \\[2mm]
+\rulename{u-map} & \hspace{-1.0em} |vmap ((hnf_1, v_1), xdots, (hnf_n, v_n')) == vmap ((hnf_1, v_1), xdots, (hnf_n, v_n')); e| & \movesto & |v_1==v1';xdots;v_n==v_n'; e| \\
+\end{array}
+$$
+\caption{Extensions for maps} \label{fig:map-ext}
+\end{figure}
+
+The \rulename{app-mkmap} make a map from an array of key-value pairs.
+The key has to be in |hnf|, but the value can also be a variable.
+
+The \rulename{app-map} is analogous to \rulename{app-tup}.  It make a choice where the argument is unified with each of the keys.
+
+The \rulename{u-map} is analogous to \rulename{u-tup}.  For a unification to succeed all the keys have to be identical, and if they are
+then all the values are unified.
+
+\subsubsection{Example}
+The |amap| construct is very flexible.  Here are some example:\\
+$$
+\begin{array}{ll}
+|amap(1 `choice` 2=>11; 3=>33)| & \text{create a map from some lambdas} \\
+|amap(m; 'a' => 99)| & \text{``update'' the map |m| with a new value for key |'a'|} \\
+|amap(m1; m2)| & \text{concatenate the maps |m1| and |m2|, right biased} \\
+|amap(a)| & \text{turn the array |a| into a map} \\
+\end{array} \\
+$$
+
+Just like with arrays, maps can be used in a |for| to iterate over all elements.
+$$
+\begin{array}{ll}
+|m:=amap(1 `choice` 2=>11; 3=>33); for(k squiggt v:m){k}| & \text{computes the keys |1,2,3|} \\
+|m:=amap(1 `choice` 2=>11; 3=>33); for(k squiggt v:m){v}| & \text{computes the values |11,11,33|} \\
+\end{array} \\
+$$
+
+Sample desugaring
+$$
+\begin{array}{l}
+|amap{1 `choice` 2=>11; 3=>33}| \longrightarrow \\
+|mkMap(for(f:(1 `choice` 2=>11, 3=>33); i->a:f){(i,a)})| \longrightarrow \\
+|mkMap(for(f:(functionP (1 `choice` 2) 11, functionP 3 33); i->a:f){(i,a)})| \longrightarrow \\
+\end{array} \\
+$$
+
 \subsection{Example rewriting}
 $$
 \begin{array}{lrcl}
@@ -405,38 +492,13 @@ This is a list of things we have not yet covered:
 \section{Desugaring Small Source Verse into Big Core Verse}
 
 \begin{figure}
-$$
-\begin{array}{rcll}
-\multicolumn{4}{l}{\text{\bf Expressions}} \\
-|e| & ::= & |x| \vb |k|
-    \vb |e_1 `choice` e_2| \vb |def x e| & \text{Just as in Core} \\
-      & \vb & |lam x e| \\
-      & \vb & |tup (e_1, xdots, e_n)| \\
-      & \vb & |e_1 ; e_2| \\
-      & \vb & |e_1 = e_2|                 & \text{Not only on lhs of ``|;|''} \\
-      & \vb & |e_1 e_2|                   & \text{Not flattened to values} \\
-
-      & \vb & |check fx e|                & \text{Effects check} \\
-      & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
-      & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
-      & \vb & |for(e){b}|                 & \text{Finite loop} \\
-      & \vb & |tlam x e_1 e_2|             & \text{Tim lambda} \\
-      & \vb & |oftype e t|                & \text{Type ascription}
-    \\
-\multicolumn{4}{l}{\text{\bf Effects}} \\
-|fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
-\end{array}
-$$
-\caption{BigCore Verse expressions} \label{fig:core-verse}
-\end{figure}
-
-\begin{figure}
 \begin{code}
 any    = (x => x)
 int    = (x => applyx isInt x; x)
 nat    = (x => applyx isInt x; x > (-1); x)
 abs    = (x => applyx isInt x; if x > 0 then x else (-x))
 false  = array()
+true   = (truth^{:any} => truth^{false})
 \end{code}
 %%arrow  = (ft => f => y => applyx (applyx ft y) (applyx f y))
 
@@ -497,117 +559,220 @@ $$
 \begin{array}{@@{}l}
 \mbox{\bf Syntax} \\
 \multicolumn{1}{c}{\begin{array}{rcll}
-  |si| & ::= &  |solve|  \vb |infer| & \text{``solve'' and ``infer'' respectively.}\\
-  |inpw| & ::= & |x|^{|si|} & \text{If $|x|$ is a unification variable then $|si|=|solve|$} \\[1mm]
+  |si| & ::= &  |solve|  \vb |infer| \vb |solvex|
+        & \text{``solve'' and ``infer'' respectively; controls |DAe (inp f si) x| .}\\
+  |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\
+  |inpw| & ::= & |x|^{|si|}_{|md|} & \text{If $|x|$ is a unification variable then $|si|=|solve|$} \\[1mm]
+
 %  |flipsi infer| & = & |solve| \\
 %  |flipsi solve| & = & |infer| \\
-\end{array}} \\ \\
+\end{array}} \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De t| = |e|$, $|DAe inpw x| = |e|$}} \\[0.02in]
-\rulename{dinit}   & |De t | & = & |def x (XMe x solve t)| \\[1mm]
-\rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| \\
-\rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[2mm]
+\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DAe (inp f si) x| = |e|, |Hide e|$}} \\[0.02in]
+\rulename{dinit}   & |De2 md t | & = & |def x (DMe (inp2 x solve md) t)| \\[1mm]
+\rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| & \text{NB: no case for |si = solvex|}\\
+\rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[1mm]
+\rulename{hide}     & |Hide e|  & = & |forall r (assume (r == e); r)|
+  & \text{Just an abbreviation; BigCore to BigCore}\\[1mm]
 \end{array} \\
 
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\begin{array}{lr@@{\;}c@@{\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
 
-\multicolumn{4}{l}{\mbox{\it Function rules (verification)}} \\
-\rulename{mcfun} &  |DMe (inp f si) (functionX t_1 (eff closed) t_2)|
-& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i (flipsi si)) t_1);
-                                            assert (z := DAe (inp f si) j; Me (inp z si) t_2))); |} \\
-& &   & |lam i (j := Me (inp i (flipsi si)) t_1; forall r (assume (z :=  DAe (inp f si) j;
-                                             r = Me (inp z si) t_2); r))| \\[2mm]
-
-
-\rulename{mofun}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
-& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := Me (inp i (flipsi si)) t_1;
-                                            assert (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
-& &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
-    |if (j := Me (inp i (flipsi si)) t_1)| \\
-    |then (forall r (assume (z := DAe (inp f si) j; r = Me (inp z si) (t_2)); r))| \\
-    |else (DAe (inp f si) i)|
-   \end{array}} \\[10mm]
-
-\end{array} \\
+\multicolumn{4}{l}{\mbox{\it Closed functions}} \\
+\rulename{mcfun+} &  |DMe (inp2 f si mdpos) (functionOCX closed t_1 fx t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(forall i (j := (Me (inp2 i solve mdneg) t_1);
+                                            check fx (z := DAe (inp f si) j; Me (inp2 z si mdpos) t_2))); |} \\
+& &   & |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)| \\[1mm]
+\rulename{mcfun-} &  |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)|
+& = & |lam i (j := Me (inp2 i infer mdpos) t_1;
+                havoc fx; z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2)| \\[1mm]
+\rulename{mcfunx}& |DMe (inp2 f si mdx) (functionOCX closed t_1 fx t_2)|
+& = & |lam i (j := Me (inp2 i infer mdx) t_1;
+              z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)| \\[2mm]
+\end{array}
+\\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Open functions}} \\
 
-\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
-         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
-         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+\rulename{mofun+}  & |DMe (inp2 f si mdpos) (functionOCX open t_1 fx t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(forall i (j := Me (inp2 i solve mdneg) t_1;
+                                            check fx (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
+& &   & |DMe (inp2 f si mdneg) (functionOCX open t_1 fx t_2)| \\[1mm]
 
-\multicolumn{4}{l}{\mbox{\it Function rules (execution)}} \\
+\rulename{mofun-}  & |DMe (inp2 f si mdneg) (functionOCX open t_1 fx t_2)|
+ & = & |defhdr h olamKW| \left( \begin{array}{@@{}l@@{}}
+    |h,| \\
+    |lam i (j := Me (inp2 i infer mdx) t_1; arr (j, x_1, dots, x_n)), | \\
+    |lamhdr x| \begin{array}[t]{@@{}l@@{}}
+      |(arr (j, x_1, dots, x_n):= x; havoc fx;| \\
+      |z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2)|
+      \end{array}
+   \end{array} \right) \\
+    && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}} \\
 
-
-\multicolumn{2}{l}{\rulename{mcfunx}\hspace{4mm} |DMe (inp f si) (functionX t_1 (eff closed) t_2)|}
-  & = & |lam i (j := Me (inp i (flipsi si)) t_1; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\[2mm]
-
-
-
-\rulename{mofunx}  & |DMe (inp f si) (functionX t_1 (eff open) t_2)|
- & =  & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
-    |if (j := Me (inp i (flipsi si)) t_1)| \\
-    |then (z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
-    |else (DAe (inp f si) i)|
-   \end{array}} \\[10mm]
-
-\rulename{moftypex} & |DMe inpw (oftype t_1 t_2)| & = & |y:=DMe inpw t_1; ((De t_2))^[y]| \\[2mm]
-
+\rulename{mofunx}  & |DMe (inp2 f si mdx) (functionOCX open t_1 fx t_2)|
+  & = & |defhdr h olamKW| \left( \begin{array}{@@{}l@@{}}
+    |h,| \\
+    |lam i (j := Me (inp2 i infer mdx) t_1; arr (j, x_1, dots, x_n)), | \\
+    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)|
+   \end{array} \right) \\
+    && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
+\end{array} \\[10mm]
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{mtype}   & |DMe (inp i si) (:t)|           & = & |((De t))^[i]| \\
-\rulename{msquig} & |DMe (inp z si) (y squiggt x := t)| & = & |y := z; DMe (inp z si) (x := t)| \\
-\rulename{marray} & |DMe (inp x si) (arr(t_1, xdots, t_n))| & = &
-    |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n));
-     arr (DMe (inp x_1 si) t_1, xdots, DMe (inp x_n si) t_n)|
+%\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
+%         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
+%         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+
+\rulename{moftype+} & |DMe (inp2 f si mdpos) (oftype t_1 t_2)|
+  & = & |y := DMe (inp2 f si mdpos) t_1; z := De2 mdpos t_2; apply1N z y; Hide (def i (apply1N z i))| \\
+\rulename{moftype-} & |DMe (inp2 f si mdneg) (oftype t_1 t_2)|
+  & = & |z := De2 mdneg t_2; Hide (def i (apply1N z i))| \\
+\rulename{moftypex} & |DMe (inp2 f si mdx) (oftype t_1 t_2)|
+  & = & |y:=DMe (inp2 f si mdx) t_1; z := De2 mdx t_2; apply1N z y| \\
+\rulename{mtype1}   & |DMe (inp2 i solve md) (:t)|           & = & |z:=De2 md t; Hide (def j (apply1N z j))| \\
+\rulename{mtype2}   & |DMe (inp2 i infer md) (:t)|           & = & |(De2 md t)^[i]| \\
+\rulename{msquig} & |DMe (inp2 z si md) (y squiggt x := t)| & = &
+\multicolumn{2}{@@{}l}{|y := z; DMe (inp2 z sip md) (x := t)|
+\hspace{3mm} \text{where |sip| = |solvex| if |si=solve|, or |si| otherwise}}\\
+\rulename{marray} & |DMe (inp2 x si md) (arr(t_1, xdots, t_n))| & = &
+    |def (x1 xdots xn) (x == arr (x1, xdots, xn));
+     arr (DMe (inp2 x1 si md) t_1, xdots, DMe (inp2 xn si md) t_n)|
     \\[2mm]
 
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
 \rulename{mbind}   & |DMe inpw (x:=t)|         & = & |x := DMe inpw t| \\
 \rulename{meq}     & |DMe inpw (t_1=t_2)|      & = & |(DMe inpw t_1) = (DMe inpw t_2)| \\
 \rulename{msemi}   & |DMe inpw (t_1 ; t_2)|    & = & |De t_1 ; DMe inpw t_2| \\
+\rulename{mcheck}   & |DMe inpw (check fx t)|    & = & |check fx (DMe inpw t)| \\
 \rulename{mchoice} & |DMe inpw ((t_1 `choice` t_2))| & = & |(DMe inpw t_1) `choice` (DMe inpw t_2)| \\
 \multicolumn{2}{l}{\rulename{mif}\hspace{3mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
     \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe inpw t_2 else DMe inpw t_3|} \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Equality rules}} \\
-\rulename{mconst}  & |DMe (inp x si) k|                  & = & |x = k| \\
-\rulename{mvar}    & |DMe (inp x si) y|                  & = & |x = y| \\
-\rulename{mapp}    & |DMe (inp x si) (t_1^[t_2])|         & = & |x = ((De t_1))^[De t_2]|
+\rulename{mconst}  & |DMe (inp2 x si md) k|                  & = & |x = k| \\
+\rulename{mvar}    & |DMe (inp2 x si md) y|                  & = & |x = y| \\
+\rulename{mapp}    & |DMe (inp2 x si md) (t_1^[t_2])|         & = & |x = (De2 md t_1)^[De2 md t_2]|
 \end{array}
 \end{array}$$
-\caption{{\bf DS7} 16 Oct new attempt at getting rid of EXI-APP} \label{fig:ds7}
+\caption{{\bf DS9}: Small Source to Big Core } \label{fig:ds9}
 \end{figure}
 
-\subsection{Big Core Verse}
+\begin{figure}
+$$
+\begin{array}{@@{}l}
 
-\Cref{fig:core-verse} gives the Big Core Verse language into which we desugar,
-Big Core Verse is slightly larger than the core language of the ICFP 23 paper, but
-can very easily be desugared into it.  Specifically:
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Function rules (verification)}} \\
+\rulename{mcfun} &  |DMe (inp f si) (functionOC closed t_1 t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i (flipsi si)) t_1);
+                                            z := DAe (inp f si) j; Me (inp z si) t_2)); |} \\
+& &   & |lam i (j := Me (inp i (flipsi si)) t_1; assume (z :=  DAe (inp f si) j;
+                                             Me (inp z si) t_2))| \\[2mm]
+\end{array} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+
+\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
+         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; (De t_2)^[y];| \hspace{5mm} \text{|y| fresh}} \\
+         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+\\
+\rulename{asm-semi} & |assume (v == e_1; e_2)| & \movesto & |v == (assume e_1); assume e_2| \\
+\rulename{check-semi} & |check fx (v=e_1; e_2)| & \movesto & |v = (check fx e_1); check fx e_2| \\
+ & & \multicolumn{2}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
+\rulename{asm-verify} & |assume (E^[verify e_1; e_2]| & \movesto & |E^[e_2]| \\
+\rulename{asm-val} & |assume v| & \movesto & |v| \\
+\rulename{verify-gc} & |verify e_1; e_2| & \movesto
+   & \multicolumn{2}{l}{|e_2| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e_1|}}
+\end{array} \\
+\\
+\begin{minipage}{12cm}
+  \begin{itemize}
+  \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
+  \item |verify e| checks that |e| neither gets stuck nor goes wrong.
+\end{itemize}
+Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
+\end{minipage}
+\end{array}$$
+\caption{\bf DS7-new: SPJ attempt to simplify}
+\end{figure}
+
+
+\begin{figure}[t]
+  $$
+\begin{array}{@@{}l}
+\mbox{\em Core Syntax} \\
+\begin{array}{@@{}lr@@{\;}c@@{\;}l@@{}l}
+      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e|  \vb |olam v (lam x e_1) (lam y e_2)| \\
+\end{array} \\[4mm]
+
+\mbox{\em Rewrite rules} \\
+\begin{array}{@@{} l r c l l}
+  \rulename{u-olam}          & \multicolumn{3}{l}{|olam v_1 dom_1 rng_1 == olam v_2 dom_2 rng_2|} \\
+  & \multicolumn{3}{l}{\hspace{5mm} \movesto |defKW z|.
+  \begin{array}[t]{l}
+        |v_1 == olam z ((lam i (check fails (apply1N dom_1 i); apply1N dom_2 i))) rng_2;| \\
+        |v_2 == olam z ((lam i (check fails (apply1N dom_2 i); apply1N dom_1 i))) rng_1;| \\
+   \end{array}} \\[5mm]
+\rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &  |if (x := apply1N dom v) then apply1N rng x else apply1N g v|
+\end{array}\\
+\\
+
+\mbox{\em Desugaring rules (for execution)} \\
+\begin{array}{@@{}lr@@{\;}c@@{\;}l}
+\rulename{mofun}  & |DMe (inp f si) (functionOC open t_1 t_2)|
+& = & |olamKW| \left( \begin{array}{l}
+    |f,| \\
+    |lam i (j := Me (inp i (flipsi si)) t_1; arr (j, x_1, dots, x_n)), | \\
+    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
+   \end{array} \right) \\
+&& \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
+\end{array}
+
+\end{array}
+$$
+\caption{Extra stuff for open functions (temporary figure)} \label{fig:open}
+\end{figure}
+
+
+\Cref{fig:ds8} desugars Small Source Verse into Big Core Verse. (See \Cref{sec:big-core} for the syntax of
+Big Core.)
+The key function is |DMe (inp2 i si md) t|, which desugars a Small Source term |t| to produce a
+Big Core expression |e|. Desugaring takes:
 \begin{itemize}
-\item It includes |x := e|.  This means |x=e|, plus an existential for |x| added at the
-  top of the enclosing scope.
-\item In |if (e_1) then e_2 else e_3| each of the |e_i| has its own scope, but existentials
-  at the top of |e_1| also scope over |e_2|.  So |if (x:=f^[0]) { y:=x+1; y*y } else 0| gets turned into
-  |if (def x (x==f^[0])) then (def y (y==x+1; y*y)) else 0|.
-\item In |for (e_1) {e_2}| both expressions have their own scope, but with top existential in |e_1| scoping over |e_2|.
+\item An \emph{input variable}, |i|.
+\item A \emph{mode}, |md|, which has three possibilities:
+  \begin{itemize}
+  \item |md = mdx|: desugar for execution. Generates no verification checks.
+    \item |md = mdneg|: generate enough |verify xdots| blocks for |t| to verify |t|'s \emph{context}.
+  \item |md = mdpos|: like |md = mdneg|, but also generate |verify xdots| blocks for |t| that verify |t| itself.
+\end{itemize}
+\item A \emph{wrapping flag}, |si|, which takes the form:
+  \begin{itemize}
+  \item |si = solve|: do not generate wrapper calls to |i|.
+  \item |si = infer|: generate wrapper calls to |i|.
+  \item |si = solvex|: fail outright on |functionKW| terms.
+  \end{itemize}
 \end{itemize}
 
+\subsection{Hiding, forall, and assume}
 
-\subsection{Desugaring from SmallSource to BigCore}
+The auxiliary function |Hide e|, pronounced ``hide |e|'', returns a \emph{single value} drawn from |e|.
+A typical use is for a function that returns an |int|; when verifying \emph{calls} to such a function
+we want it to return an |int|, but we don't know which one, so we return |Hide (:int)|, or equivalently
+|Hide (def x (apply1N int x))|.
 
-\Cref{fig:ds7} desugars Small Source Verse into Big Core Verse.
-In desugaring from SmallSource Verse into BigCore Verse, there are two big features to watch:
-\begin{description}
-\item[Functions.] We desugar Verse's lambdas |functionP t_1 t_2|, which (very unusually) have a domain \emph{expression} |t_1| rather
-  than a (conventional) domain \emph{variable}.
-\item[Verification.] We desugar certain constructs in two different ways, one for \emph{execution} and one for \emph{verification}.
-\end{description}
-\noindent
+As \Cref{fig:ds8} shows, |Hide e| is just an abreviation for |forall r (assume (r == e); r)|, and \emph{this is the only way that |forallKW| and |assumeKW| are introduced in the desugaring}.
 
+\subsection{Desugaring functions for execution}
 
-\subsubsection{Desugaring functions for execution}
-
+Verse functions, |functionOCX oc t_1 dx t_2|, are unusual in having a domain \emph{expression} |t_1| rather
+than a (conventional) domain \emph{variable} or \emph{pattern}.
 We concentrate first on desugaring functions for execution.
 
 Consider the Source Verse lambda |functionP 3 t|. This is a function that takes an
@@ -677,7 +842,7 @@ $$
 $$
 Here you can see \rulename{mtype} in action.
 
-\subsubsection{Desugaring functions for verification}
+\subsection{Desugaring functions for verification}
 \lennart{Stuff here.}
 
 \subsection{The pattern |y squiggt x|}
@@ -725,10 +890,50 @@ in the syntax of Small Source Verse.
 We could just have |(y squiggt x) := t| with a fresh |y|.  But the for |x := t| is so
 ubiquitously useful that we include it in our syntax.
 
+\subsection{Open functions}
+
+\Cref{fig:open} gives extra rules for open functions.
+
+Rule \rulename{u-olam} comes directly from rule \rulename{c-mutatate-ll} in Fig 10-13 of the extendded version of the extended version of ``The essence of ML type inference'' (Pottier and Remy) \url{http://cristal.inria.fr/attapl/}.
+
+Here is an example. Assume the function definitions are open.
+$$
+\begin{array}{ll}
+  \multicolumn{2}{l}{|f^(x:int) := x+1; f^(x:float) := x*0.2; f^[2.4]|} \\[1mm]
+  \movesto & \mbox{\{desugar\}} \\
+  & |defhdr f| \begin{array}[t]{l}
+    |f = def z_1 (olam z_1 (lam i (apply1N int i)) (lam x (x+1)));| \\
+    |f = def z_2 (olam z_2 (lam i (apply1N float i)) (lam x (x*0.2)));| \\
+    |f^[2.4]|
+    \end{array} \\[10mm]
+  \movesto & \mbox{\{substitute for f, and discard f\}} \\
+  & |defhdr (z_1 z_2)| \begin{array}[t]{l}
+    |(olam z_1 (lam i (apply1N int i)) (lam x (x+1)))
+      == (olam z_2 (lam i (apply1N float i)) (lam x (x*0.2)));| \\
+    |(olam z_1 (lam i (apply1N int i)) (lam x (x+1)))^[2.4]|
+    \end{array}\\[6mm]
+  \movesto & \mbox{\{\rulename{u-olam} and \rulename{app-olam}\}} \\
+  & |defhdr (z_1 z_2 z_3)| \begin{array}[t]{l}
+    |z_1 == olam z_3 (lam (i) (check fails (apply1N int i); apply1N float i)) (x*0.2);| \\
+    |z_2 == olam z_3 (lam (i) (check fails (apply1N float i); apply1N int i)) (x+1);| \\
+    |if (x:=int^[2.4]) then (x+1) else apply1N z_1 2.4|
+    \end{array}\\[10mm]
+  \movesto & \mbox{\{Simplify |if|, discard |z_2|\}} \\
+  & |defhdr (z_1 z_3)| \begin{array}[t]{l}
+    |z_1 == olam z_3 (lam (i) (check fails (apply1N int i); apply1N float i)) (x*0.2);| \\
+    |apply1N z_1 2.4|
+    \end{array}\\[7mm]
+  \movesto & \mbox{\{substitute for |z_1|, then discard |z_1|, and \rulename{app-olam}\}} \\
+  & |def (z_3) (if (x := (check fails (apply1N int 2.4); apply1N float 2.4)) then (x*0.2) else apply1N z_3 2.4| \\[2mm]
+ \movesto & \mbox{\{Simplify |if|\}} \\
+  & |def (z_3) (2.4 * 0.2)| \\[2mm]
+ \movesto & \mbox{\{arithmetic and GC\}} \\
+  & |0.48| \\
+\end{array}
+$$
 \subsection{Loose ends}
 
 \begin{itemize}
-\item \simon{Lennart, why did you duplicate all of M into D?}
 \item Is \rulename{meq} right. E.g. |functionP ( x:= (:nat = :even) ) t| should
   check that both |nat^[i]| and |even^[i]| succeed \emph{and} that they give the same result.
 \item \simon{Is \rulename{moftype} right?}
@@ -740,6 +945,51 @@ ubiquitously useful that we include it in our syntax.
     |f ( for(1 `choice` 2){:abs} ) := ...|
     \end{array}
   $$
+\end{itemize}
+
+%----------------------------------------------------------
+
+\section{Big Core Verse} \label{sec:big-core}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+\multicolumn{4}{l}{\text{\bf Expressions}} \\
+|e| & ::= & |x| \vb |k|
+    \vb |e_1 `choice` e_2| \vb |def x e|  & \text{Just as in Core} \\
+      & \vb & |lam x e|                  & \text{Ordinary lambda} \\
+      & \vb & |olam e_1 v_1 v_2|          & \text{Open lambda} \\
+      & \vb & |tup (e_1, xdots, e_n)| \\
+      & \vb & |e_1 ; e_2| \\
+      & \vb & |v = e|                 & \text{Not only on lhs of ``|;|''} \\
+      & \vb & |e_1 e_2|                   & \text{Not flattened to values} \\
+
+      & \vb & |x := e|                    & \text{Brings |x| into scope and binds it} \\
+      & \vb & |if e_1 then e_2 else e_3|   & \text{Conditional expression} \\
+      & \vb & |for(e){b}|                 & \text{Finite loop} \\
+      & \vb & |check fx e|                & \text{Effects check} \\
+    & \vb & |verify e| \\
+    & \vb & |forall x e| \\
+    & \vb & |e_1 guard e_2|               & \text{Guard} \\
+    & \vb & |assume e|                    & \text{Assumption}
+    \\
+\multicolumn{4}{l}{\text{\bf Effects}} \\
+|fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
+\end{array}
+$$
+\caption{BigCore Verse expressions} \label{fig:core-verse}
+\end{figure}
+
+\Cref{fig:core-verse} gives the Big Core Verse language into which we desugar,
+Big Core Verse is slightly larger than the core language of the ICFP 23 paper, but
+can very easily be desugared into it.  Specifically:
+\begin{itemize}
+\item It includes |x := e|.  This means |x=e|, plus an existential for |x| added at the
+  top of the enclosing scope.
+\item In |if (e_1) then e_2 else e_3| each of the |e_i| has its own scope, but existentials
+  at the top of |e_1| also scope over |e_2|.  So |if (x:=f^[0]) { y:=x+1; y*y } else 0| gets turned into
+  |if (def x (x==f^[0])) then (def y (y==x+1; y*y)) else 0|.
+\item In |for (e_1) {e_2}| both expressions have their own scope, but with top existential in |e_1| scoping over |e_2|.
 \end{itemize}
 
 
@@ -765,6 +1015,47 @@ The Core Verse rewrite rules are given in \Cref{fig:rules}.
 
 \section{Verifier}
 
+\begin{figure}
+$$
+\begin{array}{@@{}l@@{}}
+
+\begin{array}{rcll}
+\multicolumn{4}{l}{\text{\bf Substitution contexts}} \\
+|S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e|
+\end{array}
+\\
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+
+\\[-0.6em]
+
+\rulegroupname{Application, unification, choice rules as in \Cref{fig:rules}}
+\\
+\rulegroupname{Substitution:}
+
+\rulename{subst1} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
+  & \text{if $|v|\ne|V^[x]|$} \\
+\rulename{subst2} & |assume (x==e_1); e_2| & \movesto & |assume (x==e_1);  subst e_2 e_1 x|
+    \\[-0.6em]
+
+\rulegroupname{Normalization:}
+\rulename{exi-elim1} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[()]| & \text{if $|x| \notin \freevars{|E|}$}\\
+% \rulename{exi-app} & |def f E^[apply1 f v]| & \movesto & |def y E^[y]| & \text{if $|f| \notin \freevars{|E,v|} \cup \boundvars{|E|}$} \\
+%\rulename{exi-app} & |def f E^[apply1 f v]| & \movesto & |def f E^[def y y]|
+%  & \text{if $|f|$ appears only in calls |apply1 f v| in |E|} \\
+\rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+%\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
+%\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
+%\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
+\rulename{seq-assoc} & |v_2==(v_1==e_1 ; e_2) ; e_3| & \movesto & |v_1==e_1 ; v_2==e_2 ; e_3| \\
+
+\end{array}
+\end{array}
+$$
+\caption{Verification rules (Dec 23)}
+\end{figure}
+
+
 \input{../trsverifier/overview}
 \input{../trsverifier/rules}
 \input{../trsverifier/examples}
@@ -787,6 +1078,8 @@ Out-dated rules:
 \item DS4: \Cref{fig:ds4}
 \item DS5: \Cref{fig:ds5}
 \item DS6: \Cref{fig:ds6}
+\item DS7: \Cref{fig:ds7}
+\item DS8: \Cref{fig:ds8}
 \end{itemize}
 
 \begin{figure}
@@ -1061,11 +1354,11 @@ $$\begin{array}{@@{}l}
 % \rulename{dinit-alt}   & |De t | & = & |DMe ((def i i)) t| \\[2mm]
 
 \multicolumn{4}{l}{\mbox{\it Function rules}} \\
-\rulename{mcfun}  & |DMe f (functionX t_1 (closed) t_2)|
+\rulename{mcfun}  & |DMe f (functionOC closed t_1 t_2)|
      & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
 & &   & |lam i (j := Me i t_1; forall r (assume (z := f^[j]; r = Me z (t_2)); r))| \\[2mm]
 
-\rulename{mofun}  & |DMe f (functionX t_1 (open) t_2)|
+\rulename{mofun}  & |DMe f (functionOC open t_1 t_2)|
      & = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me i t_1); assert (z := f^[j]; (Me z t_2))))); |} \\
 & &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
     |if (j := Me i t_1)| \\
@@ -1103,6 +1396,195 @@ $$\begin{array}{@@{}l}
 \end{array}
 \end{array}$$
 \caption{{\bf DS6} [old Fig 14]: using just M, with no D} \label{fig:ds6}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\mbox{\bf Syntax} \\
+\multicolumn{1}{c}{\begin{array}{rcll}
+  |si| & ::= &  |solve|  \vb |infer| & \text{``solve'' and ``infer'' respectively.}\\
+  |inpw| & ::= & |x|^{|si|} & \text{If $|x|$ is a unification variable then $|si|=|solve|$} \\[1mm]
+%  |flipsi infer| & = & |solve| \\
+%  |flipsi solve| & = & |infer| \\
+\end{array}} \\ \\
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De t| = |e|$, $|DAe inpw x| = |e|$}} \\[0.02in]
+\rulename{dinit}   & |De t | & = & |def x (XMe x solve t)| \\[1mm]
+\rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| \\
+\rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[2mm]
+\end{array} \\
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
+
+\multicolumn{4}{l}{\mbox{\it Function rules (verification)}} \\
+\rulename{mcfun} &  |DMe (inp f si) (functionOC closed t_1 t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i (flipsi si)) t_1);
+                                            assert (z := DAe (inp f si) j; Me (inp z si) t_2))); |} \\
+& &   & |lam i (j := Me (inp i (flipsi si)) t_1; forall r (assume (z :=  DAe (inp f si) j;
+                                             r = Me (inp z si) t_2); r))| \\[2mm]
+
+
+\rulename{mofun}  & |DMe (inp f si) (functionOC open t_1 t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := Me (inp i (flipsi si)) t_1;
+                                            assert (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
+& &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
+    |if (j := Me (inp i (flipsi si)) t_1)| \\
+    |then (forall r (assume (z := DAe (inp f si) j; r = Me (inp z si) (t_2)); r))| \\
+    |else (DAe (inp f si) i)|
+   \end{array}} \\[10mm]
+
+\end{array} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+
+\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
+         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
+         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Function rules (execution)}} \\
+
+
+\multicolumn{2}{l}{\rulename{mcfunx}\hspace{4mm} |DMe (inp f si) (functionOC closed t_1 t_2)|}
+  & = & |lam i (j := Me (inp i (flipsi si)) t_1; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\[2mm]
+
+
+
+\rulename{mofunx}  & |DMe (inp f si) (functionOC open t_1 t_2)|
+ & =  & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
+    |if (j := Me (inp i (flipsi si)) t_1)| \\
+    |then (z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
+    |else (DAe (inp f si) i)|
+   \end{array}} \\[10mm]
+
+\rulename{moftypex} & |DMe inpw (oftype t_1 t_2)| & = & |y:=DMe inpw t_1; ((De t_2))^[y]| \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Type rules}} \\
+\rulename{mtype}   & |DMe (inp i si) (:t)|           & = & |((De t))^[i]| \\
+\rulename{msquig} & |DMe (inp z si) (y squiggt x := t)| & = & |y := z; DMe (inp z si) (x := t)| \\
+\rulename{marray} & |DMe (inp x si) (arr(t_1, xdots, t_n))| & = &
+    |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n));
+     arr (DMe (inp x_1 si) t_1, xdots, DMe (inp x_n si) t_n)|
+    \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
+\rulename{mbind}   & |DMe inpw (x:=t)|         & = & |x := DMe inpw t| \\
+\rulename{meq}     & |DMe inpw (t_1=t_2)|      & = & |(DMe inpw t_1) = (DMe inpw t_2)| \\
+\rulename{msemi}   & |DMe inpw (t_1 ; t_2)|    & = & |De t_1 ; DMe inpw t_2| \\
+\rulename{mcheck}   & |DMe inpw (check fx t)|    & = & |check fx (DMe inpw t)| \\
+\rulename{mchoice} & |DMe inpw ((t_1 `choice` t_2))| & = & |(DMe inpw t_1) `choice` (DMe inpw t_2)| \\
+\multicolumn{2}{l}{\rulename{mif}\hspace{3mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
+    \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe inpw t_2 else DMe inpw t_3|} \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
+\rulename{mconst}  & |DMe (inp x si) k|                  & = & |x = k| \\
+\rulename{mvar}    & |DMe (inp x si) y|                  & = & |x = y| \\
+\rulename{mapp}    & |DMe (inp x si) (t_1^[t_2])|         & = & |x = ((De t_1))^[De t_2]|
+\end{array}
+\end{array}$$
+\caption{{\bf DS7} 16 Oct new attempt at getting rid of EXI-APP} \label{fig:ds7}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\mbox{\bf Syntax} \\
+\multicolumn{1}{c}{\begin{array}{rcll}
+  |si| & ::= &  |solve|  \vb |infer| \vb |solvex|
+        & \text{``solve'' and ``infer'' respectively; controls |DAe (inp f si) x| .}\\
+  |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\
+  |inpw| & ::= & |x|^{|si|}_{|md|} & \text{If $|x|$ is a unification variable then $|si|=|solve|$} \\[1mm]
+
+%  |flipsi infer| & = & |solve| \\
+%  |flipsi solve| & = & |infer| \\
+\end{array}} \\
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DAe (inp f si) x| = |e|, |Hide e|$}} \\[0.02in]
+\rulename{dinit}   & |De2 md t | & = & |def x (DMe (inp2 x solve md) t)| \\[1mm]
+\rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| & \text{NB: no case for |si = solvex|}\\
+\rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[1mm]
+\rulename{hide}     & |Hide e|  & = & |forall r (assume (r == e); r)|
+  & \text{Just an abbreviation; BigCore to BigCore}\\[1mm]
+\end{array} \\
+
+\begin{array}{lr@@{\;}c@@{\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
+
+\multicolumn{4}{l}{\mbox{\it Closed functions}} \\
+\rulename{mcfun+} &  |DMe (inp2 f si mdpos) (functionOCX closed t_1 fx t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp2 i infer mdneg) t_1);
+                                            check fx (z := DAe (inp f si) j; Me (inp2 z si mdpos) t_2))); |} \\
+& &   & |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)| \\[1mm]
+\rulename{mcfun-} &  |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)|
+& = & |lam i (j := Me (inp2 i infer mdpos) t_1;
+                havoc fx; Hide (z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2))| \\[1mm]
+\rulename{mcfunx}& |DMe (inp2 f si mdx) (functionOCX closed t_1 fx t_2)|
+& = & |lam i (j := Me (inp2 i infer mdx) t_1;
+              z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)| \\[2mm]
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Open functions (TODO)}} \\
+
+\rulename{mofun}  & |DMe (inp f si) (functionOC open t_1 t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := Me (inp i (flipsi si)) t_1;
+                                            assert (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
+& &   & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
+    |if (j := Me (inp i (flipsi si)) t_1)| \\
+    |then (forall r (assume (z := DAe (inp f si) j; r = Me (inp z si) (t_2)); r))| \\
+    |else (DAe (inp f si) i)|
+   \end{array}} \\[10mm]
+
+\rulename{mofunx}  & |DMe (inp2 f si mdx) (functionOCX open t_1 fx t_2)|
+ & =  & \multicolumn{2}{@@{}l}{|lamhdr i| \begin{array}[t]{l}
+    |if (j := Me (inp2 i infer mdx) t_1)| \\
+    |then (z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)| \\
+    |else (DAe (inp2 f si mdx) i)|
+   \end{array}} \\[10mm]
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Type rules}} \\
+%\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
+%         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
+%         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+
+\rulename{moftype+} & |DMe (inp2 f si mdpos) (oftype t_1 t_2)|
+  & = & |y := DMe (inp2 f si mdpos) t_1; z := De2 mdpos t_2; apply1N z y; Hide (def i (apply1N z i))| \\
+\rulename{moftype-} & |DMe (inp2 f si mdneg) (oftype t_1 t_2)|
+  & = & |z := De2 mdneg t_2; Hide (def i (apply1N z i))| \\
+\rulename{moftypex} & |DMe (inp2 f si mdx) (oftype t_1 t_2)|
+  & = & |y:=DMe (inp2 f si mdx) t_1; z := De2 mdx t_2; apply1N z y| \\
+\rulename{mtype}   & |DMe (inp2 i si md) (:t)|           & = & |(De2 md t)^[i]| \\
+\rulename{msquig} & |DMe (inp2 z si md) (y squiggt x := t)| & = &
+\multicolumn{2}{@@{}l}{|y := z; DMe (inp2 z sip md) (x := t)|
+\hspace{3mm} \text{where |sip| = |solvex| if |si=solve|, or |si| otherwise}}\\
+\rulename{marray} & |DMe (inp2 x si md) (arr(t_1, xdots, t_n))| & = &
+    |def (x1 xdots xn) (x == arr (x1, xdots, xn));
+     arr (DMe (inp2 x1 si md) t_1, xdots, DMe (inp2 xn si md) t_n)|
+    \\[2mm]
+
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
+\rulename{mbind}   & |DMe inpw (x:=t)|         & = & |x := DMe inpw t| \\
+\rulename{meq}     & |DMe inpw (t_1=t_2)|      & = & |(DMe inpw t_1) = (DMe inpw t_2)| \\
+\rulename{msemi}   & |DMe inpw (t_1 ; t_2)|    & = & |De t_1 ; DMe inpw t_2| \\
+\rulename{mcheck}   & |DMe inpw (check fx t)|    & = & |check fx (DMe inpw t)| \\
+\rulename{mchoice} & |DMe inpw ((t_1 `choice` t_2))| & = & |(DMe inpw t_1) `choice` (DMe inpw t_2)| \\
+\multicolumn{2}{l}{\rulename{mif}\hspace{3mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
+    \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe inpw t_2 else DMe inpw t_3|} \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
+\rulename{mconst}  & |DMe (inp2 x si md) k|                  & = & |x = k| \\
+\rulename{mvar}    & |DMe (inp2 x si md) y|                  & = & |x = y| \\
+\rulename{mapp}    & |DMe (inp2 x si md) (t_1^[t_2])|         & = & |x = (De2 md t_1)^[De2 md t_2]|
+\end{array}
+\end{array}$$
+\caption{{\bf DS8}: Small Source to Big Core } \label{fig:ds8}
 \end{figure}
 
 \end{document}

@@ -71,6 +71,7 @@ data Token
   | MultiplyEqual
   | Name Name
   | Path Name
+  | Prefix Name
   | Newline
   | Not
   | NotEqual
@@ -87,6 +88,7 @@ data Token
   | RightBracket
   | RightParen
   | Semi
+  | Semi'  -- Inserted by Indenter instead of newline in some case, in enum shoudl be treated as a comma
   | Set
   | String StringDelimiter String StringDelimiter
   | Struct
@@ -155,6 +157,7 @@ instance Pretty Token where
     MultiplyEqual -> "*="
     Name x -> pretty x
     Path x -> pretty x
+    Prefix x -> "'" <> pretty x <> "'"
     Newline -> "newline"
     Not -> "not"
     NotEqual -> "<>"
@@ -171,6 +174,7 @@ instance Pretty Token where
     RightBracket -> rbracket
     RightParen -> rparen
     Semi -> semi
+    Semi' -> semi<>"'"
     Set -> "set"
     String begin x end -> prettyBegin begin <> pretty x <> prettyEnd end
     Struct -> "struct"

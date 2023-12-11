@@ -31,8 +31,8 @@
 %format fails = "\textbf{fails}"
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
-%format closed = "\textbf{clos}"
-%format open = "\textbf{open}"
+%format closed = "\textbf{c}"
+%format open = "\textbf{o}"
 
 %format cons (x) (y) = "\textbf{cons}(" x "," y ")"
 %format applyx a b = a "(" b ")"
@@ -59,13 +59,24 @@
 
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
 %format (DAe (i) (x)) = "{\mathcal A}\llbracket{}" x "\rrbracket{}" i
+%format De2 md (x) = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
+%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
 
 %% 'si' is short for "solve or infer" or "unification variable or not" resp
 %format si = "\pi"
+%format sip = si "\rq"
 %format solve = "\circ"
 %format infer = "\bullet"
+%format solvex = "\diamond"
 %format inpw  = "w"
 %format inp (x) (u) = x "^{" u "}"
+%format inp2 (x) (u) (md) = x "^{" u "}_{" md "}"
+
+%% 'md' is short for "mode" or "unification variable or not" resp
+%format md = "\sigma"
+%format mdx   = "\textbf{x}"
+%format mdpos = "+"
+%format mdneg = "-"
 
 %% flipsi is a no-op for now
 %format flipsi (si) = "\bullet"
@@ -93,8 +104,11 @@
 %% Function application with 1 argument
 %format apply1 a (b) = a "(" b ")"
 
+%% Function application with 1 argument, no parens
+%format apply1np (a) (b) = a "(" b ")"
+
 %% Function application with 1 argument, without parenthesis
-%format apply1N a b = a "\," b
+%format apply1N a b = a^ "[\!" b "]"
 
 %% Function application with many arguments
 %format applyN a (b) = a "\langle" b "\rangle"
@@ -102,9 +116,13 @@
 %% ----------- End of Applications --------------
 
 %format space = "\hspace{0.3em}"
-%format lam x (e) = "\lambda" x".\," e
+%format olam (x) (y) (z) = olamKW "(" x "," y "," z ")"
+%format olamKW = "\textbf{olam}"
+%format inapplic (x) (y) = "\textbf{inapplic}(" x "," y ")"
+
+%format lam (x) (e) = "\lambda" x".\," e
 %format lam2 x r e = "\lambda"x"\!\shortrightarrow{}\!"r".\," e
-%format lamhdr x = "\lambda" x".\,"
+%format lamhdr (x) = "\lambda" x".\,"
 %format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
 %format thunk (e) = "\lambda \langle\rangle.\," e
 %format lambda = "\lambda\!"
@@ -193,8 +211,16 @@
 %% %format arrKW = "\textbf{arr}"
 %% %format arr (x) = arrKW "\{" x "\}"
 %format arr (x) = "\langle" x "\rangle"
+%format arrsp (x) = "\langle\;" x "\;\rangle"
 %format (tup (x)) = "\langle{}" x "\rangle"
 %format emptytup = "\langle" "\rangle"
+%format arropen = "\langle"
+%format arrclose = "\rangle"
+
+%format amap (x) = "\textbf{map}\{" x "\}"
+%format mkMap = "\textbf{mkMap}"
+%format vmap (x) = "\langle\hspace{-0.25em}\langle" x "\rangle\hspace{-0.25em}\rangle"
+%% %format vmap (x) = "\llangle" x "\rrangle"
 
 %format left (x)  = "L \triangleright" x
 %format right (x)  = "R \triangleright" x
@@ -213,6 +239,8 @@
 %format succeedKW = "\textbf{suc}"
 %format verifyKW = "\textbf{verify}"
 %format decideKW = "\textbf{dec}"
+%format forallKW = "\forall{}"
+%format guard    = "\blacktriangleright{}"
 
 %format assume (x) = "\textbf{asm}\{" x "\}"
 %format assert (x) = "\textbf{suc}\{" x "\}"
@@ -220,6 +248,7 @@
 %format verify (x) = "\textbf{verify}\{" x "\}"
 %format decide (x) = "\textbf{dec}\{" x "\}"
 %format bullet = "\bullet"
+%format forall (x) (y) = "\forall" x ".\," y
 
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"
@@ -229,9 +258,8 @@
 %format split (x) (y) (z) = "\textbf{split}\{" x "\}\langle" y "," z "\rangle"
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
+%format defhdr (x) = "\exists" x ".\,"
 %format def (x) (y) = "\exists" x ".\," y
-%format forallKW = "\forall{}"
-%format forall (x) (y) = "\forall" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
 %format llet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\," b
 %format defTwoLines (x) (y) = "\textbf{def}\;" x "\;\textbf{in}\\\{" y "\}"
@@ -271,11 +299,21 @@
 %format abs = "\textbf{abs}"
 %format isInt = "\textbf{isInt}"
 %format string = "\textbf{string}"
+
+%% -------Functions ---------------
+%format functionKW = "\textbf{fun}"
+
 %format fndef (x) (a) (out) (rhs) = functionKW "(" x : a ")" out "\{" rhs "\}"
 %format function (x) (rhs) = functionKW "\," x "\,\{" rhs "\}"
 %format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionX (x) (fx) (rhs) = functionKW "(" x ")" fx "\{" rhs "\}"
-%format functionKW = "\textbf{fun}"
+
+%% functionOC has open/closed subscript
+%format functionOC (oc) (x) (rhs) = functionKW "_{" oc "}(" x ")\{" rhs "\}"
+%format functionOCX (oc) (x) (fx) (rhs) = functionKW "_{" oc "}(" x ")\langle" fx "\rangle\{" rhs "\}"
+
+%% -------End of f unctions ---------------
+
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
 %format operator op = "\textbf{operator}\textquote " op "\textquote"
@@ -300,7 +338,10 @@
 %format appexi (f) (x) = "{\mathcal A" "\fbox{$" x "$}"
 
 %% Effects checking, like succeeds{e}
-%format check (r) (b) = "{\bf check}(" r ")\{" b "\}"
+%format checkKW = "{\bf chk}"
+%format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
+%format havocKW = "\textbf{havoc}"
+%format havoc (fx) = "\textbf{havoc}" "\langle" fx "\rangle"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
@@ -322,11 +363,11 @@
 %format , = ","
 %format X = "X"
 %format CX = "CX"
-%format eqgt = "=>"
+%format eqgt = "\!=>\!\!"
 %% %format squiggt = "\!\leadsto\!"
 %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format eff (x) = "\!\langle" x "\rangle\!"
+%format eff (x) = "\langle" x "\rangle"
 %format apeff g x = g "\langle" x "\rangle"
 %format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
@@ -356,11 +397,23 @@
 %format y_i
 %format y_n
 
+%format hnf_0 = "\mathit{hnf}_{\!0}"
 %format hnf_1 = "\mathit{hnf}_{\!1}"
 %format hnf_2= "\mathit{hnf}_{\!2}"
+%format hnf_d= "\mathit{hnf}_{\!d}"
+%format hnf_r= "\mathit{hnf}_{\!r}"
+%format hnf_n= "\mathit{hnf}_{\!n}"
+
+%format ol_1= "\mathit{ol}_1"
+%format ol_2= "\mathit{ol}_2"
 
 %format y1
 %format y2
+
+%format z_0
+%format z_1
+%format z_2
+%format z_3
 
 %format k_1
 %format k_2
@@ -446,6 +499,11 @@
 %format v_m'
 %format v_x
 %format v_y
+
+%format dom_1
+%format dom_2
+%format rng_1
+%format rng_2
 
 %format he_1
 %format he_2

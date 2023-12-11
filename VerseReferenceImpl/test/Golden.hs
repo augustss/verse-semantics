@@ -39,7 +39,7 @@ getTest mode directory = do
 mkTestCase :: Mode -> FilePath -> Test
 mkTestCase mode verseFile = TestLabel verseFile . TestCase $
   ByteString.readFile verseFile >>=
-  runExceptT . runSupplyT . runVerseT . eval' mode >>= \ case
+  runExceptT . runSupplyT . runVerseT . eval2' verseFile mode >>= \ case
     Left e -> handleError e
     Right Nothing -> handleError StuckError
     Right (Just xs) -> do
