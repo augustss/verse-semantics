@@ -77,6 +77,7 @@ tests = -- take 6
   , ("ex_L1", ex_L1, True)
   , ("ex_L2", ex_L2, False)
   , ("ex_PC1", ex_PC1, False)
+  , ("ex_PC2a", ex_PC2a, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -760,3 +761,30 @@ ex_PC1 = eXIs [f] $
     y = ident "y"
     i = ident "i"
     r = ident "r"
+
+{-
+f(1, 2):int := 7;
+check<succeeds>{ exi x, y. f(x, y); x+y }
+-}
+
+opAdd :: Expr -> Expr -> Expr
+opAdd e1 e2 = Op Add :@: Arr [e1, e2]
+
+ex_PC2a :: Expr
+ex_PC2a = eXIs [f] $
+            (Var f :=: lAMs [i, j] ((Var i :=: Int 1 :>: Var j :=: Int 2 :>: Int 0)
+                                    :>>:
+                                    UNI r (Assume (iNT (Var r)) :>: Var r)))
+            :>:
+            Verify (Assert (eXIs [x, y] ((Var f :@: Var x :@: Var y) :>: opAdd (Var x) (Var y))))
+  where
+    f = ident "f"
+    x = ident "x"
+    y = ident "y"
+    i = ident "i"
+    j = ident "j"
+    r = ident "r"
+{-
+f = \x y. (x=1; y=2) ;; forall r. asm{ r=7 } r
+check<succeeds>{ exi x, y. f(x, y); x+y }
+-}

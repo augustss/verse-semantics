@@ -287,7 +287,7 @@ generalizedIcfpRules env lhs =
       (cx, e1 :|: e2) <- choiceX e
       pure (LAM z (cx e1 :|: cx e2))
    ++
-   "VAL-ELIM" `name`
+   "VAL-ELIM'" `name`
    do Val _ :>>: e <- [lhs]
       pure e
    ++

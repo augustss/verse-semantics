@@ -1407,7 +1407,7 @@ rulesLR _ lhs =
      guard (not (x `isValueX` v))
      pure (ctx e)
  ++
-  "EXI-FLOAT" `name`
+  "EXI-FLOAT1" `name`
   do (ctx, EXI x e) <- evalX' lhs
      let (ax, ae) = alpha (allVars (ctx Fail)) x e
      pure $ EXI ax $ ctx ae
