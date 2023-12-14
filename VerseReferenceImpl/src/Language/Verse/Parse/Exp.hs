@@ -7,8 +7,8 @@
 module Language.Verse.Parse.Exp
   ( Exp (..)
   , Pat (..)
-  , IdentExp(..)
-  , AttributePart(..)
+  , IdentExp (..)
+  , AttributePart (..)
   , expToPat
   ) where
 
@@ -166,7 +166,6 @@ data Pat a
   | Invoke (L (Pat a)) (L (Exp a))
   | Specs (L (Pat a)) [L (Exp a)]
   | Extension (L (Exp a)) (L (Pat a)) -- The lhs is always a name
-  | Hack (Exp a)
 
 deriving instance ( Show a
                   , Show (AttributePart a)
@@ -349,7 +348,6 @@ instance ( Pretty a
     Invoke p e1 -> pretty p <> parens (pretty e1)
     Specs p ss -> pretty p <> specs ss
     Extension e p -> parens (pretty e) <> "." <> pretty p
-    Hack e -> pretty e
 
 braces :: Doc a -> Doc a
 braces x =

@@ -29,6 +29,7 @@ import Numeric (showHex)
 import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Label
+import Language.Verse.Loc
 import Language.Verse.Name
 
 import Prettyprinter
@@ -45,14 +46,15 @@ data Exp f a
   | Verify (f (Exp f a))
   | Check !Split.Effect (f (Exp f a))
   | Assume !Split.Effect (f (Exp f a))
-  | Module {-# UNPACK #-} !Label !(Env f a) (f (Exp f a))
-  | Struct {-# UNPACK #-} !Label !(Env f a) (f (Exp f a))
-  | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(Env f a) (f (Exp f a))
-  | Inst (f (Exp f a)) !(Env f a) (f (Exp f a))
+  | Module {-# UNPACK #-} !Label !(Env a) (f (Exp f a))
+  | Struct {-# UNPACK #-} !Label !(Env a) (f (Exp f a))
+  | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(Env a) (f (Exp f a))
+  | Inst (f (Exp f a)) !(Env a) (f (Exp f a))
   | Enum {-# UNPACK #-} !Label [Name]
-  | IfThenElse !(Env f a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
-  | ForDo !(Env f a) (f (Exp f a)) (f (Exp f a))
-  | Def (Quantifier f a) (f a) (f (Exp f a))
+  | IfThenElse !(Env a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
+  | ForDo !(Env a) (f (Exp f a)) (f (Exp f a))
+  | Def !Quantifier (f a) (f (Exp f a))
+  | Alloc (f a) (f (Exp f a)) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Tuple [f (Exp f a)]
@@ -62,7 +64,7 @@ data Exp f a
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
   | Lam a (f (Exp f a))
-  | OLam (f (Exp f a)) !(Env f a) (f (Exp f a)) (f (Exp f a))
+  | OLam (f (Exp f a)) !(Env a) (f (Exp f a)) (f (Exp f a))
   | Intrinsic !Intrinsic
   | Name a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
@@ -74,11 +76,6 @@ deriving instance ( Show (f (Exp f a))
                   , Show (f a)
                   , Show a
                   ) => Show (Exp f a)
-
-data Quantifier f a
-  = Exists
-  | Var (f a)
-  | Forall deriving Show
 
 instance ( Pretty (f (Exp f a))
          , Pretty (f a)
@@ -102,15 +99,17 @@ instance ( Pretty (f (Exp f a))
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
       maybe mempty (parens . pretty) e1 <+>
-      braces (quantified xs $ pretty e2)
-    Inst e1 xs e2 -> parens (pretty e1) <+> braces (quantified xs $ pretty e2)
+      braces (bindings xs $ pretty e2)
+    Inst e1 xs e2 -> parens (pretty e1) <+> braces (bindings xs $ pretty e2)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     ForDo xs e1 e2 ->
-      "for" <+> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
-    Def q x e ->
+      "for" <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
+    Def t x e ->
       align $
-      prettyQuantified x q <> separator <>
+      prettyBinding t x <> separator <>
       pretty e
+    Alloc x e1 e2 ->
+      "alloc" <> parens (pretty x) <+> pretty e1 <> parens (pretty e2)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
     Truth e -> "truth" <+> braces (pretty e)
@@ -121,7 +120,7 @@ instance ( Pretty (f (Exp f a))
     Lam x e2 ->
       backslash <+> pretty x <+> braces (pretty e2)
     OLam f xs e1 e2 ->
-      "olam" <+> pretty f <+> parens (quantified xs $ pretty e1) <+> braces (pretty e2)
+      "olam" <+> pretty f <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
     Intrinsic x -> pretty x
     Name x -> pretty x
     IfArchetypeName x y e1 e2 ->
@@ -142,15 +141,17 @@ instance ( Pretty (f (Exp f a))
       braces x =
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
-      quantified xs y = align $
-        separated (uncurry prettyQuantified <$> HashMap.toList xs) <> separator <>
+      bindings xs y = align $
+        separated (uncurry (flip prettyBinding) <$> HashMap.toList xs) <> separator <>
         y
-      prettyQuantified x = \ case
+      prettyBinding t x = case t of
         Exists -> "exists" <+> pretty x
-        Var y -> "var" <+> pretty x <> colon <> pretty y
         Forall -> "forall" <+> pretty x
+        Var -> "var" <+> pretty x
 
-type Env f a = HashMap a (Quantifier f a)
+data Quantifier = Exists | Forall | Var deriving Show
+
+type Env a = HashMap a Quantifier
 
 unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 unify = liftL2 (:=:)
@@ -170,7 +171,7 @@ forall' = liftL2 (Def Forall)
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
 
-olam :: Apply f => f (Exp f a) -> Env f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+olam :: Apply f => f (Exp f a) -> Env a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 olam f env e1 e2 = OLam f env e1 e2 <$ f <. e1 <. e2
 
 name :: Functor f => f a -> f (Exp f a)
@@ -179,9 +180,3 @@ name = fmap Name
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
 infixl 1 `then'`
-
-liftL1 :: Functor f => (f a -> b) -> f a -> f b
-liftL1 f x = f x <$ x
-
-liftL2 :: Apply f => (f a -> f b -> c) -> f a -> f b -> f c
-liftL2 f x y = f x y <$ x <. y

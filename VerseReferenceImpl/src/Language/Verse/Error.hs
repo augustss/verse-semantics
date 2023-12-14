@@ -31,7 +31,8 @@ data Error
   | InvokeError !Loc
   | InstError !Loc
   | ClassError !Loc
-  | SetError !Loc
+  | ValError !Loc
+  | RefError !Loc
   | EnvError !Loc
   | DomError !Loc !Loc
   | OLamDomError !Loc !Loc !Loc
@@ -84,7 +85,9 @@ instance Pretty Error where
       pretty x <> colon <+> "expected" <+> "class" <+> "or" <+> "struct"
     ClassError x ->
       pretty x <> colon <+> "expected" <+> "class"
-    SetError x ->
+    ValError x ->
+      pretty x <> colon <+> "unexpected" <+> "var"
+    RefError x ->
       pretty x <> colon <+> "expected" <+> "var"
     EnvError x ->
       pretty x <> colon <+> "expected" <+> "environment"

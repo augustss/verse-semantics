@@ -41,11 +41,12 @@ import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Mode
 import Language.Verse.Rewrite.Exp
-  ( pattern InfixColonEqual
+  ( pattern Alloc2
+  , pattern Alloc3
+  , pattern InfixColonEqual
   , pattern List
   , pattern OfType
   , pattern MixfixArrowColonEqual
-  , pattern MixfixVarColonEqual
   , pattern PrefixColon
   , pattern Where
   , OC (..)
@@ -54,7 +55,7 @@ import Language.Verse.Rewrite.Exp qualified as Rewrite
 
 type DesugarT m = StateT Env (ReaderT R m)
 
-type Env = IdentMap (Loc, Quantifier L Ident)
+type Env = IdentMap (Loc, Quantifier)
 
 data R = Exec | Neg | Pos
 
@@ -66,7 +67,7 @@ fromMode = \ case
 runDesugarT
   :: Functor m
   => DesugarT m a
-  -> ReaderT R m (a, IdentMap (Quantifier L Ident))
+  -> ReaderT R m (a, IdentMap Quantifier)
 runDesugarT = fmap (fmap (fmap snd)) . runDesugarT'
 
 runDesugarT' :: DesugarT m a -> ReaderT R m (a, Env)
@@ -195,11 +196,20 @@ desugarExp'' e pi i = case extract e of
     e2 <- desugarExp e2
     pure $ BracketInvoke e1 e2
   Rewrite.Exists x -> do
-    tellName x Exists
+    tellExistsName x
     pure $ i :=: name x
   Rewrite.Forall x -> do
-    tellName x Forall
+    tellForallName x
     pure $ i :=: name x
+  Alloc2 x e -> do
+    tellVarName x
+    e <- desugarExp e
+    pure $ Alloc x e i
+  Alloc3 x e1 e2 -> do
+    tellVarName x
+    e1 <- desugarExp e1
+    e2 <- desugarExp' e2 pi i
+    pure $ Alloc x e1 e2
   Rewrite.Set x e' ->
     valM i (e $>) $ Set x <$> desugarExp e'
   Rewrite.Tuple es -> do
@@ -220,27 +230,20 @@ desugarExp'' e pi i = case extract e of
     C -> desugarLam (loc e) e1 eff e2 e3 pi i
   Rewrite.Name x ->
     pure $ i :=: (Name x <$ e)
-  MixfixVarColonEqual x y e1 e2 -> do
-    tellName x $ Var y
-    e1 <- unify (name y) <$> desugarExp e1
-    e2 <- desugarExp' e2 pi i
-    ask >>= \ case
-      Exec -> pure $ e1 :*>: unify (ArchetypeName <$> x) e2
-      _ -> pure $ e1 :*>: e2
-  InfixColonEqual funName x e -> do
-    if funName then tellFunName x else tellName x Exists
+  InfixColonEqual t x e -> do
+    tellName t x
     e <- desugarExp' e pi i
     pure $ (ArchetypeName <$> x) :=: e
   PrefixColon e -> do
     e <- desugarExp e
     pure $ BracketInvoke e i
   MixfixArrowColonEqual x y e -> do
-    tellName x Exists
-    tellName y Exists
+    tellExistsName x
+    tellExistsName y
     e <- desugarExp' e pi i
     pure $ unify (name x) i :*>: unify (ArchetypeName <$> y) e
   Rewrite.IfArchetypeName x e1 e2 -> do
-    y <- (e $>) . Ident.Label <$> supply
+    y <- freshIdent' $ loc e
     xs <- get
     (e1, xs1) <- lift $ runStateT (desugarExp' e1 True $ name y) xs
     (e2, xs2) <- lift $ runStateT (desugarExp' e2 pi i) xs
@@ -739,24 +742,43 @@ freshIdent loc = do
   pure $ L loc x
 
 freshIdent' :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
-freshIdent' loc = L loc <$> freshIdent''
+freshIdent' loc = L loc . Ident.Label <$> supply
 
-freshIdent'' :: MonadSupply Label m => DesugarT m Ident
-freshIdent'' = Ident.Label <$> supply
-
-tellName :: MonadAbort Error m => L Ident -> Quantifier L Ident -> DesugarT m ()
-tellName x y =
-  put =<<
-  HashMap.alterF
-  (\ case
-      Nothing -> pure $ Just (loc x, y)
-      Just (y, _) -> abort $ DefError y (loc x) (extract x))
-  (extract x) =<<
-  get
+tellValName :: MonadAbort Error m => L Ident -> DesugarT m ()
+tellValName = tellName' Exists
 
 tellFunName :: Monad m => L Ident -> DesugarT m ()
 tellFunName x =
   modify $ HashMap.insertWith (\ _ x -> x) (extract x) (loc x, Exists)
+
+tellVarName :: MonadAbort Error m => L Ident -> DesugarT m ()
+tellVarName = tellName' Var
+
+tellExistsName :: MonadAbort Error m => L Ident -> DesugarT m ()
+tellExistsName = tellName' Exists
+
+tellForallName :: MonadAbort Error m => L Ident -> DesugarT m ()
+tellForallName = tellName' Forall
+
+tellName
+  :: MonadAbort Error m
+  => Rewrite.Quantifier
+  -> L Ident
+  -> DesugarT m ()
+tellName = \ case
+  Rewrite.Val -> tellValName
+  Rewrite.Fun -> tellFunName
+  Rewrite.Var -> tellVarName
+
+tellName' :: MonadAbort Error m => Quantifier -> L Ident -> DesugarT m ()
+tellName' t x =
+  put =<<
+  HashMap.alterF
+  (\ case
+      Nothing -> pure $ Just (loc x, t)
+      Just (y, _) -> abort $ DefError y (loc x) (extract x))
+  (extract x) =<<
+  get
 
 exists :: Monad m => DesugarT m (L (Exp L Ident)) -> DesugarT m (L (Exp L Ident))
 exists m = do
