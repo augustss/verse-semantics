@@ -771,7 +771,7 @@ opAdd :: Expr -> Expr -> Expr
 opAdd e1 e2 = Op Add :@: Arr [e1, e2]
 
 -- TODO: currently fails, next add to X context
--- X = <>  |  v=X; e  | ef ; X  |  X ; e  |  X ;; e   #  ef means can fail or have choice but not loop, or do I/O.
+-- X = <>  |  v=X; e  | X; e | ef ; X |  X ;; e   #  ef means can fail or have choice but not loop, or do I/O.
 
 ex_PC2a :: Expr
 ex_PC2a = eXIs [f] $

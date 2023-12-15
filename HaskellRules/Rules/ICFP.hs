@@ -369,9 +369,16 @@ execX1 lhs =
      (ctx, hole) <- execX x
      pure ((:>: e) . ctx, hole)
  ++
+  -- TODO: this `e` should be `ef` means "can fail or have choice but not loop or do I/O"
   do e :>: x <- [lhs]
      (ctx, hole) <- execX x
      pure ((e :>:) . ctx, hole)
+ ++
+ -- NOTE: only terms on LEFT of ;; to affect RIGHT
+ do x :>>: e <- [lhs]
+    (ctx, hole) <- execX x
+    pure ((:>>: e) . ctx, hole)
+
 {-
  ++
   do EXI y x <- [lhs]
