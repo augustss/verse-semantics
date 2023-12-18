@@ -438,7 +438,7 @@ dsDx e = do
     DS5 -> dsD_5 e
     DS6 -> dsD_6 e
     DS7 -> dsD_7 e
-    DS8 -> dsD_8_top e
+--    DS8 -> dsD_8_top e
 
 dsD_1 :: Expr -> D Expr
 dsD_1 e | isValue e = pure e  -- DCONST DVAR
@@ -2232,7 +2232,7 @@ dsM_7 (Macro1 m rs e) i = Macro1 m rs <$> dsM_7 e i
 dsM_7 e _ = error $ "dsM_7: unimplemented " ++ show e
 
 ---------------------------------------------------------------
-
+{-
 data DS8Pi = DS8Solve | DS8Infer | DS8Square
   deriving (Show, Eq)
 
@@ -2270,3 +2270,4 @@ dsH_8 e = do
   pure $ Forall [r] $ Seq [Assume (Var r `Equal` e), Var r]
 
   
+-}
