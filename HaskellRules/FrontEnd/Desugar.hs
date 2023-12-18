@@ -438,6 +438,7 @@ dsDx e = do
     DS5 -> dsD_5 e
     DS6 -> dsD_6 e
     DS7 -> dsD_7 e
+    DS8 -> dsD_8_top e
 
 dsD_1 :: Expr -> D Expr
 dsD_1 e | isValue e = pure e  -- DCONST DVAR
@@ -2229,3 +2230,43 @@ dsM_7 e@(Macro1 (Ident _ "lowered") [] _) i = pure $ unifyV (identOf_7 i) e
 dsM_7 (Macro1 m rs e) i = Macro1 m rs <$> dsM_7 e i
 
 dsM_7 e _ = error $ "dsM_7: unimplemented " ++ show e
+
+---------------------------------------------------------------
+
+data DS8Pi = DS8Solve | DS8Infer | DS8Square
+  deriving (Show, Eq)
+
+data DS8Mode = DS8Execute | DS8Verify | DS8Check
+  deriving (Show, Eq)
+
+data DS8W = DS8W Ident DS8Pi DS8Mode
+  deriving (Show, Eq)
+
+dsD_8_top :: Expr -> D Expr
+dsD_8_top e = do
+  verif <- gets (fVerify . dflags)
+  let mode | verif = DS8Verify
+           | otherwise = DS8Execute
+  dsD_8 e mode
+
+-- DINIT
+dsD_8 :: Expr -> DS8Mode -> D Expr
+dsD_8 e m = do
+  x <- newIdent (getLoc e) "x"
+  Exists [x] <$> dsM_8 e (DS8W x DS8Solve m)
+
+dsA_8 :: Ident -> DS8W -> D Expr
+dsA_8 _ (DS8W _ _ DS8Solve) = do  -- DBODY1  -- PAPER: missing subscript
+  z <- newIdent (getLoc i) "z"
+  pure $ Exists [z] (Var z)
+dsA_8 x (DS8W f _ DS8Infer) =     -- DBODY2  -- PAPER: missing subscript
+  pure $ ApplyD (Var f) (Var x)
+dsA_8 x (DS8W f _ DS8Square) =    -- Intentionally missing in paper
+  error $ "dsA_8: square " ++ show (f, x)
+
+dsH_8 :: Expr -> D Expr
+dsH_8 e = do
+  r <- newIdent (getLoc e) "r"
+  pure $ Forall [r] $ Seq [Assume (Var r `Equal` e), Var r]
+
+  
