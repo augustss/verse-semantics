@@ -235,6 +235,7 @@ valid' onlyEq = expr
     expr e@Split{} = error $ "malformed split: " ++ prettyShow e
     expr (If e1 e2 e3) = expr e1 && expr e2 && expr e3
     expr (Store _ e) = valid e   -- XXX this case seems to happen with QC
+    expr (e1 :>>: e2) = expr e1 && expr e2
     expr e = error $ "valid: unexpected " ++ show e
     expru (v :=: e) = value v && expr e
     expru e = not onlyEq && expr e
@@ -305,6 +306,7 @@ anf' onlyEq = expr
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
     expr (If e1 e2 e3) = If (expr e1) (expr e2) (expr e3)
+    expr (e1 :>>: e2)  = expr e1 :>>: expr e2
     expr e = error $ "anf: cannot handle " ++ prettyShow e
 
     expru (e1 :=: e2) =

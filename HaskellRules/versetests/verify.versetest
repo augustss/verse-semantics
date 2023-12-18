@@ -1,7 +1,17 @@
 # Trivial tests
 verify("Trivial-pass", pass){1}
 verify("Trivial-fail", fail){succeeds{0=1}}
-#
+
+# Guard tests from https://docs.google.com/document/d/17Ytcy9I_fDzW-a1FGYQkLh3oObFg47Ge6GdRy-FZjLM/edit
+verify(pass ) { f():int := 0; L1() := {y:int;  y = f[] } }
+verify(fail)  { f():int := 0; L2() := {y:any; y='m'; int[y]; y=f() } }
+verify(fail)  { f():int := 0; L2() := {y:int; y='m';         y=f() } }
+verify(fail)  { f(x:int) := int[x]; PC1() := {z := 'm' ; f[z] } }
+verify(pass)  { suc(a:int) := 10 ; g(x:int) := suc[x] }
+verify(pass)  { suc(a:int):int := 10 ; g(x:int):int := suc[x] }
+verify(pass)  { suc(a:int):int := {a+1} ; g(x:int):int := suc[x] }
+
+
 # Some simple tests
 verify(pass) {foo(z:int) := { z = z } }
 verify(pass) {foo(z:any) := { x:int = 1; int[x] } }

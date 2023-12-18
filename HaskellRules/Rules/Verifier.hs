@@ -335,8 +335,8 @@ generalizedL2RRules env lhs =
 assumeAssertRules :: VRule
 assumeAssertRules _env lhs =
   -- ASSUME --
-  "asm-hnf" `name`
-  do Assume (HNF v) <- [lhs]
+  "asm-val" `name`
+  do Assume (Val v) <- [lhs]
      pure v
   ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
@@ -662,10 +662,17 @@ execEX1 bs lhs =
      (ctx, g, bs', hole) <- execEX bs x
      pure ((:>: e) . ctx, g :>: e, bs', hole)
  ++
-   -- e; HOLE
+  -- TODO: this `e` should be `ef` means "can fail or have choice but not loop or do I/O"
+  -- e; HOLE
   do e :>: x <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
      pure ((e :>:) . ctx, e :>: g, bs', hole)
+ ++
+ -- NOTE: only terms on LEFT of ;; to affect RIGHT
+ do x :>>: e <- [lhs]
+    (ctx, g, bs', hole) <- execEX bs x
+    pure ((:>>: e) . ctx, g :>>: e, bs', hole)
+
  ++
    -- Exi y HOLE
   do EXI y x <- [lhs]
