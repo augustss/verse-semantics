@@ -321,14 +321,15 @@ evalQualName loc e x s s' = do
           Just x0 -> do
             s2 <- lift freshS
             var_e0 <- evalNamed' loc x0 s1 s2
-            var_eN <- evalQualNameRest loc ps s2 s' var_e0
+            s3 <- lift freshS
+            var_eN <- evalQualNameRest loc ps s2 s3 var_e0
             fork' $ do
               val_env <- lift (readVar' var_eN)
               xs <- getNameEnv loc val_env
               case HashMap.lookup x xs of
                 Nothing -> abort $ NameError loc x
                 Just x -> do
-                  var2 <- evalNamed' loc x s2 s'
+                  var2 <- evalNamed' loc x s3 s'
                   unify' loc var var2
   pure var
 
@@ -341,7 +342,8 @@ evalQualNameRest
   -> S m
   -> VarVal m
   -> EvalT m (VarVal m)
-evalQualNameRest _loc [] _s _s' var_e = do
+evalQualNameRest _loc [] s s' var_e = do
+  lift $ unifyS s s'
   pure var_e
 evalQualNameRest loc (p:ps) s s' var_e = do
   s'' <- lift freshS
