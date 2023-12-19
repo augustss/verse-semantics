@@ -42,11 +42,9 @@ library
     Language.Verse.Indent
     Language.Verse.Intrinsic
     Language.Verse.Label
-    Language.Verse.Lexer
     Language.Verse.Loc
     Language.Verse.Mode
     Language.Verse.Name
-    Language.Verse.Parse
     Language.Verse.Parse2
     Language.Verse.Parse.Exp
     Language.Verse.Pos
@@ -54,9 +52,6 @@ library
     Language.Verse.Rewrite.Exp
     Language.Verse.Token
     Language.Verse.Val
-  build-tool-depends:
-    alex:alex,
-    happy:happy
   build-depends:
     base >= 4.16.0.0,
     array,

@@ -8,7 +8,7 @@ module Language.Verse.Parse.Exp
   ( Exp (..)
   , Pat (..)
   , IdentExp (..)
-  , AttributePart (..)
+  , Path(..)
   , expToPat
   ) where
 
@@ -71,7 +71,6 @@ data Exp a
   | All (L (Exp a))
   | And (L (Exp a)) (L (Exp a))
   | Array [L (Exp a)]
-  | AttributeParts [L (AttributePart a)]
   | Block (L (Exp a))
   | Brace (L (Exp a))
   | BracketInvoke (L (Exp a)) (L (Exp a))
@@ -152,7 +151,6 @@ data Exp a
   | L (Exp a) `Is` L (Exp a)
 
 deriving instance ( Show a
-                  , Show (AttributePart a)
                   , Show (IdentExp a)
                   , Show (Pat a)
                   ) => Show (Exp a)
@@ -168,7 +166,6 @@ data Pat a
   | Extension (L (Exp a)) (L (Pat a)) -- The lhs is always a name
 
 deriving instance ( Show a
-                  , Show (AttributePart a)
                   , Show (Exp a)
                   , Show (IdentExp a)
                   , Show (Pat a)
@@ -177,29 +174,23 @@ deriving instance ( Show a
 data IdentExp a
  = IdentName a
  | IdentQualName [L (Exp a)] (L a)
- | IdentPath a
+ | IdentPath (Path a)
 
 deriving instance ( Show a
                   , Show (Exp a)
                   ) => Show (IdentExp a)
 
-data AttributePart a
-  = LessThan
-  | LessEqual
-  | GreaterEqual
-  | GreaterThan
-  | Part (L (Exp a))
+data Path a
+ = Path (L a) [(Maybe (Path a), L a)]
 
-deriving instance ( Show (Exp a)
-                  ) => Show (AttributePart a)
+deriving instance ( Show a
+                  ) => Show (Path a)
 
 instance ( Pretty a
-         , Pretty (AttributePart a)
          , Pretty (Exp a)
          , Pretty (IdentExp a)
          , Pretty (Pat a)
          , Show a
-         , Show (AttributePart a)
          , Show (Exp a)
          , Show (IdentExp a)
          , Show (Pat a)
@@ -214,7 +205,6 @@ instance ( Pretty a
     e :<=: x -> parens (pretty e <+> "<=" <+> pretty x)
     e :>: x -> parens (pretty e <+> ">" <+> pretty x)
     e :>=: x -> parens (pretty e <+> ">=" <+> pretty x)
-    AttributeParts parts -> pretty parts
     Paren e -> lparen <> pretty e <> rparen
     Brace e -> lbrace <> pretty e <> rbrace
     PrefixPlus x -> "+" <+> pretty x
@@ -329,12 +319,10 @@ instance ( Pretty a
       prettyAt a = "@" <> pretty a
 
 instance ( Pretty a
-         , Pretty (AttributePart a)
          , Pretty (Exp a)
          , Pretty (IdentExp a)
          , Pretty (Pat a)
          , Show a
-         , Show (AttributePart a)
          , Show (Exp a)
          , Show (IdentExp a)
          , Show (Pat a)
@@ -358,11 +346,9 @@ specs :: (Pretty a) => [a] -> Doc ann
 specs = foldr ( \ e doc -> "<" <> pretty e <> ">" <> doc ) mempty
 
 instance ( Pretty a
-         , Pretty (AttributePart a)
          , Pretty (Exp a)
          , Pretty (Pat a)
          , Show a
-         , Show (AttributePart a)
          , Show (Exp a)
          , Show (Pat a)
          ) => Pretty (IdentExp a) where
@@ -376,14 +362,12 @@ list [] = mempty
 list [x] = pretty x
 list (x:xs) = pretty x <> ";" <+> list xs
 
-instance ( Pretty (Exp a)
-         ) => Pretty (AttributePart a) where
-  pretty = \ case
-    LessThan -> "<"
-    LessEqual -> "<="
-    GreaterEqual -> "<="
-    GreaterThan -> ">"
-    Part e -> pretty e
+instance ( Pretty a
+         ) => Pretty (Path a) where
+  pretty (Path label pathIdents) = "/" <> pretty label <> foldr prettyPath mempty pathIdents
+   where
+    prettyPath (Nothing, ident) doc = "/" <> pretty (extract ident) <> doc
+    prettyPath (Just path, ident) doc = "/(" <> pretty path <> ":)" <> pretty (extract ident) <> doc
 
 expToPat :: L (Exp a) -> Maybe (L (Pat a))
 expToPat = traverse $ \ case

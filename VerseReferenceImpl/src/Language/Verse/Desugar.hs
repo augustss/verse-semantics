@@ -22,6 +22,7 @@ import Data.String
 import Language.Verse.Desugar.Exp
   ( Exp (..)
   , Quantifier (..)
+  , Path(..)
   , unify
   , verify
   , check
@@ -79,7 +80,7 @@ desugar
   -> L (Rewrite.Exp L Ident)
   -> m (L (Exp L Ident))
 desugar mode e =
-  runReaderT (runDesugarT' (desugar' e) <&> \ (e, xs) -> exists' xs e) $
+  runReaderT (runDesugarT' (desugar' e) <&> \ (e, _xs) -> e) $
   fromMode mode
 
 desugar'
@@ -87,9 +88,17 @@ desugar'
   => L (Rewrite.Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
 desugar' e = ask >>= \ case
-  Exec -> desugar'' e
-  Pos -> verifyM . checkM Effect.Succeeds . posM $ desugar'' e
-  Neg -> desugar'' e
+  Exec -> desugarTop e
+  Pos -> verifyM . checkM Effect.Succeeds . posM $ desugarTop e
+  Neg -> desugarTop e
+
+desugarTop
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => L (Rewrite.Exp L Ident)
+  -> DesugarT m (L (Exp L Ident))
+desugarTop e = do
+  (e, xs) <- lift . runDesugarT $ desugar'' e
+  pure $ TopLevel xs <$> duplicate e
 
 desugar''
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -230,6 +239,11 @@ desugarExp'' e pi i = case extract e of
     C -> desugarLam (loc e) e1 eff e2 e3 pi i
   Rewrite.Name x ->
     pure $ i :=: (Name x <$ e)
+  Rewrite.QualName e y -> do
+    e <- desugarExp e
+    pure $ i :=: (QualName e y <$ e)
+  Rewrite.ExpPath p ->
+    pure $ i :=: (PathName (desugarPath p) <$ e)
   InfixColonEqual t x e -> do
     tellName t x
     e <- desugarExp' e pi i
@@ -284,6 +298,15 @@ desugarTuple pi = \ case
     e <- desugarExp' e pi x
     (xs, es) <- desugarTuple pi es
     pure (x:xs, e:es)
+
+desugarPath
+  :: (Rewrite.Path L)
+  -> (Path L)
+desugarPath (Rewrite.Path label pathIdents) = do
+  Path label (map desugarPath' pathIdents)
+  where
+  desugarPath' (Nothing, ident) = (Nothing, ident)
+  desugarPath' (Just path, ident) = (Just (desugarPath path), ident)
 
 desugarLam
   :: (MonadAbort Error m, MonadSupply Label m)

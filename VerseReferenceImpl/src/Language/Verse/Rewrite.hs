@@ -285,6 +285,10 @@ rewritePat
   -> m (Exp L Ident)
 rewritePat = \ case
   Parse.Name (Parse.IdentName x) -> pure . Name $ Ident.Name x
+  Parse.Name (Parse.IdentQualName [e] (extract -> y)) -> do
+    e <- rewriteExp e
+    pure $ QualName e y
+  Parse.Name (Parse.IdentPath path) -> pure $ ExpPath (rewritePath path)
   InfixColon (extract -> Parse.Var [] i@(extract -> Parse.IdentName x)) e ->
     Alloc2 (Ident.Name x <$ i) <$> rewriteExp e
   Parse.PrefixColon e -> PrefixColon <$> rewriteExp e
@@ -300,6 +304,20 @@ rewritePat = \ case
     e2 <- rewriteExp e
     parenInvokeM e1 e2
   e -> notImplemented "rewritePat" e
+
+
+rewritePath
+  :: Parse.Path Name
+  -> Path L
+rewritePath = \ case
+  Parse.Path label pathIdents ->
+    let pathIdents' = map ( \ (qPath, ident) ->
+                                  (case qPath of
+                                      Nothing -> Nothing
+                                      Just path -> Just $ rewritePath path
+                                  , ident)) pathIdents
+    in Path label pathIdents'
+
 
 rewriteDef
   :: (MonadAbort Error m, MonadSupply Label m)

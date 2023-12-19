@@ -32,7 +32,7 @@ import Data.Functor.Compose
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
-import Data.List (zip)
+import Data.List (zip, map)
 import Data.Maybe
 import Data.Monoid
 import Data.Ord
@@ -80,6 +80,7 @@ type EvalT m = ReaderT (R m) (VerseT m)
 data R m = R
   { mode :: !Mode
   , env :: !(Env m)
+  , top :: !(Env m)
   , assumed :: !Bool
   , archetype :: !(Archetype m)
   , archetype' :: !(Archetype m)
@@ -129,6 +130,7 @@ runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> Mode -> VerseT m a
 runEvalT m mode = runReaderT m R {..}
   where
     env = mempty
+    top = env
     assumed = False
     archetype = mempty
     archetype' = mempty
@@ -272,6 +274,11 @@ evalExp e = case extract e of
     newVar' $ Val.Char32 x
   Exp.Name x ->
     evalIdent $ x <$ e
+  Exp.QualName e x ->
+    evalQualName (loc e) e x
+  Exp.PathName (Exp.Path label pathIdents) -> \ s s' -> lift $ do
+    unifyS s s'
+    newVar' $ Val.Path (map extract (label : map snd pathIdents)) -- Ignore nested labels for now
   Exp.IfArchetypeName x y e1 e2 -> \ s s' ->
     asks archetype <&> HashMap.lookup (extract x) >>= \ case
       Nothing -> evalExp e2 s s'
@@ -282,6 +289,78 @@ evalExp e = case extract e of
       Nothing -> abort $ IdentError (loc e) x
       Just (Ref _) -> abort . ValError $ loc e
       Just (Val var) -> lift $ unifyS s s' $> var
+  Exp.TopLevel xs e -> \ s s' -> do
+    fresh <- lift $ freshEnv xs
+    local ( \ r -> let newenv = fresh <> env r
+                   in r { top = newenv, env = newenv }) $ evalExp e s s'
+
+evalQualName
+  :: MonadEval m
+  => Loc
+  -> L (Exp L Ident)
+  -> Name
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+evalQualName loc e x s s' = do
+  s1 <- lift freshS
+  var_e <- evalExp e s s1
+  var <- lift freshVar'
+  fork' $ do
+    val_env <- lift (readVar' var_e)
+    -- inlined replacement for getNameEnv that fetches the top level Env
+    getPath loc val_env >>= \ case
+      Nothing -> do -- root level
+        var2 <- evalIdent (Ident.Name x <$ e) s1 s
+        unify' loc var var2
+      Just (p, ps) -> do
+        xs <- asks top
+        --
+        case HashMap.lookup (Ident.Name p) xs of
+          Nothing -> abort $ NameError loc p
+          Just x0 -> do
+            s2 <- lift freshS
+            var_e0 <- evalNamed' loc x0 s1 s2
+            var_eN <- evalQualNameRest loc ps s2 s' var_e0
+            fork' $ do
+              val_env <- lift (readVar' var_eN)
+              xs <- getNameEnv loc val_env
+              case HashMap.lookup x xs of
+                Nothing -> abort $ NameError loc x
+                Just x -> do
+                  var2 <- evalNamed' loc x s2 s'
+                  unify' loc var var2
+  pure var
+
+
+evalQualNameRest
+  :: MonadEval m
+  => Loc
+  -> [Name]
+  -> S m
+  -> S m
+  -> VarVal m
+  -> EvalT m (VarVal m)
+evalQualNameRest _loc [] _s _s' var_e = do
+  pure var_e
+evalQualNameRest loc (p:ps) s s' var_e = do
+  s'' <- lift freshS
+  var <- lift freshVar'
+  fork' $ do
+    lift (readVar' var_e) >>= getNameEnv loc <&> HashMap.lookup p >>= \ case
+      Nothing -> abort $ NameError loc p
+      Just x -> evalNamed' loc x s s'' >>= evalQualNameRest loc ps s'' s' >>= unify' loc var
+  pure var
+
+
+-- Ignore root for now since I don't know what it should be.  In the
+-- future we want to be able to support several packages, selecting
+-- the correct one depending on the root.
+getPath :: MonadAbort Error m => Loc -> Val ref a -> m (Maybe (Name, [Name]))
+getPath loc = \ case
+  Val.Path (_root:p:ps) -> return $ Just (p, ps)
+  Val.Path (_root:[]) -> return $ Nothing
+  _ -> abort $ EnvError loc
 
 evalDot
   :: MonadEval m
@@ -1421,6 +1500,7 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.AnyChar32, Val.Char32 _) -> pure (GE, pure ())
   (Val.Char32 _, Val.AnyChar32) -> pure (LE, pure ())
   (Val.Char32 x, Val.Char32 y) -> guard (x == y) $> (SEQ, pure ())
+  (Val.Path x, Val.Path y) -> guard (x == y) $> (SEQ, pure ())
   (Val.Truth x, Val.Truth y) -> pure . (SEQ,) $ unify' loc' x y
   (Val.Tuple xs, Val.Tuple ys) -> pure . (SEQ,) $ unifyList loc' xs ys
   (Val.Ptr ref_x x, Val.Ptr ref_y y) -> pure $ (SEQ,) do

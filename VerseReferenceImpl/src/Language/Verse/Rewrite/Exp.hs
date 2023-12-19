@@ -16,6 +16,7 @@ module Language.Verse.Rewrite.Exp
   , mixfixArrowColonEqual
   , name
   , ifArchetypeName
+  , Path (..)
   ) where
 
 import Data.ByteString.Internal (w2c)
@@ -72,6 +73,8 @@ data Exp f a
   | PrefixColon (f (Exp f a))
   | MixfixArrowColonEqual (f a) (f a) (f (Exp f a))
   | Name a
+  | QualName (f (Exp f a)) Name
+  | ExpPath (Path f)
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
 
 data Quantifier = Val | Fun | Var deriving Show
@@ -105,6 +108,8 @@ instance ( Pretty (f (Exp f a))
       maybe mempty (parens . pretty) e1 <+>
       braces (pretty e2)
     Inst e1 e2 -> parens (pretty e1) <+> braces (pretty e2)
+    Module e -> "module" <> braces (pretty e)
+    Struct e -> "struct" <> braces (pretty e)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     Exists x -> "exists" <+> pretty x
     Forall x -> "forall" <+> pretty x
@@ -130,6 +135,8 @@ instance ( Pretty (f (Exp f a))
     MixfixArrowColonEqual x y e ->
       pretty x <+> "->" <+> pretty y <+> ":=" <+> pretty e
     Name x -> pretty x
+    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
+    ExpPath x -> pretty x
     IfArchetypeName x e1 e2 ->
       "if" <+> parens ("archetype" <> parens (pretty x)) <+> braces (pretty e1) <+>
       "else" <+> braces (pretty e2)
@@ -183,3 +190,16 @@ name = fmap Name
 
 ifArchetypeName :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 ifArchetypeName = liftL3 IfArchetypeName
+
+data Path f
+ = Path (f Name) [(Maybe (Path f), f Name)]
+
+deriving instance ( Show (f Name)
+                  ) => Show (Path f)
+
+instance ( Pretty (f Name)
+         ) => Pretty (Path f) where
+  pretty (Path label pathIdents) = "/" <> pretty label <> foldr prettyPath mempty pathIdents
+   where
+    prettyPath (Nothing, ident) doc = "/" <> pretty ident <> doc
+    prettyPath (Just path, ident) doc = "/(" <> pretty path <> ":)" <> pretty ident <> doc

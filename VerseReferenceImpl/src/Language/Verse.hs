@@ -1,8 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 module Language.Verse
-  ( eval
-  , eval2
-  , eval'
+  ( eval2
   , eval2'
   ) where
 
@@ -21,27 +19,10 @@ import Language.Verse.Desugar
 import Language.Verse.Error
 import Language.Verse.Eval qualified as Eval
 import Language.Verse.Label
-import Language.Verse.Lexer
 import Language.Verse.Mode
-import Language.Verse.Parse as P
 import Language.Verse.Parse2 as P2
 import Language.Verse.Rewrite
 import Language.Verse.Val
-
-eval :: ( MonadAbort Error m
-        , MonadFix m
-        , MonadRef m
-        , MonadSupply Label m
-        , EqRef (Ref m)
-        ) => ByteString -> m [FrozenVal]
-eval xs = do
-  (e1, e2) <- liftEither $ runSupplyT $ do
-    e <- rewrite =<< lift (runLexer P.parse xs)
-    (,) <$> desugar Verification e <*> desugar Execution e
-  whenNothingM_ (runVerseT $ Eval.eval Verification e1) $
-    abort StuckError
-  whenNothingM (runVerseT $ Eval.eval Execution e2) $
-    abort StuckError
 
 eval2 :: ( MonadAbort Error m
          , MonadFix m
@@ -57,16 +38,6 @@ eval2 path xs = do
     abort StuckError
   whenNothingM (runVerseT $ Eval.eval Execution e2) $
     abort StuckError
-
-eval' :: ( MonadAbort Error m
-         , MonadFix m
-         , MonadRef m
-         , MonadSupply Label m
-         , EqRef (Ref m)
-         ) => Mode -> ByteString -> VerseT m FrozenVal
-eval' mode =
-  Eval.eval mode <=<
-  liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< runLexer P.parse)
 
 eval2' :: ( MonadAbort Error m
           , MonadFix m

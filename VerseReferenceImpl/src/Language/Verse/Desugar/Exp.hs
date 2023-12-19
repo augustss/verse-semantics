@@ -5,6 +5,7 @@
 module Language.Verse.Desugar.Exp
   ( Exp (..)
   , Quantifier (..)
+  , Path(..)
   , Env
   , unify
   , verify
@@ -67,17 +68,28 @@ data Exp f a
   | OLam (f (Exp f a)) !(Env a) (f (Exp f a)) (f (Exp f a))
   | Intrinsic !Intrinsic
   | Name a
+  | QualName (f (Exp f a)) !Name
+  | PathName (Path f)
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
+  | TopLevel !(Env a) (f (Exp f a))  -- Used to define the top level for paths
 
 infixl 1 :*>:
 
 deriving instance ( Show (f (Exp f a))
+                  , Show (f Name)
                   , Show (f a)
                   , Show a
                   ) => Show (Exp f a)
 
+data Path f
+ = Path (f Name) [(Maybe (Path f), f Name)]
+
+deriving instance ( Show (f Name)
+                  ) => Show (Path f)
+
 instance ( Pretty (f (Exp f a))
+         , Pretty (f Name)
          , Pretty (f a)
          , Pretty a
          ) => Pretty (Exp f a) where
@@ -101,6 +113,8 @@ instance ( Pretty (f (Exp f a))
       maybe mempty (parens . pretty) e1 <+>
       braces (bindings xs $ pretty e2)
     Inst e1 xs e2 -> parens (pretty e1) <+> braces (bindings xs $ pretty e2)
+    Module i xs e -> "module" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
+    Struct i xs e -> "struct" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     ForDo xs e1 e2 ->
       "for" <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
@@ -123,11 +137,16 @@ instance ( Pretty (f (Exp f a))
       "olam" <+> pretty f <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
     Intrinsic x -> pretty x
     Name x -> pretty x
+    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
+    PathName x -> pretty x
     IfArchetypeName x y e1 e2 ->
       "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
       braces (pretty e1) <+>
       "else" <+> braces (pretty e2)
     ArchetypeName x -> "archetype" <> parens (pretty x)
+    TopLevel xs e ->
+      vsep (map ( ("exists" <+>) . pretty) (HashMap.keys xs)) <> hardline <>
+      pretty e
     _ -> "unimplemented"
     where
       separated = concatWith (\x y -> x <> separator <> y)
@@ -152,6 +171,13 @@ instance ( Pretty (f (Exp f a))
 data Quantifier = Exists | Forall | Var deriving Show
 
 type Env a = HashMap a Quantifier
+
+instance ( Pretty (f Name)
+         ) => Pretty (Path f) where
+  pretty (Path label pathIdents) = "/" <> pretty label <> foldr prettyPath mempty pathIdents
+   where
+    prettyPath (Nothing, ident) doc = "/" <> pretty ident <> doc
+    prettyPath (Just path, ident) doc = "/(" <> pretty path <> ":)" <> pretty ident <> doc
 
 unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 unify = liftL2 (:=:)
