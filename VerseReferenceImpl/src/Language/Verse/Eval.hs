@@ -49,7 +49,7 @@ import Language.Verse.Ident qualified as Ident
 import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
-import Language.Verse.Loc (Loc, L, loc)
+import Language.Verse.Loc (Loc, L (..), loc)
 import Language.Verse.Mode
 import Language.Verse.Name
 import Language.Verse.Val
@@ -302,55 +302,15 @@ evalQualName
   -> S m
   -> EvalT m (VarVal m)
 evalQualName loc e x s s' = do
-  s1 <- lift freshS
-  var_e <- evalExp e s s1
-  var <- lift freshVar'
-  fork' $ do
-    val_env <- lift (readVar' var_e)
-    -- inlined replacement for getNameEnv that fetches the top level Env
-    getPath loc val_env >>= \ case
-      Nothing -> do -- root level
-        var2 <- evalIdent (Ident.Name x <$ e) s1 s
-        unify' loc var var2
-      Just (p, ps) -> do
-        xs <- asks top
-        --
-        case HashMap.lookup (Ident.Name p) xs of
-          Nothing -> abort $ NameError loc p
-          Just x0 -> do
-            s2 <- lift freshS
-            var_e0 <- evalNamed' loc x0 s1 s2
-            s3 <- lift freshS
-            var_eN <- evalQualNameRest loc ps s2 s3 var_e0
-            fork' $ do
-              val_env <- lift (readVar' var_eN)
-              xs <- getNameEnv loc val_env
-              case HashMap.lookup x xs of
-                Nothing -> abort $ NameError loc x
-                Just x -> do
-                  var2 <- evalNamed' loc x s3 s'
-                  unify' loc var var2
-  pure var
-
-
-evalQualNameRest
-  :: MonadEval m
-  => Loc
-  -> [Name]
-  -> S m
-  -> S m
-  -> VarVal m
-  -> EvalT m (VarVal m)
-evalQualNameRest _loc [] s s' var_e = do
-  lift $ unifyS s s'
-  pure var_e
-evalQualNameRest loc (p:ps) s s' var_e = do
   s'' <- lift freshS
+  var_e <- evalExp e s s''
   var <- lift freshVar'
-  fork' $ do
-    lift (readVar' var_e) >>= getNameEnv loc <&> HashMap.lookup p >>= \ case
-      Nothing -> abort $ NameError loc p
-      Just x -> evalNamed' loc x s s'' >>= evalQualNameRest loc ps s'' s' >>= unify' loc var
+  fork' $ lift (readVar' var_e) >>= getPath loc >>= \ case
+    Nothing -> unify' loc var =<< evalIdent' (L loc $ Ident.Name x) s'' s'
+    Just (p, ps) -> do
+      s''' <- lift freshS
+      var_p <- evalTopIdent' (L loc $ Ident.Name p) s'' s'''
+      unify' loc var =<< dots1M' loc var_p ps x s''' s'
   pure var
 
 -- Ignore root for now since I don't know what it should be.  In the
@@ -372,12 +332,50 @@ evalDot
   -> EvalT m (VarVal m)
 evalDot loc e x s s' = do
   s'' <- lift freshS
-  var_e <- evalExp e s s''
-  var <- lift freshVar'
-  fork' $ lift (readVar' var_e) >>= getNameEnv loc <&> HashMap.lookup x >>= \ case
+  var <- evalExp e s s''
+  dotM loc var x s'' s'
+
+dots1M'
+  :: MonadEval m
+  => Loc
+  -> VarVal m
+  -> [Name]
+  -> Name
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+dots1M' loc var xs x s s' = case xs of
+  [] -> dotM' loc var x s s'
+  y:xs -> do
+    s'' <- lift freshS
+    var <- dotM' loc var y s s''
+    dots1M' loc var xs x s'' s'
+
+dotM
+  :: MonadEval m
+  => Loc
+  -> VarVal m
+  -> Name
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+dotM loc var x s s' = do
+  var' <- lift freshVar'
+  fork' $ unify' loc var' =<< dotM' loc var x s s'
+  pure var'
+
+dotM'
+  :: MonadEval m
+  => Loc
+  -> VarVal m
+  -> Name
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+dotM' loc var x s s' =
+  lift (readVar' var) >>= getNameEnv loc <&> HashMap.lookup x >>= \ case
     Nothing -> abort $ NameError loc x
-    Just x -> unify' loc var =<< evalNamed' loc x s'' s'
-  pure var
+    Just x -> evalNamed' loc x s s'
 
 evalChoice
   :: MonadEval m
@@ -1292,6 +1290,26 @@ evalIdent x s s' = lookupNamed (extract x) >>= \ case
   Nothing -> abort $ IdentError (loc x) (extract x)
   Just y -> evalNamed (loc x) y s s'
 
+evalIdent'
+  :: MonadEval m
+  => L Ident
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+evalIdent' x s s' = lookupNamed (extract x) >>= \ case
+  Nothing -> abort $ IdentError (loc x) (extract x)
+  Just y -> evalNamed' (loc x) y s s'
+
+evalTopIdent'
+  :: MonadEval m
+  => L Ident
+  -> S m
+  -> S m
+  -> EvalT m (VarVal m)
+evalTopIdent' x s s' = lookupTopNamed (extract x) >>= \ case
+  Nothing -> abort $ IdentError (loc x) (extract x)
+  Just y -> evalNamed' (loc x) y s s'
+
 evalNamed
   :: MonadEval m
   => Loc
@@ -1398,6 +1416,9 @@ filterNames =
 
 lookupNamed :: Ident -> EvalT m (Maybe (VarNamed m))
 lookupNamed x = asks $ \ r -> HashMap.lookup x r.env
+
+lookupTopNamed :: Ident -> EvalT m (Maybe (VarNamed m))
+lookupTopNamed x = asks $ \ r -> HashMap.lookup x r.top
 
 localName :: Ident -> VarNamed m -> EvalT m a -> EvalT m a
 localName k v = local $ \ r -> r { env = HashMap.insert k v r.env }
