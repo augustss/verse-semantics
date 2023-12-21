@@ -7,6 +7,7 @@ module Language.Verse.Desugar
   ( desugar
   ) where
 
+import Control.Arrow (first)
 import Control.Comonad
 import Control.Monad.Abort
 import Control.Monad.Reader
@@ -300,13 +301,12 @@ desugarTuple pi = \ case
     pure (x:xs, e:es)
 
 desugarPath
-  :: (Rewrite.Path L)
-  -> (Path L)
-desugarPath (Rewrite.Path label pathIdents) = do
-  Path label (map desugarPath' pathIdents)
+  :: Rewrite.Path L
+  -> Path L
+desugarPath (Rewrite.Path label pathIdents) =
+  Path label $ desugarPath' <$> pathIdents
   where
-  desugarPath' (Nothing, ident) = (Nothing, ident)
-  desugarPath' (Just path, ident) = (Just (desugarPath path), ident)
+    desugarPath' = first $ fmap desugarPath
 
 desugarLam
   :: (MonadAbort Error m, MonadSupply Label m)

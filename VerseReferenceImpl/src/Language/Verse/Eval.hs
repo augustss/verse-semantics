@@ -290,9 +290,8 @@ evalExp e = case extract e of
       Just (Ref _) -> abort . ValError $ loc e
       Just (Val var) -> lift $ unifyS s s' $> var
   Exp.TopLevel xs e -> \ s s' -> do
-    fresh <- lift $ freshEnv xs
-    local ( \ r -> let newenv = fresh <> env r
-                   in r { top = newenv, env = newenv }) $ evalExp e s s'
+    xs <- lift $ freshEnv xs
+    local ( \ r -> let env = xs <> r.env in r { top = env, env }) $ evalExp e s s'
 
 evalQualName
   :: MonadEval m
@@ -354,14 +353,13 @@ evalQualNameRest loc (p:ps) s s' var_e = do
       Just x -> evalNamed' loc x s s'' >>= evalQualNameRest loc ps s'' s' >>= unify' loc var
   pure var
 
-
 -- Ignore root for now since I don't know what it should be.  In the
 -- future we want to be able to support several packages, selecting
 -- the correct one depending on the root.
 getPath :: MonadAbort Error m => Loc -> Val ref a -> m (Maybe (Name, [Name]))
 getPath loc = \ case
   Val.Path (_root:p:ps) -> return $ Just (p, ps)
-  Val.Path (_root:[]) -> return $ Nothing
+  Val.Path [_root] -> return $ Nothing
   _ -> abort $ EnvError loc
 
 evalDot
@@ -588,7 +586,7 @@ evalFails e s s' = do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
       local (\ r -> r { assumed = False }) $ evalExp e s { choiceFree } s'
-    abort . FailsError $ loc e
+    abort . FailsError $ loc e
   lift freshVar'
 
 evalDecides

@@ -5,7 +5,7 @@
 module Language.Verse.Desugar.Exp
   ( Exp (..)
   , Quantifier (..)
-  , Path(..)
+  , Path (..)
   , Env
   , unify
   , verify
@@ -73,7 +73,7 @@ data Exp f a
   | PathName (Path f)
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
-  | TopLevel !(Env a) (f (Exp f a))  -- Used to define the top level for paths
+  | TopLevel !(Env a) (f (Exp f a)) -- Used to define the top level for paths
 
 infixl 1 :*>:
 
