@@ -26,7 +26,8 @@ import Test.HUnit
 
 main :: IO ()
 main = runTestTTAndExit $ TestList
-  [ test1
+  [ test0
+  , test1
   , test2
   , test3
   , test4
@@ -86,6 +87,14 @@ unifyValList = curry $ \ case
   ([], []) -> pure ()
   (x:xs, y:ys) -> unifyVal x y *> unifyValList xs ys
   _ -> empty
+
+test0 :: Test
+test0 = TestCase $ do
+  z <- runSupplyT $ runVerseT do
+    x <- freshIVar
+    _ <- one $ readIVar x
+    writeIVar x ()
+  z @?= Just [()]
 
 test1 :: Test
 test1 = TestCase $ do

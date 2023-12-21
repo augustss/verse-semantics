@@ -1246,7 +1246,6 @@ char32 loc var = domMatch_ $ do
     _ -> empty
   pure var
 
-
 function
   :: MonadEval m
   => Loc -> VarVal m -> EvalT m (DomMatch m)

@@ -37,6 +37,7 @@ import Prettyprinter
 
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
+  -- | f (Exp f a) :>>: f (Exp f a)
   | f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :.: {-# UNPACK #-} !Name
   | f (Exp f a) :|: f (Exp f a)
