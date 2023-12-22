@@ -584,7 +584,7 @@ evalFails e s s' = do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
       local (\ r -> r { assumed = False }) $ evalExp e s { choiceFree } s'
-    abort . FailsError $ loc e
+    abort . FailsError $ loc e
   lift freshVar'
 
 evalDecides
