@@ -102,10 +102,10 @@ type Abort r m = m r
 
 data Env m = Env
   { heap :: !Heap
+  , splitDepth :: {-# UNPACK #-} !Int
   , processes :: !(Ref m (Processes m))
   , heaps :: !(Ref m (IntMap Heap))
   , suspCount :: !(Ref m Int)
-  , splitDepth :: {-# UNPACK #-} !Int
   , scope :: !(Scope m)
   }
 
@@ -116,7 +116,8 @@ data Scope m
     , tail :: !(Env m)
     }
   | Verify
-    { store :: !(Ref m (Store m))
+    { abstractHeap :: !Heap
+    , store :: !(Ref m (Store m))
     , decisions :: !(HeapRef m Decisions)
     }
 
@@ -130,7 +131,7 @@ data Process m = forall a . Freshenable a m => Process
   { env :: !(Env m)
   , left :: !(HeapRef m (Maybe a))
   , right :: !(Ref m (VerseT m (), VerseT m ()))
-  , result :: !(IVar m (Split Heap (Heap, a, VerseT m ())))
+  , result :: !(IVar m (Split (Heap, a, VerseT m ())))
   }
 
 data Heap = Root | Child
@@ -217,6 +218,8 @@ runVerseT
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VerseT m a -> m (Maybe [a])
 runVerseT m = do
+  label <- supply
+  let heap = Child { label, tail = abstractHeap, pred = Root }
   processes <- newRef mempty
   heaps <- newRef mempty
   suspCount <- newRef 0
@@ -225,7 +228,7 @@ runVerseT m = do
   let scope = Verify {..}
   unVerseT m yk ak sk fk fk Env {..}
   where
-    heap = Root
+    abstractHeap = Root
     splitDepth = 0
     yk = Yield $ \ _ _ _ _ _ -> pure Nothing
     ak = pure $ Just []
@@ -456,7 +459,7 @@ findAbstractHeap :: Env m -> Heap
 findAbstractHeap r = case r.scope of
   Join {..} -> findAbstractHeap tail
   Split {..} -> findAbstractHeap tail
-  Verify {} -> r.heap
+  Verify {..} -> abstractHeap
 
 readRepr' :: MonadRef m => Var m f -> Heap -> m (Repr m f)
 readRepr' v h = readRef (unVar v) <&> lookupVarState h >>= \ case
@@ -505,8 +508,8 @@ resume
   => Process m -> VerseT m ()
   -> m (Maybe (VerseT m ()))
 resume p@Process { env = env@Env {..}, .. } m = msplit_ m Env {..} >>= \ case
-  Fail () -> resume' p m
-  Abort () -> pure . Just . writeIVar result $ Abort heap
+  Fail -> resume' p m
+  Abort -> pure . Just $ writeIVar result Abort
   Succeed (m_fail', m_empty') -> do
     (m_fail, m_empty) <- readRef right
     (0 ==) <$> readRef suspCount `andM` readHeapRef' left heap >>= \ case
@@ -525,8 +528,8 @@ resume'
 resume' Process { env = env@Env {..}, .. } m = do
   (_, m_empty) <- readRef right
   msplit_ (fork m_empty *> m) Env {..} >>= \ case
-    Fail () -> pure . Just . writeIVar result $ Fail heap
-    Abort () -> pure . Just . writeIVar result $ Abort heap
+    Fail -> pure . Just $ writeIVar result Fail
+    Abort -> pure . Just $ writeIVar result Abort
     Succeed m@(m_fail, _) -> do
       (0 ==) <$> readRef suspCount `andM` readHeapRef' left heap >>= \ case
         Nothing -> do
@@ -594,8 +597,8 @@ fork m = liftSucceed (unVerseT m yield abort succeed fail fail) >>= reflect_
       ( liftSucceed fk >>= reflect_
       , liftSucceed ek >>= reflect_
       )
-    fail _ = pure $ Fail ()
-    abort = pure $ Abort ()
+    fail _ = pure Fail
+    abort = pure Abort
 
 one
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -606,8 +609,8 @@ one m = do
     h <- newChildHeap
     ref <- newHeapRef Nothing
     split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
-      Fail _ -> empty
-      Abort _ -> abort
+      Fail -> empty
+      Abort -> abort
       Succeed (_, x, _) -> writeIVar v x
   pure v
 
@@ -620,8 +623,8 @@ if' p t e = do
     h <- newChildHeap
     ref <- newHeapRef Nothing
     split h ref (p >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
-      Fail _ -> e >>= writeIVar v
-      Abort _ -> abort
+      Fail -> e >>= writeIVar v
+      Abort -> abort
       Succeed (_, x, _) -> t x >>= writeIVar v
   pure v
 
@@ -638,8 +641,8 @@ all m = do
   pure v
   where
     loop h ref m xs = split h ref m >>= readIVar >>= \ case
-      Fail _ -> pure $ reverse xs
-      Abort _ -> abort
+      Fail -> pure $ reverse xs
+      Abort -> abort
       Succeed (h, x, m) -> loop h ref m $ x:xs
 
 for
@@ -654,8 +657,8 @@ for m f = do
   pure v
   where
     loop ref m f xs h = split h ref m >>= readIVar >>= \ case
-      Fail _ -> pure $ reverse xs
-      Abort _ -> abort
+      Fail -> pure $ reverse xs
+      Abort -> abort
       Succeed (h, x, m) -> do
         i <- supply
         liftSucceed $ \ r -> modifyRef' r.heaps $ IntMap.insert i h
@@ -691,10 +694,11 @@ verifyAll decisions m = do
   pure v
   where
     loop h decisions ref m = do
+      abstractHeap <- asks' heap
       store <- lift $ newRef mempty
       split' h Verify {..} ref m >>= readIVar >>= \ case
-        Fail h -> lift $ readHeapRef' decisions h
-        Abort h -> lift $ readHeapRef' decisions h
+        Fail -> readHeapRef decisions
+        Abort -> readHeapRef decisions
         Succeed (h, (), m) -> loop h decisions ref m
 
 succeeds
@@ -706,11 +710,11 @@ succeeds m = do
     h <- newChildHeap
     ref <- newHeapRef Nothing
     split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
-      Fail _ -> writeIVar v Nothing
-      Abort _ -> abort
+      Fail -> writeIVar v Nothing
+      Abort -> abort
       Succeed (h, x, m) -> split h ref m >>= readIVar >>= \ case
-        Fail _ -> writeIVar v $ Just x
-        Abort _ -> abort
+        Fail -> writeIVar v $ Just x
+        Abort -> abort
         Succeed _ -> writeIVar v Nothing
   pure v
 
@@ -723,8 +727,8 @@ fails m = do
     h <- newChildHeap
     ref <- newHeapRef Nothing
     split h ref (m >> writeHeapRef ref (Just ())) >>= readIVar >>= \ case
-      Fail _ -> empty
-      Abort _ -> abort
+      Fail -> empty
+      Abort -> abort
       Succeed _ -> writeIVar v ()
   pure v
 
@@ -737,11 +741,11 @@ decides m = do
     h <- newChildHeap
     ref <- newHeapRef Nothing
     split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
-      Fail _ -> empty
-      Abort _ -> abort
+      Fail -> empty
+      Abort -> abort
       Succeed (h, x, m) -> split h ref m >>= readIVar >>= \ case
-        Fail _ -> writeIVar v $ Just x
-        Abort _ -> abort
+        Fail -> writeIVar v $ Just x
+        Abort -> abort
         Succeed _ -> writeIVar v Nothing
   pure v
 
@@ -755,8 +759,8 @@ assume m = do
     h <- newChildHeap
     ref <- newHeapRef Nothing
     split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
-      Fail _ -> abort
-      Abort _ -> abort
+      Fail -> abort
+      Abort -> abort
       Succeed (_, x, _) -> writeIVar v x
   pure v
 
@@ -768,7 +772,7 @@ split
   => Heap
   -> HeapRef m (Maybe a)
   -> VerseT m ()
-  -> VerseT m (IVar m (Split Heap (Heap, a, VerseT m ())))
+  -> VerseT m (IVar m (Split (Heap, a, VerseT m ())))
 split heap left m = do
   store <- lift $ newRef mempty
   tail <- ask'
@@ -780,16 +784,16 @@ split'
   -> Scope m
   -> HeapRef m (Maybe a)
   -> VerseT m ()
-  -> VerseT m (IVar m (Split Heap (Heap, a, VerseT m ())))
+  -> VerseT m (IVar m (Split (Heap, a, VerseT m ())))
 split' heap scope left m = do
   processes <- lift $ newRef mempty
   heaps <- lift $ newRef mempty
   suspCount <- lift $ newRef 0
-  splitDepth <- asks' $ (+ 1) . (.splitDepth)
+  splitDepth <- asks' $ (+ 1) . splitDepth
   let env = Env {..}
   lift (msplit_ m env) >>= \ case
-    Fail () -> newIVar $ Fail heap
-    Abort () -> newIVar $ Abort heap
+    Fail -> newIVar Fail
+    Abort -> newIVar Abort
     Succeed m@(m_fail, _) ->
       lift ((0 ==) <$> readRef suspCount `andM` readHeapRef' left heap) >>= \ case
         Just x -> do
@@ -991,7 +995,7 @@ instance ( MonadFix m
 
 msplit_
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => VerseT m () -> Env m -> m (Split () (VerseT m (), VerseT m ()))
+  => VerseT m () -> Env m -> m (Split (VerseT m (), VerseT m ()))
 msplit_ m = unVerseT m yield abort succeed fail fail
   where
     yield = Yield $ \ addSusp sk fk ek _ -> do
@@ -1004,8 +1008,8 @@ msplit_ m = unVerseT m yield abort succeed fail fail
       ( liftSucceed fk >>= reflect_
       , liftSucceed ek >>= reflect_
       )
-    fail _ = pure $ Fail ()
-    abort = pure $ Abort ()
+    fail _ = pure Fail
+    abort = pure Abort
 
 findDecisions :: Env m -> HeapRef m Decisions
 findDecisions r = case r.scope of
@@ -1023,13 +1027,16 @@ newHeapRef = lift . newHeapRef'
 newHeapRef' :: MonadRef m => a -> m (HeapRef m a)
 newHeapRef' = fmap HeapRef . newRef . singleton
 
+readHeapRef :: MonadRef m => HeapRef m a -> VerseT m a
+readHeapRef ref = lift . readHeapRef' ref =<< asks' heap
+
 readHeapRef' :: MonadRef m => HeapRef m a -> Heap -> m a
 readHeapRef' ref = getLocal (unHeapRef ref)
 
 writeHeapRef :: MonadRef m => HeapRef m a -> a -> VerseT m ()
 writeHeapRef ref = liftAlt' . writeHeapRef' ref
   where
-    liftAlt' f = liftAlt . fmap (. (.heap)) . f =<< asks' (.heap)
+    liftAlt' f = liftAlt . fmap (. heap) . f =<< asks' heap
 
 writeHeapRef' :: MonadRef m => HeapRef m a -> a -> Heap -> m (Heap -> m ())
 writeHeapRef' ref x h =
@@ -1226,11 +1233,11 @@ insert k v HeapMap {..} = case k of
 
 reflect_
   :: (Applicative m, MonadFix m, MonadRef m, MonadSupply Int m)
-  => Split () (VerseT m (), VerseT m ())
+  => Split (VerseT m (), VerseT m ())
   -> VerseT m ()
 reflect_ = \ case
-  Fail () -> empty
-  Abort () -> abort
+  Fail -> empty
+  Abort -> abort
   Succeed (m, n) -> alts (pure ()) m n
 
 incr :: (MonadRef m, Num a) => Ref m a -> m ()
@@ -1263,7 +1270,7 @@ state' f = state $ \ s -> case f s of
   Left x -> (Just x, s)
   Right s -> (Nothing, s)
 
-data Split a b = Fail a | Abort a | Succeed b
+data Split a = Fail | Abort | Succeed a
 
 data Decisions = Decisions [Bool] [Bool]
 
