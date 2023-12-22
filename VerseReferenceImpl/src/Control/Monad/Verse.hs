@@ -29,6 +29,7 @@ module Control.Monad.Verse
   , readVarRef
   , writeVarRef
   , fork
+  , join
   , one
   , if'
   , all
@@ -48,7 +49,7 @@ module Control.Monad.Verse
   ) where
 
 import Control.Applicative
-import Control.Monad
+import Control.Monad (Monad (..), (=<<), (>=>), guard, sequence_, when)
 import Control.Monad.Abort (MonadAbort)
 import Control.Monad.Fix
 import Control.Monad.Reader
@@ -600,6 +601,23 @@ fork m = liftSucceed (unVerseT m yield abort succeed fail fail) >>= reflect_
     fail _ = pure Fail
     abort = pure Abort
 
+join
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VerseT m a -> VerseT m (IVar m a)
+join m = do
+  v <- freshIVar
+  fork $ do
+    ref <- newHeapRef Nothing
+    loop ref (m >>= writeHeapRef ref . Just) >>= writeIVar v
+  pure v
+  where
+    loop ref m = do
+      r <- ask'
+      split' r.heap r.splitDepth Join { tail = r } ref m >>= readIVar >>= \ case
+        Fail -> empty
+        Abort -> abort
+        Succeed (_, x, m) -> pure x <|> loop ref m
+
 one
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => VerseT m a -> VerseT m (IVar m a)
@@ -688,18 +706,19 @@ verifyAll decisions m = do
   v <- freshIVar
   fork $ do
     h <- newChildHeap
+    n <- asks' $ (+ 1) . splitDepth
     ref <- newHeapRef Nothing
     decisions <- newHeapRef decisions
-    loop h decisions ref (m >> writeHeapRef ref (Just ())) >>= writeIVar v
+    loop h n decisions ref (m >> writeHeapRef ref (Just ())) >>= writeIVar v
   pure v
   where
-    loop h decisions ref m = do
+    loop h n decisions ref m = do
       abstractHeap <- asks' heap
       store <- lift $ newRef mempty
-      split' h Verify {..} ref m >>= readIVar >>= \ case
+      split' h n Verify {..} ref m >>= readIVar >>= \ case
         Fail -> readHeapRef decisions
         Abort -> readHeapRef decisions
-        Succeed (h, (), m) -> loop h decisions ref m
+        Succeed (h, (), m) -> loop h n decisions ref m
 
 succeeds
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -774,22 +793,23 @@ split
   -> VerseT m ()
   -> VerseT m (IVar m (Split (Heap, a, VerseT m ())))
 split heap left m = do
+  splitDepth <- asks' $ (+ 1) . splitDepth
   store <- lift $ newRef mempty
   tail <- ask'
-  split' heap Split {..} left m
+  split' heap splitDepth Split {..} left m
 
 split'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => Heap
+  -> Int
   -> Scope m
   -> HeapRef m (Maybe a)
   -> VerseT m ()
   -> VerseT m (IVar m (Split (Heap, a, VerseT m ())))
-split' heap scope left m = do
+split' heap splitDepth scope left m = do
   processes <- lift $ newRef mempty
   heaps <- lift $ newRef mempty
   suspCount <- lift $ newRef 0
-  splitDepth <- asks' $ (+ 1) . splitDepth
   let env = Env {..}
   lift (msplit_ m env) >>= \ case
     Fail -> newIVar Fail
