@@ -49,6 +49,7 @@ module Control.Monad.Verse
   ) where
 
 import Control.Applicative
+import Control.Arrow ((>>>))
 import Control.Monad (Monad (..), (=<<), (>=>), guard, sequence_, when)
 import Control.Monad.Abort (MonadAbort)
 import Control.Monad.Fix
@@ -67,17 +68,19 @@ import Data.Functor
 import Data.Functor.Compose
 import Data.HashMap.Strict qualified as Strict (HashMap)
 import Data.Int
-import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict (IntMap, (!))
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntMap.Lazy.Extras qualified as IntMap.Lazy
+import Data.IntSet (IntSet)
 import Data.Maybe
 import Data.Monoid
 import Data.Ord
 import Data.Traversable (Traversable, traverse)
+import Data.Tuple
 
 import GHC.Exts qualified
 
-import Prelude (Num (..), error, reverse, seq, subtract)
+import Prelude (Num (..), ($!), error, reverse, seq, subtract)
 
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -93,34 +96,45 @@ type AddSusp m a = Susp m a -> m (Fail () m)
 
 type Logic r m a = Succeed r m a -> Fail r m -> Empty r m -> Env m -> m r
 
-type Succeed r m a = a -> Fail r m -> Empty r m -> Env m -> m r
+type Succeed r m a = a -> Fail r m -> Empty r m -> S m -> m r
 
-type Fail r m = Env m -> m r
+type Fail r m = R -> m r
 
-type Empty r m = Env m -> m r
+type Empty r m = R -> m r
 
 type Abort r m = m r
 
 data Env m = Env
   { heap :: !Heap
+  , abstractHeap :: !Heap
+  , heaps :: !(IntMap Heap)
+  , store :: !(Store m)
+  , processes :: !(Processes m)
   , splitDepth :: {-# UNPACK #-} !Int
-  , processes :: !(Ref m (Processes m))
-  , heaps :: !(Ref m (IntMap Heap))
-  , suspCount :: !(Ref m Int)
-  , scope :: !(Scope m)
+  , suspCount :: !(HRef m Int)
+  , decisions :: !(HRef m Decisions)
+  , result :: !(Maybe (IVar m ()))
   }
 
-data Scope m
-  = Join { tail :: !(Env m) }
-  | Split
-    { store :: !(Ref m (Store m))
-    , tail :: !(Env m)
-    }
-  | Verify
-    { abstractHeap :: !Heap
-    , store :: !(Ref m (Store m))
-    , decisions :: !(HeapRef m Decisions)
-    }
+data R = R
+  { heap :: !Heap
+  , abstractHeap :: !Heap
+  , heaps :: !(IntMap Heap)
+  }
+
+data S m = S
+  { heap :: !Heap
+  , abstractHeap :: !Heap
+  , heaps :: !(IntMap Heap)
+  , store :: Store m
+  , processes :: Processes m
+  }
+
+toS :: Env m -> S m
+toS Env {..} = S {..}
+
+toR :: Env m -> R
+toR Env {..} = R {..}
 
 type Store m = IntMap (StoreElem m)
 
@@ -129,17 +143,32 @@ data StoreElem m = forall a . Freshenable a m => StoreElem !(VarRef m a)
 type Processes m = [Process m]
 
 data Process m = forall a . Freshenable a m => Process
-  { env :: !(Env m)
-  , left :: !(HeapRef m (Maybe a))
-  , right :: !(Ref m (VerseT m (), VerseT m ()))
-  , result :: !(IVar m (Split (Heap, a, VerseT m ())))
+  { heap :: {-# UNPACK #-} !Int
+  , abstractHeap :: !Bool
+  , heaps :: !IntSet
+  , store :: !(Store m)
+  , processes :: !(Processes m)
+  , splitDepth :: {-# UNPACK #-} !Int
+  , suspCount :: !(HRef m Int)
+  , decisions :: !(HRef m Decisions)
+  , left :: !(HRef m (Maybe a))
+  , rightFail :: !(VerseT m ())
+  , rightEmpty :: !(VerseT m ())
+  , result :: !(IVar m (Split (Heap, IntMap Heap, a, VerseT m ())))
   }
 
 data Heap = Root | Child
   { label :: {-# UNPACK #-} !Int
   , tail :: !Heap
+  , right :: !Heap
   , pred :: !Heap
   }
+
+eqHeap :: Heap -> Heap -> Bool
+eqHeap = curry $ \ case
+  (Root, Root) -> True
+  (Child { label = x }, Child { label = y }) -> x == y
+  _ -> False
 
 type Susp m a = a -> VerseT m ()
 
@@ -183,33 +212,32 @@ instance Functor (VerseT m) where
   fmap f m = VerseT $ \ yk ak sk -> unVerseT m yk ak $ sk . f
 
 instance Applicative (VerseT m) where
-  pure x = VerseT $ \ _ _ sk -> sk x
-  f <*> x = VerseT $ \ yk ak sk -> unVerseT f yk ak $ \ f -> unVerseT x yk ak $ sk . f
+  pure x = VerseT $ \ _ _ sk fk ek Env {..} ->
+    sk x fk ek S {..}
+  f <*> x = VerseT $ \ yk ak sk fk ek r@Env {..} ->
+    let sk' f fk ek S {..} = unVerseT x yk ak (sk . f) fk ek Env {..}
+    in unVerseT f yk ak sk' fk ek r
 
 instance ( MonadFix m
          , MonadRef m
          , MonadSupply Int m
          ) => Alternative (VerseT m) where
-  empty = VerseT $ \ _ _ _ _ ek r -> ek r
-  x <|> y = VerseT $ \ yk ak sk fk ek r -> do
-    processes <- readRef r.processes
-    heaps <- readRef r.heaps
-    flip runCopyT r $ do
-      writeRef r.processes =<< copyProcesses processes
-      writeRef r.heaps =<< copyHeaps heaps
+  empty = VerseT $ \ _ _ _ _ ek Env {..} -> ek R {..}
+  x <|> y = VerseT $ \ yk ak sk fk ek Env {..} -> do
     let
-      f r = do
-        writeRef r.processes processes
-        writeRef r.heaps heaps
-      fk' r = f r *> unVerseT y yk ak sk fk fk r
-      ek' r = f r *> unVerseT y yk ak sk fk ek r
-    unVerseT x yk ak sk fk' ek' r
+      fk' R {..} = unVerseT y yk ak sk fk fk Env { heaps = revert heaps heap, .. }
+      ek' R {..} = unVerseT y yk ak sk fk ek Env { heaps = revert heaps heap, .. }
+    heaps <- copy heaps heap
+    unVerseT x yk ak sk fk' ek' Env {..}
 
 instance Monad (VerseT m) where
-  x >>= f = VerseT $ \ yk ak sk -> unVerseT x yk ak $ \ x -> unVerseT (f x) yk ak sk
+  x >>= f = VerseT $ \ yk ak sk fk ek r@Env {..} ->
+    let sk' x fk ek S {..} = unVerseT (f x) yk ak sk fk ek Env {..}
+    in unVerseT x yk ak sk' fk ek r
 
 instance MonadTrans VerseT where
-  lift m = VerseT $ \ _ _ sk fk ek r -> m >>= \ x -> sk x fk ek r
+  lift m = VerseT $ \ _ _ sk fk ek Env {..} ->
+    m >>= \ x -> sk x fk ek S {..}
 
 instance MonadAbort e m => MonadAbort e (VerseT m)
 
@@ -220,24 +248,25 @@ runVerseT
   => VerseT m a -> m (Maybe [a])
 runVerseT m = do
   label <- supply
-  let heap = Child { label, tail = abstractHeap, pred = Root }
-  processes <- newRef mempty
-  heaps <- newRef mempty
-  suspCount <- newRef 0
-  store <- newRef mempty
-  decisions <- newHeapRef' emptyDecisions
-  let scope = Verify {..}
+  let heap = Child { label, tail = abstractHeap, right = Root, pred = Root }
+  suspCount <- newHRef' 0
+  decisions <- newHRef' emptyDecisions
+  let
+    sk x fk _ S {..} = readHRef' suspCount heap >>= \ case
+      0 -> do
+        freshenStore store heap
+        fmap (x:) <$> fk R {..}
+      _ -> pure Nothing
   unVerseT m yk ak sk fk fk Env {..}
   where
     abstractHeap = Root
+    heaps = mempty
     splitDepth = 0
+    store = mempty
+    processes = mempty
+    result = Nothing
     yk = Yield $ \ _ _ _ _ _ -> pure Nothing
     ak = pure $ Just []
-    sk x fk _ r = readRef r.suspCount >>= \ case
-      0 -> do
-        freshenStore r
-        fmap (x:) <$> fk r
-      _ -> pure Nothing
     fk _ = pure $ Just []
 
 yield :: Applicative m => VerseT m a
@@ -258,12 +287,12 @@ newIVar' :: MonadRef m => a -> m (IVar m a)
 newIVar' = fmap IVar . newRef . singleton . Val
 
 readIVar :: MonadRef m => IVar m a -> VerseT m a
-readIVar v = VerseT $ \ yk _ sk fk ek r ->
-  readRef (unIVar v) <&> lookupIVarState r.heap >>= \ case
-    Val x -> sk x fk ek r
-    x@(Susp k) -> rotate (unYield yk) sk fk ek r $ \ k' ->
-      put' (unIVar v) r.heap (Susp $ \ x -> k' x *> k x) $> \ r ->
-      put' (unIVar v) r.heap x
+readIVar v = VerseT $ \ yk _ sk fk ek Env {..} ->
+  readRef (unIVar v) <&> lookupIVarState heap >>= \ case
+    Val x -> sk x fk ek S {..}
+    x@(Susp k) -> rotate (unYield yk) sk fk ek Env {..} $ \ k' ->
+      put' (unIVar v) heap (Susp $ \ x -> k' x *> k x) $> \ R {..} ->
+      put' (unIVar v) heap x
   where
     rotate f x1 x2 x3 x4 x5 = f x5 x1 x2 x3 x4
 
@@ -334,13 +363,13 @@ unify
 unify f v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
   (Found v_x (Bound x _), Found v_y (Unbound n_y k_y _)) -> do
     r <- ask'
-    when (n_y < r.splitDepth) incrSuspCount
+    when (n_y < r.splitDepth) $ incr r.suspCount
     writeLink v_y v_x
     k_y x
     resumeProcesses $ subst f v_x v_y
   (Found v_x (Unbound n_x k_x _), Found v_y (Bound y _)) -> do
     r <- ask'
-    when (n_x < r.splitDepth) incrSuspCount
+    when (n_x < r.splitDepth) $ incr r.suspCount
     writeLink v_x v_y
     k_x y
     resumeProcesses $ subst f v_y v_x
@@ -349,12 +378,12 @@ unify f v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
     case compare' n_x i_x n_y i_y of
       EQ -> pure ()
       LT -> do
-        when (n_y < r.splitDepth) incrSuspCount
+        when (n_y < r.splitDepth) $ incr r.suspCount
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
         resumeProcesses $ subst f v_x v_y
       GT -> do
-        when (n_x < r.splitDepth) incrSuspCount
+        when (n_x < r.splitDepth) $ incr r.suspCount
         writeLink v_x v_y
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
         resumeProcesses $ subst f v_y v_x
@@ -393,9 +422,10 @@ subst' f v_x y = findRepr v_x <&> (, y) >>= \ case
     writeLink v_x v_y
     k_x y
     resumeProcesses $ subst f v_y v_x
-  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) ->
+  (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) -> do
+    r <- ask'
     case compare' n_x i_x n_y i_y of
-      EQ -> decrSuspCount
+      EQ -> decr r.suspCount
       LT -> do
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
@@ -405,7 +435,8 @@ subst' f v_x y = findRepr v_x <&> (, y) >>= \ case
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
         resumeProcesses $ subst f v_y v_x
   (Found v_x repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) -> do
-    decrSuspCount
+    r <- ask'
+    decr r.suspCount
     when (i_x /= i_y) $ f x y >>= \ case
       (SEQ, m) -> do
         writeRepr v_y repr_x
@@ -426,8 +457,8 @@ unifyEq = unify $ \ x y -> guard (x == y) $> (SEQ, pure ())
 
 decide :: (MonadFix m, MonadRef m, MonadSupply Int m) => VerseT m ()
 decide = do
-  r <- ask'
-  stateAbstractHeapRef' (findDecisions r) uncons >>= guard
+  Env {..} <- ask'
+  stateAbstractHRef' decisions uncons >>= guard
 
 compare' :: Int -> Int -> Int -> Int -> Ordering
 compare' n_x i_x n_y i_y = compare (n_x, i_x) (n_y, i_y)
@@ -450,17 +481,8 @@ writeRepr v x = do
 
 writeAbstractRepr :: MonadRef m => Var m f -> Repr m f -> VerseT m ()
 writeAbstractRepr v x = do
-  k <- getAbstractHeap
+  k <- asks' (.abstractHeap)
   lift . put' (unVar v) k $ Repr x
-
-getAbstractHeap :: VerseT m Heap
-getAbstractHeap = asks' findAbstractHeap
-
-findAbstractHeap :: Env m -> Heap
-findAbstractHeap r = case r.scope of
-  Join {..} -> findAbstractHeap tail
-  Split {..} -> findAbstractHeap tail
-  Verify {..} -> abstractHeap
 
 readRepr' :: MonadRef m => Var m f -> Heap -> m (Repr m f)
 readRepr' v h = readRef (unVar v) <&> lookupVarState h >>= \ case
@@ -493,64 +515,76 @@ resumeProcesses
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VerseT m () -> VerseT m ()
 resumeProcesses m = do
-  r <- ask'
-  (xs, n) <- lift $ flip resumeAll m =<< readRef r.processes
-  lift $ writeRef r.processes xs
+  processes <- asks' (.processes)
+  (xs, n) <- resumeAll processes m
+  putProcesses xs
   n
 
 resumeAll
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => [Process m] -> VerseT m ()
-  -> m ([Process m], VerseT m ())
-resumeAll xs m = fmap sequence_ <$> partitionMaybeM (flip resume m) xs
+  -> VerseT m ([Process m], VerseT m ())
+resumeAll xs m = fmap sequence_ . partitionEithers <$> traverse (flip resume m) xs
 
 resume
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => Process m -> VerseT m ()
-  -> m (Maybe (VerseT m ()))
-resume p@Process { env = env@Env {..}, .. } m = msplit_ m Env {..} >>= \ case
-  Fail -> resume' p m
-  Abort -> pure . Just $ writeIVar result Abort
-  Succeed (m_fail', m_empty') -> do
-    (m_fail, m_empty) <- readRef right
-    (0 ==) <$> readRef suspCount `andM` readHeapRef' left heap >>= \ case
-      Nothing -> do
-        writeRef right (m_fail' <|> fork m_fail *> m, m_empty' <|> fork m_empty *> m)
-        pure Nothing
-      Just x -> do
-        (m_commit, x) <- runFreshenT' ((,) <$> commitStore env <*> freshen x) heap
-        let m' = m_fail' <|> fork m_fail *> m
-        pure $ Just $ m_commit *> writeIVar result (Succeed (heap, x, m'))
+  -> VerseT m (Either (Process m) (VerseT m ()))
+resume process@Process {..} m = do
+  heap <- asks' (.heaps) <&> (! heap)
+  abstractHeap <- asks' $ if abstractHeap then (.heap) else (.abstractHeap)
+  heaps <- asks' (.heaps) <&> (`intersection'` heaps)
+  lift (msplit_ m Env { result = Nothing, .. }) >>= \ case
+    Fail -> resume' process m
+    Abort -> pure . Right $ writeIVar result Abort
+    Succeed (S {..}, rightFail', rightEmpty') -> do
+      lift ((0 ==) <$> readHRef' suspCount heap `andM` readHRef' left heap) >>= \ case
+        Just x -> lift $ do
+          (commit, x) <- runFreshenT ((,) <$> commitStore store <*> freshen x) heap
+          let m' = rightFail' <|> fork rightFail *> m
+          pure . Right $ commit *> writeIVar result (Succeed (heap, heaps, x, m'))
+        Nothing -> do
+          heaps <- modifyHeaps (heaps <>) $> IntMap.keysSet heaps
+          pure . Left $ process
+            { heaps
+            , store
+            , processes
+            , rightFail = rightFail' <|> fork rightFail *> m
+            , rightEmpty = rightEmpty' <|> fork rightEmpty *> m
+            }
 
 resume'
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => Process m -> VerseT m ()
-  -> m (Maybe (VerseT m ()))
-resume' Process { env = env@Env {..}, .. } m = do
-  (_, m_empty) <- readRef right
-  msplit_ (fork m_empty *> m) Env {..} >>= \ case
-    Fail -> pure . Just $ writeIVar result Fail
-    Abort -> pure . Just $ writeIVar result Abort
-    Succeed m@(m_fail, _) -> do
-      (0 ==) <$> readRef suspCount `andM` readHeapRef' left heap >>= \ case
+  -> VerseT m (Either (Process m) (VerseT m ()))
+resume' process@Process {..} m = do
+  heap <- asks' (.heaps) <&> (! heap)
+  abstractHeap <- asks' $ if abstractHeap then (.heap) else (.abstractHeap)
+  heaps <- asks' (.heaps) <&> (`intersection'` heaps)
+  lift (msplit_ (fork rightEmpty *> m) Env { result = Nothing, .. }) >>= \ case
+    Fail -> pure . Right $ writeIVar result Fail
+    Abort -> pure . Right $ writeIVar result Abort
+    Succeed (S {..}, rightFail, rightEmpty) -> do
+      lift ((0 ==) <$> readHRef' suspCount heap `andM` readHRef' left heap) >>= \ case
+        Just x -> lift $ do
+          (commit, x) <- runFreshenT ((,) <$> commitStore store <*> freshen x) heap
+          pure $ Right $ commit *> writeIVar result (Succeed (heap, heaps, x, rightFail))
         Nothing -> do
-          writeRef right m
-          pure Nothing
-        Just x -> do
-          (m_commit, x) <- runFreshenT' ((,) <$> commitStore env <*> freshen x) heap
-          pure $ Just $ m_commit *> writeIVar result (Succeed (heap, x, m_fail))
+          heaps <- modifyHeaps (heaps <>) $> IntMap.keysSet heaps
+          pure . Left $ process
+            { heaps
+            , store
+            , processes
+            , rightFail
+            , rightEmpty
+            }
 
 newVarRef
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => Var m a -> VerseT m (VarRef m a)
 newVarRef x = do
-  r <- ask'
   ref <- lift $ VarRef <$> supply <*> newRef (singleton x)
-  store <- lift $ readStore r
-  let store' = IntMap.insert ref.label (StoreElem ref) store
-  liftEmpty $
-    writeStore r store' $> \ r ->
-    writeStore r store
+  modifyStore' . IntMap.insert ref.label $ StoreElem ref
   pure ref
 
 readVarRef :: MonadRef m => VarRef m a -> VerseT m (Var m a)
@@ -570,53 +604,48 @@ writeVarRef ref x = do
   liftEmpty $
     put' (unVarRef ref) r.heap x $> \ r ->
     put' (unVarRef ref) r.heap y
-  store <- lift $ readStore r
-  let store' = IntMap.insert ref.label (StoreElem ref) store
-  liftEmpty $
-    writeStore r store' $> \ r ->
-    writeStore r store
+  modifyStore' . IntMap.insert ref.label $ StoreElem ref
 
 fork
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VerseT m () -> VerseT m ()
 fork m = liftSucceed (unVerseT m yield abort succeed fail fail) >>= reflect_
   where
-    yield = Yield $ \ addSusp sk fk ek r -> do
-      incr r.suspCount
+    yield = Yield $ \ addSusp sk fk ek r@Env {..} -> do
+      incr' suspCount heap
       removeSusp <- addSusp $ \ x -> do
-        decrSuspCount
-        liftSucceed (sk x fail fail) >>= reflect_
+        decr suspCount
+        whenJust result $ \ result ->
+          whenM (readHRef suspCount <&> (== 0)) $
+            writeIVar result ()
+        liftSucceed (toS >>> sk x fail fail) >>= reflect_
       let
-        f r = do
+        f r@R {..} = do
           removeSusp r
-          decr r.suspCount
+          decr' suspCount heap
       pure $ Succeed
-        ( liftSucceed (\ r -> f r *> fk r) >>= reflect_
-        , liftSucceed (\ r -> f r *> ek r) >>= reflect_
+        ( toS r
+        , liftSucceed (toR >>> \ r -> f r *> fk r) >>= reflect_
+        , liftSucceed (toR >>> \ r -> f r *> ek r) >>= reflect_
         )
-    succeed () fk ek _ = pure $ Succeed
-      ( liftSucceed fk >>= reflect_
-      , liftSucceed ek >>= reflect_
+    succeed () fk ek r = pure $ Succeed
+      ( r
+      , liftSucceed (toR >>> fk) >>= reflect_
+      , liftSucceed (toR >>> ek) >>= reflect_
       )
     fail _ = pure Fail
     abort = pure Abort
 
 join
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
-  => VerseT m a -> VerseT m (IVar m a)
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => VerseT m () -> VerseT m (IVar m ())
 join m = do
-  v <- freshIVar
-  fork $ do
-    ref <- newHeapRef Nothing
-    loop ref (m >>= writeHeapRef ref . Just) >>= writeIVar v
-  pure v
-  where
-    loop ref m = do
-      r <- ask'
-      split' r.heap r.splitDepth Join { tail = r } ref m >>= readIVar >>= \ case
-        Fail -> empty
-        Abort -> abort
-        Succeed (_, x, m) -> pure x <|> loop ref m
+  n <- newHRef 1
+  x <- freshIVar
+  local' (\ Env {..} -> Env { suspCount = n, result = Just x, .. }) m
+  decr n
+  whenM (readHRef n <&> (== 0)) $ writeIVar x ()
+  pure x
 
 one
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -624,12 +653,11 @@ one
 one m = do
   v <- freshIVar
   fork $ do
-    h <- newChildHeap
-    ref <- newHeapRef Nothing
-    split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    ref <- newHRef Nothing
+    split ref (m >>= writeHRef ref . Just) >>= readIVar >>= \ case
       Fail -> empty
       Abort -> abort
-      Succeed (_, x, _) -> writeIVar v x
+      Succeed (_, _, x, _) -> writeIVar v x
   pure v
 
 if'
@@ -638,12 +666,11 @@ if'
 if' p t e = do
   v <- freshIVar
   fork $ do
-    h <- newChildHeap
-    ref <- newHeapRef Nothing
-    split h ref (p >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    ref <- newHRef Nothing
+    split ref (p >>= writeHRef ref . Just) >>= readIVar >>= \ case
       Fail -> e >>= writeIVar v
       Abort -> abort
-      Succeed (_, x, _) -> t x >>= writeIVar v
+      Succeed (_, _, x, _) -> t x >>= writeIVar v
   pure v
 
 all
@@ -653,15 +680,25 @@ all
 all m = do
   v <- freshIVar
   fork $ do
-    h <- newChildHeap
-    ref <- newHeapRef Nothing
-    loop h ref (m >>= writeHeapRef ref . Just) [] >>= writeIVar v
+    heap <- newChildHeap
+    splitDepth <- asks' $ (+ 1) . (.splitDepth)
+    suspCount <- newHRef 0
+    ref <- newHRef Nothing
+    let
+      loop heap heaps m xs = do
+        abstractHeap <- asks' (.abstractHeap)
+        decisions <- asks' (.decisions)
+        split' Env {..} False ref m >>= readIVar >>= \ case
+          Fail -> pure $ reverse xs
+          Abort -> abort
+          Succeed (heap, heaps, x, m) -> loop heap heaps m $ x:xs
+    loop heap heaps (m >>= writeHRef ref . Just) [] >>= writeIVar v
   pure v
   where
-    loop h ref m xs = split h ref m >>= readIVar >>= \ case
-      Fail -> pure $ reverse xs
-      Abort -> abort
-      Succeed (h, x, m) -> loop h ref m $ x:xs
+    heaps = mempty
+    store = mempty
+    processes = mempty
+    result = Nothing
 
 for
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -669,21 +706,32 @@ for
 for m f = do
   v <- freshIVar
   fork $ do
-    h <- newChildHeap
-    ref <- newHeapRef Nothing
-    loop ref (m >>= writeHeapRef ref . Just) f [] h >>= writeIVar v
+    heap <- newChildHeap
+    splitDepth <- asks' $ (+ 1) . (.splitDepth)
+    suspCount <- newHRef 0
+    ref <- newHRef Nothing
+    let
+      loop heap heaps m xs = do
+        abstractHeap <- asks' (.abstractHeap)
+        decisions <- asks' (.decisions)
+        split' Env {..} False ref m >>= readIVar >>= \ case
+          Fail -> pure $ reverse xs
+          Abort -> abort
+          Succeed (heap, heaps, x, m) -> do
+            heap <- supply >>= \ i -> modifyHeaps (IntMap.insert i heap) $> i
+            heaps <- modifyHeaps (heaps <>) $> IntMap.keysSet heaps
+            xs <- f x <&> (:xs)
+            heap <- asks' (.heaps) <&> (! heap)
+            heaps <- asks' (.heaps) <&> (`intersection'` heaps)
+            duplicateStore heap
+            loop heap heaps m xs
+    loop heap heaps (m >>= writeHRef ref . Just) [] >>= writeIVar v
   pure v
   where
-    loop ref m f xs h = split h ref m >>= readIVar >>= \ case
-      Fail -> pure $ reverse xs
-      Abort -> abort
-      Succeed (h, x, m) -> do
-        i <- supply
-        liftSucceed $ \ r -> modifyRef' r.heaps $ IntMap.insert i h
-        xs <- f x <&> (:xs)
-        h <- liftSucceed $ \ r -> stateRef' r.heaps $ IntMap.Lazy.findDelete i
-        liftSucceed $ \ r -> duplicateStore r h
-        loop ref m f xs h
+    heaps = mempty
+    store = mempty
+    processes = mempty
+    result = Nothing
 
 verify
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -705,20 +753,24 @@ verifyAll
 verifyAll decisions m = do
   v <- freshIVar
   fork $ do
+    decisions <- newHRef decisions
     h <- newChildHeap
-    n <- asks' $ (+ 1) . splitDepth
-    ref <- newHeapRef Nothing
-    decisions <- newHeapRef decisions
-    loop h n decisions ref (m >> writeHeapRef ref (Just ())) >>= writeIVar v
+    ref <- newHRef Nothing
+    let
+      loop heap heaps m = do
+        abstractHeap <- asks' (.heap)
+        splitDepth <- asks' $ (+ 1) . (.splitDepth)
+        suspCount <- newHRef 0
+        split' Env {..} True ref m >>= readIVar >>= \ case
+          Fail -> readHRef decisions
+          Abort -> readHRef decisions
+          Succeed (heap, heaps, (), m) -> loop heap heaps m
+        where
+          store = mempty
+          processes = mempty
+          result = Nothing
+    loop h mempty (m >> writeHRef ref (Just ())) >>= writeIVar v
   pure v
-  where
-    loop h n decisions ref m = do
-      abstractHeap <- asks' heap
-      store <- lift $ newRef mempty
-      split' h n Verify {..} ref m >>= readIVar >>= \ case
-        Fail -> readHeapRef decisions
-        Abort -> readHeapRef decisions
-        Succeed (h, (), m) -> loop h n decisions ref m
 
 succeeds
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -726,16 +778,27 @@ succeeds
 succeeds m = do
   v <- freshIVar
   fork $ do
-    h <- newChildHeap
-    ref <- newHeapRef Nothing
-    split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    heap <- newChildHeap
+    abstractHeap <- asks' (.abstractHeap)
+    splitDepth <- asks' $ (+ 1) . (.splitDepth)
+    suspCount <- newHRef 0
+    decisions <- asks' (.decisions)
+    ref <- newHRef Nothing
+    split' Env {..} False ref (m >>= writeHRef ref . Just) >>= readIVar >>= \ case
       Fail -> writeIVar v Nothing
       Abort -> abort
-      Succeed (h, x, m) -> split h ref m >>= readIVar >>= \ case
-        Fail -> writeIVar v $ Just x
-        Abort -> abort
-        Succeed _ -> writeIVar v Nothing
+      Succeed (heap, heaps, x, m) -> do
+        abstractHeap <- asks' (.abstractHeap)
+        split' Env {..} False ref m >>= readIVar >>= \ case
+          Fail -> writeIVar v $ Just x
+          Abort -> abort
+          Succeed _ -> writeIVar v Nothing
   pure v
+  where
+    heaps = mempty
+    store = mempty
+    processes = mempty
+    result = Nothing
 
 fails
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -743,9 +806,8 @@ fails
 fails m = do
   v <- freshIVar
   fork $ do
-    h <- newChildHeap
-    ref <- newHeapRef Nothing
-    split h ref (m >> writeHeapRef ref (Just ())) >>= readIVar >>= \ case
+    ref <- newHRef Nothing
+    split ref (m >> writeHRef ref (Just ())) >>= readIVar >>= \ case
       Fail -> empty
       Abort -> abort
       Succeed _ -> writeIVar v ()
@@ -757,16 +819,27 @@ decides
 decides m = do
   v <- freshIVar
   fork $ do
-    h <- newChildHeap
-    ref <- newHeapRef Nothing
-    split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    heap <- newChildHeap
+    abstractHeap <- asks' (.abstractHeap)
+    splitDepth <- asks' $ (+ 1) . (.splitDepth)
+    suspCount <- newHRef 0
+    decisions <- asks' (.decisions)
+    ref <- newHRef Nothing
+    split' Env {..} False ref (m >>= writeHRef ref . Just) >>= readIVar >>= \ case
       Fail -> empty
       Abort -> abort
-      Succeed (h, x, m) -> split h ref m >>= readIVar >>= \ case
-        Fail -> writeIVar v $ Just x
-        Abort -> abort
-        Succeed _ -> writeIVar v Nothing
+      Succeed (heap, heaps, x, m) -> do
+        abstractHeap <- asks' (.abstractHeap)
+        split' Env {..} False ref m >>= readIVar >>= \ case
+          Fail -> writeIVar v $ Just x
+          Abort -> abort
+          Succeed _ -> writeIVar v Nothing
   pure v
+  where
+    heaps = mempty
+    store = mempty
+    processes = mempty
+    result = Nothing
 
 assume
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -775,12 +848,11 @@ assume
 assume m = do
   v <- freshIVar
   fork $ do
-    h <- newChildHeap
-    ref <- newHeapRef Nothing
-    split h ref (m >>= writeHeapRef ref . Just) >>= readIVar >>= \ case
+    ref <- newHRef Nothing
+    split ref (m >>= writeHRef ref . Just) >>= readIVar >>= \ case
       Fail -> abort
       Abort -> abort
-      Succeed (_, x, _) -> writeIVar v x
+      Succeed (_, _, x, _) -> writeIVar v x
   pure v
 
 abort :: VerseT m a
@@ -788,100 +860,44 @@ abort = VerseT $ \ _ ak _ _ _ _ -> ak
 
 split
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
-  => Heap
-  -> HeapRef m (Maybe a)
+  => HRef m (Maybe a)
   -> VerseT m ()
-  -> VerseT m (IVar m (Split (Heap, a, VerseT m ())))
-split heap left m = do
-  splitDepth <- asks' $ (+ 1) . splitDepth
-  store <- lift $ newRef mempty
-  tail <- ask'
-  split' heap splitDepth Split {..} left m
+  -> VerseT m (IVar m (Split (Heap, IntMap Heap, a, VerseT m ())))
+split left m = do
+  heap <- newChildHeap
+  abstractHeap <- asks' (.abstractHeap)
+  splitDepth <- asks' $ (+ 1) . (.splitDepth)
+  suspCount <- newHRef 0
+  decisions <- asks' (.decisions)
+  split' Env {..} False left m
+  where
+    heaps = mempty
+    store = mempty
+    processes = mempty
+    result = Nothing
 
 split'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
-  => Heap
-  -> Int
-  -> Scope m
-  -> HeapRef m (Maybe a)
+  => Env m
+  -> Bool
+  -> HRef m (Maybe a)
   -> VerseT m ()
-  -> VerseT m (IVar m (Split (Heap, a, VerseT m ())))
-split' heap splitDepth scope left m = do
-  processes <- lift $ newRef mempty
-  heaps <- lift $ newRef mempty
-  suspCount <- lift $ newRef 0
-  let env = Env {..}
-  lift (msplit_ m env) >>= \ case
+  -> VerseT m (IVar m (Split (Heap, IntMap Heap, a, VerseT m ())))
+split' r@Env { abstractHeap = _, ..} abstractHeap left m = do
+  lift (msplit_ m r) >>= \ case
     Fail -> newIVar Fail
     Abort -> newIVar Abort
-    Succeed m@(m_fail, _) ->
-      lift ((0 ==) <$> readRef suspCount `andM` readHeapRef' left heap) >>= \ case
+    Succeed (S { heaps, store, processes }, rightFail, rightEmpty) ->
+      lift ((0 ==) <$> readHRef' suspCount heap `andM` readHRef' left heap) >>= \ case
         Just x -> do
-          (m_commit, x) <- lift $ runFreshenT' ((,) <$> commitStore env <*> freshen x) heap
-          m_commit
-          newIVar $ Succeed (heap, x, m_fail)
+          (commit, x) <- lift $ runFreshenT ((,) <$> commitStore store <*> freshen x) heap
+          commit *> newIVar (Succeed (heap, heaps, x, rightFail))
         Nothing -> do
-          r <- ask'
+          heap <- supply >>= \ i -> modifyHeaps (IntMap.insert i heap) $> i
+          heaps <- modifyHeaps (heaps <>) $> IntMap.keysSet heaps
           result <- freshIVar
-          right <- lift $ newRef m
-          lift $ modifyRef' r.processes (Process {..}:)
+          modifyProcesses (Process {..}:)
           pure result
-
-commitStore
-  :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Env m -> FreshenT m (VerseT m ())
-commitStore r = case r.scope of
-  Join {..} -> commitStore tail
-  Split {..} -> do
-    h <- FreshenT ask
-    for' store $ \ (StoreElem ref) -> do
-      x <- freshen =<< lift (get' (unVarRef ref) h)
-      put' (unVarRef ref) h x
-      pure $ writeVarRef ref x
-  Verify {..} -> do
-    h <- FreshenT ask
-    for' store $ \ (StoreElem ref) -> do
-      x <- freshen =<< lift (get' (unVarRef ref) h)
-      put' (unVarRef ref) h x
-      pure $ pure ()
-  where
-    for' ref f = foldlM (\ z x -> (z *>) <$> f x) (pure ()) =<< readRef ref
-
-duplicateStore :: MonadRef m => Env m -> Heap -> m ()
-duplicateStore r h = case r.scope of
-  Join {..} -> duplicateStore tail h
-  Split {..} -> for_' store $ \ (StoreElem ref) ->
-    put' (unVarRef ref) h =<< get' (unVarRef ref) r.heap
-  Verify {..} -> for_' store $ \ (StoreElem ref) ->
-    put' (unVarRef ref) h =<< get' (unVarRef ref) r.heap
-  where
-    for_' ref f = readRef ref >>= traverse_ f
-
-freshenStore
-  :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Env m -> m ()
-freshenStore r = case r.scope of
-  Join {..} -> freshenStore tail
-  Split {..} -> for_' store $ \ (StoreElem ref) -> freshenRef ref
-  Verify {..} -> for_' store $ \ (StoreElem ref) -> freshenRef ref
-  where
-    for_' ref f = flip runFreshenT' r.heap . traverse_ f =<< readRef ref
-    freshenRef ref = do
-      h <- FreshenT ask
-      x <- freshen =<< lift (get' (unVarRef ref) h)
-      put' (unVarRef ref) h x
-
-readStore :: MonadRef m => Env m -> m (Store m)
-readStore r = case r.scope of
-  Join {..} -> readStore tail
-  Split {..} -> readRef store
-  Verify {..} -> readRef store
-
-writeStore :: MonadRef m => Env m -> Store m -> m ()
-writeStore r x = case r.scope of
-  Join {..} -> writeStore tail x
-  Split {..} -> writeRef store x
-  Verify {..} -> writeRef store x
 
 newtype FreezeT m a = FreezeT
   { unFreezeT :: RST Heap (IntMap GHC.Exts.Any) m a
@@ -958,8 +974,8 @@ newtype FreshenT m a = FreshenT
              , MonadFix
              )
 
-runFreshenT' :: Monad m => FreshenT m a -> Heap -> m a
-runFreshenT' m h = evalRST (unFreshenT m) h mempty
+runFreshenT :: Monad m => FreshenT m a -> Heap -> m a
+runFreshenT m h = evalRST (unFreshenT m) h mempty
 
 instance MonadTrans FreshenT where
   lift = FreshenT . lift
@@ -1015,148 +1031,127 @@ instance ( MonadFix m
 
 msplit_
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => VerseT m () -> Env m -> m (Split (VerseT m (), VerseT m ()))
+  => VerseT m () -> Env m -> m (Split (S m, VerseT m (), VerseT m ()))
 msplit_ m = unVerseT m yield abort succeed fail fail
   where
-    yield = Yield $ \ addSusp sk fk ek _ -> do
-      removeSusp <- addSusp (\ x -> liftSucceed (sk x fail fail) >>= reflect_)
+    yield = Yield $ \ addSusp sk fk ek r -> do
+      removeSusp <- addSusp $ \ x ->
+        liftSucceed (toS >>> sk x fail fail) >>= reflect_
       pure $ Succeed
-        ( liftSucceed (\ r -> removeSusp r *> fk r) >>= reflect_
-        , liftSucceed (\ r -> removeSusp r *> ek r) >>= reflect_
+        ( toS r
+        , liftSucceed (toR >>> \ r -> removeSusp r *> fk r) >>= reflect_
+        , liftSucceed (toR >>> \ r -> removeSusp r *> ek r) >>= reflect_
         )
-    succeed () fk ek _ = pure $ Succeed
-      ( liftSucceed fk >>= reflect_
-      , liftSucceed ek >>= reflect_
+    succeed () fk ek r = pure $ Succeed
+      ( r
+      , liftSucceed (toR >>> fk) >>= reflect_
+      , liftSucceed (toR >>> ek) >>= reflect_
       )
     fail _ = pure Fail
     abort = pure Abort
 
-findDecisions :: Env m -> HeapRef m Decisions
-findDecisions r = case r.scope of
-  Join {..} -> findDecisions tail
-  Split {..} -> findDecisions tail
-  Verify {..} -> decisions
-
-newtype HeapRef m a = HeapRef
-  { unHeapRef :: Ref m (HeapMap a)
+newtype HRef m a = HRef
+  { unHRef :: Ref m (HeapMap a)
   }
 
-newHeapRef :: MonadRef m => a -> VerseT m (HeapRef m a)
-newHeapRef = lift . newHeapRef'
+newHRef :: MonadRef m => a -> VerseT m (HRef m a)
+newHRef = lift . newHRef'
 
-newHeapRef' :: MonadRef m => a -> m (HeapRef m a)
-newHeapRef' = fmap HeapRef . newRef . singleton
+newHRef' :: MonadRef m => a -> m (HRef m a)
+newHRef' = fmap HRef . newRef . singleton
 
-readHeapRef :: MonadRef m => HeapRef m a -> VerseT m a
-readHeapRef ref = lift . readHeapRef' ref =<< asks' heap
+readHRef :: MonadRef m => HRef m a -> VerseT m a
+readHRef ref = lift . readHRef' ref =<< asks' (.heap)
 
-readHeapRef' :: MonadRef m => HeapRef m a -> Heap -> m a
-readHeapRef' ref = getLocal (unHeapRef ref)
+readHRef' :: MonadRef m => HRef m a -> Heap -> m a
+readHRef' ref = getLocal (unHRef ref)
 
-writeHeapRef :: MonadRef m => HeapRef m a -> a -> VerseT m ()
-writeHeapRef ref = liftAlt' . writeHeapRef' ref
+writeHRef :: MonadRef m => HRef m a -> a -> VerseT m ()
+writeHRef ref = liftAlt' . writeHRef' ref
   where
-    liftAlt' f = liftAlt . fmap (. heap) . f =<< asks' heap
+    liftAlt' f = liftAlt . fmap (. (.heap)) . f =<< asks' (.heap)
 
-writeHeapRef' :: MonadRef m => HeapRef m a -> a -> Heap -> m (Heap -> m ())
-writeHeapRef' ref x h =
-  readHeapRef' ref h >>= \ y ->
-  put' (unHeapRef ref) h x $> \ h ->
-  put' (unHeapRef ref) h y
+writeHRef' :: MonadRef m => HRef m a -> a -> Heap -> m (Heap -> m ())
+writeHRef' ref x h =
+  readHRef' ref h >>= \ y ->
+  put' (unHRef ref) h x $> \ h ->
+  put' (unHRef ref) h y
 
-stateAbstractHeapRef' :: MonadRef m => HeapRef m s -> (s -> (a, s)) -> VerseT m a
-stateAbstractHeapRef' ref f = getAbstractHeap >>= \ k -> lift $ do
-  (x, s) <- f <$> get' (unHeapRef ref) k
-  s `seq` put' (unHeapRef ref) k s
+modifyHRef' :: MonadRef m => HRef m a -> (a -> a) -> VerseT m ()
+modifyHRef' ref f = do
+  x <- f <$> readHRef ref
+  x `seq` writeHRef ref x
+
+stateAbstractHRef' :: MonadRef m => HRef m s -> (s -> (a, s)) -> VerseT m a
+stateAbstractHRef' ref f = asks' (.abstractHeap) >>= \ k -> lift $ do
+  (x, s) <- f <$> getLocal (unHRef ref) k
+  s `seq` put' (unHRef ref) k s
   pure x
 
-newChildHeap :: MonadSupply Int m => VerseT m Heap
-newChildHeap = do
-  label <- supply
-  tail <- ask' <&> (.heap)
-  pure $ Child { pred = Root, .. }
+incr :: (MonadRef m, Num a) => HRef m a -> VerseT m ()
+incr = flip modifyHRef' (+ 1)
 
-incrSuspCount :: MonadRef m => VerseT m ()
-incrSuspCount = do
-  r <- ask'
-  liftAlt $
-    incr r.suspCount $> \ r ->
-    decr r.suspCount
+incr' :: (MonadRef m, Num a) => HRef m a -> Heap -> m ()
+incr' ref k = do
+  x <- getLocal (unHRef ref) k
+  put' (unHRef ref) k $! x + 1
 
-decrSuspCount :: MonadRef m => VerseT m ()
-decrSuspCount = do
-  r <- ask'
-  liftAlt $
-    decr r.suspCount $> \ r ->
-    incr r.suspCount
+decr :: (MonadRef m, Num a) => HRef m a -> VerseT m ()
+decr = flip modifyHRef' $ subtract 1
 
-ask' :: VerseT m (Env m)
-ask' = VerseT $ \ _ _ sk fk ek r -> sk r fk ek r
+decr' :: (MonadRef m, Num a) => HRef m a -> Heap -> m ()
+decr' ref k = do
+  x <- getLocal (unHRef ref) k
+  put' (unHRef ref) k $! x - 1
 
-asks' :: (Env m -> a) -> VerseT m a
-asks' f = VerseT $ \ _ _ sk fk ek r -> sk (f r) fk ek r
-
-liftSucceed :: Monad m => (Env m -> m a) -> VerseT m a
-liftSucceed f = VerseT $ \ _ _ sk fk ek r -> f r >>= \ x -> sk x fk ek r
-
-liftAlt :: Monad m => m (Env m -> m ()) -> VerseT m ()
-liftAlt m = VerseT $ \ _ _ sk fk ek r ->
-  m >>= \ f -> sk () (\ r -> f r *> fk r) (\ r -> f r *> ek r) r
-
-liftEmpty :: Monad m => m (Env m -> m ()) -> VerseT m ()
-liftEmpty m = VerseT $ \ _ _ sk fk ek r ->
-  m >>= \ f -> sk () fk (\ r -> f r *> ek r) r
-
-alts
+freshenStore
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => VerseT m a -> VerseT m a -> VerseT m a -> VerseT m a
-alts x y z = VerseT $ \ yk ak sk fk ek r -> do
-  processes <- readRef r.processes
-  heaps <- readRef r.heaps
-  flip runCopyT r $ do
-    writeRef r.processes =<< copyProcesses processes
-    writeRef r.heaps =<< copyHeaps heaps
-  let
-    f r = do
-      writeRef r.processes processes
-      writeRef r.heaps heaps
-    fk' r = f r *> unVerseT y yk ak sk fk fk r
-    ek' r = f r *> unVerseT z yk ak sk fk ek r
-  unVerseT x yk ak sk fk' ek' r
+  => Store m
+  -> Heap
+  -> m ()
+freshenStore = runFreshenT . traverse_ freshenStoreElem
 
-type CopyT m = RST (Env m) (IntMap Heap) m
-
-runCopyT :: Functor m => CopyT m a -> Env m -> m a
-runCopyT m r = evalRST m r $ case r.heap of
-  Root -> mempty
-  h@Child {..} -> IntMap.singleton label h
-
-copyProcesses
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, Traversable f)
-  => f (Process m)
-  -> CopyT m (f (Process m))
-copyProcesses = traverse copyProcess
-
-copyProcess
+freshenStoreElem
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Process m
-  -> CopyT m (Process m)
-copyProcess Process {..} = do
-  env <- copyEnv env
-  right <- newRef =<< readRef right
-  pure Process {..}
+  => StoreElem m
+  -> FreshenT m ()
+freshenStoreElem (StoreElem ref) = do
+  h <- FreshenT ask
+  x <- freshen =<< lift (readVarRef' ref h)
+  lift $ put' (unVarRef ref) h x
 
-copyEnv
+commitStore
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Env m
-  -> CopyT m (Env m)
-copyEnv Env {..} = mfix $ \ env -> do
-  heap <- copyHeap heap
-  processes <- newRef =<< local (const env) . copyProcesses =<< readRef processes
-  heaps <- newRef =<< copyHeaps =<< readRef heaps
-  suspCount <- newRef =<< readRef suspCount
-  scope <- copyScope scope
-  pure $ Env {..}
+  => Store m
+  -> FreshenT m (VerseT m ())
+commitStore store = foldlM f (pure ()) store
+  where
+    f z x = (z *>) <$> commitStoreElem x
+
+commitStoreElem
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
+  => StoreElem m
+  -> FreshenT m (VerseT m ())
+commitStoreElem (StoreElem ref) = do
+  h <- FreshenT ask
+  x <- freshen =<< lift (get' (unVarRef ref) h)
+  lift $ put' (unVarRef ref) h x
+  pure $ writeVarRef ref x
+
+duplicateStore :: MonadRef m => Heap -> VerseT m ()
+duplicateStore h = traverse_ f =<< asks' (.store)
+  where
+    f (StoreElem ref) = lift . put' (unVarRef ref) h =<< readVarRef ref
+
+copy
+  :: (MonadFix m, MonadSupply Int m, Traversable f)
+  => f Heap -> Heap -> m (f Heap)
+copy = runCopyT . copyHeaps
+
+type CopyT m = RST Heap (IntMap Heap) m
+
+runCopyT :: Monad m => CopyT m a -> Heap -> m a
+runCopyT m h = evalRST m h mempty
 
 copyHeaps
   :: (MonadFix m, MonadSupply Int m, Traversable f)
@@ -1168,29 +1163,96 @@ copyHeap
   => Heap -> CopyT m Heap
 copyHeap = \ case
   Root -> pure Root
-  pred@Child { label, tail } ->
+  h@Child {..} ->
     mfix $ state' . IntMap.Lazy.lookupInsert label >=> \ case
       Just h -> pure h
       Nothing -> do
         label <- supply
-        tail <- copyHeap tail
-        pure $ Child { label, tail, pred }
+        ask <&> eqHeap tail >>= \ case
+          True -> pure $ Child { label, tail, right = h, pred = h }
+          False -> do
+            tail <- copyHeap tail
+            right <- copyHeap right
+            pure $ Child { label, tail, right, pred = h }
 
-copyScope
+revert :: Traversable f => f Heap -> Heap -> f Heap
+revert = runRevert . revertHeaps
+
+type Revert = Reader Heap
+
+runRevert :: Revert a -> Heap -> a
+runRevert = runReader
+
+revertHeaps :: Traversable f => f Heap -> Revert (f Heap)
+revertHeaps = traverse revertHeap
+
+revertHeap :: Heap -> Revert Heap
+revertHeap = \ case
+  Root -> pure Root
+  Child {..} -> ask <&> eqHeap tail >>= \ case
+    True -> pure right
+    False -> pure pred
+
+newChildHeap :: MonadSupply Int m => VerseT m Heap
+newChildHeap = do
+  label <- supply
+  tail <- ask' <&> (.heap)
+  pure $ Child { right = Root, pred = Root, .. }
+
+reflect_
+  :: (Applicative m, MonadFix m, MonadRef m, MonadSupply Int m)
+  => Split (S m, VerseT m (), VerseT m ())
+  -> VerseT m ()
+reflect_ = \ case
+  Fail -> empty
+  Abort -> abort
+  Succeed (r, m, n) -> alts r m n
+
+liftSucceed :: Monad m => (Env m -> m a) -> VerseT m a
+liftSucceed f = VerseT $ \ _ _ sk fk ek r@Env {..} -> f r >>= \ x -> sk x fk ek S {..}
+
+liftAlt :: Monad m => m (Env m -> m ()) -> VerseT m ()
+liftAlt m = VerseT $ \ _ _ sk fk ek Env {..} ->
+  m >>= \ f ->
+  sk () (\ r@R {..} -> f Env {..} *> fk r) (\ r@R {..} -> f Env {..} *> ek r) S {..}
+
+liftEmpty :: Monad m => m (R -> m ()) -> VerseT m ()
+liftEmpty m = VerseT $ \ _ _ sk fk ek Env {..} ->
+  m >>= \ f -> sk () fk (\ r -> f r *> ek r) S {..}
+
+alts
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Scope m
-  -> CopyT m (Scope m)
-copyScope = \ case
-  Join {} -> do
-    tail <- ask
-    pure $ Join {..}
-  Split {..} -> do
-    store <- newRef =<< readRef store
-    tail <- ask
-    pure $ Split {..}
-  Verify {..} -> do
-    store <- newRef =<< readRef store
-    pure $ Verify {..}
+  => S m -> VerseT m () -> VerseT m () -> VerseT m ()
+alts r x y = VerseT $ \ yk ak sk fk ek Env {..} -> do
+  let
+    fk' R {..} = unVerseT x yk ak sk fk fk Env {..}
+    ek' R {..} = unVerseT y yk ak sk fk ek Env {..}
+  sk () fk' ek' r
+
+modifyHeaps :: (IntMap Heap -> IntMap Heap) -> VerseT m ()
+modifyHeaps f = VerseT $ \ _ _ sk fk ek Env {..} ->
+  sk () fk ek S { heaps = f heaps, .. }
+
+modifyStore' :: (Store m -> Store m) -> VerseT m ()
+modifyStore' f = VerseT $ \ _ _ sk fk ek Env {..} ->
+  sk () fk ek S { store = f store, .. }
+
+putProcesses :: Processes m -> VerseT m ()
+putProcesses xs = VerseT $ \ _ _ sk fk ek Env {..} ->
+  sk () fk ek S { processes = xs, .. }
+
+modifyProcesses :: (Processes m -> Processes m) -> VerseT m ()
+modifyProcesses f = VerseT $ \ _ _ sk fk ek Env {..} ->
+  sk () fk ek S { processes = f processes, .. }
+
+ask' :: VerseT m (Env m)
+ask' = VerseT $ \ _ _ sk fk ek r@Env {..} -> sk r fk ek S {..}
+
+asks' :: (Env m -> a) -> VerseT m a
+asks' f = VerseT $ \ _ _ sk fk ek r@Env {..} -> sk (f r) fk ek S {..}
+
+local' :: (Env m -> Env m) -> VerseT m a -> VerseT m a
+local' f m = VerseT $ \ yk ak sk fk ek -> unVerseT m yk ak sk fk ek . f
 
 lookupIVarState :: Heap -> HeapMap (IVarState m a) -> IVarState m a
 lookupIVarState k xs@HeapMap {..} = case k of
@@ -1251,33 +1313,9 @@ insert k v HeapMap {..} = case k of
   Root -> HeapMap { root = v, .. }
   Child {..} -> HeapMap { child = IntMap.insert label v child, .. }
 
-reflect_
-  :: (Applicative m, MonadFix m, MonadRef m, MonadSupply Int m)
-  => Split (VerseT m (), VerseT m ())
-  -> VerseT m ()
-reflect_ = \ case
-  Fail -> empty
-  Abort -> abort
-  Succeed (m, n) -> alts (pure ()) m n
-
-incr :: (MonadRef m, Num a) => Ref m a -> m ()
-incr = flip modifyRef' (+ 1)
-
-decr :: (MonadRef m, Num a) => Ref m a -> m ()
-decr = flip modifyRef' $ subtract 1
-
 or :: Maybe a -> a -> a
 or = flip fromMaybe
 infixr 3 `or`
-
-partitionMaybeM :: Monad m => (a -> m (Maybe b)) -> [a] -> m ([a], [b])
-partitionMaybeM f = loop f [] []
-  where
-    loop f xs ys = \ case
-      [] -> pure (xs, ys)
-      z:zs -> f z >>= \ case
-        Nothing -> loop f (z:xs) ys zs
-        Just z -> loop f xs (z:ys) zs
 
 andM :: Monad m => m Bool -> m (Maybe a) -> m (Maybe a)
 m `andM` n = m >>= \ case
@@ -1285,10 +1323,21 @@ m `andM` n = m >>= \ case
   True -> n
 infixr 3 `andM`
 
+whenM :: Monad m => m Bool -> m () -> m ()
+whenM m n = m >>= \ case
+  True -> n
+  False -> pure ()
+
+whenJust :: Applicative m => Maybe a -> (a -> m ()) -> m ()
+whenJust x f = maybe (pure ()) f x
+
 state' :: MonadState s m => (s -> Either a s) -> m (Maybe a)
 state' f = state $ \ s -> case f s of
   Left x -> (Just x, s)
   Right s -> (Nothing, s)
+
+intersection' :: IntMap a -> IntSet -> IntMap a
+intersection' x = IntMap.intersection x . IntMap.fromSet (const ())
 
 data Split a = Fail | Abort | Succeed a
 

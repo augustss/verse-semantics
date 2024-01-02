@@ -32,6 +32,7 @@ import Language.Verse.Desugar.Exp
   , bracketInvoke
   , name
   , then'
+  , seq'
   )
 import Language.Verse.Effect.Split qualified as Split (Effect)
 import Language.Verse.Effect.Split qualified as Effect
@@ -379,7 +380,7 @@ assumePosLam e1 eff e2 e3 pi f = do
   a <- freshIdent' $ loc e1
   Lam (extract a) <$> exists case e2 of
     Just e2 ->
-      desugarExp' e1 True (name a) `thenM`
+      desugarExp' e1 True (name a) `seqM`
       negM (abstractD eff e2)
     Nothing -> do
       b <- name <$> freshIdent (loc e1)
@@ -408,7 +409,7 @@ assumeNegLam e1 eff e2 e3 = do
   i <- freshIdent' $ loc e1
   Lam (extract i) <$> exists case e2 of
     Just e2 ->
-      posM (desugarExp' e1 True $ name i) `thenM`
+      posM (desugarExp' e1 True $ name i) `seqM`
       abstractD eff e2
     Nothing ->
       posM (desugarExp' e1 True $ name i) `thenM`
@@ -530,7 +531,7 @@ verifyPosLam' loc' e1 eff e2 e3 pi f = do
   a <- freshIdent' $ loc e1
   functionM loc' pi f . verifyM $ forall' a <$> do
     b <- name <$> freshIdent (loc e1)
-    unify b <$> negM (desugarExp' e1 True $ name a) `thenM` checkM eff do
+    unify b <$> negM (desugarExp' e1 True $ name a) `seqM` checkM eff do
       c <- name <$> freshIdent (loc e3)
       case e2 of
         Just e2 -> unify c <$> invokeM b pi f `thenM` checkOfTypeD e3 e2 pi c
@@ -545,7 +546,7 @@ desugarOfType
   -> DesugarT m (Exp L Ident)
 desugarOfType e1 e2 pi x = ask >>= \ case
   Exec -> execOfType e1 e2 pi x
-  Neg -> negOfType e2
+  Neg -> negOfType e1 e2 pi x
   Pos -> posOfType e1 e2 pi x
 
 execOfType
@@ -559,17 +560,24 @@ execOfType e1 e2 pi x = do
   y <- name <$> freshIdent (loc e1)
   e1 <- desugarExp' e1 pi x
   e2 <- desugarExp e2
-  pure $ unify y e1 :*>: bracketInvoke e2 y
+  pure $ unify y e1 :>>: bracketInvoke e2 y
 
 negOfType
   :: (MonadAbort Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
+  -> L (Rewrite.Exp L Ident)
+  -> Bool
+  -> L (Exp L Ident)
   -> DesugarT m (Exp L Ident)
-negOfType e2 = do
+negOfType e1 e2 pi x = do
+  e1 <- desugarExp' e1 pi x
   z <- name <$> freshIdent (loc e2)
   e2 <- unify z <$> desugarExp e2
   r <- freshIdent' $ loc e2
-  pure $ e2 :*>: forall' r (assume Effect.Succeeds $ bracketInvoke z (name r))
+  pure $
+    e1 :*>:
+    (e2 `seq'`
+     forall' r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 posOfType
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -586,9 +594,9 @@ posOfType e1 e2 pi x = do
   r <- freshIdent' $ loc e2
   pure $
     e1 `then'`
-    e2 `then'`
-    check Effect.Succeeds (bracketInvoke z y) :*>:
-    forall' r (assume Effect.Succeeds $ bracketInvoke z (name r))
+    e2 :*>:
+    (check Effect.Succeeds (bracketInvoke z y) `seq'`
+     forall' r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 checkOfTypeD
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -757,6 +765,14 @@ thenM'
   -> m (Exp f a)
 thenM' = liftA2 (:*>:)
 infixl 1 `thenM'`
+
+seqM
+  :: (Applicative m, Apply f)
+  => m (f (Exp f a))
+  -> m (f (Exp f a))
+  -> m (f (Exp f a))
+seqM = liftA2 seq'
+infixl 1 `seqM`
 
 freshIdent :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
 freshIdent loc = do

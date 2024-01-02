@@ -16,6 +16,7 @@ module Language.Verse.Desugar.Exp
   , olam
   , name
   , then'
+  , seq'
   ) where
 
 import Data.ByteString.Internal (w2c)
@@ -37,7 +38,7 @@ import Prettyprinter
 
 data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
-  -- | f (Exp f a) :>>: f (Exp f a)
+  | f (Exp f a) :>>: f (Exp f a)
   | f (Exp f a) :=: f (Exp f a)
   | f (Exp f a) :.: {-# UNPACK #-} !Name
   | f (Exp f a) :|: f (Exp f a)
@@ -76,6 +77,7 @@ data Exp f a
   | TopLevel !(Env a) (f (Exp f a)) -- Used to define the top level for paths
 
 infixl 1 :*>:
+infixl 1 :>>:
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f Name)
@@ -95,13 +97,18 @@ instance ( Pretty (f (Exp f a))
          , Pretty a
          ) => Pretty (Exp f a) where
   pretty = \ case
+    e1 :*>: e2 ->
+      align $
+      pretty e1 <> ssemi <>
+      pretty e2
+    e1 :>>: e2 ->
+      parens $
+      align $
+      pretty e1 <> dsemi <>
+      pretty e2
     e1 :=: e2 -> parens $ pretty e1 <+> equals <+> pretty e2
     e :.: x -> pretty e <> dot <> pretty x
     e1 :|: e2 -> parens $ pretty e1 <+> pipe <+> pretty e2
-    e1 :*>: e2 ->
-      align $
-      pretty e1 <> separator <>
-      pretty e2
     Fail -> "fail"
     One e -> "one" <+> braces (pretty e)
     All e -> "all" <+> braces (pretty e)
@@ -114,14 +121,16 @@ instance ( Pretty (f (Exp f a))
       maybe mempty (parens . pretty) e1 <+>
       braces (bindings xs $ pretty e2)
     Inst e1 xs e2 -> parens (pretty e1) <+> braces (bindings xs $ pretty e2)
-    Module i xs e -> "module" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
-    Struct i xs e -> "struct" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
+    Module i xs e ->
+      "module" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
+    Struct i xs e ->
+      "struct" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     ForDo xs e1 e2 ->
       "for" <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
     Def t x e ->
       align $
-      prettyBinding t x <> separator <>
+      prettyBinding t x <> ssemi <>
       pretty e
     Alloc x e1 e2 ->
       "alloc" <> parens (pretty x) <+> pretty e1 <> parens (pretty e2)
@@ -130,7 +139,7 @@ instance ( Pretty (f (Exp f a))
     Truth e -> "truth" <+> braces (pretty e)
     Int x -> pretty x
     Float x -> pretty x
-    Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape
+    Char x -> "'" <> pretty (w2c x) <> "'" -- FIXME add escape
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Lam x e2 ->
       backslash <+> pretty x <+> braces (pretty e2)
@@ -150,8 +159,8 @@ instance ( Pretty (f (Exp f a))
       pretty e
     _ -> "unimplemented"
     where
-      separated = concatWith (\x y -> x <> separator <> y)
-      separator = flatAlt hardline (semi <> space)
+      ssemi = flatAlt hardline (semi <> space)
+      dsemi = flatAlt (semi <> semi <> hardline) (semi <> semi <> space)
       tupled =
         group .
         encloseSep
@@ -162,8 +171,10 @@ instance ( Pretty (f (Exp f a))
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
       bindings xs y = align $
-        separated (uncurry (flip prettyBinding) <$> HashMap.toList xs) <> separator <>
+        concatWith' ssemi (uncurry (flip prettyBinding) <$> HashMap.toList xs) <>
+        ssemi <>
         y
+      concatWith' x = concatWith $ \ y z -> y <> x <> z
       prettyBinding t x = case t of
         Exists -> "exists" <+> pretty x
         Forall -> "forall" <+> pretty x
@@ -207,3 +218,7 @@ name = fmap Name
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)
 infixl 1 `then'`
+
+seq' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+seq' = liftL2 (:>>:)
+infixl 1 `seq'`

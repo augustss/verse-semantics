@@ -42,7 +42,6 @@ main = runTestTTAndExit $ TestList
   , test13
   , test14
   , test15
-  , test16
   ]
 
 pattern Known :: f (Fix (Compose Maybe f)) -> Fix (Compose Maybe f)
@@ -291,17 +290,11 @@ test14 = TestCase do
 test15 :: Test
 test15 = TestCase do
   z <- runSupplyT $ runVerseT do
-    x <- coerce <$> freshVar
-    y <- join $ do
-      unifyVal x . coerce =<< newVar . Int =<< pure 1 <|> pure 2
-      readVar $ coerce x
-    freeze' =<< readIVar y
-  z @?= Just [Int 1, Int 2]
-
-test16 :: Test
-test16 = TestCase do
-  z <- runSupplyT $ runVerseT do
-    (x :: VarVal m) <- coerce <$> freshVar
-    y <- join . readVar $ coerce x
-    freeze' =<< readIVar y
-  z @?= Nothing
+    void $ all do
+      x <- coerce <$> freshVar
+      void $ all do
+        void $ all do
+          unifyVal x . coerce =<< newVar . Int =<< pure 2
+        unifyVal x . coerce =<< newVar . Int =<< pure 2 <|> pure 2
+      unifyVal x . coerce =<< newVar . Int =<< pure 2 <|> pure 2
+  z @?= Just [()]

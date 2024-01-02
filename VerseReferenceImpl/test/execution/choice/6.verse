@@ -11,7 +11,7 @@ FreshSubTuples(Xs:Any) :=
 Append(Xs:Any, Ys:Any) :=
   Xs = FreshSubTuples[Result]
   Ys = FreshSubTuples[Result]
-  Result:any = all{(:Xs) | (:Ys)}
+  Result:Any = all{(:Xs) | (:Ys)}
 
 Append[As:Any, Bs:Any] = (1, 2, 3, 4)
 
