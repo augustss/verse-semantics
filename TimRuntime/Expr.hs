@@ -44,7 +44,7 @@ sequence-refine-fx
 * tuple-expand
 * tuple-elim-succeed
 * tuple-elim-fail
-tuple-elim-choose
+* tuple-elim-choose
 lambda-intro
 lambda-elim
 choice-intro
@@ -365,8 +365,13 @@ empty |- topfx{program a . exists y; y=3}
 
 -}
 
-gadd :: [Assumption] -> S.Set Assumption -> S.Set Assumption
-gadd asms g = foldr S.insert g asms
+gadd :: [Assumption] -> S.Set Assumption -> [S.Set Assumption]
+gadd asms g =
+  let asms' = filter (not . (`S.member` g)) asms
+  in  if null asms' then
+        []
+      else
+        [foldr S.insert g asms']
 
 afx :: EffectSpecifier -> Op -> Assumption
 afx fx = AFX (S.singleton fx)
@@ -429,20 +434,20 @@ atomIntro _ lhs =
     (_g', AFlex x d) <- assumeContext g
     (_, d', eq@(OEqHead x' h@HAtom{})) <- decisionContext e
     guard (d == d' && x == x')
-    guard (not (AUnifyHead x h `S.member` g))
-    pure $ gadd [AUnifyHead x h, afx Satisfies eq] g :- p
+    g' <- gadd [AUnifyHead x h, afx Satisfies eq] g
+    pure $ g' :- p
 
 tupleIntro :: Rule Config
 tupleIntro _ lhs =
   "tuple-intro" `name`
   do
     (g :- p@(Fx _ e)) <- [lhs]
-    (g', AFlex x d) <- assumeContext g
-    (_g'', AFlex i d') <- assumeContext g'
+    (g1, AFlex x d) <- assumeContext g
+    (_g2, AFlex i d') <- assumeContext g1
     (_, d'', eq@(OEqHead x' h@(HTuple i' _))) <- decisionContext e
     guard (d == d' && d == d'' && x == x' && i == i')
-    guard (not (AUnifyHead x h `S.member` g))
-    pure $ gadd [AUnifyHead x h, afx Satisfies eq] g :- p
+    g' <- gadd [AUnifyHead x h, afx Satisfies eq] g
+    pure $ g' :- p
 
 tuple :: Rule Config
 tuple _ lhs =
@@ -464,8 +469,8 @@ tuple _ lhs =
     (_g'', AUnifyHead i' (HAtom (ANumber (Number n)))) <- assumeContext g
     guard (x == x' && i == i' && n > 0)
     let ts = [ AUnifyVar dummy $ VTuple t (Number k) | k <- [0..n-1] ]
-    guard (head ts `notElem` g)
-    pure $ gadd ts g :- p
+    g' <- gadd ts g
+    pure $ g' :- p
  ++
   "tuple-unify-element" `name`
   do
@@ -486,9 +491,8 @@ tuple _ lhs =
     (_, _, (OEq tu@(VTuple u _) _)) <- decisionContext e
     (_, AFlex (VarT u') d) <- assumeContext g
     guard (u == u')
-    let fl = AFlex tu d
-    guard (not (fl `S.member` g))
-    pure $ gadd [fl] g :- p
+    g' <- gadd [AFlex tu d] g
+    pure $ g' :- p
  ++
   "tuple-elim" `name`  -- -succeed and -fail
   do
@@ -520,10 +524,15 @@ tuple _ lhs =
     (g4,  AUnifyHead y'  (HTuple j' (VarT t))) <- assumeContext g3
     guard (x == x' && y == y' && d == d' && d == d'' && i == i' && j == j')
     guard $ null $ [ () | AUnifyHead i'' (Num _) <- S.toList g4, i == i'' ]  -- make sure i doesn't have a value
-    let ops = [ op | k <- [0 .. n-1], op <- [ OEqVar x (VTuple t (Number k)), OEqHead i (Num k) ], op `notElem` aops ]
-        aops = allOps e
-    guard (not (null ops))
-    pure $ g :- Fx fx (ctx d (foldr (+>) eq ops))
+    let ops = [ OEqVar x (VTuple t (Number k)) +> OEqHead i (Num k) | k <- [0 .. n-1] ]
+        cop = choices x ops
+    guard (cop `notElem` allOps e)
+    pure $ g :- Fx fx (ctx d (eq +> cop))
+
+choices :: Var -> [Op] -> Op
+choices x [] = OEqFail x
+choices _ [op] = op
+choices _ ops = foldr1 OChoice ops
 
 unifyHead :: Rule Config
 unifyHead _ lhs =
@@ -534,8 +543,8 @@ unifyHead _ lhs =
     (_g'', AUnifyHead y h) <- assumeContext g
     (_, d', eq@(OEqVar x' y')) <- decisionContext e
     guard (d == d' && x == x' && y == y')
-    guard (not (AUnifyHead x h `S.member` g))
-    pure $ gadd [AUnifyHead x h, afx Satisfies eq] g :- p
+    g' <- gadd [AUnifyHead x h, afx Satisfies eq] g
+    pure $ g' :- p
  ++
   "unify-head-right" `name`
   do
@@ -544,20 +553,19 @@ unifyHead _ lhs =
     (_g'', AUnifyHead x h) <- assumeContext g
     (_, d', OEqVar x' y') <- decisionContext e
     guard (d == d' && x == x' && y == y')
-    guard (not (AUnifyHead y h `S.member` g))
-    pure $ gadd [AUnifyHead y h, afx Satisfies $ OEqVar y x] g :- p
+    g' <- gadd [AUnifyHead y h, afx Satisfies $ OEqVar y x] g
+    pure $ g' :- p
  ++
   "unify-disjoint" `name`
   do
     (g :- p@(Fx _ e)) <- [lhs]
-    (g', AUnifyHead x h1) <- assumeContext g
-    (_g'', AUnifyHead x' h2) <- assumeContext g'
+    (g1, AUnifyHead x h1) <- assumeContext g
+    (_g2, AUnifyHead x' h2) <- assumeContext g1
     (_, _, eq@(OEq x'' _)) <- decisionContext e
     guard (x == x' && x == x'')
     guard (disjointHead h1 h2)
-    let a = afx Fails eq
-    guard (not (a `S.member` g))
-    pure $ gadd [a] g :- p
+    g' <- gadd [afx Fails eq] g
+    pure $ g' :- p
 
 disjointHead :: Head -> Head -> Bool
 disjointHead (HAtom a1) (HAtom a2) = a1 /= a2
@@ -611,3 +619,11 @@ test4 = startConfig $
   x =# Num 1 +>
   x =# Num 2
   where x = VarI "x"
+
+test5 :: Config
+test5 = startConfig $
+  OExists [y,t,x,i] +>
+  tup y "t" [OEHead $ Num 1, OEHead $ Num 10] +>
+  OEqApply x y i
+  where x = VarI "x"; y = VarI "y"; i = VarI "i"; t = VarTI "t"
+  
