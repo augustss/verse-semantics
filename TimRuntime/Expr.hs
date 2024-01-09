@@ -21,6 +21,8 @@ import Debug.Trace
 --     by test for existing assumption
 --   * tuple-expand has no j
 --   * tuple-expand adds unknown assumptions
+--   * tuple-elim-choose needs to restrict i as well
+--     could also demand that i<-n is not an assumption
 -- 
 
 {-
@@ -40,9 +42,9 @@ sequence-refine-fx
 * tuple-unify-length
 * tuple-unify-element
 * tuple-expand
-tuple-elim-succeed
-tuple-elim-fail
-tuple-elim-choose
+* tuple-elim-succeed
+* tuple-elim-fail
+* tuple-elim-choose
 lambda-intro
 lambda-elim
 choice-intro
@@ -66,6 +68,14 @@ interact-elim
 ------------------------------
 
 type Ident = String
+newtype VarIdent = VarIdent Ident
+  deriving (Show, Eq, Ord)
+newtype TupleIdent = TupleIdent Ident
+  deriving (Show, Eq, Ord)
+newtype DecisionIdent = DecisionIdent Ident
+  deriving (Show, Eq, Ord)
+newtype PointerIdent = PointerIdent Ident
+  deriving (Show, Eq, Ord)
 
 newtype Number = Number Integer         -- n ::== 0 | 1 | ..
   deriving (Show, Eq, Ord)
@@ -76,17 +86,15 @@ data Atom                               -- a ::== n | () | Path | ..
   | APath String
   deriving (Show, Eq, Ord)
 
-type TupleIdent = Ident                 -- ::= t | u
-
 data Var                                -- ::== i | j | k | f | g | h | w | x | y | z | t[n]
-  = Var Ident
+  = Var VarIdent
   | VarT TupleIdent
   | VTuple TupleIdent Number
   deriving (Show, Eq, Ord)
 
-type DecisionVar = Var                  -- ::= d | e
+type DecisionVar = DecisionIdent        -- ::= d | e
 
-type PointerVar = Var                   -- ::= p | q
+type PointerVar = PointerIdent          -- ::= p | q
 
 data EffectSpecifier                    -- fx ::=
   = Succeeds | Fails | Satisfies | Abstracts
@@ -172,6 +180,18 @@ data Config = AssumptionSet :- Fx Program | Done
 
 --------------------------------------------------------
 
+ppIdent :: PrettyLevel -> Rational -> Ident -> Doc
+ppIdent _ _ i = text i
+
+instance Pretty VarIdent where
+  pPrintPrec l p (VarIdent i) = ppIdent l p i
+instance Pretty TupleIdent where
+  pPrintPrec l p (TupleIdent i) = ppIdent l p i
+instance Pretty DecisionIdent where
+  pPrintPrec l p (DecisionIdent i) = ppIdent l p i
+instance Pretty PointerIdent where
+  pPrintPrec l p (PointerIdent i) = ppIdent l p i
+
 instance Pretty Number where
   pPrintPrec l p (Number i) = pPrintPrec l p i
 
@@ -189,9 +209,9 @@ instance Pretty Head where
   pPrintPrec l p (HLambda i z op) = maybeParens (p > 0) $ text "lambda" <+> pPrintPrec l 0 i <+> pPrintPrec l 0 z <> text "." <+> pPrintPrec l 10 op
 
 instance Pretty Var where
-  pPrintPrec _ _ (Var v) = text v
-  pPrintPrec _ _ (VarT v) = braces $ text v
-  pPrintPrec l _ (VTuple i n) = text i <> brackets (pPrintPrec l 0 n)
+  pPrintPrec l _ (Var v) = pPrintPrec l 0 v
+  pPrintPrec l _ (VarT v) = braces $ pPrintPrec l 0 v
+  pPrintPrec l _ (VTuple i n) = pPrintPrec l 0 i <> brackets (pPrintPrec l 0 n)
 
 instance Pretty Op where
   pPrintPrec l p (OEqHead v h) = maybeParens (p > 5) $ pPrintPrec l 0 v <> text "=" <> pPrintPrec l 5 h
@@ -241,7 +261,7 @@ instance Pretty Config where
 
 startConfig :: Op -> Config
 startConfig op = S.empty :- Fx topfx (Program d op)
-  where d = Var "dt"
+  where d = DecisionIdent "dt"
 
 topfx :: S.Set EffectSpecifier
 topfx = S.fromList [Succeeds, Reads, Writes, Interacts]
@@ -252,6 +272,7 @@ topfx = S.fromList [Succeeds, Reads, Writes, Interacts]
 allowAfter :: EffectSpecifier -> Set EffectSpecifier
 allowAfter _fx = undefined
 
+{-
 bvs :: Op -> Set Var
 bvs (OEqHead _ (HTuple _ t)) = S.singleton t                 -- BVS(x=tuple(i) t)                                   ---> {t}
 bvs (OChoice op0 op1) = bvs op0 `S.union` bvs op1            -- BVS(op0|op1)                                        ---> BVS(op0)+BVS(op1)
@@ -260,6 +281,7 @@ bvs (OExists xs) = S.fromList xs                             -- BVS(exists xs)  
 bvs (OIterate _ d op0 _ _) = S.singleton d `S.union` bvs op0 -- BVS(iterate(v) d. op0 then w1 w2. op1 else w1. op2) ---> {d}+BVS(op0)
                                                              -- BVS(cond(x) y. op0)                                 ---> {y}+BVS(op0)
 bvs _ = S.empty                                              -- BVS(any other operation op)                         ---> {}
+-}
 
 type Context a = a -> [(a -> a, a)]
 
@@ -321,15 +343,6 @@ instance Rec Config where
   data RuleEnv Config = None
   rec r s ae = r s ae
 
-allRules :: Rule Config
-allRules =
-  axiom P.<>
-  existsIntro P.<>
-  atomIntro P.<>
-  tupleIntro P.<>
-  unifyHead P.<>
-  tuple
-
 sys :: TRSystem Config
 sys = TRSystem {
   sname = "TimRun", description = "Tim's runtime rules", ruleEnv = None,
@@ -352,6 +365,49 @@ empty |- topfx{program a . exists y; y=3}
 
 -}
 
+gadd :: [Assumption] -> S.Set Assumption -> [S.Set Assumption]
+gadd asms g =
+  let asms' = filter (not . (`S.member` g)) asms
+  in  if null asms' then
+        []
+      else
+        [foldr S.insert g asms']
+
+afx :: EffectSpecifier -> Op -> Assumption
+afx fx = AFX (S.singleton fx)
+
+dummy :: Var
+dummy = Var $ VarIdent "_"
+
+pattern Num :: Integer -> Head
+pattern Num i = HAtom (ANumber (Number i))
+
+pattern VarI :: Ident -> Var
+pattern VarI i = Var (VarIdent i)
+
+pattern VarTI :: Ident -> Var
+pattern VarTI i = VarT (TupleIdent i)
+
+infixr 0 +>
+(+>) :: Op -> Op -> Op
+(+>) = OSeq
+
+infix 5 =#
+(=#) :: Var -> Head -> Op
+(=#) = OEqHead
+
+infix 5 =$
+(=$) :: Var -> Var -> Op
+(=$) = OEqVar
+
+allRules :: Rule Config
+allRules =
+  axiom P.<>
+  existsIntro P.<>
+  atomIntro P.<>
+  tupleIntro P.<>
+  unifyHead P.<>
+  tuple
 
 axiom :: Rule Config
 axiom _ lhs =
@@ -378,20 +434,20 @@ atomIntro _ lhs =
     (_g', AFlex x d) <- assumeContext g
     (_, d', eq@(OEqHead x' h@HAtom{})) <- decisionContext e
     guard (d == d' && x == x')
-    guard (not (AUnifyHead x h `S.member` g))
-    pure $ gadd [AUnifyHead x h, afx Satisfies eq] g :- p
+    g' <- gadd [AUnifyHead x h, afx Satisfies eq] g
+    pure $ g' :- p
 
 tupleIntro :: Rule Config
 tupleIntro _ lhs =
   "tuple-intro" `name`
   do
     (g :- p@(Fx _ e)) <- [lhs]
-    (g', AFlex x d) <- assumeContext g
-    (_g'', AFlex i d') <- assumeContext g'
+    (g1, AFlex x d) <- assumeContext g
+    (_g2, AFlex i d') <- assumeContext g1
     (_, d'', eq@(OEqHead x' h@(HTuple i' _))) <- decisionContext e
     guard (d == d' && d == d'' && x == x' && i == i')
-    guard (not (AUnifyHead x h `S.member` g))
-    pure $ gadd [AUnifyHead x h, afx Satisfies eq] g :- p
+    g' <- gadd [AUnifyHead x h, afx Satisfies eq] g
+    pure $ g' :- p
 
 tuple :: Rule Config
 tuple _ lhs =
@@ -413,8 +469,8 @@ tuple _ lhs =
     (_g'', AUnifyHead i' (HAtom (ANumber (Number n)))) <- assumeContext g
     guard (x == x' && i == i' && n > 0)
     let ts = [ AUnifyVar dummy $ VTuple t (Number k) | k <- [0..n-1] ]
-    guard (head ts `notElem` g)
-    pure $ gadd ts g :- p
+    g' <- gadd ts g
+    pure $ g' :- p
  ++
   "tuple-unify-element" `name`
   do
@@ -435,19 +491,18 @@ tuple _ lhs =
     (_, _, (OEq tu@(VTuple u _) _)) <- decisionContext e
     (_, AFlex (VarT u') d) <- assumeContext g
     guard (u == u')
-    let fl = AFlex tu d
-    guard (not (fl `S.member` g))
-    pure $ gadd [fl] g :- p
+    g' <- gadd [AFlex tu d] g
+    pure $ g' :- p
  ++
-  "tuple-elim" `name`
+  "tuple-elim" `name`  -- -succeed and -fail
   do
     (g :- (Fx fx e)) <- [lhs]
-    (ctx, d, eq@(OEqVar x (VTuple y i))) <- decisionContext e
-    (g1, AFlex d'  x') <- assumeContext g
-    (g2, AFlex d'' i') <- assumeContext g1
+    (ctx, d, eq@(OEqApply x y i)) <- decisionContext e
+    (g1, AFlex x' d' ) <- assumeContext g
+    (g2, AFlex i' d'') <- assumeContext g1
     (g3, AUnifyHead i'' (Num n0)) <- assumeContext g2
     (g4, AUnifyHead j   (Num n1)) <- assumeContext g3
-    (_,  AUnifyHead y'  (HTuple j' t)) <- assumeContext g4
+    (_,  AUnifyHead y' (HTuple j' (VarT t))) <- assumeContext g4
     guard (x == x' && y == y' && d == d' && d == d'' && i == i' && i == i'' && j == j')
     let a =
           if (0 <= n0 && n0 < n1) then
@@ -458,15 +513,26 @@ tuple _ lhs =
             OEqFail x
     guard (a `notElem` allOps e)
     pure $ g :- Fx fx (ctx d (eq +> a))
+ ++
+  "tuple-elim-choose" `name`
+  do
+    (g :- (Fx fx e)) <- [lhs]
+    (ctx, d, eq@(OEqApply x y i)) <- decisionContext e
+    (g1, AFlex x' d') <- assumeContext g
+    (g2, AFlex i' d'') <- assumeContext g1
+    (g3, AUnifyHead j   (Num n)) <- assumeContext g2
+    (g4,  AUnifyHead y'  (HTuple j' (VarT t))) <- assumeContext g3
+    guard (x == x' && y == y' && d == d' && d == d'' && i == i' && j == j')
+    guard $ null $ [ () | AUnifyHead i'' (Num _) <- S.toList g4, i == i'' ]  -- make sure i doesn't have a value
+    let ops = [ OEqVar x (VTuple t (Number k)) +> OEqHead i (Num k) | k <- [0 .. n-1] ]
+        cop = choices x ops
+    guard (cop `notElem` allOps e)
+    pure $ g :- Fx fx (ctx d (eq +> cop))
 
-dummy :: Var
-dummy = Var "_"
-
-afx :: EffectSpecifier -> Op -> Assumption
-afx fx = AFX (S.singleton fx)
-
-gadd :: [Assumption] -> S.Set Assumption -> S.Set Assumption
-gadd asms g = foldr S.insert g asms
+choices :: Var -> [Op] -> Op
+choices x [] = OEqFail x
+choices _ [op] = op
+choices _ ops = foldr1 OChoice ops
 
 unifyHead :: Rule Config
 unifyHead _ lhs =
@@ -477,8 +543,8 @@ unifyHead _ lhs =
     (_g'', AUnifyHead y h) <- assumeContext g
     (_, d', eq@(OEqVar x' y')) <- decisionContext e
     guard (d == d' && x == x' && y == y')
-    guard (not (AUnifyHead x h `S.member` g))
-    pure $ gadd [AUnifyHead x h, afx Satisfies eq] g :- p
+    g' <- gadd [AUnifyHead x h, afx Satisfies eq] g
+    pure $ g' :- p
  ++
   "unify-head-right" `name`
   do
@@ -487,20 +553,19 @@ unifyHead _ lhs =
     (_g'', AUnifyHead x h) <- assumeContext g
     (_, d', OEqVar x' y') <- decisionContext e
     guard (d == d' && x == x' && y == y')
-    guard (not (AUnifyHead y h `S.member` g))
-    pure $ gadd [AUnifyHead y h, afx Satisfies $ OEqVar y x] g :- p
+    g' <- gadd [AUnifyHead y h, afx Satisfies $ OEqVar y x] g
+    pure $ g' :- p
  ++
   "unify-disjoint" `name`
   do
     (g :- p@(Fx _ e)) <- [lhs]
-    (g', AUnifyHead x h1) <- assumeContext g
-    (_g'', AUnifyHead x' h2) <- assumeContext g'
+    (g1, AUnifyHead x h1) <- assumeContext g
+    (_g2, AUnifyHead x' h2) <- assumeContext g1
     (_, _, eq@(OEq x'' _)) <- decisionContext e
     guard (x == x' && x == x'')
     guard (disjointHead h1 h2)
-    let a = afx Fails eq
-    guard (not (a `S.member` g))
-    pure $ gadd [a] g :- p
+    g' <- gadd [afx Fails eq] g
+    pure $ g' :- p
 
 disjointHead :: Head -> Head -> Bool
 disjointHead (HAtom a1) (HAtom a2) = a1 /= a2
@@ -512,30 +577,16 @@ disjointHead (HLambda _ _ _) _ = True
 
 -------
 
-pattern Num :: Integer -> Head
-pattern Num i = HAtom (ANumber (Number i))
-
 tup :: Var -> String -> [OpEqRhs] -> Op
 tup res zname vals =
-  let z = VarT zname
-      x = Var (zname ++ "_sz")
+  let zi = TupleIdent zname
+      z = VarT zi
+      x = Var  $ VarIdent $ zname ++ "_sz"
       t = res =# HTuple x z
       s = x =# Num (toInteger (length vals))
       ex = OExists [x]
-      es = zipWith (\ i v -> VTuple zname (Number i) `OEq` v) [0..] vals
+      es = zipWith (\ i v -> VTuple zi (Number i) `OEq` v) [0..] vals
   in  foldr (+>) t (ex : s : es)
-
-infixr 0 +>
-(+>) :: Op -> Op -> Op
-(+>) = OSeq
-
-infix 5 =#
-(=#) :: Var -> Head -> Op
-(=#) = OEqHead
-
-infix 5 =$
-(=$) :: Var -> Var -> Op
-(=$) = OEqVar
 
 pptr :: Config -> IO ()
 pptr = mapM_ pp . f . normalFormFuelTracePlain sys 100
@@ -544,7 +595,7 @@ pptr = mapM_ pp . f . normalFormFuelTracePlain sys 100
 test1 :: Config
 test1 = startConfig $
   OExists [x,y] +> x =# Num 5 +> y =$ x
-  where x = Var "x"; y = Var "y"
+  where x = VarI "x"; y = VarI "y"
 
 res1 :: [Traced Config]
 res1 = nrDone $ normalFormFuelTracePlain sys 100 test1
@@ -552,7 +603,7 @@ res1 = nrDone $ normalFormFuelTracePlain sys 100 test1
 test2 :: Config
 test2 = startConfig $
   OExists [x,i] +> x =# HTuple i t
-  where x = Var "x"; i = Var "i"; t = Var "t"
+  where x = VarI "x"; i = VarI "i"; t = VarI "t"
 
 test3 :: Config
 test3 = startConfig $
@@ -560,11 +611,19 @@ test3 = startConfig $
   tup x "z" [OEHead $ Num 1, OEHead $ Num 10] +>
   tup y "w" [OEVar a, OEVar b] +>
   x =$ y
-  where x = Var "x"; y = Var "y"; a = Var "a"; b = Var "b"; z = VarT "z"; w = VarT "w"
+  where x = VarI "x"; y = VarI "y"; a = VarI "a"; b = VarI "b"; z = VarTI "z"; w = VarTI "w"
 
 test4 :: Config
 test4 = startConfig $
   OExists [x] +>
   x =# Num 1 +>
   x =# Num 2
-  where x = Var "x"
+  where x = VarI "x"
+
+test5 :: Config
+test5 = startConfig $
+  OExists [y,t,x,i] +>
+  tup y "t" [OEHead $ Num 1, OEHead $ Num 10] +>
+  OEqApply x y i
+  where x = VarI "x"; y = VarI "y"; i = VarI "i"; t = VarTI "t"
+  
