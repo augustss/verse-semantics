@@ -1,18 +1,24 @@
-{-# OPTIONS_GHC -Wno-x-partial #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-x-partial -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 module Expr where
 import Prelude hiding ((<>))
 import qualified Prelude as P
 import Control.Arrow(first)
 import Control.Monad
 import Data.Char
---import Data.List
+import Data.Data(Data)
+import Data.List
+import Data.Maybe
 import qualified Data.Set as S
 import Data.Set(Set)
+import Data.String
 import TRS.TRS
 import TRS.Traced hiding (trace)
 import Epic.Print
+import Epic.Uniplate
 import Debug.Trace
 
 -- Fixes:
@@ -45,8 +51,8 @@ sequence-refine-fx
 * tuple-elim-succeed
 * tuple-elim-fail
 * tuple-elim-choose
-lambda-intro
-lambda-elim
+* lambda-intro
+* lambda-elim
 choice-intro
 choice-elim
 iterate-intro
@@ -67,30 +73,39 @@ interact-elim
 
 ------------------------------
 
-type Ident = String
+newtype Ident = Ident String
+  deriving (Eq, Ord, Data)
+instance Show Ident where
+  show (Ident i) = show i
+instance IsString Ident where
+  fromString = Ident
+
+appIdent :: Ident -> Ident -> Ident
+appIdent (Ident i1) (Ident i2) = Ident (i1 ++ i2)
+
 newtype VarIdent = VarIdent Ident
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 newtype TupleIdent = TupleIdent Ident
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 newtype DecisionIdent = DecisionIdent Ident
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 newtype PointerIdent = PointerIdent Ident
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 newtype Number = Number Integer         -- n ::== 0 | 1 | ..
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 data Atom                               -- a ::== n | () | Path | ..
   = ANumber Number
   | AEmpty
   | APath String
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 data Var                                -- ::== i | j | k | f | g | h | w | x | y | z | t[n]
   = Var VarIdent
   | VarT TupleIdent
   | VTuple TupleIdent Number
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 type DecisionVar = DecisionIdent        -- ::= d | e
 
@@ -100,13 +115,13 @@ data EffectSpecifier                    -- fx ::=
   = Succeeds | Fails | Satisfies | Abstracts
   | Imperatives | Interacts | Throws | Reads | Writes
   | Pendings | InteractsPending | ThrowsPending | ReadsPending | WritesPending
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 data Head                               -- h ::=
   = HAtom Atom                          -- a
   | HTuple Var Var                      -- tuple(x) z     -- x is the size, z is base the name of elements
   | HLambda Var Var Op                  -- lambda i z. op
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 data OpEqRhs
   = OEHead  Head                   -- x=h
@@ -114,7 +129,7 @@ data OpEqRhs
   | OEFail                         -- x=fail
   | OEApply Var Var                -- x=y[z]
   | OEDeref PointerVar             -- x=y^     ??y should be p??
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 pattern OEqHead :: Var -> Head -> Op
 pattern OEqHead  x h   = OEq x (OEHead h)
@@ -136,11 +151,11 @@ data Op                                 -- op ::=
   | OIterate Var DecisionVar Op (Var, Var, Op) (Var, Op) -- iterate(v) d. op0 then w1 w2. op1 else w3. op2
   | ONop                                -- nop
   | OPrint   Var                        -- print(x)
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 data Program                            -- P ::=
   = Program DecisionVar Op              --   program d. op
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 {-
 data ScopeContext op                    -- sc[OP] ::=
@@ -168,20 +183,27 @@ data Assumption                             -- A ::=
   | ARead PointerVar Var                    --   p:=x    # reading pointer p yields value x
   | ADone DecisionVar                       --   d:=done # no more iterations of decision context
   | AOp DecisionVar Op                      --   d:=op   # next iteration of decision context identified by d runs op
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 type AssumptionSet = Set Assumption
 
 data Fx a = Fx (Set EffectSpecifier) a
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 data Config = AssumptionSet :- Fx Program | Done
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
+
+allIdents :: (Data a) => a -> [Ident]
+allIdents = universeBi
+
+cloneIdents :: Data a => a -> [Ident] -> [Ident]
+cloneIdents a = map (\ i -> head $ [ i `appIdent` Ident (show k) | k <- [1::Int ..] ] \\ vs)
+  where vs = allIdents a
 
 --------------------------------------------------------
 
 ppIdent :: PrettyLevel -> Rational -> Ident -> Doc
-ppIdent _ _ i = text i
+ppIdent _ _ (Ident i) = text i
 
 instance Pretty VarIdent where
   pPrintPrec l p (VarIdent i) = ppIdent l p i
@@ -210,7 +232,7 @@ instance Pretty Head where
 
 instance Pretty Var where
   pPrintPrec l _ (Var v) = pPrintPrec l 0 v
-  pPrintPrec l _ (VarT v) = braces $ pPrintPrec l 0 v
+  pPrintPrec l _ (VarT v) = brackets $ pPrintPrec l 0 v
   pPrintPrec l _ (VTuple i n) = pPrintPrec l 0 i <> brackets (pPrintPrec l 0 n)
 
 instance Pretty Op where
@@ -272,16 +294,18 @@ topfx = S.fromList [Succeeds, Reads, Writes, Interacts]
 allowAfter :: EffectSpecifier -> Set EffectSpecifier
 allowAfter _fx = undefined
 
-{-
-bvs :: Op -> Set Var
-bvs (OEqHead _ (HTuple _ t)) = S.singleton t                 -- BVS(x=tuple(i) t)                                   ---> {t}
-bvs (OChoice op0 op1) = bvs op0 `S.union` bvs op1            -- BVS(op0|op1)                                        ---> BVS(op0)+BVS(op1)
-bvs (OSeq op0 op1) = bvs op0 `S.union` bvs op1               -- BVS(op0; op1)                                       ---> BVS(op0)+BVS(op1)
-bvs (OExists xs) = S.fromList xs                             -- BVS(exists xs)                                      ---> {xs}
-bvs (OIterate _ d op0 _ _) = S.singleton d `S.union` bvs op0 -- BVS(iterate(v) d. op0 then w1 w2. op1 else w1. op2) ---> {d}+BVS(op0)
-                                                             -- BVS(cond(x) y. op0)                                 ---> {y}+BVS(op0)
-bvs _ = S.empty                                              -- BVS(any other operation op)                         ---> {}
--}
+bvs :: Op -> [Ident]
+bvs (OEqHead _ (HTuple _ (VarTI t))) = [t]                 -- BVS(x=tuple(i) t)                                   ---> {t}
+bvs (OChoice op0 op1)               = bvs op0 ++ bvs op1  -- BVS(op0|op1)                                        ---> BVS(op0)+BVS(op1)
+bvs (OSeq op0 op1)                  = bvs op0 ++ bvs op1  -- BVS(op0; op1)                                       ---> BVS(op0)+BVS(op1)
+bvs (OExists xs)                    = [ i | Var (VarIdent i) <- xs ]                  -- BVS(exists xs)                                      ---> {xs}
+bvs (OIterate _ (DecisionIdent d) op0 _ _)          = d : bvs op0         -- BVS(iterate(v) d. op0 then w1 w2. op1 else w1. op2) ---> {d}+BVS(op0)
+                                                          -- BVS(cond(x) y. op0)                                 ---> {y}+BVS(op0)
+bvs _                               = []                  -- BVS(any other operation op)                         ---> {}
+
+substBound :: [(Ident, Ident)] -> Op -> Op
+substBound s = transformBi f
+  where f i = fromMaybe i $ lookup i s
 
 type Context a = a -> [(a -> a, a)]
 
@@ -407,7 +431,8 @@ allRules =
   atomIntro P.<>
   tupleIntro P.<>
   unifyHead P.<>
-  tuple
+  tuple P.<>
+  lambda
 
 axiom :: Rule Config
 axiom _ lhs =
@@ -444,9 +469,9 @@ tupleIntro _ lhs =
     (g :- p@(Fx _ e)) <- [lhs]
     (g1, AFlex x d) <- assumeContext g
     (_g2, AFlex i d') <- assumeContext g1
-    (_, d'', eq@(OEqHead x' h@(HTuple i' _))) <- decisionContext e
+    (_, d'', eq@(OEqHead x' h@(HTuple i' t))) <- decisionContext e
     guard (d == d' && d == d'' && x == x' && i == i')
-    g' <- gadd [AUnifyHead x h, afx Satisfies eq] g
+    g' <- gadd [AUnifyHead x h, AFlex t d, afx Satisfies eq] g
     pure $ g' :- p
 
 tuple :: Rule Config
@@ -575,13 +600,38 @@ disjointHead (HTuple _ _) _ = True
 disjointHead (HLambda _ _ _) (HLambda _ _ _) = False -- XXX not sure
 disjointHead (HLambda _ _ _) _ = True
 
--------
+lambda :: Rule Config
+lambda _ lhs =
+  "lambda-intro" `name`
+  do
+    (g :- p@(Fx _ e)) <- [lhs]
+    (_g', AFlex f d) <- assumeContext g
+    (_, d', (OEqHead f' h@HLambda{})) <- decisionContext e
+    guard (d == d' && f == f')
+    g' <- gadd [AUnifyHead f h] g
+    pure $ g' :- p
+ ++
+  "lambda-elim" `name`
+  do
+    (g :- (Fx fx e)) <- [lhs]
+    (_g', AUnifyHead f (HLambda (Var (VarIdent i)) (Var (VarIdent z)) op)) <- assumeContext g
+    (ctx, d, OEqApply y f' x) <- decisionContext e
+    guard (f == f')
+    let os, ns :: [Ident]
+        os = i : z : bvs op
+        ns@(i' : z' : _) = cloneIdents lhs os
+        vi' = Var (VarIdent i'); vz' = Var (VarIdent z')
+        op' = substBound (zip os ns) op
+        beta = OExists [vi', vz'] +> OEqVar vi' x +> OEqVar vz' y +> op'
+    pure $ g :- Fx fx (ctx d beta)
 
-tup :: Var -> String -> [OpEqRhs] -> Op
+--------
+
+tup :: Var -> Ident -> [OpEqRhs] -> Op
 tup res zname vals =
   let zi = TupleIdent zname
       z = VarT zi
-      x = Var  $ VarIdent $ zname ++ "_sz"
+      x = Var  $ VarIdent $ zname `appIdent` "_sz"
       t = res =# HTuple x z
       s = x =# Num (toInteger (length vals))
       ex = OExists [x]
@@ -589,7 +639,7 @@ tup res zname vals =
   in  foldr (+>) t (ex : s : es)
 
 pptr :: Config -> IO ()
-pptr = mapM_ pp . f . normalFormFuelTracePlain sys 100
+pptr = mapM_ ppx . f . normalFormFuelTracePlain sys 100
   where f x = if null (nrLeft x) then nrDone x else trace "**** no fuel " (nrLeft x)
 
 test1 :: Config
@@ -607,11 +657,11 @@ test2 = startConfig $
 
 test3 :: Config
 test3 = startConfig $
-  OExists [x,y,a,b,z,w] +>
+  OExists [x,y,a,b] +>
   tup x "z" [OEHead $ Num 1, OEHead $ Num 10] +>
   tup y "w" [OEVar a, OEVar b] +>
   x =$ y
-  where x = VarI "x"; y = VarI "y"; a = VarI "a"; b = VarI "b"; z = VarTI "z"; w = VarTI "w"
+  where x = VarI "x"; y = VarI "y"; a = VarI "a"; b = VarI "b"
 
 test4 :: Config
 test4 = startConfig $
@@ -622,8 +672,21 @@ test4 = startConfig $
 
 test5 :: Config
 test5 = startConfig $
-  OExists [y,t,x,i] +>
+  OExists [y,x,i] +>
   tup y "t" [OEHead $ Num 1, OEHead $ Num 10] +>
   OEqApply x y i
-  where x = VarI "x"; y = VarI "y"; i = VarI "i"; t = VarTI "t"
+  where x = VarI "x"; y = VarI "y"; i = VarI "i"
   
+test6 :: Config
+test6 = startConfig $
+  OExists [f] +>
+  OEqHead f (HLambda i x $ OExists [y] +> OEqHead y (Num 99))
+  where f = VarI "f"; i = VarI "i"; x = VarI "x"; y = VarI "y"
+
+test7 :: Config
+test7 = startConfig $
+  OExists [f,r,a] +>
+  OEqHead f (HLambda i x $ OEqHead x (Num 99)) +>
+  OEqHead a (Num 88) +>
+  OEqApply r f a
+  where f = VarI "f"; i = VarI "i"; x = VarI "x"; a = VarI "a"; r = VarI "r"
