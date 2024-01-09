@@ -363,13 +363,13 @@ unify
 unify f v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
   (Found v_x (Bound x _), Found v_y (Unbound n_y k_y _)) -> do
     r <- ask'
-    when (n_y < r.splitDepth) $ incr r.suspCount
+    when (n_y < r.splitDepth) incrSuspCount
     writeLink v_y v_x
     k_y x
     resumeProcesses $ subst f v_x v_y
   (Found v_x (Unbound n_x k_x _), Found v_y (Bound y _)) -> do
     r <- ask'
-    when (n_x < r.splitDepth) $ incr r.suspCount
+    when (n_x < r.splitDepth) incrSuspCount
     writeLink v_x v_y
     k_x y
     resumeProcesses $ subst f v_y v_x
@@ -378,12 +378,12 @@ unify f v_x v_y = (,) <$> findRepr v_x <*> findRepr v_y >>= \ case
     case compare' n_x i_x n_y i_y of
       EQ -> pure ()
       LT -> do
-        when (n_y < r.splitDepth) $ incr r.suspCount
+        when (n_y < r.splitDepth) incrSuspCount
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
         resumeProcesses $ subst f v_x v_y
       GT -> do
-        when (n_x < r.splitDepth) $ incr r.suspCount
+        when (n_x < r.splitDepth) incrSuspCount
         writeLink v_x v_y
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
         resumeProcesses $ subst f v_y v_x
@@ -423,9 +423,8 @@ subst' f v_x y = findRepr v_x <&> (, y) >>= \ case
     k_x y
     resumeProcesses $ subst f v_y v_x
   (Found v_x (Unbound n_x k_x i_x), Found v_y (Unbound n_y k_y i_y)) -> do
-    r <- ask'
     case compare' n_x i_x n_y i_y of
-      EQ -> decr r.suspCount
+      EQ -> decrSuspCount
       LT -> do
         writeRepr v_x $ Unbound n_x (\ x -> k_x x *> k_y x) i_x
         writeLink v_y v_x
@@ -435,8 +434,6 @@ subst' f v_x y = findRepr v_x <&> (, y) >>= \ case
         writeRepr v_y $ Unbound n_y (\ x -> k_x x *> k_y x) i_y
         resumeProcesses $ subst f v_y v_x
   (Found v_x repr_x@(Bound x i_x), Found v_y repr_y@(Bound y i_y)) -> do
-    r <- ask'
-    decr r.suspCount
     when (i_x /= i_y) $ f x y >>= \ case
       (SEQ, m) -> do
         writeRepr v_y repr_x
@@ -449,16 +446,12 @@ subst' f v_x y = findRepr v_x <&> (, y) >>= \ case
         decide
         writeAbstractRepr v_x repr_y
         m
+    decrSuspCount
 
 unifyEq
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Eq a)
   => Var m a -> Var m a -> VerseT m ()
 unifyEq = unify $ \ x y -> guard (x == y) $> (SEQ, pure ())
-
-decide :: (MonadFix m, MonadRef m, MonadSupply Int m) => VerseT m ()
-decide = do
-  Env {..} <- ask'
-  stateAbstractHRef' decisions uncons >>= guard
 
 compare' :: Int -> Int -> Int -> Int -> Ordering
 compare' n_x i_x n_y i_y = compare (n_x, i_x) (n_y, i_y)
@@ -754,13 +747,13 @@ verifyAll decisions m = do
   v <- freshIVar
   fork $ do
     decisions <- newHRef decisions
-    h <- newChildHeap
+    heap <- newChildHeap
+    splitDepth <- asks' $ (+ 1) . (.splitDepth)
+    suspCount <- newHRef 0
     ref <- newHRef Nothing
     let
       loop heap heaps m = do
         abstractHeap <- asks' (.heap)
-        splitDepth <- asks' $ (+ 1) . (.splitDepth)
-        suspCount <- newHRef 0
         split' Env {..} True ref m >>= readIVar >>= \ case
           Fail -> readHRef decisions
           Abort -> readHRef decisions
@@ -769,8 +762,13 @@ verifyAll decisions m = do
           store = mempty
           processes = mempty
           result = Nothing
-    loop h mempty (m >> writeHRef ref (Just ())) >>= writeIVar v
+    loop heap mempty (m >> writeHRef ref (Just ())) >>= writeIVar v
   pure v
+
+decide :: (MonadFix m, MonadRef m, MonadSupply Int m) => VerseT m ()
+decide = do
+  Env {..} <- ask'
+  stateAbstractHRef' decisions uncons >>= guard
 
 succeeds
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -1088,6 +1086,11 @@ stateAbstractHRef' ref f = asks' (.abstractHeap) >>= \ k -> lift $ do
   s `seq` put' (unHRef ref) k s
   pure x
 
+incrSuspCount :: MonadRef m => VerseT m ()
+incrSuspCount = do
+  Env {..} <- ask'
+  incr suspCount
+
 incr :: (MonadRef m, Num a) => HRef m a -> VerseT m ()
 incr = flip modifyHRef' (+ 1)
 
@@ -1095,6 +1098,14 @@ incr' :: (MonadRef m, Num a) => HRef m a -> Heap -> m ()
 incr' ref k = do
   x <- getLocal (unHRef ref) k
   put' (unHRef ref) k $! x + 1
+
+decrSuspCount :: (MonadFix m, MonadRef m, MonadSupply Int m) => VerseT m ()
+decrSuspCount = do
+  Env {..} <- ask'
+  decr suspCount
+  whenJust result $ \ result ->
+    whenM (readHRef suspCount <&> (== 0)) $
+      writeIVar result ()
 
 decr :: (MonadRef m, Num a) => HRef m a -> VerseT m ()
 decr = flip modifyHRef' $ subtract 1

@@ -23,7 +23,7 @@ import Data.String
 import Language.Verse.Desugar.Exp
   ( Exp (..)
   , Quantifier (..)
-  , Path(..)
+  , Path (..)
   , unify
   , verify
   , check
@@ -81,32 +81,17 @@ desugar
   => Mode
   -> L (Rewrite.Exp L Ident)
   -> m (L (Exp L Ident))
-desugar mode e =
-  runReaderT (runDesugarT' (desugar' e) <&> \ (e, _xs) -> e) $
-  fromMode mode
-
-desugar'
-  :: (MonadAbort Error m, MonadSupply Label m)
-  => L (Rewrite.Exp L Ident)
-  -> DesugarT m (L (Exp L Ident))
-desugar' e = ask >>= \ case
-  Exec -> desugarTop e
-  Pos -> verifyM . checkM Effect.Succeeds . posM $ desugarTop e
-  Neg -> desugarTop e
+desugar mode e = flip runReaderT (fromMode mode) $ case mode of
+  Execution -> desugarTop e
+  Verification -> verify . check Effect.Succeeds <$> posM (desugarTop e)
 
 desugarTop
   :: (MonadAbort Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
-  -> DesugarT m (L (Exp L Ident))
+  -> ReaderT R m (L (Exp L Ident))
 desugarTop e = do
-  (e, xs) <- lift . runDesugarT $ desugar'' e
+  (e, xs) <- runDesugarT $ unifyEnv (loc e) `thenM` desugarExp e
   pure $ TopLevel xs <$> duplicate e
-
-desugar''
-  :: (MonadAbort Error m, MonadSupply Label m)
-  => L (Rewrite.Exp L Ident)
-  -> DesugarT m (L (Exp L Ident))
-desugar'' e = unifyEnv (loc e) `thenM` desugarExp e
 
 desugarExp
   :: (MonadAbort Error m, MonadSupply Label m)
