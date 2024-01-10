@@ -113,9 +113,24 @@ type PointerVar = PointerIdent          -- ::= p | q
 
 data EffectSpecifier                    -- fx ::=
   = Succeeds | Fails | Satisfies | Abstracts
-  | Imperatives | Interacts | Throws | Reads | Writes
-  | Pendings | InteractsPending | ThrowsPending | ReadsPending | WritesPending
+  {-x | Imperatives -} | Interacts | Throws | Reads | Writes
+  {- | Pendings -} | InteractsPending | ThrowsPending | ReadsPending | WritesPending
   deriving (Show, Eq, Ord, Data)
+
+topfx :: S.Set EffectSpecifier
+topfx = S.fromList [Succeeds, Reads, Writes, Interacts]
+
+choicefx :: Set EffectSpecifier
+choicefx = S.singleton Abstracts `S.union` imperatives `S.union` pendings
+
+imperatives :: Set EffectSpecifier
+imperatives = S.fromList [ Interacts, Throws, Reads, Writes ]
+
+pendings :: Set EffectSpecifier
+pendings = S.fromList [InteractsPending, ThrowsPending, ReadsPending, WritesPending]
+
+                        
+                        
 
 data Head                               -- h ::=
   = HAtom Atom                          -- a
@@ -223,7 +238,9 @@ instance Pretty Atom where
   pPrintPrec _ _ (APath q) = text q
 
 instance Pretty EffectSpecifier where
-  pPrintPrec _ _ e = text $ take 3 $ map toLower $ show e
+  pPrintPrec _ _ e = text $ f $ map toLower $ show e
+    where f s | "_pending" `isSuffixOf` s = take 3 s ++ "p"
+              | otherwise = take 3 s
 
 instance Pretty Head where
   pPrintPrec l p (HAtom a) = pPrintPrec l p a
@@ -258,6 +275,7 @@ instance Pretty Program where
 
 ppFx :: PrettyLevel -> Set EffectSpecifier -> Doc
 ppFx _ sfx | sfx == topfx = text "topfx"
+ppFx _ sfx | sfx == choicefx = text "choicefx"
 ppFx l sfx =
   case S.toList sfx of
     [fx] -> pPrintPrec l 0 fx
@@ -284,9 +302,6 @@ instance Pretty Config where
 startConfig :: Op -> Config
 startConfig op = S.empty :- Fx topfx (Program d op)
   where d = DecisionIdent "dt"
-
-topfx :: S.Set EffectSpecifier
-topfx = S.fromList [Succeeds, Reads, Writes, Interacts]
 
 --    G.IsKnown[x]              ::== G, x<-a or
 --                                   G, x<-tuple(i) t, i<-n1] and for all 0<=n0<n1, G.IsKnown[t[n0]].
@@ -432,7 +447,8 @@ allRules =
   tupleIntro P.<>
   unifyHead P.<>
   tuple P.<>
-  lambda
+  lambda P.<>
+  choice
 
 axiom :: Rule Config
 axiom _ lhs =
@@ -625,6 +641,15 @@ lambda _ lhs =
         beta = OExists [vi', vz'] +> OEqVar vi' x +> OEqVar vz' y +> op'
     pure $ g :- Fx fx (ctx d beta)
 
+choice :: Rule Config
+choice _ lhs =
+  "choice-intro" `name`
+  do
+    (g :- p@(Fx _ e)) <- [lhs]
+    (_, _, op@(OChoice _ _)) <- decisionContext e
+    g' <- gadd [ AFX choicefx op ] g
+    pure $ g' :- p
+
 --------
 
 tup :: Var -> Ident -> [OpEqRhs] -> Op
@@ -690,3 +715,9 @@ test7 = startConfig $
   OEqHead a (Num 88) +>
   OEqApply r f a
   where f = VarI "f"; i = VarI "i"; x = VarI "x"; a = VarI "a"; r = VarI "r"
+
+test8 :: Config
+test8 = startConfig $
+  OExists [x] +>
+  OChoice (OEqHead x (Num 111)) (OEqHead x (Num 222))
+  where x = VarI "x"
