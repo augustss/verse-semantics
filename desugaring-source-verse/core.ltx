@@ -38,7 +38,9 @@
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,r,f,g} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
-      \text{Expressions} & e & ::= & |v| \vb |v==e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+%       \text{Expressions} & e & ::= & |v| \vb |v==e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+      && \vb & |verify e| \vb |forall x e| \vb |check fx e| \vb |assume e| \vb |e_1 guard e_2| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e| \\
       \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt|
@@ -46,14 +48,15 @@
 \\ \\
 \mbox{\em Contexts} \\
 \begin{array}{lrcl}
-      \text{Value contexts} & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-      \text{Evaluation contexts} & |E| & ::= & |hole| \vb |v==E; e| \vb |v==ef; E| \vb |def x E| \\
-      \text{Effect-free exprs} & |ef|  & ::=  & |v| \vb |apply1 op v| |-- for certain op|\\
-                               &       &  \vb & |all e| \vb |one e| |-- maybe?| \\
-                                      %-- this is not needed, these will be floated out anyway
-                                      %\vb |v==ce_1; ce_2| \vb |def x ce|
-                                      %-- this is wrong
-                                      % \vb |one e| \vb |all e|
+\text{Value contexts} & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
+\text{Substitution contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e| \vb |assume S| \\
+\text{Evaluation contexts} & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \\
+\text{Effect-free exprs} & |ef|  & ::=  & |v| \vb |v==ef| \vb |apply1N op v| |-- for certain op|\\
+                         &       &  \vb & |all e| \vb |one e| |-- maybe?| \\
+                                %-- this is not needed, these will be floated out anyway
+                                %\vb |v==ce_1; ce_2| \vb |def x ce|
+                                %-- this is wrong
+                                % \vb |one e| \vb |all e|
 \end{array}
 \\
 \mbox{\em Free variables} \\
@@ -71,7 +74,7 @@
 
 \newcommand{\alphamark}{use $\alpha$}
 
-% ------------------ ICFP rewrite rules -------------------
+% ------------------ Rewrite rules -------------------
 
 \newcommand{\figureRewriteRules}{
   \begin{figure}
@@ -105,24 +108,17 @@
 
 \rulegroupname{Substitution:}
 
-  \rulename{subst} & |x==v; e| & \movesto & |x==v; subst e x v|
+\rulename{subst} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
   & \text{if $|v|\ne|V^[x]|$} \\
-%\rulename{subst-rec} & |x==V^[lam y e_1]; e| & \movesto & |x==V^[lam y (def x (x==V^[lam y e_1]; e_1))]; e| & \text{if $|x|\in|fvs(e_1)|$} \\
-  \rulename{val-swap} & |v==x; e|    & \movesto & |x==v; e| \\
-  \rulename{eqn-swap} & |v==ef; v_1==v_2; e| & \movesto & |v_1==v_2; v==ef; e| \\
-
-    \\[-0.6em]
+\\
 
 \rulegroupname{Normalization:}
-\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-% \rulename{exi-app} & |def f E^[apply1 f v]| & \movesto & |def y E^[y]| & \text{if $|f| \notin \freevars{|E,v|} \cup \boundvars{|E|}$} \\
-%\rulename{exi-app} & |def f E^[apply1 f v]| & \movesto & |def f E^[def y y]|
-%  & \text{if $|f|$ appears only in calls |apply1 f v| in |E|} \\
+\rulename{exi-elim1} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[v]| & \text{if $|x| \notin \freevars{|E|}$}\\
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-%\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
-%\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
-%\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
-\rulename{seq-assoc} & |v_2==(v_1==e_1 ; e_2) ; e_3| & \movesto & |v_1==e_1 ; v_2==e_2 ; e_3| \\
+\rulename{forall-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1; (e_2; e_3)| \\
+\rulename{seq-float} & |e_1 == (e_2 ; e_3)| & \movesto & |e_2; e_1 == e_3| \\
 
     \\[-0.6em]
 
@@ -147,7 +143,7 @@
 \text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
 \end{array}$
 
-\caption{\textbf{The \vcname: Rewrite rules}} \label{fig:rules}
+\caption{\textbf{The \vcname: Rewrite rules for execution}} \label{fig:rules}
 \Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
 \end{figure}
 }
