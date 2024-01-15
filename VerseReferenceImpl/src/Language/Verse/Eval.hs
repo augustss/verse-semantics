@@ -1293,6 +1293,7 @@ evalIdent x s s' = lookupNamed (extract x) >>= \ case
   Nothing -> abort $ IdentError (loc x) (extract x)
   Just y -> evalNamed (loc x) y s s'
 
+{-
 evalIdent'
   :: MonadEval m
   => L Ident
@@ -1302,6 +1303,7 @@ evalIdent'
 evalIdent' x s s' = lookupNamed (extract x) >>= \ case
   Nothing -> abort $ IdentError (loc x) (extract x)
   Just y -> evalNamed' (loc x) y s s'
+-}
 
 evalQualName
   :: MonadEval m
@@ -1316,7 +1318,7 @@ evalQualName loc e x s s' = do
   var_e <- evalExp e s s''
   var <- lift freshVar'
   fork' $ lift (readVar' var_e) >>= getPath loc >>= \ case
-    Nothing -> unify' loc var =<< evalIdent' (L loc $ Ident.Name x) s'' s'
+    Nothing -> unify' loc var =<< evalTopIdent' (L loc $ Ident.Name x) s'' s'
     Just (p, ps) -> do
       s''' <- lift freshS
       var_p <- evalTopIdent' (L loc $ Ident.Name p) s'' s'''
