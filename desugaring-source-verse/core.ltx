@@ -38,11 +38,11 @@
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,r,f,g} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
-%       \text{Expressions} & e & ::= & |v| \vb |v==e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
-      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
-      && \vb & |verify e| \vb |forall x e| \vb |check fx e| \vb |assume e| \vb |e_1 guard e_2| \\
+      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+      && \vb & |forall x e| \vb |e_1 guard e_2| \vb |assume e| \vb |check fx e| \vb |verify e| \vb |havoc fx| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
-      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e| \\
+      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e|
+             \vb |olam v (lam x e_1) (lam y e_2)|\\
       \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt|
 \end{array}
 \\ \\
@@ -50,16 +50,11 @@
 \begin{array}{lrcl}
 \text{Value contexts} & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Substitution contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e| \vb |assume S| \\
-\text{Evaluation contexts} & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \\
-\text{Effect-free exprs} & |ef|  & ::=  & |v| \vb |v==ef| \vb |apply1N op v| |-- for certain op|\\
-                         &       &  \vb & |all e| \vb |one e| |-- maybe?| \\
-                                %-- this is not needed, these will be floated out anyway
-                                %\vb |v==ce_1; ce_2| \vb |def x ce|
-                                %-- this is wrong
-                                % \vb |one e| \vb |all e|
+\text{Evaluation contexts} & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \vb |forall x E| \vb |E guard e| \\
+\multicolumn{4}{c}{\text{|ef| is an |e| that can have choice and fail, but not I/O effects or divergence}}
 \end{array}
-\\
-\mbox{\em Free variables} \\
+\\ \\
+\mbox{\em Free variables (needs updating)} \\
   \begin{array}{rcl}
        |fvs(hole)| & = & \{ \} \\
        |fvs(v==E; e)| & = & |fvs(v) `cup` fvs(E) `cup` fvs(e)| \\
@@ -114,11 +109,12 @@
 
 \rulegroupname{Normalization:}
 \rulename{exi-elim1} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[v]| & \text{if $|x| \notin \freevars{|E|}$}\\
+\rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[v]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{forall-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1; (e_2; e_3)| \\
 \rulename{seq-float} & |e_1 == (e_2 ; e_3)| & \movesto & |e_2; e_1 == e_3| \\
+\rulename{seq-elim} & |v ; e| & \movesto & |e| \\
 
     \\[-0.6em]
 

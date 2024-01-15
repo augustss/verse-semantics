@@ -240,7 +240,7 @@
 %format verifyKW = "\textbf{verify}"
 %format decideKW = "\textbf{dec}"
 %format forallKW = "\forall{}"
-%format guard    = "\blacktriangleright{}"
+%format guard    = "\!\blacktriangleright{}\!"
 
 %format assume (x) = "\textbf{asm}\{" x "\}"
 %format assert (x) = "\textbf{suc}\{" x "\}"
