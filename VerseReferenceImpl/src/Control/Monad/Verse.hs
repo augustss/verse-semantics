@@ -254,14 +254,14 @@ runVerseT m = do
   let
     sk x fk _ S {..} = readHRef' suspCount heap >>= \ case
       0 -> do
-        freshenStore store heap
+        freshenStore store FreshenEnv {..}
         fmap (x:) <$> fk R {..}
       _ -> pure Nothing
   unVerseT m yk ak sk fk fk Env {..}
   where
     abstractHeap = Root
     heaps = mempty
-    splitDepth = 0
+    splitDepth = 1
     store = mempty
     processes = mempty
     result = Nothing
@@ -533,7 +533,8 @@ resume process@Process {..} m = do
     Succeed (S {..}, rightFail', rightEmpty') -> do
       lift ((0 ==) <$> readHRef' suspCount heap `andM` readHRef' left heap) >>= \ case
         Just x -> lift $ do
-          (commit, x) <- runFreshenT ((,) <$> commitStore store <*> freshen x) heap
+          let r = FreshenEnv {..}
+          (commit, x) <- runFreshenT ((,) <$> commitStore store <*> freshen x) r
           let m' = rightFail' <|> fork rightFail *> m
           pure . Right $ commit *> writeIVar result (Succeed (heap, heaps, x, m'))
         Nothing -> do
@@ -560,7 +561,8 @@ resume' process@Process {..} m = do
     Succeed (S {..}, rightFail, rightEmpty) -> do
       lift ((0 ==) <$> readHRef' suspCount heap `andM` readHRef' left heap) >>= \ case
         Just x -> lift $ do
-          (commit, x) <- runFreshenT ((,) <$> commitStore store <*> freshen x) heap
+          let r = FreshenEnv {..}
+          (commit, x) <- runFreshenT ((,) <$> commitStore store <*> freshen x) r
           pure $ Right $ commit *> writeIVar result (Succeed (heap, heaps, x, rightFail))
         Nothing -> do
           heaps <- modifyHeaps (heaps <>) $> IntMap.keysSet heaps
@@ -888,7 +890,8 @@ split' r@Env { abstractHeap = _, ..} abstractHeap left m = do
     Succeed (S { heaps, store, processes }, rightFail, rightEmpty) ->
       lift ((0 ==) <$> readHRef' suspCount heap `andM` readHRef' left heap) >>= \ case
         Just x -> do
-          (commit, x) <- lift $ runFreshenT ((,) <$> commitStore store <*> freshen x) heap
+          let r = FreshenEnv {..}
+          (commit, x) <- lift $ runFreshenT ((,) <$> commitStore store <*> freshen x) r
           commit *> newIVar (Succeed (heap, heaps, x, rightFail))
         Nothing -> do
           heap <- supply >>= \ i -> modifyHeaps (IntMap.insert i heap) $> i
@@ -965,15 +968,20 @@ freeze' :: (Monad m, Freezable a b m) => a -> VerseT m b
 freeze' = runFreezeT . freeze
 
 newtype FreshenT m a = FreshenT
-  { unFreshenT :: RST Heap (IntMap GHC.Exts.Any) m a
+  { unFreshenT :: RST FreshenEnv (IntMap GHC.Exts.Any) m a
   } deriving ( Functor
              , Applicative
              , Monad
              , MonadFix
              )
 
-runFreshenT :: Monad m => FreshenT m a -> Heap -> m a
-runFreshenT m h = evalRST (unFreshenT m) h mempty
+data FreshenEnv = FreshenEnv
+  { heap :: !Heap
+  , splitDepth :: {-# UNPACK #-} !Int
+  }
+
+runFreshenT :: Monad m => FreshenT m a -> FreshenEnv -> m a
+runFreshenT m r = evalRST (unFreshenT m) r mempty
 
 instance MonadTrans FreshenT where
   lift = FreshenT . lift
@@ -1016,16 +1024,19 @@ instance ( MonadFix m
          , Freshenable a m
          ) => Freshenable (Var m a) m where
   freshen v = do
-    h <- FreshenT ask
-    lift (findRepr' v h) >>= \ case
+    FreshenEnv {..} <- FreshenT ask
+    lift (findRepr' v heap) >>= \ case
       Found _ (Bound x i) -> mfix $ \ x' ->
         FreshenT (state' . IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
           Just x' -> pure $ unsafeCoerce x'
           Nothing -> lift . newVar' =<< freshen x
-      Found v (Unbound _ _ i) -> mfix $ \ x' ->
-        FreshenT (state' . IntMap.Lazy.lookupInsert i $ unsafeCoerce x') >>= \ case
-          Just x' -> pure $ unsafeCoerce x'
-          Nothing -> pure v
+      Found v (Unbound n _ i) -> mfix $ \ x ->
+        FreshenT (state' . IntMap.Lazy.lookupInsert i $ unsafeCoerce x) >>= \ case
+          Just x -> pure $ unsafeCoerce x
+          Nothing ->
+            if n == splitDepth
+            then lift . freshVar' $ splitDepth - 1
+            else pure v
 
 msplit_
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -1118,7 +1129,7 @@ decr' ref k = do
 freshenStore
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => Store m
-  -> Heap
+  -> FreshenEnv
   -> m ()
 freshenStore = runFreshenT . traverse_ freshenStoreElem
 
@@ -1127,9 +1138,9 @@ freshenStoreElem
   => StoreElem m
   -> FreshenT m ()
 freshenStoreElem (StoreElem ref) = do
-  h <- FreshenT ask
-  x <- freshen =<< lift (readVarRef' ref h)
-  lift $ put' (unVarRef ref) h x
+  FreshenEnv {..} <- FreshenT ask
+  x <- freshen =<< lift (readVarRef' ref heap)
+  lift $ put' (unVarRef ref) heap x
 
 commitStore
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -1144,9 +1155,9 @@ commitStoreElem
   => StoreElem m
   -> FreshenT m (VerseT m ())
 commitStoreElem (StoreElem ref) = do
-  h <- FreshenT ask
-  x <- freshen =<< lift (get' (unVarRef ref) h)
-  lift $ put' (unVarRef ref) h x
+  FreshenEnv {..} <- FreshenT ask
+  x <- freshen =<< lift (get' (unVarRef ref) heap)
+  lift $ put' (unVarRef ref) heap x
   pure $ writeVarRef ref x
 
 duplicateStore :: MonadRef m => Heap -> VerseT m ()
