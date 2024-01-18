@@ -8,7 +8,7 @@ module Main
   ) where
 
 import Control.Applicative
-import Control.Monad
+import Control.Monad hiding (join)
 import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Supply
@@ -26,7 +26,8 @@ import Test.HUnit
 
 main :: IO ()
 main = runTestTTAndExit $ TestList
-  [ test1
+  [ test0
+  , test1
   , test2
   , test3
   , test4
@@ -40,6 +41,7 @@ main = runTestTTAndExit $ TestList
   , test12
   , test13
   , test14
+  , test15
   ]
 
 pattern Known :: f (Fix (Compose Maybe f)) -> Fix (Compose Maybe f)
@@ -86,6 +88,14 @@ unifyValList = curry $ \ case
   ([], []) -> pure ()
   (x:xs, y:ys) -> unifyVal x y *> unifyValList xs ys
   _ -> empty
+
+test0 :: Test
+test0 = TestCase $ do
+  z <- runSupplyT $ runVerseT do
+    x <- freshIVar
+    _ <- one $ readIVar x
+    writeIVar x ()
+  z @?= Just [()]
 
 test1 :: Test
 test1 = TestCase $ do
@@ -276,3 +286,15 @@ test14 = TestCase do
   void $ runSupplyT $ runVerseT $ void $ readIVar =<< all do
     void $ readIVar =<< for (void $ pure ()) do
       \ _ -> pure () <|> pure ()
+
+test15 :: Test
+test15 = TestCase do
+  z <- runSupplyT $ runVerseT do
+    void $ all do
+      x <- coerce <$> freshVar
+      void $ all do
+        void $ all do
+          unifyVal x . coerce =<< newVar . Int =<< pure 2
+        unifyVal x . coerce =<< newVar . Int =<< pure 2 <|> pure 2
+      unifyVal x . coerce =<< newVar . Int =<< pure 2 <|> pure 2
+  z @?= Just [()]

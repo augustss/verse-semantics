@@ -6,6 +6,9 @@ module Language.Verse.Loc
   , L (..)
   , loc
   , uncurryL
+  , liftL1
+  , liftL2
+  , liftL3
   ) where
 
 import Control.Comonad.Env
@@ -59,3 +62,12 @@ loc (L x _) = x
 
 uncurryL :: (Loc -> a -> b) -> L a -> b
 uncurryL f (L x y) = f x y
+
+liftL1 :: Functor f => (f a -> b) -> f a -> f b
+liftL1 f x = f x <$ x
+
+liftL2 :: Apply f => (f a -> f b -> c) -> f a -> f b -> f c
+liftL2 f x y = f x y <$ x <. y
+
+liftL3 :: Apply f => (f a -> f b -> f c -> d) -> f a -> f b -> f c -> f d
+liftL3 f x y z = f x y z <$ x <. y <. z

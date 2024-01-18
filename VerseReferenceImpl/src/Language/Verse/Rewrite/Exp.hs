@@ -5,14 +5,27 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Rewrite.Exp
   ( Exp (..)
+  , Quantifier (..)
   , OC (..)
+  , ofType
+  , bracketInvoke
+  , alloc2
+  , alloc3
+  , infixColonEqual
+  , prefixColon
+  , mixfixArrowColonEqual
+  , name
+  , ifArchetypeName
+  , Path (..)
   ) where
 
 import Data.ByteString.Internal (w2c)
 import Data.Char
+import Data.Functor.Apply
 import Data.Text (Text)
 
 import Language.Verse.Effect.Split qualified as Split
+import Language.Verse.Loc
 import Language.Verse.Name
 
 import Data.Word (Word8)
@@ -46,6 +59,8 @@ data Exp f a
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
   | Forall (f a)
+  | Alloc2 (f a) (f (Exp f a))
+  | Alloc3 (f a) (f (Exp f a)) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
@@ -54,12 +69,15 @@ data Exp f a
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
   | Lam (f (Exp f a)) !OC !Split.Effect !(Maybe (f (Exp f a))) (f (Exp f a))
-  | MixfixVarColonEqual (f a) (f a) (f (Exp f a)) (f (Exp f a))
-  | InfixColonEqual !Bool (f a) (f (Exp f a))
+  | InfixColonEqual !Quantifier (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
   | MixfixArrowColonEqual (f a) (f a) (f (Exp f a))
   | Name a
+  | QualName (f (Exp f a)) Name
+  | ExpPath (Path f)
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
+
+data Quantifier = Val | Fun | Var deriving Show
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f Text)
@@ -90,9 +108,15 @@ instance ( Pretty (f (Exp f a))
       maybe mempty (parens . pretty) e1 <+>
       braces (pretty e2)
     Inst e1 e2 -> parens (pretty e1) <+> braces (pretty e2)
+    Module e -> "module" <> braces (pretty e)
+    Struct e -> "struct" <> braces (pretty e)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     Exists x -> "exists" <+> pretty x
     Forall x -> "forall" <+> pretty x
+    Alloc2 x e ->
+      "alloc" <> parens (pretty x) <+> pretty e
+    Alloc3 x e1 e2 ->
+      "alloc" <> parens (pretty x) <+> pretty e1 <> parens (pretty e2)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
     Int x -> pretty x
@@ -106,15 +130,13 @@ instance ( Pretty (f (Exp f a))
       angles (pretty eff) <>
       maybe mempty (\ e2 -> colon <> pretty e2) e2 <+>
       braces (pretty e3)
-    MixfixVarColonEqual x y e1 e2 ->
-      "var" <+> pretty x <> colon <>
-      parens (pretty y <+> equals <+> pretty e1) <+>
-      equals <+> pretty e2
     InfixColonEqual _ x e -> pretty x <+> ":=" <+> pretty e
     PrefixColon e -> colon <> pretty e
     MixfixArrowColonEqual x y e ->
       pretty x <+> "->" <+> pretty y <+> ":=" <+> pretty e
     Name x -> pretty x
+    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
+    ExpPath x -> pretty x
     IfArchetypeName x e1 e2 ->
       "if" <+> parens ("archetype" <> parens (pretty x)) <+> braces (pretty e1) <+>
       "else" <+> braces (pretty e2)
@@ -136,3 +158,48 @@ instance Pretty OC where
   pretty = \ case
     O -> "open"
     C -> "closed"
+
+ofType :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+ofType = liftL2 OfType
+
+bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+bracketInvoke = liftL2 BracketInvoke
+
+alloc2 :: Apply f => f a -> f (Exp f a) -> f (Exp f a)
+alloc2 = liftL2 Alloc2
+
+alloc3 :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+alloc3 = liftL3 Alloc3
+
+infixColonEqual :: Apply f => Quantifier -> f a -> f (Exp f a) -> f (Exp f a)
+infixColonEqual = liftL2 . InfixColonEqual
+
+prefixColon :: Functor f => f (Exp f a) -> f (Exp f a)
+prefixColon = liftL1 PrefixColon
+
+mixfixArrowColonEqual
+  :: Apply f
+  => f a
+  -> f a
+  -> f (Exp f a)
+  -> f (Exp f a)
+mixfixArrowColonEqual = liftL3 MixfixArrowColonEqual
+
+name :: Functor f => f a -> f (Exp f a)
+name = fmap Name
+
+ifArchetypeName :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+ifArchetypeName = liftL3 IfArchetypeName
+
+data Path f
+ = Path (f Name) [(Maybe (Path f), f Name)]
+
+deriving instance ( Show (f Name)
+                  ) => Show (Path f)
+
+instance ( Pretty (f Name)
+         ) => Pretty (Path f) where
+  pretty (Path label pathIdents) = "/" <> pretty label <> foldr prettyPath mempty pathIdents
+   where
+    prettyPath (Nothing, ident) doc = "/" <> pretty ident <> doc
+    prettyPath (Just path, ident) doc = "/(" <> pretty path <> ":)" <> pretty ident <> doc

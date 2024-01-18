@@ -1,4 +1,3 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-Y := if (X = 1) then 1 else 2
-X := 3
-Y
+B[0]
+var B:type{(:int, :int)} = (1, 1)

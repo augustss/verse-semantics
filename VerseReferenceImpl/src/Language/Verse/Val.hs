@@ -55,44 +55,46 @@ data Val ref a
   | Char {-# UNPACK #-} !Word8
   | AnyChar32
   | Char32 {-# UNPACK #-} !Char
+  | Path [Name]
   | Truth a
   | Tuple [a]
+  | Ptr (ref (Val ref a)) a
   | Module
     {-# UNPACK #-} !Label
-    !(Env Name ref a)
+    !(Env Name a)
   | Enum
     {-# UNPACK #-} !Label
-    !(Env Name ref a) [a]
+    !(Env Name a) [a]
   | EnumValue
     {-# UNPACK #-} !Label
     {-# UNPACK #-} !Name
   | Struct
     {-# UNPACK #-} !Label
-    !(Env Ident ref a)
-    !(Desugar.Env L Ident)
+    !(Env Ident a)
+    !(Desugar.Env Ident)
     !Exp
   | StructInst
     {-# UNPACK #-}
     !Label
-    !(Env Name ref a)
+    !(Env Name a)
   | Class
     {-# UNPACK #-} !Label
-    !(Env Ident ref a)
+    !(Env Ident a)
     !(Maybe a)
-    !(Desugar.Env L Ident)
+    !(Desugar.Env Ident)
     !Exp
   | ClassInst
     {-# UNPACK #-} !Label
     !(Maybe a)
-    !(Env Name ref a)
+    !(Env Name a)
   | Lam
-    !(Env Ident ref a)
+    !(Env Ident a)
     !Ident
     !Exp
   | AnyOLam
   | OLam
-    !(Env Ident ref a)
-    !(Desugar.Env L Ident)
+    !(Env Ident a)
+    !(Desugar.Env Ident)
     !Exp
     !Exp
     a
@@ -112,8 +114,10 @@ forVal_ x f = case x of
   Char _ -> pure ()
   AnyChar32 -> pure ()
   Char32 _ -> pure ()
+  Path _ -> pure ()
   Truth x -> void $ f x
   Tuple xs -> for_ xs f
+  Ptr _ x -> void $ f x
   Module _ env -> forEnv_ env f
   Enum _ env xs -> forEnv_ env f *> for_ xs f
   EnumValue {} -> pure ()
@@ -125,12 +129,6 @@ forVal_ x f = case x of
   AnyOLam -> pure ()
   OLam _ _ _ _ tail -> void $ f tail
   Intrinsic _ tail -> void $ f tail
-
-type VarVal m = Fix (Compose (Var m) (Val (VarRef m)))
-
-type VarRefVal m = VarRef m (Val (VarRef m) (VarVal m))
-
-type FrozenVal = Fix (Compose Maybe (Val Maybe))
 
 instance Freshenable a m => Freshenable (Val f a) m where
   freshen x = case x of
@@ -146,8 +144,10 @@ instance Freshenable a m => Freshenable (Val f a) m where
     Char _ -> pure x
     AnyChar32 -> pure x
     Char32 _ -> pure x
+    Path _ -> pure x
     Truth x -> Truth <$> freshen x
     Tuple xs -> Tuple <$> for xs freshen
+    Ptr ref x -> Ptr ref <$> freshen x
     Module i env -> Module i <$> for env freshen
     Enum i env xs -> Enum i <$> for env freshen <*> for xs freshen
     EnumValue {} -> pure x
@@ -186,8 +186,10 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
     Char x -> pure $ Char x
     AnyChar32 -> pure AnyChar32
     Char32 x -> pure $ Char32 x
+    Path x -> pure $ Path x
     Truth x -> Truth <$> freeze x
     Tuple xs -> Tuple <$> for xs freeze
+    Ptr ref x -> Ptr <$> freeze ref <*> freeze x
     Module i env -> Module i <$> for env freeze
     Enum i env xs -> Enum i <$> for env freeze <*> for xs freeze
     EnumValue i x -> pure $ EnumValue i x
@@ -208,7 +210,6 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
       pure $ OLam env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freeze tail
 
-
 instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
   pretty = \ case
     Any -> "any"
@@ -224,9 +225,11 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
     Char x -> "'" <> pretty (w2c x) <> "'"
     AnyChar32 -> "char32" <> lbracket <> pretty '_' <> rbracket
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
+    Path xs ->  prettyPath xs
     Truth x -> align $ "truth" <> group (braces $ pretty x)
     Tuple [] -> "false"
     Tuple xs -> tupled $ pretty <$> xs
+    Ptr ref x -> "ptr" <> parens (pretty x) <> parens (pretty ref)
     Module i env ->
       align $
       "module#" <>
@@ -268,6 +271,7 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
     OLam {} -> "function"
     Intrinsic {} -> "function"
     where
+      prettyPath xs = foldr ( \ a b -> "/" <> pretty a <> b ) mempty xs
       prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
         align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
       tupled =
@@ -288,39 +292,41 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
 
+type VarVal m = Fix (Compose (Var m) (Val (VarRef m)))
+
+type VarRefVal m = VarRef m (Val (VarRef m) (VarVal m))
+
+type FrozenVal = Fix (Compose Maybe (Val Maybe))
+
 type Exp = L (Desugar.Exp L Ident)
 
-data Named ref a
-  = Val a
-  | Ref (ref (Val ref a)) a
+data Named a = Val a | Ref a
 
-forNamed_ :: Applicative m => Named ref a -> (a -> m b) -> m ()
+forNamed_ :: Applicative m => Named a -> (a -> m b) -> m ()
 forNamed_ x f = case x of
   Val x -> void $ f x
-  Ref _ x -> void $ f x
+  Ref x -> void $ f x
 
-type VarNamed m = Named (VarRef m) (VarVal m)
+type VarNamed m = Named (VarVal m)
 
-instance Freshenable a m => Freshenable (Named ref a) m where
+instance Freshenable a m => Freshenable (Named a) m where
   freshen = \ case
     Val x -> Val <$> freshen x
-    Ref x y -> Ref x <$> freshen y
+    Ref x -> Ref <$> freshen x
 
-instance ( Freezable (f (Val f a)) (g (Val g b)) m
-         , Freezable a b m
-         ) => Freezable (Named f a) (Named g b) m where
+instance Freezable a b m => Freezable (Named a) (Named b) m where
   freeze = \ case
     Val x -> Val <$> freeze x
-    Ref x y -> Ref <$> freeze x <*> freeze y
+    Ref x -> Ref <$> freeze x
 
-instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Named ref a) where
+instance Pretty a => Pretty (Named a) where
   pretty = \ case
     Val x -> pretty x
-    Ref x _ -> pretty x
+    Ref x -> pretty x
 
-type Env k ref a = HashMap k (Named ref a)
+type Env k a = HashMap k (Named a)
 
-forEnv_ :: Applicative m => Env k ref a -> (a -> m b) -> m ()
+forEnv_ :: Applicative m => Env k a -> (a -> m b) -> m ()
 forEnv_ x f = for_ x $ \ x -> forNamed_ x f
 
-type VarEnv k m = Env k (VarRef m) (VarVal m)
+type VarEnv k m = Env k (VarVal m)

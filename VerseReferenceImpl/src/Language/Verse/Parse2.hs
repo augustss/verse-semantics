@@ -42,6 +42,8 @@ import Language.Verse.Parse.Exp ( pattern (:->:)
 import Language.Verse.Parse.Exp qualified as Pat
 import Language.Verse.Parse.Exp (IdentExp)
 import Language.Verse.Parse.Exp qualified as IdentExp
+import Language.Verse.Parse.Exp (Path)
+import Language.Verse.Parse.Exp qualified as Path
 import Language.Verse.Pos qualified as Pos
 
 import Numeric(readHex, readBin)
@@ -308,8 +310,12 @@ pNumT =
   <|>
   (mkNum <$> pos <*> pDigits <*> P.optionMaybe (P.try (pDot *> pDigits)) <*> P.optionMaybe pExp <*> P.optionMaybe pUnits <*> pos)
  where
-   mkHex p1 xs p2 = L (toLoc p1 p2)  $ Exp.Int . fst . head . readHex . map w2c $ xs
-   mkBin p1 xs p2 = L (toLoc p1 p2)  $ Exp.Int . fst . head . readBin . map w2c $ xs
+   mkHex p1 xs p2 = L (toLoc p1 p2)  $ Exp.Int . fst . head' xs . readHex . map w2c $ xs
+   mkBin p1 xs p2 = L (toLoc p1 p2)  $ Exp.Int . fst . head' xs . readBin . map w2c $ xs
+
+   head' s [] = error ("Failed to parse " ++ show s)
+   head' _ (x:_) = x
+
 
    mkNum :: PPos.SourcePos -> [Word8] -> Maybe [Word8] -> Maybe (Char, [Word8]) -> Maybe (L Name) -> PPos.SourcePos -> L (Exp Name)
    mkNum p1 is Nothing   Nothing units p2 =  addUnits units $ Exp.Int (wsToInteger is) <$ unitLoc p1 p2
@@ -329,7 +335,7 @@ pNumT =
 
    fixHexChar :: (Char->Exp Name) -> PPos.SourcePos -> [Word8] -> PPos.SourcePos -> L (Exp Name)
    fixHexChar c p1 ws p2 =
-     L (toLoc p1 p2) $ c $ Char.chr $ fst $ head $ readHex $ map w2c ws
+     L (toLoc p1 p2) $ c $ Char.chr $ fst $ head' ws $ readHex $ map w2c ws
 
    addUnits Nothing e = e
    addUnits (Just u) e = Exp.Units e <$> duplicate u
@@ -430,13 +436,15 @@ pIdent = pIdentT <* pSpace
 
 -- Path      := '/' Label ('@' Label | !'@')] {'/' ['(' Path ":)"] Ident} !'/'
 -- Paths are currently represented with a Name, could be changed to something with structure
-pPathT :: Parser Name
+pPathT :: Parser (Path Name)
 pPathT = do
   _ <- match '/'
+  p0 <- pos
   label <- pLabel
   atLabel <- P.optionMaybe pAtLabel
+  p1 <- pos
   idents <- P.many $ (,) <$ pSlash <*> P.optionMaybe (pLParen *> pPathT <* pColonParen) <*> pIdentT
-  return $ Text.pack "/" <> label <> fixAt atLabel <> Text.concat (map fixIdent idents)
+  return $ Path.Path (wrapLoc p0 (label <> fixAt atLabel) p1) idents
  where
    pAtLabel :: Parser Name
    pAtLabel = pAt *> pLabel
@@ -444,10 +452,6 @@ pPathT = do
    fixAt :: Maybe Name -> Name
    fixAt Nothing = Text.empty
    fixAt (Just txt) = Text.pack "@" <> txt
-
-   fixIdent :: (Maybe Name, L Name) -> Name
-   fixIdent (Nothing, extract -> name) = Text.pack "/" <> name
-   fixIdent (Just path, extract -> name) = Text.pack "/(" <> path <> Text.pack ":)" <> name
 
 pPath :: Parser (L (IdentExp Name))
 pPath = wrapLoc <$> pos <*> (IdentExp.IdentPath <$> pPathT) <*> pos <* pSpace
@@ -461,9 +465,10 @@ pLabel = do
     Left err -> fail $ "Label with illegal utf8 character " ++ show err
     Right txt -> return txt
  where
+  isLabel '_' = True
   isLabel '-' = True
   isLabel '.' = True
-  isLabel x = Char.isAlphaNum x
+  isLabel x = isAlphaNum x
 
 -- Interp    := '{' List '}'
 pInterp :: Parser (L (Exp Name))

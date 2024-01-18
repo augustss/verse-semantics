@@ -586,40 +586,12 @@ $$
                                             check fx (z := DAe (inp f si) j; Me (inp2 z si mdpos) t_2))); |} \\
 & &   & |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)| \\[1mm]
 \rulename{mcfun-} &  |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)|
-& = & |lam i (j := Me (inp2 i infer mdpos) t_1;
-                havoc fx; z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2)| \\[1mm]
+& = & |lam i ((j := Me (inp2 i infer mdpos) t_1) guard
+                    (havoc fx; z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2))| \\[1mm]
 \rulename{mcfunx}& |DMe (inp2 f si mdx) (functionOCX closed t_1 fx t_2)|
 & = & |lam i (j := Me (inp2 i infer mdx) t_1;
               z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)| \\[2mm]
 \end{array}
-\\
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{4}{l}{\mbox{\it Open functions}} \\
-
-\rulename{mofun+}  & |DMe (inp2 f si mdpos) (functionOCX open t_1 fx t_2)|
-& = & \multicolumn{2}{@@{}l}{|verify(forall i (j := Me (inp2 i solve mdneg) t_1;
-                                            check fx (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
-& &   & |DMe (inp2 f si mdneg) (functionOCX open t_1 fx t_2)| \\[1mm]
-
-\rulename{mofun-}  & |DMe (inp2 f si mdneg) (functionOCX open t_1 fx t_2)|
- & = & |defhdr h olamKW| \left( \begin{array}{@@{}l@@{}}
-    |h,| \\
-    |lam i (j := Me (inp2 i infer mdx) t_1; arr (j, x_1, dots, x_n)), | \\
-    |lamhdr x| \begin{array}[t]{@@{}l@@{}}
-      |(arr (j, x_1, dots, x_n):= x; havoc fx;| \\
-      |z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2)|
-      \end{array}
-   \end{array} \right) \\
-    && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}} \\
-
-\rulename{mofunx}  & |DMe (inp2 f si mdx) (functionOCX open t_1 fx t_2)|
-  & = & |defhdr h olamKW| \left( \begin{array}{@@{}l@@{}}
-    |h,| \\
-    |lam i (j := Me (inp2 i infer mdx) t_1; arr (j, x_1, dots, x_n)), | \\
-    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)|
-   \end{array} \right) \\
-    && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
-\end{array} \\[10mm]
 \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
@@ -664,54 +636,38 @@ $$
 \caption{{\bf DS9}: Small Source to Big Core } \label{fig:ds9}
 \end{figure}
 
-\begin{figure}
-$$
-\begin{array}{@@{}l}
-
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{4}{l}{\mbox{\it Function rules (verification)}} \\
-\rulename{mcfun} &  |DMe (inp f si) (functionOC closed t_1 t_2)|
-& = & \multicolumn{2}{@@{}l}{|verify(lam i (j := (Me (inp i (flipsi si)) t_1);
-                                            z := DAe (inp f si) j; Me (inp z si) t_2)); |} \\
-& &   & |lam i (j := Me (inp i (flipsi si)) t_1; assume (z :=  DAe (inp f si) j;
-                                             Me (inp z si) t_2))| \\[2mm]
-\end{array} \\
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-
-\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
-         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; (De t_2)^[y];| \hspace{5mm} \text{|y| fresh}} \\
-         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
-\\
-\rulename{asm-semi} & |assume (v == e_1; e_2)| & \movesto & |v == (assume e_1); assume e_2| \\
-\rulename{check-semi} & |check fx (v=e_1; e_2)| & \movesto & |v = (check fx e_1); check fx e_2| \\
- & & \multicolumn{2}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
-\rulename{asm-verify} & |assume (E^[verify e_1; e_2]| & \movesto & |E^[e_2]| \\
-\rulename{asm-val} & |assume v| & \movesto & |v| \\
-\rulename{verify-gc} & |verify e_1; e_2| & \movesto
-   & \multicolumn{2}{l}{|e_2| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e_1|}}
-\end{array} \\
-\\
-\begin{minipage}{12cm}
-  \begin{itemize}
-  \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
-  \item |verify e| checks that |e| neither gets stuck nor goes wrong.
-\end{itemize}
-Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
-\end{minipage}
-\end{array}$$
-\caption{\bf DS7-new: SPJ attempt to simplify}
-\end{figure}
-
 
 \begin{figure}[t]
   $$
 \begin{array}{@@{}l}
-\mbox{\em Core Syntax} \\
-\begin{array}{@@{}lr@@{\;}c@@{\;}l@@{}l}
-      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e|  \vb |olam v (lam x e_1) (lam y e_2)| \\
-\end{array} \\[4mm]
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{@@{}l}{\mbox{\it Desugaring rules for open functions}} \\
+\rulename{mofun+}  & |DMe (inp2 f si mdpos) (functionOCX open t_1 fx t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(forall i (j := Me (inp2 i solve mdneg) t_1;
+                                            check fx (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
+& &   & |DMe (inp2 f si mdneg) (functionOCX open t_1 fx t_2)| \\[1mm]
 
-\mbox{\em Rewrite rules} \\
+\rulename{mofun-}  & |DMe (inp2 f si mdneg) (functionOCX open t_1 fx t_2)|
+ & = & |defhdr h olamKW| \left( \begin{array}{@@{}l@@{}}
+    |h,| \\
+    |lam i (j := Me (inp2 i infer mdx) t_1; arr (j, x_1, dots, x_n)), | \\
+    |lamhdr x| \begin{array}[t]{@@{}l@@{}}
+      |(arr (j, x_1, dots, x_n):= x; havoc fx;| \\
+      |z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2)|
+      \end{array}
+   \end{array} \right) \\
+    && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}} \\
+
+\rulename{mofunx}  & |DMe (inp2 f si mdx) (functionOCX open t_1 fx t_2)|
+  & = & |defhdr h olamKW| \left( \begin{array}{@@{}l@@{}}
+    |h,| \\
+    |lam i (j := Me (inp2 i infer mdx) t_1; arr (j, x_1, dots, x_n)), | \\
+    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)|
+   \end{array} \right) \\
+    && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
+\end{array} \\[10mm]
+\\
+\mbox{\em Rewrite rules for open lambdas} \\
 \begin{array}{@@{} l r c l l}
   \rulename{u-olam}          & \multicolumn{3}{l}{|olam v_1 dom_1 rng_1 == olam v_2 dom_2 rng_2|} \\
   & \multicolumn{3}{l}{\hspace{5mm} \movesto |defKW z|.
@@ -721,26 +677,13 @@ Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
    \end{array}} \\[5mm]
 \rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &  |if (x := apply1N dom v) then apply1N rng x else apply1N g v|
 \end{array}\\
-\\
-
-\mbox{\em Desugaring rules (for execution)} \\
-\begin{array}{@@{}lr@@{\;}c@@{\;}l}
-\rulename{mofun}  & |DMe (inp f si) (functionOC open t_1 t_2)|
-& = & |olamKW| \left( \begin{array}{l}
-    |f,| \\
-    |lam i (j := Me (inp i (flipsi si)) t_1; arr (j, x_1, dots, x_n)), | \\
-    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp z si) t_2)| \\
-   \end{array} \right) \\
-&& \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
-\end{array}
-
 \end{array}
 $$
-\caption{Extra stuff for open functions (temporary figure)} \label{fig:open}
+\caption{Extra stuff for open functions} \label{fig:open}
 \end{figure}
 
 
-\Cref{fig:ds8} desugars Small Source Verse into Big Core Verse. (See \Cref{sec:big-core} for the syntax of
+\Cref{fig:ds9} desugars Small Source Verse into Big Core Verse. (See \Cref{sec:big-core} for the syntax of
 Big Core.)
 The key function is |DMe (inp2 i si md) t|, which desugars a Small Source term |t| to produce a
 Big Core expression |e|. Desugaring takes:
@@ -1002,62 +945,46 @@ can very easily be desugared into it.  Specifically:
 
 \subsection{Syntax}
 
- \figureSyntax
+\figureSyntax
 The syntax of Core Verse expressions is in \Cref{fig:vc-syntax}.
 
 \subsection{Rewrite rules} \label{sec:rewrite-rules}
 
- \figureRewriteRules
+\figureRewriteRules
 The Core Verse rewrite rules are given in \Cref{fig:rules}.
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\rulename{asm-elim} & |assume v| & \movesto & |v| \\
+\rulename{asm-seq} & |assume (e_1 ; e_2)| & \movesto & |assume e_1; assume e_2| \\
+\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
+\rulename{check-semi} & |check fx (v=e_1; e_2)| & \movesto & |v = (check fx e_1); check fx e_2| \\
+ & & \multicolumn{2}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
+\rulename{asm-verify} & |assume (E^[verify e_1; e_2]| & \movesto & |E^[e_2]| \\
+\rulename{verify-gc} & |verify e_1; e_2| & \movesto
+   & \multicolumn{2}{l}{|e_2| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e_1|}}
+\end{array} \\
+\\
+\begin{minipage}{12cm}
+  \begin{itemize}
+  \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
+  \item |verify e| checks that |e| neither gets stuck nor goes wrong.
+\end{itemize}
+Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
+\end{minipage}
+\end{array}$$
+\caption{\bf SPJ verification rules}
+\end{figure}
 
 % ------------------------------------------------
 % TRSVerifier
 
 \section{Verifier}
 
-\begin{figure}
-$$
-\begin{array}{@@{}l@@{}}
-
-\begin{array}{rcll}
-\multicolumn{4}{l}{\text{\bf Substitution contexts}} \\
-|S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e|
-\end{array}
-\\
-\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
-
-\\[-0.6em]
-
-\rulegroupname{Application, unification, choice rules as in \Cref{fig:rules}}
-\\
-\rulegroupname{Substitution:}
-
-\rulename{subst1} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
-  & \text{if $|v|\ne|V^[x]|$} \\
-\rulename{subst2} & |assume (x==e_1); e_2| & \movesto & |assume (x==e_1);  subst e_2 e_1 x|
-    \\[-0.6em]
-
-\rulegroupname{Normalization:}
-\rulename{exi-elim1} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[()]| & \text{if $|x| \notin \freevars{|E|}$}\\
-% \rulename{exi-app} & |def f E^[apply1 f v]| & \movesto & |def y E^[y]| & \text{if $|f| \notin \freevars{|E,v|} \cup \boundvars{|E|}$} \\
-%\rulename{exi-app} & |def f E^[apply1 f v]| & \movesto & |def f E^[def y y]|
-%  & \text{if $|f|$ appears only in calls |apply1 f v| in |E|} \\
-\rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-%\rulename{exi-float-l}^{\alpha} & |v==(def x e_1);e_2| & \movesto & |def x (v==e_1;e_2)| & \text{if $x \notin \freevars{|v,e_2|}$} \\
-%\rulename{exi-float-r} & |def x (v==e_1;e_2)| & \movesto & |v==e_1;def x e_2| & \text{if $x \notin \freevars{|v,e_1|}$} \\
-%\rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
-\rulename{seq-assoc} & |v_2==(v_1==e_1 ; e_2) ; e_3| & \movesto & |v_1==e_1 ; v_2==e_2 ; e_3| \\
-
-\end{array}
-\end{array}
-$$
-\caption{Verification rules (Dec 23)}
-\end{figure}
-
-
-\input{../trsverifier/overview}
 \input{../trsverifier/rules}
+\input{../trsverifier/overview}
 \input{../trsverifier/examples}
 
 % ------------------------------------------------

@@ -30,6 +30,10 @@ pp = putStrLn . prettyShow
 ppl :: (Pretty a) => PrettyLevel -> a -> IO ()
 ppl l = putStrLn . render . pPrintL l
 
+ppx :: (Pretty a) => a -> IO ()
+ppx = putStrLn . renderStyle s . pPrintL prettyNormal
+  where s = style{ lineLength = 150, ribbonsPerLine = 1.2 }
+
 type PPPrec = Rational
 
 data PPFixity = PPInfixL PPPrec | PPInfixR PPPrec | PPInfix PPPrec

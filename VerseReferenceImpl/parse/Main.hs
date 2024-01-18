@@ -11,9 +11,7 @@ import Data.ByteString qualified as ByteString
 import Data.ByteString(ByteString)
 import Data.List(sort, find, isSuffixOf)
 import Language.Verse.Desugar qualified as D
-import Language.Verse.Lexer
 import Language.Verse.Mode
-import Language.Verse.Parse qualified as P
 import Language.Verse.Parse2  qualified as P2
 import Language.Verse.Rewrite qualified as R
 import Language.Verse.Error
@@ -50,10 +48,7 @@ noOptions = Options {
   }
 
 
--- old and new parser
-parser :: String -> ByteString -> Either Error (L (Exp Name))
-parser _ contents = runLexer P.parse contents
-
+-- back to one parser
 parser2 :: String -> ByteString -> Either Error (L (Exp Name))
 parser2 path contents = P2.parse2 path contents
 
@@ -118,8 +113,6 @@ extractFlags options ("--skiplist":path:paths) = do
   let sl = read content
   if verbose options then hPutStrLn stdout ("Found skiplist: " ++ show sl) else return ()
   extractFlags options{ skiplist = sl } paths
-extractFlags options ("--new":paths)       = extractFlags options{ getParser = parser2 } paths
-extractFlags options ("--old":paths)       = extractFlags options{ getParser = parser } paths
 extractFlags options ("--desugar":paths)  = extractFlags options{ getWorker = desugar } paths
 extractFlags options ("--desugar-verification":paths) = extractFlags options{ getWorker = desugar, mode = Verification } paths
 extractFlags options ("--desugar-execution":paths) = extractFlags options{ getWorker = desugar, mode = Execution } paths

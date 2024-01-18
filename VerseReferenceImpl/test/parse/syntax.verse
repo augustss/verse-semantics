@@ -27,6 +27,9 @@
 "This is not a {
 }multi line string"
 "You have { count } points"
+'a'
+"abcåäö"
+"abc{42}def"
 
 # Some literals can have units
 
@@ -44,6 +47,11 @@ apa1
 /abc.def@whatever.com/(/here/be/path:)ap.a4                                            # This is a path '/abc.def@whatever.com/(/here/be/path:)ap', infix '.', and an identifier 'a4'
 /abc/cde/fgh/i.k/l_n/o.q                                                               # /abc/cde/fgh/i . k / l_n / o . q
 # /abc.def@whatever.com/(not_a_path:)ap.a4                                             # This a syntax error, paths must be qualified with paths
+(/mail@path/xx:)Value
+(/path/xx:)Value
+(/path:)Value
+
+
 
 # Indentation differs between ShipVerse and ebnf
 
