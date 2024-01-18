@@ -1,0 +1,308 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../calculus.fmt
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Examples}\label{sec:examples}
+
+$$\begin{array}{ll}
+|f^(x:int) :== x+1|                                                           & \text{\# pass} \\
+|f^(x:int) :== x+1; apply1 f 42|                                              & \text{\# pass} \\
+|f^(x:int) :== x+1; apply1 f (arr ())|                                        & \text{\# fail} \\
+|f^(x):int :== myite ((apply1 int x)) (x + 1) 0|                              & \text{\# pass} \\
+|f^(n):int :== myite (0 < n) (n + (apply1 f (n-1))) 0|                        & \text{\# pass} \\
+|f^(x:int) :== {x + 1}; g^(h^(z:int):int):int :== {h^(3)}; g^(f)|             & \text{\# pass} \\
+|t^(x:int)(eff decides) :== {x = 666 choice x = 42}; f^(z:t):t :== {708 - z}| & \text{\# pass} \\
+\end{array}$$
+
+\mypara{Example 0} Consider |f^(x:int):int :== x|, represented as the surface term
+\begin{align*}
+& |def f (f = (fndef x int (tup (succeedKW) : int) x))| \\
+\intertext{Desugaring turns the definition of |f| into the verification goal}
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; x); succeed (apply1 int x; arr ())))); f = v)| \\
+\intertext{where $|v| \doteq |lam x (apply1 int x; assume (apply1 int x))|$. The above rewrites as}
+& \movestoR{subst}\ \text{with}\ |x = y| \\
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; y); succeed (apply1 int y; arr())))); f = v)| \\
+& \movestoR{asm-seq}\\
+& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); succeed (apply1 int y; arr())))); f = v)| \\
+& \movestoR{prove}\\
+& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); succeed (arr())))); f = v)| \\
+& \movestoR{suc-elim}\\
+& |def f (verify (lam y (def x (assume (apply1 int y); assume(x = y); assume (y); arr()))); f = v)| \\
+& \movestoR{prove-elim}\\
+& |def f (arr (); f = v)| \\
+\intertext{at which point the verifier is done and accepts the program.}
+\end{align*}
+
+\mypara{Example 1: Unification} Consider the following surface term
+$$ |def f (f = (functionKW (x:int,y:int,z:int where x=y)(tup (succeedKW)) { def (a, b) (a = x; b = a; b = y) }))| $$
+which desugars to the core expression
+$$ |def f (verify (lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def (a, b) (a = x; b = a; b = y; arr()) ))); f = xdots)| $$
+where we elide the actual $\lambda$-term defining |f| for brevity. The |verify ()| block corresponds to checking the
+body of |f| under the input types and rewrites as
+\begin{align*}
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def (a, b) (a = x; b = a; b = y; arr()))))| \\
+& \movestoR{subst}\ \text{with}\ |x = y| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def (a, b) (a = y; b = a; b = y; arr()))))| \\
+& \movestoR{subst}\ \text{with}\ |a = y| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def (a, b) (a = y; b = y; b = y; arr()))))| \\
+& \movestoR{exi-elim}\ \text{the variable}\ |a| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def b (b = y; b = y; arr()))))| \\
+& \movestoR{subst}\ \text{with}\ |b = y| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (def b (b = y; y = y; arr()))))| \\
+& \movestoR{exi-elim}\ \text{the variable}\ |b| \\
+& |verify(lam (x,y,z) (assume (apply1 int x; apply1 int y; apply1 int z; x=y) ; succeed (y = y; arr())))| \\
+& \movestoR{asm-seq}\\
+& |verify(lam (x,y,z) (assume (apply1 int x); assume(apply1 int y); assume(apply1 int z); assume(x=y) ; succeed (y = y; arr())))| \\
+& \movestoR{prove}\ \text{using}\ |assume (apply1 int y)| \\
+& |verify(lam (x,y,z) (assume (apply1 int x); assume(apply1 int y); assume(apply1 int z); assume(x=y) ; succeed (arr())))| \\
+& \movestoR{suc-elim} \\
+& |verify(lam (x,y,z) (assume (apply1 int x); assume(apply1 int y); assume(apply1 int z); assume(x=y) ; arr()))| \\
+& \movestoR{prove-elim} \\
+& |arr ()|
+\end{align*}
+
+\mypara{Primitive Operators}
+%
+In the sequel, we assume that the infix names |+| and |-| are bound to the following core expressions,
+which test that that the inputs are |int| before invoking the respective primitive arithmetic operations
+|plus| and |minus|.
+%
+\begin{align*}
+|(+)| & \doteq\ |(lam p (def (a, b) ( p = tup (a, b); apply1 int a; apply1 int b; assume (def r (r = a plus b; apply1 int r)))))| \\
+|(-)| & \doteq\ |(lam p (def (a, b) ( p = tup (a, b); apply1 int a; apply1 int b; assume (def r (r = a minus b; apply1 int r)))))| \\
+\end{align*}
+
+\mypara{Example 2: Primitive Operations} Consider |f^(x:int) :== x + 1|, represented as the surface term
+%
+\begin{align*}
+& |def f (f = (fndef x int (tup (succeedKW)) (x + 1)))|
+\intertext{Desugaring turns the definition of |f| into the verification goal}
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; x); succeed (x + 1)))); f = v_f)| \\
+\intertext{where $v_f \doteq |lam x (apply1 int x; x + 1)|$. The above rewrites as}
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; x); succeed (apply1 int x; apply1 int 1; assume (def r (xdots; apply1 int r)))))); f = v_f)| \\
+& \movestoR{subst}    \\
+& |def f (verify (lam y (def x (assume (apply1 int y; x = y; y); succeed (apply1 int y; apply1 int 1; assume (def r (xdots; apply1 int r)))))); f = v_f)| \\
+& \movestoR{eqn-elim} \\
+& |def f (verify (lam y (assume (apply1 int y; y); succeed (apply1 int y; apply1 int 1; assume (def r (xdots; apply1 int r))))); f = v_f)| \\
+& \movestoR{asm-seq + seq-assoc} \\
+& |def f (verify (lam y (assume (apply1 int y; assume y; succeed (apply1 int y; apply1 int 1; assume (def r (xdots; apply1 int r)))))); f = v_f)| \\
+& \movestoR{prove} \\
+& |def f (verify (lam y (assume (apply1 int y; assume y; succeed (apply1 int 1; assume (def r (xdots; apply1 int r)))))); f = v_f)| \\
+& \movestoR{app-int} \\
+& |def f (verify (lam y (assume (apply1 int y; assume y; succeed (1; assume (def r (xdots; apply1 int r)))))); f = v_f)| \\
+& \movestoR{suc-elim} \\
+& |def f (verify (lam y (assume (apply1 int y; assume y; 1; assume (def r (xdots; apply1 int r))))); f = v_f)| \\
+& \movestoR{prove-elim} \\
+& |def f (arr (); f = v_f)|
+\end{align*}
+
+\mypara{Example 3: Verifying Applications} Next, consider |f^(x:int) :== {x + 1}; f^(42)|. This is represented as the surface term
+%
+\begin{align*}
+& |def f (f = (fndef x int (tup (succeedKW)) (x + 1)); apply1 f 42)| \\
+\intertext{which desugars into the below where the |verify (xdots)| is the same as above}
+& |def f (verify (xdots); f = (lam x (apply1 int x; (x + 1))); succeed (apply1 f 42))| \\
+& \movesto^{*} \text{many steps as in the previous example} \\
+& |def f (arr(); f = (lam x (apply1 int x; (x + 1))); succeed (apply1 f 42))| \\
+& \movestoR{val-elim} \\
+& |def f (f = (lam x (apply1 int x; x + 1)); succeed (apply1 f 42))| \\
+& \movestoR{app-beta + subst + eqn-elim} \\
+& |succeed (apply1 int 42; 42 + 1)| \\
+& \movestoR{app-beta} \\
+& |succeed (apply1 int 42; apply1 int 42; apply1 int 1; 42 plus 1)| \\
+& \movestoR{app-int} \\
+& |succeed (42; 42; 1; 42 plus 1)| \\
+& \movestoR{val-elim} \\
+& |succeed (42 plus 1)| \\
+& \movestoR{app-plus} \\
+& |succeed (43)| \\
+& \movestoR{suc-elim}\\
+& |43|
+\end{align*}
+
+\mypara{Example 3: Ill-typed application} Consider |f^(x:int) :== {x + 1}; f^(arr ())|, with the surface representation
+%
+\begin{align*}
+& |def f (f = (fndef x int (tup (succeedKW)) (x+1)); f^(arr ()))| \\
+\intertext{which desugars into the below where the |verify (xdots)| is the same as above}
+& |def f (verify (xdots); f = (lam x (apply1 int x; x + 1)); succeed (apply1 f (arr())))| \\
+& \movesto^{*} \text{as before} \\
+& |succeed (apply1 int (arr()); arr() + 1)| \\
+& \movestoR{app-int} \\
+& |succeed (fail; xdots)| \\
+& \movestoR{fail-elim} \\
+& |succeed (fail)|
+\end{align*}
+%
+The (final) normal form has a \emph{residual} obligation |succeed (xdots)|,
+so the verifier rejects the ill-typed program.
+
+\mypara{Example 4: HOFs and residual checks} see
+%
+% https://epicgames.slack.com/archives/C045HLE7T2N/p1690548481495029?thread_ts=1689879022.328029&cid=C045HLE7T2N
+%
+Consider |f(g(x:int):int) := g(10)|. Let
+\begin{align}
+e \doteq\ & |verify(lam x (assume(int[x]); succeed (def y (y = g'[x]; int[y]; y))));| \notag \\
+          & |g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y)))| \notag \\
+\intertext{the surface representation for |f| desugars to the core}
+& |def f (verify (lam g' (def g (assume e; succeed (g[10])))); f = lam g' (def g (e; assume (g[10]))); f)| \label{eq:hof:1} \\
+\end{align}
+%
+The |verify| block |lam g' (def g (assume e; succeed (g[10])))|, after expanding the definition of |e|
+and using \rulename{asm-seq} rewrites as
+%
+$$\begin{array}{ll}
+           & |lam g' (def g ())| \\
+           & \quad |assume(verify(lam x (assume(int[x]); succeed (def y (y = g'[x]; int[y]; y)))));| \\
+           & \quad |assume(g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y))));| \\
+           & \quad |succeed(g[10])| \\
+%
+& \movestoR{asm-ver} \\
+%
+           & |lam g' (def g ())| \\
+           & \quad |arr();| \\
+           & \quad |assume(g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y))));| \\
+           & \quad |succeed(g[10])| \\
+%
+& \movestoR{elim-val} \\
+%
+           & |lam g' (def g ())| \\
+           & \quad |assume(g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y))));| \\
+           & \quad |succeed(g[10])| \\
+&{\movestoR{subst + app-beta}} \\
+%
+           & |lam g' (def g ())| \\
+           & \quad |assume(g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y))));| \\
+           & \quad |succeed(int[10]; assume (def y (y = g'[10]; int[y]; y)))| \\
+%
+& \movestoR{app-int} \\
+%
+           & |lam g' (def g ())| \\
+           & \quad |assume(g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y))));| \\
+           & \quad |succeed(10; assume (def y (y = g'[10]; int[y]; y)))| \\
+%
+& \movestoR{elim-val} \\
+%
+           & |lam g' (def g ())| \\
+           & \quad |assume(g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y))));| \\
+           & \quad |succeed(assume (def y (y = g'[10]; int[y]; y)))| \\
+%
+& \movestoR{suc-elim} \\
+%
+           & |lam g' (def g ())| \\
+           & \quad |assume(g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y))));| \\
+           & \quad |assume (def y (y = g'[10]; int[y]; y))| \\
+%
+& \movestoR{prove-elim} \\
+%
+           & |arr()| \\
+%
+\end{array}$$
+Thus, via the above steps, (\ref{eq:hof:1}) rewrites to
+%
+\begin{align*}
+%
+& |def f (arr(); f = lam g' (def g (e; assume (g[10]))); f)| \\
+%
+& \movestoR{elim-val} \\
+%
+& |def f (f = lam g' (def g (e; assume (g[10]))); f)| \\
+%
+& \movestoR{subst + exi-elim}  \\
+%
+& |lam g' (def g (e; assume (g[10])))| \\
+%
+\intertext{expanding the definition of |e|} \\
+%
+& |lam g' (def g ())| \\
+& \quad |verify(lam x (assume(int[x]); succeed (def y (y = g'[x]; int[y]; y))));| \\
+& \quad |g = lam x (int[x]; assume(def y (y = g'[x]; int[y]; y)));| \\
+& \quad |assume(g[10])|
+\intertext{which contains a |succeedKW| but in a  |verify| that
+is under a $\lambda$, so the verifier accepts the program.}
+\end{align*}
+%
+
+% TODO: typeset
+\begin{comment}
+## desugar
+
+exists f .
+  verify{\g'. exists g .
+              assume{verify{\x. assume{int[x]}; assert{exists y . y = g'[x]; int[y]; y}};
+                     g = (\x. {int[x]}; assume{exists y . y = g'[x]; int[y]; y})};
+              assert{g[10]}};
+  f = (\g'. exists g .
+       	    verify{\x. assume{int[x]}; assert{exists y . y = g'[x]; int[y]; y}};
+       	    g = (\x. int[x]; assume{exists y . y = g'[x]; int[y]; y});
+       	    assume{g[10]})
+
+i.e.
+
+exists f .
+  verify{\g'. exists g . assume{e}; assert{g[10]}};
+  f = (\g'. exists g . e; assume{g[10]})
+
+where
+  e == verify{\x. assume{int[x]}; assert{exists y . y = g'[x]; int[y]; y}};
+       g = (\x. {int[x]}; assume{exists y . y = g'[x]; int[y]; y})
+
+Consider the top half
+
+\g'. exists g .
+     assume{verify{\x. assume{int[x]}; assert{exists y . y = g'[x]; int[y]; y}};
+            g = (\x. {int[x]}; assume{exists y . y = g'[x]; int[y]; y})};
+     assert{g[10]}
+
+--> [assume-seq]
+
+\g'. exists g .
+     assume{verify{\x. assume{int[x]}; assert{exists y . y = g'[x]; int[y]; y}}};
+     assume{g = (\x. {int[x]}; assume{exists y . y = g'[x]; int[y]; y})};
+     assert{g[10]}
+
+--> [assume-verify + val-elim]
+
+\g'. exists g .
+     assume{g = (\x. {int[x]}; assume{exists y . y = g'[x]; int[y]; y})};
+     assert{g[10]}
+
+--> [subst + app-beta]
+
+\g'. exists g .
+     assume{g = (\x. {int[x]}; assume{exists y . y = g'[x]; int[y]; y})};
+     assert{int[10]; assume {exists y. y = g'[10]; int[y]; y}}
+
+--> [app-int + val-elim]
+
+\g'. exists g .
+     assume{g = (\x. {int[x]}; assume{exists y . y = g'[x]; int[y]; y})};
+     assert{assume {exists y. y = g'[10]; int[y]; y}}
+
+Thus (1) rewrites to
+
+--> [prove-elim]
+
+exists f . <>; f = (\g'. exists g . e; assume{g[10]}); f
+
+--> [val-elim]
+
+exists f . f = (\g'. exists g . e; assume{g[10]}); f
+
+--> [subst + elim-exi]
+
+\g'. exists g . e; assume{g[10]}
+
+expanding |e|
+
+\g'. exists g .
+       	verify{\x. assume{int[x]}; assert{exists y . y = g'[x]; int[y]; y}};
+       	g = (\x. int[x]; assume{exists y . y = g'[x]; int[y]; y});
+       	assume{g[10]}
+
+**cannot prove assert without `g`**
+
+\end{comment}
