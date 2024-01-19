@@ -198,7 +198,7 @@ uniRules _env lhs =
      pure (Uni (Bind x (Assume e)))
   ++
   -- X[uni x. e] ---> uni x. X[e]
-  "uni-float" `name`
+  "uni-float" `name`    -- TODO(RJ): Duplicate of UNI-FLOAT
   do (ctx, UNI x e) <- execX lhs  -- Note: Store not allowed in ctx
      -- guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
      let freeX = free ctx
@@ -271,7 +271,7 @@ generalizedIcfpRules env lhs =
    do Fail :>: _ <- [lhs]
       pure Fail
    ++
-   "FAIL-ELIM-R'" `name`
+   "GUARD-FAIL-ELIM-R" `name`
    do Fail :>>: _ <- [lhs]
       pure Fail
    ++
@@ -287,7 +287,7 @@ generalizedIcfpRules env lhs =
       (cx, e1 :|: e2) <- choiceX e
       pure (LAM z (cx e1 :|: cx e2))
    ++
-   "VAL-ELIM'" `name`
+   "GUARD-ELIM" `name`
    do Val _ :>>: e <- [lhs]
       pure e
    ++
@@ -335,7 +335,7 @@ generalizedL2RRules env lhs =
 assumeAssertRules :: VRule
 assumeAssertRules _env lhs =
   -- ASSUME --
-  "asm-val" `name`
+  "ASM-ELIM" `name`
   do Assume (Val v) <- [lhs]
      pure v
   ++
@@ -388,22 +388,6 @@ assumeAssertRules _env lhs =
        else pure (Assume (EXI x  (Val v :=: e)))
      -- pure (Assume (EXI x (Val v :=: e)))
   ++
---   -- ASSERT --
---   -- Assert { e } ----> e   if   e mustSucceed
---   "suc-elim" `name`
---   do Assert e <- [lhs]
---      guard (mustSucceed e)
---      pure e
---   ++
---   -- DECIDE --
---   -- Decide { e } ----> e   if   e mustDecide
---   "dec-elim" `name`
---   do Decide e <- [lhs]
---      guard (mustDecide (bndVars env) e)
---      pure e
---   ++
-  -- VERIFY --
-  -- Verify { e } ----> ()  if   e no Assert/Decide in e
   "prove-elim" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
@@ -438,7 +422,6 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
    go bs (e1 :|: e2)      = go bs e1 || go bs e2
    go bs (Exi (Bind _ e)) = go bs e
    go _  _                = False
-
 
 mustDecide :: QContext -> [BndVar] -> Expr -> Bool
 mustDecide _ bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} res
@@ -503,15 +486,8 @@ directRules _env lhs =
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules env lhs =
-   -- PROVE --
-   -- -- P[e; e'] ----> P[e']   if   P |- e
-   -- "prove" `name`
-   -- do (ctx, g, bs, e :>: e') <- eX lhs
-   --    guard (proves g bs e)
-   --    pure (ctx e')
-   -- ++
    "implies-r" `name`
-   -- asm{e}; X[e1; e2] ----> asm{e}; P[e2]   if   fv(e1) disjoint from bvars(X) and e |- e1
+   -- asm{e}; X[e1; e2] ----> asm{e}; X[e2]   if   fv(e1) disjoint from bvars(X) and e |- e1
    do (Assume e) :>: rhs <- [lhs]
       (ctx, _, bs, e1 :>: e2) <- eX rhs
       guard (null (free e1 `intersect` bndIds bs))
@@ -549,32 +525,6 @@ verifierRules env lhs =
       guard (mustDecide g (bndVars env) e)
       pure (ctx e)
    ++
-   -- P[suc{e}] -> P[e] if mustSucceed(P, e)
-   -- "suc-intro" `name`
-   -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
-   -- "asm-intro" `name`
-   -- do (ctx, g, _, e) <- eX lhs
-   --    guard (case e of Assume _ -> False; _ -> True)
-   --    guard (g `proves` e)
-   --    pure (ctx (Assume e))
-   -- ++
-   -- -- if e1 e2 e3 ---> (assume{e1} ; e2) | (assume-fail{e1}; e3) IF mustDecides e1
-   -- -- unsoundly verifies if foo(n:any):int := if int[n] then 0 else n
-   -- "Unfold-If" `name`
-   -- do If e1 e2 e3 <- [lhs]
-   --    let bs = bndVars env
-   --    guard (mustDecide bs e1)
-   --    let (eThen, eElse) = unfoldIte e1 e2 e3
-   --    pure (eThen :|: eElse)
-   -- ++
---   -- Verify{CTX[if e1 e2 e3]} ---> Verify{CTX[(assume{e1} ; e2)}; Verify{CTX(e3)} IF CTX `mustDecide` e1
---   "asm-if" `name`
---   do Verify e <- [lhs]
---      (ctx, g, bs, If e1 e2 e3) <- eX e
---      let bs0 = bndVars env
---      guard (mustDecide g (bs0 ++ bs) e1)
---      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx (Fails e1 :>: e3)))
---   ++
    -- Verify{CTX[exi xs. if e1 e2 e3]} ---> Verify{CTX[exi xs. assume{e1} ; e2]}; Verify{CTX(Fails (exis xs e1); e3)} IF CTX + xs `mustDecide` e1
    "asm-if" `name`
    do Verify e <- [lhs]
