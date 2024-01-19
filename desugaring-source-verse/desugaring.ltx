@@ -950,11 +950,11 @@ $$
 \rulename{asm-elim} & |assume v| & \movesto & |v| \\
 \rulename{asm-seq} & |assume (e_1 ; e_2)| & \movesto & |assume e_1; assume e_2| \\
 \rulename{guard-elim} & |v guard e| & \movesto & |e| \\
-\rulename{check-semi} & |check fx (v=e_1; e_2)| & \movesto & |v = (check fx e_1); check fx e_2| \\
+\rulename{check-semi} & |check fx (e_1; e_2)| & \movesto & |check fx e_1 ; check fx e_2| \\
  & & \multicolumn{2}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
-\rulename{asm-verify} & |assume (E^[verify e_1; e_2]| & \movesto & |assume (E^[e_2])| \\
-\rulename{verify-gc} & |verify e_1; e_2| & \movesto
-   & \multicolumn{2}{l}{|e_2| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e_1|}}
+\rulename{asm-verify} & |assume (E^[verify e]| & \movesto & |assume (E^[()])| \\
+\rulename{verify-gc} & |verify e| & \movesto
+   & \multicolumn{2}{l}{|()| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e_1|}}
 \end{array} \\
 \\
 \begin{minipage}{12cm}
