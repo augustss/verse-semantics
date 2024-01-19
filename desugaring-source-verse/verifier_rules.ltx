@@ -9,33 +9,57 @@
 \begin{figure}[t]
 $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
+
+\multicolumn{5}{l}{\textit{Guard:}} \\
+\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
+\rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
+\\[-0.6em]
+
 \multicolumn{5}{l}{\textit{Assume:}} \\
-    \rulename{asm-hnf} & |assume hnf|         & \movesto & |hnf|                    & \\
-  \rulename{asm-seq} & |assume (e_1; e_2)|  & \movesto & |assume e_1; assume e_2| & \\
-  \rulename{asm-exi} & |assume (def x e)|   & \movesto & |def x (assume e)|       & \\
+  \rulename{asm-elim} & |assume v| & \movesto & |v| \\
+  \rulename{asm-seq} & |assume (e_1 ; e_2)| & \movesto & |assume e_1; assume e_2| \\
+  % \rulename{asm-hnf} & |assume hnf|         & \movesto & |hnf|                    & \\
+  % \rulename{asm-seq} & |assume (e_1; e_2)|  & \movesto & |assume e_1; assume e_2| & \\
+  % \rulename{asm-exi} & |assume (def x e)|   & \movesto & |def x (assume e)|       & \\
   % \rulename{asm-cas} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & \multicolumn{2}{@@{}l}{|verify (E^[assume e_1]) ; verify (E^[assume e_2])|}  \\
-  \rulename{asm-cas} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & |verify (E^[assume e_1]);| & \\
-                     &                                        &          & |verify (E^[assume e_2])|  \\
-  \rulename{asm-id}  & |assume (assume e)|  & \movesto & |assume e|               & \\
-  \rulename{asm-suc} & |assume (succeed e)| & \movesto & |assume e|               & \\
-  \rulename{asm-dec} & |assume (decide e)|  & \movesto & |assume e|               & \\
-  \rulename{asm-ver} & |assume (verify e)|  & \movesto & |tup ()|                 & \\
+ \rulename{asm-id}  & |assume (assume e)|  & \movesto & |assume e|               & \\
+  % \rulename{asm-suc} & |assume (succeed e)| & \movesto & |assume e|               & \\
+  % \rulename{asm-dec} & |assume (decide e)|  & \movesto & |assume e|               & \\
+  \rulename{asm-check} & |assume (check fx e)|  & \movesto & |assume e|           & \text{if}\ |fx|\ \text{is not}\ |fails| \\
+  % \rulename{asm-ver} & |assume (verify e)|  & \movesto & |tup ()|                 & \\
+  \rulename{asm-verify} & |assume (E^[verify e]| & \movesto & |assume (E^[tup ()])| \\
 \\[-0.6em]
 
-\multicolumn{5}{l}{\textit{Succeed/Decide:}} \\
-  \rulename{suc-elim}   & |P^[succeed e]| & \movesto & |e|      & \text{if}\ $\mustSucceed{P}{e}$ \\
-  \rulename{dec-elim}   & |P^[decide e]|  & \movesto & |P^[e]|  & \text{if}\ $\mustDecide{P}{e}$ \\
-  \rulename{prove-elim} & |verify e|      & \movesto & |tup ()| & \text{if}\ $e$\ \text{has no}\ |succeedKW|, |decideKW| \\
+\multicolumn{5}{l}{\textit{Check:}} \\
+  % \rulename{suc-elim}   & |P^[check succeeds e]| & \movesto & |P^[e]|  & \text{if}\ $\mustSucceed{P}{e}$ \\
+  % \rulename{dec-elim}   & |P^[check decides e]|  & \movesto & |P^[e]|  & \text{if}\ $\mustDecide{P}{e}$ \\
+  \rulename{check-seq} & |check fx (e_1; e_2)| & \movesto & |check fx e_1; check fx e_2| & \text{if}\ |fx|\ \text{is not}\ |fails| \\
+  % & & \multicolumn{3}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
+  \rulename{check-elim}   & |P^[check fx e]|  & \movesto & |P^[e]| & \text{if}\ \must{\mathit{fx}}{P}{e}\ \text{and} \\
+                          &                   &          &         & |fx|\ \text{is}\ |succeeds|\ \text{or}\ |decides| \\
+  \rulename{fails-val}    & |check fails v|   & \movesto & |fail| \\
+  \rulename{fails-fail}   & |check fails fail|   & \movesto & |tup ()| \\
 \\[-0.6em]
 
-\multicolumn{5}{l}{\textit{Prove:}} \\
+\multicolumn{5}{l}{\textit{Verify:}} \\
+  \rulename{verify-elim} & |verify e|      & \movesto & |tup ()| & \text{if no |checkKW| outside |verifyKW| in |e|} \\
+  \rulename{verify-case} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & |verify (E^[assume e_1]);| & \\
+                         &                                        &          & |verify (E^[assume e_2])|  \\
+  \rulename{verify-if}   & |verify (P^[myite e_1 e_2 e_3])| & \movesto & |verify (P^[assume e_1; e_2]);| & \text{if}\ \mustDecide{P}{e_1} \\
+                         &                                  &          & |verify (P^[check fails e_1; e_3])|              & \\
+  % \text{if}\ $e$\ \text{has no}\ |succeedKW|, |decideKW| \\
+  % \rulename{verify-elim} & |verify e; e_2| & \movesto
+  %  & \multicolumn{2}{l}{|e_2| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e|}}
+  \\[-0.6em]
+
+\multicolumn{5}{l}{\textit{Implies:}} \\
   %\rulename{asm-intro} & |P^[e]|                          & \movesto & |P^[assume e]|                  & \text{if}\ \proves{P}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
   % \rulename{prove}    & |P^[e; e']|                      & \movesto & |P^[e']|                        & \text{if $\proves{P}{e}$} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
   % \rulename{implies}  & |assume e_1; P^[e_2; e_3]|       & \movesto & |assume e_1; P^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$} \\
-  \rulename{implies-dir} & |e_1; P^[e_2; e_3]|       & \movesto & |e_1; P^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$} \\
-  \rulename{subst-asm}  & |assume (X^[x = v]); e|          & \movesto & |assume (X^[x = v]); subst e x v| & \text{if $|v| \not= |V^[x]|$} \\
-  \rulename{asm-if}     & |verify (P^[myite e_1 e_2 e_3])| & \movesto & |verify (P^[assume e_1; e_2]);| & \text{if}\ \mustDecide{P}{e_1} \\
-                        &                                  &          & |verify (P^[e_3])|              & \\
+  \rulename{implies-r} & |e_1; P^[e_2; e_3]|   & \movesto & \multicolumn{2}{l}{|e_1; P^[e_3]|   \quad \quad\ \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$}} \\
+  \rulename{implies-l} & |e_2; S^[assume e_1]| & \movesto & \multicolumn{2}{l}{|S^[assume e_1]| \quad \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$}} \\
+  \rulename{implies-fail} & |assume fail; S^[fail]| & \movesto & |assume fail; S^[tup ()]| \\
+  % \rulename{subst-asm}  & |assume (X^[x = v]); e|          & \movesto & |assume (X^[x = v]); subst e x v| & \text{if $|v| \not= |V^[x]|$} \\
 \end{array}\\
 \end{array}$
 \\[0.1in]
@@ -47,7 +71,7 @@ $\begin{array}{l}
   \end{array}\\
 \end{array}$
 \\[0.1in]
-\caption{TRS Verifier Rewrite Rules}
+\caption{TRS Verifier Rewrite Rules \ranjit{TODO: Contexts S = X, E = P} \ranjit{TODO: \rulename{choice} should use CX}}
 \label{fig:verifier-rewrite-rules}
 \end{figure}
 

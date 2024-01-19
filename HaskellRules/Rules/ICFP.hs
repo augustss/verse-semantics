@@ -1371,11 +1371,11 @@ rulesGuy _ lhs =
   do (Val _v :=: Fail) :>: _e <- [lhs]
      pure Fail
  ++
-  "FAIL-ELIM-L" `name`
+  "FAIL-L" `name`
   do Fail :>: _e <- [lhs]
      pure Fail
  ++
-  "FAIL-ELIM-R" `name`
+  "FAIL-R" `name`
   do _eq :>: Fail <- [lhs]
      pure Fail
  ++

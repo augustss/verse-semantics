@@ -267,15 +267,15 @@ generalizedIcfpRules env lhs =
    -- copied from ICFP (but the variant in L2R make `TRSVerify.ex0` fail...?)
    -- restricted/effect-compatible variants of FAIL-ELIM
    ++
-   "FAIL-ELIM-R" `name`
+   "FAIL-L" `name`
    do Fail :>: _ <- [lhs]
       pure Fail
    ++
-   "GUARD-FAIL-ELIM-R" `name`
+   "GUARD-FAIL-L" `name`
    do Fail :>>: _ <- [lhs]
       pure Fail
    ++
-   "FAIL-ELIM-L" `name`
+   "FAIL-R" `name`
    do e :>: Fail <- [lhs]
       guard (effectFree e)
       pure Fail
@@ -388,7 +388,7 @@ assumeAssertRules _env lhs =
        else pure (Assume (EXI x  (Val v :=: e)))
      -- pure (Assume (EXI x (Val v :=: e)))
   ++
-  "prove-elim" `name`
+  "verify-elim" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
          verified (Decide _) = False
@@ -398,7 +398,7 @@ assumeAssertRules _env lhs =
      pure e
   ++
   -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
-  "asm-cas" `name`
+  "verify-cas" `name`
   do Verify e                 <- [lhs]
      (cx, _, _, Assume (e1 :|: e2)) <-  eX e
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
@@ -526,7 +526,7 @@ verifierRules env lhs =
       pure (ctx e)
    ++
    -- Verify{CTX[exi xs. if e1 e2 e3]} ---> Verify{CTX[exi xs. assume{e1} ; e2]}; Verify{CTX(Fails (exis xs e1); e3)} IF CTX + xs `mustDecide` e1
-   "asm-if" `name`
+   "verify-if" `name`
    do Verify e <- [lhs]
       (ctx, g, bs, e') <- eX e
       (xs, If e1 e2 e3) <- splitIf e'
