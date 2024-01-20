@@ -48,9 +48,9 @@
 \\ \\
 \mbox{\em Contexts} \\
 \begin{array}{lrcl}
-\text{Value contexts} & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-\text{Substitution contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e| \vb |assume S| \\
-\text{Evaluation contexts} & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \vb |forall x E| \vb |E guard e| \vb |e guard E| \\
+\text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
+\text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e| \vb |assume S| \\
+\text{Eval. contexts}  & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \vb |forall x E| \vb |E guard e| \vb |e guard E| \vb |assume E| \\
 \multicolumn{4}{c}{\text{|ef| is an |e| that can have choice and fail, but not I/O effects or divergence}}
 \end{array}
 \\ \\
@@ -123,7 +123,7 @@
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{forall-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1; (e_2; e_3)| \\
-\rulename{seq-float} & |e_1 == (e_2 ; e_3)| & \movesto & |e_2; e_1 == e_3| \\
+\rulename{seq-float} & |v == (e_1 ; e_2)| & \movesto & |e_1; v == e_2| \\
 \rulename{seq-elim} & |v ; e| & \movesto & |e| \\
 
     \\[-0.6em]
@@ -132,7 +132,9 @@
 \rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
-\rulename{fail} & |E^[fail]| & \movesto & |fail| \\
+% \rulename{fail} & |E^[fail]| & \movesto & |fail| \\
+\rulename{fail-l} & |fail; e| & \movesto & |fail| \\
+\rulename{fail-r} & |e; fail| & \movesto & |fail| & \text{if}\ |e| \ \text{is effect-free} \\
 \rulename{choice} & |E^[e_1 choice e_2]| & \movesto & |E^[e_1] choice E^[e_2]| \\
 
     \\[-0.6em]
@@ -174,4 +176,3 @@
       \label{fig:rules-structural}  \label{fig:structural}
    \end{figure}
 }
-

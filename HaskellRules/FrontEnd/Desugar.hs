@@ -8,7 +8,7 @@ module FrontEnd.Desugar(
 import Data.Monoid
 import Control.Monad
 import Control.Monad.State.Strict
-import Control.Monad.Writer
+import Control.Monad.Writer hiding (guard)
 import Data.Either
 import Data.List
 --import qualified Data.Map as M
@@ -648,6 +648,7 @@ scope sc = expr
     expr (Macro1 m@(Ident _ "lowered") [] e1) = Macro1 m [] <$> exprD' e1
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
+    expr (Macro2 (Ident l "guard") e1 e2) = Macro2 (Ident l "guard") <$> expr e1 <*> expr e2
     expr (OfType e1 e2) = OfType <$> exprD e1 <*> exprD e2
     expr (TLam i r e1 e2) = do
       (e1', sc') <- defs (S.insert i sc) e1
@@ -702,6 +703,7 @@ getVisible Block{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
 getVisible (Macro1 (Ident _ "assume") _ e) = getVisible e
+getVisible (Macro2 (Ident _ "guard") e1 e2) = getVisible e1 ++ getVisible e2
 getVisible Macro1 {} = []
 getVisible (DefineV i) = [i]
 getVisible (DefineE i e) = i : getVisible e
@@ -1130,6 +1132,7 @@ lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
 lower (Macro1 (Ident _ "verify") [] e) = lowerVerify =<< lower e
 lower (Macro1 (Ident _ "assert") [] e) = lowerAssert =<< lower e
 lower (Macro1 (Ident _ "lowered") [] e) = pure e
+lower (Macro2 (Ident _ "guard") e1 e2) = eGuard <$> lower e1 <*> lower e2
 lower (Exists is e) = lExists is <$> lower e
 lower (TLam i rs (Exists is e1) e2) = join $ lowerTLam i rs is <$> lower e1 <*> lower e2
 lower (OfType e t) = join $ lowerOfType <$> lower e <*> lower t
@@ -1602,6 +1605,8 @@ eDecide = Macro1 (Ident noLoc "decides") []
 eFails :: Expr -> Expr
 eFails = Macro1 (Ident noLoc "fails") []
 
+eGuard :: Expr -> Expr -> Expr
+eGuard e1 e2 = Macro2 (Ident noLoc "guard") e1 e2
 
 -- Used to create the array of free variables passed from the domain to the range
 -- of for/if.  If it's just a single variable, don't use an array.
@@ -1856,7 +1861,7 @@ dsV_2 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM_2 V t1 i
    t2' <- dsV_2 (bodyEff fx _effs) t2
-   pure $ Lam i $ seqE [{- ASSUME-INPUT-direct-implies eAssume -} t1', t2']
+   pure $ Lam i $ seqE [t1', t2']
 dsV_2 _  (OfType  t1 t2)  = do { e <- dsD_2 t1; vOfType_2 e t2 }
 dsV_2 Suc t               = eAssert <$> dsD_2 t
 dsV_2 Dec t               = eDecide <$> dsD_2 t
@@ -1872,7 +1877,7 @@ dsI_2 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM_2 I t1 i
    t2' <- dsI_2 (bodyEff fx _effs) t2
-   pure $ Lam i $ seqE [t1', t2']
+   pure $ Lam i $ t1' `eGuard` t2'
 dsI_2 _ (OfType _ t2)    = iOfType_2 t2
 dsI_2 Suc t              = eAssume <$> dsD_2 t
 dsI_2 Dec t              =             dsD_2 t

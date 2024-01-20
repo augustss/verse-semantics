@@ -2,7 +2,7 @@ LATEX=pdflatex -halt-on-error
 
 PAPER=desugaring
 PAPERTEX = $(PAPER).tex
-PAPERSRC = $(PAPERTEX) ../trsverifier/overview.tex ../trsverifier/rules.tex ../trsverifier/examples.tex ../calculus.fmt core.tex verse-macros.tex
+PAPERSRC = $(PAPERTEX) verifier_overview.tex verifier_rules.tex verifier_examples.tex ../calculus.fmt core.tex verse-macros.tex
 
 $(PAPER).pdf: $(PAPERSRC)
 	$(LATEX) $(PAPER)

@@ -7,7 +7,9 @@ module Rules.ICFP(
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, anf, anfK, execX, choiceX, ltExpr) where
+  isRecursive, anf, anfK, execX, execX1, choiceX, ltExpr,
+  hasStore, isChoiceFree
+  ) where
 import Control.Monad( guard )
 import Data.List
 import Data.Maybe
@@ -233,6 +235,7 @@ valid' onlyEq = expr
     expr e@Split{} = error $ "malformed split: " ++ prettyShow e
     expr (If e1 e2 e3) = expr e1 && expr e2 && expr e3
     expr (Store _ e) = valid e   -- XXX this case seems to happen with QC
+    expr (e1 :>>: e2) = expr e1 && expr e2
     expr e = error $ "valid: unexpected " ++ show e
     expru (v :=: e) = value v && expr e
     expru e = not onlyEq && expr e
@@ -303,6 +306,7 @@ anf' onlyEq = expr
           ds = ds1 ++ ds2
       in  binds ds (Split (expr e) v1 v2)
     expr (If e1 e2 e3) = If (expr e1) (expr e2) (expr e3)
+    expr (e1 :>>: e2)  = expr e1 :>>: expr e2
     expr e = error $ "anf: cannot handle " ++ prettyShow e
 
     expru (e1 :=: e2) =
@@ -367,9 +371,16 @@ execX1 lhs =
      (ctx, hole) <- execX x
      pure ((:>: e) . ctx, hole)
  ++
+  -- TODO: this `e` should be `ef` means "can fail or have choice but not loop or do I/O"
   do e :>: x <- [lhs]
      (ctx, hole) <- execX x
      pure ((e :>:) . ctx, hole)
+ ++
+ -- NOTE: only terms on LEFT of ;; to affect RIGHT
+ do x :>>: e <- [lhs]
+    (ctx, hole) <- execX x
+    pure ((:>>: e) . ctx, hole)
+
 {-
  ++
   do EXI y x <- [lhs]
@@ -1360,11 +1371,11 @@ rulesGuy _ lhs =
   do (Val _v :=: Fail) :>: _e <- [lhs]
      pure Fail
  ++
-  "FAIL-ELIM-L" `name`
+  "FAIL-L" `name`
   do Fail :>: _e <- [lhs]
      pure Fail
  ++
-  "FAIL-ELIM-R" `name`
+  "FAIL-R" `name`
   do _eq :>: Fail <- [lhs]
      pure Fail
  ++
@@ -1405,7 +1416,7 @@ rulesLR _ lhs =
      guard (not (x `isValueX` v))
      pure (ctx e)
  ++
-  "EXI-FLOAT" `name`
+  "EXI-FLOAT1" `name`
   do (ctx, EXI x e) <- evalX' lhs
      let (ax, ae) = alpha (allVars (ctx Fail)) x e
      pure $ EXI ax $ ctx ae

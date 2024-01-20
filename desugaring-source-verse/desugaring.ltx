@@ -907,7 +907,7 @@ $$
     & \vb & |assume e|                    & \text{Assumption}
     \\
 \multicolumn{4}{l}{\text{\bf Effects}} \\
-|fx| & ::= & |succeeds| \vb |decides| \vb |iterates|
+|fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |fails|
 \end{array}
 $$
 \caption{BigCore Verse expressions} \label{fig:core-verse}
@@ -944,25 +944,13 @@ The syntax of Core Verse expressions is in \Cref{fig:vc-syntax}.
 The Core Verse rewrite rules are given in \Cref{fig:rules}.
 
 \begin{figure}
-$$
-\begin{array}{@@{}l}
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\rulename{asm-elim} & |assume v| & \movesto & |v| \\
-\rulename{asm-seq} & |assume (e_1 ; e_2)| & \movesto & |assume e_1; assume e_2| \\
-\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
-\rulename{check-semi} & |check fx (e_1; e_2)| & \movesto & |check fx e_1 ; check fx e_2| \\
- & & \multicolumn{2}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
-\rulename{asm-verify} & |assume (E^[verify e]| & \movesto & |assume (E^[()])| \\
-\rulename{verify-gc} & |verify e| & \movesto
-   & \multicolumn{2}{l}{|()| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e_1|}}
-\end{array} \\
-\\
+$$\begin{array}{@@{}l}
 \begin{minipage}{12cm}
   \begin{itemize}
   \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
   \item |verify e| checks that |e| neither gets stuck nor goes wrong.
 \end{itemize}
-Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
+Question: \rulename{verify-elim} does not (yet) account for stuck-ness.
 \end{minipage}
 \end{array}$$
 \caption{\bf SPJ verification rules}
@@ -973,9 +961,9 @@ Question: \rulename{verify-gc} does not (yet) account for stuck-ness.
 
 \section{Verifier}
 
-\input{../trsverifier/rules}
-\input{../trsverifier/overview}
-\input{../trsverifier/examples}
+\input{verifier_rules}
+\input{verifier_overview}
+\input{verifier_examples}
 
 % ------------------------------------------------
 

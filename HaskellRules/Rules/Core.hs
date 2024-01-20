@@ -18,6 +18,7 @@ module Rules.Core(
   pattern HNF, getHNF,
   pattern CON,
   pattern INT,
+  pattern CHAR,
   isHNF,
   isVal,
   isLam,
@@ -79,6 +80,7 @@ data Expr
   | Expr :=: Expr               -- ^ e1 = e2
   | Ident :~: Ident             -- ^ e1 ~ e2
   | Expr :>: Expr               -- ^ e1; e2
+  | Expr :>>: Expr              -- ^ e1;;e2
   | Expr :|: Expr               -- ^ e1 | e2
   | Expr :@: Expr               -- ^ v1(v2)
   | Exi (Bind Expr)             -- ^ ex x. e
@@ -137,6 +139,9 @@ instance Pretty Expr where
   pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ sep [pPrintPrec l 4 a <+> text "|", pPrintPrec l 4 b]
   pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
+  pPrintPrec l p e@(_ :>>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";;")  $ map (pPrintPrec l 2) $ ap [] e
+                                    where ap r (a :>>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
+
   pPrintPrec l p (a :=: b)        = maybeParens (l >= prettyNormal || p > 2) $ pPrintPrec l 3 a <+> text "=" <+> pPrintPrec l 3 b
   pPrintPrec l p (a :~: b)        = maybeParens (p > 5) $ pPrintPrec l 6 a <+> text "~" <+> pPrintPrec l 6 b
   pPrintPrec l p (a :@: b)        = maybeParens (p > 4) $ pPrintPrec l 4 a <> text "(" <> pPrintPrec l 0 b <> text ")"
@@ -233,8 +238,8 @@ comp _xs _ys _       (Lam _) = GT
 
 comp  xs  ys (OLam ax ad ar) (OLam bx bd br) =
   comp xs ys ax bx <> comp xs ys (Lam ad) (Lam bd) <> comp xs ys (Lam ar) (Lam br)
-comp _xs _ys (OLam _ _ _) _       = LT
-comp _xs _ys _       (OLam _ _ _) = GT
+comp _xs _ys (OLam {}) _       = LT
+comp _xs _ys _       (OLam {}) = GT
 
 comp _xs _ys Wrong{} Wrong{} = EQ
 comp _xs _ys Wrong{} _       = LT
@@ -255,6 +260,10 @@ comp _xs _ys _       (_:~:_) = GT
 comp  xs  ys (a:>:b) (c:>:d) = comp xs ys a c <> comp xs ys b d
 comp _xs _ys (_:>:_) _       = LT
 comp _xs _ys _       (_:>:_) = GT
+
+comp  xs  ys (a:>>:b) (c:>>:d) = comp xs ys a c <> comp xs ys b d
+comp _xs _ys (_:>>:_) _       = LT
+comp _xs _ys _       (_:>>:_) = GT
 
 comp  xs  ys (a:|:b) (c:|:d) = comp xs ys a c <> comp xs ys b d
 comp _xs _ys (_:|:_) _       = LT
@@ -450,6 +459,10 @@ isLam _ = False
 pattern INT :: Expr -> Expr
 pattern INT e = Op IsInt :@: e
 
+pattern CHAR :: Expr -> Expr
+pattern CHAR e = Op IsChar :@: e
+
+
 pattern CON :: Expr -> Expr
 pattern CON e <- (getCON -> Just e)
 
@@ -522,6 +535,11 @@ instance Rec Expr where
       a :>: b ->
            [ (n, a' :>: b)  | (n,a') <- rec r s a ]
         ++ [ (n, a  :>: b') | (n,b') <- rec r s b ]
+
+      a :>>: b ->
+           [ (n, a' :>>: b)  | (n,a') <- rec r s a ]
+        ++ [ (n, a  :>>: b') | (n,b') <- rec r s b ]
+
 
       If a b c ->
             [ (n, If a' b c) | (n,a') <- rec r s a ]
@@ -611,6 +629,7 @@ instance Free Expr where
   free (a :=: b) = free a `union` free b
   free (a :~: b) = free a `union` free b
   free (a :>: b) = free a `union` free b
+  free (a :>>: b) = free a `union` free b
   free (a :|: b) = free a `union` free b
   free (a :@: b) = free a `union` free b
   free (Exi bnd) = free bnd
@@ -658,6 +677,7 @@ instance Substitutable Expr where
   subst sub (a :=: b) = subst sub a :=: subst sub b
   subst sub (a :~: b) = substVar sub a :~: substVar sub b
   subst sub (a :>: b) = subst sub a :>: subst sub b
+  subst sub (a :>>: b) = subst sub a :>>: subst sub b
   subst sub (a :|: b) = subst sub a :|: subst sub b
   subst sub (a :@: b) = subst sub a :@: subst sub b
   subst sub (If a b c) = If (subst sub a) (subst sub b) (subst sub c)
@@ -730,6 +750,7 @@ instance Arbitrary Expr where
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
   shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
+  shrink (a :>>: b) = [a,b] ++ [a':>>:b|a'<-shrink a] ++ [a:>>:b'|b'<-shrink b]
   shrink (a :@: b) = [a,b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]

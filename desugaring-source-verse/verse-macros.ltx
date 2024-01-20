@@ -116,9 +116,9 @@
 
 %% Definitions for explaining skew confluence
 \newcommand{\inccon}[2]{\mathbin{\smash{\mathop{\xleftrightarrowdbl{\hphantom{#1}}}\limits_{\smash{\hbox{\raise0.55ex\hbox{\smash{$\scriptstyle#2$}}}}}^{\vbox to 0pt{\hbox{\lower0.95ex\hbox{\smash{$\scriptstyle#1$}}}\vss}}}}}
-\newcommand{\leqomega}{\mathrel{\leq_\omega}} 
+\newcommand{\leqomega}{\mathrel{\leq_\omega}}
 \newcommand{\omegarr}{\omega_{\rr}}
-\newcommand{\leqomegarr}{\mathrel{\leq_{\omegarr}}} 
+\newcommand{\leqomegarr}{\mathrel{\leq_{\omegarr}}}
 \newcommand{\preceqomegarr}{\mathrel{\preceq_{\omega_{\rr}}}}
 \newcommand{\downclose}{\mathord{\Downarrow_{\leqomega}\!}}
 
@@ -143,9 +143,13 @@
 \newcommand{\vcshort}{VC\xspace}
 \newcommand{\isdone}[1]{\mathsf{Verified}(#1)}
 \newcommand{\mustSucceedKW}{\mathsf{Suc}}
-\newcommand{\mustSucceed}[2]{\ensuremath{\mustSucceedKW(#1, #2)}}
+%\newcommand{\mustSucceed}[2]{\ensuremath{\mustSucceedKW(#1, #2)}}
+\newcommand{\must}[3]{\ensuremath{\mathsf{Must}(#1, #2, #3)}}
+\newcommand{\mustSucceed}[2]{\ensuremath{\must{\textbf{succeeds}}{#1}{#2}}}
+\newcommand{\mustDecide}[2]{\ensuremath{\must{\textbf{decides}}{#1}{#2}}}
 \newcommand{\mustDecideKW}{\mathsf{Dec}}
-\newcommand{\mustDecide}[2]{\ensuremath{\mustDecideKW(#1, #2)}}
+% \newcommand{\mustDecide}[2]{\ensuremath{\mustDecideKW(#1, #2)}}
+
 \newcommand{\mustVerifyKW}{\mathsf{Prove}}
 \newcommand{\mustVerify}[1]{\ensuremath{\mustVerifyKW(#1)}}
 \newcommand{\proves}[2]{\ensuremath{#1 \vdash #2}}

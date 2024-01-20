@@ -272,6 +272,17 @@
 %% ----------------------
 
 
+%% --------------------------
+%%        Desugaring rules
+%% --------------------------
+
+
+
+%% 'si' is short for "solve or infer" or "unification variable or not" resp
+
+%% 'md' is short for "mode" or "unification variable or not" resp
+
+%% flipsi is a no-op for now
 
 
 
@@ -283,11 +294,14 @@
 
 %% Function application with 1 argument
 
+%% Function application with 1 argument, no parens
+
 %% Function application with 1 argument, without parenthesis
 
 %% Function application with many arguments
 
 %% ----------- End of Applications --------------
+
 
 
 %% Sequences e1; ...; en; v
@@ -311,6 +325,8 @@
 %% %format arrKW = "\textbf{arr}"
 %% %format arr (x) = arrKW "\{" x "\}"
 
+%% %format vmap (x) = "\llangle" x "\rrangle"
+
 
 
 %% assert = succeed, abbreviated to suc
@@ -322,6 +338,15 @@
 % only used in comments, but still prettier this way:
 %%%%format map = "\textbf{map}"
 
+%% -------Functions ---------------
+
+
+%% functionOC has open/closed subscript
+
+%% -------End of f unctions ---------------
+
+
+
 %% Effects checking, like succeeds{e}
 
 
@@ -331,7 +356,9 @@
 
 % format := = "\mapsto"
 %% %format squiggt = "\!\leadsto\!"
-%  format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
+
+
+
 
 
 

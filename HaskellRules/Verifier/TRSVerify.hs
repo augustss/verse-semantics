@@ -72,8 +72,12 @@ tests = -- take 6
   , ("ex_choice_01", ex_choice_01, True)
   , ("ex_if_asm_00", ex_if_asm_00, True)
   , ("ex1_mini", ex1_mini, True)
-  , ("ex_asm_var", ex_asm_var, True)
+  -- not needed, asm's should only have uni-vars, ("ex_asm_var", ex_asm_var, True)
   , ("ex_ifb", ex_ifb, True)
+  , ("ex_L1", ex_L1, True)
+  , ("ex_L2", ex_L2, False)
+  , ("ex_PC1", ex_PC1, False)
+  , ("ex_PC2a", ex_PC2a, True)
   ]
 
 --------------------------------------------------------------------------------
@@ -687,9 +691,9 @@ ex1_mini = lAMs [x] (
 
 ex_asm_var :: Expr
 ex_asm_var = Verify $ lAMs [x] (
-                ((Assume (Var x)) :=: Int 10)
+                (Assume (Var x) :=: Int 10)
                 :>:
-                (Verify (Assert (Var x :=: Int 10)) )
+                Verify (Assert (Var x :=: Int 10))
              )
              where
               x = ident "x"
@@ -699,3 +703,91 @@ ex_ifb = Verify $ Assert (iteB [x, y] (Var x :=: Int 1 :>: Var y :=: Int 1 :>: I
   where
     x = ident "x"
     y = ident "y"
+
+
+-- See "Verse: tricky cases" https://docs.google.com/document/d/17Ytcy9I_fDzW-a1FGYQkLh3oObFg47Ge6GdRy-FZjLM/edit
+
+{- L1
+
+    f():int := 0;  # or loop()
+    check<succeeds>{ y:any; int[y]; y=f() }
+
+-}
+
+ex_L1 :: Expr
+ex_L1 = eXIs [f] $
+          (Var f :=: LAM x (Arr [] :>>: UNI r (Assume (iNT (Var r)) :>: Var r)))
+          :>:
+          Verify (Assert (EXI y (iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0)))
+  where
+    f = ident "f"
+    x = ident "x"
+    y = ident "y"
+    r = ident "r"
+
+{- L2
+
+    f():int := 0;  # or loop()
+    check<succeeds>{ y:any; y='m'; int[y]; y=f() }
+
+-}
+
+ex_L2 :: Expr
+ex_L2 = eXIs [f] $
+          (Var f :=: LAM x (Arr [] :>>: UNI r (Assume (iNT (Var r)) :>: Var r)))
+          :>:
+          Verify (Assert (EXI y (Var y :=: Char 'm' :>: iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0)))
+  where
+    f = ident "f"
+    x = ident "x"
+    y = ident "y"
+    r = ident "r"
+
+{- PC1
+
+  foo(x:int)<succeeds> := int[x]    # No result signature
+  check<succeeds> { z := "monkey" ; foo[z] }
+
+-}
+
+ex_PC1 :: Expr
+ex_PC1 = eXIs [f] $
+          (Var f :=: LAM i (EXI x ((Var x :=: iNT (Var i) :>: Int 0) :>>: UNI r (Assume (Var r :=: iNT (Var x) :>: Int 0) :>: Var r))))
+          :>:
+          Verify (Assert (EXI y (Var y :=: Char 'm' :>: (Var y :=: Var f :@: Var y) :>: Int 0)))
+  where
+    f = ident "f"
+    x = ident "x"
+    y = ident "y"
+    i = ident "i"
+    r = ident "r"
+
+{-
+f(1, 2):int := 7;
+check<succeeds>{ exi x, y. f(x, y); x+y }
+-}
+
+opAdd :: Expr -> Expr -> Expr
+opAdd e1 e2 = Op Add :@: Arr [e1, e2]
+
+-- TODO: currently fails, next add to X context
+-- X = <>  |  v=X; e  | X; e | ef ; X |  X ;; e   #  ef means can fail or have choice but not loop, or do I/O.
+
+ex_PC2a :: Expr
+ex_PC2a = eXIs [f] $
+            (Var f :=: lAMs [i, j] ((Var i :=: Int 1 :>: Var j :=: Int 2 :>: Int 0)
+                                    :>>:
+                                    UNI r (Assume (iNT (Var r)) :>: Var r)))
+            :>:
+            Verify (Assert (eXIs [x, y] ((Var f :@: Var x :@: Var y) :>: opAdd (Var x) (Var y))))
+  where
+    f = ident "f"
+    x = ident "x"
+    y = ident "y"
+    i = ident "i"
+    j = ident "j"
+    r = ident "r"
+{-
+f = \x y. (x=1; y=2) ;; forall r. asm{ r=7 } r
+check<succeeds>{ exi x, y. f(x, y); x+y }
+-}

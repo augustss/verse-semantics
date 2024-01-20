@@ -127,7 +127,8 @@ keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "
 
 macros :: [String]
 macros = ["all", "allow", "assert", "assume", "expect", "first", "last",
-          "logic", "lowered", "one", "reject", "type", "unify", "verify"]
+          "logic", "lowered", "one", "reject", "type", "unify", "verify",
+          "guard"]
          ++ effects
 
 macrosOp :: [String]

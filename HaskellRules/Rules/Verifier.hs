@@ -18,7 +18,7 @@ import TRS.TRS hiding (step)
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core -- hiding (Wrong)
-import Rules.ICFP (systemICFP, systemICFPE, execX, choiceX, ltExpr, isChoiceFreeOp)
+import Rules.ICFP (systemICFP, systemICFPE, execX, choiceX, ltExpr, isChoiceFreeOp, execX1, hasStore, isChoiceFree)
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
 import Data.List( intersect )
@@ -82,6 +82,7 @@ isDone = go False False
   go ver lam (e1 :=: e2)      = go ver lam e1 && go ver lam e2
   go ver lam (e1 :|: e2)      = go ver lam e1 && go ver lam e2
   go ver lam (e1 :>: e2)      = go ver lam e1 && go ver lam e2
+  go ver lam (e1 :>>: e2)      = go ver lam e1 && go ver lam e2
   go ver lam (e1 :@: e2)      = go ver lam e1 && go ver lam e2
   go ver lam (One e)          = go ver lam e
   go ver lam (All e)          = go ver lam e
@@ -125,10 +126,9 @@ icfpeVerifier = icfp
   { sname = "ICFPEverify"
   , description = "ICFPE + extra verifier rules"
   , rules = (rules icfp -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
-              <> (generalizedIcfpRules -= "SUBST-GEN")
-              <> l2rSubstRules
+              <> generalizedIcfpRules
               <> uniRules
-              <> assumeAssertRules
+              <> (assumeAssertRules -= "suc-seq")
               <> verifierRules
               <> directRules
   }
@@ -160,13 +160,28 @@ type QContext = Expr
 --------------------------------------------------------------------------------
 type VRule = Rule Expr
 
-l2rSubstRules :: VRule
-l2rSubstRules _env lhs =
+_l2rSubstRules :: VRule
+_l2rSubstRules env lhs =
   "SUBST-SIMP" `name`
+  -- x=v; e --> x=v; (subst x v e)         if x in FV(e), x not in FV(v)
   do -- guard (not recursiveSubstitution)
      (Var x :=: Val v) :>: e <- [lhs]
      guard (x `notElem` free v)
      pure ((Var x :=: v) :>: subst [(x,v)] e)
+  ++
+  "SUBST-SIMP-ASM" `name`
+  -- asm{X[x=v]}; e --> asm{X[x=v]} ; (subst x v e)         if x in FV(e), x not in FV(v)
+  do (Assume e_asm) :>: e <- [lhs]
+     (_ctx, VAR x :=: Val v) <- execX e_asm
+     let freeE = free e
+         freeV = free v
+     let sub   = [(x, v)]
+     guard (x `elem` freeE)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     pure (Assume e_asm :>: subst sub e)
+
+
   ++
   "SUBST-ASM-SIMP" `name`
   do -- guard (not recursiveSubstitution)
@@ -183,7 +198,7 @@ uniRules _env lhs =
      pure (Uni (Bind x (Assume e)))
   ++
   -- X[uni x. e] ---> uni x. X[e]
-  "uni-float" `name`
+  "uni-float" `name`    -- TODO(RJ): Duplicate of UNI-FLOAT
   do (ctx, UNI x e) <- execX lhs  -- Note: Store not allowed in ctx
      -- guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
      let freeX = free ctx
@@ -193,7 +208,7 @@ uniRules _env lhs =
        else pure (UNI x (ctx e))
   ++
   -- exi x. uni y. e ---> uni y. exi x. e
-  "uni-hop" `name`
+  "uni-swap" `name`
   do  EXI x (UNI y e) <- [lhs]
       guard (x /= y)
       pure (UNI y (EXI x e))
@@ -234,15 +249,33 @@ generalizedIcfpRules env lhs =
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     -- TODO: guard x is not uni-bound
      pure (subst sub (ctx (Var x0 :=: Val v)))
+   ++
+  "SUBST-GEN-ASM" `name`
+  do (ctx, Assume (Var x :=: Val v)) <- execX lhs
+     let freeX = free ctx
+         freeV = free v
+     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
+         sub   = [(x, v),(x0, Var x)]
+     guard (x `elem` freeX)
+     guard (x `notElem` freeV)
+     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
+     -- TODO: guard x is not uni-bound
+     pure (subst sub (ctx (Assume (Var x0 :=: Val v))))
+
    -- copied from ICFP (but the variant in L2R make `TRSVerify.ex0` fail...?)
    -- restricted/effect-compatible variants of FAIL-ELIM
    ++
-   "FAIL-ELIM-R" `name`
+   "FAIL-L" `name`
    do Fail :>: _ <- [lhs]
       pure Fail
    ++
-   "FAIL-ELIM-L" `name`
+   "GUARD-FAIL-L" `name`
+   do Fail :>>: _ <- [lhs]
+      pure Fail
+   ++
+   "FAIL-R" `name`
    do e :>: Fail <- [lhs]
       guard (effectFree e)
       pure Fail
@@ -253,6 +286,20 @@ generalizedIcfpRules env lhs =
    do LAM z e <- [lhs]
       (cx, e1 :|: e2) <- choiceX e
       pure (LAM z (cx e1 :|: cx e2))
+   ++
+   "GUARD-ELIM" `name`
+   do Val _ :>>: e <- [lhs]
+      pure e
+   ++
+   "UNI-FLOAT" `name`
+   do (ctx, UNI x e) <- execX1 lhs  -- Note: Store not allowed in ctx
+      guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
+      let freeX = free ctx
+          x'    = identNotIn (freeX ++ free e)
+      if x `elem` freeX
+        then pure (UNI x' (ctx (subst [(x,Var x')] e)))
+        else pure (UNI x (ctx e))
+
 
 effectFree :: Expr -> Bool
 effectFree (Val _)       = True
@@ -286,10 +333,10 @@ generalizedL2RRules env lhs =
 -- | Rules for `Assume` and `Assert` -------------------------------------------
 
 assumeAssertRules :: VRule
-assumeAssertRules env lhs =
+assumeAssertRules _env lhs =
   -- ASSUME --
-  "asm-hnf" `name`
-  do Assume (HNF v) <- [lhs]
+  "ASM-ELIM" `name`
+  do Assume (Val v) <- [lhs]
      pure v
   ++
   -- Assume {e1; e2} ---> Assume e1; Assume e2
@@ -341,23 +388,7 @@ assumeAssertRules env lhs =
        else pure (Assume (EXI x  (Val v :=: e)))
      -- pure (Assume (EXI x (Val v :=: e)))
   ++
---   -- ASSERT --
---   -- Assert { e } ----> e   if   e mustSucceed
---   "suc-elim" `name`
---   do Assert e <- [lhs]
---      guard (mustSucceed e)
---      pure e
---   ++
---   -- DECIDE --
---   -- Decide { e } ----> e   if   e mustDecide
---   "dec-elim" `name`
---   do Decide e <- [lhs]
---      guard (mustDecide (bndVars env) e)
---      pure e
---   ++
-  -- VERIFY --
-  -- Verify { e } ----> ()  if   e no Assert/Decide in e
-  "prove-elim" `name`
+  "verify-elim" `name`
   do Verify e <- [lhs]
      let verified (Assert _) = False
          verified (Decide _) = False
@@ -367,23 +398,10 @@ assumeAssertRules env lhs =
      pure e
   ++
   -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
-  "asm-cas" `name`
+  "verify-cas" `name`
   do Verify e                 <- [lhs]
      (cx, _, _, Assume (e1 :|: e2)) <-  eX e
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
-  ++
-  "subst-asm" `name`
-  -- asm{X[x=v]}; e --> asm{X[x=v]} ; (subst x v e)         if x in FV(e), x not in FV(v)
-  do (Assume e_asm) :>: e <- [lhs]
-     (_ctx, VAR x :=: Val v) <- execX e_asm
-     let freeE = free e
-         freeV = free v
-     let sub   = [(x, v)]
-     guard (x `elem` freeE)
-     guard (x `notElem` freeV)
-     guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
-     pure (Assume e_asm :>: subst sub e)
-
 
 mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
 mustSucceed _ bvars = go [x | BLam x <- bvars]
@@ -405,7 +423,6 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
    go bs (Exi (Bind _ e)) = go bs e
    go _  _                = False
 
-
 mustDecide :: QContext -> [BndVar] -> Expr -> Bool
 mustDecide _ bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} res
   where
@@ -425,6 +442,7 @@ mustDecide _ bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} re
     go (e1 :@: e2) = go e1 && go e2 && isDecideOp e1
     go (Op _)      = True
     go Fail        = True
+    go (Exi (Bind _ e1)) = go e1
     go _           = False
 
 isDecideOp :: Expr -> Bool
@@ -465,33 +483,26 @@ directRules _env lhs =
       pure (e :>: ctx1 (Assert (ctx2 e2)))
 
 
-   --     e; E[e1;e2] --> e; E[e2]     if e `implies` e1
-   -- "implies-direct" `name`
-   -- do e :>: rhs <- [lhs]
-   --    (ctx, _, bs, e1 :>: e2) <- eX rhs
-   --    guard (null (free e1 `intersect` bndIds bs))
-   --    guard (implies e e1)
-   --    guard (e /= Fail)
-   --    pure (e :>: ctx e2)
-
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules env lhs =
-   -- PROVE --
-   -- -- P[e; e'] ----> P[e']   if   P |- e
-   -- "prove" `name`
-   -- do (ctx, g, bs, e :>: e') <- eX lhs
-   --    guard (proves g bs e)
-   --    pure (ctx e')
-   -- ++
-   -- asm{e}; P[e; e'] ----> P[e']   if   fv(e) disjoint from bvars(P)
-   "implies" `name`
+   "implies-r" `name`
+   -- asm{e}; X[e1; e2] ----> asm{e}; X[e2]   if   fv(e1) disjoint from bvars(X) and e |- e1
    do (Assume e) :>: rhs <- [lhs]
       (ctx, _, bs, e1 :>: e2) <- eX rhs
       guard (null (free e1 `intersect` bndIds bs))
       guard (implies e e1)
       guard (e /= Fail)
       pure (Assume e :>: ctx e2)
+   ++
+   "implies-l" `name`
+   -- e1; X[asm{e}]  ----> X[asm{e}]   if   fv(e) disjoint from bvars(X) and e |- e1
+   do e1 :>: rhs <- [lhs]
+      (_, _, bs, Assume e) <- eX rhs
+      guard (null (free e `intersect` bndIds bs))
+      guard (implies e e1)
+      guard (e /= Fail)
+      pure rhs
    ++
    "implies-fail" `name`
    do e@(Assume Fail) :>: rhs <- [lhs]
@@ -514,34 +525,8 @@ verifierRules env lhs =
       guard (mustDecide g (bndVars env) e)
       pure (ctx e)
    ++
-   -- P[suc{e}] -> P[e] if mustSucceed(P, e)
-   -- "suc-intro" `name`
-   -- CTX[e] ---> CTX[assume{e}]    if    CTX |- e
-   -- "asm-intro" `name`
-   -- do (ctx, g, _, e) <- eX lhs
-   --    guard (case e of Assume _ -> False; _ -> True)
-   --    guard (g `proves` e)
-   --    pure (ctx (Assume e))
-   -- ++
-   -- -- if e1 e2 e3 ---> (assume{e1} ; e2) | (assume-fail{e1}; e3) IF mustDecides e1
-   -- -- unsoundly verifies if foo(n:any):int := if int[n] then 0 else n
-   -- "Unfold-If" `name`
-   -- do If e1 e2 e3 <- [lhs]
-   --    let bs = bndVars env
-   --    guard (mustDecide bs e1)
-   --    let (eThen, eElse) = unfoldIte e1 e2 e3
-   --    pure (eThen :|: eElse)
-   -- ++
---   -- Verify{CTX[if e1 e2 e3]} ---> Verify{CTX[(assume{e1} ; e2)}; Verify{CTX(e3)} IF CTX `mustDecide` e1
---   "asm-if" `name`
---   do Verify e <- [lhs]
---      (ctx, g, bs, If e1 e2 e3) <- eX e
---      let bs0 = bndVars env
---      guard (mustDecide g (bs0 ++ bs) e1)
---      pure (Verify (ctx (Assume e1 :>: e2)) :>: Verify (ctx (Fails e1 :>: e3)))
---   ++
    -- Verify{CTX[exi xs. if e1 e2 e3]} ---> Verify{CTX[exi xs. assume{e1} ; e2]}; Verify{CTX(Fails (exis xs e1); e3)} IF CTX + xs `mustDecide` e1
-   "asm-if" `name`
+   "verify-if" `name`
    do Verify e <- [lhs]
       (ctx, g, bs, e') <- eX e
       (xs, If e1 e2 e3) <- splitIf e'
@@ -553,6 +538,11 @@ verifierRules env lhs =
    "fails-hnf" `name`
    do Fails (HNF _) <- [lhs]
       pure (Assume Fail)
+   -- Fails {fail} ---> ()
+   ++
+   "fails-fail" `name`
+   do Fails Fail <- [lhs]
+      pure (Arr [])
 
 splitIf :: Expr -> [([Ident], Expr)]
 splitIf e@If{}    = pure ([], e )
@@ -573,9 +563,10 @@ unAssume a           = a
 implies :: Expr -> Expr -> Bool
 implies e1' e2'
   | e1  == e2                       = True
-  | e1' == Fail                    = True
-  | INT a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
-  | otherwise                      = False
+  | e1' == Fail                     = True
+  | INT  a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
+  | CHAR a <- e1, (b1 :=: b2) <- e2 = a == b1 && a == b2
+  | otherwise                       = False
   where
    e1 = unAssume e1'
    e2 = unAssume e2'
@@ -621,10 +612,17 @@ execEX1 bs lhs =
      (ctx, g, bs', hole) <- execEX bs x
      pure ((:>: e) . ctx, g :>: e, bs', hole)
  ++
-   -- e; HOLE
+  -- TODO: this `e` should be `ef` means "can fail or have choice but not loop or do I/O"
+  -- e; HOLE
   do e :>: x <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
      pure ((e :>:) . ctx, e :>: g, bs', hole)
+ ++
+ -- NOTE: only terms on LEFT of ;; to affect RIGHT
+ do x :>>: e <- [lhs]
+    (ctx, g, bs', hole) <- execEX bs x
+    pure ((:>>: e) . ctx, g :>>: e, bs', hole)
+
  ++
    -- Exi y HOLE
   do EXI y x <- [lhs]
