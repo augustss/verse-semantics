@@ -944,17 +944,7 @@ The syntax of Core Verse expressions is in \Cref{fig:vc-syntax}.
 The Core Verse rewrite rules are given in \Cref{fig:rules}.
 
 \begin{figure}
-$$
-\begin{array}{@@{}l}
-% \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-% % \rulename{asm-elim} & |assume v| & \movesto & |v| \\
-% % \rulename{asm-seq} & |assume (e_1 ; e_2)| & \movesto & |assume e_1; assume e_2| \\
-% % \rulename{guard-elim} & |v guard e| & \movesto & |e| \\
-% % \rulename{asm-verify} & |assume (E^[verify e_1; e_2]| & \movesto & |E^[e_2]| \\
-% %\rulename{verify-gc} & |verify e_1; e_2| & \movesto
-% %   & \multicolumn{2}{l}{|e_2| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e_1|}}
-% \end{array} \\
-% \\
+$$\begin{array}{@@{}l}
 \begin{minipage}{12cm}
   \begin{itemize}
   \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
