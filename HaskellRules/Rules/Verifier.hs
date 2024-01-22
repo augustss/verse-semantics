@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# HLINT ignore "Eta reduce" #-}
 
 module Rules.Verifier(
   allSystemsVerify,
@@ -22,6 +23,7 @@ import Rules.ICFP (systemICFP, systemICFPE, execX, choiceX, ltExpr, isChoiceFree
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
 import Data.List( intersect )
+import Data.Maybe (fromMaybe)
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
@@ -47,9 +49,7 @@ verifyM sys e = res
 verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
 verify sys e =
   let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = 20000 } }
-  in  case verifyM sys' e of
-        Just  x -> x
-        Nothing -> undefined
+  in  fromMaybe undefined (verifyM sys' e)
 
 wrapAssert :: Expr -> Expr
 wrapAssert = Assert
@@ -409,7 +409,7 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
    go _  (Int _)          = True
    go _  (Char _)         = True
    go _  (Path _)         = True
-   go bs (Arr as)         = all (go bs) as
+   go _bs (Arr _as)         = True -- all (go bs) as
    go _  (Lam _)          = True
    go bs (Var x)          = x `elem` bs
    go _  (Assume _)       = True

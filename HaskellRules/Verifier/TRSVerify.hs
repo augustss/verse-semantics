@@ -496,7 +496,7 @@ ex_inc = tlamOblig y [x]
 
 ex_tim_0 :: Expr
 ex_tim_0 = lAMs [a, b, f] $
-             Assume (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>: Assume (Var a :=: Var b))))
+             Assume (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>>: Assume (Var a :=: Var b))))
              :>:
              Assert (Var a :=: Var b :>: (Var f :@: Int 0) :>: Int 0)
   where
@@ -507,7 +507,7 @@ ex_tim_0 = lAMs [a, b, f] $
 
 ex_tim_1 :: Expr
 ex_tim_1 = lAMs [a, b, f] $
-             Assume (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>: Assume (Var a :=: Var b))))
+             Assume (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>>: Assume (Var a :=: Var b))))
              :>:
              Assert ((Var f :@: Int 0) :>: Var a :=: Var b :>:  Int 0)
   where
