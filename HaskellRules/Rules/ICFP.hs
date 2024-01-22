@@ -483,6 +483,11 @@ choiceX1 lhs =
      (ctx, hole) <- choiceX cx
      pure ((ce :>:) . ctx, hole)
  ++
+  do ce :>>: cx <- [lhs]
+     guard (isEffFree ce)
+     (ctx, hole) <- choiceX cx
+     pure ((ce :>:) . ctx, hole)
+ ++
   do EXI x cx <- [lhs]
      (ctx, hole) <- choiceX cx
      pure (EXI x . ctx, hole)
