@@ -8,6 +8,13 @@
 
 \begin{figure}[t]
 $\begin{array}{@@{}l}
+\begin{minipage}{12cm}
+  \begin{itemize}
+  \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
+  \item |verify e| checks that |e| neither gets stuck nor goes wrong.
+\end{itemize}
+\end{minipage} \\
+
 \begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
 
 \multicolumn{5}{l}{\textit{Guard:}} \\
@@ -31,11 +38,11 @@ $\begin{array}{@@{}l}
 \\[-0.6em]
 
 \multicolumn{5}{l}{\textit{Check:}} \\
-  % \rulename{suc-elim}   & |P^[check succeeds e]| & \movesto & |P^[e]|  & \text{if}\ $\mustSucceed{P}{e}$ \\
-  % \rulename{dec-elim}   & |P^[check decides e]|  & \movesto & |P^[e]|  & \text{if}\ $\mustDecide{P}{e}$ \\
+  % \rulename{suc-elim}   & |E^[check succeeds e]| & \movesto & |E^[e]|  & \text{if}\ $\mustSucceed{E}{e}$ \\
+  % \rulename{dec-elim}   & |E^[check decides e]|  & \movesto & |E^[e]|  & \text{if}\ $\mustDecide{E}{e}$ \\
   \rulename{check-seq} & |check fx (e_1; e_2)| & \movesto & |check fx e_1; check fx e_2| & \text{if}\ |fx|\ \text{is not}\ |fails| \\
   % & & \multicolumn{3}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
-  \rulename{check-elim}   & |P^[check fx e]|  & \movesto & |P^[e]| & \text{if}\ \must{\mathit{fx}}{P}{e}\ \text{and} \\
+  \rulename{check-elim}   & |E^[check fx e]|  & \movesto & |E^[e]| & \text{if}\ \must{\mathit{fx}}{E}{e}\ \text{and} \\
                           &                   &          &         & |fx|\ \text{is}\ |succeeds|\ \text{or}\ |decides| \\
   \rulename{fails-val}    & |check fails v|   & \movesto & |fail| \\
   \rulename{fails-fail}   & |check fails fail|   & \movesto & |tup ()| \\
@@ -45,30 +52,22 @@ $\begin{array}{@@{}l}
   \rulename{verify-elim} & |verify e|      & \movesto & |tup ()| & \text{if no |checkKW| outside |verifyKW| in |e|} \\
   \rulename{verify-case} & |verify (E^[assume (e_1 choice e_2)])| & \movesto & |verify (E^[assume e_1]);| & \\
                          &                                        &          & |verify (E^[assume e_2])|  \\
-  \rulename{verify-if}   & |verify (P^[myite e_1 e_2 e_3])| & \movesto & |verify (P^[assume e_1; e_2]);| & \text{if}\ \mustDecide{P}{e_1} \\
-                         &                                  &          & |verify (P^[check fails e_1; e_3])|              & \\
+  \rulename{verify-if}   & |verify (E^[myite e_1 e_2 e_3])| & \movesto & |verify (E^[assume e_1; e_2]);| & \text{if}\ \mustDecide{E}{e_1} \\
+                         &                                  &          & |verify (E^[check fails e_1; e_3])|              & \\
   % \text{if}\ $e$\ \text{has no}\ |succeedKW|, |decideKW| \\
   % \rulename{verify-elim} & |verify e; e_2| & \movesto
   %  & \multicolumn{2}{l}{|e_2| \hspace{10mm} \text{if no |checkKW| outside |verifyKW| in |e|}}
   \\[-0.6em]
 
 \multicolumn{5}{l}{\textit{Implies:}} \\
-  %\rulename{asm-intro} & |P^[e]|                          & \movesto & |P^[assume e]|                  & \text{if}\ \proves{P}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
-  % \rulename{prove}    & |P^[e; e']|                      & \movesto & |P^[e']|                        & \text{if $\proves{P}{e}$} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
-  % \rulename{implies}  & |assume e_1; P^[e_2; e_3]|       & \movesto & |assume e_1; P^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$} \\
-  \rulename{implies-r} & |e_1; P^[e_2; e_3]|   & \movesto & \multicolumn{2}{l}{|e_1; P^[e_3]|   \quad \quad\ \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$}} \\
-  \rulename{implies-l} & |e_2; S^[assume e_1]| & \movesto & \multicolumn{2}{l}{|S^[assume e_1]| \quad \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{P} = \emptyset$}} \\
+  %\rulename{asm-intro} & |E^[e]|                          & \movesto & |E^[assume e]|                  & \text{if}\ \proves{E}{e} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  % \rulename{prove}    & |E^[e; e']|                      & \movesto & |E^[e']|                        & \text{if $\proves{E}{e}$} \\ %\ \text{and}\ $e \not \equiv$ |assume e'|\\
+  % \rulename{implies}  & |assume e_1; E^[e_2; e_3]|       & \movesto & |assume e_1; E^[e_3]|             & \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{E} = \emptyset$} \\
+  \rulename{implies-r} & |e_1; E^[e_2; e_3]|   & \movesto & \multicolumn{2}{l}{|e_1; E^[e_3]|   \quad \quad\ \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{E} = \emptyset$}} \\
+  \rulename{implies-l} & |e_2; S^[assume e_1]| & \movesto & \multicolumn{2}{l}{|S^[assume e_1]| \quad \text{if $\impl{e_1}{e_2}$ and $\freevars{e_2} \cap \boundvars{E} = \emptyset$}} \\
   \rulename{implies-fail} & |assume fail; S^[fail]| & \movesto & |assume fail; S^[tup ()]| \\
   % \rulename{subst-asm}  & |assume (X^[x = v]); e|          & \movesto & |assume (X^[x = v]); subst e x v| & \text{if $|v| \not= |V^[x]|$} \\
 \end{array}\\
-\end{array}$
-\\[0.1in]
-$\begin{array}{l}
-  \begin{array}{lr@@{\;}c@@{\;}l}
-  \text{Prove contexts} & P & ::= & \hole \vb |v == P| \vb |e; P| \vb |def x P| \vb |lam x P| \vb |apply1N P e| \vb |apply1N e P| \\
-                        &   & \vb & |one P| \vb |all P| \vb |P choice e| \vb |e choice P| \\
-                        &   & \vb & |myite P e e| \vb |succeed P| \vb |verify P| \\
-  \end{array}\\
 \end{array}$
 \\[0.1in]
 \caption{TRS Verifier Rewrite Rules \ranjit{TODO: Contexts S = X, E = P} \ranjit{TODO: \rulename{choice} should use CX}}

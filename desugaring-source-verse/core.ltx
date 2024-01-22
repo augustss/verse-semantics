@@ -51,7 +51,9 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e| \vb |assume S| \\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \vb |forall x E| \vb |E guard e| \vb |e guard E| \vb |assume E| \\
-\multicolumn{4}{c}{\text{|ef| is an |e| that can have choice and fail, but not I/O effects or divergence}}
+\text{Choice contexts}  & |C| & ::= & |hole| \vb |v==C| \vb |cf; C| \vb |C; e| \vb |C guard e| \vb |e guard C| \vb |assume C| \\
+\text{Effect-free} & \multicolumn{3}{l}{\text{|ef| is an |e| that can have choice and fail, but not I/O effects or divergence}} \\
+\text{Choice-free} & \multicolumn{3}{l}{\text{|cf| is an |e| that has no choice, I/O effects or divergence}}
 \end{array}
 \\ \\
 \mbox{\em Free variables (needs updating)} \\
@@ -135,7 +137,7 @@
 % \rulename{fail} & |E^[fail]| & \movesto & |fail| \\
 \rulename{fail-l} & |fail; e| & \movesto & |fail| \\
 \rulename{fail-r} & |e; fail| & \movesto & |fail| & \text{if}\ |e| \ \text{is effect-free} \\
-\rulename{choice} & |E^[e_1 choice e_2]| & \movesto & |E^[e_1] choice E^[e_2]| \\
+\rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
 
     \\[-0.6em]
 
