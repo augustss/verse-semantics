@@ -689,6 +689,7 @@ instance Substitutable Expr where
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Assume a) = Assume (subst sub a)
+  -- subst _ e@(Assume _) = e
   subst sub (Assert a) = Assert (subst sub a)
   subst sub (Verify a) = Verify (subst sub a)
   subst sub (Decide a) = Decide (subst sub a)

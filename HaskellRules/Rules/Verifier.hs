@@ -410,6 +410,7 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
    go _  (Char _)         = True
    go _  (Path _)         = True
    go _bs (Arr _as)         = True -- all (go bs) as
+   -- go bs (Arr as)         = all (go bs) as
    go _  (Lam _)          = True
    go bs (Var x)          = x `elem` bs
    go _  (Assume _)       = True
@@ -423,8 +424,8 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
    go bs (Exi (Bind _ e)) = go bs e
    go _  _                = False
 
-mustDecide :: QContext -> [BndVar] -> Expr -> Bool
-mustDecide _ bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} res
+mustDecide :: [BndVar] -> Expr -> Bool
+mustDecide bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} res
   where
     res = go e
     lamBinds       = [x | BLam x <- bs]
@@ -472,11 +473,12 @@ isDecideOp _           = False
 
 --     e; E1[succ{E2[e1;e2]}] --> e; E1[succ{E2[e2]}]    if e `implies` e1
 directRules :: VRule
-directRules _env lhs =
-   "implies-direct" `name`
+directRules env lhs =
+   "implies-r" `name`
    do e :>: rhs <- [lhs]
       (ctx1, _, bs1, Assert e') <- eX rhs
       (ctx2, _, bs2, e1 :>: e2) <- eX e'
+      --- TODO:see "tricky example L3"  ??? guard (mustDecide (bndVars env) e)
       guard (null (free e1 `intersect` bndIds (bs1 ++ bs2)))
       guard (implies e e1)
       guard (e /= Fail)
@@ -486,7 +488,7 @@ directRules _env lhs =
 -- | Rules to "prove" an `Assert` (succeeds) using `Assume` (context G) --------------------
 verifierRules :: VRule
 verifierRules env lhs =
-   "implies-r" `name`
+   "implies-r-asm" `name`
    -- asm{e}; X[e1; e2] ----> asm{e}; X[e2]   if   fv(e1) disjoint from bvars(X) and e |- e1
    do (Assume e) :>: rhs <- [lhs]
       (ctx, _, bs, e1 :>: e2) <- eX rhs
@@ -521,17 +523,17 @@ verifierRules env lhs =
    -- DECIDE --
    -- Decide { e } ----> e   if   e mustDecide
    "dec-elim" `name`
-   do (ctx, g, _, Decide e) <- eX lhs
-      guard (mustDecide g (bndVars env) e)
+   do (ctx, _, _, Decide e) <- eX lhs
+      guard (mustDecide (bndVars env) e)
       pure (ctx e)
    ++
    -- Verify{CTX[exi xs. if e1 e2 e3]} ---> Verify{CTX[exi xs. assume{e1} ; e2]}; Verify{CTX(Fails (exis xs e1); e3)} IF CTX + xs `mustDecide` e1
    "verify-if" `name`
    do Verify e <- [lhs]
-      (ctx, g, bs, e') <- eX e
+      (ctx, _, bs, e') <- eX e
       (xs, If e1 e2 e3) <- splitIf e'
       let bs0 = bndVars env
-      guard (mustDecide g (bs0 ++ bs ++ (BLam <$> xs)) e1)  -- TODO: new binder type for if-definitions
+      guard (mustDecide (bs0 ++ bs ++ (BLam <$> xs)) e1)  -- TODO: new binder type for if-definitions
       pure (Verify (ctx (exis xs (Assume e1 :>: e2))) :>: Verify (ctx (Fails (exis xs e1) :>: e3)))
    ++
    -- Fails {hnf} ---> Assume {fail}
