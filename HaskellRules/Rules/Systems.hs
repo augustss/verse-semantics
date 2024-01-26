@@ -3,6 +3,7 @@ module Rules.Systems(ESystem, allSystems, lookupSystemEx, lookupSystem,
 import Epic.String
 import TRS.System
 import Rules.Core
+import Rules.TRS2024(allSystemsTRS2024)
 import Rules.ICFP(allSystemsICFP, isRecursive)
 import Rules.PLDI(allSystemsPLDI)
 import Rules.POPL(allSystemsPOPL)
@@ -16,6 +17,7 @@ type ESystem = TRSystem Expr
 allSystems :: [ESystem]
 allSystems =
      allSystemsICFP
+  ++ allSystemsTRS2024
   ++ allSystemsPOPL
   ++ allSystemsPLDI
   ++ allSystemsKoen

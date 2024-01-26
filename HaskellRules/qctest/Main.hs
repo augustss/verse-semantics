@@ -142,7 +142,8 @@ prop_Confluence3 flags sys =
 
   shrinkExpr p =
     [ p'
-    | p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
+    | False
+    , p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
     , validExpr sys (ruleEnv sys) p'
     ]
 

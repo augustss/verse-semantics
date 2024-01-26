@@ -64,6 +64,7 @@ library all
                       --DenSem.DenSem
     other-modules:    Rules.PLDI
                       Rules.POPL
+                      Rules.TRS2024
                       Rules.KoenNaive
                       Rules.LeftToRight
                       Rules.Block
