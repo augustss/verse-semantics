@@ -1241,52 +1241,52 @@ evalPrimOp op v | op == opIsInt =
   case v of
     a@(BVInt _) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsPath =
   case v of
     a@(BVPath _) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsMap =
   case v of
     a@(BVMap _) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsRat =
   case v of
     a@(BVLit (BRat _)) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsF32 =
   case v of
     a@(BVLit (BF32 _)) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsF64 =
   case v of
     a@(BVLit (BF64 _)) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsChr =
   case v of
     a@(BVLit (BChr _)) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsStr =
   case v of
     a@(BVLit (BStr _)) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsFcn =
   case v of
     a@(BHNF (BHLam _ _)) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opIsArr =
   case v of
     a@(BHNF (BArr _)) -> Just $ BVal a
     BHNF _ -> Just BFail
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op v | op == opMkMap =
   case v of
     (BHNF (BArr a)) | Just kvs <- mapM chkMap a -> Just $ BVal $ BVMap $ orderMap kvs
@@ -1308,7 +1308,7 @@ evalPrimOp op v | op == opPrint =
     BHNF h ->
       trace ("Print: " ++ prettyShow h) $
       Just $ BVal $ BVArr []
---    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
+    _ -> Just $ BWrong $ "bad primop args: " ++ prettyShow (BPrimOp op v)      
 evalPrimOp op _ | op == opAppend = Nothing
 evalPrimOp op _ | op == opErr = error "Err() called"
 evalPrimOp op _ | op `elem` [opAlloc, opRead, opWrite, opAddTo, opSubFrom] = Nothing
