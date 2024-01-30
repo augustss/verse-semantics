@@ -15,7 +15,7 @@ import Data.Ratio
 import Epic.Print
 import Epic.Uniplate
 import TRS.TRS
---import TRS.Traced hiding (trace)
+import TRS.Traced(term)
 import Debug.Trace
 
 type Q = Rational
@@ -53,15 +53,6 @@ data Syntax
   | SyntaxExpr Expr
   deriving (Eq, Ord, Show, Data)
 
-data EffectSpecifier
-  = Cardinalities | Succeeds | Decides | Resolves | Abstracts | Fails | Contradicts
-  | Imperatives | Diverges | Demands | Allocates | Varies | Transacts
-  | Iterates         | Reads         | Writes         | Interacts         | Throws         | Suspends
-  | Iterates_Pending | Reads_Pending | Writes_Pending | Interacts_Pending | Throws_Pending | Suspends_Pending
-  | Effects 
-  | EffectSpecifier :\/ EffectSpecifier
-  deriving (Eq, Ord, Show, Data)
-
 data AvailableFx = None | EffectSpecifier :& EffectSpecifier
   deriving (Eq, Ord, Show, Data)
 
@@ -95,7 +86,7 @@ data Vertex
   | VertexCall Vertex Vertex
   deriving (Eq, Ord, Show, Data)
 
-data Program = Program Context Variable Variable Operation | ProgramSeq Program Program
+data Program = Program Context Variable Variable Operation | ProgramSeq Program Program | ProgramDone
   deriving (Eq, Ord, Show, Data)
 
 data Operation
@@ -134,6 +125,8 @@ data Assumption
   | AImpliedEffects EffectSpecifier EffectSpecifier AvailableFx Context
   | ASolveOrImply SolveOrImply Context
   | AVerifyOrEval VerifyOrEval Context
+  -- XXX many more
+  | ADominates EffectSpecifier Vertex Vertex Context
   deriving (Eq, Ord, Show, Data)
 
 data AssumptionSet = A [Assumption]
@@ -157,9 +150,6 @@ instance Eq EffectSpecifier where
           flat fx = [fx]
           -- XXX expand
 -}
-
-tops :: EffectSpecifier
-tops = Succeeds :\/ Diverges :\/ Transacts :\/ Interacts
 
 ------------------------------------------------------------------
 
@@ -185,10 +175,6 @@ instance Pretty VerifyOrEval where pPrint = ppLower
 instance Pretty Syntax where
   pPrint (SyntaxList aes) = parens $ hcat (punctuate (text ",") (map pPrint aes))
   pPrint (SyntaxExpr e) = pPrint e
-instance Pretty EffectSpecifier where
-  pPrint fx | fx == tops = text "tops"
-  pPrint (fx1 :\/ fx2) = pPrint fx1 <+> text "\\/" <+> pPrint fx2
-  pPrint fx = ppLower fx
 instance Pretty AvailableFx where
   pPrint None = text "none"
   pPrint (fx1 :& fx2) = pPrint (fx1, fx2)
@@ -209,6 +195,7 @@ instance Pretty Vertex where
 instance Pretty Program where
   pPrint (Program c i x op) = text "program" <+> pPrint c <+> pPrint i <+> pPrint x <> text "." <+> pPrint op
   pPrint (ProgramSeq pg1 pg2) = pPrint pg1 <> text ";" <+> pPrint pg2
+  pPrint ProgramDone = text "DONE"
 instance Pretty Operation where -- XXX precedence
   pPrint (OpUnify u v) = pPrint u <+> text "=" <+> pPrint v
   pPrint (OpCall u v p) = pPrint u <+> text "=" <+> pPrint v <> parens (pPrint p)
@@ -247,6 +234,7 @@ instance Pretty Assumption where
   pPrint (AImpliedEffects fx1 fx2 afx c) = pPrint fx1 <> text ":" <> pPrint fx2 <> text ":" <> pPrint afx <> text "@" <> pPrint c
   pPrint (ASolveOrImply si c) = pPrint si <> text "@" <> pPrint c
   pPrint (AVerifyOrEval vb c) = pPrint vb <> text "@" <> pPrint c
+  pPrint (ADominates fx u v c) = pPrint fx <> braces (pPrint u <> text ">>" <> pPrint v) <> text "@" <> pPrint c
   
 instance Pretty AssumptionSet where
   pPrint (A []) = text "empty"
@@ -256,6 +244,99 @@ instance Pretty Config where
 
 instance Pretty (Context -> Operation -> Program) where
   pPrint f = pPrint (f (Context (Ident "C")) (OpVar "OP"))
+
+------------------------------------------------------------------
+
+data Effect
+  = FXsucceeds | FXdecides | FXresolves | FXabstracts | FXfails | FXcontradicts
+  | FXdiverges | FXdemands | FXallocates | FXvaries
+  | FXiterates         | FXreads         | FXwrites         | FXinteracts         | FXthrows         | FXsuspends
+  | FXiterates_pending | FXreads_pending | FXwrites_pending | FXinteracts_pending | FXthrows_pending | FXsuspends_pending
+  deriving (Eq, Ord, Show, Data)
+
+-- Partial order on Effect (reflexive, transitive closure of adjecent <==)
+(<==) :: Effect -> Effect -> Bool
+FXsucceeds    <== e = e `elem` [FXsucceeds, FXdecides, FXiterates, FXresolves, FXabstracts]
+FXdecides     <== e = e `elem`             [FXdecides, FXiterates, FXresolves, FXabstracts]
+FXresolves    <== e = e `elem`                                    [FXresolves, FXabstracts]
+FXabstracts   <== e = e `elem`                                                [FXabstracts]
+FXfails       <== e = e `elem` [FXfails,    FXdecides, FXiterates, FXresolves, FXabstracts]
+FXiterates    <== e = e `elem`                        [FXiterates]
+FXcontradicts <== e = e `elem` [FXcontradicts, FXfails, FXsucceeds, FXdecides, FXiterates, FXresolves, FXabstracts]
+--
+FXvaries      <== e = e `elem` [FXvaries, FXreads, FXallocates]
+e1            <== e2 = e1 == e2
+
+newtype EffectSpecifier = ES [Effect] -- the list has no elements x,y where x <== y
+  deriving (Eq, Ord, Show, Data)
+
+effs :: [Effect] -> EffectSpecifier
+effs = ES . sort
+
+esInvariant :: EffectSpecifier -> EffectSpecifier
+esInvariant fx@(ES aes) | or [ e1 <== e2 | e1 <- aes, e2 <- aes, e1 /= e2 ] = error "esInvariant 1"
+                        | length aes /= length (nub aes) = error "esInvariant 2"
+                        | otherwise = fx
+
+cardinalities :: EffectSpecifier
+cardinalities = effs [FXabstracts, FXiterates]
+transacts :: EffectSpecifier
+transacts = effs [FXreads, FXwrites, FXallocates]
+imperatives :: EffectSpecifier
+imperatives = effs [FXdiverges, FXdemands, FXreads, FXwrites, FXallocates, FXinteracts, FXthrows, FXsuspends, 
+  FXiterates_pending, FXreads_pending, FXwrites_pending, FXinteracts_pending, FXthrows_pending, FXsuspends_pending]
+tops :: EffectSpecifier
+tops = effs [FXsucceeds, FXdiverges, FXinteracts] \/ transacts
+effects :: EffectSpecifier
+effects = cardinalities \/ imperatives \/ ES [FXdemands, FXvaries]
+pattern Succeeds :: EffectSpecifier
+pattern Succeeds = ES [FXsucceeds]
+pattern Fails :: EffectSpecifier
+pattern Fails = ES [FXfails]
+pattern Abstracts :: EffectSpecifier
+pattern Abstracts = ES [FXabstracts]
+pattern Resolves :: EffectSpecifier
+pattern Resolves = ES [FXresolves]
+pattern Demands :: EffectSpecifier
+pattern Demands = ES [FXdemands]
+
+-- The join of two EffectSpecifier
+(\/) :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
+ES fx0 \/ ES fx1 =
+  let fx0' = filter (\ e0 -> not $ any (\ e1 -> e0 <== e1) fx1 ) fx0
+      fx1' = filter (\ e1 -> not $ any (\ e0 -> e1 <== e0) fx0') fx1
+  in  esInvariant $ effs $ fx0' ++ fx1'
+
+-- The meet of two EffectSpecifier
+(/\) :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
+ES fx0 /\ ES fx1 =
+  esInvariant $ effs $ nub
+  [ e | e0 <- fx0, e1 <- fx1, e <- if e0 <== e1 then [e0] else if e1 <== e0 then [e1] else [] ]
+
+-- Partial order on EffectSpecifier
+(<===) :: EffectSpecifier -> EffectSpecifier -> Bool
+fx0 <=== fx1 = (fx0/\fx1) == fx0
+
+instance Pretty Effect where pPrint = text . drop 2 . show
+
+instance Pretty EffectSpecifier where
+  pPrint fx | fx == tops = text "tops"
+            | fx == effects = text "effects"
+            | fx == transacts = text "transacts"
+            | fx == imperatives = text "imperatives"
+            | fx == cardinalities = text "cardinalities"
+            | fx == ES [] = text "noeffects"
+            | ES aes <- fx = hcat (punctuate (text "\\/") (map pPrint aes))
+
+remove :: EffectSpecifier -> Effect -> EffectSpecifier
+remove (ES aes) e = ES (filter (/= e) aes)
+
+star :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
+star fx0 fx1 = (fx0\/fx1)/\
+  if      m <=== Fails   then Fails\/imperatives
+  else if m <=== Demands then Abstracts\/imperatives
+  else                       effects `remove` FXdemands
+  where m = fx0/\fx1
 
 ------------------------------------------------------------------
 
@@ -310,11 +391,9 @@ pptr :: Config -> IO ()
 pptr = mapM_ ppx . f . normalFormFuelTracePlain sys 100
   where f x = if null (nrLeft x) then nrDone x else trace "**** no fuel " (nrLeft x)
 
-------------------------------------------------------------------
-
-star :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
-star fx0 fx1 | fx0 == fx1 = fx0
-             | otherwise = undefined -- XXX
+norm :: Config -> Config
+norm = term . (!!0) . f . normalFormFuelTracePlain sys 100
+  where f x = if null (nrLeft x) then nrDone x else trace "**** no fuel " (nrLeft x)
 
 ------------------------------------------------------------------
 
@@ -326,13 +405,22 @@ gAdd asms g =
       else
         [A $ asms' ++ g]
 
+before :: Rule a -> Rule a -> Rule a
+before aRules bRules cfg a =
+  case aRules cfg a of
+    [] -> bRules cfg a
+    as -> as
+
 allRules :: Rule Config
 allRules =
-  programRules P.<> 
-  assumptionRules P.<>
-  unificationRules P.<>
-  sequenceRules P.<>
-  existsRules
+  (programRules P.<> 
+   assumptionRules P.<>
+   unificationRules P.<>
+   sequenceRules P.<>
+   existsRules P.<>
+   dominatorRules)
+  `before`
+  dominators
 
 ------------------------------------------------------------------
 
@@ -348,7 +436,7 @@ programRules _ (A g :|- pg) =
   "program-intro" `name`
   do
     Program c _i _x _op <- [pg]
-    g' <- gAdd [AVerifyOrEval Verify c, ASolveOrImply Solve c, AImpliedEffects Effects tops None c] g
+    g' <- gAdd [AVerifyOrEval Verify c, ASolveOrImply Solve c, AImpliedEffects effects tops None c] g
     pure $ g' :|- pg
  -- program-sequence
  ++
@@ -356,8 +444,8 @@ programRules _ (A g :|- pg) =
   do
     Program c _i _x op <- [pg]
     AEffectOp fx op' c' <- g
-    guard (c == c' && op == op' && fx == tops)
-    error "Done"
+    guard (c == c' && op == op' && fx <=== tops)
+    pure $ A [] :|- ProgramDone
 
 assumptionRules :: Rule Config
 assumptionRules _ (A g :|- pg) =
@@ -464,6 +552,20 @@ existsRules _ (A g :|- pg) =
     g' <- gAdd (AEffectOp Succeeds op c : map (\ x -> AFlex (VertexVariable x) c) xs) g
     pure $ g' :|- pg
 
+dominatorRules :: Rule Config
+dominatorRules _ (A g :|- pg) =
+  "dominator-equiv" `name`  -- QQQ: fx{v>>u}@c is not among assumptions
+  do
+    ADominates fx v u c <- g
+    g' <- gAdd [AEffectOp fx (OpUnify u v) c] g
+    pure $ g' :|- pg
+ ++
+  "eq-dominator" `name`
+  do
+    AEffectOp fx (OpUnify u v) c <- g
+    g' <- gAdd [ADominates fx v u c] g
+    pure $ g' :|- pg
+
 ------------------------------------------------------------------
 
 class ExploreStart a where
@@ -546,6 +648,44 @@ instance FlexibleContext Operation where
 --    do
       -- fc[c,fc[C,OP]]  QQQ: is this really right?
 
+------------------------------------------------------------------
+
+dominators :: Rule Config
+dominators _ (A g :|- pg) =
+  "dominators" `name`
+  do
+    ADominates fx _ _ c <- g
+    let ds = dom fx c g
+    g' <- gAdd [ ADominates Succeeds u v c | Dom u v <- ds ] g
+    pure $ g' :|- pg
+
+data Dom = Dom Vertex Vertex
+  deriving (Eq, Show)
+instance Pretty Dom where
+  pPrint (Dom u v) = pPrint u <> text ">>" <> pPrint v
+
+-- XXX no accounting for tuples in candidates
+-- XXX no accounting for lambda-dominators
+dom :: EffectSpecifier -> Context -> [Assumption] -> [Dom]
+dom afx ac g =
+  let candidates = [ Dom v u | AEffectOp fx (OpUnify v u) c <- g, afx == fx, ac == c ]
+      add ds = ds `union` [ Dom v u | AEffectOp fx (OpUnify v w) c <- g, afx == fx, ac == c,
+                            AUnify u w' <- g, w == w' ]
+      startDs = loop candidates
+        where loop xs =
+                let xs' = add xs
+                in  if length xs == length xs' then xs else loop xs'
+
+      -- XXX not sure what this means: and (v<=w or ...something re comparable)
+      keep xs (Dom v u) =
+        AEffectOp afx (OpUnify u v) ac `elem` g ||
+        and [ AEffectOp afx (OpUnify u w) ac `elem` g || Dom v w `elem` xs
+            | AUnify u' w <- g, u == u' ]
+      finalDs = loop startDs
+        where loop xs =
+                let xs' = filter (keep xs) xs
+                in  if length xs == length xs' then xs else loop xs'
+  in  finalDs
 
 ------------------------------------------------------------------
 
