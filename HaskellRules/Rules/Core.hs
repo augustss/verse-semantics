@@ -865,6 +865,8 @@ allVars = nub . expr
     expr (e1 :=: e2) = expr e1 ++ expr e2
     expr (e1 :@: e2) = expr e1 ++ expr e2
     expr (e1 :>: e2) = expr e1 ++ expr e2
+    expr (e1 :>>: e2) = expr e1 ++ expr e2
+    expr (e1 :|: e2) = expr e1 ++ expr e2
     expr (One e) = expr e
     expr (All e) = expr e
     expr (Assume e) = expr e
