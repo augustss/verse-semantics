@@ -323,12 +323,13 @@ rulesNormalization _ lhs =
      guard (x `notElem` free e)
      pure e
  ++
- {-
   "EXI-ELIM2" `name`
-  do Exi (Bind _x _e) <- [lhs]
-     ..
+  do Exi bnd <- [lhs]
+     let Bind x e = alphaRename (allVars lhs) bnd
+     (ctx, Var x' :=: Val v) <- evalX e
+     guard (x == x')
+     pure (ctx (Val v))
  ++
- -}
   "EXI-FLOAT" `name`
   do (ctx, Exi bnd) <- evalX1 lhs
      let Bind x e = alphaRename (allVars (ctx (Arr []))) bnd
