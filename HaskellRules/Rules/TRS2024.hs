@@ -328,6 +328,7 @@ rulesNormalization _ lhs =
      let Bind x e = alphaRename (allVars lhs) bnd
      (ctx, Var x' :=: Val v) <- evalX e
      guard (x == x')
+     guard (x `notElem` allVars (ctx (Arr [])))
      pure (Exi (Bind x (ctx (Val v))))
  ++
   "EXI-FLOAT" `name`
