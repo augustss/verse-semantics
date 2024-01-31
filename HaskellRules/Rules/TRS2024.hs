@@ -328,7 +328,7 @@ rulesNormalization _ lhs =
      let Bind x e = alphaRename (allVars lhs) bnd
      (ctx, Var x' :=: Val v) <- evalX e
      guard (x == x')
-     pure (ctx (Val v))
+     pure (Exi (Bind x (ctx (Val v))))
  ++
   "EXI-FLOAT" `name`
   do (ctx, Exi bnd) <- evalX1 lhs
@@ -369,12 +369,12 @@ rulesChoice _ lhs =
      pure e
  ++
   "FAIL-L" `name`
-  do Fail :>: e <- [lhs]
-     pure e
+  do Fail :>: _ <- [lhs]
+     pure Fail
  ++
   "FAIL-R" `name`
-  do e :>: Fail <- [lhs]
-     pure e
+  do _ :>: Fail <- [lhs]
+     pure Fail
  ++
   "CHOICE" `name`
   do (c, e1 :|: e2) <- choiceX lhs
