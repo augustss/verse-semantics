@@ -209,7 +209,7 @@ choiceX1 lhs =
      return ((:>: e2) . ctx, hole)
  ++
   do e1 :>: e2 <- [lhs]
-     guard (isChoiceFree e1)
+     --guard (isChoiceFree e1)
      (ctx, hole) <- choiceX e2
      return ((e1 :>:) . ctx, hole)
  ++
@@ -247,8 +247,10 @@ rulesPrimOps _ lhs =
      pure (Int k1)
  ++
   "APP-GT-FAIL" `name`
-  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
-     guard (not (k1 > k2))
+  do Op Gt :@: a <- [lhs]
+     guard (case a of
+              Arr [Int k1, Int k2] -> not (k1 > k2)
+              _                    -> True)
      pure Fail
  ++
   "APP-ISINT" `name`
@@ -311,7 +313,7 @@ rulesSubstitution _ lhs =
   "SUBST" `name`
   do (s, Var x :=: Val v) <- substX lhs
      guard (not (isValueX v x))
-     let z:_ = identsNotIn (allVars lhs)
+     let z = identNotIn (allVars lhs) -- z is placeholder
      pure (subst [(x,v),(z,Var x :=: v)] (s (Var z))) 
 
 --------------------------------------------------------------------------------
@@ -329,6 +331,7 @@ rulesNormalization _ lhs =
      (ctx, Var x' :=: Val v) <- evalX e
      guard (x == x')
      guard (x `notElem` allVars (ctx (Arr [])))
+     guard (x `notElem` free v)
      pure (Exi (Bind x (ctx (Val v))))
  ++
   "EXI-FLOAT" `name`
@@ -348,6 +351,18 @@ rulesNormalization _ lhs =
   "SEQ-FLOAT" `name`
   do Val v :=: (e1 :>: e2) <- [lhs]
      pure (e1 :>: (v :=: e2))
+ ++
+  "GUARD-FLOAT" `name`
+  do Val v :=: (e1 :>>: e2) <- [lhs]
+     pure (e1 :>>: (v :=: e2))
+ ++
+  "EQU-FLOAT" `name`
+  do Val v1 :=: (Val v2 :=: e) <- [lhs]
+     pure ((v1 :=: v2) :>: (v1 :=: e))
+ ++
+  "EQU-SWAP" `name`
+  do Val v :=: Var x <- [lhs]
+     pure (Var x :=: v)
  ++
   "SEQ-ELIM" `name`
   do Val _ :>: e <- [lhs]
@@ -369,17 +384,13 @@ rulesChoice _ lhs =
   do e :|: Fail <- [lhs]
      pure e
  ++
-  "FAIL-L" `name`
-  do Fail :>: _ <- [lhs]
-     pure Fail
- ++
-  "FAIL-R" `name`
-  do _ :>: Fail <- [lhs]
-     pure Fail
- ++
   "CHOICE" `name`
   do (c, e1 :|: e2) <- choiceX lhs
      pure (c e1 :|: c e2)
+ ++
+  "FAIL" `name`
+  do (_, Fail) <- choiceX lhs
+     pure Fail
 
 --------------------------------------------------------------------------------
 
