@@ -10,8 +10,10 @@ import qualified Prelude as P
 import Control.Monad
 import Data.Char
 import Data.Data(Data)
-import Data.List
+import Data.List hiding(nub)
+import Data.Maybe
 import Data.Ratio
+import Epic.List
 import Epic.Print
 import Epic.Uniplate
 import TRS.TRS
@@ -22,6 +24,10 @@ type Q = Rational
 
 data Expr
   = ExprAtom Atom
+--  | ExprList [Expr]
+  | ExprDef Variable Expr
+  | ExprVar Variable
+  | ExprUnify Expr Expr
   deriving (Eq, Ord, Show, Data)
 
 data Path = Path String
@@ -106,7 +112,7 @@ data Operation
   -- OpStage
   | OpVerify EffectSpecifier (Maybe Err) Context Operation
   | OpAssume EffectSpecifier Context Operation
---  | OpS Vertex Vertex Syntax
+  | OpS Vertex Vertex Syntax
   | OpErr Err
   -- OpVar is not a real Op, it's just for pretty printing a context
   | OpVar String
@@ -117,17 +123,25 @@ data Err = Err
 
 -- ...
 
+data Arg = ArgO Operation | ArgV Vertex
+  deriving (Eq, Ord, Show, Data)
+
 data Assumption
-  = AEffectOp EffectSpecifier Operation Context
-  | AEffectVertex EffectSpecifier Vertex Context
+  = AEffect EffectSpecifier Arg Context
   | AUnify Vertex Vertex
   | AFlex Vertex Context
   | AImpliedEffects EffectSpecifier EffectSpecifier AvailableFx Context
   | ASolveOrImply SolveOrImply Context
   | AVerifyOrEval VerifyOrEval Context
   -- XXX many more
+  | AResolvedIdent Variable Context Vertex
   | ADominates EffectSpecifier Vertex Vertex Context
   deriving (Eq, Ord, Show, Data)
+
+pattern AEffectOp:: EffectSpecifier -> Operation -> Context -> Assumption
+pattern AEffectOp fx op c = AEffect fx (ArgO op) c
+pattern AEffectVertex:: EffectSpecifier -> Vertex -> Context -> Assumption
+pattern AEffectVertex fx v c = AEffect fx (ArgV v) c
 
 data AssumptionSet = A [Assumption]
   deriving (Eq, Ord, Show, Data)
@@ -158,6 +172,10 @@ ppLower = text . map toLower . show
 
 instance Pretty Expr where
   pPrint (ExprAtom a) = pPrint a
+--
+  pPrint (ExprDef x e) = pPrint x <+> text ":=" <+> pPrint e
+  pPrint (ExprVar x) = pPrint x
+  pPrint (ExprUnify e1 e2) = pPrint e1 <+> text "=" <+> pPrint e2
 instance Pretty Ident where
   pPrint (Ident i) = text i
 instance Pretty Path where
@@ -173,8 +191,8 @@ instance Pretty OperationVariable where pPrint (OperationVariable i) = pPrint i
 instance Pretty SolveOrImply where pPrint = ppLower
 instance Pretty VerifyOrEval where pPrint = ppLower
 instance Pretty Syntax where
-  pPrint (SyntaxList aes) = parens $ hcat (punctuate (text ",") (map pPrint aes))
   pPrint (SyntaxExpr e) = pPrint e
+  pPrint (SyntaxList aes) = parens $ hcat (punctuate (text ";") (map pPrint aes))
 instance Pretty AvailableFx where
   pPrint None = text "none"
   pPrint (fx1 :& fx2) = pPrint (fx1, fx2)
@@ -200,7 +218,7 @@ instance Pretty Operation where -- XXX precedence
   pPrint (OpUnify u v) = pPrint u <+> text "=" <+> pPrint v
   pPrint (OpCall u v p) = pPrint u <+> text "=" <+> pPrint v <> parens (pPrint p)
   pPrint (OpFail u) = pPrint u <+> text "=fail"
-  pPrint (OpSeq op0 op1) = pPrint op0 <> text ";" <+> pPrint op1
+  pPrint (OpSeq op0 op1) = parens $ pPrint op0 <> text ";" <+> pPrint op1
   pPrint (OpChoice op0 op1) = pPrint op0 <+> text "|" <+> pPrint op1
   pPrint (OpExists xs) = hsep (text "exists" : map pPrint xs)
   -- OpCond
@@ -221,7 +239,7 @@ instance Pretty Operation where -- XXX precedence
   pPrint (OpVerify fx Nothing c op0) = text "verify" <> parens (pPrint fx) <+> pPrint c <> text "." <+> pPrint op0
   pPrint (OpVerify fx (Just err) c op0) = text "verify" <> parens (pPrint (fx, err)) <+> pPrint c <> text "." <+> pPrint op0
   pPrint (OpAssume fx c op0) = text "assume" <> parens (pPrint fx) <+> pPrint c <> text "." <+> pPrint op0
---  pPrint (OpS u v s) = text "S" <> pPrint (u,v,s)
+  pPrint (OpS u v s) = text "S" <> pPrint (u,v,s)
   pPrint (OpErr e) = pPrint e
   pPrint (OpVar s) = text s
 instance Pretty Err where
@@ -229,18 +247,20 @@ instance Pretty Err where
 instance Pretty Assumption where
   pPrint (AEffectOp fx arg c) = pPrint fx <> braces (pPrint arg) <> text "@" <> pPrint c
   pPrint (AEffectVertex fx arg c) = pPrint fx <> braces (pPrint arg) <> text "@" <> pPrint c
+  pPrint AEffect{} = undefined
   pPrint (AUnify v0 v1) = pPrint v0 <> text "<-" <> pPrint v1
   pPrint (AFlex v c) = pPrint v <> text "@" <> pPrint c
   pPrint (AImpliedEffects fx1 fx2 afx c) = pPrint fx1 <> text ":" <> pPrint fx2 <> text ":" <> pPrint afx <> text "@" <> pPrint c
   pPrint (ASolveOrImply si c) = pPrint si <> text "@" <> pPrint c
   pPrint (AVerifyOrEval vb c) = pPrint vb <> text "@" <> pPrint c
+  pPrint (AResolvedIdent x c v) = pPrint x <> text "@" <> pPrint c <> text ":=" <> pPrint v
   pPrint (ADominates fx u v c) = pPrint fx <> braces (pPrint u <> text ">>" <> pPrint v) <> text "@" <> pPrint c
   
 instance Pretty AssumptionSet where
   pPrint (A []) = text "empty"
-  pPrint (A as) = hcat (punctuate (text ",") (map pPrint as))
+  pPrint (A as) = fsep (punctuate (text ",") (map pPrint as))
 instance Pretty Config where
-  pPrint (g :|- pg) = pPrint g <+> text "|-" <+> pPrint pg
+  pPrint (g :|- pg) = sep [pPrint g, text "|-", pPrint pg]
 
 instance Pretty (Context -> Operation -> Program) where
   pPrint f = pPrint (f (Context (Ident "C")) (OpVar "OP"))
@@ -248,94 +268,145 @@ instance Pretty (Context -> Operation -> Program) where
 ------------------------------------------------------------------
 
 data Effect
-  = FXsucceeds | FXdecides | FXresolves | FXabstracts | FXfails | FXcontradicts
-  | FXdiverges | FXdemands | FXallocates | FXvaries
-  | FXiterates         | FXreads         | FXwrites         | FXinteracts         | FXthrows         | FXsuspends
+  = FXsucceeds | FXfails | FXiterates | FXresolves | FXabstracts
+  | FXdiverges | FXdemands
+  | FXvaries
+  | FXreads | FXwrites | FXallocates
+  | FXinteracts | FXthrows | FXsuspends
   | FXiterates_pending | FXreads_pending | FXwrites_pending | FXinteracts_pending | FXthrows_pending | FXsuspends_pending
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Bounded, Enum, Show, Data)
 
--- Partial order on Effect (reflexive, transitive closure of adjecent <==)
-(<==) :: Effect -> Effect -> Bool
-FXsucceeds    <== e = e `elem` [FXsucceeds, FXdecides, FXiterates, FXresolves, FXabstracts]
-FXdecides     <== e = e `elem`             [FXdecides, FXiterates, FXresolves, FXabstracts]
-FXresolves    <== e = e `elem`                                    [FXresolves, FXabstracts]
-FXabstracts   <== e = e `elem`                                                [FXabstracts]
-FXfails       <== e = e `elem` [FXfails,    FXdecides, FXiterates, FXresolves, FXabstracts]
-FXiterates    <== e = e `elem`                        [FXiterates]
-FXcontradicts <== e = e `elem` [FXcontradicts, FXfails, FXsucceeds, FXdecides, FXiterates, FXresolves, FXabstracts]
---
-FXvaries      <== e = e `elem` [FXvaries, FXreads, FXallocates]
-e1            <== e2 = e1 == e2
-
-newtype EffectSpecifier = ES [Effect] -- the list has no elements x,y where x <== y
+newtype EffectSpecifier = ES [Effect] -- the effect list has no duplicates and is sorted.
   deriving (Eq, Ord, Show, Data)
 
 effs :: [Effect] -> EffectSpecifier
 effs = ES . sort
 
-esInvariant :: EffectSpecifier -> EffectSpecifier
-esInvariant fx@(ES aes) | or [ e1 <== e2 | e1 <- aes, e2 <- aes, e1 /= e2 ] = error "esInvariant 1"
-                        | length aes /= length (nub aes) = error "esInvariant 2"
-                        | otherwise = fx
-
-cardinalities :: EffectSpecifier
-cardinalities = effs [FXabstracts, FXiterates]
-transacts :: EffectSpecifier
-transacts = effs [FXreads, FXwrites, FXallocates]
 imperatives :: EffectSpecifier
-imperatives = effs [FXdiverges, FXdemands, FXreads, FXwrites, FXallocates, FXinteracts, FXthrows, FXsuspends, 
-  FXiterates_pending, FXreads_pending, FXwrites_pending, FXinteracts_pending, FXthrows_pending, FXsuspends_pending]
+imperatives = Diverges\/Demands\/Reads\/Writes\/Allocates\/Interacts\/Throws\/Suspends\/
+              ES (sort [FXiterates_pending, FXreads_pending, FXwrites_pending, FXinteracts_pending, FXthrows_pending, FXsuspends_pending])
 tops :: EffectSpecifier
-tops = effs [FXsucceeds, FXdiverges, FXinteracts] \/ transacts
+tops = Succeeds\/Diverges\/Interacts\/Transacts
 effects :: EffectSpecifier
-effects = cardinalities \/ imperatives \/ ES [FXdemands, FXvaries]
+effects = Cardinalities \/ imperatives \/ Varies
+effects' :: EffectSpecifier
+effects' = effects `remove` Demands
+
+pattern Contradicts :: EffectSpecifier
+pattern Contradicts = ES []
 pattern Succeeds :: EffectSpecifier
 pattern Succeeds = ES [FXsucceeds]
 pattern Fails :: EffectSpecifier
 pattern Fails = ES [FXfails]
-pattern Abstracts :: EffectSpecifier
-pattern Abstracts = ES [FXabstracts]
+pattern Decides :: EffectSpecifier
+pattern Decides = ES [FXsucceeds, FXfails]
+pattern Iterates :: EffectSpecifier
+pattern Iterates = ES [FXsucceeds, FXfails, FXiterates]
 pattern Resolves :: EffectSpecifier
-pattern Resolves = ES [FXresolves]
+pattern Resolves = ES [FXsucceeds, FXfails, FXresolves]
+pattern Abstracts :: EffectSpecifier
+pattern Abstracts = ES [FXsucceeds, FXfails, FXresolves, FXabstracts]
+pattern Cardinalities :: EffectSpecifier
+pattern Cardinalities = ES [FXsucceeds, FXfails, FXiterates, FXresolves, FXabstracts]
+pattern Varies :: EffectSpecifier
+pattern Varies = ES [FXvaries]
+pattern Reads :: EffectSpecifier
+pattern Reads = ES [FXvaries, FXreads]
+pattern Writes :: EffectSpecifier
+pattern Writes = ES [FXvaries, FXwrites]
+pattern Allocates :: EffectSpecifier
+pattern Allocates = ES [FXvaries, FXallocates]
+pattern Transacts :: EffectSpecifier
+pattern Transacts = ES [FXvaries, FXreads, FXwrites, FXallocates]
+pattern Interacts :: EffectSpecifier
+pattern Interacts = ES [FXinteracts]
 pattern Demands :: EffectSpecifier
 pattern Demands = ES [FXdemands]
+pattern Diverges :: EffectSpecifier
+pattern Diverges = ES [FXdiverges]
+pattern Suspends :: EffectSpecifier
+pattern Suspends = ES [FXsuspends]
+pattern Throws :: EffectSpecifier
+pattern Throws = ES [FXthrows]
+--pattern Bottom = ES []
 
--- The join of two EffectSpecifier
+-- The join (union) of two EffectSpecifier
 (\/) :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
-ES fx0 \/ ES fx1 =
-  let fx0' = filter (\ e0 -> not $ any (\ e1 -> e0 <== e1) fx1 ) fx0
-      fx1' = filter (\ e1 -> not $ any (\ e0 -> e1 <== e0) fx0') fx1
-  in  esInvariant $ effs $ fx0' ++ fx1'
+ES fx0 \/ ES fx1 = ES $ merge fx0 fx1
+  where merge [] es1 = es1
+        merge es0 [] = es0
+        merge (e0:es0) (e1:es1) =
+          case compare e0 e1 of
+            LT -> e0 : merge es0 (e1:es1)
+            EQ -> e0 : merge es0 es1
+            GT -> e1 : merge (e0:es0) es1
 
--- The meet of two EffectSpecifier
+-- The meet (intersection) of two EffectSpecifier
 (/\) :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
-ES fx0 /\ ES fx1 =
-  esInvariant $ effs $ nub
-  [ e | e0 <- fx0, e1 <- fx1, e <- if e0 <== e1 then [e0] else if e1 <== e0 then [e1] else [] ]
+ES fx0 /\ ES fx1 = ES $ isect fx0 fx1
+  where isect (e0:es0) (e1:es1) =
+          case compare e0 e1 of
+            LT -> isect es0 (e1:es1)
+            EQ -> e0 : isect es0 es1
+            GT -> isect (e0:es0) es1
+        isect _ _ = []
 
 -- Partial order on EffectSpecifier
 (<===) :: EffectSpecifier -> EffectSpecifier -> Bool
 fx0 <=== fx1 = (fx0/\fx1) == fx0
 
+remove :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
+remove (ES fx0) (ES fx1)  = ES (filter (`notElem` fx1) fx0)
+
 instance Pretty Effect where pPrint = text . drop 2 . show
 
-instance Pretty EffectSpecifier where
-  pPrint fx | fx == tops = text "tops"
-            | fx == effects = text "effects"
-            | fx == transacts = text "transacts"
-            | fx == imperatives = text "imperatives"
-            | fx == cardinalities = text "cardinalities"
-            | fx == ES [] = text "noeffects"
-            | ES aes <- fx = hcat (punctuate (text "\\/") (map pPrint aes))
+cardEffs :: [(EffectSpecifier, String)]
+cardEffs =
+  [(Cardinalities, "cardinalities")
+  ,(Abstracts, "abstracts")
+  ,(Resolves, "resolves")
+  ,(Iterates, "iterates")
+  ,(Decides, "decides")
+  ,(Fails, "fails")
+  ,(Succeeds, "succeeds")
+  ,(Contradicts, "contradicts")
+  ]
+otherEffs :: [(EffectSpecifier, String)]
+otherEffs =
+  [(Transacts, "transacts")
+  ,(Reads, "reads")
+  ,(Writes, "writes")
+  ,(Allocates, "allocates")
+  ,(Varies, "varies")
+  ,(Demands, "demands")
+  ,(Diverges, "diverges")
+  ,(Suspends, "suspends")
+  ,(Throws, "throws")
+  ]
 
-remove :: EffectSpecifier -> Effect -> EffectSpecifier
-remove (ES aes) e = ES (filter (/= e) aes)
+instance Pretty EffectSpecifier where
+  pPrint afx | afx == tops = text "tops"
+             | afx == effects = text "effects"
+             | afx == effects' = text "effects'"
+             | otherwise =
+              let (cfx, cs) = fromJust $ find (\ (a,_) -> a <=== afx) cardEffs
+                  sfx = cs : loop (afx `remove` cfx)
+                  loop (ES []) = []
+                  loop fx@(ES xes) =
+                    case find (\ (a,_) -> a <=== fx) otherEffs of
+                      Just (xfx, s) -> s : loop (afx `remove` xfx)
+                      Nothing -> map show xes
+              in  hcat (punctuate (text "\\/") $ map text sfx)
+
+-- QQQ: How can * be commutative?
+-- for all fx diverges*fx = diverges
+-- but fails * diverges = fails
 
 star :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
 star fx0 fx1 = (fx0\/fx1)/\
   if      m <=== Fails   then Fails\/imperatives
   else if m <=== Demands then Abstracts\/imperatives
-  else                       effects `remove` FXdemands
+  else                       effects'
   where m = fx0/\fx1
 
 ------------------------------------------------------------------
@@ -350,6 +421,8 @@ instance NewIdents (String, String, String) (Ident, Ident, Ident) where
   newIdents x (s1, s2, s3) = (is !! 0, is !! 1, is !! 2)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3]
 instance NewIdents [String] [Ident] where
   newIdents x ss = is  where is = identsNotIn x (map Ident ss)
+instance NewIdents (Int, String) [Ident] where
+  newIdents x (n, s) = take n $ identsNotIn x [Ident s]
 
 identsOf :: Data i => i -> [Ident]
 identsOf = universeBi
@@ -365,13 +438,32 @@ idents is = concatMap (\ s -> map (addSuf s) is) sufs
 
 ------------------------------------------------------------------
 
-dsS :: Vertex -> Vertex -> Syntax -> Operation
-dsS u v (SyntaxExpr e) = dsE u v e
-dsS _ _ _ = undefined
+dsS :: Data a => a -> Vertex -> Vertex -> Syntax -> Operation
+dsS pg u v (SyntaxExpr e) = dsE pg u v e
+dsS pg u v (SyntaxList (Snoc aes e)) =
+  let n = length aes
+      is = map Variable $ newIdents pg (n, "i")
+      xs = map Variable $ newIdents pg (n, "x")
+  in  opSeqs $ OpExists (is ++ xs) :
+               zipWith3 (dsS pg) (map VertexVariable is) (map VertexVariable xs) aes ++ [dsS (pg, is, xs) u v e]
+dsS _ _ _ _ = undefined
 
-dsE :: Vertex -> Vertex -> Expr -> Operation
-dsE u v (ExprAtom a) = OpUnify u h +> OpUnify v h
+dsE :: Data a => a -> Vertex -> Vertex -> Expr -> Operation
+dsE _ u v (ExprAtom a) = OpUnify u h +> OpUnify v h
   where h = VertexHead $ HeadAtom a
+dsE pg u v (ExprUnify e1 e2) = dsE pg u v e1 +> dsE pg u v e2
+{-
+dsE u v ae@(ExprList (Snoc aes e)) =
+  let n = length aes
+      is = map Variable $ newIdents ae (n, "i")
+      xs = map Variable $ newIdents ae (n, "x")
+  in  opSeqs $ OpExists (is ++ xs) :
+               zipWith3 dsE (map VertexVariable is) (map VertexVariable xs) aes ++ [dsE u v e]
+-}
+dsE _ u v x = OpS u v (SyntaxExpr x)
+
+opSeqs :: [Operation] -> Operation
+opSeqs = foldr1 OpSeq
 
 ------------------------------------------------------------------
 
@@ -388,11 +480,11 @@ sys = TRSystem {
   }
 
 pptr :: Config -> IO ()
-pptr = mapM_ ppx . f . normalFormFuelTracePlain sys 100
+pptr = mapM_ ppx . f . normalFormFuelTracePlain sys 10000
   where f x = if null (nrLeft x) then nrDone x else trace "**** no fuel " (nrLeft x)
 
 norm :: Config -> Config
-norm = term . (!!0) . f . normalFormFuelTracePlain sys 100
+norm = term . (!!0) . f . normalFormFuelTracePlain sys 10000
   where f x = if null (nrLeft x) then nrDone x else trace "**** no fuel " (nrLeft x)
 
 ------------------------------------------------------------------
@@ -413,21 +505,52 @@ before aRules bRules cfg a =
 
 allRules :: Rule Config
 allRules =
-  (programRules P.<> 
+  fxIntersectsRule `before`
+  (desugarRules P.<>
+   identRules P.<>
+   programRules P.<> 
    assumptionRules P.<>
    unificationRules P.<>
    sequenceRules P.<>
    existsRules P.<>
    dominatorRules)
+--  `before`
+--  dominators
   `before`
-  dominators
+  programElimRule
 
 ------------------------------------------------------------------
 
--- define-ident
+desugarRules :: Rule Config
+desugarRules _ (g :|- pg) =
+  "S" `name`
+  do
+    (ctx, c, op@(OpS u v s)) <- fc pg
+    let op' = dsS pg u v s
+    guard $ op /= op'
+    pure $ g :|- ctx c op'
+
+------------------------------------------------------------------
+
+identRules :: Rule Config
+identRules _ (A g :|- pg) =
+  "define-ident" `name`
+  do -- QQQ: should be? fc[c,S(u,v,s0)]
+    (ctx, c, OpS u v (SyntaxExpr (ExprDef x e))) <- fc pg
+    let pg' = ctx c (OpS u v (SyntaxExpr e))
+    g' <- gAdd [AResolvedIdent x c v] g
+    pure $ g' :|- pg'
+ ++
 -- define-ident-var
 -- define-ident-ref
--- resolve-ident
+  "resolve-ident" `name`
+  do
+    (ctx, c, OpS u v (SyntaxExpr (ExprVar x))) <- fc pg
+    AResolvedIdent x' c' r <- g
+    guard (x == x' && c == c')
+    let pg' = ctx c (OpSeq (OpUnify u r) (OpUnify v r))
+    pure $ A g :|- pg'
+  
 
 ------------------------------------------------------------------
 
@@ -439,7 +562,9 @@ programRules _ (A g :|- pg) =
     g' <- gAdd [AVerifyOrEval Verify c, ASolveOrImply Solve c, AImpliedEffects effects tops None c] g
     pure $ g' :|- pg
  -- program-sequence
- ++
+
+programElimRule :: Rule Config
+programElimRule _ (A g :|- pg) =
   "program-elim" `name`
   do
     Program c _i _x op <- [pg]
@@ -447,10 +572,21 @@ programRules _ (A g :|- pg) =
     guard (c == c' && op == op' && fx <=== tops)
     pure $ A [] :|- ProgramDone
 
+fxIntersectsRule :: Rule Config
+fxIntersectsRule _ (A g :|- pg) =
+  "fx-intersects" `name`
+  do
+    _a0@(AEffect fx0 a  c)  <- g
+    _a1@(AEffect fx1 a' c') <- g
+    guard (a == a' && c == c' && fx0 /= fx1)
+    let gr = -- filter (\ aa -> aa /= _a0 && aa /= _a1)
+             g
+    g' <- gAdd [AEffect (fx0/\fx1) a c] gr
+    pure $ g' :|- pg
+
 assumptionRules :: Rule Config
 assumptionRules _ (A g :|- pg) =
   -- fx-weaken
-  -- fx-intersects
   "eq-refl" `name`
   do
     AFlex v c <- g
@@ -525,10 +661,22 @@ unificationRules _ (A g :|- pg) =
     (_ctx, c, op@(OpFail _u)) <- fc pg
     g' <- gAdd [AEffectOp Fails op c] g
     pure $ g' :|- pg
--- unify-head-fails
+ ++
+  "unify-head-fails" `name`
+  do
+    AEffectOp fx op@(OpUnify (VertexHead head0) (VertexHead head1)) c <- g
+    guard (disjointHead head0 head1)
+    g' <- gAdd [AEffectOp (fx /\ Fails) op c] g
+    pure $ g' :|- pg
+
 -- unify-tuple-intro
 -- unify-lambda-intro
 -- ...
+
+-- XXX incomplete
+disjointHead :: Head -> Head -> Bool
+disjointHead (HeadAtom a0) (HeadAtom a1) = a0 /= a1
+disjointHead _ _ = True
 
 sequenceRules :: Rule Config
 sequenceRules _ (A g :|- pg) =
@@ -596,8 +744,13 @@ class FlexibleOp a where
 instance FlexibleOp Operation where
   fop a = (id, a) : fop1 a
     where fop1 (OpSeq op1 op2) =
-            [(\ op1' -> OpSeq op1' op2, op1)
-            ,(\ op2' -> OpSeq op1 op2', op2)]
+              do
+                (ctx, op11) <- fop op1
+                pure (\ op11' -> OpSeq (ctx op11') op2, op11)
+             ++
+              do
+                (ctx, op21) <- fop op2
+                pure (\ op21' -> OpSeq op1 (ctx op21'), op21)
           fop1 (OpScope c aop) = do
             (ctx, op) <- fop aop
             pure (\ op' -> OpScope c (ctx op'), op)
@@ -606,7 +759,9 @@ instance FlexibleOp Operation where
             (ctx, op) <- fop op0
             [(\ op' -> OpBeta lam c0 (ctx op') c1 op1, op),
              (\ op' -> OpBeta lam c0 op0 c1 (ctx op'), op)]
-          fop1 _ = []
+          fop1 _op =
+            --trace ("fop1: " ++ prettyShow _op)
+            []
 
 class ExploreOp a where
   eop :: a -> [(Operation -> a, Operation)]
@@ -698,10 +853,28 @@ startConfig s = g :|- pg
         vvx = VertexVariable vx
         vc = Context c
         g = A [AFlex vvi vc, AFlex vvx vc]
-        pg = Program vc vi vx $ dsS vvi vvx s
+        pg = Program vc vi vx $ OpS vvi vvx s
 
 ------------------------------------------------------------------
 
 -- example1:  5
 example1 :: Syntax
 example1 = SyntaxExpr $ ExprAtom $ AtomRational 5
+
+-- example2: a:=5; a
+example2 :: Syntax
+example2 = SyntaxList [SyntaxExpr $ ExprDef a (ExprAtom $ AtomRational 5)
+                      ,SyntaxExpr $ ExprVar a]
+  where a = Variable $ Ident "a"
+
+-- example3: a:=5; a=3
+example3 :: Syntax
+example3 = SyntaxList [SyntaxExpr $ ExprDef a (ExprAtom $ AtomRational 5)
+                      ,SyntaxExpr $ ExprUnify (ExprVar a) (ExprAtom $ AtomRational 3)]
+  where a = Variable $ Ident "a"
+
+-- example4:  1=2
+example4 :: Syntax
+example4 = SyntaxExpr $ ExprUnify (ExprAtom $ AtomRational 1) (ExprAtom $ AtomRational 2)
+
+
