@@ -899,8 +899,14 @@ collect here (\/) = col
 allVars :: Expr -> [Ident]
 allVars = nub . collect vars (++)
   where
-    vars (Var i) = [i]
-    vars _       = []
+    vars (Var i)   = [i]
+    vars (Lam bnd) = varsBind bnd
+    vars (Exi bnd) = varsBind bnd
+    vars (Uni bnd) = varsBind bnd
+    vars (Olam _ bnd1 bnd2) = varsBind bnd1 ++ varsBind bnd2
+    vars _         = []
+
+    varsBind (Bind x _) = [x]
 
 --------------------------------------------------------------------------------
 
