@@ -85,7 +85,7 @@ prop_Confluence1 flags sys =
             discard                     -- reduction timed out
  where
   arbExpr =
-    do p <- arbitrary
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
@@ -112,7 +112,7 @@ prop_Confluence2 flags sys =
             _ -> discard
  where
   arbExpr =
-    do p <- arbitrary
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
@@ -137,7 +137,7 @@ prop_Confluence3 flags sys =
           _ -> discard
  where
   arbExpr =
-    do p <- arbitrary
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
@@ -205,7 +205,7 @@ prop_Terminates flags sys =
         False
  where
   arbExpr =
-    do p <- arbitrary
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =

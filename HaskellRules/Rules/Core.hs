@@ -42,6 +42,7 @@ module Rules.Core(
   substExp,
   BndVar(..),
   boundVars, flexVars, rigidVars, bndIds,
+  arbExprFor
   ) where
 import qualified Epic.SIntMap as IM
 import Data.Char
@@ -55,6 +56,7 @@ import TRS.TRS
 import Test.QuickCheck hiding ( collect )
 import Epic.List(nub)
 import Epic.Print hiding ((<>))
+import Epic.QuickCheck( generateOne )
 import qualified Epic.Print as P
 
 type ERule = Rule Expr
@@ -736,7 +738,7 @@ arbIdents =
 ---
 
 instance Arbitrary Expr where
-  arbitrary = sized (`arbExpr` map Name ["a","b","c"]) -- closed by default
+  arbitrary = arbExprBasic
 
   -- shrink _ = []
   shrink (Var _)   = [ Int 0, Arr [] ]
@@ -786,41 +788,80 @@ instance Arbitrary Expr where
     [OLam x (Bind xd ed') r | ed'<-shrink ed] ++
     [OLam x d (Bind xr er') | er'<-shrink er]
 
-arbExpr :: Int -> [Ident] -> Gen Expr
-arbExpr n xs =
-  frequency $
-  [ (length xs, Var <$> elements xs) ] ++
-  [ (1, Int <$> arbitrary)
-  , (1, Op  <$> arbitrary)
-  , (1, return Fail)
-  , (rv, Arr <$> do k <- choose (0,5)
-                    sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
-  , (ri, Lam <$> arbBind n1 xs)
-  , (ri, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (ri, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (ri, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (rv, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (ri, Exi <$> arbBind n1 xs)
-  , (rv, One <$> arbExpr n1 xs)
-  , (rv, All <$> arbExpr n1 xs)
-  -- Don't generate Block, the anf-ing will do that.
-  -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
-  ]
+arbExprBasic :: Gen Expr
+arbExprBasic = arbExprFor ok
  where
-  n1 = n-1
-  n2 = n `div` 2
-  ri = 6 `min` n
-  rv = 2 `min` n
+  -- basic core language
+  ok (Var _)   = True
+  ok (Int _)   = True
+  ok (Op _)    = True
+  ok (Fail)    = True
+  ok (Arr _)   = True
+  ok (Lam _)   = True
+  ok (_ :=: _) = True
+  ok (_ :>: _) = True
+  ok (_ :|: _) = True
+  ok (_ :@: _) = True
+  ok (Exi _)   = True
+  ok (One _)   = True
+  ok (All _)   = True
+  ok _         = False
 
-arbBind :: Int -> [Ident] -> Gen (Bind Expr)
-arbBind n xs =
+arbExprFor :: (Expr->Bool) -> Gen Expr
+arbExprFor ok =
+  let constructors n xs arbExpr =
+        -- this list should have a static length
+        [ (length xs, Var <$> elements xs)
+        , (1, Int <$> arbitrary)
+        , (1, Op  <$> arbitrary)
+        , (1, return Fail)
+        , (rv, Arr <$> do k <- choose (0,5)
+                          sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
+        , (ri, Lam <$> arbBind arbExpr n1 xs)
+        , (ri, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (ri, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (rv, (:>>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (ri, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (rv, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (ri, Exi <$> arbBind arbExpr n1 xs)
+        , (ri, Uni <$> arbBind arbExpr n1 xs)
+        , (rv, One <$> arbExpr n1 xs)
+        , (rv, All <$> arbExpr n1 xs)
+        , (rv, Assume <$> arbExpr n1 xs)
+        , (rv, Assert <$> arbExpr n1 xs)
+        , (rv, Verify <$> arbExpr n1 xs)
+        , (rv, Fails <$> arbExpr n1 xs)
+        -- Don't generate Block, the anf-ing will do that.
+        -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
+        ]
+       where
+        n1 = 0 `max` (n-1)
+        n2 = n `div` 2
+        ri = 0 `max` (6 `min` n)
+        rv = 0 `max` (2 `min` n)
+
+      oks =
+        [ ok e
+        | (_, gen) <- constructors 0 [x] (\_ _ -> return (Int 0))
+        , let e = generateOne gen
+        ]
+
+      x = identNotIn []
+
+      arb n xs =
+        frequency [ t | (t,True) <- constructors n xs arb `zip` oks ]
+
+   in sized (`arb` map Name ["a","b","c"])
+
+arbBind :: (Int -> [Ident] -> Gen Expr) -> Int -> [Ident] -> Gen (Bind Expr)
+arbBind arb n xs =
   frequency $
   [ (1, do x <- elements xs
-           Bind x <$> arbExpr n xs)
+           Bind x <$> arb n xs)
   | not (null xs)
   ] ++
   [ (4, do let x:_ = filter (`notElem` xs) (map Name ["x","y","z","v","w"] ++ map Prim [1..])
-           Bind x <$> arbExpr n (x:xs))
+           Bind x <$> arb n (x:xs))
   ]
 
 --------------------------------------------------------------------------------
