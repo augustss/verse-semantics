@@ -903,7 +903,7 @@ allVars = nub . collect vars (++)
     vars (Lam bnd) = varsBind bnd
     vars (Exi bnd) = varsBind bnd
     vars (Uni bnd) = varsBind bnd
-    vars (Olam _ bnd1 bnd2) = varsBind bnd1 ++ varsBind bnd2
+    vars (OLam _ bnd1 bnd2) = varsBind bnd1 ++ varsBind bnd2
     vars _         = []
 
     varsBind (Bind x _) = [x]
