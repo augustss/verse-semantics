@@ -14,6 +14,7 @@ common shared-properties
 --    ghc-options:      -Wall -O2 -prof -fprof-auto
     build-depends:    base,
                       containers,
+                      random,
                       mtl,
                       pretty,
                       megaparsec,
@@ -34,6 +35,7 @@ library all
                       Epic.String
                       Epic.Trace
                       Epic.Uniplate
+                      Epic.QuickCheck
                       TRS.Bind
                       TRS.Graph
                       TRS.NormalForm
