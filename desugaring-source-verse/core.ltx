@@ -37,12 +37,13 @@
   \begin{array}{lr@@{\;}c@@{\;}l@@{}}
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,r,f,g} \\
+      \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
       \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       && \vb & |forall x e| \vb |e_1 guard e_2| \vb |assume e| \vb |check fx e| \vb |verify e| \vb |havoc fx| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
-      \text{Head values} & \hnf & ::= & k \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam x e|
-             \vb |olam v (lam x e_1) (lam y e_2)|\\
+      \text{Head values} & \hnf & ::= & k \vb r \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
+             \vb |olam v (lam r e_1) (lam s e_2)|\\
       \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt|
 \end{array}
 \\ \\
@@ -123,7 +124,6 @@
 \rulename{exi-elim1} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[v]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{forall-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1; (e_2; e_3)| \\
 \rulename{seq-float} & |v == (e_1 ; e_2)| & \movesto & |e_1; v == e_2| \\
 \rulename{seq-elim} & |v ; e| & \movesto & |e| \\
@@ -159,6 +159,10 @@
 \end{figure}
 }
 
+
+
+
+% --------------------------- Structural rules ----------------
 \newcommand{\figureStructuralRules}{
   \begin{figure}
     $$

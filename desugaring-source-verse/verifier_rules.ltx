@@ -13,6 +13,49 @@ $\begin{array}{@@{}l}
   \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
   \item |verify e| checks that |e| neither gets stuck nor goes wrong.
 \end{itemize}
+\end{minipage} \\[3mm]
+
+\begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
+
+\rulename{nu-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\[2mm]
+
+\multicolumn{5}{l}{\textit{Guard:}} \\
+\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
+\rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
+\rulename{guard-float} & |(assume e ; e_1) guard e_2| & \movesto &  |assume e; (e_1 guard e_2)| \\
+
+\\[-0.6em]
+
+\multicolumn{5}{l}{\textit{Check:}} \\
+  \rulename{check-elim}   & |check fx e|  & \movesto & |e| & \text{if}\ \must{\mathit{fx}}{e} \\
+\\[-0.6em]
+
+\multicolumn{5}{l}{\textit{Verify:}} \\
+  \rulename{verify-elim} & |verify e|      & \movesto & |tup ()| & \text{if no |checkKW| outside |verifyKW| in |e|} \\
+  \rulename{verify-if}   & |verify (E^[myite e_1 e_2 e_3])| & \movesto & |verify (E^[assume e_1; e_2]);| & \text{if}\ \mustDecide{e_1} \\
+                         &                                  &          & |verify (E^[check fails e_1; e_3])|              & \\
+  \\[-0.6em]
+
+\multicolumn{5}{l}{\textit{Implies:}} \\
+\rulename{substr} & |S^[x==apply1N f v]| & \movesto & |subst S (apply1N f v) x ^[x==apply1N f v]|
+  & \text{if only skolems free in |v|} \\
+\end{array}\\
+\end{array}$
+\\[0.1in]
+\caption{SPJ: TRS Verifier Rewrite Rules}
+\label{fig:spj-verifier-rewrite-rules}
+\end{figure}
+
+
+% ------------------- Ranjit version --------------
+
+\begin{figure}[t]
+$\begin{array}{@@{}l}
+\begin{minipage}{12cm}
+  \begin{itemize}
+  \item |assume e| means that we can assume |e| neither gets stuck nor goes wrong.
+  \item |verify e| checks that |e| neither gets stuck nor goes wrong.
+\end{itemize}
 \end{minipage} \\
 
 \begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
@@ -42,7 +85,7 @@ $\begin{array}{@@{}l}
   % \rulename{dec-elim}   & |E^[check decides e]|  & \movesto & |E^[e]|  & \text{if}\ $\mustDecide{E}{e}$ \\
   \rulename{check-seq} & |check fx (e_1; e_2)| & \movesto & |check fx e_1; check fx e_2| & \text{if}\ |fx|\ \text{is not}\ |fails| \\
   % & & \multicolumn{3}{l}{\text{if |fx| is |decides|, |succeeds|, |iterates| but not |fails|}} \\
-  \rulename{check-elim}   & |E^[check fx e]|  & \movesto & |E^[e]| & \text{if}\ \must{\mathit{fx}}{E}{e}\ \text{and} \\
+  \rulename{check-elim}   & |E^[check fx e]|  & \movesto & |E^[e]| & \text{if}\ \must{\mathit{fx}}{e}\ \text{and} \\
                           &                   &          &         & |fx|\ \text{is}\ |succeeds|\ \text{or}\ |decides| \\
   \rulename{fails-val}    & |check fails v|   & \movesto & |fail| \\
   \rulename{fails-fail}   & |check fails fail|   & \movesto & |tup ()| \\
@@ -84,49 +127,32 @@ $\begin{array}{ll}
 \end{figure}
 
 \begin{figure}
-$\begin{array}{lcl}
-  \toprule
-  % \impl{e_1}{e_2} & \doteq & \ensuremath{\UnAssume{e_1} = \UnAssume{e_2}} \vee (e_1 \equiv |isInt x| \wedge e_2 \equiv |x = x|) \\
-  % \midrule
-  \mustSucceedKW & :: & (P, e) \rightarrow \{ \mathit{true}, \mathit{false} \} \\
-  \midrule
-   \mustSucceed{P}{n}                 & \doteq & \mathit{true} \\
-   \mustSucceed{P}{|arr (v_1, xdots, v_n) |} & \doteq & \mustSucceed{P}{|v_1|} \wedge \dots \wedge \mustSucceed{P}{|v_n|} \\
-   \mustSucceed{P}{|x|}               & \doteq & x \in \lamvars{P} \\
-   \mustSucceed{P}{|lam x e|}         & \doteq & \mathit{true} \\
-   \mustSucceed{P}{|assume e|}        & \doteq & \mathit{true} \\
-   \mustSucceed{P}{|one e|}           & \doteq & \mustSucceed{P}{e} \\
-   \mustSucceed{P}{|all e|}           & \doteq & \mustSucceed{P}{e} \\
-   \mustSucceed{P}{|e_1; e_2|}        & \doteq & \mustSucceed{P}{e_1} \wedge \mustSucceed{P}{e_2} \\
-   \mustSucceed{P}{|e_1 choice e_2|}  & \doteq & \mustSucceed{P}{e_1} \vee   \mustSucceed{P}{e_2} \\
-   \mustSucceed{P}{|def x e|}         & \doteq & \mustSucceed{P}{e} \\
-   \mustSucceed{P}{|e|}               & \doteq & \mathit{false} \\
-   \bottomrule
+$\begin{array}{lcll}
+  \must{|fails|}{|fail|}      & \doteq & true \\
+  \\
+   \must{|fx|}{n}                 & \doteq & \mathit{true}  & \sucdec{|fx|} \\
+   \must{|fx|}{|arr (v_1, xdots, v_n) |} & \doteq & \must{|fx|}{|v_1|} \wedge \dots \\
+   && \wedge \must{|fx|}{|v_n|} & \sucdec{|fx|} \\
+   \must{|fx|}{|x|}               & \doteq & \mathit{false} & \sucdec{|fx|} \\
+   \must{|fx|}{|r|}               & \doteq & \mathit{true} & \sucdec{|fx|} \\
+   \must{|fx|}{|lam r e|}         & \doteq & \mathit{true} & \sucdec{|fx|} \\
+   \must{|fx|}{|def x e|}         & \doteq & \must{|fx|}{e} \\
+   \must{|fx|}{|forall r e|}         & \doteq & \must{|fx|}{e} \\
+   \must{|fx|}{|assume e|}        & \doteq & \mathit{true} & \sucdec{|fx|} \\
+   \must{|fx|}{|one e|}           & \doteq & \must{|fx|}{e} & \sucdec{|fx|} \\
+   \must{|fx|}{|all e|}           & \doteq & \must{|fx|}{e} & \sucdec{|fx|} \\
+   \must{|fx|}{|e_1; e_2|}        & \doteq & \must{|fx|}{e_1} \wedge \must{|fx|}{e_2} & \sucdec{|fx|} \\
+   \mustSucceed{|e_1 choice e_2|}  & \doteq & \mustSucceed{e_1} \vee   \mustSucceed{e_2} \\
+   \mustDecide{|e_1 choice e_2|}  & \doteq & \mustDecide{e_1} \wedge   \mustDecide{e_2} \\
+   \mustSucceed{|e_1 = e_2|}       & \doteq & \mathit{false} \\
+   \mustDecide{|e_1 = e_2|}       & \doteq & \mustDecide{e_1} \wedge \mustDecide{e_2} \\
+   \mustSucceed{|apply1N op e|}     & \doteq & \mathit{false} \\
+   \mustDecide{|apply1N op e|}     & \doteq & \mustDecide{e} \\
+   \must{|fx|}{|e|}               & \doteq & \mathit{false} & \sucdec{|fx|}\\
+  \\
+  \sucdec{|fx|} & \doteq & |fx| = \{|succeeds|,|decides|\} \\
 \end{array}$
-\caption{Definition of the $\mustSucceedKW$ predicate used in \cref{fig:verifier-rewrite-rules}.}
-\end{figure}
-
-\begin{figure}
-$\begin{array}{lcl}
-  \toprule
-  \mustDecideKW & :: & (P, e) \rightarrow \{ \mathit{true}, \mathit{false} \} \\
-  \midrule
-  \mustDecide{P}{n}                 & \doteq & \mathit{true} \\
-  \mustDecide{P}{|arr (v_1, xdots, v_n) |} & \doteq & \mustDecide{P}{|v_1|} \wedge \dots \wedge \mustDecide{P}{|v_n|} \\
-  \mustDecide{P}{x}                 & \doteq & x \in \lamvars{P} \\
-  \mustDecide{P}{|lam x e|}         & \doteq & \mathit{true} \\
-  \mustDecide{P}{|assume e|}        & \doteq & \mathit{true} \\
-  \mustDecide{P}{|one e|}           & \doteq & \mustDecide{P}{e} \\
-  \mustDecide{P}{|all e|}           & \doteq & \mustDecide{P}{e} \\
-  \mustDecide{P}{|e_1; e_2|}        & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
-  \mustDecide{P}{|e_1 choice e_2|}  & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
-  \mustDecide{P}{|op|}              & \doteq & \mathit{true} \\
-  \mustDecide{P}{|e_1 = e_2|}       & \doteq & \mustDecide{P}{e_1} \wedge \mustDecide{P}{e_2} \\
- \mustDecide{P}{|apply1N op e|}     & \doteq & \mustDecide{P}{e} \\
-  \mustDecide{P}{|e|}               & \doteq & \mathit{false} \\
-  \bottomrule
-\end{array}$
-\caption{Definitions of the $\mustDecideKW$ predicates used in \cref{fig:verifier-rewrite-rules}.}
+\caption{Definitions of the $\mustKW$ predicates used in \cref{fig:verifier-rewrite-rules}.}
 \end{figure}
 
 \mypara{Notes}

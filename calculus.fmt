@@ -41,7 +41,7 @@
 %format ^ = " "
 %format ^^ = "\hspace{0.1em}"
 
-%format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
+%format subst (e) (x) (v) = "\subst{" e "}{" x "}{" v "}"
 
 %% --------------------------
 %%        Desugaring rules
@@ -232,27 +232,6 @@
 %format one (x) = "\textbf{one}\{" x "\}"
 %format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
 
-%% assert = succeed, abbreviated to suc
-
-%format assumeKW = "\textbf{asm}"
-%format assertKW = "\textbf{suc}"
-%format succeedKW = "\textbf{suc}"
-%format verifyKW = "\textbf{verify}"
-%format decideKW = "\textbf{dec}"
-%format forallKW = "\forall{}"
-%format guard    = "\!\blacktriangleright{}\!"
-
-%format assume (x) = "\textbf{asm}\{" x "\}"
-%format assert (x) = "\textbf{suc}\{" x "\}"
-%format succeed (x) = "\textbf{suc}\{" x "\}"
-%format verify (x) = "\textbf{verify}\{" x "\}"
-%format decide (x) = "\textbf{dec}\{" x "\}"
-%format bullet = "\bullet"
-%format forall (x) (y) = "\forall" x ".\," y
-
-%format allKW = "\textbf{all}"
-%format all (x) = "\textbf{all}\{" x "\}"
-%format all2 (r) (x) = "\textbf{all}("r")\{" x "\}"
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
 %format split (x) (y) (z) = "\textbf{split}\{" x "\}\langle" y "," z "\rangle"
@@ -270,7 +249,7 @@
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
 %format square(x) = x "^2"
-%format univ (x) (y) = "\forall" x ".\," y
+%format univ (x) (y) = "\nu" x ".\," y
 %format myite (x) (y) (z) = "\textbf{if}\;" x "\;\{" y "\}\;\{" z "\}"
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
@@ -337,11 +316,6 @@
 
 %format appexi (f) (x) = "{\mathcal A" "\fbox{$" x "$}"
 
-%% Effects checking, like succeeds{e}
-%format checkKW = "{\bf chk}"
-%format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
-%format havocKW = "\textbf{havoc}"
-%format havoc (fx) = "\textbf{havoc}" "\langle" fx "\rangle"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
@@ -665,3 +639,40 @@
 %format spawn       = "\textbf{spawn}"
 %format rational    = "\textbf{rational}"
 %format float       = "\textbf{float}"
+
+%% ----------------------------
+%%         Verification
+%% ----------------------------
+
+%% assert = succeed, abbreviated to suc
+
+%format assumeKW = "\textbf{asm}"
+%format assertKW = "\textbf{suc}"
+%format succeedKW = "\textbf{suc}"
+%format verifyKW = "\textbf{verify}"
+%format decideKW = "\textbf{dec}"
+%format forallKW = "\nu{}"
+%format guard    = "\!\blacktriangleright{}\!"
+
+%format assume (x) = "\textbf{asm}\{" x "\}"
+%format assert (x) = "\textbf{suc}\{" x "\}"
+%format succeed (x) = "\textbf{suc}\{" x "\}"
+%format verify (x) = "\textbf{verify}\{" x "\}"
+%format decide (x) = "\textbf{dec}\{" x "\}"
+%format bullet = "\bullet"
+%format forall (x) (y) = "\nu" x ".\," y
+
+%% Effects checking, like succeeds{e}
+%format checkKW = "{\bf chk}"
+%format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
+%format havocKW = "\textbf{havoc}"
+%format havoc (fx) = "\textbf{havoc}" "\langle" fx "\rangle"
+
+%format allKW = "\textbf{all}"
+%format all (x) = "\textbf{all}\{" x "\}"
+%format all2 (r) (x) = "\textbf{all}("r")\{" x "\}"
+
+%format mustKW = "\mathsf{Must}"
+%format must r b = mustKW "\langle" r "\rangle\{" b "\}"
+%format mustsuc b = mustKW "\langle" succeedKW "\rangle\{" b "\}"
+%format mustdec b = mustKW "\langle" decideKW "\rangle\{" b "\}"
