@@ -209,7 +209,7 @@ choiceX1 lhs =
      return ((:>: e2) . ctx, hole)
  ++
   do e1 :>: e2 <- [lhs]
-     --guard (isChoiceFree e1)
+     guard (isChoiceFree e1)
      (ctx, hole) <- choiceX e2
      return ((e1 :>:) . ctx, hole)
  ++
