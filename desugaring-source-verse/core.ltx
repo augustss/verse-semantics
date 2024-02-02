@@ -97,7 +97,7 @@
 
 \rulegroupname{Unification:}
   \rulename{u-lit}   & |k_1 == k_2 | & \movesto & |k_1| & \text{if $k_1=k_2$} \\
-  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')| & \movesto & |v_1==v1';xdots;v_n==v_n'| \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';xdots;v_n==v_n'; tup (v_1,xdots,v_n)|} \\
   \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
   \rulename{u-occurs} & |x==V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
 
@@ -127,17 +127,18 @@
 \rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1; (e_2; e_3)| \\
 \rulename{seq-float} & |v == (e_1 ; e_2)| & \movesto & |e_1; v == e_2| \\
 \rulename{seq-elim} & |v ; e| & \movesto & |e| \\
+\rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e_2| \\
+\rulename{eq-swap} & |v == x| & \movesto & |x == v| & \text{May apply infinitely for |x==y|} \\
 
     \\[-0.6em]
 
 \rulegroupname{Choice:}
 \rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+% \rulename{fail} & |E^[fail]| & \movesto & |fail| \\
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
-% \rulename{fail} & |E^[fail]| & \movesto & |fail| \\
-\rulename{fail-l} & |fail; e| & \movesto & |fail| \\
-\rulename{fail-r} & |e; fail| & \movesto & |fail| & \text{if}\ |e| \ \text{is effect-free} \\
 \rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
+\rulename{choice-fail} & |C^[fail]| & \movesto & |fail| \\
 
     \\[-0.6em]
 
