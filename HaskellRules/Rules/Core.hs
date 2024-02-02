@@ -840,6 +840,7 @@ collect here (\/) = col
   recr a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :|: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
+  recr a (e1 :>>: e2)     = a \/ (col e1 \/ col e2)
   recr a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
   recr a (One e)          = a \/ col e
   recr a (All e)          = a \/ col e
@@ -855,28 +856,10 @@ collect here (\/) = col
 --------------------------------------------------------------------------------
 
 allVars :: Expr -> [Ident]
-allVars = nub . expr
+allVars = nub . collect vars (++)
   where
-    expr (Var i) = [i]
-    expr (Arr es) = concatMap expr es
-    expr (LAM i e) = i : expr e
-    expr (EXI i e) = i : expr e
-    expr (UNI i e) = i : expr e
-    expr (e1 :=: e2) = expr e1 ++ expr e2
-    expr (e1 :@: e2) = expr e1 ++ expr e2
-    expr (e1 :>: e2) = expr e1 ++ expr e2
-    expr (e1 :>>: e2) = expr e1 ++ expr e2
-    expr (e1 :|: e2) = expr e1 ++ expr e2
-    expr (One e) = expr e
-    expr (All e) = expr e
-    expr (Assume e) = expr e
-    expr (Fails e)  = expr e
-    expr (Assert e) = expr e
-    expr (Verify e) = expr e
-    expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
-    expr (BlockC e) = expr e
-    expr (OLam x (Bind i d) (Bind j r)) = i : j : expr x ++ expr d ++ expr r
-    expr _ = []
+    vars (Var i) = [i]
+    vars _       = []
 
 --------------------------------------------------------------------------------
 
