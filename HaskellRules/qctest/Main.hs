@@ -124,28 +124,39 @@ prop_Confluence2 flags sys =
 prop_Confluence3 :: TestFlags -> TRSystem Expr -> Property
 prop_Confluence3 flags sys =
   forAllBlind (liftArbitrary arbPermutation) $ \permf ->
-    forAllShrink arbExpr shrinkExpr $ \p0 ->
-      let p = if wrapOne flags then One p0 else p0 in
-        case (normTrace sys (const id) p, normTrace sys permf p) of
-          (Just t1, Just t2) ->
-            whenFail (do putStrLn "==trace:1=="
-                         putStr (unlines (showTrace t1))
-                         putStrLn "==trace:2=="
-                         putStr (unlines (showTrace t2))) $
-              norm sys t1 == norm sys t2
-
-          _ -> discard
+    forAllShrink (arbFork permf) shrinkFork $ \(p, q :<-- tr) ->
+      case (normzTrace p, normzTrace q) of
+        (Just ptr@(p' :<-- _), Just (q' :<-- qtr)) ->
+          whenFail (do putStrLn "==trace:1=="
+                       putStr (unlines (showTrace ptr))
+                       putStrLn "==trace:2=="
+                       putStr (unlines (showTrace (q' :<-- (qtr ++ tr))))) $
+            p' == q'
+        
+        _ -> discard
  where
-  arbExpr =
+  arbFork permf =
     do p <- arbExprFor (validExpr sys (ruleEnv sys))
-       return (preProcess sys (ruleEnv sys) p)
+       let p' = preProcess sys (ruleEnv sys) p
+       case normTrace sys permf p' of
+         Just tr -> return (p', tr)
+         Nothing -> discard
 
-  shrinkExpr p =
-    [ p'
-    | False
-    , p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
-    , validExpr sys (ruleEnv sys) p'
+  shrinkFork (p, q :<-- ((s,r):tr@(_:_))) =
+    [ (r, q :<-- [(s,r)])
+    , (p, r :<-- tr)
     ]
+
+  shrinkFork (p, _ :<-- [_]) =
+    [ (p', q' :<-- [(s,p')])
+    | p' <- shrink p 
+    , validExpr sys (ruleEnv sys) p'
+    , (s,q') <- step (rules sys) (ruleEnv sys) p'
+    ]
+
+  shrinkFork _ = error "impossible"
+ 
+  normzTrace p = normTrace sys (const id) p
 
   normTrace rsys permf p =
     if ignoreRecursive flags && isRecursive p then
