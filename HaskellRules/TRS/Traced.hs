@@ -1,11 +1,14 @@
 module TRS.Traced(
   Traced(..), term, trace, start, (++>), toList, loop,
-  showTrace, showRevTrace,
+  showTrace, showRevTrace, filterTrace
   ) where
 import Epic.Print
 
 data Traced a = a :<-- [(String,a)]
   deriving (Show)
+
+filterTrace :: (String -> Bool) -> Traced t -> Traced t
+filterTrace p (x :<-- nys) = x :<-- [(n, y) | (n, y) <- nys, p n ]
 
 term :: Traced a -> a
 term (x :<-- _) = x
@@ -49,7 +52,7 @@ loop (xx :<-- tr) = xx :<-- find xx tr
 
 showTrace, showRevTrace :: Pretty a => Traced a -> [String]
 showTrace (x :<-- tr) =
-  reverse (prettyShow x : concat [ ["  --"++n++"-->", prettyShow y] | (n,y) <- tr ])
+  reverse (prettyShow x : concat [ ["  --"++n++"-->>", prettyShow y] | (n,y) <- tr ])
 
 showRevTrace (x :<-- tr) =
   prettyShow x : concat [ ["  <--"++n++"--", prettyShow y] | (n,y) <- tr ]

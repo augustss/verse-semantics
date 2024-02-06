@@ -62,6 +62,7 @@ systemICFP = TRSystem
   , confluenceRules     = noRules
   , validExpr           = const valid
   , sortRewrites        = id
+  , displayRules        = const True
   }
 
 systemICFPC :: TRSystem Expr

@@ -33,6 +33,7 @@ systemPLDI = TRSystem
   , confluenceRules     = rulesStructural
   , validExpr           = const validE
   , sortRewrites        = id
+  , displayRules        = const True
   }
 
 systemPLDIG :: TRSystem Expr
@@ -687,7 +688,7 @@ elimDead ee =
   in
     simpleCst xs ts cs e'''
 
--- 
+--
 -- xs are the existentially bound identifiers
 -- ts are the alias definitions, x~y
 -- bs are the definitions, x=e
@@ -714,7 +715,7 @@ simpleCst xs ts bs expr = do
       lbs' = [ b | b@(x, _) <- bs, x `elem` reachable ]
   guard (reachable /= xs)
   pure $ existBind reachable ts' (lbs' ++ nlbs) expr
-      
+
 search :: (Eq a) => [(a, [a])] -> [a] -> [a]
 search g = loop []
   where loop seen [] = seen

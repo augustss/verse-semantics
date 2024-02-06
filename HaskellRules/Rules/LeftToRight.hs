@@ -35,6 +35,7 @@ systemLeftToRight = TRSystem
   , confluenceRules     = \_ _ -> []
   , validExpr           = const validE
   , sortRewrites        = sortThem
+  , displayRules        = const True
   }
 
 -- Move "looping" rules last so pickiung the first one has a better change

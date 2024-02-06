@@ -158,7 +158,8 @@ data TRSystem t = TRSystem
   , rulesHaveStructural :: !Bool                      -- are any rules structural? (slower)
   , confluenceRules     :: !(Rule t)                  -- structural rules for equivalence test
   , validExpr           :: !(RuleEnv t -> t -> Bool)  -- is t valid for reduction
-  , sortRewrites        :: !([Rewrite t] -> [Rewrite t])  -- sort rewrites 
+  , sortRewrites        :: !([Rewrite t] -> [Rewrite t])  -- sort rewrites
+  , displayRules        :: !(String -> Bool)              -- which steps (rules) to show when printing trace
   }
 --  deriving (Show)
 

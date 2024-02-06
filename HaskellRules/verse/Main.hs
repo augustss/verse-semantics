@@ -27,7 +27,7 @@ import Rules.Systems(ESystem, TRSystem(..))
 --import Rules.Core(defaultTRSFlags)
 --import Verifier.Verify
 import Rules.Verifier
-import TRS.Traced(toList, showTrace)
+import TRS.Traced(toList, filterTrace, showTrace)
 -- import TRS.Bind(free)
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
@@ -321,8 +321,9 @@ cVerify = do
       putStrLn $ "Desugared:\n" ++ prettyShow e'
       let (done, trc) = verify sys e'
       when (fTraceVerify flg) $ do
+        let trc' = filterTrace (displayRules sys) trc
         putStrLn "Verification trace:"
-        putStrLn $ unlines $ showTrace trc
+        putStrLn $ unlines $ showTrace trc'
       if done then
         putStrLn "Verified"
        else do
@@ -332,7 +333,6 @@ cVerify = do
 
 systemDescr :: ESystem -> String
 systemDescr s = sname s ++ ": " ++ description s
-
 
 cRules :: Run CState
 cRules "" s = do putStrLn ("rules: " ++ systemDescr (esystem s)); pure s

@@ -22,7 +22,7 @@ import Rules.Core -- hiding (Wrong)
 import Rules.ICFP (systemICFP, systemICFPE, execX, defX, choiceX, ltExpr, isChoiceFreeOp, execX1, hasStore, isChoiceFree)
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
-import Data.List( intersect )
+import Data.List( intersect, isInfixOf )
 import Data.Maybe (fromMaybe)
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
@@ -131,6 +131,7 @@ icfpeVerifier = icfp
               <> (assumeAssertRules -= "suc-seq")
               <> verifierRules
               <> directRules
+  , displayRules = isInfixOf "MODULO"
   }
   where icfp = systemICFPE
 

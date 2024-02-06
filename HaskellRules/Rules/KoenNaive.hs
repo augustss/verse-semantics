@@ -28,6 +28,7 @@ systemKoen = TRSystem
   , confluenceRules     = \_ _ -> []
   , validExpr           = const validE
   , sortRewrites        = id
+  , displayRules        = const True
   }
 
 -- Turn an expression into the subset of the Koen grammar
@@ -380,4 +381,3 @@ rulesChoice _ lhs =
      pure (ctx1 (ctx2 e1 :|: ctx2 e2))
 
 --------------------------------------------------------------------------------
-
