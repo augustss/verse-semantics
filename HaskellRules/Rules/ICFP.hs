@@ -7,7 +7,7 @@ module Rules.ICFP(
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, anf, anfK, execX, execX1, choiceX, ltExpr,
+  isRecursive, anf, anfK, execX, defX, execX1, choiceX, ltExpr,
   hasStore, isChoiceFree
   ) where
 import Control.Monad( guard )
@@ -380,22 +380,23 @@ execX1 lhs =
  do x :>>: e <- [lhs]
     (ctx, hole) <- execX x
     pure ((:>>: e) . ctx, hole)
-
-{-
- ++
-  do EXI y x <- [lhs]
-     (ctx, hole) <- execX x
-     pure (EXI y . ctx, hole)
--}
+--  ++
+--   do EXI y x <- [lhs]
+--      (ctx, hole) <- execX x
+--      pure (EXI y . ctx, hole)
  ++
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
   -- extra rule for verifier to elim stuff like `exi x. assume { x = 2 }; 99`
- ++
-  do Assume e <- [lhs]
-     (ctx, hole) <- execX e
-     return (Assume . ctx, hole)
+--  ++
+--   do Assert e <- [lhs]
+--      (ctx, hole) <- execX e
+--      return (Assert . ctx, hole)
+--  ++
+--   do Assume e <- [lhs]
+--      (ctx, hole) <- execX e
+--      return (Assume . ctx, hole)
 
 substX :: Expr -> [(Context, Expr)]
 -- X context

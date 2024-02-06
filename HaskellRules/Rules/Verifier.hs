@@ -19,7 +19,7 @@ import TRS.TRS hiding (step)
 import TRS.Traced
 import TRS.Tarjan
 import Rules.Core -- hiding (Wrong)
-import Rules.ICFP (systemICFP, systemICFPE, execX, choiceX, ltExpr, isChoiceFreeOp, execX1, hasStore, isChoiceFree)
+import Rules.ICFP (systemICFP, systemICFPE, execX, defX, choiceX, ltExpr, isChoiceFreeOp, execX1, hasStore, isChoiceFree)
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
 import Data.List( intersect )
@@ -240,6 +240,19 @@ generalizedIcfpRules env lhs =
                             _               -> True)
      pure Fail
   ++
+  "SUBST-MODULO-ASM" `name`
+  do EXI x e <- [lhs]
+     (ctx, Var x' :=: Val v) <- defX x e
+     guard (x == x')
+     let freeX = free ctx
+         freeV = free v
+         freeM = freeModAssume (ctx (Arr []))
+     guard (x `notElem` freeV)
+     guard (x `notElem` freeM)
+     let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
+         sub   = [(x, v),(x0, Var x)]
+     pure (substGen Full sub (EXI x (ctx (Var x0 :=: Val v))))
+  ++
   "SUBST-GEN" `name`
   do (ctx, Var x :=: Val v) <- execX lhs
      let freeX = free ctx
@@ -250,7 +263,9 @@ generalizedIcfpRules env lhs =
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      -- TODO: guard x is not uni-bound
-     pure (subst sub (ctx (Var x0 :=: Val v)))
+     -- pure (subst sub (ctx (Var x0 :=: Val v)))
+     -- pure (substGen Full [(x0, Var x)] (substGen Asm [(x, v)] (ctx(Var x0 :=: Val v))))
+     pure (substGen Asm sub (ctx (Var x0 :=: Val v)))
    ++
   "SUBST-GEN-ASM" `name`
   do (ctx, Assume (Var x :=: Val v)) <- execX lhs
@@ -262,7 +277,8 @@ generalizedIcfpRules env lhs =
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
      -- TODO: guard x is not uni-bound
-     pure (subst sub (ctx (Assume (Var x0 :=: Val v))))
+     -- pure (subst sub (ctx (Assume (Var x0 :=: Val v))))
+     pure (substGen Full sub (ctx (Assume (Var x0 :=: Val v))))
 
    -- copied from ICFP (but the variant in L2R make `TRSVerify.ex0` fail...?)
    -- restricted/effect-compatible variants of FAIL-ELIM
@@ -473,7 +489,7 @@ isDecideOp _           = False
 
 --     e; E1[succ{E2[e1;e2]}] --> e; E1[succ{E2[e2]}]    if e `implies` e1
 directRules :: VRule
-directRules env lhs =
+directRules _env lhs =
    "implies-r" `name`
    do e :>: rhs <- [lhs]
       (ctx1, _, bs1, Assert e') <- eX rhs

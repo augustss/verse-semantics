@@ -42,11 +42,12 @@ module Rules.Core(
   substExp,
   BndVar(..),
   boundVars, flexVars, rigidVars, bndIds,
+  substGen, SubstFlag(..), freeModAssume
   ) where
 import qualified Epic.SIntMap as IM
 import Data.Char
 import Data.Data(Data)
-import Data.List( union, elemIndex, sort )
+import Data.List( union, elemIndex, sort, (\\))
 import Data.Maybe
 import GHC.Stack(HasCallStack)
 
@@ -653,7 +654,7 @@ instance Free Expr where
 --------------------------------------------------------------------------------
 
 class Substitutable a where
-  subst :: Subst Expr -> a -> a
+  subst    :: Subst Expr -> a -> a
 
 -- rename the binder so that it is not the same as the first argument
 alphaRename :: (Substitutable a, Free a) => [Ident] -> Bind a -> Bind a
@@ -689,7 +690,7 @@ instance Substitutable Expr where
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Assume a) = Assume (subst sub a)
-  -- subst _ e@(Assume _) = e
+  -- subst sub (Assume e) = Assume (subst sub' e) where sub' = [ (x, e') | (x, e'@Lam {}) <- sub ]
   subst sub (Assert a) = Assert (subst sub a)
   subst sub (Verify a) = Verify (subst sub a)
   subst sub (Decide a) = Decide (subst sub a)
@@ -699,6 +700,109 @@ instance Substitutable Expr where
   subst sub (BlockC e) = BlockC (subst sub e)
   subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
   subst _sub e@Ref{}  = e
+
+
+{-
+  C[x = v]  -->   C{v/x}[x = v]
+
+
+  C[ x0 = v]
+
+  --> subst ASM [ x -> v ]
+
+  C{v/x}[ x0 = v]
+
+  --> subst FULL [ x0 -> x ]
+
+  C{v/x}[ x = v]
+
+substGen FULL [x0 -> x] (substGen ASM [x -> v] (ctx (Var x0 :=: Val v)))
+
+-}
+
+data SubstFlag = Full | Asm
+
+substGen :: SubstFlag -> Subst Expr -> Expr -> Expr
+substGen flg = go
+  where
+    go [] e = e
+    go sub e@(Var x) = fromMaybe e (lookup x sub)
+    go _sub e@Int{}  = e
+    go _sub e@Char{} = e
+    go _sub e@Path{} = e
+    go _sub e@Op{}   = e
+    go sub (Arr vs)  = Arr (map (go sub) vs)
+    go sub (Map vs)  = Map (map (\ (k,v) -> (go sub k, go sub v)) vs)
+    go sub (Lam bnd) = Lam (substBind Var go sub bnd)
+    go sub (OLam x d r) = OLam (go sub x) (substBind Var go sub d) (substBind Var subst sub r)
+    go sub (a :=: b) =  go sub a :=: go sub b
+    go sub (a :~: b) = substVar sub a :~: substVar sub b
+    go sub (a :>: b) = go sub a :>: go sub b
+    go sub (a :>>: b) = go sub a :>>: go sub b
+    go sub (a :|: b)  = go sub a :|:  go sub b
+    go sub (a :@: b)  = go sub a :@:  go sub b
+    go sub (If a b c) = If (go sub a) (go sub b) (go sub c)
+    go _sub Fail     = Fail
+    go _sub e@Wrong{}= e
+    go sub (Exi bnd) = Exi (substBind Var go sub bnd)
+    go sub (Uni bnd) = Uni (substBind Var go sub bnd)
+    go sub (IfB bnd) = IfB (substBind Var go sub bnd)
+    go sub (One a)   = One (go sub a)
+    go sub (All a)   = All (go sub a)
+    go sub (Assume a) = case flg of
+                          Full -> Assume (go sub a)
+                          Asm  -> Assume a
+    -- go sub (Assume e) = Assume (subst sub' e) where sub' = [ (x, e') | (x, e'@Lam {}) <- sub ]
+    go sub (Assert a) = Assert (go sub a)
+    go sub (Verify a) = Verify (go sub a)
+    go sub (Decide a) = Decide (go sub a)
+    go sub (Fails  a) = Fails  (go sub a)
+    go sub (Split e f g) = Split (go sub e) (go sub f) (go sub g)
+    go sub (BlockC e) = BlockC (go sub e)
+    go sub (Store h e) = Store (IM.map (go sub) h) (go sub e)
+    go _sub e@Ref{}  = e
+
+freeModAssume :: Expr -> [Ident]
+freeModAssume = go
+  where
+    goB (Bind x e) = go e \\ [x]
+    go (Var x)  = [x]
+    go Int{}    = []
+    go Char{}   = []
+    go Path{}   = []
+    go Op{}     = []
+    go (Arr es) = concatMap go es
+    go (Map es) = concatMap (go . snd) es
+    go (Lam bnd)  = goB bnd
+    go (a :=: b) =  concatMap go [a, b]
+    go (a :>: b) =  concatMap go [a, b]
+    go (a :>>: b) =  concatMap go [a, b]
+    go (a :|: b) =  concatMap go [a, b]
+    go (a :@: b) =  concatMap go [a, b]
+    go (If a b c) = concatMap go [a, b, c]
+    go Fail       = []
+    go Wrong{}    = []
+    go (Exi bnd) = goB bnd
+    go (Uni bnd) = goB bnd
+    go (IfB bnd) = goB bnd
+    go (One a)   = go a
+    go (All a)   = go a
+    go (Assume _) = []
+    go (Assert a) = go a
+    go (Verify a) = go a
+    go (Decide a) = go a
+    go (Fails  a) = go a
+    go (Split e f g) = concatMap go [e, f, g]
+    go (BlockC e) = go e
+    go _          = []
+
+    -- go (a :~: b) =  [a, b]
+    -- go (OLam x d r) = OLam (go sub x) (substBind Var go sub d) (substBind Var subst sub r)
+    -- go (Store h e) = Store (IM.map (go sub) h) (go sub e)
+    -- go e@Ref{}  = e
+
+
+
 
 instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
   subst sub (a, b) = (subst sub a, subst sub b)

@@ -68,7 +68,7 @@ desugar flgs = eval flgs .
     prel = spl $ eval flgs $ syntaxFixes $ snd $ fPrelude flgs
 
     -- Split the prelude into an association list
-    spl (Array ds) = map (\ e -> (nameOf e, e)) ds
+    spl (Array ds) = map (\ e -> (nameOf e, eAssume e)) ds
     spl e = impossible e
 
     -- Find the name of a definition
@@ -1827,6 +1827,7 @@ dsD_2 (ApplyD e1 e2) = ApplyD <$> dsD_2 e1 <*> dsD_2 e2
 dsD_2 (Unify e1 e2)  = Unify  <$> dsD_2 e1 <*> dsD_2 e2
 dsD_2 (Choice e1 e2) = Choice <$> dsD_2 e1 <*> dsD_2 e2
 dsD_2 e@(DefineV _)  = pure e
+dsD_2 (DefineE x t@Function{}) = eGuard <$> (eVerify <$> dsV_2 Suc t) <*> (eAssume <$> (DefineE x <$> dsI_2 Suc t))
 dsD_2 (DefineE x e)  = DefineE x <$> dsD_2 e
 dsD_2 (Seq [])       = pure (Array [])
 dsD_2 (Seq [t])      = dsD_2 t
@@ -1861,7 +1862,7 @@ dsV_2 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM_2 V t1 i
    t2' <- dsV_2 (bodyEff fx _effs) t2
-   pure $ Lam i $ seqE [t1', t2']
+   pure $ Lam i $ seqE [eAssume t1', t2']
 dsV_2 _  (OfType  t1 t2)  = do { e <- dsD_2 t1; vOfType_2 e t2 }
 dsV_2 Suc t               = eAssert <$> dsD_2 t
 dsV_2 Dec t               = eDecide <$> dsD_2 t
@@ -1912,7 +1913,7 @@ dsM_2 I ((Function [(t1, _effs)] t2)) f = do
   z <- newIdent (getLoc t2) "z"
   t1' <- dsM_2 V t1 i'
   t2' <- dsM_2 I t2 z
-  pure $ eVerify $ Lam i' $ seqE [{- ASSUME-INPUT-direct-implies  eAssume -} (DefineE i t1'), eAssert $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+  pure $ eVerify $ Lam i' $ seqE [eAssume (DefineE i t1'), eAssert $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
 
 dsM_2 _ (Range t)       i = ApplyD    <$> dsD_2 t <*> pure (Variable i)
 dsM_2 m (DefineE x t)   i = DefineE x <$> dsM_2 m t i
@@ -2274,5 +2275,5 @@ dsH_8 e = do
   r <- newIdent (getLoc e) "r"
   pure $ Forall [r] $ Seq [Assume (Var r `Equal` e), Var r]
 
-  
+
 -}
