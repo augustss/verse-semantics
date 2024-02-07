@@ -752,7 +752,7 @@ instance Arbitrary Expr where
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
   shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
-  shrink (a :>>: b) = [a,b] ++ [a':>>:b|a'<-shrink a] ++ [a:>>:b'|b'<-shrink b]
+  shrink (a :>>: b) = [a,b,a:>:b] ++ [a':>>:b|a'<-shrink a] ++ [a:>>:b'|b'<-shrink b]
   shrink (a :@: b) = [a,b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
@@ -942,6 +942,7 @@ substExp from to = sub
      where Bind x e = alphaRename tvs bnd
     sub (a :=: b) = sub a :=: sub b
     sub (a :>: b) = sub a :>: sub b
+    sub (a :>>: b) = sub a :>>: sub b
     sub (a :|: b) = sub a :|: sub b
     sub (a :@: b) = sub a :@: sub b
     sub Fail      = Fail
