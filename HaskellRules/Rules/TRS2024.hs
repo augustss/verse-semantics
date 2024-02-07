@@ -341,7 +341,7 @@ rulesNormalization _ lhs =
      guard (x == x')
      guard (x `notElem` allVars (ctx (Arr [])))
      guard (x `notElem` free v)
-     pure (Exi (Bind x (ctx (Val v))))
+     pure (ctx (Val v))
  ++
   "EXI-FLOAT" `name`
   do (ctx, Exi bnd) <- evalX1 lhs
