@@ -225,10 +225,12 @@ choiceX1 lhs =
   do Exi (Bind x e) <- [lhs]
      (ctx, hole) <- choiceX e
      return (Exi . Bind x . ctx, hole)
+{-
  ++
   do e1 :>>: e2 <- [lhs]
      (ctx, hole) <- choiceX e2
      return ((e1 :>>:) . ctx, hole)
+-}
 
 --------------------------------------------------------------------------------
 
@@ -364,6 +366,7 @@ rulesNormalization _ lhs =
  ++
   "SEQ-FLOAT" `name`
   do Val v :=: (e1 :>: e2) <- [lhs]
+     guard (isEffectFree e1)
      pure (e1 :>: (v :=: e2))
  ++
   "SEQ-ELIM" `name`
@@ -383,6 +386,10 @@ rulesNormalization _ lhs =
   "EQ-SWAP" `name`
   do Val v :=: Var x <- [lhs]
      pure (Var x :=: v)
+ ++
+  "EQ-RESULT" `name`
+  do Val v1 :=: Val v2 <- [lhs]
+     pure ((v1 :=: v2) :>: v2)
      
 --------------------------------------------------------------------------------
 
