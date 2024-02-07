@@ -38,6 +38,7 @@ valid = expr
     -- left out for now: assume, check, verify, havoc, olam
     expr (v  :=: e)       = value v && expr e
     expr (e1 :>: e2)      = expr e1 && expr e2
+    expr (e1 :>>: e2)     = expr e1 && expr e2
     expr (e1 :|: e2)      = expr e1 && expr e2
     expr Fail             = True
     expr (Exi (Bind _ e)) = expr e
@@ -62,6 +63,7 @@ anf = expr
   where
     expr (v' :=: e)       = makeValue v' (\v -> v :=: expr e)
     expr (e1 :>: e2)      = expr e1 :>: expr e2
+    expr (e1 :>>: e2)     = expr e1 :>>: expr e2
     expr (e1 :|: e2)      = expr e1 :|: expr e2
     expr Fail             = Fail
     expr (Exi (Bind x e)) = Exi (Bind x (expr e))
@@ -92,6 +94,7 @@ isChoiceFree :: Expr -> Bool
 isChoiceFree (Val _)          = True
 isChoiceFree (a :=: b)        = isChoiceFree a && isChoiceFree b
 isChoiceFree (a :>: b)        = isChoiceFree a && isChoiceFree b
+isChoiceFree (a :>>: b)       = isChoiceFree a && isChoiceFree b
 isChoiceFree (One _)          = True
 isChoiceFree (All _)          = True
 isChoiceFree (Op op :@: _)    = isChoiceFreeOp op
@@ -108,6 +111,7 @@ isEffectFree :: Expr -> Bool
 isEffectFree (Val _)          = True
 isEffectFree (a :=: b)        = isEffectFree a && isEffectFree b
 isEffectFree (a :>: b)        = isEffectFree a && isEffectFree b
+isEffectFree (a :>>: b)       = isEffectFree a && isEffectFree b
 isEffectFree (a :|: b)        = isEffectFree a && isEffectFree b
 isEffectFree (One _)          = True
 isEffectFree (All _)          = True
@@ -216,6 +220,11 @@ choiceX1 lhs =
   do e1 :>>: e2 <- [lhs]
      (ctx, hole) <- choiceX e1
      return ((:>>: e2) . ctx, hole)
+ ++
+  -- not in desugaring.tex yet!
+  do Exi (Bind x e) <- [lhs]
+     (ctx, hole) <- choiceX e
+     return (Exi . Bind x . ctx, hole)
  ++
   do e1 :>>: e2 <- [lhs]
      (ctx, hole) <- choiceX e2
@@ -339,6 +348,11 @@ rulesNormalization _ lhs =
      let Bind x e = alphaRename (allVars (ctx (Arr []))) bnd
      pure (Exi (Bind x (ctx e)))
  ++
+  "UNI-ELIM1" `name`
+  do Uni (Bind x e) <- [lhs]
+     guard (x `notElem` free e)
+     pure e
+ ++
   "UNI-FLOAT" `name`
   do (ctx, Uni bnd) <- evalX1 lhs
      let Bind x e = alphaRename (allVars (ctx (Arr []))) bnd
@@ -352,21 +366,23 @@ rulesNormalization _ lhs =
   do Val v :=: (e1 :>: e2) <- [lhs]
      pure (e1 :>: (v :=: e2))
  ++
-  "GUARD-FLOAT" `name`
-  do Val v :=: (e1 :>>: e2) <- [lhs]
-     pure (e1 :>>: (v :=: e2))
- ++
-  "EQU-FLOAT" `name`
-  do Val v1 :=: (Val v2 :=: e) <- [lhs]
-     pure ((v1 :=: v2) :>: (v1 :=: e))
- ++
-  "EQU-SWAP" `name`
-  do Val v :=: Var x <- [lhs]
-     pure (Var x :=: v)
- ++
   "SEQ-ELIM" `name`
   do Val _ :>: e <- [lhs]
      pure e
+{-
+ ++
+  "GUARD-FLOAT" `name`
+  do Val v :=: (e1 :>>: e2) <- [lhs]
+     pure (e1 :>>: (v :=: e2))
+-}
+ ++
+  "EQ-FLOAT" `name`
+  do Val v1 :=: (Val v2 :=: e) <- [lhs]
+     pure ((v1 :=: v2) :>: (v1 :=: e))
+ ++
+  "EQ-SWAP" `name`
+  do Val v :=: Var x <- [lhs]
+     pure (Var x :=: v)
      
 --------------------------------------------------------------------------------
 
