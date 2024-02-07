@@ -141,7 +141,7 @@ instance Pretty Expr where
   pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ sep [pPrintPrec l 4 a <+> text "|", pPrintPrec l 4 b]
   pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
-  pPrintPrec l p e@(_ :>>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";;")  $ map (pPrintPrec l 2) $ ap [] e
+  pPrintPrec l p e@(_ :>>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ">>")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
 
   pPrintPrec l p (a :=: b)        = maybeParens (l >= prettyNormal || p > 2) $ pPrintPrec l 3 a <+> text "=" <+> pPrintPrec l 3 b
