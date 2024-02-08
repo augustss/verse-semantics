@@ -52,7 +52,7 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e| \vb |assume S| \\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \vb |forall x E| \vb |E guard e| \vb |e guard E| \vb |assume E| \\
-\text{Choice contexts}  & |C| & ::= & |hole| \vb |v==C| \vb |cf; C| \vb |C; e| \vb |C guard e| \vb |e guard C| \vb |assume C| \\
+\text{Choice contexts}  & |C| & ::= & |hole| \vb |v==C| \vb |cf; C| \vb |C; e| \vb |C guard e| \vb |assume C| \vb |def x C| \\
 \text{Effect-free} & \multicolumn{3}{l}{\text{|ef| is an |e| that can have choice and fail, but not I/O effects or divergence}} \\
 \text{Choice-free} & \multicolumn{3}{l}{\text{|cf| is an |e| that has no choice, I/O effects or divergence}}
 \end{array}
@@ -121,13 +121,14 @@
 \\
 
 \rulegroupname{Normalization:}
+\rulename{uni-elim} & |forall x e| & \movesto & |e| & \text{if $|x| \notin \freevars{e}$}\\
 \rulename{exi-elim1} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[v]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1; (e_2; e_3)| \\
 \rulename{seq-float} & |v == (e_1 ; e_2)| & \movesto & |e_1; v == e_2| \\
 \rulename{seq-elim} & |v ; e| & \movesto & |e| \\
-\rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_1 == v_2; v_1 == e_2| \\
+\rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_1 == e; v_1 == v_2| \\
 \rulename{eq-swap} & |v == x| & \movesto & |x == v| & \text{May apply infinitely for |x==y|} \\
 
     \\[-0.6em]
