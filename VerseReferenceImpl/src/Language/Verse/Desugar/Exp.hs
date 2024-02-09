@@ -5,7 +5,10 @@
 module Language.Verse.Desugar.Exp
   ( Exp (..)
   , Quantifier (..)
+  , Name (..)
   , Path (..)
+  , Scope
+  , Access (..)
   , Env
   , unify
   , verify
@@ -26,13 +29,14 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Word (Word8)
 
-import Numeric (showHex)
-
 import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Label
 import Language.Verse.Loc
-import Language.Verse.Name
+import Language.Verse.Rewrite.Exp(Access(..))
+import Language.Verse.SimpleName
+
+import Numeric (showHex)
 
 import Prettyprinter
 
@@ -40,7 +44,7 @@ data Exp f a
   = f (Exp f a) :*>: f (Exp f a)
   | f (Exp f a) :>>: f (Exp f a)
   | f (Exp f a) :=: f (Exp f a)
-  | f (Exp f a) :.: {-# UNPACK #-} !Name
+  | f (Exp f a) :.: {-# UNPACK #-} !SimpleName
   | f (Exp f a) :|: f (Exp f a)
   | Fail
   | One (f (Exp f a))
@@ -53,10 +57,10 @@ data Exp f a
   | Struct {-# UNPACK #-} !Label !(Env a) (f (Exp f a))
   | Class {-# UNPACK #-} !Label (Maybe (f (Exp f a))) !(Env a) (f (Exp f a))
   | Inst (f (Exp f a)) !(Env a) (f (Exp f a))
-  | Enum {-# UNPACK #-} !Label [Name]
+  | Enum {-# UNPACK #-} !Label [SimpleName]
   | IfThenElse !(Env a) (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo !(Env a) (f (Exp f a)) (f (Exp f a))
-  | Def !Quantifier (f a) (f (Exp f a))
+  | Def !Access !Quantifier (f a) (f (Exp f a))
   | Alloc (f a) (f (Exp f a)) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
@@ -69,8 +73,7 @@ data Exp f a
   | Lam a (f (Exp f a))
   | OLam (f (Exp f a)) !(Env a) (f (Exp f a)) (f (Exp f a))
   | Intrinsic !Intrinsic
-  | Name a
-  | QualName (f (Exp f a)) !Name
+  | Name (Name f a)
   | PathName (Path f)
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
@@ -80,19 +83,26 @@ infixl 1 :*>:
 infixl 1 :>>:
 
 deriving instance ( Show (f (Exp f a))
-                  , Show (f Name)
+                  , Show (f SimpleName)
                   , Show (f a)
                   , Show a
                   ) => Show (Exp f a)
 
 data Path f
- = Path (f Name) [(Maybe (Path f), f Name)]
+ = Path (f SimpleName) [(Maybe (Path f), f SimpleName)]
 
-deriving instance ( Show (f Name)
+deriving instance ( Show (f SimpleName)
                   ) => Show (Path f)
 
+
+-- The current scope. If empty then top level
+type Scope = [Label]
+
+
+
+
 instance ( Pretty (f (Exp f a))
-         , Pretty (f Name)
+         , Pretty (f SimpleName)
          , Pretty (f a)
          , Pretty a
          ) => Pretty (Exp f a) where
@@ -128,9 +138,9 @@ instance ( Pretty (f (Exp f a))
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     ForDo xs e1 e2 ->
       "for" <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
-    Def t x e ->
+    Def access t x e ->
       align $
-      prettyBinding t x <> ssemi <>
+      prettyBindingAccess (access,t) x <> ssemi <>
       pretty e
     Alloc x e1 e2 ->
       "alloc" <> parens (pretty x) <+> pretty e1 <> parens (pretty e2)
@@ -147,16 +157,14 @@ instance ( Pretty (f (Exp f a))
       "olam" <+> pretty f <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
     Intrinsic x -> pretty x
     Name x -> pretty x
-    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
     PathName x -> pretty x
-    IfArchetypeName x y e1 e2 ->
+    IfArchetypeName  x y e1 e2 ->
       "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
       braces (pretty e1) <+>
       "else" <+> braces (pretty e2)
     ArchetypeName x -> "archetype" <> parens (pretty x)
     TopLevel xs e ->
-      vsep (map ( ("exists" <+>) . pretty) (HashMap.keys xs)) <> hardline <>
-      pretty e
+      bindings xs $ pretty e
     _ -> "unimplemented"
     where
       ssemi = flatAlt hardline (semi <> space)
@@ -171,25 +179,43 @@ instance ( Pretty (f (Exp f a))
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
       bindings xs y = align $
-        concatWith' ssemi (uncurry (flip prettyBinding) <$> HashMap.toList xs) <>
+        concatWith' ssemi (uncurry (flip prettyBindingAccess) <$> HashMap.toList xs) <>
         ssemi <>
         y
       concatWith' x = concatWith $ \ y z -> y <> x <> z
-      prettyBinding t x = case t of
-        Exists -> "exists" <+> pretty x
-        Forall -> "forall" <+> pretty x
-        Var -> "var" <+> pretty x
+      prettyBindingAccess (access, t) x = case t of
+        Exists -> "exists" <+> pretty access <+> pretty x
+        Forall -> "forall" <+> pretty access <+> pretty x
+        Var -> "var" <+> pretty access <+> pretty x
 
 data Quantifier = Exists | Forall | Var deriving Show
 
-type Env a = HashMap a Quantifier
+type Env a = HashMap a (Access, Quantifier)
 
-instance ( Pretty (f Name)
+instance ( Pretty (f SimpleName)
          ) => Pretty (Path f) where
   pretty (Path label pathIdents) = "/" <> pretty label <> foldr prettyPath mempty pathIdents
    where
     prettyPath (Nothing, ident) doc = "/" <> pretty ident <> doc
     prettyPath (Just path, ident) doc = "/(" <> pretty path <> ":)" <> pretty ident <> doc
+
+data Name f a
+  = SimpleName a
+  | QualName (f (Exp f a)) SimpleName
+
+deriving instance ( Show (f (Exp f a))
+                  , Show (f a)
+                  , Show a
+                  ) => Show (Name f a)
+
+
+instance ( Pretty (f (Exp f a))
+         , Pretty (f a)
+         , Pretty a
+         ) => Pretty (Name f a) where
+  pretty = \ case
+    SimpleName x -> pretty x
+    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
 
 unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 unify = liftL2 (:=:)
@@ -203,8 +229,8 @@ check = liftL1 . Check
 assume :: Functor f => Split.Effect -> f (Exp f a) -> f (Exp f a)
 assume = liftL1 . Assume
 
-forall' :: Apply f => f a -> f (Exp f a) -> f (Exp f a)
-forall' = liftL2 (Def Forall)
+forall' :: Apply f => Access -> f a -> f (Exp f a) -> f (Exp f a)
+forall' access = liftL2 (Def access Forall)
 
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
@@ -213,7 +239,7 @@ olam :: Apply f => f (Exp f a) -> Env a -> f (Exp f a) -> f (Exp f a) -> f (Exp 
 olam f env e1 e2 = OLam f env e1 e2 <$ f <. e1 <. e2
 
 name :: Functor f => f a -> f (Exp f a)
-name = fmap Name
+name = fmap (Name . SimpleName)
 
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)

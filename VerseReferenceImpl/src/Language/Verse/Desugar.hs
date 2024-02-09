@@ -23,7 +23,9 @@ import Data.String
 import Language.Verse.Desugar.Exp
   ( Exp (..)
   , Quantifier (..)
+  , Name (..)
   , Path (..)
+  , Access (..)
   , unify
   , verify
   , check
@@ -58,7 +60,7 @@ import Language.Verse.Rewrite.Exp qualified as Rewrite
 
 type DesugarT m = StateT Env (ReaderT R m)
 
-type Env = IdentMap (Loc, Quantifier)
+type Env = IdentMap (Loc, Access, Quantifier)
 
 data R = Exec | Neg | Pos
 
@@ -70,8 +72,10 @@ fromMode = \ case
 runDesugarT
   :: Functor m
   => DesugarT m a
-  -> ReaderT R m (a, IdentMap Quantifier)
-runDesugarT = fmap (fmap (fmap snd)) . runDesugarT'
+  -> ReaderT R m (a, IdentMap (Access, Quantifier))
+runDesugarT = fmap (fmap (fmap dropLocation)) . runDesugarT'
+  where
+    dropLocation (_loc, access, x) = (access, x)
 
 runDesugarT' :: DesugarT m a -> ReaderT R m (a, Env)
 runDesugarT' m = runStateT m mempty
@@ -192,17 +196,17 @@ desugarExp'' e pi i = case extract e of
     e2 <- desugarExp e2
     pure $ BracketInvoke e1 e2
   Rewrite.Exists x -> do
-    tellExistsName x
+    tellExistsName Private x
     pure $ i :=: name x
   Rewrite.Forall x -> do
-    tellForallName x
+    tellForallName Private x
     pure $ i :=: name x
   Alloc2 x e -> do
-    tellVarName x
+    tellVarName Private x
     e <- desugarExp e
     pure $ Alloc x e i
   Alloc3 x e1 e2 -> do
-    tellVarName x
+    tellVarName Private x
     e1 <- desugarExp e1
     e2 <- desugarExp' e2 pi i
     pure $ Alloc x e1 e2
@@ -224,23 +228,21 @@ desugarExp'' e pi i = case extract e of
   Rewrite.Lam e1 oc eff e2 e3 -> case oc of
     O -> desugarOLam (loc e) e1 eff e2 e3 pi i
     C -> desugarLam (loc e) e1 eff e2 e3 pi i
-  Rewrite.Name x ->
-    pure $ i :=: (Name x <$ e)
-  Rewrite.QualName e y -> do
-    e <- desugarExp e
-    pure $ i :=: (QualName e y <$ e)
+  Rewrite.Name x -> do
+    x' <- desugarName x
+    pure $ i :=: (Name x' <$ e)
   Rewrite.ExpPath p ->
     pure $ i :=: (PathName (desugarPath p) <$ e)
-  InfixColonEqual t x e -> do
-    tellName t x
+  InfixColonEqual access t x e -> do
+    tellName access t x
     e <- desugarExp' e pi i
     pure $ (ArchetypeName <$> x) :=: e
   PrefixColon e -> do
     e <- desugarExp e
     pure $ BracketInvoke e i
   MixfixArrowColonEqual x y e -> do
-    tellExistsName x
-    tellExistsName y
+    tellExistsName Private x
+    tellExistsName Private y
     e <- desugarExp' e pi i
     pure $ unify (name x) i :*>: unify (ArchetypeName <$> y) e
   Rewrite.IfArchetypeName x e1 e2 -> do
@@ -250,6 +252,17 @@ desugarExp'' e pi i = case extract e of
     (e2, xs2) <- lift $ runStateT (desugarExp' e2 pi i) xs
     put $ xs1 <> xs2
     pure $ IfArchetypeName x y e1 e2
+
+desugarName
+  :: (MonadAbort Error m, MonadSupply Label m)
+  => Rewrite.Name L Ident
+  -> DesugarT m (Name L Ident)
+desugarName = \ case
+  Rewrite.SimpleName x ->
+    pure $ SimpleName x
+  Rewrite.QualName e y -> do
+    e <- desugarExp e
+    pure $ QualName e y
 
 desugarNonEmpty
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -514,7 +527,7 @@ verifyPosLam'
   -> DesugarT m (L (Exp L Ident))
 verifyPosLam' loc' e1 eff e2 e3 pi f = do
   a <- freshIdent' $ loc e1
-  functionM loc' pi f . verifyM $ forall' a <$> do
+  functionM loc' pi f . verifyM $ forall' Private a <$> do
     b <- name <$> freshIdent (loc e1)
     unify b <$> negM (desugarExp' e1 True $ name a) `seqM` checkM eff do
       c <- name <$> freshIdent (loc e3)
@@ -562,7 +575,7 @@ negOfType e1 e2 pi x = do
   pure $
     e1 :*>:
     (e2 `seq'`
-     forall' r (assume Effect.Succeeds . bracketInvoke z $ name r))
+     forall' Private r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 posOfType
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -581,7 +594,7 @@ posOfType e1 e2 pi x = do
     e1 `then'`
     e2 :*>:
     (check Effect.Succeeds (bracketInvoke z y) `seq'`
-     forall' r (assume Effect.Succeeds . bracketInvoke z $ name r))
+     forall' Private r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 checkOfTypeD
   :: (MonadAbort Error m, MonadSupply Label m)
@@ -624,7 +637,7 @@ abstractD
   -> DesugarT m (L (Exp L Ident))
 abstractD eff e = do
   r <- freshIdent' $ loc e
-  forall' r <$> assumeM eff do
+  forall' Private r <$> assumeM eff do
     i <- name <$> freshIdent (loc e)
     unify i <$> desugarExp e `thenM`
       pure (assume Effect.Succeeds . bracketInvoke i $ name r)
@@ -636,7 +649,7 @@ concreteD
   -> DesugarT m (L (Exp L Ident))
 concreteD eff e = do
   r <- freshIdent' $ loc e
-  forall' r <$> assumeM eff (negM . desugarExp' e True $ name r)
+  forall' Private r <$> assumeM eff (negM . desugarExp' e True $ name r)
 
 valM
   :: Functor m
@@ -685,7 +698,7 @@ unifyEnv loc =
       x:xs -> foldr then' x xs
     f x = do
       let x' = L loc . Ident.Name . fromString $ Intrinsic.toString x
-      tellFunName x'
+      tellFunName Public x'
       pure $ unify (name x') (L loc $ Intrinsic x)
 
 negM :: MonadReader R m => m a -> m a
@@ -703,7 +716,7 @@ functionM
   -> DesugarT m (L (Exp L Ident))
 functionM loc pi f m = case pi of
   False -> m
-  True -> (bracketInvoke (L loc $ Name "function") f `then'`) <$> m
+  True -> (bracketInvoke (L loc $ Name $ SimpleName "function") f `then'`) <$> m
 
 function'
   :: Loc
@@ -713,7 +726,7 @@ function'
   -> Exp L Ident
 function' loc pi f e = case pi of
   False -> e
-  True -> bracketInvoke (L loc $ Name "function") f :*>: L loc e
+  True -> bracketInvoke (L loc $ Name $ SimpleName "function") f :*>: L loc e
 
 verifyM
   :: (MonadSupply Label m)
@@ -762,45 +775,46 @@ infixl 1 `seqM`
 freshIdent :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
 freshIdent loc = do
   x <- Ident.Label <$> supply
-  modify $ HashMap.insert x (loc, Exists)
+  modify $ HashMap.insert x (loc, Private, Exists)
   pure $ L loc x
 
 freshIdent' :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
 freshIdent' loc = L loc . Ident.Label <$> supply
 
-tellValName :: MonadAbort Error m => L Ident -> DesugarT m ()
-tellValName = tellName' Exists
+tellValName :: MonadAbort Error m => Access -> L Ident -> DesugarT m ()
+tellValName access = tellName' access Exists
 
-tellFunName :: Monad m => L Ident -> DesugarT m ()
-tellFunName x =
-  modify $ HashMap.insertWith (\ _ x -> x) (extract x) (loc x, Exists)
+tellFunName :: Monad m => Access -> L Ident -> DesugarT m ()
+tellFunName access x =
+  modify $ HashMap.insertWith (\ _ x -> x) (extract x) (loc x, access, Exists)
 
-tellVarName :: MonadAbort Error m => L Ident -> DesugarT m ()
-tellVarName = tellName' Var
+tellVarName :: MonadAbort Error m => Access -> L Ident -> DesugarT m ()
+tellVarName access = tellName' access Var
 
-tellExistsName :: MonadAbort Error m => L Ident -> DesugarT m ()
-tellExistsName = tellName' Exists
+tellExistsName :: MonadAbort Error m => Access -> L Ident -> DesugarT m ()
+tellExistsName access = tellName' access Exists
 
-tellForallName :: MonadAbort Error m => L Ident -> DesugarT m ()
-tellForallName = tellName' Forall
+tellForallName :: MonadAbort Error m => Access -> L Ident -> DesugarT m ()
+tellForallName access = tellName' access Forall
 
 tellName
   :: MonadAbort Error m
-  => Rewrite.Quantifier
+  => Access
+  -> Rewrite.Quantifier
   -> L Ident
   -> DesugarT m ()
-tellName = \ case
-  Rewrite.Val -> tellValName
-  Rewrite.Fun -> tellFunName
-  Rewrite.Var -> tellVarName
+tellName access = \ case
+  Rewrite.Val -> tellValName access
+  Rewrite.Fun -> tellFunName access
+  Rewrite.Var -> tellVarName access
 
-tellName' :: MonadAbort Error m => Quantifier -> L Ident -> DesugarT m ()
-tellName' t x =
+tellName' :: MonadAbort Error m => Access -> Quantifier -> L Ident -> DesugarT m ()
+tellName' access t x =
   put =<<
   HashMap.alterF
   (\ case
-      Nothing -> pure $ Just (loc x, t)
-      Just (y, _) -> abort $ DefError y (loc x) (extract x))
+      Nothing -> pure $ Just (loc x, access, t)
+      Just (y, _, _) -> abort $ DefError y (loc x) (extract x))
   (extract x) =<<
   get
 
@@ -812,4 +826,4 @@ exists m = do
 exists' :: Env -> L (Exp L Ident) -> L (Exp L Ident)
 exists' xs e = foldlWithKey' f e xs
   where
-    f z x (loc, y) = Def y (L loc x) z <$ z
+    f z x (loc, access, y) = Def access y (L loc x) z <$ z

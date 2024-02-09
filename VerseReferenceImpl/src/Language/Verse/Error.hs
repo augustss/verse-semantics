@@ -7,7 +7,7 @@ module Language.Verse.Error
 import Language.Verse.Ident
 import Language.Verse.Indent
 import Language.Verse.Loc
-import Language.Verse.Name
+import Language.Verse.SimpleName
 import Language.Verse.Pos
 import Language.Verse.Token
 
@@ -18,10 +18,11 @@ data Error
   | IndentError !Pos !Indent !Indent
   | ParseError !Loc !Token
   | OpenClosedError !Loc !Loc
+  | MultipleAccessError !Loc !Loc
   | SplitEffectError !Loc !Loc
   | SpecError !Loc
   | DefError !Loc !Loc !Ident
-  | NameError !Loc !Name
+  | NameError !Loc !SimpleName
   | IdentError !Loc !Ident
   | SucceedsError !Loc
   | FailsError !Loc
@@ -59,6 +60,9 @@ instance Pretty Error where
     SplitEffectError x y ->
       pretty x <+> "and" <+> pretty y <> colon <+>
       "multiple" <+> "effect" <+> "specifiers"
+    MultipleAccessError x y ->
+      pretty x <+> "and" <+> pretty y <> colon <+>
+      "multiple" <+> "access" <+> "specifiers"
     SpecError x ->
       pretty x <> colon <+> "unexpected" <+> "specifier"
     DefError x y z ->

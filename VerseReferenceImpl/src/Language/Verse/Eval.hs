@@ -5,6 +5,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 module Language.Verse.Eval
   ( MonadEval
@@ -21,6 +22,7 @@ import Control.Monad.Reader
 import Control.Monad.Supply
 import Control.Monad.Verse
 
+import Data.List(elem)
 import Data.Bool
 import Data.Coerce
 import Data.Eq
@@ -29,6 +31,7 @@ import Data.Foldable (foldr, foldrM, for_)
 import Data.Function
 import Data.Functor ((<&>), void)
 import Data.Functor.Compose
+import Data.Hashable (Hashable)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Int
@@ -47,6 +50,7 @@ import Language.Verse.Desugar.Exp
     , (:.:)
     , (:|:)
     )
+  , Access(..)
   )
 import Language.Verse.Desugar.Exp qualified as Exp
 import Language.Verse.Effect.Split qualified as Split (Effect)
@@ -59,7 +63,7 @@ import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
 import Language.Verse.Loc (Loc, L (..), loc)
 import Language.Verse.Mode
-import Language.Verse.Name
+import Language.Verse.SimpleName
 import Language.Verse.Val
   ( FrozenVal
   , Named (..)
@@ -85,10 +89,13 @@ import Prelude
 
 type EvalT m = ReaderT (R m) (VerseT m)
 
+type Scope = [Label]
+
 data R m = R
   { mode :: !Mode
   , env :: !(Env m)
   , top :: !(Env m)
+  , scope :: Scope
   , assumed :: !Bool
   , archetype :: !(Archetype m)
   , archetype' :: !(Archetype m)
@@ -134,8 +141,8 @@ type Env m = Val.VarEnv Ident m
 
 type Archetype m = Env m
 
-runEvalT :: (MonadRef m, MonadSupply Int m) => EvalT m a -> Mode -> VerseT m a
-runEvalT m mode = runReaderT m R {..}
+runEvalT :: (MonadRef m, MonadSupply Int m) => Scope -> EvalT m a -> Mode -> VerseT m a
+runEvalT scope m mode = runReaderT m R {..}
   where
     env = mempty
     top = env
@@ -155,7 +162,7 @@ eval :: MonadEval m => Mode -> L (Exp L Ident) -> VerseT m FrozenVal
 eval mode e = do
   s <- newS
   s' <- freshS
-  freeze' =<< runEvalT (evalExp e s s') mode
+  freeze' =<< runEvalT [] (evalExp e s s') mode
 
 evalExp :: MonadEval m => L (Exp L Ident) -> S m -> S m -> EvalT m (VarVal m)
 evalExp e = case extract e of
@@ -199,40 +206,45 @@ evalExp e = case extract e of
   Exp.Assume eff e' ->
     evalAssume (loc e) eff e'
   Exp.Module i xs e -> \ s s' -> do
-    xs <- lift $ freshEnv xs
-    _ <- localNames xs $ evalExp e s s'
-    lift . newVar' . Val.Module i $ filterNames xs
-  Exp.Enum i xs -> \ s s' -> lift $ do
-    let foldrM' xs f = foldrM f mempty xs
-    (env, xs) <- foldrM' xs $ \ x (env, xs) ->
-      newVar' (Val.EnumValue i x) <&> \ var ->
-      (HashMap.insert x (Val var) env, var:xs)
-    unifyS s s'
-    newVar' $ Val.Enum i env xs
+    scope <- getScope
+    nestScope i $  do
+      scope' <- getScope
+      xs <- lift $ freshEnv scope' xs
+      _ <- localNames xs $ evalExp e s s'
+      lift . newVar' . Val.Module i scope $ filterNames xs
+  Exp.Enum i xs -> \ s s' -> do
+    scope <- getScope
+    lift $ do
+      let foldrM' xs f = foldrM f mempty xs
+      (env, xs) <- foldrM' xs $ \ x (env, xs) ->
+        newVar' (Val.EnumValue i x) <&> \ var ->
+        (HashMap.insert x (Val.AccessScope Public scope, Val var) env, var:xs)
+      unifyS s s'
+      newVar' $ Val.Enum i env xs
   Exp.Struct i xs e -> \ s s' -> ask >>= \ r -> lift $ do
     unifyS s s'
-    newVar' $ Val.Struct i r.env xs e
+    newVar' $ Val.Struct i r.scope r.env xs e
   Exp.Class i e_sup xs e -> \ s s' -> do
     r <- ask
     var_sup <- case e_sup of
       Nothing -> lift $ Nothing <$ unifyS s s'
       Just e_sup -> Just <$> evalExp e_sup s s'
-    lift $ newVar' $ Val.Class i r.env var_sup xs e
+    lift $ newVar' $ Val.Class i r.scope r.env var_sup xs e
   Exp.Inst e1 xs e2 ->
     evalInst (loc e) e1 xs e2
   Exp.IfThenElse xs p t e ->
     evalIfThenElse (loc e) xs p t e
   Exp.ForDo xs e1 e2 ->
     evalForDo (loc e) xs e1 e2
-  Exp.Def Exp.Exists (extract -> x) e -> \ s s' -> do
+  Exp.Def access Exp.Exists (extract -> x) e -> \ s s' -> do
     var <- lift freshVar'
-    localName x (Val var) $ evalExp e s s'
-  Exp.Def Exp.Forall x e -> \ s s' -> do
+    localName access x (Val var) $ evalExp e s s'
+  Exp.Def access Exp.Forall x e -> \ s s' -> do
     var <- lift $ newVar' Val.Any
-    localName (extract x) (Val var) $ evalExp e s s'
-  Exp.Def Exp.Var (extract -> x) e -> \ s s' -> do
+    localName access (extract x) (Val var) $ evalExp e s s'
+  Exp.Def access Exp.Var (extract -> x) e -> \ s s' -> do
     var <- lift freshVar'
-    localName x (Ref var) $ evalExp e s s'
+    localName access x (Ref var) $ evalExp e s s'
   Exp.Alloc x e1 e2 ->
     evalAlloc (loc e) x e1 e2
   Exp.Set x e -> \ s s' -> lookupNamed (extract x) >>= \ case
@@ -247,10 +259,10 @@ evalExp e = case extract e of
       pure var_e
   Exp.Lam x e -> \ s s' -> ask >>= \ r -> lift $ do
     unifyS s s'
-    newVar' $ Val.Lam r.env x e
+    newVar' $ Val.Lam r.scope r.env x e
   Exp.OLam f xs e_domain e -> \ s s' -> ask >>= \ r -> do
     var_f <- evalExp f s s'
-    lift . newVar' $ Val.OLam r.env xs e_domain e var_f
+    lift . newVar' $ Val.OLam r.scope r.env xs e_domain e var_f
   Exp.Intrinsic x -> \ s s' -> lift $ do
     unifyS s s'
     newVar' . Val.Intrinsic x =<< freshVar'
@@ -277,32 +289,43 @@ evalExp e = case extract e of
     unifyS s s'
     newVar' $ Val.Char32 x
   Exp.Name x ->
-    evalIdent $ x <$ e
-  Exp.QualName e x ->
-    evalQualName (loc e) e x
+    evalName (loc e) x
   Exp.PathName (Exp.Path label pathIdents) -> \ s s' -> lift $ do
     unifyS s s'
     -- Ignore nested labels for now
     newVar' . Val.Path . map extract $ label : map snd pathIdents
-  Exp.IfArchetypeName x y e1 e2 -> \ s s' ->
-    asks archetype <&> HashMap.lookup (extract x) >>= \ case
+  Exp.IfArchetypeName x y e1 e2 -> \ s s' -> do
+    scope <- getScope
+    asks archetype <&> lookupEnv scope (extract x) >>= \ case
       Nothing -> evalExp e2 s s'
-      Just x -> localName (extract y) x $ evalExp e1 s s'
+      Just x' -> localName Private (extract y) x' $ evalExp e1 s s'
   Exp.ArchetypeName x -> \ s s' -> do
     r <- ask
-    case HashMap.lookup x r.archetype' <|> HashMap.lookup x r.env of
+    case lookupEnv r.scope x r.archetype' <|> lookupEnv r.scope x r.env of
       Nothing -> abort $ IdentError (loc e) x
       Just (Ref _) -> abort . ValError $ loc e
       Just (Val var) -> lift $ unifyS s s' $> var
   Exp.TopLevel xs e -> \ s s' -> do
-    xs <- lift $ freshEnv xs
+    scope <- getScope
+    xs <- lift $ freshEnv scope xs
     local ( \ r -> let env = xs <> r.env in r { top = env, env }) $ evalExp e s s'
+
+evalName
+  :: MonadEval m
+  => Loc
+  -> Exp.Name L Ident
+  -> S m -> S m -> EvalT m (VarVal m)
+evalName loc = \ case
+  Exp.SimpleName x ->
+    evalIdent $ L loc x
+  Exp.QualName e x ->
+    evalQualName loc e x
 
 evalDot
   :: MonadEval m
   => Loc
   -> L (Exp L Ident)
-  -> Name
+  -> SimpleName
   -> S m
   -> S m
   -> EvalT m (VarVal m)
@@ -315,8 +338,8 @@ dots1M'
   :: MonadEval m
   => Loc
   -> VarVal m
-  -> [Name]
-  -> Name
+  -> [SimpleName]
+  -> SimpleName
   -> S m
   -> S m
   -> EvalT m (VarVal m)
@@ -331,7 +354,7 @@ dotM
   :: MonadEval m
   => Loc
   -> VarVal m
-  -> Name
+  -> SimpleName
   -> S m
   -> S m
   -> EvalT m (VarVal m)
@@ -344,12 +367,13 @@ dotM'
   :: MonadEval m
   => Loc
   -> VarVal m
-  -> Name
+  -> SimpleName
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-dotM' loc var x s s' =
-  lift (readVar' var) >>= getNameEnv loc <&> HashMap.lookup x >>= \ case
+dotM' loc var x s s' = do
+  scope <- getScope
+  lift (readVar' var) >>= getNameEnv loc <&> lookupEnv scope x >>= \ case
     Nothing -> abort $ NameError loc x
     Just x -> evalNamed' loc x s s'
 
@@ -436,11 +460,12 @@ evalIfThenElse
   -> S m
   -> EvalT m (VarVal m)
 evalIfThenElse loc xs p t e s s' = do
+  scope <- getScope
   var <- lift freshVar'
   fork' do
     var' <- lift . readIVar =<< if''
       do
-        xs <- lift $ freshEnv xs
+        xs <- lift $ freshEnv scope xs
         choiceFree <- lift $ newVar ChoiceFree
         s' <- lift freshS
         _ <- localNames xs $ evalExp p s { choiceFree } s'
@@ -462,12 +487,13 @@ evalForDo
   -> S m
   -> EvalT m (VarVal m)
 evalForDo loc xs e1 e2 s s' = do
+  scope <- getScope
   var <- lift freshVar'
   fork' $ do
     s'' <- lift freshS
     vars <- lift . readIVar =<< for'
       do
-        xs <- lift $ freshEnv xs
+        xs <- lift $ freshEnv scope xs
         choiceFree <- lift $ newVar ChoiceFree
         s' <- lift freshS
         _ <- localNames xs $ evalExp e1 s { choiceFree } s'
@@ -489,7 +515,7 @@ evalAlloc
   -> EvalT m (VarVal m)
 evalAlloc loc' x e1 e2 s s' = do
   r <- ask
-  case HashMap.lookup (extract x) r.archetype' <|> HashMap.lookup (extract x) r.env of
+  case lookupEnv r.scope (extract x) r.archetype' <|> lookupEnv r.scope (extract x) r.env of
     Nothing -> abort $ IdentError (loc x) (extract x)
     Just (Val _) -> abort . RefError $ loc x
     Just (Ref var) -> do
@@ -620,20 +646,22 @@ evalInst loc e1 xs e2 s s' = do
   s'' <- lift freshS
   var1 <- evalExp e1 s s''
   s''' <- lift freshS
-  xs <- lift $ freshEnv xs
+  scope <- getScope
+  xs <- lift $ freshEnv scope xs
   _ <- localNames xs $ evalExp e2 s'' s'''
   var <- lift freshVar'
   fork' $ lift (readVar' var1) >>= \ case
-    Val.Struct i env ys e ->
-      unify' loc var =<< instStruct i env ys e xs s''' s'
-    Val.Class i env sup ys e ->
-      unify' loc var =<< instClass loc i env sup ys e xs s''' s'
+    Val.Struct i scope env ys e ->
+      unify' loc var =<< (useScope (i:scope) $ instStruct i scope env ys e xs s''' s')
+    Val.Class i scope env sup ys e ->
+      unify' loc var =<< (useScope (i:scope) $ instClass loc i scope env sup ys e xs s''' s')
     _ -> abort $ InstError loc
   pure var
 
 instStruct
   :: MonadEval m
   => Label
+  -> Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -641,15 +669,18 @@ instStruct
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-instStruct i env xs e archetype s s' = do
-  archetype' <- lift $ freshEnv xs
-  _ <- local (\ r -> r { env = archetype' <> env, archetype, archetype' }) $ evalExp e s s'
-  lift $ newVar' $ Val.StructInst i $ filterNames archetype'
+instStruct i scope env xs e archetype s s' =
+  do
+    scope' <- getScope
+    archetype' <- lift $ freshEnv scope' xs
+    _ <- local (\ r -> r { env = archetype' <> env, archetype, archetype' }) $ evalExp e s s'
+    lift $ newVar' $ Val.StructInst i scope $ filterNames archetype'
 
 instClass
   :: MonadEval m
   => Loc
   -> Label
+  -> Scope
   -> Env m
   -> Maybe (VarVal m)
   -> Exp.Env Ident
@@ -658,30 +689,32 @@ instClass
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-instClass loc i env sup xs e archetype s s' = do
-  (var, _, initClass) <- allocClass loc i env sup xs e
-  initClass archetype s s'
-  pure var
+instClass loc i scope env sup xs e archetype s s' = do
+    (var, _, initClass) <- allocClass loc i scope env sup xs e
+    initClass archetype s s'
+    pure var
 
 allocClass
   :: MonadEval m
   => Loc
   -> Label
+  -> Scope
   -> Env m
   -> Maybe (VarVal m)
   -> Exp.Env Ident
   -> L (Exp L Ident)
   -> EvalT m (VarVal m, Env m, Archetype m -> S m -> S m -> EvalT m ())
-allocClass loc i env sup xs e = do
-  (sup, vars_sup, initSup) <- allocSup loc sup
-  archetype' <- lift $ freshEnv xs
-  let
-    vars = vars_sup <> archetype'
-    initClass archetype s s' = do
-      s'' <- lift freshS
-      _ <- local (\ r -> r { env = vars <> env, archetype, archetype' }) $ evalExp e  s s''
-      initSup (archetype' <> archetype) s'' s'
-  lift $ newVar' (Val.ClassInst i sup $ filterNames vars) <&> (, vars, initClass)
+allocClass loc i scope env sup xs e = do
+   (sup, vars_sup, initSup) <- allocSup loc sup
+   scope' <- getScope
+   archetype' <- lift $ freshEnv scope' xs
+   let
+     vars = vars_sup <> archetype'
+     initClass archetype s s' = useScope scope' do
+       s'' <- lift freshS
+       _ <- local (\ r -> r { env = vars <> env, archetype, archetype'}) $ evalExp e  s s''
+       initSup (archetype' <> archetype) s'' s'
+   lift $ newVar' (Val.ClassInst i scope sup $ filterNames vars) <&> (, vars, initClass)
 
 allocSup
   :: MonadEval m
@@ -691,8 +724,8 @@ allocSup
 allocSup loc sup = case sup of
   Nothing -> pure (Nothing, mempty, \ _ s s' -> lift $ unifyS s s')
   Just sup -> do
-    (i, env, sup, xs, e) <- lift $ readClass loc sup
-    (sup, xs, initSup) <- allocClass loc i env sup xs e
+    (i, scope, env, sup, xs, e) <- lift $ readClass loc sup
+    (sup, xs, initSup) <- useScope (i:scope) $ allocClass loc i scope env sup xs e
     pure (Just sup, xs, initSup)
 
 invoke
@@ -729,10 +762,10 @@ invoke' loc var1 var2 s s' = lift (readVar' var1) >>= \ case
     var <- invokeEnum loc xs var2
     lift $ unifyEq s.choiceFree s'.choiceFree
     pure var
-  Val.Lam env x e -> localNames env . localName x (Val var2) $ evalExp e s s'
-  Val.OLam env xs e1 e2 tail -> invokeOLam loc env xs e1 e2 tail var2 s s'
-  Val.Struct i env xs e -> invokeStruct loc i env xs e var2 s s'
-  Val.Class i env sup xs e -> invokeClass loc i env sup xs e var2 s s'
+  Val.Lam scope env x e -> useScope scope $ localNames env . localName Private x (Val var2) $ evalExp e s s'
+  Val.OLam scope env xs e1 e2 tail -> useScope scope $ invokeOLam loc scope env xs e1 e2 tail var2 s s'
+  Val.Struct i scope env xs e -> useScope (i:scope) $ invokeStruct loc i scope env xs e var2 s s'
+  Val.Class i scope env sup xs e -> useScope (i:scope) $ invokeClass loc i env sup xs e var2 s s'
   Val.Intrinsic x tail -> invokeIntrinsic loc x tail var2 s s'
   Val.AnyOLam -> abort $ UnknownInvokeError loc
   _ -> abort $ InvokeError loc
@@ -760,6 +793,7 @@ invokeEnum loc xs var = asum $ xs <&> \ x -> do
 invokeOLam
   :: MonadEval m
   => Loc
+  -> Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -769,31 +803,32 @@ invokeOLam
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeOLam loc env xs e1 e2 tail arg s s' = lift . readIVar =<< if''
+invokeOLam loc scope env xs e1 e2 tail arg s s' = lift . readIVar =<< if''
   do
-    invokeOLamDom loc env xs e1 e2 arg s s'
+    invokeOLamDom loc scope env xs e1 e2 arg s s'
   do
     runDomMatch
   do
     lift (readVar' tail) >>= \ case
       Val.AnyOLam -> abort $ UnknownInvokeError loc
-      Val.OLam env xs e1 e2 tail -> invokeOLam loc env xs e1 e2 tail arg s s'
+      Val.OLam scope env xs e1 e2 tail -> invokeOLam loc scope env xs e1 e2 tail arg s s'
       Val.Intrinsic x tail -> invokeIntrinsic loc x tail arg s s'
       _ -> abort $ InvokeError loc
 
 invokeOLamDom_
   :: MonadEval m
   => Loc
+  -> Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
   -> L (Exp L Ident)
   -> VarVal m
   -> EvalT m ()
-invokeOLamDom_ loc env xs e1 e2 arg = do
+invokeOLamDom_ loc scope env xs e1 e2 arg = do
   s <- lift newS
   s' <- lift freshS
-  void $ invokeOLamDom loc env xs e1 e2 arg s s'
+  void $ invokeOLamDom loc scope env xs e1 e2 arg s s'
 
 data DomMatch m = forall a . Freshenable a m => DomMatch
   a
@@ -814,6 +849,7 @@ instance Monad m => Freshenable (DomMatch m) m where
 invokeOLamDom
   :: MonadEval m
   => Loc
+  -> Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -822,18 +858,20 @@ invokeOLamDom
   -> S m
   -> S m
   -> EvalT m (DomMatch m)
-invokeOLamDom loc env xs e1 e2 v_arg s s' = do
-  xs <- lift $ freshEnv xs
+invokeOLamDom loc scope env xs e1 e2 v_arg s s' = do
+  xs <- lift $ freshEnv scope xs
   choiceFree <- lift $ newVar ChoiceFree
   s'' <- lift freshS
-  v_domain <- localEnv (xs <> env) $ evalExp e1 s { choiceFree } s''
-  unify' loc v_arg v_domain
-  pure . DomMatch xs $ \ xs -> localEnv (xs <> env) $ evalExp e2 s s'
+  useScope scope $ do
+    v_domain <- localEnv (xs <> env) $ evalExp e1 s { choiceFree } s''
+    unify' loc v_arg v_domain
+    pure . DomMatch xs $ \ xs -> localEnv (xs <> env) $ evalExp e2 s s'
 
 invokeStruct
   :: MonadEval m
   => Loc
   -> Label
+  -> Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -841,13 +879,14 @@ invokeStruct
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeStruct loc i env xs e arg s s' = do
-  archetype <- lift $ freshEnv xs
+invokeStruct loc i scope env xs e arg s s' = do
+  archetype <- lift $ freshEnv (i:scope) xs
   let archetype' = mempty
-  xs <- lift $ freshEnv xs
-  _ <- local (\ r -> r { env = xs <> env, archetype, archetype' }) $ evalExp e s s'
-  unify' loc arg =<< lift (newVar' . Val.StructInst i $ filterNames xs)
-  pure arg
+  xs <- lift $ freshEnv (i:scope) xs
+  useScope (i:scope) $ do
+    _ <- local (\ r -> r { env = xs <> env, archetype, archetype' }) $ evalExp e s s'
+    unify' loc arg =<< lift (newVar' . Val.StructInst i scope $ filterNames xs)
+    pure arg
 
 invokeClass
   :: MonadEval m
@@ -880,12 +919,13 @@ instEmptyClass
 instEmptyClass loc i env sup xs e s s' = do
   s'' <- lift freshS
   (sup, xs_sup) <- instEmptySup loc sup s s''
-  archetype <- lift $ freshEnv xs
+  scope <- getScope
+  archetype <- lift $ freshEnv scope xs
   let archetype' = mempty
-  xs <- lift $ freshEnv xs
+  xs <- lift $ freshEnv scope xs
   let xs' = xs_sup <> xs
   _ <- local (\ r -> r { env = xs' <> env, archetype, archetype' }) $ evalExp e s'' s'
-  lift $ newVar' (Val.ClassInst i sup $ filterNames xs') <&> (, xs')
+  lift $ newVar' (Val.ClassInst i scope sup $ filterNames xs') <&> (, xs')
 
 instEmptySup
   :: MonadEval m
@@ -899,7 +939,7 @@ instEmptySup loc sup s s' = case sup of
     unifyS s s'
     pure (Nothing, mempty)
   Just sup -> do
-    (i, env, sup, xs, e) <- lift $ readClass loc sup
+    (i, _scope, env, sup, xs, e) <- lift $ readClass loc sup
     (sup, xs) <- instEmptyClass loc i env sup xs e s s'
     pure (Just sup, xs)
 
@@ -907,16 +947,16 @@ readClass
   :: (MonadAbort Error m, MonadRef m)
   => Loc
   -> VarVal m
-  -> VerseT m (Label, Env m, Maybe (VarVal m), Exp.Env Ident, L (Exp L Ident))
+  -> VerseT m (Label, Scope, Env m, Maybe (VarVal m), Exp.Env Ident, L (Exp L Ident))
 readClass loc = readVar' >=> \ case
-  Val.Class i env sup xs e -> pure (i, env, sup, xs, e)
+  Val.Class i scope env sup xs e -> pure (i, scope, env, sup, xs, e)
   _ -> abort $ ClassError loc
 
 findClassInst
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => Label -> VarVal m -> VerseT m (VarVal m)
 findClassInst i var = readVar' var >>= \ case
-  Val.ClassInst j sup _
+  Val.ClassInst j _scope sup _
     | i == j -> pure var
     | Just var <- sup -> findClassInst i var
   _ -> empty
@@ -938,7 +978,7 @@ invokeIntrinsic loc x tail arg s s' = lift . readIVar =<< if''
   do
     lift (readVar' tail) >>= \ case
       Val.AnyOLam -> abort $ UnknownInvokeError loc
-      Val.OLam env xs e1 e2 tail -> invokeOLam loc env xs e1 e2 tail arg s s'
+      Val.OLam scope env xs e1 e2 tail -> invokeOLam loc scope env xs e1 e2 tail arg s s'
       Val.Intrinsic x tail -> invokeIntrinsic loc x tail arg s s'
       _ -> abort $ InvokeError loc
 
@@ -1293,23 +1333,11 @@ evalIdent x s s' = lookupNamed (extract x) >>= \ case
   Nothing -> abort $ IdentError (loc x) (extract x)
   Just y -> evalNamed (loc x) y s s'
 
-{-
-evalIdent'
-  :: MonadEval m
-  => L Ident
-  -> S m
-  -> S m
-  -> EvalT m (VarVal m)
-evalIdent' x s s' = lookupNamed (extract x) >>= \ case
-  Nothing -> abort $ IdentError (loc x) (extract x)
-  Just y -> evalNamed' (loc x) y s s'
--}
-
 evalQualName
   :: MonadEval m
   => Loc
   -> L (Exp L Ident)
-  -> Name
+  -> SimpleName
   -> S m
   -> S m
   -> EvalT m (VarVal m)
@@ -1328,7 +1356,7 @@ evalQualName loc e x s s' = do
 -- Ignore root for now since I don't know what it should be.  In the
 -- future we want to be able to support several packages, selecting
 -- the correct one depending on the root.
-getPath :: MonadAbort Error m => Loc -> Val ref a -> m (Maybe (Name, [Name]))
+getPath :: MonadAbort Error m => Loc -> Val ref a -> m (Maybe (SimpleName, [SimpleName]))
 getPath loc = \ case
   Val.Path (_root:p:ps) -> return $ Just (p, ps)
   Val.Path [_root] -> return $ Nothing
@@ -1440,7 +1468,7 @@ evalExpList xs s s' = case xs of
     vars <- evalExpList xs s'' s'
     pure $ var:vars
 
-filterNames :: IdentMap a -> HashMap Name a
+filterNames :: IdentMap a -> HashMap SimpleName a
 filterNames =
   HashMap.fromList .
   HashMap.foldrWithKey
@@ -1449,14 +1477,32 @@ filterNames =
     Ident.Label _ -> \ _ z -> z
   []
 
+isOk :: Access -> Scope -> Scope -> Bool
+isOk access scope scope' =
+  case access of
+    Public -> True
+    -- Protected  is not implemented yet, treated as Private/Internal for now
+    _ -> case scope of
+      [] -> True -- everything can access top level
+      (scope:_) -> scope `elem` scope'
+
 lookupNamed :: Ident -> EvalT m (Maybe (VarNamed m))
-lookupNamed x = asks $ \ r -> HashMap.lookup x r.env
+lookupNamed x = do
+  asks $ \ r -> lookupEnv r.scope x r.env
 
 lookupTopNamed :: Ident -> EvalT m (Maybe (VarNamed m))
-lookupTopNamed x = asks $ \ r -> HashMap.lookup x r.top
+lookupTopNamed x = asks $ \ r -> lookupEnv r.scope x r.top
 
-localName :: Ident -> VarNamed m -> EvalT m a -> EvalT m a
-localName k v = local $ \ r -> r { env = HashMap.insert k v r.env }
+lookupEnv :: (Eq k, Hashable k) => Scope -> k -> HashMap k (Val.AccessScope, VarNamed m) -> Maybe (VarNamed m)
+lookupEnv currentScope x env =
+  case HashMap.lookup x env of
+    Just (Val.AccessScope Public _scope, named) -> Just named
+    Just (Val.AccessScope access scope, named) | isOk access scope currentScope -> Just named
+    _ -> Nothing
+
+localName :: Access -> Ident -> VarNamed m -> EvalT m a -> EvalT m a
+localName access k v = do
+  local $ \ r -> r { env = HashMap.insert k (Val.AccessScope access r.scope , v) r.env }
 
 localEnv :: Env m -> EvalT m a -> EvalT m a
 localEnv env = local $ \ r ->
@@ -1466,15 +1512,28 @@ localNames :: Env m -> EvalT m a -> EvalT m a
 localNames env = local $ \ r ->
   r { env = env <> r.env, archetype = mempty, archetype' = mempty }
 
+getScope :: EvalT m Scope
+getScope = do
+  r <- ask
+  pure r.scope
+
+nestScope :: Label -> EvalT m a -> EvalT m a
+nestScope i =
+  local $ \ r -> r { scope = i : r.scope }
+
+useScope :: Scope -> EvalT m a -> EvalT m a
+useScope scope = local $ \ r -> r { scope = scope }
+
 freshEnv
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Exp.Env Ident -> VerseT m (Env m)
-freshEnv = getAp . HashMap.foldMapWithKey f
+  => Scope -> Exp.Env Ident -> VerseT m (Env m)
+freshEnv scope = do
+  getAp . HashMap.foldMapWithKey f
   where
     f k = \ case
-      Exp.Exists -> Ap $ HashMap.singleton k . Val <$> freshVar'
-      Exp.Forall -> Ap $ HashMap.singleton k . Val <$> newVar' Val.Any
-      Exp.Var -> Ap $ HashMap.singleton k . Ref <$> freshVar'
+      (access, Exp.Exists) -> Ap $ HashMap.singleton k . (Val.AccessScope access scope,) . Val <$> freshVar'
+      (access, Exp.Forall) -> Ap $ HashMap.singleton k . (Val.AccessScope access scope,) . Val <$> newVar' Val.Any
+      (access, Exp.Var) -> Ap $ HashMap.singleton k . (Val.AccessScope access scope,) . Ref <$> freshVar'
 
 unify'
   :: MonadEval m
@@ -1496,7 +1555,7 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Any, Val.Lam {})
     | r.assumed -> pure $ (GE, pure ())
     | otherwise -> abort $ UndecidableError loc'
-  (Val.Any, Val.OLam _ _ _ _ ys)
+  (Val.Any, Val.OLam _ _ _ _ _ ys)
     | r.assumed -> pure $ (GE,) do
         xs <- lift $ newVar' Val.AnyOLam
         unify' loc' xs ys
@@ -1566,9 +1625,9 @@ match loc' x y = ask >>= \ r -> case (x, y) of
     unifyList loc' xs ys
   (Val.EnumValue i x, Val.EnumValue j y) ->
     guard (i == j && x == y) $> (SEQ, pure ())
-  (Val.StructInst i xs, Val.StructInst j ys) -> do
+  (Val.StructInst i _scope_x xs, Val.StructInst j _scope_y ys) -> do
     guard (i == j) $> (SEQ, unifyEnv loc' xs ys)
-  (Val.ClassInst i x xs, Val.ClassInst j y ys) -> guard (i == j) $> (SEQ,) do
+  (Val.ClassInst i _scope x xs, Val.ClassInst j _ y ys) -> guard (i == j) $> (SEQ,) do
     unifyMaybe loc' x y
     unifyEnv loc' xs ys
   (Val.Lam {}, Val.Any)
@@ -1586,7 +1645,7 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.AnyOLam, Val.AnyOLam)
     | r.assumed -> pure (LE, pure ())
     | otherwise -> abort $ UndecidableError loc'
-  (Val.AnyOLam, Val.OLam _ _ _ _ ys)
+  (Val.AnyOLam, Val.OLam _ _ _ _ _ ys)
     | r.assumed -> pure . (GE,) $ do
         xs <- lift $ newVar' Val.AnyOLam
         unify' loc' xs ys
@@ -1596,40 +1655,40 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         xs <- lift $ newVar' Val.AnyOLam
         unify' loc' xs ys
     | otherwise -> abort $ UndecidableError loc'
-  (Val.OLam _ _ _ _ xs, Val.Any)
+  (Val.OLam _ _ _ _ _ xs, Val.Any)
     | r.assumed -> pure $ (LE,) do
         ys <- lift $ newVar' Val.AnyOLam
         unify' loc' xs ys
     | otherwise -> abort $ UndecidableError loc'
   (Val.OLam {}, Val.Comparable) -> abort $ UndecidableError loc'
   (Val.OLam {}, Val.Lam {}) -> abort $ UndecidableError loc'
-  (Val.OLam _ _ _ _ xs, Val.AnyOLam)
+  (Val.OLam _ _ _ _ _ xs, Val.AnyOLam)
     | r.assumed -> pure $ (LE,) do
         ys <- lift $ newVar' Val.AnyOLam
         unify' loc' xs ys
     | otherwise -> abort $ UndecidableError loc'
-  (Val.OLam env_x xs dom_x rng_x tail_x, Val.OLam env_y ys dom_y rng_y tail_y) ->
+  (Val.OLam scope_x env_x xs dom_x rng_x tail_x, Val.OLam scope_y env_y ys dom_y rng_y tail_y) ->
     pure $ (SEQ,) do
       whenVerifying $ do
         fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
           i <- lift $ newVar' Val.Any
-          invokeOLamDom_ loc' env_x xs dom_x rng_x i
-          lift . readIVar <=< fails' $ invokeOLamDom_ loc' env_y ys dom_y rng_y i
+          invokeOLamDom_ loc' scope_x env_x xs dom_x rng_x i
+          lift . readIVar <=< fails' $ invokeOLamDom_ loc' scope_y env_y ys dom_y rng_y i
           abort $ OLamDomError loc' (loc dom_x) (loc dom_y)
       zs <- lift freshVar'
-      unify' loc' tail_x =<< lift (newVar' $ Val.OLam env_y ys dom_y rng_y zs)
-      unify' loc' tail_y =<< lift (newVar' $ Val.OLam env_x xs dom_x rng_x zs)
-  (Val.OLam env_x xs dom_x rng_x tail_x, Val.Intrinsic y tail_y) ->
+      unify' loc' tail_x =<< lift (newVar' $ Val.OLam scope_y env_y ys dom_y rng_y zs)
+      unify' loc' tail_y =<< lift (newVar' $ Val.OLam scope_x env_x xs dom_x rng_x zs)
+  (Val.OLam scope_x env_x xs dom_x rng_x tail_x, Val.Intrinsic y tail_y) ->
     pure $ (SEQ,) do
       whenVerifying $ do
         fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
           i <- lift $ newVar' Val.Any
-          invokeOLamDom_ loc' env_x xs dom_x rng_x i
+          invokeOLamDom_ loc' scope_x env_x xs dom_x rng_x i
           lift . readIVar <=< fails' $ invokeIntrinsicDom_ loc' y i
           abort $ DomError loc' (loc dom_x)
       zs <- lift freshVar'
       unify' loc' tail_x =<< lift (newVar' $ Val.Intrinsic y zs)
-      unify' loc' tail_y =<< lift (newVar' $ Val.OLam env_x xs dom_x rng_x zs)
+      unify' loc' tail_y =<< lift (newVar' $ Val.OLam scope_x env_x xs dom_x rng_x zs)
   (Val.Intrinsic _ xs, Val.Any)
     | r.assumed -> pure $ (LE,) do
         ys <- lift $ newVar' Val.AnyOLam
@@ -1641,16 +1700,16 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         ys <- lift $ newVar' Val.AnyOLam
         unify' loc' xs ys
     | otherwise -> abort $ UndecidableError loc'
-  (Val.Intrinsic x tail_x, Val.OLam env_y ys dom_y rng_y tail_y) ->
+  (Val.Intrinsic x tail_x, Val.OLam scope_y env_y ys dom_y rng_y tail_y) ->
     pure $ (SEQ,) do
       whenVerifying $ do
         fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
           i <- lift $ newVar' Val.Any
           invokeIntrinsicDom_ loc' x i
-          lift . readIVar <=< fails' $ invokeOLamDom_ loc' env_y ys dom_y rng_y i
+          lift . readIVar <=< fails' $ invokeOLamDom_ loc' scope_y env_y ys dom_y rng_y i
           abort $ DomError loc' (loc dom_y)
       zs <- lift freshVar'
-      unify' loc' tail_x =<< lift (newVar' $ Val.OLam env_y ys dom_y rng_y zs)
+      unify' loc' tail_x =<< lift (newVar' $ Val.OLam scope_y env_y ys dom_y rng_y zs)
       unify' loc' tail_y =<< lift (newVar' $ Val.Intrinsic x zs)
   (Val.Intrinsic x tail_x, Val.Intrinsic y tail_y) ->
     pure $ (SEQ,) do
@@ -1701,7 +1760,7 @@ unifyEnv
   -> VarEnv k m
   -> VarEnv k m
   -> EvalT m ()
-unifyEnv loc xs ys = for_ (HashMap.intersectionWith (,) xs ys) $ \ (x, y) ->
+unifyEnv loc xs ys = for_ (HashMap.intersectionWith (,) xs ys) $ \ ((_, x), (_, y)) ->
   unifyNamed loc x y
 
 unifyNamed
@@ -1718,12 +1777,12 @@ unifyNamed loc = curry $ \ case
 eqFloat :: Double -> Double -> Bool
 eqFloat x y = if isNaN x then isNaN y else x == y
 
-getNameEnv :: MonadAbort Error m => Loc -> Val ref a -> m (Val.Env Name a)
+getNameEnv :: MonadAbort Error m => Loc ->Val ref a -> m (Val.Env SimpleName a)
 getNameEnv loc = \ case
-  Val.Module _ xs -> pure xs
+  Val.Module _ _ xs -> pure xs
   Val.Enum _ xs _ -> pure xs
-  Val.StructInst _ xs -> pure xs
-  Val.ClassInst _ _ xs -> pure xs
+  Val.StructInst _ _ xs -> pure xs
+  Val.ClassInst _ _ _ xs -> pure xs
   _ -> abort $ EnvError loc
 
 fork'

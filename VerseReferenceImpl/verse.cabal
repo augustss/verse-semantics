@@ -44,7 +44,7 @@ library
     Language.Verse.Label
     Language.Verse.Loc
     Language.Verse.Mode
-    Language.Verse.Name
+    Language.Verse.SimpleName
     Language.Verse.Parse2
     Language.Verse.Parse.Exp
     Language.Verse.Pos

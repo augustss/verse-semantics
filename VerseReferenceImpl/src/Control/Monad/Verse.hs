@@ -924,6 +924,14 @@ instance Monad m => Freezable Int Int m where
 
 instance ( Freezable a b m
          , Freezable c d m
+         ) => Freezable (a, c) (b, d) m where
+  freeze (a, b) = do
+    a' <- freeze a
+    b' <- freeze b
+    pure (a', b')
+
+instance ( Freezable a b m
+         , Freezable c d m
          ) => Freezable (Const a c) (Const b d) m where
   freeze = fmap Const . freeze . getConst
 

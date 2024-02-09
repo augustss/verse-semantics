@@ -35,7 +35,7 @@ eval2 path xs = do
     e <- rewrite =<< lift (P2.parse2 path xs)
     (,) <$> desugar Verification e <*> desugar Execution e
   whenNothingM_ (runVerseT $ Eval.eval Verification e1) $
-    abort StuckError
+     abort StuckError
   whenNothingM (runVerseT $ Eval.eval Execution e2) $
     abort StuckError
 

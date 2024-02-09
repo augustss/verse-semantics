@@ -20,7 +20,7 @@ import Data.Word (Word8)
 
 import Language.Verse.Error qualified as E
 import Language.Verse.Loc (L (..), Loc(..))
-import Language.Verse.Name(Name)
+import Language.Verse.SimpleName
 import Language.Verse.Parse.Exp ( Exp
                                 , pattern (:=:)
                                 , pattern (:<>:)
@@ -85,13 +85,13 @@ instance (Monad m) => PPrim.Stream Word8String m Word8 where
 
 type Parser = P.Parsec Word8String ParserState
 
-parse :: String -> ByteString -> Either ParseError (L (Exp Name))
+parse :: String -> ByteString -> Either ParseError (L (Exp SimpleName))
 parse path content = runIdentity $ P.runParserT pFile beginPS path (WS content)
 
 
 -- Wrapper to make it an almost drop in replacement for the old parser
 -- The difference is that it needs the file name for error messages
-parse2 :: String -> ByteString -> Either E.Error (L (Exp Name))
+parse2 :: String -> ByteString -> Either E.Error (L (Exp SimpleName))
 parse2 path bytestring =
   case parse path bytestring of
     Left err -> Left $ E.OtherError (toPos $ PE.errorPos err) (showWithoutPos err)
@@ -271,7 +271,7 @@ pExp = match 'e' *> ( match '-' *> (('-',) <$> pDigits)
 
 -- Units     := [Alpha {Alpha}] !Alpha
 -- Above does not agree with Shipverse
-pUnits :: Parser (L Name)
+pUnits :: Parser (L SimpleName)
 pUnits = do
   p1 <- pos
   w <- pAlpha
@@ -285,7 +285,7 @@ pUnits = do
 -- Num       := ("0x" Hex {Hex} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !'.' !Alnum
 -- This is a brutal hack for now, using Haskell's read function for conversion of floats
 -- pNumI also handles Char8 and Char32 since they starts with a digit.
-pNumT :: Parser (L (Exp Name))
+pNumT :: Parser (L (Exp SimpleName))
 pNumT =
   (pos <* match '0' >>= \ p1 ->
                           (fixHexChar Exp.Char32 p1 <$ match 'u' <*> fromTo 1 6 pHex <*> pos <* P.notFollowedBy pAlnum -- HACK accept all 6 digits hex nuumbers, not only 0-10ffff
@@ -317,7 +317,7 @@ pNumT =
    head' _ (x:_) = x
 
 
-   mkNum :: PPos.SourcePos -> [Word8] -> Maybe [Word8] -> Maybe (Char, [Word8]) -> Maybe (L Name) -> PPos.SourcePos -> L (Exp Name)
+   mkNum :: PPos.SourcePos -> [Word8] -> Maybe [Word8] -> Maybe (Char, [Word8]) -> Maybe (L SimpleName) -> PPos.SourcePos -> L (Exp SimpleName)
    mkNum p1 is Nothing   Nothing units p2 =  addUnits units $ Exp.Int (wsToInteger is) <$ unitLoc p1 p2
    mkNum p1 is Nothing   (Just ('+', es)) units p2 =  addUnits units $ Exp.Int (wsToInteger is * (10 ^ wsToInteger es)) <$ unitLoc p1 p2
    mkNum p1 is fs es units p2 = addUnits units $ mkFloat is (qFractionToWords fs) (qExpToWords es) <$ unitLoc p1 p2
@@ -333,14 +333,14 @@ pNumT =
    qExpToWords Nothing = []
    qExpToWords (Just (sgn, es)) = map c2w ['e', sgn] ++ es
 
-   fixHexChar :: (Char->Exp Name) -> PPos.SourcePos -> [Word8] -> PPos.SourcePos -> L (Exp Name)
+   fixHexChar :: (Char->Exp SimpleName) -> PPos.SourcePos -> [Word8] -> PPos.SourcePos -> L (Exp SimpleName)
    fixHexChar c p1 ws p2 =
      L (toLoc p1 p2) $ c $ Char.chr $ fst $ head' ws $ readHex $ map w2c ws
 
    addUnits Nothing e = e
    addUnits (Just u) e = Exp.Units e <$> duplicate u
 
-   mkFloat :: [Word8] -> [Word8] -> [Word8] -> Exp Name
+   mkFloat :: [Word8] -> [Word8] -> [Word8] -> Exp SimpleName
    mkFloat is fs es =
      let s = map w2c (is ++ c2w '.':fs ++ es)
      in case reads s of
@@ -348,7 +348,7 @@ pNumT =
        _ -> error ("Failed to parse floating point number " ++ s)
 
 
-pNum :: Parser (L (Exp Name))
+pNum :: Parser (L (Exp SimpleName))
 pNum = pNumT <* pSpace
 
 -- Special   := '\'|'{'|'}'|'#'|'<'|'>'|'&'|'~'
@@ -369,7 +369,7 @@ pCharEsc = fixChar <$ match '\\' <*> satisfy (`elem` charEsc)
     charEsc = map c2w ['r', 'n', 't'] ++ special
 
 -- CharLit   := ''' Printable ''' !''' | ''' CharEsc '''
-pCharLit :: Parser (L (Exp Name))
+pCharLit :: Parser (L (Exp SimpleName))
 pCharLit = do
   p1 <- pos
   c <- match '\'' *> ((Exp.Char <$> pCharEsc) <|> pPrintable') <* match '\''
@@ -377,10 +377,10 @@ pCharLit = do
   return $ L (toLoc p1 p2) c
 
 -- Utility function to get the correct return type
-pPrintable' :: Parser (Exp Name)
+pPrintable' :: Parser (Exp SimpleName)
 pPrintable' = pPrintable >>= fix
   where
-    fix :: [Word8] -> Parser (Exp Name)
+    fix :: [Word8] -> Parser (Exp SimpleName)
     fix [w] = return $ Exp.Char $ w2c w
     fix ws =
       case Text.decodeUtf8' $ ByteString.pack ws of
@@ -401,11 +401,11 @@ pPrintable' = pPrintable >>= fix
 -- Embedded in pNum since both starts with a digit
 
 -- Char      := CharLit | Char8 | Char32
-pChar :: Parser (L (Exp Name))
+pChar :: Parser (L (Exp SimpleName))
 pChar = pCharLit   -- <|> pChar8 <|> pChar32) included in pNum instead
 
 -- Ident     := Alpha {Alnum} !Alnum ["'" {!('<#'|'#>'|'\'|'{'|'}'|'"'|''') 0o20-0o7E} "'"]
-pIdentT :: Parser (L Name)
+pIdentT :: Parser (L SimpleName)
 pIdentT = P.try $ do  -- This P.try is needed for now since it will fail for keywords
   p1 <- pos
   x <- pAlpha
@@ -431,12 +431,11 @@ pIdentT = P.try $ do  -- This P.try is needed for now since it will fail for key
   fix w8s = c2w '\'' : w8s ++ [c2w '\'']
 
 
-pIdent :: Parser (L Name)
+pIdent :: Parser (L SimpleName)
 pIdent = pIdentT <* pSpace
 
 -- Path      := '/' Label ('@' Label | !'@')] {'/' ['(' Path ":)"] Ident} !'/'
--- Paths are currently represented with a Name, could be changed to something with structure
-pPathT :: Parser (Path Name)
+pPathT :: Parser (Path SimpleName)
 pPathT = do
   _ <- match '/'
   p0 <- pos
@@ -446,18 +445,18 @@ pPathT = do
   idents <- P.many $ (,) <$ pSlash <*> P.optionMaybe (pLParen *> pPathT <* pColonParen) <*> pIdentT
   return $ Path.Path (wrapLoc p0 (label <> fixAt atLabel) p1) idents
  where
-   pAtLabel :: Parser Name
+   pAtLabel :: Parser SimpleName
    pAtLabel = pAt *> pLabel
 
-   fixAt :: Maybe Name -> Name
+   fixAt :: Maybe SimpleName -> SimpleName
    fixAt Nothing = Text.empty
    fixAt (Just txt) = Text.pack "@" <> txt
 
-pPath :: Parser (L (IdentExp Name))
+pPath :: Parser (L (IdentExp SimpleName))
 pPath = wrapLoc <$> pos <*> (IdentExp.IdentPath <$> pPathT) <*> pos <* pSpace
 
 -- Label     := Alnum {Alnum|'-'|'.'} !(Alnum|'-'|'.')
-pLabel :: Parser Name
+pLabel :: Parser SimpleName
 pLabel = do
   x <- pAlnum
   xs <- P.many $ satisfy (isLabel . w2c)
@@ -471,13 +470,13 @@ pLabel = do
   isLabel x = isAlphaNum x
 
 -- Interp    := '{' List '}'
-pInterp :: Parser (L (Exp Name))
+pInterp :: Parser (L (Exp SimpleName))
 pInterp = mkListPos <$> match '{' <*> pList <*> match '}'
 
 -- Ampersand := push; parse LinePrefix='&'; Space Def (';'|Ending); pop
 
 -- String    := '"' {Interp | CharEsc |                                       !('\'|'{'|'}'|'"') Text} '"'
-pString :: Parser (L (Exp Name))
+pString :: Parser (L (Exp SimpleName))
 pString = do
   p1 <- pos
   s1 <- match '"' *> pStringText
@@ -488,7 +487,7 @@ pString = do
 pStringText :: Parser (L Text)
 pStringText = ( \ p1 xs p2 -> L (toLoc p1 p2) (Text.pack xs)) <$> pos <*> P.many (pCharEsc <|> pStringChar) <*> pos
 
-pStringRest  :: Parser [(L (Exp Name), L Text)]
+pStringRest  :: Parser [(L (Exp SimpleName), L Text)]
 pStringRest =
   ( \ e s xs -> (e,s):xs) <$> pInterp <*> pStringText <*> pStringRest
   <|>
@@ -526,7 +525,7 @@ pPrintable'' = pPrintable >>= fix
 -- Return    := ("return"|"yield"|"break"|"continue") Key
 -- Not exactly as the grammar, this parser also consumes any following Block/Def in the case of return
 -- I guess break also could take an argument, an maybe yield, but continue?
-pReturn :: Parser (L (Exp Name))
+pReturn :: Parser (L (Exp SimpleName))
 pReturn =
   (\ p1 qE p2 -> L (toLoc p1 p2) (Exp.Return qE)) <$> pos <* pKeyword "return" <* pSpace <*> P.optionMaybe (pBlock <|> pSpace *> pDef) <*> pos <* pStopDef
   <|>
@@ -551,11 +550,11 @@ pDotSpace :: Parser (L String)
 pDotSpace = (<.) <$> match '.' <*> P.lookAhead (match '\t' <|> match ' ' <|> pEnding)
 
 -- Brace     := Scan '{' List '}' Space
-pBrace :: Parser (L (Exp Name))
+pBrace :: Parser (L (Exp SimpleName))
 pBrace = P.try $ mkListPos <$ pScan <*> pLBrace <*> pList <*> pRBrace <* pSpace
 
 -- Block     := Brace | DotSpace Space Def Space | ':' Space Ind List Ded
-pBlock :: Parser (L (Exp Name))
+pBlock :: Parser (L (Exp SimpleName))
 pBlock = pBrace
          <|>
          pDotSpace *> pSpace *> pDef <* pSpace
@@ -563,30 +562,30 @@ pBlock = pBrace
          P.try (mkListPos <$> pColon <* pSpace <* pInd <*> pList <* pDed <*> pPos)  -- After "of" there can be either a "colon pInd ... pDed" or a prefix ":"
 
 -- BraceInd  := Brace | Ind List Ded
-pBraceInd :: Parser (L (Exp Name))
+pBraceInd :: Parser (L (Exp SimpleName))
 pBraceInd =
   pBrace <|> (mkList <$ pInd <*> pList <* pDed)
 
 -- KeyBlock  := Block
-pKeyBlock :: Parser (L (Exp Name))
+pKeyBlock :: Parser (L (Exp SimpleName))
 pKeyBlock = pBlock
 
 
 -- A NameBlock is a block with only identifiers and attributes. It's used for enum.
-pNameBlock :: Parser (L [([L (Exp Name)], L Name)])
+pNameBlock :: Parser (L [([L (Exp SimpleName)], L SimpleName)])
 pNameBlock =
   pLBrace *> pNameList <* pRBrace <* pSpace
   <|>
   pColon *> pSpace *> pInd *> pNameList <* pDed
 
 -- Defs      := Def {Space ',' Scan Def}
-pDefs :: Parser (L (Exp Name))
+pDefs :: Parser (L (Exp SimpleName))
 pDefs = P.try $ do
   d <- pDef
   ds <- tryDefs d
   return $ mkList ds
  where
-  tryDefs :: L (Exp Name) -> Parser (L [L (Exp Name)])
+  tryDefs :: L (Exp SimpleName) -> Parser (L [L (Exp SimpleName)])
   tryDefs e = do
     qD <- P.optionMaybe (P.try (pSpace *> pComma *> pScan *> pDef))
     ds <- case qD of
@@ -596,11 +595,11 @@ pDefs = P.try $ do
 
 
 -- Paren     :=  '(' List  ')' Space
-pParen :: Parser (L (Exp Name))
+pParen :: Parser (L (Exp SimpleName))
 pParen = mkListPos  <$> pLParen <*> pList <*> pRParen <* pSpace
 
 -- QualIdent := ['(' List ":)" Space] Ident
-pQualIdent :: Parser (L (IdentExp Name))
+pQualIdent :: Parser (L (IdentExp SimpleName))
 pQualIdent =
   fixQual <$> P.optionMaybe ( char '(' *> pSpace *> pList <* pColonParen) <* pSpace <*> pIdent
   where
@@ -611,7 +610,7 @@ pQualIdent =
 
 
 -- Use when it can be either a pParen or a pQualIdent. Needed to get rid of a P.try that is otherwise needed.
-pParenOrQualIdent :: Parser (L (Exp Name))
+pParenOrQualIdent :: Parser (L (Exp SimpleName))
 pParenOrQualIdent = do
   p1 <- pos
   qParens <- P.optionMaybe ((,) <$ char '(' <* pSpace <*> pList <*> (True <$ char ')' <|> False <$ pColonParen))
@@ -626,28 +625,28 @@ pParenOrQualIdent = do
       return $ (Exp.Pat <$>) $ (Pat.Name <$>) $ wrapLoc p1 (extract $ IdentExp.IdentQualName <$> es <.> duplicate n) p2
 
 -- Specs     := [ScanKey "with" Key] '<' Scan Choose Space '>' Space (Specs | !Specs)
-pSpecs :: Parser [L (Exp Name)]
+pSpecs :: Parser [L (Exp SimpleName)]
 pSpecs =  P.many (pSpec <* pSpace) -- Do not use "P.sepBy pSpec pSpace", since the latter always succeeds
 
-pSpecs1 :: Parser [L (Exp Name)]
+pSpecs1 :: Parser [L (Exp SimpleName)]
 pSpecs1 = P.many1 (pSpec <* pSpace)
 
 -- Parsing <attribute> in most cases needs backtracking
-pSpec :: Parser (L (Exp Name))
+pSpec :: Parser (L (Exp SimpleName))
 pSpec = P.try $ P.optionMaybe (pKeyword "with" *> pSpace) *> match '<' *> pChoose <* match '>'
 
-addSpecs :: [L (Exp Name)] -> L (Exp Name) -> L (Exp Name)
+addSpecs :: [L (Exp SimpleName)] -> L (Exp SimpleName) -> L (Exp SimpleName)
 addSpecs [] base = base
 addSpecs sp base = Exp.ExpSpecs <$> duplicate base <.> (sp <$ last sp)
 
 -- Tags      := Space (!'/' Call ScanKey '.' | !Reserved) QualIdent Space {Invoke} [',' Scan Tags]
 
 -- Do        := ScanKey "do"    Key (KeyBlock | Def)
-pDo :: L (Exp Name) -> Parser (L (Exp Name))
+pDo :: L (Exp SimpleName) -> Parser (L (Exp SimpleName))
 pDo e1 = liftL2 Exp.Do e1 <$ pScanKey <* pKeyword "do" <* pSpace <*> (pKeyBlock <|> pDef)
 
 -- Until     := ScanKey "until" Key (KeyBlock | Def) | ScanKey "catch" Key Invoke
-pUntil :: L (Exp Name) -> Parser (L (Exp Name))
+pUntil :: L (Exp SimpleName) -> Parser (L (Exp SimpleName))
 pUntil e1 = P.try (liftL2 Exp.Until e1 <$ pScanKey <* pKeyword "until" <* pSpace <*> (pKeyBlock <|> pDef))
             <|>
             P.try (do
@@ -656,15 +655,15 @@ pUntil e1 = P.try (liftL2 Exp.Until e1 <$ pScanKey <* pKeyword "until" <* pSpace
                return $ liftL2 Exp.Catch e1 e2)
 
 -- Then      := ScanKey "then"  Key (KeyBlock | Def)
-pThen :: Parser (L (Exp Name))
+pThen :: Parser (L (Exp SimpleName))
 pThen = P.try $ pScanKey *> pKeyword "then" *> pScanKey *> (pKeyBlock <|> pDef)
 
 -- Else      := ScanKey "else"  Key (ScanKey If | !(ScanKey If) (KeyBlock | Def))
-pElse :: Parser (L (Exp Name))
+pElse :: Parser (L (Exp SimpleName))
 pElse = P.try $ pScanKey *> pKeyword "else" *> pScanKey *> (P.try (pScanKey *> pIf) <|> pKeyBlock <|> pDef)
 
 -- Invoke    :=          [Specs] (Paren [Specs] (Block | Do  ) | Block [[Specs] Do  ]) (Until | !Until)
-pInvoke :: L (Exp Name) -> Parser (L (Exp Name))
+pInvoke :: L (Exp SimpleName) -> Parser (L (Exp SimpleName))
 pInvoke base =
   P.try (( \ s1 p s2 b -> Exp.Inst <$> duplicate (addSpecs s2 $ Exp.ParenInvoke <$> duplicate (addSpecs s1 base) <.> duplicate p) <.> duplicate b) <$> pSpecs <*> pParen <*> pSpecs <*> pBlock)
   <|>
@@ -676,7 +675,7 @@ pInvoke base =
 
 
 -- If        := "if" Key [Specs] (Paren         (Block | Then) | Block [        Then]) (Else  | !Else )
-pIf :: Parser (L (Exp Name))
+pIf :: Parser (L (Exp SimpleName))
 pIf = P.try $ pKeyword "if" *> pSpace *> (fixIf <$> pParen <*> P.optionMaybe (P.try (pBlock <|> pThen)) <*> P.optionMaybe pElse
                                                              <|>
                                                              fixIf <$> pBlock <*> P.optionMaybe pThen <*> P.optionMaybe pElse)
@@ -689,7 +688,7 @@ pIf = P.try $ pKeyword "if" *> pSpace *> (fixIf <$> pParen <*> P.optionMaybe (P.
 
 -- In        := ("in" Key | ':') Space (In | &Choose NotEq [Space Specs])
 -- Is 'in' other syntax for ':'?
-pIn :: Maybe (L (Exp Name)) -> Parser (L (Exp Name))
+pIn :: Maybe (L (Exp SimpleName)) -> Parser (L (Exp SimpleName))
 pIn qE1 = fixIn <$> (pColon <|> pKeyword "in") <* pSpace <*> (pIn Nothing <|> pNotEq) <* pSpace <*> pSpecs
   where
   fixIn p1 e specs = addSpecs specs $
@@ -699,7 +698,7 @@ pIn qE1 = fixIn <$> (pColon <|> pKeyword "in") <* pSpace <*> (pIn Nothing <|> pN
 
 
 -- Var       := ("var"|"set"|"ref"|"alias") Key Space Choose
-pVar :: Parser (L (Exp Name))
+pVar :: Parser (L (Exp SimpleName))
 pVar = (((\ specs e -> addSpecs specs $ Exp.ExpVar <$> duplicate e) <$ pKeyword "var")
         <|>
         ((\ specs e -> addSpecs specs $ Exp.ExpSet <$> duplicate e) <$ pKeyword "set")
@@ -711,7 +710,7 @@ pVar = (((\ specs e -> addSpecs specs $ Exp.ExpVar <$> duplicate e) <$ pKeyword 
 
 -- Base      := '(' List ')' | Num | Char | Path | String | Markup | If | !Reserved QualIdent
 -- TODO Markup
-pBase :: Parser (L (Exp Name))
+pBase :: Parser (L (Exp SimpleName))
 pBase =
   (\ n -> Exp.Exists <$> duplicate n) <$ pKeyword "exists" <* pSpace <*> pIdent  -- TODO Here for refimpl
   <|>
@@ -742,14 +741,14 @@ pBase =
   pParenOrQualIdent <* pSpace
 
 -- Call      := Base    {Space Postfix}
-pCall :: Parser (L (Exp Name))
+pCall :: Parser (L (Exp SimpleName))
 pCall = do
   call <- pBase
   pPostfix call
 
 -- Postfix   := Invoke  | !Invoke (Paren | Specs) | ("at"|"of") Key (KeyBlock | Fun)
 --                      | ('^' | '?' | '[' List ']' | ScanKey '.' QualIdent)
-pPostfix :: L (Exp Name) -> Parser (L (Exp Name))
+pPostfix :: L (Exp SimpleName) -> Parser (L (Exp SimpleName))
 pPostfix base = pSpace *>
   repeatChoice base [ pInvoke
                     , \ a -> liftL2 Exp.ParenInvoke a <$> pParen
@@ -763,7 +762,7 @@ pPostfix base = pSpace *>
                     ]
 
 -- Prefix    := Call    | ('^' | '?' | '[' List ']' | '+' | '-' | '*') Space (Brace | Prefix)
-pPrefix :: Parser (L (Exp Name))
+pPrefix :: Parser (L (Exp SimpleName))
 pPrefix =
   (\ e -> Exp.PrefixCaret <$> duplicate e) <$ match '^' <* pSpace <*> (pBrace <|> pPrefix)
   <|>
@@ -780,17 +779,17 @@ pPrefix =
   pCall
 
 -- Mul       := Prefix  { Space ('*' | '/' | '&'       ) Scan  Prefix  }
-pMul :: Parser (L (Exp Name))
+pMul :: Parser (L (Exp SimpleName))
 pMul =
   doBinary pPrefix pPrefix [(pMultiply, (:*:)), (pDivide, (:/:))]
 
 -- Add       := Mul     { Space ('+' | '-'             ) Scan  Mul     }
-pAdd :: Parser (L (Exp Name))
+pAdd :: Parser (L (Exp SimpleName))
 pAdd =
   doBinary pMul pMul [(pPlus, (:+:)), (pMinus, (:-:))]
 
 -- To        := Add     [ Space ("to" Key | ".." | "->") Scan  To      ]
-pTo :: Parser (L (Exp Name))
+pTo :: Parser (L (Exp SimpleName))
 pTo =
   doBinary pAdd pTo [ (pKeyword "to", (:..:))
                     , (string "..", (:..:))
@@ -798,48 +797,48 @@ pTo =
                     ]
 
 -- Choose    := To      [ Space ('|'                   ) Scan  Choose  ]
-pChoose :: Parser (L (Exp Name))
+pChoose :: Parser (L (Exp SimpleName))
 pChoose =
   doBinary pTo pChoose [(match '|', (:|:))]
 
 -- Greater   := Choose  [ Space ('>'  | ">="           ) Scan  Greater ]
-pGreater :: Parser (L (Exp Name))
+pGreater :: Parser (L (Exp SimpleName))
 pGreater =
   doBinary pChoose pGreater [ (pGreaterEqual, (:>=:))
                             , (pGreaterThan, (:>:))
                             ]
 
 -- Less      := Greater [ Space ('<'  | "<="           ) Scan  &(Choose Space !'>' !'>=') Less]
-pLess :: Parser (L (Exp Name))
+pLess :: Parser (L (Exp SimpleName))
 pLess = -- This works since Specs are collected in pPostfix if there are any
   doBinary pGreater pLess  [ (pLessEqual, (:<=:))
                            , (pLessThan, (:<:))
                            ]
 
 -- NotEq     := Less    { Space ("<>"                  ) Scan  Choose  }
-pNotEq :: Parser (L (Exp Name))
+pNotEq :: Parser (L (Exp SimpleName))
 pNotEq =
   doBinary pLess pChoose [(string "<>", (:<>:))]
 
 -- Eq        := NotEq   { Space ('='                   ) Scan  NotEq   }
-pEq :: Parser (L (Exp Name))
+pEq :: Parser (L (Exp SimpleName))
 pEq =
   doBinary pNotEq pNotEq [(pEqual, (:=:))]
 
 -- Not       := Eq      |       ("not" Key             ) Space Not
-pNot :: Parser (L (Exp Name))
+pNot :: Parser (L (Exp SimpleName))
 pNot =
   (\ e -> Exp.Not <$> duplicate e) <$ pKeyword "not" <* pSpace <*> pNot
   <|>
   pEq
 
 -- And       := Not     { Space ("and" Key             ) Scan  And     }
-pAnd :: Parser (L (Exp Name))
+pAnd :: Parser (L (Exp SimpleName))
 pAnd =
   doBinary pNot pAnd [(pKeyword "and", Exp.And)]
 
 -- Or        := And     { Space ("or"  Key             ) Scan  Or      }
-pOr :: Parser (L (Exp Name))
+pOr :: Parser (L (Exp SimpleName))
 pOr =
   doBinary pAnd pOr [(pKeyword "or", Exp.Or)]
 
@@ -852,10 +851,10 @@ pOr =
 --           |  ('&'|"..") Space Def | Return [Block | Def] StopDef
 
 
-pDef :: Parser (L (Exp Name))
+pDef :: Parser (L (Exp SimpleName))
 pDef = pDef' Nothing
 
-pDef' :: Maybe (L (Exp Name)) -> Parser (L (Exp Name))
+pDef' :: Maybe (L (Exp SimpleName)) -> Parser (L (Exp SimpleName))
 pDef' qE =
   (((maybeInfix <$> (pIn qE <|> pVar) <* pSpace
      <*> P.optionMaybe ( (,) <$>
@@ -897,28 +896,28 @@ pDef' qE =
   <|>
   pForall
 
-maybeInfix :: L (Exp Name) -> Maybe (L (Exp Name) -> L (Exp Name) -> Exp Name, L (Exp Name)) -> L (Exp Name)
+maybeInfix :: L (Exp SimpleName) -> Maybe (L (Exp SimpleName) -> L (Exp SimpleName) -> Exp SimpleName, L (Exp SimpleName)) -> L (Exp SimpleName)
 maybeInfix e1 (Just (op,e2)) = liftL2 op e1 e2
 maybeInfix e1 Nothing = e1
 
 
 
-pForall :: Parser (L (Exp Name))
+pForall :: Parser (L (Exp SimpleName))
 pForall =
   (\ p1 n -> Exp.Forall <$ p1 <.> duplicate n) <$> pKeyword "forall" <* pSpace <*> pIdent
 
-pEnum :: Parser (L (Exp Name))
+pEnum :: Parser (L (Exp SimpleName))
 pEnum =
   (\ e s ns -> Exp.Enum s <$ e <.> ns) <$> pKeyword "enum" <*> pSpecs <* pSpace <*> pNameBlock
 
 
 -- Fun       := Def { Space ("over" | "when" | "while") Key (KeyBlock | Defs)
 --                 | Space ("=>" Space | "next" Key) (BraceInd | Fun) } StopFun
-pFun :: Parser (L (Exp Name))
+pFun :: Parser (L (Exp SimpleName))
 pFun = pDef <* pSpace >>= pFun'
 
 -- TODO Not all implmented
-pFun' :: L (Exp Name) -> Parser (L (Exp Name))
+pFun' :: L (Exp SimpleName) -> Parser (L (Exp SimpleName))
 pFun' e1 =
   repeatChoiceNoTry e1 [ \e1 -> liftL2 Exp.Lam e1 <$ pFatArrow <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
                        , \e1 -> liftL2 Exp.Next e1 <$ pKeyword "next" <* pSpace <*> (pBraceInd <|> pFun) <* pSpace
@@ -930,13 +929,13 @@ pFun' e1 =
 -- Expr      := Fun {Space '@' Space Call} StopExpr
 --           |  '@' Space Call Scan &('@' | QualIdent) Expr
 -- added optional ';' since it's already used in the wild
-pExpr :: Parser (L (Exp Name))
+pExpr :: Parser (L (Exp SimpleName))
 pExpr =
   liftL2 Exp.AtSpec <$ pAt <* pSpace <*> pCall <* pScan  <* P.optionMaybe pSemi <*> pExpr
   <|>
   fixAfterAt <$> pFun <*> P.many ((.>) <$ pSpace <*> pAt <* pSpace <*> pCall <* pScan)
   where
-    fixAfterAt :: L (Exp Name) -> [L (Exp Name)] ->  L (Exp Name)
+    fixAfterAt :: L (Exp SimpleName) -> [L (Exp SimpleName)] ->  L (Exp SimpleName)
     fixAfterAt e [] = e
     fixAfterAt e (x:xs) = fixAfterAt (Exp.SpecAt <$> duplicate e <.> duplicate x) xs
 
@@ -957,14 +956,14 @@ pAfterDef = pSpace *> ( pFatArrow <|> pKeyword "over" <|> pKeyword "when" <|> pK
 
 -- Commas    := Expr {',' Scan Expr}
 
-pCommas :: Parser (L (Exp Name))
+pCommas :: Parser (L (Exp SimpleName))
 pCommas = do
   p1 <- P.getPosition
   xs <- pExpr `P.sepBy1` (pComma *> pScan)
   p2 <- P.getPosition
   return $ mkTuple (toLoc p1 p2) xs
 
-mkTuple :: Loc -> [L (Exp Name)] -> L (Exp Name)
+mkTuple :: Loc -> [L (Exp SimpleName)] -> L (Exp SimpleName)
 mkTuple _loc [x] = x
 mkTuple loc xs = L loc $ Exp.Tuple xs
 
@@ -974,13 +973,13 @@ pSeparator :: Parser ()
 pSeparator = (pSemi <|> pEnding) *> pScan
 
 -- List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} [Separator]]; pop
-pList :: Parser (L [L (Exp Name)])
+pList :: Parser (L [L (Exp SimpleName)])
 pList = doList pCommas pSeparator
 
-pNameList :: Parser (L [([L (Exp Name)], L Name)])
+pNameList :: Parser (L [([L (Exp SimpleName)], L SimpleName)])
 pNameList = doList pAtName pNameSeparator
 
-pAtName :: Parser ([L (Exp Name)], L Name)
+pAtName :: Parser ([L (Exp SimpleName)], L SimpleName)
 pAtName =
   (,) <$> P.many ( (.>) <$> pAt <* pSpace <*> pCall <* pScan) <*> pIdent
 
@@ -1013,16 +1012,16 @@ doList pItem pSeparator = do
             return $ item : items
 
 -- File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
-pFile :: Parser (L (Exp Name))  -- no need to set state since it's done in the parse function
+pFile :: Parser (L (Exp SimpleName))  -- no need to set state since it's done in the parse function
 pFile = do
   xs <- P.optionMaybe (string "\xEF\xBB\xBF") *> pList <* P.eof
   return $ mkList xs
 
-mkList :: L[L (Exp Name)] -> L (Exp Name)
+mkList :: L[L (Exp SimpleName)] -> L (Exp SimpleName)
 mkList (extract -> [x]) = x
 mkList xs = Exp.List <$> xs
 
-mkListPos :: L a -> L[L (Exp Name)] -> L b -> L (Exp Name)
+mkListPos :: L a -> L[L (Exp SimpleName)] -> L b -> L (Exp SimpleName)
 mkListPos p1 xs p2 = mkList xs <. p1 <. p2
 
 ---------------------------------useful parsers

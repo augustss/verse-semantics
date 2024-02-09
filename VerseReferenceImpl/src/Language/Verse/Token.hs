@@ -5,7 +5,7 @@ module Language.Verse.Token
   ( StringDelimiter(..), Token (..)
   ) where
 
-import Language.Verse.Name
+import Language.Verse.SimpleName
 
 import Prettyprinter
 import Prelude (Char, String, Double, Integer, Rational, fromRational)
@@ -69,9 +69,9 @@ data Token
   | Module
   | Multiply
   | MultiplyEqual
-  | Name Name
-  | Path Name
-  | Prefix Name
+  | Name SimpleName
+  | Path SimpleName
+  | Prefix SimpleName
   | Newline
   | Not
   | NotEqual

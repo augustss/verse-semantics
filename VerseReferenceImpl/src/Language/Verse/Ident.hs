@@ -10,12 +10,12 @@ import Data.HashMap.Strict (HashMap)
 import Data.String
 
 import Language.Verse.Label
-import Language.Verse.Name
+import Language.Verse.SimpleName
 
 import Prettyprinter
 
 data Ident
-  = Name !Name
+  = Name !SimpleName
   | Label !Label deriving (Show, Eq, Ord)
 
 instance Hashable Ident where
