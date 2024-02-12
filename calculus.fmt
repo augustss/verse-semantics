@@ -196,6 +196,7 @@
 %format he = "he"
 %format none = "\textbf{none}"
 %format fail = "\textbf{fail}"
+%format ok = "\textbf{ok}"
 %format succeed = "\textbf{succeed}"
 %format wront = "\wrong"
 %format do = "\textbf{do}"
@@ -204,6 +205,7 @@
 %format orElse = "\textbf{orElse}"
 %format append = "\textbf{append}"
 %format app = "\textbf{app}"
+%format eqsemi = "\fatsemi"
 
 %% Arrays and tuples
 %format array (x) = "\textbf{array}\{" x "\}"
@@ -552,6 +554,7 @@
 
 %format C_1
 %format C_2
+%format Ceq = "C_{eq}"
 
 %% ----------- Metatheory --------------
 %format cut (n) (x) = "\operatorname{cut}_{" n "}(" x ")"

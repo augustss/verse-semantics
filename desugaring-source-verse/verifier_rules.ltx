@@ -17,10 +17,13 @@ $\begin{array}{@@{}l}
 
 \begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
 
+
+\multicolumn{5}{l}{\textit{Normalisation of |forallKW|:}} \\
+\rulename{nu-elim} & |forall x e| & \movesto & |e| & \text{if $|x| \notin \freevars{e}$}\\
 \rulename{nu-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\[2mm]
 
 \multicolumn{5}{l}{\textit{Guard:}} \\
-\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
+\rulename{guard-elim} & |ok guard e| & \movesto & |e| \\
 \rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
 \rulename{guard-float} & |(assume e ; e_1) guard e_2| & \movesto &  |assume e; (e_1 guard e_2)| \\
 

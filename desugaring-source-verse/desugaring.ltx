@@ -1481,4 +1481,134 @@ $$
 \caption{{\bf DS8}: Small Source to Big Core } \label{fig:ds8}
 \end{figure}
 
+\section{Out-dated core syntax and rewrite rules}
+
+\begin{itemize}
+\item Old core syntax: \Cref{fig:vc-syntax-v1}
+\item Old core rewrite rules: \Cref{fig:rules-v1}
+\end{itemize}
+
+\begin{figure}[t]
+  $$
+\begin{array}{l}
+\mbox{\em Syntax} \\
+  \begin{array}{lr@@{\;}c@@{\;}l@@{}}
+      \text{Integers} & k \\
+      \text{Variables} & \multicolumn{3}{l}{x,y,z,r,f,g} \\
+      \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
+      \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
+      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+      && \vb & |forall x e| \vb |e_1 guard e_2| \vb |assume e| \vb |check fx e| \vb |verify e| \vb |havoc fx| \\
+      \text{Values} & |v| & ::= & x  \vb \hnf \\
+      \text{Head values} & \hnf & ::= & k \vb r \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
+             \vb |olam v (lam r e_1) (lam s e_2)|\\
+      \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt|
+\end{array}
+\\ \\
+\mbox{\em Contexts} \\
+\begin{array}{lrcl}
+\text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
+\text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e| \vb |assume S| \\
+\text{Eval. contexts}  & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \vb |forall x E| \vb |E guard e| \vb |e guard E| \vb |assume E| \\
+\text{Choice contexts}  & |C| & ::= & |hole| \vb |v==C| \vb |cf; C| \vb |C; e| \vb |C guard e| \vb |assume C| \vb |def x C| \\
+\text{Effect-free} & \multicolumn{3}{l}{\text{|ef| is an |e| that can have choice and fail, but not I/O effects or divergence}} \\
+\text{Choice-free} & \multicolumn{3}{l}{\text{|cf| is an |e| that has no choice, I/O effects or divergence}}
+\end{array}
+\\ \\
+\mbox{\em Free variables (needs updating)} \\
+  \begin{array}{rcl}
+       |fvs(hole)| & = & \{ \} \\
+       |fvs(v==E; e)| & = & |fvs(v) `cup` fvs(E) `cup` fvs(e)| \\
+       |fvs(v==ef; E)| & = & |fvs(v) `cup` fvs(ef) `cup` fvs(E)| \\
+       |fvs(def x E)| & = & |{x} `cup` fvs(E)| |-- this is correct| \\
+    \end{array}
+\end{array}
+     $$
+  \caption{Core Verse Syntax} \label{fig:vc-syntax-v1}
+\end{figure}
+
+  \begin{figure}
+
+    $\begin{array}{@@{}l}
+
+
+\begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l@@{}}
+
+\\[-0.6em]
+
+\rulegroupname{Application:}
+\rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
+\rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
+\rulename{app-lam}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
+                                                  & \text{if $x \not\in \freevars{|v|}$} \\
+\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_n)) v| & \movesto &
+                            \multicolumn{2}{@@{}l}{|(v == 0^^^ v_0) choice xdots choice (v == n^^^ v_n)|} \\
+\rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
+
+    \\[-0.6em]
+
+\rulegroupname{Unification:}
+  \rulename{u-lit}   & |k_1 == k_2 | & \movesto & |k_1| & \text{if $k_1=k_2$} \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';xdots;v_n==v_n'; tup (v_1,xdots,v_n)|} \\
+  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
+  \rulename{u-occurs} & |x==V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+
+    \\[-0.6em]
+
+\rulegroupname{Open Lambdas:}
+  \rulename{u-olam}          & \multicolumn{3}{l}{|olam v_1 dom_1 rng_1 == olam v_2 dom_2 rng_2|} \\
+  & \multicolumn{4}{l}{\hspace{5mm} \movesto |defKW z|.
+  \begin{array}[t]{l}
+        |v_1 == olam z ((lam i (check fails (apply1N dom_1 i); apply1N dom_2 i))) rng_2;| \\
+        |v_2 == olam z ((lam i (check fails (apply1N dom_2 i); apply1N dom_1 i))) rng_1;| \\
+   \end{array}} \\[5mm]
+  \rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &
+  \multicolumn{2}{l}{|if (x := apply1N dom v) then apply1N rng x else apply1N g v|} \\
+\\
+\rulegroupname{Substitution:}
+
+\rulename{subst} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
+  & \text{if $|v|\ne|V^[x]|$} \\
+\\
+
+\rulegroupname{Normalization:}
+\rulename{uni-elim} & |forall x e| & \movesto & |e| & \text{if $|x| \notin \freevars{e}$}\\
+\rulename{exi-elim1} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[v]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
+\rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1; (e_2; e_3)| \\
+\rulename{seq-float} & |v == (e_1 ; e_2)| & \movesto & |e_1; v == e_2| \\
+\rulename{seq-elim} & |v ; e| & \movesto & |e| \\
+\rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 == v_2| \\
+\rulename{eq-swap} & |v == x| & \movesto & |x == v| & \text{May apply infinitely for |x==y|} \\
+
+    \\[-0.6em]
+
+\rulegroupname{Choice:}
+\rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
+% \rulename{fail} & |E^[fail]| & \movesto & |fail| \\
+\rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
+\rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
+\rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
+\rulename{choice-fail} & |C^[fail]| & \movesto & |fail| \\
+
+    \\[-0.6em]
+
+\rulegroupname{One and All:}
+\rulename{one-fail}   & |one fail| & \movesto & |fail| \\
+\rulename{one-value}  & |one v| & \movesto & |v| \\
+\rulename{one-choice}  & |one (v choice e)| & \movesto & |v| \\
+\rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
+\rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)| \\
+
+\end{array} \\
+\\[-0.3em]
+\text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
+\end{array}$
+
+\caption{\textbf{The \vcname: Rewrite rules for execution}} \label{fig:rules-v1}
+\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
+\end{figure}
+
 \end{document}

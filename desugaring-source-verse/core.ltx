@@ -39,8 +39,9 @@
       \text{Variables} & \multicolumn{3}{l}{x,y,z,r,f,g} \\
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
-      \text{Expressions} & e & ::= & |v| \vb |v==e| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
-      && \vb & |forall x e| \vb |e_1 guard e_2| \vb |assume e| \vb |check fx e| \vb |verify e| \vb |havoc fx| \\
+      \text{Expressions} & e & ::= & |v| \vb |eq ; e| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+      && \vb & |forall x e| \vb |eq guard e| \vb |check fx e| \vb |verify e| \vb |havoc fx| \\
+      \text{Equations} & |eq| & ::= & |fail| \vb |ok| \vb |v == e| \vb |eq_1 eqsemi eq_2| \vb |assume eq| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb r \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
@@ -52,10 +53,13 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |v == S| \vb |S guard e| \vb |assume S| \\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |v==E| \vb |e; E| \vb |E; e| \vb |def x E| \vb |forall x E| \vb |E guard e| \vb |e guard E| \vb |assume E| \\
-\text{Choice contexts}  & |C| & ::= & |hole| \vb |v==C| \vb |cf; C| \vb |C; e| \vb |C guard e| \vb |assume C| \vb |def x C| \\
-\text{Effect-free} & \multicolumn{3}{l}{\text{|ef| is an |e| that can have choice and fail, but not I/O effects or divergence}} \\
-\text{Choice-free} & \multicolumn{3}{l}{\text{|cf| is an |e| that has no choice, I/O effects or divergence}}
+\text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |Ceq; e| \vb |Ceq guard e| \vb |def x C| \\
+\text{Choice contexts}  & |Ceq| & ::= & |hole| \vb |v==C| \vb |assume Ceq| \\
+\text{Effect-free} & \multicolumn{3}{l}{\text{|ef| is an |eq| that can have choice and fail, but not I/O effects or divergence}} \\
+\text{Choice-free} & \multicolumn{3}{l}{\text{|cf| is an |eq| that has no choice, I/O effects or divergence}} \\
+                   & \multicolumn{3}{l}{\text{Note: |Ceq| does not have rules for |eqsemi|; use \rulename{seq-assoc} first.}}
 \end{array}
+
 \\ \\
 \mbox{\em Free variables (needs updating)} \\
   \begin{array}{rcl}
@@ -96,9 +100,9 @@
 
     \\[-0.6em]
 
-\rulegroupname{Unification:}
-  \rulename{u-lit}   & |k_1 == k_2 | & \movesto & |k_1| & \text{if $k_1=k_2$} \\
-  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1';xdots;v_n==v_n'; tup (v_1,xdots,v_n)|} \\
+\rulegroupname{Unification (|eq|):}
+  \rulename{u-lit}   & |k == k| & \movesto & |ok| & \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')| & \movesto & \multicolumn{2}{@@{}l}{|v_1==v1' eqsemi xdots eqsemi v_n==v_n'|} \\
   \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
   \rulename{u-occurs} & |x==V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
 
@@ -121,14 +125,13 @@
 \\
 
 \rulegroupname{Normalization:}
-\rulename{uni-elim} & |forall x e| & \movesto & |e| & \text{if $|x| \notin \freevars{e}$}\\
 \rulename{exi-elim1} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{exi-elim2} & |def x (E^[x==v])| & \movesto & |E^[v]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{seq-assoc} & |(e_1 ; e_2) ; e_3| & \movesto & |e_1; (e_2; e_3)| \\
-\rulename{seq-float} & |v == (e_1 ; e_2)| & \movesto & |e_1; v == e_2| \\
-\rulename{seq-elim} & |v ; e| & \movesto & |e| \\
-\rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_1 == e; v_1 == v_2| \\
+\rulename{seq-assoc} & |(eq_1 eqsemi eq_2) ; e| & \movesto & |eq_1; (eq_2; e)| \\
+\rulename{seq-float} & |v == (eq eqsemi e)| & \movesto & |eq eqsemi v == e| \\
+\rulename{seq-elim} & |ok ; e| & \movesto & |e| \\
+\rulename{eq-float} & |v_1 == (v_2 == e_2 ; e_1)| & \movesto & |v_2 == e_2 eqsemi v_1 == e_1| \\
 \rulename{eq-swap} & |v == x| & \movesto & |x == v| & \text{May apply infinitely for |x==y|} \\
 
     \\[-0.6em]
