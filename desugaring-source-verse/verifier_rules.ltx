@@ -24,7 +24,7 @@ $\begin{array}{@@{}l}
 \rulename{exi-nu} & |assume (def x e)|
   & \movesto & |forall r (assume (subst e x r))|
 & |r| \not\in \freevars{|v|,|e|} \\
-\rulename{promote} & |r == v| & \movesto & |def x (x==r; r==v)| & |x| \in \freevars{v} \\
+\rulename{promote} & |r == v| & \movesto & |forall s (x==s; r==v)| & |x| \in \freevars{v}, |s| \not\in \freevars{|v|} \\
 \\[2mm]
 
 \multicolumn{5}{l}{\textit{Assumptions:}} \\
@@ -79,7 +79,7 @@ $\begin{array}{@@{}l}
    \must{|fx|}{|lam r e|}         & \doteq & \mathit{true} \\
    \must{|fx|}{|def x e|}         & \doteq & \must{|fx|}{e} \\
    \must{|fx|}{|forall r e|}         & \doteq & \must{|fx|}{e} \\
-   \must{|fx|}{|eq; e|}        & \doteq & \must{|fx|}{eq} \wedge \must{|fx|}{e} \\[1mm]
+   \must{|fx|}{|eq_1; e_2|}        & \doteq & \must{|fx|}{|eq_1|} \wedge \must{|fx|}{|e_2|} \\[1mm]
    \must{|fx_1|}{|havoc fx_2|}        & \doteq & |fx_2| \subseteq |fx_1| \\[1mm]
 
    \must{|iterates|}{|one e|}           & \doteq & \mathit{true} \\
@@ -96,7 +96,7 @@ $\begin{array}{@@{}l}
    \must{|fx|}{|apply1N op v|} & \doteq & \mustop{|fx|}{op} \\
    \must{|fx|}{|apply1N v_1 v_2|} & \doteq & \mathit{false} & \text{|v_1| is not |op|} \\
 
-   \must{|fx|}{|eq guard e|}     & \doteq & \mathit{false} & \text{Check!} \\[1mm]
+   \must{|fx|}{|eq_1 guard e_2|}     & \doteq & \mathit{false} & \text{Check!} \\[1mm]
 
    \must{|fx|}{|assume e|}        & \doteq & \mathit{true} \\[1mm]
 

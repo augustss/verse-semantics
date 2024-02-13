@@ -131,7 +131,7 @@
 \rulegroupname{Substitution:}
 
 \rulename{subst-skol} & |S^[r==v]| & \movesto & |substw S r v ^[r==v]|
-  & \text{if $|v|\ne|V^[r]|$} \\
+  & |v|\ne|V^[r]|, \not\exists |x|. |v|=|V^[x]| \\
 \rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
   & \text{if |x| is existential and $|v|\ne|V^[x]|$} \\
 \\
