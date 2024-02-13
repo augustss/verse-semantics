@@ -207,8 +207,10 @@
 %format orElse = "\textbf{orElse}"
 %format append = "\textbf{append}"
 %format app = "\textbf{app}"
-%format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
-%format eqsemiKW = "\fatsemi"
+%% %format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
+%% %format eqsemiKW = "\fatsemi"
+%format `eqsemi` = ";"
+%format eqsemiKW = ";"
 
 %% Arrays and tuples
 %format array (x) = "\textbf{array}\{" x "\}"
@@ -443,9 +445,9 @@
 %format eu = "eu"
 %format eu_1 = "eu_1"
 %format eu_2 = "eu_2"
-%format eq = "eq"
-%format eq_1 = "eq_1"
-%format eq_2 = "eq_2"
+%format eq = "e"
+%format eq_1 = "e_1"
+%format eq_2 = "e_2"
 
 %format h_1
 %format h_2

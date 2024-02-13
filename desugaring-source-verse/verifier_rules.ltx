@@ -21,9 +21,11 @@ $\begin{array}{@@{}l}
 \multicolumn{5}{l}{\textit{Normalisation of |forallKW|:}} \\
 \rulename{nu-elim} & |forall x e| & \movesto & |e| & \text{if $|x| \notin \freevars{e}$}\\
 \rulename{nu-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{exi-nu} & |assume (v == def x e_1); e_2|
-  & \movesto & |forall r (assume (v = subst e_1 x r); e_2)|
-             & |r| \not\in \freevars{|v|,|e_1|,|e_2|} \\[2mm]
+\rulename{exi-nu} & |assume (def x e)|
+  & \movesto & |forall r (assume (subst e x r))|
+& |r| \not\in \freevars{|v|,|e|} \\
+\rulename{promote} & |r == v| & \movesto & |def x (x==r; r==v)| & |x| \in \freevars{v} \\
+\\[2mm]
 
 \multicolumn{5}{l}{\textit{Assumptions:}} \\
 \rulename{asm-seq} & |assume (eq_1 `eqsemi` eq_2)| & \movesto & |assume eq_1 `eqsemi` assume eq_2| \\
