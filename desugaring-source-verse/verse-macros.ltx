@@ -147,6 +147,8 @@
 \newcommand{\mustSucceed}[1]{\must{|succeeds|}{#1}}
 \newcommand{\mustDecide}[1]{\must{|decides|}{#1}}
 \newcommand{\sucdec}[1]{\mathsf{sd}(#1)}
+\newcommand{\mustopKW}{\mathsf{Must_{op}}}
+\newcommand{\mustop}[2]{\ensuremath{\mustopKW{}\langle #1 \rangle\{#2\}}}
 
 \newcommand{\mustVerifyKW}{\mathsf{Prove}}
 \newcommand{\mustVerify}[1]{\ensuremath{\mustVerifyKW(#1)}}
@@ -229,7 +231,6 @@
 \newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
 \newcommand{\disjoint}{\;\#\;}
 \newcommand{\hnf}{\mathit{hnf}}  % Head normal form
-\newcommand{\subst}[3]{#1\{#3/#2\}}
 
 \newcommand{\hexp}{h-expression}
 \newcommand{\Hexp}{H-expression}

@@ -1,4 +1,4 @@
-%% ----------------------
+% ----------------------
 %% Stuff for TimCore
 
 %format timlam h fx i x s0 j y s1 = "\textbf{tlam}(" h "," fx ")\," i "," x "\{" s0 "\}" j "," y "\{" s1 "\}"
@@ -29,6 +29,7 @@
 %format iteratesE (e) = "\textbf{iterates}\{" e "\}"
 %format resolves = "\textbf{resolves}"
 %format fails = "\textbf{fails}"
+%format nofail = "\textbf{nofail}"
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
 %format closed = "\textbf{c}"
@@ -41,7 +42,8 @@
 %format ^ = " "
 %format ^^ = "\hspace{0.1em}"
 
-%format subst (e) (x) (v) = "\subst{" e "}{" x "}{" v "}"
+%format subst (e) (x) (v)  = e "\{" v "/" x "\}"
+%format substw (e) (x) (v) = e "\{\!\{" v "/" x "\}\!\}"
 
 %% --------------------------
 %%        Desugaring rules
@@ -205,7 +207,8 @@
 %format orElse = "\textbf{orElse}"
 %format append = "\textbf{append}"
 %format app = "\textbf{app}"
-%format eqsemi = "\fatsemi"
+%format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
+%format eqsemiKW = "\fatsemi"
 
 %% Arrays and tuples
 %format array (x) = "\textbf{array}\{" x "\}"
@@ -554,7 +557,10 @@
 
 %format C_1
 %format C_2
-%format Ceq = "C_{eq}"
+%format Ceq = "Ce"
+%format Eeq = "Ee"
+%format Seq = "Se"
+%format Veq = "V\!e"
 
 %% ----------- Metatheory --------------
 %format cut (n) (x) = "\operatorname{cut}_{" n "}(" x ")"
@@ -666,8 +672,10 @@
 %format forall (x) (y) = "\nu" x ".\," y
 
 %% Effects checking, like succeeds{e}
-%format checkKW = "{\bf chk}"
+%format checkKW = "{\bf vchk}"
 %format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
+%format rcheckKW = "{\bf rchk}"
+%format rcheck (r) (b) = rcheckKW "\langle" r "\rangle\{" b "\}"
 %format havocKW = "\textbf{havoc}"
 %format havoc (fx) = "\textbf{havoc}" "\langle" fx "\rangle"
 

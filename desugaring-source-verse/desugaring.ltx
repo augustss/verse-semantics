@@ -590,7 +590,7 @@ $$
                     (havoc fx; z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2))| \\[1mm]
 \rulename{mcfunx}& |DMe (inp2 f si mdx) (functionOCX closed t_1 fx t_2)|
 & = & |lam i (j := Me (inp2 i infer mdx) t_1;
-              z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)| \\[2mm]
+              z :=  DAe (inp f si) j; rcheck fx (Me (inp2 z si mdx) t_2))| \\[2mm]
 \end{array}
 \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
