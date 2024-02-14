@@ -73,11 +73,12 @@ $\begin{array}{@@{}l}
   $\begin{array}{@@{}l}
     \begin{array}{lcll}
 %  \must{|fails|}{|fail|}      & \doteq & true \\[1mm]
-   \must{|fx|}{|x|}               & \doteq & \mathit{false} \\
+%   \must{|fx|}{|x|}               & \doteq & \mathit{true} \\
 %   \must{|fx|}{|r|}               & \doteq & \mathit{true}  \\[1mm]
-   \must{|fx|}{k}                 & \doteq & \mathit{true}  \\
-   \must{|fx|}{|arr (v_1, xdots, v_n) |} & \doteq & \must{|fx|}{|v_1|} \wedge \dots \wedge \must{|fx|}{|v_n|} \\
-   \must{|fx|}{|lam r e|}         & \doteq & \mathit{true} \\
+%   \must{|fx|}{k}                 & \doteq & \mathit{true}  \\
+%   \must{|fx|}{|arr (v_1, xdots, v_n) |} & \doteq & \must{|fx|}{|v_1|} \wedge \dots \wedge \must{|fx|}{|v_n|} \\
+%   \must{|fx|}{|lam r e|}         & \doteq & \mathit{true} \\
+   \must{|fx|}{|v|}               & \doteq & \mathit{true} \\
    \must{|fx|}{|def x e|}         & \doteq & \mathit{false} \\
    \must{|fx|}{|forall r e|}         & \doteq & \must{|fx|}{e} \\
    \must{|fx|}{|eq_1; e_2|}        & \doteq & \must{|fx|}{|eq_1|} \wedge \must{|fx|}{|e_2|} \\[1mm]
