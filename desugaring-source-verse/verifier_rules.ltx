@@ -23,7 +23,7 @@ $\begin{array}{@@{}l}
 \rulename{nu-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{exi-nu} & |assume (def x e)|
   & \movesto & |forall r (assume (subst e x r))|
-& |r| \not\in \freevars{|v|,|e|} \\
+& |r| \not\in \freevars{|e|} \\
 \rulename{promote} & |r == v| & \movesto & |forall s (x==s; r==v)| & |x| \in \freevars{v}, |s| \not\in \freevars{|v|} \\
 \\[2mm]
 
@@ -35,7 +35,7 @@ $\begin{array}{@@{}l}
 \multicolumn{5}{l}{\textit{Guard:}} \\
 \rulename{guard-elim} & |ok guard e| & \movesto & |e| \\
 \rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
-\rulename{guard-float} & |(assume eq_1 `eqsemi` eq_2) guard e| & \movesto &  |assume eq_1; (eq_2 guard e)| \\
+\rulename{guard-float} & |(assume eq_1 `eqsemi` eq_2) guard e_3| & \movesto &  |assume eq_1; (eq_2 guard e_3)| \\
 
 \\[-0.6em]
 
@@ -47,12 +47,12 @@ $\begin{array}{@@{}l}
 
 \multicolumn{5}{l}{\textit{Verify:}} \\
   \rulename{verify-elim} & |verify e|      & \movesto &
-    \multicolumn{2}{l}{|ok| \hspace{10mm} \text{if no |checkKW| in |e|}} \\
-  \rulename{verify-one}   & \multicolumn{3}{l}{|verify fx (V^[one ((r==v ; e_1) `choice` e_2)])|} & \text{if}\ \mustDecide{eq} \\
+    |ok| & \text{if no |checkKW| in |e|} \\
+  \rulename{verify-one}   & \multicolumn{3}{l}{|verify (V^[one ((r==v ; e_1) `choice` e_2)])|} & \text{if}\ \mustDecide{eq} \\
     & & \movesto &
          \multicolumn{2}{l}{\begin{array}[t]{l}
-              |verify fx (V^[assume (r==v); one (e_1 `choice` e_2)]) eqsemiKW| \\
-              |verify fx (V^[one e_2])| \\
+              |verify (V^[assume (r==v); one (e_1 `choice` e_2)]) eqsemiKW| \\
+              |verify (V^[one e_2])| \\
          \end{array}} \\
 \\
 \multicolumn{5}{l}{\textit{Substitution:}} \\

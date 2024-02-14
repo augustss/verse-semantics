@@ -123,7 +123,7 @@
   & \multicolumn{4}{l}{\hspace{5mm} \movesto |defKW z|.
   \begin{array}[t]{l}
         |v_1 == olam z ((lam i (check fails (apply1N dom_1 i); apply1N dom_2 i))) rng_2;| \\
-        |v_2 == olam z ((lam i (check fails (apply1N dom_2 i); apply1N dom_1 i))) rng_1;| \\
+        |v_2 == olam z ((lam i (check fails (apply1N dom_2 i); apply1N dom_1 i))) rng_1| \\
    \end{array}} \\[5mm]
   \rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &
   \multicolumn{2}{l}{|if (x := apply1N dom v) then apply1N rng x else apply1N g v|} \\
