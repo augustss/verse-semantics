@@ -19,12 +19,13 @@ $\begin{array}{@@{}l}
 
 
 \multicolumn{5}{l}{\textit{Normalisation of |forallKW|:}} \\
-\rulename{nu-elim} & |forall x e| & \movesto & |e| & \text{if $|x| \notin \freevars{e}$}\\
-\rulename{nu-float}^{\alpha} & |E^[forall x e]| & \movesto & |forall x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{nu-elim} & |forall r e| & \movesto & |e| & \text{if $|r| \notin \freevars{e}$}\\
+\rulename{nu-float}^{\alpha} & |E^[forall r e]| & \movesto & |forall r E^[e]| & \text{if $r \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{exi-nu} & |assume (def x e)|
   & \movesto & |forall r (assume (subst e x r))|
-& |r| \not\in \freevars{|e|} \\
-\rulename{promote} & |r == v| & \movesto & |forall s (x==s; r==v)| & |x| \in \freevars{v}, |s| \not\in \freevars{|v|} \\
+& |r| \not\in \freevars{|e|}
+% \rulename{promote} & |r == v| & \movesto
+%     & |forall s (x==s; r==v)| & |x| \in \freevars{v}, |s| \not\in \freevars{|v|} \\
 \\[2mm]
 
 \multicolumn{5}{l}{\textit{Assumptions:}} \\
@@ -33,7 +34,7 @@ $\begin{array}{@@{}l}
 \\[-0.6em]
 
 \multicolumn{5}{l}{\textit{Guard:}} \\
-\rulename{guard-elim} & |ok guard e| & \movesto & |e| \\
+\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
 \rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
 \rulename{guard-float} & |(assume eq_1 `eqsemi` eq_2) guard e_3| & \movesto &  |assume eq_1; (eq_2 guard e_3)| \\
 
@@ -58,8 +59,8 @@ $\begin{array}{@@{}l}
 \multicolumn{5}{l}{\textit{Substitution:}} \\
 \rulename{subst-asm} & |S^[assume (x==v)]| & \movesto & |subst S x v ^[assume (x==v)]|
   & \text{if $|v|\ne|V^[x]|$} \\
-\rulename{subst-asm-rev} & |S^[assume (x==apply1N f v)]| & \movesto & |subst S (apply1N f v) x ^[assume (x==apply1N f v)]|
-  & \text{if only skolems free in |v|} \\
+\rulename{subst-asm-rev} & |S^[assume (x==apply1N f v)]| & \movesto
+   & |subst S (apply1N f v) x ^[assume (x==apply1N f v)]| \\
 \end{array}\\
 \end{array}$
 \\[0.1in]
@@ -73,11 +74,11 @@ $\begin{array}{@@{}l}
     \begin{array}{lcll}
 %  \must{|fails|}{|fail|}      & \doteq & true \\[1mm]
    \must{|fx|}{|x|}               & \doteq & \mathit{false} \\
-   \must{|fx|}{|r|}               & \doteq & \mathit{true}  \\[1mm]
+%   \must{|fx|}{|r|}               & \doteq & \mathit{true}  \\[1mm]
    \must{|fx|}{k}                 & \doteq & \mathit{true}  \\
    \must{|fx|}{|arr (v_1, xdots, v_n) |} & \doteq & \must{|fx|}{|v_1|} \wedge \dots \wedge \must{|fx|}{|v_n|} \\
    \must{|fx|}{|lam r e|}         & \doteq & \mathit{true} \\
-   \must{|fx|}{|def x e|}         & \doteq & \must{|fx|}{e} \\
+   \must{|fx|}{|def x e|}         & \doteq & \mathit{false} \\
    \must{|fx|}{|forall r e|}         & \doteq & \must{|fx|}{e} \\
    \must{|fx|}{|eq_1; e_2|}        & \doteq & \must{|fx|}{|eq_1|} \wedge \must{|fx|}{|e_2|} \\[1mm]
    \must{|fx_1|}{|havoc fx_2|}        & \doteq & |fx_2| \subseteq |fx_1| \\[1mm]

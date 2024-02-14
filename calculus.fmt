@@ -198,7 +198,10 @@
 %format he = "he"
 %format none = "\textbf{none}"
 %format fail = "\textbf{fail}"
-%format ok = "\textbf{ok}"
+
+%% %format ok = "\textbf{ok}"
+%format ok = "\langle\rangle"
+
 %format succeed = "\textbf{succeed}"
 %format wront = "\wrong"
 %format do = "\textbf{do}"

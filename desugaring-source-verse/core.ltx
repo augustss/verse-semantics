@@ -36,14 +36,14 @@
 \mbox{\em Syntax} \\
   \begin{array}{lr@@{\;}c@@{\;}l@@{}}
       \text{Integers} & k \\
-      \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-      \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
+      \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g,r,s,t} \\
+%      \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
       \text{Expressions} & e & ::= & |v| \vb |eq ; e| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       && \vb & |forall r e| \vb |eq guard e| \vb |check fx e| \vb |rcheck fx e| \\
       && \vb & |v == e| \vb |assume eq| \vb |verify e_1| \vb |havoc fx| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
-      \text{Head values} & \hnf & ::= & k \vb r  \vb |ok| \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
+      \text{Head values} & \hnf & ::= & k \vb r  \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
       \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt| \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail|
@@ -54,7 +54,7 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |S guard e| \vb |v=S| \\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |eq; E| \vb |E; e| \vb |def x E| \vb |forall r E| \vb |E guard e| \vb |eq guard E| \vb |v==E| \\
-\text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |C guard e| \vb |def x C| \vb |v==C| \vb |assume C| \\
+\text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |C guard e| \vb |v==C| \vb |assume C| \\
 \text{Verification contexts}  & |V| & ::= & |hole| \vb |eq; V| \vb |V; e| \vb |def x V| \vb |forall r V| \vb |one V| \vb |all V| \\
              && \vb & |V `choice` e| \vb |e `choice` V| \vb |V guard e| \vb |eq guard V| \vb |check fx V| \\
   &  & \vb & |v==V| \vb |assume V|
@@ -142,7 +142,7 @@
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(eq_1 `eqsemi` eq_2) ; e_3| & \movesto & |eq_1; (eq_2; e_3)| \\
 \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
-\rulename{seq-elim} & |ok ; e| & \movesto & |e| \\
+\rulename{seq-elim} & |v ; e| & \movesto & |e| \\
 \rulename{eq-swap} & |v == x| & \movesto & |x == v| & \text{May apply infinitely for |x==y|} \\
 
     \\[-0.6em]
