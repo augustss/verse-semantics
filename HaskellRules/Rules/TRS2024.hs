@@ -317,8 +317,7 @@ rulesSubstitution _ lhs =
   "SUBST" `name`
   do (s, Var x :=: Val v) <- substX lhs
      guard (not (isValueX v x))
-     let z = identNotIn (allVars lhs) -- z is placeholder
-     pure (subst [(x,v),(z,Var x :=: v)] (s (Var z))) 
+     pure ((substCtx [(x,v)] s) (Var x :=: v))
 
 --------------------------------------------------------------------------------
 
@@ -360,7 +359,6 @@ rulesNormalization _ lhs =
   do Val _ :>: e <- [lhs]
      pure e
  ++
-  -- not in the document right now, but considered OK
   "EQ-FLOAT" `name`
   do Val v1 :=: (Val v2 :=: e) <- [lhs]
      pure ((v2 :=: e) :>: (v1 :=: Arr []))

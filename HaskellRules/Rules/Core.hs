@@ -40,6 +40,7 @@ module Rules.Core(
   allVars,
   check,
   substExp,
+  substCtx,
   BndVar(..),
   boundVars, flexVars, rigidVars, bndIds,
   arbExprFor
@@ -720,6 +721,13 @@ substVar sub x =
     Nothing -> x
     Just (Var y) -> y
     Just _ -> error "substVar"
+
+substCtx :: Subst Expr -> (Expr -> Expr) -> (Expr -> Expr)
+substCtx sub ctx = \e -> subst ((z,e):sub) (ctx (Var z))
+ where
+  ctx0 = ctx (Int 0)
+  z    = identNotIn (allVars ctx0 ++ map fst sub ++ concatMap (free . snd) sub)
+  -- z is placeholder for e
 
 --------------------------------------------------------------------------------
 
