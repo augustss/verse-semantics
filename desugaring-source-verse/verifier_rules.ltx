@@ -102,9 +102,9 @@ $\begin{array}{@@{}l}
 
    \must{|fx|}{|assume e|}        & \doteq & \mathit{true} \\[1mm]
 
-   \must{|iterates|}{|v = e|}       & \doteq & \must{|iterates|}{|v|} \wedge \must{|iterates|}{e} \\
+   \must{|iterates|}{|v = e|}       & \doteq & \must{|iterates|}{e} \\
    \mustSucceed{|v = e|}       & \doteq & \mathit{false} \\
-   \mustDecide{|v = e|}       & \doteq & \must{|iterates|}{|v|} \wedge \mustDecide{e} \\
+   \mustDecide{|v = e|}       & \doteq & \mustDecide{e} \\
    \must{|nofail|}{|v = e|}       & \doteq & \mathit{false} \\[1mm]
 
    \must{|fx_1|}{|check fx_2 e|} & \doteq & \multicolumn{2}{l}{\mathit{false} \hspace{5mm} \text{Conservative; checks aren't nested}}\\
