@@ -748,7 +748,7 @@ instance Arbitrary Expr where
   shrink (Op _)    = [ Int 0, Int 1 ]
   shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ] ++ [ Int 0, Int 1 ]
   shrink (Map vs)  = [ Map vs' | vs' <- shrink vs ]
-  shrink (Lam (Bind x e)) = [ Int 0, Int 1 ] ++ [ e | x `notElem` free e] ++ [ Lam (Bind x e') | e' <- shrink e ]
+  shrink (Lam (Bind x e)) = [ Int 0, Int 1 ] ++ [e] ++ [ Lam (Bind x e') | e' <- shrink e ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
   shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
@@ -763,13 +763,13 @@ instance Arbitrary Expr where
   shrink (Verify a) = [a] ++ [Verify a'| a'<-shrink a]
   shrink (Fails  a) = [a] ++ [Fails  a'| a'<-shrink a]
 
-  shrink (Exi (Bind x a)) = [a |x `notElem` ys]
+  shrink (Exi (Bind x a)) = [a]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
-  shrink (Uni (Bind x a)) = [a |x `notElem` ys]
+  shrink (Uni (Bind x a)) = [a]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Uni (Bind x a') | a' <- shrink a] where ys = free a
-  shrink (IfB (Bind x a)) = [a |x `notElem` ys]
+  shrink (IfB (Bind x a)) = [a]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [IfB (Bind x a') | a' <- shrink a] where ys = free a
 
