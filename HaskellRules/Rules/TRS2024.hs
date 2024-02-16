@@ -61,21 +61,21 @@ valid = expr
 anf :: Expr -> Expr
 anf = expr
   where
-    expr (v' :=: e)       = makeValue v' (\v -> v :=: expr e)
+    expr (e1 :=: e2)      = makeValue e1 (\v -> v :=: expr e2)
     expr (e1 :>: e2)      = expr e1 :>: expr e2
     expr (e1 :>>: e2)     = expr e1 :>>: expr e2
     expr (e1 :|: e2)      = expr e1 :|: expr e2
     expr Fail             = Fail
     expr (Exi (Bind x e)) = Exi (Bind x (expr e))
-    expr (v1' :@: v2')    = makeValues [v1',v2'] (\[v1,v2] -> v1 :@: v2)
+    expr (e1 :@: e2)      = makeValues [e1,e2] (\[v1,v2] -> v1 :@: v2)
     expr (One e)          = One (expr e)
     expr (All e)          = All (expr e)
     expr (Uni (Bind x e)) = Uni (Bind x (expr e))
-    expr (Arr vs')        = makeValues vs' (\vs -> Arr vs)
+    expr (Arr es)         = makeValues es (\vs -> Arr vs)
     expr (Lam (Bind x e)) = Lam (Bind x (expr e))
     expr (Int k)          = Int k
     expr (Op op)          = Op op
-    expr _                = Int 1 -- what to do here??
+    expr _                = Int 13 -- what to do here??
 
     value v = valid (v :=: Int 0)
 
@@ -221,16 +221,9 @@ choiceX1 lhs =
      (ctx, hole) <- choiceX e1
      return ((:>>: e2) . ctx, hole)
  ++
-  -- not in desugaring.tex yet!
   do Exi (Bind x e) <- [lhs]
      (ctx, hole) <- choiceX e
      return (Exi . Bind x . ctx, hole)
-{-
- ++
-  do e1 :>>: e2 <- [lhs]
-     (ctx, hole) <- choiceX e2
-     return ((e1 :>>:) . ctx, hole)
--}
 
 --------------------------------------------------------------------------------
 
@@ -267,7 +260,7 @@ rulesPrimOps _ lhs =
   "APP-ISINT" `name`
   do Op IsInt :@: (HNF hnf) <- [lhs]
      case hnf of
-       Int _ -> pure hnf -- (Arr [])
+       Int _ -> pure hnf
        _     -> pure Fail
 
 --------------------------------------------------------------------------------
@@ -294,12 +287,12 @@ rulesUnification _ lhs =
   "U-LIT" `name`
   do Int k1 :=: Int k2 <- [lhs]
      guard (k1 == k2)
-     pure (Int k1)
+     pure (Arr [])
  ++
   "U-TUP" `name`
   do Arr vs :=: Arr vs' <- [lhs]
      guard (length vs == length vs')
-     pure (foldr (:>:) (Arr vs) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
+     pure (foldr (:>:) (Arr []) [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
  ++
   "U-FAIL" `name`
   do HNF hnf1 :=: HNF hnf2 <- [lhs]
@@ -343,12 +336,43 @@ rulesNormalization _ lhs =
      guard (x == x')
      guard (x `notElem` allVars (ctx (Arr [])))
      guard (x `notElem` free v)
-     pure (ctx (Val v))
+     pure (ctx (Arr []))
  ++
   "EXI-FLOAT" `name`
+  do Val v :=: Exi bnd <- [lhs]
+     let Bind x e = alphaRename (free v) bnd
+     pure (Exi (Bind x (v :=: e)))
+{-
   do (ctx, Exi bnd) <- evalX1 lhs
      let Bind x e = alphaRename (allVars (ctx (Arr []))) bnd
      pure (Exi (Bind x (ctx e)))
+-}
+ ++
+  "SEQ-ASSOC" `name`
+  do (e1 :>: e2) :>: e3 <- [lhs]
+     pure (e1 :>: (e2 :>: e3))
+ ++
+  "SEQ-FLOAT" `name`
+  do Val v :=: (e1 :>: e2) <- [lhs]
+     pure (e1 :>: (v :=: e2))
+ ++
+  "SEQ-ELIM" `name`
+  do Val _ :>: e <- [lhs]
+     pure e
+ ++
+  -- not in the document right now, but considered OK
+  "EQ-FLOAT" `name`
+  do Val v1 :=: (Val v2 :=: e) <- [lhs]
+     pure ((v2 :=: e) :>: (v1 :=: Arr []))
+ ++
+  "EQ-SWAP" `name`
+  do Val v :=: Var x <- [lhs]
+     pure (Var x :=: v)
+ ++
+  "EQ-RESULT" `name`
+  do (Val v :=: e) :>: Arr [] <- [lhs]
+     pure (v :=: e)
+ -- nu-normalization
  ++
   "UNI-ELIM1" `name`
   do Uni (Bind x e) <- [lhs]
@@ -359,37 +383,6 @@ rulesNormalization _ lhs =
   do (ctx, Uni bnd) <- evalX1 lhs
      let Bind x e = alphaRename (allVars (ctx (Arr []))) bnd
      pure (Uni (Bind x (ctx e)))
- ++
-  "SEQ-ASSOC" `name`
-  do (e1 :>: e2) :>: e3 <- [lhs]
-     pure (e1 :>: (e2 :>: e3))
- ++
-  "SEQ-FLOAT" `name`
-  do Val v :=: (e1 :>: e2) <- [lhs]
-     guard (isEffectFree e1)
-     pure (e1 :>: (v :=: e2))
- ++
-  "SEQ-ELIM" `name`
-  do Val _ :>: e <- [lhs]
-     pure e
-{-
- ++
-  "GUARD-FLOAT" `name`
-  do Val v :=: (e1 :>>: e2) <- [lhs]
-     pure (e1 :>>: (v :=: e2))
--}
- ++
-  "EQ-FLOAT" `name`
-  do Val v1 :=: (Val v2 :=: e) <- [lhs]
-     pure ((v1 :=: v2) :>: (v1 :=: e))
- ++
-  "EQ-SWAP" `name`
-  do Val v :=: Var x <- [lhs]
-     pure (Var x :=: v)
- ++
-  "EQ-RESULT" `name`
-  do Val v1 :=: Val v2 <- [lhs]
-     pure ((v1 :=: v2) :>: v2)
      
 --------------------------------------------------------------------------------
 
