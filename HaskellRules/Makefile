@@ -3,6 +3,7 @@ TESTFILE=versetests/tests.versetest
 TESTSTOREFILE=versetests/storetests.versetest
 TRICKY=versetests/tricky.versetest
 VERIFY=versetests/verify.versetest
+TRACEVERIFY=versetests/verify1.versetest
 TESTPARSEFILE=versetests/test1.verse
 .PHONY: all test testfast clean
 
@@ -36,6 +37,11 @@ testiblock:
 testverify:
 	$(TESTER) --quiet --rules=$(VRULES) --max-norm-steps=100000 $(VERIFY)
 	cabal run trsverifier
+
+traceverify:
+	$(TESTER) --quiet --trace --rules=$(VRULES) --max-norm-steps=100000 $(TRACEVERIFY)
+	cabal run trsverifier
+
 
 testicfpqc:
 	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive

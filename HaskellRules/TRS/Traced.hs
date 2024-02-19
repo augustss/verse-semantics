@@ -51,7 +51,7 @@ loop (xx :<-- tr) = xx :<-- find xx tr
 
 showTrace, showRevTrace :: Pretty a => Traced a -> [String]
 showTrace (x :<-- tr) =
-  reverse (prettyShow x : concat [ ["  --"++n++"-->>", prettyShow y] | (n,y) <- tr ])
+  reverse (prettyShow x : concat [ ["  --"++n++"-->", prettyShow y] | (n,y) <- tr ])
 
 showRevTrace (x :<-- tr) =
   prettyShow x : concat [ ["  <--"++n++"--", prettyShow y] | (n,y) <- tr ]

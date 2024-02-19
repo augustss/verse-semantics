@@ -131,7 +131,7 @@ icfpeVerifier = icfp
               <> (assumeAssertRules -= "suc-seq")
               <> verifierRules
               <> directRules
-  , displayRules = isInfixOf "MODULO"
+  , displayRules = if True then const True else isInfixOf "MODULO"
   }
   where icfp = systemICFPE
 
@@ -252,7 +252,7 @@ generalizedIcfpRules env lhs =
      guard (x `notElem` freeM)
      let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
          sub   = [(x, v),(x0, Var x)]
-     pure (substGen Full sub (EXI x (ctx (Var x0 :=: Val v))))
+     pure (EXI x (substGen Full sub (ctx (Var x0 :=: Val v))))
   ++
   "SUBST-GEN" `name`
   do (ctx, Var x :=: Val v) <- execX lhs

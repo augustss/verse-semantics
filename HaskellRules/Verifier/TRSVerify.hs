@@ -59,7 +59,7 @@ tests = -- take 6
   -- , ("ex_f_3'", ex_f_3', False)
   -- , ("ex_cmp", ex_cmp, True)
   , ("ex_asm_race", ex_asm_race, True)
-  , ("ex_asm_race'", ex_asm_race', False)
+  , ("ex_asm_race'", ex_asm_race', True)
   , ("ex_if_else_only", ex_if_else_only, True)
   , ("ex_if_then_only", ex_if_then_only, True)
   , ("ex_hide_00", ex_hide_00, True)
