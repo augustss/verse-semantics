@@ -142,15 +142,3 @@ cabal run tester -- --tim-verify versetests/TimTests.verse --only-test=L252 --ve
 ## Junk
 
 - TODO: `asm-exi` is wrong, it floats out an exi?
-- TODO: remove the `asm` in the "domain" part of a lambda?
-- TODO: ASM-SEQ-G   asm{e1 ;; e2} ===> asm{e1}; asm{e2}
-
-assume {ex $i2.
-          (y = (($i2 = $i3); (ex x. ((x = $i2); x);; ((x = 3); x))))};
- 
-assume {ex $i2.
-          (y = (($i2 = $i3); (ex x. ((x = $i2); x);; ((x = 3); x))))};
-      
-log 
-
-l1630 -> 1666 SUBST-GEN using _x = $i3
