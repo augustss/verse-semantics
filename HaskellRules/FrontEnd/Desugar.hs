@@ -1862,7 +1862,7 @@ dsV_2 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM_2 V t1 i
    t2' <- dsV_2 (bodyEff fx _effs) t2
-   pure $ Lam i $ seqE [eAssume t1', t2']
+   pure $ Lam i $ seqE [{- eAssume -} t1' , t2']
 dsV_2 _  (OfType  t1 t2)  = do { e <- dsD_2 t1; vOfType_2 e t2 }
 dsV_2 Suc t               = eAssert <$> dsD_2 t
 dsV_2 Dec t               = eDecide <$> dsD_2 t

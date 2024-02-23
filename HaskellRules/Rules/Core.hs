@@ -690,7 +690,6 @@ instance Substitutable Expr where
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Assume a) = Assume (subst sub a)
-  -- subst sub (Assume e) = Assume (subst sub' e) where sub' = [ (x, e') | (x, e'@Lam {}) <- sub ]
   subst sub (Assert a) = Assert (subst sub a)
   subst sub (Verify a) = Verify (subst sub a)
   subst sub (Decide a) = Decide (subst sub a)
@@ -725,6 +724,7 @@ data SubstFlag = Full | Asm
 substGen :: SubstFlag -> Subst Expr -> Expr -> Expr
 substGen flg = go
   where
+    goB = substBindGen Var substGen flg
     go [] e = e
     go sub e@(Var x) = fromMaybe e (lookup x sub)
     go _sub e@Int{}  = e
@@ -732,9 +732,9 @@ substGen flg = go
     go _sub e@Path{} = e
     go _sub e@Op{}   = e
     go sub (Arr vs)  = Arr (map (go sub) vs)
-    go sub (Map vs)  = Map (map (\ (k,v) -> (go sub k, go sub v)) vs)
-    go sub (Lam bnd) = Lam (substBind Var go sub bnd)
-    go sub (OLam x d r) = OLam (go sub x) (substBind Var go sub d) (substBind Var subst sub r)
+    go sub (Map vs)  = Map (map (\(k,v) -> (go sub k, go sub v)) vs)
+    go sub (Lam bnd) = Lam (goB sub bnd)
+    go sub (OLam x d r) = OLam (go sub x) (goB sub d) (goB sub r)
     go sub (a :=: b) =  go sub a :=: go sub b
     go sub (a :~: b) = substVar sub a :~: substVar sub b
     go sub (a :>: b) = go sub a :>: go sub b
@@ -744,15 +744,14 @@ substGen flg = go
     go sub (If a b c) = If (go sub a) (go sub b) (go sub c)
     go _sub Fail     = Fail
     go _sub e@Wrong{}= e
-    go sub (Exi bnd) = Exi (substBind Var go sub bnd)
-    go sub (Uni bnd) = Uni (substBind Var go sub bnd)
-    go sub (IfB bnd) = IfB (substBind Var go sub bnd)
+    go sub (Exi bnd) = Exi (goB sub bnd)
+    go sub (Uni bnd) = Uni (goB sub bnd)
+    go sub (IfB bnd) = IfB (goB sub bnd)
     go sub (One a)   = One (go sub a)
     go sub (All a)   = All (go sub a)
     go sub (Assume a) = case flg of
                           Full -> Assume (go sub a)
                           Asm  -> Assume a
-    -- go sub (Assume e) = Assume (subst sub' e) where sub' = [ (x, e') | (x, e'@Lam {}) <- sub ]
     go sub (Assert a) = Assert (go sub a)
     go sub (Verify a) = Verify (go sub a)
     go sub (Decide a) = Decide (go sub a)
@@ -761,6 +760,19 @@ substGen flg = go
     go sub (BlockC e) = BlockC (go sub e)
     go sub (Store h e) = Store (IM.map (go sub) h) (go sub e)
     go _sub e@Ref{}  = e
+
+substBindGen :: (Free s, Free t)
+          => (Ident->s) -> (SubstFlag -> Subst s -> t -> t) -> SubstFlag -> (Subst s -> Bind t -> Bind t)
+substBindGen var substf flg sub a@(Bind x t)
+  | null sub'   = a
+  | x `elem` vs = Bind x' (substf Full [(x,var x')] (substf flg sub' t))
+  | otherwise   = Bind x  (substf flg sub' t)
+ where
+  sub' = [ (y,th) | (y, th) <- sub, y /= x ]
+  vs   = free (map snd sub')
+  zs   = map fst sub' ++ vs ++ free t
+  x'   = identNotIn zs
+
 
 freeModAssume :: Expr -> [Ident]
 freeModAssume = go

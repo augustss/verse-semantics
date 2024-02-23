@@ -791,3 +791,9 @@ ex_PC2a = eXIs [f] $
 f = \x y. (x=1; y=2) ;; forall r. asm{ r=7 } r
 check<succeeds>{ exi x, y. f(x, y); x+y }
 -}
+
+
+exS0 :: Expr
+exS0 = lAMs [x] (Var x :>: Assume (Var x))
+  where 
+    x = ident "x"
