@@ -99,7 +99,7 @@ isChoiceFree (One _)          = True
 isChoiceFree (All _)          = True
 isChoiceFree (Op op :@: _)    = isChoiceFreeOp op
 isChoiceFree (Exi (Bind _ e)) = isChoiceFree e
-isChoiceFree (Uni (Bind _ e)) = False -- isChoiceFree e
+isChoiceFree (Uni (Bind _ _)) = False -- isChoiceFree e
 isChoiceFree Fail             = True
 isChoiceFree _                = False
 
