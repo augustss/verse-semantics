@@ -170,35 +170,37 @@ substX1 lhs =
      (ctx, hole) <- substX e1
      return ((:>>: e2) . ctx, hole)
 
-evalX, evalX1 :: Expr -> [(Context, Expr)]
-evalX lhs = emptyX lhs ++ evalX1 lhs
-evalX1 lhs =
+evalX, evalX1 :: [Ident] -> Expr -> [(Context, Expr)]
+evalX zs lhs = emptyX lhs ++ evalX1 zs lhs
+evalX1 zs lhs =
   do v :=: e <- [lhs]
-     (ctx, hole) <- evalX e
+     (ctx, hole) <- evalX zs e
      return ((v :=:) . ctx, hole)
  ++
   do e1 :>: e2 <- [lhs]
-     (ctx, hole) <- evalX e2
+     (ctx, hole) <- evalX zs e2
      return ((e1 :>:) . ctx, hole)
  ++
   do e1 :>: e2 <- [lhs]
-     (ctx, hole) <- evalX e1
+     (ctx, hole) <- evalX zs e1
      return ((:>: e2) . ctx, hole)
  ++
-  do Exi (Bind x e) <- [lhs]
-     (ctx, hole) <- evalX e
+  do Exi bnd <- [lhs]
+     let Bind x e = alphaRename zs bnd
+     (ctx, hole) <- evalX (x:zs) e
      return (Exi . Bind x . ctx, hole)
  ++
-  do Uni (Bind x e) <- [lhs]
-     (ctx, hole) <- evalX e
+  do Uni bnd <- [lhs]
+     let Bind x e = alphaRename zs bnd
+     (ctx, hole) <- evalX (x:zs) e
      return (Uni . Bind x . ctx, hole)
  ++
   do e1 :>>: e2 <- [lhs]
-     (ctx, hole) <- evalX e1
+     (ctx, hole) <- evalX zs e1
      return ((:>>: e2) . ctx, hole)
  ++
   do e1 :>>: e2 <- [lhs]
-     (ctx, hole) <- evalX e2
+     (ctx, hole) <- evalX zs e2
      return ((e1 :>>:) . ctx, hole)
  
 choiceX, choiceX1 :: Expr -> [(Context, Expr)]
@@ -331,11 +333,10 @@ rulesNormalization _ lhs =
      pure e
  ++
   "DEF-ELIM" `name`
-  do Exi bnd <- [lhs]
-     let Bind x e = alphaRename (allVars lhs) bnd
-     (ctx, Var x' :=: Val v) <- evalX e
+  do Exi (Bind x e) <- [lhs]
+     (ctx, Var x' :=: Val v) <- evalX [x] e
      guard (x == x')
-     guard (x `notElem` allVars (ctx (Arr [])))
+     guard (x `notElem` free (ctx (Arr [])))
      guard (x `notElem` free v)
      pure (ctx (Arr []))
  ++
@@ -413,9 +414,8 @@ rulesChoice _ lhs =
      pure (c e1 :|: c e2)
  ++
   "EXI-CHOICE" `name`
-  do Exi bnd@(Bind _ e0) <- [lhs]
-     let Bind x e = alphaRename (allVars e0) bnd
-     (ctx, e1 :|: e2) <- evalX e
+  do Exi (Bind x e) <- [lhs]
+     (ctx, e1 :|: e2) <- evalX [x] e
      guard (x `notElem` free (ctx (Int 0)))
      pure (ctx (Exi (Bind x e1) :|: Exi (Bind x e2)))
  ++
