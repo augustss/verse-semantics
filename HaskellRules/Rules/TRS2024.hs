@@ -220,10 +220,12 @@ choiceX1 lhs =
   do e1 :>>: e2 <- [lhs]
      (ctx, hole) <- choiceX e1
      return ((:>>: e2) . ctx, hole)
+{-
  ++
   do Exi (Bind x e) <- [lhs]
      (ctx, hole) <- choiceX e
      return (Exi . Bind x . ctx, hole)
+-}
 
 --------------------------------------------------------------------------------
 
@@ -323,12 +325,12 @@ rulesSubstitution _ lhs =
 
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
-  "EXI-ELIM1" `name`
+  "EXI-ELIM" `name`
   do Exi (Bind x e) <- [lhs]
      guard (x `notElem` free e)
      pure e
  ++
-  "EXI-ELIM2" `name`
+  "DEF-ELIM" `name`
   do Exi bnd <- [lhs]
      let Bind x e = alphaRename (allVars lhs) bnd
      (ctx, Var x' :=: Val v) <- evalX e
@@ -338,14 +340,9 @@ rulesNormalization _ lhs =
      pure (ctx (Arr []))
  ++
   "EXI-FLOAT" `name`
-  do Val v :=: Exi bnd <- [lhs]
-     let Bind x e = alphaRename (free v) bnd
-     pure (Exi (Bind x (v :=: e)))
-{-
-  do (ctx, Exi bnd) <- evalX1 lhs
+  do (ctx, Exi bnd) <- choiceX1 lhs
      let Bind x e = alphaRename (allVars (ctx (Arr []))) bnd
      pure (Exi (Bind x (ctx e)))
--}
  ++
   "SEQ-ASSOC" `name`
   do (e1 :>: e2) :>: e3 <- [lhs]
@@ -372,13 +369,26 @@ rulesNormalization _ lhs =
      pure (v :=: e)
  -- nu-normalization
  ++
-  "UNI-ELIM1" `name`
+  "EXI-EXI-SWAP" `name`
+  do Exi (Bind x (Exi (Bind y e))) <- [lhs]
+     pure (Exi (Bind y (Exi (Bind x e))))
+ ++
+  "UNI-EXI-SWAP" `name`
+  do Uni (Bind x (Exi bnd)) <- [lhs]
+     let Bind y e = alphaRename [x] bnd
+     pure (Exi (Bind y (Uni (Bind x e))))
+ ++
+  "UNI-UNI-SWAP" `name`
+  do Uni (Bind x (Uni (Bind y e))) <- [lhs]
+     pure (Uni (Bind y (Uni (Bind x e))))
+ ++
+  "UNI-ELIM" `name`
   do Uni (Bind x e) <- [lhs]
      guard (x `notElem` free e)
      pure e
  ++
   "UNI-FLOAT" `name`
-  do (ctx, Uni bnd) <- evalX1 lhs
+  do (ctx, Uni bnd) <- choiceX1 lhs
      let Bind x e = alphaRename (allVars (ctx (Arr []))) bnd
      pure (Uni (Bind x (ctx e)))
      
@@ -401,6 +411,13 @@ rulesChoice _ lhs =
   "CHOICE" `name`
   do (c, e1 :|: e2) <- choiceX lhs
      pure (c e1 :|: c e2)
+ ++
+  "EXI-CHOICE" `name`
+  do Exi bnd@(Bind _ e0) <- [lhs]
+     let Bind x e = alphaRename (allVars e0) bnd
+     (ctx, e1 :|: e2) <- evalX e
+     guard (x `notElem` free (ctx (Int 0)))
+     pure (ctx (Exi (Bind x e1) :|: Exi (Bind x e2)))
  ++
   "FAIL" `name`
   do (_, Fail) <- choiceX lhs
