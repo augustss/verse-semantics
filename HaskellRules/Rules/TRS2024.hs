@@ -140,6 +140,9 @@ type Context = Expr -> Expr
 emptyX :: Expr -> [(Context, Expr)]
 emptyX lhs = pure (id, lhs)
 
+emptyXzs :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
+emptyXzs zs lhs = pure (id, zs, lhs)
+
 {-
 valueX, valueX1 :: Expr -> [(Context, Expr)]
 valueX lhs = emptyX lhs ++ valueX1 lhs
@@ -175,65 +178,63 @@ substX1 lhs =
      (ctx, hole) <- substX e1
      return ((:>>: e2) . ctx, hole)
 
-evalX, evalX1 :: [Ident] -> Expr -> [(Context, Expr)]
-evalX zs lhs = emptyX lhs ++ evalX1 zs lhs
+evalX, evalX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
+evalX zs lhs = emptyXzs zs lhs ++ evalX1 zs lhs
 evalX1 zs lhs =
   do v :=: e <- [lhs]
-     (ctx, hole) <- evalX zs e
-     return ((v :=:) . ctx, hole)
+     (ctx, zs', hole) <- evalX zs e
+     return ((v :=:) . ctx, zs', hole)
  ++
   do e1 :>: e2 <- [lhs]
-     (ctx, hole) <- evalX zs e2
-     return ((e1 :>:) . ctx, hole)
+     (ctx, zs', hole) <- evalX zs e2
+     return ((e1 :>:) . ctx, zs', hole)
  ++
   do e1 :>: e2 <- [lhs]
-     (ctx, hole) <- evalX zs e1
-     return ((:>: e2) . ctx, hole)
+     (ctx, zs', hole) <- evalX zs e1
+     return ((:>: e2) . ctx, zs', hole)
  ++
   do Exi bnd <- [lhs]
      let Bind x e = alphaRename zs bnd
-     (ctx, hole) <- evalX (x:zs) e
-     return (Exi . Bind x . ctx, hole)
+     (ctx, zs', hole) <- evalX (x:zs) e
+     return (Exi . Bind x . ctx, zs', hole)
  ++
   do Uni bnd <- [lhs]
      let Bind x e = alphaRename zs bnd
-     (ctx, hole) <- evalX (x:zs) e
-     return (Uni . Bind x . ctx, hole)
+     (ctx, zs', hole) <- evalX (x:zs) e
+     return (Uni . Bind x . ctx, zs', hole)
  ++
   do e1 :>>: e2 <- [lhs]
-     (ctx, hole) <- evalX zs e1
-     return ((:>>: e2) . ctx, hole)
+     (ctx, zs', hole) <- evalX zs e1
+     return ((:>>: e2) . ctx, zs', hole)
  ++
   do e1 :>>: e2 <- [lhs]
-     (ctx, hole) <- evalX zs e2
-     return ((e1 :>>:) . ctx, hole)
+     (ctx, zs', hole) <- evalX zs e2
+     return ((e1 :>>:) . ctx, zs', hole)
  
-choiceX, choiceX1 :: [Ident] -> Expr -> [(Context, Expr)]
-choiceX zs lhs = emptyX lhs ++ choiceX1 zs lhs
+choiceX, choiceX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
+choiceX zs lhs = emptyXzs zs lhs ++ choiceX1 zs lhs
 choiceX1 zs lhs =
   do v :=: e <- [lhs]
-     (ctx, hole) <- choiceX zs e
-     return ((v :=:) . ctx, hole)
+     (ctx, zs', hole) <- choiceX zs e
+     return ((v :=:) . ctx, zs', hole)
  ++
   do e1 :>: e2 <- [lhs]
-     (ctx, hole) <- choiceX zs e1
-     return ((:>: e2) . ctx, hole)
+     (ctx, zs', hole) <- choiceX zs e1
+     return ((:>: e2) . ctx, zs', hole)
  ++
   do e1 :>: e2 <- [lhs]
      guard (isChoiceFree e1)
-     (ctx, hole) <- choiceX zs e2
-     return ((e1 :>:) . ctx, hole)
+     (ctx, zs', hole) <- choiceX zs e2
+     return ((e1 :>:) . ctx, zs', hole)
  ++
   do e1 :>>: e2 <- [lhs]
-     (ctx, hole) <- choiceX zs e1
-     return ((:>>: e2) . ctx, hole)
-{-
+     (ctx, zs', hole) <- choiceX zs e1
+     return ((:>>: e2) . ctx, zs', hole)
  ++
   do Exi bnd <- [lhs]
      let Bind x e = alphaRename zs bnd
-     (ctx, hole) <- choiceX (x:zs) e
-     return (Exi . Bind x . ctx, hole)
--}
+     (ctx, zs', hole) <- choiceX (x:zs) e
+     return (Exi . Bind x . ctx, zs', hole)
 
 --------------------------------------------------------------------------------
 
@@ -340,16 +341,23 @@ rulesNormalization _ lhs =
  ++
   "DEF-ELIM" `name`
   do Exi (Bind x e) <- [lhs]
-     (ctx, Var x' :=: Val v) <- evalX [x] e
+     (ctx, _, Var x' :=: Val v) <- evalX [x] e
      guard (x == x')
-     guard (x `notElem` free (ctx (Arr [])))
+     guard (x `notElem` free (ctx (#)))
      guard (x `notElem` free v)
      pure (ctx (Arr []))
  ++
   "EXI-FLOAT" `name`
-  do (ctx, Exi bnd) <- choiceX1 [] lhs
-     let Bind x e = alphaRename (allVars (ctx (#))) bnd
+  do (ctx, zs, Exi bnd) <- choiceX1 [] lhs
+     let Bind x e = alphaRename zs bnd
+     guard (x `notElem` free (ctx (#)))
      pure (Exi (Bind x (ctx e)))
+ ++
+  "EXI-CHOICE" `name`
+  do Exi (Bind x e) <- [lhs]
+     (ctx, _, e1 :|: e2) <- evalX [x] e
+     guard (x `notElem` free (ctx (#)))
+     pure (ctx (Exi (Bind x e1) :|: Exi (Bind x e2)))
  ++
   "SEQ-ASSOC" `name`
   do (e1 :>: e2) :>: e3 <- [lhs]
@@ -374,7 +382,18 @@ rulesNormalization _ lhs =
   "EQ-RESULT" `name`
   do (Val v :=: e) :>: Arr [] <- [lhs]
      pure (v :=: e)
- -- nu-normalization
+ ++
+  "UNI-ELIM" `name`
+  do Uni (Bind x e) <- [lhs]
+     guard (x `notElem` free e)
+     pure e
+ ++
+  "UNI-FLOAT" `name`
+  do (ctx, zs, Uni bnd) <- choiceX1 [] lhs
+     let Bind x e = alphaRename zs bnd
+     guard (x `notElem` free (ctx (#)))
+     pure (Uni (Bind x (ctx e)))
+{-
  ++
   "EXI-EXI-SWAP" `name`
   do Exi (Bind x (Exi (Bind y e))) <- [lhs]
@@ -388,16 +407,7 @@ rulesNormalization _ lhs =
   "UNI-UNI-SWAP" `name`
   do Uni (Bind x (Uni (Bind y e))) <- [lhs]
      pure (Uni (Bind y (Uni (Bind x e))))
- ++
-  "UNI-ELIM" `name`
-  do Uni (Bind x e) <- [lhs]
-     guard (x `notElem` free e)
-     pure e
- ++
-  "UNI-FLOAT" `name`
-  do (ctx, Uni bnd) <- choiceX1 [] lhs
-     let Bind x e = alphaRename (allVars (ctx (#))) bnd
-     pure (Uni (Bind x (ctx e)))
+-}
      
 --------------------------------------------------------------------------------
 
@@ -416,17 +426,11 @@ rulesChoice _ lhs =
      pure e
  ++
   "CHOICE" `name`
-  do (ctx, e1 :|: e2) <- choiceX [] lhs
+  do (ctx, _, e1 :|: e2) <- choiceX [] lhs
      pure (ctx e1 :|: ctx e2)
  ++
-  "EXI-CHOICE" `name`
-  do Exi (Bind x e) <- [lhs]
-     (ctx, e1 :|: e2) <- evalX [x] e
-     guard (x `notElem` free (ctx (#)))
-     pure (ctx (Exi (Bind x e1) :|: Exi (Bind x e2)))
- ++
   "FAIL" `name`
-  do (_, Fail) <- choiceX [] lhs
+  do (_, _, Fail) <- choiceX [] lhs
      pure Fail
 
 --------------------------------------------------------------------------------
