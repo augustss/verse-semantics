@@ -10,6 +10,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text
 import Text.PrettyPrint.HughesPJClass hiding (Str, first)
+import System.IO
 import Prelude hiding ((<>))
 
 instance Pretty Data.Text.Text where
@@ -32,6 +33,10 @@ ppl l = putStrLn . render . pPrintL l
 
 ppx :: (Pretty a) => a -> IO ()
 ppx = putStrLn . renderStyle s . pPrintL prettyNormal
+  where s = style{ lineLength = 150, ribbonsPerLine = 1.2 }
+
+hppx :: (Pretty a) => Handle -> a -> IO ()
+hppx h = hPutStrLn h . renderStyle s . pPrintL prettyNormal
   where s = style{ lineLength = 150, ribbonsPerLine = 1.2 }
 
 type PPPrec = Rational
