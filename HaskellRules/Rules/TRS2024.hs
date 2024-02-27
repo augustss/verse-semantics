@@ -353,11 +353,11 @@ rulesNormalization _ lhs =
      guard (x `notElem` free (ctx (#)))
      pure (Exi (Bind x (ctx e)))
  ++
-  "EXI-CHOICE" `name`
-  do Exi (Bind x e) <- [lhs]
-     (ctx, _, e1 :|: e2) <- evalX [x] e
+  "EXI-PUSH" `name`
+  do Exi (Bind x ctx_e) <- [lhs]
+     (ctx, _, e) <- evalX [x] ctx_e
      guard (x `notElem` free (ctx (#)))
-     pure (ctx (Exi (Bind x e1) :|: Exi (Bind x e2)))
+     pure (ctx (Exi (Bind x e)))
  ++
   "SEQ-ASSOC" `name`
   do (e1 :>: e2) :>: e3 <- [lhs]
