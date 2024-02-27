@@ -75,7 +75,8 @@ anf = expr
     expr (Lam (Bind x e)) = Lam (Bind x (expr e))
     expr (Int k)          = Int k
     expr (Op op)          = Op op
-    expr _                = Int 13 -- what to do here??
+    expr (Var x)          = Var x
+    expr e                = error (show e) -- Int 13 -- what to do here??
 
     value v = valid (v :=: Int 0)
 
