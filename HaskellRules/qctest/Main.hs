@@ -41,7 +41,7 @@ main = do
                       , maxShrinks = maxShrink flags }
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
   putStrLn $ "This source code has git hash " ++ gitHash ++ if gitDirty then " (with uncommited files)" else ""
-  res <- quickCheckWithResult qcargs (prop_Confluence flags sys)
+  res <- quickCheckParWithResult qcargs (prop_Confluence flags sys)
   case res of
     QC.Failure{usedSeed = seed, usedSize = size} ->
       putStrLn $ "To replay use --replay '" ++ show (seed, size) ++ "'"

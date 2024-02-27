@@ -121,6 +121,7 @@ executable qctest
 
     hs-source-dirs:   qctest
     default-language: Haskell2010
+    ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O2 -Werror -threaded -feager-blackholing -rtsopts
 
 --executable verifier
 --    import:           shared-properties
