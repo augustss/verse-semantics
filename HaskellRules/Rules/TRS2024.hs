@@ -350,7 +350,7 @@ rulesNormalization _ lhs =
  ++
   "EXI-FLOAT" `name`
   do (ctx, zs, Exi bnd) <- choiceX1 [] lhs
-     let Bind x e = alphaRename zs bnd
+     let Bind x e = alphaRename (zs ++ free (ctx (#))) bnd
      guard (x `notElem` free (ctx (#)))
      pure (Exi (Bind x (ctx e)))
  ++
@@ -391,7 +391,7 @@ rulesNormalization _ lhs =
  ++
   "UNI-FLOAT" `name`
   do (ctx, zs, Uni bnd) <- choiceX1 [] lhs
-     let Bind x e = alphaRename zs bnd
+     let Bind x e = alphaRename (zs ++ free (ctx (#))) bnd
      guard (x `notElem` free (ctx (#)))
      pure (Uni (Bind x (ctx e)))
 {-
