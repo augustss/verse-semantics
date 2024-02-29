@@ -30,7 +30,7 @@ module Rules.Core(
   pattern VAR,
   pattern Block, Eqn,
   getExis,
-  exis,
+  exis, unis,
   opArity,
   comp,
   Substitutable(subst),
@@ -394,6 +394,8 @@ getUnis = get []
 exis :: [Ident] -> Expr -> Expr
 exis is e = foldr EXI e is
 
+unis:: [Ident] -> Expr -> Expr
+unis is e = foldr UNI e is
 --------------------------------------------------------------------------------
 -- patterns
 

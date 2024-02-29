@@ -32,6 +32,7 @@ verify(fail) {f(x:int):int=x+1; f()}
 verify(pass) {f(x:int):int = x; a := f(1); int[a] }
 verify(pass) {f(x:int):int=x+1; f(1)+1}
 verify(fail) {f(x:int):int=x+1; f(1)+()}
+verify(pass) {f(x:int,y:int)<decides> := (x > 0) }
 verify(pass) {f(x:int,y:int) := if (x > 0) then { 1 } else { 2 } }
 
 verify(fail) { g(x : int, y : int) := {a := x; b := a; b = y} }

@@ -23,7 +23,7 @@ import Rules.ICFP (systemICFP, systemICFPE, execX, defX, choiceX, ltExpr, isChoi
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
 import Data.List( intersect, isInfixOf )
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
@@ -361,6 +361,11 @@ assumeAssertRules _env lhs =
   do Assume (e1 :>: e2) <- [lhs]
      pure (Assume e1 :>: Assume e2)
   ++
+  -- Assume {e1;; e2} ---> Assume e1; Assume e2
+  "asm-guard-seq" `name`
+  do Assume (e1 :>>: e2) <- [lhs]
+     pure (Assume e1 :>: Assume e2)
+  ++
   -- Assert {e1; e2} ---> Assert e1; Assert e2
   "suc-seq" `name`
   do Assert (e1 :>: e2) <- [lhs]
@@ -421,13 +426,13 @@ assumeAssertRules _env lhs =
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
 
 mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
-mustSucceed _ bvars = go [x | BLam x <- bvars]
+mustSucceed _ bvars = go (mapMaybe definedVar bvars)
   where
    go _  (Int _)          = True
    go _  (Char _)         = True
    go _  (Path _)         = True
-   go _bs (Arr _as)         = True -- all (go bs) as
-   -- go bs (Arr as)         = all (go bs) as
+   go _bs (Arr _as)       = True -- all (go bs) as
+   -- go bs (Arr as)      = all (go bs) as
    go _  (Lam _)          = True
    go bs (Var x)          = x `elem` bs
    go _  (Assume _)       = True
@@ -441,17 +446,22 @@ mustSucceed _ bvars = go [x | BLam x <- bvars]
    go bs (Exi (Bind _ e)) = go bs e
    go _  _                = False
 
+definedVar :: BndVar -> Maybe Ident
+definedVar (BLam x) = Just x
+definedVar (BUni x) = Just x
+definedVar _        = Nothing
+
 mustDecide :: [BndVar] -> Expr -> Bool
 mustDecide bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} res
   where
     res = go e
-    lamBinds       = [x | BLam x <- bs]
+    definedVars    = mapMaybe definedVar bs
     go (Int _)     = True
     go (Char _)    = True
     go (Path _)    = True
     go (Arr as)    = all go as
     go (Lam _)     = True
-    go (Var x)     = x `elem` lamBinds
+    go (Var x)     = x `elem` definedVars
     go (Assume _)  = True
     -- go (One e)     = go e
     go (e1 :|: e2) = go e1 && go e2
@@ -552,6 +562,30 @@ verifierRules env lhs =
       let bs0 = bndVars env
       guard (mustDecide (bs0 ++ bs ++ (BLam <$> xs)) e1)  -- TODO: new binder type for if-definitions
       pure (Verify (ctx (exis xs (Assume e1 :>: e2))) :>: Verify (ctx (Fails (exis xs e1) :>: e3)))
+   ++
+   -- Verify{uni r. V[r=<v1...vn>]} ---> Verify{uni r. V[fail]}; Verify{uni r. uni r1..rn. asm{r=<r1...rn>}; V[r1=v1;...;rn=vn;<>]}
+   "decides-split-tup" `name`
+   do Verify (UNI r e) <- [lhs]
+      (ctx, _, bs, Var r' :=: Arr vs) <- eX e
+      guard (not (null vs))
+      guard (r == r')
+      let xs  = bndIds bs ++ free e
+      let rs  = take (length vs) (identsNotIn xs)
+      let rvs = foldr1 (:>:) [ Var x :=: v | (x, v) <- rs `zip` vs ]
+      pure (Verify (UNI r (ctx Fail)) :>:
+            Verify (UNI r (unis rs ( Assume (Var r :=: Arr (Var <$> rs)) :>: ctx rvs))))
+   ++
+   -- Verify{\r. V[r=<v1...vn>]} ---> Verify{\r. V[fail]}; Verify{\r. uni r1..rn. asm{r=<r1...rn>}; V[r1=v1;...;rn=vn;<>]}
+   "decides-split-tup" `name`
+   do Verify (LAM r e) <- [lhs]
+      (ctx, _, bs, Var r' :=: Arr vs) <- eX e
+      guard (not (null vs))
+      guard (r == r')
+      let xs  = bndIds bs ++ free e
+      let rs  = take (length vs) (identsNotIn xs)
+      let rvs = foldr1 (:>:) [ Var x :=: v | (x, v) <- rs `zip` vs ]
+      pure (Verify (LAM r (ctx Fail)) :>:
+            Verify (LAM r (unis rs ( Assume (Var r :=: Arr (Var <$> rs)) :>: ctx rvs))))
    ++
    -- Fails {hnf} ---> Assume {fail}
    "fails-hnf" `name`
