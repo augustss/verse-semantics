@@ -241,7 +241,7 @@ generalizedIcfpRules env lhs =
                             _               -> True)
      pure Fail
   ++
-  "SUBST-MODULO-ASM" `name`
+  "SUBST-MODULO-ASM" `name` -- tim-style "dominator"-based DEF-ELIM
   do EXI x e <- [lhs]
      (ctx, Var x' :=: Val v) <- defX x e
      guard (x == x')
@@ -260,6 +260,7 @@ generalizedIcfpRules env lhs =
          freeV = free v
      let x0    = identNotIn (freeX ++ freeV) -- replacing x temporarily
          sub   = [(x, v),(x0, Var x)]
+     guard (x `notElem` definedVars (bndVars env))
      guard (x `elem` freeX)
      guard (x `notElem` freeV)
      guard (case v of Var y -> ltExpr env (Var x) (Var y); _ -> True)
@@ -426,7 +427,7 @@ assumeAssertRules _env lhs =
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
 
 mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
-mustSucceed _ bvars = go (mapMaybe definedVar bvars)
+mustSucceed _ bvars = go (definedVars bvars)
   where
    go _  (Int _)          = True
    go _  (Char _)         = True
@@ -446,22 +447,25 @@ mustSucceed _ bvars = go (mapMaybe definedVar bvars)
    go bs (Exi (Bind _ e)) = go bs e
    go _  _                = False
 
-definedVar :: BndVar -> Maybe Ident
-definedVar (BLam x) = Just x
-definedVar (BUni x) = Just x
-definedVar _        = Nothing
+definedVars :: [BndVar] -> [Ident]
+definedVars = mapMaybe definedVar
+  where
+     definedVar :: BndVar -> Maybe Ident
+     definedVar (BLam x) = Just x
+     definedVar (BUni x) = Just x
+     definedVar _        = Nothing
 
 mustDecide :: [BndVar] -> Expr -> Bool
 mustDecide bs e = {- Debug.trace ("mustDecide: " ++ prettyShow (e, res)) -} res
   where
     res = go e
-    definedVars    = mapMaybe definedVar bs
+    defBs          = definedVars bs
     go (Int _)     = True
     go (Char _)    = True
     go (Path _)    = True
     go (Arr as)    = all go as
     go (Lam _)     = True
-    go (Var x)     = x `elem` definedVars
+    go (Var x)     = x `elem` defBs
     go (Assume _)  = True
     -- go (One e)     = go e
     go (e1 :|: e2) = go e1 && go e2

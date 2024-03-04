@@ -1913,7 +1913,8 @@ dsM_2 V ((Function [(t1, _effs)] t2)) f = do
   z <- newIdent (getLoc t2) "z"
   t1' <- dsM_2 I t1 i'
   t2' <- dsM_2 V t2 z
-  pure $ Lam i' $ seqE [DefineE i t1', eAssume $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+  -- pure $ Lam i' $ seqE [DefineE i t1', GUARD GOES HERE??? eAssume $ seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2']]
+  pure $ Lam i' $ (DefineE i t1') `eGuard` eAssume (seqE [DefineE z (ApplyD (Variable f) (Variable i)), t2'])
 
 dsM_2 I ((Function [(t1, _effs)] t2)) f = do
   i <- newIdent (getLoc t1) "i"
