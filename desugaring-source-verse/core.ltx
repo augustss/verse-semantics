@@ -36,8 +36,8 @@
 \mbox{\em Syntax} \\
   \begin{array}{lr@@{\;}c@@{\;}l@@{}}
       \text{Integers} & k \\
-      \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g,r,s,t} \\
-%      \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
+      \text{Existentials} & \multicolumn{3}{l}{x,y,z,f,g} \\
+      \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
       \text{Expressions} & e & ::= & |v| \vb |eq ; e| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       && \vb & |forall r e| \vb |eq guard e| \vb |check fx e| \vb |rcheck fx e| \\
@@ -54,6 +54,8 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |S guard e| \vb |v=S| \\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |eq; E| \vb |E; e| \vb |def x E| \vb |forall r E| \vb |E guard e| \vb |eq guard E| \vb |v==E| \\
+\text{Universal contexts}  & |N| & ::= & |hole| \vb |cf; N| \vb |N; e| \vb |def x N| \vb |forall r N| \vb |N guard e| \vb |v==N| \\
+                           & & \vb &  |N choice e| \vb |e choice N| \\
 \text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |def x C| \vb |C guard e| \vb |v==C| \vb |assume C| \\
 \text{Verification contexts}  & |V| & ::= & |hole| \vb |eq; V| \vb |V; e| \vb |def x V| \vb |forall r V| \vb |one V| \vb |all V| \\
              && \vb & |V `choice` e| \vb |e `choice` V| \vb |V guard e| \vb |eq guard V| \vb |check fx V| \\
@@ -133,8 +135,8 @@ $\begin{array}{@@{}l}
 \rulegroupname{Normalization:}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
-% \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{exi-float} & |v = (def x e)| & \movesto & |def x (v=e)| & \text{if $x \notin \freevars{|v|}$} \\
+\rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
+% \rulename{exi-float} & |v = (def x e)| & \movesto & |def x (v=e)| & \text{if $x \notin \freevars{|v|}$} \\
 \rulename{seq-assoc} & |(eq_1 `eqsemi` eq_2) ; e_3| & \movesto & |eq_1; (eq_2; e_3)| \\
 \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
 \rulename{seq-elim} & |v ; e| & \movesto & |e| \\

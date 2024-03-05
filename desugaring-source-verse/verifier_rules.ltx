@@ -20,7 +20,7 @@ $\begin{array}{@@{}l}
 
 \multicolumn{5}{l}{\textit{Normalisation of |forallKW|:}} \\
 \rulename{nu-elim} & |forall r e| & \movesto & |e| & \text{if $|r| \notin \freevars{e}$}\\
-\rulename{nu-float}^{\alpha} & |E^[forall r e]| & \movesto & |forall r E^[e]| & \text{if $r \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{nu-float}^{\alpha} & |N^[forall r e]| & \movesto & |forall r N^[e]| & \text{if $r \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{exi-nu} & |assume (def x e)|
   & \movesto & |forall r (assume (subst e x r))|
 & |r| \not\in \freevars{|e|}
@@ -49,12 +49,22 @@ $\begin{array}{@@{}l}
 \multicolumn{5}{l}{\textit{Verify:}} \\
   \rulename{verify-elim} & |verify e|      & \movesto &
     |ok| & \text{if no |checkKW| in |e|} \\
-  \rulename{verify-one}   & \multicolumn{3}{l}{|verify (V^[one ((r==v ; e_1) `choice` e_2)])|} & \text{if}\ \mustDecide{eq} \\
-    & & \movesto &
-         \multicolumn{2}{l}{\begin{array}[t]{l}
-              |verify (V^[assume (r==v); one (e_1 `choice` e_2)]) eqsemiKW| \\
-              |verify (V^[one e_2])| \\
-         \end{array}} \\
+    \rulename{split-k} & |verify (forall r (V^[r==k]))| & \movesto &
+          |verify (forall r (assume (r==k); V[ tup () ]))| \\
+    &&& |verify (forall r (assume (not (r==k)); V[ fail ]))| \\
+          \rulename{split-tup} & \multicolumn{3}{l}{|verify (forall r (V^[r==tup (v_1, xdots, v_n)]))|} \\
+          && \movesto & |verifyKW {|
+          \begin{array}[t]{@@{}l}
+            |forallKW r r_1 xdots r_n dot (assume (r==tup (r_1, xdots, r_n)));| \\
+              |V[ r_n==v_1; xdots; r_n == v_n ] }|
+            \end{array} |}| \\
+    &&& |verify (forall r (assume (not (r==k)); V[ fail ]))| \\
+%  \rulename{verify-one}   & \multicolumn{3}{l}{|verify (V^[one ((r==v ; e_1) `choice` e_2)])|} & \text{if}\ \mustDecide{eq} \\
+%    & & \movesto &
+%         \multicolumn{2}{l}{\begin{array}[t]{l}
+%              |verify (V^[assume (r==v); one (e_1 `choice` e_2)]) eqsemiKW| \\
+%              |verify (V^[one e_2])| \\
+%         \end{array}} \\
 \\
 \multicolumn{5}{l}{\textit{Substitution:}} \\
 \rulename{subst-asm} & |S^[assume (x==v)]| & \movesto & |subst S x v ^[assume (x==v)]|
@@ -76,10 +86,11 @@ $\begin{array}{@@{}l}
 %   \must{|fx|}{|x|}               & \doteq & \mathit{true} \\
 %   \must{|fx|}{|r|}               & \doteq & \mathit{true}  \\[1mm]
 %   \must{|fx|}{k}                 & \doteq & \mathit{true}  \\
-%   \must{|fx|}{|arr (v_1, xdots, v_n) |} & \doteq & \must{|fx|}{|v_1|} \wedge \dots \wedge \must{|fx|}{|v_n|} \\
-%   \must{|fx|}{|lam r e|}         & \doteq & \mathit{true} \\
-   \must{|fx|}{|v|}               & \doteq & \mathit{true} \\
-   \must{|fx|}{|def x e|}         & \doteq & \mathit{false} \\
+   \must{|fx|}{|x|}               & \doteq & \mathit{false} \\
+   \must{|fx|}{|r|}               & \doteq & \mathit{true} \\
+  \must{|fx|}{|arr (v_1, xdots, v_n) |} & \doteq & \must{|fx|}{|v_1|} \wedge \dots \wedge \must{|fx|}{|v_n|} \\
+  \must{|fx|}{|lam r e|}         & \doteq & \mathit{true} \\
+   \must{|fx|}{|def x e|}         & \doteq & \must{|fx|}{e} \\
    \must{|fx|}{|forall r e|}         & \doteq & \must{|fx|}{e} \\
    \must{|fx|}{|eq_1; e_2|}        & \doteq & \must{|fx|}{|eq_1|} \wedge \must{|fx|}{|e_2|} \\[1mm]
    \must{|fx_1|}{|havoc fx_2|}        & \doteq & |fx_2| \subseteq |fx_1| \\[1mm]
@@ -95,7 +106,7 @@ $\begin{array}{@@{}l}
    \must{|nofail|}{|e_1 choice e_2|}  & \doteq & \must{|iterates|}{e_1} \wedge\\
     && (\must{|nofail|}{e_1} \vee   \must{|nofail|}{e_2}) \\[1mm]
 
-   \must{|fx|}{|apply1N op v|} & \doteq & \mustop{|fx|}{op} \\
+   \must{|fx|}{|apply1N op v|} & \doteq & \mustop{|fx|}{op} \wedge \must{|fx|}{v} \\
    \must{|fx|}{|apply1N v_1 v_2|} & \doteq & \mathit{false} & \text{|v_1| is not |op|} \\
 
    \must{|fx|}{|eq_1 guard e_2|}     & \doteq & \mathit{false} & \text{Check!} \\[1mm]
