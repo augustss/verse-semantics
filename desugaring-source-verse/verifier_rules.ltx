@@ -15,44 +15,51 @@ $\begin{array}{@@{}l}
 \end{itemize}
 \end{minipage} \\[3mm]
 
-\begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 
 
-\multicolumn{5}{l}{\textit{Normalisation of \; |forallKW|:}} \\
+\multicolumn{5}{l}{\textit{Normalisation of \; |forallKW|}} \\
 \rulename{uni-elim} & |forall r e| & \movesto & |e| & \text{if $|r| \notin \freevars{e}$}\\
 \rulename{uni-float}^{\alpha} & |P^[forall r e]| & \movesto & |forall r P^[e]| & \text{if $r \notin \freevars{|P|} \cup \boundvars{|P|}$} \\
 \rulename{exi-asm} & |assume (def x e)| & \movesto & |forall r (assume (subst e x r))| & |r| \not\in \freevars{|e|} 
 \\[2mm]
 
-\multicolumn{5}{l}{\textit{Assumptions:}} \\
+\multicolumn{5}{l}{\textit{Assumptions}} \\
 \rulename{asm-seq} & |assume (eq_1 `eqsemi` eq_2)| & \movesto & |assume eq_1 `eqsemi` assume eq_2| \\
 
 \\[-0.6em]
 
-\multicolumn{5}{l}{\textit{Guard:}} \\
+\multicolumn{5}{l}{\textit{Guard}} \\
 \rulename{guard-elim} & |v guard e| & \movesto & |e| \\
 \rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
 \rulename{guard-float} & |(assume eq_1 `eqsemi` eq_2) guard e_3| & \movesto &  |assume eq_1; (eq_2 guard e_3)| \\
 
 \\[-0.6em]
 
-\multicolumn{5}{l}{\textit{Check:}} \\
+\multicolumn{5}{l}{\textit{Check}} \\
 %  \rulename{check-elim}   & |check fx e|  & \movesto & |e| & \text{if}\ \must{\mathit{fx}}{e} \\
-  \rulename{check-k}   & |check fx k|  & \movesto & |k| \\
-  \rulename{check-uni}   & |check fx r|  & \movesto & |r| \\
-  \rulename{check-havoc}   & |check fx_1 (havoc fx_2; e)|  & \movesto & |check fx_1 e| & \text{ if $|fx_2| \subseteq |fx_1|$}\\
+  \rulename{check-k}   & |check fx k|  & \movesto & |tup ()| \\
+  \rulename{check-uni}   & |check fx r|  & \movesto & |tup ()| \\
+  \rulename{check-tup}   & |check fx (tup (v_1, xdots, v_n)|  & \movesto & \multicolumn{2}{l}{|check fx v_1; xdots; check fx v_n|} \\
+  \rulename{check-choice}   & |check fx (v choice e)|  & \movesto & |check fails e| & |fx| \in \{|succeeds|,|decides|\}\\
+  \rulename{check-fail}   & |check fx fail|  & \movesto & |tup ()|  & |fx| \in \{|fails|,|decides|\}\\
   \rulename{rcheck-elim}   & |rcheck fx v|  & \movesto & |v|  & |fx| \in \{|succeeds|,|decides| \} \\
   \rulename{rcheck-elim}   & |rcheck decides fail|  & \movesto & |fail| \\
-\\
-\multicolumn{5}{l}{\textit{Substitution:}} \\
+\\[-0.6em]
+\multicolumn{5}{l}{\textit{Havoc}} \\
+  \rulename{havoc-suc} & |havoc succeeds| & \movesto & |tup ()| \\
+  \rulename{havoc-fail} & |havoc fails| & \movesto & |fail| \\
+  \rulename{havoc-dec} & |havoc decides| & \movesto & |forall r (r = tup())| \\
+\\[-0.6em]
+\multicolumn{5}{l}{\textit{Substitution}} \\
 \rulename{subst-asm} & |S^[assume (x==v)]| & \movesto & |subst S x v ^[assume (x==v)]|
   & \text{if $|v|\ne|V^[x]|$} \\
 \rulename{subst-asm-rev} & |S^[assume (x==apply1N f v)]| & \movesto
    & |subst S (apply1N f v) x ^[assume (x==apply1N f v)]| \\
 \end{array}\\
-\\
+\\[-0.6em]
 \begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
-\multicolumn{5}{l}{\textit{Verify:}} \\
+\multicolumn{5}{l}{\textit{Verify}} \\
   \rulename{verify-elim} & |verify e|      & \movesto &
     \multicolumn{2}{l}{|ok| \hspace{5mm} \text{if no |checkKW| in |e|}} \\ \\[-1mm]
 
@@ -61,7 +68,7 @@ $\begin{array}{@@{}l}
     &&& |verify (forall r (assume (not (r==k)); P[ fail ]))| \\  \\[-1mm]
   \rulename{split-tup} & \multicolumn{3}{l}{|verify (forall r (P^[r==tup (v_1, xdots, v_n)]))|} \\
       && \movesto & |verifyKW {forallKW r r_1 xdots r_n dot|
-            \begin{array}[t]{@@{}l}
+            \begin{array}[t]{l}
               |assume (r==tup (r_1, xdots, r_n));| \\
               |P[ r_n==v_1; xdots; r_n == v_n ] };|
             \end{array}\\
