@@ -665,7 +665,7 @@
 %format succeedKW = "\textbf{suc}"
 %format verifyKW = "\textbf{verify}"
 %format decideKW = "\textbf{dec}"
-%format forallKW = "\nu{}"
+%format forallKW = "\forall{}\!"
 %format guard    = "\!\blacktriangleright{}\!"
 
 %format assume (x) = "\textbf{asm}\{" x "\}"
@@ -674,7 +674,7 @@
 %format verify (x) = "\textbf{verify}\{" x "\}"
 %format decide (x) = "\textbf{dec}\{" x "\}"
 %format bullet = "\bullet"
-%format forall (x) (y) = "\nu" x ".\," y
+%format forall (x) (y) = "\forall" x ".\," y
 
 %% Effects checking, like succeeds{e}
 %format checkKW = "{\bf vchk}"

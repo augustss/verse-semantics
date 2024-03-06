@@ -18,14 +18,10 @@ $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
 
 
-\multicolumn{5}{l}{\textit{Normalisation of |forallKW|:}} \\
-\rulename{nu-elim} & |forall r e| & \movesto & |e| & \text{if $|r| \notin \freevars{e}$}\\
-\rulename{nu-float}^{\alpha} & |N^[forall r e]| & \movesto & |forall r N^[e]| & \text{if $r \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{exi-nu} & |assume (def x e)|
-  & \movesto & |forall r (assume (subst e x r))|
-& |r| \not\in \freevars{|e|}
-% \rulename{promote} & |r == v| & \movesto
-%     & |forall s (x==s; r==v)| & |x| \in \freevars{v}, |s| \not\in \freevars{|v|} \\
+\multicolumn{5}{l}{\textit{Normalisation of \; |forallKW|:}} \\
+\rulename{uni-elim} & |forall r e| & \movesto & |e| & \text{if $|r| \notin \freevars{e}$}\\
+\rulename{uni-float}^{\alpha} & |P^[forall r e]| & \movesto & |forall r P^[e]| & \text{if $r \notin \freevars{|P|} \cup \boundvars{|P|}$} \\
+\rulename{exi-asm} & |assume (def x e)| & \movesto & |forall r (assume (subst e x r))| & |r| \not\in \freevars{|e|} 
 \\[2mm]
 
 \multicolumn{5}{l}{\textit{Assumptions:}} \\
@@ -41,30 +37,12 @@ $\begin{array}{@@{}l}
 \\[-0.6em]
 
 \multicolumn{5}{l}{\textit{Check:}} \\
-  \rulename{check-elim}   & |check fx e|  & \movesto & |e| & \text{if}\ \must{\mathit{fx}}{e} \\
+%  \rulename{check-elim}   & |check fx e|  & \movesto & |e| & \text{if}\ \must{\mathit{fx}}{e} \\
+  \rulename{check-k}   & |check fx k|  & \movesto & |k| \\
+  \rulename{check-uni}   & |check fx r|  & \movesto & |r| \\
+  \rulename{check-havoc}   & |check fx_1 (havoc fx_2; e)|  & \movesto & |check fx_1 e| & \text{ if $|fx_2| \subseteq |fx_1|$}\\
   \rulename{rcheck-elim}   & |rcheck fx v|  & \movesto & |v|  & |fx| \in \{|succeeds|,|decides| \} \\
   \rulename{rcheck-elim}   & |rcheck decides fail|  & \movesto & |fail| \\
-\\[-0.6em]
-
-\multicolumn{5}{l}{\textit{Verify:}} \\
-  \rulename{verify-elim} & |verify e|      & \movesto &
-    |ok| & \text{if no |checkKW| in |e|} \\
-    \rulename{split-k} & |verify (forall r (V^[r==k]))| & \movesto &
-          |verify (forall r (assume (r==k); V[ tup () ]))| \\
-    &&& |verify (forall r (assume (not (r==k)); V[ fail ]))| \\
-          \rulename{split-tup} & \multicolumn{3}{l}{|verify (forall r (V^[r==tup (v_1, xdots, v_n)]))|} \\
-          && \movesto & |verifyKW {|
-          \begin{array}[t]{@@{}l}
-            |forallKW r r_1 xdots r_n dot (assume (r==tup (r_1, xdots, r_n)));| \\
-              |V[ r_n==v_1; xdots; r_n == v_n ] }|
-            \end{array} |}| \\
-    &&& |verify (forall r (assume (not (r==k)); V[ fail ]))| \\
-%  \rulename{verify-one}   & \multicolumn{3}{l}{|verify (V^[one ((r==v ; e_1) `choice` e_2)])|} & \text{if}\ \mustDecide{eq} \\
-%    & & \movesto &
-%         \multicolumn{2}{l}{\begin{array}[t]{l}
-%              |verify (V^[assume (r==v); one (e_1 `choice` e_2)]) eqsemiKW| \\
-%              |verify (V^[one e_2])| \\
-%         \end{array}} \\
 \\
 \multicolumn{5}{l}{\textit{Substitution:}} \\
 \rulename{subst-asm} & |S^[assume (x==v)]| & \movesto & |subst S x v ^[assume (x==v)]|
@@ -72,6 +50,27 @@ $\begin{array}{@@{}l}
 \rulename{subst-asm-rev} & |S^[assume (x==apply1N f v)]| & \movesto
    & |subst S (apply1N f v) x ^[assume (x==apply1N f v)]| \\
 \end{array}\\
+\\
+\begin{array}{@@{\hskip0.5em} l @@{} r @@{\;}c@@{\;} l l@@{}}
+\multicolumn{5}{l}{\textit{Verify:}} \\
+  \rulename{verify-elim} & |verify e|      & \movesto &
+    \multicolumn{2}{l}{|ok| \hspace{5mm} \text{if no |checkKW| in |e|}} \\ \\[-1mm]
+
+  \rulename{split-k} & |verify (forall r (P^[r==k]))| & \movesto &
+          |verify (forall r (assume (r==k); P[ tup () ]));| \\
+    &&& |verify (forall r (assume (not (r==k)); P[ fail ]))| \\  \\[-1mm]
+  \rulename{split-tup} & \multicolumn{3}{l}{|verify (forall r (P^[r==tup (v_1, xdots, v_n)]))|} \\
+      && \movesto & |verifyKW {forallKW r r_1 xdots r_n dot|
+            \begin{array}[t]{@@{}l}
+              |assume (r==tup (r_1, xdots, r_n));| \\
+              |P[ r_n==v_1; xdots; r_n == v_n ] };|
+            \end{array}\\
+    &&& |verify (forall r (assume (not (r==k)); P[ fail ]))| \\  \\[-1mm]
+  \rulename{split-op} & |verify (forall r (P^[apply1N isInt r]))| & \movesto &
+          |verify (forall r (assume (apply1N isInt r); P[ tup () ]));| \\
+    &&& |verify (forall r (assume (not (apply1N isInt r)); P[ fail ]))| \\
+\end{array}\\
+
 \end{array}$
 \\[0.1in]
 \caption{SPJ: TRS Verifier Rewrite Rules}

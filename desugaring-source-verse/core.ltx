@@ -54,12 +54,10 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |S guard e| \vb |v=S| \\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |eq; E| \vb |E; e| \vb |def x E| \vb |forall r E| \vb |E guard e| \vb |eq guard E| \vb |v==E| \\
-\text{Universal contexts}  & |N| & ::= & |hole| \vb |cf; N| \vb |N; e| \vb |def x N| \vb |forall r N| \vb |N guard e| \vb |v==N| \\
-                           & & \vb &  |N choice e| \vb |e choice N| \\
 \text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |def x C| \vb |C guard e| \vb |v==C| \vb |assume C| \\
-\text{Verification contexts}  & |V| & ::= & |hole| \vb |eq; V| \vb |V; e| \vb |def x V| \vb |forall r V| \vb |one V| \vb |all V| \\
-             && \vb & |V `choice` e| \vb |e `choice` V| \vb |V guard e| \vb |eq guard V| \vb |check fx V| \\
-  &  & \vb & |v==V| \vb |assume V|
+\text{Proof contexts}  & |P| & ::= & |hole| \vb |cf; P| \vb |P; e| \vb |def x P| \vb |forall r P| \vb |one P| \vb |all P| \\
+             && \vb & |P `choice` e| \vb |e `choice` P| \vb |P guard e| \vb |check fx P| \\
+  &  & \vb & |v==P| \vb |assume P|
 \end{array} \\
 \begin{array}{ll}
 \text{Effect-free} & \text{|ef| is an |eq| that can have choice and fail, but not I/O effects or divergence} \\
@@ -135,8 +133,7 @@ $\begin{array}{@@{}l}
 \rulegroupname{Normalization:}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
-\rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
-% \rulename{exi-float} & |v = (def x e)| & \movesto & |def x (v=e)| & \text{if $x \notin \freevars{|v|}$} \\
+\rulename{exi-float}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(eq_1 `eqsemi` eq_2) ; e_3| & \movesto & |eq_1; (eq_2; e_3)| \\
 \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
 \rulename{seq-elim} & |v ; e| & \movesto & |e| \\
