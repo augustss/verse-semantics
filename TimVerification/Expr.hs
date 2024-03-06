@@ -218,7 +218,7 @@ instance Pretty Syntax where
   pPrint (SyntaxList aes) = parens $ hcat (punctuate (text ";") (map pPrint aes))
 instance Pretty AvailableFx where
   pPrint None = text "none"
-  pPrint fx = pPrint fx
+  pPrint (Some fx) = pPrint fx
 instance Pretty VarianceSpecifier where pPrint = ppLower
 instance Pretty Lambda where
   pPrint (Lambda oc fx u c0 i w op0 c1 j z op1) =
