@@ -72,7 +72,7 @@ $\begin{array}{@@{}l}
               |assume (r==tup (r_1, xdots, r_n));| \\
               |P[ r_n==v_1; xdots; r_n == v_n ] };|
             \end{array}\\
-    &&& |verify (forall r (assume (not (r==k)); P[ fail ]))| \\  \\[-1mm]
+    &&& |verify (forall r (assume (not (r==tup (_, xdots,_))); P[ fail ]))| \\  \\[-1mm]
   \rulename{split-op} & |verify (forall r (P^[apply1N isInt r]))| & \movesto &
           |verify (forall r (assume (apply1N isInt r); P[ tup () ]));| \\
     &&& |verify (forall r (assume (not (apply1N isInt r)); P[ fail ]))| \\
