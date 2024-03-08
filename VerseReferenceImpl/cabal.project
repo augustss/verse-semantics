@@ -1,6 +1,0 @@
-packages: .
-
-source-repository-package
-  type: git
-  location: https://github.com/haskell-unordered-containers/unordered-containers.git
-  tag: 259dc9e4191d988a7f84c3d417764a32e7c8e29f
