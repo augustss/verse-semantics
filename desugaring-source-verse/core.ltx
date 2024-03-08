@@ -91,7 +91,7 @@
   \begin{figure}
 $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l @@{\hspace{-.5em}} r @@{\;}c@@{\;} l l@@{}}
-\rulegroupname{Application:}
+\rulegroupname{Application}
 \rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
@@ -103,7 +103,7 @@ $\begin{array}{@@{}l}
 
     \\[-0.6em]
 
-\rulegroupname{Unification:}
+\rulegroupname{Unification}
   \rulename{u-lit}   & |k == k| & \movesto & |ok| & \\
   \rulename{u-tup-0}   & |tup () == tup ()| & \movesto & |ok| & \\
   \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')|
@@ -113,7 +113,7 @@ $\begin{array}{@@{}l}
 
     \\[-0.6em]
 
-\rulegroupname{Open Lambdas:}
+\rulegroupname{Open Lambdas}
   \rulename{u-olam}          & \multicolumn{3}{l}{|olam v_1 dom_1 rng_1 == olam v_2 dom_2 rng_2|} \\
   & \multicolumn{4}{l}{\hspace{5mm} \movesto |defKW z|.
   \begin{array}[t]{l}
@@ -123,16 +123,17 @@ $\begin{array}{@@{}l}
   \rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &
   \multicolumn{2}{l}{|if (x := apply1N dom v) then apply1N rng x else apply1N g v|} \\[2mm]
 
-\rulegroupname{Substitution:}
+\rulegroupname{Substitution}
 
 \rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
   & \text{$|v|\ne|V^[x]|$} \\
-\\
+\\[-0.6em]
 
-\rulegroupname{Normalization:}
+\rulegroupname{Normalization}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
-\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+%\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(eq_1 `eqsemi` eq_2) ; e_3| & \movesto & |eq_1; (eq_2; e_3)| \\
 \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
 \rulename{seq-elim} & |v ; e| & \movesto & |e| \\
@@ -142,17 +143,17 @@ $\begin{array}{@@{}l}
 
     \\[-0.6em]
 
-\rulegroupname{Choice:}
+\rulegroupname{Choice}
 \rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
-% \rulename{fail} & |E^[fail]| & \movesto & |fail| \\
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
 \rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
 \rulename{choice-fail} & |C^[fail]| & \movesto & |fail| \\
+\rulename{choice-exi} & |def x (E^[e_1 choice e_2]| & \movesto & |E^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 
     \\[-0.6em]
 
-\rulegroupname{One and All:}
+\rulegroupname{One and All}
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
 \rulename{one-value}  & |one v| & \movesto & |v| \\
 \rulename{one-choice}  & |one (v choice e)| & \movesto & |v| \\
@@ -160,7 +161,7 @@ $\begin{array}{@@{}l}
 \rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)|  & n \geq 0 \\
 
 \end{array} \\
-\\[-0.3em]
+\\[-0.6em]
 \text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
 \end{array}$
 

@@ -52,8 +52,8 @@ $\begin{array}{@@{}l}
   \rulename{havoc-dec} & |havoc decides| & \movesto & |forall r (r = tup())| \\
 \\[-0.6em]
 \multicolumn{5}{l}{\textit{Substitution}} \\
-\rulename{subst-asm} & |S^[assume (x==v)]| & \movesto & |subst S x v ^[assume (x==v)]|
-  & \text{if $|v|\ne|V^[x]|$} \\
+\rulename{subst-asm} & |S^[assume (r==v)]| & \movesto & |subst S r v ^[assume (r==v)]|
+  & \text{if $|v|\ne|V^[r]|$} \\
 \rulename{subst-asm-rev} & |S^[assume (x==apply1N f v)]| & \movesto
    & |subst S (apply1N f v) x ^[assume (x==apply1N f v)]| \\
 \end{array}\\
@@ -70,7 +70,7 @@ $\begin{array}{@@{}l}
       && \movesto & |verifyKW {forallKW r r_1 xdots r_n dot|
             \begin{array}[t]{l}
               |assume (r==tup (r_1, xdots, r_n));| \\
-              |P[ r_n==v_1; xdots; r_n == v_n ] };|
+              |P[ r_1==v_1; xdots; r_n == v_n ] };|
             \end{array}\\
     &&& |verify (forall r (assume (not (r==tup (_, xdots,_))); P[ fail ]))| \\  \\[-1mm]
   \rulename{split-op} & |verify (forall r (P^[apply1N isInt r]))| & \movesto &
