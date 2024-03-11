@@ -139,6 +139,95 @@ To examine a single test where 252 is the line number of the test
 cabal run tester -- --tim-verify versetests/TimTests.verse --only-test=L252 --verbose --prelude=verifyprelude
 ```
 
-## Junk
+## JUNK
 
-- TODO: `asm-exi` is wrong, it floats out an exi?
+verify:
+  check<suc>:
+    exi x, f, g:
+      x=1
+      x=2
+      f = (verify{ check<suc> { 1 = (x=1) } } ;; \i. uni r. assume{r = (x=1)}; r)
+      g = (verify{ check<suc> { exi z. z = f[];  z = (1=2) } } ;; \i. uni r. assume{r = (1=2)}; r)
+      g[]
+
+--> selectively subst x=1 in f's `verify`
+
+verify:
+  check<suc>:
+    exi x, f, g:
+      x=1
+      x=2
+      f = (verify{ check<suc> { 1 = (1=1) } } ;; \i. uni r. assume{r = (x=1)}; r)
+      g = (verify{ check<suc> { exi z. z = f[];  z = (1=2) } } ;; \i. uni r. assume{r = (1=2)}; r)
+      g[]
+
+--> elim f's `verify`
+
+verify:
+  check<suc>:
+    exi x, f, g:
+      x=1
+      x=2
+      f = (\i. uni r. assume{r = (x=1)}; r)
+      g = (verify{ check<suc> { exi z. z = f[];  z = (1=2) } } ;; \i. uni r. assume{r = (1=2)}; r)
+      g[]
+
+--> subst f and app-beta inside `g`s verify and eliminate f
+
+verify:
+  check<suc>:
+    exi x, g:
+      x=1
+      x=2
+      g = (verify{ check<suc> { uni r, exi z. assume{r = (x=1)}; z = r;  z = (1=2) } } ;; \i. uni r. assume{r = (1=2)}; r)
+      g[]
+
+--> selectively subst x=2 inside g's verify
+
+verify:
+  check<suc>:
+    exi x, g:
+      x=1
+      x=2
+      g = (verify{ check<suc> { uni r, exi z. assume{r = (2=1)}; z = r;  z = (1=2) } } ;; \i. uni r. assume{r = (1=2)}; r)
+      g[]
+
+--> subst z=r and eliminate z
+
+verify:
+  check<suc>:
+    exi x, g:
+      x=1
+      x=2
+      g = (verify{ check<suc> { uni r. assume{r = (2=1)}; r = (1=2) } } ;; \i. uni r. assume{r = (1=2)}; r)
+      g[]
+
+--> use assume {r = (2=1)} to "prove" the g's verify
+
+verify:
+  check<suc>:
+    exi x, g:
+      x=1
+      x=2
+      g = (\i. uni r. assume{r = (1=2)}; r)
+      g[]
+
+--> app-beta and eliminate g
+
+verify:
+  check<suc>:
+    exi x:
+      x=1
+      x=2
+      uni r. assume{r = (1=2)}; r
+
+--> 1=2 is fail
+
+verify:
+  check<suc>:
+    exi x:
+      x=1
+      x=2
+      uni r. assume{fail}; r
+
+--> YIKES, prove outer check/verify with `assume{fail}`

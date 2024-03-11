@@ -200,7 +200,7 @@ uniRules _env lhs =
   ++
   -- X[uni x. e] ---> uni x. X[e]
   "uni-float" `name`    -- TODO(RJ): Duplicate of UNI-FLOAT
-  do (ctx, UNI x e) <- execX lhs  -- Note: Store not allowed in ctx
+  do (ctx, _, _, UNI x e) <- evalX lhs  -- Note: Store not allowed in ctx
      -- guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
      let freeX = free ctx
          x'    = identNotIn (freeX ++ free e)
@@ -591,6 +591,23 @@ verifierRules env lhs =
       pure (Verify (LAM r (ctx Fail)) :>:
             Verify (LAM r (unis rs ( Assume (Var r :=: Arr (Var <$> rs)) :>: ctx rvs))))
    ++
+   -- Verify{uni r. V[r=k]} ---> Verify{uni r. V[fail]}; Verify{uni r. asm{r=k}; V[<>]}
+   "decides-split-lit" `name`
+   do Verify (LAM b (UNI r e)) <- [lhs]
+      (ctx, _, _, Var r' :=: Int k) <- eX e
+      guard (r == r')
+      pure (Verify (LAM b (UNI r (ctx Fail))) :>:
+            Verify (LAM b (UNI r ( Assume (Var r :=: Int k) :>: ctx (Arr[])))))
+   ++
+   -- Verify{uni r. V[r=k]} ---> Verify{uni r. V[fail]}; Verify{uni r. asm{r=k}; V[<>]}
+   "decides-split-lit" `name`
+   do Verify (LAM r e) <- [lhs]
+      (ctx, _, _, Var r' :=: Int k) <- eX e
+      guard (r == r')
+      pure (Verify (LAM r (ctx Fail)) :>:
+            Verify (LAM r ( Assume (Var r :=: Int k) :>: ctx (Arr[]))))
+   ++
+
    -- Fails {hnf} ---> Assume {fail}
    "fails-hnf" `name`
    do Fails (HNF _) <- [lhs]
@@ -646,6 +663,52 @@ _proves g bs e = unAssume e `elem` facts g && null (vs `intersect` bndIds bs)
   -- derives (Op IsChar :@: a) = ( a :=: a ) : assumes a
   derives (INT a) = ( a :=: a ) : assumes a
   derives _                = []
+
+
+
+evalX :: Expr -> [(EContext, QContext, [BndVar], Expr)]
+evalX = evalEX []
+
+evalEX :: [BndVar] -> Expr -> [(EContext, QContext, [BndVar], Expr)]
+evalEX bs lhs = evalEX1 bs lhs ++ [(id, Arr [], bs, lhs)]
+
+evalEX1 :: [BndVar] -> Expr -> [(EContext, QContext, [BndVar], Expr)]
+evalEX1 bs lhs =
+   -- v = E
+   do v :=: x     <- [lhs]
+      (ctx, g, bs', hole) <- evalEX bs x
+      pure (\ a -> v :=: ctx a, g, bs', hole)
+   ++
+   -- E; e
+   do x :>: e <- [lhs]
+      (ctx, g, bs', hole) <- evalEX bs x
+      pure ((:>: e) . ctx, g :>: e, bs', hole)
+   ++
+   -- e; E
+   do e :>: x <- [lhs]
+      (ctx, g, bs', hole) <- evalEX bs x
+      pure ((e :>:) . ctx, e :>: g, bs', hole)
+   ++
+   -- Exi y E
+   do EXI y x <- [lhs]
+      (ctx, g, bs', hole) <- evalEX (BExi y : bs) x
+      pure (EXI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
+   ++
+   -- Uni y E
+   do UNI y x <- [lhs]
+      (ctx, g, bs', hole) <- evalEX (BUni y : bs) x
+      pure (UNI y . ctx, g, bs', hole)   -- y should be visible to e in g |- e
+   ++
+   -- E;; e
+   do x :>>: e <- [lhs]
+      (ctx, g, bs', hole) <- evalEX bs x
+      pure ((:>>: e) . ctx, g :>>: e, bs', hole)
+   ++
+   -- e;; E
+   do e :>>: x <- [lhs]
+      (ctx, g, bs', hole) <- evalEX bs x
+      pure ((e :>>:) . ctx, e :>>: g, bs', hole)
+
 
 ----------------------------------------------------------------------
 -- | Expression Contexts

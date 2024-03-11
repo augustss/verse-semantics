@@ -122,7 +122,7 @@ verify(fail) {f(x:int)<succeeds>:=x/0}
 
 # left-to-right
 verify(pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
-
+verify(fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
 
 # if-then-else (negations)
 
