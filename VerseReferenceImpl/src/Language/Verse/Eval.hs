@@ -85,6 +85,7 @@ import Prelude
   , fromRational
   , isNaN
   , toRational
+  , error
   )
 
 type EvalT m = ReaderT (R m) (VerseT m)
@@ -205,7 +206,7 @@ evalExp e = case extract e of
   Exp.Assume eff e' ->
     evalAssume (loc e) eff e'
   Exp.Module i xs e -> \ s s' -> do
-    pushScope i $  do
+    pushModuleScope i $  do
       xs <- freshEnv xs
       _ <- localNames xs $ evalExp e s s'
       lift . newVar' . Val.Module i $ filterNames xs
@@ -1465,22 +1466,24 @@ filterNames =
     Ident.Label _ -> \ _ z -> z
   []
 
-accessOk :: Access -> Maybe Label -> [Val.Scope] -> Bool
-accessOk access qLabel scopes =
-  case qLabel of
+accessOk :: Access -> Maybe Label -> Maybe Label -> [Val.Scope] -> Bool
+accessOk access qScope qModule scopes =
+  case qScope of
     Nothing -> True -- everything on the top level is accessible to everyone
-    Just label ->
+    Just scope ->
        case access of
          Public -> True
-         Protected -> List.any (matchProtected label) scopes
-         Internal -> List.any (matchPrivate label) scopes
-         Private -> List.any (matchPrivate label) scopes
+         Protected -> List.any (matchProtected scope) scopes
+         Private -> List.any (matchScope scope) scopes
+         Internal -> case qModule of
+           Nothing -> error "internal without enclosing module"
+           Just m -> List.any (matchScope m) scopes
 
-matchPrivate :: Label -> Val.Scope -> Bool
-matchPrivate label (Val.Scope label' _) = label == label'
+matchScope :: Label -> Val.Scope -> Bool
+matchScope label (Val.Scope label' _ _) = label == label'
 
 matchProtected :: Label -> Val.Scope -> Bool
-matchProtected label (Val.Scope label' labels') = label == label' || List.any (label==) labels'
+matchProtected label (Val.Scope label' labels' _) = label == label' || List.any (label==) labels'
 
 lookupNamed :: Ident -> EvalT m (Maybe (VarNamed m))
 lookupNamed x = do
@@ -1492,8 +1495,7 @@ lookupTopNamed x = asks $ \ r -> lookupEnv r.scopes x r.top
 lookupEnv :: (Hashable k, Eq k) => [Val.Scope] -> k -> HashMap k (Val.AccessScope, VarNamed m) -> Maybe (VarNamed m)
 lookupEnv scopes x env =
   case HashMap.lookup x env of
-    Just (Val.AccessScope Public _qLabel, named) -> Just named
-    Just (Val.AccessScope access qLabel, named) | accessOk access qLabel scopes -> Just named
+    Just (Val.AccessScope access qScope qModule, named) | accessOk access qScope qModule scopes -> Just named
     _ -> Nothing
 
 localName :: Access -> Ident -> VarNamed m -> EvalT m a -> EvalT m a
@@ -1514,38 +1516,39 @@ getScopes = do
   pure r.scopes
 
 accessScope :: Access -> [Val.Scope] -> Val.AccessScope
-accessScope access [] = Val.AccessScope access Nothing
-accessScope access (Val.Scope label _ : _) = Val.AccessScope access (Just label)
+accessScope access [] = Val.AccessScope access Nothing Nothing
+accessScope access (Val.Scope label _ qModule: _) = Val.AccessScope access (Just label) qModule
 
 addScope :: Label -> [Val.Scope] -> [Val.Scope]
-addScope label scopes = Val.Scope label [] : scopes
+addScope label scopes =
+  Val.Scope label []  (moduleFromScopes scopes) : scopes
 
 addScopeWithSup :: Label -> [Label] -> [Val.Scope] -> [Val.Scope]
-addScopeWithSup label labels scopes = Val.Scope label labels : scopes
+addScopeWithSup label labels scopes =
+  Val.Scope label labels (moduleFromScopes scopes) : scopes
 
-pushScope :: Label -> EvalT m a -> EvalT m a
-pushScope i m = do
-  scopes <- getScopes
-  useScopes (addScope i scopes) m
+moduleFromScopes :: [Val.Scope] -> Maybe Label
+moduleFromScopes = \ case
+  [] -> Nothing
+  (Val.Scope _ _ qModule : _) -> qModule
 
 useScopes :: [Val.Scope] -> EvalT m a -> EvalT m a
 useScopes scopes = local $ \ r -> r { scopes = scopes }
+
+pushModuleScope :: Label -> EvalT m a -> EvalT m a
+pushModuleScope i = local $ \ r -> r { scopes = Val.Scope i [] (Just i) : r.scopes }
 
 freshEnv
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => Exp.Env Ident -> EvalT m (Env m)
 freshEnv xs = do
-  label <- getLabel
-  lift $ (getAp . HashMap.foldMapWithKey (f label)) xs
+  r <- ask
+  lift $ (getAp . HashMap.foldMapWithKey (f r.scopes)) xs
   where
-    getLabel = getScopes >>= \ case
-              [] -> pure Nothing
-              (Val.Scope label _:_) -> pure $ Just label
-
-    f label k = \ case
-      (access, Exp.Exists) -> Ap $ HashMap.singleton k . (Val.AccessScope access label,) . Val <$> freshVar'
-      (access, Exp.Forall) -> Ap $ HashMap.singleton k . (Val.AccessScope access label,) . Val <$> newVar' Val.Any
-      (access, Exp.Var) -> Ap $ HashMap.singleton k . (Val.AccessScope access label,) . Ref <$> freshVar'
+    f scopes k = \ case
+      (access, Exp.Exists) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> freshVar'
+      (access, Exp.Forall) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> newVar' Val.Any
+      (access, Exp.Var) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Ref <$> freshVar'
 
 unify'
   :: MonadEval m

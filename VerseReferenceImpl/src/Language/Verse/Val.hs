@@ -338,16 +338,24 @@ forEnv_ x f = for_ x $ \ (_access, x) -> forNamed_ x f
 type VarEnv k m = Env k (VarVal m)
 
 data Scope = Scope
-  !Label      -- The identifier for this scope, must match for <private>/<internal>
-  ![Label]    -- List of identifiers for all scopes that could contain <protected> items
+  !Label          -- The identifier for this scope, must match for <private>/<internal>
+  ![Label]        -- List of identifiers for all scopes that could contain <protected> items
+  !(Maybe Label)  -- Enclosing module, if any
   deriving Show
 
 instance Pretty Scope where
   pretty = \ case
-    Scope label [] -> "[" <> prettyLabel label <> "]"
-    Scope label labels -> "[" <> prettyLabel label <> "|" <> concatWith (<+>) (map prettyLabel labels) <> "]"
+    Scope label labels qModule -> "Scope{" <> prettyLabel label <>  prettySup labels <> prettyMaybeLabel "in" qModule <> "}"
+   where
+     prettySup = \ case
+       [] -> mempty
+       labels -> "," <> "sup=[" <> concatWith (<+>) (map prettyLabel labels) <> "]"
 
-data AccessScope = AccessScope Desugar.Access (Maybe Label)
+data AccessScope
+  = AccessScope
+    Desugar.Access
+    (Maybe Label)   -- enclosing scope, if any
+    (Maybe Label)   -- enclosing module, if inside a module
   deriving Show
 
 instance Monad m => Freezable AccessScope AccessScope m where
@@ -358,5 +366,10 @@ instance Monad m => Freshenable AccessScope m where
 
 instance Pretty AccessScope where
   pretty = \ case
-    AccessScope access (Just label) -> pretty access <+> prettyLabel label
-    AccessScope access Nothing -> pretty access <+> "-"
+    AccessScope access qScope qModule -> "AC{" <> pretty access <> prettyMaybeLabel "scope" qScope <+> prettyMaybeLabel "in" qModule <> "}"
+
+
+prettyMaybeLabel :: Doc a -> Maybe Label -> Doc a
+prettyMaybeLabel m = \ case
+  Nothing -> mempty
+  Just label -> "," <+> m <> "=" <> prettyLabel label
