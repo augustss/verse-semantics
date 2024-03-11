@@ -681,8 +681,8 @@
 %format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
 %format rcheckKW = "{\bf rchk}"
 %format rcheck (r) (b) = rcheckKW "\langle" r "\rangle\{" b "\}"
-%format havocKW = "\textbf{havoc}"
-%format havoc (fx) = "\textbf{havoc}" "\langle" fx "\rangle"
+%format havocKW = "\mathcal K"
+%format havoc (fx) = "{\mathcal K}\langle{}" fx "\rangle{}"
 
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"

@@ -20,37 +20,37 @@ $\begin{array}{@@{}l}
 
 \multicolumn{5}{l}{\textit{Normalisation of \; |forallKW|}} \\
 \rulename{uni-elim} & |forall r e| & \movesto & |e| & \text{if $|r| \notin \freevars{e}$}\\
-\rulename{uni-float}^{\alpha} & |P^[forall r e]| & \movesto & |forall r P^[e]| & \text{if $r \notin \freevars{|P|} \cup \boundvars{|P|}$} \\
-\rulename{exi-asm} & |assume (def x e)| & \movesto & |forall r (assume (subst e x r))| & |r| \not\in \freevars{|e|} 
+\rulename{uni-float}^{\alpha} & |P^[forall r e]| & \movesto & |forall r P^[e]| & \text{if $r \notin \freevars{|P|} \cup \boundvars{|P|}$}
+% \rulename{exi-asm} & |assume (def x e)| & \movesto & |forall r (assume (subst e x r))| & |r| \not\in \freevars{|e|} 
 \\[2mm]
 
-\multicolumn{5}{l}{\textit{Assumptions}} \\
-\rulename{asm-seq} & |assume (eq_1 `eqsemi` eq_2)| & \movesto & |assume eq_1 `eqsemi` assume eq_2| \\
-
-\\[-0.6em]
+% \multicolumn{5}{l}{\textit{Assumptions}} \\
+% \rulename{asm-seq} & |assume (eq_1 `eqsemi` eq_2)| & \movesto & |assume eq_1 `eqsemi` assume eq_2| \\
+%
+% \\[-0.6em]
 
 \multicolumn{5}{l}{\textit{Guard}} \\
 \rulename{guard-elim} & |v guard e| & \movesto & |e| \\
 \rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
-\rulename{guard-float} & |(assume eq_1 `eqsemi` eq_2) guard e_3| & \movesto &  |assume eq_1; (eq_2 guard e_3)| \\
+% \rulename{guard-float} & |(assume eq_1 `eqsemi` eq_2) guard e_3| & \movesto &  |assume eq_1; (eq_2 guard e_3)| \\
 
 \\[-0.6em]
 
 \multicolumn{5}{l}{\textit{Check}} \\
 %  \rulename{check-elim}   & |check fx e|  & \movesto & |e| & \text{if}\ \must{\mathit{fx}}{e} \\
   \rulename{check-k}   & |check fx k|  & \movesto & |tup ()| \\
-  \rulename{check-uni}   & |check fx r|  & \movesto & |tup ()| \\
+  \rulename{check-uni}   & |check fx r|  & \movesto & |tup ()| & \text{NB: |check fx x| is stuck} \\
   \rulename{check-tup}   & |check fx (tup (v_1, xdots, v_n)|  & \movesto & \multicolumn{2}{l}{|check fx v_1; xdots; check fx v_n|} \\
   \rulename{check-choice}   & |check fx (v choice e)|  & \movesto & |check fails e| & |fx| \in \{|succeeds|,|decides|\}\\
   \rulename{check-fail}   & |check fx fail|  & \movesto & |tup ()|  & |fx| \in \{|fails|,|decides|\}\\
   \rulename{rcheck-elim}   & |rcheck fx v|  & \movesto & |v|  & |fx| \in \{|succeeds|,|decides| \} \\
   \rulename{rcheck-elim}   & |rcheck decides fail|  & \movesto & |fail| \\
 \\[-0.6em]
-\multicolumn{5}{l}{\textit{Havoc}} \\
-  \rulename{havoc-suc} & |havoc succeeds| & \movesto & |tup ()| \\
-  \rulename{havoc-fail} & |havoc fails| & \movesto & |fail| \\
-  \rulename{havoc-dec} & |havoc decides| & \movesto & |forall r (r = tup())| \\
-\\[-0.6em]
+% \multicolumn{5}{l}{\textit{Havoc}} \\
+%   \rulename{havoc-suc} & |havoc succeeds| & \movesto & |tup ()| \\
+%   \rulename{havoc-fail} & |havoc fails| & \movesto & |fail| \\
+%   \rulename{havoc-dec} & |havoc decides| & \movesto & |forall r (r = tup())| \\
+% \\[-0.6em]
 \multicolumn{5}{l}{\textit{Substitution}} \\
 \rulename{subst-asm} & |S^[assume (r==v)]| & \movesto & |subst S r v ^[assume (r==v)]|
   & \text{if $|v|\ne|V^[r]|$} \\

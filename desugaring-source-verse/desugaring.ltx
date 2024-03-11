@@ -569,12 +569,14 @@ $$
 \end{array}} \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DAe (inp f si) x| = |e|, |Hide e|$}} \\[0.02in]
+\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DAe (inp f si) x| = |e|, |Hide e|, |havoc fx|$}} \\[0.02in]
 \rulename{dinit}   & |De2 md t | & = & |def x (DMe (inp2 x solve md) t)| \\[1mm]
 \rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| & \text{NB: no case for |si = solvex|}\\
 \rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[1mm]
-\rulename{hide}     & |Hide e|  & = & |forall r (assume (r == e); r)|
-  & \text{Just an abbreviation; BigCore to BigCore}\\[1mm]
+\rulename{hide}     & |Hide e|  & = & |forall r (assume (r == e); r)| \\[1mm]
+\rulename{havoc-succ}     & |havoc succeeds|  & = & |tup ()| \\
+\rulename{havoc-fail}     & |havoc fails|  & = & |fail| \\
+\rulename{havoc-dec}     & |havoc decides|  & = & |forall r (r=tup())| \\[1mm]
 \end{array} \\
 
 \begin{array}{lr@@{\;}c@@{\;}ll}

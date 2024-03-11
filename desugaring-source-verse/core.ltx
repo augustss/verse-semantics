@@ -41,7 +41,7 @@
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
       \text{Expressions} & e & ::= & |v| \vb |eq ; e| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       && \vb & |forall r e| \vb |eq guard e| \vb |check fx e| \vb |rcheck fx e| \\
-      && \vb & |v == e| \vb |assume eq| \vb |verify e_1| \vb |havoc fx| \\
+      && \vb & |v == e| \vb |assume eq| \vb |verify e_1| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb r  \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
