@@ -34,19 +34,20 @@
   $$
 \begin{array}{l}
 \mbox{\em Syntax} \\
-  \begin{array}{lr@@{\;}c@@{\;}l@@{}}
+  \begin{array}{lrcl@@{}}
       \text{Integers} & k \\
       \text{Existentials} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
       \text{Expressions} & e & ::= & |v| \vb |eq ; e| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       && \vb & |forall r e| \vb |eq guard e| \vb |check fx e| \vb |rcheck fx e| \\
-      && \vb & |v == e| \vb |assume eq| \vb |verify e_1| \\
+      && \vb & |v == e| \vb |assume eq| \vb |verify2 rs as e| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb r  \vb op \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
       \text{Primops} & op  & ::= & |gt| \vb |add| \vb |isInt| \\
-      \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail|
+      \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail| \\
+      \text{Assumptions} & |a| & ::= & |r = v| \vb |apply1N op v| \vb |not a|
 \end{array}
 \\ \\
 \mbox{\em Contexts} \\
@@ -56,7 +57,8 @@
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |eq; E| \vb |E; e| \vb |def x E| \vb |forall r E| \vb |E guard e| \vb |eq guard E| \vb |v==E| \\
 \text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |def x C| \vb |C guard e| \vb |v==C| \vb |assume C| \\
 \text{Proof contexts}  & |P| & ::= & |hole| \vb |cf; P| \vb |P; e| \vb |def x P| \vb |forall r P| \vb |one P| \vb |all P| \\
-             && \vb & |v==P| \vb |P `choice` e| \vb |e `choice` P| \vb |P guard e| \vb |check fx P|
+&& \vb & |v==P| \vb |P `choice` e| \vb |e `choice` P| \vb |P guard e|
+    \vb |check fx P| \vb |assume P|
 \end{array} \\
 \begin{array}{ll}
 \text{Effect-free} & \text{|ef| is an |eq| that can have choice and fail, but not I/O effects or divergence} \\

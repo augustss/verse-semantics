@@ -516,17 +516,17 @@
 %format t_km1 = "t_{k-1}"
 %format t_kp1 = "t_{k+1}"
 
+%format rs = "\overline{r}"
 %format r_0
 %format r_1
 %format r_2
 %format r_k
 %format r_n
 
+%format as = "\overline{a}"
+
 %format E_1
 %format V_1
-
-
-
 
 %format fun = "\mathit{fun}"
 
@@ -552,11 +552,6 @@
 %format s_2'
 %format s_n'
 %format s_m'
-
-
-%format r_1
-%format r_2
-%format r_n
 
 %format K_1
 
@@ -660,6 +655,7 @@
 
 %% assert = succeed, abbreviated to suc
 
+%format unr      = "\textbf{asm}\{\textbf{fail}\}"
 %format assumeKW = "\textbf{asm}"
 %format assertKW = "\textbf{suc}"
 %format succeedKW = "\textbf{suc}"
@@ -672,13 +668,14 @@
 %format assert (x) = "\textbf{suc}\{" x "\}"
 %format succeed (x) = "\textbf{suc}\{" x "\}"
 %format verify (x) = "\textbf{verify}\{" x "\}"
+%format verify2 (r) (a) (x) = "\textbf{verify}(" r ";\," a ")\{" x "\}"
 %format decide (x) = "\textbf{dec}\{" x "\}"
 %format bullet = "\bullet"
 %format forall (x) (y) = "\forall" x ".\," y
 
 %% Effects checking, like succeeds{e}
 %format checkKW = "{\bf vchk}"
-%format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
+%format (check (r) (b)) = checkKW "\langle" r "\rangle\{" b "\}"
 %format rcheckKW = "{\bf rchk}"
 %format rcheck (r) (b) = rcheckKW "\langle" r "\rangle\{" b "\}"
 %format havocKW = "\mathcal K"
