@@ -74,11 +74,12 @@ isDone = go False False
   go _   _   (Decide _)       = False
   go _   lam (Verify e)       = lam || go True False e
   go ver _   (Lam (Bind _ e)) = go ver (not ver) e
+  go ver _   (Uni (Bind _ e)) = go ver (not ver) e
 
   go ver lam (Arr es)         = all (go ver lam) es
   go _ _ (Map _) = error "isDone: Map not implemented"
   go ver lam (Exi (Bind _ e)) = go ver lam e
-  go ver lam (Uni (Bind _ e)) = go ver lam e
+  -- go ver lam (Uni (Bind _ e)) = go ver lam e
   go ver lam (e1 :=: e2)      = go ver lam e1 && go ver lam e2
   go ver lam (e1 :|: e2)      = go ver lam e1 && go ver lam e2
   go ver lam (e1 :>: e2)      = go ver lam e1 && go ver lam e2
@@ -89,7 +90,7 @@ isDone = go False False
   go ver lam (Fails  e)       = go ver lam e
   go ver lam (Split x y z)    = all (go ver lam) [x,y,z]
   go ver lam (Store h e)      = all (go ver lam) (IM.elems h) && go ver lam e
-  go ver lam (If e1 e2 e3)   = all (go ver lam) [e1, e2, e3]
+  go ver lam (If e1 e2 e3)    = all (go ver lam) [e1, e2, e3]
   go ver lam (BlockC e)       = go ver lam e
   go ver lam (IfB (Bind _ e)) = go ver lam e
   go _   _   (Var _)          = True
@@ -417,8 +418,9 @@ assumeAssertRules _env lhs =
          verified (Decide _) = False
          verified _          = True
      guard (collect verified (&&) e)
-     -- (old-style) pure (Val (Arr []))
-     pure e
+     -- (old-style)
+     pure (Val (Arr []))
+     -- pure e
   ++
   -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
   "verify-cas" `name`
@@ -579,35 +581,42 @@ verifierRules env lhs =
       pure (Verify (UNI r (ctx Fail)) :>:
             Verify (UNI r (unis rs ( Assume (Var r :=: Arr (Var <$> rs)) :>: ctx rvs))))
    ++
-   -- Verify{\r. V[r=<v1...vn>]} ---> Verify{\r. V[fail]}; Verify{\r. uni r1..rn. asm{r=<r1...rn>}; V[r1=v1;...;rn=vn;<>]}
-   "decides-split-tup" `name`
-   do Verify (LAM r e) <- [lhs]
-      (ctx, _, bs, Var r' :=: Arr vs) <- eX e
-      guard (not (null vs))
-      guard (r == r')
-      let xs  = bndIds bs ++ free e
-      let rs  = take (length vs) (identsNotIn xs)
-      let rvs = foldr1 (:>:) [ Var x :=: v | (x, v) <- rs `zip` vs ]
-      pure (Verify (LAM r (ctx Fail)) :>:
-            Verify (LAM r (unis rs ( Assume (Var r :=: Arr (Var <$> rs)) :>: ctx rvs))))
-   ++
+   -- -- Verify{\r. V[r=<v1...vn>]} ---> Verify{\r. V[fail]}; Verify{\r. uni r1..rn. asm{r=<r1...rn>}; V[r1=v1;...;rn=vn;<>]}
+   -- "decides-split-tup" `name`
+   -- do Verify (LAM r e) <- [lhs]
+   --    (ctx, _, bs, Var r' :=: Arr vs) <- eX e
+   --    guard (not (null vs))
+   --    guard (r == r')
+   --    let xs  = bndIds bs ++ free e
+   --    let rs  = take (length vs) (identsNotIn xs)
+   --    let rvs = foldr1 (:>:) [ Var x :=: v | (x, v) <- rs `zip` vs ]
+   --    pure (Verify (LAM r (ctx Fail)) :>:
+   --          Verify (LAM r (unis rs ( Assume (Var r :=: Arr (Var <$> rs)) :>: ctx rvs))))
+   -- ++
+   -- -- Verify{uni r. V[r=k]} ---> Verify{uni r. V[fail]}; Verify{uni r. asm{r=k}; V[<>]}
+   -- "decides-split-lit" `name`
+   -- do Verify (LAM b (UNI r e)) <- [lhs]
+   --    (ctx, _, _, Var r' :=: Int k) <- eX e
+   --    guard (r == r')
+   --    pure (Verify (LAM b (UNI r (ctx Fail))) :>:
+   --          Verify (LAM b (UNI r ( Assume (Var r :=: Int k) :>: ctx (Arr[])))))
+   -- ++
    -- Verify{uni r. V[r=k]} ---> Verify{uni r. V[fail]}; Verify{uni r. asm{r=k}; V[<>]}
    "decides-split-lit" `name`
-   do Verify (LAM b (UNI r e)) <- [lhs]
+   do Verify (UNI r e) <- [lhs]
       (ctx, _, _, Var r' :=: Int k) <- eX e
       guard (r == r')
-      pure (Verify (LAM b (UNI r (ctx Fail))) :>:
-            Verify (LAM b (UNI r ( Assume (Var r :=: Int k) :>: ctx (Arr[])))))
+      pure (Verify (UNI r (ctx Fail)) :>:
+            Verify (UNI r ( Assume (Var r :=: Int k) :>: ctx (Arr[]))))
    ++
-   -- Verify{uni r. V[r=k]} ---> Verify{uni r. V[fail]}; Verify{uni r. asm{r=k}; V[<>]}
-   "decides-split-lit" `name`
-   do Verify (LAM r e) <- [lhs]
-      (ctx, _, _, Var r' :=: Int k) <- eX e
+   "decides-split-var" `name`
+   do Verify (UNI r e) <- [lhs]
+      (ctx, _, bs, Var r' :=: Var r'') <- eX e  <------------ SPLIT IN ASSERT needs NEGATION yuck.
       guard (r == r')
-      pure (Verify (LAM r (ctx Fail)) :>:
-            Verify (LAM r ( Assume (Var r :=: Int k) :>: ctx (Arr[]))))
+      guard (r'' `elem` [ b | BUni b <- bs ])
+      pure (Verify (UNI r (ctx Fail)) :>:
+            Verify (UNI r ( Assume (Var r :=: Var r') :>: ctx (Arr[]))))
    ++
-
    -- Fails {hnf} ---> Assume {fail}
    "fails-hnf" `name`
    do Fails (HNF _) <- [lhs]
