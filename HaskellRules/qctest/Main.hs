@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
-import Data.Maybe
-import Control.Monad( guard )
+-- import Data.Maybe
+-- import Control.Monad( guard )
 import Epic.List( nub )
 import Rules.Core
 import Rules.Equiv(norm)
@@ -67,16 +67,16 @@ prop_Confluence1 flags sys =
       case nub $ map (norm sys) done of
         [] ->                           -- no "stuck" results
           discard
-        trs | any isNothing trs ->      -- normalization timed out
+        trs | any isTimeout trs ->      -- normalization timed out
           discard
         trs@(_:_:_)
-          | ignoreRecursive flags && any (maybe False (isRecursive . term)) trs ->
+          | ignoreRecursive flags && any (finish False (isRecursive . term)) trs ->
             discard
           | otherwise ->                  -- multiple normal form
           whenFail (sequence_
                   [ do putStrLn ("==trace:" ++ show i ++ "==")
                        putStr $ unlines $ showTrace ttr
-                  | (Just ttr,i) <- trs `zip` [1::Int ..]
+                  | (Finish ttr,i) <- trs `zip` [1::Int ..]
                   ]) False
         _ | null left || ignoreFuelStop flags ->
             property True  -- no time-outs
@@ -108,7 +108,7 @@ prop_Confluence2 flags sys =
                            putStrLn "==trace:2=="
                            putStr (unlines (showTrace w2))) $
                 norm sys w1 == norm sys w2
-            
+
             _ -> discard
  where
   arbExpr =
@@ -150,10 +150,13 @@ prop_Confluence3 flags sys =
     if ignoreRecursive flags && isRecursive p then
       Nothing
     else
-      do ps <- tarjan1 100 next (start p)
-         let p' = minimum ps
-         guard (not (ignoreRecursive flags && isRecursive (term p')))
-         return p'
+      case tarjan1 100 next (start p) of
+        Timeout _ -> Nothing
+        Finish ps -> let p' = minimum ps in
+                     if (not (ignoreRecursive flags && isRecursive (term p')))
+                       then Just p'
+                       else Nothing
+
    where
     next (t :<-- tr) =
       [ q :<-- ((n,t):tr)
@@ -184,7 +187,7 @@ arbTrace flags sys p = go (5 :: Int) (15 :: Int) [] p
             nqs -> do (n,q) <- elements nqs
                       go (k0-1) k1 ((n,p'):t) q)
     ]
-  
+
   go k0 k1 t p' =
     case step (rules sys) (ruleEnv sys) p' of
       []  -> do return (Just (p' :<-- t))
@@ -198,7 +201,7 @@ prop_Terminates flags sys =
   case diverges (999::Int) S.empty [(299::Int,S.empty,p' :<-- [])] of
     Nothing ->
       property True
-    
+
     Just trp ->
       whenFail (putStr (unlines (showTrace trp))) $
         False
@@ -216,7 +219,7 @@ prop_Terminates flags sys =
   diverges n seen ((fuel,pars,trp@(p :<-- tr)):ps)
     | fuel <= 0 || p `S.member` pars =
       Just trp
-    
+
     | isRecursive p || p `S.member` seen =
       diverges n seen ps
 
@@ -225,7 +228,7 @@ prop_Terminates flags sys =
         [ (fuel-1, S.insert p pars, q :<-- ((rule,p):tr))
         | (rule,q) <- step (rules sys) (ruleEnv sys) p
         ]
-       ++ ps  
+       ++ ps
 
   diverges _ _ _ = undefined
 

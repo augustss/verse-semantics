@@ -1895,7 +1895,8 @@ dsI_2 Suc t              = eAssume <$> dsD_2 t
 dsI_2 Dec t              =             dsD_2 t
 
 ofType_2 :: Expr -> Expr -> D Expr
-ofType_2 e t = seqE <$> sequence [vOfType_2 e t, iOfType_2 t]
+ofType_2 e t = -- seqE <$> sequence [vOfType_2 e t, iOfType_2 t]
+               eGuard <$> vOfType_2 e t <*> iOfType_2 t
 
 vOfType_2 :: Expr -> Expr -> D Expr
 vOfType_2 e t = do

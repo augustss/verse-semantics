@@ -23,7 +23,7 @@ import Rules.ICFP (systemICFP, systemICFPE, execX, defX, choiceX, ltExpr, isChoi
 import Rules.LeftToRight hiding (effectFree)
 import Control.Monad (guard)
 import Data.List( intersect, isInfixOf )
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
@@ -33,23 +33,24 @@ _traceShow :: (Pretty a) => String -> a -> a
 _traceShow msg x = Debug.trace ("TRACE: " ++ msg ++ prettyShow x) x
 
 
-verifyM :: TRSystem Expr -> Expr -> Maybe (Bool, Traced Expr)
+verifyM :: TRSystem Expr -> Expr -> Result (Bool, Traced Expr)
 verifyM sys e = res
  where
    res =
-     case tarjan1 (tfNormSteps (ruleEnv sys)) arrow (start e) of -- (preProcess sys (ruleEnv sys) e :<-- [])
-       Just (tr@(x :<-- _):_) -> Just (isDone x, tr)
-       _ -> Nothing
+     case tarjan1 (tfNormSteps (ruleEnv sys)) arrow (start e) of
+       Finish (tr@(x :<-- _):_) -> Finish (isDone x, tr)
+       Timeout (tr:_) -> Timeout (False, tr)
+       _ -> undefined -- should never happen as tarjan1 returns a single trace?
+
    arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- next a ]
    next a = {- traceShow ("STEPS: " ++ prettyShow a) $ -} stepS sys a
-
-  --norms           = normalFormsFuelTracePlain sys (-1) e
-  --tr@(x :<-- _):_ = nrDone norms ++ nrLeft norms
 
 verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
 verify sys e =
   let sys' = sys{ ruleEnv = (ruleEnv sys){ tfNormSteps = 20000 } }
-  in  fromMaybe undefined (verifyM sys' e)
+  in  case verifyM sys' e of
+         Finish (b, tr) -> (b, tr)
+         Timeout (_, tr) -> (False, tr)
 
 wrapAssert :: Expr -> Expr
 wrapAssert = Assert
@@ -611,10 +612,11 @@ verifierRules env lhs =
    ++
    "decides-split-var" `name`
    do Verify (UNI r e) <- [lhs]
-      (ctx, _, bs, Var r' :=: Var r'') <- eX e  <------------ SPLIT IN ASSERT needs NEGATION yuck.
+      (ctx, _, bs, Var r' :=: Var r'') <- eX e  ----------- SPLIT IN ASSERT needs NEGATION yuck.
       guard (r == r')
       guard (r'' `elem` [ b | BUni b <- bs ])
-      pure (Verify (UNI r (ctx Fail)) :>:
+      pure (Verify (UNI r ( Fails  (Var r :=: Var r') :>: ctx Fail))
+            :>:
             Verify (UNI r ( Assume (Var r :=: Var r') :>: ctx (Arr[]))))
    ++
    -- Fails {hnf} ---> Assume {fail}

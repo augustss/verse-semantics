@@ -30,7 +30,7 @@ import Rules.Equiv
 import Rules.Systems(ESystem, TRSystem(..))
 import Rules.Verifier(wrapAssert, verifyM)
 import TRS.Traced(Traced, showTrace)
-
+import qualified TRS.Tarjan as T
 --------------
 
 data TestFlags = TestFlags
@@ -264,6 +264,7 @@ data VerifyResult
   = VerifyError String
   | VerifyFail (Traced R.Expr)
   | VerifySuccess (Traced R.Expr)
+  | VerifyTimeout (Traced R.Expr)
   deriving (Show)
 
 verifyIt :: TestFlags -> Expr -> IO VerifyResult
@@ -274,10 +275,10 @@ verifyIt tflg e = do
       vres = verifyM sys e'
   eres <- Control.Exception.try (evaluate (seq (vres==vres) vres))
   pure $ case eres of
-           Left err                  -> VerifyError (show (err :: SomeException))
-           Right Nothing             -> VerifyError "time-out, use --max-norm-steps=N to change"
-           Right (Just (True, trc))  -> VerifySuccess trc
-           Right (Just (False, trc)) -> VerifyFail trc
+           Left err                    -> VerifyError (show (err :: SomeException))
+           Right (T.Timeout (_, trc))    -> VerifyTimeout trc -- Error "time-out, use --max-norm-steps=N to change"
+           Right (T.Finish (True, trc))  -> VerifySuccess trc
+           Right (T.Finish (False, trc)) -> VerifyFail trc
 
 assertVerify :: HasCallStack => TestInfo -> TestFlags -> Expr -> IO TestRes
 assertVerify ti tflg e | typ == TSkip = do
@@ -290,26 +291,33 @@ assertVerify ti tflg e | typ == TSkip = do
 
   res <- verifyIt tflg e
 
-  let message (done, trc) = do
+  let message (timeout, done, trc) = do
         when (fTrace flags) $ do
           putStrLn "Verification trace:"
           putStrLn $ unlines $ showTrace trc
 
-        if done == shouldVerify then do
-          when noisy $
-            putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", expected"
-          pure Good
-         else do
-          putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", unexpected" ++
-                     (if typ == TBroken then ", marked as broken" else "")
-          pure Bad
+        if timeout then do
+           when noisy $
+             putStrLn $ pos ++ " " ++ "time-out, use --max-norm-steps=N to change"
+           pure None
+         else
+         if done == shouldVerify then do
+           when noisy $
+             putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", expected"
+           pure Good
+          else do
+           putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", unexpected" ++
+                      (if typ == TBroken then ", marked as broken" else "")
+           pure Bad
 
   case res of
     VerifyError msg -> do
       putStrLn $ pos ++ " " ++ msg
       pure Excn
-    VerifyFail trc -> message (False, trc)
-    VerifySuccess trc -> message (True, trc)
+    VerifyFail trc -> message (False, False, trc)
+    VerifySuccess trc -> message (False, True, trc)
+    VerifyTimeout trc -> message (True, False, trc)
+
  where
     loc = testLocn ti
     noisy = not (quiet tflg)
@@ -659,15 +667,15 @@ runTimTest tflg test | timVerify tflg = do
       putStrLn $ "test expr: " ++ prettyShow (timExpr test)
     case take 1 stag of
       "S" -> case tres of
-               ResOK Nothing          -> do putStrLn "timeout";     pure (mempty {sDied = 1})
-               ResOK (Just (True, _)) -> do putStrLn "pass, OK";    pure (mempty {sOK = 1})
-               ResOK (Just (False, t))-> do putStrLn "fail, bad";   disp t; pure (mempty {sBadFail = 1})
-               _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
+               ResOK (T.Timeout _)         -> do putStrLn "timeout";     pure (mempty {sDied = 1})
+               ResOK (T.Finish (True, _))  -> do putStrLn "pass, OK";    pure (mempty {sOK = 1})
+               ResOK (T.Finish (False, t)) -> do putStrLn "fail, bad";   disp t; pure (mempty {sBadFail = 1})
+               _                           -> do putStrLn "exception";   pure (mempty {sDied = 1})
       _   -> case tres of
-               ResOK Nothing          -> do putStrLn "timeout";     pure (mempty {sDied = 1})
-               ResOK (Just (True, t)) -> do putStrLn "pass, bad";   disp t; pure (mempty {sBadPass = 1})
-               ResOK (Just (False, _))-> do putStrLn "fail, OK";    pure (mempty {sOK = 1})
-               _                      -> do putStrLn "exception";   pure (mempty {sDied = 1})
+               ResOK (T.Timeout _)         -> do putStrLn "timeout";     pure (mempty {sDied = 1})
+               ResOK (T.Finish (True, t))  -> do putStrLn "pass, bad";   disp t; pure (mempty {sBadPass = 1})
+               ResOK (T.Finish (False, _)) -> do putStrLn "fail, OK";    pure (mempty {sOK = 1})
+               _                           -> do putStrLn "exception";   pure (mempty {sDied = 1})
 
 runTimTest _ _ = error "impossible"
 
