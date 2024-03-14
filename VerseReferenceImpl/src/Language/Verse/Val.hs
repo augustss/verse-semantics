@@ -30,6 +30,7 @@ import Data.Functor.Compose
 import Data.Functor.Compose.Instances ()
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Ratio
 import Data.Traversable
 import Data.Word
@@ -72,7 +73,7 @@ data Val ref a
     {-# UNPACK #-} !SimpleName
   | Struct
     {-# UNPACK #-} !Label
-    ![Scope]
+    !(NonEmpty Scope)
     !(Env Ident a)
     !(Desugar.Env Ident)
     !Exp
@@ -82,7 +83,7 @@ data Val ref a
     !(Env SimpleName a)
   | Class
     {-# UNPACK #-} !Label
-    ![Scope]
+    !(NonEmpty Scope)
     !(Env Ident a)
     !(Maybe a)
     !(Desugar.Env Ident)
@@ -92,13 +93,13 @@ data Val ref a
     !(Maybe a)
     !(Env SimpleName a)
   | Lam
-    ![Scope]
+    !(NonEmpty Scope)
     !(Env Ident a)
     !Ident
     !Exp
   | AnyOLam
   | OLam
-    ![Scope]
+    !(NonEmpty Scope)
     !(Env Ident a)
     !(Desugar.Env Ident)
     !Exp
@@ -338,16 +339,24 @@ forEnv_ x f = for_ x $ \ (_access, x) -> forNamed_ x f
 type VarEnv k m = Env k (VarVal m)
 
 data Scope = Scope
-  !Label      -- The identifier for this scope, must match for <private>/<internal>
-  ![Label]    -- List of identifiers for all scopes that could contain <protected> items
+  !Label          -- The identifier for this scope, must match for <private>/<internal>
+  ![Label]        -- List of identifiers for all scopes that could contain <protected> items
+  !Label          -- Enclosing module
   deriving Show
 
 instance Pretty Scope where
   pretty = \ case
-    Scope label [] -> "[" <> prettyLabel label <> "]"
-    Scope label labels -> "[" <> prettyLabel label <> "|" <> concatWith (<+>) (map prettyLabel labels) <> "]"
+    Scope label labels mLabel -> "Scope{" <> prettyLabel label <>  prettySup labels <+> "in" <+> prettyLabel mLabel <> "}"
+   where
+     prettySup = \ case
+       [] -> mempty
+       labels -> "," <> "sup=[" <> concatWith (<+>) (map prettyLabel labels) <> "]"
 
-data AccessScope = AccessScope Desugar.Access (Maybe Label)
+data AccessScope
+  = AccessScope
+    Desugar.Access
+    Label           -- enclosing scope
+    Label           -- enclosing module
   deriving Show
 
 instance Monad m => Freezable AccessScope AccessScope m where
@@ -357,6 +366,4 @@ instance Monad m => Freshenable AccessScope m where
   freshen = pure
 
 instance Pretty AccessScope where
-  pretty = \ case
-    AccessScope access (Just label) -> pretty access <+> prettyLabel label
-    AccessScope access Nothing -> pretty access <+> "-"
+  pretty (AccessScope access sLabel mLabel) = "AC{" <> pretty access <+> "scope" <+> prettyLabel sLabel <+> "in" <+> prettyLabel mLabel <> "}"

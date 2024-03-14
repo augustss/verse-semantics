@@ -22,6 +22,9 @@ import Control.Monad.Reader
 import Control.Monad.Supply
 import Control.Monad.Verse
 
+import Data.List.NonEmpty qualified as NonEmpty
+import Data.List.NonEmpty (NonEmpty(..), (<|))
+
 import Data.List qualified as List
 import Data.Bool
 import Data.Coerce
@@ -89,12 +92,11 @@ import Prelude
 
 type EvalT m = ReaderT (R m) (VerseT m)
 
-
 data R m = R
   { mode :: !Mode
   , env :: !(Env m)
   , top :: !(Env m)
-  , scopes :: [Val.Scope]  -- stack of all currently active scopes, head is innermost scope
+  , scopes :: NonEmpty Val.Scope  -- stack of all currently active scopes, head is innermost scope
   , assumed :: !Bool
   , archetype :: !(Archetype m)
   , archetype' :: !(Archetype m)
@@ -140,7 +142,7 @@ type Env m = Val.VarEnv Ident m
 
 type Archetype m = Env m
 
-runEvalT :: (MonadRef m, MonadSupply Int m) => [Val.Scope] -> EvalT m a -> Mode -> VerseT m a
+runEvalT :: (MonadRef m, MonadSupply Int m) => NonEmpty Val.Scope -> EvalT m a -> Mode -> VerseT m a
 runEvalT scopes m mode = runReaderT m R {..}
   where
     env = mempty
@@ -161,7 +163,8 @@ eval :: MonadEval m => Mode -> L (Exp L Ident) -> VerseT m FrozenVal
 eval mode e = do
   s <- newS
   s' <- freshS
-  freeze' =<< runEvalT [] (evalExp e s s') mode
+  m <- supply
+  freeze' =<< runEvalT (NonEmpty.singleton $ Val.Scope m [] m)  (evalExp e s s') mode
 
 evalExp :: MonadEval m => L (Exp L Ident) -> S m -> S m -> EvalT m (VarVal m)
 evalExp e = case extract e of
@@ -205,7 +208,7 @@ evalExp e = case extract e of
   Exp.Assume eff e' ->
     evalAssume (loc e) eff e'
   Exp.Module i xs e -> \ s s' -> do
-    pushScope i $  do
+    pushModuleScope i $  do
       xs <- freshEnv xs
       _ <- localNames xs $ evalExp e s s'
       lift . newVar' . Val.Module i $ filterNames xs
@@ -782,7 +785,7 @@ invokeEnum loc xs var = asum $ xs <&> \ x -> do
 invokeOLam
   :: MonadEval m
   => Loc
-  -> [Val.Scope]
+  -> NonEmpty Val.Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -808,7 +811,7 @@ invokeOLam loc scopes env xs e1 e2 tail arg s s' =
 invokeOLamDom_
   :: MonadEval m
   => Loc
-  -> [Val.Scope]
+  -> NonEmpty Val.Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -839,7 +842,7 @@ instance Monad m => Freshenable (DomMatch m) m where
 invokeOLamDom
   :: MonadEval m
   => Loc
-  -> [Val.Scope]
+  -> NonEmpty Val.Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -860,7 +863,7 @@ invokeStruct
   :: MonadEval m
   => Loc
   -> Label
-  -> [Val.Scope]
+  -> NonEmpty Val.Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -880,7 +883,7 @@ invokeClass
   :: MonadEval m
   => Loc
   -> Label
-  -> [Val.Scope]
+  -> NonEmpty Val.Scope
   -> Env m
   -> Maybe (VarVal m)
   -> Exp.Env Ident
@@ -935,7 +938,7 @@ readClass
   :: (MonadAbort Error m, MonadRef m)
   => Loc
   -> VarVal m
-  -> VerseT m (Label, [Val.Scope], Env m, Maybe (VarVal m), Exp.Env Ident, L (Exp L Ident))
+  -> VerseT m (Label, NonEmpty Val.Scope, Env m, Maybe (VarVal m), Exp.Env Ident, L (Exp L Ident))
 readClass loc = readVar' >=> \ case
   Val.Class i scopes env sup xs e -> pure (i, scopes, env, sup, xs, e)
   _ -> abort $ ClassError loc
@@ -1465,22 +1468,19 @@ filterNames =
     Ident.Label _ -> \ _ z -> z
   []
 
-accessOk :: Access -> Maybe Label -> [Val.Scope] -> Bool
-accessOk access qLabel scopes =
-  case qLabel of
-    Nothing -> True -- everything on the top level is accessible to everyone
-    Just label ->
-       case access of
-         Public -> True
-         Protected -> List.any (matchProtected label) scopes
-         Internal -> List.any (matchPrivate label) scopes
-         Private -> List.any (matchPrivate label) scopes
+accessOk :: Access -> Label -> Label -> NonEmpty Val.Scope -> Bool
+accessOk access scope mod scopes =
+  case access of
+    Public -> True
+    Protected -> List.any (matchProtected scope) scopes
+    Private -> List.any (matchScope scope) scopes
+    Internal -> List.any (matchScope mod) scopes
 
-matchPrivate :: Label -> Val.Scope -> Bool
-matchPrivate label (Val.Scope label' _) = label == label'
+matchScope :: Label -> Val.Scope -> Bool
+matchScope label (Val.Scope label' _ _) = label == label'
 
 matchProtected :: Label -> Val.Scope -> Bool
-matchProtected label (Val.Scope label' labels') = label == label' || List.any (label==) labels'
+matchProtected label (Val.Scope label' labels' _) = label == label' || List.any (label==) labels'
 
 lookupNamed :: Ident -> EvalT m (Maybe (VarNamed m))
 lookupNamed x = do
@@ -1489,11 +1489,10 @@ lookupNamed x = do
 lookupTopNamed :: Ident -> EvalT m (Maybe (VarNamed m))
 lookupTopNamed x = asks $ \ r -> lookupEnv r.scopes x r.top
 
-lookupEnv :: (Hashable k, Eq k) => [Val.Scope] -> k -> HashMap k (Val.AccessScope, VarNamed m) -> Maybe (VarNamed m)
+lookupEnv :: (Hashable k, Eq k) => NonEmpty Val.Scope -> k -> HashMap k (Val.AccessScope, VarNamed m) -> Maybe (VarNamed m)
 lookupEnv scopes x env =
   case HashMap.lookup x env of
-    Just (Val.AccessScope Public _qLabel, named) -> Just named
-    Just (Val.AccessScope access qLabel, named) | accessOk access qLabel scopes -> Just named
+    Just (Val.AccessScope access qScope qModule, named) | accessOk access qScope qModule scopes -> Just named
     _ -> Nothing
 
 localName :: Access -> Ident -> VarNamed m -> EvalT m a -> EvalT m a
@@ -1508,44 +1507,41 @@ localNames :: Env m -> EvalT m a -> EvalT m a
 localNames env = local $ \ r ->
   r { env = env <> r.env, archetype = mempty, archetype' = mempty }
 
-getScopes :: EvalT m [Val.Scope]
+getScopes :: EvalT m (NonEmpty Val.Scope)
 getScopes = do
   r <- ask
   pure r.scopes
 
-accessScope :: Access -> [Val.Scope] -> Val.AccessScope
-accessScope access [] = Val.AccessScope access Nothing
-accessScope access (Val.Scope label _ : _) = Val.AccessScope access (Just label)
+accessScope :: Access -> NonEmpty Val.Scope -> Val.AccessScope
+accessScope access (Val.Scope scope _ mod :| _) = Val.AccessScope access scope mod
 
-addScope :: Label -> [Val.Scope] -> [Val.Scope]
-addScope label scopes = Val.Scope label [] : scopes
+addScope :: Label -> NonEmpty Val.Scope -> NonEmpty Val.Scope
+addScope label scopes = addScopeWithSup label [] scopes
 
-addScopeWithSup :: Label -> [Label] -> [Val.Scope] -> [Val.Scope]
-addScopeWithSup label labels scopes = Val.Scope label labels : scopes
+addScopeWithSup :: Label -> [Label] -> NonEmpty Val.Scope -> NonEmpty Val.Scope
+addScopeWithSup label labels scopes =
+  Val.Scope label labels (moduleFromScopes scopes) <| scopes
 
-pushScope :: Label -> EvalT m a -> EvalT m a
-pushScope i m = do
-  scopes <- getScopes
-  useScopes (addScope i scopes) m
+moduleFromScopes :: NonEmpty Val.Scope -> Label
+moduleFromScopes (Val.Scope _ _ mLabel :| _) = mLabel
 
-useScopes :: [Val.Scope] -> EvalT m a -> EvalT m a
+useScopes :: NonEmpty Val.Scope -> EvalT m a -> EvalT m a
 useScopes scopes = local $ \ r -> r { scopes = scopes }
+
+pushModuleScope :: Label -> EvalT m a -> EvalT m a
+pushModuleScope i = local $ \ r -> r { scopes = Val.Scope i [] i <| r.scopes }
 
 freshEnv
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => Exp.Env Ident -> EvalT m (Env m)
 freshEnv xs = do
-  label <- getLabel
-  lift $ (getAp . HashMap.foldMapWithKey (f label)) xs
+  r <- ask
+  lift $ (getAp . HashMap.foldMapWithKey (f r.scopes)) xs
   where
-    getLabel = getScopes >>= \ case
-              [] -> pure Nothing
-              (Val.Scope label _:_) -> pure $ Just label
-
-    f label k = \ case
-      (access, Exp.Exists) -> Ap $ HashMap.singleton k . (Val.AccessScope access label,) . Val <$> freshVar'
-      (access, Exp.Forall) -> Ap $ HashMap.singleton k . (Val.AccessScope access label,) . Val <$> newVar' Val.Any
-      (access, Exp.Var) -> Ap $ HashMap.singleton k . (Val.AccessScope access label,) . Ref <$> freshVar'
+    f scopes k = \ case
+      (access, Exp.Exists) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> freshVar'
+      (access, Exp.Forall) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> newVar' Val.Any
+      (access, Exp.Var) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Ref <$> freshVar'
 
 unify'
   :: MonadEval m
