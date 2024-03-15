@@ -126,16 +126,19 @@ instance ( Pretty (f (Exp f a))
     Verify e -> "verify" <+> braces (pretty e)
     Check eff e -> "check" <> angles (pretty eff) <+> braces (pretty e)
     Assume eff e -> "assume" <> angles (pretty eff) <+> braces (pretty e)
+    Module i xs e ->
+      "module" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
+    Struct i xs e ->
+      "struct" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
     Class i e1 xs e2 ->
       "class" <> pretty '#' <> prettyLabel i <>
       maybe mempty (parens . pretty) e1 <+>
       braces (bindings xs $ pretty e2)
     Inst e1 xs e2 -> parens (pretty e1) <+> braces (bindings xs $ pretty e2)
-    Module i xs e ->
-      "module" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
-    Struct i xs e ->
-      "struct" <> pretty '#' <> prettyLabel i <> braces (bindings xs $ pretty e)
-    BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
+    IfThenElse xs e1 e2 e3 ->
+      "if" <+> parens (bindings xs $ pretty e1) <+>
+      braces (pretty e2) <+>
+      braces (pretty e3)
     ForDo xs e1 e2 ->
       "for" <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
     Def access t x e ->
@@ -145,6 +148,7 @@ instance ( Pretty (f (Exp f a))
     Alloc x e1 e2 ->
       "alloc" <> parens (pretty x) <+> pretty e1 <> parens (pretty e2)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
+    BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     Tuple es -> tupled $ pretty <$> es
     Truth e -> "truth" <+> braces (pretty e)
     Int x -> pretty x

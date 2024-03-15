@@ -5,8 +5,8 @@ module Main
   ) where
 
 import Control.Monad(when, (<=<))
-import Control.Monad.Abort
 import Control.Monad.Supply
+import Control.Monad.Wrong
 import Data.ByteString qualified as ByteString
 import Data.ByteString(ByteString)
 import Data.List(sort, find, isSuffixOf)

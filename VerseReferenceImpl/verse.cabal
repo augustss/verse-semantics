@@ -24,11 +24,12 @@ flag wasm
 
 library
   exposed-modules:
-    Control.Monad.Abort
+    Control.Monad.Extras
     Control.Monad.Ref
     Control.Monad.RS
     Control.Monad.Supply
     Control.Monad.Verse
+    Control.Monad.Wrong
     Data.IntMap.Lazy.Extras
     Data.Fix
     Data.Functor.Compose.Instances

@@ -9,10 +9,10 @@ module Language.Verse.Desugar
 
 import Control.Arrow (first)
 import Control.Comonad
-import Control.Monad.Abort
 import Control.Monad.Reader
 import Control.Monad.State.Strict
 import Control.Monad.Supply
+import Control.Monad.Wrong
 
 import Data.Functor
 import Data.Functor.Apply
@@ -81,7 +81,7 @@ runDesugarT' :: DesugarT m a -> ReaderT R m (a, Env)
 runDesugarT' m = runStateT m mempty
 
 desugar
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Mode
   -> L (Rewrite.Exp L Ident)
   -> m (L (Exp L Ident))
@@ -90,7 +90,7 @@ desugar mode e = flip runReaderT (fromMode mode) $ case mode of
   Verification -> verify . check Effect.Succeeds <$> posM (desugarTop e)
 
 desugarTop
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> ReaderT R m (L (Exp L Ident))
 desugarTop e = do
@@ -98,7 +98,7 @@ desugarTop e = do
   pure $ TopLevel xs <$> duplicate e
 
 desugarExp
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
 desugarExp e = do
@@ -106,7 +106,7 @@ desugarExp e = do
   desugarExp' e False x
 
 desugarExp'
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> Bool
   -> L (Exp L Ident)
@@ -114,7 +114,7 @@ desugarExp'
 desugarExp' e pi x = (e $>) <$> desugarExp'' e pi x
 
 desugarExp''
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> Bool
   -> L (Exp L Ident)
@@ -254,7 +254,7 @@ desugarExp'' e pi i = case extract e of
     pure $ IfArchetypeName x y e1 e2
 
 desugarName
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Rewrite.Name L Ident
   -> DesugarT m (Name L Ident)
 desugarName = \ case
@@ -265,7 +265,7 @@ desugarName = \ case
     pure $ QualName e y
 
 desugarNonEmpty
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Bool
   -> L (Exp L Ident)
   -> L (Rewrite.Exp L Ident)
@@ -276,7 +276,7 @@ desugarNonEmpty pi i x = \ case
   y:xs -> desugarExp x `thenM` desugarNonEmpty pi i y xs
 
 desugarNonEmpty'
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Bool
   -> L (Exp L Ident)
   -> L (Rewrite.Exp L Ident)
@@ -287,7 +287,7 @@ desugarNonEmpty' pi i x = \ case
   y:xs -> desugarExp x `thenM'` desugarNonEmpty pi i y xs
 
 desugarTuple
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Bool
   -> [L (Rewrite.Exp L Ident)]
   -> DesugarT m ([L (Exp L Ident)], [L (Exp L Ident)])
@@ -308,7 +308,7 @@ desugarPath (Rewrite.Path label pathIdents) =
     desugarPath' = first $ fmap desugarPath
 
 desugarLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Split.Effect
@@ -323,7 +323,7 @@ desugarLam loc e1 eff e2 e3 pi f = ask >>= \ case
   Pos -> posLam loc e1 eff e2 e3 pi f
 
 execLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Maybe (L (Rewrite.Exp L Ident))
@@ -352,7 +352,7 @@ execLam loc' e1 e2 e3 pi f = do
         pure (bracketInvoke e d)
 
 posLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Split.Effect
@@ -366,7 +366,7 @@ posLam loc e1 eff e2 e3 pi f =
   L loc <$> assumePosLam e1 eff e2 e3 pi f
 
 assumePosLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> Split.Effect
   -> Maybe (L (Rewrite.Exp L Ident))
@@ -388,7 +388,7 @@ assumePosLam e1 eff e2 e3 pi f = do
         negM (desugarExp' e3 pi c)
 
 negLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> Split.Effect
   -> Maybe (L (Rewrite.Exp L Ident))
@@ -397,7 +397,7 @@ negLam
 negLam = assumeNegLam
 
 assumeNegLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> Split.Effect
   -> Maybe (L (Rewrite.Exp L Ident))
@@ -414,7 +414,7 @@ assumeNegLam e1 eff e2 e3 = do
       concreteD eff e3
 
 desugarOLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Split.Effect
@@ -429,7 +429,7 @@ desugarOLam loc e1 eff e2 e3 pi f = ask >>= \ case
   Pos -> posOLam loc e1 eff e2 e3 pi f
 
 execOLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Maybe (L (Rewrite.Exp L Ident))
@@ -450,7 +450,7 @@ execOLam loc' e1 e2 e3 pi f = do
       Nothing -> desugarExp' e3 pi b
 
 posOLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Split.Effect
@@ -464,7 +464,7 @@ posOLam loc e1 eff e2 e3 pi f =
   L loc <$> assumePosOLam e1 eff e2 e3 pi f
 
 assumePosOLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> Split.Effect
   -> Maybe (L (Rewrite.Exp L Ident))
@@ -485,7 +485,7 @@ assumePosOLam e1 eff e2 e3 pi f = do
       unify b <$> invokeM a pi f `thenM` negM (desugarExp' e3 pi b)
 
 negOLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Split.Effect
@@ -497,7 +497,7 @@ negOLam
 negOLam = assumeNegOLam
 
 assumeNegOLam
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Split.Effect
@@ -516,7 +516,7 @@ assumeNegOLam loc' e1 eff e2 e3 pi f = do
     Nothing -> concreteD eff e3
 
 verifyPosLam'
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Loc
   -> L (Rewrite.Exp L Ident)
   -> Split.Effect
@@ -536,7 +536,7 @@ verifyPosLam' loc' e1 eff e2 e3 pi f = do
         Nothing -> unify c <$> invokeM b pi f `thenM` desugarExp' e3 pi c
 
 desugarOfType
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> Bool
@@ -548,7 +548,7 @@ desugarOfType e1 e2 pi x = ask >>= \ case
   Pos -> posOfType e1 e2 pi x
 
 execOfType
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> Bool
@@ -561,7 +561,7 @@ execOfType e1 e2 pi x = do
   pure $ unify y e1 :>>: bracketInvoke e2 y
 
 negOfType
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> Bool
@@ -578,7 +578,7 @@ negOfType e1 e2 pi x = do
      forall' Private r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 posOfType
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> Bool
@@ -597,7 +597,7 @@ posOfType e1 e2 pi x = do
      forall' Private r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 checkOfTypeD
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> Bool
@@ -614,7 +614,7 @@ checkOfTypeD e1 e2 pi x = do
     check Effect.Succeeds (bracketInvoke j i)
 
 ofTypeD
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Rewrite.Exp L Ident)
   -> L (Rewrite.Exp L Ident)
   -> Bool
@@ -631,7 +631,7 @@ ofTypeD e1 e2 pi x = do
     bracketInvoke j i
 
 abstractD
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Split.Effect
   -> L (Rewrite.Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
@@ -643,7 +643,7 @@ abstractD eff e = do
       pure (assume Effect.Succeeds . bracketInvoke i $ name r)
 
 concreteD
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Split.Effect
   -> L (Rewrite.Exp L Ident)
   -> DesugarT m (L (Exp L Ident))
@@ -781,24 +781,24 @@ freshIdent loc = do
 freshIdent' :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
 freshIdent' loc = L loc . Ident.Label <$> supply
 
-tellValName :: MonadAbort Error m => Access -> L Ident -> DesugarT m ()
+tellValName :: MonadWrong Error m => Access -> L Ident -> DesugarT m ()
 tellValName access = tellName' access Exists
 
 tellFunName :: Monad m => Access -> L Ident -> DesugarT m ()
 tellFunName access x =
   modify $ HashMap.insertWith (\ _ x -> x) (extract x) (loc x, access, Exists)
 
-tellVarName :: MonadAbort Error m => Access -> L Ident -> DesugarT m ()
+tellVarName :: MonadWrong Error m => Access -> L Ident -> DesugarT m ()
 tellVarName access = tellName' access Var
 
-tellExistsName :: MonadAbort Error m => Access -> L Ident -> DesugarT m ()
+tellExistsName :: MonadWrong Error m => Access -> L Ident -> DesugarT m ()
 tellExistsName access = tellName' access Exists
 
-tellForallName :: MonadAbort Error m => Access -> L Ident -> DesugarT m ()
+tellForallName :: MonadWrong Error m => Access -> L Ident -> DesugarT m ()
 tellForallName access = tellName' access Forall
 
 tellName
-  :: MonadAbort Error m
+  :: MonadWrong Error m
   => Access
   -> Rewrite.Quantifier
   -> L Ident
@@ -808,13 +808,13 @@ tellName access = \ case
   Rewrite.Fun -> tellFunName access
   Rewrite.Var -> tellVarName access
 
-tellName' :: MonadAbort Error m => Access -> Quantifier -> L Ident -> DesugarT m ()
+tellName' :: MonadWrong Error m => Access -> Quantifier -> L Ident -> DesugarT m ()
 tellName' access t x =
   put =<<
   HashMap.alterF
   (\ case
       Nothing -> pure $ Just (loc x, access, t)
-      Just (y, _, _) -> abort $ DefError y (loc x) (extract x))
+      Just (y, _, _) -> wrong $ DefError y (loc x) (extract x))
   (extract x) =<<
   get
 

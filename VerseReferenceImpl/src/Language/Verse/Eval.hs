@@ -14,13 +14,13 @@ module Language.Verse.Eval
 
 import Control.Applicative
 import Control.Comonad
-import Control.Monad (Monad (..), (=<<), (>=>), (<=<), guard)
-import Control.Monad.Abort
+import Control.Monad.Extras (Monad (..), (=<<), (>=>), guard, whenM)
 import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Reader
 import Control.Monad.Supply
 import Control.Monad.Verse
+import Control.Monad.Wrong
 
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.List.NonEmpty (NonEmpty(..), (<|))
@@ -47,12 +47,11 @@ import Data.Tuple
 
 import Language.Verse.Desugar.Exp
   ( Exp
-    ( (:*>:)
-    , (:>>:)
-    , (:=:)
-    , (:.:)
-    , (:|:)
-    )
+  , pattern (:*>:)
+  , pattern (:>>:)
+  , pattern (:=:)
+  , pattern (:.:)
+  , pattern (:|:)
   , Access(..)
   )
 import Language.Verse.Desugar.Exp qualified as Exp
@@ -73,7 +72,7 @@ import Language.Verse.Val
   , Val
   , VarEnv
   , VarNamed
-  , VarRefVal
+  , RefVarVal
   , VarVal
   , forVal_
   )
@@ -152,7 +151,7 @@ runEvalT scopes m mode = runReaderT m R {..}
     archetype' = mempty
 
 type MonadEval m =
-  ( MonadAbort Error m
+  ( MonadWrong Error m
   , MonadFix m
   , MonadRef m
   , MonadSupply Label m
@@ -161,10 +160,10 @@ type MonadEval m =
 
 eval :: MonadEval m => Mode -> L (Exp L Ident) -> VerseT m FrozenVal
 eval mode e = do
+  i <- supply
   s <- newS
   s' <- freshS
-  m <- supply
-  freeze' =<< runEvalT (NonEmpty.singleton $ Val.Scope m [] m)  (evalExp e s s') mode
+  freeze' =<< runEvalT (NonEmpty.singleton $ Val.Scope i [] i)  (evalExp e s s') mode
 
 evalExp :: MonadEval m => L (Exp L Ident) -> S m -> S m -> EvalT m (VarVal m)
 evalExp e = case extract e of
@@ -176,7 +175,7 @@ evalExp e = case extract e of
     var <- lift freshVar'
     fork' $ do
       s'' <- lift freshS
-      lift . readIVar <=< join' . void $ evalExp e1 s s''
+      join'' . void $ evalExp e1 s s''
       unify' (loc e) var =<< evalExp e2 s'' s'
     pure var
   e1 :=: e2 -> \ s s' -> do
@@ -240,7 +239,7 @@ evalExp e = case extract e of
     var <- lift freshVar'
     localName access x (Val var) $ evalExp e s s'
   Exp.Def access Exp.Forall x e -> \ s s' -> do
-    var <- lift $ newVar' Val.Any
+    var <- lift $ newVerifyVar' Val.Any
     localName access (extract x) (Val var) $ evalExp e s s'
   Exp.Def access Exp.Var (extract -> x) e -> \ s s' -> do
     var <- lift freshVar'
@@ -248,14 +247,14 @@ evalExp e = case extract e of
   Exp.Alloc x e1 e2 ->
     evalAlloc (loc e) x e1 e2
   Exp.Set x e -> \ s s' -> lookupNamed (extract x) >>= \ case
-    Nothing -> abort $ IdentError (loc x) (extract x)
-    Just (Val _) -> abort $ RefError $ loc e
+    Nothing -> wrong $ IdentError (loc x) (extract x)
+    Just (Val _) -> wrong $ RefError $ loc e
     Just (Ref var) -> do
       s'' <- lift freshS
       var_e <- evalExp e s s''
       fork' $ lift (readVar' var) >>= \ case
         Val.Ptr ref var -> writeRef' (loc x) ref var var_e s'' s'
-        _ -> abort . RefError $ loc e
+        _ -> wrong . RefError $ loc e
       pure var_e
   Exp.Lam x e -> \ s s' -> ask >>= \ r -> lift $ do
     unifyS s s'
@@ -302,8 +301,8 @@ evalExp e = case extract e of
   Exp.ArchetypeName x -> \ s s' -> do
     r <- ask
     case lookupEnv r.scopes x r.archetype' <|> lookupEnv r.scopes x r.env of
-      Nothing -> abort $ IdentError (loc e) x
-      Just (Ref _) -> abort . ValError $ loc e
+      Nothing -> wrong $ IdentError (loc e) x
+      Just (Ref _) -> wrong . ValError $ loc e
       Just (Val var) -> lift $ unifyS s s' $> var
   Exp.TopLevel xs e -> \ s s' -> do
     xs <- freshEnv xs
@@ -373,7 +372,7 @@ dotM'
 dotM' loc var x s s' = do
   scopes <- getScopes
   lift (readVar' var) >>= getNameEnv loc <&> lookupEnv scopes x >>= \ case
-    Nothing -> abort $ NameError loc x
+    Nothing -> wrong $ NameError loc x
     Just x -> evalNamed' loc x s s'
 
 evalChoice
@@ -402,7 +401,7 @@ evalOne loc e s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
   var <- lift freshVar'
   fork' do
-    var' <- lift . readIVar =<< one' do
+    var' <- one' do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
       evalExp e s { choiceFree } s'
@@ -421,7 +420,7 @@ evalAll loc e s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
   var <- lift freshVar'
   fork' $ do
-    vars <- lift . readIVar =<< all' do
+    vars <- all'' do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
       evalExp e s { choiceFree } s'
@@ -437,7 +436,7 @@ evalNot
   -> EvalT m (VarVal m)
 evalNot e s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
-  fork' $ lift . readIVar =<< if''
+  fork' $ if''
     do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
@@ -461,7 +460,7 @@ evalIfThenElse
 evalIfThenElse loc xs p t e s s' = do
   var <- lift freshVar'
   fork' do
-    var' <- lift . readIVar =<< if''
+    var' <- if''
       do
         xs <- freshEnv xs
         choiceFree <- lift $ newVar ChoiceFree
@@ -488,7 +487,7 @@ evalForDo loc xs e1 e2 s s' = do
   var <- lift freshVar'
   fork' $ do
     s'' <- lift freshS
-    vars <- lift . readIVar =<< for'
+    vars <- for''
       do
         xs <- freshEnv xs
         choiceFree <- lift $ newVar ChoiceFree
@@ -513,8 +512,8 @@ evalAlloc
 evalAlloc loc' x e1 e2 s s' = do
   r <- ask
   case lookupEnv r.scopes (extract x) r.archetype' <|> lookupEnv r.scopes (extract x) r.env of
-    Nothing -> abort $ IdentError (loc x) (extract x)
-    Just (Val _) -> abort . RefError $ loc x
+    Nothing -> wrong $ IdentError (loc x) (extract x)
+    Just (Val _) -> wrong . RefError $ loc x
     Just (Ref var) -> do
       s'' <- lift freshS
       var1 <- evalExp e1 s s''
@@ -522,8 +521,8 @@ evalAlloc loc' x e1 e2 s s' = do
       var2 <- evalExp e2 s'' s'''
       var' <- lift freshVar'
       fork' do
-        lift . readIVar <=< join' $ unify' loc' var' =<< invoke loc' var1 var2 s''' s'
-        ref <- lift . newVarRef $ coerce var'
+        join'' $ unify' loc' var' =<< invoke loc' var1 var2 s''' s'
+        ref <- lift . newVerseRef $ coerce var'
         unify' loc' var =<< lift (newVar' $ Val.Ptr ref var1)
       pure var'
 
@@ -536,7 +535,7 @@ evalVerify
 evalVerify e s s' = do
   whenM (asks $ not . (.assumed)) $ do
     lift $ unifyS s s'
-    fork' $ lift . readIVar =<< verify' do
+    fork' $ verify' do
       s <- lift newS
       s' <- lift freshS
       void . local (\ r -> r { assumed = True }) $ evalExp e s s'
@@ -551,11 +550,10 @@ evalFails
 evalFails e s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
   fork' $ do
-    lift . readIVar =<< fails' do
-      choiceFree <- lift $ newVar ChoiceFree
-      s' <- lift freshS
-      local (\ r -> r { assumed = False }) $ evalExp e s { choiceFree } s'
-    abort . FailsError $ loc e
+    choiceFree <- lift $ newVar ChoiceFree
+    s' <- lift freshS
+    _ <- local (\ r -> r { assumed = False }) $ evalExp e s { choiceFree } s'
+    wrong . FailsError $ loc e
   lift freshVar'
 
 evalSucceeds
@@ -573,8 +571,8 @@ evalSucceeds loc' e s s' = do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
       local (\ r -> r { assumed = False }) $ evalExp e s { choiceFree } s'
-    >>= lift . readIVar >>= \ case
-      Nothing -> abort . SucceedsError $ loc e
+    >>= \ case
+      Nothing -> wrong . SucceedsError $ loc e
       Just var' -> do
         lift $ unifyEq s.storeFree s'.storeFree
         unify' loc' var var'
@@ -591,8 +589,8 @@ evalDecides loc' e s s' = do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
       local (\ r -> r { assumed = False }) $ evalExp e s { choiceFree} s'
-    >>= lift . readIVar >>= \ case
-      Nothing -> abort . DecidesError $ loc e
+    >>= \ case
+      Nothing -> wrong . DecidesError $ loc e
       Just var' -> do
         lift $ unifyEq s.storeFree s'.storeFree
         unify' loc' var var'
@@ -622,7 +620,7 @@ evalAssume' loc e s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
   var <- lift freshVar'
   fork' $ do
-    var' <- lift . readIVar =<< assume' do
+    var' <- assume' do
       choiceFree <- lift $ newVar ChoiceFree
       s' <- lift freshS
       local (\ r -> r { assumed = True }) $ evalExp e s { choiceFree } s'
@@ -651,7 +649,7 @@ evalInst loc e1 xs e2 s s' = do
       unify' loc var =<< (useScopes (addScope i scopes) $ instStruct i env ys e xs s''' s')
     Val.Class i scopes env sup ys e ->
       unify' loc var =<< (useScopes (addScope i scopes) $ instClass loc i env sup ys e xs s''' s')
-    _ -> abort $ InstError loc
+    _ -> wrong $ InstError loc
   pure var
 
 instStruct
@@ -754,13 +752,18 @@ invoke' loc var1 var2 s s' = lift (readVar' var1) >>= \ case
     var <- invokeEnum loc xs var2
     lift $ unifyEq s.choiceFree s'.choiceFree
     pure var
-  Val.Lam scopes env x e -> useScopes scopes $ localNames env . localName Private x (Val var2) $ evalExp e s s'
-  Val.OLam scopes env xs e1 e2 tail -> invokeOLam loc scopes env xs e1 e2 tail var2 s s'
-  Val.Struct i scopes env xs e -> invokeStruct loc i scopes env xs e var2 s s'
-  Val.Class i scopes env sup xs e -> invokeClass loc i scopes env sup xs e var2 s s'
-  Val.Intrinsic x tail -> invokeIntrinsic loc x tail var2 s s'
-  Val.AnyOLam -> abort $ UnknownInvokeError loc
-  _ -> abort $ InvokeError loc
+  Val.Lam scopes env x e ->
+    useScopes scopes $ localEnv env . localName Private x (Val var2) $ evalExp e s s'
+  Val.OLam scopes env xs e1 e2 tail ->
+    invokeOLam loc scopes env xs e1 e2 tail var2 s s'
+  Val.Struct i scopes env xs e ->
+    invokeStruct loc i scopes env xs e var2 s s'
+  Val.Class i scopes env sup xs e ->
+    invokeClass loc i scopes env sup xs e var2 s s'
+  Val.Intrinsic x tail ->
+    invokeIntrinsic loc x tail var2 s s'
+  Val.AnyOLam -> wrong $ UnknownInvokeError loc
+  _ -> wrong $ InvokeError loc
 
 invokeTuple
   :: MonadEval m
@@ -795,18 +798,17 @@ invokeOLam
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeOLam loc scopes env xs e1 e2 tail arg s s' =
-   useScopes scopes $ lift . readIVar =<< if''
+invokeOLam loc scopes env xs e1 e2 tail arg s s' = useScopes scopes $ if''
   do
     invokeOLamDom loc scopes env xs e1 e2 arg s s'
   do
     runDomMatch
   do
     lift (readVar' tail) >>= \ case
-      Val.AnyOLam -> abort $ UnknownInvokeError loc
+      Val.AnyOLam -> wrong $ UnknownInvokeError loc
       Val.OLam scopes env xs e1 e2 tail -> invokeOLam loc scopes env xs e1 e2 tail arg s s'
       Val.Intrinsic x tail -> invokeIntrinsic loc x tail arg s s'
-      _ -> abort $ InvokeError loc
+      _ -> wrong $ InvokeError loc
 
 invokeOLamDom_
   :: MonadEval m
@@ -935,13 +937,13 @@ instEmptySup loc sup s s' = case sup of
     pure (Just sup, xs)
 
 readClass
-  :: (MonadAbort Error m, MonadRef m)
+  :: (MonadWrong Error m, MonadRef m)
   => Loc
   -> VarVal m
   -> VerseT m (Label, NonEmpty Val.Scope, Env m, Maybe (VarVal m), Exp.Env Ident, L (Exp L Ident))
 readClass loc = readVar' >=> \ case
   Val.Class i scopes env sup xs e -> pure (i, scopes, env, sup, xs, e)
-  _ -> abort $ ClassError loc
+  _ -> wrong $ ClassError loc
 
 findClassInst
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -961,17 +963,17 @@ invokeIntrinsic
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeIntrinsic loc x tail arg s s' = lift . readIVar =<< if''
+invokeIntrinsic loc x tail arg s s' = if''
   do
     invokeIntrinsicDom loc x arg s s'
   do
     runDomMatch
   do
     lift (readVar' tail) >>= \ case
-      Val.AnyOLam -> abort $ UnknownInvokeError loc
+      Val.AnyOLam -> wrong $ UnknownInvokeError loc
       Val.OLam scopes env xs e1 e2 tail -> invokeOLam loc scopes env xs e1 e2 tail arg s s'
       Val.Intrinsic x tail -> invokeIntrinsic loc x tail arg s s'
-      _ -> abort $ InvokeError loc
+      _ -> wrong $ InvokeError loc
 
 invokeIntrinsicDom_
   :: MonadEval m
@@ -1049,41 +1051,41 @@ liftNum
   -> VarVal m -> VerseT m (DomMatch m)
 liftNum f var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Val.AnyRational, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyRational, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyRational, Val.Int _) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyRational, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Rational _, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyRational, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyRational, Val.Int _) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyRational, Val.Float _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Rational _, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
     (Val.Rational x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ f x y
-    (Val.Rational _, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.Rational _, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyRational
     (Val.Rational x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ f x (fromInteger y)
-    (Val.Rational _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Rational _, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
     (Val.Rational x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f (fromRational x) y
-    (Val.AnyInt, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyInt, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyInt
-    (Val.AnyInt, Val.Int _) -> domMatch_' $ newVar' Val.AnyInt
-    (Val.AnyInt, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyInt, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Int _, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyRational
+    (Val.AnyInt, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyInt, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyInt, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyInt
+    (Val.AnyInt, Val.Int _) -> domMatch_' $ newVerifyVar' Val.AnyInt
+    (Val.AnyInt, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyInt, Val.Float _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Int _, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
     (Val.Int x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ f (fromInteger x) y
-    (Val.Int _, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyInt
+    (Val.Int _, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyInt
     (Val.Int x, Val.Int y) -> domMatch_' . newVar' . Val.Int $ f x y
-    (Val.Int _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Int _, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
     (Val.Int x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f (fromInteger x) y
-    (Val.AnyFloat, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Rational _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Int _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Float _, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Int _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Float _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Float _, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyFloat
     (Val.Float x, Val.Rational y) -> domMatch_' . newVar' . Val.Float $ f x (fromRational y)
-    (Val.Float _, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float _, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyFloat
     (Val.Float x, Val.Int y) -> domMatch_' . newVar' . Val.Float $ f x (fromInteger y)
-    (Val.Float _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
+    (Val.Float _, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
     (Val.Float x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f x y
     _ -> empty
   _ -> empty
@@ -1099,11 +1101,11 @@ prefixMinus
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VarVal m -> VerseT m (DomMatch m)
 prefixMinus var = readVar' var >>= \ case
-  Val.AnyRational -> domMatch_' $ newVar' Val.AnyRational
+  Val.AnyRational -> domMatch_' $ newVerifyVar' Val.AnyRational
   Val.Rational x -> domMatch_' $ newVar' (Val.Rational $ negate x)
-  Val.AnyInt -> domMatch_' $ newVar' Val.AnyInt
+  Val.AnyInt -> domMatch_' $ newVerifyVar' Val.AnyInt
   Val.Int x -> domMatch_' $ newVar' (Val.Int $ negate x)
-  Val.AnyFloat -> domMatch_' $ newVar' Val.AnyFloat
+  Val.AnyFloat -> domMatch_' $ newVerifyVar' Val.AnyFloat
   Val.Float x -> domMatch_' $ newVar' (Val.Float $ negate x)
   _ -> empty
 
@@ -1112,50 +1114,94 @@ div'
   => VarVal m -> VerseT m (DomMatch m)
 div' var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Val.AnyRational, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyRational
-    (Val.AnyRational, Val.Rational 0) -> domMatch_' empty
-    (Val.AnyRational, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
-    (Val.AnyRational, Val.Int 0) -> domMatch_' empty
-    (Val.AnyRational, Val.Int _) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyRational, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Rational _, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyRational
-    (Val.Rational _, Val.Rational 0) -> domMatch_' empty
-    (Val.Rational x, Val.Rational y) -> domMatch_' $ newVar' . Val.Rational $ x / y
-    (Val.Rational _, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
-    (Val.Rational _, Val.Int 0) -> domMatch_' empty
-    (Val.Rational x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ x / fromInteger y
-    (Val.Rational _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Rational x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ fromRational x / y
-    (Val.AnyInt, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyRational
-    (Val.AnyInt, Val.Rational 0) -> domMatch_' empty
-    (Val.AnyInt, Val.Rational _) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
-    (Val.AnyInt, Val.Int 0) -> domMatch_' empty
-    (Val.AnyInt, Val.Int _) -> domMatch_' $ newVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyInt, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Int _, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyRational
-    (Val.Int _, Val.Rational 0) -> domMatch_' empty
-    (Val.Int x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ fromInteger x / y
-    (Val.Int _, Val.AnyInt) -> domMatch_' $ decide *> newVar' Val.AnyRational
-    (Val.Int _, Val.Int 0) -> domMatch_' empty
-    (Val.Int x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ x % y
-    (Val.Int _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Int x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ fromInteger x / y
-    (Val.AnyFloat, Val.AnyRational) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Rational _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Int _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Float _) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Float _, Val.AnyRational) -> domMatch_' $ decide *> newVar' Val.AnyFloat
-    (Val.Float x, Val.Rational y) -> domMatch_' . newVar' . Val.Float $ x / fromRational y
-    (Val.Float _, Val.AnyInt) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Float x, Val.Int y) -> domMatch_' . newVar' . Val.Float $ x / fromInteger y
-    (Val.Float _, Val.AnyFloat) -> domMatch_' $ newVar' Val.AnyFloat
-    (Val.Float x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ x / y
+    (Val.AnyRational, Val.AnyRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.AnyRational, Val.Rational 0) ->
+      domMatch_' empty
+    (Val.AnyRational, Val.Rational _) ->
+      domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyInt) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.AnyRational, Val.Int 0) ->
+      domMatch_' empty
+    (Val.AnyRational, Val.Int _) ->
+      domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyRational, Val.AnyFloat) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyRational, Val.Float _) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Rational _, Val.AnyRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.Rational _, Val.Rational 0) ->
+      domMatch_' empty
+    (Val.Rational x, Val.Rational y) ->
+      domMatch_' $ newVar' . Val.Rational $ x / y
+    (Val.Rational _, Val.AnyInt) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.Rational _, Val.Int 0) ->
+      domMatch_' empty
+    (Val.Rational x, Val.Int y) ->
+      domMatch_' . newVar' . Val.Rational $ x / fromInteger y
+    (Val.Rational _, Val.AnyFloat) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Rational x, Val.Float y) ->
+      domMatch_' . newVar' . Val.Float $ fromRational x / y
+    (Val.AnyInt, Val.AnyRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.AnyInt, Val.Rational 0) ->
+      domMatch_' empty
+    (Val.AnyInt, Val.Rational _) ->
+      domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyInt, Val.AnyInt) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.AnyInt, Val.Int 0) ->
+      domMatch_' empty
+    (Val.AnyInt, Val.Int _) ->
+      domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.AnyInt, Val.AnyFloat) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyInt, Val.Float _) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Int _, Val.AnyRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.Int _, Val.Rational 0) ->
+      domMatch_' empty
+    (Val.Int x, Val.Rational y) ->
+      domMatch_' . newVar' . Val.Rational $ fromInteger x / y
+    (Val.Int _, Val.AnyInt) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.Int _, Val.Int 0) ->
+      domMatch_' empty
+    (Val.Int x, Val.Int y) ->
+      domMatch_' . newVar' . Val.Rational $ x % y
+    (Val.Int _, Val.AnyFloat) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Int x, Val.Float y) ->
+      domMatch_' . newVar' . Val.Float $ fromInteger x / y
+    (Val.AnyFloat, Val.AnyRational) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Rational _) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyInt) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Int _) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.AnyFloat) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.AnyFloat, Val.Float _) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Float _, Val.AnyRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.AnyFloat
+    (Val.Float x, Val.Rational y) ->
+      domMatch_' . newVar' . Val.Float $ x / fromRational y
+    (Val.Float _, Val.AnyInt) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Float x, Val.Int y) ->
+      domMatch_' . newVar' . Val.Float $ x / fromInteger y
+    (Val.Float _, Val.AnyFloat) ->
+      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Float x, Val.Float y) ->
+      domMatch_' . newVar' . Val.Float $ x / y
     _ -> empty
   _ -> empty
 
@@ -1222,8 +1268,8 @@ int
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 int loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyInt)
-    Val.AnyRational -> unify' loc var =<< lift (newVar' Val.AnyInt)
+    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyInt)
+    Val.AnyRational -> unify' loc var =<< lift (newVerifyVar' Val.AnyInt)
     Val.Rational x | denominator x == 1 -> pure ()
     Val.AnyInt -> pure ()
     Val.Int _ -> pure ()
@@ -1235,7 +1281,7 @@ rational
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 rational loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyRational)
+    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyRational)
     Val.AnyRational -> pure ()
     Val.Rational _ -> pure ()
     Val.AnyInt -> pure ()
@@ -1248,7 +1294,7 @@ float
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 float loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyFloat)
+    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyFloat)
     Val.AnyFloat -> pure ()
     Val.Float _ -> pure ()
     _ -> empty
@@ -1259,7 +1305,7 @@ char
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 char loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyChar)
+    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyChar)
     Val.AnyChar -> pure ()
     Val.Char _ -> pure ()
     _ -> empty
@@ -1270,7 +1316,7 @@ char32
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 char32 loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyChar32)
+    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyChar32)
     Val.AnyChar32 -> pure ()
     Val.Char32 _ -> pure ()
     _ -> empty
@@ -1281,7 +1327,7 @@ function
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 function loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVar' Val.AnyOLam)
+    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyOLam)
     Val.Tuple _ -> pure ()
     Val.Enum {} -> pure ()
     Val.Lam {} -> pure ()
@@ -1321,7 +1367,7 @@ evalIdent
   -> S m
   -> EvalT m (VarVal m)
 evalIdent x s s' = lookupNamed (extract x) >>= \ case
-  Nothing -> abort $ IdentError (loc x) (extract x)
+  Nothing -> wrong $ IdentError (loc x) (extract x)
   Just y -> evalNamed (loc x) y s s'
 
 evalQualName
@@ -1347,11 +1393,11 @@ evalQualName loc e x s s' = do
 -- Ignore root for now since I don't know what it should be.  In the
 -- future we want to be able to support several packages, selecting
 -- the correct one depending on the root.
-getPath :: MonadAbort Error m => Loc -> Val ref a -> m (Maybe (SimpleName, [SimpleName]))
+getPath :: MonadWrong Error m => Loc -> Val ref a -> m (Maybe (SimpleName, [SimpleName]))
 getPath loc = \ case
   Val.Path (_root:p:ps) -> return $ Just (p, ps)
   Val.Path [_root] -> return $ Nothing
-  _ -> abort $ EnvError loc
+  _ -> wrong $ EnvError loc
 
 evalTopIdent'
   :: MonadEval m
@@ -1360,7 +1406,7 @@ evalTopIdent'
   -> S m
   -> EvalT m (VarVal m)
 evalTopIdent' x s s' = lookupTopNamed (extract x) >>= \ case
-  Nothing -> abort $ IdentError (loc x) (extract x)
+  Nothing -> wrong $ IdentError (loc x) (extract x)
   Just y -> evalNamed' (loc x) y s s'
 
 evalNamed
@@ -1376,7 +1422,7 @@ evalNamed loc x s s' = case x of
     var' <- lift freshVar'
     fork' $ lift (readVar' var) >>= \ case
       Val.Ptr ref var -> unify' loc var' =<< readRef' loc ref var s s'
-      _ -> abort $ RefError loc
+      _ -> wrong $ RefError loc
     pure var'
 
 evalNamed'
@@ -1390,12 +1436,12 @@ evalNamed' loc x s s' = case x of
   Val var -> lift $ unifyS s s' $> var
   Ref var -> lift (readVar' var) >>= \ case
     Val.Ptr ref var -> readRef' loc ref var s s'
-    _ -> abort $ RefError loc
+    _ -> wrong $ RefError loc
 
 writeRef'
   :: MonadEval m
   => Loc
-  -> VarRefVal m
+  -> RefVarVal m
   -> VarVal m
   -> VarVal m
   -> S m
@@ -1405,16 +1451,16 @@ writeRef' loc ref var x s s' = asks (.mode) >>= \ case
   Execution -> do
     s'' <- lift freshS
     y <- lift freshVar'
-    lift . readIVar <=< join' $ unify' loc y =<< invoke loc var x s s''
+    join'' $ unify' loc y =<< invoke loc var x s s''
     lift $ do
       unifyEq s''.choiceFree s'.choiceFree
       fork $ do
         _ <- readVar s''.storeFree
-        writeVarRef ref $ coerce y
+        writeVerseRef ref $ coerce y
         unifyEq s''.storeFree s'.storeFree
   Verification -> do
     s'' <- lift freshS
-    lift . readIVar <=< join' . void $ invoke loc var x s s''
+    join'' . void $ invoke loc var x s s''
     lift $ do
       unifyEq s''.choiceFree s'.choiceFree
       fork $ do
@@ -1424,7 +1470,7 @@ writeRef' loc ref var x s s' = asks (.mode) >>= \ case
 readRef'
   :: MonadEval m
   => Loc
-  -> VarRefVal m
+  -> RefVarVal m
   -> VarVal m
   -> S m
   -> S m
@@ -1433,10 +1479,10 @@ readRef' loc ref var s s' = do
   lift $ unifyEq s.choiceFree s'.choiceFree
   _ <- lift $ readVar s.storeFree
   x <- asks (.mode) >>= \ case
-    Execution -> lift $ coerce <$> readVarRef ref
+    Execution -> lift $ readVerseRef ref
     Verification -> do
-      i <- lift $ newVar' Val.Any
-      lift . readIVar <=< assume' . local (\ r -> r { assumed = True }) $ do
+      i <- lift $ newVerifyVar' Val.Any
+      assume' . local (\ r -> r { assumed = True }) $ do
         s <- lift newS
         s' <- lift freshS
         invoke loc var i s s'
@@ -1480,7 +1526,8 @@ matchScope :: Label -> Val.Scope -> Bool
 matchScope label (Val.Scope label' _ _) = label == label'
 
 matchProtected :: Label -> Val.Scope -> Bool
-matchProtected label (Val.Scope label' labels' _) = label == label' || List.any (label==) labels'
+matchProtected label (Val.Scope label' labels' _) =
+  label == label' || List.any (label==) labels'
 
 lookupNamed :: Ident -> EvalT m (Maybe (VarNamed m))
 lookupNamed x = do
@@ -1489,10 +1536,16 @@ lookupNamed x = do
 lookupTopNamed :: Ident -> EvalT m (Maybe (VarNamed m))
 lookupTopNamed x = asks $ \ r -> lookupEnv r.scopes x r.top
 
-lookupEnv :: (Hashable k, Eq k) => NonEmpty Val.Scope -> k -> HashMap k (Val.AccessScope, VarNamed m) -> Maybe (VarNamed m)
+lookupEnv
+  :: (Hashable k, Eq k)
+  => NonEmpty Val.Scope
+  -> k
+  -> HashMap k (Val.AccessScope, VarNamed m)
+  -> Maybe (VarNamed m)
 lookupEnv scopes x env =
   case HashMap.lookup x env of
-    Just (Val.AccessScope access qScope qModule, named) | accessOk access qScope qModule scopes -> Just named
+    Just (Val.AccessScope access qScope qModule, named)
+      | accessOk access qScope qModule scopes -> Just named
     _ -> Nothing
 
 localName :: Access -> Ident -> VarNamed m -> EvalT m a -> EvalT m a
@@ -1540,7 +1593,7 @@ freshEnv xs = do
   where
     f scopes k = \ case
       (access, Exp.Exists) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> freshVar'
-      (access, Exp.Forall) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> newVar' Val.Any
+      (access, Exp.Forall) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> newVerifyVar' Val.Any
       (access, Exp.Var) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Ref <$> freshVar'
 
 unify'
@@ -1556,36 +1609,36 @@ unify' loc x y = do
 match
   :: MonadEval m
   => Loc
-  -> Val (VarRef m) (VarVal m)
-  -> Val (VarRef m) (VarVal m)
+  -> Val (VerseRef m) (VarVal m)
+  -> Val (VerseRef m) (VarVal m)
   -> EvalT m (Match, EvalT m ())
 match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Any, Val.Lam {})
     | r.assumed -> pure $ (GE, pure ())
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.Any, Val.OLam _ _ _ _ _ ys)
     | r.assumed -> pure $ (GE,) do
-        xs <- lift $ newVar' Val.AnyOLam
+        xs <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.Any, Val.Intrinsic _ ys)
     | r.assumed -> pure $ (GE,) do
-        xs <- lift $ newVar' Val.AnyOLam
+        xs <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.Any, y)
     | r.assumed -> pure . (GE,) . forVal_ y $ \ y -> do
-        x <- lift $ newVar' Val.Any
+        x <- lift $ newVerifyVar' Val.Any
         unify' loc' x y
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.Comparable, Val.Any)
     | r.assumed -> pure (LE, pure ())
-    | otherwise -> abort $ UndecidableError loc'
-  (Val.Comparable, Val.AnyOLam) -> abort $ UndecidableError loc'
-  (Val.Comparable, Val.OLam {}) -> abort $ UndecidableError loc'
-  (Val.Comparable, Val.Intrinsic {}) -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
+  (Val.Comparable, Val.AnyOLam) -> wrong $ UndecidableError loc'
+  (Val.Comparable, Val.OLam {}) -> wrong $ UndecidableError loc'
+  (Val.Comparable, Val.Intrinsic {}) -> wrong $ UndecidableError loc'
   (Val.Comparable, y) -> pure . (GE,) . forVal_ y $ \ y -> do
-    x <- lift $ newVar' Val.Comparable
+    x <- lift $ newVerifyVar' Val.Comparable
     unify' loc' x y
   (Val.AnyRational, Val.AnyRational) -> pure (LE, pure ())
   (Val.AnyRational, Val.Rational _) -> pure (GE, pure ())
@@ -1607,13 +1660,11 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Int x, Val.Rational y) ->
     guard (1 == denominator y && x == numerator y) $> (SEQ, pure ())
   (Val.Int _, Val.AnyInt) -> pure (LE, pure ())
-  (Val.Int x, Val.Int y) ->
-    guard (x == y) $> (SEQ, pure ())
+  (Val.Int x, Val.Int y) -> guard (x == y) $> (SEQ, pure ())
   (Val.AnyFloat, Val.AnyFloat) -> pure (LE, pure ())
   (Val.AnyFloat, Val.Float _) -> pure (GE, pure ())
   (Val.Float _, Val.AnyFloat) -> pure (LE, pure ())
-  (Val.Float x, Val.Float y) ->
-    guard (eqFloat x y) $> (SEQ, pure ())
+  (Val.Float x, Val.Float y) -> guard (eqFloat x y) $> (SEQ, pure ())
   (Val.AnyChar, Val.AnyChar) -> pure (LE, pure ())
   (Val.AnyChar, Val.Char _) -> pure (GE, pure ())
   (Val.Char _, Val.AnyChar) -> pure (LE, pure ())
@@ -1640,103 +1691,99 @@ match loc' x y = ask >>= \ r -> case (x, y) of
     unifyEnv loc' xs ys
   (Val.Lam {}, Val.Any)
     | r.assumed -> pure (LE, pure ())
-    | otherwise -> abort $ UndecidableError loc'
-  (Val.Lam {}, Val.Comparable) -> abort $ UndecidableError loc'
-  (Val.Lam {}, Val.Lam {}) -> abort $ UndecidableError loc'
-  (Val.Lam {}, Val.AnyOLam) -> abort $ UndecidableError loc'
-  (Val.Lam {}, Val.OLam {}) -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
+  (Val.Lam {}, Val.Comparable) -> wrong $ UndecidableError loc'
+  (Val.Lam {}, Val.Lam {}) -> wrong $ UndecidableError loc'
+  (Val.Lam {}, Val.AnyOLam) -> wrong $ UndecidableError loc'
+  (Val.Lam {}, Val.OLam {}) -> wrong $ UndecidableError loc'
   (Val.AnyOLam, Val.Any)
     | r.assumed -> pure (LE, pure ())
-    | otherwise -> abort $ UndecidableError loc'
-  (Val.AnyOLam, Val.Comparable) -> abort $ UndecidableError loc'
-  (Val.AnyOLam, Val.Lam {}) -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
+  (Val.AnyOLam, Val.Comparable) -> wrong $ UndecidableError loc'
+  (Val.AnyOLam, Val.Lam {}) -> wrong $ UndecidableError loc'
   (Val.AnyOLam, Val.AnyOLam)
     | r.assumed -> pure (LE, pure ())
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.AnyOLam, Val.OLam _ _ _ _ _ ys)
     | r.assumed -> pure . (GE,) $ do
-        xs <- lift $ newVar' Val.AnyOLam
+        xs <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.AnyOLam, Val.Intrinsic _ ys)
     | r.assumed -> pure . (GE,) $ do
-        xs <- lift $ newVar' Val.AnyOLam
+        xs <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.OLam _ _ _ _ _ xs, Val.Any)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVar' Val.AnyOLam
+        ys <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
-    | otherwise -> abort $ UndecidableError loc'
-  (Val.OLam {}, Val.Comparable) -> abort $ UndecidableError loc'
-  (Val.OLam {}, Val.Lam {}) -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
+  (Val.OLam {}, Val.Comparable) -> wrong $ UndecidableError loc'
+  (Val.OLam {}, Val.Lam {}) -> wrong $ UndecidableError loc'
   (Val.OLam _ _ _ _ _ xs, Val.AnyOLam)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVar' Val.AnyOLam
+        ys <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.OLam scopes_x env_x xs dom_x rng_x tail_x, Val.OLam scopes_y env_y ys dom_y rng_y tail_y) ->
     pure $ (SEQ,) do
-      whenVerifying $ do
-        fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
-          i <- lift $ newVar' Val.Any
-          invokeOLamDom_ loc' scopes_x env_x xs dom_x rng_x i
-          lift . readIVar <=< fails' $ invokeOLamDom_ loc' scopes_y env_y ys dom_y rng_y i
-          abort $ OLamDomError loc' (loc dom_x) (loc dom_y)
+      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
+        i <- lift $ newVerifyVar' Val.Any
+        invokeOLamDom_ loc' scopes_x env_x xs dom_x rng_x i
+        invokeOLamDom_ loc' scopes_y env_y ys dom_y rng_y i
+        wrong . OLamDomError loc' (loc dom_x) (loc dom_y) =<< lift (freeze' i)
       zs <- lift freshVar'
       unify' loc' tail_x =<< lift (newVar' $ Val.OLam scopes_y env_y ys dom_y rng_y zs)
       unify' loc' tail_y =<< lift (newVar' $ Val.OLam scopes_x env_x xs dom_x rng_x zs)
   (Val.OLam scopes_x env_x xs dom_x rng_x tail_x, Val.Intrinsic y tail_y) ->
     pure $ (SEQ,) do
-      whenVerifying $ do
-        fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
-          i <- lift $ newVar' Val.Any
-          invokeOLamDom_ loc' scopes_x env_x xs dom_x rng_x i
-          lift . readIVar <=< fails' $ invokeIntrinsicDom_ loc' y i
-          abort $ DomError loc' (loc dom_x)
+      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
+        i <- lift $ newVerifyVar' Val.Any
+        invokeOLamDom_ loc' scopes_x env_x xs dom_x rng_x i
+        invokeIntrinsicDom_ loc' y i
+        wrong . DomError loc' (loc dom_x) =<< lift (freeze' i)
       zs <- lift freshVar'
       unify' loc' tail_x =<< lift (newVar' $ Val.Intrinsic y zs)
       unify' loc' tail_y =<< lift (newVar' $ Val.OLam scopes_x env_x xs dom_x rng_x zs)
   (Val.Intrinsic _ xs, Val.Any)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVar' Val.AnyOLam
+        ys <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
-    | otherwise -> abort $ UndecidableError loc'
-  (Val.Intrinsic {}, Val.Comparable) -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
+  (Val.Intrinsic {}, Val.Comparable) -> wrong $ UndecidableError loc'
   (Val.Intrinsic _ xs, Val.AnyOLam)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVar' Val.AnyOLam
+        ys <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (Val.Intrinsic x tail_x, Val.OLam scopes_y env_y ys dom_y rng_y tail_y) ->
     pure $ (SEQ,) do
-      whenVerifying $ do
-        fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
-          i <- lift $ newVar' Val.Any
-          invokeIntrinsicDom_ loc' x i
-          lift . readIVar <=< fails' $ invokeOLamDom_ loc' scopes_y env_y ys dom_y rng_y i
-          abort $ DomError loc' (loc dom_y)
+      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
+        i <- lift $ newVerifyVar' Val.Any
+        invokeIntrinsicDom_ loc' x i
+        invokeOLamDom_ loc' scopes_y env_y ys dom_y rng_y i
+        wrong . DomError loc' (loc dom_y) =<< lift (freeze' i)
       zs <- lift freshVar'
       unify' loc' tail_x =<< lift (newVar' $ Val.OLam scopes_y env_y ys dom_y rng_y zs)
       unify' loc' tail_y =<< lift (newVar' $ Val.Intrinsic x zs)
   (Val.Intrinsic x tail_x, Val.Intrinsic y tail_y) ->
     pure $ (SEQ,) do
-      whenVerifying $ do
-        fork' . lift . readIVar <=< verify' . local (\ r -> r { assumed = True }) $ do
-          i <- lift $ newVar' Val.Any
-          invokeIntrinsicDom_ loc' x i
-          lift . readIVar <=< fails' $ invokeIntrinsicDom_ loc' y i
-          abort $ IntrinsicDomError loc'
+      whenVerifying . verify' . local (\ r -> r { assumed = True }) $ do
+        i <- lift $ newVerifyVar' Val.Any
+        invokeIntrinsicDom_ loc' x i
+        invokeIntrinsicDom_ loc' y i
+        wrong $ IntrinsicDomError loc'
       zs <- lift freshVar'
       unify' loc' tail_x =<< lift (newVar' $ Val.Intrinsic y zs)
       unify' loc' tail_y =<< lift (newVar' $ Val.Intrinsic x zs)
   (x, Val.Any)
     | r.assumed -> pure . (LE,) $ forVal_ x $ \ x -> do
-        y <- lift $ newVar' Val.Any
+        y <- lift $ newVerifyVar' Val.Any
         unify' loc' x y
-    | otherwise -> abort $ UndecidableError loc'
+    | otherwise -> wrong $ UndecidableError loc'
   (x, Val.Comparable) -> pure . (LE,) . forVal_ x $ \ x -> do
-    y <- lift $ newVar' Val.Comparable
+    y <- lift $ newVerifyVar' Val.Comparable
     unify' loc' x y
   _ -> empty
 
@@ -1785,13 +1832,13 @@ unifyNamed loc = curry $ \ case
 eqFloat :: Double -> Double -> Bool
 eqFloat x y = if isNaN x then isNaN y else x == y
 
-getNameEnv :: MonadAbort Error m => Loc ->Val ref a -> m (Val.Env SimpleName a)
+getNameEnv :: MonadWrong Error m => Loc ->Val ref a -> m (Val.Env SimpleName a)
 getNameEnv loc = \ case
   Val.Module _ xs -> pure xs
   Val.Enum _ xs _ -> pure xs
   Val.StructInst _ xs -> pure xs
   Val.ClassInst _ _ xs -> pure xs
-  _ -> abort $ EnvError loc
+  _ -> wrong $ EnvError loc
 
 fork'
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -1799,17 +1846,23 @@ fork'
   -> ReaderT r (VerseT m) ()
 fork' m = ReaderT $ fork . runReaderT m
 
-join'
+join''
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => ReaderT r (VerseT m) ()
-  -> ReaderT r (VerseT m) (IVar m ())
-join' m = ReaderT $ join . runReaderT m
+  -> ReaderT r (VerseT m) ()
+join'' m = ReaderT $ join' . runReaderT m
 
 newVar'
   :: (MonadRef m, MonadSupply Int m)
   => f (Fix (Compose (Var m) f))
   -> VerseT m (Fix (Compose (Var m) f))
 newVar' = fmap coerce . newVar
+
+newVerifyVar'
+  :: (MonadRef m, MonadSupply Int m)
+  => f (Fix (Compose (Var m) f))
+  -> VerseT m (Fix (Compose (Var m) f))
+newVerifyVar' = fmap coerce . newVerifyVar
 
 freshVar'
   :: (MonadRef m, MonadSupply Int m)
@@ -1825,58 +1878,52 @@ readVar' = readVar . coerce
 one'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => EvalT m a
-  -> EvalT m (IVar m a)
+  -> EvalT m a
 one' m = ReaderT $ one . runReaderT m
 
 if''
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => EvalT m a -> (a -> EvalT m b)
   -> EvalT m b
-  -> EvalT m (IVar m b)
+  -> EvalT m b
 if'' p t e = ReaderT $ \ r ->
   if' (runReaderT p r) (\ x -> runReaderT (t x) r) (runReaderT e r)
 
-all'
+all''
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => EvalT m a
-  -> EvalT m (IVar m [a])
-all' m = ReaderT $ all . runReaderT m
+  -> EvalT m [a]
+all'' m = ReaderT $ all' . runReaderT m
 
-for'
+for''
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => EvalT m a
   -> (a -> EvalT m b)
-  -> EvalT m (IVar m [b])
-for' m f = ReaderT $ \ r -> for (runReaderT m r) (\ x -> runReaderT (f x) r)
+  -> EvalT m [b]
+for'' m f = ReaderT $ \ r -> for' (runReaderT m r) (\ x -> runReaderT (f x) r)
 
 verify'
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => EvalT m ()
-  -> EvalT m (IVar m ())
+  -> EvalT m ()
 verify' m = ReaderT $ verify . runReaderT m
 
 assume'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => EvalT m a
-  -> EvalT m (IVar m a)
+  -> EvalT m a
 assume' m = ReaderT $ assume . runReaderT m
 
 succeeds'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => EvalT m a
-  -> EvalT m (IVar m (Maybe a))
+  -> EvalT m (Maybe a)
 succeeds' m = ReaderT $ succeeds . runReaderT m
-
-fails'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => EvalT m a
-  -> EvalT m (IVar m ())
-fails' m = ReaderT $ fails . runReaderT m
 
 decides'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
   => EvalT m a
-  -> EvalT m (IVar m (Maybe a))
+  -> EvalT m (Maybe a)
 decides' m = ReaderT $ decides . runReaderT m
 
 whenVerifying :: EvalT m () -> EvalT m ()
@@ -1884,7 +1931,46 @@ whenVerifying m = asks (.mode) >>= \ case
   Execution -> pure ()
   Verification -> m
 
-whenM :: Monad m => m Bool -> m () -> m ()
-whenM m n = m >>= \ case
-  False -> pure ()
-  True -> n
+succeeds
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VerseT m a
+  -> VerseT m (Maybe a)
+succeeds m = split m >>= \ case
+  Done -> pure Nothing
+  Step x m -> m >>= \ case
+    Done -> pure $ Just x
+    Step _ _ -> pure Nothing
+
+decides
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VerseT m a
+  -> VerseT m (Maybe a)
+decides m = split m >>= \ case
+  Done -> empty
+  Step x m -> m >>= \ case
+    Done -> pure $ Just x
+    Step _ _ -> pure Nothing
+
+decide :: VerseT m ()
+decide = pure () <?> empty
+
+if'
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VerseT m a
+  -> (a -> VerseT m b)
+  -> VerseT m b
+  -> VerseT m b
+if' p t e = split p >>= \ case
+  Done -> e
+  Step x _ -> t x
+
+for'
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VerseT m a
+  -> (a -> VerseT m b)
+  -> VerseT m [b]
+for' m k = loop $ split m
+  where
+    loop m = m >>= \ case
+      Done -> pure []
+      Step x m -> k x >>= \ y -> (y:) <$> loop m

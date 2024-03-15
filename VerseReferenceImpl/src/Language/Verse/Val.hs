@@ -7,7 +7,7 @@ module Language.Verse.Val
   ( Val (..)
   , forVal_
   , VarVal
-  , VarRefVal
+  , RefVarVal
   , FrozenVal
   , Named (..)
   , VarNamed
@@ -19,7 +19,7 @@ module Language.Verse.Val
   , AccessScope (..)
   ) where
 
-import Control.Monad.Verse (Var, VarRef, Freezable (..), Freshenable (..))
+import Control.Monad.Verse (Var, VerseRef, Freezable (..), Freshenable (..))
 
 import Data.ByteString.Internal (w2c)
 import Data.Char
@@ -27,12 +27,11 @@ import Data.Fix
 import Data.Foldable (for_)
 import Data.Functor
 import Data.Functor.Compose
-import Data.Functor.Compose.Instances ()
+import Data.Functor.Identity
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Ratio
-import Data.Traversable
 import Data.Word
 
 import Language.Verse.Desugar.Exp qualified as Desugar
@@ -61,7 +60,7 @@ data Val ref a
   | Path [SimpleName]
   | Truth a
   | Tuple [a]
-  | Ptr (ref (Val ref a)) a
+  | Ptr (ref a) a
   | Module
     {-# UNPACK #-} !Label
     !(Env SimpleName a)
@@ -153,22 +152,22 @@ instance Freshenable a m => Freshenable (Val f a) m where
     Char32 _ -> pure x
     Path _ -> pure x
     Truth x -> Truth <$> freshen x
-    Tuple xs -> Tuple <$> for xs freshen
+    Tuple xs -> Tuple <$> freshen xs
     Ptr ref x -> Ptr ref <$> freshen x
-    Module i env -> Module i <$> for env freshen
-    Enum i env xs -> Enum i <$> for env freshen <*> for xs freshen
+    Module i env -> Module i <$> freshen env
+    Enum i env xs -> Enum i <$> freshen env <*> freshen xs
     EnumValue {} -> pure x
     Struct i scope env xs e -> do
-      env <- for env freshen
+      env <- freshen env
       pure $ Struct i scope env xs e
-    StructInst i env -> StructInst i <$> for env freshen
+    StructInst i env -> StructInst i <$> freshen env
     Class i scope env sup xs e -> do
-      env <- for env freshen
-      sup <- for sup freshen
+      env <- freshen env
+      sup <- freshen sup
       pure $ Class i scope env sup xs e
-    ClassInst i sup env -> ClassInst i <$> for sup freshen <*> for env freshen
+    ClassInst i sup env -> ClassInst i <$> freshen sup <*> freshen env
     Lam scope env x e -> do
-      env <- for env freshen
+      env <- freshen env
       pure $ Lam scope env x e
     AnyOLam -> pure x
     OLam scope env xs e1 e2 tail -> do
@@ -177,7 +176,7 @@ instance Freshenable a m => Freshenable (Val f a) m where
       pure $ OLam scope env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freshen tail
 
-instance ( Freezable (f (Val f a)) (g (Val g b)) m
+instance ( Freezable (f a) (g b) m
          , Freezable a b m
          ) => Freezable (Val f a) (Val g b) m where
   freeze = \ case
@@ -195,29 +194,29 @@ instance ( Freezable (f (Val f a)) (g (Val g b)) m
     Char32 x -> pure $ Char32 x
     Path x -> pure $ Path x
     Truth x -> Truth <$> freeze x
-    Tuple xs -> Tuple <$> for xs freeze
+    Tuple xs -> Tuple <$> freeze xs
     Ptr ref x -> Ptr <$> freeze ref <*> freeze x
-    Module i env -> Module i <$> for env freeze
-    Enum i env xs -> Enum i <$> for env freeze <*> for xs freeze
+    Module i env -> Module i <$> freeze env
+    Enum i env xs -> Enum i <$> freeze env <*> freeze xs
     EnumValue i x -> pure $ EnumValue i x
     Struct i scope env xs e -> do
-      env <- for env freeze
+      env <- freeze env
       pure $ Struct i scope env xs e
-    StructInst i env -> StructInst i <$> for env freeze
+    StructInst i env -> StructInst i <$> freeze env
     Class i scope env sup xs e -> do
-      env <- for env freeze
-      sup <- for sup freeze
+      env <- freeze env
+      sup <- freeze sup
       pure $ Class i scope env sup xs e
-    ClassInst i sup env -> ClassInst i <$> for sup freeze <*> for env freeze
-    Lam scope env x e -> for env freeze <&> \ env -> Lam scope env x e
+    ClassInst i sup env -> ClassInst i <$> freeze sup <*> freeze env
+    Lam scope env x e -> freeze env <&> \ env -> Lam scope env x e
     AnyOLam -> pure AnyOLam
     OLam scope env xs e1 e2 tail -> do
-      env <- for env freeze
+      env <- freeze env
       tail <- freeze tail
       pure $ OLam scope env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freeze tail
 
-instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
+instance (Pretty (ref a), Pretty a) => Pretty (Val ref a) where
   pretty = \ case
     Any -> "any"
     Comparable -> "comparable"
@@ -299,11 +298,11 @@ instance (Pretty (ref (Val ref a)), Pretty a) => Pretty (Val ref a) where
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
 
-type VarVal m = Fix (Compose (Var m) (Val (VarRef m)))
+type VarVal m = Fix (Compose (Var m) (Val (VerseRef m)))
 
-type VarRefVal m = VarRef m (Val (VarRef m) (VarVal m))
+type RefVarVal m = VerseRef m (VarVal m)
 
-type FrozenVal = Fix (Compose Maybe (Val Maybe))
+type FrozenVal = Fix (Compose Maybe (Val Identity))
 
 type Exp = L (Desugar.Exp L Ident)
 

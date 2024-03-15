@@ -1,11 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
 module Language.Verse
-  ( eval2
-  , eval2'
+  ( eval
+  , eval'
   ) where
 
 import Control.Monad ((<=<))
-import Control.Monad.Abort
+import Control.Monad.Wrong
 import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Supply
@@ -24,28 +24,32 @@ import Language.Verse.Parse2 as P2
 import Language.Verse.Rewrite
 import Language.Verse.Val
 
-eval2 :: ( MonadAbort Error m
+import Debug.Trace
+import Prettyprinter
+
+eval :: ( MonadWrong Error m
          , MonadFix m
          , MonadRef m
          , MonadSupply Label m
          , EqRef (Ref m)
-         ) => String -> ByteString -> m [FrozenVal]
-eval2 path xs = do
+         ) => String -> ByteString -> m [[FrozenVal]]
+eval path xs = do
   (e1, e2) <- liftEither $ runSupplyT $ do
     e <- rewrite =<< lift (P2.parse2 path xs)
     (,) <$> desugar Verification e <*> desugar Execution e
+  traceShowM $ pretty e1
   whenNothingM_ (runVerseT $ Eval.eval Verification e1) $
-     abort StuckError
+    wrong StuckError
   whenNothingM (runVerseT $ Eval.eval Execution e2) $
-    abort StuckError
+    wrong StuckError
 
-eval2' :: ( MonadAbort Error m
-          , MonadFix m
-          , MonadRef m
-          , MonadSupply Label m
-          , EqRef (Ref m)
-          ) => String -> Mode -> ByteString -> VerseT m FrozenVal
-eval2' path mode =
+eval' :: ( MonadWrong Error m
+         , MonadFix m
+         , MonadRef m
+         , MonadSupply Label m
+         , EqRef (Ref m)
+         ) => String -> Mode -> ByteString -> VerseT m FrozenVal
+eval' path mode =
   Eval.eval mode <=<
   liftEither . (runSupplyT . (desugar mode <=< rewrite) <=< P2.parse2 path)
 

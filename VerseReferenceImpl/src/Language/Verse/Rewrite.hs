@@ -13,8 +13,8 @@ import Control.Applicative
 import Control.Arrow ((***))
 import Control.Comonad
 import Control.Monad
-import Control.Monad.Abort
 import Control.Monad.Supply
+import Control.Monad.Wrong
 
 import Data.Bool
 import Data.ByteString qualified as ByteString
@@ -73,13 +73,13 @@ import Language.Verse.Rewrite.Exp
 import Prelude (Maybe (..), Show (..), String, (==), (+), (++), ($!), map, zip)
 
 rewrite
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Parse.Exp SimpleName)
   -> m (L (Exp L Ident))
 rewrite = rewriteExp
 
 rewriteExp
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Parse.Exp SimpleName)
   -> m (L (Exp L Ident))
 rewriteExp e = for e $ \ case
@@ -280,7 +280,7 @@ rewriteExp e = for e $ \ case
   e -> notImplemented "rewriteExp" e
 
 rewritePat
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Pat SimpleName
   -> m (Exp L Ident)
 rewritePat = \ case
@@ -320,7 +320,7 @@ rewritePath = \ case
 
 
 rewriteDef
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => L (Pat SimpleName)
   -> L (Exp L Ident)
   -> m (Exp L Ident)
@@ -362,7 +362,7 @@ rewriteDef p e = case extract p of
   e -> notImplemented "rewriteDef" e
 
 rewriteDef'
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => Quantifier
   -> L (Pat SimpleName)
   -> L (Exp L Ident)
@@ -407,8 +407,8 @@ rewriteDef' q p e1 e2 = case extract p of
       (lam e_domain oc eff Nothing e2)
   e -> notImplemented "rewriteDef'" e
 
-notImplemented :: (MonadAbort Error m, Show a) => String -> a -> m b
-notImplemented fun e = abort $ NotImplemented $ fun ++ " on: " ++ show e
+notImplemented :: (MonadWrong Error m, Show a) => String -> a -> m b
+notImplemented fun e = wrong $ NotImplemented $ fun ++ " on: " ++ show e
 
 getMacroParensBraces
   :: SimpleName
@@ -437,7 +437,7 @@ stripSpecs = \ case
   pat -> (pat, [])
 
 rewriteOperator1
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => SimpleName
   -> L (Parse.Exp SimpleName)
   -> m (Exp L Ident)
@@ -446,7 +446,7 @@ rewriteOperator1 x e =
   BracketInvoke (Name (SimpleName (Ident.Name x)) <$ e) e
 
 rewriteOperator2
-  :: (MonadAbort Error m, MonadSupply Label m)
+  :: (MonadWrong Error m, MonadSupply Label m)
   => SimpleName
   -> L (Parse.Exp SimpleName)
   -> L (Parse.Exp SimpleName)
@@ -454,31 +454,31 @@ rewriteOperator2
 rewriteOperator2 x e1 e2 = bracketInvoke2 x <$> rewriteExp e1 <*> rewriteExp e2
 
 getLamSpecs
-  :: MonadAbort Error m
+  :: MonadWrong Error m
   => [L (Parse.Exp SimpleName)]
   -> m (OC, Split.Effect)
 getLamSpecs = wrap $ \ case
   ((Nothing, z), y@(extract -> IdentName "open")) ->
     pure $! (Just $! O <$ y, z)
   ((Just x, _), y@(extract -> IdentName "open")) ->
-    abort $ OpenClosedError (loc x) (loc y)
+    wrong $ OpenClosedError (loc x) (loc y)
   ((Nothing, z), y@(extract -> IdentName "closed")) ->
     pure $! (Just $! C <$ y, z)
   ((Just x, _), y@(extract -> IdentName "closed")) ->
-    abort $ OpenClosedError (loc x) (loc y)
+    wrong $ OpenClosedError (loc x) (loc y)
   ((z, Nothing), y@(extract -> IdentName "fails")) ->
     pure $! (z, Just $! Effect.Fails <$ y)
   ((_, Just x), y@(extract -> IdentName "fails")) ->
-    abort $ SplitEffectError (loc x) (loc y)
+    wrong $ SplitEffectError (loc x) (loc y)
   ((z, Nothing), y@(extract -> IdentName "succeeds")) ->
     pure $! (z, Just $! Effect.Succeeds <$ y)
   ((_, Just x), y@(extract -> IdentName "succeeds")) ->
-    abort $ SplitEffectError (loc x) (loc y)
+    wrong $ SplitEffectError (loc x) (loc y)
   ((z, Nothing), y@(extract -> IdentName "decides")) ->
     pure $! (z, Just $! Effect.Decides <$ y)
   ((_, Just x), y@(extract -> IdentName "decides")) ->
-    abort $ SplitEffectError (loc x) (loc y)
-  (_, y) -> abort $ SpecError $ loc y
+    wrong $ SplitEffectError (loc x) (loc y)
+  (_, y) -> wrong $ SpecError $ loc y
   where
     wrap f =
       fmap (maybe O extract *** maybe Effect.Succeeds extract) .
@@ -486,7 +486,7 @@ getLamSpecs = wrap $ \ case
 
 
 getDefSpecs
-  :: MonadAbort Error m
+  :: MonadWrong Error m
   => [L (Parse.Exp SimpleName)]
   -> m Access
 getDefSpecs = wrap $ \ case
@@ -494,14 +494,13 @@ getDefSpecs = wrap $ \ case
   (x, y@(extract -> IdentName "protected")) -> add x Protected y
   (x, y@(extract -> IdentName "private")) -> add x Private y
   (x, y@(extract -> IdentName "internal")) -> add x Internal y
-  (_, y) -> abort $ SpecError $ loc y
+  (_, y) -> wrong $ SpecError $ loc y
   where
     wrap f =
       fmap (maybe Public extract) .
       foldlM (curry f) Nothing
-
     add Nothing access y = pure $! (Just $! access <$ y)
-    add (Just x) _access y = abort $ MultipleAccessError (loc x) (loc y)
+    add (Just x) _access y = wrong $ MultipleAccessError (loc x) (loc y)
 
 
 pattern IdentName :: a -> Parse.Exp a

@@ -10,7 +10,6 @@ module Control.Monad.RS
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Abort
 import Control.Monad.Error.Class
 import Control.Monad.Fix
 import Control.Monad.IO.Class
@@ -19,6 +18,7 @@ import Control.Monad.Ref
 import Control.Monad.State.Class
 import Control.Monad.Supply
 import Control.Monad.Trans.Class
+import Control.Monad.Wrong
 
 import Data.Functor
 
@@ -79,7 +79,7 @@ instance MonadFix m => MonadFix (RST r s m) where
 instance MonadIO m => MonadIO (RST r s m) where
   liftIO m = RST $ \ _ s -> (, s) <$> liftIO m
 
-instance MonadAbort e m => MonadAbort e (RST r s m)
+instance MonadWrong e m => MonadWrong e (RST r s m)
 
 instance MonadRef m => MonadRef (RST r s m)
 
