@@ -141,8 +141,13 @@ type Env m = Val.VarEnv Ident m
 
 type Archetype m = Env m
 
-runEvalT :: (MonadRef m, MonadSupply Int m) => NonEmpty Val.Scope -> EvalT m a -> Mode -> VerseT m a
-runEvalT scopes m mode = runReaderT m R {..}
+runEvalT
+  :: (MonadRef m, MonadSupply Int m)
+  => EvalT m a
+  -> Mode
+  -> NonEmpty Val.Scope
+  -> VerseT m a
+runEvalT m mode scopes = runReaderT m R {..}
   where
     env = mempty
     top = env
@@ -160,10 +165,11 @@ type MonadEval m =
 
 eval :: MonadEval m => Mode -> L (Exp L Ident) -> VerseT m FrozenVal
 eval mode e = do
-  i <- supply
   s <- newS
   s' <- freshS
-  freeze' =<< runEvalT (NonEmpty.singleton $ Val.Scope i [] i)  (evalExp e s s') mode
+  i <- supply
+  let scopes = NonEmpty.singleton $ Val.Scope i [] i
+  freeze' =<< runEvalT (evalExp e s s') mode scopes
 
 evalExp :: MonadEval m => L (Exp L Ident) -> S m -> S m -> EvalT m (VarVal m)
 evalExp e = case extract e of
@@ -646,9 +652,9 @@ evalInst loc e1 xs e2 s s' = do
   var <- lift freshVar'
   fork' $ lift (readVar' var1) >>= \ case
     Val.Struct i scopes env ys e ->
-      unify' loc var =<< (useScopes (addScope i scopes) $ instStruct i env ys e xs s''' s')
+      unify' loc var =<< (localScopes (addScope i scopes) $ instStruct i env ys e xs s''' s')
     Val.Class i scopes env sup ys e ->
-      unify' loc var =<< (useScopes (addScope i scopes) $ instClass loc i env sup ys e xs s''' s')
+      unify' loc var =<< (localScopes (addScope i scopes) $ instClass loc i env sup ys e xs s''' s')
     _ -> wrong $ InstError loc
   pure var
 
@@ -700,7 +706,7 @@ allocClass loc i env sup xs e = do
    archetype' <- freshEnv xs
    let
      vars = vars_sup <> archetype'
-     initClass archetype s s' = useScopes (addScopeWithSup i sup_labels scopes') do
+     initClass archetype s s' = localScopes (addScopeWithSup i sup_labels scopes') do
        s'' <- lift freshS
        _ <- local (\ r -> r { env = vars <> env, archetype, archetype'}) $ evalExp e  s s''
        initSup (archetype' <> archetype) s'' s'
@@ -715,7 +721,7 @@ allocSup loc sup = case sup of
   Nothing -> pure (Nothing, [], mempty, \ _ s s' -> lift $ unifyS s s')
   Just sup -> do
     (i, scopes, env, sup, xs, e) <- lift $ readClass loc sup
-    (sup, labels, xs, initSup) <- useScopes (addScope i scopes) $ allocClass loc i env sup xs e
+    (sup, labels, xs, initSup) <- localScopes (addScope i scopes) $ allocClass loc i env sup xs e
     pure (Just sup, labels, xs, initSup)
 
 invoke
@@ -753,7 +759,7 @@ invoke' loc var1 var2 s s' = lift (readVar' var1) >>= \ case
     lift $ unifyEq s.choiceFree s'.choiceFree
     pure var
   Val.Lam scopes env x e ->
-    useScopes scopes $ localEnv env . localName Private x (Val var2) $ evalExp e s s'
+    localScopes scopes $ localEnv env . localName Private x (Val var2) $ evalExp e s s'
   Val.OLam scopes env xs e1 e2 tail ->
     invokeOLam loc scopes env xs e1 e2 tail var2 s s'
   Val.Struct i scopes env xs e ->
@@ -798,7 +804,7 @@ invokeOLam
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeOLam loc scopes env xs e1 e2 tail arg s s' = useScopes scopes $ if''
+invokeOLam loc scopes env xs e1 e2 tail arg s s' = localScopes scopes $ if''
   do
     invokeOLamDom loc scopes env xs e1 e2 arg s s'
   do
@@ -853,7 +859,7 @@ invokeOLamDom
   -> S m
   -> S m
   -> EvalT m (DomMatch m)
-invokeOLamDom loc scopes env xs e1 e2 v_arg s s' = useScopes scopes $ do
+invokeOLamDom loc scopes env xs e1 e2 v_arg s s' = localScopes scopes $ do
   xs <- freshEnv xs
   choiceFree <- lift $ newVar ChoiceFree
   s'' <- lift freshS
@@ -873,7 +879,7 @@ invokeStruct
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeStruct loc i scopes env xs e arg s s' = useScopes (addScope i scopes) $ do
+invokeStruct loc i scopes env xs e arg s s' = localScopes (addScope i scopes) $ do
   archetype <- freshEnv xs
   let archetype' = mempty
   xs <- freshEnv xs
@@ -894,7 +900,7 @@ invokeClass
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeClass loc i scopes sup env xs e arg s s' = useScopes (addScope i scopes) $ do
+invokeClass loc i scopes sup env xs e arg s s' = localScopes (addScope i scopes) $ do
   (inst, _) <- instEmptyClass loc i sup env xs e s s'
   unify' loc inst =<< lift (findClassInst i arg)
   pure arg
@@ -1060,9 +1066,11 @@ liftNum f var = readPair var >>= \ case
     (Val.Rational _, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
     (Val.Rational x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ f x y
     (Val.Rational _, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.Rational x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ f x (fromInteger y)
+    (Val.Rational x, Val.Int y) ->
+      domMatch_' . newVar' . Val.Rational $ f x (fromInteger y)
     (Val.Rational _, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.Rational x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f (fromRational x) y
+    (Val.Rational x, Val.Float y) ->
+      domMatch_' . newVar' . Val.Float $ f (fromRational x) y
     (Val.AnyInt, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
     (Val.AnyInt, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.AnyRational
     (Val.AnyInt, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyInt
@@ -1566,7 +1574,8 @@ getScopes = do
   pure r.scopes
 
 accessScope :: Access -> NonEmpty Val.Scope -> Val.AccessScope
-accessScope access (Val.Scope scope _ mod :| _) = Val.AccessScope access scope mod
+accessScope access (Val.Scope scope _ mod :| _) =
+  Val.AccessScope access scope mod
 
 addScope :: Label -> NonEmpty Val.Scope -> NonEmpty Val.Scope
 addScope label scopes = addScopeWithSup label [] scopes
@@ -1578,8 +1587,8 @@ addScopeWithSup label labels scopes =
 moduleFromScopes :: NonEmpty Val.Scope -> Label
 moduleFromScopes (Val.Scope _ _ mLabel :| _) = mLabel
 
-useScopes :: NonEmpty Val.Scope -> EvalT m a -> EvalT m a
-useScopes scopes = local $ \ r -> r { scopes = scopes }
+localScopes :: NonEmpty Val.Scope -> EvalT m a -> EvalT m a
+localScopes scopes = local $ \ r -> r { scopes = scopes }
 
 pushModuleScope :: Label -> EvalT m a -> EvalT m a
 pushModuleScope i = local $ \ r -> r { scopes = Val.Scope i [] i <| r.scopes }
@@ -1592,9 +1601,12 @@ freshEnv xs = do
   lift $ (getAp . HashMap.foldMapWithKey (f r.scopes)) xs
   where
     f scopes k = \ case
-      (access, Exp.Exists) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> freshVar'
-      (access, Exp.Forall) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> newVerifyVar' Val.Any
-      (access, Exp.Var) -> Ap $ HashMap.singleton k . (accessScope access scopes,) . Ref <$> freshVar'
+      (access, Exp.Exists) ->
+        Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> freshVar'
+      (access, Exp.Forall) ->
+        Ap $ HashMap.singleton k . (accessScope access scopes,) . Val <$> newVerifyVar' Val.Any
+      (access, Exp.Var) ->
+        Ap $ HashMap.singleton k . (accessScope access scopes,) . Ref <$> freshVar'
 
 unify'
   :: MonadEval m
@@ -1726,7 +1738,8 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         ys <- lift $ newVerifyVar' Val.AnyOLam
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.OLam scopes_x env_x xs dom_x rng_x tail_x, Val.OLam scopes_y env_y ys dom_y rng_y tail_y) ->
+  (Val.OLam scopes_x env_x xs dom_x rng_x tail_x,
+   Val.OLam scopes_y env_y ys dom_y rng_y tail_y) ->
     pure $ (SEQ,) do
       whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
         i <- lift $ newVerifyVar' Val.Any

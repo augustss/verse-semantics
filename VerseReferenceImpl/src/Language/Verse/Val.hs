@@ -104,7 +104,7 @@ data Val ref a
     !Exp
     !Exp
     a
-  | Intrinsic !Intrinsic a
+  | Intrinsic !Intrinsic a deriving Show
 
 forVal_ :: Applicative m => Val ref a -> (a -> m b) -> m ()
 forVal_ x f = case x of
@@ -306,7 +306,7 @@ type FrozenVal = Fix (Compose Maybe (Val Identity))
 
 type Exp = L (Desugar.Exp L Ident)
 
-data Named a = Val a | Ref a
+data Named a = Val a | Ref a deriving Show
 
 forNamed_ :: Applicative m => Named a -> (a -> m b) -> m ()
 forNamed_ x f = case x of

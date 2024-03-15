@@ -43,7 +43,7 @@ data Error
   | IntrinsicDomError !Loc
   | StuckError
   | OtherError !Pos String -- Used for Parsec error type
-  | NotImplemented String
+  | NotImplemented String deriving Show
 
 instance Pretty Error where
   pretty = \ case
@@ -112,7 +112,7 @@ instance Pretty Error where
     OtherError x msg ->
       pretty x <> colon <+> pretty msg
     NotImplemented msg ->
-      "Not" <+> "implemented" <+> pretty msg
+      "not" <+> "implemented" <+> pretty msg
 
 prettyIndent :: Indent -> Doc ann
 prettyIndent = dquotes . hcat . fmap pretty
