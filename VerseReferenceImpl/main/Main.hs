@@ -23,5 +23,5 @@ import System.IO (IO, stderr)
 
 main :: IO ()
 main = getContents >>= runExceptT . runSupplyT . eval "<command line>" >>= \ case
-  Right xs -> for_ xs $ putDoc . (<> line) . pretty
+  Right xs -> for_ (join xs) $ putDoc . (<> line) . pretty
   Left e -> hPutDoc stderr $ pretty e <> line

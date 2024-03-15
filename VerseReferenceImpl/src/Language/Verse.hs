@@ -24,9 +24,6 @@ import Language.Verse.Parse2 as P2
 import Language.Verse.Rewrite
 import Language.Verse.Val
 
-import Debug.Trace
-import Prettyprinter
-
 eval :: ( MonadWrong Error m
          , MonadFix m
          , MonadRef m
@@ -37,7 +34,6 @@ eval path xs = do
   (e1, e2) <- liftEither $ runSupplyT $ do
     e <- rewrite =<< lift (P2.parse2 path xs)
     (,) <$> desugar Verification e <*> desugar Execution e
-  traceShowM $ pretty e1
   whenNothingM_ (runVerseT $ Eval.eval Verification e1) $
     wrong StuckError
   whenNothingM (runVerseT $ Eval.eval Execution e2) $
