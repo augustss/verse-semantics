@@ -296,7 +296,7 @@ commitRun level heap store = for_ store $ \ (StoreElem ref) ->
 commitRun' :: (MonadRef m, Freshenable a m) => Int -> Heap -> HRef m a -> m ()
 commitRun' level heap (HRef ref) = do
   x <- freshenRun' level heap . findHeap' heap =<< readRef ref
-  modifyRef' ref $ insertHeap' heap x
+  modifyRef' ref $ insertLocalHeap' heap x
 
 freshenRun' :: Freshenable a m => Int -> Heap -> a -> m a
 freshenRun' level heap x = runFreshenT (freshen x) FreshenEnv {..}
@@ -987,22 +987,22 @@ writeVarState
   -> VerseT m ()
 writeVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   y <- findVarState heaps.heap <$> readRef ref
-  modifyRef' ref (insertHeap heaps.heap x)
+  modifyRef' ref (insertLocalHeap heaps.heap x)
   let
     fk' heaps@Heaps {..} ak = do
       x <- findVarState heap <$> readRef ref
-      modifyRef' ref (insertHeap heap y)
+      modifyRef' ref (insertLocalHeap heap y)
       fk heaps $ \ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertHeap heap x
+        modifyRef' ref $ insertLocalHeap heap x
         ak heaps
     ek' heaps@Heaps {..} ak = do
       x <- findVarState heap <$> readRef ref
-      modifyRef' ref $ insertHeap heap y
+      modifyRef' ref $ insertLocalHeap heap y
       ek heaps $ \ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertHeap heap x
+        modifyRef' ref $ insertLocalHeap heap x
         ak heaps
     ak' heaps@Heaps {..} = do
-      modifyRef' ref $ insertHeap heap y
+      modifyRef' ref $ insertLocalHeap heap y
       ak heaps
   sk heaps s () fk' ek' ak'
 
@@ -1013,29 +1013,11 @@ writeVerifyVarState
   -> VerseT m ()
 writeVerifyVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   y <- findVarState heaps.verifyHeap <$> readRef ref
-  modifyRef' ref (insertHeap heaps.verifyHeap x)
+  modifyRef' ref (insertLocalHeap heaps.verifyHeap x)
   let
     ak' heaps@Heaps {..} =
-      modifyRef' ref (insertHeap verifyHeap y) *> ak heaps
+      modifyRef' ref (insertLocalHeap verifyHeap y) *> ak heaps
   sk heaps s () fk ek ak'
-
-findVarState :: Maybe Heap -> HeapMap (VarState m a) -> VarState m a
-findVarState k xs@HeapMap {..} = case k of
-  Just k -> findVarState' k xs
-  Nothing -> case nothing of
-    Just x -> x
-    Nothing -> error "findVarState"
-
-findVarState' :: Heap -> HeapMap (VarState m a) -> VarState m a
-findVarState' Heap {..} xs@HeapMap {..} = case IntMap.lookup label just of
-  Just x -> x
-  Nothing -> case lookupLocalHeap pred just of
-    Just x -> x
-    Nothing -> case findHeap tail xs of
-      Unbound unbound -> Unbound unbound
-        { substSusp = const $ pure ()
-        }
-      x -> x
 
 data VerseRef m a = VerseRef
   { label :: {-# UNPACK #-} !Int
@@ -1085,17 +1067,17 @@ writeVerseRef VerseRef {..} x = do
 
 writeVerseRef' :: MonadRef m => HRef m a -> a -> VerseT m ()
 writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
-  y <- findHeap heaps.heap <$> readRef ref
-  modifyRef' ref $ insertHeap heaps.heap x
+  y <- lookupHeap heaps.heap <$> readRef ref
+  modifyRef' ref $ insertLocalHeap heaps.heap x
   let
     ek' heaps@Heaps {..} ak = do
       x <- findHeap heap <$> readRef ref
-      modifyRef' ref $ insertHeap heap y
+      modifyRef' ref $ alterLocalHeap heap y
       ek heaps $ \ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertHeap heap x
+        modifyRef' ref $ insertLocalHeap heap x
         ak heaps
     ak' heaps@Heaps {..} = do
-      modifyRef' ref $ insertHeap heap y
+      modifyRef' ref $ alterLocalHeap heap y
       ak heaps
   sk heaps s () fk ek' ak'
 
@@ -1116,24 +1098,7 @@ duplicate store heap = for_ store $ \ (StoreElem ref) ->
 duplicate' :: MonadRef m => HRef m a -> Maybe Heap -> VerseT m ()
 duplicate' ref = writeVerseRef' ref <=< lift . readVerseRef' ref
 
-findHeap :: Maybe Heap -> HeapMap a -> a
-findHeap k xs@HeapMap {..} = case k of
-  Just k -> findHeap' k xs
-  Nothing -> case nothing of
-    Just x -> x
-    Nothing -> error "findHeap"
-
-findHeap' :: Heap -> HeapMap a -> a
-findHeap' Heap {..} xs@HeapMap {..} = case IntMap.lookup label just of
-  Just x -> x
-  Nothing -> case lookupLocalHeap pred just of
-    Just x -> x
-    Nothing -> findHeap tail xs
-
 newtype HRef m a = HRef (Ref m (HeapMap a))
-
-instance EqRef (Ref m) => Eq (HRef m a) where
-  HRef x == HRef y = eqRef x y
 
 newHRef :: MonadRef m => a -> VerseT m (HRef m a)
 newHRef x = getHeap >>= lift . newHRef' x
@@ -1167,22 +1132,22 @@ readHRef'' (HRef ref) h = findLocalHeap' h . (.just) <$> readRef ref
 writeHRef :: MonadRef m => HRef m a -> a -> VerseT m ()
 writeHRef (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   y <- findLocalHeap heaps.heap <$> readRef ref
-  modifyRef' ref (insertHeap heaps.heap x)
+  modifyRef' ref (insertLocalHeap heaps.heap x)
   let
     fk' heaps@Heaps {..} ak = do
       x <- findLocalHeap heap <$> readRef ref
-      modifyRef' ref $ insertHeap heap y
+      modifyRef' ref $ insertLocalHeap heap y
       fk heaps $ \ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertHeap heap x
+        modifyRef' ref $ insertLocalHeap heap x
         ak heaps
     ek' heaps@Heaps {..} ak = do
       x <- findLocalHeap heap <$> readRef ref
-      modifyRef' ref $ insertHeap heap y
+      modifyRef' ref $ insertLocalHeap heap y
       ek heaps $ \ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertHeap heap x
+        modifyRef' ref $ insertLocalHeap heap x
         ak heaps
     ak' heaps@Heaps {..} = do
-      modifyRef' ref $ insertHeap heap y
+      modifyRef' ref $ insertLocalHeap heap y
       ak heaps
   sk heaps s () fk' ek' ak'
 
@@ -1196,39 +1161,75 @@ data HeapMap a = HeapMap
   , just :: IntMap a
   }
 
+findVarState :: Maybe Heap -> HeapMap (VarState m a) -> VarState m a
+findVarState k xs@HeapMap {..} = case k of
+  Just k -> findVarState' k xs
+  Nothing -> nothing `orError` "findVarState"
+
+findVarState' :: Heap -> HeapMap (VarState m a) -> VarState m a
+findVarState' k@Heap {..} xs@HeapMap {..} = case lookupLocalHeap' k just of
+  Just x -> x
+  Nothing -> case findHeap tail xs of
+    Unbound unbound -> Unbound unbound
+      { substSusp = const $ pure ()
+      }
+    x -> x
+
+findHeap :: Maybe Heap -> HeapMap a -> a
+findHeap k xs = lookupHeap k xs `orError` "findHeap"
+
+findHeap' :: Heap -> HeapMap a -> a
+findHeap' k xs = lookupHeap' k xs `orError` "findHeap'"
+
+lookupHeap :: Maybe Heap -> HeapMap a -> Maybe a
+lookupHeap k xs@HeapMap {..} = case k of
+  Just k -> lookupHeap' k xs
+  Nothing -> nothing
+
+lookupHeap' :: Heap -> HeapMap a -> Maybe a
+lookupHeap' k@Heap {..} xs@HeapMap {..} = case lookupLocalHeap' k just of
+  x@Just {} -> x
+  Nothing -> lookupHeap tail xs
+
 findLocalHeap :: Maybe Heap -> HeapMap a -> a
 findLocalHeap k HeapMap {..} = case k of
   Just k -> findLocalHeap' k just
-  Nothing -> case nothing of
-    Just x -> x
-    Nothing -> error "findLocalHeap"
+  Nothing -> nothing `orError` "findLocalHeap"
 
 findLocalHeap' :: Heap -> IntMap a -> a
-findLocalHeap' Heap {..} xs = case IntMap.lookup label xs of
-  Just x -> x
-  Nothing -> case pred of
-    Nothing -> error "findLocalHeap'"
-    Just pred -> findLocalHeap' pred xs
-
-lookupLocalHeap :: Maybe Heap -> IntMap a -> Maybe a
-lookupLocalHeap k xs = case k of
-  Nothing -> Nothing
-  Just k -> lookupLocalHeap' k xs
+findLocalHeap' k xs = lookupLocalHeap' k xs `orError` "findLocalHeap'"
 
 lookupLocalHeap' :: Heap -> IntMap a -> Maybe a
 lookupLocalHeap' Heap {..} xs = case IntMap.lookup label xs of
   x@Just {} -> x
-  Nothing -> lookupLocalHeap pred xs
+  Nothing -> case pred of
+    Nothing -> Nothing
+    Just k -> lookupLocalHeap' k xs
 
-insertHeap :: Maybe Heap -> a -> HeapMap a -> HeapMap a
-insertHeap k x xs = case k of
+alterLocalHeap :: Maybe Heap -> Maybe a -> HeapMap a -> HeapMap a
+alterLocalHeap k x xs = case x of
+  Nothing -> deleteLocalHeap k xs
+  Just x -> insertLocalHeap k x xs
+
+insertLocalHeap :: Maybe Heap -> a -> HeapMap a -> HeapMap a
+insertLocalHeap k x xs = case k of
   Nothing -> xs { nothing = Just x }
-  Just k -> insertHeap' k x xs
+  Just k -> insertLocalHeap' k x xs
 
-insertHeap' :: Heap -> a -> HeapMap a -> HeapMap a
-insertHeap' Heap {..} x xs = xs { just = IntMap.insert label x xs.just }
+insertLocalHeap' :: Heap -> a -> HeapMap a -> HeapMap a
+insertLocalHeap' Heap {..} x xs = xs { just = IntMap.insert label x xs.just }
+
+deleteLocalHeap :: Maybe Heap -> HeapMap a -> HeapMap a
+deleteLocalHeap k xs = case k of
+  Nothing -> xs { nothing = Nothing }
+  Just Heap {..} -> xs { just = IntMap.delete label xs.just }
 
 state' :: MonadState s m => (s -> Either a s) -> m (Maybe a)
 state' f = state $ \ s -> case f s of
   Left x -> (Just x, s)
   Right s -> (Nothing, s)
+
+orError :: Maybe a -> String -> a
+orError x y = case x of
+  Just x -> x
+  Nothing -> error y
