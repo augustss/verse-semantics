@@ -196,17 +196,17 @@ desugarExp'' e pi i = case extract e of
     e2 <- desugarExp e2
     pure $ BracketInvoke e1 e2
   Rewrite.Exists x -> do
-    tellExistsName Private x
+    tellExistsName Internal x
     pure $ i :=: name x
   Rewrite.Forall x -> do
-    tellForallName Private x
+    tellForallName Internal x
     pure $ i :=: name x
   Alloc2 x e -> do
-    tellVarName Private x
+    tellVarName Internal x
     e <- desugarExp e
     pure $ Alloc x e i
   Alloc3 x e1 e2 -> do
-    tellVarName Private x
+    tellVarName Internal x
     e1 <- desugarExp e1
     e2 <- desugarExp' e2 pi i
     pure $ Alloc x e1 e2
@@ -241,8 +241,8 @@ desugarExp'' e pi i = case extract e of
     e <- desugarExp e
     pure $ BracketInvoke e i
   MixfixArrowColonEqual x y e -> do
-    tellExistsName Private x
-    tellExistsName Private y
+    tellExistsName Internal x
+    tellExistsName Internal y
     e <- desugarExp' e pi i
     pure $ unify (name x) i :*>: unify (ArchetypeName <$> y) e
   Rewrite.IfArchetypeName x e1 e2 -> do
@@ -527,7 +527,7 @@ verifyPosLam'
   -> DesugarT m (L (Exp L Ident))
 verifyPosLam' loc' e1 eff e2 e3 pi f = do
   a <- freshIdent' $ loc e1
-  functionM loc' pi f . verifyM $ forall' Private a <$> do
+  functionM loc' pi f . verifyM $ forall' Internal a <$> do
     b <- name <$> freshIdent (loc e1)
     unify b <$> negM (desugarExp' e1 True $ name a) `seqM` checkM eff do
       c <- name <$> freshIdent (loc e3)
@@ -575,7 +575,7 @@ negOfType e1 e2 pi x = do
   pure $
     e1 :*>:
     (e2 `seq'`
-     forall' Private r (assume Effect.Succeeds . bracketInvoke z $ name r))
+     forall' Internal r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 posOfType
   :: (MonadWrong Error m, MonadSupply Label m)
@@ -594,7 +594,7 @@ posOfType e1 e2 pi x = do
     e1 `then'`
     e2 :*>:
     (check Effect.Succeeds (bracketInvoke z y) `seq'`
-     forall' Private r (assume Effect.Succeeds . bracketInvoke z $ name r))
+     forall' Internal r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 checkOfTypeD
   :: (MonadWrong Error m, MonadSupply Label m)
@@ -637,7 +637,7 @@ abstractD
   -> DesugarT m (L (Exp L Ident))
 abstractD eff e = do
   r <- freshIdent' $ loc e
-  forall' Private r <$> assumeM eff do
+  forall' Internal r <$> assumeM eff do
     i <- name <$> freshIdent (loc e)
     unify i <$> desugarExp e `thenM`
       pure (assume Effect.Succeeds . bracketInvoke i $ name r)
@@ -649,7 +649,7 @@ concreteD
   -> DesugarT m (L (Exp L Ident))
 concreteD eff e = do
   r <- freshIdent' $ loc e
-  forall' Private r <$> assumeM eff (negM . desugarExp' e True $ name r)
+  forall' Internal r <$> assumeM eff (negM . desugarExp' e True $ name r)
 
 valM
   :: Functor m
@@ -698,7 +698,7 @@ unifyEnv loc =
       x:xs -> foldr then' x xs
     f x = do
       let x' = L loc . Ident.Name . fromString $ Intrinsic.toString x
-      tellFunName Public x'
+      tellFunName Internal x'
       pure $ unify (name x') (L loc $ Intrinsic x)
 
 negM :: MonadReader R m => m a -> m a
@@ -775,7 +775,7 @@ infixl 1 `seqM`
 freshIdent :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
 freshIdent loc = do
   x <- Ident.Label <$> supply
-  modify $ HashMap.insert x (loc, Private, Exists)
+  modify $ HashMap.insert x (loc, Internal, Exists)
   pure $ L loc x
 
 freshIdent' :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
