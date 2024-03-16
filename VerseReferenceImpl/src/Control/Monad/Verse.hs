@@ -40,7 +40,6 @@ module Control.Monad.Verse
   ) where
 
 import Control.Applicative
-import Control.Comonad
 import Control.Monad.Extras
 import Control.Monad.Fix
 import Control.Monad.ST
@@ -53,6 +52,7 @@ import Control.Monad.Supply
 import Control.Monad.Wrong
 
 import Data.Fix
+import Data.Foldable
 import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Identity
@@ -60,6 +60,7 @@ import Data.HashMap.Strict (HashMap)
 import Data.IntMap.Lazy.Extras qualified as IntMap.Lazy
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.IntMap.Strict.Extras qualified as IntMap
 
 import GHC.Exts qualified
 
@@ -169,24 +170,22 @@ getLatch = asksV (.latch)
 
 data S m = S
   { suspend :: !(Suspend m)
-  , commit :: !(Commit m)
-  , duplicate :: !(Duplicate m)
+  , store :: !(Store m)
   }
 
 emptyS :: Applicative m => S m
 emptyS = S
   { suspend = const $ pure ()
-  , commit = const $ pure ()
-  , duplicate = const $ pure ()
+  , store = mempty
   }
 
 type Suspend m = Resume m -> VerseT m ()
 
 type Resume m = VerseT m () -> VerseT m ()
 
-type Commit m = Heap -> VerseT m ()
+type Store m = IntMap (StoreElem m)
 
-type Duplicate m = Maybe Heap -> VerseT m ()
+data StoreElem m = forall a . Freshenable a m => StoreElem (HRef m a)
 
 putV :: S m -> VerseT m ()
 putV s = VerseT $ \ _ R {..} _ sk -> sk heaps s ()
@@ -199,12 +198,8 @@ whenSuspended :: Suspend m -> VerseT m ()
 whenSuspended f = modifyV' $ \ S {..} ->
   S { suspend = \ resume -> suspend resume *> f resume, .. }
 
-whenCommitted :: Commit m -> Duplicate m -> VerseT m ()
-whenCommitted f g = modifyV' $ \ S {..} ->
-  S { commit = \ heap -> commit heap *> f heap
-    , duplicate = \ heap -> duplicate heap *> g heap
-    , ..
-    }
+modifyStore :: (Store m -> Store m) -> VerseT m ()
+modifyStore f = modifyV' $ \ S {..} -> S { store = f store, .. }
 
 data Heap = Heap
   { label :: {-# UNPACK #-} !Int
@@ -281,10 +276,11 @@ runVerseT m = do
   latch <- newLatch'' heap
   let
     heaps = Heaps { heap = Just heap, verifyHeap }
-    sk heaps _ x fk _ ak = do
+    sk heaps s x fk _ ak = do
       suspCount <- readSuspCount'' latch heap
       runMaybeT $ do
         guard $ suspCount == 0
+        lift $ commitRun level heap s.store
         prepend x <$> MaybeT (fk heaps abortRun) <*> MaybeT (ak heaps)
   unVerseT m yk R {..} emptyS sk failRun failRun abortRun
   where
@@ -292,6 +288,18 @@ runVerseT m = do
     level = 0
     verifyHeap = Nothing
     prepend x xss yss = ((x:) <$> xss) ++ yss
+
+commitRun :: MonadRef m => Int -> Heap -> Store m -> m ()
+commitRun level heap store = for_ store $ \ (StoreElem ref) ->
+  commitRun' level heap ref
+
+commitRun' :: (MonadRef m, Freshenable a m) => Int -> Heap -> HRef m a -> m ()
+commitRun' level heap (HRef ref) = do
+  x <- freshenRun' level heap . findHeap' heap =<< readRef ref
+  modifyRef' ref $ insertHeap' heap x
+
+freshenRun' :: Freshenable a m => Int -> Heap -> a -> m a
+freshenRun' level heap x = runFreshenT (freshen x) FreshenEnv {..}
 
 failRun :: Functor m => Fail (Maybe [[a]]) m
 failRun heap ak = fmap ([]:) <$> ak heap
@@ -391,8 +399,7 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   , init :: !(VerseT m (), VerseT m (), VerseT m ())
   , last :: !(HRef m (Maybe a))
   , suspend :: !(Suspend m)
-  , commit :: !(Commit m)
-  , duplicate :: !(Duplicate m)
+  , store :: !(Store m)
   }
 
 split'
@@ -422,11 +429,11 @@ split' m heap latch last =
       suspCount <- readSuspCount' latch heap
       (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
         Just x ->
-          (do commit heap
+          (do commit store heap
               x <- freshen' x heap
               pure . Step x $ do
                 heap <- copyHeap heap
-                split' (duplicate heap.tail *> m_f) heap latch last) <?>
+                split' (duplicate store heap.tail *> m_f) heap latch last) <?>
           (do heap <- copyHeap heap
               split' m_a heap latch last)
         Nothing ->
@@ -471,8 +478,7 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
           , (whenSuspended env.suspend *> m_a) <?> m_a'
           )
         suspend resume = env.suspend resume *> s.suspend resume
-        commit heap = env.commit heap *> s.commit heap
-        duplicate heap = env.duplicate heap *> s.duplicate heap
+        store = env.store <> s.store
       in do
         writeHRef ref_env $ Just SplitEnv {..}
         s.suspend $ resumeSplit ref_env
@@ -481,16 +487,15 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
       let
         m_f'' = (whenSuspended env.suspend *> m_f) <|> m_f'
         m_a'' = (whenSuspended env.suspend *> m_a) <?> m_a'
-        commit heap = env.commit heap *> s.commit heap
-        duplicate heap = env.duplicate heap *> s.duplicate heap
+        store = env.store <> s.store
       suspCount <- readSuspCount' latch heap
       (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
         Just x ->
-          (do commit heap
+          (do commit store heap
               x <- freshen' x heap
               susp . Step x $ do
                 heap <- copyHeap heap
-                split' (duplicate heap.tail *> m_f'') heap latch last) <?>
+                split' (duplicate store heap.tail *> m_f'') heap latch last) <?>
           (do heap <- copyHeap heap
               susp =<< split' m_a'' heap latch last)
         Nothing -> do
@@ -1032,46 +1037,51 @@ findVarState' Heap {..} xs@HeapMap {..} = case IntMap.lookup label just of
         }
       x -> x
 
-newtype VerseRef m a = VerseRef (HRef m a)
+data VerseRef m a = VerseRef
+  { label :: {-# UNPACK #-} !Int
+  , ref :: !(HRef m a)
+  }
 
-instance EqRef (Ref m) => Eq (VerseRef m a) where
-  VerseRef x == VerseRef y = x == y
+instance Eq (VerseRef m a) where
+  x == y = x.label == y.label
 
 instance (MonadRef m, Freezable a b m) => Freezable (VerseRef m a) (Identity b) m where
-  freeze (VerseRef ref) =
+  freeze VerseRef {..} =
     fmap Identity . freeze =<< FreezeT (lift . lift . readVerseRef' ref =<< ask)
 
-newVerseRef :: (MonadRef m, Freshenable a m) => a -> VerseT m (VerseRef m a)
-newVerseRef x = VerseRef <$> newVerseRef' x
-
-newVerseRef' :: (MonadRef m, Freshenable a m) => a -> VerseT m (HRef m a)
-newVerseRef' x = getHeap >>= \ case
-  Just Heap {..} -> do
-    ref <- lift $ newRef HeapMap
+newVerseRef
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => a -> VerseT m (VerseRef m a)
+newVerseRef x = getHeap >>= \ case
+  Just heap -> do
+    label <- supply
+    ref <- lift $ HRef <$> newRef HeapMap
       { nothing = Nothing
-      , just = IntMap.singleton label x
+      , just = IntMap.singleton heap.label x
       }
-    whenCommitted
-      (\ heap -> lift . modifyRef' ref . insertHeap heap.tail =<< freshen' x heap)
-      (const $ pure ())
-    pure $ HRef ref
-  Nothing -> lift $ HRef <$> newRef HeapMap
-    { nothing = Just x
-    , just = mempty
-    }
+    modifyStore . IntMap.insert label $ StoreElem ref
+    pure $ VerseRef {..}
+  Nothing -> do
+    label <- supply
+    ref <- lift $ HRef <$> newRef HeapMap
+      { nothing = Just x
+      , just = mempty
+      }
+    pure $ VerseRef {..}
 
 readVerseRef :: MonadRef m => VerseRef m a -> VerseT m a
-readVerseRef (VerseRef ref) = lift . readVerseRef' ref =<< getHeap
+readVerseRef VerseRef {..} = lift . readVerseRef' ref =<< getHeap
 
 readVerseRef' :: MonadRef m => HRef m a -> Maybe Heap -> m a
 readVerseRef' (HRef ref) heap = findHeap heap <$> readRef ref
 
+readVerseRef'' :: MonadRef m => HRef m a -> Heap -> m a
+readVerseRef'' (HRef ref) heap = findHeap' heap <$> readRef ref
+
 writeVerseRef :: (MonadRef m, Freshenable a m) => VerseRef m a -> a -> VerseT m ()
-writeVerseRef var@(VerseRef ref) x = do
+writeVerseRef VerseRef {..} x = do
   writeVerseRef' ref x
-  whenCommitted
-    (writeVerseRef var <=< freshen' x)
-    (writeVerseRef' ref <=< lift . readVerseRef' ref)
+  modifyStore . IntMap.insert label $ StoreElem ref
 
 writeVerseRef' :: MonadRef m => HRef m a -> a -> VerseT m ()
 writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
@@ -1088,6 +1098,23 @@ writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
       modifyRef' ref $ insertHeap heap y
       ak heaps
   sk heaps s () fk ek' ak'
+
+commit :: MonadRef m => Store m -> Heap -> VerseT m ()
+commit store heap = IntMap.forWithKey_ store $ \ label elem ->
+  commit' label elem heap
+
+commit' :: MonadRef m => Int -> StoreElem m -> Heap -> VerseT m ()
+commit' label elem@(StoreElem ref) heap = do
+  x <- flip freshen' heap =<< lift (readVerseRef'' ref heap)
+  writeVerseRef' ref x
+  modifyStore $ IntMap.insert label elem
+
+duplicate :: MonadRef m => Store m -> Maybe Heap -> VerseT m ()
+duplicate store heap = for_ store $ \ (StoreElem ref) ->
+  duplicate' ref heap
+
+duplicate' :: MonadRef m => HRef m a -> Maybe Heap -> VerseT m ()
+duplicate' ref = writeVerseRef' ref <=< lift . readVerseRef' ref
 
 findHeap :: Maybe Heap -> HeapMap a -> a
 findHeap k xs@HeapMap {..} = case k of
@@ -1196,7 +1223,10 @@ lookupLocalHeap' Heap {..} xs = case IntMap.lookup label xs of
 insertHeap :: Maybe Heap -> a -> HeapMap a -> HeapMap a
 insertHeap k x xs = case k of
   Nothing -> xs { nothing = Just x }
-  Just Heap {..} -> xs { just = IntMap.insert label x xs.just }
+  Just k -> insertHeap' k x xs
+
+insertHeap' :: Heap -> a -> HeapMap a -> HeapMap a
+insertHeap' Heap {..} x xs = xs { just = IntMap.insert label x xs.just }
 
 state' :: MonadState s m => (s -> Either a s) -> m (Maybe a)
 state' f = state $ \ s -> case f s of

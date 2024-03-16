@@ -160,7 +160,6 @@ type MonadEval m =
   , MonadFix m
   , MonadRef m
   , MonadSupply Label m
-  , EqRef (Ref m)
   )
 
 eval :: MonadEval m => Mode -> L (Exp L Ident) -> VerseT m FrozenVal
@@ -1022,7 +1021,7 @@ invokeIntrinsicDom loc = \ case
   Intrinsic.Query -> liftPrim $ query loc
 
 liftOrd
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => (forall a . Ord a => a -> a -> Bool)
   -> VarVal m -> VerseT m (DomMatch m)
 liftOrd f var = readPair var >>= \ case
@@ -1052,7 +1051,7 @@ liftOrd f var = readPair var >>= \ case
   _ -> empty
 
 liftNum
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => (forall a . Num a => a -> a -> a)
   -> VarVal m -> VerseT m (DomMatch m)
 liftNum f var = readPair var >>= \ case
@@ -1118,7 +1117,7 @@ prefixMinus var = readVar' var >>= \ case
   _ -> empty
 
 div'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VarVal m -> VerseT m (DomMatch m)
 div' var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
@@ -1214,7 +1213,7 @@ div' var = readPair var >>= \ case
   _ -> empty
 
 to
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VarVal m
   -> S m
   -> S m
@@ -1228,7 +1227,7 @@ to var s s' = lift $ readPair var >>= \ case
   _ -> empty
 
 to'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m), Enum a)
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Enum a)
   => (a -> f (Fix (Compose (Var m) f)))
   -> a
   -> a
@@ -1361,7 +1360,7 @@ liftPrim f var s s' = f var <&> \ (DomMatch x f) ->
   DomMatch x $ \ x -> f x <* lift (unifyS s s')
 
 readPair
-  :: (MonadFix m, MonadRef m, MonadSupply Int m, EqRef (Ref m))
+  :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VarVal m
   -> VerseT m (Maybe (VarVal m, VarVal m))
 readPair var = readVar' var <&> \ case

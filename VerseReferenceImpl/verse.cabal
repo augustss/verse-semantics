@@ -31,6 +31,7 @@ library
     Control.Monad.Verse
     Control.Monad.Wrong
     Data.IntMap.Lazy.Extras
+    Data.IntMap.Strict.Extras
     Data.Fix
     Data.Functor.Compose.Instances
     Language.Verse
