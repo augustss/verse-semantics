@@ -609,7 +609,7 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
         resumeVerify ref_env m_y
     SucceedS s m_f m_e m_a -> do
       let
-        m_f'' = alt (whenSuspended env.suspend *> m_f) m_f' m_e'
+        m_f'' = (whenSuspended env.suspend *> m_f) <|> m_f'
         m_a'' = (whenSuspended env.suspend *> m_a) <?> m_a'
       suspCount <- readSuspCount' latch heap
       (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
