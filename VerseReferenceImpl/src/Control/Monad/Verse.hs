@@ -598,7 +598,7 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
     YieldS s m_y m_f m_e m_a ->
       let
         init =
-          ( alt (whenSuspended env.suspend *> m_f) m_f' m_e'
+          ( (whenSuspended env.suspend *> m_f) <|> m_f'
           , alt (whenSuspended env.suspend *> m_e) m_f' m_e'
           , (whenSuspended env.suspend *> m_a) <?> m_a'
           )
