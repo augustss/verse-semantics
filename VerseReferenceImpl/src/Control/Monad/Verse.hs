@@ -168,6 +168,9 @@ getVerifyHeap = asksV (.heaps.verifyHeap)
 getLatch :: VerseT m (Latch m)
 getLatch = asksV (.latch)
 
+localLatch :: (Latch m -> Latch m) -> VerseT m a -> VerseT m a
+localLatch f = localV $ \ R {..} -> R { latch = f latch, .. }
+
 data S m = S
   { suspend :: !(Suspend m)
   , store :: !(Store m)
@@ -195,8 +198,14 @@ modifyV' f = VerseT $ \ _ R {..} s sk ->
   let s' = f s in s' `seq` sk heaps s' ()
 
 whenSuspended :: Suspend m -> VerseT m ()
-whenSuspended f = modifyV' $ \ S {..} ->
-  S { suspend = \ resume -> suspend resume *> f resume, .. }
+whenSuspended f = do
+  latch <- getLatch
+  modifyV' $ \ S {..} -> S
+    { suspend = \ resume -> do
+        suspend resume
+        f $ resume . localLatch (const latch)
+    , ..
+    }
 
 modifyStore :: (Store m -> Store m) -> VerseT m ()
 modifyStore f = modifyV' $ \ S {..} -> S { store = f store, .. }
@@ -653,7 +662,7 @@ fork m =
 join' :: MonadRef m => VerseT m a -> VerseT m a
 join' m = do
   latch@(Latch ref) <- newLatch
-  x <- localV (\ R { latch = _, .. } -> R {..}) m
+  x <- localLatch (const latch) m
   LatchState {..} <- readHRef ref
   if suspCount == 0 then pure x else yield $ \ f ->
     let susp = f x in writeHRef ref $! LatchState {..}
