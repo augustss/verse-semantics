@@ -9,6 +9,7 @@ module Language.Verse.Desugar
 
 import Control.Arrow (first)
 import Control.Comonad
+import Control.Monad (when)
 import Control.Monad.Reader
 import Control.Monad.State.Strict
 import Control.Monad.Supply
@@ -57,6 +58,7 @@ import Language.Verse.Rewrite.Exp
   , OC (..)
   )
 import Language.Verse.Rewrite.Exp qualified as Rewrite
+import Prettyprinter (pretty)
 
 type DesugarT m = StateT Env (ReaderT R m)
 
@@ -72,10 +74,8 @@ fromMode = \ case
 runDesugarT
   :: Functor m
   => DesugarT m a
-  -> ReaderT R m (a, IdentMap (Access, Quantifier))
-runDesugarT = fmap (fmap (fmap dropLocation)) . runDesugarT'
-  where
-    dropLocation (_loc, access, x) = (access, x)
+  -> ReaderT R m (a, IdentMap (Loc, Access, Quantifier))
+runDesugarT =  runDesugarT'
 
 runDesugarT' :: DesugarT m a -> ReaderT R m (a, Env)
 runDesugarT' m = runStateT m mempty
@@ -95,7 +95,7 @@ desugarTop
   -> ReaderT R m (L (Exp L Ident))
 desugarTop e = do
   (e, xs) <- runDesugarT $ unifyEnv (loc e) `thenM` desugarExp e
-  pure $ TopLevel xs <$> duplicate e
+  pure $ TopLevel (dropLoc xs) <$> duplicate e
 
 desugarExp
   :: (MonadWrong Error m, MonadSupply Label m)
@@ -163,32 +163,33 @@ desugarExp'' e pi i = case extract e of
   Rewrite.Module e' -> valM i (e $>) $ do
     i <- supply
     (e', xs) <- lift . runDesugarT $ desugarExp e'
-    pure $ Module i xs e'
+    checkNoneOf [Private] xs
+    pure $ Module i (dropLoc xs) e'
   Rewrite.Enum xs -> valM i (e $>) $ do
     j <- supply
     pure $ Enum j xs
   Rewrite.Struct e' -> valM i (e $>) $ do
     j <- supply
     (e', xs) <- lift . runDesugarT $ desugarExp e'
-    pure $ Struct j xs e'
+    pure $ Struct j (dropLoc xs) e'
   Rewrite.Class e1 e2 -> valM i (e $>) $ do
     j <- supply
     e1 <- traverse desugarExp e1
     (e2, xs) <- lift . runDesugarT $ desugarExp e2
-    pure $ Class j e1 xs e2
+    pure $ Class j e1 (dropLoc xs) e2
   Rewrite.Inst e1 e2 -> valM i (e $>) $ do
     e1 <- desugarExp e1
     (e2, xs) <- lift . runDesugarT $ desugarExp e2
-    pure $ Inst e1 xs e2
+    pure $ Inst e1 (dropLoc xs) e2
   Rewrite.IfThenElse e1 e2 e3 -> do
     (e1, xs) <- lift . runDesugarT $ desugarExp e1
-    IfThenElse xs e1 <$>
+    IfThenElse (dropLoc xs) e1 <$>
       exists (desugarExp' e2 pi i) <*>
       exists (desugarExp' e3 pi i)
   Rewrite.ForDo e1 e2 -> valM i (e $>) $ do
     (e1, xs) <- lift . runDesugarT $ desugarExp e1
     e2 <- exists $ desugarExp e2
-    pure $ ForDo xs e1 e2
+    pure $ ForDo (dropLoc xs) e1 e2
   Rewrite.Block e' ->
     (i :=:) <$> exists (desugarExp e')
   Rewrite.BracketInvoke e1 e2 -> valM i (e $>) $ do
@@ -201,12 +202,12 @@ desugarExp'' e pi i = case extract e of
   Rewrite.Forall x -> do
     tellForallName Internal x
     pure $ i :=: name x
-  Alloc2 x e -> do
-    tellVarName Internal x
+  Alloc2 access x e -> do
+    tellVarName access x
     e <- desugarExp e
     pure $ Alloc x e i
-  Alloc3 x e1 e2 -> do
-    tellVarName Internal x
+  Alloc3 access x e1 e2 -> do
+    tellVarName access x
     e1 <- desugarExp e1
     e2 <- desugarExp' e2 pi i
     pure $ Alloc x e1 e2
@@ -443,7 +444,7 @@ execOLam loc' e1 e2 e3 pi f = do
     b <- name <$> freshIdent (loc e1)
     e1 <- desugarExp' e1 True b
     pure (unify a e1 `then'` b, a)
-  function' loc' pi f . OLam f xs e1 <$> exists do
+  function' loc' pi f . OLam f (dropLoc xs) e1 <$> exists do
     b <- name <$> freshIdent (loc e3)
     unify b <$> invokeM a pi f `thenM` case e2 of
       Just e2 -> ofTypeD e3 e2 pi b
@@ -478,7 +479,7 @@ assumePosOLam e1 eff e2 e3 pi f = do
     b <- name <$> freshIdent (loc e1)
     e1 <- desugarExp' e1 True b
     pure (unify a e1 `then'` b, a)
-  OLam f xs e1 <$> case e2 of
+  OLam f (dropLoc xs) e1 <$> case e2 of
     Just e2 -> negM $ abstractD eff e2
     Nothing -> exists do
       b <- name <$> freshIdent (loc e3)
@@ -511,7 +512,7 @@ assumeNegOLam loc' e1 eff e2 e3 pi f = do
     i <- name <$> freshIdent (loc e1)
     e1 <- posM $ desugarExp' e1 True i
     pure $ e1 `then'` i
-  function' loc' pi f . OLam f xs e1 <$> case e2 of
+  function' loc' pi f . OLam f (dropLoc xs) e1 <$> case e2 of
     Just e2 -> abstractD eff e2
     Nothing -> concreteD eff e3
 
@@ -827,3 +828,9 @@ exists' :: Env -> L (Exp L Ident) -> L (Exp L Ident)
 exists' xs e = foldlWithKey' f e xs
   where
     f z x (loc, access, y) = Def access y (L loc x) z <$ z
+
+dropLoc :: Env -> HashMap.HashMap Ident (Access, Quantifier)
+dropLoc = fmap (\ (_loc, access, x) -> (access, x))
+
+checkNoneOf :: MonadWrong Error m => [Access] -> Env -> m ()
+checkNoneOf notAllowed env = mapM_ ( \ (loc, access, _) -> when (access `elem` notAllowed) (wrong $ AccessError loc (show $ pretty access)) ) $ HashMap.elems env

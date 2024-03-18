@@ -41,6 +41,7 @@ data Error
   | DomError !Loc !Loc !FrozenVal
   | OLamDomError !Loc !Loc !Loc !FrozenVal
   | IntrinsicDomError !Loc
+  | AccessError !Loc String
   | StuckError
   | OtherError !Pos String -- Used for Parsec error type
   | NotImplemented String deriving Show
@@ -107,6 +108,9 @@ instance Pretty Error where
     IntrinsicDomError x ->
       pretty x <> colon <+>
       "overlapping" <+> "function" <+> "domains"
+    AccessError x access ->
+      pretty x <> colon <+>
+      pretty access <+> "specifier" <+> "can't" <+> "be" <+> "used" <+> "here"
     StuckError ->
       "stuck"
     OtherError x msg ->
