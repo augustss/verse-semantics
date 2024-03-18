@@ -277,6 +277,8 @@
 %format fix = "\textbf{fix}"
 %format unify = "\textbf{unify}"
 %format add = "\textbf{add}"
+%format pfun = "\mathit{pf}"
+%format ppred = "\mathit{pp}"
 %%%%format map = "\textbf{map}"
 %format sub = "\textbf{sub}"
 %format semi = "\textbf{seq}"
@@ -671,6 +673,7 @@
 %format verify2 (r) (a) (x) = "\textbf{verify}(" r ";\," a ")\{" x "\}"
 %format decide (x) = "\textbf{dec}\{" x "\}"
 %format bullet = "\bullet"
+%format not (e) = "\neg" e
 %format forall (x) (y) = "\forall" x ".\," y
 
 %% Effects checking, like succeeds{e}
@@ -680,6 +683,8 @@
 %format rcheck (r) (b) = rcheckKW "\langle" r "\rangle\{" b "\}"
 %format havocKW = "\mathcal K"
 %format havoc (fx) = "{\mathcal K}\langle{}" fx "\rangle{}"
+%format someKW = "{\bf some}"
+%format some (v) = "{\bf some}\{" v "\}"
 
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"

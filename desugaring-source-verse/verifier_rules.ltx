@@ -14,54 +14,51 @@ $\begin{array}{@@{}l}
 
 
 \multicolumn{5}{l}{\textit{Guard}} \\
-\rulename{asm}        & |assume v| & \movesto & |tup ()| \\
 \rulename{guard-elim} & |v guard e| & \movesto & |e| \\
 \rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
-% \rulename{guard-float} & |(assume eq_1 `eqsemi` eq_2) guard e_3| & \movesto &  |assume eq_1; (eq_2 guard e_3)| 
 \end{array} \\
 \\[-2mm]
 
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \multicolumn{5}{l}{\textit{Check}} \\
-  \rulename{check-afail}   & |check fx (assume fail)|  & \movesto & |assume fail|  & \\
   \rulename{check-fail}   & |check fails fail|  & \movesto & |fail|  & \\
   \rulename{check-suc}    & |check succeeds v|  & \movesto & |v| & \text{if $\skol{|v|}$} \\
   \rulename{check-dec}    & |check decides v|  & \movesto & |v| & \text{if $\skol{|v|}$} \\
   \rulename{check-choice} & |check succeeds (v choice e)|  & \movesto & |v choice (check fails e)| & \text{if $\skol{|v|}$} \\
 \end{array} \\
 \\[-0.6em]
-% \multicolumn{5}{l}{\textit{Havoc}} \\
-%   \rulename{havoc-suc} & |havoc succeeds| & \movesto & |tup ()| \\
-%   \rulename{havoc-fail} & |havoc fails| & \movesto & |fail| \\
-%   \rulename{havoc-dec} & |havoc decides| & \movesto & |forall r (r = tup())| \\
-% \\[-0.6em]
-
 
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \multicolumn{5}{l}{\textit{Verify}} \\
-\rulename{smt} & |verify2 rs as (P^[a])| & \movesto
-   & \multicolumn{2}{l}{|verify2 rs as (P^[v])| \hspace{5mm} \text{if $|rs;as| \vDash |a| \leadsto |v|$}} \\
+\rulename{smt} & |verify2 rs as e| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
   \rulename{verify-val} & |verify2 rs as v|      & \movesto & |tup ()| & \\
-  \rulename{verify-unr} & |verify2 rs as unr|    & \movesto & |tup ()| & \\
   \rulename{verify-fail} & |verify2 rs as fail|    & \movesto & |tup ()| & \\[1mm]
-  \rulename{uni-float}^{\alpha} & |verify2 rs as (P^[forall r e])| & \movesto
-    & \multicolumn{2}{l}{|verify2 (rs,r) as (P^[e])| \hspace{5mm} \text{if $r \notin \freevars{|P|} \cup \boundvars{|P|}$}} \\[1mm]
+  \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
+  & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
+  &&& \text{if $|r| \notin |rs|$ and $\freevars{|v|} \notin \boundvars{|P|}$} \\[1mm]
 
-  \rulename{split-k} & |verify2 (rs,r) as (P^[r==k])| & \movesto &
-          |verify2 (rs,r) (as, r==k) (P^[ tup () ]);| \\
-    &&& |verify2 (rs,r) (as, not (r==k)) (P^[ fail ])| \\  \\[-1mm]
-  \rulename{split-tup} & \multicolumn{3}{l}{|verify2 (rs,r) as (P^[r==tup (v_1, xdots, v_n)])|} \\
-      && \movesto & |verifyKW|
-            \begin{array}[t]{@@{}l}
-              |(rs, r, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
-              |P^[ r_1==v_1; xdots; r_n == v_n ] };|
-            \end{array}\\
-    &&& |verify2 (rs,r) (as, not (r==tup (_, xdots,_))) (P^[ fail ])| \\  \\[-1mm]
-  \rulename{split-op} & |verify2 (rs,r) as (P^[apply1N isInt r]))| & \movesto &
-          |verify2 (rs,r) (as, apply1N isInt r) (P^[ tup () ]);| \\
-    &&& |verify2 (rs,r) (as, not (apply1N isInt r)) (P^[ fail ])| \\
+  \rulename{split-val} & |verify2 (rs,r) as (P^[r==v])| & \movesto &
+    \hspace{5mm} \text{if $\freevars{|v|} \not\in \boundvars{|P|}$ } \\
+    &&& |verify2 (rs,r) (as, r==v) (P^[ tup () ]);| \\
+    &&& |verify2 (rs,r) (as, not (r==v)) (P^[ fail ])| \\  \\[-1mm]
+  \rulename{split-ppred} & |verify2 (rs,r) as (P^[apply1N ppred r]))| & \movesto &
+          |verify2 (rs,r) (as, apply1N ppred r) (P^[ tup () ]);| \\
+    &&& |verify2 (rs,r) (as, not (apply1N ppred r)) (P^[ fail ])| \\
+  \rulename{split-pfun} & |verify2 (rs,r) as (P^[apply1N pfun hnf]))| & \movesto &
+          |verify2 (rs,r) (as, r = apply1N pfun hnf) (P^[r ]);| 
 \end{array}\\
 
+\text{Note: \rulename{split-val} could be more incremental.}
+%  \rulename{split-k} & |verify2 (rs,r) as (P^[r==k])| & \movesto &
+%          |verify2 (rs,r) (as, r==k) (P^[ tup () ]);| \\
+%    &&& |verify2 (rs,r) (as, not (r==k)) (P^[ fail ])| \\  \\[-1mm]
+%  \rulename{split-tup} & \multicolumn{3}{l}{|verify2 (rs,r) as (P^[r==tup (v_1, xdots, v_n)])|} \\
+%      && \movesto & |verifyKW|
+%            \begin{array}[t]{@@{}l}
+%              |(rs, r, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
+%              |P^[ r_1==v_1; xdots; r_n == v_n ] };|
+%            \end{array}\\
+%   &&& |verify2 (rs,r) (as, not (r==tup (_, xdots,_))) (P^[ fail ])| \\  \\[-1mm]
 \end{array}$
 \\[0.1in]
 \caption{SPJ: TRS Verifier Rewrite Rules}

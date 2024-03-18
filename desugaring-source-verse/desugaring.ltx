@@ -573,7 +573,7 @@ $$
 \rulename{dinit}   & |De2 md t | & = & |def x (DMe (inp2 x solve md) t)| \\[1mm]
 \rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| & \text{NB: no case for |si = solvex|}\\
 \rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[1mm]
-\rulename{hide}     & |Hide e|  & = & |forall r (assume (r == e); r)| \\[1mm]
+\rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
 \rulename{havoc-succ}     & |havoc succeeds|  & = & |tup ()| \\
 \rulename{havoc-fail}     & |havoc fails|  & = & |fail| \\
 \rulename{havoc-dec}     & |havoc decides|  & = & |forall r (r=tup())| \\[1mm]
@@ -602,12 +602,12 @@ $$
 %         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
 
 \rulename{moftype+} & |DMe (inp2 f si mdpos) (oftype t_1 t_2)|
-  & = & |y := DMe (inp2 f si mdpos) t_1; z := De2 mdpos t_2; apply1N z y; Hide (def i (apply1N z i))| \\
+  & = & |y := DMe (inp2 f si mdpos) t_1; z := De2 mdpos t_2; apply1N z y; Hide z)| \\
 \rulename{moftype-} & |DMe (inp2 f si mdneg) (oftype t_1 t_2)|
-  & = & |z := De2 mdneg t_2; Hide (def i (apply1N z i))| \\
+  & = & |z := De2 mdneg t_2; Hide z)| \\
 \rulename{moftypex} & |DMe (inp2 f si mdx) (oftype t_1 t_2)|
   & = & |y:=DMe (inp2 f si mdx) t_1; z := De2 mdx t_2; apply1N z y| \\
-\rulename{mtype1}   & |DMe (inp2 i solve md) (:t)|           & = & |z:=De2 md t; Hide (def j (apply1N z j))| \\
+\rulename{mtype1}   & |DMe (inp2 i solve md) (:t)|           & = & |z:=De2 md t; Hide z)| \\
 \rulename{mtype2}   & |DMe (inp2 i infer md) (:t)|           & = & |(De2 md t)^[i]| \\
 \rulename{msquig} & |DMe (inp2 z si md) (y squiggt x := t)| & = &
 \multicolumn{2}{@@{}l}{|y := z; DMe (inp2 z sip md) (x := t)|
