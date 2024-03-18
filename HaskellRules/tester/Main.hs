@@ -297,8 +297,8 @@ assertVerify ti tflg e | typ == TSkip = do
           putStrLn $ unlines $ showTrace trc
 
         if timeout then do
-           when noisy $
-             putStrLn $ pos ++ " " ++ "time-out, use --max-norm-steps=N to change"
+           -- when noisy $
+           putStrLn $ pos ++ " " ++ "time-out, use --max-norm-steps=N to change"
            pure None
          else
          if done == shouldVerify then do

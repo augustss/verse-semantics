@@ -615,9 +615,9 @@ verifierRules env lhs =
       (ctx, _, bs, Var r' :=: Var r'') <- eX e  ----------- SPLIT IN ASSERT needs NEGATION yuck.
       guard (r == r')
       guard (r'' `elem` [ b | BUni b <- bs ])
-      pure (Verify (UNI r ( Fails  (Var r :=: Var r') :>: ctx Fail))
+      pure (Verify (UNI r ( Fails  (Var r' :=: Var r'') :>: ctx Fail))
             :>:
-            Verify (UNI r ( Assume (Var r :=: Var r') :>: ctx (Arr[]))))
+            Verify (UNI r ( Assume (Var r' :=: Var r'') :>: ctx (Arr[]))))
    ++
    -- Fails {hnf} ---> Assume {fail}
    "fails-hnf" `name`
