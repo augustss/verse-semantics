@@ -898,12 +898,11 @@ unifyUnboundUnbound f var1 _ var2@(Var ref2) unbound2 = do
   writeVarState ref2 $ Link var1
   unbound2.substSusp $ LinkS var1
   whenM ((unbound2.level /=) <$> getLevel) $ do
-    latch <- getLatch
-    incrSuspCount latch
+    incrSuspCount =<< getLatch
     whenSuspended $ \ resume ->
       fork $ readSubst var2 >>= \ subst -> resume $ do
         unifySubst f subst var2
-        decrSuspCount latch
+        decrSuspCount =<< getLatch
 
 unifyBoundUnbound
   :: MonadRef m
@@ -913,12 +912,11 @@ unifyBoundUnbound f var1 bound1 var2@(Var ref2) unbound2 = do
   writeVarState ref2 $ Link var1
   unbound2.substSusp $ BoundS var1 bound1
   whenM ((unbound2.level /=) <$> getLevel) $ do
-    latch <- getLatch
-    incrSuspCount latch
+    incrSuspCount =<< getLatch
     whenSuspended $ \ resume ->
       fork $ readBound var2 >>= \ (var2, bound2) -> resume $ do
         unifyBoundBound f var1 bound1 var2 bound2
-        decrSuspCount latch
+        decrSuspCount =<< getLatch
 
 unifyBoundBound
   :: MonadRef m
