@@ -62,7 +62,9 @@
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
 %format (DAe (i) (x)) = "{\mathcal A}\llbracket{}" x "\rrbracket{}" i
 %format De2 md (x) = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
-%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
+
+%%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
+%format Hide (v) = "{\bf some}\{" v "\}"
 
 %% 'si' is short for "solve or infer" or "unification variable or not" resp
 %format si = "\pi"
@@ -684,7 +686,7 @@
 %format havocKW = "\mathcal K"
 %format havoc (fx) = "{\mathcal K}\langle{}" fx "\rangle{}"
 %format someKW = "{\bf some}"
-%format some (v) = "{\bf some}\{" v "\}"
+%format some (v) =  "{\bf some}\{" v "\}"
 
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"

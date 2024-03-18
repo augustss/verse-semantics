@@ -39,8 +39,8 @@
       \text{Existentials} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
-      \text{Expressions} & |e| & ::= & |v| \vb |eq ; e| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
-      && \vb & |some v| \vb |eq guard e| \vb |check fx e| \vb |rcheck fx e| \\
+      \text{Expressions} & |e| & ::= & |v| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+      && \vb & |some v| \vb |e_1 guard e_2| \vb |check fx e| \vb |rcheck fx e| \\
       && \vb & |v == e| \vb |verify2 rs as e| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb r  \vb |pfun| \vb |ppred| \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
@@ -48,7 +48,7 @@
       \text{Prim functions} & |pfun|  & ::= & |add| \vb |sub| \vb \ldots \\
       \text{Prim predicates} & |ppred| & ::= & |gt| \vb |isInt| \vb \ldots \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail| \\
-      \text{Assumptions} & |a| & ::= & |r = v| \vb |apply1N op v| \vb |not a|
+      \text{Assumptions} & |a| & ::= & |r = v| \vb |r = apply1N pfun hnf| \vb |apply1N ppred r| \vb |not a|
 \end{array}
 \\ \\
 \mbox{\em Contexts} \\
@@ -56,10 +56,10 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |ef; S| \vb |S guard e| \vb |v=S| \\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |eq; E| \vb |E; e| \vb |def x E| \vb |E guard e| \vb |eq guard E| \vb |v==E| \\
-\text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |def x C| \vb |C guard e| \vb |v==C| \vb |assume C| \\
+\text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |def x C| \vb |C guard e| \vb |v==C| \\
 \text{Proof contexts}  & |P| & ::= & |hole| \vb |cf; P| \vb |P; e| \vb |def x P| \vb |one P| \vb |all P| \\
 && \vb & |v==P| \vb |P `choice` e| \vb |e `choice` P| \vb |P guard e|
-    \vb |check fx P| \vb |assume P|
+    \vb |check fx P|
 \end{array} \\
 \begin{array}{ll}
 \text{Effect-free} & \text{|ef| is an |eq| that can have choice and fail, but not I/O effects or divergence} \\
