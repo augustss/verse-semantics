@@ -346,10 +346,10 @@ data Scope = Scope
 instance Pretty Scope where
   pretty = \ case
     Scope label labels mLabel -> "Scope{" <> prettyLabel label <>  prettySup labels <+> "in" <+> prettyLabel mLabel <> "}"
-   where
-     prettySup = \ case
-       [] -> mempty
-       labels -> "," <> "sup=[" <> concatWith (<+>) (map prettyLabel labels) <> "]"
+    where
+      prettySup = \ case
+        [] -> mempty
+        labels -> "," <> "sup=[" <> concatWith (<+>) (map prettyLabel labels) <> "]"
 
 data AccessScope
   = AccessScope

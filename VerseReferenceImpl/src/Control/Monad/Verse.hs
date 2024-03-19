@@ -772,20 +772,19 @@ instance ( MonadFix m
          ) => Freshenable (Var m a) m where
   freshen var@(Var ref) = FreshenT $ do
     FreshenEnv {..} <- ask
-    lift (lift $ readLocalVarState ref heap) >>= \ case
-      Nothing -> pure var
-      Just (Link var) -> unFreshenT $ freshen var
-      Just (Unbound unbound) ->
+    lift (lift $ readVarState'' ref heap) >>= \ case
+      Link var -> unFreshenT $ freshen var
+      Unbound unbound ->
         if unbound.level < level then pure var else mfix $ \ var' ->
           state' (IntMap.Lazy.lookupInsert unbound.label $ unsafeCoerce var') >>= \ case
             Just (unsafeCoerce -> var') -> pure var'
             Nothing -> lift . lift $ freshVar' (level - 1) heap.tail
-      Just (Bound bound) -> mfix $ \ var' ->
+      Bound bound -> mfix $ \ var' ->
         state' (IntMap.Lazy.lookupInsert bound.label $ unsafeCoerce var') >>= \ case
           Just (unsafeCoerce -> var') -> pure var'
           Nothing -> do
             binding <- unFreshenT (freshen bound.binding)
-            lift . lift $ newVar' binding heap.tail
+            lift . lift $ newVar' binding
 
 instance ( MonadFix m
          , MonadRef m
@@ -842,10 +841,10 @@ newVerifyVar binding = do
   label <- supply
   Var <$> newVerifyHRef (Bound MkBound {..})
 
-newVar' :: (MonadRef m, MonadSupply Int m) => a -> Maybe Heap -> m (Var m a)
-newVar' binding heap = do
+newVar' :: (MonadRef m, MonadSupply Int m) => a -> m (Var m a)
+newVar' binding = do
   label <- supply
-  Var <$> newHRef' (Bound MkBound {..}) heap
+  Var <$> newHRef' (Bound MkBound {..}) Nothing
 
 readVar :: MonadRef m => Var m a -> VerseT m a
 readVar = fmap ((.binding) . snd) . readBound
@@ -980,12 +979,12 @@ readVarState'
   -> m (VarState m a)
 readVarState' (HRef ref) heap = findVarState heap <$> readRef ref
 
-readLocalVarState
+readVarState''
   :: MonadRef m
   => HRef m (VarState m a)
   -> Heap
-  -> m (Maybe (VarState m a))
-readLocalVarState (HRef ref) heap = lookupLocalHeap' heap . (.just) <$> readRef ref
+  -> m (VarState m a)
+readVarState'' (HRef ref) heap = findVarState' heap <$> readRef ref
 
 writeVarState
   :: MonadRef m
