@@ -289,8 +289,9 @@ rewritePat = \ case
     e <- rewriteExp e
     pure $ Name $ QualName e y
   Parse.Name (Parse.IdentPath path) -> pure $ ExpPath (rewritePath path)
-  InfixColon (extract -> Parse.Var [] i@(extract -> Parse.IdentName x)) e ->
-    Alloc2 (Ident.Name x <$ i) <$> rewriteExp e
+  InfixColon (extract -> Parse.Var _e1 i@(extract -> Parse.IdentName x) e2) e -> do -- Dropping specs after var for now
+    access <- getDefSpecs e2
+    Alloc2 access (Ident.Name x <$ i) <$> rewriteExp e
   Parse.PrefixColon e -> PrefixColon <$> rewriteExp e
   InfixColon p e -> do
     e <- rewriteExp e
@@ -327,14 +328,15 @@ rewriteDef
 rewriteDef p e = case extract p of
   (stripSpecs -> (Parse.Name (Parse.IdentName x), specs)) -> do
     let x' = Ident.Name x <$ p
-    pp <- getDefSpecs specs
+    access <- getDefSpecs specs
     pure $
-      InfixColonEqual pp Val x' $
+      InfixColonEqual access Val x' $
       ifArchetypeName x' e e
-  InfixColon (extract -> Parse.Var [] i@(extract -> Parse.IdentName x)) e' -> do
+  InfixColon (extract -> Parse.Var [] i@(extract -> Parse.IdentName x) specs) e' -> do
     let x' = Ident.Name x <$ i
+    access <- getDefSpecs specs
     e' <- rewriteExp e'
-    pure $ IfArchetypeName x' (alloc2 x' e') (alloc3 x' e' e)
+    pure $ IfArchetypeName x' (alloc2 access x' e') (alloc3 access x' e' e)
   Parse.PrefixColon e' -> (e `OfType`) <$> rewriteExp e'
   InfixColon (extract -> stripSpecs -> (Invoke p e_domain, specs)) e_range -> do
     e_domain <- rewriteExp e_domain
@@ -371,14 +373,15 @@ rewriteDef'
 rewriteDef' q p e1 e2 = case extract p of
   (stripSpecs -> (Parse.Name (Parse.IdentName x), specs)) -> do
     let x' = Ident.Name x <$ p
-    pp <- getDefSpecs specs
+    access <- getDefSpecs specs
     pure $
-      InfixColonEqual pp q x' $
+      InfixColonEqual access q x' $
       ifArchetypeName x' e1 e2
-  InfixColon (extract -> Parse.Var [] i@(extract -> Parse.IdentName x)) e -> do
+  InfixColon (extract -> Parse.Var [] i@(extract -> Parse.IdentName x) specs) e -> do
     let x' = Ident.Name x <$ i
+    access <- getDefSpecs specs
     e <- rewriteExp e
-    pure $ IfArchetypeName x' (alloc2 x' e1) (alloc3 x' e2 e)
+    pure $ IfArchetypeName x' (alloc2 access x' e1) (alloc3 access x' e2 e)
   Parse.PrefixColon e' -> (e2 `OfType`) <$> rewriteExp e'
   InfixColon (extract -> stripSpecs -> (Invoke p e_domain, specs)) e_range -> do
     e_domain <- rewriteExp e_domain
@@ -497,7 +500,7 @@ getDefSpecs = wrap $ \ case
   (_, y) -> wrong $ SpecError $ loc y
   where
     wrap f =
-      fmap (maybe Public extract) .
+      fmap (maybe Internal extract) .
       foldlM (curry f) Nothing
     add Nothing access y = pure $! (Just $! access <$ y)
     add (Just x) _access y = wrong $ MultipleAccessError (loc x) (loc y)

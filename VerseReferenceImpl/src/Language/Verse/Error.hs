@@ -9,8 +9,9 @@ import Data.Functor.Compose.Instances ()
 import Language.Verse.Ident
 import Language.Verse.Indent
 import Language.Verse.Loc
-import Language.Verse.SimpleName
 import Language.Verse.Pos
+import Language.Verse.Rewrite.Exp(Access)
+import Language.Verse.SimpleName
 import Language.Verse.Token
 import Language.Verse.Val
 
@@ -41,6 +42,7 @@ data Error
   | DomError !Loc !Loc !FrozenVal
   | OLamDomError !Loc !Loc !Loc !FrozenVal
   | IntrinsicDomError !Loc
+  | AccessError !Loc Access
   | StuckError
   | OtherError !Pos String -- Used for Parsec error type
   | NotImplemented String deriving Show
@@ -107,6 +109,9 @@ instance Pretty Error where
     IntrinsicDomError x ->
       pretty x <> colon <+>
       "overlapping" <+> "function" <+> "domains"
+    AccessError x access ->
+      pretty x <> colon <+>
+      "specifier" <+> "<" <> pretty access <> ">" <+> "can't" <+> "be" <+> "used" <+> "here"
     StuckError ->
       "stuck"
     OtherError x msg ->

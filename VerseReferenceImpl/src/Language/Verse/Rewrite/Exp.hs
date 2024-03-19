@@ -61,8 +61,8 @@ data Exp f a
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
   | Forall (f a)
-  | Alloc2 (f a) (f (Exp f a))
-  | Alloc3 (f a) (f (Exp f a)) (f (Exp f a))
+  | Alloc2 !Access (f a) (f (Exp f a))
+  | Alloc3 !Access (f a) (f (Exp f a)) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
@@ -114,10 +114,10 @@ instance ( Pretty (f (Exp f a))
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     Exists x -> "exists" <+> pretty x
     Forall x -> "forall" <+> pretty x
-    Alloc2 x e ->
-      "alloc" <> parens (pretty x) <+> pretty e
-    Alloc3 x e1 e2 ->
-      "alloc" <> parens (pretty x) <+> pretty e1 <> parens (pretty e2)
+    Alloc2 access x e ->
+      "alloc" <> parens (pretty x <> prettySpec access) <+> pretty e
+    Alloc3 access x e1 e2 ->
+      "alloc" <> parens (pretty x <> prettySpec access) <+> pretty e1 <> parens (pretty e2)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
     Int x -> pretty x
@@ -131,7 +131,7 @@ instance ( Pretty (f (Exp f a))
       angles (pretty eff) <>
       maybe mempty (\ e2 -> colon <> pretty e2) e2 <+>
       braces (pretty e3)
-    InfixColonEqual pp _ x e -> pretty x <> "<" <> pretty pp <> ">" <+> ":=" <+> pretty e
+    InfixColonEqual access _ x e -> pretty x <> prettySpec access <+> ":=" <+> pretty e
     PrefixColon e -> colon <> pretty e
     MixfixArrowColonEqual x y e ->
       pretty x <+> "->" <+> pretty y <+> ":=" <+> pretty e
@@ -151,6 +151,9 @@ instance ( Pretty (f (Exp f a))
       braces x =
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
+      prettySpec access = "<" <> pretty access <> ">"
+
+
 
 data OC = O | C deriving Show
 
@@ -159,7 +162,7 @@ instance Pretty OC where
     O -> "open"
     C -> "closed"
 
-data Access = Public | Protected | Private | Internal deriving Show
+data Access = Public | Protected | Private | Internal deriving (Eq, Show)
 
 instance Pretty Access where
   pretty = \ case
@@ -196,11 +199,11 @@ ofType = liftL2 OfType
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
 
-alloc2 :: Apply f => f a -> f (Exp f a) -> f (Exp f a)
-alloc2 = liftL2 Alloc2
+alloc2 :: Apply f => Access -> f a -> f (Exp f a) -> f (Exp f a)
+alloc2 access = liftL2 (Alloc2 access)
 
-alloc3 :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-alloc3 = liftL3 Alloc3
+alloc3 :: Apply f => Access -> f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+alloc3 access = liftL3 (Alloc3 access)
 
 infixColonEqual :: Apply f => Quantifier -> f a -> f (Exp f a) -> f (Exp f a)
 infixColonEqual = liftL2 . InfixColonEqual Public -- HACK

@@ -6,7 +6,7 @@ m0 := module:
   m1 := module:
     F1<internal>(X:int):int = 20 + X
 
-  c1 := class:
+  c1<public> := class:
      M1<public>(X:int) := (F0(X), m1.F1(X))
 
 

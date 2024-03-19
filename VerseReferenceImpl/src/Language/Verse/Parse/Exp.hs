@@ -157,7 +157,7 @@ deriving instance ( Show a
 
 data Pat a
   = Name (IdentExp a)
-  | Var [L (Exp a)] (L (IdentExp a))   -- expression list is for attributes
+  | Var [L (Exp a)] (L (IdentExp a)) [L (Exp a)]   -- expression lists are for attributes, can be both after "var" and after identifier
   | PrefixColon (L (Exp a))
   | InfixColon (L (Pat a)) (L (Exp a))
   | InfixArrow (L (Pat a)) (L (Pat a))
@@ -329,7 +329,7 @@ instance ( Pretty a
          ) => Pretty (Pat a) where
   pretty = \ case
     Name ident -> pretty ident
-    Var es x -> "var" <+> specs es <> pretty x
+    Var es1 x es2 -> "var" <> specs es1 <+> pretty x <> specs es2
     PrefixColon e -> parens(colon <> pretty e)
     InfixColon p e -> parens (pretty p <> colon <> pretty e)
     InfixArrow p1 p2 -> parens( pretty p1 <+> "->" <+> pretty p2)
@@ -376,7 +376,8 @@ expToPat = traverse $ \ case
   List [e] -> extract <$> expToPat e
   ParenInvoke e1 e2 -> expToPat e1 <&> \ p1 -> Invoke p1 e2
   ExpInfixColon e1 e2 -> expToPat e1 <&> \ p1 -> InfixColon p1 e2
-  ExpVar (expToPat -> Just p@(extract -> Name x)) -> Just . Var [] $ x <$ p
+  ExpVar (expToPat -> Just p@(extract -> Name x)) -> Just . (\ x -> Var [] x []) $ x <$ p
+  ExpVar (expToPat -> Just (extract -> Specs p@(extract -> Name x) e2)) -> Just . (\ x -> Var [] x e2) $ x <$ p
   ExpSpecs e es -> expToPat e <&> \ p -> Specs p es
   e1 :->: e2 -> InfixArrow <$> expToPat e1 <*> expToPat e2
   _ -> Nothing
