@@ -200,10 +200,10 @@ bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
 
 alloc2 :: Apply f => Access -> f a -> f (Exp f a) -> f (Exp f a)
-alloc2 pp = liftL2 (Alloc2 pp)
+alloc2 access = liftL2 (Alloc2 access)
 
 alloc3 :: Apply f => Access -> f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-alloc3 pp = liftL3 (Alloc3 pp)
+alloc3 access = liftL3 (Alloc3 access)
 
 infixColonEqual :: Apply f => Quantifier -> f a -> f (Exp f a) -> f (Exp f a)
 infixColonEqual = liftL2 . InfixColonEqual Public -- HACK

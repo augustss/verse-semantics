@@ -58,7 +58,6 @@ import Language.Verse.Rewrite.Exp
   , OC (..)
   )
 import Language.Verse.Rewrite.Exp qualified as Rewrite
-import Prettyprinter (pretty)
 
 type DesugarT m = StateT Env (ReaderT R m)
 
@@ -833,4 +832,4 @@ dropLoc :: Env -> HashMap.HashMap Ident (Access, Quantifier)
 dropLoc = fmap (\ (_loc, access, x) -> (access, x))
 
 checkNoneOf :: MonadWrong Error m => [Access] -> Env -> m ()
-checkNoneOf notAllowed env = mapM_ ( \ (loc, access, _) -> when (access `elem` notAllowed) (wrong $ AccessError loc (show $ pretty access)) ) $ HashMap.elems env
+checkNoneOf notAllowed env = mapM_ ( \ (loc, access, _) -> when (access `elem` notAllowed) (wrong $ AccessError loc access) ) $ HashMap.elems env
