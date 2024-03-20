@@ -5,7 +5,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 module Main(main,
-  example1, example2, example3, example4, example5, example6,
+  example1, example2, example3, example4, example5, example6, example7,
   pptr, fpptr, norm, startConfig) where
 import Prelude hiding ((<>))
 import qualified Prelude as P
@@ -34,6 +34,9 @@ data Expr
   | ExprLambda Expr Expr
   | ExprFunction Expr VarianceSpecifier [EffectSpecifier] Expr
   | ExprAt Expr Expr
+  | ExprColon Variable Expr
+  | ExprArray [Expr]
+  | ExprExists Variable
   deriving (Eq, Ord, Show, Data)
 
 data Path = Path String
@@ -107,7 +110,7 @@ data Program = Program Context Variable Variable Operation | ProgramSeq Program 
 
 data Operation
   = OpUnify Vertex Vertex                             -- u=v
-  | OpCallX Bool Vertex Vertex Vertex                       -- u=v(p)
+  | OpCallX Bool Vertex Vertex Vertex                 -- u=v(p)
   | OpFail Vertex                                     -- u=fail
   | OpSeq Operation Operation                         -- op0; op1
   | OpChoice Operation Operation                      -- op0|op1
@@ -128,6 +131,9 @@ data Operation
   -- OpVar is not a real Op, it's just for pretty printing a context
   | OpVar String
   deriving (Eq, Ord, Show, Data)
+
+opChoices :: [Operation] -> Operation
+opChoices = foldr1 OpChoice
 
 pattern OpCall :: Vertex -> Vertex -> Vertex -> Operation
 pattern OpCall x y z = OpCallX False x y z
@@ -154,7 +160,7 @@ data Assumption
   | AFlexes Context Context                                               -- c flexes d
   | ASees Context Context                                                 -- c sees d
   -- added: QQQ2 add this?
-  | ADominates EffectSpecifier Vertex Vertex Context                      -- fx{v>>u}@c
+--  | ADominates EffectSpecifier Vertex Vertex Context                      -- fx{v>>u}@c
   deriving (Eq, Ord, Show, Data)
 
 pattern AEffectOp:: EffectSpecifier -> Operation -> Context -> Assumption
@@ -199,6 +205,9 @@ instance Pretty Expr where
   pPrint (ExprFunction e1 oc fx e2) = text "function" <> parens (pPrint e1) <> hcat (f oc : map f fx) <> braces (pPrint e2)
     where f e = text "<" <> pPrint e <> pPrint ">"
   pPrint (ExprAt e1 e2) = pPrint e1 <> brackets (pPrint e2)
+  pPrint (ExprColon e1 e2) = parens $ pPrint e1 <> text ":" <> pPrint e2
+  pPrint (ExprArray xs) = brackets $ sep $ punctuate (text ",") (map pPrint xs)
+  pPrint (ExprExists x) = pPrint x <> text ":any"
 instance Pretty Ident where
   pPrint (Ident i) = text i
 instance Pretty Path where
@@ -232,7 +241,7 @@ instance Pretty Head where
   pPrint (HeadAtom a) = pPrint a
   pPrint (HeadLambda l) = pPrint l
   pPrint (HeadRunLambda l) = pPrint l
-  pPrint (HeadTuple u t) = text "tuple" <> parens (pPrint u) <+> pPrint t
+  pPrint (HeadTuple u t) = parens $ text "tuple" <> parens (pPrint u) <+> pPrint t
   pPrint (HeadNom p u) = text "nom" <+> pPrint p <> text "." <+> pPrint u
 instance Pretty Vertex where
   pPrint (VertexVariable x) = pPrint x
@@ -289,18 +298,20 @@ instance Pretty Assumption where
   pPrint (ACtxIsOp c op) = pPrint c <> text ":=" <> pPrint op
   pPrint (AFlexes c0 c1) = pPrint c0 <+> text "flexes" <+> pPrint c1
   pPrint (ASees c0 c1) = pPrint c0 <+> text "sees" <+> pPrint c1
-  pPrint (ADominates fx u v c) = pPrint fx <> braces (pPrint u <> text ">>" <> pPrint v) <> text "@" <> pPrint c
+--  pPrint (ADominates fx u v c) = pPrint fx <> braces (pPrint u <> text ">>" <> pPrint v) <> text "@" <> pPrint c
   
 instance Pretty AssumptionSet where
   pPrint (A []) = text "empty"
-  pPrint (A as) = fsep (punctuate (text ",") (map pPrint ({-sort-} as)))
+  pPrint (A as) = sep (punctuate (text ",") (map pPrint (sort as)))
+
 instance Pretty Config where
   pPrint (g :|- pg) = xsep [pPrint g, text "|-", pPrint pg]
 
 instance Pretty (Context -> Operation -> Program) where
   pPrint f = pPrint (f (Context (Ident "C")) (OpVar "OP"))
 
-xsep = vcat
+xsep :: [Doc] -> Doc
+xsep = fsep
 
 ------------------------------------------------------------------
 
@@ -408,15 +419,15 @@ ameet :: AvailableFx -> EffectSpecifier -> AvailableFx
 ameet None _ = None
 ameet (Some fx1) fx = Some (fx1/\fx)
 
--- Partial order on EffectSpecifier
+-- Partial order on EffectSpecifier, fx0 has fewer (or same) effects than fx1
 (<===) :: EffectSpecifier -> EffectSpecifier -> Bool
 fx0 <=== fx1 = (fx0/\fx1) == fx0
 
 remove :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
 remove (ES fx0) (ES fx1)  = ES (filter (`notElem` fx1) fx0)
 
-weakenFx :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
-weakenFx fx weaken =
+_weakenFx :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
+_weakenFx fx weaken =
   if (fx/\Cardinalities) <=== Fails then fx \/ (weaken /\ Fails) else fx \/ (weaken /\ Cardinalities)
 
 instance Pretty Effect where pPrint = text . drop 2 . show
@@ -620,6 +631,18 @@ dsE pg u v (ExprAt s0 s1) =
   OpCall vz vg vx
   where vars@(h, g, j, x, z) = map5 Variable $ newIdents pg ("h", "g", "j", "x", "z")
         (vh, vg, vj, vx, vz) = map5 VertexVariable vars
+-- QQQ8:
+-- should it be     S(u,v,array{s0, ..., sn-1}) ---> u=tuple(n) i; v=tuple(n) x; S(u(0),v(0),s0); ...; S(u(n-1),v(n-1),sn-1)
+dsE pg u v (ExprArray ss) =
+  let (i, x) = map2 Variable $ newIdents pg ("i", "x")
+      n = VertexHead (HeadAtom (AtomRational (fromIntegral (length ss))))
+      tupi = VertexHead (HeadTuple n i)
+      tupx = VertexHead (HeadTuple n x)
+      ix a k = VertexCall a (VertexHead (HeadAtom (AtomRational (fromIntegral k))))
+  in
+  OpUnify u tupi +>
+  OpUnify v tupx +>
+  opSeqs [ dsE pg (ix u k) (ix v k) s | (s, k) <- zip ss [0::Int ..] ]
 dsE _ u v x = OpS u v (SyntaxExpr x)
 
 opSeqs :: [Operation] -> Operation
@@ -660,11 +683,19 @@ norm = term . (!!0) . f . normalFormFuelTracePlain sys 10000
 
 gAdd :: [Assumption] -> [Assumption] -> [AssumptionSet]
 gAdd asms g =
-  let asms' = filter (`notElem` g) asms
+  let asms' = filter (\ a -> not (weaker a g)) asms
+      -- weaker1 a1 a2, a1 is a2, but with more effects
+      weaker1 :: Assumption -> Assumption -> Bool
+      weaker1 (AEffect fx a c) (AEffect fx' a' c') = a == a' && c == c' && fx' <=== fx
+      weaker1 a a' = a == a'
+      -- weaker a as, if a is weaker than any of the as
+      weaker :: Assumption -> [Assumption] -> Bool
+      weaker a as = any (weaker1 a) as
   in  if null asms' then
         []
       else
-        [A $ asms' ++ g]
+        [A $ asms' ++ filter (\ a -> not (weaker a asms')) g]
+--        [A $ asms' ++ g]
 
 before :: Rule a -> Rule a -> Rule a
 before aRules bRules cfg a =
@@ -736,7 +767,38 @@ identRules _ (A g :|- pg) =
     guard (x == x' && c == c')
     let pg' = ctx c (OpSeq (OpUnify u r) (OpUnify v r))
     pure $ A g :|- pg'
-  
+ ++
+  "S-exists" `name`
+  do
+    (ctx, c, OpS u v (SyntaxExpr (ExprExists x))) <- fc pg
+    let pg' = ctx c (OpUnify u v)
+    g' <- gAdd [AResolvedIdent x c v] g
+    pure $ g' :|- pg'    
+ ++
+  "S-colon" `name`
+--    S(u,v,    s2 : ...s0)       ---> exists h f; S(h,f,s0);               exists i y; y=f(u); S(i,v,s2:=...y) (if in a context without imply@c; if s2 not of the form s3->s4)
+-- QQQ8: How does the ...y manage to desugar?  The y is source not a source variable
+-- maybe y:=f(u)
+  do
+    (ctx, c, OpS u v (SyntaxExpr (ExprColon s2 s0))) <- fc pg
+    guard (ASolveOrImply Imply c `notElem` g)
+    let (h, f, i, y) = map4 Variable $ newIdents pg ("h", "f", "i", "y")
+    let op =
+          OpExists [h, f] +>
+          OpS (VertexVariable h) (VertexVariable f) (SyntaxExpr s0) +>
+          OpExists [i, y] +>
+          OpCall (VertexVariable y) (VertexVariable f) u +>
+          OpS (VertexVariable i) v (SyntaxExpr (ExprDef s2 (ExprVar y)))
+    g' <- gAdd [AResolvedIdent y c (VertexVariable y)] g
+    pure $ g' :|- ctx c op
+{-
+dsE pg u v (ExprColon s2 s0) =  -- XXX only when not imply@c
+  OpExists [h, f] +>
+  dsE pg (VertexVariable h) (VertexVariable f) s0 +>
+  OpExists [i, y] +>
+  OpCall (VertexVariable y) (VertexVariable f) u +>
+  dsE pg (VertexVariable i) v (ExprDef s2 (ExprExVar y))
+-}
 
 ------------------------------------------------------------------
 
@@ -802,8 +864,29 @@ assumptionRules _ (A g :|- pg) =
     pure $ g' :|- pg
   -- eq-call-same  QQQ: is p something in pg, or just taken from thin air
   -- eq-call-computes QQQ: what do the two things below the line mean?
+ ++
   -- eq-tuple QQQ2: missing @c
+  "eq-tuple" `name`
+  do
+    AEffectOp Abstracts (OpUnify t@(VertexHead (HeadTuple p _x)) u@(VertexHead (HeadTuple q _y))) c <- g
+    AEffectOp fx (OpUnify p' (VertexHead (HeadAtom (AtomRational n)))) c' <- g
+    guard (p == p' && c == c' && fx /= Abstracts)
+    AEffectOp fx' (OpUnify q' (VertexHead (HeadAtom (AtomRational n')))) c'' <- g
+    guard (q == q' && c == c'' && n == n' && fx == fx')
+    let ix a b = VertexCall a (VertexHead (HeadAtom (AtomRational b)))
+    guard $ all (\ i -> AEffectOp fx (OpUnify (ix t i) (ix u i)) c `elem` g) [0 .. n-1]
+    g' <- gAdd [AEffectOp fx (OpUnify t u) c] g
+    pure $ g' :|- pg
   -- flow-tuple QQQ2: missing @c
+ ++
+  "flow-tuple" `name`
+  do
+    AEffectVertex Abstracts vp@(VertexCall v p) c <- g
+    AUnify u v' <- g
+    guard (v == v')
+    g' <- gAdd [AUnify (VertexCall u p) vp, AEffectOp Abstracts (OpUnify (VertexCall u p) vp) c] g
+    pure $ g' :|- pg
+    
   -- tuple-resolves QQQ: what is ...
   -- dominator-equiv, below
   -- eq-dominator, below QQQ: needs side condition?  
@@ -889,7 +972,12 @@ unificationRules _ cfg@(A g :|- pg) =
     g' <- gAdd [AEffectOp (fx /\ Fails) op c] g
     pure $ g' :|- pg
 
--- unify-tuple-intro
+ ++
+  "unify-tuple-intro" `name`
+  do
+    (_ctx, c, OpUnify _x t@(VertexHead (HeadTuple _u _t))) <- fc pg
+    g' <- gAdd [AFlex t c] g
+    pure $ g' :|- pg
  ++
   "unify-lambda-intro" `name`
   do
@@ -900,8 +988,38 @@ unificationRules _ cfg@(A g :|- pg) =
         e' = freshen cfg e
     g' <- gAdd [AFlex l c] g
     pure $ g' :|- ctx c (lam +> e')
--- call-tuple-intro
--- call-tuple-iterates  QQQ2: this has a precondition "lacks", doesn't that lead to non-confluence?
+-- call-tuple-intro QQQ8: how can we conclude succeeds{u=v(p)} without knowing p<q?
+-- call-tuple-iterates  QQQ2: this has a precondition "lacks", doesn't that lead to non-confluence?  Is p=n the right condition in lacks?
+ ++
+  "call-tuple-iterates" `name`  -- QQQ8: should v0 be v
+  do
+    (ctx, c, op@(OpCall _u v p)) <- fc pg
+    AEffectOp Abstracts (OpUnify v' (VertexHead (HeadTuple q _v0))) c' <- g
+    guard (c == c' && v == v')
+    AEffectOp Abstracts (OpUnify q' (VertexHead (HeadAtom (AtomRational n)))) c'' <- g
+    guard (q == q' && c == c'' && 0 < n && natural n)
+    let pg' = ctx c (op +> opChoices [ OpUnify p (VertexHead (HeadAtom (AtomRational i))) | i <- [0 .. n-1] ])
+    pure $ A g :|- pg'
+ ++
+  "call-tuple-fails" `name`
+  do
+    (ctx, c, op@(OpCall u v p)) <- fc pg
+    AEffectOp fx (OpUnify v' (VertexHead (HeadTuple q _t))) c' <- g
+    guard (c == c' && v == v')
+    AEffectOp fx' (OpUnify q' (VertexHead (HeadAtom (AtomRational n)))) c'' <- g
+    guard (fx == fx' && c == c'' && q == q')
+    AEffectOp fx'' (OpUnify p' (VertexHead hd)) c''' <- g
+    guard (fx == fx'' && c == c''' && p == p')
+    let goodIndex (HeadAtom (AtomRational r)) = natural r
+        goodIndex _ = False
+    guard (n == 0 || not (goodIndex hd))
+    let op' = OpUnify u (VertexCall v p)
+    g' <- gAdd [AEffectOp (fx /\ Fails) op c] g
+    pure $ g' :|- ctx c (op +> op')
+
+natural :: Rational -> Bool
+natural r = denominator r == 1 && r >= 0
+
 -- call-tuple-fails
 
 freshen :: (Data a) => a -> Operation -> Operation
@@ -1114,12 +1232,14 @@ useDominatorRules :: Bool
 useDominatorRules = True
 
 dominatorRules :: Rule Config
+{-
 dominatorRules _ (A g :|- pg) | useDominatorRules =
   "dominator-equiv" `name`  -- QQQ: fx{v>>u}@c is not among assumptions
   do
     ADominates fx v u c <- g
     g' <- gAdd [AEffectOp fx (OpUnify u v) c] g
     pure $ g' :|- pg
+-}
 {-
  ++
   "eq-dominator" `name`
@@ -1202,10 +1322,12 @@ instance FlexibleStart Operation where
     [(\ c' op' -> OpAssume fx c' op', c, op)]
   fs _ = []
 
+-- QQQ*: can OP match op0;op1 ?
 class FlexibleOp a where
   fop :: a -> [(Operation -> a, Operation)]
 instance FlexibleOp Operation where
-  fop a = (id, a) : fop1 a
+  fop a = [ (id, a) | not (isOpSeq a) ] ++
+          fop1 a
     where fop1 (OpSeq op1 op2) =
               do
                 (ctx, op11) <- fop op1
@@ -1225,6 +1347,9 @@ instance FlexibleOp Operation where
           fop1 _op =
             --trace ("fop1: " ++ prettyShow _op)
             []
+isOpSeq :: Operation -> Bool
+isOpSeq OpSeq{} = True
+isOpSeq _ = False
 
 class ExploreOp a where
   _eop :: a -> [(Operation -> a, Operation)]
@@ -1285,7 +1410,8 @@ dominators _ (A g :|- pg) =
     AEffectOp fx' (OpUnify _ _) c <- g
     guard (fx == fx')
     let ds = dom fx c g
-    g' <- gAdd [ ADominates fx u v c | Dom u v <- ds ] g
+--    g' <- gAdd [ ADominates fx u v c | Dom u v <- ds ] g
+    g' <- gAdd [ AEffectOp fx (OpUnify u v) c | Dom u v <- ds ] g
     pure $ g' :|- pg
 
 data Dom = Dom Vertex Vertex
@@ -1298,8 +1424,13 @@ instance Pretty Dom where
 dom :: EffectSpecifier -> Context -> [Assumption] -> [Dom]
 dom afx ac g =
   let candidates = [ Dom v u | AEffectOp fx (OpUnify v u) c <- g, afx == fx, ac == c ]
+{-
       add ds = ds `union` [ Dom v u | AEffectOp fx (OpUnify v w) c <- g, afx == fx, ac == c,
                             AUnify u w' <- g, w == w' ]
+-}
+      add ds = ds `union` [ Dom v u | AUnify u w <- g,
+                                      AEffectOp afx (OpUnify u w) ac `notElem` g,
+                                      Dom v w' <- ds, w == w' ]
       startDs = loop candidates
         where loop xs =
                 let xs' = add xs
@@ -1314,7 +1445,7 @@ dom afx ac g =
         where loop xs =
                 let xs' = filter (keep xs) xs
                 in  if length xs == length xs' then xs else loop xs'
-  in -- error $ prettyShow finalDs
+  in trace (show afx ++ " candidates=" ++ prettyShow candidates ++ "\nstartDs=" ++ prettyShow startDs ++ "\nfinal=" ++ prettyShow finalDs)
      finalDs
 
 ------------------------------------------------------------------
@@ -1370,6 +1501,34 @@ example6 = SyntaxList
            ]
   where f = Variable $ Ident "f"
   
+-- example7: a=array{1,2} --; a[1]
+example7 :: Syntax
+example7 = SyntaxList
+           [ SyntaxExpr $ ExprDef a $ ExprArray [ERat 1, ERat 2]
+--           , SyntaxExpr $ ExprAt (ExprVar a) (ERat 1)
+           ]
+  where a = Variable $ Ident "a"
+
+-- example8 a:any; a = 1
+example8 :: Syntax
+example8 = SyntaxList
+           [ SyntaxExpr $ ExprExists a
+           , SyntaxExpr $ ExprUnify (ExprVar a) (ERat 1)
+           ]
+  where a = Variable $ Ident "a"
+        any = Variable $ Ident "any"
+
+-- example9: a=array{1,2}; a=array{m:any,n:any}
+example9 :: Syntax
+example9 = SyntaxList
+           [ --SyntaxExpr $ ExprDef a $ ExprArray [ERat 1, ERat 2],
+            SyntaxExpr $ ExprDef a $ ExprArray [ExprColon m (ExprVar any), ExprColon n (ExprVar any)]
+           ]
+  where a = Variable $ Ident "a"
+        m = Variable $ Ident "m"
+        n = Variable $ Ident "n"
+        any = Variable $ Ident "any"
+
 main :: IO ()
 main = do
-  fpptr "ut" $ startConfig example6
+  fpptr "ut" $ startConfig example8
