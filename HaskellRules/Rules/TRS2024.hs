@@ -326,10 +326,12 @@ rulesUnification _ lhs =
 
 rulesSubstitution :: ERule
 rulesSubstitution _ lhs =
-  "SUBST" `name`
-  do (s, Var x :=: Val v) <- substX lhs
+  "SUBST1" `name`
+  do Exi (Bind x e) <- [lhs]
+     (s, Var x' :=: Val v) <- substX e
+     guard (x == x')
      guard (not (isValueX v x))
-     pure ((substCtx [(x,v)] s) (Var x :=: v))
+     pure ((substCtx [(x,v)] s) (Arr []))
 
 --------------------------------------------------------------------------------
 
@@ -340,25 +342,11 @@ rulesNormalization _ lhs =
      guard (x `notElem` free e)
      pure e
  ++
-  "DEF-ELIM" `name`
-  do Exi (Bind x e) <- [lhs]
-     (ctx, _, Var x' :=: Val v) <- evalX [x] e
-     guard (x == x')
-     guard (x `notElem` free (ctx (#)))
-     guard (x `notElem` free v)
-     pure (ctx (Arr []))
- ++
   "EXI-FLOAT" `name`
-  do (ctx, zs, Exi bnd) <- choiceX1 [] lhs
+  do (ctx, zs, Exi bnd) <- evalX1 [] lhs
      let Bind x e = alphaRename (zs ++ free (ctx (#))) bnd
      guard (x `notElem` free (ctx (#)))
      pure (Exi (Bind x (ctx e)))
- ++
-  "EXI-PUSH" `name`
-  do Exi (Bind x ctx_e) <- [lhs]
-     (ctx, _, e) <- evalX [x] ctx_e
-     guard (x `notElem` free (ctx (#)))
-     pure (ctx (Exi (Bind x e)))
  ++
   "SEQ-ASSOC" `name`
   do (e1 :>: e2) :>: e3 <- [lhs]
@@ -375,6 +363,12 @@ rulesNormalization _ lhs =
   "EQ-FLOAT" `name`
   do Val v1 :=: (Val v2 :=: e) <- [lhs]
      pure ((v2 :=: e) :>: (v1 :=: Arr []))
+ ++
+  "DEF-MOVE" `name`
+  do (Var x :=: Val v) :>: e <- [lhs]
+     (e1,e2) <- [ (e1,e2) | e1 :>: e2 <- [e], isEffectFree e1 ]
+             ++ [ (Var y :=: w, Arr []) | Var y :=: Val w <- [e] ]
+     pure (e1 :>: ((Var x :=: v) :>: e2))
  ++
   "EQ-SWAP" `name`
   do Val v :=: Var x <- [lhs]
@@ -433,6 +427,12 @@ rulesChoice _ lhs =
   "FAIL" `name`
   do (_, _, Fail) <- choiceX [] lhs
      pure Fail
+ ++
+  "CHOICE-EXI" `name`
+  do Exi (Bind x ctx_e) <- [lhs]
+     (ctx, _, e1 :|: e2) <- evalX [x] ctx_e
+     guard (x `notElem` free (ctx (#)))
+     pure (ctx (Exi (Bind x (e1 :|: e2))))
 
 --------------------------------------------------------------------------------
 
