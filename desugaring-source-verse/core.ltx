@@ -128,13 +128,15 @@ $\begin{array}{@@{}l}
 
 \rulegroupname{Substitution}
 
-\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
+%\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
+%  & \text{$|v|\ne|V^[x]|$} \\
+\rulename{subst1} & |def x (S^[x==v])| & \movesto & |subst S x v ^[tup()]|
   & \text{$|v|\ne|V^[x]|$} \\
 \\[-0.6em]
 
 \rulegroupname{Normalization}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
+%\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 %\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(eq_1 `eqsemi` eq_2) ; e_3| & \movesto & |eq_1; (eq_2; e_3)| \\
