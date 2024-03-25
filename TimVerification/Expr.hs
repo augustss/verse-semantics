@@ -5,7 +5,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 module Main(main,
-  example1, example2, example3, example4, example5, example6, example7,
+  example1, example2, example3, example4, example5, example6, example7, example8, example9, example10, example11,
   pptr, fpptr, norm, startConfig) where
 import Prelude hiding ((<>))
 import qualified Prelude as P
@@ -206,7 +206,7 @@ instance Pretty Expr where
     where f e = text "<" <> pPrint e <> pPrint ">"
   pPrint (ExprAt e1 e2) = pPrint e1 <> brackets (pPrint e2)
   pPrint (ExprColon e1 e2) = parens $ pPrint e1 <> text ":" <> pPrint e2
-  pPrint (ExprArray xs) = brackets $ sep $ punctuate (text ",") (map pPrint xs)
+  pPrint (ExprArray xs) = text "array" <> (braces $ sep $ punctuate (text ",") (map pPrint xs))
   pPrint (ExprExists x) = pPrint x <> text ":any"
 instance Pretty Ident where
   pPrint (Ident i) = text i
@@ -639,10 +639,12 @@ dsE pg u v (ExprArray ss) =
       tupi = VertexHead (HeadTuple n i)
       tupx = VertexHead (HeadTuple n x)
       ix a k = VertexCall a (VertexHead (HeadAtom (AtomRational (fromIntegral k))))
+      --ds k s = dsE pg (ix u k) (ix v k) s
+      ds k s = dsE pg (ix tupi k) (ix tupx k) s
   in
   OpUnify u tupi +>
   OpUnify v tupx +>
-  opSeqs [ dsE pg (ix u k) (ix v k) s | (s, k) <- zip ss [0::Int ..] ]
+  opSeqs [ ds k s | (s, k) <- zip ss [0::Int ..] ]
 dsE _ u v x = OpS u v (SyntaxExpr x)
 
 opSeqs :: [Operation] -> Operation
@@ -969,6 +971,7 @@ unificationRules _ cfg@(A g :|- pg) =
   do
     AEffectOp fx op@(OpUnify (VertexHead head0) (VertexHead head1)) c <- g
     guard (disjointHead head0 head1)
+    traceM $ "disjointHead " ++ prettyShow (head0, head1)
     g' <- gAdd [AEffectOp (fx /\ Fails) op c] g
     pure $ g' :|- pg
 
@@ -977,6 +980,24 @@ unificationRules _ cfg@(A g :|- pg) =
   do
     (_ctx, c, OpUnify _x t@(VertexHead (HeadTuple _u _t))) <- fc pg
     g' <- gAdd [AFlex t c] g
+    pure $ g' :|- pg
+{-
+ ++
+  "unify-tuple-intro-elem" `name`
+  do
+    (_ctx, c, OpUnify x (VertexHead (HeadTuple u _t))) <- fc pg
+    n <- [ n | VertexHead (HeadAtom (AtomRational n)) <- [u] ] ++
+         do AEffectOp Abstracts (OpUnify u' (VertexHead (HeadAtom (AtomRational n)))) c' <- g
+            guard (u == u' && c == c')
+            return n
+    g' <- gAdd [AFlex (VertexCall x (VertexHead (HeadAtom (AtomRational i)))) c | i <- [0 .. n-1]] g
+    pure $ g' :|- pg
+-}
+ ++
+  "unify-tuple-intro-elem" `name`
+  do
+    AFlex a@(VertexHead (HeadTuple (VertexHead (HeadAtom (AtomRational n))) _t)) c <- g
+    g' <- gAdd [ AFlex (VertexCall a (VertexHead (HeadAtom (AtomRational i)))) c | i <- [0 .. n-1]] g
     pure $ g' :|- pg
  ++
   "unify-lambda-intro" `name`
@@ -1031,7 +1052,9 @@ freshen a op =
           | otherwise = i
   in  transformBi f op
 
+-- Are the heads definitely disjoint?
 disjointHead :: Head -> Head -> Bool
+disjointHead (HeadTuple u _) (HeadTuple v _) = u /= v
 disjointHead head0 head1 = head0 /= head1
 
 -- Elimination rules
@@ -1228,8 +1251,8 @@ choiceRules _ cfg@(A g :|- pg) =
     g' <- gAdd [cop, ACtxIsOp e0 op0] gx
     pure $ g' :|- fctx c (ictx d opL)
 
-useDominatorRules :: Bool
-useDominatorRules = True
+--useDominatorRules :: Bool
+--useDominatorRules = True
 
 dominatorRules :: Rule Config
 {-
@@ -1326,7 +1349,7 @@ instance FlexibleStart Operation where
 class FlexibleOp a where
   fop :: a -> [(Operation -> a, Operation)]
 instance FlexibleOp Operation where
-  fop a = [ (id, a) | not (isOpSeq a) ] ++
+  fop a = [ (id, a) {-x | not (isOpSeq a)-} ] ++
           fop1 a
     where fop1 (OpSeq op1 op2) =
               do
@@ -1347,9 +1370,11 @@ instance FlexibleOp Operation where
           fop1 _op =
             --trace ("fop1: " ++ prettyShow _op)
             []
+{-
 isOpSeq :: Operation -> Bool
 isOpSeq OpSeq{} = True
 isOpSeq _ = False
+-}
 
 class ExploreOp a where
   _eop :: a -> [(Operation -> a, Operation)]
@@ -1423,30 +1448,51 @@ instance Pretty Dom where
 -- XXX no accounting for lambda-dominators
 dom :: EffectSpecifier -> Context -> [Assumption] -> [Dom]
 dom afx ac g =
-  let candidates = [ Dom v u | AEffectOp fx (OpUnify v u) c <- g, afx == fx, ac == c ]
-{-
-      add ds = ds `union` [ Dom v u | AEffectOp fx (OpUnify v w) c <- g, afx == fx, ac == c,
-                            AUnify u w' <- g, w == w' ]
--}
-      add ds = ds `union` [ Dom v u | AUnify u w <- g,
-                                      AEffectOp afx (OpUnify u w) ac `notElem` g,
-                                      Dom v w' <- ds, w == w' ]
-      startDs = loop candidates
+  --   starting with dominator candidates
+  --       fx{v>>u}@c if fx{v=u}@c or exists w. u<-w and not fx{u=w} and fx{v>>w}@c
+  --       fx{vs[p]>>us[q]}@c if fx{vs>>us}@c and abstracts{vs[p]}@c and abstracts{us[q]}@c and fx{p=q}@c
+  let initialCandidates =
+        [ Dom v u | AEffectOp fx (OpUnify v u) c <- g, afx == fx, ac == c ]  -- 'if fx{v=u}@c'
+      addCandidates ds = -- 'or'
+        ds `union` [ Dom v u | AUnify u w <- g,                              -- 'exists w. u<-w'
+                               AEffectOp afx (OpUnify u w) ac `notElem` g,   -- 'and not fx{u=w}'
+                               Dom v w' <- ds, w == w'                       -- 'fx{v>>w}@c'
+                   ]
+           `union` [ Dom (VertexCall vs p) (VertexCall us q) |                  -- 'fx{vs[p]>>us[q]}@c'
+                     Dom vs us <- ds,                                           -- 'if fx{vs>>us}@c'
+                     AEffectVertex Abstracts (VertexCall vs' p) c  <- g, vs == vs', c  == ac,  -- 'abstracts{vs[p]}@c'
+                     AEffectVertex Abstracts (VertexCall us' q) c' <- g, us == us', c' == ac,  -- 'abstracts{us[q]}@c'
+                     AEffectOp fx (OpUnify p' q') c'' <- g, fx == afx, p == p', q == q', c'' == ac -- 'fx{p=q}@c'   -- Why must p=q?
+                   ]
+      candidates = loop initialCandidates
         where loop xs =
-                let xs' = add xs
+                let xs' = addCandidates xs
                 in  if length xs == length xs' then xs else loop xs'
 
       -- XXX not sure what this means: and (v<=w or ...something re comparable)
-      keep xs (Dom v u) =
-        AEffectOp afx (OpUnify u v) ac `elem` g ||
-        and [ AEffectOp afx (OpUnify u w) ac `elem` g || Dom v w `elem` xs
-            | AUnify u' w <- g, u == u' ]
-      finalDs = loop startDs
+      keep xs (Dom v u) =  -- 'keeping fx{v>>u}@c only if'
+        AEffectOp afx (OpUnify u v) ac `elem` g ||                           -- 'fx{u=v}@c'
+        and [ AEffectOp afx (OpUnify u w) ac `elem` g ||                     -- 'fx{u=w}@c or'
+              Dom v w `elem` xs                                              -- 'fx{v>>w}@c'
+            | AUnify u' w <- g, u == u' ]                                    -- 'for all w where u<-w'
+      finalDoms = loop candidates
         where loop xs =
                 let xs' = filter (keep xs) xs
                 in  if length xs == length xs' then xs else loop xs'
-  in trace (show afx ++ " candidates=" ++ prettyShow candidates ++ "\nstartDs=" ++ prettyShow startDs ++ "\nfinal=" ++ prettyShow finalDs)
-     finalDs
+
+
+      -- compute transitive reachability of all 'u<-v'
+      reachable = reach [] [ (u, v) | AEffectOp fx (OpUnify v u) c <- g, afx == fx, ac == c ]
+      reach r [] = r
+      reach r ((u, v) : uvs) =
+        let r' = [(u, v)] `union` [ (u, w) | (v', w) <- r, v == v' ] `union` [ (w, v) | (w, u') <- r, u == u'] `union` r
+        in  reach r' uvs
+
+  in --trace (show afx ++ " candidates=" ++ prettyShow candidates ++ "\nstartDs=" ++ prettyShow startDs ++ "\nfinal=" ++ prettyShow finalDs)
+     --trace ("reachable=" ++ prettyShow reachable) $
+     trace ("finalDoms=" ++ prettyShow finalDoms)
+     finalDoms
+     
 
 ------------------------------------------------------------------
 
@@ -1516,19 +1562,33 @@ example8 = SyntaxList
            , SyntaxExpr $ ExprUnify (ExprVar a) (ERat 1)
            ]
   where a = Variable $ Ident "a"
-        any = Variable $ Ident "any"
 
--- example9: a=array{1,2}; a=array{m:any,n:any}
+-- example9: a:=array{1,2}; a=array{m:any,n:any}
 example9 :: Syntax
 example9 = SyntaxList
-           [ --SyntaxExpr $ ExprDef a $ ExprArray [ERat 1, ERat 2],
-            SyntaxExpr $ ExprDef a $ ExprArray [ExprColon m (ExprVar any), ExprColon n (ExprVar any)]
+           [ SyntaxExpr $ ExprDef a $ ExprArray [ExprExists m, ExprExists n],
+             SyntaxExpr $ ExprUnify (ExprVar a) $ ExprArray [ERat 1, ERat 2]
            ]
   where a = Variable $ Ident "a"
         m = Variable $ Ident "m"
         n = Variable $ Ident "n"
-        any = Variable $ Ident "any"
+
+-- example10: a:=array{1}; a=array{1}
+example10 :: Syntax
+example10 = SyntaxList
+           [ SyntaxExpr $ ExprDef a $ ExprArray [ERat 1],
+             SyntaxExpr $ ExprUnify (ExprVar a) $ ExprArray [ERat 1]
+           ]
+  where a = Variable $ Ident "a"
+
+-- example11 a:=1; a = 1
+example11 :: Syntax
+example11 = SyntaxList
+           [ SyntaxExpr $ ExprDef a (ERat 1)
+           , SyntaxExpr $ ExprUnify (ExprVar a) (ERat 1)
+           ]
+  where a = Variable $ Ident "a"
 
 main :: IO ()
 main = do
-  fpptr "ut" $ startConfig example8
+  fpptr "ut" $ startConfig example10
