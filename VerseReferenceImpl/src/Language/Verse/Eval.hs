@@ -651,15 +651,16 @@ evalInst loc e1 xs e2 s s' = do
   var <- lift freshVar'
   fork' $ lift (readVar' var1) >>= \ case
     Val.Struct i scopes env ys e ->
-      unify' loc var =<< (localScopes (addScope i scopes) $ instStruct i env ys e xs s''' s')
+      unify' loc var =<< instStruct i scopes env ys e xs s''' s'
     Val.Class i scopes env sup ys e ->
-      unify' loc var =<< (localScopes (addScope i scopes) $ instClass loc i env sup ys e xs s''' s')
+      unify' loc var =<< instClass loc i scopes env sup ys e xs s''' s'
     _ -> wrong $ InstError loc
   pure var
 
 instStruct
   :: MonadEval m
   => Label
+  -> NonEmpty Val.Scope
   -> Env m
   -> Exp.Env Ident
   -> L (Exp L Ident)
@@ -667,8 +668,8 @@ instStruct
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-instStruct i env xs e archetype s s' =
-  do
+instStruct i scopes env xs e archetype s s' =
+  localScopes (addScope i scopes) $ do
     archetype' <- freshEnv xs
     _ <- local (\ r -> r { env = archetype' <> env, archetype, archetype' }) $ evalExp e s s'
     lift $ newVar' $ Val.StructInst i $ filterNames archetype'
@@ -677,6 +678,7 @@ instClass
   :: MonadEval m
   => Loc
   -> Label
+  -> NonEmpty Val.Scope
   -> Env m
   -> Maybe (VarVal m)
   -> Exp.Env Ident
@@ -685,8 +687,8 @@ instClass
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-instClass loc i env sup xs e archetype s s' = do
-    (var, _, _, initClass) <- allocClass loc i env sup xs e
+instClass loc i scopes env sup xs e archetype s s' = do
+    (var, _, _, initClass) <- allocClass loc i scopes env sup xs e
     initClass archetype s s'
     pure var
 
@@ -694,22 +696,24 @@ allocClass
   :: MonadEval m
   => Loc
   -> Label
+  -> NonEmpty Val.Scope
   -> Env m
   -> Maybe (VarVal m)
   -> Exp.Env Ident
   -> L (Exp L Ident)
   -> EvalT m (VarVal m, [Label], Env m, Archetype m -> S m -> S m -> EvalT m ())
-allocClass loc i env sup xs e = do
+allocClass loc i scopes env sup xs e = do
    (sup, sup_labels, vars_sup, initSup) <- allocSup loc sup
-   scopes' <- getScopes
-   archetype' <- freshEnv xs
-   let
-     vars = vars_sup <> archetype'
-     initClass archetype s s' = localScopes (addScopeWithSup i sup_labels scopes') do
-       s'' <- lift freshS
-       _ <- local (\ r -> r { env = vars <> env, archetype, archetype'}) $ evalExp e  s s''
-       initSup (archetype' <> archetype) s'' s'
-   lift $ newVar' (Val.ClassInst i sup $ filterNames vars) <&> (, i:sup_labels, vars, initClass)
+   let scopes' = addScopeWithSup i sup_labels scopes
+   localScopes scopes' $ do
+     archetype' <- freshEnv xs
+     let
+       vars = vars_sup <> archetype'
+       initClass archetype s s' = localScopes scopes' $ do
+         s'' <- lift freshS
+         _ <- local (\ r -> r { env = vars <> env, archetype, archetype'}) $ evalExp e  s s''
+         initSup (archetype' <> archetype) s'' s'
+     lift $ newVar' (Val.ClassInst i sup $ filterNames vars) <&> (, i:sup_labels, vars, initClass)
 
 allocSup
   :: MonadEval m
@@ -720,7 +724,7 @@ allocSup loc sup = case sup of
   Nothing -> pure (Nothing, [], mempty, \ _ s s' -> lift $ unifyS s s')
   Just sup -> do
     (i, scopes, env, sup, xs, e) <- lift $ readClass loc sup
-    (sup, labels, xs, initSup) <- localScopes (addScope i scopes) $ allocClass loc i env sup xs e
+    (sup, labels, xs, initSup) <- allocClass loc i scopes env sup xs e
     pure (Just sup, labels, xs, initSup)
 
 invoke
