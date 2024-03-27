@@ -73,7 +73,7 @@ isDone = go False False
   go :: Bool -> Bool -> Expr -> Bool
   go _   _   (Assert _)       = False
   go _   _   (Decide _)       = False
-  go _   lam (Verify e)       = lam || go True False e
+  go _   lam (Verify _ _ e)   = lam || go True False e
   go ver _   (Lam (Bind _ e)) = go ver (not ver) e
   go ver _   (Uni (Bind _ e)) = go ver (not ver) e
 
@@ -391,7 +391,7 @@ assumeAssertRules _env lhs =
   ++
   -- Assume { Verify {e} } ----> ()
   "asm-ver" `name`
-  do Assume (Verify _) <- [lhs]
+  do Assume (Verify {}) <- [lhs]
      pure (Val (Arr []))
   ++
   -- We *used* to get this from plain `HNF-SWAP` when it was of the form `hnf = x -> x = hnf`
@@ -414,7 +414,7 @@ assumeAssertRules _env lhs =
      -- pure (Assume (EXI x (Val v :=: e)))
   ++
   "verify-elim" `name`
-  do Verify e <- [lhs]
+  do Verify _ _ e <- [lhs]
      let verified (Assert _) = False
          verified (Decide _) = False
          verified _          = True
@@ -425,9 +425,9 @@ assumeAssertRules _env lhs =
   ++
   -- Verify{ E [ Assume(e1 | e2) ]  ----> Verify{ E [Assume e1] } ; Verify{ E [Assume e2] }
   "verify-cas" `name`
-  do Verify e                 <- [lhs]
+  do Verify rs as e                 <- [lhs]
      (cx, _, _, Assume (e1 :|: e2)) <-  eX e
-     pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
+     pure (Verify rs as (cx (Assume e1)) :>: Verify rs as (cx (Assume e2)))
 
 
 
@@ -563,27 +563,27 @@ verifierRules env lhs =
       guard (mustDecide (bndVars env) e)
       pure (ctx e)
    ++
-   -- Verify{CTX[exi xs. if e1 e2 e3]} ---> Verify{CTX[exi xs. assume{e1} ; e2]}; Verify{CTX(Fails (exis xs e1); e3)} IF CTX + xs `mustDecide` e1
-   "verify-if" `name`
-   do Verify e <- [lhs]
-      (ctx, _, bs, e') <- eX e
-      (xs, If e1 e2 e3) <- splitIf e'
-      let bs0 = bndVars env
-      guard (mustDecide (bs0 ++ bs ++ (BLam <$> xs)) e1)  -- TODO: new binder type for if-definitions
-      pure (Verify (ctx (exis xs (Assume e1 :>: e2))) :>: Verify (ctx (Fails (exis xs e1) :>: e3)))
-   ++
+   -- -- Verify{CTX[exi xs. if e1 e2 e3]} ---> Verify{CTX[exi xs. assume{e1} ; e2]}; Verify{CTX(Fails (exis xs e1); e3)} IF CTX + xs `mustDecide` e1
+   -- "verify-if" `name`
+   -- do Verify rs as e <- [lhs]
+   --    (ctx, _, bs, e') <- eX e
+   --    (xs, If e1 e2 e3) <- splitIf e'
+   --    let bs0 = bndVars env
+   --    guard (mustDecide (bs0 ++ bs ++ (BLam <$> xs)) e1)  -- TODO: new binder type for if-definitions
+   --    pure (Verify (ctx (exis xs (Assume e1 :>: e2))) :>: Verify (ctx (Fails (exis xs e1) :>: e3)))
+   -- ++
    -- Verify{uni r. V[r=<v1...vn>]} ---> Verify{uni r. V[fail]}; Verify{uni r. uni r1..rn. asm{r=<r1...rn>}; V[r1=v1;...;rn=vn;<>]}
-   "decides-split-tup" `name`
-   do Verify (UNI r e) <- [lhs]
-      (ctx, _, bs, Var r' :=: Arr vs) <- eX e
-      guard (not (null vs))
-      guard (r == r')
-      let xs  = bndIds bs ++ free e
-      let rs  = take (length vs) (identsNotIn xs)
-      let rvs = foldr1 (:>:) [ Var x :=: v | (x, v) <- rs `zip` vs ]
-      pure (Verify (UNI r (ctx Fail)) :>:
-            Verify (UNI r (unis rs ( Assume (Var r :=: Arr (Var <$> rs)) :>: ctx rvs))))
-   ++
+   -- "decides-split-tup" `name`
+   -- do Verify (UNI r e) <- [lhs]
+   --    (ctx, _, bs, Var r' :=: Arr vs) <- eX e
+   --    guard (not (null vs))
+   --    guard (r == r')
+   --    let xs  = bndIds bs ++ free e
+   --    let rs  = take (length vs) (identsNotIn xs)
+   --    let rvs = foldr1 (:>:) [ Var x :=: v | (x, v) <- rs `zip` vs ]
+   --    pure (Verify (UNI r (ctx Fail)) :>:
+   --          Verify (UNI r (unis rs ( Assume (Var r :=: Arr (Var <$> rs)) :>: ctx rvs))))
+   -- ++
    -- -- Verify{\r. V[r=<v1...vn>]} ---> Verify{\r. V[fail]}; Verify{\r. uni r1..rn. asm{r=<r1...rn>}; V[r1=v1;...;rn=vn;<>]}
    -- "decides-split-tup" `name`
    -- do Verify (LAM r e) <- [lhs]
@@ -605,13 +605,13 @@ verifierRules env lhs =
    --          Verify (LAM b (UNI r ( Assume (Var r :=: Int k) :>: ctx (Arr[])))))
    -- ++
    -- Verify{uni r. V[r=k]} ---> Verify{uni r. V[fail]}; Verify{uni r. asm{r=k}; V[<>]}
-   "decides-split-lit" `name`
-   do Verify (UNI r e) <- [lhs]
-      (ctx, _, _, Var r' :=: Int k) <- eX e
-      guard (r == r')
-      pure (Verify (UNI r (ctx Fail)) :>:
-            Verify (UNI r ( Assume (Var r :=: Int k) :>: ctx (Arr[]))))
-   ++
+   -- "decides-split-lit" `name`
+   -- do Verify (UNI r e) <- [lhs]
+   --    (ctx, _, _, Var r' :=: Int k) <- eX e
+   --    guard (r == r')
+   --    pure (Verify (UNI r (ctx Fail)) :>:
+   --          Verify (UNI r ( Assume (Var r :=: Int k) :>: ctx (Arr[]))))
+   -- ++
    "decides-split-var" `name`
    do Verify (UNI r e) <- [lhs]
       (ctx, _, bs, Var r' :=: Var r'') <- eX e  ----------- SPLIT IN ASSERT needs NEGATION yuck.

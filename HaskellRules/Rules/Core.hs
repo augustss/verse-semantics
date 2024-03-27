@@ -98,7 +98,7 @@ data Expr
   -- used for verification (experimental)
   | Assert Expr                 -- ^ assert{ e }
   | Assume Expr                 -- ^ assume{ e }
-  | Verify Expr                 -- ^ verify{ e }
+  | Verify [Ident] [Expr] Expr  -- ^ verify (rs, as) { e }
   | Decide Expr                 -- ^ decide{ e }
   | Fails  Expr                 -- ^ fails { e }  (dual to 'Assume' for "else" branches)
 
@@ -150,11 +150,9 @@ instance Pretty Expr where
   pPrintPrec l p (a :~: b)        = maybeParens (p > 5) $ pPrintPrec l 6 a <+> text "~" <+> pPrintPrec l 6 b
   pPrintPrec l p (a :@: b)        = maybeParens (p > 4) $ pPrintPrec l 4 a <> text "(" <> pPrintPrec l 0 b <> text ")"
   pPrintPrec _ _ Fail             = text "fail"
-  pPrintPrec l p e@(EXI{})        = maybeParens (p > 0) $ text "ex" <+> sep [hcat (punctuate (text " ") (map (pPrintPrec l 0) xs)) P.<> text ".",
-                                                                             pPrintPrec l 0 a]
+  pPrintPrec l p e@(EXI{})        = maybeParens (p > 0) $ text "ex" <+> sep [ppMany l " " xs P.<> text ".", pPrintPrec l 0 a]
                                     where (xs, a) = getExis e
-  pPrintPrec l p e@(UNI{})        = maybeParens (p > 0) $ text "un" <+> sep [hcat (punctuate (text " ") (map (pPrintPrec l 0) xs)) P.<> text ".",
-                                                                             pPrintPrec l 0 a]
+  pPrintPrec l p e@(UNI{})        = maybeParens (p > 0) $ text "un" <+> sep [ppMany l " " xs P.<> text ".", pPrintPrec l 0 a]
                                     where (xs, a) = getUnis e
 
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
@@ -163,7 +161,7 @@ instance Pretty Expr where
   pPrintPrec l _ (Fails  a)       = text "fails {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assert a)       = text "assert {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Decide a)       = text "decide {" <> pPrintPrec l 0 a <> text "}"
-  pPrintPrec l _ (Verify a)       = text "verify {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Verify rs as a) = text "verify(" <> ppMany l "," rs <> text "; " <> ppMany l "," as <> text "){" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ e@(IFB {})       = ppIf l xs a b c where (xs, a, b, c) = splitIfB e
   pPrintPrec l _ (If a b c)       = ppIf l [] a b c
   pPrintPrec _ _ (Wrong s)        = text $ "wrong(" ++ show s ++")"
@@ -175,6 +173,9 @@ instance Pretty Expr where
                                                              pPrintPrec l 0 e] P.<> text "}"
   pPrintPrec l p (Ref r)          = pPrintPrec l p r
   pPrintPrec _ _ e                = error ("CRASH: " ++ show e) -- undefined -- GHC bug
+
+ppMany :: Pretty a => PrettyLevel -> String -> [a] -> Doc
+ppMany l s xs = hcat (punctuate (text s) (map (pPrintPrec l 0) xs))
 
 ppIf :: PrettyLevel -> [Ident] -> Expr -> Expr -> Expr -> Doc
 ppIf l xs a b c = text "if" <+> parens (pPrintPrec l 0 (exis xs a)) <+> braces (pPrintPrec l 0 b) <+> text "else" <+> braces (pPrintPrec l 0 c)
@@ -297,9 +298,9 @@ comp  xs  ys (Decide a) (Decide b) = comp xs ys a b
 comp _xs _ys (Decide _) _          = LT
 comp _xs _ys _          (Decide _) = GT
 
-comp  xs  ys (Verify a) (Verify b) = comp xs ys a b
-comp _xs _ys (Verify _) _          = LT
-comp _xs _ys _          (Verify _) = GT
+comp  xs  ys (Verify r1 _ e1) (Verify r2 _ e2) = comp xs' ys' e1 e2 where (xs', ys') = (r1 ++ xs, r2 ++ ys)
+comp _xs _ys (Verify {}) _          = LT
+comp _xs _ys _          (Verify {}) = GT
 
 comp  xs  ys (Fails a) (Fails b)   = comp xs ys a b
 comp _xs _ys (Fails _) _           = LT
@@ -584,7 +585,7 @@ instance Rec Expr where
       Assert a -> [ (n, Assert a') | (n,a') <- rec r (addBound BBlk s) a ]
       Decide a -> [ (n, Decide a') | (n,a') <- rec r (addBound BBlk s) a ]
 
-      Verify a -> [ (n, Verify a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Verify rs as a -> [ (n, Verify rs as a') | (n,a') <- rec r (addBound BBlk s) a ]
       Split a f g ->
            [ (n, Split a' f g) | (n,a') <- rec r (addBound BBlk s) a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
@@ -645,7 +646,7 @@ instance Free Expr where
   free (All a)   = free a
   free (Assume a) = free a
   free (Assert a) = free a
-  free (Verify a) = free a
+  free (Verify rs as a) = free (a:as) \\ rs
   free (Decide a) = free a
   free (Fails  a) = free a
   free (If a b c) = free a `union` free b `union` free c
@@ -696,7 +697,7 @@ instance Substitutable Expr where
   subst sub (All a)   = All (subst sub a)
   subst sub (Assume a) = Assume (subst sub a)
   subst sub (Assert a) = Assert (subst sub a)
-  subst sub (Verify a) = Verify (subst sub a)
+  subst sub (Verify rs as a) = ofUni (subst sub (toUni rs as a))
   subst sub (Decide a) = Decide (subst sub a)
   subst sub (Fails  a) = Fails  (subst sub a)
 
@@ -704,6 +705,17 @@ instance Substitutable Expr where
   subst sub (BlockC e) = BlockC (subst sub e)
   subst sub (Store h e) = Store (IM.map (subst sub) h) (subst sub e)
   subst _sub e@Ref{}  = e
+
+
+toUni :: [Ident] -> [Expr] -> Expr -> Expr
+toUni rs as a = foldr (\r a -> Uni (Bind r a)) (Arr as :>: a) rs
+
+ofUni :: Expr -> Expr
+ofUni = go []
+  where
+    go acc (Uni (Bind r a)) = go (r:acc) a
+    go acc (Arr es :>: e)   = Verify (reverse acc) es e
+    go _   e                = error ("ofUni: " ++ show e)
 
 
 {-
@@ -758,7 +770,8 @@ substGen flg = go
                           Full -> Assume (go sub a)
                           Asm  -> Assume a
     go sub (Assert a) = Assert (go sub a)
-    go sub (Verify a) = Verify (go sub a)
+    -- go sub (Verify a) = Verify (go sub a)
+    go sub (Verify rs as a) = ofUni (go sub (toUni rs as a))
     go sub (Decide a) = Decide (go sub a)
     go sub (Fails  a) = Fails  (go sub a)
     go sub (Split e f g) = Split (go sub e) (go sub f) (go sub g)
@@ -806,7 +819,7 @@ freeModAssume = go
     go (All a)   = go a
     go (Assume _) = []
     go (Assert a) = go a
-    go (Verify a) = go a
+    go (Verify rs _ a) = go a \\ rs
     go (Decide a) = go a
     go (Fails  a) = go a
     go (Split e f g) = concatMap go [e, f, g]
@@ -887,7 +900,7 @@ instance Arbitrary Expr where
   shrink (Assume a) = [a] ++ [Assume a'| a'<-shrink a]
   shrink (Assert a) = [a] ++ [Assert a'| a'<-shrink a]
   shrink (Decide a) = [a] ++ [Decide a'| a'<-shrink a]
-  shrink (Verify a) = [a] ++ [Verify a'| a'<-shrink a]
+  shrink (Verify rs as a) = [Verify rs as a'| a' <- shrink a]
   shrink (Fails  a) = [a] ++ [Fails  a'| a'<-shrink a]
 
   shrink (Exi (Bind x a)) = [a]
@@ -956,7 +969,7 @@ arbExprFor ok =
         , (rv, All <$> arbExpr n1 xs)
         , (rv, Assume <$> arbExpr n1 xs)
         , (rv, Assert <$> arbExpr n1 xs)
-        , (rv, Verify <$> arbExpr n1 xs)
+        , (rv, Verify [] [] <$> arbExpr n1 xs)
         , (rv, Fails <$> arbExpr n1 xs)
         -- Don't generate Block, the anf-ing will do that.
         -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
@@ -1015,7 +1028,7 @@ collect here (\/) = col
   recr a (Assume e)       = a \/ col e
   recr a (Fails e)        = a \/ col e
   recr a (Assert e)       = a \/ col e
-  recr a (Verify e)       = a \/ col e
+  recr a (Verify _ as e)  = foldr (\/) a (col <$> (as ++ [e]))
   recr a (Split x y z)    = a \/ (col x \/ (col y \/ col z))
   recr a (Store h e)      = foldr (\/) a (map col (IM.elems h)) \/ col e
   recr a (OLam x (Bind _ d) (Bind _ r)) = a \/ col x \/ col d \/ col r
@@ -1093,7 +1106,8 @@ substExp from to = sub
     sub (All a)   = All (sub a)
     sub (Assume a) = Assume (sub a)
     sub (Assert a) = Assert (sub a)
-    sub (Verify a) = Verify (sub a)
+    -- sub (Verify a) = Verify (sub a)
+    sub (Verify rs as e) = ofUni (sub (toUni rs as e))
     sub (Split e f g) = Split (sub e) (sub f) (sub g)
     sub (BlockC e) = BlockC (sub e)
     sub (Store h e) = Store (IM.map sub h) (sub e)
