@@ -1,19 +1,26 @@
 #!/bin/bash
 set -eux
+
 nix shell \
-  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz \
+  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz#all_9_8 \
+  --extra-experimental-features nix-command \
+  --extra-experimental-features flakes \
+  --command \
+wasm32-wasi-cabal update
+
+nix shell \
+  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz#all_9_8 \
   --extra-experimental-features nix-command \
   --extra-experimental-features flakes \
   --command \
 wasm32-wasi-cabal install \
-  --allow-newer \
   --flag wasm \
   --installdir=www/static \
   --overwrite-policy=always \
   -O2
 
 nix shell \
-  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz \
+  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz#all_9_8 \
   --extra-experimental-features nix-command \
   --extra-experimental-features flakes \
   --command \
@@ -24,7 +31,7 @@ wizer \
   -o www/static/versewasm.wizer.wasm
 
 nix shell \
-  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz \
+  https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz#all_9_8 \
   --extra-experimental-features nix-command \
   --extra-experimental-features flakes \
   --command \

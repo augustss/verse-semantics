@@ -6,6 +6,7 @@ module Main
   ) where
 
 import Control.Exception
+import Control.Monad
 import Control.Monad.Supply
 import Control.Monad.Trans.Except
 
@@ -49,10 +50,10 @@ eval inPtr n outPtrPtr =
 eval' :: ByteString -> IO Text
 eval' xs = catch' $ eval'' xs <&> renderStrict . layoutSmart layoutOptions . \ case
   Left e -> pretty e
-  Right xs -> vsep $ pretty <$> xs
+  Right xs -> vsep $ pretty <$> join xs
 
-eval'' :: ByteString -> IO (Either Error [FrozenVal])
-eval'' = runExceptT . runSupplyT . Verse.eval2 "<web page>"
+eval'' :: ByteString -> IO (Either Error [[FrozenVal]])
+eval'' = runExceptT . runSupplyT . Verse.eval "<web page>"
 
 catch' :: IO Text -> IO Text
 catch' m = m `catch` \ (_ :: SomeException) ->

@@ -4,12 +4,16 @@ module Language.Verse.Error
   ( Error (..)
   ) where
 
+import Data.Functor.Compose.Instances ()
+
 import Language.Verse.Ident
 import Language.Verse.Indent
 import Language.Verse.Loc
-import Language.Verse.Name
 import Language.Verse.Pos
+import Language.Verse.Rewrite.Exp(Access)
+import Language.Verse.SimpleName
 import Language.Verse.Token
+import Language.Verse.Val
 
 import Prettyprinter
 
@@ -18,10 +22,11 @@ data Error
   | IndentError !Pos !Indent !Indent
   | ParseError !Loc !Token
   | OpenClosedError !Loc !Loc
+  | MultipleAccessError !Loc !Loc
   | SplitEffectError !Loc !Loc
   | SpecError !Loc
   | DefError !Loc !Loc !Ident
-  | NameError !Loc !Name
+  | NameError !Loc !SimpleName
   | IdentError !Loc !Ident
   | SucceedsError !Loc
   | FailsError !Loc
@@ -34,9 +39,10 @@ data Error
   | ValError !Loc
   | RefError !Loc
   | EnvError !Loc
-  | DomError !Loc !Loc
-  | OLamDomError !Loc !Loc !Loc
+  | DomError !Loc !Loc !FrozenVal
+  | OLamDomError !Loc !Loc !Loc !FrozenVal
   | IntrinsicDomError !Loc
+  | AccessError !Loc Access
   | StuckError
   | OtherError !Pos String -- Used for Parsec error type
   | NotImplemented String deriving Show
@@ -59,6 +65,9 @@ instance Pretty Error where
     SplitEffectError x y ->
       pretty x <+> "and" <+> pretty y <> colon <+>
       "multiple" <+> "effect" <+> "specifiers"
+    MultipleAccessError x y ->
+      pretty x <+> "and" <+> pretty y <> colon <+>
+      "multiple" <+> "access" <+> "specifiers"
     SpecError x ->
       pretty x <> colon <+> "unexpected" <+> "specifier"
     DefError x y z ->
@@ -91,21 +100,24 @@ instance Pretty Error where
       pretty x <> colon <+> "expected" <+> "var"
     EnvError x ->
       pretty x <> colon <+> "expected" <+> "environment"
-    DomError x y ->
+    DomError x y z ->
       pretty x <+> "and" <+> pretty y <> colon <+>
-      "overlapping" <+> "function" <+> "domains"
-    OLamDomError x y z ->
-      pretty x <+> "and" <+> pretty y <+> "and" <+> pretty z <> colon <+>
-      "overlapping" <+> "function" <+> "domains"
+      "overlapping" <+> "function" <+> "domains" <+> "for" <+> pretty z
+    OLamDomError a b c d ->
+      pretty a <+> "and" <+> pretty b <+> "and" <+> pretty c <> colon <+>
+      "overlapping" <+> "function" <+> "domains" <+> "for" <+> pretty d
     IntrinsicDomError x ->
       pretty x <> colon <+>
       "overlapping" <+> "function" <+> "domains"
+    AccessError x access ->
+      pretty x <> colon <+>
+      "specifier" <+> "<" <> pretty access <> ">" <+> "can't" <+> "be" <+> "used" <+> "here"
     StuckError ->
       "stuck"
     OtherError x msg ->
       pretty x <> colon <+> pretty msg
     NotImplemented msg ->
-      "Not" <+> "implemented" <+> pretty msg
+      "not" <+> "implemented" <+> pretty msg
 
 prettyIndent :: Indent -> Doc ann
 prettyIndent = dquotes . hcat . fmap pretty

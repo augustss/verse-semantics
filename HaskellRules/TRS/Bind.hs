@@ -26,19 +26,20 @@ prim = Prim
 
 identsNotInPrefix :: String -> [Ident] -> [Ident]
 identsNotInPrefix prefix zs = [ Name (prefix ++ show (m+i)) | i <- [1..] ]
-  -- where m = maximum (0 : [ read s :: Integer | Name ('v':s) <- zs, not (null s), all isDigit s ])
-  where m = maximum (0 : [ read s :: Integer | Name str <- zs, s <- maybeToList (removePrefix prefix str), not (null s), all isDigit s ])
+  where m = maximum (0 : [ read s :: Integer
+                         | Name str <- zs
+                         , s <- maybeToList (removePrefix prefix str)
+                         , not (null s)
+                         , all isDigit s
+                         ])
 
 removePrefix :: String -> String -> Maybe String
 removePrefix p x = if p `isPrefixOf` x then Just (drop (length p) x) else Nothing
 
 identsNotIn :: [Ident] -> [Ident]
-identsNotIn = identsNotInPrefix "v"
-
-{-
-identsNotIn zs = [ Prim (m+i) | i <- [1..] ]
- where m = maximum (0 : [ n | Prim n <- zs ])
--}
+identsNotIn zs = filter (`notElem` zs) [ Name x | x <- xs ] ++ identsNotInPrefix "v" zs
+ where
+  xs = ["x","y","z","u","v","w"]
 
 identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn

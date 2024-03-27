@@ -4,3 +4,7 @@ package z3
    extra-lib-dirs: /Users/rjhala/.pyenv/versions/3.11.2/lib
    extra-include-dirs: /Users/rjhala/.pyenv/versions/3.11.2/include
 
+source-repository-package
+    type: git
+    location: https://github.com/Rewbert/quickcheck.git
+    tag: 605c7468efe02f584dabf6029c4204ab395183d3

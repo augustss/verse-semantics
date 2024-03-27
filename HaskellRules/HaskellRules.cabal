@@ -14,6 +14,7 @@ common shared-properties
 --    ghc-options:      -Wall -O2 -prof -fprof-auto
     build-depends:    base,
                       containers,
+                      random,
                       mtl,
                       pretty,
                       megaparsec,
@@ -34,6 +35,7 @@ library all
                       Epic.String
                       Epic.Trace
                       Epic.Uniplate
+                      Epic.QuickCheck
                       TRS.Bind
                       TRS.Graph
                       TRS.NormalForm
@@ -64,6 +66,7 @@ library all
                       --DenSem.DenSem
     other-modules:    Rules.PLDI
                       Rules.POPL
+                      Rules.TRS2024
                       Rules.KoenNaive
                       Rules.LeftToRight
                       Rules.Block
@@ -118,6 +121,7 @@ executable qctest
 
     hs-source-dirs:   qctest
     default-language: Haskell2010
+    ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O2 -Werror -threaded -feager-blackholing -rtsopts
 
 --executable verifier
 --    import:           shared-properties

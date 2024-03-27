@@ -6,7 +6,9 @@
 module Language.Verse.Rewrite.Exp
   ( Exp (..)
   , Quantifier (..)
+  , Name (..)
   , OC (..)
+  , Access (..)
   , ofType
   , bracketInvoke
   , alloc2
@@ -26,7 +28,7 @@ import Data.Text (Text)
 
 import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Loc
-import Language.Verse.Name
+import Language.Verse.SimpleName
 
 import Data.Word (Word8)
 
@@ -36,7 +38,7 @@ import Prettyprinter
 
 data Exp f a
   = f (Exp f a) :=: f (Exp f a)
-  | f (Exp f a) :.: {-# UNPACK #-} !Name
+  | f (Exp f a) :.: {-# UNPACK #-} !SimpleName
   | f (Exp f a) :|: f (Exp f a)
   | List [f (Exp f a)]
   | f (Exp f a) `Where` f (Exp f a)
@@ -52,15 +54,15 @@ data Exp f a
   | Struct (f (Exp f a))
   | Class (Maybe (f (Exp f a))) (f (Exp f a))
   | Inst (f (Exp f a)) (f (Exp f a))
-  | Enum [Name]
+  | Enum [SimpleName]
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo (f (Exp f a)) (f (Exp f a))
   | Block (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
   | Forall (f a)
-  | Alloc2 (f a) (f (Exp f a))
-  | Alloc3 (f a) (f (Exp f a)) (f (Exp f a))
+  | Alloc2 !Access (f a) (f (Exp f a))
+  | Alloc3 !Access (f a) (f (Exp f a)) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
   | Truth (f (Exp f a))
@@ -69,11 +71,10 @@ data Exp f a
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
   | Lam (f (Exp f a)) !OC !Split.Effect !(Maybe (f (Exp f a))) (f (Exp f a))
-  | InfixColonEqual !Quantifier (f a) (f (Exp f a))
+  | InfixColonEqual !Access !Quantifier (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
   | MixfixArrowColonEqual (f a) (f a) (f (Exp f a))
-  | Name a
-  | QualName (f (Exp f a)) Name
+  | Name (Name f a)
   | ExpPath (Path f)
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
 
@@ -113,10 +114,10 @@ instance ( Pretty (f (Exp f a))
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
     Exists x -> "exists" <+> pretty x
     Forall x -> "forall" <+> pretty x
-    Alloc2 x e ->
-      "alloc" <> parens (pretty x) <+> pretty e
-    Alloc3 x e1 e2 ->
-      "alloc" <> parens (pretty x) <+> pretty e1 <> parens (pretty e2)
+    Alloc2 access x e ->
+      "alloc" <> parens (pretty x <> prettySpec access) <+> pretty e
+    Alloc3 access x e1 e2 ->
+      "alloc" <> parens (pretty x <> prettySpec access) <+> pretty e1 <> parens (pretty e2)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
     Int x -> pretty x
@@ -130,12 +131,11 @@ instance ( Pretty (f (Exp f a))
       angles (pretty eff) <>
       maybe mempty (\ e2 -> colon <> pretty e2) e2 <+>
       braces (pretty e3)
-    InfixColonEqual _ x e -> pretty x <+> ":=" <+> pretty e
+    InfixColonEqual access _ x e -> pretty x <> prettySpec access <+> ":=" <+> pretty e
     PrefixColon e -> colon <> pretty e
     MixfixArrowColonEqual x y e ->
       pretty x <+> "->" <+> pretty y <+> ":=" <+> pretty e
     Name x -> pretty x
-    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
     ExpPath x -> pretty x
     IfArchetypeName x e1 e2 ->
       "if" <+> parens ("archetype" <> parens (pretty x)) <+> braces (pretty e1) <+>
@@ -151,6 +151,9 @@ instance ( Pretty (f (Exp f a))
       braces x =
         nest 2 (flatAlt (lbrace <> hardline) "{ " <> x) <>
         flatAlt (hardline <> rbrace) " }"
+      prettySpec access = "<" <> pretty access <> ">"
+
+
 
 data OC = O | C deriving Show
 
@@ -159,20 +162,51 @@ instance Pretty OC where
     O -> "open"
     C -> "closed"
 
+data Access = Public | Protected | Private | Internal deriving (Eq, Show)
+
+instance Pretty Access where
+  pretty = \ case
+    Private -> "private"
+    Protected -> "protected"
+    Public -> "public"
+    Internal -> "internal"
+
+
+data Name f a
+  = SimpleName a
+  | QualName (f (Exp f a)) SimpleName
+
+deriving instance ( Show (f (Exp f a))
+                  , Show (f a)
+                  , Show a
+                  ) => Show (Name f a)
+
+
+instance ( Pretty (f (Exp f a))
+         , Pretty (f a)
+         , Pretty a
+         ) => Pretty (Name f a) where
+  pretty = \ case
+    SimpleName x -> pretty x
+    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
+
+
+
+
 ofType :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 ofType = liftL2 OfType
 
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
 
-alloc2 :: Apply f => f a -> f (Exp f a) -> f (Exp f a)
-alloc2 = liftL2 Alloc2
+alloc2 :: Apply f => Access -> f a -> f (Exp f a) -> f (Exp f a)
+alloc2 access = liftL2 (Alloc2 access)
 
-alloc3 :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-alloc3 = liftL3 Alloc3
+alloc3 :: Apply f => Access -> f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+alloc3 access = liftL3 (Alloc3 access)
 
 infixColonEqual :: Apply f => Quantifier -> f a -> f (Exp f a) -> f (Exp f a)
-infixColonEqual = liftL2 . InfixColonEqual
+infixColonEqual = liftL2 . InfixColonEqual Public -- HACK
 
 prefixColon :: Functor f => f (Exp f a) -> f (Exp f a)
 prefixColon = liftL1 PrefixColon
@@ -186,18 +220,18 @@ mixfixArrowColonEqual
 mixfixArrowColonEqual = liftL3 MixfixArrowColonEqual
 
 name :: Functor f => f a -> f (Exp f a)
-name = fmap Name
+name = fmap (Name . SimpleName)
 
 ifArchetypeName :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-ifArchetypeName = liftL3 IfArchetypeName
+ifArchetypeName = liftL3 $ IfArchetypeName
 
 data Path f
- = Path (f Name) [(Maybe (Path f), f Name)]
+ = Path (f SimpleName) [(Maybe (Path f), f SimpleName)]
 
-deriving instance ( Show (f Name)
+deriving instance ( Show (f SimpleName)
                   ) => Show (Path f)
 
-instance ( Pretty (f Name)
+instance ( Pretty (f SimpleName)
          ) => Pretty (Path f) where
   pretty (Path label pathIdents) = "/" <> pretty label <> foldr prettyPath mempty pathIdents
    where

@@ -5,8 +5,8 @@ module Main
   ) where
 
 import Control.Monad(when, (<=<))
-import Control.Monad.Abort
 import Control.Monad.Supply
+import Control.Monad.Wrong
 import Data.ByteString qualified as ByteString
 import Data.ByteString(ByteString)
 import Data.List(sort, find, isSuffixOf)
@@ -16,7 +16,7 @@ import Language.Verse.Parse2  qualified as P2
 import Language.Verse.Rewrite qualified as R
 import Language.Verse.Error
 import Language.Verse.Loc(L(..))
-import Language.Verse.Name(Name)
+import Language.Verse.SimpleName(SimpleName)
 import Language.Verse.Parse.Exp(Exp)
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -27,7 +27,7 @@ import System.IO
 import System.IO.Error
 
 data Options = Options {
-  getParser :: String -> ByteString -> Either Error (L (Exp Name)),
+  getParser :: String -> ByteString -> Either Error (L (Exp SimpleName)),
   getWorker :: Options -> FilePath -> ByteString -> IO (),
   progress :: Bool,
   verbose :: Bool,
@@ -47,9 +47,8 @@ noOptions = Options {
   mode = Execution
   }
 
-
 -- back to one parser
-parser2 :: String -> ByteString -> Either Error (L (Exp Name))
+parser2 :: String -> ByteString -> Either Error (L (Exp SimpleName))
 parser2 path contents = P2.parse2 path contents
 
 -- how much to do, parse, rewrite, desugar

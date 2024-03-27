@@ -1,4 +1,4 @@
-%% ----------------------
+% ----------------------
 %% Stuff for TimCore
 
 %format timlam h fx i x s0 j y s1 = "\textbf{tlam}(" h "," fx ")\," i "," x "\{" s0 "\}" j "," y "\{" s1 "\}"
@@ -29,6 +29,7 @@
 %format iteratesE (e) = "\textbf{iterates}\{" e "\}"
 %format resolves = "\textbf{resolves}"
 %format fails = "\textbf{fails}"
+%format nofail = "\textbf{nofail}"
 %format abstracts = "\textbf{abstracts}"
 %format contradicts = "\textbf{contradicts}"
 %format closed = "\textbf{c}"
@@ -41,7 +42,8 @@
 %format ^ = " "
 %format ^^ = "\hspace{0.1em}"
 
-%format subst e x (v) = "\subst{" e "}{" x "}{" v "}"
+%format subst (e) (x) (v)  = e "\{" v "/" x "\}"
+%format substw (e) (x) (v) = e "\{\!\{" v "/" x "\}\!\}"
 
 %% --------------------------
 %%        Desugaring rules
@@ -60,7 +62,9 @@
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
 %format (DAe (i) (x)) = "{\mathcal A}\llbracket{}" x "\rrbracket{}" i
 %format De2 md (x) = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
-%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
+
+%%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
+%format Hide (v) = "{\bf some}(" v ")"
 
 %% 'si' is short for "solve or infer" or "unification variable or not" resp
 %format si = "\pi"
@@ -196,6 +200,10 @@
 %format he = "he"
 %format none = "\textbf{none}"
 %format fail = "\textbf{fail}"
+
+%% %format ok = "\textbf{ok}"
+%format ok = "\langle\rangle"
+
 %format succeed = "\textbf{succeed}"
 %format wront = "\wrong"
 %format do = "\textbf{do}"
@@ -204,6 +212,10 @@
 %format orElse = "\textbf{orElse}"
 %format append = "\textbf{append}"
 %format app = "\textbf{app}"
+%% %format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
+%% %format eqsemiKW = "\fatsemi"
+%format `eqsemi` = ";"
+%format eqsemiKW = ";"
 
 %% Arrays and tuples
 %format array (x) = "\textbf{array}\{" x "\}"
@@ -232,27 +244,6 @@
 %format one (x) = "\textbf{one}\{" x "\}"
 %format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
 
-%% assert = succeed, abbreviated to suc
-
-%format assumeKW = "\textbf{asm}"
-%format assertKW = "\textbf{suc}"
-%format succeedKW = "\textbf{suc}"
-%format verifyKW = "\textbf{verify}"
-%format decideKW = "\textbf{dec}"
-%format forallKW = "\forall{}"
-%format guard    = "\!\blacktriangleright{}\!"
-
-%format assume (x) = "\textbf{asm}\{" x "\}"
-%format assert (x) = "\textbf{suc}\{" x "\}"
-%format succeed (x) = "\textbf{suc}\{" x "\}"
-%format verify (x) = "\textbf{verify}\{" x "\}"
-%format decide (x) = "\textbf{dec}\{" x "\}"
-%format bullet = "\bullet"
-%format forall (x) (y) = "\forall" x ".\," y
-
-%format allKW = "\textbf{all}"
-%format all (x) = "\textbf{all}\{" x "\}"
-%format all2 (r) (x) = "\textbf{all}("r")\{" x "\}"
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
 %format split (x) (y) (z) = "\textbf{split}\{" x "\}\langle" y "," z "\rangle"
@@ -270,7 +261,7 @@
 %format rangeKW = "\textbf{range}"
 %format range = "\textbf{range}"
 %format square(x) = x "^2"
-%format univ (x) (y) = "\forall" x ".\," y
+%format univ (x) (y) = "\nu" x ".\," y
 %format myite (x) (y) (z) = "\textbf{if}\;" x "\;\{" y "\}\;\{" z "\}"
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
@@ -288,6 +279,8 @@
 %format fix = "\textbf{fix}"
 %format unify = "\textbf{unify}"
 %format add = "\textbf{add}"
+%format pfun = "\mathit{pf}"
+%format ppred = "\mathit{pp}"
 %%%%format map = "\textbf{map}"
 %format sub = "\textbf{sub}"
 %format semi = "\textbf{seq}"
@@ -337,11 +330,6 @@
 
 %format appexi (f) (x) = "{\mathcal A" "\fbox{$" x "$}"
 
-%% Effects checking, like succeeds{e}
-%format checkKW = "{\bf chk}"
-%format check (r) (b) = checkKW "\langle" r "\rangle\{" b "\}"
-%format havocKW = "\textbf{havoc}"
-%format havoc (fx) = "\textbf{havoc}" "\langle" fx "\rangle"
 
 %format xdots = "\mydots"
 %format ctrdots = "\cdots"
@@ -464,9 +452,9 @@
 %format eu = "eu"
 %format eu_1 = "eu_1"
 %format eu_2 = "eu_2"
-%format eq = "eq"
-%format eq_1 = "eq_1"
-%format eq_2 = "eq_2"
+%format eq = "e"
+%format eq_1 = "e_1"
+%format eq_2 = "e_2"
 
 %format h_1
 %format h_2
@@ -532,17 +520,17 @@
 %format t_km1 = "t_{k-1}"
 %format t_kp1 = "t_{k+1}"
 
+%format rs = "\overline{r}"
 %format r_0
 %format r_1
 %format r_2
 %format r_k
 %format r_n
 
+%format as = "\overline{a}"
+
 %format E_1
 %format V_1
-
-
-
 
 %format fun = "\mathit{fun}"
 
@@ -569,15 +557,14 @@
 %format s_n'
 %format s_m'
 
-
-%format r_1
-%format r_2
-%format r_n
-
 %format K_1
 
 %format C_1
 %format C_2
+%format Ceq = "Ce"
+%format Eeq = "Ee"
+%format Seq = "Se"
+%format Veq = "V\!e"
 
 %% ----------- Metatheory --------------
 %format cut (n) (x) = "\operatorname{cut}_{" n "}(" x ")"
@@ -665,3 +652,47 @@
 %format spawn       = "\textbf{spawn}"
 %format rational    = "\textbf{rational}"
 %format float       = "\textbf{float}"
+
+%% ----------------------------
+%%         Verification
+%% ----------------------------
+
+%% assert = succeed, abbreviated to suc
+
+%format unr      = "\textbf{asm}\{\textbf{fail}\}"
+%format assumeKW = "\textbf{asm}"
+%format assertKW = "\textbf{suc}"
+%format succeedKW = "\textbf{suc}"
+%format verifyKW = "\textbf{verify}"
+%format decideKW = "\textbf{dec}"
+%format forallKW = "\forall{}\!"
+%format guard    = "\!\blacktriangleright{}\!"
+
+%format assume (x) = "\textbf{asm}\{" x "\}"
+%format assert (x) = "\textbf{suc}\{" x "\}"
+%format succeed (x) = "\textbf{suc}\{" x "\}"
+%format verify (x) = "\textbf{verify}\{" x "\}"
+%format verify2 (r) (a) (x) = "\textbf{verify}(" r ";\," a ")\{" x "\}"
+%format decide (x) = "\textbf{dec}\{" x "\}"
+%format bullet = "\bullet"
+%format not (e) = "\neg" e
+%format forall (x) (y) = "\forall" x ".\," y
+
+%% Effects checking, like succeeds{e}
+%format checkKW = "{\bf vchk}"
+%format (check (r) (b)) = checkKW "\langle" r "\rangle\{" b "\}"
+%format rcheckKW = "{\bf rchk}"
+%format rcheck (r) (b) = rcheckKW "\langle" r "\rangle\{" b "\}"
+%format havocKW = "\mathcal K"
+%format havoc (fx) = "{\mathcal K}\langle{}" fx "\rangle{}"
+%format someKW = "{\bf some}"
+%format some (v) =  "{\bf some}(" v ")"
+
+%format allKW = "\textbf{all}"
+%format all (x) = "\textbf{all}\{" x "\}"
+%format all2 (r) (x) = "\textbf{all}("r")\{" x "\}"
+
+%format mustKW = "\mathsf{Must}"
+%format must r b = mustKW "\langle" r "\rangle\{" b "\}"
+%format mustsuc b = mustKW "\langle" succeedKW "\rangle\{" b "\}"
+%format mustdec b = mustKW "\langle" decideKW "\rangle\{" b "\}"

@@ -12,6 +12,7 @@ import Data.ByteString (getContents)
 import Data.Either
 import Data.Foldable
 import Data.Function
+import Data.Functor.Compose.Instances ()
 
 import Language.Verse
 
@@ -21,6 +22,6 @@ import Prettyprinter.Render.Text
 import System.IO (IO, stderr)
 
 main :: IO ()
-main = getContents >>= runExceptT . runSupplyT . eval2 "<command line>" >>= \ case
-  Right xs -> for_ xs $ putDoc . (<> line) . pretty
+main = getContents >>= runExceptT . runSupplyT . eval "<command line>" >>= \ case
+  Right xs -> for_ (join xs) $ putDoc . (<> line) . pretty
   Left e -> hPutDoc stderr $ pretty e <> line

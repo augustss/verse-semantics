@@ -1,4 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main
   ( main
   ) where
@@ -9,6 +11,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Verse (runVerseT)
 
 import Data.ByteString qualified as ByteString
+import Data.Functor.Compose.Instances ()
 import Data.List
 import Data.Traversable
 
@@ -39,10 +42,10 @@ getTest mode directory = do
 mkTestCase :: Mode -> FilePath -> Test
 mkTestCase mode verseFile = TestLabel verseFile . TestCase $
   ByteString.readFile verseFile >>=
-  runExceptT . runSupplyT . runVerseT . eval2' verseFile mode >>= \ case
+  runExceptT . runSupplyT . runVerseT . eval' verseFile mode >>= \ case
     Left e -> handleError e
     Right Nothing -> handleError StuckError
-    Right (Just xs) -> do
+    Right (Just (join -> xs)) -> do
       let outFile = replaceExtension verseFile "out"
       expected <- readFile outFile `catchIOError` \ e ->
         if isDoesNotExistError e then pure "" else ioError e

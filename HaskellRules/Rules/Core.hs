@@ -40,9 +40,11 @@ module Rules.Core(
   allVars,
   check,
   substExp,
+  substCtx,
   BndVar(..),
   boundVars, flexVars, rigidVars, bndIds,
   substGen, SubstFlag(..), freeModAssume
+  arbExprFor
   ) where
 import qualified Epic.SIntMap as IM
 import Data.Char
@@ -56,6 +58,7 @@ import TRS.TRS
 import Test.QuickCheck hiding ( collect )
 import Epic.List(nub)
 import Epic.Print hiding ((<>))
+import Epic.QuickCheck( generateOne )
 import qualified Epic.Print as P
 
 type ERule = Rule Expr
@@ -140,7 +143,7 @@ instance Pretty Expr where
   pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ sep [pPrintPrec l 4 a <+> text "|", pPrintPrec l 4 b]
   pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
-  pPrintPrec l p e@(_ :>>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";;")  $ map (pPrintPrec l 2) $ ap [] e
+  pPrintPrec l p e@(_ :>>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ">>")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
 
   pPrintPrec l p (a :=: b)        = maybeParens (l >= prettyNormal || p > 2) $ pPrintPrec l 3 a <+> text "=" <+> pPrintPrec l 3 b
@@ -838,6 +841,13 @@ substVar sub x =
     Just (Var y) -> y
     Just _ -> error "substVar"
 
+substCtx :: Subst Expr -> (Expr -> Expr) -> (Expr -> Expr)
+substCtx sub ctx = \e -> subst ((z,e):sub) (ctx (Var z))
+ where
+  ctx0 = ctx (Int 0)
+  z    = identNotIn (allVars ctx0 ++ map fst sub ++ concatMap (free . snd) sub)
+  -- z is placeholder for e
+
 --------------------------------------------------------------------------------
 
 instance Arbitrary Op where
@@ -855,21 +865,21 @@ arbIdents =
 ---
 
 instance Arbitrary Expr where
-  arbitrary = sized (`arbExpr` map Name ["a","b","c"]) -- closed by default
+  arbitrary = arbExprBasic
 
   -- shrink _ = []
-  shrink (Var _)   = [ Int 0, Arr [] ]
-  shrink (Int n)   = [ Int n' | n' <- shrink n ] ++ [ Arr [] ]
-  shrink (Char _)  = [ Int 0, Arr [] ]
-  shrink (Path _)  = [ Int 0, Arr [] ]
-  shrink (Op _)    = []
-  shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ]
+  shrink (Var _)   = [ Int 0, Int 1 ]
+  shrink (Int n)   = [ Int n' | n' <- shrink n ]
+  shrink (Char _)  = [ Int 0, Int 1 ]
+  shrink (Path _)  = [ Int 0, Int 1 ]
+  shrink (Op _)    = [ Int 0, Int 1 ]
+  shrink (Arr vs)  = [ Arr vs' | vs' <- shrink vs ] ++ [ Int 0, Int 1 ]
   shrink (Map vs)  = [ Map vs' | vs' <- shrink vs ]
-  shrink (Lam (Bind x e)) = [ Arr [] ] ++ [ e | x `notElem` free e] ++ [ Lam (Bind x e') | e' <- shrink e ]
+  shrink (Lam (Bind x e)) = [ Int 0, Int 1 ] ++ [e] ++ [ Lam (Bind x e') | e' <- shrink e ]
   shrink (a :=: b) = [a,b] ++ [a':=:b|a'<-shrink a] ++ [a:=:b'|b'<-shrink b]
   shrink (a :|: b) = [a,b] ++ [a':|:b|a'<-shrink a] ++ [a:|:b'|b'<-shrink b]
   shrink (a :>: b) = [a,b] ++ [a':>:b|a'<-shrink a] ++ [a:>:b'|b'<-shrink b]
-  shrink (a :>>: b) = [a,b] ++ [a':>>:b|a'<-shrink a] ++ [a:>>:b'|b'<-shrink b]
+  shrink (a :>>: b) = [a,b,a:>:b] ++ [a':>>:b|a'<-shrink a] ++ [a:>>:b'|b'<-shrink b]
   shrink (a :@: b) = [a,b] ++ [a':@:b|a'<-shrink a] ++ [a:@:b'|b'<-shrink b]
   shrink Fail      = []
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
@@ -880,13 +890,13 @@ instance Arbitrary Expr where
   shrink (Verify a) = [a] ++ [Verify a'| a'<-shrink a]
   shrink (Fails  a) = [a] ++ [Fails  a'| a'<-shrink a]
 
-  shrink (Exi (Bind x a)) = [a |x `notElem` ys]
+  shrink (Exi (Bind x a)) = [a]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Exi (Bind x a') | a' <- shrink a] where ys = free a
-  shrink (Uni (Bind x a)) = [a |x `notElem` ys]
+  shrink (Uni (Bind x a)) = [a]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [Uni (Bind x a') | a' <- shrink a] where ys = free a
-  shrink (IfB (Bind x a)) = [a |x `notElem` ys]
+  shrink (IfB (Bind x a)) = [a]
                          ++ [subst [(x,Var y)] a |x `elem` ys, y <- ys, x /= y]
                          ++ [IfB (Bind x a') | a' <- shrink a] where ys = free a
 
@@ -905,41 +915,80 @@ instance Arbitrary Expr where
     [OLam x (Bind xd ed') r | ed'<-shrink ed] ++
     [OLam x d (Bind xr er') | er'<-shrink er]
 
-arbExpr :: Int -> [Ident] -> Gen Expr
-arbExpr n xs =
-  frequency $
-  [ (length xs, Var <$> elements xs) ] ++
-  [ (1, Int <$> arbitrary)
-  , (1, Op  <$> arbitrary)
-  , (1, return Fail)
-  , (rv, Arr <$> do k <- choose (0,5)
-                    sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
-  , (ri, Lam <$> arbBind n1 xs)
-  , (ri, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (ri, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (ri, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (rv, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
-  , (ri, Exi <$> arbBind n1 xs)
-  , (rv, One <$> arbExpr n1 xs)
-  , (rv, All <$> arbExpr n1 xs)
-  -- Don't generate Block, the anf-ing will do that.
-  -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
-  ]
+arbExprBasic :: Gen Expr
+arbExprBasic = arbExprFor ok
  where
-  n1 = n-1
-  n2 = n `div` 2
-  ri = 6 `min` n
-  rv = 2 `min` n
+  -- basic core language
+  ok (Var _)   = True
+  ok (Int _)   = True
+  ok (Op _)    = True
+  ok (Fail)    = True
+  ok (Arr _)   = True
+  ok (Lam _)   = True
+  ok (_ :=: _) = True
+  ok (_ :>: _) = True
+  ok (_ :|: _) = True
+  ok (_ :@: _) = True
+  ok (Exi _)   = True
+  ok (One _)   = True
+  ok (All _)   = True
+  ok _         = False
 
-arbBind :: Int -> [Ident] -> Gen (Bind Expr)
-arbBind n xs =
+arbExprFor :: (Expr->Bool) -> Gen Expr
+arbExprFor ok =
+  let constructors n xs arbExpr =
+        -- this list should have a static length
+        [ (length xs, Var <$> elements xs)
+        , (1, Int <$> arbitrary)
+        , (1, Op  <$> arbitrary)
+        , (1, return Fail)
+        , (rv, Arr <$> do k <- choose (0,5)
+                          sequence [ arbExpr (n `div` k) xs | _ <- [1..k] ])
+        , (ri, Lam <$> arbBind arbExpr n1 xs)
+        , (ri, (:=:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (ri, (:>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (rv, (:>>:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (ri, (:|:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (rv, (:@:) <$> arbExpr n2 xs <*> arbExpr n2 xs)
+        , (ri, Exi <$> arbBind arbExpr n1 xs)
+        , (ri, Uni <$> arbBind arbExpr n1 xs)
+        , (rv, One <$> arbExpr n1 xs)
+        , (rv, All <$> arbExpr n1 xs)
+        , (rv, Assume <$> arbExpr n1 xs)
+        , (rv, Assert <$> arbExpr n1 xs)
+        , (rv, Verify <$> arbExpr n1 xs)
+        , (rv, Fails <$> arbExpr n1 xs)
+        -- Don't generate Block, the anf-ing will do that.
+        -- , (n, Split <$> arbExpr n3 xs <*> arbValue n3 xs <*> arbValue n3 xs)
+        ]
+       where
+        n1 = 0 `max` (n-1)
+        n2 = n `div` 2
+        ri = 0 `max` (6 `min` n)
+        rv = 0 `max` (2 `min` n)
+
+      oks =
+        [ ok e
+        | (_, gen) <- constructors 0 [x] (\_ _ -> return (Int 0))
+        , let e = generateOne gen
+        ]
+
+      x = identNotIn []
+
+      arb n xs =
+        frequency [ t | (t,True) <- constructors n xs arb `zip` oks ]
+
+   in sized (`arb` map Name ["a","b","c"])
+
+arbBind :: (Int -> [Ident] -> Gen Expr) -> Int -> [Ident] -> Gen (Bind Expr)
+arbBind arb n xs =
   frequency $
   [ (1, do x <- elements xs
-           Bind x <$> arbExpr n xs)
+           Bind x <$> arb n xs)
   | not (null xs)
   ] ++
   [ (4, do let x:_ = filter (`notElem` xs) (map Name ["x","y","z","v","w"] ++ map Prim [1..])
-           Bind x <$> arbExpr n (x:xs))
+           Bind x <$> arb n (x:xs))
   ]
 
 --------------------------------------------------------------------------------
@@ -959,6 +1008,7 @@ collect here (\/) = col
   recr a (e1 :=: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :|: e2)      = a \/ (col e1 \/ col e2)
   recr a (e1 :>: e2)      = a \/ (col e1 \/ col e2)
+  recr a (e1 :>>: e2)     = a \/ (col e1 \/ col e2)
   recr a (e1 :@: e2)      = a \/ (col e1 \/ col e2)
   recr a (One e)          = a \/ col e
   recr a (All e)          = a \/ col e
@@ -974,26 +1024,16 @@ collect here (\/) = col
 --------------------------------------------------------------------------------
 
 allVars :: Expr -> [Ident]
-allVars = nub . expr
+allVars = nub . collect vars (++)
   where
-    expr (Var i) = [i]
-    expr (Arr es) = concatMap expr es
-    expr (LAM i e) = i : expr e
-    expr (EXI i e) = i : expr e
-    expr (UNI i e) = i : expr e
-    expr (e1 :=: e2) = expr e1 ++ expr e2
-    expr (e1 :@: e2) = expr e1 ++ expr e2
-    expr (e1 :>: e2) = expr e1 ++ expr e2
-    expr (One e) = expr e
-    expr (All e) = expr e
-    expr (Assume e) = expr e
-    expr (Fails e)  = expr e
-    expr (Assert e) = expr e
-    expr (Verify e) = expr e
-    expr (Split e1 e2 e3) = expr e1 ++ expr e2 ++ expr e3
-    expr (BlockC e) = expr e
-    expr (OLam x (Bind i d) (Bind j r)) = i : j : expr x ++ expr d ++ expr r
-    expr _ = []
+    vars (Var i)   = [i]
+    vars (Lam bnd) = varsBind bnd
+    vars (Exi bnd) = varsBind bnd
+    vars (Uni bnd) = varsBind bnd
+    vars (OLam _ bnd1 bnd2) = varsBind bnd1 ++ varsBind bnd2
+    vars _         = []
+
+    varsBind (Bind x _) = [x]
 
 --------------------------------------------------------------------------------
 
@@ -1029,6 +1069,7 @@ substExp from to = sub
      where Bind x e = alphaRename tvs bnd
     sub (a :=: b) = sub a :=: sub b
     sub (a :>: b) = sub a :>: sub b
+    sub (a :>>: b) = sub a :>>: sub b
     sub (a :|: b) = sub a :|: sub b
     sub (a :@: b) = sub a :@: sub b
     sub Fail      = Fail

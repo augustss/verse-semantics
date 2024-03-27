@@ -3,7 +3,7 @@
 A := 10
 
 Module1 := module:
-  A := 20
+  A<public> := 20
 
 class1 := class:
    A:int := (/root:)A

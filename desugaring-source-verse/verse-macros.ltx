@@ -142,13 +142,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newcommand{\vcshort}{VC\xspace}
 \newcommand{\isdone}[1]{\mathsf{Verified}(#1)}
-\newcommand{\mustSucceedKW}{\mathsf{Suc}}
-%\newcommand{\mustSucceed}[2]{\ensuremath{\mustSucceedKW(#1, #2)}}
-\newcommand{\must}[3]{\ensuremath{\mathsf{Must}(#1, #2, #3)}}
-\newcommand{\mustSucceed}[2]{\ensuremath{\must{\textbf{succeeds}}{#1}{#2}}}
-\newcommand{\mustDecide}[2]{\ensuremath{\must{\textbf{decides}}{#1}{#2}}}
-\newcommand{\mustDecideKW}{\mathsf{Dec}}
-% \newcommand{\mustDecide}[2]{\ensuremath{\mustDecideKW(#1, #2)}}
+\newcommand{\mustKW}{\mathsf{Must}}
+\newcommand{\must}[2]{\ensuremath{\mustKW{}\langle #1 \rangle\{#2\}}}
+\newcommand{\mustSucceed}[1]{\must{|succeeds|}{#1}}
+\newcommand{\mustDecide}[1]{\must{|decides|}{#1}}
+\newcommand{\sucdec}[1]{\mathsf{sd}(#1)}
+\newcommand{\mustopKW}{\mathsf{Must_{op}}}
+\newcommand{\mustop}[2]{\ensuremath{\mustopKW{}\langle #1 \rangle\{#2\}}}
 
 \newcommand{\mustVerifyKW}{\mathsf{Prove}}
 \newcommand{\mustVerify}[1]{\ensuremath{\mustVerifyKW(#1)}}
@@ -226,12 +226,12 @@
 % Hole in context
 \newcommand{\hole}{\square}
 \newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\skol}[1]{\mathsf{skol}(#1)}
 \newcommand{\freevarsoutsidelambdas}[1]{\mathsf{fvsol}(#1)}
 \newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
 \newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
 \newcommand{\disjoint}{\;\#\;}
 \newcommand{\hnf}{\mathit{hnf}}  % Head normal form
-\newcommand{\subst}[3]{#1\{#3/#2\}}
 
 \newcommand{\hexp}{h-expression}
 \newcommand{\Hexp}{H-expression}

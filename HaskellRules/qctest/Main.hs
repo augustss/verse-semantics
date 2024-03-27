@@ -11,7 +11,7 @@ import TRS.TRS( step )
 import TRS.NormalForm( normalFormsFuelTrace, NormResult(..) )
 import TRS.Tarjan
 import TRS.Traced
---import TRS.Bind( Bind(..), ident )
+import TRS.Bind( Bind(..), identNotIn )
 import Test.QuickCheck as QC
 import Options.Applicative
 import qualified Data.Set as S
@@ -41,7 +41,7 @@ main = do
                       , maxShrinks = maxShrink flags }
   putStrLn $ "Running " ++ show (numtests flags) ++ " tests of " ++ description sys
   putStrLn $ "This source code has git hash " ++ gitHash ++ if gitDirty then " (with uncommited files)" else ""
-  res <- quickCheckWithResult qcargs (prop_Confluence flags sys)
+  res <- quickCheckParWithResult qcargs (prop_Confluence flags sys)
   case res of
     QC.Failure{usedSeed = seed, usedSize = size} ->
       putStrLn $ "To replay use --replay '" ++ show (seed, size) ++ "'"
@@ -85,7 +85,7 @@ prop_Confluence1 flags sys =
             discard                     -- reduction timed out
  where
   arbExpr =
-    do p <- arbitrary
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
@@ -112,7 +112,7 @@ prop_Confluence2 flags sys =
             _ -> discard
  where
   arbExpr =
-    do p <- arbitrary
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
@@ -124,27 +124,34 @@ prop_Confluence2 flags sys =
 prop_Confluence3 :: TestFlags -> TRSystem Expr -> Property
 prop_Confluence3 flags sys =
   forAllBlind (liftArbitrary arbPermutation) $ \permf ->
-    forAllShrink arbExpr shrinkExpr $ \p0 ->
-      let p = if wrapOne flags then One p0 else p0 in
-        case (normTrace sys (const id) p, normTrace sys permf p) of
-          (Just t1, Just t2) ->
-            whenFail (do putStrLn "==trace:1=="
-                         putStr (unlines (showTrace t1))
-                         putStrLn "==trace:2=="
-                         putStr (unlines (showTrace t2))) $
-              norm sys t1 == norm sys t2
-
-          _ -> discard
+    forAllShrink (arbFork permf) shrinkFork $ \(p, q :<-- tr) ->
+      case (normzTrace p, normzTrace q) of
+        (Just ptr@(p' :<-- _), Just (q' :<-- qtr)) ->
+          whenFail (do putStrLn "==trace:1=="
+                       putStr (unlines (showTrace ptr))
+                       putStrLn "==trace:2=="
+                       putStr (unlines (showTrace (q' :<-- (qtr ++ tr))))) $
+            shape p' == shape q'
+        
+        _ -> discard
  where
-  arbExpr =
-    do p <- arbitrary
-       return (preProcess sys (ruleEnv sys) p)
+  arbFork permf =
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
+       let p' = preProcess sys (ruleEnv sys) p
+       case normTrace sys permf p' of
+         Just tr -> return (p', tr)
+         Nothing -> discard
 
-  shrinkExpr p =
-    [ p'
-    | p' <- shrink p ++ map snd (step (rules sys) (ruleEnv sys) p)
+  shrinkFork (p, _ :<-- tr) =
+    [ (p', q' :<-- [(s,p')])
+    | p' <- case tr of
+              _:_:_ -> [ r | (_,r) <- tr ]
+              _     -> shrink p
     , validExpr sys (ruleEnv sys) p'
+    , (s,q') <- step (rules sys) (ruleEnv sys) p'
     ]
+ 
+  normzTrace p = normTrace sys (const id) p
 
   normTrace rsys permf p =
     if ignoreRecursive flags && isRecursive p then
@@ -162,6 +169,77 @@ prop_Confluence3 flags sys =
       [ q :<-- ((n,t):tr)
       | (n,q) <- permf t (step (rules rsys) (ruleEnv rsys) t)
       ]
+
+  shape (Var _)          = Var x
+  shape (Int k)          = Int k
+  shape (Arr vs)         = Arr (map shape vs)
+  shape (Lam (Bind _ e)) = Lam (Bind x (shape e))
+  shape Fail             = Fail
+  shape (Exi (Bind _ e)) = shape e
+  shape (Uni (Bind _ e)) = shape e
+  shape (Var _ :=: e)    = shape e
+  shape (e1 :|: e2)      = shape e1 .|. shape e2
+  shape (e1 :>: e2)      = shape e1 .>. shape e2
+  shape (e1 :>>: e2)     = shape e1 :>>: shape e2
+  shape _                = Var x :@: Var x
+
+  Fail        .|. s    = s
+  s           .|. Fail = s
+  (s1 :|: s2) .|. s    = s1 .|. (s2 .|. s)
+  t           .|. s    = t :|: s
+  
+  Fail        .>. _ = Fail
+  (s1 :|: s2) .>. s = (s1 .>. s) .|. (s2 .>. s)
+  Val _       .>. s = s
+  stuck       .>. _ = stuck
+  
+  x = identNotIn []
+
+{-
+prop_Confluence3 :: TestFlags -> TRSystem Expr -> Property
+prop_Confluence3 flags sys =
+  forAllShrink arbExpr shrinkExpr $ \p ->
+    let trs = [ p0 :<-- (tr ++ [(s,p)])
+              | (s,p') <- step (rules sys) (ruleEnv sys) p
+              , Just (p0 :<-- tr) <- [normTrace p']
+              ]
+     in case nub trs of
+          tr1 : tr2 : _ ->
+            whenFail (do putStrLn "==trace:1=="
+                         putStr (unlines (showTrace tr1))
+                         putStrLn "==trace:2=="
+                         putStr (unlines (showTrace tr2))) $ False
+          
+          [] ->
+            discard
+          
+          _ ->
+            property True
+ where
+  arbExpr =
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
+       return (preProcess sys (ruleEnv sys) p)
+
+  shrinkExpr p =
+    [ p'
+    | p' <- shrink p
+    , validExpr sys (ruleEnv sys) p'
+    ]
+
+  normTrace p =
+    if ignoreRecursive flags && isRecursive p then
+      Nothing
+    else
+      do ps <- tarjan1 100 next (start p)
+         let p' = minimum ps
+         guard (not (ignoreRecursive flags && isRecursive (term p')))
+         return p'
+   where
+    next (t :<-- tr) =
+      [ q :<-- ((n,t):tr)
+      | (n,q) <- step (rules sys) (ruleEnv sys) t
+      ]
+-}
 
 arbPermutation :: Gen ([a] -> [a])
 arbPermutation =
@@ -207,7 +285,7 @@ prop_Terminates flags sys =
         False
  where
   arbExpr =
-    do p <- arbitrary
+    do p <- arbExprFor (validExpr sys (ruleEnv sys))
        return (preProcess sys (ruleEnv sys) p)
 
   shrinkExpr p =
