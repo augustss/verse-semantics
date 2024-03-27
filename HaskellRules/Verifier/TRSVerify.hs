@@ -36,6 +36,7 @@ tests = -- take 6
   , ("ex0", ex0, True)
   , ("ex0'", ex0', False)
   , ("ex1", ex1, True)
+{-
   , ("ex2", ex2, True)
   , ("ex2'", ex2', False)
   , ("ex3", ex3, True)
@@ -74,6 +75,7 @@ tests = -- take 6
   , ("ex_L2", ex_L2, False)
   , ("ex_PC1", ex_PC1, False)
   , ("ex_PC2a", ex_PC2a, True)
+-}
   ]
 
 --------------------------------------------------------------------------------

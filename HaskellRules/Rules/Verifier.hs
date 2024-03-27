@@ -189,20 +189,36 @@ unsat _ es = any (`elem` pos) neg
     neg    = [ e | Fails  e <- es ]
 
 --------------------------------------------------------------------------------
+
+isUni :: [Ident] -> [BndVar] -> Ident -> Bool
+isUni rs bs r = r `elem` rs && r `notElem` (bndIds bs)
+
 splitRules :: Rule Expr
 splitRules env lhs =
    "SPLIT-K" `name`
    do Verify rs as e <- [lhs]
-      (ctx, _, Var r :=: Int k) <- proofX [] e
-      guard (r `elem` rs)
-      let a = (Var r :=: Int k)
+      (ctx, bs, a@(Var r :=: Int _)) <- proofX [] e
+      guard (isUni rs bs r)
+      pure $ caseSplit rs a as ctx (Arr [])
+   ++
+   "SPLIT-C" `name`
+   do Verify rs as e <- [lhs]
+      (ctx, bs, a@(Var r :=: Char _)) <- proofX [] e
+      guard (isUni rs bs r)
+      pure $ caseSplit rs a as ctx (Arr [])
+   ++
+   "SPLIT-VAR" `name`
+   do Verify rs as e <- [lhs]
+      (ctx, bs, a@(Var r :=: Var r')) <- proofX [] e
+      guard (isUni rs bs r)
+      guard (isUni rs bs r')
       pure $ caseSplit rs a as ctx (Arr [])
    ++
    "SPLIT-TUP" `name`
    do Verify rs as e <- [lhs]
       (ctx, bs, Var r :=: Arr vs) <- proofX [] e
       guard (not (null vs))
-      guard (r `elem` rs)
+      guard (isUni rs bs r)
       let xs   = rs ++ free e ++ bndIds bs ++ boundVars env
       let rs'  = take (length vs) (uvIdentsNotIn xs)
       let rvs' = foldr1 (:>:) [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
@@ -211,8 +227,8 @@ splitRules env lhs =
    ++
    "SPLIT-PPRED" `name`
    do Verify rs as e <- [lhs]
-      (ctx, _, a@(op :@: Var r)) <- proofX [] e
-      guard (r `elem` rs)
+      (ctx, bs, a@(op :@: Var r)) <- proofX [] e
+      guard (isUni rs bs r)
       guard (isPrim1 op)
       pure $ caseSplit rs a as ctx (Arr [])
 
