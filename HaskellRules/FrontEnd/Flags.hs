@@ -51,7 +51,7 @@ defaultFlags = Flags
   , fTraceVerify  = False
   , fPrelude      = either error id $ findPrelude defaultPrelude
   , fNoWarn       = False
-  , fDesugar      = DS2 -- ORIG: DS1
+  , fDesugar      = DS1
   , fKeepIf       = False
   }
 
