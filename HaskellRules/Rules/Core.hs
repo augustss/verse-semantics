@@ -591,7 +591,7 @@ instance Rec Expr where
       Assert a -> [ (n, Assert a') | (n,a') <- rec r (addBound BBlk s) a ]
       Decide a -> [ (n, Decide a') | (n,a') <- rec r (addBound BBlk s) a ]
 
-      Verify rs as a -> [ (n, Verify rs as a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Verify rs as a -> [ (n, Verify rs as a') | (n,a') <- rec r (foldr (addBound . BUni) s rs) a ]
       Split a f g ->
            [ (n, Split a' f g) | (n,a') <- rec r (addBound BBlk s) a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
