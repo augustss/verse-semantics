@@ -164,7 +164,7 @@ assume a =
 verify :: Program a => a -> Verse ()
 verify a =
   do e <- block a
-     splice (Verify e)
+     splice (Verify [] [] e)
 
 -- primitives
 

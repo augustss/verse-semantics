@@ -119,7 +119,7 @@ desugar :: SExpr -> Expr
 desugar t = evalState (d t) (MkDS 0 ())
 
 d :: SExpr -> D Expr
-d t@(Fun {})      = (:>:) <$> (Verify <$> v t) <*> i t
+d t@(Fun {})      = (:>:) <$> (Verify [] [] <$> v t) <*> i t
 d (Ty  t)         = do {y <- fresh; Exi . Bind y <$> m I t y}
 d (As  {})        = undefined
 d (Def x t)       = do {e <- d t; pure $ Exi (Bind x (Var x :=: e :>: Var x))}
@@ -147,7 +147,7 @@ m I (Ty (Fun t1 t2)) f' = do
     z   <- fresh
     e1  <- m V t1 ix'
     e2  <- m I t2 z
-    pure $ Verify (LAM ix' (EXI ix (Assume (Var ix :=: e1) :>: Assert (def z (Var f' :@: Var ix) e2)))) :>: Var f'
+    pure $ Verify [ix'] [] (EXI ix (Var ix :=: e1 :>: Assert (def z (Var f' :@: Var ix) e2))) :>: Var f'
 
 m _ (Ty t)      y  = (:@:)       <$> d t      <*> pure (Var y)
 m k (Def x t)   y  = (Var x :=:) <$> m k t y
@@ -159,7 +159,7 @@ m _ t           y  = (Var y :=:) <$> d t
 as :: Expr -> Expr -> D Expr
 as e t = do
     x <- fresh
-    pure $ Verify (Assert (t :@: e)) :>: Assume (Uni (Bind x (t :@: Var x)))
+    pure $ Assert (t :@: e) :>: Assume (Uni (Bind x (t :@: Var x)))
 
 v :: SExpr -> D Expr
 v (Fun t1 t2) = do

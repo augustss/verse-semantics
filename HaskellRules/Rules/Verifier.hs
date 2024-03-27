@@ -102,6 +102,7 @@ isDone = go False False
   go _   _   (_ :~:  _)       = True
   go _   _   Fail             = True
   go _   _   (Assume _)       = True
+  go _   _   (Some _)         = True
   go _   _   (Ref _)          = True
   go _  _    (Wrong _)        = False -- should this be True?
   go _  _    OLam{}           = error "isDone: OLam not implemented"
@@ -612,15 +613,15 @@ verifierRules env lhs =
    --    pure (Verify (UNI r (ctx Fail)) :>:
    --          Verify (UNI r ( Assume (Var r :=: Int k) :>: ctx (Arr[]))))
    -- ++
-   "decides-split-var" `name`
-   do Verify (UNI r e) <- [lhs]
-      (ctx, _, bs, Var r' :=: Var r'') <- eX e  ----------- SPLIT IN ASSERT needs NEGATION yuck.
-      guard (r == r')
-      guard (r'' `elem` [ b | BUni b <- bs ])
-      pure (Verify (UNI r ( Fails  (Var r' :=: Var r'') :>: ctx Fail))
-            :>:
-            Verify (UNI r ( Assume (Var r' :=: Var r'') :>: ctx (Arr[]))))
-   ++
+   -- "decides-split-var" `name`
+   -- do Verify (UNI r e) <- [lhs]
+   --    (ctx, _, bs, Var r' :=: Var r'') <- eX e  ----------- SPLIT IN ASSERT needs NEGATION yuck.
+   --    guard (r == r')
+   --    guard (r'' `elem` [ b | BUni b <- bs ])
+   --    pure (Verify (UNI r ( Fails  (Var r' :=: Var r'') :>: ctx Fail))
+   --          :>:
+   --          Verify (UNI r ( Assume (Var r' :=: Var r'') :>: ctx (Arr[]))))
+   -- ++
    -- Fails {hnf} ---> Assume {fail}
    "fails-hnf" `name`
    do Fails (HNF _) <- [lhs]
@@ -631,10 +632,10 @@ verifierRules env lhs =
    do Fails Fail <- [lhs]
       pure (Arr [])
 
-splitIf :: Expr -> [([Ident], Expr)]
-splitIf e@If{}    = pure ([], e )
-splitIf (IFB x e) = do (xs, e') <- splitIf e; pure (x:xs, e')
-splitIf _         = []
+-- splitIf :: Expr -> [([Ident], Expr)]
+-- splitIf e@If{}    = pure ([], e )
+-- splitIf (IFB x e) = do (xs, e') <- splitIf e; pure (x:xs, e')
+-- splitIf _         = []
 
 --------------------------------------------------------------------------------
 -- | A simple "decision procedure"
@@ -804,6 +805,6 @@ execEX1 bs lhs =
      (ctx, g, bs', hole) <- execEX bs x
      pure (Assert . ctx, g, bs', hole)
  ++
-  do Verify x <- [lhs]
+  do Verify rs as x  <- [lhs]
      (ctx, g, bs', hole) <- execEX bs x
-     pure (Verify . ctx, g, bs', hole)
+     pure (Verify rs as . ctx, g, bs', hole)

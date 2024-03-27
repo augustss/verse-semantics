@@ -98,6 +98,7 @@ data Expr
   -- used for verification (experimental)
   | Assert Expr                 -- ^ assert{ e }
   | Assume Expr                 -- ^ assume{ e }
+  | Some   Expr                 -- ^ some { e }
   | Verify [Ident] [Expr] Expr  -- ^ verify (rs, as) { e }
   | Decide Expr                 -- ^ decide{ e }
   | Fails  Expr                 -- ^ fails { e }  (dual to 'Assume' for "else" branches)
@@ -645,6 +646,7 @@ instance Free Expr where
   free (One a)   = free a
   free (All a)   = free a
   free (Assume a) = free a
+  free (Some a)   = free a
   free (Assert a) = free a
   free (Verify rs as a) = free (a:as) \\ rs
   free (Decide a) = free a
@@ -696,6 +698,7 @@ instance Substitutable Expr where
   subst sub (One a)   = One (subst sub a)
   subst sub (All a)   = All (subst sub a)
   subst sub (Assume a) = Assume (subst sub a)
+  subst sub (Some a)   = Some (subst sub a)
   subst sub (Assert a) = Assert (subst sub a)
   subst sub (Verify rs as a) = ofUni (subst sub (toUni rs as a))
   subst sub (Decide a) = Decide (subst sub a)
@@ -708,7 +711,7 @@ instance Substitutable Expr where
 
 
 toUni :: [Ident] -> [Expr] -> Expr -> Expr
-toUni rs as a = foldr (\r a -> Uni (Bind r a)) (Arr as :>: a) rs
+toUni rs as a = foldr (\r e -> Uni (Bind r e)) (Arr as :>: a) rs
 
 ofUni :: Expr -> Expr
 ofUni = go []
@@ -766,6 +769,7 @@ substGen flg = go
     go sub (IfB bnd) = IfB (goB sub bnd)
     go sub (One a)   = One (go sub a)
     go sub (All a)   = All (go sub a)
+    go sub (Some a)  = Some (go sub a)
     go sub (Assume a) = case flg of
                           Full -> Assume (go sub a)
                           Asm  -> Assume a
@@ -898,6 +902,7 @@ instance Arbitrary Expr where
   shrink (One a)   = [a] ++ [One a'| a'<-shrink a]
   shrink (All a)   = [a, One a, Arr []] ++ [All a'|a'<-shrink a]
   shrink (Assume a) = [a] ++ [Assume a'| a'<-shrink a]
+  shrink (Some a)   = [a] ++ [Some a'| a'<-shrink a]
   shrink (Assert a) = [a] ++ [Assert a'| a'<-shrink a]
   shrink (Decide a) = [a] ++ [Decide a'| a'<-shrink a]
   shrink (Verify rs as a) = [Verify rs as a'| a' <- shrink a]
