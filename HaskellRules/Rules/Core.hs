@@ -159,6 +159,7 @@ instance Pretty Expr where
   pPrintPrec l _ (One a)          = text "one {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (All a)          = text "all {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assume a)       = text "assume {" <> pPrintPrec l 0 a <> text "}"
+  pPrintPrec l _ (Some a)         = text "some {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Fails  a)       = text "fails {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Assert a)       = text "assert {" <> pPrintPrec l 0 a <> text "}"
   pPrintPrec l _ (Decide a)       = text "decide {" <> pPrintPrec l 0 a <> text "}"
@@ -290,6 +291,10 @@ comp _xs _ys _       (All _) = GT
 comp  xs  ys (Assume a) (Assume b) = comp xs ys a b
 comp _xs _ys (Assume _) _          = LT
 comp _xs _ys _          (Assume _) = GT
+
+comp  xs  ys (Some a)   (Some b) = comp xs ys a b
+comp _xs _ys (Some _) _          = LT
+comp _xs _ys _          (Some _) = GT
 
 comp  xs  ys (Assert a) (Assert b) = comp xs ys a b
 comp _xs _ys (Assert _) _          = LT
