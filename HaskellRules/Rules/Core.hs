@@ -42,7 +42,7 @@ module Rules.Core(
   substExp,
   substCtx,
   BndVar(..),
-  boundVars, flexVars, rigidVars, bndIds,
+  boundVars, flexVars, rigidVars, bndIds, isRigid,
   substGen, SubstFlag(..), freeModAssume,
   arbExprFor
   ) where
@@ -613,7 +613,12 @@ flexVars :: TRSFlags -> [Ident]
 flexVars = bndIds . takeWhile isBExi . bndVars
 
 rigidVars :: TRSFlags -> [Ident]
-rigidVars = bndIds . dropWhile isBExi . bndVars
+rigidVars = bndIds . filter isRigid . bndVars
+
+isRigid :: BndVar -> Bool
+isRigid BUni {} = True
+isRigid BLam {} = True
+isRigid _       = False
 
 isBExi :: BndVar -> Bool
 isBExi BExi{} = True

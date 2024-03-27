@@ -310,7 +310,7 @@ cVerify :: Run CState
 cVerify = do
   withLastExpr $ \ e s ->
     tryIt (pure s) (\ _ -> pure s) $ do
-      let sys = icfpeVerifier
+      let sys  = verifier
           aflg = flags s
           flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel }
           prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"

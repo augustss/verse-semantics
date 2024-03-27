@@ -45,7 +45,11 @@ identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
 
 uvIdentNotIn :: [Ident] -> Ident
-uvIdentNotIn = head . identsNotInPrefix uvPrefix
+uvIdentNotIn = head . uvIdentsNotIn
+
+uvIdentsNotIn :: [Ident] -> [Ident]
+uvIdentsNotIn = identsNotInPrefix uvPrefix
+
 
 uvPrefix :: String
 uvPrefix = "uni$"

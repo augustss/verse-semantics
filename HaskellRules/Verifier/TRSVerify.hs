@@ -81,7 +81,7 @@ tests = -- take 6
 --------------------------------------------------------------------------------
 
 sys :: TRSystem Expr
-sys = icfpeVerifier
+sys = verifier
 -- sys = l2rVerifier
 
 runTests :: IO Bool

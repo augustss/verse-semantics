@@ -62,6 +62,7 @@ library all
                       Verifier.TRSDesugar
 --                      Verifier.FOL
                       Rules.ICFP
+                      Rules.OldVerifier
                       Rules.Verifier
                       --DenSem.DenSem
     other-modules:    Rules.PLDI

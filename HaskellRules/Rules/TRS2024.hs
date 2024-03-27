@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-unused-top-binds #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.TRS2024(allSystemsTRS2024) where
+module Rules.TRS2024(allSystemsTRS2024, isEffectFree) where
 import Control.Monad( guard )
 
 --import Epic.Print(prettyShow)
