@@ -429,6 +429,8 @@ assumeAssertRules _env lhs =
      (cx, _, _, Assume (e1 :|: e2)) <-  eX e
      pure (Verify (cx (Assume e1)) :>: Verify (cx (Assume e2)))
 
+
+
 mustSucceed :: QContext -> [BndVar] -> Expr -> Bool
 mustSucceed _ bvars = go (definedVars bvars)
   where
