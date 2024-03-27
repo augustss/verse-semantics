@@ -43,7 +43,7 @@ module Rules.Core(
   substCtx,
   BndVar(..),
   boundVars, flexVars, rigidVars, bndIds,
-  substGen, SubstFlag(..), freeModAssume
+  substGen, SubstFlag(..), freeModAssume,
   arbExprFor
   ) where
 import qualified Epic.SIntMap as IM
