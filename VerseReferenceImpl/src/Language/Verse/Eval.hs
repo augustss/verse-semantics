@@ -29,11 +29,9 @@ import Data.List qualified as List
 import Data.Bool
 import Data.Coerce
 import Data.Eq
-import Data.Fix
 import Data.Foldable (foldr, foldrM, for_)
 import Data.Function
 import Data.Functor ((<&>), void)
-import Data.Functor.Compose
 import Data.Hashable (Hashable)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
@@ -69,10 +67,11 @@ import Language.Verse.SimpleName
 import Language.Verse.Val
   ( FrozenVal
   , Named (..)
+  , RefVarVal
   , Val
   , VarEnv
+  , VarList
   , VarNamed
-  , RefVarVal
   , VarVal
   , forVal_
   )
@@ -1232,12 +1231,12 @@ to var s s' = lift $ readPair var >>= \ case
 
 to'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Enum a)
-  => (a -> f (Fix (Compose (Var m) f)))
+  => (a -> Val (VerseRef m) (VarList m) (VarVal m))
   -> a
   -> a
   -> S m
   -> S m
-  -> VerseT m (Fix (Compose (Var m) f))
+  -> VerseT m (VarVal m)
 to' f val1 val2 s s' = do
   unifyEq s.storeFree s'.storeFree
   _ <- readVar s.choiceFree
@@ -1245,10 +1244,10 @@ to' f val1 val2 s s' = do
   unifyEq s.choiceFree s'.choiceFree
   pure var
 
-pattern AnyNumber :: Val f a
+pattern AnyNumber :: Val f a b
 pattern AnyNumber <- (number -> True)
 
-number :: Val f a -> Bool
+number :: Val f a b -> Bool
 number = \ case
   Val.AnyRational -> True
   Val.Rational _ -> True
@@ -1258,10 +1257,10 @@ number = \ case
   Val.Float _ -> True
   _ -> False
 
-pattern Int :: Integer -> Val f a
+pattern Int :: Integer -> Val f a b
 pattern Int x <- (getInt -> Just x)
 
-getInt :: Val f a -> Maybe Integer
+getInt :: Val f a b -> Maybe Integer
 getInt = \ case
   Val.Rational x | denominator x == 1 -> pure $ numerator x
   Val.Int x -> pure x
@@ -1404,7 +1403,7 @@ evalQualName loc e x s s' = do
 -- Ignore root for now since I don't know what it should be.  In the
 -- future we want to be able to support several packages, selecting
 -- the correct one depending on the root.
-getPath :: MonadWrong Error m => Loc -> Val ref a -> m (Maybe (SimpleName, [SimpleName]))
+getPath :: MonadWrong Error m => Loc -> Val ref a b -> m (Maybe (SimpleName, [SimpleName]))
 getPath loc = \ case
   Val.Path (_root:p:ps) -> return $ Just (p, ps)
   Val.Path [_root] -> return $ Nothing
@@ -1624,8 +1623,8 @@ unify' loc x y = do
 match
   :: MonadEval m
   => Loc
-  -> Val (VerseRef m) (VarVal m)
-  -> Val (VerseRef m) (VarVal m)
+  -> Val (VerseRef m) (VarList m) (VarVal m)
+  -> Val (VerseRef m) (VarList m) (VarVal m)
   -> EvalT m (Match, EvalT m ())
 match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Any, Val.Lam {})
@@ -1848,7 +1847,7 @@ unifyNamed loc = curry $ \ case
 eqFloat :: Double -> Double -> Bool
 eqFloat x y = if isNaN x then isNaN y else x == y
 
-getNameEnv :: MonadWrong Error m => Loc ->Val ref a -> m (Val.Env SimpleName a)
+getNameEnv :: MonadWrong Error m => Loc -> Val ref a b -> m (Val.Env SimpleName b)
 getNameEnv loc = \ case
   Val.Module _ xs -> pure xs
   Val.Enum _ xs _ -> pure xs
@@ -1870,25 +1869,25 @@ join'' m = ReaderT $ join' . runReaderT m
 
 newVar'
   :: (MonadRef m, MonadSupply Int m)
-  => f (Fix (Compose (Var m) f))
-  -> VerseT m (Fix (Compose (Var m) f))
+  => Val (VerseRef m) (VarList m) (VarVal m)
+  -> VerseT m (VarVal m)
 newVar' = fmap coerce . newVar
 
 newVerifyVar'
   :: (MonadRef m, MonadSupply Int m)
-  => f (Fix (Compose (Var m) f))
-  -> VerseT m (Fix (Compose (Var m) f))
+  => Val (VerseRef m) (VarList m) (VarVal m)
+  -> VerseT m (VarVal m)
 newVerifyVar' = fmap coerce . newVerifyVar
 
 freshVar'
   :: (MonadRef m, MonadSupply Int m)
-  => VerseT m (Fix (Compose (Var m) f))
+  => VerseT m (VarVal m)
 freshVar' = coerce <$> freshVar
 
 readVar'
   :: MonadRef m
-  => Fix (Compose (Var m) f)
-  -> VerseT m (f (Fix (Compose (Var m) f)))
+  => VarVal m
+  -> VerseT m (Val (VerseRef m) (VarList m) (VarVal m))
 readVar' = readVar . coerce
 
 one'

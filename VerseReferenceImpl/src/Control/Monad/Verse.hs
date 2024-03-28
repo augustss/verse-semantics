@@ -1256,6 +1256,19 @@ writeVerifyVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
 
 newtype GVar m a = GVar { unGVar :: Var m a }
 
+instance ( MonadFix m
+         , MonadRef m
+         , MonadSupply Int m
+         , Freshenable a m
+         ) => Freshenable (GVar m a) m where
+  freshen = fmap GVar . freshen . unGVar
+
+instance ( MonadFix m
+         , MonadRef m
+         , Freezable a b m
+         ) => Freezable (GVar m a) (Maybe b) m where
+  freeze = freeze . unGVar
+
 freshGVar :: (MonadRef m, MonadSupply Int m) => VerseT m (GVar m a)
 freshGVar = GVar <$> freshVar
 

@@ -4,13 +4,11 @@ module Language.Verse.Error
   ( Error (..)
   ) where
 
-import Data.Functor.Compose.Instances ()
-
 import Language.Verse.Ident
 import Language.Verse.Indent
 import Language.Verse.Loc
 import Language.Verse.Pos
-import Language.Verse.Rewrite.Exp(Access)
+import Language.Verse.Rewrite.Exp (Access)
 import Language.Verse.SimpleName
 import Language.Verse.Token
 import Language.Verse.Val
