@@ -12,7 +12,6 @@ import Data.ByteString (getContents)
 import Data.Either
 import Data.Foldable
 import Data.Function
-import Data.Functor.Compose.Instances ()
 
 import Language.Verse
 

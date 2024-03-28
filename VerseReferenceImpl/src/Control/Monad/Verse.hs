@@ -28,6 +28,7 @@ module Control.Monad.Verse
   , freeze'
   , Defaultable (..)
   , defaultVar
+  , defaultGVar
   , Var
   , freshVar
   , freshDVar
@@ -424,6 +425,9 @@ instance ( Freshenable a m
          , Freshenable c m
          ) => Freshenable (a, b, c) m where
   freshen (a, b, c) = (,,) <$> freshen a <*> freshen b <*> freshen c
+
+instance Monad m => Freshenable Bool m where
+  freshen = pure
 
 instance Monad m => Freshenable Integer m where
   freshen = pure
@@ -921,6 +925,9 @@ instance Monad m => Freezable () () m where
 instance (Freezable a c m, Freezable b d m) => Freezable (a, b) (c, d) m where
   freeze (x, y) = (,) <$> freeze x <*> freeze y
 
+instance Monad m => Freezable Bool Bool m where
+  freeze = pure
+
 instance Monad m => Freezable Integer Integer m where
   freeze = pure
 
@@ -956,6 +963,11 @@ defaultVar var@(Var ref) binding = readVarState ref >>= \ case
     let bound = MkBound {..}
     writeVarState ref $ Bound bound
     unbound.substSusp (var, Just bound)
+
+defaultGVar
+  :: (MonadRef m, MonadSupply Int m, Defaultable a m)
+  => GVar m a -> a -> VerseT m ()
+defaultGVar = defaultVar . unGVar
 
 instance Monad m => Defaultable () m where
   defaultVars = const $ pure ()

@@ -66,6 +66,7 @@ import Language.Verse.Mode
 import Language.Verse.SimpleName
 import Language.Verse.Val
   ( FrozenVal
+  , List
   , Named (..)
   , RefVarVal
   , Val
@@ -94,8 +95,9 @@ data R m = R
   { mode :: !Mode
   , env :: !(Env m)
   , top :: !(Env m)
-  , scopes :: NonEmpty Val.Scope  -- stack of all currently active scopes, head is innermost scope
+  , scopes :: NonEmpty Val.Scope -- stack of all currently active scopes, head is innermost scope
   , assumed :: !Bool
+  , variance :: !Bool
   , archetype :: !(Archetype m)
   , archetype' :: !(Archetype m)
   }
@@ -151,6 +153,7 @@ runEvalT m mode scopes = runReaderT m R {..}
     env = mempty
     top = env
     assumed = False
+    variance = False
     archetype = mempty
     archetype' = mempty
 
@@ -1021,6 +1024,7 @@ invokeIntrinsicDom loc = \ case
   Intrinsic.Char -> liftPrim $ char loc
   Intrinsic.Char32 -> liftPrim $ char32 loc
   Intrinsic.Function -> liftPrim $ function loc
+  Intrinsic.Type -> liftPrim $ type' loc
   Intrinsic.Query -> liftPrim $ query loc
 
 liftOrd
@@ -1345,6 +1349,14 @@ function loc var = domMatch_ $ do
     Val.OLam {} -> pure ()
     Val.Intrinsic {} -> pure ()
     _ -> empty
+  pure var
+
+type'
+  :: MonadEval m
+  => Loc -> VarVal m -> EvalT m (DomMatch m)
+type' loc var = domMatch_ $ do
+  variance <- asks (.variance)
+  unify' loc var =<< lift (newVar' . Val.Type variance =<< freshDGVar' Val.Nil)
   pure var
 
 query
@@ -1889,6 +1901,12 @@ readVar'
   => VarVal m
   -> VerseT m (Val (VerseRef m) (VarList m) (VarVal m))
 readVar' = readVar . coerce
+
+freshDGVar'
+  :: (MonadRef m, MonadSupply Int m)
+  => List (VarVal m) (VarList m)
+  -> VerseT m (VarList m)
+freshDGVar' = fmap coerce . freshDGVar . coerce
 
 one'
   :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)

@@ -26,15 +26,18 @@ import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Supply
 import Control.Monad.Verse
-  ( Freezable (..)
+  ( Defaultable (..)
+  , Freezable (..)
   , Freshenable (..)
   , GVar
   , Var
   , VerseRef
+  , defaultGVar
   )
 
 import Data.ByteString.Internal (w2c)
 import Data.Char
+import Data.Coerce
 import Data.Foldable (for_)
 import Data.Functor
 import Data.Functor.Identity
@@ -115,7 +118,7 @@ data Val ref a b
     !Exp
     b
   | Intrinsic !Intrinsic b
-  | Type a deriving Show
+  | Type !Bool a deriving Show
 
 forVal_ :: Applicative m => Val ref a b -> (b -> m c) -> m ()
 forVal_ x f = case x of
@@ -146,7 +149,7 @@ forVal_ x f = case x of
   AnyOLam -> pure ()
   OLam _ _ _ _ _ tail -> void $ f tail
   Intrinsic _ tail -> void $ f tail
-  Type _ -> pure ()
+  Type {} -> pure ()
 
 instance ( Freshenable a m
          , Freshenable b m
@@ -189,7 +192,7 @@ instance ( Freshenable a m
       tail <- freshen tail
       pure $ OLam scope env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freshen tail
-    Type x -> Type <$> freshen x
+    Type x y -> Type <$> freshen x <*> freshen y
 
 instance ( Freezable (f b) (g d) m
          , Freezable a c m
@@ -231,7 +234,7 @@ instance ( Freezable (f b) (g d) m
       tail <- freeze tail
       pure $ OLam scope env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freeze tail
-    Type x -> Type <$> freeze x
+    Type x y -> Type <$> freeze x <*> freeze y
 
 instance ( Pretty (ref b)
          , Pretty b
@@ -295,7 +298,7 @@ instance ( Pretty (ref b)
     AnyOLam -> "function"
     OLam {} -> "function"
     Intrinsic {} -> "function"
-    Type _ -> "type"
+    Type {} -> "type"
     where
       prettyPath xs = foldr ( \ a b -> "/" <> pretty a <> b ) mempty xs
       prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
@@ -321,6 +324,13 @@ instance ( Pretty (ref b)
 data List a b
   = Nil
   | Cons a b deriving Show
+
+instance ( MonadRef m
+         , MonadSupply Int m
+         ) => Defaultable (List a (VarList m)) m where
+  defaultVars = \ case
+    Nil -> pure ()
+    Cons _ x -> defaultGVar (coerce x) Nil
 
 instance (Freshenable a m, Freshenable b m) => Freshenable (List a b) m where
   freshen = \ case
@@ -399,25 +409,31 @@ forEnv_ x f = for_ x $ \ (_access, x) -> forNamed_ x f
 type VarEnv k m = Env k (VarVal m)
 
 data Scope = Scope
-  !Label          -- The identifier for this scope, must match for <private>/<internal>
-  ![Label]        -- List of identifiers for all scopes that could contain <protected> items
-  !Label          -- Enclosing module
-  deriving Show
+  -- The identifier for this scope, must match for <private>/<internal>
+  {-# UNPACK #-} !Label
+  -- List of identifiers for all scopes that could contain <protected> items
+  ![Label]
+  -- Enclosing module
+  {-# UNPACK #-} !Label deriving Show
 
 instance Pretty Scope where
   pretty = \ case
-    Scope label labels mLabel -> "Scope{" <> prettyLabel label <>  prettySup labels <+> "in" <+> prettyLabel mLabel <> "}"
+    Scope label labels mLabel ->
+      "Scope" <>
+      braces (prettyLabel label <>
+              prettySup labels <+> "in" <+>
+              prettyLabel mLabel)
     where
       prettySup = \ case
         [] -> mempty
         labels -> "," <> "sup=[" <> concatWith (<+>) (map prettyLabel labels) <> "]"
 
-data AccessScope
-  = AccessScope
-    Desugar.Access
-    Label           -- enclosing scope
-    Label           -- enclosing module
-  deriving Show
+data AccessScope = AccessScope
+  !Desugar.Access
+  -- enclosing scope
+  {-# UNPACK #-} !Label
+  -- enclosing module
+  {-# UNPACK #-} !Label deriving Show
 
 instance Monad m => Freezable AccessScope AccessScope m where
   freeze = pure
@@ -426,4 +442,8 @@ instance Monad m => Freshenable AccessScope m where
   freshen = pure
 
 instance Pretty AccessScope where
-  pretty (AccessScope access sLabel mLabel) = "AC{" <> pretty access <+> "scope" <+> prettyLabel sLabel <+> "in" <+> prettyLabel mLabel <> "}"
+  pretty (AccessScope access sLabel mLabel) =
+    "AC" <>
+    braces (pretty access <+>
+            "scope" <+> prettyLabel sLabel <+>
+            "in" <+> prettyLabel mLabel)

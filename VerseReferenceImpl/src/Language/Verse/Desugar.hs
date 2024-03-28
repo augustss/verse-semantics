@@ -690,6 +690,7 @@ unifyEnv loc =
   , Intrinsic.Char
   , Intrinsic.Char32
   , Intrinsic.Function
+  , Intrinsic.Type
   , Intrinsic.Query
   ]
   where
