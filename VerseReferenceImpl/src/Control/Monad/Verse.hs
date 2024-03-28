@@ -211,9 +211,10 @@ incrSuspCounts = modifySuspCounts . plusSuspCounts
 incrLevelSuspCount :: Int -> VerseT m ()
 incrLevelSuspCount k = modifySuspCounts $ IntMap.alter f k
   where
-    f = Just . \ case
-      Nothing -> 1
-      Just x -> x + 1
+    f = \ case
+      Nothing -> Just 1
+      Just (-1) -> Nothing
+      Just x -> Just $! x + 1
 
 decrSuspCounts :: SuspCounts -> VerseT m ()
 decrSuspCounts = modifySuspCounts . minusSuspCounts
@@ -221,23 +222,24 @@ decrSuspCounts = modifySuspCounts . minusSuspCounts
 decrLevelSuspCount :: Int -> VerseT m ()
 decrLevelSuspCount k = modifySuspCounts $ IntMap.alter f k
   where
-    f = Just . \ case
-      Nothing -> -1
-      Just x -> x - 1
+    f = \ case
+      Nothing -> Just (-1)
+      Just 1 -> Nothing
+      Just x -> Just $! x - 1
 
 plusSuspCounts :: SuspCounts -> SuspCounts -> SuspCounts
 plusSuspCounts = IntMap.mergeWithKey f id id
   where
-    f _ x y = if z == 0 then Nothing else Just z
-      where
-        z = x + y
+    f _ x y = case x + y of
+      0 -> Nothing
+      z -> Just z
 
 minusSuspCounts :: SuspCounts -> SuspCounts -> SuspCounts
 minusSuspCounts = IntMap.mergeWithKey f id id
   where
-    f _ x y = if z == 0 then Nothing else Just z
-      where
-        z = x - y
+    f _ x y = case x - y of
+      0 -> Nothing
+      z -> Just z
 
 modifySuspCounts :: (SuspCounts -> SuspCounts) -> VerseT m ()
 modifySuspCounts f = modifyV' $ \ S {..} -> S { suspCounts = f suspCounts, .. }
