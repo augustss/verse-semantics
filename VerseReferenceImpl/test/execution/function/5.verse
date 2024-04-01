@@ -1,25 +1,25 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 X:?Plus1 = option{1}
 
-prefix'?'(t:type)(X:any) := if (Y := X?) then truth{t[Y]}
+prefix'?'(t:Type)(X:any) := if (Y := X?) then truth{t[Y]}
 
 Plus1 := Curry(operator'+')(1)
 
-type := any
+Type := any
 
 Curry(F:tuple(any, any) -> any)(X:any)(Y:any) := F[X, Y]
 
 any(exists X) := X
 
-operator'->'(t:type, u:type)(F:any)(X:t):u = F[X]
+operator'->'(t:Type, u:Type)(F:any)(X:t):u = F[X]
 
-tuple(ts:[]type)(Xs:any) := for:
+tuple(ts:[]Type)(Xs:any) := for:
   I:int
   t := ts[I]
   X := Xs[I]
 do t[X]
 
-prefix'[]'(t:type)(Xs:any) := for (X:Xs). t[X]
+prefix'[]'(t:Type)(Xs:any) := for (X:Xs). t[X]
 
 Zip(Xs:[]any, Ys:[]any):[]tuple(any, any) = all:
   I:int

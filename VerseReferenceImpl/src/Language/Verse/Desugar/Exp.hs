@@ -20,6 +20,7 @@ module Language.Verse.Desugar.Exp
   , name
   , then'
   , seq'
+  , domain
   ) where
 
 import Data.ByteString.Internal (w2c)
@@ -78,6 +79,7 @@ data Exp f a
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
   | TopLevel !(Env a) (f (Exp f a)) -- Used to define the top level for paths
+  | Domain (f (Exp f a))
 
 infixl 1 :*>:
 infixl 1 :>>:
@@ -169,6 +171,8 @@ instance ( Pretty (f (Exp f a))
     ArchetypeName x -> "archetype" <> parens (pretty x)
     TopLevel xs e ->
       bindings xs $ pretty e
+    Domain e ->
+      "domain" <+> braces (pretty e)
     _ -> "unimplemented"
     where
       ssemi = flatAlt hardline (semi <> space)
@@ -252,3 +256,6 @@ infixl 1 `then'`
 seq' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 seq' = liftL2 (:>>:)
 infixl 1 `seq'`
+
+domain :: Functor f => f (Exp f a) -> f (Exp f a)
+domain = liftL1 Domain

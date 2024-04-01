@@ -1,11 +1,11 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 Any(exists X) := X
 
-type := Any
+Type := Any
 
-list(t:type) := (X:Any => X = false|truth{:Any})
+list(t:Type) := (X:Any => X = false|truth{:Any})
 
-cons(t:type) := struct:
+cons(t:Type) := struct:
   Head:t
   Tail:list(t)
 

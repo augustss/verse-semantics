@@ -15,6 +15,7 @@ import Control.Monad.State.Strict
 import Control.Monad.Supply
 import Control.Monad.Wrong
 
+import Data.Foldable
 import Data.Functor
 import Data.Functor.Apply
 import Data.HashMap.Strict (foldlWithKey')
@@ -22,20 +23,21 @@ import Data.HashMap.Strict qualified as HashMap
 import Data.String
 
 import Language.Verse.Desugar.Exp
-  ( Exp (..)
-  , Quantifier (..)
+  ( Access (..)
+  , Exp (..)
   , Name (..)
   , Path (..)
-  , Access (..)
+  , Quantifier (..)
+  , assume
+  , bracketInvoke
+  , check
+  , domain
+  , forall'
+  , name
+  , seq'
+  , then'
   , unify
   , verify
-  , check
-  , assume
-  , forall'
-  , bracketInvoke
-  , name
-  , then'
-  , seq'
   )
 import Language.Verse.Effect.Split qualified as Split (Effect)
 import Language.Verse.Effect.Split qualified as Effect
@@ -252,6 +254,8 @@ desugarExp'' e pi i = case extract e of
     (e2, xs2) <- lift $ runStateT (desugarExp' e2 pi i) xs
     put $ xs1 <> xs2
     pure $ IfArchetypeName x y e1 e2
+  Rewrite.Domain e ->
+    valM i (e $>) $ Domain <$> desugarExp e
 
 desugarName
   :: (MonadWrong Error m, MonadSupply Label m)
@@ -337,7 +341,7 @@ execLam loc' e1 e2 e3 pi f = do
     Nothing -> do
       b <- name <$> freshIdent (loc e1)
       c <- name <$> freshIdent (loc e1)
-      unify b <$> desugarExp' e1 True (name a) `thenM`
+      unify b <$> domainM (desugarExp' e1 True $ name a) `thenM`
         unify c <$> invokeM b pi f `thenM`
         desugarExp' e3 pi c
     Just e2 -> do
@@ -345,7 +349,7 @@ execLam loc' e1 e2 e3 pi f = do
       c <- name <$> freshIdent (loc e1)
       d <- name <$> freshIdent (loc e3)
       e <- name <$> freshIdent (loc e2)
-      unify b <$> desugarExp' e1 True (name a) `thenM`
+      unify b <$> domainM (desugarExp' e1 True $ name a) `thenM`
         unify c <$> invokeM b pi f `thenM`
         unify d <$> desugarExp' e3 pi c `thenM`
         unify e <$> desugarExp e2 `thenM`
@@ -378,12 +382,12 @@ assumePosLam e1 eff e2 e3 pi f = do
   a <- freshIdent' $ loc e1
   Lam (extract a) <$> exists case e2 of
     Just e2 ->
-      desugarExp' e1 True (name a) `seqM`
+      domainM (desugarExp' e1 True $ name a) `seqM`
       negM (abstractD eff e2)
     Nothing -> do
       b <- name <$> freshIdent (loc e1)
       c <- name <$> freshIdent (loc e1)
-      unify b <$> desugarExp' e1 True (name a) `thenM`
+      unify b <$> domainM (desugarExp' e1 True $ name a) `thenM`
         unify c <$> invokeM b pi f `thenM`
         negM (desugarExp' e3 pi c)
 
@@ -407,10 +411,10 @@ assumeNegLam e1 eff e2 e3 = do
   i <- freshIdent' $ loc e1
   Lam (extract i) <$> exists case e2 of
     Just e2 ->
-      posM (desugarExp' e1 True $ name i) `seqM`
+      posM (domainM . desugarExp' e1 True $ name i) `seqM`
       abstractD eff e2
     Nothing ->
-      posM (desugarExp' e1 True $ name i) `thenM`
+      posM (domainM . desugarExp' e1 True $ name i) `thenM`
       concreteD eff e3
 
 desugarOLam
@@ -441,7 +445,7 @@ execOLam loc' e1 e2 e3 pi f = do
   ((e1, a), xs) <- lift . runDesugarT $ do
     a <- name <$> freshIdent (loc e1)
     b <- name <$> freshIdent (loc e1)
-    e1 <- desugarExp' e1 True b
+    e1 <- domainM $ desugarExp' e1 True b
     pure (unify a e1 `then'` b, a)
   function' loc' pi f . OLam f (dropLoc xs) e1 <$> exists do
     b <- name <$> freshIdent (loc e3)
@@ -476,7 +480,7 @@ assumePosOLam e1 eff e2 e3 pi f = do
   ((e1, a), xs) <- lift $ runDesugarT $ do
     a <- name <$> freshIdent (loc e1)
     b <- name <$> freshIdent (loc e1)
-    e1 <- desugarExp' e1 True b
+    e1 <- domainM $ desugarExp' e1 True b
     pure (unify a e1 `then'` b, a)
   OLam f (dropLoc xs) e1 <$> case e2 of
     Just e2 -> negM $ abstractD eff e2
@@ -509,7 +513,7 @@ assumeNegOLam
 assumeNegOLam loc' e1 eff e2 e3 pi f = do
   (e1, xs) <- lift $ runDesugarT $ do
     i <- name <$> freshIdent (loc e1)
-    e1 <- posM $ desugarExp' e1 True i
+    e1 <- posM . domainM $ desugarExp' e1 True i
     pure $ e1 `then'` i
   function' loc' pi f . OLam f (dropLoc xs) e1 <$> case e2 of
     Just e2 -> abstractD eff e2
@@ -529,7 +533,7 @@ verifyPosLam' loc' e1 eff e2 e3 pi f = do
   a <- freshIdent' $ loc e1
   functionM loc' pi f . verifyM $ forall' Internal a <$> do
     b <- name <$> freshIdent (loc e1)
-    unify b <$> negM (desugarExp' e1 True $ name a) `seqM` checkM eff do
+    unify b <$> negM (domainM . desugarExp' e1 True $ name a) `seqM` checkM eff do
       c <- name <$> freshIdent (loc e3)
       case e2 of
         Just e2 -> unify c <$> invokeM b pi f `thenM` checkOfTypeD e3 e2 pi c
@@ -773,6 +777,9 @@ seqM
 seqM = liftA2 seq'
 infixl 1 `seqM`
 
+domainM :: (Functor m, Functor f) => m (f (Exp f a)) -> m (f (Exp f a))
+domainM = fmap domain
+
 freshIdent :: MonadSupply Label m => Loc -> DesugarT m (L Ident)
 freshIdent loc = do
   x <- Ident.Label <$> supply
@@ -833,4 +840,5 @@ dropLoc :: Env -> HashMap.HashMap Ident (Access, Quantifier)
 dropLoc = fmap (\ (_loc, access, x) -> (access, x))
 
 checkNoneOf :: MonadWrong Error m => [Access] -> Env -> m ()
-checkNoneOf notAllowed env = mapM_ ( \ (loc, access, _) -> when (access `elem` notAllowed) (wrong $ AccessError loc access) ) $ HashMap.elems env
+checkNoneOf notAllowed env = for_ env $ \ (loc, access, _) ->
+  when (access `elem` notAllowed) . wrong $ AccessError loc access

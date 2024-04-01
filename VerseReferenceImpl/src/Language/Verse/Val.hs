@@ -6,6 +6,7 @@
 module Language.Verse.Val
   ( Val (..)
   , forVal_
+  , Sign
   , List (..)
   , VarVal (..)
   , VarList (..)
@@ -106,19 +107,23 @@ data Val ref a b
     !(Env SimpleName b)
   | Lam
     !(NonEmpty Scope)
+    !Sign
     !(Env Ident b)
     !Ident
     !Exp
   | AnyOLam
   | OLam
     !(NonEmpty Scope)
+    !Sign
     !(Env Ident b)
     !(Desugar.Env Ident)
     !Exp
     !Exp
     b
   | Intrinsic !Intrinsic b
-  | Type !Bool a deriving Show
+  | Type !Sign a deriving Show
+
+type Sign = Bool
 
 forVal_ :: Applicative m => Val ref a b -> (b -> m c) -> m ()
 forVal_ x f = case x of
@@ -145,9 +150,9 @@ forVal_ x f = case x of
   StructInst _ env -> forEnv_ env f
   Class _ _ env sup _ _ -> forEnv_ env f *> for_ sup f
   ClassInst _ sup env -> for_ sup f *> forEnv_ env f
-  Lam _ env _ _ -> forEnv_ env f
+  Lam _ _ env _ _ -> forEnv_ env f
   AnyOLam -> pure ()
-  OLam _ _ _ _ _ tail -> void $ f tail
+  OLam _ _ _ _ _ _ tail -> void $ f tail
   Intrinsic _ tail -> void $ f tail
   Type {} -> pure ()
 
@@ -183,16 +188,16 @@ instance ( Freshenable a m
       sup <- freshen sup
       pure $ Class i scope env sup xs e
     ClassInst i sup env -> ClassInst i <$> freshen sup <*> freshen env
-    Lam scope env x e -> do
+    Lam scope sign env x e -> do
       env <- freshen env
-      pure $ Lam scope env x e
+      pure $ Lam scope sign env x e
     AnyOLam -> pure x
-    OLam scope env xs e1 e2 tail -> do
+    OLam scope sign env xs e1 e2 tail -> do
       env <- freshen env
       tail <- freshen tail
-      pure $ OLam scope env xs e1 e2 tail
+      pure $ OLam scope sign env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freshen tail
-    Type x y -> Type <$> freshen x <*> freshen y
+    Type x y -> Type x <$> freshen y
 
 instance ( Freezable (f b) (g d) m
          , Freezable a c m
@@ -227,14 +232,14 @@ instance ( Freezable (f b) (g d) m
       sup <- freeze sup
       pure $ Class i scope env sup xs e
     ClassInst i sup env -> ClassInst i <$> freeze sup <*> freeze env
-    Lam scope env x e -> freeze env <&> \ env -> Lam scope env x e
+    Lam scope sign env x e -> freeze env <&> \ env -> Lam scope sign env x e
     AnyOLam -> pure AnyOLam
-    OLam scope env xs e1 e2 tail -> do
+    OLam scope sign env xs e1 e2 tail -> do
       env <- freeze env
       tail <- freeze tail
-      pure $ OLam scope env xs e1 e2 tail
+      pure $ OLam scope sign env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freeze tail
-    Type x y -> Type <$> freeze x <*> freeze y
+    Type x y -> Type x <$> freeze y
 
 instance ( Pretty (ref b)
          , Pretty b

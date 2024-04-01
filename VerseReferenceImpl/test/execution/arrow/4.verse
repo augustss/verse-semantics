@@ -1,9 +1,9 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 any(exists X) := X
 
-type := any
+Type := any
 
-operator'->'(t:type, u:type)(F:any)(X:t):u = F(X)
+operator'->'(t:Type, u:Type)(F:any)(X:t):u = F(X)
 
 exactly(X:int)(Y:any) := X = Y
 

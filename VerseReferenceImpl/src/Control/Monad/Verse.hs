@@ -195,7 +195,7 @@ emptyS :: Applicative m => S m
 emptyS = S
   { suspend = const $ pure ()
   , suspCounts = mempty
-  , default' = pure ()
+  , default' = Nothing
   , commit = const $ pure ()
   , store = mempty
   }
@@ -245,7 +245,7 @@ minusSuspCounts = IntMap.mergeWithKey f id id
 modifySuspCounts :: (SuspCounts -> SuspCounts) -> VerseT m ()
 modifySuspCounts f = modifyV' $ \ S {..} -> S { suspCounts = f suspCounts, .. }
 
-type Default m = VerseT m ()
+type Default m = Maybe (VerseT m ())
 
 type Commit m = Heap -> VerseT m ()
 
@@ -255,6 +255,10 @@ data StoreElem m = forall a . Freshenable a m => StoreElem (HRef m a)
 
 putV :: S m -> VerseT m ()
 putV s = VerseT $ \ _ R {..} _ sk -> sk heaps s ()
+
+stateV :: (S m -> (a, S m)) -> VerseT m a
+stateV f = VerseT $ \ _ R {..} s sk -> case f s of
+  (a, s) -> sk heaps s a
 
 modifyV' :: (S m -> S m) -> VerseT m ()
 modifyV' f = VerseT $ \ _ R {..} s sk ->
@@ -270,9 +274,11 @@ whenSuspended f = do
     , ..
     }
 
-whenDefaulted :: Default m -> VerseT m ()
+whenDefaulted :: VerseT m () -> VerseT m ()
 whenDefaulted m = modifyV' $ \ S {..} -> S
-  { default' = default' *> m
+  { default' = case default' of
+      Nothing -> Just m
+      Just m' -> Just $! m' *> m
   , ..
   }
 
@@ -366,12 +372,19 @@ runVerseT m = do
         guard $ suspCount == 0
         lift $ commitRun level heap s.store
         prepend x <$> MaybeT (fk heaps abortRun) <*> MaybeT (ak heaps)
-  unVerseT m yk R {..} emptyS sk failRun failRun abortRun
+  unVerseT (m <* runDefault) yk R {..} emptyS sk failRun failRun abortRun
   where
     yk = Yield $ \ _ _ _ _ _ _ -> pure Nothing
     level = 0
     verifyHeap = Nothing
     prepend x xss yss = ((x:) <$> xss) ++ yss
+
+runDefault :: VerseT m ()
+runDefault = stateV f >>= \ case
+  Nothing -> pure ()
+  Just m -> m *> runDefault
+  where
+    f S {..} = (default', S { default' = Nothing, .. })
 
 commitRun :: MonadRef m => Int -> Heap -> Store m -> m ()
 commitRun level heap store = for_ store $ \ (StoreElem ref) ->
@@ -483,7 +496,7 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   { heap :: !Heap
   , latch :: !(Latch m)
   , susp :: !(Susp m (Stream m a))
-  , init :: !(VerseT m (), VerseT m (), VerseT m ())
+  , init :: !(Init m)
   , last :: !(HRef m (Maybe a))
   , suspend :: !(Suspend m)
   , suspCounts :: !(IntMap Int)
@@ -491,6 +504,8 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   , commit :: !(Commit m)
   , store :: !(Store m)
   }
+
+type Init m = (VerseT m (), VerseT m (), VerseT m ())
 
 split'
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -500,69 +515,116 @@ split'
   -> HRef m (Maybe a)
   -> VerseT m (Stream m a)
 split' m heap latch last =
-  splitS m heap latch >>= \ case
+  splitS m heap latch emptyS >>= \ case
     AbortS -> abort
     FailS m_a ->
-      pure Done <?>
+      pure Done
+      <?>
       (do heap <- copyHeap heap
           split' m_a heap latch last)
     YieldS s@S {..} m_y m_f m_e m_a ->
-      let
-        f susp =
-          let init = (m_f, m_e, m_a)
-          in
-            if IntMap.null suspCounts then do
-              let default' = pure ()
-              ref_env <- newHRef $ Just SplitEnv {..}
-              suspend $ resumeSplit ref_env
-              resumeSplit ref_env $ m_y *> s.default'
-            else do
-              incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-              ref_env <- newHRef $ Just SplitEnv {..}
-              suspend $ resumeSplit ref_env
-              resumeSplit ref_env m_y
-      in
-        yield f
-    SucceedS s@S {..} m_f m_e m_a -> do
-      suspCount <- readSuspCount' latch heap
-      (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
-        Just x ->
-          (do commit heap
-              commitStore store heap
-              x <- freshen' x heap
-              pure . Step x $ do
-                heap <- copyHeap heap
-                split' (dupStore store heap.tail *> m_f) heap latch last) <?>
-          (do heap <- copyHeap heap
-              split' m_a heap latch last)
-        Nothing ->
-          let
-            f susp =
-              let init = (m_f, m_e, m_a)
-              in
-                if IntMap.null suspCounts then do
-                  let default' = pure ()
-                  ref_env <- newHRef $ Just SplitEnv {..}
-                  suspend $ resumeSplit ref_env
-                  resumeSplit ref_env s.default'
-                else do
+      let init = (m_f, m_e, m_a)
+      in case guard (IntMap.null suspCounts) *> default' of
+        Nothing -> split'' m_y heap latch init last s
+        Just m_d ->
+          let default' = Nothing
+          in split'' (m_y *> m_d) heap latch init last S {..}
+    SucceedS S {..} m_f m_e m_a ->
+      let init = (m_f, m_e, m_a)
+      in case guard (IntMap.null suspCounts) *> default' of
+        Just m_d ->
+          let default' = Nothing
+          in split'' m_d heap latch init last S {..}
+        Nothing -> do
+          suspCount <- readSuspCount' latch heap
+          (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
+            Nothing ->
+              let
+                f susp = do
                   incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
                   ref_env <- newHRef $ Just SplitEnv {..}
                   suspend $ resumeSplit ref_env
-          in
-            yield f
+              in yield f
+            Just x ->
+              (do commit heap
+                  commitStore store heap
+                  x <- freshen' x heap
+                  pure . Step x $ do
+                    heap <- copyHeap heap
+                    split' (do dupStore store heap.tail
+                               m_f) heap latch last)
+              <?>
+              (do heap <- copyHeap heap
+                  split' m_a heap latch last)
+
+split''
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VerseT m ()
+  -> Heap
+  -> Latch m
+  -> Init m
+  -> HRef m (Maybe a)
+  -> S m
+  -> VerseT m (Stream m a)
+split'' m heap latch (m_f', m_e', m_a') last s =
+  splitS m heap latch s >>= \ case
+    AbortS -> split' m_a' heap latch last
+    FailS m_a ->
+      pure Done
+      <?>
+      (do heap <- copyHeap heap
+          split' (m_e' <?> m_a <?> m_a') heap latch last)
+    YieldS s@S {..} m_y m_f m_e m_a ->
+      let init = (m_f <|> m_f', alt m_e m_f' m_e', m_a <?> m_a')
+      in case guard (IntMap.null suspCounts) *> default' of
+        Nothing -> split'' m_y heap latch init last s
+        Just m_d ->
+          let default' = Nothing
+          in split'' (m_y *> m_d) heap latch init last S {..}
+    SucceedS S {..} m_f m_e m_a ->
+      let
+        m_f'' = m_f <|> m_f'
+        m_e'' = alt m_e m_f' m_e'
+        m_a'' = m_a <?> m_a'
+        init = (m_f'', m_e'', m_a'')
+      in case guard (IntMap.null suspCounts) *> default' of
+        Just m_d ->
+          let default' = Nothing
+          in split'' m_d heap latch init last S {..}
+        Nothing -> do
+          suspCount <- readSuspCount' latch heap
+          (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
+            Nothing ->
+              let
+                f susp = do
+                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+                  ref_env <- newHRef $ Just SplitEnv {..}
+                  suspend $ resumeSplit ref_env
+              in yield f
+            Just x ->
+              (do commit heap
+                  commitStore store heap
+                  x <- freshen' x heap
+                  pure . Step x $ do
+                    heap <- copyHeap heap
+                    split' (do dupStore store heap.tail
+                               m_f'') heap latch last)
+              <?>
+              (do heap <- copyHeap heap
+                  split' m_a'' heap latch last)
 
 splitS
   :: (MonadRef m, MonadSupply Int m)
   => VerseT m ()
   -> Heap
   -> Latch m
+  -> S m
   -> VerseT m (Split m)
-splitS m heap latch = do
+splitS m heap latch s = do
   level <- getLevel <&> (+ 1)
   verifyHeap <- getVerifyHeap
   let r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
-  lift $ unVerseT m yieldS r emptyS succeedS failS failS abortS
+  lift $ unVerseT m yieldS r s succeedS failS failS abortS
 
 resumeSplit
   :: (MonadRef m, MonadSupply Int m)
@@ -594,58 +656,69 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
     YieldS s@S {..} m_y m_f m_e m_a ->
       let
         init =
-          ( (m_f *> whenSuspended env.suspend) <|> m_f'
-          , alt (m_e *> whenSuspended env.suspend) m_f' m_e'
-          , (m_a *> whenSuspended env.suspend) <?> m_a'
+          ( (do m_f
+                whenSuspended env.suspend
+                incrSuspCounts env.suspCounts) <|> m_f'
+          , alt (do m_e
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) m_f' m_e'
+          , (do m_a
+                whenSuspended env.suspend
+                incrSuspCounts env.suspCounts) <?> m_a'
           )
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
         incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
-        if not (IntMap.null env.suspCounts) && IntMap.null suspCounts then do
-          let default' = pure ()
-          writeHRef ref_env $ Just SplitEnv {..}
-          s.suspend $ resumeSplit ref_env
-          resumeSplit ref_env $ m_y *> s.default'
-        else do
-          writeHRef ref_env $ Just SplitEnv {..}
-          s.suspend $ resumeSplit ref_env
-          resumeSplit ref_env m_y
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just SplitEnv {..}
+            s.suspend $ resumeSplit ref_env
+            resumeSplit ref_env $ m_y *> m_d
+          Nothing -> do
+            writeHRef ref_env $ Just SplitEnv {..}
+            s.suspend $ resumeSplit ref_env
+            resumeSplit ref_env m_y
     SucceedS s@S {..} m_f m_e m_a ->
       let
-        m_f'' = (m_f *> whenSuspended env.suspend) <|> m_f'
-        m_a'' = (m_a *> whenSuspended env.suspend) <?> m_a'
+        m_f'' = (do m_f
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <|> m_f'
+        m_e'' = alt (do m_e
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e'
+        m_a'' = (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <?> m_a'
+        init = (m_f'', m_e'', m_a'')
+        suspend resume = env.suspend resume *> s.suspend resume
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
-        suspCount <- readSuspCount' latch heap
-        (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
-          Just x ->
-            (do commit heap
-                commitStore store heap
-                x <- freshen' x heap
-                susp . Step x $ do
-                  heap <- copyHeap heap
-                  split' (dupStore store heap.tail *> m_f'') heap latch last) <?>
-            (do heap <- copyHeap heap
-                susp =<< split' m_a'' heap latch last)
-          Nothing ->
-            let
-              init =
-                ( m_f''
-                , alt (m_e *> whenSuspended env.suspend) m_f' m_e'
-                , m_a''
-                )
-              suspend resume = env.suspend resume *> s.suspend resume
-              suspCounts = plusSuspCounts env.suspCounts s.suspCounts
-            in do
-              incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
-              if not (IntMap.null env.suspCounts) && IntMap.null suspCounts then do
-                let default' = pure ()
+        incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just SplitEnv {..}
+            s.suspend $ resumeSplit ref_env
+            resumeSplit ref_env m_d
+          Nothing -> do
+            suspCount <- readSuspCount' latch heap
+            (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
+              Nothing -> do
                 writeHRef ref_env $ Just SplitEnv {..}
                 s.suspend $ resumeSplit ref_env
-                resumeSplit ref_env s.default'
-              else do
-                writeHRef ref_env $ Just SplitEnv {..}
-                s.suspend $ resumeSplit ref_env
+              Just x ->
+                (do commit heap
+                    commitStore store heap
+                    x <- freshen' x heap
+                    susp . Step x $ do
+                      heap <- copyHeap heap
+                      split' (do dupStore store heap.tail
+                                 m_f'') heap latch last)
+                <?>
+                (do heap <- copyHeap heap
+                    susp =<< split' m_a'' heap latch last)
 
 resumeSplitS
   :: (MonadRef m, MonadSupply Int m)
@@ -671,7 +744,7 @@ data VerifyEnv m = VerifyEnv
   { heap :: {-# UNPACK #-} !Heap
   , latch :: !(Latch m)
   , susp :: !(Susp m ())
-  , init :: !(VerseT m (), VerseT m (), VerseT m ())
+  , init :: !(Init m)
   , last :: !(HRef m Bool)
   , suspend :: !(Suspend m)
   , suspCounts :: !(IntMap Int)
@@ -687,60 +760,92 @@ verify'
   -> HRef m Bool
   -> VerseT m ()
 verify' m heap latch last =
-  verifyS m heap latch >>= \ case
+  verifyS m heap latch emptyS >>= \ case
     AbortS -> pure ()
     FailS m_a -> verify' m_a heap latch last
     YieldS s@S {..} m_y m_f m_e m_a ->
-      let
-        f susp =
-          let init = (m_f, m_e, m_a)
-          in
-            if IntMap.null suspCounts then do
-              let default' = pure ()
-              ref_env <- newHRef $ Just VerifyEnv {..}
-              suspend $ resumeVerify ref_env
-              resumeVerify ref_env $ m_y *> s.default'
-            else do
-              incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-              ref_env <- newHRef $ Just VerifyEnv {..}
-              suspend $ resumeVerify ref_env
-              resumeVerify ref_env m_y
-      in
-        yield f
-    SucceedS s@S {..} m_f m_e m_a -> do
-      suspCount <- readSuspCount' latch heap
-      (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
-        True -> do
-          commit heap
-          verify' (m_f <?> m_a) heap latch last
-        False ->
-          let
-            f susp =
-              let init = (m_f, m_e, m_a)
-              in
-                if IntMap.null suspCounts then do
-                  let default' = pure ()
-                  ref_env <- newHRef $ Just VerifyEnv {..}
-                  suspend $ resumeVerify ref_env
-                  resumeVerify ref_env s.default'
-                else do
+      let init = (m_f, m_e, m_a)
+      in case guard (IntMap.null suspCounts) *> default' of
+        Nothing -> verify'' m_y heap latch init last s
+        Just m_d ->
+          let default' = Nothing
+          in verify'' (m_y *> m_d) heap latch init last S {..}
+    SucceedS S {..} m_f m_e m_a ->
+      let init = (m_f, m_e, m_a)
+      in case guard (IntMap.null suspCounts) *> default' of
+        Just m_d ->
+          let default' = Nothing
+          in verify'' m_d heap latch init last S {..}
+        Nothing -> do
+          suspCount <- readSuspCount' latch heap
+          (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
+            True -> do
+              commit heap
+              verify' (m_f <?> m_a) heap latch last
+            False ->
+              let
+                f susp = do
                   incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
                   ref_env <- newHRef $ Just VerifyEnv {..}
                   suspend $ resumeVerify ref_env
-          in
-            yield f
+              in yield f
+
+verify''
+  :: (MonadRef m, MonadSupply Int m)
+  => VerseT m ()
+  -> Heap
+  -> Latch m
+  -> Init m
+  -> HRef m Bool
+  -> S m
+  -> VerseT m ()
+verify'' m heap latch (m_f', m_e', m_a') last s =
+  verifyS m heap latch s >>= \ case
+    AbortS -> verify' m_a' heap latch last
+    FailS m_a -> verify' (m_e' <?> m_a <?> m_a') heap latch last
+    YieldS s@S {..} m_y m_f m_e m_a ->
+      let init = (m_f <|> m_f', alt m_e m_f' m_e', m_a <?> m_a')
+      in case guard (IntMap.null suspCounts) *> default' of
+        Nothing -> verify'' m_y heap latch init last s
+        Just m_d ->
+          let default' = Nothing
+          in verify'' (m_y *> m_d) heap latch init last S {..}
+    SucceedS S {..} m_f m_e m_a ->
+      let
+        m_f'' = m_f <|> m_f'
+        m_e'' = alt m_e m_f' m_e'
+        m_a'' = m_a <?> m_a'
+        init = (m_f'', m_e'', m_a'')
+      in case guard (IntMap.null suspCounts) *> default' of
+        Just m_d ->
+          let default' = Nothing
+          in verify'' m_d heap latch init last S {..}
+        Nothing -> do
+          suspCount <- readSuspCount' latch heap
+          (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
+            True -> do
+              commit heap
+              verify' (m_f'' <?> m_a'') heap latch last
+            False ->
+              let
+                f susp = do
+                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+                  ref_env <- newHRef $ Just VerifyEnv {..}
+                  suspend $ resumeVerify ref_env
+              in yield f
 
 verifyS
   :: (MonadRef m, MonadSupply Int m)
   => VerseT m ()
   -> Heap
   -> Latch m
+  -> S m
   -> VerseT m (Split m)
-verifyS m heap latch = do
+verifyS m heap latch s = do
   level <- getLevel <&> (+ 1)
   verifyHeap <- getHeap
   let r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
-  lift $ unVerseT m yieldS r emptyS succeedS failS failS abortS
+  lift $ unVerseT m yieldS r s succeedS failS failS abortS
 
 resumeVerify
   :: (MonadRef m, MonadSupply Int m)
@@ -772,49 +877,59 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
     YieldS s@S {..} m_y m_f m_e m_a ->
       let
         init =
-          ( (m_f *> whenSuspended env.suspend) <|> m_f'
-          , alt (m_e *> whenSuspended env.suspend) m_f' m_e'
-          , (m_a *> whenSuspended env.suspend) <?> m_a'
+          ( (do m_f
+                whenSuspended env.suspend
+                incrSuspCounts env.suspCounts) <|> m_f'
+          , alt (do m_e
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) m_f' m_e'
+          , (do m_a
+                whenSuspended env.suspend
+                incrSuspCounts env.suspCounts) <?> m_a'
           )
         suspend resume = env.suspend resume *> s.suspend resume
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
         incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
-        if not (IntMap.null env.suspCounts) && IntMap.null suspCounts then do
-          let default' = pure ()
-          writeHRef ref_env $ Just VerifyEnv {..}
-          s.suspend $ resumeVerify ref_env
-          resumeVerify ref_env $ m_y *> s.default'
-        else do
-          writeHRef ref_env $ Just VerifyEnv {..}
-          s.suspend $ resumeVerify ref_env
-          resumeVerify ref_env m_y
-    SucceedS s@S {..} m_f m_e m_a -> do
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just VerifyEnv {..}
+            s.suspend $ resumeVerify ref_env
+            resumeVerify ref_env $ m_y *> m_d
+          Nothing -> do
+            writeHRef ref_env $ Just VerifyEnv {..}
+            s.suspend $ resumeVerify ref_env
+            resumeVerify ref_env m_y
+    SucceedS s@S {..} m_f m_e m_a ->
       let
-        m_f'' = (m_f *> whenSuspended env.suspend) <|> m_f'
-        m_a'' = (m_a *> whenSuspended env.suspend) <?> m_a'
-      suspCount <- readSuspCount' latch heap
-      (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
-        True -> do
-          commit heap
-          susp =<< verify' (m_f'' <?> m_a'') heap latch last
-        False ->
-          let
-            init =
-              ( m_f''
-              , alt (m_e *> whenSuspended env.suspend) m_f' m_e'
-              , m_a''
-              )
-            suspend resume = env.suspend resume *> s.suspend resume
-          in do
-            incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
-            if not (IntMap.null env.suspCounts) && IntMap.null suspCounts then do
-              let default' = pure ()
-              writeHRef ref_env $ Just VerifyEnv {..}
-              s.suspend $ resumeVerify ref_env
-              resumeVerify ref_env s.default'
-            else do
-              writeHRef ref_env $ Just VerifyEnv {..}
-              s.suspend $ resumeVerify ref_env
+        m_f'' = (do m_f
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <|> m_f'
+        m_e'' = alt (do m_e
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e'
+        m_a'' = (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <?> m_a'
+        init = (m_f'', m_e'', m_a'')
+      in do
+        incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just VerifyEnv {..}
+            s.suspend $ resumeVerify ref_env
+            resumeVerify ref_env m_d
+          Nothing -> do
+            suspCount <- readSuspCount' latch heap
+            (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
+              True -> do
+                commit heap
+                susp =<< verify' (m_f'' <?> m_a'') heap latch last
+              False -> do
+                writeHRef ref_env $ Just VerifyEnv {..}
+                s.suspend $ resumeVerify ref_env
 
 resumeVerifyS
   :: (MonadRef m, MonadSupply Int m)
@@ -826,7 +941,7 @@ resumeVerifyS m VerifyEnv {..} = do
   verifyHeap <- getHeap
   let
     r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
-    s = S { suspend = const $ pure (), store = mempty, .. }
+    s = S { suspend = const $ pure (), suspCounts = mempty, store = mempty, .. }
   lift $ unVerseT m yieldS r s succeedS failS failS abortS
 
 assume
@@ -967,7 +1082,19 @@ defaultVar var@(Var ref) binding = readVarState ref >>= \ case
 defaultGVar
   :: (MonadRef m, MonadSupply Int m, Defaultable a m)
   => GVar m a -> a -> VerseT m ()
-defaultGVar = defaultVar . unGVar
+defaultGVar = defaultGVar' . unGVar
+
+defaultGVar'
+  :: (MonadRef m, MonadSupply Int m, Defaultable a m)
+  => Var m a -> a -> VerseT m ()
+defaultGVar' var@(Var ref) binding = readVarState ref >>= \ case
+  Link var -> defaultGVar' var binding
+  Bound bound -> defaultVars bound.binding
+  Unbound unbound -> do
+    label <- supply
+    let bound = MkBound {..}
+    writeVarStateG ref $ Bound bound
+    unbound.substSusp (var, Just bound)
 
 instance Monad m => Defaultable () m where
   defaultVars = const $ pure ()
