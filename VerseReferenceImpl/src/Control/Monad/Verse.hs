@@ -1070,13 +1070,14 @@ class Monad m => Defaultable a m where
 defaultVar
   :: (MonadRef m, MonadSupply Int m, Defaultable a m)
   => Var m a -> a -> VerseT m ()
-defaultVar var@(Var ref) binding = readVarState ref >>= \ case
+defaultVar (Var ref) binding = readVarState ref >>= \ case
   Link var -> defaultVar var binding
   Bound bound -> defaultVars bound.binding
   Unbound unbound -> do
     label <- supply
     let bound = MkBound {..}
-    writeVarState ref $ Bound bound
+    var <- lift $ newVar'' bound
+    writeVarState ref $ Link var
     unbound.substSusp (var, Just bound)
 
 defaultGVar
@@ -1087,13 +1088,14 @@ defaultGVar = defaultGVar' . unGVar
 defaultGVar'
   :: (MonadRef m, MonadSupply Int m, Defaultable a m)
   => Var m a -> a -> VerseT m ()
-defaultGVar' var@(Var ref) binding = readVarState ref >>= \ case
+defaultGVar' (Var ref) binding = readVarState ref >>= \ case
   Link var -> defaultGVar' var binding
   Bound bound -> defaultVars bound.binding
   Unbound unbound -> do
     label <- supply
     let bound = MkBound {..}
-    writeVarStateG ref $ Bound bound
+    var <- lift $ newVar'' bound
+    writeVarStateG ref $ Link var
     unbound.substSusp (var, Just bound)
 
 instance Monad m => Defaultable () m where
@@ -1199,7 +1201,10 @@ newVerifyVar binding = do
 newVar' :: (MonadRef m, MonadSupply Int m) => a -> m (Var m a)
 newVar' binding = do
   label <- supply
-  Var <$> newHRef' (Bound MkBound {..}) Nothing
+  newVar'' MkBound {..}
+
+newVar'' :: MonadRef m => Bound a -> m (Var m a)
+newVar'' bound = Var <$> newHRef' (Bound bound) Nothing
 
 readVar :: MonadRef m => Var m a -> VerseT m a
 readVar = fmap ((.binding) . snd) . readBound

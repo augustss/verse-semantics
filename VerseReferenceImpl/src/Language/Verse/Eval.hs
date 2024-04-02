@@ -781,7 +781,7 @@ invoke' loc var1 var2 s s' = lift (readVar' var1) >>= \ case
   Val.Intrinsic x tail ->
     invokeIntrinsic loc x tail var2 s s'
   Val.Type sign xs -> asks (.sign) <&> (== sign) >>= \ case
-    True -> invokeNegList xs var2 s s'
+    True -> invokeNegList loc xs var2 s s'
     False -> invokePosList loc xs var2 s s'
   Val.AnyOLam -> wrong $ UnknownInvokeError loc
   _ -> wrong $ InvokeError loc
@@ -1396,13 +1396,14 @@ liftPrim f var s s' = f var <&> \ (DomMatch x f) ->
 
 invokeNegList
   :: MonadEval m
-  => VarList m
+  => Loc
+  -> VarList m
   -> VarVal m
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeNegList xs var s s' = do
-  unifyG' xs <=< lift $ newGVar' . Val.Cons var =<< freshGVar'
+invokeNegList loc xs var s s' = do
+  unifyG' loc xs <=< lift $ newGVar' . Val.Cons var =<< freshGVar'
   lift $ unifyS s s'
   pure var
 
@@ -1869,28 +1870,32 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   _ -> empty
 
 unifyG'
-  :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => VarList m
+  :: MonadEval m
+  => Loc
+  -> VarList m
   -> VarList m
   -> EvalT m ()
-unifyG' x y = do
+unifyG' loc x y = do
   r <- ask
   lift $ unifyG
-    (\ x y -> runReaderT (matchG x y) r <&> \ m -> runReaderT m r)
+    (\ x y -> runReaderT (matchG loc x y) r <&> \ m -> runReaderT m r)
     (coerce x)
     (coerce y)
 
 matchG
-  :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => List (VarVal m) (VarList m)
+  :: MonadEval m
+  => Loc
+  -> List (VarVal m) (VarList m)
   -> List (VarVal m) (VarList m)
   -> EvalT m (EvalT m ())
-matchG = curry $ \ case
+matchG loc = curry $ \ case
   (Val.Nil, Val.Nil) -> pure $ pure ()
-  (Val.Cons x xs, Val.Cons y ys) -> pure $ do
-    zs <- lift freshGVar'
-    unifyG' xs <=< lift . newGVar' $ Val.Cons y zs
-    unifyG' ys <=< lift . newGVar' $ Val.Cons x zs
+  (Val.Cons x xs, Val.Cons y ys) -> pure $
+    if'' (unify' loc x y) (const $ unifyG' loc xs ys)
+    do
+      zs <- lift freshGVar'
+      unifyG' loc xs <=< lift . newGVar' $ Val.Cons y zs
+      unifyG' loc ys <=< lift . newGVar' $ Val.Cons x zs
   _ -> empty
 
 unifyMaybe
