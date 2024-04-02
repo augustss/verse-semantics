@@ -559,20 +559,17 @@ $$
 \begin{array}{@@{}l}
 \mbox{\bf Syntax} \\
 \multicolumn{1}{c}{\begin{array}{rcll}
-  |si| & ::= &  |solve|  \vb |infer| \vb |solvex|
-        & \text{``solve'' and ``infer'' respectively; controls |DAe (inp f si) x| .}\\
+  |si| & ::= &  |sipat x|  \vb |sibody| \\
   |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\
-  |inpw| & ::= & |x|^{|si|}_{|md|} & \text{If $|x|$ is a unification variable then $|si|=|solve|$} \\[1mm]
-
-%  |flipsi infer| & = & |solve| \\
-%  |flipsi solve| & = & |infer| \\
 \end{array}} \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DAe (inp f si) x| = |e|, |havoc fx|$}} \\[0.02in]
-\rulename{dinit}   & |De2 md t | & = & |def x (DMe (inp2 x solve md) t)| \\[1mm]
-\rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| & \text{NB: no case for |si = solvex|}\\
-\rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[1mm]
+                   & |siupd (sipat x) y| & = & |sipat y| \\
+                   & |siupd sibody y| & = & |sibody| \\
+\rulename{dinit}   & |De2 md t | & = & |DMe2 md sibody t| \\[1mm]
+\rulename{dbody1}   & |DB md j sibody t| & = & |DMe2 md sibody t|\\
+\rulename{dbody2}   & |DB md j (sipat f) t| & = & |z := apply1N f j; DMe2 md (sipat z) t|\\
 % \rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
 \rulename{havoc-succ}     & |havoc succeeds|  & = & |tup ()| \\
 \rulename{havoc-fail}     & |havoc fails|  & = & |fail| \\
@@ -583,16 +580,14 @@ $$
 \multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
 
 \multicolumn{4}{l}{\mbox{\it Closed functions}} \\
-\rulename{mcfun+} &  |DMe (inp2 f si mdpos) (functionOCX closed t_1 fx t_2)|
-& = & \multicolumn{2}{@@{}l}{|verify2 i ()(j := (Me (inp2 i solve mdneg) t_1);
-                                            check fx (z := DAe (inp f si) j; Me (inp2 z si mdpos) t_2)) guard |} \\
-& &   & |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)| \\[1mm]
-\rulename{mcfun-} &  |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)|
-& = & |lam i ((j := Me (inp2 i infer mdpos) t_1) guard
-                    (havoc fx; z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2))| \\[1mm]
-\rulename{mcfunx}& |DMe (inp2 f si mdx) (functionOCX closed t_1 fx t_2)|
-& = & |lam i (j := Me (inp2 i infer mdx) t_1;
-              z :=  DAe (inp f si) j; rcheck fx (Me (inp2 z si mdx) t_2))| \\[2mm]
+ \rulename{mcfun+} &  |DMe2 mdpos si (functionOCX closed t_1 fx t_2)|
+ & = & \multicolumn{2}{@@{}l}{|verify2 i () (j := (DMe2 mdneg (sipat i) t_1); check fx (DB mdpos j si t_2) )|} \\
+    &&& |guard (DMe2 mdneg si (functionOCX closed t_1 fx t_2))| \\[1mm]
+\rulename{mcfun-} &  |DMe2 mdneg si (functionOCX closed t_1 fx t_2)|
+& = & |lam i ((j := DMe2 mdpos (sipat i) t_1 guard
+                    (havoc fx; DB mdneg si j t_2)))| \\[1mm]
+\rulename{mcfunx}& |DMe2 mdx si (functionOCX closed t_1 fx t_2)|
+& = & |lam i (j := DMe2 mdx (sipat i) t_1; check fx (DB mdx si j t_2))| \\[2mm]
 \end{array}
 \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
@@ -610,8 +605,8 @@ $$
   & = & |y:=DMe (inp2 f si mdx) t_1; z := De2 mdx t_2; apply1N z y| \\
 \rulename{mtype1}   & |DMe (inp2 i solve md) (:t)|           & = & |z:=De2 md t; Hide z| \\
 \rulename{mtype2}   & |DMe (inp2 i infer md) (:t)|           & = & |(De2 md t)^[i]| \\
-\rulename{msquig} & |DMe (inp2 z si md) (y squiggt x := t)| & = &
-\multicolumn{2}{@@{}l}{|y := z; DMe (inp2 z sip md) (x := t)|
+\rulename{msquigp} & |DMe2 md sibody (y squiggt x := t)| & = &
+\multicolumn{2}{@@{}l}{|def x (y := DMe2 md (sipat x) t(inp2 z sip md) (x := t)|
 \hspace{3mm} \text{where |sip| = |solvex| if |si=solve|, or |si| otherwise}}\\
 \rulename{marray} & |DMe (inp2 x si md) (arr(t_1, xdots, t_n))| & = &
     |def (x1 xdots xn) (x == arr (x1, xdots, xn));
@@ -636,7 +631,7 @@ $$
 \rulename{mapp}    & |DMe (inp2 x si md) (t_1^[t_2])|         & = & |x = (De2 md t_1)^[De2 md t_2]|
 \end{array}
 \end{array}$$
-\caption{{\bf DS9}: Small Source to Big Core } \label{fig:ds9}
+\caption{{\bf DS10}: Small Source to Big Core } \label{fig:ds10}
 \end{figure}
 
 
@@ -993,7 +988,7 @@ $\begin{array}{@@{}l}
      && \movesto & |verifyKW|
            \begin{array}[t]{@@{}l}
              |(rs, r, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
-             |P^[ r_1==v_1; xdots; r_n == v_n ] };|
+             |{ P^[ r_1==v_1; xdots; r_n == v_n ] };|
            \end{array}\\
     &&& |verify2 (rs,r) (as, not (r==tup (_, xdots,_))) (P^[ fail ])| \\  \\[-2mm]
 %  \rulename{split-val} & |verify2 (rs,r) as (P^[r==v])| & \movesto &
@@ -1036,6 +1031,7 @@ Out-dated rules:
 \item DS6: \Cref{fig:ds6}
 \item DS7: \Cref{fig:ds7}
 \item DS8: \Cref{fig:ds8}
+\item DS9: \Cref{fig:ds9}
 \end{itemize}
 
 \begin{figure}
@@ -1541,6 +1537,91 @@ $$
 \end{array}
 \end{array}$$
 \caption{{\bf DS8}: Small Source to Big Core } \label{fig:ds8}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\mbox{\bf Syntax} \\
+\multicolumn{1}{c}{\begin{array}{rcll}
+  |si| & ::= &  |solve|  \vb |infer| \vb |solvex|
+        & \text{``solve'' and ``infer'' respectively; controls |DAe (inp f si) x| .}\\
+  |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\
+  |inpw| & ::= & |x|^{|si|}_{|md|} & \text{If $|x|$ is a unification variable then $|si|=|solve|$} \\[1mm]
+
+%  |flipsi infer| & = & |solve| \\
+%  |flipsi solve| & = & |infer| \\
+\end{array}} \\
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DAe (inp f si) x| = |e|, |havoc fx|$}} \\[0.02in]
+\rulename{dinit}   & |De2 md t | & = & |def x (DMe (inp2 x solve md) t)| \\[1mm]
+\rulename{dbody1}   & |DAe (inp f solve) x| & = & |def z z| & \text{NB: no case for |si = solvex|}\\
+\rulename{dbody2}   & |DAe (inp f infer) x| & = & |f^[x]| \\[1mm]
+% \rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
+\rulename{havoc-succ}     & |havoc succeeds|  & = & |tup ()| \\
+\rulename{havoc-fail}     & |havoc fails|  & = & |fail| \\
+\rulename{havoc-dec}     & |havoc decides|  & = & |some (lam x (x == tup()))| \\[1mm]
+\end{array} \\
+
+\begin{array}{lr@@{\;}c@@{\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
+
+\multicolumn{4}{l}{\mbox{\it Closed functions}} \\
+\rulename{mcfun+} &  |DMe (inp2 f si mdpos) (functionOCX closed t_1 fx t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify2 i ()(j := (Me (inp2 i solve mdneg) t_1);
+                                            check fx (z := DAe (inp f si) j; Me (inp2 z si mdpos) t_2)) guard |} \\
+& &   & |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)| \\[1mm]
+\rulename{mcfun-} &  |DMe (inp2 f si mdneg) (functionOCX closed t_1 fx t_2)|
+& = & |lam i ((j := Me (inp2 i infer mdpos) t_1) guard
+                    (havoc fx; z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2))| \\[1mm]
+\rulename{mcfunx}& |DMe (inp2 f si mdx) (functionOCX closed t_1 fx t_2)|
+& = & |lam i (j := Me (inp2 i infer mdx) t_1;
+              z :=  DAe (inp f si) j; rcheck fx (Me (inp2 z si mdx) t_2))| \\[2mm]
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Type rules}} \\
+%\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
+%         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
+%         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
+
+\rulename{moftype+} & |DMe (inp2 f si mdpos) (oftype t_1 t_2)|
+& = & |y := DMe (inp2 f si mdpos) t_1; z := De2 mdpos t_2;| \\
+  &&& |check succeeds (apply1N z y) guard (some z)| \\
+\rulename{moftype-} & |DMe (inp2 f si mdneg) (oftype t_1 t_2)|
+  & = & |z := De2 mdneg t_2; Hide z| \\
+\rulename{moftypex} & |DMe (inp2 f si mdx) (oftype t_1 t_2)|
+  & = & |y:=DMe (inp2 f si mdx) t_1; z := De2 mdx t_2; apply1N z y| \\
+\rulename{mtype1}   & |DMe (inp2 i solve md) (:t)|           & = & |z:=De2 md t; Hide z| \\
+\rulename{mtype2}   & |DMe (inp2 i infer md) (:t)|           & = & |(De2 md t)^[i]| \\
+\rulename{msquig} & |DMe (inp2 z si md) (y squiggt x := t)| & = &
+\multicolumn{2}{@@{}l}{|y := z; DMe (inp2 z sip md) (x := t)|
+\hspace{3mm} \text{where |sip| = |solvex| if |si=solve|, or |si| otherwise}}\\
+\rulename{marray} & |DMe (inp2 x si md) (arr(t_1, xdots, t_n))| & = &
+    |def (x1 xdots xn) (x == arr (x1, xdots, xn));
+     arr (DMe (inp2 x1 si md) t_1, xdots, DMe (inp2 xn si md) t_n)|
+    \\[2mm]
+
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
+\rulename{mbind}   & |DMe inpw (x:=t)|         & = & |x := DMe inpw t| \\
+\rulename{meq}     & |DMe inpw (t_1=t_2)|      & = & |(DMe inpw t_1) = (DMe inpw t_2)| \\
+\rulename{msemi}   & |DMe inpw (t_1 ; t_2)|    & = & |De t_1 ; DMe inpw t_2| \\
+\rulename{mcheck}   & |DMe inpw (check fx t)|    & = & |check fx (DMe inpw t)| \\
+\rulename{mchoice} & |DMe inpw ((t_1 `choice` t_2))| & = & |(DMe inpw t_1) `choice` (DMe inpw t_2)| \\
+\multicolumn{2}{l}{\rulename{mif}\hspace{3mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
+    \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe inpw t_2 else DMe inpw t_3|} \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
+\rulename{mconst}  & |DMe (inp2 x si md) k|                  & = & |x = k| \\
+\rulename{mvar}    & |DMe (inp2 x si md) y|                  & = & |x = y| \\
+\rulename{mapp}    & |DMe (inp2 x si md) (t_1^[t_2])|         & = & |x = (De2 md t_1)^[De2 md t_2]|
+\end{array}
+\end{array}$$
+\caption{{\bf DS9}: Small Source to Big Core } \label{fig:ds9}
 \end{figure}
 
 \section{Out-dated core syntax and rewrite rules}
