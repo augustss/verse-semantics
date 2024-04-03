@@ -1369,13 +1369,13 @@ writeVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   modifyRef' ref (insertLocalHeap heaps.heap x)
   let
     fk' heaps@Heaps {..} ak = do
-      x <- findVarState heap <$> readRef ref
+      x <- findLocalHeap heap <$> readRef ref
       modifyRef' ref (insertLocalHeap heap y)
       fk heaps $ \ heaps@Heaps {..} -> do
         modifyRef' ref $ insertLocalHeap heap x
         ak heaps
     ek' heaps@Heaps {..} ak = do
-      x <- findVarState heap <$> readRef ref
+      x <- findLocalHeap heap <$> readRef ref
       modifyRef' ref $ insertLocalHeap heap y
       ek heaps $ \ heaps@Heaps {..} -> do
         modifyRef' ref $ insertLocalHeap heap x
@@ -1525,7 +1525,7 @@ writeVarStateG (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   modifyRef' ref (insertLocalHeap heaps.heap x)
   let
     ek' heaps@Heaps {..} ak = do
-      x <- findVarState heap <$> readRef ref
+      x <- findLocalHeap heap <$> readRef ref
       modifyRef' ref $ insertLocalHeap heap y
       ek heaps $ \ heaps@Heaps {..} -> do
         modifyRef' ref $ insertLocalHeap heap x
