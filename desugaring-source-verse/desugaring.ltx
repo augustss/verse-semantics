@@ -596,39 +596,42 @@ $$
 %         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
 %         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
 
-\rulename{moftype+} & |DMe (inp2 f si mdpos) (oftype t_1 t_2)|
-& = & |y := DMe (inp2 f si mdpos) t_1; z := De2 mdpos t_2;| \\
+\rulename{moftype+} & |DMe2 mdpos si (oftype t_1 t_2)|
+& = & |y := DMe2 mdpos si t_1; z := De2 mdpos t_2;| \\
   &&& |check succeeds (apply1N z y) guard (some z)| \\
-\rulename{moftype-} & |DMe (inp2 f si mdneg) (oftype t_1 t_2)|
+\rulename{moftype-} & |DMe2 mdneg si (oftype t_1 t_2)|
   & = & |z := De2 mdneg t_2; Hide z| \\
-\rulename{moftypex} & |DMe (inp2 f si mdx) (oftype t_1 t_2)|
-  & = & |y:=DMe (inp2 f si mdx) t_1; z := De2 mdx t_2; apply1N z y| \\
-\rulename{mtype1}   & |DMe (inp2 i solve md) (:t)|           & = & |z:=De2 md t; Hide z| \\
-\rulename{mtype2}   & |DMe (inp2 i infer md) (:t)|           & = & |(De2 md t)^[i]| \\
-\rulename{msquigp} & |DMe2 md sibody (y squiggt x := t)| & = &
-\multicolumn{2}{@@{}l}{|def x (y := DMe2 md (sipat x) t(inp2 z sip md) (x := t)|
-\hspace{3mm} \text{where |sip| = |solvex| if |si=solve|, or |si| otherwise}}\\
-\rulename{marray} & |DMe (inp2 x si md) (arr(t_1, xdots, t_n))| & = &
-    |def (x1 xdots xn) (x == arr (x1, xdots, xn));
-     arr (DMe (inp2 x1 si md) t_1, xdots, DMe (inp2 xn si md) t_n)|
+\rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|
+  & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
+\rulename{mtype1}   & |DMe2 md sibody (:t)|    & = & |z:=De2 md t; Hide z| \\
+\rulename{mtype2}   & |DMe2 md (sipat i) (:t)| & = & |z:=De2 md t; apply1N z i| \\
+\rulename{msquige} & |DMe2 md sibody (y squiggt x := t)|
+     & = & |def x (y := DMe2 md (sipat x) t)| \\
+\rulename{msquigp} & |DMe2 md (sipat i) (y squiggt x := t)|
+     & = & |def x (x == i; y := DMe2 md (sipat i) t)| \\
+\rulename{marraye} & |DMe2 md sibody (arr(t_1, xdots, t_n))| & = &
+    |arr (DMe2 md sibody t_1, xdots, DMe2 md sibody t_n)| \\
+\rulename{marrayp} & |DMe2 md (sipat i) (arr(t_1, xdots, t_n))| & = &
+    |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n));
+     arr (DMe2 md (sipat x_1) t_1, xdots, DMe2 md (sipat x_n) t_n)|
     \\[2mm]
 
 \end{array}
 \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
-\rulename{mbind}   & |DMe inpw (x:=t)|         & = & |x := DMe inpw t| \\
-\rulename{meq}     & |DMe inpw (t_1=t_2)|      & = & |(DMe inpw t_1) = (DMe inpw t_2)| \\
-\rulename{msemi}   & |DMe inpw (t_1 ; t_2)|    & = & |De t_1 ; DMe inpw t_2| \\
-\rulename{mcheck}   & |DMe inpw (check fx t)|    & = & |check fx (DMe inpw t)| \\
-\rulename{mchoice} & |DMe inpw ((t_1 `choice` t_2))| & = & |(DMe inpw t_1) `choice` (DMe inpw t_2)| \\
-\multicolumn{2}{l}{\rulename{mif}\hspace{3mm} |DMe inpw (if(t_1) then t_2 else t_3)|} & = &
-    \multicolumn{2}{@@{}l}{|if ((De t_1)) then DMe inpw t_2 else DMe inpw t_3|} \\[2mm]
+\rulename{mbind}   & |DMe2 md si (x:=t)|         & = & |x := DMe2 md si t| \\
+\rulename{meq}     & |DMe2 md si (t_1=t_2)|      & = & |(DMe2 md si t_1) = (DMe2 md si t_2)| \\
+\rulename{msemi}   & |DMe2 md si (t_1 ; t_2)|    & = & |De2 md t_1 ; DMe2 md si t_2| \\
+\rulename{mcheck}  & |DMe2 md si (check fx t)|    & = & |check fx (DMe2 md si t)| \\
+\rulename{mchoice} & |DMe2 md si (t_1 `choice` t_2)| & = & |(DMe2 md si t_1) `choice` (DMe2 md si t_2)| \\
 
 \multicolumn{4}{l}{\mbox{\it Equality rules}} \\
-\rulename{mconst}  & |DMe (inp2 x si md) k|                  & = & |x = k| \\
-\rulename{mvar}    & |DMe (inp2 x si md) y|                  & = & |x = y| \\
-\rulename{mapp}    & |DMe (inp2 x si md) (t_1^[t_2])|         & = & |x = (De2 md t_1)^[De2 md t_2]|
+\rulename{mconst}  & |DMe2 md sibody k|                  & = & |k| \\
+\rulename{mvar}    & |DMe2 md sibody y|                  & = & |y| \\
+\rulename{mapp}    & |DMe2 md sibody (apply1N t_1 t_2)|  & = & |(De2 md t_1)^[De2 md t_2]| \\
+\rulename{meq}     & |DMe2 md (sipat i) t| & = & |i = DMe2 md sibody t|
+    & \text{|t| is |k|, |y| or |apply1N t_1 t_2|}
 \end{array}
 \end{array}$$
 \caption{{\bf DS10}: Small Source to Big Core } \label{fig:ds10}

@@ -690,7 +690,7 @@
 %format havocKW = "\mathcal K"
 %format havoc (fx) = "{\mathcal K}\langle{}" fx "\rangle{}"
 %format someKW = "{\bf some}"
-%format some (v) =  "{\bf some}(" v ")"
+%format (some (v)) =  "{\bf some}(" v ")"
 
 %format allKW = "\textbf{all}"
 %format all (x) = "\textbf{all}\{" x "\}"
