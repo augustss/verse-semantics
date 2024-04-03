@@ -1525,8 +1525,11 @@ writeVarStateG (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   modifyRef' ref (insertLocalHeap heaps.heap x)
   let
     ek' heaps@Heaps {..} ak = do
+      x <- findVarState heap <$> readRef ref
       modifyRef' ref $ insertLocalHeap heap y
-      ek heaps ak
+      ek heaps $ \ heaps@Heaps {..} -> do
+        modifyRef' ref $ insertLocalHeap heap x
+        ak heaps
   sk heaps s () fk ek' ak
 
 data VerseRef m a = VerseRef
@@ -1581,8 +1584,11 @@ writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   modifyRef' ref $ insertLocalHeap heaps.heap x
   let
     ek' heaps@Heaps {..} ak = do
+      x <- findLocalHeap heaps.heap <$> readRef ref
       modifyRef' ref $ alterLocalHeap heap y
-      ek heaps ak
+      ek heaps $ \ heaps@Heaps {..} -> do
+        modifyRef' ref $ insertLocalHeap heap x
+        ak heaps
   sk heaps s () fk ek' ak
 
 commitStore :: MonadRef m => Store m -> Heap -> VerseT m ()
