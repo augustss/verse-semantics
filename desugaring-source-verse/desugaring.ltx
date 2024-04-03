@@ -93,7 +93,7 @@ $$
 \text{\bf Constants} &
  |k| & ::= & |i| \vb |r| \vb |pa| \vb |s| \vb |c| & \text{integer, rational, path, string, character}
 \\[2mm]
-\text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |p_1 squiggt p_2| \\
+\text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |squig p_1 p_2| \\
 &     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
 & |xsl| & ::= & x \vb  |xsl amp x|
 \\[2mm]
@@ -121,7 +121,7 @@ $$
       & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
       & \vb & |t_1 = t_2|                 & \text{Unification} \\
       & \vb & |x := t|                    & \text{Definition} \\
-      & \vb & |x squiggt y := t|          & \text{Definition} \\
+      & \vb & |squi x y := t|          & \text{Definition} \\
       & \vb & |:t|                        & \text{Range} \\
       & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
       & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
@@ -152,10 +152,10 @@ $$
 \rulename{dscolonb} &  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
 \rulename{dspapp} &   |p a := t| & \rightarrow & |p := function a t| \\
   %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
-\rulename{dspfun1} &  |(p_1 squiggt p_2) := t| & \rightarrow
-    & |p_1 := (x_1:any); (x_1 squiggt p_2) := t| & \text{|p_1| not a variable} \\
-\rulename{dspfun2} &  |(p_1 squiggt p_2) := t| & \rightarrow
-    & |p_2 := (x_2:any); (p_1 squiggt x_2) := t| & \text{|p_2| not a variable} \\
+\rulename{dspfun1} &  |(squig p_1 p_2) := t| & \rightarrow
+    & |p_1 := (x_1:any); (squig x_1 p_2) := t| & \text{|p_1| not a variable} \\
+\rulename{dspfun2} &  |(squig p_1 p_2) := t| & \rightarrow
+    & |p_2 := (x_2:any); (squig p_1 x_2) := t| & \text{|p_2| not a variable} \\
 % \begin{array}[t]{@@{}l@@{}}
 %    |p_1 := (x_1:any); p_2 := (x_2:any);| \\
 %    |(x_1 squiggt x_2) := t|
@@ -184,7 +184,7 @@ $$
 \rulename{dstuple} &  |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
 \\
 \multicolumn{5}{l}{\textbf{Map notation}} \\
-\rulename{dsmap}  &  |amap (t_1, xdots, t_n)| & \rightarrow & \multicolumn{2}{l}{|mkMap^(for(f : ar (t_1; xdots; t_n); i squiggt a : f){(i,a)})|} \\
+\rulename{dsmap}  &  |amap (t_1, xdots, t_n)| & \rightarrow & \multicolumn{2}{l}{|mkMap^(for(f : ar (t_1; xdots; t_n); squig i a : f){(i,a)})|} \\
                   &                           &             & & \text{fresh |f|,|i|,|a|}
 \\
 \multicolumn{5}{l}{\textbf{Function notation}} \\
@@ -327,7 +327,7 @@ For example:
 
 Source Verse has bindings |p := t|, where |p| is a \emph{pattern}.
 These patterns are completely removed by the source-to-source rewrites in \Cref{fig:sv-to-sv-1},
-yielding Small Source Verse bindings of the form |x := t|, or |x squiggt y := t| where |x|,|y| are variables.
+yielding Small Source Verse bindings of the form |x := t|, or |squig x y := t| where |x|,|y| are variables.
 
 Source Verse also has the term |p:t|, which immediately rewrites to |p := (:t)|.
 
@@ -437,8 +437,8 @@ $$
 Just like with arrays, maps can be used in a |for| to iterate over all elements.
 $$
 \begin{array}{ll}
-|m:=amap(1 `choice` 2=>11; 3=>33); for(k squiggt v:m){k}| & \text{computes the keys |1,2,3|} \\
-|m:=amap(1 `choice` 2=>11; 3=>33); for(k squiggt v:m){v}| & \text{computes the values |11,11,33|} \\
+|m:=amap(1 `choice` 2=>11; 3=>33); for(squig k v:m){k}| & \text{computes the keys |1,2,3|} \\
+|m:=amap(1 `choice` 2=>11; 3=>33); for(squig k v:m){v}| & \text{computes the values |11,11,33|} \\
 \end{array} \\
 $$
 
@@ -564,12 +564,10 @@ $$
 \end{array}} \\
 
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DAe (inp f si) x| = |e|, |havoc fx|$}} \\[0.02in]
-                   & |siupd (sipat x) y| & = & |sipat y| \\
-                   & |siupd sibody y| & = & |sibody| \\
+\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DB md j si t| = |e|, |havoc fx = e|$}} \\[0.02in]
 \rulename{dinit}   & |De2 md t | & = & |DMe2 md sibody t| \\[1mm]
 \rulename{dbody1}   & |DB md j sibody t| & = & |DMe2 md sibody t|\\
-\rulename{dbody2}   & |DB md j (sipat f) t| & = & |z := apply1N f j; DMe2 md (sipat z) t|\\
+\rulename{dbody2}   & |DB md j (sipat f) t| & = & |z := apply1N f j; DMe2 md (sipat z) t|\\[1mm]
 % \rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
 \rulename{havoc-succ}     & |havoc succeeds|  & = & |tup ()| \\
 \rulename{havoc-fail}     & |havoc fails|  & = & |fail| \\
@@ -577,25 +575,21 @@ $$
 \end{array} \\
 
 \begin{array}{lr@@{\;}c@@{\;}ll}
-\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe inpw t| = |e|$}} \\[0.02in]
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe2 md si t| = |e|$}} \\[0.02in]
 
 \multicolumn{4}{l}{\mbox{\it Closed functions}} \\
  \rulename{mcfun+} &  |DMe2 mdpos si (functionOCX closed t_1 fx t_2)|
- & = & \multicolumn{2}{@@{}l}{|verify2 i () (j := (DMe2 mdneg (sipat i) t_1); check fx (DB mdpos j si t_2) )|} \\
+ & = & \multicolumn{2}{@@{}l}{|verify2 () () (j := DMe2 mdneg sibody t_1; check fx (DB mdpos j si t_2) )|} \\
     &&& |guard (DMe2 mdneg si (functionOCX closed t_1 fx t_2))| \\[1mm]
 \rulename{mcfun-} &  |DMe2 mdneg si (functionOCX closed t_1 fx t_2)|
 & = & |lam i ((j := DMe2 mdpos (sipat i) t_1 guard
-                    (havoc fx; DB mdneg si j t_2)))| \\[1mm]
+                    (havoc fx; DB mdneg j si t_2)))| \\[1mm]
 \rulename{mcfunx}& |DMe2 mdx si (functionOCX closed t_1 fx t_2)|
-& = & |lam i (j := DMe2 mdx (sipat i) t_1; check fx (DB mdx si j t_2))| \\[2mm]
+& = & |lam i (j := DMe2 mdx (sipat i) t_1; check fx (DB mdx j si t_2))| \\[2mm]
 \end{array}
 \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-%\rulename{moftype} & |DMe inpw (oftype t_1 t_2)|
-%         & = & \multicolumn{2}{@@{}l}{|y:=DMe inpw t_1; verify (assert ((De t_2)^[y]));| \hspace{5mm} \text{|y| fresh}} \\
-%         &&& |forall r (assume (r = (De (:t_2))); r)|  \\[2mm]
-
 \rulename{moftype+} & |DMe2 mdpos si (oftype t_1 t_2)|
 & = & |y := DMe2 mdpos si t_1; z := De2 mdpos t_2;| \\
   &&& |check succeeds (apply1N z y) guard (some z)| \\
@@ -603,17 +597,18 @@ $$
   & = & |z := De2 mdneg t_2; Hide z| \\
 \rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|
   & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
-\rulename{mtype1}   & |DMe2 md sibody (:t)|    & = & |z:=De2 md t; Hide z| \\
-\rulename{mtype2}   & |DMe2 md (sipat i) (:t)| & = & |z:=De2 md t; apply1N z i| \\
-\rulename{msquige} & |DMe2 md sibody (y squiggt x := t)|
-     & = & |def x (y := DMe2 md (sipat x) t)| \\
-\rulename{msquigp} & |DMe2 md (sipat i) (y squiggt x := t)|
-     & = & |def x (x == i; y := DMe2 md (sipat i) t)| \\
+\rulename{mtype1}   & |DMe2 mdneg sibody (:t)|    & = & |z:=De2 mdneg t; Hide z| \\
+\rulename{mtype2}   & |DMe2 md sibody (:t)|    & = & |def i (DMe2 md (sipat i) (:t); i| & |md| \in \{|mdpos|, |mdx|\}\\
+\rulename{mtype3}   & |DMe2 md (sipat i) (:t)| & = & |z:=De2 md t; apply1N z i| \\
+\rulename{msquige} & |DMe2 md sibody (squig x y := t)|
+     & = & |def i (DMe2 md (sipat i) (squig x y := t))| \\
+\rulename{msquigp} & |DMe2 md (sipat i) (squig x y := t)|
+     & = & |x := i; y := DMe2 md (sipat i) t| \\
 \rulename{marraye} & |DMe2 md sibody (arr(t_1, xdots, t_n))| & = &
     |arr (DMe2 md sibody t_1, xdots, DMe2 md sibody t_n)| \\
 \rulename{marrayp} & |DMe2 md (sipat i) (arr(t_1, xdots, t_n))| & = &
-    |def (x_1 xdots x_n) (x == arr (x_1, xdots, x_n));
-     arr (DMe2 md (sipat x_1) t_1, xdots, DMe2 md (sipat x_n) t_n)|
+    \multicolumn{2}{@@{}l}{|def (i_1 xdots i_n) (i == arr (i_1, xdots, i_n));
+     arr (DMe2 md (sipat i_1) t_1, xdots, DMe2 md (sipat i_n) t_n)|}
     \\[2mm]
 
 \end{array}
@@ -778,12 +773,12 @@ Here you can see \rulename{mtype} in action.
 \subsection{Desugaring functions for verification}
 \lennart{Stuff here.}
 
-\subsection{The pattern |y squiggt x|}
+\subsection{The pattern |squig y x|}
 
 What does the strange pattern |y squiggt x| do?  As you can see from rule \rulename{msquig}, it
 allows you access to the \emph{input} of the match as well as the \emph{output}.  So in
 $$
-|f( (y squiggt x) : abs ) := dots|
+|f( (squig y x) : abs ) := dots|
 $$
 in a call |f(-4)|, |x| gets bound to |4|, but |y| gets bound to the original input, |(-4)|.
 
@@ -803,13 +798,13 @@ to the elements of |a|; it is an implicit for-loop.
 We can use |for| to build a new array; thus |for(x:a){x+1}| returns an array the same size as |a| but
 with each element increased by 1.
 
-Now consider |(i squiggt x):a|.  That binds |i| and |x| successively to the \emph{index/value} pairs of |a|.
+Now consider |(squig i x):a|.  That binds |i| and |x| successively to the \emph{index/value} pairs of |a|.
 How does that happen?  Consider
 $$
 \begin{array}{ll}
-  |De ((i squiggt x) := :a)| \\
+  |De ((squig i x) := :a)| \\
   \rightarrow \{\rulename{dexpr}\} &
-    |def j (Me j ((i squiggt x) := :a))| \\
+    |def j (Me j ((squig i x) := :a))| \\
   \rightarrow \{\rulename{msquig}\} &
     |def j (x := (Me j (:a)); i := j| \\
   \rightarrow \{\rulename{mtype}\} &
@@ -820,7 +815,7 @@ $$
 $$
 Clever!  Incidentally, from \rulename{msquig} you can see that the form |x := t| is redundant
 in the syntax of Small Source Verse.
-We could just have |(y squiggt x) := t| with a fresh |y|.  But the for |x := t| is so
+We could just have |(squig y x) := t| with a fresh |y|.  But the for |x := t| is so
 ubiquitously useful that we include it in our syntax.
 
 \subsection{Open functions}
@@ -979,6 +974,7 @@ $\begin{array}{@@{}l}
 \multicolumn{5}{l}{\textit{Verify}} \\
 \rulename{smt} & |verify2 rs as e| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
   \rulename{verify-val} & |verify2 rs as v|      & \movesto & |tup ()| & \\
+  \rulename{verify-choice} & |verify2 rs as (v choice e)|      & \movesto & |verify2 rs as e| & \\
   \rulename{verify-fail} & |verify2 rs as fail|    & \movesto & |tup ()| & \\[1mm]
   \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
   & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\

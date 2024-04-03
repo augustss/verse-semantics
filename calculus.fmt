@@ -356,8 +356,9 @@
 %format X = "X"
 %format CX = "CX"
 %format eqgt = "\!=>\!\!"
-%% %format squiggt = "\!\leadsto\!"
-%format squiggt = "\!-\!\!>\!\!\!"
+%format squig (x) (y) = x "\!" squiggt "\!" y
+%format squiggt = "\leadsto"
+%% %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
 %format eff (x) = "\langle" x "\rangle"
 %format apeff g x = g "\langle" x "\rangle"
@@ -381,6 +382,12 @@
 %format h_2
 %format h_n
 %format h_i
+
+%format i_0
+%format i_1
+%format i_2
+%format i_3
+%format i_n
 
 %format y_0
 %format y_1
