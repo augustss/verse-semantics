@@ -154,8 +154,8 @@ incrSuspCount (Latch ref) = modifyHRef' ref $ \ LatchState {..} ->
 decrSuspCount :: MonadRef m => Latch m -> VerseT m ()
 decrSuspCount (Latch ref) = do
   LatchState {..} <- readHRef ref
-  when (suspCount == 1) susp
   writeHRef ref $! LatchState { suspCount = suspCount - 1, .. }
+  when (suspCount == 1) susp
 
 asksV :: (R m -> a) -> VerseT m a
 asksV f = VerseT $ \ _ r@R {..} s sk -> sk heaps s $ f r
@@ -1419,7 +1419,13 @@ freshGVar = GVar <$> freshVar
 freshDGVar
   :: (MonadRef m, MonadSupply Int m, Defaultable a m)
   => a -> VerseT m (GVar m a)
-freshDGVar = fmap GVar . freshDVar
+freshDGVar binding = do
+  label <- supply
+  level <- getLevel
+  let substSusp = const $ pure ()
+  var <- Var <$> newHRef (Unbound MkUnbound {..})
+  whenDefaulted $ defaultGVar' var binding
+  pure $ GVar var
 
 newGVar :: (MonadRef m, MonadSupply Int m) => a -> VerseT m (GVar m a)
 newGVar = fmap GVar . newVar
