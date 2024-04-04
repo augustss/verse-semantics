@@ -870,10 +870,15 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
       decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
       writeHRef ref_env Nothing
       susp =<< verify' m_a' heap latch last
-    FailS m_a -> do
-      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-      writeHRef ref_env Nothing
-      susp =<< verify' (m_e' <?> m_a <?> m_a') heap latch last
+    FailS m_a ->
+      let
+        m_a'' = (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <?> m_a'
+      in do
+        decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+        writeHRef ref_env Nothing
+        susp =<< verify' (m_e' <?> m_a'') heap latch last
     YieldS s@S {..} m_y m_f m_e m_a ->
       let
         init =
