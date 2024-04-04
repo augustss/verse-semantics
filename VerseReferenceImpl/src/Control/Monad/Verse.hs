@@ -913,6 +913,8 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
                     whenSuspended env.suspend
                     incrSuspCounts env.suspCounts) <?> m_a'
         init = (m_f'', m_e'', m_a'')
+        suspend resume = env.suspend resume *> s.suspend resume
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
         incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
         case guard (IntMap.null suspCounts) *> default' of
@@ -924,12 +926,12 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
           Nothing -> do
             suspCount <- readSuspCount' latch heap
             (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
-              True -> do
-                commit heap
-                susp =<< verify' (m_f'' <?> m_a'') heap latch last
               False -> do
                 writeHRef ref_env $ Just VerifyEnv {..}
                 s.suspend $ resumeVerify ref_env
+              True -> do
+                commit heap
+                susp =<< verify' (m_f'' <?> m_a'') heap latch last
 
 resumeVerifyS
   :: (MonadRef m, MonadSupply Int m)
