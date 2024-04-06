@@ -1135,33 +1135,43 @@ instance ( MonadFix m
   freshen var@(Var ref) = FreshenT $ do
     FreshenEnv {..} <- ask
     lift (readVarState'' ref heap) >>= \ case
-      Link var -> do
-        tell $ Any True
-        unFreshenT $ freshen var
-      Unbound unbound -> lift $ do
-        when (unbound.level == level) .
-          freshenHRef' ref heap $ Unbound MkUnbound
-            { label = unbound.label
-            , level = level - 1
-            , substSusp = unbound.substSusp
-            }
-        pure var
-      Bound bound -> fmap fst . mfix $ \ ~(var', _) ->
-        state' (lookupInsert bound.label (unsafeCoerce var', Any True)) >>= \ case
-          Just (unsafeCoerce -> var', changed) -> do
-            tell changed
-            pure (var', changed)
-          Nothing -> do
-            (binding, Any changed) <- listen . unFreshenT $ freshen bound.binding
-            if changed
-              then lift $ newVar' binding <&> (, Any True)
-              else do
-                modify' $ IntMap.insert bound.label (unsafeCoerce var, Any False)
-                pure (var, Any False)
+      Link var -> tell (Any True) *> unFreshenT (freshen var)
+      Bound bound -> unFreshenT $ freshenBound var bound
+      Unbound unbound -> unFreshenT (freshenUnbound ref unbound) $> var
 
-freshenHRef' :: MonadRef m => HRef m a -> Heap -> a -> m ()
-freshenHRef' (HRef ref) heap x =
-  modifyRef' ref $ insertLocalHeap heap.tail x . deleteLocalHeap' heap
+freshenBound
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
+  => Var m a
+  -> Bound a
+  -> FreshenT m (Var m a)
+freshenBound var bound = FreshenT . fmap fst . mfix $ \ ~(var', _) ->
+  state' (lookupInsert bound.label (unsafeCoerce var', Any True)) >>= \ case
+    Just (unsafeCoerce -> var', changed) -> do
+      tell changed
+      pure (var', changed)
+    Nothing -> do
+      (binding, Any changed) <- listen . unFreshenT $ freshen bound.binding
+      if changed
+        then lift $ newVar' binding <&> (, Any True)
+        else do
+          modify' $ IntMap.insert bound.label (unsafeCoerce var, Any False)
+          pure (var, Any False)
+
+freshenUnbound
+  :: MonadRef m
+  => HRef m (VarState m a)
+  -> Unbound m a
+  -> FreshenT m ()
+freshenUnbound (HRef ref) unbound = FreshenT $ do
+  FreshenEnv {..} <- ask
+  lift . when (unbound.level == level) $
+    let
+      unbound' = Unbound MkUnbound
+        { label = unbound.label
+        , level = level - 1
+        , substSusp = const $ pure ()
+        }
+    in modifyRef' ref $ insertLocalHeap heap.tail unbound' . deleteLocalHeap' heap
 
 instance ( MonadFix m
          , MonadRef m
