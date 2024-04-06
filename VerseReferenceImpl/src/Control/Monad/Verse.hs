@@ -1139,14 +1139,12 @@ instance ( MonadFix m
         tell $ Any True
         unFreshenT $ freshen var
       Unbound unbound -> lift $ do
-        when (unbound.level == level) $
-          let
-            state = Unbound MkUnbound
-              { label = unbound.label
-              , level = level - 1
-              , substSusp = const $ pure ()
-              }
-          in writeVarState' ref heap.tail state
+        when (unbound.level == level) .
+          freshenHRef' ref heap $ Unbound MkUnbound
+            { label = unbound.label
+            , level = level - 1
+            , substSusp = unbound.substSusp
+            }
         pure var
       Bound bound -> fmap fst . mfix $ \ ~(var', _) ->
         state' (lookupInsert bound.label (unsafeCoerce var', Any True)) >>= \ case
@@ -1160,6 +1158,10 @@ instance ( MonadFix m
               else do
                 modify' $ IntMap.insert bound.label (unsafeCoerce var, Any False)
                 pure (var, Any False)
+
+freshenHRef' :: MonadRef m => HRef m a -> Heap -> a -> m ()
+freshenHRef' (HRef ref) heap x =
+  modifyRef' ref $ insertLocalHeap heap.tail x . deleteLocalHeap' heap
 
 instance ( MonadFix m
          , MonadRef m
@@ -1411,14 +1413,6 @@ writeVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
       modifyRef' ref $ insertLocalHeap heap y
       ak heaps
   sk heaps s () fk' ek' ak'
-
-writeVarState'
-  :: MonadRef m
-  => HRef m (VarState m a)
-  -> Maybe Heap
-  -> VarState m a
-  -> m ()
-writeVarState' (HRef ref) heap = modifyRef' ref . insertLocalHeap heap
 
 writeVerifyVarState
   :: MonadRef m
@@ -1766,7 +1760,10 @@ insertLocalHeap' Heap {..} x xs = xs { just = IntMap.insert label x xs.just }
 deleteLocalHeap :: Maybe Heap -> HeapMap a -> HeapMap a
 deleteLocalHeap k xs = case k of
   Nothing -> xs { nothing = Nothing }
-  Just Heap {..} -> xs { just = IntMap.delete label xs.just }
+  Just k -> deleteLocalHeap' k xs
+
+deleteLocalHeap' :: Heap -> HeapMap a -> HeapMap a
+deleteLocalHeap' Heap {..} xs = xs { just = IntMap.delete label xs.just }
 
 state' :: MonadState s m => (s -> Either a s) -> m (Maybe a)
 state' f = state $ \ s -> case f s of
