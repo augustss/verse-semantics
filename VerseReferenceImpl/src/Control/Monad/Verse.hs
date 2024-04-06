@@ -59,6 +59,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import Control.Monad.Reader
 import Control.Monad.Ref
+import Control.Monad.RWS.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Supply
 import Control.Monad.Wrong
@@ -69,10 +70,11 @@ import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.HashMap.Strict (HashMap)
-import Data.IntMap.Lazy.Extras qualified as IntMap.Lazy
+import Data.IntMap.Lazy.Extras (lookupInsert)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntMap.Strict.Extras qualified as IntMap
+import Data.Monoid
 
 import GHC.Exts qualified
 
@@ -416,8 +418,8 @@ freshen' x heap = do
   lift $ runFreshenT (freshen x) FreshenEnv {..}
 
 newtype FreshenT m a = FreshenT
-  { unFreshenT :: ReaderT FreshenEnv (StateT (IntMap GHC.Exts.Any) m) a
-  } deriving (Functor, Applicative, Monad)
+  { unFreshenT :: RWST FreshenEnv Any (IntMap (GHC.Exts.Any, Any)) m a
+  } deriving (Functor, Applicative)
 
 data FreshenEnv = FreshenEnv
   { level :: {-# UNPACK #-} !Int
@@ -425,7 +427,7 @@ data FreshenEnv = FreshenEnv
   }
 
 runFreshenT :: Monad m => FreshenT m a -> FreshenEnv -> m a
-runFreshenT m r = evalStateT (runReaderT (unFreshenT m) r) mempty
+runFreshenT m r = fst <$> evalRWST (unFreshenT m) r mempty
 
 instance Monad m => Freshenable () m where
   freshen = pure
@@ -649,10 +651,15 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
       decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
       writeHRef ref_env Nothing
       susp =<< split' m_a' heap latch last
-    FailS m_a -> do
-      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-      writeHRef ref_env Nothing
-      susp =<< split' (m_e' <?> m_a <?> m_a') heap latch last
+    FailS m_a ->
+      let
+        m_a'' = (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <?> m_a'
+      in do
+        decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+        writeHRef ref_env Nothing
+        susp =<< split' (m_e' <?> m_a'') heap latch last
     YieldS s@S {..} m_y m_f m_e m_a ->
       let
         init =
@@ -1127,19 +1134,32 @@ instance ( MonadFix m
          ) => Freshenable (Var m a) m where
   freshen var@(Var ref) = FreshenT $ do
     FreshenEnv {..} <- ask
-    lift (lift $ readVarState'' ref heap) >>= \ case
-      Link var -> unFreshenT $ freshen var
-      Unbound unbound ->
-        if unbound.level < level then pure var else mfix $ \ var' ->
-          state' (IntMap.Lazy.lookupInsert unbound.label $ unsafeCoerce var') >>= \ case
-            Just (unsafeCoerce -> var') -> pure var'
-            Nothing -> lift . lift $ freshVar' (level - 1) heap.tail
-      Bound bound -> mfix $ \ var' ->
-        state' (IntMap.Lazy.lookupInsert bound.label $ unsafeCoerce var') >>= \ case
-          Just (unsafeCoerce -> var') -> pure var'
+    lift (readVarState'' ref heap) >>= \ case
+      Link var -> do
+        tell $ Any True
+        unFreshenT $ freshen var
+      Unbound unbound -> lift $ do
+        when (unbound.level == level) $
+          let
+            state = Unbound MkUnbound
+              { label = unbound.label
+              , level = level - 1
+              , substSusp = const $ pure ()
+              }
+          in writeVarState' ref heap.tail state
+        pure var
+      Bound bound -> fmap fst . mfix $ \ ~(var', _) ->
+        state' (lookupInsert bound.label (unsafeCoerce var', Any True)) >>= \ case
+          Just (unsafeCoerce -> var', changed) -> do
+            tell changed
+            pure (var', changed)
           Nothing -> do
-            binding <- unFreshenT (freshen bound.binding)
-            lift . lift $ newVar' binding
+            (binding, Any changed) <- listen . unFreshenT $ freshen bound.binding
+            if changed
+              then lift $ newVar' binding <&> (, Any True)
+              else do
+                modify' $ IntMap.insert bound.label (unsafeCoerce var, Any False)
+                pure (var, Any False)
 
 instance ( MonadFix m
          , MonadRef m
@@ -1151,7 +1171,7 @@ instance ( MonadFix m
       Link var -> unFreezeT $ freeze var
       Unbound _ -> pure Nothing
       Bound bound -> mfix $ \ binding ->
-        state' (IntMap.Lazy.lookupInsert bound.label $ unsafeCoerce binding) >>= \ case
+        state' (lookupInsert bound.label $ unsafeCoerce binding) >>= \ case
           Just (unsafeCoerce -> binding) -> pure binding
           Nothing -> Just <$> unFreezeT (freeze bound.binding)
 
@@ -1391,6 +1411,14 @@ writeVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
       modifyRef' ref $ insertLocalHeap heap y
       ak heaps
   sk heaps s () fk' ek' ak'
+
+writeVarState'
+  :: MonadRef m
+  => HRef m (VarState m a)
+  -> Maybe Heap
+  -> VarState m a
+  -> m ()
+writeVarState' (HRef ref) heap = modifyRef' ref . insertLocalHeap heap
 
 writeVerifyVarState
   :: MonadRef m
