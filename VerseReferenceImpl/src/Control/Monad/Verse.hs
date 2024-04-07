@@ -572,12 +572,19 @@ split'' m heap latch (m_f', m_e', m_a') last s =
   splitS m heap latch s >>= \ case
     AbortS -> split' m_a' heap latch last
     FailS m_a ->
-      pure Done
-      <?>
-      (do heap <- copyHeap heap
-          split' (m_e' <?> m_a <?> m_a') heap latch last)
+      let m_a'' = alt m_a m_f' m_e' <?> m_a'
+      in
+        pure Done
+        <?>
+        (do heap <- copyHeap heap
+            split' (m_e' <?> m_a'') heap latch last)
     YieldS s@S {..} m_y m_f m_e m_a ->
-      let init = (m_f <|> m_f', alt m_e m_f' m_e', m_a <?> m_a')
+      let
+        init =
+          ( m_f <|> m_f'
+          , alt m_e m_f' m_e'
+          , alt m_a m_f' m_e' <?> m_a'
+          )
       in case guard (IntMap.null suspCounts) *> default' of
         Nothing -> split'' m_y heap latch init last s
         Just m_d ->
@@ -587,7 +594,7 @@ split'' m heap latch (m_f', m_e', m_a') last s =
       let
         m_f'' = m_f <|> m_f'
         m_e'' = alt m_e m_f' m_e'
-        m_a'' = m_a <?> m_a'
+        m_a'' = alt m_a m_f' m_e' <?> m_a'
         init = (m_f'', m_e'', m_a'')
       in case guard (IntMap.null suspCounts) *> default' of
         Just m_d ->
@@ -653,9 +660,9 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
       susp =<< split' m_a' heap latch last
     FailS m_a ->
       let
-        m_a'' = (do m_a
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) <?> m_a'
+        m_a'' = alt (do m_a
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
       in do
         decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
         writeHRef ref_env Nothing
@@ -669,9 +676,9 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
           , alt (do m_e
                     whenSuspended env.suspend
                     incrSuspCounts env.suspCounts) m_f' m_e'
-          , (do m_a
-                whenSuspended env.suspend
-                incrSuspCounts env.suspCounts) <?> m_a'
+          , alt (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
           )
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
@@ -695,9 +702,9 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
         m_e'' = alt (do m_e
                         whenSuspended env.suspend
                         incrSuspCounts env.suspCounts) m_f' m_e'
-        m_a'' = (do m_a
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) <?> m_a'
+        m_a'' = alt (do m_a
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
         init = (m_f'', m_e'', m_a'')
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
@@ -821,7 +828,7 @@ verify'' m heap latch (m_f', m_e', m_a') last s =
       let
         m_f'' = m_f <|> m_f'
         m_e'' = alt m_e m_f' m_e'
-        m_a'' = m_a <?> m_a'
+        m_a'' = alt m_a m_f' m_e' <?> m_a'
         init = (m_f'', m_e'', m_a'')
       in case guard (IntMap.null suspCounts) *> default' of
         Just m_d ->
@@ -895,9 +902,9 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
           , alt (do m_e
                     whenSuspended env.suspend
                     incrSuspCounts env.suspCounts) m_f' m_e'
-          , (do m_a
-                whenSuspended env.suspend
-                incrSuspCounts env.suspCounts) <?> m_a'
+          , alt (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
           )
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
@@ -921,9 +928,9 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
         m_e'' = alt (do m_e
                         whenSuspended env.suspend
                         incrSuspCounts env.suspCounts) m_f' m_e'
-        m_a'' = (do m_a
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) <?> m_a'
+        m_a'' = alt (do m_a
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
         init = (m_f'', m_e'', m_a'')
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
