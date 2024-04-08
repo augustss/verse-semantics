@@ -108,7 +108,7 @@ $\begin{array}{@@{}l}
                             |(v == 1^^^ v_1) choice xdots choice (v == n^^^ v_n)| & n \geq 1 \\
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail|
 \end{array}
-\\ \\[-0.6em]
+\\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Unification}
   \rulename{u-lit}   & |k == k| & \movesto & |ok| & \\
@@ -118,7 +118,7 @@ $\begin{array}{@@{}l}
   \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
   \rulename{u-occurs} & |x==V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
 \end{array} \\
-\\[-0.6em]
+\\[-0.8em]
 
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Substitution}
@@ -128,9 +128,9 @@ $\begin{array}{@@{}l}
 \rulename{subst1} & |def x (S^[x==v])| & \movesto & |subst S x v ^[tup()]|
   & \text{$|x|\not\in\freevars{|v|}$} \\
 \rulename{subst-rec} & |z = V^[lam x e]| & \movesto & |z = V^[lam x (def z (z = V^[lam x e]; e))]|
-  & \text{$|f| \in |e|$} \\
+  & \text{$|z| \in |e|$} \\
 \end{array}
-\\ \\[-0.6em]
+\\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Normalization}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
@@ -145,26 +145,26 @@ $\begin{array}{@@{}l}
 \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
 \rulename{fail} & |C^[fail]| & \movesto & |fail| \\
 
-    \\[-0.6em]
+    \\[-0.8em]
 
 \rulegroupname{Choice}
 \rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
 \rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
-\rulename{choice-exi}^{\alpha} & |def x (E^[e_1 choice e_2]| & \movesto & |E^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{choice-exi}^{\alpha} & |def x (E^[e_1 choice e_2])| & \movesto & |E^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 
-    \\[-0.6em]
+    \\[-0.8em]
 
 \rulegroupname{One and All}
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
 \rulename{one-value}  & |one v| & \movesto & |v| \\
 \rulename{one-choice}  & |one (v choice e)| & \movesto & |v| \\
 \rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)|  & n \geq 0 \\
+\rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)|  & n \geq 1 \\
 
 \end{array} \\
-\\[-0.6em]
+\\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Open Lambdas}
   \rulename{u-olam}          & \multicolumn{3}{l}{|olam v_1 dom_1 rng_1 == olam v_2 dom_2 rng_2|} \\
@@ -174,11 +174,11 @@ $\begin{array}{@@{}l}
         |v_2 == olam z ((lam i (check fails (apply1N dom_2 i); apply1N dom_1 i))) rng_1| \\
    \end{array}} \\[5mm]
   \rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &
-  \multicolumn{2}{l}{|if (x := apply1N dom v) then apply1N rng x else apply1N g v|} \\[2mm]
+  \multicolumn{2}{l}{|if (x := apply1N dom v) then apply1N rng x else apply1N g v|} \\[1mm]
 \end{array}
 \\
 \text{\textit{Note}: In rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.} \\
-\text{\textit{Note}: Rules marked with a superscript $*$, use $\alpha$-conversion to satisfy the side condition.}
+\text{\textit{Note}: Rules marked with a superscript $*$ may apply infinitely.}
 \end{array}$
 
 \caption{\textbf{The \vcname: Rewrite rules for execution}} \label{fig:rules}
