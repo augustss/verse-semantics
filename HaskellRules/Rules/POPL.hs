@@ -34,6 +34,7 @@ systemPOPL = TRSystem
   , confluenceRules     = rulesStructural
   , validExpr           = const valid
   , sortRewrites        = id
+  , displayRules        = const True
   }
 
 systemPOPLL :: TRSystem Expr
@@ -836,7 +837,7 @@ rulesUnificationVariables env lhs =
      guard (x `notElem` freeX)
      guard (x `notElem` freeV)
      pure (ctx (Val v))
-  
+
 
 rulesUnificationVariablesNoR :: ERule
 rulesUnificationVariablesNoR _ lhs =
@@ -1221,7 +1222,7 @@ rulesStructural _ lhs =
 -}
 
 rulesValSwap :: ERule
-rulesValSwap _ lhs = 
+rulesValSwap _ lhs =
   "VAL-SWAP" `name`
   do e1 :>: (e2@(_ :=: Val _) :>: e3) <- [lhs]
      pure $ e2 :>: (e1 :>: e3)
@@ -1468,4 +1469,3 @@ systemPOPLLH = s
   , rules = rules s -= "UX-OCCURS"
   }
   where s = systemPOPLLC
-

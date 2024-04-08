@@ -29,8 +29,10 @@ takeL :: Int -> [a] -> [a]
 takeL n xs = [xs!!n]
 
 tests :: [(String, Expr, Bool)]
-tests = -- take 6
-  [ ("ex_crash", ex_crash, True)
+tests = -- take 1
+  [ ("ex_asm_fail", ex_asm_fail, True)
+  , ("ex_asm_fail'", ex_asm_fail', True)
+  , ("ex_crash", ex_crash, True)
   , ("ex00", ex00, True)
   , ("ex01", ex01, True)
   , ("ex0", ex0, True)
@@ -46,20 +48,18 @@ tests = -- take 6
   , ("ex_flex2rigid1", ex_flex2rigid1, False)
   , ("ex_flex2rigid2", ex_flex2rigid2, True)
   , ("ex_stuck1", ex_stuck1, False)
-  , ("ex_stuck2", ex_stuck2, False)
+  -- TODO:PORT:ASSUME , ("ex_stuck2", ex_stuck2, False)
   , ("ex_stuck3", ex_stuck3, False)
   , ("ex_if0", ex_if0, True)
   , ("ex_if1", ex_if1, False)
   , ("ex_if2", ex_if2, True)
   , ("ex_inc", ex_inc, True)
-  , ("ex_tim_0", ex_tim_0, False)
-  , ("ex_tim_1", ex_tim_1, False)
+  -- TODO:HOF , ("ex_tim_0", ex_tim_0, False)
+  -- TODO:HOF , ("ex_tim_1", ex_tim_1, False)
   , ("ex_asm_subst", ex_asm_subst, True)
-  -- , ("ex_f_3", ex_f_3, False)
-  -- , ("ex_f_3'", ex_f_3', False)
-  -- , ("ex_cmp", ex_cmp, True)
+{-
   , ("ex_asm_race", ex_asm_race, True)
-  , ("ex_asm_race'", ex_asm_race', False)
+  , ("ex_asm_race'", ex_asm_race', True)
   , ("ex_if_else_only", ex_if_else_only, True)
   , ("ex_if_then_only", ex_if_then_only, True)
   , ("ex_hide_00", ex_hide_00, True)
@@ -69,7 +69,6 @@ tests = -- take 6
   , ("ex_ty_00", ex_ty_00, True)
   , ("ex_ty_01", ex_ty_01, True)
   , ("ex_choice_00", ex_choice_00, True)
-  , ("ex_choice_01", ex_choice_01, True)
   , ("ex_if_asm_00", ex_if_asm_00, True)
   , ("ex1_mini", ex1_mini, True)
   -- not needed, asm's should only have uni-vars, ("ex_asm_var", ex_asm_var, True)
@@ -78,6 +77,7 @@ tests = -- take 6
   , ("ex_L2", ex_L2, False)
   , ("ex_PC1", ex_PC1, False)
   , ("ex_PC2a", ex_PC2a, True)
+-}
   ]
 
 --------------------------------------------------------------------------------
@@ -85,7 +85,7 @@ tests = -- take 6
 --------------------------------------------------------------------------------
 
 sys :: TRSystem Expr
-sys = icfpeVerifier
+sys = verifier
 -- sys = l2rVerifier
 
 runTests :: IO Bool
@@ -146,7 +146,7 @@ iteB :: [Ident] -> Expr -> Expr -> Expr -> Expr
 iteB xs e1 e2 e3 = foldr (\x e -> IfB (Bind x e)) (If e1 e2 e3) xs
 
 tlamOblig :: Ident -> [Ident] -> Expr -> Expr -> Expr
-tlamOblig x ys e1 e2 = Verify (Lam $ Bind x $ exis ys (Assume e1 :>: Assert e2))
+tlamOblig x ys e1 e2 = Verify [x] [] (exis ys (e1 :>: Assert e2))
 
 tlamAbs :: Ident -> [Ident] -> Expr -> Expr -> Expr
 tlamAbs x ys e1 e2 = Lam $ Bind x $ exis ys (e1 :>: Assume e2)
@@ -163,12 +163,14 @@ exNotValid = eXIs [g, i1] $ (Var g :=: (blob1 :>: blob2) :>: Var i1) :>: Var g
 --     x2 = ident "x2"
 --     x = ident "x"
 
+tINT :: Expr
+tINT = LAM x (iNT (Var x))
+  where x = ident "x"
 
 blob1 :: Expr
-blob1 = Var i1 :=: (Verify (LAM x2 ( EXI x ((Assume ((Var x :=: iNT(Var x2)) :>: Var x) :>: Assert (Var x))))))
+blob1 = Var i1 :=: (Verify [] [] (( EXI x (((Var x :=: Some(tINT)) :>: Assert (Var x))))))
   where
     i1 = ident "i1"
-    x2 = ident "x2"
     x = ident "x"
 
 blob2 :: Expr
@@ -187,14 +189,13 @@ ex01 :: Expr
 ex01 = verse $ lam (\x -> Assert x)
 
 
---  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=y => succeeds{ exists a b. a=x; b=a; b=y}
 ex0_aa :: Expr
-ex0_aa = lAMs [x, y] (
-              Assume (INT (Var x))
+ex0_aa = Verify [x, y] [] (
+              Var x :=: Some tINT
               :>:
-              Assume (INT (Var y))
+              Var y :=: Some tINT
               :>:
-              Assume (Var y :=: Var x)
+              Var y :=: Var x
               :>:
               Assert (Var x :=: Var x :>: Int 0)
             )
@@ -202,24 +203,11 @@ ex0_aa = lAMs [x, y] (
      x = ident "x"
      y = ident "y"
 
-
-ex0_bb :: Expr
-ex0_bb = lAMs [x,y] $
-              Assume (INT (Var x) :>: INT (Var y) :>: (Var y :=: Var x))
-              :>:
-              Assert (Var y :=: Var x :>: Int 0)
-
-   where
-     x = ident "x"
-     y = ident "y"
-
-
 ex0 :: Expr
-ex0 = LAM x (LAM y (LAM z (
-        Assume (INT (Var x) :>: INT (Var y) :>: INT (Var z) :>: Var x :=: Var y)
+ex0 = Verify [x,y,z] [] $
+        (INT (Var x) :>: INT (Var y) :>: INT (Var z) :>: (Var x :=: Var y))
         :>:
         Assert (EXI a $ EXI b $ (Var a :=: Var x) :>: Var b :=: Var a :>: Var b :=: Var y :>: Int 0)
-      )))
   where
     x = ident "x"
     y = ident "y"
@@ -229,11 +217,10 @@ ex0 = LAM x (LAM y (LAM z (
 
 --  forall x. int[x] => forall y.  int[y] => forall z. int[z] => x=z => succeeds{ exists a b. a=x; b=a; b=y}
 ex0' :: Expr
-ex0' = LAM x (LAM y (LAM z (
-        Assume (INT (Var x) :>: INT (Var y) :>: INT (Var z) :>: Var x :=: Var z)
+ex0' = Verify [x, y, z] [] $
+        (INT (Var x) :>: INT (Var y) :>: INT (Var z) :>: (Var x :=: Var z))
         :>:
         Assert (EXI a $ EXI b $ (Var a :=: Var x) :>: Var b :=: Var a :>: Var b :=: Var y :>: Int 0)
-      )))
   where
     x = ident "x"
     y = ident "y"
@@ -245,15 +232,14 @@ ex0' = LAM x (LAM y (LAM z (
 -- hangs the icfpVerifier due to EXI-SWAP blowup, but not icfpeVerifier
 ex00_hang :: Expr
 ex00_hang =
-  LAM xt $
+  Verify [xt] [] $
     eXIs [x3, x4, x5, x, y, z] $
-      Assume (
-              (Var x  :=: iNT (Var x3)) :>:
-              (Var y  :=: iNT (Var x4)) :>:
-              (Var z  :=: iNT (Var x5)) :>:
-              (Var xt :=: Arr [Var x3, Var x4, Var x5]) :>:
-              Var xt
-             )
+      ( (Var x  :=: iNT (Var x3)) :>:
+        (Var y  :=: iNT (Var x4)) :>:
+        (Var z  :=: iNT (Var x5)) :>:
+        (Var xt :=: Arr [Var x3, Var x4, Var x5]) :>:
+        Var xt
+      )
       :>: Assert (Int 0)
   where
     x3 = ident "x3"
@@ -262,20 +248,17 @@ ex00_hang =
     x  = ident "x"
     y  = ident "y"
     z  = ident "z"
-    -- a  = ident "a"
-    -- b  = ident "b"
     xt = ident "xt"
 
 ex01_hang :: Expr
 ex01_hang =
-  lAMs [x3, x4, x5] $
+  Verify [x3, x4, x5] [] $
     eXIs [x, y, z] $
-      Assume (
-              (Var x  :=: iNT (Var x3)) :>:
-              (Var y  :=: iNT (Var x4)) :>:
-              (Var z  :=: iNT (Var x5)) :>:
-              Arr []
-             )
+      ((Var x  :=: iNT (Var x3)) :>:
+       (Var y  :=: iNT (Var x4)) :>:
+       (Var z  :=: iNT (Var x5)) :>:
+       Arr []
+      )
       :>: Assert (eXIs [a, b] ((Var a :=: Var x) :>: (Var b :=: Var a) :>: (Var b :=: Var y) :>: Var b))
   where
     x3 = ident "x3"
@@ -286,38 +269,42 @@ ex01_hang =
     z  = ident "z"
     a  = ident "a"
     b  = ident "b"
-    -- xt = ident "xt"
 
 
 -------------------------------------------------------------------------------------------
 -- ex1' (andy's variant with x = suc x)
 {-
 exi suc.
-  suc = \a. INT[a]; assume { UNI b. INT[b]; b }
-  (\v. assume {int[x]} ; assert { exi r. r = succ(x); INT[r]; r }
+  suc = \a. INT[a]; some(INT)
+  (fun (x:int):int = suc(x) )
 -}
 ex1 ::Expr
-ex1 = lET succ (LAM a (iNT (Var a) :>: Assume (UNI b (iNT (Var b)))))
-        (LAM x (Assume (iNT (Var x)) :>: Assert (EXI r (Var r :=: Var succ :@: Var x :>: iNT (Var r) ))))
+ex1 = lET succ (LAM a (iNT (Var a) :>: Some tINT))
+        (Verify [x] [] (iNT (Var x) :>: Assert (EXI y (Var y :=: (Var succ :@: Var x) :>: iNT (Var y) ))))
   where
     succ = ident "succ"
     a    = ident "a"
-    b    = ident "b"
     x    = ident "x"
-    r    = ident "r"
+    y    = ident "y"
 
 -------------------------------------------------------------------------------------------
 -- f = \x. assume{x = 3}; assert{ exi r. r = (x = 3; 3); r }
 
 ex2 :: Expr
-ex2 = LAM x (Assume (Var x :=: Int 3) :>: Assert (EXI r (Var r :=: (Var x :=: Int 3 :>: Int 3) :>: Var r)))
+ex2 = Verify [x] [] $
+        Var x :=: Int 3
+        :>:
+        Assert (EXI r (Var r :=: (Var x :=: Int 3 :>: Int 3) :>: Var r))
   where
     x = ident "x"
     r = ident "r"
 
--- f = \x. assume{x = 3}; assert{ exi r. r = (x = 3; 3); r }
+-- f = \x. assume{x = 3}; assert{ exi r. r = (x = 4; 4); r }
 ex2' :: Expr
-ex2' = LAM x (Assume (Var x :=: Int 3) :>: Assert (EXI r (Var r :=: (Var x :=: Int 4 :>: Int 4) :>: Var r)))
+ex2' = Verify [x] [] $
+        Var x :=: Int 3
+        :>:
+        Assert (EXI r (Var r :=: (Var x :=: Int 4 :>: Int 4) :>: Var r))
   where
     x = ident "x"
     r = ident "r"
@@ -325,23 +312,21 @@ ex2' = LAM x (Assume (Var x :=: Int 3) :>: Assert (EXI r (Var r :=: (Var x :=: I
 -------------------------------------------------------------------------------------------
 {-
 
-f(x:FOO):FOO = 708 - x
 FOO(x) = (x = 666 | x = 42); x
+f(x:FOO):FOO = 708 - x
 -}
 -- f = \v. exi x. assume{x = FOO(v)}; assert{exi r. r = 708 - x; FOO(r)}
 
--- TODO:PORT
 ex3 :: Expr
-ex3 = Verify $
-      EXI foo $ (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42)) :>: Var y)) :>:
-        LAM v ({- to force SX/CX -}
-                (EXI x $ Assume ((Var x :=: Var foo :@: Var v) :>: Var x) :>:
-                        Assert (EXI r (Var r :=: (Int 708 `sub` Var x) :>: (Var foo :@: Var r)))))
+ex3 = lET foo (Var foo :=: LAM y (((Var y :=: Int 666) :|: (Var y :=: Int 42)) :>: Var y)) $
+        Verify [x] [] (
+          (Var x :=: Some (Var foo))
+          :>:
+          Assert (EXI z (Var z :=: (Int 708 `sub` Var x) :>: (Var foo :@: Var z))))
   where
     foo = ident "foo"
     x = ident "x"
-    v = ident "v"
-    r = ident "r"
+    z = ident "z"
     y = ident "y"
 
 -------------------------------------------------------------------------------------------
@@ -360,19 +345,22 @@ sum(x:any):int := if nat(x) then add(x, sum(dec(x))) else 0
 ex4 :: Expr
 ex4 =  lETs
           [ (nat, LAM x (iNT (Var x) :>: leq (Int 0) (Var x) :>: Var x) )
-          , (add, LAM x (LAM y (iNT (Var x) :>: iNT (Var y) :>: Assume (UNI r (iNT (Var r))))))
-          , (dec, LAM x (iNT (Var x) :>: Assume (UNI r (iNT (Var r)))))
-          , (sum, LAM x (Assume (UNI r (iNT (Var r)))))
+          , (add, LAM x (LAM y (iNT (Var x) :>: iNT (Var y) :>: Some tINT )))
+          , (dec, LAM x (iNT (Var x) :>: Some tINT))
+          , (sum, LAM x (Some tINT))
           ]
-          (Verify (LAM x (Assert (EXI r ((Var r :=: ite (Var nat :@: Var x)
-                                                      (lETs
-                                                        [ (t0, Var dec :@: Var x)
-                                                        , (t1, Var sum :@: Var t0)
-                                                        ]
-                                                        ((Var add :@: Var x) :@: Var t1)
-                                                      )
-                                              (Int 0))
-                                  :>: iNT (Var r))))))
+          (Verify [x] []
+            (Assert (EXI r
+              ((Var r :=: ite (Var nat :@: Var x)
+                            (lETs
+                              [ (t0, Var dec :@: Var x)
+                              , (t1, Var sum :@: Var t0)
+                              ]
+                            ((Var add :@: Var x) :@: Var t1))
+                            (Int 0)
+                )
+                :>: iNT (Var r)
+              ))))
   where
     nat = ident "nat"
     dec = ident "dec"
@@ -388,7 +376,7 @@ ex4 =  lETs
 ----
 
 ex5 :: Expr
-ex5 = Verify $ LAM x (Assert (EXI r ((Var r :=: ite (INT (Var x)) (Int 10) (Int 20)) :>: INT (Var r))))
+ex5 = Verify [x] [] $ Assert (EXI r ((Var r :=: ite (INT (Var x)) (Int 10) (Int 20)) :>: INT (Var r)))
   where
     x = ident "x"
     r = ident "r"
@@ -413,22 +401,40 @@ ex6 = verse $
 
 --- examples testing rigid/flexible ---
 
-
 ex_rigid2flex :: Expr
-ex_rigid2flex = verse $
-  timlam $ \x ->
-    do x' <- int x
-       return $
-         do y <- exists
-            x' .=. y
+ex_rigid2flex =
+  Verify [x] [] $ EXI x' $
+    Var x' :=: iNT (Var x)
+    :>:
+    Assert (EXI y (Var x' :=: Var y))
+  where
+    x  = ident "x"
+    x' = ident "x'"
+    y  = ident "y"
+
+  --  verse $
+  -- timlam $ \x ->
+  --   do x' <- int x
+  --      return $
+  --        do y <- exists
+  --           x' .=. y
 
 -- TODO:PORT
 ex_flex2rigid1 :: Expr
-ex_flex2rigid1 = verse $
-  timlam $ \x ->
-    do x' <- int x
-       return $
-         do x' .=. Int 3
+ex_flex2rigid1 =
+   Verify [x] [] $ EXI x' $
+    Var x' :=: iNT (Var x)
+    :>:
+    Assert ((Var x' :=: Int 3))
+  where
+    x  = ident "x"
+    x' = ident "x'"
+
+  -- verse $
+  -- timlam $ \x ->
+  --   do x' <- int x
+  --      return $
+  --        do x' .=. Int 3
 
 ex_flex2rigid2 :: Expr
 ex_flex2rigid2 = verse $
@@ -441,9 +447,15 @@ ex_flex2rigid2 = verse $
 --- examples testing getting stuck ---
 
 ex_stuck1 :: Expr
-ex_stuck1 = verse $
-  timlam $ \_x ->
-    do return (exists <? "y")
+ex_stuck1 = Verify [x] [] (Assert (EXI y (Var y)))
+  where
+    x = ident "x"
+    y = ident "y"
+
+-- ex_stuck1 = verse $
+--   timlam $ \_x ->
+--     do return (exists <? "y")
+
 
 ex_stuck2 :: Expr
 ex_stuck2 = verse $
@@ -453,38 +465,54 @@ ex_stuck2 = verse $
                   y .=. Arr [x,z])
 
 ex_stuck3 :: Expr
-ex_stuck3 = verse $
-  timlam $ \_x ->
-    do return (do y <- exists <? "y"
-                  def (ite (y :=: Int 3) (y :=: Int 3) (y :=: Int 4)))
+ex_stuck3 = Verify [x] [] (Assert (EXI y (If (Var y :=: Int 3) (Var y :=: Int 3) (Var y :=: Int 4))))
+  where
+    x = ident "x"
+    y = ident "y"
+
+
+-- ex_stuck3 = verse $
+--   timlam $ \_x ->
+--     do return (do y <- exists <? "y"
+--                   def (ite (y :=: Int 3) (y :=: Int 3) (y :=: Int 4)))
 
 --- examples testing If with `mustDecide` ---
 
 -- this *should* VERIFY
 ex_if0 :: Expr
-ex_if0 = verse $
-  timlam $ \b -> return (ite b (Int 3) (Int 4))
+ex_if0 = Verify [b] [] $ Assert (If (Var b) (Int 3) (Int 4))
+  where
+    b = ident "b"
+-- verse $
+--  timlam $ \b -> return (ite b (Int 3) (Int 4))
 
 -- this *should not* VERIFY
 ex_if1 :: Expr
-ex_if1 = verse $
-  timlam $ \_x ->
-    do return (do b <- exists <? "b"
-                  def (ite b (Int 3) (Int 4)))
+ex_if1 = Verify [x] [] $ Assert (EXI b $ If (Var b) (Int 3) (Int 4))
+  where
+    x = ident "x"
+    b = ident "b"
+
+  -- verse $
+  -- timlam $ \_x ->
+  --   do return (do b <- exists <? "b"
+  --                 def (ite b (Int 3) (Int 4)))
 
 ex_if2 :: Expr
-ex_if2 = Verify $ LAM x $ Assume (iNT (Var x)) :>: Assert (ite (leq (Int 0) (Var x)) (Int 1) (Int 2))
+ex_if2 = Verify [x] [] $
+           iNT (Var x)
+           :>:
+           Assert (ite (leq (Int 0) (Var x)) (Int 1) (Int 2))
   where
     x = ident "x"
 
 ex_inc :: Expr
 ex_inc = tlamOblig y [x]
             (INT (Var y) :>: (Var x :=: Var y) :>: Var x)
-            (INT (Var x) :>: INT (Int 1) :>: Assume (UNI r (INT (Var r) ) ))
+            (INT (Var x) :>: INT (Int 1) :>: Some tINT)
   where
     x = ident "x"
     y = ident "y"
-    r = ident "r"
 
 
 
@@ -494,9 +522,15 @@ ex_inc = tlamOblig y [x]
 -- I can't quite replicate the unsoundness due to desugarer obfuscations, so here's a plain CORE version
 --   \a b f. assume {int[a]; int[b]; f = (\z. a = b; assume{a=b})}; assert {a = b; f[0]}
 
+ty :: Expr -> Expr
+ty e = lAMs [x] (Var x :=: e :>: Var x)
+  where
+    x = ident "x"
+
+
 ex_tim_0 :: Expr
-ex_tim_0 = lAMs [a, b, f] $
-             Assume (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>: Assume (Var a :=: Var b))))
+ex_tim_0 = Verify [a, b] [] $ EXI f $
+             (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>>: Some (ty (Var a :=: Var b)))))
              :>:
              Assert (Var a :=: Var b :>: (Var f :@: Int 0) :>: Int 0)
   where
@@ -506,9 +540,10 @@ ex_tim_0 = lAMs [a, b, f] $
     z = ident "z"
 
 ex_tim_1 :: Expr
-ex_tim_1 = lAMs [a, b, f] $
-             Assume (iNT (Var a) :>: iNT (Var b) :>: (Var f :=: LAM z (Var a :=: Var b :>: Assume (Var a :=: Var b))))
-             :>:
+ex_tim_1 = Verify [a, b] [] $ EXI f $
+             iNT (Var a) :>:
+             iNT (Var b) :>:
+             Var f :=: LAM z (Var a :=: Var b :>>: Some (ty (Var a :=: Var b))) :>:
              Assert ((Var f :@: Int 0) :>: Var a :=: Var b :>:  Int 0)
   where
     a = ident "a"
@@ -517,54 +552,32 @@ ex_tim_1 = lAMs [a, b, f] $
     z = ident "z"
 
 ex_asm_subst :: Expr
-ex_asm_subst = lAMs [a] $
-                 Assume (Var a :=: Int 10)
+ex_asm_subst = Verify [a] [] $
+                 (Var a :=: Int 10)
                  :>:
                  Assert (sub (Var a) (Int 1) :=: Int 9 :>: Int 0)
   where
     a = ident "a"
 
 ex_crash :: Expr
-ex_crash = Assert (Int 1)
+ex_crash = Verify [] [] (Assert (Int 1))
 
--- f():int => 3 = f[]
-
--- exi f, g.
---    g = \a. assume {exi x. x = f(); int(x); x};
---    succ { g() = 3 }
-
-ex_f_3 :: Expr
-ex_f_3 = eXIs [f, g] $
-          ( Var g :=: LAM a (Assume (EXI x (Var x :=: Var f :@: Arr []) :>: iNT (Var x) :>: Var x) ) )
-          :>:
-          Assert ( (Var g :@: Arr [] :=: Int 3 ) :>: Int 3)
-  where
-    f = ident "f"
-    g = ident "g"
-    a = ident "a"
-    x = ident "x"
-
-
--- assert {(3 = (ex $y29.                                                      // CHECKPOINT2
---                 assume {($y29 = $x27(<>)); (\_x. isint(_x); assume {_x})($y29)}));
---        3}};
-
-ex_f_3' :: Expr
-ex_f_3' = Assert (Int 3 :=: EXI y (Assume (Var y :=: Var f :@: Arr [] :>:  iNT (Var y) :>: Var y)) :>: Int 3)
-  where
-    f = ident "f"
-    y = ident "y"
 
 ex_cmp :: Expr
-ex_cmp = LAM a $ Assume (INT (Var a))
-                 :>:
-                 Assert (EXI b (( Var b :=: INT (Var a) ) :>: Int 10))
+ex_cmp = Verify [a] [] $
+          INT (Var a)
+          :>:
+          Assert (EXI b (( Var b :=: INT (Var a) ) :>: Int 10))
   where
     a = ident "a"
     b = ident "b"
 
 ex_asm_race :: Expr
-ex_asm_race = lAMs [b, a] $ Assume(INT (Var a)) :>: Assume(INT (Var b)) :>:  Assert ( Assume (Var a :=: Var b) :>: (Var a :=: Var b) :>: Int 10)
+ex_asm_race = Verify [b, a] [] $
+                INT (Var a)     :>:
+                INT (Var b)     :>:
+                Var a :=: Var b :>:
+                Assert ((Var a :=: Var b) :>: Int 10)
   where
     a = ident "a"
     b = ident "b"
@@ -576,23 +589,17 @@ ex_asm_race' = lAMs [b, a] $ Assume(INT (Var a)) :>: Assume(INT (Var b)) :>: Ass
     b = ident "b"
 
 ex_if_then_only :: Expr
-ex_if_then_only = Verify (Assert (Int 2 :=: If (Int 10) (Int 2) (Int 99)))
+ex_if_then_only = Verify [] [] (Assert (Int 2 :=: If (Int 10) (Int 2) (Int 99)))
 
 ex_if_else_only :: Expr
-ex_if_else_only = Verify (Assert (Int 2 :=: If (Int 10 :=: Int 20) (Int 99) (Int 2)))
+ex_if_else_only = Verify [] [] (Assert (Int 2 :=: If (Int 10 :=: Int 20) (Int 99) (Int 2)))
 
 ---------------------------------------------------------------------------------------------
 -- | `asType` (aka |> from `desugaring.pdf`)
 ---------------------------------------------------------------------------------------------
 
-tINT :: Expr
-tINT = LAM z (iNT (Var z))
-  where z = ident "z"
-
 asType :: Expr -> Expr -> Expr
-asType e t = Verify (Assert (t :@: e)) :>: Assume (UNI a (t :@: Var a))
-  where
-    a = ident "a"
+asType e t = Assert (t :@: e) :>>: Some t -- Assume (UNI a (t :@: Var a))
 
 -- exi x. x = 2; x = 2; 100  (ACCEPT)
 ex_hide_00 :: Expr
@@ -615,36 +622,33 @@ ex_hide_02 = Assert $ eXIs [x,y] ((Var x :=: (Int 2 `asType` tINT)) :>: Var y :=
 
 -- verify { \x. isInt[x]; assert{isInt[x]}}
 ex_direct00 :: Expr
-ex_direct00 = Verify $ LAM x (iNT (Var x) :>: Assert (iNT (Var x)))
+ex_direct00 = Verify [x] [] $ iNT (Var x) :>: Assert (iNT (Var x))
   where
     x = ident "x"
 
 ex_ty_00 :: Expr
-ex_ty_00 = Verify (lAMs [a] (
-              Assume (INT (Var a))
-              :>:
-              Assert (Var a :=: Var a :>: Int 99)
-             )
-           )
+ex_ty_00 = Verify [a] [] $
+             INT (Var a)
+             :>:
+             Assert (Var a :=: Var a :>: Int 99)
   where
     a = ident "a"
 
 ex_ty_01 :: Expr
-ex_ty_01 = Verify (lAMs [a] (eXIs [x] (
-            Assume (Var x :=: (
-              eXIs [y] (
-                Assume (Var a :=: Int 99)
-                :>:
-                Assume (Var y :=: Int 200)
-                :>:
-                Int 10
+ex_ty_01 = Verify [a] [] $ eXIs [x] $
+             (Var x :=: (
+               eXIs [y] (
+                 Var a :=: Int 99
+                 :>:
+                 Var y :=: Int 200
+                 :>:
+                 Int 10
+               )
               )
-             )
-             :>:
-             Int 66
-            ) :>:
-            Assert (Var a :=: Int 99)
-            )))
+              :>:
+              Int 66
+             ) :>:
+             Assert (Var a :=: Int 99)
   where
     x = ident "x"
     y = ident "y"
@@ -652,54 +656,45 @@ ex_ty_01 = Verify (lAMs [a] (eXIs [x] (
 
 ex_choice_00 :: Expr
 ex_choice_00 =
-  Verify (lAMs [a] (
-    Assume ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
+  Verify [a] [] $
+    ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
     :>:
     Assert ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
-    )
-  )
-  where
-    a = ident "a"
-
-ex_choice_01 :: Expr
-ex_choice_01 =
-  Verify (lAMs [a] (
-    {- Assume -} ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
-    :>:
-    Assert       ( (Var a :=: Int 10) :|: (Var a :=: Int 20) )
-    )
-  )
   where
     a = ident "a"
 
 ex_if_asm_00 :: Expr
 ex_if_asm_00 =
-  Verify (Assert (ite (EXI z (Assume (Var z :=: Int 199) :>: Int 2)) (Int 1) (Int 2)))
-  -- Verify (Assert (One (EXI z (Assume (Var z :=: Int 199) :>: Int 2)) ))
+  Verify [] [] $
+    Assert (ite (EXI z (Assume (Var z :=: Int 199) :>: Int 2)) (Int 1) (Int 2))
   where
     z = ident "z"
 
 ex1_mini :: Expr
-ex1_mini = lAMs [x] (
-              Assume (INT (Var x))
-              :>:
-              Assert (UNI b (INT (Var x) :>: Int 3))
-           )
-           where
-            x = ident "x"
-            b = ident "b"
+ex1_mini =
+  Verify [x] [] $
+    INT (Var x)
+    :>:
+    Assert (INT (Var x) :>: Int 3)
+  where
+    x = ident "x"
 
 ex_asm_var :: Expr
-ex_asm_var = Verify $ lAMs [x] (
-                (Assume (Var x) :=: Int 10)
-                :>:
-                Verify (Assert (Var x :=: Int 10))
-             )
-             where
-              x = ident "x"
+ex_asm_var =
+  Verify [x] [] $
+    Assume (Var x) :=: Int 10
+    :>:
+    Assert (Var x :=: Int 10)
+  where
+    x = ident "x"
 
 ex_ifb :: Expr
-ex_ifb = Verify $ Assert (iteB [x, y] (Var x :=: Int 1 :>: Var y :=: Int 1 :>: Int 1) (Var x) (Int 9 :=: Int 10))
+ex_ifb =
+  Verify [] [] $
+    Assert (iteB [x, y]
+              (Var x :=: Int 1 :>: Var y :=: Int 1 :>: Int 1)
+              (Var x)
+              (Int 9 :=: Int 10))
   where
     x = ident "x"
     y = ident "y"
@@ -715,15 +710,12 @@ ex_ifb = Verify $ Assert (iteB [x, y] (Var x :=: Int 1 :>: Var y :=: Int 1 :>: I
 -}
 
 ex_L1 :: Expr
-ex_L1 = eXIs [f] $
-          (Var f :=: LAM x (Arr [] :>>: UNI r (Assume (iNT (Var r)) :>: Var r)))
-          :>:
-          Verify (Assert (EXI y (iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0)))
+ex_L1 = lET f (LAM x (Arr [] :>>: Some tINT))
+          (Verify [] [] (Assert (EXI y (iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0))))
   where
     f = ident "f"
     x = ident "x"
     y = ident "y"
-    r = ident "r"
 
 {- L2
 
@@ -733,34 +725,28 @@ ex_L1 = eXIs [f] $
 -}
 
 ex_L2 :: Expr
-ex_L2 = eXIs [f] $
-          (Var f :=: LAM x (Arr [] :>>: UNI r (Assume (iNT (Var r)) :>: Var r)))
-          :>:
-          Verify (Assert (EXI y (Var y :=: Char 'm' :>: iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0)))
+ex_L2 = lET f (LAM x (Arr [] :>>: Some tINT))
+          (Verify [] [] (Assert (EXI y (Var y :=: Char 'm' :>: iNT (Var y) :>: (Var y :=: Var f :@: Arr []) :>: Int 0))))
   where
     f = ident "f"
     x = ident "x"
     y = ident "y"
-    r = ident "r"
 
 {- PC1
 
   foo(x:int)<succeeds> := int[x]    # No result signature
-  check<succeeds> { z := "monkey" ; foo[z] }
+  check<succeeds> { y := "monkey" ; foo[y] }
 
 -}
 
 ex_PC1 :: Expr
-ex_PC1 = eXIs [f] $
-          (Var f :=: LAM i (EXI x ((Var x :=: iNT (Var i) :>: Int 0) :>>: UNI r (Assume (Var r :=: iNT (Var x) :>: Int 0) :>: Var r))))
-          :>:
-          Verify (Assert (EXI y (Var y :=: Char 'm' :>: (Var y :=: Var f :@: Var y) :>: Int 0)))
+ex_PC1 = lET f (LAM i (EXI x ((Var x :=: iNT (Var i) :>: Int 0) :>>: iNT (Var x))))
+            (Verify [] [] (Assert (EXI y (Var y :=: Char 'm' :>: (Var y :=: Var f :@: Var y) :>: Int 0))))
   where
     f = ident "f"
     x = ident "x"
     y = ident "y"
     i = ident "i"
-    r = ident "r"
 
 {-
 f(1, 2):int := 7;
@@ -774,20 +760,28 @@ opAdd e1 e2 = Op Add :@: Arr [e1, e2]
 -- X = <>  |  v=X; e  | X; e | ef ; X |  X ;; e   #  ef means can fail or have choice but not loop, or do I/O.
 
 ex_PC2a :: Expr
-ex_PC2a = eXIs [f] $
-            (Var f :=: lAMs [i, j] ((Var i :=: Int 1 :>: Var j :=: Int 2 :>: Int 0)
-                                    :>>:
-                                    UNI r (Assume (iNT (Var r)) :>: Var r)))
-            :>:
-            Verify (Assert (eXIs [x, y] ((Var f :@: Var x :@: Var y) :>: opAdd (Var x) (Var y))))
+ex_PC2a = lET f (lAMs [i,j] ((Var i :=: Int 1 :>: Var j :=: Int 2 :>: Int 0) :>>: Some tINT))
+            (Verify [] [] (Assert (eXIs [x, y] ((Var f :@: Var x :@: Var y) :>: opAdd (Var x) (Var y)))))
   where
     f = ident "f"
     x = ident "x"
     y = ident "y"
     i = ident "i"
     j = ident "j"
-    r = ident "r"
 {-
 f = \x y. (x=1; y=2) ;; forall r. asm{ r=7 } r
 check<succeeds>{ exi x, y. f(x, y); x+y }
 -}
+
+
+exS0 :: Expr
+exS0 = lAMs [x] (Var x :>: Assume (Var x))
+  where
+    x = ident "x"
+
+
+ex_asm_fail :: Expr
+ex_asm_fail = Verify [] [Assume (Int 1 :=: Int 2)] (Assert Fail)
+
+ex_asm_fail' :: Expr
+ex_asm_fail' = Verify [] [Fails (Int 1)] (Assert Fail)

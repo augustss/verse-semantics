@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-unused-top-binds #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.TRS2024(allSystemsTRS2024) where
+module Rules.TRS2024(allSystemsTRS2024, isEffectFree) where
 import Control.Monad( guard )
 
 --import Epic.Print(prettyShow)
@@ -29,6 +29,7 @@ systemTRS2024 = TRSystem
   , confluenceRules     = \ _ _ -> []
   , validExpr           = const valid
   , sortRewrites        = id
+  , displayRules        = const True
   }
 
 -- Check that an expression is valid as defined by the grammar
@@ -47,15 +48,15 @@ valid = expr
     expr (All e)          = expr e
     expr (Uni (Bind _ e)) = expr e
     expr v                = value v
-    
+
     value (Var _) = True
     value r       = hnf r
-    
+
     hnf (Int _)          = True
     hnf (Op _)           = True
     hnf (Arr vs)         = all value vs
     hnf (Lam (Bind _ e)) = expr e
-    hnf _                = False    
+    hnf _                = False
 
 -- Make the expression obey the grammar; i.e. valid (anf e) == True
 anf :: Expr -> Expr
@@ -85,10 +86,10 @@ anf = expr
       | otherwise = Exi (Bind x ((Var x :=: expr v) :>: f (Var x)))
      where
       x:_ = identsNotIn (free (f v))
-    
+
     makeValues []       f = f []
     makeValues (v':vs') f = makeValue v' (\v -> makeValues vs' (\vs -> f (v:vs)))
-    
+
 --------------------------------------------------------------------------------
 
 (#) :: Expr
@@ -211,7 +212,7 @@ evalX1 zs lhs =
   do e1 :>>: e2 <- [lhs]
      (ctx, zs', hole) <- evalX zs e2
      return ((e1 :>>:) . ctx, zs', hole)
- 
+
 choiceX, choiceX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
 choiceX zs lhs = emptyXzs zs lhs ++ choiceX1 zs lhs
 choiceX1 zs lhs =
@@ -403,7 +404,7 @@ rulesNormalization _ lhs =
   do Uni (Bind x (Uni (Bind y e))) <- [lhs]
      pure (Uni (Bind y (Uni (Bind x e))))
 -}
-     
+
 --------------------------------------------------------------------------------
 
 rulesChoice :: ERule
@@ -475,4 +476,3 @@ rulesGuard _ lhs =
      pure Fail
 
 -----------------------------------------------------------------------------------
-

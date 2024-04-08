@@ -37,10 +37,19 @@ runM f s e = rewrite f s e
 -- There are no rewrite rules, instead everything happens in the preprocessing stage.
 
 blockSystem :: ESystem
-blockSystem = TRSystem { sname = "iblock", description = "left-to-right ICFP rules",
-  ruleEnv = defaultTRSFlags,
-  preProcess = const id, postProcess = const id, rules = noRules, rules2 = noRules, rulesHaveStructural = False,
-  confluenceRules = noRules, validExpr = \ _ _ -> True, sortRewrites = id }
+blockSystem = TRSystem
+  { sname = "iblock", description = "left-to-right ICFP rules"
+  , ruleEnv = defaultTRSFlags
+  , preProcess = const id
+  , postProcess = const id
+  , rules = noRules
+  , rules2 = noRules
+  , rulesHaveStructural = False
+  , confluenceRules = noRules
+  , validExpr = \ _ _ -> True
+  , sortRewrites = id
+  , displayRules = const True
+  }
   where
     noRules _ _ = []
 

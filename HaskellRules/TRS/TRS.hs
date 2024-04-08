@@ -17,7 +17,7 @@ module TRS.TRS(
 
 import Epic.List( nub, nubKey )
 import Epic.Print(Pretty, prettyShow)
-import TRS.Tarjan(tarjanAny)
+import TRS.Tarjan(tarjanAny, Result (..))
 import TRS.Traced
 import qualified Data.Set as S
 --import Control.Monad( unless )
@@ -138,8 +138,8 @@ normalTarjan justOne sys fuel at =
   let e = start at
       arrow (a :<-- t) = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
   in  case tarjanAny justOne fuel arrow e of
-        Just xss -> NormResult { nrDone = map head xss, nrLeft = [] }
-        Nothing  -> NormResult { nrDone = [], nrLeft = [e] }
+        Finish xss -> NormResult { nrDone = map head xss, nrLeft = [] }
+        Timeout _  -> NormResult { nrDone = [], nrLeft = [e] }
 
 --------------------------------------------------------------------------------------------------------
 
@@ -158,7 +158,8 @@ data TRSystem t = TRSystem
   , rulesHaveStructural :: !Bool                      -- are any rules structural? (slower)
   , confluenceRules     :: !(Rule t)                  -- structural rules for equivalence test
   , validExpr           :: !(RuleEnv t -> t -> Bool)  -- is t valid for reduction
-  , sortRewrites        :: !([Rewrite t] -> [Rewrite t])  -- sort rewrites 
+  , sortRewrites        :: !([Rewrite t] -> [Rewrite t])  -- sort rewrites
+  , displayRules        :: !(String -> Bool)              -- which steps (rules) to show when printing trace
   }
 --  deriving (Show)
 

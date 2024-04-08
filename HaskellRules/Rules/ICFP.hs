@@ -7,7 +7,7 @@ module Rules.ICFP(
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, anf, anfK, execX, execX1, choiceX, ltExpr,
+  isRecursive, anf, anfK, execX, defX, execX1, choiceX, ltExpr,
   hasStore, isChoiceFree
   ) where
 import Control.Monad( guard )
@@ -62,6 +62,7 @@ systemICFP = TRSystem
   , confluenceRules     = noRules
   , validExpr           = const valid
   , sortRewrites        = id
+  , displayRules        = const True
   }
 
 systemICFPC :: TRSystem Expr
@@ -213,7 +214,7 @@ valid' onlyEq = expr
     expr (Assume e) = expr e
     expr (Assert e) = expr e
     expr (Decide e) = expr e
-    expr (Verify e) = expr e
+    expr (Verify _ as e) = all expr (e:as)
     expr (Fails  e) = expr e
     expr e@Val{} = value e
     expr (LAM _ e) = expr e
@@ -293,10 +294,10 @@ anf' onlyEq = expr
     expr (IFB i e) = IFB i (expr e)
     expr (One e) = One $ expr e
     expr (All e) = All $ expr e
-    expr (Assume e) = Assume $ expr e
-    expr (Assert e) = Assert $ expr e
-    expr (Decide e) = Decide $ expr e
-    expr (Verify e) = Verify $ expr e
+    expr (Assume e) = Assume (expr e)
+    expr (Assert e) = Assert (expr e)
+    expr (Decide e) = Decide (expr e)
+    expr (Verify rs as e) = Verify rs (expr <$> as) (expr e)
     expr e@Fail = e
     expr e@Wrong{} = e
     expr (Split e e1 e2) =
@@ -380,22 +381,23 @@ execX1 lhs =
  do x :>>: e <- [lhs]
     (ctx, hole) <- execX x
     pure ((:>>: e) . ctx, hole)
-
-{-
- ++
-  do EXI y x <- [lhs]
-     (ctx, hole) <- execX x
-     pure (EXI y . ctx, hole)
--}
+--  ++
+--   do EXI y x <- [lhs]
+--      (ctx, hole) <- execX x
+--      pure (EXI y . ctx, hole)
  ++
   do Store h e <- [lhs]
      (ctx, hole) <- execX e
      pure (Store h . ctx, hole)
   -- extra rule for verifier to elim stuff like `exi x. assume { x = 2 }; 99`
- ++
-  do Assume e <- [lhs]
-     (ctx, hole) <- execX e
-     return (Assume . ctx, hole)
+--  ++
+--   do Assert e <- [lhs]
+--      (ctx, hole) <- execX e
+--      return (Assert . ctx, hole)
+--  ++
+--   do Assume e <- [lhs]
+--      (ctx, hole) <- execX e
+--      return (Assume . ctx, hole)
 
 substX :: Expr -> [(Context, Expr)]
 -- X context
@@ -479,6 +481,11 @@ choiceX1 lhs =
      pure ((:>: e) . ctx, hole)
  ++
   do ce :>: cx <- [lhs]
+     guard (isEffFree ce)
+     (ctx, hole) <- choiceX cx
+     pure ((ce :>:) . ctx, hole)
+ ++
+  do ce :>>: cx <- [lhs]
      guard (isEffFree ce)
      (ctx, hole) <- choiceX cx
      pure ((ce :>:) . ctx, hole)

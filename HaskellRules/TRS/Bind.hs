@@ -45,7 +45,11 @@ identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
 
 uvIdentNotIn :: [Ident] -> Ident
-uvIdentNotIn = head . identsNotInPrefix uvPrefix
+uvIdentNotIn = head . uvIdentsNotIn
+
+uvIdentsNotIn :: [Ident] -> [Ident]
+uvIdentsNotIn = identsNotInPrefix uvPrefix
+
 
 uvPrefix :: String
 uvPrefix = "uni$"
@@ -90,11 +94,11 @@ instance Free t => Free (Bind t) where
 type Subst a = [(Ident,a)]
 
 substBind :: (Free s, Free t)
-          => (Ident->s) -> (Subst s -> t -> t) -> (Subst s -> Bind t -> Bind t)
+          => (Ident -> s) -> (Subst s -> t -> t) -> (Subst s -> Bind t -> Bind t)
 substBind var subst sub a@(Bind x t)
   | null sub'   = a
   | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)
-  | otherwise   = Bind x (subst sub' t)
+  | otherwise   = Bind x  (subst sub' t)
  where
   sub' = [ (y,t) | (y,t) <- sub, y /= x ]
   vs   = free (map snd sub')

@@ -138,4 +138,3 @@ To examine a single test where 252 is the line number of the test
 ```
 cabal run tester -- --tim-verify versetests/TimTests.verse --only-test=L252 --verbose --prelude=verifyprelude
 ```
-

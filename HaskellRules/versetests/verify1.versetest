@@ -1,0 +1,2 @@
+verify(pass) { (a:any) => (b:any) => pf:type{a=b} => { a = b } }
+# verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := z }
