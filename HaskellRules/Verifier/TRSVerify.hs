@@ -29,14 +29,15 @@ takeL :: Int -> [a] -> [a]
 takeL n xs = [xs!!n]
 
 tests :: [(String, Expr, Bool)]
-tests = -- take 6
-  [ ("ex_crash", ex_crash, True)
+tests = -- take 1
+  [ ("ex_asm_fail", ex_asm_fail, True)
+  , ("ex_asm_fail'", ex_asm_fail', True)
+  , ("ex_crash", ex_crash, True)
   , ("ex00", ex00, True)
   , ("ex01", ex01, True)
   , ("ex0", ex0, True)
   , ("ex0'", ex0', False)
   , ("ex1", ex1, True)
-{-
   , ("ex2", ex2, True)
   , ("ex2'", ex2', False)
   , ("ex3", ex3, True)
@@ -47,7 +48,7 @@ tests = -- take 6
   , ("ex_flex2rigid1", ex_flex2rigid1, False)
   , ("ex_flex2rigid2", ex_flex2rigid2, True)
   , ("ex_stuck1", ex_stuck1, False)
-  , ("ex_stuck2", ex_stuck2, False)
+  -- TODO:PORT:ASSUME , ("ex_stuck2", ex_stuck2, False)
   , ("ex_stuck3", ex_stuck3, False)
   , ("ex_if0", ex_if0, True)
   , ("ex_if1", ex_if1, False)
@@ -56,6 +57,7 @@ tests = -- take 6
   -- TODO:HOF , ("ex_tim_0", ex_tim_0, False)
   -- TODO:HOF , ("ex_tim_1", ex_tim_1, False)
   , ("ex_asm_subst", ex_asm_subst, True)
+{-
   , ("ex_asm_race", ex_asm_race, True)
   , ("ex_asm_race'", ex_asm_race', True)
   , ("ex_if_else_only", ex_if_else_only, True)
@@ -400,20 +402,39 @@ ex6 = verse $
 --- examples testing rigid/flexible ---
 
 ex_rigid2flex :: Expr
-ex_rigid2flex = verse $
-  timlam $ \x ->
-    do x' <- int x
-       return $
-         do y <- exists
-            x' .=. y
+ex_rigid2flex =
+  Verify [x] [] $ EXI x' $
+    Var x' :=: iNT (Var x)
+    :>:
+    Assert (EXI y (Var x' :=: Var y))
+  where
+    x  = ident "x"
+    x' = ident "x'"
+    y  = ident "y"
+
+  --  verse $
+  -- timlam $ \x ->
+  --   do x' <- int x
+  --      return $
+  --        do y <- exists
+  --           x' .=. y
 
 -- TODO:PORT
 ex_flex2rigid1 :: Expr
-ex_flex2rigid1 = verse $
-  timlam $ \x ->
-    do x' <- int x
-       return $
-         do x' .=. Int 3
+ex_flex2rigid1 =
+   Verify [x] [] $ EXI x' $
+    Var x' :=: iNT (Var x)
+    :>:
+    Assert ((Var x' :=: Int 3))
+  where
+    x  = ident "x"
+    x' = ident "x'"
+
+  -- verse $
+  -- timlam $ \x ->
+  --   do x' <- int x
+  --      return $
+  --        do x' .=. Int 3
 
 ex_flex2rigid2 :: Expr
 ex_flex2rigid2 = verse $
@@ -426,9 +447,15 @@ ex_flex2rigid2 = verse $
 --- examples testing getting stuck ---
 
 ex_stuck1 :: Expr
-ex_stuck1 = verse $
-  timlam $ \_x ->
-    do return (exists <? "y")
+ex_stuck1 = Verify [x] [] (Assert (EXI y (Var y)))
+  where
+    x = ident "x"
+    y = ident "y"
+
+-- ex_stuck1 = verse $
+--   timlam $ \_x ->
+--     do return (exists <? "y")
+
 
 ex_stuck2 :: Expr
 ex_stuck2 = verse $
@@ -438,24 +465,38 @@ ex_stuck2 = verse $
                   y .=. Arr [x,z])
 
 ex_stuck3 :: Expr
-ex_stuck3 = verse $
-  timlam $ \_x ->
-    do return (do y <- exists <? "y"
-                  def (ite (y :=: Int 3) (y :=: Int 3) (y :=: Int 4)))
+ex_stuck3 = Verify [x] [] (Assert (EXI y (If (Var y :=: Int 3) (Var y :=: Int 3) (Var y :=: Int 4))))
+  where
+    x = ident "x"
+    y = ident "y"
+
+
+-- ex_stuck3 = verse $
+--   timlam $ \_x ->
+--     do return (do y <- exists <? "y"
+--                   def (ite (y :=: Int 3) (y :=: Int 3) (y :=: Int 4)))
 
 --- examples testing If with `mustDecide` ---
 
 -- this *should* VERIFY
 ex_if0 :: Expr
-ex_if0 = verse $
-  timlam $ \b -> return (ite b (Int 3) (Int 4))
+ex_if0 = Verify [b] [] $ Assert (If (Var b) (Int 3) (Int 4))
+  where
+    b = ident "b"
+-- verse $
+--  timlam $ \b -> return (ite b (Int 3) (Int 4))
 
 -- this *should not* VERIFY
 ex_if1 :: Expr
-ex_if1 = verse $
-  timlam $ \_x ->
-    do return (do b <- exists <? "b"
-                  def (ite b (Int 3) (Int 4)))
+ex_if1 = Verify [x] [] $ Assert (EXI b $ If (Var b) (Int 3) (Int 4))
+  where
+    x = ident "x"
+    b = ident "b"
+
+  -- verse $
+  -- timlam $ \_x ->
+  --   do return (do b <- exists <? "b"
+  --                 def (ite b (Int 3) (Int 4)))
 
 ex_if2 :: Expr
 ex_if2 = Verify [x] [] $
@@ -737,3 +778,10 @@ exS0 :: Expr
 exS0 = lAMs [x] (Var x :>: Assume (Var x))
   where
     x = ident "x"
+
+
+ex_asm_fail :: Expr
+ex_asm_fail = Verify [] [Assume (Int 1 :=: Int 2)] (Assert Fail)
+
+ex_asm_fail' :: Expr
+ex_asm_fail' = Verify [] [Fails (Int 1)] (Assert Fail)

@@ -16,7 +16,7 @@ import TRS.Bind
 import TRS.TRS hiding (step)
 import TRS.Traced
 import TRS.Tarjan
-import Rules.Core
+import Rules.Core hiding (isHNF)
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
@@ -40,7 +40,7 @@ verifyM sys e = res
        _ -> undefined -- should never happen as tarjan1 returns a single trace?
 
    arrow (a :<-- t)       = [ b :<-- ((r,a):t) | (r,b) <- next a ]
-   next a = {- traceShow ("STEPS: " ++ prettyShow a) $ -} stepS sys a
+   next a = {- _traceShow ("STEPS: " ++ prettyShow a) $ -} stepS sys a
 
 verify :: TRSystem Expr -> Expr -> (Bool, Traced Expr)
 verify sys e =
@@ -108,6 +108,7 @@ splitVerifier = systemICFPE
   , description = "ICFPE + split verifier rules"
   , rules = (rules systemICFPE -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
               <> Old.generalizedIcfpRules
+              <> ifRules
               <> substRules
               <> guardRules
               <> checkRules
@@ -118,6 +119,23 @@ splitVerifier = systemICFPE
    -- TODO:SPLIT-PFUN
   , displayRules = const True
   }
+
+------------------------------------------------------------------
+isHNF :: TRSFlags -> Expr -> Bool
+isHNF _   (HNF _) = True
+isHNF env (Var x) = x `elem` rigidVars env
+isHNF _   _       = False
+
+ifRules :: Rule Expr
+ifRules env lhs =
+   "IF-TRUE" `name`
+   do If b e _ <- [lhs]
+      guard (isHNF env b)
+      pure e
+   ++
+   "IF-FALSE" `name`
+   do If Fail _ e <- [lhs]
+      pure e
 
 ------------------------------------------------------------------
 substRules :: Rule Expr
@@ -165,7 +183,7 @@ verifyRules env lhs =
    ++
    "VERIFY-FAIL" `name`
    do Verify _ _ Fail <- [lhs]
-      pure Fail
+      pure (Arr[])
    ++
    "SMT" `name`
    do Verify rs as _ <- [lhs]
@@ -183,42 +201,48 @@ verifyRules env lhs =
 
 
 unsat :: [Ident] -> [Expr] -> Bool
-unsat _ es = any (`elem` pos) neg
+unsat _ es = asmFail || contra
   where
-    pos    = [ e | Assume e <- es ]
-    neg    = [ e | Fails  e <- es ]
+    asmFail = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]
+    contra  = any (`elem` pos) neg
+    pos     = [ e | Assume e <- es ]
+    neg     = [ e | Fails  e <- es ]
 
 --------------------------------------------------------------------------------
 
-isUni :: [Ident] -> [BndVar] -> Ident -> Bool
-isUni rs bs r = r `elem` rs && r `notElem` (bndIds bs)
+isUni :: [Ident] -> [BndVar] -> Expr -> Bool
+isUni rs bs (Var r)  = r `elem` rs && r `notElem` (bndIds bs)
+isUni _  _  (Int _)  = True
+isUni _  _  (Char _) = True
+isUni rs bs (Arr es) = all (isUni rs bs) es
+isUni _  _  _        = False
 
 splitRules :: Rule Expr
 splitRules env lhs =
    "SPLIT-K" `name`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Int _)) <- proofX [] e
-      guard (isUni rs bs r)
+      guard (isUni rs bs (Var r))
       pure $ caseSplit rs a as ctx (Arr [])
    ++
    "SPLIT-C" `name`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Char _)) <- proofX [] e
-      guard (isUni rs bs r)
+      guard (isUni rs bs (Var r))
       pure $ caseSplit rs a as ctx (Arr [])
    ++
    "SPLIT-VAR" `name`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Var r')) <- proofX [] e
-      guard (isUni rs bs r)
-      guard (isUni rs bs r')
+      guard (isUni rs bs (Var r))
+      guard (isUni rs bs (Var r'))
       pure $ caseSplit rs a as ctx (Arr [])
    ++
    "SPLIT-TUP" `name`
    do Verify rs as e <- [lhs]
       (ctx, bs, Var r :=: Arr vs) <- proofX [] e
       guard (not (null vs))
-      guard (isUni rs bs r)
+      guard (isUni rs bs (Var r))
       let xs   = rs ++ free e ++ bndIds bs ++ boundVars env
       let rs'  = take (length vs) (uvIdentsNotIn xs)
       let rvs' = foldr1 (:>:) [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
@@ -227,8 +251,8 @@ splitRules env lhs =
    ++
    "SPLIT-PPRED" `name`
    do Verify rs as e <- [lhs]
-      (ctx, bs, a@(op :@: Var r)) <- proofX [] e
-      guard (isUni rs bs r)
+      (ctx, bs, a@(op :@: arg)) <- proofX [] e
+      guard (isUni rs bs arg)
       guard (isPrim1 op)
       pure $ caseSplit rs a as ctx (Arr [])
 
@@ -242,6 +266,11 @@ caseSplit rs a as ctx e =
 isPrim1 :: Expr -> Bool
 isPrim1 (Op IsInt)  = True
 isPrim1 (Op IsChar) = True
+isPrim1 (Op Gt)     = True
+isPrim1 (Op Ge)     = True
+isPrim1 (Op Lt)     = True
+isPrim1 (Op Le)     = True
+isPrim1 (Op Ne)     = True
 isPrim1 _           = False
 --------------------------------------------------------------------------------
 -- | Contexts ------------------------------------------------------------------
@@ -314,6 +343,10 @@ proofX1 bs lhs =
   do x :>>: e  <- [lhs]
      (ctx, bs', hole) <- proofX bs x
      pure ((:>>: e) . ctx, bs', hole)
+ ++
+  do If x e1 e2 <- [lhs]
+     (ctx, bs', hole) <- proofX bs x
+     pure ((\e1' -> If e1' e1 e2) . ctx, bs', hole)
  ++
   do Assert x <- [lhs]
      (ctx, bs', hole) <- proofX bs x

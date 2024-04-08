@@ -304,7 +304,7 @@ comp  xs  ys (Decide a) (Decide b) = comp xs ys a b
 comp _xs _ys (Decide _) _          = LT
 comp _xs _ys _          (Decide _) = GT
 
-comp  xs  ys (Verify r1 _ e1) (Verify r2 _ e2) = comp xs' ys' e1 e2 where (xs', ys') = (r1 ++ xs, r2 ++ ys)
+comp  xs  ys (Verify r1 a1 e1) (Verify r2 a2 e2) = comp xs' ys' (Arr a1) (Arr a2) <> comp xs' ys' e1 e2 where (xs', ys') = (r1 ++ xs, r2 ++ ys)
 comp _xs _ys (Verify {}) _          = LT
 comp _xs _ys _          (Verify {}) = GT
 
@@ -591,7 +591,14 @@ instance Rec Expr where
       Assert a -> [ (n, Assert a') | (n,a') <- rec r (addBound BBlk s) a ]
       Decide a -> [ (n, Decide a') | (n,a') <- rec r (addBound BBlk s) a ]
 
-      Verify rs as a -> [ (n, Verify rs as a') | (n,a') <- rec r (foldr (addBound . BUni) s rs) a ]
+      Verify rs as e -> [ (n, Verify rs as e') | (n, e') <- rec r s' e ]
+                        ++
+                        [ (n, Verify rs (take i as ++ [a'] ++ drop (i+1) as) e)
+                        | (i, a) <- [0..] `zip` as
+                        , (n, a') <- rec r s' a
+                        ]
+                        where s' = foldr (addBound . BUni) s rs
+
       Split a f g ->
            [ (n, Split a' f g) | (n,a') <- rec r (addBound BBlk s) a ]
         ++ [ (n, Split a f' g) | (n,f') <- rec r s f ]
