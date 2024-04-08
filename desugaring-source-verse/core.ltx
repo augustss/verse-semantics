@@ -136,12 +136,12 @@ $\begin{array}{@@{}l}
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 %\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 %\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{exi-float}^{\alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{exi-float}^{* \alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |(eq_1 `eqsemi` eq_2) ; e_3| & \movesto & |eq_1; (eq_2; e_3)| \\
 \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
 \rulename{seq-elim} & |v ; e| & \movesto & |e| \\
 \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
-\rulename{eq-swap} & |v == x| & \movesto & |x == v| & \text{May apply infinitely for |x==y|} \\
+\rulename{eq-swap}^{*} & |v == x| & \movesto & |x == v|  \\
 \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
 \rulename{fail} & |C^[fail]| & \movesto & |fail| \\
 
@@ -177,7 +177,8 @@ $\begin{array}{@@{}l}
   \multicolumn{2}{l}{|if (x := apply1N dom v) then apply1N rng x else apply1N g v|} \\[2mm]
 \end{array}
 \\
-\text{\textit{Note}: In the rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.}
+\text{\textit{Note}: In rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.} \\
+\text{\textit{Note}: Rules marked with a superscript $*$, use $\alpha$-conversion to satisfy the side condition.}
 \end{array}$
 
 \caption{\textbf{The \vcname: Rewrite rules for execution}} \label{fig:rules}
