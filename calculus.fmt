@@ -434,6 +434,9 @@
 %format G_1
 %format G_2
 
+%format susp_1
+%format susp_2
+
 %format e_0
 %format e_0'
 %format e0'

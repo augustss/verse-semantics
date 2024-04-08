@@ -57,9 +57,11 @@
 \text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |cf; S| \vb |S guard e| \vb |v=S| \\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |eq; E| \vb |E; e| \vb |def x E| \vb |E guard e| \vb |eq guard E| \vb |v==E| \\
 \text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |def x C| \vb |C guard e| \vb |v==C| \\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb |cf; P| \vb |P; e| \vb |def x P| \vb |one P| \vb |all P| \\
+\text{Proof contexts}  & |P| & ::= & |hole| \vb |susp; P| \vb |P; e| \vb |def x P| \vb |one P| \vb |all P| \\
 && \vb & |v==P| \vb |P `choice` e| \vb |e `choice` P| \vb |P guard e|
-    \vb |check fx P|
+    \vb |check fx P| \\
+    \text{Suspended exprs}  & |susp| & ::= &|v=susp| \vb |one susp| \vb |all susp| \vb |susp_1; susp_2| \\
+    && \vb & |apply1N pp x| \vb  |susp guard e| \vb |check fx susp| \vb |some susp| \\
 \end{array} \\
 \begin{array}{ll}
 % \text{Effect-free} & \text{|ef| is an |eq| that can have choice and fail, but not I/O effects or divergence} \\
@@ -123,7 +125,7 @@ $\begin{array}{@@{}l}
 %  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{subst1} & |def x (S^[x==v])| & \movesto & |subst S x v ^[tup()]|
   & \text{$|x|\not\in\freevars{|v|}$} \\
-\rulename{subst-rec} & |f = V^[lam x e]| & \movesto & |f = V^[lam x (def f (f = V^[lam x e]; e))]|
+\rulename{subst-rec} & |z = V^[lam x e]| & \movesto & |z = V^[lam x (def z (z = V^[lam x e]; e))]|
   & \text{$|f| \in |e|$} \\
 \end{array}
 \\ \\[-0.6em]
@@ -148,7 +150,7 @@ $\begin{array}{@@{}l}
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
 \rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
-\rulename{choice-exi} & |def x (E^[e_1 choice e_2]| & \movesto & |E^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{choice-exi}^{\alpha} & |def x (E^[e_1 choice e_2]| & \movesto & |E^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 
     \\[-0.6em]
 
