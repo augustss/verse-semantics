@@ -201,12 +201,17 @@ verifyRules env lhs =
 
 
 unsat :: [Ident] -> [Expr] -> Bool
-unsat _ es = asmFail || contra
+unsat _ es = asmFail || contra || _refl
   where
     asmFail = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]
+    _refl    = not . null $ [ e | Fails e@(Var x :=: Var y) <- es, x == y, isInt asms x ]
+    asms    = [ e | Assume e <- es ]
     contra  = any (`elem` pos) neg
     pos     = [ e | Assume e <- es ]
     neg     = [ e | Fails  e <- es ]
+
+isInt :: [Expr] -> Ident -> Bool
+isInt asms x = INT (Var x) `elem` asms
 
 --------------------------------------------------------------------------------
 
