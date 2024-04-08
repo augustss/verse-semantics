@@ -77,6 +77,7 @@ data Exp f a
   | Name (Name f a)
   | ExpPath (Path f)
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
+  | Domain (f (Exp f a))
 
 data Quantifier = Val | Fun | Var deriving Show
 

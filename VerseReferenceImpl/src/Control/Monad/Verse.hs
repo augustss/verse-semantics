@@ -22,11 +22,16 @@ module Control.Monad.Verse
   , assume
   , fork
   , join'
+  , yield
   , Freezable (..)
   , FreezeT
   , freeze'
+  , Defaultable (..)
+  , defaultVar
+  , defaultGVar
   , Var
   , freshVar
+  , freshDVar
   , newVar
   , newVerifyVar
   , readVar
@@ -35,6 +40,7 @@ module Control.Monad.Verse
   , unify
   , GVar
   , freshGVar
+  , freshDGVar
   , newGVar
   , readGVar
   , unifyG
@@ -53,6 +59,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import Control.Monad.Reader
 import Control.Monad.Ref
+import Control.Monad.RWS.Strict
 import Control.Monad.State.Strict
 import Control.Monad.Supply
 import Control.Monad.Wrong
@@ -63,10 +70,11 @@ import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.HashMap.Strict (HashMap)
-import Data.IntMap.Lazy.Extras qualified as IntMap.Lazy
+import Data.IntMap.Lazy.Extras (lookupInsert)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntMap.Strict.Extras qualified as IntMap
+import Data.Monoid
 
 import GHC.Exts qualified
 
@@ -148,8 +156,8 @@ incrSuspCount (Latch ref) = modifyHRef' ref $ \ LatchState {..} ->
 decrSuspCount :: MonadRef m => Latch m -> VerseT m ()
 decrSuspCount (Latch ref) = do
   LatchState {..} <- readHRef ref
-  when (suspCount == 1) susp
   writeHRef ref $! LatchState { suspCount = suspCount - 1, .. }
+  when (suspCount == 1) susp
 
 asksV :: (R m -> a) -> VerseT m a
 asksV f = VerseT $ \ _ r@R {..} s sk -> sk heaps s $ f r
@@ -179,6 +187,8 @@ localLatch f = localV $ \ R {..} -> R { latch = f latch, .. }
 
 data S m = S
   { suspend :: !(Suspend m)
+  , suspCounts :: !SuspCounts
+  , default' :: !(Default m)
   , commit :: !(Commit m)
   , store :: !(Store m)
   }
@@ -186,6 +196,8 @@ data S m = S
 emptyS :: Applicative m => S m
 emptyS = S
   { suspend = const $ pure ()
+  , suspCounts = mempty
+  , default' = Nothing
   , commit = const $ pure ()
   , store = mempty
   }
@@ -193,6 +205,49 @@ emptyS = S
 type Suspend m = Resume m -> VerseT m ()
 
 type Resume m = VerseT m () -> VerseT m ()
+
+type SuspCounts = IntMap Int
+
+incrSuspCounts :: SuspCounts -> VerseT m ()
+incrSuspCounts = modifySuspCounts . plusSuspCounts
+
+incrLevelSuspCount :: Int -> VerseT m ()
+incrLevelSuspCount k = modifySuspCounts $ IntMap.alter f k
+  where
+    f = \ case
+      Nothing -> Just 1
+      Just (-1) -> Nothing
+      Just x -> Just $! x + 1
+
+decrSuspCounts :: SuspCounts -> VerseT m ()
+decrSuspCounts = modifySuspCounts . minusSuspCounts
+
+decrLevelSuspCount :: Int -> VerseT m ()
+decrLevelSuspCount k = modifySuspCounts $ IntMap.alter f k
+  where
+    f = \ case
+      Nothing -> Just (-1)
+      Just 1 -> Nothing
+      Just x -> Just $! x - 1
+
+plusSuspCounts :: SuspCounts -> SuspCounts -> SuspCounts
+plusSuspCounts = IntMap.mergeWithKey f id id
+  where
+    f _ x y = case x + y of
+      0 -> Nothing
+      z -> Just z
+
+minusSuspCounts :: SuspCounts -> SuspCounts -> SuspCounts
+minusSuspCounts = IntMap.mergeWithKey f id id
+  where
+    f _ x y = case x - y of
+      0 -> Nothing
+      z -> Just z
+
+modifySuspCounts :: (SuspCounts -> SuspCounts) -> VerseT m ()
+modifySuspCounts f = modifyV' $ \ S {..} -> S { suspCounts = f suspCounts, .. }
+
+type Default m = Maybe (VerseT m ())
 
 type Commit m = Heap -> VerseT m ()
 
@@ -202,6 +257,10 @@ data StoreElem m = forall a . Freshenable a m => StoreElem (HRef m a)
 
 putV :: S m -> VerseT m ()
 putV s = VerseT $ \ _ R {..} _ sk -> sk heaps s ()
+
+stateV :: (S m -> (a, S m)) -> VerseT m a
+stateV f = VerseT $ \ _ R {..} s sk -> case f s of
+  (a, s) -> sk heaps s a
 
 modifyV' :: (S m -> S m) -> VerseT m ()
 modifyV' f = VerseT $ \ _ R {..} s sk ->
@@ -216,6 +275,14 @@ whenSuspended f = do
         f $ resume . localLatch (const latch)
     , ..
     }
+
+whenDefaulted :: VerseT m () -> VerseT m ()
+whenDefaulted m = modifyV' $ \ S {..} -> S
+  { default' = case default' of
+      Nothing -> Just m
+      Just m' -> Just $! m' *> m
+  , ..
+  }
 
 whenCommitted :: Commit m -> VerseT m ()
 whenCommitted m = modifyV' $ \ S {..} -> S
@@ -307,12 +374,19 @@ runVerseT m = do
         guard $ suspCount == 0
         lift $ commitRun level heap s.store
         prepend x <$> MaybeT (fk heaps abortRun) <*> MaybeT (ak heaps)
-  unVerseT m yk R {..} emptyS sk failRun failRun abortRun
+  unVerseT (m <* runDefault) yk R {..} emptyS sk failRun failRun abortRun
   where
     yk = Yield $ \ _ _ _ _ _ _ -> pure Nothing
     level = 0
     verifyHeap = Nothing
     prepend x xss yss = ((x:) <$> xss) ++ yss
+
+runDefault :: VerseT m ()
+runDefault = stateV f >>= \ case
+  Nothing -> pure ()
+  Just m -> m *> runDefault
+  where
+    f S {..} = (default', S { default' = Nothing, .. })
 
 commitRun :: MonadRef m => Int -> Heap -> Store m -> m ()
 commitRun level heap store = for_ store $ \ (StoreElem ref) ->
@@ -344,8 +418,8 @@ freshen' x heap = do
   lift $ runFreshenT (freshen x) FreshenEnv {..}
 
 newtype FreshenT m a = FreshenT
-  { unFreshenT :: ReaderT FreshenEnv (StateT (IntMap GHC.Exts.Any) m) a
-  } deriving (Functor, Applicative, Monad)
+  { unFreshenT :: RWST FreshenEnv Any (IntMap (GHC.Exts.Any, Any)) m a
+  } deriving (Functor, Applicative)
 
 data FreshenEnv = FreshenEnv
   { level :: {-# UNPACK #-} !Int
@@ -353,7 +427,7 @@ data FreshenEnv = FreshenEnv
   }
 
 runFreshenT :: Monad m => FreshenT m a -> FreshenEnv -> m a
-runFreshenT m r = evalStateT (runReaderT (unFreshenT m) r) mempty
+runFreshenT m r = fst <$> evalRWST (unFreshenT m) r mempty
 
 instance Monad m => Freshenable () m where
   freshen = pure
@@ -366,6 +440,9 @@ instance ( Freshenable a m
          , Freshenable c m
          ) => Freshenable (a, b, c) m where
   freshen (a, b, c) = (,,) <$> freshen a <*> freshen b <*> freshen c
+
+instance Monad m => Freshenable Bool m where
+  freshen = pure
 
 instance Monad m => Freshenable Integer m where
   freshen = pure
@@ -421,12 +498,16 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   { heap :: !Heap
   , latch :: !(Latch m)
   , susp :: !(Susp m (Stream m a))
-  , init :: !(VerseT m (), VerseT m (), VerseT m ())
+  , init :: !(Init m)
   , last :: !(HRef m (Maybe a))
   , suspend :: !(Suspend m)
+  , suspCounts :: !(IntMap Int)
+  , default' :: !(Default m)
   , commit :: !(Commit m)
   , store :: !(Store m)
   }
+
+type Init m = (VerseT m (), VerseT m (), VerseT m ())
 
 split'
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -436,41 +517,123 @@ split'
   -> HRef m (Maybe a)
   -> VerseT m (Stream m a)
 split' m heap latch last =
-  splitS m heap latch >>= \ case
+  splitS m heap latch emptyS >>= \ case
     AbortS -> abort
     FailS m_a ->
-      pure Done <?>
+      pure Done
+      <?>
       (do heap <- copyHeap heap
           split' m_a heap latch last)
     YieldS s@S {..} m_y m_f m_e m_a ->
-      let
-        f susp = do
-          let init = (m_f, m_e, m_a)
-          ref_env <- newHRef $ Just SplitEnv {..}
-          s.suspend $ resumeSplit ref_env
-          resumeSplit ref_env m_y
+      let init = (m_f, m_e, m_a)
+      in case guard (IntMap.null suspCounts) *> default' of
+        Nothing -> split'' m_y heap latch init last s
+        Just m_d ->
+          let default' = Nothing
+          in split'' (m_y *> m_d) heap latch init last S {..}
+    SucceedS S {..} m_f m_e m_a ->
+      let init = (m_f, m_e, m_a)
+      in case guard (IntMap.null suspCounts) *> default' of
+        Just m_d ->
+          let default' = Nothing
+          in split'' m_d heap latch init last S {..}
+        Nothing -> do
+          suspCount <- readSuspCount' latch heap
+          (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
+            Nothing ->
+              let
+                f susp = do
+                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+                  ref_env <- newHRef $ Just SplitEnv {..}
+                  suspend $ resumeSplit ref_env
+              in yield f
+            Just x ->
+              (do commit heap
+                  commitStore store heap
+                  x <- freshen' x heap
+                  pure . Step x $ do
+                    heap <- copyHeap heap
+                    split' (do dupStore store heap.tail
+                               m_f) heap latch last)
+              <?>
+              (do heap <- copyHeap heap
+                  split' m_a heap latch last)
+
+split''
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => VerseT m ()
+  -> Heap
+  -> Latch m
+  -> Init m
+  -> HRef m (Maybe a)
+  -> S m
+  -> VerseT m (Stream m a)
+split'' m heap latch (m_f', m_e', m_a') last s =
+  splitS m heap latch s >>= \ case
+    AbortS -> split' m_a' heap latch last
+    FailS m_a ->
+      let m_a'' = alt m_a m_f' m_e' <?> m_a'
       in
-        yield f
-    SucceedS s@S {..} m_f m_e m_a -> do
-      suspCount <- readSuspCount' latch heap
-      (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
-        Just x ->
-          (do commit heap
-              commitStore store heap
-              x <- freshen' x heap
-              pure . Step x $ do
-                heap <- copyHeap heap
-                split' (duplicate store heap.tail *> m_f) heap latch last) <?>
-          (do heap <- copyHeap heap
-              split' m_a heap latch last)
-        Nothing ->
-          let
-            f susp = do
-              let init = (m_f, m_e, m_a)
-              ref_env <- newHRef $ Just SplitEnv {..}
-              s.suspend $ resumeSplit ref_env
-          in
-            yield f
+        pure Done
+        <?>
+        (do heap <- copyHeap heap
+            split' (m_e' <?> m_a'') heap latch last)
+    YieldS s@S {..} m_y m_f m_e m_a ->
+      let
+        init =
+          ( m_f <|> m_f'
+          , alt m_e m_f' m_e'
+          , alt m_a m_f' m_e' <?> m_a'
+          )
+      in case guard (IntMap.null suspCounts) *> default' of
+        Nothing -> split'' m_y heap latch init last s
+        Just m_d ->
+          let default' = Nothing
+          in split'' (m_y *> m_d) heap latch init last S {..}
+    SucceedS S {..} m_f m_e m_a ->
+      let
+        m_f'' = m_f <|> m_f'
+        m_e'' = alt m_e m_f' m_e'
+        m_a'' = alt m_a m_f' m_e' <?> m_a'
+        init = (m_f'', m_e'', m_a'')
+      in case guard (IntMap.null suspCounts) *> default' of
+        Just m_d ->
+          let default' = Nothing
+          in split'' m_d heap latch init last S {..}
+        Nothing -> do
+          suspCount <- readSuspCount' latch heap
+          (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
+            Nothing ->
+              let
+                f susp = do
+                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+                  ref_env <- newHRef $ Just SplitEnv {..}
+                  suspend $ resumeSplit ref_env
+              in yield f
+            Just x ->
+              (do commit heap
+                  commitStore store heap
+                  x <- freshen' x heap
+                  pure . Step x $ do
+                    heap <- copyHeap heap
+                    split' (do dupStore store heap.tail
+                               m_f'') heap latch last)
+              <?>
+              (do heap <- copyHeap heap
+                  split' m_a'' heap latch last)
+
+splitS
+  :: (MonadRef m, MonadSupply Int m)
+  => VerseT m ()
+  -> Heap
+  -> Latch m
+  -> S m
+  -> VerseT m (Split m)
+splitS m heap latch s = do
+  level <- getLevel <&> (+ 1)
+  verifyHeap <- getVerifyHeap
+  let r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
+  lift $ unVerseT m yieldS r s succeedS failS failS abortS
 
 resumeSplit
   :: (MonadRef m, MonadSupply Int m)
@@ -490,65 +653,99 @@ resumeSplit'
   -> VerseT m ()
   -> VerseT m ()
 resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
-  splitS m heap latch >>= \ case
+  resumeSplitS m env >>= \ case
     AbortS -> do
+      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
       writeHRef ref_env Nothing
       susp =<< split' m_a' heap latch last
-    FailS m_a -> do
-      writeHRef ref_env Nothing
-      susp =<< split' (m_e' <?> m_a <?> m_a') heap latch last
-    YieldS s m_y m_f m_e m_a ->
+    FailS m_a ->
+      let
+        m_a'' = alt (do m_a
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
+      in do
+        decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+        writeHRef ref_env Nothing
+        susp =<< split' (m_e' <?> m_a'') heap latch last
+    YieldS s@S {..} m_y m_f m_e m_a ->
       let
         init =
-          ( (whenSuspended env.suspend *> m_f) <|> m_f'
-          , alt (whenSuspended env.suspend *> m_e) m_f' m_e'
-          , (whenSuspended env.suspend *> m_a) <?> m_a'
+          ( (do m_f
+                whenSuspended env.suspend
+                incrSuspCounts env.suspCounts) <|> m_f'
+          , alt (do m_e
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) m_f' m_e'
+          , alt (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
           )
         suspend resume = env.suspend resume *> s.suspend resume
-        store = env.store <> s.store
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
-        writeHRef ref_env $ Just SplitEnv {..}
-        s.suspend $ resumeSplit ref_env
-        resumeSplit ref_env m_y
-    SucceedS s m_f m_e m_a -> do
+        incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just SplitEnv {..}
+            s.suspend $ resumeSplit ref_env
+            resumeSplit ref_env $ m_y *> m_d
+          Nothing -> do
+            writeHRef ref_env $ Just SplitEnv {..}
+            s.suspend $ resumeSplit ref_env
+            resumeSplit ref_env m_y
+    SucceedS s@S {..} m_f m_e m_a ->
       let
-        m_f'' = (whenSuspended env.suspend *> m_f) <|> m_f'
-        m_a'' = (whenSuspended env.suspend *> m_a) <?> m_a'
-        commit heap = env.commit heap *> s.commit heap
-        store = env.store <> s.store
-      suspCount <- readSuspCount' latch heap
-      (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
-        Just x ->
-          (do commit heap
-              commitStore store heap
-              x <- freshen' x heap
-              susp . Step x $ do
-                heap <- copyHeap heap
-                split' (duplicate store heap.tail *> m_f'') heap latch last) <?>
-          (do heap <- copyHeap heap
-              susp =<< split' m_a'' heap latch last)
-        Nothing -> do
-          let
-            init =
-              ( m_f''
-              , alt (whenSuspended env.suspend *> m_e) m_f' m_e'
-              , m_a''
-              )
-            suspend resume = env.suspend resume *> s.suspend resume
-          writeHRef ref_env $ Just SplitEnv {..}
-          s.suspend $ resumeSplit ref_env
+        m_f'' = (do m_f
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <|> m_f'
+        m_e'' = alt (do m_e
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e'
+        m_a'' = alt (do m_a
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
+        init = (m_f'', m_e'', m_a'')
+        suspend resume = env.suspend resume *> s.suspend resume
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
+      in do
+        incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just SplitEnv {..}
+            s.suspend $ resumeSplit ref_env
+            resumeSplit ref_env m_d
+          Nothing -> do
+            suspCount <- readSuspCount' latch heap
+            (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
+              Nothing -> do
+                writeHRef ref_env $ Just SplitEnv {..}
+                s.suspend $ resumeSplit ref_env
+              Just x ->
+                (do commit heap
+                    commitStore store heap
+                    x <- freshen' x heap
+                    susp . Step x $ do
+                      heap <- copyHeap heap
+                      split' (do dupStore store heap.tail
+                                 m_f'') heap latch last)
+                <?>
+                (do heap <- copyHeap heap
+                    susp =<< split' m_a'' heap latch last)
 
-splitS
+resumeSplitS
   :: (MonadRef m, MonadSupply Int m)
   => VerseT m ()
-  -> Heap
-  -> Latch m
+  -> SplitEnv m
   -> VerseT m (Split m)
-splitS m heap latch = do
+resumeSplitS m SplitEnv {..} = do
   level <- getLevel <&> (+ 1)
   verifyHeap <- getVerifyHeap
-  let r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
-  lift $ unVerseT m yieldS r emptyS succeedS failS failS abortS
+  let
+    r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
+    s = S { suspend = const $ pure (), suspCounts = mempty, .. }
+  lift $ unVerseT m yieldS r s succeedS failS failS abortS
 
 verify :: (MonadRef m, MonadSupply Int m) => VerseT m () -> VerseT m ()
 verify m = do
@@ -561,9 +758,12 @@ data VerifyEnv m = VerifyEnv
   { heap :: {-# UNPACK #-} !Heap
   , latch :: !(Latch m)
   , susp :: !(Susp m ())
-  , init :: !(VerseT m (), VerseT m (), VerseT m ())
+  , init :: !(Init m)
   , last :: !(HRef m Bool)
   , suspend :: !(Suspend m)
+  , suspCounts :: !(IntMap Int)
+  , default' :: !(Default m)
+  , commit :: !(Commit m)
   }
 
 verify'
@@ -574,30 +774,92 @@ verify'
   -> HRef m Bool
   -> VerseT m ()
 verify' m heap latch last =
-  verifyS m heap latch >>= \ case
+  verifyS m heap latch emptyS >>= \ case
     AbortS -> pure ()
     FailS m_a -> verify' m_a heap latch last
     YieldS s@S {..} m_y m_f m_e m_a ->
+      let init = (m_f, m_e, m_a)
+      in case guard (IntMap.null suspCounts) *> default' of
+        Nothing -> verify'' m_y heap latch init last s
+        Just m_d ->
+          let default' = Nothing
+          in verify'' (m_y *> m_d) heap latch init last S {..}
+    SucceedS S {..} m_f m_e m_a ->
+      let init = (m_f, m_e, m_a)
+      in case guard (IntMap.null suspCounts) *> default' of
+        Just m_d ->
+          let default' = Nothing
+          in verify'' m_d heap latch init last S {..}
+        Nothing -> do
+          suspCount <- readSuspCount' latch heap
+          (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
+            True -> do
+              commit heap
+              verify' (m_f <?> m_a) heap latch last
+            False ->
+              let
+                f susp = do
+                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+                  ref_env <- newHRef $ Just VerifyEnv {..}
+                  suspend $ resumeVerify ref_env
+              in yield f
+
+verify''
+  :: (MonadRef m, MonadSupply Int m)
+  => VerseT m ()
+  -> Heap
+  -> Latch m
+  -> Init m
+  -> HRef m Bool
+  -> S m
+  -> VerseT m ()
+verify'' m heap latch (m_f', m_e', m_a') last s =
+  verifyS m heap latch s >>= \ case
+    AbortS -> verify' m_a' heap latch last
+    FailS m_a -> verify' (m_e' <?> m_a <?> m_a') heap latch last
+    YieldS s@S {..} m_y m_f m_e m_a ->
+      let init = (m_f <|> m_f', alt m_e m_f' m_e', m_a <?> m_a')
+      in case guard (IntMap.null suspCounts) *> default' of
+        Nothing -> verify'' m_y heap latch init last s
+        Just m_d ->
+          let default' = Nothing
+          in verify'' (m_y *> m_d) heap latch init last S {..}
+    SucceedS S {..} m_f m_e m_a ->
       let
-        f susp = do
-          let init = (m_f, m_e, m_a)
-          ref_env <- newHRef $ Just VerifyEnv {..}
-          s.suspend $ resumeVerify ref_env
-          resumeVerify ref_env m_y
-      in
-        yield f
-    SucceedS s@S {..} m_f m_e m_a -> do
-      suspCount <- readSuspCount' latch heap
-      (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
-        True -> verify' (m_f <?> m_a) heap latch last
-        False ->
-          let
-            f susp = do
-              let init = (m_f, m_e, m_a)
-              ref_env <- newHRef $ Just VerifyEnv {..}
-              s.suspend $ resumeVerify ref_env
-          in
-            yield f
+        m_f'' = m_f <|> m_f'
+        m_e'' = alt m_e m_f' m_e'
+        m_a'' = alt m_a m_f' m_e' <?> m_a'
+        init = (m_f'', m_e'', m_a'')
+      in case guard (IntMap.null suspCounts) *> default' of
+        Just m_d ->
+          let default' = Nothing
+          in verify'' m_d heap latch init last S {..}
+        Nothing -> do
+          suspCount <- readSuspCount' latch heap
+          (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
+            True -> do
+              commit heap
+              verify' (m_f'' <?> m_a'') heap latch last
+            False ->
+              let
+                f susp = do
+                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+                  ref_env <- newHRef $ Just VerifyEnv {..}
+                  suspend $ resumeVerify ref_env
+              in yield f
+
+verifyS
+  :: (MonadRef m, MonadSupply Int m)
+  => VerseT m ()
+  -> Heap
+  -> Latch m
+  -> S m
+  -> VerseT m (Split m)
+verifyS m heap latch s = do
+  level <- getLevel <&> (+ 1)
+  verifyHeap <- getHeap
+  let r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
+  lift $ unVerseT m yieldS r s succeedS failS failS abortS
 
 resumeVerify
   :: (MonadRef m, MonadSupply Int m)
@@ -617,54 +879,91 @@ resumeVerify'
   -> VerseT m ()
   -> VerseT m ()
 resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
-  verifyS m heap latch >>= \ case
+  resumeVerifyS m env >>= \ case
     AbortS -> do
+      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
       writeHRef ref_env Nothing
       susp =<< verify' m_a' heap latch last
-    FailS m_a -> do
-      writeHRef ref_env Nothing
-      susp =<< verify' (m_e' <?> m_a <?> m_a') heap latch last
-    YieldS s m_y m_f m_e m_a ->
+    FailS m_a ->
+      let
+        m_a'' = (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <?> m_a'
+      in do
+        decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+        writeHRef ref_env Nothing
+        susp =<< verify' (m_e' <?> m_a'') heap latch last
+    YieldS s@S {..} m_y m_f m_e m_a ->
       let
         init =
-          ( (whenSuspended env.suspend *> m_f) <|> m_f'
-          , alt (whenSuspended env.suspend *> m_e) m_f' m_e'
-          , (whenSuspended env.suspend *> m_a) <?> m_a'
+          ( (do m_f
+                whenSuspended env.suspend
+                incrSuspCounts env.suspCounts) <|> m_f'
+          , alt (do m_e
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) m_f' m_e'
+          , alt (do m_a
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
           )
         suspend resume = env.suspend resume *> s.suspend resume
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
-        writeHRef ref_env $ Just VerifyEnv {..}
-        s.suspend $ resumeVerify ref_env
-        resumeVerify ref_env m_y
-    SucceedS s m_f m_e m_a -> do
+        incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just VerifyEnv {..}
+            s.suspend $ resumeVerify ref_env
+            resumeVerify ref_env $ m_y *> m_d
+          Nothing -> do
+            writeHRef ref_env $ Just VerifyEnv {..}
+            s.suspend $ resumeVerify ref_env
+            resumeVerify ref_env m_y
+    SucceedS s@S {..} m_f m_e m_a ->
       let
-        m_f'' = (whenSuspended env.suspend *> m_f) <|> m_f'
-        m_a'' = (whenSuspended env.suspend *> m_a) <?> m_a'
-      suspCount <- readSuspCount' latch heap
-      (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
-        True -> susp =<< verify' (m_f'' <?> m_a'') heap latch last
-        False -> do
-          let
-            init =
-              ( m_f''
-              , alt (whenSuspended env.suspend *> m_e) m_f' m_e'
-              , m_a''
-              )
-            suspend resume = env.suspend resume *> s.suspend resume
-          writeHRef ref_env $ Just VerifyEnv {..}
-          s.suspend $ resumeVerify ref_env
+        m_f'' = (do m_f
+                    whenSuspended env.suspend
+                    incrSuspCounts env.suspCounts) <|> m_f'
+        m_e'' = alt (do m_e
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e'
+        m_a'' = alt (do m_a
+                        whenSuspended env.suspend
+                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
+        init = (m_f'', m_e'', m_a'')
+        suspend resume = env.suspend resume *> s.suspend resume
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
+      in do
+        incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just VerifyEnv {..}
+            s.suspend $ resumeVerify ref_env
+            resumeVerify ref_env m_d
+          Nothing -> do
+            suspCount <- readSuspCount' latch heap
+            (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
+              False -> do
+                writeHRef ref_env $ Just VerifyEnv {..}
+                s.suspend $ resumeVerify ref_env
+              True -> do
+                commit heap
+                susp =<< verify' (m_f'' <?> m_a'') heap latch last
 
-verifyS
+resumeVerifyS
   :: (MonadRef m, MonadSupply Int m)
   => VerseT m ()
-  -> Heap
-  -> Latch m
+  -> VerifyEnv m
   -> VerseT m (Split m)
-verifyS m heap latch = do
+resumeVerifyS m VerifyEnv {..} = do
   level <- getLevel <&> (+ 1)
   verifyHeap <- getHeap
-  let r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
-  lift $ unVerseT m yieldS r emptyS succeedS failS failS abortS
+  let
+    r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
+    s = S { suspend = const $ pure (), suspCounts = mempty, store = mempty, .. }
+  lift $ unVerseT m yieldS r s succeedS failS failS abortS
 
 assume
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -762,6 +1061,9 @@ instance Monad m => Freezable () () m where
 instance (Freezable a c m, Freezable b d m) => Freezable (a, b) (c, d) m where
   freeze (x, y) = (,) <$> freeze x <*> freeze y
 
+instance Monad m => Freezable Bool Bool m where
+  freeze = pure
+
 instance Monad m => Freezable Integer Integer m where
   freeze = pure
 
@@ -783,6 +1085,53 @@ instance Freezable (a (b c)) (d (e f)) m =>
          Freezable (Compose a b c) (Compose d e f) m where
   freeze = fmap Compose . freeze . getCompose
 
+class Monad m => Defaultable a m where
+  defaultVars :: a -> VerseT m ()
+
+defaultVar
+  :: (MonadRef m, MonadSupply Int m, Defaultable a m)
+  => Var m a -> a -> VerseT m ()
+defaultVar (Var ref) binding = readVarState ref >>= \ case
+  Link var -> defaultVar var binding
+  Bound bound -> defaultVars bound.binding
+  Unbound unbound -> do
+    label <- supply
+    let bound = MkBound {..}
+    var <- lift $ newVar'' bound
+    writeVarState ref $ Link var
+    unbound.substSusp (var, Just bound)
+
+defaultGVar
+  :: (MonadRef m, MonadSupply Int m, Defaultable a m)
+  => GVar m a -> a -> VerseT m ()
+defaultGVar = defaultGVar' . unGVar
+
+defaultGVar'
+  :: (MonadRef m, MonadSupply Int m, Defaultable a m)
+  => Var m a -> a -> VerseT m ()
+defaultGVar' (Var ref) binding = readVarState ref >>= \ case
+  Link var -> defaultGVar' var binding
+  Bound bound -> defaultVars bound.binding
+  Unbound unbound -> do
+    label <- supply
+    let bound = MkBound {..}
+    var <- lift $ newVar'' bound
+    writeVarStateG ref $ Link var
+    unbound.substSusp (var, Just bound)
+
+instance Monad m => Defaultable () m where
+  defaultVars = const $ pure ()
+
+instance ( Defaultable a m
+         , Defaultable b m
+         ) => Defaultable (a, b) m where
+  defaultVars (a, b) = do
+    defaultVars a
+    defaultVars b
+
+instance Monad m => Defaultable Integer m where
+  defaultVars = const $ pure ()
+
 newtype Var m a = Var (HRef m (VarState m a))
 
 instance ( MonadFix m
@@ -792,19 +1141,44 @@ instance ( MonadFix m
          ) => Freshenable (Var m a) m where
   freshen var@(Var ref) = FreshenT $ do
     FreshenEnv {..} <- ask
-    lift (lift $ readVarState'' ref heap) >>= \ case
-      Link var -> unFreshenT $ freshen var
-      Unbound unbound ->
-        if unbound.level < level then pure var else mfix $ \ var' ->
-          state' (IntMap.Lazy.lookupInsert unbound.label $ unsafeCoerce var') >>= \ case
-            Just (unsafeCoerce -> var') -> pure var'
-            Nothing -> lift . lift $ freshVar' (level - 1) heap.tail
-      Bound bound -> mfix $ \ var' ->
-        state' (IntMap.Lazy.lookupInsert bound.label $ unsafeCoerce var') >>= \ case
-          Just (unsafeCoerce -> var') -> pure var'
-          Nothing -> do
-            binding <- unFreshenT (freshen bound.binding)
-            lift . lift $ newVar' binding
+    lift (readVarState'' ref heap) >>= \ case
+      Link var -> tell (Any True) *> unFreshenT (freshen var)
+      Bound bound -> unFreshenT $ freshenBound var bound
+      Unbound unbound -> unFreshenT (freshenUnbound ref unbound) $> var
+
+freshenBound
+  :: (MonadFix m, MonadRef m, MonadSupply Int m, Freshenable a m)
+  => Var m a
+  -> Bound a
+  -> FreshenT m (Var m a)
+freshenBound var bound = FreshenT . fmap fst . mfix $ \ ~(var', _) ->
+  state' (lookupInsert bound.label (unsafeCoerce var', Any True)) >>= \ case
+    Just (unsafeCoerce -> var', changed) -> do
+      tell changed
+      pure (var', changed)
+    Nothing -> do
+      (binding, Any changed) <- listen . unFreshenT $ freshen bound.binding
+      if changed
+        then lift $ newVar' binding <&> (, Any True)
+        else do
+          modify' $ IntMap.insert bound.label (unsafeCoerce var, Any False)
+          pure (var, Any False)
+
+freshenUnbound
+  :: MonadRef m
+  => HRef m (VarState m a)
+  -> Unbound m a
+  -> FreshenT m ()
+freshenUnbound (HRef ref) unbound = FreshenT $ do
+  FreshenEnv {..} <- ask
+  lift . when (unbound.level == level) $
+    let
+      unbound' = Unbound MkUnbound
+        { label = unbound.label
+        , level = level - 1
+        , substSusp = const $ pure ()
+        }
+    in modifyRef' ref $ insertLocalHeap heap.tail unbound' . deleteLocalHeap' heap
 
 instance ( MonadFix m
          , MonadRef m
@@ -816,7 +1190,7 @@ instance ( MonadFix m
       Link var -> unFreezeT $ freeze var
       Unbound _ -> pure Nothing
       Bound bound -> mfix $ \ binding ->
-        state' (IntMap.Lazy.lookupInsert bound.label $ unsafeCoerce binding) >>= \ case
+        state' (lookupInsert bound.label $ unsafeCoerce binding) >>= \ case
           Just (unsafeCoerce -> binding) -> pure binding
           Nothing -> Just <$> unFreezeT (freeze bound.binding)
 
@@ -851,10 +1225,19 @@ freshVar' level heap = do
   let substSusp = const $ pure ()
   Var <$> newHRef' (Unbound MkUnbound {..}) heap
 
-newVar :: (MonadRef m, MonadSupply Int m) => a -> VerseT m (Var m a)
-newVar binding = do
+freshDVar
+  :: (MonadRef m, MonadSupply Int m, Defaultable a m)
+  => a -> VerseT m (Var m a)
+freshDVar binding = do
   label <- supply
-  Var <$> newHRef (Bound MkBound {..})
+  level <- getLevel
+  let substSusp = const $ pure ()
+  var <- Var <$> newHRef (Unbound MkUnbound {..})
+  whenDefaulted $ defaultVar var binding
+  pure var
+
+newVar :: (MonadRef m, MonadSupply Int m) => a -> VerseT m (Var m a)
+newVar = lift . newVar'
 
 newVerifyVar :: (MonadRef m, MonadSupply Int m) => a -> VerseT m (Var m a)
 newVerifyVar binding = do
@@ -864,7 +1247,10 @@ newVerifyVar binding = do
 newVar' :: (MonadRef m, MonadSupply Int m) => a -> m (Var m a)
 newVar' binding = do
   label <- supply
-  Var <$> newHRef' (Bound MkBound {..}) Nothing
+  newVar'' MkBound {..}
+
+newVar'' :: MonadRef m => Bound a -> m (Var m a)
+newVar'' bound = Var <$> newHRef' (Bound bound) Nothing
 
 readVar :: MonadRef m => Var m a -> VerseT m a
 readVar = fmap ((.binding) . snd) . readBound
@@ -884,8 +1270,8 @@ unify f var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
   (UnboundR var1 unbound1, UnboundR var2 unbound2) ->
     case compareUnbound unbound1 unbound2 of
       EQ -> pure ()
-      LT -> unifyUnboundUnbound f var1 unbound1 var2 unbound2
-      GT -> unifyUnboundUnbound f var2 unbound2 var1 unbound1
+      LT -> unifyUnboundUnbound f var1 var2 unbound2
+      GT -> unifyUnboundUnbound f var2 var1 unbound1
   (UnboundR var1 unbound1, BoundR var2 bound2) ->
     unifyBoundUnbound f var2 bound2 var1 unbound1
   (BoundR var1 bound1, UnboundR var2 unbound2) ->
@@ -896,15 +1282,15 @@ unify f var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
 unifyUnboundUnbound
   :: MonadRef m
   => (a -> a -> VerseT m (Match, VerseT m ()))
-  -> Var m a -> Unbound m a -> Var m a -> Unbound m a -> VerseT m ()
-unifyUnboundUnbound f var1 _ var2@(Var ref2) unbound2 = do
+  -> Var m a -> Var m a -> Unbound m a -> VerseT m ()
+unifyUnboundUnbound f var1 var2@(Var ref2) unbound2 = do
   writeVarState ref2 $ Link var1
   unbound2.substSusp (var1, Nothing)
   whenM ((unbound2.level /=) <$> getLevel) $ do
     incrSuspCount =<< getLatch
     whenSuspended $ \ resume ->
-      fork $ readSubst var2 >>= \ subst -> resume $ do
-        unifySubst f subst var1
+      fork $ readSubst var2 >>= \ subst2 -> resume $ do
+        unifySubst f subst2 var1
         decrSuspCount =<< getLatch
 
 unifyBoundUnbound
@@ -925,12 +1311,12 @@ unifyBoundBound
   :: MonadRef m
   => (a -> a -> VerseT m (Match, VerseT m ()))
   -> Var m a -> Bound a -> Var m a -> Bound a -> VerseT m ()
-unifyBoundBound f (Var ref1) bound1 (Var ref2) bound2 =
+unifyBoundBound f var1@(Var ref1) bound1 var2@(Var ref2) bound2 =
   when (bound1.label /= bound2.label) $
     f bound1.binding bound2.binding >>= \ case
-      (SEQ, m) -> writeVarState ref2 (Bound bound1) *> m
-      (LE, m) -> (writeVerifyVarState ref2 (Bound bound1) *> m) <?> empty
-      (GE, m) -> (writeVerifyVarState ref1 (Bound bound2) *> m) <?> empty
+      (SEQ, m) -> writeVarState ref2 (Link var1) *> m
+      (LE, m) -> (writeVerifyVarState ref2 (Link var1) *> m) <?> empty
+      (GE, m) -> (writeVerifyVarState ref1 (Link var2) *> m) <?> empty
 
 unifySubst
   :: MonadRef m
@@ -953,8 +1339,11 @@ data Root m a
   | BoundR !(Var m a) !(Bound a)
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Root m a)
-readRoot var@(Var ref) = readVarState ref >>= \ case
-  Link var -> readRoot var
+readRoot var = lift . readRoot' var =<< getHeap
+
+readRoot' :: MonadRef m => Var m a -> Maybe Heap -> m (Root m a)
+readRoot' var@(Var ref) heap = readVarState' ref heap >>= \ case
+  Link var -> readRoot' var heap
   Bound bound -> pure $ BoundR var bound
   Unbound unbound -> pure $ UnboundR var unbound
 
@@ -965,11 +1354,19 @@ readSubst var@(Var ref) = readVarState ref >>= \ case
   Link var -> pure (var, Nothing)
   Bound bound -> pure (var, Just bound)
   Unbound unbound -> yield $ \ k -> do
-    k <- once k
-    writeVarState ref $ Unbound unbound
-      { substSusp = \ x -> unbound.substSusp x *> k x
-      }
-    whenM ((unbound.level /=) <$> getLevel) $
+    level <- getLevel
+    if (unbound.level == level) then
+      writeVarState ref $ Unbound unbound
+        { substSusp = \ x -> unbound.substSusp x *> k x
+        }
+    else do
+      incrLevelSuspCount unbound.level
+      k <- once $ \ x -> do
+        decrLevelSuspCount unbound.level
+        k x
+      writeVarState ref $ Unbound unbound
+        { substSusp = \ x -> unbound.substSusp x *> k x
+        }
       whenSuspended $ \ resume -> fork $ do
         subst@(var, _) <- readSubst var
         resume $ do
@@ -1018,13 +1415,13 @@ writeVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   modifyRef' ref (insertLocalHeap heaps.heap x)
   let
     fk' heaps@Heaps {..} ak = do
-      x <- findVarState heap <$> readRef ref
+      x <- findLocalHeap heap <$> readRef ref
       modifyRef' ref (insertLocalHeap heap y)
       fk heaps $ \ heaps@Heaps {..} -> do
         modifyRef' ref $ insertLocalHeap heap x
         ak heaps
     ek' heaps@Heaps {..} ak = do
-      x <- findVarState heap <$> readRef ref
+      x <- findLocalHeap heap <$> readRef ref
       modifyRef' ref $ insertLocalHeap heap y
       ek heaps $ \ heaps@Heaps {..} -> do
         modifyRef' ref $ insertLocalHeap heap x
@@ -1049,8 +1446,32 @@ writeVerifyVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
 
 newtype GVar m a = GVar { unGVar :: Var m a }
 
+instance ( MonadFix m
+         , MonadRef m
+         , MonadSupply Int m
+         , Freshenable a m
+         ) => Freshenable (GVar m a) m where
+  freshen = fmap GVar . freshen . unGVar
+
+instance ( MonadFix m
+         , MonadRef m
+         , Freezable a b m
+         ) => Freezable (GVar m a) (Maybe b) m where
+  freeze = freeze . unGVar
+
 freshGVar :: (MonadRef m, MonadSupply Int m) => VerseT m (GVar m a)
 freshGVar = GVar <$> freshVar
+
+freshDGVar
+  :: (MonadRef m, MonadSupply Int m, Defaultable a m)
+  => a -> VerseT m (GVar m a)
+freshDGVar binding = do
+  label <- supply
+  level <- getLevel
+  let substSusp = const $ pure ()
+  var <- Var <$> newHRef (Unbound MkUnbound {..})
+  whenDefaulted $ defaultGVar' var binding
+  pure $ GVar var
 
 newGVar :: (MonadRef m, MonadSupply Int m) => a -> VerseT m (GVar m a)
 newGVar = fmap GVar . newVar
@@ -1077,23 +1498,26 @@ unifyG' f var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
   (UnboundR var1 unbound1, UnboundR var2 unbound2) ->
     case compareUnbound unbound1 unbound2 of
       EQ -> pure ()
-      LT -> unifyUnboundUnboundG f var1 unbound1 var2 unbound2
-      GT -> unifyUnboundUnboundG f var2 unbound2 var1 unbound1
+      LT -> unifyUnboundUnboundG f var1 var2 unbound2
+      GT -> unifyUnboundUnboundG f var2 var1 unbound1
   (UnboundR var1 unbound1, BoundR var2 bound2) ->
     unifyBoundUnboundG f var2 bound2 var1 unbound1
   (BoundR var1 bound1, UnboundR var2 unbound2) ->
     unifyBoundUnboundG f var1 bound1 var2 unbound2
   (BoundR _ bound1, BoundR var2 bound2) ->
-    unifyBoundBoundG f bound1 var2 bound2
+    unifyBoundBoundG f var1 bound1 var2 bound2
 
 unifyUnboundUnboundG
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
   => (a -> a -> VerseT m (VerseT m ()))
-  -> Var m a -> Unbound m a -> Var m a -> Unbound m a -> VerseT m ()
-unifyUnboundUnboundG f var1 _ var2@(Var ref2) unbound2 = do
-  writeVarState ref2 $ Link var1
+  -> Var m a -> Var m a -> Unbound m a -> VerseT m ()
+unifyUnboundUnboundG f var1 var2@(Var ref2) unbound2 = do
+  writeVarStateG ref2 $ Link var1
   unbound2.substSusp (var1, Nothing)
-  whenM ((unbound2.level /=) <$> getLevel) $
+  whenM ((unbound2.level /=) <$> getLevel) $ do
+    whenSuspended $ \ resume ->
+      fork $ readSubst var2 >>= \ subst2 -> resume $
+        unifySubstG f subst2 var1
     whenCommitted . const $
       unifyG' f var1 var2
 
@@ -1102,22 +1526,57 @@ unifyBoundUnboundG
   => (a -> a -> VerseT m (VerseT m ()))
   -> Var m a -> Bound a -> Var m a -> Unbound m a -> VerseT m ()
 unifyBoundUnboundG f var1 bound1 var2@(Var ref2) unbound2 = do
-  writeVarState ref2 $ Link var1
+  writeVarStateG ref2 $ Link var1
   unbound2.substSusp (var1, Just bound1)
-  whenM ((unbound2.level /=) <$> getLevel) $
-    whenCommitted $ \ heap -> do
-      var1 <- newVar =<< freshen' bound1.binding heap
-      unifyG' f var1 var2
+  whenM ((unbound2.level /=) <$> getLevel) $ do
+    whenSuspended $ \ resume ->
+      fork $ readBound var2 >>= \ (var2, bound2) -> resume $
+        unifyBoundBoundG f var1 bound1 var2 bound2
+    whenCommitted $ \ heap ->
+      unifyG' f var2 =<< newVar =<< freshen' bound1.binding heap
 
 unifyBoundBoundG
   :: MonadRef m
   => (a -> a -> VerseT m (VerseT m ()))
-  -> Bound a -> Var m a -> Bound a -> VerseT m ()
-unifyBoundBoundG f bound1 (Var ref2) bound2 =
+  -> Var m a -> Bound a -> Var m a -> Bound a -> VerseT m ()
+unifyBoundBoundG f var1 bound1 (Var ref2) bound2 =
   when (bound1.label /= bound2.label) $ do
     m <- f bound1.binding bound2.binding
-    writeVarState ref2 (Bound bound1)
+    writeVarStateG ref2 $ Link var1
     m
+
+unifySubstG
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => (a -> a -> VerseT m (VerseT m ()))
+  -> Subst m a -> Var m a -> VerseT m ()
+unifySubstG f subst1 var2 = case subst1 of
+  (var1, Nothing) -> unifyG' f var1 var2
+  (var1, Just bound1) -> unifyBoundG f var1 bound1 var2
+
+unifyBoundG
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => (a -> a -> VerseT m (VerseT m ()))
+  -> Var m a -> Bound a -> Var m a -> VerseT m ()
+unifyBoundG f var1 bound1 var2 = readRoot var2 >>= \ case
+  UnboundR var2 unbound2 -> unifyBoundUnboundG f var1 bound1 var2 unbound2
+  BoundR var2 bound2 -> unifyBoundBoundG f var1 bound1 var2 bound2
+
+writeVarStateG
+  :: MonadRef m
+  => HRef m (VarState m a)
+  -> VarState m a
+  -> VerseT m ()
+writeVarStateG (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
+  y <- findVarState heaps.heap <$> readRef ref
+  modifyRef' ref (insertLocalHeap heaps.heap x)
+  let
+    ek' heaps@Heaps {..} ak = do
+      x <- findLocalHeap heap <$> readRef ref
+      modifyRef' ref $ insertLocalHeap heap y
+      ek heaps $ \ heaps@Heaps {..} -> do
+        modifyRef' ref $ insertLocalHeap heap x
+        ak heaps
+  sk heaps s () fk ek' ak
 
 data VerseRef m a = VerseRef
   { label :: {-# UNPACK #-} !Int
@@ -1171,15 +1630,12 @@ writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   modifyRef' ref $ insertLocalHeap heaps.heap x
   let
     ek' heaps@Heaps {..} ak = do
-      x <- findHeap heap <$> readRef ref
+      x <- findLocalHeap heaps.heap <$> readRef ref
       modifyRef' ref $ alterLocalHeap heap y
       ek heaps $ \ heaps@Heaps {..} -> do
         modifyRef' ref $ insertLocalHeap heap x
         ak heaps
-    ak' heaps@Heaps {..} = do
-      modifyRef' ref $ alterLocalHeap heap y
-      ak heaps
-  sk heaps s () fk ek' ak'
+  sk heaps s () fk ek' ak
 
 commitStore :: MonadRef m => Store m -> Heap -> VerseT m ()
 commitStore store heap = IntMap.forWithKey_ store $ \ label elem ->
@@ -1187,16 +1643,15 @@ commitStore store heap = IntMap.forWithKey_ store $ \ label elem ->
 
 commitStoreElem :: MonadRef m => Int -> StoreElem m -> Heap -> VerseT m ()
 commitStoreElem label elem@(StoreElem ref) heap = do
-  x <- flip freshen' heap =<< lift (readVerseRef'' ref heap)
-  writeVerseRef' ref x
+  writeVerseRef' ref =<< flip freshen' heap =<< lift (readVerseRef'' ref heap)
   modifyStore $ IntMap.insert label elem
 
-duplicate :: MonadRef m => Store m -> Maybe Heap -> VerseT m ()
-duplicate store heap = for_ store $ \ (StoreElem ref) ->
-  duplicate' ref heap
+dupStore :: MonadRef m => Store m -> Maybe Heap -> VerseT m ()
+dupStore store heap = for_ store $ \ (StoreElem ref) ->
+  dupStoreElem ref heap
 
-duplicate' :: MonadRef m => HRef m a -> Maybe Heap -> VerseT m ()
-duplicate' ref = writeVerseRef' ref <=< lift . readVerseRef' ref
+dupStoreElem :: MonadRef m => HRef m a -> Maybe Heap -> VerseT m ()
+dupStoreElem ref = writeVerseRef' ref <=< lift . readVerseRef' ref
 
 newtype HRef m a = HRef (Ref m (HeapMap a))
 
@@ -1322,7 +1777,10 @@ insertLocalHeap' Heap {..} x xs = xs { just = IntMap.insert label x xs.just }
 deleteLocalHeap :: Maybe Heap -> HeapMap a -> HeapMap a
 deleteLocalHeap k xs = case k of
   Nothing -> xs { nothing = Nothing }
-  Just Heap {..} -> xs { just = IntMap.delete label xs.just }
+  Just k -> deleteLocalHeap' k xs
+
+deleteLocalHeap' :: Heap -> HeapMap a -> HeapMap a
+deleteLocalHeap' Heap {..} xs = xs { just = IntMap.delete label xs.just }
 
 state' :: MonadState s m => (s -> Either a s) -> m (Maybe a)
 state' f = state $ \ s -> case f s of

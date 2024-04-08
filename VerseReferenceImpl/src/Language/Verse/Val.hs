@@ -6,9 +6,13 @@
 module Language.Verse.Val
   ( Val (..)
   , forVal_
-  , VarVal
+  , Sign
+  , List (..)
+  , VarVal (..)
+  , VarList (..)
   , RefVarVal
-  , FrozenVal
+  , FrozenVal (..)
+  , FrozenList (..)
   , Named (..)
   , VarNamed
   , forNamed_
@@ -19,14 +23,24 @@ module Language.Verse.Val
   , AccessScope (..)
   ) where
 
-import Control.Monad.Verse (Var, VerseRef, Freezable (..), Freshenable (..))
+import Control.Monad.Fix
+import Control.Monad.Ref
+import Control.Monad.Supply
+import Control.Monad.Verse
+  ( Defaultable (..)
+  , Freezable (..)
+  , Freshenable (..)
+  , GVar
+  , Var
+  , VerseRef
+  , defaultGVar
+  )
 
 import Data.ByteString.Internal (w2c)
 import Data.Char
-import Data.Fix
+import Data.Coerce
 import Data.Foldable (for_)
 import Data.Functor
-import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
@@ -44,7 +58,7 @@ import Language.Verse.SimpleName
 import Numeric (showHex)
 import Prettyprinter
 
-data Val ref a
+data Val ref a b
   = Any
   | Comparable
   | AnyRational
@@ -58,55 +72,60 @@ data Val ref a
   | AnyChar32
   | Char32 {-# UNPACK #-} !Char
   | Path [SimpleName]
-  | Truth a
-  | Tuple [a]
-  | Ptr (ref a) a
+  | Truth b
+  | Tuple [b]
+  | Ptr (ref b) b
   | Module
     {-# UNPACK #-} !Label
-    !(Env SimpleName a)
+    !(Env SimpleName b)
   | Enum
     {-# UNPACK #-} !Label
-    !(Env SimpleName a) [a]
+    !(Env SimpleName b) [b]
   | EnumValue
     {-# UNPACK #-} !Label
     {-# UNPACK #-} !SimpleName
   | Struct
     {-# UNPACK #-} !Label
     !(NonEmpty Scope)
-    !(Env Ident a)
+    !(Env Ident b)
     !(Desugar.Env Ident)
     !Exp
   | StructInst
     {-# UNPACK #-}
     !Label
-    !(Env SimpleName a)
+    !(Env SimpleName b)
   | Class
     {-# UNPACK #-} !Label
     !(NonEmpty Scope)
-    !(Env Ident a)
-    !(Maybe a)
+    !(Env Ident b)
+    !(Maybe b)
     !(Desugar.Env Ident)
     !Exp
   | ClassInst
     {-# UNPACK #-} !Label
-    !(Maybe a)
-    !(Env SimpleName a)
+    !(Maybe b)
+    !(Env SimpleName b)
   | Lam
     !(NonEmpty Scope)
-    !(Env Ident a)
+    !Sign
+    !(Env Ident b)
     !Ident
     !Exp
   | AnyOLam
   | OLam
     !(NonEmpty Scope)
-    !(Env Ident a)
+    !Sign
+    !(Env Ident b)
     !(Desugar.Env Ident)
     !Exp
     !Exp
-    a
-  | Intrinsic !Intrinsic a deriving Show
+    b
+  | Intrinsic !Intrinsic b
+  | Type !Sign a deriving Show
 
-forVal_ :: Applicative m => Val ref a -> (a -> m b) -> m ()
+type Sign = Bool
+
+forVal_ :: Applicative m => Val ref a b -> (b -> m c) -> m ()
 forVal_ x f = case x of
   Any -> pure ()
   Comparable -> pure ()
@@ -131,12 +150,15 @@ forVal_ x f = case x of
   StructInst _ env -> forEnv_ env f
   Class _ _ env sup _ _ -> forEnv_ env f *> for_ sup f
   ClassInst _ sup env -> for_ sup f *> forEnv_ env f
-  Lam _ env _ _ -> forEnv_ env f
+  Lam _ _ env _ _ -> forEnv_ env f
   AnyOLam -> pure ()
-  OLam _ _ _ _ _ tail -> void $ f tail
+  OLam _ _ _ _ _ _ tail -> void $ f tail
   Intrinsic _ tail -> void $ f tail
+  Type {} -> pure ()
 
-instance Freshenable a m => Freshenable (Val f a) m where
+instance ( Freshenable a m
+         , Freshenable b m
+         ) => Freshenable (Val f a b) m where
   freshen x = case x of
     Any -> pure x
     Comparable -> pure x
@@ -166,19 +188,21 @@ instance Freshenable a m => Freshenable (Val f a) m where
       sup <- freshen sup
       pure $ Class i scope env sup xs e
     ClassInst i sup env -> ClassInst i <$> freshen sup <*> freshen env
-    Lam scope env x e -> do
+    Lam scope sign env x e -> do
       env <- freshen env
-      pure $ Lam scope env x e
+      pure $ Lam scope sign env x e
     AnyOLam -> pure x
-    OLam scope env xs e1 e2 tail -> do
+    OLam scope sign env xs e1 e2 tail -> do
       env <- freshen env
       tail <- freshen tail
-      pure $ OLam scope env xs e1 e2 tail
+      pure $ OLam scope sign env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freshen tail
+    Type x y -> Type x <$> freshen y
 
-instance ( Freezable (f a) (g b) m
-         , Freezable a b m
-         ) => Freezable (Val f a) (Val g b) m where
+instance ( Freezable (f b) (g d) m
+         , Freezable a c m
+         , Freezable b d m
+         ) => Freezable (Val f a b) (Val g c d) m where
   freeze = \ case
     Any -> pure Any
     Comparable -> pure Comparable
@@ -208,15 +232,18 @@ instance ( Freezable (f a) (g b) m
       sup <- freeze sup
       pure $ Class i scope env sup xs e
     ClassInst i sup env -> ClassInst i <$> freeze sup <*> freeze env
-    Lam scope env x e -> freeze env <&> \ env -> Lam scope env x e
+    Lam scope sign env x e -> freeze env <&> \ env -> Lam scope sign env x e
     AnyOLam -> pure AnyOLam
-    OLam scope env xs e1 e2 tail -> do
+    OLam scope sign env xs e1 e2 tail -> do
       env <- freeze env
       tail <- freeze tail
-      pure $ OLam scope env xs e1 e2 tail
+      pure $ OLam scope sign env xs e1 e2 tail
     Intrinsic i tail -> Intrinsic i <$> freeze tail
+    Type x y -> Type x <$> freeze y
 
-instance (Pretty (ref a), Pretty a) => Pretty (Val ref a) where
+instance ( Pretty (ref b)
+         , Pretty b
+         ) => Pretty (Val ref a b) where
   pretty = \ case
     Any -> "any"
     Comparable -> "comparable"
@@ -276,6 +303,7 @@ instance (Pretty (ref a), Pretty a) => Pretty (Val ref a) where
     AnyOLam -> "function"
     OLam {} -> "function"
     Intrinsic {} -> "function"
+    Type {} -> "type"
     where
       prettyPath xs = foldr ( \ a b -> "/" <> pretty a <> b ) mempty xs
       prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
@@ -298,11 +326,59 @@ instance (Pretty (ref a), Pretty a) => Pretty (Val ref a) where
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
 
-type VarVal m = Fix (Compose (Var m) (Val (VerseRef m)))
+data List a b
+  = Nil
+  | Cons a b deriving Show
+
+instance ( MonadRef m
+         , MonadSupply Int m
+         ) => Defaultable (List a (VarList m)) m where
+  defaultVars = \ case
+    Nil -> pure ()
+    Cons _ x -> defaultGVar (coerce x) Nil
+
+instance (Freshenable a m, Freshenable b m) => Freshenable (List a b) m where
+  freshen = \ case
+    Nil -> pure Nil
+    Cons x y -> Cons <$> freshen x <*> freshen y
+
+instance ( Freezable a b m
+         , Freezable c d m
+         ) => Freezable (List a c) (List b d) m where
+  freeze = \ case
+    Nil -> pure Nil
+    Cons x y -> Cons <$> freeze x <*> freeze y
+
+newtype VarVal m = VarVal (Var m (Val (VerseRef m) (VarList m) (VarVal m)))
+
+instance ( MonadFix m
+         , MonadRef m
+         , MonadSupply Int m
+         ) => Freshenable (VarVal m) m where
+  freshen (VarVal x) = VarVal <$> freshen x
+
+instance (MonadFix m, MonadRef m) => Freezable (VarVal m) FrozenVal m where
+  freeze (VarVal x) = FrozenVal <$> freeze x
+
+newtype VarList m = VarList (GVar m (List (VarVal m) (VarList m)))
+
+instance ( MonadFix m
+         , MonadRef m
+         , MonadSupply Int m
+         ) => Freshenable (VarList m) m where
+  freshen (VarList x) = VarList <$> freshen x
+
+instance (MonadFix m, MonadRef m) => Freezable (VarList m) FrozenList m where
+  freeze (VarList x) = FrozenList <$> freeze x
 
 type RefVarVal m = VerseRef m (VarVal m)
 
-type FrozenVal = Fix (Compose Maybe (Val Identity))
+newtype FrozenVal = FrozenVal (Maybe (Val Identity FrozenList FrozenVal)) deriving Show
+
+instance Pretty FrozenVal where
+  pretty (FrozenVal x) = pretty x
+
+newtype FrozenList = FrozenList (Maybe (List FrozenVal FrozenList)) deriving Show
 
 type Exp = L (Desugar.Exp L Ident)
 
@@ -338,25 +414,31 @@ forEnv_ x f = for_ x $ \ (_access, x) -> forNamed_ x f
 type VarEnv k m = Env k (VarVal m)
 
 data Scope = Scope
-  !Label          -- The identifier for this scope, must match for <private>/<internal>
-  ![Label]        -- List of identifiers for all scopes that could contain <protected> items
-  !Label          -- Enclosing module
-  deriving Show
+  -- The identifier for this scope, must match for <private>/<internal>
+  {-# UNPACK #-} !Label
+  -- List of identifiers for all scopes that could contain <protected> items
+  ![Label]
+  -- Enclosing module
+  {-# UNPACK #-} !Label deriving Show
 
 instance Pretty Scope where
   pretty = \ case
-    Scope label labels mLabel -> "Scope{" <> prettyLabel label <>  prettySup labels <+> "in" <+> prettyLabel mLabel <> "}"
+    Scope label labels mLabel ->
+      "Scope" <>
+      braces (prettyLabel label <>
+              prettySup labels <+> "in" <+>
+              prettyLabel mLabel)
     where
       prettySup = \ case
         [] -> mempty
         labels -> "," <> "sup=[" <> concatWith (<+>) (map prettyLabel labels) <> "]"
 
-data AccessScope
-  = AccessScope
-    Desugar.Access
-    Label           -- enclosing scope
-    Label           -- enclosing module
-  deriving Show
+data AccessScope = AccessScope
+  !Desugar.Access
+  -- enclosing scope
+  {-# UNPACK #-} !Label
+  -- enclosing module
+  {-# UNPACK #-} !Label deriving Show
 
 instance Monad m => Freezable AccessScope AccessScope m where
   freeze = pure
@@ -365,4 +447,8 @@ instance Monad m => Freshenable AccessScope m where
   freshen = pure
 
 instance Pretty AccessScope where
-  pretty (AccessScope access sLabel mLabel) = "AC{" <> pretty access <+> "scope" <+> prettyLabel sLabel <+> "in" <+> prettyLabel mLabel <> "}"
+  pretty (AccessScope access sLabel mLabel) =
+    "AC" <>
+    braces (pretty access <+>
+            "scope" <+> prettyLabel sLabel <+>
+            "in" <+> prettyLabel mLabel)

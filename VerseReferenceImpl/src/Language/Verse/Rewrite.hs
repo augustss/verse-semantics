@@ -197,6 +197,8 @@ rewriteExp e = for e $ \ case
     All <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "truth" e1 ->
     Truth <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "domain" e1 ->
+    Domain <$> rewriteExp e2
 
   -- Parse generates these
   Parse.One e2 ->

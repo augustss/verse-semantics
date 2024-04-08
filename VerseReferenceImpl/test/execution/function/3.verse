@@ -1,9 +1,9 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
 any(exists X) := X
 
-type := any
+Type := any
 
-prefix'[]'(t:type)(Xs:any) :=
+prefix'[]'(t:Type)(Xs:any) :=
   for (X:Xs). t[X]
 
 Zip(Xs:[]any, Ys:[]any) := all:

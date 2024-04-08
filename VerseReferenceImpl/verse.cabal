@@ -33,7 +33,6 @@ library
     Data.IntMap.Lazy.Extras
     Data.IntMap.Strict.Extras
     Data.Fix
-    Data.Functor.Compose.Instances
     Language.Verse
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp

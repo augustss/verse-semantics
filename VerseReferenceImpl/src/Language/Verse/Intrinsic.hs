@@ -27,6 +27,7 @@ data Intrinsic
   | Char
   | Char32
   | Function
+  | Type
   | Query deriving (Show, Eq)
 
 toString :: Intrinsic -> String
@@ -49,6 +50,7 @@ toString = \ case
   Char -> "char"
   Char32 -> "char32"
   Function -> "function"
+  Type -> "type"
   Query -> "postfix'?'"
 
 instance Pretty Intrinsic where

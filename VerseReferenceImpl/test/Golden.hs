@@ -11,7 +11,6 @@ import Control.Monad.Trans.Except
 import Control.Monad.Verse (runVerseT)
 
 import Data.ByteString qualified as ByteString
-import Data.Functor.Compose.Instances ()
 import Data.List
 import Data.Traversable
 
