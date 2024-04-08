@@ -38,17 +38,19 @@
       \text{Integers} & k \\
       \text{Existentials} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
+          & |rs| & ::= & |{r_1, xdots, r_n}|  \hspace{1cm} (n \geq 0)\\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
       \text{Expressions} & |e| & ::= & |v| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
-      && \vb & |some v| \vb |e_1 guard e_2| \vb |check fx e| \\
-      && \vb & |v == e| \vb |verify2 rs as e| \\
+      && \vb & |v == e| \vb |some v| \vb |e_1 guard e_2| \vb |check fx e|
+      \vb |verify2 rs as e| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb r  \vb |pfun| \vb |ppred| \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
       \text{Prim functions} & |pfun|  & ::= & |add| \vb |sub| \vb \ldots \\
       \text{Prim predicates} & |ppred| & ::= & |gt| \vb |isInt| \vb \ldots \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail| \\
-      \text{Assumptions} & |a| & ::= & |r = v| \vb |r = apply1N pfun hnf| \vb |apply1N ppred r| \vb |not a|
+      \text{Assumptions} & |a| & ::= & |r = v| \vb |r = apply1N pfun hnf| \vb |apply1N ppred r| \vb |not a| \\
+      & |as| & ::= & |{a_1, xdots, a_n}|   \hspace{1cm} (n \geq 0)
 \end{array}
 \\ \\
 \mbox{\em Contexts} \\

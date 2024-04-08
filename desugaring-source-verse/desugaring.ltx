@@ -979,7 +979,10 @@ $\begin{array}{@@{}l}
   \rulename{verify-fail} & |verify2 rs as fail|    & \movesto & |tup ()| & \\[1mm]
   \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
   & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
-  &&& \text{if $|r| \notin |rs|$ and $\skol{|v|}$} \\[1mm]
+  &&& \text{if $|r| \notin |rs|$ and $\skol{|v|}$} \\
+  \rulename{skol-pfun} & |verify2 (rs,r) as (P^[apply1N pfun hnf]))| & \movesto &
+          |verify2 (rs,r) (as, r = apply1N pfun hnf) (P^[r ]);| \\
+    &&& \text{if $\skol{|hnf|}$} \\[1mm]
 
  \rulename{split-v} & |verify2 (rs,r) as (P^[r==v])| & \movesto &
     |verify2 (rs,r) (as, r==v) (P^[ tup () ]);| \\
@@ -999,9 +1002,6 @@ $\begin{array}{@@{}l}
   \rulename{split-ppred} & |verify2 (rs,r) as (P^[apply1N ppred r]))| & \movesto &
           |verify2 (rs,r) (as, apply1N ppred r) (P^[ tup () ]);| \\
     &&& |verify2 (rs,r) (as, not (apply1N ppred r)) (P^[ fail ])| \\
-  \rulename{split-pfun} & |verify2 (rs,r) as (P^[apply1N pfun hnf]))| & \movesto &
-          |verify2 (rs,r) (as, r = apply1N pfun hnf) (P^[r ]);| \\
-    &&& \text{if $\skol{|hnf|}$} \\[1mm]
 \end{array}\\
 
 \end{array}$
