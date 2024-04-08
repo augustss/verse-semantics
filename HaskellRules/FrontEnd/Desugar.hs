@@ -68,7 +68,7 @@ desugar flgs = eval flgs .
     prel = spl $ eval flgs $ syntaxFixes $ snd $ fPrelude flgs
 
     -- Split the prelude into an association list
-    spl (Array ds) = map (\ e -> (nameOf e, eAssume e)) ds
+    spl (Array ds) = map (\ e -> (nameOf e, e)) ds
     spl e = impossible e
 
     -- Find the name of a definition
