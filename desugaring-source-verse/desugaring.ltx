@@ -982,9 +982,9 @@ $\begin{array}{@@{}l}
   \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
   & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
   &&& \text{if $|r| \notin |rs|$ and $\skol{|v|}$} \\
-  \rulename{skol-pfun} & |verify2 (rs,r) as (P^[apply1N pfun hnf]))| & \movesto &
-          |verify2 (rs,r) (as, r = apply1N pfun hnf) (P^[r ]);| \\
-    &&& \text{if $\skol{|hnf|}$} \\[1mm]
+  \rulename{skol-pfun} & |verify2 (rs,r) as (P^[apply1N pfun v]))| & \movesto &
+          |verify2 (rs,r) (as, r = apply1N pfun v) (P^[r ]);| \\
+    &&& \text{if $\skol{|v|}$} \\[1mm]
 
  \rulename{split-v} & |verify2 (rs,r) as (P^[r==v])| & \movesto &
     |verify2 (rs,r) (as, r==v) (P^[ tup () ]);| \\
@@ -997,13 +997,10 @@ $\begin{array}{@@{}l}
              |{ P^[ r_1==v_1; xdots; r_n == v_n ] };|
            \end{array}\\
     &&& |verify2 (rs,r) (as, not (r==tup (_, xdots,_))) (P^[ fail ])| \\  \\[-2mm]
-%  \rulename{split-val} & |verify2 (rs,r) as (P^[r==v])| & \movesto &
-%    \hspace{5mm} \text{if $\freevars{|v|} \not\in \boundvars{|P|}$ } \\
-%    &&& |verify2 (rs,r) (as, r==v) (P^[ tup () ]);| \\
-%    &&& |verify2 (rs,r) (as, not (r==v)) (P^[ fail ])| \\  \\[-1mm]
-  \rulename{split-ppred} & |verify2 (rs,r) as (P^[apply1N ppred r]))| & \movesto &
-          |verify2 (rs,r) (as, apply1N ppred r) (P^[ tup () ]);| \\
-    &&& |verify2 (rs,r) (as, not (apply1N ppred r)) (P^[ fail ])| \\
+  \rulename{split-ppred} & |verify2 (rs,r) as (P^[apply1N ppred v]))| & \movesto &
+          |verify2 (rs,r) (as, apply1N ppred v) (P^[ tup () ]);| \\
+    &&& |verify2 (rs,r) (as, not (apply1N ppred v)) (P^[ fail ])| \\
+    &&& \text{if $\skol{|v|}$} \\[1mm]
 \end{array}\\
 
 \end{array}$
