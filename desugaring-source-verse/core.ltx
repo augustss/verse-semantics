@@ -128,7 +128,7 @@ $\begin{array}{@@{}l}
 \rulename{subst1} & |def x (S^[x==v])| & \movesto & |subst S x v ^[tup()]|
   & \text{$|x|\not\in\freevars{|v|}$} \\
 \rulename{subst-rec} & |z = V^[lam x e]| & \movesto & |z = V^[lam x (def z (z = V^[lam x e]; e))]|
-  & \text{$|z| \in |e|$} \\
+  & \text{$|z| \in \freevars{|e|}$} \\
 \end{array}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
