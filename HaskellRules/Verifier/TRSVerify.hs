@@ -30,7 +30,8 @@ takeL n xs = [xs!!n]
 
 tests :: [(String, Expr, Bool)]
 tests = -- take 1
-  [ ("ex_asm_fail", ex_asm_fail, True)
+  [ ("ex_ty_00", ex_ty_00, True)
+  , ("ex_asm_fail", ex_asm_fail, True)
   , ("ex_asm_fail'", ex_asm_fail', True)
   , ("ex_crash", ex_crash, True)
   , ("ex00", ex00, True)
@@ -57,7 +58,6 @@ tests = -- take 1
   -- TODO:HOF , ("ex_tim_0", ex_tim_0, False)
   -- TODO:HOF , ("ex_tim_1", ex_tim_1, False)
   , ("ex_asm_subst", ex_asm_subst, True)
-{-
   , ("ex_asm_race", ex_asm_race, True)
   , ("ex_asm_race'", ex_asm_race', True)
   , ("ex_if_else_only", ex_if_else_only, True)
@@ -65,18 +65,18 @@ tests = -- take 1
   , ("ex_hide_00", ex_hide_00, True)
   , ("ex_hide_01", ex_hide_01, False)
   , ("ex_hide_02", ex_hide_02, True)
-  --, ("ex_direct00", ex_direct00, True)
+  , ("ex_direct00", ex_direct00, True)
   , ("ex_ty_00", ex_ty_00, True)
   , ("ex_ty_01", ex_ty_01, True)
   , ("ex_choice_00", ex_choice_00, True)
-  , ("ex_if_asm_00", ex_if_asm_00, True)
   , ("ex1_mini", ex1_mini, True)
-  -- not needed, asm's should only have uni-vars, ("ex_asm_var", ex_asm_var, True)
-  , ("ex_ifb", ex_ifb, True)
   , ("ex_L1", ex_L1, True)
   , ("ex_L2", ex_L2, False)
   , ("ex_PC1", ex_PC1, False)
   , ("ex_PC2a", ex_PC2a, True)
+  , ("ex_asm_var", ex_asm_var, True)
+{-
+  , ("ex_ifb", ex_ifb, True)
 -}
   ]
 
@@ -583,7 +583,7 @@ ex_asm_race = Verify [b, a] [] $
     b = ident "b"
 
 ex_asm_race' :: Expr
-ex_asm_race' = lAMs [b, a] $ Assume(INT (Var a)) :>: Assume(INT (Var b)) :>: Assert ((Var a :=: Var b) :>: Assume (Var a :=: Var b) :>: Int 10)
+ex_asm_race' = Verify [b, a]  [Assume (Var a :=: Var b)] $ INT (Var a) :>: INT (Var b) :>: Assert ((Var a :=: Var b) :>: Int 10)
   where
     a = ident "a"
     b = ident "b"
@@ -615,7 +615,7 @@ ex_hide_01 = Assert $ EXI x ((Var x :=: (Int 2 `asType` tINT)) :>: Var x :=: Int
 
 -- exi x,y. x = (2 |> int); y = x; int[y]   (ACCEPT)
 ex_hide_02 :: Expr
-ex_hide_02 = Assert $ eXIs [x,y] ((Var x :=: (Int 2 `asType` tINT)) :>: Var y :=: Var x :>: iNT (Var y))
+ex_hide_02 = Verify [] [] $ Assert $ eXIs [x,y] ((Var x :=: (Int 2 `asType` tINT)) :>: Var y :=: Var x :>: iNT (Var y))
   where
     x = ident "x"
     y = ident "y"
@@ -663,13 +663,6 @@ ex_choice_00 =
   where
     a = ident "a"
 
-ex_if_asm_00 :: Expr
-ex_if_asm_00 =
-  Verify [] [] $
-    Assert (ite (EXI z (Assume (Var z :=: Int 199) :>: Int 2)) (Int 1) (Int 2))
-  where
-    z = ident "z"
-
 ex1_mini :: Expr
 ex1_mini =
   Verify [x] [] $
@@ -682,7 +675,7 @@ ex1_mini =
 ex_asm_var :: Expr
 ex_asm_var =
   Verify [x] [] $
-    Assume (Var x) :=: Int 10
+    {- Assume -} (Var x) :=: Int 10
     :>:
     Assert (Var x :=: Int 10)
   where

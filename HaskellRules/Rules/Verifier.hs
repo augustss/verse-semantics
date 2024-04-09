@@ -198,15 +198,34 @@ verifyRules env lhs =
       let x  = identNotIn xs
           r  = uvIdentNotIn (x : xs)
       pure $ Verify (r:rs) as (EXI x (Var x :=: (v :@: Var r) :>: ctx (Var x)))
+   ++
+   "SUBST-ASM" `name`
+   -- VERIFY(rs, A[r = hnf]) { e } ---> VERIFY(rs, A{hnf/r}[r = hnf]) { e{hnf/r} }
+   do Verify rs as e <- [lhs]
+      (a@(Assume (Var r :=: HNF h)), as') <- asmX as
+      guard (r `elem` rs)
+      pure $ Verify rs (a: subst [(r, h)] as') ({- subst [(r, h)] -} e)
 
+
+
+asmX :: [a] -> [(a, [a])]
+asmX = go []
+  where
+    go _  []      = []
+    go as (a:as') = (a, as++as') : go (a:as) as'
 
 unsat :: [Ident] -> [Expr] -> Bool
-unsat _ es = asmFail || contra
+unsat _ es = asmFail || contra || _refl
   where
     asmFail = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]
+    _refl    = not . null $ [ e | Fails e@(Var x :=: Var y) <- es, x == y, isInt asms x ]
+    asms    = [ e | Assume e <- es ]
     contra  = any (`elem` pos) neg
     pos     = [ e | Assume e <- es ]
     neg     = [ e | Fails  e <- es ]
+
+isInt :: [Expr] -> Ident -> Bool
+isInt asms x = INT (Var x) `elem` asms
 
 --------------------------------------------------------------------------------
 
