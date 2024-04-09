@@ -204,7 +204,7 @@ verifyRules env lhs =
    do Verify rs as e <- [lhs]
       (a@(Assume (Var r :=: HNF h)), as') <- asmX as
       guard (r `elem` rs)
-      pure $ Verify rs (a: subst [(r, h)] as') (subst [(r, h)] e)
+      pure $ Verify rs (a: subst [(r, h)] as') ({- subst [(r, h)] -} e)
 
 
 
