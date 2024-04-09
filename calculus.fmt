@@ -434,6 +434,9 @@
 %format G_1
 %format G_2
 
+%format susp_1
+%format susp_2
+
 %format e_0
 %format e_0'
 %format e0'
@@ -531,14 +534,14 @@
 %format t_km1 = "t_{k-1}"
 %format t_kp1 = "t_{k+1}"
 
-%format rs = "\overline{r}"
+%format rs = "R"
 %format r_0
 %format r_1
 %format r_2
 %format r_k
 %format r_n
 
-%format as = "\overline{a}"
+%format as = "A"
 
 %format E_1
 %format V_1

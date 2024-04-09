@@ -522,7 +522,7 @@ $$
 \begin{array}{@@{}l}
   \begin{array}{r@@{\;\;}c@@{\;\;}ll}
     \multicolumn{4}{l}{\textbf{ANF (where needed)}} \\
-      |tup (e_1, xdots, e_n)| & = & |def (x_1 xdots x_n) (x_1==e_1; xdots; x_n==e_n; tup (x_1; xdots; x_n)| & \text{fresh |x_i|}  \\
+      |tup (e_1, xdots, e_n)| & = & |def (x_1 xdots x_n) (x_1==e_1; xdots; x_n==e_n; tup (x_1; xdots; x_n))| & \text{fresh |x_i|}  \\
       |e_1 = e_2| & = & |def x (x == e_1; x==e_2)| & \text{fresh |x|} \\
       |e_1 e_2| & = & |def (f x) (f==e_1; x==e_2; f x)| & \text{fresh |f|,|x|}  \\
   \end{array} \\
@@ -571,7 +571,7 @@ $$
 % \rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
 \rulename{havoc-succ}     & |havoc succeeds|  & = & |tup ()| \\
 \rulename{havoc-fail}     & |havoc fails|  & = & |fail| \\
-\rulename{havoc-dec}     & |havoc decides|  & = & |some (lam x (x == tup()))| \\[1mm]
+\rulename{havoc-dec}     & |havoc decides|  & = & |some (lam x x) == tup()| \\[1mm]
 \end{array} \\
 
 \begin{array}{lr@@{\;}c@@{\;}ll}
@@ -598,7 +598,7 @@ $$
 \rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|
   & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
 \rulename{mtype1}   & |DMe2 mdneg sibody (:t)|    & = & |z:=De2 mdneg t; Hide z| \\
-\rulename{mtype2}   & |DMe2 md sibody (:t)|    & = & |def i (DMe2 md (sipat i) (:t); i| & |md| \in \{|mdpos|, |mdx|\}\\
+\rulename{mtype2}   & |DMe2 md sibody (:t)|    & = & |def i (DMe2 md (sipat i) (:t)| & |md| \in \{|mdpos|, |mdx|\}\\
 \rulename{mtype3}   & |DMe2 md (sipat i) (:t)| & = & |z:=De2 md t; apply1N z i| \\
 \rulename{msquige} & |DMe2 md sibody (squig x y := t)|
      & = & |def i (DMe2 md (sipat i) (squig x y := t))| \\
@@ -617,7 +617,9 @@ $$
 \multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
 \rulename{mbind}   & |DMe2 md si (x:=t)|         & = & |x := DMe2 md si t| \\
 \rulename{meq}     & |DMe2 md si (t_1=t_2)|      & = & |(DMe2 md si t_1) = (DMe2 md si t_2)| \\
-\rulename{msemi}   & |DMe2 md si (t_1 ; t_2)|    & = & |De2 md t_1 ; DMe2 md si t_2| \\
+\rulename{msemi}   & |DMe2 md si (t_1 ; t_2)|    & = & |De2 mdpos t_1 ; DMe2 md si t_2|
+   & |md|\in\{|mdpos|,|mdneg|\} \\
+\rulename{msemix}   & |DMe2 mdx si (t_1 ; t_2)|    & = & |De2 mdx t_1 ; DMe2 mdx si t_2| \\
 \rulename{mcheck}  & |DMe2 md si (check fx t)|    & = & |check fx (DMe2 md si t)| \\
 \rulename{mchoice} & |DMe2 md si (t_1 `choice` t_2)| & = & |(DMe2 md si t_1) `choice` (DMe2 md si t_2)| \\
 
@@ -963,7 +965,8 @@ $\begin{array}{@@{}l}
 
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \multicolumn{5}{l}{\textit{Check}} \\
-  \rulename{check-fail}   & |check fails fail|  & \movesto & |fail|  & \\
+\rulename{check-fail}   & |check fx fail|  & \movesto & |fail|
+   & \text{if $|fx| \in \{|fails|,|decides|\}$}\\
   \rulename{check-suc}    & |check succeeds v|  & \movesto & |v| & \text{if $\skol{|v|}$} \\
   \rulename{check-dec}    & |check decides v|  & \movesto & |v| & \text{if $\skol{|v|}$} \\
   \rulename{check-choice} & |check succeeds (v choice e)|  & \movesto & |v choice (check fails e)| & \text{if $\skol{|v|}$} \\
@@ -972,17 +975,21 @@ $\begin{array}{@@{}l}
 
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \multicolumn{5}{l}{\textit{Verify}} \\
-\rulename{smt} & |verify2 rs as e| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
+\rulename{solver} & |verify2 rs as e| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
   \rulename{verify-val} & |verify2 rs as v|      & \movesto & |tup ()| & \\
-  \rulename{verify-choice} & |verify2 rs as (v choice e)|      & \movesto & |verify2 rs as e| & \\
+  \rulename{verify-choice} & |verify2 rs as (e_1 choice e_2)|      & \movesto & |verify2 rs as e_1 ; verify2 rs as e_2| & \\
   \rulename{verify-fail} & |verify2 rs as fail|    & \movesto & |tup ()| & \\[1mm]
   \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
   & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
-  &&& \text{if $|r| \notin |rs|$ and $\skol{|v|}$} \\[1mm]
+  &&& \text{if $|r| \notin |rs|$ and $\skol{|v|}$} \\
+  \rulename{skol-pfun} & |verify2 (rs,r) as (P^[apply1N pfun hnf]))| & \movesto &
+          |verify2 (rs,r) (as, r = apply1N pfun hnf) (P^[r ]);| \\
+    &&& \text{if $\skol{|hnf|}$} \\[1mm]
 
- \rulename{split-k} & |verify2 (rs,r) as (P^[r==k])| & \movesto &
-         |verify2 (rs,r) (as, r==k) (P^[ tup () ]);| \\
-   &&& |verify2 (rs,r) (as, not (r==k)) (P^[ fail ])| \\[1mm]
+ \rulename{split-v} & |verify2 (rs,r) as (P^[r==v])| & \movesto &
+    |verify2 (rs,r) (as, r==v) (P^[ tup () ]);| \\
+    &&& |verify2 (rs,r) (as, not (r==v)) (P^[ fail ])|\\
+    &&& \text{if $\skol{|v|}$} \\[1mm]
  \rulename{split-tup} & \multicolumn{3}{l}{|verify2 (rs,r) as (P^[r==tup (v_1, xdots, v_n)])|} \\
      && \movesto & |verifyKW|
            \begin{array}[t]{@@{}l}
@@ -997,8 +1004,6 @@ $\begin{array}{@@{}l}
   \rulename{split-ppred} & |verify2 (rs,r) as (P^[apply1N ppred r]))| & \movesto &
           |verify2 (rs,r) (as, apply1N ppred r) (P^[ tup () ]);| \\
     &&& |verify2 (rs,r) (as, not (apply1N ppred r)) (P^[ fail ])| \\
-  \rulename{split-pfun} & |verify2 (rs,r) as (P^[apply1N pfun hnf]))| & \movesto &
-          |verify2 (rs,r) (as, r = apply1N pfun hnf) (P^[r ]);| 
 \end{array}\\
 
 \end{array}$
