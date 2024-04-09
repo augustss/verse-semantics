@@ -484,6 +484,8 @@
 %format u_n
 %format v_0
 %format v_1
+%format lv_1
+%format lv_2
 %format v1'
 %format v_1'
 %format v0'

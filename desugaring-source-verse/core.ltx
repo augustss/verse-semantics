@@ -40,9 +40,10 @@
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
           & |rs| & ::= & |{r_1, xdots, r_n}|  \hspace{1cm} (n \geq 0)\\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
-      \text{Expressions} & |e| & ::= & |v| \vb |e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
-      && \vb & |v == e| \vb |some v| \vb |e_1 guard e_2| \vb |check fx e|
+      \text{Expressions} & |e| & ::= & |v| \vb |lv == e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+      && \vb & |some v| \vb |e_1 guard e_2| \vb |check fx e|
       \vb |verify2 rs as e| \\
+      \text{Lvalues} & |lv| & ::= & |_| \vb |x| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb r  \vb |pfun| \vb |ppred| \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
@@ -56,13 +57,13 @@
 \mbox{\em Contexts} \\
 \begin{array}{lrcl}
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-\text{Subst. contexts} & |S| & ::= & |hole| \vb |S; e| \vb |cf; S| \vb |S guard e| \vb |v=S| \\
-\text{Eval. contexts}  & |E| & ::= & |hole| \vb |eq; E| \vb |E; e| \vb |def x E| \vb |E guard e| \vb |eq guard E| \vb |v==E| \\
-\text{Choice contexts}  & |C| & ::= & |hole| \vb |cf; C| \vb |C; e| \vb |def x C| \vb |C guard e| \vb |v==C| \\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb |susp; P| \vb |P; e| \vb |def x P| \vb |one P| \vb |all P| \\
-&& \vb & |v==P| \vb |P `choice` e| \vb |e `choice` P| \vb |P guard e|
+\text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |def x E| \vb |E guard e| \vb |eq guard E| \\
+\text{Subst. contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == cf; S| \vb |S guard e| \\
+\text{Choice contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
+\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |def x P| \vb |one P| \vb |all P| \\
+   && \vb &|P `choice` e| \vb |e `choice` P| \vb |P guard e|
     \vb |check fx P| \\
-    \text{Suspended exprs}  & |susp| & ::= &|v=susp| \vb |one susp| \vb |all susp| \vb |susp_1; susp_2| \\
+    \text{Suspended exprs}  & |susp| & ::= &|lv == susp; susp| \vb |one susp| \vb |all susp| \\
     && \vb & |apply1N pp x| \vb  |susp guard e| \vb |check fx susp| \vb |some susp| \\
 \end{array} \\
 \begin{array}{ll}
@@ -111,12 +112,11 @@ $\begin{array}{@@{}l}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Unification}
-  \rulename{u-lit}   & |k == k| & \movesto & |ok| & \\
-  \rulename{u-tup-0}   & |tup () == tup ()| & \movesto & |ok| & \\
-  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')|
-       & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n'| & n \geq 1\\
-  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
-  \rulename{u-occurs} & |x==V^[x]| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+  \rulename{u-lit}   & |k == k; e| & \movesto & |e| & \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|
+       & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n' `eqsemi` e| & n \geq 0\\
+  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
+  \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
 \end{array} \\
 \\[-0.8em]
 
@@ -125,10 +125,10 @@ $\begin{array}{@@{}l}
 
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
-\rulename{subst1} & |def x (S^[x==v])| & \movesto & |subst S x v ^[tup()]|
+\rulename{subst1} & |def x (S^[x==v; e])| & \movesto & |subst S x v ^[e]|
   & \text{$|x|\not\in\freevars{|v|}$} \\
-\rulename{subst-rec} & |z = V^[lam x e]| & \movesto & |z = V^[lam x (def z (z = V^[lam x e]; e))]|
-  & \text{$|z| \in \freevars{|e|}$} \\
+\rulename{subst-rec} & |z = V^[lam x e_1]; e_2| & \movesto & |z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
+  & \text{$|z| \in \freevars{|e_1|}$} \\
 \end{array}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
@@ -137,13 +137,13 @@ $\begin{array}{@@{}l}
 %\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 %\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{exi-float}^{* \alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{seq-assoc} & |(eq_1 `eqsemi` eq_2) ; e_3| & \movesto & |eq_1; (eq_2; e_3)| \\
-\rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
-\rulename{seq-elim} & |v ; e| & \movesto & |e| \\
-\rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
-\rulename{eq-swap}^{*} & |v == x| & \movesto & |x == v|  \\
-\rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
-\rulename{fail} & |C^[fail]| & \movesto & |fail| \\
+\rulename{seq-assoc} & |(lv_2 == (lv_1 == e_1; e_2); e_3| & \movesto & |lv_1 == e_1; lv_2 == e_2; e_3| \\
+% \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
+% \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
+\rulename{eq-swap}^{*} & |v == x; e| & \movesto & |x == v; e|  \\
+% \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
+\rulename{seq-elim} & |_ == v ; e| & \movesto & |e| \\
+\rulename{seq-fail} & |lv == fail; e| & \movesto & |fail| \\
 
     \\[-0.8em]
 

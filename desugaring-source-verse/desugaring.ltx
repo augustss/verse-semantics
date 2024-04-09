@@ -966,10 +966,9 @@ $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \multicolumn{5}{l}{\textit{Check}} \\
 \rulename{check-fail}   & |check fx fail|  & \movesto & |fail|
-   & \text{if $|fx| \in \{|fails|,|decides|\}$}\\
-  \rulename{check-suc}    & |check succeeds v|  & \movesto & |v| & \text{if $\skol{|v|}$} \\
-  \rulename{check-dec}    & |check decides v|  & \movesto & |v| & \text{if $\skol{|v|}$} \\
-  \rulename{check-choice} & |check succeeds (v choice e)|  & \movesto & |v choice (check fails e)| & \text{if $\skol{|v|}$} \\
+   & \text{$|fx| \in \{|fails|,|decides|\}$}\\
+  \rulename{check-suc}    & |check fx v|  & \movesto & |v| & \text{$\skol{|v|}, |fx| \in \{|succeeds|,|decides|\}$} \\
+  \rulename{check-choice} & |check succeeds (v choice e)|  & \movesto & |v choice (check fails e)| & \text{$\skol{|v|}$} \\
 \end{array} \\
 \\[-0.6em]
 
@@ -986,19 +985,19 @@ $\begin{array}{@@{}l}
           |verify2 (rs,r) (as, r = apply1N pfun v) (P^[r ]);| \\
     &&& \text{if $\skol{|v|}$} \\[1mm]
 
- \rulename{split-v} & |verify2 (rs,r) as (P^[r==v])| & \movesto &
-    |verify2 (rs,r) (as, r==v) (P^[ tup () ]);| \\
+ \rulename{split-v} & |verify2 (rs,r) as (P^[r==v; e])| & \movesto &
+    |verify2 (rs,r) (as, r==v) (P^[ e ]);| \\
     &&& |verify2 (rs,r) (as, not (r==v)) (P^[ fail ])|\\
     &&& \text{if $\skol{|v|}$} \\[1mm]
- \rulename{split-tup} & \multicolumn{3}{l}{|verify2 (rs,r) as (P^[r==tup (v_1, xdots, v_n)])|} \\
+ \rulename{split-tup} & \multicolumn{3}{l}{|verify2 (rs,r) as (P^[r==tup (v_1, xdots, v_n); e])|} \\
      && \movesto & |verifyKW|
            \begin{array}[t]{@@{}l}
              |(rs, r, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
-             |{ P^[ r_1==v_1; xdots; r_n == v_n ] };|
+             |{ P^[ r_1==v_1; xdots; r_n == v_n; e ] };|
            \end{array}\\
-    &&& |verify2 (rs,r) (as, not (r==tup (_, xdots,_))) (P^[ fail ])| \\  \\[-2mm]
+    &&& |verify2 (rs,r) (as, not (r==tup (_, xdots,_))) (P^[ e ])| \\  \\[-2mm]
   \rulename{split-ppred} & |verify2 (rs,r) as (P^[apply1N ppred v]))| & \movesto &
-          |verify2 (rs,r) (as, apply1N ppred v) (P^[ tup () ]);| \\
+          |verify2 (rs,r) (as, apply1N ppred v) (P^[ v ]);| \\
     &&& |verify2 (rs,r) (as, not (apply1N ppred v)) (P^[ fail ])| \\
     &&& \text{if $\skol{|v|}$} \\[1mm]
 \end{array}\\
