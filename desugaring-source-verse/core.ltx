@@ -43,7 +43,7 @@
       \text{Expressions} & |e| & ::= & |v| \vb |lv == e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
       && \vb & |some v| \vb |e_1 guard e_2| \vb |check fx e|
       \vb |verify2 rs as e| \\
-      \text{Lvalues} & |lv| & ::= & |_| \vb |x| \\
+      \text{Lvalues} & |lv| & ::= & |_| \vb |v| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb r  \vb |pfun| \vb |ppred| \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
@@ -127,8 +127,6 @@ $\begin{array}{@@{}l}
 %  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{subst1} & |def x (S^[x==v; e])| & \movesto & |subst S x v ^[e]|
   & \text{$|x|\not\in\freevars{|v|}$} \\
-\rulename{subst-rec} & |z = V^[lam x e_1]; e_2| & \movesto & |z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
-  & \text{$|z| \in \freevars{|e_1|}$} \\
 \end{array}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
@@ -137,13 +135,15 @@ $\begin{array}{@@{}l}
 %\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 %\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{exi-float}^{* \alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{seq-assoc} & |(lv_2 == (lv_1 == e_1; e_2); e_3| & \movesto & |lv_1 == e_1; lv_2 == e_2; e_3| \\
+\rulename{seq-assoc} & |lv_2 == (lv_1 == e_1; e_2); e_3| & \movesto & |lv_1 == e_1; lv_2 == e_2; e_3| \\
 % \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
 % \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
 \rulename{eq-swap}^{*} & |v == x; e| & \movesto & |x == v; e|  \\
 % \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
 \rulename{seq-elim} & |_ == v ; e| & \movesto & |e| \\
 \rulename{seq-fail} & |lv == fail; e| & \movesto & |fail| \\
+\rulename{rec} & |z = V^[lam x e_1]; e_2| & \movesto & \multicolumn{2}{l}{|z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
+  \hspace{4mm} \text{$|z| \in \freevars{|e_1|}$}} \\
 
     \\[-0.8em]
 
