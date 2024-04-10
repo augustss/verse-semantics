@@ -366,6 +366,7 @@
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 %format arrayty = "[]"
 
+%format lv = l
 %format cx_0
 %format cx_1
 %format cx_2

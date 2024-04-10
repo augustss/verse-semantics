@@ -58,8 +58,8 @@
 \begin{array}{lrcl}
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |def x E| \vb |E guard e| \vb |eq guard E| \\
-\text{Subst. contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == cf; S| \vb |S guard e| \\
 \text{Choice contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
+\text{Subst. contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == susp; S| \vb |S guard e| \\
 \text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |def x P| \vb |one P| \vb |all P| \\
    && \vb &|P `choice` e| \vb |e `choice` P| \vb |P guard e|
     \vb |check fx P| \\
