@@ -25,6 +25,7 @@ import Rules.ICFP (systemICFPE, isChoiceFree)
 import Control.Monad (guard)
 import Data.List ((\\))
 import Rules.TRS2024 (isEffectFree)
+import qualified Rules.TRS2024 as TRS2024
 
 -- | Run verification rules.
 _traceShow :: (Pretty a) => String -> a -> a
@@ -97,7 +98,7 @@ isDone = go False False
   go _  _    OLam{}           = error "isDone: OLam not implemented"
 
 verifier :: TRSystem Expr
-verifier = splitVerifier -- Old.icfpeVerifier
+verifier = splitVerifier
 
 allSystemsVerify :: [TRSystem Expr]
 allSystemsVerify = [Old.icfpeVerifier, splitVerifier]
@@ -106,8 +107,9 @@ splitVerifier :: TRSystem Expr
 splitVerifier = systemICFPE
   { sname = "SPLITverify"
   , description = "ICFPE + split verifier rules"
-  , rules = (rules systemICFPE -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
-              <> Old.generalizedIcfpRules
+  , rules =     -- (rules systemICFPE -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
+                --  <> Old.generalizedIcfpRules
+                 rules TRS2024.systemTRS2024
               <> ifRules
               <> substRules
               <> guardRules
@@ -204,7 +206,7 @@ verifyRules env lhs =
    do Verify rs as e <- [lhs]
       (a@(Assume (Var r :=: HNF h)), as') <- asmX as
       guard (r `elem` rs)
-      pure $ Verify rs (a: subst [(r, h)] as') ({- subst [(r, h)] -} e)
+      pure $ Verify rs (a: subst [(r, h)] as') ( subst [(r, h)] e)
 
 
 

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-unused-top-binds #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.TRS2024(allSystemsTRS2024, isEffectFree) where
+module Rules.TRS2024(allSystemsTRS2024, systemTRS2024, isEffectFree) where
 import Control.Monad( guard )
 
 --import Epic.Print(prettyShow)
@@ -257,6 +257,10 @@ rulesPrimOps _ lhs =
   "APP-ADD" `name`
   do Op Add :@: Arr [Int k1, Int k2] <- [lhs]
      pure (Int (k1+k2))
+ ++
+  "APP-SUB" `name`
+  do Op Sub :@: Arr [Int k1, Int k2] <- [lhs]
+     pure (Int (k1-k2))
  ++
   "APP-GT" `name`
   do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
