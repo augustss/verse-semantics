@@ -59,16 +59,18 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |def x E| \vb |E guard e| \vb |eq guard E| \\
 \text{Choice contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
-\text{Subst. contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == susp; S| \vb |S guard e| \\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |def x P| \vb |one P| \vb |all P| \\
-   && \vb &|P `choice` e| \vb |e `choice` P| \vb |P guard e|
-    \vb |check fx P| \\
-    \text{Suspended exprs}  & |susp| & ::= &|lv == susp; susp| \vb |one susp| \vb |all susp| \\
-    && \vb & |apply1N pp x| \vb  |susp guard e| \vb |check fx susp| \vb |some susp| \\
+\text{Subst. contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == susp; S| \vb |def x S| \vb |S guard e| \\
+\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |def x P| \vb |one P| \vb |all PV| \\
+   && \vb &|P `choice` e| \vb |P guard e| \vb |check fx P| \\
+   & |PV| & ::= & |P| \vb |v `choice` PV| \\
+\text{Suspended exprs}  & |susp| & ::= & |P^[apply1N pp x]|
+%    \text{Suspended exprs}  & |susp| & ::= &|lv == susp; susp| \vb |one susp| \vb |all susp| \\
+%    && \vb & |apply1N pp x| \vb  |susp guard e| \vb |check fx susp| \vb |some susp| \\
 \end{array} \\
 \begin{array}{ll}
 % \text{Effect-free} & \text{|ef| is an |eq| that can have choice and fail, but not I/O effects or divergence} \\
-\text{Choice-free} & \text{|cf| is an |eq| that has no choice, I/O effects or divergence; but it can fail} \\
+\text{Choice-free:} & \text{|cf| is an |eq| that has no choice, I/O effects or divergence; but it can fail} \\
+\text{Note:} & \text{The productions |def x C| in |C|, and |def x S| in |S| are optional.}
 \end{array}
 
 \\ \\
@@ -117,16 +119,14 @@ $\begin{array}{@@{}l}
        & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n' `eqsemi` e| & n \geq 0\\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
-\end{array} \\
 \\[-0.8em]
 
-\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Substitution}
 
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{subst1} & |def x (S^[x==v; e])| & \movesto & |subst S x v ^[e]|
-  & \text{$|x|\not\in\freevars{|v|}$} \\
+  & \text{$|x|\not\in\freevars{|v|};\, |x|,\freevars{|v|} \not\in \boundvars{|S|}$} \\
 \end{array}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
