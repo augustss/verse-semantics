@@ -125,7 +125,7 @@ $\begin{array}{@@{}l}
 
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
-\rulename{subst1} & |def x (S^[x==v; e])| & \movesto & |subst S x v ^[e]|
+\rulename{subst1} & |def x (S^[x==v; e])| & \movesto & |subst S x v ^[subst e x v]|
   & \text{$|x|\not\in\freevars{|v|};\, |x|,\freevars{|v|} \not\in \boundvars{|S|}$} \\
 \end{array}
 \\ \\[-0.8em]
