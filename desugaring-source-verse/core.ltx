@@ -47,21 +47,20 @@
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Head values} & \hnf & ::= & k \vb r  \vb |pfun| \vb |ppred| \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
-      \text{Prim functions} & |pfun|  & ::= & |add| \vb |sub| \vb \ldots \\
-      \text{Prim predicates} & |ppred| & ::= & |gt| \vb |isInt| \vb \ldots \\
+      \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail| \\
-      \text{Assumptions} & |a| & ::= & |r = v| \vb |r = apply1N pfun v| \vb |apply1N ppred v| \vb |not a| \\
+      \text{Assumptions} & |a| & ::= & |r = v| \vb |noteq r v| \vb |r = apply1N op v| \vb |not (apply1N op v)| \\
       & |as| & ::= & |{a_1, xdots, a_n}|   \hspace{1cm} (n \geq 0)
 \end{array}
 \\ \\
 \mbox{\em Contexts} \\
 \begin{array}{lrcl}
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-\text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |def x E| \vb |E guard e| \vb |eq guard E| \\
-\text{Choice contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
-\text{Subst. contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == susp; S| \vb |def x S| \vb |S guard e| \\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |def x P| \vb |one P| \vb |all PV| \\
-   && \vb &|P `choice` e| \vb |P guard e| \vb |check fx P| \\
+\text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |E guard e| \vb |def x E| \\
+% \text{Pure contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
+\text{Pure contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == susp; S| \vb |S guard e| \\
+\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |P guard e| \\
+   && \vb &  |def x P| \vb |one P| \vb |all PV| \vb |P `choice` e|  \vb |check fx P| \\
    & |PV| & ::= & |P| \vb |v `choice` PV| \\
 \text{Suspended exprs}  & |susp| & ::= & |P^[apply1N pp x]|
 %    \text{Suspended exprs}  & |susp| & ::= &|lv == susp; susp| \vb |one susp| \vb |all susp| \\
@@ -69,8 +68,8 @@
 \end{array} \\
 \begin{array}{ll}
 % \text{Effect-free} & \text{|ef| is an |eq| that can have choice and fail, but not I/O effects or divergence} \\
-\text{Choice-free:} & \text{|cf| is an |eq| that has no choice, I/O effects or divergence; but it can fail} \\
-\text{Note:} & \text{The productions |def x C| in |C|, and |def x S| in |S| are optional.}
+% \text{Choice-free:} & \text{|cf| is an |eq| that has no choice, I/O effects or divergence; but it can fail} \\
+% \text{Note:} & \text{The productions |def x C| in |C|, and |def x S| in |S| are optional.}
 \end{array}
 
 \\ \\
@@ -121,20 +120,21 @@ $\begin{array}{@@{}l}
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
 \\[-0.8em]
 
-\rulegroupname{Substitution}
+\rulegroupname{Existentials}
 
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
-\rulename{subst1} & |def x (S^[x==v; e])| & \movesto & |subst S x v ^[subst e x v]|
+\rulename{exi-subst} & |def x (S^[x==v; e])| & \movesto & |subst (S^[e]) x v|
   & \text{$|x|\not\in\freevars{|v|};\, |x|,\freevars{|v|} \not\in \boundvars{|S|}$} \\
+\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{exi-float}^{* \alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{exi-choice}^{\alpha} & |def x (E^[e_1 choice e_2])| & \movesto & |E^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \end{array}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Normalization}
-\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 %\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
 %\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{exi-float}^{* \alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 \rulename{seq-assoc} & |lv_2 == (lv_1 == e_1; e_2); e_3| & \movesto & |lv_1 == e_1; lv_2 == e_2; e_3| \\
 % \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
 % \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
@@ -152,7 +152,6 @@ $\begin{array}{@@{}l}
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
 \rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
-\rulename{choice-exi}^{\alpha} & |def x (E^[e_1 choice e_2])| & \movesto & |E^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
 
     \\[-0.8em]
 

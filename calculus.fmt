@@ -576,6 +576,9 @@
 
 %format K_1
 
+%% We combined S and C into one
+%format S = "C"
+
 %format C_1
 %format C_2
 %format Ceq = "Ce"
@@ -693,6 +696,7 @@
 %format decide (x) = "\textbf{dec}\{" x "\}"
 %format bullet = "\bullet"
 %format not (e) = "\neg" e
+%format noteq r v = r "\not=" v
 %format forall (x) (y) = "\forall" x ".\," y
 
 %% Effects checking, like succeeds{e}

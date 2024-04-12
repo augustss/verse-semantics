@@ -981,25 +981,21 @@ $\begin{array}{@@{}l}
   \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
   & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
   &&& \text{if $|r| \notin |rs|$ and $\skol{|v|}$} \\
-  \rulename{skol-pfun} & |verify2 (rs,r) as (P^[apply1N pfun v]))| & \movesto &
-          |verify2 (rs,r) (as, r = apply1N pfun v) (P^[r ]);| \\
+ \rulename{split-v} & |verify2 rs as (P^[r==v; e])| & \movesto &
+    |verify2 rs (as, r==v) (P^[ e ]);| \\
+    &&& |verify2 rs (as, noteq r v) (P^[ fail ])|\\
     &&& \text{if $\skol{|v|}$} \\[1mm]
-
- \rulename{split-v} & |verify2 (rs,r) as (P^[r==v; e])| & \movesto &
-    |verify2 (rs,r) (as, r==v) (P^[ e ]);| \\
-    &&& |verify2 (rs,r) (as, not (r==v)) (P^[ fail ])|\\
-    &&& \text{if $\skol{|v|}$} \\[1mm]
- \rulename{split-tup} & \multicolumn{3}{l}{|verify2 (rs,r) as (P^[r==tup (v_1, xdots, v_n); e])|} \\
+ \rulename{split-tup} & \multicolumn{3}{l}{|verify2 rs as (P^[r==tup (v_1, xdots, v_n); e])|} \\
      && \movesto & |verifyKW|
            \begin{array}[t]{@@{}l}
-             |(rs, r, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
+             |(rs, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
              |{ P^[ r_1==v_1; xdots; r_n == v_n; e ] };|
            \end{array}\\
-    &&& |verify2 (rs,r) (as, not (r==tup (_, xdots,_))) (P^[ e ])| \\  \\[-2mm]
-  \rulename{split-ppred} & |verify2 (rs,r) as (P^[apply1N ppred v]))| & \movesto &
-          |verify2 (rs,r) (as, apply1N ppred v) (P^[ v ]);| \\
-    &&& |verify2 (rs,r) (as, not (apply1N ppred v)) (P^[ fail ])| \\
-    &&& \text{if $\skol{|v|}$} \\[1mm]
+    &&& |verify2 rs (as, not (r==tup (_, xdots,_))) (P^[ e ])| \\  \\[-2mm]
+  \rulename{split-op} & |verify2 (rs) as (P^[apply1N op v]))| & \movesto &
+          |verify2 (rs,r) (as, r = apply1N op v) (P^[ r ]);| \\
+    &&& |verify2 rs (as, not (apply1N op v)) (P^[ fail ])| \\
+    &&& \text{if $r \not\in R, \skol{|v|}$} \\[1mm]
 \end{array}\\
 
 \end{array}$
