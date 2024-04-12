@@ -45,11 +45,12 @@
       \vb |verify2 rs as e| \\
       \text{Lvalues} & |lv| & ::= & |_| \vb |v| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
-      \text{Head values} & \hnf & ::= & k \vb r  \vb |pfun| \vb |ppred| \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
+      \text{Ground values} & |gv| & ::= & |k| \vb |r| \vb |arr (gv_1, xdots, gv_n)| \\
+      \text{Head values} & \hnf & ::= & |k| \vb |r|  \vb |op| \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
              \vb |olam v (lam r e_1) (lam s e_2)|\\
       \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail| \\
-      \text{Assumptions} & |a| & ::= & |r = v| \vb |noteq r v| \vb |r = apply1N op v| \vb |not (apply1N op v)| \\
+      \text{Assumptions} & |a| & ::= & |r = gv| \vb |noteq r gv| \vb |r = apply1N op gv| \vb |not (apply1N op gv)| \\
       & |as| & ::= & |{a_1, xdots, a_n}|   \hspace{1cm} (n \geq 0)
 \end{array}
 \\ \\
@@ -62,7 +63,7 @@
 \text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |P guard e| \\
    && \vb &  |def x P| \vb |one P| \vb |all PV| \vb |P `choice` e|  \vb |check fx P| \\
    & |PV| & ::= & |P| \vb |v `choice` PV| \\
-\text{Suspended exprs}  & |susp| & ::= & |P^[apply1N pp x]|
+\text{Suspended exprs}  & |susp| & ::= & |P^[apply1N op x]|  \hspace{5mm} \text{where |P| has no choice outside |oneKW| or |allKW|}\\
 %    \text{Suspended exprs}  & |susp| & ::= &|lv == susp; susp| \vb |one susp| \vb |all susp| \\
 %    && \vb & |apply1N pp x| \vb  |susp guard e| \vb |check fx susp| \vb |some susp| \\
 \end{array} \\

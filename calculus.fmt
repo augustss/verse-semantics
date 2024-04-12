@@ -504,6 +504,8 @@
 %format v_m'
 %format v_x
 %format v_y
+%format gv_1
+%format gv_n
 
 %format dom_1
 %format dom_2
