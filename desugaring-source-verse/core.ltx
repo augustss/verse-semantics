@@ -59,21 +59,27 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |E guard e| \vb |def x E| \\
 % \text{Pure contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
-\text{Pure contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == susp; S| \vb |S guard e| \\
+\text{Pure contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == cf; S| \vb |S guard e| \\
 \text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |P guard e| \\
    && \vb &  |def x P| \vb |one P| \vb |all PV| \vb |P `choice` e|  \vb |check fx P| \\
    & |PV| & ::= & |P| \vb |v `choice` PV| \\
-\text{Suspended exprs}  & |susp| & ::= & |P^[apply1N op x]|  \hspace{5mm} \text{where |P| has no choice outside |oneKW| or |allKW|}\\
+\text{Choice-free exprs} & |cf| & ::= & |v | \vb |l==cf; cf| \vb op[v] \vb |one e| \vb |all e| \vb |cf guard cf| \\
+
+\text{Suspended exprs}  & |susp| & ::= & |P^[apply1N op v]|  \hspace{2mm}
+    \begin{array}[t]{l}
+    \text{where |P| has no choice outside |oneKW| or |allKW|}\\
+    \text{and |v = V^[x]| for some existential |x| and context |V|}
+    \end{array}
 %    \text{Suspended exprs}  & |susp| & ::= &|lv == susp; susp| \vb |one susp| \vb |all susp| \\
 %    && \vb & |apply1N pp x| \vb  |susp guard e| \vb |check fx susp| \vb |some susp| \\
 \end{array} \\
-\begin{array}{ll}
+% \begin{array}{ll}
 % \text{Effect-free} & \text{|ef| is an |eq| that can have choice and fail, but not I/O effects or divergence} \\
 % \text{Choice-free:} & \text{|cf| is an |eq| that has no choice, I/O effects or divergence; but it can fail} \\
 % \text{Note:} & \text{The productions |def x C| in |C|, and |def x S| in |S| are optional.}
-\end{array}
+% \end{array}
 
-\\ \\
+\\
 \mbox{\em Substitution} \\
 \begin{array}{ll}
   |subst S x v| & \text{Substitute |v| for |x| everywhere in |S|} \\
