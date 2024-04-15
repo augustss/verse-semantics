@@ -23,6 +23,7 @@ import Epic.Uniplate(universeBi, transform)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
+import Prelude hiding (pi)
 
 -- QUESTIONS:
 --  x:int='a'   fail or wrong?, tests L93, L95
@@ -438,6 +439,7 @@ dsDx e = do
     DS5 -> dsD_5 e
     DS6 -> dsD_6 e
     DS7 -> dsD_7 e
+    DS10 -> dsD_10 e
 --    DS8 -> dsD_8_top e
 
 dsD_1 :: Expr -> D Expr
@@ -645,6 +647,7 @@ scope sc = expr
     expr (DefineE i e) = Unify (Variable i) <$> expr e
     expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
     expr (Macro1 (Ident l "assume") [] e1) = Macro1 (Ident l "assume") [] <$> expr e1
+    expr (Macro1 (Ident l "some") [] e1)   = Macro1 (Ident l "some") [] <$> expr e1
     expr (Macro1 m@(Ident _ "lowered") [] e1) = Macro1 m [] <$> exprD' e1
     expr (Macro1 m [] e1) = Macro1 m [] <$> exprD e1
     expr Macro1 {} = unimplemented "Macro1 with effects"
@@ -702,7 +705,8 @@ getVisible (Let _ e) = getVisible e
 getVisible Block{} = []
 getVisible (Unify e1 e2) = getVisible e1 ++ getVisible e2
 --getVisible (Typedef _) = []
-getVisible (Macro1 (Ident _ "assume") _ e) = getVisible e
+getVisible (Macro1 (Ident _ "assume") _ e)  = getVisible e
+getVisible (Macro1 (Ident _ "some") _ e)    = getVisible e
 getVisible (Macro2 (Ident _ "guard") e1 e2) = getVisible e1 ++ getVisible e2
 getVisible Macro1 {} = []
 getVisible (DefineV i) = [i]
@@ -1128,9 +1132,10 @@ lower (Macro1 (Ident _ "all") [] e) = lowerAll =<< lower e
 lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
 lower (Succeeds e) = lowerSucceeds =<< lower e
 lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
-lower (Macro1 (Ident _ "assume") [] e) = lowerAssume =<< lower e
-lower (Macro1 (Ident _ "verify") [] e) = lowerVerify =<< lower e
-lower (Macro1 (Ident _ "assert") [] e) = lowerAssert =<< lower e
+lower (Macro1 (Ident _ "assume") [] e)  = lowerAssume =<< lower e
+lower (Macro1 (Ident _ "some") [] e)    = lowerSome   =<< lower e
+lower (Macro1 (Ident _ "verify") [] e)  = lowerVerify =<< lower e
+lower (Macro1 (Ident _ "assert") [] e)  = lowerAssert =<< lower e
 lower (Macro1 (Ident _ "lowered") [] e) = pure e
 lower (Macro2 (Ident _ "guard") e1 e2) = eGuard <$> lower e1 <*> lower e2
 lower (Exists is e) = lExists is <$> lower e
@@ -1357,12 +1362,8 @@ lowerSucceeds e = do
   how <- gets context
   if verif then
     case how of
-      DS1 -> pure $ eAssert e
-      DS2 -> pure $ eAssert e
-      DS3 -> pure $ Succeeds e
-      DS5 -> pure $ eAssert e  -- XXX ???
-      DS6 -> pure $ eAssert e  -- XXX ???
-      DS7 -> pure $ eAssert e  -- XXX ???
+      DS3  -> pure $ Succeeds e
+      _    -> pure $ eAssert e
    else if asmVerif then
     pure $ e
    else if useSplit then
@@ -1408,6 +1409,9 @@ lowerDecidesSplit e = do
 
 lowerAssume :: Expr -> D Expr
 lowerAssume e = pure $ eAssume e
+
+lowerSome :: Expr -> D Expr
+lowerSome e = pure $ eSome e
 
 lowerVerify :: Expr -> D Expr
 lowerVerify e = pure $ eVerify e
@@ -1607,6 +1611,9 @@ eFails = Macro1 (Ident noLoc "fails") []
 
 eGuard :: Expr -> Expr -> Expr
 eGuard e1 e2 = Macro2 (Ident noLoc "guard") e1 e2
+
+eSome :: Expr -> Expr
+eSome = Macro1 (Ident noLoc "some") []
 
 -- Used to create the array of free variables passed from the domain to the range
 -- of for/if.  If it's just a single variable, don't use an array.
@@ -1814,7 +1821,7 @@ dsM_3 (OfType t1 t2) i = OfType <$> dsM_3 t1 i <*> dsD_3 t2
 dsM_3 t i = unifyV i <$> dsD_3 t
 
 ------------------------------------------------------------------------------------
--- | Adding DS for "fig 10: Mode-based Translation from SmallSource to Core."
+-- | Adding DS for "DS2 Mode-based Translation from SmallSource to Core."
 ------------------------------------------------------------------------------------
 
 data DsMode = I | V deriving (Eq, Ord, Show)
@@ -1938,6 +1945,173 @@ dsM_2 m (Choice t1 t2)  i = Choice    <$> dsM_2 m t1 i <*> dsM_2 m t2 i
 dsM_2 m (If3 e1 e2 e3)  i = If3       <$> dsD_2 e1     <*> dsM_2 m e2 i <*> dsM_2 m e3 i
 dsM_2 _ (OfType _t1 _t2)  _i = error "TODO" -- OfType    <$> dsM_3 t1 i <*> dsD_3 t2
 dsM_2 _ t               i = unifyV i <$> dsD_2 t
+
+------------------------------------------------------------------------------------
+-- | Code for DS10 SPJ's non-exponential translation for curried functions
+------------------------------------------------------------------------------------
+data Pi
+  = P Ident -- ^ P(x)
+  | E       -- ^ E
+  deriving (Eq, Ord, Show)
+
+data DsMode10
+  = MX -- ^ x "execution"
+  | MV -- ^ + "verification"
+  | MI -- ^ - "checking" ("implementation")
+  deriving (Eq, Ord, Show)
+
+dsD_10 :: Expr -> D Expr
+dsD_10 = dsDD_10 MV
+
+dsDD_10 :: DsMode10 -> Expr -> D Expr
+dsDD_10 s t = dsM_10 s t E
+
+dsB_10 :: DsMode10 -> Expr -> Pi -> Ident -> D Expr
+dsB_10 s t E     _
+  = dsM_10 s t E
+dsB_10 s t (P f) j
+  = do z <- newIdent (getLoc t) "z";
+       seqDE [ pure $ DefineE z (ApplyD (Variable f) (Variable j)), dsM_10 s t (P z)]
+
+dsK_10 :: Loc -> [Eff] -> D Expr
+dsK_10 loc fx
+  | hasEff "fails" fx   = pure Fail
+  | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
+  | otherwise           = pure (Array [])
+
+dsCheck :: DsEff -> Expr -> Expr
+dsCheck Suc = eAssert
+dsCheck Dec = eDecide
+
+seqDE :: [D Expr] -> D Expr
+seqDE ds = seqE <$> sequence ds
+
+dsM_10 :: DsMode10 -> Expr -> Pi -> D Expr
+dsM_10 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
+  = do j   <- newIdent (getLoc t) "j"
+       dom <- DefineE j <$> dsM_10 MI t1 E
+       rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MV t2 pi j
+       eGuard (eVerify (seqE [dom, rng])) <$> (dsM_10 MI t pi)
+
+dsM_10 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
+  = do i   <- newIdent (getLoc t1) "i"
+       j   <- newIdent (getLoc t1) "j"
+       dom <- DefineE j <$> dsM_10 MV t1 (P i)
+       rng <- seqDE [ dsK_10 (getLoc t1) _fx, dsB_10 MI t2 pi j]
+       pure $ Lam i (dom `eGuard` rng)
+
+dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
+  = do i   <- newIdent (getLoc t1) "i"
+       j   <- newIdent (getLoc t1) "j"
+       dom <- DefineE j <$> dsM_10 MX t1 (P i)
+       rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MX t2 pi j
+       pure $ Lam i (seqE [dom, rng])
+
+dsM_10 MV (OfType t1 t2) pi                   -- MOFTYPE+
+  = do y <- newIdent (getLoc t1) "y"
+       z <- newIdent (getLoc t1) "z"
+       seqDE [ DefineE y <$> dsM_10  MV t1 pi
+             , DefineE z <$> dsDD_10 MV t2
+             , pure ((dsCheck Suc (ApplyD (Variable z) (Variable y))) `eGuard` eSome (Variable z))
+             ]
+
+dsM_10 MI (OfType t1 t2) _pi                  -- MOFTYPE-
+  = do z <- newIdent (getLoc t1) "z"
+       seqDE [ DefineE z <$> dsDD_10 MI t2
+             , pure (eSome (Variable z))
+             ]
+
+dsM_10 MX (OfType t1 t2) pi                   -- MOFTYPEX
+  = do y <- newIdent (getLoc t1) "y"
+       z <- newIdent (getLoc t1) "z"
+       seqDE [ DefineE y <$> dsM_10  MX t1 pi
+             , DefineE z <$> dsDD_10 MX t2
+             , pure (ApplyD (Variable z) (Variable y))
+             ]
+
+dsM_10 MI (Range t) E                       -- MTYPE1
+  = do z <- newIdent (getLoc t) "z"
+       seqDE [ DefineE z <$> dsDD_10 MI t
+             , pure (eSome (Variable z)) ]
+
+dsM_10 s (Range t) E                       -- MTYPE2
+  = do i <- newIdent (getLoc t) "i"
+       existsV [i] <$> dsM_10 s (Range t) (P i)
+
+dsM_10 s (Range t) (P i)                   -- MTYPE3
+  = do z <- newIdent (getLoc t) "z"
+       seqDE [ DefineE z <$> dsDD_10 s t
+             , pure (ApplyD (Variable z) (Variable i)) ]
+
+dsM_10 s (DefineIE x y t) E                -- MSQUIGE
+  = do i <- newIdent (getLoc t) "i"
+       existsV [i] <$> dsM_10 s (DefineIE x y t) (P i)
+
+dsM_10 s (DefineIE x y t) (P i)             -- MSQUIGP
+  = seqDE [ pure $ DefineE x (Variable i)
+          ,        DefineE y <$> dsM_10 s t (P i)
+          ]
+
+dsM_10 s (Array ts) E                       -- MARRAYE
+   = Array <$> mapM (\t -> dsM_10 s t E) ts
+
+dsM_10 s (Array ts) (P i)                   -- MARRAYP
+   = do is <- mapM (\t -> newIdent (getLoc t) "i") ts
+        existsV is <$> seqDE
+          [ pure    $  unifyV i (Array (Variable <$> is))
+          , Array  <$> zipWithM (\t' i' -> dsM_10 s t' (P i')) ts is
+          ]
+
+dsM_10 s (DefineE x t) pi                   -- MBIND
+  = DefineE x <$> dsM_10 s t pi
+
+dsM_10 s (Unify t1 t2) pi                   -- MEQ
+  = Unify <$> dsM_10 s t1 pi <*> dsM_10 s t2 pi
+
+dsM_10 MX (Seq ts) pi                      -- MSEMIX
+  = do let (ts', t) = unSeq ts
+       es' <- mapM (dsDD_10 MX) ts'
+       e'  <- dsM_10 MX t pi
+       pure $ seqE (es' ++ [e'])
+
+dsM_10 s  (Seq ts) pi                      -- MSEMI
+  = do let (ts', t) = unSeq ts
+       es' <- mapM (dsDD_10 MV) ts'
+       e'  <- dsM_10 s t pi
+       pure $ seqE (es' ++ [e'])
+
+dsM_10 s (Succeeds t) pi                   -- MCHECK / TODO:Generalized to check<fx>
+  = eAssert <$> dsM_10 s t pi
+
+dsM_10 s (Choice t1 t2) pi                 -- MCHOICE
+  = Choice <$> dsM_10 s t1 pi <*> dsM_10 s t2 pi
+
+dsM_10 s (If3 t1 t2 t3) pi                 -- MIF
+  = If3 <$> dsDD_10 s t1 <*> dsM_10 s t2 pi <*> dsM_10 s t3 pi
+
+dsM_10 _ t@(Lit{}) E                       -- MCONST
+   = pure t
+
+dsM_10 _ t@(Variable {}) E                 -- MVAR
+   = pure t
+
+dsM_10 s (ApplyD t1 t2) E                -- MVAR
+   = ApplyD <$> dsDD_10 s t1 <*> dsDD_10 s t2
+
+dsM_10 s t (P i)                        -- MEQ
+   = Unify (Variable i) <$> dsM_10 s t E
+
+dsM_10 s t pi
+   = error $ "TODO: dsM_10 " ++ show (s, t, pi)
+
+unSeq :: [Expr] -> ([Expr], Expr)
+unSeq = go []
+  where
+    go acc []     = (reverse acc, Array [])
+    go acc [t]    = (reverse acc, t)
+    go acc (t:ts) = go (t:acc) ts
+
+------------------------------------------------------------------------------------
 
 dsD_5 :: Expr -> D Expr
 dsD_5 e = dsM_5 e Nothing
