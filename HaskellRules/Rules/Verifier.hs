@@ -20,8 +20,8 @@ import Rules.Core hiding (isHNF)
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
-import qualified Rules.OldVerifier as Old
-import Rules.ICFP (systemICFPE, isChoiceFree)
+-- import qualified Rules.OldVerifier as Old
+-- import Rules.ICFP ({- systemICFPE, -} isChoiceFree)
 import Control.Monad (guard)
 import Data.List ((\\))
 import Rules.TRS2024 (isEffectFree)
@@ -101,10 +101,10 @@ verifier :: TRSystem Expr
 verifier = splitVerifier
 
 allSystemsVerify :: [TRSystem Expr]
-allSystemsVerify = [Old.icfpeVerifier, splitVerifier]
+allSystemsVerify = [{- Old.icfpeVerifier, -} splitVerifier]
 
 splitVerifier :: TRSystem Expr
-splitVerifier = systemICFPE
+splitVerifier = TRS2024.systemTRS2024 -- systemICFPE
   { sname = "SPLITverify"
   , description = "ICFPE + split verifier rules"
   , rules =     -- (rules systemICFPE -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
@@ -329,7 +329,7 @@ proofX bs lhs = proofX1 bs lhs ++ [(id, bs, lhs)]
 -- P context, X /= hole
 proofX1 bs lhs =
    do cf :>: x <- [lhs]
-      guard (isChoiceFree cf)
+      guard (TRS2024.isChoiceFree cf)
       (ctx, bs', hole) <- proofX bs x
       pure ((cf :>:) . ctx, bs', hole)
  ++

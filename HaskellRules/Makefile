@@ -12,7 +12,7 @@ TESTER=cabal run tester --
 QCTEST=cabal run qctest --
 
 RULES=ICFP
-VRULES=ICFPEverify
+VRULES=SPLITverify
 
 all: build testiblock testrulesfast
 
