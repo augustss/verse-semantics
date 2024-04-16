@@ -48,6 +48,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Ratio
 import Data.Word
 
+import Language.Verse.Access
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
 import Language.Verse.Intrinsic (Intrinsic)
@@ -434,7 +435,7 @@ instance Pretty Scope where
         labels -> "," <> "sup=[" <> concatWith (<+>) (map prettyLabel labels) <> "]"
 
 data AccessScope = AccessScope
-  !Desugar.Access
+  !Access
   -- enclosing scope
   {-# UNPACK #-} !Label
   -- enclosing module

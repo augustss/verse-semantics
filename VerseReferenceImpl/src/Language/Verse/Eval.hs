@@ -43,6 +43,7 @@ import Data.Ord
 import Data.Ratio
 import Data.Tuple
 
+import Language.Verse.Access
 import Language.Verse.Desugar.Exp
   ( Exp
   , pattern (:*>:)
@@ -50,7 +51,6 @@ import Language.Verse.Desugar.Exp
   , pattern (:=:)
   , pattern (:.:)
   , pattern (:|:)
-  , Access(..)
   )
 import Language.Verse.Desugar.Exp qualified as Exp
 import Language.Verse.Effect.Split qualified as Split (Effect)
@@ -63,6 +63,7 @@ import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
 import Language.Verse.Loc (Loc, L (..), loc)
 import Language.Verse.Mode
+import Language.Verse.Path
 import Language.Verse.SimpleName
 import Language.Verse.Val
   ( FrozenVal
@@ -296,11 +297,13 @@ evalExp e = case extract e of
     unifyS s s'
     newVar' $ Val.Char32 x
   Exp.Name x ->
-    evalName (loc e) x
-  Exp.PathName (Exp.Path label pathIdents) -> \ s s' -> lift $ do
+    evalIdent $ x <$ e
+  Exp.QualName x y ->
+    evalQualName (loc e) x y
+  Exp.Path (Path label pathIdents) -> \ s s' -> lift $ do
     unifyS s s'
     -- Ignore nested labels for now
-    newVar' . Val.Path . map extract $ label : map snd pathIdents
+    newVar' . Val.Path $ label : map snd pathIdents
   Exp.IfArchetypeName x y e1 e2 -> \ s s' -> do
     scopes <- getScopes
     asks archetype <&> lookupEnv scopes (extract x) >>= \ case
@@ -317,17 +320,6 @@ evalExp e = case extract e of
     local ( \ r -> let env = xs <> r.env in r { top = env, env }) $ evalExp e s s'
   Exp.Domain e -> \ s s' ->
     local (\ r -> r { sign = not r.sign }) $ evalExp e s s'
-
-evalName
-  :: MonadEval m
-  => Loc
-  -> Exp.Name L Ident
-  -> S m -> S m -> EvalT m (VarVal m)
-evalName loc = \ case
-  Exp.SimpleName x ->
-    evalIdent $ L loc x
-  Exp.QualName e x ->
-    evalQualName loc e x
 
 evalDot
   :: MonadEval m

@@ -33,7 +33,9 @@ library
     Data.IntMap.Lazy.Extras
     Data.IntMap.Strict.Extras
     Data.Fix
+    Data.Function.Extras
     Language.Verse
+    Language.Verse.Access
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp
     Language.Verse.Effect.Split
@@ -45,12 +47,13 @@ library
     Language.Verse.Label
     Language.Verse.Loc
     Language.Verse.Mode
-    Language.Verse.SimpleName
     Language.Verse.Parse2
     Language.Verse.Parse.Exp
+    Language.Verse.Path
     Language.Verse.Pos
     Language.Verse.Rewrite
     Language.Verse.Rewrite.Exp
+    Language.Verse.SimpleName
     Language.Verse.Token
     Language.Verse.Val
   build-depends:

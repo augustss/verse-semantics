@@ -4,11 +4,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Language.Verse.Desugar.Exp
   ( Exp (..)
-  , Quantifier (..)
-  , Name (..)
-  , Path (..)
   , Scope
-  , Access (..)
+  , Quantifier (..)
   , Env
   , unify
   , verify
@@ -30,11 +27,12 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Word (Word8)
 
+import Language.Verse.Access
 import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Intrinsic (Intrinsic)
 import Language.Verse.Label
 import Language.Verse.Loc
-import Language.Verse.Rewrite.Exp(Access(..))
+import Language.Verse.Path (Path)
 import Language.Verse.SimpleName
 
 import Numeric (showHex)
@@ -74,8 +72,9 @@ data Exp f a
   | Lam a (f (Exp f a))
   | OLam (f (Exp f a)) !(Env a) (f (Exp f a)) (f (Exp f a))
   | Intrinsic !Intrinsic
-  | Name (Name f a)
-  | PathName (Path f)
+  | Name a
+  | QualName (f (Exp f a)) {-# UNPACK #-} !SimpleName
+  | Path !Path
   | IfArchetypeName (f a) (f a) (f (Exp f a)) (f (Exp f a))
   | ArchetypeName a
   | TopLevel !(Env a) (f (Exp f a)) -- Used to define the top level for paths
@@ -85,26 +84,11 @@ infixl 1 :*>:
 infixl 1 :>>:
 
 deriving instance ( Show (f (Exp f a))
-                  , Show (f SimpleName)
                   , Show (f a)
                   , Show a
                   ) => Show (Exp f a)
 
-data Path f
- = Path (f SimpleName) [(Maybe (Path f), f SimpleName)]
-
-deriving instance ( Show (f SimpleName)
-                  ) => Show (Path f)
-
-
--- The current scope. If empty then top level
-type Scope = [Label]
-
-
-
-
 instance ( Pretty (f (Exp f a))
-         , Pretty (f SimpleName)
          , Pretty (f a)
          , Pretty a
          ) => Pretty (Exp f a) where
@@ -163,7 +147,8 @@ instance ( Pretty (f (Exp f a))
       "olam" <+> pretty f <+> parens (bindings xs $ pretty e1) <+> braces (pretty e2)
     Intrinsic x -> pretty x
     Name x -> pretty x
-    PathName x -> pretty x
+    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
+    Path x -> pretty x
     IfArchetypeName  x y e1 e2 ->
       "if" <+> parens (pretty y <+> ":=" <+> "archetype" <> parens (pretty x)) <+>
       braces (pretty e1) <+>
@@ -196,34 +181,12 @@ instance ( Pretty (f (Exp f a))
         Forall -> "forall" <+> pretty access <+> pretty x
         Var -> "var" <+> pretty access <+> pretty x
 
+-- The current scope. If empty then top level
+type Scope = [Label]
+
 data Quantifier = Exists | Forall | Var deriving Show
 
 type Env a = HashMap a (Access, Quantifier)
-
-instance ( Pretty (f SimpleName)
-         ) => Pretty (Path f) where
-  pretty (Path label pathIdents) = "/" <> pretty label <> foldr prettyPath mempty pathIdents
-   where
-    prettyPath (Nothing, ident) doc = "/" <> pretty ident <> doc
-    prettyPath (Just path, ident) doc = "/(" <> pretty path <> ":)" <> pretty ident <> doc
-
-data Name f a
-  = SimpleName a
-  | QualName (f (Exp f a)) SimpleName
-
-deriving instance ( Show (f (Exp f a))
-                  , Show (f a)
-                  , Show a
-                  ) => Show (Name f a)
-
-
-instance ( Pretty (f (Exp f a))
-         , Pretty (f a)
-         , Pretty a
-         ) => Pretty (Name f a) where
-  pretty = \ case
-    SimpleName x -> pretty x
-    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
 
 unify :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 unify = liftL2 (:=:)
@@ -243,11 +206,17 @@ forall' access = liftL2 (Def access Forall)
 bracketInvoke :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 bracketInvoke = liftL2 BracketInvoke
 
-olam :: Apply f => f (Exp f a) -> Env a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
+olam
+  :: Apply f
+  => f (Exp f a)
+  -> Env a
+  -> f (Exp f a)
+  -> f (Exp f a)
+  -> f (Exp f a)
 olam f env e1 e2 = OLam f env e1 e2 <$ f <. e1 <. e2
 
 name :: Functor f => f a -> f (Exp f a)
-name = fmap (Name . SimpleName)
+name = fmap Name
 
 then' :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 then' = liftL2 (:*>:)

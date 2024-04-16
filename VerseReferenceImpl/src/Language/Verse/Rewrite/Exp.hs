@@ -6,9 +6,7 @@
 module Language.Verse.Rewrite.Exp
   ( Exp (..)
   , Quantifier (..)
-  , Name (..)
   , OC (..)
-  , Access (..)
   , ofType
   , bracketInvoke
   , alloc2
@@ -18,7 +16,6 @@ module Language.Verse.Rewrite.Exp
   , mixfixArrowColonEqual
   , name
   , ifArchetypeName
-  , Path (..)
   ) where
 
 import Data.ByteString.Internal (w2c)
@@ -26,8 +23,10 @@ import Data.Char
 import Data.Functor.Apply
 import Data.Text (Text)
 
+import Language.Verse.Access
 import Language.Verse.Effect.Split qualified as Split
 import Language.Verse.Loc
+import Language.Verse.Path (Path)
 import Language.Verse.SimpleName
 
 import Data.Word (Word8)
@@ -70,16 +69,15 @@ data Exp f a
   | Float {-# UNPACK #-} !Double
   | Char {-# UNPACK #-} !Word8
   | Char32 {-# UNPACK #-} !Char
-  | Lam (f (Exp f a)) !OC !Split.Effect !(Maybe (f (Exp f a))) (f (Exp f a))
+  | Lam (f (Exp f a)) !OC !Split.Effect (f (Exp f a))
   | InfixColonEqual !Access !Quantifier (f a) (f (Exp f a))
   | PrefixColon (f (Exp f a))
   | MixfixArrowColonEqual (f a) (f a) (f (Exp f a))
-  | Name (Name f a)
-  | ExpPath (Path f)
+  | Name a
+  | QualName (f (Exp f a)) {-# UNPACK #-} !SimpleName
+  | Path !Path
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
   | Domain (f (Exp f a))
-
-data Quantifier = Val | Fun | Var deriving Show
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f Text)
@@ -125,19 +123,19 @@ instance ( Pretty (f (Exp f a))
     Float x -> pretty x
     Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
-    Lam e1 oc eff e2 e3 ->
+    Lam e1 oc eff e2 ->
       "function" <>
       parens (pretty e1) <>
       angles (pretty oc) <>
       angles (pretty eff) <>
-      maybe mempty (\ e2 -> colon <> pretty e2) e2 <+>
-      braces (pretty e3)
+      braces (pretty e2)
     InfixColonEqual access _ x e -> pretty x <> prettySpec access <+> ":=" <+> pretty e
     PrefixColon e -> colon <> pretty e
     MixfixArrowColonEqual x y e ->
       pretty x <+> "->" <+> pretty y <+> ":=" <+> pretty e
     Name x -> pretty x
-    ExpPath x -> pretty x
+    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
+    Path x -> pretty x
     IfArchetypeName x e1 e2 ->
       "if" <+> parens ("archetype" <> parens (pretty x)) <+> braces (pretty e1) <+>
       "else" <+> braces (pretty e2)
@@ -154,7 +152,7 @@ instance ( Pretty (f (Exp f a))
         flatAlt (hardline <> rbrace) " }"
       prettySpec access = "<" <> pretty access <> ">"
 
-
+data Quantifier = Val | Fun | Var deriving Show
 
 data OC = O | C deriving Show
 
@@ -162,37 +160,6 @@ instance Pretty OC where
   pretty = \ case
     O -> "open"
     C -> "closed"
-
-data Access = Public | Protected | Private | Internal deriving (Eq, Show)
-
-instance Pretty Access where
-  pretty = \ case
-    Private -> "private"
-    Protected -> "protected"
-    Public -> "public"
-    Internal -> "internal"
-
-
-data Name f a
-  = SimpleName a
-  | QualName (f (Exp f a)) SimpleName
-
-deriving instance ( Show (f (Exp f a))
-                  , Show (f a)
-                  , Show a
-                  ) => Show (Name f a)
-
-
-instance ( Pretty (f (Exp f a))
-         , Pretty (f a)
-         , Pretty a
-         ) => Pretty (Name f a) where
-  pretty = \ case
-    SimpleName x -> pretty x
-    QualName x y -> "(" <> pretty x <> ":)" <> pretty y
-
-
-
 
 ofType :: Apply f => f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 ofType = liftL2 OfType
@@ -221,20 +188,7 @@ mixfixArrowColonEqual
 mixfixArrowColonEqual = liftL3 MixfixArrowColonEqual
 
 name :: Functor f => f a -> f (Exp f a)
-name = fmap (Name . SimpleName)
+name = fmap Name
 
 ifArchetypeName :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
 ifArchetypeName = liftL3 $ IfArchetypeName
-
-data Path f
- = Path (f SimpleName) [(Maybe (Path f), f SimpleName)]
-
-deriving instance ( Show (f SimpleName)
-                  ) => Show (Path f)
-
-instance ( Pretty (f SimpleName)
-         ) => Pretty (Path f) where
-  pretty (Path label pathIdents) = "/" <> pretty label <> foldr prettyPath mempty pathIdents
-   where
-    prettyPath (Nothing, ident) doc = "/" <> pretty ident <> doc
-    prettyPath (Just path, ident) doc = "/(" <> pretty path <> ":)" <> pretty ident <> doc

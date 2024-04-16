@@ -8,7 +8,7 @@ module Language.Verse.Parse.Exp
   ( Exp (..)
   , Pat (..)
   , IdentExp (..)
-  , Path(..)
+  , Path (..)
   , expToPat
   ) where
 
@@ -180,11 +180,7 @@ deriving instance ( Show a
                   , Show (Exp a)
                   ) => Show (IdentExp a)
 
-data Path a
- = Path (L a) [(Maybe (Path a), L a)]
-
-deriving instance ( Show a
-                  ) => Show (Path a)
+data Path a = Path (L a) [(Maybe (Path a), L a)] deriving Show
 
 instance ( Pretty a
          , Pretty (Exp a)

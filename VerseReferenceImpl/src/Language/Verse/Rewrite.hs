@@ -28,6 +28,7 @@ import Data.Text.Encoding qualified as Text
 import Data.Traversable
 import Data.Tuple
 
+import Language.Verse.Access
 import Language.Verse.Effect.Split qualified as Split (Effect)
 import Language.Verse.Effect.Split qualified as Effect
 import Language.Verse.Error
@@ -35,6 +36,8 @@ import Language.Verse.Ident (Ident)
 import Language.Verse.Ident qualified as Ident
 import Language.Verse.Label
 import Language.Verse.Loc (L (..), Loc (..), liftL1, liftL2, loc)
+import Language.Verse.Path (Path)
+import Language.Verse.Path qualified as Path
 import Language.Verse.SimpleName
 import Language.Verse.Parse.Exp
   ( pattern (:<>:)
@@ -157,21 +160,24 @@ rewriteExp e = for e $ \ case
     Struct <$> rewriteExp e
   Parse.Class e1 e2 ->
     Class <$> traverse rewriteExp e1 <*> rewriteExp e2
-  Parse.Inst (getMacroParensBraces "class" -> Just (arg, _specs)) e2 -> -- Ignore attributes for now
+  -- Ignore attributes for now
+  Parse.Inst (getMacroParensBraces "class" -> Just (arg, _specs)) e2 ->
     Class <$> traverse rewriteExp arg <*> rewriteExp e2
-  Parse.Inst (getMacroParensBraces "struct" -> Just (Nothing, _specs)) e2 -> -- Ignore attributes for now
+  -- Ignore attributes for now
+  Parse.Inst (getMacroParensBraces "struct" -> Just (Nothing, _specs)) e2 ->
     Struct <$> rewriteExp e2
   Parse.Inst (getMacroParensBraces "function" -> Just (Just e1, specs)) e2 -> do
     e1 <- rewriteExp e1
     (oc, eff) <- getLamSpecs specs
     e2 <- rewriteExp e2
-    pure $ Lam e1 oc eff Nothing e2
-  Parse.Inst (getMacroParensBraces "module" -> Just (Nothing, _specs)) e2 -> -- Ignore attributes for now
+    pure $ Lam e1 oc eff e2
+  -- Ignore attributes for now
+  Parse.Inst (getMacroParensBraces "module" -> Just (Nothing, _specs)) e2 ->
     Module <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "type" e1 -> do
     x <- freshIdent $ loc e2
     e2 <- rewriteExp e2
-    pure $ Lam (infixColonEqual Val x e2) C Effect.Succeeds Nothing ((Name . SimpleName) <$> x)
+    pure . Lam (infixColonEqual Val x e2) C Effect.Succeeds $ Name <$> x
   Parse.Inst e1 e2 | isPredefined "assume" e1 ->
     Assume <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "fails" e1 ->
@@ -209,7 +215,7 @@ rewriteExp e = for e $ \ case
   Parse.Inst e1 e2 | isPredefined "option" e1 -> do
     x <- freshIdent $ loc e
     e' <- rewriteExp e2
-    pure $ IfThenElse (infixColonEqual Val x e') ((Name . SimpleName) <$> x) (Tuple [] <$ e)
+    pure $ IfThenElse (infixColonEqual Val x e') (Name <$> x) (Tuple [] <$ e)
   Parse.Inst e1 e2 ->
     Inst <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Enum _attributes xs -> -- Ignore attributes
@@ -263,7 +269,7 @@ rewriteExp e = for e $ \ case
     Loc p _ ->
       pure .
       Tuple .
-      map (\ (i,x) -> L (Loc p { column = column p + i } p { column = column p + i + 1 }) (Char x)) .
+      map (\ (i, x) -> L (Loc p { column = column p + i } p { column = column p + i + 1 }) (Char x)) .
       zip [1 ..] .
       ByteString.unpack $
       Text.encodeUtf8 txt
@@ -274,8 +280,9 @@ rewriteExp e = for e $ \ case
   Parse.Lam e1 e2 -> do
     e1 <- rewriteExp e1
     e2 <- rewriteExp e2
-    pure $ Lam e1 C Effect.Decides Nothing e2
-  Parse.ExpInfixColon (Parse.expToPat -> Just pat) e2 -> -- Try to fix Parse2 so that we can get rid of this
+    pure $ Lam e1 C Effect.Succeeds e2
+  -- Try to fix Parse2 so that we can get rid of this
+  Parse.ExpInfixColon (Parse.expToPat -> Just pat) e2 ->
     rewritePat $ Parse.InfixColon pat e2
   Pat p ->
     rewritePat p
@@ -286,12 +293,13 @@ rewritePat
   => Pat SimpleName
   -> m (Exp L Ident)
 rewritePat = \ case
-  Parse.Name (Parse.IdentName x) -> pure . (Name . SimpleName) $ Ident.Name x
+  Parse.Name (Parse.IdentName x) -> pure . Name $ Ident.Name x
   Parse.Name (Parse.IdentQualName [e] (extract -> y)) -> do
     e <- rewriteExp e
-    pure $ Name $ QualName e y
-  Parse.Name (Parse.IdentPath path) -> pure $ ExpPath (rewritePath path)
-  InfixColon (extract -> Parse.Var _e1 i@(extract -> Parse.IdentName x) e2) e -> do -- Dropping specs after var for now
+    pure $ QualName e y
+  Parse.Name (Parse.IdentPath path) -> pure . Path $ rewritePath path
+  -- Dropping specs after var for now
+  InfixColon (extract -> Parse.Var _e1 i@(extract -> Parse.IdentName x) e2) e -> do
     access <- getDefSpecs e2
     Alloc2 access (Ident.Name x <$ i) <$> rewriteExp e
   Parse.PrefixColon e -> PrefixColon <$> rewriteExp e
@@ -308,19 +316,13 @@ rewritePat = \ case
     parenInvokeM e1 e2
   e -> notImplemented "rewritePat" e
 
-
 rewritePath
   :: Parse.Path SimpleName
-  -> Path L
+  -> Path
 rewritePath = \ case
   Parse.Path label pathIdents ->
-    let pathIdents' = map ( \ (qPath, ident) ->
-                                  (case qPath of
-                                      Nothing -> Nothing
-                                      Just path -> Just $ rewritePath path
-                                  , ident)) pathIdents
-    in Path label pathIdents'
-
+    Path.Path (extract label) $ pathIdents <&> \ (qualPath, ident) ->
+      (rewritePath <$> qualPath, extract ident)
 
 rewriteDef
   :: (MonadWrong Error m, MonadSupply Label m)
@@ -345,8 +347,8 @@ rewriteDef p e = case extract p of
     (oc, eff) <- getLamSpecs specs
     e_range <- rewriteExp e_range
     rewriteDef' Fun p
-      (lam e_domain oc eff Nothing $ prefixColon e_range)
-      (lam e_domain oc eff (Just e_range) e)
+      (lam e_domain oc eff $ prefixColon e_range)
+      (lam e_domain oc eff $ e `ofType` e_range)
   InfixColon p e' -> do
     e' <- rewriteExp e'
     rewriteDef' Val p
@@ -355,13 +357,13 @@ rewriteDef p e = case extract p of
   InfixArrow p1 p2 -> do
     x1 <- freshIdent $ loc p1
     x2 <- freshIdent $ loc p2
-    e1 <- rewriteDef p1 $ (Name . SimpleName) <$> x1
-    e2 <- rewriteDef p2 $ (Name . SimpleName) <$> x2
+    e1 <- rewriteDef p1 $ Name <$> x1
+    e2 <- rewriteDef p2 $ Name <$> x2
     pure $ List [e1 <$ p1, e2 <$ p2, mixfixArrowColonEqual x1 x2 e]
   (stripSpecs -> (Invoke p e_domain, specs)) -> do
     e_domain <- rewriteExp e_domain
     (oc, eff) <- getLamSpecs specs
-    let e' = lam e_domain oc eff Nothing e
+    let e' = lam e_domain oc eff e
     rewriteDef' Fun p e' e'
   e -> notImplemented "rewriteDef" e
 
@@ -390,8 +392,8 @@ rewriteDef' q p e1 e2 = case extract p of
     (oc, eff) <- getLamSpecs specs
     e_range <- rewriteExp e_range
     rewriteDef' Fun p
-      (lam e_domain oc eff (Just e_range) e1)
-      (lam e_domain oc eff (Just e_range) e2)
+      (lam e_domain oc eff $ e1 `ofType` e_range)
+      (lam e_domain oc eff $ e2 `ofType` e_range)
   InfixColon p e' -> do
     e' <- rewriteExp e'
     rewriteDef' q p
@@ -400,16 +402,16 @@ rewriteDef' q p e1 e2 = case extract p of
   InfixArrow p1 p2 -> do
     x1 <- freshIdent $ loc p1
     x2 <- freshIdent $ loc p2
-    e1' <- rewriteDef p1 $ (Name . SimpleName) <$> x1
-    let x2' = (Name . SimpleName) <$> x2
+    e1' <- rewriteDef p1 $ Name <$> x1
+    let x2' = Name <$> x2
     e2' <- rewriteDef' q p2 x2' x2'
     pure $ List [e1' <$ p1, e2' <$ p2, mixfixArrowColonEqual x1 x2 e2]
   (stripSpecs -> (Invoke p e_domain, specs)) -> do
     e_domain <- rewriteExp e_domain
     (oc, eff) <- getLamSpecs specs
     rewriteDef' Fun p
-      (lam e_domain oc eff Nothing e1)
-      (lam e_domain oc eff Nothing e2)
+      (lam e_domain oc eff e1)
+      (lam e_domain oc eff e2)
   e -> notImplemented "rewriteDef'" e
 
 notImplemented :: (MonadWrong Error m, Show a) => String -> a -> m b
@@ -448,7 +450,7 @@ rewriteOperator1
   -> m (Exp L Ident)
 rewriteOperator1 x e =
   rewriteExp e <&> \ e ->
-  BracketInvoke (Name (SimpleName (Ident.Name x)) <$ e) e
+  BracketInvoke (Name (Ident.Name x) <$ e) e
 
 rewriteOperator2
   :: (MonadWrong Error m, MonadSupply Label m)
@@ -489,7 +491,6 @@ getLamSpecs = wrap $ \ case
       fmap (maybe O extract *** maybe Effect.Succeeds extract) .
       foldlM (curry f) (Nothing, Nothing)
 
-
 getDefSpecs
   :: MonadWrong Error m
   => [L (Parse.Exp SimpleName)]
@@ -507,7 +508,6 @@ getDefSpecs = wrap $ \ case
     add Nothing access y = pure $! (Just $! access <$ y)
     add (Just x) _access y = wrong $ MultipleAccessError (loc x) (loc y)
 
-
 pattern IdentName :: a -> Parse.Exp a
 pattern IdentName x = Parse.Pat (Parse.Name (Parse.IdentName x))
 
@@ -522,7 +522,7 @@ parenInvokeM e1 e2 = do
   pure $ List
     [ infixColonEqual Val x1 e1
     , infixColonEqual Val x2 e2
-    , check Effect.Succeeds $ bracketInvoke ((Name . SimpleName) <$> x1) ((Name . SimpleName) <$> x2)
+    , check Effect.Succeeds $ bracketInvoke (Name <$> x1) (Name <$> x2)
     ]
 
 freshIdent :: MonadSupply Label m => Loc -> m (L Ident)
@@ -537,21 +537,20 @@ not' = liftL1 Not
 check :: Functor f => Split.Effect -> f (Exp f a) -> f (Exp f a)
 check = liftL1 . Check
 
-bracketInvoke2 :: Apply f => SimpleName -> f (Exp f Ident) -> f (Exp f Ident) -> Exp f Ident
+bracketInvoke2
+  :: Apply f
+  => SimpleName
+  -> f (Exp f Ident)
+  -> f (Exp f Ident)
+  -> Exp f Ident
 bracketInvoke2 x e1 e2 =
-  BracketInvoke (Name (SimpleName (Ident.Name x)) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
+  BracketInvoke (Name (Ident.Name x) <$ e1 <. e2) (Tuple [e1, e2] <$ e1 <. e2)
 
 lam
   :: Apply f
   => f (Exp f a)
   -> OC
   -> Split.Effect
-  -> Maybe (f (Exp f a))
   -> f (Exp f a)
   -> f (Exp f a)
-lam e1 oc eff e2 e3 = Lam e1 oc eff e2 e3 <$ e1 <.. e2 <. e3
-  where
-    infixl 4 <..
-    (<..) x = \ case
-      Nothing -> x
-      Just y -> x <. y
+lam e1 oc eff e2 = Lam e1 oc eff e2 <$ e1 <. e2
