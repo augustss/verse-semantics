@@ -1,0 +1,461 @@
+    Programs           Program := explore(tops) {scope c {op}}    
+    Operations              op := u=v
+                               |  u=v(p)
+                               |  u=fail
+                               |  op0; op1
+                               |  op0|op1
+                               |  exists x_0 ... x_n
+                               |  scope c {op}
+                               |  beta(L(p)) c0 {op0} range c1 {op1}
+                               |  explore(fx) {op_0; ...; op_n}
+                               |  iterate     {op_0; ...; op_n}
+                               |  next(u0) c0 v0 {op0} then c1 v1 {op1} else c2 {op2}
+                               |  cast(u,err) opv {pattern => {op}}
+                               |  in(fx) c i x {op}
+                               |  stage(fx,opv) c0 i x {op0} value c1 y {op1}
+                               |  verify(fx,?err) c {op0}
+                               |  assume(fx)      c {op0}
+                               |  syntax(u,v,s)
+                               |  natives
+                               |  err
+                               |  {op}
+
+                               EBNF patterns for operations that start a new context:
+    ScopeStartOp[SC,OP]        := scope      SC {OP }
+                               |  beta(L(p)) SC {OP } range c1 {op1}
+                               |  beta(L(p)) c0 {op0} range SC {OP }
+    FlexibleStartOp[FC,OP]     := verify(fx,err)        FC     {OP }
+                               |  in(fx)                FC i x {OP }
+                               |  stage(fx,opv)         FC i x {OP } value c1 y {op1}
+                               |  stage(fx,opv)         c0 i x {op0} value FC y {OP }
+                               |  assume(fx)            FC     {OP }
+                               |  IterateStartOp[FC,OP]
+    IterateStartOp[FC,OP]      := iterate     {...; next(u0) FC v0 {OP} then d1 v1 {op1} else d2 {op2}; ...}
+    ExploreStartOp[OP]         := explore(fx) {...; OP; ...}
+
+                               EBNF patterns identifying all operations within the span of a context:
+    ScopeSpan[OP]              := OP | seqop[OP]; op | op; seqop[OP]
+    FlexibleSpan[OP]           := seqop[OP | (ScopeStartOp                               )[sc,FlexibleSpan[OP]]]
+    ExploreSpan[OP]            := seqop[OP | (ScopeStartOp|FlexibleStartOp               )[ic,ExploreSpan[OP]]]
+    ProgramSpan[OP]            := seqop[OP | (ScopeStartOp|FlexibleStartOp|ExploreStartOp)[ic,ProgramSpan[OP]]]
+
+                               EBNF patterns matching a context-starting operation and identifying an operation in its span:
+    ScopeOp[SC,OP]             :=            ScopeSpan[ScopeStartOp    [SC,OP ]]
+    FlexibleOp[FC,SC,OP]       := let op0 be ScopeSpan[FlexibleStartOp [FC,op1]] where (op0|op1) matches (ScopeOp                     )[   SC,OP]
+    IterateOp[FC,SC,OP]        := let op0 be ScopeSpan[IterateStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp                     )[   SC,OP]
+    ExploreOp[FC,SC,OP]        := let op0 be ScopeSpan[ExploreStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp|FlexibleOp          )[FC,SC,OP]
+    ProgramOp[FC,SC,OP]        := let op0 be ScopeSpan[ExploreStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp|FlexibleOp|ExploreOp)[FC,SC,OP]
+
+                               EBNF patterns matching the whole program and identifying an accessible part of it. We must ensure any parts not covered by BVS are inaccessible.
+    ProgramOp[FC,SC,OP]        := ProgramOp[FC,SC,OP]
+    ProgramExploreOp[OP]       := ExploreStartOp[OP] | ProgramOp[fc,sc,ProgramExploreOp[OP]]
+
+Then, the inference rules look like:
+
+Program:
+
+                         G, verify@c_i, solve@c_i, effects:tops:none@c_i |- explore(tops) {...; scope c_i. op_i; ...}
+        (program-intro)  --------------------------------------------------------------------------------------------
+                         G                                               |- explore(tops) {...; scope c_i. op_i; ...}
+
+         (program-elim)  ------------------------------------------------------------------------
+                         G[...; tops{op_i}@c_0; ...] |- explore(tops) {...; scope c_0. op_i; ...}
+
+                         G |- ProgramOp[c,sc,op  ]
+           (group-elim)  -------------------------
+                         G |- ProgramOp[c,sc,{op}]
+
+Assumptions (left rules):
+ 
+                         fx0<=fx1
+                         G, fx1{arg}@c |- Program
+            (fx-weaken)  ------------------------
+                         G[fx0{arg}@c] |- Program
+
+                         G, (fx0/\fx1){arg}@c      |- Program
+         (fx-intersect)  ------------------------------------
+                         G[fx0{arg}@c, fx1{arg}@c] |- Program
+     
+                         G, succeeds{a=a}@c |- Program
+           (equal-atom)  -----------------------------
+                         G                  |- Program
+
+                         G, resolves{a} |- Program
+        (atom-resolves)  -------------------------
+                         G              |- Program
+
+                         G, succeeds{u=u}@c |- Program
+      (equal-reflexive)  -----------------------------
+                         G[u@c]             |- Program
+ 
+                         G, fx{v=u}@c |- Program
+      (equal-symmetric)  -----------------------
+                         G[fx{u=v}@c] |- Program
+
+                         G, fx{p=r}@c            |- Program
+     (equal-transitive)  ----------------------------------
+                         G[fx{p=q}@c, fx{q=r}@c] |- Program
+
+                         head0 and head1 are disjoint heads
+                         G, (fx/\fails){head0=head1}@c |- Program
+   (unequal-head-fails)  ----------------------------------------
+                         G[fx{head0=head1}@c]          |- Program
+
+                         T is tuple(p) t
+                         G, resolves{u}@c                                                                |- Program
+   (container-resolves)  ------------------------------------------------------------------------------------------
+                         G[abstracts{u=T}@c, resolves{p=n}@c, resolves{u[0]}@c, ..., resolves{u[n-1]}@c] |- Program
+
+ (container-comparable)  TODO
+
+                         T is tuple(p) x
+                         U is tuple(q) y
+                         G, fx{T=U}@c                                                                         |- Program
+      (equal-container)  -----------------------------------------------------------------------------------------------
+                         G[abstracts{T=U}@c, fx{p=n}@c, fx{q=n}@c, fx{T[0]=U[0]}@c, ..., fx{T[n-1]=U[n-1]}@c] |- Program
+
+                         G, fx{u0[p]=u1[p]}@c |- Program
+      (equal-call-same)  -------------------------------
+                         G[fx{u0=u1}@c        |- Program
+
+                         One call site (identified with p), potentially reaching multiple function overloads unified together.
+
+                         G, fx{L[p0]=u1[p1]}@c                                                                         |- Program
+  (equal-call-computes)  --------------------------------------------------------------------------------------------------------
+                         G[fx{u1=L}@c, fx{p0=p1}@c, abstracts{p0=p}@c, abstracts{u=L}@c, computes{beta(L[p]) {...}}@c] |- Program
+                         G[fx{u1=L}@c, fx{p0=p1}@c, abstracts{u=tuple(q) v }@c]                                        |- Program
+
+                         Potentially multiple call sites, but equal because call is to a pure function or tuple.
+
+                         G, fx{v}@c                   |- Program
+   (equation-propagate)  ---------------------------------------
+                         G[fx{u}@c, abstracts{u=v}@c] |- Program
+
+                         fx<=fails
+                         G, fx{u}@c          |- Program
+       (equation-fails)  ------------------------------
+                         G[fx{u=v}@c]        |- Program
+ 
+                         G, u[p]@c               |- Program
+         (call-context)  ----------------------------------
+                         G[u@c, p@c, fx{u[p]=v}] |- Program
+                         G[u@c, p@c, fx{v=u[p]}] |- Program
+                         
+                         G, c0 inherits c2                 |- Program
+       (inherits-trans)  --------------------------------------------
+                         G[c0 inherits c1, c1 inherits c2] |- Program
+
+                         G, fx{arg}@d               |- Program
+          (inherits-fx)  -------------------------------------
+                         G[fx{arg}@c, d inherits c] |- Program
+
+                         G, c0 sees c2             |- op
+           (sees-trans)  -------------------------------
+                         G[c0 sees c1, c1 sees c2] |- op
+
+        (atom-rational)  --------------------------------------- !!TODO
+                         G[succeeds{Q=rational[Q]}@c] |- Program
+ 
+             (atom-int)  ---------------------------------- !!TODO
+                         G[succeeds{Z=int[Z]}@c] |- Program
+ 
+             (atom-nat)  ---------------------------------- !!TODO
+                         G[succeeds{n=nat[n]}@c] |- Program
+ 
+                         G, fx{x=int[y]}@c      |- Program
+         (int-rational)  --------------------------------- !!TODO
+                         G[fx{x=rational[y]}@c] |- Program
+ 
+                         G, fx{x=nat[y]}@c      |- Program
+              (nat-int)  --------------------------------- !!TODO
+                         G[fx{x=int[y]}@c]      |- Program
+ 
+                         G, (fx1/\~pendings \/ fx2/\pendings){op0}@c |- Program
+   (sequence-pending-1)  ------------------------------------------------------
+                         G[fx2{op0; op1}@c, fx1{op0}@c]              |- Program
+ 
+                         G, (fx1/\~pendings \/ PendingAfter(fx0)){op1}@c |- Program
+   (sequence-pending-2)  ----------------------------------------------------------
+                         G[fx0{op0}@c, fx1{op1}@c]                       |- Program
+ 
+                         G, (fx0\/~pendings){op0}@c                   |- Program
+       (beta-pending-1)  -------------------------------------------------------
+                         G[fx0{beta(L(p)) d0 {op0} range op1 {d1}}@c] |- Program
+
+                         G, (fx1\/~pendings){op1}@c                               |- Program
+       (beta-pending-2)  -------------------------------------------------------------------
+                         G[fx0{beta(L(p)) d0 {op0} range op1 {d1}}@c, fx1{op0}@c] |- Program
+
+Unification Introduction Rules:
+
+                         G, v->u, (fx1\/succeeds){u} |- ProgramOp[c,sc,u=v]
+          (unify-intro)  --------------------------------------------------
+                         G[u@c, fx1:fx2:ifx3@c]      |- ProgramOp[c,sc,u=v]
+                         G[u@c, fx1:fx2:ifx3@c]      |- ProgramOp[c,sc,v=u]
+ 
+                         We use fx1\/succeeds because assuming fails{e0; e1} is weaker than assuming fails{e0} and fails{e1}.
+
+                         G, fails{u}, fails{u=fail}@c |- ProgramOp[c,sc,u=fail]
+           (fail-intro)  ------------------------------------------------------
+                         G[u@c, fx1:fx2:ifx3@c]       |- ProgramOp[c,sc,u=fail]
+
+                         L     is lambda(oc0,fx,u) d0         i w  {op0}; range d1         p z {        op1}
+                         Beta0 is beta(L(p))       d0 {exists i w;  op0 ; range d1 {exists p z {p=u[w]; op1}}
+                         G, L@c |- ProgramOp[c,sc,{f=L; explore(fx) {Beta0[*/*]}}]
+         (lambda-intro)  ------------------------------------------------------------------------------------
+                         G      |- ProgramOp[c,sc,f=L                            ]
+
+                         Here we keep the original f=L operation, we capture its context L@c, and
+                         we add a new explore operation asking whether L's input-output relation is satisfied here.
+
+                         !!TODO: The explore... contains the call-to-input-function j=u[w], and here we need (and are missing)
+                         special logic to deem succeeds{j=u[w]} when u is unconstrained (not bound to a function or any other
+                         value) and (explore-fx) otherwise succeeds.
+
+                         G, succeeds{u=v(p)}                              |- ProgramOp[c,sc,{u=v(p); u=v[p]}]
+ (call-container-intro)  ------------------------------------------------------------------------------------
+                         G, abstracts{v=tuple(q) v0}@c, abstracts{q=n}@c] |- ProgramOp[c,sc, u=v(p)         ]
+
+                         0<n
+                         G lacks resolves{p=n}@c (so we don't apply this rule more than necessary)
+                         G                                               |- ProgramOp[c,sc,{u=v(p); p=0 | ... | p=n-1}]
+(call-container-iterates)----------------------------------------------------------------------------------------------
+                         G[abstracts{v=tuple(q) v0}@c, abstracts{q=n}@c] |- ProgramOp[c,sc, u=v(p)                    ]
+
+                         n=0 or head is not a natural number or not 0<=head<n
+                         G, (fx/\fails){u=v[p]}                         |- ProgramOp[c,sc,{u=v(p); u=v[p]}]
+(call-container-fails)   ----------------------------------------------------------------------------------
+                         G[fx{v=tuple(q) t}@c, fx{q=n}@c, fx{p=head}@c] |- ProgramOp[c,sc, u=v(p)         ]
+
+Unify Refinement Rules:
+
+                         fx<=fails
+                         G, fx{us=vs}@c   |- ProgramOp[c,sc,us=vs]
+     (unify-deep-fails)  -----------------------------------------
+                         G[fx{w=us[p]}@c] |- ProgramOp[c,sc,us=vs]
+
+                         This is the deep failure rule for unify ops since equation effects fx{u} are shallow.
+
+Elimination Rules:
+
+                         ifx9 is if ifx7<>none then ifx7 \/ fx0/\cardinalities else none
+                         G, fx2:fx:ifx9@e1              |- ProgramOp[c,sc,beta(L(p)) e0 {op0} range e1 {op1}]
+           (beta-intro)  ----------------------------------------------------------------------------------------------
+                         G[fx2:fx3:ifx4@c,
+                           fx5:fx6:ifx7@d,  L@d,
+                            _ :fx : _  @e1, fx0{op0}@e0 |- ProgramOp[c,sc,beta(L(p)) e0 {op0} range e1 {op1}]
+
+                         Beta0 is beta(L(p)) d0 {op0} range d1 {op1}
+                         G, (fx0*fx1){Beta0}@c       |- ProgramOp[c,sc,Beta0]
+              (beta-fx)  --------------------------------------------------------------
+                         G[fx0{op0}@c, fx1{op1}@c]   |- ProgramOp[c,sc,Beta0]
+
+                         fx<=(succeeds\/imperatives/\~rejects)
+                         L    is lambda(closed,fx,v) d0 i w {op0}; range d1 j z {op1}
+                         G, succeeds{x=u(p)},
+                            beta@e0, si@e0, fx2:effects:none@e0, e0 inherits c, c inherits e0,
+                            beta@e1, si@e1, e1 inherits e0, e0 inherits e1 |- ProgramOp[c,sc,{
+                                x=u(p)    # Keep the original, and deem it succeeds.
+                                x=u[p]    # Unify x with the caller's data flow vertex u[p].
+                                u[p]=L[p] # Unify caller u[p] with this overload's callee data flow vertex L[p].
+                                beta(L(p)) e0 {exists i w; i=p; op0} range e1 {exists j z; j=v(w); op1; L[p]=z}
+                                } [e0/d0][e1/d1][*/*]] # e0,e1 fresh
+    (call-closed-intro)  ---------------------------------------------------------------------------------------
+                         G[si@c, fx2:fx3:ifx4@c, x@c, u@c, p@c, abstracts{u=L}@c,
+                                 fx5:fx6:ifx7@d, L@d] |- ProgramOp[c,sc,x=u(p)]
+
+                         Note that this rule doesn't accomodate overloads fullsomely, where we'll need to
+                         specialize inferences among the multiple beta terms arising from the call.
+
+       (call-closed-fx)  TODO: Instead of (call-closed-intro) saying succeeds{x=u(p)} and (equal-call-same)&(equal-call-computes)
+                         doing similar things, figure our how to reconcile all calls and betas and incorporate the
+                         logic of MakeLambda-BetaContext-GetSuspendedFx.
+
+                         fx<=(succeeds\/imperatives/\~rejects)
+                         G, vb@d0, imply@d0, succeeds:succeeds:succeeds@d0, d0 sees s,  d0 inherits c, d0 inherits d1
+                            vb@d1, solve@d1, d1 sees d0, d1 inherits d0     |- pc[c,s,explore(fx) {...; Beta_i; ...}]
+        (explore-intro)  --------------------------------------------------------------------------------------------
+                         G[vb@c, fx2:fx3:ifx4@c]                            |- pc[c,s,explore(fx) {...; Beta_i; ...}]
+
+                         The effects fx1 represent the tightest effects where fx1{Beta_i}@c holds for all i.
+                         fx6 is if fx1<=fx then succeeds else
+                            cardinalities/\CompliesFx(fx1,fx) \/
+                            (if ifx4<>none then resolves/\ifx4 else resolves) \/
+                            (if vb=verify then rejects else bottom)
+                         G, fx6{explore(fx) {...; Beta_i; ...}}@c         |- ProgramOp[c,sc,explore(fx) {...; Beta_i; ...}]
+           (explore-fx)  ------------------------------------------------------------------------------------------------------------
+                         G[vb@c, fx2:fx3:ifx4@c][...; fx1{Beta_i}@c; ...] |- ProgramOp[c,sc,explore(fx) {...; Beta_i; ...}]
+
+                         G, fx{opv}@c |- ProgramOp[c,sc,FlexibleStartOp[d,op]]
+          (flex-opv-up)  ---------------------------------------------------------------
+                         G[fx{opv}@d] |- ProgramOp[c,sc,FlexibleStartOp[d,op]]
+
+                         G, fx{opv}@c              |- ProgramOp[c,sc,iterate {...; next(u0) ic_i v0 {op0} then d1 v1 {op1} else d2 {op2}; ...}]
+       (iterate-opv-up)  --------------------------------------------------------------------------------------------------------------------------------
+                         G[...; fx{opv}@ic_i; ...] |- ProgramOp[c,sc,iterate {...; next(u0) ic_i v0 {op0} then d1 v1 {op1} else d2 {op2}; ...}]
+
+                         G, fx{opv}@c             |- ProgramOp[c,sc,explore(fx) {...; (ss|fs)[d_i,op_i]; ...}]
+       (explore-opv-up)  -----------------------------------------------------------------------------------------------
+                         G[...; fx{opv}@d_i; ...] |- ProgramOp[c,sc,explore(fx) {...; (ss|fs)[d_i,op_i]; ...}]
+
+                         G[fx{opv}@d] |- same
+             (opv-down)  ------------------------------------------------------------------------------------------- !!TODO
+                         G[fx{opv}@c] |- ProgramOp[c,sc,...d...] where d is flexible context right beneath
+
+Sequence:
+ 
+                         G, (fx0*fx1){op0; op1}@c   |- ProgramOp[c,sc,{op0; op1}]
+       (sequence-intro)  --------------------------------------------------------
+                         G[fx0{op0}@c, fx1{op1}@c]  |- ProgramOp[c,sc,{op0; op1}]
+ 
+Exists:
+ 
+                         G, x_0@c, ..., x_n@c, succeeds{exists x_0...x_n}@c |- ProgramOp[c,sc,exists x_0 ... x_n]
+         (exists-intro)  ----------------------------------------------------------------------------------------
+                         G                                                  |- ProgramOp[c,sc,exists x_0 ... x_n]
+ 
+                         T is tuple(p) t
+                         G, T@c |- ProgramOp[c,sc,x=T]
+      (container-intro)  -----------------------------
+                         G      |- ProgramOp[c,sc,x=T]
+
+Scope:
+ 
+                         G, fx{scope e {op}}@c, e sees s |- ProgramOp[c,s,scope e {op}]
+          (scope-intro)  --------------------------------------------------------------
+                         G[fx{op}@d]                     |- ProgramOp[c,s,scope e {op}]
+ 
+                         G, (fx\/~pendings){op} |- ProgramOp[c,d,scope e {op}]
+        (scope-pending)  -----------------------------------------------------
+                         G[fx{scope e {op}}@c]  |- ProgramOp[c,d,scope e {op}]
+ 
+Iterate:
+
+                         I is next(u0) ic v0 {op0} then d1 v1 {op1} else d2 {op2}
+                         G, vb@ic, ic sees s, ic inherits c, v0@ic,
+                            effects:(fx3/\(diverges\/transacts)\/iterates):none@ic,
+                            effects{I}@ic, ic:=(scope d2 {op2})[*/*]                   |- pc[c,s,I]
+        (iterate-intro)  --------------------------------------------------------------------------
+                         G[vb@c, fx2:fx3:ifx4@c]                                       |- pc[c,s,I]
+
+                         I is next(u0) d0 v0 {op0} then d1 v1 {op1} else d2 {op2}
+                         G, (fx/\~iterates_pending\/interacts_pending\/throws_pending\/abstracts){op0}@c |- ProgramOp[c,sc,I]
+      (iterate-pending)  ----------------------------------------------------------------------------------------------------
+                         G[fx{I}@c]                                                                      |- ProgramOp[c,sc,I]
+
+                         fx1 is succeeds\/diverges\/reads\/reads_pending\/writes\/writes_pending\/suspends\/suspends_pending
+                         G, e1 sees d0, v1@e1    |- ProgramOp[c,sc,{verify(effects) d0 {op0}; exists v1; scope e1. {op1[*/*][u0/v0][e1/d1]}; op3[v1/v0]}] # e1 fresh
+(iterate-succeeds-elim)  --------------------------------------------------------------------------------------------------------------------------------
+                         G[fx1{op0}@d0, d0:=op3] |- ProgramOp[c,sc,next(u0) d0 v0 {op0} then d1 v1 {op1} else d2 {op2}]
+
+                         G                |- ProgramOp[c,sc,scope e3 {op3[*/*][u0/v0]}]
+   (iterate-fails-elim)  ---------------------------------------------------------------------------------------
+                         G[fails{op0}@d0] |- ProgramOp[c,sc,next(u0) d0 v0 {op0} then d1 v1 {op1} else d2 {op2}]
+ 
+                         I is iterate{...; next(u0) d0 v0 {op0} then d1 v1 {op1} else d2 {op2}; ...}
+                         G, succeeds:iterates:none@d0, fails:iterates:none@e0        |- ProgramExploreOp[ExploreOp[fc,sc,I]; ExploreOp[fc,sc,I][*/*]]
+      (iterate-explore)  ----------------------------------------------------------------------------------------------------------------------------
+                         G[effects:iterates:none@d0, (decides\/imperatives){op0}@d0] |- ProgramExploreOp[ExploreOp[fc,sc,I]]
+
+                         Inside a Program Exploration Start (pes), when an iterate's domain <decides>, fork the iterate's bc to simultaneously:
+                         (1) Verify the first  bc assuming the domain d0 succeeds.
+                         (2) Verify the second bc assuming the domain e0 fails.
+
+                         !!make the effects precise including imperatives
+
+Choice:
+ 
+                         G, effects{op0|op1}@c |- ProgramOp[c,sc,op0|op1]
+         (choice-intro)  ------------------------------------------------
+                         G                     |- ProgramOp[c,sc,op0|op1]
+
+                         G[d:=IterateOp[d,opR][*/*]/d:=op0], e0:=op0      |- ProgramOp[c,sc,IterateOp[d,opL    ]]
+    (choice-solve-elim)  ----------------------------------------------------------------------------------------
+                         G[solve@c, d:=op0, ~iterates_pending{opL|opR}@d] |- ProgramOp[c,sc,IterateOp[d,opL|opR]]
+
+                         G          |- ProgramExploreOp[ExploreOp[fc,sc,opL]; ExploreOp[fc,sc,opR][*/*]]
+    (choice-imply-elim)  -------------------------------------------------------------------------------
+                         G[imply@c] |- ProgramExploreOp[ExploreOp[fc,sc,opL|opR]]
+
+In, Stage, Assume, Verify:
+
+                         G                 |- ProgramOp[c,sc,scope   d0 {exists i x; op0}]
+       (in-solve-intro)  -----------------------------------------------------------------
+                         G[fx2:fx3:none@c] |- ProgramOp[c,sc,in(fx0) d0         i x {op0}]
+
+                         This :t isn't implied here, so reduce monotonically, exposing it as a flexible test.
+
+                         fx5 is fx/\fx2/\fx3 \/ fx4
+                         G, vb@d0, imply@d0, d0 sees s, d0 inherits c, c inherits d0, fx5:effects:none@d0, i@d0, x@d0 |- pc[c,s,in(fx) d0 i x {op0}]
+       (in-imply-intro)  ---------------------------------------------------------------------------------------------------------------------------
+                         G[vb@c, fx2:fx3:fx4@c]                                                                       |- pc[c,s,in(fx) d0 i x {op0}]
+                   
+                         G, (fx5/\~unifies){in(fx) d0 i x {op0}}@c |- ProgramOp[c,sc,in(fx) d0 i x {op0}]
+          (in-imply-fx)  --------------------------------------------------------------------------------
+                         G[fx5:fx6:fx7@d0]                         |- ProgramOp[c,sc,in(fx) d0 i x {op0}]
+
+                         Any fx{op0}@c are for the caller beta reduction to reject, as we can't reason about effects of
+                         open world idempotent overloads here.
+
+                         S   is stage(fx,opv) d0 i x {op0} value d1 y {op1}
+                         fx5 is fx/\fx2/\fx3 \/ (if ifx4<>none then ifx4 else bottom) \/ fx8
+                         G, vb@d0, imply@d0, d0 sees s, d0 inherits c, c inherits d0, fx5:effects:none@d0, i@d0, x@d |- pc[c,s,S]
+          (stage-intro)  --------------------------------------------------------------------------------------------------------
+                         G[vb@c, fx2:fx3:ifx4@c, fx8{opv}@c]                                                         |- pc[c,s,S]
+
+                         The fx8 term is needed for test(D00){a:int => f(x:=a=3):type{a=3}=x => f[_]}, otherwise when an
+                         implied lambda in a domain is reevaluated in a beta, it's not weakened by parameter strength.
+
+                         S is stage(fx,opv) d0 i x {op0} value d1 y {op1}
+                         G, verify@d1, solve@d1, d1 sees s, d1 inherits c, effects:fx3/\fx:ifx4@d1, y@d1 |- pc[c,s,S]
+   (stage-verify-intro)  --------------------------------------------------------------------------------------------
+                         G[verify@c, fx2:fx3:ifx4@c]                                                     |- pc[c,s,S]
+
+                         S is stage(fx,opv) d0 i x {op0} value d1 y {op1}
+                         fx9 is if vb=beta or fx0<=fx/\fx2 then succeeds else fx0\/succeeds\/rejects
+                         G, ((fx5/\~unifies)*fx9){S}@c                        |- ProgramOp[c,sc,S]
+             (stage-fx)  -------------------------------------------------------------------------
+                         G[vb@c, fx2:fx3:ifx4@c, fx5:fx6:fx7@d0, fx0{op0}@d0] |- ProgramOp[c,sc,S]
+
+                         S is stage(fx,opv) d0 i x {op0} value d1 y {op1}
+                         G, CompliesFx(fx8,fx/\fx3){opv}@c        |- ProgramOp[c,sc,S]
+     (stage-verify-opv)  -------------------------------------------------------------
+                         G[verify@c, fx2:fx3:ifx4@c, fx8{op1}@d1] |- ProgramOp[c,sc,S]
+
+                         G, vb@d, solve@d, d sees s, d inherits c, c inherits d, effects:fx0/\(abstracts|imperatives):none@d |- pc[c,s,verify(fx0,?err) d {op0}]
+         (verify-intro)  ---------------------------------------------------------------------------------------------------------------------------------------
+                         G[vb@c]                                                                                             |- pc[c,s,verify(fx0,?err) d {op0}]
+ 
+                         G, (fx0\/~pendings){op}            |- ProgramOp[c,sc,verify(fx0,?err) d {op}]
+       (verify-pending)  -----------------------------------------------------------------------------
+                         G[fx0{verify(fx1,?err) d {op0}}@c] |- ProgramOp[c,sc,verify(fx0,?err) d {op}]
+ 
+                         G, (fx/\~unifies){verify(fx0,?err) d {op0}}@c |- ProgramOp[c,sc,verify(fx0,err) d {op0}]
+            (verify-fx)  ----------------------------------------------------------------------------------------
+                         G[fx{op0}@d]                                  |- ProgramOp[c,sc,verify(fx0,err) d {op0}]
+ 
+                         G, vb@d, imply@d, d sees s, c inherits d, d inherits c, fx0:succeeds:none@d |- pc[c,s,assume(fx0) d {op0}]
+         (assume-intro)  ----------------------------------------------------------------------------------------------------------
+                         G[vb@c]                                                                     |- pc[c,s,assume(fx0) d {op0}]
+ 
+                         G, (fx/\~unifies){assume(fx0) d {op0}}@c |- ProgramOp[c,sc,assume(fx) d {op0}]
+            (assume-fx)  ------------------------------------------------------------------------------
+                         G[fx{op0}@d]                             |- ProgramOp[c,sc,assume(fx) d {op0}]
+
+Cast:
+ 
+                          G, effects{cast(u,err) opv {pattern => {op0}; ...}}@c |- ProgramOp[c,sc,cast(u,err) opv {pattern => {op0}; ...}]
+     (cast-verify-intro)  ----------------------------------------------------------------------------------------------------------------
+                          G[verify@c]                                           |- ProgramOp[c,sc,cast(u,err) opv {pattern => {op0}; ...}]
+ 
+                          G                   |- ProgramOp[c,sc,op0[*/*]]
+        (cast-eval-elim)  ------------------------------------------------------------------------------
+                          G[beta@c, opv:=op0] |- ProgramOp[c,sc,cast(u,err) opv {pattern => {op0}; ...}]
+ 
+                          v matches head pattern
+                          G, opv:=op0                             |- ProgramOp[c,sc,op0]
+      (cast-verify-elim)  --------------------------------------------------------------------------------------------------
+                          G[verify@c, fx1:fx2:ifx3@c, fx1{u=v}@c] |- ProgramOp[c,sc,cast(u,err) opv {pattern => {op0}; ...}]
+ 
+                          Ignore this for now. It's used in my implementation for recursively determining head normal
+                          information about a variable. !!TODO: Deal with paraconsistency systematically.
