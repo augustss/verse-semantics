@@ -568,34 +568,23 @@ split''
   -> HRef m (Maybe a)
   -> S m
   -> VerseT m (Stream m a)
-split'' m heap latch (m_f', m_e', m_a') last s =
+split'' m heap latch init'@(_, m_e', m_a') last s =
   splitS m heap latch s >>= \ case
     AbortS -> split' m_a' heap latch last
     FailS m_a ->
-      let m_a'' = alt m_a m_f' m_e' <?> m_a'
-      in
-        pure Done
-        <?>
-        (do heap <- copyHeap heap
-            split' (m_e' <?> m_a'') heap latch last)
+      pure Done
+      <?>
+      (do heap <- copyHeap heap
+          split' (m_e' <?> appendAbort m_a init') heap latch last)
     YieldS s@S {..} m_y m_f m_e m_a ->
-      let
-        init =
-          ( m_f <|> m_f'
-          , alt m_e m_f' m_e'
-          , alt m_a m_f' m_e' <?> m_a'
-          )
+      let init = appendInit m_f m_e m_a init'
       in case guard (IntMap.null suspCounts) *> default' of
         Nothing -> split'' m_y heap latch init last s
         Just m_d ->
           let default' = Nothing
           in split'' (m_y *> m_d) heap latch init last S {..}
     SucceedS S {..} m_f m_e m_a ->
-      let
-        m_f'' = m_f <|> m_f'
-        m_e'' = alt m_e m_f' m_e'
-        m_a'' = alt m_a m_f' m_e' <?> m_a'
-        init = (m_f'', m_e'', m_a'')
+      let init@(m_f'', _, m_a'') = appendInit m_f m_e m_a init'
       in case guard (IntMap.null suspCounts) *> default' of
         Just m_d ->
           let default' = Nothing
@@ -723,22 +712,22 @@ appendInitS m_f m_e m_a env =
   )
 
 appendFailS :: VerseT m () -> SplitEnv m -> VerseT m ()
-appendFailS m_f SplitEnv { init = (m_f', _, _), .. } =
-  (do m_f
-      whenSuspended suspend
-      incrSuspCounts suspCounts) <|> m_f'
+appendFailS m_f SplitEnv {..} =
+  appendFail (do m_f
+                 whenSuspended suspend
+                 incrSuspCounts suspCounts) init
 
 appendEmptyS :: VerseT m () -> SplitEnv m -> VerseT m ()
-appendEmptyS m_e SplitEnv { init = (m_f', m_e', _), .. } =
-  alt (do m_e
-          whenSuspended suspend
-          incrSuspCounts suspCounts) m_f' m_e'
+appendEmptyS m_e SplitEnv {..} =
+  appendEmpty (do m_e
+                  whenSuspended suspend
+                  incrSuspCounts suspCounts) init
 
 appendAbortS :: VerseT m () -> SplitEnv m -> VerseT m ()
-appendAbortS m_a SplitEnv { init = (m_f', m_e', m_a'), .. } =
-  alt (do m_a
-          whenSuspended suspend
-          incrSuspCounts suspCounts) m_f' m_e' <?> m_a'
+appendAbortS m_a SplitEnv {..} =
+  appendAbort (do m_a
+                  whenSuspended suspend
+                  incrSuspCounts suspCounts) init
 
 resumeSplitS
   :: (MonadRef m, MonadSupply Int m)
@@ -819,23 +808,19 @@ verify''
   -> HRef m Bool
   -> S m
   -> VerseT m ()
-verify'' m heap latch (m_f', m_e', m_a') last s =
+verify'' m heap latch init'@(_, m_e', m_a') last s =
   verifyS m heap latch s >>= \ case
     AbortS -> verify' m_a' heap latch last
     FailS m_a -> verify' (m_e' <?> m_a <?> m_a') heap latch last
     YieldS s@S {..} m_y m_f m_e m_a ->
-      let init = (m_f <|> m_f', alt m_e m_f' m_e', m_a <?> m_a')
+      let init = appendInit m_f m_e m_a init'
       in case guard (IntMap.null suspCounts) *> default' of
         Nothing -> verify'' m_y heap latch init last s
         Just m_d ->
           let default' = Nothing
           in verify'' (m_y *> m_d) heap latch init last S {..}
     SucceedS S {..} m_f m_e m_a ->
-      let
-        m_f'' = m_f <|> m_f'
-        m_e'' = alt m_e m_f' m_e'
-        m_a'' = alt m_a m_f' m_e' <?> m_a'
-        init = (m_f'', m_e'', m_a'')
+      let init@(m_f'', _, m_a'') = appendInit m_f m_e m_a init'
       in case guard (IntMap.null suspCounts) *> default' of
         Just m_d ->
           let default' = Nothing
@@ -947,22 +932,22 @@ appendInitV m_f m_e m_a env =
   )
 
 appendFailV :: VerseT m () -> VerifyEnv m -> VerseT m ()
-appendFailV m_f VerifyEnv { init = (m_f', _, _), .. } =
-  (do m_f
-      whenSuspended suspend
-      incrSuspCounts suspCounts) <|> m_f'
+appendFailV m_f VerifyEnv {..} =
+  appendFail (do m_f
+                 whenSuspended suspend
+                 incrSuspCounts suspCounts) init
 
 appendEmptyV :: VerseT m () -> VerifyEnv m -> VerseT m ()
-appendEmptyV m_e VerifyEnv { init = (m_f', m_e', _), .. } =
-  alt (do m_e
-          whenSuspended suspend
-          incrSuspCounts suspCounts) m_f' m_e'
+appendEmptyV m_e VerifyEnv {..} =
+  appendEmpty (do m_e
+                  whenSuspended suspend
+                  incrSuspCounts suspCounts) init
 
 appendAbortV :: VerseT m () -> VerifyEnv m -> VerseT m ()
-appendAbortV m_a VerifyEnv { init = (m_f', m_e', m_a'), .. } =
-  alt (do m_a
-          whenSuspended suspend
-          incrSuspCounts suspCounts) m_f' m_e' <?> m_a'
+appendAbortV m_a VerifyEnv {..} =
+  appendAbort (do m_a
+                  whenSuspended suspend
+                  incrSuspCounts suspCounts) init
 
 resumeVerifyS
   :: (MonadRef m, MonadSupply Int m)
@@ -976,6 +961,22 @@ resumeVerifyS m VerifyEnv {..} = do
     r = R { level, heaps = Heaps { heap = Just heap, verifyHeap }, latch }
     s = S { suspend = const $ pure (), suspCounts = mempty, store = mempty, .. }
   lift $ unVerseT m yieldS r s succeedS failS failS abortS
+
+appendInit :: VerseT m () -> VerseT m () -> VerseT m () -> Init m -> Init m
+appendInit m_f m_e m_a init =
+  ( appendFail m_f init
+  , appendEmpty m_e init
+  , appendAbort m_a init
+  )
+
+appendFail :: VerseT m () -> Init m -> VerseT m ()
+appendFail m_f (m_f', _, _) = m_f <|> m_f'
+
+appendEmpty :: VerseT m () -> Init m -> VerseT m ()
+appendEmpty m_e (m_f', m_e', _) = alt m_e m_f' m_e'
+
+appendAbort :: VerseT m () -> Init m -> VerseT m ()
+appendAbort m_a (m_f', m_e', m_a') = alt m_a m_f' m_e' <?> m_a'
 
 assume
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
