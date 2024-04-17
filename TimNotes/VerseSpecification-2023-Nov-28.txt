@@ -97,7 +97,7 @@ Ampersand := push; parse LinePrefix:='&'; Space Def (';'|Ending); pop
 String    := '"' {Interp | CharEsc |                                       !('\'|'{'|'}'|'"') Text} '"'
 Content   :=     {Interp | CharEsc | Markup | Ampersand | Comment | Line | !Special           Text}
 Contents  := Content | '~' Content {'~' Content}
-Markup    := '<' Scan Tags Scan ":>" Space Ind Contents Ded 
+Markup    := '<' Scan Tags Scan ":>" Space Ind Contents Ded
           |  '<' Scan Tags Scan ';'  Scan      Contents '>'
           |  '<' Scan Tags Scan '>'  Scan      Contents "</" Ident Space {'/' Ident Space} '>'
 
@@ -237,19 +237,19 @@ Definitions (as EBNF grammars) used by our inference rules:
                                |  imperatives | diverges | demands | allocates | varies
                                |  iterates         | reads         | writes         | interacts         | throws         | suspends
                                |  iterates_pending | reads_pending | writes_pending | interacts_pending | throws_pending | suspends_pending
-                               |  effects 
+                               |  effects
                                |  fx0\/fx1
     Available fx           afx := none | (fx,fx)                                      # The pair is (local lambda fx,propagating implied fx).
     Variance Specifier      oc := open|closed
     Lambda                   L := lambda(oc,fx,u) c0 i w. op0; range c1 j z. op1      # lambda_variable
     Heads                 head := a | L                                               # variable with head shape
                                |  tuple(u) t                                          # array_variable
-                               |  nom Path. u                                         
+                               |  nom Path. u
     Vertices         p,q,r,u,v := x                                                   # variable with top shape
                                |  head                                                # variable with specific shape
                                |  u[v]                                                # call_variable
     Programs                pg := program c i x. op
-                               |  pg; pg                                              
+                               |  pg; pg
     Operations          op,L,E := u=v                                                 # op::atom, op::unify, op::span, op::lambda
                                |  u=v(p)                                              # op::call
                                |  u=fail                                              # op::fail
@@ -340,7 +340,7 @@ Strength And Effects Lattice:
                  decides      |
             ========|====\====|================
                 succeeds   fails        DECIDED
-                    \        / 
+                    \        /
                     contradicts
 
     Additionally, we have the following independent sublattices for imperative effects:
@@ -361,7 +361,7 @@ Strength And Effects Lattice:
         tops          = succeeds\/diverges\/transacts\/interacts
 
     The operation fx0*fx1 captures the cumulative effects of running op0 with effects fx0 then op1 with efffects fx1.
-    The operation is associative, transitive, and commutative. Note that fails*contradicts=fails, because 
+    The operation is associative, transitive, and commutative. Note that fails*contradicts=fails, because
     an op having effects <contradicts><converges> means the context cannot commit with <succeeds>, but it can fail.
         fx0*fx1 = (fx0\/fx1)/\
             if      fx0/\fx1 <= fails   then fails\/imperatives
@@ -375,9 +375,9 @@ Strength And Effects Lattice:
             if(writes   <=fx) {writes_pending   } else {none} \/
             if(throws   <=fx) {throws_pending   } else {none} \/ # throws&interacts can't run where fails allowed,
             if(interacts<=fx) {interacts_pending} else {none} \/ # so we needn't relatively sequence them.
-            fx 
+            fx
 
-    The operation WeakenFx(Fx,WeakenFx) = 
+    The operation WeakenFx(Fx,WeakenFx) =
         if fx/\cardinalities <= fails then Fx \/ WeakenFx/\fails
         else                               Fx \/ WeakenFx/\cardinalities
 
@@ -446,7 +446,7 @@ Syntax Equivalences between full grammar (left) and core grammar (right)
     s0=>s1        <--> function(s0){s1}
     s0^           <--> operator'^'[s0]     # Same for postfix ^ ?
     s0&s1         <--> operator'&'{s0,s1}  # Same for infix & -> to | <> = and or += -= *= /=
-    s0+s1         <--> operator'+'[s0,s1]  # Same for infix * / + - >= > <= < .. 
+    s0+s1         <--> operator'+'[s0,s1]  # Same for infix * / + - >= > <= < ..
     :s0           <--> prefix'-'{s0}       # Same for prefix : not
     -s0           <--> prefix'-'[s0]       # Same for prefix ^ ? + - * []
     -{s0}         <--> :-type{s0}          # Same for prefix ^ ? + - * []
@@ -483,7 +483,7 @@ Overview
 
     Here we specify the translatition from Syntax s defined by the Verse Grammar into an Operation op
     using Syntax Reduction Rules of the form:
-  
+
         S(u,v,s) ---> op
 
     Such a reduction rule translates precisely to the inference rule:
@@ -495,9 +495,9 @@ Overview
 Constant Syntax:
 
     S(u,v,Num)           ---> u=Z; v=Z (for Num sans units) where Z is the integer specified by Num in the usual way
-                         
-Basic Syntax:            
-                         
+
+Basic Syntax:
+
     S(u,v,_)             ---> S(u,v,:any)
 
     S(u,v,s0=s1)         ---> S(u,v,s0); S(u,v,s1)
@@ -509,7 +509,7 @@ Basic Syntax:
 
     S(u,v,(s0; ...; sn)) ---> (exists i0 x0; S(i0,x0,s0); ...); S(u,v,sn)
 
-    S(u,v,(s0,..,sn-1)) where n<>1 ---> S(u,v,array{s0,..,sn-1}) 
+    S(u,v,(s0,..,sn-1)) where n<>1 ---> S(u,v,array{s0,..,sn-1})
 
 Identifiers:
 
@@ -568,7 +568,7 @@ Destructuring Definition Syntax:
     S(u,v,s0^:s1)               ---> S(u,v,s0:new(s1))
     S(u,v,s0^:s1=s2)            ---> S(u,v,s0:new(s1)=s2)
     S(u,v,var s0:s1)            ---> S(u,v,s0<var>:new(s1))
-    S(u,v,var s0:s1=s2)         ---> S(u,v,s0<var>:new(s1)=s2) 
+    S(u,v,var s0:s1=s2)         ---> S(u,v,s0<var>:new(s1)=s2)
     S(u,x,ref s0)               ---> S(u,v,ref{s0})
     S(u,v,ref s0:s1)            ---> S(u,v,s0<var>:^s1)
     S(u,v,ref s0:s1=s2)         ---> S(u,v,s0<var>:^s1=s2)
@@ -717,28 +717,28 @@ Program:
                          G[tops{op}@c] |- program c i x. op
 
 Assumptions (left rules):
-  
+
                          fx0<=fx1
                          G, fx1{arg} |- pg
             (fx-weaken)  -----------------
                          G[fx0{arg}] |- pg
-  
+
                          G, (fx0/\fx1){arg}    |- pg
          (fx-intersect)  ---------------------------
                          G[fx0{arg}, fx1{arg}] |- pg
-  
+
                          G, succeeds{v=v}@c |- pg
               (eq-refl)  ----------------------------
                          G[v@c]             |- pg
-  
+
                          G, fx{v=u}@c |- pg
               (eq-symm)  ------------------
                          G[fx{u=v}@c] |- pg
-  
+
                          G, fx{p=r}@c            |- pg
              (eq-trans)  -----------------------------
                          G[fx{p=q}@c, fx{q=r}@c] |- pg
-  
+
                          G, fx{u0[p]=u1[p]}@c |- pg
          (eq-call-same)  --------------------------
                          G[fx{u0=u1}@c        |- pg
@@ -759,30 +759,30 @@ Assumptions (left rules):
                          G, fx{T=U}                                                                 |- pg
              (eq-tuple)  --------------------------------------------------------------------------------
                          G[abstracts{T=U}, fx{p=n}, fx{q=n}, fx{T[0]=U[0]}, ..., fx{T[n-1]=U[n-1]}] |- pg
-  
+
                          G, u[p]<-v[p], abstracts{u[p]=v[p]} |- pg
            (flow-tuple)  -----------------------------------------
                          G[u<-v, abstracts{v[p]}]            |- pg
-                         
+
                          !!TODO: Tighten tuple data flow specification. It's not complete here and not aligned with implementation.
 
 
                          G, ... |- pg
        (tuple-resolves)  ------------
                          G[...] |- pg
-  
+
                          G, fx{u=v}@c   |- pg
       (dominator-equiv)  --------------------
                          G[fx{v>>u}@c]  |- pg
-  
+
                          G, fx{v>>u}@c |- pg
          (eq-dominator)  -------------------
                          G[fx{u=v}@c]  |- pg
-  
+
                          G, fx{v}@c                   |- pg
    (equation-propagate)  ----------------------------------
                          G[fx{u}@c, abstracts{u=v}@c] |- pg
-  
+
                          fx<=fails
                          G, fx{u}@c, fx{v}@c |- pg
        (equation-fails)  -------------------------
@@ -791,59 +791,59 @@ Assumptions (left rules):
                          G, resolves{a}       |- pg
     (equation-resolves)  --------------------------
                          G[abstracts{u=a}]    |- pg
-  
+
                          G, d flexes c |- pg
           (flexes-symm)  -------------------
                          G[c flexes d] |- pg
-  
+
                          G, c1 flexes c2               |- op
          (flexes-trans)  -----------------------------------
                          G[c0 flexes c1, c1 flexes c2] |- op
-  
+
                          G, fx{arg}@d             |- pg
             (flexes-fx)  ------------------------------
                          G[fx{arg}@c, c flexes d] |- pg
-  
+
                          G, Ident@d           |- pg
            (sees-ident)  --------------------------
                          G[c sees d, Ident@c] |- pg
-  
+
                          G, u[p]@c               |- pg
                          -----------------------------
                          G[u@c, p@c, fx{u[p]=v}] |- pg
                          G[u@c, p@c, fx{v=u[p]}] |- pg
-  
+
         (atom-rational)  ---------------------------------- !!TODO
                          G[succeeds{Q=rational[Q]}@c] |- pg
-  
+
              (atom-int)  ----------------------------- !!TODO
                          G[succeeds{Z=int[Z]}@c] |- pg
-  
+
              (atom-nat)  ----------------------------- !!TODO
                          G[succeeds{n=nat[n]}@c] |- pg
-  
+
                          G, fx{x=int[y]}@c      |- pg
          (int-rational)  ---------------------------- !!TODO
                          G[fx{x=rational[y]}@c] |- pg
-  
+
                          G, fx{x=nat[y]}@c      |- pg
               (nat-int)  ---------------------------- !!TODO
                          G[fx{x=int[y]}@c]      |- pg
-  
+
 Unification Introduction Rules:
- 
+
                          G, u<-v |- fc[c,u=v]
       (unify-flex-left)  --------------------
                          G[u@c]  |- fc[c,u=v]
-  
+
                          G, v<-u |- fc[c,u=v]
      (unify-flex-right)  --------------------
                          G[v@c]  |- fc[c,u=v]
-  
+
                          G, fx1{u=v}@c    |- fc[c,u=v]
           (unify-intro)  -----------------------------
                          G[fx1:fx2:afx3@c |- fc[c,u=v]
- 
+
                          G, fails{u=fail} |- fc[c,u=fail x]
      (unify-fail-intro)  ----------------------------------
                          G                |- fc[c,u=fail x]
@@ -884,7 +884,7 @@ Unification Introduction Rules:
                          G[fx{v=tuple(q) t}@c, fx{q=n}@c, fx{p=head}@c] |- fc[c,(u=v(p)        )]
 
 Elimination Rules:
- 
+
                          fx<=(succeeds\/imperatives/\~rejects)
                          I is explore(fx) d0. op0; range d1. op1]
                          G, d0 sees c,  vb@d0, imply@d0, succeeds:fx\/succeeds:succeeds@d0,
@@ -906,7 +906,7 @@ Elimination Rules:
                          L      is lambda(closed,fx,v) d0 i w. op0; range d1 j z. op1
                          afx7   is if afx6 then effects else none
                          G, succeeds{x=u(p)}
-                            si@e0, beta@e0, fx1:effects:none@e0, e0 flexes c, 
+                            si@e0, beta@e0, fx1:effects:none@e0, e0 flexes c,
                             si@e1, beta@e1, fx1:fx     :afx7@e1, e1 flexes c  |- fc[c,(
                                 x=u(p)    # Keep the original, and deem it succeeds.
                                 x=u[p]    # Unify x with the caller's data flow vertex u[p].
@@ -954,49 +954,49 @@ Elimination Rules:
                          G[fx0{beta(L(p)) d0. op0 range op1. d1}@c, fx1{op0}@c] |- fc[c,beta(L(p)) d0. op0 range d1, op1]
 
 Sequence:
-  
+
                          G, (fx0*fx1){op0; op1}@c   |- fc[c,(op0; op1)]
        (sequence-intro)  ----------------------------------------------
                          G[fx0{op0}@c, fx1{op1}@c]  |- fc[c,(op0; op1)]
-  
+
                          G, (fx1/\~pendings \/ fx2/\pendings){op0}@c |- fc[c,(op0; op1)]
    (sequence-pending-1)  ---------------------------------------------------------------
                          G[fx2{op0; op1}@c, fx1{op0}@c]              |- fc[c,(op0; op1)]
-  
+
                          G, (fx1/\~pendings \/ PendingAfter(fx0)){op1}@c |- fc[c,(op0; op1)]
    (sequence-pending-2)  -------------------------------------------------------------------
                          G[fx0{op0}@c, fx1{op1}@c]                       |- fc[c,(op0; op1)]
-  
+
 Exists:
-  
+
                          G, x@c, succeeds{exists x}@c |- fc[c,exists x]
          (exists-intro)  ----------------------------------------------
                          G                            |- fc[c,exists x]
- 
+
 Conditional:
- 
+
                          G, effects{cond(u) x. op0}@c |- fc[c,cond(u) x. op0]
            (cond-intro)  ----------------------------------------------------
                          G                            |- fc[c,cond(u) x. op0]
-  
+
                          G                  |- fc[c,exists        ] # trivial op that succeeds
     (cond-reduce-false)  -------------------------------------------------------------------------
                          G[abstracts{u=()}] |- fc[c,cond(u) x. op0]
-  
+
                          G                                            |- fc[c,(exists y1. y1=u(0); op0[y1/y])] # d,y1 fresh
      (cond-reduce-true)  ----------------------------------------------------------------------------------------------------------------
                          G[abstracts{u=tuple(u0) t}, abstracts{y0=1}] |- fc[c,cond(u) y. op0]
-  
+
 Scope:
- 
+
                          G, fx{scope d. op}@c, d sees c, d flexes c |- fc[c,scope d. op]
           (scope-intro)  ---------------------------------------------------------------
                          G[fx{op}@d]                                |- fc[c,scope d. op]
-  
+
                          G, (fx\/~pendings){op} |- fc[c,scope d. op]
         (scope-pending)  -------------------------------------------
                          G[fx{scope d. op}@c]   |- fc[c,scope d. op]
-  
+
 Iterate:
 
                          I is iterate(u0) d0 v0. op0 then d1 v1. op1 else d2. op2
@@ -1008,7 +1008,7 @@ Iterate:
                          G, (fx/\~iterates_pending\/interacts_pending\/throws_pending\/abstracts){op0}@c |- fc[c,I]
       (iterate-pending)  ------------------------------------------------------------------------------------------
                          G[fx{I}@c]                                                                      |- fc[c,I]
-  
+
                          I is iterate(u0) d0 v0. op0 then d1 v1. op1 else d2. op2
                          G, succeeds               {w0=w1}@d0 |- fc[c,I]
      (iterate-force-eq)  --------------------------------------------------------
@@ -1024,12 +1024,12 @@ Iterate:
                          G                         |- fc[c,scope e3. op3[*][u0/v0]]
    (iterate-fails-elim)  ------------------------------------------------------------------------------------------
                          G[d0:=op3, fails{op0}@d0] |- fc[c,iterate(u0) d0 v0. op0 then d1 v1. op1 else d2. op2]
- 
+
                          I   is as iterate(u0) d0 v0. op0 then d1 v1. op1 else d2. op2
                          G, succeeds:succeeds:none@d0, fails:decides:none@e0 |- fc[c0,(ec[e,c1,I]; ec[e0,c1,I][*])] (e0 fresh)
       (iterate-explore)  ------------------------------------------------------------------------------------------
                          G[effects:iterates:none@d0, (decides\/imperatives){op0}@d0] |- fc[c0,ec[e,c1,I]]
- 
+
                          When we're verifying an iterate... and we conclude its domain <decides>, we simultaneously explore
                          two possibilities: one assuming it succeeds, and one assuming it fails. We do this by matching
                          the exploration context ec[...] containing the iterate..., and duplicating it.
@@ -1039,7 +1039,7 @@ Iterate:
                          !!TODO: Align with three-context fallback in Verse.cpp
 
 Choice:
- 
+
                          G, effects{op0|op1}@c |- fc[c,op0|op1]
          (choice-intro)  ------------------------------------------
                          G                     |- fc[c,op0|op1]
@@ -1085,83 +1085,83 @@ In, Stage, Assume, Verify:
                          G, vb@d, solve@d, effects:fx0/\(abstracts|imperatives):none@d, d sees c |- fc[c,verify(fx0,?err) d. op0]
          (verify-intro)  --------------------------------------------------------------------------------------------------------
                          G[vb@c]                                                                 |- fc[c,verify(fx0,?err) d. op0]
- 
+
                          G, (fx0\/~pendings){op}             |- fc[c,verify(fx0,?err) d. op]
        (verify-pending)  -------------------------------------------------------------------
                          G[fx0{verify(fx1,?err) d. op0}@c]   |- fc[c,verify(fx0,?err) d. op]
- 
+
                          G, fx{verify(fx0,?err) d. op0}@c |- fc[c,verify(fx0,err) d. op0]
             (verify-fx)  ----------------------------------------------------------------
                          G[fx{op0}@d]                     |- fc[c,verify(fx0,err) d. op0]
- 
+
                          G, vb@d, imply@d, d sees c, fx0:succeeds:none@d |- fc[c,assume(fx0) d. op0]
          (assume-intro)  ---------------------------------------------------------------------------
                          G[vb@c]                                         |- fc[c,assume(fx0) d. op0]
- 
+
                          G, fx{assume(fx0) d. op0}@c |- fc[c,assume(fx) d. op0]
             (assume-fx)  ------------------------------------------------------
                          G[fx{op0}@d]                |- fc[c,assume(fx) d. op0]
- 
+
 Cast:
-  
+
                           G, effects{cast(u,err) opv. {pattern => op0; ...}}@c |- fc[c,cast(u,err) opv. {pattern => op0; ...}]
      (cast-verify-intro)  ----------------------------------------------------------------------------------------------------
                           G[verify@c]                                          |- fc[c,cast(u,err) opv. {pattern => op0; ...}]
-  
+
                           G                   |- fc[c,op0[*]]
         (cast-eval-elim)  -----------------------------------------------------------------------
                           G[beta@c, opv:=op0] |- fc[c,cast(u,err) opv. {pattern => op0; ...}]
-  
+
                           v matches head pattern
                           G, opv:=op0                             |- fc[c,op0]
       (cast-verify-elim)  ---------------------------------------------------------------------------------------
                           G[verify@c, fx1:fx2:afx3@c, fx1{u=v}@c] |- fc[c,cast(u,err) opv. {pattern => op0; ...}]
-  
+
                           Ignore this for now. It's used in my implementation for recursively determining head normal
                           information about a variable. !!TODO: Deal with paraconsistency systematically.
 
 Natives:
- 
+
                          m and n are integers
                          ...
               (int-add)  --------------------
                          G[fx{f=operator'+'}@c, fx{x=tuple(u) t}@c, fx{u=2}@c] |- fc[c,x=f(y)]
 
                          !!TODO: Say exactly how we define a native function like addition.
-  
+
                          G, (abstracts\/allocates){x=new(u)} |- fc[c,x=new(u)]
             (new-intro)  ----------------------------------------------------- TODO: Extend so pointers tote their types.
                          G                                   |- fc[c,x=new(u)]
-  
+
                          G, P^:=u         |- fc[c,x=P     ] # P fresh
              (new-elim)  ----------------------------------
                          G, resolves{u}@c |- fc[c,x=new(u)]
-  
+
                          G, (abstracts\/reads\/reads_pending){x=v^} |- fc[c,x=v^]
            (read-intro)  --------------------------------------------------------
                          G[x@c]                                     |- fc[c,x=v^]
-  
+
                          G                                                    |- fc[c,x=u ]
             (read-elim)  ------------------------------------------------------------------
                          G[x@c, abstracts{y=P}, P^:=u, ~writes_pending{x=v^}] |- fc[c,x=v^]
-  
+
                          G, (abstracts\/writes\/writes_pending){x=set u^=v} |- fc[c,x=set u^=v]
           (write-intro)  ----------------------------------------------------------------------
                          G                                                  |- fc[c,x=set u^=v]
-  
+
                          G[P^:=v1/P^:=v0]                                                                      |- fc[c,x=()       ]
            (write-elim)  ----------------------------------------------------------------------------------------------------------
                          G[abstracts{u=P}, P^:=v0, ~writes_pending/\~reads_pending{set u^=v1}, resolves{v1}@c] |- fc[c,x=set u^=v1]
-  
+
                          G, (succeeds\/interacts_pending\/interacts){x=Print(u)}  |- fc[c,x=Print(u)]
        (interact-intro)  ----------------------------------------------------------------------------
                          G                                                        |- fc[c,x=Print(u)]
-  
+
                          (Here we physically print n)
                          G                                                                |- fc[c,x=()      ]
         (interact-elim)  ------------------------------------------------------------------------------------
                          G[abstracts{u=n}, ~interacts_pending{Print(u)}/\~throws_pending] |- fc[c,x=Print(u)]
- 
+
 Domination
 
     We use flow graph theory to conservatively determine whether, at runtime, under all possible orders of head
