@@ -540,13 +540,10 @@ split' m heap latch last =
         Nothing -> do
           suspCount <- readSuspCount' latch heap
           (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
-            Nothing ->
-              let
-                f susp = do
-                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-                  ref_env <- newHRef $ Just SplitEnv {..}
-                  suspend $ resumeSplit ref_env
-              in yield f
+            Nothing -> yield $ \ susp -> do
+              incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+              ref_env <- newHRef $ Just SplitEnv {..}
+              suspend $ resumeSplit ref_env
             Just x ->
               (do commit heap
                   commitStore store heap
@@ -592,13 +589,10 @@ split'' m heap latch init'@(_, m_e', m_a') last s =
         Nothing -> do
           suspCount <- readSuspCount' latch heap
           (guard (suspCount == 0) *>) <$> readHRef' last heap >>= \ case
-            Nothing ->
-              let
-                f susp = do
-                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-                  ref_env <- newHRef $ Just SplitEnv {..}
-                  suspend $ resumeSplit ref_env
-              in yield f
+            Nothing -> yield $ \ susp -> do
+              incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+              ref_env <- newHRef $ Just SplitEnv {..}
+              suspend $ resumeSplit ref_env
             Just x ->
               (do commit heap
                   commitStore store heap
@@ -791,13 +785,10 @@ verify' m heap latch last =
             True -> do
               commit heap
               verify' (m_f <?> m_a) heap latch last
-            False ->
-              let
-                f susp = do
-                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-                  ref_env <- newHRef $ Just VerifyEnv {..}
-                  suspend $ resumeVerify ref_env
-              in yield f
+            False -> yield $ \ susp -> do
+              incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+              ref_env <- newHRef $ Just VerifyEnv {..}
+              suspend $ resumeVerify ref_env
 
 verify''
   :: (MonadRef m, MonadSupply Int m)
@@ -831,13 +822,10 @@ verify'' m heap latch init'@(_, m_e', m_a') last s =
             True -> do
               commit heap
               verify' (m_f'' <?> m_a'') heap latch last
-            False ->
-              let
-                f susp = do
-                  incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-                  ref_env <- newHRef $ Just VerifyEnv {..}
-                  suspend $ resumeVerify ref_env
-              in yield f
+            False -> yield $ \ susp -> do
+              incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+              ref_env <- newHRef $ Just VerifyEnv {..}
+              suspend $ resumeVerify ref_env
 
 verifyS
   :: (MonadRef m, MonadSupply Int m)
