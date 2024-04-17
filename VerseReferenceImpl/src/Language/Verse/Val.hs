@@ -1,12 +1,17 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Language.Verse.Val
   ( Val (..)
   , forVal_
   , Sign
+  , Class (..)
+  , ClassInst (..)
   , List (..)
   , VarVal (..)
   , VarList (..)
@@ -95,17 +100,8 @@ data Val ref a b
     {-# UNPACK #-}
     !Label
     !(Env SimpleName b)
-  | Class
-    {-# UNPACK #-} !Label
-    !(NonEmpty Scope)
-    !(Env Ident b)
-    !(Maybe b)
-    !(Desugar.Env Ident)
-    !Exp
-  | ClassInst
-    {-# UNPACK #-} !Label
-    !(Maybe b)
-    !(Env SimpleName b)
+  | Class !(Class b)
+  | ClassInst !(ClassInst b)
   | Lam
     !(NonEmpty Scope)
     !Sign
@@ -149,8 +145,8 @@ forVal_ x f = case x of
   EnumValue {} -> pure ()
   Struct _ _ env _ _ -> forEnv_ env f
   StructInst _ env -> forEnv_ env f
-  Class _ _ env sup _ _ -> forEnv_ env f *> for_ sup f
-  ClassInst _ sup env -> for_ sup f *> forEnv_ env f
+  Class x -> forEnv_ x.env f *> for_ x.super f
+  ClassInst x -> for_ x.super f *> forEnv_ x.members f
   Lam _ _ env _ _ -> forEnv_ env f
   AnyOLam -> pure ()
   OLam _ _ _ _ _ _ tail -> void $ f tail
@@ -184,11 +180,8 @@ instance ( Freshenable a m
       env <- freshen env
       pure $ Struct i scope env xs e
     StructInst i env -> StructInst i <$> freshen env
-    Class i scope env sup xs e -> do
-      env <- freshen env
-      sup <- freshen sup
-      pure $ Class i scope env sup xs e
-    ClassInst i sup env -> ClassInst i <$> freshen sup <*> freshen env
+    Class x -> Class <$> freshen x
+    ClassInst x -> ClassInst <$> freshen x
     Lam scope sign env x e -> do
       env <- freshen env
       pure $ Lam scope sign env x e
@@ -228,11 +221,8 @@ instance ( Freezable (f b) (g d) m
       env <- freeze env
       pure $ Struct i scope env xs e
     StructInst i env -> StructInst i <$> freeze env
-    Class i scope env sup xs e -> do
-      env <- freeze env
-      sup <- freeze sup
-      pure $ Class i scope env sup xs e
-    ClassInst i sup env -> ClassInst i <$> freeze sup <*> freeze env
+    Class x -> Class <$> freeze x
+    ClassInst x -> ClassInst <$> freeze x
     Lam scope sign env x e -> freeze env <&> \ env -> Lam scope sign env x e
     AnyOLam -> pure AnyOLam
     OLam scope sign env xs e1 e2 tail -> do
@@ -285,21 +275,16 @@ instance ( Pretty (ref b)
       "struct#" <>
       prettyLabel i <>
       group (braced $ prettyNames env)
-    Class i _ _ _ _ _ ->
+    Class x ->
       align $
       "class#" <>
-      prettyLabel i
-    ClassInst i Nothing env ->
+      prettyLabel x.evalLabel
+    ClassInst x ->
       align $
       "class#" <>
-      prettyLabel i <>
-      group (braced $ prettyNames env)
-    ClassInst i (Just x) env ->
-      align $
-      "class#" <>
-      prettyLabel i <>
-      parens (pretty x) <>
-      group (braced $ prettyNames env)
+      prettyLabel x.evalLabel <>
+      maybe mempty (\ super -> parens $ pretty super) x.super <>
+      group (braced $ prettyNames x.members)
     Lam {} -> "function"
     AnyOLam -> "function"
     OLam {} -> "function"
@@ -326,6 +311,47 @@ instance ( Pretty (ref b)
         (flatAlt (hardline <> "{ ") lbrace)
         (flatAlt (hardline <> rbrace) rbrace)
         ", "
+
+data Class a = MkClass
+  { expLabel :: {-# UNPACK #-} !Label
+  , evalLabel :: {-# UNPACK #-} !Label
+  , scopes :: !(NonEmpty Scope)
+  , env :: !(Env Ident a)
+  , super :: !(Maybe a)
+  , members :: !(Desugar.Env Ident)
+  , body :: !Exp
+  } deriving Show
+
+instance Freshenable a m => Freshenable (Class a) m where
+  freshen MkClass {..} = do
+    env <- freshen env
+    super <- freshen super
+    pure MkClass {..}
+
+instance Freezable a b m => Freezable (Class a) (Class b) m where
+  freeze MkClass {..} = do
+    env <- freeze env
+    super <- freeze super
+    pure MkClass {..}
+
+data ClassInst b = MkClassInst
+  { expLabel :: {-# UNPACK #-} !Label
+  , evalLabel :: {-# UNPACK #-} !Label
+  , super :: !(Maybe b)
+  , members :: !(Env SimpleName b)
+  } deriving Show
+
+instance Freshenable a m => Freshenable (ClassInst a) m where
+  freshen MkClassInst {..} = do
+    super <- freshen super
+    members <- freshen members
+    pure MkClassInst {..}
+
+instance Freezable a b m => Freezable (ClassInst a) (ClassInst b) m where
+  freeze MkClassInst {..} = do
+    super <- freeze super
+    members <- freeze members
+    pure MkClassInst {..}
 
 data List a b
   = Nil
