@@ -2039,6 +2039,9 @@ dsM_10 s (Range t) E                       -- MTYPE2
   = do i <- newIdent (getLoc t) "i"
        existsV [i] <$> dsM_10 s (Range t) (P i)
 
+dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make M[:int](i) = int(i) instead of exi z. z = int; z(i)
+  = pure (ApplyD (Variable z) (Variable i))
+
 dsM_10 s (Range t) (P i)                   -- MTYPE3
   = do z <- newIdent (getLoc t) "z"
        seqDE [ DefineE z <$> dsDD_10 s t
@@ -2096,10 +2099,10 @@ dsM_10 _ t@(Lit{}) E                       -- MCONST
 dsM_10 _ t@(Variable {}) E                 -- MVAR
    = pure t
 
-dsM_10 s (ApplyD t1 t2) E                -- MVAR
+dsM_10 s (ApplyD t1 t2) E                  -- MVAR
    = ApplyD <$> dsDD_10 s t1 <*> dsDD_10 s t2
 
-dsM_10 s t (P i)                        -- MEQ
+dsM_10 s t (P i)                           -- MEQ
    = Unify (Variable i) <$> dsM_10 s t E
 
 dsM_10 s (Macro1 m rs t) pi
@@ -2107,6 +2110,9 @@ dsM_10 s (Macro1 m rs t) pi
 
 dsM_10 s (Lam x t) _pi
    = Lam x <$> dsM_10 s t E
+
+dsM_10 _ e@(DefineV _) _
+   = pure e
 
 dsM_10 s t pi
    = error $ "TODO: dsM_10 " ++ show (s, t, pi)

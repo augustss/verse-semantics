@@ -172,6 +172,14 @@ checkRules env lhs =
    do Decide (Val v) <- [lhs]
       guard (skol (rigidVars env) v)
       pure (Val v)
+   ++
+   "CHECK-FAIL-DEC" `name`
+   do Decide (Fail) <- [lhs]
+      pure Fail
+   ++
+   "CHECK-FAIL-FAILS" `name`
+   do Fails (Fail) <- [lhs]
+      pure Fail
 
 skol :: [Ident] -> Expr -> Bool
 skol rs e = null (free e \\ rs)

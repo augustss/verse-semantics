@@ -1,5 +1,6 @@
-
-verify(pass) { f(x:int):int := { 10 } }
-# verify(pass) { f(x:int):int := { x  } }
-# verify(pass) { f(x:int):int := { x + 1 } }
+# verify(pass) { f(x:int) := { 10 } }
+# verify(pass) { f(x:int):int := { 10 } }
+# verify(pass) { f(x:int):int := { x } }
+# verify(pass) { f(a:int, b:int) := { x := a; if (x = b) { x = b} else { 123 } } }
+verify(pass) { f(x:int):int := { x + 1 } }
 # verify(pass) { (a:int) => (b:int) => (c:int) => 10 }
