@@ -18,7 +18,7 @@
                                |  syntax(u,v,s)
                                |  natives
                                |  err
-                               |  {op}
+                               |  {op}                              # just for grouping ops with ;
 
                                EBNF patterns for operations that start a new context:
     ScopeStartOp[SC,OP]        := scope      SC {OP }
@@ -34,10 +34,10 @@
     ExploreStartOp[OP]         := explore(fx) {...; OP; ...}
 
                                EBNF patterns identifying all operations within the span of a context:
-    ScopeSpan[OP]              := OP | seqop[OP]; op | op; seqop[OP]
-    FlexibleSpan[OP]           := seqop[OP | (ScopeStartOp                               )[sc,FlexibleSpan[OP]]]
-    ExploreSpan[OP]            := seqop[OP | (ScopeStartOp|FlexibleStartOp               )[ic,ExploreSpan[OP]]]
-    ProgramSpan[OP]            := seqop[OP | (ScopeStartOp|FlexibleStartOp|ExploreStartOp)[ic,ProgramSpan[OP]]]
+    ScopeSpan[OP]              := OP | ScopeSpan[OP]; op | op; ScopeSpan[OP]
+    FlexibleSpan[OP]           := ScopeSpan[OP | (ScopeStartOp                               )[sc,FlexibleSpan[OP]]]
+    ExploreSpan[OP]            := ScopeSpan[OP | (ScopeStartOp|FlexibleStartOp               )[ic,ExploreSpan[OP]]]
+    ProgramSpan[OP]            := ScopeSpan[OP | (ScopeStartOp|FlexibleStartOp|ExploreStartOp)[ic,ProgramSpan[OP]]]
 
                                EBNF patterns matching a context-starting operation and identifying an operation in its span:
     ScopeOp[SC,OP]             :=            ScopeSpan[ScopeStartOp    [SC,OP ]]
