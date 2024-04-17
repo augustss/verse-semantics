@@ -652,34 +652,19 @@ resumeSplit'
   -> SplitEnv m
   -> VerseT m ()
   -> VerseT m ()
-resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
+resumeSplit' ref_env env@SplitEnv { init = (_, m_e', m_a'), .. } m =
   resumeSplitS m env >>= \ case
     AbortS -> do
       decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
       writeHRef ref_env Nothing
       susp =<< split' m_a' heap latch last
-    FailS m_a ->
-      let
-        m_a'' = alt (do m_a
-                        whenSuspended env.suspend
-                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
-      in do
-        decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-        writeHRef ref_env Nothing
-        susp =<< split' (m_e' <?> m_a'') heap latch last
+    FailS m_a -> do
+      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+      writeHRef ref_env Nothing
+      susp =<< split' (m_e' <?> appendAbortS m_a env) heap latch last
     YieldS s@S {..} m_y m_f m_e m_a ->
       let
-        init =
-          ( (do m_f
-                whenSuspended env.suspend
-                incrSuspCounts env.suspCounts) <|> m_f'
-          , alt (do m_e
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) m_f' m_e'
-          , alt (do m_a
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
-          )
+        init = appendInitS m_f m_e m_a env
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
@@ -696,16 +681,7 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
             resumeSplit ref_env m_y
     SucceedS s@S {..} m_f m_e m_a ->
       let
-        m_f'' = (do m_f
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) <|> m_f'
-        m_e'' = alt (do m_e
-                        whenSuspended env.suspend
-                        incrSuspCounts env.suspCounts) m_f' m_e'
-        m_a'' = alt (do m_a
-                        whenSuspended env.suspend
-                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
-        init = (m_f'', m_e'', m_a'')
+        init@(m_f'', _, m_a'') = appendInitS m_f m_e m_a env
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
@@ -733,6 +709,36 @@ resumeSplit' ref_env env@SplitEnv { init = (m_f', m_e', m_a'), .. } m =
                 <?>
                 (do heap <- copyHeap heap
                     susp =<< split' m_a'' heap latch last)
+
+appendInitS
+  :: VerseT m ()
+  -> VerseT m ()
+  -> VerseT m ()
+  -> SplitEnv m
+  -> Init m
+appendInitS m_f m_e m_a env =
+  ( appendFailS m_f env
+  , appendEmptyS m_e env
+  , appendAbortS m_a env
+  )
+
+appendFailS :: VerseT m () -> SplitEnv m -> VerseT m ()
+appendFailS m_f SplitEnv { init = (m_f', _, _), .. } =
+  (do m_f
+      whenSuspended suspend
+      incrSuspCounts suspCounts) <|> m_f'
+
+appendEmptyS :: VerseT m () -> SplitEnv m -> VerseT m ()
+appendEmptyS m_e SplitEnv { init = (m_f', m_e', _), .. } =
+  alt (do m_e
+          whenSuspended suspend
+          incrSuspCounts suspCounts) m_f' m_e'
+
+appendAbortS :: VerseT m () -> SplitEnv m -> VerseT m ()
+appendAbortS m_a SplitEnv { init = (m_f', m_e', m_a'), .. } =
+  alt (do m_a
+          whenSuspended suspend
+          incrSuspCounts suspCounts) m_f' m_e' <?> m_a'
 
 resumeSplitS
   :: (MonadRef m, MonadSupply Int m)
@@ -878,34 +884,19 @@ resumeVerify'
   -> VerifyEnv m
   -> VerseT m ()
   -> VerseT m ()
-resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
+resumeVerify' ref_env env@VerifyEnv { init = (_, m_e', m_a'), .. } m =
   resumeVerifyS m env >>= \ case
     AbortS -> do
       decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
       writeHRef ref_env Nothing
       susp =<< verify' m_a' heap latch last
-    FailS m_a ->
-      let
-        m_a'' = (do m_a
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) <?> m_a'
-      in do
-        decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-        writeHRef ref_env Nothing
-        susp =<< verify' (m_e' <?> m_a'') heap latch last
+    FailS m_a ->do
+      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+      writeHRef ref_env Nothing
+      susp =<< verify' (m_e' <?> appendAbortV m_a env) heap latch last
     YieldS s@S {..} m_y m_f m_e m_a ->
       let
-        init =
-          ( (do m_f
-                whenSuspended env.suspend
-                incrSuspCounts env.suspCounts) <|> m_f'
-          , alt (do m_e
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) m_f' m_e'
-          , alt (do m_a
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
-          )
+        init = appendInitV m_f m_e m_a env
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
@@ -922,16 +913,7 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
             resumeVerify ref_env m_y
     SucceedS s@S {..} m_f m_e m_a ->
       let
-        m_f'' = (do m_f
-                    whenSuspended env.suspend
-                    incrSuspCounts env.suspCounts) <|> m_f'
-        m_e'' = alt (do m_e
-                        whenSuspended env.suspend
-                        incrSuspCounts env.suspCounts) m_f' m_e'
-        m_a'' = alt (do m_a
-                        whenSuspended env.suspend
-                        incrSuspCounts env.suspCounts) m_f' m_e' <?> m_a'
-        init = (m_f'', m_e'', m_a'')
+        init@(m_f'', _, m_a'') = appendInitV m_f m_e m_a env
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
@@ -951,6 +933,36 @@ resumeVerify' ref_env env@VerifyEnv { init = (m_f', m_e', m_a'), .. } m =
               True -> do
                 commit heap
                 susp =<< verify' (m_f'' <?> m_a'') heap latch last
+
+appendInitV
+  :: VerseT m ()
+  -> VerseT m ()
+  -> VerseT m ()
+  -> VerifyEnv m
+  -> Init m
+appendInitV m_f m_e m_a env =
+  ( appendFailV m_f env
+  , appendEmptyV m_e env
+  , appendAbortV m_a env
+  )
+
+appendFailV :: VerseT m () -> VerifyEnv m -> VerseT m ()
+appendFailV m_f VerifyEnv { init = (m_f', _, _), .. } =
+  (do m_f
+      whenSuspended suspend
+      incrSuspCounts suspCounts) <|> m_f'
+
+appendEmptyV :: VerseT m () -> VerifyEnv m -> VerseT m ()
+appendEmptyV m_e VerifyEnv { init = (m_f', m_e', _), .. } =
+  alt (do m_e
+          whenSuspended suspend
+          incrSuspCounts suspCounts) m_f' m_e'
+
+appendAbortV :: VerseT m () -> VerifyEnv m -> VerseT m ()
+appendAbortV m_a VerifyEnv { init = (m_f', m_e', m_a'), .. } =
+  alt (do m_a
+          whenSuspended suspend
+          incrSuspCounts suspCounts) m_f' m_e' <?> m_a'
 
 resumeVerifyS
   :: (MonadRef m, MonadSupply Int m)
