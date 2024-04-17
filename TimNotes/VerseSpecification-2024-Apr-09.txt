@@ -38,13 +38,20 @@
     FlexibleSpan[OP]           := ScopeSpan[OP | (ScopeStartOp                               )[sc,FlexibleSpan[OP]]]
     ExploreSpan[OP]            := ScopeSpan[OP | (ScopeStartOp|FlexibleStartOp               )[ic,ExploreSpan[OP]]]
     ProgramSpan[OP]            := ScopeSpan[OP | (ScopeStartOp|FlexibleStartOp|ExploreStartOp)[ic,ProgramSpan[OP]]]
+                               ## LA: this is wrong, ExploreStartOp has a different arity
 
                                EBNF patterns matching a context-starting operation and identifying an operation in its span:
     ScopeOp[SC,OP]             :=            ScopeSpan[ScopeStartOp    [SC,OP ]]
     FlexibleOp[FC,SC,OP]       := let op0 be ScopeSpan[FlexibleStartOp [FC,op1]] where (op0|op1) matches (ScopeOp                     )[   SC,OP]
+                               ## LA: I don't understand this.  What is FC if it is op0 which matches in the where clause?
     IterateOp[FC,SC,OP]        := let op0 be ScopeSpan[IterateStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp                     )[   SC,OP]
+                               ## LA: Ditto
     ExploreOp[FC,SC,OP]        := let op0 be ScopeSpan[ExploreStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp|FlexibleOp          )[FC,SC,OP]
+                               ## LA: ScopeOp and FlexibleOp have different arities
+                               ## LA: Which FC is the 'hole'?
     ProgramOp[FC,SC,OP]        := let op0 be ScopeSpan[ExploreStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp|FlexibleOp|ExploreOp)[FC,SC,OP]
+                               ## LA: ScopeOp and FlexibleOp have different arities
+                               ## LA: Which FC is the 'hole'?
 
                                EBNF patterns matching the whole program and identifying an accessible part of it. We must ensure any parts not covered by BVS are inaccessible.
     ProgramOp[FC,SC,OP]        := ProgramOp[FC,SC,OP]
@@ -60,6 +67,7 @@ Program:
 
          (program-elim)  ------------------------------------------------------------------------
                          G[...; tops{op_i}@c_0; ...] |- explore(tops) {...; scope c_0. op_i; ...}
+                         ## LA: is this right?  What about the ... parts
 
                          G |- ProgramOp[c,sc,op  ]
            (group-elim)  -------------------------
@@ -276,6 +284,7 @@ Elimination Rules:
                             vb@d1, solve@d1, d1 sees d0, d1 inherits d0     |- pc[c,s,explore(fx) {...; Beta_i; ...}]
         (explore-intro)  --------------------------------------------------------------------------------------------
                          G[vb@c, fx2:fx3:ifx4@c]                            |- pc[c,s,explore(fx) {...; Beta_i; ...}]
+## LA: pc=ProgramOp?
 
                          The effects fx1 represent the tightest effects where fx1{Beta_i}@c holds for all i.
                          fx6 is if fx1<=fx then succeeds else
