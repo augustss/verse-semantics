@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -8,6 +9,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Language.Verse.Val
   ( Val (..)
+  , pattern SomeAny
+  , pattern SomeComparable
+  , pattern SomeRational
+  , pattern SomeInt
+  , pattern SomeFloat
+  , pattern SomeChar
+  , pattern SomeChar32
+  , pattern SomeFunction
   , forVal_
   , Sign
   , Struct (..)
@@ -58,6 +67,8 @@ import Data.Ratio
 import Data.Word
 
 import Language.Verse.Access
+import Language.Verse.Contract (Contract)
+import Language.Verse.Contract qualified as Contract
 import Language.Verse.Desugar.Exp qualified as Desugar
 import Language.Verse.Ident
 import Language.Verse.Intrinsic (Intrinsic)
@@ -71,6 +82,7 @@ import Prettyprinter
   , Pretty (..)
   , (<+>)
   , align
+  , brackets
   , concatWith
   , dot
   , encloseSep
@@ -79,27 +91,19 @@ import Prettyprinter
   , hardline
   , lbrace
   , line
-  , lbracket
   , lparen
   , nest
   , parens
   , rbrace
-  , rbracket
   , rparen
   )
 
 data Val ref a b
-  = Any
-  | Comparable
-  | AnyRational
+  = Some !Contract
   | Rational !Rational
-  | AnyInt
   | Int !Integer
-  | AnyFloat
   | Float {-# UNPACK #-} !Double
-  | AnyChar
   | Char {-# UNPACK #-} !Word8
-  | AnyChar32
   | Char32 {-# UNPACK #-} !Char
   | Path [SimpleName]
   | Truth b
@@ -113,26 +117,43 @@ data Val ref a b
   | Class !(Class b)
   | ClassInst !(ClassInst b)
   | Lam !(Lam b)
-  | AnyOLam
   | OLam !(OLam b) b
   | Intrinsic !Intrinsic b
   | Type !Sign a deriving Show
+
+pattern SomeAny :: Val ref a b
+pattern SomeAny = Some Contract.Any
+
+pattern SomeComparable :: Val ref a b
+pattern SomeComparable = Some Contract.Comparable
+
+pattern SomeRational :: Val ref a b
+pattern SomeRational = Some Contract.Rational
+
+pattern SomeInt :: Val ref a b
+pattern SomeInt = Some Contract.Int
+
+pattern SomeFloat :: Val ref a b
+pattern SomeFloat = Some Contract.Float
+
+pattern SomeChar :: Val ref a b
+pattern SomeChar = Some Contract.Char
+
+pattern SomeChar32 :: Val ref a b
+pattern SomeChar32 = Some Contract.Char32
+
+pattern SomeFunction :: Val ref a b
+pattern SomeFunction = Some Contract.Function
 
 type Sign = Bool
 
 forVal_ :: Applicative m => Val ref a b -> (b -> m c) -> m ()
 forVal_ x f = case x of
-  Any -> pure ()
-  Comparable -> pure ()
-  AnyRational -> pure ()
+  Some _ -> pure ()
   Rational _ -> pure ()
-  AnyInt -> pure ()
   Int _ -> pure ()
-  AnyFloat -> pure ()
   Float _ -> pure ()
-  AnyChar -> pure ()
   Char _ -> pure ()
-  AnyChar32 -> pure ()
   Char32 _ -> pure ()
   Path _ -> pure ()
   Truth x -> void $ f x
@@ -146,7 +167,6 @@ forVal_ x f = case x of
   Class x -> forEnv_ x.env f *> for_ x.super f
   ClassInst x -> for_ x.super f *> forEnv_ x.members f
   Lam x -> forEnv_ x.env f
-  AnyOLam -> pure ()
   OLam x xs -> forEnv_ x.env f <* f xs
   Intrinsic _ xs -> void $ f xs
   Type {} -> pure ()
@@ -155,17 +175,11 @@ instance ( Freshenable a m
          , Freshenable b m
          ) => Freshenable (Val f a b) m where
   freshen x = case x of
-    Any -> pure x
-    Comparable -> pure x
-    AnyRational -> pure x
+    Some _ -> pure x
     Rational _ -> pure x
-    AnyInt -> pure x
     Int _ -> pure x
-    AnyFloat -> pure x
     Float _ -> pure x
-    AnyChar -> pure x
     Char _ -> pure x
-    AnyChar32 -> pure x
     Char32 _ -> pure x
     Path _ -> pure x
     Truth x -> Truth <$> freshen x
@@ -179,7 +193,6 @@ instance ( Freshenable a m
     Class x -> Class <$> freshen x
     ClassInst x -> ClassInst <$> freshen x
     Lam x -> Lam <$> freshen x
-    AnyOLam -> pure x
     OLam x xs -> OLam <$> freshen x <*> freshen xs
     Intrinsic x xs -> Intrinsic x <$> freshen xs
     Type x y -> Type x <$> freshen y
@@ -189,17 +202,11 @@ instance ( Freezable (f b) (g d) m
          , Freezable b d m
          ) => Freezable (Val f a b) (Val g c d) m where
   freeze = \ case
-    Any -> pure Any
-    Comparable -> pure Comparable
-    AnyRational -> pure AnyRational
+    Some x -> pure $ Some x
     Rational x -> pure $ Rational x
-    AnyInt -> pure AnyInt
     Int x -> pure $ Int x
-    AnyFloat -> pure AnyFloat
     Float x -> pure $ Float x
-    AnyChar -> pure AnyChar
     Char x -> pure $ Char x
-    AnyChar32 -> pure AnyChar32
     Char32 x -> pure $ Char32 x
     Path x -> pure $ Path x
     Truth x -> Truth <$> freeze x
@@ -213,7 +220,6 @@ instance ( Freezable (f b) (g d) m
     Class x -> Class <$> freeze x
     ClassInst x -> ClassInst <$> freeze x
     Lam x -> Lam <$> freeze x
-    AnyOLam -> pure AnyOLam
     OLam x xs -> OLam <$> freeze x <*> freeze xs
     Intrinsic x xs -> Intrinsic x <$> freeze xs
     Type x y -> Type x <$> freeze y
@@ -222,18 +228,12 @@ instance ( Pretty (ref b)
          , Pretty b
          ) => Pretty (Val ref a b) where
   pretty = \ case
-    Any -> "any"
-    Comparable -> "comparable"
-    AnyRational -> "rational" <> lbracket <> pretty '_' <> rbracket
+    Some x -> pretty x <> brackets (pretty '_')
     Rational x | denominator x == 1 -> pretty $ numerator x
     Rational x -> pretty (numerator x) <> pretty '/' <> pretty (denominator x)
-    AnyInt -> "int" <> lbracket <> pretty '_' <> rbracket
     Int x -> pretty x
-    AnyFloat -> "float" <> lbracket <> pretty '_' <> rbracket
     Float x -> pretty x
-    AnyChar -> "char" <> lbracket <> pretty '_' <> rbracket
     Char x -> "'" <> pretty (w2c x) <> "'"
-    AnyChar32 -> "char32" <> lbracket <> pretty '_' <> rbracket
     Char32 x -> "0u" <> pretty (showHex (ord x) "")
     Path xs ->  prettyPath xs
     Truth x -> align $ "truth" <> group (braces $ pretty x)
@@ -256,7 +256,6 @@ instance ( Pretty (ref b)
     Class x -> pretty x
     ClassInst x -> pretty x
     Lam _ -> "function"
-    AnyOLam -> "function"
     OLam {} -> "function"
     Intrinsic {} -> "function"
     Type {} -> "type"

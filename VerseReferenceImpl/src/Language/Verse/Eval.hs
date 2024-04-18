@@ -258,7 +258,7 @@ evalExp e = case extract e of
     var <- lift freshVar'
     localName access x (Val var) $ evalExp e s s'
   Exp.Def access Exp.Forall x e -> \ s s' -> do
-    var <- lift $ newVerifyVar' Val.Any
+    var <- lift $ newVerifyVar' Val.SomeAny
     localName access (extract x) (Val var) $ evalExp e s s'
   Exp.Def access Exp.Var (extract -> x) e -> \ s s' -> do
     var <- lift freshVar'
@@ -766,7 +766,7 @@ invoke' loc var1 var2 s s' = lift (readVar' var1) >>= \ case
   Val.Type sign xs -> asks (.sign) <&> (== sign) >>= \ case
     True -> invokeNegList loc xs var2 s s'
     False -> invokePosList loc xs var2 s s'
-  Val.AnyOLam -> wrong $ UnknownInvokeError loc
+  Val.SomeFunction -> wrong $ UnknownInvokeError loc
   _ -> wrong $ InvokeError loc
 
 invokeTuple
@@ -821,7 +821,7 @@ invokeOLam loc x xs arg s s' =
     lift (readVar' xs) >>= \ case
       Val.OLam x xs -> invokeOLam loc x xs arg s s'
       Val.Intrinsic x xs -> invokeIntrinsic loc x xs arg s s'
-      Val.AnyOLam -> wrong $ UnknownInvokeError loc
+      Val.SomeFunction -> wrong $ UnknownInvokeError loc
       _ -> wrong $ InvokeError loc
 
 invokeOLamDom_
@@ -982,7 +982,7 @@ invokeIntrinsic loc x xs arg s s' = if''
     lift (readVar' xs) >>= \ case
       Val.OLam x xs -> invokeOLam loc x xs arg s s'
       Val.Intrinsic x xs -> invokeIntrinsic loc x xs arg s s'
-      Val.AnyOLam -> wrong $ UnknownInvokeError loc
+      Val.SomeFunction -> wrong $ UnknownInvokeError loc
       _ -> wrong $ InvokeError loc
 
 invokeIntrinsicDom_
@@ -1032,27 +1032,27 @@ liftOrd
   -> VarVal m -> VerseT m (DomMatch m)
 liftOrd f var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Val.AnyRational, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.SomeRational, AnyNumber) -> domMatch_' $ decide $> var_x
     (Val.Rational x, Val.Rational y) -> domMatch_' $ guard (f x y) $> var_x
     (Val.Rational x, Val.Int y) -> domMatch_' $ guard (f x (fromInteger y)) $> var_x
     (Val.Rational x, Val.Float y) -> domMatch_' $ guard (f (fromRational x) y) $> var_x
     (Val.Rational _, AnyNumber) -> domMatch_' $ decide $> var_x
-    (Val.AnyInt, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.SomeInt, AnyNumber) -> domMatch_' $ decide $> var_x
     (Val.Int x, Val.Rational y) -> domMatch_' $ guard (f (fromInteger x) y) $> var_x
     (Val.Int x, Val.Int y) -> domMatch_' $ guard (f x y) $> var_x
     (Val.Int x, Val.Float y) -> domMatch_' $ guard (f (fromInteger x) y) $> var_x
     (Val.Int _, AnyNumber) -> domMatch_' $ decide $> var_x
-    (Val.AnyFloat, AnyNumber) -> domMatch_' $ decide $> var_x
+    (Val.SomeFloat, AnyNumber) -> domMatch_' $ decide $> var_x
     (Val.Float x, Val.Rational y) -> domMatch_' $ guard (f (toRational x) y) $> var_x
     (Val.Float x, Val.Int y) -> domMatch_' $ guard (f x (fromInteger y)) $> var_x
     (Val.Float x, Val.Float y) -> domMatch_' $ guard (f x y) $> var_x
     (Val.Float _, AnyNumber) -> domMatch_' $ decide $> var_x
     (Val.Char x, Val.Char y) -> domMatch_' $ guard (f x y) $> var_x
-    (Val.Char _, Val.AnyChar) -> domMatch_' $ decide $> var_x
-    (Val.AnyChar, Val.Char _) -> domMatch_' $ decide $> var_x
+    (Val.Char _, Val.SomeChar) -> domMatch_' $ decide $> var_x
+    (Val.SomeChar, Val.Char _) -> domMatch_' $ decide $> var_x
     (Val.Char32 x, Val.Char32 y) -> domMatch_' $ guard (f x y) $> var_x
-    (Val.Char32 _, Val.AnyChar32) -> domMatch_' $ decide $> var_x
-    (Val.AnyChar32, Val.Char32 _) -> domMatch_' $ decide $> var_x
+    (Val.Char32 _, Val.SomeChar32) -> domMatch_' $ decide $> var_x
+    (Val.SomeChar32, Val.Char32 _) -> domMatch_' $ decide $> var_x
     _ -> empty
   _ -> empty
 
@@ -1062,41 +1062,41 @@ liftNum
   -> VarVal m -> VerseT m (DomMatch m)
 liftNum f var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Val.AnyRational, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyRational, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyRational, Val.Int _) -> domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyRational, Val.Float _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.Rational _, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.SomeRational, Val.SomeRational) -> domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeRational, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeRational, Val.SomeInt) -> domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeRational, Val.Int _) -> domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeRational, Val.SomeFloat) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeRational, Val.Float _) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.Rational _, Val.SomeRational) -> domMatch_' $ newVerifyVar' Val.SomeRational
     (Val.Rational x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ f x y
-    (Val.Rational _, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.Rational _, Val.SomeInt) -> domMatch_' $ newVerifyVar' Val.SomeRational
     (Val.Rational x, Val.Int y) -> domMatch_' . newVar' . Val.Rational $ f x (fromInteger y)
-    (Val.Rational _, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Rational _, Val.SomeFloat) -> domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Rational x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f (fromRational x) y
-    (Val.AnyInt, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyInt, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyInt
-    (Val.AnyInt, Val.Int _) -> domMatch_' $ newVerifyVar' Val.AnyInt
-    (Val.AnyInt, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyInt, Val.Float _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.Int _, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyRational
+    (Val.SomeInt, Val.SomeRational) -> domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeInt, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeInt, Val.SomeInt) -> domMatch_' $ newVerifyVar' Val.SomeInt
+    (Val.SomeInt, Val.Int _) -> domMatch_' $ newVerifyVar' Val.SomeInt
+    (Val.SomeInt, Val.SomeFloat) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeInt, Val.Float _) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.Int _, Val.SomeRational) -> domMatch_' $ newVerifyVar' Val.SomeRational
     (Val.Int x, Val.Rational y) -> domMatch_' . newVar' . Val.Rational $ f (fromInteger x) y
-    (Val.Int _, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyInt
+    (Val.Int _, Val.SomeInt) -> domMatch_' $ newVerifyVar' Val.SomeInt
     (Val.Int x, Val.Int y) -> domMatch_' . newVar' . Val.Int $ f x y
-    (Val.Int _, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Int _, Val.SomeFloat) -> domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Int x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f (fromInteger x) y
-    (Val.AnyFloat, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Int _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Float _) -> domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.Float _, Val.AnyRational) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.SomeFloat, Val.SomeRational) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.Rational _) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.SomeInt) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.Int _) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.SomeFloat) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.Float _) -> domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.Float _, Val.SomeRational) -> domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Float x, Val.Rational y) -> domMatch_' . newVar' . Val.Float $ f x (fromRational y)
-    (Val.Float _, Val.AnyInt) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Float _, Val.SomeInt) -> domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Float x, Val.Int y) -> domMatch_' . newVar' . Val.Float $ f x (fromInteger y)
-    (Val.Float _, Val.AnyFloat) -> domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Float _, Val.SomeFloat) -> domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Float x, Val.Float y) -> domMatch_' . newVar' . Val.Float $ f x y
     _ -> empty
   _ -> empty
@@ -1112,11 +1112,11 @@ prefixMinus
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => VarVal m -> VerseT m (DomMatch m)
 prefixMinus var = readVar' var >>= \ case
-  Val.AnyRational -> domMatch_' $ newVerifyVar' Val.AnyRational
+  Val.SomeRational -> domMatch_' $ newVerifyVar' Val.SomeRational
   Val.Rational x -> domMatch_' $ newVar' (Val.Rational $ negate x)
-  Val.AnyInt -> domMatch_' $ newVerifyVar' Val.AnyInt
+  Val.SomeInt -> domMatch_' $ newVerifyVar' Val.SomeInt
   Val.Int x -> domMatch_' $ newVar' (Val.Int $ negate x)
-  Val.AnyFloat -> domMatch_' $ newVerifyVar' Val.AnyFloat
+  Val.SomeFloat -> domMatch_' $ newVerifyVar' Val.SomeFloat
   Val.Float x -> domMatch_' $ newVar' (Val.Float $ negate x)
   _ -> empty
 
@@ -1125,92 +1125,92 @@ div'
   => VarVal m -> VerseT m (DomMatch m)
 div' var = readPair var >>= \ case
   Just (var_x, var_y) -> (,) <$> readVar' var_x <*> readVar' var_y >>= \ case
-    (Val.AnyRational, Val.AnyRational) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
-    (Val.AnyRational, Val.Rational 0) ->
+    (Val.SomeRational, Val.SomeRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeRational
+    (Val.SomeRational, Val.Rational 0) ->
       domMatch_' empty
-    (Val.AnyRational, Val.Rational _) ->
-      domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyInt) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
-    (Val.AnyRational, Val.Int 0) ->
+    (Val.SomeRational, Val.Rational _) ->
+      domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeRational, Val.SomeInt) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeRational
+    (Val.SomeRational, Val.Int 0) ->
       domMatch_' empty
-    (Val.AnyRational, Val.Int _) ->
-      domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyRational, Val.AnyFloat) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyRational, Val.Float _) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.Rational _, Val.AnyRational) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.SomeRational, Val.Int _) ->
+      domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeRational, Val.SomeFloat) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeRational, Val.Float _) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.Rational _, Val.SomeRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeRational
     (Val.Rational _, Val.Rational 0) ->
       domMatch_' empty
     (Val.Rational x, Val.Rational y) ->
       domMatch_' $ newVar' . Val.Rational $ x / y
-    (Val.Rational _, Val.AnyInt) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.Rational _, Val.SomeInt) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeRational
     (Val.Rational _, Val.Int 0) ->
       domMatch_' empty
     (Val.Rational x, Val.Int y) ->
       domMatch_' . newVar' . Val.Rational $ x / fromInteger y
-    (Val.Rational _, Val.AnyFloat) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Rational _, Val.SomeFloat) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Rational x, Val.Float y) ->
       domMatch_' . newVar' . Val.Float $ fromRational x / y
-    (Val.AnyInt, Val.AnyRational) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
-    (Val.AnyInt, Val.Rational 0) ->
+    (Val.SomeInt, Val.SomeRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeRational
+    (Val.SomeInt, Val.Rational 0) ->
       domMatch_' empty
-    (Val.AnyInt, Val.Rational _) ->
-      domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyInt) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
-    (Val.AnyInt, Val.Int 0) ->
+    (Val.SomeInt, Val.Rational _) ->
+      domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeInt, Val.SomeInt) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeRational
+    (Val.SomeInt, Val.Int 0) ->
       domMatch_' empty
-    (Val.AnyInt, Val.Int _) ->
-      domMatch_' $ newVerifyVar' Val.AnyRational
-    (Val.AnyInt, Val.AnyFloat) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyInt, Val.Float _) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.Int _, Val.AnyRational) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.SomeInt, Val.Int _) ->
+      domMatch_' $ newVerifyVar' Val.SomeRational
+    (Val.SomeInt, Val.SomeFloat) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeInt, Val.Float _) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.Int _, Val.SomeRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeRational
     (Val.Int _, Val.Rational 0) ->
       domMatch_' empty
     (Val.Int x, Val.Rational y) ->
       domMatch_' . newVar' . Val.Rational $ fromInteger x / y
-    (Val.Int _, Val.AnyInt) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyRational
+    (Val.Int _, Val.SomeInt) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeRational
     (Val.Int _, Val.Int 0) ->
       domMatch_' empty
     (Val.Int x, Val.Int y) ->
       domMatch_' . newVar' . Val.Rational $ x % y
-    (Val.Int _, Val.AnyFloat) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Int _, Val.SomeFloat) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Int x, Val.Float y) ->
       domMatch_' . newVar' . Val.Float $ fromInteger x / y
-    (Val.AnyFloat, Val.AnyRational) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Rational _) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyInt) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Int _) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.AnyFloat) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.AnyFloat, Val.Float _) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
-    (Val.Float _, Val.AnyRational) ->
-      domMatch_' $ decide *> newVerifyVar' Val.AnyFloat
+    (Val.SomeFloat, Val.SomeRational) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.Rational _) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.SomeInt) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.Int _) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.SomeFloat) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.SomeFloat, Val.Float _) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
+    (Val.Float _, Val.SomeRational) ->
+      domMatch_' $ decide *> newVerifyVar' Val.SomeFloat
     (Val.Float x, Val.Rational y) ->
       domMatch_' . newVar' . Val.Float $ x / fromRational y
-    (Val.Float _, Val.AnyInt) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Float _, Val.SomeInt) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Float x, Val.Int y) ->
       domMatch_' . newVar' . Val.Float $ x / fromInteger y
-    (Val.Float _, Val.AnyFloat) ->
-      domMatch_' $ newVerifyVar' Val.AnyFloat
+    (Val.Float _, Val.SomeFloat) ->
+      domMatch_' $ newVerifyVar' Val.SomeFloat
     (Val.Float x, Val.Float y) ->
       domMatch_' . newVar' . Val.Float $ x / y
     _ -> empty
@@ -1250,11 +1250,11 @@ pattern AnyNumber <- (number -> True)
 
 number :: Val f a b -> Bool
 number = \ case
-  Val.AnyRational -> True
+  Val.SomeRational -> True
   Val.Rational _ -> True
-  Val.AnyInt -> True
+  Val.SomeInt -> True
   Val.Int _ -> True
-  Val.AnyFloat -> True
+  Val.SomeFloat -> True
   Val.Float _ -> True
   _ -> False
 
@@ -1279,10 +1279,10 @@ int
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 int loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyInt)
-    Val.AnyRational -> unify' loc var =<< lift (newVerifyVar' Val.AnyInt)
+    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeInt)
+    Val.SomeRational -> unify' loc var =<< lift (newVerifyVar' Val.SomeInt)
     Val.Rational x | denominator x == 1 -> pure ()
-    Val.AnyInt -> pure ()
+    Val.SomeInt -> pure ()
     Val.Int _ -> pure ()
     _ -> empty
   pure var
@@ -1292,10 +1292,10 @@ rational
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 rational loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyRational)
-    Val.AnyRational -> pure ()
+    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeRational)
+    Val.SomeRational -> pure ()
     Val.Rational _ -> pure ()
-    Val.AnyInt -> pure ()
+    Val.SomeInt -> pure ()
     Val.Int _ -> pure ()
     _ -> empty
   pure var
@@ -1305,8 +1305,8 @@ float
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 float loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyFloat)
-    Val.AnyFloat -> pure ()
+    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeFloat)
+    Val.SomeFloat -> pure ()
     Val.Float _ -> pure ()
     _ -> empty
   pure var
@@ -1316,8 +1316,8 @@ char
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 char loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyChar)
-    Val.AnyChar -> pure ()
+    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeChar)
+    Val.SomeChar -> pure ()
     Val.Char _ -> pure ()
     _ -> empty
   pure var
@@ -1327,8 +1327,8 @@ char32
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 char32 loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyChar32)
-    Val.AnyChar32 -> pure ()
+    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeChar32)
+    Val.SomeChar32 -> pure ()
     Val.Char32 _ -> pure ()
     _ -> empty
   pure var
@@ -1338,11 +1338,11 @@ function
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 function loc var = domMatch_ $ do
   fork' $ lift (readVar' var) >>= \ case
-    Val.Any -> unify' loc var =<< lift (newVerifyVar' Val.AnyOLam)
+    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeFunction)
     Val.Tuple _ -> pure ()
     Val.Enum {} -> pure ()
     Val.Lam _ -> pure ()
-    Val.AnyOLam -> pure ()
+    Val.SomeFunction -> pure ()
     Val.OLam {} -> pure ()
     Val.Intrinsic {} -> pure ()
     _ -> empty
@@ -1530,7 +1530,7 @@ readRef' loc ref var s s' = do
   x <- asks (.mode) >>= \ case
     Execution -> lift $ readVerseRef ref
     Verification -> do
-      i <- lift $ newVerifyVar' Val.Any
+      i <- lift $ newVerifyVar' Val.SomeAny
       assume' . local (\ r -> r { assumed = True }) $ do
         s <- lift newS
         s' <- lift freshS
@@ -1650,7 +1650,7 @@ freshEnv xs = do
         freshVar'
       (access, Exp.Forall) ->
         HashMap.singleton k . (accessScope access scopes,) . Val <$>
-        newVerifyVar' Val.Any
+        newVerifyVar' Val.SomeAny
       (access, Exp.Var) ->
         HashMap.singleton k . (accessScope access scopes,) . Ref <$>
         freshVar'
@@ -1672,65 +1672,65 @@ match
   -> Val (VerseRef m) (VarList m) (VarVal m)
   -> EvalT m (Match, EvalT m ())
 match loc' x y = ask >>= \ r -> case (x, y) of
-  (Val.Any, Val.Lam _)
+  (Val.SomeAny, Val.Lam _)
     | r.assumed -> pure (GE, pure ())
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Any, Val.OLam _ ys)
+  (Val.SomeAny, Val.OLam _ ys)
     | r.assumed -> pure $ (GE,) do
-        xs <- lift $ newVerifyVar' Val.AnyOLam
+        xs <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Any, Val.Intrinsic _ ys)
+  (Val.SomeAny, Val.Intrinsic _ ys)
     | r.assumed -> pure $ (GE,) do
-        xs <- lift $ newVerifyVar' Val.AnyOLam
+        xs <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Any, y)
+  (Val.SomeAny, y)
     | r.assumed -> pure . (GE,) . forVal_ y $ \ y -> do
-        x <- lift $ newVerifyVar' Val.Any
+        x <- lift $ newVerifyVar' Val.SomeAny
         unify' loc' x y
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Comparable, Val.Any)
+  (Val.SomeComparable, Val.SomeAny)
     | r.assumed -> pure (LE, pure ())
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Comparable, Val.AnyOLam) -> wrong $ UndecidableError loc'
-  (Val.Comparable, Val.OLam {}) -> wrong $ UndecidableError loc'
-  (Val.Comparable, Val.Intrinsic {}) -> wrong $ UndecidableError loc'
-  (Val.Comparable, y) -> pure . (GE,) . forVal_ y $ \ y -> do
-    x <- lift $ newVerifyVar' Val.Comparable
+  (Val.SomeComparable, Val.SomeFunction) -> wrong $ UndecidableError loc'
+  (Val.SomeComparable, Val.OLam {}) -> wrong $ UndecidableError loc'
+  (Val.SomeComparable, Val.Intrinsic {}) -> wrong $ UndecidableError loc'
+  (Val.SomeComparable, y) -> pure . (GE,) . forVal_ y $ \ y -> do
+    x <- lift $ newVerifyVar' Val.SomeComparable
     unify' loc' x y
-  (Val.AnyRational, Val.AnyRational) -> pure (LE, pure ())
-  (Val.AnyRational, Val.Rational _) -> pure (GE, pure ())
-  (Val.AnyRational, Val.AnyInt) -> pure (GE, pure ())
-  (Val.AnyRational, Val.Int _) -> pure (GE, pure ())
-  (Val.Rational _, Val.AnyRational) -> pure (LE, pure ())
+  (Val.SomeRational, Val.SomeRational) -> pure (LE, pure ())
+  (Val.SomeRational, Val.Rational _) -> pure (GE, pure ())
+  (Val.SomeRational, Val.SomeInt) -> pure (GE, pure ())
+  (Val.SomeRational, Val.Int _) -> pure (GE, pure ())
+  (Val.Rational _, Val.SomeRational) -> pure (LE, pure ())
   (Val.Rational x, Val.Rational y) ->
     guard (x == y) $> (SEQ, pure ())
-  (Val.Rational x, Val.AnyInt) ->
+  (Val.Rational x, Val.SomeInt) ->
     guard (denominator x == 1) $> (LE, pure ())
   (Val.Rational x, Val.Int y) ->
     guard (denominator x == 1 && numerator x == y) $> (SEQ, pure ())
-  (Val.AnyInt, Val.AnyRational) -> pure (LE, pure ())
-  (Val.AnyInt, Val.Rational y) ->
+  (Val.SomeInt, Val.SomeRational) -> pure (LE, pure ())
+  (Val.SomeInt, Val.Rational y) ->
     guard (1 == denominator y) $> (GE, pure ())
-  (Val.AnyInt, Val.AnyInt) -> pure (LE, pure ())
-  (Val.AnyInt, Val.Int _) -> pure (GE, pure ())
-  (Val.Int _, Val.AnyRational) -> pure (LE, pure ())
+  (Val.SomeInt, Val.SomeInt) -> pure (LE, pure ())
+  (Val.SomeInt, Val.Int _) -> pure (GE, pure ())
+  (Val.Int _, Val.SomeRational) -> pure (LE, pure ())
   (Val.Int x, Val.Rational y) ->
     guard (1 == denominator y && x == numerator y) $> (SEQ, pure ())
-  (Val.Int _, Val.AnyInt) -> pure (LE, pure ())
+  (Val.Int _, Val.SomeInt) -> pure (LE, pure ())
   (Val.Int x, Val.Int y) -> guard (x == y) $> (SEQ, pure ())
-  (Val.AnyFloat, Val.AnyFloat) -> pure (LE, pure ())
-  (Val.AnyFloat, Val.Float _) -> pure (GE, pure ())
-  (Val.Float _, Val.AnyFloat) -> pure (LE, pure ())
+  (Val.SomeFloat, Val.SomeFloat) -> pure (LE, pure ())
+  (Val.SomeFloat, Val.Float _) -> pure (GE, pure ())
+  (Val.Float _, Val.SomeFloat) -> pure (LE, pure ())
   (Val.Float x, Val.Float y) -> guard (eqFloat x y) $> (SEQ, pure ())
-  (Val.AnyChar, Val.AnyChar) -> pure (LE, pure ())
-  (Val.AnyChar, Val.Char _) -> pure (GE, pure ())
-  (Val.Char _, Val.AnyChar) -> pure (LE, pure ())
+  (Val.SomeChar, Val.SomeChar) -> pure (LE, pure ())
+  (Val.SomeChar, Val.Char _) -> pure (GE, pure ())
+  (Val.Char _, Val.SomeChar) -> pure (LE, pure ())
   (Val.Char x, Val.Char y) -> guard (x == y) $> (SEQ, pure ())
-  (Val.AnyChar32, Val.AnyChar32) -> pure (LE, pure ())
-  (Val.AnyChar32, Val.Char32 _) -> pure (GE, pure ())
-  (Val.Char32 _, Val.AnyChar32) -> pure (LE, pure ())
+  (Val.SomeChar32, Val.SomeChar32) -> pure (LE, pure ())
+  (Val.SomeChar32, Val.Char32 _) -> pure (GE, pure ())
+  (Val.Char32 _, Val.SomeChar32) -> pure (LE, pure ())
   (Val.Char32 x, Val.Char32 y) -> guard (x == y) $> (SEQ, pure ())
   (Val.Path x, Val.Path y) -> guard (x == y) $> (SEQ, pure ())
   (Val.Truth x, Val.Truth y) -> pure . (SEQ,) $ unify' loc' x y
@@ -1748,47 +1748,47 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.ClassInst x, Val.ClassInst y) -> guard (x.expLabel == y.expLabel) $> (SEQ,) do
     unifyMaybe loc' x.super y.super
     unifyEnv loc' x.members y.members
-  (Val.Lam _, Val.Any)
+  (Val.Lam _, Val.SomeAny)
     | r.assumed -> pure (LE, pure ())
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Lam _, Val.Comparable) -> wrong $ UndecidableError loc'
+  (Val.Lam _, Val.SomeComparable) -> wrong $ UndecidableError loc'
   (Val.Lam _, Val.Lam _) -> wrong $ UndecidableError loc'
-  (Val.Lam _, Val.AnyOLam) -> wrong $ UndecidableError loc'
+  (Val.Lam _, Val.SomeFunction) -> wrong $ UndecidableError loc'
   (Val.Lam _, Val.OLam {}) -> wrong $ UndecidableError loc'
-  (Val.AnyOLam, Val.Any)
+  (Val.SomeFunction, Val.SomeAny)
     | r.assumed -> pure (LE, pure ())
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.AnyOLam, Val.Comparable) -> wrong $ UndecidableError loc'
-  (Val.AnyOLam, Val.Lam _) -> wrong $ UndecidableError loc'
-  (Val.AnyOLam, Val.AnyOLam)
+  (Val.SomeFunction, Val.SomeComparable) -> wrong $ UndecidableError loc'
+  (Val.SomeFunction, Val.Lam _) -> wrong $ UndecidableError loc'
+  (Val.SomeFunction, Val.SomeFunction)
     | r.assumed -> pure (LE, pure ())
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.AnyOLam, Val.OLam _ ys)
+  (Val.SomeFunction, Val.OLam _ ys)
     | r.assumed -> pure . (GE,) $ do
-        xs <- lift $ newVerifyVar' Val.AnyOLam
+        xs <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.AnyOLam, Val.Intrinsic _ ys)
+  (Val.SomeFunction, Val.Intrinsic _ ys)
     | r.assumed -> pure . (GE,) $ do
-        xs <- lift $ newVerifyVar' Val.AnyOLam
+        xs <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.OLam _ xs, Val.Any)
+  (Val.OLam _ xs, Val.SomeAny)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVerifyVar' Val.AnyOLam
+        ys <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.OLam {}, Val.Comparable) -> wrong $ UndecidableError loc'
+  (Val.OLam {}, Val.SomeComparable) -> wrong $ UndecidableError loc'
   (Val.OLam {}, Val.Lam _) -> wrong $ UndecidableError loc'
-  (Val.OLam _ xs, Val.AnyOLam)
+  (Val.OLam _ xs, Val.SomeFunction)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVerifyVar' Val.AnyOLam
+        ys <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
   (Val.OLam x xs, Val.OLam y ys) ->
     pure $ (SEQ,) do
       whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
-        i <- lift $ newVerifyVar' Val.Any
+        i <- lift $ newVerifyVar' Val.SomeAny
         invokeOLamDom_ loc' x i
         invokeOLamDom_ loc' y i
         wrong . OLamDomError loc' (loc x.domain) (loc y.domain) =<< lift (freeze' i)
@@ -1798,28 +1798,28 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.OLam x xs, Val.Intrinsic y ys) ->
     pure $ (SEQ,) do
       whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
-        i <- lift $ newVerifyVar' Val.Any
+        i <- lift $ newVerifyVar' Val.SomeAny
         invokeOLamDom_ loc' x i
         invokeIntrinsicDom_ loc' y i
         wrong . DomError loc' (loc x.domain) =<< lift (freeze' i)
       zs <- lift freshVar'
       unify' loc' xs <=< lift . newVar' $ Val.Intrinsic y zs
       unify' loc' ys <=< lift . newVar' $ Val.OLam x zs
-  (Val.Intrinsic _ xs, Val.Any)
+  (Val.Intrinsic _ xs, Val.SomeAny)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVerifyVar' Val.AnyOLam
+        ys <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Intrinsic {}, Val.Comparable) -> wrong $ UndecidableError loc'
-  (Val.Intrinsic _ xs, Val.AnyOLam)
+  (Val.Intrinsic {}, Val.SomeComparable) -> wrong $ UndecidableError loc'
+  (Val.Intrinsic _ xs, Val.SomeFunction)
     | r.assumed -> pure $ (LE,) do
-        ys <- lift $ newVerifyVar' Val.AnyOLam
+        ys <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
   (Val.Intrinsic x xs, Val.OLam y ys) ->
     pure $ (SEQ,) do
       whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
-        i <- lift $ newVerifyVar' Val.Any
+        i <- lift $ newVerifyVar' Val.SomeAny
         invokeIntrinsicDom_ loc' x i
         invokeOLamDom_ loc' y i
         wrong . DomError loc' (loc y.domain) =<< lift (freeze' i)
@@ -1829,20 +1829,20 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Intrinsic x xs, Val.Intrinsic y ys) ->
     pure $ (SEQ,) do
       whenVerifying . verify' . local (\ r -> r { assumed = True }) $ do
-        i <- lift $ newVerifyVar' Val.Any
+        i <- lift $ newVerifyVar' Val.SomeAny
         invokeIntrinsicDom_ loc' x i
         invokeIntrinsicDom_ loc' y i
         wrong $ IntrinsicDomError loc'
       zs <- lift freshVar'
       unify' loc' xs =<< lift (newVar' $ Val.Intrinsic y zs)
       unify' loc' ys =<< lift (newVar' $ Val.Intrinsic x zs)
-  (x, Val.Any)
+  (x, Val.SomeAny)
     | r.assumed -> pure . (LE,) $ forVal_ x $ \ x -> do
-        y <- lift $ newVerifyVar' Val.Any
+        y <- lift $ newVerifyVar' Val.SomeAny
         unify' loc' x y
     | otherwise -> wrong $ UndecidableError loc'
-  (x, Val.Comparable) -> pure . (LE,) . forVal_ x $ \ x -> do
-    y <- lift $ newVerifyVar' Val.Comparable
+  (x, Val.SomeComparable) -> pure . (LE,) . forVal_ x $ \ x -> do
+    y <- lift $ newVerifyVar' Val.SomeComparable
     unify' loc' x y
   _ -> empty
 
