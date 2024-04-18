@@ -57,19 +57,21 @@
 \mbox{\em Contexts} \\
 \begin{array}{lrcl}
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-\text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |E guard e| \vb |def x E| \\
+% \text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |E guard e| \vb |def x E| \\
 % \text{Pure contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
-\text{Pure contexts} & |S| & ::= & |hole| \vb |lv == S; e| \vb |lv == cf; S| \vb |S guard e| \\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |P guard e| \\
-   && \vb &  |def x P| \vb |one P| \vb |all PV| \vb |P `choice` e|  \vb |check fx P| \\
+\text{Pure contexts} & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == susp; C| \vb |def x C| \vb |C guard e| \\
+\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |def x P| \vb |P guard e| \\
+   && \vb &  |one (FC^[P])| \vb |all (VC^[P])| \vb \vb |check fx P| \\
    & |PV| & ::= & |P| \vb |v `choice` PV| \\
-\text{Choice-free exprs} & |cf| & ::= & |v | \vb |l==cf; cf| \vb op[v] \vb |one e| \vb |all e| \vb |cf guard cf| \\
+\text{First choice} & |FC| & ::= & |hole| \vb |hole `choice` e| \\
+\text{Value choice} & |VC| & ::= & |FC| \vb |v `choice` VC| \\
+% \text{Choice-free exprs} & |cf| & ::= & |v | \vb |l==cf; cf| \vb op[v] \vb |one e| \vb |all e| \vb |cf guard cf| \\
 
-\text{Suspended exprs}  & |susp| & ::= & |P^[apply1N op v]|  \hspace{2mm}
-    \begin{array}[t]{l}
-    \text{where |P| has no choice outside |oneKW| or |allKW|}\\
-    \text{and |v = V^[x]| for some existential |x| and context |V|}
-    \end{array}
+\text{Suspended exp}  & |susp| & ::= &
+    |l=susp_1; susp_2| \vb |susp guard e| \vb |one (FC^[susp])| \vb |all (VC^[susp])| \\
+  & & \vb & |apply1N op v|  \hspace{4mm}
+    \text{where |v = V^[x]| for some existential |x| and context |V|} \\
+
 %    \text{Suspended exprs}  & |susp| & ::= &|lv == susp; susp| \vb |one susp| \vb |all susp| \\
 %    && \vb & |apply1N pp x| \vb  |susp guard e| \vb |check fx susp| \vb |some susp| \\
 \end{array} \\
@@ -131,11 +133,11 @@ $\begin{array}{@@{}l}
 
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
-\rulename{exi-subst} & |def x (S^[x==v; e])| & \movesto & |subst (S^[e]) x v|
+\rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
   & \text{$|x|\not\in\freevars{|v|};\, |x|,\freevars{|v|} \not\in \boundvars{|S|}$} \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{exi-float}^{* \alpha} & |E^[def x e]| & \movesto & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
-\rulename{exi-choice}^{\alpha} & |def x (E^[e_1 choice e_2])| & \movesto & |E^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{exi-float}^{* \alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
+\rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
 \end{array}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
@@ -148,7 +150,6 @@ $\begin{array}{@@{}l}
 \rulename{eq-swap}^{*} & |v == x; e| & \movesto & |x == v; e|  \\
 % \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
 \rulename{seq-elim} & |_ == v ; e| & \movesto & |e| \\
-\rulename{seq-fail} & |lv == fail; e| & \movesto & |fail| \\
 \rulename{rec} & |z = V^[lam x e_1]; e_2| & \movesto & \multicolumn{2}{l}{|z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
   \hspace{4mm} \text{$|z| \in \freevars{|e_1|}$}} \\
 
@@ -159,6 +160,7 @@ $\begin{array}{@@{}l}
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
 \rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
+\rulename{fail} & |C^[fail]| & \movesto & |fail| \\
 
     \\[-0.8em]
 
