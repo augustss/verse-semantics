@@ -14,7 +14,15 @@ module Language.Verse.Eval
 
 import Control.Applicative
 import Control.Comonad
-import Control.Monad.Extras (Monad (..), (=<<), (>=>), (<=<), guard, whenM)
+import Control.Monad.Extras
+  ( Monad (..)
+  , (=<<)
+  , (>=>)
+  , (<=<)
+  , guard
+  , when
+  , whenM
+  )
 import Control.Monad.Fix
 import Control.Monad.Ref
 import Control.Monad.Reader
@@ -874,16 +882,18 @@ invokeStruct
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeStruct loc Val.MkStruct {..} arg s s' =
-  localScopes (addScope expLabel scopes) $ do
-    archetype <- freshEnv members
-    let archetype' = mempty
-    xs <- freshEnv members
-    _ <- local (\ r -> r { env = xs <> env, archetype, archetype' }) $
-      evalExp exp s s'
-    let members = filterNames xs
-    unify' loc arg <=< lift . newVar' $ Val.StructInst Val.MkStructInst {..}
-    pure arg
+invokeStruct loc x@Val.MkStruct {..} arg s s' = do
+  localScopes (addScope expLabel scopes) . fork' $ lift (readVar' arg) >>= \ case
+    Val.StructInst y | x.expLabel == y.expLabel -> when (x.label /= y.label) $ do
+      archetype <- freshEnv members
+      let archetype' = mempty
+      xs <- freshEnv members
+      _ <- local (\ r -> r { env = xs <> env, archetype, archetype' }) $
+        evalExp exp s s'
+      let members = filterNames xs
+      unify' loc arg <=< lift . newVar' $ Val.StructInst Val.MkStructInst {..}
+    _ -> empty
+  pure arg
 
 invokeClass
   :: MonadEval m
@@ -893,11 +903,13 @@ invokeClass
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeClass loc x@Val.MkClass {..} arg s s' =
-  localScopes (addScope expLabel scopes) $ do
-    (inst, _) <- instEmptyClass loc x s s'
-    unify' loc inst =<< lift (findClassInst expLabel arg)
-    pure arg
+invokeClass loc x@Val.MkClass {..} arg s s' = do
+  localScopes (addScope expLabel scopes) . fork' $ do
+    (inst_y, y) <- lift (findClassInst expLabel arg)
+    when (x.label /= y.label) $ do
+      (inst_x, _) <- instEmptyClass loc x s s'
+      unify' loc inst_x inst_y
+  pure arg
 
 instEmptyClass
   :: MonadEval m
@@ -945,10 +957,10 @@ readClass loc = readVar' >=> \ case
 
 findClassInst
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
-  => Label -> VarVal m -> VerseT m (VarVal m)
+  => Label -> VarVal m -> VerseT m (VarVal m, Val.ClassInst (VarVal m))
 findClassInst i var = readVar' var >>= \ case
   Val.ClassInst x
-    | x.expLabel == i -> pure var
+    | x.expLabel == i -> pure (var, x)
     | Just super <- x.super -> findClassInst i super
   _ -> empty
 
