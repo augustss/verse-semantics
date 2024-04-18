@@ -1356,7 +1356,7 @@ readSubst var@(Var ref) = readVarState ref >>= \ case
   Bound bound -> pure (var, Just bound)
   Unbound unbound -> yield $ \ k -> do
     level <- getLevel
-    if (unbound.level == level) then
+    if unbound.level == level then
       writeVarState ref $ Unbound unbound
         { substSusp = \ x -> unbound.substSusp x *> k x
         }

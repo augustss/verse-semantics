@@ -10,8 +10,12 @@ module Language.Verse.Val
   ( Val (..)
   , forVal_
   , Sign
+  , Struct (..)
+  , StructInst (..)
   , Class (..)
   , ClassInst (..)
+  , Lam (..)
+  , OLam (..)
   , List (..)
   , VarVal (..)
   , VarList (..)
@@ -63,6 +67,26 @@ import Language.Verse.SimpleName
 
 import Numeric (showHex)
 import Prettyprinter
+  ( Doc
+  , Pretty (..)
+  , (<+>)
+  , align
+  , concatWith
+  , dot
+  , encloseSep
+  , flatAlt
+  , group
+  , hardline
+  , lbrace
+  , line
+  , lbracket
+  , lparen
+  , nest
+  , parens
+  , rbrace
+  , rbracket
+  , rparen
+  )
 
 data Val ref a b
   = Any
@@ -81,42 +105,16 @@ data Val ref a b
   | Truth b
   | Tuple [b]
   | Ptr (ref b) b
-  | Module
-    {-# UNPACK #-} !Label
-    !(Env SimpleName b)
-  | Enum
-    {-# UNPACK #-} !Label
-    !(Env SimpleName b) [b]
-  | EnumValue
-    {-# UNPACK #-} !Label
-    {-# UNPACK #-} !SimpleName
-  | Struct
-    {-# UNPACK #-} !Label
-    !(NonEmpty Scope)
-    !(Env Ident b)
-    !(Desugar.Env Ident)
-    !Exp
-  | StructInst
-    {-# UNPACK #-}
-    !Label
-    !(Env SimpleName b)
+  | Module {-# UNPACK #-} !Label !(Env SimpleName b)
+  | Enum {-# UNPACK #-} !Label !(Env SimpleName b) [b]
+  | EnumValue {-# UNPACK #-} !Label {-# UNPACK #-} !SimpleName
+  | Struct !(Struct b)
+  | StructInst !(StructInst b)
   | Class !(Class b)
   | ClassInst !(ClassInst b)
-  | Lam
-    !(NonEmpty Scope)
-    !Sign
-    !(Env Ident b)
-    !Ident
-    !Exp
+  | Lam !(Lam b)
   | AnyOLam
-  | OLam
-    !(NonEmpty Scope)
-    !Sign
-    !(Env Ident b)
-    !(Desugar.Env Ident)
-    !Exp
-    !Exp
-    b
+  | OLam !(OLam b) b
   | Intrinsic !Intrinsic b
   | Type !Sign a deriving Show
 
@@ -143,14 +141,14 @@ forVal_ x f = case x of
   Module _ env -> forEnv_ env f
   Enum _ env xs -> forEnv_ env f *> for_ xs f
   EnumValue {} -> pure ()
-  Struct _ _ env _ _ -> forEnv_ env f
-  StructInst _ env -> forEnv_ env f
+  Struct x -> forEnv_ x.env f
+  StructInst x -> forEnv_ x.members f
   Class x -> forEnv_ x.env f *> for_ x.super f
   ClassInst x -> for_ x.super f *> forEnv_ x.members f
-  Lam _ _ env _ _ -> forEnv_ env f
+  Lam x -> forEnv_ x.env f
   AnyOLam -> pure ()
-  OLam _ _ _ _ _ _ tail -> void $ f tail
-  Intrinsic _ tail -> void $ f tail
+  OLam x xs -> forEnv_ x.env f <* f xs
+  Intrinsic _ xs -> void $ f xs
   Type {} -> pure ()
 
 instance ( Freshenable a m
@@ -176,21 +174,14 @@ instance ( Freshenable a m
     Module i env -> Module i <$> freshen env
     Enum i env xs -> Enum i <$> freshen env <*> freshen xs
     EnumValue {} -> pure x
-    Struct i scope env xs e -> do
-      env <- freshen env
-      pure $ Struct i scope env xs e
-    StructInst i env -> StructInst i <$> freshen env
+    Struct x -> Struct <$> freshen x
+    StructInst x -> StructInst <$> freshen x
     Class x -> Class <$> freshen x
     ClassInst x -> ClassInst <$> freshen x
-    Lam scope sign env x e -> do
-      env <- freshen env
-      pure $ Lam scope sign env x e
+    Lam x -> Lam <$> freshen x
     AnyOLam -> pure x
-    OLam scope sign env xs e1 e2 tail -> do
-      env <- freshen env
-      tail <- freshen tail
-      pure $ OLam scope sign env xs e1 e2 tail
-    Intrinsic i tail -> Intrinsic i <$> freshen tail
+    OLam x xs -> OLam <$> freshen x <*> freshen xs
+    Intrinsic x xs -> Intrinsic x <$> freshen xs
     Type x y -> Type x <$> freshen y
 
 instance ( Freezable (f b) (g d) m
@@ -217,19 +208,14 @@ instance ( Freezable (f b) (g d) m
     Module i env -> Module i <$> freeze env
     Enum i env xs -> Enum i <$> freeze env <*> freeze xs
     EnumValue i x -> pure $ EnumValue i x
-    Struct i scope env xs e -> do
-      env <- freeze env
-      pure $ Struct i scope env xs e
-    StructInst i env -> StructInst i <$> freeze env
+    Struct x -> Struct <$> freeze x
+    StructInst x -> StructInst <$> freeze x
     Class x -> Class <$> freeze x
     ClassInst x -> ClassInst <$> freeze x
-    Lam scope sign env x e -> freeze env <&> \ env -> Lam scope sign env x e
+    Lam x -> Lam <$> freeze x
     AnyOLam -> pure AnyOLam
-    OLam scope sign env xs e1 e2 tail -> do
-      env <- freeze env
-      tail <- freeze tail
-      pure $ OLam scope sign env xs e1 e2 tail
-    Intrinsic i tail -> Intrinsic i <$> freeze tail
+    OLam x xs -> OLam <$> freeze x <*> freeze xs
+    Intrinsic x xs -> Intrinsic x <$> freeze xs
     Type x y -> Type x <$> freeze y
 
 instance ( Pretty (ref b)
@@ -257,69 +243,79 @@ instance ( Pretty (ref b)
     Module i env ->
       align $
       "module#" <>
-      prettyLabel i <>
+      prettyLabel i <+>
       group (braced $ prettyNames env)
     Enum i _ xs ->
       align $
       "enum#" <>
-      prettyLabel i <>
+      prettyLabel i <+>
       group (braced $ pretty <$> xs)
-    EnumValue i x ->
-      "enum#" <> prettyLabel i <> dot <> pretty x
-    Struct i _ _ _ _ ->
-      align $
-      "struct#" <>
-      prettyLabel i
-    StructInst i env ->
-      align $
-      "struct#" <>
-      prettyLabel i <>
-      group (braced $ prettyNames env)
-    Class x ->
-      align $
-      "class#" <>
-      prettyLabel x.evalLabel
-    ClassInst x ->
-      align $
-      "class#" <>
-      prettyLabel x.evalLabel <>
-      maybe mempty (\ super -> parens $ pretty super) x.super <>
-      group (braced $ prettyNames x.members)
-    Lam {} -> "function"
+    EnumValue i x -> "enum#" <> prettyLabel i <> dot <> pretty x
+    Struct x -> pretty x
+    StructInst x -> pretty x
+    Class x -> pretty x
+    ClassInst x -> pretty x
+    Lam _ -> "function"
     AnyOLam -> "function"
     OLam {} -> "function"
     Intrinsic {} -> "function"
     Type {} -> "type"
     where
-      prettyPath xs = foldr ( \ a b -> "/" <> pretty a <> b ) mempty xs
-      prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
-        align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
-      tupled =
-        align .
-        group .
-        encloseSep
-        (flatAlt "( " lparen)
-        (flatAlt (hardline <> rparen) rparen)
-        ", "
-      braces x =
-        flatAlt (hardline <> "{ ") lbrace <>
-        x <>
-        flatAlt (hardline <> rbrace) rbrace
-      braced =
-        group .
-        encloseSep
-        (flatAlt (hardline <> "{ ") lbrace)
-        (flatAlt (hardline <> rbrace) rbrace)
-        ", "
+      prettyPath = foldr ( \ a b -> "/" <> pretty a <> b ) mempty
+
+data Struct a = MkStruct
+  { label :: {-# UNPACK #-} !Label
+  , expLabel :: {-# UNPACK #-} !Label
+  , scopes :: !(NonEmpty Scope)
+  , env :: !(Env Ident a)
+  , members :: !(Desugar.Env Ident)
+  , exp :: !Exp
+  } deriving Show
+
+instance Freshenable a m => Freshenable (Struct a) m where
+  freshen MkStruct {..} = do
+    env <- freshen env
+    pure MkStruct {..}
+
+instance Freezable a b m => Freezable (Struct a) (Struct b) m where
+  freeze MkStruct {..} = do
+    env <- freeze env
+    pure MkStruct {..}
+
+instance Pretty (Struct a) where
+  pretty MkStruct {..} = align $ "struct#" <> prettyLabel label
+
+data StructInst a = MkStructInst
+  { label :: {-# UNPACK #-} !Label
+  , expLabel :: {-# UNPACK #-} !Label
+  , members :: !(Env SimpleName a)
+  } deriving Show
+
+instance Freshenable a m => Freshenable (StructInst a) m where
+  freshen MkStructInst {..} = do
+    members <- freshen members
+    pure MkStructInst {..}
+
+instance Freezable a b m => Freezable (StructInst a) (StructInst b) m where
+  freeze MkStructInst {..} = do
+    members <- freeze members
+    pure MkStructInst {..}
+
+instance Pretty a => Pretty (StructInst a) where
+  pretty MkStructInst {..} =
+    align $
+    "struct#" <>
+    prettyLabel label <+>
+    group (braced $ prettyNames members)
 
 data Class a = MkClass
-  { expLabel :: {-# UNPACK #-} !Label
-  , evalLabel :: {-# UNPACK #-} !Label
+  { label :: {-# UNPACK #-} !Label
+  , expLabel :: {-# UNPACK #-} !Label
   , scopes :: !(NonEmpty Scope)
   , env :: !(Env Ident a)
   , super :: !(Maybe a)
   , members :: !(Desugar.Env Ident)
-  , body :: !Exp
+  , exp :: !Exp
   } deriving Show
 
 instance Freshenable a m => Freshenable (Class a) m where
@@ -334,9 +330,12 @@ instance Freezable a b m => Freezable (Class a) (Class b) m where
     super <- freeze super
     pure MkClass {..}
 
+instance Pretty (Class a) where
+  pretty MkClass {..} = align $ "class#" <> prettyLabel label
+
 data ClassInst b = MkClassInst
-  { expLabel :: {-# UNPACK #-} !Label
-  , evalLabel :: {-# UNPACK #-} !Label
+  { label :: {-# UNPACK #-} !Label
+  , expLabel :: {-# UNPACK #-} !Label
   , super :: !(Maybe b)
   , members :: !(Env SimpleName b)
   } deriving Show
@@ -352,6 +351,51 @@ instance Freezable a b m => Freezable (ClassInst a) (ClassInst b) m where
     super <- freeze super
     members <- freeze members
     pure MkClassInst {..}
+
+instance Pretty a => Pretty (ClassInst a) where
+  pretty MkClassInst {..} =
+    align $
+    "class#" <>
+    prettyLabel label <+>
+    maybe mempty (parens . pretty) super <>
+    group (braced $ prettyNames members)
+
+data Lam a = MkLam
+  { scopes :: !(NonEmpty Scope)
+  , sign :: !Sign
+  , env :: !(Env Ident a)
+  , param :: !Ident
+  , exp :: !Exp
+  } deriving Show
+
+instance Freshenable a m => Freshenable (Lam a) m where
+  freshen MkLam {..} = do
+    env <- freshen env
+    pure MkLam {..}
+
+instance Freezable a b m => Freezable (Lam a) (Lam b) m where
+  freeze MkLam {..} = do
+    env <- freeze env
+    pure MkLam {..}
+
+data OLam a = MkOLam
+  { scopes :: !(NonEmpty Scope)
+  , sign :: !Sign
+  , env :: !(Env Ident a)
+  , params :: !(Desugar.Env Ident)
+  , domain :: !Exp
+  , range :: !Exp
+  } deriving Show
+
+instance Freshenable a m => Freshenable (OLam a) m where
+  freshen MkOLam {..} = do
+    env <- freshen env
+    pure MkOLam {..}
+
+instance Freezable a b m => Freezable (OLam a) (OLam b) m where
+  freeze MkOLam {..} = do
+    env <- freeze env
+    pure MkOLam {..}
 
 data List a b
   = Nil
@@ -449,14 +493,13 @@ data Scope = Scope
   {-# UNPACK #-} !Label deriving Show
 
 instance Pretty Scope where
-  pretty = \ case
-    Scope label labels mLabel ->
-      "Scope" <>
-      braces (prettyLabel label <>
-              prettySup labels <+> "in" <+>
-              prettyLabel mLabel)
+  pretty (Scope label labels moduleLabel) =
+    "Scope" <>
+    braces (prettyLabel label <>
+            prettySuper labels <+> "in" <+>
+            prettyLabel moduleLabel)
     where
-      prettySup = \ case
+      prettySuper = \ case
         [] -> mempty
         labels -> "," <> "sup=[" <> concatWith (<+>) (map prettyLabel labels) <> "]"
 
@@ -479,3 +522,30 @@ instance Pretty AccessScope where
     braces (pretty access <+>
             "scope" <+> prettyLabel sLabel <+>
             "in" <+> prettyLabel mLabel)
+
+prettyNames :: (Pretty k, Pretty v) => HashMap k v -> [Doc ann]
+prettyNames xs = HashMap.toList xs <&> \ (k, v) ->
+  align $ pretty k <+> ":=" <> group (nest 2 $ line <> pretty v)
+
+tupled :: [Doc ann] -> Doc ann
+tupled =
+  align .
+  group .
+  encloseSep
+  (flatAlt "( " lparen)
+  (flatAlt (hardline <> rparen) rparen)
+  ", "
+
+braces :: Doc ann -> Doc ann
+braces x =
+  flatAlt (hardline <> "{ ") lbrace <>
+  x <>
+  flatAlt (hardline <> rbrace) rbrace
+
+braced :: [Doc ann] -> Doc ann
+braced =
+  group .
+  encloseSep
+  (flatAlt (hardline <> "{ ") lbrace)
+  (flatAlt (hardline <> rbrace) rbrace)
+  ", "

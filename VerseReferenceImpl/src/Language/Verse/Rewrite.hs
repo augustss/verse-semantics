@@ -466,23 +466,23 @@ getLamSpecs
   -> m (OC, Split.Effect)
 getLamSpecs = wrap $ \ case
   ((Nothing, z), y@(extract -> IdentName "open")) ->
-    pure $! (Just $! O <$ y, z)
+    pure (Just $ O <$ y, z)
   ((Just x, _), y@(extract -> IdentName "open")) ->
     wrong $ OpenClosedError (loc x) (loc y)
   ((Nothing, z), y@(extract -> IdentName "closed")) ->
-    pure $! (Just $! C <$ y, z)
+    pure (Just $ C <$ y, z)
   ((Just x, _), y@(extract -> IdentName "closed")) ->
     wrong $ OpenClosedError (loc x) (loc y)
   ((z, Nothing), y@(extract -> IdentName "fails")) ->
-    pure $! (z, Just $! Effect.Fails <$ y)
+    pure (z, Just $ Effect.Fails <$ y)
   ((_, Just x), y@(extract -> IdentName "fails")) ->
     wrong $ SplitEffectError (loc x) (loc y)
   ((z, Nothing), y@(extract -> IdentName "succeeds")) ->
-    pure $! (z, Just $! Effect.Succeeds <$ y)
+    pure (z, Just $ Effect.Succeeds <$ y)
   ((_, Just x), y@(extract -> IdentName "succeeds")) ->
     wrong $ SplitEffectError (loc x) (loc y)
   ((z, Nothing), y@(extract -> IdentName "decides")) ->
-    pure $! (z, Just $! Effect.Decides <$ y)
+    pure (z, Just $ Effect.Decides <$ y)
   ((_, Just x), y@(extract -> IdentName "decides")) ->
     wrong $ SplitEffectError (loc x) (loc y)
   (_, y) -> wrong $ SpecError $ loc y
