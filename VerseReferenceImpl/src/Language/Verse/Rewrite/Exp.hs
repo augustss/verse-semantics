@@ -191,4 +191,4 @@ name :: Functor f => f a -> f (Exp f a)
 name = fmap Name
 
 ifArchetypeName :: Apply f => f a -> f (Exp f a) -> f (Exp f a) -> f (Exp f a)
-ifArchetypeName = liftL3 $ IfArchetypeName
+ifArchetypeName = liftL3 IfArchetypeName

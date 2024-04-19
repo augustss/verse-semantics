@@ -36,6 +36,7 @@ library
     Data.Function.Extras
     Language.Verse
     Language.Verse.Access
+    Language.Verse.Contract
     Language.Verse.Desugar
     Language.Verse.Desugar.Exp
     Language.Verse.Effect.Split

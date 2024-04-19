@@ -3,11 +3,11 @@
 {-# LANGUAGE ViewPatterns #-}
 module Rules.ICFP(
   allSystemsICFP,
-  systemICFP,
+  -- systemICFP,
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, anf, anfK, execX, defX, execX1, choiceX, ltExpr,
+  isRecursive, {- anf, -} anfK, execX, defX, execX1, choiceX, ltExpr,
   hasStore, isChoiceFree
   ) where
 import Control.Monad( guard )

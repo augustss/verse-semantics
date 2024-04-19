@@ -617,7 +617,7 @@ pParenOrQualIdent = do
   p2 <- pos
   _ <- pSpace
   case qParens of
-    Nothing -> ((Exp.Pat <$>) . (Pat.Name <$>) . (IdentExp.IdentName <$>)) <$> pIdent
+    Nothing -> (Exp.Pat <$>) . (Pat.Name <$>) . (IdentExp.IdentName <$>) <$> pIdent
     Just (es, True) -> return $ wrapLoc p1 (extract $ mkList es) p2
     Just (es, False) -> do
       n <- pIdent
@@ -732,7 +732,7 @@ pBase =
   <|>
   pEnum
   <|>
-  ((Exp.Pat <$>) . (Pat.Name<$>)) <$> pPath
+  (Exp.Pat <$>) . (Pat.Name<$>) <$> pPath
   <|>
   pString
   <|>
@@ -1034,8 +1034,8 @@ doBinary pLhs pRhs choices = do
   lhs <- pLhs -- No try since doBinary is only called when pLhs must match
   _ <- pSpace
   repeatChoiceNoTry lhs $ map fixBinary choices
- where
-  fixBinary (p, f) = \ e1 -> liftL2 f e1 <$ p <* pScan <*> pRhs <* pSpace
+  where
+    fixBinary (p, f) = \ e1 -> liftL2 f e1 <$ p <* pScan <*> pRhs <* pSpace
 
 repeatChoice :: a -> [a -> Parser a] -> Parser a
 repeatChoice e choices = do
