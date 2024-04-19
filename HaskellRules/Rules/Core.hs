@@ -587,7 +587,8 @@ instance Rec Expr where
       One a -> [ (n, One a') | (n,a') <- rec r (addBound BBlk s) a ]
       All a -> [ (n, All a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assume a -> [ (n, Assume a') | (n,a') <- rec r (addBound BBlk s) a ]
-      Fails  a -> [ (n, Fails a')  | (n,a') <- rec r (addBound BBlk s) a ]
+      Some   a -> [ (n, Some   a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Fails  a -> [ (n, Fails  a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assert a -> [ (n, Assert a') | (n,a') <- rec r (addBound BBlk s) a ]
       Decide a -> [ (n, Decide a') | (n,a') <- rec r (addBound BBlk s) a ]
 

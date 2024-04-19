@@ -176,10 +176,11 @@ checkRules env lhs =
    "CHECK-FAIL-DEC" `name`
    do Decide (Fail) <- [lhs]
       pure Fail
-   ++
-   "CHECK-FAIL-FAILS" `name`
-   do Fails (Fail) <- [lhs]
-      pure Fail
+   -- ++
+   -- we use Fails{e} as (~e) so don't want `fails` to escape that
+   -- "CHECK-FAIL-FAILS" `name`
+   -- do Fails (Fail) <- [lhs]
+   --    pure Fail
 
 skol :: [Ident] -> Expr -> Bool
 skol rs e = null (free e \\ rs)

@@ -55,6 +55,9 @@ tests = -- take 1
   , ("ex_if1", ex_if1, False)
   , ("ex_if2", ex_if2, True)
   , ("ex_inc", ex_inc, True)
+  , ("ex_add_ty", ex_add_ty, True)
+  , ("ex_add_ty_int", ex_add_ty_int, True)
+  , ("ex_add_ty_int", ex_add_ty_int', False)
   -- TODO:HOF , ("ex_tim_0", ex_tim_0, False)
   -- TODO:HOF , ("ex_tim_1", ex_tim_1, False)
   , ("ex_asm_subst", ex_asm_subst, True)
@@ -514,6 +517,60 @@ ex_inc = tlamOblig y [x]
     x = ident "x"
     y = ident "y"
 
+
+ex_add_ty :: Expr
+ex_add_ty =
+  lETs
+    [ (add, lAMs [x, y, z] ( (Var z :=: ((Op Add :@: Arr [Var x, Var y]))) :>: iNT (Var z) ) )
+    , (plus, LAM x (LAM y (INT (Var x) :>: INT (Var y) :>: Some ((Var add :@: Var x) :@: Var y))))
+    ]
+    (Verify [a] [] $
+        iNT (Var a)
+        :>:
+        (Assert (((Var plus :@: Var a) :@: Int 1))))
+  where
+    add  = ident "add"
+    plus = ident "plus"
+    x    = ident "x"
+    y    = ident "y"
+    z    = ident "z"
+    a    = ident "a"
+
+ex_add_ty_int :: Expr
+ex_add_ty_int =
+  lETs
+    [ (add, lAMs [x, y, z] ( (Var z :=: ((Op Add :@: Arr [Var x, Var y]))) :>: iNT (Var z) ) )
+    , (plus, LAM x (LAM y (iNT (Var x) :>: iNT (Var y) :>: Some ((Var add :@: Var x) :@: Var y))))
+    ]
+    (Verify [a] [] $
+        INT (Var a)
+        :>:
+        (Assert (EXI z (Var z :=: ((Var plus :@: Var a) :@: Int 1) :>: iNT (Var z)))))
+  where
+    add  = ident "add"
+    plus = ident "plus"
+    x    = ident "x"
+    y    = ident "y"
+    z    = ident "z"
+    a    = ident "a"
+
+ex_add_ty_int' :: Expr
+ex_add_ty_int' =
+  lETs
+    [ (add, lAMs [x, y, z] ( (Var z :=: ((Op Add :@: Arr [Var x, Var y]))) :>: iNT (Var z) ) )
+    , (plus, LAM x (LAM y (iNT (Var x) :>: iNT (Var y) :>: Some ((Var add :@: Var x) :@: Var y))))
+    ]
+    (Verify [a] [] $
+        -- INT (Var a)
+        -- :>:
+        (Assert (EXI z (Var z :=: ((Var plus :@: Var a) :@: Int 1) :>: iNT (Var z)))))
+  where
+    add  = ident "add"
+    plus = ident "plus"
+    x    = ident "x"
+    y    = ident "y"
+    z    = ident "z"
+    a    = ident "a"
 
 
 -- example showing Tim's caution re: using assumes: make sure you cannot use a post-condition to prove its
