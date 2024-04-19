@@ -45,7 +45,7 @@ valid = expr
     expr (IFB _ e)        = expr e
     expr (If e1 e2 e3)    = expr e1 && expr e2 && expr e3
     expr (v  :=: e)       = value v && expr e
-    expr (e1 :>: e2)      = expr e1 && expr e2
+    expr (eq :>: e)       = equ eq && expr e
     expr (e1 :>>: e2)     = expr e1 && expr e2
     expr (e1 :|: e2)      = expr e1 && expr e2
     expr Fail             = True
@@ -54,6 +54,9 @@ valid = expr
     expr (One e)          = expr e
     expr (All e)          = expr e
     expr v                = value v
+
+    equ (v :=: e)         = value v && expr e
+    equ _                 = False
 
     value (Var _) = True
     value r       = hnf r
@@ -68,8 +71,8 @@ valid = expr
 anf :: Expr -> Expr
 anf = expr
   where
-    expr (e1 :=: e2)      = makeValue e1 (\v -> v :=: expr e2)
-    expr (e1 :>: e2)      = expr e1 :>: expr e2
+    expr (e1 :=: e2)      = makeValue e1 $ \v -> (v :=: expr e2) :>: v
+    expr (eq :>: e)       = makeEq eq (expr e)
     expr (e1 :>>: e2)     = expr e1 :>>: expr e2
     expr (e1 :|: e2)      = expr e1 :|: expr e2
     expr Fail             = Fail
@@ -90,6 +93,9 @@ anf = expr
     expr (Assume e)       = expr e         -- hack to strip out `assume` inserted in the prelude
     expr e                = error (show e) -- Int 13 -- what to do here??
 
+    makeEq (e1 :=: e2) e = makeValue e1 $ \v -> (v :=: expr e2) :>: e
+    makeEq e1          e = makeValue e1 $ \_ -> e
+
     value v = valid (v :=: Int 0)
 
     makeValue v f
@@ -108,6 +114,49 @@ anf = expr
 
 --------------------------------------------------------------------------------
 
+{-
+data Effect = Fails | Decides | Succeeds deriving ( Show, Eq, Ord )
+
+susp :: Expr -> [(Expr, Effect)]
+susp e =
+  do (_, Op op :@: v, _, fx) <- proof e
+     pure (e, fx \/ effect op)
+
+proof :: Expr -> [(Context, Expr, [Ident], Effect)]
+proof e =
+  do pure (id, e, [], noeff)
+ ++
+  do (l :=: e1) :>: e2 <- [e]
+     (p, h, bnds, fx) <- proof e1
+     pure ((:>: e2) . (l :=:) . p, h, bnds, fx)
+ ++
+  do (l :=: e1) :>: e2 <- [e]
+     (s, fx1) <- susp e1
+     (p, h, bnds, fx2) <- proof e2
+     pure (((l :=: e1) :>:) . p, h, bnds, fx1\/fx2)
+ ++
+  do e1 :>>: e2 <- [e]
+     (p, h, bnds, fx) <- proof e1
+     pure ((:>>: e2) . p, h, bnds, fx)
+ ++
+  do Exi (Bind x e1) <- [e]
+     (p, h, bnds, fx) <- proof e1
+     pure (Exi . Bind x . p, h, x:bnds, fx)
+ ++
+  do One e1 <- [e]
+     (p, h, bnds, fx) <- proof e1
+     pure (One . p, h, bnds, fx)
+ ++
+  do All e1 <- [e]
+     (vs,e2) <- 
+     (p, h, bnds, fx) <- proof e1
+     pure (All . p, h, bnds, fx)
+ ++
+  do Check fx e1 <- [e]
+     (p, h, bnds, fx) <- proof e1
+     pure (All . p, h, bnds, fx)
+-}
+     
 isChoiceFree :: Expr -> Bool
 isChoiceFree (Val _)          = True
 isChoiceFree (a :=: b)        = isChoiceFree a && isChoiceFree b
