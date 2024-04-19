@@ -144,7 +144,7 @@ instance Pretty Expr where
   pPrintPrec l p (a :|: b)        = maybeParens (l >= prettyNormal || p > 3) $ sep [pPrintPrec l 4 a <+> text "|", pPrintPrec l 4 b]
   pPrintPrec l p e@(_ :>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ";")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
-  pPrintPrec l p e@(_ :>>: _)      = maybeParens (p > 1) $ sep $ punctuate (text ">>")  $ map (pPrintPrec l 2) $ ap [] e
+  pPrintPrec l p e@(_ :>>: _)      = maybeParens (p > 1) $ sep $ punctuate (text " >>")  $ map (pPrintPrec l 2) $ ap [] e
                                     where ap r (a :>>: b) = ap (r ++ [a]) b; ap r a = r ++ [a]
 
   pPrintPrec l p (a :=: b)        = maybeParens (l >= prettyNormal || p > 2) $ pPrintPrec l 3 a <+> text "=" <+> pPrintPrec l 3 b
@@ -587,7 +587,8 @@ instance Rec Expr where
       One a -> [ (n, One a') | (n,a') <- rec r (addBound BBlk s) a ]
       All a -> [ (n, All a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assume a -> [ (n, Assume a') | (n,a') <- rec r (addBound BBlk s) a ]
-      Fails  a -> [ (n, Fails a')  | (n,a') <- rec r (addBound BBlk s) a ]
+      Some   a -> [ (n, Some   a') | (n,a') <- rec r (addBound BBlk s) a ]
+      Fails  a -> [ (n, Fails  a') | (n,a') <- rec r (addBound BBlk s) a ]
       Assert a -> [ (n, Assert a') | (n,a') <- rec r (addBound BBlk s) a ]
       Decide a -> [ (n, Decide a') | (n,a') <- rec r (addBound BBlk s) a ]
 

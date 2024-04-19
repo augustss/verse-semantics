@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-unused-top-binds #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Rules.TRS2024(allSystemsTRS2024, systemTRS2024, isEffectFree) where
+module Rules.TRS2024(allSystemsTRS2024, systemTRS2024, isChoiceFree, isEffectFree) where
 import Control.Monad( guard )
 
 --import Epic.Print(prettyShow)
@@ -36,7 +36,14 @@ systemTRS2024 = TRSystem
 valid :: Expr -> Bool
 valid = expr
   where
-    -- left out for now: assume, check, verify, havoc, olam
+    -- left out for now: check, havoc, olam
+    expr (Assume e)       = expr e
+    expr (Assert e)       = expr e
+    expr (Decide e)       = expr e
+    expr (Verify _ as e)  = all expr (e:as)
+    expr (Some e)         = expr e
+    expr (IFB _ e)        = expr e
+    expr (If e1 e2 e3)    = expr e1 && expr e2 && expr e3
     expr (v  :=: e)       = value v && expr e
     expr (e1 :>: e2)      = expr e1 && expr e2
     expr (e1 :>>: e2)     = expr e1 && expr e2
@@ -77,6 +84,12 @@ anf = expr
     expr (Int k)          = Int k
     expr (Op op)          = Op op
     expr (Var x)          = Var x
+    expr (Some e)         = Some (expr e)
+    expr (If e1 e2 e3)    = If (expr e1) (expr e2) (expr e3)
+    expr (Verify rs es e) = Verify rs (expr <$> es) (expr e)
+    expr (Decide e)       = Decide (expr e)
+    expr (Assert e)       = Assert (expr e)
+    expr (Assume e)       = expr e         -- hack to strip out `assume` inserted in the prelude
     expr e                = error (show e) -- Int 13 -- what to do here??
 
     value v = valid (v :=: Int 0)
