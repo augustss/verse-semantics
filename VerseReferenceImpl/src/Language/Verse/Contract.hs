@@ -8,18 +8,16 @@ import Prettyprinter
 
 data Contract
   = Any
-  | Comparable
   | Rational
   | Int
   | Float
   | Char
   | Char32
-  | Function deriving Show
+  | Function deriving (Eq, Show)
 
 instance Pretty Contract where
   pretty = \ case
     Any -> "any"
-    Comparable -> "comparable"
     Rational -> "rational"
     Int -> "int"
     Float -> "float"

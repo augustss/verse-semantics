@@ -52,6 +52,8 @@ import Data.Ratio
 import Data.Tuple
 
 import Language.Verse.Access
+import Language.Verse.Contract (Contract)
+import Language.Verse.Contract qualified as Contract
 import Language.Verse.Desugar.Exp
   ( Exp
   , pattern (:*>:)
@@ -85,6 +87,7 @@ import Language.Verse.Val
   , VarVal
   , forVal_
   )
+import Language.Verse.Val qualified as List
 import Language.Verse.Val qualified as Val
 
 import Prelude
@@ -1026,6 +1029,21 @@ invokeIntrinsicDom loc = \ case
   Intrinsic.Type -> liftPrim $ type' loc
   Intrinsic.Query -> liftPrim $ query loc
 
+invokeContract
+  :: MonadEval m
+  => Loc
+  -> Contract
+  -> VarVal m
+  -> EvalT m ()
+invokeContract loc = \ case
+  Contract.Any -> lift . anyC
+  Contract.Rational -> rationalC loc
+  Contract.Int -> intC loc
+  Contract.Float -> floatC loc
+  Contract.Char -> charC loc
+  Contract.Char32 -> char32C loc
+  Contract.Function -> functionC loc
+
 liftOrd
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
   => (forall a . Ord a => a -> a -> Bool)
@@ -1267,93 +1285,100 @@ getInt = \ case
   Val.Int x -> pure x
   _ -> empty
 
-any
-  :: MonadEval m
-  => VarVal m -> VerseT m (DomMatch m)
+any :: MonadEval m => VarVal m -> VerseT m (DomMatch m)
 any var = domMatch_' $ do
-  fork . void $ readVar' var
+  fork $ anyC var
   pure var
 
-int
-  :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (DomMatch m)
-int loc var = domMatch_ $ do
-  fork' $ lift (readVar' var) >>= \ case
-    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeInt)
-    Val.SomeRational -> unify' loc var =<< lift (newVerifyVar' Val.SomeInt)
-    Val.Rational x | denominator x == 1 -> pure ()
-    Val.SomeInt -> pure ()
-    Val.Int _ -> pure ()
-    _ -> empty
-  pure var
+anyC :: MonadRef m => VarVal m -> VerseT m ()
+anyC var = void $ readVar' var
 
-rational
-  :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (DomMatch m)
+rational :: MonadEval m => Loc -> VarVal m -> EvalT m (DomMatch m)
 rational loc var = domMatch_ $ do
-  fork' $ lift (readVar' var) >>= \ case
-    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeRational)
-    Val.SomeRational -> pure ()
-    Val.Rational _ -> pure ()
-    Val.SomeInt -> pure ()
-    Val.Int _ -> pure ()
-    _ -> empty
+  fork' $ rationalC loc var
   pure var
 
-float
-  :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (DomMatch m)
+rationalC :: MonadEval m => Loc -> VarVal m -> EvalT m ()
+rationalC loc var = lift (readVar' var) >>= \ case
+  Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeRational)
+  Val.SomeRational -> pure ()
+  Val.Rational _ -> pure ()
+  Val.SomeInt -> pure ()
+  Val.Int _ -> pure ()
+  _ -> empty
+
+int :: MonadEval m => Loc -> VarVal m -> EvalT m (DomMatch m)
+int loc var = domMatch_ $ do
+  fork' $ intC loc var
+  pure var
+
+intC :: MonadEval m => Loc -> VarVal m -> EvalT m ()
+intC loc var = lift (readVar' var) >>= \ case
+  Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeInt)
+  Val.SomeRational -> unify' loc var =<< lift (newVerifyVar' Val.SomeInt)
+  Val.Rational x | denominator x == 1 -> pure ()
+  Val.SomeInt -> pure ()
+  Val.Int _ -> pure ()
+  _ -> empty
+
+float :: MonadEval m => Loc -> VarVal m -> EvalT m (DomMatch m)
 float loc var = domMatch_ $ do
-  fork' $ lift (readVar' var) >>= \ case
-    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeFloat)
-    Val.SomeFloat -> pure ()
-    Val.Float _ -> pure ()
-    _ -> empty
+  fork' $ floatC loc var
   pure var
 
-char
-  :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (DomMatch m)
+floatC :: MonadEval m => Loc -> VarVal m -> EvalT m ()
+floatC loc var = lift (readVar' var) >>= \ case
+  Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeFloat)
+  Val.SomeFloat -> pure ()
+  Val.Float _ -> pure ()
+  _ -> empty
+
+char :: MonadEval m => Loc -> VarVal m -> EvalT m (DomMatch m)
 char loc var = domMatch_ $ do
-  fork' $ lift (readVar' var) >>= \ case
-    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeChar)
-    Val.SomeChar -> pure ()
-    Val.Char _ -> pure ()
-    _ -> empty
+  fork' $ charC loc var
   pure var
 
-char32
-  :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (DomMatch m)
+charC :: MonadEval m => Loc -> VarVal m -> EvalT m ()
+charC loc var = lift (readVar' var) >>= \ case
+  Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeChar)
+  Val.SomeChar -> pure ()
+  Val.Char _ -> pure ()
+  _ -> empty
+
+char32 :: MonadEval m => Loc -> VarVal m -> EvalT m (DomMatch m)
 char32 loc var = domMatch_ $ do
-  fork' $ lift (readVar' var) >>= \ case
-    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeChar32)
-    Val.SomeChar32 -> pure ()
-    Val.Char32 _ -> pure ()
-    _ -> empty
+  fork' $ char32C loc var
   pure var
 
-function
-  :: MonadEval m
-  => Loc -> VarVal m -> EvalT m (DomMatch m)
+char32C :: MonadEval m => Loc -> VarVal m -> EvalT m ()
+char32C loc var = lift (readVar' var) >>= \ case
+  Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeChar32)
+  Val.SomeChar32 -> pure ()
+  Val.Char32 _ -> pure ()
+  _ -> empty
+
+function :: MonadEval m => Loc -> VarVal m -> EvalT m (DomMatch m)
 function loc var = domMatch_ $ do
-  fork' $ lift (readVar' var) >>= \ case
-    Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeFunction)
-    Val.Tuple _ -> pure ()
-    Val.Enum {} -> pure ()
-    Val.Lam _ -> pure ()
-    Val.SomeFunction -> pure ()
-    Val.OLam {} -> pure ()
-    Val.Intrinsic {} -> pure ()
-    _ -> empty
+  fork' $ functionC loc var
   pure var
+
+functionC :: MonadEval m => Loc -> VarVal m -> EvalT m ()
+functionC loc var = lift (readVar' var) >>= \ case
+  Val.SomeAny -> unify' loc var =<< lift (newVerifyVar' Val.SomeFunction)
+  Val.Tuple _ -> pure ()
+  Val.Enum {} -> pure ()
+  Val.Lam _ -> pure ()
+  Val.SomeFunction -> pure ()
+  Val.OLam {} -> pure ()
+  Val.Intrinsic {} -> pure ()
+  _ -> empty
 
 type'
   :: MonadEval m
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 type' loc var = domMatch_ $ do
   sign <- asks (.sign)
-  unify' loc var <=< lift $ newVar' . Val.Type sign =<< freshDGVar' Val.Nil
+  unify' loc var <=< lift $ newVar' . Val.Type sign =<< freshDGVar' List.Nil
   pure var
 
 query
@@ -1380,9 +1405,13 @@ invokeNegList
   -> S m
   -> EvalT m (VarVal m)
 invokeNegList loc xs var s s' = do
-  unifyG' loc xs <=< lift $ newGVar' . Val.Cons var =<< freshGVar'
+  unifyG' loc xs <=< lift $ newList var
   lift $ unifyS s s'
   pure var
+  where
+    newList var = readVar' var >>= \ case
+      Val.Some x -> newGVar' . List.Contract x =<< freshGVar'
+      _ -> newGVar' . List.Var var =<< freshGVar'
 
 invokePosList
   :: MonadEval m
@@ -1398,8 +1427,9 @@ invokePosList loc xs var s s' = do
   pure var
   where
     loop = lift . readGVar' >=> \ case
-      Val.Nil -> empty
-      Val.Cons x xs -> unify' loc x var <|> loop xs
+      List.Nil -> empty
+      List.Var x xs -> unify' loc x var <|> loop xs
+      List.Contract x xs -> invokeContract loc x var <|> loop xs
 
 readPair
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -1690,15 +1720,6 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         x <- lift $ newVerifyVar' Val.SomeAny
         unify' loc' x y
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.SomeComparable, Val.SomeAny)
-    | r.assumed -> pure (LE, pure ())
-    | otherwise -> wrong $ UndecidableError loc'
-  (Val.SomeComparable, Val.SomeFunction) -> wrong $ UndecidableError loc'
-  (Val.SomeComparable, Val.OLam {}) -> wrong $ UndecidableError loc'
-  (Val.SomeComparable, Val.Intrinsic {}) -> wrong $ UndecidableError loc'
-  (Val.SomeComparable, y) -> pure . (GE,) . forVal_ y $ \ y -> do
-    x <- lift $ newVerifyVar' Val.SomeComparable
-    unify' loc' x y
   (Val.SomeRational, Val.SomeRational) -> pure (LE, pure ())
   (Val.SomeRational, Val.Rational _) -> pure (GE, pure ())
   (Val.SomeRational, Val.SomeInt) -> pure (GE, pure ())
@@ -1751,14 +1772,12 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Lam _, Val.SomeAny)
     | r.assumed -> pure (LE, pure ())
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Lam _, Val.SomeComparable) -> wrong $ UndecidableError loc'
   (Val.Lam _, Val.Lam _) -> wrong $ UndecidableError loc'
   (Val.Lam _, Val.SomeFunction) -> wrong $ UndecidableError loc'
   (Val.Lam _, Val.OLam {}) -> wrong $ UndecidableError loc'
   (Val.SomeFunction, Val.SomeAny)
     | r.assumed -> pure (LE, pure ())
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.SomeFunction, Val.SomeComparable) -> wrong $ UndecidableError loc'
   (Val.SomeFunction, Val.Lam _) -> wrong $ UndecidableError loc'
   (Val.SomeFunction, Val.SomeFunction)
     | r.assumed -> pure (LE, pure ())
@@ -1778,7 +1797,6 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         ys <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.OLam {}, Val.SomeComparable) -> wrong $ UndecidableError loc'
   (Val.OLam {}, Val.Lam _) -> wrong $ UndecidableError loc'
   (Val.OLam _ xs, Val.SomeFunction)
     | r.assumed -> pure $ (LE,) do
@@ -1810,7 +1828,6 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         ys <- lift $ newVerifyVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Intrinsic {}, Val.SomeComparable) -> wrong $ UndecidableError loc'
   (Val.Intrinsic _ xs, Val.SomeFunction)
     | r.assumed -> pure $ (LE,) do
         ys <- lift $ newVerifyVar' Val.SomeFunction
@@ -1841,9 +1858,6 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         y <- lift $ newVerifyVar' Val.SomeAny
         unify' loc' x y
     | otherwise -> wrong $ UndecidableError loc'
-  (x, Val.SomeComparable) -> pure . (LE,) . forVal_ x $ \ x -> do
-    y <- lift $ newVerifyVar' Val.SomeComparable
-    unify' loc' x y
   _ -> empty
 
 unifyG'
@@ -1866,13 +1880,30 @@ matchG
   -> List (VarVal m) (VarList m)
   -> EvalT m (EvalT m ())
 matchG loc = curry $ \ case
-  (Val.Nil, Val.Nil) -> pure $ pure ()
-  (Val.Cons x xs, Val.Cons y ys) -> pure $
-    if'' (unify' loc x y) (const $ unifyG' loc xs ys)
+  (List.Nil, List.Nil) -> pure $ pure ()
+  (List.Var x xs, List.Var y ys) -> pure $
+    if'' (unify' loc x y)
+    do
+      const $ unifyG' loc xs ys
     do
       zs <- lift freshGVar'
-      unifyG' loc xs <=< lift . newGVar' $ Val.Cons y zs
-      unifyG' loc ys <=< lift . newGVar' $ Val.Cons x zs
+      unifyG' loc xs <=< lift . newGVar' $ List.Var y zs
+      unifyG' loc ys <=< lift . newGVar' $ List.Var x zs
+  (List.Var x xs, List.Contract y ys) -> pure $ do
+     zs <- lift freshGVar'
+     unifyG' loc xs <=< lift . newGVar' $ List.Contract y zs
+     unifyG' loc ys <=< lift . newGVar' $ List.Var x zs
+  (List.Contract x xs, List.Var y ys) -> pure $ do
+     zs <- lift freshGVar'
+     unifyG' loc xs <=< lift . newGVar' $ List.Var y zs
+     unifyG' loc ys <=< lift . newGVar' $ List.Contract x zs
+  (List.Contract x xs, List.Contract y ys) -> pure $
+    if x == y
+    then unifyG' loc xs ys
+    else do
+      zs <- lift freshGVar'
+      unifyG' loc xs <=< lift . newGVar' $ List.Contract y zs
+      unifyG' loc ys <=< lift . newGVar' $ List.Contract x zs
   _ -> empty
 
 unifyMaybe

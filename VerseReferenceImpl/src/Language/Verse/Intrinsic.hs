@@ -21,8 +21,8 @@ data Intrinsic
   | Divide
   | To
   | Any
-  | Int
   | Rational
+  | Int
   | Float
   | Char
   | Char32
@@ -44,8 +44,8 @@ toString = \ case
   Divide -> "operator'/'"
   To -> "operator'..'"
   Any -> "any"
-  Int -> "int"
   Rational -> "rational"
+  Int -> "int"
   Float -> "float"
   Char -> "char"
   Char32 -> "char32"

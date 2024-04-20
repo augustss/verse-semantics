@@ -10,7 +10,6 @@
 module Language.Verse.Val
   ( Val (..)
   , pattern SomeAny
-  , pattern SomeComparable
   , pattern SomeRational
   , pattern SomeInt
   , pattern SomeFloat
@@ -123,9 +122,6 @@ data Val ref a b
 
 pattern SomeAny :: Val ref a b
 pattern SomeAny = Some Contract.Any
-
-pattern SomeComparable :: Val ref a b
-pattern SomeComparable = Some Contract.Comparable
 
 pattern SomeRational :: Val ref a b
 pattern SomeRational = Some Contract.Rational
@@ -398,26 +394,30 @@ instance Freezable a b m => Freezable (OLam a) (OLam b) m where
 
 data List a b
   = Nil
-  | Cons a b deriving Show
+  | Var a b
+  | Contract !Contract b deriving Show
 
 instance ( MonadRef m
          , MonadSupply Int m
          ) => Defaultable (List a (VarList m)) m where
   defaultVars = \ case
     Nil -> pure ()
-    Cons _ x -> defaultGVar (coerce x) Nil
+    Var _ x -> defaultGVar (coerce x) Nil
+    Contract _ x -> defaultGVar (coerce x) Nil
 
 instance (Freshenable a m, Freshenable b m) => Freshenable (List a b) m where
   freshen = \ case
     Nil -> pure Nil
-    Cons x y -> Cons <$> freshen x <*> freshen y
+    Var x xs -> Var <$> freshen x <*> freshen xs
+    Contract x xs -> Contract x <$> freshen xs
 
 instance ( Freezable a b m
          , Freezable c d m
          ) => Freezable (List a c) (List b d) m where
   freeze = \ case
     Nil -> pure Nil
-    Cons x y -> Cons <$> freeze x <*> freeze y
+    Var x xs -> Var <$> freeze x <*> freeze xs
+    Contract x xs -> Contract x <$> freeze xs
 
 newtype VarVal m = VarVal (Var m (Val (VerseRef m) (VarList m) (VarVal m)))
 
