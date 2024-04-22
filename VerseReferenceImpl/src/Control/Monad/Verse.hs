@@ -1569,7 +1569,7 @@ writeVarStateG
   -> VerseT m ()
 writeVarStateG (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
   y <- findVarState heaps.heap <$> readRef ref
-  modifyRef' ref (insertLocalHeap heaps.heap x)
+  modifyRef' ref $ insertLocalHeap heaps.heap x
   let
     ek' heaps@Heaps {..} ak = do
       x <- findLocalHeap heap <$> readRef ref
@@ -1577,7 +1577,10 @@ writeVarStateG (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
       ek heaps $ \ heaps@Heaps {..} -> do
         modifyRef' ref $ insertLocalHeap heap x
         ak heaps
-  sk heaps s () fk ek' ak
+    ak' heaps@Heaps {..} = do
+      modifyRef' ref $ insertLocalHeap heap y
+      ak heaps
+  sk heaps s () fk ek' ak'
 
 data VerseRef m a = VerseRef
   { label :: {-# UNPACK #-} !Int
@@ -1636,7 +1639,10 @@ writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
       ek heaps $ \ heaps@Heaps {..} -> do
         modifyRef' ref $ insertLocalHeap heap x
         ak heaps
-  sk heaps s () fk ek' ak
+    ak' heaps@Heaps {..} = do
+      modifyRef' ref $ alterLocalHeap heap y
+      ak heaps
+  sk heaps s () fk ek' ak'
 
 commitStore :: MonadRef m => Store m -> Heap -> VerseT m ()
 commitStore store heap = IntMap.forWithKey_ store $ \ label elem ->
