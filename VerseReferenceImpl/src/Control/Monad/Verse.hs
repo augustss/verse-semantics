@@ -382,7 +382,7 @@ runVerseT m = do
       suspCount <- readSuspCount'' latch heap
       runMaybeT $ do
         guard $ suspCount == 0
-        lift $ commitRun level heap s.store
+        lift $ commitStore' level heap s.store
         prepend x <$> MaybeT (fk heaps abortRun) <*> MaybeT (ak heaps)
   unVerseT (m <* runDefault) yk R {..} emptyS sk failRun failRun abortRun
   where
@@ -398,14 +398,12 @@ runDefault = stateV f >>= \ case
   where
     f S {..} = (default', S { default' = Nothing, .. })
 
-commitRun :: MonadRef m => Int -> Heap -> Store m -> m ()
-commitRun level heap store = for_ store $ \ (StoreElem ref) ->
-  commitRun' level heap ref
+commitStore' :: MonadRef m => Int -> Heap -> Store m -> m ()
+commitStore' level heap store = for_ store $ commitStoreElem' level heap
 
-commitRun' :: (MonadRef m, Freshenable a m) => Int -> Heap -> HRef m a -> m ()
-commitRun' level heap (HRef ref) = do
-  x <- freshenRun' level heap . findHeap' heap =<< readRef ref
-  modifyRef' ref $ insertLocalHeap' heap x
+commitStoreElem' :: MonadRef m => Int -> Heap -> StoreElem m -> m ()
+commitStoreElem' level heap (StoreElem ref) =
+  writeVerseRef'' ref heap =<< freshenRun' level heap =<< readVerseRef'' ref heap
 
 freshenRun' :: Freshenable a m => Int -> Heap -> a -> m a
 freshenRun' level heap x = runFreshenT (freshen x) FreshenEnv {..}
@@ -1663,21 +1661,23 @@ writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk ek ak -> do
       ak heaps
   sk heaps s () fk ek' ak'
 
-commitStore :: MonadRef m => Store m -> Heap -> VerseT m ()
-commitStore store heap = IntMap.forWithKey_ store $ \ label elem ->
-  commitStoreElem label elem heap
+writeVerseRef'' :: MonadRef m => HRef m a -> Heap -> a -> m ()
+writeVerseRef'' (HRef ref) heap = modifyRef' ref . insertLocalHeap' heap
 
-commitStoreElem :: MonadRef m => Int -> StoreElem m -> Heap -> VerseT m ()
-commitStoreElem label elem@(StoreElem ref) heap = do
-  writeVerseRef' ref =<< flip freshen' heap =<< lift (readVerseRef'' ref heap)
+commitStore :: MonadRef m => Store m -> Heap -> VerseT m ()
+commitStore store heap = IntMap.forWithKey_ store $ commitStoreElem heap
+
+commitStoreElem :: MonadRef m => Heap -> Int -> StoreElem m -> VerseT m ()
+commitStoreElem heap label elem@(StoreElem ref) = do
+  writeVerseRef' ref <=< flip freshen' heap <=< lift $ readVerseRef'' ref heap
   modifyStore $ IntMap.insert label elem
 
 dupStore :: MonadRef m => Store m -> Maybe Heap -> VerseT m ()
-dupStore store heap = for_ store $ \ (StoreElem ref) ->
-  dupStoreElem ref heap
+dupStore store heap = for_ store $ dupStoreElem heap
 
-dupStoreElem :: MonadRef m => HRef m a -> Maybe Heap -> VerseT m ()
-dupStoreElem ref = writeVerseRef' ref <=< lift . readVerseRef' ref
+dupStoreElem :: MonadRef m => Maybe Heap -> StoreElem m -> VerseT m ()
+dupStoreElem heap (StoreElem ref) =
+  writeVerseRef' ref <=< lift $ readVerseRef' ref heap
 
 newtype HRef m a = HRef (Ref m (HeapMap a))
 
