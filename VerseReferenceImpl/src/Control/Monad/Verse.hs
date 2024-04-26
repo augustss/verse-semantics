@@ -190,6 +190,7 @@ data S m = S
   , suspCounts :: !SuspCounts
   , default' :: !(Default m)
   , commit :: !(Commit m)
+  , duplicate :: !(Duplicate m)
   , store :: !(Store m)
   }
 
@@ -199,6 +200,7 @@ emptyS = S
   , suspCounts = mempty
   , default' = Nothing
   , commit = const $ pure ()
+  , duplicate = const $ pure ()
   , store = mempty
   }
 
@@ -251,6 +253,8 @@ type Default m = Maybe (VerseT m ())
 
 type Commit m = Heap -> VerseT m ()
 
+type Duplicate m = Maybe Heap -> VerseT m ()
+
 type Store m = IntMap (StoreElem m)
 
 data StoreElem m = forall a . Freshenable a m => StoreElem (HRef m a)
@@ -285,8 +289,14 @@ whenDefaulted m = modifyV' $ \ S {..} -> S
   }
 
 whenCommitted :: Commit m -> VerseT m ()
-whenCommitted m = modifyV' $ \ S {..} -> S
-  { commit = commit *> m
+whenCommitted f = modifyV' $ \ S {..} -> S
+  { commit = \ x -> commit x *> f x
+  , ..
+  }
+
+whenDuplicated :: Duplicate m -> VerseT m ()
+whenDuplicated f = modifyV' $ \ S {..} -> S
+  { duplicate = \ x -> duplicate x *> f x
   , ..
   }
 
@@ -504,6 +514,7 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   , suspCounts :: !(IntMap Int)
   , default' :: !(Default m)
   , commit :: !(Commit m)
+  , duplicate :: !(Duplicate m)
   , store :: !(Store m)
   }
 
@@ -550,7 +561,8 @@ split' m heap latch last =
                   x <- freshen' x heap
                   pure . Step x $ do
                     heap <- copyHeap heap
-                    split' (do dupStore store heap.tail
+                    split' (do duplicate heap.tail
+                               dupStore store heap.tail
                                m_f) heap latch last)
               <?>
               (do heap <- copyHeap heap
@@ -599,7 +611,8 @@ split'' m heap latch init'@(_, m_e', m_a') last s =
                   x <- freshen' x heap
                   pure . Step x $ do
                     heap <- copyHeap heap
-                    split' (do dupStore store heap.tail
+                    split' (do duplicate heap.tail
+                               dupStore store heap.tail
                                m_f'') heap latch last)
               <?>
               (do heap <- copyHeap heap
@@ -687,7 +700,8 @@ resumeSplit' ref_env env@SplitEnv { init = (_, m_e', m_a'), .. } m =
                     x <- freshen' x heap
                     susp . Step x $ do
                       heap <- copyHeap heap
-                      split' (do dupStore store heap.tail
+                      split' (do duplicate heap.tail
+                                 dupStore store heap.tail
                                  m_f'') heap latch last)
                 <?>
                 (do heap <- copyHeap heap
@@ -753,6 +767,7 @@ data VerifyEnv m = VerifyEnv
   , suspCounts :: !(IntMap Int)
   , default' :: !(Default m)
   , commit :: !(Commit m)
+  , duplicate :: !(Duplicate m)
   }
 
 verify'
@@ -1521,6 +1536,8 @@ unifyUnboundUnboundG f var1 var2@(Var ref2) unbound2 = do
         unifySubstG f subst2 var1
     whenCommitted . const $
       unifyG' f var1 var2
+    whenDuplicated $
+      writeVarStateG ref2 <=< lift . readVarState' ref2
 
 unifyBoundUnboundG
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
@@ -1533,8 +1550,10 @@ unifyBoundUnboundG f var1 bound1 var2@(Var ref2) unbound2 = do
     whenSuspended $ \ resume ->
       fork $ readBound var2 >>= \ (var2, bound2) -> resume $
         unifyBoundBoundG f var1 bound1 var2 bound2
-    whenCommitted $ \ heap ->
-      unifyG' f var2 =<< newVar =<< freshen' bound1.binding heap
+    whenCommitted $
+      unifyG' f var2 <=< newVar <=< freshen' bound1.binding
+    whenDuplicated $
+      writeVarStateG ref2 <=< lift . readVarState' ref2
 
 unifyBoundBoundG
   :: MonadRef m
