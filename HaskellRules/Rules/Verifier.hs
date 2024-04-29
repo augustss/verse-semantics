@@ -276,7 +276,7 @@ splitRules env lhs =
       let xs   = rs ++ free e ++ bndIds bs ++ boundVars env
       let rs'  = take (length vs) (uvIdentsNotIn xs)
       let rvs' = foldr1 (:>:) [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
-      let a    = (Var r :=: Arr (Var <$> rs'))
+      let a    = Var r :=: Arr (Var <$> rs')
       pure     $ caseSplit (rs ++ rs') a as ctx rvs'
    ++
    "SPLIT-PPRED" `name`
@@ -285,6 +285,15 @@ splitRules env lhs =
       guard (isUni rs bs arg)
       guard (isPrim1 op)
       pure $ caseSplit rs a as ctx (Arr [])
+   ++
+   "SPLIT-OP" `name`
+   do Verify rs as e <- [lhs]
+      (ctx, bs, a@(Var r :=: (op :@: arg))) <- proofX [] e
+      guard (isUni rs bs (Var r))
+      guard (isUni rs bs arg)
+      guard (isPrimOp1 op)
+      pure $ caseSplit (r:rs) a as ctx (Arr [])
+
 
 
 caseSplit :: [Ident] -> Expr -> [Expr] -> (Expr -> Expr) -> Expr -> Expr
@@ -302,6 +311,15 @@ isPrim1 (Op Lt)     = True
 isPrim1 (Op Le)     = True
 isPrim1 (Op Ne)     = True
 isPrim1 _           = False
+
+isPrimOp1 :: Expr -> Bool
+isPrimOp1 (Op Add) = True
+isPrimOp1 (Op Sub) = True
+isPrimOp1 (Op Mul) = True
+isPrimOp1 (Op Div) = True
+isPrimOp1 (Op Neg) = True
+isPrimOp1 _        = False
+
 --------------------------------------------------------------------------------
 -- | Contexts ------------------------------------------------------------------
 --------------------------------------------------------------------------------
