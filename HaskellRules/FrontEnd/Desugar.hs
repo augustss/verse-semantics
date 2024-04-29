@@ -1989,10 +1989,9 @@ seqDE ds = seqE <$> sequence ds
 dsM_10 :: DsMode10 -> Expr -> Pi -> D Expr
 dsM_10 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
   = do j   <- newIdent (getLoc t) "j"
-       -- dom <- DefineE j <$> dsM_10 MI t1 E
        dom <- dsM_10 MI t1 (P j)
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MV t2 pi j
-       eGuard (eVerify (Forall [j] (seqE [dom, rng]))) <$> (dsM_10 MI t pi)
+       eGuard (eVerify (Forall [j] (seqE [dom, rng]))) <$> dsM_10 MI t pi
 
 dsM_10 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
   = do i   <- newIdent (getLoc t1) "i"
@@ -2008,12 +2007,18 @@ dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MX t2 pi j
        pure $ Lam i (seqE [dom, rng])
 
+dsM_10 MV (OfType t1 t2@(Variable z)) pi                   -- MOFTYPE+
+  = do y <- newIdent (getLoc t1) "y"
+       seqDE [ DefineE y <$> dsM_10  MV t1 pi
+             , pure (dsCheck Suc (ApplyD t2 (Variable y)) `eGuard` eSome (Variable z))
+             ]
+
 dsM_10 MV (OfType t1 t2) pi                   -- MOFTYPE+
   = do y <- newIdent (getLoc t1) "y"
        z <- newIdent (getLoc t1) "z"
        seqDE [ DefineE y <$> dsM_10  MV t1 pi
              , DefineE z <$> dsDD_10 MV t2
-             , pure ((dsCheck Suc (ApplyD (Variable z) (Variable y))) `eGuard` eSome (Variable z))
+             , pure (dsCheck Suc (ApplyD (Variable z) (Variable y)) `eGuard` eSome (Variable z))
              ]
 
 dsM_10 MI (OfType t1 t2) _pi                  -- MOFTYPE-

@@ -271,12 +271,12 @@ splitRules env lhs =
    "SPLIT-TUP" `name`
    do Verify rs as e <- [lhs]
       (ctx, bs, Var r :=: Arr vs) <- proofX [] e
-      guard (not (null vs))
+      -- guard (not (null vs))
       guard (isUni rs bs (Var r))
       let xs   = rs ++ free e ++ bndIds bs ++ boundVars env
       let rs'  = take (length vs) (uvIdentsNotIn xs)
-      let rvs' = foldr1 (:>:) [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
-      let a    = (Var r :=: Arr (Var <$> rs'))
+      let rvs' = foldr (:>:) (Arr [])  [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
+      let a    = Var r :=: Arr (Var <$> rs')
       pure     $ caseSplit (rs ++ rs') a as ctx rvs'
    ++
    "SPLIT-PPRED" `name`
