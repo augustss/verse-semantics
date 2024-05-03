@@ -60,6 +60,7 @@ valid = expr
     value r       = hnf r
 
     hnf (Int _)          = True
+    hnf (Char _)         = True
     hnf (Op _)           = True
     hnf (Arr vs)         = all value vs
     hnf (Lam (Bind _ e)) = expr e
@@ -79,9 +80,10 @@ anf = expr
     expr (One e)          = One (expr e)
     expr (All e)          = All (expr e)
     expr (Uni (Bind x e)) = Uni (Bind x (expr e))
-    expr (Arr es)         = makeValues es (\vs -> Arr vs)
+    expr (Arr es)         = makeValues es Arr
     expr (Lam (Bind x e)) = Lam (Bind x (expr e))
     expr (Int k)          = Int k
+    expr (Char c)         = Char c
     expr (Op op)          = Op op
     expr (Var x)          = Var x
     expr (Some e)         = Some (expr e)
@@ -192,6 +194,10 @@ substX1 lhs =
   do e1 :>>: e2 <- [lhs]
      (ctx, hole) <- substX e1
      return ((:>>: e2) . ctx, hole)
+ ++ -- RJ: adding EXI to subst-ctxt
+  do EXI y x <- [lhs]
+     (ctx, hole) <- substX x
+     pure (EXI y . ctx, hole)
 
 evalX, evalX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
 evalX zs lhs = emptyXzs zs lhs ++ evalX1 zs lhs
@@ -353,6 +359,11 @@ rulesSubstitution _ lhs =
 
 --------------------------------------------------------------------------------
 
+-- | A `trivialC` is a C that is just a chain of `exi x1 ... xn. HOLE`
+trivialC :: Expr -> Bool
+trivialC (Exi (Bind _ e)) = trivialC e
+trivialC e                = e == (#)
+
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
   "EXI-ELIM" `name`
@@ -363,6 +374,7 @@ rulesNormalization _ lhs =
   "EXI-FLOAT" `name`
   do (ctx, zs, Exi bnd) <- evalX1 [] lhs
      let Bind x e = alphaRename (zs ++ free (ctx (#))) bnd
+     guard (not (trivialC (ctx (#))))
      guard (x `notElem` free (ctx (#)))
      pure (Exi (Bind x (ctx e)))
  ++

@@ -111,7 +111,7 @@ splitVerifier = TRS2024.systemTRS2024 -- systemICFPE
                 --  <> Old.generalizedIcfpRules
                  rules TRS2024.systemTRS2024
               <> ifRules
-              <> substRules
+              -- <> substRules
               <> guardRules
               <> checkRules
               <> verifyRules
@@ -140,9 +140,9 @@ ifRules env lhs =
       pure e
 
 ------------------------------------------------------------------
-substRules :: Rule Expr
-substRules _ lhs =
-   "SUBST1" `name`
+_substRules :: Rule Expr
+_substRules _ lhs =
+   "SUBST1-OLD" `name`
    do EXI x e <- [lhs]
       (ctx, Var x' :=: Val v) <- substX e
       guard (x == x')
@@ -173,8 +173,16 @@ checkRules env lhs =
       guard (skol (rigidVars env) v)
       pure (Val v)
    ++
+   "CHECK-SUC-SOME" `name`
+   do Assert (Some e) <- [lhs]
+      pure (Some e)
+   ++
+   "CHECK-DEC-SOME" `name`
+   do Decide (Some e) <- [lhs]
+      pure (Some e)
+   ++
    "CHECK-FAIL-DEC" `name`
-   do Decide (Fail) <- [lhs]
+   do Decide Fail <- [lhs]
       pure Fail
    -- ++
    -- we use Fails{e} as (~e) so don't want `fails` to escape that

@@ -377,7 +377,7 @@ runTestFileSys tflg ts = do
   let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
   res <- mapM (runTest tflg) (filter p ts)
   let ok = all (`elem` [Good, Skip]) res
-  putStrLn $ sname (system tflg) ++ " " ++ if ok then "SUCCESS" else "FAILURE"
+  putStrLn $ sname (system tflg) ++ " " ++ if ok then "SUCCESS" else ("FAILURE: " ++ show res)
   pure ok
 
 widthTestName :: Int
