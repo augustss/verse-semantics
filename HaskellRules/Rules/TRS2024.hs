@@ -45,7 +45,7 @@ valid = expr
     expr (IFB _ e)        = expr e
     expr (If e1 e2 e3)    = expr e1 && expr e2 && expr e3
     expr (v  :=: e)       = value v && expr e
-    expr (e1 :>: e2)      = expr e1 && expr e2
+    expr (eq :>: e)       = equ eq && expr e
     expr (e1 :>>: e2)     = expr e1 && expr e2
     expr (e1 :|: e2)      = expr e1 && expr e2
     expr Fail             = True
@@ -55,6 +55,9 @@ valid = expr
     expr (All e)          = expr e
     expr (Uni (Bind _ e)) = expr e
     expr v                = value v
+
+    equ (v :=: e)         = value v && expr e
+    equ _                 = False
 
     value (Var _) = True
     value r       = hnf r
@@ -70,8 +73,8 @@ valid = expr
 anf :: Expr -> Expr
 anf = expr
   where
-    expr (e1 :=: e2)      = makeValue e1 (\v -> v :=: expr e2)
-    expr (e1 :>: e2)      = expr e1 :>: expr e2
+    expr (e1 :=: e2)      = makeValue e1 $ \v -> (v :=: expr e2) :>: v
+    expr (eq :>: e)       = makeEq eq (expr e)
     expr (e1 :>>: e2)     = expr e1 :>>: expr e2
     expr (e1 :|: e2)      = expr e1 :|: expr e2
     expr Fail             = Fail
@@ -80,7 +83,7 @@ anf = expr
     expr (One e)          = One (expr e)
     expr (All e)          = All (expr e)
     expr (Uni (Bind x e)) = Uni (Bind x (expr e))
-    expr (Arr es)         = makeValues es Arr
+    expr (Arr es)         = makeValues es (\vs -> Arr vs)
     expr (Lam (Bind x e)) = Lam (Bind x (expr e))
     expr (Int k)          = Int k
     expr (Char c)         = Char c
@@ -93,6 +96,9 @@ anf = expr
     expr (Assert e)       = Assert (expr e)
     expr (Assume e)       = expr e         -- hack to strip out `assume` inserted in the prelude
     expr e                = error (show e) -- Int 13 -- what to do here??
+
+    makeEq (e1 :=: e2) e = makeValue e1 $ \v -> (v :=: expr e2) :>: e
+    makeEq e1          e = makeValue e1 $ \_ -> e
 
     value v = valid (v :=: Int 0)
 
@@ -374,7 +380,7 @@ rulesNormalization _ lhs =
   "EXI-FLOAT" `name`
   do (ctx, zs, Exi bnd) <- evalX1 [] lhs
      let Bind x e = alphaRename (zs ++ free (ctx (#))) bnd
-     guard (not (trivialC (ctx (#))))
+     guard (not (trivialC (ctx (#))))    -- RJ: optimization to avoid "permutation" exi-float
      guard (x `notElem` free (ctx (#)))
      pure (Exi (Bind x (ctx e)))
  ++
@@ -393,12 +399,14 @@ rulesNormalization _ lhs =
   "EQ-FLOAT" `name`
   do Val v1 :=: (Val v2 :=: e) <- [lhs]
      pure ((v2 :=: e) :>: (v1 :=: Arr []))
+{-
  ++
   "DEF-MOVE" `name`
   do (Var x :=: Val v) :>: e <- [lhs]
      (e1,e2) <- [ (e1,e2) | e1 :>: e2 <- [e], isEffectFree e1 ]
              ++ [ (Var y :=: w, Arr []) | Var y :=: Val w <- [e] ]
      pure (e1 :>: ((Var x :=: v) :>: e2))
+-}
  ++
   "EQ-SWAP" `name`
   do Val v :=: Var x <- [lhs]
@@ -407,32 +415,6 @@ rulesNormalization _ lhs =
   "EQ-RESULT" `name`
   do (Val v :=: e) :>: Arr [] <- [lhs]
      pure (v :=: e)
- ++
-  "UNI-ELIM" `name`
-  do Uni (Bind x e) <- [lhs]
-     guard (x `notElem` free e)
-     pure e
- ++
-  "UNI-FLOAT" `name`
-  do (ctx, zs, Uni bnd) <- choiceX1 [] lhs
-     let Bind x e = alphaRename (zs ++ free (ctx (#))) bnd
-     guard (x `notElem` free (ctx (#)))
-     pure (Uni (Bind x (ctx e)))
-{-
- ++
-  "EXI-EXI-SWAP" `name`
-  do Exi (Bind x (Exi (Bind y e))) <- [lhs]
-     pure (Exi (Bind y (Exi (Bind x e))))
- ++
-  "UNI-EXI-SWAP" `name`
-  do Uni (Bind x (Exi bnd)) <- [lhs]
-     let Bind y e = alphaRename [x] bnd
-     pure (Exi (Bind y (Uni (Bind x e))))
- ++
-  "UNI-UNI-SWAP" `name`
-  do Uni (Bind x (Uni (Bind y e))) <- [lhs]
-     pure (Uni (Bind y (Uni (Bind x e))))
--}
 
 --------------------------------------------------------------------------------
 
