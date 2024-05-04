@@ -181,29 +181,35 @@ isValueX (Arr vs) x = any (`isValueX` x) vs
 isValueX (Var y)  x = x == y
 isValueX _        _ = False
 
-substX, substX1 :: Expr -> [(Context, Expr)]
-substX lhs = emptyX lhs ++ substX1 lhs
-substX1 lhs =
+substX, substX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
+substX zs lhs = emptyXzs zs lhs ++ substX1 zs lhs
+substX1 zs lhs =
   do e1 :>: e2 <- [lhs]
-     (ctx, hole) <- substX e1
-     return ((:>: e2) . ctx, hole)
+     (ctx, zs', hole) <- substX zs e1
+     return ((:>: e2) . ctx, zs', hole)
  ++
   do e1 :>: e2 <- [lhs]
      guard (isEffectFree e1)
-     (ctx, hole) <- substX e2
-     return ((e1 :>:) . ctx, hole)
+     (ctx, zs', hole) <- substX zs e2
+     return ((e1 :>:) . ctx, zs', hole)
  ++
   do v :=: e <- [lhs]
-     (ctx, hole) <- substX e
-     return ((v :=:) . ctx, hole)
+     (ctx, zs', hole) <- substX zs e
+     return ((v :=:) . ctx, zs', hole)
  ++
   do e1 :>>: e2 <- [lhs]
-     (ctx, hole) <- substX e1
-     return ((:>>: e2) . ctx, hole)
+     (ctx, zs', hole) <- substX zs e1
+     return ((:>>: e2) . ctx, zs', hole)
  ++ -- RJ: adding EXI to subst-ctxt
-  do EXI y x <- [lhs]
-     (ctx, hole) <- substX x
-     pure (EXI y . ctx, hole)
+  do Exi bnd <- [lhs]
+     let Bind x e = alphaRename zs bnd
+     (ctx, zs', hole) <- substX (x:zs) e
+     return (Exi . Bind x . ctx, zs', hole)
+--  ++
+--   do EXI y x <- [lhs]
+--      (ctx, hole) <- substX x
+--      pure (EXI y . ctx, hole)
+
 
 evalX, evalX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
 evalX zs lhs = emptyXzs zs lhs ++ evalX1 zs lhs
@@ -358,7 +364,7 @@ rulesSubstitution :: ERule
 rulesSubstitution _ lhs =
   "SUBST1" `name`
   do Exi (Bind x e) <- [lhs]
-     (s, Var x' :=: Val v) <- substX e
+     (s, _ , Var x' :=: Val v) <- substX [] e
      guard (x == x')
      guard (not (isValueX v x))
      pure ((substCtx [(x,v)] s) (Arr []))
