@@ -98,6 +98,10 @@
 %format (Th (x)) = "\Th{" ^ x "}"
 %format (Pd (x)(y)) = "\Pd{" ^ x "}{" ^ y "}"
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
+%format PX (x) = "P\{" x "\}"
+%format suspx (x) = "susp\{" x "\}"
+%format suspx1 (x) = "susp\{" x "\}_1"
+%format suspx2 (x) = "susp\{" x "\}_2"
 
 %format match (e) (b) = e "\blacktriangleright" b
 %format `match`       = "\blacktriangleright"
@@ -292,6 +296,10 @@
 %format rec = "\textbf{rec}"
 %format wrong = "\textbf{wrong}"
 %format int = "\textbf{int}"
+%format rat = "\textbf{rat}"
+%format str = "\textbf{str}"
+%format char = "\textbf{char}"
+%format path = "\textbf{path}"
 %format nat = "\textbf{nat}"
 %format abs = "\textbf{abs}"
 %format isInt = "\textbf{isInt}"

@@ -46,8 +46,8 @@
       \text{Lvalues} & |lv| & ::= & |_| \vb |v| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Ground values} & |gv| & ::= & |k| \vb |r| \vb |arr (gv_1, xdots, gv_n)| \\
-      \text{Head values} & \hnf & ::= & |k| \vb |r|  \vb |op| \vb |arr (v_1, xdots, v_n)| \vb |lam r e|
-             \vb |olam v (lam r e_1) (lam s e_2)|\\
+      \text{Head values} & \hnf & ::= & |k| \vb |r|  \vb |op| \vb |arr (v_1, xdots, v_n)| \vb |lam x e|
+             \vb |olam v (lam x_1 e_1) (lam x_2 e_2)|\\
       \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail| \\
       \text{Assumptions} & |a| & ::= & |r = gv| \vb |noteq r gv| \vb |r = apply1N op gv| \vb |not (apply1N op gv)| \\
@@ -60,18 +60,20 @@
 % \text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |E guard e| \vb |def x E| \\
 % \text{Pure contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
 \text{Pure contexts} & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == susp; C| \vb |def x C| \vb |C guard e| \\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == susp; P| \vb |def x P| \vb |P guard e| \\
-   && \vb &  |one (FC^[P])| \vb |all (VC^[P])| \vb \vb |check fx P| \\
-   & |PV| & ::= & |P| \vb |v `choice` PV| \\
+\text{Proof contexts}  & |PX xs| & ::= & |hole| \vb |lv == PX xs; e| \vb |lv == suspx xs; PX xs| \vb |def x (PX (xs,x))| \vb |PX xs guard e| \\
+   && \vb &  |one (FC^[PX xs])| \vb |all (VC^[PX xs])| \vb \vb |check fx (PX xs)| \\
+%   & |PV| & ::= & |P| \vb |v `choice` PV| \\
 \text{First choice} & |FC| & ::= & |hole| \vb |hole `choice` e| \\
 \text{Value choice} & |VC| & ::= & |FC| \vb |v `choice` VC| \\
 % \text{Choice-free exprs} & |cf| & ::= & |v | \vb |l==cf; cf| \vb op[v] \vb |one e| \vb |all e| \vb |cf guard cf| \\
 
-\text{Suspended exp}  & |susp| & ::= &
-    |l=susp_1; susp_2| \vb |susp guard e| \vb |one (FC^[susp])| \vb |all (VC^[susp])| \\
-  & & \vb & |verify2 rs as e| \vb |check fx susp| \\
+\text{Suspended exp}  & |suspx xs| & ::= &
+|l==suspx1 xs; suspx2 xs| \vb |suspx xs guard e| \vb |one (FC^[suspx xs])| \\
+  & & \vb & |all (VC^[suspx xs])| \vb  |verify2 rs as e| \vb |check fx (suspx xs)| \\
   & & \vb & |apply1N op v|  \hspace{4mm}
-    \text{where |v = V^[x]| for some existential |x| and context |V|} \\
+    \text{where |v = V^[x]| for some $|x| \in |xs|$ and context |V|} \\
+  & & \vb & |apply1N x v|  \hspace{5mm}
+    \text{where $|x| \in |xs|$} \\
 
 %    \text{Suspended exprs}  & |susp| & ::= &|lv == susp; susp| \vb |one susp| \vb |all susp| \\
 %    && \vb & |apply1N pp x| \vb  |susp guard e| \vb |check fx susp| \vb |some susp| \\
@@ -89,13 +91,13 @@
 %  |substw S x v| & \text{Substitute |v| for |x| everywhere outside |assumeKW| in |S|} \\
 \end{array}
 \\ \\
-\mbox{\em Free variables (needs updating)} \\
-  \begin{array}{rcl}
-       |fvs(hole)| & = & \{ \} \\
-       |fvs(v==E; e)| & = & |fvs(v) `cup` fvs(E) `cup` fvs(e)| \\
-       |fvs(v==ef; E)| & = & |fvs(v) `cup` fvs(ef) `cup` fvs(E)| \\
-       |fvs(def x E)| & = & |{x} `cup` fvs(E)| |-- this is correct| \\
-    \end{array}
+\mbox{\em Free variables and bound variables (give definitions)} \\
+%  \begin{array}{rcl}
+%       |fvs(hole)| & = & \{ \} \\
+%       |fvs(v==E; e)| & = & |fvs(v) `cup` fvs(E) `cup` fvs(e)| \\
+%       |fvs(v==ef; E)| & = & |fvs(v) `cup` fvs(ef) `cup` fvs(E)| \\
+%       |fvs(def x E)| & = & |{x} `cup` fvs(E)| |-- this is correct| \\
+%    \end{array}
 \end{array}
      $$
   \caption{Core Verse Syntax} \label{fig:vc-syntax}
@@ -134,7 +136,7 @@ $\begin{array}{@@{}l}
 
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
-\rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
+\rulename{exi-subst} & |def x (PX x^[x==v; e])| & \movesto & |subst (P^[e]) x v|
   & \text{$|x|\not\in\freevars{|v|};\, |x|,\freevars{|v|} \not\in \boundvars{|S|}$} \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{exi-float}^{* \alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
@@ -179,8 +181,8 @@ $\begin{array}{@@{}l}
   \rulename{u-olam}          & \multicolumn{3}{l}{|olam v_1 dom_1 rng_1 == olam v_2 dom_2 rng_2|} \\
   & \multicolumn{4}{l}{\hspace{5mm} \movesto |defKW z|.
   \begin{array}[t]{l}
-        |v_1 == olam z ((lam i (check fails (apply1N dom_1 i); apply1N dom_2 i))) rng_2;| \\
-        |v_2 == olam z ((lam i (check fails (apply1N dom_2 i); apply1N dom_1 i))) rng_1| \\
+        |v_1 == olam z ((lam x (check fails (apply1N dom_1 x); apply1N dom_2 x))) rng_2;| \\
+        |v_2 == olam z ((lam x (check fails (apply1N dom_2 x); apply1N dom_1 x))) rng_1| \\
    \end{array}} \\[5mm]
   \rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &
   \multicolumn{2}{l}{|if (x := apply1N dom v) then apply1N rng x else apply1N g v|} \\[1mm]
