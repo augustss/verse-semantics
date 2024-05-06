@@ -61,7 +61,7 @@
 % \text{Pure contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
 \text{Pure contexts} & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == susp; C| \vb |def x C| \vb |C guard e| \\
 \text{Proof contexts}  & |PX xs| & ::= & |hole| \vb |lv == PX xs; e| \vb |lv == suspx xs; PX xs| \vb |def x (PX (xs,x))| \vb |PX xs guard e| \\
-   && \vb &  |one (FC^[PX xs])| \vb |all (VC^[PX xs])| \vb \vb |check fx (PX xs)| \\
+   && \vb &  |one (FC^[PX xs])| \vb |all (VC^[PX xs])| \vb |check fx (PX xs)| \\
 %   & |PV| & ::= & |P| \vb |v `choice` PV| \\
 \text{First choice} & |FC| & ::= & |hole| \vb |hole `choice` e| \\
 \text{Value choice} & |VC| & ::= & |FC| \vb |v `choice` VC| \\
