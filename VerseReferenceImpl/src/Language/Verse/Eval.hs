@@ -766,8 +766,8 @@ invoke' loc var1 var2 s s' = lift (readVar' var1) >>= \ case
   Val.Struct x -> invokeStruct loc x var2 s s'
   Val.Class x -> invokeClass loc x var2 s s'
   Val.Intrinsic x xs -> invokeIntrinsic loc x xs var2 s s'
-  Val.Type sign xs -> asks (.sign) <&> (== sign) >>= \ case
-    True -> invokeNegList loc xs var2 s s'
+  Val.Type assumed sign xs -> asks (.sign) <&> (== sign) >>= \ case
+    True -> invokeNegList loc assumed xs var2 s s'
     False -> invokePosList loc xs var2 s s'
   Val.SomeFunction -> wrong $ UnknownInvokeError loc
   _ -> wrong $ InvokeError loc
@@ -1377,8 +1377,8 @@ type'
   :: MonadEval m
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 type' loc var = domMatch_ $ do
-  sign <- asks (.sign)
-  unify' loc var <=< lift $ newVar' . Val.Type sign =<< freshDGVar' List.Nil
+  r <- ask
+  unify' loc var <=< lift $ newVar' . Val.Type r.assumed r.sign =<< freshDGVar' List.Nil
   pure var
 
 query
@@ -1399,18 +1399,19 @@ liftPrim f var s s' = f var <&> \ (DomMatch x f) ->
 invokeNegList
   :: MonadEval m
   => Loc
+  -> Val.Assumed
   -> VarList m
   -> VarVal m
   -> S m
   -> S m
   -> EvalT m (VarVal m)
-invokeNegList loc xs var s s' = do
+invokeNegList loc assumed xs var s s' = do
   unifyG' loc xs <=< lift $ newList var
   lift $ unifyS s s'
   pure var
   where
     newList var = readVar' var >>= \ case
-      Val.Some x -> newGVar' . List.Contract x =<< freshGVar'
+      Val.Some x | not assumed -> newGVar' . List.Contract x =<< freshGVar'
       _ -> newGVar' . List.Var var =<< freshGVar'
 
 invokePosList
@@ -1656,7 +1657,7 @@ addScopeWithSuper label labels scopes =
   Val.Scope label labels (moduleFromScopes scopes) <| scopes
 
 moduleFromScopes :: NonEmpty Val.Scope -> Label
-moduleFromScopes (Val.Scope _ _ mLabel :| _) = mLabel
+moduleFromScopes (Val.Scope _ _ moduleLabel :| _) = moduleLabel
 
 localScopes :: NonEmpty Val.Scope -> EvalT m a -> EvalT m a
 localScopes scopes = local $ \ r -> r { scopes }
