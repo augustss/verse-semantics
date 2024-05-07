@@ -16,6 +16,7 @@
                                |  iterates_pending | reads_pending | writes_pending | interacts_pending | throws_pending | suspends_pending
                                |  rejects | effects
                                |  fx0\/fx1
+### LA: unifies is used as an effect later, but not mentioned above
     Equality Strengths      st := equal | decidable | undecidable
     Implied fx             ifx := none | fx
     Open World Specifier    oc := open|closed
@@ -41,6 +42,7 @@ Operations do not "produce a value".  Rather, they are "things to do".  E.g. u=v
                                |  iterate     {op_0; ...; op_n}                          # op::iterate
                                |  next(u0) c0 v0 {op0} then c1 v1 {op1} else c2 {op2}    # op::iterate
                                |  cast(u,err) opv {pattern => {op}}                      # WhenCastStep
+                               ### LA: pattern is not defined anywhere
                                |  in(fx) c i x {op}                                      # op::in
                                |  stage(fx,opv) c0 i x {op0} value c1 y {op1}            # op::stage
                                |  verify(fx,?err) c {op0}                                # op::verify
@@ -68,9 +70,12 @@ Operations do not "produce a value".  Rather, they are "things to do".  E.g. u=v
     FlexibleSpan[OP]           := ScopeSpan[OP | (ScopeStartOp                               )[c,FlexibleSpan[OP]]]
 
 Notation: can move the "|" to the top
-    FlexibleSpan[OP]           := ScopeSpan[OP] | ScopeSpan[ScopeStartOp)[c,FlexibleSpan[OP]]
+    FlexibleSpan[OP]           := ScopeSpan[OP] | ScopeSpan[ScopeStartOp[c,FlexibleSpan[OP]]
 
     ExploreSpan[OP]            := ScopeSpan[OP | (ScopeStartOp|FlexibleStartOp               )[c,ExploreSpan[OP]]]
+same as
+    ExploreSpan[OP]            := ScopeSpan[OP] | ScopeStartOp[c,ExploreSpan[OP]] | FlexibleStartOp[c,ExploreSpan[OP]]
+
     ProgramSpan[OP]            := ScopeSpan[OP | (ScopeStartOp|FlexibleStartOp|ExploreStartOp)[c,ProgramSpan[OP]]]
 
                                EBNF patterns matching a context-starting operation and identifying an operation in its span:
@@ -85,12 +90,14 @@ More notation: "where" and "is" and "matches".  The above is equivalent to:
 
 
     IterateOp[FC,SC,OP]        := op0 where op0 is ScopeSpan[IterateStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp                     )[   SC,OP]
-    ExploreOp[FC,SC,OP]        := op0 where op0 is ScopeSpan[ExploreStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp|FlexibleOp          )[FC,SC,OP]
-    ProgramOpX[FC,SC,OP]       := op0 where op0 is ScopeSpan[ExploreStartOp  [FC,op1]] where (op0|op1) matches (ScopeOp|FlexibleOp|ExploreOp)[FC,SC,OP]
+
+    ExploreOp[FC,SC,OP]        := op0 where op0 is ScopeSpan[ExploreStartOp  [op1]] where (op0|op1) matches (ScopeOp|FlexibleOp          )[FC,SC,OP]
+
+    ProgramOpX[FC,SC,OP]       := op0 where op0 is ScopeSpan[ExploreStartOp  [op1]] where (op0|op1) matches (ScopeOp|FlexibleOp|ExploreOp)[FC,SC,OP]
 
                                EBNF patterns matching the whole program and identifying an accessible part of it. We must ensure any parts not covered by BVS are inaccessible.
     ProgramOp[FC,SC,OP]        := ProgramOpX[FC,SC,OP]
-    ProgramExploreOp[OP]       := ExploreStartOp[OP] | ProgramOp[fc,sc,ProgramExploreOp[OP]]
+    ProgramExploreOp[OP]       := ExploreStartOp[OP] | ProgramOpX[fc,sc,ProgramExploreOp[OP]]
 
     Resolved Identifier      r := u | u^
     err                        := F00 | S00 | D00 | D01 | D02 | A00 | X00
@@ -154,7 +161,7 @@ Program:
          (program-elim)  ------------------------------------------------------------------------
                          G[...; tops{op_i}@c_i; ...] |- explore(tops) {...; scope c_i. op_i; ...}
 
-Notation: {...; scope c_i. op_i; ... } means  {scope c_1.op_1; scope c_2.op_2;  ; scope c_1;op_n}
+Notation: {...; scope c_i. op_i; ... } means  {scope c_1.op_1; scope c_2.op_2; ... ; scope c_n;op_n}
 
                          G |- ProgramOp[c,sc,op  ]
            (group-elim)  -------------------------
@@ -179,7 +186,7 @@ Assumptions (left rules):
         (atom-resolves)  -------------------------  (only use for a actually in the program)
                          G              |- Program
 
-                         G, succeeds{u=u}@c |- Program
+                         G, succeeds{u=u}@c |- Program    ### LA: should that be equal{u=u}?
       (equal-reflexive)  -----------------------------
                          G[u@c]             |- Program
   

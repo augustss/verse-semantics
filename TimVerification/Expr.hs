@@ -661,7 +661,8 @@ sys = TRSystem {
   sname = "TimRun", description = "Tim's runtime rules", ruleEnv = RuleEnvConfig,
   preProcess = \ _ x -> x, postProcess = \ _ x -> x, rules = allRules,
   rules2 = \ _ _ -> [], rulesHaveStructural = False, confluenceRules = \ _ _ -> [],
-  validExpr = \ _ _ -> True, sortRewrites = id
+  validExpr = \ _ _ -> True, sortRewrites = id,
+  displayRules = \ _ -> True
   }
 
 pptr :: Config -> IO ()

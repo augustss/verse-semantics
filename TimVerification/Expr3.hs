@@ -1,7 +1,7 @@
 --
 -- from TimNotes/VerseSpecification-2024-Apr-09.txt
 --
-{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wall -Wno-unused-imports #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -22,10 +22,8 @@ import Epic.Print
 import Epic.Uniplate
 import TRS.TRS
 import TRS.Traced(term)
+import GHC.Stack
 import Debug.Trace
-
-main :: IO ()
-main = return ()
 
 type Q = Rational
 
@@ -50,6 +48,9 @@ data Ident = Ident String
   deriving (Eq, Ord, Show, Data)
 
 data Atom = AtomRational Q | AtomPath Path | AtomUnit -- XXX ...
+  deriving (Eq, Ord, Show, Data)
+
+data Pointer = Pointer Ident
   deriving (Eq, Ord, Show, Data)
 
 data Variable = Variable Ident
@@ -95,13 +96,15 @@ data Lambda = Lambda { lambda_variance         :: VarianceSpecifier
                      }
   deriving (Eq, Ord, Show, Data)
 
+{-
 data RunLambda = RunLambda Vertex Variable Variable Operation
   deriving (Eq, Ord, Show, Data)
+-}
 
 data Head
   = HeadAtom Atom
   | HeadLambda Lambda
-  | HeadRunLambda RunLambda
+--x  | HeadRunLambda RunLambda
   | HeadTuple Vertex Variable                         -- tuple(u) x
   | HeadNom Path Vertex
   deriving (Eq, Ord, Show, Data)
@@ -109,17 +112,19 @@ data Head
 data Vertex
   = VertexVariable Variable                           -- x
   | VertexHead Head                                   -- head
-  | VertexCall Vertex Vertex                          -- u[v]
+  | VertexCall Vertex Vertex                          -- u(v)
   deriving (Eq, Ord, Show, Data)
 
+type Program = Operation
+{-
 data Program
-  = Program Operation                      -- The Operation is always explore(tops) {scope c {op}}
+  = Program Operation                                 -- The Operation is always explore(tops) {scope c {op}}
   | ProgramDone
   deriving (Eq, Ord, Show, Data)
+-}
 
 data Operation
   = OpUnify Vertex Vertex                             -- u=v
-  | OpCall Vertex Vertex Vertex                       -- u=v(p)
   | OpFail Vertex                                     -- u=fail
   | OpSeq Operation Operation                         -- op0; op1
   | OpChoice Operation Operation                      -- op0|op1
@@ -141,6 +146,7 @@ data Operation
   | OpErr Err                                                     -- err
   -- OpVar is not a real Op, it's just for pretty printing a context
   | OpVar String
+  | OpDone
   deriving (Eq, Ord, Show, Data)
 
 data NativeOp = NativeOp String
@@ -154,29 +160,30 @@ data Err = Err
 
 -- ...
 
-data Arg = ArgO Operation | ArgV Vertex
+data Arg = ArgOp Operation | ArgOpv OperationVariable | ArgV Vertex
   deriving (Eq, Ord, Show, Data)
 
 data Assumption
   = AEffect EffectSpecifier Arg Context                                   -- fx{arg}@c
-  | AUnify Vertex Vertex                                                  -- v0<-v1
+  | AEqual EqualityStrength Vertex Vertex Context                         -- st{u=v}@c
+  | AFlow Vertex Vertex                                                   -- v1->v0
+  | AInherits Context Context                                             -- d inherits c
+  | ASees Context Context                                                 -- d sees c
   | AFlex Vertex Context                                                  -- v@c
-  | AImpliedEffects EffectSpecifier EffectSpecifier ImpliedFx Context   -- fx1:fx2:afx@c
+  | AImpliedEffects EffectSpecifier EffectSpecifier ImpliedFx Context     -- fx1:fx2:ifx@c
   | ASolveOrImply SolveOrImply Context                                    -- si@c
   | AVerifyOrBeta VerifyOrBeta Context                                    -- vb@c
-  | ASetOpVar OperationVariable Operation                                 -- opv:=op
+  | ASetOpVar OperationVariable Context Operation                         -- opv@c:=op
   | AResolvedIdent Variable Context Vertex                                -- Ident@c:=r
-  -- P^:=u
+  | AReadPointer Pointer Vertex                                           -- P^:=u
   | ACtxIsOp Context Operation                                            -- c:=op
-  | AFlexes Context Context                                               -- c flexes d
-  | ASees Context Context                                                 -- c sees d
-  -- added: QQQ2 add this?
---  | ADominates EffectSpecifier Vertex Vertex Context                      -- fx{v>>u}@c
   deriving (Eq, Ord, Show, Data)
 
-pattern AEffectOp:: EffectSpecifier -> Operation -> Context -> Assumption
-pattern AEffectOp fx op c = AEffect fx (ArgO op) c
-pattern AEffectVertex:: EffectSpecifier -> Vertex -> Context -> Assumption
+pattern AEffectOp :: EffectSpecifier -> Operation -> Context -> Assumption
+pattern AEffectOp fx op c = AEffect fx (ArgOp op) c
+pattern AEffectOpv :: EffectSpecifier -> OperationVariable -> Context -> Assumption
+pattern AEffectOpv fx opv c = AEffect fx (ArgOpv opv) c
+pattern AEffectVertex :: EffectSpecifier -> Vertex -> Context -> Assumption
 pattern AEffectVertex fx v c = AEffect fx (ArgV v) c
 
 data AssumptionSet = A [Assumption]
@@ -228,6 +235,7 @@ instance Pretty Atom where
                                   | otherwise = pPrintPrec l p (numerator q) <> text "/" <> pPrintPrec l p (denominator q)
   pPrintPrec l p (AtomPath path) = pPrintPrec l p path
   pPrintPrec _ _ (AtomUnit) = text "()"
+instance Pretty Pointer where pPrint (Pointer i) = pPrint i
 instance Pretty Variable where pPrint (Variable i) = pPrint i
 instance Pretty Context where pPrint (Context i) = pPrint i
 instance Pretty OperationVariable where pPrint (OperationVariable i) = pPrint i
@@ -236,6 +244,10 @@ instance Pretty VerifyOrBeta where pPrint = ppLower
 instance Pretty Syntax where
   pPrint (SyntaxExpr e) = pPrint e
   pPrint (SyntaxList aes) = parens $ hcat (punctuate (text ";") (map pPrint aes))
+instance Pretty EqualityStrength where
+  pPrint Equal = text "eq"
+  pPrint Decidable = text "dec"
+  pPrint Undecidable = text "und"
 instance Pretty ImpliedFx where
   pPrint None = text "none"
   pPrint (Some fx) = pPrint fx
@@ -245,25 +257,28 @@ instance Pretty Lambda where
     xsep [
       text "lambda" <> pPrint (oc,fx,u) <+> pPrint c0 <+> pPrint i <+> pPrint w <> text "." <+> pPrint op0 <> text ";",
       nest 2 (text "range" <+> pPrint c1 <+> pPrint j <+> pPrint z <> text "." <+> pPrint op1) ]
+{-
 instance Pretty RunLambda where
   pPrint (RunLambda u i w op0) =
     text "lambda" <> parens (pPrint u) <+> pPrint i <+> pPrint w <> text "." <+> pPrint op0
+-}
 instance Pretty Head where
   pPrint (HeadAtom a) = pPrint a
   pPrint (HeadLambda l) = pPrint l
-  pPrint (HeadRunLambda l) = pPrint l
+--  pPrint (HeadRunLambda l) = pPrint l
   pPrint (HeadTuple u t) = parens $ text "tuple" <> parens (pPrint u) <+> pPrint t
   pPrint (HeadNom p u) = text "nom" <+> pPrint p <> text "." <+> pPrint u
 instance Pretty Vertex where
   pPrint (VertexVariable x) = pPrint x
   pPrint (VertexHead h) = pPrint h
-  pPrint (VertexCall u v) = pPrint u <> brackets (pPrint v)
+  pPrint (VertexCall u v) = pPrint u <> parens (pPrint v)
+{-
 instance Pretty Program where
   pPrint (Program op) = xsep [text "program", nest 2 $ pPrint op]
   pPrint ProgramDone = text "DONE"
+-}
 instance Pretty Operation where -- XXX precedence
   pPrint (OpUnify u v) = xsep [pPrint u <+> text "=", pPrint v]
-  pPrint (OpCall u v p) = pPrint u <+> text "=" <+> pPrint v <> parens (pPrint p)
   pPrint (OpFail u) = pPrint u <+> text "=fail"
   pPrint (OpSeq op0 op1) = xsep [pPrint op0 <> text ";", pPrint op1]
   pPrint (OpChoice op0 op1) = pPrint op0 <+> text "|" <+> pPrint op1
@@ -290,22 +305,26 @@ instance Pretty Operation where -- XXX precedence
   pPrint (OpNative n) = pPrint n
   pPrint (OpErr e) = pPrint e
   pPrint (OpVar s) = text s
+  pPrint OpDone = text "DONE"
 instance Pretty Err where
   pPrint Err = text "ERR"
 instance Pretty Assumption where
   pPrint (AEffectOp fx arg c) = pPrint fx <> braces (pPrint arg) <> text "@" <> pPrint c
+  pPrint (AEffectOpv fx arg c) = pPrint fx <> braces (pPrint arg) <> text "@" <> pPrint c
   pPrint (AEffectVertex fx arg c) = pPrint fx <> braces (pPrint arg) <> text "@" <> pPrint c
   pPrint AEffect{} = undefined
-  pPrint (AUnify v0 v1) = pPrint v0 <> text "<-" <> pPrint v1
+  pPrint (AEqual st u v c) = pPrint st <> braces (pPrint u <> text "=" <> pPrint v) <> text "@" <> pPrint c
+  pPrint (AFlow v1 v0) = pPrint v0 <> text "->" <> pPrint v1
   pPrint (AFlex v c) = pPrint v <> text "@" <> pPrint c
   pPrint (AImpliedEffects fx1 fx2 afx c) = pPrint fx1 <> text ":" <> pPrint fx2 <> text ":" <> pPrint afx <> text "@" <> pPrint c
   pPrint (ASolveOrImply si c) = pPrint si <> text "@" <> pPrint c
   pPrint (AVerifyOrBeta vb c) = pPrint vb <> text "@" <> pPrint c
   pPrint (AResolvedIdent x c v) = pPrint x <> text "@" <> pPrint c <> text ":=" <> pPrint v
-  pPrint (ASetOpVar opv op) = pPrint opv <+> text ":=" <+> braces (pPrint op)
+  pPrint (ASetOpVar opv c op) = pPrint opv <> text "@" <> pPrint c <+> text ":=" <+> braces (pPrint op)
   pPrint (ACtxIsOp c op) = pPrint c <> text ":=" <> pPrint op
-  pPrint (AFlexes c0 c1) = pPrint c0 <+> text "flexes" <+> pPrint c1
+  pPrint (AInherits c0 c1) = pPrint c0 <+> text "inherits" <+> pPrint c1
   pPrint (ASees c0 c1) = pPrint c0 <+> text "sees" <+> pPrint c1
+  pPrint (AReadPointer p v) = pPrint p <> text "^:=" <> pPrint v
 --  pPrint (ADominates fx u v c) = pPrint fx <> braces (pPrint u <> text ">>" <> pPrint v) <> text "@" <> pPrint c
 instance Pretty NativeOp where
   pPrint (NativeOp n) = text n
@@ -317,8 +336,19 @@ instance Pretty AssumptionSet where
 instance Pretty Config where
   pPrint (g :|- pg) = xsep [pPrint g, text "|-", pPrint pg]
 
+instance Pretty (Operation -> Program) where
+  pPrint f = pPrint (f (OpVar "OP"))
+
+instance Pretty (Context -> Operation -> Program) where
+  pPrint f = pPrint (f (Context (Ident "SC")) (OpVar "OP"))
+
+instance Pretty (Context -> Context -> Operation -> Program) where
+  pPrint f = pPrint (f (Context (Ident "FC")) (Context (Ident "SC")) (OpVar "OP"))
+
+{-
 instance Pretty (Context -> Operation -> Program) where
   pPrint f = pPrint (f (Context (Ident "C")) (OpVar "OP"))
+-}
 
 xsep :: [Doc] -> Doc
 xsep = fsep
@@ -496,13 +526,14 @@ star fx0 fx1 = (fx0\/fx1)/\
 class Bvs a where
   bvs :: a -> [Ident]
 
+{-
 instance Bvs Program where
   bvs (Program op) = bvs op
   bvs ProgramDone = []
+-}
 
 instance Bvs Operation where
   bvs (OpUnify u v) = bvs u ++ bvs v
-  bvs (OpCall u v p) = bvs u ++ bvs v ++ bvs p
   bvs (OpFail u) = bvs u
   bvs (OpSeq op0 op1) = bvs op0 ++ bvs op1
   bvs (OpChoice op0 op1) = bvs op0 ++ bvs op1
@@ -522,6 +553,7 @@ instance Bvs Operation where
   bvs (OpNative _) = []
   bvs (OpErr _) = []
   bvs (OpVar _) = []
+  bvs OpDone = []
 
 instance Bvs Vertex where
   bvs (VertexVariable _) = []
@@ -531,17 +563,17 @@ instance Bvs Vertex where
 instance Bvs Head where
   bvs (HeadAtom _) = []
   bvs (HeadLambda l) = bvs l
-  bvs (HeadRunLambda l) = bvs l
+--  bvs (HeadRunLambda l) = bvs l
   bvs (HeadTuple u (Variable x)) = x : bvs u
   bvs (HeadNom _ v) = bvs v
 
 instance Bvs Lambda where
   bvs (Lambda _oc _fx u (Context c0) (Variable i) (Variable w) op0
                         (Context c1) (Variable j) (Variable z) op1) = [c0,i,w,c1,j,z] ++ bvs u ++ bvs op0 ++ bvs op1
-
+{-
 instance Bvs RunLambda where
   bvs (RunLambda u (Variable i) (Variable z) op0) = i : z : bvs u ++ bvs op0
-
+-}
 ------------------------------------------------------------------
 
 class NewIdents i o | i -> o where
@@ -638,7 +670,7 @@ dsE pg u v (ExprAt s0 s1) =
   OpUnify v vz +>
   dsE pg vh vg s0 +>
   dsE pg vj vx s1 +>
-  OpCall vz vg vx
+  OpUnify vz (VertexCall vg vx)
   where vars@(h, g, j, x, z) = map5 Variable $ newIdents pg ("h", "g", "j", "x", "z")
         (vh, vg, vj, vx, vz) = map5 VertexVariable vars
 -- QQQ8:
@@ -718,18 +750,24 @@ before aRules bRules cfg a =
 
 ------------------------------------------------------------------
 
+type FlexContext = Context
+type ScopeContext = Context
+
 type Ctx = Operation -> Operation
+type CtxFlex = FlexContext -> Ctx
+type CtxScope = ScopeContext -> Ctx
 type CtxC = Context -> Ctx
 type CtxCC = Context -> CtxC
 
-scopeStartOp :: Operation -> [(CtxC, Context, Operation)]
+scopeStartOp :: Operation -> [(CtxScope, Context, Operation)]
 scopeStartOp (OpScope sc op) = [(OpScope, sc, op)]
 scopeStartOp (OpBeta lp sc0 op0 sc1 op1) =
-  [(\ sc op -> OpBeta lp sc  op  sc1 op1, sc0, op0)
-  ,(\ sc op -> OpBeta lp sc0 op0 sc  op,  sc1, op1)]
+  [(\ sc0' op0' -> OpBeta lp sc0' op0' sc1   op1,   sc0, op0)
+  ,(\ sc1' op1' -> OpBeta lp sc0  op0  sc1'  op1',  sc1, op1)
+  ]
 scopeStartOp _ = []
 
-flexibleStartOp :: Operation -> [(CtxC, Context, Operation)]
+flexibleStartOp :: Operation -> [(CtxFlex, Context, Operation)]
 flexibleStartOp (OpVerify fx err fc op) = [(OpVerify fx err, fc, op)]
 flexibleStartOp (OpIn fx fc i x op) = [(\ fc' op' -> OpIn fx fc' i x op', fc, op)]
 flexibleStartOp (OpStage fx opv fc0 i x op0 fc1 y op1) =
@@ -738,7 +776,7 @@ flexibleStartOp (OpStage fx opv fc0 i x op0 fc1 y op1) =
 flexibleStartOp (OpAssume fx fc op) = [(OpAssume fx, fc, op)]
 flexibleStartOp op = iterateStartOp op
 
-iterateStartOp :: Operation -> [(CtxC, Context, Operation)]
+iterateStartOp :: Operation -> [(CtxFlex, FlexContext, Operation)]
 iterateStartOp (OpIterate aop) = do
   (ctx, OpNext u0 fc v0 op d1 v1 op1 d2 op2) <- scopeSpan aop
   pure (\ fc' op' -> ctx (OpNext u0 fc' v0 op' d1 v1 op1 d2 op2), fc, op)
@@ -762,158 +800,194 @@ scopeSpan aop = [(id, aop)] ++
     _ -> []
 
 flexibleSpan :: Operation -> [(Ctx, Operation)]
-flexibleSpan aop = do
-  (ctx1, op1) <- scopeSpan aop
-  [(ctx1, op1)]
-   ++ do
+flexibleSpan aop =
+  scopeSpan aop
+ ++
+  do
+    (ctx1, op1)      <- scopeSpan aop
     (ctx2, sc2, op2) <- scopeStartOp op1
-    (ctx3, op3) <- flexibleSpan op2
-    pure (\ op -> ctx1 (ctx2 sc2 (ctx3 op)), op3)
+    (ctx3, op3)      <- flexibleSpan op2
+    pure (\ op3' -> ctx1 (ctx2 sc2 (ctx3 op3')), op3)
 
 exploreSpan :: Operation -> [(Ctx, Operation)]
 exploreSpan aop = do
-  (ctx1, op1) <- scopeSpan aop
-  [(ctx1, op1)]
-   ++ do
-    (ctx2, sc2, op2) <- scopeStartOp op1 ++ flexibleStartOp op1
-    (ctx3, op3) <- exploreSpan op2
-    pure (\ op -> ctx1 (ctx2 sc2 (ctx3 op)), op3)
+  scopeSpan aop
+ ++
+  do
+    (ctx1, op1)      <- scopeSpan aop
+    (ctx2, sc2, op2) <- scopeStartOp op1
+    (ctx3, op3)      <- exploreSpan op2
+    pure (\ op3' -> ctx1 (ctx2 sc2 (ctx3 op3')), op3)
+ ++
+  do
+    (ctx1, op1)      <- scopeSpan aop
+    (ctx2, sc2, op2) <- flexibleStartOp op1
+    (ctx3, op3)      <- exploreSpan op2
+    pure (\ op3' -> ctx1 (ctx2 sc2 (ctx3 op3')), op3)
 
 programSpan :: Operation -> [(Ctx, Operation)]
 programSpan aop = do
-  (ctx1, op1) <- scopeSpan aop
-  [(ctx1, op1)]
-   ++ do
-    (ctx2, sc2, op2) <- scopeStartOp op1 ++ flexibleStartOp op1
-    (ctx3, op3) <- programSpan op2
-    pure (\ op -> ctx1 (ctx2 sc2 (ctx3 op)), op3)
-   ++ do
+  scopeSpan aop
+ ++
+  do
+    (ctx1, op1)      <- scopeSpan aop
+    (ctx2, sc2, op2) <- scopeStartOp op1
+    (ctx3, op3)      <- programSpan op2
+    pure (\ op3' -> ctx1 (ctx2 sc2 (ctx3 op3')), op3)
+ ++
+  do
+    (ctx1, op1)      <- scopeSpan aop
+    (ctx2, sc2, op2) <- flexibleStartOp op1
+    (ctx3, op3)      <- programSpan op2
+    pure (\ op3' -> ctx1 (ctx2 sc2 (ctx3 op3')), op3)
+ ++
+  do
+    (ctx1, op1) <- scopeSpan aop
     (ctx2, op2) <- exploreStartOp op1
     (ctx3, op3) <- programSpan op2
-    pure (\ op -> ctx1 (ctx2 (ctx3 op)), op3)
+    pure (\ op3' -> ctx1 (ctx2 (ctx3 op3')), op3)
 
-scopeOp :: Operation -> [(CtxC, Context, Operation)]
+scopeOp :: Operation -> [(CtxScope, Context, Operation)]
 scopeOp aop = do
-  (ctx1, op1) <- scopeSpan aop
+  (ctx1, op1)      <- scopeSpan aop
   (ctx2, sc2, op2) <- scopeStartOp op1
-  pure (\ sc op -> ctx1 (ctx2 sc op), sc2, op2)
+  pure (\ sc2' op2' -> ctx1 (ctx2 sc2' op2'), sc2, op2)
 
-flexibleOp :: Operation -> [(CtxCC, Context, Context, Operation)]
-flexibleOp aop = do
-  (ctx0, op0) <- scopeSpan aop
-  (ctx1, fc1, op1) <- flexibleStartOp op0
-  (ctx2, sc2, op2) <- scopeOp op1
-  pure (\ fc sc op -> ctx0 (ctx1 fc (ctx2 sc op)), fc1, sc2, op2)
+checkEq :: (HasCallStack) => Context -> Context -> b -> b
+checkEq a a' b | a == a' = b
+               | a == Context (Ident "FC"), a' == Context (Ident "SC") = b  -- pretty printing hack
+               | otherwise = error $ "checkEq: " ++ prettyShow (a, a')
 
+flexibleOp :: Operation -> [(CtxCC, FlexContext, ScopeContext, Operation)]
+flexibleOp aop =
+  do
+    (ctx0, op0)      <- scopeSpan aop
+    (ctx1, fc1, op1) <- flexibleStartOp op0
+    -- XXX check _fc1 and fc1' are equal?
+    pure (\ _fc1 fc1' op1' -> checkEq _fc1 fc1' $ ctx0 (ctx1 fc1' op1'), fc1, fc1, op1)
+ ++
+  do
+    (ctx0, op0)      <- scopeSpan aop
+    (ctx1, fc1, op1) <- flexibleStartOp op0
+    (ctx2, sc2, op2) <- scopeOp op1
+    pure (\ fc1' sc2' op2' -> ctx0 (ctx1 fc1' (ctx2 sc2' op2')), fc1, sc2, op2)
+
+iterateOp :: Operation -> [(CtxCC, FlexContext, ScopeContext, Operation)]
+iterateOp aop =
 {-
-Class ExploreStart a where
-  es :: a -> [(Context -> Operation -> a, Context, Operation)]
-instance ExploreStart Program where
-  es (Program e i x op) =
-    [(\ e' op' -> Program e' i x op', e, op)]
-  es _ = []
-instance ExploreStart Operation where
-  es (OpExplore fx e op0 d op1) =
-    [(\ e' op0' -> OpExplore fx e' op0' d op1, e, op0)
-    ,(\ d' op1' -> OpExplore fx e op0 d' op1', d, op1)]
-  es _ = []
+  do
+    (ctx0, op0)      <- scopeSpan aop
+    (ctx1, fc1, op1) <- iterateStartOp op0
+    pure (\ _fc1 fc1' op1' -> checkEq _fc1 fc1' $ ctx0 (ctx1 fc1' op1), fc1, op1)
+ ++
+-}
+  do
+    (ctx0, op0)      <- scopeSpan aop
+    (ctx1, fc1, op1) <- iterateStartOp op0
+    (ctx2, sc2, op2) <- scopeOp op1
+    pure (\ fc1' sc2' op2' -> ctx0 (ctx1 fc1' (ctx2 sc2' op2')), fc1, sc2, op2)
 
-class FlexibleStart a where
-  fs :: a -> [(Context -> Operation -> a, Context, Operation)]
-instance FlexibleStart Operation where
-  fs (OpIterate u0 c v0 op c1 v1 op1 c2 op2) =
-    [(\ c' op' -> OpIterate u0 c' v0 op' c1 v1 op1 c2 op2, c, op)]
-  fs (OpVerify fx merr c op) =
-    [(\ c' op' -> OpVerify fx merr c' op', c, op)]
-  fs (OpAssume fx c op) =
-    [(\ c' op' -> OpAssume fx c' op', c, op)]
-  fs _ = []
-
--- QQQ*: can OP match op0;op1 ?
-class FlexibleOp a where
-  fop :: a -> [(Operation -> a, Operation)]
-instance FlexibleOp Operation where
-  fop a = [ (id, a) {-x | not (isOpSeq a)-} ] ++
-          fop1 a
-    where fop1 (OpSeq op1 op2) =
-              do
-                (ctx, op11) <- fop op1
-                pure (\ op11' -> OpSeq (ctx op11') op2, op11)
-             ++
-              do
-                (ctx, op21) <- fop op2
-                pure (\ op21' -> OpSeq op1 (ctx op21'), op21)
-          fop1 (OpScope c aop) = do
-            (ctx, op) <- fop aop
-            pure (\ op' -> OpScope c (ctx op'), op)
--- QQQ: what is p?  beta(L(p)) c0. fop[OP] range c1. op
-          fop1 (OpBeta lam c0 op0 c1 op1) = do
-            (ctx, op) <- fop op0
-            [(\ op' -> OpBeta lam c0 (ctx op') c1 op1, op),
-             (\ op' -> OpBeta lam c0 op0 c1 (ctx op'), op)]
-          fop1 _op =
-            --trace ("fop1: " ++ prettyShow _op)
-            []
+exploreOp :: Operation -> [(CtxCC, FlexContext, ScopeContext, Operation)]
+exploreOp aop =
 {-
-isOpSeq :: Operation -> Bool
-isOpSeq OpSeq{} = True
-isOpSeq _ = False
+  do
+    (ctx0, op0)      <- scopeSpan aop
+    (ctx1, fc1, op1) <- exploreStartOp op0
+    pure (\ _fc1 fc1' op1' -> checkEq _fc1 fc1' $ ctx0 (ctx1 fc1' op1), fc1, op1)
+ ++
 -}
+  do
+    (ctx0, op0)      <- scopeSpan aop
+    (ctx1, op1)      <- exploreStartOp op0
+    (ctx2, sc2, op2) <- scopeOp op1
+    pure (\ _sc2 sc2' op2' -> checkEq _sc2 sc2' $ ctx0 (ctx1 (ctx2 sc2' op2')), sc2, sc2, op2)
+ ++
+  do
+    (ctx0, op0)           <- scopeSpan aop
+    (ctx1, op1)           <- exploreStartOp op0
+    (ctx2, fc2, sc2, op2) <- flexibleOp op1
+    pure (\ fc2' sc2' op2' -> ctx0 (ctx1 (ctx2 fc2' sc2' op2')), fc2, sc2, op2)
 
-class ExploreOp a where
-  _eop :: a -> [(Operation -> a, Operation)]
-instance ExploreOp Operation where
-  _eop a = fop a ++
-           do
-             (ctx, c, op) <- fs a
-             pure (\ op' -> ctx c op', op)
-
--- QQQ: fc does not allow 'program'
-class FlexibleContext a where
-  fc :: a -> [(Context -> Operation -> a, Context, Operation)]
-instance FlexibleContext Program where
-  fc (Program ac i x aop) =
-    do
-      (ctx, op) <- fop aop
-      pure (\ c' op' -> Program c' i x (ctx op'), ac, op)
-   ++
-    do
-      (ctx, c, op) <- fc aop
-      pure (\ c' op' -> Program ac i x (ctx c' op'), c, op)
-  fc _ = []  -- QQQ: should es and fc handle  'pg; pg' ?
-instance FlexibleContext Operation where
-  fc a =
-    do
-      -- fop[fs[C,fop[OP]]]
-      (fop1ctx, aop) <- fop a
-      (fsctx, c, bop) <- fs aop
-      (fop2ctx, op) <- fop bop
-      pure (\ c' op' -> fop1ctx (fsctx c' (fop2ctx op')), c, op)
-     ++
-    do
-      -- fop[es[C,fop[OP]]]
-      (fop1ctx, aop) <- fop a
-      (esctx, c, bop) <- es aop
-      (fop2ctx, op) <- fop bop
-      pure (\ c' op' -> fop1ctx (esctx c' (fop2ctx op')), c, op)
---     ++
---    do
-      -- fc[c,fc[C,OP]]  QQQ: is this really right?
-
-class IterateContext a where
-  ic :: a -> [(Context -> Operation -> a, Context, Operation)]
-instance IterateContext Operation where
-  -- ic[D,OP] := iterate(u0) D v0. fop[OP] then d1 v1. op1 else d2. op2
-  ic (OpIterate u0 d v0 x d1 v1 op1 d2 op2) = do
-    (fopctx, op) <- fop x
-    pure (\ d' op' -> OpIterate u0 d' v0 (fopctx op') d1 v1 op1 d2 op2, d, op)
-  ic _ = []
+programOpX :: Operation -> [(CtxCC, FlexContext, ScopeContext, Operation)]
+programOpX aop =
+{-
+  do
+    (ctx0, op0) <- scopeSpan aop
+    (ctx1, op1) <- exploreStartOp op0
+    pure (\ fc1' op1' -> ctx0 (ctx1 fc1' op1), fc1, op1)
+ ++
 -}
+  do
+    (ctx0, op0)      <- scopeSpan aop
+    (ctx1, op1)      <- exploreStartOp op0
+    (ctx2, sc2, op2) <- scopeOp op1
+    pure (\ _sc2 sc2' op2' -> checkEq _sc2 sc2' $ ctx0 (ctx1 (ctx2 sc2' op2')), sc2, sc2, op2)
+ ++
+  do
+    (ctx0, op0)           <- scopeSpan aop
+    (ctx1, op1)           <- exploreStartOp op0
+    (ctx2, fc2, sc2, op2) <- flexibleOp op1
+    pure (\ fc2' sc2' op2' -> ctx0 (ctx1 (ctx2 fc2' sc2' op2')), fc2, sc2, op2)
+ ++
+  do
+    (ctx0, op0)           <- scopeSpan aop
+    (ctx1, op1)           <- exploreStartOp op0
+    (ctx2, fc2, sc2, op2) <- exploreOp op1
+    pure (\ fc2' sc2' op2' -> ctx0 (ctx1 (ctx2 fc2' sc2' op2')), fc2, sc2, op2)
+
+programOp :: Operation -> [(CtxCC, FlexContext, ScopeContext, Operation)]
+programOp = programOpX
+
+programExploreOp :: Operation -> [(Ctx, Operation)]
+programExploreOp aop =
+  exploreStartOp aop
+ ++
+  do
+    (ctx1, fc1, sc1, op1) <- programOpX aop
+    (ctx2, op2)           <- programExploreOp op1
+    pure (\ op2' -> ctx1 fc1 sc1 (ctx2 op2'), op2)
+
+------------------------------------------------------------------
+
+anyOp :: Operation -> [(Ctx, Operation)]
+anyOp aop = [(id, aop)] ++ concatMap expnd (
+  case aop of
+    OpSeq op0 op1 -> [(\ op0' -> OpSeq op0' op1, op0), (\ op1' -> OpSeq op0 op1', op1)]
+    OpChoice op0 op1 -> [(\ op0' -> OpChoice op0' op1, op0), (\ op1' -> OpChoice op0 op1', op1)]
+    OpScope c op -> [(OpScope c, op)]
+    OpBeta lp c0 op0 c1 op1 -> [(\ op0' -> OpBeta lp c0 op0' c1 op1, op0), (\ op1' -> OpBeta lp c0 op0 c1 op1', op1)]
+    OpExplore fx op -> [(OpExplore fx, op)]
+    OpIterate op -> [(OpIterate, op)]
+    OpNext u0 c0 v0 op0 c1 v1 op1 c2 op2 -> [ (\ op0' -> OpNext u0 c0 v0 op0' c1 v1 op1 c2 op2, op0)
+                                            , (\ op1' -> OpNext u0 c0 v0 op0 c1 v1 op1' c2 op2, op1)
+                                            , (\ op2' -> OpNext u0 c0 v0 op0 c1 v1 op1 c2 op2', op2)]
+--    OpCast -> undefined
+    OpIn fx c i x op -> [(OpIn fx c i x, op)]
+    OpStage fx opv c0 i x op0 c1 y op1 -> [(\ op0' -> OpStage fx opv c0 i x op0' c1 y op1, op0), (\ op1' -> OpStage fx opv c0 i x op0 c1 y op1', op1)]
+    OpVerify fx oerr c op0 -> [(OpVerify fx oerr c, op0)]
+    OpAssume fx c op0 -> [(OpAssume fx c, op0)]
+    _ -> []
+    )
+ where expnd (ctx, op) = [ (ctx . ictx, iop) | (ictx, iop) <- anyOp op ]
+
+desugarRules :: Rule Config
+desugarRules _ (g :|- pg) =
+  "S" `name`
+  do
+    (ctx, op@(OpSyntax u v s)) <- anyOp pg
+    let op' = dsS pg u v s
+    guard $ op /= op'
+    pure $ g :|- ctx op'
 
 ------------------------------------------------------------------
 
 allRules :: Rule Config
-allRules _ _ = []
+allRules =
+  desugarRules P.<>
+  programRules P.<>
+  equalRules P.<>
+  existsRules
+
 {-
 allRules :: Rule Config
 allRules =
@@ -939,6 +1013,80 @@ allRules =
   programElimRule
 -}
 
+programRules :: Rule Config
+programRules _ (A g :|- pg) =
+  "program-intro" `name`
+  do
+    OpExplore atops (OpScope c _op) <- [pg]
+    guard (atops == tops)
+    g' <- gAdd [AVerifyOrBeta Verify c, ASolveOrImply Solve c, AImpliedEffects effects tops None c] g
+    pure $ g' :|- pg
+ ++
+  "program-elim" `name`
+  do
+    OpExplore atops op <- [pg]
+    guard $ atops == tops
+    let scopeDone (OpScope c_i op_i) = not $ null [ () | AEffectOp fx op_i' c_i' <- g, op_i == op_i', c_i == c_i', fx <=== atops ]
+        scopeDone _ = False
+    guard $ all (scopeDone . snd) (scopeSpan op)
+    pure $ A [] :|- OpDone
+
+-- fx-weaken
+-- fx-intersect
+
+atomRules :: Rule Config
+atomRules _ (A _g :|- _pg) = []
+
+-- equal-atom
+-- atom-resolves
+
+------------------------------------------------------------------
+
+equalRules :: Rule Config
+equalRules _ (A g :|- pg) =
+  "equal-reflexive" `name`
+  do
+    AFlex v c <- g
+    g' <- gAdd [AEffectOp Succeeds (OpUnify v v) c] g
+    pure $ g' :|- pg
+ ++
+  "equal-symmetric" `name`
+  do
+    AEffectOp fx (OpUnify u v) c <- g
+    g' <- gAdd [AEffectOp fx (OpUnify v u) c] g
+    pure $ g' :|- pg
+ ++
+  "equal-transitive" `name`
+  do
+    AEffectOp fx  (OpUnify p  q) c  <- g
+    AEffectOp fx' (OpUnify q' r) c' <- g
+    guard (fx == fx' && c == c' && q == q')
+    guard (p /= q && q /= r)
+    g' <- gAdd [AEffectOp fx (OpUnify p r) c] g
+    pure $ g' :|- pg
+
+-- unequal-head-fails
+-- container-resolves
+-- container-comparable
+-- equal-container
+-- equal-call-name
+-- equal-call-computes
+-- equation-propagates
+-- equation-fails
+-- inherits-trans
+-- inherits-fx
+
+------------------------------------------------------------------
+
+existsRules :: Rule Config
+existsRules _ (A g :|- pg) =
+  "exists-intro" `name`
+  do
+    (_ctx, c, _sc, op@(OpExists xs)) <- programOp pg
+    g' <- gAdd (AEffectOp Succeeds op c : map (\ x -> AFlex (VertexVariable x) c) xs) g
+    pure $ g' :|- pg
+
+
 {-
 ------------------------------------------------------------------
 
@@ -949,18 +1097,8 @@ constRules _ (A g :|- pg) =
     (_ctx, c, OpUnify _ v@(VertexHead (HeadAtom _))) <- fc pg
     g' <- gAdd [AEffectOp Succeeds (OpUnify v v) c] g
     pure $ g' :|- pg
-
-------------------------------------------------------------------
-
-desugarRules :: Rule Config
-desugarRules _ (g :|- pg) =
-  "S" `name`
-  do
-    (ctx, c, op@(OpS u v s)) <- fc pg
-    let op' = dsS pg u v s
-    guard $ op /= op'
-    pure $ g :|- ctx c op'
-
+-}
+{-
 ------------------------------------------------------------------
 
 identRules :: Rule Config
@@ -1602,17 +1740,20 @@ dom afx ac g =
      
 
 ------------------------------------------------------------------
+-}
 
 startConfig :: Syntax -> Config
-startConfig s = g :|- pg
+startConfig s = A [] :|- startProgram s
+
+startProgram :: Syntax -> Program
+startProgram s = pg
   where (c, i, x) = newIdents s ("c", "i", "x")
         vi = Variable i
         vvi = VertexVariable vi
         vx = Variable x
         vvx = VertexVariable vx
         vc = Context c
-        g = A [AFlex vvi vc, AFlex vvx vc]
-        pg = Program vc vi vx $ OpS vvi vvx s
+        pg = OpExplore tops $ OpScope vc $ OpExists [vi, vx] +> OpSyntax vvi vvx s
 
 ------------------------------------------------------------------
 
@@ -1623,6 +1764,7 @@ pattern ERat r = ExprAtom (AtomRational r)
 example1 :: Syntax
 example1 = SyntaxExpr $ ExprAtom $ AtomRational 5
 
+{-
 -- example2: a:=5; a
 example2 :: Syntax
 example2 = SyntaxList [SyntaxExpr $ ExprDef a (ERat 5)
@@ -1695,8 +1837,8 @@ example11 = SyntaxList
            , SyntaxExpr $ ExprUnify (ExprVar a) (ERat 1)
            ]
   where a = Variable $ Ident "a"
+-}
 
 main :: IO ()
 main = do
-  fpptr "ut" $ startConfig example10
--}
+  fpptr "ut" $ startConfig example1
