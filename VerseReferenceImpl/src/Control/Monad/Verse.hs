@@ -34,7 +34,6 @@ module Control.Monad.Verse
   , freshVar
   , freshDVar
   , newVar
-  , newVerifyVar
   , readVar
   , unifyEq
   , Match (..)
@@ -1326,11 +1325,6 @@ freshDVar binding = do
 newVar :: (MonadRef m, MonadSupply Int m) => a -> VerseT m (Var m a)
 newVar = lift . newVar'
 
-newVerifyVar :: (MonadRef m, MonadSupply Int m) => a -> VerseT m (Var m a)
-newVerifyVar binding = do
-  label <- supply
-  Var <$> newVerifyHRef (Bound MkBound {..})
-
 newVar' :: (MonadRef m, MonadSupply Int m) => a -> m (Var m a)
 newVar' binding = do
   label <- supply
@@ -1769,9 +1763,6 @@ newtype HRef m a = HRef (Ref m (HeapMap a))
 
 newHRef :: MonadRef m => a -> VerseT m (HRef m a)
 newHRef x = getHeap >>= lift . newHRef' x
-
-newVerifyHRef :: MonadRef m => a -> VerseT m (HRef m a)
-newVerifyHRef x = getVerifyHeap >>= lift . newHRef' x
 
 newHRef' :: MonadRef m => a -> Maybe Heap -> m (HRef m a)
 newHRef' x = \ case
