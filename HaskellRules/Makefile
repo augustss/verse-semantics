@@ -39,7 +39,7 @@ testverify:
 	cabal run trsverifier
 
 traceverify:
-	$(TESTER) --quiet --trace --prelude=verifyprelude --rules=$(VRULES) --max-norm-steps=100000 $(TRACEVERIFY)
+	$(TESTER) --quiet --prelude=verifyprelude --rules=$(VRULES) --max-norm-steps=100000 $(TRACEVERIFY)
 
 testicfpqc:
 	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive

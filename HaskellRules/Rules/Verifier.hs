@@ -108,6 +108,7 @@ splitVerifier :: TRSystem Expr
 splitVerifier = TRS2024.systemTRS2024 -- systemICFPE
   { sname = "SPLITverify"
   , description = "ICFPE + split verifier rules"
+  , preProcess = preProcess ICFP.systemICFPE
   , rules =     -- (rules systemICFPE -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
                 --  <> Old.generalizedIcfpRules
                  (rules TRS2024.systemTRS2024 -= "EXI-FLOAT")
