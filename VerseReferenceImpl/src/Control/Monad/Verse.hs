@@ -293,6 +293,9 @@ stateV :: (S m -> (a, S m)) -> VerseT m a
 stateV f = VerseT $ \ _ R {..} s sk -> case f s of
   (a, s) -> sk heaps s a
 
+putV :: S m -> VerseT m ()
+putV s = VerseT $ \ _ R {..} _ sk -> sk heaps s ()
+
 modifyV' :: (S m -> S m) -> VerseT m ()
 modifyV' f = VerseT $ \ _ R {..} s sk ->
   let s' = f s in s' `seq` sk heaps s' ()
@@ -541,7 +544,7 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   , init :: !(Choices m)
   , last :: !(HRef m (Maybe a))
   , suspend :: !(Suspend m)
-  , suspCounts :: !(IntMap Int)
+  , suspCounts :: !SuspCounts
   , default' :: !(Default m)
   , commit :: !(Commit m)
   , duplicate :: !(Duplicate m)
@@ -587,7 +590,7 @@ split'' m heap latch choices last s =
     AbortS ->
       split' choices.abort' heap latch last
     SucceedS s choices' ->
-      let init = appendChoices choices' choices'
+      let init = appendChoices choices' choices
       in splitSucceed heap latch init last s
     YieldS s m_y choices' ->
       let init = appendChoices choices' choices
@@ -795,7 +798,7 @@ data VerifyEnv m = VerifyEnv
   , init :: !(Choices m)
   , last :: !(HRef m Bool)
   , suspend :: !(Suspend m)
-  , suspCounts :: !(IntMap Int)
+  , suspCounts :: !SuspCounts
   , default' :: !(Default m)
   , commit :: !(Commit m)
   , duplicate :: !(Duplicate m)
@@ -1087,20 +1090,10 @@ abortS = const $ pure AbortS
 reflectS :: Split m -> VerseT m ()
 reflectS = \ case
   AbortS -> abort
+  SucceedS s choices -> alt' (putV s) choices
+  YieldS s m_y choices -> alt' (putV s *> m_y) choices
   FailS m_a' -> VerseT $ \ yk R {..} s sk fk fk' ak ak' ->
     fk' heaps $ \ heaps -> unVerseT m_a' yk R {..} s sk fk fk' ak ak'
-  SucceedS s Choices {..} -> VerseT $ \ yk R {..} s' sk fk fk' ak ak' ->
-    sk heaps s ()
-    (\ heaps -> dup $ unVerseT fail yk R {..} s' sk fk fk)
-    (\ heaps -> dup $ unVerseT fail' yk R {..} s' sk fk fk')
-    (\ heaps -> unVerseT abort yk R {..} s' sk fk fk' ak ak')
-    (\ heaps -> unVerseT abort' yk R {..} s' sk fk fk' ak ak')
-  YieldS s m_y Choices {..} -> VerseT $ \ yk r@R {..} s' sk fk fk' ak ak' ->
-    unVerseT m_y yk r s sk
-    (\ heaps -> dup (unVerseT fail yk R {..} s' sk fk fk))
-    (\ heaps -> dup (unVerseT fail' yk R {..} s' sk fk fk'))
-    (\ heaps -> unVerseT abort yk R {..} s' sk fk fk' ak ak')
-    (\ heaps -> unVerseT abort' yk R {..} s' sk fk fk' ak ak')
 
 reflectSucceedS :: Monad m => Succeed (Split m) m a -> a -> VerseT m ()
 reflectSucceedS sk x =
@@ -1119,6 +1112,14 @@ alt x y z = VerseT $ \ yk r@R {..} s sk fk fk' ->
   unVerseT x yk r s sk
   (\ heaps -> dup $ unVerseT y yk R {..} s sk fk fk)
   (\ heaps -> dup $ unVerseT z yk R {..} s sk fk fk')
+
+alt' :: VerseT m () -> Choices m -> VerseT m ()
+alt' m Choices {..} = VerseT $ \ yk r@R {..} s sk fk fk' ak ak' ->
+  unVerseT m yk r s sk
+  (\ heaps -> dup (unVerseT fail yk R {..} s sk fk fk))
+  (\ heaps -> dup (unVerseT fail' yk R {..} s sk fk fk'))
+  (\ heaps -> unVerseT abort yk R {..} s sk fk fk' ak ak')
+  (\ heaps -> unVerseT abort' yk R {..} s sk fk fk' ak ak')
 
 yield :: ((a -> VerseT m ()) -> VerseT m ()) -> VerseT m a
 yield f = VerseT $ \ yk _ -> unYield yk f
