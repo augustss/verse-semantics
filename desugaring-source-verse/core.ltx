@@ -49,7 +49,7 @@
       \text{Head values} & \hnf & ::= & |k| \vb |r|  \vb |op| \vb |arr (v_1, xdots, v_n)| \vb |lam x e|
              \vb |olam v (lam x_1 e_1) (lam x_2 e_2)|\\
       \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
-      \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |iterates| \vb |nofail| \\
+      \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |fails|  \\
       \text{Assumptions} & |a| & ::= & |r = gv| \vb |noteq r gv| \vb |r = apply1N op gv| \vb |not (apply1N op gv)| \\
       & |as| & ::= & |{a_1, xdots, a_n}|   \hspace{1cm} (n \geq 0)
 \end{array}
