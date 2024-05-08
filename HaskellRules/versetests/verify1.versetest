@@ -1,38 +1,37 @@
+## verify(pass) { f():int := { 1 } }
+## verify(pass) { f(x:int) := { 10 } }
+## verify(pass) { f(x:int):int := { 10 } }
+## verify(pass) { f(x:int):int := { x } }
+## verify(pass) { f(a:int, b:int) := { x := a; if (x = b) { x = b} else { 123 } } }
+## verify(pass) { f(x:int):int := { x + 1 } }
+## verify(pass) { (a:int) => (b:int) => (c:int) => 10 }
+## verify(pass) { f():int := { 1 + 2 } }
+## verify(fail)  { f():int := 0; L2() := {y:any; y='m'; int[y]; y=f() } }
+## verify(fail)  { f():int := 0; L2() := {y:int; y='m';         y=f() } }
+## verify(fail)  { f(x:int) := int[x]; PC1() := {z := 'm' ; f[z] } }
+## verify(pass) {f(x:int):=x+1}
+## verify(pass) {f(x:int):=x; f(1)}
+## verify(pass) {f(x:int):int=x}
+## verify(pass) {f(x:int):int=x+1; f(1)}
+## verify(pass ) { f():int := 0; L1() := {y:int;  y = f[] } }
+## verify(pass)  { suc(a:int) := 10 ; g(x:int) := suc[x] }
+## verify(pass)  { suc(a:int):int := 10 ; g(x:int):int := suc[x] }
+## verify(pass)  { suc(a:int):int := {a+1} }
+## verify(pass)  { suc(a:int):int := {a+1} ; g(x:int):int := suc[x] }
+## verify(pass)  { f():int := 0; L1() := {y:int;  y = f[] } }
+## verify(pass)  { a:int => {x:=a; assume{x=a}}}
+## verify(pass, SPLITverify=skip)  { x:int => {x=0; assume{x=0}}}
+## verify(pass) {foo(z:int) := { z = z } }
+## verify(pass) {foo(z:any) := { x:int = 1; int[x] } }
+## verify(pass) {f(x:int):={x=x;x}}
+## verify(pass) {f(x:int):=x+1}
+## verify(pass) {f(x:int):=x; f(1)}
+## verify(pass) {f(x:int):=x+1; f(1)}
+## verify(pass) {f(x:int):int=x}
+## verify(pass) {f(x:int):int=x+1; f(1)}
+## verify(pass) {f(x:int):int = x; a := f(1); int[a] }
+## verify(pass) {f(x:int):int=x+1; f(1) + 1 }
+## verify(pass) {f(x:int,y:int)<decides> := (x > 0) }
 
-# verify(pass) { f():int := { 1 } }
-# verify(pass) { f(x:int) := { 10 } }
-# verify(pass) { f(x:int):int := { 10 } }
-# verify(pass) { f(x:int):int := { x } }
-# verify(pass) { f(a:int, b:int) := { x := a; if (x = b) { x = b} else { 123 } } }
-# verify(pass) { f(x:int):int := { x + 1 } }
-# verify(pass) { (a:int) => (b:int) => (c:int) => 10 }
-# verify(pass) { f():int := { 1 + 2 } }
-# verify(fail)  { f():int := 0; L2() := {y:any; y='m'; int[y]; y=f() } }
-# verify(fail)  { f():int := 0; L2() := {y:int; y='m';         y=f() } }
-# verify(fail)  { f(x:int) := int[x]; PC1() := {z := 'm' ; f[z] } }
-# verify(pass) {f(x:int):=x+1}
-# verify(pass) {f(x:int):=x; f(1)}
-# verify(pass) {f(x:int):int=x}
-# verify(pass) {f(x:int):int=x+1; f(1)}
-
-###################################################################################
-
-verify(pass ) { f():int := 0; L1() := {y:int;  y = f[] } }
-
-# verify(pass)  { suc(a:int) := 10 ; g(x:int) := suc[x] }
-# verify(pass)  { suc(a:int):int := 10 ; g(x:int):int := suc[x] }
-# verify(pass)  { suc(a:int):int := {a+1} }
-# verify(pass)  { suc(a:int):int := {a+1} ; g(x:int):int := suc[x] }
-# verify(pass)  { f():int := 0; L1() := {y:int;  y = f[] } }
-# verify(pass)  { a:int => {x:=a; assume{x=a}}}
-# verify(pass)  { x:int => {x=0; assume{x=0}}}
-# verify(pass) {foo(z:int) := { z = z } }
-# verify(pass) {foo(z:any) := { x:int = 1; int[x] } }
-# verify(pass) {f(x:int):={x=x;x}}
-# verify(pass) {f(x:int):=x+1}
-# verify(pass) {f(x:int):=x; f(1)}
-# verify(pass) {f(x:int):=x+1; f(1)}
-# verify(pass) {f(x:int):int=x}
-# verify(pass) {f(x:int):int=x+1; f(1)}
-# verify(pass) {f(x:int):int = x; a := f(1); int[a] }
-# verify(pass) {f(x:int):int=x+1; f(1)+1}
+# verify(fail) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
+verify(fail) { g(x : int, y : int, z: int where x = z) := { x = y } }

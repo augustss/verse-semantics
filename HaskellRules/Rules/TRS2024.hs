@@ -9,6 +9,7 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
+-- import qualified Rules.ICFP as ICFP
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
@@ -21,7 +22,7 @@ systemTRS2024 = TRSystem
   { sname               = "TRS2024"
   , description         = "TRS2024, as specified in our internal document"
   , ruleEnv             = defaultTRSFlags
-  , preProcess          = const (check valid . anf)
+  , preProcess          = {- preProcess ICFP.systemICFPE -} const (check valid . anf)
   , postProcess         = const id
   , rules               = allRules
   , rules2              = \ _ _ -> []
@@ -200,15 +201,12 @@ substX1 zs lhs =
   do e1 :>>: e2 <- [lhs]
      (ctx, zs', hole) <- substX zs e1
      return ((:>>: e2) . ctx, zs', hole)
- ++ -- RJ: adding EXI to subst-ctxt
-  do Exi bnd <- [lhs]
-     let Bind x e = alphaRename zs bnd
-     (ctx, zs', hole) <- substX (x:zs) e
-     return (Exi . Bind x . ctx, zs', hole)
---  ++
---   do EXI y x <- [lhs]
---      (ctx, hole) <- substX x
---      pure (EXI y . ctx, hole)
+--  ++ -- RJ: adding EXI to subst-ctxt
+--   do Exi bnd <- [lhs]
+--      let Bind x e = alphaRename zs bnd
+--      (ctx, zs', hole) <- substX (x:zs) e
+--      return (Exi . Bind x . ctx, zs', hole)
+
 
 
 evalX, evalX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
@@ -362,12 +360,20 @@ rulesUnification _ lhs =
 
 rulesSubstitution :: ERule
 rulesSubstitution _ lhs =
+  -- exi x. exi ys. S[x=v] --->  exi ys. S{v/x}[<>]   if x not in fv(v)
   "SUBST1" `name`
-  do Exi (Bind x e) <- [lhs]
+  do EXI x e'     <- [lhs]
+     let (ys, e) = getExis e'
      (s, _ , Var x' :=: Val v) <- substX [] e
      guard (x == x')
      guard (not (isValueX v x))
-     pure ((substCtx [(x,v)] s) (Arr []))
+     pure (exis ys (substCtx [(x,v)] s (Arr [])))
+--   do Exi (Bind x e) <- [lhs]
+--      (s, _ , Var x' :=: Val v) <- substX [] e
+--      guard (x == x')
+--      guard (not (isValueX v x))
+--      pure ((substCtx [(x,v)] s) (Arr []))
+
 
 --------------------------------------------------------------------------------
 

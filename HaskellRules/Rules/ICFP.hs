@@ -7,8 +7,8 @@ module Rules.ICFP(
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, {- anf, -} anfK, execX, defX, execX1, choiceX, ltExpr,
-  hasStore, isChoiceFree
+  isRecursive, anf, anfK, execX, defX, execX1, choiceX, ltExpr,
+  hasStore, isChoiceFree, rulesExiFloat
   ) where
 import Control.Monad( guard )
 import Data.List
@@ -1010,8 +1010,8 @@ defX xx lhs =
 
 --------------------------------------------------------------------------------
 
-rulesNormalization :: ERule
-rulesNormalization _ lhs =
+rulesExiFloat :: p -> Expr -> [(String, Expr)]
+rulesExiFloat _ lhs =
   "EXI-FLOAT" `name`
   do (ctx, EXI x e) <- execX1 lhs  -- Note: Store not allowed in ctx
      guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
@@ -1020,6 +1020,10 @@ rulesNormalization _ lhs =
      if x `elem` freeX
        then pure (EXI x' (ctx (subst [(x,Var x')] e)))
        else pure (EXI x (ctx e))
+
+rulesNormalization :: ERule
+rulesNormalization env lhs =
+  rulesExiFloat env lhs
  ++
   "SEQ-ASSOC" `name`
   do (e1 :>: e2) :>: e3 <- [lhs]

@@ -35,11 +35,11 @@ testiblock:
 	$(TESTER) --quiet --split --rules=iblock --assume-verified --max-steps=25000    $(TESTSTOREFILE)
 
 testverify:
-	$(TESTER) --quiet --rules=$(VRULES) --max-norm-steps=100000 $(VERIFY)
+	$(TESTER) --quiet         --prelude=verifyprelude --rules=$(VRULES) --max-norm-steps=100000 $(VERIFY)
 	cabal run trsverifier
 
 traceverify:
-	$(TESTER) --quiet --trace --prelude=verifyprelude --rules=$(VRULES) --max-norm-steps=500000 $(TRACEVERIFY)
+	$(TESTER) --quiet --trace --prelude=verifyprelude --rules=$(VRULES) --max-norm-steps=100000 $(TRACEVERIFY)
 
 testicfpqc:
 	$(QCTEST) --rules=ICFP --ignore-fuel-stop --max-success=1000000 --ignore-recursive

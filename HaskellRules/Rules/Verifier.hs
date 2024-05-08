@@ -26,6 +26,7 @@ import Control.Monad (guard)
 import Data.List ((\\))
 import Rules.TRS2024 (isEffectFree)
 import qualified Rules.TRS2024 as TRS2024
+import qualified Rules.ICFP as ICFP
 
 -- | Run verification rules.
 _traceShow :: (Pretty a) => String -> a -> a
@@ -51,7 +52,7 @@ verify sys e =
          Timeout (_, tr) -> (False, tr)
 
 wrapAssert :: Expr -> Expr
-wrapAssert = Assert
+wrapAssert e = Verify [] [] (Assert e)
 
 -- | `isDone e` ignores "assert/decide" that occur under `verify` which are themselves
 --   under TOP-LEVEL lambdas, as those are obligations for higher-order args that are checked at
@@ -61,8 +62,8 @@ isDone :: Expr -> Bool
 isDone = go False False
  where
   go :: Bool -> Bool -> Expr -> Bool
-  go _   _   (Assert _)       = False
-  go _   _   (Decide _)       = False
+  go _   lam   (Assert _)     = lam || False
+  go _   lam   (Decide _)     = lam || False
   go _   lam (Verify _ _ e)   = lam || go True False e
   go ver _   (Lam (Bind _ e)) = go ver (not ver) e
   go ver _   (Uni (Bind _ e)) = go ver (not ver) e
@@ -109,8 +110,9 @@ splitVerifier = TRS2024.systemTRS2024 -- systemICFPE
   , description = "ICFPE + split verifier rules"
   , rules =     -- (rules systemICFPE -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
                 --  <> Old.generalizedIcfpRules
-                 rules TRS2024.systemTRS2024
+                 (rules TRS2024.systemTRS2024 -= "EXI-FLOAT")
               <> ifRules
+              <> ICFP.rulesExiFloat
               -- <> substRules
               <> guardRules
               <> checkRules
@@ -221,17 +223,20 @@ verifyRules env lhs =
    "SUBST-ASM" `name`
    -- VERIFY(rs, A[r = hnf]) { e } ---> VERIFY(rs, A{hnf/r}[r = hnf]) { e{hnf/r} }
    do Verify rs as e <- [lhs]
-      (a@(Assume (Var r :=: HNF h)), as') <- asmX as
+      (as1, a@(Assume (Var r :=: HNF h)), as2) <- asmX as
+      guard (not (isArr h))
       guard (r `elem` rs)
-      pure $ Verify rs (a: subst [(r, h)] as') ( subst [(r, h)] e)
+      pure $ Verify rs ( subst [(r, h)] as1 ++ [a] ++ subst [(r, h)] as2) ( subst [(r, h)] e)
 
+isArr :: Expr -> Bool
+isArr (Arr _) = True
+isArr _       = False
 
-
-asmX :: [a] -> [(a, [a])]
+asmX :: [a] -> [([a], a, [a])]
 asmX = go []
   where
     go _  []      = []
-    go as (a:as') = (a, as++as') : go (a:as) as'
+    go as (a:as') = (reverse as, a, as') : go (a:as) as'
 
 unsat :: [Ident] -> [Expr] -> Bool
 unsat _ es = asmFail || contra || _refl
