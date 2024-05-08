@@ -1108,10 +1108,10 @@ reflectAbortS ak =
   asksMV (\ R {..} -> ak heaps) >>= reflectS
 
 alt :: VerseT m a -> VerseT m a -> VerseT m a -> VerseT m a
-alt x y z = VerseT $ \ yk r@R {..} s sk fk fk' ->
-  unVerseT x yk r s sk
-  (\ heaps -> dup $ unVerseT y yk R {..} s sk fk fk)
-  (\ heaps -> dup $ unVerseT z yk R {..} s sk fk fk')
+alt m m_f m_f' = VerseT $ \ yk r@R {..} s sk fk fk' ->
+  unVerseT m yk r s sk
+  (\ heaps -> dup $ unVerseT m_f yk R {..} s sk fk fk)
+  (\ heaps -> dup $ unVerseT m_f' yk R {..} s sk fk fk')
 
 alt' :: VerseT m () -> Choices m -> VerseT m ()
 alt' m Choices {..} = VerseT $ \ yk r@R {..} s sk fk fk' ak ak' ->

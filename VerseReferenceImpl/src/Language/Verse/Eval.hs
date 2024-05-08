@@ -13,6 +13,7 @@ module Language.Verse.Eval
   ) where
 
 import Control.Applicative
+import Control.Arrow
 import Control.Comonad
 import Control.Monad.Extras
   ( Monad (..)
@@ -1406,7 +1407,7 @@ invokeNegList
   -> S m
   -> EvalT m (VarVal m)
 invokeNegList loc assumed xs var s s' = do
-  unifyG' loc xs <=< lift $ newList var
+  localAssumed assumed . unifyG' loc xs <=< lift $ newList var
   lift $ unifyS s s'
   pure var
   where
@@ -1662,6 +1663,9 @@ moduleFromScopes (Val.Scope _ _ moduleLabel :| _) = moduleLabel
 localScopes :: NonEmpty Val.Scope -> EvalT m a -> EvalT m a
 localScopes scopes = local $ \ r -> r { scopes }
 
+localAssumed :: Bool -> EvalT m a -> EvalT m a
+localAssumed assumed = local $ \ r -> r { assumed }
+
 localSign :: Val.Sign -> EvalT m a -> EvalT m a
 localSign sign = local $ \ r -> r { sign }
 
@@ -1883,7 +1887,7 @@ matchG
 matchG loc = curry $ \ case
   (List.Nil, List.Nil) -> pure $ pure ()
   (List.Var x xs, List.Var y ys) -> pure $
-    if'' (unify' loc x y)
+    if'' (asks ((.assumed) >>> not) >>= guard >> unify' loc x y)
     do
       const $ unifyG' loc xs ys
     do

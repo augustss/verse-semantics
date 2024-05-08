@@ -424,6 +424,12 @@ instance ( Freezable a b m
     Var x xs -> Var <$> freeze x <*> freeze xs
     Contract x xs -> Contract x <$> freeze xs
 
+instance (Pretty a, Pretty b) => Pretty (List a b) where
+  pretty = \ case
+    Nil -> "()"
+    Var x xs -> tupled [pretty x, pretty xs]
+    Contract x xs -> tupled [pretty x <> brackets (pretty '_'), pretty xs]
+
 newtype VarVal m = VarVal (Var m (Val (VerseRef m) (VarList m) (VarVal m)))
 
 instance ( MonadFix m
@@ -454,6 +460,9 @@ instance Pretty FrozenVal where
   pretty (FrozenVal x) = pretty x
 
 newtype FrozenList = FrozenList (Maybe (List FrozenVal FrozenList)) deriving Show
+
+instance Pretty FrozenList where
+  pretty (FrozenList x) = pretty x
 
 type Exp = L (Desugar.Exp L Ident)
 
