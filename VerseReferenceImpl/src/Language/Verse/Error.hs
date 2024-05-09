@@ -39,7 +39,7 @@ data Error
   | EnvError !Loc
   | DomError !Loc !Loc !FrozenVal
   | OLamDomError !Loc !Loc !Loc !FrozenVal
-  | IntrinsicDomError !Loc
+  | IntrinsicDomError !Loc !FrozenVal
   | AccessError !Loc Access
   | StuckError
   | OtherError !Pos String -- Used for Parsec error type
@@ -75,7 +75,8 @@ instance Pretty Error where
     NameError x y ->
       pretty x <> colon <+> "name" <+> pretty y <+> "not" <+> "in" <+> "scope"
     IdentError x y ->
-      pretty x <> colon <+> "identifier" <+> pretty y <+> "not" <+> "in" <+> "scope"
+      pretty x <> colon <+>
+      "identifier" <+> pretty y <+> "not" <+> "in" <+> "scope"
     SucceedsError x ->
       pretty x <> colon <+> "expected" <+> "one" <+> "value"
     FailsError x ->
@@ -104,9 +105,9 @@ instance Pretty Error where
     OLamDomError a b c d ->
       pretty a <+> "and" <+> pretty b <+> "and" <+> pretty c <> colon <+>
       "overlapping" <+> "function" <+> "domains" <+> "for" <+> pretty d
-    IntrinsicDomError x ->
-      pretty x <> colon <+>
-      "overlapping" <+> "function" <+> "domains"
+    IntrinsicDomError a b ->
+      pretty a <> colon <+>
+      "overlapping" <+> "function" <+> "domains" <+> "for" <+> pretty b
     AccessError x access ->
       pretty x <> colon <+>
       "specifier" <+> "<" <> pretty access <> ">" <+> "can't" <+> "be" <+> "used" <+> "here"

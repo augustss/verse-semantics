@@ -1716,59 +1716,89 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         x <- lift $ newVar' Val.SomeAny
         unify' loc' x y
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.SomeRational, Val.SomeRational) -> pure (LE, pure ())
-  (Val.SomeRational, Val.Rational _) -> pure (GE, pure ())
-  (Val.SomeRational, Val.SomeInt) -> pure (GE, pure ())
-  (Val.SomeRational, Val.Int _) -> pure (GE, pure ())
-  (Val.Rational _, Val.SomeRational) -> pure (LE, pure ())
+  (Val.SomeRational, Val.SomeRational) ->
+    pure (LE, pure ())
+  (Val.SomeRational, Val.Rational _) ->
+    pure (GE, pure ())
+  (Val.SomeRational, Val.SomeInt) ->
+    pure (GE, pure ())
+  (Val.SomeRational, Val.Int _) ->
+    pure (GE, pure ())
+  (Val.Rational _, Val.SomeRational) ->
+    pure (LE, pure ())
   (Val.Rational x, Val.Rational y) ->
     guard (x == y) $> (SEQ, pure ())
   (Val.Rational x, Val.SomeInt) ->
     guard (denominator x == 1) $> (LE, pure ())
   (Val.Rational x, Val.Int y) ->
     guard (denominator x == 1 && numerator x == y) $> (SEQ, pure ())
-  (Val.SomeInt, Val.SomeRational) -> pure (LE, pure ())
+  (Val.SomeInt, Val.SomeRational) ->
+    pure (LE, pure ())
   (Val.SomeInt, Val.Rational y) ->
     guard (1 == denominator y) $> (GE, pure ())
-  (Val.SomeInt, Val.SomeInt) -> pure (LE, pure ())
-  (Val.SomeInt, Val.Int _) -> pure (GE, pure ())
-  (Val.Int _, Val.SomeRational) -> pure (LE, pure ())
+  (Val.SomeInt, Val.SomeInt) ->
+    pure (LE, pure ())
+  (Val.SomeInt, Val.Int _) ->
+    pure (GE, pure ())
+  (Val.Int _, Val.SomeRational) ->
+    pure (LE, pure ())
   (Val.Int x, Val.Rational y) ->
     guard (1 == denominator y && x == numerator y) $> (SEQ, pure ())
-  (Val.Int _, Val.SomeInt) -> pure (LE, pure ())
-  (Val.Int x, Val.Int y) -> guard (x == y) $> (SEQ, pure ())
-  (Val.SomeFloat, Val.SomeFloat) -> pure (LE, pure ())
-  (Val.SomeFloat, Val.Float _) -> pure (GE, pure ())
-  (Val.Float _, Val.SomeFloat) -> pure (LE, pure ())
-  (Val.Float x, Val.Float y) -> guard (eqFloat x y) $> (SEQ, pure ())
-  (Val.SomeChar, Val.SomeChar) -> pure (LE, pure ())
-  (Val.SomeChar, Val.Char _) -> pure (GE, pure ())
-  (Val.Char _, Val.SomeChar) -> pure (LE, pure ())
-  (Val.Char x, Val.Char y) -> guard (x == y) $> (SEQ, pure ())
-  (Val.SomeChar32, Val.SomeChar32) -> pure (LE, pure ())
-  (Val.SomeChar32, Val.Char32 _) -> pure (GE, pure ())
-  (Val.Char32 _, Val.SomeChar32) -> pure (LE, pure ())
-  (Val.Char32 x, Val.Char32 y) -> guard (x == y) $> (SEQ, pure ())
-  (Val.Path x, Val.Path y) -> guard (x == y) $> (SEQ, pure ())
-  (Val.Truth x, Val.Truth y) -> pure . (SEQ,) $ unify' loc' x y
-  (Val.Tuple xs, Val.Tuple ys) -> pure . (SEQ,) $ unifyList loc' xs ys
-  (Val.Ptr ref_x x, Val.Ptr ref_y y) -> pure $ (SEQ,) do
-    guard $ ref_x == ref_y
-    unify' loc' x y
-  (Val.Enum i env_x xs, Val.Enum j env_y ys) -> guard (i == j) $> (SEQ,) do
-    unifyEnv loc' env_x env_y
-    unifyList loc' xs ys
+  (Val.Int _, Val.SomeInt) ->
+    pure (LE, pure ())
+  (Val.Int x, Val.Int y) ->
+    guard (x == y) $> (SEQ, pure ())
+  (Val.SomeFloat, Val.SomeFloat) ->
+    pure (LE, pure ())
+  (Val.SomeFloat, Val.Float _) ->
+    pure (GE, pure ())
+  (Val.Float _, Val.SomeFloat) ->
+    pure (LE, pure ())
+  (Val.Float x, Val.Float y) ->
+    guard (eqFloat x y) $> (SEQ, pure ())
+  (Val.SomeChar, Val.SomeChar) ->
+    pure (LE, pure ())
+  (Val.SomeChar, Val.Char _) ->
+    pure (GE, pure ())
+  (Val.Char _, Val.SomeChar) ->
+    pure (LE, pure ())
+  (Val.Char x, Val.Char y) ->
+    guard (x == y) $> (SEQ, pure ())
+  (Val.SomeChar32, Val.SomeChar32) ->
+    pure (LE, pure ())
+  (Val.SomeChar32, Val.Char32 _) ->
+    pure (GE, pure ())
+  (Val.Char32 _, Val.SomeChar32) ->
+    pure (LE, pure ())
+  (Val.Char32 x, Val.Char32 y) ->
+    guard (x == y) $> (SEQ, pure ())
+  (Val.Path x, Val.Path y) ->
+    guard (x == y) $> (SEQ, pure ())
+  (Val.Truth x, Val.Truth y) ->
+    pure . (SEQ,) $ unify' loc' x y
+  (Val.Tuple xs, Val.Tuple ys) ->
+    pure . (SEQ,) $ unifyList loc' xs ys
+  (Val.Ptr ref_x x, Val.Ptr ref_y y) ->
+    guard (ref_x == ref_y) $> (SEQ,) do
+      unify' loc' x y
+  (Val.Enum i env_x xs, Val.Enum j env_y ys) ->
+    guard (i == j) $> (SEQ,) do
+      unifyEnv loc' env_x env_y
+      unifyList loc' xs ys
   (Val.EnumValue i x, Val.EnumValue j y) ->
     guard (i == j && x == y) $> (SEQ, pure ())
-  (Val.StructInst x, Val.StructInst y) -> do
-    guard (x.expLabel == y.expLabel) $> (SEQ, unifyEnv loc' x.members y.members)
-  (Val.ClassInst x, Val.ClassInst y) -> guard (x.expLabel == y.expLabel) $> (SEQ,) do
-    unifyMaybe loc' x.super y.super
-    unifyEnv loc' x.members y.members
+  (Val.StructInst x, Val.StructInst y) ->
+    guard (x.expLabel == y.expLabel) $> (SEQ,) do
+      unifyEnv loc' x.members y.members
+  (Val.ClassInst x, Val.ClassInst y) ->
+    guard (x.expLabel == y.expLabel) $> (SEQ,) do
+      unifyMaybe loc' x.super y.super
+      unifyEnv loc' x.members y.members
   (Val.Lam _, Val.SomeAny)
     | r.assumed -> pure (LE, pure ())
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.Lam _, Val.Lam _) -> wrong $ UndecidableError loc'
+  (Val.Lam _, Val.Lam _) ->
+    wrong $ UndecidableError loc'
   (Val.Lam _, Val.SomeFunction) -> wrong $ UndecidableError loc'
   (Val.Lam _, Val.OLam {}) -> wrong $ UndecidableError loc'
   (Val.SomeFunction, Val.SomeAny)
@@ -1801,21 +1831,23 @@ match loc' x y = ask >>= \ r -> case (x, y) of
     | otherwise -> wrong $ UndecidableError loc'
   (Val.OLam x xs, Val.OLam y ys) ->
     pure $ (SEQ,) do
-      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
-        i <- lift $ newVar' Val.SomeAny
-        invokeOLamDom_ loc' x i
-        invokeOLamDom_ loc' y i
-        wrong . OLamDomError loc' (loc x.domain) (loc y.domain) =<< lift (freeze' i)
+      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $
+        lift (newVar' Val.SomeAny) >>= \ i ->
+        invokeOLamDom_ loc' x i >>
+        invokeOLamDom_ loc' y i >>
+        lift (freeze' i) >>=
+        wrong . OLamDomError loc' (loc x.domain) (loc y.domain)
       zs <- lift freshVar'
       unify' loc' xs <=< lift . newVar' $ Val.OLam y zs
       unify' loc' ys <=< lift . newVar' $ Val.OLam x zs
   (Val.OLam x xs, Val.Intrinsic y ys) ->
     pure $ (SEQ,) do
-      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
-        i <- lift $ newVar' Val.SomeAny
-        invokeOLamDom_ loc' x i
-        invokeIntrinsicDom_ loc' y i
-        wrong . DomError loc' (loc x.domain) =<< lift (freeze' i)
+      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $
+        lift (newVar' Val.SomeAny) >>= \ i ->
+        invokeOLamDom_ loc' x i >>
+        invokeIntrinsicDom_ loc' y i >>
+        lift (freeze' i) >>=
+        wrong . DomError loc' (loc x.domain)
       zs <- lift freshVar'
       unify' loc' xs <=< lift . newVar' $ Val.Intrinsic y zs
       unify' loc' ys <=< lift . newVar' $ Val.OLam x zs
@@ -1831,21 +1863,23 @@ match loc' x y = ask >>= \ r -> case (x, y) of
     | otherwise -> wrong $ UndecidableError loc'
   (Val.Intrinsic x xs, Val.OLam y ys) ->
     pure $ (SEQ,) do
-      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $ do
-        i <- lift $ newVar' Val.SomeAny
-        invokeIntrinsicDom_ loc' x i
-        invokeOLamDom_ loc' y i
-        wrong . DomError loc' (loc y.domain) =<< lift (freeze' i)
+      whenVerifying . fork' . verify' . local (\ r -> r { assumed = True }) $
+        lift (newVar' Val.SomeAny) >>= \ i ->
+        invokeIntrinsicDom_ loc' x i >>
+        invokeOLamDom_ loc' y i >>
+        lift (freeze' i) >>=
+        wrong . DomError loc' (loc y.domain)
       zs <- lift freshVar'
       unify' loc' xs <=< lift . newVar' $ Val.OLam y zs
       unify' loc' ys <=< lift . newVar' $ Val.Intrinsic x zs
   (Val.Intrinsic x xs, Val.Intrinsic y ys) ->
     pure $ (SEQ,) do
-      whenVerifying . verify' . local (\ r -> r { assumed = True }) $ do
-        i <- lift $ newVar' Val.SomeAny
-        invokeIntrinsicDom_ loc' x i
-        invokeIntrinsicDom_ loc' y i
-        wrong $ IntrinsicDomError loc'
+      whenVerifying . verify' . local (\ r -> r { assumed = True }) $
+        lift (newVar' Val.SomeAny) >>= \ i ->
+        invokeIntrinsicDom_ loc' x i >>
+        invokeIntrinsicDom_ loc' y i >>
+        lift (freeze' i) >>=
+        wrong . IntrinsicDomError loc'
       zs <- lift freshVar'
       unify' loc' xs =<< lift (newVar' $ Val.Intrinsic y zs)
       unify' loc' ys =<< lift (newVar' $ Val.Intrinsic x zs)
