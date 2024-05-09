@@ -1717,7 +1717,7 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         unify' loc' x y
     | otherwise -> wrong $ UndecidableError loc'
   (Val.SomeRational, Val.SomeRational) ->
-    pure (LE, pure ())
+    pure (GE, pure ())
   (Val.SomeRational, Val.Rational _) ->
     pure (GE, pure ())
   (Val.SomeRational, Val.SomeInt) ->
@@ -1737,7 +1737,7 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.SomeInt, Val.Rational y) ->
     guard (1 == denominator y) $> (GE, pure ())
   (Val.SomeInt, Val.SomeInt) ->
-    pure (LE, pure ())
+    pure (GE, pure ())
   (Val.SomeInt, Val.Int _) ->
     pure (GE, pure ())
   (Val.Int _, Val.SomeRational) ->
@@ -1749,7 +1749,7 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Int x, Val.Int y) ->
     guard (x == y) $> (SEQ, pure ())
   (Val.SomeFloat, Val.SomeFloat) ->
-    pure (LE, pure ())
+    pure (GE, pure ())
   (Val.SomeFloat, Val.Float _) ->
     pure (GE, pure ())
   (Val.Float _, Val.SomeFloat) ->
@@ -1757,7 +1757,7 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Float x, Val.Float y) ->
     guard (eqFloat x y) $> (SEQ, pure ())
   (Val.SomeChar, Val.SomeChar) ->
-    pure (LE, pure ())
+    pure (GE, pure ())
   (Val.SomeChar, Val.Char _) ->
     pure (GE, pure ())
   (Val.Char _, Val.SomeChar) ->
@@ -1765,7 +1765,7 @@ match loc' x y = ask >>= \ r -> case (x, y) of
   (Val.Char x, Val.Char y) ->
     guard (x == y) $> (SEQ, pure ())
   (Val.SomeChar32, Val.SomeChar32) ->
-    pure (LE, pure ())
+    pure (GE, pure ())
   (Val.SomeChar32, Val.Char32 _) ->
     pure (GE, pure ())
   (Val.Char32 _, Val.SomeChar32) ->
@@ -1823,7 +1823,8 @@ match loc' x y = ask >>= \ r -> case (x, y) of
         ys <- lift $ newVar' Val.SomeFunction
         unify' loc' xs ys
     | otherwise -> wrong $ UndecidableError loc'
-  (Val.OLam {}, Val.Lam _) -> wrong $ UndecidableError loc'
+  (Val.OLam {}, Val.Lam _) ->
+    wrong $ UndecidableError loc'
   (Val.OLam _ xs, Val.SomeFunction)
     | r.assumed -> pure $ (LE,) do
         ys <- lift $ newVar' Val.SomeFunction
