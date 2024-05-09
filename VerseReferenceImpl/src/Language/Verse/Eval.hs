@@ -13,7 +13,6 @@ module Language.Verse.Eval
   ) where
 
 import Control.Applicative
-import Control.Arrow
 import Control.Comonad
 import Control.Monad.Extras
   ( Monad (..)
@@ -1407,7 +1406,7 @@ invokeNegList
   -> S m
   -> EvalT m (VarVal m)
 invokeNegList loc assumed xs var s s' = do
-  localAssumed assumed . unifyG' loc xs <=< lift $ newList var
+  unifyG' loc xs <=< lift $ newList var
   lift $ unifyS s s'
   pure var
   where
@@ -1663,9 +1662,6 @@ moduleFromScopes (Val.Scope _ _ moduleLabel :| _) = moduleLabel
 localScopes :: NonEmpty Val.Scope -> EvalT m a -> EvalT m a
 localScopes scopes = local $ \ r -> r { scopes }
 
-localAssumed :: Bool -> EvalT m a -> EvalT m a
-localAssumed assumed = local $ \ r -> r { assumed }
-
 localSign :: Val.Sign -> EvalT m a -> EvalT m a
 localSign sign = local $ \ r -> r { sign }
 
@@ -1693,12 +1689,7 @@ freshEnv xs = do
 unify'
   :: MonadEval m
   => Loc -> VarVal m -> VarVal m -> EvalT m ()
-unify' loc x y = do
-  r <- ask
-  lift $ unify
-    (\ x y -> runReaderT (match loc x y) r <&> fmap (\ m -> runReaderT m r))
-    (coerce x)
-    (coerce y)
+unify' loc = unify'' (match loc) `on` coerce
 
 match
   :: MonadEval m
@@ -1887,7 +1878,7 @@ matchG
 matchG loc = curry $ \ case
   (List.Nil, List.Nil) -> pure $ pure ()
   (List.Var x xs, List.Var y ys) -> pure $
-    if'' (asks ((.assumed) >>> not) >>= guard >> unify' loc x y)
+    if'' (unifyHead loc x y)
     do
       const $ unifyG' loc xs ys
     do
@@ -1909,6 +1900,22 @@ matchG loc = curry $ \ case
       zs <- lift freshGVar'
       unifyG' loc xs <=< lift . newGVar' $ List.Contract y zs
       unifyG' loc ys <=< lift . newGVar' $ List.Contract x zs
+  _ -> empty
+
+
+unifyHead
+  :: MonadEval m
+  => Loc -> VarVal m -> VarVal m -> EvalT m ()
+unifyHead loc = unify'' (matchHead loc) `on` coerce
+
+matchHead
+  :: MonadEval m
+  => Loc
+  -> Val (VerseRef m) (VarList m) (VarVal m)
+  -> Val (VerseRef m) (VarList m) (VarVal m)
+  -> EvalT m (Match, EvalT m ())
+matchHead loc x y = match loc x y >>= \ case
+  (SEQ, m) -> pure (SEQ, m)
   _ -> empty
 
 unifyMaybe
@@ -1953,6 +1960,13 @@ unifyNamed loc = curry $ \ case
   (Val x, Val y) -> unify' loc x y
   (Ref x, Ref y) -> unify' loc x y
   _ -> empty
+
+unify''
+  :: MonadEval m
+  => (a -> a -> EvalT m (Match, EvalT m ()))
+  -> Var m a -> Var m a -> EvalT m ()
+unify'' f x y = ask >>= \ r -> lift $
+  unify (\ x y -> runReaderT (f x y) r <&> fmap (\ m -> runReaderT m r)) x y
 
 eqFloat :: Double -> Double -> Bool
 eqFloat x y = if isNaN x then isNaN y else x == y
