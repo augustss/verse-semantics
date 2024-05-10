@@ -77,7 +77,7 @@ import Language.Verse.Path
 import Language.Verse.SimpleName
 import Language.Verse.Val
   ( FrozenVal
-  , List
+  , List (..)
   , Named (..)
   , RefVarVal
   , Val
@@ -87,7 +87,6 @@ import Language.Verse.Val
   , VarVal
   , forVal_
   )
-import Language.Verse.Val qualified as List
 import Language.Verse.Val qualified as Val
 
 import Prelude
@@ -1381,7 +1380,7 @@ type'
   => Loc -> VarVal m -> EvalT m (DomMatch m)
 type' loc var = anyDom $ do
   R {..} <- ask
-  unify' loc var <=< lift $ newVar' . Val.Type assumed sign =<< freshDGVar' List.Nil
+  unify' loc var <=< lift $ newVar' . Val.Type assumed sign =<< freshDGVar' Nil
   pure var
 
 query
@@ -1414,8 +1413,8 @@ invokeNegList loc assumed xs var s s' = do
   pure var
   where
     newList var = readVar' var >>= \ case
-      Val.Some x | not assumed -> newGVar' . List.Contract x =<< freshGVar'
-      _ -> newGVar' . List.Var var =<< freshGVar'
+      Val.Some x | not assumed -> newGVar' . Contract x =<< freshGVar'
+      _ -> newGVar' . Var var =<< freshGVar'
 
 invokePosList
   :: MonadEval m
@@ -1431,9 +1430,9 @@ invokePosList loc xs var s s' = do
   pure var
   where
     loop = lift . readGVar' >=> \ case
-      List.Nil -> empty
-      List.Var x xs -> unify' loc x var <|> loop xs
-      List.Contract x xs -> invokeContract loc x var <|> loop xs
+      Nil -> empty
+      Var x xs -> unify' loc x var <|> loop xs
+      Contract x xs -> invokeContract loc x var <|> loop xs
 
 readPair
   :: (MonadFix m, MonadRef m, MonadSupply Int m)
@@ -1914,30 +1913,30 @@ matchG
   -> List (VarVal m) (VarList m)
   -> EvalT m (EvalT m ())
 matchG loc = curry $ \ case
-  (List.Nil, List.Nil) -> pure $ pure ()
-  (List.Var x xs, List.Var y ys) -> pure $
+  (Nil, Nil) -> pure $ pure ()
+  (Var x xs, Var y ys) -> pure $
     if'' (unifyHead loc x y)
     do
       const $ unifyG' loc xs ys
     do
       zs <- lift freshGVar'
-      unifyG' loc xs <=< lift . newGVar' $ List.Var y zs
-      unifyG' loc ys <=< lift . newGVar' $ List.Var x zs
-  (List.Var x xs, List.Contract y ys) -> pure $ do
+      unifyG' loc xs <=< lift . newGVar' $ Var y zs
+      unifyG' loc ys <=< lift . newGVar' $ Var x zs
+  (Var x xs, Contract y ys) -> pure $ do
      zs <- lift freshGVar'
-     unifyG' loc xs <=< lift . newGVar' $ List.Contract y zs
-     unifyG' loc ys <=< lift . newGVar' $ List.Var x zs
-  (List.Contract x xs, List.Var y ys) -> pure $ do
+     unifyG' loc xs <=< lift . newGVar' $ Contract y zs
+     unifyG' loc ys <=< lift . newGVar' $ Var x zs
+  (Contract x xs, Var y ys) -> pure $ do
      zs <- lift freshGVar'
-     unifyG' loc xs <=< lift . newGVar' $ List.Var y zs
-     unifyG' loc ys <=< lift . newGVar' $ List.Contract x zs
-  (List.Contract x xs, List.Contract y ys) -> pure $
+     unifyG' loc xs <=< lift . newGVar' $ Var y zs
+     unifyG' loc ys <=< lift . newGVar' $ Contract x zs
+  (Contract x xs, Contract y ys) -> pure $
     if x == y
     then unifyG' loc xs ys
     else do
       zs <- lift freshGVar'
-      unifyG' loc xs <=< lift . newGVar' $ List.Contract y zs
-      unifyG' loc ys <=< lift . newGVar' $ List.Contract x zs
+      unifyG' loc xs <=< lift . newGVar' $ Contract y zs
+      unifyG' loc ys <=< lift . newGVar' $ Contract x zs
   _ -> empty
 
 unifyHead
