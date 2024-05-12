@@ -9,6 +9,8 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module Control.Monad.Verse
   ( VerseT
+  , Level
+  , getLevel
   , runVerseT
   , runVerse
   , abort
@@ -35,6 +37,7 @@ module Control.Monad.Verse
   , freshDVar
   , newVar
   , readVar
+  , readVarLevel
   , unifyEq
   , Match (..)
   , unify
@@ -147,6 +150,11 @@ data R m = R
   , heaps :: !Heaps
   , latch :: !(Latch m)
   }
+
+type Level = Int
+
+minLevel :: Level
+minLevel = 0
 
 data Heaps = Heaps
   { heap :: !(Maybe Heap)
@@ -352,8 +360,6 @@ copyHeap pred = do
   tail <- getHeap
   pure $ Heap { label, pred = Just pred, tail }
 
-type Level = Int
-
 instance Functor (VerseT m) where
    fmap f m = VerseT $ \ yk r s sk ->
      unVerseT m yk r s $ \ heap s -> sk heap s . f
@@ -416,7 +422,7 @@ runVerseT m = do
   unVerseT (m <* runDefault) yk R {..} emptyS sk runFail runFail runAbort runAbort
   where
     yk = Yield $ \ _ _ _ _ _ _ _ -> pure Nothing
-    level = 0
+    level = minLevel
     verifyHeap = Nothing
     prepend x xss yss = ((x:) <$> xss) ++ yss
 
@@ -1185,7 +1191,7 @@ defaultVar (Var ref) binding = readVarState ref >>= \ case
     let bound = MkBound {..}
     var <- lift $ newVar'' bound
     writeVarState ref $ Link var
-    unbound.substSusp (var, Just bound)
+    unbound.substSusp var $ BoundS bound
 
 defaultGVar
   :: (MonadRef m, MonadSupply Int m, Defaultable a m)
@@ -1203,7 +1209,7 @@ defaultGVar' (Var ref) binding = readVarState ref >>= \ case
     let bound = MkBound {..}
     var <- lift $ newVar'' bound
     writeVarStateG ref $ Link var
-    unbound.substSusp (var, Just bound)
+    unbound.substSusp var $ BoundS bound
 
 instance Monad m => Defaultable () m where
   defaultVars = const $ pure ()
@@ -1262,7 +1268,7 @@ freshenUnbound (HRef ref) unbound = FreshenT $ do
       unbound' = Unbound MkUnbound
         { label = unbound.label
         , level = level - 1
-        , substSusp = const $ pure ()
+        , substSusp = emptySubstSusp
         }
     in modifyRef' ref $ insertLocalHeap heap.tail unbound' . deleteLocalHeap' heap
 
@@ -1288,8 +1294,11 @@ data VarState m a
 data Unbound m a = MkUnbound
   { label :: {-# UNPACK #-} !Int
   , level :: {-# UNPACK #-} !Int
-  , substSusp :: !(Subst m a -> VerseT m ())
+  , substSusp :: !(Var m a -> Subst m a -> VerseT m ())
   }
+
+emptySubstSusp :: Var m a -> Subst m a -> VerseT m ()
+emptySubstSusp _ _ = pure ()
 
 compareUnbound :: Unbound m a -> Unbound m a -> Ordering
 compareUnbound x y = compare (x.level, x.label) (y.level, y.label)
@@ -1308,7 +1317,7 @@ freshVar = do
 freshVar' :: (MonadRef m, MonadSupply Int m) => Int -> Maybe Heap -> m (Var m a)
 freshVar' level heap = do
   label <- supply
-  let substSusp = const $ pure ()
+  let substSusp = emptySubstSusp
   Var <$> newHRef' (Unbound MkUnbound {..}) heap
 
 freshDVar
@@ -1317,7 +1326,7 @@ freshDVar
 freshDVar binding = do
   label <- supply
   level <- getLevel
-  let substSusp = const $ pure ()
+  let substSusp = emptySubstSusp
   var <- Var <$> newHRef (Unbound MkUnbound {..})
   whenDefaulted $ defaultVar var binding
   pure var
@@ -1336,6 +1345,11 @@ newVar'' bound = Var <$> newHRef' (Bound bound) Nothing
 readVar :: MonadRef m => Var m a -> VerseT m a
 readVar = fmap ((.binding) . snd) . readBound
 
+readVarLevel :: MonadRef m => Var m a -> VerseT m Level
+readVarLevel var = readRoot var <&> \ case
+  (_, UnboundR unbound) -> unbound.level
+  _ -> minLevel
+
 unifyEq
   :: (MonadRef m, Eq a)
   => Var m a -> Var m a -> VerseT m ()
@@ -1348,16 +1362,16 @@ unify
   => (a -> a -> VerseT m (Match, VerseT m ()))
   -> Var m a -> Var m a -> VerseT m ()
 unify f var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
-  (UnboundR var1 unbound1, UnboundR var2 unbound2) ->
+  ((var1, UnboundR unbound1), (var2, UnboundR unbound2)) ->
     case compareUnbound unbound1 unbound2 of
       EQ -> pure ()
       LT -> unifyUnboundUnbound f var1 var2 unbound2
       GT -> unifyUnboundUnbound f var2 var1 unbound1
-  (UnboundR var1 unbound1, BoundR var2 bound2) ->
+  ((var1, UnboundR unbound1), (var2, BoundR bound2)) ->
     unifyBoundUnbound f var2 bound2 var1 unbound1
-  (BoundR var1 bound1, UnboundR var2 unbound2) ->
+  ((var1, BoundR bound1), (var2, UnboundR unbound2)) ->
     unifyBoundUnbound f var1 bound1 var2 unbound2
-  (BoundR var1 bound1, BoundR var2 bound2) ->
+  ((var1, BoundR bound1), (var2, BoundR bound2)) ->
     unifyBoundBound f var1 bound1 var2 bound2
 
 unifyUnboundUnbound
@@ -1366,12 +1380,12 @@ unifyUnboundUnbound
   -> Var m a -> Var m a -> Unbound m a -> VerseT m ()
 unifyUnboundUnbound f var1 var2@(Var ref2) unbound2 = do
   writeVarState ref2 $ Link var1
-  unbound2.substSusp (var1, Nothing)
+  unbound2.substSusp var1 LinkS
   whenM ((unbound2.level /=) <$> getLevel) $ do
     incrSuspCount =<< getLatch
     whenSuspended $ \ resume ->
-      fork $ readSubst var2 >>= \ subst2 -> resume $ do
-        unifySubst f subst2 var1
+      fork $ readSubst var2 >>= \ (var2, subst2) -> resume $ do
+        unifySubst f var2 subst2 var1
         decrSuspCount =<< getLatch
 
 unifyBoundUnbound
@@ -1380,7 +1394,7 @@ unifyBoundUnbound
   -> Var m a -> Bound a -> Var m a -> Unbound m a -> VerseT m ()
 unifyBoundUnbound f var1 bound1 var2@(Var ref2) unbound2 = do
   writeVarState ref2 $ Link var1
-  unbound2.substSusp (var1, Just bound1)
+  unbound2.substSusp var1 $ BoundS bound1
   whenM ((unbound2.level /=) <$> getLevel) $ do
     incrSuspCount =<< getLatch
     whenSuspended $ \ resume ->
@@ -1402,43 +1416,47 @@ unifyBoundBound f var1@(Var ref1) bound1 var2@(Var ref2) bound2 =
 unifySubst
   :: MonadRef m
   => (a -> a -> VerseT m (Match, VerseT m ()))
-  -> Subst m a -> Var m a -> VerseT m ()
-unifySubst f subst1 var2 = case subst1 of
-  (var1, Nothing) -> unify f var1 var2
-  (var1, Just bound1) -> unifyBound f var1 bound1 var2
+  -> Var m a -> Subst m a -> Var m a -> VerseT m ()
+unifySubst f var1 subst1 var2 = case subst1 of
+  LinkS -> unify f var1 var2
+  BoundS bound1 -> unifyBound f var1 bound1 var2
 
 unifyBound
   :: MonadRef m
   => (a -> a -> VerseT m (Match, VerseT m ()))
   -> Var m a -> Bound a -> Var m a -> VerseT m ()
 unifyBound f var1 bound1 var2 = readRoot var2 >>= \ case
-  UnboundR var2 unbound2 -> unifyBoundUnbound f var1 bound1 var2 unbound2
-  BoundR var2 bound2 -> unifyBoundBound f var1 bound1 var2 bound2
+  (var2, UnboundR unbound2) -> unifyBoundUnbound f var1 bound1 var2 unbound2
+  (var2, BoundR bound2) -> unifyBoundBound f var1 bound1 var2 bound2
 
 data Root m a
-  = UnboundR !(Var m a) !(Unbound m a)
-  | BoundR !(Var m a) !(Bound a)
+  = UnboundR !(Unbound m a)
+  | BoundR !(Bound a)
 
-readRoot :: MonadRef m => Var m a -> VerseT m (Root m a)
+readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 readRoot var = lift . readRoot' var =<< getHeap
 
-readRoot' :: MonadRef m => Var m a -> Maybe Heap -> m (Root m a)
+readRoot' :: MonadRef m => Var m a -> Maybe Heap -> m (Var m a, Root m a)
 readRoot' var@(Var ref) heap = readVarState' ref heap >>= \ case
   Link var -> readRoot' var heap
-  Bound bound -> pure $ BoundR var bound
-  Unbound unbound -> pure $ UnboundR var unbound
+  Bound bound -> pure (var, BoundR bound)
+  Unbound unbound -> pure (var, UnboundR unbound)
 
-type Subst m a = (Var m a, Maybe (Bound a))
+data Subst m a
+  = LinkS
+  | BoundS !(Bound a)
 
-readSubst :: MonadRef m => Var m a -> VerseT m (Subst m a)
+readSubst :: MonadRef m => Var m a -> VerseT m (Var m a, Subst m a)
 readSubst var@(Var ref) = readVarState ref >>= \ case
-  Link var -> pure (var, Nothing)
-  Bound bound -> pure (var, Just bound)
+  Link var -> pure (var, LinkS)
+  Bound bound -> pure (var, BoundS bound)
   Unbound unbound -> yield $ \ k -> do
     level <- getLevel
     if unbound.level == level then
       writeVarState ref $ Unbound unbound
-        { substSusp = \ x -> unbound.substSusp x *> k x
+        { substSusp = \ var subst -> do
+            unbound.substSusp var subst
+            k (var, subst)
         }
     else do
       incrLevelSuspCount unbound.level
@@ -1446,18 +1464,20 @@ readSubst var@(Var ref) = readVarState ref >>= \ case
         decrLevelSuspCount unbound.level
         k x
       writeVarState ref $ Unbound unbound
-        { substSusp = \ x -> unbound.substSusp x *> k x
+        { substSusp = \ var subst -> do
+            unbound.substSusp var subst
+            k (var, subst)
         }
       whenSuspended $ \ resume -> fork $ do
-        subst@(var, _) <- readSubst var
+        (var, subst) <- readSubst var
         resume $ do
           writeVarState ref $ Link var
-          k subst
+          k (var, subst)
 
 readBound :: MonadRef m => Var m a -> VerseT m (Var m a, Bound a)
 readBound var = readSubst var >>= \ case
-  (var, Nothing) -> readBound var
-  (var, Just bound) -> pure (var, bound)
+  (var, LinkS) -> readBound var
+  (var, BoundS bound) -> pure (var, bound)
 
 once :: MonadRef m => (a -> VerseT m ()) -> VerseT m (a -> VerseT m ())
 once f = do
@@ -1557,7 +1577,7 @@ freshDGVar
 freshDGVar binding = do
   label <- supply
   level <- getLevel
-  let substSusp = const $ pure ()
+  let substSusp = emptySubstSusp
   var <- Var <$> newHRef (Unbound MkUnbound {..})
   whenDefaulted $ defaultGVar' var binding
   pure $ GVar var
@@ -1584,16 +1604,16 @@ unifyG'
   => (a -> a -> VerseT m (VerseT m ()))
   -> Var m a -> Var m a -> VerseT m ()
 unifyG' f var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
-  (UnboundR var1 unbound1, UnboundR var2 unbound2) ->
+  ((var1, UnboundR unbound1), (var2, UnboundR unbound2)) ->
     case compareUnbound unbound1 unbound2 of
       EQ -> pure ()
       LT -> unifyUnboundUnboundG f var1 var2 unbound2
       GT -> unifyUnboundUnboundG f var2 var1 unbound1
-  (UnboundR var1 unbound1, BoundR var2 bound2) ->
+  ((var1, UnboundR unbound1), (var2, BoundR bound2)) ->
     unifyBoundUnboundG f var2 bound2 var1 unbound1
-  (BoundR var1 bound1, UnboundR var2 unbound2) ->
+  ((var1, BoundR bound1), (var2, UnboundR unbound2)) ->
     unifyBoundUnboundG f var1 bound1 var2 unbound2
-  (BoundR _ bound1, BoundR var2 bound2) ->
+  ((_, BoundR bound1), (var2, BoundR bound2)) ->
     unifyBoundBoundG f var1 bound1 var2 bound2
 
 unifyUnboundUnboundG
@@ -1602,11 +1622,11 @@ unifyUnboundUnboundG
   -> Var m a -> Var m a -> Unbound m a -> VerseT m ()
 unifyUnboundUnboundG f var1 var2@(Var ref2) unbound2 = do
   writeVarStateG ref2 $ Link var1
-  unbound2.substSusp (var1, Nothing)
+  unbound2.substSusp var1 LinkS
   whenM ((unbound2.level /=) <$> getLevel) $ do
     whenSuspended $ \ resume ->
-      fork $ readSubst var2 >>= \ subst2 -> resume $
-        unifySubstG f subst2 var1
+      fork $ readSubst var2 >>= \ (var2, subst2) -> resume $
+        unifySubstG f var2 subst2 var1
     whenCommitted . const $
       unifyG' f var1 var2
     whenDuplicated $
@@ -1618,7 +1638,7 @@ unifyBoundUnboundG
   -> Var m a -> Bound a -> Var m a -> Unbound m a -> VerseT m ()
 unifyBoundUnboundG f var1 bound1 var2@(Var ref2) unbound2 = do
   writeVarStateG ref2 $ Link var1
-  unbound2.substSusp (var1, Just bound1)
+  unbound2.substSusp var1 $ BoundS bound1
   whenM ((unbound2.level /=) <$> getLevel) $ do
     whenSuspended $ \ resume ->
       fork $ readBound var2 >>= \ (var2, bound2) -> resume $
@@ -1641,18 +1661,18 @@ unifyBoundBoundG f var1 bound1 (Var ref2) bound2 =
 unifySubstG
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
   => (a -> a -> VerseT m (VerseT m ()))
-  -> Subst m a -> Var m a -> VerseT m ()
-unifySubstG f subst1 var2 = case subst1 of
-  (var1, Nothing) -> unifyG' f var1 var2
-  (var1, Just bound1) -> unifyBoundG f var1 bound1 var2
+  -> Var m a -> Subst m a -> Var m a -> VerseT m ()
+unifySubstG f var1 subst1 var2 = case subst1 of
+  LinkS -> unifyG' f var1 var2
+  BoundS bound1 -> unifyBoundG f var1 bound1 var2
 
 unifyBoundG
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
   => (a -> a -> VerseT m (VerseT m ()))
   -> Var m a -> Bound a -> Var m a -> VerseT m ()
 unifyBoundG f var1 bound1 var2 = readRoot var2 >>= \ case
-  UnboundR var2 unbound2 -> unifyBoundUnboundG f var1 bound1 var2 unbound2
-  BoundR var2 bound2 -> unifyBoundBoundG f var1 bound1 var2 bound2
+  (var2, UnboundR unbound2) -> unifyBoundUnboundG f var1 bound1 var2 unbound2
+  (var2, BoundR bound2) -> unifyBoundBoundG f var1 bound1 var2 bound2
 
 writeVarStateG
   :: MonadRef m
@@ -1831,7 +1851,7 @@ findVarState' k@Heap {..} xs@HeapMap {..} = case lookupLocalHeap' k just of
   Just x -> x
   Nothing -> case findHeap tail xs of
     Unbound unbound -> Unbound unbound
-      { substSusp = const $ pure ()
+      { substSusp = emptySubstSusp
       }
     x -> x
 
