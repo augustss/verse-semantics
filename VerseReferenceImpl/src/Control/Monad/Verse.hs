@@ -1091,8 +1091,7 @@ reflectS = \ case
   AbortS -> abort
   SucceedS s choices -> alt' (putV s) choices
   YieldS s m_y choices -> alt' (putV s *> m_y) choices
-  FailS m_a' -> VerseT $ \ yk R {..} s sk fk fk' ak ak' ->
-    fk' heaps $ \ heaps -> unVerseT m_a' yk R {..} s sk fk fk' ak ak'
+  FailS m_a' -> empty' m_a'
 
 reflectSucceedS :: Monad m => Succeed (Split m) m a -> a -> VerseT m ()
 reflectSucceedS sk x =
@@ -1119,6 +1118,10 @@ alt' m Choices {..} = VerseT $ \ yk r@R {..} s sk fk fk' ak ak' ->
   (\ heaps -> dup (unVerseT fail' yk R {..} s sk fk fk'))
   (\ heaps -> unVerseT abort yk R {..} s sk fk fk' ak ak')
   (\ heaps -> unVerseT abort' yk R {..} s sk fk fk' ak ak')
+
+empty' :: VerseT m () -> VerseT m ()
+empty' m_a' = VerseT $ \ yk R {..} s sk fk fk' ak ak' ->
+  fk' heaps $ \ heaps -> unVerseT m_a' yk R {..} s sk fk fk' ak ak'
 
 yield :: ((a -> VerseT m ()) -> VerseT m ()) -> VerseT m a
 yield f = VerseT $ \ yk _ -> unYield yk f
