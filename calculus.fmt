@@ -99,9 +99,17 @@
 %format (Pd (x)(y)) = "\Pd{" ^ x "}{" ^ y "}"
 %format (Ld (x)(y)) = "\Ld{" ^ x "}{" ^ y "}"
 %format PX (x) = "P\{" x "\}"
+
+%% EXX is just EX, but with no argument
+%format EX (x) = "C\{" x "\}"
+%format EXX (x) = "C"
+
 %format suspx (x) = "susp\{" x "\}"
 %format suspx1 (x) = "susp\{" x "\}_1"
 %format suspx2 (x) = "susp\{" x "\}_2"
+
+%format blockedc (xs) (y) = "\mathsf{blkd}_{\small C}("  xs "," y ")"
+%format blockede (xs) (y) = "\mathsf{blkd}_{\small e}("  xs "," y ")"
 
 %format match (e) (b) = e "\blacktriangleright" b
 %format `match`       = "\blacktriangleright"
@@ -597,21 +605,23 @@
 %format Veq = "V\!e"
 
 %% ----------- Metatheory --------------
-%format cut (n) (x) = "\operatorname{cut}_{" n "}(" x ")"
-%format cutr (n) = "\underset{" n "}\movesto"
-%format cutrr (n) = "\underset{" n "}\movesfrom"
-%format `cuten` = "\equiv_{n}"
-%format cute (n) = "\equiv_{" n "}"
+%format cut (n) (x)     g= "\operatorname{cut}_{" n "}(" x ")"
+%format cutr (n)        = "\underset{" n "}\movesto"
+%format cutrr (n)       = "\underset{" n "}\movesfrom"
+%format `cuten`         = "\equiv_{n}"
+%format cute (n)        = "\equiv_{" n "}"
 %format cute' (n) e1 e2 = e1 "\equiv_{" n "}" e2
-%format ~ = "\mathrel{\sim}"
-%format ~= = "\mathrel{\simeq}"
-%format ->*  = "\movesto^{\ast}"
-%format <-*  = "\movesfrom^{\ast}"
-%format <->  = "\mathrel{\convertible}"
-%format ===  = "\mathrel{\equiv}"
-%format `ss`  = "\mathrel{\subseteq}"
-%format :=  = "\mathrel{\coloneqq}"
+%format ~      = "\mathrel{\sim}"
+%format ~=     = "\mathrel{\simeq}"
+%format ->*    = "\movesto^{\ast}"
+%format <-*    = "\movesfrom^{\ast}"
+%format <->    = "\mathrel{\convertible}"
+%format ===    = "\mathrel{\equiv}"
+%format `ss`   = "\mathrel{\subseteq}"
+%format :=     = "\mathrel{\coloneqq}"
 %format `cup`  = "\mathop{\cup}"
+%format `and`  = "\mathop{\wedge}"
+%format `or`   = "\mathop{\vee}"
 %format stepA       = "\underset{A}\movesto"
 %format stepAs      = "\underset{A}\movesto^{\ast}"
 %format stepAr      = "\underset{A}\movesfrom"

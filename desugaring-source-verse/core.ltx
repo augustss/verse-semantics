@@ -36,7 +36,7 @@
 \mbox{\em Syntax} \\
   \begin{array}{lrcl@@{}}
       \text{Integers} & k \\
-      \text{Existentials} & \multicolumn{3}{l}{x,y,z,f,g} \\
+      \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
           & |rs| & ::= & |{r_1, xdots, r_n}|  \hspace{1cm} (n \geq 0)\\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
@@ -59,7 +59,7 @@
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 % \text{Eval. contexts}  & |E| & ::= & |hole| \vb |lv == E; e| \vb |lv == e; E| \vb |E guard e| \vb |def x E| \\
 % \text{Pure contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == cf; C| \vb |def x C| \vb |C guard e| \\
-\text{Pure contexts} & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == susp; C| \vb |def x C| \vb |C guard e| \\
+\text{Evaluation contexts} & |EX xs| & ::= & |hole| \vb |lv == EX xs; e| \vb |lv == suspx xs; EX xs| \vb |def x (EX (xs,x))| \vb |EX xs guard e| \\
 \text{Proof contexts}  & |PX xs| & ::= & |hole| \vb |lv == PX xs; e| \vb |lv == suspx xs; PX xs| \vb |def x (PX (xs,x))| \vb |PX xs guard e| \\
    && \vb &  |one (FC^[PX xs])| \vb |all (VC^[PX xs])| \vb |check fx (PX xs)| \\
 %   & |PV| & ::= & |P| \vb |v `choice` PV| \\
@@ -90,6 +90,25 @@
   |subst S x v| & \text{Substitute |v| for |x| everywhere in |S|} \\
 %  |substw S x v| & \text{Substitute |v| for |x| everywhere outside |assumeKW| in |S|} \\
 \end{array}
+\\ \\
+\mbox{\em Blocked expressions and contexts} \\
+\begin{array}{rcl}
+  |blockedc xs hole| & = & \mathit{true} \\
+  |blockedc xs (def x C)| & = & |blockedc (xs,x) C| \\
+  |blockedc xs (l==e; C)| & = & |blockede xs e `and` blockedc xs C| \\
+\end{array}
+\\ \\
+\begin{array}{rcl}
+  |blockede xs (l==e_1; e_2)| & = & |blockede xs e_1 `and` blockede xs e_2|\\
+  |blockede xs (e_1 guard e_2)| & = & |blockede xs e_1|\\
+  |blockede xs (verify2 rs as e)| & = & true \\
+  |blockede xs (check fx e)| & = & |blockede xs e| \\
+  |blockede xs (def x e)| & = & |blockede ((xs,x)) e| \\
+  |blockede xs (apply1N op v)| & = & \text{|v = V^[x]| for some $|x| \in |xs|$ and context |V|} \\
+  |blockede xs (apply1N x v)| & = & |x| \in |xs| \\
+
+\end{array}
+%  |substw S x v| & \text{Substitute |v| for |x| everywhere outside |assumeKW| in |S|} \\
 \\ \\
 \mbox{\em Free variables and bound variables (give definitions)} \\
 %  \begin{array}{rcl}
@@ -136,7 +155,7 @@ $\begin{array}{@@{}l}
 
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
-\rulename{exi-subst} & |def x (PX x^[x==v; e])| & \movesto & |subst (P^[e]) x v|
+\rulename{exi-subst} & |def x (EX x^[x==v; e])| & \movesto & |subst (EXX^[e]) x v|
   & \text{$|x|\not\in\freevars{|v|};\, |x|,\freevars{|v|} \not\in \boundvars{|S|}$} \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{exi-float}^{* \alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
