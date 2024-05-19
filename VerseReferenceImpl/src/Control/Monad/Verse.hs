@@ -133,8 +133,8 @@ unYield (Yield x) = x
 
 type Succeed r m a
   =  Heaps
-  -> S m
   -> a
+  -> S m
   -> Fail r m
   -> Fail r m
   -> Abort r m
@@ -197,12 +197,12 @@ decrSuspCount (Latch ref) = do
   when (suspCount == 1) susp
 
 asksV :: (R m -> a) -> VerseT m a
-asksV f = VerseT $ \ _ r@R {..} s sk -> sk heaps s $ f r
+asksV f = VerseT $ \ _ r@R {..} s sk -> sk heaps (f r) s
 
 asksMV :: Monad m => (R m -> m a) -> VerseT m a
 asksMV f = VerseT $ \ _ r@R {..} s sk fk fk' ak ak' -> do
   x <- f r
-  sk heaps s x fk fk' ak ak'
+  sk heaps x s fk fk' ak ak'
 
 localV :: (R m -> R m) -> VerseT m a -> VerseT m a
 localV f m = VerseT $ \ yk -> unVerseT m yk . f
@@ -298,14 +298,13 @@ data StoreElem m = forall a . Freshenable a m => StoreElem (HRef m a)
 
 stateV :: (S m -> (a, S m)) -> VerseT m a
 stateV f = VerseT $ \ _ R {..} s sk -> case f s of
-  (a, s) -> sk heaps s a
+  (a, s) -> sk heaps a s
 
 putV :: S m -> VerseT m ()
-putV s = VerseT $ \ _ R {..} _ sk -> sk heaps s ()
+putV s = VerseT $ \ _ R {..} _ sk -> sk heaps () s
 
 modifyV' :: (S m -> S m) -> VerseT m ()
-modifyV' f = VerseT $ \ _ R {..} s sk ->
-  let s' = f s in s' `seq` sk heaps s' ()
+modifyV' f = VerseT $ \ _ R {..} s sk -> sk heaps () $! f s
 
 whenSuspended :: Suspend m -> VerseT m ()
 whenSuspended f = do
@@ -362,13 +361,13 @@ copyHeap pred = do
 
 instance Functor (VerseT m) where
    fmap f m = VerseT $ \ yk r s sk ->
-     unVerseT m yk r s $ \ heap s -> sk heap s . f
+     unVerseT m yk r s $ \ heap -> sk heap . f
 
 instance Applicative (VerseT m) where
-   pure x = VerseT $ \ _ R {..} s sk -> sk heaps s x
+   pure x = VerseT $ \ _ R {..} s sk -> sk heaps x s
    f <*> x = VerseT $ \ yk r@R {..} s sk ->
-     unVerseT f yk r s $ \ heaps s f ->
-     unVerseT x yk R {..} s $ \ heaps s -> sk heaps s . f
+     unVerseT f yk r s $ \ heaps f s ->
+     unVerseT x yk R {..} s $ \ heaps -> sk heaps . f
 
 instance Alternative (VerseT m) where
   empty = VerseT $ \ _ R {..} _ _ _ fk' _ -> fk' heaps
@@ -388,7 +387,7 @@ x <?> y = VerseT $ \ yk r@R {..} s sk fk fk' ak ak' ->
 
 instance Monad (VerseT m) where
   m >>= k = VerseT $ \ yk r@R {..} s sk ->
-    unVerseT m yk r s $ \ heaps s x ->
+    unVerseT m yk r s $ \ heaps x s ->
     unVerseT (k x) yk R {..} s sk
 
 instance MonadSupply s m => MonadSupply s (VerseT m) where
@@ -400,12 +399,12 @@ instance MonadWrong e m => MonadWrong e (VerseT m) where
 instance MonadTrans VerseT where
   lift m = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
     x <- m
-    sk heaps s x fk fk' ak ak'
+    sk heaps x s fk fk' ak ak'
 
 lift' :: Monad m => (R m -> S m -> m a) -> VerseT m a
 lift' f = VerseT $ \ _ r@R {..} s sk fk fk' ak ak' -> do
   x <- f r s
-  sk heaps s x fk fk' ak ak'
+  sk heaps x s fk fk' ak ak'
 
 runVerseT :: (MonadRef m, MonadSupply Int m) => VerseT m a -> m (Maybe [[a]])
 runVerseT m = do
@@ -413,7 +412,7 @@ runVerseT m = do
   latch <- newLatch'' heap
   let
     heaps = Heaps { heap = Just heap, verifyHeap }
-    sk heaps s x fk _ ak _ = do
+    sk heaps x s fk _ ak _ = do
       suspCount <- readSuspCount'' latch heap
       runMaybeT $ do
         guard $ suspCount == 0
@@ -546,7 +545,7 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   { heap :: !Heap
   , latch :: !(Latch m)
   , susp :: !(Stream m a -> VerseT m ())
-  , init :: !(Choices m)
+  , init :: !(Choices m ())
   , last :: !(HRef m (Maybe a))
   , suspend :: !(Suspend m)
   , suspCounts :: !SuspCounts
@@ -556,11 +555,11 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   , store :: !(Store m)
   }
 
-data Choices m = Choices
-  { fail :: !(VerseT m ())
-  , fail' :: !(VerseT m ())
-  , abort :: !(VerseT m ())
-  , abort' :: !(VerseT m ())
+data Choices m a = Choices
+  { fail :: !(VerseT m a)
+  , fail' :: !(VerseT m a)
+  , abort :: !(VerseT m a)
+  , abort' :: !(VerseT m a)
   }
 
 split'
@@ -573,60 +572,28 @@ split'
 split' m heap latch last =
   splitS m heap latch emptyS >>= \ case
     AbortS -> abort
-    SucceedS s init -> splitSucceed heap latch init last s
-    YieldS s m_y init -> splitYield heap latch init last s m_y
-    FailS m_a' ->
-      pure Done
-      <?>
-      (do heap <- copyHeap heap
-          split' m_a' heap latch last)
+    FailS m_a' -> splitFail heap latch last m_a'
+    SucceedS () s init -> splitSucceed heap latch init last s
+    YieldS k s succeed init -> splitYield heap latch init last s k succeed
 
-split''
-  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
-  => VerseT m ()
-  -> Heap
-  -> Latch m
-  -> Choices m
-  -> HRef m (Maybe a)
-  -> S m
-  -> VerseT m (Stream m a)
-split'' m heap latch choices last s =
-  splitS m heap latch s >>= \ case
-    AbortS ->
-      split' choices.abort' heap latch last
-    SucceedS s choices' ->
-      let init = appendChoices choices' choices
-      in splitSucceed heap latch init last s
-    YieldS s m_y choices' ->
-      let init = appendChoices choices' choices
-      in splitYield heap latch init last s m_y
-    FailS m_a' ->
-      split' choices.fail' heap latch last
-      <?>
-      (do heap <- copyHeap heap
-          split' (appendAbort m_a' choices) heap latch last)
-
-splitYield
+splitFail
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
   => Heap
   -> Latch m
-  -> Choices m
   -> HRef m (Maybe a)
-  -> S m
   -> VerseT m ()
   -> VerseT m (Stream m a)
-splitYield heap latch init last s@S {..} m_y =
-  case guard (IntMap.null suspCounts) *> default' of
-    Nothing -> split'' m_y heap latch init last s
-    Just m_d ->
-      let default' = Nothing
-      in split'' (m_y *> m_d) heap latch init last S {..}
+splitFail heap latch last m_a' =
+  pure Done
+  <?>
+  (do heap <- copyHeap heap
+      split' m_a' heap latch last)
 
 splitSucceed
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
   => Heap
   -> Latch m
-  -> Choices m
+  -> Choices m ()
   -> HRef m (Maybe a)
   -> S m
   -> VerseT m (Stream m a)
@@ -655,13 +622,55 @@ splitSucceed heap latch init last S {..} =
           (do heap <- copyHeap heap
               split' init.abort heap latch last)
 
-splitS
-  :: (MonadRef m, MonadSupply Int m)
+splitYield
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
+  => Heap
+  -> Latch m
+  -> Choices m ()
+  -> HRef m (Maybe a)
+  -> S m
+  -> ((b -> VerseT m ()) -> VerseT m ())
+  -> (b -> VerseT m ())
+  -> VerseT m (Stream m a)
+splitYield heap latch init last s@S {..} k succeed =
+  case guard (IntMap.null suspCounts) *> default' of
+    Nothing -> split'' (k succeed) heap latch init last s
+    Just m_d ->
+      let default' = Nothing
+      in split'' (k succeed *> m_d) heap latch init last S {..}
+
+split''
+  :: (MonadRef m, MonadSupply Int m, Freshenable a m)
   => VerseT m ()
   -> Heap
   -> Latch m
+  -> Choices m ()
+  -> HRef m (Maybe a)
   -> S m
-  -> VerseT m (Split m)
+  -> VerseT m (Stream m a)
+split'' m heap latch choices last s =
+  splitS m heap latch s >>= \ case
+    AbortS ->
+      split' choices.abort' heap latch last
+    SucceedS () s choices' ->
+      let init = appendChoices choices' choices
+      in splitSucceed heap latch init last s
+    YieldS k s succeed choices' ->
+      let init = appendChoices choices' choices
+      in splitYield heap latch init last s k succeed
+    FailS m_a' ->
+      split' choices.fail' heap latch last
+      <?>
+      (do heap <- copyHeap heap
+          split' (appendAbort m_a' choices) heap latch last)
+
+splitS
+  :: (MonadRef m, MonadSupply Int m)
+  => VerseT m a
+  -> Heap
+  -> Latch m
+  -> S m
+  -> VerseT m (Split m a)
 splitS m heap latch s = do
   level <- getLevel <&> (+ 1)
   verifyHeap <- getVerifyHeap
@@ -695,7 +704,7 @@ resumeSplit' ref_env env@SplitEnv {..} m =
       decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
       writeHRef ref_env Nothing
       susp =<< split' (init.fail' <?> appendAbortS m_a env) heap latch last
-    YieldS s@S {..} m_y choices ->
+    YieldS k s@S {..} succeed choices ->
       let
         init = appendChoicesS choices env
         suspend resume = env.suspend resume *> s.suspend resume
@@ -707,12 +716,12 @@ resumeSplit' ref_env env@SplitEnv {..} m =
             let default' = Nothing
             writeHRef ref_env $ Just SplitEnv {..}
             s.suspend $ resumeSplit ref_env
-            resumeSplit ref_env $ m_y *> m_d
+            resumeSplit ref_env $ k succeed *> m_d
           Nothing -> do
             writeHRef ref_env $ Just SplitEnv {..}
             s.suspend $ resumeSplit ref_env
-            resumeSplit ref_env m_y
-    SucceedS s@S {..} choices ->
+            resumeSplit ref_env $ k succeed
+    SucceedS () s@S {..} choices ->
       let
         init = appendChoicesS choices env
         suspend resume = env.suspend resume *> s.suspend resume
@@ -744,7 +753,7 @@ resumeSplit' ref_env env@SplitEnv {..} m =
                 (do heap <- copyHeap heap
                     susp =<< split' init.abort heap latch last)
 
-appendChoicesS :: Choices m -> SplitEnv m -> Choices m
+appendChoicesS :: Choices m () -> SplitEnv m -> Choices m ()
 appendChoicesS init env = Choices {..}
   where
     fail = appendFailS init.fail env
@@ -778,9 +787,9 @@ appendAbortS' m_a' SplitEnv {..} =
 
 resumeSplitS
   :: (MonadRef m, MonadSupply Int m)
-  => VerseT m ()
+  => VerseT m a
   -> SplitEnv m
-  -> VerseT m (Split m)
+  -> VerseT m (Split m a)
 resumeSplitS m SplitEnv {..} = do
   level <- getLevel <&> (+ 1)
   verifyHeap <- getVerifyHeap
@@ -800,7 +809,7 @@ data VerifyEnv m = VerifyEnv
   { heap :: {-# UNPACK #-} !Heap
   , latch :: !(Latch m)
   , susp :: !(VerseT m ())
-  , init :: !(Choices m)
+  , init :: !(Choices m ())
   , last :: !(HRef m Bool)
   , suspend :: !(Suspend m)
   , suspCounts :: !SuspCounts
@@ -820,15 +829,15 @@ verify' m heap latch last =
   verifyS m heap latch emptyS >>= \ case
     AbortS -> pure ()
     FailS m_a' -> verify' m_a' heap latch last
-    SucceedS s init -> verifySucceed heap latch init last s
-    YieldS s m_y init -> verifyYield heap latch init last s m_y
+    SucceedS () s init -> verifySucceed heap latch init last s
+    YieldS k s succeed init -> verifyYield heap latch init last s k succeed
 
 verify''
   :: (MonadRef m, MonadSupply Int m)
   => VerseT m ()
   -> Heap
   -> Latch m
-  -> Choices m
+  -> Choices m ()
   -> HRef m Bool
   -> S m
   -> VerseT m ()
@@ -839,34 +848,35 @@ verify'' m heap latch choices last s =
     FailS m_a' ->
       let m = choices.fail' <?> appendAbort m_a' choices
       in verify' m heap latch last
-    SucceedS s choices' ->
+    SucceedS () s choices' ->
       let init = appendChoices choices' choices
       in verifySucceed heap latch init last s
-    YieldS s m_y choices' ->
+    YieldS k s succeed choices' ->
       let init = appendChoices choices' choices
-      in verifyYield heap latch init last s m_y
+      in verifyYield heap latch init last s k succeed
 
 verifyYield
   :: (MonadRef m, MonadSupply Int m)
   => Heap
   -> Latch m
-  -> Choices m
+  -> Choices m ()
   -> HRef m Bool
   -> S m
+  -> ((a -> VerseT m ()) -> VerseT m ())
+  -> (a -> VerseT m ())
   -> VerseT m ()
-  -> VerseT m ()
-verifyYield heap latch init last s@S {..} m_y =
+verifyYield heap latch init last s@S {..} k succeed =
   case guard (IntMap.null suspCounts) *> default' of
-    Nothing -> verify'' m_y heap latch init last s
+    Nothing -> verify'' (k succeed) heap latch init last s
     Just m_d ->
       let default' = Nothing
-      in verify'' (m_y *> m_d) heap latch init last S {..}
+      in verify'' (k succeed *> m_d) heap latch init last S {..}
 
 verifySucceed
   :: (MonadRef m, MonadSupply Int m)
   => Heap
   -> Latch m
-  -> Choices m
+  -> Choices m ()
   -> HRef m Bool
   -> S m
   -> VerseT m ()
@@ -881,18 +891,18 @@ verifySucceed heap latch init last S {..} =
         True -> do
           commit heap
           verify' (init.fail <?> init.abort) heap latch last
-        False -> yield $ \ k -> do
+        False -> yield $ \ f -> do
           incrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
-          ref_env <- newHRef $ Just VerifyEnv { susp = k (), .. }
+          ref_env <- newHRef $ Just VerifyEnv { susp = f (), .. }
           suspend $ resumeVerify ref_env
 
 verifyS
   :: (MonadRef m, MonadSupply Int m)
-  => VerseT m ()
+  => VerseT m a
   -> Heap
   -> Latch m
   -> S m
-  -> VerseT m (Split m)
+  -> VerseT m (Split m a)
 verifyS m heap latch s = do
   level <- getLevel <&> (+ 1)
   verifyHeap <- getHeap
@@ -928,7 +938,7 @@ resumeVerify' ref_env env@VerifyEnv {..} m =
       writeHRef ref_env Nothing
       verify' (init.fail' <?> appendAbortV m_a env) heap latch last
       susp
-    YieldS s@S {..} m_y choices ->
+    YieldS k s@S {..} succeed choices ->
       let
         init = appendChoicesV choices env
         suspend resume = env.suspend resume *> s.suspend resume
@@ -940,12 +950,12 @@ resumeVerify' ref_env env@VerifyEnv {..} m =
             let default' = Nothing
             writeHRef ref_env $ Just VerifyEnv {..}
             s.suspend $ resumeVerify ref_env
-            resumeVerify ref_env $ m_y *> m_d
+            resumeVerify ref_env $ k succeed *> m_d
           Nothing -> do
             writeHRef ref_env $ Just VerifyEnv {..}
             s.suspend $ resumeVerify ref_env
-            resumeVerify ref_env m_y
-    SucceedS s@S {..} choices ->
+            resumeVerify ref_env $ k succeed
+    SucceedS () s@S {..} choices ->
       let
         init = appendChoicesV choices env
         suspend resume = env.suspend resume *> s.suspend resume
@@ -969,7 +979,7 @@ resumeVerify' ref_env env@VerifyEnv {..} m =
                 verify' (init.fail <?> init.abort) heap latch last
                 susp
 
-appendChoicesV :: Choices m -> VerifyEnv m -> Choices m
+appendChoicesV :: Choices m () -> VerifyEnv m -> Choices m ()
 appendChoicesV init env = Choices {..}
   where
     fail = appendFailV init.fail env
@@ -1003,9 +1013,9 @@ appendAbortV' m_a' VerifyEnv {..} =
 
 resumeVerifyS
   :: (MonadRef m, MonadSupply Int m)
-  => VerseT m ()
+  => VerseT m a
   -> VerifyEnv m
-  -> VerseT m (Split m)
+  -> VerseT m (Split m a)
 resumeVerifyS m VerifyEnv {..} = do
   level <- getLevel <&> (+ 1)
   verifyHeap <- getHeap
@@ -1014,7 +1024,7 @@ resumeVerifyS m VerifyEnv {..} = do
     s = S { suspend = const $ pure (), suspCounts = mempty, store = mempty, .. }
   lift $ unVerseT m yieldS r s succeedS failS failS abortS abortS
 
-appendChoices :: Choices m -> Choices m -> Choices m
+appendChoices :: Choices m () -> Choices m () -> Choices m ()
 appendChoices init init' = Choices {..}
   where
     fail = appendFail init.fail init'
@@ -1022,16 +1032,16 @@ appendChoices init init' = Choices {..}
     abort = appendAbort init.abort init'
     abort' = appendAbort' init.abort' init'
 
-appendFail :: VerseT m () -> Choices m -> VerseT m ()
+appendFail :: VerseT m () -> Choices m () -> VerseT m ()
 appendFail m_f Choices {..} = m_f <|> fail
 
-appendFail' :: VerseT m () -> Choices m -> VerseT m ()
+appendFail' :: VerseT m () -> Choices m () -> VerseT m ()
 appendFail' m_f' Choices {..} = alt m_f' fail fail'
 
-appendAbort :: VerseT m () -> Choices m -> VerseT m ()
+appendAbort :: VerseT m () -> Choices m () -> VerseT m ()
 appendAbort m_a Choices {..} = alt m_a fail fail' <?> abort
 
-appendAbort' :: VerseT m () -> Choices m -> VerseT m ()
+appendAbort' :: VerseT m () -> Choices m () -> VerseT m ()
 appendAbort' m_a' Choices {..} = alt m_a' fail fail' <?> abort'
 
 assume
@@ -1043,71 +1053,103 @@ assume m = split m >>= \ case
   Step x _ -> pure x
 
 fork :: MonadRef m => VerseT m () -> VerseT m ()
-fork m =
-  lift' (\ r s -> unVerseT m yieldS r s succeedS failS failS abortS abortS) >>=
-  reflectS
+fork m = forkS m >>= \ case
+  AbortS ->
+    abort
+  FailS m_a' ->
+    empty' $ fork m_a'
+  SucceedS x s choices ->
+    alt' (x <$ putV s) (forkChoices choices)
+  YieldS k s succeed choices ->
+    alt'
+    (do putV s
+        latch <- getLatch
+        incrSuspCount latch
+        k $ \ x -> do
+          fork $ succeed x
+          decrSuspCount latch)
+    (forkChoices choices)
+
+forkChoices :: MonadRef m => Choices m () -> Choices m ()
+forkChoices Choices {..} = Choices
+  { fail = fork fail
+  , fail' = fork fail'
+  , abort = fork abort
+  , abort' = fork abort'
+  }
+
+forkS :: MonadRef m => VerseT m a -> VerseT m (Split m a)
+forkS m =
+  lift' $ \ r s -> unVerseT m yieldS r s succeedS failS failS abortS abortS
 
 join' :: MonadRef m => VerseT m a -> VerseT m a
 join' m = do
   latch@(Latch ref) <- newLatch
   x <- localLatch (const latch) m
   LatchState {..} <- readHRef ref
-  if suspCount == 0 then pure x else yield $ \ f ->
-    let susp = f x in writeHRef ref $! LatchState {..}
+  if suspCount == 0
+    then pure x
+    else yield $ \ f -> writeHRef ref $! LatchState { susp = f x, .. }
 
-data Split m
-  = YieldS !(S m) !(VerseT m ()) !(Choices m)
-  | SucceedS !(S m) !(Choices m)
-  | FailS !(VerseT m ())
-  | AbortS
+data Split m a
+  = AbortS
+  | FailS
+    !(VerseT m a)
+  | SucceedS
+    !a
+    !(S m)
+    !(Choices m a)
+  | forall b . YieldS
+    !((b -> VerseT m ()) -> VerseT m ())
+    !(S m)
+    !(b -> VerseT m a)
+    !(Choices m a)
 
-yieldS :: MonadRef m => Yield (Split m) m
-yieldS = Yield $ \ f s sk fk fk' ak ak' -> pure $
+yieldS :: MonadRef m => Yield (Split m a) m
+yieldS = Yield $ \ k s sk fk fk' ak ak' -> pure $
   let
     fail = reflectFailS fk
     fail' = reflectFailS fk'
     abort = reflectAbortS ak
     abort' = reflectAbortS ak'
-  in
-    YieldS
-    s
-    (do latch <- getLatch
-        incrSuspCount latch
-        f $ \ x -> do
-          reflectSucceedS sk x
-          decrSuspCount latch)
-    Choices {..}
+  in YieldS k s (reflectSucceedS sk) Choices {..}
 
-succeedS :: Monad m => Succeed (Split m) m ()
-succeedS _ s () fk fk' ak ak' = pure $ SucceedS s Choices {..}
+succeedS :: Monad m => Succeed (Split m a) m a
+succeedS _ x s fk fk' ak ak' = pure $ SucceedS x s Choices {..}
   where
     fail = reflectFailS fk
     fail' = reflectFailS fk'
     abort = reflectAbortS ak
     abort' = reflectAbortS ak'
 
-failS :: Monad m => Fail (Split m) m
+failS :: Monad m => Fail (Split m a) m
 failS _ ak = pure . FailS $ asksMV (\ R {..} -> ak heaps) >>= reflectS
 
-abortS :: Applicative m => Abort (Split m) m
+abortS :: Applicative m => Abort (Split m a) m
 abortS = const $ pure AbortS
 
-reflectS :: Split m -> VerseT m ()
+reflectS :: Monad m => Split m a -> VerseT m a
 reflectS = \ case
-  AbortS -> abort
-  SucceedS s choices -> alt' (putV s) choices
-  YieldS s m_y choices -> alt' (putV s *> m_y) choices
-  FailS m_a' -> empty' m_a'
+  AbortS ->
+    abort
+  FailS m_a' ->
+    empty' m_a'
+  SucceedS x s choices ->
+    alt' (x <$ putV s) choices
+  YieldS k s succeed choices ->
+    alt'
+    (putV s *> yield (\ f -> k $ succeed >=> f))
+    choices
 
-reflectSucceedS :: Monad m => Succeed (Split m) m a -> a -> VerseT m ()
+reflectSucceedS :: Monad m => Succeed (Split m b) m a -> a -> VerseT m b
 reflectSucceedS sk x =
-  lift' (\ R {..} s -> sk heaps s x failS failS abortS abortS) >>= reflectS
+  lift' (\ R {..} s -> sk heaps x s failS failS abortS abortS) >>= reflectS
 
-reflectFailS :: Monad m => Fail (Split m) m -> VerseT m ()
+reflectFailS :: Monad m => Fail (Split m a) m -> VerseT m a
 reflectFailS fk =
   asksMV (\ R {..} -> fk heaps abortS) >>= reflectS
 
-reflectAbortS :: Monad m => Abort (Split m) m -> VerseT m ()
+reflectAbortS :: Monad m => Abort (Split m a) m -> VerseT m a
 reflectAbortS ak =
   asksMV (\ R {..} -> ak heaps) >>= reflectS
 
@@ -1117,7 +1159,7 @@ alt m m_f m_f' = VerseT $ \ yk r@R {..} s sk fk fk' ->
   (\ heaps -> dup $ unVerseT m_f yk R {..} s sk fk fk)
   (\ heaps -> dup $ unVerseT m_f' yk R {..} s sk fk fk')
 
-alt' :: VerseT m () -> Choices m -> VerseT m ()
+alt' :: VerseT m a -> Choices m a -> VerseT m a
 alt' m Choices {..} = VerseT $ \ yk r@R {..} s sk fk fk' ak ak' ->
   unVerseT m yk r s sk
   (\ heaps -> dup (unVerseT fail yk R {..} s sk fk fk))
@@ -1125,7 +1167,7 @@ alt' m Choices {..} = VerseT $ \ yk r@R {..} s sk fk fk' ak ak' ->
   (\ heaps -> unVerseT abort yk R {..} s sk fk fk' ak ak')
   (\ heaps -> unVerseT abort' yk R {..} s sk fk fk' ak ak')
 
-empty' :: VerseT m () -> VerseT m ()
+empty' :: VerseT m a -> VerseT m a
 empty' m_a' = VerseT $ \ yk R {..} s sk fk fk' ak ak' ->
   fk' heaps $ \ heaps -> unVerseT m_a' yk R {..} s sk fk fk' ak ak'
 
@@ -1517,7 +1559,7 @@ writeVarState
 writeVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
   y <- findVarState heaps.heap <$> readRef ref
   modifyRef' ref (insertLocalHeap heaps.heap x)
-  sk heaps s ()
+  sk heaps () s
     (\ heaps@Heaps {..} ak -> do
         x <- findLocalHeap heap <$> readRef ref
         modifyRef' ref (insertLocalHeap heap y)
@@ -1545,7 +1587,7 @@ writeVerifyVarState
 writeVerifyVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
   y <- findVarState heaps.verifyHeap <$> readRef ref
   modifyRef' ref (insertLocalHeap heaps.verifyHeap x)
-  sk heaps s () fk fk'
+  sk heaps () s fk fk'
     (\ heaps@Heaps {..} -> do
         modifyRef' ref (insertLocalHeap verifyHeap y)
         ak heaps)
@@ -1685,7 +1727,7 @@ writeVarStateG
 writeVarStateG (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
   y <- findVarState heaps.heap <$> readRef ref
   modifyRef' ref $ insertLocalHeap heaps.heap x
-  sk heaps s ()
+  sk heaps () s
     fk
     (\ heaps@Heaps {..} ak' -> do
         x <- findLocalHeap heap <$> readRef ref
@@ -1751,7 +1793,7 @@ writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
   y <- lookupHeap heaps.heap <$> readRef ref
   modifyRef' ref $ insertLocalHeap heaps.heap x
   let
-  sk heaps s ()
+  sk heaps () s
     fk
     (\ heaps@Heaps {..} ak' -> do
         x <- findLocalHeap heaps.heap <$> readRef ref
@@ -1814,7 +1856,7 @@ writeHRef :: MonadRef m => HRef m a -> a -> VerseT m ()
 writeHRef (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
   y <- findLocalHeap heaps.heap <$> readRef ref
   modifyRef' ref (insertLocalHeap heaps.heap x)
-  sk heaps s ()
+  sk heaps () s
     (\ heaps@Heaps {..} ak -> do
         x <- findLocalHeap heap <$> readRef ref
         modifyRef' ref $ insertLocalHeap heap y
