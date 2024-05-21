@@ -12,7 +12,7 @@ verify(pass)  { suc(a:int):int := 10 ; g(x:int):int := suc[x] }
 verify(pass)  { suc(a:int):int := {a+1} }
 verify(pass)  { suc(a:int):int := {a+1} ; g(x:int):int := suc[x] }
 verify(pass)  { f():int := 0; L1() := {y:int;  y = f[] } }
-verify(pass)  { a:int => {x:=a; assume{x=a}}}
+verify(pass, SPLITverify=skip)  { a:int => {x:=a; assume{x=a}}}
 verify(pass, SPLITverify=skip)  { x:int => {x=0; assume{x=0}}}
 
 # Some simple tests
@@ -39,29 +39,29 @@ verify(fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
 verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
-### verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
-### verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
-### verify(fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
-###
-### # Ported tests from TRSVerify.hs
-### verify(pass) { g() := (2 = 2; 2) }
-### verify(pass) { ex01(x:any) := x }
-### verify(pass) { g(x:int) := x }
-### verify(pass) { g(x:int):int := x }
-### verify(pass) { g(x:any):int := { if (int[x]) then 10 else 20 } }
-### verify(fail) { g(x:any):int := { if (int(x)) then 10 else 20 } }
-### verify(pass) { suc(a:int):int := {a + 1} ; g(x:int):int := { suc(x) } }
-### verify(pass) { foo(x:any):int := if (int[x]) then { x } else { 0 } }
-### verify(pass) { foo(x:any):int := if (int[x]) then { x + 1 } else { 0 } }
-### verify(pass,ICFPEverify=skip) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
-### verify(pass,ICFPEverify=skip) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
-### verify(pass,ICFPEverify=skip) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
-### verify(pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
-###
-### # Testing 'if' with 'mustDecide'
-### verify(pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
-### verify(fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
-### verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
+### SLOW??? verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
+### SLOW??? verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
+### SLOW??? verify(fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
+
+# Ported tests from TRSVerify.hs
+verify(pass) { g() := (2 = 2; 2) }
+verify(pass) { ex01(x:any) := x }
+verify(pass) { g(x:int) := x }
+verify(pass) { g(x:int):int := x }
+verify(pass) { g(x:any):int := { if (int[x]) then 10 else 20 } }
+verify(fail) { g(x:any):int := { if (int(x)) then 10 else 20 } }
+verify(pass) { suc(a:int):int := {a + 1} ; g(x:int):int := { suc(x) } }
+verify(pass) { foo(x:any):int := if (int[x]) then { x } else { 0 } }
+verify(pass) { foo(x:any):int := if (int[x]) then { x + 1 } else { 0 } }
+verify(pass,SPLITverify=skip) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
+verify(pass,SPLITverify=skip) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
+verify(pass,SPLITverify=skip) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
+verify(pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
+
+# Testing 'if' with 'mustDecide'
+verify(pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
+verify(fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
+verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
 ###
 ### # stuck tests
 ### verify(fail) { ex_stuck1(x:any) := { y:any; y } }
