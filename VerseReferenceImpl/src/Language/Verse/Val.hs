@@ -16,8 +16,9 @@ module Language.Verse.Val
   , pattern SomeChar
   , pattern SomeChar32
   , pattern SomeFunction
-  , forVal_
+  , Assumed
   , Sign
+  , forVal_
   , Struct (..)
   , StructInst (..)
   , Class (..)
@@ -118,7 +119,7 @@ data Val ref a b
   | Lam !(Lam b)
   | OLam !(OLam b) b
   | Intrinsic !Intrinsic b
-  | Type !Sign a deriving Show
+  | Type !Assumed !Sign a deriving Show
 
 pattern SomeAny :: Val ref a b
 pattern SomeAny = Some Contract.Any
@@ -140,6 +141,8 @@ pattern SomeChar32 = Some Contract.Char32
 
 pattern SomeFunction :: Val ref a b
 pattern SomeFunction = Some Contract.Function
+
+type Assumed = Bool
 
 type Sign = Bool
 
@@ -191,7 +194,7 @@ instance ( Freshenable a m
     Lam x -> Lam <$> freshen x
     OLam x xs -> OLam <$> freshen x <*> freshen xs
     Intrinsic x xs -> Intrinsic x <$> freshen xs
-    Type x y -> Type x <$> freshen y
+    Type x y z -> Type x y <$> freshen z
 
 instance ( Freezable (f b) (g d) m
          , Freezable a c m
@@ -218,7 +221,7 @@ instance ( Freezable (f b) (g d) m
     Lam x -> Lam <$> freeze x
     OLam x xs -> OLam <$> freeze x <*> freeze xs
     Intrinsic x xs -> Intrinsic x <$> freeze xs
-    Type x y -> Type x <$> freeze y
+    Type x y z -> Type x y <$> freeze z
 
 instance ( Pretty (ref b)
          , Pretty b
@@ -357,6 +360,7 @@ instance Pretty a => Pretty (ClassInst a) where
 
 data Lam a = MkLam
   { scopes :: !(NonEmpty Scope)
+  , assumed :: !Bool
   , sign :: !Sign
   , env :: !(Env Ident a)
   , param :: !Ident
@@ -375,6 +379,7 @@ instance Freezable a b m => Freezable (Lam a) (Lam b) m where
 
 data OLam a = MkOLam
   { scopes :: !(NonEmpty Scope)
+  , assumed :: !Bool
   , sign :: !Sign
   , env :: !(Env Ident a)
   , params :: !(Desugar.Env Ident)
@@ -419,6 +424,12 @@ instance ( Freezable a b m
     Var x xs -> Var <$> freeze x <*> freeze xs
     Contract x xs -> Contract x <$> freeze xs
 
+instance (Pretty a, Pretty b) => Pretty (List a b) where
+  pretty = \ case
+    Nil -> "()"
+    Var x xs -> tupled [pretty x, pretty xs]
+    Contract x xs -> tupled [pretty x <> brackets (pretty '_'), pretty xs]
+
 newtype VarVal m = VarVal (Var m (Val (VerseRef m) (VarList m) (VarVal m)))
 
 instance ( MonadFix m
@@ -449,6 +460,9 @@ instance Pretty FrozenVal where
   pretty (FrozenVal x) = pretty x
 
 newtype FrozenList = FrozenList (Maybe (List FrozenVal FrozenList)) deriving Show
+
+instance Pretty FrozenList where
+  pretty (FrozenList x) = pretty x
 
 type Exp = L (Desugar.Exp L Ident)
 

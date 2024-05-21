@@ -95,19 +95,6 @@ test-suite golden-files
   ghc-options: -Wall -Wno-name-shadowing -Werror
   default-language: GHC2021
 
-test-suite hunit
-  type: exitcode-stdio-1.0
-  main-is: HUnit.hs
-  build-depends:
-    base >= 4.16.0.0,
-    HUnit,
-    verse
-  hs-source-dirs: test
-  if flag(wasm)
-    buildable: False
-  ghc-options: -Wall -Wno-name-shadowing -Werror
-  default-language: GHC2021
-
 executable versei
   main-is: Main.hs
   build-depends:

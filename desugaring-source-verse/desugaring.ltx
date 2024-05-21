@@ -86,12 +86,9 @@ $$
 &      & \vb & |option^{t}|       & \text{Create an option} \\
 &      & \vb & |truth^{t} |       & \text{Singleton map} \\
 &      & \vb & |amap (t_1; xdots; t_n) | & \text{Map}, n \geq 0 \\
-\\[2mm]
+\\
 \text{\bf Arguments} &
  |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
-\\[2mm]
-\text{\bf Constants} &
- |k| & ::= & |i| \vb |r| \vb |pa| \vb |s| \vb |c| & \text{integer, rational, path, string, character}
 \\[2mm]
 \text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |squig p_1 p_2| \\
 &     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
@@ -111,8 +108,12 @@ $$
 $$
 \begin{array}{rcll}
   |x,y,f| &     & \textit{Variable} \\
-  |k| &     & \textit{Integer constant} \\
-      \\
+  |k| &     & \textit{Constant} \\[2mm]
+
+\multicolumn{4}{l}{\text{\bf Constants}} \\
+ |k| & ::= & |int| \vb |rat| \vb |path| & \text{integer, rational, path} \\
+ & \vb &   |str| \vb |char| & \text{string, character}
+\\[2mm]
 
 \multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
   |t| & ::= & |x|                        & \text{Variable} \\
@@ -987,7 +988,7 @@ $\begin{array}{@@{}l}
   \rulename{split-op} & |verify2 (rs) as (P^[apply1N op gv]))| & \movesto &
           |verify2 (rs,r) (as, r = apply1N op gv) (P^[ r ]);| \\
     &&& |verify2 rs (as, not (apply1N op gv)) (P^[ fail ])| \\
-    &&& \text{if $r \not\in R, \skol{|v|}$} \\[1mm]
+    &&& \text{if $r \not\in R, \skol{|gv|}$} \\[1mm]
  \rulename{split-tup} & \multicolumn{3}{l}{|verify2 rs as (P^[r==tup (v_1, xdots, v_n); e])|} \\
      && \movesto & |verifyKW|
            \begin{array}[t]{@@{}l}
