@@ -468,12 +468,11 @@ verifyPosLam' loc' e1 eff e2 = \ case
   E -> verifyM $
     negM (domainM $ desugarExp e1) `seqM`
     checkM eff (desugarExp e2)
-  P f ->
-    (bracketInvoke (L loc' $ Name "function") (name f) `then'`) <$> verifyM do
-      b <- name <$> freshIdent (loc e1)
-      unify b <$> negM (domainM $ desugarExp e1) `seqM` checkM eff do
-        c <- freshIdent $ loc e2
-        (unify (name c) (bracketInvoke (name f) b) `then'`) <$> desugarExp' e2 (P c)
+  P f -> (bracketInvoke (L loc' $ Name "function") (name f) `then'`) <$> verifyM do
+    b <- name <$> freshIdent (loc e1)
+    unify b <$> negM (domainM $ desugarExp e1) `thenM` checkM eff do
+      c <- freshIdent $ loc e2
+      (unify (name c) (bracketInvoke (name f) b) `then'`) <$> desugarExp' e2 (P c)
 
 desugarOfType
   :: (MonadWrong Error m, MonadSupply Label m)
