@@ -762,7 +762,8 @@ resumeSplit' ref_env env@SplitEnv {..} m =
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
-        incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
+        level <- getLevel
+        incrSuspCounts $ IntMap.delete level s.suspCounts
         case guard (IntMap.null suspCounts) *> default' of
           Just m_d -> do
             let default' = Nothing
@@ -906,10 +907,10 @@ verifyYield
   -> ((a -> VerseT m ()) -> VerseT m ())
   -> (a -> VerseT m ())
   -> VerseT m ()
-verifyYield heap latch init last s@S {..} i k succeed =
-  (i <=) <$> getLevel >>= \ case
+verifyYield heap latch init last s@S {..} i k succeed = do
+  level <- getLevel
+  case i <= level of
     True -> yield i $ \ f -> do
-      level <- getLevel
       incrSuspCounts $ IntMap.delete level suspCounts
       ref_env <- newHRef $ Just VerifyEnv { susp = f (), .. }
       suspend $ resumeVerify ref_env
@@ -1026,7 +1027,8 @@ resumeVerify' ref_env env@VerifyEnv {..} m =
         suspend resume = env.suspend resume *> s.suspend resume
         suspCounts = plusSuspCounts env.suspCounts s.suspCounts
       in do
-        incrSuspCounts . flip IntMap.delete s.suspCounts =<< getLevel
+        level <- getLevel
+        incrSuspCounts $ IntMap.delete level s.suspCounts
         case guard (IntMap.null suspCounts) *> default' of
           Just m_d -> do
             let default' = Nothing
