@@ -1431,7 +1431,7 @@ invokePosList loc xs var s s' = do
   where
     loop = lift . readGVar' >=> \ case
       Nil -> empty
-      Var x xs -> unify' loc x var <|> loop xs
+      Var x xs -> unifyHead loc x var <|> loop xs
       Contract x xs -> invokeContract loc x var <|> loop xs
 
 readPair
