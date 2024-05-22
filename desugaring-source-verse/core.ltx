@@ -201,8 +201,8 @@ $\begin{array}{@@{}l}
 \rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
-\rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]| \\
-\rulename{fail} & |C^[fail]| & \movesto & |fail| \\
+\rulename{choice} & |SX^[C^[e_1 choice e_2]]| & \movesto & |SX^[C^[e_1] choice C^[e_2]]| \\
+\rulename{fail} & |C^[fail]| & \movesto & |fail| & \text{if |blockedc emptyset C|}\\
 
     \\[-0.8em]
 
