@@ -1000,7 +1000,7 @@ resumeVerify' ref_env env@VerifyEnv {..} m =
       in do
         level <- getLevel
         incrSuspCounts $ IntMap.delete level s.suspCounts
-        case i < level of
+        (i <=) <$> getVerifyLevel >>= \ case
           True -> yield i $ \ f -> do
             f <- once f
             writeHRef ref_env $ Just VerifyEnv
