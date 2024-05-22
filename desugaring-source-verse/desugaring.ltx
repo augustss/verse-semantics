@@ -974,7 +974,7 @@ $\begin{array}{@@{}l}
 \\[-0.6em]
 
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
-\multicolumn{5}{l}{\textit{Verify}} \\
+\multicolumn{5}{l}{\textit{Verify} \hspace{3mm} \text{All rules require |blockedc emptyset P|}} \\
 \rulename{solver} & |verify2 rs as e| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
   \rulename{verify-val} & |verify2 rs as v|      & \movesto & |tup ()| & \\
   \rulename{verify-choice} & |verify2 rs as (e_1 choice e_2)|      & \movesto & |verify2 rs as e_1 ; verify2 rs as e_2| & \\

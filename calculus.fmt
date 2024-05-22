@@ -108,8 +108,11 @@
 %format suspx1 (x) = "susp\{" x "\}_1"
 %format suspx2 (x) = "susp\{" x "\}_2"
 
-%format blockedc (xs) (y) = "\mathsf{blkd}_{\small C}("  xs "," y ")"
-%format blockede (xs) (y) = "\mathsf{blkd}_{\small e}("  xs "," y ")"
+%format validc x xs (y) = "\mathsf{valid}("  x "," xs "," y ")"
+%format blockedc xs (y) = "\mathsf{blkd}_{\textsc{\tiny P}}("  xs "," y ")"
+%format blockede xs (y) = "\mathsf{blkd}_{\small e}("  xs "," y ")"
+%format freevars (e) = "\freevars{" e "}"
+%format `delete` = "\setminus"
 
 %format match (e) (b) = e "\blacktriangleright" b
 %format `match`       = "\blacktriangleright"
@@ -242,6 +245,7 @@
 %format arrsp (x) = "\langle\;" x "\;\rangle"
 %format (tup (x)) = "\langle{}" x "\rangle"
 %format emptytup = "\langle" "\rangle"
+%format emptyset = "\emptyset"
 %format arropen = "\langle"
 %format arrclose = "\rangle"
 
