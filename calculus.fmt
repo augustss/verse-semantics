@@ -109,8 +109,10 @@
 %format suspx2 (x) = "susp\{" x "\}_2"
 
 %format validc x xs (y) = "\mathsf{valid}("  x "," xs "," y ")"
-%format blockedc xs (y) = "\mathsf{blkd}_{\textsc{\tiny P}}("  xs "," y ")"
+%format blockedc xs (y) = "\mathsf{blkd}_{\small c}("  xs "," y ")"
 %format blockede xs (y) = "\mathsf{blkd}_{\small e}("  xs "," y ")"
+%format choicefreec (y) = "\mathsf{choicefree}_{\small c}(" y ")"
+%format choicefreee (y) = "\mathsf{choicefree}_{\small e}(" y ")"
 %format freevars (e) = "\freevars{" e "}"
 %format `delete` = "\setminus"
 
