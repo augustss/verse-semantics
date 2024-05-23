@@ -727,35 +727,6 @@ resumeSplit' ref_env env@SplitEnv {..} m =
       decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
       writeHRef ref_env Nothing
       susp =<< split' (init.fail' <?> appendAbortS m_a env) heap latch last
-    YieldS i k s@S {..} succeed choices ->
-      let
-        init = appendChoicesS choices env
-        suspend resume = env.suspend resume *> s.suspend resume
-        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
-      in do
-        level <- getLevel
-        incrSuspCounts $ IntMap.delete level s.suspCounts
-        (i <=) <$> getVerifyLevel >>= \ case
-          True -> yield i $ \ f -> do
-            f <- once f
-            writeHRef ref_env $ Just SplitEnv
-              { susp = \ x -> susp x <* f ()
-              , ..
-              }
-            s.suspend $ resumeSplit ref_env
-            resumeSplit ref_env . k $ \ x -> do
-              succeed x
-              whenSuspended $ \ _ -> f ()
-          False -> case guard (IntMap.null suspCounts) *> default' of
-            Just m_d -> do
-              let default' = Nothing
-              writeHRef ref_env $ Just SplitEnv {..}
-              s.suspend $ resumeSplit ref_env
-              resumeSplit ref_env $ k succeed *> m_d
-            Nothing -> do
-              writeHRef ref_env $ Just SplitEnv {..}
-              s.suspend $ resumeSplit ref_env
-              resumeSplit ref_env $ k succeed
     SucceedS () s@S {..} choices ->
       let
         init = appendChoicesS choices env
@@ -788,6 +759,35 @@ resumeSplit' ref_env env@SplitEnv {..} m =
                 <?>
                 (do heap <- copyHeap heap
                     susp =<< split' init.abort heap latch last)
+    YieldS i k s@S {..} succeed choices ->
+      let
+        init = appendChoicesS choices env
+        suspend resume = env.suspend resume *> s.suspend resume
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
+      in do
+        level <- getLevel
+        incrSuspCounts $ IntMap.delete level s.suspCounts
+        (i <=) <$> getVerifyLevel >>= \ case
+          True -> yield i $ \ f -> do
+            f <- once f
+            writeHRef ref_env $ Just SplitEnv
+              { susp = \ x -> susp x <* f ()
+              , ..
+              }
+            s.suspend $ resumeSplit ref_env
+            resumeSplit ref_env . k $ \ x -> do
+              succeed x
+              whenSuspended $ \ _ -> f ()
+          False -> case guard (IntMap.null suspCounts) *> default' of
+            Just m_d -> do
+              let default' = Nothing
+              writeHRef ref_env $ Just SplitEnv {..}
+              s.suspend $ resumeSplit ref_env
+              resumeSplit ref_env $ k succeed *> m_d
+            Nothing -> do
+              writeHRef ref_env $ Just SplitEnv {..}
+              s.suspend $ resumeSplit ref_env
+              resumeSplit ref_env $ k succeed
 
 appendChoicesS :: Choices m () -> SplitEnv m -> Choices m ()
 appendChoicesS init env = Choices {..}
@@ -992,6 +992,30 @@ resumeVerify' ref_env env@VerifyEnv {..} m =
       writeHRef ref_env Nothing
       verify' (init.fail' <?> appendAbortV m_a env) heap latch last
       susp
+    SucceedS () s@S {..} choices ->
+      let
+        init = appendChoicesV choices env
+        suspend resume = env.suspend resume *> s.suspend resume
+        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
+      in do
+        level <- getLevel
+        incrSuspCounts $ IntMap.delete level s.suspCounts
+        case guard (IntMap.null suspCounts) *> default' of
+          Just m_d -> do
+            let default' = Nothing
+            writeHRef ref_env $ Just VerifyEnv {..}
+            s.suspend $ resumeVerify ref_env
+            resumeVerify ref_env m_d
+          Nothing -> do
+            suspCount <- readSuspCount' latch heap
+            (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
+              False -> do
+                writeHRef ref_env $ Just VerifyEnv {..}
+                s.suspend $ resumeVerify ref_env
+              True -> do
+                commit heap
+                verify' (init.fail <?> init.abort) heap latch last
+                susp
     YieldS i k s@S {..} succeed choices ->
       let
         init = appendChoicesV choices env
@@ -1021,30 +1045,6 @@ resumeVerify' ref_env env@VerifyEnv {..} m =
               writeHRef ref_env $ Just VerifyEnv {..}
               s.suspend $ resumeVerify ref_env
               resumeVerify ref_env $ k succeed
-    SucceedS () s@S {..} choices ->
-      let
-        init = appendChoicesV choices env
-        suspend resume = env.suspend resume *> s.suspend resume
-        suspCounts = plusSuspCounts env.suspCounts s.suspCounts
-      in do
-        level <- getLevel
-        incrSuspCounts $ IntMap.delete level s.suspCounts
-        case guard (IntMap.null suspCounts) *> default' of
-          Just m_d -> do
-            let default' = Nothing
-            writeHRef ref_env $ Just VerifyEnv {..}
-            s.suspend $ resumeVerify ref_env
-            resumeVerify ref_env m_d
-          Nothing -> do
-            suspCount <- readSuspCount' latch heap
-            (suspCount == 0 &&) <$> readHRef' last heap >>= \ case
-              False -> do
-                writeHRef ref_env $ Just VerifyEnv {..}
-                s.suspend $ resumeVerify ref_env
-              True -> do
-                commit heap
-                verify' (init.fail <?> init.abort) heap latch last
-                susp
 
 appendChoicesV :: Choices m () -> VerifyEnv m -> Choices m ()
 appendChoicesV init env = Choices {..}
