@@ -1497,29 +1497,37 @@ unifyUnboundUnbound
   :: MonadRef m
   => (a -> a -> VerseT m (Match, VerseT m ()))
   -> Var m a -> Var m a -> Unbound m a -> VerseT m ()
-unifyUnboundUnbound f var1 var2@(Var ref2) unbound2 = do
-  writeVarState ref2 $ Link var1
-  unbound2.substSusp var1 LinkS
-  whenM ((unbound2.level /=) <$> getLevel) $ do
-    incrSuspCount =<< getLatch
-    whenSuspended $ \ resume ->
-      fork $ readSubst var2 >>= \ (var2, subst2) -> resume $ do
-        unifySubst f var2 subst2 var1
-        decrSuspCount =<< getLatch
+unifyUnboundUnbound f var1 var2@(Var ref2) unbound2 =
+  (unbound2.level <=) <$> getVerifyLevel >>= \ case
+    True -> readSubst var2 >>= \ (var2, subst2) ->
+      unifySubst f var2 subst2 var1
+    False -> do
+      writeVarState ref2 $ Link var1
+      unbound2.substSusp var1 LinkS
+      whenM ((unbound2.level /=) <$> getLevel) $ do
+        incrSuspCount =<< getLatch
+        whenSuspended $ \ resume ->
+          fork $ readSubst var2 >>= \ (var2, subst2) -> resume $ do
+            unifySubst f var2 subst2 var1
+            decrSuspCount =<< getLatch
 
 unifyBoundUnbound
   :: MonadRef m
   => (a -> a -> VerseT m (Match, VerseT m ()))
   -> Var m a -> Bound a -> Var m a -> Unbound m a -> VerseT m ()
-unifyBoundUnbound f var1 bound1 var2@(Var ref2) unbound2 = do
-  writeVarState ref2 $ Link var1
-  unbound2.substSusp var1 $ BoundS bound1
-  whenM ((unbound2.level /=) <$> getLevel) $ do
-    incrSuspCount =<< getLatch
-    whenSuspended $ \ resume ->
-      fork $ readBound var2 >>= \ (var2, bound2) -> resume $ do
-        unifyBoundBound f var1 bound1 var2 bound2
-        decrSuspCount =<< getLatch
+unifyBoundUnbound f var1 bound1 var2@(Var ref2) unbound2 =
+  (unbound2.level <=) <$> getVerifyLevel >>= \ case
+    True -> readBound var2 >>= \ (var2, bound2) ->
+      unifyBoundBound f var1 bound1 var2 bound2
+    False -> do
+      writeVarState ref2 $ Link var1
+      unbound2.substSusp var1 $ BoundS bound1
+      whenM ((unbound2.level /=) <$> getLevel) $ do
+        incrSuspCount =<< getLatch
+        whenSuspended $ \ resume ->
+          fork $ readBound var2 >>= \ (var2, bound2) -> resume $ do
+            unifyBoundBound f var1 bound1 var2 bound2
+            decrSuspCount =<< getLatch
 
 unifyBoundBound
   :: MonadRef m
