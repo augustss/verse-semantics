@@ -1,7 +1,7 @@
 --
 -- from TimNotes/VerseSpecification-2024-May-07.txt
 --
-{-# OPTIONS_GHC -Wall -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wall -Wno-unused-imports -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -42,32 +42,58 @@ instance Pretty Ident where
   pPrint (Ident i) = text i
 
 data Expr
-  = ExprAtom Atom
---  | ExprList [Expr]
-  | ExprDef EVariable Expr
-  | ExprVar EVariable
-  | ExprUnify Expr Expr
+  = ExprAtom Atom              -- atom
+  | ExprUnify Expr Expr        -- s0=s1
+  | ExprChoice Expr Expr       -- s0|s1
+  | ExprArray [Expr]           -- array{s1,...}
+  | ExprCallClosed Expr Expr   -- s0[s1]
+  | ExprCallOpen Expr Expr     -- s0(s1)
+  | ExprDeoption Expr          -- s0?
+  | ExprOption Expr            -- option{s0}
+  | ExprPreColon Expr          -- :s0
+  | ExprFunction Expr (Maybe VarianceSpecifier) Expr Expr
+  | ExprSpec Expr [Expr]       -- s0<s1><s2>...
+  | ExprDef Expr Expr          -- s0:=s1
+  | ExprPostHat Expr           -- s0^
+  | ExprFx EffectSpecifier     -- fx
+  | ExprColon Expr Expr        -- s0:s1
+  | ExprVar EVariable          -- x
+  | ExprUnderscore             -- _
+  | ExprArrow Expr Expr        -- s0->s1
+  | ExprStage Expr Expr Expr   -- :s0<s2>=s1
+
   | ExprLambda Expr Expr
-  | ExprFunction Expr VarianceSpecifier [EffectSpecifier] Expr
-  | ExprAt Expr Expr
-  | ExprColon EVariable Expr
-  | ExprArray [Expr]
   | ExprExists EVariable
+
+  -- Unholy mix of levels
+  | ExprVertex Vertex          -- u
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Expr where
   pPrint (ExprAtom a) = pPrint a
+  pPrint (ExprUnify e1 e2) = pPrint e1 <+> text "=" <+> pPrint e2
+  pPrint (ExprChoice e1 e2) = pPrint e1 <+> text "|" <+> pPrint e2
 --
   pPrint (ExprDef x e) = pPrint x <+> text ":=" <+> pPrint e
   pPrint (ExprVar x) = pPrint x
-  pPrint (ExprUnify e1 e2) = pPrint e1 <+> text "=" <+> pPrint e2
+  pPrint ExprUnderscore = text "_"
   pPrint (ExprLambda e1 e2) = pPrint e1 <+> text "=>" <+> pPrint e2
-  pPrint (ExprFunction e1 oc fx e2) = text "function" <> parens (pPrint e1) <> hcat (f oc : map f fx) <> braces (pPrint e2)
+  pPrint (ExprFunction e1 oc fx e2) = text "function" <> parens (pPrint e1) <> hcat [maybe empty f oc, f fx) <> braces (pPrint e2)
     where f e = text "<" <> pPrint e <> pPrint ">"
-  pPrint (ExprAt e1 e2) = pPrint e1 <> brackets (pPrint e2)
+  pPrint (ExprCallClosed e1 e2) = pPrint e1 <> brackets (pPrint e2)
+  pPrint (ExprCallOpen e1 e2) = pPrint e1 <> parens (pPrint e2)
   pPrint (ExprColon e1 e2) = parens $ pPrint e1 <> text ":" <> pPrint e2
   pPrint (ExprArray xs) = text "array" <> (braces $ sep $ punctuate (text ",") (map pPrint xs))
   pPrint (ExprExists x) = pPrint x <> text ":any"
+  pPrint (ExprDeoption x) = pPrint x <> text "?"
+  pPrint (ExprOption x) = text "option" <> braces (pPrint x)
+  pPrint (ExprPreColon x) = text ":" <> pPrint x
+  pPrint (ExprPostHat x) = pPrint x <> text "^"
+  pPrint (ExprSpec x ss) = foldl f (pPrint x) ss
+    where f s e = s <> text "<" <> pPrint e <> pPrint ">"
+  pPrint (ExprFx fx) = pPrint fx
+  pPrint (ExprArrow e1 e2) = pPrint e1 <> text "->" <> pPrint e2
+  pPrint (ExprVertex u) = text "$" <> pPrint u
 
 data EVariable = EVariable Ident
   deriving (Eq, Ord, Show, Data)
@@ -78,8 +104,6 @@ data VarianceSpecifier = Open | Closed
   deriving (Eq, Ord, Show, Data, Enum, Bounded)
 
 instance Pretty VarianceSpecifier where pPrint = ppLower
-
-type EffectSpecifier = ()
 
 data Atom
   = AtomRational Q
@@ -107,27 +131,27 @@ data Path = Path String
 instance Pretty Path where
   pPrint (Path i) = text i
 
-data Pointer = Pointer Ident
+newtype Pointer = Pointer Ident
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Pointer where pPrint (Pointer i) = pPrint i
 
-data Variable = Variable Ident
+newtype Variable = Variable Ident
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Variable where pPrint (Variable i) = pPrint i
 
-data Context = Context Ident
+newtype Context = Context Ident
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Context where pPrint (Context i) = pPrint i
 
-data OperationVariable = OperationVariable Ident
+newtype OperationVariable = OperationVariable Ident
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty OperationVariable where pPrint (OperationVariable i) = pPrint i
 
-data EffectVariable = EffectVariable Ident
+newtype EffectVariable = EffectVariable Ident
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty EffectVariable where pPrint (EffectVariable i) = pPrint i
@@ -181,7 +205,7 @@ data Head
   | HeadLambda Lambda
   | HeadMacro Lambda
   | HeadTuple Vertex Variable                         -- tuple(u) x
-  | HeadNom Path Vertex
+  | HeadNom Path Variable                             -- nom(Path) x
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Head where
@@ -203,7 +227,7 @@ instance Pretty Vertex where
   pPrint (VertexCall u v) = pPrint u <> parens (pPrint v)
 
 -- The operation is always of the form
---  explore(tops,fxv) {...; scope c {op}; ...}
+--  explore(top_allows,fxv) {...; scope c {op}; ...}
 type Program = Operation
 
 data Operation
@@ -217,7 +241,7 @@ data Operation
   | OpIn EffectSpecifier (Maybe EffectVariable) Context Variable Variable Operation      -- in(fx,fxv|none) c i x op0
   | OpStage EffectSpecifier EffectVariable Context Variable Variable Operation {-value-} Context Variable Operation
                                                                   -- stage(fx,opv) c0 i x {op0} value c1 y {op1}
-  | OpVerify EffectSpecifier (Maybe Err) Context Operation        -- verify(fx,?err) c. op0
+  | OpVerify EffectSpecifier Err Context Operation                -- verify(fx,err) c. op0
   | OpAssume EffectSpecifier Context Operation                    -- assume(fx) c. op0
   | OpIterate Operation                                           -- iterate {op_0; ...; op_n}
   | OpFold Variable Context Operation {-then-} Context Variable Operation {-else-} Context Operation
@@ -229,7 +253,6 @@ data Operation
   | OpSyntax OperationVariable Vertex Vertex Syntax               -- S(u,v,s)
   | OpResolved OperationVariable Operation                        -- resolved(opv){op}
   | OpDefine Ident Defineable                                     -- define Ident {definable}
-  | OpVar OperationVariable                                       -- opv
 
   -- OpMetaVar is not a real Op, it's just for pretty printing a context
   | OpMetaVar String
@@ -255,8 +278,7 @@ instance Pretty Operation where -- XXX precedence
   pPrint (OpStage fx fxv c0 i x op0 c1 y op1) =
     text "stage" <> parens (pPrint (fx, fxv)) <+> pPrint c0 <+> pPrint i <+> pPrint x <+> braces (pPrint op0) <+>
     text "value" <+> pPrint c1 <+> pPrint y <+> braces (pPrint op1)
-  pPrint (OpVerify fx Nothing c op0) = text "verify" <> parens (pPrint fx) <+> pPrint c <> text "." <+> pPrint op0
-  pPrint (OpVerify fx (Just err) c op0) = text "verify" <> parens (pPrint (fx, err)) <+> pPrint c <> text "." <+> pPrint op0
+  pPrint (OpVerify fx err c op0) = text "verify" <> parens (pPrint (fx, err)) <+> pPrint c <> text "." <+> pPrint op0
   pPrint (OpAssume fx c op0) = text "assume" <> parens (pPrint fx) <+> pPrint c <+> braces (pPrint op0)
   pPrint (OpIterate op) = text "iterate" <+> braces (pPrint op)
   pPrint (OpFold x0 c0 op0 c1 x1 op1 c2 op2) =
@@ -270,7 +292,6 @@ instance Pretty Operation where -- XXX precedence
   pPrint (OpSyntax opv u v s) = text "syntax" <> pPrint (opv,u,v) <> braces (pPrint s)
   pPrint (OpResolved opv op) = text "resolved" <> parens (pPrint opv) <> braces (pPrint op)
   pPrint (OpDefine i d) = text "define" <+> pPrint i <+> pPrint d
-  pPrint (OpVar v) = pPrint v
 
   pPrint (OpMetaVar s) = text s
   pPrint OpDone = text "DONE"
@@ -444,6 +465,12 @@ programOp aop = do
   (ctx1, fc, op) <- flexibleOp op0
   pure (\ fc' op' -> ctx0 (ctx1 fc' op'), fc, op)
 
+programUnify :: Operation -> [(FlexContext -> Vertex -> Vertex -> Operation, FlexContext, Vertex, Vertex)]
+programUnify aop = do
+  (ctx, fc, OpUnify u v) <- programOp aop
+  [ (\ fc' u' v' -> ctx fc' (OpUnify u' v'), fc, u, v)
+   ,(\ fc' u' v' -> ctx fc' (OpUnify u' v'), fc, v, u) ]
+
 programScope :: Operation -> [(CtxScope, ScopeContext, Operation)]
 programScope aop = do
   (ctx0, aop0) <- programSpan aop
@@ -453,40 +480,44 @@ programScope aop = do
       OpStage fx fxv sc i x op0 c1 y op -> pure (\ sc' op' -> OpStage fx fxv sc' i x op0 c1 y op', sc, op)
       _ -> []
 
-programExists :: Operation -> [(Context -> Variable -> Operation, Context, Variable)]
-programExists aop = ex1 ++ ex2
+programFlexible :: Operation -> [(Context -> Vertex -> Operation, Context, Vertex)]
+programFlexible aop = ex1 ++ ex2
   where
+    unvar (VertexVariable x) = x
+    unvar u = error $ "programFlexible: unvar " ++ show u
+    unlam (VertexHead (HeadLambda l)) = l
+    unlam u = error $ "programFlexible: unlam " ++ show u
     ex1 = do
-      (ctx0, c, op0) <- programOp aop
-      case op0 of
+      (ctx0, c, aop0) <- programOp aop
+      case aop0 of
         OpExists xs -> do
           (ctx1, x) <- listCtx xs
-          pure (\ c' x' -> ctx0 c' (OpExists (ctx1 x')), c, x)
-{-
+          pure (\ c' u -> ctx0 c' (OpExists (ctx1 (unvar u))), c, VertexVariable x)
+
         OpUnify u0 u@(VertexHead (HeadLambda _)) -> 
           pure (\ c' u' -> ctx0 c' (OpUnify u0 u'), c, u)
         OpUnify u@(VertexHead (HeadLambda _)) u0 -> 
           pure (\ c' u' -> ctx0 c' (OpUnify u' u0), c, u)
--}
-        OpUnify u (VertexHead (HeadTuple v x)) ->
-          pure (\ c' x' -> ctx0 c' (OpUnify u (VertexHead (HeadTuple v x'))), c, x)
-        OpUnify (VertexHead (HeadTuple v x)) u ->
-          pure (\ c' x' -> ctx0 c' (OpUnify (VertexHead (HeadTuple v x')) u), c, x)
-{-
-        OpBeta x c0 op0 c1 op1 ->
-          pure (\ c' x' -> ctx0 c' (OpBeta x' c0 op0 c1 op1), c, x)
--}
+
+        OpUnify u v@(VertexHead (HeadTuple _ _)) ->
+          pure (\ c' v' -> ctx0 c' (OpUnify u v'), c, v)
+        OpUnify v@(VertexHead (HeadTuple _ _)) u ->
+          pure (\ c' v' -> ctx0 c' (OpUnify v' u), c, v)
+
+        OpBeta (l, p) c0 op0 c1 op1 ->
+          pure (\ c' u' -> ctx0 c' (OpBeta (unlam u', p) c0 op0 c1 op1), c, VertexHead (HeadLambda l))
+
         _ ->
           []
     ex2 = do
       (ctx0, sop0) <- programSpan aop
       case sop0 of
         OpIn fx fxv c i x op ->
-          [ (\ c' u' -> ctx0 (OpIn fx fxv c' u' x op), c, i)
-          , (\ c' u' -> ctx0 (OpIn fx fxv c' i u' op), c, x) ]
+          [ (\ c' u' -> ctx0 (OpIn fx fxv c' (unvar u') x op), c, VertexVariable i)
+          , (\ c' u' -> ctx0 (OpIn fx fxv c' i (unvar u') op), c, VertexVariable x) ]
         OpStage fx fxv c i x op0 c1 y op1 ->
-          [ (\ c' u' -> ctx0 (OpStage fx fxv c' u' x op0 c1 y op1), c, i)
-          , (\ c' u' -> ctx0 (OpStage fx fxv c' i u' op0 c1 y op1), c, x) ]
+          [ (\ c' u' -> ctx0 (OpStage fx fxv c' (unvar u') x op0 c1 y op1), c, VertexVariable i)
+          , (\ c' u' -> ctx0 (OpStage fx fxv c' i (unvar u') op0 c1 y op1), c, VertexVariable x) ]
         _ ->
           []
 
@@ -498,7 +529,7 @@ listCtx (a : as) = (\ a' -> a':as, a) : [ (\ b' -> a : ctx b', b) | (ctx, b) <- 
 
 beta :: Operation -> Operation
 beta = transform f
-  where f (OpSyntax opv _u _v _s) = OpVar opv
+  where --f (OpSyntax opv _u _v _s) = OpVar opv
         f (OpDefine _ident _definable) = OpExists []
         f (OpStage fx fxv c0 i x op0 _c1 _y _op1) = OpIn fx (Just fxv) c0 i x op0
         f op = op
@@ -540,12 +571,30 @@ data Effect
   | FXreads | FXwrites | FXallocates
   | FXinteracts | FXthrows | FXsuspends
   | FXunifies
+  | FXrejects
   | FXiterates_pending | FXreads_pending | FXwrites_pending | FXinteracts_pending | FXthrows_pending | FXsuspends_pending
   deriving (Eq, Ord, Bounded, Enum, Show, Data)
 
 newtype EffectSpecifier = ES [Effect] -- the effect list has no duplicates and is sorted.
   deriving (Eq, Ord, Show, Data)
 
+instance Pretty EffectSpecifier where
+  pPrint _ = undefined
+{-
+  pPrint afx | afx == tops = text "tops"
+             | afx == effects = text "effects"
+             | afx == effects' = text "effects'"
+             | otherwise =
+              let (cfx, cs) = fromJust $ find (\ (a,_) -> a <=== afx) cardEffs
+                  sfx = cs : loop (afx `remove` cfx)
+                  loop (ES []) = []
+                  loop fx@(ES xes) =
+                    case find (\ (a,_) -> a <=== fx) otherEffs of
+                      Just (xfx, s) -> s : loop (afx `remove` xfx)
+                      Nothing -> map show xes
+              in  hcat (punctuate (text "\\/") $ map text sfx)
+-}
+  
 pattern Iterates :: EffectSpecifier
 pattern Iterates = ES [FXsucceeds, FXfails, FXiterates]
 pattern Abstracts :: EffectSpecifier
@@ -556,24 +605,31 @@ pattern Writes :: EffectSpecifier
 pattern Writes = ES [FXvaries, FXwrites]
 pattern Allocates :: EffectSpecifier
 pattern Allocates = ES [FXvaries, FXallocates]
+pattern Unifies :: EffectSpecifier
+pattern Unifies = ES [FXunifies]
 
 pattern Cardinalities :: EffectSpecifier
 pattern Cardinalities = ES [FXsucceeds, FXfails, FXiterates, FXresolves, FXabstracts]
 imperatives :: EffectSpecifier
-imperatives = Diverges\/Demands\/Reads\/Writes\/Allocates\/Interacts\/Throws\/Suspends\/pendings
+imperatives = Unifies\/Diverges\/Transacts\/Suspends\/Interacts\/Throws\/pendings
 pendings :: EffectSpecifier
 pendings = ES (sort [FXiterates_pending, FXreads_pending, FXwrites_pending, FXinteracts_pending, FXthrows_pending, FXsuspends_pending])
-
 {-
+
 tops :: EffectSpecifier
 tops = Succeeds\/Diverges\/Interacts\/Transacts
+-}
+top_allows :: EffectSpecifier
+top_allows = Succeeds\/Unifies\/Diverges\/Transacts\/Interacts
 effects :: EffectSpecifier
-effects = Cardinalities \/ imperatives \/ Varies
+effects = Cardinalities \/ imperatives \/ Rejects
+{-
 effects' :: EffectSpecifier
 effects' = effects `remove` Demands
 
 pattern Contradicts :: EffectSpecifier
 pattern Contradicts = ES []
+-}
 pattern Succeeds :: EffectSpecifier
 pattern Succeeds = ES [FXsucceeds]
 pattern Fails :: EffectSpecifier
@@ -585,7 +641,7 @@ pattern Resolves = ES [FXsucceeds, FXfails, FXresolves]
 pattern Varies :: EffectSpecifier
 pattern Varies = ES [FXvaries]
 pattern Transacts :: EffectSpecifier
-pattern Transacts = ES [FXvaries, FXreads, FXwrites, FXallocates]
+pattern Transacts = ES [FXreads, FXwrites, FXallocates]
 pattern Interacts :: EffectSpecifier
 pattern Interacts = ES [FXinteracts]
 pattern Demands :: EffectSpecifier
@@ -596,7 +652,9 @@ pattern Suspends :: EffectSpecifier
 pattern Suspends = ES [FXsuspends]
 pattern Throws :: EffectSpecifier
 pattern Throws = ES [FXthrows]
--}
+pattern Rejects :: EffectSpecifier
+pattern Rejects = ES [FXrejects]
+{-
 
 ----------------------------------------------------------
 
@@ -604,7 +662,6 @@ class Desugar syn where
   desugar :: Data a => a -> Vertex -> Vertex -> syn -> Operation
 
 
-{-
 -- ...
 
 data Arg = ArgOp Operation | ArgOpv OperationVariable | ArgV Vertex
@@ -786,6 +843,7 @@ effIn e (ES fx) = e `elem` fx
 
 sublists :: [a] -> [[a]]
 sublists = filterM (const [False, True])
+-}
 
 -- The join (union) of two EffectSpecifier
 (\/) :: EffectSpecifier -> EffectSpecifier -> EffectSpecifier
@@ -798,6 +856,7 @@ ES fx0 \/ ES fx1 = ES $ merge fx0 fx1
             EQ -> e0 : merge es0 es1
             GT -> e1 : merge (e0:es0) es1
 
+{-
 joins :: [EffectSpecifier] -> EffectSpecifier
 joins = foldr (\/) (ES [])
 
@@ -931,19 +990,27 @@ instance Bvs RunLambda where
   bvs (RunLambda u (Variable i) (Variable z) op0) = i : z : bvs u ++ bvs op0
 -}
 ------------------------------------------------------------------
+-}
 
-class NewIdents i o | i -> o where
+class NewIdents i o where
   newIdents :: (Data a) => a -> i -> o
 instance NewIdents String Ident where
   newIdents x s = is !! 0  where is = identsNotIn x [Ident s]
+
 instance NewIdents (String, String) (Ident, Ident) where
   newIdents x (s1, s2) = (is !! 0, is !! 1)  where is = identsNotIn x [Ident s1, Ident s2]
+instance NewIdents (String, String) (OperationVariable, OperationVariable) where
+  newIdents x (s1, s2) = (OperationVariable (is !! 0), OperationVariable (is !! 1))  where is = identsNotIn x [Ident s1, Ident s2]
+instance NewIdents (String, String) (Context, Context) where
+  newIdents x (s1, s2) = (Context (is !! 0), Context (is !! 1))  where is = identsNotIn x [Ident s1, Ident s2]
+
 instance NewIdents (String, String, String) (Ident, Ident, Ident) where
   newIdents x (s1, s2, s3) = (is !! 0, is !! 1, is !! 2)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3]
 instance NewIdents (String, String, String, String) (Ident, Ident, Ident, Ident) where
   newIdents x (s1, s2, s3, s4) = (is !! 0, is !! 1, is !! 2, is !! 3)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3, Ident s4]
 instance NewIdents (String, String, String, String, String) (Ident, Ident, Ident, Ident, Ident) where
   newIdents x (s1, s2, s3, s4, s5) = (is !! 0, is !! 1, is !! 2, is !! 3, is !! 4)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3, Ident s4, Ident s5]
+
 instance NewIdents [String] [Ident] where
   newIdents x ss = is  where is = identsNotIn x (map Ident ss)
 instance NewIdents (Int, String) [Ident] where
@@ -963,6 +1030,7 @@ idents is = concatMap (\ s -> map (addSuf s) is) sufs
   where sufs = "" : "'" : map show [1::Integer ..]
         addSuf s (Ident i) = Ident (i ++ s)
 
+{-
 -- e[y/x]
 substVar :: (Data a) => Variable -> Variable -> a -> a
 substVar y x = transformBi f
@@ -1044,10 +1112,12 @@ dsE pg u v (ExprArray ss) =
   OpUnify v tupx +>
   opSeqs [ ds k s | (s, k) <- zip ss [0::Int ..] ]
 dsE _ u v x = OpSyntax u v (SyntaxExpr x)
+-}
 
 opSeqs :: [Operation] -> Operation
 opSeqs = foldr1 OpSeq
 
+{-
 ------------------------------------------------------------------
 
 instance Rec Config where
@@ -2147,6 +2217,151 @@ example11 = SyntaxList
 -}
 
 -}
+
+unwrapColons :: Expr -> (Expr -> Expr, Expr)
+unwrapColons (ExprPreColon e) = (ExprPreColon . pre, s) where (pre, s) = unwrapColons e
+unwrapColons e = (id, e)
+
+desugar :: Data pgm => pgm -> OperationVariable -> Vertex -> Vertex -> Syntax -> Maybe Operation
+desugar _ _ _ _ (SyntaxList []) = undefined
+desugar pgm opv u v (SyntaxList ss) = -- SequenceSyntax
+  let n1 = length ss - 1
+      is = map (VertexVariable . Variable) $ newIdents pgm (n1, "i")
+      xs = map (VertexVariable . Variable) $ newIdents pgm (n1, "x")
+      opvs = map OperationVariable $ newIdents pgm (n1, "opv")
+      ops = zipWith4 OpSyntax opvs is xs (init ss)
+  in  Just $ opSeqs $ ops ++ [OpSyntax opv u v (last ss)]
+desugar _ _ _ _ (SyntaxUnquote _) = undefined
+desugar pgm aopv u v (SyntaxExpr expr) = OpResolved aopv <$> dsE expr
+  where
+    newIds :: (NewIdents i o) => i -> o
+    newIds a = newIdents pgm a
+    newOpv s = OperationVariable (newIds s)
+    syntax oopv uu vv e = OpSyntax oopv uu vv (SyntaxExpr e)
+    syntax1 = syntax (newOpv "opv1")
+    ok _ = Just
+
+    dsE (ExprVertex x) = ok "Vertex" $ opSeqs [OpUnify u x, OpUnify v x]
+    dsE (ExprAtom a) = ok "Atom" $ opSeqs [OpUnify u n, OpUnify v n] where n = VertexHead (HeadAtom a)
+    dsE (ExprUnify s0 s1) = ok "Unify" $ opSeqs [syntax1 u v s0, syntax (newOpv "opv2") u v s1]
+    dsE (ExprChoice s0 s1) = ok "Choice" $ opSeqs [OpScope c $ syntax1 u v s0, OpScope d $ syntax (newOpv "opv2") u v s1]
+      where (c, d) = newIds ("c", "d")
+    -- RangeSyntax
+    dsE (ExprArray _es) = undefined  -- Tim's desugaring makes no sense
+    -- ArrayListMacro
+
+    -- Application Syntax
+    dsE (ExprCallClosed s0 s1) = ok "CallClosed" $
+      let vars = map Variable $ newIds ["f","h","i","x","z"]
+          [vf, vh, vi, vx, vz] = map VertexVariable vars
+          opv2 = newOpv "opv2"
+      in  opSeqs [ OpExists vars,
+                   OpUnify u vz, OpUnify v vz,
+                   syntax1 vh vf s0, syntax opv2 vi vx s1,
+                   OpUnify vz (VertexCall vf vx) ]
+    dsE (ExprCallOpen s0 s1) = ok "CallOpen" $
+      let vars = map Variable $ newIds ["f","h","i","x"]
+          [vf, vh, vi, vx] = map VertexVariable vars
+          opv2 = newOpv "opv2"
+          c = Context $ newIds "c"
+          avars = map Variable $ newIds ["f1","x1", "z"]
+          [vf1, vx1, vz] = map VertexVariable avars
+      in  opSeqs [ OpExists vars,
+                   OpUnify u vz, OpUnify v vz,
+                   syntax1 vh vf s0, syntax opv2 vi vx s1,
+                   OpVerify (Succeeds\/imperatives) (Err "P00") c $ opSeqs [
+                     OpExists avars,
+                     OpUnify vf1 vf, OpUnify vx1 vx, OpUnify vz (VertexCall vf1 vx1) ]
+                 ]
+    dsE (ExprDeoption s0) = ok "Deoption" $
+      let vars = map Variable $ newIds ["f","h","x","z"]
+          [vf, vh, vx, vz] = map VertexVariable vars
+          opv0 = OperationVariable $ newIds "opv0"
+      in  opSeqs [ OpExists vars,
+                   OpUnify u vz, OpUnify v vz,
+                   syntax opv0 vh vf s0,
+                   OpUnify vz (VertexCall vf vx)
+                 ]
+
+    -- Identifier resolution syntax
+    dsE ExprUnderscore = ok "Underscore" $
+      syntax1 u v (ExprPreColon (ExprVar (EVariable (Ident "any"))))
+    -- IdentSyntax has an actual rule
+    -- DotIdentSyntax
+
+    -- Identifier definition syntax
+    dsE (ExprDef ExprUnderscore s) = ok "UnderscoreDefine" $
+      syntax1 u v s
+    dsE (ExprDef (ExprVar (EVariable i)) s2) = ok "IdentDefine" $
+      opSeqs [ OpDefine i (DefVertex v),
+               syntax1 u v s2
+             ]
+    -- IdentSpecDefine
+    -- DotDefine
+
+    -- Destructuring Definition Syntax
+    dsE (ExprDef (ExprCallOpen s0 s1) s2) = ok "CallOpenDefine" $
+      syntax1 u v $ ExprDef s0 (ExprFunction s1 Nothing [ExprFx (Succeeds\/Transacts)] s2)
+    dsE (ExprDef (ExprSpec (ExprCallOpen s0 s1) s3) s2) = ok "CallOpenSpecDefine" $
+      syntax1 u v $ ExprDef s0 (ExprFunction s1 Nothing s3 s2)
+    -- CallClosedDefine
+    -- MultipleDefine
+    -- MultipleSpecDefine
+    -- ArrayDefine, rule
+    -- ArrayListDefine
+    -- ArraySpecDefine
+    -- TupleDefine
+    -- TupleSpecDefine
+    dsE (ExprDef (ExprDeoption s0) s1) = ok "DeoptionDefine" $
+      syntax1 u v (ExprDef s0 (ExprOption s1))
+    -- OptionalDefine
+    -- PointerTypeDefine
+    -- much pointer and variable desugaring
+    -- mutation
+
+    dsE (ExprPreColon s) = ok "InSyntax" $
+      syntax1 u v (ExprColon (ExprArrow ExprUnderscore ExprUnderscore) s)
+    -- InSpecSyntax
+    dsE (ExprColon (ExprArrow s1 s2) as0) = ok "ArrowInDefine" $
+      let (pre, s0) = unwrapColons as0
+          c = newIds "c"
+          cc = Context c
+          vars1@[f,h,x,k] = map Variable $ newIds ["f", "h", "x", "k"]
+          [vf,vh,vx,vk] = map VertexVariable vars1
+          vars2@[g,j,y] = map Variable $ newIds ["g", "j", "y"]
+          [vg,vj,vy] = map VertexVariable vars2
+      in  opSeqs [ OpExists [f, h],
+                   syntax (newOpv "opv2") u u (ExprDef s1 (ExprVertex u)),
+                   syntax1 vh vf s0,
+                   OpUnify v vx,
+                   OpIn effects Nothing cc k x $ opSeqs [
+                     OpExists [g, j, y],
+                     OpUnify vk u,
+                     OpUnify vg vf,
+                     OpUnify vy (VertexCall vg vk),
+                     syntax (newOpv "opv3") vj vx (ExprDef s2 (pre (ExprVertex vy)))
+                     ]
+                 ]
+    dsE (ExprStage s0 s2 s1) = ok "StageSpec" $
+      let xxx=0
+      in  opSeqs [ OpVerify Succeeds (Err "U00") $ opSeqs [
+                     OpExists [i, w],
+                     syntax1 vi vw s2
+                     ],
+                   OpCast w (newOpv "opv2") (Err X30) $ opSeqs [
+                     RHS (PatHead (HeadAtom (AtomEffect fx))) $ opSeqs [
+                         OpExists [f, h],
+                         syntax (newOpv "opv3") vh vf s0,
+                         OpUnify v x,
+                         OpStage fx fxv
+                           c0 k x (opSeqs [OpExists [g]; OpUnify vk u, OpUnify vg vf, OpUnify x (VertexCall vg vk)])
+                           c1 z   (opSeqs [OpExists j f2, syntax (newOpv "opv2") vj vz s1, OpUnify vf2 vf, OpUnify z (VertexCall vf2 vj)]
+                       ]
+                     ]
+                 ]
+
+    dsE _ = Nothing
+
 main :: IO ()
 main = do
   --fpptr "ut" $ startConfig example1
