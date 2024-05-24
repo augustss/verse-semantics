@@ -25,7 +25,6 @@ module Control.Monad.Verse
   , assume
   , fork
   , join'
-  , yield
   , Freezable (..)
   , FreezeT
   , freeze'
@@ -37,7 +36,6 @@ module Control.Monad.Verse
   , freshDVar
   , newVar
   , readVar
-  , readVarLevel
   , unifyEq
   , Match (..)
   , unify
@@ -1466,11 +1464,6 @@ newVar'' bound = Var <$> newHRef' (Bound bound) Nothing
 
 readVar :: MonadRef m => Var m a -> VerseT m a
 readVar = fmap ((.binding) . snd) . readBound
-
-readVarLevel :: MonadRef m => Var m a -> VerseT m Level
-readVarLevel var = readRoot var <&> \ case
-  (_, UnboundR unbound) -> unbound.level
-  _ -> minLevel
 
 unifyEq
   :: (MonadRef m, Eq a)
