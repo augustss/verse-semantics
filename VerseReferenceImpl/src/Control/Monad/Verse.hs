@@ -160,7 +160,7 @@ minLevel :: Level
 minLevel = 0
 
 data Heaps = Heaps
-  { heap :: !(Maybe Heap)
+  { heap :: !Heap
   , verifyHeap :: !(Maybe Heap)
   }
 
@@ -216,7 +216,7 @@ getLevel = asksV (.level)
 getVerifyLevel :: VerseT m Level
 getVerifyLevel = asksV (.verifyLevel)
 
-getHeap :: VerseT m (Maybe Heap)
+getHeap :: VerseT m Heap
 getHeap = asksV (.heaps.heap)
 
 getVerifyHeap :: VerseT m (Maybe Heap)
@@ -352,7 +352,7 @@ data Heap = Heap
   }
 
 newHeap :: MonadSupply Int m => VerseT m Heap
-newHeap = lift . newHeap' =<< getHeap
+newHeap = lift . newHeap' . Just =<< getHeap
 
 newHeap' :: MonadSupply Int m => Maybe Heap -> m Heap
 newHeap' tail = do
@@ -363,7 +363,7 @@ copyHeap :: MonadSupply Int m => Heap -> VerseT m Heap
 copyHeap pred = do
   label <- supply
   tail <- getHeap
-  pure $ Heap { label, pred = Just pred, tail }
+  pure $ Heap { label, pred = Just pred, tail = Just tail }
 
 instance Functor (VerseT m) where
    fmap f m = VerseT $ \ yk r s sk ->
@@ -417,7 +417,7 @@ runVerseT m = do
   heap <- newHeap' verifyHeap
   latch <- newLatch'' heap
   let
-    heaps = Heaps { heap = Just heap, verifyHeap }
+    heaps = Heaps {..}
     sk heaps x s fk _ ak _ = do
       suspCount <- readSuspCount'' latch heap
       runMaybeT $ do
@@ -697,7 +697,7 @@ splitS m heap latch s = do
   level <- getLevel <&> (+ 1)
   verifyLevel <- getVerifyLevel
   verifyHeap <- getVerifyHeap
-  let r = R { heaps = Heaps { heap = Just heap, .. }, .. }
+  let r = R { heaps = Heaps {..}, .. }
   lift $ unVerseT m yieldS r s succeedS failS failS abortS abortS
 
 resumeSplit
@@ -831,7 +831,7 @@ resumeSplitS m SplitEnv {..} = do
   verifyLevel <- getVerifyLevel
   verifyHeap <- getVerifyHeap
   let
-    r = R { heaps = Heaps { heap = Just heap, .. }, .. }
+    r = R { heaps = Heaps {..}, .. }
     s = S { suspend = const $ pure (), suspCounts = mempty, .. }
   lift $ unVerseT m yieldS r s succeedS failS failS abortS abortS
 
@@ -852,7 +852,6 @@ data VerifyEnv m = VerifyEnv
   , suspCounts :: !SuspCounts
   , default' :: !(Default m)
   , commit :: !(Commit m)
-  , duplicate :: !(Duplicate m)
   }
 
 verify'
@@ -960,7 +959,7 @@ verifyS m heap latch s = do
   verifyHeap <- getHeap
   let
     level = verifyLevel + 1
-    r = R { heaps = Heaps { heap = Just heap, .. }, .. }
+    r = R { heaps = Heaps { verifyHeap = Just verifyHeap, .. }, .. }
   lift $ unVerseT m yieldS r s succeedS failS failS abortS abortS
 
 resumeVerify
@@ -1088,8 +1087,12 @@ resumeVerifyS m VerifyEnv {..} = do
   verifyHeap <- getHeap
   let
     level = verifyLevel + 1
-    r = R { heaps = Heaps { heap = Just heap, .. }, .. }
-    s = S { suspend = const $ pure (), suspCounts = mempty, store = mempty, .. }
+    suspend = const $ pure ()
+    suspCounts = mempty
+    duplicate = const $ pure ()
+    store = mempty
+    r = R { heaps = Heaps { verifyHeap = Just verifyHeap, .. }, .. }
+    s = S {..}
   lift $ unVerseT m yieldS r s succeedS failS failS abortS abortS
 
 appendChoices :: Choices m () -> Choices m () -> Choices m ()
@@ -1255,15 +1258,15 @@ freeze' :: Freezable a b m => a -> VerseT m b
 freeze' x = lift . runFreezeT (freeze x) =<< getHeap
 
 newtype FreezeT m a = FreezeT
-  ( ReaderT (Maybe Heap) (StateT (IntMap GHC.Exts.Any) m) a
+  ( ReaderT Heap (StateT (IntMap GHC.Exts.Any) m) a
   ) deriving (Functor, Applicative, Monad)
 
 unFreezeT
   :: FreezeT m a
-  -> ReaderT (Maybe Heap) (StateT (IntMap GHC.Exts.Any) m) a
+  -> ReaderT Heap (StateT (IntMap GHC.Exts.Any) m) a
 unFreezeT (FreezeT x) = x
 
-runFreezeT :: Monad m => FreezeT m a -> Maybe Heap -> m a
+runFreezeT :: Monad m => FreezeT m a -> Heap -> m a
 runFreezeT m heap = evalStateT (runReaderT (unFreezeT m) heap) mempty
 
 instance Monad m => Freezable () () m where
@@ -1397,7 +1400,7 @@ instance ( MonadFix m
          ) => Freezable (Var m a) (Maybe b) m where
   freeze (Var ref) = FreezeT $ do
     heap <- ask
-    lift (lift $ readVarState' ref heap) >>= \ case
+    lift (lift $ readVarState'' ref heap) >>= \ case
       Link var -> unFreezeT $ freeze var
       Unbound _ -> pure Nothing
       Bound bound -> mfix $ \ binding ->
@@ -1433,11 +1436,11 @@ freshVar = do
   heap <- getHeap
   lift $ freshVar' level heap
 
-freshVar' :: (MonadRef m, MonadSupply Int m) => Int -> Maybe Heap -> m (Var m a)
+freshVar' :: (MonadRef m, MonadSupply Int m) => Int -> Heap -> m (Var m a)
 freshVar' level heap = do
   label <- supply
   let substSusp = emptySubstSusp
-  Var <$> newHRef' (Unbound MkUnbound {..}) heap
+  Var <$> newHRef'' (Unbound MkUnbound {..}) heap
 
 freshDVar
   :: (MonadRef m, MonadSupply Int m, Defaultable a m)
@@ -1563,8 +1566,8 @@ data Root m a
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 readRoot var = lift . readRoot' var =<< getHeap
 
-readRoot' :: MonadRef m => Var m a -> Maybe Heap -> m (Var m a, Root m a)
-readRoot' var@(Var ref) heap = readVarState' ref heap >>= \ case
+readRoot' :: MonadRef m => Var m a -> Heap -> m (Var m a, Root m a)
+readRoot' var@(Var ref) heap = readVarState'' ref heap >>= \ case
   Link var -> readRoot' var heap
   Bound bound -> pure (var, BoundR bound)
   Unbound unbound -> pure (var, UnboundR unbound)
@@ -1617,7 +1620,7 @@ readVarState
   :: MonadRef m
   => HRef m (VarState m a)
   -> VerseT m (VarState m a)
-readVarState ref = lift . readVarState' ref =<< getHeap
+readVarState ref = lift . readVarState'' ref =<< getHeap
 
 readVarState'
   :: MonadRef m
@@ -1639,26 +1642,26 @@ writeVarState
   -> VarState m a
   -> VerseT m ()
 writeVarState (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
-  y <- findVarState heaps.heap <$> readRef ref
-  modifyRef' ref (insertLocalHeap heaps.heap x)
+  y <- findVarState' heaps.heap <$> readRef ref
+  modifyRef' ref (insertLocalHeap' heaps.heap x)
   sk heaps () s
     (\ heaps@Heaps {..} ak -> do
-        x <- findLocalHeap heap <$> readRef ref
-        modifyRef' ref (insertLocalHeap heap y)
+        x <- findLocalHeap' heap <$> readRef ref
+        modifyRef' ref (insertLocalHeap' heap y)
         fk heaps $ \ heaps@Heaps {..} -> do
-          modifyRef' ref $ insertLocalHeap heap x
+          modifyRef' ref $ insertLocalHeap' heap x
           ak heaps)
     (\ heaps@Heaps {..} ak' -> do
-        x <- findLocalHeap heap <$> readRef ref
-        modifyRef' ref $ insertLocalHeap heap y
+        x <- findLocalHeap' heap <$> readRef ref
+        modifyRef' ref $ insertLocalHeap' heap y
         fk' heaps $ \ heaps@Heaps {..} -> do
-          modifyRef' ref $ insertLocalHeap heap x
+          modifyRef' ref $ insertLocalHeap' heap x
           ak' heaps)
     (\ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertLocalHeap heap y
+        modifyRef' ref $ insertLocalHeap' heap y
         ak heaps)
     (\ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertLocalHeap heap y
+        modifyRef' ref $ insertLocalHeap' heap y
         ak' heaps)
 
 writeVerifyVarState
@@ -1754,8 +1757,11 @@ unifyUnboundUnboundG f var1 var2@(Var ref2) unbound2 = do
     whenSuspended $ \ resume ->
       fork $ readSubst var2 >>= \ (var2, subst2) -> resume $
         unifySubstG f var2 subst2 var1
+    flag <- lift . newHRef' True . (.tail) =<< getHeap
     whenCommitted . const $
-      unifyG' f var1 var2
+      whenM (readHRef flag) $ do
+        writeHRef flag False
+        unifyG' f var1 var2
     whenDuplicated $
       writeVarStateG ref2 <=< lift . readVarState' ref2
 
@@ -1770,8 +1776,11 @@ unifyBoundUnboundG f var1 bound1 var2@(Var ref2) unbound2 = do
     whenSuspended $ \ resume ->
       fork $ readBound var2 >>= \ (var2, bound2) -> resume $
         unifyBoundBoundG f var1 bound1 var2 bound2
-    whenCommitted $
-      unifyG' f var2 <=< newVar <=< freshen' bound1.binding
+    flag <- lift . newHRef' True . (.tail) =<< getHeap
+    whenCommitted $ \ heap ->
+      whenM (readHRef flag) $ do
+        writeHRef flag False
+        unifyG' f var2 =<< newVar =<< freshen' bound1.binding heap
     whenDuplicated $
       writeVarStateG ref2 <=< lift . readVarState' ref2
 
@@ -1807,19 +1816,19 @@ writeVarStateG
   -> VarState m a
   -> VerseT m ()
 writeVarStateG (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
-  y <- findVarState heaps.heap <$> readRef ref
-  modifyRef' ref $ insertLocalHeap heaps.heap x
+  y <- findVarState' heaps.heap <$> readRef ref
+  modifyRef' ref $ insertLocalHeap' heaps.heap x
   sk heaps () s
     fk
     (\ heaps@Heaps {..} ak' -> do
-        x <- findLocalHeap heap <$> readRef ref
-        modifyRef' ref $ insertLocalHeap heap y
+        x <- findLocalHeap' heap <$> readRef ref
+        modifyRef' ref $ insertLocalHeap' heap y
         fk' heaps $ \ heaps@Heaps {..} -> do
-          modifyRef' ref $ insertLocalHeap heap x
+          modifyRef' ref $ insertLocalHeap' heap x
           ak' heaps)
     ak
     (\ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertLocalHeap heap y
+        modifyRef' ref $ insertLocalHeap' heap y
         ak' heaps)
 
 data VerseRef m a = VerseRef
@@ -1834,30 +1843,23 @@ instance ( MonadRef m
          , Freezable a b m
          ) => Freezable (VerseRef m a) (Identity b) m where
   freeze VerseRef {..} =
-    fmap Identity . freeze =<< FreezeT (lift . lift . readVerseRef' ref =<< ask)
+    fmap Identity . freeze =<< FreezeT (lift . lift . readVerseRef'' ref =<< ask)
 
 newVerseRef
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
   => a -> VerseT m (VerseRef m a)
-newVerseRef x = getHeap >>= \ case
-  Just heap -> do
-    label <- supply
-    ref <- lift $ HRef <$> newRef HeapMap
-      { nothing = Nothing
-      , just = IntMap.singleton heap.label x
-      }
-    modifyStore . IntMap.insert label $ StoreElem ref
-    pure $ VerseRef {..}
-  Nothing -> do
-    label <- supply
-    ref <- lift $ HRef <$> newRef HeapMap
-      { nothing = Just x
-      , just = mempty
-      }
-    pure $ VerseRef {..}
+newVerseRef x = do
+  heap <- getHeap
+  label <- supply
+  ref <- lift $ HRef <$> newRef HeapMap
+    { nothing = Nothing
+    , just = IntMap.singleton heap.label x
+    }
+  modifyStore . IntMap.insert label $ StoreElem ref
+  pure $ VerseRef {..}
 
 readVerseRef :: MonadRef m => VerseRef m a -> VerseT m a
-readVerseRef VerseRef {..} = lift . readVerseRef' ref =<< getHeap
+readVerseRef VerseRef {..} = lift . readVerseRef'' ref =<< getHeap
 
 readVerseRef' :: MonadRef m => HRef m a -> Maybe Heap -> m a
 readVerseRef' (HRef ref) heap = findHeap heap <$> readRef ref
@@ -1872,20 +1874,20 @@ writeVerseRef VerseRef {..} x = do
 
 writeVerseRef' :: MonadRef m => HRef m a -> a -> VerseT m ()
 writeVerseRef' (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
-  y <- lookupHeap heaps.heap <$> readRef ref
-  modifyRef' ref $ insertLocalHeap heaps.heap x
+  y <- lookupHeap' heaps.heap <$> readRef ref
+  modifyRef' ref $ insertLocalHeap' heaps.heap x
   let
   sk heaps () s
     fk
     (\ heaps@Heaps {..} ak' -> do
-        x <- findLocalHeap heaps.heap <$> readRef ref
-        modifyRef' ref $ alterLocalHeap heap y
+        x <- findLocalHeap' heaps.heap <$> readRef ref
+        modifyRef' ref $ alterLocalHeap' heap y
         fk' heaps $ \ heaps@Heaps {..} -> do
-          modifyRef' ref $ insertLocalHeap heap x
+          modifyRef' ref $ insertLocalHeap' heap x
           ak' heaps)
     ak
     (\ heaps@Heaps {..} -> do
-        modifyRef' ref $ alterLocalHeap heap y
+        modifyRef' ref $ alterLocalHeap' heap y
         ak' heaps)
 
 writeVerseRef'' :: MonadRef m => HRef m a -> Heap -> a -> m ()
@@ -1909,7 +1911,7 @@ duplicateStoreElem heap (StoreElem ref) =
 newtype HRef m a = HRef (Ref m (HeapMap a))
 
 newHRef :: MonadRef m => a -> VerseT m (HRef m a)
-newHRef x = getHeap >>= lift . newHRef' x
+newHRef x = lift . newHRef'' x =<< getHeap
 
 newHRef' :: MonadRef m => a -> Maybe Heap -> m (HRef m a)
 newHRef' x = \ case
@@ -1926,36 +1928,36 @@ newHRef'' x Heap {..} = HRef <$> newRef HeapMap
   }
 
 readHRef :: MonadRef m => HRef m a -> VerseT m a
-readHRef (HRef ref) = findLocalHeap <$> getHeap <*> lift (readRef ref)
+readHRef (HRef ref) = findLocalHeap' <$> getHeap <*> lift (readRef ref)
 
 readHRef' :: MonadRef m => HRef m a -> Heap -> VerseT m a
 readHRef' ref = lift . readHRef'' ref
 
 readHRef'' :: MonadRef m => HRef m a -> Heap -> m a
-readHRef'' (HRef ref) h = findLocalHeap' h . (.just) <$> readRef ref
+readHRef'' (HRef ref) h = findLocalHeap' h <$> readRef ref
 
 writeHRef :: MonadRef m => HRef m a -> a -> VerseT m ()
 writeHRef (HRef ref) x = VerseT $ \ _ R {..} s sk fk fk' ak ak' -> do
-  y <- findLocalHeap heaps.heap <$> readRef ref
-  modifyRef' ref (insertLocalHeap heaps.heap x)
+  y <- findLocalHeap' heaps.heap <$> readRef ref
+  modifyRef' ref (insertLocalHeap' heaps.heap x)
   sk heaps () s
     (\ heaps@Heaps {..} ak -> do
-        x <- findLocalHeap heap <$> readRef ref
-        modifyRef' ref $ insertLocalHeap heap y
+        x <- findLocalHeap' heap <$> readRef ref
+        modifyRef' ref $ insertLocalHeap' heap y
         fk heaps $ \ heaps@Heaps {..} -> do
-          modifyRef' ref $ insertLocalHeap heap x
+          modifyRef' ref $ insertLocalHeap' heap x
           ak heaps)
     (\ heaps@Heaps {..} ak' -> do
-        x <- findLocalHeap heap <$> readRef ref
-        modifyRef' ref $ insertLocalHeap heap y
+        x <- findLocalHeap' heap <$> readRef ref
+        modifyRef' ref $ insertLocalHeap' heap y
         fk' heaps $ \ heaps@Heaps {..} -> do
-          modifyRef' ref $ insertLocalHeap heap x
+          modifyRef' ref $ insertLocalHeap' heap x
           ak' heaps)
     (\ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertLocalHeap heap y
+        modifyRef' ref $ insertLocalHeap' heap y
         ak heaps)
     (\ heaps@Heaps {..} -> do
-        modifyRef' ref $ insertLocalHeap heap y
+        modifyRef' ref $ insertLocalHeap' heap y
         ak' heaps)
 
 modifyHRef' :: MonadRef m => HRef m a -> (a -> a) -> VerseT m ()
@@ -1974,7 +1976,7 @@ findVarState k xs@HeapMap {..} = case k of
   Nothing -> nothing `orError` "findVarState"
 
 findVarState' :: Heap -> HeapMap (VarState m a) -> VarState m a
-findVarState' k@Heap {..} xs@HeapMap {..} = case lookupLocalHeap' k just of
+findVarState' k@Heap {..} xs = case lookupLocalHeap' k xs of
   Just x -> x
   Nothing -> case findHeap tail xs of
     Unbound unbound -> Unbound unbound
@@ -1994,29 +1996,24 @@ lookupHeap k xs@HeapMap {..} = case k of
   Nothing -> nothing
 
 lookupHeap' :: Heap -> HeapMap a -> Maybe a
-lookupHeap' k@Heap {..} xs@HeapMap {..} = case lookupLocalHeap' k just of
+lookupHeap' k@Heap {..} xs = case lookupLocalHeap' k xs of
   x@Just {} -> x
   Nothing -> lookupHeap tail xs
 
-findLocalHeap :: Maybe Heap -> HeapMap a -> a
-findLocalHeap k HeapMap {..} = case k of
-  Just k -> findLocalHeap' k just
-  Nothing -> nothing `orError` "findLocalHeap"
-
-findLocalHeap' :: Heap -> IntMap a -> a
+findLocalHeap' :: Heap -> HeapMap a -> a
 findLocalHeap' k xs = lookupLocalHeap' k xs `orError` "findLocalHeap'"
 
-lookupLocalHeap' :: Heap -> IntMap a -> Maybe a
-lookupLocalHeap' Heap {..} xs = case IntMap.lookup label xs of
+lookupLocalHeap' :: Heap -> HeapMap a -> Maybe a
+lookupLocalHeap' Heap {..} xs = case IntMap.lookup label xs.just of
   x@Just {} -> x
   Nothing -> case pred of
     Nothing -> Nothing
     Just k -> lookupLocalHeap' k xs
 
-alterLocalHeap :: Maybe Heap -> Maybe a -> HeapMap a -> HeapMap a
-alterLocalHeap k x xs = case x of
-  Nothing -> deleteLocalHeap k xs
-  Just x -> insertLocalHeap k x xs
+alterLocalHeap' :: Heap -> Maybe a -> HeapMap a -> HeapMap a
+alterLocalHeap' k x xs = case x of
+  Nothing -> deleteLocalHeap' k xs
+  Just x -> insertLocalHeap' k x xs
 
 insertLocalHeap :: Maybe Heap -> a -> HeapMap a -> HeapMap a
 insertLocalHeap k x xs = case k of
@@ -2025,11 +2022,6 @@ insertLocalHeap k x xs = case k of
 
 insertLocalHeap' :: Heap -> a -> HeapMap a -> HeapMap a
 insertLocalHeap' Heap {..} x xs = xs { just = IntMap.insert label x xs.just }
-
-deleteLocalHeap :: Maybe Heap -> HeapMap a -> HeapMap a
-deleteLocalHeap k xs = case k of
-  Nothing -> xs { nothing = Nothing }
-  Just k -> deleteLocalHeap' k xs
 
 deleteLocalHeap' :: Heap -> HeapMap a -> HeapMap a
 deleteLocalHeap' Heap {..} xs = xs { just = IntMap.delete label xs.just }
