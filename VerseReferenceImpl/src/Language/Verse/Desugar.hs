@@ -331,10 +331,11 @@ execLam loc' e1 e2 = \ case
     a <- freshIdent' $ loc e1
     e <- Lam (extract a) <$> exists do
       b <- name <$> freshIdent (loc e1)
-      c <- freshIdent $ loc e2
       e1 <- unify b <$> domainM (desugarExp' e1 $ P a)
+      c <- freshIdent $ loc e2
+      let e_f = unify (name c) $ bracketInvoke (name f) b
       e2 <- desugarExp' e2 $ P c
-      pure $ e1 `seq'` e2
+      pure $ e1 `seq'` (e_f `then'` e2)
     pure $ bracketInvoke (L loc' $ Name "function") (name f) :*>: L loc' e
 
 negLam
@@ -356,9 +357,8 @@ negLam loc' e1 eff e2 = \ case
     a <- freshIdent' $ loc e1
     e <- Lam (extract a) <$> exists do
       b <- name <$> freshIdent (loc e1)
-      c <- freshIdent $ loc e2
       e1 <- unify b <$> posM (domainM . desugarExp' e1 $ P a)
-      e2 <- assumeM eff . desugarExp' e2 $ P c
+      e2 <- desugarExp e2
       pure $ e1 `seq'` e2
     pure $ bracketInvoke (L loc' $ Name "function") (name f) :*>: L loc' e
 
@@ -404,15 +404,16 @@ execOLam loc' e1 e2 = \ case
     e2 <- exists (desugarExp e2)
     pure $ OLam f (dropLoc xs) e1 e2
   P f -> do
-    ((e1, a), xs) <- lift . runDesugarT $ do
-      a <- name <$> freshIdent (loc e1)
-      b <- freshIdent (loc e1)
-      e1 <- domainM . desugarExp' e1 $ P b
-      pure (unify a e1 `then'` name b, a)
+    ((e1, b), xs) <- lift . runDesugarT $ do
+      a <- freshIdent (loc e1)
+      b <- name <$> freshIdent (loc e1)
+      e1 <- domainM . desugarExp' e1 $ P a
+      pure (unify b e1 `then'` name a, b)
     e <- OLam (name f) (dropLoc xs) e1 <$> exists do
-      b <- freshIdent (loc e1)
-      e2 <- exists . desugarExp' e2 $ P b
-      pure $ unify (name b) (bracketInvoke (name f) a) `then'` e2
+      c <- freshIdent (loc e1)
+      let e_f = unify (name c) (bracketInvoke (name f) b)
+      e2 <- exists . desugarExp' e2 $ P c
+      pure $ e_f `then'` e2
     pure $ bracketInvoke (L loc' $ Name "function") (name f) :*>: L loc' e
 
 negOLam
@@ -433,15 +434,11 @@ negOLam loc' e1 eff e2 = \ case
     e2 <- assumeM eff $ desugarExp e2
     pure $ OLam f (dropLoc xs) e1 e2
   P f -> do
-    ((e1, a), xs) <- lift . runDesugarT $ do
-      a <- name <$> freshIdent (loc e1)
-      b <- freshIdent $ loc e1
-      e1 <- posM . domainM . desugarExp' e1 $ P b
-      pure (unify a e1 `then'` name b, a)
-    e <- OLam (name f) (dropLoc xs) e1 <$> exists do
-      b <- freshIdent $ loc e1
-      e2 <- assumeM eff . desugarExp' e2 $ P b
-      pure $ unify (name b) (bracketInvoke (name f) a) `then'` e2
+    (e1, xs) <- lift . runDesugarT $ do
+      a <- freshIdent $ loc e1
+      e1 <- posM . domainM . desugarExp' e1 $ P a
+      pure $ e1 `then'` name a
+    e <- OLam (name f) (dropLoc xs) e1 <$> exists (desugarExp e2)
     pure $ bracketInvoke (L loc' $ Name "function") (name f) :*>: L loc' e
 
 posOLam
