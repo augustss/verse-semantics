@@ -1428,6 +1428,14 @@ data Bound a = MkBound
   , binding :: !a
   }
 
+instance ( MonadSupply Int m
+         , Freshenable a m
+         ) => Freshenable (Bound a) m where
+  freshen x =
+    (\ label binding -> MkBound {..}) <$>
+    FreshenT (lift supply) <*>
+    freshen x.binding
+
 freshVar :: (MonadRef m, MonadSupply Int m) => VerseT m (Var m a)
 freshVar = do
   level <- getLevel
@@ -1750,11 +1758,9 @@ unifyUnboundUnboundG f var1 var2@(Var ref2) unbound2 = do
     whenSuspended $ \ resume ->
       fork $ readSubst var2 >>= \ (var2, subst2) -> resume $
         unifySubstG f var2 subst2 var1
-    flag <- lift . newHRef' True . (.tail) =<< getHeap
-    whenCommitted . const $
-      whenM (readHRef flag) $ do
-        writeHRef flag False
-        unifyG' f var1 var2
+    whenCommitted . const $ readRoot var2 >>= \ case
+      (var2, UnboundR _) -> unifyG' f var1 var2
+      _ -> pure ()
     whenDuplicated $
       writeVarStateG ref2 <=< lift . readVarState' ref2
 
@@ -1769,11 +1775,12 @@ unifyBoundUnboundG f var1 bound1 var2@(Var ref2) unbound2 = do
     whenSuspended $ \ resume ->
       fork $ readBound var2 >>= \ (var2, bound2) -> resume $
         unifyBoundBoundG f var1 bound1 var2 bound2
-    flag <- lift . newHRef' True . (.tail) =<< getHeap
-    whenCommitted $ \ heap ->
-      whenM (readHRef flag) $ do
-        writeHRef flag False
-        unifyG' f var2 =<< newVar =<< freshen' bound1.binding heap
+    whenCommitted $ \ heap -> readRoot var2 >>= \ case
+      (var2, UnboundR unbound2) -> do
+        bound1 <- freshen' bound1 heap
+        var1 <- lift $ newVar'' bound1
+        unifyBoundUnboundG f var1 bound1 var2 unbound2
+      _ -> pure ()
     whenDuplicated $
       writeVarStateG ref2 <=< lift . readVarState' ref2
 
