@@ -22,6 +22,8 @@
 \usepackage{conteq}
 \usepackage{textgreek}
 \usepackage{xspace}
+\usepackage{mathtools}
+\usepackage{graphicx}
 
 % \renewcommand{\arraystretch}{1.1}
 
@@ -1006,6 +1008,147 @@ $\begin{array}{@@{}l}
 
 \input{verifier_overview}
 \input{verifier_examples}
+
+\section{Block Rules}
+This is an alternative runtime semantics.
+In contrast to the other versions this uniquely identifies the next redex, so it is deterministic.
+
+\begin{figure}[t]
+  $$
+\begin{array}{l}
+\mbox{\em Syntax} \\
+  \begin{array}{lrcl@@{}}
+      \text{Integers} & k \\
+      \text{Variables} & \multicolumn{2}{l}{x,y,z,f,g} \\
+      \text{Set of variables} & \multicolumn{2}{l}{|xs,ys|} \\
+      \text{Programs} & |p|  & ::=  & |beff ({diverges,reads,writes,allocs,interacts}) b| \quad \text{where} \; \freevars{b} = \{ \} \\
+      \text{Blocks} & |b| & ::= & |fail| \vb |b_1 choice b_2| \vb |def xs (beq ; v)| \\
+      \text{Equations} & |beq| & ::= & |lv == e ; beq| \vb |beff fxs beq ; beq| \vb \epsilon \\
+      \text{Expressions} & |e| & ::= & |v| \vb |b| \vb |apply1N v_1 v_2| \vb |one b| \vb |all b| \\
+      \text{Lvalues} & |lv| & ::= & |_| \vb |v| \\
+      \text{Values} & |v| & ::= & |x| \vb |x_fx|  \vb \hnf \\
+      \text{Head values} & \hnf & ::= & |k| \vb |op_fx| \vb |arr (v_1, xdots, v_n)| \vb |lam x b| \\
+      \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb |read| \vb |write| \vb |print| \vb \ldots \\
+      \text{Effects} & |fx| & ::= & |fails| \vb |chooses| \vb |diverges| \vb |reads| \vb |writes| \vb |allocs| \\
+                     &      & \vb & |interacts| \vb |xdots|  \\
+      \text{Set of effects} & |fxs| \\
+  \end{array}
+\\ \\
+\mbox{\em Effects} \\
+  \begin{array}{rcl}
+    |beffects fail| & = & \{ |fails| \} \\
+    |beffects (b_1 choice b_2)| & = & |beffects b_1| |`cup`| |beffects b_2| |`cup`| \{|chooses|\} \\
+    |beffects (def xs beq)| & = & |beffects beq| \\
+    |beffects v| & = & |emptyset| \\
+    |beffects (apply1N v_1 v_2)| & = & |beffectsfun v_1| \\
+    |beffects (one b)| & = & |beffects b| \setminus \{|fails,chooses|\} \\
+    |beffects (all b)| & = & |beffects b| \setminus \{|fails,chooses|\} \\
+    |beffects (lv == e ; beq)| & = & |beffects e| |`cup`| |beffects beq| \\
+    |beffects (beff fxs beq_1 ; beq_2|) & = & |fxs `cup`| |beffects beq_2| \\
+    \\
+    |beffectsfun x| & = & \{|fails|,|diverges|,|xdots|\} \hspace{8em} \text{all effects} \\
+    |beffectsfun x_fx| & = & |fxs| \\
+    |beffectsfun k| & = & |emptyset| \\
+    |beffectsfun op_fx| & = & |fxs| \\
+    |beffectsfun (arr (v_1, xdots, v_n))| & = & |emptyset| \\
+    |beffectsfun (lam x b)| & = & |beffects b| \\
+  \end{array}
+\\ \\
+\end{array}
+     $$
+  \caption{Block Core Verse Syntax} \label{fig:vc-syntax}
+\end{figure}
+
+\begin{figure}[t]
+  $$
+\begin{array}{l}
+\begin{array}{lrcll}
+\multicolumn{4}{l}{\textbf{Rewrites}} \\
+\multicolumn{4}{l}{\textbf{Effect free rules}} \\
+\rulename{merge-block} & |def xs (xdots; l == (def ys (beq; v)); xdots| & \rightarrow & |def ((xs `cup` ys)) (xdots; beq; l == v; xdots)|
+                         & \text{$\alpha$-conversion blah blah} \\
+\rulename{app-beta}   & |l == apply1N (lam x b) v| & \rightarrow & |x == v ; l == b| & \text{$\alpha$-conversion blah blah} \\
+\rulename{drop-value} & |_ == v; beq| & \rightarrow & |beq| \\
+\rulename{one-fail}   & |one fail| & \movesto & |fail| \\
+\rulename{one-value}  & |one (def emptyset v)| & \movesto & |v| \\
+\rulename{one-choice} & |one ((def emptyset v) choice e)| & \movesto & |v| \\
+\rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
+\rulename{all-choice} & |all ((def emptyset v_1) choice xdots choice (def emptyset v_n))| & \movesto & |tup (v_1, xdots, v_n)| \\
+\multicolumn{4}{l}{\text{Effect free primops, unification, and choice shuffling as usual.}} \\
+
+\\
+\multicolumn{4}{l}{\textbf{Effectful rules}} \\
+\rulename{fail} & |def xs (xdots; l == fail; xdots)| & \rightarrow & |fail| \\
+\rulename{choice} & |def xs (xdots; l == (b_1 `choice` b_2); xdots)|& \rightarrow & |(def xs (xdots; l == b_1; xdots)) `choice` (def xs (xdots; l == b_2; xdots))| \\
+\rulename{subst} & |def xs (beq_1 ; x = v ; beq_2)| & \rightarrow & |def ((xs `setminus` {x})) (subst ((beq_1 ; beq_2)) x v)| & \text{TODO:handle recursion} \\
+\multicolumn{4}{l}{\text{Effectful primops}} \\
+
+
+\end{array}
+\\ \\
+
+\begin{array}{rclll}
+\multicolumn{4}{l}{\textbf{Finding the next redex}} \\
+\multicolumn{4}{l}{\text{\hspace{3em}takes a set of allowed effects and closest bound variables, and maybe returns a redex}} \\
+  |bnext a v (def xs beq)| & = & |bnext s xs beq| \\
+  |bnext a v (l == b_1 `choice` b_2; beq)| & = & |bnext a v b_1 `alt` bnext a v b_2| \\
+  |bnext a v (l == e; beq)| & = & \textbf{Just} |(l == e)| & \text{if |l == e| is an effect free redex} \\
+  |bnext a v (l == e; beq)| & = & \textbf{Just} |(l == e)| & \text{if |beffects e| $\subseteq$ |a|}\\
+  |bnext a v (l == e; beq)| & = & |bnext (bcombine a (beffects e)) v beq| & \text{if |beffects e| $\not\subseteq$ |a|}\\
+  |bnext a v (x == v; beq)| & = & \textbf{Just} |(x == v)| & \text{if |x| $\in$ |v| } \\
+  |bnext a v (beff fxs beq_1; beq_2)| & = & |bnext (fxs `cap` a) v beq_1 `alt` bnext (bcombine a fxs) v beq_2| \\
+  |bnext a v _| & = & \textbf{Nothing} & \text{otherwise, no redex}\\
+\end{array}
+\\ \\
+\begin{array}{rclll}
+|bcombine a b| & = & |{ fx_1 || fx_1 `elem` a, forall (fx_2 `elem` b) (bcommutes fx_1 fx_2)}|  \\
+\end{array}
+\\ \\
+
+
+\end{array}
+     $$
+
+
+  \caption{Block Core Verse Rewrites} \label{fig:vc-syntax}
+\end{figure}
+
+\begin{figure}{l}
+\begin{tabular}{||r||c||c||c||c||c||c||c||}
+  \hline
+  \rotatebox{45}{\textit{commutes}}
+  & \rotatebox{90}{|fails|}
+  & \rotatebox{90}{|chooses|}
+  & \rotatebox{90}{|diverges|}
+  & \rotatebox{90}{|reads|}
+  & \rotatebox{90}{|writes|}
+  & \rotatebox{90}{|allocs|}
+  & \rotatebox{90}{|interacts|}
+   \\
+  \hline
+  |fails| & x & x &  & x & x & x &  \\
+  \hline
+  |chooses| & x &  & x & & & x & \\
+  \hline
+  |diverges| &  & x & x & x & x & x & \\
+  \hline
+  |reads| & x &  & x & x & & x & x \\
+  \hline
+  |writes| & x &  & x & & & x & \\
+  \hline
+  |allocs| & x & x & x & x & x & x &\\
+  \hline
+  |interacts| &  &  &  & x & & &  \\
+  \hline
+\end{tabular}
+
+
+  \caption{Commuting effects} \label{fig:vc-syntax}
+\end{figure}
+
+
+
+Blah, blah.
 
 % ------------------------------------------------
 
