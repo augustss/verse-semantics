@@ -1067,7 +1067,7 @@ In contrast to the other versions this uniquely identifies the next redex, so it
 \multicolumn{4}{l}{\textbf{Effect free rules}} \\
 \rulename{merge-block} & |def xs (xdots; l == (def ys (beq; v)); xdots| & \rightarrow & |def ((xs `cup` ys)) (xdots; beq; l == v; xdots)|
                          & \text{$\alpha$-conversion blah blah} \\
-\rulename{app-beta}   & |l == apply1N (lam x b) v| & \rightarrow & |x == v ; l == b| & \text{$\alpha$-conversion blah blah} \\
+\rulename{app-beta}   & |l == apply1N (lam x b) v| & \rightarrow & |x == v ; l == b| & \text{FIXME: no binder for x} \\
 \rulename{drop-value} & |_ == v; beq| & \rightarrow & |beq| \\
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
 \rulename{one-value}  & |one (def emptyset v)| & \movesto & |v| \\
@@ -1075,8 +1075,10 @@ In contrast to the other versions this uniquely identifies the next redex, so it
 \rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
 \rulename{all-choice} & |all ((def emptyset v_1) choice xdots choice (def emptyset v_n))| & \movesto & |tup (v_1, xdots, v_n)| \\
 \multicolumn{4}{l}{\text{Effect free primops, unification, and choice shuffling as usual.}} \\
+\end{array}
 
-\\
+\\ \\
+\begin{array}{lrcll}
 \multicolumn{4}{l}{\textbf{Effectful rules}} \\
 \rulename{fail} & |def xs (xdots; l == fail; xdots)| & \rightarrow & |fail| \\
 \rulename{choice} & |def xs (xdots; l == (b_1 `choice` b_2); xdots)|& \rightarrow & |(def xs (xdots; l == b_1; xdots)) `choice` (def xs (xdots; l == b_2; xdots))| \\
