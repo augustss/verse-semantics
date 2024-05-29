@@ -560,13 +560,6 @@ data SplitEnv m = forall a . Freshenable a m => SplitEnv
   , store :: !(Store m)
   }
 
-data Choices m a = Choices
-  { fail :: !(VerseT m a)
-  , fail' :: !(VerseT m a)
-  , abort :: !(VerseT m a)
-  , abort' :: !(VerseT m a)
-  }
-
 split'
   :: (MonadRef m, MonadSupply Int m, Freshenable a m)
   => VerseT m ()
@@ -1122,39 +1115,73 @@ assume m = split m >>= \ case
   Step x _ -> pure x
 
 fork :: MonadRef m => VerseT m () -> VerseT m ()
-fork m = forkS m >>= \ case
+fork m = forkF m >>= reflectF
+
+reflectF :: MonadRef m => Split m () -> VerseT m ()
+reflectF = \ case
   AbortS ->
     abort
   FailS m_a' ->
-    empty' $ fork m_a'
+    empty' m_a'
   SucceedS x s choices ->
-    alt' (x <$ putV s) (forkChoices choices)
+    let m = putV s $> x
+    in alt' m choices
   YieldS i k s succeed choices -> (i <=) <$> getVerifyLevel >>= \ case
     True ->
-      alt'
-      (putV s *> yield i (\ f -> k $ \ x -> fork (succeed x) *> f ()))
-      (forkChoices choices)
+      let
+        m = do
+          putV s
+          yield i $ \ f -> k $ succeed >=> f
+      in alt' m choices
     False ->
-      alt'
-      (do putV s
+      let
+        m = do
+          putV s
           latch <- getLatch
           incrSuspCount latch
-          k $ \ x -> do
-            fork $ succeed x
-            decrSuspCount latch)
-      (forkChoices choices)
+          k $ \ x -> succeed x *> decrSuspCount latch
+      in alt' m choices
 
-forkChoices :: MonadRef m => Choices m () -> Choices m ()
-forkChoices Choices {..} = Choices
-  { fail = fork fail
-  , fail' = fork fail'
-  , abort = fork abort
-  , abort' = fork abort'
-  }
+forkF :: MonadRef m => VerseT m () -> VerseT m (Split m ())
+forkF m =
+  lift' $ \ r s -> unVerseT m yieldF r s succeedF failF failF abortF abortF
 
-forkS :: MonadRef m => VerseT m a -> VerseT m (Split m a)
-forkS m =
-  lift' $ \ r s -> unVerseT m yieldS r s succeedS failS failS abortS abortS
+yieldF :: MonadRef m => Yield (Split m ()) m
+yieldF = Yield $ \ i k s sk fk fk' ak ak' -> pure $
+  let
+    succeed = reflectSucceedF sk
+    fail = reflectFailF fk
+    fail' = reflectFailF fk'
+    abort = reflectAbortF ak
+    abort' = reflectAbortF ak'
+  in YieldS i k s succeed Choices {..}
+
+succeedF :: MonadRef m => Succeed (Split m ()) m ()
+succeedF _ x s fk fk' ak ak' = pure $
+  let
+    fail = reflectFailF fk
+    fail' = reflectFailF fk'
+    abort = reflectAbortF ak
+    abort' = reflectAbortF ak'
+  in SucceedS x s Choices {..}
+
+failF :: MonadRef m => Fail (Split m ()) m
+failF _ ak' = pure . FailS $ reflectAbortF ak'
+
+abortF :: Applicative m => Abort (Split m ()) m
+abortF = abortS
+
+reflectSucceedF :: MonadRef m => Succeed (Split m ()) m a -> a -> VerseT m ()
+reflectSucceedF sk x =
+  lift' (\ R {..} s -> sk heaps x s failF failF abortF abortF) >>= reflectF
+
+reflectFailF :: MonadRef m => Fail (Split m ()) m -> VerseT m ()
+reflectFailF fk =
+  asksMV (\ R {..} -> fk heaps abortF) >>= reflectF
+
+reflectAbortF :: MonadRef m => Abort (Split m ()) m -> VerseT m ()
+reflectAbortF ak =
+  asksMV (\ R {..} -> ak heaps) >>= reflectF
 
 join' :: MonadRef m => VerseT m a -> VerseT m a
 join' m = do
@@ -1169,12 +1196,8 @@ join' m = do
 
 data Split m a
   = AbortS
-  | FailS
-    !(VerseT m a)
-  | SucceedS
-    !a
-    !(S m)
-    !(Choices m a)
+  | FailS !(VerseT m a)
+  | SucceedS !a !(S m) !(Choices m a)
   | forall b . YieldS
     {-# UNPACK #-} !Level
     !((b -> VerseT m ()) -> VerseT m ())
@@ -1182,25 +1205,34 @@ data Split m a
     !(b -> VerseT m a)
     !(Choices m a)
 
+data Choices m a = Choices
+  { fail :: !(VerseT m a)
+  , fail' :: !(VerseT m a)
+  , abort :: !(VerseT m a)
+  , abort' :: !(VerseT m a)
+  }
+
 yieldS :: MonadRef m => Yield (Split m a) m
 yieldS = Yield $ \ i k s sk fk fk' ak ak' -> pure $
+  let
+    succeed = reflectSucceedS sk
+    fail = reflectFailS fk
+    fail' = reflectFailS fk'
+    abort = reflectAbortS ak
+    abort' = reflectAbortS ak'
+  in YieldS i k s succeed Choices {..}
+
+succeedS :: Monad m => Succeed (Split m a) m a
+succeedS _ x s fk fk' ak ak' = pure $
   let
     fail = reflectFailS fk
     fail' = reflectFailS fk'
     abort = reflectAbortS ak
     abort' = reflectAbortS ak'
-  in YieldS i k s (reflectSucceedS sk) Choices {..}
-
-succeedS :: Monad m => Succeed (Split m a) m a
-succeedS _ x s fk fk' ak ak' = pure $ SucceedS x s Choices {..}
-  where
-    fail = reflectFailS fk
-    fail' = reflectFailS fk'
-    abort = reflectAbortS ak
-    abort' = reflectAbortS ak'
+  in SucceedS x s Choices {..}
 
 failS :: Monad m => Fail (Split m a) m
-failS _ ak = pure . FailS $ asksMV (\ R {..} -> ak heaps) >>= reflectS
+failS _ ak' = pure . FailS $ reflectAbortS ak'
 
 abortS :: Applicative m => Abort (Split m a) m
 abortS = const $ pure AbortS
