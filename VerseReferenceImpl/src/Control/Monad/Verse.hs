@@ -711,11 +711,13 @@ resumeSplit'
 resumeSplit' ref_env env@SplitEnv {..} m =
   resumeSplitS m env >>= \ case
     AbortS -> do
-      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+      level <- getLevel
+      decrSuspCounts $ IntMap.delete level suspCounts
       writeHRef ref_env Nothing
       susp =<< split' init.abort heap latch last
     FailS m_a -> do
-      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+      level <- getLevel
+      decrSuspCounts $ IntMap.delete level suspCounts
       writeHRef ref_env Nothing
       susp =<< split' (init.fail' <?> appendAbortS m_a env) heap latch last
     SucceedS () s@S {..} choices ->
@@ -973,12 +975,14 @@ resumeVerify'
 resumeVerify' ref_env env@VerifyEnv {..} m =
   resumeVerifyS m env >>= \ case
     AbortS -> do
-      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+      level <- getLevel
+      decrSuspCounts $ IntMap.delete level suspCounts
       writeHRef ref_env Nothing
       verify' init.abort heap latch last
       susp
     FailS m_a -> do
-      decrSuspCounts . flip IntMap.delete suspCounts =<< getLevel
+      level <- getLevel
+      decrSuspCounts $ IntMap.delete level suspCounts
       writeHRef ref_env Nothing
       verify' (init.fail' <?> appendAbortV m_a env) heap latch last
       susp
