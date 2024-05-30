@@ -1064,26 +1064,21 @@ In contrast to the other versions this uniquely identifies the next redex, so it
 \begin{array}{l}
 \begin{array}{lrcll}
 \multicolumn{4}{l}{\textbf{Rewrites}} \\
-\multicolumn{4}{l}{\textbf{Effect free rules}} \\
 \rulename{merge-block} & |def xs (xdots; l == (def ys (beq; v)); xdots| & \rightarrow & |def ((xs `cup` ys)) (xdots; beq; l == v; xdots)|
                          & \text{$\alpha$-conversion blah blah} \\
-\rulename{app-beta}   & |l == apply1N (lam x b) v| & \rightarrow & |x == v ; l == b| & \text{FIXME: no binder for x} \\
+\rulename{app-beta}   & |l == apply1N (lam x b) v| & \rightarrow & |l == subst b x v|
+                         & \text{$\alpha$-conversion blah blah} \\
 \rulename{drop-value} & |_ == v; beq| & \rightarrow & |beq| \\
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
 \rulename{one-value}  & |one (def emptyset v)| & \movesto & |v| \\
 \rulename{one-choice} & |one ((def emptyset v) choice e)| & \movesto & |v| \\
 \rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
 \rulename{all-choice} & |all ((def emptyset v_1) choice xdots choice (def emptyset v_n))| & \movesto & |tup (v_1, xdots, v_n)| \\
-\multicolumn{4}{l}{\text{Effect free primops, unification, and choice shuffling as usual.}} \\
-\end{array}
 
-\\ \\
-\begin{array}{lrcll}
-\multicolumn{4}{l}{\textbf{Effectful rules}} \\
 \rulename{fail} & |def xs (xdots; l == fail; xdots)| & \rightarrow & |fail| \\
-\rulename{choice} & |def xs (xdots; l == (b_1 `choice` b_2); xdots)|& \rightarrow & |(def xs (xdots; l == b_1; xdots)) `choice` (def xs (xdots; l == b_2; xdots))| \\
+\rulename{choice} & |def xs (xdots; l == (b_1 `choice` b_2); xdots)|& \rightarrow & \multicolumn{2}{l}{|(def xs (xdots; l == b_1; xdots)) `choice` (def xs (xdots; l == b_2; xdots))|} \\
 \rulename{subst} & |def xs (beq_1 ; x = v ; beq_2)| & \rightarrow & |def ((xs `setminus` {x})) (subst ((beq_1 ; beq_2)) x v)| & \text{TODO:handle recursion} \\
-\multicolumn{4}{l}{\text{Effectful primops}} \\
+\multicolumn{4}{l}{\text{Primops, unification, and choice shuffling as usual.}} \\
 
 
 \end{array}
@@ -1093,17 +1088,19 @@ In contrast to the other versions this uniquely identifies the next redex, so it
 \multicolumn{4}{l}{\textbf{Finding the next redex}} \\
 \multicolumn{4}{l}{\text{\hspace{3em}takes a set of allowed effects and closest bound variables, and maybe returns a redex}} \\
   |bnext a v (def xs beq)| & = & |bnext s xs beq| \\
-  |bnext a v (l == b_1 `choice` b_2; beq)| & = & |bnext a v b_1 `alt` bnext a v b_2| \\
-  |bnext a v (l == e; beq)| & = & \textbf{Just} |(l == e)| & \text{if |l == e| is an effect free redex} \\
+  |bnext a v (l == b_1 `choice` b_2)| & = & \textbf{Just} |(l == b_1 `choice` b_2)| & \text{if |chooses `elem` a|} \\
+  |bnext a v (l == b_1 `choice` b_2; beq)| & = & |bnext a v b_1 `alt` bnext a v b_2 `alt` next a v beq| \\
   |bnext a v (l == e; beq)| & = & \textbf{Just} |(l == e)| & \text{if |beffects e| $\subseteq$ |a|}\\
   |bnext a v (l == e; beq)| & = & |bnext (bcombine a (beffects e)) v beq| & \text{if |beffects e| $\not\subseteq$ |a|}\\
-  |bnext a v (x == v; beq)| & = & \textbf{Just} |(x == v)| & \text{if |x| $\in$ |v| } \\
   |bnext a v (beff fxs beq_1; beq_2)| & = & |bnext (fxs `cap` a) v beq_1 `alt` bnext (bcombine a fxs) v beq_2| \\
+  |bnext a v (one b)| & = & |bnext (biter a) v b| \\
+  |bnext a v (all b)| & = & |bnext (biter a) v b| \\
   |bnext a v _| & = & \textbf{Nothing} & \text{otherwise, no redex}\\
 \end{array}
 \\ \\
 \begin{array}{rclll}
 |bcombine a b| & = & |{ fx_1 || fx_1 `elem` a, forall (fx_2 `elem` b) (bcommutes fx_1 fx_2)}|  \\
+|biter a| & = & |(a `setminus` {interacts}) `cup` {fails,chooses}| \\
 \end{array}
 \\ \\
 
@@ -1150,7 +1147,21 @@ In contrast to the other versions this uniquely identifies the next redex, so it
 
 
 
-Blah, blah.
+Some remarks:
+\begin{itemize}
+\item A \textit{block}, |def xs b|, is always at the as far left as possible, either the program top level
+  or in a |oneKW/allKW|.
+  When a block is exposed furher in the \rulename{merge-block} will at once merge it with the surrounding block.
+\item The |beff fxs beq| construct limits the effects available within |beq|.
+  It is used to limit effects for function bodies.
+\item Effects are actual effects, not the mixture of effects and non-effects the Verse has.
+  \Eg, |<succeeds>| is the absence of |fails| and |chooses|, |<iterates>| is |<fails,chooses>|.
+\item The \textit{next} function identifies the next essential part of a redex; but not the full redex.
+  \Eg, if |x=v| is identified by \textit{next} it is the \rulename{subst} rule that should be used next.
+\item To find a redex, start with the entire program to find the next redex.
+  After each reduction, start over from the top.
+\end{itemize}
+
 
 % ------------------------------------------------
 

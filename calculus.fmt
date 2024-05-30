@@ -21,6 +21,7 @@
 %format bnext (a) (v) (e) = "\textit{next}(" a "," v "," e ")"
 %format bcombine (x) (y) = "\textit{combine}(" x "," y ")"
 %format bcommutes (x) (y) = "\textit{commutes}(" x "," y ")"
+%format biter (e) = "\textit{iter}(" e ")"
 
 %format fx_1
 %format fx_2
