@@ -128,7 +128,9 @@
 %format blockede xs (y) = "\mathsf{blkd}_{\small e}("  xs "," y ")"
 %format choicefreec (y) = "\mathsf{choicefree}_{\small c}(" y ")"
 %format choicefreee (y) = "\mathsf{choicefree}_{\small e}(" y ")"
-%format freevars (e) = "\freevars{" e "}"
+%format skolval (xs) v = "\mathsf{skol}(" xs "," v ")"
+%format freevars (e) = "\mathsf{fvs}(" e ")"
+%format boundvars (e) = "\mathsf{bvs}(" e ")"
 %format `delete` = "\setminus"
 
 %format match (e) (b) = e "\blacktriangleright" b

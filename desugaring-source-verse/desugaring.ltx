@@ -582,10 +582,10 @@ $$
 
 \multicolumn{4}{l}{\mbox{\it Closed functions}} \\
  \rulename{mcfun+} &  |DMe2 mdpos si (functionOCX closed t_1 fx t_2)|
- & = & \multicolumn{2}{@@{}l}{|verify2 () () (j := DMe2 mdneg sibody t_1; check fx (DB mdpos j si t_2) )|} \\
-    &&& |guard (DMe2 mdneg si (functionOCX closed t_1 fx t_2))| \\[1mm]
+ & = & \multicolumn{2}{@@{}l}{|verify2 r () (j := DMe2 mdpos (sipat r) t_1; check fx (DB mdpos j si t_2) );|} \\
+    &&& |DMe2 mdneg si (functionOCX closed t_1 fx t_2)| \\[1mm]
 \rulename{mcfun-} &  |DMe2 mdneg si (functionOCX closed t_1 fx t_2)|
-& = & |lam i ((j := DMe2 mdpos (sipat i) t_1 guard
+& = & |lam i ((j := DMe2 mdpos (sipat i) t_1;
                     (havoc fx; DB mdneg j si t_2)))| \\[1mm]
 \rulename{mcfunx}& |DMe2 mdx si (functionOCX closed t_1 fx t_2)|
 & = & |lam i (j := DMe2 mdx (sipat i) t_1; check fx (DB mdx j si t_2))| \\[2mm]
@@ -594,10 +594,11 @@ $$
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
 \rulename{moftype+} & |DMe2 mdpos si (oftype t_1 t_2)|
-& = & |y := DMe2 mdpos si t_1; z := De2 mdpos t_2;| \\
-  &&& |check succeeds (apply1N z y) guard (some z)| \\
+& = & |x := DMe2 mdpos si t_1; z := De2 mdpos t_2;| \\
+  &&& |verify2 () () (check succeeds (apply1N z x));| \\
+  &&& |y:= apply1N z x; y guard (some z)| \\
 \rulename{moftype-} & |DMe2 mdneg si (oftype t_1 t_2)|
-  & = & |z := De2 mdneg t_2; Hide z| \\
+  & = & |z := De2 mdneg t_2; freevars t_1 guard (Hide z)| \\
 \rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|
   & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
 \rulename{mtype1}   & |DMe2 mdneg sibody (:t)|    & = & |z:=De2 mdneg t; Hide z| \\
@@ -634,7 +635,7 @@ $$
     & \text{|t| is |k|, |y| or |apply1N t_1 t_2|}
 \end{array}
 \end{array}$$
-\caption{{\bf DS10}: Small Source to Big Core } \label{fig:ds10}
+\caption{{\bf DS11}: Small Source to Big Core } \label{fig:ds11}
 \end{figure}
 
 
@@ -953,58 +954,7 @@ Simon's draft rules for vreification are in \Cref{fig:spj-verifier-rewrite-rules
 
 \subsection{Rules}\label{sec:rules}
 
-\begin{figure}[t]
-$\begin{array}{@@{}l}
-\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
-  \multicolumn{5}{l}{\textit{Auxiliary functions}} \\
-  & \skol{|v|} & = & \not\exists x. x \in \freevars{|v|} \\[2mm]
-
-
-\multicolumn{5}{l}{\textit{Guard}} \\
-\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
-\rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
-\end{array} \\
-\\[-2mm]
-
-\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
-\multicolumn{5}{l}{\textit{Check}} \\
-\rulename{check-fail}   & |check fx fail|  & \movesto & |fail|
-   & \text{$|fx| \in \{|fails|,|decides|\}$}\\
-  \rulename{check-suc}    & |check fx v|  & \movesto & |v| & \text{$\skol{|v|}, |fx| \in \{|succeeds|,|decides|\}$} \\
-  \rulename{check-choice} & |check succeeds (v choice e)|  & \movesto & |v choice (check fails e)| & \text{$\skol{|v|}$} \\
-\end{array} \\
-\\[-0.6em]
-
-\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
-\multicolumn{5}{l}{\textit{Verify} \hspace{3mm} \text{All rules require |blockedc emptyset P|}} \\
-\rulename{solver} & |verify2 rs as e| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
-  \rulename{verify-val} & |verify2 rs as v|      & \movesto & |tup ()| & \\
-  \rulename{verify-choice} & |verify2 rs as (e_1 choice e_2)|      & \movesto & |verify2 rs as e_1 ; verify2 rs as e_2| & \\
-  \rulename{verify-fail} & |verify2 rs as fail|    & \movesto & |tup ()| & \\[1mm]
-  \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
-  & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
-  &&& \text{if $|r| \notin |rs|$ and $\skol{|v|}$} \\
- \rulename{split-v} & |verify2 rs as (P^[r==gv; e])| & \movesto &
-    |verify2 rs (as, r==gv) (P^[ e ]);| \\
-    &&& |verify2 rs (as, noteq r gv) (P^[ fail ])|\\[1mm]
-  \rulename{split-op} & |verify2 (rs) as (P^[apply1N op gv]))| & \movesto &
-          |verify2 (rs,r) (as, r = apply1N op gv) (P^[ r ]);| \\
-    &&& |verify2 rs (as, not (apply1N op gv)) (P^[ fail ])| \\
-    &&& \text{if $r \not\in R, \skol{|gv|}$} \\[1mm]
- \rulename{split-tup} & \multicolumn{3}{l}{|verify2 rs as (P^[r==tup (v_1, xdots, v_n); e])|} \\
-     && \movesto & |verifyKW|
-           \begin{array}[t]{@@{}l}
-             |(rs, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
-             |{ P^[ r_1==v_1; xdots; r_n == v_n; e ] };|
-           \end{array}\\
-    &&& |verify2 rs (as, noteq r (tup (_, xdots,_))) (P^[ e ])| \\  \\[-2mm]
-\end{array}\\
-
-\end{array}$
-\\[0.1in]
-\caption{TRS Verifier Rewrite Rules}
-\label{fig:spj-verifier-rewrite-rules}
-\end{figure}
+\figureVerificationRules
 
 \input{verifier_overview}
 \input{verifier_examples}
@@ -1249,6 +1199,7 @@ Out-dated rules:
 \item DS7: \Cref{fig:ds7}
 \item DS8: \Cref{fig:ds8}
 \item DS9: \Cref{fig:ds9}
+\item DS10: \Cref{fig:ds10}
 \end{itemize}
 
 \begin{figure}
@@ -1839,6 +1790,86 @@ $$
 \end{array}
 \end{array}$$
 \caption{{\bf DS9}: Small Source to Big Core } \label{fig:ds9}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\mbox{\bf Syntax} \\
+\multicolumn{1}{c}{\begin{array}{rcll}
+  |si| & ::= &  |sipat x|  \vb |sibody| \\
+  |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\
+\end{array}} \\
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DB md j si t| = |e|, |havoc fx = e|$}} \\[0.02in]
+\rulename{dinit}   & |De2 md t | & = & |DMe2 md sibody t| \\[1mm]
+\rulename{dbody1}   & |DB md j sibody t| & = & |DMe2 md sibody t|\\
+\rulename{dbody2}   & |DB md j (sipat f) t| & = & |z := apply1N f j; DMe2 md (sipat z) t|\\[1mm]
+% \rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
+\rulename{havoc-succ}     & |havoc succeeds|  & = & |tup ()| \\
+\rulename{havoc-fail}     & |havoc fails|  & = & |fail| \\
+\rulename{havoc-dec}     & |havoc decides|  & = & |some (lam x x) == tup()| \\[1mm]
+\end{array} \\
+
+\begin{array}{lr@@{\;}c@@{\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe2 md si t| = |e|$}} \\[0.02in]
+
+\multicolumn{4}{l}{\mbox{\it Closed functions}} \\
+ \rulename{mcfun+} &  |DMe2 mdpos si (functionOCX closed t_1 fx t_2)|
+ & = & \multicolumn{2}{@@{}l}{|verify2 () () (j := DMe2 mdneg sibody t_1; check fx (DB mdpos j si t_2) )|} \\
+    &&& |guard (DMe2 mdneg si (functionOCX closed t_1 fx t_2))| \\[1mm]
+\rulename{mcfun-} &  |DMe2 mdneg si (functionOCX closed t_1 fx t_2)|
+& = & |lam i ((j := DMe2 mdpos (sipat i) t_1 guard
+                    (havoc fx; DB mdneg j si t_2)))| \\[1mm]
+\rulename{mcfunx}& |DMe2 mdx si (functionOCX closed t_1 fx t_2)|
+& = & |lam i (j := DMe2 mdx (sipat i) t_1; check fx (DB mdx j si t_2))| \\[2mm]
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Type rules}} \\
+\rulename{moftype+} & |DMe2 mdpos si (oftype t_1 t_2)|
+& = & |y := DMe2 mdpos si t_1; z := De2 mdpos t_2;| \\
+  &&& |check succeeds (apply1N z y) guard (some z)| \\
+\rulename{moftype-} & |DMe2 mdneg si (oftype t_1 t_2)|
+  & = & |z := De2 mdneg t_2; Hide z| \\
+\rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|
+  & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
+\rulename{mtype1}   & |DMe2 mdneg sibody (:t)|    & = & |z:=De2 mdneg t; Hide z| \\
+\rulename{mtype2}   & |DMe2 md sibody (:t)|    & = & |def i (DMe2 md (sipat i) (:t)| & |md| \in \{|mdpos|, |mdx|\}\\
+\rulename{mtype3}   & |DMe2 md (sipat i) (:t)| & = & |z:=De2 md t; apply1N z i| \\
+\rulename{msquige} & |DMe2 md sibody (squig x y := t)|
+     & = & |def i (DMe2 md (sipat i) (squig x y := t))| \\
+\rulename{msquigp} & |DMe2 md (sipat i) (squig x y := t)|
+     & = & |x := i; y := DMe2 md (sipat i) t| \\
+\rulename{marraye} & |DMe2 md sibody (arr(t_1, xdots, t_n))| & = &
+    |arr (DMe2 md sibody t_1, xdots, DMe2 md sibody t_n)| \\
+\rulename{marrayp} & |DMe2 md (sipat i) (arr(t_1, xdots, t_n))| & = &
+    \multicolumn{2}{@@{}l}{|def (i_1 xdots i_n) (i == arr (i_1, xdots, i_n));
+     arr (DMe2 md (sipat i_1) t_1, xdots, DMe2 md (sipat i_n) t_n)|}
+    \\[2mm]
+
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
+\rulename{mbind}   & |DMe2 md si (x:=t)|         & = & |x := DMe2 md si t| \\
+\rulename{meq}     & |DMe2 md si (t_1=t_2)|      & = & |(DMe2 md si t_1) = (DMe2 md si t_2)| \\
+\rulename{msemi}   & |DMe2 md si (t_1 ; t_2)|    & = & |De2 mdpos t_1 ; DMe2 md si t_2|
+   & |md|\in\{|mdpos|,|mdneg|\} \\
+\rulename{msemix}   & |DMe2 mdx si (t_1 ; t_2)|    & = & |De2 mdx t_1 ; DMe2 mdx si t_2| \\
+\rulename{mcheck}  & |DMe2 md si (check fx t)|    & = & |check fx (DMe2 md si t)| \\
+\rulename{mchoice} & |DMe2 md si (t_1 `choice` t_2)| & = & |(DMe2 md si t_1) `choice` (DMe2 md si t_2)| \\
+
+\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
+\rulename{mconst}  & |DMe2 md sibody k|                  & = & |k| \\
+\rulename{mvar}    & |DMe2 md sibody y|                  & = & |y| \\
+\rulename{mapp}    & |DMe2 md sibody (apply1N t_1 t_2)|  & = & |(De2 md t_1)^[De2 md t_2]| \\
+\rulename{meq}     & |DMe2 md (sipat i) t| & = & |i = DMe2 md sibody t|
+    & \text{|t| is |k|, |y| or |apply1N t_1 t_2|}
+\end{array}
+\end{array}$$
+\caption{{\bf DS10}: Small Source to Big Core } \label{fig:ds10}
 \end{figure}
 
 \section{Out-dated core syntax and rewrite rules}

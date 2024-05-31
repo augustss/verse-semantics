@@ -42,7 +42,7 @@
           & |rs| & ::= & |{r_1, xdots, r_n}|  \hspace{1cm} (n \geq 0)\\
       \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
       \text{Expressions} & |e| & ::= & |v| \vb |lv == e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
-      && \vb & |some v| \vb |e_1 guard e_2| \vb |check fx e|
+      && \vb & |some v| \vb |v guard e| \vb |check fx e|
       \vb |verify2 rs as e| \\
       \text{Lvalues} & |lv| & ::= & |_| \vb |v| \\
       \text{Values} & |v| & ::= & x  \vb \hnf \\
@@ -58,8 +58,8 @@
 \begin{array}{lrcl}
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
 \text{Scope contexts}  & |SX| & ::= & |one hole| \vb |all hole| \vb |hole choice e| \vb |e choice hole| \vb |lam x hole| \\
-\text{Evaluation contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == e; C| \vb |def x C| \vb |C guard e| \\
-\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == e; P| \vb |def x P| \vb |P guard e| \\
+\text{Evaluation contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == e; C| \vb |def x C| \\
+\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == e; P| \vb |def x P|  \\
                        &     & \vb & |one (FC^[P])| \vb |all (VC^[P])| \vb |check fx P| \\
 \text{First choice} & |FC| & ::= & |hole| \vb |FC `choice` e| \\
 \text{Value choice} & |VC| & ::= & |FC| \vb |v `choice` VC| \\
@@ -89,7 +89,6 @@ $\begin{array}{@@{}l}
 \begin{array}{rcll}
   |validc x Y hole| & = & \mathit{true} \\
   |validc x Y (def y C)| & = & |validc x (Y,y) C| \\
-  |validc x Y (C guard e)| & = & |validc x Y C| \\
   |validc x Y (l==e; C)| & = & |blockedc (x,Y) (l==e; C)| & \text{if $|x| \in \freevars{e}$} \\
   |validc x Y (l==e; C)| & = & |blockede (x,Y) e `and` validc x Y C| & \text{if $|x| \not\in \freevars{e}$} \\
   & & |`or` validc x (Y `delete` freevars e) C|
@@ -98,7 +97,6 @@ $\begin{array}{@@{}l}
   |blockedc X (def x P)| & = & |blockedc (X,x) P| \\
   |blockedc X (l==P; e)| & = & |blockedc X P| \\
   |blockedc X (l==e; P)| & = & |blockede X e `and` blockedc X P| \\
-  |blockedc X (P guard e)| & = & |blockedc X P| \\
   |blockedc X (check fx P)| & = & |blockedc X P| \\
   |blockedc X (one (FC^[P]))| & = & |blockedc X P| \\
   |blockedc X (all (VC^[P]))| & = & |blockedc X P| \\
@@ -114,7 +112,7 @@ $\begin{array}{@@{}l}
   |blockede X (def x e)| & = & |blockede (X,x) e| \\
   |blockede X (apply1N v_1 v_2)| & = & (|v_1| = |x| \in |X|) \\
    & & |`or`| (|v_1| = |op| |`and`| |v_2 = V^[x]|) \hspace{2mm} \text{for some $|x| \in |X|$ and context |V|} \\
-  |blockede X (e_1 guard e_2)| & = & |blockede X e_1|\\
+  |blockede X (e_1 guard e_2)| & = & |X| \cap \freevars{|v|} \not= \emptyset\\
   |blockede X (verify2 rs as e)| & = & |true| \\
   |blockede X (check fx e)| & = & |blockede X e| \\
 \end{array}
@@ -124,14 +122,13 @@ $\begin{array}{@@{}l}
   |choicefreec (def x C)| & = & |choicefreec C| \\
   |choicefreec (l==C; e)| & = & |choicefreec C| \\
   |choicefreec (l==e; C)| & = & |choicefreee e `and` choicefreec C| \\
-  |choicefreec (C guard e)| & = & |choicefreec C|
   \\[2mm]
   |choicefreee (e_1 choice e_2)| & = & |false|\\
   |choicefreee fail| & = & |true|\\
   |choicefreee (one e)| & = & |true|\\
   |choicefreee (all e)| & = & |true|\\
   |choicefreee (l==e_1; e_2)| & = & |choicefreee e_1 `and` choicefreee e_2|\\
-  |choicefreee (e_1 guard e_2)| & = & |choicefreee e_1 `and` choicefreee e_2|\\
+  |choicefreee (v guard e)| & = & |choicefreee e|\\
   |choicefreee (def x e)| & = & |choicefreee e| \\
   |choicefreee (apply1N v_1 v_2)| & = & \text{|v_1| is a choice-free primop |op|} \\
   |choicefreee v|  & = & |true| \\
@@ -235,8 +232,64 @@ $\begin{array}{@@{}l}
 \end{figure}
 }
 
+% ----------------------------------------
+%             Verification rules
+% ----------------------------------------
+
+\newcommand{\figureVerificationRules}{
+\begin{figure}[t]
+$\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+  \multicolumn{5}{l}{\textit{Auxiliary functions}} \\
+  & |skolval X v| & = & |X| \cap |freevars v| = \emptyset \\[2mm]
 
 
+\multicolumn{5}{l}{\textit{Guard}} \\
+\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
+\rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
+\end{array} \\
+\\[-2mm]
+
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\multicolumn{5}{l}{\textit{Check}} \\
+\rulename{check-fail}   & |check fx fail|  & \movesto & |fail|
+   & \text{$|fx| \in \{|fails|,|decides|\}$}\\
+  \rulename{check-suc}    & |check fx v|  & \movesto & |v| & \text{$\skol{|v|}, |fx| \in \{|succeeds|,|decides|\}$} \\
+  \rulename{check-choice} & |check succeeds (v choice e)|  & \movesto & |v choice (check fails e)| & \text{$\skol{|v|}$} \\
+\end{array} \\
+\\[-0.6em]
+
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\multicolumn{5}{l}{\textit{Verify} \hspace{3mm} \text{All rules require |blockedc emptyset P|}} \\
+\rulename{solver} & |verify2 rs as e| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
+  \rulename{verify-val} & |verify2 rs as v|      & \movesto & |tup ()| & \\
+  \rulename{verify-choice} & |verify2 rs as (e_1 choice e_2)|      & \movesto & |verify2 rs as e_1 ; verify2 rs as e_2| & \\
+  \rulename{verify-fail} & |verify2 rs as fail|    & \movesto & |tup ()| & \\[1mm]
+  \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
+  & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
+  &&& \text{if $|r| \notin |rs|$ and |skolval (boundvars P) v|} \\
+ \rulename{split-v} & |verify2 rs as (P^[r==gv; e])| & \movesto &
+    |verify2 rs (as, r==gv) (P^[ e ]);| \\
+    &&& |verify2 rs (as, noteq r gv) (P^[ fail ])|\\[1mm]
+  \rulename{split-op} & |verify2 (rs) as (P^[apply1N op gv]))| & \movesto &
+          |verify2 (rs,r) (as, r = apply1N op gv) (P^[ r ]);| \\
+    &&& |verify2 rs (as, not (apply1N op gv)) (P^[ fail ])| \\
+    &&& \text{if $r \not\in R$} \\[1mm]
+ \rulename{split-tup} & \multicolumn{3}{l}{|verify2 rs as (P^[r==tup (v_1, xdots, v_n); e])|} \\
+     && \movesto & |verifyKW|
+           \begin{array}[t]{@@{}l}
+             |(rs, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
+             |{ P^[ r_1==v_1; xdots; r_n == v_n; e ] };|
+           \end{array}\\
+    &&& |verify2 rs (as, noteq r (tup (_, xdots,_))) (P^[ e ])| \\  \\[-2mm]
+\end{array}\\
+
+\end{array}$
+\\[0.1in]
+\caption{TRS Verifier Rewrite Rules}
+\label{fig:spj-verifier-rewrite-rules}
+\end{figure}
+}
 
 % --------------------------- Structural rules ----------------
 \newcommand{\figureStructuralRules}{
