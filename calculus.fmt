@@ -16,12 +16,13 @@
 
 %format effects (g) (e) = "\mathcal{FX}(" g "," e ")"
 
-%format beffects (e) = "\textit{effects}(" e ")"
+%format beffects (s) (e) = "\textit{effects}_{" s "}(" e ")"
 %format beffectsfun (e) = "\textit{effectsfun}(" e ")"
-%format bnext (a) (v) (e) = "\textit{next}(" a "," v "," e ")"
+%format bnext (s) (a) (v) (e) = "\textit{next}_{" s "}(" a "," v "," e ")"
 %format bcombine (x) (y) = "\textit{combine}(" x "," y ")"
 %format bcommutes (x) (y) = "\textit{commutes}(" x "," y ")"
 %format biter (e) = "\textit{iter}(" e ")"
+%format g_diverges = "\textit{g}_{diverges}"
 
 %format fx_1
 %format fx_2

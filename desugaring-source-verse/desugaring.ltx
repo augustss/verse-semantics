@@ -1023,7 +1023,7 @@ In contrast to the other versions this uniquely identifies the next redex, so it
       \text{Set of variables} & \multicolumn{2}{l}{|xs,ys|} \\
       \text{Programs} & |p|  & ::=  & |beff ({diverges,reads,writes,allocs,interacts}) b| \quad \text{where} \; \freevars{b} = \{ \} \\
       \text{Blocks} & |b| & ::= & |fail| \vb |b_1 choice b_2| \vb |def xs (beq ; v)| \\
-      \text{Equations} & |beq| & ::= & |lv == e ; beq| \vb |beff fxs beq ; beq| \vb \epsilon \\
+      \text{Equations} & |beq| & ::= & |lv == e ; beq| \vb |beff fxs beq ; beq| \vb |emp| \\
       \text{Expressions} & |e| & ::= & |v| \vb |b| \vb |apply1N v_1 v_2| \vb |one b| \vb |all b| \\
       \text{Lvalues} & |lv| & ::= & |_| \vb |v| \\
       \text{Values} & |v| & ::= & |x| \vb |x_fx|  \vb \hnf \\
@@ -1036,22 +1036,28 @@ In contrast to the other versions this uniquely identifies the next redex, so it
 \\ \\
 \mbox{\em Effects} \\
   \begin{array}{rcl}
-    |beffects fail| & = & \{ |fails| \} \\
-    |beffects (b_1 choice b_2)| & = & |beffects b_1| |`cup`| |beffects b_2| |`cup`| \{|chooses|\} \\
-    |beffects (def xs beq)| & = & |beffects beq| \\
-    |beffects v| & = & |emptyset| \\
-    |beffects (apply1N v_1 v_2)| & = & |beffectsfun v_1| \\
-    |beffects (one b)| & = & |beffects b| \setminus \{|fails,chooses|\} \\
-    |beffects (all b)| & = & |beffects b| \setminus \{|fails,chooses|\} \\
-    |beffects (lv == e ; beq)| & = & |beffects e| |`cup`| |beffects beq| \\
-    |beffects (beff fxs beq_1 ; beq_2|) & = & |fxs `cup`| |beffects beq_2| \\
+    |beffects b fail| & = & \{ |fails| \} \\
+    |beffects b (b_1 choice b_2)| & = & |beffects b b_1| |`cup`| |beffects b b_2| |`cup`| \{|chooses|\} \\
+    |beffects b (def xs (beq; v))| & = & |beffects beq beq| \\
+  \\[-0.8em]
+    |beffects beq (lv == e ; beq)| & = & |beffects e e| |`cup`| |beffects beq beq| \\
+    |beffects beq (beff fxs beq_1 ; beq_2|) & = & |fxs `cup`| |beffects beq beq_2| \\
+    |beffects beq emp| & = & |emptyset| \\
+  \\[-0.8em]
+    |beffects e v| & = & |emptyset| \\
+    |beffects e (apply1N v_1 v_2)| & = & |beffectsfun v_1| \\
+    |beffects e (one b)| & = & |beffects b b| \setminus |{fails,chooses}| \\
+    |beffects e (all b)| & = & |beffects b b| \setminus |{fails,chooses}| \\
     \\
-    |beffectsfun x| & = & \{|fails|,|diverges|,|xdots|\} \hspace{8em} \text{all effects} \\
+    |beffectsfun x| & = & \textit{alleffects} \\
     |beffectsfun x_fx| & = & |fxs| \\
     |beffectsfun k| & = & |emptyset| \\
     |beffectsfun op_fx| & = & |fxs| \\
     |beffectsfun (arr (v_1, xdots, v_n))| & = & |emptyset| \\
-    |beffectsfun (lam x b)| & = & |beffects b| \\
+    |beffectsfun (lam x b)| & = & |beffects b b| \\
+    \\
+    \textit{alleffects} & = & |{fails,chooses,diverges,reads,writes,allocs,interacts,xdots}| \\
+    \textit{transacts} & = & |{reads,writes,allocs,diverges}| \\
   \end{array}
 \\ \\
 \end{array}
@@ -1059,48 +1065,101 @@ In contrast to the other versions this uniquely identifies the next redex, so it
   \caption{Block Core Verse Syntax} \label{fig:vc-syntax}
 \end{figure}
 
+\newcommand{\rulenames}[1]{\rulename{#1}^*}
+
 \begin{figure}[t]
   $$
 \begin{array}{l}
 \begin{array}{lrcll}
 \multicolumn{4}{l}{\textbf{Rewrites}} \\
+
+\rulegroupname{Application}
+\rulename{app-add}          & |applyN add (k_1,k_2)|  & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
+\rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
+\textit{Etc.}\\
+\rulename{app-tup}          & |apply1 (tup (v_1,xdots, v_n)) v| & \movesto &
+                              |(v == 1^^^ v_1) choice xdots choice (v == n^^^ v_n)| & n \geq 1 \\
+\rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail| \\
+\rulenames{app-lam}          & |apply1N (lam x b) v| & \rightarrow & |subst b x v|        & \text{$\alpha$-conversion blah blah} \\
+
+\\
+\rulegroupname{Normalization}
 \rulename{merge-block} & |def xs (xdots; l == (def ys (beq; v)); xdots| & \rightarrow & |def ((xs `cup` ys)) (xdots; beq; l == v; xdots)|
                          & \text{$\alpha$-conversion blah blah} \\
-\rulename{app-beta}   & |l == apply1N (lam x b) v| & \rightarrow & |l == subst b x v|
-                         & \text{$\alpha$-conversion blah blah} \\
-\rulename{drop-value} & |_ == v; beq| & \rightarrow & |beq| \\
+\rulename{seq-elim}   & |_ == v; beq| & \rightarrow & |beq| \\
+\\
+\rulegroupname{Choice}
+\rulename{choice-assoc} & |(b_1 choice b_2) choice b_3| & \movesto & |b_1 choice (b_2 choice b_3)| \\
+\rulename{choice-fail-l} & |fail choice b| & \movesto & |b| \\
+\rulename{choice-fail-r} & |b choice fail| & \movesto & |b| \\
+\rulenames{fail} & |def xs (xdots; l == fail; xdots)| & \rightarrow & |fail| \\
+\rulenames{choice} & |def xs (xdots; l == (b_1 `choice` b_2); xdots)|& \rightarrow & \multicolumn{2}{l}{|(def xs (xdots; l == b_1; xdots)) `choice` (def xs (xdots; l == b_2; xdots))|} \\
+\\
+
+\rulegroupname{Substitution}
+\rulenames{subst} & |def xs (beq_1 ; x = v ; beq_2)| & \rightarrow & |def ((xs `setminus` {x})) (subst ((beq_1 ; beq_2)) x v)| & \text{FIXME: handle recursion} \\
+\\
+
+\rulegroupname{Unification}
+  \rulename{u-lit}   & |k == k| & \movesto & |_ == k| & \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n')|
+       & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n'| & n \geq 0\\
+  \rulename{u-fail} & |hnf_1 == hnf_2| & \movesto & |_ == fail| & \text{if \rulename{u-lit}, \rulename{u-tup} do not match} \\
+  \rulename{u-occurs} & |x==V^[x]| & \movesto & |_ == fail| & \text{if $|V| \ne |hole|$} \\
+\\
+
+\rulegroupname{One and All}
 \rulename{one-fail}   & |one fail| & \movesto & |fail| \\
 \rulename{one-value}  & |one (def emptyset v)| & \movesto & |v| \\
 \rulename{one-choice} & |one ((def emptyset v) choice e)| & \movesto & |v| \\
 \rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
 \rulename{all-choice} & |all ((def emptyset v_1) choice xdots choice (def emptyset v_n))| & \movesto & |tup (v_1, xdots, v_n)| \\
-
-\rulename{fail} & |def xs (xdots; l == fail; xdots)| & \rightarrow & |fail| \\
-\rulename{choice} & |def xs (xdots; l == (b_1 `choice` b_2); xdots)|& \rightarrow & \multicolumn{2}{l}{|(def xs (xdots; l == b_1; xdots)) `choice` (def xs (xdots; l == b_2; xdots))|} \\
-\rulename{subst} & |def xs (beq_1 ; x = v ; beq_2)| & \rightarrow & |def ((xs `setminus` {x})) (subst ((beq_1 ; beq_2)) x v)| & \text{TODO:handle recursion} \\
-\multicolumn{4}{l}{\text{Primops, unification, and choice shuffling as usual.}} \\
-
-
+\\
+\rulegroupname{One and All, better?}
+\rulename{one-value}  & |def xs (xdots; l == one (def ys v); xdots)| & \movesto & |def ((xs `cup` ys)) (xdots; l == v; xdots)| \\
+Etc. \\
 \end{array}
 \\ \\
 
+\end{array}
+     $$
+Starred rules can only be used when the \textit{next} function indicates them as the next redex.
+  The others can simply be done left-to-right (probably even in any order).
+
+
+  \caption{Block Core Verse Rewrites} \label{fig:block-rewrite}
+\end{figure}
+
+\begin{figure}[t]
+  $$
+\begin{array}{l}
 \begin{array}{rclll}
 \multicolumn{4}{l}{\textbf{Finding the next redex}} \\
 \multicolumn{4}{l}{\text{\hspace{3em}takes a set of allowed effects and closest bound variables, and maybe returns a redex}} \\
-  |bnext a v (def xs beq)| & = & |bnext s xs beq| \\
-  |bnext a v (l == b_1 `choice` b_2)| & = & \textbf{Just} |(l == b_1 `choice` b_2)| & \text{if |chooses `elem` a|} \\
-  |bnext a v (l == b_1 `choice` b_2; beq)| & = & |bnext a v b_1 `alt` bnext a v b_2 `alt` next a v beq| \\
-  |bnext a v (l == e; beq)| & = & \textbf{Just} |(l == e)| & \text{if |beffects e| $\subseteq$ |a|}\\
-  |bnext a v (l == e; beq)| & = & |bnext (bcombine a (beffects e)) v beq| & \text{if |beffects e| $\not\subseteq$ |a|}\\
-  |bnext a v (beff fxs beq_1; beq_2)| & = & |bnext (fxs `cap` a) v beq_1 `alt` bnext (bcombine a fxs) v beq_2| \\
-  |bnext a v (one b)| & = & |bnext (biter a) v b| \\
-  |bnext a v (all b)| & = & |bnext (biter a) v b| \\
-  |bnext a v _| & = & \textbf{Nothing} & \text{otherwise, no redex}\\
+\\
+  |bnext b a v (def xs (beq; v))| & = & |bnext beq a xs beq| \\
+  |bnext b a v (b_1 `choice` b_2)| & = & |bnext b a v b_1 `alt` bnext b a v b_2| \\
+  |bnext b a v fail| & = & \textbf{Nothing} \\
+  \\[-0.8em]
+  |bnext beq a v (l == b_1 `choice` b_2; beq)| & = & \textbf{Just} |(l == b_1 `choice` b_2)| & \text{if |chooses `elem` a|} \\
+  |bnext beq a v (l == e; beq)| & = & \textbf{Just} |(l == e)| & \text{if |beffects e e| $\subseteq$ |a|}\\
+  |bnext beq a v (l == e; beq)| & = & |bnext e (bcombine a (beffects e e)) v beq| & \text{if |beffects e e| $\not\subseteq$ |a|}\\
+  |bnext beq a v (beff fxs beq_1; beq_2)| & = &
+    \multicolumn{2}{l} {
+      |bnext beq (fxs `cap` a) v beq_1 `alt` bnext beq (bcombine a fxs) v beq_2|
+    } \\
+  |bnext beq a v emp| & = & \textbf{Nothing} \\
+  \\[-0.8em]
+  |bnext e a v b| & = & |bnext b a v b| \\
+  |bnext e a v (one b)| & = & |bnext b (biter a) v b| \\
+  |bnext e a v (all b)| & = & |bnext b (biter a) v b| \\
+  |bnext e a v _| & = & \textbf{Nothing} & \text{otherwise, no redex}\\
 \end{array}
 \\ \\
 \begin{array}{rclll}
 |bcombine a b| & = & |{ fx_1 || fx_1 `elem` a, forall (fx_2 `elem` b) (bcommutes fx_1 fx_2)}|  \\
-|biter a| & = & |(a `setminus` {interacts}) `cup` {fails,chooses}| \\
+|biter a| & = & |(a `cap` | \textit{transacts} |) `cup` {fails,chooses}| \\
 \end{array}
 \\ \\
 
@@ -1109,7 +1168,7 @@ In contrast to the other versions this uniquely identifies the next redex, so it
      $$
 
 
-  \caption{Block Core Verse Rewrites} \label{fig:vc-syntax}
+  \caption{Block Core Verse Next Redex} \label{fig:block-next}
 \end{figure}
 
 \begin{figure}{l}
@@ -1127,17 +1186,17 @@ In contrast to the other versions this uniquely identifies the next redex, so it
   \hline
   |fails| & x & x &  & x & x & x &  \\
   \hline
-  |chooses| & x &  & x & & & x & \\
+  |chooses| & x &  & x & ? & & x & \\
   \hline
   |diverges| &  & x & x & x & x & x & \\
   \hline
-  |reads| & x &  & x & x & & x & x \\
+  |reads| & x & ? & x & x & & x & x \\
   \hline
   |writes| & x &  & x & & & x & \\
   \hline
-  |allocs| & x & x & x & x & x & x &\\
+  |allocs| & x & x & x & x & x & x & x \\
   \hline
-  |interacts| &  &  &  & x & & &  \\
+  |interacts| &  &  &  & x & & x &  \\
   \hline
 \end{tabular}
 
@@ -1155,11 +1214,17 @@ Some remarks:
 \item The |beff fxs beq| construct limits the effects available within |beq|.
   It is used to limit effects for function bodies.
 \item Effects are actual effects, not the mixture of effects and non-effects the Verse has.
-  \Eg, |<succeeds>| is the absence of |fails| and |chooses|, |<iterates>| is |<fails,chooses>|.
+  \Eg, |<succeeds>| is the absence of |fails| and |chooses|, |<iterates>| is |<fails,chooses>|, |<decides>| is |<fails>|.
 \item The \textit{next} function identifies the next essential part of a redex; but not the full redex.
   \Eg, if |x=v| is identified by \textit{next} it is the \rulename{subst} rule that should be used next.
 \item To find a redex, start with the entire program to find the next redex.
   After each reduction, start over from the top.
+\item Desugaring annotates all |op| with their effects, \eg, |gt|$_{\{fails\}}$, |print|$_{\{interacts\}}$.
+\item Desugaring propagates effect annotations on higher order arguments in the source to all their uses, \eg,
+  |f(g()<diverges>:int) := g[]| becomes (simplified!) |f := lam g (apply1N g_diverges (tup ()))|.
+\item Variables with no effect annotation are assumed to have all possible effects, since we know nothing.
+\item There is no reduction under $\lambda$, but it could easily be added.
+\item FIXME: Maybe $\rulenames{choice}$ should not be done until all $\rulenames{subst}$ to the right are done?
 \end{itemize}
 
 
