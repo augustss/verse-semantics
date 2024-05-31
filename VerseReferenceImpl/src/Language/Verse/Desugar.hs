@@ -514,14 +514,15 @@ posOfType
   -> DesugarT m (Exp L Ident)
 posOfType e1 e2 pi = do
   y <- name <$> freshIdent (loc e1)
-  e1 <- unify y <$> desugarExp' e1 pi
+  e1 <- desugarExp' e1 pi
   z <- name <$> freshIdent (loc e2)
-  e2 <- unify z <$> desugarExp e2
+  e2 <- desugarExp e2
   r <- freshIdent' $ loc e2
   pure $
-    e1 `then'`
-    e2 :*>:
-    (check Effect.Succeeds (bracketInvoke z y) `seq'`
+    unify y e1 `then'`
+    unify z e2 `then'`
+    check Effect.Succeeds (bracketInvoke z y) :*>:
+    (bracketInvoke z y `seq'`
      forall' Internal r (assume Effect.Succeeds . bracketInvoke z $ name r))
 
 valM
