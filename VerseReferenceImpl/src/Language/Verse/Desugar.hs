@@ -463,7 +463,7 @@ verifyPosLam'
   -> DesugarT m (L (Exp L Ident))
 verifyPosLam' loc' e1 eff e2 = \ case
   E -> verifyM $
-    negM (domainM $ desugarExp e1) `seqM`
+    negM (domainM $ desugarExp e1) `thenM`
     checkM eff (desugarExp e2)
   P f -> (bracketInvoke (L loc' $ Name "function") (name f) `then'`) <$> verifyM do
     b <- name <$> freshIdent (loc e1)
@@ -500,10 +500,10 @@ negOfType
   -> DesugarT m (Exp L Ident)
 negOfType e2 = do
   z <- name <$> freshIdent (loc e2)
-  e2 <- unify z <$> desugarExp e2
+  e2 <- desugarExp e2
   r <- freshIdent' $ loc e2
   pure $
-    e2 :>>:
+    unify z e2 :*>:
     forall' Internal r (assume Effect.Succeeds . bracketInvoke z $ name r)
 
 posOfType
@@ -619,14 +619,6 @@ thenM'
   -> m (Exp f a)
 thenM' = liftA2 (:*>:)
 infixl 1 `thenM'`
-
-seqM
-  :: (Applicative m, Apply f)
-  => m (f (Exp f a))
-  -> m (f (Exp f a))
-  -> m (f (Exp f a))
-seqM = liftA2 seq'
-infixl 1 `seqM`
 
 domainM :: (Functor m, Functor f) => m (f (Exp f a)) -> m (f (Exp f a))
 domainM = fmap domain
