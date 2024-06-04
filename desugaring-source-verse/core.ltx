@@ -172,7 +172,7 @@ $\begin{array}{@@{}l}
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
-  & \text{if |validc x emptyset C|}  \\
+  & \text{if |validc x emptyset C|, $x \not\in \freevars{v}$}  \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{exi-float}^{* \alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
 \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
@@ -189,7 +189,7 @@ $\begin{array}{@@{}l}
 % \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
 \rulename{seq-elim} & |_ == v ; e| & \movesto & |e| \\
 \rulename{rec} & |z = V^[lam x e_1]; e_2| & \movesto & \multicolumn{2}{l}{|z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
-  \hspace{4mm} \text{$|z| \in \freevars{|e_1|}$}} \\
+  \hspace{4mm} \text{$|z| \in \freevars{|lam x e_1|}$}} \\
 
     \\[-0.8em]
 
