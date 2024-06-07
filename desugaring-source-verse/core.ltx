@@ -147,6 +147,12 @@ $
   \begin{figure}
 $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Structural rules}
+\rulename{exi-swap}          & |def x (def y e)| & = & |def y (def x e)| \\
+\rulename{exi-alpha}          & |def x e| & = & |def y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
+\rulename{lam-alpha}          & |lam x e| & = & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
+\\[-0.8em]
+
 \rulegroupname{Application}
 \rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
@@ -173,8 +179,10 @@ $\begin{array}{@@{}l}
 %  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
   & \text{if |validc x emptyset C|, $x \not\in \freevars{v}$}  \\
+\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
+  & \text{if |validc x emptyset C|, $x \not= y$}  \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{exi-float}^{* \alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
+\rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
 \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
 \end{array}
 \\ \\[-0.8em]
@@ -185,7 +193,6 @@ $\begin{array}{@@{}l}
 \rulename{seq-assoc} & |lv_2 == (lv_1 == e_1; e_2); e_3| & \movesto & |lv_1 == e_1; lv_2 == e_2; e_3| \\
 % \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
 % \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
-\rulename{eq-swap}^{*} & |v == x; e| & \movesto & |x == v; e|  \\
 % \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
 \rulename{seq-elim} & |_ == v ; e| & \movesto & |e| \\
 \rulename{rec} & |z = V^[lam x e_1]; e_2| & \movesto & \multicolumn{2}{l}{|z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
@@ -224,7 +231,6 @@ $\begin{array}{@@{}l}
 \end{array}
 \\
 \text{\textit{Note}: In rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.} \\
-\text{\textit{Note}: Rules marked with a superscript $*$ may apply infinitely.}
 \end{array}$
 
 \caption{\textbf{The \vcname: Rewrite rules for execution}} \label{fig:rules}

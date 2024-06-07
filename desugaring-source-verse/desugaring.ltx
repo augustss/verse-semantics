@@ -572,9 +572,12 @@ $$
 \rulename{dbody1}   & |DB md j sibody t| & = & |DMe2 md sibody t|\\
 \rulename{dbody2}   & |DB md j (sipat f) t| & = & |z := apply1N f j; DMe2 md (sipat z) t|\\[1mm]
 % \rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
-\rulename{havoc-succ}     & |havoc succeeds|  & = & |tup ()| \\
-\rulename{havoc-fail}     & |havoc fails|  & = & |fail| \\
-\rulename{havoc-dec}     & |havoc decides|  & = & |some (lam x x) == tup()| \\[1mm]
+\rulename{funchk-e}     & |FunCheck sibody| & = & |tup ()| \\
+\rulename{funchk-p}     & |FunCheck (sipat f)| & = & |apply1N isFun f| \\[1mm]
+
+\rulename{havoc-succ}     & |havoc2 succeeds e|  & = & |e| \\
+\rulename{havoc-fail}     & |havoc2 fails e|  & = & |fail| \\
+\rulename{havoc-dec}     & |havoc2 decides e|  & = & |some (lam x x) == tup(); e| \\[1mm]
 \end{array} \\
 
 \begin{array}{lr@@{\;}c@@{\;}ll}
@@ -585,10 +588,10 @@ $$
  & = & \multicolumn{2}{@@{}l}{|verify2 r () (j := DMe2 mdneg (sipat r) t_1; check fx (DB mdpos j si t_2) );|} \\
     &&& |DMe2 mdneg si (functionOCX closed t_1 fx t_2)| \\[1mm]
 \rulename{mcfun-} &  |DMe2 mdneg si (functionOCX closed t_1 fx t_2)|
-& = & |lam i ((j := DMe2 mdpos (sipat i) t_1;
-                    (havoc fx; DB mdneg j si t_2)))| \\[1mm]
+& = & |FunCheck si; lam i (j := DMe2 mdpos (sipat i) t_1;
+                    havoc2 fx (DB mdneg j si t_2))| \\[1mm]
 \rulename{mcfunx}& |DMe2 mdx si (functionOCX closed t_1 fx t_2)|
-& = & |lam i (j := DMe2 mdx (sipat i) t_1; check fx (DB mdx j si t_2))| \\[2mm]
+& = & |FunCheck si; lam i (j := DMe2 mdx (sipat i) t_1; check fx (DB mdx j si t_2))| \\[2mm]
 \end{array}
 \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
@@ -601,8 +604,8 @@ $$
   & = & |z := De2 mdneg t_2; freevars t_1 guard (some z)| \\
 \rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|
   & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
-\rulename{mtype1}   & |DMe2 mdneg (sipat i) (:t)|    & = & |z:=De2 mdneg t; y := apply1N z i; y guard (some z)| \\
-\rulename{mtype2}   & |DMe2 md (sipat i) (:t)|    & = & |z:=De2 md t; apply1N z i| \\
+\rulename{mtype1}   & |DMe2 mdneg (sipat i) (:t)|    & = & |z:=De2 mdneg t; i guard (some z)| \\
+\rulename{mtype2}   & |DMe2 md (sipat i) (:t)|    & = & |z:=De2 md t; apply1N z i| & |md|\in\{|mdpos|,|mdx|\}\\
 \rulename{mtype3}   & |DMe2 md sibody (:t)| & = & |def x (z:=De2 md t; apply1N z x)| \\
 \rulename{msquige} & |DMe2 md sibody (squig x y := t)|
      & = & |def i (DMe2 md (sipat i) (squig x y := t))| \\
@@ -630,9 +633,9 @@ $$
 \multicolumn{4}{l}{\mbox{\it Equality rules}} \\
 \rulename{mconst}  & |DMe2 md sibody k|                  & = & |k| \\
 \rulename{mvar}    & |DMe2 md sibody y|                  & = & |y| \\
-\rulename{mapp}    & |DMe2 md sibody (apply1N t_1 t_2)|  & = & |(De2 md t_1)^[De2 md t_2]| \\
+\rulename{mapp}    & |DMe2 md sibody (apply1N t_1 t_2)|  & = & |f := De2 md t_1; a := De2 md t_2; apply1N f a| \\
 \rulename{meq}     & |DMe2 md (sipat i) t| & = & |i = DMe2 md sibody t|
-    & \text{|t| is |k|, |y| or |apply1N t_1 t_2|}
+    & \text{|t| is not |k|, |y| or |apply1N t_1 t_2|}
 \end{array}
 \end{array}$$
 \caption{{\bf DS11}: Small Source to Big Core } \label{fig:ds11}
