@@ -1,0 +1,407 @@
+========================================================================================================================
+Verse Runtime Sketch 2
+========================================================================================================================
+
+This is a core Verse runtime intended to be compatible with ICFP Verse.
+We define runtime Operations, runtime Assumptions, and runtime inference rules.
+We don't cover desugaring and verification, which are documented in VerseSpecification.txt.
+
+Given a program "program c {op}", we begin with the inference described in (ProgramIntro):
+
+    empty, unblocked{op}@c |- program c {op}
+
+We then apply available inference rules.
+The inference rules match specific running parts of the program through the lens of EBNF wildcards like ProgramOp.
+The inference rules keep the entire program on the right hand side of the |- turnstile.
+The inference rules add to the assumptions on the left of the turnstile; this is monotonic except for mutable writes.
+The EBNF wildcards only match running parts of the program; parts that aren't yet available to run are not matched.
+
+We have completed successfully when (ProgramElim) becomes available.
+
+------------------------------------------------------------------------------------------------------------------------
+Runtime Definitions
+------------------------------------------------------------------------------------------------------------------------
+
+Definitions (as EBNF grammars) used by our inference rules:
+
+    Natural Numbers        m n := 0 | 1 | ...
+    Atom Values           atom := n | Print | operator'^' | prefix'set'
+
+    Variables                  := f | g | h | i | j | k | t | w | x | y | z
+    Contexts                   := c | d | e
+
+    Effects Sublattices:
+        CardinalityFx          := abstracts   | succeeds  | fails
+        TransactFx             := transacts   | varies    | allocates | reads    | writes  | no_transacts
+        ImperativeFx           := imperatives | interacts | throws    | suspends | no_imperatives
+        UnblockFx              := blocked     | unblocked_iterates | unblocked_reads | unblocked_writes | unblocked_imperatives | unblocked
+    Effects                    := CardinalityFx & TransactFx & ImperativeFx & UnblockFx
+
+    ICFP Lambdas        lambda := lambda(u) i x {op}
+    Heads                 head := atom | lambda | tuple{u_0,...,u_n-1}
+    Known (Ground) Value    kv := atom | lambda | tuple{kv_0,...,kv_m-1}
+    Vertices         p,q,r,u,v := x | head
+
+    Operations              op := u=v
+                               |  u=v(p)
+                               |  op0; op1
+                               |  op0|op1
+                               |  exists u_0 ... u_n
+                               |  iterate(u0) x0 c {op0} then x1 {op1} else {op2}
+                               |  cast(u) {head_0 => {op_0}; ...}
+    Programs           Program := program c {op}
+
+                               Matches any running operation that starts a new context C and its top level operation op.
+    ContextStartOp[c,op]       := program c {op}
+                               |  iterate(u0) x0 c {op0} then x1 {op1} else {op2}
+
+                               Matches any running operation within the current flexible span.
+    ContextSpan[op]            := op
+                               |  ContextSpan[op]; op
+                               |  op; ContextSpan[op]
+
+                               Matches a program containing a running context c and an operation op in its span.
+    ProgramOp[c,op]            := ContextStartOp[c,ContextSpan[op]]
+                               |  ContextStartOp[d,ContextSpan[ProgamOp[c,op]]]
+
+                               Matches a unification operation op that unifies U and V.
+    ProgramUnifyOp[c,u,v,op]   := ProgramOp[c,op & (u=v | v=u)]
+
+                               Matches a program exposing a context c and a flexible vertex within it.
+    ProgramFlexible[c,u]       := ProgramOp[c,exists ... u ...]
+                               |  ProgramOp[c,exists ... tuple{...,u,...} ...]
+
+    Assumptions              A := fx{op}@c | P^:=kv@c
+    Assumption Sets          G := empty | G, A
+
+    E0 & E1                    := Concrete syntax matches both EBNF E0 and E1, with consistent bindings in both
+    E0 | E1                    := Concrete syntax matches either BNF E0 or E1, exposing a binding only if it's bound in both branches
+    ~E                         := Concrete syntax doesn't match EBNF E
+    G[A0, ..., A1]             := assumption set G containing assumptions A0, A1, ... in any order.
+    E[E1/E0]                   := EBNF E with EBNF E1 replacing EBNF E0.
+    op[v_0/u_0,...,*/*]        := op[if p is u_i for some i then v_i/p else p_i/p | p:BVS[op]] where p_i fresh
+    BVS[op]                    := Bound variables; the least set of Contexts and Variables such that:
+                                      BVS[ProgramOp      [c,op]] includes {c}
+                                      BVS[ProgramFlexible[c,x ]] includes {x}
+
+Effects:
+
+    Effects is a lattice (https://en.wikipedia.org/wiki/Lattice_(order)) describing the effects of a computation.
+    The EBNF definition of Effects above describes its canonical form; unequal Effects EBNF means unequal effects.
+
+    Here we also write effects computations non-canonically as shorthand for their canonical form using:
+
+        fx0 & fx1          := the lattice meet of effects fx0 and fx1
+        fx0 | fx1          := the lattice join of effects fx0 and fx1
+
+        effects            := abstracts   & transacts & imperatives  & blocked
+        no_effects         := contradicts & converges & no_transacts & no_imperatives & unblocked
+
+        only_cardinalities :=               converges & no_transacts & no_imperatives & unblocked
+        only_succeeds      := succeeds    & converges & no_transacts & no_imperatives & unblocked
+        only_transacts     := contradicts & converges &                no_imperatives & unblocked
+        only_imperatives   := contradicts & converges & no_transacts &                  unblocked
+        only_blocked       := contradicts & converges & no_transacts & no_imperatives &          
+
+        We can write effects from any of the Effects Sublattices as shorthand for meeting that
+        sublattice effect with the top effect in each of the other sublattices. The top sublattice effects
+        are cardinalities, recurses, transacts, imperatives, unifies, rejects, and blocked.
+
+    The Effects lattice is the product of the following sublattices:
+
+    - CardinalityFx describes the potential multiplicity of values:
+
+                                   abstracts
+                                   /       \
+                               succeeds   fails
+
+    - TransactFx is a complete lattice on fx in the set {varies,allocates,reads,writes}
+      where no_transacts<=fx<=transacts.
+
+    - ImperativeFx is a complete lattice on fx in the set {interacts,throws,suspends}
+      where no_imperatives<=fx<=imperatives.
+
+    - UnblockFx is a a complete lattice on the set fx in {unblocked_iterates,unblocked_reads,unblocked_writes,unblocked_imperatives}
+      where unblocked<=fx<=blocked. This describes which operations fx{op} are blocked from running now, to ensure proper
+      sequencing of effects amidst lenient evaluation.
+
+    Effects Inclusion
+
+        The inequality fx0 <= fx1 (the lattice partial order inclusion) says fx0 has no more effects than fx1.
+        The Effects lattice is information-ordered. That is, if fx0{op} holds (meaning operation op has at most the effects fx0)
+        and fx0<=fx1, then fx1{op} also holds. As we learn more information about a program's effects, the information
+        we have about it strictly increases.
+
+        Given a computation with effects fx, we can ask if it definitely fails via fails<=contradicts+fx or
+        only_cardinalities&fails<=fx.
+
+    Sequencing Effects
+
+        The effects sequencing operation SequenceFx(fx0,fx1) captures the cumulative effects of running
+        op0 with effects fx0 then running op1 with effects fx1. It's associative, transitive, and commutative.
+        We have fx = only_succeeds*fx = fx*only_succeeds
+
+            SequenceFx(fx0,fx1) := (fx0 + fx1) &
+                if(fx0&fx1 <= fails) then fails
+                else                      effects
+
+	    An op that contradicts neither fails nor allows the current context to commit successfully,
+	    when sequenced with an op that fails, the context may fail, so we have fails*contradicts = fails.
+
+    Blocking Effects
+    
+        In a language with lenient evaluation and effects, we must ensure that operations with unsatisfied
+        effects dependencies, such as read operations dependent on unfinished prior write operations,
+        are executed in-order while enabling all other operations to execute out-of-order.
+
+        The operation AfterFx(fx) says what effects should be unblocked subsequent to this operation having effects fx.
+        During inference, each operation receives unblocked_* effects from its sequentially prior operation,
+        calculates its actual suspended effects fx, and propagates AfterFx(fx) to the sequentially next operation.
+
+            AfterFx(fx) := (unblocked + fx) &
+	            (if(iterates  <= contradicts    + fx) then blocked else unblocked_iterates              ) & # While iterates    pending, blocked subsequent iterates.
+	            (if(reads     <= no_transacts   + fx) then blocked else unblocked_writes                ) & # While reads       pending, blocked subsequent writes.
+	            (if(writes    <= no_transacts   + fx) then blocked else unblocked_reads&unblocked_writes) & # While writes      pending, blocked subsequent reads and writes.
+	            (if(throws    <= no_imperatives + fx) then blocked else unblocked_imperatives           ) & # While imperatives pending, blocked subsequent imperatives.
+	            (if(suspends  <= no_imperatives + fx) then blocked else unblocked_imperatives           ) &
+	            (if(interacts <= no_imperatives + fx) then blocked else unblocked_imperatives           )
+
+            DownFx(fx) := unblocked + fx
+                This says how a compound operation's pending effects propagate to its sequentially first sub-operation.
+
+        TODO: Ingest additional constraints arising from Sonnenberg-identified (fails|throws|iteracts)-diverges race.
+
+------------------------------------------------------------------------------------------------------------------------
+Verse Runtime Inference Rules
+------------------------------------------------------------------------------------------------------------------------
+
+Program:
+
+         (ProgramIntro)  empty |- program c {op}
+
+                         G, unblocked{op}@c |- program c {op}
+       (ProgramUnblock)  ------------------------------------
+                         G                  |- program c {op}
+
+          (ProgramElim)  ---------------------------------------
+                         G[only_succeeds{op}@c |- program c {op}
+
+Effects:
+
+                         G, effects{op}@c |- ProgramOp[c,op]
+              (OpIntro)  -----------------------------------
+                         G                |- ProgramOp[c,op]
+
+                         fx0<=fx1
+                         G, fx1{op}@c |- Program
+             (FxWeaken)  -----------------------
+                         G[fx0{op}@c] |- Program
+
+                         G, (fx0&fx1){op}@c      |- Program
+         (FxStrengthen)  ----------------------------------
+                         G[fx0{op}@c, fx1{op}@c] |- Program
+
+Simple Ops:
+
+                         E is exists u_0 ... u_n
+                         G, only_succeeds{E}@c |- ProgramOp[c,E]
+          (ExistsIntro)  ---------------------------------------
+                         G                     |- ProgramOp[c,E]
+
+                         G, SequenceFx(fx0,fx1){op0; op1}@c, DownFx(fx2){op0}@c, AfterFx(fx0){op1}@c |- Program
+        (SequenceIntro)  --------------------------------------------------------------------------------------
+                         G[fx0{op0}@c, fx1{op1}@c, fx2{op0; op1}@c]                                  |- Program
+
+Unification:
+
+    Like ICFP, our (UnifySubstitute) uses substitution.
+    Like ICFP, lambda unification is non-confluent and doesn't capture denotational semantics of overloading.
+    Here we aren't handling full Verse function inputs, but we have a working implementation of that elsewhere.
+
+                         G, computes{u=v}@c |- ProgramOp[c,u=v]
+           (UnifyIntro)  -------------------------------------- (Unblocks subsequent effects)
+                         G                  |- ProgramOp[c,u=v]
+
+                         G, succeeds{atom0=atom0}@c |- ProgramOp[c,atom0=atom0]
+    (UnifyAtomSucceeds)  ------------------------------------------------------ (ICFP U-LIT)
+                         G                          |- ProgramOp[c,atom0=atom0]
+
+                         G, fails{op}@c |- ProgramOp[c,op                                ]
+           (UnifyFails)  -----------------------------------------------------------------
+                         G              |- ProgramUnifyOp[c,atom0,atom1               ,op] where atom0<>atom1        (ICFP U-FAILS)
+                         G              |- ProgramUnifyOp[c,atom0,tuple{u_0,...,u_m-1},op]                           (ICFP U-FAILS)
+                         G              |- ProgramUnifyOp[c,atom0,lambda(u) i x {op}  ,op]                           (ICFP U-FAILS)
+                         G              |- ProgramUnifyOp[c,tuple{u_0,...,u_m-1},tuple{v_0,...,v_n-1},op] where m<>n (ICFP U-FAILS)
+
+                         G[u/x] |- ProgramUnifyOp[c,op,x,u] [u/x]
+      (UnifySubstitute)  ---------------------------------------- (ICFP SUBST)
+                         G      |- ProgramUnifyOp[c,op,x,u]
+                                &  ProgramFlexible[c,x    ]
+
+                         G |- ProgramOp[c,u_0=v_0; ...; u_m-1=v_m-1                ]
+          (UnifyTuples)  ----------------------------------------------------------- (ICFP U-TUP)
+                         G |- ProgramOp[c,tuple{u_0,...,u_m-1}=tuple{v_0,...,v_m-1}]
+
+Calling:
+
+                         0<=m<n
+                         G |- ProgramOp[c,u=v_m                       ]
+    (CallTupleSucceeds)  ---------------------------------------------- (Optimized version of ICFP APP-TUP)
+                         G |- ProgramOp[c,op,u=tuple{v_0,...,v_n-1}(m)]
+
+                         n=0 or p is head and is not a natural number with 0<=head<n
+                         G, fails{op} |- ProgramOp[c,op                       ]
+       (CallTupleFails)  ------------------------------------------------------ (ICFP APP-TUP-0 and optimized version of ICFP APP-TUP))
+                         G            |- ProgramOp[c,u=tuple{v_0,...,v_n-1}(p)]
+
+                         0<n
+                         G |- ProgramOp[c,(p=0; u=v_0); ...; (p=n-1; u=v_n-1)]
+    (CallTupleIterates)  ----------------------------------------------------- (ICFP APP-TUP)
+                         G |- ProgramOp[c,u=tuple{v_0,...,v_n-1}(p)          ]
+
+                         G |- ProgramOp[c,op1[p/i,v/x,*/*]        ]
+       (CallLambdaElim)  ------------------------------------------ (ICFP APP-BETA)
+                         G |- ProgramOp[c,v=lambda(u) i x {op1}(p)]
+
+Iterate & Choice:
+
+                         Iterate is iterate(u0) x0 d {op0} then x1 {op1} else {op2}
+                         G, DownFx(fx0){op0}@d         |- ProgramOp[c,Iterate]
+         (IterateIntro)  -----------------------------------------------------
+                         G[fx0{Iterate}@c, fx1{op0}@d] |- ProgramOp[c,Iterate]
+
+                         Iterate is iterate(u0) x0 d {op0} then x1 {op1} else {op2}
+                         G, P^:=v0@d                       |- ProgramOp[c,Iterate]
+  (IterateCopyMutables)  --------------------------------------------------------- (Copies c's mutables to d for speculative writes)
+                         G[P^:=v0@c] where not G[P^:=v1@d] |- ProgramOp[c,Iterate]
+
+                         G                                 |- ProgramOp[c,iterate(u0) x0 d {ContextSpan[opL    ]} then x1 {op1             } else {
+                                                                          iterate(x1) y0 d {ContextSpan[    opR]} then y1 {op1[y0/x0,y1/x1]} else {op2[y0/x0]} }]
+           (ChoiceElim)  ---------------------------------------------------------------------------------------------------------------------------------------- (ICFP CHOOSE)
+                         G[unblocked_iterates{opL|opR}@d]  |- ProgramOp[c,iterate(u0) d {ContextSpan[opL|opR]} then x1 {op1} else {op2}                         ]
+
+                         G[P^:=v1@c / P^:=v0@c | P^:=v1@d <- G][P^:=v1@c / P^:=v1@d] ("G with d's allocates&writes moved to c, replacing any existing")
+                                            |- ProgramOp[c,
+                                                   op0;
+                                                   exists x0 x1 y1;
+                                                   x0=u0(0);
+                                                   op1[y1/x1,*/*];
+                                                   cast(y1) {
+                                                       tuple{v1} => {op2[y1/x1,*/*]};
+                                                       tuple{}   => {exists}
+                                                   }]
+  (IterateSucceedsElim)  ----------------------------------------------------------------------------------
+                         G[succeeds{op0}@d] |- ProgramOp[c,iterate(u0) x0 d {op0} then x1 {op1} else {op2}]
+
+                         G                  |- ProgramOp[c,op2[*/*]                                    ]
+     (IterateFailsElim)  ---------------------------------------------------------------------------------- (Abandons d's mutable writes)
+                         G[fails{op0}@d]    |- ProgramOp[c,iterate(u0) x0 d {op0} then x1 {op1} else {op2}]
+
+    Explanation of iterate:
+        
+        Here we explain the meaning of: iterate(u0) x0 c {op0} then x1 {op1} else {op2}
+
+        We're going to iterate over one or more of the values produced by op0, executing op1 on success,
+        and op2 on failure. While doing this, we're folding a value (initially u0) into the variable x0,
+        and giving op1 the opportunity to ask for the next iteration by unifying x1 with tuple{u1},
+        or to stop by unifying x1 with tuple{}.
+
+        - u0 is the value we're folding through the current iteration.
+        - x0 is a variable that will be unified with u0 upon success or failure, before running op1 or op2.
+          We have to keep x0 separate from u0 until success, so that we can rename it in (ChoiceElim).
+          If we tried to combine u0 and x0 into a single vertex, substitution would make it unrenamable.
+        - We are running running op0 in context c, until (IterateSucceedsElim) or (IterateFailsElim) kick in.
+        - Our EBNF patterns only see op0 running; op1 and op2 aren't visible until  we reduce the 'iterate'
+          into something simpler in (IterateSucceedsElim) or (IterateFailsElim).
+        - On success, (IterateSucceedsElim) does housekeeping and runs op1.
+          This op1 has the opportunity to read the current fold value (stored in the 1-tuple x0).
+          This op1 is must unify the next fold value (stored in x1) with either tuple{u1} to continue iterating,
+          or with tuple{} to stop. When op1 decides to continue iterating, (ChoiceElim)'s cast runs op2.
+        - Making all of this useful is the job of (ChoiceElim), which says essentially:
+          When we saw this choice a|b, we were iterating in op0 with then & else prongs op1 and op2.
+          So now we eliminate the choice by continuing to iterate op in op0 (but with a|b rewritten to a),
+          keep op1 as our then-pring, but replace our else-prong op2 with a new 'iterate' that's a copy of
+          this one (but write a|b rewritten to b), with a copy of our original then-prong op1, and
+          we move op2 from our original iterate else-prong to the new iterate's else-prong.
+          Effectively, we're inserting a new op1 prong into a linked list.
+          This approach ensures choices are properly ordered.
+
+    Here are translations loosely using desugar{vertex=term}:
+
+        desugar{u=one{e0}} --->
+            iterate(tuple{tuple{}}) x0 c {exists z; desugar{z=e0}}
+                then x1                  {u=z; x1=tuple{}}
+                else                     {u=false()}
+
+        desugar{u=if(e0) then e1 else e2} --->
+            iterate(tuple{tuple{}}) x0 c {exists z; desugar{z=e0}}
+                then                x1   {desugar{u=e1}; x1=tuple{}}
+                else                     {desugar{u=e2}}
+
+        desugar{u=all{e0}} --->
+            iterate(tuple{0})       x0 c {exists z; desugar(z=e0}}
+                then                x1   {exists y; y=x0(0); u(y)=z; x1=tuple{y+1}}
+                else                     {x0=length(u)}
+
+        desugar{u=for(e0) do e1} --->
+            iterate(tuple{0})       x0 c {desugar{e0}}
+                then                x1   {exists y; y=x0(0); desugar{u(y)=e1}; x1=tuple{y+1}}
+                else                     {x0=length(u)}
+
+Casting:
+
+    This operation performs a simple pattern match and reduces once there's a match.
+    It's a primitive building block for (IterateSucceedsElim) and makes it easier to specify natives.
+
+                         head matches head_i and definitely does not match head_0 ... head_i-1
+                         G |- ProgramOp[c,                            op_i       ]
+             (CastElim)  ---------------------------------------------------------
+                         G |- ProgramOp[c,cast(head) {...; head_i => {op_i}; ...}]
+
+Pure Native Functions:
+
+                         G |- ProgramOp[c,u=n     ]
+              (NatAtom)  --------------------------
+                         G |- ProgramOp[c,u=nat[n]]
+                         G |- ProgramOp[c,n=nat[u]]
+
+                         G |- ProgramOp[c,u=m+n                   ]
+               (AddInt)  ------------------------------------------ (ICFP APP-ADD)
+                         G |- ProgramOp[c,u=opertor'+'[tuple{m,n}]]
+
+Effectful Native Functions:
+
+                         G, (abstracts*allocates*no_imperatives){u=new(v)}@c |- ProgramOp[c,u=new(v)]
+             (NewIntro)  ----------------------------------------------------------------------------
+                         G                                                   |- ProgramOp[c,u=new(v)]
+  
+                         G, P^:=kv@c |- ProgramOp[c,u=P      ] # P fresh
+              (NewElim)  -------------------------------------
+                         G           |- ProgramOp[c,u=new(kv)]
+  
+                         G, (abstracts*reads*no_imperatives){u=v^}@c |- ProgramOp[c,u=v^]
+            (ReadIntro)  ----------------------------------------------------------------
+                         G                                           |- ProgramOp[c,u=v^]
+  
+                         G                                   |- ProgramOp[c,u=v ]
+             (ReadElim)  --------------------------------------------------------
+                         G[P^:=v@c, unblocked_reads{u=v^}@c] |- ProgramOp[c,u=P^]
+  
+                         G, (abstracts*writes*no_imperatives){u=set p^=v}@c |- ProgramOp[c,u=set p^=v]
+           (WriteIntro)  -----------------------------------------------------------------------------
+                         G                                                  |- ProgramOp[c,u=set p^=v]
+
+                         G[P^:=kv1@c / P^:=kv0@c]                       |- ProgramOp[c,u=tuple{}   ]
+            (WriteElim)  ---------------------------------------------------------------------------
+                         G[P^:=kv0@c, unblocked_writes{u=set P^=kv1}@c] |- ProgramOp[c,u=set P^=kv1]
+
+                         G, (succeeds*no_transacts*interacts){u=Print(v)}@c |- ProgramOp[c,u=Print(v)]
+        (InteractIntro)  -----------------------------------------------------------------------------
+                         G                                                  |- ProgramOp[c,u=Print(v)]
+  
+                         (Here we physically print n in the sequence defined by blocked effects)
+                         G                                      |- ProgramOp[c,u=tuple{} ]
+         (InteractElim)  -----------------------------------------------------------------
+                         G[unblocked_imperatives{u=Print(n)}@c] |- ProgramOp[c,u=Print(n)]
+
+------------------------------------------------------------------------------------------------------------------------
