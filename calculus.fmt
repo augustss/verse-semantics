@@ -16,6 +16,14 @@
 
 %format effects (g) (e) = "\mathcal{FX}(" g "," e ")"
 
+%format beffects (s) (e) = "\textit{effects}_{" s "}(" e ")"
+%format beffectsfun (e) = "\textit{effectsfun}(" e ")"
+%format bnext (s) (a) (v) (e) = "\textit{next}_{" s "}(" a "," v "," e ")"
+%format bcombine (x) (y) = "\textit{combine}(" x "," y ")"
+%format bcommutes (x) (y) = "\textit{commutes}(" x "," y ")"
+%format biter (e) = "\textit{iter}(" e ")"
+%format g_diverges = "\textit{g}_{diverges}"
+
 %format fx_1
 %format fx_2
 %format andeffects (fx1) (fx2) = fx1 "\ast" fx2
@@ -34,6 +42,13 @@
 %format contradicts = "\textbf{contradicts}"
 %format closed = "\textbf{c}"
 %format open = "\textbf{o}"
+%format diverges = "\textbf{diverges}"
+%format transacts = "\textbf{transacts}"
+%format interacts = "\textbf{interacts}"
+%format chooses = "\textbf{chooses}"
+%format reads = "\textbf{reads}"
+%format writes = "\textbf{writes}"
+%format allocs = "\textbf{allocs}"
 
 %format cons (x) (y) = "\textbf{cons}(" x "," y ")"
 %format applyx a b = a "(" b ")"
@@ -63,6 +78,7 @@
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
 %format (DB (m) (j) (pi) (t)) = "{\mathcal B}_{" m "}\llbracket{}" t "\rrbracket{}" pi "\," j
 %format De2 md (x)        = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
+%format FunCheck (pi) = "{\mathcal F}(" pi ")"
 
 %%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
 %format Hide (v) = "{\bf some}(" v ")"
@@ -109,9 +125,13 @@
 %format suspx2 (x) = "susp\{" x "\}_2"
 
 %format validc x xs (y) = "\mathsf{valid}("  x "," xs "," y ")"
-%format blockedc xs (y) = "\mathsf{blkd}_{\textsc{\tiny P}}("  xs "," y ")"
+%format blockedc xs (y) = "\mathsf{blkd}_{\small c}("  xs "," y ")"
 %format blockede xs (y) = "\mathsf{blkd}_{\small e}("  xs "," y ")"
-%format freevars (e) = "\freevars{" e "}"
+%format choicefreec (y) = "\mathsf{choicefree}_{\small c}(" y ")"
+%format choicefreee (y) = "\mathsf{choicefree}_{\small e}(" y ")"
+%format skolval (xs) v = "\mathsf{skol}(" xs "," v ")"
+%format freevars (e) = "\mathsf{fvs}(" e ")"
+%format boundvars (e) = "\mathsf{bvs}(" e ")"
 %format `delete` = "\setminus"
 
 %format match (e) (b) = e "\blacktriangleright" b
@@ -171,6 +191,9 @@
 %format colonequals = "\colonequals"
 %format dollar = "\$"
 %format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\," b
+
+%format blam (x) (fx) (e) = "\lambda_{" fx "}" x".\," e
+
 
 %% Sequences e1; ...; en; v
 %format se = "es"
@@ -315,6 +338,7 @@
 %format nat = "\textbf{nat}"
 %format abs = "\textbf{abs}"
 %format isInt = "\textbf{isInt}"
+%format isFun = "\textbf{isFun}"
 %format string = "\textbf{string}"
 
 %% -------Functions ---------------
@@ -343,6 +367,7 @@
 %format alloc = "\textbf{alloc}"
 %format read = "\textbf{read}"
 %format write = "\textbf{write}"
+%format print = "\textbf{print}"
 %format any = "\textbf{any}"
 %format dots = "\!\ldots\!"
 %format tdots = "\!\!\!\cdots\!\!\!"
@@ -369,6 +394,8 @@
 % format := = "\mapsto"
 %format :@: = ":\!@\!:"
 %format <> = "<\!>"
+%format `alt` = "<\!\!|\!\!>"
+%format eps = "\epsilon"
 %format ^^^ = ";"
 %format ; = ";\,"
 %format csp = ",\,"  %% Comma with space
@@ -385,6 +412,8 @@
 %format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 %format arrayty = "[]"
+%format effs (x) (y) = "\textbf{eff}\;" x "\;\{" y "\}"
+%format beff (x) (y) = "\textbf{eff}" (x) "\{" y "\}"
 
 %format lv = l
 %format cx_0
@@ -398,6 +427,12 @@
 %format x_3
 %format x_i
 %format x_n
+%format x_fx = "x_{" fxs "}"
+
+%format op_fx = "op_{" fxs "}"
+%format fxs = "\overline{\textit{fx}}"
+%format fxs_1 = "\overline{\textit{fx_1}}"
+%format fxs_2 = "\overline{\textit{fx_2}}"
 
 %format h_1
 %format h_2
@@ -490,6 +525,9 @@
 %format eq = "e"
 %format eq_1 = "e_1"
 %format eq_2 = "e_2"
+%format beq = "eq"
+%format beq_1 = "eq_1"
+%format beq_2 = "eq_2"
 
 %format h_1
 %format h_2
@@ -624,6 +662,8 @@
 %format `ss`   = "\mathrel{\subseteq}"
 %format :=     = "\mathrel{\coloneqq}"
 %format `cup`  = "\mathop{\cup}"
+%format `cap`  = "\mathop{\cap}"
+%format `setminus` = "\mathop{\setminus}"
 %format `and`  = "\mathop{\wedge}"
 %format `or`   = "\mathop{\vee}"
 %format stepA       = "\underset{A}\movesto"
@@ -730,6 +770,7 @@
 %format rcheck (r) (b) = rcheckKW "\langle" r "\rangle\{" b "\}"
 %format havocKW = "\mathcal K"
 %format havoc (fx) = "{\mathcal K}\langle{}" fx "\rangle{}"
+%format havoc2 (fx) (body) = "{\mathcal K}\langle{}" fx "\rangle{}\{" body "\}"
 %format someKW = "{\bf some}"
 %format (some (v)) =  "{\bf some}(" v ")"
 

@@ -5,7 +5,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 module Language.Verse.Eval
   ( MonadEval
@@ -1631,8 +1630,8 @@ lookupEnv scopes x env =
     _ -> Nothing
 
 localName :: Access -> Ident -> VarNamed m -> EvalT m a -> EvalT m a
-localName access k v = do
-  local $ \ r -> r { env = HashMap.insert k (accessScope access r.scopes, v) r.env }
+localName access k v = local $ \ r ->
+  r { env = HashMap.insert k (accessScope access r.scopes, v) r.env }
 
 localEnv :: Env m -> EvalT m a -> EvalT m a
 localEnv env = local $ \ r ->
@@ -1641,6 +1640,12 @@ localEnv env = local $ \ r ->
 localNames :: Env m -> EvalT m a -> EvalT m a
 localNames env = local $ \ r ->
   r { env = env <> r.env, archetype = mempty, archetype' = mempty }
+
+localSign :: Val.Sign -> EvalT m a -> EvalT m a
+localSign sign = local $ \ r -> r { sign }
+
+localScopes :: NonEmpty Val.Scope -> EvalT m a -> EvalT m a
+localScopes scopes = local $ \ r -> r { scopes }
 
 getScopes :: EvalT m (NonEmpty Val.Scope)
 getScopes = do
@@ -1660,12 +1665,6 @@ addScopeWithSuper label labels scopes =
 
 moduleFromScopes :: NonEmpty Val.Scope -> Label
 moduleFromScopes (Val.Scope _ _ moduleLabel :| _) = moduleLabel
-
-localScopes :: NonEmpty Val.Scope -> EvalT m a -> EvalT m a
-localScopes scopes = local $ \ r -> r { scopes }
-
-localSign :: Val.Sign -> EvalT m a -> EvalT m a
-localSign sign = local $ \ r -> r { sign }
 
 pushModuleScope :: Label -> EvalT m a -> EvalT m a
 pushModuleScope i = local $ \ r -> r { scopes = Val.Scope i [] i <| r.scopes }
