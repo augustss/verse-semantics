@@ -308,14 +308,14 @@ splitRules env lhs =
       guard (isPrimOp1 op)
       pure (a, caseSplit (r:rs) a as ctx (Arr []))
    ++
+   -- Verify(rs ; as){ P[r[s]] } ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
    "SPLIT-APP" `nameWith`
    do Verify rs as e <- [lhs]
-      (ctx, bs, a@(Var r :@: arg)) <- proofX [] e
+      (ctx, bs, a@(Var r :@: s)) <- proofX [] e
+      let r' = uvIdentNotIn (rs ++ free e ++ bndIds bs ++ boundVars env)
       guard (isUni rs bs (Var r))
-      guard (isUni rs bs arg)
-      pure (a, caseSplit (r:rs) a as ctx (Arr []))
-      FIXME -- pure (a, Verify rs (Assume a : as) (ctx e)
-
+      guard (isUni rs bs s)
+      pure (a, Verify (r':rs) (Assume (Var r' :=: a) : as) (ctx (Var r')))
 
 
 caseSplit :: [Ident] -> Expr -> [Expr] -> (Expr -> Expr) -> Expr -> Expr
