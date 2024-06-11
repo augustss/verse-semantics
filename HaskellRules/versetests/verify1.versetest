@@ -1,1 +1,1 @@
-verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
+verify(pass) { f(g(z:int):int) := {g(3)} }

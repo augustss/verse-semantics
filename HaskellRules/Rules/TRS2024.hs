@@ -297,10 +297,8 @@ rulesPrimOps _ lhs =
      pure (Int k1)
  ++
   "APP-GT-FAIL" `name`
-  do Op Gt :@: a <- [lhs]
-     guard (case a of
-              Arr [Int k1, Int k2] -> not (k1 > k2)
-              _                    -> True)
+  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
+     guard (k1 <= k2)
      pure Fail
  ++
   "APP-ISINT" `name`

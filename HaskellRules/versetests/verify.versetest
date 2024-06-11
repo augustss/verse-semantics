@@ -62,27 +62,27 @@ verify(pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
 verify(pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
 verify(fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
 verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
-###
-### # stuck tests
-### verify(fail) { ex_stuck1(x:any) := { y:any; y } }
-### verify(fail) { ex_stuck2(x:any) := { y:any; z:any; y = (x, (x, y)); y } }
-### verify(fail) { ex_stuck3(x:any) := { y:any; if (y = 3) then { y = 3 } else { y = 4 } } }
-### verify(pass) { f(x:int) := {y:any; if (x > 1) then { y = 1 } else { y = 2 }; y} }
-### verify(fail) { f(x:int) := {y:any; if (y > 1) then { y = 1 } else { y = 2 }; y} }
-###
-### # shows that Unfold-If is UNSOUND; instead use `Fork-If`
-### verify(fail) { foo(n:any):int := if (int[n]) then { 0 } else { (1,2) } }
-### verify(fail) { foo(n:any):int := if (int[n]) then { n } else { (1,2) } }
-### verify(fail) { foo(n:any):int := if (0 < n) then { n } else { n } }
-### verify(fail) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { n } }
-### verify(fail) { sum(n:any):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
-###
+
+# stuck tests
+verify(fail) { ex_stuck1(x:any) := { y:any; y } }
+verify(fail) { ex_stuck2(x:any) := { y:any; z:any; y = (x, (x, y)); y } }
+verify(fail) { ex_stuck3(x:any) := { y:any; if (y = 3) then { y = 3 } else { y = 4 } } }
+verify(pass) { f(x:int) := {y:any; if (x > 1) then { y = 1 } else { y = 2 }; y} }
+verify(fail) { f(x:int) := {y:any; if (y > 1) then { y = 1 } else { y = 2 }; y} }
+
+# shows that Unfold-If is UNSOUND; instead use `Fork-If`
+verify(fail) { foo(n:any):int := if (int[n]) then { 0 } else { (1,2) } }
+verify(fail) { foo(n:any):int := if (int[n]) then { n } else { (1,2) } }
+verify(fail) { foo(n:any):int := if (0 < n) then { n } else { n } }
+### TODO:RECURSION verify(fail) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { n } }
+### TODO:RECURSION verify(fail) { sum(n:any):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
+
 ### # higher-order functions
-### verify(pass) { f(g(z:int):int) := {g(3)} }
-### verify(fail) { f(g(z:int):int) := {g(())} }
-### verify(pass) { f(g(z:int):int):int := {g(3)} }
-### verify(fail) { f(g(z:int):int):int := {g(())} }
-###
+### TODO: HOF verify(pass) { f(g(z:int):int) := {g(3)} }
+verify(fail) { f(g(z:int):int) := {g(())} }
+### TODO: HOF verify(pass) { f(g(z:int):int):int := {g(3)} }
+verify(fail) { f(g(z:int):int):int := {g(())} }
+
 ### verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 ### verify(fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 ### verify(pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
@@ -90,9 +90,9 @@ verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
 ### verify(fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
 ###
 ### # flex/rigid tests
-### verify(pass) { ex_rigid2flex(x:int) := {y := x; y} }
-### verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
-### verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
+verify(pass) { ex_rigid2flex(x:int) := {y := x; y} }
+verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
+verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
 ###
 ### # decides
 ### verify(pass) { three(x:any)<decides> := { x = 3 } }
@@ -125,11 +125,11 @@ verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
 ###
 ### # if-then-else (negations)
 ###
-### verify(pass) { f(:any) := { 2 = if (1) then {2} else {99} } }
-### verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
+verify(pass) { f(:any) := { 2 = if (1) then {2} else {99} } }
+verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
 ###
 ### # if-then-else (binders)
-### verify(pass) { f(:any) := { if (x:=1) then {x} else {2} } }
+### TODO:IFBINDER verify(pass) { f(:any) := { if (x:=1) then {x} else {2} } }
 ###
 ### # koen's hof examples
 ### verify(pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int

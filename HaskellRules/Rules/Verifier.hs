@@ -263,50 +263,58 @@ isUni _  _  _        = False
 
 splitRules :: Rule Expr
 splitRules env lhs =
-   "SPLIT-K" `name`
+   "SPLIT-K" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Int _)) <- proofX [] e
       guard (isUni rs bs (Var r))
-      pure $ caseSplit rs a as ctx (Arr [])
+      pure (a, caseSplit rs a as ctx (Arr []))
    ++
-   "SPLIT-C" `name`
+   "SPLIT-C" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Char _)) <- proofX [] e
       guard (isUni rs bs (Var r))
-      pure $ caseSplit rs a as ctx (Arr [])
+      pure (a, caseSplit rs a as ctx (Arr []))
    ++
-   "SPLIT-VAR" `name`
+   "SPLIT-VAR" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Var r')) <- proofX [] e
       guard (isUni rs bs (Var r))
       guard (isUni rs bs (Var r'))
-      pure $ caseSplit rs a as ctx (Arr [])
+      pure (a, caseSplit rs a as ctx (Arr []))
    ++
-   "SPLIT-TUP" `name`
+   "SPLIT-TUP" `nameWith`
    do Verify rs as e <- [lhs]
-      (ctx, bs, Var r :=: Arr vs) <- proofX [] e
+      (ctx, bs, aa@(Var r :=: Arr vs)) <- proofX [] e
       -- guard (not (null vs))
       guard (isUni rs bs (Var r))
       let xs   = rs ++ free e ++ bndIds bs ++ boundVars env
       let rs'  = take (length vs) (uvIdentsNotIn xs)
       let rvs' = foldr (:>:) (Arr []) [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
       let a    = Var r :=: Arr (Var <$> rs')
-      pure     $ caseSplit (rs ++ rs') a as ctx rvs'
+      pure     (aa, caseSplit (rs ++ rs') a as ctx rvs')
    ++
-   "SPLIT-PPRED" `name`
+   "SPLIT-PPRED" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(op :@: arg)) <- proofX [] e
       guard (isUni rs bs arg)
       guard (isPrim1 op)
-      pure $ caseSplit rs a as ctx (Arr [])
+      pure (a, caseSplit rs a as ctx (Arr []))
    ++
-   "SPLIT-OP" `name`
+   "SPLIT-OP" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: (op :@: arg))) <- proofX [] e
       guard (isUni rs bs (Var r))
       guard (isUni rs bs arg)
       guard (isPrimOp1 op)
-      pure $ caseSplit (r:rs) a as ctx (Arr [])
+      pure (a, caseSplit (r:rs) a as ctx (Arr []))
+   ++
+   "SPLIT-APP" `nameWith`
+   do Verify rs as e <- [lhs]
+      (ctx, bs, a@(Var r :@: arg)) <- proofX [] e
+      guard (isUni rs bs (Var r))
+      guard (isUni rs bs arg)
+      pure (a, caseSplit (r:rs) a as ctx (Arr []))
+      FIXME -- pure (a, Verify rs (Assume a : as) (ctx e)
 
 
 
