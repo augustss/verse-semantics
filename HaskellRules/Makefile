@@ -36,7 +36,7 @@ testiblock:
 
 testverify:
 	$(TESTER) --quiet         --prelude=verifyprelude --rules=$(VRULES) --max-norm-steps=100000 $(VERIFY)
-	cabal run trsverifier
+# cabal run trsverifier
 
 traceverify:
 	$(TESTER) --quiet --prelude=verifyprelude --rules=$(VRULES) --trace --max-norm-steps=100000 $(TRACEVERIFY)

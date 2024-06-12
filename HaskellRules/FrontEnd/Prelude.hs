@@ -70,7 +70,7 @@ verifyprelude = ("verifyprelude", "\
 \# XXX What should the definition of Err() be?\n\
 \array{\n\
 \false        := array{};\n\
-\any          := lowered{ lambda(_x){                                                        assume { _x }}};\n\
+\any          := lowered{ lambda(_x){                                                                 _x  }};\n\
 \int          := lowered{ lambda(_x){                isInt$[_x];                                      _x  }};\n\
 \char         := lowered{ lambda(_x){                isChr$[_x];                                      _x  }};\n\
 \nat          := lowered{ lambda(_x){                isInt$[_x];             intGE$[_x,0];            _x  }};\n\

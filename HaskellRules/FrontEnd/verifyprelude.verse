@@ -7,7 +7,7 @@
 # XXX What should the definition of Err() be?
 array{
 false        := array{};
-any          := lowered{ lambda(_x){                                                        assume { _x }}};
+any          := lowered{ lambda(_x){                                                                 _x  }};
 int          := lowered{ lambda(_x){                isInt$[_x];                                      _x  }};
 char         := lowered{ lambda(_x){                isChr$[_x];                                      _x  }};
 nat          := lowered{ lambda(_x){                isInt$[_x];             intGE$[_x,0];            _x  }};

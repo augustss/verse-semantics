@@ -1,1 +1,1 @@
-verify(pass) { f(g(z:int):int) := {g(3)} }
+verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }

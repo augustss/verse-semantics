@@ -78,12 +78,12 @@ verify(fail) { foo(n:any):int := if (0 < n) then { n } else { n } }
 ### TODO:RECURSION verify(fail) { sum(n:any):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
 
 ### # higher-order functions
-### TODO: HOF verify(pass) { f(g(z:int):int) := {g(3)} }
+verify(pass) { f(g(z:int):int) := {g(3)} }
 verify(fail) { f(g(z:int):int) := {g(())} }
-### TODO: HOF verify(pass) { f(g(z:int):int):int := {g(3)} }
+verify(pass) { f(g(z:int):int):int := {g(3)} }
 verify(fail) { f(g(z:int):int):int := {g(())} }
 
-### verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+### TODO:HEREHEREHEREHERE verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 ### verify(fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 ### verify(pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 ### verify(fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; ex6(suc) }

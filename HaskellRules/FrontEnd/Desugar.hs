@@ -1997,8 +1997,8 @@ dsM_10 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
   = do i   <- newIdent (getLoc t1) "i"
        j   <- newIdent (getLoc t1) "j"
        dom <- DefineE j <$> dsM_10 MV t1 (P i)
-       rng <- seqDE [ dsK_10 (getLoc t1) _fx, dsB_10 MI t2 pi j]
-       pure $ Lam i (dom `eGuard` rng)
+       rng <- seqDE [ dsK_10 (getLoc t1) _fx, {- BUG -} dsB_10 MI t2 pi j]
+       pure $ {- TODO: ISFUN -} Lam i (dom `eGuard` rng)
 
 dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
   = do i   <- newIdent (getLoc t1) "i"
@@ -2035,22 +2035,27 @@ dsM_10 MX (OfType t1 t2) pi                   -- MOFTYPEX
              , pure (ApplyD (Variable z) (Variable y))
              ]
 
-dsM_10 MI (Range t) E                       -- MTYPE1
+-- dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make M[:int](i) = int(i) instead of exi z. z = int; z(i)
+--   = pure (ApplyD (Variable z) (Variable i))
+
+dsM_10 MI (Range t) (P i)                   -- MTYPE1
   = do z <- newIdent (getLoc t) "z"
        seqDE [ DefineE z <$> dsDD_10 MI t
-             , pure (eSome (Variable z)) ]
+             , pure (Variable i `eGuard` eSome (Variable z))
+             ]
 
-dsM_10 s (Range t) E                       -- MTYPE2
-  = do i <- newIdent (getLoc t) "i"
-       existsV [i] <$> dsM_10 s (Range t) (P i)
-
-dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make M[:int](i) = int(i) instead of exi z. z = int; z(i)
-  = pure (ApplyD (Variable z) (Variable i))
-
-dsM_10 s (Range t) (P i)                   -- MTYPE3
+dsM_10 s (Range t) (P i)                   -- MTYPE2
   = do z <- newIdent (getLoc t) "z"
        seqDE [ DefineE z <$> dsDD_10 s t
              , pure (ApplyD (Variable z) (Variable i)) ]
+
+dsM_10 s (Range t) E                       -- MTYPE3
+  = do x <- newIdent (getLoc t) "x"
+       z <- newIdent (getLoc t) "z"
+       existsV [x] <$> seqDE
+          [ DefineE z <$> dsDD_10 s t
+          , pure (ApplyD (Variable z) (Variable x)) ]
+
 
 dsM_10 s (DefineIE x y t) E                -- MSQUIGE
   = do i <- newIdent (getLoc t) "i"
