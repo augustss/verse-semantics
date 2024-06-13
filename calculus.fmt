@@ -782,3 +782,6 @@
 %format must r b = mustKW "\langle" r "\rangle\{" b "\}"
 %format mustsuc b = mustKW "\langle" succeedKW "\rangle\{" b "\}"
 %format mustdec b = mustKW "\langle" decideKW "\rangle\{" b "\}"
+
+%% <fx> brackets
+%format (fxb (fx)) = "\langle" fx "\rangle"

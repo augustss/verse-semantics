@@ -153,6 +153,7 @@ $$
 \rulename{dswild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
 \rulename{dswild2} &  |(: t_1) := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
 \rulename{dscolonb} &  |(p : t_1) := t_2| & \rightarrow & |p := oftype t_2 t_1| \\
+\rulename{dsfx} &  |p (fxb fx) := t| & \rightarrow & |p := check fx t| \\
 \rulename{dspapp} &   |p a := t| & \rightarrow & |p := function a t| \\
   %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
 \rulename{dspfun1} &  |(squig p_1 p_2) := t| & \rightarrow
