@@ -604,9 +604,10 @@ $$
   & = & |z := De2 mdneg t_2; freevars t_1 guard (some z)| \\
 \rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|
   & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
-\rulename{mcheck+}  & |DMe2 md si (check fx t)|    & = & |check fx (DMe2 md si t)| & |md|\in\{|mdpos|,|mdx|\}\\
+\rulename{mcheck+}  & |DMe2 mdpos si (check fx t)|    & = & \multicolumn{2}{@@{}l}{|verify2 () () (check fx (DMe2 mdpos si t)); DMe2 mdneg si (check fx t)|} \\
 \rulename{mcheck-}  & |DMe2 mdneg si (check fx t)|    & = & |havoc fx; (DMe2 mdneg si t)| \\
 
+\rulename{mcheckx}  & |DMe2 mdx si (check fx t)|    & = & |check fx (DMe2 mdx si t)| \\
 \rulename{mtype1}   & |DMe2 mdneg (sipat i) (:t)|    & = & |z:=De2 mdneg t; i guard (some z)| \\
 \rulename{mtype2}   & |DMe2 md (sipat i) (:t)|    & = & |z:=De2 md t; apply1N z i| & |md|\in\{|mdpos|,|mdx|\}\\
 \rulename{mtype3}   & |DMe2 md sibody (:t)| & = & |def x (z:=De2 md t; apply1N z x)| \\
@@ -627,9 +628,7 @@ $$
 \multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
 \rulename{mbind}   & |DMe2 md si (x:=t)|         & = & |x := DMe2 md si t| \\
 \rulename{meq}     & |DMe2 md si (t_1=t_2)|      & = & |(DMe2 md si t_1) = (DMe2 md si t_2)| \\
-\rulename{msemi}   & |DMe2 md si (t_1 ; t_2)|    & = & |De2 mdpos t_1 ; DMe2 md si t_2|
-   & |md|\in\{|mdpos|,|mdneg|\} \\
-\rulename{msemix}   & |DMe2 mdx si (t_1 ; t_2)|    & = & |De2 mdx t_1 ; DMe2 mdx si t_2| \\
+\rulename{msemi}   & |DMe2 md si (t_1 ; t_2)|    & = & |De2 md t_1 ; DMe2 md si t_2| \\
 \rulename{mchoice} & |DMe2 md si (t_1 `choice` t_2)| & = & |(DMe2 md si t_1) `choice` (DMe2 md si t_2)| \\
 
 \multicolumn{4}{l}{\mbox{\it Equality rules}} \\
