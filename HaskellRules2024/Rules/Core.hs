@@ -130,6 +130,7 @@ subst sub (Exi bnd)    = Exi (substBind Var subst sub bnd)
 subst sub (Verify bnd) = error "subst Verify undefined"
 subst sub e            = e
 
+{-
 match :: (Expr -> [(String,Expr]) -> Expr -> [(String,Expr)]
 match step e = step e ++ recurse e
  where
@@ -151,7 +152,8 @@ match step e = step e ++ recurse e
   recurse (Check fx e) = Check fx (alpha k e)
   alpha k e@(Exi _)    = alphaExi k [] e
   recurse (Verify bnd) = error "alpha Verify undefined"
-  
+-}
+
 
 
 
