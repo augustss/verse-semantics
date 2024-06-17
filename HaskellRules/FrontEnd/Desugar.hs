@@ -40,18 +40,25 @@ import Prelude hiding (pi)
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
-            (-- simplification
+            (-- Simplification [drop this for now]
              traceDS "simpler"    <=< simpler   <=<  -- verifier breaks without this
              traceDS "simplify"   <=< simplify  <=<
-             -- desugaring
-             traceDS "primops"    <=< primops   <=<
-             traceDS "lower"      <=< lower     <=<
-             traceDS "addScope"   <=< addScope  <=<
-             traceDS "lowerApply" <=< lowerApply<=<
-             traceDS "dsD"        <=< dsDx      <=<
-             traceDS "addDeref"   <=< addDeref  <=<
-             traceDS "dsSmall"    <=< dsSmall   <=<
-             traceDS "addPrelude" <=< addPrelude <=<
+
+             -- Desugaring
+             traceDS "primops"    <=< primops   <=<    -- Var (Ident "op") --> EPrim op
+             traceDS "lower"      <=< lower     <=<    -- Lowers all/one/for/if into split or whatever
+             traceDS "addScope"   <=< addScope  <=<    -- x:e -->  exists x. ....(x=e)....
+                                                       --   if --> If3B,  for --> For2B
+             traceDS "lowerApply" <=< lowerApply<=<    -- Round vs square
+
+             traceDS "dsD"        <=< dsDx      <=<    -- Heavy lifting: Fig 9
+
+             traceDS "addDeref"   <=< addDeref  <=<    -- Side effects
+             traceDS "dsSmall"    <=< dsSmall   <=<    -- Main desugaring into Small Source
+
+             traceDS "addPrelude" <=< addPrelude <=<   -- Prepends prelude from
+                                                       --    verifyprelude.verse, mediumprelude.verse
+
              traceDS "syntaxFixes" <=< syntaxFixes)
   where
 {-
@@ -161,6 +168,7 @@ syntaxFixes = pure . f
 ---------------------
 
 eval :: Flags -> D Expr -> Expr
+-- Runs the D monad
 eval flgs = flip evalState DState{ nextNo = 1, dflags = flgs }
 
 -- Desugar into Small Source Verse
@@ -169,9 +177,12 @@ dsSmall = ds
   where
     ds :: Expr -> D Expr
     -- Application and unification
+
+    -- (e1 where e2)  -->   ( x ::= e1; e2; x)
     ds (InfixOp e1 (Op "where") e2) = do
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
+
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
 
@@ -180,12 +191,14 @@ dsSmall = ds
     ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
     ds (Macro1 (Ident _ "in'='") [] (Blk es)) = dsU =<< mapM ds es
 -}
+    -- (e1 = e2)  --->   
     ds (InfixOp e1 (Op "=") e2) = Unify <$> ds e1 <*> ds e2
 
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
 
     -- Bindings
     ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)  -- PCOLONT
+
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Function notation
@@ -321,6 +334,8 @@ apply2 :: (Value -> Value -> Expr) -> Value -> Value -> D Expr
 apply2 con x1 x2 = pure $ con x1 x2
 
 defn :: Expr -> Expr -> D Expr
+-- Desugars (p := e) into an expression; see Fig 3, top group
+
 -- Rule: (i := e) -->  (i := e)
 defn (Variable (Ident _ "_")) e = do
   x <- newIdent (getLoc e) "u"
