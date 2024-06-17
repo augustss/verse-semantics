@@ -11,7 +11,7 @@ module TRS.Bind
   , bind
   , unsafeUnbind
   , alphaRenameWith
-  , Binds(..)
+  , BindList(..)
   , Subst
   , substBind
   , substBinds
@@ -104,10 +104,10 @@ alphaRenameWith ren forb (Bind x t)
 
 -- a list of binders
 
-data Binds t = Body t | Binder (Bind (Binds t))
+data BindList t = Body t | Binder (Bind (BindList t))
  deriving ( Eq, Ord, Show )
 
-instance Variables t => Variables (Binds t) where
+instance Variables t => Variables (BindList t) where
   variables f (Body t)     = variables f t
   variables f (Binder bnd) = variables f bnd
 
@@ -128,7 +128,7 @@ substBind var subst sub a@(Bind x t)
   x'   = identNotIn zs
 
 substBinds :: (Variables s, Variables t)
-           => (Ident -> s) -> (Subst s -> t -> t) -> (Subst s -> Binds t -> Binds t)
+           => (Ident -> s) -> (Subst s -> t -> t) -> (Subst s -> BindList t -> BindList t)
 substBinds var subst sub (Body t)     = Body (subst sub t)
 substBinds var subst sub (Binder bnd) = Binder (substBind var (substBinds var subst) sub bnd)
 

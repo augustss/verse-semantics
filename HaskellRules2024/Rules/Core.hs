@@ -26,12 +26,12 @@ data Expr
   
   -- verifier
   | Some Expr
-  | Expr :>>: Expr   -- guard           |>   <-- black triangle
+  | Val :>>: Expr    -- guard           |>   <-- black triangle
   | Check Effect Expr
-  | Verify (Binds ([Assump],Expr))
+  | Verify (BindList ([Assump],Expr))
 
   -- only for contexts
-  | Hole
+  | HOLE
  deriving ( Eq, Show )
 
 data Op = Add | Sub | Gt | IsInt
@@ -44,7 +44,6 @@ data Assump
 data Effect
   = Fail_Effect
   | Succeeds
-  | Iterates
   | Decides
  deriving ( Eq, Show )
 
@@ -55,7 +54,7 @@ instance Variables Assump where
   variables f NOTHING_HERE_YET = []
 
 instance Variables Expr where
-  variables f (Var x) = [x]
+  variables f (Var x)      = [x]
   variables f (Arr es)     = variables f es
   variables f (Lam bnd)    = variables f bnd
   variables f (e1 :=: e2)  = variables f (e1,e2)
@@ -77,6 +76,9 @@ isSkolem _              = False
 
 unbindAs :: Ident -> Bind Expr -> Expr
 unbindAs x bnd = subst [(y,Var x)] e where (y,e) = unsafeUnbind bnd
+
+alphaRename :: [Ident] -> Bind Expr -> (Ident,Expr)
+alphaRename = alphaRenameWith (\x y -> subst [(x,Var y)])
 
 -- sorts binders and renames variables
 norm :: Expr -> Expr
@@ -130,30 +132,37 @@ subst sub (Exi bnd)    = Exi (substBind Var subst sub bnd)
 subst sub (Verify bnd) = error "subst Verify undefined"
 subst sub e            = e
 
-{-
-match :: (Expr -> [(String,Expr]) -> Expr -> [(String,Expr)]
+match :: (Expr -> [(String,Expr)]) -> Expr -> [(String,Expr)]
 match step e = step e ++ recurse e
  where
-  recurse (Arr es)     = [ (s, Arr (take i es ++ e' ++ drop (i+1) es))
+  recurse (Arr es)     = [ (s, Arr (take i es ++ [e'] ++ drop (i+1) es))
                          | i <- [0..length es-1]
                          , (s,e') <- match step (es!!i)
                          ]
-  recurse (Lam bnd)    = [] -- [ (s, Lam (bind x e')) | (s,e') <- match step e ]
-  recurse (e1 :=: e2)  = [ (s, e1' :=: e2) | e1' <- match step e ]
-                      ++ [ (s, e1' :=: e2) | e1' <- match step e ]
-  recurse (e1 :>: e2)  = [ (s, e1' :>: e2) | e1' <- match step e ]
-                      ++ [ (s, e1' :>: e2) | e1' <- match step e ]
-  recurse (e1 :|: e2)  = alpha k e1 :|: alpha k e2
-  recurse (e1 :@: e2)  = alpha k e1 :@: alpha k e2
-  recurse (One e)      = One (alpha k e)
-  recurse (All e)      = All (alpha k e)
-  recurse (Some e)     = Some (alpha k e)
-  recurse (e1 :>>: e2) = alpha k e1 :>>: alpha k e2
-  recurse (Check fx e) = Check fx (alpha k e)
-  alpha k e@(Exi _)    = alphaExi k [] e
-  recurse (Verify bnd) = error "alpha Verify undefined"
--}
+  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- match step e ]
+                       where (x,e) = unsafeUnbind bnd
+  recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- match step e1 ]
+                      ++ [ (s, e1  :=: e2') | (s,e2') <- match step e2 ]
+  recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- match step e1 ]
+                      ++ [ (s, e1  :>: e2') | (s,e2') <- match step e2 ]
+  recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- match step e1 ]
+                      ++ [ (s, e1  :|: e2') | (s,e2') <- match step e2 ]
+  recurse (e1 :@: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- match step e1 ]
+                      ++ [ (s, e1  :>: e2') | (s,e2') <- match step e2 ]
+  recurse (One e)      = [ (s, One e') | (s,e') <- match step e ]
+  recurse (All e)      = [ (s, One e') | (s,e') <- match step e ]
+  recurse (Some e)     = [ (s, One e') | (s,e') <- match step e ]
+  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- match step e1 ]
+                      ++ [ (s, e1  :>>: e2') | (s,e2') <- match step e2 ]
+  recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- match step e ]
+  recurse e@(Exi _)    = [ (s, exis body') | (s,body') <- match step body ]
+                       where (exis,body) = unExi e
+  recurse (Verify bnd) = error "match Verify undefined"
+  recurse e            = []
 
-
-
+  unExi (Exi bnd) = (Exi . bind x . exis, body)
+   where
+    (x,e)       = unsafeUnbind bnd
+    (exis,body) = unExi e
+  unExi e         = (id, e)
 
