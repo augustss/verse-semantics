@@ -10,7 +10,7 @@ data Expr
   -- values
   = Var Ident
   | Int Integer
-  | Arr [Expr]
+  | Arr [Val]
   | Lam (Bind Expr)
   | Op Op
   
@@ -18,7 +18,7 @@ data Expr
   | Expr :=: Expr    -- unification      =
   | Expr :>: Expr    -- seq. composition ;
   | Expr :|: Expr    -- choice           |
-  | Expr :@: Expr    -- application      v1[v2]
+  | Val  :@: Val     -- application      v1[v2]
   | Exi (Bind Expr)
   | Fail
 
@@ -28,7 +28,7 @@ data Expr
   -- | Split Expr  -- maybe later
   
   -- verifier
-  | Some Expr
+  | Some Val
   | Val :>>: Expr    -- guard           |>   <-- black triangle
   | Check Effect Expr
   | Verify (BindList ([Assump],Expr))
@@ -51,18 +51,71 @@ data Effect
  deriving ( Eq, Show )
 
 --------------------------------------------------------------------------------
--- other uses of expressions
+-- values
 
-type Context = Expr
 type Val     = Expr
 
 isVal :: Expr -> Bool
 isVal (Var x)   = True
 isVal (Int k)   = True
 isVal (Arr es)  = all isVal es
-isVal (Lam bnd) = True
+isVal (Lam bnd) = valid e where (_,e) = unsafeUnbind bnd
 isVal (Op op)   = True
 isVal _         = False
+
+--------------------------------------------------------------------------------
+-- valid expressions
+
+-- checks if an expression is syntactically valid
+valid :: Expr -> Bool
+valid ((a :=: e1) :>: e2) = isVal a && valid e1 && valid e2
+valid (e1 :|: e2)         = valid e1 && valid e2
+valid (a1 :@: a2)         = isVal a1 && isVal a2
+valid (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
+valid Fail                = True
+valid (One e)             = valid e
+valid (All e)             = valid e
+valid (Some a)            = isVal a
+valid (a :>>: e)          = isVal a && valid e
+valid (Check fx e)        = valid e
+valid (Verify bnds)       = error "check Verify undefined"
+valid e                   = isVal e
+
+-- valid (prep e) == True
+prep :: Expr -> Expr
+prep (Var x)       = Var x
+prep (Int k)       = Int k
+prep (Arr as)      = prepVals as (\vs -> Arr vs)
+prep (Lam bnd)     = Lam (bind x (prep e)) where (x,e) = unsafeUnbind bnd
+prep (Op op)       = Op op
+prep (e1 :>: e2)   = prepSeq e1 (prep e2)
+prep (a  :=: e)    = prepVal a (\v -> (v :=: prep e) :>: v)
+prep (e1 :|: e2)   = prep e1 :|: prep e2
+prep (a1 :@: a2)   = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
+prep (Exi bnd)     = Exi (bind x (prep e)) where (x,e) = unsafeUnbind bnd
+prep Fail          = Fail
+prep (One e)       = One (prep e)
+prep (All e)       = All (prep e)
+prep (Some a)      = prepVal a (\v -> Some v)
+prep (a :>>: e)    = prepVal a (\v -> v :>>: e)
+prep (Check fx e)  = Check fx (prep e)
+prep (Verify bnds) = error "prep Verify undefined"
+
+prepSeq :: Expr -> Expr -> Expr
+prepSeq (a :=: e1) e2 = prepVal a (\v -> (v :=: prep e1) :>: e2)
+prepSeq e1         e2 = prepVal e1 (\_ -> e2)
+
+prepVal :: Expr -> (Val -> Expr) -> Expr
+prepVal a f
+  | isVal pa  = f pa
+  | otherwise = Exi (bind x ((Var x :=: pa) :>: f (Var x)))
+ where
+  pa = prep a
+  x  = identNotIn (free (pa, f (Var (ident "?"))))
+
+prepVals :: [Expr] -> ([Val] -> Expr) -> Expr
+prepVals []     f = f []
+prepVals (a:as) f = prepVal a (\v -> prepVals as (f . (v:)))
 
 --------------------------------------------------------------------------------
 -- variables
@@ -92,7 +145,7 @@ isSkolem (Name ('$':_)) = True
 isSkolem _              = False
 
 --------------------------------------------------------------------------------
--- bindings
+-- binders
 
 unbindAs :: Ident -> Bind Expr -> Expr
 unbindAs x bnd = subst [(y,Var x)] e where (y,e) = unsafeUnbind bnd
@@ -136,6 +189,9 @@ norm e = alpha 0 e
     exis []     e = e
     exis (y:ys) e = Exi (bind y (exis ys e))
 
+--------------------------------------------------------------------------------
+-- substitution
+
 subst :: Subst Expr -> Expr -> Expr
 subst sub (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
 subst sub (Arr es)     = Arr (map (subst sub) es)
@@ -153,40 +209,47 @@ subst sub (Exi bnd)    = Exi (substBind Var subst sub bnd)
 subst sub (Verify bnd) = error "subst Verify undefined"
 subst sub e            = e
 
-match :: (Expr -> [(String,Expr)]) -> Expr -> [(String,Expr)]
-match step e = step e ++ recurse e
+--------------------------------------------------------------------------------
+-- rewriting
+
+type Rule = Expr -> [(String,Expr)]
+
+-- apply a rule everywhere (recursively) in the expression
+everywhere :: Rule -> Rule
+everywhere step e = step e ++ recurse e
  where
   recurse (Arr es)     = [ (s, Arr (take i es ++ [e'] ++ drop (i+1) es))
                          | i <- [0..length es-1]
-                         , (s,e') <- match step (es!!i)
+                         , (s,e') <- everywhere step (es!!i)
                          ]
-  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- match step e ]
+  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step e ]
                        where (x,e) = unsafeUnbind bnd
-  recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- match step e1 ]
-                      ++ [ (s, e1  :=: e2') | (s,e2') <- match step e2 ]
-  recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- match step e1 ]
-                      ++ [ (s, e1  :>: e2') | (s,e2') <- match step e2 ]
-  recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- match step e1 ]
-                      ++ [ (s, e1  :|: e2') | (s,e2') <- match step e2 ]
-  recurse (e1 :@: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- match step e1 ]
-                      ++ [ (s, e1  :>: e2') | (s,e2') <- match step e2 ]
-  recurse (One e)      = [ (s, One e')  | (s,e') <- match step e ]
-  recurse (All e)      = [ (s, All e')  | (s,e') <- match step e ]
-  recurse (Some e)     = [ (s, Some e') | (s,e') <- match step e ]
-  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- match step e1 ]
-                      ++ [ (s, e1  :>>: e2') | (s,e2') <- match step e2 ]
-  recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- match step e ]
-  recurse e@(Exi _)    = [ (s, exis body') | (s,body') <- match step body ]
-                       where (exis,body) = unExi e
-  recurse (Verify bnd) = error "match Verify undefined"
+  recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- everywhere step e1 ]
+                      ++ [ (s, e1  :=: e2') | (s,e2') <- everywhere step e2 ]
+  recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step e1 ]
+                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step e2 ]
+  recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- everywhere step e1 ]
+                      ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step e2 ]
+  recurse (e1 :@: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step e1 ]
+                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step e2 ]
+  recurse (One e)      = [ (s, One e')  | (s,e') <- everywhere step e ]
+  recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step e ]
+  recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step e ]
+  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step e1 ]
+                      ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step e2 ]
+  recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step e ]
+  recurse e@(Exi _)    = [ (s, exis body') | (s,body') <- everywhere step body ]
+                       where (exis,body) = unExis e
+  recurse (Verify bnd) = error "everywhere Verify undefined"
   recurse e            = []
 
-  -- treat "exi x1 .. exi xn" as one block when matching
-  unExi (Exi bnd) = (Exi . bind x . exis, body)
-   where
-    (x,e)       = unsafeUnbind bnd
-    (exis,body) = unExi e
-  unExi e         = (id, e)
+-- treat "exi x1 .. exi xn" as one block when matching
+unExis :: Expr -> (Expr -> Expr, Expr)
+unExis (Exi bnd) = (Exi . bind x . exis, body)
+ where
+  (x,e)       = unsafeUnbind bnd
+  (exis,body) = unExis e
+unExis e         = (id, e)
 
 -- structural rules matching
 matchExi :: Expr -> [Bind Expr]
@@ -204,6 +267,60 @@ matchEq :: Expr -> [(Expr,Expr)]
 matchEq e =
   [ (lhs, rhs)
   | e1 :=: e2 <- [e]
-  , (lhs,rhs) <- (e1,e2) : [ (Var y, Var x) | (Var x, Var y) <- [(e1,e2)] ]
+  , (lhs,rhs) <- (e1,e2) : [ (Var y, Var x)
+                           | (Var x, Var y) <- [(e1,e2)]
+                           ]
   ]
+
+--------------------------------------------------------------------------------
+-- contexts
+
+type Context = Expr
+
+contexts :: Expr -> [(Context,Expr)]
+contexts e = (HOLE,e) : recurse e
+ where
+  recurse (Arr es)     = [ (Arr (take i es ++ [ctx] ++ drop (i+1) es), h)
+                         | i <- [0..length es-1]
+                         , (ctx,h) <- contexts (es!!i)
+                         ]
+  recurse (Lam bnd)    = [ (Lam (bind x ctx), h) | (ctx,h) <- contexts e ]
+                       where (x,e) = unsafeUnbind bnd
+  recurse (e1 :=: e2)  = [ (ctx :=: e2,  h) | (ctx,h) <- contexts e1 ]
+                      ++ [ (e1  :=: ctx, h) | (ctx,h) <- contexts e2 ]
+  recurse (e1 :>: e2)  = [ (ctx :>: e2,  h) | (ctx,h) <- contexts e1 ]
+                      ++ [ (e1  :>: ctx, h) | (ctx,h) <- contexts e2 ]
+  recurse (e1 :|: e2)  = [ (ctx :|: e2,  h) | (ctx,h) <- contexts e1 ]
+                      ++ [ (e1  :|: ctx, h) | (ctx,h) <- contexts e2 ]
+  recurse (e1 :@: e2)  = [ (ctx :@: e2,  h) | (ctx,h) <- contexts e1 ]
+                      ++ [ (e1  :@: ctx, h) | (ctx,h) <- contexts e2 ]
+  recurse (One e)      = [ (One ctx, h)  | (ctx,h) <- contexts e ]
+  recurse (All e)      = [ (All ctx, h)  | (ctx,h) <- contexts e ]
+  recurse (Some e)     = [ (Some ctx, h) | (ctx,h) <- contexts e ]
+  recurse (e1 :>>: e2) = [ (ctx :>>: e2,  h) | (ctx,h) <- contexts e1 ]
+                      ++ [ (e1  :>>: ctx, h) | (ctx,h) <- contexts e2 ]
+  recurse (Check fx e) = [ (Check fx ctx, h) | (ctx,h) <- contexts e ]
+  recurse e@(Exi _)    = [ (exis ctx, h) | (ctx,h) <- contexts body ]
+                       where (exis,body) = unExis e
+  recurse (Verify bnd) = error "contexts Verify undefined"
+  recurse e            = []
+
+(<@) :: Context -> Expr -> Expr
+Arr as       <@ h = Arr (map (<@ h) as)
+Lam bnd      <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
+(e1 :>: e2)  <@ h = (e1 <@ h) :>: (e2 <@ h)
+(e1 :=: e2)  <@ h = (e1 <@ h) :=: (e2 <@ h)
+(e1 :|: e2)  <@ h = (e1 <@ h) :|: (e2 <@ h)
+(e1 :@: e2)  <@ h = (e1 <@ h) :@: (e2 <@ h)
+Exi bnd      <@ h = Exi (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
+One e        <@ h = One (e <@ h)
+All e        <@ h = All (e <@ h)
+Some e       <@ h = Some (e <@ h)
+(e1 :>>: e2) <@ h = (e1 <@ h) :>>: (e2 <@ h)
+Check fx e   <@ h = Check fx (e <@ h)
+Verify bnds  <@ h = error "context plugging Verify undefined"
+HOLE         <@ h = h
+e            <@ h = e
+
+--------------------------------------------------------------------------------
 
