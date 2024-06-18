@@ -54,12 +54,24 @@ identNotIn = head . identsNotIn
 
 --------------------------------------------------------------------------------
 
+{- Note [Binders, uses, and occurrences]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In (\x. x), the first x is a /binder/
+            the second x is a /use/
+Both are /occurrences/
+-}
+
+-- A type t is an instances of (Variables t) if
+-- t has occurrences of Ident, and/or bindings of Ident
 class Variables a where
-  variables :: (Ident -> [Ident] -> [Ident]) -> a -> [Ident]
+  variables :: (Ident -> [Ident] -> [Ident])  -- What to do at a binder
+            -> a -> [Ident]
 
 free, occurs :: Variables a => a -> [Ident]
-free   = variables (filter . (/=))  -- finds all free variables
-occurs = variables (union . (:[]))  -- finds all variable occurrences
+-- See Note [Binders, uses, and occurrences
+free   = variables (filter . (/=))   -- Finds all free variables
+occurs = variables (union . (: []))  -- Finds all variables,
+                                     -- both binders and uses
 
 instance Variables () where
   variables _ _ = []
@@ -82,25 +94,33 @@ instance Variables Ident where
 
 --------------------------------------------------------------------------------
 
+-- Bind is abstract: data contructor not visible outside this module
 data Bind t = Bind Ident t
  deriving ( Eq, Ord, Show )
 
 bind :: Ident -> t -> Bind t
 bind x t = Bind x t
 
-unsafeUnbind :: Bind t -> (Ident, t)
-unsafeUnbind (Bind x t) = (x,t)
-
 instance Variables t => Variables (Bind t) where
   variables f (Bind x t) = f x (variables f t)
 
-alphaRenameWith :: Variables t => (Ident -> Ident -> t -> t) -> [Ident] -> Bind t -> (Ident, t)
+alphaRenameWith :: Variables t
+                => (Ident -> Ident -> t -> t)  -- Renamer
+                -> [Ident]                     -- Forbidden
+                -> Bind t -> (Ident, t)
+-- Recommended way to walk inside a Bind
+--    (ren x y t) should replace all uses of `x` by `y` in `t`
 alphaRenameWith ren forb (Bind x t)
   | x `notElem` forb = (x, t)
   | otherwise        = (x', ren x x' t)
  where
   zs = forb ++ free t
   x' = identNotIn zs
+
+unsafeUnbind :: Bind t -> (Ident, t)
+-- Non-recommended way to walk inside a Bind
+unsafeUnbind (Bind x t) = (x,t)
+
 
 -- a list of binders
 

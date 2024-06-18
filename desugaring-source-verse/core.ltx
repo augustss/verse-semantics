@@ -148,9 +148,10 @@ $
 $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Structural rules}
-\rulename{exi-swap}          & |def x (def y e)| & = & |def y (def x e)| \\
-\rulename{exi-alpha}          & |def x e| & = & |def y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
-\rulename{lam-alpha}          & |lam x e| & = & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
+\rulename{exi-swap} & |def x (def y e)| & = & |def y (def x e)| \\
+\rulename{var-swap} & |x == y; e| & = & |y == x; e| \\
+\rulename{exi-alpha} & |def x e| & = & |def y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
+\rulename{lam-alpha} & |lam x e| & = & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
 \\[-0.8em]
 
 \rulegroupname{Application}
@@ -171,6 +172,7 @@ $\begin{array}{@@{}l}
        & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n' `eqsemi` e| & n \geq 0\\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+  \rulename{u-swap} & |hnf == x; e| & \movesto & |x == hnf; e| \\
 \\[-0.8em]
 
 \rulegroupname{Existentials}
@@ -179,8 +181,8 @@ $\begin{array}{@@{}l}
 %  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
   & \text{if |validc x emptyset C|, $x \not\in \freevars{v}$}  \\
-\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
-  & \text{if |validc x emptyset C|, $x \not= y$}  \\
+%\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
+%  & \text{if |validc x emptyset C|, $x \not= y$}  \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 \rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
 \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
@@ -251,8 +253,7 @@ $\begin{array}{@@{}l}
 
 
 \multicolumn{5}{l}{\textit{Guard}} \\
-\rulename{guard-elim} & |v guard e| & \movesto & |e| \\
-\rulename{guard-fail} & |fail guard e| & \movesto & |fail| \\
+\rulename{guard-elim} & |v guard e| & \movesto & |e| & \text{if $\skol{|v|}$}\\
 \end{array} \\
 \\[-2mm]
 
@@ -287,7 +288,7 @@ $\begin{array}{@@{}l}
              |(rs, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
              |{ P^[ r_1==v_1; xdots; r_n == v_n; e ] };|
            \end{array}\\
-    &&& |verify2 rs (as, noteq r (tup (_, xdots,_))) (P^[ e ])| \\  \\[-2mm]
+    &&& |verify2 rs (as, noteq r (tup (_, xdots,_))) (P^[ fail ])| \\  \\[-2mm]
 \end{array}\\
 
 \end{array}$

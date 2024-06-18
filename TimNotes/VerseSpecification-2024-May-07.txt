@@ -1,14 +1,14 @@
 ========================================================================================================================
-Verse Language Specification 0.1.1
+Verse Language Specification 0.1.3
 ========================================================================================================================
 
 We define Verse by saying how to parse, verify, and run a program:
 - Verse Source Code is ASCII, UTF8, or UTF32 text accepted by the Verse Grammar's File production below.
-- Verse syntax s accepted by the Verse Grammar is verified and compiled into a Operations op by using
-  sequent calculus inference rules specified in the Syntax Reduction Rules, Verifier Inference Rules,
-  and Verifier Data Flow Inference Rules starting with the goal:
+- Verse syntax accepted by the Verse Grammar is verified and compiled into Operations by using
+  sequent calculus inference rules specified in the Verse Syntax Reduction Rules, Verse Inference Rules,
+  and Verse Data Flow Inference Rules starting with the goal:
   empty |- explore(top_allows,fxv) {scope c {exists i x; syntax(opv,i,x){s}}} where fxv,c,i,x,opv fresh.
-- Verified Operations are run according to the runtime subset (TBD) of the Verifier Inference Rules,
+- Verified Operations are run according to the runtime subset (TBD) of the Verse Inference Rules,
   with the same goal.
 
 ------------------------------------------------------------------------------------------------------------------------
@@ -64,9 +64,9 @@ NewLine   := 0o0D [0o0A] | 0o0A
 Ending    := &(NewLine | end)
 Ind       := Ending push; set Nest=false; set BlockInd=LineInd; set LinePrefix=""
 Ded       := Ending pop
-Line      := NewLine; parse i:={0o09|0o20}; (Ending | !(0o09|0o20) Space
-             if     (i>BlockInd | Nest and i=BlockInd) then set LineInd=i
-             else if(not i<=BlockInd                 ) then error)
+Line      := NewLine; parse ThisInd:={0o09|0o20}; (Ending | !(0o09|0o20) Space
+             if     (ThisInd>BlockInd or Nest and ThisInd=BlockInd) then set LineInd=ThisInd
+             else if(not ThisInd<=BlockInd                        ) then error)
 Scan      := Space {Line}
 ScanKey   := Space (&NewLine Scan ^LinePrefix Space | !NewLine)
 
@@ -78,9 +78,8 @@ Text      := Printable | BlockCmt | "<#>"
 
 Exp       := [('e'|'E') ['+'|'-'] Digits] !(('e'|'E') ('+'|'-'|Digit))
 Units     := [Alpha {Alpha}] !Alpha
-Num       := ("0x" Hex {Hex} | !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !'.' !Alnum
-    TODO: allow dot alnum for extension methods
-    TODO: separate units out
+Num       := !(("0b"|"0o"|"0u"|"0x") Hex) Digits ['.' Digits] Exp Units) !('.' Digits)
+          |  ("0x" Hex {Hex} !('.' Alnum)
 
 Special   := '\'|'{'|'}'|'#'|'<'|'>'|'&'|'~'
 CharEsc   := '\' ('r'|'n'|'t'|'''|'"'|Special)
@@ -125,7 +124,7 @@ Else      := ScanKey "else"  Key (ScanKey If | !(ScanKey If) (KeyBlock | Def))
 
 Invoke    :=          [Specs] (Paren [Specs] (Block | Do  ) | Block [[Specs] Do  ]) (Until | !Until)
 If        := "if" Key [Specs] (Paren         (Block | Then) | Block [        Then]) (Else  | !Else )
-In        := ("in" Key | ':') Space (In | &Choose NotEq [Space Specs])
+In        := ("in" Key | ':') Space (In | NotEq)
 Var       := ("var"|"set"|"ref"|"alias") Key Space Choose
 
 Base      := '(' List ')' | Num | Char | Path | String | Markup | If | !Reserved QualIdent
@@ -157,19 +156,12 @@ Expr      := Fun {Space '@' Space Call} StopExpr
 
 StopExpr  := &(Space (":)" | ')' | ']' | '}' | ';' | ',' | Ending !(ScanKey "is" Key)))
 StopFun   := &(Space ("@")) | StopExpr
-StopDef   := &(Space ("=>" | ("over"|"when"|"while"|"next") Key) | StopFun)
+StopDef   := &(Space ("=>" | ("over"|"when"|"while"|"next"       ) Key) | StopFun)
 
 Commas    := Expr {',' Scan Expr}
 Separator := (';' | Ending) Scan
 List      := push; set LinePrefix=""; Scan [Commas {Separator Commas} (Separator | !Separator)]; pop
 File      := [0oEF 0oBB 0oBF] set Nest=true; set BlockInd=""; set LineInd=""; List end
-
-------------------------------------------------------------------------------------------------------------------------
-Grammar Disambiguation
-------------------------------------------------------------------------------------------------------------------------
-
-If the Specs production is recognizable by both the Postfix and In productions, In prevails.
-TODO: Eliminate this rule be parsing all s<spec> with Call precedence, and handling in desugaring.
 
 ------------------------------------------------------------------------------------------------------------------------
 Verse Grammar Extension to Directories
@@ -178,7 +170,7 @@ Verse Grammar Extension to Directories
 Here we specify how to translate the files in a directory or zip file D into text interpretable by the
 Verse Grammar. We form a Verse module "module {\n...\n}". We recursively gather a list of all filenames and
 directory names FS residing in D and (recursive) subdirectories whose names matches *.more[.*]. For each name
-F in FS, sorted lexocographically (by case-sensitive UCS-32 hence UTF-8 sort order), we handle F as follows:
+F in FS, sorted lexicographically (by case-sensitive UCS-32 hence UTF-8 sort order), we handle F as follows:
 
 1) If F is a *.zip file, we treat it as a directory with the .zip extension omitted.
 
@@ -189,7 +181,7 @@ F in FS, sorted lexocographically (by case-sensitive UCS-32 hence UTF-8 sort ord
    - is a directory containing *.more[.*]
 
 3) Otherwise if F is a directory, we break it into a Name (up to the first '.') and Specifiers (following each '.').
-  We produce an error if the Name or any Specifiers don't match Verse Grannar Ident syntax.
+  We produce an error if the Name or any Specifiers don't match Verse Grammar Ident syntax.
   We add a field:
       Name<Specifiers_0>...<Specifiers_n>:=module{...};
   and recursively translate the contents of directory F into a module as above.
@@ -213,8 +205,9 @@ F in FS, sorted lexocographically (by case-sensitive UCS-32 hence UTF-8 sort ord
 Verse Core Grammar
 ------------------------------------------------------------------------------------------------------------------------
 
-The full Verse grammar can be simplified to the following core grammar subset, which is canonical if Num is canonical:
+The full Verse grammar can be simplified to a core subset which we define here.
 
+    Num    := '0' | '1'..'9' {'0'..'9'}
     Expr   := Num
            |  ['(' Expr ':)'] Ident
            |  Expr ['(' Expr ')' {'<' Expr '>'}] '{' List '}' ['until' '{' List '}']
@@ -252,6 +245,8 @@ Syntax Equivalences between full grammar (left) and core grammar (right):
 
     TODO: Go through and ensure this is 100% complete.
     TODO: Clarify arrays versus lists here.
+    TODO: Specify rules for each concrete syntax production (including whitespace attribution)
+          and abstract syntax production from separate VerseGrammar.txt parser overview document.
 
 TODO: Write core translations for:
 
@@ -319,7 +314,7 @@ Our Use of Sequent Calculus:
         G |- ProgramOp[c,op], meaning: under the assumptions in G, our program containing
                                        a flexibility context c and operation op is valid.
 
-    EBNF patterns like ProgramOp[c,op] defined as paramterized EBNF grammars below and enable us to match
+    EBNF patterns like ProgramOp[c,op] defined as parameterized EBNF grammars below and enable us to match
     constructs nested arbitrarily deeply within Verse programs, while binding symbols (like c and op in this
     example) which are available to the inference rules:
 
@@ -327,7 +322,7 @@ Our Use of Sequent Calculus:
         matches this EBNF grammar, then c and op are bound to particular program operations.
 
         Above the horizontal line, those EBNF patterns and wildcards have the meaning bound to them
-        below the line. In this way, we can easily express parameteric transformations of program syntax,
+        below the line. In this way, we can easily express parametric transformations of program syntax,
         and parametric analysis of program contents.
 
         Above the horizontal line, new EBNF terms like 'x' that aren't defined below the line are
@@ -376,48 +371,51 @@ Definitions (as EBNF grammars) used by our inference rules:
     Operation Variables        := opv
     Effects Variables          := fxv
     Syntax and Metasyntax    s := List | Expr | Num | Ident | Unquote(u)
-    Effects                 fx := cardinalities | ambiguates | succeeds | decides | resolves | abstracts | fails | contradicts
-                               |  diverges | unifies | demands | varies | allocates
-                               |  iterates         | reads         | writes         | interacts         | throws         | suspends
-                               |  iterates_pending | reads_pending | writes_pending | interacts_pending | throws_pending | suspends_pending
-                               |  imperatives | pendings | transacts | top_allows | lambda_allows | rejects | effects
-                               |  fx0\/fx1 (canonized from lattice)
-                               |  ~fx      (canonized from lattice)
+    Primitive Effects          := effects       | no_effects
+                               |  specifies     | no_specifies
+                               |  unifies       | no_unifies 
+                               |  recurses      | converges
+                               |  rejects       | err       | accepts
+                               |  cardinalities | abstracts | resolves  | iterates | decides | succeeds | fails | contradicts
+                               |  transacts     | varies    | allocates | reads    | writes  | no_transacts
+                               |  imperatives   | interacts | throws    | suspends | no_imperatives
+                               |  blocks        | unblock_iterates | unblock_reads | unblock_writes | unblock_imperatives | unblocks
+    Effects                    := Primitive Effects
+                               |  fx0 + fx1 (modulo lattice equivalence)
+                               |  fx0 & fx1 (modulo lattice equivalence)
     Open World Specifier    oc := open|closed
-    Equality Strength       st := succeeds\/ambiguates | decides\/ambiguates | abstracts
+    Equality Strength       st := succeeds+ambiguates | decides+ambiguates | abstracts
     Atom Values           atom := Q | P | Path | () | Print | operator'^' | prefix'set' | fx | oc
-    Implied fx             ifx := none | fx
+    Implied fx             ifx := none | fx (where succeeds<=fx<=abstracts from lattice)
     Lambdas                  L := lambda(oc,fx,u) c0 i w {op0} range c1 j z {op1}
-    Heads                 head := atom                                             # atom value
-                               |  L                                                # lambda_vertex
-                               |  macro L                                          # macro_vertex
-                               |  tuple(p) x                                       # array_vertex
-                               |  nom(Path) x                                      # nominal data type wrapper
-    Vertices         p,q,r,u,v := x                                                # variable with top shape
-                               |  head                                             # variable with specific shape
-                               |  u(v)                                             # call_vertex
+    Heads                 head := atom                                              # atom value
+                               |  L                                                 # lambda_vertex
+                               |  macro L                                           # macro_vertex
+                               |  tuple(p) x                                        # array_vertex
+                               |  nom(Path) x                                       # nominal data type wrapper
+    Vertices         p,q,r,u,v := x                                                 # variable with top shape
+                               |  head                                              # variable with specific shape
+                               |  u(v)                                              # call_vertex
     Programs           Program := explore(top_allows,fxv) {...; scope c {op}; ...}
-    Operations              op := u=v                                              # op::atom, op::unify, op::span, op::lambda, op::call
-                               |  u=fail                                           # op::fail
-                               |  op0; op1                                         # op::sequence
-                               |  op0|op1                                          # op::choice
-                               |  exists x_0 ... x_n                               # op::exists
-                               |  scope c {op}                                     # op::scope
-                               |  beta L(p) c0 {op0} range c1 {op1}                # op::call logic to track beta conversion effects in c
-                               |  in(fx,fxv|none) c i x {op}                       # op::in
-                               |  stage(fx,fxv) c0 i x {op0} value c1 y {op1}      # op::stage
-                               |  verify(fx,err) c     {op}                        # op::verify
-                               |  assume(fx)     c     {op}                        # op::assume
-                               |  iterate         {op_0; ...; op_n}                # op::iterate
-                               |  fold(x0) c0 {op0} then c1 x1 {op1} else c2 {op2} # op::iterate
-                               |  explore(fx,fxv) {op_0; ...; op_n}                # part of op::lambda
-                               |  cast(u)         {HeadPattern_0 => {op_0}; ...}   # WhenCastStep (dynamic, paraconsistent)
-                               |  cast(u,opv,err) {HeadPattern_0 => {op_0}; ...}   # WhenCastStep (static, consistent)
-                               |  err                                              # op::stuck
-                               |  syntax(opv,u,v){s}                               # op::reduce (NewRedex)
+    Operations              op := u=v                                               # op::atom, op::unify, op::span, op::lambda, op::call
+                               |  u=fail                                            # op::fail
+                               |  op0; op1                                          # op::sequence
+                               |  op0|op1                                           # op::choice
+                               |  exists x_0 ... x_n                                # op::exists
+                               |  scope c {op}                                      # op::scope
+                               |  beta L(p) c0 {op0} range c1 {op1}                 # op::call logic to track beta conversion effects in c
+                               |  in(fx,fxv|none) c i x {op}                        # op::in
+                               |  stage(fx,fxv) c0 i x {op0} value c1 y {op1}       # op::stage
+                               |  verify(fx) c {op}                                 # op::verify
+                               |  assume(fx) c {op}                                 # op::assume
+                               |  iterate         {op_0; ...; op_n}                 # op::iterate
+                               |  split(x0) c0 {op0} then c1 x1 {op1} else c2 {op2} # op::iterate
+                               |  explore(fx,fxv) {op_0; ...; op_n}                 # part of op::lambda
+                               |  cast(u,v|opv,fx) {head_0 => {op_0}; ...}          # WhenCastStep
+                               |  err                                               # op::stuck
+                               |  syntax(opv,u,v){s}                                # op::reduce (NewRedex)
                                |  resolved(opv){op}
                                |  define Ident {definable}
-    Head Pattern   HeadPattern := head | prose unambiguously describing a nested head normal form
 
                                EBNF patterns matching operations that start a new context and its top level operation
     ScopeStartOp[SC,OP]        := scope           SC     {OP }
@@ -426,9 +424,9 @@ Definitions (as EBNF grammars) used by our inference rules:
     FlexibleStartOp[FC,OP]     := in(fx,fxv|none) FC i x {OP }
                                |  stage(fx,fxv)   FC i x {OP } value c1 y {op1}
                                |  stage(fx,fxv)   c0 i x {op0} value FC y {OP }
-                               |  verify(fx,err)  FC     {OP }
+                               |  verify(fx)      FC     {OP }
                                |  assume(fx)      FC     {OP }
-                               |  fold(x0)        FC     {OP } then d1 x1 {op1} else d2 {op2}
+                               |  split(x0)       FC     {OP } then d1 x1 {op1} else d2 {op2}
     ExploreStartOp[EC,OP]      := explore(fx,fxv) {...; ScopeStartOp    [EC,OP]; ...}
     IterateStartOp[EC,OP]      := iterate         {...; FlexibleStartOp [EC,OP]; ...}
 
@@ -461,7 +459,7 @@ Definitions (as EBNF grammars) used by our inference rules:
     
                                EBNF pattern matching a program span exposing an existential U in flexibility context C.
     ProgramFlexible[C,U]       := ProgramOp[C,exists ... U ...]
-                               |  ProgramOp[C,u = U] | ProgramOp[C,U = u] where U is L or U is tuple(x) t
+                               |  ProgramOp[C,u = U] | ProgramOp[C,U = u] where (U is L) or (U is tuple(x) t) or (U is v(p) where ProgramFlexible[C,V] and ProgramFlexible[C,P])
                                |  ProgramOp[C,beta U c0 {op0} range c1 {op1}]
                                |  ProgramSpan[in(fx,fxv|none) C U x {op}]
                                |  ProgramSpan[in(fx,fxv|none) C i U {op}]
@@ -469,23 +467,23 @@ Definitions (as EBNF grammars) used by our inference rules:
                                |  ProgramSpan[stage(fx,fxv) C i U {op0} value c1 y {op1}]
 
                                EBNF pattern applied during beta conversion to replace verifier spine checking with verifier evaluation.
-    Beta(OP)                   := OP[opv                     / syntax(opv,u,v){s}                         ]
-                                    [exists                  / define Ident {definable}                   ] # Empty 'exists' is a no-op
+    Beta(G,op)                 := op[ProgramOp[c,op1]        / ProgramOp[c,syntax(opv,u,v){s}]            ] where G[opv:=op1@c]
+                                    [exists                  / defined Ident {definable}                  ]
                                     [in(fx,fxv) c0 i x {op0} / stage(fx,fxv) c0 i x {op0} value c1 y {op1}]
 
     Errors                 err := F00 | S00 | D00 | D01 | D02 | A00 | X00
                                |  N00 | N01 | N03 | N04 | N05 | N10
                                |  P00 | X30 | X31 | C00 | V04 | V10
     Things With Effects    arg := op            # In inference, fx{op }@c means op has effects fx in context c.
-                               |  fxv           # In inference, fx{fxv}@c means stage identified by fxv has effects fx in context c.
                                |  v             # In inference, fx{v  }@c means vertex v has fx in context c.
-                               |  v->*u         # In data flow analysis, st{v->*u}@c means v "strength-reaches" u through edges v->w where not st{v=w}@c ... w->u where not st{w=u}@c.
+                               |  fxv           # In inference, fx{fxv}@c means stage identified by fxv has effects fx in context c.
+                               |  v->*u         # In data flow analysis, st{v->*u}@c means v "strength-reaches" u through edges v->w_0 where not st{v=w_0}@c ... w_n->u where not st{w_n=u}@c.
                                |  v->*u at p    # In data flow analysis, st{v->*u at p}@c means tuple v "strength-reaches" tuple u "at tuple element index p".
     Assumptions              A := fx{arg}@c     # The argument arg has effects bounded by fx in context c.
-                               |  fx1:fx2:ifx@c # Context c has allowed effects fx1, implied effects fx2, in-impliable effects ifx.
+                               |  fx1:fx2:ifx@c # Context c allows effects fx1, implies effects fx2, and has in-impliable cardinalities ifx.
                                |  v->u          # Data flows directly from vertex v to vertex u via unification with flexible u.
                                |  opv:=op@c     # Operation variable opv resolves to operation op in flexible context c.
-                               |  P^:=u         # Reading pointer p where no reads_pending yields vertex u.
+                               |  P^:=u         # Reading pointer p where unblock_reads yields vertex u.
     Definable Ops    definable := u | u^
     Assumption Sets          G := empty | G, A
     Comparable Values       cv := atom | 'product{' {cv_n '=>' cv1_n ';'} '}' | nom(Path {Path}) cv
@@ -506,86 +504,178 @@ Definitions (as EBNF grammars) used by our inference rules:
     E[E1/E0]                   := EBNF E with EBNF E1 replacing EBNF E0.
     op[y_0/x_0,...,*/*]        := op[if z is x_i for some i then y_i/z else z_i/z | z:BVS[op]] where z_i fresh
 
-Effects Lattice:
+Effects:
 
-    Effects form a lattice where fx0\/fx1 is lattice join, and fx0/\fx1 is lattice meet.
-    Cardinality effects are information-ordered by the following lattice:
+    Verse describes the Effects fx of a computation in terms of a lattice (https://en.wikipedia.org/wiki/Lattice_(order))
+    with the following features:
+
+    - fx0 <= fx1 (the lattice partial order) says fx0 has no more effects than fx1.
+    - fx0 & fx1  (the lattice meet) is the biggest  set of effects where fx0&fx1<=fx0 and fx0&fx1<=fx1.
+    - fx0 + fx1  (the lattice join) is the smallest set of effects where fx0<=fx0+fx1 and fx1<fx0+fx1.
+    - The Effects lattice is information-ordered. That is, if fx0{op} holds (meaning operation op has at most the effects fx0)
+      and fx0<=fx1, then fx1{op} also holds. As we learn more information about a program's effects, the information
+      we have about it strictly increases.
+    - For all Effects fx, we have no_effects <= fx <= effects.
+
+    The Effects lattice is the product of the following sublattices containing Primitive Effects:
+
+    - The cardinalities sublattice describes the multiplicity of values (zero, one, many) denoted
+      by an expression together with our runtime ability to decide or finitely enumerate values:
 
                                   cardinalities
                                    |         |
                                abstracts     |
                               /    |         |      UNDECIDABLE
                              /  resolves     | 
-            ================/======|=========|================
-            decides\/ambiguates    |    iterates
+             ===============/======|=========|================
+             ambiguates+decides    |    iterates
                          |     \   |   /     |       DECIDABLE
                          |      decides      |
-           ==============|=========|===\=====|================
-           succeeds\/ambiguates    |    \    |
+            =============|=========|===\=====|================
+            ambiguates+succeeds    |    \    |
                               \    |     \   |
                                succeeds   fails        DECIDED
                                    \        / 
                                    contradicts
 
-    For all effects fx, we have contradicts<=fx<=effects.
-    We have varies<=allocates and varies<=reads.
-    We define compound effects:
-        cardinalities   = abstracts\/iterates
-        transacts       = reads\/writes\/allocates
-        pendings        = iterates_pending\/reads_pending\/writes_pending\/interacts_pending\/throws_pending\/suspends_pending
-        imperatives     = unifies\/diverges\/transacts\/suspends\/interacts\/throws\/pendings
-        top_allows      = succeeds      \/ unifies\/diverges\/transacts\/interacts
-        lambda_allows   = resolves      \/ imperatives
-        lambda_defaults = succeeds      \/ unifies\/diverges\/transacts,
-        effects         = cardinalities \/ imperatives \/ rejects
+    - The recurses sublattice, where converges<=recurses.
+      converges{op} means op is guaranteed to eventually complete given sufficient computing reosurces.
+      recurses{op}  means op may diverge due to infinite recursion.
 
-    The effects sequencing operation fx0*fx1 captures the cumulative effects of running op0 with effects fx0
-    then running op1 with efffects fx1. It's associative, transitive, and commutative.
+    - The transacts sublattice, a complete lattice on fx in {varies,allocates,reads,writes}
+      where no_transacts<=fx<=transacts. Describes transactional effects.
 
-        fx0*fx1 = (fx0\/fx1)/\
-            if      fx0/\fx1 <= fails   then fails\/imperatives\/rejects
-            else if fx0/\fx1 <= demands then effects
-            else                             effects/\~demands
+    - The imperatives sublattice, a complete lattice on fx in {interacts,throws,suspends}
+      where no_imperatives<=fx<=imperatives. Describes imperative effects.
 
-        Note that fails*contradicts=fails, because an op having effects <contradicts><converges> means the context
-        containing it cannot commit with <succeeds>, but it doesn't preclude other ops in the context failing first.
+    - The unifies sublattice, where no_unifies<=unifies.
+      unifies{op} means the operation may expand through beta expansion and other inference rules to contain new
+      yet-unseen unifications which have a nonmonotonic effect on dataflow analysis. no_unifies{op} where op
+      is at the start of a flexible context means the context's dataflow will henceforth only evolve monotonically.
 
-    Pending Effects
+    - The specifies sublattice, where no_specifies<=specifies, exists to distinguish:
+      * Effects derived from effects specifiers like f()<succeeds>:=1
+      * Effects derived from verifier inference like f(g()<fx0> where fx0:fx)<fx0>:=g()
 
-        The operation PendingAfter[fx] says what pending effects should be held subsequent to this operation having fx.
-        During inference, each operation receives *_pending effects from its sequentially prior operation,
-        calculates its actual suspended effects fx, and propagates PendingAfter[fx] to the sequentially next operation.
+    - The blocks sublattice, a complete lattice on fx in {unblock_iterates,unblock_reads,unblock_writes,unblock_imperatives}
+      where unblocks<=fx<=blocks. Describes which operations fx{op} are blocked from running now, to ensure proper
+      sequencing of effects amidst lenient evaluation.
 
-        PendingAfter[fx] :=
-            if(iterates <=fx) {iterates_pending } else {none} \/
-            if(reads    <=fx) {reads_pending    } else {none} \/
-            if(writes   <=fx) {writes_pending   } else {none} \/
-            if(throws   <=fx) {throws_pending   } else {none} \/ # throws&interacts can't run where fails allowed,
-            if(interacts<=fx) {interacts_pending} else {none} \/ # so we needn't relatively sequence them.
-            fx \/ ~pendings
+    - The rejects sublattice, a complete lattice on e in the set defined by err, where accepts<=e<=rejects.
+      During verification, accepts{op} means the verifier accepts the operation. Anything else means rejection.
 
-        PendingDown[fx] says how a compound operation's pending effects propagate to its sequentially first sub-operation.
-        PendingDown[fx] := fx\/~pendings
+    We define the following derived effects:
+
+        computes           := no_transacts & no_imperatives
+        top_allows         := succeeds & (interacts+       suspends) & accepts;
+        lambda_allows      := resolves & (interacts+throws+suspends) & accepts;
+        lambda_defaults    := succeeds & (no_imperatives           ) & accepts;
+
+        only_cardinalities :=             converges&no_transacts&no_imperatives&no_unifies&unblocks&accepts
+        only_succeeds      := succeeds   &converges&no_transacts&no_imperatives&no_unifies&unblocks&accepts
+        only_recurses      := contradicts&          no_transacts&no_imperatives&no_unifies&unblocks&accepts
+        only_transacts     := contradicts&converges&             no_imperatives&no_unifies&unblocks&accepts
+        only_imperatives   := contradicts&converges&no_transacts&               no_unifies&unblocks&accepts
+        only_blocks        := contradicts&converges&no_transacts&no_imperatives&no_unifies&         accepts
+        only_rejects       := contradicts&converges&no_transacts&no_imperatives&no_unifies&unblocks
+
+    Effects from Primitive Effects
+
+        We can generate all Effects in the lattice by taking the meet fx0 & ... & fx1 of Primitive Effects because
+        each primitive effect each sublattice includes all of the other primitive effects in the other sublattices.
+
+        Thus succeeds{op} rules out fails{op} because succeeds and fails are in the same sublattice,
+        but succeeds{op} does not rule out interacts{op}, recurses{op}, and so on, which are in other sublattices.
+
+    Effects from Verse syntax <fx_0>...<fx_n> effects specifiers:
+
+        Every Verse construct that accepts such effects specifiers provides a default set of effects DefaultFx,
+        found in the Verse Syntax Reduction Rules. If the user provides a series of zero or more effects
+        specifiers <fx_0>...<fx_n>, we calculate the complete effects CompleteFx as follows:
+
+            CompleteFx(DefaultFx,fx_0,...,fx_n) :=
+                (DefaultFx & KeepDefaultFx  (fx_0) & ... & KeepDefaultFx (fx_n)) +
+                             KeepSpecifierFx(fx_0) + ... + KeepSpecifierFx(fx_n)
+
+        Where:
+
+            KeepDefaultFx(Fx) :=
+                if(Fx<=no_specifies) then no_effects
+                else (if(only_cardinalities<=Fx) then effects else contradicts   ) &
+		             (if(only_recurses     <=Fx) then effects else converges     ) &
+		             (if(only_transacts    <=Fx) then effects else no_transacts  ) &
+		             (if(only_imperatives  <=Fx) then effects else no_imperatives)
+
+            KeepSpecifierFx(fx) :=
+                if(Fx<=no_specifies) then effects
+                else 
+		            (if(only_cardinalities<=Fx) then no_effects else only_cardinalities) +
+		            (if(only_recurses     <=Fx) then no_effects else only_recurses     ) +
+		            (if(only_transacts    <=Fx) then no_effects else only_transacts    ) +
+		            (if(only_imperatives  <=Fx) then no_effects else only_imperatives  )
+
+    Sequencing Effects
+
+        The effects sequencing operation SequenceFx(fx0,fx1) captures the cumulative effects of running
+        op0 with effects fx0 then running op1 with efffects fx1. It's associative, transitive, and commutative.
+        We have fx = only_succeeds*fx = fx*only_succeeds
+	    An op that contradicts neither fails nor allows the current context to commit successfully,
+	    when sequenced with an op that fails, the context may fail, so we have fails*contradicts = fails.
+
+            SequenceFx(fx0,fx1) := (fx0+fx1) &
+                if(fx0&fx1 <= fails) then fails
+                else                      effects
+
+        The operation ProductFx(fx0,fx1) describes the cardinalities of a product (e.g. a tuple) based
+        on the cardinalities of its elements, disregarding other effects.
+
+            ProductFx(fx0,fx1) := (contradicts+fx0+fx1) & 
+                if     (fx0<=contradicts or fx1<=contradicts) then contradicts
+                else if(fx0&fx1 <= fails                    ) then fails
+                else                                               effects
+            ProductFx(fx0,fx1,...) := ProductFx(ProductFx(fx0,fx),...)
+
+    Blocking Effects
+    
+        In a language with lenient evaluation and effects, we must ensure that operations with effects dependencies,
+        such as read operations dependent on prior write operations, are executed in-order while enabling all other
+        operations to execute out-of-order.
+
+        The operation AfterFx(fx) says what effects should be unblocked subsequent to this operation having effects fx.
+        During inference, each operation receives unblock_* effects from its sequentially prior operation,
+        calculates its actual suspended effects fx, and propagates AfterFx(fx) to the sequentially next operation.
+
+            AfterFx(fx) := (unblocks + fx) &
+	            (if(iterates  <= contradicts    + fx) then blocks else unblock_iterates            ) & # While iterates    pending, block subsequent iterates.
+	            (if(reads     <= no_transacts   + fx) then blocks else unblock_writes              ) & # While reads       pending, block subsequent writes.
+	            (if(writes    <= no_transacts   + fx) then blocks else unblock_reads&unblock_writes) & # While writes      pending, block subsequent reads and writes.
+	            (if(throws    <= no_imperatives + fx) then blocks else unblock_imperatives         ) & # While imperatives pending, block subsequent imperatives.
+	            (if(suspends  <= no_imperatives + fx) then blocks else unblock_imperatives         ) &
+	            (if(interacts <= no_imperatives + fx) then blocks else unblock_imperatives         )
+
+            DownFx(fx) := unblocks + fx
+                This says how a compound operation's pending effects propagate to its sequentially first sub-operation.
+
+        We don't have throws, interacts and possible failure block each other as they aren't allowed to coexist in a context.
+
+	    In a context that may fail, we allow writing to variables even after suspended operation that may fail
+        because failure undoes writes.
+
+        Verifier inference rules on 'lambda' are reasoning about the lambda under all possible program states that may
+        exist, so we don't use DownFx or AfterFx to relate unblocks outside and inside the lambda. Similarly,
+        inference rules for 'in' (where implied) and 'assume' are reasoning abstractly about potential computations
+        so we don't use AfterFx to propagate unblocks out.
+
+        TODO: Ingest additional constraints arising from Sonnenberg-identified (fails|throws|iteracts)-diverges race.
 
     Effects Compliance
 
         The operation CompliesFx(ActualFx,SpecifiedFx) describes to what extent ActualFx is a subset of SpecifiedFx.
-        It's used in analyzing actual versus specified effects in 'lambda' and 'stage.
-        When its cardinalities aren't a subset, we capture that as pootential failure cardinalities.
-        When its imperatives aren't a subset, we capture those as excess effects.
-
-        CompliesFx(ActualFx,SpecifiedFx) = ActualFx /\ ~SpecifiedFx /\ ~cardinalities \/
-            if      cardinalities/\ActualFx              <= SpecifiedFx then succeeds
-            else if cardinalities/\ActualFx/\SpecifiedFx <= contradicts then fails
-            else                                                             cardinalities/\ActualFx
-
-        The operation GateFx(SpecifiedFx,CompliedFx) widenes SpecifiedFx by CompliedFx, where CompiledFx is expected
-        to be derived from prior CompliesFx calculations.
-
-        GateFx(SpecifiedFx,CompliedFx) =
-            if      cardinalities/\CompliedFx <= contradicts then contradicts
-            else if cardinalities/\CompliedFx <= succeeds    then SpecifiedFx \/ CompliedFx/\imperatives
-            else                                                  SpecifiedFx \/ CompliedFx
+    
+        CompliesFx(ActualFx,SpecifiedFx) := only_cardinalities & (
+            if     (ActualFx             <= SpecifiedFx) then succeeds
+            else if(ActualFx&SpecifiedFx <= contradicts) then fails
+            else                                              abstracts&ActualFx)
 
 Bound Variables:
 
@@ -612,7 +702,7 @@ Inference Rule Conventions
     (*Reach)   Data flow reachability rules
 
 ------------------------------------------------------------------------------------------------------------------------
-Verifier Syntax Reduction Rules
+Verse Syntax Reduction Rules
 ------------------------------------------------------------------------------------------------------------------------
 
 Overview
@@ -636,17 +726,41 @@ Overview
     As with inference rules, all variables to the right side of the ---> that aren't defined on the left side are fresh.
     The resolved(opv){op} op is plumbing involved in ensuring syntax resolves consistently everywhere.
 
+    Here, Specs as an abbreviation for the postfix specifiers <s_0>...<s_n>, including the 0-ary case.
+
+    Here, we define:
+
+        VerifySpec(fx,oc,s){op} :=
+            verify(succeeds&converges&computes,U00) {
+                exists i w;
+                syntax(opv1,i,w){s}
+            };
+            cast(w,opv1,X31) {
+                fx and oc => {op}
+            }
+
+        VerifySpecs(fx,oc,DefaultFx,<s_0>...<s_n>){op} :=
+            VerifySpec(fx_0,oc_0,s_0){
+                VerifySpec(fx_n,oc_n,s_n){
+                    fx:=CompleteFx(DefaultFx,fx_0,...,fx_n)
+                    oc:=<zero or one oc unambiguously specified by oc_0...oc_n>
+                    op
+                }
+            }
+
+        VerifyFxSpecs(fx,DefaultFx,Specs){op} := <Use VerifySpecs and statically require zero oc to be specified>
+
 Constant Syntax:
 
-                         Num from the Verse Grammar spec describe a natural number n excluding Units and decimals.
-           (AtomSyntax)  syntax(opv,u,v){Num} ---> u=n; v=n
+                         Num|Char|Path are from the Verse Grammar spec; let atom be the corresponding atom.
+           (AtomSyntax)  syntax(opv,u,v){Num|Char|Path} ---> u=atom; v=atom
 
 Core Functional Logic Syntax:
 
-          (UnifySyntax)  syntax(opv,u,v){s0=s1}  ---> syntax(opv1,u,v){s0}; syntax(opv1,u,v){s1}
+          (UnifySyntax)  syntax(opv,u,v){s0=s1}  ---> syntax(opv1,u,v){s0}; syntax(opv2,u,v){s1}
          (ChoiceSyntax)  syntax(opv,u,v){s0|s1}  ---> scope c {syntax(opv1,u,v){s0}} | scope d {syntax(opv2,u,v){s1}}
           (RangeSyntax)  syntax(opv,u,v){s0..s1} ---> exists i j x y; syntax(opv1,i,x){s0}; syntax(opv2,j,y){s1}; TODO
-
+                                                      
 Product Syntax:
 
        (SequenceSyntax)  syntax(opv,u,v){s_0; ... s_n} --->
@@ -659,19 +773,20 @@ Product Syntax:
           (TupleSyntax)  syntax(opv,u,v){s_0,...,s_n-1} ---> syntax(opv1,u,v){array{s_0,...,s_n-1}}
 
            (ArrayMacro)  syntax(opv,u,v){array{s_0, ..., s_n-1}) --->
+
                              u=tuple(n) i;
                              v=tuple(n) x;
-                             exists (tuple(n) i)(0) ... (tuple(n) i)(n-1)
-                                    (tuple(n) x)(0) ... (tuple(n) i)(n-1);
+
                              syntax(opv_0  ,(tuple(n) i)(0  ),(tuple(n) x)(0  )){s_0  };
                              ...
                              syntax(opv_n-1,(tuple(n) i)(n-1),(tuple(n) x)(n-1)){s_n-1}
+
        (ArrayListMacro)  syntax(opv,u,v){array{s_0; ...  s_n-1}) ---> syntax(opv1,u,v){array{s_0,...,s_n-1}}
 
 Application Syntax:
 
      (CallClosedSyntax)  syntax(opv,u,v){s0[s1]} --->
-                             exists f h f(x) i x z;
+                             exists f h i x z;
                              u=z; v=z;
                              syntax(opv1,h,f){s0};
                              syntax(opv2,i,x){s1};
@@ -682,13 +797,13 @@ Application Syntax:
                              u=z; v=z;
                              syntax(opv1,h,f){s0};
                              syntax(opv2,i,x){s1};
-                             verify(succeeds\/imperatives,P00) c {
-                                 exists f1 f1(x1) x1 z;
+                             verify(succeeds+imperatives,P00) c {
+                                 exists f1 x1 z;
                                  f1=f; x1=x; z=f1(x1)
                              }
 
        (DeoptionSyntax)  syntax(opv,u,v){s0?} --->
-                             exists f h x z(x);
+                             exists f h x;
                              u=z; v=z;
                              syntax(opv1,h,f){s0};
                              z=f(x)
@@ -704,13 +819,13 @@ Identifier Resolution Syntax:
 
                          This rule resolves a reference to an identifier Ident anywhere underneath
                          a scope sc that is defined within the scope sc's ScopeSpan.
-                         TODO: Explain eterministic mechanism for detecting and producing ambiguous identifier errors.
+                         TODO: Explain deterministic mechanism for detecting and producing ambiguous identifier errors.
 
        (DotIdentSyntax)  syntax(opv,u,v){s0.Ident} --->
                              exists f h z;
                              syntax(opv1,h,f){s0};
-                             cast(f,opv2,N05) {
-                                 nominal value containing field named Ident with Path matching Ident => {
+                             cast(f,opv2,abstracts*reads*(accepts+N05)) {
+                                 head normal form representing an instance of a nominal type containing a field with a Path that Ident matches unambiguously => {
                                      u=z; v=z
                                      z=f(Path);
                                  }
@@ -721,6 +836,7 @@ Identifier Definition Syntax:
     We reify defined identifiers into the program syntax rather than placing them in assumptions
     so that (IdentSyntax) works even when beta reduction or other op[*/*] renames contexts.
 
+                         Ident is not _
           (IdentDefine)  syntax(opv,u,v){Ident:=s2} ---> define Ident {v}; syntax(opv1,u,v){s2}
 
      (UnderscoreDefine)  syntax(opv,u,v){_:=s} ---> syntax(opv1,u,v){s}
@@ -730,16 +846,15 @@ Identifier Definition Syntax:
                                  exists i x;
                                  syntax(opv1,i,x){s1}
                              }
-                             cast(x,opv2,X31) {
+                             cast(x,opv2,accepts+X31) {
                                  natively defined 'var' specifier => {define Ident {v^}; syntax(opv3,u,v){TODO}}
                                  natively defined 'ref' specifier => {define Ident {v^}; syntax(opv3,u,v){TODO}}
                              }
 
-                         TODO: Define exactly how desugaring works, for example:
-                             var x:t   -> x:new(t)=v
-                             var x:t=v -> new(t)=v
-                             var x:=v  -> new(type{v})=v, but this is a rough approximation
-                         TODO: Say if we can breathe life into nested constructs like "var x:=(:int=2,:nat=5)".
+                         TODO: Define exactly how desugaring works based on definition form, for example:
+                         var x:t   -> x:new(t)
+                         var x:t=v -> x:new(t)=v
+                         var x:=v  -> x:=new(type{v})=v, but this is a rough approximation
 
            *(DotDefine)  syntax(opv,u,v){s0.Ident:=s1} ---> syntax(opv1,u,v){operator'.Ident'(s0):=s1}
 
@@ -749,43 +864,37 @@ Destructuring Definition Syntax:
     Where the right-hand side may fail, the left-hand-side's outermost operation determines whether it captures
     or propagates failure: (a,b)?:=c captures failure, (a?,b?):=c propagates failure.
 
-       (CallOpenDefine)  syntax(opv,u,v){s0(s1)    :=s2) ---> syntax(opv1,u,v){s0:=function(s1)<succeeds><transacts>{s2}}
-   (CallOpenSpecDefine)  syntax(opv,u,v){s0(s1)<s3>:=s2) ---> syntax(opv1,u,v){s0:=function(s1)<s3>{s2}}
+       (CallOpenDefine)  syntax(opv,u,v){s0(s1)Specs:=s2) ---> syntax(opv1,u,v){s0:=function(s1)Specs{s2}}
 
-    *(CallClosedDefine)  syntax(opv,u,v){s0[s1]:=s2} ---> ...
+    *(CallClosedDefine)  syntax(opv,u,v){s0[s1]Specs:=s2} ---> ...
 
                          TODO: Figure out what to do with this. This syntax was originally used for defining arrays and maps as lambdas,
                          but its future disposition depends on whether we make arrays nominally disjoint from maps.
          
-      *(MultipleDefine)  syntax(opv,u,v){s_0 & ... & s_n := s}   ---> syntax(opv1,u,v){s_0:=expect<computes>{s}}; ... syntax(opv2,u,v){s_n:=expect<computes>{s}}
-  *(MultipleSpecDefine)  syntax(opv,u,v){(s_0 & ... & s_n)<spec>:=s} ---> syntax(opv1,u,v){s_0<spec> & ... & s_n<spec> := s}
+      *(MultipleDefine)  syntax(opv,u,v){(s_0 & ... & s_n) Specs := s} ---> 
+                             syntax(opv1,u,v){s_0 Specs:=expect<computes>{s}}; ... syntax(opv2,u,v){s_n Specs:=expect<computes>{s}}
+
                          NOTE: Later we'll wrap the result in prefix'..' macro for Scheme macro style unquote-splicing.
 
                          G |- ProgramOp[c,resolve(opv){
                                   u=tuple(n) t1;
                                   v=tuple(n) t2;
-                                  exists (tuple(n) t1)(0) ... (tuple(n) t1)(n-1)
-                                         (tuple(n) t2)(0) ... (tuple(n) t2)(n-1);
                                   syntax(opv1,u,v){s2};
-                                  syntax(opv_0  ,(tuple(n) t1)(0  ),(tuple(n) t2)(0  )){s0  :=_};
+                                  syntax(opv_0  ,(tuple(n) t1)(0  ),(tuple(n) t2)(0  )){s0   Specs:=_};
                                   ...
-                                  syntax(opv_n-1,(tuple(n) t1)(n-1),(tuple(n) t2)(n-1)){sn-1:=_}
+                                  syntax(opv_n-1,(tuple(n) t1)(n-1),(tuple(n) t2)(n-1)){sn-1 Specs:=_}
                               }]
-         *(ArrayDefine)  -----------------------------------------------------------------------------------------------------------
-                         G, abstracts{u=tuple(p) t0}@c, abstracts{p=n}@c |- ProgramOp[c,syntax(opv,u,v){array{s_0, ..., s_n-1}:=s2}]
-                         G, abstracts{v=tuple(p) t0}@c, abstracts{p=n}@c |- ProgramOp[c,syntax(opv,u,v){array{s_0, ..., s_n-1}:=s2}]
+         *(ArrayDefine)  ------------------------------------------------------------------------------------------------------------
+                         G, effects{u=tuple(p) t0}@c, effects{p=n}@c |- ProgramOp[c,syntax(opv,u,v){array{s_0, ..., s_n-1}Specs:=s2}]
+                         G, effects{v=tuple(p) t0}@c, effects{p=n}@c |- ProgramOp[c,syntax(opv,u,v){array{s_0, ..., s_n-1}Specs:=s2}]
 
-     *(ArrayListDefine)  syntax(opv,u,v){array{s_0; ...; s_n-1}:=s} ---> syntax(opv1,u,v){array{s_0,...,s_n-1}:=s}
-     *(ArraySpecDefine)  syntax(opv,u,v){array{...}<spec>:=s} ---> syntax(opv1,u,v){array{...}:=s}
-
-                         n<>1
-         *(TupleDefine)  syntax(opv,u,v){(s_0, ..., s_n-1):=s2} ---> syntax(opv1,u,v){array{s_0,...,s_n-1}:=s2}
+     *(ArrayListDefine)  syntax(opv,u,v){array{s_0; ...; s_n-1}Specs:=s} ---> syntax(opv1,u,v){array{s_0,...,s_n-1}Specs:=s}
 
                          n<>1
-     *(TupleSpecDefine)  syntax(opv,u,v){(s_0, ..., s_n)<spec>:=s} ---> syntax(opv1,u,v){(s_0<spec>,...,s_n<spec>) := s}
+         *(TupleDefine)  syntax(opv,u,v){(s_0, ..., s_n-1)Specs:=s2} ---> syntax(opv1,u,v){array{s_0,...,s_n-1}Specs:=s2}
 
-      *(DeoptionDefine)  syntax(opv,u,v){s0?:=s1)              ---> syntax(opv1,u,v){s0:=option{s1}}
-      *(OptionalDefine)  syntax(opv,u,v){?s0:=s1)              ---> ...
+      *(DeoptionDefine)  syntax(opv,u,v){s0? Specs:=s1)        ---> syntax(opv1,u,v){s0:=option Specs{s1}}
+      *(OptionalDefine)  syntax(opv,u,v){?s0 Specs:=s1)        ---> ...
 
    *(PointerTypeDefine)  syntax(opv,u,v){s0^:s1)               ---> syntax(opv1,u,v){s0:new(s1)}
   *(PointerStageDefine)  syntax(opv,u,v){s0^:s1=s2)            ---> syntax(opv1,u,v){s0:new(s1)=s2}
@@ -828,64 +937,51 @@ Abstraction Syntax:
     On the left hand side of a definition, :UnwrapColons[s0] stands for greedy :s0 or ::s0 or :::s0, etc.
     Right-hand UnwrapColons[s1] stands for s1 prefixed by the number of ':' the left-hand matched.
 
-             (InSyntax)  syntax(opv,u,v){:UnwrapColons[s0]} ---> syntax(opv,u,v){_->_:UnwrapColons[s0]}
+             (InSyntax)  syntax(opv,u,v){:s0} ---> syntax(opv1,u,v){_->_:s0}
 
-         (InSpecSyntax)  TODO, and expand UnwrapColons to capture specifiers
-
-        (ArrowInDefine)  syntax(opv,u,v){s1->s2:UnwrapColons[s0]} --->
+        (ArrowInDefine)  syntax(opv,u,v){(s1->s2)Specs0:UnwrapColons[s0 Specs1]} --->
                              # Here we define s1 as the input, and move s2 definition to the unwrapped output.
-                             exists f h;
-                             syntax(opv2,u,u){s1:=u};
+                             exists i f h;
+                             syntax(opv2,i,u){s1:=_};
                              syntax(opv1,h,f){s0};
                              v=x; # When implying, directed edge x->v makes type abstraction output x flow into 'in' output v.
                              in(effects,none) c k x {
-                                 exists g g(k) j y;
+                                 exists g j y;
                                  k=u;    # When implying, directed edge u->k makes 'in' input u flow into type abstraction input k.
                                  g=f;
                                  y=g(k); # Plumb input through type abstraction to get output.
-                                 syntax(opv3,j,x){s2:=UnwrapColons[y]}
+                                 define Ident1 {y}; # Where Ident1 fresh; needed because UnwrapColons expects syntax, not variable.
+                                 syntax(opv3,j,x){s2 Specs0:=UnwrapColons[Ident1]}
                              }
-     (ArrowInSpecDefine) syntax(opv,u,v){(s0->s1)<spec>:UnwrapColons[s2]} ---> syntax(opv1,u,v){s0->s1<spec>:UnwrapColons[s2]}
+                         TODO: Handle Specs1.
 
-          (StageSyntax)  syntax(opv,u,v){:s0=s1) ---> syntax(opv1,u,v){:s0<effects>=s1}
-
-      (StageSpecSyntax)  syntax(opv,u,v){:s0<s2> = s1) --->
-                             verify(succeeds,U00) {
-                                 exists i w;
-                                 syntax(opv1,i,w){s2}
-                             };
-                             cast(w,opv2,X30) {
-                                 fx => {
-                                     exists f h;
-                                     syntax(opv1,h,f){s0);
-                                     v=x;
-                                     stage(fx,fxv)
-                                         c0 k x     {exists g g(k); k=u; g=f; x=g(k)}
-                                         value c1 z {exists j f2 f2(j); syntax(opv2,j,z){s1}; f2=f; z=f2(j)}
-                                 }
+          (StageSyntax)  syntax(opv,u,v){:s0 Specs = s1) --->
+                             VerifyFxSpecs(fx,effects,Specs) {
+                                 exists f h;
+                                 syntax(opv1,h,f){s0);
+                                 v=x;
+                                 stage(fx,fxv)
+                                     c0 k x     {exists g; k=u; g=f; x=g(k)}
+                                     value c1 z {exists j f2; syntax(opv2,j,z){s1}; f2=f; z=f2(j)}
                              }
+                         TODO: Handle Specs.
 
-     *(StageSpecDefine)  TODO
+     *(StageDefine)      TODO
 
 Intrinsic Macro Syntax:
 
-        (FunctionMacro)  syntax(opv,u,v){function(s0){s1}}     ---> syntax(opv1,u,v){function(s0)<succeeds><transacts>{s1}}
-    (FunctionSpecMacro)  syntax(opv,u,v){function(s0)<s1>{s2}) --->
-                             verify(succeeds,U00) c {
-                                exists j y;
-                                syntax(opv1,j,y){s1}
-                             };
-                             cast(y,opv2,X30) {
-                                 fx and oc => {
-                                     v=lambda(oc,fx,u)
-                                           d0 i w       {syntax(opv1,i,w){s0}}
-                                           range d1 j z {syntax(opv2,j,z){s1}}
-                                 }
-                             }
+        (FunctionMacro)  syntax(opv,u,v){function(s0)Specs{s1}} --->
+                             VerifySpecs(fx,oc,lambda_defaults,Specs) {
+                                cast(cast(u,opv1,X31) {
+                                    fx where fx<=lambda_allows => {
+                                        v=lambda(oc,fx,u)
+                                            d0 i w       {syntax(opv2,i,w){s0}}
+                                            range d1 j z {syntax(opv3,j,z){s1}}
+                                    }
+                                }
      (LambdaArrowMacro)  syntax(opv,u,v){operator'=>'(s0){s1}} ---> syntax(opv1,u,v){function(s0)<succeeds><transacts>{s1}}
 
-            (TypeMacro)  syntax(opv,u,v){type{s0}}     ---> syntax(opv1,u,v){function(y:=s0)<closed><succeeds>{y}}
-        (TypeSpecMacro)  syntax(opv,u,v){type<s0>{s1}} ---> syntax(opv1,u,v){function(y:=s0)<closed><s0>{y}}
+            (TypeMacro)  syntax(opv,u,v){type Specs{s0}} ---> syntax(opv1,u,v){function(y:=s0)Specs<closed>{y}}
 
              (LetMacro)  syntax(opv,u,v){let(s0){s1}} --->
                              exists i x;
@@ -905,7 +1001,7 @@ Intrinsic Macro Syntax:
                              exists i;
                              i=();
                              iterate {
-                                 fold(i)
+                                 split(i)
                                      c0         {exists j y; syntax(opv1,j,y){s0}}
                                      then c1 v1 {syntax(opv2,u,v){s1}; v1=()}
                                      else c2    {syntax(opv3,u,v){s2}}
@@ -931,9 +1027,9 @@ Intrinsic Macro Syntax:
                              exists i;
                              i=();
                              iterate {
-                                 fold(i)
+                                 split(i)
                                      c0         {exists j y; syntax(opv1,j,y){s0}}
-                                     then c1 v1 {exists w (tuple(1) t0)(0) (tuple(1) t1)(0); v1=tuple(1) t0; (tuple(1) t0)(0)=tuple(1) t1; (tuple(1) t1)(0)=y}
+                                     then c1 v1 {exists w; v1=tuple(1) t0; (tuple(1) t0)(0)=tuple(1) t1; (tuple(1) t1)(0)=y}
                                      else c2    {exists z; z=u0(0); u=z; v=z}
                              }
 
@@ -943,13 +1039,13 @@ Intrinsic Macro Syntax:
                              v=tuple(w) t1;
                              i=0;
                              iterate {
-                                 fold(i)
+                                 split(i)
                                      c0 {
                                          exists j y;
                                          syntax(opv1,j,y){s0}
                                      }
                                      then c1 v1 {
-                                         exists k z (tuple(w) t0)(i) (tuple(w) t1)(i);
+                                         exists k z;
                                          k=(tuple(w) t0)(i);
                                          z=(tuple(w) t1)(i);
                                          syntax(opv1,k,z){s1};
@@ -964,17 +1060,10 @@ Intrinsic Macro Syntax:
 
         (NotEqualMacro)  syntax(opv,u,v){s0<>s1} ---> syntax(opv1,u,v){s0 where for(y:=s1) {not v=y}}
 
-          (VerifyMacro)  syntax(opv,u,v){verify{s0}} --->
-                             u=i; v=x
-                             verify(fx,U00) d {exists i x; syntax(opv1,i,x){s0}};
-      (VerifySpecMacro)  syntax(opv,u,v){verify<s1>{s0}} --->
-                             exists j y;
-                             verify(opv1,U00){syntax(opv2,j,y){s1}};
-                             cast(y,opv3,X30) {
-                                 fx where fx <= (abstracts\/imperatives) => {
-                                     verify(fx) d {exists i x; syntax(opv4,i,x){s0}};
-                                     u=i; v=x
-                                 }
+          (VerifyMacro)  syntax(opv,u,v){verify Specs{s0}} --->
+                             VerifyFxSpecs(fx,succeeds,Specs){
+                                 u=i; v=x
+                                 verify(fx,U00) d {exists i x; syntax(opv1,i,x){s0}};
                              }
 
           (AssertMacro)  syntax(opv,u,v){assert{s0}} ---> syntax(opv1,u,v){if(s0){} else Err("Assertion Failed")}
@@ -987,35 +1076,27 @@ Intrinsic Macro Syntax:
 
 Unsound Intrinsic Macro Syntax For Testing Only:
 
-          (AssumeMacro)  syntax(opv,u,v){assume{s0}} ---> syntax(opv1,u,v){assume<succeeds>{s0}}
-      (AssumeSpecMacro)  syntax(opv,u,v){assume<s1>{s0}} --->
-                             verify(opv1,U00){
-                                 exists j y;
-                                 syntax(opv2,j,y){s1}
-                             };
-                             cast(y,opv2,X30) {
-                                 fx => {
-                                     assume(fx) d {exists i x; syntax(opv3,i,x){s0}};
-                                     u=i; v=x
-                                 }
+          (AssumeMacro)  syntax(opv,u,v){assume Specs{s0}} --->
+                             VerifyFxSpecs(fx,succeeds,Specs){
+                                 assume(fx) d {exists i x; syntax(opv3,i,x){s0}};
+                                 u=i; v=x
                              }
-                          }
 
-           (AllowMacro)  syntax(opv,u,v){allow{s0}}            ---> ...
-       (AllowSpecMacro)  syntax(opv,u,v){allow<s1>{s0}}        ---> ...
+           (AllowMacro)  syntax(opv,u,v){allow Specs{s0}} ---> ...
 
-          (ExpectMacro)  syntax(opv,u,v){expect...}            ---> ...
+          (ExpectMacro)  syntax(opv,u,v){expect Specs{s0}} ---> ...
 
-            (TestMacro)  syntax(opv,u,v){test(err){s0}}        ---> ...
+            (TestMacro)  syntax(opv,u,v){test(err){s0}} ---> ...
 
 ------------------------------------------------------------------------------------------------------------------------
-Verifier Inference Rules
+Verse Inference Rules
 ------------------------------------------------------------------------------------------------------------------------
 
 Program:
 
-                         empty, top_allows:effects:none@c, (effects/\~pendings){op}@c |- explore(top_allows,fxv) {scope c {exists u v; syntax(opv,u,v){s}}}
-         (ProgramIntro)  ----------------------------------------------------------------------------------------------------------------------------------
+                         S is scope c {exists u v; syntax(opv,u,v){s}}
+                         empty, top_allows:effects:none@c, (effects&unblocks){S}@c |- explore(top_allows,fxv) {S}
+         (ProgramIntro)  ----------------------------------------------------------------------------------------
 
           (ProgramElim)  -------------------------------------------------------------------------------------------------------------------------------------------------
                          G[top_allows{op_0}@d_0, ..., top_allows{op_n}@d_n] |- ProgramSpan[explore(top_allows,fxv) {ScopeStartOp[d_0,op_0]]; ...; ScopeStartOp[d_n,op_n]}]
@@ -1031,21 +1112,26 @@ Effects:
              (FxWeaken)  ------------------------
                          G[fx0{arg}@c] |- Program
 
-                         G, (fx0/\fx1){arg}@c      |- Program
+                         G, (fx0&fx1){arg}@c       |- Program
          (FxStrengthen)  ------------------------------------
                          G[fx0{arg}@c, fx1{arg}@c] |- Program
      
-                         G, fx{arg}@d |- ProgramOp[c,FlexibleOp[d,op]]
-              (ArgDown)  --------------------------------------------- (Goes down all contexts)
-                         G[fx{arg}@c] |- ProgramOp[c,FlexibleOp[d,op]]
+                         G, fx0{arg}@d |- ProgramOp[c,FlexibleOp[d,op]]
+              (ArgDown)  --------------------------------------------=- (Goes down all contexts)
+                         G[fx0{arg}@c] |- ProgramOp[c,FlexibleOp[d,op]]
 
-                         G, fx{arg}@c |- ProgramOp[c,FlexibleStartOp[d,op]]
-                (ArgUp)  -------------------------------------------------- (Goes up contexts weaker than explore/iterate)
-                         G[fx{arg}@d] |- ProgramOp[c,FlexibleStartOp[d,op]]
+                         G, fx0{arg}@c |- ProgramOp[c,FlexibleStartOp[d,op]]
+                (ArgUp)  --------------------------------------------------- (Goes up contexts weaker than explore/iterate)
+                         G[fx0{arg}@d] |- ProgramOp[c,FlexibleStartOp[d,op]]
 
-                         G, fx{fxv}@c                     |- ProgramOp[c,SplitOp[d_0,...,d_n]]
-                (FxvUp)  ---------------------------------------------------------------------
-                         G[fx{fxv}@d_0; ...; fx{fxv}@d_n] |- ProgramOp[c,SplitOp[d_0,...,d_n]]
+                         G, fx0{fxv}@c                      |- Program
+                (FxvUp)  -----------------------------------------------------------------------------------------------------
+                         G[fx0{fxv}@d_0; ...; fx0{fxv}@d_n] |- Program & ProgramOp[c, SplitOp[d_0,...,d_n]                   ]
+                         G[fx0{fxv}@d                     ] |- Program & ProgramOp[c,~SplitOp[d_0,...,d_n] & FlexibleOp[d,op]]
+
+                         G, fx0{fxv}@d |- ProgramOp[c,FlexibleOp[d,op]]
+              (FxvDown)  ----------------------------------------------
+                         G[fx0{fxv}@c] |- ProgramOp[c,FlexibleOp[d,op]]
 
                          G, opv:=op@c                     |- ProgramOp[c,SplitOp[d_0,...,d_n]]
                 (OpvUp)  ---------------------------------------------------------------------
@@ -1054,34 +1140,35 @@ Effects:
 Simple Ops:
 
                          E is exists x_0 ... x_n
-                         G, succeeds{E}@c |- ProgramOp[c,E]
-          (ExistsIntro)  ----------------------------------
-                         G                |- ProgramOp[c,E]
+                         G, only_succeeds{E}@c |- ProgramOp[c,E]
+          (ExistsIntro)  ---------------------------------------
+                         G                     |- ProgramOp[c,E]
 
                          TODO: Consider whether an unreferenced existential should hold <ambiguates> effect.
 
-                         G, (fx0*fx1){op0; op1}@c, PendingDown[fx]{op0}@c, PendingAfter[fx0]{op1}@c |- Program
-        (SequenceIntro)  -------------------------------------------------------------------------------------
-                         G[fx{op0; op1}@c, fx0{op0}@c, fx1{op1}@c]                                  |- Program
+                         G, SequenceFx(fx0*fx1){op0; op1}@c, DownFx(fx2){op0}@c, AfterFx(fx0){op1}@c |- Program
+        (SequenceIntro)  --------------------------------------------------------------------------------------
+                         G[fx0{op0}@c, fx1{op1}@c, fx2{op0; op1}@c]                                  |- Program
 
-                         G, fx0{scope e {op}}@c, PendingDown[fx]{op} |- ProgramOp[c,scope e {op}]
-           (ScopeIntro)  ------------------------------------------------------------------------
-                         G[fx{scope e {op}}@c, fx0{op}@d]            |- ProgramOp[c,scope e {op}]
+                         G, fx1{scope e {op}}@c, DownFx(fx0){op} |- ProgramOp[c,scope e {op}]
+           (ScopeIntro)  --------------------------------------------------------------------
+                         G[fx0{scope e {op}}@c, fx1{op}@d]       |- ProgramOp[c,scope e {op}]
 
-                         G, opv:=op, succeeds{resolved(opv){op}}@c |- ProgramOp[c,resolved(opv){op}; op]
-        (ResolvedIntro)  -------------------------------------------------------------------------------
-                         G                                         |- ProgramOp[c,resolved(opv){op}    ]
+                         G, opv:=op, only_succeeds{resolved(opv){op}}@c |- ProgramOp[c,resolved(opv){op}; op]
+        (ResolvedIntro)  ------------------------------------------------------------------------------------
+                         G                                              |- ProgramOp[c,resolved(opv){op}    ]
+                                                                        & ~ProgramOp[c,op                   ]
 
                          D is define Ident {definable}
-                         G, succeeds{D}@c |- ProgramOp[c,D]
-          (DefineIntro)  ----------------------------------
-                         G                |- ProgramOp[c,D]
+                         G, only_succeeds{D}@c |- ProgramOp[c,D]
+          (DefineIntro)  ---------------------------------------
+                         G                     |- ProgramOp[c,D]
 
 Equality:
 
-                         G, (succeeds\/ambiguates){u=u}@c |- Program
-       (ReflexiveEqual)  -------------------------------------------
-                         G[abstracts{u}@c]                |- Program
+                         G, (only_cardinalities&(succeeds+ambiguates)){u=u}@c |- Program
+       (ReflexiveEqual)  ---------------------------------------------------------------
+                         G[effects{u}@c]                                      |- Program
 
                          G, fx{v=u}@c |- Program
        (SymmetricEqual)  -----------------------
@@ -1093,9 +1180,9 @@ Equality:
 
                          T is tuple(p) x
                          U is tuple(q) y
-                         G, fx{T=U}@c                                                                         |- Program
-         (ProductEqual)  -----------------------------------------------------------------------------------------------
-                         G[abstracts{T=U}@c, fx{p=n}@c, fx{q=n}@c, fx{T(0)=U(0)}@c, ..., fx{T(n-1)=U(n-1)}@c] |- Program
+                         G, fx{T=U}@c                                                                       |- Program
+         (ProductEqual)  ---------------------------------------------------------------------------------------------
+                         G[effects{T=U}@c, fx{p=n}@c, fx{q=n}@c, fx{T(0)=U(0)}@c, ..., fx{T(n-1)=U(n-1)}@c] |- Program
 
                          G, fx{u0(p)=u1(p)}@c              |- Program
         (SameCallEqual)  --------------------------------------------
@@ -1103,99 +1190,101 @@ Equality:
 
                          One call site (uniquely identified by p), potentially equated with multiple tuples or function overloads.
 
-                         G, fx{u0(p0)=u1(p1)}@c                                                                       |- Program
-    (ComputesCallEqual)  -------------------------------------------------------------------------------------------------------
-                         G[fx{u0=u1}@c, fx{p0=p1}@c, fx{p=p0}, abstracts{u0=L         }@c, computes{beta L(p) ...}@c] |- Program
-                         G[fx{u0=u1}@c, fx{p0=p1}@c, fx{p=p0}, abstracts{u0=tuple(q) t}@c                           ] |- Program
+                         G, fx{u0(p0)=u1(p1)}@c                                                                     |- Program
+    (ComputesCallEqual)  -----------------------------------------------------------------------------------------------------
+                         G[fx{u0=u1}@c, fx{p0=p1}@c, fx{p=p0}, effects{u0=L         }@c, computes{beta L(p) ...}@c] |- Program
+                         G[fx{u0=u1}@c, fx{p0=p1}@c, fx{p=p0}, effects{u0=tuple(q) t}@c                           ] |- Program
 
                          One or multiple call sites, but equal because call is to a pure function or tuple.
 
                          head0 and head1 are disjoint heads
-                         G, (fx/\fails){head0=head1}@c |- Program
+                         G, (fx&fails){head0=head1}@c  |- Program
        (HeadEqualFails)  ----------------------------------------
                          G[fx{head0=head1}@c]          |- Program
 
 Vertices and Equality:
 
                          fx is contradicts|fails|resolves
-                         G, fx{u}@c, fx{v}@c              |- Program
-     (VertexFromEquals)  -------------------------------------------
-                         G[fx{u=v}@c, fx1{u}@c, fx2{v}@c] |- Program
+                         G, fx{u}@c, fx{v}@c                      |- Program
+     (VertexFromEquals)  ---------------------------------------------------
+                         G[fx{u=v}@c, effects{u}@c, effects{v}@c] |- Program
 
                          fx is contradicts|fails|resolves
-                         G, fx{u=v}               |- Program
-     (EqualsFromVertex)  -----------------------------------
-                         G[fx{u}, abstracts{u=v}] |- Program
+                         G, fx{u=v}             |- Program
+     (EqualsFromVertex)  ---------------------------------
+                         G[fx{u}, effects{u=v}] |- Program
 
 Unification:
 
-                         G, fx{u=v}@c                    |- ProgramOp[c,u=v]
-           (UnifyIntro)  ---------------------------------------------------
-                         G[_:fx:_@c, fx2{u}@c, fx3{v}@c] |- ProgramOp[c,u=v]
+                         G, fx0{u=v}@c                            |- ProgramOp[c,u=v]
+           (UnifyIntro)  ------------------------------------------------------------
+                         G[_:fx0:_@c, effects{u}@c, effects{v}@c] |- ProgramOp[c,u=v]
 
-                         We only infer unification fx{u=v} once we've ingested vertices (including recognizing
-                         tuple calls, beta reducing function calls, and exploring lambda effects) hence we have
-                         vertex effects fx{u} and fx{v}.
+                         We only infer unification fx0{u=v}@c once we've ingested vertices u and v which
+                         includes making new ops via (CallClosedIntro) and (LambdaIntro).
 
-                         G, (fx/\fails){u}, (fx/\fails){u=fail}@c |- ProgramOp[c,u=fail]
-            (FailIntro)  ---------------------------------------------------------------
-                         G[_:fx:_@c]                              |- ProgramOp[c,u=fail]
-                                                                  &  ProgramFlexible[c,u]
+                         G, (fx0&fails){u}@c, (fx0&fails){u=fail}@c |- ProgramOp[c,u=fail ]
+            (FailIntro)  ------------------------------------------------------------------
+                         G[_:fx0:_@c]                               |- ProgramOp[c,u=fail ]
+                                                                    &  ProgramFlexible[c,u]
 
-                         fx is contradicts or fails
-                         G, fx{u=v}@c     |- ProgramOp[c,op]
-       (UnifyDeepFails)  ------------------------------------------
-                         G[fx{w=us(p)}@c] |- ProgramUnify[c,op,u,v]
+                         fx0 is contradicts or fails
+                         G, fx0{u=v}@c     |- ProgramOp[c,op]
+       (UnifyDeepFails)  -------------------------------------------
+                         G[fx0{w=us(p)}@c] |- ProgramUnify[c,op,u,v]
 
                          This is the deep failure rule for unify ops since equation effects fx{u}@c
                          only characterize the head for paraconsistency.
 
 Vertices:
 
-                         G, (fx/\succeeds){atom}@c |- Program
-            (AtomIntro)  ------------------------------------
-                         G                         |- Program
+                         G, (fx0&succeeds){atom}@c |- ProgramOp[c,op]
+            (AtomIntro)  ------------------------------------------------------
+                         G                         |- ProgramUnify[c,op,u,atom]
 
-                         G, (fx/\(succeeds\/ambiguates)){x}@c |- ProgramFlexible[c,x]
-        (VariableIntro)  ------------------------------------------------------------
-                         G[_:fx:_@c]                          |- ProgramFlexible[c,x]
+                         G, (fx0&(succeeds+ambiguates)){x}@c |- ProgramFlexible[c,x]
+        (VariableIntro)  -----------------------------------------------------------
+                         G[_:fx0:_@c]                        |- ProgramFlexible[c,x]
 
-                         G, (fx/\abstracts){tuple(p) t}@c |- Program
-         (ProductIntro)  -------------------------------------------
-                         G[_:fx:_@c, fx{tuple(p) t}@c]    |- Program
+                         G, (fx0&(succeeds+ambiguates)){tuple(p) t}@c |- ProgramFlexible[c,tuple(p) t}@c]
+         (ProductIntro)  --------------------------------------------------------------------------------
+                         G[_:fx0:_@c]                                 |- ProgramFlexible[c,tuple(p) t}@c]
 
                          T is tuple(p) t
-                         G, resolves{T}@c                                                 |- Program
-      (ProductResolves)  ---------------------------------------------------------------------------
-                         G[resolves{p=n}@c, abstracts{u_0  =T}@c, resolves{u_0  [0  ]}@c,
+                         G, ProductFx(fx_0,...,fx_n-1){T}@c                           |- Program
+ (ProductCardinalities)  -----------------------------------------------------------------------
+                         G[resolves{p=n}@c, effects{u_0  =T}@c, fx_0  {u_0  [0  ]}@c,
                                             ...
-                                            abstracts{u_n-1=T}@c, resolves{u_n-1[n-1]}@c] |- Program
+                                            effects{u_n-1=T}@c, fx_n-1{u_n-1[n-1]}@c] |- Program
 
     (ProductComparable)  TODO
 
-                         G, abstracts{u(p)}@c         |- ProgramFlexible[c,u(p)]
-     (CallProductIntro)  -------------------------------------------------------
-                         G[abstracts{u=tuple(p) t}@c] |- ProgramFlexible[c,u(p)]
+                         G, only_cardinalities{op}@c |- ProgramFlexible[c,u(p)]
+     (CallProductIntro)  --------------------------------------------------------
+                         G[effects{u=tuple(q) t}@c]  |- ProgramUnify[c,op,v,u(p)]
 
-                         head is not a natural number with 0<=head<n
-                         G, (fx/\fails){op}                             |- ProgramOp[c,op; v=fail]
-     (CallProductFails)  ---------------------------------------------------------------------------
-                         G[fx{u=tuple(q) t}@c, fx{q=n}@c, fx{p=head}@c] |- ProgramUnify[c,op,v,u(p)]
-                                                                           & ~ProgramOp[c,v=fail]
+                         0<=n0<n1
+                         G, fx0{u(p)}@c                                     |- ProgramFlexible[c,u(p)]
+  (CallProductSucceeds)  -----------------------------------------------------------------------------
+                         G[fx0{u=tuple(q) t}@c, fx0{q=n1}@c, fx0{p=n0}@c]   |- ProgramFlexible[c,u(p)]
 
-                         0<n
-                         G lacks resolves{p=a}@c, so we don't apply this rule more than necessary.
-                         G                                              |- ProgramOp[c,op; p=0 | ... | p=n-1]
-  (CallProductIterates)  ------------------------------------------------------------------------------------
-                         G[abstracts{v=tuple(q) t}@c, abstracts{q=n}@c] |- ProgramUnify[c,op,u,v(p)]
-                                                                           & ~ProgramOp[c,op; p=0 | ... |  p=n-1]
+                         n1=0 or head is not a natural number with 0<=head<n1
+                         G, (fx0&fails){u(p)}                               |- ProgramFlexible[c,u(p)]
+     (CallProductFails)  -------------------------------------------------------------------------------
+                         G[fx0{u=tuple(q) t}@c, fx0{q=n1}@c, fx0{p=head}@c] |- ProgramFlexible[c,u(p)]
 
-                         L     is lambda(oc0,fx,u) d0         i w  {op0} range d1         p z {        op1 }
-                         B is  beta L(p)           d0 {exists i w;  op0} range d1 {exists p z {p=u(w); op1}}
-                         G           |- ProgramOp[c,op; explore(fx,fxv) {B}] # fxv fresh
-          (LambdaIntro)  ---------------------------------------------------
-                         G[_:fx:_@c] |- ProgramUnify[c,op,v,L]
-                                     &  ~ProgramOp[c,explore(fx,fxv) {...; beta L(p); ...}]
+                         0<n1
+                         G                                           |- ProgramOp[c,op; p=0 | ... | p=n-1]
+  (CallProductIterates)  --------------------------------------------------------------------------------
+                         G[effects{v=tuple(q) t}@c, effects{q=n1}@c] |- ProgramUnify[c,op,u,v(p)]
+                                                                     & ~ProgramOp[c,op; p=0 | ... | p=n-1]
+
+                         L     is lambda(oc0,fx0,u) d0         i w  {op0} range d1         p z {        op1 }
+                         B is  beta L(p)            d0 {exists i w;  op0} range d1 {exists p z {p=u(w); op1}}
+                         G |- ProgramOp[c,op; explore(fx0,fxv) {B}] # fxv fresh
+          (LambdaIntro)  ------------------------------------------------------------------------------------
+                         G |- ProgramUnify[c,op,v,L]
+                           & ~ProgramOp[c,explore(fx0,fxv) {...; beta L(p) ...; ...}]
 
                          Here we keep the original f=L and add a new explore operation
                          asking whether L's input-output relation is satisfied here.
@@ -1204,72 +1293,82 @@ Vertices:
                          special logic to deem succeeds{j=u(w)} when u is unconstrained (not bound to a function or any other
                          value) and (ExploreUp) otherwise succeeds.
 
-                         fx<=(succeeds\/imperatives)
+                         fx0<=succeeds+imperatives
                          Beta is beta L(p) d0 {op0} range d1 {op1}
-                         fx2 is succeeds\/~cardinalities
-                         G, (fx1/\succeeds){L}@c, fx:fx2:fx2@d0 |- ProgramOp[c,op; ...; explore(fx,fxv) {...; Beta; ...}]
-           (LambdaDown)  -------------------------------------------------------------------------------------------------------
-                         G[_:fx1:_@c]                           |- ProgramUnify[c,op,v,L]
-                                                                &  ProgramOp[c,explore(fx,fxv) {...; Beta; ...}]
+                         L    is lambda(oc,fx1,u) ...
+                         fx2 is only_succeeds+(contradicts&lambda_allows&fx1)
+                         G, only_succeeds{L}@c, fx0:fx2:only_succeeds@d0 |- ProgramOp[c,explore(fx0,fxv) {...; Beta; ...}]
+           (LambdaDown)  -------------------------------------------------------------------------------------------------
+                         G                                               |- ProgramOp[c,explore(fx0,fxv) {...; Beta; ...}]
+                                                                         &  ProgramUnify[c,op,v,L]
+                                                                         &  ProgramFlexible[e,L]
 
-                         fx<=succeeds\/imperatives
-                         L is lambda(closed,fx,v) d0 i w {op0} range d1 j z {op1}
-                         G |- ProgramOp[c,
+                         fx0<=succeeds+imperatives
+                         L is lambda(closed,fx0,v) d0 i w {op0} range d1 j z {op1}
+                         G, (just_cardinalities&abstracts){op}@c |- ProgramOp[c,
                              op;
                              beta L(p)
-                                 d0       {exists i w; i=p;    Beta(op0)        }
-                                 range e1 {exists j z; j=v(w); Beta(op1); L(p)=z} [e0/d0,e1/d1,*/*]] # e0,e1 fresh
-      (CallClosedIntro)  ---------------------------------------------------------------------------
-                         G[abstracts{u=L}@c, fx1:fx2:_@c] |- ProgramUnify[c,op,u(p),v]
-                                                          &  ~ProgramOp[c,beta L(p) ...]
+                                 d0       {exists i w; i=p;    Beta(G,op0)        }
+                                 range e1 {exists j z; j=v(w); Beta(G,op1); L(p)=z} [e0/d0,e1/d1,*/*]] # e0,e1 fresh
+      (CallClosedIntro)  -----------------------------------------------------------------------------
+                         G[effects{u=L}@c] |- ProgramUnify[c,op,u(p),v]
+                                           & ~ProgramOp[c,beta L(p) ...]
 
-                         fx<=succeeds\/imperatives
-                         L is lambda(closed,fx,v) ...
-                         G, fx1:fx2:none@d0, fx2{u(p)}@c, fx2{L(p)}@c |- ProgramOp[c,op]
-       (CallClosedDown)  ---------------------------------------------------------------
-                         G[abstracts{u=L}@c, fx1:fx2:_@c] |- ProgramUnify[c,op,u(p),v]
-                                                          &  ProgramOp[c,beta L(p) d0 {op0} range e1 {op1}]
-
-Beta Reduction:
-
-                         L is lambda(oc,fx2,u) ...
+                         fx0<=succeeds+imperatives
+                         L is lambda(closed,fx0,v) ...
                          B is beta L(p) d0 {op0} range d1 {op1}
-                         ifx1 is if ifx=none then none else ifx \/ cardinalities/\fx0
-                         G, (fx0*fx1){B}@c, PendingDown[fx]{op0}@d0, PendingAfter[fx0]{op1}@d1, fx2:fx3:ifx1@d1 |- ProgramOp[c,B]
-           (BetaUpDown)  --------------------------------------------------------------------------------------------------------
-                         G[fx{B}@c, fx0{op0}@d0, fx1{op1}@c, _:fx3:_@c, _:_:ifx@e] |- ProgramOp[c,B]
+                         G, fx1:fx2:none@d0, fx2{u(p)}@c, fx2{L(p)}@c |- ProgramOp[c,op]
+       (CallClosedDown)  -------------------------------------------------------------------------
+                         G[effects{u=L}@c, fx1:fx2:_@c]               |- ProgramUnify[c,op,u(p),v]
+                                                                      &  ProgramOp[c,B]
+
+                         L is lambda(oc,fx6,u) ...
+                         B is beta L(p) d0 {op0} range d1 {op1}
+                         ifx5 is if ifx=none then none else (ifx4 + only_cardinalities&abstracts&fx0)
+                         G, SequenceFx(fx0,fx1){B}@c, DownFx(fx6){op0}@d0, AfterFx(fx0){op1}@d1, fx2:fx3:ifx5@d1 |- ProgramOp[c,B      ]
+           (BetaUpDown)  ---------------------------------------------------------------------------------------------------------------
+                         G[fx{B}@c, fx0{op0}@d0, fx1{op1}@c, fx2:fx3:_@c, _:_:ifx4@e]                            |- ProgramOp[c,B      ]
+                                                                                                                 &  ProgramFlexible[e,L]
 
 Exploration (of value and control flow possibilities):
 
-                         fx2 is if fx1<=fx then succeeds else 
-                            cardinalities/\CompliesFx(fx1,fx) \/ succeeds \/
-                            (if ifx<>none then resolves/\ifx else resolves)
-                         E is explore(fx,fxv) {ScopeStartOp[d_0,op_0]]; ...; ScopeStartOp[d_n,op_n]}
-                         G, fx1{fxv}@c, fx2{E}@c                         |- ProgramOp[c,E]
-            (ExploreUp)  -----------------------------------------------------------------
-                         G[_:_:ifx@c][fx1{op_0}@d_0; ...; fx1{op_n}@d_n] |- ProgramOp[c,E]
+                         fx1 is fx_0 + ... + fx_n
+                         fx2 is if fx1<=fx0 then only_succeeds else 
+                            (only_cardinalities&CompliesFx(fx1,fx0)) +
+                            (only_cardinalities&resolves&(if(ifx<>none) then ifx else effects)
+                         E is explore(fx0,fxv) {ScopeStartOp[d_0,op_0]]; ...; ScopeStartOp[d_n,op_n]}
+                         G, (only_cardinalities&fx_0){fxv}@d_0, ...,
+                            (only_cardinalities&fx_n){fxv}@d_n, ...,
+                                                                     fx2{E}@c |- ProgramOp[c,E]
+            (ExploreUp)  ----------------------------------------------------------------------
+                         G[_:_:ifx@c][fx_0{op_0}@d_0, ..., fx_n{op_n}@d_n]    |- ProgramOp[c,E]
 
 Iterate:
 
-                         F is fold(x0) d0 {op0} then d1 x1 {op1} else c2 {op2}
-                         fx2 is fx1/\(diverges\/transacts)\/iterates
-                         G, PendingDown[fx]{op0}@d0, fx2:effects:none@d0 |- ProgramOp[c,iterate {...; F; ...}]
-         (IterateIntro)  -------------------------------------------------------------------------------------
-                         G[fx{F}@c, fx1:_:_@c]                           |- ProgramOp[c,iterate {...; F; ...}]
+                         Iterate  is iterate {Sequence}
+                         Sequence is ...; Split; ...
+                         Split    is split(x0) d0 {op0} then d1 x1 {op1} else c2 {op2}
+                         fx3 is fx2&(recurses+transacts) + only_cardinalities&iterates
+                         G, fx1{Iterate}@c, DownFx(fx0){Sequence}@d0, fx3:effects:none@d0 |- ProgramOp[c,Iterate]
+         (IterateIntro)  ----------------------------------------------------------------------------------------
+                         G[fx0{Iterate}@c, fx1{Sequence}@c, fx2:_:_@c]                    |- ProgramOp[c,Iterate]
 
-                         fx1 is succeeds\/diverges\/reads\/reads_pending\/writes\/writes_pending\/suspends\/suspends_pending
-                         G              |- ProgramOp[c,iterate {...; verify(fx1,U00) d0 {op0; exists x2; scope d1 {op1} [x2/x1,*/*]}; cast(x2) {tuple(1) t => {scope d2 {op2} [x2(0)/x0,*/*]}};               ...}] # x2 fresh
-  (IterateSucceedsElim)  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-                         G[fx1{op0}@d0] |- ProgramOp[c,iterate {...; fold(x0)        d0 {op0} then  d1 x1         {op1                                                                       } else d2 {op2}; ...}]
+                         G                   |- ProgramOp[c,iterate {...; verify(fx1,U00) d0 {op0; exists x2; scope d1 {op1} [x2/x1,*/*]}; cast(x2,x3,effects) {tuple(1) t => {scope d2 {op2} [x2(0)/x0,*/*]}; tuple(0) t => exists};               ...}] # x2,x3 fresh
+  (IterateSucceedsElim)  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                         G[succeeds{op0}@d0] |- ProgramOp[c,iterate {...; split(x0)       d0 {op0} then  d1 x1         {op1                                                                                                        } else d2 {op2}; ...}]
 
-                         G                |- ProgramOp[c,                                  scope d2 {op2[*/*]}]
-     (IterateFailsElim)  --------------------------------------------------------------------------------------
-                         G[fails{op0}@d0] |- ProgramOp[c,fold(x0) d0 {op0} then d1 x1 {op1} else d2 {op2     }]
+                         G                |- ProgramOp[c,                                   scope d2 {op2[*/*]}]
+     (IterateFailsElim)  ---------------------------------------------------------------------------------------
+                         G[fails{op0}@d0] |- ProgramOp[c,split(x0) d0 {op0} then d1 x1 {op1} else d2 {op2     }]
 
-                         F is fold(x0) d0 {op0} then d1 x1 {op1} else d2 {op2}
-                         G, fx2:succeeds\/~cardinalities:none@d0, fx2:fails\/~cardinalities:none@e0 |- ProgramSpan[explore(fx,fxv) {...; ExploreSpan[F]; ExploreSpan[F][e0/d0,*/*]; ...}] # e0 fresh
-       (IterateExplore)  ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-                         G[fx2:effects:none@d0, (decides\/imperatives){op0}@d0]                     |- ProgramSpan[explore(fx,fxv) {...; ExploreSpan[F];                            ...}]
+                         F is split(x0) d0 {op0} then d1 x1 {op1} else d2 {op2}
+                         Not G[succeeds{op0}@d0]
+                         Not G[fails   {op0}@d0]
+                         G, fx2:succeeds:none@d0, succeeds{op0}@d0,
+                            fx2:effects :none@e0, fails   {op0}@d0
+                                                                               |- ProgramSpan[explore(fx0,fxv) {...; ExploreSpan[F]; ExploreSpan[F][e0/d0,*/*]; ...}] # e0 fresh
+       (IterateExplore)  --------------------------------------------------------------------------------------------------------------------------------------------
+                         G[fx2:effects:none@d0, (decides+imperatives){op0}@d0] |- ProgramSpan[explore(fx0,fxv) {...; ExploreSpan[F];                            ...}]
 
                          When an iterate's domain <decides>, split the enclosing explore to simultaneously:
                          (1) Verify an exploration split assuming the domain d0 succeeds.
@@ -1277,18 +1376,21 @@ Iterate:
 
 Choice:
  
+                         iterates<=fx0
                          iterates<=fx1
-                         G                                           |- ProgramOp[c,iterate {...; fold(x0) c0 {FlexibleSpan[opL    ]} then d1 x1 {op1} else d2 {
-                                                                                                  fold(x0) c0 {FlexibleSpan[opR    ]} then d1 x1 {op1} else d2 {op2} }; ...}]
-      (ChoiceSolveElim)  ----------------------------------------------------------------------------------------------------------------------------------------------------
-                         G[_:fx1:_@c, ~iterates_pending{opL|opR}@c0] |- ProgramOp[c,iterate {...; fold(x0) c0 {FlexibleSpan[opL|opR]} then d1 x1 {op1} else d2 {op2  }; ...}]
+                         G                                            |- ProgramOp[c,iterate {...; split(x0) c0 {FlexibleSpan[opL    ]} then d1 x1 {op1} else d2 {
+                                                                                                   split(x0) c0 {FlexibleSpan[opR    ]} then d1 x1 {op1} else d2 {op2} }; ...}]
+      (ChoiceSolveElim)  ------------------------------------------------------------------------------------------------------------------------------------------------------
+                         G[fx0:fx1:_@c, unblock_iterates{opL|opR}@c0] |- ProgramOp[c,iterate {...; split(x0) c0 {FlexibleSpan[opL|opR]} then d1 x1 {op1} else d2 {op2  }; ...}]
 
                          Choices are only allowed within an iterate op's starting FlexibleSpan, not in its whole IterateSpan.
 
-                         not iterates<=fx1
-                         G            |- ProgramSpan[explore(fx,fxv) {...; ExploreSpan[FlexibleOp[c,op0    ]]; ExploreSpan[FlexibleOp[c,op1]][*/*]; ...}]
-      (ChoiceImplyElim)  --------------------------------------------------------------------------------------------------------------------------------
-                         G[_:fx1:_@c] |- ProgramSpan[explore(fx,fxv) {...; ExploreSpan[FlexibleOp[c,op0|op1]];                                      ...}]
+                         not iterates<=fx2
+                         G            |- ProgramSpan[explore(fx0,fxv) {...; ExploreSpan[FlexibleOp[c,op0    ]]; ExploreSpan[FlexibleOp[c,op1]][*/*]; ...}]
+      (ChoiceImplyElim)  ---------------------------------------------------------------------------------------------------------------------------------
+                         G[_:fx2:_@c] |- ProgramSpan[explore(fx0,fxv) {...; ExploreSpan[FlexibleOp[c,op0|op1]];                                      ...}]
+
+                         We must further handle the case of implied a|b inside an 'in' abstraction like :type{a|b}.
 
 In and Stage:
 
@@ -1296,77 +1398,99 @@ In and Stage:
           (InSolveElim)  --------------------------------------------------------------
                          G[_:_:none@c] |- ProgramOp[c,in(fx,none) d0         i x {op0}]
 
-                         ifx4<>none
                          In  is in(fx,E) d0 i x {op0}
-                         fx6 is GateFx(fx/\fx2/\fx3 \/ (if ifx4<>none then ifx4 else contradicts),fx5)
-                         G, effects:fx6:none@d0, (fx6/\~unifies){In}@c |- ProgramOp[c,In]
-         (InImplyIntro)  -------------------------------------------------------------------------------
-                         G[fx2:fx3:ifx4@c            ]                 |- ProgramOp[c,In] where E is none and fx5 is succeeds
-                         G[fx2:fx3:ifx4@c, fx5{fxv}@c]                 |- ProgramOp[c,In] where E is fxv
+                         fx6 is GateFx(fx&fx2&fx3 + fx4,fx5)
+                         G, (fx6&no_unifies){In}@c, DownFx(fx1){op0}@d0, fx2:fx6:none@d0 |- ProgramOp[c,In]
+         (InImplyIntro)  ----------------------------------------------------------------------------------------------------------------------
+                         G[fx1{In}@c, fx2:fx3:fx4@c            ]                         |- ProgramOp[c,In] where E is none and fx5 is succeeds
+                         G[fx1{In}@c, fx2:fx3:fx4@c, fx5{fxv}@c]                         |- ProgramOp[c,In] where E is fxv
 
-                         G            |- ProgramOp[c, in     (fx     ,fxv) d0 i x {op0};
-                                                      explore(fx/\fx1,fxv)               {scope d1 {exists y; op1}} [*/*]]
+                         G            |- ProgramOp[c, in     (fx0    ,fxv) d0 i x {op0};
+                                                      explore(fx0&fx1,fxv)               {scope d1 {exists y; op1}} [*/*]]
             (StageElim)  -------------------------------------------------------------------------------------------------
-                         G[fx1:_:_@c] |- ProgramOp[c, stage  (fx     ,fxv) d0 i x {op0}   value d1         y {op1}       ]
+                         G[fx1:_:_@c] |- ProgramOp[c, stage  (fx0    ,fxv) d0 i x {op0}   value d1         y {op1}       ]
 
 Verify and Assume testing primitives:
 
-                         V is verify(fx1,err) d {op0}
-                         G, (fx0/\~unifies){V}@c, PendingDown[fx]{op0}, fx1:effects:none@d |- ProgramOp[c,V]
-          (VerifyIntro)  -----------------------------------------------------------------------------------
-                         G[fx{V}@c, fx0{op0}@d]                                            |- ProgramOp[c,V]
+                         V is verify(fx1) d {op0}
+                         G, (fx0&no_unifies){V}@c, DownFx(fx){op0}, fx1:effects:none@d |- ProgramOp[c,V]
+          (VerifyIntro)  -------------------------------------------------------------------------------
+                         G[fx{V}@c, fx0{op0}@d]                                        |- ProgramOp[c,V]
 
-                         A is assume(fx) d {op0}
-                         G, (fx0/\~unifies){A}@c, fx1:cardinalities/\fx/\fx2:none@d |- ProgramOp[c,A]
-          (AssumeIntro)  ----------------------------------------------------------------------------
-                         G[fx0{op0}@d, fx1:fx2:_@c]                                 |- ProgramOp[c,A]
+                         A is assume(fx0) d0 {op0}
+                         G, (fx0&no_unifies){A}@c, DownFx(fx1){op0}@d0, fx1:abstracts&fx0&fx2:none@d0 |- ProgramOp[c,A]
+          (AssumeIntro)  ----------------------------------------------------------------------------------------------
+                         G[fx4{A}@c, fx0{op0}@d0, fx1:fx2:_@c]                                        |- ProgramOp[c,A]
 
 Casting:
 
-                         v matches head pattern pattern_i and definitely matches no earlier pattern
-                         G                 |- ProgramOp[c,op_i                                   ]
-            (CastElim)   -------------------------------------------------------------------------
-                         G[abstracts{u=v}] |- ProgramOp[c,cast(u) {...; pattern_i => {op_i}; ...}]
+                         G, fx0{cast(u,v,fx0) ...}@c |- ProgramOp[c,op_i             ]
+           (CastIntro)   -------------------------------------------------------------
+                         G                           |- ProgramOp[c,cast(u,v,fx0) ...]
 
-                         v matches head pattern pattern_i and definitely matches no earlier pattern
-                         G                 |- ProgramOp[c,resolved(opv){op_i}                            ]
-         (CastOpvElim)   ---------------------------------------------------------------------------------
-                         G[abstracts{u=v}] |- ProgramOp[c,cast(u,opv,err) {...; pattern_i => {op_i}; ...}]
+                         C is cast(u,v,fx0) {...; head_i => {op_i}; ...}
+                         head matches head_i and definitely does not match head_0 ... head_i-1
+                         fx2 is (contradicts+fx1)&converges&computes&no_unifies&accepts
+                         G, fx2{C}@c            |- ProgramOp[c,C; op_i]
+        (CastSucceeds)   ----------------------------------------------
+                         G[fx1{u=head}@c]       |- ProgramOp[c,C      ]
+                                                & ~ProgramOp[c,op_i   ]
+
+                         C is cast(u,v,fx0) {...; head_i => {op_i}; ...}
+                         head definitely does not match head_0 ... head_i-1
+                         fx1 is fails&converges&computes&no_unifies&accepts
+                         G, (fx1&fx3){C}@c, (fx1&fx3){v}@c   |- ProgramOp[c,C]
+    (CastHeadMismatch)   -----------------------------------------------------
+                         G[fx2:fx3:fx4@c, effects{u=head}@c] |- ProgramOp[c,C]
+
+                         fx1 is fails or contradicts
+                         fx2 is fx1&converges&computes&no_unifies&accepts
+                         G, fx2{cast(u,v,fx0) ...}@c, fx2{v}@c |- ProgramOp[c,cast(u,v,fx0) ...]
+    (CastVariableFails)  -----------------------------------------------------------------------
+                         G[fx1{u}]                             |- ProgramOp[c,cast(u,v,fx0) ...]
+
+                         C is cast(u,opv,fx0) {...; head_i => {op_i}; ...}
+                         head matches head_i and definitely does not match head_0 ... head_i-1
+                         fx2 is succeeds&converges&computes&no_unifies&accepts
+                         G, fx2{C}@c          |- ProgramOp[c,C; resolved(opv){op_i}]
+         (CastOpvElim)   -----------------------------------------------------------
+                         G[effects{u=head}@c] |- ProgramOp[c,C                     ]
+                                              & ~ProgramOp[c,resolved(opv){op_i}   ]
 
 Native Functions:
 
-                         G, succeeds{Q=rational(Q)}@c |- Program
-         (RationalAtom)  ---------------------------------------
-                         G[fx{u=Q}@c]                 |- Program
+                         G, only_succeeds{Q=rational(Q)}@c |- Program
+         (RationalAtom)  --------------------------------------------
+                         G[effects{u=Q}@c]                 |- Program
   
-                         G, succeeds{Z=int(Z)}@c |- Program
-              (IntAtom)  ----------------------------------
-                         G[fx{u=Z}@c]            |- Program
+                         G, only_succeeds{Z=int(Z)}@c |- Program
+              (IntAtom)  ---------------------------------------
+                         G[effects{u=Z}@c]            |- Program
                          
   
-                         G[succeeds{n=nat(n)}@c] |- Program
-              (NatAtom)  ----------------------------------
-                         G[fx{u=n}@c]            |- Program
+                         G[only_succeeds{n=nat(n)}@c] |- Program
+              (NatAtom)  ---------------------------------------
+                         G[effects{u=n}@c]            |- Program
   
-                         G, fx{u=int(v)}@c      |- Program
-   (IntRationalSubtype)  ---------------------------------
-                         G[fx{u=rational(v)}@c] |- Program
+                         G, fx0{u=int(v)}@c      |- Program
+   (IntRationalSubtype)  ----------------------------------
+                         G[fx0{u=rational(v)}@c] |- Program
   
-                         G, fx{u=nat(v)}@c      |- Program
-        (NatIntSubtype)  ---------------------------------
-                         G[fx{u=int(v)}@c]      |- Program
+                         G, fx0{u=nat(v)}@c      |- Program
+        (NatIntSubtype)  ----------------------------------
+                         G[fx0{u=int(v)}@c]      |- Program
   
                          m and n are integers
-                         G, fx{f(y)}@c                                       |- ProgramOp[c,op; x=m+n]
-               (AddInt)  -----------------------------------------------------------------------------
-                         G[fx{f=operator'+'}@c, fx{x=tuple(u) t}@c, fx{u=2}@c,
-                           fx{(tuple(u) t)(0)=m}@c, fx{(tuple(u) t)[1]=n}@c] |- ProgramUnify[c,op,x,f(y)]
-                                                                                & ~ProgramOp[c,x=m+n]
+                         G, fx0{f(y)}@c                                        |- ProgramOp[c,op; x=m+n   ]
+               (AddInt)  --------------------------------------------------------------------------------
+                         G[fx0{f=operator'+'}@c, fx0{x=tuple(u) t}@c, fx0{u=2}@c,
+                           fx0{(tuple(u) t)(0)=m}@c, fx0{(tuple(u) t)[1]=n}@c] |- ProgramUnify[c,op,x,f(y)]
+                                                                               & ~ProgramOp   [c,x=m+n    ]
 
                          TODO: Rephrase this at a lower level on 'beta' construct.
 
 ------------------------------------------------------------------------------------------------------------------------
-Verifier Data Flow Inference Rule
+Verse Data Flow Inference Rules
 ------------------------------------------------------------------------------------------------------------------------
 
 Overview of flow graphs and domination:
@@ -1400,7 +1524,7 @@ Strength-cut dominators:
     the subgraph consisting of edges v->u where our fully saturated assumption set G doesn't contain an
     assumption st{v=u}@c.
 
-    Now we define the strength-cut domination relationship st{v>>w}@c, in a context c lacking pending <unifies>, as:
+    Now we define the strength-cut domination relationship st{v>>w}@c, in a flexible context c lacking <unifies>, as:
     st{v>>u}@c means that v>>u in the strength st-cut subgraph.
 
     Why do we do this? Because succeeds{v>>w} means that there is guaranteed to be no runtime dispute about whether
@@ -1416,7 +1540,7 @@ About head normal forms and head shapes:
         HeadShape[u]          <= any    (for all Vertices u)
         HeadShape[atom]@c     <= atom   (where atom comes from Atom Values in the spec)
         HeadShape[tuple(x) t] <= []any  (for all tuples)
-        HeadShape[tuple(x) t] <= [n]any (when our assumptions G satisfy G[abstracts{x=n}@c] for n in the Natural Numbers)
+        HeadShape[tuple(x) t] <= [n]any (when our assumptions G satisfy G[effects{x=n}@c] for n in the Natural Numbers)
         TODO: Expand to all Head EBNF
 
 About data flow among tuples and their elements:
@@ -1471,33 +1595,33 @@ Data Flow Analysis Process
                          FG[st{w->*v}@c, v->u]  |- Program
 
                          F is tuple(p) t | L
-                         FG, succeeds{us->*us at p}@c              |- Program
-         (ProductReach)  ----------------------------------------------------
-                         FG[abstracts{us=F}@c, abstracts{us(p)}@c] |- Program
+                         FG, succeeds{us->*us at p}@c          |- Program
+         (ProductReach)  ------------------------------------------------
+                         FG[effects{us=F}@c, effects{us(p)}@c] |- Program
 
-                         FG, st{vs->*us at q}                   |- Program
-    (EqualProductReach)  -------------------------------------------------
-                         FG[st{vs->*us at p}, abstracts{p=q}@c] |- Program
+                         FG, st{vs->*us at q}                 |- Program
+    (EqualProductReach)  -----------------------------------------------
+                         FG[st{vs->*us at p}, effects{p=q}@c] |- Program
 
-                         For all xs&q where FG[abstracts{xs(q)}@c], we do not have FG[st{xs=ws}@c, abstracts{q=p}@c].
+                         For all xs&q where FG[effects{xs(q)}@c], we do not have FG[st{xs=ws}@c, effects{q=p}@c].
                          FG, st{ws->*us at p}@c               |- Program
 (TransitiveProductReach) -----------------------------------------------
                          FG[st{ws->vs}@c, st{vs->*us at p}@c] |- Program
 
                          Not FG[st{ws=vs}@c]
-                         FG, st{ws(q)->*us(p)}@c                                            |- Program
-         (ElementReach)  -----------------------------------------------------------------------------
-                         FG[ws->vs, abstracts{ws(q)}@c, abstracts{q=p}, st{vs->*us at p}@c] |- Program
+                         FG, st{ws(q)->*us(p)}@c                                        |- Program
+         (ElementReach)  -------------------------------------------------------------------------
+                         FG[ws->vs, effects{ws(q)}@c, effects{q=p}, st{vs->*us at p}@c] |- Program
 
-                         For all xs&ys&qs, we do not have FG[xs->*ws at q, st{xs=ys}@c, abstracts{ys(q)}, abstracts{q=p}]
+                         For all xs&ys&qs, we do not have FG[xs->*ws at q, st{xs=ys}@c, effects{ys(q)}, effects{q=p}]
                          FG, st{z->*us(p)}@c    |- Program (z fresh)
     (BlockElementReach)  ---------------------------------
                          FG[st{ws->*us at p}@c] |- Program
 
-                         Not FG[abstracts{xs(r)}@c, abstracts{r=p}@c]
-                         FG, st{z->*us(p)}@c, st{z=ys(q)}                                                |- Program (z fresh)
-    (EqualElementReach)  ------------------------------------------------------------------------------------------
-                         FG[xs->ws, abstracts{ys(q)}@c, abstracts{q=p}, st{ws->*us at p}@c, st{xs=ys}@c] |- Program
+                         Not FG[effects{xs(r)}@c, effects{r=p}@c]
+                         FG, st{z->*us(p)}@c, st{z=ys(q)}                                            |- Program (z fresh)
+    (EqualElementReach)  --------------------------------------------------------------------------------------
+                         FG[xs->ws, effects{ys(q)}@c, effects{q=p}, st{ws->*us at p}@c, st{xs=ys}@c] |- Program
 
     Data Flow Analysis Stage 2: We run the following rules to saturation to treat strength-reachable vertices as strength-dominator
     candidates. The output is a set of dominators candidates st{v>>u}@c which the next stage will narrow down by enforcing dominator
@@ -1512,18 +1636,18 @@ Data Flow Analysis Process
                          FG[st{w=v}@c, st{v>>u}@c] |- Program
 
                          Not FG[st{u=w}@c]
-                         FG, st{v>>u}@c                       |- ProgramFlexible[c,u]
-        (FlowDominator)  ----------------------------------------------------------------------------------------------------------
-                         FG[st{v>>w}@c, w->u, ~unifies{op}@c] |- ProgramFlexible[c,u]
-                                                              &  ProgramSpan[(ExploreStartOp|IterateStartOp|FlexibleStartOp)[c,op]]
+                         FG, st{v>>u}@c                         |- ProgramFlexible[c,u]
+        (FlowDominator)  ------------------------------------------------------------------------------------------------------------
+                         FG[st{v>>w}@c, w->u, no_unifies{op}@c] |- ProgramFlexible[c,u]
+                                                                &  ProgramSpan[(ExploreStartOp|IterateStartOp|FlexibleStartOp)[c,op]]
 
                          Candidate dominators of w flow across non-strength-cut edges w->u to become candidate dominators of u.
                          We only do this once u's context is free of <unifies> effects, meaning no further unifications (and thus
                          data flow arrows) may be introduced.
 
-                         FG, st{vs(q)>>us(p)}@c                                                 |- Program
-        (CallDominator)  ---------------------------------------------------------------------------------
-                         FG[abstracts{vs(q)}@c, st{vs>>us}@c, abstracts{us(p)}@c and st{p=q}@c] |- Program
+                         FG, st{vs(q)>>us(p)}@c                                             |- Program
+        (CallDominator)  -----------------------------------------------------------------------------
+                         FG[effects{vs(q)}@c, st{vs>>us}@c, effects{us(p)}@c and st{p=q}@c] |- Program
 
     Data Flow Analysis Stage 3: We run the following rules to saturation to remove inconsistent candidate dominators fx{v>>u}@c.
     Upon completion, the remaining candidate dominators are guaranteed to be actual dominators.
@@ -1538,13 +1662,13 @@ Data Flow Analysis Process
                          Not:
                              FG[st{us(p)>>us(p)}@c] or
                              exists ws.   FG[st{xs(p)>>us(p)}@c, st{xs=vs}@c] or
-                             exists xs q. FG[st{xs(q)>>us(p)}@c, st{xs=vs}@c, st{q=p}@c,(st\/computes){us(p)}@c, (st\/computes){ws(q)}@c]
-                         FG with st{vs>>us} removed         |- Program
-  (FunctionConsistency)  ---------------------------------------------
-                         FG[st{vs>>us}, abstracts{us(p)}@c] |- Program
+                             exists xs q. FG[st{xs(q)>>us(p)}@c, st{xs=vs}@c, st{q=p}@c,st{us(p)}@c, st{ws(q)}@c]
+                         FG with st{vs>>us} removed       |- Program
+  (FunctionConsistency)  -------------------------------------------
+                         FG[st{vs>>us}, effects{us(p)}@c] |- Program
 
                          Not:
-                             (exists ws cs q. FG[st{v=ws(q)}@c, abstracts{q=p}, st{cs>>us}@c, st{cs>>ws}@c)] or
+                             (exists ws cs q. FG[st{v=ws(q)}@c, effects{q=p}, st{cs>>us}@c, st{cs>>ws}@c)] or
                              (for all w where FG[succeeds{w->*u}]. (FG[st{v=w}@c] or FG[st{v>>w}@c]) and FG[st{v<=u}@c])
                          FG with st{v>>us(p)}@c removed |- Program
       (CallConsistency)  -----------------------------------------
@@ -1552,47 +1676,46 @@ Data Flow Analysis Process
 
     Data Flow Analysis Stage 4: We apply our local dominator assumptions FG to global equality assumptions G.
         
-                         G[st{v=u}@c]   |- Program
-        (DominatorElim)  -------------------------
-                         FG[st{v>>u}@c] |- Program
+                         G[st{v=u}@c]                     |- Program
+        (DominatorElim)  -------------------------------------------
+                         FG[st{v>>u}@c, st{v}@c, st{u}@c] |- Program
 
-                         G[st{as(p)=bs(q)}@c]                                                       |- Program
- (ElementDominatorElim)  -------------------------------------------------------------------------------------
-                         FG[st{cs>>as}@c, st{cs>>bs}@c, abstracts{p=q}@c, abstracts{as(p)=bs(q)}@c] |- Program
+                         This rule works because y=f(x) and y=L block data flow analysis until they are expanded
+                         and their effects are reflected in separate ops.
 
 ------------------------------------------------------------------------------------------------------------------------
 Verifier User Macro Inference Rules
 ------------------------------------------------------------------------------------------------------------------------
 
-Here we extend Verse with simple Scheme style hygenic macros of the form m{a} and m(a){b} with
+Here we extend Verse with simple Scheme style hygienic macros of the form m{a} and m(a){b} with
 macro unquote &e and unquote-splicing &..e with some simple transformations among syntax and equations.
 This is incomplete (we assume we can write functions on syntax, but provide no features for doing so),
-but demonstrates that our EBNF patterns extend naturally to hygenic scoping.
+but demonstrates that our EBNF patterns extend naturally to hygienic scoping.
 
 The macro syntax quoting operation Quote[sc,s] takes a scope and syntax, where the right-hand sides refer to
 Verse syntax datatype constructors:
 
     Quote(sc,u){&s0}   ---> exists p; syntax(opv1,p,u){s0}          # Where s0 is expected to be an expression producing a syntax value.
     Quote(sc,u){Num}   ---> u=nom(/Verse.org/Verse/syntax/number) n # Where n is the natural number for Num.
-    Quote(sc,u){Ident} ---> u=nom(/Verse.org/Verse/syntax/ident)  tuple(2) t; exists t(0) t(1); t0(0)=sc; t0(1)=Ident
-    Quote(sc,u){a[b]}  ---> u=nom(/Verse.org/Verse/syntax/at)     tuple(2) t; exists t(0) t(1); Quote(t(0),sc){a}; Quote(t(1),sc){b}
-    Quote(sc,u){a(b)}  ---> u=nom(/Verse.org/Verse/syntax/call)   tuple(2) t; exists t(0) t(1); Quote(t(0),sc){a}; Quote(t(1),sc){b}
-    Quote(sc,u){m{a}}  ---> u=nom(/Verse.org/Verse/syntax/invoke) tuple(2) t; exists t(0) t(1); Quote(t(0),sc){a}; Quote(t(1),sc){b}
+    Quote(sc,u){Ident} ---> u=nom(/Verse.org/Verse/syntax/ident)  tuple(2) t; t0(0)=sc; t0(1)=Ident
+    Quote(sc,u){a[b]}  ---> u=nom(/Verse.org/Verse/syntax/at)     tuple(2) t; Quote(t(0),sc){a}; Quote(t(1),sc){b}
+    Quote(sc,u){a(b)}  ---> u=nom(/Verse.org/Verse/syntax/call)   tuple(2) t; Quote(t(0),sc){a}; Quote(t(1),sc){b}
+    Quote(sc,u){m{a}}  ---> u=nom(/Verse.org/Verse/syntax/invoke) tuple(2) t; Quote(t(0),sc){a}; Quote(t(1),sc){b}
     Quote(sc,u){...}   ---> ... TODO: Quote other forms of core Verse Expr.
 
                          G |- ProgramOp[c,syntax(opv,u,v){Num}] # Where Num is derived from n.
-           (NumUnquote)  -------------------------------------------------------------------------------------------------------------------------
-                         G, abstracts{p0=nom(/Verse.org/Verse/syntax/number) p1}@c, abstracts{p1=n}@c |- ProgramOp[c,syntax(opv,u,v){Unquote(p0)}]
+           (NumUnquote)  ---------------------------------------------------------------------------------------------------------------------
+                         G, effects{p0=nom(/Verse.org/Verse/syntax/number) p1}@c, effects{p1=n}@c |- ProgramOp[c,syntax(opv,u,v){Unquote(p0)}]
 
                          p1 is a ground value 2-tuple containing a scope sc and an identifier Ident (which relates c and sc).
-                         G                                                        |- ProgramOp[c,resolved(opv){u=definable; v=definable}]
-   (IdentUnquoteSyntax)  ----------------------------------------------------------------------------------------------------------------
-                         G, abstracts{p0=nom(/Verse.org/Verse/syntax/ident) p1}@c |- ProgramOp[c,syntax(opv,u,v){Unquote(p0)}]
-                                                                                  &  ProgramScope[sc,ScopeSpan[define Ident {definable}]]
+                         G                                                      |- ProgramOp[c,resolved(opv){u=definable; v=definable}]
+   (IdentUnquoteSyntax)  --------------------------------------------------------------------------------------------------------------
+                         G, effects{p0=nom(/Verse.org/Verse/syntax/ident) p1}@c |- ProgramOp[c,syntax(opv,u,v){Unquote(p0)}]
+                                                                                &  ProgramScope[sc,ScopeSpan[define Ident {definable}]]
 
                          G |- ProgramOp[c,resolved(opv){syntax(opv1,u,v){Unquote(p1(0))[Unquote(p1(1))]}}]
     (CallClosedUnquote)  ------------------------------------------------------------------------------------------------------------------------------
-                         G, abstracts{p0=nom(/Verse.org/Verse/syntax/at) p1}@c, abstracts{p1=tuple(2) t}@c |- ProgramOp[c,syntax(opv,u,v){Unquote(p0)}]
+                         G, effects{p0=nom(/Verse.org/Verse/syntax/at) p1}@c, effects{p1=tuple(2) t}@c |- ProgramOp[c,syntax(opv,u,v){Unquote(p0)}]
 
       (CallOpenUnquote)  ... Same idea as (CallClosedUnquote).
         (InvokeUnquote)  ... Same idea as (CallClosedUnquote).
@@ -1602,7 +1725,7 @@ Verse syntax datatype constructors:
                                   exists f g h i x y z;
                                   syntax(opv1,h,f){s0}
                                   Quote(sc,y){s1}
-                                  cast(f) {
+                                  cast(f,fxv,effects) {
                                       macro L => {g=L; z=g(y)}
                                   }
                                   syntax(opv2,u,v){Unquote(z)}]
@@ -1615,21 +1738,20 @@ Verse syntax datatype constructors:
 Verse Verification Aftermath
 ------------------------------------------------------------------------------------------------------------------------
 
-Verification of a program with syntax s starts by introducing fresh c,u,v,opv and making the initial inference:
-    empty |- explore(top_allows,fxv) {scope c {exists u v; syntax(opv,u,v){s}}}
+To verify a program with syntax s, we define InitialProgramOp as scope c {exists u v; syntax(opv,u,v){s}}
+and make the initial inference:
+
+    empty |- explore(top_allows,fxv) {InitialProgramOp}
 
 We then apply available inference rules beginning with (ProgramIntro) until one of the following occurs:
 
-    1) The (ProgramElim) inference rule is discharged, so a verifier should accept the program.
-       Our fully verified desugared program is then syntax(opv,u,v){s} with the following substitutions
-       named (Desugar) applied where G are the Assumptions available to (ProgramElim) and c is the
-       top-level scope from above:
+    1) The (ProgramElim) inference rule is discharged, so the verifier should accept the program.
+       Our fully verified desugared program is then VerifiedProgramOp:=Verified(G,c,InitialProgramOp) where:
 
-       ProgramOp[d,syntax(opv1,u1,v1){s}]    ---> op1 where G[opv1:=op1@c]
-       ProgramOp[d,scope e {op}]             ---> ProgramOp[c,op[d/e]]
-       ProgramOp[d,define Ident {definable}] ---> ProgramOp[c,exists]
+       Verified(G,op) := op[op1    / syntax(opv,u,v){s}      ] where G[opv:=op1@c]
+                           [exists / define Ident {definable}]
 
-       The resulting program has the following properties:
+       The resulting program VerifiedProgramOp has the following properties:
        - It's object code: It contains no syntax to be desugared or identifiers to be resolved.
        - It's proof-carrying: The verified program can be verified again and it will be accepted.
 
@@ -1643,65 +1765,66 @@ We then apply available inference rules beginning with (ProgramIntro) until one 
        a specification TBD that considers:
        - Program sequential order.
        - Dependencies among the program which may assist in identifying the ultimate cause of the error.
-       - Errors err embedded in various Operations.
+       - Effects belonging to the set err embedded in various Operations and in fx{op}@c.
        - Operations whose inferred effects are disallowed (we have fx1{op}@c and fx2:_:_@c without fx1<=fx2).
 
 ------------------------------------------------------------------------------------------------------------------------
 Verse Runtime
 ------------------------------------------------------------------------------------------------------------------------
 
-The runtime is defined on simpler Operations translated with the rule named (RuntimeSimplify):
+Given a verified program VerifiedProgramOp from above, the runnable program is RuntimeProgramOp:=Runtime(OP) where:
 
-    ProgramOp[c,lambda(oc,fx,u) d0 i w {op0}; range d1 j z {op1}] ---> ProgramOp[c,icfp_lambda(u) i z {exists j w; op0; op1[c/d0][c/d1]}]
-    ProgramOp[c,in(fx,fxv) d i x {op}]                            ---> ProgramOp[c,exists i x; op[c/d]]
-    ProgramOp[c,stage(fx,fxv) d0 i x {op0} value y {op1}]         ---> ProgramOp[c,exists i x y; i=y; u=x; op0[c/d0]; op1[c/d0]]
-    ProgramOp[c,verify(fx,err) d {op}]                            ---> ProgramOp[c,op[c/d]]
-    ProgramOp[c,assume(fx)      d {op}]                           ---> ProgramOp[c,op[c/d]]
+    Runtime(op) := op[ProgramOp[c,op1[d/c]]                                     / ProgramOp[c,scope d. op1]]
+                     [ProgramOp[c,exists i x; op1[c/d]]]                        / ProgramOp[c,in(fx,fxv) d i x {op1}]]
+                     [ProgramOp[c,exists i x y; i=y; u=x; op0[c/d0]; op1[c/d1]] / ProgramOp[c,stage(fx,fxv) d0 i x {op0} value d1 {op1}]
+                     [ProgramOp[c,op1[c/d]]                                     / ProgramOp[c,verify(fx) d {op1}]]
+                     [ProgramOp[c,op1[c/d]]                                     / ProgramOp[c,assume(fx) d {op1}]]
+                     [icfp_lambda(u) i z {exists j w; op0; op1[c/d0][c/d1]}     / lambda(oc,fx,u) d0 i w {op0}; range d1 j z {op1}]
 
 TODO: Say which verifier inference rules are supported in the runtime, and establish that they're
 at least as powerful as ICFP on confluent programs.
 
-NOTE: Here are some of the operations we'll define at runtime, illustrating how we use "pending effects" to
+NOTE: Here are some of the operations we'll define at runtime, illustrating how we use "blocked effects" to
 orchestrate program sequencing within inference rules:
 
-                         G, (abstracts\/allocates){x=new(u)} |- ProgramOp[c,x=new(u)]
-             (NewIntro)  ------------------------------------------------------------
-                         G                                   |- ProgramOp[c,x=new(u)]
+                         G, (abstracts*allocates){x=new(u)} |- ProgramOp[c,x=new(u)]
+             (NewIntro)  -----------------------------------------------------------
+                         G                                  |- ProgramOp[c,x=new(u)]
 
                          TODO: Extend so pointers tote their types.
   
-                         G, P^:=u          |- ProgramOp[c,x=P     ] # P fresh
-              (NewElim)  ------------------------------------------
-                         G, abstracts{u}@c |- ProgramOp[c,x=new(u)]
+                         G, P^:=u        |- ProgramOp[c,x=P     ] # P fresh
+              (NewElim)  ----------------------------------------
+                         G, effects{u}@c |- ProgramOp[c,x=new(u)]
   
-                         G, (abstracts\/reads\/reads_pending){x=v^} |- ProgramOp[c,x=v^]
-            (ReadIntro)  ----------------------------------------------------------------
-                         G                                          |- ProgramOp[c,x=v^]
-                                                                    &  ProgramFlexible[c,x]
+                         G, (abstracts*reads){x=v^} |- ProgramOp[c,x=v^]
+            (ReadIntro)  --------------------------------------------------
+                         G                          |- ProgramOp[c,x=v^]
+                                                    &  ProgramFlexible[c,x]
   
-                         G                                               |- ProgramOp[c,x=u]
+                         G                                           |- ProgramOp[c,x=u]
              (ReadElim)  ---------------------------------------------------------------------
-                         G[abstracts{y=P}, P^:=u, ~writes_pending{x=v^}] |- ProgramOp[c,x=v^]
-                                                                         &  ProgramFlexible[c,x]
+                         G[effects{y=P}, P^:=u, unblock_reads{x=v^}] |- ProgramOp[c,x=v^]
+                                                                     &  ProgramFlexible[c,x]
   
-                         G, (abstracts\/writes\/writes_pending){x=set u^=v} |- ProgramOp[c,x=set u^=v]
-           (WriteIntro)  -----------------------------------------------------------------------------
-                         G                                                  |- ProgramOp[c,x=set u^=v]
+                         G, (abstracts*writes){x=set u^=v} |- ProgramOp[c,x=set u^=v]
+           (WriteIntro)  ------------------------------------------------------------
+                         G                                 |- ProgramOp[c,x=set u^=v]
   
-                         G[P^:=v1/P^:=v0]                                                                      |- ProgramOp[c,x=()       ]
-            (WriteElim)  -----------------------------------------------------------------------------------------------------------------
-                         G[abstracts{u=P}, P^:=v0, ~writes_pending/\~reads_pending{set u^=v1}, resolves{v1}@c] |- ProgramOp[c,x=set u^=v1]
+                         G[P^:=v1/P^:=v0]                                                   |- ProgramOp[c,x=()       ]
+            (WriteElim)  ----------------------------------------------------------------------------------------------
+                         G[effects{u=P}, P^:=v0, unblock_writes{set u^=v1}, resolves{v1}@c] |- ProgramOp[c,x=set u^=v1]
 
                          TODO: specify undo-upon-failure mechanism.
   
-                         G, (succeeds\/interacts_pending\/interacts){x=Print(u)}  |- ProgramOp[c,x=Print(u)]
-        (InteractIntro)  -----------------------------------------------------------------------------------
-                         G                                                        |- ProgramOp[c,x=Print(u)]
+                         G, (succeeds*interacts){x=Print(u)}  |- ProgramOp[c,x=Print(u)]
+        (InteractIntro)  ---------------------------------------------------------------
+                         G                                    |- ProgramOp[c,x=Print(u)]
   
                          (Here we physically print n)
-                         G                                                                |- ProgramOp[c,x=()      ]
-         (InteractElim)  -------------------------------------------------------------------------------------------
-                         G[abstracts{u=n}, ~interacts_pending{Print(u)}/\~throws_pending] |- ProgramOp[c,x=Print(u)]
+                         G                                              |- ProgramOp[c,x=()      ]
+         (InteractElim)  -------------------------------------------------------------------------
+                         G[effects{u=n}, unblock_imperatives{Print(u)}] |- ProgramOp[c,x=Print(u)]
  
 ------------------------------------------------------------------------------------------------------------------------
 Verse Denotational semantics
