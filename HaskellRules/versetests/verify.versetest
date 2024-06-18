@@ -82,49 +82,48 @@ verify(pass) { f(g(z:int):int) := {g(3)} }
 verify(fail) { f(g(z:int):int) := {g(())} }
 verify(pass) { f(g(z:int):int):int := {g(3)} }
 verify(fail) { f(g(z:int):int):int := {g(())} }
+verify(pass) { suc(x:int) := {99}; ex6(h(z:int):int) := {3}; ex6(suc) }
+verify(pass) { ex6(hog(z:int):int):int := {hog(3)}  }
+verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify(fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify(pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify(fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; ex6(suc) }
+verify(fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
 
-### TODO:HEREHEREHEREHERE verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
-### verify(fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
-### verify(pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
-### verify(fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; ex6(suc) }
-### verify(fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
-###
 ### # flex/rigid tests
 verify(pass) { ex_rigid2flex(x:int) := {y := x; y} }
 verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
 verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
-###
-### # decides
-### verify(pass) { three(x:any)<decides> := { x = 3 } }
-### verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {x} }
-### verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {3} }
-### verify(fail) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {4} }
-### verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := z }
-### verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 666 }
-### verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 42 }
-### verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 708 - z }
-### verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 }
-### verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
-###
-###
-### # disallow any to unify with int?
-### verify(pass) { foo(x:any)<decides> := { x = 666 } }
-### verify(pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
-###
-### verify(pass) {f(x:int)<succeeds>:=x/2}
-### verify(fail) {f(x:int)<succeeds>:=x/0}
-###
+
+# decides
+verify(pass) { three(x:any)<decides> := { x = 3 } }
+verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {x} }
+verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {3} }
+verify(fail) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {4} }
+verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := z }
+verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 666 }
+verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 42 }
+verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 708 - z }
+verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 }
+verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
+
+# disallow any to unify with int?
+verify(pass) { foo(x:any)<decides> := { x = 666 } }
+verify(pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
+verify(pass) {f(x:int)<succeeds>:=x/2}
+verify(fail) {f(x:int)<succeeds>:=x/0}
+
 ### # Tim examples 8/9/2023
 ### # verify(pass) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
 ### # verify(pass) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
 ### # forall x y . exists z . assume{z = x}; z = x; x = y
 ###
 ### # left-to-right
-### verify(pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
+verify(pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
 ### verify(fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
-###
-### # if-then-else (negations)
-###
+
+# if-then-else (negations)
+
 verify(pass) { f(:any) := { 2 = if (1) then {2} else {99} } }
 verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
 ###
@@ -144,12 +143,11 @@ verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
 ### # simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
 ### # verify(pass) { f(x:int) := x; foo(:any) := {f[_]=3} }
 ### # verify(fail) { f(x:int) := x; foo(:any) := {f[_]='3'} }
-###
-### # subtyping (passes, but apparently, should be rejected!)
-### verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }
-###
-### verify(pass) { main(:any) := { x := x; x = 2 } }
-### verify(pass) { a := (_,_) => a=(_,_) }
+# subtyping (passes, but apparently, should be rejected!)
+verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }
+
+verify(pass) { main(:any) := { x := x; x = 2 } }
+verify(pass) { a := (_,_) => a=(_,_) }
 ### verify(pass) { main(:any) := { if(a:=1|2){a=1} } }  # TODO:IF:CHOICE
 ### verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
 ###

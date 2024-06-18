@@ -20,13 +20,11 @@ import Rules.Core hiding (isHNF)
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
--- import qualified Rules.OldVerifier as Old
--- import Rules.ICFP ({- systemICFPE, -} isChoiceFree)
 import Control.Monad (guard)
 import Data.List ((\\))
-import Rules.TRS2024 (isEffectFree)
 import qualified Rules.TRS2024 as TRS2024
 import qualified Rules.ICFP as ICFP
+import qualified Epic.UnionFind as UF
 
 -- | Run verification rules.
 _traceShow :: (Pretty a) => String -> a -> a
@@ -108,13 +106,10 @@ splitVerifier :: TRSystem Expr
 splitVerifier = TRS2024.systemTRS2024 -- systemICFPE
   { sname = "SPLITverify"
   , description = "ICFPE + split verifier rules"
-  , preProcess = preProcess ICFP.systemICFPE
-  , rules =     -- (rules systemICFPE -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
-                --  <> Old.generalizedIcfpRules
-                 (rules TRS2024.systemTRS2024 -= "EXI-FLOAT")
+  , preProcess  = preProcess ICFP.systemICFPE
+  , rules       = (rules TRS2024.systemTRS2024 -= "EXI-FLOAT")
               <> ifRules
               <> ICFP.rulesExiFloat
-              -- <> substRules
               <> guardRules
               <> checkRules
               <> verifyRules
@@ -141,16 +136,6 @@ ifRules env lhs =
    "IF-FALSE" `name`
    do If Fail _ e <- [lhs]
       pure e
-
-------------------------------------------------------------------
-_substRules :: Rule Expr
-_substRules _ lhs =
-   "SUBST1-OLD" `name`
-   do EXI x e <- [lhs]
-      (ctx, Var x' :=: Val v) <- substX e
-      guard (x == x')
-      guard (x `notElem` (free v))
-      pure (subst [(x, v)] (ctx (Arr [])))
 
 --------------------------------------------------------------------------------
 guardRules :: Rule Expr
@@ -240,14 +225,23 @@ asmX = go []
     go as (a:as') = (reverse as, a, as') : go (a:as) as'
 
 unsat :: [Ident] -> [Expr] -> Bool
-unsat _ es = asmFail || contra || _refl
+unsat _ es = asmFail || contra || refl || eqContra
   where
-    asmFail = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]
-    _refl    = not . null $ [ e | Fails e@(Var x :=: Var y) <- es, x == y, isInt asms x ]
-    asms    = [ e | Assume e <- es ]
-    contra  = any (`elem` pos) neg
-    pos     = [ e | Assume e <- es ]
-    neg     = [ e | Fails  e <- es ]
+    asmFail  = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]
+    refl     = not . null $ [ e | Fails e@(Var x :=: Var y) <- es, x == y, isInt pos x ]
+    contra   = any (`elem` pos) neg
+    eqContra = eqUnsat pos neg
+    pos      = [ e | Assume e <- es ]
+    neg      = [ e | Fails  e <- es ]
+
+eqUnsat :: [Expr] -> [Expr] -> Bool
+eqUnsat pos neg = any (uncurry (UF.equal uf')) diseqs
+  where
+    uf' = foldr (\(x, y) uf -> UF.union uf x y) UF.new eqs
+    eqs     = [(x, y) | (Var x :=: Var y) <- pos]
+    diseqs  = [(x, y) | (Var x :=: Var y) <- neg]
+
+
 
 isInt :: [Expr] -> Ident -> Bool
 isInt asms x = INT (Var x) `elem` asms
@@ -255,7 +249,7 @@ isInt asms x = INT (Var x) `elem` asms
 --------------------------------------------------------------------------------
 
 isUni :: [Ident] -> [BndVar] -> Expr -> Bool
-isUni rs bs (Var r)  = r `elem` rs && r `notElem` (bndIds bs)
+isUni rs bs (Var r)  = r `elem` rs && r `notElem` bndIds bs
 isUni _  _  (Int _)  = True
 isUni _  _  (Char _) = True
 isUni rs bs (Arr es) = all (isUni rs bs) es
@@ -347,29 +341,29 @@ isPrimOp1 _        = False
 --------------------------------------------------------------------------------
 type Context = Expr -> Expr
 
---------------------------------------------------------------------------------
-substX, substX1 :: Expr -> [(Context, Expr)]
--- S context
-substX lhs = substX1 lhs ++ [(id,lhs)]
--- S context, X /= hole
-substX1 lhs =
-   do x :>: e <- [lhs]
-      (ctx, hole) <- substX x
-      pure ((:>: e) . ctx, hole)
-   ++
-   -- TODO: this `e` should be `ef` means "can fail or have choice but not loop or do I/O"
-   do e :>: x <- [lhs]
-      guard (isEffectFree e)
-      (ctx, hole) <- substX x
-      pure ((e :>:) . ctx, hole)
-   ++
-   do x :>>: e <- [lhs]
-      (ctx, hole) <- substX x
-      pure ((:>>: e) . ctx, hole)
-   ++
-   do (v :=: x)   <- [lhs]
-      (ctx, hole) <- substX x
-      pure ((v :=:) . ctx, hole)
+-- --------------------------------------------------------------------------------
+-- substX, substX1 :: Expr -> [(Context, Expr)]
+-- -- S context
+-- substX lhs = substX1 lhs ++ [(id,lhs)]
+-- -- S context, X /= hole
+-- substX1 lhs =
+--    do x :>: e <- [lhs]
+--       (ctx, hole) <- substX x
+--       pure ((:>: e) . ctx, hole)
+--    ++
+--    -- TODO: this `e` should be `ef` means "can fail or have choice but not loop or do I/O"
+--    do e :>: x <- [lhs]
+--       guard (isEffectFree e)
+--       (ctx, hole) <- substX x
+--       pure ((e :>:) . ctx, hole)
+--    ++
+--    do x :>>: e <- [lhs]
+--       (ctx, hole) <- substX x
+--       pure ((:>>: e) . ctx, hole)
+--    ++
+--    do (v :=: x)   <- [lhs]
+--       (ctx, hole) <- substX x
+--       pure ((v :=:) . ctx, hole)
 
 --------------------------------------------------------------------------------
 proofX, proofX1 :: [BndVar] -> Expr -> [(Context, [BndVar], Expr)]

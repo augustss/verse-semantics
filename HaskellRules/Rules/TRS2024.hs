@@ -291,21 +291,23 @@ rulesPrimOps _ lhs =
   do Op Sub :@: Arr [Int k1, Int k2] <- [lhs]
      pure (Int (k1-k2))
  ++
-  "APP-GT" `name`
-  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
-     guard (k1 > k2)
-     pure (Int k1)
- ++
-  "APP-GT-FAIL" `name`
-  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
-     guard (k1 <= k2)
-     pure Fail
- ++
   "APP-ISINT" `name`
   do Op IsInt :@: (HNF hnf) <- [lhs]
      case hnf of
        Int _ -> pure hnf
        _     -> pure Fail
+ ++
+  "APP-GT" `name`
+  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
+     pure $ if k1 > k2 then Int k1 else Fail
+ ++
+  "APP-GE" `name`
+  do Op Ge :@: Arr [Int k1, Int k2] <- [lhs]
+     pure $ if k1 >= k2 then Int k1 else Fail
+ ++
+  "APP-NE" `name`
+  do Op Ne :@: Arr [Int k1, Int k2] <- [lhs]
+     pure $ if k1 /= k2 then Int k1 else Fail
 
 --------------------------------------------------------------------------------
 

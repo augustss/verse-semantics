@@ -14,9 +14,9 @@ nat          := lowered{ lambda(_x){                isInt$[_x];             intG
 void         := lowered{ lambda(_x){                                                                 array{} }};
 comparable   := lowered{ lambda(_x){                isInt$[_x] | isChr$[_x];                assume { _x }}};  # incomplete
 operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 some   { lambda(_z) { _z = intAdd$[_x,_y]; isInt$[_z]; _z }}}};
-operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intSub$[_x,_y]; isInt$[_z]; _z }}};
-operator'*'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intMul$[_x,_y]; isInt$[_z]; _z }}};
-operator'/'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_y, 0];  assume { _z := intDiv$[_x,_y]; isInt$[_z]; _z }}};
+operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 some   { lambda(_z) { _z = intSub$[_x,_y]; isInt$[_z]; _z }}}};
+operator'*'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 some   { lambda(_z) { _z = intMul$[_x,_y]; isInt$[_z]; _z }}}};
+operator'/'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_y, 0];  some   { lambda(_z) { _z = intDiv$[_x,_y]; isInt$[_z]; _z }}}};
 operator'<'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLT$[_x, _y]; assume { isInt$[_x]; _x }}};
 operator'<=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLE$[_x, _y];                      _x  }};
 operator'>'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intGT$[_x, _y];                      _x  }};

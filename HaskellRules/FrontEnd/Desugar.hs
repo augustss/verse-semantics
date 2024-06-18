@@ -1974,9 +1974,10 @@ dsB_10 s t (P f) j
        seqDE [ pure $ DefineE z (ApplyD (Variable f) (Variable j)), dsM_10 s t (P z)]
 
 dsK_10 :: Loc -> [Eff] -> D Expr
-dsK_10 loc fx
+dsK_10 _loc fx
   | hasEff "fails" fx   = pure Fail
-  | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
+  -- TODO: commenting-out-for-now
+  -- | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
   | otherwise           = pure (Array [])
 
 dsCheck :: DsEff -> Expr -> Expr
@@ -1988,10 +1989,11 @@ seqDE ds = seqE <$> sequence ds
 
 dsM_10 :: DsMode10 -> Expr -> Pi -> D Expr
 dsM_10 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
-  = do j   <- newIdent (getLoc t) "j"
-       dom <- dsM_10 MI t1 (P j)
+  = do r   <- newIdent (getLoc t) "r"
+       j   <- newIdent (getLoc t) "j"
+       dom <- DefineE j <$> dsM_10 MI t1 (P r)
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MV t2 pi j
-       eGuard (eVerify (Forall [j] (seqE [dom, rng]))) <$> dsM_10 MI t pi
+       eGuard (eVerify (Forall [r] (seqE [dom, rng]))) <$> dsM_10 MI t pi
 
 dsM_10 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
   = do i   <- newIdent (getLoc t1) "i"
@@ -2038,8 +2040,8 @@ dsM_10 MX (OfType t1 t2) pi                   -- MOFTYPEX
 dsM_10 MI (Range (Variable z)) (P _)       -- MTYPE-VAR Spl case to make M-[:int](i) = some{int} instead of exi z. z = int; z(i)
    = pure (eSome (Variable z))
 
--- dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make Ms[:int](i) = int(i) instead of exi z. z = int; z(i)
---   = pure (ApplyD (Variable z) (Variable i))
+dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make Ms[:int](i) = int(i) instead of exi z. z = int; z(i)
+  = pure (ApplyD (Variable z) (Variable i))
 
 dsM_10 MI (Range t) (P i)                   -- MTYPE1
   = do z <- newIdent (getLoc t) "z"
