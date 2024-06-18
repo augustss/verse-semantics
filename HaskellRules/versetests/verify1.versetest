@@ -1,1 +1,3 @@
-verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify(pass) { suc(x:int) := {99}; ex6(h(z:int):int) := {3}; ex6(suc) }
+# verify(pass) { ex6(hog(z:int):int):int := {hog(3)}  }
+# verify(pass) { suc(x:int) := {x + 1}; ex(h(z:int):int):int := {h(3)}; ex6(suc) }

@@ -2007,7 +2007,7 @@ dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MX t2 pi j
        pure $ Lam i (seqE [dom, rng])
 
-dsM_10 MV (OfType t1 t2@(Variable z)) pi                   -- MOFTYPE+
+dsM_10 MV (OfType t1 t2@(Variable z)) pi      -- MOFTYPE+
   = do y <- newIdent (getLoc t1) "y"
        seqDE [ DefineE y <$> dsM_10  MV t1 pi
              , pure (dsCheck Suc (ApplyD t2 (Variable y)) `eGuard` eSome (Variable z))
@@ -2035,7 +2035,10 @@ dsM_10 MX (OfType t1 t2) pi                   -- MOFTYPEX
              , pure (ApplyD (Variable z) (Variable y))
              ]
 
--- dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make M[:int](i) = int(i) instead of exi z. z = int; z(i)
+dsM_10 MI (Range (Variable z)) (P _)       -- MTYPE-VAR Spl case to make M-[:int](i) = some{int} instead of exi z. z = int; z(i)
+   = pure (eSome (Variable z))
+
+-- dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make Ms[:int](i) = int(i) instead of exi z. z = int; z(i)
 --   = pure (ApplyD (Variable z) (Variable i))
 
 dsM_10 MI (Range t) (P i)                   -- MTYPE1
