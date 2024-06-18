@@ -3,6 +3,9 @@ module Rules.Core where
 import qualified Data.Map as M
 import TRS.Bind
 
+--------------------------------------------------------------------------------
+-- main expression datatype
+
 data Expr
   -- values
   = Var Ident
@@ -22,7 +25,7 @@ data Expr
   -- one/all
   | One Expr
   | All Expr
-  -- | Split Expr
+  -- | Split Expr  -- maybe later
   
   -- verifier
   | Some Expr
@@ -47,11 +50,22 @@ data Effect
   | Decides
  deriving ( Eq, Show )
 
+--------------------------------------------------------------------------------
+-- other uses of expressions
+
 type Context = Expr
 type Val     = Expr
 
-instance Variables Assump where
-  variables f NOTHING_HERE_YET = []
+isVal :: Expr -> Bool
+isVal (Var x)   = True
+isVal (Int k)   = True
+isVal (Arr es)  = all isVal es
+isVal (Lam bnd) = True
+isVal (Op op)   = True
+isVal _         = False
+
+--------------------------------------------------------------------------------
+-- variables
 
 instance Variables Expr where
   variables f (Var x)      = [x]
@@ -70,9 +84,15 @@ instance Variables Expr where
   variables f (Verify bnd) = variables f bnd
   variables f e            = []
 
+instance Variables Assump where
+  variables f NOTHING_HERE_YET = []
+
 isSkolem :: Ident -> Bool
 isSkolem (Name ('$':_)) = True
 isSkolem _              = False
+
+--------------------------------------------------------------------------------
+-- bindings
 
 unbindAs :: Ident -> Bind Expr -> Expr
 unbindAs x bnd = subst [(y,Var x)] e where (y,e) = unsafeUnbind bnd
@@ -87,7 +107,8 @@ norm e = alpha 0 e
   var i = ident ("_" ++ show i)
  
   alpha k (Arr es)     = Arr (map (alpha k) es)
-  alpha k (Lam bnd)    = Lam (bind x (alpha (k+1) e)) where x = var k; e = unbindAs x bnd
+  alpha k (Lam bnd)    = Lam (bind x (alpha (k+1) e))
+                       where x = var k; e = unbindAs x bnd
   alpha k (e1 :=: e2)  = alpha k e1 :=: alpha k e2
   alpha k (e1 :>: e2)  = alpha k e1 :>: alpha k e2
   alpha k (e1 :|: e2)  = alpha k e1 :|: alpha k e2
@@ -149,9 +170,9 @@ match step e = step e ++ recurse e
                       ++ [ (s, e1  :|: e2') | (s,e2') <- match step e2 ]
   recurse (e1 :@: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- match step e1 ]
                       ++ [ (s, e1  :>: e2') | (s,e2') <- match step e2 ]
-  recurse (One e)      = [ (s, One e') | (s,e') <- match step e ]
-  recurse (All e)      = [ (s, One e') | (s,e') <- match step e ]
-  recurse (Some e)     = [ (s, One e') | (s,e') <- match step e ]
+  recurse (One e)      = [ (s, One e')  | (s,e') <- match step e ]
+  recurse (All e)      = [ (s, All e')  | (s,e') <- match step e ]
+  recurse (Some e)     = [ (s, Some e') | (s,e') <- match step e ]
   recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- match step e1 ]
                       ++ [ (s, e1  :>>: e2') | (s,e2') <- match step e2 ]
   recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- match step e ]
@@ -160,9 +181,29 @@ match step e = step e ++ recurse e
   recurse (Verify bnd) = error "match Verify undefined"
   recurse e            = []
 
+  -- treat "exi x1 .. exi xn" as one block when matching
   unExi (Exi bnd) = (Exi . bind x . exis, body)
    where
     (x,e)       = unsafeUnbind bnd
     (exis,body) = unExi e
   unExi e         = (id, e)
+
+-- structural rules matching
+matchExi :: Expr -> [Bind Expr]
+matchExi e =
+  [ bnd'
+  | Exi bnd <- [e]
+  , let (x,e') = unsafeUnbind bnd
+  , bnd' <- bnd : [ bind y (Exi (bind x e''))
+                  | bnd' <- matchExi e'
+                  , let (y,e'') = unsafeUnbind bnd'
+                  ]
+  ]
+
+matchEq :: Expr -> [(Expr,Expr)]
+matchEq e =
+  [ (lhs, rhs)
+  | e1 :=: e2 <- [e]
+  , (lhs,rhs) <- (e1,e2) : [ (Var y, Var x) | (Var x, Var y) <- [(e1,e2)] ]
+  ]
 
