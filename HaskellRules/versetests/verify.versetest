@@ -117,17 +117,17 @@ verify(fail) {f(x:int)<succeeds>:=x/0}
 ### # verify(pass) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
 ### # verify(pass) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
 ### # forall x y . exists z . assume{z = x}; z = x; x = y
-###
-### # left-to-right
+
+# left-to-right
 verify(pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
-### verify(fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
+verify(fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
 
 # if-then-else (negations)
 
 verify(pass) { f(:any) := { 2 = if (1) then {2} else {99} } }
 verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
-###
-### # if-then-else (binders)
+
+# if-then-else (binders)
 ### TODO:IFBINDER verify(pass) { f(:any) := { if (x:=1) then {x} else {2} } }
 ###
 ### # koen's hof examples
@@ -149,7 +149,7 @@ verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }
 verify(pass) { main(:any) := { x := x; x = 2 } }
 verify(pass) { a := (_,_) => a=(_,_) }
 ### verify(pass) { main(:any) := { if(a:=1|2){a=1} } }  # TODO:IF:CHOICE
-### verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
+# TODO:HEREHEREHERE:GATHER-OUTER-SKOLEM verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
 ###
 ### # TODO
 ### verify(pass, ICFPEverify=skip) {a:any => b:any => {x:=b; x=a; assume{x=a}; assume{x=b}}}

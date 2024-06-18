@@ -1,1 +1,2 @@
-verify(pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
+
+verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
