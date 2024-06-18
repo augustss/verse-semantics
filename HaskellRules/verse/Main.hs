@@ -112,7 +112,10 @@ data CState = CState
   }
 
 
-data SomeExpr = NoExpr | Parsed Expr | Desugared Expr | Cores [Core]
+data SomeExpr = NoExpr
+              | Parsed Expr
+              | Desugared Expr
+              | Cores [Core]
 
 asParsed :: SomeExpr -> Expr
 asParsed NoExpr = error "No current expression"

@@ -71,19 +71,26 @@ data Expr
   | ApplyS Expr Expr          -- f(e)
   | ApplyD Expr Expr          -- f[e]
   | EffAttr Expr Eff          -- f<e>
+
+  -- Prefix and infix operator application
   | PrefixOp Op Expr          -- op e
   | PostfixOp Expr Op         -- e op
   | InfixOp Expr Op Expr      -- e1 op e2
+
   | If1 Blk                   -- if{e}
   | If2 Expr Blk              -- if(e1) then e2
   | If2E Expr Blk             -- if(e1) else e2
   | If3 Expr Blk Blk          -- if(e1) then e2 else e3
   | If3B [Ident] Expr Blk Blk -- if(exists is . e1) then e2 else e3
+                              --  where 'is' are the identifiers bound by e1
+
   | For1 Blk                  -- for{e}
   | For2 Expr Blk             -- for(e1) in e2
   | For2B [Ident] Expr Blk    -- for(exists is . e1) in e2
+
   | Let Expr Blk              -- let(e1) in e2
   | Block Blk                 -- do e
+
   | Case1 Blk                 -- case{e1; e2; ... } block treated in a non-standard way
   | Case2 Expr Blk            -- case(e) of {e1; e2; ... } block treated in a non-standard way
   | Function [(Expr, [Eff])] Blk -- function(e)<eff>...{e}
@@ -91,14 +98,18 @@ data Expr
   | Blk [Expr]                -- { e1; e2; ... }
   | Option (Maybe Expr)       -- option{e}
   | Parens Expr               -- (e)
+
+  -- Mutable variables
   | Set Expr Ident Expr       -- set e1 = e2
   | MVar Ident (Maybe Expr) (Maybe Expr)      -- var i : t = e
   | MRef Ident (Maybe Expr) (Maybe Expr)      -- ref i : t = e
   | MAlias Ident (Maybe Expr) (Maybe Expr)    -- alias i : t = e
+
   -- Some 1-argument macros
   | Macro1 Ident [Eff] Blk    -- m<a>{e}
   | Macro2 Ident Expr Blk     -- m(e1){e2}
   | Return Expr               -- return e
+
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [Expr]                -- e1;e2;...
   | DefineV Ident             -- i:any
@@ -107,6 +118,8 @@ data Expr
   | Choice Expr Expr          -- e | e
   | Unify Expr Expr           -- e1 = e2
   | Range Expr                -- :e
+
+  -- Below here, not source language
   | Wrong String              -- wrong
   | Exists [Ident] Expr       -- exists xs . e
   | Forall [Ident] Expr       -- forall xs . e
