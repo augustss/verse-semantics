@@ -2,6 +2,8 @@ module Rules.Core where
 
 import qualified Data.Map as M
 import TRS.Bind
+import Test.QuickCheck
+import Control.Monad( liftM2 )
 
 --------------------------------------------------------------------------------
 -- main expression datatype
@@ -271,6 +273,82 @@ matchEq e =
                            | (Var x, Var y) <- [(e1,e2)]
                            ]
   ]
+
+--------------------------------------------------------------------------------
+-- arbitrary
+
+instance Arbitrary Op where
+  arbitrary = elements [Add, Sub, Gt, IsInt]
+
+instance Arbitrary Expr where
+  arbitrary = sized (arbExprWith xs)
+   where
+    xs = take 3 (identsNotIn [])
+
+  shrink (Int k)      = [ Int k' | k' <- shrink k ]
+  shrink (Arr es)     = es
+                     ++ [ Arr es' | es' <- shrink es ]
+  shrink (Lam bnd)    = shrinkBind Lam bnd
+  shrink (e1 :=: e2)  = [ e1, e2 ]
+                     ++ [ e1' :=: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :=: e2' | e2' <- shrink e2 ]
+  shrink (e1 :>: e2)  = [ e1, e2 ]
+                     ++ [ e1' :>: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :>: e2' | e2' <- shrink e2 ]
+  shrink (e1 :|: e2)  = [ e1, e2 ]
+                     ++ [ e1' :|: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :|: e2' | e2' <- shrink e2 ]
+  shrink (e1 :@: e2)  = [ e1, e2 ]
+                     ++ [ e1' :>: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :>: e2' | e2' <- shrink e2 ]
+  shrink (One e)      = [ e ] ++ [ One e'  | e' <- shrink e ]
+  shrink (All e)      = [ e, One e ] ++ [ All e'  | e' <- shrink e ]
+  shrink (Some e)     = [ e ] ++ [ Some e' | e' <- shrink e ]
+  shrink (e1 :>>: e2) = [ e1, e2 ]
+                     ++ [ e1' :>>: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :>>: e2' | e2' <- shrink e2 ]
+  shrink (Check fx e) = [ e ] 
+                     ++ [ Check fx e' | e' <- shrink e ]
+  shrink (Exi bnd)    = shrinkBind Exi bnd
+  --shrink (Verify bnd) = error "shrink Verify undefined"
+  shrink e            = []
+
+arbExprWith :: [Ident] -> Int -> Gen Expr
+arbExprWith xs n =
+  frequency $
+  [ (1, Var `fmap` elements xs) | not (null xs) ] ++
+  [ (1, Int `fmap` arbitrary)
+  , (a, Arr `fmap` listOf arbExpr2)
+  , (a, Lam `fmap` arbBind)
+  , (1, Op  `fmap` arbitrary)
+  , (b, liftM2 (:=:) arbExpr2 arbExpr2)
+  , (b, liftM2 (:>:) arbExpr2 arbExpr2)
+  , (b, liftM2 (:|:) arbExpr2 arbExpr2)
+  , (a, liftM2 (:@:) arbExpr2 arbExpr2)
+  , (b, Exi `fmap` arbBind)
+  , (1, return Fail)
+  , (b, One `fmap` arbExpr1)
+  , (b, All `fmap` arbExpr1)
+{-
+  | Some Val
+  | Val :>>: Expr    -- guard           |>   <-- black triangle
+  | Check Effect Expr
+  | Verify (BindList ([Assump],Expr))
+-}
+  ]
+ where
+  a = n `min` 5 -- for bigger values
+  b = n         -- for recursive expressions
+  arbExpr1 = arbExprWith xs (n-1)
+  arbExpr2 = arbExprWith xs (n `div` 2)
+  arbBind  = frequency $
+             [ (1, liftM2 bind (elements xs) (arbExprWith xs (n-1))) | not (null xs) ] ++
+             [ (4, let x = identNotIn xs in bind x `fmap` arbExprWith (x:xs) (n-1)) ]
+
+shrinkBind :: Arbitrary a => (Bind a -> a) -> Bind a -> [a]
+shrinkBind con bnd = [ t ] ++ [ con (bind x t') | t' <- shrink t ]
+ where
+  (x,t) = unsafeUnbind bnd
 
 --------------------------------------------------------------------------------
 -- contexts
