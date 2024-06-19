@@ -26,7 +26,10 @@ import Epic.Print
 --------------------------------------------------------------------------------
 
 newtype Ident = Name String
- deriving ( Show, Eq, Ord )
+ deriving ( Eq, Ord )
+
+instance Show Ident where
+  show (Name x) = x
 
 instance Pretty Ident where
   pPrintPrec _ _ (Name x) = text x

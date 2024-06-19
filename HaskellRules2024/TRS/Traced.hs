@@ -1,6 +1,7 @@
 module TRS.Traced(
-  Traced(..), term, trace, start, (++>), toList, loop,
-  showTrace, showRevTrace, filterTrace
+  Traced(..), term, trace, start, (++>), loop,
+  showTrace, showRevTrace, filterTrace,
+  printTrace, printRevTrace
   ) where
 import Epic.Print
 
@@ -18,11 +19,6 @@ start x = x :<-- []
 
 (++>) :: (a -> (String,a)) -> Traced a -> Traced a
 f ++> (x :<-- tr) = let (s,y) = f x in y :<-- ((s,x):tr)
-
--- should get deprecated because the old trace format is no good
-toList :: Traced a -> [(String,a)]
-toList (x :<-- [])         = [("",x)]
-toList (x :<-- ((n,y):tr)) = (n,x) : toList (y :<-- tr)
 
 instance Functor Traced where
   fmap f (x :<-- tr) = f x :<-- [ (n,f y) | (n,y) <- tr ]
@@ -46,6 +42,21 @@ loop (xx :<-- tr) = xx :<-- find xx tr
   find  x ((s,y):sys)
     | y == x    = [(s,y)]
     | otherwise = (s,y) : find x sys
+
+printTrace, printRevTrace :: Show a => Traced a -> IO ()
+printTrace (x :<-- tr) =
+  do sequence_ $ reverse
+               [ do print y
+                    putStrLn ("  --" ++ s ++ "-->")
+               | (s,y) <- tr
+               ]
+     print x
+printRevTrace (x :<-- tr) =
+  do print x
+     sequence_ [ do putStrLn ("  <--" ++ s ++ "--")
+                    print y
+               | (s,y) <- tr
+               ]
 
 showTrace, showRevTrace :: Pretty a => Traced a -> [String]
 showTrace (x :<-- tr) =

@@ -28,13 +28,22 @@ isV x e = x==e || case e of
                     _      -> False
 
 -- evaluation contexts
-evalCtx :: Expr -> [(Context, Expr)]
-evalCtx e = [ (ctx,e) | (ctx,e) <- contexts e, isEvalCtx ctx ]
- where
-  isEvalCtx HOLE                = True
-  isEvalCtx ((_ :=: e1) :>: e2) = isEvalCtx e1 || isEvalCtx e2
-  isEvalCtx (Exi bnd)           = isEvalCtx e where (_,e) = unsafeUnbind bnd
-  isEvalCtx _                   = False
+evalCtx :: [Ident] -> Expr -> [(Context, Expr)]
+evalCtx zs lhs =
+  do pure (HOLE, lhs)
+ ++
+  do (v :=: e1) :>: e2 <- [lhs]
+     (ctx, h) <- evalCtx zs e1
+     pure ((v :=: ctx) :>: e2, h)
+ ++
+  do (v :=: e1) :>: e2 <- [lhs]
+     (ctx, h) <- evalCtx zs e2
+     pure ((v :=: e1) :>: ctx, h)
+ ++
+  do Exi bnd <- [lhs]
+     let (x,e) = alphaRename zs bnd
+     (ctx, h) <- evalCtx (x:zs) e
+     pure (Exi (bind x ctx), h)
 
 -- scope contexts
 scopeCtx :: Expr -> [(Context, Expr)]
@@ -103,7 +112,7 @@ rulesUnification lhs =
      pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
  ++
   "U-FAIL" `name`
-  do a1 :=: a2 <- [lhs]
+  do (a1 :=: a2) :>: _ <- [lhs]
      guard (isHNF a1 && isHNF a2)
      guard $
        case (a1, a2) of
@@ -113,17 +122,22 @@ rulesUnification lhs =
      pure Fail
  ++
   "U-OCCURS" `name`
-  do x@(Var _) :=: v <- [lhs]
+  do (x@(Var _) :=: v) :>: _ <- [lhs]
      guard (isV x v && v /= x)
      pure Fail
+ ++
+  "U-SWAP" `name`
+  do (a :=: Var x) :>: e <- [lhs]
+     guard (isHNF a)
+     pure ((Var x :=: a) :>: e)
 
 --------------------------------------------------------------------------------
 
 rulesExistentials :: Rule
 rulesExistentials lhs =
   "EXI-SUBST" `name`
-  do (x,e) <- unsafeUnbind `fmap` matchExi lhs
-     (ctx, x_eq_v :>: e) <- evalCtx e
+  do (x,ctx_e) <- unsafeUnbind `fmap` matchExi lhs
+     (ctx, x_eq_v :>: e) <- evalCtx [x] ctx_e
      -- TODO: add correct guard on ctx
      (Var x',v) <- matchEq x_eq_v
      guard (x == x')
@@ -136,14 +150,15 @@ rulesExistentials lhs =
      pure e
  ++
   "EXI-FLOAT" `name`
-  do (ctx, exi_e) <- evalCtx lhs
+  do (ctx, exi_e) <- evalCtx [] lhs
+     guard (ctx /= HOLE)
      guard (null (bvs ctx))
      (x,e) <- alphaRename (free ctx) `fmap` matchExi exi_e
      pure (Exi (bind x (ctx <@ e)))
  ++
   "EXI-CHOICE" `name`
   do (x,e) <- unsafeUnbind `fmap` matchExi lhs
-     (ctx, e1 :|: e2) <- evalCtx e
+     (ctx, e1 :|: e2) <- evalCtx [x] e
      guard (x `notElem` free ctx)
      pure (ctx <@ (Exi (bind x e1) :|: Exi (bind x e2)))
 
@@ -179,13 +194,15 @@ rulesChoice lhs =
  ++
   "CHOICE" `name`
   do (sx, e) <- scopeCtx lhs
-     (ctx, e1 :|: e2) <- evalCtx e
+     (ctx, e1 :|: e2) <- evalCtx [] e
+     guard (ctx /= HOLE)
      -- TODO: add guard on ctx
      pure (sx <@ ((ctx <@ e1) :|: (ctx <@ e2)))
  ++
   "FAIL" `name`
-  do (ctx, Fail) <- evalCtx lhs
+  do (ctx, Fail) <- evalCtx [] lhs
      -- TODO: add guard on ctx
+     guard (ctx /= HOLE)
      pure Fail
 
 --------------------------------------------------------------------------------

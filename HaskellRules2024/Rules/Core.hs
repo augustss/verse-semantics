@@ -1,7 +1,7 @@
 module Rules.Core where
 
 import qualified Data.Map as M
-import Data.List( union )
+import Data.List( union, intersperse )
 import TRS.Bind
 import TRS.Traced
 import Test.QuickCheck
@@ -39,7 +39,7 @@ data Expr
 
   -- only for contexts
   | HOLE
- deriving ( Eq, Show )
+ deriving ( Eq, Ord )
 
 data Op = Add | Sub | Gt | IsInt
  deriving ( Eq, Ord, Show )
@@ -49,11 +49,59 @@ data Assump
  deriving ( Eq, Ord, Show )
 
 data Effect
-  = Fail_Effect
+  = Fails
   | Succeeds
   | Decides
- deriving ( Eq, Show )
+ deriving ( Eq, Ord )
 
+instance Show Effect where
+  show Fails    = "fails"
+  show Succeeds = "succeeds"
+  show Decides  = "decides"
+
+--------------------------------------------------------------------------------
+-- show -- TODO: use pretty printing library
+
+instance Show Expr where
+  show (Var x)       = show x
+  show (Int k)       = show k
+  show (Arr as)      = "<" ++ concat (intersperse "," (map show as)) ++ ">"
+  show (Lam bnd)     = "\\" ++ showBind bnd
+  show (Op op)       = show op
+  show ((a :=: e1) :>: e2) = show1 a ++ " = " ++ show1 e1 ++ "; " ++ show0 e2
+  show (e1 :>: e2)   = show1 e1 ++ "; " ++ show1 e2
+  show (e1 :=: e2)   = show1 e1 ++ " = " ++ show1 e2
+  show (e1 :|: e2)   = show1 e1 ++ " | " ++ show1 e2
+  show (a1 :@: a2)   = show1 a1 ++ "[" ++ show a2 ++ "]"
+  show (Exi bnd)     = "exi " ++ showBind bnd
+  show Fail          = "fail"
+  show (One e)       = "one{" ++ show e ++ "}"
+  show (All e)       = "all{" ++ show e ++ "}"
+  show (Some a)      = "some(" ++ show a ++ ")"
+  show (a :>>: e)    = show1 a ++ "|>" ++ show1 e
+  show (Check fx e)  = "check<" ++ show fx ++ ">{" ++ show e ++ "}"
+  show (Verify bnds) = error "show Verify undefined"
+
+showBind :: Bind Expr -> String
+showBind bnd = show x ++ ". " ++ show e where (x,e) = unsafeUnbind bnd
+
+show0, show1 :: Expr -> String
+show0 = showP 0
+show1 = showP 1
+
+showP :: Int -> Expr -> String
+showP p e | parens e  = "(" ++ show e ++ ")"
+          | otherwise = show e
+ where
+  parens (Lam _)    = True
+  parens (_ :>: _)  = 1 <= p
+  parens (_ :=: _)  = True
+  parens (_ :|: _)  = True
+  parens (_ :@: _)  = True
+  parens (Exi _)    = True
+  parens (_ :>>: _) = True
+  parens _          = False
+  
 --------------------------------------------------------------------------------
 -- values
 
@@ -104,7 +152,7 @@ prep Fail          = Fail
 prep (One e)       = One (prep e)
 prep (All e)       = All (prep e)
 prep (Some a)      = prepVal a (\v -> Some v)
-prep (a :>>: e)    = prepVal a (\v -> v :>>: e)
+prep (a :>>: e)    = prepVal a (\v -> v :>>: prep e)
 prep (Check fx e)  = Check fx (prep e)
 prep (Verify bnds) = error "prep Verify undefined"
 
@@ -238,8 +286,8 @@ everywhere step e = step e ++ recurse e
                       ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step e2 ]
   recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- everywhere step e1 ]
                       ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (e1 :@: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step e2 ]
+  recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step e1 ]
+                      ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step e2 ]
   recurse (One e)      = [ (s, One e')  | (s,e') <- everywhere step e ]
   recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step e ]
   recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step e ]
@@ -282,11 +330,16 @@ matchEq e =
 
 -- normalize
 normalize :: Rule -> Expr -> Traced Expr
-normalize rule e = go [] e
+normalize rule e = go (-1) [] e  -- go 99 [] e
  where
-  go tr e = case rule e of
-              []       -> e :<-- tr
-              (s,e'):_ -> go ((s,e):tr) e'
+  go fuel tr e =
+    case rule e of
+      []                        -> e :<-- tr
+      (s,e'):_ | fuel==0        -> abort "OUT-OF-FUEL"
+               | not (valid e') -> abort "INVALID"
+               | otherwise      -> go (fuel-1) ((s,e):tr) e'
+              where
+               abort msg = e' :<-- ((s ++ "-**" ++ msg ++ "**",e):tr)
 
 --------------------------------------------------------------------------------
 -- arbitrary
@@ -313,8 +366,8 @@ instance Arbitrary Expr where
                      ++ [ e1' :|: e2  | e1' <- shrink e1 ]
                      ++ [ e1  :|: e2' | e2' <- shrink e2 ]
   shrink (e1 :@: e2)  = [ e1, e2 ]
-                     ++ [ e1' :>: e2  | e1' <- shrink e1 ]
-                     ++ [ e1  :>: e2' | e2' <- shrink e2 ]
+                     ++ [ e1' :@: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :@: e2' | e2' <- shrink e2 ]
   shrink (One e)      = [ e ] ++ [ One e'  | e' <- shrink e ]
   shrink (All e)      = [ e, One e ] ++ [ All e'  | e' <- shrink e ]
   shrink (Some e)     = [ e ] ++ [ Some e' | e' <- shrink e ]
@@ -332,7 +385,7 @@ arbExprWith xs n =
   frequency $
   [ (1, Var `fmap` elements xs) | not (null xs) ] ++
   [ (1, Int `fmap` arbitrary)
-  , (a, Arr `fmap` listOf arbExpr2)
+  , (a, Arr `fmap` arbExprs)
   , (a, Lam `fmap` arbBind)
   , (1, Op  `fmap` arbitrary)
   , (b, liftM2 (:=:) arbExpr2 arbExpr2)
@@ -351,10 +404,14 @@ arbExprWith xs n =
 -}
   ]
  where
-  a = n `min` 5 -- for bigger values
-  b = n         -- for recursive expressions
+  a = 0 `max` (n `min` 5) -- for bigger values
+  b = 0 `max` n           -- for recursive expressions
   arbExpr1 = arbExprWith xs (n-1)
   arbExpr2 = arbExprWith xs (n `div` 2)
+  arbExprs = do k <- elements [0,1,2,3,5]
+                sequence [ arbExprWith xs (if k <= 1 then n-k else n`div`k)
+                         | i <- [1..k]
+                         ]
   arbBind  = frequency $
              [ (1, liftM2 bind (elements xs) (arbExprWith xs (n-1))) | not (null xs) ] ++
              [ (4, let x = identNotIn xs in bind x `fmap` arbExprWith (x:xs) (n-1)) ]
@@ -364,38 +421,13 @@ shrinkBind con bnd = [ t ] ++ [ con (bind x t') | t' <- shrink t ]
  where
   (x,t) = unsafeUnbind bnd
 
+instance CoArbitrary Expr where
+  coarbitrary = coarbitrary . show -- not completely honest!
+
 --------------------------------------------------------------------------------
 -- contexts
 
 type Context = Expr
-
-contexts :: Expr -> [(Context,Expr)]
-contexts e = (HOLE,e) : recurse e
- where
-  recurse (Arr es)     = [ (Arr (take i es ++ [ctx] ++ drop (i+1) es), h)
-                         | i <- [0..length es-1]
-                         , (ctx,h) <- contexts (es!!i)
-                         ]
-  recurse (Lam bnd)    = [ (Lam (bind x ctx), h) | (ctx,h) <- contexts e ]
-                       where (x,e) = unsafeUnbind bnd
-  recurse (e1 :=: e2)  = [ (ctx :=: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :=: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (e1 :>: e2)  = [ (ctx :>: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :>: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (e1 :|: e2)  = [ (ctx :|: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :|: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (e1 :@: e2)  = [ (ctx :@: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :@: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (One e)      = [ (One ctx, h)  | (ctx,h) <- contexts e ]
-  recurse (All e)      = [ (All ctx, h)  | (ctx,h) <- contexts e ]
-  recurse (Some e)     = [ (Some ctx, h) | (ctx,h) <- contexts e ]
-  recurse (e1 :>>: e2) = [ (ctx :>>: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :>>: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (Check fx e) = [ (Check fx ctx, h) | (ctx,h) <- contexts e ]
-  recurse e@(Exi _)    = [ (exis ctx, h) | (ctx,h) <- contexts body ]
-                       where (exis,body) = unExis e
-  recurse (Verify bnd) = error "contexts Verify undefined"
-  recurse e            = []
 
 (<@) :: Context -> Expr -> Expr
 Arr as       <@ h = Arr (map (<@ h) as)
