@@ -124,7 +124,6 @@ unsafeUnbind :: Bind t -> (Ident, t)
 -- Non-recommended way to walk inside a Bind
 unsafeUnbind (Bind x t) = (x,t)
 
-
 -- a list of binders
 
 data BindList t = Body t | Binder (Bind (BindList t))

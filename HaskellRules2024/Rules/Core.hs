@@ -461,7 +461,7 @@ bvs ctx = explore [] ctx
   explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
   explore xs (Check fx e) = explore xs e
   explore xs (Exi bnd)    = exploreBind xs bnd
-  explore xs (Verify bnd) = error "contexts Verify undefined"
+  explore xs (Verify bnd) = error "bvs Verify undefined"
   explore xs HOLE         = xs
   explore xs e            = []
   
