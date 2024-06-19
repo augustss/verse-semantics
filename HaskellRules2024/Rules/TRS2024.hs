@@ -138,7 +138,7 @@ rulesUnification lhs =
 rulesExistentials :: Rule
 rulesExistentials lhs =
   "EXI-SUBST" `name`
-  do (x,ctx_e) <- unsafeUnbind `fmap` matchExi lhs
+  do (x,ctx_e) <- alphaRename [] <$> matchExi lhs
      (ctx, x_eq_v :>: e) <- evalCtx [x] ctx_e
      -- TODO: add correct guard on ctx
      (Var x',v) <- matchEq x_eq_v
@@ -149,7 +149,7 @@ rulesExistentials lhs =
      pure (subst [(x,v)] (ctx <@ e))
  ++
   "EXI-ELIM" `name`
-  do (x,e) <- unsafeUnbind `fmap` matchExi lhs
+  do (x,e) <- alphaRename [] <$> matchExi lhs
      guard (x `notElem` free e)
      pure e
  ++
@@ -157,11 +157,11 @@ rulesExistentials lhs =
   do (ctx, exi_e) <- evalCtx [] lhs
      guard (ctx /= HOLE)
      guard (null (bvs ctx))
-     (x,e) <- alphaRename (free ctx) `fmap` matchExi exi_e
+     (x,e) <- alphaRename (free ctx) <$> matchExi exi_e
      pure (Exi (bind x (ctx <@ e)))
  ++
   "EXI-CHOICE" `name`
-  do (x,e) <- unsafeUnbind `fmap` matchExi lhs
+  do (x,e) <- alphaRename [] <$> matchExi lhs
      (ctx, e1 :|: e2) <- evalCtx [x] e
      guard (x `notElem` free ctx)
      pure (ctx <@ (Exi (bind x e1) :|: Exi (bind x e2)))
