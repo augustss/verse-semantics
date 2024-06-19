@@ -57,15 +57,18 @@ data Effect
 --------------------------------------------------------------------------------
 -- values
 
-type Val     = Expr
+type Val = Expr
 
 isVal :: Expr -> Bool
 isVal (Var x)   = True
-isVal (Int k)   = True
-isVal (Arr es)  = all isVal es
-isVal (Lam bnd) = valid e where (_,e) = unsafeUnbind bnd
-isVal (Op op)   = True
-isVal _         = False
+isVal e         = isHNF e
+
+isHNF :: Expr -> Bool
+isHNF (Int k)   = True
+isHNF (Arr es)  = all valid es
+isHNF (Lam bnd) = valid e where (_,e) = unsafeUnbind bnd
+isHNF (Op op)   = True
+isHNF _         = False
 
 --------------------------------------------------------------------------------
 -- valid expressions
