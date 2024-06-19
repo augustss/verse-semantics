@@ -4,6 +4,8 @@ import Control.Monad( guard )
 import TRS.Bind
 import Rules.Core
 
+import Data.List( intersect )
+
 --------------------------------------------------------------------------------
 
 rules :: Rule
@@ -142,6 +144,8 @@ rulesExistentials lhs =
      (Var x',v) <- matchEq x_eq_v
      guard (x == x')
      guard (isVal v)
+     guard (x `notElem` free v)
+     guard (null (free v `intersect` bvs ctx))
      pure (subst [(x,v)] (ctx <@ e))
  ++
   "EXI-ELIM" `name`
