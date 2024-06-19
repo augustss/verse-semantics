@@ -1,6 +1,7 @@
 module Rules.Core where
 
 import qualified Data.Map as M
+import Data.List( union )
 import TRS.Bind
 import Test.QuickCheck
 import Control.Monad( liftM2 )
@@ -399,6 +400,27 @@ Check fx e   <@ h = Check fx (e <@ h)
 Verify bnds  <@ h = error "context plugging Verify undefined"
 HOLE         <@ h = h
 e            <@ h = e
+
+bvs :: Context -> [Ident]
+bvs ctx = explore [] ctx
+ where
+  explore xs (Arr es)     = foldr union [] (map (explore xs) es)
+  explore xs (Lam bnd)    = exploreBind xs bnd
+  explore xs (e1 :=: e2)  = explore xs e1 `union` explore xs e2
+  explore xs (e1 :>: e2)  = explore xs e1 `union` explore xs e2
+  explore xs (e1 :|: e2)  = explore xs e1 `union` explore xs e2
+  explore xs (e1 :@: e2)  = explore xs e1 `union` explore xs e2
+  explore xs (One e)      = explore xs e
+  explore xs (All e)      = explore xs e
+  explore xs (Some e)     = explore xs e
+  explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
+  explore xs (Check fx e) = explore xs e
+  explore xs (Exi bnd)    = exploreBind xs bnd
+  explore xs (Verify bnd) = error "contexts Verify undefined"
+  explore xs HOLE         = xs
+  explore xs e            = []
+  
+  exploreBind xs bnd = explore ([x] `union` xs) e where (x,e) = unsafeUnbind bnd
 
 --------------------------------------------------------------------------------
 
