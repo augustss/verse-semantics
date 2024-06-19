@@ -9,7 +9,7 @@ import Rules.Core
 rules :: Rule
 rules = rulesApplication
      <> rulesUnification
-     <> rulesSubstitution
+     <> rulesExistentials
      <> rulesNormalization
      <> rulesChoice
      <> rulesOneAndAll
@@ -17,6 +17,31 @@ rules = rulesApplication
 --------------------------------------------------------------------------------
 
 name :: String -> [Expr] -> [(String,Expr)]
+name s es = [ (s,e) | e <- es ]
+
+--------------------------------------------------------------------------------
+
+-- value contexts
+isV :: Expr -> Expr -> Bool
+isV x e = x==e || case e of
+                    Arr es -> any (isV x) es
+                    _      -> False
+
+-- evaluation contexts
+evalCtx :: Expr -> [(Context, Expr)]
+evalCtx e = [ (ctx,e) | (ctx,e) <- contexts e, isEvalCtx ctx ]
+ where
+  isEvalCtx HOLE                = True
+  isEvalCtx ((_ :=: e1) :>: e2) = isEvalCtx e1 || isEvalCtx e2
+  isEvalCtx (Exi bnd)           = isEvalCtx e where (_,e) = unsafeUnbind bnd
+  isEvalCtx _                   = False
+
+-- scope contexts
+scopeCtx :: Expr -> [(Context, Expr)]
+scopeCtx (One e)     = [(One HOLE, e)]
+scopeCtx (All e)     = [(All HOLE, e)]
+scopeCtx (e1 :|: e2) = [(HOLE :|: e2, e1), (e1 :|: HOLE, e2)]
+scopeCtx _           = []
 
 --------------------------------------------------------------------------------
 
@@ -44,20 +69,23 @@ rulesApplication lhs =
   do Op IsInt :@: a <- [lhs]
      guard (isHNF a)
      case a of
-       Int _ -> pure hnf
+       Int _ -> pure a
        _     -> pure Fail
  ++
   "APP-LAM" `name`
-  do Lam bnd :@: Val v <- [lhs]
-     let (x,body) = alphaRename (free v) bnd
-     pure (Exi (bind x ((Var x :=: v) :>: body)))
+  do Lam bnd :@: v <- [lhs]
+     guard (isVal v)
+     let (x,e) = alphaRename (free v) bnd
+     pure (Exi (bind x ((Var x :=: v) :>: e)))
  ++
   "APP-TUP" `name`
   do Arr vs@(_:_) :@: v <- [lhs]
-     pure (foldr1 (:|:) [ (Val v :=: Int i) :>: Val vi | (i,vi) <- [0..] `zip` vs ])
+     guard (isVal v && all isVal vs)
+     pure (foldr1 (:|:) [ (v :=: Int i) :>: vi | (i,vi) <- [0..] `zip` vs ])
  ++
   "APP-TUP-0" `name`
-  do Arr [] :@: _ <- [lhs]
+  do Arr [] :@: v <- [lhs]
+     guard (isVal v)
      pure Fail
 
 --------------------------------------------------------------------------------
@@ -72,7 +100,7 @@ rulesUnification lhs =
   "U-TUP" `name`
   do (Arr vs :=: Arr vs') :>: e <- [lhs]
      guard (length vs == length vs')
-     pure (foldr (:>:) e [ Val v :=: Val v' | (v,v') <- vs `zip` vs' ])
+     pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
  ++
   "U-FAIL" `name`
   do a1 :=: a2 <- [lhs]
@@ -85,74 +113,58 @@ rulesUnification lhs =
      pure Fail
  ++
   "U-OCCURS" `name`
-  do Var x :=: v <- [lhs]
-     let isVar (Var _) = True
-         isVar _       = False
-     guard (not (isVar v) && isValueX v x)
+  do x@(Var _) :=: v <- [lhs]
+     guard (isV x v && v /= x)
      pure Fail
 
 --------------------------------------------------------------------------------
 
-rulesSubstitution :: ERule
-rulesSubstitution _ lhs =
-  "SUBST1" `name`
-  do Exi (Bind x e) <- [lhs]
-     (s, Var x' :=: Val v) <- substX e
+rulesExistentials :: Rule
+rulesExistentials lhs =
+  "EXI-SUBST" `name`
+  do (x,e) <- unsafeUnbind `fmap` matchExi lhs
+     (ctx, x_eq_v :>: e) <- evalCtx e
+     -- TODO: add correct guard on ctx
+     (Var x',v) <- matchEq x_eq_v
      guard (x == x')
-     guard (not (isValueX v x))
-     pure ((substCtx [(x,v)] s) (Arr []))
-
---------------------------------------------------------------------------------
-
-rulesNormalization :: ERule
-rulesNormalization _ lhs =
+     guard (isVal v)
+     pure (subst [(x,v)] (ctx <@ e))
+ ++
   "EXI-ELIM" `name`
-  do Exi (Bind x e) <- [lhs]
+  do (x,e) <- unsafeUnbind `fmap` matchExi lhs
      guard (x `notElem` free e)
      pure e
  ++
   "EXI-FLOAT" `name`
-  do (ctx, zs, Exi bnd) <- evalX1 [] lhs
-     let Bind x e = alphaRename (zs ++ free (ctx (#))) bnd
-     guard (x `notElem` free (ctx (#)))
-     pure (Exi (Bind x (ctx e)))
+  do (ctx, exi_e) <- evalCtx lhs
+     guard (null (bvs ctx))
+     (x,e) <- alphaRename (free ctx) `fmap` matchExi exi_e
+     pure (Exi (bind x (ctx <@ e)))
  ++
-  "SEQ-ASSOC" `name`
-  do (e1 :>: e2) :>: e3 <- [lhs]
-     pure (e1 :>: (e2 :>: e3))
- ++
-  "SEQ-FLOAT" `name`
-  do Val v :=: (e1 :>: e2) <- [lhs]
-     pure (e1 :>: (v :=: e2))
- ++
-  "SEQ-ELIM" `name`
-  do Val _ :>: e <- [lhs]
-     pure e
- ++
-  "EQ-FLOAT" `name`
-  do Val v1 :=: (Val v2 :=: e) <- [lhs]
-     pure ((v2 :=: e) :>: (v1 :=: Arr []))
-{-
- ++
-  "DEF-MOVE" `name`
-  do (Var x :=: Val v) :>: e <- [lhs]
-     (e1,e2) <- [ (e1,e2) | e1 :>: e2 <- [e], isEffectFree e1 ]
-             ++ [ (Var y :=: w, Arr []) | Var y :=: Val w <- [e] ]
-     pure (e1 :>: ((Var x :=: v) :>: e2))
--}
- ++
-  "EQ-SWAP" `name`
-  do Val v :=: Var x <- [lhs]
-     pure (Var x :=: v)
- ++
-  "EQ-RESULT" `name`
-  do (Val v :=: e) :>: Arr [] <- [lhs]
-     pure (v :=: e)
+  "EXI-CHOICE" `name`
+  do (x,e) <- unsafeUnbind `fmap` matchExi lhs
+     (ctx, e1 :|: e2) <- evalCtx e
+     guard (x `notElem` free ctx)
+     pure (ctx <@ (Exi (bind x e1) :|: Exi (bind x e2)))
 
 --------------------------------------------------------------------------------
 
-rulesChoice :: ERule
-rulesChoice _ lhs =
+rulesNormalization :: Rule
+rulesNormalization lhs =
+  "SEQ-ASSOC" `name`
+  do (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- [lhs]
+     pure ((v1 :=: e1) :>: ((v2 :=: e2) :>: e3))
+ ++
+  "SEQ-ELIM" `name`
+  [] -- we do not need SEQ-ELIM because we don't actually have _=e1;e2
+ ++
+  "REC" `name`
+  [] -- TODO
+
+--------------------------------------------------------------------------------
+
+rulesChoice :: Rule
+rulesChoice lhs =
   "CHOICE-ASSOC" `name`
   do (e1 :|: e2) :|: e3 <- [lhs]
      pure (e1 :|: (e2 :|: e3))
@@ -166,33 +178,32 @@ rulesChoice _ lhs =
      pure e
  ++
   "CHOICE" `name`
-  do (ctx, _, e1 :|: e2) <- choiceX [] lhs
-     pure (ctx e1 :|: ctx e2)
+  do (sx, e) <- scopeCtx lhs
+     (ctx, e1 :|: e2) <- evalCtx e
+     -- TODO: add guard on ctx
+     pure (sx <@ ((ctx <@ e1) :|: (ctx <@ e2)))
  ++
   "FAIL" `name`
-  do (_, _, Fail) <- choiceX [] lhs
+  do (ctx, Fail) <- evalCtx lhs
+     -- TODO: add guard on ctx
      pure Fail
- ++
-  "CHOICE-EXI" `name`
-  do Exi (Bind x ctx_e) <- [lhs]
-     (ctx, _, e1 :|: e2) <- evalX [x] ctx_e
-     guard (x `notElem` free (ctx (#)))
-     pure (ctx (Exi (Bind x (e1 :|: e2))))
 
 --------------------------------------------------------------------------------
 
-rulesOneAndAll :: ERule
-rulesOneAndAll _ lhs =
+rulesOneAndAll :: Rule
+rulesOneAndAll lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
  ++
   "ONE-VALUE" `name`
-  do One (Val v) <- [lhs]
+  do One v <- [lhs]
+     guard (isVal v)
      pure v
  ++
   "ONE-CHOICE" `name`
-  do One (Val v :|: _) <- [lhs]
+  do One (v :|: _) <- [lhs]
+     guard (isVal v)
      pure v
  ++
   "ALL-FAIL" `name`
@@ -206,17 +217,5 @@ rulesOneAndAll _ lhs =
      let vs = choices e
      guard (all isVal vs)
      pure (Arr vs)
-
---------------------------------------------------------------------------------
-
-rulesGuard :: ERule
-rulesGuard _ lhs =
-  "GUARD-ELIM" `name`
-  do Val _ :>>: e <- [lhs]
-     pure e
- ++
-  "GUARD-FAIL" `name`
-  do Fail :>>: _ <- [lhs]
-     pure Fail
 
 -----------------------------------------------------------------------------------
