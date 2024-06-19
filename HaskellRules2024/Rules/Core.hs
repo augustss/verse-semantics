@@ -3,6 +3,7 @@ module Rules.Core where
 import qualified Data.Map as M
 import Data.List( union )
 import TRS.Bind
+import TRS.Traced
 import Test.QuickCheck
 import Control.Monad( liftM2 )
 
@@ -157,6 +158,7 @@ alphaRename :: [Ident] -> Bind Expr -> (Ident,Expr)
 alphaRename = alphaRenameWith (\x y -> subst [(x,Var y)])
 
 -- sorts binders and renames variables
+-- TODO: new normalization for x=y
 norm :: Expr -> Expr
 norm e = alpha 0 e
  where
@@ -274,6 +276,14 @@ matchEq e =
                            | (Var x, Var y) <- [(e1,e2)]
                            ]
   ]
+
+-- normalize
+normalize :: Rule -> Expr -> Traced Expr
+normalize rule e = go [] e
+ where
+  go tr e = case rule e of
+              []       -> e :<-- tr
+              (s,e'):_ -> go ((s,e):tr) e'
 
 --------------------------------------------------------------------------------
 -- arbitrary
