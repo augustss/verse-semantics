@@ -494,11 +494,11 @@ opChoices :: [Operation] -> Operation
 opChoices = foldr1 OpChoice
 
 -- The Program has the output variable as the first argument
-data Program = Program Vertex Context Operation | ProgramDone Vertex | ProgramFail
+data Program = Program Context Vertex Operation | ProgramDone Vertex | ProgramFail
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Program where
-  pPrint (Program x c op) = sep [text "program" <> parens (pPrint x) <+> pPrint c, nest 2 (braces (pPrint op))]
+  pPrint (Program c x op) = sep [text "program" <+> pPrint c <+> pPrint x, nest 2 (braces (pPrint op))]
   pPrint (ProgramDone v) = text "DONE" <> parens (pPrint v)
   pPrint ProgramFail = text "FAIL"
 
@@ -512,8 +512,8 @@ class ContextStartUp a where
   contextStartOp :: a -> [(Context -> Operation -> a, Context, Operation)]
 
 instance ContextStartUp Program where
-  contextStartOp (Program x c op) =
-    [(Program x, c, op)]
+  contextStartOp (Program c x op) =
+    [(\ c' op' -> Program c' x op', c, op)]
   contextStartOp _ =
     []
 
@@ -750,7 +750,7 @@ allRules =
 -----
 -- Program:
 programRules :: Rule Config
-programRules _ (A g :|- pg@(Program x c op)) =
+programRules _ (A g :|- pg@(Program c x op)) =
   -- programIntro is startConfig
   "ProgramUnblock" `name`
   do
@@ -956,7 +956,7 @@ freshen a aop = transformBi sub aop
 
 -- XXX Output variable is always 'x'
 startConfig :: Operation -> Config
-startConfig s = A [] :|- Program (newIdents () "x") (newIdents s "c") s
+startConfig s = A [] :|- Program (newIdents s "c") (newIdents () "x") s
 
 -- example1:  5=5
 -- Hand-desugared
