@@ -8,7 +8,7 @@
 module Main where
 import Prelude hiding ((<>), reads)
 import qualified Prelude as P
-import Control.Arrow(second)
+import Control.Arrow(second, (***))
 import Control.Monad
 import Data.Char
 import Data.Data(Data)
@@ -206,11 +206,14 @@ data Effect = Eff EffCardinality (ESet EffTransacts1) (ESet EffImperatives1) (ES
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Effect where
+  pPrint e | Just s <- lookup e namedEffects = text ("<" ++ s ++ ">")
   pPrint (Eff c t i b) =
-    text "<" <> fsep (punctuate (text ",") (pPrint c : ppt ++ ppi ++ ppb)) <> text ">"
-    where ppt | t == P_Transacts = [text "transacts"]
+    text "<" <> fsep (punctuate (text " &") (pPrint c : ppt ++ ppi ++ ppb)) <> text ">"
+    where ppt | t == P_No_Transacts = [text "no_transacts"]
+              | t == P_Transacts = []
               | otherwise = map pPrint $ unSet t
-          ppi | i == P_Imperatives = [text "imperatives"]
+          ppi | i == P_No_Imperatives = [text "no_imperatives"]
+              | i == P_Imperatives = []
               | otherwise = map pPrint $ unSet i
           ppb | b == P_Unblocked = [text "unblocked"]
               | otherwise = map pPrint $ unSet b
@@ -258,6 +261,8 @@ succeeds :: Effect
 succeeds = Eff P_Succeeds P_Transacts P_Imperatives P_Blocked
 fails :: Effect
 fails = Eff P_Fails P_Transacts P_Imperatives P_Blocked
+abstracts :: Effect
+abstracts = Eff P_Abstracts P_Transacts P_Imperatives P_Blocked
 imperatives :: Effect
 imperatives = Eff P_Abstracts P_Transacts P_Imperatives P_Blocked
 unblocked :: Effect
@@ -286,6 +291,34 @@ unblocked_reads :: Effect
 unblocked_reads = Eff P_Abstracts P_Transacts P_Imperatives (ESet [P_Unblocked_Reads])
 unblocked_imperatives :: Effect
 unblocked_imperatives = Eff P_Abstracts P_Transacts P_Imperatives (ESet [P_Unblocked_Imperatives])
+succeeds_done :: Effect
+succeeds_done = Eff P_Succeeds P_Transacts P_Imperatives P_Unblocked
+fails_done :: Effect
+fails_done = Eff P_Fails P_Transacts P_Imperatives P_Unblocked
+
+namedEffects :: [(Effect, String)]
+namedEffects = [
+  (effects, "effects"),
+  (no_effects, "no_effects"),
+  (succeeds, "succeeds"),
+  (fails, "fails"),
+  (imperatives, "imperatives"),
+  (unblocked, "unblocked"),
+  (blocked, "blocked"),
+  (only_succeeds, "only_succeeds"),
+  (no_transacts, "no_transacts"),
+  (no_imperatives, "no_imperatives"),
+  (throws, "throws"),
+  (suspends, "suspends"),
+  (interacts, "interacts"),
+  (reads, "reads"),
+  (writes, "writes"),
+  (unblocked_writes, "unblocked_writes"),
+  (unblocked_reads, "unblocked_reads"),
+  (unblocked_imperatives, "unblocked_imperatives"),
+  (succeeds_done, "succeeds_done"),
+  (fails_done, "fails_done")
+  ]
 
 -- The join of two effects in the lattice.
 (.+) :: Effect -> Effect -> Effect
@@ -308,7 +341,7 @@ downFx  :: Effect -> Effect
 downFx fx = unblocked .+ fx
 
 afterFx :: Effect -> Effect
-afterFx fx = (unblocked .& fx)
+afterFx fx = (unblocked .+ fx)
 --  .& (if (iterates  <=== (contradicts    .+ fx)) then blocked else unblocked_iterates)
   .& (if (reads     <=== (no_transacts   .+ fx)) then blocked else unblocked_writes)
   .& (if (writes    <=== (no_transacts   .+ fx)) then blocked else unblocked_reads .& unblocked_writes)
@@ -358,10 +391,20 @@ data Head
   | HeadTuple [Vertex]
   deriving (Eq, Ord, Show, Data)
 
+-- Does not have to be symmetric, since the ProgramUnifyOp handles symmetry.
+-- This is used in the UnifyFails rule.
+distinctHeads :: Head -> Head -> Bool
+distinctHeads (HeadAtom a) (HeadAtom a') = a /= a'
+distinctHeads (HeadAtom _) (HeadTuple _) = True
+distinctHeads (HeadAtom _) (HeadLambda _) = True
+distinctHeads (HeadTuple vs) (HeadTuple vs') = length vs /= length vs'
+--distinctHeads (HeadTuple _) _ = True
+distinctHeads _ _ = False
+
 instance Pretty Head where
   pPrint (HeadAtom a) = pPrint a
   pPrint (HeadLambda l) = pPrint l
-  pPrint (HeadTuple us) = parens $ text "tuple" <> parens (pPrint us)
+  pPrint (HeadTuple us) = text "tuple" <> braces (fsep (punctuate (text ",") (map pPrint us)))
 
 type KnownValue = Head  -- Nested tuples are always KnownValue
 
@@ -388,6 +431,9 @@ data Operation
   | OpMetaVar String
   deriving (Eq, Ord, Show, Data)
 
+pattern OpNoop :: Operation
+pattern OpNoop = OpExists []
+
 infixr 0 +>
 (+>) :: Operation -> Operation -> Operation
 (+>) = OpSeq
@@ -403,6 +449,7 @@ instance Pretty Operation where -- XXX precedence
   pPrint (OpCall u v p) = pPrint u <+> text "=" <+> pPrint v <> parens (pPrint p)
   pPrint (OpSeq op0 op1) = xsep [pPrint op0 <> text ";", pPrint op1]
   pPrint (OpChoice op0 op1) = pPrint op0 <+> text "|" <+> pPrint op1
+  pPrint OpNoop = text "nop"
   pPrint (OpExists xs) = hsep (text "exists" : map pPrint xs)
   pPrint (OpIterate u0 x0 c op0 x1 op1 op2) =
     text "iterate" <> parens (pPrint u0) <+> pPrint x0 <+> pPrint c <+> braces (pPrint op0) <+>
@@ -424,12 +471,13 @@ instance Pretty HeadPattern where
 opChoices :: [Operation] -> Operation
 opChoices = foldr1 OpChoice
 
-data Program = Program Context Operation | ProgramDone
+data Program = Program Context Operation | ProgramDone | ProgramFail
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Program where
-  pPrint (Program c op) = sep [text "program" <+> pPrint c, nest 2 (pPrint op)]
+  pPrint (Program c op) = sep [text "program" <+> pPrint c, nest 2 (braces (pPrint op))]
   pPrint ProgramDone = text "DONE"
+  pPrint ProgramFail = text "FAIL"
 
 ------------------------------------------------------
 
@@ -443,7 +491,7 @@ class ContextStartUp a where
 instance ContextStartUp Program where
   contextStartOp (Program c op) =
     [(Program, c, op)]
-  contextStartOp ProgramDone =
+  contextStartOp _ =
     []
 
 instance ContextStartUp Operation where
@@ -474,12 +522,14 @@ programOp a =
      pure (\ c' op' -> ctx d (ctx' c' op'), c, op)
   )
 
+-- XXX not symmetric between match and construct.
+-- This is because we cannot guarentee consistensy between u,v,op in construction.
 programUnifyOp :: ContextStartUp a =>
-                  a -> [(Context -> Vertex -> Vertex -> Operation -> a, Context, Vertex, Vertex, Operation)]
+                  a -> [(Context -> Operation -> a, Context, Vertex, Vertex, Operation)]
 programUnifyOp a = do
   (ctx, c, op@(OpUnify u v)) <- programOp a
-  [ (\ c' _u' _v' op' -> ctx c' op', c, u, v, op)
-   ,(\ c' _u' _v' op' -> ctx c' op', c, v, u, op) ]
+  [ (\ c' op' -> ctx c' op', c, u, v, op)
+   ,(\ c' op' -> ctx c' op', c, v, u, op) ]
 
 programFlexible :: ContextStartUp a =>
                    a -> [(Context -> Vertex -> a, Context, Vertex)]
@@ -499,11 +549,14 @@ programFlexible a = do
 data Assumption
   = AEffect Effect Operation Context                                      -- fx{op}@c
   | AReadPointer Pointer KnownValue Context                               -- P^:=kv@c
+  -- For debugging
+  | AComment String
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Assumption where
   pPrint (AEffect fx op c) = pPrint fx <> braces (pPrint op) <> text "@" <> pPrint c
   pPrint (AReadPointer p kv c) = pPrint p <> text "^:=" <> pPrint kv <> text "@" <> pPrint c
+  pPrint (AComment s) = text "#" <+> text s
 
 data AssumptionSet = A [Assumption]
   deriving (Eq, Ord, Show, Data)
@@ -511,6 +564,11 @@ data AssumptionSet = A [Assumption]
 instance Pretty AssumptionSet where
   pPrint (A []) = text "empty"
   pPrint (A as) = sep (punctuate (text ",") (map pPrint (sort as)))
+
+{-
+pPrint' x | prettyShow x == "<unblocked>{5 = 5}@c" = text (show x)
+          | otherwise = pPrint x
+-}
 
 data Config = AssumptionSet :|- Program
   deriving (Eq, Ord, Show, Data)
@@ -524,11 +582,8 @@ instance Pretty (Operation -> Program) where
 instance Pretty (Context -> Operation -> Program) where
   pPrint f = pPrint (f (Context (Ident "SC")) (OpMetaVar "OP"))
 
-instance Pretty (Context -> Context -> Operation -> Program) where
-  pPrint f = pPrint (f (Context (Ident "FC")) (Context (Ident "SC")) (OpMetaVar "OP"))
-
 -- Add asms to g, but don't add existing (or weaker) assumptions.
--- Also, make sure to weed out any weker assumption from g.
+-- Also, make sure to weed out any weaker assumption from g.
 gAdd :: [Assumption] -> [Assumption] -> [AssumptionSet]
 gAdd asms g =
   let asms' = filter (\ a -> not (weaker a g)) asms
@@ -543,36 +598,58 @@ gAdd asms g =
         []
       else
         [A $ asms' ++ filter (\ a -> not (weaker a asms')) g]
---        [A $ asms' ++ g]
-
-
+{-
+gAdd asms ag =
+  let g = filter (not . isComment) ag
+      isComment (AComment _) = True
+      isComment _ = False
+      asms' = filter (`notElem` g) asms
+  in  if null asms' then
+        []
+      else
+        [A $ asms' ++ filter (`notElem` asms') g]
+-}
 ---------------------------------------------
 
 class NewIdents i o where
   newIdents :: (Data a) => a -> i -> o
 instance NewIdents String Ident where
   newIdents x s = is !! 0  where is = identsNotIn x [Ident s]
+instance NewIdents String OperationVariable where
+  newIdents x s = OperationVariable $ newIdents x s
+instance NewIdents String Context where
+  newIdents x s = Context $ newIdents x s
+instance NewIdents String Variable where
+  newIdents x s = Variable $ newIdents x s
+instance NewIdents String Vertex where
+  newIdents x s = VertexVariable $ newIdents x s
 
 instance NewIdents (String, String) (Ident, Ident) where
   newIdents x (s1, s2) = (is !! 0, is !! 1)  where is = identsNotIn x [Ident s1, Ident s2]
 instance NewIdents (String, String) (OperationVariable, OperationVariable) where
-  newIdents x (s1, s2) = (OperationVariable (is !! 0), OperationVariable (is !! 1))  where is = identsNotIn x [Ident s1, Ident s2]
+  newIdents x ss = OperationVariable *** OperationVariable $ newIdents x ss
 instance NewIdents (String, String) (Context, Context) where
-  newIdents x (s1, s2) = (Context (is !! 0), Context (is !! 1))  where is = identsNotIn x [Ident s1, Ident s2]
+  newIdents x ss = Context *** Context $ newIdents x ss
 instance NewIdents (String, String) (Variable, Variable) where
-  newIdents x (s1, s2) = (Variable (is !! 0), Variable (is !! 1))  where is = identsNotIn x [Ident s1, Ident s2]
+  newIdents x ss = Variable *** Variable $ newIdents x ss
+instance NewIdents (String, String) (Vertex, Vertex) where
+  newIdents x ss = VertexVariable *** VertexVariable $ newIdents x ss
 
 instance NewIdents (String, String, String) (Ident, Ident, Ident) where
   newIdents x (s1, s2, s3) = (is !! 0, is !! 1, is !! 2)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3]
+
 instance NewIdents (String, String, String, String) (Ident, Ident, Ident, Ident) where
   newIdents x (s1, s2, s3, s4) = (is !! 0, is !! 1, is !! 2, is !! 3)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3, Ident s4]
+
 instance NewIdents (String, String, String, String, String) (Ident, Ident, Ident, Ident, Ident) where
   newIdents x (s1, s2, s3, s4, s5) = (is !! 0, is !! 1, is !! 2, is !! 3, is !! 4)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3, Ident s4, Ident s5]
 
 instance NewIdents [String] [Ident] where
   newIdents x ss = is  where is = identsNotIn x (map Ident ss)
+
 instance NewIdents (Int, String) [Ident] where
   newIdents x (n, s) = take n $ identsNotIn x [Ident s]
+
 instance NewIdents [Ident] [Ident] where
   newIdents x ss = is  where is = identsNotIn x ss
 
@@ -620,6 +697,21 @@ norm :: Config -> Config
 norm = term . (!!0) . f . normalFormFuelTracePlain sys 10000
   where f x = if null (nrLeft x) then nrDone x else trace "**** no fuel " (nrLeft x)
 
+hrun :: Handle -> Operation -> IO ()
+hrun h op = do
+  hppx h op
+  hPutStrLn h "---ProgramIntro--->"
+  hpptr h $ startConfig op
+
+frun :: FilePath -> Operation -> IO ()
+frun fn op = do
+  h <- openFile fn WriteMode
+  hrun h op
+  hClose h
+
+run :: Operation -> IO ()
+run = hrun stdout
+
 ---------------------------------------------
 
 allRules :: Rule Config
@@ -627,6 +719,7 @@ allRules =
        programRules
   P.<> effectRules
   P.<> simpleOpsRules
+  P.<> unificationRules
 
 ---------------------------------------------
 
@@ -644,8 +737,16 @@ programRules _ (A g :|- pg@(Program c op)) =
   do
     AEffect fx op' c' <- g
     guard $ op == op' && c == c'
-    guard $ isEffect fx only_succeeds
+    guard $ isEffect fx succeeds_done -- only_succeeds
     pure $ A g :|- ProgramDone
+ ++
+  -- Extra rule to get a nice failure
+  "ProgramElimFail" `name`
+  do
+    AEffect fx op' c' <- g
+    guard $ op == op' && c == c'
+    guard $ isEffect fx fails_done
+    pure $ A g :|- ProgramFail
 programRules _ _ = []
 
 -----
@@ -684,21 +785,126 @@ simpleOpsRules _ (A g :|- pg) =
     guard $ op0 == op0' && c == c'
     AEffect fx1 op1' c'' <- g
     guard $ op1 == op1' && c == c''
-    g' <- gAdd [AEffect (sequenceFx fx0 fx1) op01 c, AEffect (downFx fx2) op0 c, AEffect (afterFx fx0) op1 c] g
+    let sFx = sequenceFx fx0 fx1
+        dFx = downFx fx2
+        aFx = afterFx fx0
+    g' <- gAdd [AEffect sFx op01 c, AEffect dFx op0 c, AEffect aFx op1 c] g
+    let g'' = g' -- addComment g' $ "SequenceFx"++prettyShow(fx0,fx1)++"="++prettyShow sFx++", DownFx("++prettyShow fx2++")="++prettyShow dFx++", AfterFx("++prettyShow fx0++")="++prettyShow aFx
+    pure $ g'' :|- pg
+
+addComment :: AssumptionSet -> String -> AssumptionSet
+addComment (A as) s = A (AComment s : as)
+
+-----
+-- Unification:
+unificationRules :: Rule Config
+unificationRules _ (A g :|- pg) =
+  -- UnifyIntro ???
+  "UnifyAtomSucceeds" `name`
+  do
+    (_ctx, c, op@(OpUnify (VertexHead (HeadAtom a)) (VertexHead (HeadAtom a')))) <- programOp pg
+    guard $ a == a'
+    g' <- gAdd [AEffect succeeds op c] g
     pure $ g' :|- pg
+ ++
+  "UnifyFails" `name`
+  do
+    (_ctx, c, VertexHead h, VertexHead h', op) <- programUnifyOp pg
+    guard $ distinctHeads h h'
+    g' <- gAdd [AEffect fails op c] g
+    pure $ g' :|- pg
+ ++
+  "UnifySubstitute" `name`
+  do
+    (ctx, c, VertexVariable x, u, _op) <- programUnifyOp pg
+    (_ctx, c', VertexVariable x') <- programFlexible pg
+    guard $ x == x' && c == c'
+    let pg' = ctx c OpNoop
+    pure $ remAsmDup $ subst u x (A g :|- pg')
+ ++
+  "UnifyTuples" `name`
+  do
+    (ctx, c, OpUnify (VertexHead (HeadTuple vs)) (VertexHead (HeadTuple us))) <- programOp pg
+    guard $ length vs == length us
+    let ops = if null vs then OpNoop else opSeqs $ zipWith OpUnify vs us
+    pure $ A g :|- ctx c ops
+
+-- e[y/x]
+subst :: (Data a) => Vertex -> Variable -> a -> a
+subst u x = transformBi f . transformBi g
+  where f (VertexVariable x') | x' == x   = u
+        f z = z
+        g (OpExists us) = OpExists (filter (/= VertexVariable x) us)
+        g o = o
+
+remAsmDup :: Config -> Config
+remAsmDup (A g :|- pg) = A (nub g) :|- pg
 
 ---------------------------------------------
 
 startConfig :: Operation -> Config
-startConfig s = A [] :|- Program (Context (newIdents s "c")) s
+startConfig s = A [] :|- Program (newIdents s "c") s
 
--- example1:  5
+-- example1:  5=5
+-- Hand-desugared
 example1 :: Operation
-example1 = opSeqs [ OpExists [vi, vx], OpUnify vi h, OpUnify vx h]
-  where h = VertexHead $ HeadAtom $ AtomRational 5
-        (i, x) = newIdents () ("i", "x")
-        vi = VertexVariable i; vx = VertexVariable x
+example1 = OpUnify a5 a5
+  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+
+-- example2:  5=3
+-- Hand-desugared
+example2 :: Operation
+example2 = OpUnify a5 a3
+  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+        a3 = VertexHead $ HeadAtom $ AtomRational 3
+
+-- example3:  5
+example3 :: Operation
+example3 = opSeqs [ OpExists [vi, vx], OpUnify vi a5, OpUnify vx a5]
+  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+        (vi, vx) = newIdents () ("i", "x")
+
+-- example4: a:=5; a
+example4 :: Operation
+example4 = opSeqs [ OpExists [vi, vx], OpExists [vi', vx'], (OpUnify vi' a5 +> OpUnify vx' a5), (OpUnify vi vx' +> OpUnify vx vx')]
+  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+        (vi, vx) = newIdents () ("i", "x")
+        (vi', vx') = newIdents () ("i'", "x'")
+
+-- example5:  5=3
+example5 :: Operation
+example5 = opSeqs [ OpExists [vi, vx],
+                    (OpUnify vi a5 +> OpUnify vx a5) +> (OpUnify vi a3 +> OpUnify vx a3)
+                  ]
+  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+        a3 = VertexHead $ HeadAtom $ AtomRational 3
+        (vi, vx) = newIdents () ("i", "x")
+
+-- example6: a:=5; a=3
+example6 :: Operation
+example6 = opSeqs [ OpExists [vi, vx],
+                    OpExists [vi', vx'],
+                    (OpUnify vi' a5 +> OpUnify vx' a5),
+                    (OpUnify vi vx' +> OpUnify vx vx') +> (OpUnify vi' a3 +> OpUnify vx' a3)
+                  ]
+  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+        a3 = VertexHead $ HeadAtom $ AtomRational 3
+        (vi, vx) = newIdents () ("i", "x")
+        (vi', vx') = newIdents () ("i'", "x'")
+
+-- example7: <>=<>
+-- Hand-desugared
+example7 :: Operation
+example7 = OpUnify (VertexHead (HeadTuple [])) (VertexHead (HeadTuple []))
+
+-- example8: ex x y . <3,x>=<y,5>
+-- Hand-desugared
+example8 :: Operation
+example8 = OpExists [vx,vy] +> OpUnify (VertexHead (HeadTuple [a3,vx])) (VertexHead (HeadTuple [vy,a5]))
+  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+        a3 = VertexHead $ HeadAtom $ AtomRational 3
+        (vx, vy) = newIdents () ("x", "y")
 
 main :: IO ()
 main = do
-  pptr $ startConfig example1
+  fpptr "ut" $ startConfig example5
