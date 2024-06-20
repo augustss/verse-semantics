@@ -265,6 +265,8 @@ fails :: Effect
 fails = Eff P_Fails P_Transacts P_Imperatives P_Blocked
 abstracts :: Effect
 abstracts = Eff P_Abstracts P_Transacts P_Imperatives P_Blocked
+contradicts :: Effect
+contradicts = Eff P_Contradicts P_Transacts P_Imperatives P_Blocked
 imperatives :: Effect
 imperatives = Eff P_Abstracts P_Transacts P_Imperatives P_Blocked
 unblocked :: Effect
@@ -287,6 +289,8 @@ reads :: Effect
 reads = Eff P_Abstracts (ESet [P_Reads]) P_Imperatives P_Blocked
 writes :: Effect
 writes = Eff P_Abstracts (ESet [P_Writes]) P_Imperatives P_Blocked
+unblocked_iterates :: Effect
+unblocked_iterates = Eff P_Abstracts P_Transacts P_Imperatives (ESet [P_Unblocked_Iterates])
 unblocked_writes :: Effect
 unblocked_writes = Eff P_Abstracts P_Transacts P_Imperatives (ESet [P_Unblocked_Writes])
 unblocked_reads :: Effect
@@ -304,6 +308,7 @@ namedEffects = [
   (no_effects, "no_effects"),
   (succeeds, "succeeds"),
   (fails, "fails"),
+  (contradicts, "contradicts"),
   (imperatives, "imperatives"),
   (unblocked, "unblocked"),
   (blocked, "blocked"),
@@ -315,6 +320,7 @@ namedEffects = [
   (interacts, "interacts"),
   (reads, "reads"),
   (writes, "writes"),
+  (unblocked_iterates, "unblocked_iterates"),
   (unblocked_writes, "unblocked_writes"),
   (unblocked_reads, "unblocked_reads"),
   (unblocked_imperatives, "unblocked_imperatives"),
@@ -344,7 +350,7 @@ downFx fx = unblocked .+ fx
 
 afterFx :: Effect -> Effect
 afterFx fx = (unblocked .+ fx)
---  .& (if (iterates  <=== (contradicts    .+ fx)) then blocked else unblocked_iterates)
+  .& (if (abstracts <=== (contradicts    .+ fx)) then blocked else unblocked_iterates)
   .& (if (reads     <=== (no_transacts   .+ fx)) then blocked else unblocked_writes)
   .& (if (writes    <=== (no_transacts   .+ fx)) then blocked else unblocked_reads .& unblocked_writes)
   .& (if (throws    <=== (no_imperatives .+ fx)) then blocked else unblocked_imperatives)
@@ -880,6 +886,20 @@ callingRules _ (A g :|- pg) =
     let op' = freshen pg op
         op'' = subst p i $ subst v x op'
     pure $ A g :|- ctx c op''
+
+-----
+-- Iterate & Choice:
+iterateChoiceRules :: Rule Config
+iterateChoiceRules _ (A g :|- pg) =
+  "IterateIntro" `name`
+  do
+    (_ctx, c, op@(OpIterate _u0 _x0 d op0 _x1 _op1 _op2)) <- programOp pg
+    fx0 <- [ fx0 | AEffect fx0 op' c' <- g, op == op', c == c' ]
+    _fx1 <- [ fx1 | AEffect fx1 op0' d' <- g, op0 == op0', d == d' ]
+    g' <- gAdd [AEffect (downFx fx0) op0 d] g
+    pure $ g' :|- pg
+  -- IterateCopyMutables
+  
 
 ---------------------------------------------
 
