@@ -1,14 +1,14 @@
 ========================================================================================================================
-Verse Runtime Sketch 2
+Verse Runtime Sketch 3
 ========================================================================================================================
 
 This is a core Verse runtime intended to be compatible with ICFP Verse.
 We define runtime Operations, runtime Assumptions, and runtime inference rules.
 We don't cover desugaring and verification, which are documented in VerseSpecification.txt.
 
-Given a program "program c {op}", we begin with the inference described in (ProgramIntro):
+Given a program "program c x {op}", we begin with the inference described in (ProgramIntro):
 
-    empty, unblocked{op}@c |- program c {op}
+    empty, unblocked{op}@c |- program c x {op}
 
 We then apply available inference rules.
 The inference rules match specific running parts of the program through the lens of EBNF wildcards like ProgramOp.
@@ -49,10 +49,10 @@ Definitions (as EBNF grammars) used by our inference rules:
                                |  exists u_0 ... u_n
                                |  iterate(u0) x0 c {op0} then x1 {op1} else {op2}
                                |  cast(u) {head_0 => {op_0}; ...}
-    Programs           Program := program c {op}
+    Programs           Program := program c x {op}
 
                                Matches any running operation that starts a new context C and its top level operation op.
-    ContextStartOp[c,op]       := program c {op}
+    ContextStartOp[c,op]       := program c x {op}
                                |  iterate(u0) x0 c {op} then x1 {op1} else {op2}
 
                                Matches any running operation within the current flexible span.
@@ -65,7 +65,7 @@ Definitions (as EBNF grammars) used by our inference rules:
                                |  ContextStartOp[d,ContextSpan[ProgamOp[c,op]]]
 
                                Matches a unification operation op that unifies U and V.
-    ProgramUnifyOp[c,u,v,op]   := ProgramOp[c,op & (u=v | v=u)]
+    Unify[u,v]                 := u=v | v=u
 
                                Matches a program exposing a context c and a flexible vertex within it.
     ProgramFlexible[c,u]       := ProgramOp[c,exists ... u ...]
@@ -94,14 +94,14 @@ Effects:
         fx0 & fx1          := the lattice meet of effects fx0 and fx1
         fx0 + fx1          := the lattice join of effects fx0 and fx1
 
-        effects            := abstracts   & transacts    & imperatives  & blocked                        # top of the lattice
-        no_effects         := contradicts & no_transacts & no_transacts & no_imperatives & unblocked     # bottom of the lattice
+        effects            := abstracts   & transacts    & imperatives  & blocked                    # top of the whole lattice
+        no_effects         := contradicts & no_transacts & no_transacts & no_imperatives & unblocked # bottom of the whole lattice
 
-        only_cardinalities :=               no_transacts& no_transacts & no_imperatives & unblocked
-        only_succeeds      := succeeds    & no_transacts& no_transacts & no_imperatives & unblocked
-        only_transacts     := contradicts & no_transacts&                no_imperatives & unblocked
-        only_imperatives   := contradicts & no_transacts& no_transacts &                  unblocked
-        only_blocked       := contradicts & no_transacts& no_transacts & no_imperatives &          
+        only_cardinalities :=               no_transacts & no_imperatives & unblocked
+        only_succeeds      := succeeds    & no_transacts & no_imperatives & unblocked
+        only_transacts     := contradicts &                no_imperatives & unblocked
+        only_imperatives   := contradicts & no_transacts &                  unblocked
+        only_blocked       := contradicts & no_transacts & no_imperatives
 
         We can write effects from any of the Effects Sublattices as shorthand for meeting that
         sublattice effect with the top effect in each of the other sublattices. The top sublattice effects
@@ -179,14 +179,14 @@ Verse Runtime Inference Rules
 
 Program:
 
-         (ProgramIntro)  empty |- program c {op}
+         (ProgramIntro)  empty |- program c x {op}
 
-                         G, unblocked{op}@c |- program c {op}
-       (ProgramUnblock)  ------------------------------------
-                         G                  |- program c {op}
+                         G, unblocked{op}@c |- program c x {op}
+       (ProgramUnblock)  --------------------------------------
+                         G                  |- program c x {op}
 
-          (ProgramElim)  ---------------------------------------
-                         G[only_succeeds{op}@c |- program c {op}
+          (ProgramElim)  -----------------------------------------
+                         G[only_succeeds{op}@c |- program c x {op}
 
 Effects:
 
@@ -222,7 +222,7 @@ Unification:
 
                          G, abstracts{u=v}@c |- ProgramOp[c,u=v]
            (UnifyIntro)  --------------------------------------- (Unblocks subsequent effects)
-                         G                    |- ProgramOp[c,u=v]
+                         G                   |- ProgramOp[c,u=v]
 
                          G, succeeds{atom0=atom0}@c |- ProgramOp[c,atom0=atom0]
     (UnifyAtomSucceeds)  ------------------------------------------------------ (ICFP U-LIT)
@@ -230,22 +230,25 @@ Unification:
 
                          G, fails{op}@c |- ProgramOp[c,op                                ]
            (UnifyFails)  -----------------------------------------------------------------
-                         G              |- ProgramUnifyOp[c,atom0,atom1               ,op] where atom0<>atom1        (ICFP U-FAILS)
-                         G              |- ProgramUnifyOp[c,atom0,tuple{u_0,...,u_m-1},op]                           (ICFP U-FAILS)
-                         G              |- ProgramUnifyOp[c,atom0,lambda i x {op}     ,op]                           (ICFP U-FAILS)
-                         G              |- ProgramUnifyOp[c,tuple{u_0,...,u_m-1},tuple{v_0,...,v_n-1},op] where m<>n (ICFP U-FAILS)
+                         G              |- ProgramOp[c,op & Unify[atom0,atom1               ]] where atom0<>atom1        (ICFP U-FAILS)
+                         G              |- ProgramOp[c,op & Unify[atom0,tuple{u_0,...,u_m-1}]]                           (ICFP U-FAILS)
+                         G              |- ProgramOp[c,op & Unify[atom0,lambda i x {op}     ]]                           (ICFP U-FAILS)
+                         G              |- ProgramOp[c,op & Unify[tuple{u_0,...,u_m-1},tuple{v_0,...,v_n-1}]] where m<>n (ICFP U-FAILS)
 
-                         G[u/x] |- ProgramUnifyOp[c,exists] [u/x]
-      (UnifySubstitute)  ---------------------------------------- (ICFP SUBST)
-                         G      |- ProgramUnifyOp[c,x,u,op]
-                                &  ProgramFlexible[c,x    ]
+                         G[u/x] |- ProgramOp[c,op] [u/x]
+      (UnifySubstitute)  -------------------------------------- (ICFP SUBST)
+                         G      |- ProgramOp[c,op & Unify[x,u]]
+                                &  ProgramFlexible[c,x]
 
                          This rule needs work.
                          - We ought to remove the existential x=u binding from the program.
-                         - Maybe we should only substitute (flex,flex) and (flex,atom)
-                           with a special rule for tuples to make a local flexible version,
-                           out of concern that substituting an inflexible for a flexible
-                           leaves us stuck on "a:any; if(a=3; a=4)..." rather than failing.
+                         - We should only substitute (flex variable,flex variable),
+                           (flex variable, flex tuple), and (flex variable,atom).
+                         - When we unify (flex variable, inflex tuple), we should substitute
+                           our flex variable for a new flex tuple of the same length,
+                           then UnifyTuples will make maximum progress.
+                         This solves the problem of substituting an inflexible for a flexible
+                         leaving us stuck on "a:any; if(a=3; a=4)..." rather than failing.
 
                          G |- ProgramOp[c,exists; u_0=v_0; ...; u_m-1=v_m-1        ]
           (UnifyTuples)  ----------------------------------------------------------- (ICFP U-TUP)
@@ -254,19 +257,19 @@ Unification:
 Calling:
 
                          0<=m<n
-                         G |- ProgramOp[c,u=v_m                       ]
-    (CallTupleSucceeds)  ---------------------------------------------- (Optimized version of ICFP APP-TUP)
+                         G |- ProgramOp[c,u=v_m                    ]
+    (CallTupleSucceeds)  ------------------------------------------- (Optimized version of ICFP APP-TUP)
                          G |- ProgramOp[c,u=tuple{v_0,...,v_n-1}(m)]
 
                          n=0 or p is head and is not a natural number with 0<=head<n
                          G, fails{op}@c |- ProgramOp[c,op                       ]
-       (CallTupleFails)  ------------------------------------------------------ (ICFP APP-TUP-0 and optimized version of ICFP APP-TUP))
-                         G            |- ProgramOp[c,u=tuple{v_0,...,v_n-1}(p)]
+       (CallTupleFails)  -------------------------------------------------------- (ICFP APP-TUP-0 and optimized version of ICFP APP-TUP))
+                         G              |- ProgramOp[c,u=tuple{v_0,...,v_n-1}(p)]
 
                          0<n
-                         G |- ProgramOp[c,(p=0; u=v_0)|; ...; (p=n-1; u=v_n-1)]
-    (CallTupleIterates)  ----------------------------------------------------- (ICFP APP-TUP)
-                         G |- ProgramOp[c,u=tuple{v_0,...,v_n-1}(p)          ]
+                         G |- ProgramOp[c,(p=0; u=v_0) | ... | (p=n-1; u=v_n-1)]
+    (CallTupleIterates)  ------------------------------------------------------- (ICFP APP-TUP)
+                         G |- ProgramOp[c,u=tuple{v_0,...,v_n-1}(p)            ]
 
                          G |- ProgramOp[c,op1[p/i,v/x,*/*]     ]
        (CallLambdaElim)  --------------------------------------- (ICFP APP-BETA)
@@ -275,9 +278,9 @@ Calling:
 Iterate & Choice:
 
                          Iterate is iterate(u0) x0 d {op0} then x1 {op1} else {op2}
-                         G, DownFx(fx0){op0}@d         |- ProgramOp[c,Iterate]
-         (IterateIntro)  -----------------------------------------------------
-                         G[fx0{Iterate}@c, fx1{op0}@d] |- ProgramOp[c,Iterate]
+                         G, DownFx(fx0){op0}@d |- ProgramOp[c,Iterate]
+         (IterateIntro)  ---------------------------------------------
+                         G[fx0{Iterate}@c]     |- ProgramOp[c,Iterate]
 
                          Iterate is iterate(u0) x0 d {op0} then x1 {op1} else {op2}
                          G, P^:=v0@d                       |- ProgramOp[c,Iterate]
@@ -320,7 +323,7 @@ Iterate & Choice:
           We have to keep x0 separate from u0 until success, so that we can rename it in (ChoiceElim).
           If we tried to combine u0 and x0 into a single vertex, substitution would make it unrenamable.
         - We are running op0 in context c, until (IterateSucceedsElim) or (IterateFailsElim) kick in.
-        - Our EBNF patterns only see op0 running; op1 and op2 aren't visible until  we reduce the 'iterate'
+        - Our EBNF patterns only see op0 running; op1 and op2 aren't visible until we reduce the 'iterate'
           into something simpler in (IterateSucceedsElim) or (IterateFailsElim).
         - On success, (IterateSucceedsElim) does housekeeping and runs op1.
           This op1 has the opportunity to read the current fold value (stored in the 1-tuple x0).
@@ -330,10 +333,10 @@ Iterate & Choice:
           When we saw this choice a|b, we were iterating in op0 with then & else prongs op1 and op2.
           So now we eliminate the choice by continuing to iterate op in op0 (but with a|b rewritten to a),
           keep op1 as our then-prong, but replace our else-prong op2 with a new 'iterate' that's a copy of
-          this one (but write a|b rewritten to b), with a copy of our original then-prong op1, and
+          this one (but with a|b rewritten to b), with a copy of our original then-prong op1, and
           we move op2 from our original iterate else-prong to the new iterate's else-prong.
           Effectively, we're inserting a new op1 prong into a linked list.
-          This approach ensures choices are properly ordered.
+          This approach ensures choices are properly sequenced.
 
     Here are translations loosely using desugar{vertex=term}:
 
@@ -376,8 +379,8 @@ Pure Native Functions:
 
                          NOTE: Missing a (NatFail) rule for u=nat(atom) and atom=nat(u) where atom isn't a natural number.
 
-                         G |- ProgramOp[c,u=m+n                   ]
-               (AddInt)  ------------------------------------------ (ICFP APP-ADD)
+                         G |- ProgramOp[c,u=m+n                    ]
+               (AddInt)  ------------------------------------------- (ICFP APP-ADD)
                          G |- ProgramOp[c,u=operator'+'[tuple{m,n}]]
 
 Effectful Native Functions:
@@ -410,9 +413,12 @@ Effectful Native Functions:
         (InteractIntro)  -----------------------------------------------------------------------------
                          G                                                  |- ProgramOp[c,u=Print(v)]
   
-                         (Here we physically print n in the sequence defined by blocked effects)
                          G                                      |- ProgramOp[c,u=tuple{} ]
          (InteractElim)  -----------------------------------------------------------------
                          G[unblocked_imperatives{u=Print(n)}@c] |- ProgramOp[c,u=Print(n)]
+
+                         At the point this rule is discharged, we'd physically print n.
+                         If we were being thorough, the top-level 'program' construct could build up a sequential
+                         list of inputs and outputs to further explain the semantics of <interacts> effects.
 
 ------------------------------------------------------------------------------------------------------------------------
