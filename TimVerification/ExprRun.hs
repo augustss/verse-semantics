@@ -389,16 +389,15 @@ instance Pretty Atom where
   pPrintPrec l p (AtomEffect e) = pPrintPrec l p e
   pPrintPrec l p (AtomOpenWorld v) = pPrintPrec l p v
 
-data Lambda = Lambda { lambda_arg              :: Vertex              -- u
-                     , lambda_range_input      :: Variable            -- i
+data Lambda = Lambda { lambda_range_input      :: Variable            -- i
                      , lambda_range_output     :: Variable            -- x
                      , lambda_range_operation  :: Operation           -- op
                      }
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Lambda where
-  pPrint (Lambda u i x op) =
-    text "lambda" <> parens (pPrint u) <+> pPrint i <+> pPrint x <+>  braces (pPrint op)
+  pPrint (Lambda i x op) =
+    text "lambda" <+> pPrint i <+> pPrint x <+>  braces (pPrint op)
 
 
 data Head
@@ -433,8 +432,8 @@ pattern VTuple :: [Vertex] -> Vertex
 pattern VTuple vs = VertexHead (HeadTuple vs)
 pattern VInteger :: Integer -> Vertex
 pattern VInteger i = VertexHead (HeadAtom (AtomInteger i))
-pattern VLambda :: Vertex -> Variable -> Variable -> Operation -> Vertex
-pattern VLambda u i x op = VertexHead (HeadLambda (Lambda u i x op))
+pattern VLambda :: Variable -> Variable -> Operation -> Vertex
+pattern VLambda i x op = VertexHead (HeadLambda (Lambda i x op))
 
 instance Pretty Vertex where
   pPrint (VertexVariable x) = pPrint x
@@ -470,7 +469,7 @@ data RHS = RHS HeadPattern Operation
 instance Pretty Operation where -- XXX precedence
   pPrint (OpUnify u v) = xsep [pPrint u <+> text "=", pPrint v]
   pPrint (OpCall u v p) = pPrint u <+> text "=" <+> pPrint v <> parens (pPrint p)
-  pPrint (OpSeq op0 op1) = xsep [pPrint op0 <> text ";", pPrint op1]
+  pPrint (OpSeq op0 op1) = parens $ xsep [pPrint op0 <> text ";", pPrint op1]
   pPrint (OpChoice op0 op1) = pPrint op0 <+> text "|" <+> pPrint op1
   pPrint OpNoop = text "nop"
   pPrint (OpExists xs) = hsep (text "exists" : map pPrint xs)
@@ -824,7 +823,12 @@ addComment (A as) s = A (AComment s : as)
 -- Unification:
 unificationRules :: Rule Config
 unificationRules _ (A g :|- pg) =
-  -- UnifyIntro ???
+  "UnifyIntro" `name`
+  do
+    (_ctx, c, op@(OpUnify _u _v)) <- programOp pg
+    g' <- gAdd [AEffect abstracts op c] g
+    pure $ g' :|- pg
+ ++
   "UnifyAtomSucceeds" `name`
   do
     (_ctx, c, op@(OpUnify (VertexHead (HeadAtom a)) (VertexHead (HeadAtom a')))) <- programOp pg
@@ -870,19 +874,32 @@ callingRules _ (A g :|- pg) =
   "CallTupleFails" `name`
 -}
   do
-    (ctx, c, op@(OpCall u (VTuple vs) (VertexHead h))) <- programOp pg
-    case h of
-      HeadAtom (AtomInteger m) | 0 <= m && m < toInteger (length vs) ->
+    (ctx, c, op@(OpCall u (VTuple vs) p)) <- programOp pg
+    let len = toInteger (length vs)
+        failed = do
+          g' <- gAdd [AEffect fails op c] g
+          pure ("CallTupleFails",
+                g' :|- pg)
+    case p of
+      -- Special case, when we happen to have a literal integer index.
+      -- This case could be removed.
+      VInteger m | 0 <= m && m < len ->
         pure ("CallTupleSucceeds",
               A g :|- ctx c (OpUnify u (vs !! fromInteger m)))
+                 | otherwise -> failed
+
+      _ | null vs -> failed
+
       _ -> do
-        g' <- gAdd [AEffect fails op c] g
-        pure ("CallTupleFails",
-              g' :|- pg)
+        let choices = opChoices $ zipWith choice vs [0..]
+            choice v i = OpUnify p (VInteger i) +> OpUnify u v
+        pure ("CallTupleIterates",
+              A g :|- ctx c choices)
+        
  ++
   "CallLambdaElim" `name`
   do
-    (ctx, c, OpCall v (VLambda _u i x op) p) <- programOp pg
+    (ctx, c, OpCall v (VLambda i x op) p) <- programOp pg
     let op' = freshen pg op
         op'' = subst p i $ subst v x op'
     pure $ A g :|- ctx c op''
@@ -933,7 +950,7 @@ freshen a aop = transformBi sub aop
     opids _op@(OpCast _ _ _) = undefined
     opids op = return op
     lamids :: Lambda -> Writer [Ident] Lambda
-    lamids lam@(Lambda _u (Variable i) (Variable x) _op) = do tell [i, x]; return lam
+    lamids lam@(Lambda (Variable i) (Variable x) _op) = do tell [i, x]; return lam
 
 ---------------------------------------------
 
@@ -1035,8 +1052,52 @@ example12 = OpExists [vx] +> OpCall vx lam a3
         vx = newIdents () "x"
         (i, o) = newIdents () ("i", "o")
         vi = VertexVariable i; vo = VertexVariable o
-        lam = VLambda (VInteger 0) i o (OpUnify vo (VTuple [vi, vi]))
+        lam = VLambda i o (OpUnify vo (VTuple [vi, vi]))
+
+-- example13: ex a x . x=<3,5>(a)
+-- Hand-desugared
+example13 :: Operation
+example13 = OpExists [vx] +> OpCall vx (VTuple [a3,a5]) va
+  where a5 = VInteger 5
+        a3 = VInteger 3
+        (vx, va) = newIdents () ("x", "a")
+
+finalResult :: Operation -> Maybe Vertex
+finalResult = getRes . norm . startConfig
+  where
+    getRes r@(_ :|- Program _ _ _) = error $ "finalResult: did not finish: " ++ prettyShow r
+    getRes (_ :|- ProgramDone v) = Just v
+    getRes (_ :|- ProgramFail) = Nothing
+
+tests :: [(String, Operation, Maybe Vertex)]
+tests = [
+  -- ("example1", example1, x),
+  ("example2", example2, Nothing),
+  ("example3", example3, Just $ VInteger 5),
+  ("example4", example4, Just $ VInteger 5),
+  ("example5", example5, Nothing),
+  ("example6", example6, Nothing),
+  -- ("example7", example7, x),
+  -- ("example8", example8, x),
+  ("example9", example9, Just $ VTuple [VInteger 5, VInteger 3]),
+  ("example10", example10, Just $ VInteger 5),
+  ("example11", example11, Nothing),
+  ("example12", example12, Just $ VTuple [VInteger 3, VInteger 3])
+  -- ("example13", example13, ...)
+  ]
+
+runTest :: (String, Operation, Maybe Vertex) -> IO ()
+runTest (nm, op, res) =
+  if finalResult op == res then
+    return ()
+  else
+    error $ "Test failed: " ++ prettyShow (nm, op, finalResult op, res)
+
+runTests :: IO ()
+runTests =
+  mapM_ runTest tests
 
 main :: IO ()
 main = do
-  fpptr "ut" $ startConfig example5
+  runTests
+  --fpptr "ut" $ startConfig example5
