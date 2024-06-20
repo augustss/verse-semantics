@@ -471,12 +471,13 @@ instance Pretty HeadPattern where
 opChoices :: [Operation] -> Operation
 opChoices = foldr1 OpChoice
 
-data Program = Program Context Operation | ProgramDone | ProgramFail
+-- The Program has the output variable as the first argument
+data Program = Program Vertex Context Operation | ProgramDone Vertex | ProgramFail
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Program where
-  pPrint (Program c op) = sep [text "program" <+> pPrint c, nest 2 (braces (pPrint op))]
-  pPrint ProgramDone = text "DONE"
+  pPrint (Program x c op) = sep [text "program" <> parens (pPrint x) <+> pPrint c, nest 2 (braces (pPrint op))]
+  pPrint (ProgramDone v) = text "DONE" <> parens (pPrint v)
   pPrint ProgramFail = text "FAIL"
 
 ------------------------------------------------------
@@ -489,8 +490,8 @@ class ContextStartUp a where
   contextStartOp :: a -> [(Context -> Operation -> a, Context, Operation)]
 
 instance ContextStartUp Program where
-  contextStartOp (Program c op) =
-    [(Program, c, op)]
+  contextStartOp (Program x c op) =
+    [(Program x, c, op)]
   contextStartOp _ =
     []
 
@@ -726,7 +727,7 @@ allRules =
 -----
 -- Program:
 programRules :: Rule Config
-programRules _ (A g :|- pg@(Program c op)) =
+programRules _ (A g :|- pg@(Program x c op)) =
   -- programIntro is startConfig
   "ProgramUnblock" `name`
   do
@@ -738,7 +739,7 @@ programRules _ (A g :|- pg@(Program c op)) =
     AEffect fx op' c' <- g
     guard $ op == op' && c == c'
     guard $ isEffect fx succeeds_done -- only_succeeds
-    pure $ A g :|- ProgramDone
+    pure $ A g :|- ProgramDone x
  ++
   -- Extra rule to get a nice failure
   "ProgramElimFail" `name`
@@ -842,8 +843,9 @@ remAsmDup (A g :|- pg) = A (nub g) :|- pg
 
 ---------------------------------------------
 
+-- XXX Output variable is always 'x'
 startConfig :: Operation -> Config
-startConfig s = A [] :|- Program (newIdents s "c") s
+startConfig s = A [] :|- Program (newIdents () "x") (newIdents s "c") s
 
 -- example1:  5=5
 -- Hand-desugared
@@ -892,18 +894,30 @@ example6 = opSeqs [ OpExists [vi, vx],
         (vi, vx) = newIdents () ("i", "x")
         (vi', vx') = newIdents () ("i'", "x'")
 
+tup :: [Vertex] -> Vertex
+tup = VertexHead . HeadTuple
+
 -- example7: <>=<>
 -- Hand-desugared
 example7 :: Operation
-example7 = OpUnify (VertexHead (HeadTuple [])) (VertexHead (HeadTuple []))
+example7 = OpUnify (tup []) (tup [])
 
--- example8: ex x y . <3,x>=<y,5>
+-- example8: ex p q . <3,p>=<q,5>
 -- Hand-desugared
 example8 :: Operation
-example8 = OpExists [vx,vy] +> OpUnify (VertexHead (HeadTuple [a3,vx])) (VertexHead (HeadTuple [vy,a5]))
+example8 = OpExists [vp,vq] +> OpUnify (tup [a3,vp]) (tup [vq,a5])
   where a5 = VertexHead $ HeadAtom $ AtomRational 5
         a3 = VertexHead $ HeadAtom $ AtomRational 3
-        (vx, vy) = newIdents () ("x", "y")
+        (vp, vq) = newIdents () ("p", "q")
+
+-- example8: ex x p q . <3,p>=<q,5>; x = <p,q>
+-- Hand-desugared
+example9 :: Operation
+example9 = OpExists [vx,vp,vq] +> OpUnify (tup [a3,vp]) (tup [vq,a5]) +> OpUnify vx (tup [vp,vq])
+  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+        a3 = VertexHead $ HeadAtom $ AtomRational 3
+        (vp, vq) = newIdents () ("p", "q")
+        vx = newIdents () "x"
 
 main :: IO ()
 main = do
