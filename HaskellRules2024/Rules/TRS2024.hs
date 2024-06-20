@@ -138,8 +138,8 @@ rulesUnification lhs =
 rulesExistentials :: Rule
 rulesExistentials lhs =
   "EXI-SUBST" `name`
-  do (x,ctx_e) <- alphaRename [] <$> matchExi lhs
-     (ctx, x_eq_v :>: e) <- evalCtx [x] ctx_e
+  do (x,ctx_xv_e) <- alphaRename [] <$> matchExi lhs
+     (ctx, x_eq_v :>: e) <- evalCtx [x] ctx_xv_e
      -- TODO: add correct guard on ctx
      (Var x',v) <- matchEq x_eq_v
      guard (x == x')

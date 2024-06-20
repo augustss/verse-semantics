@@ -14,13 +14,13 @@ prop_Valid t0 =
   valid (prep t0)
 
 prop_Confluent =
-  forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- tr) ->
-    let tr1@(np :<-- _)  = normalize trs2024 p
-        tr2@(nq :<-- qs) = normalize trs2024 q
+  forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- qs1) ->
+    let np :<-- ps  = normalize trs2024 p
+        nq :<-- qs2 = normalize trs2024 q
      in whenFail (do putStrLn "== TRACE #1 =="
-                     printTrace tr1
+                     printTrace (np :<-- ps)
                      putStrLn "== TRACE #2 =="
-                     printTrace (nq :<-- (qs ++ tr))) $
+                     printTrace (nq :<-- (qs2 ++ qs1))) $
           norm np == norm nq
  where
   arbFork =
