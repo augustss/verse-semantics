@@ -1,4 +1,4 @@
-module Confluence.Main where
+module Main where
 
 import Rules.Core
 import Rules.TRS2024 as TRS2024

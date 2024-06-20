@@ -11,7 +11,6 @@ extra-source-files: CHANGELOG.md
 common general-libs
     default-language: Haskell2010
     ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O2
---    ghc-options:      -Wall -O2 -prof -fprof-auto
     build-depends:    base,
                       containers,
                       random,
@@ -35,41 +34,61 @@ executable verse-repl
 
     default-language: Haskell2010
 
-executable trsverifier
+executable confluence-check
+    -- In the Confluence/ subdirectory
     import:           general-libs
-    build-depends:    verse-libs,
-                      optparse-applicative,
-                      QuickCheck,
-                      githash
+    hs-source-dirs:   Confluence, .
+    build-depends:
 
-    main-is:          TRSVerify.hs
-
-    hs-source-dirs:   Verifier
-    default-language: Haskell2010
-
-executable tester
-    import:           general-libs
-    build-depends:    verse-libs,
-                      megaparsec,
-                      optparse-applicative,
+    other-modules:
+                      Rules.Core
+                      Rules.TRS2024
+                      TRS.Bind
+                      TRS.Traced
+                      Epic.Print
 
     main-is:          Main.hs
 
-    hs-source-dirs:   tester
+    build-depends:    text,
+                      QuickCheck
+
     default-language: Haskell2010
 
-executable qctest
-    import:           general-libs
-    build-depends:    verse-libs,
-                      optparse-applicative,
-                      QuickCheck,
-                      githash,
+-- executable trsverifier
+--    import:           general-libs
+--    hs-source-dirs:   Verifier
+--    build-depends:    verse-libs,
+--                      optparse-applicative,
+--                      QuickCheck,
+--                      githash
+--
+--    main-is:          TRSVerify.hs
+--
+--    default-language: Haskell2010
 
-    main-is:          Main.hs
-
-    hs-source-dirs:   qctest
-    default-language: Haskell2010
-    ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O2 -threaded -feager-blackholing -rtsopts
+-- executable tester
+--     import:           general-libs
+--     hs-source-dirs:   tester
+--     build-depends:    verse-libs,
+--                       megaparsec,
+--                       optparse-applicative,
+-- 
+--     main-is:          Main.hs
+-- 
+--     default-language: Haskell2010
+-- 
+-- executable qctest
+--     import:           general-libs
+--     build-depends:    verse-libs,
+--                       optparse-applicative,
+--                       QuickCheck,
+--                       githash,
+-- 
+--     main-is:          Main.hs
+-- 
+--     hs-source-dirs:   qctest
+--     default-language: Haskell2010
+--     ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O2 -threaded -feager-blackholing -rtsopts
 
 --executable verifier
 --    import:           general-libs
@@ -86,18 +105,24 @@ executable qctest
 
 
 
--- Various utilities on which other stuff depends
+-- Various Verse utilities on which other stuff depends
 -- Should really have its own cabal project
 library verse-libs
     import:           general-libs
     hs-source-dirs:   .
     exposed-modules:
---                      Epic.Applicative
---                      Epic.Lens
---                      Epic.List
                       Epic.Print
                       Epic.Repl
                       Epic.OpParser
+                      FrontEnd.Error
+                      FrontEnd.Expr
+                      FrontEnd.Flags
+                      FrontEnd.Parse
+                      FrontEnd.Prelude
+
+--                      Epic.Applicative
+--                      Epic.Lens
+--                      Epic.List
 --                      Epic.ShowRational
 --                      Epic.SIntMap
 --                      Epic.SIntSet
@@ -117,14 +142,9 @@ library verse-libs
 --                      Rules.CoreEDSL
 --                      Rules.Equiv
 --                      Rules.Systems
-                      FrontEnd.Error
 --                      FrontEnd.EvalBlock
-                      FrontEnd.Expr
-                      FrontEnd.Flags
---                      FrontEnd.Desugar
-                      FrontEnd.Parse
 --                      FrontEnd.ParseCore
-                      FrontEnd.Prelude
+--                      FrontEnd.Desugar
 --                      FrontEnd.RefImpl
 --                      FrontEnd.Run
 --                      FrontEnd.TRSAdapter
