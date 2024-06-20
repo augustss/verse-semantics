@@ -5,11 +5,13 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 module Main where
 import Prelude hiding ((<>), reads)
 import qualified Prelude as P
 import Control.Arrow(second, (***))
 import Control.Monad
+import Control.Monad.Writer
 import Data.Char
 import Data.Data(Data)
 import Data.List hiding(nub)
@@ -363,9 +365,17 @@ data Atom
   | AtomOpenWorld OpenWorldSpecifier
   deriving (Eq, Ord, Show, Data)
 
+pattern AtomInteger :: Integer -> Atom
+pattern AtomInteger i <- AtomRational (ratInteger -> Just i)
+  where AtomInteger i = AtomRational (toRational i)
+
+ratInteger :: Rational -> Maybe Integer
+ratInteger q | denominator q == 1 = Just (numerator q)
+             | otherwise = Nothing
+
 instance Pretty Atom where
-  pPrintPrec l p (AtomRational q) | denominator q == 1 = pPrintPrec l p (numerator q)
-                                  | otherwise = pPrintPrec l p (numerator q) <> text "/" <> pPrintPrec l p (denominator q)
+  pPrintPrec l p (AtomInteger i) = pPrintPrec l p i
+  pPrintPrec l p (AtomRational q) = pPrintPrec l p (numerator q) <> text "/" <> pPrintPrec l p (denominator q)
   pPrintPrec l p (AtomPointer ptr) = pPrintPrec l p ptr
   pPrintPrec l p (AtomPath path) = pPrintPrec l p path
   pPrintPrec _ _ (AtomUnit) = text "()"
@@ -413,6 +423,13 @@ data Vertex
   | VertexHead Head                                   -- head
   deriving (Eq, Ord, Show, Data)
 
+pattern VTuple :: [Vertex] -> Vertex
+pattern VTuple vs = VertexHead (HeadTuple vs)
+pattern VInteger :: Integer -> Vertex
+pattern VInteger i = VertexHead (HeadAtom (AtomInteger i))
+pattern VLambda :: Vertex -> Variable -> Variable -> Operation -> Vertex
+pattern VLambda u i x op = VertexHead (HeadLambda (Lambda u i x op))
+
 instance Pretty Vertex where
   pPrint (VertexVariable x) = pPrint x
   pPrint (VertexHead h) = pPrint h
@@ -424,7 +441,7 @@ data Operation
   | OpChoice Operation Operation                                  -- op0|op1
   | OpExists [Vertex]                                             -- exists u0 ...
   | OpIterate Vertex Variable Context Operation {-then-} Variable Operation {-else-} Operation
-                                                                  -- iterate(x0) c0 {op0} then c1 x1 {op1} else {op2}
+                                                                  -- iterate(u0) x0 c0 {op0} then x1 {op1} else {op2}
   | OpCast Vertex Vertex [RHS]                                    -- cast(u) {head_0 => {op_0}; ...}
 
   -- OpMetaVar is not a real Op, it's just for pretty printing a context
@@ -540,9 +557,9 @@ programFlexible a = do
   (++)
     (pure (\ c' u' -> ctx c' (OpExists (ctx' u')), c, u))
     (do
-        VertexHead (HeadTuple vs) <- [u]
+        VTuple vs <- [u]
         (ctx'', v) <- listCtx vs
-        pure (\ c' v' -> ctx c' (OpExists (ctx' (VertexHead (HeadTuple (ctx'' v'))))), c, v)
+        pure (\ c' v' -> ctx c' (OpExists (ctx' (VTuple (ctx'' v')))), c, v)
     )
 
 ------------------------------------------------------------------
@@ -721,6 +738,7 @@ allRules =
   P.<> effectRules
   P.<> simpleOpsRules
   P.<> unificationRules
+  P.<> callingRules
 
 ---------------------------------------------
 
@@ -825,12 +843,49 @@ unificationRules _ (A g :|- pg) =
  ++
   "UnifyTuples" `name`
   do
-    (ctx, c, OpUnify (VertexHead (HeadTuple vs)) (VertexHead (HeadTuple us))) <- programOp pg
+    (ctx, c, OpUnify (VTuple vs) (VTuple us)) <- programOp pg
     guard $ length vs == length us
     let ops = if null vs then OpNoop else opSeqs $ zipWith OpUnify vs us
     pure $ A g :|- ctx c ops
 
--- e[y/x]
+-----
+-- Calling:
+callingRules :: Rule Config
+callingRules _ (A g :|- pg) =
+{-
+  "CallTupleSucceeds" `name`
+  do
+    (ctx, c, OpCall u (VTuple vs) (VInteger im)) <- programOp pg
+    let n = length vs
+        m = fromInteger im
+    guard $ 0 <= m && m < n
+    pure $ A g :|- ctx c (OpUnify u (vs !! m))
+ ++
+  "CallTupleFails" `name`
+-}
+  do
+    (ctx, c, op@(OpCall u (VTuple vs) (VertexHead h))) <- programOp pg
+    case h of
+      HeadAtom (AtomInteger m) | 0 <= m && m < toInteger (length vs) ->
+        pure ("CallTupleSucceeds",
+              A g :|- ctx c (OpUnify u (vs !! fromInteger m)))
+      _ -> do
+        g' <- gAdd [AEffect fails op c] g
+        pure ("CallTupleFails",
+              g' :|- pg)
+ ++
+  "CallLambdaElim" `name`
+  do
+    (ctx, c, OpCall v (VLambda _u i x op) p) <- programOp pg
+    let op' = freshen pg op
+        op'' = subst p i $ subst v x op'
+    pure $ A g :|- ctx c op''
+
+---------------------------------------------
+
+-- Substitution e[u/x]
+-- Also removes x from existentials.
+-- Assumes all variables are distinct.
 subst :: (Data a) => Vertex -> Variable -> a -> a
 subst u x = transformBi f . transformBi g
   where f (VertexVariable x') | x' == x   = u
@@ -838,8 +893,27 @@ subst u x = transformBi f . transformBi g
         g (OpExists us) = OpExists (filter (/= VertexVariable x) us)
         g o = o
 
+-- Remove duplicate assumptions, needed after subst.
 remAsmDup :: Config -> Config
 remAsmDup (A g :|- pg) = A (nub g) :|- pg
+
+-- Make all bound variables fresh.
+freshen :: Data a => a -> Operation -> Operation
+freshen a aop = transformBi sub aop
+  where
+    sub :: Ident -> Ident
+    sub x | Just x' <- lookup x isub = x'
+        | otherwise = x
+    isub :: [(Ident, Ident)]
+    isub = zip ids (newIdents a ids)
+    ids = execWriter (transformBiM opids aop >> transformBiM lamids aop)
+    opids :: Operation -> Writer [Ident] Operation
+    opids op@(OpExists vs) = do tell [x | VertexVariable (Variable x) <- vs]; return op
+    opids op@(OpIterate _u0 (Variable x0) (Context c0) _op0 (Variable x1) _op1 _op2) = do tell [x0, c0, x1]; return op
+    opids _op@(OpCast _ _ _) = undefined
+    opids op = return op
+    lamids :: Lambda -> Writer [Ident] Lambda
+    lamids lam@(Lambda _u (Variable i) (Variable x) _op) = do tell [i, x]; return lam
 
 ---------------------------------------------
 
@@ -851,25 +925,25 @@ startConfig s = A [] :|- Program (newIdents () "x") (newIdents s "c") s
 -- Hand-desugared
 example1 :: Operation
 example1 = OpUnify a5 a5
-  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+  where a5 = VInteger 5
 
 -- example2:  5=3
 -- Hand-desugared
 example2 :: Operation
 example2 = OpUnify a5 a3
-  where a5 = VertexHead $ HeadAtom $ AtomRational 5
-        a3 = VertexHead $ HeadAtom $ AtomRational 3
+  where a5 = VInteger 5
+        a3 = VInteger 3
 
 -- example3:  5
 example3 :: Operation
 example3 = opSeqs [ OpExists [vi, vx], OpUnify vi a5, OpUnify vx a5]
-  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+  where a5 = VInteger 5
         (vi, vx) = newIdents () ("i", "x")
 
 -- example4: a:=5; a
 example4 :: Operation
 example4 = opSeqs [ OpExists [vi, vx], OpExists [vi', vx'], (OpUnify vi' a5 +> OpUnify vx' a5), (OpUnify vi vx' +> OpUnify vx vx')]
-  where a5 = VertexHead $ HeadAtom $ AtomRational 5
+  where a5 = VInteger 5
         (vi, vx) = newIdents () ("i", "x")
         (vi', vx') = newIdents () ("i'", "x'")
 
@@ -878,8 +952,8 @@ example5 :: Operation
 example5 = opSeqs [ OpExists [vi, vx],
                     (OpUnify vi a5 +> OpUnify vx a5) +> (OpUnify vi a3 +> OpUnify vx a3)
                   ]
-  where a5 = VertexHead $ HeadAtom $ AtomRational 5
-        a3 = VertexHead $ HeadAtom $ AtomRational 3
+  where a5 = VInteger 5
+        a3 = VInteger 3
         (vi, vx) = newIdents () ("i", "x")
 
 -- example6: a:=5; a=3
@@ -889,35 +963,59 @@ example6 = opSeqs [ OpExists [vi, vx],
                     (OpUnify vi' a5 +> OpUnify vx' a5),
                     (OpUnify vi vx' +> OpUnify vx vx') +> (OpUnify vi' a3 +> OpUnify vx' a3)
                   ]
-  where a5 = VertexHead $ HeadAtom $ AtomRational 5
-        a3 = VertexHead $ HeadAtom $ AtomRational 3
+  where a5 = VInteger 5
+        a3 = VInteger 3
         (vi, vx) = newIdents () ("i", "x")
         (vi', vx') = newIdents () ("i'", "x'")
-
-tup :: [Vertex] -> Vertex
-tup = VertexHead . HeadTuple
 
 -- example7: <>=<>
 -- Hand-desugared
 example7 :: Operation
-example7 = OpUnify (tup []) (tup [])
+example7 = OpUnify (VTuple []) (VTuple [])
 
 -- example8: ex p q . <3,p>=<q,5>
 -- Hand-desugared
 example8 :: Operation
-example8 = OpExists [vp,vq] +> OpUnify (tup [a3,vp]) (tup [vq,a5])
-  where a5 = VertexHead $ HeadAtom $ AtomRational 5
-        a3 = VertexHead $ HeadAtom $ AtomRational 3
+example8 = OpExists [vp,vq] +> OpUnify (VTuple [a3,vp]) (VTuple [vq,a5])
+  where a5 = VInteger 5
+        a3 = VInteger 3
         (vp, vq) = newIdents () ("p", "q")
 
--- example8: ex x p q . <3,p>=<q,5>; x = <p,q>
+-- example9: ex x p q . <3,p>=<q,5>; x = <p,q>
 -- Hand-desugared
 example9 :: Operation
-example9 = OpExists [vx,vp,vq] +> OpUnify (tup [a3,vp]) (tup [vq,a5]) +> OpUnify vx (tup [vp,vq])
-  where a5 = VertexHead $ HeadAtom $ AtomRational 5
-        a3 = VertexHead $ HeadAtom $ AtomRational 3
+example9 = OpExists [vx,vp,vq] +> OpUnify (VTuple [a3,vp]) (VTuple [vq,a5]) +> OpUnify vx (VTuple [vp,vq])
+  where a5 = VInteger 5
+        a3 = VInteger 3
         (vp, vq) = newIdents () ("p", "q")
         vx = newIdents () "x"
+
+-- example10: ex x . x=<3,5>(1)
+-- Hand-desugared
+example10 :: Operation
+example10 = OpExists [vx] +> OpCall vx (VTuple [a3,a5]) a1
+  where a5 = VInteger 5
+        a3 = VInteger 3
+        a1 = VInteger 1
+        vx = newIdents () "x"
+
+-- example11: ex x . x=<3,5>(3)
+-- Hand-desugared
+example11 :: Operation
+example11 = OpExists [vx] +> OpCall vx (VTuple [a3,a5]) a3
+  where a5 = VInteger 5
+        a3 = VInteger 3
+        vx = newIdents () "x"
+
+-- example12: ex x . x=(lambda(_) i o (o = <i,i>))(3)
+-- Hand-desugared
+example12 :: Operation
+example12 = OpExists [vx] +> OpCall vx lam a3
+  where a3 = VInteger 3
+        vx = newIdents () "x"
+        (i, o) = newIdents () ("i", "o")
+        vi = VertexVariable i; vo = VertexVariable o
+        lam = VLambda (VInteger 0) i o (OpUnify vo (VTuple [vi, vi]))
 
 main :: IO ()
 main = do
