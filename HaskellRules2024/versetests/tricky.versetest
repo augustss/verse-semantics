@@ -1,0 +1,83 @@
+# Trivial
+testceq("Triv1", pass) { 1 } { 1 }
+testceq("Triv2", pass) { exists x . x=1 } { 1 }
+
+#testeq(pass) { all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
+
+testceq("RJ1", pass)  { ID := (\a.a); exists x y . x = ID; one{ x = y; x(10) } }
+                     { exists y . one{ y = (\a.a); 10 } }
+testceq("RJ2", pass)  { ID := (\a.a); exists x y . x = ID; y = x; < y > }
+                     { < \a.a > }
+testceq("RJ3", pass)  { exists a b c d x . x = <a, b>; x = <c, d>; x }
+                     { exists c d . <c,d> }
+testceq("RJ3a", pass) { exists a b c d . one { exists x . x = <a,b>; x = <c, d>; x } }
+                     { exists a b c d . one { exists x . a=c; b=d;  x = <c, d>; x } }
+testceq("Yikes1",pass) { exists x y . x=<1,2>; y=<1,3>; one{x=y} }
+                     { fail }
+testceq("Yikes2",pass) { exists x y. x=<1,2>; y=x; \w.<x,y> }
+                     # we would like this: { \w. <<1,2>,<1,2>> }
+                     # but the PLDI rules fail because of the ANF pass
+                     { x:= <1,2>; \w. <x,x> }
+testceq("QC1", pass)  { exists x . (exists y . x = y; x) | <> }
+                     { exists x . x | <> }
+# There are too many existentials in Block for the structural rules to terminate.
+testceq("Ex1", pass, Block=Skip, POPLL=Skip, ICFP=Skip, ICFPGuy=skip)
+                     { exists f g a b c d . f(a); g(b); one { exists x . x = <a,b>; x = <c, d>; x } }
+                     { exists f g a b c d . f(a); g(b); one { exists x . a=c; b=d;  x = <c, d>; x } }
+testceq("Ex2", pass, ICFP=Skip, ICFPGuy=skip)
+                     { exists f g a b c d x . f(a); g(b); x = <a, b>; x = <c, d>; x }
+                     { exists f g c d       . f(c); g(d); <c, d> }
+testceq("Wombat1a",pass){ x := <1>; one { exists y . x = y; < x > } }
+                     { < <1> > }
+testceq("Wombat1b",pass){ x := (\a.a); one { exists y . x = y; < x > } }
+                     { < \a.a > }
+testceq("Wombat2",pass){ exists y. x := (\a.a); one { x = y; < x > } }
+                     # The denotational semantics would say the result is { < \a.a > }
+                     # but that doesn't seem executable.
+                     # We settle for this
+                     { exists y . one { y = (\a.a); < \a.a > } }
+testceq("Koen1", pass){ (\x.one {one {isInt = x; <>}; x = (exists y . y); <>})(<>) }
+                     { fail }
+# This test loops with substitution and reduction under lambda, e.g., POPL rules
+# because x=<\y.x>
+testceq("Koen3", pass, POPL=Skip, POPLV=Skip, Block=Skip, POPLL=Skip,ICFP*=Skip)
+                     { exists x . (\y.x = <y>; (exists z . z))(\y.x) }
+                     { exists z . z }
+testceq("Koen5", pass){ exists y . (\x.x = (exists z . 0); x = y; <>) }
+                     { exists y . (\x.x = 0; y = 0; <>) }
+testceq("Koen5a", pass){ exists y . (\x.x = (exists z . <0>); x = y; <>) }
+                     { exists y . (\x.x = <0>; y = <0>; <>) }
+# Do we expect confluence of | that is not under a one/all?
+# It's unclear what this should be, so skip for now.
+#testceq("QC2", pass)  { (<> | <>) = (<> = <>) }
+#                     { <> | <> }
+testceq("QC3", pass)  { <0(add) = <>> }
+                     { <0(add) = <>> }
+testceq("QC4", pass)  { add(<>) = (ex x. all {x} = all {x}) }
+                     { ex x . <x> = add(<>); x=x; <x> }
+testceq("QC4a", pass) { \a. add(a) = (ex x. <x> = <x>) }
+                     { \a. ex x . <x> = add(a); x=x; <x> }
+# QC5 takes a surprising numbers of steps (>100000) with the ICFP rules.
+testceq("QC5", pass)  { \x.(<<x>> = x)(<>) }
+                     { \x.fail }
+testceq("QC6", pass)  { ex a. ex y. ex c. (c = y; <>) | <>; a = c; c }
+                     { ex y. ex c. (c = y; <>) | <>; c }
+# QC7 kills ICFP + Plan A
+testceq("QC7", pass)  { ex x. ex c. <c> | (c = x; x) }
+                     { ex x. ex c. <c> | (c = x; x) }
+# QC8 kills ICFP + Plan C
+testceq("QC8", pass)  { ex x. ex y. ex z. z | (ex v. ex w. z = y; y) }
+                     { ex y z. z | (z = y; y) }
+# QC9 kills ICFP
+testceq("QC9", pass)  { ex a. (ex y. (a = y; <>) | <>); a = (ex b. b); a }
+                     { ex a y. (a = y; ()) | (); a }
+# QC10 kills ICFPK with unidirectional VAL-SWAP
+testceq("QC10", pass) { \c.(ex a. a = (add | <>); c); c = add; c }
+                     { \c.ex a. a = (add | <>); c = add; add }
+testceq("Rec1", pass, POPLL=Skip,ICFP*=Skip,iblock=Skip) { ex x. (\y.x(fail)) = x }
+                     { \y.fail }
+# Result depends on how recursion is treated.
+testceq("Rec2", pass, POPLL=Skip,ICFP*=Skip,iblock=Skip) { <> = one { ex a. <> = one {ex b. b = one {\y.a}; b = a; b} } }
+                     { fail }
+testceq("QC11", pass) { \ d c b . ((b = one {d = <>; <>}); <>); c = <>; <> }
+                     { \ d c b . b = one {d = <>; <>}; c = <>; <> }

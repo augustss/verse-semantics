@@ -1,0 +1,156 @@
+cabal-version:      2.4
+name:               HaskellRules2024
+version:            0.1.0.0
+synopsis:           Haskell prototypes and testing for Verse
+description:        Programs for automated and interactive tests of Core Verse rewrite systems.
+copyright:          Epic Games 2022
+
+extra-source-files: CHANGELOG.md
+                    README.md
+
+common general-libs
+    default-language: Haskell2010
+    ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O2
+--    ghc-options:      -Wall -O2 -prof -fprof-auto
+    build-depends:    base,
+                      containers,
+                      random,
+                      mtl,
+                      pretty,
+                      megaparsec,
+                      haskeline
+
+executable verse-repl
+    import:           general-libs
+
+    -- In the repl/ subdirectory
+    hs-source-dirs:   repl
+
+
+    build-depends:    verse-libs,
+                      haskeline,
+                      optparse-applicative,
+
+    main-is:          Main.hs
+
+    default-language: Haskell2010
+
+executable trsverifier
+    import:           general-libs
+    build-depends:    verse-libs,
+                      optparse-applicative,
+                      QuickCheck,
+                      githash
+
+    main-is:          TRSVerify.hs
+
+    hs-source-dirs:   Verifier
+    default-language: Haskell2010
+
+executable tester
+    import:           general-libs
+    build-depends:    verse-libs,
+                      megaparsec,
+                      optparse-applicative,
+
+    main-is:          Main.hs
+
+    hs-source-dirs:   tester
+    default-language: Haskell2010
+
+executable qctest
+    import:           general-libs
+    build-depends:    verse-libs,
+                      optparse-applicative,
+                      QuickCheck,
+                      githash,
+
+    main-is:          Main.hs
+
+    hs-source-dirs:   qctest
+    default-language: Haskell2010
+    ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O2 -threaded -feager-blackholing -rtsopts
+
+--executable verifier
+--    import:           general-libs
+--    build-depends:    verse-libs,
+--                      optparse-applicative,
+--                      QuickCheck,
+--                      githash,
+--                      z3
+--
+--    main-is:          Main.hs
+--
+--    hs-source-dirs:   verify
+--    default-language: Haskell2010
+
+
+
+-- Various utilities on which other stuff depends
+-- Should really have its own cabal project
+library verse-libs
+    import:           general-libs
+    hs-source-dirs:   .
+    exposed-modules:
+--                      Epic.Applicative
+--                      Epic.Lens
+--                      Epic.List
+                      Epic.Print
+                      Epic.Repl
+                      Epic.OpParser
+--                      Epic.ShowRational
+--                      Epic.SIntMap
+--                      Epic.SIntSet
+--                      Epic.String
+--                      Epic.Trace
+--                      Epic.Uniplate
+--                      Epic.QuickCheck
+--                      TRS.Bind
+--                      TRS.Graph
+--                      TRS.NormalForm
+--                      TRS.System
+--                      TRS.Tarjan
+--                      TRS.TRS
+--                      TRS.TRSGraph
+--                      TRS.Traced
+--                      Rules.Core
+--                      Rules.CoreEDSL
+--                      Rules.Equiv
+--                      Rules.Systems
+                      FrontEnd.Error
+--                      FrontEnd.EvalBlock
+                      FrontEnd.Expr
+                      FrontEnd.Flags
+--                      FrontEnd.Desugar
+                      FrontEnd.Parse
+--                      FrontEnd.ParseCore
+                      FrontEnd.Prelude
+--                      FrontEnd.RefImpl
+--                      FrontEnd.Run
+--                      FrontEnd.TRSAdapter
+--                      Verifier.TRSDesugar
+----                      Verifier.FOL
+--                      Rules.ICFP
+--                      Rules.OldVerifier
+--                      Rules.Verifier
+--                      DenSem.DenSem
+    other-modules:
+--                      Rules.PLDI
+--                      Rules.POPL
+--                      Rules.TRS2024
+--                      Rules.KoenNaive
+--                      Rules.LeftToRight
+--                      Rules.Block
+
+    build-depends:
+                      parser-combinators,
+--                      lens,
+                      text,
+                      uniplate,
+                      QuickCheck,
+                      megaparsec,
+                      scientific,
+                      text,
+                      transformers,
+                      unordered-containers,
+--                      z3,
