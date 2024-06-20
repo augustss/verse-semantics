@@ -545,14 +545,11 @@ programOp a =
      pure (\ c' op' -> ctx d (ctx' c' op'), c, op)
   )
 
--- XXX not symmetric between match and construct.
--- This is because we cannot guarentee consistensy between u,v,op in construction.
-programUnifyOp :: ContextStartUp a =>
-                  a -> [(Context -> Operation -> a, Context, Vertex, Vertex, Operation)]
-programUnifyOp a = do
-  (ctx, c, op@(OpUnify u v)) <- programOp a
-  [ (\ c' op' -> ctx c' op', c, u, v, op)
-   ,(\ c' op' -> ctx c' op', c, v, u, op) ]
+unify :: Operation -> [(Vertex -> Vertex -> Operation, Vertex, Vertex)]
+unify (OpUnify u v) = do
+  [ (OpUnify, u, v)
+   ,(OpUnify, v, u) ]
+unify _ = []
 
 programFlexible :: ContextStartUp a =>
                    a -> [(Context -> Vertex -> a, Context, Vertex)]
@@ -838,14 +835,16 @@ unificationRules _ (A g :|- pg) =
  ++
   "UnifyFails" `name`
   do
-    (_ctx, c, VertexHead h, VertexHead h', op) <- programUnifyOp pg
+    (_ctx, c, op) <- programOp pg
+    (_ctx, VertexHead h, VertexHead h') <- unify op
     guard $ distinctHeads h h'
     g' <- gAdd [AEffect fails op c] g
     pure $ g' :|- pg
  ++
   "UnifySubstitute" `name`
   do
-    (ctx, c, VertexVariable x, u, _op) <- programUnifyOp pg
+    (ctx, c, op) <- programOp pg
+    (_ctx, VertexVariable x, u) <- unify op
     (_ctx, c', VertexVariable x') <- programFlexible pg
     guard $ x == x' && c == c'
     let pg' = ctx c OpNoop
