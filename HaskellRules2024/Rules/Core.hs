@@ -308,15 +308,31 @@ unExis (Exi bnd) = (Exi . bind x . exis, body)
 unExis e         = (id, e)
 
 -- structural rules matching
-matchExi :: Expr -> [Bind Expr]
-matchExi e =
+matchOuterExi :: Expr -> [Bind Expr]
+matchOuterExi e =
   [ bnd'
   | Exi bnd <- [e]
   , let (x,e') = unsafeUnbind bnd
   , bnd' <- bnd : [ bind y (Exi (bind x e''))
-                  | bnd' <- matchExi e'
+                  | bnd' <- matchOuterExi e'
                   , let (y,e'') = unsafeUnbind bnd'
                   ]
+  ]
+
+matchInnerExi :: Expr -> [(Context, Bind Expr)]
+matchInnerExi e =
+  [ (ctx,bnd')
+  | Exi bnd <- [e]
+  , let (x,e') = unsafeUnbind bnd
+        cbnds  = matchInnerExi e'
+  , (ctx,bnd') <- [ (Exi (bind x ctx), bnd')
+                  | (ctx,bnd') <- cbnds
+                  ] ++ case cbnds of
+                         [] -> [ (HOLE, bnd) ]
+                         _  -> [ (Exi (bind y ctx), bind x e')
+                               | (ctx,bnd') <- [head cbnds]
+                               , let (y,e') = unsafeUnbind bnd'
+                               ]
   ]
 
 matchEq :: Expr -> [(Expr,Expr)]
