@@ -14,17 +14,29 @@ prop_Valid t0 =
   valid (prep t0)
 
 prop_Confluent =
-  forAllShrink (prep `fmap` arbitrary) shrinkExpr $ \t ->
-  forAllBlind (liftArbitrary arbPermutation) $ \permf ->
-    let tr1 = normalize trs2024 t
-        tr2 = normalize (\e -> permf e (trs2024 e)) t
+  forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- tr) ->
+    let tr1@(np :<-- _)  = normalize trs2024 p
+        tr2@(nq :<-- qs) = normalize trs2024 q
      in whenFail (do putStrLn "== TRACE #1 =="
                      printTrace tr1
                      putStrLn "== TRACE #2 =="
-                     printTrace tr2) $
-          fmap norm tr1 == fmap norm tr2
+                     printTrace (nq :<-- (qs ++ tr))) $
+          norm np == norm nq
  where
-  shrinkExpr e = filter valid (shrink e ++ map snd (trs2024 e))
+  arbFork =
+    do p <- prep `fmap` arbitrary
+       permf <- liftArbitrary arbPermutation
+       let tr = normalize (\e -> permf e (trs2024 e)) p
+       return (p,tr)
+ 
+  shrinkFork (p, _ :<-- tr) = 
+    [ (p', q' :<-- [(s,p')])
+    | p' <- case tr of
+              _:_:_ -> [ r | (_,r) <- tr ]
+              _     -> shrink p ++ map snd (trs2024 p)
+    , valid p'
+    , (s,q') <- trs2024 p'
+    ]
 
 --------------------------------------------------------------------------------
 
