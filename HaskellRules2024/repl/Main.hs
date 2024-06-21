@@ -8,6 +8,7 @@ import Epic.Repl
 
 import FrontEnd.Flags( Flags(..), defaultFlags )
 import FrontEnd.Expr
+import FrontEnd.Desugar
 import FrontEnd.Parse(parseDie, pFile)
 import FrontEnd.Prelude( PreludeName, findPrelude )
 import FrontEnd.Error
@@ -15,7 +16,6 @@ import FrontEnd.Error
 import Epic.Print hiding( (<>) )   -- In this module (<>) is Prelude.<>
 
 {-
-import FrontEnd.Desugar
 import FrontEnd.ParseCore
 import FrontEnd.Run(run, findSystem, blockSystem, everySystem, adjustFlags)
 import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
@@ -226,26 +226,32 @@ theCommandSet :: CommandSet CState
 theCommandSet = CommandSet
   -- NB: the REPL adds :quit and :help
   { c_commands =
-      [ Cmd "read FILE"            "Parse a file"                          cRead
-      , Cmd "show [EXPR]"          "Show [last] expression"                cShow
+      [ Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
       , Cmd "set"                  "Turn on flag"                          (cSet True)
       , Cmd "unset"                "Turn off flag"                         (cSet False)
       , Cmd "prelude [NAME]"       "Select prelude"                        cPrelude
+      , Cmd "display"              "Show current global defs"              cDisplay
+      , Cmd "clear"                "Clear global defs"                     cClear
+      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
+
+      , Cmd "read FILE"            "Parse a file"                          cRead
+      , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
+
+--      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
+          -- Use Koen's:  normalize :: Rule -> Expr -> Traced Expr
+
+--       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
+
+--      , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
 
 --      , Cmd "pcore EXPR"           "parse core expression"                 cPcore
---      , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
 --      , Cmd "pdesugar [EXPR]"      "Desugar [last] expression pretty"      cPDesugar
 --      , Cmd "vdesugar [EXPR]"      "Desugar (for verification) [last] expression"             cDesugarVerify
 --      , Cmd "pvdesugar [EXPR]"     "Desugar (for verification) [last] expression pretty"      cPDesugarVerify
---      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
---      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
---      , Cmd "clear"                "Clear global defs"                     cClear
 --      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
---      , Cmd "display"              "Show current global defs"              cDisplay
 --      , Cmd "preprocess"           "Preprocess for rule set"                 cPreprocess
 --      , Cmd "rules [NAME]"         "Select rule system"                    cRules
---      , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
       ]
 --  , c_exec = cParseLine
   , c_exec = errorMessage "c_exec: not done yet"
@@ -347,6 +353,12 @@ cRead afn s = do
 --
 --------------------------------------------------------
 
+cDesugar :: CmdRunner CState
+cDesugar c s = do
+  let flg = cs_flags s
+  putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
+  cTransform (Desugared . desugar flg . asExpr) c s
+
 {-
 cParseLine :: CmdRunner CState
 cParseLine line s =
@@ -362,11 +374,6 @@ cPcore line s =
     pp prog
     pure prog
 
-cDesugar :: CmdRunner CState
-cDesugar c s = do
-  let flg = flags s
-  putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform (Desugared . desugar flg . asExpr) c s
 
 cPDesugar :: CmdRunner CState
 cPDesugar c s = do

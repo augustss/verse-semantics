@@ -53,31 +53,31 @@ data SrcExpr
   | QualVariable SrcExpr Ident   -- (e:)x
   | Array [SrcExpr]              -- array{e1;e2;...}
   | Tuple [SrcExpr]              -- e1,e2,...             -- will be turned into Array
-  | ApplyS SrcExpr SrcExpr          -- f(e)
-  | ApplyD SrcExpr SrcExpr          -- f[e]
+  | ApplyS SrcExpr SrcExpr       -- f(e)
+  | ApplyD SrcExpr SrcExpr       -- f[e]
   | EffAttr SrcExpr Eff          -- f<e>
 
   -- Prefix and infix operator application
   | PrefixOp Op SrcExpr          -- op e
   | PostfixOp SrcExpr Op         -- e op
-  | InfixOp SrcExpr Op SrcExpr      -- e1 op e2
+  | InfixOp SrcExpr Op SrcExpr   -- e1 op e2
 
   | If1 SrcBlk                   -- if{e}
-  | If2 SrcExpr SrcBlk              -- if(e1) then e2
-  | If2E SrcExpr SrcBlk             -- if(e1) else e2
+  | If2 SrcExpr SrcBlk           -- if(e1) then e2
+  | If2E SrcExpr SrcBlk          -- if(e1) else e2
   | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
   | If3B [Ident] SrcExpr SrcBlk SrcBlk -- if(exists is . e1) then e2 else e3
-                              --  where 'is' are the identifiers bound by e1
+                                       --  where 'is' are the identifiers bound by e1
 
-  | For1 SrcBlk                  -- for{e}
-  | For2 SrcExpr SrcBlk             -- for(e1) in e2
-  | For2B [Ident] SrcExpr SrcBlk    -- for(exists is . e1) in e2
+  | For1 SrcBlk                    -- for{e}
+  | For2 SrcExpr SrcBlk            -- for(e1) in e2
+  | For2B [Ident] SrcExpr SrcBlk   -- for(exists is . e1) in e2
 
-  | Let SrcExpr SrcBlk              -- let(e1) in e2
-  | Block SrcBlk                 -- do e
+  | Let SrcExpr SrcBlk             -- let(e1) in e2
+  | Block SrcBlk                   -- do e
 
-  | Case1 SrcBlk                 -- case{e1; e2; ... } block treated in a non-standard way
-  | Case2 SrcExpr SrcBlk            -- case(e) of {e1; e2; ... } block treated in a non-standard way
+  | Case1 SrcBlk                   -- case{e1; e2; ... } block treated in a non-standard way
+  | Case2 SrcExpr SrcBlk           -- case(e) of {e1; e2; ... } block treated in a non-standard way
   | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
 --  | Typedef SrcBlk             -- type{e}
   | Blk [SrcExpr]                -- { e1; e2; ... }
@@ -92,40 +92,43 @@ data SrcExpr
 
   -- Some 1-argument macros
   | Macro1 Ident [Eff] SrcBlk    -- m<a>{e}
-  | Macro2 Ident SrcExpr SrcBlk     -- m(e1){e2}
+  | Macro2 Ident SrcExpr SrcBlk  -- m(e1){e2}
   | Return SrcExpr               -- return e
 
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [SrcExpr]                -- e1;e2;...
-  | DefineV Ident             -- i:any
+  | DefineV Ident                -- i:any
   | DefineE Ident SrcExpr        -- i := e
   | DefineIE Ident Ident SrcExpr -- (i->x) := e
-  | Choice SrcExpr SrcExpr          -- e | e
-  | Unify SrcExpr SrcExpr           -- e1 = e2
+  | Choice SrcExpr SrcExpr       -- e | e
+  | Unify SrcExpr SrcExpr        -- e1 = e2
   | Range SrcExpr                -- :e
 
   -- Below here, not source language
   | Wrong String              -- wrong
-  | Exists [Ident] SrcExpr       -- exists xs . e
-  | Forall [Ident] SrcExpr       -- forall xs . e
-  | OfType SrcExpr SrcExpr          -- e:t, but only type known to verifier
+  | Exists [Ident] SrcExpr    -- exists xs . e
+  | Forall [Ident] SrcExpr    -- forall xs . e
+  | OfType SrcExpr SrcExpr    -- e:t, but only type known to verifier
   | TLam Ident [Eff] SrcExpr SrcExpr
                               -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
                               -- The last argument is a possible type, (e2:t)
   | DomainFail                -- either Wrong or try next overload
   | EPrim String              -- primop
-  | Lam Ident SrcExpr            -- \ x . e
+  | Lam Ident SrcExpr         -- \ x . e
   | Split SrcExpr SrcExpr SrcExpr      -- split(e1){e2}{e3}
   | Fail                      -- :false
-  | Map [SrcExpr]                -- map{e1;e2; ... }
-  | Truth SrcExpr                -- truth{e}
+  | Map [SrcExpr]             -- map{e1;e2; ... }
+  | Truth SrcExpr             -- truth{e}
+
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
+
   deriving (Eq, Ord, Show, Data)
 
--- SrcCore synonym is used for the very reduced subset of SrcExpr that
--- can be directly translated to Rules.Core.Expr
+-- SrcCore synonym is used for the very reduced subset of SrcExpr
+-- that can be directly translated to Rules.Core.Expr
 type SrcCore  = SrcExpr
+
 type SrcValue = SrcExpr
 type SrcBlk   = SrcExpr
 
@@ -409,63 +412,64 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
 --               Utility functions
 --------------------------------------------------------
 
-compos :: (Applicative f) => (SrcExpr -> f SrcExpr) -> SrcExpr -> f SrcExpr
-compos _ e@Lit{} = pure e
-compos _ e@Variable{} = pure e
+compos :: (Applicative m) => (SrcExpr -> m SrcExpr) -> SrcExpr -> m SrcExpr
+-- (compose f e) applies f to the top-level SrcExpr children of the SrcExpr
+compos _ e@Lit{}            = pure e
+compos _ e@Variable{}       = pure e
 compos f (QualVariable e v) = QualVariable <$> f e <*> pure v
-compos f (Array es) = Array <$> traverse f es
-compos f (Tuple es) = Tuple <$> traverse f es
-compos f (Seq es) = Seq <$> traverse f es
-compos f (ApplyS e1 e2) = ApplyS <$> f e1 <*> f e2
-compos f (ApplyD e1 e2) = ApplyD <$> f e1 <*> f e2
-compos f (EffAttr e r) = EffAttr <$> f e <*> pure r
-compos f (PrefixOp op e) = PrefixOp op <$> f e
-compos f (PostfixOp e op) = PostfixOp <$> f e <*> pure op
+compos f (Array es)         = Array <$> traverse f es
+compos f (Tuple es)         = Tuple <$> traverse f es
+compos f (Seq es)           = Seq <$> traverse f es
+compos f (ApplyS e1 e2)     = ApplyS <$> f e1 <*> f e2
+compos f (ApplyD e1 e2)     = ApplyD <$> f e1 <*> f e2
+compos f (EffAttr e r)      = EffAttr <$> f e <*> pure r
+compos f (PrefixOp op e)    = PrefixOp op <$> f e
+compos f (PostfixOp e op)   = PostfixOp <$> f e <*> pure op
 compos f (InfixOp e1 op e2) = InfixOp <$> f e1 <*> pure op <*> f e2
-compos f (If1 b) = If1 <$> f b
-compos f (If2 e b) = If2 <$> f e <*> f b
-compos f (If2E e b) = If2E <$> f e <*> f b
-compos f (If3 e b1 b2) = If3 <$> f e <*> f b1 <*> f b2
-compos f (If3B is e b1 b2) = If3B is <$> f e <*> f b1 <*> f b2
-compos f (For1 b) = For1 <$> f b
-compos f (For2 e b) = For2 <$> f e <*> f b
-compos f (For2B is e b) = For2B is <$> f e <*> f b
-compos f (Let e b) = Let <$> f e <*> f b
-compos f (Block b) = Block <$> f b
-compos f (Case1 b) = Case1 <$> f b
-compos f (Case2 e b) = Case2 <$> f e <*> f b
-compos f (Function ers b) = Function <$> traverse g ers <*> f b
+compos f (If1 b)            = If1 <$> f b
+compos f (If2 e b)          = If2 <$> f e <*> f b
+compos f (If2E e b)         = If2E <$> f e <*> f b
+compos f (If3 e b1 b2)      = If3 <$> f e <*> f b1 <*> f b2
+compos f (If3B is e b1 b2)  = If3B is <$> f e <*> f b1 <*> f b2
+compos f (For1 b)           = For1 <$> f b
+compos f (For2 e b)         = For2 <$> f e <*> f b
+compos f (For2B is e b)     = For2B is <$> f e <*> f b
+compos f (Let e b)          = Let <$> f e <*> f b
+compos f (Block b)          = Block <$> f b
+compos f (Case1 b)          = Case1 <$> f b
+compos f (Case2 e b)        = Case2 <$> f e <*> f b
+compos f (Function ers b)   = Function <$> traverse g ers <*> f b
   where g (e, r) = (,) <$> f e <*> pure r
-compos f (Blk es) = Blk <$> traverse f es
-compos f (Option me) = Option <$> traverse f me
+compos f (Blk es)           = Blk <$> traverse f es
+compos f (Option me)        = Option <$> traverse f me
 --compos f (Typedef b) = Typedef <$> f b
-compos f (Parens e) = Parens <$> f e
-compos f (Set e1 op e2) = Set <$> f e1 <*> pure op <*> f e2
-compos f (MVar i e1 e2) = MVar i <$> traverse f e1 <*> traverse f e2
-compos f (MRef i e1 e2) = MVar i <$> traverse f e1 <*> traverse f e2
-compos f (MAlias i e1 e2) = MVar i <$> traverse f e1 <*> traverse f e2
-compos f (Macro1 m as b) = Macro1 m as <$> f b
-compos f (Macro2 m a b) = Macro2 m <$> f a <*> f b
-compos f (Return e) = Return <$> f e
-compos _ (DefineV i) = pure $ DefineV i
-compos f (DefineE i e) = DefineE i <$> f e
-compos f (DefineIE i x e) = DefineIE i x <$> f e
-compos f (Choice e1 e2) = Choice <$> f e1 <*> f e2
-compos f (Unify e1 e2) = Unify <$> f e1 <*> f e2
-compos f (Range e) = Range <$> f e
-compos _ e@Wrong{} = pure e
-compos f (Exists is e) = Exists is <$> f e
-compos f (Forall is e) = Forall is <$> f e
-compos f (OfType e1 e2) = OfType <$> f e1 <*> f e2
-compos f (TLam i rs e1 e2) = TLam i rs <$> f e1 <*> f e2
-compos _ e@DomainFail = pure e
-compos _ e@EPrim{} = pure e
-compos f (Lam i e) = Lam i <$> f e
-compos f (Split e1 e2 e3) = Split <$> f e1 <*> f e2 <*> f e3
-compos _ e@Fail = pure e
-compos f (Map es) = Map <$> traverse f es
-compos f (Truth e) = Truth <$> f e
-compos f (EStore s e) = EStore <$> storeMapA f s <*> f e
+compos f (Parens e)         = Parens <$> f e
+compos f (Set e1 op e2)     = Set <$> f e1 <*> pure op <*> f e2
+compos f (MVar i e1 e2)     = MVar i <$> traverse f e1 <*> traverse f e2
+compos f (MRef i e1 e2)     = MVar i <$> traverse f e1 <*> traverse f e2
+compos f (MAlias i e1 e2)   = MVar i <$> traverse f e1 <*> traverse f e2
+compos f (Macro1 m as b)    = Macro1 m as <$> f b
+compos f (Macro2 m a b)     = Macro2 m <$> f a <*> f b
+compos f (Return e)         = Return <$> f e
+compos _ (DefineV i)        = pure $ DefineV i
+compos f (DefineE i e)      = DefineE i <$> f e
+compos f (DefineIE i x e)   = DefineIE i x <$> f e
+compos f (Choice e1 e2)     = Choice <$> f e1 <*> f e2
+compos f (Unify e1 e2)      = Unify <$> f e1 <*> f e2
+compos f (Range e)          = Range <$> f e
+compos _ e@Wrong{}          = pure e
+compos f (Exists is e)      = Exists is <$> f e
+compos f (Forall is e)      = Forall is <$> f e
+compos f (OfType e1 e2)     = OfType <$> f e1 <*> f e2
+compos f (TLam i rs e1 e2)  = TLam i rs <$> f e1 <*> f e2
+compos _ e@DomainFail       = pure e
+compos _ e@EPrim{}          = pure e 
+compos f (Lam i e)          = Lam i <$> f e
+compos f (Split e1 e2 e3)   = Split <$> f e1 <*> f e2 <*> f e3
+compos _ e@Fail             = pure e 
+compos f (Map es)           = Map <$> traverse f es
+compos f (Truth e)          = Truth <$> f e
+compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
 storeMapA :: (Applicative a) => (SrcValue -> a SrcValue) -> Store -> a Store
 storeMapA f s = Store <$> sequenceA (IM.map f (refMap s)) <*> pure (outputs s)

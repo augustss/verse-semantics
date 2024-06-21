@@ -1,29 +1,33 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans -Wno-dodgy-imports #-}
 {-# LANGUAGE FlexibleContexts #-}
 module FrontEnd.Desugar(
-  desugar,
-  dsScope,
-  getFree, substMany, getAllVars,
+    desugar,
+    dsScope,
+    getFree, substMany, getAllVars,
   ) where
-import Data.Monoid
-import Control.Monad
-import Control.Monad.State.Strict
-import Control.Monad.Writer hiding (guard)
-import Data.Either
-import Data.List
---import qualified Data.Map as M
-import Data.Maybe
-import qualified Data.Set as S
-import Debug.Trace
-import GHC.Stack
-import Epic.List
-import Epic.Print
-import Epic.Uniplate(universeBi, transform)
---import FrontEnd.Desugar
+
+import Prelude hiding (pi)
+
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
-import Prelude hiding (pi)
+
+-- Epic libraries
+import Epic.List
+import Epic.Print
+
+-- General libraries
+import Data.Monoid
+import Data.Either
+import Data.List
+import Data.Maybe
+import qualified Data.Set as S
+import Control.Monad
+import Control.Monad.State.Strict
+import Control.Monad.Writer hiding (guard)
+import Debug.Trace
+import GHC.Stack
+--import qualified Data.Map as M
 
 -- QUESTIONS:
 --  x:int='a'   fail or wrong?, tests L93, L95
@@ -37,7 +41,7 @@ import Prelude hiding (pi)
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
 
-desugar :: Flags -> Expr -> Expr
+desugar :: Flags -> SrcExpr -> SrcExpr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
             (-- Simplification [drop this for now]
@@ -48,7 +52,8 @@ desugar flgs = eval flgs .
              traceDS "primops"    <=< primops   <=<    -- Var (Ident "op") --> EPrim op
              traceDS "lower"      <=< lower     <=<    -- Lowers all/one/for/if into split or whatever
              traceDS "addScope"   <=< addScope  <=<    -- x:e -->  exists x. ....(x=e)....
-                                                       --   if --> If3B,  for --> For2B
+                                                       -- if --> If3B,  for --> For2B
+
              traceDS "lowerApply" <=< lowerApply<=<    -- Round vs square
 
              traceDS "dsD"        <=< dsDx      <=<    -- Heavy lifting: Fig 9
@@ -68,7 +73,7 @@ desugar flgs = eval flgs .
             traceDS "syntaxFixes" <=< syntaxFixes)
 -}
     tr = fTraceDesugar flgs
-    traceDS :: String -> Expr -> D Expr
+    traceDS :: String -> SrcExpr -> D SrcExpr
     traceDS msg e | tr = trace ("---- " ++ msg ++ "\n" ++ prettyShow e) $
                          pure e
                   | otherwise = pure e
@@ -82,14 +87,14 @@ desugar flgs = eval flgs .
     -- Find the name of a definition
     nameOf (InfixOp lhs (Ident _ ":=") _) = lhsName lhs
     nameOf e = impossible e
-    lhsName :: Expr -> Ident
+    lhsName :: SrcExpr -> Ident
     lhsName (EffAttr e _) = lhsName e
     lhsName (ApplyS e _) = lhsName e
     lhsName (Variable i) = i
     lhsName e = impossible e
 
 -- Hackily add prelude identifiers used in e
-addUsed :: [(Ident, Expr)] -> Expr -> Expr
+addUsed :: [(Ident, SrcExpr)] -> SrcExpr -> SrcExpr
 addUsed prel = loop []
   where
     loop vs e =
@@ -99,7 +104,14 @@ addUsed prel = loop []
             [] -> e
             ies -> loop (map fst ies ++ vs) $ seqE (map snd ies ++ [e])
 
-allIdents :: Expr -> [Ident]
+allIdents :: SrcExpr -> [Ident]
+-- Find all occurrences, ignoring binders (hence hacky)
+allIdents e = Epic.List.nub (execWriter (vars e))
+  where
+    vars :: SrcExpr -> Writer [Ident] SrcExpr
+    vars ev@(Variable i) = do tell [i]; pure ev
+    vars ev              = compos vars ev
+{-
 allIdents = universeBi . transform fixops
   where
     -- Fix operator names
@@ -109,6 +121,7 @@ allIdents = universeBi . transform fixops
     -- If there's an MVar, we need "new"
     fixops e@MVar{} = ApplyS (Variable (Ident noLoc "new")) e
     fixops e = e
+-}
 
 ------
 
@@ -147,9 +160,9 @@ withContext c da = do
 --  * (e1,...)  -->  array{e1,...} no need to distingush them anymore
 --  * x&y:e     -->  array{x&y:e}  if outside an array
 --                   x:e; y:e      if inside an array
-syntaxFixes :: Expr -> D Expr
+syntaxFixes :: SrcExpr -> D SrcExpr
 syntaxFixes = pure . f
-  where f :: Expr -> Expr
+  where f :: SrcExpr -> SrcExpr
         f (Parens e) = f e
         f (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
           f $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
@@ -160,22 +173,22 @@ syntaxFixes = pure . f
         f e = composOp f e
 
         -- PAMP2
-        g :: Expr -> [Expr]
+        g :: SrcExpr -> [SrcExpr]
         g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
         g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
         g e = [f e]
 
 ---------------------
 
-eval :: Flags -> D Expr -> Expr
+eval :: Flags -> D SrcExpr -> SrcExpr
 -- Runs the D monad
 eval flgs = flip evalState DState{ nextNo = 1, dflags = flgs }
 
 -- Desugar into Small Source Verse
-dsSmall :: Expr -> D Expr
+dsSmall :: SrcExpr -> D SrcExpr
 dsSmall = ds
   where
-    ds :: Expr -> D Expr
+    ds :: SrcExpr -> D SrcExpr
     -- Application and unification
 
     -- (e1 where e2)  -->   ( x ::= e1; e2; x)
@@ -305,13 +318,13 @@ checkEffs = mapM checkEff
         checkEff e | e `elem` knownEffects = pure e
                    | otherwise = errorMessage $ "unknown effect: " ++ show e
 
-simpleMapEntry :: Expr -> Maybe (Expr, Expr)
+simpleMapEntry :: SrcExpr -> Maybe (SrcExpr, SrcExpr)
 simpleMapEntry (InfixOp k (Op "=>") v) = Just (k, v)
 simpleMapEntry _ = Nothing
 
-type Value = Expr
+type Value = SrcExpr
 
-apply :: (Value -> Value -> Expr) -> Expr -> Expr -> D Expr
+apply :: (Value -> Value -> SrcExpr) -> SrcExpr -> SrcExpr -> D SrcExpr
 -- val1[e2]  -->
 apply con e1 e2 | isValue e1 = apply1 con e1 e2   -- Easy special case.  Not really needed
 -- e1[e2]  -->  f:=e1; f[e2]
@@ -320,7 +333,7 @@ apply con e1 e2 = do
   r <- apply1 con (Variable f) e2
   pure $ seqE [DefineE f e1, r]
 
-apply1 :: (Value -> Value -> Expr) -> Value -> Expr -> D Expr
+apply1 :: (Value -> Value -> SrcExpr) -> Value -> SrcExpr -> D SrcExpr
 -- val1[val2]
 apply1 con x1 e2 | isValue e2 = apply2 con x1 e2   -- Easy special case.  Not really needed
 -- val1[e2]  -->  a:=e2; val1[a]
@@ -330,10 +343,10 @@ apply1 con x1 e2 = do
   pure $ seqE [DefineE a e2, r]
 
 -- val1[val2]  -->
-apply2 :: (Value -> Value -> Expr) -> Value -> Value -> D Expr
+apply2 :: (Value -> Value -> SrcExpr) -> Value -> Value -> D SrcExpr
 apply2 con x1 x2 = pure $ con x1 x2
 
-defn :: Expr -> Expr -> D Expr
+defn :: SrcExpr -> SrcExpr -> D SrcExpr
 -- Desugars (p := e) into an expression; see Fig 3, top group
 
 -- Rule: (i := e) -->  (i := e)
@@ -371,23 +384,23 @@ defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 --defn p _ = impossible p
 
 -- Return function, argument, and attributes
-getFun :: Expr -> Maybe (Expr, Expr, [Ident])
+getFun :: SrcExpr -> Maybe (SrcExpr, SrcExpr, [Ident])
 getFun = gf []
   where
     gf rs (EffAttr e r) = gf (r:rs) e
     gf rs (ApplyS f a) = Just (f, a, reverse rs)
     gf _ _ = Nothing
 
-eFalse :: Expr
+eFalse :: SrcExpr
 eFalse = Array []
 
-eAny :: Expr
+eAny :: SrcExpr
 eAny = Variable (Ident noLoc "any$")
 
-eMkMap :: Loc -> Expr
+eMkMap :: Loc -> SrcExpr
 eMkMap l = Variable (Ident l "mkMap$")
 
-defnArray :: [Expr] -> Expr -> D Expr
+defnArray :: [SrcExpr] -> SrcExpr -> D SrcExpr
 defnArray ps e = do
   let var p = do
         let (wrap, ip) =
@@ -407,7 +420,7 @@ defnArray ps e = do
 --  traceM ("*** " ++ show bs)
   pure $ seqE $ bs ++ [InfixOp arr (Op "=") e]
 
-arraySplice :: [Expr] -> D Expr
+arraySplice :: [SrcExpr] -> D SrcExpr
 arraySplice as =
 --  trace ("--- " ++ show (as, arrayElems as)) $
   case arrayElems as of
@@ -421,15 +434,15 @@ arraySplice as =
           rest <- app (Variable t) es
           pure $ seqE [eAppend r e t, rest]
 
-eAppend :: Expr -> Expr -> Ident -> Expr
+eAppend :: SrcExpr -> SrcExpr -> Ident -> SrcExpr
 eAppend (Array xs) (Array ys) z = DefineE z (Array (xs ++ ys))
 eAppend x y z = Seq [DefineV z, ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, Variable z])]
 
-data ArrayElem = EElems [Expr] | ESplice Expr
+data ArrayElem = EElems [SrcExpr] | ESplice SrcExpr
   deriving (Show)
 
 -- Handle an array element, it can be ..e or e
-arrayElems :: [Expr] -> [ArrayElem]
+arrayElems :: [SrcExpr] -> [ArrayElem]
 arrayElems = grp . map cls
   where cls (PrefixOp (Ident _ "..") e) = Left e
         cls e = Right e
@@ -444,131 +457,27 @@ arrayElems = grp . map cls
 context :: DState -> Desugar
 context = fDesugar . dflags
 
-dsDx :: Expr -> D Expr
+dsDx :: SrcExpr -> D SrcExpr
 dsDx e = do
   how <- gets context
   case how of
-    DS1 -> dsD_1 e
-    DS2 -> dsD_2 e
-    DS3 -> dsD_3 e
-    DS5 -> dsD_5 e
-    DS6 -> dsD_6 e
-    DS7 -> dsD_7 e
-    DS10 -> dsD_10 e
---    DS8 -> dsD_8_top e
+    DS12 -> dsD_12 e
 
-dsD_1 :: Expr -> D Expr
-dsD_1 e | isValue e = pure e  -- DCONST DVAR
-dsD_1 (Choice e1 e2) = Choice <$> dsD_1 e1 <*> dsD_1 e2
-dsD_1 (ApplyD e1 e2) = ApplyD <$> dsD_1 e1 <*> dsD_1 e2
-dsD_1 (Unify e1 e2) = Unify <$> dsD_1 e1 <*> dsD_1 e2
-dsD_1 (DefineV x) = pure (DefineV x)
-dsD_1 (DefineE x e) = DefineE x <$> dsD_1 e
-dsD_1 (For2 e1 e2) = For2 <$> dsD_1 e1 <*> dsD_1 e2
-dsD_1 (If3 e1 e2 e3) = If3 <$> dsD_1 e1 <*> dsD_1 e2 <*> dsD_1 e3
-dsD_1 (Macro1 m rs e) = Macro1 m rs <$> dsD_1 e
-dsD_1 (Array ts) = Array <$> mapM dsD_1 ts
-dsD_1 (Seq []) = pure (Array [])
-dsD_1 (Seq [t]) = dsD_1 t
-dsD_1 (Seq (t:ts)) = seqE <$> sequence [dsD_1 t, dsD_1 (Seq ts)]
-dsD_1 (OfType e t) = OfType <$> dsD_1 e <*> dsD_1 t
-dsD_1 Fail = pure Fail
-dsD_1 (Function [(t1, effs)] t2) = do
-  x <- newIdent (getLoc t1) "x"
-  t1' <- dsM_1 x t1
-  t2' <- dsD_1 t2
-  pure $ TLam x effs t1' t2'
-dsD_1 e@Range{} = dsDM e
-dsD_1 e@DefineIE{} = dsDM e
-dsD_1 (Lam x e) = Lam x <$> dsD_1 e
---dsD_1 (Map ts) = Map <$> mapM dsD_1 ts
-dsD_1 e = impossible e
 
--- Use M to desugar
-dsDM :: Expr -> D Expr
-dsDM e = do
-  x <- newIdent (getLoc e) "i"
-  existsV [x] <$> dsM_1 x e
+dsD_12 :: SrcExpr -> D SrcExpr
+-- RANJIT!!!!!!  fill in here
+dsD_12 _e = errorMessage "dsD_12"
 
-dsM_1 :: Ident -> Expr -> D Expr
--- Rule:  i |> k       -->  i = k
-dsM_1 i k | isLiteral k = pure $ unifyV i k
--- Rule:  i |> x       -->  i = x
-dsM_1 i x@Variable{} = pure $ unifyV i x
--- Rule:  i |> f[x]    -->  i = f[x]
---dsM_1 i fa@(ApplyD f a) | isValue f && isValue a = pure $ unifyV i fa
---dsM_1 i e@(ApplyD f a) | isValue f && isValue a = pure $ unifyV i e
---                     | otherwise = undefined -- invariant broken
-dsM_1 i (ApplyD f a) = unifyV i <$> (ApplyD <$> dsD_1 f <*> dsD_1 a)
--- Rule:  i |> x = t   -->  x = (i |> t)
-dsM_1 i (Unify t1 t2) = Unify <$> dsM_1 i t1 <*> dsM_1 i t2
--- Rule:  i |> x:any  --> x := i
-dsM_1 i (DefineV x) = pure $ DefineE x (Variable i)
--- Rule:  i |> x := t  -->  x := (i |> t)
-dsM_1 i (DefineE x t) = DefineE x <$> dsM_1 i t
--- Rule:  i |> (j->x) := t  -->  j := i; x := (i |> t)
-dsM_1 i (DefineIE j x t) = do
-  t' <- dsM_1 i t
-  pure $ seqE [DefineE j (Variable i), DefineE x t']
--- Rule:  i |> :t      -->  D(t)[i]
-dsM_1 i (Range t) = ApplyD <$> dsD_1 t <*> pure (Variable i)
--- Rule:  i |> t1; t2  -->  D(t1); i |> t2
-dsM_1 i (Seq []) = dsM_1 i (Array [])
-dsM_1 i (Seq [t]) = dsM_1 i t
-dsM_1 i (Seq (t:ts)) = seqE <$> sequence [dsD_1 t, dsM_1 i (Seq ts)]
--- Rule:  i |> t1 | t2 -->  (i |> t1) | (i |> t2)
-dsM_1 i (Choice t1 t2) = Choice <$> dsM_1 i t1 <*> dsM_1 i t2
--- Rule:  i |> (t1,...,tn)  -->  exists x1 ... xn . x1 |> t1; ...; xn |> tn; i = (x1,...,xn)
-dsM_1 i (Array ts) = do
-  xs <- mapM (\ t -> newIdent (getLoc t) "x") ts
-  bs <- zipWithM dsM_1 xs ts
-  pure $ existsV xs $ seqE [ unifyV i $ Array $ map Variable xs, Array bs]
 
-dsM_1 i (If3 e1 e2 e3) = If3 <$> dsD_1 e1 <*> dsM_1 i e2 <*> dsM_1 i e3
-dsM_1 i (For2 e1 e2) = unifyV i <$> (For2 <$> dsD_1 e1 <*> dsD_1 e2)
-
-dsM_1 i (Function [(t1, effs)] t2) = do
-  x <- newIdent (getLoc t1) "x"
-  y <- newIdent (getLoc t1) "y"
-  z <- newIdent (getLoc t1) "z"
-  t1' <- dsM_1 x t1
-  t2' <- dsM_1 y t2
-  pure $ TLam x effs (DefineE z t1') (Seq [DefineE y (ApplyD (Variable i) (Variable z)), t2'])
-
-dsM_1 i (OfType a f) = OfType <$> dsM_1 i a <*> dsD_1 f
-dsM_1 i (Macro1 m rs e) = Macro1 m rs <$> dsM_1 i e  -- XXX really?
-dsM_1 i Fail = pure $ unifyV i Fail
-dsM_1 i (Lam x e) = unifyV i . Lam x <$> dsD_1 e
-dsM_1 i (Let e1 e2) = Let <$> dsD_1 e1 <*> dsM_1 i e2
-dsM_1 _ e = impossible e
-
-{-
-dsFunction :: DContext -> Ident -> Expr -> [Eff] -> Expr -> D Expr
--- This is highly dubious
-dsFunction DEval i t1 effs t2 = do
-  x <- newIdent (getLoc t1) "x"
-  t1' <- withContext DAbstract $ dsM_1 x t1
-  t2' <- dsD_1 t2
-  pure $ unifyV i $  -- Do the unification?
-         TLam x effs t1' t2'
-dsFunction DAbstract i t1 effs t2 = do
-  x <- newIdent (getLoc t1) "x"
-  y <- newIdent (getLoc t1) "y"
-  z <- newIdent (getLoc t1) "z"
-  t1' <- dsM_1 x t1
-  t2' <- dsM_1 y t2
-  pure $ TLam x effs (DefineE z t1') (Seq [DefineE y (ApplyD (Variable i) (Variable z)), t2'])
--}
-
-unifyV :: Ident -> Expr -> Expr
+unifyV :: Ident -> SrcExpr -> SrcExpr
 unifyV i e = Unify (Variable i) e
 
-existsV :: [Ident] -> Expr -> Expr
+existsV :: [Ident] -> SrcExpr -> SrcExpr
 existsV is e = --seqE $ map (\ i -> Define i AnyT) is ++ [e]
                Exists is e
 
 -- Pick the appropriate form of apply for operators
-call :: String -> Loc -> String -> Expr -> D Expr
+call :: String -> Loc -> String -> SrcExpr -> D SrcExpr
 call p l s e = do
   ver <- gets (not . fAssumeVerified . dflags)
   let
@@ -630,13 +539,13 @@ errMultiple =
   mapM_ (\ is -> errorMessage $ "multiply defined: " ++ prettyShow (head is) ++
                          prettyShow [ l | Ident l _ <- is ])
 
-dsScope :: Flags -> Expr -> Expr
+dsScope :: Flags -> SrcExpr -> SrcExpr
 dsScope flgs = eval flgs . (primops <=< addScope)
 
-addScope :: Expr -> D Expr
+addScope :: SrcExpr -> D SrcExpr
 addScope e = scope (S.fromList primOps) (Block e)
 
-scope :: S.Set Ident -> Expr -> D Expr
+scope :: S.Set Ident -> SrcExpr -> D SrcExpr
 scope sc = expr
   where
     expr e@Lit{} = pure e
@@ -689,12 +598,12 @@ scope sc = expr
     dropEmptyExists (Exists [] e) = e
     dropEmptyExists e = e
 
-    defs :: S.Set Ident -> Expr -> D (Expr, S.Set Ident)
+    defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)
     defs as e = do
       (is, e', s) <- defs' as e
       pure (Exists is e', s)
 
-    defs' :: S.Set Ident -> Expr -> D ([Ident], Expr, S.Set Ident)
+    defs' :: S.Set Ident -> SrcExpr -> D ([Ident], SrcExpr, S.Set Ident)
     defs' as e = do
       let is = getVisible e
           errM = filter ((> 1) . length) $ group $ sort is
@@ -706,7 +615,7 @@ scope sc = expr
       pure (is, e', s')
 
 -- Get all visible identifiers from i := e
-getVisible :: HasCallStack => Expr -> [Ident]
+getVisible :: HasCallStack => SrcExpr -> [Ident]
 getVisible Lit{} = []
 getVisible Variable{} = []
 getVisible (Array es) = concatMap getVisible es
@@ -739,7 +648,7 @@ getVisible DomainFail = []
 --getVisible (Map es) = concatMap getVisible es
 getVisible e = impossible e
 
-getVar :: HasCallStack => Expr -> [Ident]
+getVar :: HasCallStack => SrcExpr -> [Ident]
 getVar Lit{} = []
 getVar Variable{} = []
 getVar (Array es) = concatMap getVar es
@@ -813,7 +722,7 @@ primOps = map (Ident noLoc)
 --  If3
 --  For2
 -- If there isn't, this pass will insert an empty exists.
-addExist :: Expr -> D Expr
+addExist :: SrcExpr -> D SrcExpr
 addExist = pure . f
   where
     f (If3 e1 e2 e3) = If3 (ex (f e1)) (f e2) (f e3)
@@ -825,13 +734,13 @@ addExist = pure . f
 
 ------------------------
 
-simplify :: Expr -> D Expr
+simplify :: SrcExpr -> D SrcExpr
 simplify expr = do
   simpl <- gets (fSimplify . dflags)
   if not simpl then
     pure expr
    else do
-    let loop :: Int -> Expr -> D Expr
+    let loop :: Int -> SrcExpr -> D SrcExpr
         loop 0 e = trace "simplifier timed out" $ pure e
         loop n e = do
           e' <- oneSimplifyPass e
@@ -841,10 +750,10 @@ simplify expr = do
             loop (n-1) e'
     loop 25 expr
 
-oneSimplifyPass :: Expr -> D Expr
+oneSimplifyPass :: SrcExpr -> D SrcExpr
 oneSimplifyPass expr = do
   tr <- gets (fTraceDesugar . dflags)
-  let traceDS :: String -> Expr -> D Expr
+  let traceDS :: String -> SrcExpr -> D SrcExpr
       traceDS msg e | tr = trace ("---- " ++ msg ++ "\n" ++ prettyShow e) $
                            pure e
                     | otherwise = pure e
@@ -854,7 +763,7 @@ oneSimplifyPass expr = do
    traceDS "inlineVal"  <=< inlineVal <=<
    pure ) expr
 
-inlineVal :: Expr -> D Expr
+inlineVal :: SrcExpr -> D SrcExpr
 inlineVal expr = do
   simpl <- gets (fSimplify . dflags)
   if simpl then
@@ -862,10 +771,10 @@ inlineVal expr = do
    else
     pure expr
 
-inlineVal' :: Expr -> Expr
+inlineVal' :: SrcExpr -> SrcExpr
 inlineVal' expr = evalState (inl expr) []
   where
-    inl :: Expr -> State [(Ident, Expr)] Expr
+    inl :: SrcExpr -> State [(Ident, SrcExpr)] SrcExpr
     inl (Seq (e@(Unify (Variable x) v) : es)) | shouldInline x v = do
 --      traceM $ "extend " ++ prettyShow (x, v)
       v' <- inl v
@@ -893,11 +802,11 @@ inlineVal' expr = evalState (inl expr) []
     shouldInline x (Lam _ _) = unIdent x `elem` ["int", "any"]
     shouldInline _ e = isValue e
 
-    withVal :: (Ident, Expr) -> State [(Ident, Expr)] a -> State [(Ident, Expr)] a
+    withVal :: (Ident, SrcExpr) -> State [(Ident, SrcExpr)] a -> State [(Ident, SrcExpr)] a
     withVal b ma = do
       m <- get
       pure $ evalState ma (b:m)
-    withNotIn :: [Ident] -> State [(Ident, Expr)] a -> State [(Ident, Expr)] a
+    withNotIn :: [Ident] -> State [(Ident, SrcExpr)] a -> State [(Ident, SrcExpr)] a
     withNotIn is ma = do
       m <- get
       let m' = filter ((`notElem` is) . fst) m
@@ -907,7 +816,7 @@ inlineVal' expr = evalState (inl expr) []
 -- Eliminate existentials of the form
 --  Exists x . ... x=e ...
 -- where the x=e is the only occurrence of x.
-elimExist :: Expr -> D Expr
+elimExist :: SrcExpr -> D SrcExpr
 elimExist expr = do
   simpl <- gets (fSimplify . dflags)
   if simpl then
@@ -948,7 +857,7 @@ elimExist expr = do
 instance Pretty a => Pretty (Sum a) where
   pPrint (Sum a) = text "Sum" <+> pPrint a
 
-simpler :: Expr -> D Expr
+simpler :: SrcExpr -> D SrcExpr
 simpler expr = do
   -- Always remove silly uses of any$
   expr' <- simpValue <=< simpAny $ expr
@@ -959,10 +868,10 @@ simpler expr = do
     pure expr'
 
 -- Simplify  v; e  -->  e
-simpValue :: Expr -> D Expr
+simpValue :: SrcExpr -> D SrcExpr
 simpValue = pure . simpValue'
 
-simpValue' :: Expr -> Expr
+simpValue' :: SrcExpr -> SrcExpr
 simpValue' = f
   where f (Seq (Snoc es e)) = seqE $ map f (Snoc (filter (not . isValue') es) e)
         f e = composOp f e
@@ -971,14 +880,14 @@ simpValue' = f
 
 {- Cannot do this everywhere, e.g., If3 relies on existentials
 -- Simplify  exists . e  -->  e
-simpExists :: Expr -> D Expr
+simpExists :: SrcExpr -> D SrcExpr
 simpExists = pure . f
   where f (Exists [] e) = f e
         f e = composOp f e
 -}
 
 -- Simplify any[e]  -->  e
-simpAny :: Expr -> D Expr
+simpAny :: SrcExpr -> D SrcExpr
 simpAny = pure . f
   where f (ApplyD (Variable (Ident _ "any")) e) = f e  -- This should go away
         f (ApplyD (EPrim "any$") e) = f e
@@ -987,7 +896,7 @@ simpAny = pure . f
 
 -- Simplify x = (e1; ...; en)  -->  e1; ...; x = en
 --          x = (y = e)  -->  x = y; y = e
-simpUnify :: Expr -> D Expr
+simpUnify :: SrcExpr -> D SrcExpr
 simpUnify = pure . f
   where f (Unify v (Seq (Snoc xs x))) | isValue v = f $ Seq $ xs ++ [Unify v x]
         f (Unify e1 (Unify v e2)) | isValue v = f $ Seq [Unify e1 v, Unify v e2]
@@ -996,7 +905,7 @@ simpUnify = pure . f
 
 -- If we have a unification x=y, and x&y are bound in the same existential
 -- then we can get rid of one of the variables.
-simpAlias :: Expr -> D Expr
+simpAlias :: SrcExpr -> D SrcExpr
 simpAlias expr = do
   simpl <- gets (fSimplify . dflags)
   if simpl then
@@ -1034,7 +943,7 @@ uniq _ [] = []
 uniq u (x@(a,b):xs) | a `elem` u || b `elem` u = uniq u xs
                     | otherwise = x : uniq (a:b:u) xs
 
-dropUnify :: [(Ident, Ident)] -> Expr -> Expr
+dropUnify :: [(Ident, Ident)] -> SrcExpr -> SrcExpr
 dropUnify xys (Seq es) = seqE (seqDrop (map (dropUnify xys) $ concatMap flat es))
   where flat (Seq xs) = concatMap flat xs
         flat x = [x]
@@ -1042,13 +951,13 @@ dropUnify xys (Unify (Variable x) (Variable y)) | (x, y) `elem` xys = Variable y
                                                 | (y, x) `elem` xys = Variable x
 dropUnify _ e = e
 
-seqDrop :: [Expr] -> [Expr]
+seqDrop :: [SrcExpr] -> [SrcExpr]
 seqDrop [] = []
 seqDrop [e] = [e]
 seqDrop (v:es@(_:_)) | isValue v = seqDrop es
 seqDrop (e:es) = e : seqDrop es
 
-localUnify :: Expr -> [(Ident, Ident)]
+localUnify :: SrcExpr -> [(Ident, Ident)]
 localUnify (Seq es) = concatMap localUnify es
 localUnify (Unify (Variable x) (Variable y)) = [(x, y)]
 localUnify _ = []
@@ -1059,7 +968,7 @@ isTempIdent _ = False
 
 -------------------------
 
-addDeref :: Expr -> D Expr
+addDeref :: SrcExpr -> D SrcExpr
 addDeref = pure . exprD S.empty
   where
     expr _ e@Lit{} = e
@@ -1110,7 +1019,7 @@ addDeref = pure . exprD S.empty
       | otherwise = syntaxError l $ "set variable must be declared with var: " ++ prettyShow i
     set _ e1 _ _ = syntaxError (getLoc e1) $ "set LHS not valid: " ++ prettyShow e1
 
-    defs :: S.Set Ident -> Expr -> S.Set Ident
+    defs :: S.Set Ident -> SrcExpr -> S.Set Ident
     defs s e = S.union s (S.fromList (getVar e))
 
     applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
@@ -1119,7 +1028,7 @@ addDeref = pure . exprD S.empty
 
 -- Applications have to be lowered before scope insertion
 -- so existential get inserted in the right place.
-lowerApply :: Expr -> D Expr
+lowerApply :: SrcExpr -> D SrcExpr
 lowerApply = f
   where
     f (ApplyS e1 e2) = Succeeds <$> (ApplyD <$> f e1 <*> f e2)
@@ -1132,7 +1041,7 @@ lowerApply = f
     f e = compos f e
 
 -- Convert Big Core to Core
-lower :: Expr -> D Expr
+lower :: SrcExpr -> D SrcExpr
 lower e@Lit{} = pure e
 lower e@Variable{} = pure e
 lower (Array es) = Array <$> mapM lower es
@@ -1163,7 +1072,7 @@ lower (Forall is e) = Forall is <$> lower e
 lower e = impossible e
 
 -- Lower a for loop
-lowerFor :: [Ident] -> Expr -> Expr -> D Expr
+lowerFor :: [Ident] -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerFor is e1 e2 = do
   useSplit <- gets (fSplit . dflags)
   if useSplit then
@@ -1173,7 +1082,7 @@ lowerFor is e1 e2 = do
 
 -- Lower for loop using split
 -- TODO: special case 'for{e}'
-lowerForSplit :: [Ident] -> Expr -> Expr -> D Expr
+lowerForSplit :: [Ident] -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerForSplit vs e1 e2 = do
   let l = getLoc e1
   x <- newIdent l "x"   -- array of free variables
@@ -1191,7 +1100,7 @@ lowerForSplit vs e1 e2 = do
   pure $ Split e1' fe ge
 
 -- Lower for loop using all
-lowerForAll :: [Ident] -> Expr -> Expr -> D Expr
+lowerForAll :: [Ident] -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerForAll (i:is) (Unify (Variable i') e) (Variable i'') | i == i' && i == i'' =
   -- Simple special case: for{e} = all{e}
   pure $ eAll (lExists is e)
@@ -1201,7 +1110,7 @@ lowerForAll is e1 e2 = do
       ea = eAll $ lExists is $ Seq [e1, eThunk e2]
   pure $ Exists [vv] $ Seq [Unify ev ea, ApplyD (EPrim "mapAp$") ev]
 
-lowerIf :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIf :: [Ident] -> SrcExpr -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerIf is e1 e2 e3 = do
   noLambdaIf <- gets (fNoLambdaIf . dflags)
   useSplit <- gets (fSplit . dflags)
@@ -1216,10 +1125,10 @@ lowerIf is e1 e2 e3 = do
    else
     lowerIfOne is e1 e2 e3
 
-lowerIfVerify :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIfVerify :: [Ident] -> SrcExpr -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerIfVerify is e1 e2 e3 = pure $ If3B is e1 e2 e3
 
-lowerIfNoLambda :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIfNoLambda :: [Ident] -> SrcExpr -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerIfNoLambda vs e1 e2 e3 = do
   y <- newIdent (getLoc e1) "y"
   let vy = Variable y
@@ -1235,7 +1144,7 @@ lowerIfNoLambda vs e1 e2 e3 = do
            ]
 
 -- TODO: special case 'if{}'
-lowerIfSplit :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIfSplit :: [Ident] -> SrcExpr -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerIfSplit vs e1 e2 e3 = do
   x <- newIdent (getLoc e1) "x"
   let fvs = vs `intersect` getFree e2
@@ -1248,12 +1157,12 @@ lowerIfSplit vs e1 e2 e3 = do
              ]
   pure $ Split e1' fe ge
 
-lowerIfOne :: [Ident] -> Expr -> Expr -> Expr -> D Expr
+lowerIfOne :: [Ident] -> SrcExpr -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerIfOne is e1 e2 e3 = do
   let e1e2 = lExists is $ Seq [e1, eThunk e2]
   pure $ eForce $ eOne $ Choice e1e2 (eThunk e3)
 
-lowerTLam :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
+lowerTLam :: Ident -> [Eff] -> [Ident] -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerTLam i rs is e1 e2 = do
   verif <- gets (fVerify . dflags)
   if verif then
@@ -1262,7 +1171,7 @@ lowerTLam i rs is e1 e2 = do
     lowerTLamRun i rs is e1 e2
 
 -- XXX what about _rs
-lowerTLamVerify :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
+lowerTLamVerify :: Ident -> [Eff] -> [Ident] -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerTLamVerify i rs is e1 e2 = do
   (e2', e2'') <-
     case e2 of
@@ -1285,7 +1194,7 @@ lowerTLamVerify i rs is e1 e2 = do
 hasEff :: String -> [Ident] -> Bool
 hasEff r rs = Ident noLoc r `elem` rs
 
-lowerTLamVerifyFails :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
+lowerTLamVerifyFails :: Ident -> [Ident] -> SrcExpr -> SrcExpr -> SrcExpr -> SrcExpr
 lowerTLamVerifyFails i is e1 e2' e2'' =
   -- Lam i $ lExists is $ Seq [ e1, eDecide e2'']
   Seq
@@ -1293,7 +1202,7 @@ lowerTLamVerifyFails i is e1 e2' e2'' =
     ,           Lam i $ lExists is $ Seq [        e1,         e2'']
     ]
 
-lowerTLamVerifyDecides :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
+lowerTLamVerifyDecides :: Ident -> [Ident] -> SrcExpr -> SrcExpr -> SrcExpr -> SrcExpr
 lowerTLamVerifyDecides i is e1 e2' e2'' =
   -- Lam i $ lExists is $ Seq [ e1, eDecide e2'']
   Seq
@@ -1301,7 +1210,7 @@ lowerTLamVerifyDecides i is e1 e2' e2'' =
     ,           Lam i $ lExists is $ Seq [        e1,         e2'']
     ]
 
-lowerTLamVerifySucceeds :: Ident -> [Ident] -> Expr -> Expr -> Expr -> Expr
+lowerTLamVerifySucceeds :: Ident -> [Ident] -> SrcExpr -> SrcExpr -> SrcExpr -> SrcExpr
 lowerTLamVerifySucceeds i is e1 e2' e2'' =
   Seq
     [ eVerify $ Lam i $ lExists is $ Seq [eAssume e1, eAssert e2']
@@ -1309,7 +1218,7 @@ lowerTLamVerifySucceeds i is e1 e2' e2'' =
     ]
 
 -- XXX use all of rs
-lowerTLamRun :: Ident -> [Eff] -> [Ident] -> Expr -> Expr -> D Expr
+lowerTLamRun :: Ident -> [Eff] -> [Ident] -> SrcExpr -> SrcExpr -> D SrcExpr
 lowerTLamRun i rs is e1 e2 = do
   -- XXX This inserts Succeeds late, and scope insertion has already happened.
   -- XXX This might be wrong.
@@ -1323,7 +1232,7 @@ lowerTLamRun i rs is e1 e2 = do
     else
       Lam i <$> lowerIf is e1 e2 DomainFail
 
-lowerOfType :: Expr -> Expr -> D Expr
+lowerOfType :: SrcExpr -> SrcExpr -> D SrcExpr
 lowerOfType e t = do
   verif <- gets (fVerify . dflags)
   if verif then
@@ -1331,12 +1240,12 @@ lowerOfType e t = do
    else
     lowerSucceeds (ApplyD t e)
 
-lowerOfTypeVerify :: Expr -> Expr -> D Expr
+lowerOfTypeVerify :: SrcExpr -> SrcExpr -> D SrcExpr
 lowerOfTypeVerify e t = do
   x <- newIdent (getLoc t) "x"
   pure $ Seq [ eVerify $ eAssert $ ApplyD t e, eAssume $ Forall [x] $ ApplyD t (Variable x) ]
 
-lowerAll :: Expr -> D Expr
+lowerAll :: SrcExpr -> D SrcExpr
 lowerAll e = do
   useSplit <- gets (fSplit . dflags)
   if useSplit then
@@ -1344,7 +1253,7 @@ lowerAll e = do
    else
     pure $ eAll e
 
-lowerAllSplit :: Expr -> D Expr
+lowerAllSplit :: SrcExpr -> D SrcExpr
 lowerAllSplit e = do
   let l = getLoc e
   x <- newIdent l "x"   -- array of free variables
@@ -1356,7 +1265,7 @@ lowerAllSplit e = do
              ApplyD (EPrim "cons$") (Array [Variable x, xs])
   pure $ Split e fe ge
 
-lowerOne :: Expr -> D Expr
+lowerOne :: SrcExpr -> D SrcExpr
 lowerOne e = do
   useSplit <- gets (fSplit . dflags)
   if useSplit then
@@ -1364,21 +1273,18 @@ lowerOne e = do
    else
     pure $ eOne e
 
-lowerOneSplit :: Expr -> D Expr
+lowerOneSplit :: SrcExpr -> D SrcExpr
 lowerOneSplit e = do
   v <- newIdent (getLoc e) "v"
   pure $ Split e (eThunk Fail) (Lam v $ Lam underscore $ Lam underscore $ Variable v)
 
-lowerSucceeds :: Expr -> D Expr
+lowerSucceeds :: SrcExpr -> D SrcExpr
 lowerSucceeds e = do
   useSplit <- gets (fSplit . dflags)
   verif <- gets (fVerify . dflags)
   asmVerif <- gets (fAssumeVerified . dflags)
-  how <- gets context
   if verif then
-    case how of
-      DS3  -> pure $ Succeeds e
-      _    -> pure $ eAssert e
+      pure $ eAssert e
    else if asmVerif then
     pure $ e
    else if useSplit then
@@ -1386,7 +1292,7 @@ lowerSucceeds e = do
    else
     pure $ Succeeds e
 
-lowerSucceedsSplit :: Expr -> D Expr
+lowerSucceedsSplit :: SrcExpr -> D SrcExpr
 lowerSucceedsSplit e = do
   let l = getLoc e
   x <- newIdent l "x"   -- array of free variables
@@ -1398,7 +1304,7 @@ lowerSucceedsSplit e = do
                          (eThunk (Variable x))
                          (Lam underscore $ Lam underscore $ Lam underscore $ Wrong "succeed-many")
 
-lowerDecides :: Expr -> D Expr
+lowerDecides :: SrcExpr -> D SrcExpr
 lowerDecides e = do
   useSplit <- gets (fSplit . dflags)
   verif <- gets (fVerify . dflags)
@@ -1410,7 +1316,7 @@ lowerDecides e = do
   else
     pure $ eDecide  e
 
-lowerDecidesSplit :: Expr -> D Expr
+lowerDecidesSplit :: SrcExpr -> D SrcExpr
 lowerDecidesSplit e = do
   let l = getLoc e
   x <- newIdent l "x"   -- array of free variables
@@ -1422,23 +1328,23 @@ lowerDecidesSplit e = do
                          (eThunk (Variable x))
                          (Lam underscore $ Lam underscore $ Lam underscore $ Wrong "decides-many")
 
-lowerAssume :: Expr -> D Expr
+lowerAssume :: SrcExpr -> D SrcExpr
 lowerAssume e = pure $ eAssume e
 
-lowerSome :: Expr -> D Expr
+lowerSome :: SrcExpr -> D SrcExpr
 lowerSome e = pure $ eSome e
 
-lowerVerify :: Expr -> D Expr
+lowerVerify :: SrcExpr -> D SrcExpr
 lowerVerify e = pure $ eVerify e
 
-lowerAssert :: Expr -> D Expr
+lowerAssert :: SrcExpr -> D SrcExpr
 lowerAssert e = pure $ eAssert e
 
 
 
 -----------------
 
-primops :: Expr -> D Expr
+primops :: SrcExpr -> D SrcExpr
 primops = f
   where
     f (Variable (Ident _ s)) | Ident noLoc s `S.member` prim = pure $ EPrim s
@@ -1463,7 +1369,7 @@ primops = f
     app func v = ApplyD (toLam func) v
 
     arg = Ident noLoc "arg"
-    toLam :: Func -> Core
+    toLam :: Func -> SrcCore
     toLam (   [],    es) = seqE es
     toLam (   [a],   es) = Lam a   $ seqE es
     toLam (as@[_,_], es) = Lam arg $ lExists as $ seqE $ Unify (Array $ map Variable as) (Variable arg) : es
@@ -1479,7 +1385,7 @@ lowerPrimOp s = do
   else
     pure $ Nothing
 
-type Func = ([Ident], [Core])
+type Func = ([Ident], [SrcCore])
 
 lowerPrimOpVerif :: String -> D (Maybe Func)
 lowerPrimOpVerif s = do
@@ -1589,7 +1495,7 @@ verifyPrelude =
 
 -- After lowering there are no funny scopes, so empty existential
 -- are no longer necessary.
-lExists :: [Ident] -> Expr -> Expr
+lExists :: [Ident] -> SrcExpr -> SrcExpr
 lExists [] e = e
 lExists is (Exists is' e) = lExists (is ++ is') e
 lExists is e = Exists is e
@@ -1597,49 +1503,49 @@ lExists is e = Exists is e
 underscore :: Ident
 underscore = Ident noLoc "_"
 
-eThunk :: Expr -> Expr
+eThunk :: SrcExpr -> SrcExpr
 eThunk = Lam (Ident noLoc "_")
 
-eForce :: Expr -> Expr
+eForce :: SrcExpr -> SrcExpr
 eForce e = ApplyD e (Array [])
 
-eAll :: Expr -> Expr
+eAll :: SrcExpr -> SrcExpr
 eAll = Macro1 (Ident noLoc "all") []
 
-eOne :: Expr -> Expr
+eOne :: SrcExpr -> SrcExpr
 eOne = Macro1 (Ident noLoc "one") []
 
-eAssert :: Expr -> Expr
+eAssert :: SrcExpr -> SrcExpr
 eAssert = Macro1 (Ident noLoc "assert") []
 
-eAssume :: Expr -> Expr
+eAssume :: SrcExpr -> SrcExpr
 eAssume = Macro1 (Ident noLoc "assume") []
 
-eVerify :: Expr -> Expr
+eVerify :: SrcExpr -> SrcExpr
 eVerify = Macro1 (Ident noLoc "verify") []
 
-eDecide :: Expr -> Expr
+eDecide :: SrcExpr -> SrcExpr
 eDecide = Macro1 (Ident noLoc "decides") []
 
-eFails :: Expr -> Expr
+eFails :: SrcExpr -> SrcExpr
 eFails = Macro1 (Ident noLoc "fails") []
 
-eGuard :: Expr -> Expr -> Expr
+eGuard :: SrcExpr -> SrcExpr -> SrcExpr
 eGuard e1 e2 = Macro2 (Ident noLoc "guard") e1 e2
 
-eSome :: Expr -> Expr
+eSome :: SrcExpr -> SrcExpr
 eSome = Macro1 (Ident noLoc "some") []
 
 -- Used to create the array of free variables passed from the domain to the range
 -- of for/if.  If it's just a single variable, don't use an array.
-fvArray :: [Expr] -> Expr
+fvArray :: [SrcExpr] -> SrcExpr
 fvArray [e] = e
 fvArray es = Array es
 
 ----------------------
 
--- Functions that only work on the core subset of Expr
-getFree :: Core -> [Ident]
+-- Functions that only work on the core subset of SrcExpr
+getFree :: SrcCore -> [Ident]
 getFree = Epic.List.nub . fvs
   where
     fvs (Variable i) = [i]
@@ -1662,25 +1568,27 @@ getFree = Epic.List.nub . fvs
 --    fvs (Map es) = concatMap fvs es
     fvs e = impossible e
 
-closed :: Core -> Bool
+closed :: SrcCore -> Bool
 closed = null . getFree
 
--- XXX binders
-getAllVars :: Core -> [Ident]
-getAllVars = Epic.List.nub . execWriter . vars
-  where vars e@(Variable i) = do tell [i]; pure e
-        vars e@(Lam i e') = do tell [i]; _ <- vars e'; pure e
-        vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
-        vars e@(Forall is e') = do tell is; _ <- vars e'; pure e
-        vars TLam{} = undefined
-        vars e = compos vars e
+getAllVars :: SrcCore -> [Ident]
+-- Finds all binders in e
+getAllVars e = Epic.List.nub (execWriter (vars e))
+  where
+    vars :: SrcCore -> Writer [Ident] SrcCore
+    vars e@(Variable i)   = do tell [i]; pure e
+    vars e@(Lam i e')     = do tell [i]; _ <- vars e'; pure e
+    vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
+    vars e@(Forall is e') = do tell is; _ <- vars e'; pure e
+    vars TLam{}           = undefined
+    vars e                = compos vars e
 
-substMany :: [(Ident, Core)] -> Core -> Core
+substMany :: [(Ident, SrcCore)] -> SrcCore -> SrcCore
 substMany [] = id
 substMany sb = sub
   where
     bs = getFree $ Seq $ map snd sb
-    sub :: Core -> Core
+    sub :: SrcCore -> SrcCore
     sub v@(Variable i) | Just b <- lookup i sb = b
                        | otherwise = v
     sub e@Lit{} = e
@@ -1706,7 +1614,7 @@ substMany sb = sub
     sub DomainFail = DomainFail
     sub e = impossible e
 
-    binder :: Ident -> (Expr -> Expr) -> Expr -> Expr
+    binder :: Ident -> (SrcExpr -> SrcExpr) -> SrcExpr -> SrcExpr
     binder i con e | Just _ <- lookup i sb = substMany (filter ((/= i) . fst) sb) (con e)
                    | i `notElem` bs = con (sub e)
                    | otherwise = sub $ alphaConvert bs (con e)
@@ -1717,7 +1625,7 @@ substMany sb = sub
     forall1 i (Forall is e) = Forall (i:is) e
     forall1 _ _ = undefined
 
-if3Hack :: (Expr -> Expr) -> [Ident] -> Expr -> Expr -> ([Ident], Expr, Expr)
+if3Hack :: (SrcExpr -> SrcExpr) -> [Ident] -> SrcExpr -> SrcExpr -> ([Ident], SrcExpr, SrcExpr)
 if3Hack f is e1 e2 =
   case f (Exists is (Array [e1, e2])) of
     Exists is' (Array [e1', e2']) -> (is', e1', e2')
@@ -1726,10 +1634,10 @@ if3Hack f is e1 e2 =
 
 -- Alpha convert a term, avoiding vs as the names for bound
 -- variables.
-alphaConvert :: [Ident] -> Core -> Core
+alphaConvert :: [Ident] -> SrcCore -> SrcCore
 alphaConvert vs = alpha []
   where
-    alpha :: [(Ident, Ident)] -> Core -> Core
+    alpha :: [(Ident, Ident)] -> SrcCore -> SrcCore
     alpha m (Variable i) = Variable $ fromMaybe i $ lookup i m
     alpha _ e@Lit{} = e
     alpha _ e@EPrim{} = e
@@ -1759,7 +1667,7 @@ alphaConvert vs = alpha []
 
 -------------------------------------------------------------------
 
-dsD_3 :: Expr -> D Expr
+dsD_3 :: SrcExpr -> D SrcExpr
 dsD_3 e@Lit{} = pure e
 dsD_3 e@Variable{} = pure e
 dsD_3 (ApplyD e1 e2) = ApplyD <$> dsD_3 e1 <*> dsD_3 e2
@@ -1784,7 +1692,7 @@ dsD_3 (Macro1 m rs e) = Macro1 m rs <$> dsD_3 e
 dsD_3 (Lam x e) = Lam x <$> dsD_3 e
 dsD_3 e = impossible e
 
-dsF_3 :: Expr -> D Expr
+dsF_3 :: SrcExpr -> D SrcExpr
 dsF_3 (Function [(t1, _effs)] t2) = do
   y <- newIdent (getLoc t1) "y"
   t1' <- dsM_3 t1 y
@@ -1799,13 +1707,13 @@ dsF_3 t = do
   t' <- dsD_3 t
   pure $ seqE [eAssert t', t']
 
-dsA_3 :: Expr -> D Expr
+dsA_3 :: SrcExpr -> D SrcExpr
 dsA_3 t = do
   r <- newIdent (getLoc t) "r"
   t' <- dsD_3 (Range t)
   pure $ Forall [r] $ seqE [eAssume (Unify (Variable r) t'), Variable r]
 
-dsM_3 :: Expr -> Ident -> D Expr
+dsM_3 :: SrcExpr -> Ident -> D SrcExpr
 dsM_3 ((Function [(Range t1, _effs)] (Range t2))) f = do
   i <- newIdent (getLoc t1) "i"
   i' <- newIdent (getLoc t1) "i'"
@@ -1836,13 +1744,13 @@ dsM_3 (OfType t1 t2) i = OfType <$> dsM_3 t1 i <*> dsD_3 t2
 dsM_3 t i = unifyV i <$> dsD_3 t
 
 ------------------------------------------------------------------------------------
--- | Adding DS for "DS2 Mode-based Translation from SmallSource to Core."
+-- | Adding DS for "DS2 Mode-based Translation from SmallSource to SrcCore."
 ------------------------------------------------------------------------------------
 
 data DsMode = I | V deriving (Eq, Ord, Show)
 data DsEff  = Suc | Dec deriving (Eq, Ord, Show)
 
-dsD_2 :: Expr -> D Expr
+dsD_2 :: SrcExpr -> D SrcExpr
 dsD_2 e@Lit{} = pure e
 dsD_2 e@Variable{}   = pure e
 dsD_2 (ApplyD e1 e2) = ApplyD <$> dsD_2 e1 <*> dsD_2 e2
@@ -1867,7 +1775,7 @@ dsD_2 (Macro1 m rs e) = Macro1 m rs <$> dsD_2 e
 dsD_2 (Lam x e)       = Lam x <$> dsD_2 e
 dsD_2 e               = impossible e
 
-_domainExpr :: Expr -> ([Ident], Expr)
+_domainExpr :: SrcExpr -> ([Ident], SrcExpr)
 _domainExpr = go
   where
     go (Exists xs e) = (ys, Exists xs e')            where (ys, e')   = go e
@@ -1879,7 +1787,7 @@ _domainExpr = go
     go e             = ([], e)
 
 
-dsV_2 :: DsEff -> Expr -> D Expr
+dsV_2 :: DsEff -> SrcExpr -> D SrcExpr
 dsV_2 fx (Function [(tin@(Array t1s),_effs)] t2) = do
    i    <- newIdent (getLoc tin) "i"
    is   <- mapM (\t1 -> newIdent (getLoc t1) "i") t1s
@@ -1906,7 +1814,7 @@ bodyEff fx rs
   | hasEff "decides"  rs = Dec
   | otherwise            = fx
 
-dsI_2 :: DsEff -> Expr -> D Expr
+dsI_2 :: DsEff -> SrcExpr -> D SrcExpr
 dsI_2 fx (Function [(t1,_effs)] t2) = do
    i <- newIdent (getLoc t1) "i"
    t1' <- dsM_2 I t1 i
@@ -1916,23 +1824,23 @@ dsI_2 _ (OfType _ t2)    = iOfType_2 t2
 dsI_2 Suc t              = eAssume <$> dsD_2 t
 dsI_2 Dec t              =             dsD_2 t
 
-ofType_2 :: Expr -> Expr -> D Expr
+ofType_2 :: SrcExpr -> SrcExpr -> D SrcExpr
 ofType_2 e t = -- seqE <$> sequence [vOfType_2 e t, iOfType_2 t]
                eGuard <$> vOfType_2 e t <*> iOfType_2 t
 
-vOfType_2 :: Expr -> Expr -> D Expr
+vOfType_2 :: SrcExpr -> SrcExpr -> D SrcExpr
 vOfType_2 e t = do
   t' <- dsD_2 t
   pure $ eVerify (eAssert (ApplyD t' e))
 
-iOfType_2 :: Expr -> D Expr
+iOfType_2 :: SrcExpr -> D SrcExpr
 iOfType_2 t = do
   r <- newIdent (getLoc t) "r"
   t' <- dsD_2 (Range t)
   pure $ Forall [r] $ seqE [eAssume (Unify (Variable r) t'), Variable r]
 
 
-dsM_2 :: DsMode -> Expr -> Ident -> D Expr
+dsM_2 :: DsMode -> SrcExpr -> Ident -> D SrcExpr
 dsM_2 V ((Function [(t1, _effs)] t2)) f = do
   i <- newIdent (getLoc t1) "i"
   i' <- newIdent (getLoc t1) "i'"
@@ -1975,33 +1883,33 @@ data DsMode10
   | MI -- ^ - "checking" ("implementation")
   deriving (Eq, Ord, Show)
 
-dsD_10 :: Expr -> D Expr
+dsD_10 :: SrcExpr -> D SrcExpr
 dsD_10 = dsDD_10 MV
 
-dsDD_10 :: DsMode10 -> Expr -> D Expr
+dsDD_10 :: DsMode10 -> SrcExpr -> D SrcExpr
 dsDD_10 s t = dsM_10 s t E
 
-dsB_10 :: DsMode10 -> Expr -> Pi -> Ident -> D Expr
+dsB_10 :: DsMode10 -> SrcExpr -> Pi -> Ident -> D SrcExpr
 dsB_10 s t E     _
   = dsM_10 s t E
 dsB_10 s t (P f) j
   = do z <- newIdent (getLoc t) "z";
        seqDE [ pure $ DefineE z (ApplyD (Variable f) (Variable j)), dsM_10 s t (P z)]
 
-dsK_10 :: Loc -> [Eff] -> D Expr
+dsK_10 :: Loc -> [Eff] -> D SrcExpr
 dsK_10 loc fx
   | hasEff "fails" fx   = pure Fail
   | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
   | otherwise           = pure (Array [])
 
-dsCheck :: DsEff -> Expr -> Expr
+dsCheck :: DsEff -> SrcExpr -> SrcExpr
 dsCheck Suc = eAssert
 dsCheck Dec = eDecide
 
-seqDE :: [D Expr] -> D Expr
+seqDE :: [D SrcExpr] -> D SrcExpr
 seqDE ds = seqE <$> sequence ds
 
-dsM_10 :: DsMode10 -> Expr -> Pi -> D Expr
+dsM_10 :: DsMode10 -> SrcExpr -> Pi -> D SrcExpr
 dsM_10 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
   = do j   <- newIdent (getLoc t) "j"
        -- dom <- DefineE j <$> dsM_10 MI t1 E
@@ -2132,7 +2040,7 @@ dsM_10 _ e@(DefineV _) _
 dsM_10 s t pi
    = error $ "TODO: dsM_10 " ++ show (s, t, pi)
 
-unSeq :: [Expr] -> ([Expr], Expr)
+unSeq :: [SrcExpr] -> ([SrcExpr], SrcExpr)
 unSeq = go []
   where
     go acc []     = (reverse acc, Array [])
@@ -2141,10 +2049,10 @@ unSeq = go []
 
 ------------------------------------------------------------------------------------
 
-dsD_5 :: Expr -> D Expr
+dsD_5 :: SrcExpr -> D SrcExpr
 dsD_5 e = dsM_5 e Nothing
 
-dsM_5 :: Expr -> Maybe Ident -> D Expr
+dsM_5 :: SrcExpr -> Maybe Ident -> D SrcExpr
 dsM_5 (Function [(t1, _effs)] t2) Nothing = do
   i <- newIdent (getLoc t1) "i"
   r <- newIdent (getLoc t2) "r"
@@ -2215,12 +2123,12 @@ dsM_5 e _ = error $ "dsM_5: unimplemented " ++ show e
 
 ----------------------------------------
 
-dsD_6 :: Expr -> D Expr
+dsD_6 :: SrcExpr -> D SrcExpr
 dsD_6 e = do
   x <- newIdent (getLoc e) "x"
   Exists [x] <$> dsM_6 e x
 
-dsM_6 :: Expr -> Ident -> D Expr
+dsM_6 :: SrcExpr -> Ident -> D SrcExpr
 dsM_6 (Function [(t1, effs)] t2) f = do
   i <- newIdent (getLoc t1) "i"
   j <- newIdent (getLoc t1) "j"
@@ -2321,7 +2229,7 @@ identOf_7 :: Ident_7 -> Ident
 identOf_7 (Solve_7 i) = i
 identOf_7 (Infer_7 i) = i
 
-dsD_7 :: Expr -> D Expr
+dsD_7 :: SrcExpr -> D SrcExpr
 {-
 -- To not make the desugared version ridiculosely large,
 -- do some minor short-cuts here.
@@ -2334,18 +2242,18 @@ dsD_7 e = do
   x <- newIdent (getLoc e) "x"
   Exists [x] <$> dsM_7 e (Solve_7 x)
 
-dsA_7 :: Ident -> Ident_7 -> D Expr
+dsA_7 :: Ident -> Ident_7 -> D SrcExpr
 dsA_7 _ (Solve_7 f) = (\ z -> Exists [z] $ Variable z) <$> newIdent (getLoc (Variable f)) "z"
 dsA_7 x (Infer_7 f) = pure $ ApplyD (Variable f) (Variable x)
 
 -- dsA_7def z x f  ===  DefineE z (dsA_7 x f)
 -- but eliminating an existential.
-dsA_7def :: Ident -> Ident -> Ident_7 -> D Expr
+dsA_7def :: Ident -> Ident -> Ident_7 -> D SrcExpr
 --dsA_7def z x f = Define z <$> dsA_7 x f
 dsA_7def z _ (Solve_7 _) = pure $ DefineV z
 dsA_7def z x (Infer_7 f) = pure $ DefineE z $ ApplyD (Variable f) (Variable x)
 
-dsM_7 :: Expr -> Ident_7 -> D Expr
+dsM_7 :: SrcExpr -> Ident_7 -> D SrcExpr
 dsM_7 (Function [(t1, effs)] t2) f = do
   i <- newIdent (getLoc t1) "i"
   j <- newIdent (getLoc t1) "j"
@@ -2462,7 +2370,7 @@ data DS8Mode = DS8Execute | DS8Verify | DS8Check
 data DS8W = DS8W Ident DS8Pi DS8Mode
   deriving (Show, Eq)
 
-dsD_8_top :: Expr -> D Expr
+dsD_8_top :: SrcExpr -> D SrcExpr
 dsD_8_top e = do
   verif <- gets (fVerify . dflags)
   let mode | verif = DS8Verify
@@ -2470,12 +2378,12 @@ dsD_8_top e = do
   dsD_8 e mode
 
 -- DINIT
-dsD_8 :: Expr -> DS8Mode -> D Expr
+dsD_8 :: SrcExpr -> DS8Mode -> D SrcExpr
 dsD_8 e m = do
   x <- newIdent (getLoc e) "x"
   Exists [x] <$> dsM_8 e (DS8W x DS8Solve m)
 
-dsA_8 :: Ident -> DS8W -> D Expr
+dsA_8 :: Ident -> DS8W -> D SrcExpr
 dsA_8 _ (DS8W _ _ DS8Solve) = do  -- DBODY1  -- PAPER: missing subscript
   z <- newIdent (getLoc i) "z"
   pure $ Exists [z] (Var z)
@@ -2484,7 +2392,7 @@ dsA_8 x (DS8W f _ DS8Infer) =     -- DBODY2  -- PAPER: missing subscript
 dsA_8 x (DS8W f _ DS8Square) =    -- Intentionally missing in paper
   error $ "dsA_8: square " ++ show (f, x)
 
-dsH_8 :: Expr -> D Expr
+dsH_8 :: SrcExpr -> D SrcExpr
 dsH_8 e = do
   r <- newIdent (getLoc e) "r"
   pure $ Forall [r] $ Seq [Assume (Var r `Equal` e), Var r]

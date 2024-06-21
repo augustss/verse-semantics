@@ -114,11 +114,13 @@ library verse-libs
                       Epic.Print
                       Epic.Repl
                       Epic.OpParser
+                      Epic.List
                       FrontEnd.Error
                       FrontEnd.Expr
                       FrontEnd.Flags
                       FrontEnd.Parse
                       FrontEnd.Prelude
+                      FrontEnd.Desugar
 
 --                      Epic.Applicative
 --                      Epic.Lens
@@ -144,7 +146,6 @@ library verse-libs
 --                      Rules.Systems
 --                      FrontEnd.EvalBlock
 --                      FrontEnd.ParseCore
---                      FrontEnd.Desugar
 --                      FrontEnd.RefImpl
 --                      FrontEnd.Run
 --                      FrontEnd.TRSAdapter
