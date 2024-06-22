@@ -168,7 +168,7 @@ $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Unification}
   \rulename{u-lit}   & |k == k; e| & \movesto & |e| & \\
-  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|
+  \rulename{u-tup} & \hspace{-3.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|
        & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n' `eqsemi` e| & n \geq 0\\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
@@ -184,7 +184,7 @@ $\begin{array}{@@{}l}
 %\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
 %  & \text{if |validc x emptyset C|, $x \not= y$}  \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
+\rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $|noteq C hole|, x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
 \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
 \end{array}
 \\ \\[-0.8em]
@@ -206,8 +206,8 @@ $\begin{array}{@@{}l}
 \rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
-\rulename{choice} & |SX^[C^[e_1 choice e_2]]| & \movesto & |SX^[C^[e_1] choice C^[e_2]]| & \text{if |choicefreec C|}\\
-\rulename{fail} & |C^[fail]| & \movesto & |fail| & \text{if |blockedc emptyset C|}\\
+\rulename{choice} & |SX^[C^[e_1 choice e_2]]| & \movesto & |SX^[C^[e_1] choice C^[e_2]]| & \text{if |noteq C hole, choicefreec C|}\\
+\rulename{fail} & |C^[fail]| & \movesto & |fail| & \text{if |noteq C  hole, blockedc emptyset C|}\\
 
     \\[-0.8em]
 

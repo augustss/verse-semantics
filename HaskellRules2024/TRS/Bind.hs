@@ -26,7 +26,10 @@ import Epic.Print
 --------------------------------------------------------------------------------
 
 newtype Ident = Name String
- deriving ( Show, Eq, Ord )
+ deriving ( Eq, Ord )
+
+instance Show Ident where
+  show (Name x) = x
 
 instance Pretty Ident where
   pPrintPrec _ _ (Name x) = text x
@@ -120,7 +123,6 @@ alphaRenameWith ren forb (Bind x t)
 unsafeUnbind :: Bind t -> (Ident, t)
 -- Non-recommended way to walk inside a Bind
 unsafeUnbind (Bind x t) = (x,t)
-
 
 -- a list of binders
 

@@ -1,0 +1,30 @@
+testeq(pass) {2}                                   {2}
+testeq(pass) {x:=1; x}                             {1}
+testeq(pass) {3+4}                                 {7}
+testeq(pass) {1*2}                                 {2}
+testeq(pass) {8/4}                                 {2}
+testeq(pass) {1/0}                                 {:false}
+testeq(pass) {3>4}                                 {:false}
+testeq(pass) {3>3}                                 {:false}
+testeq(pass) {3>2}                                 {3}
+testeq(pass) {array{1;2;3}}                        {1,2,3}
+testeq(pass) {array{}}                             {()}
+testeq(pass) {(x:int => x+1)[2]}                   {3}
+testeq(pass) {x:int:=1}                            {1}
+testeq(pass) {x:=1; y:= if(x=2) then 0 else 3; y}  {3}
+testeq(pass) {y:= if(x=2) then 0 else 3; x:=1; y}  {3}
+testeq(pass) {for{:false}}                         {()}
+testeq(pass) {for{1}}	                          {array{1}}
+testeq(pass) {for{1|2}}	                          {(1,2)}
+testeq(pass) {succ(x:int):=x+1; y:succ:=1; y}      {2}
+testeq(pass) {i->x := 2; (i, x)}                   {2,2}
+# SLOW testeq(pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
+testeq(pass) {(x:int) = 2}                         {2}
+testeq(pass) {all{:(1,2,3)}}                            {1,2,3}
+testeq(pass) {all{x:(1,2,3); x}}                        {1,2,3}
+testeq(pass) {all{x:= :(1,2,3); x}}                     {1,2,3}
+testeq(pass) {all{x:(1,2,3)}}                           {1,2,3}
+testeq(pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[0]}}     {1}
+testeq(pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[2]}}     {:false}
+
+testeq(pass) { x := ((:any) => 1)[x+1] }           {1}

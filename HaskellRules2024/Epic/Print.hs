@@ -6,12 +6,13 @@ module Epic.Print
   )
 where
 
+import Prelude hiding ((<>))  -- (<>) is a pretty-printing op
+
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text
 import Text.PrettyPrint.HughesPJClass hiding (Str, first)
 import System.IO
-import Prelude hiding ((<>))
 
 instance Pretty Data.Text.Text where
   pPrintPrec l p = pPrintPrec l p . Data.Text.unpack

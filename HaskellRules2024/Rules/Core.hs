@@ -1,7 +1,11 @@
 module Rules.Core where
 
 import qualified Data.Map as M
+import Data.List( union, intersperse )
 import TRS.Bind
+import TRS.Traced
+import Test.QuickCheck
+import Control.Monad( liftM2 )
 
 --------------------------------------------------------------------------------
 -- main expression datatype
@@ -35,7 +39,7 @@ data Expr
 
   -- only for contexts
   | HOLE
- deriving ( Eq, Show )
+ deriving ( Eq, Ord )
 
 data Op = Add | Sub | Gt | IsInt
  deriving ( Eq, Ord, Show )
@@ -45,23 +49,74 @@ data Assump
  deriving ( Eq, Ord, Show )
 
 data Effect
-  = Fail_Effect
+  = Fails
   | Succeeds
   | Decides
- deriving ( Eq, Show )
+ deriving ( Eq, Ord )
 
+instance Show Effect where
+  show Fails    = "fails"
+  show Succeeds = "succeeds"
+  show Decides  = "decides"
+
+--------------------------------------------------------------------------------
+-- show -- TODO: use pretty printing library
+
+instance Show Expr where
+  show (Var x)       = show x
+  show (Int k)       = show k
+  show (Arr as)      = "<" ++ concat (intersperse "," (map show as)) ++ ">"
+  show (Lam bnd)     = "\\" ++ showBind bnd
+  show (Op op)       = show op
+  show ((a :=: e1) :>: e2) = show1 a ++ " = " ++ show1 e1 ++ "; " ++ show0 e2
+  show (e1 :>: e2)   = show1 e1 ++ "; " ++ show1 e2
+  show (e1 :=: e2)   = show1 e1 ++ " = " ++ show1 e2
+  show (e1 :|: e2)   = show1 e1 ++ " | " ++ show1 e2
+  show (a1 :@: a2)   = show1 a1 ++ "[" ++ show a2 ++ "]"
+  show (Exi bnd)     = "exi " ++ showBind bnd
+  show Fail          = "fail"
+  show (One e)       = "one{" ++ show e ++ "}"
+  show (All e)       = "all{" ++ show e ++ "}"
+  show (Some a)      = "some(" ++ show a ++ ")"
+  show (a :>>: e)    = show1 a ++ "|>" ++ show1 e
+  show (Check fx e)  = "check<" ++ show fx ++ ">{" ++ show e ++ "}"
+  show (Verify bnds) = error "show Verify undefined"
+
+showBind :: Bind Expr -> String
+showBind bnd = show x ++ ". " ++ show e where (x,e) = unsafeUnbind bnd
+
+show0, show1 :: Expr -> String
+show0 = showP 0
+show1 = showP 1
+
+showP :: Int -> Expr -> String
+showP p e | parens e  = "(" ++ show e ++ ")"
+          | otherwise = show e
+ where
+  parens (Lam _)    = True
+  parens (_ :>: _)  = 1 <= p
+  parens (_ :=: _)  = True
+  parens (_ :|: _)  = True
+  parens (_ :@: _)  = True
+  parens (Exi _)    = True
+  parens (_ :>>: _) = True
+  parens _          = False
+  
 --------------------------------------------------------------------------------
 -- values
 
-type Val     = Expr
+type Val = Expr
 
 isVal :: Expr -> Bool
 isVal (Var x)   = True
-isVal (Int k)   = True
-isVal (Arr es)  = all isVal es
-isVal (Lam bnd) = valid e where (_,e) = unsafeUnbind bnd
-isVal (Op op)   = True
-isVal _         = False
+isVal e         = isHNF e
+
+isHNF :: Expr -> Bool
+isHNF (Int k)   = True
+isHNF (Arr es)  = all valid es
+isHNF (Lam bnd) = valid e where (_,e) = unsafeUnbind bnd
+isHNF (Op op)   = True
+isHNF _         = False
 
 --------------------------------------------------------------------------------
 -- valid expressions
@@ -97,7 +152,7 @@ prep Fail          = Fail
 prep (One e)       = One (prep e)
 prep (All e)       = All (prep e)
 prep (Some a)      = prepVal a (\v -> Some v)
-prep (a :>>: e)    = prepVal a (\v -> v :>>: e)
+prep (a :>>: e)    = prepVal a (\v -> v :>>: prep e)
 prep (Check fx e)  = Check fx (prep e)
 prep (Verify bnds) = error "prep Verify undefined"
 
@@ -154,6 +209,7 @@ alphaRename :: [Ident] -> Bind Expr -> (Ident,Expr)
 alphaRename = alphaRenameWith (\x y -> subst [(x,Var y)])
 
 -- sorts binders and renames variables
+-- TODO: new normalization for x=y
 norm :: Expr -> Expr
 norm e = alpha 0 e
  where
@@ -230,8 +286,8 @@ everywhere step e = step e ++ recurse e
                       ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step e2 ]
   recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- everywhere step e1 ]
                       ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (e1 :@: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step e2 ]
+  recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step e1 ]
+                      ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step e2 ]
   recurse (One e)      = [ (s, One e')  | (s,e') <- everywhere step e ]
   recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step e ]
   recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step e ]
@@ -252,15 +308,31 @@ unExis (Exi bnd) = (Exi . bind x . exis, body)
 unExis e         = (id, e)
 
 -- structural rules matching
-matchExi :: Expr -> [Bind Expr]
-matchExi e =
+matchOuterExi :: Expr -> [Bind Expr]
+matchOuterExi e =
   [ bnd'
   | Exi bnd <- [e]
   , let (x,e') = unsafeUnbind bnd
   , bnd' <- bnd : [ bind y (Exi (bind x e''))
-                  | bnd' <- matchExi e'
+                  | bnd' <- matchOuterExi e'
                   , let (y,e'') = unsafeUnbind bnd'
                   ]
+  ]
+
+matchInnerExi :: Expr -> [(Context, Bind Expr)]
+matchInnerExi e =
+  [ (ctx,bnd')
+  | Exi bnd <- [e]
+  , let (x,e') = unsafeUnbind bnd
+        cbnds  = matchInnerExi e'
+  , (ctx,bnd') <- [ (Exi (bind x ctx), bnd')
+                  | (ctx,bnd') <- cbnds
+                  ] ++ case cbnds of
+                         [] -> [ (HOLE, bnd) ]
+                         _  -> [ (Exi (bind y ctx), bind x e')
+                               | (ctx,bnd') <- [head cbnds]
+                               , let (y,e') = unsafeUnbind bnd'
+                               ]
   ]
 
 matchEq :: Expr -> [(Expr,Expr)]
@@ -272,38 +344,106 @@ matchEq e =
                            ]
   ]
 
+-- normalize
+normalize :: Rule -> Expr -> Traced Expr
+normalize rule e = go (-1) [] e  -- go 99 [] e
+ where
+  go fuel tr e =
+    case rule e of
+      []                        -> e :<-- tr
+      (s,e'):_ | fuel==0        -> abort "OUT-OF-FUEL"
+               | not (valid e') -> abort "INVALID"
+               | otherwise      -> go (fuel-1) ((s,e):tr) e'
+              where
+               abort msg = e' :<-- ((s ++ "-**" ++ msg ++ "**",e):tr)
+
+--------------------------------------------------------------------------------
+-- arbitrary
+
+instance Arbitrary Op where
+  arbitrary = elements [Add, Sub, Gt, IsInt]
+
+instance Arbitrary Expr where
+  arbitrary = sized (arbExprWith xs)
+   where
+    xs = take 3 (identsNotIn [])
+
+  shrink (Int k)      = [ Int k' | k' <- shrink k ]
+  shrink (Arr es)     = es
+                     ++ [ Arr es' | es' <- shrink es ]
+  shrink (Lam bnd)    = shrinkBind Lam bnd
+  shrink (e1 :=: e2)  = [ e1, e2 ]
+                     ++ [ e1' :=: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :=: e2' | e2' <- shrink e2 ]
+  shrink (e1 :>: e2)  = [ e1, e2 ]
+                     ++ [ e1' :>: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :>: e2' | e2' <- shrink e2 ]
+  shrink (e1 :|: e2)  = [ e1, e2 ]
+                     ++ [ e1' :|: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :|: e2' | e2' <- shrink e2 ]
+  shrink (e1 :@: e2)  = [ e1, e2 ]
+                     ++ [ e1' :@: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :@: e2' | e2' <- shrink e2 ]
+  shrink (One e)      = [ e ] ++ [ One e'  | e' <- shrink e ]
+  shrink (All e)      = [ e, One e ] ++ [ All e'  | e' <- shrink e ]
+  shrink (Some e)     = [ e ] ++ [ Some e' | e' <- shrink e ]
+  shrink (e1 :>>: e2) = [ e1, e2 ]
+                     ++ [ e1' :>>: e2  | e1' <- shrink e1 ]
+                     ++ [ e1  :>>: e2' | e2' <- shrink e2 ]
+  shrink (Check fx e) = [ e ] 
+                     ++ [ Check fx e' | e' <- shrink e ]
+  shrink (Exi bnd)    = shrinkBind Exi bnd
+  --shrink (Verify bnd) = error "shrink Verify undefined"
+  shrink e            = []
+
+arbExprWith :: [Ident] -> Int -> Gen Expr
+arbExprWith xs n =
+  frequency $
+  [ (1, Var `fmap` elements xs) | not (null xs) ] ++
+  [ (1, Int `fmap` arbitrary)
+  , (a, Arr `fmap` arbExprs)
+  , (a, Lam `fmap` arbBind)
+  , (1, Op  `fmap` arbitrary)
+  , (b, liftM2 (:=:) arbExpr2 arbExpr2)
+  , (b, liftM2 (:>:) arbExpr2 arbExpr2)
+  , (b, liftM2 (:|:) arbExpr2 arbExpr2)
+  , (a, liftM2 (:@:) arbExpr2 arbExpr2)
+  , (b, Exi `fmap` arbBind)
+  , (1, return Fail)
+  , (b, One `fmap` arbExpr1)
+  , (b, All `fmap` arbExpr1)
+{-
+  | Some Val
+  | Val :>>: Expr    -- guard           |>   <-- black triangle
+  | Check Effect Expr
+  | Verify (BindList ([Assump],Expr))
+-}
+  ]
+ where
+  a = 0 `max` (n `min` 5) -- for bigger values
+  b = 0 `max` n           -- for recursive expressions
+  arbExpr1 = arbExprWith xs (n-1)
+  arbExpr2 = arbExprWith xs (n `div` 2)
+  arbExprs = do k <- elements [0,1,2,3,5]
+                sequence [ arbExprWith xs (if k <= 1 then n-k else n`div`k)
+                         | i <- [1..k]
+                         ]
+  arbBind  = frequency $
+             [ (1, liftM2 bind (elements xs) (arbExprWith xs (n-1))) | not (null xs) ] ++
+             [ (4, let x = identNotIn xs in bind x `fmap` arbExprWith (x:xs) (n-1)) ]
+
+shrinkBind :: Arbitrary a => (Bind a -> a) -> Bind a -> [a]
+shrinkBind con bnd = [ t ] ++ [ con (bind x t') | t' <- shrink t ]
+ where
+  (x,t) = unsafeUnbind bnd
+
+instance CoArbitrary Expr where
+  coarbitrary = coarbitrary . show -- not completely honest!
+
 --------------------------------------------------------------------------------
 -- contexts
 
 type Context = Expr
-
-contexts :: Expr -> [(Context,Expr)]
-contexts e = (HOLE,e) : recurse e
- where
-  recurse (Arr es)     = [ (Arr (take i es ++ [ctx] ++ drop (i+1) es), h)
-                         | i <- [0..length es-1]
-                         , (ctx,h) <- contexts (es!!i)
-                         ]
-  recurse (Lam bnd)    = [ (Lam (bind x ctx), h) | (ctx,h) <- contexts e ]
-                       where (x,e) = unsafeUnbind bnd
-  recurse (e1 :=: e2)  = [ (ctx :=: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :=: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (e1 :>: e2)  = [ (ctx :>: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :>: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (e1 :|: e2)  = [ (ctx :|: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :|: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (e1 :@: e2)  = [ (ctx :@: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :@: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (One e)      = [ (One ctx, h)  | (ctx,h) <- contexts e ]
-  recurse (All e)      = [ (All ctx, h)  | (ctx,h) <- contexts e ]
-  recurse (Some e)     = [ (Some ctx, h) | (ctx,h) <- contexts e ]
-  recurse (e1 :>>: e2) = [ (ctx :>>: e2,  h) | (ctx,h) <- contexts e1 ]
-                      ++ [ (e1  :>>: ctx, h) | (ctx,h) <- contexts e2 ]
-  recurse (Check fx e) = [ (Check fx ctx, h) | (ctx,h) <- contexts e ]
-  recurse e@(Exi _)    = [ (exis ctx, h) | (ctx,h) <- contexts body ]
-                       where (exis,body) = unExis e
-  recurse (Verify bnd) = error "contexts Verify undefined"
-  recurse e            = []
 
 (<@) :: Context -> Expr -> Expr
 Arr as       <@ h = Arr (map (<@ h) as)
@@ -321,6 +461,27 @@ Check fx e   <@ h = Check fx (e <@ h)
 Verify bnds  <@ h = error "context plugging Verify undefined"
 HOLE         <@ h = h
 e            <@ h = e
+
+bvs :: Context -> [Ident]
+bvs ctx = explore [] ctx
+ where
+  explore xs (Arr es)     = foldr union [] (map (explore xs) es)
+  explore xs (Lam bnd)    = exploreBind xs bnd
+  explore xs (e1 :=: e2)  = explore xs e1 `union` explore xs e2
+  explore xs (e1 :>: e2)  = explore xs e1 `union` explore xs e2
+  explore xs (e1 :|: e2)  = explore xs e1 `union` explore xs e2
+  explore xs (e1 :@: e2)  = explore xs e1 `union` explore xs e2
+  explore xs (One e)      = explore xs e
+  explore xs (All e)      = explore xs e
+  explore xs (Some e)     = explore xs e
+  explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
+  explore xs (Check fx e) = explore xs e
+  explore xs (Exi bnd)    = exploreBind xs bnd
+  explore xs (Verify bnd) = error "bvs Verify undefined"
+  explore xs HOLE         = xs
+  explore xs e            = []
+  
+  exploreBind xs bnd = explore ([x] `union` xs) e where (x,e) = unsafeUnbind bnd
 
 --------------------------------------------------------------------------------
 
