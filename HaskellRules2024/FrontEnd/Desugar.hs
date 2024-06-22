@@ -204,7 +204,7 @@ dsSmall = ds
     ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
     ds (Macro1 (Ident _ "in'='") [] (Blk es)) = dsU =<< mapM ds es
 -}
-    -- (e1 = e2)  --->   
+    -- (e1 = e2)  --->
     ds (InfixOp e1 (Op "=") e2) = Unify <$> ds e1 <*> ds e2
 
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
@@ -462,11 +462,6 @@ dsDx e = do
   how <- gets context
   case how of
     DS12 -> dsD_12 e
-
-
-dsD_12 :: SrcExpr -> D SrcExpr
--- RANJIT!!!!!!  fill in here
-dsD_12 _e = errorMessage "dsD_12"
 
 
 unifyV :: Ident -> SrcExpr -> SrcExpr
@@ -1877,28 +1872,30 @@ data Pi
   | E       -- ^ E
   deriving (Eq, Ord, Show)
 
-data DsMode10
+data DsMode12
   = MX -- ^ x "execution"
   | MV -- ^ + "verification"
   | MI -- ^ - "checking" ("implementation")
   deriving (Eq, Ord, Show)
 
-dsD_10 :: SrcExpr -> D SrcExpr
-dsD_10 = dsDD_10 MV
+dsD_12 :: SrcExpr -> D SrcExpr
+dsD_12 = dsDD_12 MV
 
-dsDD_10 :: DsMode10 -> SrcExpr -> D SrcExpr
-dsDD_10 s t = dsM_10 s t E
+dsDD_12 :: DsMode12 -> SrcExpr -> D SrcExpr
+dsDD_12 s t = dsM_12 s t E
 
-dsB_10 :: DsMode10 -> SrcExpr -> Pi -> Ident -> D SrcExpr
-dsB_10 s t E     _
-  = dsM_10 s t E
-dsB_10 s t (P f) j
+
+dsB_12 :: DsMode12 -> SrcExpr -> Pi -> Ident -> D SrcExpr
+dsB_12 s t E     _
+  = dsM_12 s t E
+dsB_12 s t (P f) j
   = do z <- newIdent (getLoc t) "z";
-       seqDE [ pure $ DefineE z (ApplyD (Variable f) (Variable j)), dsM_10 s t (P z)]
+       seqDE [ pure $ DefineE z (ApplyD (Variable f) (Variable j)), dsM_12 s t (P z)]
 
-dsK_10 :: Loc -> [Eff] -> D SrcExpr
-dsK_10 loc fx
+dsK_12 :: Loc -> [Eff] -> D SrcExpr
+dsK_12 loc fx
   | hasEff "fails" fx   = pure Fail
+  -- TODO: commenting-out-for-now
   | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
   | otherwise           = pure (Array [])
 
@@ -1909,136 +1906,150 @@ dsCheck Dec = eDecide
 seqDE :: [D SrcExpr] -> D SrcExpr
 seqDE ds = seqE <$> sequence ds
 
-dsM_10 :: DsMode10 -> SrcExpr -> Pi -> D SrcExpr
-dsM_10 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
-  = do j   <- newIdent (getLoc t) "j"
-       -- dom <- DefineE j <$> dsM_10 MI t1 E
-       dom <- dsM_10 MI t1 (P j)
-       rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MV t2 pi j
-       eGuard (eVerify (Forall [j] (seqE [dom, rng]))) <$> (dsM_10 MI t pi)
+dsM_12 :: DsMode12 -> SrcExpr -> Pi -> D SrcExpr
+dsM_12 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
+  = do r   <- newIdent (getLoc t) "r"
+       j   <- newIdent (getLoc t) "j"
+       dom <- DefineE j <$> dsM_12 MI t1 (P r)
+       rng <- dsCheck (bodyEff Suc _fx) <$> dsB_12 MV t2 pi j
+       eGuard (eVerify (Forall [r] (seqE [dom, rng]))) <$> dsM_12 MI t pi
 
-dsM_10 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
+dsM_12 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
   = do i   <- newIdent (getLoc t1) "i"
        j   <- newIdent (getLoc t1) "j"
-       dom <- DefineE j <$> dsM_10 MV t1 (P i)
-       rng <- seqDE [ dsK_10 (getLoc t1) _fx, dsB_10 MI t2 pi j]
-       pure $ Lam i (dom `eGuard` rng)
+       dom <- DefineE j <$> dsM_12 MV t1 (P i)
+       rng <- seqDE [ dsK_12 (getLoc t1) _fx, {- BUG -} dsB_12 MI t2 pi j]
+       pure $ {- TODO: ISFUN -} Lam i (dom `eGuard` rng)
 
-dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
+dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
   = do i   <- newIdent (getLoc t1) "i"
        j   <- newIdent (getLoc t1) "j"
-       dom <- DefineE j <$> dsM_10 MX t1 (P i)
-       rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MX t2 pi j
+       dom <- DefineE j <$> dsM_12 MX t1 (P i)
+       rng <- dsCheck (bodyEff Suc _fx) <$> dsB_12 MX t2 pi j
        pure $ Lam i (seqE [dom, rng])
 
-dsM_10 MV (OfType t1 t2) pi                   -- MOFTYPE+
+dsM_12 MV (OfType t1 t2@(Variable z)) pi      -- MOFTYPE+
   = do y <- newIdent (getLoc t1) "y"
-       z <- newIdent (getLoc t1) "z"
-       seqDE [ DefineE y <$> dsM_10  MV t1 pi
-             , DefineE z <$> dsDD_10 MV t2
-             , pure ((dsCheck Suc (ApplyD (Variable z) (Variable y))) `eGuard` eSome (Variable z))
+       seqDE [ DefineE y <$> dsM_12  MV t1 pi
+             , pure (dsCheck Suc (ApplyD t2 (Variable y)) `eGuard` eSome (Variable z))
              ]
 
-dsM_10 MI (OfType t1 t2) _pi                  -- MOFTYPE-
+dsM_12 MV (OfType t1 t2) pi                   -- MOFTYPE+
+  = do y <- newIdent (getLoc t1) "y"
+       z <- newIdent (getLoc t1) "z"
+       seqDE [ DefineE y <$> dsM_12  MV t1 pi
+             , DefineE z <$> dsDD_12 MV t2
+             , pure (dsCheck Suc (ApplyD (Variable z) (Variable y)) `eGuard` eSome (Variable z))
+             ]
+
+dsM_12 MI (OfType t1 t2) _pi                  -- MOFTYPE-
   = do z <- newIdent (getLoc t1) "z"
-       seqDE [ DefineE z <$> dsDD_10 MI t2
+       seqDE [ DefineE z <$> dsDD_12 MI t2
              , pure (eSome (Variable z))
              ]
 
-dsM_10 MX (OfType t1 t2) pi                   -- MOFTYPEX
+dsM_12 MX (OfType t1 t2) pi                   -- MOFTYPEX
   = do y <- newIdent (getLoc t1) "y"
        z <- newIdent (getLoc t1) "z"
-       seqDE [ DefineE y <$> dsM_10  MX t1 pi
-             , DefineE z <$> dsDD_10 MX t2
+       seqDE [ DefineE y <$> dsM_12  MX t1 pi
+             , DefineE z <$> dsDD_12 MX t2
              , pure (ApplyD (Variable z) (Variable y))
              ]
 
-dsM_10 MI (Range t) E                       -- MTYPE1
-  = do z <- newIdent (getLoc t) "z"
-       seqDE [ DefineE z <$> dsDD_10 MI t
-             , pure (eSome (Variable z)) ]
+dsM_12 MI (Range (Variable z)) (P _)       -- MTYPE-VAR Spl case to make M-[:int](i) = some{int} instead of exi z. z = int; z(i)
+   = pure (eSome (Variable z))
 
-dsM_10 s (Range t) E                       -- MTYPE2
-  = do i <- newIdent (getLoc t) "i"
-       existsV [i] <$> dsM_10 s (Range t) (P i)
-
-dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make M[:int](i) = int(i) instead of exi z. z = int; z(i)
+dsM_12 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make Ms[:int](i) = int(i) instead of exi z. z = int; z(i)
   = pure (ApplyD (Variable z) (Variable i))
 
-dsM_10 s (Range t) (P i)                   -- MTYPE3
+dsM_12 MI (Range t) (P i)                   -- MTYPE1
   = do z <- newIdent (getLoc t) "z"
-       seqDE [ DefineE z <$> dsDD_10 s t
+       seqDE [ DefineE z <$> dsDD_12 MI t
+             , pure (Variable i `eGuard` eSome (Variable z))
+             ]
+
+dsM_12 s (Range t) (P i)                   -- MTYPE2
+  = do z <- newIdent (getLoc t) "z"
+       seqDE [ DefineE z <$> dsDD_12 s t
              , pure (ApplyD (Variable z) (Variable i)) ]
 
-dsM_10 s (DefineIE x y t) E                -- MSQUIGE
-  = do i <- newIdent (getLoc t) "i"
-       existsV [i] <$> dsM_10 s (DefineIE x y t) (P i)
+dsM_12 s (Range t) E                       -- MTYPE3
+  = do x <- newIdent (getLoc t) "x"
+       z <- newIdent (getLoc t) "z"
+       existsV [x] <$> seqDE
+          [ DefineE z <$> dsDD_12 s t
+          , pure (ApplyD (Variable z) (Variable x)) ]
 
-dsM_10 s (DefineIE x y t) (P i)             -- MSQUIGP
+
+dsM_12 s (DefineIE x y t) E                -- MSQUIGE
+  = do i <- newIdent (getLoc t) "i"
+       existsV [i] <$> dsM_12 s (DefineIE x y t) (P i)
+
+dsM_12 s (DefineIE x y t) (P i)             -- MSQUIGP
   = seqDE [ pure $ DefineE x (Variable i)
-          ,        DefineE y <$> dsM_10 s t (P i)
+          ,        DefineE y <$> dsM_12 s t (P i)
           ]
 
-dsM_10 s (Array ts) E                       -- MARRAYE
-   = Array <$> mapM (\t -> dsM_10 s t E) ts
+dsM_12 s (Array ts) E                       -- MARRAYE
+   = Array <$> mapM (\t -> dsM_12 s t E) ts
 
-dsM_10 s (Array ts) (P i)                   -- MARRAYP
+dsM_12 s (Array ts) (P i)                   -- MARRAYP
    = do is <- mapM (\t -> newIdent (getLoc t) "i") ts
         existsV is <$> seqDE
           [ pure    $  unifyV i (Array (Variable <$> is))
-          , Array  <$> zipWithM (\t' i' -> dsM_10 s t' (P i')) ts is
+          , Array  <$> zipWithM (\t' i' -> dsM_12 s t' (P i')) ts is
           ]
 
-dsM_10 s (DefineE x t) pi                   -- MBIND
-  = DefineE x <$> dsM_10 s t pi
+dsM_12 s (DefineE x t) pi                   -- MBIND
+  = DefineE x <$> dsM_12 s t pi
 
-dsM_10 s (Unify t1 t2) pi                   -- MEQ
-  = Unify <$> dsM_10 s t1 pi <*> dsM_10 s t2 pi
+dsM_12 s (Unify t1 t2) pi                   -- MEQ
+  = Unify <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
 
-dsM_10 MX (Seq ts) pi                      -- MSEMIX
+dsM_12 MX (Seq ts) pi                      -- MSEMIX
   = do let (ts', t) = unSeq ts
-       es' <- mapM (dsDD_10 MX) ts'
-       e'  <- dsM_10 MX t pi
+       es' <- mapM (dsDD_12 MX) ts'
+       e'  <- dsM_12 MX t pi
        pure $ seqE (es' ++ [e'])
 
-dsM_10 s  (Seq ts) pi                      -- MSEMI
+dsM_12 s  (Seq ts) pi                      -- MSEMI
   = do let (ts', t) = unSeq ts
-       es' <- mapM (dsDD_10 MV) ts'
-       e'  <- dsM_10 s t pi
+       es' <- mapM (dsDD_12 MV) ts'
+       e'  <- dsM_12 s t pi
        pure $ seqE (es' ++ [e'])
 
-dsM_10 s (Succeeds t) pi                   -- MCHECK / TODO:Generalized to check<fx>
-  = eAssert <$> dsM_10 s t pi
+dsM_12 s (Succeeds t) pi                   -- MCHECK / TODO:Generalized to check<fx>
+  = eAssert <$> dsM_12 s t pi
 
-dsM_10 s (Choice t1 t2) pi                 -- MCHOICE
-  = Choice <$> dsM_10 s t1 pi <*> dsM_10 s t2 pi
+dsM_12 s (Choice t1 t2) pi                 -- MCHOICE
+  = Choice <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
 
-dsM_10 s (If3 t1 t2 t3) pi                 -- MIF
-  = If3 <$> dsDD_10 s t1 <*> dsM_10 s t2 pi <*> dsM_10 s t3 pi
+dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
+  = If3 <$> dsDD_12 s t1 <*> dsM_12 s t2 pi <*> dsM_12 s t3 pi
 
-dsM_10 _ t@(Lit{}) E                       -- MCONST
+dsM_12 _ t@(Lit{}) E                       -- MCONST
    = pure t
 
-dsM_10 _ t@(Variable {}) E                 -- MVAR
+dsM_12 _ t@(Variable {}) E                 -- MVAR
    = pure t
 
-dsM_10 s (ApplyD t1 t2) E                  -- MVAR
-   = ApplyD <$> dsDD_10 s t1 <*> dsDD_10 s t2
+dsM_12 s (ApplyD t1 t2) E                  -- MVAR
+   = ApplyD <$> dsDD_12 s t1 <*> dsDD_12 s t2
 
-dsM_10 s t (P i)                           -- MEQ
-   = Unify (Variable i) <$> dsM_10 s t E
+dsM_12 s t (P i)                           -- MEQ
+   = Unify (Variable i) <$> dsM_12 s t E
 
-dsM_10 s (Macro1 m rs t) pi
-   = Macro1 m rs <$> dsM_10 s t pi
+dsM_12 s (Macro1 m rs t) pi
+   = Macro1 m rs <$> dsM_12 s t pi
 
-dsM_10 s (Lam x t) _pi
-   = Lam x <$> dsM_10 s t E
+dsM_12 s (Lam x t) _pi
+   = Lam x <$> dsM_12 s t E
 
-dsM_10 _ e@(DefineV _) _
+dsM_12 _ e@(DefineV _) _
    = pure e
 
-dsM_10 s t pi
-   = error $ "TODO: dsM_10 " ++ show (s, t, pi)
+dsM_12 s t pi
+   = error $ "TODO: dsM_12 " ++ show (s, t, pi)
 
 unSeq :: [SrcExpr] -> ([SrcExpr], SrcExpr)
 unSeq = go []
