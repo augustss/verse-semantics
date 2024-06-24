@@ -46,9 +46,12 @@ evalCtx lhs =
 validC :: Ident -> [Ident] -> Context -> Bool
 validC x ys HOLE        = True
 validC x ys ((v :=: e) :>: ctx)
-  | x `elem` free (v,e) = blkd (x:ys) ((v :=: e) :>: ctx)
-  | otherwise           = validC x ys ctx
-validC x ys _           = False
+  | x `elem` zs = blkd (x:ys) ((v :=: e) :>: ctx)
+  | otherwise   = (blkd (x:ys) e && validC x ys ctx)
+                  || validC x (filter (`notElem` zs) ys) ctx
+ where
+  zs = free (v,e)
+validC x ys _ = False
 
 type Expr_or_Context = Expr
 
