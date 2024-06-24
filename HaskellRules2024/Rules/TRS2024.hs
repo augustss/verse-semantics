@@ -4,8 +4,6 @@ import Control.Monad( guard )
 import TRS.Bind
 import Rules.Core
 
-import Data.List( intersect )
-
 --------------------------------------------------------------------------------
 
 rules :: Rule
@@ -29,23 +27,18 @@ isV x e = x==e || case e of
                     Arr es -> any (isV x) es
                     _      -> False
 
--- evaluation contexts
-evalCtx :: [Ident] -> Expr -> [(Context, Expr)]
-evalCtx zs lhs =
+-- evaluation contexts (no existentials anymore!)
+evalCtx :: Expr -> [(Context, Expr)]
+evalCtx lhs =
   do pure (HOLE, lhs)
  ++
   do (v :=: e1) :>: e2 <- [lhs]
-     (ctx, h) <- evalCtx zs e1
+     (ctx, h) <- evalCtx e1
      pure ((v :=: ctx) :>: e2, h)
  ++
   do (v :=: e1) :>: e2 <- [lhs]
-     (ctx, h) <- evalCtx zs e2
+     (ctx, h) <- evalCtx e2
      pure ((v :=: e1) :>: ctx, h)
- ++
-  do Exi bnd <- [lhs]
-     let (x,e) = alphaRename zs bnd
-     (ctx, h) <- evalCtx (x:zs) e
-     pure (Exi (bind x ctx), h)
 
 -- scope contexts
 scopeCtx :: Expr -> [(Context, Expr)]
@@ -138,32 +131,29 @@ rulesUnification lhs =
 rulesExistentials :: Rule
 rulesExistentials lhs =
   "EXI-SUBST" `name`
-  do (x,ctx_xv_e) <- alphaRename [] <$> matchOuterExi lhs
-     (ctx, x_eq_v :>: e) <- evalCtx [x] ctx_xv_e
-     -- TODO: add correct guard on ctx
+  do (exis,x,ctx_xv_e) <- matchExi_alphaRename [] lhs
+     (ctx, x_eq_v :>: e) <- evalCtx ctx_xv_e
+     -- TODO: add correct guard on ctx, exis, etc.
      (Var x',v) <- matchEq x_eq_v
      guard (x == x')
      guard (isVal v)
      guard (x `notElem` free v)
-     guard (null (free v `intersect` bvs ctx))
-     pure (subst [(x,v)] (ctx <@ e))
+     pure (exis <@ (subst [(x,v)] (ctx <@ e)))
  ++
   "EXI-ELIM" `name`
-  do (x,e) <- alphaRename [] <$> matchOuterExi lhs
+  do (exis,x,e) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free e)
-     pure e
+     pure (exis <@ e)
  ++
   "EXI-FLOAT" `name`
-  do (ctx, exi_e) <- evalCtx [] lhs
+  do (ctx, exi_x_e) <- evalCtx lhs
      guard (ctx /= HOLE)
-     guard (null (bvs ctx))
-     (x,e) <- alphaRename (free ctx) <$> matchOuterExi exi_e
-     pure (Exi (bind x (ctx <@ e)))
+     (exis,x,e) <- matchExi_alphaRename (free ctx) exi_x_e
+     pure (Exi (bind x (ctx <@ (exis <@ e))))
  ++
   "EXI-CHOICE" `name`
-  do (exis,bnd) <- matchInnerExi lhs
-     let (x,e) = alphaRename (bvs exis) bnd
-     (ctx, e1 :|: e2) <- evalCtx [x] e
+  do (exis,x,e) <- matchExi_alphaRename [] lhs
+     (ctx, e1 :|: e2) <- evalCtx e
      guard (x `notElem` free ctx)
      pure (exis <@ (ctx <@ (Exi (bind x e1) :|: Exi (bind x e2))))
 
@@ -199,13 +189,13 @@ rulesChoice lhs =
  ++
   "CHOICE" `name`
   do (sx, e) <- scopeCtx lhs
-     (ctx, e1 :|: e2) <- evalCtx [] e
+     (ctx, e1 :|: e2) <- evalCtx e
      guard (ctx /= HOLE)
      -- TODO: add guard on ctx
      pure (sx <@ ((ctx <@ e1) :|: (ctx <@ e2)))
  ++
   "FAIL" `name`
-  do (ctx, Fail) <- evalCtx [] lhs
+  do (ctx, Fail) <- evalCtx lhs
      -- TODO: add guard on ctx
      guard (ctx /= HOLE)
      pure Fail
