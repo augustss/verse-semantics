@@ -43,38 +43,33 @@ evalCtx lhs =
      pure ((v :=: e1) :>: ctx, h)
 
 -- valid/blkd
-validCtx :: Ident -> [Ident] -> Context -> Bool
-validCtx x ys HOLE  = True
-validCtx x ys ((v :=: e) :>: ctx)
-  | x `elem` free e = blkdCtx (x:ys) ((v :=: e) :>: ctx)
-  | otherwise       = (blkdExpr (x:ys) e && validCtx x ys ctx)
-                      || validCtx x (filter (`notElem` free e) ys) ctx
-validCtx x ys _     = False
+validC :: Ident -> [Ident] -> Context -> Bool
+validC x ys HOLE        = True
+validC x ys ((v :=: e) :>: ctx)
+  | x `elem` free (v,e) = blkd (x:ys) ((v :=: e) :>: ctx)
+  | otherwise           = validC x ys ctx
+validC x ys _           = False
 
--- TODO: blkd can be one function
-blkdCtx :: [Ident] -> Context -> Bool
-blkdCtx xs HOLE                                = True
-blkdCtx xs ((v :=: ctx) :>: e) | isContext ctx = blkdCtx xs ctx
-blkdCtx xs ((v :=: e) :>: ctx) | isContext ctx = blkdExpr xs e && blkdCtx xs ctx
-blkdCtx xs _                                   = False
+type Expr_or_Context = Expr
 
-blkdExpr :: [Ident] -> Context -> Bool
-blkdExpr xs ((v :=: e1) :>: e2) = blkdExpr xs e1 && blkdExpr xs e2
-blkdExpr xs (e1 :|: e2)         = blkdExpr xs e1 && blkdCtx xs e2
-blkdExpr xs (One e)             = blkdExpr xs e
-blkdExpr xs (All e)             = blkdExpr xs e
-blkdExpr xs (Exi bnd)           = blkdExpr (x:xs) e where (x,e) = alphaRename xs bnd
-blkdExpr xs (v1 :@: v2)         = case v1 of
-                                    Var f -> f `elem` xs
-                                    Op op -> any ((`isV` v2) . Var) xs
-                                    _     -> False
-blkdExpr xs (v :>>: e)          = any (`elem` xs) (free v)
-blkdExpr xs (Verify _)          = True
-blkdExpr xs (Check fx e)        = blkdExpr xs e
-blkdExpr xs _                   = False
+blkd :: [Ident] -> Expr_or_Context -> Bool
+blkd xs HOLE                = True
+blkd xs ((v :=: e1) :>: e2) = blkd xs e1 && (isContext e1 || blkd xs e2)
+blkd xs (e1 :|: e2)         = blkd xs e1 && blkd xs e2
+blkd xs (One e)             = blkd xs e
+blkd xs (All e)             = blkd xs e
+blkd xs (Exi bnd)           = blkd (x:xs) e where (x,e) = alphaRename xs bnd
+blkd xs (v1 :@: v2)         = case v1 of
+                                Var f -> f `elem` xs
+                                Op op -> any ((`isV` v2) . Var) xs
+                                _     -> False
+blkd xs (v :>>: e)          = any (`elem` xs) (free v)
+blkd xs (Verify _)          = True
+blkd xs (Check fx e)        = blkd xs e
+blkd xs _                   = False
 
 -- choice-freeness
-choiceFree :: Expr {-or Context-} -> Bool
+choiceFree :: Expr_or_Context -> Bool
 choiceFree (e1 :|: e2)         = False
 choiceFree ((v :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2)
 choiceFree (v :>>: e)          = choiceFree e
@@ -181,7 +176,7 @@ rulesExistentials lhs =
      guard (x == x')
      guard (isVal v)
      guard (x `notElem` free v)
-     guard (validCtx x (bvs exis) ctx)
+     guard (validC x (bvs exis) ctx)
      pure (exis <@ (subst [(x,v)] (ctx <@ e)))
  ++
   "EXI-ELIM" `name`
@@ -242,7 +237,7 @@ rulesChoice lhs =
   do let (exis, e) = unExis lhs
      (ctx, Fail) <- evalCtx e
      guard (ctx /= HOLE)
-     guard (blkdCtx [] ctx)
+     guard (blkd (bvs exis) ctx)
      pure Fail
 
 --------------------------------------------------------------------------------

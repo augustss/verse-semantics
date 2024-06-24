@@ -308,27 +308,20 @@ unExis (Exi bnd) = (Exi (bind x exis), body)
 unExis e         = (HOLE, e)
 
 -- structural rules matching
-matchExi :: Expr -> [(Context, Bind Expr)]  -- Exi y1..x..yn . e --> [(Exi y1..yn, x . e)]
-matchExi e =
-  [ (ctx,bnd')
-  | Exi bnd <- [e]
-  , let (x,e') = unsafeUnbind bnd
-        cbnds  = matchExi e'
-  , (ctx,bnd') <- [ (Exi (bind x ctx), bnd')
-                  | (ctx,bnd') <- cbnds
-                  ] ++ case cbnds of
-                         [] -> [ (HOLE, bnd) ]
-                         _  -> [ (Exi (bind y ctx), bind x e')
-                               | (ctx,bnd') <- [head cbnds]
-                               , let (y,e') = unsafeUnbind bnd'
-                               ]
-  ]
-
 matchExi_alphaRename :: [Ident] -> Expr -> [(Context, Ident, Expr)]
 matchExi_alphaRename zs e =
-  [ (ctx, x, e)
-  | (ctx,bnd) <- matchExi e
-  , let (x,e) = alphaRename (zs ++ bvs ctx) bnd
+  [ cxe
+  | Exi bnd <- [e]
+  , let (x,ex) = alphaRename zs bnd
+        cxes   = matchExi_alphaRename (x:zs) ex
+  , cxe <- [ (Exi (bind x ctx),y,ey)
+           | (ctx,y,ey) <- cxes
+           ]
+        ++ case cxes of
+             [] -> [ (HOLE,x,ex) ]
+             _  -> [ (Exi (bind y ctx),x,ey)
+                   | (ctx,y,ey) <- [head cxes]
+                   ]
   ]
 
 matchEq :: Expr -> [(Expr,Expr)]
@@ -390,6 +383,7 @@ instance Arbitrary Expr where
   shrink (Check fx e) = [ e ] 
                      ++ [ Check fx e' | e' <- shrink e ]
   shrink (Exi bnd)    = shrinkBind Exi bnd
+  shrink Fail         = [ Int 0 ]
   --shrink (Verify bnd) = error "shrink Verify undefined"
   shrink e            = []
 
