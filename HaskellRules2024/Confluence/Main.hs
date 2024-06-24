@@ -42,7 +42,7 @@ prop_Confluent =
 
 main :: IO ()
 --main = quickCheck prop_Valid
-main = quickCheck prop_Confluent
+main = quickCheckWith stdArgs{ maxSuccess = 9999 } prop_Confluent
 
 --------------------------------------------------------------------------------
 
