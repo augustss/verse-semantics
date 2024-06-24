@@ -294,18 +294,18 @@ everywhere step e = step e ++ recurse e
   recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step e1 ]
                       ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step e2 ]
   recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step e ]
-  recurse e@(Exi _)    = [ (s, exis body') | (s,body') <- everywhere step body ]
+  recurse e@(Exi _)    = [ (s, exis <@ body') | (s,body') <- everywhere step body ]
                        where (exis,body) = unExis e
   recurse (Verify bnd) = error "everywhere Verify undefined"
   recurse e            = []
 
 -- treat "exi x1 .. exi xn" as one block when matching
-unExis :: Expr -> (Expr -> Expr, Expr)
-unExis (Exi bnd) = (Exi . bind x . exis, body)
+unExis :: Expr -> (Context, Expr)
+unExis (Exi bnd) = (Exi (bind x exis), body)
  where
   (x,e)       = unsafeUnbind bnd
   (exis,body) = unExis e
-unExis e         = (id, e)
+unExis e         = (HOLE, e)
 
 -- structural rules matching
 matchExi :: Expr -> [(Context, Bind Expr)]  -- Exi y1..x..yn . e --> [(Exi y1..yn, x . e)]
@@ -365,6 +365,7 @@ instance Arbitrary Expr where
     xs = take 3 (identsNotIn [])
 
   shrink (Int k)      = [ Int k' | k' <- shrink k ]
+  shrink (Op _)       = [ Int 0, Int 1 ]
   shrink (Arr es)     = es
                      ++ [ Arr es' | es' <- shrink es ]
   shrink (Lam bnd)    = shrinkBind Lam bnd
@@ -478,6 +479,23 @@ bvs ctx = explore [] ctx
   explore xs e            = []
   
   exploreBind xs bnd = explore ([x] `union` xs) e where (x,e) = unsafeUnbind bnd
+
+isContext :: Context -> Bool
+isContext (Arr es)     = any isContext es
+isContext (Lam bnd)    = isContext e where (x,e) = unsafeUnbind bnd
+isContext (e1 :=: e2)  = isContext e1 || isContext e2
+isContext (e1 :>: e2)  = isContext e1 || isContext e2
+isContext (e1 :|: e2)  = isContext e1 || isContext e2
+isContext (e1 :@: e2)  = isContext e1 || isContext e2
+isContext (One e)      = isContext e
+isContext (All e)      = isContext e
+isContext (Some e)     = isContext e
+isContext (e1 :>>: e2) = isContext e1 || isContext e2
+isContext (Check fx e) = isContext e
+isContext (Exi bnd)    = isContext e where (x,e) = unsafeUnbind bnd
+isContext (Verify bnd) = error "isContext Verify undefined"
+isContext HOLE         = True
+isContext e            = False
 
 --------------------------------------------------------------------------------
 
