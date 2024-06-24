@@ -179,6 +179,8 @@
 %format voftype (e) (t) = e "\vartriangleright_V" t
 %format ioftype (e) (t) = e "\vartriangleright_I" t
 %format oftypeKW = "\vartriangleright"
+%format oftypefx (e) (fx) (t) = e "\vartriangleright\hspace{-1.3mm} \langle" fx "\rangle\," t
+%format colonfx fx t = : "\hspace{-0.2mm} \langle" fx "\rangle" t
 %format at = "\, @\!\!"
 %format dot = "\! ."
 %format alpha = "\alpha"
@@ -407,7 +409,7 @@
 %format squiggt = "\leadsto"
 %% %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format eff (x) = "\langle" x "\rangle"
+%format (eff (fx)) = "\langle" fx "\rangle"
 %format apeff g x = g "\langle" x "\rangle"
 %format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
