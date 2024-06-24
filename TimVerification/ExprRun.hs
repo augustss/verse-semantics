@@ -447,7 +447,7 @@ data Operation
   | OpExists [Vertex]                                             -- exists u0 ...
   | OpIterate Vertex Variable Context Operation {-then-} Variable Operation {-else-} Operation
                                                                   -- iterate(u0) x0 c0 {op0} then x1 {op1} else {op2}
-  | OpCast Vertex Vertex [RHS]                                    -- cast(u) {head_0 => {op_0}; ...}
+  | OpCast Vertex [RHS]                                           -- cast(u) {head_0 => {op_0}; ...}
 
   -- OpMetaVar is not a real Op, it's just for pretty printing a context
   | OpMetaVar String
@@ -473,11 +473,11 @@ instance Pretty Operation where -- XXX precedence
   pPrint (OpChoice op0 op1) = pPrint op0 <+> text "|" <+> pPrint op1
   pPrint OpNoop = text "nop"
   pPrint (OpExists xs) = hsep (text "exists" : map pPrint xs)
-  pPrint (OpIterate u0 x0 c op0 x1 op1 op2) =
-    text "iterate" <> parens (pPrint u0) <+> pPrint x0 <+> pPrint c <+> braces (pPrint op0) <+>
-    text "then" <+> pPrint x1 <+> braces (pPrint op1) <+>
-    text "else" <+> braces (pPrint op2)
-  pPrint (OpCast u v rhss) = sep $ text "cast" <> parens (pPrint (u, v)) : map (nest 2 . pPrint) rhss
+  pPrint (OpIterate u0 x0 c op0 x1 op1 op2) = sep [
+    text "iterate" <> parens (pPrint u0) <+> pPrint x0 <+> pPrint c <+> braces (pPrint op0),
+    text "then" <+> pPrint x1 <+> braces (pPrint op1),
+    text "else" <+> braces (pPrint op2) ]
+  pPrint (OpCast u rhss) = sep $ text "cast" <> parens (pPrint u) : map (nest 2 . pPrint) rhss
 
   pPrint (OpMetaVar s) = text s
 
@@ -541,8 +541,9 @@ programOp a =
   ) ++
   (do
      (ctx, d, aop) <- contextStartOp a
-     (ctx', c, op) <- programOp aop
-     pure (\ c' op' -> ctx d (ctx' c' op'), c, op)
+     (ctx', bop) <- contextSpan aop
+     (ctx'', c, op) <- programOp bop
+     pure (\ c' op' -> ctx d (ctx' (ctx'' c' op')), c, op)
   )
 
 unify :: Operation -> [(Vertex -> Vertex -> Operation, Vertex, Vertex)]
@@ -599,7 +600,13 @@ instance Pretty Config where
 instance Pretty (Operation -> Program) where
   pPrint f = pPrint (f (OpMetaVar "OP"))
 
+instance Pretty (Operation -> Operation) where
+  pPrint f = pPrint (f (OpMetaVar "OP"))
+
 instance Pretty (Context -> Operation -> Program) where
+  pPrint f = pPrint (f (Context (Ident "SC")) (OpMetaVar "OP"))
+
+instance Pretty (Context -> Operation -> Operation) where
   pPrint f = pPrint (f (Context (Ident "SC")) (OpMetaVar "OP"))
 
 -- Add asms to g, but don't add existing (or weaker) assumptions.
@@ -657,6 +664,8 @@ instance NewIdents (String, String) (Vertex, Vertex) where
 
 instance NewIdents (String, String, String) (Ident, Ident, Ident) where
   newIdents x (s1, s2, s3) = (is !! 0, is !! 1, is !! 2)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3]
+instance NewIdents (String, String, String) (Variable, Variable, Variable) where
+  newIdents x ss = (Variable x0, Variable x1, Variable x2) where (x0, x1, x2) = newIdents x ss
 
 instance NewIdents (String, String, String, String) (Ident, Ident, Ident, Ident) where
   newIdents x (s1, s2, s3, s4) = (is !! 0, is !! 1, is !! 2, is !! 3)  where is = identsNotIn x [Ident s1, Ident s2, Ident s3, Ident s4]
@@ -677,13 +686,15 @@ identsOf :: Data i => i -> [Ident]
 identsOf = universeBi
 
 identsNotIn :: Data i => i -> [Ident] -> [Ident]
-identsNotIn x is = idents is \\ identsOf x
+identsNotIn x = map new
+  where is = identsOf x
+        new i = (idents i \\ is) !! 0
 
 -- Make variations on the identifiers
-idents :: [Ident] -> [Ident]
-idents is = concatMap (\ s -> map (addSuf s) is) sufs
+idents :: Ident -> [Ident]
+idents i = map (addSuf i) sufs
   where sufs = "" : "'" : map show [1::Integer ..]
-        addSuf s (Ident i) = Ident (i ++ s)
+        addSuf (Ident ss) s = Ident (ss ++ s)
 
 ------------------------------------------------------------------
 
@@ -741,6 +752,7 @@ allRules =
   P.<> simpleOpsRules
   P.<> unificationRules
   P.<> callingRules
+  P.<> iterateChoiceRules
 
 ---------------------------------------------
 
@@ -911,11 +923,71 @@ iterateChoiceRules _ (A g :|- pg) =
   do
     (_ctx, c, op@(OpIterate _u0 _x0 d op0 _x1 _op1 _op2)) <- programOp pg
     fx0 <- [ fx0 | AEffect fx0 op' c' <- g, op == op', c == c' ]
-    _fx1 <- [ fx1 | AEffect fx1 op0' d' <- g, op0 == op0', d == d' ]
     g' <- gAdd [AEffect (downFx fx0) op0 d] g
     pure $ g' :|- pg
+
   -- IterateCopyMutables
-  
+ ++
+  "ChoiceElim" `name`
+  do
+    (ctx, c, OpIterate u0 x0 d op0 x1 op1 op2) <- programOp pg
+--    traceM $ "ChoiceElim: 1 " ++ prettyShow op0
+--    traceM $ "ChoiceElim: 2 " ++ prettyShow (contextSpan op0)
+    (ctx', opc@(OpChoice opL opR)) <- contextSpan op0
+--    traceM $ "ChoiceElim: 3 " ++ prettyShow [ a | a@(AEffect _ opc' _) <- g, opc == opc' ]
+    guard $ not $ null [ () | AEffect fx opc' d' <- g, opc == opc', d == d', isEffect fx unblocked_iterates ]
+{-
+    let (y0, y1) = newIdents pg ("y0", "y1")
+        d1 = newIdents pg "d1"
+        vx1 = VertexVariable x1
+        op1' = alphaConvertVariable [(x0, y0), (x1, y1)] op1
+        op2' = alphaConvertVariable [(x0, y0)] op2
+        iop = OpIterate u0  x0 d  (ctx' opL) x1 op1 $
+              OpIterate vx1 y0 d1 (ctx' opR) y1 op1' op2'
+-}
+    let vx1 = VertexVariable x1
+        iop =              OpIterate u0  x0 d (ctx' opL) x1 op1 $
+              freshen pg $ OpIterate vx1 x0 d (ctx' opR) x1 op1 op2
+    pure $ A g :|- ctx c iop
+
+{-
+                    |- ProgramOp[c,
+                           op0;
+                           exists x0 x1 y1;
+                           x0=u0(0);
+                           op1[y1/x1,*/*];
+                           cast(y1) {
+                               tuple{v1} => {op2[y1/x1,*/*]};
+                               tuple{}   => {exists}
+                           }]
+ ----------------------------------------------------------------------------------
+ G[succeeds{op0}@d] |- ProgramOp[c,iterate(u0) x0 d {op0} then x1 {op1} else {op2}]
+-}
+ ++
+  "IterateSucceedsElim" `name`
+  do
+    (ctx, c, OpIterate u0 x0 d op0 x1 op1 op2) <- programOp pg
+    traceM $ "IterateSucceedsElim 1 " ++ prettyShow (c, op0)
+    guard $ not $ null [ () | AEffect fx op0' d' <- g, op0 == op0', d == d',
+                         trace ("IterateSucceedsElim 2 " ++ prettyShow (fx, succeeds, isEffect fx succeeds)) True,
+                         isEffect fx succeeds ]
+    let y1 = newIdents pg "y1"
+        v1 = newIdents pg "v1"
+        vy1 = VertexVariable y1
+        vx0 = VertexVariable x0
+        vx1 = VertexVariable x1
+        pg' = (pg, y1, v1)
+    let op =
+          op0 +>
+          OpExists [vx0, vx1, vy1] +>
+          OpCall vx0 u0 (VInteger 0) +>
+          freshen pg' (alphaConvertVariable [(x1, y1)] op1) +>
+          OpCast vy1 [RHS (PatHead $ HeadTuple [v1]) (freshen pg' $ alphaConvertVariable [(x1, y1)] op2),
+                      RHS (PatHead $ HeadTuple []) OpNoop]
+    
+    g' <- pure (A g) -- gAdd [{-XXX move pointers-}] g
+    pure $ g' :|- ctx c op
+  -- IterateFailsElim
 
 ---------------------------------------------
 
@@ -935,23 +1007,54 @@ remAsmDup (A g :|- pg) = A (nub g) :|- pg
 
 -- Make all bound variables fresh.
 freshen :: Data a => a -> Operation -> Operation
-freshen a aop = transformBi sub aop
+freshen a aop = alphaConvertIdent isub aop
   where
-    sub :: Ident -> Ident
-    sub x | Just x' <- lookup x isub = x'
-        | otherwise = x
     isub :: [(Ident, Ident)]
     isub = zip ids (newIdents a ids)
     ids = execWriter (transformBiM opids aop >> transformBiM lamids aop)
     opids :: Operation -> Writer [Ident] Operation
     opids op@(OpExists vs) = do tell [x | VertexVariable (Variable x) <- vs]; return op
     opids op@(OpIterate _u0 (Variable x0) (Context c0) _op0 (Variable x1) _op1 _op2) = do tell [x0, c0, x1]; return op
-    opids _op@(OpCast _ _ _) = undefined
+    opids _op@(OpCast _ _) = undefined
     opids op = return op
     lamids :: Lambda -> Writer [Ident] Lambda
     lamids lam@(Lambda (Variable i) (Variable x) _op) = do tell [i, x]; return lam
 
+alphaConvertIdent :: [(Ident, Ident)] -> Operation -> Operation
+alphaConvertIdent isub = transformBi sub
+  where
+    sub x | Just x' <- lookup x isub = x'
+          | otherwise = x
+
+alphaConvertVariable :: [(Variable, Variable)] -> Operation -> Operation
+alphaConvertVariable isub = transformBi sub
+  where
+    sub x | Just x' <- lookup x isub = x'
+          | otherwise = x
+
 ---------------------------------------------
+
+{-
+desugar{u=one{e0}} --->
+            iterate(tuple{tuple{}}) x0 c {exists z; desugar{z=e0}}
+                then x1                  {u=z; x1=tuple{}}
+                else                     {u=false()}
+-}
+
+opOne :: Vertex -> (Vertex -> Operation) -> Operation
+opOne u e0 = OpIterate (VTuple [false]) x0 c op0 x1 op1 op2
+  where
+    op0 = OpExists [z] +> e0 z
+    op1 = OpUnify u z +> OpUnify (VertexVariable x1) false
+    op2 = OpCall u false (VInteger 0)
+    false = VTuple []
+    e0u = e0 u
+    x0, x1 :: Variable
+    (x0, x1) = newIdents e0u ("x0", "x1")
+    z :: Vertex
+    z = newIdents e0u "z"
+    c :: Context
+    c = newIdents e0u "c"
 
 -- XXX Output variable is always 'x'
 startConfig :: Operation -> Config
@@ -1060,6 +1163,12 @@ example13 = OpExists [vx] +> OpCall vx (VTuple [a3,a5]) va
   where a5 = VInteger 5
         a3 = VInteger 3
         (vx, va) = newIdents () ("x", "a")
+
+-- example14: ex x . x = one{1|2}
+-- Hand-desugared
+example14 :: Operation
+example14 = OpExists [vx] +> opOne vx (\ u -> OpChoice (OpUnify u (VInteger 1)) (OpUnify u (VInteger 2)))
+  where vx = newIdents () "x"
 
 finalResult :: Operation -> Maybe Vertex
 finalResult = getRes . norm . startConfig
