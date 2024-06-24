@@ -228,6 +228,7 @@ rulesChoice lhs =
   "CHOICE-FAIL-R" `name`
   do e :|: Fail <- [lhs]
      pure e
+{-
  ++
   "CHOICE" `name`
   do (sx, e) <- scopeCtx lhs
@@ -235,11 +236,21 @@ rulesChoice lhs =
      guard (ctx /= HOLE)
      guard (choiceFree ctx)
      pure (sx <@ ((ctx <@ e1) :|: (ctx <@ e2)))
+-}
+ ++
+  -- Simon's new CHOICE rule (without SX)
+  "CHOICE" `name`
+  do let (exis, e) = unExis lhs
+     (ctx, e1 :|: e2) <- evalCtx e
+     guard ((exis <@ ctx) /= HOLE)
+     guard (choiceFree ctx)
+     guard (blkd (bvs exis) ctx)
+     pure ((exis <@ (ctx <@ e1)) :|: (exis <@ (ctx <@ e2)))
  ++
   "FAIL" `name`
   do let (exis, e) = unExis lhs
      (ctx, Fail) <- evalCtx e
-     guard (ctx /= HOLE)
+     guard ((exis <@ ctx) /= HOLE)
      guard (blkd (bvs exis) ctx)
      pure Fail
 
