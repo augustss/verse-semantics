@@ -314,9 +314,11 @@ matchExi_alphaRename zs e =
   | Exi bnd <- [e]
   , let (x,ex) = alphaRename zs bnd
         cxes   = matchExi_alphaRename (x:zs) ex
-  , cxe <- [ (Exi (bind x ctx),y,ey)
+  , cxe <- -- just add "bind x" to the exis
+           [ (Exi (bind x ctx),y,ey)
            | (ctx,y,ey) <- cxes
            ]
+           -- add a case where "bind x" is the variable we're matching on
         ++ case cxes of
              [] -> [ (HOLE,x,ex) ]
              _  -> [ (Exi (bind y ctx),x,ey)
