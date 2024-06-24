@@ -434,6 +434,10 @@ pattern VInteger :: Integer -> Vertex
 pattern VInteger i = VertexHead (HeadAtom (AtomInteger i))
 pattern VLambda :: Variable -> Variable -> Operation -> Vertex
 pattern VLambda i x op = VertexHead (HeadLambda (Lambda i x op))
+pattern VPrim :: String -> Vertex
+pattern VPrim s = VertexHead (HeadAtom (AtomPrimitive s))
+pattern VRational :: Rational -> Vertex
+pattern VRational i = VertexHead (HeadAtom (AtomRational i))
 
 instance Pretty Vertex where
   pPrint (VertexVariable x) = pPrint x
@@ -753,6 +757,8 @@ allRules =
   P.<> unificationRules
   P.<> callingRules
   P.<> iterateChoiceRules
+  P.<> castRules
+  P.<> nativeRules
 
 ---------------------------------------------
 
@@ -967,9 +973,9 @@ iterateChoiceRules _ (A g :|- pg) =
   "IterateSucceedsElim" `name`
   do
     (ctx, c, OpIterate u0 x0 d op0 x1 op1 op2) <- programOp pg
-    traceM $ "IterateSucceedsElim 1 " ++ prettyShow (c, op0)
+--    traceM $ "IterateSucceedsElim 1 " ++ prettyShow (c, op0)
     guard $ not $ null [ () | AEffect fx op0' d' <- g, op0 == op0', d == d',
-                         trace ("IterateSucceedsElim 2 " ++ prettyShow (fx, succeeds, isEffect fx succeeds)) True,
+--                         trace ("IterateSucceedsElim 2 " ++ prettyShow (fx, succeeds, isEffect fx succeeds)) True,
                          isEffect fx succeeds ]
     let y1 = newIdents pg "y1"
         v1 = newIdents pg "v1"
@@ -987,7 +993,39 @@ iterateChoiceRules _ (A g :|- pg) =
     
     g' <- pure (A g) -- gAdd [{-XXX move pointers-}] g
     pure $ g' :|- ctx c op
-  -- IterateFailsElim
+ ++
+  "IterateFailsElim" `name`
+  do
+    (ctx, c, OpIterate _u0 _x0 d op0 _x1 _op1 op2) <- programOp pg
+    guard $ not $ null [ () | AEffect fx op0' d' <- g, op0 == op0', d == d',
+                         isEffect fx fails ]
+    let op = freshen pg op2
+    pure $ A g :|- ctx c op
+
+-----
+-- Casting
+castRules :: Rule Config
+castRules _ (A g :|- pg) =
+  "CastElim" `name`
+  do
+    (ctx, c, OpCast (VertexHead h) arms) <- programOp pg
+    op <- [ opi | RHS (PatHead hi) opi <- arms, h == hi ]
+    pure $ A g :|- ctx c op
+
+-----
+-- Pure Native Functions
+nativeRules :: Rule Config
+nativeRules _ (A g :|- pg) =
+  "IntAtom" `name` do
+  do
+    (ctx, c, OpCall u (VPrim "int") (v@(VInteger _))) <- programOp pg
+    pure $ A g :|- ctx c (OpUnify u v)
+ ++
+  "IntFail" `name` do
+    (_ctx, c, op@(OpCall _u (VPrim "int") (VertexHead (HeadAtom a)))) <- programOp pg
+    guard $ case a of AtomInteger _ -> False; _ -> True
+    g' <- gAdd [AEffect fails op c] g
+    pure $ g' :|- pg
 
 ---------------------------------------------
 
@@ -1168,6 +1206,24 @@ example13 = OpExists [vx] +> OpCall vx (VTuple [a3,a5]) va
 -- Hand-desugared
 example14 :: Operation
 example14 = OpExists [vx] +> opOne vx (\ u -> OpChoice (OpUnify u (VInteger 1)) (OpUnify u (VInteger 2)))
+  where vx = newIdents () "x"
+
+-- example15: ex x . x = one{1=2}
+-- Hand-desugared
+example15 :: Operation
+example15 = OpExists [vx] +> opOne vx (\ u -> OpSeq (OpUnify u (VInteger 1)) (OpUnify u (VInteger 2)))
+  where vx = newIdents () "x"
+
+-- example16 ex x . x = int(5)
+-- Hand-desugared
+example16 :: Operation
+example16 = OpExists [vx] +> OpCall vx (VPrim "int") (VInteger 5)
+  where vx = newIdents () "x"
+
+-- example17 ex x . x = int(5)
+-- Hand-desugared
+example17 :: Operation
+example17 = OpExists [vx] +> OpCall vx (VPrim "int") (VRational (1%2))
   where vx = newIdents () "x"
 
 finalResult :: Operation -> Maybe Vertex
