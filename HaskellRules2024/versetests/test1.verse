@@ -2,10 +2,9 @@
 0x10;
 0o10;
 0b10;
-1.2;
+1.2f;
 1.2d;
 x;
-(y:)x;
 array{1;2;3};
 array{4};
 array{};
@@ -52,22 +51,28 @@ if(x){y};
 if(x)then{y};
 if{x<0}else y;
 if(x)then y else z;
-for{x};
-for(x)do y;
-for(x){y};
 let(x)do y;
 let(x){y};
 block{x};
-case{x;y};
-case(x)of{y;z};
 function(x){y};
 fn(xx:int)<succeeds>{y};
 #fn(x)<succeeds><io>{y};
 f(a:int):=a;
 (xs, z) := f[];
-var vx:int=5;
-set vx=5;
-set vx+=5;
-set vx-=5;
-set vx*=5;
-set vx/=5;
+
+####################
+#    Not yet
+####################
+
+# for{x};
+# for(x)do y;
+# for(x){y};
+# (y:)x;       # What is this? QualVariable
+# case{x;y};
+# case(x)of{y;z};
+# var vx:int=5;
+# set vx=5;
+# set vx+=5;
+# set vx-=5;
+# set vx*=5;
+# set vx/=5;

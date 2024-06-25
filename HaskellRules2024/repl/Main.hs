@@ -357,7 +357,7 @@ cDesugar :: CmdRunner CState
 cDesugar c s = do
   let flg = cs_flags s
   putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform (Desugared . desugar flg . asExpr) c s
+  cTransform (Desugared . FrontEnd.Desugar.desugar flg . asExpr) c s
 
 {-
 cParseLine :: CmdRunner CState

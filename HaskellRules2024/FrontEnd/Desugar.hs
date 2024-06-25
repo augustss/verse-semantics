@@ -41,7 +41,7 @@ import GHC.Stack
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
 
-desugar :: Flags -> SrcExpr -> SrcExpr
+desugar :: Flags -> SrcExpr -> SrcCore
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
             (-- Simplification [drop this for now]
@@ -254,6 +254,8 @@ dsSmall = ds
             elm e = ds e
 
     -- Let do case
+    ds (Let e b) = do { e' <- ds e; b' <- ds b; pure (Seq [e',b']) }  -- (let e in b) --> e; b
+    ds (Block b) = ds b                                               -- do e --> e
     ds (Case1 b) = do
       let l = getLoc b
       x <- Variable <$> newIdent l "x"
@@ -1852,6 +1854,9 @@ dsM_12 s (Lam x t) _pi
 
 dsM_12 _ e@(DefineV _) _
    = pure e
+
+dsM_12 _ Fail _
+   = pure Fail
 
 dsM_12 s t pi
    = error $ "TODO: dsM_12 " ++ show (s, t, pi)
