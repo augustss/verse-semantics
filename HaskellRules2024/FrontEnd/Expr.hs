@@ -17,7 +17,7 @@ module FrontEnd.Expr(
   pattern Check,
 --  pattern Range,
   Store(..), Ptr,
-  Eff,
+  Eff, effSucceeds,
   Op,
   pattern Op,
   compos, composOp,
@@ -40,6 +40,16 @@ import Data.Scientific(Scientific)
 
 import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
 
+
+{- Note [How SrcExpr is parsed]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  This                 is parsed as
+  ------------------------------------------
+  p := e               InfixOp p ":=" e
+  f(p)<fx> := e        InfixOp (EffAttr (ApplyS f p) fx) ":=" e
+
+-}
 
 --------------------------------------------------------
 --
@@ -75,11 +85,11 @@ data SrcExpr
 
   | Let SrcExpr SrcBlk             -- let(e1) in e2
   | Block SrcBlk                   -- do e
-
   | Case1 SrcBlk                   -- case{e1; e2; ... } block treated in a non-standard way
   | Case2 SrcExpr SrcBlk           -- case(e) of {e1; e2; ... } block treated in a non-standard way
+
   | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
---  | Typedef SrcBlk             -- type{e}
+
   | Blk [SrcExpr]                -- { e1; e2; ... }
   | Option (Maybe SrcExpr)       -- option{e}
   | Parens SrcExpr               -- (e)
@@ -102,13 +112,13 @@ data SrcExpr
   | DefineIE Ident Ident SrcExpr -- (i->x) := e
   | Choice SrcExpr SrcExpr       -- e | e
   | Unify SrcExpr SrcExpr        -- e1 = e2
-  | Range SrcExpr                -- :e
+  | Range [Eff] SrcExpr          -- :{fx}e
 
   -- Below here, not source language
   | Wrong String              -- wrong
   | Exists [Ident] SrcExpr    -- exists xs . e
   | Forall [Ident] SrcExpr    -- forall xs . e
-  | OfType SrcExpr SrcExpr    -- e:t, but only type known to verifier
+  | OfType SrcExpr [Eff] SrcExpr    -- e |>{fx} t, but only type known to verifier
   | TLam Ident [Eff] SrcExpr SrcExpr
                               -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
                               -- The last argument is a possible type, (e2:t)
@@ -208,6 +218,9 @@ instance Pretty Ident where
   pPrintPrec _ _ (Ident _ i) = text i
 
 type Eff = Ident
+effSucceeds :: Eff
+effSucceeds = "succeeds"
+
 
 type Op = Ident
 pattern Op :: String -> Op
@@ -245,19 +258,26 @@ instance Pretty SrcExpr where
     | otherwise = ppNice
     where
       ppA (Array es) = ppEs es
-      ppA e = ppr 0 e
+      ppA e          = ppr 0 e
+
       ppB (Blk es) = braces $ ppSeq l es
-      ppB e = braces (ppr 0 e)
+      ppB e        = braces $ ppr 0 e
+
       ppEs = fsep . punctuate comma . map (pPrintPrec l 1)
+
       ppEffs rs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
+
       ppr :: (Pretty a) => Rational -> a -> Doc
       ppr = pPrintPrec l
+
       ppOp = ppr 0
+
       ppNice expr =
         case expr of
           Array es | length es /= 1 -> parens $ ppEs es
 --          Define i (Range t) -> ppNice $ InfixOp (Variable i) (Ident noLoc ":") t
           _ -> ppNormal expr
+
       ppNormal expr =
         case expr of
           Lit lit -> ppr p lit
@@ -303,17 +323,21 @@ instance Pretty SrcExpr where
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $ text "function" <> hcat (map ppArs ars) <> ppB b
             where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
-          Blk es -> braces $ ppSeq l es
 --          Typedef e -> text "type" <> ppB e
-          Option me -> text "option" <> braces (maybe empty (ppr 0) me)
-          Parens e -> parens (ppr 0 e)
+          Blk es       -> braces $ ppSeq l es
+          Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
+          Parens e     -> parens (ppr 0 e)
           Set e1 op e2 -> text "set" <+> ppr 0 (InfixOp e1 op e2)
-          MVar i t e -> ppVRA "var" i t e
-          MRef i t e -> ppVRA "ref" i t e
+          MVar i t e   -> ppVRA "var" i t e
+          MRef i t e   -> ppVRA "ref" i t e
           MAlias i t e -> ppVRA "alias" i t e
-          Macro1 (Ident _ m) rs e -> text m <> ppEffs rs <> ppB e
-          Macro2 (Ident _ m) e1 e2 -> text m <> parens (ppr 0 e1) <> ppB e2
+
+          Macro1 (Ident _ m) rs e  -> text m <> ppEffs rs <> ppB e
+          Macro2 (Ident _ m) e1 e2 -> sep [ text m <> parens (ppr 0 e1)
+                                          , nest 2 (ppB e2) ]
+
           Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
+
           ----
           DefineV i -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any")))
           DefineE i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
@@ -326,7 +350,7 @@ instance Pretty SrcExpr where
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
           Forall is e -> maybeParens (p > 0) $ sep [text "forall" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
-          OfType e t -> --ppNormal (InfixOp e (Op ":") t)
+          OfType e fx t -> --ppNormal (InfixOp e (Op ":") t)
                          text "ofType" <> parens (ppr 0 e) <> braces (ppr 0 t)
           TLam i rs e1 e2 -> text "tlam" <>
                                  parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2)
@@ -347,7 +371,8 @@ instance Pretty Store where
   pPrintPrec l _ (Store m _) = fsep . punctuate comma . map (pPrintPrec l 0) . IM.toList $ m -- XXX
 
 ppSeq :: PrettyLevel -> [SrcExpr] -> Doc
-ppSeq l es = sep $ punctuate (text ";") (map (pPrintPrec l 0) es)
+ppSeq l es = sep $ punctuate (text ";") $
+             map (pPrintPrec l 0) es
 
 --------------------------------------------------------
 --               Knowledge of fixity

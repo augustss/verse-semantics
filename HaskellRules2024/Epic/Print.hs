@@ -27,6 +27,7 @@ indent :: Doc -> Doc
 indent = nest 2
 
 pp :: (Pretty a) => a -> IO ()
+-- Pretty-print the argument
 pp = putStrLn . prettyShow
 
 ppl :: (Pretty a) => PrettyLevel -> a -> IO ()
