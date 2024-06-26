@@ -4,8 +4,6 @@ import Control.Monad( guard )
 import TRS.Bind
 import Rules.Core
 
-import Data.List( (\\) )
-
 --------------------------------------------------------------------------------
 
 rules :: Rule
@@ -21,6 +19,9 @@ rules = rulesApplication
 name :: String -> [Expr] -> [(String,Expr)]
 name s es = [ (s,e) | e <- es ]
 
+iff :: [Bool] -> [()]
+iff conds = [()| and conds]
+
 --------------------------------------------------------------------------------
 
 -- value contexts
@@ -29,30 +30,42 @@ isV x e = x==e || case e of
                     Arr es -> any (isV x) es
                     _      -> False
 
--- evaluation contexts (no existentials anymore!)
-evalCtx :: Expr -> [(Context, Expr)]
-evalCtx lhs =
+-- evaluation contexts
+evalCtx :: [Ident] -> Expr -> [(Context, Expr)]
+evalCtx zs lhs =
   do pure (HOLE, lhs)
  ++
+  do Exi bnd <- [lhs]
+     let (x,e) = alphaRename zs bnd
+     (ctx, h) <- evalCtx (x:zs) e
+     pure (Exi (bind x ctx), h)
+ ++
   do (v :=: e1) :>: e2 <- [lhs]
-     (ctx, h) <- evalCtx e1
+     (ctx, h) <- evalCtx zs e1
      pure ((v :=: ctx) :>: e2, h)
  ++
   do (v :=: e1) :>: e2 <- [lhs]
-     (ctx, h) <- evalCtx e2
+     (ctx, h) <- evalCtx zs e2
      pure ((v :=: e1) :>: ctx, h)
 
--- valid/blkd
-validC :: Ident -> [Ident] -> Context -> Bool
-validC x ys HOLE        = True
-validC x ys ((v :=: e) :>: ctx)
-  | x `elem` zs = blkd (x:ys) ((v :=: e) :>: ctx)
-  | otherwise   = (blkd (x:ys) e && validC x ys ctx)
-                  || validC x (filter (`notElem` zs) ys) ctx
- where
-  zs = free (v,e)
-validC x ys _ = False
+evalCtxLift :: [Ident] -> Expr -> [(Context, Context, Expr)]
+evalCtxLift zs lhs =
+  do pure (HOLE, HOLE, lhs)
+ ++
+  do Exi bnd <- [lhs]
+     let (x,e) = alphaRename zs bnd
+     (exis, ctx, h) <- evalCtxLift (x:zs) e
+     pure (Exi (bind x exis), ctx, h)
+ ++
+  do (v :=: e1) :>: e2 <- [lhs]
+     (exis, ctx, h) <- evalCtxLift zs e1
+     pure (exis, (v :=: ctx) :>: e2, h)
+ ++
+  do (v :=: e1) :>: e2 <- [lhs]
+     (exis, ctx, h) <- evalCtxLift zs e2
+     pure (exis, (v :=: e1) :>: ctx, h)
 
+-- blkd
 type Expr_or_Context = Expr
 
 blkd :: [Ident] -> Expr_or_Context -> Bool
@@ -81,13 +94,6 @@ choiceFree (v1 :@: v2)         = case v1 of
                                    Op _ -> True -- all ops we support are choice-free right now
                                    _    -> False
 choiceFree _                   = True
-
--- scope contexts
-scopeCtx :: Expr -> [(Context, Expr)]
-scopeCtx (One e)     = [(One HOLE, e)]
-scopeCtx (All e)     = [(All HOLE, e)]
-scopeCtx (e1 :|: e2) = [(HOLE :|: e2, e1), (e1 :|: HOLE, e2)]
-scopeCtx _           = []
 
 --------------------------------------------------------------------------------
 
@@ -173,14 +179,13 @@ rulesUnification lhs =
 rulesExistentials :: Rule
 rulesExistentials lhs =
   "EXI-SUBST" `name`
-  do (exis,x,ctx_xv_e) <- matchExi_alphaRename [] lhs
-     (ctx, x_eq_v :>: e) <- evalCtx ctx_xv_e
-     (Var x',v) <- matchEq x_eq_v
-     guard (x == x')
+  do (exis, ctx, x_eq_v :>: e) <- evalCtxLift (free lhs) lhs
+     (Var x,v) <- matchEq x_eq_v
+     guard (x `elem` bvs exis)
      guard (isVal v)
      guard (x `notElem` free v)
-     guard (validC x (bvs exis) ctx)
-     pure (exis <@ (subst [(x,v)] (ctx <@ e)))
+     guard (blkd (bvs exis) ctx)
+     pure (exis <@ subst [(x,v)] (ctx <@ e))
  ++
   "EXI-ELIM" `name`
   do (exis,x,e) <- matchExi_alphaRename [] lhs
@@ -188,16 +193,14 @@ rulesExistentials lhs =
      pure (exis <@ e)
  ++
   "EXI-FLOAT" `name`
-  do (ctx,exi_x_e) <- evalCtx lhs
-     guard (ctx /= HOLE)
-     (exis,x,e) <- matchExi_alphaRename (free ctx) exi_x_e
-     pure (Exi (bind x (ctx <@ (exis <@ e))))
+  do (v :=: exi_x_e1) :>: e2 <- [lhs]
+     (exis,x,e1) <- matchExi_alphaRename (free (v,e2)) exi_x_e1
+     pure (Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
  ++
-  "EXI-CHOICE" `name`
-  do (exis,x,e) <- matchExi_alphaRename [] lhs
-     (ctx,e1 :|: e2) <- evalCtx e
-     guard (x `notElem` free ctx)
-     pure (exis <@ (ctx <@ (Exi (bind x e1) :|: Exi (bind x e2))))
+  "EXI-PUSH" `name`
+  do (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] lhs
+     guard (x `notElem` free (v,e1))
+     pure (exis <@ ((v :=: e1) :>: Exi (bind x e2)))
 
 --------------------------------------------------------------------------------
 
@@ -228,30 +231,18 @@ rulesChoice lhs =
   "CHOICE-FAIL-R" `name`
   do e :|: Fail <- [lhs]
      pure e
-{-
  ++
   "CHOICE" `name`
-  do (sx, e) <- scopeCtx lhs
-     (ctx, e1 :|: e2) <- evalCtx e
+  do (ctx, e1 :|: e2) <- evalCtx [] lhs
      guard (ctx /= HOLE)
      guard (choiceFree ctx)
-     pure (sx <@ ((ctx <@ e1) :|: (ctx <@ e2)))
--}
- ++
-  -- Simon's new CHOICE rule (without SX)
-  "CHOICE" `name`
-  do let (exis, e) = unExis lhs
-     (ctx, e1 :|: e2) <- evalCtx e
-     guard ((exis <@ ctx) /= HOLE)
-     guard (choiceFree ctx)
-     guard (blkd (bvs exis) ctx)
-     pure ((exis <@ (ctx <@ e1)) :|: (exis <@ (ctx <@ e2)))
+     guard (blkd [] ctx)
+     pure ((ctx <@ e1) :|: (ctx <@ e2))
  ++
   "FAIL" `name`
-  do let (exis, e) = unExis lhs
-     (ctx, Fail) <- evalCtx e
-     guard ((exis <@ ctx) /= HOLE)
-     guard (blkd (bvs exis) ctx)
+  do (ctx, Fail) <- evalCtx [] lhs
+     guard (ctx /= HOLE)
+     guard (blkd [] ctx)
      pure Fail
 
 --------------------------------------------------------------------------------
