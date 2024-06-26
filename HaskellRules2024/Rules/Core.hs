@@ -97,7 +97,7 @@ showP p e | parens e  = "(" ++ show e ++ ")"
   parens (_ :>: _)  = 1 <= p
   parens (_ :=: _)  = True
   parens (_ :|: _)  = True
-  parens (_ :@: _)  = True
+  --parens (_ :@: _)  = True
   parens (Exi _)    = True
   parens (_ :>>: _) = True
   parens _          = False
