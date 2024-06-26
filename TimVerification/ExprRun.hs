@@ -423,6 +423,19 @@ instance Pretty Head where
 
 type KnownValue = Head  -- Nested tuples are always KnownValue
 
+pattern Known :: Head -> KnownValue
+pattern Known h <- (getKnown -> Just h)
+  where Known h | isJust (getKnown h) = h
+                | otherwise = error "Known: not a known value"
+
+getKnown :: Head -> Maybe Head
+getKnown h@(HeadAtom _) = Just h
+getKnown h@(HeadLambda _) = Just h
+getKnown h@(HeadTuple vs) | all isKnown vs = Just h
+                          | otherwise = Nothing
+  where isKnown (VertexHead hh) = isJust (getKnown hh)
+        isKnown (VertexVariable _) = False
+
 data Vertex
   = VertexVariable Variable                           -- x
   | VertexHead Head                                   -- head
@@ -1009,8 +1022,19 @@ castRules _ (A g :|- pg) =
   "CastElim" `name`
   do
     (ctx, c, OpCast (VertexHead h) arms) <- programOp pg
-    op <- [ opi | RHS (PatHead hi) opi <- arms, h == hi ]
+    op <- [ opi | RHS (PatHead hi) opi <- arms, match hi h ]
     pure $ A g :|- ctx c op
+
+match :: Head -> Head -> Bool
+match (HeadAtom a) (HeadAtom a') = a == a'
+match (HeadLambda _) (HeadLambda _) = error "match: lambda"
+match (HeadTuple vs) (HeadTuple vs') | length vs == length vs' = and $ zipWith matchVertex vs vs'
+match _ _ = False
+
+matchVertex :: Vertex -> Vertex -> Bool
+matchVertex (VertexHead h) (VertexHead h') = match h h'
+matchVertex (VertexVariable (Variable (Ident "_"))) _ = True
+matchVertex _ _ = error "matchVertex: variable"
 
 -----
 -- Pure Native Functions
@@ -1026,6 +1050,11 @@ nativeRules _ (A g :|- pg) =
     guard $ case a of AtomInteger _ -> False; _ -> True
     g' <- gAdd [AEffect fails op c] g
     pure $ g' :|- pg
+ ++
+  "Add" `name` do
+    (ctx, c, OpCall u (VPrim "add") (VTuple [VRational x, VRational y])) <- programOp pg
+    pure $ A g :|- ctx c (OpUnify u (VRational (x+y)))
+    
 
 ---------------------------------------------
 
@@ -1220,10 +1249,16 @@ example16 :: Operation
 example16 = OpExists [vx] +> OpCall vx (VPrim "int") (VInteger 5)
   where vx = newIdents () "x"
 
--- example17 ex x . x = int(5)
+-- example17 ex x . x = int(1%2)
 -- Hand-desugared
 example17 :: Operation
 example17 = OpExists [vx] +> OpCall vx (VPrim "int") (VRational (1%2))
+  where vx = newIdents () "x"
+
+-- example18 ex x . x = add(tuple{1,2})
+-- Hand-desugared
+example18 :: Operation
+example18 = OpExists [vx] +> OpCall vx (VPrim "add") (VTuple [VInteger 1, VInteger 2])
   where vx = newIdents () "x"
 
 finalResult :: Operation -> Maybe Vertex
