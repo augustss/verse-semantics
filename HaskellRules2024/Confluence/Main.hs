@@ -29,13 +29,18 @@ prop_Confluent =
        let tr = normalize (\e -> permf e (trs2024 e)) p
        return (p,tr)
  
-  shrinkFork (p, _ :<-- tr) = 
+  shrinkFork (p, q :<-- tr) = 
     [ (p', q' :<-- [(s,p')])
-    | p' <- case tr of
-              _:_:_ -> [ r | (_,r) <- tr ]
-              _     -> shrink p ++ map snd (trs2024 p)
-    , valid p'
-    , (s,q') <- trs2024 p'
+    | (p',s,q') <-
+        case tr of
+          _:_:_ -> [ (p',s,q')
+                   | ((s,p'),q') <- tr `zip` (q : map snd tr)
+                   ]
+          _     -> [ (p',s,q')
+                   | p' <- shrink p ++ map snd (trs2024 p)
+                   , valid p'
+                   , (s,q') <- trs2024 p'
+                   ]
     ]
 
 --------------------------------------------------------------------------------
