@@ -2,8 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module FrontEnd.Desugar(
     desugar,
-    dsScope,
-    getFree, substMany, getAllVars,
+    dsScope
   ) where
 
 import Prelude hiding (pi)
@@ -26,7 +25,6 @@ import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Writer hiding (guard)
 import Debug.Trace
-import GHC.Stack
 --import qualified Data.Map as M
 
 -- QUESTIONS:
@@ -43,25 +41,25 @@ import GHC.Stack
 
 desugar :: Flags -> SrcExpr -> SrcCore
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
-desugar flgs = eval flgs .
+desugar flgs = runD flgs .
             (-- Simplification [drop this for now]
 {-
              traceDS "simpler"    <=< simpler   <=<  -- verifier breaks without this
              traceDS "simplify"   <=< simplify  <=<
 
              -- Desugaring
-             traceDS "primops"    <=< primops   <=<    -- Var (Ident "op") --> EPrim op
              traceDS "lower"      <=< lower     <=<    -- Lowers all/one/for/if into split or whatever
              traceDS "addScope"   <=< addScope  <=<    -- x:e -->  exists x. ....(x=e)....
                                                        -- if --> If3B,  for --> For2B
 -}
-             traceDS "lowerApply" <=< lowerApply<=<    -- Round vs square
+--             traceDS "lowerApply" <=< lowerApply<=<    -- Round vs square
 
              traceDS "dsD"        <=< dsDx      <=<    -- Heavy lifting: Fig 9
 
              traceDS "addDeref"   <=< addDeref  <=<    -- Side effects
              traceDS "dsSmall"    <=< dsSmall   <=<    -- Main desugaring into Small Source
 
+             traceDS "primops"    <=< primops   <=<    -- Var (Ident "op") --> EPrim op
              traceDS "addPrelude" <=< addPrelude <=<   -- Prepends prelude from
                                                        --    verifyprelude.verse, mediumprelude.verse
 
@@ -79,7 +77,7 @@ desugar flgs = eval flgs .
                          pure e
                   | otherwise = pure e
     addPrelude e = pure $ addUsed prel e
-    prel = spl $ eval flgs $ syntaxFixes $ snd $ fPrelude flgs
+    prel = spl $ runD flgs $ syntaxFixes $ snd $ fPrelude flgs
 
     -- Split the prelude into an association list
     spl (Array ds) = map (\ e -> (nameOf e, e)) ds
@@ -99,19 +97,12 @@ addUsed :: [(Ident, SrcExpr)] -> SrcExpr -> SrcExpr
 addUsed prel = loop []
   where
     loop vs e =
-      let is = allIdents e
+      let is = getAllIdents e
           ps = filter (\ (i, _) -> i `elem` is && i `notElem` vs) prel
       in  case ps of
             [] -> e
             ies -> loop (map fst ies ++ vs) $ seqE (map snd ies ++ [e])
 
-allIdents :: SrcExpr -> [Ident]
--- Find all occurrences, ignoring binders (hence hacky)
-allIdents e = Epic.List.nub (execWriter (vars e))
-  where
-    vars :: SrcExpr -> Writer [Ident] SrcExpr
-    vars ev@(Variable i) = do tell [i]; pure ev
-    vars ev              = compos vars ev
 {-
 allIdents = universeBi . transform fixops
   where
@@ -188,24 +179,27 @@ syntaxFixes = pure . f
 
 ---------------------
 
-eval :: Flags -> D SrcExpr -> SrcExpr
+runD :: Flags -> D SrcExpr -> SrcExpr
 -- Runs the D monad
-eval flgs = flip evalState DState{ nextNo = 1, dflags = flgs }
+runD flgs = flip evalState DState{ nextNo = 1, dflags = flgs }
 
--- Desugar into Small Source Verse
+
+
+--------------------------------------------------------
+--
+--         Desugar into Small Source Verse
+--
+--------------------------------------------------------
+
 dsSmall :: SrcExpr -> D SrcExpr
 dsSmall = ds
   where
     ds :: SrcExpr -> D SrcExpr
     -- Application and unification
 
-    -- (e1 where e2)  -->   ( x ::= e1; e2; x)
-    ds (InfixOp e1 (Op "where") e2) = do
-      x <- newIdent (getLoc e1) "x"
-      ds $ seqE [DefineE x e1, e2, Variable x]
-
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
-      where applyS x y = Succeeds (ApplyD x y)
+      where
+        applyS x y = eCheck [effSucceeds] (ApplyD x y)
 
     -- (e1 = e2)  --->
     ds (InfixOp e1 (Op "=") e2) = Unify <$> ds e1 <*> ds e2
@@ -218,9 +212,12 @@ dsSmall = ds
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Function notation
-    ds (Typedef e) = do x <- newIdent (getLoc e) "x"; ds $ Function [(DefineE x e, [closedId])] (Variable x)
+    ds (Typedef e) = do { x <- newIdent (getLoc e) "x"
+                        ; ds $ Function [(DefineE x e, [closedId])] (Variable x) }
+
     ds (InfixOp e1 (Op "=>") e2) = ds $ Function [(e1, [closedId])] e2
     ds (Function (a:as@(_:_)) b) = ds $ Function [a] $ Function as b
+
 -- not yet
 --  ds (Function [(e, ps@(_:_))] b) = ds $ Function [(e, [])] $ Check ps b
     ds (Function [(e1, effs)] e2) = do
@@ -256,15 +253,22 @@ dsSmall = ds
       where elm (PrefixOp (Ident l "..") e) = PrefixOp (Ident l "..") <$> ds e
             elm e = ds e
 
-    -- Let do case
-    ds (Let e b) = do { e' <- ds e; b' <- ds b; pure (Seq [e',b']) }  -- (let e in b) --> e; b
-    ds (Block b) = ds b                                               -- do e --> e
+    -- Let and where
+    --    (let e in b) --> e; b
+    --    (e1 where e2)  -->   ( x ::= e1; e2; x)
+    ds (Let e b) = do { e' <- ds e; b' <- ds b; pure (Seq [e',b']) }
+    ds (InfixOp e1 (Op "where") e2) = do
+      x <- newIdent (getLoc e1) "x"
+      ds $ seqE [DefineE x e1, e2, Variable x]
+
+    -- Do and case
     ds (Case1 b) = do
       let l = getLoc b
       x <- Variable <$> newIdent l "x"
       ds $ Function [(InfixOp x (Op ":") eAny, [])] $ Case2 x b
     ds (Case2 _ _) = undefined
-    ds (Blk es) = ds $ seqE es
+    ds (Block b)   = ds b                                               -- do e --> e
+    ds (Blk es)    = ds $ seqE es
 
     ds (Seq es) = seqE <$> mapM ds es
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
@@ -462,9 +466,6 @@ dsDx e = do
     DS12 -> dsD_12 e
 
 
-unifyV :: Ident -> SrcExpr -> SrcExpr
-unifyV i e = Unify (Variable i) e
-
 existsV :: [Ident] -> SrcExpr -> SrcExpr
 existsV is e = --seqE $ map (\ i -> Define i AnyT) is ++ [e]
                Exists is e
@@ -504,8 +505,13 @@ _isLambdaEffect i = elem i [
 closedId :: Ident
 closedId = Ident noLoc "closed"
 
-openId :: Ident
-openId = Ident noLoc "open"
+traceD :: String -> Doc -> D ()
+traceD msg doc
+  = do { flg <- gets dflags
+       ; if fTraceDesugar flg
+         then trace ("---- " ++ msg ++ "\n" ++ render doc) $
+              return ()
+         else return () }
 
 errUndefined :: [Ident] -> D ()
 errUndefined is = do
@@ -532,8 +538,14 @@ errMultiple =
   mapM_ (\ is -> errorMessage $ "multiply defined: " ++ prettyShow (head is) ++
                          prettyShow [ l | Ident l _ <- is ])
 
+--------------------------------------------------------
+--
+--         Add scoping
+--
+--------------------------------------------------------
+
 dsScope :: Flags -> SrcExpr -> SrcExpr
-dsScope flgs = eval flgs . (primops <=< addScope)
+dsScope flgs = runD flgs . (primops <=< addScope)
 
 addScope :: SrcExpr -> D SrcExpr
 addScope e = scope (S.fromList primOps) (Block e)
@@ -583,7 +595,7 @@ scope sc = expr
     expr (Exists _ e) = expr e
     expr (Lam i e) = Lam i <$> scopeD' (S.insert i sc) e
     expr Fail = pure Fail
-    expr (Forall is e) = Forall is <$> scopeD' sc' e
+    expr (Verify is e) = Verify is <$> scopeD' sc' e
       where sc' = foldr S.insert sc is
     expr e = impossible e
 
@@ -607,7 +619,7 @@ scope sc = expr
     -- along with extended scope-set and transformed `e`.
     defs' as e = do
       let -- Get all binders from e
-          is = getVisible e
+          is = getVisibleBinders e
           -- errM: find ones that are defined more than once
           errM = filter ((> 1) . length) $ group $ sort is
 
@@ -619,109 +631,6 @@ scope sc = expr
       errShadow errS
       pure (is, e', s')
 
--- Get all visible binders from i := e
--- By "visible" we mean not nested inside anoter scope.
--- E.g.   getVisible ( x:=3; (y:=4 | 5); 
---        returns [x,y], but not z.
-getVisible :: HasCallStack => SrcExpr -> [Ident]
-
--- These two equations are the main payload
-getVisible (DefineV i)     = [i]
-getVisible (DefineE i e)   = i : getVisible e
-
--- The rest is just recursive traversal
-getVisible Lit{}          = []
-getVisible Variable{}     = []
-getVisible (Seq es)       = concatMap getVisible es
-getVisible (Array es)     = concatMap getVisible es
-getVisible (ApplyS e1 e2) = getVisible e1 ++ getVisible e2
-getVisible (ApplyD e1 e2) = getVisible e1 ++ getVisible e2
-getVisible (If3 {})       = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
-                                --     So this would be wrong: getVisible (If3 e _ _) = getVisible e
-getVisible For2{}         = []
-getVisible (Let _ e)      = getVisible e   -- ToDo: why not first arg?
-getVisible Block{}        = []
-getVisible (Unify e1 e2)  = getVisible e1 ++ getVisible e2
---getVisible (Typedef _)  = []
-getVisible (Macro1 (Ident _ "some") _ e)    = getVisible e
-getVisible (Macro2 (Ident _ "guard") e1 e2) = getVisible e1 ++ getVisible e2
-getVisible Macro1 {}                        = []
-getVisible Choice{}        = []
-getVisible (Range _fx e)   = getVisible e
-getVisible Function{}      = []
-getVisible (Exists is e)   = is ++ getVisible e   -- ToDo: really?
-getVisible (Forall _is _e) = []  -- Forall is a new scope
-getVisible (OfType _ _ _)  = []
-getVisible Lam{}           = [] 
-getVisible Fail            = []
-getVisible DomainFail      = []
---getVisible (Map es)      = concatMap getVisible es
-getVisible e = impossible e
-
-getVar :: HasCallStack => SrcExpr -> [Ident]
-getVar Lit{} = []
-getVar Variable{} = []
-getVar (Array es) = concatMap getVar es
-getVar (Seq es) = concatMap getVar es
-getVar (ApplyS e1 e2) = getVar e1 ++ getVar e2
-getVar (ApplyD e1 e2) = getVar e1 ++ getVar e2
--- getVar If3{} = []
-getVar (If3 e _ _) = getVar e
-getVar For2{} = []
-getVar (Let _ e) = getVar e
-getVar Block{} = []
-getVar (Unify e1 e2) = getVar e1 ++ getVar e2
-getVar Macro1 {} = []
-getVar (DefineV _) = []
-getVar (DefineE _ e) = getVar e
-getVar (DefineIE _ _ e) = getVar e
-getVar Choice{} = []
-getVar (Set _ _ e) = getVar e
-getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
-getVar (Range _fx e) = getVar e
-getVar Function{} = []
-getVar (Exists _ e)   = getVar e
-getVar (Forall _ e)   = getVar e
-getVar (OfType e _ t) = getVar e ++ getVar t
-getVar Lam{} = []
-getVar Fail = []
-getVar DomainFail = []
-getVar e = impossible e
-
--- Primitives
-primOps :: [Ident]
-primOps = map (Ident noLoc)
-  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$"
-  , "isPtr$", "isArr$", "isFcn$", "isPath$", "isMap$"
-
-  , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
-  , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
-
-  , "ratAdd$", "ratSub$", "ratMul$", "ratDiv$", "ratNeg$", "ratPlus$"
-  , "ratLT$", "ratLE$", "ratGT$", "ratGE$", "ratNE$"
-
-  , "f32Add$", "f32Sub$", "f32Mul$", "f32Div$", "f32Neg$", "f32Plus$"
-  , "f32LT$", "f32LE$", "f32GT$", "f32GE$", "f32NE$"
-
-  , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
-  , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
-
-
-  , "mkMap$"
-  , "concat$", "cons$"
-  , "length$"
-  , "alloc$", "read$", "write$"
-  , "in'..'"
-  , "in'+='", "in'-='", "in'*='", "in'/='"
-  , "print$"
-  , "append$"
-  , "known$"  -- This is a horrible hack
-  , "any$"
-  , "fail$"
-  , "err$"
-  , "arrLen$"
-  , "arrConc$"
-  ]
 
 ------------------------
 
@@ -741,7 +650,11 @@ addExist = pure . f
     ex e = Exists [] e
 -}
 
-------------------------
+--------------------------------------------------------
+--
+--         Simplification
+--
+--------------------------------------------------------
 
 simplify :: SrcExpr -> D SrcExpr
 simplify expr = do
@@ -802,7 +715,7 @@ inlineVal' expr = evalState (inl expr) []
           inl $ Exists [i] $ Seq [ Unify (Variable i) a, e]
         _ -> ApplyD <$> inl f <*> inl a
     inl (Exists is e) = Exists is <$> withNotIn is  (inl e)
-    inl (Forall is e) = Forall is <$> withNotIn is  (inl e)
+    inl (Verify is e) = Verify is <$> withNotIn is  (inl e)
     inl (Lam i e)     = Lam    i  <$> withNotIn [i] (inl e)
     inl e = compos inl e
 
@@ -975,7 +888,12 @@ isTempIdent :: Ident -> Bool
 isTempIdent (Ident _ ('$':_)) = True
 isTempIdent _ = False
 
--------------------------
+
+--------------------------------------------------------
+--
+--         Adding dereferencing
+--
+--------------------------------------------------------
 
 addDeref :: SrcExpr -> D SrcExpr
 addDeref = pure . exprD S.empty
@@ -1031,8 +949,16 @@ addDeref = pure . exprD S.empty
 
     applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
 
----------------------------------
 
+--------------------------------------------------------
+--
+--         Lowering (whatever that is)
+--
+--------------------------------------------------------
+
+------------------------------------------------------------------------------------
+
+{-
 -- Applications have to be lowered before scope insertion
 -- so existential get inserted in the right place.
 lowerApply :: SrcExpr -> D SrcExpr
@@ -1059,21 +985,14 @@ lower (Unify e1 e2) = Unify <$> lower e1 <*> lower e2
 lower (Choice e1 e2) = Choice <$> lower e1 <*> lower e2
 lower (For2B is e1 e2) = join $ lowerFor is <$> lower e1 <*> lower e2
 lower (If3B is e1 e2 e3) = join $ lowerIf is <$> lower e1 <*> lower e2 <*> lower e3
-lower (Macro1 (Ident _ "all") [] e) = lowerAll =<< lower e
-lower (Macro1 (Ident _ "one") [] e) = lowerOne =<< lower e
-lower (Succeeds e) = lowerSucceeds =<< lower e
-lower (Macro1 (Ident _ "decides") [] e) = lowerDecides =<< lower e
-lower (Macro1 (Ident _ "assume") [] e)  = lowerAssume =<< lower e
-lower (Macro1 (Ident _ "some") [] e)    = lowerSome   =<< lower e
-lower (Macro1 (Ident _ "verify") [] e)  = lowerVerify =<< lower e
-lower (Macro1 (Ident _ "assert") [] e)  = lowerAssert =<< lower e
-lower (Macro1 (Ident _ "lowered") [] e) = pure e
+lower (Macro1 (Ident _ "all") [] e)    = lowerAll =<< lower e
+lower (Macro1 (Ident _ "one") [] e)    = lowerOne =<< lower e
+lower (Macro1 (Ident _ "some") [] e)   = lowerSome   =<< lower e
 lower (Macro2 (Ident _ "guard") e1 e2) = eGuard <$> lower e1 <*> lower e2
 lower (Exists is e) = lExists is <$> lower e
-lower (OfType e fx t) = join $ lowerOfType fx <$> lower e <*> lower t
 lower (Lam i e) = Lam i <$> lower e
 lower Fail = pure Fail
-lower (Forall is e) = Forall is <$> lower e
+lower (Verify is e) = Verify is <$> lower e
 lower e = impossible e
 
 -- Lower a for loop
@@ -1168,22 +1087,6 @@ lowerIfOne is e1 e2 e3 = do
   pure $ eForce $ eOne $ Choice e1e2 (eThunk e3)
 
 
-hasEff :: String -> [Ident] -> Bool
-hasEff r rs = Ident noLoc r `elem` rs
-
-lowerOfType :: [Eff] -> SrcExpr -> SrcExpr -> D SrcExpr
-lowerOfType _fx e t = do    -- ToDo: what about fx?
-  verif <- gets (fVerify . dflags)
-  if verif then
-    lowerOfTypeVerify e t
-   else
-    lowerSucceeds (ApplyD t e)
-
-lowerOfTypeVerify :: SrcExpr -> SrcExpr -> D SrcExpr
-lowerOfTypeVerify e t = do
-  x <- newIdent (getLoc t) "x"
-  pure $ Seq [ eVerify $ eAssert $ ApplyD t e, eAssume $ Forall [x] $ ApplyD t (Variable x) ]
-
 lowerAll :: SrcExpr -> D SrcExpr
 lowerAll e = do
   useSplit <- gets (fSplit . dflags)
@@ -1217,6 +1120,7 @@ lowerOneSplit e = do
   v <- newIdent (getLoc e) "v"
   pure $ Split e (eThunk Fail) (Lam v $ Lam underscore $ Lam underscore $ Variable v)
 
+{-
 lowerSucceeds :: SrcExpr -> D SrcExpr
 lowerSucceeds e = do
   useSplit <- gets (fSplit . dflags)
@@ -1269,26 +1173,66 @@ lowerDecidesSplit e = do
 
 lowerAssume :: SrcExpr -> D SrcExpr
 lowerAssume e = pure $ eAssume e
+lowerAssert :: SrcExpr -> D SrcExpr
+lowerAssert e = pure $ eAssert e
+
+-}
 
 lowerSome :: SrcExpr -> D SrcExpr
 lowerSome e = pure $ eSome e
 
-lowerVerify :: SrcExpr -> D SrcExpr
-lowerVerify e = pure $ eVerify e
-
-lowerAssert :: SrcExpr -> D SrcExpr
-lowerAssert e = pure $ eAssert e
+-}
 
 
-
------------------
+--------------------------------------------------------
+--
+--         Primops
+--
+--------------------------------------------------------
 
 primops :: SrcExpr -> D SrcExpr
+-- Replace (Variable (Ident "op")) with (EPrim "op")
 primops = f
   where
     f (Variable (Ident _ s)) | Ident noLoc s `S.member` prim = pure $ EPrim s
     f e = compos f e
     prim = S.fromList primOps
+
+-- Primitives
+primOps :: [Ident]
+primOps = map (Ident noLoc)
+  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$"
+  , "isPtr$", "isArr$", "isFcn$", "isPath$", "isMap$"
+
+  , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
+  , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
+
+  , "ratAdd$", "ratSub$", "ratMul$", "ratDiv$", "ratNeg$", "ratPlus$"
+  , "ratLT$", "ratLE$", "ratGT$", "ratGE$", "ratNE$"
+
+  , "f32Add$", "f32Sub$", "f32Mul$", "f32Div$", "f32Neg$", "f32Plus$"
+  , "f32LT$", "f32LE$", "f32GT$", "f32GE$", "f32NE$"
+
+  , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
+  , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
+
+
+  , "mkMap$"
+  , "concat$", "cons$"
+  , "length$"
+  , "alloc$", "read$", "write$"
+  , "in'..'"
+  , "in'+='", "in'-='", "in'*='", "in'/='"
+  , "print$"
+  , "append$"
+  , "known$"  -- This is a horrible hack
+  , "any$"
+  , "fail$"
+  , "err$"
+  , "arrLen$"
+  , "arrConc$"
+  ]
+
 
 {-
   where
@@ -1507,8 +1451,8 @@ eAssert = Macro1 (Ident noLoc "assert") []
 eAssume :: SrcExpr -> SrcExpr
 eAssume = Macro1 (Ident noLoc "assume") []
 
-eVerify :: SrcExpr -> SrcExpr
-eVerify = Macro1 (Ident noLoc "verify") []
+eVerify :: [Ident] -> SrcExpr -> SrcExpr
+eVerify = Verify
 
 eDecide :: SrcExpr -> SrcExpr
 eDecide = Macro1 (Ident noLoc "decides") []
@@ -1519,18 +1463,17 @@ eFails = Macro1 (Ident noLoc "fails") []
 eGuard :: SrcExpr -> SrcExpr -> SrcExpr
 eGuard e1 e2 = Macro2 (Ident noLoc "guard") e1 e2
 
-eSeq :: SrcExpr -> SrcExpr -> SrcExpr
-eSeq e1 e2 = Seq (getSeqs e1 ++ getSeqs e2)
-
-getSeqs :: SrcExpr -> [SrcExpr]
-getSeqs (Seq es) = es
-getSeqs e        = [e]
-
 eSome :: SrcExpr -> SrcExpr
 eSome = Macro1 (Ident noLoc "some") []
 
 eCheck :: [Eff] -> SrcExpr -> SrcExpr
 eCheck fx e = Macro1 (Ident noLoc "check") fx e
+
+eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
+-- (eApply f x)  returns  f[x]
+-- But has a short-cut for any$[x]
+eApplyD (EPrim "any$") x = x
+eApplyD f              x = ApplyD f x
 
 -- Used to create the array of free variables passed from the domain to the range
 -- of for/if.  If it's just a single variable, don't use an array.
@@ -1538,134 +1481,16 @@ fvArray :: [SrcExpr] -> SrcExpr
 fvArray [e] = e
 fvArray es = Array es
 
-----------------------
+--------------------------------------------------------
+--
+--         Desugaring Small Source -> Big Core
+--
+--------------------------------------------------------
 
--- Functions that only work on the core subset of SrcExpr
-getFree :: SrcCore -> [Ident]
-getFree = Epic.List.nub . fvs
-  where
-    fvs (Variable i) = [i]
-    fvs (Lit _) = []
-    fvs (EPrim _) = []
-    fvs (Array es) = concatMap fvs es
-    fvs (Lam i e) = filter (/= i) (fvs e)
-    fvs (Unify e1 e2) = fvs e1 ++ fvs e2
-    fvs (ApplyD e1 e2) = fvs e1 ++ fvs e2
-    fvs (Seq es) = concatMap fvs es
-    fvs (Choice e1 e2) = fvs e1 ++ fvs e2
-    fvs (Exists is e) = filter (`notElem` is) (fvs e)
-    fvs (Forall is e) = filter (`notElem` is) (fvs e)
-    fvs (Wrong _) = []
-    fvs (Macro1 _ _ e) = fvs e
-    fvs (Split e1 e2 e3) = fvs e1 ++ fvs e2 ++ fvs e3
-    fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
-    fvs Fail = []
-    fvs DomainFail = []
---    fvs (Map es) = concatMap fvs es
-    fvs e = impossible e
-
-closed :: SrcCore -> Bool
-closed = null . getFree
-
-getAllVars :: SrcCore -> [Ident]
--- Finds all binders in e
-getAllVars expr = Epic.List.nub (execWriter (vars expr))
-  where
-    vars :: SrcCore -> Writer [Ident] SrcCore
-    vars e@(Variable i)   = do tell [i]; pure e
-    vars e@(Lam i e')     = do tell [i]; _ <- vars e'; pure e
-    vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
-    vars e@(Forall is e') = do tell is; _ <- vars e'; pure e
-    vars e                = compos vars e
-
-substMany :: [(Ident, SrcCore)] -> SrcCore -> SrcCore
-substMany [] = id
-substMany sb = sub
-  where
-    bs = getFree $ Seq $ map snd sb
-    sub :: SrcCore -> SrcCore
-    sub v@(Variable i) | Just b <- lookup i sb = b
-                       | otherwise = v
-    sub e@Lit{} = e
-    sub e@EPrim{} = e
-    sub (Array es) = Array (map sub es)
-    sub (Lam i e) = binder i (Lam i) e
-    sub (Unify e1 e2) = Unify (sub e1) (sub e2)
-    sub (ApplyD e1 e2) = ApplyD (sub e1) (sub e2)
-    sub (Seq es) = Seq (map sub es)
-    sub (Choice e1 e2) = Choice (sub e1) (sub e2)
-    sub (Exists [] e) = Exists [] (sub e)
-    sub (Exists (i:is) e) = binder i (exists1 i) (Exists is e)
-    sub (Forall [] e) = Forall [] (sub e)
-    sub (Forall (i:is) e) = binder i (forall1 i) (Forall is e)
-    sub e@Wrong{} = e
-    sub (Macro1 i rs e) = Macro1 i rs (sub e)
-    sub (Split e1 e2 e3) = Split (sub e1) (sub e2) (sub e3)
-    sub (If3 e1 e2 e3) = If3 (sub e1) (sub e2) (sub e3)
-    sub (If3B is e1 e2 e3) =
-      let (is', e1', e2') = if3Hack sub is e1 e2
-      in  If3B is' e1' e2' (sub e3)
-    sub Fail = Fail
-    sub DomainFail = DomainFail
-    sub e = impossible e
-
-    binder :: Ident -> (SrcExpr -> SrcExpr) -> SrcExpr -> SrcExpr
-    binder i con e | Just _ <- lookup i sb = substMany (filter ((/= i) . fst) sb) (con e)
-                   | i `notElem` bs = con (sub e)
-                   | otherwise = sub $ alphaConvert bs (con e)
-
-    exists1 i (Exists is e) = Exists (i:is) e
-    exists1 _ _ = undefined
-
-    forall1 i (Forall is e) = Forall (i:is) e
-    forall1 _ _ = undefined
-
-if3Hack :: (SrcExpr -> SrcExpr) -> [Ident] -> SrcExpr -> SrcExpr -> ([Ident], SrcExpr, SrcExpr)
-if3Hack f is e1 e2 =
-  case f (Exists is (Array [e1, e2])) of
-    Exists is' (Array [e1', e2']) -> (is', e1', e2')
---    Array [e1', e2'] -> ([], e1', e2')
-    e -> impossible e
-
--- Alpha convert a term, avoiding vs as the names for bound
--- variables.
-alphaConvert :: [Ident] -> SrcCore -> SrcCore
-alphaConvert vs = alpha []
-  where
-    alpha :: [(Ident, Ident)] -> SrcCore -> SrcCore
-    alpha m (Variable i) = Variable $ fromMaybe i $ lookup i m
-    alpha _ e@Lit{} = e
-    alpha _ e@EPrim{} = e
-    alpha m (Array es) = Array (map (alpha m) es)
-    alpha m (Lam i e) = Lam i' $ alpha (add (i, i') m) e where i' = fresh i
-    alpha m (Unify e1 e2) = Unify (alpha m e1) (alpha m e2)
-    alpha m (Seq es) = Seq (map (alpha m) es)
-    alpha m (ApplyD e1 e2) = ApplyD (alpha m e1) (alpha m e2)
-    alpha m (Choice e1 e2) = Choice (alpha m e1) (alpha m e2)
-    alpha m (Macro1 i rs e) = Macro1 i rs (alpha m e)
-    alpha m (Exists is e) = Exists is' (alpha m' e)
-      where is' = map fresh is
-            m' = foldr add m $ zip is is'
-    alpha _ e@Wrong{} = e
-    alpha m (Split e f g) = Split (alpha m e) (alpha m f) (alpha m g)
-    alpha m (If3 (Exists is e1) e2 e3) =
-      let (is', e1', e2') = if3Hack (alpha m) is e1 e2
-      in  If3 (Exists is' e1') e2' (alpha m e3)
-    alpha _ Fail = Fail
-    alpha _ e = impossible e
-
-    add ii@(i, i') m | i == i' = m
-                     | otherwise = ii : m
-
-    fresh i@(Ident l s) | i `notElem` vs = i
-                        | otherwise = fresh $ Ident l (s ++ "'")
-
-------------------------------------------------------------------------------------
--- | Code for DS10 SPJ's non-exponential translation for curried functions
-------------------------------------------------------------------------------------
 data Pi
-  = P Ident -- ^ P(x)
-  | E       -- ^ E
+  = P SrcExpr -- ^ P(x)    The SrcExpr is always small and freely duplicable
+              --           Typically just (Variable x)
+  | E         -- ^ E
   deriving (Eq, Ord, Show)
 
 data DsMode12
@@ -1682,6 +1507,9 @@ bodyEff fx rs
   | hasEff "decides"  rs = Dec
   | otherwise            = fx
 
+hasEff :: String -> [Ident] -> Bool
+hasEff r rs = Ident noLoc r `elem` rs
+
 
 dsD_12 :: SrcExpr -> D SrcExpr
 dsD_12 = dsDD_12 MV
@@ -1690,12 +1518,12 @@ dsDD_12 :: DsMode12 -> SrcExpr -> D SrcExpr
 dsDD_12 s t = dsM_12 s t E
 
 
-dsB_12 :: DsMode12 -> SrcExpr -> Pi -> Ident -> D SrcExpr
+dsB_12 :: DsMode12 -> SrcExpr -> Pi -> SrcExpr -> D SrcExpr
 dsB_12 s t E     _
   = dsM_12 s t E
 dsB_12 s t (P f) j
   = do z <- newIdent (getLoc t) "z";
-       seqDE [ pure $ DefineE z (ApplyD (Variable f) (Variable j)), dsM_12 s t (P z)]
+       seqDE [ pure $ DefineE z (ApplyD f j), dsM_12 s t (P (Variable z))]
 
 dsK_12 :: Loc -> [Eff] -> D SrcExpr
 dsK_12 loc fx
@@ -1711,108 +1539,112 @@ dsCheck Dec = eDecide
 seqDE :: [D SrcExpr] -> D SrcExpr
 seqDE ds = seqE <$> sequence ds
 
-defineDE :: String -> D SrcExpr -> D (Ident, SrcExpr)
+defineDE :: String -> D SrcExpr
+         -> D (SrcExpr,   -- The defn
+               SrcExpr)   -- The use
 -- define "x" de   returns   x := e, along with x itself
-defineDE nm ds_rhs = do { rhs' <- ds_rhs
-                        ; x    <- newIdent (getLoc rhs') nm
-                        ; pure (x, DefineE x rhs') }
+-- But (just to save clutter) if the rhs turns out to be tiny,
+--   just return it alone
+defineDE nm ds_rhs
+  = do { rhs' <- ds_rhs
+       ; if isAtomic rhs'
+         then pure (seqE [], rhs')
+         else do { x <- newIdent (getLoc rhs') nm
+                 ; pure (DefineE x rhs', Variable x) } }
 
+defineDE2 :: String
+          -> D SrcExpr               -- The RHS
+          -> (SrcExpr -> D SrcExpr)  -- The body
+          -> D SrcExpr               -- z := rhs; body
+defineDE2 nm ds_rhs ds_body
+  = do { rhs' <- ds_rhs
+       ; if isAtomic rhs'
+         then ds_body rhs'
+         else do { x <- newIdent (getLoc rhs') nm
+                 ; body' <- ds_body (Variable x)
+                 ; if x `elem` getAllIdents body'  -- See Note [Avoiding clutter]
+                   then pure (seqE [DefineE x rhs', body'])
+                   else pure (seqE [rhs',           body']) } }
+
+{- Note [Avoiding clutter]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+In defineDE2 we are building a term looking like:
+
+   x := rhs
+   ...body...
+
+where `x` is complely fresh.   We can abbreviate this if
+
+* `rhs` is atomic; then just use `rhs` rather than `x`
+
+* `x` is not used in rhs.  Since `rhs` is a SrcExpr, its binding structure
+  is not obvious, and it's awkward to get its true free variables. But since
+  `x` is fresh anyway it suffices to look for /any/ occurrence of `x`. At worst
+  we'll create a binding we don't really need.
+
+  Hence the user of `getAllIdents`.
+-}
 
 dsM_12 :: DsMode12 -> SrcExpr -> Pi -> D SrcExpr
 dsM_12 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
-  = do r   <- newIdent (getLoc t) "r"
-       (j, dom) <- defineDE "j" (dsM_12 MI t1 (P r))
-       rng <- dsCheck (bodyEff Suc _fx) <$> dsB_12 MV t2 pi j
-       seqDE [ pure (eVerify (Forall [r] (seqE [dom, rng])))
+  = do r <- newIdent (getLoc t) "r"
+       body <- defineDE2 "j" (dsM_12 MI t1 (P (Variable r)))
+                             (dsB_12 MV t2 pi)
+       seqDE [ pure (eVerify [r] body)
              , dsM_12 MI t pi ]
 
 dsM_12 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
   = do i   <- newIdent (getLoc t1) "i"
-       (j, dom) <- defineDE "j" (dsM_12 MV t1 (P i))
-       rng <- seqDE [ dsK_12 (getLoc t1) _fx
-                    , {- BUG -} dsB_12 MI t2 pi j]
-       pure $ {- TODO: ISFUN -} Lam i (dom `eSeq` rng)
+       body <- defineDE2 "j" (dsM_12 MV t1 (P (Variable i)))
+                             (dsB_12 MI t2 pi)
+       pure $ {- TODO: ISFUN -} Lam i body
 
 dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
   = do i   <- newIdent (getLoc t1) "i"
-       (j, dom) <- defineDE "j" (dsM_12 MX t1 (P i))
+       (dom, j) <- defineDE "j" (dsM_12 MX t1 (P (Variable i)))
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_12 MX t2 pi j
        pure $ Lam i (seqE [dom, rng])
 
 -------------------- e |>{fx} t -----------------------
 
 dsM_12 MV t@(OfType t1 fx t2) pi      -- MOFTYPE1
-  = seqDE [ eVerify <$> (eCheck fx <$> verify_body)
+  = seqDE [ eVerify [] <$> (eCheck fx <$> verify_body)
           , dsM_12 MI t pi ]
   where
-    verify_body = do { (x, e1) <- defineDE "x" (dsM_12 MV t1 pi)
-                     ; (z, e2) <- defineDE "z" (dsDD_12 MV t2)
-                     ; let eapp = ApplyD (Variable z) (Variable x) -- z[x]
-                     ; pure (seqE [e1, e2, eapp]) }
+    verify_body = do { (e1, x) <- defineDE "x" (dsM_12 MV t1 pi)
+                     ; (e2, z) <- defineDE "z" (dsDD_12 MV t2)
+                     ; pure (seqE [e1, e2, eApplyD z x]) }
 
-dsM_12 s t@(OfType t1 fx t2) pi      -- MOFTYPE2
-  = do { (x, e1) <- defineDE "x" (dsM_12 s t1 pi)
+dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
+  = do { (e1, x) <- defineDE "x" (dsM_12 s t1 pi)
        ; e2 <- dsM_12 s (Range fx t2) (P x)
        ; pure (seqE [e1,e2]) }
-{-
-dsM_12 MV (OfType t1 fx t2@(Variable z)) pi      -- MOFTYPE+
-  = do y <- newIdent (getLoc t1) "y"
-       seqDE [ DefineE y <$> dsM_12  MV t1 pi
-             , pure (dsCheck Suc (ApplyD t2 (Variable y)) `eGuard` eSome (Variable z))
-             ]
-
-dsM_12 MV (OfType t1 fx t2) pi                   -- MOFTYPE+
-  = do y <- newIdent (getLoc t1) "y"
-       z <- newIdent (getLoc t1) "z"
-       seqDE [ DefineE y <$> dsM_12  MV t1 pi
-             , DefineE z <$> dsDD_12 MV t2
-             , pure (dsCheck Suc (ApplyD (Variable z) (Variable y)) `eGuard` eSome (Variable z))
-             ]
-
-dsM_12 s (OfType t1 fx t2) pi                  -- MOFTYPE2
-  = do x <- newIdent (getLoc t1) "x"
-       seqDE [ DefineE x <$> dsDD_12 s t1
-             , dsM_12 s (Range fx t2) (P x)
-             ]
--}
 
 -------------------- :{fx} t -----------------
-dsM_12 MI (Range fx t) (P i)                  -- MTYPE1
-  = do { (z,e) <- defineDE "z" (dsDD_12 MI t)
-       ; pure (seqE [e, eHavoc fx, eGuard (Variable i) (eSome (Variable z)) ]) }
+dsM_12 MI (Range fx t) (P i)                 -- MTYPE1
+  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
+--       ; pure (seqE [e, eHavoc fx, eGuard i (eSome z) ]) }
+-- ToDo: check this... it's not what is in the doc yet
+       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
 
-{-
-dsM_12 MI (Range (Variable z)) (P _)       -- MTYPE-VAR Spl case to make M-[:int](i) = some{int} instead of exi z. z = int; z(i)
-   = pure (eSome (Variable z))
+dsM_12 s (Range fx t) (P i)                  -- MTYPE2
+         -- ToDo: what about <fx>?
+  = do { (e, z) <- defineDE "z" (dsDD_12 s t)
+       ; pure (seqE [e, eApplyD z i]) }   -- z[x]
 
-dsM_12 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make Ms[:int](i) = int(i) instead of exi z. z = int; z(i)
-  = pure (ApplyD (Variable z) (Variable i))
-
-dsM_12 MI (Range t) (P i)                   -- MTYPE1
-  = do z <- newIdent (getLoc t) "z"
-       seqDE [ DefineE z <$> dsDD_12 MI t
-             , pure (Variable i `eGuard` eSome (Variable z))
-             ]
-
-dsM_12 s (Range t) (P i)                   -- MTYPE2
-  = do z <- newIdent (getLoc t) "z"
-       seqDE [ DefineE z <$> dsDD_12 s t
-             , pure (ApplyD (Variable z) (Variable i)) ]
-
-dsM_12 s (Range t) E                       -- MTYPE3
-  = do x <- newIdent (getLoc t) "x"
-       z <- newIdent (getLoc t) "z"
-       existsV [x] <$> seqDE
-          [ DefineE z <$> dsDD_12 s t
-          , pure (ApplyD (Variable z) (Variable x)) ]
--}
+dsM_12 s (Range fx t) E                      -- MTYPE3
+         -- ToDo: what about <fx>?
+  = do { x <- newIdent (getLoc t) "x"
+       ; (e, z) <- defineDE "z" (dsDD_12 s t)
+       ; let z_app = eApplyD z (Variable x)   -- z[x]
+       ; pure (Exists [x] (seqE [e, z_app])) }
 
 dsM_12 s (DefineIE x y t) E                -- MSQUIGE
   = do i <- newIdent (getLoc t) "i"
-       existsV [i] <$> dsM_12 s (DefineIE x y t) (P i)
+       existsV [i] <$> dsM_12 s (DefineIE x y t) (P (Variable i))
 
 dsM_12 s (DefineIE x y t) (P i)             -- MSQUIGP
-  = seqDE [ pure $ DefineE x (Variable i)
+  = seqDE [ pure $ DefineE x i
           ,        DefineE y <$> dsM_12 s t (P i)
           ]
 
@@ -1822,8 +1654,8 @@ dsM_12 s (Array ts) E                       -- MARRAYE
 dsM_12 s (Array ts) (P i)                   -- MARRAYP
    = do is <- mapM (\t -> newIdent (getLoc t) "i") ts
         existsV is <$> seqDE
-          [ pure    $  unifyV i (Array (Variable <$> is))
-          , Array  <$> zipWithM (\t' i' -> dsM_12 s t' (P i')) ts is
+          [ pure    $  Unify i (Array (Variable <$> is))
+          , Array  <$> zipWithM (\t' i' -> dsM_12 s t' (P (Variable i'))) ts is
           ]
 
 dsM_12 s (DefineE x t) pi                   -- MBIND
@@ -1844,9 +1676,6 @@ dsM_12 s  (Seq ts) pi                      -- MSEMI
        e'  <- dsM_12 s t pi
        pure $ seqE (es' ++ [e'])
 
-dsM_12 s (Succeeds t) pi                   -- MCHECK / TODO:Generalized to check<fx>
-  = eAssert <$> dsM_12 s t pi
-
 dsM_12 s (Choice t1 t2) pi                 -- MCHOICE
   = Choice <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
 
@@ -1856,14 +1685,17 @@ dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
 dsM_12 _ t@(Lit{}) E                       -- MCONST
    = pure t
 
+dsM_12 _ t@(EPrim{}) E                     -- MPrim
+   = pure t
+
 dsM_12 _ t@(Variable {}) E                 -- MVAR
    = pure t
 
 dsM_12 s (ApplyD t1 t2) E                  -- MVAR
-   = ApplyD <$> dsDD_12 s t1 <*> dsDD_12 s t2
+   = eApplyD <$> dsDD_12 s t1 <*> dsDD_12 s t2
 
 dsM_12 s t (P i)                           -- MEQ
-   = Unify (Variable i) <$> dsM_12 s t E
+   = Unify i <$> dsM_12 s t E
 
 dsM_12 s (Macro1 m rs t) pi
    = Macro1 m rs <$> dsM_12 s t pi
@@ -1886,3 +1718,4 @@ unSeq = go []
     go acc []     = (reverse acc, Array [])
     go acc [t]    = (reverse acc, t)
     go acc (t:ts) = go (t:acc) ts
+
