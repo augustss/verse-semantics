@@ -15,7 +15,7 @@ module FrontEnd.Expr(
   pattern Check,
 --  pattern Range,
   Store(..), Ptr,
-  Eff, effSucceeds, effDecides, effFails,
+  Eff, effSucceeds, effDecides, effFails, isOpenClosed,
   Op,
   pattern Op,
   compos, composOp,
@@ -156,12 +156,14 @@ type SrcBlk   = SrcExpr
 --pattern Range e = ApplyD e AnyT
 pattern Unit :: SrcExpr
 pattern Unit = Array []
+
 pattern Typedef :: SrcBlk -> SrcExpr
 pattern Typedef e <- Macro1 (Ident _ "type") [] e
   where Typedef e = Macro1 (Ident noLoc "type") [] e
-pattern Check :: [Ident] -> SrcExpr -> SrcExpr
+
+pattern Check :: [Eff] -> SrcExpr -> SrcExpr
 pattern Check ps e <- Macro1 (Ident _ "check") ps e
-  where Check ps e = Macro1 (Ident noLoc "succeeds") ps e
+  where Check ps e = Macro1 (Ident noLoc "check") ps e
 
 
 --------------------------------------------------------
@@ -242,6 +244,11 @@ effSucceeds, effDecides, effFails :: Eff
 effSucceeds = Ident noLoc "succeeds"
 effDecides  = Ident noLoc "decides"
 effFails    = Ident noLoc "fails"
+
+isOpenClosed :: Eff -> Bool
+isOpenClosed (Ident _ "open")   = True
+isOpenClosed (Ident _ "closed") = True
+isOpenClosed _                  = False
 
 --------------------------------------------------------
 --               Store
@@ -344,8 +351,10 @@ instance Pretty SrcExpr where
           Case2 e bs ->
             maybeParens (p > 0) $ sep [ text "case" <+> parens (pPrintL l e) <+> text "of",
                                            indent $ ppr 0 bs ]
-          Function ars b -> maybeParens (p > 0) $ text "function" <> hcat (map ppArs ars) <> ppB b
-            where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
+          Function ars b -> maybeParens (p > 0) $
+                            cat [ text "fun" <> hcat (map ppArs ars)
+                                , indent (ppB b) ]
+                where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
 --          Typedef e -> text "type" <> ppB e
           Blk es       -> braces $ ppSeq l es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)

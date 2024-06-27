@@ -26,16 +26,14 @@ pPrintL l = pPrintPrec l 0
 indent :: Doc -> Doc
 indent = nest 2
 
-pp :: (Pretty a) => a -> IO ()
+display :: (Pretty a) => a -> IO ()
 -- Pretty-print the argument
-pp = putStrLn . prettyShow
-
-ppl :: (Pretty a) => PrettyLevel -> a -> IO ()
-ppl l = putStrLn . render . pPrintL l
+display = putStrLn . prettyShow
 
 ppx :: (Pretty a) => a -> IO ()
 ppx = putStrLn . renderStyle s . pPrintL prettyNormal
-  where s = style{ lineLength = 150, ribbonsPerLine = 1.2 }
+  where
+    s = style{ lineLength = 150, ribbonsPerLine = 1.2 }
 
 hppx :: (Pretty a) => Handle -> a -> IO ()
 hppx h = hPutStrLn h . renderStyle s . pPrintL prettyNormal

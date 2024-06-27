@@ -36,7 +36,7 @@ import Epic.Uniplate
 -}
 
 -- General library utilities
-import Control.Exception(SomeException, try)
+import Control.Exception(SomeException, evaluate, try)
 import Control.Monad
 import Data.List
 import Data.Maybe
@@ -207,13 +207,15 @@ withLastExpr cmd _line s = do
   let s' = s   -- Ignore input line for now
   cmd (cs_lastExpr s') s'
 
-cTransform :: (SomeExpr -> SomeExpr) -> CmdRunner CState
-cTransform tr =
+cTransform :: Bool                    -- True <=> display the result
+           -> (SomeExpr -> SomeExpr)  -- How to transform
+           -> CmdRunner CState
+cTransform display_result tr =
   withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $ do
-      let e' = tr e
-      pp e'
-      pure e'
+    do { e' <- evaluate (tr e)
+       ; when display_result $ display e'
+       ; pure e' }
 
 
 --------------------------------------------------------
@@ -354,24 +356,38 @@ cRead afn s = do
 --------------------------------------------------------
 
 cDesugar :: CmdRunner CState
-cDesugar c s = do
-  let flg = cs_flags s
-  putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform (Desugared . FrontEnd.Desugar.desugar flg . asExpr) c s
+cDesugar
+  = withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $
+
+    do { let flags = cs_flags s
+
+       ; putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flags) ++
+             ", prelude=" ++ fst (fPrelude flags)
+
+       ; e' <- FrontEnd.Desugar.desugar flags (asExpr e)
+
+       -- Display the result
+       ; let display_result = not (fTraceDesugar flags)
+                  -- Don't display the result twice
+       ; when display_result $ display e'
+
+       ; pure (Desugared e') }
+
 
 {-
 cParseLine :: CmdRunner CState
 cParseLine line s =
   tryIt (pure s) (updateLastExpr s) $ do
     let prog = parseDie ((Parsed <$> P.try pFile) <|> (Desugared <$> pCoreFile)) "<interactive>" line
-    pp prog
+    display prog
     pure prog
 
 cPcore :: CmdRunner CState
 cPcore line s =
   tryIt (pure s) (updateLastExpr s) $ do
     let prog = parseDie (Desugared <$> pCoreFile) "<interactive>" line
-    pp prog
+    display prog
     pure prog
 
 
@@ -380,7 +396,7 @@ cPDesugar c s = do
   let flg = (flags s){ fSimplify = True, fSplit = False, fAssumeVerified = True, fKeepIf = True,
                        fPrelude = either error id $ findPrelude "miniprelude" }
   putStrLn $ "Desugar for execution, prettyfied: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform (Desugared . dropDollar . desugar flg . asExpr) c s
+  cTransform True (Desugared . dropDollar . desugar flg . asExpr) c s
 
 cDesugarVerify :: CmdRunner CState
 cDesugarVerify c s = do
@@ -389,7 +405,7 @@ cDesugarVerify c s = do
       prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
       flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel }
   putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform (Desugared . desugar flg . asExpr) c s
+  cTransform True (Desugared . desugar flg . asExpr) c s
 
 cPDesugarVerify :: CmdRunner CState
 cPDesugarVerify c s = do
@@ -398,15 +414,15 @@ cPDesugarVerify c s = do
       prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
       flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel, fSimplify = True }
   putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform (Desugared . dropDollar . desugar flg . asExpr) c s
+  cTransform True (Desugared . dropDollar . desugar flg . asExpr) c s
 
 cPreprocess :: CmdRunner CState
-cPreprocess c s = cTransform (Desugared . pre . asCore (flags s)) c s
+cPreprocess c s = cTransform True (Desugared . pre . asCore (flags s)) c s
   where pre = trsToCore . preProcess sys (ruleEnv sys) . coreToTrs
         sys = esystem s
 
 cEval :: CmdRunner CState
-cEval c s = cTransform (Desugared . run flg (esystem s) . asCore flg) c s
+cEval c s = cTransform True (Desugared . run flg (esystem s) . asCore flg) c s
   where flg = flags s
 
 systemDescr :: ESystem -> String
@@ -426,7 +442,7 @@ cShow =
 cPrint :: CmdRunner CState
 cPrint =
   withLastExpr $ \ e s -> do
-    pp e
+    display e
     pure s
 
 --------------------------------------------------------
@@ -445,9 +461,9 @@ cClear _ s = pure s{ cs_definitions = [] }
 cDisplay :: CmdRunner CState
 cDisplay _ s = do
   let (prel, _) = fPrelude (cs_flags s)
-  putStrLn "prelude:"; pp prel
+  putStrLn "prelude:"; display prel
   putStrLn "definitions:"
-  mapM_ pp $ cs_definitions s
+  mapM_ display $ cs_definitions s
   pure s
 
 --------------------------------------------------------
@@ -490,7 +506,7 @@ cVerify = do
         putStrLn "Verified"
        else do
         putStrLn "Not verified, residual term:"
-        pp $ snd $ head $ toList trc
+        display $ snd $ head $ toList trc
       pure ()
 
 
@@ -508,7 +524,7 @@ cDefEval :: CmdRunner CState
 cDefEval c s = do
   let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
       flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
-  cTransform (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asExpr) c s
+  cTransform True (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asExpr) c s
 
 -}
 
