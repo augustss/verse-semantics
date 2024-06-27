@@ -128,8 +128,7 @@ keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "
            \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "one", "some", "guard", "verify" ]
-         ++ effects
+macros = ["all", "one", "some", "guard", "verify", "check" ]
 
 macrosOp :: [String]
 macrosOp = ["in'='"]

@@ -9,18 +9,18 @@ module FrontEnd.Expr(
   SrcExpr(..),
   Lit(..),
   Path(..),
-  SrcCore,
-  SrcBlk,
+  SrcCore, SrcBlk, SrcValue,
   pattern Unit,
   pattern Typedef,
   pattern Succeeds,
   pattern Check,
 --  pattern Range,
   Store(..), Ptr,
-  Eff, effSucceeds,
+  Eff, effSucceeds, effDecides, effFails,
   Op,
   pattern Op,
   compos, composOp,
+
   seqE,
   getLoc,
   isLiteral,
@@ -119,9 +119,6 @@ data SrcExpr
   | Exists [Ident] SrcExpr    -- exists xs . e
   | Forall [Ident] SrcExpr    -- forall xs . e
   | OfType SrcExpr [Eff] SrcExpr    -- e |>{fx} t, but only type known to verifier
-  | TLam Ident [Eff] SrcExpr SrcExpr
-                              -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
-                              -- The last argument is a possible type, (e2:t)
   | DomainFail                -- either Wrong or try next overload
   | EPrim String              -- primop
   | Lam Ident SrcExpr         -- \ x . e
@@ -186,6 +183,17 @@ instance Pretty Lit where
       LitPath s -> pPrintPrec l p s
       LitPtr ptr -> text ("R#" ++ show ptr)
 
+
+
+--------------------------------------------------------
+--               Op
+--------------------------------------------------------
+
+type Op = Ident
+pattern Op :: String -> Op
+pattern Op s <- Ident _ s
+  where Op s = Ident noLoc s
+
 --------------------------------------------------------
 --               Loc
 --------------------------------------------------------
@@ -217,15 +225,17 @@ unIdent (Ident _ s) = s
 instance Pretty Ident where
   pPrintPrec _ _ (Ident _ i) = text i
 
+
+--------------------------------------------------------
+--               Eff
+--------------------------------------------------------
+
 type Eff = Ident
-effSucceeds :: Eff
-effSucceeds = "succeeds"
 
-
-type Op = Ident
-pattern Op :: String -> Op
-pattern Op s <- Ident _ s
-  where Op s = Ident noLoc s
+effSucceeds, effDecides, effFails :: Eff
+effSucceeds = Ident noLoc "succeeds"
+effDecides  = Ident noLoc "decides"
+effFails    = Ident noLoc "fails"
 
 --------------------------------------------------------
 --               Store
@@ -264,8 +274,6 @@ instance Pretty SrcExpr where
       ppB e        = braces $ ppr 0 e
 
       ppEs = fsep . punctuate comma . map (pPrintPrec l 1)
-
-      ppEffs rs = mconcat (map (\ r -> text "<" <> pPrintL l r <> text ">") rs)
 
       ppr :: (Pretty a) => Rational -> a -> Doc
       ppr = pPrintPrec l
@@ -345,15 +353,13 @@ instance Pretty SrcExpr where
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
           Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
           Fail -> text "fail"
-          Range e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
-                     text "range" <> braces (ppr 0 e)
+          Range fx e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
+                        text "range" <> ppEffs fx <> braces (ppr 0 e)
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
           Forall is e -> maybeParens (p > 0) $ sep [text "forall" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
           OfType e fx t -> --ppNormal (InfixOp e (Op ":") t)
-                         text "ofType" <> parens (ppr 0 e) <> braces (ppr 0 t)
-          TLam i rs e1 e2 -> text "tlam" <>
-                                 parens (ppr 0 i) <> ppEffs rs <> braces (ppr 0 e1) <> braces (ppr 0 e2)
+                           text "ofType" <> ppEffs fx <> parens (ppr 0 e) <> braces (ppr 0 t)
           DomainFail -> text "DomainFail"
           EPrim s -> ppNormal (Variable (Ident noLoc s))
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
@@ -369,6 +375,9 @@ instance Pretty SrcExpr where
 
 instance Pretty Store where
   pPrintPrec l _ (Store m _) = fsep . punctuate comma . map (pPrintPrec l 0) . IM.toList $ m -- XXX
+
+ppEffs :: [Eff] -> Doc
+ppEffs rs = mconcat (map (\ r -> text "<" <> pPrint r <> text ">") rs)
 
 ppSeq :: PrettyLevel -> [SrcExpr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") $
@@ -481,12 +490,11 @@ compos f (DefineE i e)      = DefineE i <$> f e
 compos f (DefineIE i x e)   = DefineIE i x <$> f e
 compos f (Choice e1 e2)     = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2)      = Unify <$> f e1 <*> f e2
-compos f (Range e)          = Range <$> f e
+compos f (Range fx e)       = Range <$> pure fx <*> f e
 compos _ e@Wrong{}          = pure e
 compos f (Exists is e)      = Exists is <$> f e
 compos f (Forall is e)      = Forall is <$> f e
-compos f (OfType e1 e2)     = OfType <$> f e1 <*> f e2
-compos f (TLam i rs e1 e2)  = TLam i rs <$> f e1 <*> f e2
+compos f (OfType e1 fx e2)  = OfType <$> f e1 <*> pure fx <*> f e2
 compos _ e@DomainFail       = pure e
 compos _ e@EPrim{}          = pure e 
 compos f (Lam i e)          = Lam i <$> f e
