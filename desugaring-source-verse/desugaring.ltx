@@ -597,20 +597,22 @@ $$
 \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{moftype1} & |DMe2 mdpos si (oftypefx t_1 fx t_2)|
-  & = & \multicolumn{2}{@@{}l}{|verify2 () () (check fx (x := DMe2 mdpos si t_1; z := De2 mdpos t_2; apply1N z x));|} \\
-   &&& |DMe2 mdneg si (oftypefx t_1 fx t_2)| \\
-\rulename{moftype2} & |DMe2 md si (oftypefx t_1 fx t_2)|
-  & = & |x := DMe2 md si t_1; DMe2 md (sipat x) (colonfx fx t_2)| &  |md|\in\{|mdneg|,|mdx|\} \\
+\rulename{moftype+} & |DMe2 mdpos si (oftypefx t_1 fx t_2)|
+  & = & \multicolumn{2}{@@{}l}{|check fx (x := DMe2 mdpos si t_1; z := De2 mdpos t_2; apply1N z x)|} \\
+\rulename{moftype-} & |DMe2 mdneg si (oftype t_1 t_2)|
+  & = & |z := De2 mdneg t_2; freevars t_1 guard (some z)| \\
+\rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|
+  & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
+
 % \rulename{moftypex} & |DMe2 mdx si (oftypefx t_1 fx t_2)|
 %  & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
-\rulename{mtype1}   & |DMe2 mdneg (sipat i) (colonfx fx t)|    & = & |z:=De2 mdneg t; havoc2 fx (i guard (some z))| \\
+% \rulename{mtype1}   & |DMe2 mdneg (sipat i) (colonfx fx t)|    & = & |z:=De2 mdneg t; havoc2 fx (i guard (some z))| \\
+
+\rulename{mtype1}   & |DMe2 mdneg (sipat i) (colonfx fx t)|    & = & |z:=De2 mdneg t; havoc2 fx (apply1N z i)| \\
 \rulename{mtype2}   & |DMe2 md (sipat i) (colonfx fx t)|    & = & |z:=De2 md t; apply1N z i| & |md|\in\{|mdpos|,|mdx|\}\\
 \rulename{mtype3}   & |DMe2 md sibody (colonfx fx t)| & = & |def x (z:=De2 md t; apply1N z x)| \\
-\rulename{mcheck+}  & |DMe2 mdpos si (check fx t)|    & = & \multicolumn{2}{@@{}l}{|verify2 () () (check fx (DMe2 mdpos si t)); DMe2 mdneg si t|} \\
 \rulename{mcheck-}  & |DMe2 mdneg si (check fx t)|    & = & |DMe2 mdneg si t| \\
-
-\rulename{mcheckx}  & |DMe2 mdx si (check fx t)|    & = & |check fx (DMe2 mdx si t)| \\
+\rulename{mcheck+x}  & |DMe2 md si (check fx t)|    & = & |check fx (DMe2 md si t)| & |md|\in\{|mdpos|,|mdx|\} \\
 \rulename{msquige} & |DMe2 md sibody (squig x y := t)|
      & = & |def i (DMe2 md (sipat i) (squig x y := t))| \\
 \rulename{msquigp} & |DMe2 md (sipat i) (squig x y := t)|

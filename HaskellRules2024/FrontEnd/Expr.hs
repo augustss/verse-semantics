@@ -10,9 +10,7 @@ module FrontEnd.Expr(
   Lit(..),
   Path(..),
   SrcCore, SrcBlk, SrcValue,
-  pattern Unit,
-  pattern Typedef,
-  pattern Check,
+  pattern Typedef, pattern Check, pattern Guard, pattern Some, 
 --  pattern Range,
   Store(..), Ptr,
   Eff, effSucceeds, effDecides, effFails, isOpenClosed,
@@ -116,7 +114,7 @@ data SrcExpr
   | DefineV Ident                -- i:any
   | DefineE Ident SrcExpr        -- i := e
   | DefineIE Ident Ident SrcExpr -- (i->x) := e
-  | Choice SrcExpr SrcExpr       -- e1 | e2
+  | Choice SrcBlk SrcBlk         -- e1 | e2
   | Unify SrcExpr SrcExpr        -- e1 = e2
   | Range [Eff] SrcExpr          -- :{fx}e
 
@@ -152,19 +150,25 @@ type SrcBlk   = SrcExpr
 --               Pattern synoyms for SrcExpr
 --------------------------------------------------------
 
---pattern Range :: SrcExpr -> SrcExpr
---pattern Range e = ApplyD e AnyT
-pattern Unit :: SrcExpr
-pattern Unit = Array []
-
+-- type{e}
 pattern Typedef :: SrcBlk -> SrcExpr
 pattern Typedef e <- Macro1 (Ident _ "type") [] e
   where Typedef e = Macro1 (Ident noLoc "type") [] e
 
+-- check<fx>{e}
 pattern Check :: [Eff] -> SrcExpr -> SrcExpr
-pattern Check ps e <- Macro1 (Ident _ "check") ps e
-  where Check ps e = Macro1 (Ident noLoc "check") ps e
+pattern Check fx e <- Macro1 (Ident _ "check") fx e
+  where Check fx e = Macro1 (Ident noLoc "check") fx e
 
+-- some<fx>{e}
+pattern Some :: SrcExpr -> SrcExpr
+pattern Some e <- Macro1 (Ident _ "some") _fx e
+  where Some e = Macro1 (Ident noLoc "some") [] e
+
+-- guard(v){e}
+pattern Guard :: SrcExpr -> SrcExpr -> SrcExpr
+pattern Guard v e <- Macro2 (Ident _ "guard") v e
+  where Guard v e = Macro2 (Ident noLoc "guard") v e
 
 --------------------------------------------------------
 --               Lit
@@ -303,7 +307,7 @@ instance Pretty SrcExpr where
         case expr of
           Lit lit    -> ppr p lit
           Variable v -> ppr 0 v
-          EPrim s    -> ppNormal (Variable (Ident noLoc s))
+          EPrim s    -> char '!' <> ppNormal (Variable (Ident noLoc s))
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           Array es   -> text "array" <> braces (ppSeq l es)
           Tuple es   -> parens (ppEs es)
@@ -364,7 +368,8 @@ instance Pretty SrcExpr where
           MRef i t e   -> ppVRA "ref" i t e
           MAlias i t e -> ppVRA "alias" i t e
 
-          Macro1 (Ident _ m) rs e  -> text m <> ppEffs rs <> ppB e
+          Macro1 (Ident _ m) rs e  -> cat [ text m <> ppEffs rs
+                                          , indent (ppB e) ]
           Macro2 (Ident _ m) e1 e2 -> cat [text m <> parens (ppr 0 e1), indent (ppB e2)]
 
           Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
@@ -379,12 +384,15 @@ instance Pretty SrcExpr where
           Range fx e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
                         text "range" <> ppEffs fx <> braces (ppr 0 e)
           Wrong s -> text $ "WRONG'" ++ s ++ "'"
-          Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <+> text ".", ppr 0 e]
+          Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <> text ".", ppr 0 e]
           Verify is e -> maybeParens (p > 0) $
                          cat [text "verify" <> parens (hsep (map (ppr 0) is))
                              , indent (braces (ppr 0 e)) ]
+
           OfType e fx t -> --ppNormal (InfixOp e (Op ":") t)
-                           text "ofType" <> ppEffs fx <> parens (ppr 0 e) <> braces (ppr 0 t)
+                           cat [ text "ofType" <> ppEffs fx <> parens (ppr 0 e)
+                               , indent (braces (ppr 0 t)) ]
+
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
           Map es -> text "map" <> braces (ppSeq l es)
@@ -580,34 +588,71 @@ getVisibleBinders = go
 
     -- The rest is just recursive traversal
     go Lit{}          = []
+    go EPrim{}        = []
     go Variable{}     = []
     go (Seq es)       = concatMap go es
     go (Array es)     = concatMap go es
+    go (Tuple es)     = concatMap go es
     go (ApplyS e1 e2) = go e1 ++ go e2
     go (ApplyD e1 e2) = go e1 ++ go e2
-    go (If3 {})       = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
-                            --     So this would be wrong: go (If3 e _ _) = go e
-    go For2{}         = []
     go (Let _ e)      = go e   -- ToDo: why not first arg?
-    go Block{}        = []
     go (Unify e1 e2)  = go e1 ++ go e2
+    go (Range _fx e)   = go e
     --go (Typedef _)  = []
 
-    go Choice{}        = []
-    go (Range _fx e)   = go e
-    go Function{}      = []
-    go (Exists is e)   = is ++ go e   -- ToDo: really?
-    go (Verify _is _e) = []  -- verify is a new scope
-    go (OfType _ _ _)  = []
-    go Lam{}           = []
-    go Fail            = []
+    go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
+                        --     So this would be wrong: go (If3 e _ _) = go e
+    go For2{}     = []
+    go Block{}    = []
+    go Choice{}   = []
+    go Function{} = []
+    go Exists {}  = []
+    go Verify {}  = []  -- verify is a new scope
+    go OfType{}   = []
+    go Lam{}      = []
+    go Fail       = []
 
     go (Macro1 (Ident _ "some") _ e)    = go e
-    go (Macro2 (Ident _ "guard") e1 e2) = go e1 ++ go e2
+    go (Macro2 (Ident _ "guard") e1 _b) = go e1
     go Macro1 {}                        = []
 
     --go (Map es)      = concatMap go es
     go e = impossible e
+
+getFree :: SrcExpr -> [Ident]
+getFree = fvs_blk
+  where
+    fvs_blk e = Epic.List.nub (fvs e) `remove` getVisibleBinders e
+
+    fvs (Variable i)      = [i]
+    fvs (Lit _)           = []
+    fvs (EPrim _)         = []
+    fvs Fail              = []
+    fvs (Wrong {})        = []
+    fvs (Array es)        = concatMap fvs es
+    fvs (Tuple es)        = concatMap fvs es
+    fvs (EffAttr e _)     = fvs e
+    fvs (PrefixOp _ e)    = fvs e
+    fvs (PostfixOp e _)   = fvs e
+    fvs (InfixOp e1 _ e2) = fvs e1 ++ fvs e2
+    fvs (Lam i e)         = fvs_blk e `remove` [i]
+    fvs (ApplyD e1 e2)    = fvs e1 ++ fvs e2
+    fvs (Unify e1 e2)     = fvs e1 ++ fvs e2
+    fvs (Choice b1 b2)    = fvs_blk b1 ++ fvs_blk b2
+    fvs (Seq es)          = concatMap fvs es
+    fvs (Exists is e)     = fvs e `remove` is
+    fvs (Verify is e)     = fvs e `remove` is
+    fvs (Macro1 _ _ e)    = fvs e
+    fvs (Macro2 _ e b)    = fvs e ++ fvs_blk b
+    fvs (Split e1 e2 e3)  = fvs e1 ++ fvs e2 ++ fvs e3
+    fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
+--    fvs (Map es) = concatMap fvs es
+    fvs e = impossible e
+
+    remove xs bndrs = filter (`notElem` bndrs) xs
+
+closed :: SrcCore -> Bool
+closed = null . getFree
 
 
 getVar :: HasCallStack => SrcExpr -> [Ident]
@@ -642,10 +687,6 @@ getVar EPrim{} = []
 getVar e = impossible e
 
 
----------------------------------------------------------
--- Functions that only work on the core subset of SrcExpr
----------------------------------------------------------
-
 getAllIdents :: SrcExpr -> [Ident]
 -- Find all occurrences, ignoring binders (hence hacky)
 getAllIdents e = Epic.List.nub (execWriter (vars e))
@@ -653,32 +694,6 @@ getAllIdents e = Epic.List.nub (execWriter (vars e))
     vars :: SrcExpr -> Writer [Ident] SrcExpr
     vars ev@(Variable i) = do tell [i]; pure ev
     vars ev              = compos vars ev
-
-getFree :: SrcCore -> [Ident]
--- DefineE would mess this function up, hence SrcCore
-getFree = Epic.List.nub . fvs
-  where
-    fvs (Variable i)   = [i]
-    fvs (Lit _)        = []
-    fvs (EPrim _)      = []
-    fvs Fail           = []
-    fvs (Wrong {})     = []
-    fvs (Array es)     = concatMap fvs es
-    fvs (Lam i e)      = filter (/= i) (fvs e)
-    fvs (ApplyD e1 e2) = fvs e1 ++ fvs e2
-    fvs (Unify e1 e2)  = fvs e1 ++ fvs e2
-    fvs (Choice e1 e2) = fvs e1 ++ fvs e2
-    fvs (Seq es)       = concatMap fvs es
-    fvs (Exists is e)  = filter (`notElem` is) (fvs e)
-    fvs (Verify is e)  = filter (`notElem` is) (fvs e)
-    fvs (Macro1 _ _ e) = fvs e
-    fvs (Split e1 e2 e3) = fvs e1 ++ fvs e2 ++ fvs e3
-    fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
---    fvs (Map es) = concatMap fvs es
-    fvs e = impossible e
-
-closed :: SrcCore -> Bool
-closed = null . getFree
 
 getAllBinders :: SrcCore -> [Ident]
 -- Finds all binders in e
@@ -690,6 +705,10 @@ getAllBinders expr = Epic.List.nub (execWriter (vars expr))
     vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
     vars e@(Verify is e') = do tell is; _ <- vars e'; pure e
     vars e                = compos vars e
+
+---------------------------------------------------------
+-- Functions that only work on the core subset of SrcExpr
+---------------------------------------------------------
 
 substMany :: [(Ident, SrcCore)] -> SrcCore -> SrcCore
 substMany [] = id

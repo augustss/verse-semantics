@@ -128,7 +128,7 @@ keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "
            \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "one", "some", "guard", "verify", "check" ]
+macros = ["all", "one", "some", "guard", "verify", "check","type" ]
 
 macrosOp :: [String]
 macrosOp = ["in'='"]
@@ -288,9 +288,6 @@ pArray = pKeyword "array" *> (tArray <$> pBlockEs)
     tArray [Tuple es] = Array es
     tArray es = Array es
 
---pTypedef :: P SrcExpr
---pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
--- XXX remove try by combining with Variable
 pMacro :: P SrcExpr
 pMacro = try $ do
   n <- pMacroName
