@@ -1,6 +1,6 @@
 # f1(x:int) := x
-# f2(x:int):int := x
-f3(x:int)<succeeds>:int := x
+f(x:int):int := x+1
+# f3(x:int)<succeeds>:int := x
 # f4(x:int)<decides>:int := x
 # f5(x:int)(y:int):int := (x,y)
 # f( g(x:int):int ) := g[0]

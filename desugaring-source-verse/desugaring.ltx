@@ -599,6 +599,7 @@ $$
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
 \rulename{moftype+} & |DMe2 mdpos si (oftypefx t_1 fx t_2)|
   & = & \multicolumn{2}{@@{}l}{|check fx (x := DMe2 mdpos si t_1; z := De2 mdpos t_2; apply1N z x)|} \\
+  &&& |DMe2 mdneg si (oftypefx t_1 fx t_2)| \\
 \rulename{moftype-} & |DMe2 mdneg si (oftype t_1 t_2)|
   & = & |z := De2 mdneg t_2; freevars t_1 guard (some z)| \\
 \rulename{moftypex} & |DMe2 mdx si (oftype t_1 t_2)|

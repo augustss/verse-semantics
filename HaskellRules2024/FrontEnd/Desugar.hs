@@ -46,17 +46,19 @@ desugar flgs = runD flgs .
             (-- Simplification [drop this for now]
 --             traceDS "simpler"    <=< simpler   <=<  -- verifier breaks without this
 --             traceDS "simplify"   <=< simplify  <=<
-
-             -- Desugaring
 --             traceDS "lower"      <=< lower     <=<    -- Lowers all/one/for/if into split or whatever
-             traceDS "Add scopes"   <=< addScope  <=<    -- x:e -->  exists x. ....(x=e)....
+
+
+-- The scope-adding bit works, but I think it should be
+-- part of desugaring into Core, because it adds clutter
+--             traceDS "Add scopes"   <=< addScope  <=<    -- x:e -->  exists x. ....(x=e)....
                                                        -- if --> If3B,  for --> For2B
---             traceDS "lowerApply" <=< lowerApply<=<    -- Round vs square
 
              traceDS "Main desugaring" <=< dsDx      <=<    -- Heavy lifting: Fig 9
 
 --             traceDS "addDeref"   <=< addDeref  <=<    -- Side effects
 
+--             traceDS "lowerApply" <=< lowerApply<=<    -- Round vs square
              traceDS "Add primops"    <=< primops   <=<    -- Var (Ident "op") --> EPrim op
                -- primops: do this after dsSmall, so that PrefixOp, InfixOp, InfixOP are gone
 
