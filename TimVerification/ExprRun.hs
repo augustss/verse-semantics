@@ -366,7 +366,7 @@ data Atom
   | AtomPointer Pointer
   | AtomPath Path
   | AtomUnit
-  | AtomPrimitive String -- Print, operator'^', prefix'set'
+  | AtomPrimitive String -- Print, operator'^', prefix'set', Length, ...
   | AtomEffect Effect
   | AtomOpenWorld OpenWorldSpecifier
   deriving (Eq, Ord, Show, Data)
@@ -1054,7 +1054,18 @@ nativeRules _ (A g :|- pg) =
   "Add" `name` do
     (ctx, c, OpCall u (VPrim "add") (VTuple [VRational x, VRational y])) <- programOp pg
     pure $ A g :|- ctx c (OpUnify u (VRational (x+y)))
-    
+
+ -- The Length rules can overlap, but should yield the same result.
+ ++
+  "Length-tup" `name` do
+    (ctx, c, OpCall u (VPrim "Length") (VTuple vs)) <- programOp pg
+    pure $ A g :|- ctx c (OpUnify u (VInteger (toInteger (length vs))))
+ ++
+  "Length-int" `name` do
+    (ctx, c, OpCall (VInteger l) (VPrim "Length") v) <- programOp pg
+    let vs = [ newIdents pg ("a" ++ show i) | i <- [ 0 .. l-1 ] ]
+    pure $ A g :|- ctx c (OpExists vs +> OpUnify v (VTuple vs))
+  
 
 ---------------------------------------------
 
@@ -1261,6 +1272,26 @@ example18 :: Operation
 example18 = OpExists [vx] +> OpCall vx (VPrim "add") (VTuple [VInteger 1, VInteger 2])
   where vx = newIdents () "x"
 
+-- example19: ex x . x = one{(tuple{}(9))|3}
+-- Hand-desugared
+example19 :: Operation
+example19 = OpExists [vx] +> opOne vx (\ u -> OpChoice (OpCall u (VTuple []) (VInteger 9)) (OpUnify u (VInteger 3)))
+  where vx = newIdents () "x"
+
+-- example20: ex x . 3 = Length(x)
+-- Hand-desugared
+example20 :: Operation
+example20 = OpExists [vx] +> OpCall (VInteger 3) (VPrim "Length") vx
+  where vx = newIdents () "x"
+
+-- example21: ex x . 10 = x(0); 20 = x(1); 2 = Length(x)
+-- Hand-desugared
+example21 :: Operation
+example21 = OpExists [vx] +>
+            OpCall (VInteger 10) vx (VInteger 0) +> OpCall (VInteger 20) vx (VInteger 1) +>
+            OpCall (VInteger 2) (VPrim "Length") vx
+  where vx = newIdents () "x"
+
 finalResult :: Operation -> Maybe Vertex
 finalResult = getRes . norm . startConfig
   where
@@ -1281,8 +1312,16 @@ tests = [
   ("example9", example9, Just $ VTuple [VInteger 5, VInteger 3]),
   ("example10", example10, Just $ VInteger 5),
   ("example11", example11, Nothing),
-  ("example12", example12, Just $ VTuple [VInteger 3, VInteger 3])
+  ("example12", example12, Just $ VTuple [VInteger 3, VInteger 3]),
   -- ("example13", example13, ...)
+  ("example14", example14, Just $ VInteger 1),
+  ("example15", example15, Nothing),
+  ("example16", example16, Just $ VInteger 5),
+  ("example17", example17, Nothing),
+  ("example18", example18, Just $ VInteger 3),
+  -- example19
+  ("example20", example20, Just $ VTuple [newIdents () "a0", newIdents () "a1", newIdents () "a2"]),
+  ("example21", example21, Just $ VTuple [VInteger 10, VInteger 20])
   ]
 
 runTest :: (String, Operation, Maybe Vertex) -> IO ()
