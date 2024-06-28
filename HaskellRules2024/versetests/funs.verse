@@ -24,5 +24,7 @@
 # Clients should see just some(int)
 # x12:int := 88
 
+# 'main' should verify despite three's<decides>,
+# because 'three' is transparent
 three(x:int)<decides> := x = 3;
-main() := y:three := 3
+main() := y<succeeds>:three := 3
