@@ -1669,10 +1669,12 @@ dsM_12 s (Array ts) E                       -- MARRAYE
    = Array <$> mapM (\t -> dsM_12 s t E) ts
 
 dsM_12 s (Array ts) (P i)                   -- MARRAYP
-   = do js <- mapM (\t -> newIdent (getLoc t) "j") ts
-        es <- zipWithM do_one ts js
-        pure (eExists js (seqE [ Unify i (Array (Variable <$> js))
-                               , Array es ]))
+   | not (null ts)  -- Shortcut for empty ts, via MEQ
+                    -- M_s[ <> ]P(i) --> i = <>
+   = do { js <- mapM (\t -> newIdent (getLoc t) "j") ts
+        ; es <- zipWithM do_one ts js
+        ; pure (eExists js (seqE [ Unify i (Array (Variable <$> js))
+                                 , Array es ])) }
    where
      do_one :: SrcExpr -> Ident -> D SrcExpr
      do_one t j = dsM_12 s t (P (Variable j))

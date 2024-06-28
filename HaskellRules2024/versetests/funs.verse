@@ -1,5 +1,5 @@
 # f1(x:int) := x
-f(x:int):int := x+1
+# f2(x:int):int := x+1
 # f3(x:int)<succeeds>:int := x
 # f4(x:int)<decides>:int := x
 # f5(x:int)(y:int):int := (x,y)
@@ -24,20 +24,5 @@ f(x:int):int := x+1
 # Clients should see just some(int)
 # x12:int := 88
 
-# exists y.
-#   y = (x := check<succ>{int[y]}; int[x])
-# -->
-# exists x y.
-#   x = check<succ>{int[y]}
-#   y = int[x]
-#
-#
-# f2(x:int):int := x
-# -->
-# f2 := fun(x := :int){ x |> int }
-# -->
-# f2 := verify{...}
-#       \i. j := x := M+[:int]P(i); B-[x |> int]E j
-# -->
-# f2 := verify{...}
-#       \i. j := x := check<succ>{int[i]}; M-[x |> int]E
+three(x:int)<decides> := x = 3;
+main() := y:three := 3
