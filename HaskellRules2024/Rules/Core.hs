@@ -1,5 +1,8 @@
 module Rules.Core where
 
+import Prelude hiding( (<>) )
+import Epic.Print
+
 import qualified Data.Map as M
 import Data.List( union, intersperse )
 import TRS.Bind
@@ -17,7 +20,7 @@ data Expr
   | Arr [Val]
   | Lam (Bind Expr)
   | Op Op
-  
+
   -- programs
   | Expr :=: Expr    -- unification      =
   | Expr :>: Expr    -- seq. composition ;
@@ -30,7 +33,7 @@ data Expr
   | One Expr
   | All Expr
   -- | Split Expr  -- maybe later
-  
+
   -- verifier
   | Some Val
   | Val :>>: Expr    -- guard           |>   <-- black triangle
@@ -45,7 +48,7 @@ data Op = Add | Sub | Gt | IsInt
  deriving ( Eq, Ord, Show )
 
 data Assump
-  = NOTHING_HERE_YET 
+  = NOTHING_HERE_YET
  deriving ( Eq, Ord, Show )
 
 data Effect
@@ -61,6 +64,22 @@ instance Show Effect where
 
 --------------------------------------------------------------------------------
 -- show -- TODO: use pretty printing library
+
+instance Pretty Expr where
+  pPrintPrec = pPrintPrecE
+
+pPrintPrecE :: PrettyLevel -> Rational -> Expr -> Doc
+pPrintPrecE lvl prec e
+  = case e of
+       Var x   -> ppr 0    x
+       Lit l   -> ppr prec l
+       Arr as  -> char '<' <> fsep (punctuate comma (map (ppr 0) as)) <> char '>'
+       Lam bnd -> "\\" ++ pprBind bnd
+  where
+    ppr :: forall a. Pretty a => Rational -> a -> Doc
+    ppr = pPrintPrec lvl
+
+pprBind :: Bind 
 
 instance Show Expr where
   show (Var x)       = show x

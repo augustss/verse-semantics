@@ -2,7 +2,8 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module FrontEnd.Desugar(
     desugar,
-    simplify
+    simplify,
+    D, runD
   ) where
 
 import Prelude hiding (pi)
@@ -47,12 +48,7 @@ desugar flgs = runD flgs .
 --             traceDS "simpler"    <=< simpler   <=<  -- verifier breaks without this
 --             traceDS "simplify"   <=< simplify  <=<
 --             traceDS "lower"      <=< lower     <=<    -- Lowers all/one/for/if into split or whatever
-
-
--- The scope-adding bit works, but I think it should be
--- part of desugaring into Core, because it adds clutter
---             traceDS "Add scopes"   <=< addScope  <=<    -- x:e -->  exists x. ....(x=e)....
-                                                       -- if --> If3B,  for --> For2B
+                                                         -- if --> If3B,  for --> For2B
 
              traceDS "Main desugaring" <=< dsDx      <=<    -- Heavy lifting: Fig 9
 
@@ -296,8 +292,8 @@ dsSmall = ds
 
     -- one, all
     -- XXX why do we do this?
-    ds (Macro1 (Ident _ "one") [] e) = ds $ If2E e Fail
-    ds (Macro1 (Ident _ "all") [] e) = ds $ For1 e
+    ds (One e) = ds $ If2E e Fail
+    ds (All e) = ds $ For1 e
 
     ds (Macro1 (Ident _ "first") [] e) = ds $ If2E e Fail  -- same as one{}
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
@@ -547,108 +543,6 @@ errMultiple :: [[Ident]] -> D ()
 errMultiple =
   mapM_ (\ is -> errorMessage $ "multiply defined: " ++ prettyShow (head is) ++
                          prettyShow [ l | Ident l _ <- is ])
-
---------------------------------------------------------
---
---         Add scoping
---
---------------------------------------------------------
-
-addScope :: SrcExpr -> D SrcExpr
-addScope e = scope (S.fromList primOps) (Block e)
-
-scope :: S.Set Ident -> SrcExpr -> D SrcExpr
--- The input expression is in BigCore, after desugaring,
--- but still with x := e stuff
--- In  (scope sc expr), `sc` is a set of identifiers already in scope
---     to allow us to complain about shadowing
-scope sc = expr
-  where
-    -- x := e  -->   x = e
-    expr (DefineV i)   = pure $ Variable i
-    expr (DefineE i e) = Unify (Variable i) <$> expr e
-
-    expr e@Lit{}   = pure e
-    expr e@EPrim{} = pure e
-    expr e@(Variable i) | i `S.member` sc = pure e
-                        | otherwise = do errUndefined [i]; pure e
-    expr (Array es) = Array <$> mapM expr es
-    expr (Seq es) = seqE <$> mapM expr es
-    expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
-
-    expr (If3 e1 e2 e3) = do
-      (is, e1', sc') <- defs' sc e1
-      If3B is e1' <$> scopeD sc' e2 <*> exprD e3
-    expr (For2 e1 e2) = do
-      (is, e1', sc') <- defs' sc e1
-      For2B is e1' <$> scopeD sc' e2
-
-    expr (Block e) = exprD e
-    expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
-                          ; e2' <- scope sc' e2
-                          ; pure $ eExists is $ seqE [e1'', e2'] }
-
-    expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
-
-    expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
-    expr Fail           = pure Fail
-
-    expr (Check fx e) = Check fx <$> exprD e
-    expr (Some e)     = Some <$> expr e
-    expr (Guard v e)  = Guard <$> expr v <*> expr e
-
-    expr (OfType e1 eff e2) = OfType <$> exprD e1 <*> pure eff <*> exprD e2
-
-    expr (Exists _ e)  = expr e
-    expr (Lam i e)     = Lam i <$> scopeD (S.insert i sc) e
-    expr (Verify is e) = Verify is <$> scopeD sc' e
-      where sc' = foldr S.insert sc is
-    expr e = impossible e
-
-    exprD e = fst <$> defs sc e
-    scopeD s e = fst <$> defs s e
-
-    defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)
-    -- `e` starts a new scoping context.  Wrap it in an `Exists`
-    defs as e = do
-      (is, e', s) <- defs' as e
-      pure (eExists is e', s)
-
-    defs' :: S.Set Ident -> SrcExpr -> D ([Ident], SrcExpr, S.Set Ident)
-    -- Find identifers bound in `e`, and return them
-    -- along with extended scope-set and transformed `e`.
-    defs' as e = do
-      let -- Get all binders from e
-          is = getVisibleBinders e
-          -- errM: find ones that are defined more than once
-          errM = filter ((> 1) . length) $ group $ sort is
-
-          -- errS: find ones that are already in scope
-          errS = [ (i, j) | i <- is, i `S.member` sc, j <- filter (== i) (S.toList sc) ]
-          s' :: S.Set Ident = foldr S.insert as is
-      e' <- scope s' e
-      errMultiple errM
-      errShadow errS
-      pure (is, e', s')
-
-
-------------------------
-
-{-
--- The invariant for generating core is that there is always an Exists
--- in the following constructs:
---  If3
---  For2
--- If there isn't, this pass will insert an empty exists.
-addExist :: SrcExpr -> D SrcExpr
-addExist = pure . f
-  where
-    f (If3 e1 e2 e3) = If3 (ex (f e1)) (f e2) (f e3)
-    f (For2 e1 e2)   = For2 (ex (f e1)) (f e2)
-    f e = composOp f e
-    ex e@Exists{} = e
-    ex e = Exists [] e
--}
 
 --------------------------------------------------------
 --
@@ -948,6 +842,93 @@ addDeref = pure . exprD S.empty
     defs s e = S.union s (S.fromList (getVar e))
 
     applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
+
+
+
+--------------------------------------------------------
+--
+--             Adding scopes
+--
+--    Replace  x:=t by   exits x. ...(x=t)...
+--
+--------------------------------------------------------
+
+addScope :: SrcExpr -> D SrcExpr
+addScope e = scope (S.fromList primOps) (Block e)
+
+scope :: S.Set Ident -> SrcExpr -> D SrcExpr
+-- The input expression is in BigCore, after desugaring,
+-- but still with x := e stuff
+-- In  (scope sc expr), `sc` is a set of identifiers already in scope
+--     to allow us to complain about shadowing
+scope sc = expr
+  where
+    -- x := e  -->   x = e
+    expr (DefineV i)   = pure $ Variable i
+    expr (DefineE i e) = Unify (Variable i) <$> expr e
+
+    expr e@Lit{}   = pure e
+    expr e@EPrim{} = pure e
+    expr e@(Variable i) | i `S.member` sc = pure e
+                        | otherwise = do errUndefined [i]; pure e
+    expr (Array es) = Array <$> mapM expr es
+    expr (Seq es) = seqE <$> mapM expr es
+    expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
+
+    expr (If3 e1 e2 e3) = do
+      (is, e1', sc') <- defs' sc e1
+      If3B is e1' <$> scopeD sc' e2 <*> exprD e3
+    expr (For2 e1 e2) = do
+      (is, e1', sc') <- defs' sc e1
+      For2B is e1' <$> scopeD sc' e2
+
+    expr (Block e) = exprD e
+    expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
+                          ; e2' <- scope sc' e2
+                          ; pure $ eExists is $ seqE [e1'', e2'] }
+
+    expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
+
+    expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
+    expr Fail           = pure Fail
+
+    expr (Check fx e) = Check fx <$> exprD e
+    expr (Some e)     = Some <$> expr e
+    expr (Guard v e)  = Guard <$> expr v <*> expr e
+
+    expr (OfType e1 eff e2) = OfType <$> exprD e1 <*> pure eff <*> exprD e2
+
+    expr (Exists _ e)  = expr e
+    expr (Lam i e)     = Lam i <$> scopeD (S.insert i sc) e
+    expr (Verify is e) = Verify is <$> scopeD sc' e
+      where sc' = foldr S.insert sc is
+    expr e = impossible e
+
+    exprD e = fst <$> defs sc e
+    scopeD s e = fst <$> defs s e
+
+    defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)
+    -- `e` starts a new scoping context.  Wrap it in an `Exists`
+    defs as e = do
+      (is, e', s) <- defs' as e
+      pure (eExists is e', s)
+
+    defs' :: S.Set Ident -> SrcExpr -> D ([Ident], SrcExpr, S.Set Ident)
+    -- Find identifers bound in `e`, and return them
+    -- along with extended scope-set and transformed `e`.
+    defs' as e = do
+      let -- Get all binders from e
+          is = getVisibleBinders e
+          -- errM: find ones that are defined more than once
+          errM = filter ((> 1) . length) $ group $ sort is
+
+          -- errS: find ones that are already in scope
+          errS = [ (i, j) | i <- is, i `S.member` sc, j <- filter (== i) (S.toList sc) ]
+          s' :: S.Set Ident = foldr S.insert as is
+      e' <- scope s' e
+      errMultiple errM
+      errShadow errS
+      pure (is, e', s')
 
 
 --------------------------------------------------------
@@ -1410,13 +1391,6 @@ getEffs orig_e = go orig_e []
 
     wrap fx (e, fxs) = (EffAttr e fx, fxs)
 
-unSeq :: [SrcExpr] -> ([SrcExpr], SrcExpr)
--- Extracts the last expression of Seq
-unSeq = go []
-  where
-    go acc []     = (reverse acc, Array [])
-    go acc [t]    = (reverse acc, t)
-    go acc (t:ts) = go (t:acc) ts
 --------------------------------------------------------
 --         Functions to construct SrcExpr
 --------------------------------------------------------
@@ -1446,10 +1420,10 @@ eForce :: SrcExpr -> SrcExpr
 eForce e = ApplyD e (Array [])
 
 eAll :: SrcExpr -> SrcExpr
-eAll = Macro1 (Ident noLoc "all") []
+eAll = All
 
 eOne :: SrcExpr -> SrcExpr
-eOne = Macro1 (Ident noLoc "one") []
+eOne = One
 
 eVerify :: [Ident] -> SrcExpr -> SrcExpr
 eVerify = Verify

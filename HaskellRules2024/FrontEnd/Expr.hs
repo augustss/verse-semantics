@@ -16,7 +16,7 @@ module FrontEnd.Expr(
   Eff, effSucceeds, effDecides, effFails, isOpenClosed,
   Op,
   pattern Op,
-  compos, composOp,
+  compos, composOp, unSeq
 
   seqE,
   getLoc,
@@ -160,15 +160,39 @@ pattern Check :: [Eff] -> SrcExpr -> SrcExpr
 pattern Check fx e <- Macro1 (Ident _ "check") fx e
   where Check fx e = Macro1 (Ident noLoc "check") fx e
 
--- some<fx>{e}
+-- some{e}
 pattern Some :: SrcExpr -> SrcExpr
-pattern Some e <- Macro1 (Ident _ "some") _fx e
+pattern Some e <- Macro1 (Ident _ "some") [] e
   where Some e = Macro1 (Ident noLoc "some") [] e
+
+-- one{e}
+pattern One :: SrcExpr -> SrcExpr
+pattern One e <- Macro1 (Ident _ "one") [] e
+  where One e = Macro1 (Ident noLoc "one") [] e
+
+-- all{e}
+pattern One :: SrcExpr -> SrcExpr
+pattern One e <- Macro1 (Ident _ "all") [] e
+  where One e = Macro1 (Ident noLoc "all") [] e
 
 -- guard(v){e}
 pattern Guard :: SrcExpr -> SrcExpr -> SrcExpr
 pattern Guard v e <- Macro2 (Ident _ "guard") v e
   where Guard v e = Macro2 (Ident noLoc "guard") v e
+
+
+--------------------------------------------------------
+--            Decomposing SrcExpr
+--------------------------------------------------------
+
+unSeq :: [SrcExpr] -> ([SrcExpr], SrcExpr)
+-- Extracts the last expression of Seq
+unSeq = go []
+  where
+    go acc []     = (reverse acc, Array [])
+    go acc [t]    = (reverse acc, t)
+    go acc (t:ts) = go (t:acc) ts
+
 
 --------------------------------------------------------
 --               Lit
@@ -194,8 +218,6 @@ instance Pretty Lit where
       LitStr s -> text (show s)
       LitPath s -> pPrintPrec l p s
       LitPtr ptr -> text ("R#" ++ show ptr)
-
-
 
 --------------------------------------------------------
 --               Op

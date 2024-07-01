@@ -4,7 +4,8 @@ module Main(main) where
 
 import Prelude
 
-import Epic.Repl
+
+import Rules.Core as Rules
 
 import FrontEnd.Flags( Flags(..), defaultFlags )
 import FrontEnd.Expr
@@ -13,7 +14,10 @@ import FrontEnd.Parse(parseDie, pFile)
 import FrontEnd.Prelude( PreludeName, findPrelude )
 import FrontEnd.Error
 
+-- Epic libraries
+import Epic.Repl
 import Epic.Print hiding( (<>) )   -- In this module (<>) is Prelude.<>
+
 
 {-
 import FrontEnd.ParseCore
@@ -29,10 +33,6 @@ import TRS.Traced(toList, filterTrace, showTrace)
 --import Rules.Core(defaultTRSFlags)
 --import Verifier.Verify
 --import TRS.Bind(free)
-
--- Epic Library utilities
-import Epic.Print hiding ((<>))
-import Epic.Uniplate
 -}
 
 -- General library utilities
@@ -161,6 +161,7 @@ data SomeExpr = NoExpr
               | Parsed    SrcExpr
               | Desugared SrcExpr
               | Cores     [SrcCore]
+              | RulesCore Rules.Core
 
 instance Show SomeExpr where
   show NoExpr = "No current expression"
@@ -183,14 +184,14 @@ asParsed (Parsed e) = e
 asParsed (Desugared _) = error "Current expression is desugared"
 asParsed (Cores _) = error "Current expression is [Core]"
 
-asExpr :: SomeExpr -> SrcExpr
-asExpr (Desugared e) = e
-asExpr e = asParsed e
+asSrcExpr :: SomeExpr -> SrcExpr
+asSrcExpr (Desugared e) = e
+asSrcExpr e = asParsed e
 
 {-
 asDesugared :: Flags -> SomeExpr -> SrcExpr
 asDesugared f (Parsed e) = desugar f e
-asDesugared _ e = asExpr e
+asDesugared _ e = asSrcExpr e
 
 asCore :: Flags -> SomeExpr -> SrcCore
 asCore _ (Cores [e]) = e
@@ -239,6 +240,8 @@ theCommandSet = CommandSet
 
       , Cmd "read FILE"            "Parse a file"                          cRead
       , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
+
+      , Cmd "tocore [EXPR]"        "Convert [last] expression to Core"     cToCore
 
 --      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
           -- Use Koen's:  normalize :: Rule -> Expr -> Traced Expr
@@ -365,7 +368,7 @@ cDesugar
        ; putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flags) ++
              ", prelude=" ++ fst (fPrelude flags)
 
-       ; e' <- FrontEnd.Desugar.desugar flags (asExpr e)
+       ; e' <- FrontEnd.Desugar.desugar flags (asSrcExpr e)
 
        -- Display the result
        ; let display_result = not (fTraceDesugar flags)
@@ -373,6 +376,17 @@ cDesugar
        ; when display_result $ display e'
 
        ; pure (Desugared e') }
+
+
+cToCore :: CmdRunner CState
+cToCore
+  = withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $
+    do { let flags = cs_flags s
+       ; putStrLn $ "Convert to Core"
+       ; e' <- FrontEnd.ToCore.convertToToCore flags (asSrcExpr e)
+       ; display e'
+       ; pure (RulesCore e') }
 
 
 {-
@@ -396,7 +410,7 @@ cPDesugar c s = do
   let flg = (flags s){ fSimplify = True, fSplit = False, fAssumeVerified = True, fKeepIf = True,
                        fPrelude = either error id $ findPrelude "miniprelude" }
   putStrLn $ "Desugar for execution, prettyfied: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform True (Desugared . dropDollar . desugar flg . asExpr) c s
+  cTransform True (Desugared . dropDollar . desugar flg . asSrcExpr) c s
 
 cDesugarVerify :: CmdRunner CState
 cDesugarVerify c s = do
@@ -405,7 +419,7 @@ cDesugarVerify c s = do
       prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
       flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel }
   putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform True (Desugared . desugar flg . asExpr) c s
+  cTransform True (Desugared . desugar flg . asSrcExpr) c s
 
 cPDesugarVerify :: CmdRunner CState
 cPDesugarVerify c s = do
@@ -414,7 +428,7 @@ cPDesugarVerify c s = do
       prel = if isVerifyPrelude (fPrelude aflg) then fPrelude aflg else either error id $ findPrelude "verifyprelude"
       flg = aflg{ fVerify = True, fSplit = False, fAssumeVerified = False, fPrelude = prel, fSimplify = True }
   putStrLn $ "Desugar for verification: rules=" ++ show (fDesugar flg) ++ ", prelude=" ++ fst (fPrelude flg)
-  cTransform True (Desugared . dropDollar . desugar flg . asExpr) c s
+  cTransform True (Desugared . dropDollar . desugar flg . asSrcExpr) c s
 
 cPreprocess :: CmdRunner CState
 cPreprocess c s = cTransform True (Desugared . pre . asCore (flags s)) c s
@@ -452,7 +466,7 @@ cPrint =
 cDefine :: CmdRunner CState
 cDefine =
   withLastExpr $ \ e s -> do
-    let !e' = asExpr e
+    let !e' = asSrcExpr e
     pure  s{ cs_definitions = cs_definitions s ++ [e'] }
 
 cClear :: CmdRunner CState
@@ -524,7 +538,7 @@ cDefEval :: CmdRunner CState
 cDefEval c s = do
   let addDefs e = Seq $ maybeToList (prelude s) ++ definitions s ++ [e]
       flg = EFlags { underLambda = fUnderLambda (flags s), traceEval = fTrace (flags s), steps = fEvalSteps (flags s) }
-  cTransform True (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asExpr) c s
+  cTransform True (Cored . eval flg . simpCore . asCore (flags s) . Parsed . addDefs . asSrcExpr) c s
 
 -}
 
