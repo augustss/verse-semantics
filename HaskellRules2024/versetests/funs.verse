@@ -26,5 +26,12 @@
 
 # 'main' should verify despite three's<decides>,
 # because 'three' is transparent
-three(x:int)<decides> := x = 3;
-main() := y<succeeds>:three := 3
+# three(x:int)<decides> := x = 3;
+# main() := y<succeeds>:three := 3
+
+F(X:int, G():type{X = 1}) :=
+  (H()<succeeds> := X = 1 ;
+   H() ;
+   G() ) ;
+F(2, G() := G())
+
