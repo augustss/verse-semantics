@@ -1,8 +1,9 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans -Wno-dodgy-imports #-}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module FrontEnd.Desugar(
-    desugar, simplify, addScope,
-    D, runD, traceD
+      desugar, simplify
+    , primOps
+    , D, runD, traceD, getDFlagsX
   ) where
 
 import Prelude hiding (pi)
@@ -18,7 +19,6 @@ import Epic.Print
 -- General libraries
 import Data.Monoid hiding( All )
 import Data.Either
-import Data.List
 import Data.Maybe
 import Data.IORef
 import qualified Data.Set as S
@@ -518,31 +518,6 @@ _isLambdaEffect i = elem i [
 closedId :: Ident
 closedId = Ident noLoc "closed"
 
-errUndefined :: [Ident] -> D ()
-errUndefined is = do
-  no_warn <- getDFlagsX fNoWarn
-  if no_warn then
-    case is of
-      [] -> pure ()
-      i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
-   else
-    mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)) is
-
-errShadow :: [(Ident, Ident)] -> D ()
-errShadow is = do
-  no_warn <- getDFlagsX fNoWarn
-  if no_warn then
-    case is of
-      [] -> pure ()
-      (i@(Ident li _), (Ident lj _)) : _ -> errorMessage $ "shadowing: " ++ prettyShow (li, i, lj)
-   else
-    mapM_ (\ (i@(Ident li _), (Ident lj _)) -> traceM $ "warning shadowing " ++ prettyShow (li, i, lj)) is
-
-errMultiple :: [[Ident]] -> D ()
-errMultiple =
-  mapM_ (\ is -> errorMessage $ "multiply defined: " ++ prettyShow (head is) ++
-                         prettyShow [ l | Ident l _ <- is ])
-
 --------------------------------------------------------
 --
 --         Simplification
@@ -842,92 +817,6 @@ addDeref = pure . exprD S.empty
 
     applyPrimD s e = ApplyD (Variable (Ident noLoc s)) e
 
-
-
---------------------------------------------------------
---
---             Adding scopes
---
---    Replace  x:=t by   exits x. ...(x=t)...
---
---------------------------------------------------------
-
-addScope :: SrcExpr -> D SrcExpr
-addScope e = scope (S.fromList primOps) (Block e)
-
-scope :: S.Set Ident -> SrcExpr -> D SrcExpr
--- The input expression is in BigCore, after desugaring,
--- but still with x := e stuff
--- In  (scope sc expr), `sc` is a set of identifiers already in scope
---     to allow us to complain about shadowing
-scope sc = expr
-  where
-    -- x := e  -->   x = e
-    expr (DefineV i)   = pure $ Variable i
-    expr (DefineE i e) = Unify (Variable i) <$> expr e
-
-    expr e@Lit{}   = pure e
-    expr e@EPrim{} = pure e
-    expr e@(Variable i) | i `S.member` sc = pure e
-                        | otherwise = do errUndefined [i]; pure e
-    expr (Array es) = Array <$> mapM expr es
-    expr (Seq es) = seqE <$> mapM expr es
-    expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
-
-    expr (If3 e1 e2 e3) = do
-      (is, e1', sc') <- defs' sc e1
-      If3B is e1' <$> scopeD sc' e2 <*> exprD e3
-    expr (For2 e1 e2) = do
-      (is, e1', sc') <- defs' sc e1
-      For2B is e1' <$> scopeD sc' e2
-
-    expr (Block e) = exprD e
-    expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
-                          ; e2' <- scope sc' e2
-                          ; pure $ eExists is $ seqE [e1'', e2'] }
-
-    expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
-
-    expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
-    expr Fail           = pure Fail
-
-    expr (Check fx e) = Check fx <$> exprD e
-    expr (Some e)     = Some <$> expr e
-    expr (Guard v e)  = Guard <$> expr v <*> expr e
-
-    expr (OfType e1 eff e2) = OfType <$> exprD e1 <*> pure eff <*> exprD e2
-
-    expr (Exists _ e)  = expr e
-    expr (Lam i e)     = Lam i <$> scopeD (S.insert i sc) e
-    expr (Verify is e) = Verify is <$> scopeD sc' e
-      where sc' = foldr S.insert sc is
-    expr e = impossible e
-
-    exprD e = fst <$> defs sc e
-    scopeD s e = fst <$> defs s e
-
-    defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)
-    -- `e` starts a new scoping context.  Wrap it in an `Exists`
-    defs as e = do
-      (is, e', s) <- defs' as e
-      pure (eExists is e', s)
-
-    defs' :: S.Set Ident -> SrcExpr -> D ([Ident], SrcExpr, S.Set Ident)
-    -- Find identifers bound in `e`, and return them
-    -- along with extended scope-set and transformed `e`.
-    defs' as e = do
-      let -- Get all binders from e
-          is = getVisibleBinders e
-          -- errM: find ones that are defined more than once
-          errM = filter ((> 1) . length) $ group $ sort is
-
-          -- errS: find ones that are already in scope
-          errS = [ (i, j) | i <- is, i `S.member` sc, j <- filter (== i) (S.toList sc) ]
-          s' :: S.Set Ident = foldr S.insert as is
-      e' <- scope s' e
-      errMultiple errM
-      errShadow errS
-      pure (is, e', s')
 
 
 --------------------------------------------------------
@@ -1355,18 +1244,6 @@ verifyPrelude =
     vz = Variable z
 -}
 
------------------------------------------------
-
-
---------------------------------------------------------
---         Identifiers
---------------------------------------------------------
-
-underscore :: Ident
-underscore = Ident noLoc "_"
-
-idX :: Ident
-idX = Ident noLoc "x"
 
 --------------------------------------------------------
 --         Functions to take apart SrcExpr
@@ -1390,80 +1267,6 @@ getEffs orig_e = go orig_e []
 
     wrap fx (e, fxs) = (EffAttr e fx, fxs)
 
---------------------------------------------------------
---         Functions to construct SrcExpr
---------------------------------------------------------
-
-eFalse :: SrcExpr
-eFalse = Array []
-
-eAny :: SrcExpr
-eAny = Variable (Ident noLoc "any$")
-
-eMkMap :: Loc -> SrcExpr
-eMkMap l = Variable (Ident l "mkMap$")
-
-
-eHavoc :: [Eff] -> SrcExpr
-eHavoc fx = seqE (map havoc1 fx)
-  where
-    havoc1 x | x == effSucceeds = seqE []
-             | x == effFails    = Fail
-             | x == effDecides  = Unify (eSome (Lam idX (Variable idX))) (Array [])
-             | otherwise        = errorMessage $ "eHavoc: " ++ show fx
-
-eThunk :: SrcExpr -> SrcExpr
-eThunk = Lam (Ident noLoc "_")
-
-eForce :: SrcExpr -> SrcExpr
-eForce e = ApplyD e (Array [])
-
-eAll :: SrcExpr -> SrcExpr
-eAll = All
-
-eOne :: SrcExpr -> SrcExpr
-eOne = One
-
-eVerify :: [Ident] -> SrcExpr -> SrcExpr
-eVerify = Verify
-
-eSome :: SrcExpr -> SrcExpr
-eSome = Some
-
-eGuard :: [Ident] -> SrcExpr -> SrcExpr
--- Smart constructor, drops empty guard
-eGuard xs e
-  | null xs   = e
-  | otherwise = Guard (fvArray xs) e
-
-eCheck :: [Eff] -> SrcExpr -> SrcExpr
-eCheck fxs1 e
-  | Check fxs2 e' <- e  = Check (fxs1 ++ fxs2) e'
-  | otherwise           = Check fxs1 e
-
-eExists :: [Ident] -> SrcExpr -> SrcExpr
--- Smart constructor, drops empty list of binders
-eExists [] e = e
-eExists is e = Exists is e
-
-eDefine :: Ident -> SrcExpr -> SrcExpr
--- Smart contructor, floats out nested defines
-eDefine x (Seq ts) = seqE (floats ++ [eDefine x rhs])
-                   where
-                     (floats, rhs) = unSeq ts
-eDefine x rhs = DefineE x rhs
-
-eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
--- (eApply f x)  returns  f[x]
--- But has a short-cut for any$[x]
-eApplyD (EPrim "any$") x = x
-eApplyD f              x = ApplyD f x
-
--- Used to create the array of free variables passed from the domain to the range
--- of for/if.  If it's just a single variable, don't use an array.
-fvArray :: [Ident] -> SrcExpr
-fvArray [x] = Variable x
-fvArray xs = Array (map Variable xs)
 
 -- After lowering there are no funny scopes, so empty existential
 -- are no longer necessary.
@@ -1578,7 +1381,7 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
        pure $ Lam i body
 
 -------------------- e |>{fx} t -----------------------
-dsM_12 MV t@(OfType t1 fx t2) pi      -- MOFTYPE+
+dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
    = eCheck fx <$> verify_body
 -- ToDo: check this; not what is in the doc
 --            , dsM_12 MI t pi ]

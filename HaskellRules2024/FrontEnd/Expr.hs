@@ -4,27 +4,32 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module FrontEnd.Expr(
-  Loc, noLoc,
-  Ident(..), unIdent,
-  SrcExpr(..),
-  Lit(..),
-  Path(..),
-  SrcCore, SrcBlk, SrcValue,
-  pattern Typedef, pattern Check, pattern Guard, pattern Some,
-  pattern One, pattern All,
---  pattern Range,
-  Store(..), Ptr,
-  Eff, effSucceeds, effDecides, effFails, isOpenClosed,
-  Op,
-  pattern Op,
-  compos, composOp, unSeq,
+      Loc, noLoc
 
-  seqE,
-  getLoc,
-  isLiteral, isAtomic, isValue,
+    , Ident(..), unIdent
+    , SrcExpr(..), Lit(..), Path(..)
+    , SrcCore, SrcBlk, SrcValue
+    , pattern Typedef, pattern Check, pattern Guard, pattern Some
+    , pattern One, pattern All
 
-  getFree, getAllIdents, getVisibleBinders, getAllBinders, getVar,
-  substMany, closed
+      -- Predicates on SrcExpr
+    , isLiteral, isAtomic, isValue
+
+      -- Building SrcExpr
+    , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne, eAll, eExists
+    , eCheck, eDefine, eApplyD, eVerify
+    , eThunk, eForce
+    , seqE, fvArray
+    , idX, underscore
+
+    , Store(..), Ptr
+    , Eff, effSucceeds, effDecides, effFails, isOpenClosed
+    , Op, pattern Op
+    , compos, composOp, unSeq
+    , getLoc
+
+    , getFree, getAllIdents, getVisibleBinders, getAllBinders, getVar
+    , substMany, closed
   ) where
 
 import Prelude hiding ((<>))  -- Epic.Print exports (<>)
@@ -182,6 +187,87 @@ pattern Guard :: SrcExpr -> SrcExpr -> SrcExpr
 pattern Guard v e <- Macro2 (Ident _ "guard") v e
   where Guard v e = Macro2 (Ident noLoc "guard") v e
 
+
+--------------------------------------------------------
+--         Functions to construct SrcExpr
+--------------------------------------------------------
+
+underscore :: Ident
+underscore = Ident noLoc "_"
+
+idX :: Ident
+idX = Ident noLoc "x"
+
+eFalse :: SrcExpr
+eFalse = Array []
+
+eAny :: SrcExpr
+eAny = Variable (Ident noLoc "any$")
+
+eMkMap :: Loc -> SrcExpr
+eMkMap l = Variable (Ident l "mkMap$")
+
+
+eHavoc :: [Eff] -> SrcExpr
+eHavoc fx = seqE (map havoc1 fx)
+  where
+    havoc1 x | x == effSucceeds = seqE []
+             | x == effFails    = Fail
+             | x == effDecides  = Unify (eSome (Lam idX (Variable idX))) (Array [])
+             | otherwise        = errorMessage $ "eHavoc: " ++ show fx
+
+eThunk :: SrcExpr -> SrcExpr
+eThunk = Lam (Ident noLoc "_")
+
+eForce :: SrcExpr -> SrcExpr
+eForce e = ApplyD e (Array [])
+
+eAll :: SrcExpr -> SrcExpr
+eAll = All
+
+eOne :: SrcExpr -> SrcExpr
+eOne = One
+
+eVerify :: [Ident] -> SrcExpr -> SrcExpr
+eVerify = Verify
+
+eSome :: SrcExpr -> SrcExpr
+eSome = Some
+
+eGuard :: [Ident] -> SrcExpr -> SrcExpr
+-- Smart constructor, drops empty guard
+eGuard xs e
+  | null xs   = e
+  | otherwise = Guard (fvArray xs) e
+
+eCheck :: [Eff] -> SrcExpr -> SrcExpr
+eCheck fxs1 e
+  | Check fxs2 e' <- e  = Check (fxs1 ++ fxs2) e'
+  | otherwise           = Check fxs1 e
+
+eExists :: [Ident] -> SrcExpr -> SrcExpr
+-- Smart constructor, drops empty list of binders
+eExists [] e = e
+eExists is e = Exists is e
+
+eDefine :: Ident -> SrcExpr -> SrcExpr
+-- Smart contructor, floats out nested defines
+eDefine x (Seq ts) = seqE (floats ++ [eDefine x rhs])
+                   where
+                     (floats, rhs) = unSeq ts
+eDefine x rhs = DefineE x rhs
+
+eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
+-- (eApply f x)  returns  f[x]
+-- But has a short-cut for any$[x]
+eApplyD (EPrim "any$") x = x
+eApplyD f              x = ApplyD f x
+
+-- Used to create the array of free variables passed from the domain to the range
+-- of for/if.  If it's just a single variable, don't use an array.
+fvArray :: [Ident] -> SrcExpr
+fvArray [x] = Variable x
+fvArray xs = Array (map Variable xs)
 
 --------------------------------------------------------
 --            Decomposing SrcExpr
