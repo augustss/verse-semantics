@@ -10,13 +10,14 @@ module FrontEnd.Expr(
   Lit(..),
   Path(..),
   SrcCore, SrcBlk, SrcValue,
-  pattern Typedef, pattern Check, pattern Guard, pattern Some, 
+  pattern Typedef, pattern Check, pattern Guard, pattern Some,
+  pattern One, pattern All,
 --  pattern Range,
   Store(..), Ptr,
   Eff, effSucceeds, effDecides, effFails, isOpenClosed,
   Op,
   pattern Op,
-  compos, composOp, unSeq
+  compos, composOp, unSeq,
 
   seqE,
   getLoc,
@@ -28,6 +29,8 @@ module FrontEnd.Expr(
 
 import Prelude hiding ((<>))  -- Epic.Print exports (<>)
 
+import Rules.Core( Lit(..), Ptr, Path(..) )
+
 import FrontEnd.Error
 import Epic.Print
 import Epic.List
@@ -37,7 +40,6 @@ import Control.Monad.Writer
 import Data.Data (Data)
 import qualified Data.IntMap as IM
 import Data.Maybe
-import Data.Scientific(Scientific)
 
 import GHC.Stack
 
@@ -137,7 +139,7 @@ data SrcExpr
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
 
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show)
 
 -- SrcCore synonym is used for the very reduced subset of SrcExpr
 -- that can be directly translated to Rules.Core.Expr
@@ -171,9 +173,9 @@ pattern One e <- Macro1 (Ident _ "one") [] e
   where One e = Macro1 (Ident noLoc "one") [] e
 
 -- all{e}
-pattern One :: SrcExpr -> SrcExpr
-pattern One e <- Macro1 (Ident _ "all") [] e
-  where One e = Macro1 (Ident noLoc "all") [] e
+pattern All :: SrcExpr -> SrcExpr
+pattern All e <- Macro1 (Ident _ "all") [] e
+  where All e = Macro1 (Ident noLoc "all") [] e
 
 -- guard(v){e}
 pattern Guard :: SrcExpr -> SrcExpr -> SrcExpr
@@ -193,31 +195,6 @@ unSeq = go []
     go acc [t]    = (reverse acc, t)
     go acc (t:ts) = go (t:acc) ts
 
-
---------------------------------------------------------
---               Lit
---------------------------------------------------------
-
-data Lit
-  = LitInt Integer            -- d
-  | LitRat Scientific String  -- d.d
-  | LitChar Char              -- 'c'
-  | LitStr String             -- "str"
-  | LitPath Path              -- /path/to/something
-  | LitPtr Ptr                -- not a textual literal, just used when translating back.
-  deriving (Eq, Ord, Show, Data)
-
-instance Pretty Lit where
-  pPrintPrec l p lit =
-    case lit of
-      LitInt i
-        | i >= 0 -> text $ show i
-        | otherwise -> maybeParens (p >= 10) $ text $ show i
-      LitRat r s -> text (show r ++ s)
-      LitChar c -> text (show c)
-      LitStr s -> text (show s)
-      LitPath s -> pPrintPrec l p s
-      LitPtr ptr -> text ("R#" ++ show ptr)
 
 --------------------------------------------------------
 --               Op
@@ -282,20 +259,7 @@ isOpenClosed _                  = False
 
 data Store = Store { refMap :: IM.IntMap SrcValue
                    , outputs :: [SrcCore] }
-  deriving (Show, Eq, Ord, Data)
-
-type Ptr = Int
-
---------------------------------------------------------
---               Path
---------------------------------------------------------
-
-newtype Path = Path String
-  deriving (Eq, Ord, Show, Data)
-
-instance Pretty Path where
-  pPrintPrec _ _ (Path s) = text s
-
+  deriving (Show, Eq, Ord)
 
 --------------------------------------------------------
 --               Pretty printing
@@ -607,6 +571,7 @@ getVisibleBinders = go
     -- These two equations are the main payload
     go (DefineV i)     = [i]
     go (DefineE i e)   = i : go e
+    go (Exists is e)   = is ++ go e
 
     -- The rest is just recursive traversal
     go Lit{}          = []
@@ -628,7 +593,6 @@ getVisibleBinders = go
     go Block{}    = []
     go Choice{}   = []
     go Function{} = []
-    go Exists {}  = []
     go Verify {}  = []  -- verify is a new scope
     go OfType{}   = []
     go Lam{}      = []

@@ -6,12 +6,15 @@ import Prelude
 
 
 import Rules.Core as Rules
+import Rules.TRS2024 as TRS2024
+import TRS.Traced
 
 import FrontEnd.Flags( Flags(..), defaultFlags )
 import FrontEnd.Expr
 import FrontEnd.Desugar
+import FrontEnd.ToCore
 import FrontEnd.Parse(parseDie, pFile)
-import FrontEnd.Prelude( PreludeName, findPrelude )
+import FrontEnd.Prelude( findPrelude )
 import FrontEnd.Error
 
 -- Epic libraries
@@ -36,7 +39,7 @@ import TRS.Traced(toList, filterTrace, showTrace)
 -}
 
 -- General library utilities
-import Control.Exception(SomeException, evaluate, try)
+import Control.Exception(SomeException, try)
 import Control.Monad
 import Data.List
 import Data.Maybe
@@ -100,8 +103,7 @@ runFile _flg _sys _ddesugar fn = do
 --------------------------------------------------------
 
 data MainFlags = MainFlags
-  { mf_rulesys     :: !(Maybe String)
-  , mf_wslbug      :: !Bool
+  { mf_wslbug      :: !Bool
   , mf_preludeName :: !String
   , mf_desugar     :: !Bool
   , mf_simplify    :: !Bool
@@ -110,12 +112,7 @@ data MainFlags = MainFlags
 
 mainFlags :: Parser MainFlags
 mainFlags = MainFlags
-  <$> optional (strOption
-         ( long "rules"
-        <> short 'r'
-        <> metavar "NAME"
-        <> help "Use rule system NAME" ))
-  <*> switch
+  <$> switch
          ( long "wsl"
         <> help "Add extra NL to compensate for WSL bug" )
   <*> strOption
@@ -161,32 +158,32 @@ data SomeExpr = NoExpr
               | Parsed    SrcExpr
               | Desugared SrcExpr
               | Cores     [SrcCore]
-              | RulesCore Rules.Core
-
-instance Show SomeExpr where
-  show NoExpr = "No current expression"
-  show (Parsed e) = show e
-  show (Desugared e) = show e
-  show (Cores e) = show e
+              | RulesCore Rules.Expr
 
 instance Pretty SomeExpr where
-  pPrintPrec _ _ NoExpr = text "No current expression"
-  pPrintPrec l p (Parsed e) = pPrintPrec l p e
+  pPrintPrec _ _ NoExpr        = text "No current expression"
+  pPrintPrec l p (Parsed e)    = pPrintPrec l p e
   pPrintPrec l p (Desugared e) = pPrintPrec l p e
-  pPrintPrec _ _ (Cores []) = text "No results"
-  pPrintPrec l p (Cores [e]) = pPrintPrec l p e
-  pPrintPrec l _ (Cores es) = vcat $ text "Multiple results:" :
-                                     map (\ e -> pPrintPrec l 0 e $$ text "------------") es
+  pPrintPrec _ _ (Cores [])    = text "No results"
+  pPrintPrec l p (Cores [e])   = pPrintPrec l p e
+  pPrintPrec l _ (Cores es)    = vcat $ text "Multiple results:" :
+                                   map (\ e -> pPrintPrec l 0 e $$ text "------------") es
+  pPrintPrec l p (RulesCore e) = pPrintPrec l p e
 
 asParsed :: SomeExpr -> SrcExpr
-asParsed NoExpr = error "No current expression"
-asParsed (Parsed e) = e
+asParsed NoExpr        = error "No current expression"
+asParsed (Parsed e)    = e
 asParsed (Desugared _) = error "Current expression is desugared"
-asParsed (Cores _) = error "Current expression is [Core]"
+asParsed (Cores _)     = error "Current expression is [Core]"
+asParsed (RulesCore _) = error "Current expression is Core"
 
 asSrcExpr :: SomeExpr -> SrcExpr
 asSrcExpr (Desugared e) = e
 asSrcExpr e = asParsed e
+
+asCore :: SomeExpr -> Rules.Expr
+asCore (RulesCore e) = e
+asCore _            = error "Current expresion has not been desugared to Core"
 
 {-
 asDesugared :: Flags -> SomeExpr -> SrcExpr
@@ -207,16 +204,6 @@ withLastExpr cmd _line s = do
 --   s' <- if null line then pure s else cParseLine line s
   let s' = s   -- Ignore input line for now
   cmd (cs_lastExpr s') s'
-
-cTransform :: Bool                    -- True <=> display the result
-           -> (SomeExpr -> SomeExpr)  -- How to transform
-           -> CmdRunner CState
-cTransform display_result tr =
-  withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $ do
-    do { e' <- evaluate (tr e)
-       ; when display_result $ display e'
-       ; pure e' }
 
 
 --------------------------------------------------------
@@ -243,7 +230,7 @@ theCommandSet = CommandSet
 
       , Cmd "tocore [EXPR]"        "Convert [last] expression to Core"     cToCore
 
---      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
+      , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
           -- Use Koen's:  normalize :: Rule -> Expr -> Traced Expr
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
@@ -383,13 +370,40 @@ cToCore
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { let flags = cs_flags s
-       ; putStrLn $ "Convert to Core"
-       ; e' <- FrontEnd.ToCore.convertToToCore flags (asSrcExpr e)
+       ; putStrLn ("\n\n------- Convert to Core ---------")
+       ; e' <- FrontEnd.ToCore.convertToCore flags (asSrcExpr e)
        ; display e'
        ; pure (RulesCore e') }
 
+cEval :: CmdRunner CState
+cEval
+  = withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $
+    do { let core_expr, prepd_expr :: Rules.Expr
+             core_expr  = asCore e
+             prepd_expr = prep core_expr
+             tr@(e' :<-- _) = eval_it prepd_expr
+       ; putStrLn ("\n\n------- Prep'd ---------")
+       ; putStrLn (prettyShow prepd_expr)
+       ; putStrLn ("\n\n------- Evaluate ---------")
+       ; putStrLn (render (pPrint tr))
+       ; pure (RulesCore e') }
+  where
+    eval_it = Rules.normalize (Rules.everywhere TRS2024.rules)
+
 
 {-
+cTransform :: Bool                    -- True <=> display the result
+           -> (SomeExpr -> SomeExpr)  -- How to transform
+           -> CmdRunner CState
+cTransform display_result tr =
+  withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $ do
+    do { e' <- evaluate (tr e)
+       ; when display_result $ display e'
+       ; pure e' }
+
+
 cParseLine :: CmdRunner CState
 cParseLine line s =
   tryIt (pure s) (updateLastExpr s) $ do
@@ -435,12 +449,12 @@ cPreprocess c s = cTransform True (Desugared . pre . asCore (flags s)) c s
   where pre = trsToCore . preProcess sys (ruleEnv sys) . coreToTrs
         sys = esystem s
 
-cEval :: CmdRunner CState
-cEval c s = cTransform True (Desugared . run flg (esystem s) . asCore flg) c s
-  where flg = flags s
-
 systemDescr :: ESystem -> String
 systemDescr s = sname s ++ ": " ++ description s
+
+
+isVerifyPrelude :: (PreludeName, SrcExpr) -> Bool
+isVerifyPrelude (pn, _) = "verify" `isPrefixOf` pn
 -}
 
 --------------------------------------------------------
@@ -450,7 +464,7 @@ systemDescr s = sname s ++ ": " ++ description s
 cShow :: CmdRunner CState
 cShow =
   withLastExpr $ \ e s -> do
-    print e
+    display e
     pure s
 
 cPrint :: CmdRunner CState
@@ -572,7 +586,4 @@ dropDollar = transform f . transformBi g
         f (EPrim s) = EPrim $ filter (/= '$') s
         f x = x
 -}
-
-isVerifyPrelude :: (PreludeName, SrcExpr) -> Bool
-isVerifyPrelude (pn, _) = "verify" `isPrefixOf` pn
 

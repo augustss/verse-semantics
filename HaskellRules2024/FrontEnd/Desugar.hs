@@ -1,9 +1,8 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans -Wno-dodgy-imports #-}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module FrontEnd.Desugar(
-    desugar,
-    simplify,
-    D, runD
+    desugar, simplify, addScope,
+    D, runD, traceD
   ) where
 
 import Prelude hiding (pi)
@@ -17,7 +16,7 @@ import Epic.List
 import Epic.Print
 
 -- General libraries
-import Data.Monoid
+import Data.Monoid hiding( All )
 import Data.Either
 import Data.List
 import Data.Maybe
@@ -125,7 +124,7 @@ instance Applicative D where
 instance Functor D where
   fmap f (MkD m) = MkD (\env -> f <$> m env)
 
-runD :: Flags -> D SrcExpr -> IO SrcExpr
+runD :: Flags -> D a -> IO a
 -- Runs the D monad
 runD flags (MkD thing_inside)
   = do { nextref <- newIORef 1
@@ -140,7 +139,7 @@ traceD msg doc
          else return () }
 
 doIO_D :: IO a -> D a
-doIO_D io = MkD (\env -> io)
+doIO_D io = MkD (\_ -> io)
 
 getDFlags :: D Flags
 getDFlags = MkD (\(DEnv { dflags = flags }) -> return flags)
@@ -1580,9 +1579,11 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
 
 -------------------- e |>{fx} t -----------------------
 dsM_12 MV t@(OfType t1 fx t2) pi      -- MOFTYPE+
-    = seqDE [ eCheck fx <$> verify_body
-            , dsM_12 MI t pi ]
+   = eCheck fx <$> verify_body
 -- ToDo: check this; not what is in the doc
+--            , dsM_12 MI t pi ]
+--    = seqDE [ eCheck fx <$> verify_body
+--            , dsM_12 MI t pi ]
 --  = seqDE [ eVerify [] <$> (eCheck fx <$> verify_body)
 --          , dsM_12 MI t pi ]
   where
@@ -1590,12 +1591,12 @@ dsM_12 MV t@(OfType t1 fx t2) pi      -- MOFTYPE+
                      ; (e2, z) <- defineDE "z" (dsDD_12 MV t2)
                      ; pure (seqE [e1, e2, eApplyD z x]) }
 
-dsM_12 MI (OfType t1 fx t2) pi      -- MOFTYPE-
-    -- ToDo: fx and pi are unused, which seems suspicious
+dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
+    -- ToDo: pi is unused, which seems suspicious
+    -- But I think that's a correct reflection of opacity
   = do { (e2, z) <- defineDE "z" (dsDD_12 MI t2)
        ; pure (seqE [ e2
-                    , eHavoc fx
-                    , eGuard (getFree t1) (eSome z)]) }
+                    , eGuard (getFree t1) (seqE [eHavoc fx, eSome z]) ]) }
 
 dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
   = do { (e1, x) <- defineDE "x" (dsM_12 s t1 pi)
@@ -1603,19 +1604,19 @@ dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
        ; pure (seqE [e1,e2]) }
 
 -------------------- :{fx} t -----------------
-dsM_12 MI (Range fx t) (P i)                 -- MTYPE1
-  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
+-- ToDo: I don't think we want fx on Range at all
+
+--dsM_12 MI (Range fx t) (P i)                 -- MTYPE1
+--  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
 --       ; pure (seqE [e, eHavoc fx, eGuard i (eSome z) ]) }
 -- ToDo: check this... it's not what is in the doc yet
-       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
+--       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
 
-dsM_12 s (Range fx t) (P i)                  -- MTYPE2  s = {+,x}
+dsM_12 s (Range _fx t) (P i)                  -- MTYPEP
   = do { (e, z) <- defineDE "z" (dsDD_12 s t)
--- ToDo: the eCheck is new
-       ; pure (eCheck fx $ seqE [e, eApplyD z i]) }   -- z[x]
+       ; pure (seqE [e, eApplyD z i]) }   -- z[x]
 
-dsM_12 s (Range fx t) E                      -- MTYPE3
-    -- ToDo: what about <fx>?
+dsM_12 s (Range _fx t) E                      -- MTYPEE
   = do { x <- newIdent (getLoc t) "x"
        ; (e, z) <- defineDE "z" (dsDD_12 s t)
        ; let z_app = eApplyD z (Variable x)   -- z[x]

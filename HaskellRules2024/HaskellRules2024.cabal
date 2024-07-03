@@ -119,6 +119,11 @@ library verse-libs
                       FrontEnd.Parse
                       FrontEnd.Prelude
                       FrontEnd.Desugar
+                      FrontEnd.ToCore
+                      Rules.Core
+                      Rules.TRS2024
+                      TRS.Bind
+                      TRS.Traced
 
 --                      Epic.Applicative
 --                      Epic.Lens

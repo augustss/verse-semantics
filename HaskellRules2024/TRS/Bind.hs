@@ -1,26 +1,21 @@
 module TRS.Bind
   ( Ident(..)
   , ident
-  , identsNotInPrefix
-  , identsNotIn
-  , identNotIn
+  , identsNotInPrefix, identsNotIn, identNotIn
+
   , Variables(..)
-  , free
-  , occurs
+  , free, occurs
+
   , Bind -- abstract! let's see if we can do this
-  , bind
-  , unsafeUnbind
-  , alphaRenameWith
-  , BindList(..)
-  , Subst
-  , substBind
-  , substBinds
+  , bind, unsafeUnbind, alphaRenameBindWith
+  , BindList, bindList, unsafeUnbindList, alphaRenameBindListWith
+
+  , Subst, substBind, substBinds
   )
  where
 
-import Data.List( union, (\\), isPrefixOf )
+import Data.List( union, isPrefixOf )
 import Data.Char( isDigit )
-import Data.Maybe (maybeToList)
 import Epic.Print
 
 --------------------------------------------------------------------------------
@@ -107,18 +102,40 @@ bind x t = Bind x t
 instance Variables t => Variables (Bind t) where
   variables f (Bind x t) = f x (variables f t)
 
-alphaRenameWith :: Variables t
-                => (Ident -> Ident -> t -> t)  -- Renamer
-                -> [Ident]                     -- Forbidden
-                -> Bind t -> (Ident, t)
+alphaRenameBindWith :: Variables t
+                    => (Ident -> Ident -> t -> t)  -- Renamer
+                    -> [Ident]                     -- Forbidden
+                    -> Bind t -> (Ident, t)
 -- Recommended way to walk inside a Bind
 --    (ren x y t) should replace all uses of `x` by `y` in `t`
-alphaRenameWith ren forb (Bind x t)
+--
+--ToDo: ;combination of 'free' and 'forb' seems excessive
+alphaRenameBindWith ren forb (Bind x t)
   | x `notElem` forb = (x, t)
   | otherwise        = (x', ren x x' t)
  where
   zs = forb ++ free t
   x' = identNotIn zs
+
+alphaRenameBindListWith :: Variables t
+                        => ([(Ident,Ident)] -> t -> t)  -- Renamer
+                        -> [Ident]                      -- Forbidden
+                        -> BindList t -> ([Ident], t)
+-- Recommended way to walk inside a Bind
+--    (ren x y t) should replace all uses of `x` by `y` in `t`
+alphaRenameBindListWith ren top_forb bl
+  = go (top_forb ++ free bl) [] bl
+  where
+    go _ rn_prs (Body t)
+      | null rn_prs = ([], t)
+      | otherwise   = ([], ren (reverse rn_prs) t)
+    go forb prs (Binder (Bind x t)) = (x':xs', t')
+      where
+        (xs', t') = go (x':forb) prs' t
+        (x', prs') | x `elem` forb = (new_x, (x,new_x):prs)
+                   | otherwise     = (x,     prs)
+                   where
+                     new_x = identNotIn forb
 
 unsafeUnbind :: Bind t -> (Ident, t)
 -- Non-recommended way to walk inside a Bind
@@ -133,25 +150,37 @@ instance Variables t => Variables (BindList t) where
   variables f (Body t)     = variables f t
   variables f (Binder bnd) = variables f bnd
 
+bindList :: [Ident] -> t -> BindList t
+bindList xs t = foldr do_one (Body t) xs
+  where
+    do_one x bl = Binder (bind x bl)
+
+unsafeUnbindList :: BindList t -> ([Ident], t)
+unsafeUnbindList (Body t)     = ([], t)
+unsafeUnbindList (Binder bnd) = let (x,bl)    = unsafeUnbind bnd
+                                    (xs,body) = unsafeUnbindList bl
+                                in (x:xs, body)
+
 --------------------------------------------------------------------------------
 
 type Subst a = [(Ident,a)]
 
 substBind :: (Variables s, Variables t)
-          => (Ident -> s) -> (Subst s -> t -> t) -> (Subst s -> Bind t -> Bind t)
+          => (Ident -> s) -> (Subst s -> t -> t)
+          -> (Subst s -> Bind t -> Bind t)
 substBind var subst sub a@(Bind x t)
   | null sub'   = a
   | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)
   | otherwise   = Bind x  (subst sub' t)
  where
-  sub' = [ (y,t) | (y,t) <- sub, y /= x ]
+  sub' = [ (y,ty) | (y,ty) <- sub, y /= x ]
   vs   = free (map snd sub')
   zs   = map fst sub' ++ vs ++ free t
   x'   = identNotIn zs
 
 substBinds :: (Variables s, Variables t)
            => (Ident -> s) -> (Subst s -> t -> t) -> (Subst s -> BindList t -> BindList t)
-substBinds var subst sub (Body t)     = Body (subst sub t)
-substBinds var subst sub (Binder bnd) = Binder (substBind var (substBinds var subst) sub bnd)
+substBinds _var subst sub (Body t)     = Body (subst sub t)
+substBinds var  subst sub (Binder bnd) = Binder (substBind var (substBinds var subst) sub bnd)
 
 --------------------------------------------------------------------------------

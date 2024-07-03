@@ -1,8 +1,9 @@
 module Rules.TRS2024 where
 
-import Control.Monad( guard )
 import TRS.Bind
 import Rules.Core
+
+import Control.Monad( guard )
 
 --------------------------------------------------------------------------------
 
@@ -100,20 +101,20 @@ choiceFree _                   = True
 rulesApplication :: Rule
 rulesApplication lhs =
   "APP-ADD" `name`
-  do Op Add :@: Arr [Int k1, Int k2] <- [lhs]
-     pure (Int (k1+k2))
+  do Op Add :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     pure (LitInt (k1+k2))
  ++
   "APP-SUB" `name`
-  do Op Sub :@: Arr [Int k1, Int k2] <- [lhs]
-     pure (Int (k1-k2))
+  do Op Sub :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     pure (LitInt (k1-k2))
  ++
   "APP-GT" `name`
-  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
+  do Op Gt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 > k2)
-     pure (Int k1)
+     pure (LitInt k1)
  ++
   "APP-GT-FAIL" `name`
-  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
+  do Op Gt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 <= k2)
      pure Fail
  ++
@@ -121,7 +122,7 @@ rulesApplication lhs =
   do Op IsInt :@: a <- [lhs]
      guard (isHNF a)
      case a of
-       Int _ -> pure a
+       LitInt _ -> pure a
        _     -> pure Fail
  ++
   "APP-LAM" `name`
@@ -133,7 +134,7 @@ rulesApplication lhs =
   "APP-TUP" `name`
   do Arr vs@(_:_) :@: v <- [lhs]
      guard (isVal v && all isVal vs)
-     pure (foldr1 (:|:) [ (v :=: Int i) :>: vi | (i,vi) <- [0..] `zip` vs ])
+     pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
  ++
   "APP-TUP-0" `name`
   do Arr [] :@: v <- [lhs]
@@ -145,7 +146,7 @@ rulesApplication lhs =
 rulesUnification :: Rule
 rulesUnification lhs =
   "U-LIT" `name`
-  do (Int k1 :=: Int k2) :>: e <- [lhs]
+  do (LitInt k1 :=: LitInt k2) :>: e <- [lhs]
      guard (k1 == k2)
      pure e
  ++
@@ -159,7 +160,7 @@ rulesUnification lhs =
      guard (isHNF a1 && isHNF a2)
      guard $
        case (a1, a2) of
-         (Int k1, Int k2)  -> k1 /= k2
+         (LitInt k1, LitInt k2)  -> k1 /= k2
          (Arr vs, Arr vs') -> length vs /= length vs'
          (_,      _)       -> True
      pure Fail
