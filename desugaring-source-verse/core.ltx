@@ -226,9 +226,10 @@ $\begin{array}{@@{}l}
 \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Open Lambdas}
-  \rulename{u-olam}   & |olam k_1 v_1 == olam k_2 v_2| & \movesto & \multicolumn{2}{@@{}l}{|def k_3 (k_1 == olam k_3 v_2; k_2 == olam k_3 v_1)|} \\
-  \rulename{app-olam} & |apply1N (olam k v_1) v_2| & \movesto & |apply1N k v_2 == apply1N v_1 v_2| \\
-  \rulename{exi-app} & |def k e| & \movesto & |subst e k ((lam x (def y y)))| & \text{|k| occurs in |e| only as |apply1N k v|}
+  \rulename{u-olam}   & |olam z_1 v_1 == olam z_2 v_2; e| & \movesto & \multicolumn{2}{@@{}l}{|def z_3 (z_1 == olam z_3 v_2; z_2 == olam z_3 v_1); e|} \\
+  \rulename{app-olam} & |apply1N (olam z v_1) v_2| & \movesto & |def x (x == apply1N z v_2; x == apply1N v_1 v_2; x| \\
+  \rulename{exi-app} & |def z e| & \movesto &
+  \multicolumn{2}{@@{}l}{|subst e z ((lam x (def y y)))| \hspace{5mm} \text{if |z| occurs in |e| only as |apply1N z v|}}
 \end{array}
 \\
 \text{\textit{Note}: In rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.} \\
