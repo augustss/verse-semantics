@@ -41,19 +41,26 @@ import Debug.Trace
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
 
+-----------------------------------------------
+--
+--      The main desugaring pass: desugar
+--
+-----------------------------------------------
+
+
 desugar :: Flags -> SrcExpr -> IO SrcCore
 desugar flgs = runD flgs .
-            (-- Simplification [drop this for now]
---             traceDS "simpler"    <=< simpler   <=<  -- verifier breaks without this
---             traceDS "simplify"   <=< simplify  <=<
---             traceDS "lower"      <=< lower     <=<    -- Lowers all/one/for/if into split or whatever
+            (
+               -- Simplification [drop this for now]
+               -- traceDS "simpler"    <=< simpler   <=<  -- verifier breaks without this
+               -- traceDS "simplify"   <=< simplify  <=<
+               -- traceDS "lower"      <=< lower     <=<    -- Lowers all/one/for/if into split or whatever
                                                          -- if --> If3B,  for --> For2B
 
              traceDS "Main desugaring" <=< dsDx      <=<    -- Heavy lifting: Fig 9
 
 --             traceDS "addDeref"   <=< addDeref  <=<    -- Side effects
 
---             traceDS "lowerApply" <=< lowerApply<=<    -- Round vs square
              traceDS "Add primops"    <=< primops   <=<    -- Var (Ident "op") --> EPrim op
                -- primops: do this after dsSmall, so that PrefixOp, InfixOp, InfixOP are gone
 
@@ -63,132 +70,6 @@ desugar flgs = runD flgs .
                                                        --    verifyprelude.verse, mediumprelude.verse
 
              traceDS "syntaxFixes" <=< syntaxFixes)
-  where
-    traceDS :: String -> SrcExpr -> D SrcExpr
-    traceDS msg e = do { traceD msg (pPrint e)
-                       ; pure e }
-
-addPrelude :: SrcExpr -> D SrcExpr
-addPrelude orig_e
-  = do { prel  <- getDFlagsX (snd . fPrelude)
-       ; prel1 <- syntaxFixes prel
-       ; return (addUsed (spl prel1) orig_e) }
-  where
-    -- Split the prelude into an association list
-    spl (Array ds) = map (\ e -> (nameOf e, e)) ds
-    spl e = impossible e
-
-    -- Find the name of a definition
-    nameOf (InfixOp lhs (Ident _ ":=") _) = lhsName lhs
-    nameOf e = impossible e
-
-    lhsName :: SrcExpr -> Ident
-    lhsName (EffAttr e _) = lhsName e
-    lhsName (ApplyS e _) = lhsName e
-    lhsName (Variable i) = i
-    lhsName e = impossible e
-
--- Hackily add prelude identifiers used in e
-addUsed :: [(Ident, SrcExpr)] -> SrcExpr -> SrcExpr
-addUsed prel = loop []
-  where
-    loop vs e =
-      let is = getAllIdents e
-          ps = filter (\ (i, _) -> i `elem` is && i `notElem` vs) prel
-      in  case ps of
-            [] -> e
-            ies -> loop (map fst ies ++ vs) $ seqE (map snd ies ++ [e])
-
-
------------------------------------------------
---      The desugaring monad: D
---
---   It is an IO monad (for tracing), with an env that carries
---       a mutable fresh-variable supply
---       the Flags
-
------------------------------------------------
-
-newtype D a = MkD (DEnv -> IO a)
-
-data DEnv = DEnv { nextNo :: !(IORef Int), dflags :: !Flags }
-
-instance Monad D where
-  MkD m1 >>= k = MkD (\env -> do { r <- m1 env
-                                 ; let MkD m2 = k r
-                                 ; m2 env })
-instance Applicative D where
-  pure x = MkD (\_ -> return x)
-  (<*>) = ap
-
-instance Functor D where
-  fmap f (MkD m) = MkD (\env -> f <$> m env)
-
-runD :: Flags -> D a -> IO a
--- Runs the D monad
-runD flags (MkD thing_inside)
-  = do { nextref <- newIORef 1
-       ; let env = DEnv { nextNo = nextref, dflags = flags }
-       ; thing_inside env }
-
-traceD :: String -> Doc -> D ()
-traceD msg doc
-  = do { do_trace <- getDFlagsX fTraceDesugar
-       ; if do_trace
-         then doIO_D (putStrLn ("\n------- " ++ msg ++ "---------\n" ++ render doc))
-         else return () }
-
-doIO_D :: IO a -> D a
-doIO_D io = MkD (\_ -> io)
-
-getDFlags :: D Flags
-getDFlags = MkD (\(DEnv { dflags = flags }) -> return flags)
-
-getDFlagsX :: (Flags -> a) -> D a
-getDFlagsX f = f <$> getDFlags
-
-newInt :: D Int
-newInt = MkD $ \(DEnv { nextNo = ref }) ->
-  do { n <- readIORef ref
-     ; writeIORef ref (n+1)
-     ; return n }
-
-newIdent :: Loc -> String -> D Ident
-newIdent l s = do
-  n <- newInt
-  pure $ Ident l $ "$" ++ s ++ show n
-
-
---------------------------------------------------------
---
---         syntaxFixes
---
---------------------------------------------------------
-
--- Do various early changes:
---  * (e)       -->  e             parens are there to stop the next from possibly firing
---  * e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
---  * (e1,...)  -->  array{e1,...} no need to distingush them anymore
---  * x&y:e     -->  array{x&y:e}  if outside an array
---                   x:e; y:e      if inside an array
-syntaxFixes :: SrcExpr -> D SrcExpr
-syntaxFixes = pure . f
-  where f :: SrcExpr -> SrcExpr
-        f (Parens e) = f e
-        f (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
-          f $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
-        f (Tuple es) = f (Array es)
-        f (Array es) = Array $ concatMap g es
-        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":" ) _) = f (Array [e])  -- PAMP1
-        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":=") _) = f (Array [e])  -- PAMP1
-        f e = composOp f e
-
-        -- PAMP2
-        g :: SrcExpr -> [SrcExpr]
-        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
-        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
-        g e = [f e]
-
 
 --------------------------------------------------------
 --
@@ -201,15 +82,15 @@ dsSmall = ds
   where
     ds :: SrcExpr -> D SrcExpr
 
-    -- Application and unification
+    -- Application
+    ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where
+        -- This replaces f(e) with check<succeeds>{f[e]}
         applyS x y = eCheck [effSucceeds] (ApplyD x y)
 
     -- (e1 = e2)  --->  Unify
     ds (InfixOp e1 (Op "=") e2) = Unify <$> ds e1 <*> ds e2
-
-    ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
 
     -- Bindings
     ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)  -- PCOLONT
@@ -321,9 +202,18 @@ checkEffs = mapM checkEff
     checkEff e | e `elem` knownEffects = pure e
                | otherwise = errorMessage $ "unknown effect: " ++ show e
 
-simpleMapEntry :: SrcExpr -> Maybe (SrcExpr, SrcExpr)
-simpleMapEntry (InfixOp k (Op "=>") v) = Just (k, v)
-simpleMapEntry _ = Nothing
+
+knownEffects :: [Ident]
+knownEffects = map (Ident noLoc) [
+  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "transacts", "open"
+  ] ++ [closedId]
+
+closedId :: Ident
+closedId = Ident noLoc "closed"
+
+--------------------------------------
+-- Application
+--------------------------------------
 
 apply :: (SrcValue -> SrcValue -> SrcExpr) -> SrcExpr -> SrcExpr -> D SrcExpr
 -- val1[e2]  -->
@@ -347,9 +237,9 @@ apply1 con x1 e2 = do
 apply2 :: (SrcValue -> SrcValue -> SrcExpr) -> SrcValue -> SrcValue -> D SrcExpr
 apply2 con x1 x2 = pure $ con x1 x2
 
-addSucceeds :: [Eff] -> [Eff]
-addSucceeds [] = [effSucceeds]   -- Default is <succeeds>
-addSucceeds fx = fx
+--------------------------------------
+-- Patterns
+--------------------------------------
 
 defn :: SrcExpr -> SrcExpr -> D SrcExpr
 -- Desugars (p := e) into an expression; see Fig 3, top group
@@ -418,6 +308,21 @@ defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 --defn p _ = impossible p
 
 
+addSucceeds :: [Eff] -> [Eff]
+addSucceeds [] = [effSucceeds]   -- Default is <succeeds>
+addSucceeds fx = fx
+
+--------------------------------------
+-- Maps
+--------------------------------------
+
+simpleMapEntry :: SrcExpr -> Maybe (SrcExpr, SrcExpr)
+simpleMapEntry (InfixOp k (Op "=>") v) = Just (k, v)
+simpleMapEntry _ = Nothing
+
+--------------------------------------
+-- Arrays
+--------------------------------------
 
 defnArray :: [SrcExpr] -> SrcExpr -> D SrcExpr
 defnArray ps e = do
@@ -471,20 +376,15 @@ arrayElems = grp . map cls
           let (rs, bs) = span isRight as
           in  EElems [ e | Right e <- rs ] : grp bs
 
----------------------------------------------------------------------------------
+--------------------------------------
+-- Calls
+--------------------------------------
 
-dsDx :: SrcExpr -> D SrcExpr
-dsDx e = do
-  how <- getDFlagsX fDesugar
-  case how of
-    DS12 -> dsD_12 e
-
-
--- Pick the appropriate form of apply for operators
 call :: String         -- "pre", "post", or "in" depending on prefix, postfix or infix
      -> Loc -> String  -- Function
      -> SrcExpr        -- Argumemt
      -> D SrcExpr
+-- Pick the appropriate form of apply for operators
 call p l s e = do
   ver <- getDFlagsX (not . fAssumeVerified)
   let
@@ -503,20 +403,6 @@ call p l s e = do
     s' = p ++ "'" ++ s ++ "'"
   pure $ con (Variable (Ident l s')) e
 
-----------------------------------------------
-
-knownEffects :: [Ident]
-knownEffects = map (Ident noLoc) [
-  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "transacts", "open"
-  ] ++ [closedId]
-
-_isLambdaEffect :: Ident -> Bool
-_isLambdaEffect i = elem i [
-  closedId
-  ]
-
-closedId :: Ident
-closedId = Ident noLoc "closed"
 
 --------------------------------------------------------
 --
@@ -541,17 +427,12 @@ simplify expr = do
     loop 25 expr
 
 oneSimplifyPass :: SrcExpr -> D SrcExpr
-oneSimplifyPass expr = do
-  tr <- getDFlagsX fTraceDesugar
-  let traceDS :: String -> SrcExpr -> D SrcExpr
-      traceDS msg e | tr = trace ("---- " ++ msg ++ "\n" ++ prettyShow e) $
-                           pure e
-                    | otherwise = pure e
-  (traceDS "elimExist"  <=< elimExist <=<
+oneSimplifyPass =
+   traceDS "elimExist"  <=< elimExist <=<
    traceDS "alias"      <=< simpAlias <=<
    traceDS "simpler"    <=< simpler   <=<
    traceDS "inlineVal"  <=< inlineVal <=<
-   pure ) expr
+   pure
 
 inlineVal :: SrcExpr -> D SrcExpr
 inlineVal expr = do
@@ -819,13 +700,481 @@ addDeref = pure . exprD S.empty
 
 
 
+
+--------------------------------------------------------
+--         Functions to take apart SrcExpr
+--------------------------------------------------------
+
+-- Return function, argument, and attributes
+getFun :: SrcExpr -> Maybe (SrcExpr, SrcExpr, [Ident])
+getFun = gf []
+  where
+    gf rs (EffAttr e r) = gf (r:rs) e
+    gf rs (ApplyS f a) = Just (f, a, reverse rs)
+    gf _ _ = Nothing
+
+getEffs :: SrcExpr -> (SrcExpr, [Eff])  -- e<fx1><fx2> --> (e, [fx1,fx2])
+getEffs orig_e = go orig_e []
+  where
+    go (EffAttr e fx) fxs
+     | isOpenClosed fx    = wrap fx (go e fxs)
+     | otherwise          = go e (fx:fxs)
+    go e              fxs = (e, fxs)
+
+    wrap fx (e, fxs) = (EffAttr e fx, fxs)
+
+
+-- After lowering there are no funny scopes, so empty existential
+-- are no longer necessary.
+-- ToDo: why are empty existentials ever necessary?
+lExists :: [Ident] -> SrcExpr -> SrcExpr
+lExists [] e = e
+lExists is (Exists is' e) = lExists (is ++ is') e
+lExists is e = Exists is e
+
+--------------------------------------------------------
+--
+--         dsDx: Desugaring Small Source -> Big Core
+--
+--------------------------------------------------------
+
+data Pi
+  = P SrcExpr -- ^ P(x)    The SrcExpr is always small and freely duplicable
+              --           Typically just (Variable x)
+  | E         -- ^ E
+  deriving (Eq, Ord, Show)
+
+data DsMode12
+  = MX -- ^ x "execution"
+  | MV -- ^ + "verification"
+  | MI -- ^ - "checking" ("implementation")
+  deriving (Eq, Ord, Show)
+
+
+dsDx :: SrcExpr -> D SrcExpr
+dsDx e = do
+  how <- getDFlagsX fDesugar
+  case how of
+    DS12 -> dsD_12 e
+
+
+dsD_12 :: SrcExpr -> D SrcExpr
+dsD_12 = dsDD_12 MV
+
+dsDD_12 :: DsMode12 -> SrcExpr -> D SrcExpr
+dsDD_12 s t = dsM_12 s t E
+
+
+dsB_12 :: DsMode12 -> SrcExpr -> Pi -> SrcExpr -> D SrcExpr
+dsB_12 s t E     _
+  = dsM_12 s t E
+dsB_12 s t (P f) j
+  = do z <- newIdent (getLoc t) "z";
+       seqDE [ pure $ eDefine z (ApplyD f j)
+             , dsM_12 s t (P (Variable z))]
+
+seqDE :: [D SrcExpr] -> D SrcExpr
+seqDE ds = seqE <$> sequence ds
+
+defineDE :: String -> D SrcExpr
+         -> D (SrcExpr,   -- The defn
+               SrcExpr)   -- The use
+-- define "x" de   returns   x := e, along with x itself
+-- But (just to save clutter) if the rhs turns out to be tiny,
+--   just return it alone
+defineDE nm ds_rhs
+  = do { rhs' <- ds_rhs
+       ; if isAtomic rhs'
+         then pure (seqE [], rhs')
+         else do { x <- newIdent (getLoc rhs') nm
+                 ; pure (eDefine x rhs', Variable x) } }
+
+defineDE2 :: String
+          -> D SrcExpr               -- The RHS
+          -> (SrcExpr -> D SrcExpr)  -- The body
+          -> D SrcExpr               -- z := rhs; body
+defineDE2 nm ds_rhs ds_body
+  = do { rhs' <- ds_rhs
+       ; if isAtomic rhs'
+         then ds_body rhs'
+         else do { x <- newIdent (getLoc rhs') nm
+                 ; body' <- ds_body (Variable x)
+                 ; if x `elem` getAllIdents body'  -- See Note [Avoiding clutter]
+                   then pure (seqE [eDefine x rhs', body'])
+                   else pure (seqE [rhs',           body']) } }
+
+{- Note [Avoiding clutter]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+In defineDE2 we are building a term looking like:
+
+   x := rhs
+   ...body...
+
+where `x` is complely fresh.   We can abbreviate this if
+
+* `rhs` is atomic; then just use `rhs` rather than `x`
+
+* `x` is not used in rhs.  Since `rhs` is a SrcExpr, its binding structure
+  is not obvious, and it's awkward to get its true free variables. But since
+  `x` is fresh anyway it suffices to look for /any/ occurrence of `x`. At worst
+  we'll create a binding we don't really need.
+
+  Hence the user of `getAllIdents`.
+-}
+
+dsM_12 :: DsMode12 -> SrcExpr -> Pi -> D SrcExpr
+
+-------------------- Functions -----------------------
+dsM_12 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
+  = do r <- newIdent (getLoc t) "r"
+       body <- defineDE2 "j" (dsM_12 MI t1 (P (Variable r)))
+                             (dsB_12 MV t2 pi)
+       seqDE [ pure (eVerify [r] body)
+             , dsM_12 MI t pi ]
+
+dsM_12 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
+  = do i   <- newIdent (getLoc t1) "i"
+       body <- defineDE2 "j" (dsM_12 MV t1 (P (Variable i)))
+                             (dsB_12 MI t2 pi)
+       pure $ {- TODO: ISFUN -} Lam i body
+
+dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
+  = do i   <- newIdent (getLoc t1) "i"
+       body <- defineDE2 "j" (dsM_12 MX t1 (P (Variable i)))
+                             (dsB_12 MX t2 pi)
+       pure $ Lam i body
+
+-------------------- e |>{fx} t -----------------------
+dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
+   = eCheck fx <$> verify_body
+-- ToDo: check this; not what is in the doc
+--            , dsM_12 MI t pi ]
+--    = seqDE [ eCheck fx <$> verify_body
+--            , dsM_12 MI t pi ]
+--  = seqDE [ eVerify [] <$> (eCheck fx <$> verify_body)
+--          , dsM_12 MI t pi ]
+  where
+    verify_body = do { (e1, x) <- defineDE "x" (dsM_12 MV t1 pi)
+                     ; (e2, z) <- defineDE "z" (dsDD_12 MV t2)
+                     ; pure (seqE [e1, e2, eApplyD z x]) }
+
+dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
+    -- ToDo: pi is unused, which seems suspicious
+    -- But I think that's a correct reflection of opacity
+  = do { (e2, z) <- defineDE "z" (dsDD_12 MI t2)
+       ; pure (seqE [ e2
+                    , eGuard (getFree t1) (seqE [eHavoc fx, eSome z]) ]) }
+
+dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
+  = do { (e1, x) <- defineDE "x" (dsM_12 s t1 pi)
+       ; e2 <- dsM_12 s (Range fx t2) (P x)
+       ; pure (seqE [e1,e2]) }
+
+-------------------- :{fx} t -----------------
+-- ToDo: I don't think we want fx on Range at all
+
+--dsM_12 MI (Range fx t) (P i)                 -- MTYPE1
+--  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
+--       ; pure (seqE [e, eHavoc fx, eGuard i (eSome z) ]) }
+-- ToDo: check this... it's not what is in the doc yet
+--       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
+
+dsM_12 s (Range _fx t) (P i)                  -- MTYPEP
+  = do { (e, z) <- defineDE "z" (dsDD_12 s t)
+       ; pure (seqE [e, eApplyD z i]) }   -- z[x]
+
+dsM_12 s (Range _fx t) E                      -- MTYPEE
+  = do { x <- newIdent (getLoc t) "x"
+       ; (e, z) <- defineDE "z" (dsDD_12 s t)
+       ; let z_app = eApplyD z (Variable x)   -- z[x]
+       ; pure (Exists [x] (seqE [e, z_app])) }
+
+-------------------- check<fx>{t} -----------------
+dsM_12 MI (Check _fx t) pi                  -- MCHECK-
+  = dsM_12 MI t pi
+
+dsM_12 s (Check fx t) pi                   -- MCHECK+X
+  = Check fx <$> dsM_12 s t pi
+
+-------------------- (x~>y) := t -----------------
+dsM_12 s (DefineIE x y t) E                -- MSQUIGE
+  = do i <- newIdent (getLoc t) "i"
+       eExists [i] <$> dsM_12 s (DefineIE x y t) (P (Variable i))
+
+dsM_12 s (DefineIE x y t) (P i)             -- MSQUIGP
+  = seqDE [ pure $ eDefine x i
+          ,        eDefine y <$> dsM_12 s t (P i)
+          ]
+
+-------------------- array{t1,...tn} -----------------
+dsM_12 s (Array ts) E                       -- MARRAYE
+   = Array <$> mapM (\t -> dsM_12 s t E) ts
+
+dsM_12 s (Array ts) (P i)                   -- MARRAYP
+   | not (null ts)  -- Shortcut for empty ts, via MEQ
+                    -- M_s[ <> ]P(i) --> i = <>
+   = do { js <- mapM (\t -> newIdent (getLoc t) "j") ts
+        ; es <- zipWithM do_one ts js
+        ; pure (eExists js (seqE [ Unify i (Array (Variable <$> js))
+                                 , Array es ])) }
+   where
+     do_one :: SrcExpr -> Ident -> D SrcExpr
+     do_one t j = dsM_12 s t (P (Variable j))
+
+-------------------- x := t -----------------
+dsM_12 s (DefineE x t) pi                   -- MBIND
+  = eDefine x <$> dsM_12 s t pi
+
+-------------------- t1 = t2 -----------------
+dsM_12 s (Unify t1 t2) pi                   -- MEQ
+  = Unify <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
+
+-------------------- t1 ; t2 -----------------
+dsM_12 MX (Seq ts) pi                      -- MSEMIX
+  = do let (ts', t) = unSeq ts
+       es' <- mapM (dsDD_12 MX) ts'
+       e'  <- dsM_12 MX t pi
+       pure $ seqE (es' ++ [e'])
+
+dsM_12 s  (Seq ts) pi                      -- MSEMI
+  = do let (ts', t) = unSeq ts
+       es' <- mapM (dsDD_12 MV) ts'
+       e'  <- dsM_12 s t pi
+       pure $ seqE (es' ++ [e'])
+
+-------------------- (t1 | t2) and fail -----------------
+dsM_12 s (Choice t1 t2) pi                 -- MCHOICE
+  = Choice <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
+
+dsM_12 _ Fail _
+   = pure Fail
+
+-------------------- k, op, x -----------------
+dsM_12 _ t@(Lit{}) E                       -- MCONST
+   = pure t
+
+dsM_12 _ t@(EPrim{}) E                     -- MPrim
+   = pure t
+
+dsM_12 _ t@(Variable {}) E                 -- MVAR
+   = pure t
+
+-------------------- t1[t2] -----------------
+dsM_12 s (ApplyD t1 t2) E                  -- MVAR
+   = eApplyD <$> dsDD_12 s t1 <*> dsDD_12 s t2
+
+dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
+  = If3 <$> dsDD_12 s t1 <*> dsM_12 s t2 pi <*> dsM_12 s t3 pi
+
+dsM_12 s (Macro1 m rs t) pi
+   = Macro1 m rs <$> dsM_12 s t pi
+
+dsM_12 s (Lam x t) _pi
+   = Lam x <$> dsM_12 s t E
+
+dsM_12 _ e@(DefineV _) _
+   = pure e
+
+---------- Other terms with P(i) ---------------
+dsM_12 s t (P i)                           -- MEQ
+   = Unify i <$> dsM_12 s t E
+
+
+dsM_12 s t pi
+   = error $ "TODO: dsM_12 " ++ show (s, t, pi)
+
+
+-----------------------------------------------
+--
+--    addPrelude: a small pass to add the prelude
+--
+-----------------------------------------------
+
+
+addPrelude :: SrcExpr -> D SrcExpr
+addPrelude orig_e
+  = do { prel  <- getDFlagsX (snd . fPrelude)
+       ; prel1 <- syntaxFixes prel
+       ; return (addUsed (spl prel1) orig_e) }
+  where
+    -- Split the prelude into an association list
+    spl (Array ds) = map (\ e -> (nameOf e, e)) ds
+    spl e = impossible e
+
+    -- Find the name of a definition
+    nameOf (InfixOp lhs (Ident _ ":=") _) = lhsName lhs
+    nameOf e = impossible e
+
+    lhsName :: SrcExpr -> Ident
+    lhsName (EffAttr e _) = lhsName e
+    lhsName (ApplyS e _) = lhsName e
+    lhsName (Variable i) = i
+    lhsName e = impossible e
+
+-- Hackily add prelude identifiers used in e
+addUsed :: [(Ident, SrcExpr)] -> SrcExpr -> SrcExpr
+addUsed prel = loop []
+  where
+    loop vs e =
+      let is = getAllIdents e
+          ps = filter (\ (i, _) -> i `elem` is && i `notElem` vs) prel
+      in  case ps of
+            [] -> e
+            ies -> loop (map fst ies ++ vs) $ seqE (map snd ies ++ [e])
+
+
+--------------------------------------------------------
+--
+--    primops: a little pass to replace Ident "op" with EPrim "op"
+--
+--------------------------------------------------------
+
+primops :: SrcExpr -> D SrcExpr
+-- Replace (Variable (Ident "op")) with (EPrim "op")
+primops = f
+  where
+    f (Variable (Ident _ s)) | Ident noLoc s `S.member` prim = pure $ EPrim s
+    f e = compos f e
+    prim = S.fromList primOps
+
+-- Primitives
+primOps :: [Ident]
+primOps = map (Ident noLoc)
+  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$"
+  , "isPtr$", "isArr$", "isFcn$", "isPath$", "isMap$"
+
+  , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
+  , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
+
+  , "ratAdd$", "ratSub$", "ratMul$", "ratDiv$", "ratNeg$", "ratPlus$"
+  , "ratLT$", "ratLE$", "ratGT$", "ratGE$", "ratNE$"
+
+  , "f32Add$", "f32Sub$", "f32Mul$", "f32Div$", "f32Neg$", "f32Plus$"
+  , "f32LT$", "f32LE$", "f32GT$", "f32GE$", "f32NE$"
+
+  , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
+  , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
+
+
+  , "mkMap$"
+  , "concat$", "cons$"
+  , "length$"
+  , "alloc$", "read$", "write$"
+  , "in'..'"
+  , "in'+'",  "in'-'",  "in'*'",  "in'/'"
+  , "in'+='", "in'-='", "in'*='", "in'/='"
+  , "print$"
+  , "append$"
+  , "known$"  -- This is a horrible hack
+  , "any$"
+  , "fail$"
+  , "err$"
+  , "arrLen$"
+  , "arrConc$"
+  ]
+
+--------------------------------------------------------
+--
+--         syntaxFixes
+--
+--------------------------------------------------------
+
+-- Do various early changes:
+--  * (e)       -->  e             parens are there to stop the next from possibly firing
+--  * e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
+--  * (e1,...)  -->  array{e1,...} no need to distingush them anymore
+--  * x&y:e     -->  array{x&y:e}  if outside an array
+--                   x:e; y:e      if inside an array
+syntaxFixes :: SrcExpr -> D SrcExpr
+syntaxFixes = pure . f
+  where f :: SrcExpr -> SrcExpr
+        f (Parens e) = f e
+        f (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
+          f $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
+        f (Tuple es) = f (Array es)
+        f (Array es) = Array $ concatMap g es
+        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":" ) _) = f (Array [e])  -- PAMP1
+        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":=") _) = f (Array [e])  -- PAMP1
+        f e = composOp f e
+
+        -- PAMP2
+        g :: SrcExpr -> [SrcExpr]
+        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
+        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
+        g e = [f e]
+
+
+
+-----------------------------------------------
+--      The desugaring monad: D
+--
+--   It is an IO monad (for tracing), with an env that carries
+--       a mutable fresh-variable supply
+--       the Flags
+--
+-----------------------------------------------
+
+newtype D a = MkD (DEnv -> IO a)
+
+data DEnv = DEnv { nextNo :: !(IORef Int), dflags :: !Flags }
+
+instance Monad D where
+  MkD m1 >>= k = MkD (\env -> do { r <- m1 env
+                                 ; let MkD m2 = k r
+                                 ; m2 env })
+instance Applicative D where
+  pure x = MkD (\_ -> return x)
+  (<*>) = ap
+
+instance Functor D where
+  fmap f (MkD m) = MkD (\env -> f <$> m env)
+
+runD :: Flags -> D a -> IO a
+-- Runs the D monad
+runD flags (MkD thing_inside)
+  = do { nextref <- newIORef 1
+       ; let env = DEnv { nextNo = nextref, dflags = flags }
+       ; thing_inside env }
+
+traceDS :: String -> SrcExpr -> D SrcExpr
+traceDS msg e = do { traceD msg (pPrint e)
+                   ; pure e }
+
+traceD :: String -> Doc -> D ()
+traceD msg doc
+  = do { do_trace <- getDFlagsX fTraceDesugar
+       ; if do_trace
+         then doIO_D (putStrLn ("\n------- " ++ msg ++ "---------\n" ++ render doc))
+         else return () }
+
+doIO_D :: IO a -> D a
+doIO_D io = MkD (\_ -> io)
+
+getDFlags :: D Flags
+getDFlags = MkD (\(DEnv { dflags = flags }) -> return flags)
+
+getDFlagsX :: (Flags -> a) -> D a
+getDFlagsX f = f <$> getDFlags
+
+newInt :: D Int
+newInt = MkD $ \(DEnv { nextNo = ref }) ->
+  do { n <- readIORef ref
+     ; writeIORef ref (n+1)
+     ; return n }
+
+newIdent :: Loc -> String -> D Ident
+newIdent l s = do
+  n <- newInt
+  pure $ Ident l $ "$" ++ s ++ show n
+
+
+
+
 --------------------------------------------------------
 --
 --         Lowering (whatever that is)
 --
 --------------------------------------------------------
-
-------------------------------------------------------------------------------------
 
 {-
 -- Applications have to be lowered before scope insertion
@@ -1053,56 +1402,6 @@ lowerSome e = pure $ eSome e
 -}
 
 
---------------------------------------------------------
---
---         Primops
---
---------------------------------------------------------
-
-primops :: SrcExpr -> D SrcExpr
--- Replace (Variable (Ident "op")) with (EPrim "op")
-primops = f
-  where
-    f (Variable (Ident _ s)) | Ident noLoc s `S.member` prim = pure $ EPrim s
-    f e = compos f e
-    prim = S.fromList primOps
-
--- Primitives
-primOps :: [Ident]
-primOps = map (Ident noLoc)
-  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$"
-  , "isPtr$", "isArr$", "isFcn$", "isPath$", "isMap$"
-
-  , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
-  , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
-
-  , "ratAdd$", "ratSub$", "ratMul$", "ratDiv$", "ratNeg$", "ratPlus$"
-  , "ratLT$", "ratLE$", "ratGT$", "ratGE$", "ratNE$"
-
-  , "f32Add$", "f32Sub$", "f32Mul$", "f32Div$", "f32Neg$", "f32Plus$"
-  , "f32LT$", "f32LE$", "f32GT$", "f32GE$", "f32NE$"
-
-  , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
-  , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
-
-
-  , "mkMap$"
-  , "concat$", "cons$"
-  , "length$"
-  , "alloc$", "read$", "write$"
-  , "in'..'"
-  , "in'+'",  "in'-'",  "in'*'",  "in'/'"
-  , "in'+='", "in'-='", "in'*='", "in'/='"
-  , "print$"
-  , "append$"
-  , "known$"  -- This is a horrible hack
-  , "any$"
-  , "fail$"
-  , "err$"
-  , "arrLen$"
-  , "arrConc$"
-  ]
-
 
 {-
   where
@@ -1243,280 +1542,4 @@ verifyPrelude =
     vy = Variable y
     vz = Variable z
 -}
-
-
---------------------------------------------------------
---         Functions to take apart SrcExpr
---------------------------------------------------------
-
--- Return function, argument, and attributes
-getFun :: SrcExpr -> Maybe (SrcExpr, SrcExpr, [Ident])
-getFun = gf []
-  where
-    gf rs (EffAttr e r) = gf (r:rs) e
-    gf rs (ApplyS f a) = Just (f, a, reverse rs)
-    gf _ _ = Nothing
-
-getEffs :: SrcExpr -> (SrcExpr, [Eff])  -- e<fx1><fx2> --> (e, [fx1,fx2])
-getEffs orig_e = go orig_e []
-  where
-    go (EffAttr e fx) fxs
-     | isOpenClosed fx    = wrap fx (go e fxs)
-     | otherwise          = go e (fx:fxs)
-    go e              fxs = (e, fxs)
-
-    wrap fx (e, fxs) = (EffAttr e fx, fxs)
-
-
--- After lowering there are no funny scopes, so empty existential
--- are no longer necessary.
--- ToDo: why are empty existentials ever necessary?
-lExists :: [Ident] -> SrcExpr -> SrcExpr
-lExists [] e = e
-lExists is (Exists is' e) = lExists (is ++ is') e
-lExists is e = Exists is e
-
---------------------------------------------------------
---
---         Desugaring Small Source -> Big Core
---
---------------------------------------------------------
-
-data Pi
-  = P SrcExpr -- ^ P(x)    The SrcExpr is always small and freely duplicable
-              --           Typically just (Variable x)
-  | E         -- ^ E
-  deriving (Eq, Ord, Show)
-
-data DsMode12
-  = MX -- ^ x "execution"
-  | MV -- ^ + "verification"
-  | MI -- ^ - "checking" ("implementation")
-  deriving (Eq, Ord, Show)
-
-dsD_12 :: SrcExpr -> D SrcExpr
-dsD_12 = dsDD_12 MV
-
-dsDD_12 :: DsMode12 -> SrcExpr -> D SrcExpr
-dsDD_12 s t = dsM_12 s t E
-
-
-dsB_12 :: DsMode12 -> SrcExpr -> Pi -> SrcExpr -> D SrcExpr
-dsB_12 s t E     _
-  = dsM_12 s t E
-dsB_12 s t (P f) j
-  = do z <- newIdent (getLoc t) "z";
-       seqDE [ pure $ eDefine z (ApplyD f j)
-             , dsM_12 s t (P (Variable z))]
-
-seqDE :: [D SrcExpr] -> D SrcExpr
-seqDE ds = seqE <$> sequence ds
-
-defineDE :: String -> D SrcExpr
-         -> D (SrcExpr,   -- The defn
-               SrcExpr)   -- The use
--- define "x" de   returns   x := e, along with x itself
--- But (just to save clutter) if the rhs turns out to be tiny,
---   just return it alone
-defineDE nm ds_rhs
-  = do { rhs' <- ds_rhs
-       ; if isAtomic rhs'
-         then pure (seqE [], rhs')
-         else do { x <- newIdent (getLoc rhs') nm
-                 ; pure (eDefine x rhs', Variable x) } }
-
-defineDE2 :: String
-          -> D SrcExpr               -- The RHS
-          -> (SrcExpr -> D SrcExpr)  -- The body
-          -> D SrcExpr               -- z := rhs; body
-defineDE2 nm ds_rhs ds_body
-  = do { rhs' <- ds_rhs
-       ; if isAtomic rhs'
-         then ds_body rhs'
-         else do { x <- newIdent (getLoc rhs') nm
-                 ; body' <- ds_body (Variable x)
-                 ; if x `elem` getAllIdents body'  -- See Note [Avoiding clutter]
-                   then pure (seqE [eDefine x rhs', body'])
-                   else pure (seqE [rhs',           body']) } }
-
-{- Note [Avoiding clutter]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-In defineDE2 we are building a term looking like:
-
-   x := rhs
-   ...body...
-
-where `x` is complely fresh.   We can abbreviate this if
-
-* `rhs` is atomic; then just use `rhs` rather than `x`
-
-* `x` is not used in rhs.  Since `rhs` is a SrcExpr, its binding structure
-  is not obvious, and it's awkward to get its true free variables. But since
-  `x` is fresh anyway it suffices to look for /any/ occurrence of `x`. At worst
-  we'll create a binding we don't really need.
-
-  Hence the user of `getAllIdents`.
--}
-
-dsM_12 :: DsMode12 -> SrcExpr -> Pi -> D SrcExpr
-
--------------------- Functions -----------------------
-dsM_12 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
-  = do r <- newIdent (getLoc t) "r"
-       body <- defineDE2 "j" (dsM_12 MI t1 (P (Variable r)))
-                             (dsB_12 MV t2 pi)
-       seqDE [ pure (eVerify [r] body)
-             , dsM_12 MI t pi ]
-
-dsM_12 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
-  = do i   <- newIdent (getLoc t1) "i"
-       body <- defineDE2 "j" (dsM_12 MV t1 (P (Variable i)))
-                             (dsB_12 MI t2 pi)
-       pure $ {- TODO: ISFUN -} Lam i body
-
-dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
-  = do i   <- newIdent (getLoc t1) "i"
-       body <- defineDE2 "j" (dsM_12 MX t1 (P (Variable i)))
-                             (dsB_12 MX t2 pi)
-       pure $ Lam i body
-
--------------------- e |>{fx} t -----------------------
-dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
-   = eCheck fx <$> verify_body
--- ToDo: check this; not what is in the doc
---            , dsM_12 MI t pi ]
---    = seqDE [ eCheck fx <$> verify_body
---            , dsM_12 MI t pi ]
---  = seqDE [ eVerify [] <$> (eCheck fx <$> verify_body)
---          , dsM_12 MI t pi ]
-  where
-    verify_body = do { (e1, x) <- defineDE "x" (dsM_12 MV t1 pi)
-                     ; (e2, z) <- defineDE "z" (dsDD_12 MV t2)
-                     ; pure (seqE [e1, e2, eApplyD z x]) }
-
-dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
-    -- ToDo: pi is unused, which seems suspicious
-    -- But I think that's a correct reflection of opacity
-  = do { (e2, z) <- defineDE "z" (dsDD_12 MI t2)
-       ; pure (seqE [ e2
-                    , eGuard (getFree t1) (seqE [eHavoc fx, eSome z]) ]) }
-
-dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
-  = do { (e1, x) <- defineDE "x" (dsM_12 s t1 pi)
-       ; e2 <- dsM_12 s (Range fx t2) (P x)
-       ; pure (seqE [e1,e2]) }
-
--------------------- :{fx} t -----------------
--- ToDo: I don't think we want fx on Range at all
-
---dsM_12 MI (Range fx t) (P i)                 -- MTYPE1
---  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
---       ; pure (seqE [e, eHavoc fx, eGuard i (eSome z) ]) }
--- ToDo: check this... it's not what is in the doc yet
---       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
-
-dsM_12 s (Range _fx t) (P i)                  -- MTYPEP
-  = do { (e, z) <- defineDE "z" (dsDD_12 s t)
-       ; pure (seqE [e, eApplyD z i]) }   -- z[x]
-
-dsM_12 s (Range _fx t) E                      -- MTYPEE
-  = do { x <- newIdent (getLoc t) "x"
-       ; (e, z) <- defineDE "z" (dsDD_12 s t)
-       ; let z_app = eApplyD z (Variable x)   -- z[x]
-       ; pure (Exists [x] (seqE [e, z_app])) }
-
--------------------- check<fx>{t} -----------------
-dsM_12 MI (Check _fx t) pi                  -- MCHECK-
-  = dsM_12 MI t pi
-
-dsM_12 s (Check fx t) pi                   -- MCHECK+X
-  = Check fx <$> dsM_12 s t pi
-
--------------------- (x~>y) := t -----------------
-dsM_12 s (DefineIE x y t) E                -- MSQUIGE
-  = do i <- newIdent (getLoc t) "i"
-       eExists [i] <$> dsM_12 s (DefineIE x y t) (P (Variable i))
-
-dsM_12 s (DefineIE x y t) (P i)             -- MSQUIGP
-  = seqDE [ pure $ eDefine x i
-          ,        eDefine y <$> dsM_12 s t (P i)
-          ]
-
--------------------- array{t1,...tn} -----------------
-dsM_12 s (Array ts) E                       -- MARRAYE
-   = Array <$> mapM (\t -> dsM_12 s t E) ts
-
-dsM_12 s (Array ts) (P i)                   -- MARRAYP
-   | not (null ts)  -- Shortcut for empty ts, via MEQ
-                    -- M_s[ <> ]P(i) --> i = <>
-   = do { js <- mapM (\t -> newIdent (getLoc t) "j") ts
-        ; es <- zipWithM do_one ts js
-        ; pure (eExists js (seqE [ Unify i (Array (Variable <$> js))
-                                 , Array es ])) }
-   where
-     do_one :: SrcExpr -> Ident -> D SrcExpr
-     do_one t j = dsM_12 s t (P (Variable j))
-
--------------------- x := t -----------------
-dsM_12 s (DefineE x t) pi                   -- MBIND
-  = eDefine x <$> dsM_12 s t pi
-
--------------------- t1 = t2 -----------------
-dsM_12 s (Unify t1 t2) pi                   -- MEQ
-  = Unify <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
-
--------------------- t1 ; t2 -----------------
-dsM_12 MX (Seq ts) pi                      -- MSEMIX
-  = do let (ts', t) = unSeq ts
-       es' <- mapM (dsDD_12 MX) ts'
-       e'  <- dsM_12 MX t pi
-       pure $ seqE (es' ++ [e'])
-
-dsM_12 s  (Seq ts) pi                      -- MSEMI
-  = do let (ts', t) = unSeq ts
-       es' <- mapM (dsDD_12 MV) ts'
-       e'  <- dsM_12 s t pi
-       pure $ seqE (es' ++ [e'])
-
--------------------- (t1 | t2) and fail -----------------
-dsM_12 s (Choice t1 t2) pi                 -- MCHOICE
-  = Choice <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
-
-dsM_12 _ Fail _
-   = pure Fail
-
--------------------- k, op, x -----------------
-dsM_12 _ t@(Lit{}) E                       -- MCONST
-   = pure t
-
-dsM_12 _ t@(EPrim{}) E                     -- MPrim
-   = pure t
-
-dsM_12 _ t@(Variable {}) E                 -- MVAR
-   = pure t
-
--------------------- t1[t2] -----------------
-dsM_12 s (ApplyD t1 t2) E                  -- MVAR
-   = eApplyD <$> dsDD_12 s t1 <*> dsDD_12 s t2
-
-dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
-  = If3 <$> dsDD_12 s t1 <*> dsM_12 s t2 pi <*> dsM_12 s t3 pi
-
-dsM_12 s (Macro1 m rs t) pi
-   = Macro1 m rs <$> dsM_12 s t pi
-
-dsM_12 s (Lam x t) _pi
-   = Lam x <$> dsM_12 s t E
-
-dsM_12 _ e@(DefineV _) _
-   = pure e
-
----------- Other terms with P(i) ---------------
-dsM_12 s t (P i)                           -- MEQ
-   = Unify i <$> dsM_12 s t E
-
-
-dsM_12 s t pi
-   = error $ "TODO: dsM_12 " ++ show (s, t, pi)
-
 

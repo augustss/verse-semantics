@@ -64,17 +64,17 @@ executable confluence-check
 --
 --    default-language: Haskell2010
 
--- executable tester
---     import:           general-libs
---     hs-source-dirs:   tester
---     build-depends:    verse-libs,
---                       megaparsec,
---                       optparse-applicative,
--- 
---     main-is:          Main.hs
--- 
---     default-language: Haskell2010
--- 
+executable tester
+     import:           general-libs
+     hs-source-dirs:   tester
+     build-depends:    verse-libs,
+                       megaparsec,
+                       optparse-applicative,
+
+     main-is:          Main.hs
+
+     default-language: Haskell2010
+
 -- executable qctest
 --     import:           general-libs
 --     build-depends:    verse-libs,
