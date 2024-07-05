@@ -39,7 +39,7 @@ convertToCore flags src
 convert :: SrcCore -> Rules.Expr
 convert (Variable i)   = Rules.Var (toCoreIdent i)
 convert (Array ts)     = Rules.Arr (map convert ts)
-convert (EPrim op)     = Rules.Var (toCoreOp op)
+convert (EPrim op)     = Rules.Op op
 convert (Lit lit)      = Rules.Lit lit
 convert (ApplyD t1 t2) = convert t1 Rules.:@: convert t2
 convert (Unify t1 t2)  = convert t1 Rules.:=: convert t2
@@ -68,9 +68,6 @@ convert e = impossible e
 toCoreIdent :: Ident -> Rules.Ident
 toCoreIdent (Ident _ s) = Rules.Name s
 
-toCoreOp :: String -> Rules.Ident
-toCoreOp s = Rules.Name s
-
 toCoreEff :: Eff -> Rules.Effect
 toCoreEff eff
   | eff == effSucceeds = Rules.Succeeds
@@ -87,7 +84,7 @@ toCoreEff eff
 --------------------------------------------------------
 
 addScope :: SrcExpr -> D SrcExpr
-addScope e = scope (S.fromList primOps) (Block e)
+addScope e = scope S.empty (Block e)
 
 scope :: S.Set Src.Ident -> SrcExpr -> D SrcExpr
 -- The input expression is in BigCore, after desugaring,

@@ -34,7 +34,7 @@ module FrontEnd.Expr(
 
 import Prelude hiding ((<>))  -- Epic.Print exports (<>)
 
-import Rules.Core( Lit(..), Ptr, Path(..) )
+import Rules.Core( Lit(..), Ptr, Path(..), PrimOp(..) )
 
 import FrontEnd.Error
 import Epic.Print
@@ -46,7 +46,7 @@ import Data.Data (Data)
 import qualified Data.IntMap as IM
 import Data.Maybe
 
-import GHC.Stack
+import GHC.Stack( HasCallStack )
 
 import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
 
@@ -134,7 +134,7 @@ data SrcExpr
 
   | OfType SrcExpr [Eff] SrcExpr    -- e |>{fx} t
 
-  | EPrim String                   -- Primop
+  | EPrim PrimOp                   -- Primop
   | Lam Ident SrcExpr              -- ICFP lambda:   \ x . e
   | Split SrcExpr SrcExpr SrcExpr  -- split(e1){e2}{e3}
   | Fail                           -- :false
@@ -259,9 +259,7 @@ eDefine x rhs = DefineE x rhs
 
 eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
 -- (eApply f x)  returns  f[x]
--- But has a short-cut for any$[x]
-eApplyD (EPrim "any$") x = x
-eApplyD f              x = ApplyD f x
+eApplyD f x = ApplyD f x
 
 -- Used to create the array of free variables passed from the domain to the range
 -- of for/if.  If it's just a single variable, don't use an array.
@@ -379,7 +377,7 @@ instance Pretty SrcExpr where
         case expr of
           Lit lit    -> ppr p lit
           Variable v -> ppr 0 v
-          EPrim s    -> char '!' <> ppNormal (Variable (Ident noLoc s))
+          EPrim s    -> char '!' <> pPrint s
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           Array es   -> text "array" <> braces (ppSeq l es)
           Tuple es   -> parens (ppEs es)

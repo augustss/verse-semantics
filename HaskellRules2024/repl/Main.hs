@@ -4,7 +4,6 @@ module Main(main) where
 
 import Prelude
 
-
 import Rules.Core as Rules
 import Rules.TRS2024 as TRS2024
 import TRS.Traced
@@ -21,23 +20,6 @@ import FrontEnd.Error
 import Epic.Repl
 import Epic.Print hiding( (<>) )   -- In this module (<>) is Prelude.<>
 
-
-{-
-import FrontEnd.ParseCore
-import FrontEnd.Run(run, findSystem, blockSystem, everySystem, adjustFlags)
-import FrontEnd.TRSAdapter(coreToTrs, trsToCore)
-
-import Rules.Systems(ESystem, TRSystem(..))
-import Rules.Verifier
-import TRS.Traced(toList, filterTrace, showTrace)
-
---import qualified Parser.Testing as Testing
---import DenSem.DenSem
---import Rules.Core(defaultTRSFlags)
---import Verifier.Verify
---import TRS.Bind(free)
--}
-
 -- General library utilities
 import Control.Exception(SomeException, try)
 import Control.Monad
@@ -45,9 +27,7 @@ import Data.List
 import Data.Maybe
 import Text.Printf
 import Text.Read(readMaybe)
-import Options.Applicative
-
-
+import qualified Options.Applicative as OA
 
 
 --------------------------------------------------------
@@ -110,32 +90,32 @@ data MainFlags = MainFlags
   , mf_fileNames   :: ![FilePath]          -- input files
   }
 
-mainFlags :: Parser MainFlags
+mainFlags :: OA.Parser MainFlags
 mainFlags = MainFlags
-  <$> switch
-         ( long "wsl"
-        <> help "Add extra NL to compensate for WSL bug" )
-  <*> strOption
-         ( long "prelude"
-        <> short 'p'
-        <> metavar "NAME"
-        <> value "miniprelude"
-        <> help "Use built in prelude NAME" )
-  <*> switch
-         ( long "ddesugar"
-        <> help "Debug - show desugared" )
-  <*> switch
-         ( long "simplify"
-        <> help "simplify core" )
-  <*> many (argument str (metavar "FILES..."))
+  <$> OA.switch
+      ( OA.long "wsl"
+      <> OA.help "Add extra NL to compensate for WSL bug" )
+  <*> OA.strOption
+      ( OA.long "prelude"
+      <> OA.short 'p'
+      <> OA.metavar "NAME"
+      <> OA.value "miniprelude"
+      <> OA.help "Use built in prelude NAME" )
+  <*> OA.switch
+      ( OA.long "ddesugar"
+      <> OA.help "Debug - show desugared" )
+  <*> OA.switch
+      ( OA.long "simplify"
+      <> OA.help "simplify core" )
+  <*> OA.many (OA.argument OA.str (OA.metavar "FILES..."))
 
 mainArgs :: IO MainFlags
 mainArgs = do
-  let prf = prefs disambiguate
-  customExecParser prf $ info (mainFlags <**> helper)
-             ( fullDesc
-            <> progDesc "Verse interactive system"
-            <> header "verse - Parse, desugar, and evaluate Verse expressions"
+  let prf = OA.prefs OA.disambiguate
+  OA.customExecParser prf $ OA.info (mainFlags OA.<**> OA.helper)
+             ( OA.fullDesc
+            <> OA.progDesc "Verse interactive system"
+            <> OA.header "verse - Parse, desugar, and evaluate Verse expressions"
              )
 
 --------------------------------------------------------

@@ -3,7 +3,7 @@
 module Rules.Core
   ( -- The data type itself
     Expr(..), pattern LitInt
-  , Op(..), Effect(..), Assump(..), Ident(..)
+  , Effect(..), Assump(..), Ident(..)
   , Lit(..), Ptr, Path(..)
   , isVal, isHNF, isSkolem
   , prep, norm
@@ -16,6 +16,9 @@ module Rules.Core
   , subst, bvs
   , unbindAs, unExis
   , alphaRename, matchExi_alphaRename, matchEq
+
+    -- Primops
+  , PrimOp(..), allPrimOps, primOpString
   ) where
 
 import Prelude hiding( (<>) )
@@ -41,7 +44,7 @@ data Expr
   | Lit Lit
   | Arr [Val]
   | Lam (Bind Expr)
-  | Op Op
+  | Op PrimOp
 
   -- programs
   | Expr :=: Expr    -- unification      =
@@ -66,8 +69,42 @@ data Expr
   | HOLE
  deriving ( Eq, Ord )
 
-data Op = Add | Sub | Gt | IsInt
- deriving ( Eq, Ord, Show )
+--------------------------------------------------------------------------------
+--
+--                 PrimOps
+--
+--------------------------------------------------------------------------------
+
+data PrimOp
+ = -- Operations on integers
+   Add | Sub | Mul | Div
+
+   -- Relational
+ | Gt | Lt | Eq | NEq
+
+   -- Type tests
+ | IsInt | IsStr
+ deriving
+   ( Eq, Ord, Bounded, Enum, Show )
+
+allPrimOps :: [PrimOp]
+allPrimOps = [minBound .. maxBound]
+
+primOpString :: PrimOp -> String
+primOpString Add = "+"
+primOpString Sub = "-"
+primOpString Mul = "*"
+primOpString Div = "/"
+
+primOpString Gt  = ">"
+primOpString Lt  = "<"
+primOpString Eq  = "="
+primOpString NEq = "/="
+
+primOpString IsInt = "isInt$"
+primOpString IsStr = "isStr$"
+
+
 
 --------------------------------------------------------------------------------
 --
@@ -162,8 +199,8 @@ instance Pretty Effect where
 instance Pretty Expr where
   pPrintPrec = pPrintPrecE
 
-instance Pretty Op where
-  pPrint op = text (show op)
+instance Pretty PrimOp where
+  pPrint op = text (primOpString op)
 
 pPrintPrecE :: PrettyLevel -> Rational -> Expr -> Doc
 pPrintPrecE lvl prec the_expr
@@ -398,7 +435,7 @@ alphaRenameVerifyBody forb bl
      ren :: [(Ident,Ident)] -> ([Assump],Expr) -> ([Assump],Expr)
      ren prs (as,e) = (as, subst [(x,Var y) | (x,y) <- prs] e)
 
--- sorts binders and renames variables
+-- Sorts binders and renames variables
 -- TODO: new normalization for x=y
 norm :: Expr -> Expr
 norm orig_e = alpha 0 orig_e
@@ -557,8 +594,8 @@ normalize rule orig_e = go (-1) [] orig_e  -- go 99 [] e
 --
 --------------------------------------------------------------------------------
 
-instance Arbitrary Op where
-  arbitrary = elements [Add, Sub, Gt, IsInt]
+instance Arbitrary PrimOp where
+  arbitrary = elements allPrimOps
 
 instance Arbitrary Expr where
   arbitrary = sized (arbExprWith xs)

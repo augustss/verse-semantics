@@ -2,7 +2,6 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module FrontEnd.Desugar(
       desugar, simplify
-    , primOps
     , D, runD, traceD, getDFlagsX
   ) where
 
@@ -11,6 +10,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
+import Rules.Core( PrimOp, allPrimOps, primOpString )
 
 -- Epic libraries
 import Epic.List
@@ -60,9 +60,6 @@ desugar flgs = runD flgs .
              traceDS "Main desugaring" <=< dsDx      <=<    -- Heavy lifting: Fig 9
 
 --             traceDS "addDeref"   <=< addDeref  <=<    -- Side effects
-
-             traceDS "Add primops"    <=< primops   <=<    -- Var (Ident "op") --> EPrim op
-               -- primops: do this after dsSmall, so that PrefixOp, InfixOp, InfixOP are gone
 
              traceDS "Desugar to Small Source"  <=< dsSmall   <=<    -- Main desugaring into Small Source
 
@@ -114,9 +111,12 @@ dsSmall = ds
            pure $ Function [(e1', effs')] e2'
 
     -- Conditional and for-loop notation
-    ds (If1 e) = ds $ If2E e eFalse
-    ds (If2 e1 e2) = ds $ If3 e1 e2 eFalse
-    ds (If2E e1 e2) = do x <- newIdent (getLoc e1) "x"; ds $ If3 (eDefine x e1) (Variable x) e2
+    ds (If1 e)        = ds $ If2E e eFalse
+    ds (If2 e1 e2)    = ds $ If3 e1 e2 eFalse
+    ds (If2E e1 e2)   = do x <- newIdent (getLoc e1) "x"; ds $ If3 (eDefine x e1) (Variable x) e2
+    ds (If3 e1 e2 e3) = do { e1' <- ds e1; e2' <- ds e2; e3' <- ds e3
+                           ; return (One (Choice (seqE [e1',e2']) e3')) }
+
     ds (For1 e) = do x <- newIdent (getLoc e) "x"; ds $ For2 (eDefine x e) (Variable x)
 
     -- Array
@@ -145,23 +145,31 @@ dsSmall = ds
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
 
     -- Operators
-    ds (PrefixOp (Op "not") e) = do e' <- ds e; pure $ If3 e' Fail eFalse
-    ds (PrefixOp (Op ":") e) = Range [effSucceeds] <$> ds e
-    ds (PrefixOp (Op "?") e) = do
-      x <- Variable <$> newIdent (getLoc e) "x"
-      let ee = Let (InfixOp x (Op ":") e) (Truth x)
-      ds $ Typedef $ InfixOp eFalse (Op "|") ee
+    ds (PrefixOp (Op "not") e)   = do e' <- ds e; pure $ If3 e' Fail eFalse
+    ds (PrefixOp (Op "-") e)     = do ds $ InfixOp (Lit (LInt 0)) (Op "-") e
+    ds (PrefixOp (Op "+") e)     = ds e  -- Prefix "+"; maybe should have an isInt test?
+    ds (PrefixOp (Op ":") e)     = Range [effSucceeds] <$> ds e
+    ds (PrefixOp (Op "?") e)     = do x <- Variable <$> newIdent (getLoc e) "x"
+                                      let ee = Let (InfixOp x (Op ":") e) (Truth x)
+                                      ds $ Typedef $ InfixOp eFalse (Op "|") ee
     ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
-    ds (PostfixOp e (Ident l "?")) = ds $ ApplyD e (Variable (Ident l "_"))
-    ds (PostfixOp e (Ident l op)) = ds =<< call "post" l op e
-    ds (InfixOp e1 (Op "|") e2) = Choice <$> ds e1 <*> ds e2
-    ds (InfixOp e1 (Op "and") e2) = ds $ Seq [e1, e2]                  -- XXX multiplicity?
+
+    ds (PostfixOp e (Ident l "?"))  = ds $ ApplyD e (Variable (Ident l "_"))
+    ds (PostfixOp e (Ident l op))   = ds =<< call "post" l op e
+
+    ds (InfixOp e1 (Op "|") e2)     = Choice <$> ds e1 <*> ds e2
+    ds (InfixOp e1 (Op "and") e2)   = ds $ Seq [e1, e2]                  -- XXX multiplicity?
     --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 Fail) Fail    -- XXX binding
-    ds (InfixOp e1 (Op "or") e2) = ds $ If2E e1 $ If2E e2 Fail
+    ds (InfixOp e1 (Op "or") e2)    = ds $ If2E e1 $ If2E e2 Fail
     ds (InfixOp e1 (Ident l op) e2) = ds =<< call "in" l op (Array [e1, e2])
 
+    -- Variables
+    ds (Variable ident@(Ident l v))
+      | v == "_"                    = DefineV <$> newIdent l "u"
+      | Just op <- lookupPrimOp v   = return (EPrim op)
+      | otherwise                   = return (Variable ident)
+
     -- Misc
-    ds (Variable (Ident l "_")) = DefineV <$> newIdent l "u"
     ds (Option Nothing) = pure eFalse
 
     -- option{e}  -->  if(x:=e)then truth(e)
@@ -385,6 +393,10 @@ call :: String         -- "pre", "post", or "in" depending on prefix, postfix or
      -> SrcExpr        -- Argumemt
      -> D SrcExpr
 -- Pick the appropriate form of apply for operators
+-- SPJ don't understand
+call _ loc op arg = return (ApplyD (Variable (Ident loc op)) arg)
+
+{-
 call p l s e = do
   ver <- getDFlagsX (not . fAssumeVerified)
   let
@@ -402,7 +414,7 @@ call p l s e = do
         | otherwise = ApplyS
     s' = p ++ "'" ++ s ++ "'"
   pure $ con (Variable (Ident l s')) e
-
+-}
 
 --------------------------------------------------------
 --
@@ -561,8 +573,6 @@ simpExists = pure . f
 simpAny :: SrcExpr -> D SrcExpr
 simpAny = pure . f
   where f (ApplyD (Variable (Ident _ "any")) e) = f e  -- This should go away
-        f (ApplyD (EPrim "any$") e) = f e
-        f (EPrim "fail$") = Fail
         f e = composOp f e
 
 -- Simplify x = (e1; ...; en)  -->  e1; ...; x = en
@@ -1029,49 +1039,11 @@ addUsed prel = loop []
 --
 --------------------------------------------------------
 
-primops :: SrcExpr -> D SrcExpr
--- Replace (Variable (Ident "op")) with (EPrim "op")
-primops = f
+lookupPrimOp :: String -> Maybe PrimOp
+lookupPrimOp s = lookup s prs
   where
-    f (Variable (Ident _ s)) | Ident noLoc s `S.member` prim = pure $ EPrim s
-    f e = compos f e
-    prim = S.fromList primOps
-
--- Primitives
-primOps :: [Ident]
-primOps = map (Ident noLoc)
-  [ "isInt$", "isRat$", "isChr$", "isF32$", "isF64$", "isStr$"
-  , "isPtr$", "isArr$", "isFcn$", "isPath$", "isMap$"
-
-  , "intAdd$", "intSub$", "intMul$", "intDiv$", "intNeg$", "intPlus$"
-  , "intLT$", "intLE$", "intGT$", "intGE$", "intNE$"
-
-  , "ratAdd$", "ratSub$", "ratMul$", "ratDiv$", "ratNeg$", "ratPlus$"
-  , "ratLT$", "ratLE$", "ratGT$", "ratGE$", "ratNE$"
-
-  , "f32Add$", "f32Sub$", "f32Mul$", "f32Div$", "f32Neg$", "f32Plus$"
-  , "f32LT$", "f32LE$", "f32GT$", "f32GE$", "f32NE$"
-
-  , "f64Add$", "f64Sub$", "f64Mul$", "f64Div$", "f64Neg$", "f64Plus$"
-  , "f64LT$", "f64LE$", "f64GT$", "f64GE$", "f64NE$"
-
-
-  , "mkMap$"
-  , "concat$", "cons$"
-  , "length$"
-  , "alloc$", "read$", "write$"
-  , "in'..'"
-  , "in'+'",  "in'-'",  "in'*'",  "in'/'"
-  , "in'+='", "in'-='", "in'*='", "in'/='"
-  , "print$"
-  , "append$"
-  , "known$"  -- This is a horrible hack
-  , "any$"
-  , "fail$"
-  , "err$"
-  , "arrLen$"
-  , "arrConc$"
-  ]
+    prs :: [(String,PrimOp)]
+    prs = [(primOpString op, op) | op <- allPrimOps]
 
 --------------------------------------------------------
 --

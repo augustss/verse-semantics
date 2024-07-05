@@ -70,28 +70,28 @@ evalCtxLift zs lhs =
 type Expr_or_Context = Expr
 
 blkd :: [Ident] -> Expr_or_Context -> Bool
-blkd xs HOLE                = True
-blkd xs ((v :=: e1) :>: e2) = blkd xs e1 && (isContext e1 || blkd xs e2)
+blkd _  HOLE                = True
+blkd xs ((_ :=: e1) :>: e2) = blkd xs e1 && (isContext e1 || blkd xs e2)
 blkd xs (e1 :|: e2)         = blkd xs e1 && blkd xs e2
 blkd xs (One e)             = blkd xs e
 blkd xs (All e)             = blkd xs e
 blkd xs (Exi bnd)           = blkd (x:xs) e where (x,e) = alphaRename xs bnd
 blkd xs (v1 :@: v2)         = case v1 of
                                 Var f -> f `elem` xs
-                                Op op -> any ((`isV` v2) . Var) xs
+                                Op {} -> any ((`isV` v2) . Var) xs
                                 _     -> False
-blkd xs (v :>>: e)          = any (`elem` xs) (free v)
-blkd xs (Verify _)          = True
-blkd xs (Check fx e)        = blkd xs e
-blkd xs _                   = False
+blkd xs (v :>>: _)          = any (`elem` xs) (free v)
+blkd _  (Verify _)          = True
+blkd xs (Check _ e)         = blkd xs e
+blkd _  _                   = False
 
 -- choice-freeness
 choiceFree :: Expr_or_Context -> Bool
-choiceFree (e1 :|: e2)         = False
-choiceFree ((v :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2)
-choiceFree (v :>>: e)          = choiceFree e
-choiceFree (Exi bnd)           = choiceFree e where (x,e) = unsafeUnbind bnd
-choiceFree (v1 :@: v2)         = case v1 of
+choiceFree (_ :|: _)           = False
+choiceFree ((_ :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2)
+choiceFree (_ :>>: e)          = choiceFree e
+choiceFree (Exi bnd)           = choiceFree e where (_,e) = unsafeUnbind bnd
+choiceFree (v1 :@: _)          = case v1 of
                                    Op _ -> True -- all ops we support are choice-free right now
                                    _    -> False
 choiceFree _                   = True
@@ -108,6 +108,14 @@ rulesApplication lhs =
   do Op Sub :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1-k2))
  ++
+  "APP-MUL" `name`
+  do Op Mul :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     pure (LitInt (k1*k2))
+ ++
+  "APP-DIV" `name`
+  do Op Div :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     pure (LitInt (k1 `div` k2))
+ ++
   "APP-GT" `name`
   do Op Gt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 > k2)
@@ -115,15 +123,32 @@ rulesApplication lhs =
  ++
   "APP-GT-FAIL" `name`
   do Op Gt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
-     guard (k1 <= k2)
+     guard (not (k1 > k2))
+     pure Fail
+ ++
+  "APP-LT" `name`
+  do Op Lt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (k1 < k2)
+     pure (LitInt k1)
+ ++
+  "APP-LT-FAIL" `name`
+  do Op Lt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (not (k1 < k2))
      pure Fail
  ++
   "APP-ISINT" `name`
   do Op IsInt :@: a <- [lhs]
      guard (isHNF a)
      case a of
-       LitInt _ -> pure a
-       _     -> pure Fail
+       Lit (LInt _) -> pure a
+       _           -> pure Fail
+ ++
+  "APP-ISSTR" `name`
+  do Op IsStr :@: a <- [lhs]
+     guard (isHNF a)
+     case a of
+       Lit (LStr _) -> pure a
+       _            -> pure Fail
  ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]
