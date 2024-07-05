@@ -114,6 +114,7 @@ rulesApplication lhs =
  ++
   "APP-DIV" `name`
   do Op Div :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (k2 /= 0)
      pure (LitInt (k1 `div` k2))
  ++
   "APP-GT" `name`
@@ -134,6 +135,36 @@ rulesApplication lhs =
   "APP-LT-FAIL" `name`
   do Op Lt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 < k2))
+     pure Fail
+ ++
+  "APP-LE" `name`
+  do Op LEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (k1 <= k2)
+     pure (LitInt k1)
+ ++
+  "APP-LE-FAIL" `name`
+  do Op LEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (not (k1 <= k2))
+     pure Fail
+ ++
+  "APP-GE" `name`
+  do Op GEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (k1 >= k2)
+     pure (LitInt k1)
+ ++
+  "APP-GE-FAIL" `name`
+  do Op GEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (not (k1 >= k2))
+     pure Fail
+ ++
+  "APP-NE" `name`
+  do Op NEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (k1 /= k2)
+     pure (LitInt k1)
+ ++
+  "APP-NE-FAIL" `name`
+  do Op NEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+     guard (not (k1 /= k2))
      pure Fail
  ++
   "APP-ISINT" `name`
@@ -185,9 +216,9 @@ rulesUnification lhs =
      guard (isHNF a1 && isHNF a2)
      guard $
        case (a1, a2) of
-         (LitInt k1, LitInt k2)  -> k1 /= k2
-         (Arr vs, Arr vs') -> length vs /= length vs'
-         (_,      _)       -> True
+         (LitInt k1, LitInt k2) -> k1 /= k2
+         (Arr vs, Arr vs')      -> length vs /= length vs'
+         (_,      _)            -> True
      pure Fail
  ++
   "U-OCCURS" `name`

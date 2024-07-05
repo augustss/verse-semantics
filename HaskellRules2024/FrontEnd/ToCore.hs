@@ -62,7 +62,7 @@ convert (Check fxs t) = foldr add_check (convert t) fxs
                           where
                             add_check fx e = Rules.Check (toCoreEff fx) e
 convert (Src.Verify is t) = Rules.Verify (TRS.bindList (map toCoreIdent is) ([], convert t))
-
+convert Src.Fail          = Rules.Fail
 convert e = impossible e
 
 toCoreIdent :: Ident -> Rules.Ident
@@ -132,9 +132,14 @@ scope sc = expr
     expr (Src.Lam i e)     = Src.Lam i <$> scopeD (S.insert i sc) e
     expr (Src.Verify is e) = Src.Verify is <$> scopeD sc' e
       where sc' = foldr S.insert sc is
+    expr (Src.One e) = Src.One <$> exprD e
+    expr (Src.All e) = Src.All <$> exprD e
     expr e = impossible e
 
+    -- exprD for a new scope context, using current in-scope set
     exprD e = fst <$> defs sc e
+
+    -- exprD for a new scope context, with an extended in-scope set
     scopeD s e = fst <$> defs s e
 
     defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)

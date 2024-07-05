@@ -42,22 +42,22 @@ testeq(pass) {3=2}                                 {:false}
 # K
 testeq(pass) {1=2}                                 {:false}
 # no prefix'op'
-testeq(pass,refimpl=skip) {1=prefix'-'}                         {:false}
+testeq(pass,refimpl=skip) {1=prefix'-'}            {:false}
 testeq(pass) {1=(1,2)}                             {:false}
 # ICFP rules gets stuck on any lambda comparison
 testeq(pass,ICFP*=skip) {1=(x:any=>x)}                        {:false}
 # op
 testeq(pass,refimpl=skip) {prefix'-'=1}                         {:false}
-testeq(pass,refimpl=skip,iblock=skip) {prefix'-'=prefix'+'}                 {:false}
+testeq(pass,refimpl=skip,iblock=skip) {prefix'-'=prefix'+'}     {:false}
 testeq(pass,refimpl=skip) {prefix'-'=(1,2,3)}                   {:false}
 testeq(pass,refimpl=skip,ICFP*=skip,iblock=skip) {prefix'-'=(x:any=>x)}                {:false}
 # tuple
 testeq(pass) {(1,2)=1}                             {:false}
-testeq(pass,refimpl=skip) {(1,2)=prefix'-'}                     {:false}
+testeq(pass,refimpl=skip) {(1,2)=prefix'-'}        {:false}
 testeq(pass) {(1,2)=(1,2,3)}                       {:false}
-testeq(pass,ICFP*=skip) {(1,2)=(x:any=>x)}                    {:false}
+testeq(pass,ICFP*=skip) {(1,2)=(x:any=>x)}         {:false}
 # lambda
-testeq(pass,ICFP*=skip) {(x:any=>x)=1}                        {:false}
+testeq(pass,ICFP*=skip) {(x:any=>x)=1}             {:false}
 testeq(pass,refimpl=skip,ICFP*=skip,iblock=skip) {(x:any=>x)=prefix'-'}                {:false}
 testeq(pass,ICFP*=skip) {(x:any=>x)=(1,2,3)}                  {:false}
 testeq(pass,ICFP*=skip,iblock=skip) {(x:any=>x)=(x:any=>1)}               {:false}

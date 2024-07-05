@@ -34,36 +34,6 @@ import Text.Printf( printf )
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
 
-{-
-import Control.Monad
-import Data.Char
-import Data.List
-import Data.Maybe
-import GHC.Stack
-import Options.Applicative
-import Text.Printf
-import System.Exit
-import System.IO(hFlush, stdout)
-
-import Text.Megaparsec(getSourcePos, sourceLine, unPos)
-
-import FrontEnd.Expr
-import FrontEnd.Flags
-import FrontEnd.Parse hiding (many)
-import FrontEnd.ParseCore
-import FrontEnd.Prelude
-import FrontEnd.TRSAdapter(coreToTrs)
-import Epic.Print (Pretty, prettyShow)
-
-import FrontEnd.Run(run, runM, everySystem, findSystem, blockSystem, adjustFlags)
-
-import qualified Rules.Core as R
-import Rules.Equiv
-import Rules.Systems(ESystem, TRSystem(..))
-import Rules.Verifier(wrapAssert, verifyM)
-import TRS.Traced(Traced, showTrace)
-import qualified TRS.Tarjan as T
--}
 
 -----------------------------------------------
 --

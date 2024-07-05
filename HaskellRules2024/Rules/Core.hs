@@ -80,7 +80,7 @@ data PrimOp
    Add | Sub | Mul | Div
 
    -- Relational
- | Gt | Lt | Eq | NEq
+ | Gt | Lt | Eq | NEq | GEq | LEq
 
    -- Type tests
  | IsInt | IsStr
@@ -97,9 +97,11 @@ primOpString Mul = "*"
 primOpString Div = "/"
 
 primOpString Gt  = ">"
+primOpString GEq = ">="
 primOpString Lt  = "<"
+primOpString LEq = "<="
 primOpString Eq  = "="
-primOpString NEq = "/="
+primOpString NEq = "<>"
 
 primOpString IsInt = "isInt$"
 primOpString IsStr = "isStr$"
