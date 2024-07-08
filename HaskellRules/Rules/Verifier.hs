@@ -20,12 +20,11 @@ import Rules.Core hiding (isHNF)
 import qualified Epic.SIntMap as IM
 import Epic.Print (prettyShow, Pretty)
 import qualified Debug.Trace as Debug
--- import qualified Rules.OldVerifier as Old
--- import Rules.ICFP ({- systemICFPE, -} isChoiceFree)
 import Control.Monad (guard)
 import Data.List ((\\))
-import Rules.TRS2024 (isEffectFree)
 import qualified Rules.TRS2024 as TRS2024
+import qualified Rules.ICFP as ICFP
+import qualified Epic.UnionFind as UF
 
 -- | Run verification rules.
 _traceShow :: (Pretty a) => String -> a -> a
@@ -51,7 +50,7 @@ verify sys e =
          Timeout (_, tr) -> (False, tr)
 
 wrapAssert :: Expr -> Expr
-wrapAssert = Assert
+wrapAssert e = Verify [] [] (Assert e)
 
 -- | `isDone e` ignores "assert/decide" that occur under `verify` which are themselves
 --   under TOP-LEVEL lambdas, as those are obligations for higher-order args that are checked at
@@ -61,8 +60,8 @@ isDone :: Expr -> Bool
 isDone = go False False
  where
   go :: Bool -> Bool -> Expr -> Bool
-  go _   _   (Assert _)       = False
-  go _   _   (Decide _)       = False
+  go _   lam   (Assert _)     = lam || False
+  go _   lam   (Decide _)     = lam || False
   go _   lam (Verify _ _ e)   = lam || go True False e
   go ver _   (Lam (Bind _ e)) = go ver (not ver) e
   go ver _   (Uni (Bind _ e)) = go ver (not ver) e
@@ -107,11 +106,10 @@ splitVerifier :: TRSystem Expr
 splitVerifier = TRS2024.systemTRS2024 -- systemICFPE
   { sname = "SPLITverify"
   , description = "ICFPE + split verifier rules"
-  , rules =     -- (rules systemICFPE -= "EQN-FLOAT" -= "SUBST" -= "U-LIT" -= "U-FAIL"  -= "FAIL-ELIM" )
-                --  <> Old.generalizedIcfpRules
-                 rules TRS2024.systemTRS2024
+  , preProcess  = preProcess ICFP.systemICFPE
+  , rules       = (rules TRS2024.systemTRS2024 -= "EXI-FLOAT")
               <> ifRules
-              <> substRules
+              <> ICFP.rulesExiFloat
               <> guardRules
               <> checkRules
               <> verifyRules
@@ -139,16 +137,6 @@ ifRules env lhs =
    do If Fail _ e <- [lhs]
       pure e
 
-------------------------------------------------------------------
-substRules :: Rule Expr
-substRules _ lhs =
-   "SUBST1" `name`
-   do EXI x e <- [lhs]
-      (ctx, Var x' :=: Val v) <- substX e
-      guard (x == x')
-      guard (x `notElem` (free v))
-      pure (subst [(x, v)] (ctx (Arr [])))
-
 --------------------------------------------------------------------------------
 guardRules :: Rule Expr
 guardRules _ lhs =
@@ -173,8 +161,16 @@ checkRules env lhs =
       guard (skol (rigidVars env) v)
       pure (Val v)
    ++
+   "CHECK-SUC-SOME" `name`
+   do Assert (Some e) <- [lhs]
+      pure (Some e)
+   ++
+   "CHECK-DEC-SOME" `name`
+   do Decide (Some e) <- [lhs]
+      pure (Some e)
+   ++
    "CHECK-FAIL-DEC" `name`
-   do Decide (Fail) <- [lhs]
+   do Decide Fail <- [lhs]
       pure Fail
    -- ++
    -- we use Fails{e} as (~e) so don't want `fails` to escape that
@@ -213,27 +209,39 @@ verifyRules env lhs =
    "SUBST-ASM" `name`
    -- VERIFY(rs, A[r = hnf]) { e } ---> VERIFY(rs, A{hnf/r}[r = hnf]) { e{hnf/r} }
    do Verify rs as e <- [lhs]
-      (a@(Assume (Var r :=: HNF h)), as') <- asmX as
+      (as1, a@(Assume (Var r :=: HNF h)), as2) <- asmX as
+      guard (not (isArr h))
       guard (r `elem` rs)
-      pure $ Verify rs (a: subst [(r, h)] as') ( subst [(r, h)] e)
+      pure $ Verify rs ( subst [(r, h)] as1 ++ [a] ++ subst [(r, h)] as2) ( subst [(r, h)] e)
 
+isArr :: Expr -> Bool
+isArr (Arr _) = True
+isArr _       = False
 
-
-asmX :: [a] -> [(a, [a])]
+asmX :: [a] -> [([a], a, [a])]
 asmX = go []
   where
     go _  []      = []
-    go as (a:as') = (a, as++as') : go (a:as) as'
+    go as (a:as') = (reverse as, a, as') : go (a:as) as'
 
 unsat :: [Ident] -> [Expr] -> Bool
-unsat _ es = asmFail || contra || _refl
+unsat _ es = asmFail || contra || refl || eqContra
   where
-    asmFail = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]
-    _refl    = not . null $ [ e | Fails e@(Var x :=: Var y) <- es, x == y, isInt asms x ]
-    asms    = [ e | Assume e <- es ]
-    contra  = any (`elem` pos) neg
-    pos     = [ e | Assume e <- es ]
-    neg     = [ e | Fails  e <- es ]
+    asmFail  = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]
+    refl     = not . null $ [ e | Fails e@(Var x :=: Var y) <- es, x == y, isInt pos x ]
+    contra   = any (`elem` pos) neg
+    eqContra = eqUnsat pos neg
+    pos      = [ e | Assume e <- es ]
+    neg      = [ e | Fails  e <- es ]
+
+eqUnsat :: [Expr] -> [Expr] -> Bool
+eqUnsat pos neg = any (uncurry (UF.equal uf')) diseqs
+  where
+    uf' = foldr (\(x, y) uf -> UF.union uf x y) UF.new eqs
+    eqs     = [(x, y) | (Var x :=: Var y) <- pos]
+    diseqs  = [(x, y) | (Var x :=: Var y) <- neg]
+
+
 
 isInt :: [Expr] -> Ident -> Bool
 isInt asms x = INT (Var x) `elem` asms
@@ -241,7 +249,7 @@ isInt asms x = INT (Var x) `elem` asms
 --------------------------------------------------------------------------------
 
 isUni :: [Ident] -> [BndVar] -> Expr -> Bool
-isUni rs bs (Var r)  = r `elem` rs && r `notElem` (bndIds bs)
+isUni rs bs (Var r)  = r `elem` rs && r `notElem` bndIds bs
 isUni _  _  (Int _)  = True
 isUni _  _  (Char _) = True
 isUni rs bs (Arr es) = all (isUni rs bs) es
@@ -249,52 +257,59 @@ isUni _  _  _        = False
 
 splitRules :: Rule Expr
 splitRules env lhs =
-   "SPLIT-K" `name`
+   "SPLIT-K" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Int _)) <- proofX [] e
       guard (isUni rs bs (Var r))
-      pure $ caseSplit rs a as ctx (Arr [])
+      pure (a, caseSplit rs a as ctx (Arr []))
    ++
-   "SPLIT-C" `name`
+   "SPLIT-C" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Char _)) <- proofX [] e
       guard (isUni rs bs (Var r))
-      pure $ caseSplit rs a as ctx (Arr [])
+      pure (a, caseSplit rs a as ctx (Arr []))
    ++
-   "SPLIT-VAR" `name`
+   "SPLIT-VAR" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: Var r')) <- proofX [] e
       guard (isUni rs bs (Var r))
       guard (isUni rs bs (Var r'))
-      pure $ caseSplit rs a as ctx (Arr [])
+      pure (a, caseSplit rs a as ctx (Arr []))
    ++
-   "SPLIT-TUP" `name`
+   "SPLIT-TUP" `nameWith`
    do Verify rs as e <- [lhs]
-      (ctx, bs, Var r :=: Arr vs) <- proofX [] e
-      guard (not (null vs))
+      (ctx, bs, aa@(Var r :=: Arr vs)) <- proofX [] e
+      -- guard (not (null vs))
       guard (isUni rs bs (Var r))
       let xs   = rs ++ free e ++ bndIds bs ++ boundVars env
       let rs'  = take (length vs) (uvIdentsNotIn xs)
-      let rvs' = foldr1 (:>:) [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
+      let rvs' = foldr (:>:) (Arr []) [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
       let a    = Var r :=: Arr (Var <$> rs')
-      pure     $ caseSplit (rs ++ rs') a as ctx rvs'
+      pure     (aa, caseSplit (rs ++ rs') a as ctx rvs')
    ++
-   "SPLIT-PPRED" `name`
+   "SPLIT-PPRED" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(op :@: arg)) <- proofX [] e
       guard (isUni rs bs arg)
       guard (isPrim1 op)
-      pure $ caseSplit rs a as ctx (Arr [])
+      pure (a, caseSplit rs a as ctx (Arr []))
    ++
-   "SPLIT-OP" `name`
+   "SPLIT-OP" `nameWith`
    do Verify rs as e <- [lhs]
       (ctx, bs, a@(Var r :=: (op :@: arg))) <- proofX [] e
       guard (isUni rs bs (Var r))
       guard (isUni rs bs arg)
       guard (isPrimOp1 op)
-      pure $ caseSplit (r:rs) a as ctx (Arr [])
-
-
+      pure (a, caseSplit (r:rs) a as ctx (Arr []))
+   ++
+   -- Verify(rs ; as){ P[r[s]] } ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+   "SPLIT-APP" `nameWith`
+   do Verify rs as e <- [lhs]
+      (ctx, bs, a@(Var r :@: s)) <- proofX [] e
+      let r' = uvIdentNotIn (rs ++ free e ++ bndIds bs ++ boundVars env)
+      guard (isUni rs bs (Var r))
+      guard (isUni rs bs s)
+      pure (a, Verify (r':rs) (Assume (Var r' :=: a) : as) (ctx (Var r')))
 
 caseSplit :: [Ident] -> Expr -> [Expr] -> (Expr -> Expr) -> Expr -> Expr
 caseSplit rs a as ctx e =
@@ -325,29 +340,29 @@ isPrimOp1 _        = False
 --------------------------------------------------------------------------------
 type Context = Expr -> Expr
 
---------------------------------------------------------------------------------
-substX, substX1 :: Expr -> [(Context, Expr)]
--- S context
-substX lhs = substX1 lhs ++ [(id,lhs)]
--- S context, X /= hole
-substX1 lhs =
-   do x :>: e <- [lhs]
-      (ctx, hole) <- substX x
-      pure ((:>: e) . ctx, hole)
-   ++
-   -- TODO: this `e` should be `ef` means "can fail or have choice but not loop or do I/O"
-   do e :>: x <- [lhs]
-      guard (isEffectFree e)
-      (ctx, hole) <- substX x
-      pure ((e :>:) . ctx, hole)
-   ++
-   do x :>>: e <- [lhs]
-      (ctx, hole) <- substX x
-      pure ((:>>: e) . ctx, hole)
-   ++
-   do (v :=: x)   <- [lhs]
-      (ctx, hole) <- substX x
-      pure ((v :=:) . ctx, hole)
+-- --------------------------------------------------------------------------------
+-- substX, substX1 :: Expr -> [(Context, Expr)]
+-- -- S context
+-- substX lhs = substX1 lhs ++ [(id,lhs)]
+-- -- S context, X /= hole
+-- substX1 lhs =
+--    do x :>: e <- [lhs]
+--       (ctx, hole) <- substX x
+--       pure ((:>: e) . ctx, hole)
+--    ++
+--    -- TODO: this `e` should be `ef` means "can fail or have choice but not loop or do I/O"
+--    do e :>: x <- [lhs]
+--       guard (isEffectFree e)
+--       (ctx, hole) <- substX x
+--       pure ((e :>:) . ctx, hole)
+--    ++
+--    do x :>>: e <- [lhs]
+--       (ctx, hole) <- substX x
+--       pure ((:>>: e) . ctx, hole)
+--    ++
+--    do (v :=: x)   <- [lhs]
+--       (ctx, hole) <- substX x
+--       pure ((v :=:) . ctx, hole)
 
 --------------------------------------------------------------------------------
 proofX, proofX1 :: [BndVar] -> Expr -> [(Context, [BndVar], Expr)]

@@ -1989,9 +1989,10 @@ dsB_10 s t (P f) j
        seqDE [ pure $ DefineE z (ApplyD (Variable f) (Variable j)), dsM_10 s t (P z)]
 
 dsK_10 :: Loc -> [Eff] -> D Expr
-dsK_10 loc fx
+dsK_10 _loc fx
   | hasEff "fails" fx   = pure Fail
-  | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
+  -- TODO: commenting-out-for-now
+  -- | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
   | otherwise           = pure (Array [])
 
 dsCheck :: DsEff -> Expr -> Expr
@@ -2003,18 +2004,18 @@ seqDE ds = seqE <$> sequence ds
 
 dsM_10 :: DsMode10 -> Expr -> Pi -> D Expr
 dsM_10 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
-  = do j   <- newIdent (getLoc t) "j"
-       -- dom <- DefineE j <$> dsM_10 MI t1 E
-       dom <- dsM_10 MI t1 (P j)
+  = do r   <- newIdent (getLoc t) "r"
+       j   <- newIdent (getLoc t) "j"
+       dom <- DefineE j <$> dsM_10 MI t1 (P r)
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MV t2 pi j
-       eGuard (eVerify (Forall [j] (seqE [dom, rng]))) <$> (dsM_10 MI t pi)
+       eGuard (eVerify (Forall [r] (seqE [dom, rng]))) <$> dsM_10 MI t pi
 
 dsM_10 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
   = do i   <- newIdent (getLoc t1) "i"
        j   <- newIdent (getLoc t1) "j"
        dom <- DefineE j <$> dsM_10 MV t1 (P i)
-       rng <- seqDE [ dsK_10 (getLoc t1) _fx, dsB_10 MI t2 pi j]
-       pure $ Lam i (dom `eGuard` rng)
+       rng <- seqDE [ dsK_10 (getLoc t1) _fx, {- BUG -} dsB_10 MI t2 pi j]
+       pure $ {- TODO: ISFUN -} Lam i (dom `eGuard` rng)
 
 dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
   = do i   <- newIdent (getLoc t1) "i"
@@ -2023,12 +2024,18 @@ dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MX t2 pi j
        pure $ Lam i (seqE [dom, rng])
 
+dsM_10 MV (OfType t1 t2@(Variable z)) pi      -- MOFTYPE+
+  = do y <- newIdent (getLoc t1) "y"
+       seqDE [ DefineE y <$> dsM_10  MV t1 pi
+             , pure (dsCheck Suc (ApplyD t2 (Variable y)) `eGuard` eSome (Variable z))
+             ]
+
 dsM_10 MV (OfType t1 t2) pi                   -- MOFTYPE+
   = do y <- newIdent (getLoc t1) "y"
        z <- newIdent (getLoc t1) "z"
        seqDE [ DefineE y <$> dsM_10  MV t1 pi
              , DefineE z <$> dsDD_10 MV t2
-             , pure ((dsCheck Suc (ApplyD (Variable z) (Variable y))) `eGuard` eSome (Variable z))
+             , pure (dsCheck Suc (ApplyD (Variable z) (Variable y)) `eGuard` eSome (Variable z))
              ]
 
 dsM_10 MI (OfType t1 t2) _pi                  -- MOFTYPE-
@@ -2045,22 +2052,30 @@ dsM_10 MX (OfType t1 t2) pi                   -- MOFTYPEX
              , pure (ApplyD (Variable z) (Variable y))
              ]
 
-dsM_10 MI (Range t) E                       -- MTYPE1
-  = do z <- newIdent (getLoc t) "z"
-       seqDE [ DefineE z <$> dsDD_10 MI t
-             , pure (eSome (Variable z)) ]
+dsM_10 MI (Range (Variable z)) (P _)       -- MTYPE-VAR Spl case to make M-[:int](i) = some{int} instead of exi z. z = int; z(i)
+   = pure (eSome (Variable z))
 
-dsM_10 s (Range t) E                       -- MTYPE2
-  = do i <- newIdent (getLoc t) "i"
-       existsV [i] <$> dsM_10 s (Range t) (P i)
-
-dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make M[:int](i) = int(i) instead of exi z. z = int; z(i)
+dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make Ms[:int](i) = int(i) instead of exi z. z = int; z(i)
   = pure (ApplyD (Variable z) (Variable i))
 
-dsM_10 s (Range t) (P i)                   -- MTYPE3
+dsM_10 MI (Range t) (P i)                   -- MTYPE1
+  = do z <- newIdent (getLoc t) "z"
+       seqDE [ DefineE z <$> dsDD_10 MI t
+             , pure (Variable i `eGuard` eSome (Variable z))
+             ]
+
+dsM_10 s (Range t) (P i)                   -- MTYPE2
   = do z <- newIdent (getLoc t) "z"
        seqDE [ DefineE z <$> dsDD_10 s t
              , pure (ApplyD (Variable z) (Variable i)) ]
+
+dsM_10 s (Range t) E                       -- MTYPE3
+  = do x <- newIdent (getLoc t) "x"
+       z <- newIdent (getLoc t) "z"
+       existsV [x] <$> seqDE
+          [ DefineE z <$> dsDD_10 s t
+          , pure (ApplyD (Variable z) (Variable x)) ]
+
 
 dsM_10 s (DefineIE x y t) E                -- MSQUIGE
   = do i <- newIdent (getLoc t) "i"

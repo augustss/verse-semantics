@@ -29,8 +29,9 @@ takeL :: Int -> [a] -> [a]
 takeL n xs = [xs!!n]
 
 tests :: [(String, Expr, Bool)]
-tests = -- take 1
-  [ ("ex_ty_00", ex_ty_00, True)
+tests = take 1
+  [ ("ex_blob0", blob0, False)
+  , ("ex_ty_00", ex_ty_00, True)
   , ("ex_asm_fail", ex_asm_fail, True)
   , ("ex_asm_fail'", ex_asm_fail', True)
   , ("ex_crash", ex_crash, True)
@@ -169,6 +170,17 @@ exNotValid = eXIs [g, i1] $ (Var g :=: (blob1 :>: blob2) :>: Var i1) :>: Var g
 tINT :: Expr
 tINT = LAM x (iNT (Var x))
   where x = ident "x"
+
+
+blob0 :: Expr
+blob0 = Var i1 :=: Verify [] []
+  ( EXI x ((Var x :=: Some tINT) :>: Assert (INT (Var x)))
+    :>>:
+    Int 0
+  )
+  where
+    i1 = ident "i1"
+    x = ident "x"
 
 blob1 :: Expr
 blob1 = Var i1 :=: (Verify [] [] (( EXI x (((Var x :=: Some(tINT)) :>: Assert (Var x))))))

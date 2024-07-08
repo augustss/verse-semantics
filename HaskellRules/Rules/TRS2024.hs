@@ -9,6 +9,7 @@ import TRS.Bind
 import TRS.System
 import TRS.TRS
 import Rules.Core
+-- import qualified Rules.ICFP as ICFP
 --import Debug.Trace
 
 --------------------------------------------------------------------------------
@@ -62,6 +63,7 @@ valid = expr
     value r       = hnf r
 
     hnf (Int _)          = True
+    hnf (Char _)         = True
     hnf (Op _)           = True
     hnf (Arr vs)         = all value vs
     hnf (Lam (Bind _ e)) = expr e
@@ -83,6 +85,7 @@ anf = expr
     expr (Arr es)         = makeValues es (\vs -> Arr vs)
     expr (Lam (Bind x e)) = Lam (Bind x (expr e))
     expr (Int k)          = Int k
+    expr (Char c)         = Char c
     expr (Op op)          = Op op
     expr (Var x)          = Var x
     expr (Some e)         = Some (expr e)
@@ -218,25 +221,32 @@ isValueX (Arr vs) x = any (`isValueX` x) vs
 isValueX (Var y)  x = x == y
 isValueX _        _ = False
 
-substX, substX1 :: Expr -> [(Context, Expr)]
-substX lhs = emptyX lhs ++ substX1 lhs
-substX1 lhs =
+substX, substX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
+substX zs lhs = emptyXzs zs lhs ++ substX1 zs lhs
+substX1 zs lhs =
   do e1 :>: e2 <- [lhs]
-     (ctx, hole) <- substX e1
-     return ((:>: e2) . ctx, hole)
+     (ctx, zs', hole) <- substX zs e1
+     return ((:>: e2) . ctx, zs', hole)
  ++
   do e1 :>: e2 <- [lhs]
      guard (isEffectFree e1)
-     (ctx, hole) <- substX e2
-     return ((e1 :>:) . ctx, hole)
+     (ctx, zs', hole) <- substX zs e2
+     return ((e1 :>:) . ctx, zs', hole)
  ++
   do v :=: e <- [lhs]
-     (ctx, hole) <- substX e
-     return ((v :=:) . ctx, hole)
+     (ctx, zs', hole) <- substX zs e
+     return ((v :=:) . ctx, zs', hole)
  ++
   do e1 :>>: e2 <- [lhs]
-     (ctx, hole) <- substX e1
-     return ((:>>: e2) . ctx, hole)
+     (ctx, zs', hole) <- substX zs e1
+     return ((:>>: e2) . ctx, zs', hole)
+--  ++ -- RJ: adding EXI to subst-ctxt
+--   do Exi bnd <- [lhs]
+--      let Bind x e = alphaRename zs bnd
+--      (ctx, zs', hole) <- substX (x:zs) e
+--      return (Exi . Bind x . ctx, zs', hole)
+
+
 
 evalX, evalX1 :: [Ident] -> Expr -> [(Context, [Ident], Expr)]
 evalX zs lhs = emptyXzs zs lhs ++ evalX1 zs lhs
@@ -320,23 +330,23 @@ rulesPrimOps _ lhs =
   do Op Sub :@: Arr [Int k1, Int k2] <- [lhs]
      pure (Int (k1-k2))
  ++
-  "APP-GT" `name`
-  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
-     guard (k1 > k2)
-     pure (Int k1)
- ++
-  "APP-GT-FAIL" `name`
-  do Op Gt :@: a <- [lhs]
-     guard (case a of
-              Arr [Int k1, Int k2] -> not (k1 > k2)
-              _                    -> True)
-     pure Fail
- ++
   "APP-ISINT" `name`
   do Op IsInt :@: (HNF hnf) <- [lhs]
      case hnf of
        Int _ -> pure hnf
        _     -> pure Fail
+ ++
+  "APP-GT" `name`
+  do Op Gt :@: Arr [Int k1, Int k2] <- [lhs]
+     pure $ if k1 > k2 then Int k1 else Fail
+ ++
+  "APP-GE" `name`
+  do Op Ge :@: Arr [Int k1, Int k2] <- [lhs]
+     pure $ if k1 >= k2 then Int k1 else Fail
+ ++
+  "APP-NE" `name`
+  do Op Ne :@: Arr [Int k1, Int k2] <- [lhs]
+     pure $ if k1 /= k2 then Int k1 else Fail
 
 --------------------------------------------------------------------------------
 
@@ -389,14 +399,27 @@ rulesUnification _ lhs =
 
 rulesSubstitution :: ERule
 rulesSubstitution _ lhs =
+  -- exi x. exi ys. S[x=v] --->  exi ys. S{v/x}[<>]   if x not in fv(v)
   "SUBST1" `name`
-  do Exi (Bind x e) <- [lhs]
-     (s, Var x' :=: Val v) <- substX e
+  do EXI x e'     <- [lhs]
+     let (ys, e) = getExis e'
+     (s, _ , Var x' :=: Val v) <- substX [] e
      guard (x == x')
      guard (not (isValueX v x))
-     pure ((substCtx [(x,v)] s) (Arr []))
+     pure (exis ys (substCtx [(x,v)] s (Arr [])))
+--   do Exi (Bind x e) <- [lhs]
+--      (s, _ , Var x' :=: Val v) <- substX [] e
+--      guard (x == x')
+--      guard (not (isValueX v x))
+--      pure ((substCtx [(x,v)] s) (Arr []))
+
 
 --------------------------------------------------------------------------------
+
+-- | A `trivialC` is a C that is just a chain of `exi x1 ... xn. HOLE`
+trivialC :: Expr -> Bool
+trivialC (Exi (Bind _ e)) = trivialC e
+trivialC e                = e == (#)
 
 rulesNormalization :: ERule
 rulesNormalization _ lhs =
@@ -408,6 +431,7 @@ rulesNormalization _ lhs =
   "EXI-FLOAT" `name`
   do (ctx, zs, Exi bnd) <- evalX1 [] lhs
      let Bind x e = alphaRename (zs ++ free (ctx (#))) bnd
+     guard (not (trivialC (ctx (#))))    -- RJ: optimization to avoid "permutation" exi-float
      guard (x `notElem` free (ctx (#)))
      pure (Exi (Bind x (ctx e)))
  ++
