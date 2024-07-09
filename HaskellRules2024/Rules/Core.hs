@@ -244,7 +244,7 @@ pPrintPrecE lvl prec the_expr
        Fail       -> text "fail"
        Var x      -> pPrint x
        Lit i      -> pPrint i
-       Op op      -> pPrint op
+       Op op      -> char '!' <> pPrint op
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> mbPar0 $ ppr1 e1 <+> char '|' <+> ppr1 e2
@@ -587,11 +587,11 @@ everywhere step env orig_e = step env orig_e ++ recurse orig_e
   recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step env e ]
   recurse e@(Exi _)    = [ (s, exis <@ body') | (s,body') <- everywhere step env body ]
                        where (exis,body) = unExis e
-  recurse (Verify bl)  = [ (s, Verify (bindList xs (as,e')))
+  recurse (Verify bl)  = [ (s, Verify (bindList rs (as,e')))
                          | (s,e') <- everywhere step env' e ]
                        where
-                         env' = env `addSkolsRE` xs
-                         (xs,(as,e)) = unsafeUnbindList bl
+                         env' = env `addSkolsRE` rs
+                         (rs,(as,e)) = unsafeUnbindList bl
   recurse _            = []
 
 -- treat "exi x1 .. exi xn" as one block when matching
@@ -622,6 +622,7 @@ matchExi_alphaRename zs e =
   ]
 
 matchEq :: Expr -> [(Expr,Expr)]
+-- Matches (v = e), and also (v1 = v2) returning (v2 = v1)
 matchEq e =
   [ (lhs, rhs)
   | e1 :=: e2 <- [e]
@@ -640,7 +641,8 @@ normalize rule orig_e = go (-1) [] orig_e  -- go 99 [] e
       []                        -> e :<-- tr
       (s,e'):_ | fuel==0        -> abort "OUT-OF-FUEL"
                | not (valid e') -> abort "INVALID"
-               | otherwise      -> go (fuel-1) ((s,e):tr) e'
+               | otherwise      -> ppTrace ("done " ++ s) (pPrint e') $
+                                   go (fuel-1) ((s,e):tr) e'
               where
                abort msg = e' :<-- ((s ++ "-**" ++ msg ++ "**",e):tr)
 

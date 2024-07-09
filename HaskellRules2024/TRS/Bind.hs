@@ -1,7 +1,7 @@
 module TRS.Bind
   ( Ident(..)
-  , ident
-  , identsNotInPrefix, identsNotIn, identNotIn
+  , ident, underscore
+  , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn
 
   , Variables(..)
   , free, occurs
@@ -23,6 +23,8 @@ import Epic.Print
 newtype Ident = Name String
  deriving ( Eq, Ord )
 
+type SkolIdent = Ident   -- Skolem variables, R, in verify(R,A){e}
+
 instance Show Ident where
   show (Name x) = x
 
@@ -32,20 +34,31 @@ instance Pretty Ident where
 ident :: String -> Ident
 ident = Name
 
+underscore :: Ident
+-- `underscore` does not count as free or bound
+-- We use it only on the LHS of (_ = e1; e2)
+underscore = Name "_"
+
 identsNotInPrefix :: String -> [Ident] -> [Ident]
-identsNotInPrefix prefix zs = [ Name (prefix ++ show (m+i)) | i <- [1..] ]
-  where m = maximum (0 : [ read s :: Integer
-                         | Name str <- zs
-                         , prefix `isPrefixOf` str
-                         , let s = drop (length prefix) str
-                         , not (null s)
-                         , all isDigit s
-                         ])
+identsNotInPrefix prefix forb = [ Name (prefix ++ show (m+i)) | i <- [1..] ]
+  where
+    m :: Integer  -- m is the max k, such that prefix_k is in forb
+    m = maximum (0 : [ read s :: Integer
+                     | Name str <- forb
+                     , prefix `isPrefixOf` str
+                     , let s = drop (length prefix) str
+                     , not (null s)
+                     , all isDigit s ])
 
 identsNotIn :: [Ident] -> [Ident]
-identsNotIn zs = filter (`notElem` zs) [ Name x | x <- xs ] ++ identsNotInPrefix "x" zs
+-- Return an infinite list of identifiers not in `forb`
+identsNotIn forb = filter (`notElem` forb) [ Name x | x <- xs ]
+                   ++ identsNotInPrefix "x" forb
  where
   xs = ["x","y","z","u","v","w"]
+
+skolNotIn :: [SkolIdent] -> SkolIdent
+skolNotIn skols = head (identsNotInPrefix "$r" skols)
 
 identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
@@ -86,9 +99,9 @@ instance (Variables a, Variables b, Variables c, Variables d) => Variables (a,b,
 instance Variables a => Variables [a] where
   variables f = foldr union [] . map (variables f)
 
--- This simplifies some code
 instance Variables Ident where
-  variables _ x = [x]
+  variables _ x | x == underscore = []   -- Underscore is not a real variable
+                | otherwise       = [x]
 
 --------------------------------------------------------------------------------
 

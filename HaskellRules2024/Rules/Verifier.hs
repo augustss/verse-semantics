@@ -97,7 +97,7 @@ verifyRules env lhs =
       guard (skol all_rs v)
       guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
-          r  = identNotIn all_rs
+          r  = skolNotIn all_rs
       pure $ Verify $ bindList (r:rs) $
              (as, Exi $ bind x $
                   Var x :=: (v :@: Var r) :>: (ctx <@ Var x) )
@@ -161,10 +161,21 @@ splitRules env lhs =
       let env_rs = skolVars env
           (rs, (as, e)) = alphaRenameVerify env_rs bnd
           all_rs = rs ++ env_rs
-      (ctx, (Var r :=: v)) <- proofX [] e
+      (ctx, (Var r :=: v) :>: rest) <- proofX [] e
       guard (r `elem` all_rs)
-      Just gv <- [groundValue (skolVars env) v]
-      pure (caseSplit rs (A_GVEq r gv) as ctx (Arr []))
+      Just gv <- [groundValue all_rs v]
+      pure (caseSplit rs (A_GVEq r gv) as ctx rest)
+   ++
+   "SPLIT-OP" `nameWith`
+   do Verify bnd <- [lhs]
+      let env_rs = skolVars env
+          (rs, (as, e)) = alphaRenameVerify env_rs bnd
+          all_rs = rs ++ env_rs
+      (ctx, Op op :@: arg) <- proofX [] e
+      Just gv <- [groundValue all_rs arg]
+      let r   = skolNotIn all_rs
+          asm = A_PrimOp r op gv
+      pure (asm, caseSplit (r:rs) asm as ctx (Var r))
 {-
    ++
    "SPLIT-C" `name`
@@ -197,14 +208,6 @@ splitRules env lhs =
       guard (isUni rs bs arg)
       guard (isPrim1 op)
       pure (a, caseSplit rs a as ctx (Arr []))
-   ++
-   "SPLIT-OP" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(Var r :=: (op :@: arg))) <- proofX e
-      guard (isUni rs bs (Var r))
-      guard (isUni rs bs arg)
-      guard (isPrimOp1 op)
-      pure (a, caseSplit (r:rs) a as ctx (Arr []))
    ++
    -- Verify(rs ; as){ P[r[s]] } ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
    "SPLIT-APP" `name`
@@ -244,7 +247,7 @@ isPrimOp1 _        = False
 
 caseSplit :: [Ident] -> Assump -> [Assump] -> Context -> Expr -> Expr
 caseSplit rs a as ctx e
-  = Verify (bindList rs (a : as, ctx <@ e))
+  = (Var underscore :=: Verify (bindList rs (a : as, ctx <@ e)))
     :>:
     Verify (bindList rs (A_Fails a : as, ctx <@ Fail))
 
@@ -257,14 +260,18 @@ proofX :: [Ident] -> Expr -> [(Context, Expr)]
 proofX bs lhs =
    pure (HOLE,lhs)
  ++
+   do x :>: e <- [lhs]
+      (ctx, hole) <- proofX bs x
+      pure (ctx :>: e, hole)
+ ++
    do cf :>: x <- [lhs]
       guard (TRS2024.choiceFree cf)
       (ctx, hole) <- proofX bs x
       pure (cf :>: ctx, hole)
  ++
-   do x :>: e <- [lhs]
+   do v :=: x <- [lhs]
       (ctx, hole) <- proofX bs x
-      pure (ctx :>: e, hole)
+      pure (v :=: ctx, hole)
  ++
   do Exi bnd <- [lhs]
      let (x,e) = alphaRename bs bnd

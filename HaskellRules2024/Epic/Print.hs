@@ -2,7 +2,9 @@
 
 module Epic.Print
   ( module Epic.Print,
+
     module Text.PrettyPrint.HughesPJClass,
+      -- prettyShow :: (Pretty a) => a -> String
   )
 where
 
@@ -13,12 +15,17 @@ import qualified Data.Set as S
 import qualified Data.Text
 import Text.PrettyPrint.HughesPJClass hiding (Str, first)
 import System.IO
+import Debug.Trace
 
 instance Pretty Data.Text.Text where
   pPrintPrec l p = pPrintPrec l p . Data.Text.unpack
 
 commaSep :: (Pretty a) => PrettyLevel -> [a] -> Doc
 commaSep l es = fsep $ punctuate comma (map (pPrintL l) es)
+
+ppTrace :: String -> Doc -> b -> b
+ppTrace herald doc result
+  = trace (render (text herald <> colon <+> doc)) result
 
 pPrintL :: (Pretty a) => PrettyLevel -> a -> Doc
 pPrintL l = pPrintPrec l 0

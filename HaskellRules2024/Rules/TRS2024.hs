@@ -1,11 +1,14 @@
 module Rules.TRS2024 (
      evalRules
    , blocked, choiceFree
-   , name, iff
+   , name, nameWith, iff
  ) where
+
+import Prelude
 
 import TRS.Bind
 import Rules.Core
+import Epic.Print hiding ( (<>) )
 
 import Control.Monad( guard )
 
@@ -24,6 +27,10 @@ evalRules = rulesApplication
 
 name :: String -> [Expr] -> [(String,Expr)]
 name s es = [ (s,e) | e <- es ]
+
+-- This is used to give rules names.
+nameWith :: (Pretty s) => String -> [(s, a)] -> [(String, a)]
+nameWith s as = [(s ++ ":" ++ prettyShow k, a) | (k, a) <- as]
 
 iff :: [Bool] -> [()]
 iff conds = [()| and conds]
@@ -243,29 +250,31 @@ rulesUnification _env lhs =
 
 rulesExistentials :: Rule
 rulesExistentials _env lhs =
-  "EXI-SUBST" `name`
+  "EXI-SUBST" `nameWith`
   do (exis, ctx, x_eq_v :>: e) <- evalCtxLift (free lhs) lhs
      (Var x,v) <- matchEq x_eq_v
-     guard (x `elem` bvs exis)
+     ppTrace "exi-subst1" (pPrint x <+> pPrint v $$ pPrint exis $$ pPrint (isVal v) $$ text "free" <+> pPrint (free v) $$ text "blkd" <+> pPrint (blkd (bvs exis) ctx)) $
+        guard (x `elem` bvs exis)
      guard (isVal v)
      guard (x `notElem` free v)
      guard (blkd (bvs exis) ctx)
-     pure (exis <@ subst [(x,v)] (ctx <@ e))
+     ppTrace "exi-subst2" (pPrint x) $
+       pure (x, exis <@ subst [(x,v)] (ctx <@ e))
  ++
-  "EXI-ELIM" `name`
+  "EXI-ELIM" `nameWith`
   do (exis,x,e) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free e)
-     pure (exis <@ e)
+     pure (x, exis <@ e)
  ++
-  "EXI-FLOAT" `name`
+  "EXI-FLOAT" `nameWith`
   do (v :=: exi_x_e1) :>: e2 <- [lhs]
      (exis,x,e1) <- matchExi_alphaRename (free (v,e2)) exi_x_e1
-     pure (Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
+     pure (x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
  ++
-  "EXI-PUSH" `name`
+  "EXI-PUSH" `nameWith`
   do (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free (v,e1))
-     pure (exis <@ ((v :=: e1) :>: Exi (bind x e2)))
+     pure (x, exis <@ ((v :=: e1) :>: Exi (bind x e2)))
 
 --------------------------------------------------------------------------------
 
