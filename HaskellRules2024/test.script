@@ -3,4 +3,5 @@
 :desugar
 :tocore
 :eval
+:verify
 :quit

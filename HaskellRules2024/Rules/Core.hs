@@ -3,21 +3,28 @@
 module Rules.Core
   ( -- The data type itself
     Expr(..), pattern LitInt
-  , Effect(..), Assump(..), Ident(..)
+  , Ident(..)
   , Lit(..), Ptr, Path(..)
   , isVal, isHNF, isSkolem
   , prep, norm
 
+    -- Assupmtions
+  , Assump(..), GroundVal(..)
+
     -- Rewriting
-  , Rule, Context, isContext, (<@)
+  , Rule, Context, RuleEnv(..), isContext, (<@)
   , everywhere, normalize
 
     -- Binding and substitution
   , subst, bvs
   , unbindAs, unExis
   , alphaRename, matchExi_alphaRename, matchEq
+  , alphaRenameVerify
 
-    -- Primops
+    -- Effects
+  , Effect(..), canSucceed, canFail
+
+  -- Primops
   , PrimOp(..), allPrimOps, primOpString
   ) where
 
@@ -165,12 +172,26 @@ instance Pretty Path where
 --
 --------------------------------------------------------------------------------
 
+data GroundVal = GVVar Ident
+               | GVLit Lit
+               | GVArr [GroundVal]
+  deriving( Eq, Ord, Show )
+
 data Assump
-  = NOTHING_HERE_YET
+  = A_GVEq Ident GroundVal            -- r = gv
+  | A_PrimOp Ident PrimOp GroundVal   -- r = op[gv]
+  | A_Fails Assump                    -- not( a )
  deriving ( Eq, Ord, Show )
 
 instance Pretty Assump where
-  pPrint _ = text "[asm]"  -- ToDo
+  pPrint (A_GVEq i gv)      = pPrint i <+> text "="  <+> pPrint gv
+  pPrint (A_PrimOp i op gv) = pPrint i <+> text "=" <+> pPrint op <> brackets (pPrint gv)
+  pPrint (A_Fails a)        = text "not" <> parens (pPrint a)
+
+instance Pretty GroundVal where
+  pPrint (GVVar i)   = pPrint i
+  pPrint (GVLit l)   = pPrint l
+  pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
 
 --------------------------------------------------------------------------------
 --
@@ -191,6 +212,18 @@ instance Show Effect where
 
 instance Pretty Effect where
   pPrint eff = text (show eff)
+
+canSucceed :: Effect -> Bool
+-- True if one result is acceptable
+canSucceed Succeeds = True
+canSucceed Decides  = True
+canSucceed Fails    = False
+
+canFail :: Effect -> Bool
+-- True if no results is acceptable
+canFail Succeeds = False
+canFail Decides  = True
+canFail Fails    = True
 
 --------------------------------------------------------------------------------
 --
@@ -236,7 +269,7 @@ pPrintPrecE lvl prec the_expr
                                                        , fsep (punctuate comma (map pPrint as)) ])
                         , indent (braces (ppr0 body)) ]
            where
-             (ids, (as, body)) = alphaRenameVerifyBody (free bl) bl
+             (ids, (as, body)) = alphaRenameVerify (free bl) bl
   where
     ppr0 = pPrintPrecE lvl 0
     ppr1 = pPrintPrecE lvl 1
@@ -410,7 +443,14 @@ instance Variables Expr where
   variables _ _            = []
 
 instance Variables Assump where
-  variables _f NOTHING_HERE_YET = []
+  variables f (A_GVEq i gv)       = [i] `union` variables f gv
+  variables f (A_PrimOp i _ gv)   = [i] `union` variables f gv
+  variables f (A_Fails a)         = variables f a
+
+instance Variables GroundVal where
+  variables _f (GVVar i)   = [i]
+  variables _f (GVLit {})  = []
+  variables f  (GVArr gvs) = variables f gvs
 
 isSkolem :: Ident -> Bool
 isSkolem (Name ('$':_)) = True
@@ -430,8 +470,8 @@ alphaRename :: [Ident] -> Bind Expr -> (Ident,Expr)
 -- Open up the binding, but avoiding any of the binders in `forb`
 alphaRename forb t = alphaRenameBindWith (\x y -> subst [(x,Var y)]) forb t
 
-alphaRenameVerifyBody :: [Ident] -> BindList ([Assump], Expr) -> ([Ident], ([Assump], Expr))
-alphaRenameVerifyBody forb bl
+alphaRenameVerify :: [Ident] -> BindList ([Assump], Expr) -> ([Ident], ([Assump], Expr))
+alphaRenameVerify forb bl
   = alphaRenameBindListWith ren forb bl
   where
      ren :: [(Ident,Ident)] -> ([Assump],Expr) -> ([Assump],Expr)
@@ -506,36 +546,51 @@ substVerify sub (as,e) = (as, subst sub e)   -- ToDo: fix me.   Sadly (Subst Exp
 --
 --------------------------------------------------------------------------------
 
-type Rule = Expr -> [(String,Expr)]
+data RuleEnv = RE { skolVars :: [Ident] }
+
+emptyRuleEnv :: RuleEnv
+emptyRuleEnv = RE { skolVars = [] }
+
+addSkolsRE :: RuleEnv -> [Ident] -> RuleEnv
+addSkolsRE rule_env@(RE { skolVars = skols }) new_skols
+  = rule_env { skolVars = new_skols ++ skols }
+
+type Rule = RuleEnv -> Expr -> [(String,Expr)]
+
+stepRule :: Rule -> Expr -> [(String,Expr)]
+stepRule rule expr = rule emptyRuleEnv     -- Empty set of skolems
+                          expr
 
 -- apply a rule everywhere (recursively) in the expression
 everywhere :: Rule -> Rule
-everywhere step orig_e = step orig_e ++ recurse orig_e
+everywhere step env orig_e = step env orig_e ++ recurse orig_e
  where
   recurse (Arr es)     = [ (s, Arr (take i es ++ [e'] ++ drop (i+1) es))
                          | i <- [0..length es-1]
-                         , (s,e') <- everywhere step (es!!i)
+                         , (s,e') <- everywhere step env (es!!i)
                          ]
-  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step e ]
+  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step env e ]
                        where (x,e) = unsafeUnbind bnd
-  recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :=: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (One e)      = [ (s, One e')  | (s,e') <- everywhere step e ]
-  recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step e ]
-  recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step e ]
-  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step e ]
-  recurse e@(Exi _)    = [ (s, exis <@ body') | (s,body') <- everywhere step body ]
+  recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :=: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (One e)      = [ (s, One e')  | (s,e') <- everywhere step env e ]
+  recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step env e ]
+  recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step env e ]
+  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step env e ]
+  recurse e@(Exi _)    = [ (s, exis <@ body') | (s,body') <- everywhere step env body ]
                        where (exis,body) = unExis e
-  recurse (Verify bl)  = [ (s, Verify (bindList xs (as,e')))  | (s,e') <- everywhere step e ]
+  recurse (Verify bl)  = [ (s, Verify (bindList xs (as,e')))
+                         | (s,e') <- everywhere step env' e ]
                        where
+                         env' = env `addSkolsRE` xs
                          (xs,(as,e)) = unsafeUnbindList bl
   recurse _            = []
 
@@ -581,7 +636,7 @@ normalize rule orig_e = go (-1) [] orig_e  -- go 99 [] e
  where
   go :: Int -> [(String,Expr)] -> Expr -> Traced Expr
   go fuel tr e =
-    case rule e of
+    case stepRule rule e of
       []                        -> e :<-- tr
       (s,e'):_ | fuel==0        -> abort "OUT-OF-FUEL"
                | not (valid e') -> abort "INVALID"

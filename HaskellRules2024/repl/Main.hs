@@ -4,8 +4,9 @@ module Main(main) where
 
 import Prelude
 
-import Rules.Core as Rules
-import Rules.TRS2024 as TRS2024
+import Rules.Core     as Rules
+import Rules.TRS2024  as TRS2024
+import Rules.Verifier as Verifier
 import TRS.Traced
 
 import FrontEnd.Flags( Flags(..), defaultFlags )
@@ -215,7 +216,7 @@ theCommandSet = CommandSet
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
 
---      , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
+      , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
 
 --      , Cmd "pcore EXPR"           "parse core expression"                 cPcore
 --      , Cmd "pdesugar [EXPR]"      "Desugar [last] expression pretty"      cPDesugar
@@ -355,22 +356,47 @@ cToCore
        ; display e'
        ; pure (RulesCore e') }
 
+--------------------------------------------------------
+--
+--         Evalaution and verification
+--
+--------------------------------------------------------
+
 cEval :: CmdRunner CState
 cEval
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
-    do { let core_expr, prepd_expr :: Rules.Expr
+    do { putStrLn ("\n\n------- Prep'd ---------")
+       ; let core_expr, prepd_expr :: Rules.Expr
              core_expr  = asCore e
              prepd_expr = prep core_expr
-             tr@(e' :<-- _) = eval_it prepd_expr
-       ; putStrLn ("\n\n------- Prep'd ---------")
        ; putStrLn (prettyShow prepd_expr)
+
        ; putStrLn ("\n\n------- Evaluate ---------")
+       ; let tr@(e' :<-- _) = eval_it prepd_expr
        ; putStrLn (render (pPrint tr))
+
        ; pure (RulesCore e') }
   where
-    eval_it = Rules.normalize (Rules.everywhere TRS2024.rules)
+    eval_it = Rules.normalize (Rules.everywhere TRS2024.evalRules)
 
+cVerify :: CmdRunner CState
+cVerify
+  = withLastExpr $ \ e s ->
+    tryIt (pure s) (updateLastExpr s) $
+    do { putStrLn ("\n\n------- Prep'd ---------")
+       ; let core_expr, prepd_expr :: Rules.Expr
+             core_expr  = asCore e
+             prepd_expr = prep core_expr
+       ; putStrLn (prettyShow prepd_expr)
+
+       ; putStrLn ("\n\n------- Verify ---------")
+       ; let tr@(e' :<-- _) = verify_it prepd_expr
+       ; putStrLn (render (pPrint tr))
+
+       ; pure (RulesCore e') }
+  where
+    verify_it = Rules.normalize (Rules.everywhere Verifier.verificationRules)
 
 {-
 cTransform :: Bool                    -- True <=> display the result

@@ -39,10 +39,13 @@ noprelude = ("noprelude", "\
 \")
 
 miniprelude :: (PreludeName, String)
+-- This "miniprelude" uses already-lowered lambdas, rather than Source Verse,
+-- to reduce clutter
 miniprelude = ("miniprelude", "\
 \## Use FrontEnd/Makefile to update compiled prelude.\n\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
+\false            := array{};\n\
 \operator'+'      := intAdd$;\n\
 \operator'-'      := intSub$;\n\
 \operator'*'      := intMul$;\n\
@@ -55,17 +58,16 @@ miniprelude = ("miniprelude", "\
 \operator'>='     := intGE$;\n\
 \operator'<>'     := intNE$;\n\
 \any              := any$;\n\
-\int(_x:any$)<decides><closed>         := { isInt$[_x]; _x };\n\
-\rational(_x:any$)<decides><closed>    := { isRat$[_x]; _x };\n\
-\string(_x:any$)<decides><closed>      := { isStr$[_x]; _x };\n\
-\char(_x:any$)<decides><closed>        := { isChr$[_x]; _x };\n\
-\nat(_x:any$)<decides><closed>         := { isInt$[_x]; intGE$[_x,0]; _x };\n\
-\## operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
-\false                       := array{};\n\
-\postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
-\operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
-\new := function(_t:any$)(_x:any$)<allocates><decides>{ alloc$[_t[_x]] };\n\
+\int      := lambda (y) { isInt$[y]; y };\n\
+\rational := lambda (y) { isRat$[y]; y };\n\
+\string   := lambda (y) { isStr$[y]; y };\n\
+\char     := lambda (y) { isChar$[y]; y };\n\
+\nat      := lambda (y) { isChar$[y]; intGE$[y,0]; y };\n\
 \Length(_x:any$):=arrLen$[_x];\n\
+\## operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
+\## postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
+\## operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
+\## new := function(_t:any$)(_x:any$)<allocates><decides>{ alloc$[_t[_x]] };\n\
 \}\n\
 \")
 

@@ -1,4 +1,8 @@
-module Rules.TRS2024 where
+module Rules.TRS2024 (
+     evalRules
+   , blocked, choiceFree
+   , name, iff
+ ) where
 
 import TRS.Bind
 import Rules.Core
@@ -7,13 +11,14 @@ import Control.Monad( guard )
 
 --------------------------------------------------------------------------------
 
-rules :: Rule
-rules = rulesApplication
-     <> rulesUnification
-     <> rulesExistentials
-     <> rulesNormalization
-     <> rulesChoice
-     <> rulesOneAndAll
+evalRules :: Rule
+-- Runtime evauation rules
+evalRules = rulesApplication
+          <> rulesUnification
+          <> rulesExistentials
+          <> rulesNormalization
+          <> rulesChoice
+          <> rulesOneAndAll
 
 --------------------------------------------------------------------------------
 
@@ -69,6 +74,9 @@ evalCtxLift zs lhs =
 -- blkd
 type Expr_or_Context = Expr
 
+blocked :: Expr_or_Context -> Bool
+blocked ec = blkd [] ec
+
 blkd :: [Ident] -> Expr_or_Context -> Bool
 blkd _  HOLE                = True
 blkd xs ((_ :=: e1) :>: e2) = blkd xs e1 && (isContext e1 || blkd xs e2)
@@ -99,7 +107,7 @@ choiceFree _                   = True
 --------------------------------------------------------------------------------
 
 rulesApplication :: Rule
-rulesApplication lhs =
+rulesApplication _env lhs =
   "APP-ADD" `name`
   do Op Add :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1+k2))
@@ -200,7 +208,7 @@ rulesApplication lhs =
 --------------------------------------------------------------------------------
 
 rulesUnification :: Rule
-rulesUnification lhs =
+rulesUnification _env lhs =
   "U-LIT" `name`
   do (LitInt k1 :=: LitInt k2) :>: e <- [lhs]
      guard (k1 == k2)
@@ -234,7 +242,7 @@ rulesUnification lhs =
 --------------------------------------------------------------------------------
 
 rulesExistentials :: Rule
-rulesExistentials lhs =
+rulesExistentials _env lhs =
   "EXI-SUBST" `name`
   do (exis, ctx, x_eq_v :>: e) <- evalCtxLift (free lhs) lhs
      (Var x,v) <- matchEq x_eq_v
@@ -262,7 +270,7 @@ rulesExistentials lhs =
 --------------------------------------------------------------------------------
 
 rulesNormalization :: Rule
-rulesNormalization lhs =
+rulesNormalization _env lhs =
   "SEQ-ASSOC" `name`
   do (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- [lhs]
      pure ((v1 :=: e1) :>: ((v2 :=: e2) :>: e3))
@@ -276,7 +284,7 @@ rulesNormalization lhs =
 --------------------------------------------------------------------------------
 
 rulesChoice :: Rule
-rulesChoice lhs =
+rulesChoice _env lhs =
   "CHOICE-ASSOC" `name`
   do (e1 :|: e2) :|: e3 <- [lhs]
      pure (e1 :|: (e2 :|: e3))
@@ -293,19 +301,19 @@ rulesChoice lhs =
   do (ctx, e1 :|: e2) <- evalCtx [] lhs
      guard (ctx /= HOLE)
      guard (choiceFree ctx)
-     guard (blkd [] ctx)
+     guard (blocked ctx)
      pure ((ctx <@ e1) :|: (ctx <@ e2))
  ++
   "FAIL" `name`
   do (ctx, Fail) <- evalCtx [] lhs
      guard (ctx /= HOLE)
-     guard (blkd [] ctx)
+     guard (blocked ctx)
      pure Fail
 
 --------------------------------------------------------------------------------
 
 rulesOneAndAll :: Rule
-rulesOneAndAll lhs =
+rulesOneAndAll _env lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail

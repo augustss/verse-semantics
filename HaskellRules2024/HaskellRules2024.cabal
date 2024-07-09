@@ -113,6 +113,7 @@ library verse-libs
                       Epic.Repl
                       Epic.OpParser
                       Epic.List
+                      Epic.UnionFind
                       FrontEnd.Error
                       FrontEnd.Expr
                       FrontEnd.Flags
@@ -122,6 +123,7 @@ library verse-libs
                       FrontEnd.ToCore
                       Rules.Core
                       Rules.TRS2024
+                      Rules.Verifier
                       TRS.Bind
                       TRS.Traced
 
