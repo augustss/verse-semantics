@@ -359,8 +359,9 @@ blocked ec = blkd [] ec
 
 blkd :: [Ident] -> Expr_or_Context -> Bool
 blkd _  HOLE                = True
+blkd xs ((Var x1 :=: Var x2) :>: e2) | x1==x2 = blkd xs e2  -- ToDo: check special case
 blkd xs ((_ :=: e1) :>: e2) = blkd xs e1 && (isContext e1 || blkd xs e2)
-blkd xs (e1 :|: e2)         = blkd xs e1 && (isContext e2 || blkd xs e2)  -- ToDo: check
+blkd xs (e1 :|: e2)         = blkd xs e1 && (isContext e1 || blkd xs e2)  -- ToDo: check
 blkd xs (One e)             = blkd xs e
 blkd xs (All e)             = blkd xs e
 blkd xs (Exi bnd)           = blkd (x:xs) e where (x,e) = alphaRename xs bnd

@@ -161,8 +161,8 @@ verify(pass) { a := (_,_) => a=(_,_) }
 ### verify(pass, ICFPEverify=skip) {a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
 ### verify(pass, ICFPEverify=skip) {a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
 ### verify(pass, ICFPEverify=skip) {a:int => b:any => f(a   ):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
-### verify(pass, ICFPEverify=skip) {a:int => b:any => f(a   ):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
-### verify(pass, ICFPEverify=skip) {a:=(1;2;),a=(1,2)}		#FP:10.4:DESUGARING?
+verify(pass, ICFPEverify=skip) {a:int => b:any => f(a   ):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
+verify(pass, ICFPEverify=skip) {a:=(1;2;),a=(1,2)}		#FP:10.4:DESUGARING?
 ### verify(pass, ICFPEverify=skip) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
 ### verify(pass, ICFPEverify=skip) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}			#FP:10.4:CHECK:DESUGAR
-### verify(pass, ICFPEverify=skip) {x:int,x=3}                                            #FP:10.4:UNASSUME / assume{x} --> x
+verify(pass, ICFPEverify=skip) {x:int,x=3}
