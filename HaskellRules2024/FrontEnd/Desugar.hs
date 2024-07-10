@@ -632,9 +632,9 @@ dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
 -------------------- :{fx} t -----------------
 -- ToDo: I don't think we want fx on Range at all
 
---dsM_12 MI (Range fx t) (P i)                 -- MTYPE1
---  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
---       ; pure (seqE [e, eHavoc fx, eGuard i (eSome z) ]) }
+dsM_12 MI (Range _fx t) (P i)                 -- MTYPE1
+  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
+       ; pure (seqE [e, eGuard (getFree i) (eSome z) ]) }
 -- ToDo: check this... it's not what is in the doc yet
 --       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
 

@@ -74,29 +74,24 @@ groundValue _  _                     = Nothing
 verifyRules :: Rule
 verifyRules env lhs =
    "VERIFY-VAL" `name`
-   do Verify bnd <- [lhs]
-      let (_rs, (_as, v)) = alphaRenameVerify (skolVars env) bnd
+   do (_env', _rs, _as, v) <- matchVerify env lhs
       guard (isVal v)
       pure (Arr [])
    ++
    "VERIFY-FAIL" `name`
-   do Verify bnd <- [lhs]
-      let (_rs, (_as, e)) = alphaRenameVerify (skolVars env) bnd
+   do (_env', _rs, _as, e) <- matchVerify env lhs
       guard (e == Fail)
       pure (Arr[])
    ++
    "SOLVER" `name`
-   do Verify bnd <- [lhs]
-      let (rs, (as, _)) = alphaRenameVerify (skolVars env) bnd
-      guard (unsat (extendRuleEnv env rs as))
+   do (env', _rs, _as, _e) <- matchVerify env lhs
+      guard (unsat env')
       pure (Arr [])
    ++
    "SKOLEMIZE" `name`
-   do Verify bnd <- [lhs]
-      let env_rs = skolVars env
-          (rs, (as, e)) = alphaRenameVerify env_rs bnd
-          all_rs = rs ++ env_rs
+   do (env', rs, as, e) <- matchVerify env lhs
       (ctx, Some v) <- proofX [] e
+      let all_rs = skolVars env'
       guard (skolValue all_rs v)
       guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
@@ -135,6 +130,8 @@ unsat (RE { assumps = asms })
     pos, neg :: [Assump]
     pos = filter isPosAssump asms
     neg = [asm | A_Fails asm <- asms]
+
+    -- Looks for (a; not a)
     contra = any contradicted pos
     contradicted asm@(A_GVEq {})    = asm `elem` neg
     contradicted (A_PrimOp _ op gv) = any contradicts neg
@@ -177,6 +174,7 @@ splitRules env lhs =
       guard (r `elem` rs)
       Just gv <- [groundValue (skolVars env') v]
       pure (caseSplit rs (A_GVEq r gv) as ctx rest)
+
    ++
    "SPLIT-OP" `nameWith`
    do (env', rs, as, e) <- matchVerify env lhs
@@ -185,12 +183,13 @@ splitRules env lhs =
       Just gv <- [groundValue skol_rs arg]
       guard (free gv `intersects` skol_rs)  -- At least one skolem in gv
       let r   = skolNotIn skol_rs
-          asm = A_PrimOp r op gv
+          asm = A_PrimOp r (AO_Prim op) gv
       if primOpCanFail op
         then pure (pPrint asm, caseSplit (r:rs) asm as ctx (Var r))
         else pure (pPrint asm, Verify (bindList (r:rs) (asm : as, ctx <@ Var r)))
         -- Generate one or two 'verify' blocks, depending on
         -- whether or not the PrimOp can fail
+
    ++
    "SPLIT-TUP" `nameWith`
    do (env', rs, as, e) <- matchVerify env lhs
@@ -201,6 +200,18 @@ splitRules env lhs =
           asm    = A_GVEq r (GVArr (map GVVar rs'))
       pure (pPrint asm, caseSplit (rs ++ rs') asm as ctx rvs')
 
+   ++
+   -- Verify(rs ; as){ P[r[s]] }
+   -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+   "SPLIT-APP" `nameWith`
+   do (env', rs, as, e) <- matchVerify env lhs
+      (ctx, Var r :@: s) <- proofX [] e
+      let skol_rs = skolVars env'
+      guard (r `elem` rs)
+      Just gv <- [groundValue skol_rs s]
+      let r' = skolNotIn skol_rs
+          asm = A_PrimOp r' AO_Apply (GVArr [GVVar r, gv])
+      pure (pPrint asm, Verify (bindList (r':rs) (asm : as, ctx <@ Var r')))
 
 matchVerify :: RuleEnv -> Expr -> [(RuleEnv, [SkolIdent], [Assump], Expr)]
 matchVerify env (Verify bnd) = [(extendRuleEnv env rs as, rs, as, e)]

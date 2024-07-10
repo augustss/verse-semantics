@@ -10,7 +10,7 @@ module Rules.Core
   , pPrintSmallExpr
 
     -- Assupmtions
-  , Assump(..), GroundVal(..), isPosAssump
+  , Assump(..), AssumpOp(..), GroundVal(..), isPosAssump
 
     -- Rewriting
   , Rule, Context, isContext, (<@)
@@ -191,13 +191,23 @@ data GroundVal = GVVar Ident
   deriving( Eq, Ord, Show )
 
 data Assump
-  = A_GVEq Ident GroundVal            -- r = gv
-  | A_PrimOp Ident PrimOp GroundVal   -- r = op[gv]
-  | A_Fails Assump                    -- not( a )
+  = A_GVEq Ident GroundVal              -- r = gv
+  | A_PrimOp Ident AssumpOp GroundVal   -- r = op[gv]
+  | A_Fails Assump                      -- not( a )
  deriving ( Eq, Ord, Show )
+
+data AssumpOp  -- Either a regular primop or Apply
+  = AO_Apply | AO_Prim PrimOp
+  deriving( Eq, Ord, Show )
+
+instance Pretty AssumpOp where
+  pPrint AO_Apply     = text "Apply"
+  pPrint (AO_Prim op) = pPrint op
 
 instance Pretty Assump where
   pPrint (A_GVEq i gv)      = pPrint i <+> text "="  <+> pPrint gv
+  pPrint (A_PrimOp i AO_Apply (GVArr [fun,arg]))
+                            = pPrint i <+> text "=" <+> pPrint fun <> brackets (pPrint arg)
   pPrint (A_PrimOp i op gv) = pPrint i <+> text "=" <+> pPrint op <> brackets (pPrint gv)
   pPrint (A_Fails a)        = text "not" <> parens (pPrint a)
 
