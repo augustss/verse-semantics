@@ -36,7 +36,7 @@ guardRules :: Rule
 guardRules env lhs =
    "GUARD-ELIM" `name`
    do v :>>: e <- [lhs]
-      guard (skol (skolVars env) v)
+      guard (skolValue (skolVars env) v)
       pure e
    ++
    "GUARD-FAIL" `name`
@@ -48,7 +48,7 @@ checkRules :: Rule
 checkRules env lhs =
    "CHECK-SUC" `name`
    do Check eff v <- [lhs]
-      guard (skol (skolVars env) v)
+      guard (skolValue (skolVars env) v)
       guard (canSucceed eff)
       pure v
    ++
@@ -57,10 +57,12 @@ checkRules env lhs =
       guard (canFail eff)
       pure Fail
 
-skol :: [Ident] -> Expr -> Bool
-skol rs e = isVal e && null (free e \\ rs)
+skolValue :: [SkolIdent] -> Expr -> Bool
+-- A value whose only free vars are skolems
+skolValue rs e = isVal e && null (free e \\ rs)
 
-groundValue :: [Ident] -> Expr -> Maybe GroundVal
+groundValue :: [SkolIdent] -> Expr -> Maybe GroundVal
+-- Like skolValue, but no lambdas
 groundValue _  (Lit l)               = Just (GVLit l)
 groundValue rs (Var v) | v `elem` rs = Just (GVVar v)
 groundValue rs (Arr vs)              = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
@@ -94,7 +96,7 @@ verifyRules env lhs =
           (rs, (as, e)) = alphaRenameVerify env_rs bnd
           all_rs = rs ++ env_rs
       (ctx, Some v) <- proofX [] e
-      guard (skol all_rs v)
+      guard (skolValue all_rs v)
       guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
           r  = skolNotIn all_rs
@@ -175,7 +177,11 @@ splitRules env lhs =
       Just gv <- [groundValue all_rs arg]
       let r   = skolNotIn all_rs
           asm = A_PrimOp r op gv
-      pure (asm, caseSplit (r:rs) asm as ctx (Var r))
+      if primOpCanFail op
+        then pure (asm, caseSplit (r:rs) asm as ctx (Var r))
+        else pure (asm, Verify (bindList (r:rs) (asm : as, ctx <@ Var r)))
+        -- Generate one or two 'verify' blocks, depending on
+        -- whether or not the PrimOp can fail
 {-
    ++
    "SPLIT-C" `name`
@@ -247,9 +253,9 @@ isPrimOp1 _        = False
 
 caseSplit :: [Ident] -> Assump -> [Assump] -> Context -> Expr -> Expr
 caseSplit rs a as ctx e
-  = (Var underscore :=: Verify (bindList rs (a : as, ctx <@ e)))
+  = (Var underscore :=: Verify (bindList rs (A_Fails a : as, ctx <@ Fail)))
     :>:
-    Verify (bindList rs (A_Fails a : as, ctx <@ Fail))
+    Verify (bindList rs (a : as, ctx <@ e))
 
 --------------------------------------------------------------------------------
 -- | Contexts ------------------------------------------------------------------

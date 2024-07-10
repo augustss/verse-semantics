@@ -25,7 +25,7 @@ module Rules.Core
   , Effect(..), canSucceed, canFail
 
   -- Primops
-  , PrimOp(..), allPrimOps, primOpString
+  , PrimOp(..), allPrimOps, primOpString, primOpCanFail
   ) where
 
 import Prelude hiding( (<>) )
@@ -98,7 +98,7 @@ allPrimOps :: [PrimOp]
 allPrimOps = [minBound .. maxBound]
 
 primOpString :: PrimOp -> String
-primOpString Add = "+"
+primOpString Add = "intAdd$"
 primOpString Sub = "-"
 primOpString Mul = "*"
 primOpString Div = "/"
@@ -113,7 +113,20 @@ primOpString NEq = "<>"
 primOpString IsInt = "isInt$"
 primOpString IsStr = "isStr$"
 
+primOpCanFail :: PrimOp -> Bool
+primOpCanFail Gt    = True
+primOpCanFail Lt    = True
+primOpCanFail Eq    = True
+primOpCanFail NEq   = True
+primOpCanFail GEq   = True
+primOpCanFail LEq   = True
+primOpCanFail IsInt = True
+primOpCanFail IsStr = True
 
+primOpCanFail Add = False
+primOpCanFail Sub = True
+primOpCanFail Mul = True
+primOpCanFail Div = True
 
 --------------------------------------------------------------------------------
 --
@@ -192,6 +205,7 @@ instance Pretty GroundVal where
   pPrint (GVVar i)   = pPrint i
   pPrint (GVLit l)   = pPrint l
   pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
+
 
 --------------------------------------------------------------------------------
 --
@@ -357,6 +371,7 @@ isHNF (Lit _)   = True
 isHNF (Op _)    = True
 isHNF (Arr es)  = all valid es
 isHNF (Lam bnd) = valid e where (_,e) = unsafeUnbind bnd
+                   -- ToDo: why valid????
 isHNF _         = False
 
 
@@ -641,8 +656,7 @@ normalize rule orig_e = go (-1) [] orig_e  -- go 99 [] e
       []                        -> e :<-- tr
       (s,e'):_ | fuel==0        -> abort "OUT-OF-FUEL"
                | not (valid e') -> abort "INVALID"
-               | otherwise      -> ppTrace ("done " ++ s) (pPrint e') $
-                                   go (fuel-1) ((s,e):tr) e'
+               | otherwise      -> go (fuel-1) ((s,e):tr) e'
               where
                abort msg = e' :<-- ((s ++ "-**" ++ msg ++ "**",e):tr)
 

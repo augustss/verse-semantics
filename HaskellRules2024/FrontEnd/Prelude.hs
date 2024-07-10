@@ -45,24 +45,22 @@ miniprelude = ("miniprelude", "\
 \## Use FrontEnd/Makefile to update compiled prelude.\n\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
-\false            := array{};\n\
-\operator'+'      := intAdd$;\n\
+\false    := array{};\n\
+\int      := lambda y { isInt$[y]; y };\n\
+\rational := lam y { isRat$[y]; y };\n\
+\string   := lam y { isStr$[y]; y };\n\
+\char     := lam y { isChar$[y]; y };\n\
+\nat      := lam y { isChar$[y]; intGE$[y,0]; y };\n\
+\operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{int} }};\n\
 \operator'-'      := intSub$;\n\
 \operator'*'      := intMul$;\n\
 \operator'/'      := intDiv$;\n\
-\prefix'-'        := intNeg$;\n\
-\prefix'+'        := intPlus$;\n\
 \operator'<'      := intLT$;\n\
 \operator'<='     := intLE$;\n\
 \operator'>'      := intGT$;\n\
 \operator'>='     := intGE$;\n\
 \operator'<>'     := intNE$;\n\
 \any              := any$;\n\
-\int      := lambda (y) { isInt$[y]; y };\n\
-\rational := lambda (y) { isRat$[y]; y };\n\
-\string   := lambda (y) { isStr$[y]; y };\n\
-\char     := lambda (y) { isChar$[y]; y };\n\
-\nat      := lambda (y) { isChar$[y]; intGE$[y,0]; y };\n\
 \Length(_x:any$):=arrLen$[_x];\n\
 \## operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
 \## postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
@@ -70,7 +68,6 @@ miniprelude = ("miniprelude", "\
 \## new := function(_t:any$)(_x:any$)<allocates><decides>{ alloc$[_t[_x]] };\n\
 \}\n\
 \")
-
 verifyprelude :: (PreludeName, String)
 verifyprelude = ("verifyprelude", "\
 \## Use FrontEnd/Makefile to update compiled prelude.\n\

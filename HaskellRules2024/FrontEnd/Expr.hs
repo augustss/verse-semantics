@@ -683,6 +683,8 @@ getVisibleBinders = go
     go Fail       = []
 
     go (Macro1 (Ident _ "some") _ e)    = go e
+    go (Macro1 (Ident _ "all") _ e)     = go e
+    go (Macro1 (Ident _ "one") _ e)     = go e
     go (Macro2 (Ident _ "guard") e1 _b) = go e1
     go Macro1 {}                        = []
 
@@ -759,11 +761,14 @@ getVar e = impossible e
 
 getAllIdents :: SrcExpr -> [Ident]
 -- Find all occurrences, ignoring binders (hence hacky)
-getAllIdents e = Epic.List.nub (execWriter (vars e))
+getAllIdents orig_e = Epic.List.nub (execWriter (vars orig_e))
   where
     vars :: SrcExpr -> Writer [Ident] SrcExpr
-    vars ev@(Variable i) = do tell [i]; pure ev
-    vars ev              = compos vars ev
+    vars ev@(Variable i)       = do { tell [i]; pure ev }
+    vars ev@(PrefixOp op e)    = do { tell [op]; _ <- vars e; pure ev }
+    vars ev@(PostfixOp e op)   = do { tell [op]; _ <- vars e; pure ev }
+    vars ev@(InfixOp e1 op e2) = do { tell [op]; _ <- vars e1; _ <- vars e2; pure ev }
+    vars ev                    = compos vars ev
 
 getAllBinders :: SrcCore -> [Ident]
 -- Finds all binders in e

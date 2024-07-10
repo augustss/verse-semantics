@@ -250,16 +250,11 @@ rulesUnification _env lhs =
 
 rulesExistentials :: Rule
 rulesExistentials _env lhs =
-  "EXI-SUBST" `nameWith`
-  do (exis, ctx, x_eq_v :>: e) <- evalCtxLift (free lhs) lhs
-     (Var x,v) <- matchEq x_eq_v
-     ppTrace "exi-subst1" (pPrint x <+> pPrint v $$ pPrint exis $$ pPrint (isVal v) $$ text "free" <+> pPrint (free v) $$ text "blkd" <+> pPrint (blkd (bvs exis) ctx)) $
-        guard (x `elem` bvs exis)
-     guard (isVal v)
-     guard (x `notElem` free v)
-     guard (blkd (bvs exis) ctx)
-     ppTrace "exi-subst2" (pPrint x) $
-       pure (x, exis <@ subst [(x,v)] (ctx <@ e))
+  "UNDERSCORE-ELIM" `name`
+  do { (Var u :=: v) :>: e <- [lhs]
+     ; guard (u == underscore)
+     ; guard (isVal v)
+     ; pure e }
  ++
   "EXI-ELIM" `nameWith`
   do (exis,x,e) <- matchExi_alphaRename [] lhs
@@ -275,6 +270,16 @@ rulesExistentials _env lhs =
   do (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free (v,e1))
      pure (x, exis <@ ((v :=: e1) :>: Exi (bind x e2)))
+  ++
+  -- Do this last: most complex and expensive
+  "EXI-SUBST" `nameWith`
+  do (exis, ctx, x_eq_v :>: e) <- evalCtxLift (free lhs) lhs
+     (Var x,v) <- matchEq x_eq_v
+     guard (x `elem` bvs exis)
+     guard (isVal v)
+     guard (x `notElem` free v)
+     guard (blkd (bvs exis) ctx)
+     pure (x, exis <@ subst [(x,v)] (ctx <@ e))
 
 --------------------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 module TRS.Bind
-  ( Ident(..)
+  ( Ident(..), SkolIdent
   , ident, underscore
   , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn
 

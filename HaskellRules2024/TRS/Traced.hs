@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+
 module TRS.Traced(
   Traced(..), term, trace, start, (++>), loop,
   showTrace, showRevTrace, filterTrace,
@@ -52,15 +54,16 @@ showTrace, showRevTrace :: Pretty a => Traced a -> [String]
 showTrace    tr = map render (pPrintTrace    tr)
 showRevTrace tr = map render (pPrintRevTrace tr)
 
-pPrintTrace, pPrintRevTrace :: Pretty a => Traced a -> [Doc]
-pPrintTrace (res_expr :<-- tr) =  go empty (reverse tr) -- Print forwards
+pPrintTrace, pPrintRevTrace :: forall a. Pretty a => Traced a -> [Doc]
+pPrintTrace (res_expr :<-- tr) =  go 1 empty (reverse tr) -- Print forwards
   where
-    go herald [] = [pp_item herald res_expr]
-    go herald ((s,e):ses) = pp_item herald e : go (mkarrow s) ses
+    go :: Int -> Doc -> [(String,a)] -> [Doc]
+    go _ herald [] = [pp_item herald res_expr]
+    go n herald ((s,e):ses) = pp_item herald e : go (n+1) (mkarrow n s) ses
 
     pp_item herald e = sep [herald, indent (pPrint e)]
 
-    mkarrow s = text ("--"++s++"-->")
+    mkarrow n s = text (show n ++ ":--"++s++"-->")
 
 pPrintRevTrace (x :<-- tr) =  -- Print backwards, with terminal state first
   pPrint x : [text ("<--"++n++"--") <+> pPrint y | (n,y) <- tr ]

@@ -2,6 +2,5 @@
 :set desugartrace
 :desugar
 :tocore
-:eval
 :verify
 :quit

@@ -93,6 +93,7 @@ symbol = L.symbol skip
 pWord :: P String
 pWord = lexeme ((:) <$> (letterChar <|> char '_') <*> many (alphaNumChar <|> char '_') <?> "identifier")
 
+{-
 pWordOp :: P String
 pWordOp = do
   w0 <- pWord
@@ -108,6 +109,25 @@ pWordOp = do
     pure w'
    else do
     pure w
+-}
+
+pWordOp :: P String
+--   Parses        as
+--   -----------------------
+--   wombat        "wombat"
+--   operator'+'   "+"
+--
+pWordOp = do
+  w0 <- pWord
+  suf <- optional (char '$')
+  let w = w0 ++ maybeToList suf
+  if w =="operator"
+   then do { _ <- char '\''
+           ; op <- takeWhile1P Nothing (`elem` opChars)
+           ; _ <- char '\''
+           ; skip
+           ; pure op }
+   else pure w
 
 pIdent :: P Ident
 pIdent = try $ do
@@ -123,7 +143,7 @@ keywords :: [String]
 keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
            , "in", "let", "map", "not", "of", "or", "option", "ref", "return", "set", "then"
            , "truth",  "var", "where"
-           , "lambda"]
+           , "lambda", "lam", "exi", "exists" ]
            ++ macros)
            \\ ["logic"] -- Allowed both as a type and a macro
 
@@ -434,14 +454,25 @@ pReturn :: P SrcExpr
 pReturn = pKeyword "return" *> (Return <$> pExpr2)
 
 pExpr1 :: P SrcExpr
-pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn, pLambda ]
+pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn
+                , pLambda, pExists, pGuard ]
 
 pExpr2 :: P SrcExpr
 pExpr2 = makeExprParser pExpr1 operatorTable
 
--- A hack for already lowered lambdas
+-- Lambda and exists (not strictly part of source at all)
+pGuard :: P SrcExpr
+pGuard = Guard <$> pAtom <*> ((pOp ">>") *> pExpr1)
+
+pExists :: P SrcExpr
+pExists = p_exi *> (Exists <$> some pIdent <*> pBlockM)
+  where
+    p_exi = pKeyword "exi" <|> pKeyword "exists"
+
 pLambda :: P SrcExpr
-pLambda = pKeyword "lambda" *> (Lam <$> pParens pIdent <*> pBlockM)
+pLambda = p_lam *> (Lam <$> pIdent <*> pBlockM)
+   where
+     p_lam = pKeyword "lambda" <|> pKeyword "lam" <|> void (pOp "\\")
 
 {-
 pTermPost :: P SrcExpr

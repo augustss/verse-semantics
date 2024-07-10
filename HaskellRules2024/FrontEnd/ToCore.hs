@@ -124,7 +124,7 @@ scope sc = expr
 
     expr (Src.Check fx e) = Src.Check fx <$> exprD e
     expr (Src.Some e)     = Src.Some <$> expr e
-    expr (Guard v e)      = Guard <$> expr v <*> expr e
+    expr (Src.Guard v e)  = Src.Guard <$> expr v <*> expr e
 
     expr (OfType e1 eff e2) = OfType <$> exprD e1 <*> pure eff <*> exprD e2
 
