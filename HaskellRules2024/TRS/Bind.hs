@@ -1,10 +1,10 @@
 module TRS.Bind
   ( Ident(..), SkolIdent
   , ident, underscore
-  , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn
+  , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn, skolsNotIn
 
   , Variables(..)
-  , free, occurs
+  , free, occurs, intersects
 
   , Bind -- abstract! let's see if we can do this
   , bind, unsafeUnbind, alphaRenameBindWith
@@ -58,7 +58,10 @@ identsNotIn forb = filter (`notElem` forb) [ Name x | x <- xs ]
   xs = ["x","y","z","u","v","w"]
 
 skolNotIn :: [SkolIdent] -> SkolIdent
-skolNotIn skols = head (identsNotInPrefix "$r" skols)
+skolNotIn forb = head (skolsNotIn forb)
+
+skolsNotIn :: [SkolIdent] -> [SkolIdent]
+skolsNotIn forb = identsNotInPrefix "$r" forb
 
 identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
@@ -83,6 +86,11 @@ free, occurs :: Variables a => a -> [Ident]
 free   = variables (filter . (/=))   -- Finds all free variables
 occurs = variables (union . (: []))  -- Finds all variables,
                                      -- both binders and uses
+
+
+intersects :: [Ident] -> [Ident] -> Bool
+-- True if the two lists have one or more common members
+intersects xs ys = any (`elem` xs) ys
 
 instance Variables () where
   variables _ _ = []
@@ -180,7 +188,7 @@ type Subst a = [(Ident,a)]
 
 substBind :: (Variables s, Variables t)
           => (Ident -> s) -> (Subst s -> t -> t)
-          -> (Subst s -> Bind t -> Bind t)
+          -> Subst s -> Bind t -> Bind t
 substBind var subst sub a@(Bind x t)
   | null sub'   = a
   | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)

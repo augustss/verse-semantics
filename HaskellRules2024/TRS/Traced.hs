@@ -61,7 +61,8 @@ pPrintTrace (res_expr :<-- tr) =  go 1 empty (reverse tr) -- Print forwards
     go _ herald [] = [pp_item herald res_expr]
     go n herald ((s,e):ses) = pp_item herald e : go (n+1) (mkarrow n s) ses
 
-    pp_item herald e = sep [herald, indent (pPrint e)]
+    pp_item herald e = vcat [text "", herald, indent (pPrint e)]
+      -- (text "") adds a blank line
 
     mkarrow n s = text (show n ++ ":--"++s++"-->")
 

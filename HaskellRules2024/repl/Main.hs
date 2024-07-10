@@ -207,7 +207,8 @@ theCommandSet = CommandSet
       , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
 
       , Cmd "read FILE"            "Parse a file"                          cRead
-      , Cmd "desugar [EXPR]"       "Desugar [last] expression"             cDesugar
+      , Cmd "desugar [EXPR]"       "Desugar [last] expression"             (cDesugar False)
+      , Cmd "vdesugar [EXPR]"      "Desugar (for verification) [last] expression" (cDesugar True)
 
       , Cmd "tocore [EXPR]"        "Convert [last] expression to Core"     cToCore
 
@@ -220,7 +221,6 @@ theCommandSet = CommandSet
 
 --      , Cmd "pcore EXPR"           "parse core expression"                 cPcore
 --      , Cmd "pdesugar [EXPR]"      "Desugar [last] expression pretty"      cPDesugar
---      , Cmd "vdesugar [EXPR]"      "Desugar (for verification) [last] expression"             cDesugarVerify
 --      , Cmd "pvdesugar [EXPR]"     "Desugar (for verification) [last] expression pretty"      cPDesugarVerify
 --      , Cmd "deval [EXPR]"         "Evaluate [last] expression with global defs"  cDefEval
 --      , Cmd "preprocess"           "Preprocess for rule set"                 cPreprocess
@@ -326,8 +326,8 @@ cRead afn s = do
 --
 --------------------------------------------------------
 
-cDesugar :: CmdRunner CState
-cDesugar
+cDesugar :: Bool -> CmdRunner CState
+cDesugar add_verification
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
 
@@ -336,7 +336,7 @@ cDesugar
        ; putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flags) ++
              ", prelude=" ++ fst (fPrelude flags)
 
-       ; e' <- FrontEnd.Desugar.desugar flags (asSrcExpr e)
+       ; e' <- FrontEnd.Desugar.desugar flags add_verification (asSrcExpr e)
 
        -- Display the result
        ; let display_result = not (fTraceDesugar flags)
@@ -392,7 +392,7 @@ cVerify
 
        ; putStrLn ("\n\n------- Verify ---------")
        ; let tr@(e' :<-- _) = verify_it prepd_expr
-       ; putStrLn (render (pPrint tr))
+       ; display tr
 
        ; pure (RulesCore e') }
   where

@@ -7,13 +7,15 @@ module Rules.Core
   , Lit(..), Ptr, Path(..)
   , isVal, isHNF, isSkolem
   , prep, norm
+  , pPrintSmallExpr
 
     -- Assupmtions
-  , Assump(..), GroundVal(..)
+  , Assump(..), GroundVal(..), isPosAssump
 
     -- Rewriting
-  , Rule, Context, RuleEnv(..), isContext, (<@)
+  , Rule, Context, isContext, (<@)
   , everywhere, normalize
+  , RuleEnv(..), extendRuleEnv
 
     -- Binding and substitution
   , subst, bvs
@@ -87,7 +89,7 @@ data PrimOp
    Add | Sub | Mul | Div
 
    -- Relational
- | Gt | Lt | Eq | NEq | GEq | LEq
+ | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
  | IsInt | IsStr
@@ -99,16 +101,15 @@ allPrimOps = [minBound .. maxBound]
 
 primOpString :: PrimOp -> String
 primOpString Add = "intAdd$"
-primOpString Sub = "-"
-primOpString Mul = "*"
-primOpString Div = "/"
+primOpString Sub = "intSub$"
+primOpString Mul = "intMul$"
+primOpString Div = "intDiv$"
 
-primOpString Gt  = ">"
-primOpString GEq = ">="
-primOpString Lt  = "<"
-primOpString LEq = "<="
-primOpString Eq  = "="
-primOpString NEq = "<>"
+primOpString Gt  = "intGT$"
+primOpString GEq = "intGE$"
+primOpString Lt  = "intLT$"
+primOpString LEq = "intLE$"
+primOpString NEq = "intNE$"
 
 primOpString IsInt = "isInt$"
 primOpString IsStr = "isStr$"
@@ -116,7 +117,6 @@ primOpString IsStr = "isStr$"
 primOpCanFail :: PrimOp -> Bool
 primOpCanFail Gt    = True
 primOpCanFail Lt    = True
-primOpCanFail Eq    = True
 primOpCanFail NEq   = True
 primOpCanFail GEq   = True
 primOpCanFail LEq   = True
@@ -206,6 +206,11 @@ instance Pretty GroundVal where
   pPrint (GVLit l)   = pPrint l
   pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
 
+isPosAssump :: Assump -> Bool
+isPosAssump (A_GVEq {})   = True
+isPosAssump (A_PrimOp {}) = True
+isPosAssump (A_Fails {})  = False
+
 
 --------------------------------------------------------------------------------
 --
@@ -262,7 +267,7 @@ pPrintPrecE lvl prec the_expr
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> mbPar0 $ ppr1 e1 <+> char '|' <+> ppr1 e2
-       e1 :@: e2   -> ppr1 e1 <> brackets (ppr0 e2)
+       e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
        e@(_ :>: _) -> sep (punctuate semi $ map ppr1 (gatherSeqs e))
        e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ";;" <+> ppr1 e2
 
@@ -289,6 +294,17 @@ pPrintPrecE lvl prec the_expr
     ppr1 = pPrintPrecE lvl 1
 
     mbPar0 = maybeParens (prec > 0)
+
+    -- Reduce clutter: omit the angle brackets for a multi-arg call.
+    -- That is, print f[3,2] rather than f[<3,2>]
+    pp_call_arg (Arr es) = fsep (punctuate comma $ map ppr0 es)
+    pp_call_arg e2       = ppr0 e2
+
+pPrintSmallExpr :: Expr -> Doc
+-- Show only a small expression; otherwise return "<big>"
+pPrintSmallExpr e
+  | exprSize e < 10 = pPrint e
+  | otherwise       = text "<big>"
 
 gatherSeqs :: Expr -> [Expr]
 gatherSeqs (e1 :>: e2) = e1 : gatherSeqs e2
@@ -356,6 +372,37 @@ showP p e | need_parens e  = "(" ++ show e ++ ")"
 
 --------------------------------------------------------------------------------
 --
+--                 Size
+--
+--------------------------------------------------------------------------------
+
+exprSize :: Expr -> Int
+exprSize (Var {})      = 1
+exprSize (Lit {})      = 1
+exprSize (Op {})       = 1
+exprSize Fail          = 1
+exprSize HOLE          = 1
+exprSize (Arr as)      = 1 + sum (map exprSize as)
+exprSize (Lam bnd)     = 1 + bindSize bnd
+exprSize (e1 :>: e2)   = 1 + exprSize e1 + exprSize e2
+exprSize (e1 :=: e2)   = 1 + exprSize e1 + exprSize e2
+exprSize (e1 :|: e2)   = 1 + exprSize e1 + exprSize e2
+exprSize (e1 :@: e2)   = 1 + exprSize e1 + exprSize e2
+exprSize (e1 :>>: e2)  = 1 + exprSize e1 + exprSize e2
+exprSize (Exi bnd)     = 1 + bindSize bnd
+exprSize (One e)       = 1 + exprSize e
+exprSize (All e)       = 1 + exprSize e
+exprSize (Some a)      = 1 + exprSize a
+exprSize (Check _ e)  = 1 + exprSize e
+exprSize (Verify bl)   = 10 + exprSize e
+                       where
+                         (_rs,(_as,e)) = unsafeUnbindList bl
+
+bindSize :: Bind Expr -> Int
+bindSize bnd = exprSize (snd (unsafeUnbind bnd))
+
+--------------------------------------------------------------------------------
+--
 --                 Values
 --
 --------------------------------------------------------------------------------
@@ -367,12 +414,12 @@ isVal (Var _) = True
 isVal e       = isHNF e
 
 isHNF :: Expr -> Bool
-isHNF (Lit _)   = True
-isHNF (Op _)    = True
-isHNF (Arr es)  = all valid es
-isHNF (Lam bnd) = valid e where (_,e) = unsafeUnbind bnd
-                   -- ToDo: why valid????
-isHNF _         = False
+isHNF (Lit {}) = True
+isHNF (Op {})  = True
+isHNF (Arr es) = all isVal es   -- ToDo: This had 'valid' stuff too, strangely
+isHNF (Lam {}) = True           -- valid e where (_,e) = unsafeUnbind bnd
+                                -- ToDo: why valid????
+isHNF _        = False
 
 
 --------------------------------------------------------------------------------
@@ -403,7 +450,7 @@ prep (Lit k)       = Lit k
 prep (Arr as)      = prepVals as (\vs -> Arr vs)
 prep (Lam bnd)     = Lam (bind x (prep e)) where (x,e) = unsafeUnbind bnd
 prep (Op op)       = Op op
-prep (e1 :>: e2)   = prepSeq e1 (prep e2)
+prep (e1 :>: e2)   = prepSeq e1 e2
 prep (a  :=: e)    = prepVal a (\v -> (v :=: prep e) :>: v)
 prep (e1 :|: e2)   = prep e1 :|: prep e2
 prep (a1 :@: a2)   = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
@@ -419,16 +466,18 @@ prep (Verify bl)   = Verify (bindList xs (as, prep e))
 prep HOLE          = error "prep HOLE undefined"
 
 prepSeq :: Expr -> Expr -> Expr
-prepSeq (a :=: e1) e2 = prepVal a (\v -> (v :=: prep e1) :>: e2)
-prepSeq e1         e2 = prepVal e1 (\_ -> e2)
+prepSeq (a :=: e1) e2 = prepVal a (\v -> (v :=: prep e1) :>: prep e2)
+prepSeq e1         e2 = (Var underscore :=: prep e1) :>: prep e2
 
 prepVal :: Expr -> (Val -> Expr) -> Expr
-prepVal a f
-  | isVal pa  = f pa
-  | otherwise = Exi (bind x ((Var x :=: pa) :>: f (Var x)))
+-- (prepVal e K) makes applies K to the value of e,
+-- perhaps by adding an existential, thus (exi x. x = e; K[x])
+prepVal a k
+  | isVal pa  = k pa
+  | otherwise = Exi (bind x ((Var x :=: pa) :>: k (Var x)))
  where
   pa = prep a
-  x  = identNotIn (free (pa, f (Var (ident "?"))))
+  x  = identNotIn (free (k pa))  -- UGH!  ToDo: quadratic in prepVals
 
 prepVals :: [Expr] -> ([Val] -> Expr) -> Expr
 prepVals []     f = f []
@@ -441,7 +490,7 @@ prepVals (a:as) f = prepVal a (\v -> prepVals as (f . (v:)))
 --------------------------------------------------------------------------------
 
 instance Variables Expr where
-  variables _ (Var x)      = [x]
+  variables f (Var x)      = variables f x
   variables f (Arr es)     = variables f es
   variables f (Lam bnd)    = variables f bnd
   variables f (e1 :=: e2)  = variables f (e1,e2)
@@ -471,7 +520,6 @@ isSkolem :: Ident -> Bool
 isSkolem (Name ('$':_)) = True
 isSkolem _              = False
 
-
 --------------------------------------------------------------------------------
 --
 --                 Binders
@@ -498,6 +546,7 @@ norm :: Expr -> Expr
 norm orig_e = alpha 0 orig_e
  where
   var i = ident ("_" ++ show i)
+  skvar i = ident ("_r" ++ show i)
 
   alpha k (Arr es)     = Arr (map (alpha k) es)
   alpha k (Lam bnd)    = Lam (bind x (alpha (k+1) e))
@@ -512,7 +561,12 @@ norm orig_e = alpha 0 orig_e
   alpha k (e1 :>>: e2) = alpha k e1 :>>: alpha k e2
   alpha k (Check fx e) = Check fx (alpha k e)
   alpha k e@(Exi _)    = alphaExi k [] e
-  alpha _ (Verify {})  = error "alpha Verify undefined"
+  alpha k (Verify bl)  = let (rs, (as,e)) = unsafeUnbindList bl
+                             rs' = map skvar [k+1..k+n]
+                             n   = length rs
+                             sub = rs `zip` rs'
+                             e'  = alpha (k+n) e
+                         in Verify (bindList rs' (map (substAssump sub) as, substSkol sub e'))
   alpha _ e            = e
 
   alphaExi k xs (Exi bnd) = alphaExi k (x:xs) e
@@ -536,24 +590,63 @@ norm orig_e = alpha 0 orig_e
 --------------------------------------------------------------------------------
 
 subst :: Subst Expr -> Expr -> Expr
-subst sub (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
-subst sub (Arr es)     = Arr (map (subst sub) es)
-subst sub (Lam bnd)    = Lam (substBind Var subst sub bnd)
-subst sub (e1 :=: e2)  = subst sub e1 :=: subst sub e2
-subst sub (e1 :>: e2)  = subst sub e1 :>: subst sub e2
-subst sub (e1 :|: e2)  = subst sub e1 :|: subst sub e2
-subst sub (e1 :@: e2)  = subst sub e1 :@: subst sub e2
-subst sub (One e)      = One (subst sub e)
-subst sub (All e)      = All (subst sub e)
-subst sub (Some e)     = Some (subst sub e)
-subst sub (e1 :>>: e2) = subst sub e1 :>>: subst sub e2
-subst sub (Check fx e) = Check fx (subst sub e)
-subst sub (Exi bnd)    = Exi (substBind Var subst sub bnd)
-subst sub (Verify bl)  = Verify (substBinds Var substVerify sub bl)
-subst _   e            = e
+-- Domain of substitution does not include skolems
+subst sub orig_e = go orig_e
+  where
+    go (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
+    go (Arr es)     = Arr (map go es)
+    go (Lam bnd)    = Lam (substBind Var subst sub bnd)
+    go (e1 :=: e2)  = go e1 :=: go e2
+    go (e1 :>: e2)  = go e1 :>: go e2
+    go (e1 :|: e2)  = go e1 :|: go e2
+    go (e1 :@: e2)  = go e1 :@: go e2
+    go (One e)      = One (go e)
+    go (All e)      = All (go e)
+    go (Some e)     = Some (go e)
+    go (e1 :>>: e2) = go e1 :>>: go e2
+    go (Check fx e) = Check fx (go e)
+    go (Exi bnd)    = Exi    (substBind  Var subst     sub bnd)
+    go (Verify bl)  = Verify (substBinds Var go_verify sub bl)
+    go e            = e
 
-substVerify :: Subst Expr -> ([Assump],Expr) -> ([Assump],Expr)
-substVerify sub (as,e) = (as, subst sub e)   -- ToDo: fix me.   Sadly (Subst Expr) is not really what we want
+    go_verify :: Subst Expr -> ([Assump],Expr) -> ([Assump],Expr)
+    go_verify sub' (as,e) = (as, subst sub' e)
+
+substSkol :: Subst Ident -> Expr -> Expr
+-- Domain of substitution is skolem variables; range is just an identifier
+substSkol sub orig_e = go orig_e
+  where
+    go (Var x)      = Var (head $ [e | (y,e) <- sub, y == x] ++ [x])
+    go (Arr es)     = Arr (map go es)
+    go (Lam bnd)    = Lam (substBind id substSkol sub bnd)
+    go (e1 :=: e2)  = go e1 :=: go e2
+    go (e1 :>: e2)  = go e1 :>: go e2
+    go (e1 :|: e2)  = go e1 :|: go e2
+    go (e1 :@: e2)  = go e1 :@: go e2
+    go (One e)      = One (go e)
+    go (All e)      = All (go e)
+    go (Some e)     = Some (go e)
+    go (e1 :>>: e2) = go e1 :>>: go e2
+    go (Check fx e) = Check fx (go e)
+    go (Exi bnd)    = Exi    (substBind  id substSkol sub bnd)
+    go (Verify bl)  = Verify (substBinds id go_verify sub bl)
+    go e            = e
+
+    go_verify :: Subst Ident -> ([Assump],Expr) -> ([Assump],Expr)
+    go_verify sub' (as,e) = (map (substAssump sub') as, substSkol sub' e)
+
+substAssump :: Subst Ident -> Assump -> Assump
+substAssump sub (A_GVEq x gv)      = A_GVEq (lookupIdSubst sub x) (substGV sub gv)
+substAssump sub (A_PrimOp x op gv) = A_PrimOp (lookupIdSubst sub x) op (substGV sub gv)
+substAssump sub (A_Fails asm)      = A_Fails (substAssump sub asm)
+
+substGV :: Subst Ident -> GroundVal -> GroundVal
+substGV sub (GVVar x)  = GVVar (lookupIdSubst sub x)
+substGV _   (GVLit l)  = GVLit l
+substGV sub (GVArr vs) = GVArr (map (substGV sub) vs)
+
+lookupIdSubst :: Subst Ident -> Ident -> Ident
+lookupIdSubst sub x = head $ [y | (x',y) <- sub, x==x']
 
 --------------------------------------------------------------------------------
 --
@@ -561,14 +654,14 @@ substVerify sub (as,e) = (as, subst sub e)   -- ToDo: fix me.   Sadly (Subst Exp
 --
 --------------------------------------------------------------------------------
 
-data RuleEnv = RE { skolVars :: [Ident] }
+data RuleEnv = RE { skolVars :: [Ident], assumps :: [Assump] }
 
 emptyRuleEnv :: RuleEnv
-emptyRuleEnv = RE { skolVars = [] }
+emptyRuleEnv = RE { skolVars = [], assumps = [] }
 
-addSkolsRE :: RuleEnv -> [Ident] -> RuleEnv
-addSkolsRE rule_env@(RE { skolVars = skols }) new_skols
-  = rule_env { skolVars = new_skols ++ skols }
+extendRuleEnv :: RuleEnv -> [Ident] -> [Assump] -> RuleEnv
+extendRuleEnv rule_env@(RE { skolVars = skols, assumps = asms }) new_skols new_asms
+  = rule_env { skolVars = new_skols ++ skols, assumps = new_asms ++ asms }
 
 type Rule = RuleEnv -> Expr -> [(String,Expr)]
 
@@ -605,8 +698,8 @@ everywhere step env orig_e = step env orig_e ++ recurse orig_e
   recurse (Verify bl)  = [ (s, Verify (bindList rs (as,e')))
                          | (s,e') <- everywhere step env' e ]
                        where
-                         env' = env `addSkolsRE` rs
-                         (rs,(as,e)) = unsafeUnbindList bl
+                         env' = extendRuleEnv env rs as
+                         (rs,(as,e)) = unsafeUnbindList bl   -- ToDo: is unsafe ok? I think not
   recurse _            = []
 
 -- treat "exi x1 .. exi xn" as one block when matching

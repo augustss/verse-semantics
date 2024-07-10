@@ -13,8 +13,9 @@ import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pPare
 import FrontEnd.Prelude( findPrelude )
 
 import Rules.Core             as Rules
-import Rules.TRS2024( rules )
-import TRS.Traced( term )
+import Rules.Verifier( verificationRules )
+import TRS.Traced( Traced, term )
+import TRS.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
 
@@ -121,9 +122,17 @@ runTestFile tflg (fn, ts) = do
     ok <- runTestFileSys tflg ts
     unless ok $ exitWith (ExitFailure 1)
 
+runTestFileSys :: TestFlags -> [Test] -> IO Bool
+runTestFileSys tflg ts = do
+  let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
+  res <- mapM (runTest tflg) (filter p ts)
+  let ok = all (`elem` [Good, Skip]) res
+  putStrLn $ if ok then "SUCCESS" else "FAILURE"
+  pure ok
+
 runTest :: TestFlags -> Test -> IO TestRes
-runTest tflg (TestEvalEq n e1 e2) = assertEquivE n tflg e1 e2
-runTest _    (TestVerify {})      = error "runTest: verify" -- assertVerify n tflg e
+runTest tflg (TestEvalEq ti e1 e2) = testEvalE tflg ti e1 e2
+runTest tflg (TestVerify ti e)     = verifyE tflg ti e
 
 runTestSummary :: TestFlags -> [Test] -> IO ()
 runTestSummary atflg tests = do
@@ -144,14 +153,6 @@ showRes None = "t.o."
 showRes Many = "nonc"
 showRes Excn = "excn"
 showRes Skip = "skip"
-
-runTestFileSys :: TestFlags -> [Test] -> IO Bool
-runTestFileSys tflg ts = do
-  let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
-  res <- mapM (runTest tflg) (filter p ts)
-  let ok = all (`elem` [Good, Skip]) res
-  putStrLn $ if ok then "SUCCESS" else "FAILURE"
-  pure ok
 
 widthTestName :: Int
 widthTestName = 10
@@ -175,34 +176,47 @@ test n = runTestFile tflg verseTest
 --
 -----------------------------------------------
 
-srcToCore :: Flags -> SrcExpr -> IO Rules.Expr
-srcToCore flags e = do { e1 :: SrcCore    <- FrontEnd.Desugar.desugar flags e
-                       ; e2 :: Rules.Expr <- FrontEnd.ToCore.convertToCore flags e1
-                       ; let e3 = Rules.prep e2
-                       ; return e3 }
+srcToCore :: Flags -> Bool -> SrcExpr -> IO Rules.Expr
+srcToCore flags add_verification e
+  = do { e1 :: SrcCore    <- FrontEnd.Desugar.desugar flags add_verification e
+       ; e2 :: Rules.Expr <- FrontEnd.ToCore.convertToCore flags e1
+       ; let e3 = Rules.prep e2
+       ; return e3 }
 
-evalExpr :: Rules.Expr -> Rules.Expr
-evalExpr e = TRS.Traced.term (Rules.normalize (Rules.everywhere Rules.TRS2024.rules) e)
+evalExpr :: Rules.Expr -> Traced Rules.Expr
+evalExpr e = Rules.normalize (Rules.everywhere Rules.Verifier.verificationRules) e
 
-assertEquivE :: HasCallStack => TestInfo -> TestFlags -> SrcExpr -> SrcExpr -> IO TestRes
-assertEquivE ti flg e1 e2
-  = do { c1 <- srcToCore flags e1
-       ; c2 <- srcToCore flags e2
-       ; assertEquiv ti flg (e1, c1) (e2, c2) }
+verifyE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> IO TestRes
+verifyE flg ti e
+  = do { c <- srcToCore flags True e
+       ; let real_c = Rules.Verify (bindList [] ([], c))
+       ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) }
   where
-    flags = testFlagsToFlags flg
+    flags = setPreludeFlag True flg $
+            testFlagsToFlags flg
 
-assertEquiv :: (HasCallStack, Pretty a) => TestInfo -> TestFlags
+testEvalE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> SrcExpr -> IO TestRes
+testEvalE flg ti e1 e2
+  = do { c1 <- srcToCore flags False e1
+       ; c2 <- srcToCore flags False e2
+       ; assertEquiv flg ti (e1, c1) (e2, c2) }
+  where
+    flags = setPreludeFlag False flg $
+            testFlagsToFlags flg
+
+assertEquiv :: (HasCallStack, Pretty a) => TestFlags -> TestInfo
             -> (a, Rules.Expr) -> (a, Rules.Expr) -> IO TestRes
-assertEquiv ti tflg (p1, c1) (p2, c2)
+assertEquiv tflg ti (p1, c1) (p2, c2)
   | typ == TSkip = do { when noisy (putStrLn $ pos ++ " skipped")
                       ; pure Skip }
   | otherwise = do
   when showD (putStrLn $ "desugared:\n" ++ prettyShow c1)
 
   let expectOK = typ == TPass
-  let v1 = evalExpr c1
-  let v2 = evalExpr c2
+  let tr1 = evalExpr c1
+      tr2 = evalExpr c2
+      v1 = term tr1
+      v2 = term tr2
 
   catch (
        if (equivValue v1 v2) == expectOK
@@ -236,6 +250,8 @@ assertEquiv ti tflg (p1, c1) (p2, c2)
                 when (typ == TBroken) $
                   putStrLn " broken test has"
                 putStrLn " unexpected success"
+            when (trace tflg) $
+              do { putStrLn "Trace is:"; display tr1 }
             pure Bad
       ) (\e -> do
            when (not (noError tflg)) $ do
@@ -368,7 +384,8 @@ data TestFlags = TestFlags
   , timRun         :: !Bool                -- run Tim's verifier tests
   , timVerify      :: !Bool                -- verify Tim's verifier tests
   , showDesugared  :: !Bool                -- show desugared version just before evaluation
-  , prelude        :: !(Maybe String)      -- use this prelude
+  , preludeEval    :: !String              -- use this prelude in TestEval
+  , preludeVerify  :: !String              -- use this prelude in TestVerify
   , desugarRules   :: !Desugar             -- desugaring rules
   , fileNames      :: ![FilePath]          -- input files
   }
@@ -474,10 +491,16 @@ testFlags = TestFlags
   <*> OA.switch
          ( OA.long "show-desugared"
         <> OA.help "show desugared version" )
-  <*> OA.optional (OA.strOption
-         ( OA.long "prelude"
+  <*> OA.strOption
+         ( OA.long "eval-prelude"
         <> OA.metavar "NAME"
-        <> OA.help "use the given prelude" ))
+        <> OA.value "miniprelude"
+        <> OA.help "use the given prelude for evaluation tests" )
+  <*> OA.strOption
+         ( OA.long "verify-prelude"
+        <> OA.metavar "NAME"
+        <> OA.value "miniverifyprelude"
+        <> OA.help "use the given prelude for verification tests" )
   <*> OA.option OA.auto
          ( OA.long "desugar"
         <> OA.metavar "Name"
@@ -495,244 +518,16 @@ testFlagsToFlags t =
              fRewriteSteps = maxSteps t,
              fNoFuelStop = ignoreFuelStop t,
              fAssumeVerified = assumeVerified t,
-             fPrelude = maybe (fPrelude flags) (either error id . findPrelude) (prelude t),
              fDesugar = desugarRules t
            }
 
-
-
------------------------------------------------
---
---     Verification testing
---     verifyIt :: TestFlags -> Expr -> IO VerifyResult
---
------------------------------------------------
-{-
-assertVerify :: HasCallStack => TestInfo -> TestFlags -> Expr -> IO TestRes
-assertVerify ti tflg e | typ == TSkip = do
-  when noisy $
-    putStrLn $ pos ++ " skipped"
-  pure Skip
-                       | otherwise = do
-  let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False }
-      shouldVerify = if typ == TBroken then testType ti == TFail else typ == TPass
-
-  res <- verifyIt tflg e
-
-  let message (timeout, done, trc) = do
-        when (fTrace flags) $ do
-          putStrLn "Verification trace:"
-          putStrLn $ unlines $ showTrace trc
-
-        if timeout then do
-           when noisy $
-             putStrLn $ pos ++ " " ++ "time-out, use --max-norm-steps=N to change"
-           pure None
-         else
-         if done == shouldVerify then do
-           when noisy $
-             putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", expected"
-           pure Good
-          else do
-           putStrLn $ pos ++ " " ++ (if done then "    verified" else "not verified") ++ ", unexpected" ++
-                      (if typ == TBroken then ", marked as broken" else "")
-           pure Bad
-
-  case res of
-    VerifyError msg -> do
-      putStrLn $ pos ++ " " ++ msg
-      pure Excn
-    VerifyFail trc -> message (False, False, trc)
-    VerifySuccess trc -> message (False, True, trc)
-    VerifyTimeout trc -> message (True, False, trc)
-
- where
-    loc = testLocn ti
-    noisy = not (quiet tflg)
-    pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
-    typ = maybe (testType ti) snd $ find (\ (s,_) -> match s (sname sys)) (testExcn ti)
-    sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
-    match (n, w) m = map toLower n `tst` map toLower m
-      where tst = if w then isPrefixOf else (==)
-
-
-data VerifyResult
-  = VerifyError String
-  | VerifyFail (Traced R.Expr)
-  | VerifySuccess (Traced R.Expr)
-  | VerifyTimeout (Traced R.Expr)
-  deriving (Show)
-
-verifyIt :: TestFlags -> Expr -> IO VerifyResult
-verifyIt tflg e = do
-  let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False }
-      e' = (if True then wrapAssert else id) . preProcess sys (ruleEnv sys) . coreToTrs . desugar flags $ e
-      sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
-      vres = verifyM sys e'
-  eres <- Control.Exception.try (evaluate (seq (vres==vres) vres))
-  pure $ case eres of
-           Left err                    -> VerifyError (show (err :: SomeException))
-           Right (T.Timeout (_, trc))    -> VerifyTimeout trc -- Error "time-out, use --max-norm-steps=N to change"
-           Right (T.Finish (True, trc))  -> VerifySuccess trc
-           Right (T.Finish (False, trc)) -> VerifyFail trc
-
------------------------------------------------
---
---     Tim tests
---
------------------------------------------------
-
-
-data TimTest = TimTest { timTag :: Ident, timExpr :: Expr }
-  deriving (Show)
-
-timTestName :: TimTest -> String
-timTestName test = "L" ++ show (unPos (sourceLine loc))
-  where Ident loc _ = timTag test
-
-timTest :: TestFlags -> FilePath -> IO ()
-timTest tflg fn = do
-  file <- readFile fn
-  let tests = {- take 1000 $ -} parseDie pTimTestFile fn file
-  putStrLn $ "Flags" ++ show tflg
-  putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
-  putStrLn $ "Number of tests: " ++ show (length tests)
-  status  <- mconcat <$> mapM (runTimTest tflg) (take 1000000 tests)
-  let badFail = sBadFail status
-  let badPass = sBadPass status
-  printf "%5d skipped\n" (sSkip status)
-  printf "%5d OK\n"      (sOK   status)
-  printf "%5d bad (fail=%d, pass=%d)\n" (badFail + badPass) badFail badPass
-  printf "%5d died\n"    (sDied status)
-  printf "%5d unimplemented\n"    (sNotYet status)
-
-pTimTestFile :: P [TimTest]
-pTimTestFile = skip *> many pTimTest <* eof
-
-pTimTest :: P TimTest
-pTimTest =
-  pKeyword "test" *> do
-    TimTest <$> pParens pIdent <*> (pBlockM <* optional (pOp ";"))
-
-
--- runTimTest :: TestFlags -> TimTest -> IO (Int, Int, Int, Int)
-runTimTest :: TestFlags -> TimTest -> IO TimStatus
-runTimTest tflg test | Just s <- onlyTest tflg, s /= timTestName test = pure mempty
-runTimTest tflg test | timRun tflg = do
-  let sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
-      flg = (testFlagsToFlags tflg) { fNoWarn = True }
-      tag = timTag test
-      Ident loc stag = tag
-  putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
-
-  if take 1 stag `notElem` ["S", "F", "N"] then
-    -- Fast path for unknown tests
-    do putStrLn "skip"; pure (mempty { sSkip = 1})
-   else do
-    tres <- tryResult tflg $ run flg sys $ desugar flg $ timExpr test
-    case take 1 stag of
-      "S" -> case tres of
-               ResOK x | x /= Fail -> do putStrLn "pass, OK";  pure (mempty {sOK = 1})
-                       | otherwise -> do putStrLn "fail, bad"; pure (mempty {sBadFail = 1})
-               _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
-      "F" -> case tres of
-               ResOK x | x == Fail -> do putStrLn "fail, OK";  pure (mempty {sOK = 1})
-                       | otherwise -> do putStrLn "pass, bad"; pure (mempty {sBadPass = 1})
-               _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
-      "N" -> case tres of
-               ResOK _             -> do putStrLn "pass, bad"; pure (mempty {sBadPass = 1})
-               Undefined           -> do putStrLn "err,  OK";  pure (mempty {sOK = 1})
-               Shadowing           -> do putStrLn "err,  OK";  pure (mempty {sOK = 1})
-               _                   -> do putStrLn "exception"; pure (mempty {sDied = 1})
-      _                            -> undefined
-
-runTimTest tflg test | timVerify tflg = do
-  let flags = (testFlagsToFlags tflg){ fVerify = True, fSplit = False, fNoWarn = True  }
-      e' = (if True then wrapAssert else id) . preProcess sys (ruleEnv sys) . coreToTrs . desugar flags . timExpr $ test
-      sys = s{ ruleEnv = (ruleEnv s){ tfNormSteps = maxNormSteps tflg }} where s = system tflg
-      tag = timTag test
-      Ident loc stag = tag
-  -- putStrLn ("TRACE: Tim-Test " ++ systemDescr sys ++ " e' = " ++ prettyShow e')
-  tres <- tryResult tflg $ verifyM sys e'
-  putStr $ prettyShow loc ++ ": " ++ show tag ++ " "
-  if take 1 stag == "Q" then
-    do putStrLn "unimplemented"; pure (mempty {sNotYet = 1})
-  else if take 1 stag `notElem` ("S" : verifierErrorCodes) then
-    do putStrLn "skip";          pure (mempty {sSkip = 1})
-   else do
-    let disp trc =
-          when (trace tflg) $
-            putStrLn $ unlines $ showTrace trc
-    when (verbose tflg) $
-      putStrLn $ "test expr: " ++ prettyShow (timExpr test)
-    case take 1 stag of
-      "S" -> case tres of
-               ResOK (T.Timeout _)         -> do putStrLn "timeout";     pure (mempty {sDied = 1})
-               ResOK (T.Finish (True, _))  -> do putStrLn "pass, OK";    pure (mempty {sOK = 1})
-               ResOK (T.Finish (False, t)) -> do putStrLn "fail, bad";   disp t; pure (mempty {sBadFail = 1})
-               _                           -> do putStrLn "exception";   pure (mempty {sDied = 1})
-      _   -> case tres of
-               ResOK (T.Timeout _)         -> do putStrLn "timeout";     pure (mempty {sDied = 1})
-               ResOK (T.Finish (True, t))  -> do putStrLn "pass, bad";   disp t; pure (mempty {sBadPass = 1})
-               ResOK (T.Finish (False, _)) -> do putStrLn "fail, OK";    pure (mempty {sOK = 1})
-               _                           -> do putStrLn "exception";   pure (mempty {sDied = 1})
-
-runTimTest _ _ = error "impossible"
-
-verifierErrorCodes :: [String]
-verifierErrorCodes = ["A", "D", "F", "I", "U"]
-
-data TimStatus = MkTimStatus {
-    sSkip    :: !Int
-  , sOK      :: !Int
-  , sBadFail :: !Int
-  , sBadPass :: !Int
-  , sDied    :: !Int
-  , sNotYet  :: !Int
-  }
-  deriving (Show)
-
-instance Semigroup TimStatus where
-  MkTimStatus s1 s2 s3 s4 s5 s6 <> MkTimStatus t1 t2 t3 t4 t5 t6 =
-    MkTimStatus (s1+t1) (s2+t2) (s3+t3) (s4+t4) (s5+t5) (s6+t6)
-
-instance Monoid TimStatus where
-  mempty = MkTimStatus 0 0 0 0 0 0
-
----------------------
-
--- Results of compile&run, with somewhat decoded error messages
-data Result a
-  = ResOK a
-  | Undefined
-  | Shadowing
-  | MultiplyDefined
-  | BadLHS
-  | SyntaxError
-  | OtherError String
-  deriving (Show)
-
--- Evaluate argument and catch any errors.
--- Use == to force the computation
-tryResult :: (Eq a) => TestFlags -> a -> IO (Result a)
-tryResult tflg a = do
-  mres <- Control.Exception.try (evaluate (seq (a==a) a))
-  when (verbose tflg) $
-    case mres of
-      Left msg -> print msg
-      _ -> pure ()
-  pure $
-    case mres of
-      Left exn ->
-        case stripPrefix "error: " (show (exn :: SomeException)) of
-          Nothing -> OtherError (show exn)
-          Just msg | isPrefixOf "undefined:"        msg -> Undefined
-                   | isPrefixOf "shadowing:"        msg -> Shadowing
-                   | isPrefixOf "multiply defined:" msg -> MultiplyDefined
-                   | isPrefixOf "Bad LHS"           msg -> BadLHS
-                   | isPrefixOf "syntax error:"     msg -> SyntaxError
-                   | otherwise                          -> OtherError msg
-      Right x -> ResOK x
-
-
--}
+setPreludeFlag :: Bool    -- True <=> verifying
+               -> TestFlags
+               -> Flags -> Flags
+setPreludeFlag are_verifying test_flags flags
+  = flags { fPrelude = case findPrelude prel_name of
+                         Right stuff -> stuff
+                         Left  err   -> error err }
+  where
+    prel_name | are_verifying = preludeVerify test_flags
+              | otherwise     = preludeEval   test_flags

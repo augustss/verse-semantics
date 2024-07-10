@@ -43,18 +43,32 @@ import Control.Monad
 -----------------------------------------------
 
 
-desugar :: Flags -> SrcExpr -> IO SrcCore
-desugar flgs = runD flgs .
-            (traceDS "Main desugaring" <=< dsDx      <=<    -- Heavy lifting: Fig 9
+desugar :: Flags -> Bool -> SrcExpr -> IO SrcCore
+desugar flgs add_verification
+  = runD flgs .
+     (-- Heavy lifting: Fig 9
+         traceDS "Main desugaring"
+     <=< dsDD_12 ds_model
 
---             traceDS "addDeref"   <=< addDeref  <=<    -- Side effects
+     -- Side effects
+--   <=<  traceDS "addDeref"
+--   <=< addDeref
 
-             traceDS "Desugar to Small Source"  <=< dsSmall   <=<    -- Main desugaring into Small Source
+     -- Desugar into Small Source
+     <=< traceDS "Desugar to Small Source"
+     <=< dsSmall
 
-             traceDS "Add prelude" <=< addPrelude <=<   -- Prepends prelude from
-                                                       --    verifyprelude.verse, mediumprelude.verse
+     -- Prepends prelude from
+     --    verifyprelude.verse, mediumprelude.verse
+     <=< traceDS "Add prelude"
+     <=< addPrelude
 
-             traceDS "syntaxFixes" <=< syntaxFixes)
+     -- Syntax fixes
+     <=< traceDS "syntaxFixes"
+     <=< syntaxFixes)
+  where
+    ds_model | add_verification = MV
+             | otherwise        = MX
 
 --------------------------------------------------------
 --
@@ -167,12 +181,8 @@ dsSmall = ds
       ds $ If2 (eDefine t e) (Truth (Variable t))
     ds (Truth e) = ds $ Map [InfixOp e (Op "=>") e]
 
-    -- one, all
-    -- XXX why do we do this?
-    ds (One e) = ds $ If2E e Fail
-    ds (All e) = ds $ For1 e
-
-    ds (Macro1 (Ident _ "first") [] e) = ds $ If2E e Fail  -- same as one{}
+    ds (Macro1 (Ident _ "verify") _ e)  = Verify [] <$> ds e
+    ds (Macro1 (Ident _ "first") [] e)  = ds $ If2E e Fail  -- same as one{}
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
 
     ds (Exists xs b) = Exists xs <$> ds b
@@ -505,13 +515,6 @@ data DsMode12
   | MV -- ^ + "verification"
   | MI -- ^ - "checking" ("implementation")
   deriving (Eq, Ord, Show)
-
-
-dsDx :: SrcExpr -> D SrcExpr
-dsDx e = do
-  how <- getDFlagsX fDesugar
-  case how of
-    DS12 -> dsD_12 e
 
 
 dsD_12 :: SrcExpr -> D SrcExpr

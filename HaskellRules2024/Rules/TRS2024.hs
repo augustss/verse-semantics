@@ -11,7 +11,12 @@ import Rules.Core
 import Epic.Print hiding ( (<>) )
 
 import Control.Monad( guard )
+import Data.List( (\\) )
 
+--------------------------------------------------------------------------------
+--
+--            The rules themselves
+--
 --------------------------------------------------------------------------------
 
 evalRules :: Rule
@@ -24,95 +29,6 @@ evalRules = rulesApplication
           <> rulesOneAndAll
 
 --------------------------------------------------------------------------------
-
-name :: String -> [Expr] -> [(String,Expr)]
-name s es = [ (s,e) | e <- es ]
-
--- This is used to give rules names.
-nameWith :: (Pretty s) => String -> [(s, a)] -> [(String, a)]
-nameWith s as = [(s ++ ":" ++ prettyShow k, a) | (k, a) <- as]
-
-iff :: [Bool] -> [()]
-iff conds = [()| and conds]
-
---------------------------------------------------------------------------------
-
--- value contexts
-isV :: Expr -> Expr -> Bool
-isV x e = x==e || case e of
-                    Arr es -> any (isV x) es
-                    _      -> False
-
--- evaluation contexts
-evalCtx :: [Ident] -> Expr -> [(Context, Expr)]
-evalCtx zs lhs =
-  do pure (HOLE, lhs)
- ++
-  do Exi bnd <- [lhs]
-     let (x,e) = alphaRename zs bnd
-     (ctx, h) <- evalCtx (x:zs) e
-     pure (Exi (bind x ctx), h)
- ++
-  do (v :=: e1) :>: e2 <- [lhs]
-     (ctx, h) <- evalCtx zs e1
-     pure ((v :=: ctx) :>: e2, h)
- ++
-  do (v :=: e1) :>: e2 <- [lhs]
-     (ctx, h) <- evalCtx zs e2
-     pure ((v :=: e1) :>: ctx, h)
-
-evalCtxLift :: [Ident] -> Expr -> [(Context, Context, Expr)]
-evalCtxLift zs lhs =
-  do pure (HOLE, HOLE, lhs)
- ++
-  do Exi bnd <- [lhs]
-     let (x,e) = alphaRename zs bnd
-     (exis, ctx, h) <- evalCtxLift (x:zs) e
-     pure (Exi (bind x exis), ctx, h)
- ++
-  do (v :=: e1) :>: e2 <- [lhs]
-     (exis, ctx, h) <- evalCtxLift zs e1
-     pure (exis, (v :=: ctx) :>: e2, h)
- ++
-  do (v :=: e1) :>: e2 <- [lhs]
-     (exis, ctx, h) <- evalCtxLift zs e2
-     pure (exis, (v :=: e1) :>: ctx, h)
-
--- blkd
-type Expr_or_Context = Expr
-
-blocked :: Expr_or_Context -> Bool
-blocked ec = blkd [] ec
-
-blkd :: [Ident] -> Expr_or_Context -> Bool
-blkd _  HOLE                = True
-blkd xs ((_ :=: e1) :>: e2) = blkd xs e1 && (isContext e1 || blkd xs e2)
-blkd xs (e1 :|: e2)         = blkd xs e1 && blkd xs e2
-blkd xs (One e)             = blkd xs e
-blkd xs (All e)             = blkd xs e
-blkd xs (Exi bnd)           = blkd (x:xs) e where (x,e) = alphaRename xs bnd
-blkd xs (v1 :@: v2)         = case v1 of
-                                Var f -> f `elem` xs
-                                Op {} -> any ((`isV` v2) . Var) xs
-                                _     -> False
-blkd xs (v :>>: _)          = any (`elem` xs) (free v)
-blkd _  (Verify _)          = True
-blkd xs (Check _ e)         = blkd xs e
-blkd _  _                   = False
-
--- choice-freeness
-choiceFree :: Expr_or_Context -> Bool
-choiceFree (_ :|: _)           = False
-choiceFree ((_ :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2)
-choiceFree (_ :>>: e)          = choiceFree e
-choiceFree (Exi bnd)           = choiceFree e where (_,e) = unsafeUnbind bnd
-choiceFree (v1 :@: _)          = case v1 of
-                                   Op _ -> True -- all ops we support are choice-free right now
-                                   _    -> False
-choiceFree _                   = True
-
---------------------------------------------------------------------------------
-
 rulesApplication :: Rule
 rulesApplication _env lhs =
   "APP-ADD" `name`
@@ -184,17 +100,15 @@ rulesApplication _env lhs =
  ++
   "APP-ISINT" `name`
   do Op IsInt :@: a <- [lhs]
-     guard (isHNF a)
      case a of
        Lit (LInt _) -> pure a
-       _           -> pure Fail
+       _            -> []
  ++
   "APP-ISSTR" `name`
   do Op IsStr :@: a <- [lhs]
-     guard (isHNF a)
      case a of
        Lit (LStr _) -> pure a
-       _            -> pure Fail
+       _            -> []  -- ToDo: what is idomatic here?
  ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]
@@ -213,7 +127,6 @@ rulesApplication _env lhs =
      pure Fail
 
 --------------------------------------------------------------------------------
-
 rulesUnification :: Rule
 rulesUnification _env lhs =
   "U-LIT" `name`
@@ -247,7 +160,6 @@ rulesUnification _env lhs =
      pure ((Var x :=: a) :>: e)
 
 --------------------------------------------------------------------------------
-
 rulesExistentials :: Rule
 rulesExistentials _env lhs =
   "UNDERSCORE-ELIM" `name`
@@ -259,30 +171,31 @@ rulesExistentials _env lhs =
   "EXI-ELIM" `nameWith`
   do (exis,x,e) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free e)
-     pure (x, exis <@ e)
+     pure (pPrint x, exis <@ e)
  ++
   "EXI-FLOAT" `nameWith`
   do (v :=: exi_x_e1) :>: e2 <- [lhs]
      (exis,x,e1) <- matchExi_alphaRename (free (v,e2)) exi_x_e1
-     pure (x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
+     pure (pPrint x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
  ++
   "EXI-PUSH" `nameWith`
   do (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free (v,e1))
-     pure (x, exis <@ ((v :=: e1) :>: Exi (bind x e2)))
+     pure (pPrint x, exis <@ ((v :=: e1) :>: Exi (bind x e2)))
   ++
   -- Do this last: most complex and expensive
   "EXI-SUBST" `nameWith`
   do (exis, ctx, x_eq_v :>: e) <- evalCtxLift (free lhs) lhs
      (Var x,v) <- matchEq x_eq_v
-     guard (x `elem` bvs exis)
      guard (isVal v)
+     guard (x `elem` exis)
      guard (x `notElem` free v)
-     guard (blkd (bvs exis) ctx)
-     pure (x, exis <@ subst [(x,v)] (ctx <@ e))
+     guard (blkd exis ctx)
+     pure ( pPrint x <+> text ":=" <+> pPrintSmallExpr v
+          , wrapExis (exis \\ [x]) $
+            subst [(x,v)] (ctx <@ e) )
 
 --------------------------------------------------------------------------------
-
 rulesNormalization :: Rule
 rulesNormalization _env lhs =
   "SEQ-ASSOC" `name`
@@ -296,7 +209,6 @@ rulesNormalization _env lhs =
   [] -- TODO
 
 --------------------------------------------------------------------------------
-
 rulesChoice :: Rule
 rulesChoice _env lhs =
   "CHOICE-ASSOC" `name`
@@ -325,7 +237,6 @@ rulesChoice _env lhs =
      pure Fail
 
 --------------------------------------------------------------------------------
-
 rulesOneAndAll :: Rule
 rulesOneAndAll _env lhs =
   "ONE-FAIL" `name`
@@ -354,4 +265,122 @@ rulesOneAndAll _env lhs =
      guard (all isVal vs)
      pure (Arr vs)
 
------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--
+--            Auxiliary functions
+--
+--------------------------------------------------------------------------------
+
+name :: String -> [Expr] -> [(String,Expr)]
+name s es = [ (s,e) | e <- es ]
+
+-- This is used to give rules names.
+nameWith :: String -> [(Doc, a)] -> [(String, a)]
+nameWith rulename as = [(rulename ++ render (parens doc), a) | (doc, a) <- as]
+
+iff :: [Bool] -> [()]
+iff conds = [()| and conds]
+
+
+--------------------------------------------------------------------------------
+--
+--            Value contexts
+--
+--------------------------------------------------------------------------------
+
+isV :: Expr -> Expr -> Bool
+isV x e = x==e || case e of
+                    Arr es -> any (isV x) es
+                    _      -> False
+
+--------------------------------------------------------------------------------
+--
+--            Evaluation contexts
+--
+--------------------------------------------------------------------------------
+
+evalCtx :: [Ident] -> Expr -> [(Context, Expr)]
+evalCtx zs lhs =
+  do pure (HOLE, lhs)
+ ++
+  do Exi bnd <- [lhs]
+     let (x,e) = alphaRename zs bnd
+     (ctx, h) <- evalCtx (x:zs) e
+     pure (Exi (bind x ctx), h)
+ ++
+  do (v :=: e1) :>: e2 <- [lhs]
+     (ctx, h) <- evalCtx zs e1
+     pure ((v :=: ctx) :>: e2, h)
+ ++
+  do (v :=: e1) :>: e2 <- [lhs]
+     (ctx, h) <- evalCtx zs e2
+     pure ((v :=: e1) :>: ctx, h)
+
+evalCtxLift :: [Ident] -> Expr
+            -> [( [Ident]  -- All the 'exists x' bits
+                , Context  -- All the other bits
+                , Expr)]   -- The expression in the middle
+-- E.g.   evalCtxtLift (exi x. x=3; exi y. y=5; x+y)
+--        returns  ( [x,y]
+--                 , x=3; y=5; HOLE
+--                 , x+y )
+evalCtxLift zs lhs =
+  do pure ([], HOLE, lhs)
+ ++
+  do Exi bnd <- [lhs]
+     let (x,e) = alphaRename zs bnd
+     (exis, ctx, h) <- evalCtxLift (x:zs) e
+     pure (x:exis, ctx, h)
+ ++
+  do (v :=: e1) :>: e2 <- [lhs]
+     (exis, ctx, h) <- evalCtxLift zs e1
+     pure (exis, (v :=: ctx) :>: e2, h)
+ ++
+  do (v :=: e1) :>: e2 <- [lhs]
+     (exis, ctx, h) <- evalCtxLift zs e2
+     pure (exis, (v :=: e1) :>: ctx, h)
+
+wrapExis :: [Ident] -> Expr -> Expr
+wrapExis xs orig_e = foldr wrap orig_e xs
+  where
+    wrap x e = Exi (bind x e)
+
+--------------------------------------------------------------------------------
+--
+--            The 'blocked' and 'choice-free' predicates
+--
+--------------------------------------------------------------------------------
+
+type Expr_or_Context = Expr
+
+blocked :: Expr_or_Context -> Bool
+blocked ec = blkd [] ec
+
+blkd :: [Ident] -> Expr_or_Context -> Bool
+blkd _  HOLE                = True
+blkd xs ((_ :=: e1) :>: e2) = blkd xs e1 && (isContext e1 || blkd xs e2)
+blkd xs (e1 :|: e2)         = blkd xs e1 && (isContext e2 || blkd xs e2)  -- ToDo: check
+blkd xs (One e)             = blkd xs e
+blkd xs (All e)             = blkd xs e
+blkd xs (Exi bnd)           = blkd (x:xs) e where (x,e) = alphaRename xs bnd
+blkd xs (v1 :@: v2)         = case v1 of
+                                Var f -> f `elem` xs
+                                Op {} -> any ((`isV` v2) . Var) xs
+                                _     -> False
+blkd xs (v :>>: _)          = any (`elem` xs) (free v)
+blkd _  (Verify _)          = True
+blkd xs (Check _ e)         = blkd xs e
+blkd _  _                   = False
+
+-- choice-freeness
+choiceFree :: Expr_or_Context -> Bool
+choiceFree (_ :|: _)           = False
+choiceFree ((_ :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2)
+choiceFree (_ :>>: e)          = choiceFree e
+choiceFree (Exi bnd)           = choiceFree e where (_,e) = unsafeUnbind bnd
+choiceFree (v1 :@: _)          = case v1 of
+                                   Op _ -> True -- all ops we support are choice-free right now
+                                   _    -> False
+choiceFree _                   = True
+

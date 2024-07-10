@@ -1,6 +1,6 @@
 :read versetests/funs.verse
 :set desugartrace
-:desugar
+:vdesugar
 :tocore
 :verify
 :quit

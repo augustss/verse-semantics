@@ -12,9 +12,10 @@ module Rules.Verifier(
 import TRS.Bind
 import Rules.Core
 import Rules.TRS2024 as TRS2024
+import Epic.Print hiding ( (<>) )
 
 import Control.Monad (guard)
-import Data.List ((\\))
+import Data.List ( (\\) )
 
 
 --------------------------------------------------------
@@ -34,10 +35,10 @@ verificationRules
 --------------------------------------------------------------------------------
 guardRules :: Rule
 guardRules env lhs =
-   "GUARD-ELIM" `name`
+   "GUARD-ELIM" `nameWith`
    do v :>>: e <- [lhs]
       guard (skolValue (skolVars env) v)
-      pure e
+      pure (pPrintSmallExpr v, e)
    ++
    "GUARD-FAIL" `name`
    do Fail :>>: _ <- [lhs]
@@ -84,10 +85,10 @@ verifyRules env lhs =
       guard (e == Fail)
       pure (Arr[])
    ++
-   "SMT" `name`
+   "SOLVER" `name`
    do Verify bnd <- [lhs]
       let (rs, (as, _)) = alphaRenameVerify (skolVars env) bnd
-      guard (unsat rs as)
+      guard (unsat (extendRuleEnv env rs as))
       pure (Arr [])
    ++
    "SKOLEMIZE" `name`
@@ -125,10 +126,22 @@ asmX = go []
     go as (a:as') = (reverse as, a, as') : go (a:as) as'
 -}
 
-unsat :: [Ident] -> [Assump] -> Bool
+unsat :: RuleEnv -> Bool
 -- `unsat` is a simple unsatisfiablity checker,
 -- which implements the SOLVER rule
-unsat _ _ = False
+unsat (RE { assumps = asms })
+  = contra
+  where
+    pos, neg :: [Assump]
+    pos = filter isPosAssump asms
+    neg = [asm | A_Fails asm <- asms]
+    contra = any contradicted pos
+    contradicted asm@(A_GVEq {})    = asm `elem` neg
+    contradicted (A_PrimOp _ op gv) = any contradicts neg
+      where
+        contradicts (A_PrimOp _ op' gv') = op==op' && gv==gv'
+        contradicts _                    = False
+    contradicted _ = error "unsat"  -- pos has only positive assump
 
 {-
 unsat _ es = asmFail || contra || refl || eqContra
@@ -159,29 +172,42 @@ isInt asms x = INT (Var x) `elem` asms
 splitRules :: Rule
 splitRules env lhs =
    "SPLIT-K" `name`
-   do Verify bnd <- [lhs]
-      let env_rs = skolVars env
-          (rs, (as, e)) = alphaRenameVerify env_rs bnd
-          all_rs = rs ++ env_rs
+   do (env', rs, as, e) <- matchVerify env lhs
       (ctx, (Var r :=: v) :>: rest) <- proofX [] e
-      guard (r `elem` all_rs)
-      Just gv <- [groundValue all_rs v]
+      guard (r `elem` rs)
+      Just gv <- [groundValue (skolVars env') v]
       pure (caseSplit rs (A_GVEq r gv) as ctx rest)
    ++
    "SPLIT-OP" `nameWith`
-   do Verify bnd <- [lhs]
-      let env_rs = skolVars env
-          (rs, (as, e)) = alphaRenameVerify env_rs bnd
-          all_rs = rs ++ env_rs
+   do (env', rs, as, e) <- matchVerify env lhs
+      let skol_rs = skolVars env'
       (ctx, Op op :@: arg) <- proofX [] e
-      Just gv <- [groundValue all_rs arg]
-      let r   = skolNotIn all_rs
+      Just gv <- [groundValue skol_rs arg]
+      guard (free gv `intersects` skol_rs)  -- At least one skolem in gv
+      let r   = skolNotIn skol_rs
           asm = A_PrimOp r op gv
       if primOpCanFail op
-        then pure (asm, caseSplit (r:rs) asm as ctx (Var r))
-        else pure (asm, Verify (bindList (r:rs) (asm : as, ctx <@ Var r)))
+        then pure (pPrint asm, caseSplit (r:rs) asm as ctx (Var r))
+        else pure (pPrint asm, Verify (bindList (r:rs) (asm : as, ctx <@ Var r)))
         -- Generate one or two 'verify' blocks, depending on
         -- whether or not the PrimOp can fail
+   ++
+   "SPLIT-TUP" `nameWith`
+   do (env', rs, as, e) <- matchVerify env lhs
+      (ctx, Var r :=: Arr vs :>: rest) <- proofX [] e
+      guard (r `elem` rs)
+      let rs'  = take (length vs) (skolsNotIn (skolVars env'))
+          rvs' = foldr (:>:) rest [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
+          asm    = A_GVEq r (GVArr (map GVVar rs'))
+      pure (pPrint asm, caseSplit (rs ++ rs') asm as ctx rvs')
+
+
+matchVerify :: RuleEnv -> Expr -> [(RuleEnv, [SkolIdent], [Assump], Expr)]
+matchVerify env (Verify bnd) = [(extendRuleEnv env rs as, rs, as, e)]
+                             where
+                               (rs, (as, e)) = alphaRenameVerify (skolVars env) bnd
+matchVerify _ _ = []
+
 {-
    ++
    "SPLIT-C" `name`
@@ -196,17 +222,6 @@ splitRules env lhs =
       guard (isUni rs bs (Var r))
       guard (isUni rs bs (Var r'))
       pure (a, caseSplit rs a as ctx (Arr []))
-   ++
-   "SPLIT-TUP" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, aa@(Var r :=: Arr vs)) <- proofX e
-      -- guard (not (null vs))
-      guard (isUni rs bs (Var r))
-      let xs   = rs ++ free e ++ bndIds bs ++ boundVars env
-      let rs'  = take (length vs) (uvIdentsNotIn xs)
-      let rvs' = foldr (:>:) (Arr []) [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
-      let a    = Var r :=: Arr (Var <$> rs')
-      pure     (aa, caseSplit (rs ++ rs') a as ctx rvs')
    ++
    "SPLIT-PPRED" `name`
    do Verify rs as e <- [lhs]

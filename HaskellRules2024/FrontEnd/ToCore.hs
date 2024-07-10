@@ -33,7 +33,6 @@ convertToCore :: Flags -> SrcCore -> IO Rules.Expr
 convertToCore flags src
   = runD flags $
     do { with_exis <- addScope src
-       ; traceD "addScope" (pPrint with_exis $$ text "---- End of addScope ---" $$ text "")
        ; return (convert with_exis) }
 
 convert :: SrcCore -> Rules.Expr

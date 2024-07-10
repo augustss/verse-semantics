@@ -236,9 +236,9 @@ eSome = Some
 
 eGuard :: [Ident] -> SrcExpr -> SrcExpr
 -- Smart constructor, drops empty guard
-eGuard xs e
-  | null xs   = e
-  | otherwise = Guard (fvArray xs) e
+eGuard xs orig_e = foldr gd orig_e xs
+  where
+   gd x e = Guard (Variable x) e
 
 eCheck :: [Eff] -> SrcExpr -> SrcExpr
 eCheck fxs1 e
@@ -717,6 +717,7 @@ getFree = fvs_blk
     fvs (Macro1 _ _ e)    = fvs e
     fvs (Macro2 _ e b)    = fvs e ++ fvs_blk b
     fvs (Split e1 e2 e3)  = fvs e1 ++ fvs e2 ++ fvs e3
+    fvs (DefineE _ e)     = fvs e
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
 --    fvs (Map es) = concatMap fvs es
     fvs e = impossible e

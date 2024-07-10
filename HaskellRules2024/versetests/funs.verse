@@ -1,14 +1,15 @@
+f(x:any) := { 10 }
 # f1(x:int) := x
-f2(x:int):int := x+1 ;
-f2[3]
+# f2(x:int):int := x+1 ;
 # f3(x:int)<succeeds>:int := x
 # f4(x:int)<decides>:int := x
-# f5(x:int)(y:int):int := (x,y)
+#f5(x:int)(y:int):int := (x,y)
+# f5a(x:int)(y:int):int := x+y
 # f( g(x:int):int ) := g[0]
 
 # This should be rejected
 # f9(x:int):int := x
-# y := f9[y]
+# check<succeeds>{ y := f9[y] }
 
 # f6 should be rejected: the fn body only knows that x:int
 # f6(x:int := 3) := x=3

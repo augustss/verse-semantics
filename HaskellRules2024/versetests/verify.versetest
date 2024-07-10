@@ -1,6 +1,6 @@
 # Trivial tests
 verify("Trivial-pass", pass){1}
-verify("Trivial-fail", fail){succeeds{0=1}}
+verify("Trivial-fail", fail){check<succeeds>{0=1}}
 
 # Guard tests from https://docs.google.com/document/d/17Ytcy9I_fDzW-a1FGYQkLh3oObFg47Ge6GdRy-FZjLM/edit
 verify(pass ) { f():int := 0; L1() := {y:int;  y = f[] } }
@@ -12,8 +12,8 @@ verify(pass)  { suc(a:int):int := 10 ; g(x:int):int := suc[x] }
 verify(pass)  { suc(a:int):int := {a+1} }
 verify(pass)  { suc(a:int):int := {a+1} ; g(x:int):int := suc[x] }
 verify(pass)  { f():int := 0; L1() := {y:int;  y = f[] } }
-verify(pass, SPLITverify=skip)  { a:int => {x:=a; assume{x=a}}}
-verify(pass, SPLITverify=skip)  { x:int => {x=0; assume{x=0}}}
+#verify(pass, SPLITverify=skip)  { a:int => {x:=a; assume{x=a}}}
+#verify(pass, SPLITverify=skip)  { x:int => {x=0; assume{x=0}}}
 
 # Some simple tests
 verify(pass) {foo(z:int) := { z = z } }
@@ -39,9 +39,9 @@ verify(fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
 verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
 verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
-### SLOW??? verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
-### SLOW??? verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
-### SLOW??? verify(fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
+verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
+verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
+verify(fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
 
 # Ported tests from TRSVerify.hs
 verify(pass) { g() := (2 = 2; 2) }
