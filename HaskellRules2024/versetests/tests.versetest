@@ -4,271 +4,278 @@
 #       they should be equal but currently the test fails
 
 # Trivial tests
-testeq(pass) {2}                                   {2}
-testeq(pass) {x:=1; x}                             {1}
+testeq("EV1",pass) {2}                                   {2}
+testeq("EV2",pass) {x:=1; x}                             {1}
 
 # Arithmetic
-testeq(pass) {3+4}                                 {7}
-testeq(pass) {3-4}                                 {0-1}
-testeq(pass) {3*4}                                 {12}
-testeq(pass) {32/4}                                {8}
-testeq(pass) {1/0}                                 {:false}
-testeq(pass) {-3}                                  {0-3}
-testeq(pass) {+3}                                  {0+3}
+testeq("Arith1",pass) {3+4}                                 {7}
+testeq("Arith2",pass) {3-4}                                 {0-1}
+testeq("Arith3",pass) {3*4}                                 {12}
+testeq("Arith4",pass) {32/4}                                {8}
+testeq("Arith5",pass) {1/0}                                 {:false}
+testeq("Arith6",pass) {-3}                                  {0-3}
+testeq("Arith7",pass) {+3}                                  {0+3}
 
 # Comparison
-testeq(pass) {3<4}                                 {3}
-testeq(pass) {3<3}                                 {:false}
-testeq(pass) {3<2}                                 {:false}
-testeq(pass) {3<=4}                                {3}
-testeq(pass) {3<=3}                                {3}
-testeq(pass) {3<=2}                                {:false}
-testeq(pass) {3>4}                                 {:false}
-testeq(pass) {3>3}                                 {:false}
-testeq(pass) {3>2}                                 {3}
-testeq(pass) {3>=4}                                {:false}
-testeq(pass) {3>=3}                                {3}
-testeq(pass) {3>=2}                                {3}
-# No <> yet
-testeq(pass,refimpl=skip) {3<>4}                                {3}
-testeq(pass,refimpl=skip) {3<>3}                                {:false}
-testeq(pass,refimpl=skip) {3<>2}                                {3}
-testeq(pass) {3=4}                                 {:false}
-testeq(pass) {3=3}                                 {3}
-testeq(pass) {3=2}                                 {:false}
+testeq("Cmp1",pass) {3<4}                                 {3}
+testeq("Cmp2",pass) {3<3}                                 {:false}
+testeq("Cmp3",pass) {3<2}                                 {:false}
+testeq("Cmp4",pass) {3<=4}                                {3}
+testeq("Cmp5",pass) {3<=3}                                {3}
+testeq("Cmp6",pass) {3<=2}                                {:false}
+testeq("Cmp7",pass) {3>4}                                 {:false}
+testeq("Cmp8",pass) {3>3}                                 {:false}
+testeq("Cmp9",pass) {3>2}                                 {3}
+testeq("Cmp10",pass) {3>=4}                                {:false}
+testeq("Cmp11",pass) {3>=3}                                {3}
+testeq("Cmp12",pass) {3>=2}                                {3}
+testeq("Cmp13",pass,refimpl=skip) {3<>4}                                {3}
+testeq("Cmp14",pass,refimpl=skip) {3<>3}                                {:false}
+testeq("Cmp15",pass,refimpl=skip) {3<>2}                                {3}
+testeq("Cmp16",pass) {3=4}                                 {:false}
+testeq("Cmp17",pass) {3=3}                                 {3}
+testeq("Cmp18",pass) {3=2}                                 {:false}
 
 # Failing unifications
 # Values to consider: K, op, tuple, lambda
 # K
-testeq(pass) {1=2}                                 {:false}
+testeq("Unif",pass) {1=2}                                 {:false}
 # no prefix'op'
-testeq(pass,refimpl=skip) {1=prefix'-'}            {:false}
-testeq(pass) {1=(1,2)}                             {:false}
+testeq("Unif1",pass,refimpl=skip) {1=prefix'-'}            {:false}
+testeq("Unif2",pass) {1=(1,2)}                             {:false}
 # ICFP rules gets stuck on any lambda comparison
-testeq(pass,ICFP*=skip) {1=(x:any=>x)}                        {:false}
+testeq("Unif3",pass,ICFP*=skip) {1=(x:any=>x)}                        {:false}
 # op
-testeq(pass,refimpl=skip) {prefix'-'=1}                         {:false}
-testeq(pass,refimpl=skip,iblock=skip) {prefix'-'=prefix'+'}     {:false}
-testeq(pass,refimpl=skip) {prefix'-'=(1,2,3)}                   {:false}
-testeq(pass,refimpl=skip,ICFP*=skip,iblock=skip) {prefix'-'=(x:any=>x)}                {:false}
+testeq("Unif4",pass,refimpl=skip) {prefix'-'=1}                         {:false}
+testeq("Unif5",pass,refimpl=skip,iblock=skip) {prefix'-'=prefix'+'}     {:false}
+testeq("Unif6",pass,refimpl=skip) {prefix'-'=(1,2,3)}                   {:false}
+testeq("Unif7",pass,refimpl=skip,ICFP*=skip,iblock=skip) {prefix'-'=(x:any=>x)}                {:false}
 # tuple
-testeq(pass) {(1,2)=1}                             {:false}
-testeq(pass,refimpl=skip) {(1,2)=prefix'-'}        {:false}
-testeq(pass) {(1,2)=(1,2,3)}                       {:false}
-testeq(pass,ICFP*=skip) {(1,2)=(x:any=>x)}         {:false}
+testeq("Unif8",pass) {(1,2)=1}                             {:false}
+testeq("Unif9",pass,refimpl=skip) {(1,2)=prefix'-'}        {:false}
+testeq("Unif10",pass) {(1,2)=(1,2,3)}                       {:false}
+testeq("Unif11",pass,ICFP*=skip) {(1,2)=(x:any=>x)}         {:false}
 # lambda
-testeq(pass,ICFP*=skip) {(x:any=>x)=1}             {:false}
-testeq(pass,refimpl=skip,ICFP*=skip,iblock=skip) {(x:any=>x)=prefix'-'}                {:false}
-testeq(pass,ICFP*=skip) {(x:any=>x)=(1,2,3)}                  {:false}
-testeq(pass,ICFP*=skip,iblock=skip) {(x:any=>x)=(x:any=>1)}               {:false}
+testeq("Unif12",pass,ICFP*=skip) {(x:any=>x)=1}             {:false}
+testeq("Unif13",pass,refimpl=skip,ICFP*=skip,iblock=skip) {(x:any=>x)=prefix'-'}                {:false}
+testeq("Unif14",pass,ICFP*=skip) {(x:any=>x)=(1,2,3)}                  {:false}
+testeq("Unif15",pass,ICFP*=skip,iblock=skip) {(x:any=>x)=(x:any=>1)}               {:false}
 # Unification with equal values
-testeq(pass) {1=1}                                 {1}
+testeq("Unif16",pass) {1=1}                                 {1}
 # Not with POPL
-#testeq(pass,popl*=fail,refimpl=skip,icfp*=fail)
+#testeq("Unif17",pass,popl*=fail,refimpl=skip,icfp*=fail)
 #            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
-testeq(pass) {(1,2)=(1,2)}                         {(1,2)}
-testeq(pass,ICFP*=skip,iblock=skip) {(x:any=>x)=(x:any=>x)}               {:false}
+testeq("Unif18",pass) {(1,2)=(1,2)}                         {(1,2)}
+testeq("Unif19",pass,ICFP*=skip,iblock=skip) {(x:any=>x)=(x:any=>x)}               {:false}
+
+# If BIND is implemented in parallel, it may forget to substitute in the substitutions
+testeq("Unif20",pass) {x:any; y:any; x=y; y=1}  {1}
+testeq("Unif21",pass) {x:any; y:any; x=1; y=x}  {1}
+# Needs alpha conversion
+testeq("Unif22",pass) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
+# Needs alpha conversion
+testeq("Unif23",pass) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
+
 
 # Arrays
-testeq(pass){array{1;2;3}}                         {1,2,3}
-testeq(pass){array{}}                              {()}
-testeq(pass){Length(array{1;2;3})}                 {3}
-testeq(pass){Length(array{})}                      {0}
-testeq(pass){Length(array{_;_})}                   {2}
+testeq("Array1",pass){array{1;2;3}}                         {1,2,3}
+testeq("Array2",pass){array{}}                              {()}
+testeq("Array3",pass){Length(array{1;2;3})}                 {3}
+testeq("Array4",pass){Length(array{})}                      {0}
+testeq("Array5",pass){Length(array{_;_})}                   {2}
 
-testeq(pass,pldi=fail)
+testeq("Array6",pass,pldi=fail)
            {x:=(1,2); y:=(1,3); one{x=y}}         {:false}
-testeq(pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
+testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
 # This does not work left-to-right
-testeq(pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
+testeq("Array8",pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
+testeq("Array9",pass) { a := (0,1); a[0] }                   {0}
 
-# Functions
-testeq(pass){(x:int => x+1)[2]}                    {3}
-testeq(pass){(x:any => y:any => x+2*y)[2][3]}      {8}
-testeq(pass){(x:int => y:int => x+2*y)[2][3]}      {8}
-testeq(pass){function(x:int){x+1}[2]}              {3}
-testeq(pass){function(x:int)(y:int){x+2*y}[2][3]}  {8}
-
-# P desugaring, i.e., p:=e
-testeq(pass) {x:=1}                                {1}
-testeq(pass) {x:=1; x}                             {1}
-testeq(pass) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
-testeq(pass) {f(x:int)(y:int):=x*10+y; f[2][3]}    {23}
-testeq(pass) {:int:=5}                             {5}       # LA is this even allowed
-# fail/wrong? testeq(pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
-testeq(pass) {x:int:=1}                            {1}
-# fail/wrong? testeq(pass) {x:int:='a'}                          {:false}
-testeq(pass) {succ(x:any):=x+1; (y:succ):=1}       {2}   # XXX or 1?
-testeq(pass) {succ(x:any):=x+1; y:succ:=1; y}      {2}
-testeq(pass) {succ(x:any):int:=x+1; succ[5]}       {6}
-# XXX Not sure about these
-#testeq(pass) {x? := 5; x}                          {array{5}}
-#testeq(pass) {x? := 1/0; x}                        {array{}}
-testeq(pass) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
-testeq(pass) {i->x := 2; (i, x)}                   {2,2}
-testeq(pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
-testeq(pass) { x := ((:any) => 1)[x+1] }           {1}
-# Array LHS splicing
-testeq(skip,iblock=pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
-testeq(skip,iblock=pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq(skip,iblock=pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq(skip,iblock=pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-
-# L desugaring, i.e., l:t
-testeq(pass) {(x:int) = 5}                         {5}
-testeq(pass) {ap0(f(x:int):int) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
-testeq(pass) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
-testeq(pass) {ap0(f(x:int):=2)<invariant> := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
-testeq(pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
-# DESUGAR HOW?
-#testeq(pass) {(p^ : int) := 2}                      {p:=new[int][2]}
-# XXX Not sure about these
-#testeq(pass,refimpl=skip,icfp=skip) {x? : int}                            { x : ?int }
-#testeq(pass,refimpl=skip,icfp=skip) {x[] : int}                           { x : []int }
-testeq(pass) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
-# DESUGAR HOW?
-#testeq(pass) {p^[](:int):int}                      {0}
-
-# Times out with ICFPK
-testeq(pass,icfp=skip,icfp51=skip,l2r=skip) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a; (f(0,0),f(1,0))} {0,1}
-
-# Simple indexing
-testeq(pass) { a := (0,1); a[0] }                   {0}
 
 # Array expression splicing
-### SPLICE testeq(pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
-### SPLICE testeq(pass) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+### SPLICE testeq("EV",pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
+### SPLICE testeq("EV",pass) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
 
 #
-testeq(pass) {all{:(1,2,3)}}                            {1,2,3}
-testeq(pass) {all{x:(1,2,3); x}}                        {1,2,3}
-testeq(pass) {all{x:= :(1,2,3); x}}                     {1,2,3}
-testeq(pass) {all{x:(1,2,3)}}                           {1,2,3}
+testeq("All1",pass) {all{:(1,2,3)}}                            {1,2,3}
+testeq("All2",pass) {all{x:(1,2,3); x}}                        {1,2,3}
+testeq("All3",pass) {all{x:= :(1,2,3); x}}                     {1,2,3}
+testeq("All4",pass) {all{x:(1,2,3)}}                           {1,2,3}
 
-testeq(pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[0]}}     {1}
-testeq(pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[2]}}     {:false}
-testeq(pass) {t:=type{:int}; f(x:t)<invariant>:=x+1; f[0]}    {1}
-testeq(pass) {t:=type{:int}; f(x:t)<invariant>:=x+1; f[()]}   {:false}
-# These are very slow with alternative rules
-testeq(pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<invariant>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
-testeq(pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<invariant>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
+# Functions
+testeq("Fun1",pass){(x:int => x+1)[2]}                    {3}
+testeq("Fun2",pass){(x:any => y:any => x+2*y)[2][3]}      {8}
+testeq("Fun3",pass){(x:int => y:int => x+2*y)[2][3]}      {8}
+testeq("Fun4",pass){function(x:int){x+1}[2]}              {3}
+testeq("Fun5",pass){function(x:int)(y:int){x+2*y}[2][3]}  {8}
+# Function argument matching
+testeq("Fun6",pass,POPLR=skip,Block=skip,ICFP*=skip)
+             {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
+testeq("Fun7",pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
+             {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
+testeq("Fun8",pass) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
 
-# Try CBV fixpoint combinator.
-# Too slow with some rules
-testeq(pass,ICFP*=skip) {
-  Z(f:any) := ((x:any) => f[(v:any)=>x[x][v]])[(x:any) => f[(v:any)=>x[x][v]]];
-  fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
-  fac[3] }                                                                     {6}
+# P desugaring, i.e., p:=e
+testeq("Pat1",pass) {x:=1}                                {1}
+testeq("Pat2",pass) {x:=1; x}                             {1}
+testeq("Pat3",pass) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
+testeq("Pat4",pass) {f(x:int)(y:int):=x*10+y; f[2][3]}    {23}
+testeq("Pat5",pass) {:int:=5}                             {5}       # LA is this even allowed
+# fail/wrong? testeq("Pat",pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
+testeq("Pat6",pass) {x:int:=1}                            {1}
+# fail/wrong? testeq("Pat",pass) {x:int:='a'}                          {:false}
+testeq("Pat7",pass) {succ(x:any):=x+1; (y:succ):=1}       {2}   # XXX or 1?
+testeq("Pat8",pass) {succ(x:any):=x+1; y:succ:=1; y}      {2}
+testeq("Pat9",pass) {succ(x:any):int:=x+1; succ[5]}       {6}
+# XXX Not sure about these
+#testeq("Pat10",pass) {x? := 5; x}                          {array{5}}
+#testeq("Pat11",pass) {x? := 1/0; x}                        {array{}}
+testeq("Pat12",pass) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
+testeq("Pat13",pass) {i->x := 2; (i, x)}                   {2,2}
+testeq("Pat14",pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
+testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
+# Array LHS splicing
+testeq("Pat16",skip,iblock=pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+testeq("Pat17",skip,iblock=pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Pat18",skip,iblock=pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Pat19",skip,iblock=pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
-testeq(pass) {for(x:=1|2; y:=3|4) {x,y}}           {((1,3),(1,4),(2,3),(2,4))}
-testeq(pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
-testeq(pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
-testeq(pass) {for(x:=1|2|3){x>1}}                  {:false}
-testeq(pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip) {
-  upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
-  for(x:=upto[1,3]){x}}                           {(1,2,3)}
-# SLOW with PLDI
-testeq(pass,pldi=skip)
-            {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
-testeq(pass) {for(x:=1){x+1}}                      {array{2}}
-testeq(pass) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
-testeq(pass) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
-# times out with ICFPK
-testeq(pass,icfp=skip,icfp51=skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
+# L desugaring, i.e., l:t
+testeq("TB1",pass) {(x:int) = 5}                         {5}
+testeq("TB2",pass) {ap0(f(x:int):int) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
+testeq("TB3",pass) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
+testeq("TB4",pass) {ap0(f(x:int):=2)<invariant> := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
+testeq("TB5",pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
+# DESUGAR HOW?
+#testeq("TB6",pass) {(p^ : int) := 2}                      {p:=new[int][2]}
+# XXX Not sure about these
+#testeq("TB7",pass,refimpl=skip,icfp=skip) {x? : int}                            { x : ?int }
+#testeq("TB8",pass,refimpl=skip,icfp=skip) {x[] : int}                           { x : []int }
+testeq("TB9",pass) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
+# DESUGAR HOW?
+#testeq("TB10",pass) {p^[](:int):int}                      {0}
 
-### WRONG testeq(pass) {0[0]}                                {wrong}
-### WRONG testeq(pass) {operator'/'(1,0)}                    {wrong}
+# For
+#         Commented out until we implement 'for'; also re-add TRec3
+# testeq("For1",pass) {for(x:=1|2; y:=3|4) {x,y}}           {((1,3),(1,4),(2,3),(2,4))}
+# testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
+# testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
+# testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
+# testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
+# testeq("For6",pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip) {
+#   upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
+#   for(x:=upto[1,3]){x}}                           {(1,2,3)}
+# # SLOW with PLDI
+# testeq("For7",pass,pldi=skip)
+#             {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
+# testeq("For8",pass) {for(x:=1){x+1}}                      {array{2}}
+# testeq("For9",pass) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
+# testeq("For10",pass) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
+# # times out with ICFPK
+# testeq("For11",pass,icfp=skip,icfp51=skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
+# # Array access via choices
+# testeq("For12",pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
+# testeq("For13",pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
+# # Non-ANF array access
+# testeq("For14",pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
-testeq(pass) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
-### WRONG testeq(pass) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
-
-### WRONG testeq(pass) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
-testeq(pass) {swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))); p:any; swapGood[p] = (2,3); p } {(3,2)}
 
 # Joachim's tests
 # Check that BIND removes _one_ unification only
-testeq(pass,icfp*=skip) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
-testeq(pass) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
-testeq(pass) {x:any; y:any; x = y; x = y; x = 1}  {1}
-# Is this WRONG? testeq(pass) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
-
-# If BIND is implemented in parallel, it may forget to substitute in the substitutions
-testeq(pass) {x:any; y:any; x=y; y=1}  {1}
-testeq(pass) {x:any; y:any; x=1; y=x}  {1}
-# Needs alpha conversion testeq(pass) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
-# Needs alpha conversion testeq(pass) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
-
-# Array access via choices
-testeq(pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
-testeq(pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
-# Non-ANF array access
-testeq(pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
+testeq("JB1",pass,icfp*=skip) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
+testeq("JB2",pass) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
+testeq("JB3",pass) {x:any; y:any; x = y; x = y; x = 1}  {1}
+testeq("JB4",pass) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
 
 # Recursion
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
+testeq("TRec1",pass,POPLR=skip,Block=skip,ICFP*=skip)
             {f(n:any) := if (n = 0) then 1 else f(n-1); f(1)}  {1}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
+testeq("TRec2",pass,POPLR=skip,Block=skip,ICFP*=skip)
             {fac(n:any) := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
 # SLOW with PLDI
-#testeq(pass) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
+# testeq("TRec3",pass) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
 #            odd(n:int)  := if (n = 0)  {0} else  {even(n-1)};
-#            for(x := 0|1|2|3)  {(even(x), odd(x))}
+#           for(x := 0|1|2|3)  {(even(x), odd(x))}
 #            }
 #            {((1,0), (0,1), (1,0), (0,1))}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip)
-             {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
-testeq(pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
-             {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
 
-# Function argument matching
-testeq(pass) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
+
 
 # Non-retractions as types
-testeq(pass) {succ(n:int) := n + 1; a:succ := 2; a}  {3}
-testeq(pass) {succ(n:int) := n + 1;
+testeq("Type1",pass) {succ(n:int) := n + 1; a:succ := 2; a}  {3}
+testeq("Type2",pass) {succ(n:int) := n + 1;
             f(m:succ) := m;
             f(5)
             }
             {6}
 
 # Evaluation in if
-testeq(pass) {if(y:int; y=1) 42 else 23}  {42}
-testeq(pass) {if(y:int; y=1) y else 23}  {1}
+testeq("TIf1",pass) {if(y:int; y=1) 42 else 23}  {42}
+testeq("TIF2",pass) {if(y:int; y=1) y else 23}  {1}
+
+# Random collection
+testeq("EV10",pass) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a;
+                    (f(0,0),f(1,0))} {0,1}
+
+testeq("EV11",pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[0]}}     {1}
+testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[2]}}     {:false}
+testeq("EV13",pass) {t:=type{:int}; f(x:t)<invariant>:=x+1; f[0]}    {1}
+testeq("EV14",pass) {t:=type{:int}; f(x:t)<invariant>:=x+1; f[()]}   {:false}
+# These are very slow with alternative rules
+testeq("EV15",pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<invariant>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
+testeq("EV16",pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<invariant>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
+
+# Try CBV fixpoint combinator.
+# Too slow with some rules
+testeq("EV17",pass,ICFP*=skip) {
+  Z(f:any) := ((x:any) => f[(v:any)=>x[x][v]])[(x:any) => f[(v:any)=>x[x][v]]];
+  fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
+  fac[3] }                                                                     {6}
+
+### WRONG testeq("EV18",pass) {0[0]}                                {wrong}
+### WRONG testeq("EV19",pass) {operator'/'(1,0)}                    {wrong}
+
+testeq("EV20",pass) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
+### WRONG testeq("EV21",pass) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
+
+### WRONG testeq("EV22",pass) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
+testeq("EV23",pass) {swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))); p:any; swapGood[p] = (2,3); p } {(3,2)}
 
 # Confluence: Needs local substitution
-testeq(pass) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}}
+testeq("EV24",pass) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}}
              {x : int; if (y:int; y = 1; y = x; y > 1)  {42} else {23}}
 
 # Various combinations ';', '=', and application.
-testeq(pass) { (1=1) = (1=1) }         {1}
-testeq(pass) { (1=1) = (2;1) }         {1}
-testeq(pass) { (1=1) = ( +1) }         {1}
-testeq(pass) { (2;1) = (1=1) }         {1}
-testeq(pass) { (2;1) = (2;1) }         {1}
-testeq(pass) { (2;1) = ( +1) }         {1}
-testeq(pass) { ( +1) = (1=1) }         {1}
-testeq(pass) { ( +1) = (2;1) }         {1}
-testeq(pass) { ( +1) = ( +1) }         {1}
-testeq(pass) { (1=1) ; (1=1) }         {1}
-testeq(pass) { (1=1) ; (2;1) }         {1}
-testeq(pass) { (1=1) ; ( +1) }         {1}
-testeq(pass) { (2;1) ; (1=1) }         {1}
-testeq(pass) { (2;1) ; (2;1) }         {1}
-testeq(pass) { (2;1) ; ( +1) }         {1}
-testeq(pass) { ( +1) ; (1=1) }         {1}
-testeq(pass) { ( +1) ; (2;1) }         {1}
-testeq(pass) { ( +1) ; ( +1) }         {1}
+testeq("EV30",pass) { (1=1) = (1=1) }         {1}
+testeq("EV31",pass) { (1=1) = (2;1) }         {1}
+testeq("EV32",pass) { (1=1) = ( +1) }         {1}
+testeq("EV33",pass) { (2;1) = (1=1) }         {1}
+testeq("EV34",pass) { (2;1) = (2;1) }         {1}
+testeq("EV35",pass) { (2;1) = ( +1) }         {1}
+testeq("EV36",pass) { ( +1) = (1=1) }         {1}
+testeq("EV37",pass) { ( +1) = (2;1) }         {1}
+testeq("EV38",pass) { ( +1) = ( +1) }         {1}
+testeq("EV39",pass) { (1=1) ; (1=1) }         {1}
+testeq("EV40",pass) { (1=1) ; (2;1) }         {1}
+testeq("EV41",pass) { (1=1) ; ( +1) }         {1}
+testeq("EV42",pass) { (2;1) ; (1=1) }         {1}
+testeq("EV43",pass) { (2;1) ; (2;1) }         {1}
+testeq("EV44",pass) { (2;1) ; ( +1) }         {1}
+testeq("EV45",pass) { ( +1) ; (1=1) }         {1}
+testeq("EV46",pass) { ( +1) ; (2;1) }         {1}
+testeq("EV47",pass) { ( +1) ; ( +1) }         {1}
 # Cannot have = in the function part, it is WRONG
-testeq(pass) {       + (1=1) }         {1}
-testeq(pass) {       + (2;1) }         {1}
-testeq(pass) {       + ( +1) }         {1}
+testeq("EV48",pass) {       + (1=1) }         {1}
+testeq("EV49",pass) {       + (2;1) }         {1}
+testeq("EV50",pass) {       + ( +1) }         {1}
 #
-testeq(pass) { succ(x:any):=intAdd$[x,1]; y:succ       =1; y }     { 2 }
-testeq(pass) { succ(x:any):=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
+testeq("EV51",pass) { succ(x:any):=intAdd$[x,1]; y:succ       =1; y }     { 2 }
+testeq("EV52",pass) { succ(x:any):=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
 
 # --- What is first?
-# testeq(pass) { first{1} }              {1}
-# testeq(pass) { first{1|2} }            {1}
-# testeq(pass) { first{:false} }         {:false}
-# testeq(pass) { first(x:=1|2){x+1} }    {2}
+# testeq("EV",pass) { first{1} }              {1}
+# testeq("EV",pass) { first{1|2} }            {1}
+# testeq("EV",pass) { first{:false} }         {:false}
+# testeq("EV",pass) { first(x:=1|2){x+1} }    {2}
+
+

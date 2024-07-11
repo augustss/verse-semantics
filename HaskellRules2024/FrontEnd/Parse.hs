@@ -116,12 +116,13 @@ pWordOp :: P String
 --   -----------------------
 --   wombat        "wombat"
 --   operator'+'   "+"
+--   prefix'+'     "+"
 --
 pWordOp = do
   w0 <- pWord
   suf <- optional (char '$')
   let w = w0 ++ maybeToList suf
-  if w =="operator"
+  if w `elem` ["operator", "prefix"]
    then do { _ <- char '\''
            ; op <- takeWhile1P Nothing (`elem` opChars)
            ; _ <- char '\''
