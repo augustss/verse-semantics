@@ -92,7 +92,7 @@ data PrimOp
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr
+ | IsInt | IsStr | IsChar
  deriving
    ( Eq, Ord, Bounded, Enum, Show )
 
@@ -111,17 +111,19 @@ primOpString Lt  = "intLT$"
 primOpString LEq = "intLE$"
 primOpString NEq = "intNE$"
 
-primOpString IsInt = "isInt$"
-primOpString IsStr = "isStr$"
+primOpString IsInt  = "isInt$"
+primOpString IsStr  = "isStr$"
+primOpString IsChar = "isChar$"
 
 primOpCanFail :: PrimOp -> Bool
-primOpCanFail Gt    = True
-primOpCanFail Lt    = True
-primOpCanFail NEq   = True
-primOpCanFail GEq   = True
-primOpCanFail LEq   = True
-primOpCanFail IsInt = True
-primOpCanFail IsStr = True
+primOpCanFail Gt     = True
+primOpCanFail Lt     = True
+primOpCanFail NEq    = True
+primOpCanFail GEq    = True
+primOpCanFail LEq    = True
+primOpCanFail IsInt  = True
+primOpCanFail IsStr  = True
+primOpCanFail IsChar = True
 
 primOpCanFail Add = False
 primOpCanFail Sub = True
@@ -541,14 +543,43 @@ unbindAs x bnd = subst [(y,Var x)] e where (y,e) = unsafeUnbind bnd
 
 alphaRename :: [Ident] -> Bind Expr -> (Ident,Expr)
 -- Open up the binding, but avoiding any of the binders in `forb`
-alphaRename forb t = alphaRenameBindWith (\x y -> subst [(x,Var y)]) forb t
+-- or free in the binding
+alphaRename forb top_t
+  = alphaRenameBindWith freshen top_t
+  where
+    full_forb = forb ++ free top_t
+    freshen x t
+      | x `elem` full_forb = (x', subst [(x,Var x')] t)
+      | otherwise          = (x, t)
+      where
+        x' = identNotIn forb
 
 alphaRenameVerify :: [Ident] -> BindList ([Assump], Expr) -> ([Ident], ([Assump], Expr))
+-- Open up a Verify block, avoiding any skolems in `forb`
+-- (Unlike alphaRename we expect these to include all the in-scope
+--  skolems, so we don't need to take the free vars of the BindList
 alphaRenameVerify forb bl
-  = alphaRenameBindListWith ren forb bl
+  = alphaRenameBindListWith freshen bl
   where
-     ren :: [(Ident,Ident)] -> ([Assump],Expr) -> ([Assump],Expr)
-     ren prs (as,e) = (as, subst [(x,Var y) | (x,y) <- prs] e)
+     freshen rs (as,e) = (rs', (map (substAssump prs) as, substSkol prs e))
+       where
+         (rs', prs) = freshenSkolVars forb rs
+
+freshenSkolVars :: [Ident]           -- Forbidden
+                -> [Ident]           -- Freshen these
+                -> ( [Ident]         -- Fresh
+                   , Subst Ident )   -- Old-to-new mapping, maybe empty
+
+freshenSkolVars top_forb top_rs
+  = go top_forb [] [] top_rs
+  where
+    go _ rs' prs []
+      = (reverse rs', reverse prs)
+    go forb rs' prs (r:rs)
+      | r `elem` forb = go (r':forb) (r':rs') ((r,r'):prs) rs
+      | otherwise     = go (r:forb)  (r:rs')  prs          rs
+      where
+        r' = skolNotIn forb
 
 -- Sorts binders and renames variables
 -- TODO: new normalization for x=y
@@ -601,7 +632,9 @@ norm orig_e = alpha 0 orig_e
 
 subst :: Subst Expr -> Expr -> Expr
 -- Domain of substitution does not include skolems
-subst sub orig_e = go orig_e
+subst sub orig_e
+  | null sub  = orig_e      -- Short cut
+  | otherwise = go orig_e
   where
     go (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
     go (Arr es)     = Arr (map go es)
@@ -624,7 +657,9 @@ subst sub orig_e = go orig_e
 
 substSkol :: Subst Ident -> Expr -> Expr
 -- Domain of substitution is skolem variables; range is just an identifier
-substSkol sub orig_e = go orig_e
+substSkol sub orig_e
+  | null sub  = orig_e    -- Short cut
+  | otherwise = go orig_e
   where
     go (Var x)      = Var (head $ [e | (y,e) <- sub, y == x] ++ [x])
     go (Arr es)     = Arr (map go es)
@@ -646,9 +681,13 @@ substSkol sub orig_e = go orig_e
     go_verify sub' (as,e) = (map (substAssump sub') as, substSkol sub' e)
 
 substAssump :: Subst Ident -> Assump -> Assump
-substAssump sub (A_GVEq x gv)      = A_GVEq (lookupIdSubst sub x) (substGV sub gv)
-substAssump sub (A_PrimOp x op gv) = A_PrimOp (lookupIdSubst sub x) op (substGV sub gv)
-substAssump sub (A_Fails asm)      = A_Fails (substAssump sub asm)
+substAssump sub top_asm
+  | null sub  = top_asm      -- Short cut
+  | otherwise = go  top_asm
+  where
+    go (A_GVEq x gv)      = A_GVEq (lookupIdSubst sub x) (substGV sub gv)
+    go (A_PrimOp x op gv) = A_PrimOp (lookupIdSubst sub x) op (substGV sub gv)
+    go (A_Fails asm)      = A_Fails (go asm)
 
 substGV :: Subst Ident -> GroundVal -> GroundVal
 substGV sub (GVVar x)  = GVVar (lookupIdSubst sub x)
@@ -656,7 +695,10 @@ substGV _   (GVLit l)  = GVLit l
 substGV sub (GVArr vs) = GVArr (map (substGV sub) vs)
 
 lookupIdSubst :: Subst Ident -> Ident -> Ident
-lookupIdSubst sub x = head $ [y | (x',y) <- sub, x==x']
+lookupIdSubst sub x
+  = case [y | (x',y) <- sub, x==x'] of
+      (y:_) -> y
+      []    -> x
 
 --------------------------------------------------------------------------------
 --

@@ -127,39 +127,24 @@ instance Variables t => Variables (Bind t) where
   variables f (Bind x t) = f x (variables f t)
 
 alphaRenameBindWith :: Variables t
-                    => (Ident -> Ident -> t -> t)  -- Renamer
-                    -> [Ident]                     -- Forbidden
+                    => (Ident -> t -> (Ident, t))  -- Freshen
                     -> Bind t -> (Ident, t)
 -- Recommended way to walk inside a Bind
 --    (ren x y t) should replace all uses of `x` by `y` in `t`
 --
 --ToDo: ;combination of 'free' and 'forb' seems excessive
-alphaRenameBindWith ren forb (Bind x t)
-  | x `notElem` forb = (x, t)
-  | otherwise        = (x', ren x x' t)
- where
-  zs = forb ++ free t
-  x' = identNotIn zs
+alphaRenameBindWith freshen (Bind x t)
+  = freshen x t
 
 alphaRenameBindListWith :: Variables t
-                        => ([(Ident,Ident)] -> t -> t)  -- Renamer
-                        -> [Ident]                      -- Forbidden
+                        => ([Ident] -> t -> ([Ident], t))  -- Freshen
                         -> BindList t -> ([Ident], t)
 -- Recommended way to walk inside a Bind
 --    (ren x y t) should replace all uses of `x` by `y` in `t`
-alphaRenameBindListWith ren top_forb bl
-  = go (top_forb ++ free bl) [] bl
+alphaRenameBindListWith freshen bl
+  = freshen rs body
   where
-    go _ rn_prs (Body t)
-      | null rn_prs = ([], t)
-      | otherwise   = ([], ren (reverse rn_prs) t)
-    go forb prs (Binder (Bind x t)) = (x':xs', t')
-      where
-        (xs', t') = go (x':forb) prs' t
-        (x', prs') | x `elem` forb = (new_x, (x,new_x):prs)
-                   | otherwise     = (x,     prs)
-                   where
-                     new_x = identNotIn forb
+    (rs, body) = unsafeUnbindList bl
 
 unsafeUnbind :: Bind t -> (Ident, t)
 -- Non-recommended way to walk inside a Bind

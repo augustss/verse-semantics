@@ -88,7 +88,7 @@ verifyRules env lhs =
       guard (unsat env')
       pure (Arr [])
    ++
-   "SKOLEMIZE" `name`
+   "SKOLEMIZE" `nameWith`
    do (env', rs, as, e) <- matchVerify env lhs
       (ctx, Some v) <- proofX [] e
       let all_rs = skolVars env'
@@ -96,9 +96,10 @@ verifyRules env lhs =
       guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
           r  = skolNotIn all_rs
-      pure $ Verify $ bindList (r:rs) $
-             (as, Exi $ bind x $
-                  Var x :=: (v :@: Var r) :>: (ctx <@ Var x) )
+      pure $ ( pPrint (r,x,rs, all_rs)
+             , Verify $ bindList (r:rs) $
+               (as, Exi $ bind x $
+                    Var x :=: (v :@: Var r) :>: (ctx <@ Var x) ))
 
 {-   -- SPJ: what is this rule?
    ++

@@ -97,12 +97,13 @@ dsSmall = ds
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Expand type{t} to Fun(x := t)<closed>{x}
-    --    ds (Typedef e) = do { x <- newIdent (getLoc e) "x"
-    --                        ; ds $ Function [(eDefine x e, [closedId])] (Variable x) }
-    --  But a more direct desugaring, which generates less verification clutter,
-    --  is   type{t} --> \x. x=t
     ds (Typedef e) = do { x <- newIdent (getLoc e) "x"
-                        ; Lam x <$> (Unify (Variable x) <$> ds e) }
+                        ; ds $ Function [(eDefine x e, [closedId])] (Variable x) }
+    --  S more direct desugaring, which generates less verification clutter,
+    --  is   type{t} --> \x. x=t
+    -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
+    --     ds (Typedef e) = do { x <- newIdent (getLoc e) "x"
+    --                         ; Lam x <$> (Unify (Variable x) <$> ds e) }
 
     -- Function notation
     ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [closedId])] e2

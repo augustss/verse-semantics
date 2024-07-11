@@ -429,7 +429,6 @@ instance Pretty SrcExpr where
                             cat [ text "fun" <> hcat (map ppArs ars)
                                 , indent (ppB b) ]
                 where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
---          Typedef e -> text "type" <> ppB e
           Blk es       -> braces $ ppSeq l es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e     -> parens (ppr 0 e)
@@ -577,7 +576,6 @@ compos f (Function ers b)   = Function <$> traverse g ers <*> f b
   where g (e, r) = (,) <$> f e <*> pure r
 compos f (Blk es)           = Blk <$> traverse f es
 compos f (Option me)        = Option <$> traverse f me
---compos f (Typedef b) = Typedef <$> f b
 compos f (Parens e)         = Parens <$> f e
 compos f (Set e1 op e2)     = Set <$> f e1 <*> pure op <*> f e2
 compos f (MVar i e1 e2)     = MVar i <$> traverse f e1 <*> traverse f e2
@@ -669,7 +667,6 @@ getVisibleBinders = go
     go (Let _ e)      = go e   -- ToDo: why not first arg?
     go (Unify e1 e2)  = go e1 ++ go e2
     go (Range _fx e)   = go e
-    --go (Typedef _)  = []
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e

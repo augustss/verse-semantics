@@ -110,6 +110,12 @@ rulesApplication _env lhs =
        Lit (LStr _) -> pure a
        _            -> []  -- ToDo: what is idomatic here?
  ++
+  "APP-ISCHAR" `name`
+  do Op IsChar :@: a <- [lhs]
+     case a of
+       Lit (LChar _) -> pure a
+       _             -> []  -- ToDo: what is idomatic here?
+ ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]
      guard (isVal v)
