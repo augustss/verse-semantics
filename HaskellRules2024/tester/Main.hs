@@ -84,13 +84,15 @@ testInfo :: Test -> TestInfo
 testInfo (TestEvalEq ti _ _) = ti
 testInfo (TestVerify   ti _) = ti
 
-data TestInfo = TestInfo
-  { testMName  :: !(Maybe String)
-  , testLocn   :: !Loc
-  , testType   :: !TestType                      -- default test type
-  , testExcn   :: ![((String, Bool), TestType)]  -- the bool indicates the the string is just a prefix
-  }
-  deriving (Show)
+data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code... }
+                 -- The stuff in the parens is the TestInfo
+  TestInfo
+    { testMName  :: !(Maybe String)
+    , testLocn   :: !Loc
+    , testType   :: !TestType                      -- default test type
+    , testExcn   :: ![((String, Bool), TestType)]  -- the bool indicates the the string is just a prefix
+    }
+    deriving (Show)
 
 data TestType
   = TPass                 -- test should pass

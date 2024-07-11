@@ -3,115 +3,155 @@ verify("Trivial-pass", pass){1}
 verify("Trivial-fail", fail){check<succeeds>{0=1}}
 
 # Guard tests from https://docs.google.com/document/d/17Ytcy9I_fDzW-a1FGYQkLh3oObFg47Ge6GdRy-FZjLM/edit
-verify(pass ) { f():int := 0; L1() := {y:int;  y = f[] } }
-verify(fail)  { f():int := 0; L2() := {y:any; y='m'; int[y]; y=f() } }
-verify(fail)  { f():int := 0; L2() := {y:int; y='m';         y=f() } }
-verify(fail)  { f(x:int) := int[x]; PC1() := {z := 'm' ; f[z] } }
-verify(pass)  { suc(a:int) := 10 ; g(x:int) := suc[x] }
-verify(pass)  { suc(a:int):int := 10 ; g(x:int):int := suc[x] }
-verify(pass)  { suc(a:int):int := {a+1} }
-verify(pass)  { suc(a:int):int := {a+1} ; g(x:int):int := suc[x] }
-verify(pass)  { f():int := 0; L1() := {y:int;  y = f[] } }
+verify("Guard1", pass ) { f():int := 0; L1() := {y:int;  y = f[] } }
+verify("Guard2", fail)  { f():int := 0; L2() := {y:any; y='m'; int[y]; y=f() } }
+verify("Guard3",fail)  { f():int := 0; L2() := {y:int; y='m';         y=f() } }
+verify("Guard4",fail)  { f(x:int) := int[x]; PC1() := {z := 'm' ; f[z] } }
+verify("Guard5",pass)  { suc(a:int) := 10 ; g(x:int) := suc[x] }
+verify("Guard6",pass)  { suc(a:int):int := 10 ; g(x:int):int := suc[x] }
+verify("Guard7",pass)  { suc(a:int):int := {a+1} }
+verify("Guard8",pass)  { suc(a:int):int := {a+1} ; g(x:int):int := suc[x] }
+verify("Guard9",pass)  { f():int := 0; L1() := {y:int;  y = f[] } }
 #verify(pass, SPLITverify=skip)  { a:int => {x:=a; assume{x=a}}}
 #verify(pass, SPLITverify=skip)  { x:int => {x=0; assume{x=0}}}
 
 # Some simple tests
-verify(pass) {foo(z:int) := { z = z } }
-verify(pass) {foo(z:any) := { x:int = 1; int[x] } }
-verify(pass) {f(x:int):={x=x;x}}
-verify(pass) {f(x:int):=x+1}
-verify(fail) {f(x:int):=x+()}
-verify(pass) {f(x:int):=x; f(1)}
-verify(pass) {f(x:int):=x+1; f(1)}
-verify(fail) {f(x:int):=x; f()}
-verify(fail) {f(x:int):=x+1; f()}
-verify(pass) {f(x:int):int=x}
-verify(pass) {f(x:int):int=x+1; f(1)}
-verify(fail) {f(x:int):int=x+1; f()}
-verify(pass) {f(x:int):int = x; a := f(1); int[a] }
-verify(pass) {f(x:int):int=x+1; f(1)+1}
-verify(fail) {f(x:int):int=x+1; f(1)+()}
-verify(pass) {f(x:int,y:int)<decides> := (x > 0) }
-verify(pass) {f(x:int,y:int) := if (x > 0) then { 1 } else { 2 } }
-verify(fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
+verify("ReflInt1",pass) {foo(z:int) := { z = z } }
+verify("ReflInt2",pass) {f(x:int):={x=x;x}}
+verify("T1",pass) {foo(z:any) := { x:int = 1; int[x] } }
+verify("T3",pass) {f(x:int):=x+1}
+verify("T4",fail) {f(x:int):=x+()}
+verify("T5",pass) {f(x:int):=x; f(1)}
+verify("T6",pass) {f(x:int):=x+1; f(1)}
+verify("T7",fail) {f(x:int):=x; f()}
+verify("T8",fail) {f(x:int):=x+1; f()}
+verify("T9",pass) {f(x:int):int=x}
+verify("T10",pass) {f(x:int):int=x+1; f(1)}
+verify("T11",fail) {f(x:int):int=x+1; f()}
+verify("T12",pass) {f(x:int):int = x; a := f(1); int[a] }
+verify("T13",pass) {f(x:int):int=x+1; f(1)+1}
+verify("T14",fail) {f(x:int):int=x+1; f(1)+()}
+verify("T15",pass) {f(x:int,y:int)<decides> := (x > 0) }
+verify("T16",pass) {f(x:int,y:int) := if (x > 0) then { 1 } else { 2 } }
+verify("T17",fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
 
 ### # Times out with ICFP rules
-verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
-verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
-verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
-verify(pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
-verify(fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
-verify(fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
+verify("T18",fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
+verify("T19",pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
+verify("T20",fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
+verify("T21",pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
+verify("T22",fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
+verify("T23",fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
 
 # Ported tests from TRSVerify.hs
-verify(pass) { g() := (2 = 2; 2) }
-verify(pass) { ex01(x:any) := x }
-verify(pass) { g(x:int) := x }
-verify(pass) { g(x:int):int := x }
-verify(pass) { g(x:any):int := { if (int[x]) then 10 else 20 } }
-verify(fail) { g(x:any):int := { if (int(x)) then 10 else 20 } }
-verify(pass) { suc(a:int):int := {a + 1} ; g(x:int):int := { suc(x) } }
-verify(pass) { foo(x:any):int := if (int[x]) then { x } else { 0 } }
-verify(pass) { foo(x:any):int := if (int[x]) then { x + 1 } else { 0 } }
-verify(pass,SPLITverify=skip) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
-verify(pass,SPLITverify=skip) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
-verify(pass,SPLITverify=skip) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
-verify(pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
+verify("T24",pass) { g() := (2 = 2; 2) }
+verify("T25",pass) { ex01(x:any) := x }
+verify("T26",pass) { g(x:int) := x }
+verify("T27",pass) { g(x:int):int := x }
+verify("T28",pass) { g(x:any):int := { if (int[x]) then 10 else 20 } }
+verify("T29",fail) { g(x:any):int := { if (int(x)) then 10 else 20 } }
+verify("T30",pass) { suc(a:int):int := {a + 1} ; g(x:int):int := { suc(x) } }
+verify("T31",pass) { foo(x:any):int := if (int[x]) then { x } else { 0 } }
+verify("T32",pass) { foo(x:any):int := if (int[x]) then { x + 1 } else { 0 } }
+verify("T36",pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
 
 # Testing 'if' with 'mustDecide'
-verify(pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
-verify(fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
-verify(pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
+verify("T37",pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
+verify("T38",fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
+verify("T39",pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
 
 # stuck tests
-verify(fail) { ex_stuck1(x:any) := { y:any; y } }
-verify(fail) { ex_stuck2(x:any) := { y:any; z:any; y = (x, (x, y)); y } }
-verify(fail) { ex_stuck3(x:any) := { y:any; if (y = 3) then { y = 3 } else { y = 4 } } }
-verify(pass) { f(x:int) := {y:any; if (x > 1) then { y = 1 } else { y = 2 }; y} }
-verify(fail) { f(x:int) := {y:any; if (y > 1) then { y = 1 } else { y = 2 }; y} }
+verify("T40",fail) { ex_stuck1(x:any) := { y:any; y } }
+verify("T41",fail) { ex_stuck2(x:any) := { y:any; z:any; y = (x, (x, y)); y } }
+verify("T42",fail) { ex_stuck3(x:any) := { y:any; if (y = 3) then { y = 3 } else { y = 4 } } }
+verify("T43",pass) { f(x:int) := {y:any; if (x > 1) then { y = 1 } else { y = 2 }; y} }
+verify("T44",fail) { f(x:int) := {y:any; if (y > 1) then { y = 1 } else { y = 2 }; y} }
 
 # shows that Unfold-If is UNSOUND; instead use `Fork-If`
-verify(fail) { foo(n:any):int := if (int[n]) then { 0 } else { (1,2) } }
-verify(fail) { foo(n:any):int := if (int[n]) then { n } else { (1,2) } }
-verify(fail) { foo(n:any):int := if (0 < n) then { n } else { n } }
-### TODO:RECURSION verify(fail) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { n } }
-### TODO:RECURSION verify(fail) { sum(n:any):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
-
-### # higher-order functions
-verify(pass) { f(g(z:int):int) := {g(3)} }
-verify(fail) { f(g(z:int):int) := {g(())} }
-verify(pass) { f(g(z:int):int):int := {g(3)} }
-verify(fail) { f(g(z:int):int):int := {g(())} }
-verify(pass) { suc(x:int) := {99}; ex6(h(z:int):int) := {3}; ex6(suc) }
-verify(pass) { ex6(hog(z:int):int):int := {hog(3)}  }
-verify(pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
-verify(fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
-verify(pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
-verify(fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; ex6(suc) }
-verify(fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
+verify("T45",fail) { foo(n:any):int := if (int[n]) then { 0 } else { (1,2) } }
+verify("T46",fail) { foo(n:any):int := if (int[n]) then { n } else { (1,2) } }
+verify("T47",fail) { foo(n:any):int := if (0 < n) then { n } else { n } }
 
 ### # flex/rigid tests
-verify(pass) { ex_rigid2flex(x:int) := {y := x; y} }
-verify(fail) { ex_flex2rigid1(x:int) := {x = 3} }
-verify(pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
-
-# decides
-verify(pass) { three(x:any)<decides> := { x = 3 } }
-verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {x} }
-verify(pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {3} }
-verify(fail) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {4} }
-verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := z }
-verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 666 }
-verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 42 }
-verify(pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 708 - z }
-verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 }
-verify(fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
+verify("T48",pass) { ex_rigid2flex(x:int) := {y := x; y} }
+verify("T49",fail) { ex_flex2rigid1(x:int) := {x = 3} }
+verify("T50",pass) { ex_flex2rigid2(x:int where x=3) := { x = 3} }
 
 # disallow any to unify with int?
-verify(pass) { foo(x:any)<decides> := { x = 666 } }
-verify(pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
-verify(pass) {f(x:int)<succeeds>:=x/2}
-verify(fail) {f(x:int)<succeeds>:=x/0}
+verify("T51",pass) { foo(x:any)<decides> := { x = 666 } }
+verify("T52",pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
+verify("T53",pass) {f(x:int)<succeeds>:=x/2}
+verify("T54",fail) {f(x:int)<succeeds>:=x/0}
+verify("T55",fail) {f(x:int)(y:int):int := (x,y)}
+
+# Effects
+verify("Eff1",pass) {f(x:int)<succeeds>:int := x}
+verify("Eff2",pass) {f(x:int)<decides>:int := x}
+
+# Currying
+verify("Curry1",pass){ f(x:int)(y:int):int := x+y }
+
+# Stuck-ness
+verify("Stuck1",fail){ f(x:int):int := x; check<succeeds>{ y := f9[y] } }
+
+# Opacity
+verify("Opacity1", fail) { f(x:int := 3) := x=3 }
+      # Opacity1: the fn body only knows that x:int
+verify("Opacity2", pass) {f(x:int := 3)<decides> := x=3 }
+      # Opacity2: fn body only knows that x:int, but we have <decides>
+verify("Opacity3", fail) { f(x:int)<decides>:type{x=3} := x+1 }
+verify("Opacity4", pass) { three(x:int)<decides> := x = 3; main() := y<succeeds>:three := 3 }
+      # Opacity4: 'main' should verify despite three's<decides>, because 'three' is transparent
+
+# if-then-else (negations)
+verify("If1",pass) { f(:any) := { 2 = if (1) then {2} else {99} } }
+verify("If2", pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
+verify("If3", pass) { f(:any) := { if (x:=1) then {x} else {2} } }
+
+# Recursion
+verify("Rec1",pass) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
+verify("Rec2",pass) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
+verify("Rec3",pass) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
+
+### Higher-order functions
+verify("HO1",pass) { f(g(z:int):int) := {g(3)} }
+verify("HO2",fail) { f(g(z:int):int) := {g(())} }
+verify("HO3",pass) { f(g(z:int):int):int := {g(3)} }
+verify("HO4",fail) { f(g(z:int):int):int := {g(())} }
+verify("HO5",pass) { suc(x:int) := {99}; ex6(h(z:int):int) := {3}; ex6(suc) }
+verify("HO6",pass) { ex6(hog(z:int):int):int := {hog(3)}  }
+verify("HO7",pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify("HO8",fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify("HO9",pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify("HO10",fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; ex6(suc) }
+verify("HO11",fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
+
+## Koen's hof examples
+verify("HO12", pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
+verify("HO13",fail) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
+verify("HO14",pass) { gg(x:any) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be accepted
+verify("HO15",fail) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } } # because f expects g to return an int, and it doesn't
+verify("HO16",pass) { bar1(x:int):type{_(:int):char} := { (y:int) => {'m' } } }
+verify("HO17",fail) { bar2(x:int):type{_(:int):char} := { (y:int) => { 3  } } } # REJECT the function returns an int not a string
+verify("HO18",fail) { bar3(x:int):type{_(:int):char} := { (y:nat) => { 'a'} } } # REJECT the function only works on naturals but is supposed to work on ints
+verify("HO19",pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEPT the function works on more than ints
+
+# Tim tests
+# Simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
+verify("Tim1", pass) { f(x:int) := x; foo(:any) := {f[_]=3} }
+verify("Tim2", fail) { f(x:int) := x; foo(:any) := {f[_]='3'} }
+
+# decides
+verify("Dec1",pass) { three(x:any)<decides> := { x = 3 } }
+verify("Dec2",pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {x} }
+verify("Dec3",pass) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {3} }
+verify("Dec4",fail) { three(x:any)<decides> := { x = 3 } ; foo(x:three):three := {4} }
+verify("Dec5",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := z }
+verify("Dec6",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 666 }
+verify("Dec7",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 42 }
+verify("Dec8",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 708 - z }
+verify("Dec9",fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 }
+verify("Dec10",fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
 
 ### # Tim examples 8/9/2023
 ### # verify(pass) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
@@ -119,17 +159,15 @@ verify(fail) {f(x:int)<succeeds>:=x/0}
 ### # forall x y . exists z . assume{z = x}; z = x; x = y
 
 # left-to-right
-verify(pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
-verify(fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
+verify("PP1", pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
+verify("PP2", fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
+verify("PP3", pass)   { F(X:int, G():type{X = 1}) := (H()<succeeds> := X = 1; H(); G() ) ; F(2, G() := G()) }
 
-# if-then-else (negations)
+# f9( x := 3|4):int := x+1;
+# y:int
+# f9[y]
 
-verify(pass) { f(:any) := { 2 = if (1) then {2} else {99} } }
-verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
 
-# if-then-else (binders)
-### TODO:IFBINDER verify(pass) { f(:any) := { if (x:=1) then {x} else {2} } }
-###
 ### # koen's hof examples
 ### verify(pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
 ### verify(fail) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
@@ -143,11 +181,12 @@ verify(pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
 ### # simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
 ### # verify(pass) { f(x:int) := x; foo(:any) := {f[_]=3} }
 ### # verify(fail) { f(x:int) := x; foo(:any) := {f[_]='3'} }
+
 # subtyping (passes, but apparently, should be rejected!)
 verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }
-
 verify(pass) { main(:any) := { x := x; x = 2 } }
 verify(pass) { a := (_,_) => a=(_,_) }
+
 ### verify(pass) { main(:any) := { if(a:=1|2){a=1} } }  # TODO:IF:CHOICE
 # TODO:HEREHEREHERE:GATHER-OUTER-SKOLEM verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
 ###
@@ -161,8 +200,9 @@ verify(pass) { a := (_,_) => a=(_,_) }
 ### verify(pass, ICFPEverify=skip) {a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
 ### verify(pass, ICFPEverify=skip) {a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
 ### verify(pass, ICFPEverify=skip) {a:int => b:any => f(a   ):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
-verify(pass, ICFPEverify=skip) {a:int => b:any => f(a   ):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
-verify(pass, ICFPEverify=skip) {a:=(1;2;),a=(1,2)}		#FP:10.4:DESUGARING?
+
+verify(pass) {a:int => b:any => f(a   ):type{a=b} => {f[a],a=b}} #FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
+verify(pass) {a:=(1;2;),a=(1,2)}		 #FP:10.4:DESUGARING?
 ### verify(pass, ICFPEverify=skip) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
 ### verify(pass, ICFPEverify=skip) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}			#FP:10.4:CHECK:DESUGAR
 verify(pass, ICFPEverify=skip) {x:int,x=3}

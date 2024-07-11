@@ -718,7 +718,13 @@ getFree = fvs_blk
     fvs (Macro2 _ e b)    = fvs e ++ fvs_blk b
     fvs (Split e1 e2 e3)  = fvs e1 ++ fvs e2 ++ fvs e3
     fvs (DefineE _ e)     = fvs e
+    fvs (Range  _ e)      = fvs e
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
+    fvs (Function args body)
+      = (foldr (++) (fvs_blk body) (map fvs arg_exprs)) `remove` arg_bndrs
+      where
+        arg_bndrs = foldr ((++) . getVisibleBinders) [] arg_exprs
+        arg_exprs = map fst args
 --    fvs (Map es) = concatMap fvs es
     fvs e = impossible e
 

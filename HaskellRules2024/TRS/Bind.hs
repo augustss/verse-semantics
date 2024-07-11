@@ -1,6 +1,6 @@
 module TRS.Bind
   ( Ident(..), SkolIdent
-  , ident, underscore
+  , ident, underscore, isUnderscore
   , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn, skolsNotIn
 
   , Variables(..)
@@ -38,6 +38,9 @@ underscore :: Ident
 -- `underscore` does not count as free or bound
 -- We use it only on the LHS of (_ = e1; e2)
 underscore = Name "_"
+
+isUnderscore :: Ident -> Bool
+isUnderscore x = x == underscore
 
 identsNotInPrefix :: String -> [Ident] -> [Ident]
 identsNotInPrefix prefix forb = [ Name (prefix ++ show (m+i)) | i <- [1..] ]
@@ -108,8 +111,8 @@ instance Variables a => Variables [a] where
   variables f = foldr union [] . map (variables f)
 
 instance Variables Ident where
-  variables _ x | x == underscore = []   -- Underscore is not a real variable
-                | otherwise       = [x]
+  variables _ x | isUnderscore x = []   -- Underscore is not a real variable
+                | otherwise      = [x]
 
 --------------------------------------------------------------------------------
 

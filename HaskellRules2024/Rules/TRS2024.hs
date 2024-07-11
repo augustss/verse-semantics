@@ -114,7 +114,10 @@ rulesApplication _env lhs =
   do Lam bnd :@: v <- [lhs]
      guard (isVal v)
      let (x,e) = alphaRename (free v) bnd
-     pure (Exi (bind x ((Var x :=: v) :>: e)))
+         body = (Var x :=: v) :>: e
+     pure (if isUnderscore x
+           then body
+           else Exi (bind x body))
  ++
   "APP-TUP" `name`
   do Arr vs@(_:_) :@: v <- [lhs]
@@ -164,7 +167,7 @@ rulesExistentials :: Rule
 rulesExistentials _env lhs =
   "UNDERSCORE-ELIM" `name`
   do { (Var u :=: v) :>: e <- [lhs]
-     ; guard (u == underscore)
+     ; guard (isUnderscore u)
      ; guard (isVal v)
      ; pure e }
  ++
