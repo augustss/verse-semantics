@@ -1,2 +1,6 @@
 .versei
 non-conf*
+*.o
+*.hi
+*.dyn_o
+*.dyn_hi

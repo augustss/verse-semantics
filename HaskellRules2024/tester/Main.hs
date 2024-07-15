@@ -221,17 +221,17 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
       v2 = term tr2
 
   catch (
-       if (equivValue v1 v2) == expectOK
+       if equivValue v1 v2 == expectOK
        then do
             when noisy $
               putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
             pure Good
        else do
-            when (not (noError tflg)) $
+            unless (noError tflg) $
              if expectOK
               then do
                 putStrLn "-----------------------------------------------"
-                putStrLn $ pos ++ " failure:"
+                putStrLn $ pos ++ " failure, unexpected!"
                 putStrLn "The expression"
                 ppi p1
                 putStrLn "evaluates to"
