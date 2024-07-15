@@ -16,7 +16,7 @@ import Epic.Print hiding ( (<>) )
 import qualified Epic.UnionFind as UF
 
 import Control.Monad (guard)
-import Data.List ( (\\) )
+import Data.List ( (\\), nub )
 
 
 --------------------------------------------------------
@@ -82,7 +82,7 @@ verifyRules env lhs =
    "VERIFY-FAIL" `name`
    do (_env', _rs, _as, e) <- matchVerify env lhs
       guard (e == Fail)
-      pure (Arr[])
+      pure (Arr [])
    ++
    "SOLVER" `name`
    do (env', _rs, _as, _e) <- matchVerify env lhs
@@ -126,11 +126,12 @@ asmX = go []
 unsat :: RuleEnv -> Bool
 -- `unsat` is a simple unsatisfiablity checker,
 -- which implements the SOLVER rule
-unsat (RE { assumps = asms }) = contra pos neg || refl pos neg
+unsat (RE { assumps = asms }) = contra pos neg || refl pos neg || unsatCC cc pos neg
   where
     pos, neg :: [FailableAssump]
     pos = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | A_PrimOp _ (AO_Prim op) gv <- asms ]
     neg = [asm | A_Neg asm <- asms]
+    cc  = mkCC pos neg
 
 -- Looks for (a; not a)
 contra :: [FailableAssump] -> [FailableAssump] -> Bool
@@ -150,40 +151,44 @@ isTyOp IsChar = True
 isTyOp IsStr  = True
 isTyOp _      = False
 
+unsatCC :: CC -> [FailableAssump] -> [FailableAssump] -> Bool
+unsatCC cc _pos neg = contraVars || contraLits
+  where
+   -- [contraVars] exi x, x'. x == x'     in neg, s.t. repr x == repr x'
+   contraVars = any (uncurry (UF.equal (eq_uf cc))) diseqVars
+   diseqVars  = [(GVVar x, y) | A_GVEq x y <- neg]
 
-data EqFacts = EqFacts
-  { lits  :: [GroundVal]
-  , uf    :: UF.UF GroundVal
-  }
-
+   -- [unsatLits] exi k, k'. k != k'           , s.t. repr k == repr k'
+   contraLits = length lits /= length (nub litReps)
+   litReps    = UF.find (eq_uf cc) <$> lits
+   lits       = nub (eq_lits cc)
 
 {-
+unsatCC cc pos neg ==> true  if
+   - [contraVars] exi x, x'. x == x'     in neg, s.t. repr x == repr x'
+   - [unsatLits] exi k, k'. k != k'           , s.t. repr k == repr k'
 
-
-
-
-
-unsat _ es = asmFail || contra || refl || eqContra
-  where
-    asmFail  = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]
-    refl     = not . null $ [ e | Fails e@(Var x :=: Var y) <- es, x == y, isInt pos x ]
-    contra   = any (`elem` pos) neg
-    eqContra = eqUnsat pos neg
-    pos      = [ e | Assume e <- es ]
-    neg      = [ e | Fails  e <- es ]
-
-eqUnsat :: [Expr] -> [Expr] -> Bool
-eqUnsat pos neg = any (uncurry (UF.equal uf')) diseqs
-  where
-    uf' = foldr (\(x, y) uf -> UF.union uf x y) UF.new eqs
-    eqs     = [(x, y) | (Var x :=: Var y) <- pos]
-    diseqs  = [(x, y) | (Var x :=: Var y) <- neg]
-
-
-
-isInt :: [Expr] -> Ident -> Bool
-isInt asms x = INT (Var x) `elem` asms
+   - exi k, x . isPrimTy[x] in pos, s.t. repr k == repr x, not isPrimTy[k]
+   - exi k, x . isPrimTy[x] in neg, s.t. repr k == repr x,     isPrimTy[k]
+   - exi k    . isPrimTy[k] in pos, s.t.                   not isPrimTy[k]
+   - exi k    . isPrimTy[k] in neg, s.t.                 ,     isPrimTy[k]
 -}
+
+data CC = MkCC
+  { eq_lits  :: [GroundVal]
+  , eq_uf    :: UF.UF GroundVal
+  }
+
+mkCC :: [FailableAssump] -> [FailableAssump] -> CC
+mkCC pos neg = MkCC lits ufg
+  where
+    lits = assumpGroundVal <$> (pos ++ neg)
+    ufg   = foldr (\(x, y) uf -> UF.union uf x y) UF.new eqs
+    eqs  = [(GVVar x, y) | A_GVEq x y <- pos]
+
+assumpGroundVal :: FailableAssump -> GroundVal
+assumpGroundVal (A_GVEq _ gv) = gv
+assumpGroundVal (A_RelOp _ gv) = gv
 
 --------------------------------------------------------------------------------
 
@@ -226,6 +231,19 @@ splitRules env lhs =
       pure (pPrint asm, caseSplit (rs ++ rs') asm as ctx rvs')
 
    ++
+   -- Verify(rs ; as){ P[r[s]] }
+   -- Verify(rs ; as){ P[r[s]] }
+   -- Verify(rs ; as){ P[r[s]] }
+   -- Verify(rs ; as){ P[r[s]] }
+   -- Verify(rs ; as){ P[r[s]] }
+   -- Verify(rs ; as){ P[r[s]] }
+   -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+   -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+   -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+   -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+   -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+   -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+
    -- Verify(rs ; as){ P[r[s]] }
    -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
    "SPLIT-APP" `nameWith`
