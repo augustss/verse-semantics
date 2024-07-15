@@ -40,25 +40,18 @@ import Prelude hiding (pi)
 desugar :: Flags -> Expr -> Expr
 --desugar flgs | trace ("desugar: " ++ show flgs) False = undefined
 desugar flgs = eval flgs .
-            (-- Simplification [drop this for now]
+            (-- simplification
              traceDS "simpler"    <=< simpler   <=<  -- verifier breaks without this
              traceDS "simplify"   <=< simplify  <=<
-
-             -- Desugaring
-             traceDS "primops"    <=< primops   <=<    -- Var (Ident "op") --> EPrim op
-             traceDS "lower"      <=< lower     <=<    -- Lowers all/one/for/if into split or whatever
-             traceDS "addScope"   <=< addScope  <=<    -- x:e -->  exists x. ....(x=e)....
-                                                       --   if --> If3B,  for --> For2B
-             traceDS "lowerApply" <=< lowerApply<=<    -- Round vs square
-
-             traceDS "dsD"        <=< dsDx      <=<    -- Heavy lifting: Fig 9
-
-             traceDS "addDeref"   <=< addDeref  <=<    -- Side effects
-             traceDS "dsSmall"    <=< dsSmall   <=<    -- Main desugaring into Small Source
-
-             traceDS "addPrelude" <=< addPrelude <=<   -- Prepends prelude from
-                                                       --    verifyprelude.verse, mediumprelude.verse
-
+             -- desugaring
+             traceDS "primops"    <=< primops   <=<
+             traceDS "lower"      <=< lower     <=<
+             traceDS "addScope"   <=< addScope  <=<
+             traceDS "lowerApply" <=< lowerApply<=<
+             traceDS "dsD"        <=< dsDx      <=<
+             traceDS "addDeref"   <=< addDeref  <=<
+             traceDS "dsSmall"    <=< dsSmall   <=<
+             traceDS "addPrelude" <=< addPrelude <=<
              traceDS "syntaxFixes" <=< syntaxFixes)
   where
 {-
@@ -168,7 +161,6 @@ syntaxFixes = pure . f
 ---------------------
 
 eval :: Flags -> D Expr -> Expr
--- Runs the D monad
 eval flgs = flip evalState DState{ nextNo = 1, dflags = flgs }
 
 -- Desugar into Small Source Verse
@@ -177,12 +169,9 @@ dsSmall = ds
   where
     ds :: Expr -> D Expr
     -- Application and unification
-
-    -- (e1 where e2)  -->   ( x ::= e1; e2; x)
     ds (InfixOp e1 (Op "where") e2) = do
       x <- newIdent (getLoc e1) "x"
       ds $ seqE [DefineE x e1, e2, Variable x]
-
     ds (ApplyS  e1 e2) = join (apply applyS <$> ds e1 <*> ds e2)
       where applyS x y = Succeeds (ApplyD x y)
 
@@ -191,14 +180,12 @@ dsSmall = ds
     ds (InfixOp e1 (Op "=") e2) = do e1' <- ds e1; e2' <- ds e2; dsU [e1', e2']
     ds (Macro1 (Ident _ "in'='") [] (Blk es)) = dsU =<< mapM ds es
 -}
-    -- (e1 = e2)  --->   
     ds (InfixOp e1 (Op "=") e2) = Unify <$> ds e1 <*> ds e2
 
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
 
     -- Bindings
     ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)  -- PCOLONT
-
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
     -- Function notation
@@ -334,8 +321,6 @@ apply2 :: (Value -> Value -> Expr) -> Value -> Value -> D Expr
 apply2 con x1 x2 = pure $ con x1 x2
 
 defn :: Expr -> Expr -> D Expr
--- Desugars (p := e) into an expression; see Fig 3, top group
-
 -- Rule: (i := e) -->  (i := e)
 defn (Variable (Ident _ "_")) e = do
   x <- newIdent (getLoc e) "u"
@@ -1989,9 +1974,10 @@ dsB_10 s t (P f) j
        seqDE [ pure $ DefineE z (ApplyD (Variable f) (Variable j)), dsM_10 s t (P z)]
 
 dsK_10 :: Loc -> [Eff] -> D Expr
-dsK_10 loc fx
+dsK_10 _loc fx
   | hasEff "fails" fx   = pure Fail
-  | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
+  -- TODO: commenting-out-for-now
+  -- | hasEff "decides" fx = do { i <- newIdent loc "i"; pure (Unify (eSome (Lam i (Variable i))) (Array [])) }
   | otherwise           = pure (Array [])
 
 dsCheck :: DsEff -> Expr -> Expr
@@ -2003,18 +1989,18 @@ seqDE ds = seqE <$> sequence ds
 
 dsM_10 :: DsMode10 -> Expr -> Pi -> D Expr
 dsM_10 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
-  = do j   <- newIdent (getLoc t) "j"
-       -- dom <- DefineE j <$> dsM_10 MI t1 E
-       dom <- dsM_10 MI t1 (P j)
+  = do r   <- newIdent (getLoc t) "r"
+       j   <- newIdent (getLoc t) "j"
+       dom <- DefineE j <$> dsM_10 MI t1 (P r)
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MV t2 pi j
-       eGuard (eVerify (Forall [j] (seqE [dom, rng]))) <$> (dsM_10 MI t pi)
+       eGuard (eVerify (Forall [r] (seqE [dom, rng]))) <$> dsM_10 MI t pi
 
 dsM_10 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
   = do i   <- newIdent (getLoc t1) "i"
        j   <- newIdent (getLoc t1) "j"
        dom <- DefineE j <$> dsM_10 MV t1 (P i)
-       rng <- seqDE [ dsK_10 (getLoc t1) _fx, dsB_10 MI t2 pi j]
-       pure $ Lam i (dom `eGuard` rng)
+       rng <- seqDE [ dsK_10 (getLoc t1) _fx, {- BUG -} dsB_10 MI t2 pi j]
+       pure $ {- TODO: ISFUN -} Lam i (dom `eGuard` rng)
 
 dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
   = do i   <- newIdent (getLoc t1) "i"
@@ -2023,12 +2009,18 @@ dsM_10 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
        rng <- dsCheck (bodyEff Suc _fx) <$> dsB_10 MX t2 pi j
        pure $ Lam i (seqE [dom, rng])
 
+dsM_10 MV (OfType t1 t2@(Variable z)) pi      -- MOFTYPE+
+  = do y <- newIdent (getLoc t1) "y"
+       seqDE [ DefineE y <$> dsM_10  MV t1 pi
+             , pure (dsCheck Suc (ApplyD t2 (Variable y)) `eGuard` eSome (Variable z))
+             ]
+
 dsM_10 MV (OfType t1 t2) pi                   -- MOFTYPE+
   = do y <- newIdent (getLoc t1) "y"
        z <- newIdent (getLoc t1) "z"
        seqDE [ DefineE y <$> dsM_10  MV t1 pi
              , DefineE z <$> dsDD_10 MV t2
-             , pure ((dsCheck Suc (ApplyD (Variable z) (Variable y))) `eGuard` eSome (Variable z))
+             , pure (dsCheck Suc (ApplyD (Variable z) (Variable y)) `eGuard` eSome (Variable z))
              ]
 
 dsM_10 MI (OfType t1 t2) _pi                  -- MOFTYPE-
@@ -2045,22 +2037,31 @@ dsM_10 MX (OfType t1 t2) pi                   -- MOFTYPEX
              , pure (ApplyD (Variable z) (Variable y))
              ]
 
-dsM_10 MI (Range t) E                       -- MTYPE1
-  = do z <- newIdent (getLoc t) "z"
-       seqDE [ DefineE z <$> dsDD_10 MI t
-             , pure (eSome (Variable z)) ]
+dsM_10 MI (Range (Variable z)) (P _)       -- MTYPE-VAR Spl case to make M-[:int](i) = some{int} instead of exi z. z = int; z(i)
+   = pure (eSome (Variable z))
 
-dsM_10 s (Range t) E                       -- MTYPE2
-  = do i <- newIdent (getLoc t) "i"
-       existsV [i] <$> dsM_10 s (Range t) (P i)
-
-dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make M[:int](i) = int(i) instead of exi z. z = int; z(i)
+dsM_10 _ (Range (Variable z)) (P i)        -- MTYPE-VAR Spl case to make Ms[:int](i) = int(i) instead of exi z. z = int; z(i)
   = pure (ApplyD (Variable z) (Variable i))
 
-dsM_10 s (Range t) (P i)                   -- MTYPE3
+dsM_10 MI (Range t) (P i)                   -- MTYPE1
+  = do z <- newIdent (getLoc t) "z"
+       seqDE [ DefineE z <$> dsDD_10 MI t
+             , pure (Variable i `eGuard` eSome (Variable z))
+             ]
+
+dsM_10 s (Range t) (P i)                   -- MTYPE2
   = do z <- newIdent (getLoc t) "z"
        seqDE [ DefineE z <$> dsDD_10 s t
              , pure (ApplyD (Variable z) (Variable i)) ]
+
+dsM_10 s (Range t) E                       -- MTYPE3
+  = do x <- newIdent (getLoc t) "x"
+       z <- newIdent (getLoc t) "z"
+       existsV [x] <$> seqDE
+          [ DefineE z <$> dsDD_10 s t
+          , pure (ApplyD (Variable z) (Variable x)) ]
+
+
 
 dsM_10 s (DefineIE x y t) E                -- MSQUIGE
   = do i <- newIdent (getLoc t) "i"

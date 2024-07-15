@@ -126,7 +126,7 @@ data Expr
   | OfType Expr Expr          -- e:t, but only type known to verifier
   | TLam Ident [Eff] Expr Expr
                               -- function(x:any where e1)<eff>{e2}, e1 can make bindings visible in e2.
-                              -- The last argument is a possible type, (e2:t)  
+                              -- The last argument is a possible type, (e2:t)
   | DomainFail                -- either Wrong or try next overload
   | EPrim String              -- primop
   | Lam Ident Expr            -- \ x . e
@@ -332,12 +332,12 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inr "or"      4
 --      , inr "&&"      5
       , inr "and"     5
-      , inr ":"       6     
-      , inr "<>"      6     
-      , inr "<="      6     
-      , inr ">="      6     
-      , inr "<"       6     
-      , inr ">"       6     
+      , inr ":"       6
+      , inr "<>"      6
+      , inr "<="      6
+      , inr ">="      6
+      , inr "<"       6
+      , inr ">"       6
       , inl "|"       7
       , inl ".."      7
       , inr "->"      7
@@ -447,4 +447,3 @@ isValue Variable{} = True
 isValue EPrim{} = True
 isValue (Array es) = all isValue es
 isValue e = isLiteral e
-
