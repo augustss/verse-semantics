@@ -446,8 +446,8 @@ call p l s e = do
 --
 --------------------------------------------------------
 
-addDeref :: SrcExpr -> D SrcExpr
-addDeref = pure . exprD S.empty
+_addDeref :: SrcExpr -> D SrcExpr
+_addDeref = pure . exprD S.empty
   where
     expr _ e@Lit{} = e
     expr s e@(Variable i) | i `S.member` s = applyPrimD "read$" e
