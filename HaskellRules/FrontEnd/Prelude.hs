@@ -70,19 +70,19 @@ verifyprelude = ("verifyprelude", "\
 \# XXX What should the definition of Err() be?\n\
 \array{\n\
 \false        := array{};\n\
-\any          := lowered{ lambda(_x){                                                        assume { _x }}};\n\
-\int          := lowered{ lambda(_x){                isInt$[_x];                             assume { _x }}};\n\
-\char         := lowered{ lambda(_x){                isChr$[_x];                             assume { _x }}};\n\
-\nat          := lowered{ lambda(_x){                isInt$[_x];             intGE$[_x,0];   assume { _x }}};\n\
+\any          := lowered{ lambda(_x){                                                                 _x  }};\n\
+\int          := lowered{ lambda(_x){                isInt$[_x];                                      _x  }};\n\
+\char         := lowered{ lambda(_x){                isChr$[_x];                                      _x  }};\n\
+\nat          := lowered{ lambda(_x){                isInt$[_x];             intGE$[_x,0];            _x  }};\n\
 \void         := lowered{ lambda(_x){                                                                 array{} }};\n\
 \comparable   := lowered{ lambda(_x){                isInt$[_x] | isChr$[_x];                assume { _x }}};  # incomplete\n\
-\operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intAdd$[_x,_y]; isInt$[_z]; _z }}};\n\
-\operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intSub$[_x,_y]; isInt$[_z]; _z }}};\n\
-\operator'*'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intMul$[_x,_y]; isInt$[_z]; _z }}};\n\
-\operator'/'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_y, 0];  assume { _z := intDiv$[_x,_y]; isInt$[_z]; _z }}};\n\
+\operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 some   { lambda(_z) { _z = intAdd$[_x,_y]; isInt$[_z]; _z }}}};\n\
+\operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 some   { lambda(_z) { _z = intSub$[_x,_y]; isInt$[_z]; _z }}}};\n\
+\operator'*'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 some   { lambda(_z) { _z = intMul$[_x,_y]; isInt$[_z]; _z }}}};\n\
+\operator'/'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_y, 0];  some   { lambda(_z) { _z = intDiv$[_x,_y]; isInt$[_z]; _z }}}};\n\
 \operator'<'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLT$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
-\operator'<=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLE$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
-\operator'>'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intGT$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
+\operator'<=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLE$[_x, _y];                      _x  }};\n\
+\operator'>'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intGT$[_x, _y];                      _x  }};\n\
 \operator'>=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intGE$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
 \operator'<>' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
 \prefix'-'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intNeg$[_x];    isInt$[_z]; _z }}};\n\

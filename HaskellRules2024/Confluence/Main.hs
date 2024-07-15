@@ -18,9 +18,9 @@ prop_Confluent =
     let np :<-- ps  = normalize trs2024 p
         nq :<-- qs2 = normalize trs2024 q
      in whenFail (do putStrLn "== TRACE #1 =="
-                     printTrace (np :<-- ps)
+                     displayTrace (np :<-- ps)
                      putStrLn "== TRACE #2 =="
-                     printTrace (nq :<-- (qs2 ++ qs1))) $
+                     displayTrace (nq :<-- (qs2 ++ qs1))) $
           norm np == norm nq
  where
   arbFork =
@@ -28,21 +28,26 @@ prop_Confluent =
        permf <- liftArbitrary arbPermutation
        let tr = normalize (\e -> permf e (trs2024 e)) p
        return (p,tr)
- 
-  shrinkFork (p, _ :<-- tr) = 
+
+  shrinkFork (p, q :<-- tr) =
     [ (p', q' :<-- [(s,p')])
-    | p' <- case tr of
-              _:_:_ -> [ r | (_,r) <- tr ]
-              _     -> shrink p ++ map snd (trs2024 p)
-    , valid p'
-    , (s,q') <- trs2024 p'
+    | (p',s,q') <-
+        case tr of
+          _:_:_ -> [ (p',s,q')
+                   | ((s,p'),q') <- tr `zip` (q : map snd tr)
+                   ]
+          _     -> [ (p',s,q')
+                   | p' <- shrink p ++ map snd (trs2024 p)
+                   , valid p'
+                   , (s,q') <- trs2024 p'
+                   ]
     ]
 
 --------------------------------------------------------------------------------
 
 main :: IO ()
 --main = quickCheck prop_Valid
-main = quickCheck prop_Confluent
+main = quickCheckWith stdArgs{ maxSuccess = 9999 } prop_Confluent
 
 --------------------------------------------------------------------------------
 

@@ -1,0 +1,6 @@
+:read versetests/funs.verse
+:set desugartrace
+:vdesugar
+:tocore
+:verify
+:quit

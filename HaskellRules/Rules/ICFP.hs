@@ -7,8 +7,8 @@ module Rules.ICFP(
   systemICFPE,
   rulesPrimOps,
   isChoiceFreeOp,
-  isRecursive, {- anf, -} anfK, execX, defX, execX1, choiceX, ltExpr,
-  hasStore, isChoiceFree
+  isRecursive, anf, anfK, execX, defX, execX1, choiceX, ltExpr,
+  hasStore, isChoiceFree, rulesExiFloat
   ) where
 import Control.Monad( guard )
 import Data.List
@@ -235,8 +235,9 @@ valid' onlyEq = expr
       expr e && expr e1
     expr e@Split{} = error $ "malformed split: " ++ prettyShow e
     expr (If e1 e2 e3) = expr e1 && expr e2 && expr e3
-    expr (Store _ e) = valid e   -- XXX this case seems to happen with QC
+    expr (Store _ e)  = valid e   -- XXX this case seems to happen with QC
     expr (e1 :>>: e2) = expr e1 && expr e2
+    expr (Some e)     = expr e
     expr e = error $ "valid: unexpected " ++ show e
     expru (v :=: e) = value v && expr e
     expru e = not onlyEq && expr e
@@ -308,6 +309,7 @@ anf' onlyEq = expr
       in  binds ds (Split (expr e) v1 v2)
     expr (If e1 e2 e3) = If (expr e1) (expr e2) (expr e3)
     expr (e1 :>>: e2)  = expr e1 :>>: expr e2
+    expr (Some e)      = Some (expr e)
     expr e = error $ "anf: cannot handle " ++ prettyShow e
 
     expru (e1 :=: e2) =
@@ -1010,8 +1012,8 @@ defX xx lhs =
 
 --------------------------------------------------------------------------------
 
-rulesNormalization :: ERule
-rulesNormalization _ lhs =
+rulesExiFloat :: p -> Expr -> [(String, Expr)]
+rulesExiFloat _ lhs =
   "EXI-FLOAT" `name`
   do (ctx, EXI x e) <- execX1 lhs  -- Note: Store not allowed in ctx
      guard (hasStore (ctx Fail) <= isChoiceFree e)  -- <= is implication for booleans
@@ -1020,6 +1022,10 @@ rulesNormalization _ lhs =
      if x `elem` freeX
        then pure (EXI x' (ctx (subst [(x,Var x')] e)))
        else pure (EXI x (ctx e))
+
+rulesNormalization :: ERule
+rulesNormalization env lhs =
+  rulesExiFloat env lhs
  ++
   "SEQ-ASSOC" `name`
   do (e1 :>: e2) :>: e3 <- [lhs]

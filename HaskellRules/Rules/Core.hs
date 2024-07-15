@@ -682,13 +682,13 @@ instance Free Expr where
 class Substitutable a where
   subst    :: Subst Expr -> a -> a
 
--- rename the binder so that it is not the same as the first argument
 alphaRename :: (Substitutable a, Free a) => [Ident] -> Bind a -> Bind a
-alphaRename xs bnd@(Bind x e)
-  | x `notElem` xs = bnd
-  | otherwise      = Bind y (subst [(x,Var y)] e)
+-- Rename the binder so that it is not the same as the first argument
+alphaRename forb bnd@(Bind x e)
+  | x `notElem` forb = bnd
+  | otherwise        = Bind y (subst [(x,Var y)] e)
  where
-  y = identNotIn (x : (xs ++ free e))
+  y = identNotIn (x : (forb ++ free e))
 
 instance Substitutable Expr where
   subst [] e = e

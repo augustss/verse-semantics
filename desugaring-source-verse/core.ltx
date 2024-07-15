@@ -48,7 +48,7 @@
       \text{Values} & |v| & ::= & x  \vb \hnf \\
       \text{Ground values} & |gv| & ::= & |k| \vb |r| \vb |arr (gv_1, xdots, gv_n)| \\
       \text{Head values} & \hnf & ::= & |k| \vb |r|  \vb |op| \vb |arr (v_1, xdots, v_n)| \vb |lam x e|
-             \vb |olam v (lam x_1 e_1) (lam x_2 e_2)|\\
+             \vb |olam v (lam x e)|\\
       \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
       \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |fails|  \\
       \text{Assumptions} & |a| & ::= & |r = gv| \vb |noteq r gv| \vb |r = apply1N op gv| \vb |not (apply1N op gv)| \\
@@ -148,10 +148,12 @@ $
 $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Structural rules}
-\rulename{exi-swap} & |def x (def y e)| & = & |def y (def x e)| \\
-\rulename{var-swap} & |x == y; e| & = & |y == x; e| \\
-\rulename{exi-alpha} & |def x e| & = & |def y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
-\rulename{lam-alpha} & |lam x e| & = & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
+\rulename{exi-swap} & |def x (def y e)| & \leftrightarrow & |def y (def x e)| \\
+\rulename{exi-swiz1} & |l == def x e_1; e_2| & \leftrightarrow & |def x (l==e_1; e_2| & |x| \not\in |freevars e_2|\\
+\rulename{exi-swiz2} & |l == e_1; def x e_2| & \leftrightarrow & |def x (l==e_1; e_2| & |x| \not\in |freevars e_1|\\
+\rulename{var-swap} & |x == y; e| & \leftrightarrow & |y == x; e| \\
+\rulename{exi-alpha} & |def x e| & \leftrightarrow & |def y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
+\rulename{lam-alpha} & |lam x e| & \leftrightarrow & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
 \\[-0.8em]
 
 \rulegroupname{Application}
@@ -168,7 +170,7 @@ $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Unification}
   \rulename{u-lit}   & |k == k; e| & \movesto & |e| & \\
-  \rulename{u-tup} & \hspace{-3.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|
        & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n' `eqsemi` e| & n \geq 0\\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
   \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
@@ -180,12 +182,12 @@ $\begin{array}{@@{}l}
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
-  & \text{if |validc x emptyset C|, $x \not\in \freevars{v}$}  \\
+  & \text{if |blockedc (singleton x) C|, $x \not\in \freevars{v}$}  \\
 %\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
 %  & \text{if |validc x emptyset C|, $x \not= y$}  \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
-\rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $|noteq C hole|, x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
-\rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
+% \rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $|noteq C hole|, x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
+% \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
 \end{array}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
@@ -206,8 +208,10 @@ $\begin{array}{@@{}l}
 \rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
 \rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
 \rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
-\rulename{choice} & |SX^[C^[e_1 choice e_2]]| & \movesto & |SX^[C^[e_1] choice C^[e_2]]| & \text{if |noteq C hole, choicefreec C|}\\
-\rulename{fail} & |C^[fail]| & \movesto & |fail| & \text{if |noteq C  hole, blockedc emptyset C|}\\
+\rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]|
+    & \text{if |noteq C hole, blockedc emptyset C, choicefreec C|}\\
+\rulename{fail} & |C^[fail]| & \movesto & |fail|
+    & \text{if |noteq C hole, blockedc emptyset C, choicefreec C|}\\
 
     \\[-0.8em]
 
@@ -222,14 +226,10 @@ $\begin{array}{@@{}l}
 \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Open Lambdas}
-  \rulename{u-olam}          & \multicolumn{3}{l}{|olam v_1 dom_1 rng_1 == olam v_2 dom_2 rng_2|} \\
-  & \multicolumn{4}{l}{\hspace{5mm} \movesto |defKW z|.
-  \begin{array}[t]{l}
-        |v_1 == olam z ((lam x (check fails (apply1N dom_1 x); apply1N dom_2 x))) rng_2;| \\
-        |v_2 == olam z ((lam x (check fails (apply1N dom_2 x); apply1N dom_1 x))) rng_1| \\
-   \end{array}} \\[5mm]
-  \rulename{app-olam} & |apply1N (olam g dom rng) v| & \movesto &
-  \multicolumn{2}{l}{|if (x := apply1N dom v) then apply1N rng x else apply1N g v|} \\[1mm]
+  \rulename{u-olam}   & |olam z_1 v_1 == olam z_2 v_2; e| & \movesto & \multicolumn{2}{@@{}l}{|def z_3 (z_1 == olam z_3 v_2; z_2 == olam z_3 v_1); e|} \\
+  \rulename{app-olam} & |apply1N (olam z v_1) v_2| & \movesto & |def x (x == apply1N z v_2; x == apply1N v_1 v_2; x| \\
+  \rulename{exi-app} & |def z e| & \movesto &
+  \multicolumn{2}{@@{}l}{|subst e z ((lam x (def y y)))| \hspace{5mm} \text{if |z| occurs in |e| only as |apply1N z v|}}
 \end{array}
 \\
 \text{\textit{Note}: In rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.} \\

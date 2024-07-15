@@ -1,0 +1,4 @@
+:r versetests/funs.verse
+:print
+:desugar
+:quit

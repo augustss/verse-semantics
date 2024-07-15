@@ -1,32 +1,29 @@
 module TRS.Bind
-  ( Ident(..)
-  , ident
-  , identsNotInPrefix
-  , identsNotIn
-  , identNotIn
+  ( Ident(..), SkolIdent
+  , ident, underscore, isUnderscore
+  , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn, skolsNotIn
+
   , Variables(..)
-  , free
-  , occurs
+  , free, occurs, intersects
+
   , Bind -- abstract! let's see if we can do this
-  , bind
-  , unsafeUnbind
-  , alphaRenameWith
-  , BindList(..)
-  , Subst
-  , substBind
-  , substBinds
+  , bind, unsafeUnbind, alphaRenameBindWith
+  , BindList, bindList, unsafeUnbindList, alphaRenameBindListWith
+
+  , Subst, substBind, substBinds
   )
  where
 
-import Data.List( union, (\\), isPrefixOf )
+import Data.List( union, isPrefixOf )
 import Data.Char( isDigit )
-import Data.Maybe (maybeToList)
 import Epic.Print
 
 --------------------------------------------------------------------------------
 
 newtype Ident = Name String
  deriving ( Eq, Ord )
+
+type SkolIdent = Ident   -- Skolem variables, R, in verify(R,A){e}
 
 instance Show Ident where
   show (Name x) = x
@@ -37,20 +34,37 @@ instance Pretty Ident where
 ident :: String -> Ident
 ident = Name
 
+underscore :: Ident
+-- `underscore` does not count as free or bound
+-- We use it only on the LHS of (_ = e1; e2)
+underscore = Name "_"
+
+isUnderscore :: Ident -> Bool
+isUnderscore x = x == underscore
+
 identsNotInPrefix :: String -> [Ident] -> [Ident]
-identsNotInPrefix prefix zs = [ Name (prefix ++ show (m+i)) | i <- [1..] ]
-  where m = maximum (0 : [ read s :: Integer
-                         | Name str <- zs
-                         , prefix `isPrefixOf` str
-                         , let s = drop (length prefix) str
-                         , not (null s)
-                         , all isDigit s
-                         ])
+identsNotInPrefix prefix forb = [ Name (prefix ++ show (m+i)) | i <- [1..] ]
+  where
+    m :: Integer  -- m is the max k, such that prefix_k is in forb
+    m = maximum (0 : [ read s :: Integer
+                     | Name str <- forb
+                     , prefix `isPrefixOf` str
+                     , let s = drop (length prefix) str
+                     , not (null s)
+                     , all isDigit s ])
 
 identsNotIn :: [Ident] -> [Ident]
-identsNotIn zs = filter (`notElem` zs) [ Name x | x <- xs ] ++ identsNotInPrefix "x" zs
+-- Return an infinite list of identifiers not in `forb`
+identsNotIn forb = filter (`notElem` forb) [ Name x | x <- xs ]
+                   ++ identsNotInPrefix "x" forb
  where
   xs = ["x","y","z","u","v","w"]
+
+skolNotIn :: [SkolIdent] -> SkolIdent
+skolNotIn forb = head (skolsNotIn forb)
+
+skolsNotIn :: [SkolIdent] -> [SkolIdent]
+skolsNotIn forb = identsNotInPrefix "$r" forb
 
 identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
@@ -76,6 +90,11 @@ free   = variables (filter . (/=))   -- Finds all free variables
 occurs = variables (union . (: []))  -- Finds all variables,
                                      -- both binders and uses
 
+
+intersects :: [Ident] -> [Ident] -> Bool
+-- True if the two lists have one or more common members
+intersects xs ys = any (`elem` xs) ys
+
 instance Variables () where
   variables _ _ = []
 
@@ -91,9 +110,9 @@ instance (Variables a, Variables b, Variables c, Variables d) => Variables (a,b,
 instance Variables a => Variables [a] where
   variables f = foldr union [] . map (variables f)
 
--- This simplifies some code
 instance Variables Ident where
-  variables _ x = [x]
+  variables _ x | isUnderscore x = []   -- Underscore is not a real variable
+                | otherwise      = [x]
 
 --------------------------------------------------------------------------------
 
@@ -107,18 +126,25 @@ bind x t = Bind x t
 instance Variables t => Variables (Bind t) where
   variables f (Bind x t) = f x (variables f t)
 
-alphaRenameWith :: Variables t
-                => (Ident -> Ident -> t -> t)  -- Renamer
-                -> [Ident]                     -- Forbidden
-                -> Bind t -> (Ident, t)
+alphaRenameBindWith :: Variables t
+                    => (Ident -> t -> (Ident, t))  -- Freshen
+                    -> Bind t -> (Ident, t)
 -- Recommended way to walk inside a Bind
 --    (ren x y t) should replace all uses of `x` by `y` in `t`
-alphaRenameWith ren forb (Bind x t)
-  | x `notElem` forb = (x, t)
-  | otherwise        = (x', ren x x' t)
- where
-  zs = forb ++ free t
-  x' = identNotIn zs
+--
+--ToDo: ;combination of 'free' and 'forb' seems excessive
+alphaRenameBindWith freshen (Bind x t)
+  = freshen x t
+
+alphaRenameBindListWith :: Variables t
+                        => ([Ident] -> t -> ([Ident], t))  -- Freshen
+                        -> BindList t -> ([Ident], t)
+-- Recommended way to walk inside a Bind
+--    (ren x y t) should replace all uses of `x` by `y` in `t`
+alphaRenameBindListWith freshen bl
+  = freshen rs body
+  where
+    (rs, body) = unsafeUnbindList bl
 
 unsafeUnbind :: Bind t -> (Ident, t)
 -- Non-recommended way to walk inside a Bind
@@ -133,25 +159,37 @@ instance Variables t => Variables (BindList t) where
   variables f (Body t)     = variables f t
   variables f (Binder bnd) = variables f bnd
 
+bindList :: [Ident] -> t -> BindList t
+bindList xs t = foldr do_one (Body t) xs
+  where
+    do_one x bl = Binder (bind x bl)
+
+unsafeUnbindList :: BindList t -> ([Ident], t)
+unsafeUnbindList (Body t)     = ([], t)
+unsafeUnbindList (Binder bnd) = let (x,bl)    = unsafeUnbind bnd
+                                    (xs,body) = unsafeUnbindList bl
+                                in (x:xs, body)
+
 --------------------------------------------------------------------------------
 
 type Subst a = [(Ident,a)]
 
 substBind :: (Variables s, Variables t)
-          => (Ident -> s) -> (Subst s -> t -> t) -> (Subst s -> Bind t -> Bind t)
+          => (Ident -> s) -> (Subst s -> t -> t)
+          -> Subst s -> Bind t -> Bind t
 substBind var subst sub a@(Bind x t)
   | null sub'   = a
   | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)
   | otherwise   = Bind x  (subst sub' t)
  where
-  sub' = [ (y,t) | (y,t) <- sub, y /= x ]
+  sub' = [ (y,ty) | (y,ty) <- sub, y /= x ]
   vs   = free (map snd sub')
   zs   = map fst sub' ++ vs ++ free t
   x'   = identNotIn zs
 
 substBinds :: (Variables s, Variables t)
            => (Ident -> s) -> (Subst s -> t -> t) -> (Subst s -> BindList t -> BindList t)
-substBinds var subst sub (Body t)     = Body (subst sub t)
-substBinds var subst sub (Binder bnd) = Binder (substBind var (substBinds var subst) sub bnd)
+substBinds _var subst sub (Body t)     = Body (subst sub t)
+substBinds var  subst sub (Binder bnd) = Binder (substBind var (substBinds var subst) sub bnd)
 
 --------------------------------------------------------------------------------

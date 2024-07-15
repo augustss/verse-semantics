@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module TRS.TRS(
   Rule, Rewrite,
-  name,
+  name, nameWith,
   (-=),
   Rec(..),
   step, stepS, stepSS,
@@ -38,6 +38,13 @@ instance Show (Rule t) where
 infix 7 `name`   -- must bind tighter than <>
 name :: String -> [a] -> [(String, a)]
 name s as = [(s,a) | a <- as]
+
+-- This is used to give rules names.
+infix 7 `nameWith`   -- must bind tighter than <>
+nameWith :: (Pretty s) => String -> [(s, a)] -> [(String, a)]
+nameWith s as = [(s ++ " : " ++ prettyShow k, a) | (k, a) <- as]
+
+
 
 -- Remove a named rule.
 infixl 8 -=

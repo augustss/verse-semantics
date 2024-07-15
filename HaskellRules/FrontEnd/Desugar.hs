@@ -2062,7 +2062,6 @@ dsM_10 s (Range t) E                       -- MTYPE3
           , pure (ApplyD (Variable z) (Variable x)) ]
 
 
-
 dsM_10 s (DefineIE x y t) E                -- MSQUIGE
   = do i <- newIdent (getLoc t) "i"
        existsV [i] <$> dsM_10 s (DefineIE x y t) (P i)

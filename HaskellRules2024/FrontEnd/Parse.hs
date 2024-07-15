@@ -93,6 +93,7 @@ symbol = L.symbol skip
 pWord :: P String
 pWord = lexeme ((:) <$> (letterChar <|> char '_') <*> many (alphaNumChar <|> char '_') <?> "identifier")
 
+{-
 pWordOp :: P String
 pWordOp = do
   w0 <- pWord
@@ -108,6 +109,26 @@ pWordOp = do
     pure w'
    else do
     pure w
+-}
+
+pWordOp :: P String
+--   Parses        as
+--   -----------------------
+--   wombat        "wombat"
+--   operator'+'   "+"
+--   prefix'+'     "+"
+--
+pWordOp = do
+  w0 <- pWord
+  suf <- optional (char '$')
+  let w = w0 ++ maybeToList suf
+  if w `elem` ["operator", "prefix"]
+   then do { _ <- char '\''
+           ; op <- takeWhile1P Nothing (`elem` opChars)
+           ; _ <- char '\''
+           ; skip
+           ; pure op }
+   else pure w
 
 pIdent :: P Ident
 pIdent = try $ do
@@ -123,15 +144,12 @@ keywords :: [String]
 keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "fn", "function", "if"
            , "in", "let", "map", "not", "of", "or", "option", "ref", "return", "set", "then"
            , "truth",  "var", "where"
-           , "lambda"]
+           , "lambda", "lam", "exi", "exists" ]
            ++ macros)
            \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "allow", "assert", "assume", "expect", "first", "last",
-          "logic", "lowered", "one", "reject", "type", "unify", "verify",
-          "some", "guard"]
-         ++ effects
+macros = ["all", "one", "some", "guard", "verify", "check","type" ]
 
 macrosOp :: [String]
 macrosOp = ["in'='"]
@@ -179,11 +197,11 @@ pAngles = between (pOp "<") (pOp ">")
 
 pLiteral :: P SrcExpr
 pLiteral = choice
-  [ Lit . LitInt <$> pDecimal
-  , Lit . LitChar <$> pChar
+  [ Lit . LInt <$> pDecimal
+  , Lit . LChar <$> pChar
   -- Handle 1..2 incorrectly
-  , (Lit <$> (LitRat <$> L.scientific <*> ((:) <$> letterChar <*> many alphaNumChar)) <* skip)
-  , Lit . LitPath <$> pPath
+  , (Lit <$> (LRat <$> L.scientific <*> ((:) <$> letterChar <*> many alphaNumChar)) <* skip)
+  , Lit . LPath <$> pPath
   , pString
   ]
 
@@ -234,12 +252,12 @@ pString :: P SrcExpr
 pString = do
   let pStr = some (pPrintableChar "\"\\{" <|> pBackslashChar)
       pInterp = pBraces pExprSeq
-      conc [] = Lit (LitStr "")
+      conc [] = Lit (LStr "")
       conc [e] = e
       conc es = ApplyD (Variable (Ident noLoc "strConc$")) (Array es)
       toStr e = Macro1 (Ident noLoc "toStr$") [] e
   _ <- char '"'
-  cs <- many ((Lit . LitStr <$> pStr) <|> (toStr <$> pInterp))
+  cs <- many ((Lit . LStr <$> pStr) <|> (toStr <$> pInterp))
   _ <- char '"'
   skip
   pure $ conc cs
@@ -291,9 +309,6 @@ pArray = pKeyword "array" *> (tArray <$> pBlockEs)
     tArray [Tuple es] = Array es
     tArray es = Array es
 
---pTypedef :: P SrcExpr
---pTypedef = pKeyword "type" *> (Typedef <$> pBlockM)
--- XXX remove try by combining with Variable
 pMacro :: P SrcExpr
 pMacro = try $ do
   n <- pMacroName
@@ -440,14 +455,25 @@ pReturn :: P SrcExpr
 pReturn = pKeyword "return" *> (Return <$> pExpr2)
 
 pExpr1 :: P SrcExpr
-pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn, pLambda ]
+pExpr1 = choice [ pIf, pFor, pLet, pCase, pDo, pSet, pVar, pTerm, pReturn
+                , pLambda, pExists, pGuard ]
 
 pExpr2 :: P SrcExpr
 pExpr2 = makeExprParser pExpr1 operatorTable
 
--- A hack for already lowered lambdas
+-- Lambda and exists (not strictly part of source at all)
+pGuard :: P SrcExpr
+pGuard = Guard <$> pAtom <*> ((pOp ">>") *> pExpr1)
+
+pExists :: P SrcExpr
+pExists = p_exi *> (Exists <$> some pIdent <*> pBlockM)
+  where
+    p_exi = pKeyword "exi" <|> pKeyword "exists"
+
 pLambda :: P SrcExpr
-pLambda = pKeyword "lambda" *> (Lam <$> pParens pIdent <*> pBlockM)
+pLambda = p_lam *> (Lam <$> pIdent <*> pBlockM)
+   where
+     p_lam = pKeyword "lambda" <|> pKeyword "lam" <|> void (pOp "\\")
 
 {-
 pTermPost :: P SrcExpr

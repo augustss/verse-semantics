@@ -33,6 +33,7 @@ library all
                       Epic.SIntMap
                       Epic.SIntSet
                       Epic.String
+                      Epic.UnionFind
                       Epic.Trace
                       Epic.Uniplate
                       Epic.QuickCheck

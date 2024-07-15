@@ -133,6 +133,7 @@
 %format freevars (e) = "\mathsf{fvs}(" e ")"
 %format boundvars (e) = "\mathsf{bvs}(" e ")"
 %format `delete` = "\setminus"
+%format (singleton (x)) = "\{" x "\}"
 
 %format match (e) (b) = e "\blacktriangleright" b
 %format `match`       = "\blacktriangleright"
@@ -159,7 +160,7 @@
 %% ----------- End of Applications --------------
 
 %format space = "\hspace{0.3em}"
-%format olam (x) (y) (z) = olamKW "(" x "," y "," z ")"
+%format olam (x) (y) = olamKW "(" x "," y ")"
 %format olamKW = "\textbf{olam}"
 %format inapplic (x) (y) = "\textbf{inapplic}(" x "," y ")"
 
@@ -179,6 +180,8 @@
 %format voftype (e) (t) = e "\vartriangleright_V" t
 %format ioftype (e) (t) = e "\vartriangleright_I" t
 %format oftypeKW = "\vartriangleright"
+%format oftypefx (e) (fx) (t) = e "\vartriangleright\hspace{-1.3mm} \langle" fx "\rangle\," t
+%format colonfx fx t = : "\hspace{-0.2mm} \langle" fx "\rangle" t
 %format at = "\, @\!\!"
 %format dot = "\! ."
 %format alpha = "\alpha"
@@ -407,7 +410,7 @@
 %format squiggt = "\leadsto"
 %% %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
-%format eff (x) = "\langle" x "\rangle"
+%format (eff (fx)) = "\langle" fx "\rangle"
 %format apeff g x = g "\langle" x "\rangle"
 %format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots

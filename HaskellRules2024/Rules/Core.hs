@@ -1,23 +1,60 @@
-module Rules.Core where
+{-# LANGUAGE PatternSynonyms #-}
 
-import qualified Data.Map as M
+module Rules.Core
+  ( -- The data type itself
+    Expr(..), pattern LitInt
+  , Ident(..)
+  , Lit(..), Ptr, Path(..)
+  , isVal, isHNF, isSkolem
+  , prep, norm
+  , pPrintSmallExpr
+
+    -- Assupmtions
+  , Assump(..), AssumpOp(..), GroundVal(..), isPosAssump
+
+    -- Rewriting
+  , Rule, Context, isContext, (<@)
+  , everywhere, normalize
+  , RuleEnv(..), extendRuleEnv
+
+    -- Binding and substitution
+  , subst, bvs
+  , unbindAs, unExis
+  , alphaRename, matchExi_alphaRename, matchEq
+  , alphaRenameVerify
+
+    -- Effects
+  , Effect(..), canSucceed, canFail
+
+  -- Primops
+  , PrimOp(..), allPrimOps, primOpString, primOpCanFail
+  ) where
+
+import Prelude hiding( (<>) )
+import Epic.Print
+
 import Data.List( union, intersperse )
 import TRS.Bind
 import TRS.Traced
 import Test.QuickCheck
+
 import Control.Monad( liftM2 )
+import Data.Scientific(Scientific)
 
 --------------------------------------------------------------------------------
--- main expression datatype
+--
+--            The main expression datatype
+--
+--------------------------------------------------------------------------------
 
 data Expr
   -- values
   = Var Ident
-  | Int Integer
+  | Lit Lit
   | Arr [Val]
   | Lam (Bind Expr)
-  | Op Op
-  
+  | Op PrimOp
+
   -- programs
   | Expr :=: Expr    -- unification      =
   | Expr :>: Expr    -- seq. composition ;
@@ -30,10 +67,10 @@ data Expr
   | One Expr
   | All Expr
   -- | Split Expr  -- maybe later
-  
+
   -- verifier
   | Some Val
-  | Val :>>: Expr    -- guard           |>   <-- black triangle
+  | Val :>>: Expr    -- guard |>   <-- black triangle
   | Check Effect Expr
   | Verify (BindList ([Assump],Expr))
 
@@ -41,12 +78,157 @@ data Expr
   | HOLE
  deriving ( Eq, Ord )
 
-data Op = Add | Sub | Gt | IsInt
- deriving ( Eq, Ord, Show )
+--------------------------------------------------------------------------------
+--
+--                 PrimOps
+--
+--------------------------------------------------------------------------------
+
+data PrimOp
+ = -- Operations on integers
+   Add | Sub | Mul | Div
+
+   -- Relational
+ | Gt | Lt | NEq | GEq | LEq
+
+   -- Type tests
+ | IsInt | IsStr | IsChar
+ deriving
+   ( Eq, Ord, Bounded, Enum, Show )
+
+allPrimOps :: [PrimOp]
+allPrimOps = [minBound .. maxBound]
+
+primOpString :: PrimOp -> String
+primOpString Add = "intAdd$"
+primOpString Sub = "intSub$"
+primOpString Mul = "intMul$"
+primOpString Div = "intDiv$"
+
+primOpString Gt  = "intGT$"
+primOpString GEq = "intGE$"
+primOpString Lt  = "intLT$"
+primOpString LEq = "intLE$"
+primOpString NEq = "intNE$"
+
+primOpString IsInt  = "isInt$"
+primOpString IsStr  = "isStr$"
+primOpString IsChar = "isChar$"
+
+primOpCanFail :: PrimOp -> Bool
+primOpCanFail Gt     = True
+primOpCanFail Lt     = True
+primOpCanFail NEq    = True
+primOpCanFail GEq    = True
+primOpCanFail LEq    = True
+primOpCanFail IsInt  = True
+primOpCanFail IsStr  = True
+primOpCanFail IsChar = True
+
+primOpCanFail Add = False
+primOpCanFail Sub = True
+primOpCanFail Mul = True
+primOpCanFail Div = True
+
+--------------------------------------------------------------------------------
+--
+--                 Literals
+--
+--------------------------------------------------------------------------------
+
+data Lit
+  = LInt Integer            -- d
+  | LRat Scientific String  -- d.d
+  | LChar Char              -- 'c'
+  | LStr String             -- "str"
+  | LPath Path              -- /path/to/something
+  | LPtr Ptr                -- not a textual literal, just used when translating back.
+  deriving (Eq, Ord)
+
+pattern LitInt :: Integer -> Expr
+pattern LitInt i = Lit (LInt i)
+
+instance Pretty Lit where
+  pPrintPrec l p lit =
+    case lit of
+      LInt i
+        | i >= 0 -> text $ show i
+        | otherwise -> maybeParens (p >= 10) $ text $ show i
+      LRat r s -> text (show r ++ s)
+      LChar c -> text (show c)
+      LStr s -> text (show s)
+      LPath s -> pPrintPrec l p s
+      LPtr ptr -> text ("R#" ++ show ptr)
+
+instance Show Lit where
+  show = prettyShow
+
+
+--------------------------------------------------------
+--               Pointers (= refs)
+--------------------------------------------------------
+
+type Ptr = Int    -- ToDo: newtype
+
+--------------------------------------------------------
+--               Path
+--------------------------------------------------------
+
+newtype Path = Path String
+  deriving (Eq, Ord, Show)
+
+instance Pretty Path where
+  pPrintPrec _ _ (Path s) = text s
+
+
+--------------------------------------------------------------------------------
+--
+--                 Assumptions
+--
+--------------------------------------------------------------------------------
+
+data GroundVal = GVVar Ident
+               | GVLit Lit
+               | GVArr [GroundVal]
+  deriving( Eq, Ord, Show )
 
 data Assump
-  = NOTHING_HERE_YET 
+  = A_GVEq Ident GroundVal              -- r = gv
+  | A_PrimOp Ident AssumpOp GroundVal   -- r = op[gv]
+  | A_Fails Assump                      -- not( a )
  deriving ( Eq, Ord, Show )
+
+data AssumpOp  -- Either a regular primop or Apply
+  = AO_Apply | AO_Prim PrimOp
+  deriving( Eq, Ord, Show )
+
+instance Pretty AssumpOp where
+  pPrint AO_Apply     = text "Apply"
+  pPrint (AO_Prim op) = pPrint op
+
+instance Pretty Assump where
+  pPrint (A_GVEq i gv)      = pPrint i <+> text "="  <+> pPrint gv
+  pPrint (A_PrimOp i AO_Apply (GVArr [fun,arg]))
+                            = pPrint i <+> text "=" <+> pPrint fun <> brackets (pPrint arg)
+  pPrint (A_PrimOp i op gv) = pPrint i <+> text "=" <+> pPrint op <> brackets (pPrint gv)
+  pPrint (A_Fails a)        = text "not" <> parens (pPrint a)
+
+instance Pretty GroundVal where
+  pPrint (GVVar i)   = pPrint i
+  pPrint (GVLit l)   = pPrint l
+  pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
+
+isPosAssump :: Assump -> Bool
+isPosAssump (A_GVEq {})   = True
+isPosAssump (A_PrimOp {}) = True
+isPosAssump (A_Fails {})  = False
+
+
+--------------------------------------------------------------------------------
+--
+--                 Effects
+--
+--------------------------------------------------------------------------------
 
 data Effect
   = Fails
@@ -59,12 +241,109 @@ instance Show Effect where
   show Succeeds = "succeeds"
   show Decides  = "decides"
 
+instance Pretty Effect where
+  pPrint eff = text (show eff)
+
+canSucceed :: Effect -> Bool
+-- True if one result is acceptable
+canSucceed Succeeds = True
+canSucceed Decides  = True
+canSucceed Fails    = False
+
+canFail :: Effect -> Bool
+-- True if no results is acceptable
+canFail Succeeds = False
+canFail Decides  = True
+canFail Fails    = True
+
 --------------------------------------------------------------------------------
--- show -- TODO: use pretty printing library
+--
+--                 Pretty-printing
+--
+--------------------------------------------------------------------------------
+
+instance Pretty Expr where
+  pPrintPrec = pPrintPrecE
+
+instance Pretty PrimOp where
+  pPrint op = text (primOpString op)
+
+pPrintPrecE :: PrettyLevel -> Rational -> Expr -> Doc
+pPrintPrecE lvl prec the_expr
+  = case the_expr of
+       HOLE       -> text "HOLE"
+       Fail       -> text "fail"
+       Var x      -> pPrint x
+       Lit i      -> pPrint i
+       Op op      -> char '!' <> pPrint op
+
+       e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
+       e1 :|: e2   -> mbPar0 $ ppr1 e1 <+> char '|' <+> ppr1 e2
+       e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
+       e@(_ :>: _) -> sep (punctuate semi $ map ppr1 (gatherSeqs e))
+       e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ";;" <+> ppr1 e2
+
+       Arr as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
+       One e   -> text "one" <> braces (ppr0 e)
+       All e   -> text "all" <> braces (ppr0 e)
+       Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
+       Exi {}  -> mbPar0 $ sep [ text "exi" <+> (fsep (map pPrint bndrs)) <> char '.'
+                               , indent (ppr0 body) ]
+               where
+                  (bndrs, body) = unpackExis the_expr
+
+       Some e  -> text "some" <> parens (ppr0 e)
+       Check fx e -> cat [ text "check" <> char '<' <> pPrint fx <> char '>'
+                         , indent (braces (ppr0 e)) ]
+
+       Verify bl -> cat [ text "verify" <> parens (sep [ fsep (punctuate comma (map pPrint ids)) <> char ';'
+                                                       , fsep (punctuate comma (map pPrint as)) ])
+                        , indent (braces (ppr0 body)) ]
+           where
+             (ids, (as, body)) = alphaRenameVerify (free bl) bl
+  where
+    ppr0 = pPrintPrecE lvl 0
+    ppr1 = pPrintPrecE lvl 1
+
+    mbPar0 = maybeParens (prec > 0)
+
+    -- Reduce clutter: omit the angle brackets for a multi-arg call.
+    -- That is, print f[3,2] rather than f[<3,2>]
+    pp_call_arg (Arr es) = fsep (punctuate comma $ map ppr0 es)
+    pp_call_arg e2       = ppr0 e2
+
+pPrintSmallExpr :: Expr -> Doc
+-- Show only a small expression; otherwise return "<big>"
+pPrintSmallExpr e
+  | exprSize e < 10 = pPrint e
+  | otherwise       = text "<big>"
+
+gatherSeqs :: Expr -> [Expr]
+gatherSeqs (e1 :>: e2) = e1 : gatherSeqs e2
+gatherSeqs e           = [e]
+
+unpackExis :: Expr -> ([Ident], Expr)
+-- Gather up a contiguous block of Exis, alpha-renaming
+unpackExis orig_e
+  = go (free orig_e) orig_e
+  where
+    go forb e
+      | Exi bnd <- e
+      , (bndr, body)   <- alphaRename (free bnd) bnd
+      , (bndrs, inner) <- go (bndr:forb) body
+      = (bndr:bndrs, inner)
+    go _ other = ([], other)
+
+
+pprBind :: Bind Expr -> Doc
+pprBind bnd
+  = pPrint bndr <> char '.' <+> pPrint body
+  where
+    (bndr, body) = alphaRename (free bnd) bnd
 
 instance Show Expr where
   show (Var x)       = show x
-  show (Int k)       = show k
+  show (Lit k)       = show k
   show (Arr as)      = "<" ++ concat (intersperse "," (map show as)) ++ ">"
   show (Lam bnd)     = "\\" ++ showBind bnd
   show (Op op)       = show op
@@ -80,7 +359,8 @@ instance Show Expr where
   show (Some a)      = "some(" ++ show a ++ ")"
   show (a :>>: e)    = show1 a ++ "|>" ++ show1 e
   show (Check fx e)  = "check<" ++ show fx ++ ">{" ++ show e ++ "}"
-  show (Verify bnds) = error "show Verify undefined"
+  show (Verify {})   = error "show Verify undefined"
+  show HOLE          = "HOLE"
 
 showBind :: Bind Expr -> String
 showBind bnd = show x ++ ". " ++ show e where (x,e) = unsafeUnbind bnd
@@ -90,39 +370,78 @@ show0 = showP 0
 show1 = showP 1
 
 showP :: Int -> Expr -> String
-showP p e | parens e  = "(" ++ show e ++ ")"
-          | otherwise = show e
+showP p e | need_parens e  = "(" ++ show e ++ ")"
+          | otherwise      = show e
  where
-  parens (Lam _)    = True
-  parens (_ :>: _)  = 1 <= p
-  parens (_ :=: _)  = True
-  parens (_ :|: _)  = True
-  parens (_ :@: _)  = True
-  parens (Exi _)    = True
-  parens (_ :>>: _) = True
-  parens _          = False
-  
+  need_parens (Lam _)    = True
+  need_parens (_ :>: _)  = 1 <= p
+  need_parens (_ :=: _)  = True
+  need_parens (_ :|: _)  = True
+  --need_parens (_ :@: _)  = True
+  need_parens (Exi _)    = True
+  need_parens (_ :>>: _) = True
+  need_parens _          = False
+
 --------------------------------------------------------------------------------
--- values
+--
+--                 Size
+--
+--------------------------------------------------------------------------------
+
+exprSize :: Expr -> Int
+exprSize (Var {})      = 1
+exprSize (Lit {})      = 1
+exprSize (Op {})       = 1
+exprSize Fail          = 1
+exprSize HOLE          = 1
+exprSize (Arr as)      = 1 + sum (map exprSize as)
+exprSize (Lam bnd)     = 1 + bindSize bnd
+exprSize (e1 :>: e2)   = 1 + exprSize e1 + exprSize e2
+exprSize (e1 :=: e2)   = 1 + exprSize e1 + exprSize e2
+exprSize (e1 :|: e2)   = 1 + exprSize e1 + exprSize e2
+exprSize (e1 :@: e2)   = 1 + exprSize e1 + exprSize e2
+exprSize (e1 :>>: e2)  = 1 + exprSize e1 + exprSize e2
+exprSize (Exi bnd)     = 1 + bindSize bnd
+exprSize (One e)       = 1 + exprSize e
+exprSize (All e)       = 1 + exprSize e
+exprSize (Some a)      = 1 + exprSize a
+exprSize (Check _ e)  = 1 + exprSize e
+exprSize (Verify bl)   = 10 + exprSize e
+                       where
+                         (_rs,(_as,e)) = unsafeUnbindList bl
+
+bindSize :: Bind Expr -> Int
+bindSize bnd = exprSize (snd (unsafeUnbind bnd))
+
+--------------------------------------------------------------------------------
+--
+--                 Values
+--
+--------------------------------------------------------------------------------
 
 type Val = Expr
 
 isVal :: Expr -> Bool
-isVal (Var x)   = True
-isVal e         = isHNF e
+isVal (Var _) = True
+isVal e       = isHNF e
 
 isHNF :: Expr -> Bool
-isHNF (Int k)   = True
-isHNF (Arr es)  = all valid es
-isHNF (Lam bnd) = valid e where (_,e) = unsafeUnbind bnd
-isHNF (Op op)   = True
-isHNF _         = False
+isHNF (Lit {}) = True
+isHNF (Op {})  = True
+isHNF (Arr es) = all isVal es   -- ToDo: This had 'valid' stuff too, strangely
+isHNF (Lam {}) = True           -- valid e where (_,e) = unsafeUnbind bnd
+                                -- ToDo: why valid????
+isHNF _        = False
+
 
 --------------------------------------------------------------------------------
--- valid expressions
+--
+--                 Valid expressions
+--
+--------------------------------------------------------------------------------
 
--- checks if an expression is syntactically valid
 valid :: Expr -> Bool
+-- Checks if an expression is syntactically valid
 valid ((a :=: e1) :>: e2) = isVal a && valid e1 && valid e2
 valid (e1 :|: e2)         = valid e1 && valid e2
 valid (a1 :@: a2)         = isVal a1 && isVal a2
@@ -132,18 +451,18 @@ valid (One e)             = valid e
 valid (All e)             = valid e
 valid (Some a)            = isVal a
 valid (a :>>: e)          = isVal a && valid e
-valid (Check fx e)        = valid e
-valid (Verify bnds)       = error "check Verify undefined"
+valid (Check _ e)         = valid e
+valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid e                   = isVal e
 
--- valid (prep e) == True
 prep :: Expr -> Expr
+-- Valid (prep e) == True
 prep (Var x)       = Var x
-prep (Int k)       = Int k
+prep (Lit k)       = Lit k
 prep (Arr as)      = prepVals as (\vs -> Arr vs)
 prep (Lam bnd)     = Lam (bind x (prep e)) where (x,e) = unsafeUnbind bnd
 prep (Op op)       = Op op
-prep (e1 :>: e2)   = prepSeq e1 (prep e2)
+prep (e1 :>: e2)   = prepSeq e1 e2
 prep (a  :=: e)    = prepVal a (\v -> (v :=: prep e) :>: v)
 prep (e1 :|: e2)   = prep e1 :|: prep e2
 prep (a1 :@: a2)   = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
@@ -154,29 +473,36 @@ prep (All e)       = All (prep e)
 prep (Some a)      = prepVal a (\v -> Some v)
 prep (a :>>: e)    = prepVal a (\v -> v :>>: prep e)
 prep (Check fx e)  = Check fx (prep e)
-prep (Verify bnds) = error "prep Verify undefined"
+prep (Verify bl)   = Verify (bindList xs (as, prep e))
+                     where (xs,(as,e)) = unsafeUnbindList bl
+prep HOLE          = error "prep HOLE undefined"
 
 prepSeq :: Expr -> Expr -> Expr
-prepSeq (a :=: e1) e2 = prepVal a (\v -> (v :=: prep e1) :>: e2)
-prepSeq e1         e2 = prepVal e1 (\_ -> e2)
+prepSeq (a :=: e1) e2 = prepVal a (\v -> (v :=: prep e1) :>: prep e2)
+prepSeq e1         e2 = (Var underscore :=: prep e1) :>: prep e2
 
 prepVal :: Expr -> (Val -> Expr) -> Expr
-prepVal a f
-  | isVal pa  = f pa
-  | otherwise = Exi (bind x ((Var x :=: pa) :>: f (Var x)))
+-- (prepVal e K) makes applies K to the value of e,
+-- perhaps by adding an existential, thus (exi x. x = e; K[x])
+prepVal a k
+  | isVal pa  = k pa
+  | otherwise = Exi (bind x ((Var x :=: pa) :>: k (Var x)))
  where
   pa = prep a
-  x  = identNotIn (free (pa, f (Var (ident "?"))))
+  x  = identNotIn (free (k pa))  -- UGH!  ToDo: quadratic in prepVals
 
 prepVals :: [Expr] -> ([Val] -> Expr) -> Expr
 prepVals []     f = f []
 prepVals (a:as) f = prepVal a (\v -> prepVals as (f . (v:)))
 
 --------------------------------------------------------------------------------
--- variables
+--
+--                 Variables
+--
+--------------------------------------------------------------------------------
 
 instance Variables Expr where
-  variables f (Var x)      = [x]
+  variables f (Var x)      = variables f x
   variables f (Arr es)     = variables f es
   variables f (Lam bnd)    = variables f bnd
   variables f (e1 :=: e2)  = variables f (e1,e2)
@@ -187,34 +513,82 @@ instance Variables Expr where
   variables f (All e)      = variables f e
   variables f (Some e)     = variables f e
   variables f (e1 :>>: e2) = variables f (e1,e2)
-  variables f (Check fx e) = variables f e
+  variables f (Check _ e)  = variables f e
   variables f (Exi bnd)    = variables f bnd
   variables f (Verify bnd) = variables f bnd
-  variables f e            = []
+  variables _ _            = []
 
 instance Variables Assump where
-  variables f NOTHING_HERE_YET = []
+  variables f (A_GVEq i gv)       = [i] `union` variables f gv
+  variables f (A_PrimOp i _ gv)   = [i] `union` variables f gv
+  variables f (A_Fails a)         = variables f a
+
+instance Variables GroundVal where
+  variables _f (GVVar i)   = [i]
+  variables _f (GVLit {})  = []
+  variables f  (GVArr gvs) = variables f gvs
 
 isSkolem :: Ident -> Bool
 isSkolem (Name ('$':_)) = True
 isSkolem _              = False
 
 --------------------------------------------------------------------------------
--- binders
+--
+--                 Binders
+--
+--------------------------------------------------------------------------------
 
 unbindAs :: Ident -> Bind Expr -> Expr
 unbindAs x bnd = subst [(y,Var x)] e where (y,e) = unsafeUnbind bnd
 
 alphaRename :: [Ident] -> Bind Expr -> (Ident,Expr)
-alphaRename = alphaRenameWith (\x y -> subst [(x,Var y)])
+-- Open up the binding, but avoiding any of the binders in `forb`
+-- or free in the binding
+alphaRename forb top_t
+  = alphaRenameBindWith freshen top_t
+  where
+    full_forb = forb ++ free top_t
+    freshen x t
+      | x `elem` full_forb = (x', subst [(x,Var x')] t)
+      | otherwise          = (x, t)
+      where
+        x' = identNotIn forb
 
--- sorts binders and renames variables
+alphaRenameVerify :: [Ident] -> BindList ([Assump], Expr) -> ([Ident], ([Assump], Expr))
+-- Open up a Verify block, avoiding any skolems in `forb`
+-- (Unlike alphaRename we expect these to include all the in-scope
+--  skolems, so we don't need to take the free vars of the BindList
+alphaRenameVerify forb bl
+  = alphaRenameBindListWith freshen bl
+  where
+     freshen rs (as,e) = (rs', (map (substAssump prs) as, substSkol prs e))
+       where
+         (rs', prs) = freshenSkolVars forb rs
+
+freshenSkolVars :: [Ident]           -- Forbidden
+                -> [Ident]           -- Freshen these
+                -> ( [Ident]         -- Fresh
+                   , Subst Ident )   -- Old-to-new mapping, maybe empty
+
+freshenSkolVars top_forb top_rs
+  = go top_forb [] [] top_rs
+  where
+    go _ rs' prs []
+      = (reverse rs', reverse prs)
+    go forb rs' prs (r:rs)
+      | r `elem` forb = go (r':forb) (r':rs') ((r,r'):prs) rs
+      | otherwise     = go (r:forb)  (r:rs')  prs          rs
+      where
+        r' = skolNotIn forb
+
+-- Sorts binders and renames variables
 -- TODO: new normalization for x=y
 norm :: Expr -> Expr
-norm e = alpha 0 e
+norm orig_e = alpha 0 orig_e
  where
   var i = ident ("_" ++ show i)
- 
+  skvar i = ident ("_r" ++ show i)
+
   alpha k (Arr es)     = Arr (map (alpha k) es)
   alpha k (Lam bnd)    = Lam (bind x (alpha (k+1) e))
                        where x = var k; e = unbindAs x bnd
@@ -228,8 +602,13 @@ norm e = alpha 0 e
   alpha k (e1 :>>: e2) = alpha k e1 :>>: alpha k e2
   alpha k (Check fx e) = Check fx (alpha k e)
   alpha k e@(Exi _)    = alphaExi k [] e
-  alpha k (Verify bnd) = error "alpha Verify undefined"
-  alpha k e            = e
+  alpha k (Verify bl)  = let (rs, (as,e)) = unsafeUnbindList bl
+                             rs' = map skvar [k+1..k+n]
+                             n   = length rs
+                             sub = rs `zip` rs'
+                             e'  = alpha (k+n) e
+                         in Verify (bindList rs' (map (substAssump sub) as, substSkol sub e'))
+  alpha _ e            = e
 
   alphaExi k xs (Exi bnd) = alphaExi k (x:xs) e
    where
@@ -242,100 +621,168 @@ norm e = alpha 0 e
     ys  = free e'
     tab = filter (`elem` xs) ys `zip` [ var i | i <- [k..] ]
 
-    exis []     e = e
-    exis (y:ys) e = Exi (bind y (exis ys e))
+    exis []     e2 = e2
+    exis (z:zs) e2 = Exi (bind z (exis zs e2))
 
 --------------------------------------------------------------------------------
--- substitution
+--
+--            Substitution
+--
+--------------------------------------------------------------------------------
 
 subst :: Subst Expr -> Expr -> Expr
-subst sub (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
-subst sub (Arr es)     = Arr (map (subst sub) es)
-subst sub (Lam bnd)    = Lam (substBind Var subst sub bnd)
-subst sub (e1 :=: e2)  = subst sub e1 :=: subst sub e2
-subst sub (e1 :>: e2)  = subst sub e1 :>: subst sub e2
-subst sub (e1 :|: e2)  = subst sub e1 :|: subst sub e2
-subst sub (e1 :@: e2)  = subst sub e1 :@: subst sub e2
-subst sub (One e)      = One (subst sub e)
-subst sub (All e)      = All (subst sub e)
-subst sub (Some e)     = Some (subst sub e)
-subst sub (e1 :>>: e2) = subst sub e1 :>>: subst sub e2
-subst sub (Check fx e) = Check fx (subst sub e)
-subst sub (Exi bnd)    = Exi (substBind Var subst sub bnd)
-subst sub (Verify bnd) = error "subst Verify undefined"
-subst sub e            = e
+-- Domain of substitution does not include skolems
+subst sub orig_e
+  | null sub  = orig_e      -- Short cut
+  | otherwise = go orig_e
+  where
+    go (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
+    go (Arr es)     = Arr (map go es)
+    go (Lam bnd)    = Lam (substBind Var subst sub bnd)
+    go (e1 :=: e2)  = go e1 :=: go e2
+    go (e1 :>: e2)  = go e1 :>: go e2
+    go (e1 :|: e2)  = go e1 :|: go e2
+    go (e1 :@: e2)  = go e1 :@: go e2
+    go (One e)      = One (go e)
+    go (All e)      = All (go e)
+    go (Some e)     = Some (go e)
+    go (e1 :>>: e2) = go e1 :>>: go e2
+    go (Check fx e) = Check fx (go e)
+    go (Exi bnd)    = Exi    (substBind  Var subst     sub bnd)
+    go (Verify bl)  = Verify (substBinds Var go_verify sub bl)
+    go e            = e
+
+    go_verify :: Subst Expr -> ([Assump],Expr) -> ([Assump],Expr)
+    go_verify sub' (as,e) = (as, subst sub' e)
+
+substSkol :: Subst Ident -> Expr -> Expr
+-- Domain of substitution is skolem variables; range is just an identifier
+substSkol sub orig_e
+  | null sub  = orig_e    -- Short cut
+  | otherwise = go orig_e
+  where
+    go (Var x)      = Var (head $ [e | (y,e) <- sub, y == x] ++ [x])
+    go (Arr es)     = Arr (map go es)
+    go (Lam bnd)    = Lam (substBind id substSkol sub bnd)
+    go (e1 :=: e2)  = go e1 :=: go e2
+    go (e1 :>: e2)  = go e1 :>: go e2
+    go (e1 :|: e2)  = go e1 :|: go e2
+    go (e1 :@: e2)  = go e1 :@: go e2
+    go (One e)      = One (go e)
+    go (All e)      = All (go e)
+    go (Some e)     = Some (go e)
+    go (e1 :>>: e2) = go e1 :>>: go e2
+    go (Check fx e) = Check fx (go e)
+    go (Exi bnd)    = Exi    (substBind  id substSkol sub bnd)
+    go (Verify bl)  = Verify (substBinds id go_verify sub bl)
+    go e            = e
+
+    go_verify :: Subst Ident -> ([Assump],Expr) -> ([Assump],Expr)
+    go_verify sub' (as,e) = (map (substAssump sub') as, substSkol sub' e)
+
+substAssump :: Subst Ident -> Assump -> Assump
+substAssump sub top_asm
+  | null sub  = top_asm      -- Short cut
+  | otherwise = go  top_asm
+  where
+    go (A_GVEq x gv)      = A_GVEq (lookupIdSubst sub x) (substGV sub gv)
+    go (A_PrimOp x op gv) = A_PrimOp (lookupIdSubst sub x) op (substGV sub gv)
+    go (A_Fails asm)      = A_Fails (go asm)
+
+substGV :: Subst Ident -> GroundVal -> GroundVal
+substGV sub (GVVar x)  = GVVar (lookupIdSubst sub x)
+substGV _   (GVLit l)  = GVLit l
+substGV sub (GVArr vs) = GVArr (map (substGV sub) vs)
+
+lookupIdSubst :: Subst Ident -> Ident -> Ident
+lookupIdSubst sub x
+  = case [y | (x',y) <- sub, x==x'] of
+      (y:_) -> y
+      []    -> x
 
 --------------------------------------------------------------------------------
--- rewriting
+--
+--            Rewriting
+--
+--------------------------------------------------------------------------------
 
-type Rule = Expr -> [(String,Expr)]
+data RuleEnv = RE { skolVars :: [Ident], assumps :: [Assump] }
+
+emptyRuleEnv :: RuleEnv
+emptyRuleEnv = RE { skolVars = [], assumps = [] }
+
+extendRuleEnv :: RuleEnv -> [Ident] -> [Assump] -> RuleEnv
+extendRuleEnv rule_env@(RE { skolVars = skols, assumps = asms }) new_skols new_asms
+  = rule_env { skolVars = new_skols ++ skols, assumps = new_asms ++ asms }
+
+type Rule = RuleEnv -> Expr -> [(String,Expr)]
+
+stepRule :: Rule -> Expr -> [(String,Expr)]
+stepRule rule expr = rule emptyRuleEnv     -- Empty set of skolems
+                          expr
 
 -- apply a rule everywhere (recursively) in the expression
 everywhere :: Rule -> Rule
-everywhere step e = step e ++ recurse e
+everywhere step env orig_e = step env orig_e ++ recurse orig_e
  where
   recurse (Arr es)     = [ (s, Arr (take i es ++ [e'] ++ drop (i+1) es))
                          | i <- [0..length es-1]
-                         , (s,e') <- everywhere step (es!!i)
+                         , (s,e') <- everywhere step env (es!!i)
                          ]
-  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step e ]
+  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step env e ]
                        where (x,e) = unsafeUnbind bnd
-  recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :=: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (One e)      = [ (s, One e')  | (s,e') <- everywhere step e ]
-  recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step e ]
-  recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step e ]
-  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step e1 ]
-                      ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step e2 ]
-  recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step e ]
-  recurse e@(Exi _)    = [ (s, exis body') | (s,body') <- everywhere step body ]
+  recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :=: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (One e)      = [ (s, One e')  | (s,e') <- everywhere step env e ]
+  recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step env e ]
+  recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step env e ]
+  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step env e ]
+  recurse e@(Exi _)    = [ (s, exis <@ body') | (s,body') <- everywhere step env body ]
                        where (exis,body) = unExis e
-  recurse (Verify bnd) = error "everywhere Verify undefined"
-  recurse e            = []
+  recurse (Verify bl)  = [ (s, Verify (bindList rs (as,e')))
+                         | (s,e') <- everywhere step env' e ]
+                       where
+                         env' = extendRuleEnv env rs as
+                         (rs,(as,e)) = unsafeUnbindList bl   -- ToDo: is unsafe ok? I think not
+  recurse _            = []
 
 -- treat "exi x1 .. exi xn" as one block when matching
-unExis :: Expr -> (Expr -> Expr, Expr)
-unExis (Exi bnd) = (Exi . bind x . exis, body)
+unExis :: Expr -> (Context, Expr)
+unExis (Exi bnd) = (Exi (bind x exis), body)
  where
   (x,e)       = unsafeUnbind bnd
   (exis,body) = unExis e
-unExis e         = (id, e)
+unExis e         = (HOLE, e)
 
 -- structural rules matching
-matchOuterExi :: Expr -> [Bind Expr]
-matchOuterExi e =
-  [ bnd'
+matchExi_alphaRename :: [Ident] -> Expr -> [(Context, Ident, Expr)]
+matchExi_alphaRename zs e =
+  [ cxe
   | Exi bnd <- [e]
-  , let (x,e') = unsafeUnbind bnd
-  , bnd' <- bnd : [ bind y (Exi (bind x e''))
-                  | bnd' <- matchOuterExi e'
-                  , let (y,e'') = unsafeUnbind bnd'
-                  ]
-  ]
-
-matchInnerExi :: Expr -> [(Context, Bind Expr)]
-matchInnerExi e =
-  [ (ctx,bnd')
-  | Exi bnd <- [e]
-  , let (x,e') = unsafeUnbind bnd
-        cbnds  = matchInnerExi e'
-  , (ctx,bnd') <- [ (Exi (bind x ctx), bnd')
-                  | (ctx,bnd') <- cbnds
-                  ] ++ case cbnds of
-                         [] -> [ (HOLE, bnd) ]
-                         _  -> [ (Exi (bind y ctx), bind x e')
-                               | (ctx,bnd') <- [head cbnds]
-                               , let (y,e') = unsafeUnbind bnd'
-                               ]
+  , let (x,ex) = alphaRename zs bnd
+        cxes   = matchExi_alphaRename (x:zs) ex
+  , cxe <- -- just add "bind x" to the exis
+           [ (Exi (bind x ctx),y,ey)
+           | (ctx,y,ey) <- cxes
+           ]
+           -- add a case where "bind x" is the variable we're matching on
+        ++ case cxes of
+             [] -> [ (HOLE,x,ex) ]
+             _  -> [ (Exi (bind y ctx),x,ey)
+                   | (ctx,y,ey) <- [head cxes]
+                   ]
   ]
 
 matchEq :: Expr -> [(Expr,Expr)]
+-- Matches (v = e), and also (v1 = v2) returning (v2 = v1)
 matchEq e =
   [ (lhs, rhs)
   | e1 :=: e2 <- [e]
@@ -346,10 +793,11 @@ matchEq e =
 
 -- normalize
 normalize :: Rule -> Expr -> Traced Expr
-normalize rule e = go (-1) [] e  -- go 99 [] e
+normalize rule orig_e = go (-1) [] orig_e  -- go 99 [] e
  where
+  go :: Int -> [(String,Expr)] -> Expr -> Traced Expr
   go fuel tr e =
-    case rule e of
+    case stepRule rule e of
       []                        -> e :<-- tr
       (s,e'):_ | fuel==0        -> abort "OUT-OF-FUEL"
                | not (valid e') -> abort "INVALID"
@@ -357,18 +805,25 @@ normalize rule e = go (-1) [] e  -- go 99 [] e
               where
                abort msg = e' :<-- ((s ++ "-**" ++ msg ++ "**",e):tr)
 
---------------------------------------------------------------------------------
--- arbitrary
 
-instance Arbitrary Op where
-  arbitrary = elements [Add, Sub, Gt, IsInt]
+--------------------------------------------------------------------------------
+--
+--            Arbitrary
+--
+--------------------------------------------------------------------------------
+
+instance Arbitrary PrimOp where
+  arbitrary = elements allPrimOps
 
 instance Arbitrary Expr where
   arbitrary = sized (arbExprWith xs)
    where
     xs = take 3 (identsNotIn [])
 
-  shrink (Int k)      = [ Int k' | k' <- shrink k ]
+  shrink (LitInt k) = [ LitInt k' | k' <- shrink k ]  -- ToDo: other literals
+
+  shrink (Op _)       = [ LitInt 0, LitInt 1 ]   -- ToDo: explain
+
   shrink (Arr es)     = es
                      ++ [ Arr es' | es' <- shrink es ]
   shrink (Lam bnd)    = shrinkBind Lam bnd
@@ -393,14 +848,15 @@ instance Arbitrary Expr where
   shrink (Check fx e) = [ e ] 
                      ++ [ Check fx e' | e' <- shrink e ]
   shrink (Exi bnd)    = shrinkBind Exi bnd
+  shrink Fail         = [ LitInt 0 ]
   --shrink (Verify bnd) = error "shrink Verify undefined"
-  shrink e            = []
+  shrink _            = []
 
 arbExprWith :: [Ident] -> Int -> Gen Expr
 arbExprWith xs n =
   frequency $
   [ (1, Var `fmap` elements xs) | not (null xs) ] ++
-  [ (1, Int `fmap` arbitrary)
+  [ (1, LitInt `fmap` arbitrary)
   , (a, Arr `fmap` arbExprs)
   , (a, Lam `fmap` arbBind)
   , (1, Op  `fmap` arbitrary)
@@ -426,7 +882,7 @@ arbExprWith xs n =
   arbExpr2 = arbExprWith xs (n `div` 2)
   arbExprs = do k <- elements [0,1,2,3,5]
                 sequence [ arbExprWith xs (if k <= 1 then n-k else n`div`k)
-                         | i <- [1..k]
+                         | _ <- [1..k]
                          ]
   arbBind  = frequency $
              [ (1, liftM2 bind (elements xs) (arbExprWith xs (n-1))) | not (null xs) ] ++
@@ -441,26 +897,30 @@ instance CoArbitrary Expr where
   coarbitrary = coarbitrary . show -- not completely honest!
 
 --------------------------------------------------------------------------------
--- contexts
+--
+--            Contexts
+--
+--------------------------------------------------------------------------------
 
 type Context = Expr
 
 (<@) :: Context -> Expr -> Expr
-Arr as       <@ h = Arr (map (<@ h) as)
-Lam bnd      <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
-(e1 :>: e2)  <@ h = (e1 <@ h) :>: (e2 <@ h)
-(e1 :=: e2)  <@ h = (e1 <@ h) :=: (e2 <@ h)
-(e1 :|: e2)  <@ h = (e1 <@ h) :|: (e2 <@ h)
-(e1 :@: e2)  <@ h = (e1 <@ h) :@: (e2 <@ h)
-Exi bnd      <@ h = Exi (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
-One e        <@ h = One (e <@ h)
-All e        <@ h = All (e <@ h)
-Some e       <@ h = Some (e <@ h)
-(e1 :>>: e2) <@ h = (e1 <@ h) :>>: (e2 <@ h)
-Check fx e   <@ h = Check fx (e <@ h)
-Verify bnds  <@ h = error "context plugging Verify undefined"
-HOLE         <@ h = h
-e            <@ h = e
+-- (C <@ e) fills the hole in C with e. Often written C[e]
+Arr as        <@ h = Arr (map (<@ h) as)
+Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
+(e1 :>: e2)   <@ h = (e1 <@ h) :>: (e2 <@ h)
+(e1 :=: e2)   <@ h = (e1 <@ h) :=: (e2 <@ h)
+(e1 :|: e2)   <@ h = (e1 <@ h) :|: (e2 <@ h)
+(e1 :@: e2)   <@ h = (e1 <@ h) :@: (e2 <@ h)
+Exi bnd       <@ h = Exi (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
+One e         <@ h = One (e <@ h)
+All e         <@ h = All (e <@ h)
+Some e        <@ h = Some (e <@ h)
+(e1 :>>: e2)  <@ h = (e1 <@ h) :>>: (e2 <@ h)
+Check fx e    <@ h = Check fx (e <@ h)
+e@(Verify {}) <@ _ = e   -- No HOLE inside Verify. ToDo: check
+HOLE          <@ h = h
+e             <@ _ = e
 
 bvs :: Context -> [Ident]
 bvs ctx = explore [] ctx
@@ -475,13 +935,30 @@ bvs ctx = explore [] ctx
   explore xs (All e)      = explore xs e
   explore xs (Some e)     = explore xs e
   explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
-  explore xs (Check fx e) = explore xs e
+  explore xs (Check _ e)  = explore xs e
   explore xs (Exi bnd)    = exploreBind xs bnd
-  explore xs (Verify bnd) = error "bvs Verify undefined"
+  explore _  (Verify {})  = error "bvs Verify undefined"
   explore xs HOLE         = xs
-  explore xs e            = []
-  
+  explore _xs _e          = []
+
   exploreBind xs bnd = explore ([x] `union` xs) e where (x,e) = unsafeUnbind bnd
 
---------------------------------------------------------------------------------
+isContext :: Context -> Bool
+-- There is a HOLE, outside a Verify (ToDo: is the "outside Verify" right?
+isContext (Arr es)     = any isContext es
+isContext (Lam bnd)    = isContext e where (_,e) = unsafeUnbind bnd
+isContext (e1 :=: e2)  = isContext e1 || isContext e2
+isContext (e1 :>: e2)  = isContext e1 || isContext e2
+isContext (e1 :|: e2)  = isContext e1 || isContext e2
+isContext (e1 :@: e2)  = isContext e1 || isContext e2
+isContext (One e)      = isContext e
+isContext (All e)      = isContext e
+isContext (Some e)     = isContext e
+isContext (e1 :>>: e2) = isContext e1 || isContext e2
+isContext (Check _ e)  = isContext e
+isContext (Exi bnd)    = isContext e where (_,e) = unsafeUnbind bnd
+isContext (Verify {})  = False
+isContext HOLE         = True
+isContext _            = False
+
 
