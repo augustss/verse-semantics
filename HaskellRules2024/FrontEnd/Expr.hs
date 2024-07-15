@@ -189,7 +189,11 @@ pattern Guard v e <- Macro2 (Ident _ "guard") v e
 
 
 --------------------------------------------------------
---         Functions to construct SrcExpr
+--      Smart constructors to construct SrcExpr
+--
+-- Warning: these functions are helpful to avoid clutter
+--          but they may implicitly be doing rewrites.
+--          Be very sure that these rewrites are correct!
 --------------------------------------------------------
 
 underscore :: Ident
@@ -251,6 +255,7 @@ eExists [] e = e
 eExists is e = Exists is e
 
 eDefine :: Ident -> SrcExpr -> SrcExpr
+-- x := (e1; ...; en)   generates   e1; ... e(n-1); x=en
 -- Smart contructor, floats out nested defines
 eDefine x (Seq ts) = seqE (floats ++ [eDefine x rhs])
                    where
@@ -666,7 +671,9 @@ getVisibleBinders = go
     go (ApplyD e1 e2) = go e1 ++ go e2
     go (Let _ e)      = go e   -- ToDo: why not first arg?
     go (Unify e1 e2)  = go e1 ++ go e2
-    go (Range _fx e)   = go e
+    go (Range _fx e)  = go e
+    go (Guard e1 _)   = go e1
+    go (Some e)       = go e
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e
@@ -678,11 +685,9 @@ getVisibleBinders = go
     go OfType{}   = []
     go Lam{}      = []
     go Fail       = []
+    go (One {})   = []
+    go (All {})   = []
 
-    go (Macro1 (Ident _ "some") _ e)    = go e
-    go (Macro1 (Ident _ "all") _ e)     = go e
-    go (Macro1 (Ident _ "one") _ e)     = go e
-    go (Macro2 (Ident _ "guard") e1 _b) = go e1
     go Macro1 {}                        = []
 
     --go (Map es)      = concatMap go es

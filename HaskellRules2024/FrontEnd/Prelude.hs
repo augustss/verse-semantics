@@ -46,8 +46,8 @@ miniEvalPrelude = ("miniprelude", "\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
 \false    := array{};\n\
-\any      := lambda y { y };\n\
-\int      := lambda y { isInt$[y]; y };\n\
+\any      := lam y {            y };\n\
+\int      := lam y { isInt$[y]; y };\n\
 \rational := lam y { isRat$[y]; y };\n\
 \string   := lam y { isStr$[y]; y };\n\
 \char     := lam y { isChar$[y]; y };\n\
@@ -91,105 +91,3 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \Length(_x:any$):=arrLen$[_x];\n\
 \}\n\
 \")
-
-{-
-verifyprelude :: (PreludeName, String)
-verifyprelude = ("verifyprelude", "\
-\## Use FrontEnd/Makefile to update compiled prelude.\n\
-\## Small prelude for verification; arithmetic functions are concrete.\n\
-\## The lowered{} macro stops insertion lowering from BigCore to Core,\n\
-\## i.e., stop assume{} being inserted.\n\
-\\n\
-\# XXX How should possible effect be indicated?  Especially for Print.\n\
-\# XXX What should the definition of Err() be?\n\
-\array{\n\
-\false        := array{};\n\
-\any          := lowered{ lambda(_x){                                                        assume { _x }}};\n\
-\int          := lowered{ lambda(_x){                isInt$[_x];                             assume { _x }}};\n\
-\char         := lowered{ lambda(_x){                isChr$[_x];                             assume { _x }}};\n\
-\nat          := lowered{ lambda(_x){                isInt$[_x];             intGE$[_x,0];   assume { _x }}};\n\
-\void         := lowered{ lambda(_x){                                                                 array{} }};\n\
-\comparable   := lowered{ lambda(_x){                isInt$[_x] | isChr$[_x];                assume { _x }}};  # incomplete\n\
-\operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intAdd$[_x,_y]; isInt$[_z]; _z }}};\n\
-\operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intSub$[_x,_y]; isInt$[_z]; _z }}};\n\
-\operator'*'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z := intMul$[_x,_y]; isInt$[_z]; _z }}};\n\
-\operator'/'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_y, 0];  assume { _z := intDiv$[_x,_y]; isInt$[_z]; _z }}};\n\
-\operator'<'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLT$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
-\operator'<=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLE$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
-\operator'>'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intGT$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
-\operator'>=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intGE$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
-\operator'<>' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_x, _y]; assume { isInt$[_x]; _x }}};\n\
-\prefix'-'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intNeg$[_x];    isInt$[_z]; _z }}};\n\
-\prefix'+'    := lowered{ lambda(_x) {               isInt$[_x];                             assume { _z := intPlus$[_x];   isInt$[_z]; _z }}};\n\
-\Length       := lowered{ lambda(_x) {               isArr$[_x];                             assume { _z:any$; isInt$[_z]; intGE$[_z,0]; _z }}};\n\
-\Print        := lowered{ lambda(_x) { print$[_x];                                                    array{} }};\n\
-\Err          := lowered{ lambda(_x) {                                                       assume { _z:any$; _z }}};\n\
-\Concatenate  := lowered{ lambda(_xy){ (_x,_y):=_xy; isArr$[_x]; isArr$[_y];                 assume { _z:= arrConc$[_x,_y]; isArr$[_z]; _z }}};\n\
-\}\n\
-\")
-
-verifyabsprelude :: (PreludeName, String)
-verifyabsprelude = ("verifyabsprelude", "\
-\## Use FrontEnd/Makefile to update compiled prelude.\n\
-\## Small prelude for verification; arithmetic functions are abstract.\n\
-\## The lowered{} macro stops insertion lowering from BigCore to Core,\n\
-\## i.e., stop assume{} being inserted.\n\
-\array{\n\
-\false                                  := array{};\n\
-\any(_x:any$)<succeeds>                 := _x;\n\
-\int(_x:any$)<decides>                  := { isInt$[_x]; _x };\n\
-\char(_x:any$)<decides>                 := { isChr$[_x]; _x };\n\
-\nat(_x:any$)<decides>                  := { isInt$[_x]; intGE$[_x,0]; _x };\n\
-\operator'+'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z : any$; isInt$[_z]; _z } } };\n\
-\operator'-'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z : any$; isInt$[_z]; _z } } };\n\
-\operator'*'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y];                 assume { _z : any$; isInt$[_z]; _z } } };\n\
-\operator'/'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_y, 0];  assume { _z : any$; isInt$[_z]; _z } } };\n\
-\operator'<'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLT$[_x, _y]; assume { _z : any$; isInt$[_z]; _z } } };\n\
-\operator'<=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intLE$[_x, _y]; assume { _z : any$; isInt$[_z]; _z } } };\n\
-\operator'>'  := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intGT$[_x, _y]; assume { _z : any$; isInt$[_z]; _z } } };\n\
-\operator'>=' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intGE$[_x, _y]; assume { _z : any$; isInt$[_z]; _z } } };\n\
-\operator'<>' := lowered{ lambda(_xy){ (_x,_y):=_xy; isInt$[_x]; isInt$[_y]; intNE$[_x, _y]; assume { _z : any$; isInt$[_z]; _z } } };\n\
-\}\n\
-\")
-
-mediumprelude :: (PreludeName, String)
-mediumprelude = ("mediumprelude", "\
-\## Use FrontEnd/Makefile to update compiled prelude.\n\
-\## Medium prelude\n\
-\array{\n\
-\\n\
-\operator'+' (_x:rational, _y:rational)<open><succeeds>  := { ratAdd$[_x, _y] };\n\
-\operator'-' (_x:rational, _y:rational)<open><succeeds>  := { ratSub$[_x, _y] };\n\
-\operator'*' (_x:rational, _y:rational)<open><succeeds>  := { ratMul$[_x, _y] };\n\
-\operator'/' (_x:rational, _y:rational)<open><decides>   := { ratNE$[_y, 0]; ratDiv$[_x, _y] };\n\
-\prefix'-'   (_x:rational)             <open><succeeds>  := { ratNeg$[_x] };\n\
-\prefix'+'   (_x:rational)             <open><succeeds>  := { ratPlus$[_x] };\n\
-\operator'<' (_x:rational, _y:rational)<open><decides>   := { ratLT$[_x,_y] };\n\
-\operator'<='(_x:rational, _y:rational)<open><decides>   := { ratLE$[_x,_y] };\n\
-\operator'>' (_x:rational, _y:rational)<open><decides>   := { ratGT$[_x,_y] };\n\
-\operator'>='(_x:rational, _y:rational)<open><decides>   := { ratGE$[_x,_y] };\n\
-\operator'<>'(_x:rational, _y:rational)<open><decides>   := { ratNE$[_x,_y] };\n\
-\\n\
-\false                                             := array{};\n\
-\any                                               := any$;\n\
-\int         (_x:any$)         <decides><closed>   := { isInt$[_x]; _x };\n\
-\rational    (_x:any$)         <decides><closed>   := { isRat$[_x]; _x };\n\
-\f32         (_x:any$)         <decides><closed>   := { isF32$[_x]; _x };\n\
-\f64         (_x:any$)         <decides><closed>   := { isF64$[_x]; _x };\n\
-\string      (_x:any$)         <decides><closed>   := { isStr$[_x]; _x };\n\
-\char        (_x:any$)         <decides><closed>   := { isChr$[_x]; _x };\n\
-\nat         (_x:any$)         <decides><closed>   := { isInt$[_x]; ratGE$[_x,0]; _x };\n\
-\comparable  (_x:any$)         <decides><closed>   := { isInt$[_x] | isRat$[_x] | isF32$[_x] | isF64$[_x] | isStr$[_x] | isChr$[_x]; _x };\n\
-\void        (_x:any$)                             := array{};\n\
-\Length      (_x:any$)         <decides>           := { isArr$[_x]; arrLen$[_x] };\n\
-\Err         (_x:any$)                             := { err$[_x] };\n\
-\Print       (_x:any$)               <interacts>   := { print$[_x] };\n\
-\Concatenate (_x:any$, _y:any$)<decides>           := { arrConc$[_x,_y] };\n\
-\\n\
-\#operator'->'(_s:any$, _t:any$)(_g:any$)<decides> := function(_x:any$){isFcn$[_g]; _t[_g[_s[_x]]]};\n\
-\postfix'^'(_p:any$)<reads><decides>  := read$[_p];\n\
-\operator'.='(_p:any$,_x:any$)<writes><decides> := write$[_p, _x];\n\
-\new := function(_t:any$)(_x:any$)<allocates><decides>{ alloc$[_t[_x]] };\n\
-\}\n\
-\")
--}

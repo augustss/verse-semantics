@@ -182,7 +182,9 @@ splitRules env lhs =
       let skol_rs = skolVars env'
       (ctx, Op op :@: arg) <- proofX [] e
       Just gv <- [groundValue skol_rs arg]
-      guard (free gv `intersects` skol_rs)  -- At least one skolem in gv
+      guard (free gv `intersects` skol_rs)
+          -- At least one skolem in gv
+          -- Don't do SPLIT-OP on (3+4)
       let r   = skolNotIn skol_rs
           asm = A_PrimOp r (AO_Prim op) gv
       if primOpCanFail op
