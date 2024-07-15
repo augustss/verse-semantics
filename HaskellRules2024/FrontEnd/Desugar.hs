@@ -584,7 +584,7 @@ where `x` is complely fresh.   We can abbreviate this if
   Hence the user of `getAllIdents`.
 -}
 
-dsM_12 :: DsMode12 -> SrcExpr -> Pi -> D SrcExpr
+dsM_12 :: DsMode12 -> SrcExpr -> Pi -> D SrcCore
 
 -------------------- Functions -----------------------
 dsM_12 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+

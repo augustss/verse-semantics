@@ -48,33 +48,33 @@ import Data.Scientific(Scientific)
 --------------------------------------------------------------------------------
 
 data Expr
-  -- values
+  -- Values
   = Var Ident
   | Lit Lit
   | Arr [Val]
   | Lam (Bind Expr)
   | Op PrimOp
 
-  -- programs
-  | Expr :=: Expr    -- unification      =
-  | Expr :>: Expr    -- seq. composition ;
-  | Expr :|: Expr    -- choice           |
+  -- Programs
+  | Expr :=: Expr    -- unification      "="
+  | Expr :>: Expr    -- seq. composition ";"
+  | Expr :|: Expr    -- choice           "|"
   | Val  :@: Val     -- application      v1[v2]
   | Exi (Bind Expr)
   | Fail
 
-  -- one/all
+  -- One/all
   | One Expr
   | All Expr
   -- | Split Expr  -- maybe later
 
-  -- verifier
+  -- Verifier
   | Some Val
   | Val :>>: Expr    -- guard |>   <-- black triangle
   | Check Effect Expr
   | Verify (BindList ([Assump],Expr))
 
-  -- only for contexts
+  -- HOLE, only for contexts
   | HOLE
  deriving ( Eq, Ord )
 
@@ -198,8 +198,25 @@ data Assump
   | A_Fails Assump                      -- not( a )
  deriving ( Eq, Ord, Show )
 
+{-  Draft for Ranjit
+data Assump
+  = A_GVEq Ident GroundVal              -- r = gv             Can be under A_Fails
+  | A_FailablePrimOp PrimOp GroundVal   -- op[gv]             Can be under A_Fails
+  | A_PrimOp Ident AssumpOp GroundVal   -- r = op[gv]         Cannot be under A_Fails
+  | A_Fails Assump                      -- not( a )
+ deriving ( Eq, Ord, Show )
+
+data Assump = A_Pos FailableAssump
+            | A_Neg FailableAssump
+            | A_PrimOp Ident AssumpOp GroundVal
+
+data FailableAssump = A_GVEq  Ident  GroundVal
+                    | A_RelOp PrimOp GroundVal
+-}
+
 data AssumpOp  -- Either a regular primop or Apply
-  = AO_Apply | AO_Prim PrimOp
+  = AO_Apply              -- AO_apply [r,a]    means  r[a], r applied to a
+  | AO_Prim PrimOp
   deriving( Eq, Ord, Show )
 
 instance Pretty AssumpOp where
@@ -441,7 +458,8 @@ isHNF _        = False
 --------------------------------------------------------------------------------
 
 valid :: Expr -> Bool
--- Checks if an expression is syntactically valid
+-- Checks if an expression is syntactically valid,
+-- according to the syntax of desugaring.pdf
 valid ((a :=: e1) :>: e2) = isVal a && valid e1 && valid e2
 valid (e1 :|: e2)         = valid e1 && valid e2
 valid (a1 :@: a2)         = isVal a1 && isVal a2
@@ -456,7 +474,8 @@ valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid e                   = isVal e
 
 prep :: Expr -> Expr
--- Valid (prep e) == True
+-- Convert an Expr into an Expr in the sub-language of desugaring.pdf
+-- Hence: valid (prep e) == True
 prep (Var x)       = Var x
 prep (Lit k)       = Lit k
 prep (Arr as)      = prepVals as (\vs -> Arr vs)
@@ -706,6 +725,8 @@ lookupIdSubst sub x
 --
 --------------------------------------------------------------------------------
 
+type Rule = RuleEnv -> Expr -> [(String,Expr)]
+
 data RuleEnv = RE { skolVars :: [Ident], assumps :: [Assump] }
 
 emptyRuleEnv :: RuleEnv
@@ -714,8 +735,6 @@ emptyRuleEnv = RE { skolVars = [], assumps = [] }
 extendRuleEnv :: RuleEnv -> [Ident] -> [Assump] -> RuleEnv
 extendRuleEnv rule_env@(RE { skolVars = skols, assumps = asms }) new_skols new_asms
   = rule_env { skolVars = new_skols ++ skols, assumps = new_asms ++ asms }
-
-type Rule = RuleEnv -> Expr -> [(String,Expr)]
 
 stepRule :: Rule -> Expr -> [(String,Expr)]
 stepRule rule expr = rule emptyRuleEnv     -- Empty set of skolems

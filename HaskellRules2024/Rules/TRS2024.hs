@@ -199,7 +199,7 @@ rulesExistentials _env lhs =
      guard (isVal v)
      guard (x `elem` exis)
      guard (x `notElem` free v)
-     guard (blkd exis ctx)
+     guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
      pure ( pPrint x <+> text ":=" <+> pPrintSmallExpr v
           , wrapExis (exis \\ [x]) $
             subst [(x,v)] (ctx <@ e) )
@@ -299,6 +299,7 @@ iff conds = [()| and conds]
 --------------------------------------------------------------------------------
 
 isV :: Expr -> Expr -> Bool
+-- (isV x e) returns True if  e = < ..., < ..., x, ...>, ... >
 isV x e = x==e || case e of
                     Arr es -> any (isV x) es
                     _      -> False
@@ -363,28 +364,56 @@ wrapExis xs orig_e = foldr wrap orig_e xs
 
 type Expr_or_Context = Expr
 
+data LocalExis = LX { exi_flexi :: [Ident]   -- Flexible existentials
+                    , exi_rigid :: [Ident]   -- Rigid existentials
+                    }
+
+allExis :: LocalExis -> [Ident]
+allExis (LX { exi_flexi = flexi, exi_rigid = rigid }) = rigid ++ flexi
+
+isLocalExi :: LocalExis -> Ident -> Bool
+isLocalExi (LX { exi_flexi = flexi, exi_rigid = rigid }) x
+  = x `elem` flexi || x `elem` rigid
+
+isRigidExi :: LocalExis -> Ident -> Bool
+isRigidExi (LX { exi_rigid = rigid }) x = x `elem` rigid
+
+addFlexi :: LocalExis -> Ident -> LocalExis
+addFlexi (LX { exi_flexi = flexi, exi_rigid = rigid }) x
+  = LX { exi_flexi = x:flexi, exi_rigid = rigid }
+
+makeRigid :: LocalExis -> LocalExis
+makeRigid (LX { exi_flexi = flexi, exi_rigid = rigid })
+ = LX { exi_flexi = [], exi_rigid = rigid ++ flexi }
+
 blocked :: Expr_or_Context -> Bool
-blocked ec = blkd [] ec
+blocked ec = blkd (LX [] []) ec
 
-blkd :: [Ident] -> Expr_or_Context -> Bool
+blkd :: LocalExis
+     -> Expr_or_Context
+     -> Bool
 blkd _  HOLE                = True
-blkd xs ((Var x1 :=: Var x2) :>: e2) | x1==x2 = blkd xs e2  -- ToDo: check special case
-blkd xs ((_ :=: e1) :>: e2) = blkd xs e1 && (isContext e1 || blkd xs e2)
-blkd xs (e1 :|: e2)         = blkd xs e1 && (isContext e1 || blkd xs e2)  -- ToDo: check
-blkd xs (One e)             = blkd xs e
-blkd xs (All e)             = blkd xs e
-blkd xs (Exi bnd)           = blkd (x:xs) e where (x,e) = alphaRename xs bnd
-blkd xs (v1 :@: v2)         = case v1 of
-                                Var f -> f `elem` xs
-                                Op {} -> any ((`isV` v2) . Var) xs
-                                _     -> False
-blkd xs (v :>>: _)          = any (`elem` xs) (free v)
-blkd _  (Verify _)          = True
-blkd xs (Check _ e)         = blkd xs e
-blkd _  _                   = False
+blkd lx (Var x1 :=: Var x2)      -- x=x is blocked; ToDo: discuss and check
+  | x1==x2                   = isLocalExi lx x1
+blkd lx (v :=: e)            = blkd lx v || blkd lx e
+blkd lx (Var v)              = isRigidExi lx v
+blkd lx (e1 :>: e2)          = blkd lx e1 && (isContext e1 || blkd lx e2)
+blkd lx (e1 :|: e2)          = blkd lx e1 && (isContext e1 || blkd lx e2)  -- ToDo: check
+blkd lx (One e)              = blkd (makeRigid lx) e
+blkd lx (All e)              = blkd (makeRigid lx) e
+blkd lx (Exi bnd)            = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
+blkd lx (v :>>: _)           = any (isLocalExi lx) (free v)
+blkd _  (Verify _)           = True
+blkd lx (Check _ e)          = blkd lx e
+blkd lx (v1 :@: v2)          = case v1 of
+                                 Var f -> isLocalExi lx f
+                                 Op {} -> any (isLocalExi lx) (free v2)
+                                 _     -> False
+blkd _  _                    = False
 
--- choice-freeness
 choiceFree :: Expr_or_Context -> Bool
+-- (choiceFree ctx) means no choices to the left of the HOLE
+-- or, if no HOLE, anywhere
 choiceFree (_ :|: _)           = False
 choiceFree ((_ :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2)
 choiceFree (_ :>>: e)          = choiceFree e

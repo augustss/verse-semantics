@@ -168,24 +168,12 @@ verify("PP3", pass)   { F(X:int, G():type{X = 1}) := (H()<succeeds> := X = 1; H(
 # f9[y]
 
 
-### # koen's hof examples
-### verify(pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
-### verify(fail) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
-### verify(pass) { gg(x:any) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be accepted
-### verify(fail) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } } # because f expects g to return an int, and it doesn't
-### verify(pass) { bar1(x:int):type{_(:int):char} := { (y:int) => {'m' } } } # ACCEPT
-### verify(fail) { bar2(x:int):type{_(:int):char} := { (y:int) => { 3  } } } # REJECT the function returns an int not a string
-### verify(fail) { bar3(x:int):type{_(:int):char} := { (y:nat) => { 'a'} } } # REJECT the function only works on naturals but is supposed to work on ints
-### verify(pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEPT the function works on more than ints
-###
-### # simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
-### # verify(pass) { f(x:int) := x; foo(:any) := {f[_]=3} }
-### # verify(fail) { f(x:int) := x; foo(:any) := {f[_]='3'} }
+# Subtyping (passes, but apparently, should be rejected!)
+verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
+verify(pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
 
-# subtyping (passes, but apparently, should be rejected!)
-verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }
-verify(pass) { main(:any) := { x := x; x = 2 } }
-verify(pass) { a := (_,_) => a=(_,_) }
+verify("FunPair", pass) { (a := (_,_)) => a=(_,_) }
+   # Lambda takes a pair, a, as its argument, and then checks that the argument is a pair and returns it
 
 ### verify(pass) { main(:any) := { if(a:=1|2){a=1} } }  # TODO:IF:CHOICE
 # TODO:HEREHEREHERE:GATHER-OUTER-SKOLEM verify(pass) {x:int => f():type{x=0} => {f[];x=0}}

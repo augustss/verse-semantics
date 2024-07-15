@@ -78,11 +78,12 @@ toCoreEff eff
 --
 --             Adding scopes
 --
---    Replace  x:=t by   exits x. ...(x=t)...
+--    Replace  x:=t by   exists x. ...(x=t)...
+--        "x:=t"    is represented by     DefineE x t
 --
 --------------------------------------------------------
 
-addScope :: SrcExpr -> D SrcExpr
+addScope :: SrcCore -> D SrcCore
 addScope e = scope S.empty (Block e)
 
 scope :: S.Set Src.Ident -> SrcExpr -> D SrcExpr
@@ -111,7 +112,7 @@ scope sc = expr
       (is, e1', sc') <- defs' sc e1
       For2B is e1' <$> scopeD sc' e2
 
-    expr (Block e) = exprD e
+    expr (Block e)   = exprD e
     expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
                           ; e2' <- scope sc' e2
                           ; pure $ eExists is $ seqE [e1'', e2'] }
@@ -143,13 +144,13 @@ scope sc = expr
 
     defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)
     -- `e` starts a new scoping context.  Wrap it in an `Exists`
-    defs as e = do
-      (is, e', s) <- defs' as e
-      pure (eExists is e', s)
+    defs as e = do { (is, e', s) <- defs' as e
+                   ; pure (eExists is e', s) }
 
     defs' :: S.Set Ident -> SrcExpr -> D ([Ident], SrcExpr, S.Set Ident)
     -- Find identifers bound in `e`, and return them
     -- along with extended scope-set and transformed `e`.
+    -- 'as' is the set of in-scope variables
     defs' as e = do
       let -- Get all binders from e
           is = getVisibleBinders e
@@ -157,7 +158,7 @@ scope sc = expr
           errM = filter ((> 1) . length) $ group $ sort is
 
           -- errS: find ones that are already in scope
-          errS = [ (i, j) | i <- is, i `S.member` sc, j <- filter (== i) (S.toList sc) ]
+          errS = [ (i, j) | i <- is, j <- filter (== i) (S.toList as) ]
           s' :: S.Set Ident = foldr S.insert as is
       e' <- scope s' e
       errMultiple errM
