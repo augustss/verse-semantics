@@ -101,7 +101,7 @@ verifyRules env lhs =
                (as, Exi $ bind x $
                     Var x :=: (v :@: Var r) :>: (ctx <@ Var x) ))
 
-{-   -- SPJ: what is this rule?
+{-   -- SLPJ: what is this rule?
    ++
    "SUBST-ASM" `name`
    -- VERIFY(rs, A[r = hnf]) { e } ---> VERIFY(rs, A{hnf/r}[r = hnf]) { e{hnf/r} }

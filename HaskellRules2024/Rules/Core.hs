@@ -445,9 +445,9 @@ isVal e       = isHNF e
 isHNF :: Expr -> Bool
 isHNF (Lit {}) = True
 isHNF (Op {})  = True
-isHNF (Arr es) = all isVal es   -- ToDo: This had 'valid' stuff too, strangely
+isHNF (Arr es) = all isVal es   -- SLPJ: This had 'valid' stuff too, strangely
 isHNF (Lam {}) = True           -- valid e where (_,e) = unsafeUnbind bnd
-                                -- ToDo: why valid????
+                                -- SLPJ: why valid????
 isHNF _        = False
 
 
@@ -508,7 +508,7 @@ prepVal a k
   | otherwise = Exi (bind x ((Var x :=: pa) :>: k (Var x)))
  where
   pa = prep a
-  x  = identNotIn (free (k pa))  -- UGH!  ToDo: quadratic in prepVals
+  x  = identNotIn (free (k pa))  -- UGH!  SLPJ: quadratic in prepVals
 
 prepVals :: [Expr] -> ([Val] -> Expr) -> Expr
 prepVals []     f = f []
@@ -770,7 +770,7 @@ everywhere step env orig_e = step env orig_e ++ recurse orig_e
                          | (s,e') <- everywhere step env' e ]
                        where
                          env' = extendRuleEnv env rs as
-                         (rs,(as,e)) = unsafeUnbindList bl   -- ToDo: is unsafe ok? I think not
+                         (rs,(as,e)) = unsafeUnbindList bl   -- SLPJ: is unsafe ok? I think not
   recurse _            = []
 
 -- treat "exi x1 .. exi xn" as one block when matching
@@ -839,9 +839,9 @@ instance Arbitrary Expr where
    where
     xs = take 3 (identsNotIn [])
 
-  shrink (LitInt k) = [ LitInt k' | k' <- shrink k ]  -- ToDo: other literals
+  shrink (LitInt k) = [ LitInt k' | k' <- shrink k ]  -- SLPJ: other literals
 
-  shrink (Op _)       = [ LitInt 0, LitInt 1 ]   -- ToDo: explain
+  shrink (Op _)       = [ LitInt 0, LitInt 1 ]   -- SLPJ: explain
 
   shrink (Arr es)     = es
                      ++ [ Arr es' | es' <- shrink es ]
@@ -937,7 +937,7 @@ All e         <@ h = All (e <@ h)
 Some e        <@ h = Some (e <@ h)
 (e1 :>>: e2)  <@ h = (e1 <@ h) :>>: (e2 <@ h)
 Check fx e    <@ h = Check fx (e <@ h)
-e@(Verify {}) <@ _ = e   -- No HOLE inside Verify. ToDo: check
+e@(Verify {}) <@ _ = e   -- No HOLE inside Verify. SLPJ: check
 HOLE          <@ h = h
 e             <@ _ = e
 
@@ -963,7 +963,7 @@ bvs ctx = explore [] ctx
   exploreBind xs bnd = explore ([x] `union` xs) e where (x,e) = unsafeUnbind bnd
 
 isContext :: Context -> Bool
--- There is a HOLE, outside a Verify (ToDo: is the "outside Verify" right?
+-- There is a HOLE, outside a Verify (SLPJ: is the "outside Verify" right?
 isContext (Arr es)     = any isContext es
 isContext (Lam bnd)    = isContext e where (_,e) = unsafeUnbind bnd
 isContext (e1 :=: e2)  = isContext e1 || isContext e2
