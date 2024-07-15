@@ -13,6 +13,7 @@ import TRS.Bind
 import Rules.Core
 import Rules.TRS2024 as TRS2024
 import Epic.Print hiding ( (<>) )
+import qualified Epic.UnionFind as UF
 
 import Control.Monad (guard)
 import Data.List ( (\\) )
@@ -125,23 +126,43 @@ asmX = go []
 unsat :: RuleEnv -> Bool
 -- `unsat` is a simple unsatisfiablity checker,
 -- which implements the SOLVER rule
-unsat (RE { assumps = _asms }) = error "TODO: unsat"
---   = contra
---   where
---     pos, neg :: [Assump]
---     pos = filter isPosAssump asms
---     neg = [asm | A_Fails asm <- asms]
+unsat (RE { assumps = asms }) = contra pos neg || refl pos neg
+  where
+    pos, neg :: [FailableAssump]
+    pos = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | A_PrimOp _ (AO_Prim op) gv <- asms ]
+    neg = [asm | A_Neg asm <- asms]
 
---     -- Looks for (a; not a)
---     contra = any contradicted pos
---     contradicted asm@(A_GVEq {})    = asm `elem` neg
---     contradicted (A_PrimOp _ op gv) = any contradicts neg
---       where
---         contradicts (A_PrimOp _ op' gv') = op==op' && gv==gv'
---         contradicts _                    = False
---     contradicted _ = error "unsat"  -- pos has only positive assump
+-- Looks for (a; not a)
+contra :: [FailableAssump] -> [FailableAssump] -> Bool
+contra pos neg = any (`elem` neg) pos
+
+-- Looks for x=x; isInt[x] etc.
+refl :: [FailableAssump] -> [FailableAssump] -> Bool
+refl pos neg = not . null $ [ x | (A_GVEq x (GVVar y)) <- neg, x == y, any (isPrim x) pos ]
+
+isPrim :: Ident -> FailableAssump -> Bool
+isPrim x (A_RelOp op (GVVar y)) = x == y && isTyOp op
+isPrim _ _                      = False
+
+isTyOp :: PrimOp -> Bool
+isTyOp IsInt  = True
+isTyOp IsChar = True
+isTyOp IsStr  = True
+isTyOp _      = False
+
+
+data EqFacts = EqFacts
+  { lits  :: [GroundVal]
+  , uf    :: UF.UF GroundVal
+  }
+
 
 {-
+
+
+
+
+
 unsat _ es = asmFail || contra || refl || eqContra
   where
     asmFail  = not . null $ [ e | Assume e@Fail <- es ] ++ [ e | Fails e@(HNF _) <- es ]

@@ -1,4 +1,4 @@
-module Epic.UnionFind (new, union, find, equal) where
+module Epic.UnionFind (UF, new, union, find, equal) where
 
 import qualified Data.Map as M
 

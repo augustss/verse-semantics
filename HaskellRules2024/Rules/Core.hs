@@ -193,9 +193,10 @@ instance Pretty Path where
 --
 --------------------------------------------------------------------------------
 
-data GroundVal = GVVar Ident
-               | GVLit Lit
-               | GVArr [GroundVal]
+data GroundVal
+  = GVVar Ident
+  | GVLit Lit
+  | GVArr [GroundVal]
   deriving( Eq, Ord, Show )
 
 data Assump
@@ -208,24 +209,6 @@ data FailableAssump
   = A_GVEq  Ident  GroundVal
   | A_RelOp PrimOp GroundVal
   deriving ( Eq, Ord, Show )
-
-
-{-  Draft for Ranjit
--- data Assump
---   = A_GVEq Ident GroundVal              -- r = gv             Can be under A_Fails
---   | A_FailablePrimOp PrimOp GroundVal   -- op[gv]             Can be under A_Fails
---   | A_PrimOp Ident AssumpOp GroundVal   -- r = op[gv]         Cannot be under A_Fails
---   | A_Fails Assump                      -- not( a )
---  deriving ( Eq, Ord, Show )
-
-data Assump
-  = A_GVEq Ident GroundVal              -- r = gv
-  | A_PrimOp Ident AssumpOp GroundVal   -- r = op[gv]
-  | A_Fails Assump                      -- not( a )
- deriving ( Eq, Ord, Show )
-
-
--}
 
 data AssumpOp  -- Either a regular primop or Apply
   = AO_Apply              -- AO_apply [r,a]    means  r[a], r applied to a
