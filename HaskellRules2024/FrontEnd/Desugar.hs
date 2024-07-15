@@ -417,7 +417,7 @@ call :: String         -- "pre", "post", or "in" depending on prefix, postfix or
      -> SrcExpr        -- Argumemt
      -> D SrcExpr
 -- Pick the appropriate form of apply for operators
--- SPJ don't understand
+-- SLPJ don't understand
 call _ loc op arg = return (ApplyD (Variable (Ident loc op)) arg)
 
 {-
@@ -609,7 +609,7 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
 -------------------- e |>{fx} t -----------------------
 dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
    = eCheck fx <$> verify_body
--- ToDo: check this; not what is in the doc
+-- SLPJ: check this; not what is in the doc
 --            , dsM_12 MI t pi ]
 --    = seqDE [ eCheck fx <$> verify_body
 --            , dsM_12 MI t pi ]
@@ -621,7 +621,7 @@ dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
                      ; pure (seqE [e1, e2, eApplyD z x]) }
 
 dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
-    -- ToDo: pi is unused, which seems suspicious
+    -- SLPJ: pi is unused, which seems suspicious
     -- But I think that's a correct reflection of opacity
   = do { (e2, z) <- defineDE "z" (dsDD_12 MI t2)
        ; pure (seqE [ e2
@@ -633,12 +633,12 @@ dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
        ; pure (seqE [e1,e2]) }
 
 -------------------- :{fx} t -----------------
--- ToDo: I don't think we want fx on Range at all
+-- SLPJ: I don't think we want fx on Range at all
 
 dsM_12 MI (Range _fx t) (P i)                 -- MTYPE1
   = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
        ; pure (seqE [e, eGuard (getFree i) (eSome z) ]) }
--- ToDo: check this... it's not what is in the doc yet
+-- SLPJ: check this... it's not what is in the doc yet
 --       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
 
 dsM_12 s (Range _fx t) (P i)                  -- MTYPEP

@@ -108,13 +108,13 @@ rulesApplication _env lhs =
   do Op IsStr :@: a <- [lhs]
      case a of
        Lit (LStr _) -> pure a
-       _            -> []  -- ToDo: what is idomatic here?
+       _            -> []  -- SLPJ: what is idomatic here?
  ++
   "APP-ISCHAR" `name`
   do Op IsChar :@: a <- [lhs]
      case a of
        Lit (LChar _) -> pure a
-       _             -> []  -- ToDo: what is idomatic here?
+       _             -> []  -- SLPJ: what is idomatic here?
  ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]
@@ -389,27 +389,28 @@ makeRigid (LX { exi_flexi = flexi, exi_rigid = rigid })
 blocked :: Expr_or_Context -> Bool
 blocked ec = blkd (LX [] []) ec
 
-blkd :: LocalExis
-     -> Expr_or_Context
-     -> Bool
-blkd _  HOLE                = True
-blkd lx (Var x1 :=: Var x2)      -- x=x is blocked; ToDo: discuss and check
-  | x1==x2                   = isLocalExi lx x1
-blkd lx (v :=: e)            = blkd lx v || blkd lx e
-blkd lx (Var v)              = isRigidExi lx v
-blkd lx (e1 :>: e2)          = blkd lx e1 && (isContext e1 || blkd lx e2)
-blkd lx (e1 :|: e2)          = blkd lx e1 && (isContext e1 || blkd lx e2)  -- ToDo: check
-blkd lx (One e)              = blkd (makeRigid lx) e
-blkd lx (All e)              = blkd (makeRigid lx) e
-blkd lx (Exi bnd)            = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
-blkd lx (v :>>: _)           = any (isLocalExi lx) (free v)
-blkd _  (Verify _)           = True
-blkd lx (Check _ e)          = blkd lx e
-blkd lx (v1 :@: v2)          = case v1 of
-                                 Var f -> isLocalExi lx f
-                                 Op {} -> any (isLocalExi lx) (free v2)
-                                 _     -> False
-blkd _  _                    = False
+blkd :: LocalExis -> Expr_or_Context-> Bool
+-- SLPJ: need to update the document to reflect this function
+blkd _  HOLE        = True
+blkd lx (v :=: e)
+  | Var x1 <- v    -- x=x is blocked
+  , Var x2 <- e    --           ; SLPJ: discuss and check
+  , x1==x2          = isLocalExi lx x1
+  | otherwise       = blkd lx v || blkd lx e
+blkd lx (Var v)     = isRigidExi lx v
+blkd lx (e1 :>: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)
+blkd lx (e1 :|: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)  -- SLPJ: check
+blkd lx (One e)     = blkd (makeRigid lx) e
+blkd lx (All e)     = blkd (makeRigid lx) e
+blkd lx (Exi bnd)   = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
+blkd lx (v :>>: _)  = any (isLocalExi lx) (free v)
+blkd _  (Verify _)  = True
+blkd lx (Check _ e) = blkd lx e
+blkd lx (v1 :@: v2) = case v1 of
+                        Var f -> isLocalExi lx f
+                        Op {} -> any (isLocalExi lx) (free v2)
+                        _     -> False
+blkd _  _           = False
 
 choiceFree :: Expr_or_Context -> Bool
 -- (choiceFree ctx) means no choices to the left of the HOLE

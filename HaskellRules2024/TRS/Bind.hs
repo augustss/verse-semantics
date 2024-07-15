@@ -131,8 +131,6 @@ alphaRenameBindWith :: Variables t
                     -> Bind t -> (Ident, t)
 -- Recommended way to walk inside a Bind
 --    (ren x y t) should replace all uses of `x` by `y` in `t`
---
---ToDo: ;combination of 'free' and 'forb' seems excessive
 alphaRenameBindWith freshen (Bind x t)
   = freshen x t
 
