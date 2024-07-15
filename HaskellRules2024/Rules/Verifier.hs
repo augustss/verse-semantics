@@ -96,9 +96,9 @@ verifyRules env lhs =
       guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
           r  = skolNotIn all_rs
-      pure $ ( pPrint (r,x,rs, all_rs)
-             , Verify $ bindList (r:rs) $
-               (as, Exi $ bind x $
+      pure ( pPrint (r,x,rs, all_rs)
+           , Verify $ bindList (r:rs)
+                 (as, Exi $ bind x $
                     Var x :=: (v :@: Var r) :>: (ctx <@ Var x) ))
 
 {-   -- SPJ: what is this rule?
@@ -125,21 +125,21 @@ asmX = go []
 unsat :: RuleEnv -> Bool
 -- `unsat` is a simple unsatisfiablity checker,
 -- which implements the SOLVER rule
-unsat (RE { assumps = asms })
-  = contra
-  where
-    pos, neg :: [Assump]
-    pos = filter isPosAssump asms
-    neg = [asm | A_Fails asm <- asms]
+unsat (RE { assumps = _asms }) = error "TODO: unsat"
+--   = contra
+--   where
+--     pos, neg :: [Assump]
+--     pos = filter isPosAssump asms
+--     neg = [asm | A_Fails asm <- asms]
 
-    -- Looks for (a; not a)
-    contra = any contradicted pos
-    contradicted asm@(A_GVEq {})    = asm `elem` neg
-    contradicted (A_PrimOp _ op gv) = any contradicts neg
-      where
-        contradicts (A_PrimOp _ op' gv') = op==op' && gv==gv'
-        contradicts _                    = False
-    contradicted _ = error "unsat"  -- pos has only positive assump
+--     -- Looks for (a; not a)
+--     contra = any contradicted pos
+--     contradicted asm@(A_GVEq {})    = asm `elem` neg
+--     contradicted (A_PrimOp _ op gv) = any contradicts neg
+--       where
+--         contradicts (A_PrimOp _ op' gv') = op==op' && gv==gv'
+--         contradicts _                    = False
+--     contradicted _ = error "unsat"  -- pos has only positive assump
 
 {-
 unsat _ es = asmFail || contra || refl || eqContra
@@ -185,10 +185,11 @@ splitRules env lhs =
       guard (free gv `intersects` skol_rs)
           -- At least one skolem in gv
           -- Don't do SPLIT-OP on (3+4)
-      let r   = skolNotIn skol_rs
-          asm = A_PrimOp r (AO_Prim op) gv
+      let r    = skolNotIn skol_rs
+          asm  = A_PrimOp r (AO_Prim op) gv
+          asmF = A_RelOp op gv
       if primOpCanFail op
-        then pure (pPrint asm, caseSplit (r:rs) asm as ctx (Var r))
+        then pure (pPrint asm, caseSplit (r:rs) asmF as ctx (Var r))
         else pure (pPrint asm, Verify (bindList (r:rs) (asm : as, ctx <@ Var r)))
         -- Generate one or two 'verify' blocks, depending on
         -- whether or not the PrimOp can fail
@@ -280,11 +281,11 @@ isPrimOp1 _        = False
 
 -}
 
-caseSplit :: [Ident] -> Assump -> [Assump] -> Context -> Expr -> Expr
+caseSplit :: [Ident] -> FailableAssump -> [Assump] -> Context -> Expr -> Expr
 caseSplit rs a as ctx e
-  = (Var underscore :=: Verify (bindList rs (A_Fails a : as, ctx <@ Fail)))
+  = (Var underscore :=: Verify (bindList rs (A_Neg a : as, ctx <@ Fail)))
     :>:
-    Verify (bindList rs (a : as, ctx <@ e))
+    Verify (bindList rs (A_Pos a : as, ctx <@ e))
 
 --------------------------------------------------------------------------------
 -- | Contexts ------------------------------------------------------------------

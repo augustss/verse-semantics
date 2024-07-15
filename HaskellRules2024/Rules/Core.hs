@@ -1,4 +1,10 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
+{-# HLINT ignore "Avoid lambda" #-}
+{-# HLINT ignore "Fuse foldr/map" #-}
+{-# HLINT ignore "Eta reduce" #-}
+{-# HLINT ignore "Use :" #-}
 
 module Rules.Core
   ( -- The data type itself
@@ -10,7 +16,7 @@ module Rules.Core
   , pPrintSmallExpr
 
     -- Assupmtions
-  , Assump(..), AssumpOp(..), GroundVal(..), isPosAssump
+  , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
 
     -- Rewriting
   , Rule, Context, isContext, (<@)
@@ -33,7 +39,7 @@ module Rules.Core
 import Prelude hiding( (<>) )
 import Epic.Print
 
-import Data.List( union, intersperse )
+import Data.List( union, intercalate )
 import TRS.Bind
 import TRS.Traced
 import Test.QuickCheck
@@ -193,25 +199,32 @@ data GroundVal = GVVar Ident
   deriving( Eq, Ord, Show )
 
 data Assump
+  = A_Pos FailableAssump
+  | A_Neg FailableAssump
+  | A_PrimOp Ident AssumpOp GroundVal
+  deriving( Eq, Ord, Show )
+
+data FailableAssump
+  = A_GVEq  Ident  GroundVal
+  | A_RelOp PrimOp GroundVal
+  deriving ( Eq, Ord, Show )
+
+
+{-  Draft for Ranjit
+-- data Assump
+--   = A_GVEq Ident GroundVal              -- r = gv             Can be under A_Fails
+--   | A_FailablePrimOp PrimOp GroundVal   -- op[gv]             Can be under A_Fails
+--   | A_PrimOp Ident AssumpOp GroundVal   -- r = op[gv]         Cannot be under A_Fails
+--   | A_Fails Assump                      -- not( a )
+--  deriving ( Eq, Ord, Show )
+
+data Assump
   = A_GVEq Ident GroundVal              -- r = gv
   | A_PrimOp Ident AssumpOp GroundVal   -- r = op[gv]
   | A_Fails Assump                      -- not( a )
  deriving ( Eq, Ord, Show )
 
-{-  Draft for Ranjit
-data Assump
-  = A_GVEq Ident GroundVal              -- r = gv             Can be under A_Fails
-  | A_FailablePrimOp PrimOp GroundVal   -- op[gv]             Can be under A_Fails
-  | A_PrimOp Ident AssumpOp GroundVal   -- r = op[gv]         Cannot be under A_Fails
-  | A_Fails Assump                      -- not( a )
- deriving ( Eq, Ord, Show )
 
-data Assump = A_Pos FailableAssump
-            | A_Neg FailableAssump
-            | A_PrimOp Ident AssumpOp GroundVal
-
-data FailableAssump = A_GVEq  Ident  GroundVal
-                    | A_RelOp PrimOp GroundVal
 -}
 
 data AssumpOp  -- Either a regular primop or Apply
@@ -224,11 +237,15 @@ instance Pretty AssumpOp where
   pPrint (AO_Prim op) = pPrint op
 
 instance Pretty Assump where
-  pPrint (A_GVEq i gv)      = pPrint i <+> text "="  <+> pPrint gv
+  pPrint (A_Pos a)          = pPrint a
+  pPrint (A_Neg a)          = text "not" <> parens (pPrint a)
   pPrint (A_PrimOp i AO_Apply (GVArr [fun,arg]))
                             = pPrint i <+> text "=" <+> pPrint fun <> brackets (pPrint arg)
   pPrint (A_PrimOp i op gv) = pPrint i <+> text "=" <+> pPrint op <> brackets (pPrint gv)
-  pPrint (A_Fails a)        = text "not" <> parens (pPrint a)
+
+instance Pretty FailableAssump where
+  pPrint (A_GVEq i gv)      = pPrint i <+> text "="  <+> pPrint gv
+  pPrint (A_RelOp op gv)    = pPrint op <> brackets (pPrint gv)
 
 instance Pretty GroundVal where
   pPrint (GVVar i)   = pPrint i
@@ -236,9 +253,13 @@ instance Pretty GroundVal where
   pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
 
 isPosAssump :: Assump -> Bool
-isPosAssump (A_GVEq {})   = True
+isPosAssump (A_Pos {})    = True
 isPosAssump (A_PrimOp {}) = True
-isPosAssump (A_Fails {})  = False
+isPosAssump (A_Neg {})    = False
+
+-- isPosAssump (A_GVEq {})   = True
+-- isPosAssump (A_PrimOp {}) = True
+-- isPosAssump (A_Fails {})  = False
 
 
 --------------------------------------------------------------------------------
@@ -304,7 +325,7 @@ pPrintPrecE lvl prec the_expr
        One e   -> text "one" <> braces (ppr0 e)
        All e   -> text "all" <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
-       Exi {}  -> mbPar0 $ sep [ text "exi" <+> (fsep (map pPrint bndrs)) <> char '.'
+       Exi {}  -> mbPar0 $ sep [ text "exi" <+> fsep (map pPrint bndrs) <> char '.'
                                , indent (ppr0 body) ]
                where
                   (bndrs, body) = unpackExis the_expr
@@ -361,7 +382,7 @@ pprBind bnd
 instance Show Expr where
   show (Var x)       = show x
   show (Lit k)       = show k
-  show (Arr as)      = "<" ++ concat (intersperse "," (map show as)) ++ ">"
+  show (Arr as)      = "<" ++ intercalate "," (map show as) ++ ">"
   show (Lam bnd)     = "\\" ++ showBind bnd
   show (Op op)       = show op
   show ((a :=: e1) :>: e2) = show1 a ++ " = " ++ show1 e1 ++ "; " ++ show0 e2
@@ -537,10 +558,15 @@ instance Variables Expr where
   variables f (Verify bnd) = variables f bnd
   variables _ _            = []
 
+instance Variables FailableAssump where
+  variables f (A_GVEq i gv)  = [i] `union` variables f gv
+  variables f (A_RelOp _ gv) =             variables f gv
+
 instance Variables Assump where
-  variables f (A_GVEq i gv)       = [i] `union` variables f gv
+  variables f (A_Pos a)           = variables f a
+  variables f (A_Neg a)           = variables f a
   variables f (A_PrimOp i _ gv)   = [i] `union` variables f gv
-  variables f (A_Fails a)         = variables f a
+
 
 instance Variables GroundVal where
   variables _f (GVVar i)   = [i]
@@ -704,9 +730,11 @@ substAssump sub top_asm
   | null sub  = top_asm      -- Short cut
   | otherwise = go  top_asm
   where
-    go (A_GVEq x gv)      = A_GVEq (lookupIdSubst sub x) (substGV sub gv)
+    go (A_Pos a)          = A_Pos (goF a)
+    go (A_Neg a)          = A_Neg (goF a)
     go (A_PrimOp x op gv) = A_PrimOp (lookupIdSubst sub x) op (substGV sub gv)
-    go (A_Fails asm)      = A_Fails (go asm)
+    goF (A_GVEq x gv)     = A_GVEq   (lookupIdSubst sub x)    (substGV sub gv)
+    goF (A_RelOp op gv)   = A_RelOp                        op (substGV sub gv)
 
 substGV :: Subst Ident -> GroundVal -> GroundVal
 substGV sub (GVVar x)  = GVVar (lookupIdSubst sub x)
@@ -864,7 +892,7 @@ instance Arbitrary Expr where
   shrink (e1 :>>: e2) = [ e1, e2 ]
                      ++ [ e1' :>>: e2  | e1' <- shrink e1 ]
                      ++ [ e1  :>>: e2' | e2' <- shrink e2 ]
-  shrink (Check fx e) = [ e ] 
+  shrink (Check fx e) = [ e ]
                      ++ [ Check fx e' | e' <- shrink e ]
   shrink (Exi bnd)    = shrinkBind Exi bnd
   shrink Fail         = [ LitInt 0 ]
@@ -979,5 +1007,3 @@ isContext (Exi bnd)    = isContext e where (_,e) = unsafeUnbind bnd
 isContext (Verify {})  = False
 isContext HOLE         = True
 isContext _            = False
-
-

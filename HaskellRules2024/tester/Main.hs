@@ -1,5 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Eta reduce" #-}
 module Main(main) where
 
 import Prelude
@@ -256,7 +258,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
               do { putStrLn "Trace is:"; display tr1 }
             pure Bad
       ) (\e -> do
-           when (not (noError tflg)) $ do
+           unless (noError tflg) $ do
             putStrLn $ pos ++ " failure:"
             putStrLn "The expression"
             ppi p1
