@@ -15,7 +15,7 @@ common general-libs
     build-depends:    base,
                       containers,
                       random,
-                      mtl,
+                      mtl >= 2.3,
                       pretty,
                       megaparsec,
                       haskeline
