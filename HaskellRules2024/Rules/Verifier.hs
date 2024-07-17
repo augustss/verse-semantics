@@ -4,6 +4,7 @@
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# HLINT ignore "Eta reduce" #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Rules.Verifier(
     verificationRules
@@ -16,7 +17,9 @@ import Epic.Print hiding ( (<>) )
 import qualified Epic.UnionFind as UF
 
 import Control.Monad (guard)
-import Data.List ( (\\), nub )
+import Data.List ( (\\), nub, find )
+import Data.Maybe (listToMaybe, catMaybes, mapMaybe)
+import Epic.List (groupKey)
 
 
 --------------------------------------------------------
@@ -84,10 +87,11 @@ verifyRules env lhs =
       guard (e == Fail)
       pure (Arr [])
    ++
-   "SOLVER" `name`
+   "SOLVER" `nameWith`
    do (env', _rs, _as, _e) <- matchVerify env lhs
-      guard (unsat env')
-      pure (Arr [])
+      case unsat env' of
+        Just reason -> pure (pPrint reason, Arr [])
+        Nothing     -> []
    ++
    "SKOLEMIZE" `nameWith`
    do (env', rs, as, e) <- matchVerify env lhs
@@ -123,23 +127,39 @@ asmX = go []
     go as (a:as') = (reverse as, a, as') : go (a:as) as'
 -}
 
-unsat :: RuleEnv -> Bool
+data UnsatReason
+   = Contra    FailableAssump
+   | Refl      Ident
+   | DiseqVar  Ident Ident
+   | DiseqLit  Lit   Lit
+   deriving (Show)
+
+instance Pretty UnsatReason where
+  pPrint (Contra a)     = text "CONTRA"    <+> pPrint a
+  pPrint (Refl x)       = text "REFL"      <+> pPrint x
+  pPrint (DiseqVar x y) = text "DISEQ-VAR" <+> pPrint x <+> pPrint y
+  pPrint (DiseqLit x y) = text "DISEQ-LIT" <+> pPrint x <+> pPrint y
+
+unsat :: RuleEnv -> Maybe UnsatReason
 -- `unsat` is a simple unsatisfiablity checker,
 -- which implements the SOLVER rule
-unsat (RE { assumps = asms }) = contra pos neg || refl pos neg || unsatCC cc pos neg
+unsat (RE { assumps = asms }) = firstJust [contra pos neg, refl pos neg, unsatCC cc pos neg]
   where
     pos, neg :: [FailableAssump]
     pos = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | A_PrimOp _ (AO_Prim op) gv <- asms ]
     neg = [asm | A_Neg asm <- asms]
     cc  = mkCC pos neg
 
+firstJust :: [Maybe a] -> Maybe a
+firstJust = listToMaybe . catMaybes
+
 -- Looks for (a; not a)
-contra :: [FailableAssump] -> [FailableAssump] -> Bool
-contra pos neg = any (`elem` neg) pos
+contra :: [FailableAssump] -> [FailableAssump] -> Maybe UnsatReason
+contra pos neg = Contra <$> find (`elem` neg) pos
 
 -- Looks for x=x; isInt[x] etc.
-refl :: [FailableAssump] -> [FailableAssump] -> Bool
-refl pos neg = not . null $ [ x | (A_GVEq x (GVVar y)) <- neg, x == y, any (isPrim x) pos ]
+refl :: [FailableAssump] -> [FailableAssump] -> Maybe UnsatReason
+refl pos neg = Refl <$> listToMaybe [ x | (A_GVEq x (GVVar y)) <- neg, x == y, any (isPrim x) pos ]
 
 isPrim :: Ident -> FailableAssump -> Bool
 isPrim x (A_RelOp op (GVVar y)) = x == y && isTyOp op
@@ -151,23 +171,29 @@ isTyOp IsChar = True
 isTyOp IsStr  = True
 isTyOp _      = False
 
-unsatCC :: CC -> [FailableAssump] -> [FailableAssump] -> Bool
-unsatCC cc _pos neg = contraVars || contraLits
+unsatCC :: CC -> [FailableAssump] -> [FailableAssump] -> Maybe UnsatReason
+unsatCC cc _pos neg = firstJust [ contraVars, contraLits ]
   where
    -- [contraVars] exi x, x'. x == x'     in neg, s.t. repr x == repr x'
-   contraVars = any (uncurry (UF.equal (eq_uf cc))) diseqVars
-   diseqVars  = [(GVVar x, y) | A_GVEq x y <- neg]
+   contraVars = uncurry DiseqVar <$> find (\(x, y) -> UF.equal (eq_uf cc) (GVVar x) (GVVar y)) diseqVars
+   diseqVars  = [(x, y) | A_GVEq x (GVVar y) <- neg]
 
    -- [unsatLits] exi k, k'. k != k'           , s.t. repr k == repr k'
-   contraLits = length lits /= length (nub litReps)
-   litReps    = UF.find (eq_uf cc) <$> lits
+   contraLits = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing } <$> litGroups)
+   litGroups  = groupKey litRep lits
+   litRep l   = UF.find (eq_uf cc) (GVLit l)
    lits       = nub (eq_lits cc)
 
+
 {-
+
+k1, k2, k3, k4, k5, k6, k7, k8, k9, k10
+grou
+
+
 unsatCC cc pos neg ==> true  if
    - [contraVars] exi x, x'. x == x'     in neg, s.t. repr x == repr x'
    - [unsatLits] exi k, k'. k != k'           , s.t. repr k == repr k'
-
    - exi k, x . isPrimTy[x] in pos, s.t. repr k == repr x, not isPrimTy[k]
    - exi k, x . isPrimTy[x] in neg, s.t. repr k == repr x,     isPrimTy[k]
    - exi k    . isPrimTy[k] in pos, s.t.                   not isPrimTy[k]
@@ -175,20 +201,21 @@ unsatCC cc pos neg ==> true  if
 -}
 
 data CC = MkCC
-  { eq_lits  :: [GroundVal]
+  { eq_lits  :: [Lit]
   , eq_uf    :: UF.UF GroundVal
   }
 
 mkCC :: [FailableAssump] -> [FailableAssump] -> CC
 mkCC pos neg = MkCC lits ufg
   where
-    lits = assumpGroundVal <$> (pos ++ neg)
+    lits = mapMaybe assumpGroundVal (pos ++ neg)
     ufg   = foldr (\(x, y) uf -> UF.union uf x y) UF.new eqs
     eqs  = [(GVVar x, y) | A_GVEq x y <- pos]
 
-assumpGroundVal :: FailableAssump -> GroundVal
-assumpGroundVal (A_GVEq _ gv) = gv
-assumpGroundVal (A_RelOp _ gv) = gv
+assumpGroundVal :: FailableAssump -> Maybe Lit
+assumpGroundVal (A_GVEq  _ (GVLit l)) = Just l
+assumpGroundVal (A_RelOp _ (GVLit l)) = Just l
+assumpGroundVal _                     = Nothing
 
 --------------------------------------------------------------------------------
 

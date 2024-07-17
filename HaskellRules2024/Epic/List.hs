@@ -7,10 +7,11 @@ module Epic.List(
     pick, pickLR,
     pattern Snoc,
     nub, nubKey,
-    takeUntil, dropUntil,
+    takeUntil, dropUntil, groupKey
   ) where
 
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Data.List(inits, tails)
 
 --------------------------------------------------------
@@ -70,6 +71,14 @@ nubKey = go S.empty
     | otherwise         = x : go (S.insert k seen) key xs
    where
     k = key x
+
+
+groupKey :: (Ord k) => (a -> k) -> [a] -> [[a]]
+groupKey key = go M.empty
+  where
+    go m []     = M.elems m
+    go m (x:xs) = go (M.insertWith (++) (key x) [x] m) xs
+
 ---------
 
 takeUntil :: (a -> Bool) -> [a] -> [a]

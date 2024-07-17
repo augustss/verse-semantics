@@ -250,10 +250,9 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
                     print v2
                 --undefined
               else do
-                putStrLn pos
+                putStrLn $ pos ++ " unexpected success"
                 when (typ == TBroken) $
                   putStrLn " broken test has"
-                putStrLn " unexpected success"
             when (trace tflg) $
               do { putStrLn "Trace is:"; display tr1 }
             pure Bad

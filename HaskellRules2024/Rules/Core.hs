@@ -194,7 +194,7 @@ instance Pretty Path where
 --------------------------------------------------------------------------------
 
 data GroundVal
-  = GVVar Ident
+  = GVVar {gv_var :: Ident}
   | GVLit Lit
   | GVArr [GroundVal]
   deriving( Eq, Ord, Show )

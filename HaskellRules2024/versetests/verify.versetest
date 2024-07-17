@@ -1,5 +1,7 @@
 # Trivial tests
 verify("Trivial-pass", pass){1}
+verify("plus1", pass){main() := { 1 + 2 = 3} }
+verify("plus2", fail){main() := { 1 + 2 = 4} }
 verify("Trivial-fail", fail){check<succeeds>{0=1}}
 
 # Guard tests from https://docs.google.com/document/d/17Ytcy9I_fDzW-a1FGYQkLh3oObFg47Ge6GdRy-FZjLM/edit
@@ -40,7 +42,7 @@ verify("T18",fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b :
 verify("T19",pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
 verify("T20",fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
 verify("T21",pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
-verify("T22",fail,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
+verify("T22",fail,ICFPverify=skip) { goob(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
 verify("T23",fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
 
 # Ported tests from TRSVerify.hs
