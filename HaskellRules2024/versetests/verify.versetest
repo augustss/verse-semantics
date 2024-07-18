@@ -152,6 +152,7 @@ verify("Dec5",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:f
 verify("Dec6",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 666 }
 verify("Dec7",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 42 }
 verify("Dec8",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 708 - z }
+     # Dec8 requires "-" to be transparent
 verify("Dec9",fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 }
 verify("Dec10",fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
 
@@ -171,8 +172,8 @@ verify("PP3", pass)   { F(X:int, G():type{X = 1}) := (H()<succeeds> := X = 1; H(
 
 
 # Subtyping (passes, but apparently, should be rejected!)
-verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
-verify(pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
+verify("ST1", pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
+verify("ST2", pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
 
 verify("FunPair", pass) { (a := (_,_)) => a=(_,_) }
    # Lambda takes a pair, a, as its argument, and then checks that the argument is a pair and returns it
@@ -196,3 +197,6 @@ verify(pass) {a:=(1;2;),a=(1,2)}		 #FP:10.4:DESUGARING?
 ### verify(pass, ICFPEverify=skip) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
 ### verify(pass, ICFPEverify=skip) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}			#FP:10.4:CHECK:DESUGAR
 verify(pass, ICFPEverify=skip) {x:int,x=3}
+
+# Dicussions with Tim 17 July
+verify("Tim17July", pass) { (f7(x:int)<succeeds>:type{x=3}) => a:int => f7[a]=3 }

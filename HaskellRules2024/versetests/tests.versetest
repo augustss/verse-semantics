@@ -111,8 +111,10 @@ testeq("Fun5",pass){function(x:int)(y:int){x+2*y}[2][3]}  {8}
 # Function argument matching
 testeq("Fun6",pass,POPLR=skip,Block=skip,ICFP*=skip)
              {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
+   # Needs recursion
 testeq("Fun7",pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
              {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
+   # Needs recursion
 testeq("Fun8",pass) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
 
 # P desugaring, i.e., p:=e
@@ -144,7 +146,7 @@ testeq("Pat19",skip,iblock=pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2
 testeq("TB1",pass) {(x:int) = 5}                         {5}
 testeq("TB2",pass) {ap0(f(x:int):int) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
 testeq("TB3",pass) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
-testeq("TB4",pass) {ap0(f(x:int):=2)<invariant> := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
+testeq("TB4",pass) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
 testeq("TB5",pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 # DESUGAR HOW?
 #testeq("TB6",pass) {(p^ : int) := 2}                      {p:=new[int][2]}
@@ -214,16 +216,22 @@ testeq("TIf1",pass) {if(y:int; y=1) 42 else 23}  {42}
 testeq("TIF2",pass) {if(y:int; y=1) y else 23}  {1}
 
 # Random collection
+testeq("EV10a",pass) {succ(x:int):=x+1; f(a:succ) := a; f[3]} {4}
+testeq("EV10b",pass) {succ(x:int):=x+1; f(a := :succ) := a; f[3]} {4}
+testeq("EV10c",pass) {succ(x:int):=x+1; f(a:=if (0) then :int else :succ):=a; f[3]} {3}
+testeq("EV10d",pass) {succ(x:int):=x+1; f(a:=if (:false) then :int else :succ):=a; f[3]} {4}
+
 testeq("EV10",pass) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):=a;
                     (f(0,0),f(1,0))} {0,1}
+   # c:int, then depending on c, we either get a:int or a:succ
 
-testeq("EV11",pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[0]}}     {1}
-testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<invariant>:=x+1; f[2]}}     {:false}
-testeq("EV13",pass) {t:=type{:int}; f(x:t)<invariant>:=x+1; f[0]}    {1}
-testeq("EV14",pass) {t:=type{:int}; f(x:t)<invariant>:=x+1; f[()]}   {:false}
+testeq("EV11",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[0]}}     {1}
+testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[2]}}     {:false}
+testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
+testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
 # These are very slow with alternative rules
-testeq("EV15",pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<invariant>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
-testeq("EV16",pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<invariant>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
+testeq("EV15",pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
+testeq("EV16",pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
 
 # Try CBV fixpoint combinator.
 # Too slow with some rules
@@ -241,9 +249,9 @@ testeq("EV20",pass) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
 ### WRONG testeq("EV22",pass) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
 testeq("EV23",pass) {swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))); p:any; swapGood[p] = (2,3); p } {(3,2)}
 
-# Confluence: Needs local substitution
-testeq("EV24",pass) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}}
-             {x : int; if (y:int; y = 1; y = x; y > 1)  {42} else {23}}
+# Confluence: Need local substitution, hence 'fail'
+testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}
+testeq("EV24a",fail) {x : int; if (y:int; y = x; y = 1; y > 1)  {42} else {23}} {23}
 
 # Various combinations ';', '=', and application.
 testeq("EV30",pass) { (1=1) = (1=1) }         {1}
