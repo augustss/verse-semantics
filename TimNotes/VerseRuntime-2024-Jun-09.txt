@@ -48,7 +48,7 @@ Definitions (as EBNF grammars) used by our inference rules:
                                |  op0|op1
                                |  exists u_0 ... u_n
                                |  iterate(u0) x0 c {op0} then x1 {op1} else {op2}
-                               |  cast(u) {head_0 => {op_0}; ...}
+                               |  case(u) {head_0 => {op_0}; ...}
     Programs           Program := program c x {op}
 
                                Matches any running operation that starts a new context C and its top level operation op.
@@ -287,25 +287,25 @@ Iterate & Choice:
   (IterateCopyMutables)  --------------------------------------------------------- (Copies c's mutables to d for speculative writes)
                          G[P^:=v0@c] where not G[P^:=v1@d] |- ProgramOp[c,Iterate]
 
-                         G                                 |- ProgramOp[c,iterate(u0) x0 d {ContextSpan[opL    ]} then x1 {op1             } else {
-                                                                          iterate(x1) y0 d {ContextSpan[    opR]} then y1 {op1[y0/x0,y1/x1]} else {op2[y0/x0]} }]
-           (ChoiceElim)  ---------------------------------------------------------------------------------------------------------------------------------------- (ICFP CHOOSE)
-                         G[unblocked_iterates{opL|opR}@d]  |- ProgramOp[c,iterate(u0) d {ContextSpan[opL|opR]} then x1 {op1} else {op2}                         ]
+                         G                                  |- ProgramOp[c,iterate(u0) x0 d0 {ContextSpan[opL    ]} then x1 {op1             } else {
+                                                                           iterate(x1) y0 d1 {ContextSpan[    opR]} then y1 {op1[y0/x0,y1/x1]} else {op2[y0/x0]} }]
+           (ChoiceElim)  ----------------------------------------------------------------------------------------------------------------------------------------- (ICFP CHOOSE)
+                         G[unblocked_iterates{opL|opR}@d0]  |- ProgramOp[c,iterate(u0) x0 d0 {ContextSpan[opL|opR]} then x1 {op1} else {op2}                         ]
 
                          G[P^:=v1@c / P^:=v0@c | P^:=v1@d <- G][P^:=v1@c / P^:=v1@d] ("G with d's allocates&writes moved to c, replacing any existing")
                                             |- ProgramOp[c,
                                                    op0;
-                                                   exists x0 x1 y1;
+                                                   exists x0 x1 y1 z1;
                                                    x0=u0(0);
                                                    op1[y1/x1,*/*];
-                                                   cast(y1) {
-                                                       tuple{v1} => {op2[y1/x1,*/*]};
-                                                       tuple{}   => {exists}
+                                                   case(y1) {
+                                                       tuple{z1} => {op2[y1/x1,*/*]};
+                                                       tuple{}  => {exists}
                                                    }]
   (IterateSucceedsElim)  ----------------------------------------------------------------------------------
                          G[succeeds{op0}@d] |- ProgramOp[c,iterate(u0) x0 d {op0} then x1 {op1} else {op2}]
 
-                         G                  |- ProgramOp[c,op2[*/*]                                    ]
+                         G                  |- ProgramOp[c,exists x0; x0=u0(0); op2[*/*]                  ]
      (IterateFailsElim)  ---------------------------------------------------------------------------------- (Abandons d's mutable writes)
                          G[fails{op0}@d]    |- ProgramOp[c,iterate(u0) x0 d {op0} then x1 {op1} else {op2}]
 
@@ -319,7 +319,7 @@ Iterate & Choice:
         or to stop by unifying x1 with tuple{}.
 
         - u0 is the value we're folding through the current iteration.
-        - x0 is a variable that will be unified with u0 upon success or failure, before running op1 or op2.
+        - x0 is a variable that will be unified with u0(0) upon success or failure, before running op1 or op2.
           We have to keep x0 separate from u0 until success, so that we can rename it in (ChoiceElim).
           If we tried to combine u0 and x0 into a single vertex, substitution would make it unrenamable.
         - We are running op0 in context c, until (IterateSucceedsElim) or (IterateFailsElim) kick in.
@@ -328,7 +328,7 @@ Iterate & Choice:
         - On success, (IterateSucceedsElim) does housekeeping and runs op1.
           This op1 has the opportunity to read the current fold value (stored in the 1-tuple x0).
           This op1 is must unify the next fold value (stored in x1) with either tuple{u1} to continue iterating,
-          or with tuple{} to stop. When op1 decides to continue iterating, (ChoiceElim)'s cast runs op2.
+          or with tuple{} to stop. When op1 decides to continue iterating, (ChoiceElim)'s case runs op2.
         - Making all of this useful is the job of (ChoiceElim), which says essentially:
           When we saw this choice a|b, we were iterating in op0 with then & else prongs op1 and op2.
           So now we eliminate the choice by continuing to iterate op in op0 (but with a|b rewritten to a),
@@ -343,7 +343,7 @@ Iterate & Choice:
         desugar{u=one{e0}} --->
             iterate(tuple{tuple{}}) x0 c {exists z; desugar{z=e0}}
                 then x1                  {u=z; x1=tuple{}}
-                else                     {u=false()}
+                else                     {u=tuple{}()}
 
         desugar{u=if(e0) then e1 else e2} --->
             iterate(tuple{tuple{}}) x0 c {exists z; desugar{z=e0}}
@@ -352,7 +352,7 @@ Iterate & Choice:
 
         desugar{u=all{e0}} --->
             iterate(tuple{0})       x0 c {exists z; desugar(z=e0}}
-                then                x1   {exists y; y=x0(0); u(y)=z; x1=tuple{y+1}}
+                then                x1   {exists y; y=x0(0); z=u(y); case(y) {n => {x1=tuple{n+1}}}
                 else                     {x0=length(u)}
 
         desugar{u=for(e0) do e1} --->
@@ -360,15 +360,15 @@ Iterate & Choice:
                 then                x1   {exists y; y=x0(0); desugar{u(y)=e1}; x1=tuple{y+1}}
                 else                     {x0=length(u)}
 
-Casting:
+Head Normal Form Cases:
 
     This operation performs a simple pattern match and reduces once there's a match.
     It's a primitive building block for (IterateSucceedsElim) and makes it easier to specify natives.
 
                          head matches head_i and definitely does not match head_0 ... head_i-1
                          G |- ProgramOp[c,                            op_i       ]
-             (CastElim)  ---------------------------------------------------------
-                         G |- ProgramOp[c,cast(head) {...; head_i => {op_i}; ...}]
+             (CaseElim)  ---------------------------------------------------------
+                         G |- ProgramOp[c,case(head) {...; head_i => {op_i}; ...}]
 
 Pure Native Functions:
 
@@ -382,6 +382,8 @@ Pure Native Functions:
                          G |- ProgramOp[c,u=m+n                    ]
                (AddInt)  ------------------------------------------- (ICFP APP-ADD)
                          G |- ProgramOp[c,u=operator'+'[tuple{m,n}]]
+
+               (Length)  TODO: Need a rule showing u=length(v) can set result length from tuple parameter, or set tuple length from result.
 
 Effectful Native Functions:
 
