@@ -7,13 +7,14 @@ module Epic.List(
     pick, pickLR,
     pattern Snoc,
     nub, nubKey,
-    takeUntil, dropUntil, groupKey
+    takeUntil, dropUntil, groupKey,
+    firstJust
   ) where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.List(inits, tails)
-
+import Data.Maybe (listToMaybe, catMaybes)
 --------------------------------------------------------
 --
 --         General utilities on lists
@@ -90,3 +91,8 @@ dropUntil :: (a -> Bool) -> [a] -> [a]
 dropUntil _ []                 = []
 dropUntil p (x:xs) | p x       = xs
                    | otherwise = dropUntil p xs
+
+---------
+
+firstJust :: [Maybe a] -> Maybe a
+firstJust = listToMaybe . catMaybes

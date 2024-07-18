@@ -43,6 +43,7 @@ executable confluence-check
     -- In an executable, exposed-modules doesn't matter
     other-modules:
                       Rules.Core
+                      Rules.Solver
                       Rules.TRS2024
                       TRS.Bind
                       TRS.Traced
@@ -81,9 +82,9 @@ executable tester
 --                       optparse-applicative,
 --                       QuickCheck,
 --                       githash,
--- 
+--
 --     main-is:          Main.hs
--- 
+--
 --     hs-source-dirs:   qctest
 --     default-language: Haskell2010
 --     ghc-options:      -Wall -Wno-unrecognised-warning-flags -Wno-x-partial -O2 -threaded -feager-blackholing -rtsopts
@@ -122,6 +123,7 @@ library verse-libs
                       FrontEnd.Desugar
                       FrontEnd.ToCore
                       Rules.Core
+                      Rules.Solver
                       Rules.TRS2024
                       Rules.Verifier
                       TRS.Bind

@@ -132,9 +132,9 @@ primOpCanFail IsStr  = True
 primOpCanFail IsChar = True
 
 primOpCanFail Add = False
-primOpCanFail Sub = True
-primOpCanFail Mul = True
-primOpCanFail Div = True
+primOpCanFail Sub = False
+primOpCanFail Mul = False
+primOpCanFail Div = False
 
 --------------------------------------------------------------------------------
 --
@@ -197,6 +197,7 @@ data GroundVal
   = GVVar {gv_var :: Ident}
   | GVLit Lit
   | GVArr [GroundVal]
+  | GVLam (Bind Expr)
   deriving( Eq, Ord, Show )
 
 data Assump
@@ -234,6 +235,7 @@ instance Pretty GroundVal where
   pPrint (GVVar i)   = pPrint i
   pPrint (GVLit l)   = pPrint l
   pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
+  pPrint (GVLam bnd) = pPrint (Lam bnd)
 
 isPosAssump :: Assump -> Bool
 isPosAssump (A_Pos {})    = True
@@ -555,6 +557,7 @@ instance Variables GroundVal where
   variables _f (GVVar i)   = [i]
   variables _f (GVLit {})  = []
   variables f  (GVArr gvs) = variables f gvs
+  variables f  (GVLam bnd) = variables f bnd
 
 isSkolem :: Ident -> Bool
 isSkolem (Name ('$':_)) = True
@@ -723,6 +726,7 @@ substGV :: Subst Ident -> GroundVal -> GroundVal
 substGV sub (GVVar x)  = GVVar (lookupIdSubst sub x)
 substGV _   (GVLit l)  = GVLit l
 substGV sub (GVArr vs) = GVArr (map (substGV sub) vs)
+substGV sub (GVLam bnd) = GVLam (substBind Var subst sub' bnd) where sub' = [ (x, Var y) | (x, y) <- sub ]
 
 lookupIdSubst :: Subst Ident -> Ident -> Ident
 lookupIdSubst sub x

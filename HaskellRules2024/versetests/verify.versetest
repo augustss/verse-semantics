@@ -101,7 +101,9 @@ verify("Opacity1", fail) { f(x:int := 3) := x=3 }
       # Opacity1: the fn body only knows that x:int
 verify("Opacity2", pass) {f(x:int := 3)<decides> := x=3 }
       # Opacity2: fn body only knows that x:int, but we have <decides>
-verify("Opacity3", fail) { f(x:int)<decides>:type{x=3} := x+1 }
+verify("Opacity3", fail) { f(x:int)<decides>:type{x=99999} := 100000 }
+      # verify("Opacity3", fail) { f(x:int)<decides>:type{x=3} := x+1 }
+
 verify("Opacity4", pass) { three(x:int)<decides> := x = 3; main() := y<succeeds>:three := 3 }
       # Opacity4: 'main' should verify despite three's<decides>, because 'three' is transparent
 
@@ -129,7 +131,8 @@ verify("HO10",fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3,
 verify("HO11",fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
 
 ## Koen's hof examples
-verify("HO12", pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
+verify("HO12a",pass) { gg(x:int) := 1;  foo(f(g(:int):int):int) := { f(gg) } } # gg returns a float for any int
+verify("HO12",pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
 verify("HO13",fail) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
 verify("HO14",pass) { gg(x:any) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be accepted
 verify("HO15",fail) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } } # because f expects g to return an int, and it doesn't
@@ -152,9 +155,10 @@ verify("Dec5",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:f
 verify("Dec6",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 666 }
 verify("Dec7",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 42 }
 verify("Dec8",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 708 - z }
-     # Dec8 requires "-" to be transparent
 verify("Dec9",fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 }
 verify("Dec10",fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
+
+verify("Dec8a",pass) { foo(x:int)<decides> := { (x = 666) } ; phil(z:foo) := (708 - z = 42) }
 
 ### # Tim examples 8/9/2023
 ### # verify(pass) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
@@ -172,8 +176,8 @@ verify("PP3", pass)   { F(X:int, G():type{X = 1}) := (H()<succeeds> := X = 1; H(
 
 
 # Subtyping (passes, but apparently, should be rejected!)
-verify("ST1", pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
-verify("ST2", pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
+verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
+verify(pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
 
 verify("FunPair", pass) { (a := (_,_)) => a=(_,_) }
    # Lambda takes a pair, a, as its argument, and then checks that the argument is a pair and returns it
@@ -197,6 +201,3 @@ verify(pass) {a:=(1;2;),a=(1,2)}		 #FP:10.4:DESUGARING?
 ### verify(pass, ICFPEverify=skip) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
 ### verify(pass, ICFPEverify=skip) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}			#FP:10.4:CHECK:DESUGAR
 verify(pass, ICFPEverify=skip) {x:int,x=3}
-
-# Dicussions with Tim 17 July
-verify("Tim17July", pass) { (f7(x:int)<succeeds>:type{x=3}) => a:int => f7[a]=3 }

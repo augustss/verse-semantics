@@ -1,10 +1,13 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Eta reduce" #-}
+{-# HLINT ignore "Fuse foldr/map" #-}
 module TRS.Bind
   ( Ident(..), SkolIdent
   , ident, underscore, isUnderscore
   , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn, skolsNotIn
 
   , Variables(..)
-  , free, occurs, intersects
+  , free, occurs, intersects, includes
 
   , Bind -- abstract! let's see if we can do this
   , bind, unsafeUnbind, alphaRenameBindWith
@@ -94,6 +97,10 @@ occurs = variables (union . (: []))  -- Finds all variables,
 intersects :: [Ident] -> [Ident] -> Bool
 -- True if the two lists have one or more common members
 intersects xs ys = any (`elem` xs) ys
+
+includes :: [Ident] -> [Ident] -> Bool
+-- True if the first list includes the second
+includes xs ys = all (`elem` xs) ys
 
 instance Variables () where
   variables _ _ = []
