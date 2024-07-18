@@ -499,7 +499,7 @@ instance Pretty Operation where -- XXX precedence
   pPrint (OpMetaVar s) = text s
 
 instance Pretty RHS where
-  pPrint (RHS pat op) = pPrint pat <+> text "=>" <+> pPrint op
+  pPrint (RHS pat op) = pPrint pat <+> text "=>" <+> pPrint op <> text ";"
 
 data HeadPattern = PatHead Head  -- | ...
   deriving (Eq, Ord, Show, Data)
@@ -949,12 +949,12 @@ iterateChoiceRules _ (A g :|- pg) =
  ++
   "ChoiceElim" `name`
   do
-    (ctx, c, OpIterate u0 x0 d op0 x1 op1 op2) <- programOp pg
+    (ctx, c, OpIterate u0 x0 d0 op0 x1 op1 op2) <- programOp pg
 --    traceM $ "ChoiceElim: 1 " ++ prettyShow op0
 --    traceM $ "ChoiceElim: 2 " ++ prettyShow (contextSpan op0)
     (ctx', opc@(OpChoice opL opR)) <- contextSpan op0
 --    traceM $ "ChoiceElim: 3 " ++ prettyShow [ a | a@(AEffect _ opc' _) <- g, opc == opc' ]
-    guard $ not $ null [ () | AEffect fx opc' d' <- g, opc == opc', d == d', isEffect fx unblocked_iterates ]
+    guard $ not $ null [ () | AEffect fx opc' d' <- g, opc == opc', d0 == d', isEffect fx unblocked_iterates ]
 {-
     let (y0, y1) = newIdents pg ("y0", "y1")
         d1 = newIdents pg "d1"
@@ -965,8 +965,14 @@ iterateChoiceRules _ (A g :|- pg) =
               OpIterate vx1 y0 d1 (ctx' opR) y1 op1' op2'
 -}
     let vx1 = VertexVariable x1
-        iop =              OpIterate u0  x0 d (ctx' opL) x1 op1 $
-              freshen pg $ OpIterate vx1 x0 d (ctx' opR) x1 op1 op2
+        vx0 = VertexVariable x0
+        d1  = newIdents pg "d1"
+        y0  = newIdents pg "y0"
+        y1  = newIdents pg "y1"
+        iop =              OpIterate u0  x0 d0 (ctx' opL) x1 op1 $
+              freshen pg $ OpIterate vx0 y0 d1 (ctx' opR) y1 op1' op2'
+        op1' = alphaConvertVariable [(x0,y0),(x1,y1)] op1
+        op2' = alphaConvertVariable [(x0,y0),(x1,y1)] op2
     pure $ A g :|- ctx c iop
 
 {-
@@ -991,17 +997,18 @@ iterateChoiceRules _ (A g :|- pg) =
 --                         trace ("IterateSucceedsElim 2 " ++ prettyShow (fx, succeeds, isEffect fx succeeds)) True,
                          isEffect fx succeeds ]
     let y1 = newIdents pg "y1"
-        v1 = newIdents pg "v1"
+        und = VertexVariable (Variable (Ident "_"))
         vy1 = VertexVariable y1
         vx0 = VertexVariable x0
         vx1 = VertexVariable x1
-        pg' = (pg, y1, v1)
+        op1' = freshen (pg, y1)       $ alphaConvertVariable [(x1, y1)] op1
+        op2' = freshen (pg, y1, op1') $ alphaConvertVariable [(x1, y1)] op2
     let op =
           op0 +>
           OpExists [vx0, vx1, vy1] +>
           OpCall vx0 u0 (VInteger 0) +>
-          freshen pg' (alphaConvertVariable [(x1, y1)] op1) +>
-          OpCast vy1 [RHS (PatHead $ HeadTuple [v1]) (freshen pg' $ alphaConvertVariable [(x1, y1)] op2),
+          op1' +>
+          OpCast vy1 [RHS (PatHead $ HeadTuple [und]) op2',
                       RHS (PatHead $ HeadTuple []) OpNoop]
     
     g' <- pure (A g) -- gAdd [{-XXX move pointers-}] g
@@ -1009,11 +1016,12 @@ iterateChoiceRules _ (A g :|- pg) =
  ++
   "IterateFailsElim" `name`
   do
-    (ctx, c, OpIterate _u0 _x0 d op0 _x1 _op1 op2) <- programOp pg
+    (ctx, c, OpIterate u0 x0 d op0 _x1 _op1 op2) <- programOp pg
     guard $ not $ null [ () | AEffect fx op0' d' <- g, op0 == op0', d == d',
                          isEffect fx fails ]
-    let op = freshen pg op2
-    pure $ A g :|- ctx c op
+    let op2' = freshen pg op2
+        vx0  = VertexVariable x0
+    pure $ A g :|- ctx c (OpExists [vx0] +> OpUnify vx0 u0 +> op2')
 
 -----
 -- Casting
@@ -1292,6 +1300,92 @@ example21 = OpExists [vx] +>
             OpCall (VInteger 2) (VPrim "Length") vx
   where vx = newIdents () "x"
 
+-- example22: ex x . iterate(9) x0 d {noop} then x1 {x1=tuple{}; x=x0} else {noop}
+example22 :: Operation
+example22 = OpExists [vx] +>
+            OpIterate (VTuple [VInteger 9]) x0 d op0 x1 op1 op2
+  where vx = newIdents () "x"
+        x0 = newIdents () "x0"
+        vx0= VertexVariable x0
+        x1 = newIdents () "x1"
+        vx1= VertexVariable x1
+        d  = newIdents () "d"
+        op0 = OpNoop                         -- succeed
+        op1 = OpUnify vx1 (VTuple []) +>     -- stop
+              OpUnify vx vx0                 -- result is incoming iteration
+        op2 = OpNoop                         -- never executed
+
+-- example23: ex x . iterate(9) x0 d {noop} then x1 {x1=tuple{x0}} else {x=tuple{x0,x1}}
+example23 :: Operation
+example23 = OpExists [vx] +>
+            OpIterate (VTuple [VInteger 9]) x0 d op0 x1 op1 op2
+  where vx = newIdents () "x"
+        x0 = newIdents () "x0"
+        vx0= VertexVariable x0
+        x1 = newIdents () "x1"
+        vx1= VertexVariable x1
+        d  = newIdents () "d"
+        op0 = OpNoop                         -- succeed
+        op1 = OpUnify vx1 (VTuple [vx0])     -- use op2
+        op2 = OpUnify vx (VTuple [vx0,vx1])  -- set result
+
+-- example24: ex x . iterate(9) x0 d {0=1} then x1 {noop} else {x=8}
+example24 :: Operation
+example24 = OpExists [vx] +>
+            OpIterate (VTuple [VInteger 9]) x0 d op0 x1 op1 op2
+  where vx = newIdents () "x"
+        x0 = newIdents () "x0"
+        x1 = newIdents () "x1"
+        d  = newIdents () "d"
+        op0 = OpUnify (VInteger 0) (VInteger 1)  -- fail
+        op1 = OpNoop                             -- unused
+        op2 = OpUnify vx (VInteger 8)            -- set result
+
+-- example25: ex x . iterate(array{0}) x0 d (ex a . (a=2)|(a=3)) then x1 { x1 = array{array{x0, a}} } else { x = x1(0) }
+example25 :: Operation
+example25 = OpExists [x] +>
+            OpIterate (VTuple [VInteger 0])
+                      x0 d
+                      (OpExists [a] +> (OpUnify a (VInteger 2) `OpChoice` OpUnify a (VInteger 3)))
+                      x1
+                      (OpUnify vx1 (VTuple [VTuple [vx0, a]]))
+                      (OpCall x vx1 (VInteger 0))
+  where x  = newIdents () "x"
+        x0 = newIdents () "x0"
+        vx0= VertexVariable x0
+        x1 = newIdents () "x1"
+        vx1= VertexVariable x1
+        d  = newIdents () "d"
+        a  = newIdents () "a"
+
+-- example26: ex x . iterate (tuple{tuple{}}) x0 d (exists a . (0=1) | (a=2)) then x1 { x1 = tuple{}; x = a } else { noop }
+-- Hand-desugared
+example26 :: Operation
+example26 = OpExists [x] +>
+            OpIterate (VTuple [false]) x0 d (OpExists [a] +> OpChoice (OpUnify (VInteger 0) (VInteger 1)) (OpUnify a (VInteger 2)))
+                      x1 (OpUnify (VertexVariable x1) false +> OpUnify x a)
+                      OpNoop
+  where x  = newIdents () "x"
+        x0 = newIdents () "x0"
+        x1 = newIdents () "x1"
+        d  = newIdents () "d"
+        a  = newIdents () "a"
+        false = VTuple []
+
+-- example27: ex x . iterate (tuple{tuple{}}) x0 d (exists a . (a=2) | (0=1)) then x1 { x1 = tuple{}; x = a } else { noop }
+-- Hand-desugared
+example27 :: Operation
+example27 = OpExists [x] +>
+            OpIterate (VTuple [VTuple[]]) x0 d (OpExists [a] +> OpChoice (OpUnify a (VInteger 2)) (OpUnify (VInteger 0) (VInteger 1)))
+                      x1 (OpUnify (VertexVariable x1) false +> OpUnify x a)
+                      OpNoop
+  where x  = newIdents () "x"
+        x0 = newIdents () "x0"
+        x1 = newIdents () "x1"
+        d  = newIdents () "d"
+        a  = newIdents () "a"
+        false = VTuple []
+
 finalResult :: Operation -> Maybe Vertex
 finalResult = getRes . norm . startConfig
   where
@@ -1321,7 +1415,10 @@ tests = [
   ("example18", example18, Just $ VInteger 3),
   -- example19
   ("example20", example20, Just $ VTuple [newIdents () "a0", newIdents () "a1", newIdents () "a2"]),
-  ("example21", example21, Just $ VTuple [VInteger 10, VInteger 20])
+  ("example21", example21, Just $ VTuple [VInteger 10, VInteger 20]),
+  ("example22", example22, Just $ VInteger 9),
+  ("example23", example23, Just $ VTuple [VInteger 9, VTuple [VInteger 9]]),
+  ("example24", example24, Just $ VInteger 8)
   ]
 
 runTest :: (String, Operation, Maybe Vertex) -> IO ()
@@ -1337,5 +1434,7 @@ runTests =
 
 main :: IO ()
 main = do
-  runTests
-  --fpptr "ut" $ startConfig example5
+--  runTests
+--  putStrLn "tests ok"
+  fpptr "ut" $ startConfig example26
+  --pptr $ startConfig example19
