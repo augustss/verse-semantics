@@ -129,7 +129,7 @@ verify("HO10",fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3,
 verify("HO11",fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
 
 ## Koen's hof examples
-verify("HO12", pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
+verify("HO12", pass) { gg(x:int) := 1;  foo(f(g(:int):int):string):string:= { f(gg) } } # gg returns a float for any int
 verify("HO13",fail) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
 verify("HO14",pass) { gg(x:any) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be accepted
 verify("HO15",fail) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } } # because f expects g to return an int, and it doesn't
