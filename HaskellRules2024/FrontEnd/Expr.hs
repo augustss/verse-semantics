@@ -718,6 +718,7 @@ getFree = fvs_blk
     fvs (DefineE _ e)     = fvs e
     fvs (Range  _ e)      = fvs e
     fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
+    fvs (If3 e1 e2 e3)    = fvs e1 ++ fvs e2 ++ fvs e3
     fvs (Function args body)
       = (foldr (++) (fvs_blk body) (map fvs arg_exprs)) `remove` arg_bndrs
       where
@@ -867,4 +868,3 @@ alphaConvert vs = alpha []
 
     fresh i@(Ident l s) | i `notElem` vs = i
                         | otherwise = fresh $ Ident l (s ++ "'")
-
