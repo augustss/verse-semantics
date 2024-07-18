@@ -214,19 +214,25 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
   | typ == TSkip = do { when noisy (putStrLn $ pos ++ " skipped")
                       ; pure Skip }
   | otherwise
-  = do { when showD (putStrLn $ "desugared:\n" ++ prettyShow c1)
+  = do { -- Display the deguared output
+         when (showDesugared tflg) $
+         displayDoc (sep [text pos <+> text "desugared:", pPrint c1])
 
+       ; res <- catch (if equivValue v1 v2 == expectOK
+                       then do { success_handler; pure Good }
+                       else do { failure_handler; pure Bad })
+                      (\e -> do { exn_handler e;  pure Excn} )
 
-       ; catch (if equivValue v1 v2 == expectOK
-                then do { success_handler; pure Good }
-                else do { failure_handler; pure Bad })
-               (\e -> do { exn_handler e;  pure Excn} ) }
+       -- Display the trace if asked for, regardless of succcess/failure
+       ; when (trace tflg) $
+         do { putStrLn "Trace is:"; display tr1 }
+
+       ; pure res }
   where
-    loc      = testLocn ti
-    noisy    = not (quiet tflg)
-    showD    = showDesugared tflg
-    pos      = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
-    typ      = testType ti
+    loc   = testLocn ti
+    noisy = not (quiet tflg)
+    pos   = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
+    typ   = testType ti
 
     expectOK = typ == TPass
     tr1      = evalExpr c1
@@ -267,10 +273,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
                     putStrLn "The unpretty printed values are"
                     print v1
                     putStrLn "resp."
-                    print v2 }
-
-            ; when (trace tflg) $
-              do { putStrLn "Trace is:"; display tr1 } }
+                    print v2 } }
 
 
 

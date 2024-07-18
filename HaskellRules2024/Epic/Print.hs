@@ -35,7 +35,11 @@ indent = nest 2
 
 display :: (Pretty a) => a -> IO ()
 -- Pretty-print the argument
-display = putStrLn . prettyShow
+display = displayDoc . pPrint
+
+displayDoc :: Doc -> IO ()
+-- Pretty-print the argument
+displayDoc = putStrLn . render
 
 ppx :: (Pretty a) => a -> IO ()
 ppx = putStrLn . renderStyle s . pPrintL prettyNormal
