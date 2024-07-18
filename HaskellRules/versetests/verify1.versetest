@@ -1,1 +1,1 @@
-verify(pass) { gg(x:int) := 1;  foo(f(g(:int):int):int) := { f(gg) } } # gg returns a float for any int
+verify(pass) { (a := (_,_)) => a=(_,_) }

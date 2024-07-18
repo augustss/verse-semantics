@@ -4,31 +4,31 @@ import Rules.Core
 import Epic.Print
 import qualified Epic.UnionFind as UF
 import Data.List ( nub )
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, listToMaybe)
 import Epic.List (groupKey, firstJust)
+import Data.Containers.ListUtils (nubOrd)
 
 -- | `unsat` is a simple unsatisfiablity checker, which implements the SOLVER rule
 -----------------------------------------------------------------------------------
 unsat :: RuleEnv -> Maybe UnsatReason
 -----------------------------------------------------------------------------------
-unsat (RE { assumps = asms }) = solve s
+unsat env = {- ppTrace "TRACE: unsat" msg -} res
   where
-    pos, neg :: [FailableAssump]
-    pos = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | A_PrimOp _ (AO_Prim op) gv <- asms ]
-    neg = [asm | A_Neg asm <- asms]
-    s   = mkSolver pos neg
+    _msg  = pPrint (asms, res)
+    asms = assumps env
+    res  = solve (mkSolver asms)
 
 -- `solve s` repeatedly loops, by generating new equalities, propagating them, and checking for unsatisfiability
 solve :: Solver -> Maybe UnsatReason
 solve s
   | Just r <- res = Just r
-  | null eqs      = Nothing
+  | null eqs      = {- ppTrace "TRACE: solve" msg -} Nothing
   | otherwise     = solve s'
   where
-    res = check s
-    eqs = generate s
-    s'  = propagate s eqs
-
+    _msg           = pPrint (s_pos s')
+    res           = check s
+    eqs           = generate s
+    s'            = propagate s eqs
 -----------------------------------------------------------------------------------
 -- `check s` uses the `neg` assumptions and `lits` to check for unsatisfiability
 -----------------------------------------------------------------------------------
@@ -45,18 +45,26 @@ checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing
 
 -- looks for assumptions `not p` such that `p` is provable in s
 checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
-checkNeg s neg@(A_GVEq x (GVVar y))
-  | x == y && isPrim s x   = Just (Contra neg)
-  | otherwise              = Nothing
+checkNeg s neg@(A_GVEq x vy@(GVVar _))
+  | isEqual s (GVVar x) vy && isPrim s x
+  = Just (Contra neg)
+  | otherwise
+  = Nothing
 checkNeg s neg@(A_GVEq x gv)
-  | isEqual s (GVVar x) gv = Just (Contra neg)
-  | otherwise              = Nothing
+  | isEqual s (GVVar x) gv
+  = Just (Contra neg)
+  | otherwise
+  = Nothing
 checkNeg _ neg@(A_RelOp op (GVLit l))
-  | isRelOpLit op l        = Just (Contra neg)
-  | otherwise              = Nothing
+  | isRelOpLit op l
+  = Just (Contra neg)
+  | otherwise
+  = Nothing
 checkNeg s neg@(A_RelOp op gv)
-  | isRel s op gv          = Just (Contra neg)
-  | otherwise              = Nothing
+  | isRel s op gv
+  = Just (Contra neg)
+  | otherwise
+  = Nothing
 
 isRelOpLit :: PrimOp -> Lit -> Bool
 isRelOpLit IsInt  (LInt _)  = True
@@ -64,29 +72,47 @@ isRelOpLit IsChar (LChar _) = True
 isRelOpLit IsStr  (LStr _)  = True
 isRelOpLit _      _         = False
 
-isRel :: Solver -> PrimOp -> GroundVal -> Bool
-isRel s op gv = not $ null [ () | A_RelOp op' gv' <- s_pos s, op' == op, isEqual s gv gv' ]
-
------------------------------------------------------------------------------------
-type Equality = (GroundVal, GroundVal)
-
 -----------------------------------------------------------------------------------
 -- | `generate s` returns a list of equalities that can be derived from the solver,
 --    but which are not yet known in the UF graph
 -----------------------------------------------------------------------------------
 generate :: Solver -> [Equality]
-generate s = eqs
+generate s         = filter (not . known) (evalDefs s ++ pos)
   where
+    pos            = [(GVVar x, y) | A_GVEq x y <- s_pos s]
+    known (v1, v2) = isEqual s v1 v2
 
+evalDefs :: Solver -> [Equality]
+evalDefs s = {- ppTrace "TRACE: evalDefs" msg -} res
+  where
+    _msg    = pPrint (defs, res)
+    res    = mapMaybe (evalDef s) defs
+    defs   = s_def s
 
+primOpArith :: PrimOp -> Maybe (Integer -> Integer -> Integer)
+primOpArith Add = Just (+)
+primOpArith Sub = Just (-)
+primOpArith Mul = Just (*)
+primOpArith _   = Nothing
+
+evalDef :: Solver -> Definition -> Maybe Equality
+evalDef s (x, (op, GVArr [v1, v2])) = do
+  o       <- primOpArith op
+  LInt l1 <- evalsToLit s v1
+  LInt l2 <- evalsToLit s v2
+  Just (GVVar x, GVLit (LInt (l1 `o` l2)))
+evalDef _ _ = Nothing
 -----------------------------------------------------------------------------------
 -- | `propagate s eqs` updates the solver state `s` with the new equalities `eqs`
 -----------------------------------------------------------------------------------
 propagate :: Solver -> [Equality] -> Solver
-propagate s eqs = s { s_uf = uf' }
+propagate s eqs = s { s_uf = uf', s_lits = lits' }
   where
     uf'   = foldr (\(x, y) uf -> UF.union uf x y) (s_uf s) eqs
-    -- uf'         = foldl' (\uf (v1, v2) -> UF.union uf v1 v2) (s_uf s) eqs
+    lits' = nubOrd (s_lits s ++ eq_lits)
+    -- new lits generated from eqs
+    eq_lits = concatMap (mapMaybe groundLit . (\(x, y) -> [x, y])) eqs
+
 ------------------------------------------------------------------------------------
 -- `isEqual s v1 v2` returns true if v1 and v2 are provably equal in solver s
 ------------------------------------------------------------------------------------
@@ -106,6 +132,24 @@ isTyOp IsStr  = True
 isTyOp _      = False
 
 ------------------------------------------------------------------------------------
+-- `isRel s op v` returns true if there is a relation `op v'` in the solver and `v == v'`
+------------------------------------------------------------------------------------
+isRel :: Solver -> PrimOp -> GroundVal -> Bool
+isRel s op gv = not $ null [ () | A_RelOp op' gv' <- s_pos s, op' == op, isEqual s gv gv' ]
+
+
+------------------------------------------------------------------------------------
+-- `eval s v` returns `Just l` if `v` is provably equal to a literal `l` in solver `s`
+------------------------------------------------------------------------------------
+evalsToLit :: Solver -> GroundVal -> Maybe Lit
+evalsToLit _ (GVLit l) = Just l
+evalsToLit s v         = {- ppTrace "TRACE: evalsToLit" msg -} res
+  where
+    _msg = pPrint (v, res)
+    res = listToMaybe [l | l <- s_lits s, isEqual s v (GVLit l)]
+
+
+------------------------------------------------------------------------------------
 -- | Solver State
 ------------------------------------------------------------------------------------
 data Solver = MkSolver
@@ -113,20 +157,27 @@ data Solver = MkSolver
   , s_uf    :: UF.UF GroundVal
   , s_pos   :: [FailableAssump]
   , s_neg   :: [FailableAssump]
+  , s_def   :: [Definition]
   }
 
-mkSolver :: [FailableAssump] -> [FailableAssump] -> Solver
-mkSolver pos neg = MkSolver { s_lits = lits, s_uf = ufg, s_pos = pos, s_neg = neg }
+type Equality   = (GroundVal, GroundVal)
+type Definition = (Ident, (PrimOp, GroundVal))
+
+mkSolver :: [Assump] -> Solver
+mkSolver asms = MkSolver { s_lits = lits, s_uf = UF.new, s_pos = pos, s_neg = neg, s_def = defs }
   where
+    defs = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
+    pos  = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | (_, (op, gv)) <- defs]
+    neg  = [asm | A_Neg asm <- asms]
     lits = mapMaybe assumpGroundVal (pos ++ neg)
-    ufg   = foldr (\(x, y) uf -> UF.union uf x y) UF.new eqs
-    eqs  = [(GVVar x, y) | A_GVEq x y <- pos]
 
 assumpGroundVal :: FailableAssump -> Maybe Lit
-assumpGroundVal (A_GVEq  _ (GVLit l)) = Just l
-assumpGroundVal (A_RelOp _ (GVLit l)) = Just l
-assumpGroundVal _                     = Nothing
+assumpGroundVal (A_GVEq  _ gv) = groundLit gv
+assumpGroundVal (A_RelOp _ gv) = groundLit gv
 
+groundLit :: GroundVal -> Maybe Lit
+groundLit (GVLit l) = Just l
+groundLit _         = Nothing
 ------------------------------------------------------------------------------------
 -- | Why is the solver returning UNSAT
 ------------------------------------------------------------------------------------

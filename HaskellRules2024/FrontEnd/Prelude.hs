@@ -82,7 +82,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intSub$[x,y]; isInt$[z]; z } }}};\n\
 \operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intMul$[x,y]; isInt$[z]; z } }}};\n\
-\operator'/'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intDiv$[x,y]; isInt$[z]; z } }}};\n\
+\operator'/'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[y, 0]; (x,y) >> some{ lam z { z = intDiv$[x,y]; isInt$[z]; z } }}};\n\
 \operator'<'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intLT$[x,y] }};\n\
 \operator'<='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intLE$[x,y] }};\n\
 \operator'>'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGT$[x,y] }};\n\

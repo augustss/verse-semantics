@@ -203,17 +203,17 @@ data GroundVal
 data Assump
   = A_Pos FailableAssump                 -- e.g r = <s,t>         or   r>s
   | A_Neg FailableAssump                 -- e.g. not (r = <s,t>)  or   not (r>s)
-  | A_PrimOp Ident AssumpOp GroundVal    -- e.g. r = s+t,  (primOpCanFail op) is False
+  | A_PrimOp Ident AssumpOp GroundVal    -- e.g. r = op[v],  (primOpCanFail op) is False
   deriving( Eq, Ord, Show )
 
 data FailableAssump
   = A_GVEq  Ident  GroundVal
-  | A_RelOp PrimOp GroundVal   -- (primOpCanFail op) is True
+  | A_RelOp PrimOp GroundVal             -- (primOpCanFail op) is True
   deriving ( Eq, Ord, Show )
 
-data AssumpOp  -- Either a regular primop or Apply
-  = AO_Apply              -- AO_apply [r,a]    means  r[a], r applied to a
-  | AO_Prim PrimOp
+data AssumpOp
+  = AO_Apply                            -- AO_apply [r,a]    means  r[a], r applied to a
+  | AO_Prim PrimOp                      -- (primOpCanFail op) is False
   deriving( Eq, Ord, Show )
 
 instance Pretty AssumpOp where
@@ -241,10 +241,6 @@ isPosAssump :: Assump -> Bool
 isPosAssump (A_Pos {})    = True
 isPosAssump (A_PrimOp {}) = True
 isPosAssump (A_Neg {})    = False
-
--- isPosAssump (A_GVEq {})   = True
--- isPosAssump (A_PrimOp {}) = True
--- isPosAssump (A_Fails {})  = False
 
 
 --------------------------------------------------------------------------------
