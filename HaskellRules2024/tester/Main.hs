@@ -213,69 +213,66 @@ assertEquiv :: (HasCallStack, Pretty a) => TestFlags -> TestInfo
 assertEquiv tflg ti (p1, c1) (p2, c2)
   | typ == TSkip = do { when noisy (putStrLn $ pos ++ " skipped")
                       ; pure Skip }
-  | otherwise = do
-  when showD (putStrLn $ "desugared:\n" ++ prettyShow c1)
+  | otherwise
+  = do { when showD (putStrLn $ "desugared:\n" ++ prettyShow c1)
 
-  let expectOK = typ == TPass
-  let tr1 = evalExpr c1
-      tr2 = evalExpr c2
-      v1 = term tr1
-      v2 = term tr2
 
-  catch (
-       if equivValue v1 v2 == expectOK
-       then do
-            when noisy $
-              putStrLn $ pos ++ if expectOK then " success!" else " failure, expected"
-            pure Good
-       else do
-            unless (noError tflg) $
-             if expectOK
-              then do
-                putStrLn "-----------------------------------------------"
-                putStrLn $ pos ++ " failure, unexpected!"
-                putStrLn "The expression"
-                ppi p1
-                putStrLn "evaluates to"
-                ppi v1
-                putStrLn "but"
-                ppi p2
-                putStrLn "evaluates to"
-                ppi v2
-                putStrLn ""
-                when (prettyShow v1 == prettyShow v2) $ do
+       ; catch (if equivValue v1 v2 == expectOK
+                then do { success_handler; pure Good }
+                else do { failure_handler; pure Bad })
+               (\e -> do { exn_handler e;  pure Excn} ) }
+  where
+    loc      = testLocn ti
+    noisy    = not (quiet tflg)
+    showD    = showDesugared tflg
+    pos      = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
+    typ      = testType ti
+
+    expectOK = typ == TPass
+    tr1      = evalExpr c1
+    tr2      = evalExpr c2
+    v1       = term tr1
+    v2       = term tr2
+
+    ppi x    = putStrLn (render (text "  " <+> pPrint x))
+
+    what True  = "success!"
+    what False = "failure!"
+
+    exn_handler :: SomeException -> IO ()
+    exn_handler e
+      = unless (noError tflg) $
+        do { putStrLn $ pos ++ " failure:"
+           ; putStrLn "The expression";       ppi p1
+           ; putStrLn "or the expression";    ppi p2
+           ; putStrLn "caused an exception:"; print e
+           ; putStrLn "" }
+
+    success_handler -- What to display if all is well
+      = when noisy $ putStrLn $ pos ++ " Expected " ++ what expectOK
+
+    failure_handler -- What to display if test fails
+      | TBroken <- typ
+      = putStrLn $ pos ++ " Broken test now passes"
+      | otherwise
+      = do { putStrLn $ pos ++ " Unexpected " ++ what (not expectOK)
+           ; unless (noError tflg) $
+             do { putStrLn "-----------------------------------------------"
+                ; putStrLn "The expression"; ppi p1
+                ; putStrLn "evaluates to";   ppi v1
+                ; putStrLn "while";          ppi p2
+                ; putStrLn "evaluates to";   ppi v2
+                ; putStrLn ""
+                ; when (prettyShow v1 == prettyShow v2) $ do
                     putStrLn "The unpretty printed values are"
                     print v1
                     putStrLn "resp."
-                    print v2
-                --undefined
-              else do
-                putStrLn $ pos ++ " success, unexpected!"
-                when (typ == TBroken) $
-                  putStrLn " broken test has"
-            when (trace tflg) $
-              do { putStrLn "Trace is:"; display tr1 }
-            pure Bad
-      ) (\e -> do
-           unless (noError tflg) $ do
-            putStrLn $ pos ++ " failure:"
-            putStrLn "The expression"
-            ppi p1
-            putStrLn "or the expression"
-            ppi p2
-            putStrLn "caused an exception:"
-            print (e :: SomeException)
-            putStrLn ""
-            --undefined
-           pure Excn
-      )
-  where
-    loc = testLocn ti
-    noisy = not (quiet tflg)
-    showD = showDesugared tflg
-    pos = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
-    typ = testType ti
-    ppi x = putStrLn (render (text "  " <+> pPrint x))
+                    print v2 }
+
+            ; when (trace tflg) $
+              do { putStrLn "Trace is:"; display tr1 } }
+
+
 
 -- | Equivalence on values (or stuck expressions)
 equivValue :: Rules.Expr -> Rules.Expr -> Bool
