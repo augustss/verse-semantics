@@ -86,9 +86,7 @@ data SrcExpr
   | If1 SrcBlk                   -- if{e}
   | If2 SrcExpr SrcBlk           -- if(e1) then e2
   | If2E SrcExpr SrcBlk          -- if(e1) else e2
-  | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
-  | If3B [Ident] SrcExpr SrcBlk SrcBlk -- if(exists is . e1) then e2 else e3
-                                       --  where 'is' are the identifiers bound by e1
+  | If3 SrcExpr SrcBlk SrcBlk    -- if(e1) then e2 else e3
 
   | For1 SrcBlk                    -- for{e}
   | For2 SrcExpr SrcBlk            -- for(e1) in e2
@@ -412,7 +410,6 @@ instance Pretty SrcExpr where
                                                         indent $ ppr 0 e2,
                                                       text "else",
                                                         indent $ ppr 0 e3]
-          If3B is e1 e2 e3 -> ppNormal $ If3 (Exists is e1) e2 e3
 
           For1 e1 -> maybeParens (p > 0) $ text "for" <+> ppB e1
           For2 e1 e2 -> maybeParens (p > 0) $ sep [text "for" <+> parens (ppr 0 e1) <+> text "do",
@@ -569,7 +566,6 @@ compos f (If1 b)            = If1 <$> f b
 compos f (If2 e b)          = If2 <$> f e <*> f b
 compos f (If2E e b)         = If2E <$> f e <*> f b
 compos f (If3 e b1 b2)      = If3 <$> f e <*> f b1 <*> f b2
-compos f (If3B is e b1 b2)  = If3B is <$> f e <*> f b1 <*> f b2
 compos f (For1 b)           = For1 <$> f b
 compos f (For2 e b)         = For2 <$> f e <*> f b
 compos f (For2B is e b)     = For2B is <$> f e <*> f b
@@ -818,9 +814,6 @@ substMany sb = sub
     sub (Macro1 i rs e) = Macro1 i rs (sub e)
     sub (Split e1 e2 e3) = Split (sub e1) (sub e2) (sub e3)
     sub (If3 e1 e2 e3) = If3 (sub e1) (sub e2) (sub e3)
-    sub (If3B is e1 e2 e3) =
-      let (is', e1', e2') = if3Hack sub is e1 e2
-      in  If3B is' e1' e2' (sub e3)
     sub Fail = Fail
     sub e = impossible e
 

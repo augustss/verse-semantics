@@ -31,6 +31,10 @@ evalRules = rulesApplication
 --------------------------------------------------------------------------------
 rulesApplication :: Rule
 rulesApplication _env lhs =
+  "APP-LENGTH" `name`
+  do Op Length :@: Arr xs <- [lhs]
+     pure (LitInt (fromIntegral (length xs)))
+ ++
   "APP-ADD" `name`
   do Op Add :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1+k2))
@@ -101,20 +105,30 @@ rulesApplication _env lhs =
   "APP-ISINT" `name`
   do Op IsInt :@: a <- [lhs]
      case a of
-       Lit (LInt _) -> pure a
-       _            -> []
+       Lit (LInt _)  -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
+         | otherwise -> []
  ++
   "APP-ISSTR" `name`
   do Op IsStr :@: a <- [lhs]
      case a of
-       Lit (LStr _) -> pure a
-       _            -> []  -- SLPJ: what is idomatic here?
+       Lit (LStr _)  -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
+         | otherwise -> []
  ++
   "APP-ISCHAR" `name`
   do Op IsChar :@: a <- [lhs]
      case a of
        Lit (LChar _) -> pure a
-       _             -> []  -- SLPJ: what is idomatic here?
+       _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
+         | otherwise -> []
+ ++
+  "APP-ISARR" `name`
+  do Op IsArr :@: a <- [lhs]
+     case a of
+       Arr {}        -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
+         | otherwise -> []
  ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]

@@ -52,16 +52,16 @@ miniEvalPrelude = ("miniprelude", "\
 \string   := lam y { isStr$[y]; y };\n\
 \char     := lam y { isChar$[y]; y };\n\
 \nat      := lam y { isInt$[y]; intGE$[y,0]; y };\n\
+\Length   := lam y { isArr$[y]; length$[y] };\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intAdd$[x,y] }};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intSub$[x,y] }};\n\
 \operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intMul$[x,y] }};\n\
-\operator'/'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intDiv$[x,y] }};\n\
+\operator'/'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[y,0]; intDiv$[x,y] }};\n\
 \operator'<'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intLT$[x,y] }};\n\
 \operator'<='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intLE$[x,y] }};\n\
 \operator'>'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGT$[x,y] }};\n\
 \operator'>='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGE$[x,y] }};\n\
 \operator'<>'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[x,y] }};\n\
-\Length(_x:any$):=arrLen$[_x];\n\
 \}\n\
 \")
 
@@ -79,6 +79,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \string   := lam y { isStr$[y]; y };\n\
 \char     := lam y { isChar$[y]; y };\n\
 \nat      := lam y { isInt$[y]; intGE$[y,0]; y };\n\
+\Length   := lam y { isArr$[y]; y >> some{int} };\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{int} }};\n\
 \operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{int} }};\n\
@@ -88,6 +89,5 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \operator'>'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGT$[x,y] }};\n\
 \operator'>='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGE$[x,y] }};\n\
 \operator'<>'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[x,y] }};\n\
-\Length(_x:any$):=arrLen$[_x];\n\
 \}\n\
 \")

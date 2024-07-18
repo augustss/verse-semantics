@@ -156,7 +156,7 @@ macrosOp = ["in'='"]
            ++ macros
 
 effects :: [String]
-effects = [ "decides", "diverges", "fails", "succeeds", "iterates" ]
+effects = [ "decides", "diverges", "fails", "succeeds", "iterates", "closed", "open" ]
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
