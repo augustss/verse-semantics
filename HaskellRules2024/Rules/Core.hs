@@ -94,11 +94,14 @@ data PrimOp
  = -- Operations on integers
    Add | Sub | Mul | Div
 
+   -- Operations on arrays
+ | Length
+
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr | IsChar
+ | IsInt | IsStr | IsChar | IsArr
  deriving
    ( Eq, Ord, Bounded, Enum, Show )
 
@@ -111,6 +114,8 @@ primOpString Sub = "intSub$"
 primOpString Mul = "intMul$"
 primOpString Div = "intDiv$"
 
+primOpString Length = "length$"
+
 primOpString Gt  = "intGT$"
 primOpString GEq = "intGE$"
 primOpString Lt  = "intLT$"
@@ -120,8 +125,11 @@ primOpString NEq = "intNE$"
 primOpString IsInt  = "isInt$"
 primOpString IsStr  = "isStr$"
 primOpString IsChar = "isChar$"
+primOpString IsArr  = "isArr$"
 
 primOpCanFail :: PrimOp -> Bool
+
+-- These operations /can/ fail, and /don't/ produce a value
 primOpCanFail Gt     = True
 primOpCanFail Lt     = True
 primOpCanFail NEq    = True
@@ -130,11 +138,14 @@ primOpCanFail LEq    = True
 primOpCanFail IsInt  = True
 primOpCanFail IsStr  = True
 primOpCanFail IsChar = True
+primOpCanFail IsArr  = True
 
-primOpCanFail Add = False
-primOpCanFail Sub = False
-primOpCanFail Mul = False
-primOpCanFail Div = False
+-- These operations /can't/ fail, and /do/ produce a value
+primOpCanFail Add    = False
+primOpCanFail Sub    = False
+primOpCanFail Mul    = False
+primOpCanFail Div    = False
+primOpCanFail Length = False
 
 --------------------------------------------------------------------------------
 --
@@ -161,9 +172,9 @@ instance Pretty Lit where
         | i >= 0 -> text $ show i
         | otherwise -> maybeParens (p >= 10) $ text $ show i
       LRat r s -> text (show r ++ s)
-      LChar c -> text (show c)
-      LStr s -> text (show s)
-      LPath s -> pPrintPrec l p s
+      LChar c  -> text (show c)
+      LStr s   -> text (show s)
+      LPath s  -> pPrintPrec l p s
       LPtr ptr -> text ("R#" ++ show ptr)
 
 instance Show Lit where

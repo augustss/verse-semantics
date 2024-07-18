@@ -31,6 +31,10 @@ evalRules = rulesApplication
 --------------------------------------------------------------------------------
 rulesApplication :: Rule
 rulesApplication _env lhs =
+  "APP-LENGTH" `name`
+  do Op Length :@: Arr xs <- [lhs]
+     pure (LitInt (fromIntegral (length xs)))
+ ++
   "APP-ADD" `name`
   do Op Add :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1+k2))
@@ -101,20 +105,30 @@ rulesApplication _env lhs =
   "APP-ISINT" `name`
   do Op IsInt :@: a <- [lhs]
      case a of
-       Lit (LInt _) -> pure a
-       _            -> []
+       Lit (LInt _)  -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
+         | otherwise -> []
  ++
   "APP-ISSTR" `name`
   do Op IsStr :@: a <- [lhs]
      case a of
-       Lit (LStr _) -> pure a
-       _            -> []  -- SLPJ: what is idomatic here?
+       Lit (LStr _)  -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
+         | otherwise -> []
  ++
   "APP-ISCHAR" `name`
   do Op IsChar :@: a <- [lhs]
      case a of
        Lit (LChar _) -> pure a
-       _             -> []  -- SLPJ: what is idomatic here?
+       _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
+         | otherwise -> []
+ ++
+  "APP-ISARR" `name`
+  do Op IsArr :@: a <- [lhs]
+     case a of
+       Arr {}        -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
+         | otherwise -> []
  ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]
@@ -160,7 +174,9 @@ rulesUnification _env lhs =
  ++
   "U-OCCURS" `name`
   do (x@(Var _) :=: v) :>: _ <- [lhs]
-     guard (isV x v && v /= x)
+     guard (v /= x)
+     (_ctx, e) <- valueCtx v
+     guard (e == x)
      pure Fail
  ++
   "U-SWAP" `name`
@@ -275,6 +291,16 @@ rulesOneAndAll _env lhs =
      pure (Arr vs)
 
 
+{-
+rulesRec :: Rule
+rulesRec _env lhs =
+  "REC" `name`
+  do Var x :=: Val v <- [lhs]
+     (ctx, Lam bnd) <- valueX v
+     guard (x `elem` free (LAM y e))
+     pure (Var x :=: Val (ctx (LAM y (Exi (Bind x (lhs :>: e))))))
+-}
+
 --------------------------------------------------------------------------------
 --
 --            Auxiliary functions
@@ -298,11 +324,24 @@ iff conds = [()| and conds]
 --
 --------------------------------------------------------------------------------
 
+{-
 isV :: Expr -> Expr -> Bool
 -- (isV x e) returns True if  e = < ..., < ..., x, ...>, ... >
 isV x e = x==e || case e of
                     Arr es -> any (isV x) es
                     _      -> False
+-}
+valueCtx :: Expr -> [(Context, Expr)]
+-- V ::= HOLE | <e1,..,V,..en>
+-- Moreover we only return pairs whose Expr is /not/ a tuple
+valueCtx e
+  = [(HOLE,e)]
+  ++
+   do Arr es <- [e]
+      i <- [0..(length es - 1)]
+      let ei = es !! i
+      (ctx,h) <- valueCtx ei
+      pure (Arr (take i es ++ [ctx] ++ drop (i+1) es), h)
 
 --------------------------------------------------------------------------------
 --
@@ -356,7 +395,8 @@ wrapExis xs orig_e = foldr wrap orig_e xs
   where
     wrap x e = Exi (bind x e)
 
---------------------------------------------------------------------------------
+
+--------------------------------------------
 --
 --            The 'blocked' and 'choice-free' predicates
 --

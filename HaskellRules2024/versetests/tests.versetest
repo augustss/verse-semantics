@@ -137,10 +137,10 @@ testeq("Pat13",pass) {i->x := 2; (i, x)}                   {2,2}
 testeq("Pat14",pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
 testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 # Array LHS splicing
-testeq("Pat16",skip,iblock=pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
-testeq("Pat17",skip,iblock=pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq("Pat18",skip,iblock=pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Pat19",skip,iblock=pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Pat16",pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+testeq("Pat17",pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Pat18",pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Pat19",pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq("TB1",pass) {(x:int) = 5}                         {5}
@@ -230,8 +230,8 @@ testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[2]}}     {:false}
 testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
 testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
 # These are very slow with alternative rules
-testeq("EV15",pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
-testeq("EV16",pass,icfp51=skip) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
+testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
+testeq("EV16",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
 
 # Try CBV fixpoint combinator.
 # Too slow with some rules

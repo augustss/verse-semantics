@@ -114,15 +114,14 @@ dsSmall = ds
            effs' <- checkEffs effs
            pure $ Function [(e1', effs')] e2'
 
-    -- Conditional and for-loop notation
+    -- Conditionals
+    -- We must retain IF3 (i.e `if e1 then e2 else e3`) because
+    -- the main dsM_12 desugaring (needs to push `pi` into the branches.
     ds (If1 e)        = ds $ If2E e eFalse
     ds (If2 e1 e2)    = ds $ If3 e1 e2 eFalse
     ds (If2E e1 e2)   = do x <- newIdent (getLoc e1) "x"; ds $ If3 (eDefine x e1) (Variable x) e2
-    ds (If3 e1 e2 e3) = do { e1' <- ds e1; e2' <- ds e2; e3' <- ds e3
-                           ; let the_fun = One (Choice (seqE [e1', Lam underscore e2'])
-                                                       (Lam underscore e3'))
-                           ; return (ApplyD the_fun (Array [])) }
 
+    -- For-loops
     ds (For1 e) = do x <- newIdent (getLoc e) "x"; ds $ For2 (eDefine x e) (Variable x)
 
     -- Array
@@ -733,8 +732,10 @@ dsM_12 _ t@(Variable {}) E                 -- MVAR
 dsM_12 s (ApplyD t1 t2) E                  -- MVAR
    = eApplyD <$> dsDD_12 s t1 <*> dsDD_12 s t2
 
--- dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
---   = If3 <$> dsDD_12 s t1 <*> dsM_12 s t2 pi <*> dsM_12 s t3 pi
+-------------------- if t1 then t2 else t3 ----
+-- Push `pi` into `t2` and `t3`
+dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
+   = If3 <$> dsDD_12 s t1 <*> dsM_12 s t2 pi <*> dsM_12 s t3 pi
 
 dsM_12 s (Macro1 m rs t) pi
    = Macro1 m rs <$> dsM_12 s t pi
