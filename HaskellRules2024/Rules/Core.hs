@@ -200,14 +200,14 @@ data GroundVal
   deriving( Eq, Ord, Show )
 
 data Assump
-  = A_Pos FailableAssump
-  | A_Neg FailableAssump
-  | A_PrimOp Ident AssumpOp GroundVal
+  = A_Pos FailableAssump                 -- e.g r = <s,t>         or   r>s
+  | A_Neg FailableAssump                 -- e.g. not (r = <s,t>)  or   not (r>s)
+  | A_PrimOp Ident AssumpOp GroundVal    -- e.g. r = s+t,  (primOpCanFail op) is False
   deriving( Eq, Ord, Show )
 
 data FailableAssump
   = A_GVEq  Ident  GroundVal
-  | A_RelOp PrimOp GroundVal
+  | A_RelOp PrimOp GroundVal   -- (primOpCanFail op) is True
   deriving ( Eq, Ord, Show )
 
 data AssumpOp  -- Either a regular primop or Apply
