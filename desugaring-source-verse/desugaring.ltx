@@ -608,7 +608,7 @@ $$
 
 % \rulename{moftypex} & |DMe2 mdx si (oftypefx t_1 fx t_2)|
 %  & = & |y:=DMe2 mdx si t_1; z := De2 mdx t_2; apply1N z y| \\
-\rulename{mtype1}   & |DMe2 mdneg (sipat i) (:t)|    & = & |z:=De2 mdneg t; i guard (some z)| \\
+\rulename{mtype-}   & |DMe2 mdneg (sipat i) (:t)|    & = & |z:=De2 mdneg t; i guard (some z)| \\
 
 % \rulename{mtype2}   & |DMe2 md (sipat i) (colonfx fx t)|    & = & |z:=De2 md t; apply1N z i| & |md|\in\{|mdpos|,|mdx|\}\\
 \rulename{mtype+x}   & |DMe2 md (sipat i) (:t)|    & = & |z:=De2 md t; apply1N z i|  & |md|\in\{|mdpos|,|mdx|\}\\
