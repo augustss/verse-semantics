@@ -182,7 +182,7 @@ $\begin{array}{@@{}l}
 %\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
 %  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
-  & \text{if |blockedc (singleton x) C|, $x \not\in \freevars{v}$}  \\
+  & \text{if |blockedc (singleton x) C|, |((singleton x) `cup` boundvars C) `disjoint` freevars v|}  \\
 %\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
 %  & \text{if |validc x emptyset C|, $x \not= y$}  \\
 \rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\

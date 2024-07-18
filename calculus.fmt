@@ -669,6 +669,7 @@
 %format `setminus` = "\mathop{\setminus}"
 %format `and`  = "\mathop{\wedge}"
 %format `or`   = "\mathop{\vee}"
+%format `disjoint`   = "\mathop{\#}"
 %format stepA       = "\underset{A}\movesto"
 %format stepAs      = "\underset{A}\movesto^{\ast}"
 %format stepAr      = "\underset{A}\movesfrom"
