@@ -1,5 +1,5 @@
 module Rules.TRS2024 (
-     evalRules
+     evalRules, evalStep, recStep
    , blocked, choiceFree
    , name, nameWith, iff
  ) where
@@ -20,17 +20,24 @@ import Data.List( (\\) )
 --------------------------------------------------------------------------------
 
 evalRules :: Rule
+evalRules = everywhere evalStep <> everywhere recStep
+
+
+evalStep :: Rule
 -- Runtime evauation rules
-evalRules = rulesApplication
-          <> rulesUnification
-          <> rulesExistentials
-          <> rulesNormalization
-          <> rulesChoice
-          <> rulesOneAndAll
+evalStep = applicationStep
+           <> unificationStep
+           <> existentialStep
+           <> normalizationStep
+           <> choiceStep
+           <> oneAndAllStep
+
+-- currently:  everywhere (evalRulesNoRec `tryBefore` rulesRec)
+-- better:    (everywhere evalRulesNoRec) `tryBefore` (everywhere rulesRec)
 
 --------------------------------------------------------------------------------
-rulesApplication :: Rule
-rulesApplication _env lhs =
+applicationStep :: Rule
+applicationStep _env lhs =
   "APP-LENGTH" `name`
   do Op Length :@: Arr xs <- [lhs]
      pure (LitInt (fromIntegral (length xs)))
@@ -150,8 +157,8 @@ rulesApplication _env lhs =
      pure Fail
 
 --------------------------------------------------------------------------------
-rulesUnification :: Rule
-rulesUnification _env lhs =
+unificationStep :: Rule
+unificationStep _env lhs =
   "U-LIT" `name`
   do (LitInt k1 :=: LitInt k2) :>: e <- [lhs]
      guard (k1 == k2)
@@ -185,8 +192,8 @@ rulesUnification _env lhs =
      pure ((Var x :=: a) :>: e)
 
 --------------------------------------------------------------------------------
-rulesExistentials :: Rule
-rulesExistentials _env lhs =
+existentialStep :: Rule
+existentialStep _env lhs =
   "UNDERSCORE-ELIM" `name`
   do { (Var u :=: v) :>: e <- [lhs]
      ; guard (isUnderscore u)
@@ -202,11 +209,15 @@ rulesExistentials _env lhs =
   do (v :=: exi_x_e1) :>: e2 <- [lhs]
      (exis,x,e1) <- matchExi_alphaRename (free (v,e2)) exi_x_e1
      pure (pPrint x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
- ++
+
+
+ ++  -- EXI-PUSH is necessary to let us do  exi x. f[y]; x=3; 3+1; blah
+     -- Here we want to substitute for x despite the intervening f[y]
   "EXI-PUSH" `nameWith`
   do (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free (v,e1))
      pure (pPrint x, exis <@ ((v :=: e1) :>: Exi (bind x e2)))
+
   ++
   -- Do this last: most complex and expensive
   "EXI-SUBST" `nameWith`
@@ -221,21 +232,15 @@ rulesExistentials _env lhs =
             subst [(x,v)] (ctx <@ e) )
 
 --------------------------------------------------------------------------------
-rulesNormalization :: Rule
-rulesNormalization _env lhs =
+normalizationStep :: Rule
+normalizationStep _env lhs =
   "SEQ-ASSOC" `name`
   do (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- [lhs]
      pure ((v1 :=: e1) :>: ((v2 :=: e2) :>: e3))
- ++
-  "SEQ-ELIM" `name`
-  [] -- we do not need SEQ-ELIM because we don't actually have _=e1;e2
- ++
-  "REC" `name`
-  [] -- TODO
 
 --------------------------------------------------------------------------------
-rulesChoice :: Rule
-rulesChoice _env lhs =
+choiceStep :: Rule
+choiceStep _env lhs =
   "CHOICE-ASSOC" `name`
   do (e1 :|: e2) :|: e3 <- [lhs]
      pure (e1 :|: (e2 :|: e3))
@@ -262,8 +267,8 @@ rulesChoice _env lhs =
      pure Fail
 
 --------------------------------------------------------------------------------
-rulesOneAndAll :: Rule
-rulesOneAndAll _env lhs =
+oneAndAllStep :: Rule
+oneAndAllStep _env lhs =
   "ONE-FAIL" `name`
   do One Fail <- [lhs]
      pure Fail
@@ -291,15 +296,18 @@ rulesOneAndAll _env lhs =
      pure (Arr vs)
 
 
-{-
-rulesRec :: Rule
-rulesRec _env lhs =
+recStep :: Rule
+-- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
+--   if x/=y, and x free in body
+recStep _env lhs =
   "REC" `name`
-  do Var x :=: Val v <- [lhs]
-     (ctx, Lam bnd) <- valueX v
-     guard (x `elem` free (LAM y e))
-     pure (Var x :=: Val (ctx (LAM y (Exi (Bind x (lhs :>: e))))))
--}
+  do Var x :=: v <- [lhs]
+     (ctx, Lam bnd) <- valueCtx v
+     let (y,body) = alphaRename [x] bnd
+     guard (x `elem` free body)
+     pure (Var x :=: ctx <@ (Lam $ bind y $
+                             Exi $ bind x $
+                             (Var x :=: v) :>: body) )
 
 --------------------------------------------------------------------------------
 --

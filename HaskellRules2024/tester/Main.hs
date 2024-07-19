@@ -187,8 +187,8 @@ srcToCore flags add_verification e
        ; let e3 = Rules.prep e2
        ; return e3 }
 
-evalExpr :: Rules.Expr -> Traced Rules.Expr
-evalExpr e = Rules.normalize (Rules.everywhere Rules.Verifier.verificationRules) e
+evalExpr :: TestFlags -> Rules.Expr -> Traced Rules.Expr
+evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
 
 verifyE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> IO TestRes
 verifyE flg ti e
@@ -235,8 +235,8 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
     typ   = testType ti
 
     expectOK = typ == TPass
-    tr1      = evalExpr c1
-    tr2      = evalExpr c2
+    tr1      = evalExpr tflg c1
+    tr2      = evalExpr tflg c2
     v1       = term tr1
     v2       = term tr2
 

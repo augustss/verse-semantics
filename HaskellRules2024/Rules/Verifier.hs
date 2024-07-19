@@ -25,16 +25,18 @@ import Rules.Solver (unsat)
 --------------------------------------------------------
 
 verificationRules ::  Rule
-verificationRules
-  =  TRS2024.evalRules
-  <> guardRules
-  <> checkRules
-  <> verifyRules
-  <> splitRules
+verificationRules = everywhere verificationStep <> everywhere recStep
+
+verificationStep :: Rule
+verificationStep =  TRS2024.evalStep
+                 <> guardStep
+                 <> checkStep
+                 <> verifyStep
+                 <> splitStep
 
 --------------------------------------------------------------------------------
-guardRules :: Rule
-guardRules env lhs =
+guardStep :: Rule
+guardStep env lhs =
    "GUARD-ELIM" `nameWith`
    do v :>>: e <- [lhs]
       guard (skolValue (skolVars env) v)
@@ -45,8 +47,8 @@ guardRules env lhs =
       pure Fail
 
 --------------------------------------------------------------------------------
-checkRules :: Rule
-checkRules env lhs =
+checkStep :: Rule
+checkStep env lhs =
    "CHECK-SUC" `name`
    do Check eff v <- [lhs]
       guard (skolValue (skolVars env) v)
@@ -73,8 +75,8 @@ groundValue _  _                     = Nothing
 
 
 --------------------------------------------------------------------------------
-verifyRules :: Rule
-verifyRules env lhs =
+verifyStep :: Rule
+verifyStep env lhs =
    "VERIFY-VAL" `name`
    do (_env', _rs, _as, v) <- matchVerify env lhs
       guard (isVal v)
@@ -129,8 +131,8 @@ asmX = go []
 --------------------------------------------------------------------------------
 
 
-splitRules :: Rule
-splitRules env lhs =
+splitStep :: Rule
+splitStep env lhs =
    "SPLIT-K" `name`
    do (env', rs, as, e) <- matchVerify env lhs
       (ctx, (Var r :=: v) :>: rest) <- proofX [] e

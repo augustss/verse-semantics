@@ -20,7 +20,8 @@ module Rules.Core
 
     -- Rewriting
   , Rule, Context, isContext, (<@)
-  , everywhere, normalize
+  , everywhere, normalize, tryBefore
+  , Fuel, lotsOfSteps
   , RuleEnv(..), extendRuleEnv
 
     -- Binding and substitution
@@ -308,7 +309,7 @@ pPrintPrecE lvl prec the_expr
        Op op      -> char '!' <> pPrint op
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
-       e1 :|: e2   -> mbPar0 $ ppr1 e1 <+> char '|' <+> ppr1 e2
+       e1 :|: e2   -> sep [ mbPar0 $ ppr1 e1, char '|' <+> ppr1 e2 ]
        e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
        e@(_ :>: _) -> sep (punctuate semi $ map ppr1 (gatherSeqs e))
        e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ";;" <+> ppr1 e2
@@ -580,8 +581,9 @@ unbindAs :: Ident -> Bind Expr -> Expr
 unbindAs x bnd = subst [(y,Var x)] e where (y,e) = unsafeUnbind bnd
 
 alphaRename :: [Ident] -> Bind Expr -> (Ident,Expr)
--- Open up the binding, but avoiding any of the binders in `forb`
--- or free in the binding
+-- Open up the binding, but avoiding any of the binders
+--    * in `forb` or
+--    * free in the binding
 alphaRename forb top_t
   = alphaRenameBindWith freshen top_t
   where
@@ -762,9 +764,18 @@ stepRule :: Rule -> Expr -> [(String,Expr)]
 stepRule rule expr = rule emptyRuleEnv     -- Empty set of skolems
                           expr
 
+tryBefore :: Rule -> Rule -> Rule
+-- Run rule1, and only if it can do nothing try rule2
+tryBefore rule1 rule2 env e
+  | null rule1_results = rule2 env e
+  | otherwise          = rule1_results
+  where
+    rule1_results = rule1 env e
+
 -- apply a rule everywhere (recursively) in the expression
 everywhere :: Rule -> Rule
-everywhere step env orig_e = step env orig_e ++ recurse orig_e
+everywhere step env orig_e
+  = step env orig_e ++ recurse orig_e
  where
   recurse (Arr es)     = [ (s, Arr (take i es ++ [e'] ++ drop (i+1) es))
                          | i <- [0..length es-1]
@@ -832,17 +843,27 @@ matchEq e =
                            ]
   ]
 
--- normalize
-normalize :: Rule -> Expr -> Traced Expr
-normalize rule orig_e = go (-1) [] orig_e  -- go 99 [] e
+type Fuel = Int
+
+lotsOfSteps :: Fuel
+lotsOfSteps = 1000
+
+normalize :: Fuel    -- Maximum number of steps
+          -> Rule -> Expr -> Traced Expr
+-- Repeatedly apply the first in the
+-- list of possiblities returned by the rule
+normalize fuel rule orig_e = go fuel [] orig_e
  where
-  go :: Int -> [(String,Expr)] -> Expr -> Traced Expr
-  go fuel tr e =
+  go :: Int
+     -> [(String,Expr)]   -- Accumulating trace
+     -> Expr
+     -> Traced Expr
+  go fuel_left tr e =
     case stepRule rule e of
       []                        -> e :<-- tr
-      (s,e'):_ | fuel==0        -> abort "OUT-OF-FUEL"
+      (s,e'):_ | fuel_left==0   -> abort "OUT-OF-FUEL"
                | not (valid e') -> abort "INVALID"
-               | otherwise      -> go (fuel-1) ((s,e):tr) e'
+               | otherwise      -> go (fuel_left-1) ((s,e):tr) e'
               where
                abort msg = e' :<-- ((s ++ "-**" ++ msg ++ "**",e):tr)
 
