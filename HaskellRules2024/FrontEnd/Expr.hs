@@ -717,14 +717,19 @@ getFree = fvs_blk
     fvs (Split e1 e2 e3)  = fvs e1 ++ fvs e2 ++ fvs e3
     fvs (DefineE _ e)     = fvs e
     fvs (Range  _ e)      = fvs e
-    fvs (If3 (Exists is e1) e2 e3) = fvs (Exists is (Seq [e1, e2])) ++ fvs e3
-    fvs (If3 e1 e2 e3)    = fvs e1 ++ fvs e2 ++ fvs e3
+
+    -- In (if e1 then e2 else e3), the binders of e1 scope over e2
+    fvs (If3 e1 e2 e3)    = (fvs e1 ++ fvs_blk e2) `remove` bs
+                            ++ fvs_blk e3
+                          where
+                            bs = getVisibleBinders e1
+
     fvs (Function args body)
       = (foldr (++) (fvs_blk body) (map fvs arg_exprs)) `remove` arg_bndrs
       where
         arg_bndrs = foldr ((++) . getVisibleBinders) [] arg_exprs
         arg_exprs = map fst args
---    fvs (Map es) = concatMap fvs es
+
     fvs e = impossible e
 
     remove xs bndrs = filter (`notElem` bndrs) xs
