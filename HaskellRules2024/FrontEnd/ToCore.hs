@@ -143,11 +143,11 @@ scope sc = expr
     exprD e = fst <$> defs sc e
 
     -- exprD for a new scope context, with an extended in-scope set
-    scopeD sc e = fst <$> defs sc e
+    scopeD sc' e = fst <$> defs sc' e
 
     defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)
     -- `e` starts a new scoping context.  Wrap it in an `Exists`
-    defs sc e = do { (is, e', s) <- defs' sc e
+    defs sc' e = do { (is, e', s) <- defs' sc' e
                    ; pure (eExists is e', s) }
 
     defs' :: S.Set Ident -> SrcExpr -> D ([Ident], SrcExpr, S.Set Ident)
