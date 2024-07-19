@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module FrontEnd.Desugar(
       desugar
-    , D, runD, traceD, getDFlagsX
+    , D, runD, traceD, getDFlagsX, traceDS
   ) where
 
 import Prelude hiding (pi)
@@ -530,9 +530,11 @@ dsB_12 :: DsMode12 -> SrcExpr -> Pi -> SrcExpr -> D SrcExpr
 dsB_12 s t E     _
   = dsM_12 s t E
 dsB_12 s t (P f) j
-  = do z <- newIdent (getLoc t) "z";
-       seqDE [ pure $ eDefine z (ApplyD f j)
-             , dsM_12 s t (P (Variable z))]
+  = dsM_12 s t (P (ApplyD f j))
+-- SLPJ: Crucial chnage; this makes HO13 work
+--  = do z <- newIdent (getLoc t) "z";
+--       seqDE [ pure $ eDefine z (ApplyD f j)
+--             , dsM_12 s t (P (Variable z))]
 
 seqDE :: [D SrcExpr] -> D SrcExpr
 seqDE ds = seqE <$> sequence ds
