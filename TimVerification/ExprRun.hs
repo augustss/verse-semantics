@@ -964,7 +964,7 @@ iterateChoiceRules _ (A g :|- pg) =
         iop = OpIterate u0  x0 d  (ctx' opL) x1 op1 $
               OpIterate vx1 y0 d1 (ctx' opR) y1 op1' op2'
 -}
-    let vx1 = VertexVariable x1
+    let --vx1 = VertexVariable x1
         vx0 = VertexVariable x0
         d1  = newIdents pg "d1"
         y0  = newIdents pg "y0"
@@ -1413,12 +1413,14 @@ tests = [
   ("example16", example16, Just $ VInteger 5),
   ("example17", example17, Nothing),
   ("example18", example18, Just $ VInteger 3),
-  -- example19
+  ("example19", example19, Just $ VInteger 3),
   ("example20", example20, Just $ VTuple [newIdents () "a0", newIdents () "a1", newIdents () "a2"]),
   ("example21", example21, Just $ VTuple [VInteger 10, VInteger 20]),
   ("example22", example22, Just $ VInteger 9),
   ("example23", example23, Just $ VTuple [VInteger 9, VTuple [VInteger 9]]),
-  ("example24", example24, Just $ VInteger 8)
+  ("example24", example24, Just $ VInteger 8),
+  ("example26", example26, Just $ VInteger 2),
+  ("example27", example27, Just $ VInteger 2)
   ]
 
 runTest :: (String, Operation, Maybe Vertex) -> IO ()
@@ -1434,7 +1436,7 @@ runTests =
 
 main :: IO ()
 main = do
---  runTests
---  putStrLn "tests ok"
-  fpptr "ut" $ startConfig example26
+  runTests
+  putStrLn "tests ok"
+  --fpptr "ut" $ startConfig example26
   --pptr $ startConfig example19
