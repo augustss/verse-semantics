@@ -59,7 +59,8 @@ verify("T36",pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
 
 # Testing 'if'
 verify("T37",pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
-verify("T38",fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
+verify("T38",pass) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
+  # T38: assumes (any = \x.x)
 verify("T39",pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
 
 # stuck tests
@@ -115,6 +116,9 @@ verify("If2", pass) { f(:any) := { 2 = if (10=20) then {300} else {2} } }
 verify("If3", pass) { f(:any) := { if (x:=1) then {x} else {2} } }
 
 # Recursion
+verify("Rec0a",pass) { f(n:int):int := f[n] }
+verify("Rec0b",pass) { f(n:int):int := f[n-1] }
+verify("Rec0c",pass) { f(n:int):int := if (n=0) then {0} else {f[n+1]} }
 verify("Rec1",pass) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
 verify("Rec2",pass) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
 verify("Rec3",pass) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
