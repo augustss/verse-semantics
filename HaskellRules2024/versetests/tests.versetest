@@ -109,11 +109,13 @@ testeq("Fun3",pass){(x:int => y:int => x+2*y)[2][3]}      {8}
 testeq("Fun4",pass){function(x:int){x+1}[2]}              {3}
 testeq("Fun5",pass){function(x:int)(y:int){x+2*y}[2][3]}  {8}
 # Function argument matching
-testeq("Fun6",pass,POPLR=skip,Block=skip,ICFP*=skip)
-             {one{pair := (1, function(n:int){pair[0]}); pair[0]}}  {1}
+
+testeq("Fun6",pass) {one{ pair := (1, function(n:int){pair[0]})
+                        ; pair[0]}}  {1}
    # Needs recursion
-testeq("Fun7",pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip)
-             {one{pair := (1, function(n:int){if (n = 0)  {1} else  {n * pair[1](n-1)}}); pair[1](5)}}  {120}
+
+testeq("Fun7",pass) {one{ pair := (1, function(n:int){if (n = 0) {1} else  {n * pair[1](n-1)}})
+                        ; pair[1](5) } }  {120}
    # Needs recursion
 testeq("Fun8",pass) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
 
@@ -212,7 +214,7 @@ testeq("Type2",pass) {succ(n:int) := n + 1;
             {6}
 
 # Evaluation in if
-testeq("TIf1",pass) {if(y:int; y=1) 42 else 23}  {42}
+testeq("TIf1",pass) {if(y:int; y=1) 42 else 23} {42}
 testeq("TIF2",pass) {if(y:int; y=1) y else 23}  {1}
 
 # Random collection

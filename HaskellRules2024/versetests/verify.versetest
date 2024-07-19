@@ -57,7 +57,7 @@ verify("T31",pass) { foo(x:any):int := if (int[x]) then { x } else { 0 } }
 verify("T32",pass) { foo(x:any):int := if (int[x]) then { x + 1 } else { 0 } }
 verify("T36",pass) { ex5(x:any):int := if (int[x]) then { 10 } else { 20 } }
 
-# Testing 'if' with 'mustDecide'
+# Testing 'if'
 verify("T37",pass) { ex_if0(b:any) := if (b) then { 3 }  else { 4 } }
 verify("T38",fail) { ex_if1(x:any) := { b:any; if (b) then { 3 }  else { 4 } } }
 verify("T39",pass) { ex_if2(x:int) := if (0 <= x) then { 1 } else { 2 } }
@@ -99,8 +99,10 @@ verify("Stuck1",fail){ f(x:int):int := x; check<succeeds>{ y := f9[y] } }
 # Opacity
 verify("Opacity1", fail) { f(x:int := 3) := x=3 }
       # Opacity1: the fn body only knows that x:int
+
 verify("Opacity2", pass) {f(x:int := 3)<decides> := x=3 }
       # Opacity2: fn body only knows that x:int, but we have <decides>
+
 verify("Opacity3", fail) { f(x:int)<decides>:type{x=99999} := 100000 }
       # verify("Opacity3", fail) { f(x:int)<decides>:type{x=3} := x+1 }
 
