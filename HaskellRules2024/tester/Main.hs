@@ -191,9 +191,11 @@ evalExpr :: TestFlags -> Rules.Expr -> Traced Rules.Expr
 evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
 
 verifyE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> IO TestRes
+-- We try to verify
+--   verify(;){ check<succeeds>{e} }
 verifyE flg ti e
   = do { c <- srcToCore flags True e
-       ; let real_c = Rules.Verify (bindList [] ([], c))
+       ; let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
        ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) }
   where
     flags = setPreludeFlag True flg $
@@ -521,6 +523,7 @@ testFlagsToFlags t =
              fRewriteSteps = maxSteps t,
              fNoFuelStop = ignoreFuelStop t,
              fAssumeVerified = assumeVerified t,
+             fTraceDesugar = verbose t,
              fDesugar = desugarRules t
            }
 
