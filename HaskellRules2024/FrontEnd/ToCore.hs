@@ -143,11 +143,11 @@ scope sc = expr
     exprD e = fst <$> defs sc e
 
     -- exprD for a new scope context, with an extended in-scope set
-    scopeD s e = fst <$> defs s e
+    scopeD sc e = fst <$> defs sc e
 
     defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)
     -- `e` starts a new scoping context.  Wrap it in an `Exists`
-    defs as e = do { (is, e', s) <- defs' as e
+    defs sc e = do { (is, e', s) <- defs' sc e
                    ; pure (eExists is e', s) }
 
     defs' :: S.Set Ident -> SrcExpr -> D ([Ident], SrcExpr, S.Set Ident)
@@ -162,11 +162,11 @@ scope sc = expr
 
           -- errS: find ones that are already in scope
           errS = [ (i, j) | i <- is, j <- filter (== i) (S.toList as) ]
-          s' :: S.Set Ident = foldr S.insert as is
-      e' <- scope s' e
+          sc' :: S.Set Ident = foldr S.insert as is
+      e' <- scope sc' e
       errMultiple errM
       errShadow errS
-      pure (is, e', s')
+      pure (is, e', sc')
 
 
 errShadow :: [(Ident, Ident)] -> D ()

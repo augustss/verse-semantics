@@ -304,7 +304,8 @@ pTruth = pKeyword "truth" *> (Truth <$> pBraces pExpr1)
 -- Try to mimic TimVerse by turning a tuple into an array
 -- A trailing ';' can be used, but not a trailing ','.
 pArray :: P SrcExpr
-pArray = pKeyword "array" *> (tArray <$> pBlockEs)
+pArray = (pKeyword "array" *> (tArray <$> pBlockEs))
+         <|> (pAngles pExprT)
   where
     tArray [Tuple es] = Array es
     tArray es = Array es
@@ -550,7 +551,7 @@ operatorTable =
       pure $ \ x y -> InfixOp x (Ident l ":=") y
     defOp _ = fail "defOp"
 
-pExprT :: P SrcExpr
+pExprT :: P SrcExpr  -- A tuple e1,e2,e3
 pExprT = arrayS <$> sepBy1 pExpr2 (pOp ",")
   where
     arrayS :: [SrcExpr] -> SrcExpr
