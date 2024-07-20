@@ -94,7 +94,6 @@ scope :: S.Set Src.Ident -> SrcExpr -> D SrcExpr
 scope sc = expr
   where
     -- x := e  -->   x = e
-    expr (DefineV i)   = pure $ Variable i
     expr (DefineE i e) = Unify (Variable i) <$> expr e
 
     expr e@Src.Lit{} = pure e
@@ -107,9 +106,8 @@ scope sc = expr
 
     -- Desugar (if e1 then e2 else e3) --> one{ (e1; \_.e2) | (\_.e3) }[]
     -- The key point is that existentials bound in e1 scope over e2
-    expr (If3 e1 e2 e3) = expr (let the_fun = One (Choice (seqE [e1, Lam underscore e2])
-                                                          (Lam underscore e3))
-                                in (ApplyD the_fun (Array [])))
+    expr (If3 e1 e2 e3) = expr (eForce (One (Choice (seqE [e1, eThunk e2])
+                                                    (eThunk e3))))
 
     expr (For2 e1 e2) = do
       (is, e1', sc') <- defs' sc e1

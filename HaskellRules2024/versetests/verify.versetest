@@ -186,7 +186,10 @@ verify("PP3-Rec", pass)   { F(X:int, G():type{X = 1}) := (H()<succeeds> := X = 1
 verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
 verify(pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
 
-verify("FunPair", pass) { (a := (_,_)) => a=(_,_) }
+# Wildcards "_"
+verify("FunPair1", pass) { (a := (exists x {x},exists y {y})) => a=(_,_) }
+verify("FunPair2", pass) { (a := (_,_)) => a=(_,_) }
+verify("FunPair3", pass) { f(a := (_,_)) := a=(_,_) }
    # Lambda takes a pair, a, as its argument, and then checks that the argument is a pair and returns it
 
 ### verify(pass) { main(:any) := { if(a:=1|2){a=1} } }  # TODO:IF:CHOICE

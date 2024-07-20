@@ -16,11 +16,11 @@ module FrontEnd.Expr(
     , isLiteral, isAtomic, isValue
 
       -- Building SrcExpr
-    , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne, eAll, eExists
-    , eCheck, eDefine, eApplyD, eVerify
-    , eThunk, eForce
+    , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
+    , eAll, eExists, eCheck, eDefine, eApplyD, eVerify
+    , eThunk, eForce, existsXX
     , seqE, fvArray
-    , idX, underscore
+    , idX, srcUnderscore, isSrcUnderscore
 
     , Store(..), Ptr
     , Eff, effSucceeds, effDecides, effFails, isOpenClosed
@@ -116,7 +116,6 @@ data SrcExpr
 
   -- Initial desugaring turns some operators into more easily recognizable forms
   | Seq [SrcExpr]                -- e1;e2;...
-  | DefineV Ident                -- i:any
   | DefineE Ident SrcExpr        -- i := e
   | DefineIE Ident Ident SrcExpr -- (i->x) := e
   | Choice SrcBlk SrcBlk         -- e1 | e2
@@ -133,7 +132,7 @@ data SrcExpr
   | OfType SrcExpr [Eff] SrcExpr    -- e |>{fx} t
 
   | EPrim PrimOp                   -- Primop
-  | Lam Ident SrcExpr              -- ICFP lambda:   \ x . e
+  | Lam Ident SrcExpr              -- ICFP lambda:   \ x . e.  We include \_.e
   | Split SrcExpr SrcExpr SrcExpr  -- split(e1){e2}{e3}
   | Fail                           -- :false
   | Map [SrcExpr]                  -- map{e1;e2; ... }
@@ -194,11 +193,19 @@ pattern Guard v e <- Macro2 (Ident _ "guard") v e
 --          Be very sure that these rewrites are correct!
 --------------------------------------------------------
 
-underscore :: Ident
-underscore = Ident noLoc "_"
-
 idX :: Ident
 idX = Ident noLoc "x"
+
+srcUnderscore :: Ident
+srcUnderscore = Ident noLoc "_"
+
+isSrcUnderscore :: Ident -> Bool
+isSrcUnderscore (Ident _ s) = s == "_"
+
+existsXX :: Ident -> SrcExpr
+-- Returns (exists x. x)
+-- This is what the source-code "_" desugars to
+existsXX x = Exists [x] (Variable x)
 
 eFalse :: SrcExpr
 eFalse = Array []
@@ -219,9 +226,11 @@ eHavoc fx = seqE (map havoc1 fx)
              | otherwise        = errorMessage $ "eHavoc: " ++ show fx
 
 eThunk :: SrcExpr -> SrcExpr
-eThunk = Lam (Ident noLoc "_")
+-- Delay `e` by wrapping it in a lambda (\_.e)
+eThunk e = Lam srcUnderscore e
 
 eForce :: SrcExpr -> SrcExpr
+-- Force a (\_.e) thunk, by applying it to <>
 eForce e = ApplyD e (Array [])
 
 eAll :: SrcExpr -> SrcExpr
@@ -446,7 +455,6 @@ instance Pretty SrcExpr where
           Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
 
           ----
-          DefineV i -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any")))
           DefineE i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           DefineIE i x e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
           Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
@@ -585,7 +593,6 @@ compos f (MAlias i e1 e2)   = MVar i <$> traverse f e1 <*> traverse f e2
 compos f (Macro1 m as b)    = Macro1 m as <$> f b
 compos f (Macro2 m a b)     = Macro2 m <$> f a <*> f b
 compos f (Return e)         = Return <$> f e
-compos _ (DefineV i)        = pure $ DefineV i
 compos f (DefineE i e)      = DefineE i <$> f e
 compos f (DefineIE i x e)   = DefineIE i x <$> f e
 compos f (Choice e1 e2)     = Choice <$> f e1 <*> f e2
@@ -652,7 +659,6 @@ getVisibleBinders :: HasCallStack => SrcExpr -> [Ident]
 getVisibleBinders = go
   where
     -- These two equations are the main payload
-    go (DefineV i)     = [i]
     go (DefineE i e)   = i : go e
     go (Exists is e)   = is ++ go e
 
@@ -753,7 +759,6 @@ getVar (Let _ e) = getVar e
 getVar Block{} = []
 getVar (Unify e1 e2) = getVar e1 ++ getVar e2
 getVar Macro1 {} = []
-getVar (DefineV _) = []
 getVar (DefineE _ e) = getVar e
 getVar (DefineIE _ _ e) = getVar e
 getVar Choice{} = []

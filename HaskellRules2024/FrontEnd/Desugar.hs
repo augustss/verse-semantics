@@ -106,7 +106,8 @@ dsSmall = ds
     --                         ; Lam x <$> (Unify (Variable x) <$> ds e) }
 
     -- Function notation
-    ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [closedId])] e2
+    ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [closedId])] (eCheck [effSucceeds] e2)
+       -- The e1=>e2 notation has an implicit check<succeeds>
     ds (Function (a:as@(_:_)) b)  = ds $ Function [a] $ Function as b
     ds (Function [(e1, effs)] e2) = do
            e1' <- ds e1
@@ -170,7 +171,7 @@ dsSmall = ds
 
     -- Variables
     ds (Variable ident@(Ident l v))
-      | v == "_"                    = DefineV <$> newIdent l "u"
+      | isSrcUnderscore ident       = existsXX <$> newIdent l "u"  -- "_" means (exists u.u)
       | Just op <- lookupPrimOp v   = return (EPrim op)
       | otherwise                   = return (Variable ident)
 
@@ -364,10 +365,10 @@ defnArray ps e = do
                 _ -> (id, p)
         case ip of
           Variable v ->
-            pure (Nothing, wrap (DefineV v))
+            pure (Nothing, wrap (existsXX v))
           _ -> do
             x <- newIdent (getLoc p) "x"
-            pure (Just (Variable x, ip), wrap (DefineV x))
+            pure (Just (Variable x, ip), wrap (existsXX x))
   (xps, es) <- unzip <$> mapM var ps
   arr <- arraySplice es
   let (xs, ps') = unzip $ catMaybes xps
@@ -391,7 +392,7 @@ arraySplice as =
 
 eAppend :: SrcExpr -> SrcExpr -> Ident -> SrcExpr
 eAppend (Array xs) (Array ys) z = eDefine z (Array (xs ++ ys))
-eAppend x y z = Seq [DefineV z, ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, Variable z])]
+eAppend x y z = Seq [existsXX z, ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, Variable z])]
 
 data ArrayElem = EElems [SrcExpr] | ESplice SrcExpr
   deriving (Show)
@@ -465,7 +466,6 @@ _addDeref = pure . exprD S.empty
     expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
       where s' = defs s a
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
-    expr _ (DefineV i) = DefineV i
     expr s (DefineE i e) = DefineE i (expr s e)
     expr s (DefineIE i j e) = DefineIE i j (expr s e)
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
@@ -744,9 +744,6 @@ dsM_12 s (Macro1 m rs t) pi
 
 dsM_12 s (Lam x t) _pi
    = Lam x <$> dsM_12 s t E
-
-dsM_12 _ e@(DefineV _) _
-   = pure e
 
 ---------- Other terms with P(i) ---------------
 dsM_12 s t (P i)                           -- MEQ
