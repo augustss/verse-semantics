@@ -257,11 +257,12 @@
 \makeatother
 \EndFmtInput
 %
-%% ----------------------
+% ----------------------
 %% Stuff for TimCore
 
 
 %% 'g' inferences
+
 
 
 
@@ -278,11 +279,17 @@
 
 
 
+%%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
+
 %% 'si' is short for "solve or infer" or "unification variable or not" resp
 
 %% 'md' is short for "mode" or "unification variable or not" resp
 
 %% flipsi is a no-op for now
+
+
+%% EXX is just EX, but with no argument
+
 
 
 
@@ -304,6 +311,8 @@
 
 
 
+
+
 %% Sequences e1; ...; en; v
 
 %% xs etc stole syntax used in examples.
@@ -321,15 +330,16 @@
 
 
 
+%% %format ok = "\textbf{ok}"
+
+%% %format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
+%% %format eqsemiKW = "\fatsemi"
+
 %% Arrays and tuples
 %% %format arrKW = "\textbf{arr}"
 %% %format arr (x) = arrKW "\{" x "\}"
 
 %% %format vmap (x) = "\llangle" x "\rrangle"
-
-
-
-%% assert = succeed, abbreviated to suc
 
 
 
@@ -347,7 +357,6 @@
 
 
 
-%% Effects checking, like succeeds{e}
 
 
 %% Unification
@@ -355,7 +364,7 @@
 
 
 % format := = "\mapsto"
-%% %format squiggt = "\!\leadsto\!"
+%% %format squiggt = "\!-\!\!>\!\!\!"
 
 
 
@@ -391,10 +400,25 @@
 
 
 
+%% We combined S and C into one
 
 
 %% ----------- Metatheory --------------
 
+
+%% ----------------------------
+%%         Verification
+%% ----------------------------
+
+%% assert = succeed, abbreviated to suc
+
+
+
+%% Effects checking, like succeeds{e}
+
+
+
+%% <fx> brackets
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % ----------------------- Example
