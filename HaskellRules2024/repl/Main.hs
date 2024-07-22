@@ -367,6 +367,7 @@ cEval
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { putStrLn ("\n\n------- Prep'd ---------")
+       ; let eval_it = Rules.normalize (fEvalSteps (cs_flags s)) (Rules.everywhere TRS2024.evalRules)
        ; let core_expr, prepd_expr :: Rules.Expr
              core_expr  = asCore e
              prepd_expr = prep core_expr
@@ -377,14 +378,14 @@ cEval
        ; putStrLn (render (pPrint tr))
 
        ; pure (RulesCore e') }
-  where
-    eval_it = Rules.normalize (Rules.everywhere TRS2024.evalRules)
+    
 
 cVerify :: CmdRunner CState
 cVerify
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { putStrLn ("\n\n------- Prep'd ---------")
+       ; let verify_it = Rules.normalize (fEvalSteps (cs_flags s)) (Rules.everywhere Verifier.verificationRules)
        ; let core_expr, prepd_expr :: Rules.Expr
              core_expr  = asCore e
              prepd_expr = prep core_expr
@@ -395,8 +396,6 @@ cVerify
        ; display tr
 
        ; pure (RulesCore e') }
-  where
-    verify_it = Rules.normalize (Rules.everywhere Verifier.verificationRules)
 
 {-
 cTransform :: Bool                    -- True <=> display the result

@@ -18,7 +18,8 @@ common general-libs
                       mtl >= 2.3,
                       pretty,
                       megaparsec,
-                      haskeline
+                      haskeline,
+                      scientific
 
 executable verse-repl
     import:           general-libs
@@ -48,6 +49,8 @@ executable confluence-check
                       TRS.Bind
                       TRS.Traced
                       Epic.Print
+                      Epic.List
+                      Epic.UnionFind
 
     build-depends:    text,
                       QuickCheck
