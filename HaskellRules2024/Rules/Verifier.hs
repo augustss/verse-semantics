@@ -101,31 +101,11 @@ verifyStep env lhs =
       guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
           r  = skolNotIn all_rs
-      pure ( pPrint (r,x,rs, all_rs)
+      pure ( sep [ text "r=" <> pPrint r, text "x=" <> pPrint x
+                 , text "rs=" <> pPrint rs ]
            , Verify $ bindList (r:rs)
                  (as, Exi $ bind x $
                     Var x :=: (v :@: Var r) :>: (ctx <@ Var x) ))
-
-{-   -- SLPJ: what is this rule?
-   ++
-   "SUBST-ASM" `name`
-   -- VERIFY(rs, A[r = hnf]) { e } ---> VERIFY(rs, A{hnf/r}[r = hnf]) { e{hnf/r} }
-   do Verify rs as e <- [lhs]
-      (as1, a@(A_GVEq r h), as2) <- asmX as
-      guard (not (isArr h))
-      guard (r `elem` rs)
-      pure $ Verify rs ( subst [(r, h)] as1 ++ [a] ++ subst [(r, h)] as2) ( subst [(r, h)] e)
-
-isArr :: Expr -> Bool
-isArr (Arr _) = True
-isArr _       = False
-
-asmX :: [a] -> [([a], a, [a])]
-asmX = go []
-  where
-    go _  []      = []
-    go as (a:as') = (reverse as, a, as') : go (a:as) as'
--}
 
 
 --------------------------------------------------------------------------------
@@ -186,64 +166,6 @@ matchVerify env (Verify bnd) = [(extendRuleEnv env rs as, rs, as, e)]
                              where
                                (rs, (as, e)) = alphaRenameVerify (skolVars env) bnd
 matchVerify _ _ = []
-
-{-
-   ++
-   "SPLIT-C" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(Var r :=: Char _)) <- proofX e
-      guard (isUni rs bs (Var r))
-      pure (a, caseSplit rs a as ctx (Arr []))
-   ++
-   "SPLIT-VAR" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(Var r :=: Var r')) <- proofX e
-      guard (isUni rs bs (Var r))
-      guard (isUni rs bs (Var r'))
-      pure (a, caseSplit rs a as ctx (Arr []))
-   ++
-   "SPLIT-PPRED" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(op :@: arg)) <- proofX e
-      guard (isUni rs bs arg)
-      guard (isPrim1 op)
-      pure (a, caseSplit rs a as ctx (Arr []))
-   ++
-   -- Verify(rs ; as){ P[r[s]] } ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
-   "SPLIT-APP" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(Var r :@: s)) <- proofX e
-      let r' = uvIdentNotIn (rs ++ free e ++ bndIds bs ++ boundVars env)
-      guard (isUni rs bs (Var r))
-      guard (isUni rs bs s)
-      pure (a, Verify (r':rs) (Assume (Var r' :=: a) : as) (ctx (Var r')))
-
-isUni :: [Ident] -> [BndVar] -> Expr -> Bool
-isUni rs bs (Var r)  = r `elem` rs && r `notElem` bndIds bs
-isUni _  _  (Int _)  = True
-isUni _  _  (Char _) = True
-isUni rs bs (Arr es) = all (isUni rs bs) es
-isUni _  _  _        = False
-
-isPrim1 :: Expr -> Bool
-isPrim1 (Op IsInt)  = True
-isPrim1 (Op IsStr)  = True
-isPrim1 (Op Gt)     = True
-isPrim1 (Op Ge)     = True
-isPrim1 (Op Lt)     = True
-isPrim1 (Op Le)     = True
-isPrim1 (Op Ne)     = True
-isPrim1 _           = False
-
-isPrimOp1 :: Expr -> Bool
-isPrimOp1 (Op Add) = True
-isPrimOp1 (Op Sub) = True
-isPrimOp1 (Op Mul) = True
-isPrimOp1 (Op Div) = True
-isPrimOp1 (Op Neg) = True
-isPrimOp1 _        = False
-
--}
 
 caseSplit :: [Ident] -> FailableAssump -> [Assump] -> Context -> Expr -> Expr
 caseSplit rs a as ctx e
