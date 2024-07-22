@@ -28,12 +28,11 @@ import GHC.Stack( HasCallStack )
 import Data.Char( toLower )
 import Data.Maybe
 
-import Control.Monad( unless, when, forM_ )
+import Control.Monad( unless, when )
 
 import System.Exit( exitWith, ExitCode(..) )
-import System.IO( stdout, hFlush )
+import Text.Printf
 
-import Text.Printf( printf )
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
 
@@ -51,7 +50,7 @@ main = do
 
 runTests :: TestFlags -> IO ()
 runTests test_flags
-  | parse test_flags
+  | parseOnly test_flags
   = mapM_ parseSourceOnly (fileNames test_flags)
 
   | Just expr_string <- testExpr test_flags
@@ -80,6 +79,7 @@ data Test
   -- Test that two expressions evaluate to the same thing
   = TestEvalEq TestInfo SrcExpr SrcExpr
   | TestVerify TestInfo SrcExpr
+  | TestTim { timTag :: Src.Ident, timExpr :: SrcExpr }
   deriving (Show)
 
 testInfo :: Test -> TestInfo
@@ -91,8 +91,8 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
   TestInfo
     { testMName  :: !(Maybe String)
     , testLocn   :: !Loc
-    , testType   :: !TestType                      -- default test type
-    , testExcn   :: ![((String, Bool), TestType)]  -- the bool indicates the the string is just a prefix
+    , testType   :: !TestType                      -- Default test type
+    , testExcn   :: ![((String, Bool), TestType)]  -- The bool indicates the the string is just a prefix
     }
     deriving (Show)
 
@@ -103,11 +103,19 @@ data TestType
   | TBroken               -- test is currently broken (i.e., pass/fail is negated)
   deriving (Show, Eq)
 
+testName :: TestInfo -> String
+testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocn ti)))) (testMName ti)
+
 data TestRes = Good | Bad | Many | None | Excn | Skip
   deriving (Eq, Show)
 
-testName :: TestInfo -> String
-testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocn ti)))) (testMName ti)
+--showRes :: TestRes -> String
+--showRes Good = "OK"
+--showRes Bad  = "BAD"
+--showRes None = "t.o."
+--showRes Many = "nonc"
+--showRes Excn = "excn"
+--showRes Skip = "skip"
 
 
 -----------------------------------------------
@@ -118,51 +126,23 @@ testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocn ti)))) (testMN
 -----------------------------------------------
 
 runTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
-runTestFile tflg (fn, ts) = do
-  if summary tflg then
-    runTestSummary tflg ts
-   else do
-    putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
-    ok <- runTestFileSys tflg ts
-    unless ok $ exitWith (ExitFailure 1)
-
-runTestFileSys :: TestFlags -> [Test] -> IO Bool
-runTestFileSys tflg ts = do
-  let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
-  res <- mapM (runTest tflg) (filter p ts)
-  let ok = all (`elem` [Good, Skip]) res
-  putStrLn $ if ok then "SUCCESS" else "FAILURE"
-  pure ok
+runTestFile tflg (fn, ts)
+ = do { putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
+      ; let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
+      ; res <- mapM (runTest tflg) (filter p ts)
+      ; let ok = all (`elem` [Good, Skip]) res
+      ; putStrLn $ if ok then "SUCCESS" else "FAILURE"
+      ; unless ok $ exitWith (ExitFailure 1) }
 
 runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestEvalEq ti e1 e2) = testEvalE tflg ti e1 e2
 runTest tflg (TestVerify ti e)     = verifyE tflg ti e
 
-runTestSummary :: TestFlags -> [Test] -> IO ()
-runTestSummary atflg tests = do
-  let tflg = atflg{ noError = True }
-  putStrLn "OK=success; nonc=non-confluent; BAD=wrong result; skip=test skipped; t.o.=time-out; excn=exception thrown"
-  forM_ tests $ \ test -> do
-    printf  "%-*s" widthTestName (testName (testInfo test))
-    hFlush stdout
-    r <- runTest tflg test
-    printf " %*s" widthSysName (showRes r)
-    hFlush stdout
-    putStrLn ""
-
-showRes :: TestRes -> String
-showRes Good = "OK"
-showRes Bad  = "BAD"
-showRes None = "t.o."
-showRes Many = "nonc"
-showRes Excn = "excn"
-showRes Skip = "skip"
-
 widthTestName :: Int
 widthTestName = 10
 
-widthSysName :: Int
-widthSysName = 6
+widthFileName :: Int
+widthFileName = 40
 
 {-
 test :: String -> IO ()
@@ -213,12 +193,12 @@ testEvalE flg ti e1 e2
 assertEquiv :: (HasCallStack, Pretty a) => TestFlags -> TestInfo
             -> (a, Rules.Expr) -> (a, Rules.Expr) -> IO TestRes
 assertEquiv tflg ti (p1, c1) (p2, c2)
-  | typ == TSkip = do { when noisy (putStrLn $ pos ++ " skipped")
+  | typ == TSkip = do { when noisy (putStrLn $ test_herald ++ " skipped")
                       ; pure Skip }
   | otherwise
   = do { -- Display the deguared output
          when (showDesugared tflg) $
-         displayDoc (sep [text pos <+> text "desugared:", pPrint c1])
+         displayDoc (sep [text test_herald <+> text "desugared:", pPrint c1])
 
        ; res <- catch (if equivValue v1 v2 == expectOK
                        then do { success_handler; pure Good }
@@ -231,10 +211,13 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
 
        ; pure res }
   where
-    loc   = testLocn ti
+    loc_str = prettyShow (testLocn ti)
     noisy = not (quiet tflg)
-    pos   = prettyShow loc ++ maybe "" ((", "++) . show) (testMName ti)
+    test_herald = printf "%-*s (%-*s)" widthTestName test_nm widthFileName loc_str
     typ   = testType ti
+    test_nm = case testMName ti of
+                Just n  -> n
+                Nothing -> "<anon>"
 
     expectOK = typ == TPass
     tr1      = evalExpr tflg c1
@@ -250,20 +233,20 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
     exn_handler :: SomeException -> IO ()
     exn_handler e
       = unless (noError tflg) $
-        do { putStrLn $ pos ++ " failure:"
+        do { putStrLn $ test_herald ++ " failure:"
            ; putStrLn "The expression";       ppi p1
            ; putStrLn "or the expression";    ppi p2
            ; putStrLn "caused an exception:"; print e
            ; putStrLn "" }
 
     success_handler -- What to display if all is well
-      = when noisy $ putStrLn $ pos ++ " Expected " ++ what expectOK
+      = when noisy $ putStrLn $ test_herald ++ " Expected " ++ what expectOK
 
     failure_handler -- What to display if test fails
       | TBroken <- typ
-      = putStrLn $ pos ++ " Broken test now passes"
+      = putStrLn $ test_herald ++ " Broken test now passes"
       | otherwise
-      = do { putStrLn $ pos ++ " Unexpected " ++ what (not expectOK)
+      = do { putStrLn $ test_herald ++ " Unexpected " ++ what (not expectOK)
            ; unless (noError tflg) $
              do { putStrLn "-----------------------------------------------"
                 ; putStrLn "The expression"; ppi p1
@@ -319,17 +302,7 @@ pTestFile = skip *> many pTest <* eof
 
 -- Parse a test
 pTest :: P Test
-pTest = pTestEq OA.<|> pTestVerify
-
-pTestType :: P TestType
-pTestType = do
-  i <- pIdent
-  case map toLower $ unIdent i of
-    "pass"    -> pure TPass
-    "fail"    -> pure TFail
-    "skip"    -> pure TSkip
-    "broken"  -> pure TBroken
-    _         -> fail "pTestType"
+pTest = pTestEq OA.<|> pTestVerify OA.<|> pTimTest
 
 -- Parse an expression evaluation equality test
 pTestEq :: P Test
@@ -344,6 +317,11 @@ pTestVerify =
   pKeyword "verify" *> do
     tId <- pParens pTestInfo
     TestVerify tId <$> pBraces pExprSeq
+
+pTimTest :: P Test
+pTimTest =
+  pKeyword "test" *> do
+    TestTim <$> pParens pIdent <*> (pExprSeq <* optional (pOp ";"))
 
 pTestInfo :: P TestInfo
 pTestInfo = do
@@ -360,6 +338,16 @@ pTestInfo = do
   excns <- many ((,) <$> (pOp "," *> pSysWild) <*> (pOp "=" *> pTestType))
   pure $ TestInfo mname loc typ excns
 
+pTestType :: P TestType
+pTestType = do
+  i <- pIdent
+  case map toLower $ unIdent i of
+    "pass"    -> pure TPass
+    "fail"    -> pure TFail
+    "skip"    -> pure TSkip
+    "broken"  -> pure TBroken
+    _         -> fail "pTestType"
+
 
 -----------------------------------------------
 --
@@ -371,14 +359,14 @@ pTestInfo = do
 data TestFlags = TestFlags
   { dfs            :: !Bool                -- just find one normal form
   , split          :: !Bool                -- use split
-  , parse          :: !Bool                -- parse only
+  , parseOnly      :: !Bool                -- parse only
   , simplify       :: !Bool                -- use simplifier
   , noUnderLam     :: !Bool                -- do not reduce under lambda
   , quiet          :: !Bool                -- Less noisy
   , verbose        :: !Bool                -- More noisy
   , noError        :: !Bool                -- Don't show error message
   , postProc       :: !Bool                -- Post processing
-  , summary        :: !Bool                -- produce a summary
+  , summary        :: !Bool                -- Produce a summary
   , trace          :: !Bool                -- Show traces
   , onlyTest       :: !(Maybe String)      -- run only this test
   , testExpr       :: !(Maybe String)      -- use this expression as a test
@@ -406,7 +394,7 @@ testArgs = do
             <> OA.header "tests - testing Verse rules"
              )
   let t' = case fileNames t of
-             [] -> t{ fileNames = [if parse t then test1 else verseTest] }
+             [] -> t{ fileNames = [if parseOnly t then test1 else verseTest] }
              _  -> t
   pure t'
 
@@ -427,7 +415,7 @@ testFlags = TestFlags
       <> OA.help "Use split"
       )
   <*> OA.switch
-      (  OA.long "parse"
+      (  OA.long "parse-only"
       <> OA.help "Just do parsing"
       )
   <*> OA.switch
