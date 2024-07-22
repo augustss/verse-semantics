@@ -115,9 +115,10 @@ splitStep :: Rule
 splitStep env lhs =
    "SPLIT-K" `name`
    do (env', rs, as, e) <- matchVerify env lhs
+      let all_rs = skolVars env'
       (ctx, (Var r :=: v) :>: rest) <- proofX [] e
-      guard (r `elem` rs)
-      Just gv <- [groundValue (skolVars env') v]
+      guard (r `elem` all_rs)
+      Just gv <- [groundValue all_rs v]
       pure (caseSplit rs (A_GVEq r gv) as ctx rest)
 
    ++
