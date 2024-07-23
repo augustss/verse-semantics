@@ -209,7 +209,6 @@ data GroundVal
   = GVVar {gv_var :: Ident}
   | GVLit Lit
   | GVArr [GroundVal]
-  | GVLam (Bind Expr)
   deriving( Eq, Ord, Show )
 
 data Assump
@@ -247,7 +246,6 @@ instance Pretty GroundVal where
   pPrint (GVVar i)   = pPrint i
   pPrint (GVLit l)   = pPrint l
   pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
-  pPrint (GVLam bnd) = pPrint (Lam bnd)
 
 isPosAssump :: Assump -> Bool
 isPosAssump (A_Pos {})    = True
@@ -565,7 +563,6 @@ instance Variables GroundVal where
   variables _f (GVVar i)   = [i]
   variables _f (GVLit {})  = []
   variables f  (GVArr gvs) = variables f gvs
-  variables f  (GVLam bnd) = variables f bnd
 
 isSkolem :: Ident -> Bool
 isSkolem (Name ('$':_)) = True
@@ -597,7 +594,7 @@ alphaRename forb top_t
 alphaRenameVerify :: [Ident] -> BindList ([Assump], Expr) -> ([Ident], ([Assump], Expr))
 -- Open up a Verify block, avoiding any skolems in `forb`
 -- (Unlike alphaRename we expect these to include all the in-scope
---  skolems, so we don't need to take the free vars of the BindList)
+--  skolems, so we don't need to take the free vars of the BindList.)
 alphaRenameVerify forb bl
   = alphaRenameBindListWith freshen bl
   where
@@ -678,7 +675,7 @@ subst sub orig_e
   where
     go (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
     go (Arr es)     = Arr (map go es)
-    go (Lam bnd)    = Lam (substBind Var subst sub bnd)
+    go (Lam bnd)    = Lam (substBind subst_e_ops sub bnd)
     go (e1 :=: e2)  = go e1 :=: go e2
     go (e1 :>: e2)  = go e1 :>: go e2
     go (e1 :|: e2)  = go e1 :|: go e2
@@ -688,14 +685,24 @@ subst sub orig_e
     go (Some e)     = Some (go e)
     go (e1 :>>: e2) = go e1 :>>: go e2
     go (Check fx e) = Check fx (go e)
-    go (Exi bnd)    = Exi    (substBind  Var subst     sub bnd)
-    go (Verify bl)  = Verify (substBinds Var go_verify sub bl)
+    go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
+    go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
     go e            = e
 
-    go_verify :: Subst Expr -> ([Assump],Expr) -> ([Assump],Expr)
-    go_verify sub' (as,e) = (as, subst sub' e)
+    subst_e_ops :: SubstOps Expr Expr
+    subst_e_ops = SubstOps { so_subst = subst
+                           , so_fresh = identNotIn
+                           , so_var = Var }
 
-substSkol :: Subst Ident -> Expr -> Expr
+    subst_verify_ops :: SubstOps Expr ([Assump],Expr)
+    subst_verify_ops = SubstOps { so_subst = subst_v
+                                , so_fresh = skolNotIn  -- NB: skolNotIn here
+                                , so_var = Var }
+      where
+        subst_v :: Subst Expr -> ([Assump],Expr) -> ([Assump],Expr)
+        subst_v sub' (as,e) = (as, subst sub' e)
+
+substSkol :: Subst SkolIdent -> Expr -> Expr
 -- Domain of substitution is skolem variables; range is just an identifier
 substSkol sub orig_e
   | null sub  = orig_e    -- Short cut
@@ -703,7 +710,7 @@ substSkol sub orig_e
   where
     go (Var x)      = Var (head $ [e | (y,e) <- sub, y == x] ++ [x])
     go (Arr es)     = Arr (map go es)
-    go (Lam bnd)    = Lam (substBind id substSkol sub bnd)
+    go (Lam bnd)    = Lam (substBind subst_e_ops sub bnd)
     go (e1 :=: e2)  = go e1 :=: go e2
     go (e1 :>: e2)  = go e1 :>: go e2
     go (e1 :|: e2)  = go e1 :|: go e2
@@ -713,12 +720,22 @@ substSkol sub orig_e
     go (Some e)     = Some (go e)
     go (e1 :>>: e2) = go e1 :>>: go e2
     go (Check fx e) = Check fx (go e)
-    go (Exi bnd)    = Exi    (substBind  id substSkol sub bnd)
-    go (Verify bl)  = Verify (substBinds id go_verify sub bl)
+    go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
+    go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
     go e            = e
 
-    go_verify :: Subst Ident -> ([Assump],Expr) -> ([Assump],Expr)
-    go_verify sub' (as,e) = (map (substAssump sub') as, substSkol sub' e)
+    subst_e_ops :: SubstOps SkolIdent Expr
+    subst_e_ops = SubstOps { so_subst = substSkol
+                           , so_fresh = identNotIn
+                           , so_var = id }
+
+    subst_verify_ops :: SubstOps SkolIdent ([Assump],Expr)
+    subst_verify_ops = SubstOps { so_subst = subst_v
+                                , so_fresh = skolNotIn  -- NB: skolNotIn here
+                                , so_var = id }
+      where
+        subst_v :: Subst SkolIdent -> ([Assump],Expr) -> ([Assump],Expr)
+        subst_v sub' (as,e) = (map (substAssump sub') as, substSkol sub' e)
 
 substAssump :: Subst Ident -> Assump -> Assump
 substAssump sub top_asm
@@ -735,7 +752,6 @@ substGV :: Subst Ident -> GroundVal -> GroundVal
 substGV sub (GVVar x)  = GVVar (lookupIdSubst sub x)
 substGV _   (GVLit l)  = GVLit l
 substGV sub (GVArr vs) = GVArr (map (substGV sub) vs)
-substGV sub (GVLam bnd) = GVLam (substBind Var subst sub' bnd) where sub' = [ (x, Var y) | (x, y) <- sub ]
 
 lookupIdSubst :: Subst Ident -> Ident -> Ident
 lookupIdSubst sub x

@@ -213,7 +213,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
   where
     loc_str = prettyShow (testLocn ti)
     noisy = not (quiet tflg)
-    test_herald = printf "%-*s (%-*s)" widthTestName test_nm widthFileName loc_str
+    test_herald = printf "%-*s %-*s" widthTestName test_nm widthFileName loc_str
     typ   = testType ti
     test_nm = case testMName ti of
                 Just n  -> n

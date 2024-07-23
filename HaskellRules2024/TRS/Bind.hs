@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# HLINT ignore "Fuse foldr/map" #-}
@@ -13,7 +15,7 @@ module TRS.Bind
   , bind, unsafeUnbind, alphaRenameBindWith
   , BindList, bindList, unsafeUnbindList, alphaRenameBindListWith
 
-  , Subst, substBind, substBinds
+  , Subst, SubstOps(..), substBind, substBinds
   )
  where
 
@@ -179,24 +181,35 @@ unsafeUnbindList (Binder bnd) = let (x,bl)    = unsafeUnbind bnd
 
 type Subst a = [(Ident,a)]
 
-substBind :: (Variables s, Variables t)
-          => (Ident -> s)           -- How to turn a binder into an expression
-          -> (Subst s -> t -> t)    -- How to substitute in the payload
-          -> Subst s                -- Incoming substitution
-          -> Bind t -> Bind t
-substBind var subst sub a@(Bind x t)
-  | null sub'   = a
-  | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)
-  | otherwise   = Bind x  (subst sub' t)
- where
-  sub' = [ (y,ty) | (y,ty) <- sub, y /= x ]
-  vs   = free (map snd sub')
-  zs   = map fst sub' ++ vs ++ free t
-  x'   = identNotIn zs
+data SubstOps s t
+  = SubstOps { so_fresh :: [Ident] -> Ident   -- How to freshen
+             , so_var   :: Ident -> s         -- How to turn a binder into an expression
+             , so_subst :: Subst s -> t -> t  -- How to substitute in the payload
+    }
 
-substBinds :: (Variables s, Variables t)
-           => (Ident -> s) -> (Subst s -> t -> t) -> (Subst s -> BindList t -> BindList t)
-substBinds _var subst sub (Body t)     = Body (subst sub t)
-substBinds var  subst sub (Binder bnd) = Binder (substBind var (substBinds var subst) sub bnd)
+substBind :: (Variables s, Variables t)
+          => SubstOps s t
+          -> Subst s -> Bind t -> Bind t
+substBind (SubstOps { so_fresh = fresh, so_var = var, so_subst = substitute })
+          sub (Bind x t)
+  | null sub'   = Bind x  t
+  | x `elem` vs = Bind x' (substitute ((x, var x'):sub') t)  -- Capture => rename
+  | otherwise   = Bind x  (substitute sub'               t)  -- No capture
+ where
+  sub' = [ (y,ty) | (y,ty) <- sub, y /= x ]   -- Trim binder from incoming substitution
+  vs   = free (map snd sub')                  -- Variables in range(sub'),
+                                              -- which we must not capture
+  zs   = map fst sub' ++ vs ++ free t
+  x'   = fresh zs
+
+substBinds :: forall s t. (Variables s, Variables t)
+           => SubstOps s t -> Subst s -> BindList t -> BindList t
+substBinds ops top_sub bl
+  = go top_sub bl
+  where
+    ops' :: SubstOps s (BindList t)
+    ops' = ops { so_subst = go }
+    go sub (Body t)     = Body (so_subst ops sub t)
+    go sub (Binder bnd) = Binder (substBind ops' sub bnd)
 
 --------------------------------------------------------------------------------

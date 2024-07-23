@@ -69,10 +69,7 @@ groundValue :: [SkolIdent] -> Expr -> Maybe GroundVal
 groundValue _  (Lit l)               = Just (GVLit l)
 groundValue rs (Var v) | v `elem` rs = Just (GVVar v)
 groundValue rs (Arr vs)              = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
-groundValue rs (Lam bnd)
-  | rs `includes` free bnd           = Just (GVLam bnd)
 groundValue _  _                     = Nothing
-
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule
