@@ -180,8 +180,10 @@ unsafeUnbindList (Binder bnd) = let (x,bl)    = unsafeUnbind bnd
 type Subst a = [(Ident,a)]
 
 substBind :: (Variables s, Variables t)
-          => (Ident -> s) -> (Subst s -> t -> t)
-          -> Subst s -> Bind t -> Bind t
+          => (Ident -> s)           -- How to turn a binder into an expression
+          -> (Subst s -> t -> t)    -- How to substitute in the payload
+          -> Subst s                -- Incoming substitution
+          -> Bind t -> Bind t
 substBind var subst sub a@(Bind x t)
   | null sub'   = a
   | x `elem` vs = Bind x' (subst ((x,var x'):sub') t)
