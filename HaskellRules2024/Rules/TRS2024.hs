@@ -22,6 +22,10 @@ import Data.List( (\\) )
 evalRules :: Rule
 evalRules = everywhere evalStep <> everywhere recStep
 
+-- NB: (everywhere (evalStep <> recStep) does not work.
+-- Because evalStep tries top-level single step; we don't want to
+-- go off into recStep just becuase there is nothing to do at outermost
+-- level.    eg.  exists f. (f = \x. ..f..); f[3]
 
 evalStep :: Rule
 -- Runtime evauation rules

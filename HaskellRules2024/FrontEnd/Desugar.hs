@@ -73,6 +73,7 @@ desugar flgs add_verification
 --------------------------------------------------------
 --
 --         Desugar into Small Source Verse
+--         Figs 3 and 4 of desugaring.pdf
 --
 --------------------------------------------------------
 
@@ -527,10 +528,8 @@ dsDD_12 s t = dsM_12 s t E
 
 
 dsB_12 :: DsMode12 -> SrcExpr -> Pi -> SrcExpr -> D SrcExpr
-dsB_12 s t E     _
-  = dsM_12 s t E
-dsB_12 s t (P f) j
-  = dsM_12 s t (P (ApplyD f j))
+dsB_12 s t E     _  = dsM_12 s t E
+dsB_12 s t (P f) j  = dsM_12 s t (P (ApplyD f j))
 -- SLPJ: Crucial chnage; this makes HO13 work
 --  = do z <- newIdent (getLoc t) "z";
 --       seqDE [ pure $ eDefine z (ApplyD f j)

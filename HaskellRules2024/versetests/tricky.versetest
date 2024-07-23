@@ -4,15 +4,15 @@ testeq("Triv2", pass) { exists x { x=1} } { 1 }
 
 #testeq(pass) { all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 
-testeq("RJ1", pass)  { ID := (\a {a}); exists x y { x = ID; one{ x = y; x(10) } } }
-                     { exists y { one{ y = (\a {a}); 10 } }}
-testeq("RJ2", pass)  { ID := (\a {a}); exists x y { x = ID; y = x; array{ y } }}
-                     { array{ \a {a} } }
+testeq("RJ1", pass)  { ID := (lambda a {a}); exists x y { x = ID; one{ x = y; x(10) } } }
+                     { exists y { one{ y = (lambda a {a}); 10 } }}
+testeq("RJ2", pass)  { ID := (lambda a {a}); exists x y { x = ID; y = x; array{ y } }}
+                     { array{ lambda a {a} } }
 testeq("RJ3", pass)  { exists a b c d x { x = (a, b); x = (c, d); x } }
                      { exists c d { (c,d) } }
-testeq("RJ3a", pass) { exists a b c d { one { exists x { x = <a,b>; x = <c, d>; x } } } }
-                     { exists a b c d { one { exists x { a=c; b=d;  x = <c, d>; x } } } }
-testeq("Yikes1",pass) { exists x y . x=<1,2>; y=<1,3>; one{x=y} }
+testeq("RJ3a", pass) { exists a b c d { one { exists x { x = (a,b); x = (c, d); x } } } }
+                     { exists a b c d { one { exists x { a=c; b=d;  x = (c, d); x } } } }
+testeq("Yikes1",pass) { exists x y { x=(1,2); y=(1,3); one{x=y} } }
                      { fail }
 testeq("Yikes2",pass) { exists x y. x=<1,2>; y=x; \w.<x,y> }
                      # we would like this: { \w. <<1,2>,<1,2>> }

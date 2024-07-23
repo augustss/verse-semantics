@@ -78,54 +78,34 @@ groundValue _  _                     = Nothing
 verifyStep :: Rule
 verifyStep env lhs =
    "VERIFY-VAL" `name`
-   do (_env', _rs, _as, v) <- matchVerify env lhs
+   do (_skols, _rs, _as, v) <- matchVerify env lhs
       guard (isVal v)
       pure (Arr [])
    ++
    "VERIFY-FAIL" `name`
-   do (_env', _rs, _as, e) <- matchVerify env lhs
+   do (_skols, _rs, _as, e) <- matchVerify env lhs
       guard (e == Fail)
       pure (Arr [])
    ++
    "SOLVER" `nameWith`
-   do (env', _rs, _as, _e) <- matchVerify env lhs
+   do (_skols, rs, as, _e) <- matchVerify env lhs
+      let env' = extendRuleEnv env rs as
       case unsat env' of
         Just reason -> pure (pPrint reason, Arr [])
         Nothing     -> []
    ++
    "SKOLEMIZE" `nameWith`
-   do (env', rs, as, e) <- matchVerify env lhs
-      (ctx, Some v) <- proofX [] e
-      let all_rs = skolVars env'
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, Some v) <- proofX all_rs e
       guard (skolValue all_rs v)
       guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
           r  = skolNotIn all_rs
-      pure ( pPrint (r,x,rs, all_rs)
+      pure ( sep [ text "r=" <> pPrint r, text "x=" <> pPrint x
+                 , text "rs=" <> pPrint rs ]
            , Verify $ bindList (r:rs)
                  (as, Exi $ bind x $
                     Var x :=: (v :@: Var r) :>: (ctx <@ Var x) ))
-
-{-   -- SLPJ: what is this rule?
-   ++
-   "SUBST-ASM" `name`
-   -- VERIFY(rs, A[r = hnf]) { e } ---> VERIFY(rs, A{hnf/r}[r = hnf]) { e{hnf/r} }
-   do Verify rs as e <- [lhs]
-      (as1, a@(A_GVEq r h), as2) <- asmX as
-      guard (not (isArr h))
-      guard (r `elem` rs)
-      pure $ Verify rs ( subst [(r, h)] as1 ++ [a] ++ subst [(r, h)] as2) ( subst [(r, h)] e)
-
-isArr :: Expr -> Bool
-isArr (Arr _) = True
-isArr _       = False
-
-asmX :: [a] -> [([a], a, [a])]
-asmX = go []
-  where
-    go _  []      = []
-    go as (a:as') = (reverse as, a, as') : go (a:as) as'
--}
 
 
 --------------------------------------------------------------------------------
@@ -133,23 +113,23 @@ asmX = go []
 
 splitStep :: Rule
 splitStep env lhs =
-   "SPLIT-K" `name`
-   do (env', rs, as, e) <- matchVerify env lhs
-      (ctx, (Var r :=: v) :>: rest) <- proofX [] e
-      guard (r `elem` rs)
-      Just gv <- [groundValue (skolVars env') v]
-      pure (caseSplit rs (A_GVEq r gv) as ctx rest)
+   "SPLIT-K" `nameWith`
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, (Var r :=: v) :>: rest) <- proofX all_rs e
+      guard (r `elem` all_rs)
+      Just gv <- [groundValue all_rs v]
+      pure ( pPrint r <+> text "=" <+> pPrint v
+           , caseSplit rs (A_GVEq r gv) as ctx rest )
 
    ++
    "SPLIT-OP" `nameWith`
-   do (env', rs, as, e) <- matchVerify env lhs
-      let skol_rs = skolVars env'
-      (ctx, Op op :@: arg) <- proofX [] e
-      Just gv <- [groundValue skol_rs arg]
-      guard (free gv `intersects` skol_rs)
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, Op op :@: arg) <- proofX all_rs e
+      Just gv <- [groundValue all_rs arg]
+      guard (free gv `intersects` all_rs)
           -- At least one skolem in gv
           -- Don't do SPLIT-OP on (3+4)
-      let r    = skolNotIn skol_rs
+      let r    = skolNotIn all_rs
           asm  = A_PrimOp r (AO_Prim op) gv
           asmF = A_RelOp op gv
       if primOpCanFail op
@@ -160,10 +140,10 @@ splitStep env lhs =
 
    ++
    "SPLIT-TUP" `nameWith`
-   do (env', rs, as, e) <- matchVerify env lhs
-      (ctx, Var r :=: Arr vs :>: rest) <- proofX [] e
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, Var r :=: Arr vs :>: rest) <- proofX all_rs e
       guard (r `elem` rs)
-      let rs'  = take (length vs) (skolsNotIn (skolVars env'))
+      let rs'  = take (length vs) (skolsNotIn all_rs)
           rvs' = foldr (:>:) rest [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
           asm    = A_GVEq r (GVArr (map GVVar rs'))
       pure (pPrint asm, caseSplit (rs ++ rs') asm as ctx rvs')
@@ -172,78 +152,22 @@ splitStep env lhs =
    -- Verify(rs ; as){ P[r[s]] }
    -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
    "SPLIT-APP" `nameWith`
-   do (env', rs, as, e) <- matchVerify env lhs
-      (ctx, Var r :@: s) <- proofX [] e
-      let skol_rs = skolVars env'
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, Var r :@: s) <- proofX all_rs e
       guard (r `elem` rs)
-      Just gv <- [groundValue skol_rs s]
-      let r' = skolNotIn skol_rs
+      Just gv <- [groundValue all_rs s]
+      let r' = skolNotIn all_rs
           asm = A_PrimOp r' AO_Apply (GVArr [GVVar r, gv])
       pure (pPrint asm, Verify (bindList (r':rs) (asm : as, ctx <@ Var r')))
 
-matchVerify :: RuleEnv -> Expr -> [(RuleEnv, [SkolIdent], [Assump], Expr)]
-matchVerify env (Verify bnd) = [(extendRuleEnv env rs as, rs, as, e)]
-                             where
-                               (rs, (as, e)) = alphaRenameVerify (skolVars env) bnd
+matchVerify :: RuleEnv -> Expr -> [([SkolIdent], [SkolIdent], [Assump], Expr)]
+matchVerify env (Verify bnd)
+  = [(all_rs, new_rs, as, e)]
+  where
+    env_rs = skolVars env
+    all_rs = new_rs ++ env_rs
+    (new_rs, (as, e)) = alphaRenameVerify env_rs bnd
 matchVerify _ _ = []
-
-{-
-   ++
-   "SPLIT-C" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(Var r :=: Char _)) <- proofX e
-      guard (isUni rs bs (Var r))
-      pure (a, caseSplit rs a as ctx (Arr []))
-   ++
-   "SPLIT-VAR" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(Var r :=: Var r')) <- proofX e
-      guard (isUni rs bs (Var r))
-      guard (isUni rs bs (Var r'))
-      pure (a, caseSplit rs a as ctx (Arr []))
-   ++
-   "SPLIT-PPRED" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(op :@: arg)) <- proofX e
-      guard (isUni rs bs arg)
-      guard (isPrim1 op)
-      pure (a, caseSplit rs a as ctx (Arr []))
-   ++
-   -- Verify(rs ; as){ P[r[s]] } ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
-   "SPLIT-APP" `name`
-   do Verify rs as e <- [lhs]
-      (ctx, bs, a@(Var r :@: s)) <- proofX e
-      let r' = uvIdentNotIn (rs ++ free e ++ bndIds bs ++ boundVars env)
-      guard (isUni rs bs (Var r))
-      guard (isUni rs bs s)
-      pure (a, Verify (r':rs) (Assume (Var r' :=: a) : as) (ctx (Var r')))
-
-isUni :: [Ident] -> [BndVar] -> Expr -> Bool
-isUni rs bs (Var r)  = r `elem` rs && r `notElem` bndIds bs
-isUni _  _  (Int _)  = True
-isUni _  _  (Char _) = True
-isUni rs bs (Arr es) = all (isUni rs bs) es
-isUni _  _  _        = False
-
-isPrim1 :: Expr -> Bool
-isPrim1 (Op IsInt)  = True
-isPrim1 (Op IsStr)  = True
-isPrim1 (Op Gt)     = True
-isPrim1 (Op Ge)     = True
-isPrim1 (Op Lt)     = True
-isPrim1 (Op Le)     = True
-isPrim1 (Op Ne)     = True
-isPrim1 _           = False
-
-isPrimOp1 :: Expr -> Bool
-isPrimOp1 (Op Add) = True
-isPrimOp1 (Op Sub) = True
-isPrimOp1 (Op Mul) = True
-isPrimOp1 (Op Div) = True
-isPrimOp1 (Op Neg) = True
-isPrimOp1 _        = False
-
--}
 
 caseSplit :: [Ident] -> FailableAssump -> [Assump] -> Context -> Expr -> Expr
 caseSplit rs a as ctx e

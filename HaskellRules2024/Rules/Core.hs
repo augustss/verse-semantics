@@ -40,7 +40,7 @@ module Rules.Core
 import Prelude hiding( (<>) )
 import Epic.Print
 
-import Data.List( union, intercalate )
+import Data.List( union, intercalate, delete )
 import TRS.Bind
 import TRS.Traced
 import Test.QuickCheck
@@ -597,7 +597,7 @@ alphaRename forb top_t
 alphaRenameVerify :: [Ident] -> BindList ([Assump], Expr) -> ([Ident], ([Assump], Expr))
 -- Open up a Verify block, avoiding any skolems in `forb`
 -- (Unlike alphaRename we expect these to include all the in-scope
---  skolems, so we don't need to take the free vars of the BindList
+--  skolems, so we don't need to take the free vars of the BindList)
 alphaRenameVerify forb bl
   = alphaRenameBindListWith freshen bl
   where
@@ -764,6 +764,9 @@ stepRule :: Rule -> Expr -> [(String,Expr)]
 stepRule rule expr = rule emptyRuleEnv     -- Empty set of skolems
                           expr
 
+delSkol :: RuleEnv -> Ident -> RuleEnv
+delSkol env@(RE { skolVars=skols }) x = env { skolVars = delete x skols }
+
 tryBefore :: Rule -> Rule -> Rule
 -- Run rule1, and only if it can do nothing try rule2
 tryBefore rule1 rule2 env e
@@ -781,8 +784,12 @@ everywhere step env orig_e
                          | i <- [0..length es-1]
                          , (s,e') <- everywhere step env (es!!i)
                          ]
-  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step env e ]
-                       where (x,e) = unsafeUnbind bnd
+  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step env' e ]
+                       where
+                         (env',x,e) = walkInsideBind env bnd
+  recurse (Exi bnd)    = [ (s, Exi (bind x e')) | (s,e') <- everywhere step env' e ]
+                       where
+                         (env',x,e) = walkInsideBind env bnd
   recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- everywhere step env e1 ]
                       ++ [ (s, e1  :=: e2') | (s,e2') <- everywhere step env e2 ]
   recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step env e1 ]
@@ -797,14 +804,23 @@ everywhere step env orig_e
   recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step env e1 ]
                       ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step env e2 ]
   recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step env e ]
-  recurse e@(Exi _)    = [ (s, exis <@ body') | (s,body') <- everywhere step env body ]
-                       where (exis,body) = unExis e
   recurse (Verify bl)  = [ (s, Verify (bindList rs (as,e')))
                          | (s,e') <- everywhere step env' e ]
                        where
                          env' = extendRuleEnv env rs as
-                         (rs,(as,e)) = unsafeUnbindList bl   -- SLPJ: is unsafe ok? I think not
+                         (rs,(as,e)) = alphaRenameVerify (skolVars env) bl
+
   recurse _            = []
+
+walkInsideBind :: RuleEnv -> Bind a -> (RuleEnv, Ident, a)
+-- When we walk inside an (Exi x e) or (Lam x e) we need to delete
+-- `x` from the skolems in the RuleEnv. This would not be necessary if
+-- skolems and ordinary identifiers came from different name spaces, but
+-- currently they are the same, so we need to take care
+walkInsideBind env bnd
+  = (delSkol env x, x, e)
+  where
+    (x,e) = unsafeUnbind bnd
 
 -- treat "exi x1 .. exi xn" as one block when matching
 unExis :: Expr -> (Context, Expr)
