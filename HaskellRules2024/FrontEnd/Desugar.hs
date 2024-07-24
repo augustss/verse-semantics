@@ -77,10 +77,10 @@ desugar flgs add_verification
 --
 --------------------------------------------------------
 
-dsSmall :: SrcExpr -> D SrcExpr
+dsSmall :: SrcExpr -> D SrcSmall
 dsSmall = ds
   where
-    ds :: SrcExpr -> D SrcExpr
+    ds :: SrcExpr -> D SrcSmall
 
     -- Application
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
@@ -367,10 +367,10 @@ defnArray ps e = do
                 _ -> (id, p)
         case ip of
           Variable v ->
-            pure (Nothing, wrap (existsXX v))
+            pure (Nothing, wrap (DefineV v))
           _ -> do
             x <- newIdent (getLoc p) "x"
-            pure (Just (Variable x, ip), wrap (existsXX x))
+            pure (Just (Variable x, ip), wrap (DefineV x))
   (xps, es) <- unzip <$> mapM var ps
   arr <- arraySplice es
   let (xs, ps') = unzip $ catMaybes xps
@@ -402,7 +402,7 @@ arraySplice as =
 
 eAppend :: SrcExpr -> SrcExpr -> Ident -> SrcExpr
 eAppend (Array xs) (Array ys) z = eDefine z (Array (xs ++ ys))
-eAppend x y z = Seq [existsXX z, ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, Variable z])]
+eAppend x y z = Seq [DefineV z, ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, Variable z])]
 
 data ArrayElem  -- Used very locally, to communicate between `arrayElems` and `arraySplice`
   = EElems [SrcExpr] | ESplice SrcExpr
@@ -479,7 +479,8 @@ _addDeref = pure . exprD S.empty
     expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
       where s' = defs s a
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
-    expr s (DefineE i e) = DefineE i (expr s e)
+    expr _ (DefineV i)      = DefineV i
+    expr s (DefineE i e)    = DefineE i (expr s e)
     expr s (DefineIE i j e) = DefineIE i j (expr s e)
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
     expr s (Set e1 (Ident l sop) e2) = set s e1 op (expr s e2)
@@ -520,9 +521,9 @@ _addDeref = pure . exprD S.empty
 --------------------------------------------------------
 
 data Pi
-  = P SrcExpr -- ^ P(x)    The SrcExpr is always small and freely duplicable
-              --           Typically just (Variable x)
-  | E         -- ^ E
+  = P SrcCore  -- ^ P(x)    The SrcCore is always small and freely duplicable
+               --           Typically just (Variable x)
+  | E          -- ^ E
   deriving (Eq, Ord, Show)
 
 data DsMode12
@@ -532,14 +533,14 @@ data DsMode12
   deriving (Eq, Ord, Show)
 
 
-dsD_12 :: SrcExpr -> D SrcExpr
+dsD_12 :: SrcSmall -> D SrcCore
 dsD_12 = dsDD_12 MV
 
-dsDD_12 :: DsMode12 -> SrcExpr -> D SrcExpr
+dsDD_12 :: DsMode12 -> SrcSmall -> D SrcCore
 dsDD_12 s t = dsM_12 s t E
 
 
-dsB_12 :: DsMode12 -> SrcExpr -> Pi -> SrcExpr -> D SrcExpr
+dsB_12 :: DsMode12 -> SrcSmall -> Pi -> SrcCore -> D SrcExpr
 dsB_12 s t E     _  = dsM_12 s t E
 dsB_12 s t (P f) j  = dsM_12 s t (P (ApplyD f j))
 -- SLPJ: Crucial chnage; this makes HO13 work
@@ -547,7 +548,7 @@ dsB_12 s t (P f) j  = dsM_12 s t (P (ApplyD f j))
 --       seqDE [ pure $ eDefine z (ApplyD f j)
 --             , dsM_12 s t (P (Variable z))]
 
-seqDE :: [D SrcExpr] -> D SrcExpr
+seqDE :: [D SrcCore] -> D SrcCore
 seqDE ds = seqE <$> sequence ds
 
 defineDE :: String -> D SrcExpr
@@ -564,9 +565,9 @@ defineDE nm ds_rhs
                  ; pure (eDefine x rhs', Variable x) } }
 
 defineDE2 :: String
-          -> D SrcExpr               -- The RHS
-          -> (SrcExpr -> D SrcExpr)  -- The body
-          -> D SrcExpr               -- z := rhs; body
+          -> D SrcSmall              -- The RHS
+          -> (SrcCore -> D SrcCore)  -- The body
+          -> D SrcCore               -- z := rhs; body
 defineDE2 nm ds_rhs ds_body
   = do { rhs' <- ds_rhs
        ; if isAtomic rhs'
@@ -596,7 +597,7 @@ where `x` is complely fresh.   We can abbreviate this if
   Hence the user of `getAllIdents`.
 -}
 
-dsM_12 :: DsMode12 -> SrcExpr -> Pi -> D SrcCore
+dsM_12 :: DsMode12 -> SrcSmall -> Pi -> D SrcCore
 
 -------------------- Functions -----------------------
 dsM_12 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
@@ -755,6 +756,9 @@ dsM_12 s (Macro1 m rs t) pi
 
 dsM_12 s (Lam x t) _pi
    = Lam x <$> dsM_12 s t E
+
+dsM_12 _ e@(DefineV _) _
+   = pure e
 
 ---------- Other terms with P(i) ---------------
 dsM_12 s t (P i)                           -- MEQ

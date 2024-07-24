@@ -8,7 +8,7 @@ module FrontEnd.Expr(
 
     , Ident(..), unIdent
     , SrcExpr(..), Lit(..), Path(..)
-    , SrcCore, SrcBlk, SrcValue
+    , SrcSmall, SrcCore, SrcBlk, SrcValue
     , pattern Typedef, pattern Check, pattern Guard, pattern Some
     , pattern One, pattern All
 
@@ -53,13 +53,14 @@ import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
 
 {- Note [How SrcExpr is parsed]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-              This                 is represented as
+              This                 is initially parsed as
 -------------------------------------------------------------------------
+Type sig      e1:e2                InfixOp e1 ":" e2
 Binding       p := e               InfixOp p ":=" e
+Choice        e1 | e2              InfixOp e1 "|" e2
+Unification   e1 = e2              InfixOp e1 "=" e2
 Binding       f(p)<fx> := e        InfixOp (EffAttr (ApplyS f p) fx) ":=" e
 Guard         v ;;<fx> e           Macro2 "guard" <fx> e
-
 -}
 
 --------------------------------------------------------
@@ -69,11 +70,11 @@ Guard         v ;;<fx> e           Macro2 "guard" <fx> e
 --------------------------------------------------------
 
 data SrcExpr
-  = Lit Lit                   -- k
-  | Variable Ident            -- x
+  = Lit Lit                      -- k
+  | Variable Ident               -- x
   | QualVariable SrcExpr Ident   -- (e:)x
   | Array [SrcExpr]              -- array{e1;e2;...}
-  | Tuple [SrcExpr]              -- e1,e2,...             -- will be turned into Array
+  | Tuple [SrcExpr]              -- e1,e2,...             -- Will be turned into Array
   | ApplyS SrcExpr SrcExpr       -- f(e)
   | ApplyD SrcExpr SrcExpr       -- f[e]
   | EffAttr SrcExpr Eff          -- f<e>
@@ -102,6 +103,7 @@ data SrcExpr
   | Blk [SrcExpr]                -- { e1; e2; ... }
   | Option (Maybe SrcExpr)       -- option{e}
   | Parens SrcExpr               -- (e)
+  | Seq [SrcExpr]                -- e1;e2;...
 
   -- Mutable variables
   | Set SrcExpr Ident SrcExpr       -- set e1 = e2
@@ -114,22 +116,23 @@ data SrcExpr
   | Macro2 Ident SrcExpr SrcBlk  -- m(e1){e2}
   | Return SrcExpr               -- return e
 
-  -- Initial desugaring turns some operators into more easily recognizable forms
-  | Seq [SrcExpr]                -- e1;e2;...
-  | DefineE Ident SrcExpr        -- i := e
-  | DefineIE Ident Ident SrcExpr -- (i->x) := e
-  | Choice SrcBlk SrcBlk         -- e1 | e2
-  | Unify SrcExpr SrcExpr        -- e1 = e2
-  | Range [Eff] SrcExpr          -- :{fx}e
 
-  -- Below here, not source language
+  -- Output of dsSmall; see Note [Now SrcExpr is parsed] and the dsSmall function
+  | DefineV Ident                  -- (exists i)  Bring `i` into scope in the entire
+                                   --    innermost scoping context, with no type constraint
+  | DefineE Ident SrcExpr          -- i := e
+  | DefineIE Ident Ident SrcExpr   -- (i->x) := e
+  | Choice SrcBlk SrcBlk           -- e1 | e2
+  | Unify SrcExpr SrcExpr          -- e1 = e2
+  | Range [Eff] SrcExpr            -- :{fx}e
+  | OfType SrcExpr [Eff] SrcExpr   -- e |>{fx} t
+
+  -- Embed Core into Expr
   | Wrong String              -- wrong
   | Exists [Ident] SrcExpr    -- exists xs . e
 
   | Verify [Ident] SrcExpr    -- verify fs . e
                               --  (we only need assumptions when we get to the core language)
-
-  | OfType SrcExpr [Eff] SrcExpr    -- e |>{fx} t
 
   | EPrim PrimOp                   -- Primop
   | Lam Ident SrcExpr              -- ICFP lambda:   \ x . e.  We include \_.e
@@ -142,6 +145,10 @@ data SrcExpr
   | EStore Store SrcExpr
 
   deriving (Eq, Ord, Show)
+
+-- SrcSmall synonym is used for the reduced subset of SrcExpr
+-- that is fed to the Main Desugaring (Fig 9)
+type SrcSmall = SrcExpr
 
 -- SrcCore synonym is used for the very reduced subset of SrcExpr
 -- that can be directly translated to Rules.Core.Expr
@@ -262,11 +269,12 @@ eExists [] e = e
 eExists is e = Exists is e
 
 eDefine :: Ident -> SrcExpr -> SrcExpr
--- x := (e1; ...; en)   generates   e1; ... e(n-1); x=en
+-- x := (e1; ...; en)   generates   exists x; e1; ... e(n-1); x=en
 -- Smart contructor, floats out nested defines
 eDefine x (Seq ts) = seqE (floats ++ [eDefine x rhs])
                    where
                      (floats, rhs) = unSeq ts
+-- eDefine x rhs = seqE [ DefineV x, Unify (Variable x) rhs ]
 eDefine x rhs = DefineE x rhs
 
 eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
@@ -455,14 +463,16 @@ instance Pretty SrcExpr where
           Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
 
           ----
-          DefineE i e -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
+          DefineV i      -> text "exists" <+> pPrint i
+          DefineE i e    -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
           DefineIE i x e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
-          Choice e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
-          Unify e1 e2 -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
-          Fail -> text "fail"
+          Choice e1 e2   -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
+          Unify e1 e2    -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
+          Fail           -> text "fail"
+          Wrong s        -> text $ "WRONG'" ++ s ++ "'"
+
           Range fx e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
                         text "range" <> ppEffs fx <> braces (ppr 0 e)
-          Wrong s -> text $ "WRONG'" ++ s ++ "'"
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <> text ".", ppr 0 e]
           Verify is e -> maybeParens (p > 0) $
                          cat [text "verify" <> parens (hsep (map (ppr 0) is))
@@ -593,6 +603,7 @@ compos f (MAlias i e1 e2)   = MVar i <$> traverse f e1 <*> traverse f e2
 compos f (Macro1 m as b)    = Macro1 m as <$> f b
 compos f (Macro2 m a b)     = Macro2 m <$> f a <*> f b
 compos f (Return e)         = Return <$> f e
+compos _ (DefineV i)        = pure $ DefineV i
 compos f (DefineE i e)      = DefineE i <$> f e
 compos f (DefineIE i x e)   = DefineIE i x <$> f e
 compos f (Choice e1 e2)     = Choice <$> f e1 <*> f e2
@@ -658,7 +669,8 @@ isAtomic _             = False
 getVisibleBinders :: HasCallStack => SrcExpr -> [Ident]
 getVisibleBinders = go
   where
-    -- These two equations are the main payload
+    -- These three equations are the main payload
+    go (DefineV i)     = [i]
     go (DefineE i e)   = i : go e
     go (Exists is e)   = is ++ go e
 
@@ -722,6 +734,7 @@ getFree = fvs_blk
     fvs (Macro2 _ e b)    = fvs e ++ fvs_blk b
     fvs (Split e1 e2 e3)  = fvs e1 ++ fvs e2 ++ fvs e3
     fvs (DefineE _ e)     = fvs e
+    fvs (DefineV {})      = []
     fvs (Range  _ e)      = fvs e
 
     -- In (if e1 then e2 else e3), the binders of e1 scope over e2
@@ -746,33 +759,33 @@ closed = null . getFree
 
 getVar :: HasCallStack => SrcExpr -> [Ident]
 -- Get mutable variables
-getVar Lit{} = []
-getVar Variable{} = []
-getVar (Array es) = concatMap getVar es
-getVar (Seq es) = concatMap getVar es
-getVar (ApplyS e1 e2) = getVar e1 ++ getVar e2
-getVar (ApplyD e1 e2) = getVar e1 ++ getVar e2
--- getVar If3{} = []
-getVar (If3 e _ _) = getVar e
-getVar For2{} = []
-getVar (Let _ e) = getVar e
-getVar Block{} = []
-getVar (Unify e1 e2) = getVar e1 ++ getVar e2
-getVar Macro1 {} = []
-getVar (DefineE _ e) = getVar e
+getVar Lit{}            = []
+getVar Variable{}       = []
+getVar (Array es)       = concatMap getVar es
+getVar (Seq es)         = concatMap getVar es
+getVar (ApplyS e1 e2)   = getVar e1 ++ getVar e2
+getVar (ApplyD e1 e2)   = getVar e1 ++ getVar e2
+getVar (If3 e _ _)      = getVar e
+getVar For2{}           = []
+getVar (Let _ e)        = getVar e
+getVar Block{}          = []
+getVar (Unify e1 e2)    = getVar e1 ++ getVar e2
+getVar Macro1 {}        = []
+getVar (DefineV _)      = []
+getVar (DefineE _ e)    = getVar e
 getVar (DefineIE _ _ e) = getVar e
-getVar Choice{} = []
-getVar (Set _ _ e) = getVar e
-getVar (MVar i t e) = i : maybe [] getVar t ++ maybe [] getVar e
-getVar (Range _fx e) = getVar e
-getVar Function{} = []
-getVar (Exists _ e)   = getVar e
-getVar (Verify _ e)   = getVar e
-getVar (OfType e _ t) = getVar e ++ getVar t
-getVar Lam{} = []
-getVar Fail = []
-getVar EPrim{} = []
-getVar e = impossible e
+getVar Choice{}         = []
+getVar (Set _ _ e)      = getVar e
+getVar (MVar i t e)     = i : maybe [] getVar t ++ maybe [] getVar e
+getVar (Range _fx e)    = getVar e
+getVar Function{}       = []
+getVar (Exists _ e)     = getVar e
+getVar (Verify _ e)     = getVar e
+getVar (OfType e _ t)   = getVar e ++ getVar t
+getVar Lam{}            = []
+getVar Fail             = []
+getVar EPrim{}          = []
+getVar e                = impossible e
 
 
 getAllIdents :: SrcExpr -> [Ident]
