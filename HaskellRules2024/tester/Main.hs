@@ -77,9 +77,10 @@ runTests test_flags
 
 data Test
   -- Test that two expressions evaluate to the same thing
-  = TestEvalEq TestInfo SrcExpr SrcExpr
-  | TestVerify TestInfo SrcExpr
-  | TestTim { timTag :: Src.Ident, timExpr :: SrcExpr }
+  = TestEvalEq TestInfo SrcExpr SrcExpr     -- testeq( name, code ){ value }
+  | TestVerify TestInfo SrcExpr             -- verify( name, pass/fail){ code }
+  | TestTim { timTag :: Src.Ident           -- test(D00){ code }
+            , timExpr :: SrcExpr }
   deriving (Show)
 
 testInfo :: Test -> TestInfo
