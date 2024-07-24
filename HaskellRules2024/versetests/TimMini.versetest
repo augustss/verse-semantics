@@ -1,3 +1,10 @@
 test(S00){1}
 test(S00){1=1}
 test(F00){1=2}
+test(QS00){allow{x:int=x; x=3; x=3}}
+test(S00){1=>2}
+test(S00){x:=1}
+test(S00){let(x:=1). x+1}				#TODO:FIX
+test(N00){x}
+test(S00){f(1):=2}
+test(R01){Err("hello")}

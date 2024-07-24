@@ -1081,7 +1081,7 @@ test(S00){f(f):any=f}				#FP:10.4:RECURSION
 test(D00){a&b:int => f(a=b):=3 => f[a=b]}
 test(P00){a&b:int => f(a=b):=3 => f(a=b)}
 test(D00){a&b:int => a=b where f():=a=b}
-test(S00){a&b:int => f(:any):type{a=b} => f[a=b]}		FP:10.4:L2R:UNSOUND
+test(S00){a&b:int => f(:any):type{a=b} => f[a=b]}		#FP:10.4:L2R:UNSOUND
 test(D00){a&b:int => f(a=b):type{a=b} => f[a=b]}
 test(F00){f(:any):false => x:false where f[x]}
 
@@ -1430,13 +1430,13 @@ test(F00){a:=2,assume{a=3},4=5}		#TODO:10.4:ASSUME
 
 # Don't let diverges overwhelms fails.
 test(R20){x:=2,assume{x=3}}
-test(S00){0 => Err("Hello")};
-test(R01){Err()};
-test(R01){Err("Hello")};
+test(S00){0 => Err("Hello")}
+test(R01){Err()}
+test(R01){Err("Hello")}
 test(F00){Err(),false[]}
 test(F00){false[],Err()}
-test(F00){0 => {Err("Hello"),2=3}};
-test(F00){0 => {2=3,Err("Hello")}};
+test(F00){0 => {Err("Hello"),2=3}}
+test(F00){0 => {2=3,Err("Hello")}}
 
 # "Contradiction is contained at projections" was the former title of this section.
 test(S00){as:=(7,8=9) => as=2}
@@ -2748,20 +2748,20 @@ test(S00){a:=(1;2;),a=(1,2)}		#FP:10.4:DESUGARING?
 test(S00){for(0){1}=array{1}}
 test(S00){for(0|1){3,4}=((3,4),(3,4))}
 test(S00){let(){2,3}=(2,3)}
-test(S00):
-	x:=let():
-	  2,3
-	x=(2,3)
+## TODO:PARSE: test(S00):
+## TODO:PARSE: 	x:=let():
+## TODO:PARSE: 	  2,3
+## TODO:PARSE: 	x=(2,3)
 test(S00){let(x:=1,y:=2){y=2;x=1;}}
 test(S00){let(){2;3}=3}
 test(S00){for(0|1){3;4}=(4,4)}
 test(S00){f:=function(){r:=let(x:=3){y:=x; x+1}},f()=4}
 test(S00){for{3;4}=array{4}}
-test(S00):
-	x:=let():
-	  2
-	  3
-	x=3
+## TODO:PARSE: test(S00):
+## TODO:PARSE: 	x:=let():
+## TODO:PARSE: 	  2
+## TODO:PARSE: 	  3
+## TODO:PARSE: 	x=3
 test(S00){x:={1;2};x=2}
 #LA test(F00):
 #LA 	x:=
@@ -2828,9 +2828,9 @@ test(S00){a:int => f(3):int => f[:int]}							#FP:10.4:SWAP:ISINT
 test(S00){a:int => g(:nat):int => f(x:int):int => if{f[g[a]]}}	#FP:10.4:OK
 
 # Unify macro.
-test(S00){a:=operator'='{}}				#TODO:FP:10.4:DESUGAR:MACRO
-test(S00){a:=operator'='{2},a=2}		#TODO:FP:10.4:DESUGAR:MACRO
-test(F00){a:=operator'='{2},a=3}
+## TODO:PARSE: test(S00){a:=operator'='{}}				#TODO:FP:10.4:DESUGAR:MACRO
+## TODO:PARSE: test(S00){a:=operator'='{2},a=2}		#TODO:FP:10.4:DESUGAR:MACRO
+## TODO:PARSE: test(F00){a:=operator'='{2},a=3}
 
 # Various.
 test(F00){a:int => {x:=a,assume{x=7},x=8}}

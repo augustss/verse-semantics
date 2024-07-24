@@ -5,7 +5,7 @@ module FrontEnd.Parse(
     -- Exports for further parsing
     pKeyword, skip, eof, many, pParens, pBraces, symbol, optional,
     pIdent, pExprSeq, pOp, pLiteral, pMacroName, try,
-    pString, pBlockM,
+    pString, pBlockM, pAny,
 
     lexeme, string, testp, parseString
   ) where
@@ -93,6 +93,9 @@ symbol = L.symbol skip
 pWord :: P String
 pWord = lexeme ((:) <$> (letterChar <|> char '_') <*> many (alphaNumChar <|> char '_') <?> "identifier")
 
+pAny :: P String
+pAny = many anySingle
+
 {-
 pWordOp :: P String
 pWordOp = do
@@ -149,7 +152,29 @@ keywords = (["alias", "and", "array", "block", "do", "else", "effects", "for", "
            \\ ["logic"] -- Allowed both as a type and a macro
 
 macros :: [String]
-macros = ["all", "one", "some", "guard", "verify", "check","type" ]
+macros =
+  [ "all"
+  , "one"
+  , "some"
+  , "guard"
+  , "verify"
+  , "check"
+  -- other macros
+  , "allow"
+  , "assert"
+  , "assume"
+  , "expect"
+  , "first"
+  , "last"
+  , "logic"
+  , "lowered"
+  , "reject"
+  , "type"
+  , "unify"
+  -- , "Err"
+  ]
+
+
 
 macrosOp :: [String]
 macrosOp = ["in'='"]

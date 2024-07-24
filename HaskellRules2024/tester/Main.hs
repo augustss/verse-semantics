@@ -11,7 +11,7 @@ import FrontEnd.ToCore( convertToCore )
 import FrontEnd.Flags
 import FrontEnd.Expr as Src
 import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pParens
-                     , pString, pKeyword, many, lexeme, optional, string, skip, eof )
+                     , pString, pKeyword, many, lexeme, optional, string, skip, eof, pAny )
 import FrontEnd.Prelude( findPrelude )
 
 import Rules.Core             as Rules
@@ -35,6 +35,8 @@ import Text.Printf
 
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
+import Text.Megaparsec (try)
+import qualified Control.Exception as Exc
 
 
 -----------------------------------------------
@@ -81,12 +83,14 @@ data Test
   | TestVerify TestInfo SrcExpr             -- verify( name, pass/fail){ code }
   | TestTim { timTag :: TimTag              -- test(D00){ code }
             , timExpr :: SrcExpr }
+  | TestTimCrash TimTag String             -- test(D00){ code-that-crashes-the-parser }
   deriving (Show)
 
 testInfo :: Test -> TestInfo
 testInfo (TestEvalEq ti _ _) = ti
-testInfo (TestVerify ti _) = ti
-testInfo (TestTim    ti _) = timTestInfo ti
+testInfo (TestVerify ti _)   = ti
+testInfo (TestTim    ti _)   = timTestInfo ti
+testInfo (TestTimCrash ti _) = timTestInfo ti
 
 data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code... }
                  -- The stuff in the parens is the TestInfo
@@ -183,6 +187,19 @@ srcToCore flags add_verification e
        ; let e3 = Rules.prep e2
        ; return e3 }
 
+srcToCoreMb :: Flags -> Bool -> SrcExpr -> IO (Maybe Rules.Expr)
+srcToCoreMb flags add_verification e
+  = Exc.catch (Just <$> srcToCore flags add_verification e) handler
+    where
+        handler :: Exc.ErrorCall -> IO (Maybe Rules.Expr)
+        handler _ = return Nothing
+
+--  Exc.catch (print $ divide 5 0) handler
+--     where
+--         handler :: Exc.ErrorCall -> IO ()
+--         handler _ = putStrLn $ "You divided by 0!"
+
+
 evalExpr :: TestFlags -> Rules.Expr -> Traced Rules.Expr
 evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
 
@@ -207,9 +224,13 @@ verifyE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> IO TestRes
 -- We try to verify
 --   verify(;){ check<succeeds>{e} }
 verifyE flg ti e
-  = do { c <- srcToCore (verifyFlags flg) True e
-       ; let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
-       ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) }
+  = do { cMb <- srcToCoreMb (verifyFlags flg) True e
+       ; case cMb of
+           Nothing -> pure Excn
+           Just c  -> do { let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
+                        ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) } }
+      --  ; let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
+      --  ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) }
 
 verifyFlags :: TestFlags -> Flags
 verifyFlags flg = setPreludeFlag True flg $ testFlagsToFlags flg
@@ -342,12 +363,20 @@ pTestEq =
     tId <- pParens pTestInfo
     TestEvalEq tId <$> pBraces pExprSeq <*> pBraces pExprSeq
 
+
+
 -- Parse an expression verification test
 pTestVerify :: P Test
 pTestVerify =
   pKeyword "verify" *> do
     tId <- pParens pTestInfo
     TestVerify tId <$> pBraces pExprSeq
+
+
+pTimCrashTest :: P Test
+pTimCrashTest =
+  pKeyword "test" *> do
+    TestTimCrash <$> pParens pIdent <*> pBraces pAny
 
 pTimTest :: P Test
 pTimTest =
