@@ -77,9 +77,10 @@ runTests test_flags
 
 data Test
   -- Test that two expressions evaluate to the same thing
-  = TestEvalEq TestInfo SrcExpr SrcExpr
-  | TestVerify TestInfo SrcExpr
-  | TestTim { timTag :: Src.Ident, timExpr :: SrcExpr }
+  = TestEvalEq TestInfo SrcExpr SrcExpr     -- testeq( name, code ){ value }
+  | TestVerify TestInfo SrcExpr             -- verify( name, pass/fail){ code }
+  | TestTim { timTag :: Src.Ident           -- test(D00){ code }
+            , timExpr :: SrcExpr }
   deriving (Show)
 
 testInfo :: Test -> TestInfo
@@ -106,14 +107,12 @@ data TestType
 testName :: TestInfo -> String
 testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocn ti)))) (testMName ti)
 
-data TestRes = Good | Bad | Many | None | Excn | Skip
+data TestRes = Good | Bad | Excn | Skip
   deriving (Eq, Show)
 
 --showRes :: TestRes -> String
 --showRes Good = "OK"
 --showRes Bad  = "BAD"
---showRes None = "t.o."
---showRes Many = "nonc"
 --showRes Excn = "excn"
 --showRes Skip = "skip"
 
@@ -129,10 +128,25 @@ runTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 runTestFile tflg (fn, ts)
  = do { putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
       ; let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
-      ; res <- mapM (runTest tflg) (filter p ts)
-      ; let ok = all (`elem` [Good, Skip]) res
-      ; putStrLn $ if ok then "SUCCESS" else "FAILURE"
-      ; unless ok $ exitWith (ExitFailure 1) }
+      ; res :: [TestRes] <- mapM (runTest tflg) (filter p ts)
+
+      ; let n_tests   = length res
+            n_skipped = count Skip res
+            n_passed  = count Good res
+            n_failed  = count Bad  res
+            n_excn    = count Excn res
+      ; putStrLn ""
+      ; putStrLn "------------ Overall summary ---------------------------"
+      ; putStrLn $ "Number of tests: " ++ show n_tests
+      ; when (n_passed > 0)  $ putStrLn $ printf "%5d passed" n_passed
+      ; when (n_failed > 0)  $ putStrLn $ printf "%5d failed" n_failed
+      ; when (n_excn > 0)    $ putStrLn $ printf "%5d threw an exception" n_excn
+      ; when (n_skipped > 0) $ putStrLn $ printf "%5d skipped" n_skipped
+      ; putStrLn "---------------------------------------------------------"
+      ; unless (n_passed == n_tests) $ exitWith (ExitFailure 1) }
+  where
+    count :: TestRes -> [TestRes] -> Int
+    count r rs = length (filter (== r) rs)
 
 runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestEvalEq ti e1 e2) = testEvalE tflg ti e1 e2
@@ -213,7 +227,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
   where
     loc_str = prettyShow (testLocn ti)
     noisy = not (quiet tflg)
-    test_herald = printf "%-*s (%-*s)" widthTestName test_nm widthFileName loc_str
+    test_herald = printf "%-*s %-*s" widthTestName test_nm widthFileName loc_str
     typ   = testType ti
     test_nm = case testMName ti of
                 Just n  -> n

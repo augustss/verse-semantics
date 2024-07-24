@@ -561,6 +561,7 @@
 %format v_2
 %format v_3
 %format v_n
+%format v_nm1 = "v_{n-1}"
 %format v_n'
 %format v_m'
 %format v_x

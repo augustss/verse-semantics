@@ -162,8 +162,8 @@ $\begin{array}{@@{}l}
 \rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
 \rulename{app-lam}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
                                                   & \text{if $x \not\in \freevars{|v|}$} \\
-\rulename{app-tup}          & |apply1 (tup (v_1,xdots, v_n)) v| & \movesto &
-                            |(v == 1^^^ v_1) choice xdots choice (v == n^^^ v_n)| & n \geq 1 \\
+\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_nm1)) v| & \movesto &
+                            |(v == 0^^^ v_0) choice xdots choice (v == (n-1)^^^ v_nm1)| & n \geq 0 \\
 \rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail|
 \end{array}
 \\ \\[-0.8em]

@@ -227,6 +227,8 @@ theCommandSet = CommandSet
 --      , Cmd "rules [NAME]"         "Select rule system"                    cRules
       ]
 --  , c_exec = cParseLine
+
+  -- c_exec :: CmdRunner deals with a command /starting/ with colon
   , c_exec = errorMessage "c_exec: not done yet"
 
   , c_help   = helpMsg

@@ -31,8 +31,8 @@ data CommandSet s = CommandSet
   }
 
 data Cmd s = Cmd  -- Describes a single command
-  { cmd_string :: String    -- The command name
-  , cmd_help   :: String    -- Help text for the command
+  { cmd_string :: String          -- The command name
+  , cmd_help   :: String          -- Help text for the command
   , cmd_exec   :: CmdRunner s     -- Use this to run the command
   }
 
@@ -61,7 +61,13 @@ runCommands CommandSet{..} = do
       mapM_ (\ (Cmd c h _) -> printf ":%-*s  %s\n" l c h) commands
       pure s
 
-    eval :: s -> String -> IO (Bool, s)
+    eval :: s
+         -> String          -- The input line, typed by the user
+         -> IO (Bool, s)    -- Bool = True iff user typed ":quit"
+    -- Discard leading spaces, look for leading ':',
+    --    take longest isAlpha prefix, and see if that is a prefix of a command.
+    -- If so, run the command passing the rest of the input line;
+    --  otherwise run c_exec passing the rest of the input line
     eval s line =
       case dropWhile isSpace line of
         ':' : line' | null line'' -> pure (False, s)
