@@ -363,20 +363,12 @@ pTestEq =
     tId <- pParens pTestInfo
     TestEvalEq tId <$> pBraces pExprSeq <*> pBraces pExprSeq
 
-
-
 -- Parse an expression verification test
 pTestVerify :: P Test
 pTestVerify =
   pKeyword "verify" *> do
     tId <- pParens pTestInfo
     TestVerify tId <$> pBraces pExprSeq
-
-
-pTimCrashTest :: P Test
-pTimCrashTest =
-  pKeyword "test" *> do
-    TestTimCrash <$> pParens pIdent <*> pBraces pAny
 
 pTimTest :: P Test
 pTimTest =

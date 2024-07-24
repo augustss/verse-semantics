@@ -171,7 +171,6 @@ macros =
   , "reject"
   , "type"
   , "unify"
-  -- , "Err"
   ]
 
 
