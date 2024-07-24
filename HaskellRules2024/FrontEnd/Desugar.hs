@@ -358,6 +358,7 @@ simpleMapEntry _ = Nothing
 --------------------------------------
 
 defnArray :: [SrcExpr] -> SrcExpr -> D SrcExpr
+-- Dealing with an array on the LHS of a ":=", i.e.  an "array pattern"
 defnArray ps e = do
   let var p = do
         let (wrap, ip) =
@@ -378,6 +379,8 @@ defnArray ps e = do
   pure $ seqE $ bs ++ [InfixOp arr (Op "=") e]
 
 arraySplice :: [SrcExpr] -> D SrcExpr
+-- arraySplice [es1, ..e, es2] -->  arraySplice e1 ++ e ++ arraySplice es2
+-- The args to arraySplice are all EElems or ESplice
 arraySplice as =
 --  trace ("--- " ++ show (as, arrayElems as)) $
   case arrayElems as of
@@ -385,21 +388,30 @@ arraySplice as =
     e:es        -> app (arr e) $ map arr es
   where arr (EElems es) = Array es
         arr (ESplice e) = e
+
         app r [] = pure r
         app r (e : es) = do
           t <- newIdent noLoc "t"
           rest <- app (Variable t) es
           pure $ seqE [eAppend r e t, rest]
 
+-- app e1 [e2,e3]
+--  =  exists t1; append[e1,e2,t1]; app t1 [e3]
+--  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; app t2 []
+--  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; t2
+
 eAppend :: SrcExpr -> SrcExpr -> Ident -> SrcExpr
 eAppend (Array xs) (Array ys) z = eDefine z (Array (xs ++ ys))
 eAppend x y z = Seq [existsXX z, ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, Variable z])]
 
-data ArrayElem = EElems [SrcExpr] | ESplice SrcExpr
+data ArrayElem  -- Used very locally, to communicate between `arrayElems` and `arraySplice`
+  = EElems [SrcExpr] | ESplice SrcExpr
   deriving (Show)
 
--- Handle an array element, it can be ..e or e
 arrayElems :: [SrcExpr] -> [ArrayElem]
+-- Handle an array element, it can be ..e or e
+-- Returns a list of [EElems es, ESplice e, ESplice e, .. ]
+-- Where we maximally group the EElems, for efficiency
 arrayElems = grp . map cls
   where cls (PrefixOp (Ident _ "..") e) = Left e
         cls e = Right e

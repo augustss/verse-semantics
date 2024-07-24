@@ -488,6 +488,9 @@ valid e                   = isVal e
 prep :: Expr -> Expr
 -- Convert an Expr into an Expr in the sub-language of desugaring.pdf
 -- Hence: valid (prep e) == True
+-- In particular:
+--   * A-normal form; e.g. args of `:@:` are values
+--   * (v=e) only to the left of `:>:`
 prep (Var x)       = Var x
 prep (Lit k)       = Lit k
 prep (Arr as)      = prepVals as (\vs -> Arr vs)
