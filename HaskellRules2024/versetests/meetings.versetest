@@ -1,0 +1,6 @@
+# Meeting 24 July 24
+# Res1 should be rejected despite 'decides': the string[7] fails and should be rejected
+# Similarly Res2
+
+verify("Res1", fail) { f(x:int)<decides>:string := 7 }
+verify("Res2", fail) {f(x:int)<decides>:type{x=10} := 7 }

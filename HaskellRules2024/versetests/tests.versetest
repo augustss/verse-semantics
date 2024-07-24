@@ -40,28 +40,35 @@ testeq("Cmp18",pass) {3=2}                                 {:false}
 # Values to consider: K, op, tuple, lambda
 # K
 testeq("Unif",pass) {1=2}                                 {:false}
+
 # no prefix'op'
 testeq("Unif1",pass,refimpl=skip) {1=prefix'-'}            {:false}
 testeq("Unif2",pass) {1=(1,2)}                             {:false}
+
 # ICFP rules gets stuck on any lambda comparison
 testeq("Unif3",pass,ICFP*=skip) {1=(x:any=>x)}                        {:false}
+
 # op
 testeq("Unif4",pass,refimpl=skip) {prefix'-'=1}                         {:false}
 testeq("Unif5",pass,refimpl=skip,iblock=skip) {prefix'-'=prefix'+'}     {:false}
 testeq("Unif6",pass,refimpl=skip) {prefix'-'=(1,2,3)}                   {:false}
 testeq("Unif7",pass,refimpl=skip,ICFP*=skip,iblock=skip) {prefix'-'=(x:any=>x)}                {:false}
+
 # tuple
 testeq("Unif8",pass) {(1,2)=1}                             {:false}
 testeq("Unif9",pass,refimpl=skip) {(1,2)=prefix'-'}        {:false}
 testeq("Unif10",pass) {(1,2)=(1,2,3)}                       {:false}
 testeq("Unif11",pass,ICFP*=skip) {(1,2)=(x:any=>x)}         {:false}
+
 # lambda
 testeq("Unif12",pass,ICFP*=skip) {(x:any=>x)=1}             {:false}
 testeq("Unif13",pass,refimpl=skip,ICFP*=skip,iblock=skip) {(x:any=>x)=prefix'-'}                {:false}
 testeq("Unif14",pass,ICFP*=skip) {(x:any=>x)=(1,2,3)}                  {:false}
 testeq("Unif15",pass,ICFP*=skip,iblock=skip) {(x:any=>x)=(x:any=>1)}               {:false}
+
 # Unification with equal values
 testeq("Unif16",pass) {1=1}                                 {1}
+
 # Not with POPL
 #testeq("Unif17",pass,popl*=fail,refimpl=skip,icfp*=fail)
 #            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
@@ -90,7 +97,6 @@ testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
 # This does not work left-to-right
 testeq("Array8",pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 testeq("Array9",pass) { a := (0,1); a[0] }                   {0}
-
 
 # Array expression splicing
 ### SPLICE testeq("EV",pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
@@ -150,12 +156,15 @@ testeq("TB2",pass) {ap0(f(x:int):int) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
 testeq("TB3",pass) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
 testeq("TB4",pass) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
 testeq("TB5",pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
+
 # DESUGAR HOW?
 #testeq("TB6",pass) {(p^ : int) := 2}                      {p:=new[int][2]}
 # XXX Not sure about these
 #testeq("TB7",pass,refimpl=skip,icfp=skip) {x? : int}                            { x : ?int }
 #testeq("TB8",pass,refimpl=skip,icfp=skip) {x[] : int}                           { x : []int }
+
 testeq("TB9",pass) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
+
 # DESUGAR HOW?
 #testeq("TB10",pass) {p^[](:int):int}                      {0}
 
@@ -191,18 +200,21 @@ testeq("JB2",pass) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = 
 testeq("JB3",pass) {x:any; y:any; x = y; x = y; x = 1}  {1}
 testeq("JB4",pass) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
 
+# "Dom1": Unification in the domain
+testeq("Dom1",pass) {f9( x := 3|4):int := x+1; all{ y:int; f9[y]; y }} {(3,4)}
+
 # Recursion
 testeq("TRec1",pass,POPLR=skip,Block=skip,ICFP*=skip)
             {f(n:any) := if (n = 0) then 1 else f(n-1); f(1)}  {1}
 testeq("TRec2",pass,POPLR=skip,Block=skip,ICFP*=skip)
             {fac(n:any) := if (n = 0)  {1} else  {n * fac(n-1)}; fac(4)}  {24}
-# SLOW with PLDI
+
+# SLOW with PLDI; needs 'for'
 # testeq("TRec3",pass) {even(n:int) := if (n = 0)  {1} else  {odd(n-1)};
 #            odd(n:int)  := if (n = 0)  {0} else  {even(n-1)};
 #           for(x := 0|1|2|3)  {(even(x), odd(x))}
 #            }
 #            {((1,0), (0,1), (1,0), (0,1))}
-
 
 
 # Non-retractions as types
