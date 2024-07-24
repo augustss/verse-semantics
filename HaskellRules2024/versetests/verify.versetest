@@ -86,6 +86,7 @@ verify("T52",pass) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z
 verify("T53",pass) {f(x:int)<succeeds>:=x/2}
 verify("T54",fail) {f(x:int)<succeeds>:=x/0}
 verify("T55",fail) {f(x:int)(y:int):int := (x,y)}
+verify("T56",pass) {x:int,x=3}
 
 # Effects
 verify("Eff1",pass) {f(x:int)<succeeds>:int := x}
@@ -95,7 +96,7 @@ verify("Eff2",pass) {f(x:int)<decides>:int := x}
 verify("Curry1",pass){ f(x:int)(y:int):int := x+y }
 
 # Stuck-ness
-verify("Stuck1",fail){ f(x:int):int := x; check<succeeds>{ y := f9[y] } }
+verify("Stuck1",fail){ f(x:int):int := x; check<succeeds>{ y := f[y] } }
 
 # Opacity
 verify("Opacity1", fail) { f(x:int := 3) := x=3 }
@@ -172,21 +173,6 @@ verify("Dec8a",pass) { foo(x:int)<decides> := { (x = 666) } ; phil(z:foo) := (70
 ### # verify(pass) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
 ### # forall x y . exists z . assume{z = x}; z = x; x = y
 
-# left-to-right
-verify("PP1", pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
-verify("PP2", fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
-
-# PP3a/b: to verify H's defn, we need to know X=1, so we need to
-#         call G() to the left of that defn
-verify("PP3a", fail) { F( X:int, G():type{X = 1} )
-                              := (H()<succeeds> := X = 1; H()
-                                 ; G() )    # Call G last!
-                        ; F(2, G1() := G1()) }
-verify("PP3b", pass) { F( X:int, G():type{X = 1} )
-                              := (G();    # Call G first!
-                                  H()<succeeds> := X = 1; H())
-                        ; F(2, G1() := G1()) }
-
 # f9( x := 3|4):int := x+1;
 # y:int
 # f9[y]
@@ -202,23 +188,42 @@ verify("FunPair2", pass) { (a := (_,_)) => a=(_,_) }
 verify("FunPair3", pass) { f(a := (_,_)) := a=(_,_) }
    # Lambda takes a pair, a, as its argument, and then checks that the argument is a pair and returns it
 
-### verify(pass) { main(:any) := { if(a:=1|2){a=1} } }  # TODO:IF:CHOICE
-# TODO:HEREHEREHERE:GATHER-OUTER-SKOLEM verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
-###
+verify(pass) { main(:any) := { if(a:=1|2){a=1} } }
+verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
+
 ### # TODO
-### verify(pass, ICFPEverify=skip) {a:any => b:any => {x:=b; x=a; assume{x=a}; assume{x=b}}}
-### verify(pass, ICFPEverify=skip) {a:any => b:any => {x:=(a=b) ; assume{x=a}; assume{x=b}}}
-### verify(pass, ICFPEverify=skip) {a:any => b:any => {x:=b; x=a; assume{x=a}; assume{x=b}}}
-### verify(pass, ICFPEverify=skip) {x:int => f():type{x=0} => {x=0;f[]}}  # TODO: SWAP assume over verify
-### verify(pass, ICFPEverify=skip) {x:int => f():type{x=0} => {f[],x=0}}  #TODO:TYPEWOES:OK
-### verify(pass, ICFPEverify=skip) {x:int => f():type{x=0} => {x=0,f[]}}  #TODO:TYPEWOES:FAILS
-### verify(pass, ICFPEverify=skip) {a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
-### verify(pass, ICFPEverify=skip) {a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
-### verify(pass, ICFPEverify=skip) {a:int => b:any => f(a   ):type{a=b} => {a=b,f[a]}}	#FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
+### verify(pass) {a:any => b:any => {x:=b; x=a; assume{x=a}; assume{x=b}}}
+### verify(pass) {a:any => b:any => {x:=(a=b) ; assume{x=a}; assume{x=b}}}
+### verify(pass) {a:any => b:any => {x:=b; x=a; assume{x=a}; assume{x=b}}}
+### verify(pass) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}
+### verify(pass) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}
 
-verify("TimEq", pass) {a:int => b:int => f(a):type{a=b} => {f[a],a=b}} #FP:10.4:L2R:STRENGTH:UNSOUND:TYPEWOES:DUPLICATE(l2260):FLIPOK
-verify(pass) {a:=(1;2),a=(1,2)}		 #FP:10.4:DESUGARING?
 
-### verify(pass, ICFPEverify=skip) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}	#FP:10.4:EFF:COMPUTES:FUN-OUT-EQ
-### verify(pass, ICFPEverify=skip) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}			#FP:10.4:CHECK:DESUGAR
-verify(pass, ICFPEverify=skip) {x:int,x=3}
+# ------------------------------------------------------------
+# Proofs as programs
+verify("PP1", pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
+
+# PP3a/b: to verify H's defn, we need to know X=1, so we need to
+#         call G() to the left of that defn
+verify("PP3a", fail) { F( X:int, G():type{X = 1} )
+                              := (H()<succeeds> := X = 1; H()
+                                 ; G() )    # Call G last!
+                        ; F(2, G1() := G1()) }
+verify("PP3b", pass) { F( X:int, G():type{X = 1} )
+                              := (G();    # Call G first!
+                                  H()<succeeds> := X = 1; H())
+                        ; F(2, G1() := G1()) }
+
+verify(":type2", pass) {x:int => f():type{x=0} => {f[],x=0}}
+verify(":type5", pass) {a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}
+
+
+verify("TimEq", pass) {a:int => b:int => f(a):type{a=b} => {f[a],a=b}}
+
+# "Effective assupmtions"   These ones fail becaues we invoke the lemma too late
+verify("PP2", fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
+verify(":type1", fail) {x:int => f():type{x=0} => {x=0;f[]}}
+verify(":type6", fail) {a:int => b:int => f(a   ):type{a=b} => {a=b,f[a]}}
+verify(":type4", fail) {a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}
+
+verify(pass) {a:=(1;2;),a=(1,2)}

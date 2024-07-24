@@ -173,6 +173,7 @@ dsSmall = ds
     -- Variables
     ds (Variable ident@(Ident l v))
       | isSrcUnderscore ident       = existsXX <$> newIdent l "u"  -- "_" means (exists u.u)
+      | v == "fail"                 = return Fail
       | Just op <- lookupPrimOp v   = return (EPrim op)
       | otherwise                   = return (Variable ident)
 
@@ -621,17 +622,10 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
 
 -------------------- e |>{fx} t -----------------------
 dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
-   = eCheck fx <$> verify_body
--- SLPJ: check this; not what is in the doc
---            , dsM_12 MI t pi ]
---    = seqDE [ eCheck fx <$> verify_body
---            , dsM_12 MI t pi ]
---  = seqDE [ eVerify [] <$> (eCheck fx <$> verify_body)
---          , dsM_12 MI t pi ]
-  where
-    verify_body = do { (e1, x) <- defineDE "x" (dsM_12 MV t1 pi)
-                     ; (e2, z) <- defineDE "z" (dsDD_12 MV t2)
-                     ; pure (seqE [e1, e2, eApplyD z x]) }
+   = eCheck fx <$>
+     do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
+        ; (e2, z) <- defineDE "z" (dsDD_12 MV t2)
+        ; pure (seqE [e1, eCheck [effSucceeds] (seqE [e2, eApplyD z x])]) }
 
 dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
     -- SLPJ: pi is unused, which seems suspicious

@@ -61,6 +61,7 @@ Choice        e1 | e2              InfixOp e1 "|" e2
 Unification   e1 = e2              InfixOp e1 "=" e2
 Binding       f(p)<fx> := e        InfixOp (EffAttr (ApplyS f p) fx) ":=" e
 Guard         v ;;<fx> e           Macro2 "guard" <fx> e
+Failure       fail                 Variable "fail"
 -}
 
 --------------------------------------------------------
@@ -346,6 +347,7 @@ instance Pretty Ident where
 --------------------------------------------------------
 
 type Eff = Ident
+
 
 effSucceeds, effDecides, effFails :: Eff
 effSucceeds = Ident noLoc "succeeds"
