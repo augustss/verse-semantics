@@ -16,7 +16,7 @@ import FrontEnd.Prelude( findPrelude )
 
 import Rules.Core             as Rules
 import Rules.Verifier( verificationRules )
-import TRS.Traced( Traced, term )
+import TRS.Traced as TRS ( Traced, term, trace )
 import TRS.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
@@ -260,7 +260,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
                       (\e -> do { exn_handler e;  pure Excn} )
 
        -- Display the trace if asked for, regardless of succcess/failure
-       ; when (trace tflg) $
+       ; when (showTrace tflg) $
          do { putStrLn "Trace is:"; display tr1 }
 
        ; pure res }
@@ -274,13 +274,14 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
     expectOK = typ == TPass
     tr1      = evalExpr tflg c1
     tr2      = evalExpr tflg c2
-    v1       = term tr1
-    v2       = term tr2
+    v1       = TRS.term tr1
+    v2       = TRS.term tr2
+    n_steps  = length (TRS.trace tr1)
 
     ppi x    = putStrLn (render (text "  " <+> pPrint x))
 
-    what True  = "success!"
-    what False = "failure!"
+    what True  = "success"
+    what False = "failure"
 
     exn_handler :: SomeException -> IO ()
     exn_handler e
@@ -293,6 +294,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
 
     success_handler -- What to display if all is well
       = when noisy $ putStrLn $ test_herald ++ " Expected " ++ what expectOK
+                                ++ " in " ++ printf "%5d" n_steps ++ " steps"
 
     failure_handler -- What to display if test fails
       | TBroken <- typ
@@ -419,7 +421,7 @@ data TestFlags = TestFlags
   , noError        :: !Bool                -- Don't show error message
   , postProc       :: !Bool                -- Post processing
   , summary        :: !Bool                -- Produce a summary
-  , trace          :: !Bool                -- Show traces
+  , showTrace      :: !Bool                -- Show traces
   , onlyTest       :: !(Maybe String)      -- run only this test
   , testExpr       :: !(Maybe String)      -- use this expression as a test
   , maxSteps       :: !Int                 -- max number of rewrite steps
@@ -557,7 +559,7 @@ testFlagsToFlags :: TestFlags -> Flags
 testFlagsToFlags t =
   let flags = defaultFlags
   in  flags{ fSplit = split t, fSimplify = simplify t,
-             fTrace = trace t,
+             fTrace = showTrace t,
              fDfs = dfs t, fPostProcess = postProc t,
              fUnderLambda = not (noUnderLam t),
              fRewriteSteps = maxSteps t,
