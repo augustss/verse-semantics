@@ -94,6 +94,7 @@ scope :: S.Set Src.Ident -> SrcExpr -> D SrcExpr
 scope sc = expr
   where
     -- x := e  -->   x = e
+    expr (DefineV i)   = pure $ Variable i
     expr (DefineE i e) = Unify (Variable i) <$> expr e
 
     expr e@Src.Lit{} = pure e
@@ -155,12 +156,18 @@ scope sc = expr
     defs' as e = do
       let -- Get all binders from e
           is = getVisibleBinders e
-          -- errM: find ones that are defined more than once
+
+          -- errM: multiply-defined variables
+          -- E.g.   f() := { x:int; x:float; x }   is illegal
+          -- This is an error
           errM = filter ((> 1) . length) $ group $ sort is
 
-          -- errS: find ones that are already in scope
+          -- errS: find varaiables ones that are already in scope, hence shadowed
+          -- E.g. f(x:int) := { x:float; x }    Here the inner x shadows the outer
+          -- This is only a warning
           errS = [ (i, j) | i <- is, j <- filter (== i) (S.toList as) ]
           sc' :: S.Set Ident = foldr S.insert as is
+
       e' <- scope sc' e
       errMultiple errM
       errShadow errS
