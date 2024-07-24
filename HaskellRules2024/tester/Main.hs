@@ -79,13 +79,14 @@ data Test
   -- Test that two expressions evaluate to the same thing
   = TestEvalEq TestInfo SrcExpr SrcExpr     -- testeq( name, code ){ value }
   | TestVerify TestInfo SrcExpr             -- verify( name, pass/fail){ code }
-  | TestTim { timTag :: Src.Ident           -- test(D00){ code }
+  | TestTim { timTag :: TimTag              -- test(D00){ code }
             , timExpr :: SrcExpr }
   deriving (Show)
 
 testInfo :: Test -> TestInfo
 testInfo (TestEvalEq ti _ _) = ti
-testInfo (TestVerify   ti _) = ti
+testInfo (TestVerify ti _) = ti
+testInfo (TestTim    ti _) = timTestInfo ti
 
 data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code... }
                  -- The stuff in the parens is the TestInfo
@@ -150,7 +151,8 @@ runTestFile tflg (fn, ts)
 
 runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestEvalEq ti e1 e2) = testEvalE tflg ti e1 e2
-runTest tflg (TestVerify ti e)     = verifyE tflg ti e
+runTest tflg (TestVerify ti e)     = verifyE   tflg ti  e
+runTest tflg (TestTim    ts  e)    = verifyE   tflg ti  e where ti = timTestInfo ts
 
 widthTestName :: Int
 widthTestName = 10
@@ -184,16 +186,33 @@ srcToCore flags add_verification e
 evalExpr :: TestFlags -> Rules.Expr -> Traced Rules.Expr
 evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
 
+type TimTag = Src.Ident
+
+timTestInfo :: TimTag -> TestInfo
+timTestInfo (Ident loc status) = TestInfo
+  { testMName = Nothing
+  , testLocn = loc
+  , testType = timTestType status
+  , testExcn = []
+  }
+
+timTestType :: String -> TestType
+timTestType "S00" = TPass
+timTestType "D00" = TPass
+timTestType "U00" = TFail
+timTestType "F00" = TFail
+timTestType _     = TSkip
+
 verifyE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> IO TestRes
 -- We try to verify
 --   verify(;){ check<succeeds>{e} }
 verifyE flg ti e
-  = do { c <- srcToCore flags True e
+  = do { c <- srcToCore (verifyFlags flg) True e
        ; let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
        ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) }
-  where
-    flags = setPreludeFlag True flg $
-            testFlagsToFlags flg
+
+verifyFlags :: TestFlags -> Flags
+verifyFlags flg = setPreludeFlag True flg $ testFlagsToFlags flg
 
 testEvalE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> SrcExpr -> IO TestRes
 testEvalE flg ti e1 e2
@@ -229,9 +248,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
     noisy = not (quiet tflg)
     test_herald = printf "%-*s %-*s" widthTestName test_nm widthFileName loc_str
     typ   = testType ti
-    test_nm = case testMName ti of
-                Just n  -> n
-                Nothing -> "<anon>"
+    test_nm = fromMaybe "<anon>" (testMName ti)
 
     expectOK = typ == TPass
     tr1      = evalExpr tflg c1
