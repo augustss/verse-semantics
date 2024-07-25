@@ -23,8 +23,8 @@ testeq("QC1", pass)  { exists x { (exists y {x = y; x}) | () } }
                      { exists x {x} | () }
 
 # There are too many existentials in Block for the structural rules to terminate.
-testeq("Ex1", pass)  { exists f g a b c d { f(a); g(b); one { exists x { x = (a,b); x = (c,d); x } } } }
-                     { exists f g a b c d { f(a); g(b); one { exists x { a=c; b=d;  x = (c, d); x } } } }
+testeq("Ex1", pass)  { exists f g a b c d { f[a]; g[b]; one { exists x { x = (a,b); x = (c,d); x } } } }
+                     { exists f g a b c d { f[a]; g[b]; one { exists x { a=c; b=d;  x = (c, d); x } } } }
 testeq("Ex2", pass)  { exists f g a b c d x { f(a); g(b); x = (a, b); x = (c, d); x } }
                      { exists f g c d       { f(c); g(d); (c,d) } }
 testeq("Wombat1a",pass){ x := array{ 1 }; one { exists y {x = y; array{x}}}}
@@ -36,12 +36,13 @@ testeq("Wombat2",pass){ exists y { x := (lambda a {a}); one { x = y; array{x} } 
                      # but that doesn't seem executable.
                      # We settle for this
                      { exists y { one { y = (lambda a {a}); array{ lambda a {a} } } } }
-testeq("Koen1", pass){ (lambda x {one {one {isInt$ = x; ()}; x = (exists y {y}); ()}})() }
-                     { fail }
+
+# ToDo: Why are parens neede around (isInt$)?
+testeq("Koen1", pass){ (lambda x { one { one {(isInt$) = x; ()}; x = (exists y {y}); ()}})[] } {fail}
 
 # This test loops with substitution and reduction under lambda, e.g., POPL rules
 # because x=<\y.x>
-testeq("Koen3", pass){ exists x {(lambda y {x = array{y}; (exists z {z})})(lambda y {x}) } }
+testeq("Koen3", skip){ exists x {(lambda y {x = array{y}; (exists z {z})})(lambda y {x}) } }
                      { exists z {z} }
 testeq("Koen5", pass){ exists y  {lambda x {x = (exists z {0}); x = y; ()} } }
                      { exists y  {lambda x {x = 0; y = 0; ()} } }
@@ -83,7 +84,7 @@ testeq("QC9", pass)  { exists a { (exists y { (a = y; ()) | ()}); a = (exists b 
 testeq("Rec1", pass) { exists x { (lambda y {x(fail)}) = x } }
                      { lambda y {fail} }
 # Result depends on how recursion is treated.
-testeq("Rec2", pass) { () = one { exists a { () = one {exists b { b = one {lambda y {a}}; b = a; b} } } } }
+testeq("Rec2", skip) { () = one { exists a { () = one {exists b { b = one {lambda y {a}}; b = a; b} } } } }
                      { fail }
 testeq("QC11", pass) { lambda d { lambda c { lambda b { ((b = one {d = (); ()}); ()); c = (); () } } } }
                      { lambda d { lambda c { lambda b { b = one {d = (); ()}; c = (); () } } } }

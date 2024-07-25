@@ -11,7 +11,7 @@ import FrontEnd.ToCore( convertToCore )
 import FrontEnd.Flags
 import FrontEnd.Expr as Src
 import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pParens
-                     , pString, pKeyword, many, lexeme, optional, string, skip, eof, pAny )
+                     , pString, pKeyword, many, lexeme, optional, string, skip, eof )
 import FrontEnd.Prelude( findPrelude )
 
 import Rules.Core             as Rules
@@ -35,7 +35,6 @@ import Text.Printf
 
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
-import Text.Megaparsec (try)
 import qualified Control.Exception as Exc
 
 

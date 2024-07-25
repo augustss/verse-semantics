@@ -14,7 +14,7 @@ import FrontEnd.Error
 import FrontEnd.Expr
 
 import Epic.OpParser
-import Epic.Print(prettyShow)
+import Epic.Print( prettyShow )
 
 import Control.Monad
 import qualified Control.Monad.State.Strict as S
