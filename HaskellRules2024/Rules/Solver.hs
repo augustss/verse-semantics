@@ -4,7 +4,7 @@ import Rules.Core
 import Epic.Print
 import qualified Epic.UnionFind as UF
 import Data.List ( nub )
-import Data.Maybe (mapMaybe, listToMaybe)
+import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 
@@ -22,10 +22,10 @@ unsat env = {- ppTrace "TRACE: unsat" msg -} res
 solve :: Solver -> Maybe UnsatReason
 solve s
   | Just r <- res = Just r
-  | null eqs      = {- ppTrace "TRACE: solve" msg -} Nothing
+  | null eqs      = ppTrace "TRACE: solve (SAT)" msg Nothing
   | otherwise     = solve s'
   where
-    _msg           = pPrint (s_pos s')
+    msg           = pPrint (s_pos s')
     res           = check s
     eqs           = generate s
     s'            = propagate s eqs
@@ -56,21 +56,44 @@ checkNeg s neg@(A_GVEq x gv)
   | otherwise
   = Nothing
 checkNeg _ neg@(A_RelOp op (GVLit l))
-  | isRelOpLit op l
+  | isRelOpLit1 op l
   = Just (Contra neg)
   | otherwise
   = Nothing
 checkNeg s neg@(A_RelOp op gv)
   | isRel s op gv
   = Just (Contra neg)
+  -- | GVArr[gv1, gv2] <- gv
+  -- , Just l1 <- evalsToLit s gv1
+  -- , Just l2 <- evalsToLit s gv2
+  -- , isRel s op (GVArr [GVLit l1, GVLit l2])
+  -- = Just (Contra neg)
   | otherwise
   = Nothing
 
-isRelOpLit :: PrimOp -> Lit -> Bool
-isRelOpLit IsInt  (LInt _)  = True
-isRelOpLit IsChar (LChar _) = True
-isRelOpLit IsStr  (LStr _)  = True
-isRelOpLit _      _         = False
+isRelOpLit1 :: PrimOp -> Lit -> Bool
+isRelOpLit1 IsInt  (LInt _)  = True
+isRelOpLit1 IsChar (LChar _) = True
+isRelOpLit1 IsStr  (LStr _)  = True
+isRelOpLit1 _      _         = False
+
+intRel2 :: PrimOp -> Maybe (Integer -> Integer -> Bool)
+intRel2 Gt  = Just (>)
+intRel2 Lt  = Just (<)
+intRel2 NEq = Just (/=)
+intRel2 GEq = Just (>=)
+intRel2 LEq = Just (<=)
+intRel2 _  = Nothing
+
+isRelOpLit2 :: PrimOp -> Lit -> Lit -> Bool
+isRelOpLit2 op l1 l2
+  | LInt i1 <- l1
+  , LInt i2 <- l2
+  , Just r  <- intRel2 op
+  = i1 `r` i2
+  | otherwise
+  = False
+
 
 -----------------------------------------------------------------------------------
 -- | `generate s` returns a list of equalities that can be derived from the solver,
@@ -132,21 +155,39 @@ isTyOp IsStr  = True
 isTyOp _      = False
 
 ------------------------------------------------------------------------------------
--- `isRel s op v` returns true if there is a relation `op v'` in the solver and `v == v'`
+-- `isRel s op v` returns true if
+--  * there is a relation `op v'` in the solver and `v == v'`
+--  * if there is a literal `l` s.t. `s gv == s l` and `isRelOpLit l` holds
 ------------------------------------------------------------------------------------
 isRel :: Solver -> PrimOp -> GroundVal -> Bool
-isRel s op gv = not $ null [ () | A_RelOp op' gv' <- s_pos s, op' == op, isEqual s gv gv' ]
+isRel s op gv
+  | not (null [ () | A_RelOp op' gv' <- s_pos s, op' == op, isEqual s gv gv' ])
+  = True
+  | not (null [ () | l <- maybeToList (evalsToLit s gv), isRelOpLit1 op l ])
+  = True
+  | GVArr [gv1, gv2] <- gv
+  , Just l1 <- evalsToLit s gv1
+  , Just l2 <- evalsToLit s gv2
+  , isRelOpLit2 op l1 l2
+  = True
+  | otherwise
+  = False
 
 
 ------------------------------------------------------------------------------------
 -- `eval s v` returns `Just l` if `v` is provably equal to a literal `l` in solver `s`
 ------------------------------------------------------------------------------------
 evalsToLit :: Solver -> GroundVal -> Maybe Lit
-evalsToLit _ (GVLit l) = Just l
-evalsToLit s v         = {- ppTrace "TRACE: evalsToLit" msg -} res
-  where
-    _msg = pPrint (v, res)
-    res = listToMaybe [l | l <- s_lits s, isEqual s v (GVLit l)]
+evalsToLit s v = listToMaybe (tryLit v ++ tryEqLits s v)
+
+tryLit :: GroundVal -> [Lit]
+tryLit (GVLit l) = [l]
+tryLit _         = []
+
+tryEqLits :: Solver -> GroundVal -> [Lit]
+tryEqLits s v = [l | l <- s_lits s, isEqual s v (GVLit l)]
+
+
 
 
 ------------------------------------------------------------------------------------

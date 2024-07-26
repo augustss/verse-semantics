@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans -Wno-dodgy-imports #-}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Eta reduce" #-}
 
 module FrontEnd.ToCore(
     convertToCore
@@ -198,4 +200,3 @@ errUndefined is = do
       i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
    else
     mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)) is
-

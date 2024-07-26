@@ -156,6 +156,7 @@ runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestEvalEq ti e1 e2) = testEvalE tflg ti e1 e2
 runTest tflg (TestVerify ti e)     = verifyE   tflg ti  e
 runTest tflg (TestTim    ts  e)    = verifyE   tflg ti  e where ti = timTestInfo ts
+runTest _    (TestTimCrash _ _)    = pure Excn
 
 widthTestName :: Int
 widthTestName = 10
