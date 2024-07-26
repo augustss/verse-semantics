@@ -6,8 +6,8 @@
 # Abstraction propagation.
 test(S00){f():=for(1) do :int => 0}						# NOTE:FOR
 test(S00){f():=for(1|2) do :int => 0}					# NOTE:FOR
-test(S00){f():=if(1=1) then :int else :nat => 0}		# FP:10.4:PARSE:DESUGAR
-test(S00){f():=if(1=2) then :int else :nat => 0}		# NOTE:???
+test(S00){(f():=if(1=1) then :int else :nat) => 0}		# FP:10.4:PARSE:DESUGAR
+test(S00){(f():=if(1=2) then :int else :nat) => 0}		# NOTE:???
 test(S00){f():=let() do :int => 0}						# NOTE:???
 test(S00){f():type{(:nat)|(:int)} => 0}					# NOTE:???
 

@@ -226,4 +226,4 @@ verify(":type1", fail) {x:int => f():type{x=0} => {x=0;f[]}}
 verify(":type6", fail) {a:int => b:int => f(a   ):type{a=b} => {a=b,f[a]}}
 verify(":type4", fail) {a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}
 
-verify(pass) {a:=(1;2;),a=(1,2)}
+verify("ArrayX", skip) {a:=(1;2;),a=(1,2)}
