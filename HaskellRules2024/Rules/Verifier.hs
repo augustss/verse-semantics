@@ -41,10 +41,14 @@ guardStep env lhs =
    do v :>>: e <- [lhs]
       guard (skolValue (skolVars env) v)
       pure (pPrintSmallExpr v, e)
+
+{- Guards only have values to the left
+   ToDo: check in 'valid'
    ++
    "GUARD-FAIL" `name`
    do Fail :>>: _ <- [lhs]
       pure Fail
+-}
 
 --------------------------------------------------------------------------------
 checkStep :: Rule
@@ -83,6 +87,11 @@ verifyStep env lhs =
    do (_skols, _rs, _as, e) <- matchVerify env lhs
       guard (e == Fail)
       pure (Arr [])
+   ++
+   "VERIFY-CHOICE" `name`
+   do (_skols, rs, as, e1 :|: e2) <- matchVerify env lhs
+      pure (  (Var underscore :=: (Verify $ bindList rs (as,e1)))
+          :>: (Verify $ bindList rs (as,e2)) )
    ++
    "SOLVER" `nameWith`
    do (_skols, rs, as, _e) <- matchVerify env lhs
