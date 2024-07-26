@@ -25,7 +25,7 @@ solve s
   | null eqs      = {- ppTrace "TRACE: solve (SAT)" msg -} Nothing
   | otherwise     = solve s'
   where
-    msg           = pPrint (s_pos s')
+    _msg           = pPrint (s_pos s')
     res           = check s
     eqs           = generate s
     s'            = propagate s eqs
