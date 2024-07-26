@@ -761,6 +761,7 @@ dsM_12 _ e@(DefineV _) _
    = pure e
 
 ---------- Other terms with P(i) ---------------
+-- M-[t]P(i) = z := D-[t]; i ;; some( \v. v=z )
 dsM_12 MI t (P i)                           -- MEQG
   = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
        ; v <- newIdent (getLoc t) "v"
