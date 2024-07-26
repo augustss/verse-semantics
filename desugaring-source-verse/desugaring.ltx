@@ -564,7 +564,7 @@ $$
 \begin{array}{@@{}l}
 \mbox{\bf Syntax} \\
 \multicolumn{1}{c}{\begin{array}{rcll}
-  |si| & ::= &  |sipat x|  \vb |sibody| \\
+  |si| & ::= &  |sipat e|  \vb |sibody| \\
   |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\
 \end{array}} \\
 
@@ -572,7 +572,7 @@ $$
 \multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DB md j si t| = |e|, |havoc fx = e|$}} \\[0.02in]
 \rulename{dinit}   & |De2 md t | & = & |DMe2 md sibody t| \\[1mm]
 \rulename{dbody1}   & |DB md j sibody t| & = & |DMe2 md sibody t|\\
-\rulename{dbody2}   & |DB md j (sipat f) t| & = & |z := apply1N f j; DMe2 md (sipat z) t|\\[1mm]
+\rulename{dbody2}   & |DB md j (sipat f) t| & = & |DMe2 md (sipat (apply1N f j)) t|\\[1mm]
 % \rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
 \rulename{funchk-e}     & |FunCheck sibody| & = & |tup ()| \\
 \rulename{funchk-p}     & |FunCheck (sipat f)| & = & |apply1N isFun f| \\[1mm]

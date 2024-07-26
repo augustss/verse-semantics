@@ -18,9 +18,9 @@ module FrontEnd.Expr(
       -- Building SrcExpr
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
     , eAll, eExists, eCheck, eDefine, eApplyD, eVerify
-    , eThunk, eForce, existsXX
+    , eThunk, eForce, existsXX, eSomeAny
     , seqE, fvArray
-    , idX, srcUnderscore, isSrcUnderscore
+    , srcUnderscore, isSrcUnderscore
 
     , Store(..), Ptr
     , Eff, effSucceeds, effDecides, effFails, isOpenClosed
@@ -201,8 +201,8 @@ pattern Guard v e <- Macro2 (Ident _ "guard") v e
 --          Be very sure that these rewrites are correct!
 --------------------------------------------------------
 
-idX :: Ident
-idX = Ident noLoc "x"
+identX :: Ident
+identX = Ident noLoc "x"
 
 srcUnderscore :: Ident
 srcUnderscore = Ident noLoc "_"
@@ -230,7 +230,7 @@ eHavoc fx = seqE (map havoc1 fx)
   where
     havoc1 x | x == effSucceeds = seqE []
              | x == effFails    = Fail
-             | x == effDecides  = Unify (eSome (Lam idX (Variable idX))) (Array [])
+             | x == effDecides  = Unify eSomeAny (Array [])
              | otherwise        = errorMessage $ "eHavoc: " ++ show fx
 
 eThunk :: SrcExpr -> SrcExpr
@@ -252,6 +252,10 @@ eVerify = Verify
 
 eSome :: SrcExpr -> SrcExpr
 eSome = Some
+
+eSomeAny :: SrcExpr
+-- some(any), just a completely unconstrained skolem
+eSomeAny = Some (Lam identX (Variable identX))
 
 eGuard :: [Ident] -> SrcExpr -> SrcExpr
 -- Smart constructor, drops empty guard

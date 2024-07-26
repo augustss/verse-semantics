@@ -1,6 +1,34 @@
-# Meeting 24 July 24
-# Res1 should be rejected despite 'decides': the string[7] fails and should be rejected
-# Similarly Res2
+# Add new meetings at the top
 
-verify("Res1", fail) { f(x:int)<decides>:string := 7 }
-verify("Res2", fail) {f(x:int)<decides>:type{x=10} := 7 }
+
+# -----------------------------------------
+# Meeting 26 July 24
+#
+verify( "T26Jul24-1", pass ){ f(x:=3)<succeeds> := x>2 }
+  # Should verify easily
+
+verify( "T26Jul24-2", pass ){ f( g():=3 )<succeeds> := g[] > 2 }
+  # This is much trickier
+
+verify("T26Jul24-3", pass){ f( exists x {x} ) := x }
+  # Should succeed; places no constraint on the argument
+
+verify("T26Jul24-4", pass){ f( p := exists x { (x,x) } ) :=  ((r,s):=p; r=s) }
+  # Trickier still.  Domain is a pair with equal components
+
+verify("T26Jul24-5", pass){ f( p := exists x { (x,x) } ) :=  ((r,s):=p; x=s) }
+  #  ..and x scopes over RHS
+
+verify("T26Jul24-10", pass){ f( x := 1|2 )<succeeds> := x }
+verify("T26Jul24-11", pass){ f( g() := 1|2 )<succeeds> := g[] }
+verify("T26Jul24-12", pass){ f( g() := 1|2 )<succeeds> := g[]; f( () => 1 ) }
+
+# -----------------------------------------
+# Meeting 24 July 24
+#
+verify("T24Jul24-1", fail) { f(x:int)<decides>:string := 7 }
+  # Should be rejected despite 'decides': the string[7] fails and should be rejected
+
+verify("T24Jul24-2", fail) {f(x:int)<decides>:type{x=10} := 7 }
+  # ...Similarly
+

@@ -642,13 +642,13 @@ dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
 -------------------- :{fx} t -----------------
 -- SLPJ: I don't think we want fx on Range at all
 
-dsM_12 MI (Range _fx t) (P i)                 -- MTYPE1
+dsM_12 MI (Range _fx t) (P i)                 -- MTYPE-
   = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
        ; pure (seqE [e, eGuard (getFree i) (eSome z) ]) }
 -- SLPJ: check this... it's not what is in the doc yet
 --       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
 
-dsM_12 s (Range _fx t) (P i)                  -- MTYPEP
+dsM_12 s (Range _fx t) (P i)                  -- MTYPE+X
   = do { (e, z) <- defineDE "z" (dsDD_12 s t)
        ; pure (seqE [e, eApplyD z i]) }   -- z[x]
 
@@ -699,6 +699,12 @@ dsM_12 s (Guard t1 t2) pi                   -- MGUARD
   = Guard <$> dsD_12 t1 <*> dsM_12 s t2 pi
 
 -------------------- exi x. t -----------------
+dsM_12 s (Exists is t) pi@(P {})
+  = do { let us = [ eDefine i eSomeAny | i <- is ]
+       ; e' <- dsM_12 s t pi
+       ; pure (seqE (us ++ [e'])) }
+
+
 dsM_12 s (Exists is t) pi                   -- MEXISTS
   = Exists is <$> dsM_12 s t pi
 
@@ -755,6 +761,12 @@ dsM_12 _ e@(DefineV _) _
    = pure e
 
 ---------- Other terms with P(i) ---------------
+dsM_12 MI t (P i)                           -- MEQG
+  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
+       ; v <- newIdent (getLoc t) "v"
+       ; pure (seqE [ e, eGuard (getFree i) $
+                         eSome (Lam v (Variable v `Unify` z)) ]) }
+
 dsM_12 s t (P i)                           -- MEQ
    = Unify i <$> dsM_12 s t E
 
