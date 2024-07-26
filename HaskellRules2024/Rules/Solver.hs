@@ -22,7 +22,7 @@ unsat env = {- ppTrace "TRACE: unsat" msg -} res
 solve :: Solver -> Maybe UnsatReason
 solve s
   | Just r <- res = Just r
-  | null eqs      = ppTrace "TRACE: solve (SAT)" msg Nothing
+  | null eqs      = {- ppTrace "TRACE: solve (SAT)" msg -} Nothing
   | otherwise     = solve s'
   where
     msg           = pPrint (s_pos s')
@@ -46,7 +46,7 @@ checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing
 -- looks for assumptions `not p` such that `p` is provable in s
 checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
 checkNeg s neg@(A_GVEq x vy@(GVVar _))
-  | isEqual s (GVVar x) vy && isPrim s x
+  | isEqual s (GVVar x) vy -- && isPrim s x
   = Just (Contra neg)
   | otherwise
   = Nothing
