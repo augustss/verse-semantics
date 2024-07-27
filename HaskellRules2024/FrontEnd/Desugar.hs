@@ -135,9 +135,12 @@ dsSmall = ds
     --    (let e in b) --> e; b
     --    (e1 where e2)  -->   ( x ::= e1; e2; x)
     ds (Let e b) = do { e' <- ds e; b' <- ds b; pure (Seq [e',b']) }
-    ds (InfixOp e1 (Op "where") e2) = do
-      x <- newIdent (getLoc e1) "x"
-      ds $ seqE [eDefine x e1, e2, Variable x]
+    ds (InfixOp e1 (Op "where") e2) = do { e1' <- ds e1; e2' <- ds e2; pure (Seq [e2', e1']) }
+
+-- ToDo: old desugaring of where
+--    ds (InfixOp e1 (Op "where") e2) = do
+--      x <- newIdent (getLoc e1) "x"
+--      ds $ seqE [eDefine x e1, e2, Variable x]
 
     -- Do and case
     ds (Case1 b) = do
@@ -785,15 +788,22 @@ flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
 -- Deals with M_sigma[ t ] P(i)
 -- when we don't want to push the P(i) further into t
 -- M-[t]P(i) = z := D-[t]; i ;; some( \v. v=z )
+--  = M-[ :type{t} ]P(i)
+--  = z:= type{t}; i ;; some{z}
+--  = z := \x. x=t; i ;; some{\}
 
-flipToE MI t (Variable r)  -- Short cut
-  = Unify <$> dsDD_12 MI t <*> pure (Variable r)
+--flipToE MI t (Variable r)  -- Short cut
+--  = Unify <$> dsDD_12 MI t <*> pure (Variable r)
 
 flipToE MI t i                           -- MEQG
-  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
+  = do { e <- dsDD_12 MI t
        ; v <- newIdent (getLoc t) "v"
-       ; pure (seqE [ e, eGuard (getFree i) $
-                         eSome (Lam v (Variable v `Unify` z)) ]) }
+       ; pure (eGuard (getFree i) $
+               eSome (Lam v (Variable v `Unify` e))) }
+--  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
+--       ; v <- newIdent (getLoc t) "v"
+--       ; pure (seqE [ e, eGuard (getFree i) $
+--                         eSome (Lam v (Variable v `Unify` z)) ]) }
 
 flipToE s t i
    = Unify i <$> dsM_12 s t E

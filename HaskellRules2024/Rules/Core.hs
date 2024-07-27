@@ -20,7 +20,8 @@ module Rules.Core
 
     -- Rewriting
   , Rule, Context, isContext, (<@)
-  , everywhere, normalize, tryBefore
+  , everywhere, tryBefore
+  , NormResult(..), normalize, showNormResult
   , Fuel, lotsOfSteps
   , RuleEnv(..), extendRuleEnv
 
@@ -40,7 +41,7 @@ module Rules.Core
 import Prelude hiding( (<>) )
 import Epic.Print
 
-import Data.List( union, intercalate, delete )
+import Data.List( union, delete )
 import TRS.Bind
 import TRS.Traced
 import Test.QuickCheck
@@ -83,7 +84,7 @@ data Expr
 
   -- HOLE, only for contexts
   | HOLE
- deriving ( Eq, Ord )
+ deriving ( Eq, Ord, Show )
 
 --------------------------------------------------------------------------------
 --
@@ -370,46 +371,6 @@ pprBind bnd
   where
     (bndr, body) = alphaRename (free bnd) bnd
 
-instance Show Expr where
-  show (Var x)       = show x
-  show (Lit k)       = show k
-  show (Arr as)      = "<" ++ intercalate "," (map show as) ++ ">"
-  show (Lam bnd)     = "\\" ++ showBind bnd
-  show (Op op)       = show op
-  show ((a :=: e1) :>: e2) = show1 a ++ " = " ++ show1 e1 ++ "; " ++ show0 e2
-  show (e1 :>: e2)   = show1 e1 ++ "; " ++ show1 e2
-  show (e1 :=: e2)   = show1 e1 ++ " = " ++ show1 e2
-  show (e1 :|: e2)   = show1 e1 ++ " | " ++ show1 e2
-  show (a1 :@: a2)   = show1 a1 ++ "[" ++ show a2 ++ "]"
-  show (Exi bnd)     = "exi " ++ showBind bnd
-  show Fail          = "fail"
-  show (One e)       = "one{" ++ show e ++ "}"
-  show (All e)       = "all{" ++ show e ++ "}"
-  show (Some a)      = "some(" ++ show a ++ ")"
-  show (a :>>: e)    = show1 a ++ "|>" ++ show1 e
-  show (Check fx e)  = "check<" ++ show fx ++ ">{" ++ show e ++ "}"
-  show (Verify {})   = error "show Verify undefined"
-  show HOLE          = "HOLE"
-
-showBind :: Bind Expr -> String
-showBind bnd = show x ++ ". " ++ show e where (x,e) = unsafeUnbind bnd
-
-show0, show1 :: Expr -> String
-show0 = showP 0
-show1 = showP 1
-
-showP :: Int -> Expr -> String
-showP p e | need_parens e  = "(" ++ show e ++ ")"
-          | otherwise      = show e
- where
-  need_parens (Lam _)    = True
-  need_parens (_ :>: _)  = 1 <= p
-  need_parens (_ :=: _)  = True
-  need_parens (_ :|: _)  = True
-  --need_parens (_ :@: _)  = True
-  need_parens (Exi _)    = True
-  need_parens (_ :>>: _) = True
-  need_parens _          = False
 
 --------------------------------------------------------------------------------
 --
@@ -451,7 +412,7 @@ bindSize bnd = exprSize (snd (unsafeUnbind bnd))
 type Val = Expr
 
 isVal :: Expr -> Bool
-isVal (Var _) = True
+isVal (Var v) = not (isUnderscore v)  -- "_" is not a valid identifier
 isVal e       = isHNF e
 
 isHNF :: Expr -> Bool
@@ -472,18 +433,24 @@ isHNF _        = False
 valid :: Expr -> Bool
 -- Checks if an expression is syntactically valid,
 -- according to the syntax of desugaring.pdf
-valid ((a :=: e1) :>: e2) = isVal a && valid e1 && valid e2
+valid ((a :=: e1) :>: e2) = validL a && valid e1 && valid e2
 valid (e1 :|: e2)         = valid e1 && valid e2
 valid (a1 :@: a2)         = isVal a1 && isVal a2
 valid (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
+valid (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
 valid Fail                = True
 valid (One e)             = valid e
 valid (All e)             = valid e
 valid (Some a)            = isVal a
-valid (a :>>: e)          = isVal a && valid e
+valid (a :>>: e)          = isVal a && valid e  -- Guard
 valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid e                   = isVal e
+
+validL :: Expr -> Bool
+-- Valid on the LHS of :=:
+validL (Var v) = True     -- Includes underscore "_"
+validL e       = isVal e
 
 prep :: Expr -> Expr
 -- Convert an Expr into an Expr in the sub-language of desugaring.pdf
@@ -883,8 +850,21 @@ type Fuel = Int
 lotsOfSteps :: Fuel
 lotsOfSteps = 1000
 
+data NormResult
+  = NormOK        -- No rewrites apply
+  | NormExpired   -- We ran out of fuel
+  | NormInvalid   -- A rewrite produced an invalid output
+                  -- according to the `valid` predicate
+  deriving( Eq )
+
+showNormResult :: NormResult -> String
+showNormResult NormOK      = "reached a normal form"
+showNormResult NormExpired = "ran out of fuel"
+showNormResult NormInvalid = "reached an invalid expression -- yikes!"
+
 normalize :: Fuel    -- Maximum number of steps
-          -> Rule -> Expr -> Traced Expr
+          -> Rule -> Expr
+          -> (NormResult, Traced Expr)
 -- Repeatedly apply the first in the
 -- list of possiblities returned by the rule
 normalize fuel rule orig_e = go fuel [] orig_e
@@ -892,16 +872,15 @@ normalize fuel rule orig_e = go fuel [] orig_e
   go :: Int
      -> [(String,Expr)]   -- Accumulating trace
      -> Expr
-     -> Traced Expr
+     -> (NormResult, Traced Expr)
   go fuel_left tr e =
     case stepRule rule e of
-      []                        -> e :<-- tr
-      (s,e'):_ | fuel_left==0   -> abort "OUT-OF-FUEL"
-               | not (valid e') -> abort "INVALID"
-               | otherwise      -> go (fuel_left-1) ((s,e):tr) e'
+      []                        -> (NormOK,      e  :<-- tr)
+      (s,e'):_ | fuel_left==0   -> (NormExpired, e  :<-- tr)
+               | not (valid e') -> (NormInvalid, e' :<-- tr')
+               | otherwise      -> go (fuel_left-1) tr' e'
               where
-               abort msg = e' :<-- ((s ++ "-**" ++ msg ++ "**",e):tr)
-
+               tr' = (s,e):tr
 
 --------------------------------------------------------------------------------
 --

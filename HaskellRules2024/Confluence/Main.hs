@@ -15,8 +15,8 @@ prop_Valid t0 =
 
 prop_Confluent =
   forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- qs1) ->
-    let np :<-- ps  = normalize lotsOfSteps trs2024 p
-        nq :<-- qs2 = normalize lotsOfSteps trs2024 q
+    let (_res, np :<-- ps)  = normalize lotsOfSteps trs2024 p
+        (_res, nq :<-- qs2) = normalize lotsOfSteps trs2024 q
      in whenFail (do putStrLn "== TRACE #1 =="
                      displayTrace (np :<-- ps)
                      putStrLn "== TRACE #2 =="
@@ -26,7 +26,7 @@ prop_Confluent =
   arbFork =
     do p <- prep `fmap` arbitrary
        permf <- liftArbitrary arbPermutation
-       let tr = normalize lotsOfSteps (\e -> permf e (trs2024 e)) p
+       let (_res, tr) = normalize lotsOfSteps (\e -> permf e (trs2024 e)) p
        return (p,tr)
 
   shrinkFork (p, q :<-- tr) =

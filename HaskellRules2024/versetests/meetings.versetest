@@ -26,7 +26,8 @@ verify("T26Jul24-7", pass){ f( x, x:int  ) := x }
 
 verify("T26Jul24-10", pass){ f( x := 1|2 )<succeeds> := x }
 verify("T26Jul24-11", pass){ f( g() := 1|2 )<succeeds> := g[] > 0 }
-verify("T26Jul24-12", pass){ f( g() := 1|2 )<succeeds> := g[]; f( () => 1 ) }
+verify("T26Jul24-12", pass){ f( g() := :type{1|2} )<succeeds> := g[] > 0 }
+verify("T26Jul24-13", pass){ f( g() := 1|2 )<succeeds> := g[]; f( () => 1 ) }
 
 # -----------------------------------------
 # Meeting 24 July 24

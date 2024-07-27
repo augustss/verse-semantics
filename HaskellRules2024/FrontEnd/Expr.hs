@@ -259,6 +259,10 @@ eSomeAny = Some (Lam identX (Variable identX))
 
 eGuard :: [Ident] -> SrcExpr -> SrcExpr
 -- Smart constructor, drops empty guard
+-- It's better to do a fold, to get  x ;; y ;; z ;; e
+--    rather than <x,y,z> ;; e
+--     because then we can drop the individual elements as they become konwn.
+-- This reduces clutter when `x` is, say `int`, and we inline the lambda
 eGuard xs orig_e = foldr gd orig_e xs
   where
    gd x e = Guard (Variable x) e

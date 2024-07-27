@@ -152,11 +152,6 @@ runTestFile tflg (fn, ts)
     count :: TestRes -> [TestRes] -> Int
     count r rs = length (filter (== r) rs)
 
-runTest :: TestFlags -> Test -> IO TestRes
-runTest tflg (TestEvalEq ti e1 e2) = testEvalE tflg ti e1 e2
-runTest tflg (TestVerify ti e)     = verifyE   tflg ti  e
-runTest tflg (TestTim    ts  e)    = verifyE   tflg ti  e where ti = timTestInfo ts
-runTest _    (TestTimCrash _ _)    = pure Excn
 
 widthTestName :: Int
 widthTestName = 10
@@ -201,7 +196,7 @@ srcToCoreMb flags add_verification e
 --         handler _ = putStrLn $ "You divided by 0!"
 
 
-evalExpr :: TestFlags -> Rules.Expr -> Traced Rules.Expr
+evalExpr :: TestFlags -> Rules.Expr -> (NormResult, Traced Rules.Expr)
 evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
 
 type TimTag = Src.Ident
@@ -221,34 +216,42 @@ timTestType "U00" = TFail
 timTestType "F00" = TFail
 timTestType _     = TSkip
 
-verifyE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> IO TestRes
--- We try to verify
+----------------------------
+runTest :: TestFlags -> Test -> IO TestRes
+
+runTest tflg (TestTim    ts  e)
+  = runTest tflg (TestVerify (timTestInfo ts) e)
+
+runTest _    (TestTimCrash _ _)
+  = pure Excn
+
+-- TestVerify: we try to verify
 --   verify(;){ check<succeeds>{e} }
-verifyE flg ti e
-  = do { cMb <- srcToCoreMb (verifyFlags flg) True e
+runTest tflg test@(TestVerify _ e)
+  = do { cMb <- srcToCoreMb (verifyFlags tflg) True e
        ; case cMb of
            Nothing -> ppTrace "verifyE" (pPrint e) $
                       pure Excn
            Just c  -> do { let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
-                        ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) } }
+                        ; assertEquiv tflg test (e, real_c) (Array [], Rules.Arr []) } }
       --  ; let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
       --  ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) }
 
-verifyFlags :: TestFlags -> Flags
-verifyFlags flg = setPreludeFlag True flg $ testFlagsToFlags flg
-
-testEvalE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> SrcExpr -> IO TestRes
-testEvalE flg ti e1 e2
+runTest tflg test@(TestEvalEq _ e1 e2)
   = do { c1 <- srcToCore flags False e1
        ; c2 <- srcToCore flags False e2
-       ; assertEquiv flg ti (e1, c1) (e2, c2) }
+       ; assertEquiv tflg test (e1, c1) (e2, c2) }
   where
-    flags = setPreludeFlag False flg $
-            testFlagsToFlags flg
+    flags = setPreludeFlag False tflg $
+            testFlagsToFlags tflg
 
-assertEquiv :: (HasCallStack, Pretty a) => TestFlags -> TestInfo
+verifyFlags :: TestFlags -> Flags
+verifyFlags tflg = setPreludeFlag True tflg $ testFlagsToFlags tflg
+
+----------------------------
+assertEquiv :: (HasCallStack, Pretty a) => TestFlags -> Test
             -> (a, Rules.Expr) -> (a, Rules.Expr) -> IO TestRes
-assertEquiv tflg ti (p1, c1) (p2, c2)
+assertEquiv tflg test (p1, c1) (p2, c2)
   | typ == TSkip = do { when noisy (putStrLn $ test_herald ++ " skipped")
                       ; pure Skip }
   | otherwise
@@ -256,10 +259,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
          when (showDesugared tflg) $
          displayDoc (sep [text test_herald <+> text "desugared:", pPrint c1])
 
-       ; res <- catch (if equivValue v1 v2 == expectOK
-                       then do { success_handler; pure Good }
-                       else do { failure_handler; pure Bad })
-                      (\e -> do { exn_handler e;  pure Excn} )
+       ; res <- catch check_results (\e -> do { exn_handler e;  pure Excn} )
 
        -- Display the trace if asked for, regardless of succcess/failure
        ; when (showTrace tflg) $
@@ -267,23 +267,42 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
 
        ; pure res }
   where
-    loc_str = prettyShow (testLocn ti)
-    noisy = not (quiet tflg)
-    test_herald = printf "%-*s %-*s" widthTestName test_nm widthFileName loc_str
-    typ   = testType ti
-    test_nm = fromMaybe "<anon>" (testMName ti)
-
+    ti       = testInfo test
+    loc_str  = prettyShow (testLocn ti)
+    noisy    = not (quiet tflg)
+    typ      = testType ti
     expectOK = typ == TPass
-    tr1      = evalExpr tflg c1
-    tr2      = evalExpr tflg c2
-    v1       = TRS.term tr1
-    v2       = TRS.term tr2
-    n_steps  = length (TRS.trace tr1)
+    test_nm  = fromMaybe "<anon>" (testMName ti)
 
-    ppi x    = putStrLn (render (text "  " <+> pPrint x))
+    test_herald = printf "%-*s %-*s" widthTestName test_nm widthFileName loc_str
 
-    what True  = "success"
-    what False = "failure"
+    (res1,  tr1) = evalExpr tflg c1
+    (_res2, tr2) = evalExpr tflg c2
+    v1           = TRS.term tr1
+    v2           = TRS.term tr2
+    n_steps      = length (TRS.trace tr1)
+
+    ppi x    = displayDoc (text "  " <+> pPrint x)
+
+    what = case test of
+             TestVerify{}   -> "Verification"
+             TestEvalEq{}   -> "Evaluation"
+             TestTim{}      -> "TestTim"
+             TestTimCrash{} -> "TestTimCrash"
+
+    succ_or_fail True  = "success"
+    succ_or_fail False = "failure"
+
+    check_results :: IO TestRes
+    -- Really we should check res2, tr2 as well, but they are always boring
+    check_results
+      | res1 /= NormOK
+      = do { putStrLn (test_herald ++ " " ++ what ++ " " ++ showNormResult res1)
+           ; pure Bad }
+      | equivValue v1 v2 == expectOK
+      = do { success_handler; pure Good }
+      | otherwise
+      = do { failure_handler; pure Bad }
 
     exn_handler :: SomeException -> IO ()
     exn_handler e
@@ -295,14 +314,14 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
            ; putStrLn "" }
 
     success_handler -- What to display if all is well
-      = when noisy $ putStrLn $ test_herald ++ " Expected " ++ what expectOK
+      = when noisy $ putStrLn $ test_herald ++ " Expected " ++ succ_or_fail expectOK
                                 ++ " in " ++ printf "%5d" n_steps ++ " steps"
 
     failure_handler -- What to display if test fails
       | TBroken <- typ
       = putStrLn $ test_herald ++ " Broken test now passes"
       | otherwise
-      = do { putStrLn $ test_herald ++ " Unexpected " ++ what (not expectOK)
+      = do { putStrLn $ test_herald ++ " Unexpected " ++ succ_or_fail (not expectOK)
            ; unless (noError tflg) $
              do { putStrLn "-----------------------------------------------"
                 ; putStrLn "The expression"; ppi p1

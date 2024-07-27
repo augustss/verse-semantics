@@ -140,6 +140,7 @@ data SomeExpr = NoExpr
               | Desugared SrcExpr
               | Cores     [SrcCore]
               | RulesCore Rules.Expr
+              deriving( Show )
 
 instance Pretty SomeExpr where
   pPrintPrec _ _ NoExpr        = text "No current expression"
@@ -369,35 +370,43 @@ cEval
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { putStrLn ("\n\n------- Prep'd ---------")
-       ; let eval_it = Rules.normalize (fEvalSteps (cs_flags s)) (Rules.everywhere TRS2024.evalRules)
        ; let core_expr, prepd_expr :: Rules.Expr
              core_expr  = asCore e
              prepd_expr = prep core_expr
        ; putStrLn (prettyShow prepd_expr)
 
        ; putStrLn ("\n\n------- Evaluate ---------")
-       ; let tr@(e' :<-- _) = eval_it prepd_expr
-       ; putStrLn (render (pPrint tr))
+       ; let eval_it = Rules.normalize (fEvalSteps (cs_flags s))
+                             (Rules.everywhere TRS2024.evalRules)
+
+       ; core_result <- showEvalResult "Evaluation" (eval_it prepd_expr)
 
        ; pure (RulesCore e') }
-    
+
 
 cVerify :: CmdRunner CState
 cVerify
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { putStrLn ("\n\n------- Prep'd ---------")
-       ; let verify_it = Rules.normalize (fEvalSteps (cs_flags s)) (Rules.everywhere Verifier.verificationRules)
+       ; let verify_it = Rules.normalize (fEvalSteps (cs_flags s))
+                              (Rules.everywhere Verifier.verificationRules)
        ; let core_expr, prepd_expr :: Rules.Expr
              core_expr  = asCore e
              prepd_expr = prep core_expr
        ; putStrLn (prettyShow prepd_expr)
 
        ; putStrLn ("\n\n------- Verify ---------")
-       ; let tr@(e' :<-- _) = verify_it prepd_expr
-       ; display tr
+       ; e' <- showEvalResult "Verification" (verify_it prepd_expr)
 
        ; pure (RulesCore e') }
+
+
+showEvalResult :: String -> (NormResult, Traced Rules.Expr) -> IO Rules.Expr
+showEvalRsult what (res, tr@(e' :<-- _))
+  = do { putStrLn (what ++ " " ++ showNormResult res)
+       ; display tr
+       ; return e' }
 
 {-
 cTransform :: Bool                    -- True <=> display the result
@@ -469,12 +478,14 @@ isVerifyPrelude (pn, _) = "verify" `isPrefixOf` pn
 --------------------------------------------------------
 
 cShow :: CmdRunner CState
+-- Use Hakell's derived Show to display all the data constructors
 cShow =
   withLastExpr $ \ e s -> do
-    display e
+    print e
     pure s
 
 cPrint :: CmdRunner CState
+-- Use the pretty-printer
 cPrint =
   withLastExpr $ \ e s -> do
     display e
@@ -593,4 +604,3 @@ dropDollar = transform f . transformBi g
         f (EPrim s) = EPrim $ filter (/= '$') s
         f x = x
 -}
-
