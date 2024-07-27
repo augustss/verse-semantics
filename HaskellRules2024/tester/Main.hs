@@ -192,7 +192,8 @@ srcToCoreMb flags add_verification e
   = Exc.catch (Just <$> srcToCore flags add_verification e) handler
     where
         handler :: Exc.ErrorCall -> IO (Maybe Rules.Expr)
-        handler _ = return Nothing
+        handler err = do { putStrLn (show err)
+                         ; return Nothing }
 
 --  Exc.catch (print $ divide 5 0) handler
 --     where
@@ -226,7 +227,8 @@ verifyE :: HasCallStack => TestFlags -> TestInfo -> SrcExpr -> IO TestRes
 verifyE flg ti e
   = do { cMb <- srcToCoreMb (verifyFlags flg) True e
        ; case cMb of
-           Nothing -> pure Excn
+           Nothing -> ppTrace "verifyE" (pPrint e) $
+                      pure Excn
            Just c  -> do { let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
                         ; assertEquiv flg ti (e, real_c) (Array [], Rules.Arr []) } }
       --  ; let real_c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
@@ -285,7 +287,7 @@ assertEquiv tflg ti (p1, c1) (p2, c2)
 
     exn_handler :: SomeException -> IO ()
     exn_handler e
-      = unless (noError tflg) $
+      = -- unless (noError tflg) $
         do { putStrLn $ test_herald ++ " failure:"
            ; putStrLn "The expression";       ppi p1
            ; putStrLn "or the expression";    ppi p2

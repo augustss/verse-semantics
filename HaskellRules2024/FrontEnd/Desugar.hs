@@ -171,8 +171,7 @@ dsSmall = ds
     ds (InfixOp e1 (Ident l op) e2) = ds =<< call "in" l op (Array [e1, e2])
 
     -- Variables
-    ds (Variable ident@(Ident l v))
-      | isSrcUnderscore ident       = existsXX <$> newIdent l "u"  -- "_" means (exists u.u)
+    ds (Variable ident@(Ident _ v))
       | v == "fail"                 = return Fail
       | Just op <- lookupPrimOp v   = return (EPrim op)
       | otherwise                   = return (Variable ident)
@@ -317,7 +316,7 @@ defn (InfixOp p1 op@(Op "->") p2) e = do
   pure $ seqE [r1, r]
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
---defn p _ = impossible p
+--defn p _ = impossible "defn" p
 
 
 addSucceeds :: [Eff] -> [Eff]
@@ -496,7 +495,7 @@ _addDeref = pure . exprD S.empty
     expr s (Lam i e) = Lam i (expr s e)
     expr _ e@EPrim{} = e
 --    expr s (Map es) = Map $ map (expr s) es
-    expr _ e = impossible e
+    expr _ e = impossible "addDeref" e
 
     exprD s e = expr (defs s e) e
 
@@ -532,7 +531,6 @@ data DsMode12
   | MV -- ^ + "verification"
   | MI -- ^ - "checking" ("implementation")
   deriving (Eq, Ord, Show)
-
 
 dsD_12 :: SrcSmall -> D SrcCore
 dsD_12 = dsDD_12 MV
@@ -699,14 +697,16 @@ dsM_12 s (Guard t1 t2) pi                   -- MGUARD
   = Guard <$> dsD_12 t1 <*> dsM_12 s t2 pi
 
 -------------------- exi x. t -----------------
-dsM_12 s (Exists is t) pi@(P {})
-  = do { let us = [ eDefine i eSomeAny | i <- is ]
-       ; e' <- dsM_12 s t pi
-       ; pure (seqE (us ++ [e'])) }
+-- dsM_12 s (Exists is t) pi@(P {})
+--  = do { let us = [ eDefine i eSomeAny | i <- is ]
+--       ; e' <- dsM_12 s t pi
+--       ; pure (seqE (us ++ [e'])) }
+--
+dsM_12 s (Exists is t) E                   -- MEXISTS
+  = Exists is <$> dsM_12 s t E
 
-
-dsM_12 s (Exists is t) pi                   -- MEXISTS
-  = Exists is <$> dsM_12 s t pi
+dsM_12 _ t@(Exists {}) (P {})
+  = impossible "Exists in pattern" t
 
 -------------------- t1 = t2 -----------------
 dsM_12 s (Unify t1 t2) pi                   -- MEQ
@@ -726,21 +726,35 @@ dsM_12 s  (Seq ts) pi                      -- MSEMI
        pure $ seqE (es' ++ [e'])
 
 -------------------- (t1 | t2) and fail -----------------
-dsM_12 s (Choice t1 t2) pi                 -- MCHOICE
-  = Choice <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
+dsM_12 s t@(Choice {}) (P i)                 -- MCHOICE
+  = flipToE s t i
+dsM_12 s (Choice t1 t2) E                    -- MCHOICE
+  = Choice <$> dsM_12 s t1 E <*> dsM_12 s t2 E
 
 dsM_12 _ Fail _
    = pure Fail
 
 -------------------- k, op, x -----------------
+dsM_12 s t@(Lit{}) (P i)                   -- MCONST
+  = flipToE s t i
+
 dsM_12 _ t@(Lit{}) E                       -- MCONST
    = pure t
 
 dsM_12 _ t@(EPrim{}) E                     -- MPrim
    = pure t
 
-dsM_12 _ t@(Variable {}) E                 -- MVAR
-   = pure t
+-------------------- Unerscore "_" -------------
+-- M_sigma[ _ ] E     = exists x.x
+-- M_sigma[ _ ] P(i) = i
+dsM_12 _ (Variable v) pi             -- MUNDER
+   | isSrcUnderscore v
+   = case pi of
+       E   -> pure existsXX
+       P i -> pure i
+
+dsM_12 _ t@(Variable {}) E     = pure t
+dsM_12 s t@(Variable {}) (P i) = flipToE s t i
 
 -------------------- t1[t2] -----------------
 dsM_12 s (ApplyD t1 t2) E                  -- MVAR
@@ -761,20 +775,28 @@ dsM_12 _ e@(DefineV _) _
    = pure e
 
 ---------- Other terms with P(i) ---------------
+
+dsM_12 s t (P i) = flipToE s t i
+dsM_12 s t E     = error $ "TODO: dsM_12 " ++ show (s, t)
+
+
+----------------------------------
+flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
+-- Deals with M_sigma[ t ] P(i)
+-- when we don't want to push the P(i) further into t
 -- M-[t]P(i) = z := D-[t]; i ;; some( \v. v=z )
-dsM_12 MI t (P i)                           -- MEQG
+
+flipToE MI t (Variable r)  -- Short cut
+  = Unify <$> dsDD_12 MI t <*> pure (Variable r)
+
+flipToE MI t i                           -- MEQG
   = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
        ; v <- newIdent (getLoc t) "v"
        ; pure (seqE [ e, eGuard (getFree i) $
                          eSome (Lam v (Variable v `Unify` z)) ]) }
 
-dsM_12 s t (P i)                           -- MEQ
+flipToE s t i
    = Unify i <$> dsM_12 s t E
-
-
-dsM_12 s t pi
-   = error $ "TODO: dsM_12 " ++ show (s, t, pi)
-
 
 -----------------------------------------------
 --
@@ -791,17 +813,17 @@ addPrelude orig_e
   where
     -- Split the prelude into an association list
     spl (Array ds) = map (\ e -> (nameOf e, e)) ds
-    spl e = impossible e
+    spl e = impossible "addPrelude1" e
 
     -- Find the name of a definition
     nameOf (InfixOp lhs (Ident _ ":=") _) = lhsName lhs
-    nameOf e = impossible e
+    nameOf e = impossible "addPrelude2" e
 
     lhsName :: SrcExpr -> Ident
     lhsName (EffAttr e _) = lhsName e
     lhsName (ApplyS e _) = lhsName e
     lhsName (Variable i) = i
-    lhsName e = impossible e
+    lhsName e = impossible "addPrelude3" e
 
 -- Hackily add prelude identifiers used in e
 addUsed :: [(Ident, SrcExpr)] -> SrcExpr -> SrcExpr

@@ -6,14 +6,14 @@ module Epic.List(
     anySame, revTake, revDrop,
     pick, pickLR,
     pattern Snoc,
-    nub, nubKey,
+    nub, nubKey, (\\),
     takeUntil, dropUntil, groupKey,
     firstJust
   ) where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
-import Data.List(inits, tails)
+import Data.List(inits, tails, (\\) )
 import Data.Maybe (listToMaybe, catMaybes)
 --------------------------------------------------------
 --

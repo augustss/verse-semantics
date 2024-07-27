@@ -462,6 +462,7 @@ blkd lx (v1 :@: v2) = case v1 of
                         Var f -> isLocalExi lx f
                         Op {} -> any (isLocalExi lx) (free v2)
                         _     -> False
+blkd lx (Some v)    = any (isLocalExi lx) (free v)
 blkd _  _           = False
 
 choiceFree :: Expr_or_Context -> Bool

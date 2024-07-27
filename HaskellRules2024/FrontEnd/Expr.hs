@@ -210,16 +210,16 @@ srcUnderscore = Ident noLoc "_"
 isSrcUnderscore :: Ident -> Bool
 isSrcUnderscore (Ident _ s) = s == "_"
 
-existsXX :: Ident -> SrcExpr
+existsXX :: SrcExpr
 -- Returns (exists x. x)
 -- This is what the source-code "_" desugars to
-existsXX x = Exists [x] (Variable x)
+existsXX = Exists [identX] (Variable identX)
 
 eFalse :: SrcExpr
 eFalse = Array []
 
 eAny :: SrcExpr
-eAny = Variable (Ident noLoc "any$")
+eAny = Variable (Ident noLoc "any")
 
 eMkMap :: Loc -> SrcExpr
 eMkMap l = Variable (Ident l "mkMap$")
@@ -678,7 +678,7 @@ getVisibleBinders = go
     -- These three equations are the main payload
     go (DefineV i)     = [i]
     go (DefineE i e)   = i : go e
-    go (Exists is e)   = is ++ go e
+    go (Exists is e)   = go e \\ is
 
     -- The rest is just recursive traversal
     go Lit{}          = []
@@ -711,7 +711,7 @@ getVisibleBinders = go
     go Macro1 {}                        = []
 
     --go (Map es)      = concatMap go es
-    go e = impossible e
+    go e = impossible "getVisibleBinders" e
 
 getFree :: SrcExpr -> [Ident]
 getFree = fvs_blk
@@ -755,7 +755,7 @@ getFree = fvs_blk
         arg_bndrs = foldr ((++) . getVisibleBinders) [] arg_exprs
         arg_exprs = map fst args
 
-    fvs e = impossible e
+    fvs e = impossible "getFree" e
 
     remove xs bndrs = filter (`notElem` bndrs) xs
 
@@ -791,7 +791,7 @@ getVar (OfType e _ t)   = getVar e ++ getVar t
 getVar Lam{}            = []
 getVar Fail             = []
 getVar EPrim{}          = []
-getVar e                = impossible e
+getVar e                = impossible "getVar" e
 
 
 getAllIdents :: SrcExpr -> [Ident]
@@ -845,7 +845,7 @@ substMany sb = sub
     sub (Split e1 e2 e3) = Split (sub e1) (sub e2) (sub e3)
     sub (If3 e1 e2 e3) = If3 (sub e1) (sub e2) (sub e3)
     sub Fail = Fail
-    sub e = impossible e
+    sub e = impossible "substMany" e
 
     binder :: Ident -> (SrcExpr -> SrcExpr) -> SrcExpr -> SrcExpr
     binder i con e | Just _ <- lookup i sb = substMany (filter ((/= i) . fst) sb) (con e)
@@ -863,7 +863,7 @@ if3Hack f is e1 e2 =
   case f (Exists is (Array [e1, e2])) of
     Exists is' (Array [e1', e2']) -> (is', e1', e2')
 --    Array [e1', e2'] -> ([], e1', e2')
-    e -> impossible e
+    e -> impossible "if3Hack" e
 
 -- Alpha convert a term, avoiding vs as the names for bound
 -- variables.
@@ -890,7 +890,7 @@ alphaConvert vs = alpha []
       let (is', e1', e2') = if3Hack (alpha m) is e1 e2
       in  If3 (Exists is' e1') e2' (alpha m e3)
     alpha _ Fail = Fail
-    alpha _ e = impossible e
+    alpha _ e = impossible "alphaConvert" e
 
     add ii@(i, i') m | i == i' = m
                      | otherwise = ii : m
