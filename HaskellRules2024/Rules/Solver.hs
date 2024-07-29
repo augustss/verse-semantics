@@ -46,7 +46,7 @@ checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing
 -- looks for assumptions `not p` such that `p` is provable in s
 checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
 checkNeg s neg@(A_GVEq x vy@(GVVar _))
-  | isEqual s (GVVar x) vy -- && isPrim s x
+  | isEqual s (GVVar x) vy && isPrim s x  -- See Note [Checking negated equalities]
   = Just (Contra neg)
   | otherwise
   = Nothing
@@ -94,7 +94,22 @@ isRelOpLit2 op l1 l2
   | otherwise
   = False
 
+{- Note [Checking negated equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consdider the assumption not(r=r).  Is that enough to garantee un-satisfiablity.
+Currently we say no. Consider T29Jul24-2:
 
+    f( x:any ) := x=x
+
+This gets stuck (we do not have a rewrite rule for x=x), so should be rejected
+by the verifier.  In the verifier we will skolemise `x` to say `r`, and use
+SPLIT-V to get two verification terms with assumptions (r=r); and not(r=r) resp.
+We don't want to regard the latter as unsatisfiable, else we'll erroneously
+succeed.
+
+Instead, in `checkNeg` we test (isPrim s x), to check that the skolem `x` is
+known to have some primitive type (int, string, etc)
+-}
 -----------------------------------------------------------------------------------
 -- | `generate s` returns a list of equalities that can be derived from the solver,
 --    but which are not yet known in the UF graph
@@ -144,6 +159,7 @@ isEqual s = UF.equal (s_uf s)
 
 ------------------------------------------------------------------------------------
 -- `isPrim s x` returns true if `x` has a provably primitive type
+-- See Note [Checking negated equalities]
 ------------------------------------------------------------------------------------
 isPrim :: Solver -> Ident -> Bool
 isPrim s x = not $ null [() | A_RelOp op (GVVar y) <- s_pos s, isTyOp op, isEqual s (GVVar x) (GVVar y)]
