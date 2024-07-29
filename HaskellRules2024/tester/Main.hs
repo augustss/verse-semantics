@@ -76,7 +76,7 @@ runTests test_flags
 data Test
   -- Test that two expressions evaluate to the same thing
   = TestEvalEq TestInfo SrcExpr SrcExpr     -- testeq( name, code ){ value }
-  | TestVerify TestInfo SrcExpr             -- verify( name, pass/fail){ code }
+  | TestVerify TestInfo Effect  SrcExpr     -- verify( name, pass/fail){ code }
   | TestTim { timTag :: TimTag              -- test(D00){ code }
             , timExpr :: SrcExpr }
   | TestTimCrash TimTag String             -- test(D00){ code-that-crashes-the-parser }
@@ -84,7 +84,7 @@ data Test
 
 testInfo :: Test -> TestInfo
 testInfo (TestEvalEq ti _ _) = ti
-testInfo (TestVerify ti _)   = ti
+testInfo (TestVerify ti _ _)   = ti
 testInfo (TestTim    ti _)   = timTestInfo ti
 testInfo (TestTimCrash ti _) = timTestInfo ti
 
@@ -163,15 +163,6 @@ srcToCore flags add_verification e
        ; let e3 = Rules.prep e2
        ; return e3 }
 
--- srcToCoreMb :: Flags -> Bool -> SrcExpr -> IO (Maybe Rules.Expr)
--- srcToCoreMb flags add_verification e
---   = Exc.catch (Just <$> srcToCore flags add_verification e) handler
---     where
---         handler :: Exc.ErrorCall -> IO (Maybe Rules.Expr)
---         handler err = do { print err
---                          ; return Nothing }
-
-
 evalExpr :: TestFlags -> Rules.Expr -> (NormResult, Traced Rules.Expr)
 evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
 
@@ -185,6 +176,13 @@ timTestInfo (Ident loc status) = TestInfo
   , testExcn = []
   }
 
+
+timTestEff :: String -> Effect
+timTestEff "D00" = Decides
+timTestEff "F00" = Fails
+timTestEff "S00" = Succeeds
+timTestEff _     = Succeeds
+
 timTestType :: String -> TestType
 timTestType "S00" = TPass
 timTestType "D00" = TPass
@@ -195,13 +193,13 @@ timTestType _     = TSkip
 ----------------------------
 runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestTim    ts  e)
-  = runTest tflg (TestVerify (timTestInfo ts) e)
+  = runTest tflg (TestVerify (timTestInfo ts) (timTestEff (unIdent ts)) e)
 -- TestVerify: we try to verify
 --   verify(;){ check<succeeds>{e} }
-runTest tflg test@(TestVerify _ e)
-  = doTestCatchingExn tflg test True e (Array [])
+runTest tflg test@(TestVerify _ _ e)
+  = doTestCatchingExn tflg test e (Array [])
 runTest tflg test@(TestEvalEq _ e1 e2)
-  = doTestCatchingExn tflg test False e1 e2
+  = doTestCatchingExn tflg test e1 e2
 runTest _    (TestTimCrash _ _)
   = pure Excn
 
@@ -212,12 +210,15 @@ mkFlags tflg add_verification
     testFlagsToFlags tflg
 
 ----------------------------
+data TestMode = TEval | TVerify Effect deriving (Eq, Show)
+
+
 -- | `doTestCatchingExn` runs the actual test, catching any exceptions that are thrown during parsing, desugaring, or execution/verification
-doTestCatchingExn :: (HasCallStack) => TestFlags -> Test -> Bool -> SrcExpr -> SrcExpr -> IO TestRes
-doTestCatchingExn tflg test add_verification p1 p2
+doTestCatchingExn :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -> IO TestRes
+doTestCatchingExn tflg test p1 p2
   | typ == TSkip = do { when (noisy tflg) (putStrLn $ test_herald ++ " skipped")
                       ; pure Skip }
-  | otherwise    = do { catch (doTest tflg test add_verification p1 p2)
+  | otherwise    = do { catch (doTest tflg test p1 p2)
                               (\e -> do { exn_handler e;  pure Excn} )
                       }
   where
@@ -235,12 +236,12 @@ doTestCatchingExn tflg test add_verification p1 p2
 
 -- | `doTest` does the actual work of parsing, converting to core, and evaluating/verifying; each of
 --    which can throw an exception.
-doTest :: (HasCallStack) => TestFlags -> Test -> Bool -> SrcExpr -> SrcExpr -> IO TestRes
-doTest tflg test add_verification p1 p2 = do
-  let flags       = mkFlags tflg add_verification
-  c1'            <- srcToCore flags add_verification p1
-  c2             <- srcToCore flags add_verification p2
-  let c1          = if add_verification then wrapTopEffect c1' else c1'
+doTest :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -> IO TestRes
+doTest tflg test p1 p2 = do
+  let add_verif   = addVerification test
+  let flags       = mkFlags tflg    add_verif
+  c1             <- wrapTopEffect test <$> srcToCore flags add_verif p1
+  c2             <-                        srcToCore flags add_verif p2
   let (res1, tr1) = evalExpr tflg c1
   let (res2, tr2) = evalExpr tflg c2
   res <- checkResults tflg test (p1, res1, tr1) (p2, res2, tr2)
@@ -251,6 +252,11 @@ doTest tflg test add_verification p1 p2 = do
   when (showTrace tflg) $
     do { putStrLn "Trace is:"; display tr1 }
   pure res
+
+
+addVerification :: Test -> Bool
+addVerification (TestEvalEq {}) = False
+addVerification _               = True
 
 -- | `checkResults` just compares the results of two evaluations and prints out the appropriate message,
 --   it does _not_ throw or catch any exceptions.
@@ -303,8 +309,10 @@ checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
     succ_or_fail False = "failure"
 
 -- | `wrapTopEffect` wraps the expression in a toplevel check<EFF>{e} where EFF is Succeeds or Decides depending on the test.
-wrapTopEffect :: Expr -> Expr
-wrapTopEffect c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
+wrapTopEffect :: Test -> Expr -> Expr
+wrapTopEffect (TestVerify _ eff _) c = Rules.Verify (bindList [] ([], Rules.Check eff c))
+wrapTopEffect _                    c = c
+
 
 -- | Equivalence on values (or stuck expressions)
 equivValue :: Rules.Expr -> Rules.Expr -> Bool
@@ -372,7 +380,7 @@ pTestVerify :: P Test
 pTestVerify =
   pKeyword "verify" *> do
     tId <- pParens pTestInfo
-    TestVerify tId <$> pBraces pExprSeq
+    TestVerify tId Succeeds <$> pBraces pExprSeq
 
 pTimTest :: P Test
 pTimTest =
