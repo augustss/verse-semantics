@@ -449,8 +449,8 @@ valid e                   = isVal e
 
 validL :: Expr -> Bool
 -- Valid on the LHS of :=:
-validL (Var v) = True     -- Includes underscore "_"
-validL e       = isVal e
+validL (Var _v) = True     -- Includes underscore "_"
+validL e        = isVal e
 
 prep :: Expr -> Expr
 -- Convert an Expr into an Expr in the sub-language of desugaring.pdf
@@ -859,7 +859,7 @@ data NormResult
 
 showNormResult :: NormResult -> String
 showNormResult NormOK      = "reached a normal form"
-showNormResult NormExpired = "ran out of fuel"
+showNormResult NormExpired = "ran out of fuel (Unexpected)"
 showNormResult NormInvalid = "reached an invalid expression -- yikes!"
 
 normalize :: Fuel    -- Maximum number of steps

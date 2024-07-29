@@ -46,7 +46,7 @@ checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing
 -- looks for assumptions `not p` such that `p` is provable in s
 checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
 checkNeg s neg@(A_GVEq x vy@(GVVar _))
-  | isEqual s (GVVar x) vy -- && isPrim s x
+  | isEqual s (GVVar x) vy && isPrim s x
   = Just (Contra neg)
   | otherwise
   = Nothing
