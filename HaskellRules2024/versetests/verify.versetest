@@ -1,8 +1,8 @@
 # Trivial tests
-verify("Trivial-pass", pass){1}
+verify("Triv-pass", pass){1}
 verify("plus1", pass){main() := { 1 + 2 = 3} }
 verify("plus2", fail){main() := { 1 + 2 = 4} }
-verify("Trivial-fail", fail){check<succeeds>{0=1}}
+verify("Triv-fail", fail){check<succeeds>{0=1}}
 
 # Guard tests from https://docs.google.com/document/d/17Ytcy9I_fDzW-a1FGYQkLh3oObFg47Ge6GdRy-FZjLM/edit
 verify("Guard1", pass ) { f():int := 0; L1() := {y:int;  y = f[] } }

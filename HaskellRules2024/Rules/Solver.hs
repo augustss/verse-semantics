@@ -8,7 +8,10 @@ import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 
--- | `unsat` is a simple unsatisfiablity checker, which implements the SOLVER rule
+
+
+
+-- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
 unsat :: RuleEnv -> Maybe UnsatReason
 -----------------------------------------------------------------------------------
@@ -16,26 +19,138 @@ unsat env = {- ppTrace "TRACE: unsat" msg -} res
   where
     _msg  = pPrint (asms, res)
     asms = assumps env
-    res  = solve (mkSolver asms)
+    res  = solver (mkSolver asms)
 
 -- `solve s` repeatedly loops, by generating new equalities, propagating them, and checking for unsatisfiability
-solve :: Solver -> Maybe UnsatReason
-solve s
+solver :: Solver -> Maybe UnsatReason
+solver s
   | Just r <- res = Just r
   | null eqs      = {- ppTrace "TRACE: solve (SAT)" msg -} Nothing
-  | otherwise     = solve s'
+  | otherwise     = solver s'
   where
-    _msg           = pPrint (s_pos s')
+    _msg          = pPrint (s_pos s')
+    -- 1. check if the current solver state is unsatisfiable
     res           = check s
+    -- 2. generate new equalities from the definitions
     eqs           = generate s
+    -- 3. update the solver state with the new equalities
     s'            = propagate s eqs
+
+{- Note [Solver-Rules]
+
+Equality [s |- gv1 ~ gv2]
+
+-------------[eq-refl]
+s |- gv ~ gv
+
+s |- gv1 ~ gv2     s |- gv2 ~ gv3
+---------------------------------[eq-trans]
+s |- gv1 ~ gv3
+
+s |- gv1 ~ gv2
+---------------[eq-symm]
+s |- gv2 ~ gv1
+
+-}
+
+
+
+
+
+{- Note [Solver]
+~~~~~~~~~~~~~~~~
+
+The solver maintains a "union-find" (UF) data structure
+`s_uf` that tracks all the equivalences between ground
+values that can be proved from the *positive* assumptions
+of the form `x = gv`.
+
+Given a set of "equalities" e.g. [x = y, x = z, a = b],
+the UF data structure will build a directed acyclic graph
+with
+
+    * vertices corresponding to ground values, e.g. [x, y, z, a, b]
+    * directed edges linking equal nodes, e.g. [x -> y, y -> z, a -> b]
+
+such that the "roots" reachable from any two nodes are equal
+iff the two nodes are provably equal under the reflexive,
+symmetric, and transitive closure of the "equalities" in the graph.
+For example, in the above, x, y are provably equal as their roots
+are the same -- z. But x and a are not provably equal as their roots
+are different -- z and b.
+
+We write `s |- x ~ y` to denote that x and y are provably equal in solver s.
+
+The solver proceeds as follows:
+
+0. Use the starting assumptions to build the initial solver state `s` comprising
+  - `s_pos` the positive equalities e.g. `x = y`, predicates e.g. `int[x]`
+  - `s_neg` the negative equalities `not (x = y)`, `not int[x]`
+  - `s_def` the definitions e.g. `x = Add[y, z]`
+  - `s_lits` all the literals e.g. `1,2,3, 'c'` etc. appearing in assumptions
+  - an initial UF structure from the positive equalities in `s_pos`
+
+1. Next, the solver invokes `check`s to see if the solver state is inconsistent,
+   i.e. if `!s` can be derived, and if so, exits with the corresponding negative
+    fact as the `UnsatReason`
+
+2. Next, (if the solver state is *not* inconsistent), the solver `generate`s
+   _new_ equalities from the definitions `s_def` and the UF structure.
+   To do so it iterates over `s_defs` and invokes `evalDef` on each term
+   of the form `x = op[v1, v2]` to see if there are literals l1 and l2
+   such that s |- v1 ~ l1 and s |- v2 ~ l2 and if so, we generate the
+   new equality `x = op[l1, l2]`
+
+   If this set is empty, the solver exits with SAT.
+
+3. Next, (if the set of new equalities is non-empty), the solver extends the UF
+   structure with the new equalities, and then goes back to step 1.
+
+For example, suppose we are given the set of assumptions:
+
+    x = y
+    y = z
+    z = Add[1, a]
+    a = 2
+    not (x = 3)
+
+In step 0, the solver will build the UF structure:
+
+  { s_lits = [1, 2, 3]
+  , s_pos  = [(x = y), (y = z), (z = Add[1, a])]
+  , s_defs = [z = Add[1, 2]]
+  }
+
+  and the UF graph that looks like
+
+    x -> y -> z -> Add[1, 2]
+    a -> 2
+
+In step 1, the solver will `check` if the UF graph is inconsistent -- there is NO inconsistency
+
+In step 2, the solver will `generate` new equalities from the definitions.
+From the definition `z = Add[1, a]` and `s |- a ~ 2` we generate the new
+equality `z = 3`.
+
+In step 3, we update the UF graph with this new equality to get
+
+    x -> y -> z -> Add[1, a] -> 3
+    a -> 2
+
+and go back to step 1.
+
+Now in step 1, when we invoke `checkNeg` on the negative assumption `not (x = 3)`
+we find that in fact `s |- x ~ 3` which is a contradiction.
+
+ -}
+
 -----------------------------------------------------------------------------------
--- `check s` uses the `neg` assumptions and `lits` to check for unsatisfiability
+-- `check s` uses the `neg` assumptions and `lits` to check if !s holds
 -----------------------------------------------------------------------------------
 check :: Solver -> Maybe UnsatReason
 check s = firstJust (checkLits s : (checkNeg s <$> s_neg s))
 
--- looks for lits k, k' such that s k == s k'
+-- [c-lit], i.e. k, k' yield a contradiction if s |- k ~ k'
 checkLits :: Solver -> Maybe UnsatReason
 checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing } <$> litGroups)
   where
@@ -43,31 +158,20 @@ checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing
    litRep l   = UF.find (s_uf cc) (GVLit l)
    lits       = nub (s_lits cc)
 
--- looks for assumptions `not p` such that `p` is provable in s
+-- Can we derive !s, see Note [Rules:Contradiction]
 checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
-checkNeg s neg@(A_GVEq x vy@(GVVar _))
-  | isEqual s (GVVar x) vy && isPrim s x  -- See Note [Checking negated equalities]
-  = Just (Contra neg)
-  | otherwise
-  = Nothing
+
+-- [c-eq-*] not (x = y) yields a contradiction if s |- x ~ gv and x OR gv are primitive
 checkNeg s neg@(A_GVEq x gv)
-  | isEqual s (GVVar x) gv
+  | isEqual s (GVVar x) gv && (isPrim s (GVVar x) || isPrim s gv)  -- See Note [Checking negated equalities]
   = Just (Contra neg)
   | otherwise
   = Nothing
-checkNeg _ neg@(A_RelOp op (GVLit l))
-  | isRelOpLit1 op l
-  = Just (Contra neg)
-  | otherwise
-  = Nothing
+
+-- [c-op] not (op[gv]) yields a contradiction if s |- op[gv]
 checkNeg s neg@(A_RelOp op gv)
   | isRel s op gv
   = Just (Contra neg)
-  -- | GVArr[gv1, gv2] <- gv
-  -- , Just l1 <- evalsToLit s gv1
-  -- , Just l2 <- evalsToLit s gv2
-  -- , isRel s op (GVArr [GVLit l1, GVLit l2])
-  -- = Just (Contra neg)
   | otherwise
   = Nothing
 
@@ -93,6 +197,49 @@ isRelOpLit2 op l1 l2
   = i1 `r` i2
   | otherwise
   = False
+
+{- Note [Rules:Contradiction]
+
+Contradiction [!s]
+
+k1, k2 in s   s |- k1 ~ k2
+--------------------------- [c-lit]
+!s
+
+not (x = gv) in s    s |- x ~ gv     s |- x:prim
+-----------------------------------------------[c-eq-l]
+!s
+
+not (x = gv) in s    s |- x ~ gv     s |- gv:prim
+-------------------------------------------------[c-eq-r]
+!s
+
+
+not (op[gv]) in s   s |- op[gv]
+-------------------------------- [c-op]
+!s
+
+IsPrimitive [s |- gv : prim]
+
+s |- gv ~ l
+--------------[p-lit]
+s |- gv: prim
+
+s |- isPrim[gv1]  s |- gv1 ~ gv2
+---------------------------------[p-pred]
+s |- gv2:prim
+
+Evaluates-To [s |- op[gv]
+
+s |- gv ~ l  and op1[l]
+------------------------[ev-op1]
+s |- op1[gv]
+
+s |- gv ~ l1    s |- gv2 ~ l2   op2[l1, l2]
+----------------------------------------------[ev-op2]
+s |- op1[gv]
+
+-}
 
 {- Note [Checking negated equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,6 +280,8 @@ primOpArith Sub = Just (-)
 primOpArith Mul = Just (*)
 primOpArith _   = Nothing
 
+-- | Given a definition `x = op[gv1, gv2]` we see if s |- gv1 ~ l1, s |- gv2 ~ l2
+--   and if so, generate the equality `x = op[l1, l2]`
 evalDef :: Solver -> Definition -> Maybe Equality
 evalDef s (x, (op, GVArr [v1, v2])) = do
   o       <- primOpArith op
@@ -140,6 +289,7 @@ evalDef s (x, (op, GVArr [v1, v2])) = do
   LInt l2 <- evalsToLit s v2
   Just (GVVar x, GVLit (LInt (l1 `o` l2)))
 evalDef _ _ = Nothing
+
 -----------------------------------------------------------------------------------
 -- | `propagate s eqs` updates the solver state `s` with the new equalities `eqs`
 -----------------------------------------------------------------------------------
@@ -161,8 +311,13 @@ isEqual s = UF.equal (s_uf s)
 -- `isPrim s x` returns true if `x` has a provably primitive type
 -- See Note [Checking negated equalities]
 ------------------------------------------------------------------------------------
-isPrim :: Solver -> Ident -> Bool
-isPrim s x = not $ null [() | A_RelOp op (GVVar y) <- s_pos s, isTyOp op, isEqual s (GVVar x) (GVVar y)]
+isPrim :: Solver -> GroundVal -> Bool
+isPrim s (GVVar x) = isPrimV s x
+isPrim _ (GVLit _) = True
+isPrim _ (GVArr _) = False -- May have lambdas inside tuples?
+
+isPrimV :: Solver -> Ident -> Bool
+isPrimV s x = not $ null [() | A_RelOp op (GVVar y) <- s_pos s, isTyOp op, isEqual s (GVVar x) (GVVar y)]
 
 isTyOp :: PrimOp -> Bool
 isTyOp IsInt  = True
@@ -209,12 +364,15 @@ tryEqLits s v = [l | l <- s_lits s, isEqual s v (GVLit l)]
 ------------------------------------------------------------------------------------
 -- | Solver State
 ------------------------------------------------------------------------------------
+
+
+
 data Solver = MkSolver
-  { s_lits  :: [Lit]
-  , s_uf    :: UF.UF GroundVal
-  , s_pos   :: [FailableAssump]
-  , s_neg   :: [FailableAssump]
-  , s_def   :: [Definition]
+  { s_lits  :: [Lit]                -- ^ all the literals in the solver
+  , s_uf    :: UF.UF GroundVal      -- ^ the union-find data structure used to track equivalence classes (under equalities)
+  , s_pos   :: [FailableAssump]     -- ^ all the positive equalities and predicates
+  , s_neg   :: [FailableAssump]     -- ^ all the negative equalities and predicates (i.e. under "not")
+  , s_def   :: [Definition]         -- ^ all the terms of the form `x = op[v]`
   }
 
 type Equality   = (GroundVal, GroundVal)
