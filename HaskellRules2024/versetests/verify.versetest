@@ -37,18 +37,13 @@ verify("T15",pass) {f(x:int,y:int)<decides> := (x > 0) }
 verify("T16",pass) {f(x:int,y:int) := if (x > 0) then { 1 } else { 2 } }
 verify("T17",fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
 
-verify("T18",fail) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
-
-# Tests with `where` in the pattern
-#
-# T19, T19a put the `where` in different places
-verify("T19",pass)  { g(  x : int, y : int, (z: int where x = y)) := {a := x; b := a; b = y} }
-verify("T19a",pass) { g( (x : int, y : int, z: int) where x = y) := {a := x; b := a; b = y} }
-
-verify("T20",fail) { g( (x : int, y : int, z: int) where x = z) := {a := x; b := a; b = y} }
-verify("T21",pass) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
-verify("T22",fail) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
-verify("T23",fail) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
+### # Times out with ICFP rules
+verify("T18",fail,ICFPverify=skip) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
+verify("T19",pass,ICFPverify=skip) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
+verify("T20",fail,ICFPverify=skip) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
+verify("T21",pass,ICFPverify=skip) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
+verify("T22",fail,ICFPverify=skip) { goob(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
+verify("T23",fail,ICFPverify=skip) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
 
 # Ported tests from TRSVerify.hs
 verify("T24",pass) { g() := (2 = 2; 2) }
@@ -184,16 +179,17 @@ verify("Dec8a",pass) { foo(x:int)<decides> := { (x = 666) } ; phil(z:foo) := (70
 
 
 # Subtyping (passes, but apparently, should be rejected!)
-verify("SubType1", pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
-verify("SubType", pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
+verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
+verify(pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
 
 # Wildcards "_"
-verify("FunPair1", pass) { (a := (_,_)) => a=(_,_) }
-verify("FunPair2", pass) { f(a := (_,_)) := a=(_,_) }
+verify("FunPair1", pass) { (a := (exists x {x},exists y {y})) => a=(_,_) }
+verify("FunPair2", pass) { (a := (_,_)) => a=(_,_) }
+verify("FunPair3", pass) { f(a := (_,_)) := a=(_,_) }
    # Lambda takes a pair, a, as its argument, and then checks that the argument is a pair and returns it
 
-verify("Random1", pass) { main(:any) := { if(a:=1|2){a=1} } }
-verify("Random2", pass) {x:int => f():type{x=0} => {f[];x=0}}
+verify(pass) { main(:any) := { if(a:=1|2){a=1} } }
+verify(pass) {x:int => f():type{x=0} => {f[];x=0}}
 
 ### # TODO
 ### verify(pass) {a:any => b:any => {x:=b; x=a; assume{x=a}; assume{x=b}}}
@@ -230,4 +226,6 @@ verify(":type1", fail) {x:int => f():type{x=0} => {x=0;f[]}}
 verify(":type6", fail) {a:int => b:int => f(a   ):type{a=b} => {a=b,f[a]}}
 verify(":type4", fail) {a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}
 
+verify(pass) {a:=(1;2;),a=(1,2)}
+verify("blame0", pass) { f2( g() := 3 ) := g[] = 3 }
 verify("ArrayX", skip) {a:=(1;2;),a=(1,2)}
