@@ -37,12 +37,17 @@ verify("T15",pass) {f(x:int,y:int)<decides> := (x > 0) }
 verify("T16",pass) {f(x:int,y:int) := if (x > 0) then { 1 } else { 2 } }
 verify("T17",fail) { g(x : int, y : int) := {a := x; b := a; b = y} }
 
-### # Times out with ICFP rules
 verify("T18",fail) { g(x : int, y : int, z: int) := {a := x; b := a; b = y} }
-verify("T19",pass) { g(x : int, y : int, z: int where x = y) := {a := x; b := a; b = y} }
-verify("T20",fail) { g(x : int, y : int, z: int where x = z) := {a := x; b := a; b = y} }
+
+# Tests with `where` in the pattern
+#
+# T19, T19a put the `where` in different places
+verify("T19",pass)  { g(  x : int, y : int, (z: int where x = y)) := {a := x; b := a; b = y} }
+verify("T19a",pass) { g( (x : int, y : int, z: int) where x = y) := {a := x; b := a; b = y} }
+
+verify("T20",fail) { g( (x : int, y : int, z: int) where x = z) := {a := x; b := a; b = y} }
 verify("T21",pass) { g(x : int, y : int, z: int, pf:type{x = y}) := {a := x; b := a; b = y} }
-verify("T22",fail) { goob(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
+verify("T22",fail) { g(x : int, y : int, z: int, pf:type{x = z}) := {a := x; b := a; b = y} }
 verify("T23",fail) { f(x : int, y : int, g(z:int where x=y):type{x=y}) := {x = y; g[0]} }
 
 # Ported tests from TRSVerify.hs

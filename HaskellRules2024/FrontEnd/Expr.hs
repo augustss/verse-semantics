@@ -59,6 +59,7 @@ Type sig      e1:e2                InfixOp e1 ":" e2
 Binding       p := e               InfixOp p ":=" e
 Choice        e1 | e2              InfixOp e1 "|" e2
 Unification   e1 = e2              InfixOp e1 "=" e2
+Where         e1 where e2          InfixOp e1 "where" e2
 Binding       f(p)<fx> := e        InfixOp (EffAttr (ApplyS f p) fx) ":=" e
 Guard         v ;;<fx> e           Macro2 "guard" <fx> e
 Failure       fail                 Variable "fail"
@@ -384,8 +385,13 @@ instance Pretty SrcExpr where
     | l > prettyNormal = ppNormal
     | otherwise = ppNice
     where
-      ppA (Array es) = ppEs es
-      ppA e          = ppr 0 e
+      -- Pretty-print the argument of a call f[a] or f(a)
+      --   A user call f[]    -->  ApplyD f (Array [])
+      --   A user call f[a]   -->  ApplyD f (a)
+      --   A user call f[a,b] -->  ApplyD f (Array [a,b])
+      -- Hence the special case for length es /= 1
+      ppA (Array es) | length es /= 1 = ppEs es
+      ppA e                           = ppr 0 e
 
       ppB (Blk es) = braces $ ppSeq l es
       ppB e        = braces $ ppr 0 e
