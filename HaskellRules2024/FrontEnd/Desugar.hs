@@ -785,9 +785,22 @@ dsM_12 s t E     = error $ "TODO: dsM_12 " ++ show (s, t)
 
 ----------------------------------
 flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
+
+flipToE MI t i                           -- MEQG
+  = do { e <- dsDD_12 MI t
+       ; v <- newIdent (getLoc t) "v"
+       ; pure (eGuard (getFree i) $
+               eSome (Lam v (Variable v `Unify` e))) }
+
 -- Deals with M_sigma[ t ] P(i)
 -- when we don't want to push the P(i) further into t
--- M-[t]P(i) = z := D-[t]; i ;; some( \v. v=z )
+-- NEW version   M-[t]P(i) = z := D-[t]; i ;; some( \v. v=z )     <--- correct
+-- OLD version   M-[t]P(i) = i = D-[t]
+--
+--     f( x := 3 ) := ..
+--     f( x := :type{3} ) : = ...
+--     f( x := (3|4) ) := ..
+
 --  = M-[ :type{t} ]P(i)
 --  = z:= type{t}; i ;; some{z}
 --  = z := \x. x=t; i ;; some{\}
@@ -795,15 +808,7 @@ flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
 --flipToE MI t (Variable r)  -- Short cut
 --  = Unify <$> dsDD_12 MI t <*> pure (Variable r)
 
-flipToE MI t i                           -- MEQG
-  = do { e <- dsDD_12 MI t
-       ; v <- newIdent (getLoc t) "v"
-       ; pure (eGuard (getFree i) $
-               eSome (Lam v (Variable v `Unify` e))) }
---  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
---       ; v <- newIdent (getLoc t) "v"
---       ; pure (seqE [ e, eGuard (getFree i) $
---                         eSome (Lam v (Variable v `Unify` z)) ]) }
+
 
 flipToE s t i
    = Unify i <$> dsM_12 s t E

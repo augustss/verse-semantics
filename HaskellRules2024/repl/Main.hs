@@ -381,7 +381,7 @@ cEval
 
        ; core_result <- showEvalResult "Evaluation" (eval_it prepd_expr)
 
-       ; pure (RulesCore e') }
+       ; pure (RulesCore core_result) }
 
 
 cVerify :: CmdRunner CState
@@ -403,7 +403,7 @@ cVerify
 
 
 showEvalResult :: String -> (NormResult, Traced Rules.Expr) -> IO Rules.Expr
-showEvalRsult what (res, tr@(e' :<-- _))
+showEvalResult what (res, tr@(e' :<-- _))
   = do { putStrLn (what ++ " " ++ showNormResult res)
        ; display tr
        ; return e' }

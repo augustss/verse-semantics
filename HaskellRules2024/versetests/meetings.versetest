@@ -1,5 +1,15 @@
 # Add new meetings at the top
 
+# -----------------------------------------
+# Meeting 29 July 24
+testeq( "T29Jul24-1", pass ){ f( all{1} ) := 0; f[ array{1} ] = 0 } {0}
+verify( "T29Jul24-2", fail ){ f( x:any ) := x=x }   # Gets stuck; reject
+
+verify( "T29Jul24-3", pass ){ f(x:int,y:int)<decides> := x=y; all{ a:int; f[2,a]=2; a } }
+verify( "T29Jul24-4", fail ){ f(x:int):int = x; y:int; y=f[y] }   # Gets stuck
+
+# T29Jul24-5: reject because of ill-typed G in argument to F
+verify( "T29Jul24-5", fail ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y }
 
 # -----------------------------------------
 # Meeting 26 July 24
@@ -10,24 +20,23 @@ verify( "T26Jul24-1", pass ){ f(x:=3)<succeeds> := x>2 }
 verify( "T26Jul24-2", pass ){ f( g():=3 )<succeeds> := g[] > 2 }
   # This is much trickier
 
+# We don't allow 'exists' in a pattern; not part of Source Verse
 # verify("T26Jul24-3", pass){ f( exists x {x} ) := x }
   # Should succeed; places no constraint on the argument
-
 # verify("T26Jul24-4", pass){ f( p := exists x { (x,x) } )<succeeds> :=  ((r,s):=p; r=s) }
   # Trickier still.  Domain is a pair with equal components
-
 # verify("T26Jul24-5", pass){ f( p := exists x { (x,x) } ) :=  ((r,s):=p; x=s) }
   #  ..and x scopes over RHS
 
 verify("T26Jul24-6", pass){ f( x:int, x  ) := x }
-
 verify("T26Jul24-7", pass){ f( x, x:int  ) := x }
-  #  ..and x scopes over RHS
 
-verify("T26Jul24-10", pass){ f( x := 1|2 )<succeeds> := x }
-verify("T26Jul24-11", pass){ f( g() := 1|2 )<succeeds> := g[] > 0 }
-verify("T26Jul24-12", pass){ f( g() := :type{1|2} )<succeeds> := g[] > 0 }
-verify("T26Jul24-13", pass){ f( g() := 1|2 )<succeeds> := g[]; f( () => 1 ) }
+verify("T26Jul24-10",  pass){ f( x := 1|2 )<succeeds>          := x }
+verify("T26Jul24-11",  pass){ f( g() := 1|2        )<succeeds> := g[] > 0 }      # Tim can't do this
+verify("T26Jul24-11a", pass){ f( g() := 1|2        )<succeeds> := g[] = (1|2) }
+verify("T26Jul24-12",  pass){ f( g() := :type{1|2} )<succeeds> := g[] > 0 }      # Tim verifies this
+verify("T26Jul24-12b", pass){ f( g() := :type{1|2} )<succeeds> := g[] = (1|2) }  # Tim can't verify this
+verify("T26Jul24-13",  pass){ f( g() := 1|2        )<succeeds> := g[]; f( () => 1 ) }
 
 # -----------------------------------------
 # Meeting 24 July 24
