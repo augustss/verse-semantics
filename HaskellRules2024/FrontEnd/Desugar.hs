@@ -125,10 +125,10 @@ sDesugarExpr = ds
             elm e = ds e
 
     -- Let and where
-    --    (let e in b) --> e; b
-    --    (e1 where e2)  -->   ( x ::= e1; e2; x)
+    --    (let e in b)  --> e; b
+    --    (e1 where e2) --> e1 where e2   Need to keep this M-desugaring!
     ds (Let e b) = do { e' <- ds e; b' <- ds b; pure (Seq [e',b']) }
-    ds (InfixOp e1 (Op "where") e2) = do { e1' <- ds e1; e2' <- ds e2; pure (Seq [e2', e1']) }
+    ds (InfixOp e1 (Op "where") e2) = Where <$> ds e1 <*> ds e2
 
 -- ToDo: old desugaring of where
 --    ds (InfixOp e1 (Op "where") e2) = do
@@ -727,6 +727,12 @@ dsM_12 s (Array ts) (P i)                   -- MARRAYP
 dsM_12 s (Unify t1 t2) pi                   -- MEQ
   = Unify <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
 
+-------------------- t1  where t2 -----------------
+dsM_12 s (Where t1 t2) pi                   -- MWERE
+  = do { (e1,z) <- defineDE "z" (dsM_12 s t1 pi)
+       ; e2 <- mDesugarExpr s t2
+       ; pure (seqE [e1, e2, z]) }
+
 -------------------- t1 ; t2 -----------------
 dsM_12 MX (Seq ts) pi                      -- MSEMIX
   = do let (ts', t) = unSeq ts
@@ -777,8 +783,14 @@ dsM_12 s (ApplyD t1 t2) E                  -- MVAR
 
 -------------------- if t1 then t2 else t3 ----
 -- Push `pi` into `t2` and `t3`
+-- and desugar (if e1 then e2 else e3) --> one{ (e1; \_.e2) | (\_.e3) }[]
+-- The key point is that existentials bound in e1 scope over e2
 dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
-   = If3 <$> mDesugarExpr s t1 <*> dsM_12 s t2 pi <*> dsM_12 s t3 pi
+   = do { e1 <- mDesugarExpr s t1
+        ; e2 <- dsM_12 s t2 pi
+        ; e3 <- dsM_12 s t3 pi
+        ; pure (eForce (One (Choice (seqE [e1, eThunk e2])
+                                    (eThunk e3)))) }
 
 ---------- Other terms with P(i) ---------------
 

@@ -134,6 +134,8 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
   | OfType SrcExpr [Eff] SrcExpr       -- e |>{fx} t
   | DefineIE Ident Ident SrcExpr       -- (i->x) := e
+  | Where SrcBlk SrcExpr               -- e1 where e2
+  | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
 
   -----------------------------------------------------------
   -- Big Core: only constructors below here appear in the output of M-desugaring
@@ -142,8 +144,6 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | DefineE Ident SrcExpr              -- i := e
   | ApplyD SrcExpr SrcExpr             -- f[e]
   | Range [Eff] SrcExpr                -- :{fx}e
-  | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
-  | Where SrcBlk SrcExpr               -- e1 where e2
   | Check [Eff] SrcExpr                -- check<fx>{e}
   | Array [SrcExpr]                    -- array{e1;e2;...}
   | Seq [SrcExpr]                      -- e1;e2;...

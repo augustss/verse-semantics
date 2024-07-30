@@ -106,11 +106,6 @@ scope sc = expr
     expr (Seq es) = seqE <$> mapM expr es
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
 
-    -- Desugar (if e1 then e2 else e3) --> one{ (e1; \_.e2) | (\_.e3) }[]
-    -- The key point is that existentials bound in e1 scope over e2
-    expr (If3 e1 e2 e3) = expr (eForce (One (Choice (seqE [e1, eThunk e2])
-                                                    (eThunk e3))))
-
     expr (For2 e1 e2) = do
       (is, e1', sc') <- defs' sc e1
       For2B is e1' <$> scopeD sc' e2
