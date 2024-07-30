@@ -8,9 +8,6 @@ import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 
-
-
-
 -- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
 unsat :: RuleEnv -> Maybe UnsatReason
@@ -163,7 +160,8 @@ checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
 
 -- [c-eq-*] not (x = y) yields a contradiction if s |- x ~ gv and x OR gv are primitive
 checkNeg s neg@(A_GVEq x gv)
-  | isEqual s (GVVar x) gv && (isPrim s (GVVar x) || isPrim s gv)  -- See Note [Checking negated equalities]
+  | isEqual s (GVVar x) gv
+  , (isPrim s (GVVar x) || isPrim s gv)  -- See Note [Checking negated equalities]
   = Just (Contra neg)
   | otherwise
   = Nothing
@@ -308,13 +306,15 @@ isEqual :: Solver -> GroundVal -> GroundVal -> Bool
 isEqual s = UF.equal (s_uf s)
 
 ------------------------------------------------------------------------------------
--- `isPrim s x` returns true if `x` has a provably primitive type
+-- `isPrim s x` returns true if `x` has a provably outermost-primitive type
 -- See Note [Checking negated equalities]
 ------------------------------------------------------------------------------------
 isPrim :: Solver -> GroundVal -> Bool
-isPrim s (GVVar x) = isPrimV s x
-isPrim _ (GVLit _) = True
-isPrim _ (GVArr _) = False -- May have lambdas inside tuples?
+isPrim s (GVVar x)  = isPrimV s x
+isPrim _ (GVLit _)  = True
+isPrim s (GVArr vs) = all (isPrim s) vs
+   -- Recursion in GVArr: a common case is: r=<>, not(r=<>)
+   -- and that is definitely contradictory.  Test is T26Jul24-13.
 
 isPrimV :: Solver -> Ident -> Bool
 isPrimV s x = not $ null [() | A_RelOp op (GVVar y) <- s_pos s, isTyOp op, isEqual s (GVVar x) (GVVar y)]
