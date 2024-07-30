@@ -10,7 +10,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
-import Rules.Core( PrimOp, allPrimOps, primOpString )
+import Rules.Core( PrimOp(..), allPrimOps, primOpString )
 
 -- Epic libraries
 import Epic.Print
@@ -117,7 +117,12 @@ sDesugarExpr = ds
     ds (If2E e1 e2)   = do x <- newIdent (getLoc e1) "x"; ds $ If3 (eDefine x e1) (Variable x) e2
 
     -- For-loops
-    ds (For1 e) = do x <- newIdent (getLoc e) "x"; ds $ For2 (eDefine x e) (Variable x)
+    -- for(e1){e2} = forceArr$[ all{ e1; \_.e2 } ]
+    ds (For1 e)     = do x <- newIdent (getLoc e) "x"
+                         ds $ For2 (eDefine x e) (Variable x)
+    ds (For2 e1 e2) = do e1' <- ds e1
+                         e2' <- ds e2
+                         pure (ApplyD (EPrim ForceArr) (All (eSeq [e1', eThunk e2'])))
 
     -- Array
     ds (Array es) = arraySplice =<< mapM elm es
@@ -133,7 +138,7 @@ sDesugarExpr = ds
 -- ToDo: old desugaring of where
 --    ds (InfixOp e1 (Op "where") e2) = do
 --      x <- newIdent (getLoc e1) "x"
---      ds $ seqE [eDefine x e1, e2, Variable x]
+--      ds $ eSeq [eDefine x e1, e2, Variable x]
 
     -- Do and case
     ds (Case1 b) = do
@@ -142,9 +147,9 @@ sDesugarExpr = ds
       ds $ Function [(InfixOp x (Op ":") eAny, [])] $ Case2 x b
     ds (Case2 _ _) = undefined
     ds (Block b)   = ds b                                               -- do e --> e
-    ds (Blk es)    = ds $ seqE es
+    ds (Blk es)    = ds $ eSeq es
 
-    ds (Seq es) = seqE <$> mapM ds es
+    ds (Seq es) = eSeq <$> mapM ds es
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
 
     -- Operators
@@ -242,7 +247,7 @@ apply con e1 e2 | isValue e1 = apply1 con e1 e2   -- Easy special case.  Not rea
 apply con e1 e2 = do
   f <- newIdent (getLoc e1) "f"
   r <- apply1 con (Variable f) e2
-  pure $ seqE [eDefine f e1, r]
+  pure $ eSeq [eDefine f e1, r]
 
 apply1 :: (SrcValue -> SrcValue -> SrcExpr) -> SrcValue -> SrcExpr -> D SrcExpr
 -- val1[val2]
@@ -251,7 +256,7 @@ apply1 con x1 e2 | isValue e2 = apply2 con x1 e2   -- Easy special case.  Not re
 apply1 con x1 e2 = do
   a <- newIdent (getLoc e2) "a"
   r <- apply2 con x1 (Variable a)
-  pure $ seqE [eDefine a e2, r]
+  pure $ eSeq [eDefine a e2, r]
 
 -- val1[val2]  -->
 apply2 :: (SrcValue -> SrcValue -> SrcExpr) -> SrcValue -> SrcValue -> D SrcExpr
@@ -317,12 +322,12 @@ defn (InfixOp x1@Variable{} op@(Op "->") p2) e = do
   x2 <- Variable <$> newIdent (getLoc p2) "x"
   r2 <- defn p2 x2
   r  <- defn (InfixOp x1 op x2) e
-  pure $ seqE [r2, r]
+  pure $ eSeq [r2, r]
 defn (InfixOp p1 op@(Op "->") p2) e = do
   x1 <- Variable <$> newIdent (getLoc p2) "x"
   r1 <- defn p1 x1
   r  <- defn (InfixOp x1 op p2) e
-  pure $ seqE [r1, r]
+  pure $ eSeq [r1, r]
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 --defn p _ = impossible "defn" p
@@ -385,7 +390,7 @@ defnArray ps e = do
   let (xs, ps') = unzip $ catMaybes xps
   bs <- zipWithM defn ps' xs
 --  traceM ("*** " ++ show bs)
-  pure $ seqE $ bs ++ [InfixOp arr (Op "=") e]
+  pure $ eSeq $ bs ++ [InfixOp arr (Op "=") e]
 
 arraySplice :: [SrcExpr] -> D SrcExpr
 -- arraySplice [es1, ..e, es2] -->  arraySplice e1 ++ e ++ arraySplice es2
@@ -402,7 +407,7 @@ arraySplice as =
         app r (e : es) = do
           t <- newIdent noLoc "t"
           rest <- app (Variable t) es
-          pure $ seqE [eAppend r e t, rest]
+          pure $ eSeq [eAppend r e t, rest]
 
 -- app e1 [e2,e3]
 --  =  exists t1; append[e1,e2,t1]; app t1 [e3]
@@ -440,7 +445,11 @@ call :: String         -- "pre", "post", or "in" depending on prefix, postfix or
      -> D SrcExpr
 -- Pick the appropriate form of apply for operators
 -- SLPJ don't understand
-call _ loc op arg = return (ApplyD (Variable (Ident loc op)) arg)
+call _ loc op arg = return (ApplyD op_e arg)
+  where
+    op_e = case lookupPrimOp op of
+              Just prim -> EPrim prim
+              Nothing   -> Variable (Ident loc op)
 
 {-
 call p l s e = do
@@ -554,7 +563,7 @@ dsB_12 s t (P f) j  = dsM_12 s t (P (ApplyD f j))
 --             , dsM_12 s t (P (Variable z))]
 
 seqDE :: [D SrcCore] -> D SrcCore
-seqDE ds = seqE <$> sequence ds
+seqDE ds = eSeq <$> sequence ds
 
 defineDE :: String -> D SrcExpr
          -> D (SrcExpr,   -- The defn
@@ -565,7 +574,7 @@ defineDE :: String -> D SrcExpr
 defineDE nm ds_rhs
   = do { rhs' <- ds_rhs
        ; if isAtomic rhs'
-         then pure (seqE [], rhs')
+         then pure (eSeq [], rhs')
          else do { x <- newIdent (getLoc rhs') nm
                  ; pure (eDefine x rhs', Variable x) } }
 
@@ -580,8 +589,8 @@ defineDE2 nm ds_rhs ds_body
          else do { x <- newIdent (getLoc rhs') nm
                  ; body' <- ds_body (Variable x)
                  ; if x `elem` getAllIdents body'  -- See Note [Avoiding clutter]
-                   then pure (seqE [eDefine x rhs', body'])
-                   else pure (seqE [rhs',           body']) } }
+                   then pure (eSeq [eDefine x rhs', body'])
+                   else pure (eSeq [rhs',           body']) } }
 
 {- Note [Avoiding clutter]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -630,38 +639,38 @@ dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
    = eCheck fx <$>
      do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
         ; (e2, z) <- defineDE "z" (mDesugarExpr MV t2)
-        ; pure (seqE [e1, eCheck [effSucceeds] (seqE [e2, eApplyD z x])]) }
+        ; pure (eSeq [e1, eCheck [effSucceeds] (eSeq [e2, eApplyD z x])]) }
 
 dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
     -- SLPJ: pi is unused, which seems suspicious
     -- But I think that's a correct reflection of opacity
   = do { (e2, z) <- defineDE "z" (mDesugarExpr MI t2)
-       ; pure (seqE [ e2
-                    , eGuard (getFree t1) (seqE [eHavoc fx, eSome z]) ]) }
+       ; pure (eSeq [ e2
+                    , eGuard (getFree t1) (eSeq [eHavoc fx, eSome z]) ]) }
 
 dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
   = do { (e1, x) <- defineDE "x" (dsM_12 s t1 pi)
        ; e2 <- dsM_12 s (Range fx t2) (P x)
-       ; pure (seqE [e1,e2]) }
+       ; pure (eSeq [e1,e2]) }
 
 -------------------- :{fx} t -----------------
 -- SLPJ: I don't think we want fx on Range at all
 
 dsM_12 MI (Range _fx t) (P i)                 -- MTYPE-
   = do { (e, z) <- defineDE "z" (mDesugarExpr MI t)
-       ; pure (seqE [e, eGuard (getFree i) (eSome z) ]) }
+       ; pure (eSeq [e, eGuard (getFree i) (eSome z) ]) }
 -- SLPJ: check this... it's not what is in the doc yet
---       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
+--       ; pure (eSeq [e, eHavoc fx, eApplyD z i ]) }
 
 dsM_12 s (Range _fx t) (P i)                  -- MTYPE+X
   = do { (e, z) <- defineDE "z" (mDesugarExpr s t)
-       ; pure (seqE [e, eApplyD z i]) }   -- z[x]
+       ; pure (eSeq [e, eApplyD z i]) }   -- z[x]
 
 dsM_12 s (Range _fx t) E                      -- MTYPEE
   = do { x <- newIdent (getLoc t) "x"
        ; (e, z) <- defineDE "z" (mDesugarExpr s t)
        ; let z_app = eApplyD z (Variable x)   -- z[x]
-       ; pure (Exists [x] (seqE [e, z_app])) }
+       ; pure (Exists [x] (eSeq [e, z_app])) }
 
 -------------------- check<fx>{t} -----------------
 dsM_12 MI (Check _fx t) pi                  -- MCHECK-
@@ -699,7 +708,7 @@ dsM_12 s (Guard t1 t2) pi                   -- MGUARD
 -- dsM_12 s (Exists is t) pi@(P {})
 --  = do { let us = [ eDefine i eSomeAny | i <- is ]
 --       ; e' <- dsM_12 s t pi
---       ; pure (seqE (us ++ [e'])) }
+--       ; pure (eSeq (us ++ [e'])) }
 --
 dsM_12 s (Exists is t) E      = Exists is <$> dsM_12 s t E
 dsM_12 _ t@(Exists {}) (P {}) = impossible "Exists in pattern" t
@@ -717,7 +726,7 @@ dsM_12 s (Array ts) E                       -- MARRAYE
 dsM_12 s (Array ts) (P i)                   -- MARRAYP
    = do { js <- mapM (\t -> newIdent (getLoc t) "j") ts
         ; es <- zipWithM do_one ts js
-        ; pure (eExists js (seqE [ Unify i (Array (Variable <$> js))
+        ; pure (eExists js (eSeq [ Unify i (Array (Variable <$> js))
                                  , Array es ])) }
    where
      do_one :: SrcExpr -> Ident -> D SrcExpr
@@ -731,20 +740,20 @@ dsM_12 s (Unify t1 t2) pi                   -- MEQ
 dsM_12 s (Where t1 t2) pi                   -- MWERE
   = do { (e1,z) <- defineDE "z" (dsM_12 s t1 pi)
        ; e2 <- mDesugarExpr s t2
-       ; pure (seqE [e1, e2, z]) }
+       ; pure (eSeq [e1, e2, z]) }
 
 -------------------- t1 ; t2 -----------------
 dsM_12 MX (Seq ts) pi                      -- MSEMIX
   = do let (ts', t) = unSeq ts
        es' <- mapM (mDesugarExpr MX) ts'
        e'  <- dsM_12 MX t pi
-       pure $ seqE (es' ++ [e'])
+       pure $ eSeq (es' ++ [e'])
 
 dsM_12 s  (Seq ts) pi                      -- MSEMI
   = do let (ts', t) = unSeq ts
        es' <- mapM (mDesugarExpr MV) ts'
        e'  <- dsM_12 s t pi
-       pure $ seqE (es' ++ [e'])
+       pure $ eSeq (es' ++ [e'])
 
 -------------------- (t1 | t2) and fail -----------------
 dsM_12 s t@(Choice {}) (P i)                 -- MCHOICE
@@ -789,7 +798,7 @@ dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
    = do { e1 <- mDesugarExpr s t1
         ; e2 <- dsM_12 s t2 pi
         ; e3 <- dsM_12 s t3 pi
-        ; pure (eForce (One (Choice (seqE [e1, eThunk e2])
+        ; pure (eForce (One (Choice (eSeq [e1, eThunk e2])
                                     (eThunk e3)))) }
 
 ---------- Other terms with P(i) ---------------
@@ -872,7 +881,7 @@ addUsed prel = loop []
           ps = filter (\ (i, _) -> i `elem` is && i `notElem` vs) prel
       in  case ps of
             [] -> e
-            ies -> loop (map fst ies ++ vs) $ seqE (map snd ies ++ [e])
+            ies -> loop (map fst ies ++ vs) $ eSeq (map snd ies ++ [e])
 
 
 --------------------------------------------------------

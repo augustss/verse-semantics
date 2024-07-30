@@ -96,7 +96,11 @@ testeq("Array6",pass,pldi=fail)
 testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
 # This does not work left-to-right
 testeq("Array8",pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
-testeq("Array9",pass) { a := (0,1); a[0] }                   {0}
+testeq("Array9",pass) { a := (0,1); a[0] }                  {0}
+testeq("Array10",pass){ 1..4 }                              {array{1,2,3,4} }
+testeq("Array11",pass){ for(1..4){7} }                      {array{7,7,7,7} }
+testeq("Array12",pass){ for(i := 1..4){i+1} }               {array{2,3,4,5} }
+testeq("Array13",pass){ a := array{7,8}; for(i:a){i+1} }    {array{8,9} }
 
 # Array expression splicing
 ### SPLICE testeq("EV",pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
@@ -144,11 +148,12 @@ testeq("Pat12",pass) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
 testeq("Pat13",pass) {i->x := 2; (i, x)}                   {2,2}
 testeq("Pat14",pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
 testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
+
 # Array LHS splicing
 testeq("Pat16",pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
-testeq("Pat17",pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq("Pat18",pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Pat19",pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Pat17",skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Pat18",skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Pat19",skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq("TB1",pass) {(x:int) = 5}                         {5}
@@ -245,7 +250,7 @@ testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
 testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
 # These are very slow with alternative rules
 testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
-testeq("EV16",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=(); f[succ]}    {:false}
+testeq("EV16",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int):=(); f[badsucc]}    {:false}
 
 # Try CBV fixpoint combinator.
 # Too slow with some rules

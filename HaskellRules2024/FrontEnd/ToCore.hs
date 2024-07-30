@@ -102,8 +102,8 @@ scope sc = expr
     expr e@EPrim{}   = pure e
     expr e@(Variable i) | i `S.member` sc = pure e
                         | otherwise = do errUndefined [i]; pure e
-    expr (Array es) = Array <$> mapM expr es
-    expr (Seq es) = seqE <$> mapM expr es
+    expr (Array es)     = Array <$> mapM expr es
+    expr (Seq es)       = eSeq <$> mapM expr es
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
 
     expr (For2 e1 e2) = do
@@ -113,7 +113,7 @@ scope sc = expr
     expr (Block e)   = exprD e
     expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
                           ; e2' <- scope sc' e2
-                          ; pure $ eExists is $ seqE [e1'', e2'] }
+                          ; pure $ eExists is $ eSeq [e1'', e2'] }
 
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
 

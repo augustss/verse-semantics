@@ -17,7 +17,7 @@ module FrontEnd.Expr(
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
     , eAll, eExists, eCheck, eDefine, eApplyD, eVerify
     , eThunk, eForce, existsXX, eSomeAny
-    , seqE, fvArray
+    , eSeq, fvArray
     , srcUnderscore, isSrcUnderscore
 
     , Store(..), Ptr
@@ -212,6 +212,13 @@ existsXX :: SrcExpr
 -- This is what the source-code "_" desugars to
 existsXX = Exists [identX] (Variable identX)
 
+eSeq :: [SrcExpr] -> SrcExpr
+eSeq = mk . concatMap flat
+  where flat (Seq es) = es
+        flat e = [e]
+        mk [e] = e
+        mk es = Seq es
+
 eFalse :: SrcExpr
 eFalse = Array []
 
@@ -223,9 +230,9 @@ eMkMap l = Variable (Ident l "mkMap$")
 
 
 eHavoc :: [Eff] -> SrcExpr
-eHavoc fx = seqE (map havoc1 fx)
+eHavoc fx = eSeq (map havoc1 fx)
   where
-    havoc1 x | x == effSucceeds = seqE []
+    havoc1 x | x == effSucceeds = eSeq []
              | x == effFails    = Fail
              | x == effDecides  = Unify eSomeAny (Array [])
              | otherwise        = errorMessage $ "eHavoc: " ++ show fx
@@ -277,10 +284,10 @@ eExists is e = Exists is e
 eDefine :: Ident -> SrcExpr -> SrcExpr
 -- x := (e1; ...; en)   generates   exists x; e1; ... e(n-1); x=en
 -- Smart contructor, floats out nested defines
-eDefine x (Seq ts) = seqE (floats ++ [eDefine x rhs])
+eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
                    where
                      (floats, rhs) = unSeq ts
--- eDefine x rhs = seqE [ DefineV x, Unify (Variable x) rhs ]
+-- eDefine x rhs = eSeq [ DefineV x, Unify (Variable x) rhs ]
 eDefine x rhs = DefineE x rhs
 
 eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
@@ -650,13 +657,6 @@ storeMapA f s = Store <$> sequenceA (IM.map f (refMap s)) <*> pure (outputs s)
 
 composOp :: (SrcExpr -> SrcExpr) -> SrcExpr -> SrcExpr
 composOp f = runIdentity . compos (pure . f)
-
-seqE :: [SrcExpr] -> SrcExpr
-seqE = mk . concatMap flat
-  where flat (Seq es) = es
-        flat e = [e]
-        mk [e] = e
-        mk es = Seq es
 
 -- XXX fix this
 getLoc :: SrcExpr -> Loc

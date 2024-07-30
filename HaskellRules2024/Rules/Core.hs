@@ -98,12 +98,15 @@ data PrimOp
 
    -- Operations on arrays
  | Length
+ | DotDot     -- m..n
+ | ForceArr   -- Takes an array of (\_.e) thunk and forces them
 
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
  | IsInt | IsStr | IsChar | IsArr
+
  deriving
    ( Eq, Ord, Bounded, Enum, Show )
 
@@ -116,7 +119,9 @@ primOpString Sub = "intSub$"
 primOpString Mul = "intMul$"
 primOpString Div = "intDiv$"
 
-primOpString Length = "length$"
+primOpString Length   = "length$"
+primOpString ForceArr = "forceArr$"
+primOpString DotDot   = "dotDot$"
 
 primOpString Gt  = "intGT$"
 primOpString GEq = "intGE$"
@@ -143,11 +148,13 @@ primOpCanFail IsChar = True
 primOpCanFail IsArr  = True
 
 -- These operations /can't/ fail, and /do/ produce a value
-primOpCanFail Add    = False
-primOpCanFail Sub    = False
-primOpCanFail Mul    = False
-primOpCanFail Div    = False
-primOpCanFail Length = False
+primOpCanFail Add      = False
+primOpCanFail Sub      = False
+primOpCanFail Mul      = False
+primOpCanFail Div      = False
+primOpCanFail Length   = False
+primOpCanFail DotDot   = False
+primOpCanFail ForceArr = False
 
 --------------------------------------------------------------------------------
 --

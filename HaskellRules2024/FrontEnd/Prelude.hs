@@ -62,6 +62,7 @@ miniEvalPrelude = ("miniprelude", "\
 \operator'>'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGT$[x,y] }};\n\
 \operator'>='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGE$[x,y] }};\n\
 \operator'<>'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[x,y] }};\n\
+\operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
 \}\n\
 \")
 

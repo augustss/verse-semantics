@@ -30,6 +30,7 @@ evalRules = everywhere evalStep <> everywhere recStep
 evalStep :: Rule
 -- Runtime evauation rules
 evalStep = applicationStep
+           <> arrayOpStep
            <> unificationStep
            <> existentialStep
            <> normalizationStep
@@ -42,10 +43,6 @@ evalStep = applicationStep
 --------------------------------------------------------------------------------
 applicationStep :: Rule
 applicationStep _env lhs =
-  "APP-LENGTH" `name`
-  do Op Length :@: Arr xs <- [lhs]
-     pure (LitInt (fromIntegral (length xs)))
- ++
   "APP-ADD" `name`
   do Op Add :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1+k2))
@@ -149,7 +146,9 @@ applicationStep _env lhs =
      pure (if isUnderscore x
            then body
            else Exi (bind x body))
- ++
+
+arrayOpStep :: Rule
+arrayOpStep _env lhs =
   "APP-TUP" `name`
   do Arr vs@(_:_) :@: v <- [lhs]
      guard (isVal v && all isVal vs)
@@ -159,6 +158,22 @@ applicationStep _env lhs =
   do Arr [] :@: v <- [lhs]
      guard (isVal v)
      pure Fail
+ ++
+  "APP-LENGTH" `name`
+  do Op Length :@: Arr xs <- [lhs]
+     pure (LitInt (fromIntegral (length xs)))
+ ++
+  "APP-DOTDOT" `nameWith`
+  do Op DotDot :@: Arr [Lit (LInt k1), Lit (LInt k2)] <- [lhs]
+     pure (pPrint (k1,k2), foldr ((:|:) . Lit . LInt) Fail [k1..k2])
+ ++
+  -- forceArr$[<v1..vn>] = exists z1. z1=v1[]; ..; exists zn. zn=vn[];
+  --                       <z1,..,zn>
+  "APP-FORCEARR" `name`
+  do Op ForceArr :@: e@(Arr es) <- [lhs]
+     let zs = take (length es) (identsNotIn (free e))
+         do_one (z,v) body = Exi (bind z ((Var z :=: (v :@: Arr [])) :>: body))
+     pure (foldr do_one (Arr (map Var zs)) (zs `zip` es))
 
 --------------------------------------------------------------------------------
 unificationStep :: Rule
