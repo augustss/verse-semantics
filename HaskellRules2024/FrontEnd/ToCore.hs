@@ -54,10 +54,10 @@ convert (Exists is t)     = foldr do_one (convert t) is
                             do_one :: Src.Ident -> Rules.Expr -> Rules.Expr
                             do_one i e = Rules.Exi (TRS.bind (toCoreIdent i) e)
 
+convert (Guard v t)   = convert v Rules.:>>: convert t
 convert (One t)       = Rules.One (convert t)
 convert (All t)       = Rules.All (convert t)
 convert (Lam i t)     = Rules.Lam (TRS.bind (toCoreIdent i) (convert t))
-convert (Guard v t)   = convert v Rules.:>>: convert t
 convert (Some v)      = Rules.Some (convert v)
 convert (Check fxs t) = foldr add_check (convert t) fxs
                           where
@@ -96,7 +96,6 @@ scope :: S.Set Src.Ident -> SrcExpr -> D SrcExpr
 scope sc = expr
   where
     -- x := e  -->   x = e
-    expr (DefineV i)   = pure $ Variable i
     expr (DefineE i e) = Unify (Variable i) <$> expr e
 
     expr e@Src.Lit{} = pure e
@@ -127,17 +126,17 @@ scope sc = expr
     expr Src.Fail       = pure Src.Fail
 
     expr (Src.Check fx e) = Src.Check fx <$> exprD e
-    expr (Src.Some e)     = Src.Some <$> expr e
+    expr (Src.Some e)     = Src.Some <$> exprD e
+    expr (Src.One e)      = Src.One <$> exprD e
+    expr (Src.All e)      = Src.All <$> exprD e
     expr (Src.Guard v e)  = Src.Guard <$> expr v <*> expr e
 
-    expr (OfType e1 eff e2) = OfType <$> exprD e1 <*> pure eff <*> exprD e2
+    expr (Src.OfType e1 eff e2) = Src.OfType <$> exprD e1 <*> pure eff <*> exprD e2
 
-    expr (Exists is e)     = Exists is <$> scope (foldr S.insert sc is) e
+    expr (Src.Exists is e) = Src.Exists is <$> scope (foldr S.insert sc is) e
     expr (Src.Lam i e)     = Src.Lam i <$> scopeD (S.insert i sc) e
     expr (Src.Verify is e) = Src.Verify is <$> scopeD sc' e
       where sc' = foldr S.insert sc is
-    expr (Src.One e) = Src.One <$> exprD e
-    expr (Src.All e) = Src.All <$> exprD e
     expr e = impossible "scope" e
 
     -- exprD for a new scope context, using current in-scope set

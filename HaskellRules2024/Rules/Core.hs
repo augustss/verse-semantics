@@ -311,7 +311,7 @@ pPrintPrecE lvl prec the_expr
        e1 :|: e2   -> sep [ mbPar0 $ ppr1 e1, char '|' <+> ppr1 e2 ]
        e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
        e@(_ :>: _) -> sep (punctuate semi $ map ppr1 (gatherSeqs e))
-       e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ";;" <+> ppr1 e2
+       e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ">>" <+> ppr1 e2
 
        Arr as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        One e   -> text "one" <> braces (ppr0 e)

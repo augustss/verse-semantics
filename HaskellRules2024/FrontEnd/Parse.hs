@@ -337,8 +337,8 @@ pArray = (pKeyword "array" *> (tArray <$> pBlockEs))
 pMacro :: P SrcExpr
 pMacro = try $ do
   n <- pMacroName
-  (Macro1 n <$> many pAttr <*> pBlockM) <|>
-   (Macro2 n <$> pParens pExprSeq <*> pBlockM)
+  (Macro1 n <$> many pAttr <*> pBlockM)
+   <|> (Macro2 n <$> pParens pExprSeq <*> pBlockM)
 
 pAttr :: P Ident
 pAttr = pAngles pEffectId

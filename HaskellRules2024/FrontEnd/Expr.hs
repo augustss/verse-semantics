@@ -9,8 +9,6 @@ module FrontEnd.Expr(
     , Ident(..), unIdent
     , SrcExpr(..), Lit(..), Path(..)
     , SrcSmall, SrcCore, SrcBlk, SrcValue
-    , pattern Typedef, pattern Check, pattern Guard, pattern Some
-    , pattern One, pattern All
 
       -- Predicates on SrcExpr
     , isLiteral, isAtomic, isValue
@@ -29,7 +27,7 @@ module FrontEnd.Expr(
     , getLoc
 
     , getFree, getAllIdents, getVisibleBinders, getAllBinders, getVar
-    , substMany, closed
+    , substMany
   ) where
 
 import Prelude hiding ((<>))  -- Epic.Print exports (<>)
@@ -51,8 +49,31 @@ import GHC.Stack( HasCallStack )
 import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
 
 
-{- Note [How SrcExpr is parsed]
+{- Note [The SrcExpr lifecycle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Source expressions are parsed into `SrcExpr`.
+  At this stage lots of things appear as Macro1/2 or InfixOp;
+  See Note [How SrcExpr is parsed]
+
+* S-desugaring ("S" for superficial) desugars into `SrcSmall`.
+  Here we convert lots of InfixOp/Macro1/2 into proper data constructors.
+  This is done by `sDesugarExpr`.
+
+After this there are no more macros
+
+* M-desugaring desugars into `SrcCore`, which has fewer data constructors.
+  This is done by `mDesugarExpr`.
+
+* ToCore.convertToCore converts SrcCore to the true Core language.
+  It has two steps:
+   - addScope: replaces (... x:=e ...) with (exists x. ...x=e...)
+   - convert: moves from SrcCore to Core
+
+Note [How SrcExpr is parsed]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Initially we parse SrcExpr into a bunch of Macro1/2 ane InfixOp.
+Notable examples:
+
               This                 is initially parsed as
 -------------------------------------------------------------------------
 Type sig      e1:e2                InfixOp e1 ":" e2
@@ -71,14 +92,12 @@ Failure       fail                 Variable "fail"
 --
 --------------------------------------------------------
 
-data SrcExpr
-  = Lit Lit                      -- k
-  | Variable Ident               -- x
-  | QualVariable SrcExpr Ident   -- (e:)x
-  | Array [SrcExpr]              -- array{e1;e2;...}
+data SrcExpr  -- See Note [The SrcExpr lifecycle]
+  = -- Source Verse
+  -- The first block of constructors are eliminated by the superficial S-desugaring
+    QualVariable SrcExpr Ident   -- (e:)x
   | Tuple [SrcExpr]              -- e1,e2,...             -- Will be turned into Array
   | ApplyS SrcExpr SrcExpr       -- f(e)
-  | ApplyD SrcExpr SrcExpr       -- f[e]
   | EffAttr SrcExpr Eff          -- f<e>
 
   -- Prefix and infix operator application
@@ -89,7 +108,6 @@ data SrcExpr
   | If1 SrcBlk                   -- if{e}
   | If2 SrcExpr SrcBlk           -- if(e1) then e2
   | If2E SrcExpr SrcBlk          -- if(e1) else e2
-  | If3 SrcExpr SrcBlk SrcBlk    -- if(e1) then e2 else e3
 
   | For1 SrcBlk                    -- for{e}
   | For2 SrcExpr SrcBlk            -- for(e1) in e2
@@ -99,13 +117,39 @@ data SrcExpr
   | Block SrcBlk                   -- do e
   | Case1 SrcBlk                   -- case{e1; e2; ... } block treated in a non-standard way
   | Case2 SrcExpr SrcBlk           -- case(e) of {e1; e2; ... } block treated in a non-standard way
-
-  | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
-
   | Blk [SrcExpr]                -- { e1; e2; ... }
   | Option (Maybe SrcExpr)       -- option{e}
   | Parens SrcExpr               -- (e)
-  | Seq [SrcExpr]                -- e1;e2;...
+
+  | Macro1 Ident [Eff] SrcBlk    -- m<a>{e}
+  | Macro2 Ident SrcExpr SrcBlk  -- m(e1){e2}
+  | Return SrcExpr               -- return e
+
+  -----------------------------------------------------------
+  -- Small Source Verse
+  -- Only constructors below here appear in the output of S-desugaring
+  -- See Note [How SrcExpr is parsed] and the dsSmall function
+  | DefineV Ident                      -- (exists i)  Bring `i` into scope in the entire
+                                       --    innermost scoping context, with no type constraint
+  | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
+  | OfType SrcExpr [Eff] SrcExpr       -- e |>{fx} t
+  | DefineIE Ident Ident SrcExpr       -- (i->x) := e
+
+  -----------------------------------------------------------
+  -- Big Core: only constructors below here appear in the output of M-desugaring
+  | Lit Lit                            -- k
+  | Variable Ident                     -- x
+  | DefineE Ident SrcExpr              -- i := e
+  | ApplyD SrcExpr SrcExpr             -- f[e]
+  | Range [Eff] SrcExpr                -- :{fx}e
+  | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
+  | Where SrcBlk SrcExpr               -- e1 where e2
+  | Check [Eff] SrcExpr                -- check<fx>{e}
+  | Array [SrcExpr]                    -- array{e1;e2;...}
+  | Seq [SrcExpr]                      -- e1;e2;...
+  | Choice SrcBlk SrcBlk               -- e1 | e2
+  | Unify SrcExpr SrcExpr              -- e1 = e2
+  | EPrim PrimOp                       -- Primop
 
   -- Mutable variables
   | Set SrcExpr Ident SrcExpr       -- set e1 = e2
@@ -113,33 +157,20 @@ data SrcExpr
   | MRef Ident (Maybe SrcExpr) (Maybe SrcExpr)      -- ref i : t = e
   | MAlias Ident (Maybe SrcExpr) (Maybe SrcExpr)    -- alias i : t = e
 
-  -- Some 1-argument macros
-  | Macro1 Ident [Eff] SrcBlk    -- m<a>{e}
-  | Macro2 Ident SrcExpr SrcBlk  -- m(e1){e2}
-  | Return SrcExpr               -- return e
-
-
-  -- Output of dsSmall; see Note [Now SrcExpr is parsed] and the dsSmall function
-  | DefineV Ident                  -- (exists i)  Bring `i` into scope in the entire
-                                   --    innermost scoping context, with no type constraint
-  | DefineE Ident SrcExpr          -- i := e
-  | DefineIE Ident Ident SrcExpr   -- (i->x) := e
-  | Choice SrcBlk SrcBlk           -- e1 | e2
-  | Unify SrcExpr SrcExpr          -- e1 = e2
-  | Range [Eff] SrcExpr            -- :{fx}e
-  | OfType SrcExpr [Eff] SrcExpr   -- e |>{fx} t
+  -- Verification stuff
+  | Verify [Ident] SrcExpr         -- verify fs . e
+                                   --  (we only need assumptions when we get to the core language)
+  | Guard SrcExpr SrcExpr          -- guard(v){e}
+  | Some SrcExpr                   -- some{e}
 
   -- Embed Core into Expr
-  | Wrong String              -- wrong
-  | Exists [Ident] SrcExpr    -- exists xs . e
-
-  | Verify [Ident] SrcExpr    -- verify fs . e
-                              --  (we only need assumptions when we get to the core language)
-
-  | EPrim PrimOp                   -- Primop
+  | One SrcExpr                    -- one{e}
+  | All SrcExpr                    -- all{e}
   | Lam Ident SrcExpr              -- ICFP lambda:   \ x . e.  We include \_.e
-  | Split SrcExpr SrcExpr SrcExpr  -- split(e1){e2}{e3}
+  | Wrong String                   -- wrong
   | Fail                           -- :false
+  | Exists [Ident] SrcExpr         -- exists xs . e
+  | Split SrcExpr SrcExpr SrcExpr  -- split(e1){e2}{e3}
   | Map [SrcExpr]                  -- map{e1;e2; ... }
   | Truth SrcExpr                  -- truth{e}
 
@@ -158,41 +189,6 @@ type SrcCore  = SrcExpr
 
 type SrcValue = SrcExpr
 type SrcBlk   = SrcExpr
-
---------------------------------------------------------
---               Pattern synoyms for SrcExpr
---------------------------------------------------------
-
--- type{e}
-pattern Typedef :: SrcBlk -> SrcExpr
-pattern Typedef e <- Macro1 (Ident _ "type") [] e
-  where Typedef e = Macro1 (Ident noLoc "type") [] e
-
--- check<fx>{e}
-pattern Check :: [Eff] -> SrcExpr -> SrcExpr
-pattern Check fx e <- Macro1 (Ident _ "check") fx e
-  where Check fx e = Macro1 (Ident noLoc "check") fx e
-
--- some{e}
-pattern Some :: SrcExpr -> SrcExpr
-pattern Some e <- Macro1 (Ident _ "some") [] e
-  where Some e = Macro1 (Ident noLoc "some") [] e
-
--- one{e}
-pattern One :: SrcExpr -> SrcExpr
-pattern One e <- Macro1 (Ident _ "one") [] e
-  where One e = Macro1 (Ident noLoc "one") [] e
-
--- all{e}
-pattern All :: SrcExpr -> SrcExpr
-pattern All e <- Macro1 (Ident _ "all") [] e
-  where All e = Macro1 (Ident noLoc "all") [] e
-
--- guard(v){e}
-pattern Guard :: SrcExpr -> SrcExpr -> SrcExpr
-pattern Guard v e <- Macro2 (Ident _ "guard") v e
-  where Guard v e = Macro2 (Ident noLoc "guard") v e
-
 
 --------------------------------------------------------
 --      Smart constructors to construct SrcExpr
@@ -498,6 +494,12 @@ instance Pretty SrcExpr where
                            cat [ text "ofType" <> ppEffs fx <> parens (ppr 0 e)
                                , indent (braces (ppr 0 t)) ]
 
+          Where e1 e2 -> maybeParens (p>0) $ sep [ ppr 0 e1, text "where" <+> ppr 0 e2 ]
+          Some e      -> text "some" <> parens (ppr 0 e)
+          One e       -> text "one" <> parens (ppr 0 e)
+          All e       -> text "all" <> parens (ppr 0 e)
+          Check fx e  -> text "check" <> ppEffs fx <> braces (ppr 0 e)
+          Guard e1 e2 -> maybeParens (p>0) $ sep [ ppr 1 e1, text ";;" <+> ppr 1 e2 ]
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
           Map es -> text "map" <> braces (ppSeq l es)
@@ -627,6 +629,12 @@ compos f (Unify e1 e2)      = Unify <$> f e1 <*> f e2
 compos f (Range fx e)       = Range <$> pure fx <*> f e
 compos _ e@Wrong{}          = pure e
 compos f (Exists is e)      = Exists is <$> f e
+compos f (Where e1 e2)      = Where <$> f e1 <*> f e2
+compos f (Guard e1 e2)      = Guard <$> f e1 <*> f e2
+compos f (Check fx e)       = Check <$> pure fx <*> f e
+compos f (Some e)           = Some <$> f e
+compos f (One e)            = One <$> f e
+compos f (All e)            = All <$> f e
 compos f (Verify is e)      = Verify is <$> f e
 compos f (OfType e1 fx e2)  = OfType <$> f e1 <*> pure fx <*> f e2
 compos _ e@EPrim{}          = pure e
@@ -679,7 +687,7 @@ isAtomic _             = False
 ---------------------------------------------------------
 
 -- Get all visible binders from i := e
--- By "visible" we mean not nested inside anoter scope.
+-- By "visible" we mean not nested inside another scope.
 -- E.g.   getVisible ( x:=3; (y:=4 | 5);
 --        returns [x,y], but not z.
 getVisibleBinders :: HasCallStack => SrcExpr -> [Ident]
@@ -703,7 +711,6 @@ getVisibleBinders = go
     go (Unify e1 e2)  = go e1 ++ go e2
     go (Range _fx e)  = go e
     go (Guard e1 _)   = go e1
-    go (Some e)       = go e
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e
@@ -711,23 +718,26 @@ getVisibleBinders = go
     go Block{}    = []
     go Choice{}   = []
     go Function{} = []
+    go Check {}   = []  -- check<fx>{ e } is a new scope
+    go Some{}     = []  -- Ditto some(e), one{e}, all{e}
+    go One{}      = []
+    go All{}      = []
     go Verify {}  = []  -- verify is a new scope
     go OfType{}   = []
     go Lam{}      = []
     go Fail       = []
-    go (One {})   = []
-    go (All {})   = []
 
     go Macro1 {}                        = []
 
     --go (Map es)      = concatMap go es
     go e = impossible "getVisibleBinders" e
 
-getFree :: SrcExpr -> [Ident]
+getFree :: HasCallStack => SrcExpr -> [Ident]
 getFree = fvs_blk
   where
     fvs_blk e = Epic.List.nub (fvs e) `remove` getVisibleBinders e
 
+    fvs :: HasCallStack => SrcExpr -> [Ident]
     fvs (Variable i)      = [i]
     fvs (Lit _)           = []
     fvs (EPrim _)         = []
@@ -752,6 +762,11 @@ getFree = fvs_blk
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
     fvs (Range  _ e)      = fvs e
+    fvs (Check _ e)       = fvs e
+    fvs (Some e)          = fvs e
+    fvs (One e)           = fvs e
+    fvs (All e)           = fvs e
+    fvs (Guard e1 e2)     = fvs e1 ++ fvs e2
 
     -- In (if e1 then e2 else e3), the binders of e1 scope over e2
     fvs (If3 e1 e2 e3)    = (fvs e1 ++ fvs_blk e2) `remove` bs
@@ -768,10 +783,6 @@ getFree = fvs_blk
     fvs e = impossible "getFree" e
 
     remove xs bndrs = filter (`notElem` bndrs) xs
-
-closed :: SrcCore -> Bool
-closed = null . getFree
-
 
 getVar :: HasCallStack => SrcExpr -> [Ident]
 -- Get mutable variables

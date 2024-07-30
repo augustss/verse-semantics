@@ -48,7 +48,7 @@ desugar flgs add_verification
   = runD flgs .
      (-- Heavy lifting: Fig 9
          traceDS "Main desugaring"
-     <=< dsDD_12 ds_model
+     <=< mDesugarExpr ds_model
 
      -- Side effects
 --   <=<  traceDS "addDeref"
@@ -56,7 +56,7 @@ desugar flgs add_verification
 
      -- Desugar into Small Source
      <=< traceDS "Desugar to Small Source"
-     <=< dsSmall
+     <=< sDesugarExpr
 
      -- Prepends prelude from
      --    verifyprelude.verse, mediumprelude.verse
@@ -72,13 +72,14 @@ desugar flgs add_verification
 
 --------------------------------------------------------
 --
---         Desugar into Small Source Verse
---         Figs 3 and 4 of desugaring.pdf
+--           The S-desugaring
+--     Desugar into Small Source Verse
+--     Figs 3 and 4 of desugaring.pdf
 --
 --------------------------------------------------------
 
-dsSmall :: SrcExpr -> D SrcSmall
-dsSmall = ds
+sDesugarExpr :: SrcExpr -> D SrcSmall
+sDesugarExpr = ds
   where
     ds :: SrcExpr -> D SrcSmall
 
@@ -97,14 +98,6 @@ dsSmall = ds
     ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)  -- PCOLONT
     ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
 
-    -- Expand type{t} to Fun(x := t)<closed>{x}
-    ds (Typedef e) = do { x <- newIdent (getLoc e) "x"
-                        ; ds $ Function [(eDefine x e, [closedId])] (Variable x) }
-    --  S more direct desugaring, which generates less verification clutter,
-    --  is   type{t} --> \x. x=t
-    -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
-    --     ds (Typedef e) = do { x <- newIdent (getLoc e) "x"
-    --                         ; Lam x <$> (Unify (Variable x) <$> ds e) }
 
     -- Function notation
     ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [closedId])] (eCheck [effSucceeds] e2)
@@ -161,7 +154,8 @@ dsSmall = ds
     ds (PrefixOp (Op ":") e)     = Range [effSucceeds] <$> ds e
     ds (PrefixOp (Op "?") e)     = do x <- Variable <$> newIdent (getLoc e) "x"
                                       let ee = Let (InfixOp x (Op ":") e) (Truth x)
-                                      ds $ Typedef $ InfixOp eFalse (Op "|") ee
+                                      ds $ Macro1 (Ident noLoc "type") [] $
+                                              InfixOp eFalse (Op "|") ee
     ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
 
     ds (PostfixOp e (Ident l "?"))  = ds $ ApplyD e (Variable (Ident l "_"))
@@ -188,9 +182,21 @@ dsSmall = ds
       ds $ If2 (eDefine t e) (Truth (Variable t))
     ds (Truth e) = ds $ Map [InfixOp e (Op "=>") e]
 
+    ds (Macro1 (Ident _ "one")   _ e)   = One <$> ds e
+    ds (Macro1 (Ident _ "all")   _ e)   = All <$> ds e
     ds (Macro1 (Ident _ "verify") _ e)  = Verify [] <$> ds e
+    ds (Macro1 (Ident _ "some") _ e)    = Some <$> ds e
+    ds (Macro1 (Ident _ "check") fx e)  = Check fx <$> ds e
     ds (Macro1 (Ident _ "first") [] e)  = ds $ If2E e Fail  -- same as one{}
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
+
+    -- Expand type{t} to Fun(x := t)<closed>{x}
+    ds (Macro1 (Ident _ "type") _ e)
+      = do { x <- newIdent (getLoc e) "x"
+           ; ds $ Function [(eDefine x e, [closedId])] (Variable x) }
+           --  A more direct desugaring, which generates less verification clutter,
+           --  is   type{t} --> \x. x=t
+           -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
 
     ds (Exists xs b) = Exists xs <$> ds b
 
@@ -490,7 +496,6 @@ _addDeref = pure . exprD S.empty
       where op = Ident l ("in'" ++ sop ++ "'")
     expr s (MVar i (Just t) (Just e)) = DefineE i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
     expr s (Range fx e1) = Range fx (expr s e1)
---    expr s (Typedef e1) = Typedef (exprD s e1)
     expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)
     expr s (Exists is e) = Exists is (expr s e)
     expr s (OfType e fx t) = OfType (expr s e) fx (expr s t)
@@ -519,7 +524,9 @@ _addDeref = pure . exprD S.empty
 
 --------------------------------------------------------
 --
---         dsDx: Desugaring Small Source -> Big Core
+--           The M-desugaring
+--     Desugaring Small Source -> Big Core
+--        Fig 9 in desugaring.pdf
 --
 --------------------------------------------------------
 
@@ -535,12 +542,8 @@ data DsMode12
   | MI -- ^ - "checking" ("implementation")
   deriving (Eq, Ord, Show)
 
-dsD_12 :: SrcSmall -> D SrcCore
-dsD_12 = dsDD_12 MV
-
-dsDD_12 :: DsMode12 -> SrcSmall -> D SrcCore
-dsDD_12 s t = dsM_12 s t E
-
+mDesugarExpr :: DsMode12 -> SrcSmall -> D SrcCore
+mDesugarExpr s t = dsM_12 s t E
 
 dsB_12 :: DsMode12 -> SrcSmall -> Pi -> SrcCore -> D SrcExpr
 dsB_12 s t E     _  = dsM_12 s t E
@@ -600,6 +603,7 @@ where `x` is complely fresh.   We can abbreviate this if
 -}
 
 dsM_12 :: DsMode12 -> SrcSmall -> Pi -> D SrcCore
+-- This one does the heavy lifting
 
 -------------------- Functions -----------------------
 dsM_12 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
@@ -625,13 +629,13 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
 dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
    = eCheck fx <$>
      do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
-        ; (e2, z) <- defineDE "z" (dsDD_12 MV t2)
+        ; (e2, z) <- defineDE "z" (mDesugarExpr MV t2)
         ; pure (seqE [e1, eCheck [effSucceeds] (seqE [e2, eApplyD z x])]) }
 
 dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
     -- SLPJ: pi is unused, which seems suspicious
     -- But I think that's a correct reflection of opacity
-  = do { (e2, z) <- defineDE "z" (dsDD_12 MI t2)
+  = do { (e2, z) <- defineDE "z" (mDesugarExpr MI t2)
        ; pure (seqE [ e2
                     , eGuard (getFree t1) (seqE [eHavoc fx, eSome z]) ]) }
 
@@ -644,18 +648,18 @@ dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
 -- SLPJ: I don't think we want fx on Range at all
 
 dsM_12 MI (Range _fx t) (P i)                 -- MTYPE-
-  = do { (e, z) <- defineDE "z" (dsDD_12 MI t)
+  = do { (e, z) <- defineDE "z" (mDesugarExpr MI t)
        ; pure (seqE [e, eGuard (getFree i) (eSome z) ]) }
 -- SLPJ: check this... it's not what is in the doc yet
 --       ; pure (seqE [e, eHavoc fx, eApplyD z i ]) }
 
 dsM_12 s (Range _fx t) (P i)                  -- MTYPE+X
-  = do { (e, z) <- defineDE "z" (dsDD_12 s t)
+  = do { (e, z) <- defineDE "z" (mDesugarExpr s t)
        ; pure (seqE [e, eApplyD z i]) }   -- z[x]
 
 dsM_12 s (Range _fx t) E                      -- MTYPEE
   = do { x <- newIdent (getLoc t) "x"
-       ; (e, z) <- defineDE "z" (dsDD_12 s t)
+       ; (e, z) <- defineDE "z" (mDesugarExpr s t)
        ; let z_app = eApplyD z (Variable x)   -- z[x]
        ; pure (Exists [x] (seqE [e, z_app])) }
 
@@ -676,13 +680,41 @@ dsM_12 s (DefineIE x y t) (P i)             -- MSQUIGP
           ,        eDefine y <$> dsM_12 s t (P i)
           ]
 
+-------------------- x := t -----------------
+dsM_12 s (DefineE x t) pi                   -- MBIND
+  = eDefine x <$> dsM_12 s t pi
+
+-------------------- exists x -----------------
+-- Equivalent to to (y:any) provided any = \x.x
+--   M_sig[ exists y ]E    = y := exists x.x
+--   M_sig[ exists y ]P(i) = y := i
+dsM_12 _ (DefineV y) E     = pure $ eDefine y existsXX
+dsM_12 _ (DefineV y) (P i) = pure $ eDefine y i
+
+-------------------- v >> t -----------------
+dsM_12 s (Guard t1 t2) pi                   -- MGUARD
+  = Guard <$> dsM_12 s t1 E <*> dsM_12 s t2 pi
+
+-------------------- exi x. t -----------------
+-- dsM_12 s (Exists is t) pi@(P {})
+--  = do { let us = [ eDefine i eSomeAny | i <- is ]
+--       ; e' <- dsM_12 s t pi
+--       ; pure (seqE (us ++ [e'])) }
+--
+dsM_12 s (Exists is t) E      = Exists is <$> dsM_12 s t E
+dsM_12 _ t@(Exists {}) (P {}) = impossible "Exists in pattern" t
+
+dsM_12 s (Lam x t) E          = Lam x <$> dsM_12 s t E
+dsM_12 _ t@(Lam {}) (P {})    = impossible "Exists in pattern" t
+
+dsM_12 s (Some t) E           = Some <$> dsM_12 s t E
+dsM_12 _ t@(Some {}) (P {})   = impossible "Some in pattern" t
+
 -------------------- array{t1,...tn} -----------------
 dsM_12 s (Array ts) E                       -- MARRAYE
    = Array <$> mapM (\t -> dsM_12 s t E) ts
 
 dsM_12 s (Array ts) (P i)                   -- MARRAYP
-   | not (null ts)  -- Shortcut for empty ts, via MEQ
-                    -- M_s[ <> ]P(i) --> i = <>
    = do { js <- mapM (\t -> newIdent (getLoc t) "j") ts
         ; es <- zipWithM do_one ts js
         ; pure (eExists js (seqE [ Unify i (Array (Variable <$> js))
@@ -691,26 +723,6 @@ dsM_12 s (Array ts) (P i)                   -- MARRAYP
      do_one :: SrcExpr -> Ident -> D SrcExpr
      do_one t j = dsM_12 s t (P (Variable j))
 
--------------------- x := t -----------------
-dsM_12 s (DefineE x t) pi                   -- MBIND
-  = eDefine x <$> dsM_12 s t pi
-
--------------------- v >> t -----------------
-dsM_12 s (Guard t1 t2) pi                   -- MGUARD
-  = Guard <$> dsD_12 t1 <*> dsM_12 s t2 pi
-
--------------------- exi x. t -----------------
--- dsM_12 s (Exists is t) pi@(P {})
---  = do { let us = [ eDefine i eSomeAny | i <- is ]
---       ; e' <- dsM_12 s t pi
---       ; pure (seqE (us ++ [e'])) }
---
-dsM_12 s (Exists is t) E                   -- MEXISTS
-  = Exists is <$> dsM_12 s t E
-
-dsM_12 _ t@(Exists {}) (P {})
-  = impossible "Exists in pattern" t
-
 -------------------- t1 = t2 -----------------
 dsM_12 s (Unify t1 t2) pi                   -- MEQ
   = Unify <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
@@ -718,13 +730,13 @@ dsM_12 s (Unify t1 t2) pi                   -- MEQ
 -------------------- t1 ; t2 -----------------
 dsM_12 MX (Seq ts) pi                      -- MSEMIX
   = do let (ts', t) = unSeq ts
-       es' <- mapM (dsDD_12 MX) ts'
+       es' <- mapM (mDesugarExpr MX) ts'
        e'  <- dsM_12 MX t pi
        pure $ seqE (es' ++ [e'])
 
 dsM_12 s  (Seq ts) pi                      -- MSEMI
   = do let (ts', t) = unSeq ts
-       es' <- mapM (dsDD_12 MV) ts'
+       es' <- mapM (mDesugarExpr MV) ts'
        e'  <- dsM_12 s t pi
        pure $ seqE (es' ++ [e'])
 
@@ -761,33 +773,32 @@ dsM_12 s t@(Variable {}) (P i) = flipToE s t i
 
 -------------------- t1[t2] -----------------
 dsM_12 s (ApplyD t1 t2) E                  -- MVAR
-   = eApplyD <$> dsDD_12 s t1 <*> dsDD_12 s t2
+   = eApplyD <$> mDesugarExpr s t1 <*> mDesugarExpr s t2
 
 -------------------- if t1 then t2 else t3 ----
 -- Push `pi` into `t2` and `t3`
 dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
-   = If3 <$> dsDD_12 s t1 <*> dsM_12 s t2 pi <*> dsM_12 s t3 pi
-
-dsM_12 s (Macro1 m rs t) pi
-   = Macro1 m rs <$> dsM_12 s t pi
-
-dsM_12 s (Lam x t) _pi
-   = Lam x <$> dsM_12 s t E
-
-dsM_12 _ e@(DefineV _) _
-   = pure e
+   = If3 <$> mDesugarExpr s t1 <*> dsM_12 s t2 pi <*> dsM_12 s t3 pi
 
 ---------- Other terms with P(i) ---------------
 
-dsM_12 s t (P i) = flipToE s t i
-dsM_12 s t E     = error $ "TODO: dsM_12 " ++ show (s, t)
+-- We allow all{e}, one{e} in patterns using flipToE
+--    (not very important)
+
+dsM_12 s (All t) E       = All <$> dsM_12 s t E
+dsM_12 s t@(All{}) (P i) = flipToE s t i
+
+dsM_12 s (One t) E       = One <$> dsM_12 s t E
+dsM_12 s t@(One{}) (P i) = flipToE s t i
+
+dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 
 
 ----------------------------------
 flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
 
 flipToE MI t i                           -- MEQG
-  = do { e <- dsDD_12 MI t
+  = do { e <- mDesugarExpr MI t
        ; v <- newIdent (getLoc t) "v"
        ; pure (eGuard (getFree i) $
                eSome (Lam v (Variable v `Unify` e))) }
@@ -806,7 +817,7 @@ flipToE MI t i                           -- MEQG
 --  = z := \x. x=t; i ;; some{\}
 
 --flipToE MI t (Variable r)  -- Short cut
---  = Unify <$> dsDD_12 MI t <*> pure (Variable r)
+--  = Unify <$> mDesugarExpr MI t <*> pure (Variable r)
 
 
 

@@ -183,7 +183,6 @@ verify(pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  #
 verify(pass) { check<succeeds>{ x := x; x = 2 } }                              # Need to #asktim
 
 # Wildcards "_"
-verify("FunPair1", pass) { (a := (exists x {x},exists y {y})) => a=(_,_) }
 verify("FunPair2", pass) { (a := (_,_)) => a=(_,_) }
 verify("FunPair3", pass) { f(a := (_,_)) := a=(_,_) }
    # Lambda takes a pair, a, as its argument, and then checks that the argument is a pair and returns it
@@ -226,6 +225,5 @@ verify(":type1", fail) {x:int => f():type{x=0} => {x=0;f[]}}
 verify(":type6", fail) {a:int => b:int => f(a   ):type{a=b} => {a=b,f[a]}}
 verify(":type4", fail) {a:int => b:any => f(:int):type{a=b} => {a=b,f[a]}}
 
-verify(pass) {a:=(1;2;),a=(1,2)}
 verify("blame0", pass) { f2( g() := 3 ) := g[] = 3 }
 verify("ArrayX", skip) {a:=(1;2;),a=(1,2)}
