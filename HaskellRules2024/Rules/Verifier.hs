@@ -154,6 +154,8 @@ splitStep env lhs =
           asm    = A_GVEq r (GVArr (map GVVar rs'))
       pure (pPrint asm, caseSplit (rs ++ rs') asm as ctx rvs')
 
+{- SPJ: I am not sure if we need SPLIT-APP at all.
+        So I am commenting it out for now.
    ++
    -- Verify(rs ; as){ P[r[s]] }
    -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
@@ -165,6 +167,7 @@ splitStep env lhs =
       let r' = skolNotIn all_rs
           asm = A_PrimOp r' AO_Apply (GVArr [GVVar r, gv])
       pure (pPrint asm, Verify (bindList (r':rs) (asm : as, ctx <@ Var r')))
+-}
 
 matchVerify :: RuleEnv -> Expr -> [([SkolIdent], [SkolIdent], [Assump], Expr)]
 matchVerify env (Verify bnd)
