@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module FrontEnd.Expr(
-      Loc, noLoc
+      Loc, noLoc, mkLoc
 
     , Ident(..), unIdent
     , SrcExpr(..), Lit(..), Path(..)
@@ -46,7 +46,7 @@ import Data.Maybe
 
 import GHC.Stack( HasCallStack )
 
-import Text.Megaparsec (SourcePos, initialPos, sourcePosPretty)
+import Text.Megaparsec (SourcePos(..), mkPos, initialPos, sourcePosPretty)
 
 
 {- Note [The SrcExpr lifecycle]
@@ -329,6 +329,9 @@ pattern Op s <- Ident _ s
 type Loc = SourcePos
 noLoc :: Loc
 noLoc = initialPos ""
+
+mkLoc :: String -> Int -> Int -> Loc
+mkLoc f l c = SourcePos f (mkPos l) (mkPos c)
 
 instance Pretty Loc where
   pPrintPrec _ _ = text . sourcePosPretty
