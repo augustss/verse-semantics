@@ -46,13 +46,16 @@ miniEvalPrelude = ("miniprelude", "\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
 \false    := array{};\n\
+\void     := lam y { fail };\n\
 \any      := lam y {            y };\n\
 \int      := lam y { isInt$[y]; y };\n\
 \rational := lam y { isRat$[y]; y };\n\
 \string   := lam y { isStr$[y]; y };\n\
 \char     := lam y { isChar$[y]; y };\n\
 \nat      := lam y { isInt$[y]; intGE$[y,0]; y };\n\
-\Length   := lam y { isArr$[y]; length$[y] };\n\
+\Length   := lam y { isArr$[y]; arrLen$[y] };\n\
+\operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
+\operator'[]'     := lam t { lam a { isArr$[a]; arrMap$[t,a] } };\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intAdd$[x,y] }};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intSub$[x,y] }};\n\
 \operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intMul$[x,y] }};\n\
@@ -62,7 +65,6 @@ miniEvalPrelude = ("miniprelude", "\
 \operator'>'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGT$[x,y] }};\n\
 \operator'>='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGE$[x,y] }};\n\
 \operator'<>'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[x,y] }};\n\
-\operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
 \}\n\
 \")
 
@@ -74,6 +76,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
 \false    := array{};\n\
+\void     := lambda y { fail };\n\
 \any      := lambda y { y };\n\
 \int      := lambda y { isInt$[y]; y };\n\
 \rational := lam y { isRat$[y]; y };\n\
@@ -81,6 +84,8 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \char     := lam y { isChar$[y]; y };\n\
 \nat      := lam y { isInt$[y]; intGE$[y,0]; y };\n\
 \Length   := lam y { isArr$[y]; y >> some{int} };\n\
+\operator'[]'     := lam t { lam a { isArr$[a]; arrMap$[t,a] } };\n\
+\operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intSub$[x,y]; isInt$[z]; z } }}};\n\
 \operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intMul$[x,y]; isInt$[z]; z } }}};\n\

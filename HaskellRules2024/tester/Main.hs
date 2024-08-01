@@ -22,7 +22,7 @@ import TRS.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
 
-import Text.Megaparsec(getSourcePos, sourceLine, unPos)
+import Text.Megaparsec(getSourcePos, sourceLine, sourceName, unPos)
 
 import GHC.Stack( HasCallStack )
 
@@ -143,13 +143,6 @@ runTestFile tflg (fn, ts)
     count r rs = length (filter (== r) rs)
 
 
-widthTestName :: Int
-widthTestName = 10
-
-widthFileName :: Int
-widthFileName = 40
-
-
 -----------------------------------------------
 --
 --    Testing evaluation
@@ -244,10 +237,12 @@ doTest tflg test p1 p2 = do
   c2             <-                        srcToCore flags add_verif p2
   let (res1, tr1) = evalExpr tflg c1
   let (res2, tr2) = evalExpr tflg c2
-  res <- checkResults tflg test (p1, res1, tr1) (p2, res2, tr2)
   -- Display the desugared output
   when (showDesugared tflg) $
     displayDoc (sep [text (testHerald test) <+> text "desugared:", pPrint c1])
+
+  res <- checkResults tflg test (p1, res1, tr1) (p2, res2, tr2)
+
   -- Display the trace if asked for, regardless of success/failure
   when (showTrace tflg) $
     do { putStrLn "Trace is:"; display tr1 }
@@ -260,7 +255,10 @@ addVerification _               = True
 
 -- | `checkResults` just compares the results of two evaluations and prints out the appropriate message,
 --   it does _not_ throw or catch any exceptions.
-checkResults :: TestFlags -> Test -> (SrcExpr, NormResult, Traced Expr) -> (SrcExpr, NormResult, Traced Expr) -> IO TestRes
+checkResults :: TestFlags -> Test
+             -> (SrcExpr, NormResult, Traced Expr)
+             -> (SrcExpr, NormResult, Traced Expr)
+             -> IO TestRes
 -- Really we should check res2, tr2 as well, but they are always boring
 checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
   | res1 /= NormOK
@@ -319,11 +317,27 @@ equivValue :: Rules.Expr -> Rules.Expr -> Bool
 equivValue e1 e2 = Rules.norm e1 == Rules.norm e2
 
 testHerald :: Test -> String
-testHerald test = printf "%-*s %-*s" widthTestName test_nm widthFileName loc_str
+testHerald test = printf "%-*s %-*s" widthTestName test_nm widthTestLoc loc_str
   where
-    test_nm  = fromMaybe "<anon>" (testMName ti)
-    loc_str  = prettyShow (testLocn ti)
     ti       = testInfo test
+    test_nm  = fromMaybe "<anon>" (testMName ti)
+    test_loc :: Loc    = testLocn ti
+    loc_str  :: String = stripLeadingPath (sourceName test_loc)
+                         ++ ":" ++ show (unPos (sourceLine test_loc))
+
+widthTestName :: Int
+-- Column width for test name
+
+widthTestName = 10
+
+widthTestLoc :: Int
+-- Column width for test location
+widthTestLoc = 25
+
+
+stripLeadingPath :: String -> String
+-- Remove leading directories from a path, to shorten the output
+stripLeadingPath =  reverse . takeWhile (/= '/') . reverse
 
 noisy :: TestFlags -> Bool
 noisy = not . quiet
@@ -526,7 +540,7 @@ testFlags = TestFlags
          ( OA.long "max-steps"
         <> OA.short 'm'
         <> OA.metavar "NUM"
-        <> OA.value 1000
+        <> OA.value 500
         <> OA.help "Maximum number of rewrite steps" )
   <*> OA.option OA.auto
          ( OA.long "max-norm-steps"

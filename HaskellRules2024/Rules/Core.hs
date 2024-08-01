@@ -97,9 +97,9 @@ data PrimOp
    Add | Sub | Mul | Div
 
    -- Operations on arrays
- | Length
- | DotDot     -- m..n
- | ForceArr   -- Takes an array of (\_.e) thunk and forces them
+ | ArrLen
+ | ArrMap     -- map$[f,<v1..vn>] = <f v1, .., f vn>
+ | DotDot     -- dotDot$[m,n] = <m, m+1, .., n>
 
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
@@ -119,8 +119,8 @@ primOpString Sub = "intSub$"
 primOpString Mul = "intMul$"
 primOpString Div = "intDiv$"
 
-primOpString Length   = "length$"
-primOpString ForceArr = "forceArr$"
+primOpString ArrLen   = "arrLen$"
+primOpString ArrMap   = "arrMap$"
 primOpString DotDot   = "dotDot$"
 
 primOpString Gt  = "intGT$"
@@ -152,9 +152,9 @@ primOpCanFail Add      = False
 primOpCanFail Sub      = False
 primOpCanFail Mul      = False
 primOpCanFail Div      = False
-primOpCanFail Length   = False
+primOpCanFail ArrLen   = False
 primOpCanFail DotDot   = False
-primOpCanFail ForceArr = False
+primOpCanFail ArrMap   = False
 
 --------------------------------------------------------------------------------
 --

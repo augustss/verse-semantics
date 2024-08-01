@@ -111,18 +111,20 @@ sDesugarExpr = ds
 
     -- Conditionals
     -- We must retain IF3 (i.e `if e1 then e2 else e3`) because
-    -- the main dsM_12 desugaring (needs to push `pi` into the branches.
+    -- the main dsM_12 desugaring needs to push `pi` into the branches.
     ds (If1 e)        = ds $ If2E e eFalse
     ds (If2 e1 e2)    = ds $ If3 e1 e2 eFalse
     ds (If2E e1 e2)   = do x <- newIdent (getLoc e1) "x"; ds $ If3 (eDefine x e1) (Variable x) e2
 
     -- For-loops
-    -- for(e1){e2} = forceArr$[ all{ e1; \_.e2 } ]
+    -- for(e1){e2} = arrMap$[ \t. t[], all{ e1; \_.e2 } ]
     ds (For1 e)     = do x <- newIdent (getLoc e) "x"
                          ds $ For2 (eDefine x e) (Variable x)
     ds (For2 e1 e2) = do e1' <- ds e1
                          e2' <- ds e2
-                         pure (ApplyD (EPrim ForceArr) (All (eSeq [e1', eThunk e2'])))
+                         pure (ApplyD (EPrim ArrMap)
+                                      (Array [eForceLam
+                                             , All (eSeq [e1', eThunk e2'])]))
 
     -- Array
     ds (Array es) = arraySplice =<< mapM elm es
@@ -178,10 +180,8 @@ sDesugarExpr = ds
       | Just op <- lookupPrimOp v   = return (EPrim op)
       | otherwise                   = return (Variable ident)
 
-    -- Misc
-    ds (Option Nothing) = pure eFalse
-
     -- option{e}  -->  if(x:=e)then truth(e)
+    ds (Option Nothing) = pure eFalse
     ds (Option (Just e)) = do
       t <- newIdent (getLoc e) "t"
       ds $ If2 (eDefine t e) (Truth (Variable t))
@@ -192,10 +192,18 @@ sDesugarExpr = ds
     ds (Macro1 (Ident _ "verify") _ e)  = Verify [] <$> ds e
     ds (Macro1 (Ident _ "some") _ e)    = Some <$> ds e
     ds (Macro1 (Ident _ "check") fx e)  = Check fx <$> ds e
+
+    -- assume{e}  ==   some(\x. e; x)
+    ds (Macro1 (Ident _ "assume") _ e)  = do { x <- newIdent (getLoc e) "x"
+                                             ; e' <- ds e
+                                             ; pure (Some (Lam x (Seq [e', Variable x]))) }
+
+    -- first{e}        ==  if (x:=e) then x  else fail
+    -- first(e1){e2}   ==  if e1     then e2 else fail
     ds (Macro1 (Ident _ "first") [] e)  = ds $ If2E e Fail  -- same as one{}
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
 
-    -- Expand type{t} to Fun(x := t)<closed>{x}
+    -- type{t}  ==  Fun(x := t)<closed>{x}
     ds (Macro1 (Ident _ "type") _ e)
       = do { x <- newIdent (getLoc e) "x"
            ; ds $ Function [(eDefine x e, [closedId])] (Variable x) }
@@ -787,8 +795,9 @@ dsM_12 _ t@(Variable {}) E     = pure t
 dsM_12 s t@(Variable {}) (P i) = flipToE s t i
 
 -------------------- t1[t2] -----------------
-dsM_12 s (ApplyD t1 t2) E                  -- MVAR
-   = eApplyD <$> mDesugarExpr s t1 <*> mDesugarExpr s t2
+-- Rule MVAR
+dsM_12 s t@(ApplyD {})  (P i) = flipToE s t i
+dsM_12 s (ApplyD t1 t2) E     = eApplyD <$> mDesugarExpr s t1 <*> mDesugarExpr s t2
 
 -------------------- if t1 then t2 else t3 ----
 -- Push `pi` into `t2` and `t3`

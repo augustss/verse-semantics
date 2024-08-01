@@ -16,7 +16,7 @@ module FrontEnd.Expr(
       -- Building SrcExpr
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
     , eAll, eExists, eCheck, eDefine, eApplyD, eVerify
-    , eThunk, eForce, existsXX, eSomeAny
+    , eThunk, eForce, eForceLam, existsXX, eSomeAny
     , eSeq, fvArray
     , srcUnderscore, isSrcUnderscore
 
@@ -244,6 +244,10 @@ eThunk e = Lam srcUnderscore e
 eForce :: SrcExpr -> SrcExpr
 -- Force a (\_.e) thunk, by applying it to <>
 eForce e = ApplyD e (Array [])
+
+eForceLam :: SrcExpr
+-- \t. t[]
+eForceLam = Lam identX (ApplyD (Variable identX) (Array []))
 
 eAll :: SrcExpr -> SrcExpr
 eAll = All

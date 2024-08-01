@@ -69,7 +69,7 @@ test(S00){a:int => :int=a}							#FP:10.4:DESUGAR:HIDING
 test(S00){a:int => :int=if(1) then 2 else 3}		#FP:10.4:DESUGAR:HIDING
 test(S00){a:int => :int=if(1=2) then 2 else 3}		#FP:10.4:DESUGAR:HIDING
 test(S00){a:int => if(a=1) then :int=2 else :int=3}	#FP:10.4:DESUGAR:HIDING
-#test(S00){a:int => :int=if(a=1) then 2 else 3} #!! MUST FIX
+test(S00){a:int => :int=if(a=1) then 2 else 3}
 
 #
 # Runtime unification - maximum asynchronous progress.
@@ -926,9 +926,9 @@ test(A00){1 where a:=a}  # Could tighten to S00.	#TODO:10.4:WHY
 #
 
 # Convergence of circular function definitions.
-test(S00){f(1):=f}						#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
-test(S00){f(f):=1}					  	#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
-test(S00){f(f):=f}						#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(1):=f}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(f):=1}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
+test(S00){f(f):=f}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
 test(S00){f(x:=f):=x}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
 test(S00){f(1):=f,f}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
 test(S00){f(1):=f,f[1]}					#FP:10.4:RECURSION:SWAP:IMPL-BEFORE-VERIFY
