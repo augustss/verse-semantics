@@ -4,6 +4,10 @@
 # Slack 1 Aug 24
 verify("S1Aug24-1", fail) { x:int; for{ (x=2;x) | (x=3;x) } }
   # S1Aug24-1: stuck because x is rigid inside the `all`.
+verify("S1Aug24-2", fail) { f(x:int,y:int)<decides><closed> := x=y
+                          ; exists a { f[a,a] } }
+verify("S1Aug24-3", pass) { f(x:int)<decides><closed> := x=3
+                          ; exists a { f[a] } }
 
 # -----------------------------------------
 # Email 28 July 24
