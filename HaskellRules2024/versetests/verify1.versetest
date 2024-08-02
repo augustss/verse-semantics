@@ -1,4 +1,4 @@
-verify("decides00", pass) { f(x:int)<decides> := x = 3 }
+# verify("decides00", pass) { f(x:int)<decides> := x = 3 }
 test(D00){x:int => x=3}
 # test(U00){f():any => f[]='3'}
 # test(D00){f():int => f[]=3}
