@@ -59,21 +59,24 @@ convert (One t)       = Rules.One (convert t)
 convert (All t)       = Rules.All (convert t)
 convert (Lam i t)     = Rules.Lam (TRS.bind (toCoreIdent i) (convert t))
 convert (Some v)      = Rules.Some (convert v)
-convert (Check fxs t) = foldr add_check (convert t) fxs
-                          where
-                            add_check fx e = Rules.Check (toCoreEff fx) e
+convert (Check fxs t) = foldr addCheck (convert t) fxs
 convert (Src.Verify is t) = Rules.Verify (TRS.bindList (map toCoreIdent is) ([], convert t))
 convert Src.Fail          = Rules.Fail
 convert e = impossible "convert" e
 
+addCheck :: Eff -> Rules.Expr -> Rules.Expr
+addCheck fx e = case toCoreEff fx of
+                  Just fx' -> Rules.Check fx' e
+                  Nothing  -> e
+
 toCoreIdent :: Ident -> Rules.Ident
 toCoreIdent (Ident _ s) = Rules.Name s
 
-toCoreEff :: Eff -> Rules.Effect
+toCoreEff :: Eff -> Maybe Rules.Effect
 toCoreEff eff
-  | eff == effSucceeds = Rules.Succeeds
-  | eff == effDecides  = Rules.Decides
-  | otherwise          = error "toCoreEff" (prettyShow eff)
+  | eff == effSucceeds = Just Rules.Succeeds
+  | eff == effDecides  = Just Rules.Decides
+  | otherwise          = Nothing -- error "toCoreEff" (prettyShow eff)
 
 
 --------------------------------------------------------

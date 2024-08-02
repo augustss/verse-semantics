@@ -230,3 +230,11 @@ verify("Array1", pass) { a := for{1..3}; a = array{1,2,3} }
 verify("Array2", pass) { ([]int)[ array{1,2} ] }
 verify("Array3", pass) { f():[]int := array{1,2,3} }
 verify("Array4", pass) { f():[]int := array{1,2,3} }
+
+# For now we just ignore 'computes'
+verify("computes00", pass) { f(x:int)<computes>:int = 1 }
+verify("computes01", fail) { f(x:int)<computes>:int = (x = 1) }
+
+# Testing the tim style
+test(D00){x:int => x=3}
+test(S00){x:int => x=x}

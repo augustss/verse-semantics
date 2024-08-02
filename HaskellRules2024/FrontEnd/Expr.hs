@@ -230,12 +230,12 @@ eMkMap l = Variable (Ident l "mkMap$")
 
 
 eHavoc :: [Eff] -> SrcExpr
-eHavoc fx = eSeq (map havoc1 fx)
+eHavoc fx = eSeq (mapMaybe havoc1 fx)
   where
-    havoc1 x | x == effSucceeds = eSeq []
-             | x == effFails    = Fail
-             | x == effDecides  = Unify eSomeAny (Array [])
-             | otherwise        = errorMessage $ "eHavoc: " ++ show fx
+    havoc1 x | x == effSucceeds = Just (eSeq [])
+             | x == effFails    = Just Fail
+             | x == effDecides  = Just (Unify eSomeAny (Array []))
+             | otherwise        = Nothing -- errorMessage $ "eHavoc: " ++ show fx
 
 eThunk :: SrcExpr -> SrcExpr
 -- Delay `e` by wrapping it in a lambda (\_.e)
