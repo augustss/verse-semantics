@@ -76,7 +76,7 @@ runTests test_flags
 data Test
   -- Test that two expressions evaluate to the same thing
   = TestEvalEq TestInfo SrcExpr SrcExpr     -- testeq( name, code ){ value }
-  | TestVerify TestInfo Effect  SrcExpr     -- verify( name, pass/fail){ code }
+  | TestVerify TestInfo SrcExpr     -- verify( name, pass/fail){ code }
   | TestTim { timTag :: TimTag              -- test(D00){ code }
             , timExpr :: SrcExpr }
   | TestTimCrash TimTag String             -- test(D00){ code-that-crashes-the-parser }
@@ -84,7 +84,7 @@ data Test
 
 testInfo :: Test -> TestInfo
 testInfo (TestEvalEq ti _ _) = ti
-testInfo (TestVerify ti _ _) = ti
+testInfo (TestVerify ti _)   = ti
 testInfo (TestTim    ti _)   = timTestInfo ti
 testInfo (TestTimCrash ti _) = timTestInfo ti
 
@@ -176,27 +176,17 @@ timTestInfo (Ident loc status) = TestInfo
   , testExcn = []
   }
 
-
-timTestEff :: String -> Effect
-timTestEff "D00" = Decides
-timTestEff "F00" = Fails
-timTestEff "S00" = Succeeds
-timTestEff _     = Succeeds
-
 timTestType :: String -> TestType
 timTestType "S00" = TPass
--- timTestType "D00" = TFail
--- timTestType "U00" = TFail
--- timTestType "F00" = TFail
-timTestType _     = TSkip
+timTestType _     = TFail
 
 ----------------------------
 runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg (TestTim    ts  e)
-  = runTest tflg (TestVerify (timTestInfo ts) (timTestEff (unIdent ts)) e)
+  = runTest tflg (TestVerify (timTestInfo ts) e)
 -- TestVerify: we try to verify
 --   verify(;){ check<succeeds>{e} }
-runTest tflg test@(TestVerify _ _ e)
+runTest tflg test@(TestVerify _ e)
   = doTestCatchingExn tflg test e (Array [])
 runTest tflg test@(TestEvalEq _ e1 e2)
   = doTestCatchingExn tflg test e1 e2
@@ -380,7 +370,7 @@ pTestVerify :: P Test
 pTestVerify =
   pKeyword "verify" *> do
     tId <- pParens pTestInfo
-    TestVerify tId Succeeds <$> pBraces pExprSeq
+    TestVerify tId <$> pBraces pExprSeq
 
 pTimTest :: P Test
 pTimTest =

@@ -1,4 +1,4 @@
-# verify("decides00", pass) { f(x:int)<decides> := x = 3 }
-test(D00){x:int => x=3}
-# test(U00){f():any => f[]='3'}
-# test(D00){f():int => f[]=3}
+test(S00){type{3}?}
+test(S00){int?=3}	#FP:10.4:DESUGAR:HIDING
+test(A00){int?}
+test(F00){int?='3'}
