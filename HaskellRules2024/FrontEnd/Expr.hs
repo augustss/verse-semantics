@@ -21,7 +21,7 @@ module FrontEnd.Expr(
     , srcUnderscore, isSrcUnderscore
 
     , Store(..), Ptr
-    , Eff, effSucceeds, effDecides, effFails, isOpenClosed
+    , Eff, effSucceeds, effDecides, effFails, effComputes, isOpenClosed
     , Op, pattern Op
     , compos, composOp, unSeq
     , getLoc
@@ -233,6 +233,7 @@ eHavoc :: [Eff] -> SrcExpr
 eHavoc fx = eSeq (mapMaybe havoc1 fx)
   where
     havoc1 x | x == effSucceeds = Just (eSeq [])
+             | x == effComputes = Just (eSeq [])
              | x == effFails    = Just Fail
              | x == effDecides  = Just (Unify eSomeAny (Array []))
              | otherwise        = Nothing -- errorMessage $ "eHavoc: " ++ show fx
@@ -368,10 +369,11 @@ instance Pretty Ident where
 type Eff = Ident
 
 
-effSucceeds, effDecides, effFails :: Eff
+effSucceeds, effDecides, effFails, effComputes :: Eff
 effSucceeds = Ident noLoc "succeeds"
 effDecides  = Ident noLoc "decides"
 effFails    = Ident noLoc "fails"
+effComputes = Ident noLoc "computes"
 
 isOpenClosed :: Eff -> Bool
 isOpenClosed (Ident _ "open")   = True

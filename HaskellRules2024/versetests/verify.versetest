@@ -231,7 +231,7 @@ verify("Array2", pass) { ([]int)[ array{1,2} ] }
 verify("Array3", pass) { f():[]int := array{1,2,3} }
 verify("Array4", pass) { f():[]int := array{1,2,3} }
 
-# For now we just ignore 'computes'
+# For now we just ignore 'computes' i.e. treat as 'succeeds'
 verify("computes00", pass) { f(x:int)<computes>:int = 1 }
 verify("computes01", fail) { f(x:int)<computes>:int = (x = 1) }
 

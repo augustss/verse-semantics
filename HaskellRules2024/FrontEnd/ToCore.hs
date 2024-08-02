@@ -75,6 +75,7 @@ toCoreIdent (Ident _ s) = Rules.Name s
 toCoreEff :: Eff -> Maybe Rules.Effect
 toCoreEff eff
   | eff == effSucceeds = Just Rules.Succeeds
+  | eff == effComputes = Just Rules.Succeeds
   | eff == effDecides  = Just Rules.Decides
   | otherwise          = Nothing -- error "toCoreEff" (prettyShow eff)
 
