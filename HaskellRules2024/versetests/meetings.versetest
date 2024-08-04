@@ -1,6 +1,37 @@
 # Add new meetings at the top
 
 # -----------------------------------------
+# Opacity and function arguments
+verify("Tim3Jul24-1", pass){ f1(x:int)<decides>:int := x>3
+                           ; g()<decides> := f1["monkey"] }
+   # f1 is opaque; call f1["monkey"] is allowed by verifier even though domain test fails
+verify("Tim3Jul24-2", fail){ f1(x:int)<decides>:int := x>3
+                           ; g()<decides> := f1("monkey") }
+   # f1 is opaque; Round parens; can't prove f1("monkey") succeeds
+verify("Tim3Jul24-3", fail){ f1(x:int)<decides>:int := x>3
+                           ; g()<decides> := f1(2) }
+   # f1 is opaque; Round parens; can't prove f1(2) succeeds
+verify("Tim3Jul24-4", fail){ f1(x:int)<decides>:int := x>3
+                           ; g()<succeeds> := f1[4] }
+   # f1 is opaque; can't prove f1[4] succeeds, even though it always will
+
+verify("Tim3Jul24-5", pass){ f2(x:int)<decides> := x>3
+                           ; g()<decides> := f2["monkey"] }
+   # f2 is transparent; f2["monkey"] is allowed by verifier even though domain test fails
+verify("Tim3Jul24-6", fail){ f2(x:int)<decides> := x>3
+                           ; g()<decides> := f2("monkey") }
+   # Round parens; can't prove f1("monkey") succeeds
+verify("Tim3Jul24-7", fail){ f2(x:int)<decides> := x>3
+                           ; g()<decides> := f2(2) }
+   # Round parens; can't prove f1(2) succeeds
+verify("Tim3Jul24-8", pass){ f2(x:int)<decides> := x>3
+                           ; g()<decides> := f2(4) }
+   # Round parens; this time we can prove that f2(4) succeeds
+verify("Tim3Jul24-9", pass){ f2(x:int)<decides> := x>3
+                           ; g()<succeeds> := f2[4] }
+   # f2 is transparent; call f2[4] actually succeeds
+
+# -----------------------------------------
 # Slack 1 Aug 24
 verify("S1Aug24-1", fail) { x:int; for{ (x=2;x) | (x=3;x) } }
   # S1Aug24-1: stuck because x is rigid inside the `all`.
@@ -62,10 +93,10 @@ verify("T26Jul24-12b", pass){ f( g() := :type{1|2} )<succeeds> := g[] = (1|2) } 
 verify("T26Jul24-13",  pass){ f( g() := 1|2        )<succeeds> := g[]; f( () => 1 ) }
 
 # -----------------------------------------
-# Meeting 24 July 24
+# Meeting 24 July 24: opacity and function result types
 #
 verify("T24Jul24-1", fail) { f(x:int)<decides>:string := 7 }
-  # Should be rejected despite 'decides': the string[7] fails and should be rejected
+  # Should be rejected despite <decides>: the string[7] fails and should be rejected
 
 verify("T24Jul24-2", fail) {f(x:int)<decides>:type{x=10} := 7 }
   # ...Similarly
