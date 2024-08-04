@@ -19,6 +19,11 @@ testeq( "M28Jul24-1", fail ) { F(X:int)<decides>:void = if (X = 2) then fail
                              ; Y } { array{1} }
 
 # -----------------------------------------
+# Meeting 31 July 24
+verify( "T31Jul24-1", pass){ f(y:int; x := (y = 1; 1)|(y = 2; 1))<closed><succeeds> := x + y }
+
+
+# -----------------------------------------
 # Meeting 29 July 24
 testeq( "T29Jul24-1", pass ){ f( all{1} ) := 0; f[ array{1} ] = 0 } {0}
 verify( "T29Jul24-2", fail ){ f( x:any ) := x=x }   # Gets stuck; reject
