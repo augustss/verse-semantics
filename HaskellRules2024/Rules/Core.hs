@@ -105,7 +105,7 @@ data PrimOp
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr | IsChar | IsArr
+ | IsInt | IsStr | IsChar | IsArr | IsComp
 
  deriving
    ( Eq, Ord, Bounded, Enum, Show )
@@ -133,6 +133,7 @@ primOpString IsInt  = "isInt$"
 primOpString IsStr  = "isStr$"
 primOpString IsChar = "isChar$"
 primOpString IsArr  = "isArr$"
+primOpString IsComp = "isComp$"
 
 primOpCanFail :: PrimOp -> Bool
 
@@ -146,6 +147,7 @@ primOpCanFail IsInt  = True
 primOpCanFail IsStr  = True
 primOpCanFail IsChar = True
 primOpCanFail IsArr  = True
+primOpCanFail IsComp = True
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False

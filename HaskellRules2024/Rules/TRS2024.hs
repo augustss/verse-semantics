@@ -138,6 +138,14 @@ applicationStep _env lhs =
        _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
          | otherwise -> []
  ++
+  "APP-ISCOMP" `name`
+  do Op IsComp :@: a <- [lhs]
+     case a of
+       Lit (LChar _) -> pure a
+       Lit (LInt _)  -> pure a
+       Lit (LStr _)  -> pure a
+       _             -> []
+ ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]
      guard (isVal v)
@@ -491,4 +499,3 @@ choiceFree (v1 :@: _)          = case v1 of
                                    Op _ -> True -- all ops we support are choice-free right now
                                    _    -> False
 choiceFree _                   = True
-

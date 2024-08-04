@@ -170,14 +170,26 @@ checkNeg s neg@(A_GVEq x gv)
 checkNeg s neg@(A_RelOp op gv)
   | isRel s op gv
   = Just (Contra neg)
+  | op == IsComp && isComparable s gv
+  = Just (Contra neg)
   | otherwise
   = Nothing
+
+isComparable :: Solver -> GroundVal -> Bool
+isComparable s gv = isRel s IsInt gv || isRel s IsChar gv || isRel s IsStr gv
 
 isRelOpLit1 :: PrimOp -> Lit -> Bool
 isRelOpLit1 IsInt  (LInt _)  = True
 isRelOpLit1 IsChar (LChar _) = True
 isRelOpLit1 IsStr  (LStr _)  = True
+isRelOpLit1 IsComp l         = isCompLit l
 isRelOpLit1 _      _         = False
+
+isCompLit :: Lit -> Bool
+isCompLit (LInt _)  = True
+isCompLit (LChar _) = True
+isCompLit (LStr _)  = True
+isCompLit _         = False
 
 intRel2 :: PrimOp -> Maybe (Integer -> Integer -> Bool)
 intRel2 Gt  = Just (>)
@@ -323,6 +335,7 @@ isTyOp :: PrimOp -> Bool
 isTyOp IsInt  = True
 isTyOp IsChar = True
 isTyOp IsStr  = True
+isTyOp IsComp = True
 isTyOp _      = False
 
 ------------------------------------------------------------------------------------

@@ -238,3 +238,9 @@ verify("computes01", fail) { f(x:int)<computes>:int = (x = 1) }
 # Testing the tim style
 test(D00){x:int => x=3}
 test(S00){x:int => x=x}
+
+# Comparable
+verify("comparable00", fail){a:any => comparable[a]}
+verify("comparable01", pass){a:int => comparable[a]}
+verify("comparable02", pass){f(a:comparable):comparable => x:=f(2)}
+verify("comparable03", pass){f(a:comparable):comparable => x:=f[2]}

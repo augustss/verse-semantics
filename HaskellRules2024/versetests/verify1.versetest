@@ -1,5 +1,0 @@
-# test(S00){f(x:int)<computes>:int = 1}
-# test(U00){a:any => comparable[a]}
-# test(S00){a:int => comparable[a]}
-
-verify("computes01", fail) { f(x:int)<computes>:int = (x = 1) }
