@@ -26,6 +26,7 @@ import Text.Megaparsec(getSourcePos, sourceLine, unPos)
 
 import GHC.Stack( HasCallStack )
 
+import Data.List( isPrefixOf )
 import Data.Char( toLower )
 import Data.Maybe
 
@@ -121,8 +122,18 @@ data TestRes = Good | Bad | Excn | Skip
 runTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 runTestFile tflg (fn, ts)
  = do { putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
-      ; let p = maybe (const True) (\ s t -> testName (testInfo t) == s) (onlyTest tflg)
-      ; res :: [TestRes] <- mapM (runTest tflg) (filter p ts)
+
+      ; let tests_to_run :: [Test]
+            tests_to_run = filter keep_this ts
+
+            -- With --only=tst, rum tests for which "tst" is a prefix of the test name
+            keep_this :: Test -> Bool
+            keep_this | Just only <- onlyTest tflg
+                      = \t -> only `isPrefixOf` testName (testInfo t)
+                      | otherwise
+                      = \_ -> True
+
+      ; res :: [TestRes] <- mapM (runTest tflg) tests_to_run
 
       ; let n_tests   = length res
             n_skipped = count Skip res
@@ -516,7 +527,7 @@ testFlags = TestFlags
          ( OA.long "max-steps"
         <> OA.short 'm'
         <> OA.metavar "NUM"
-        <> OA.value 1000
+        <> OA.value 500   -- test M28Jul24-1 takes ages with 1000 steps
         <> OA.help "Maximum number of rewrite steps" )
   <*> OA.option OA.auto
          ( OA.long "max-norm-steps"
