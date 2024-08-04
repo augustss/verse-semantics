@@ -165,6 +165,7 @@ sDesugarExpr = ds
                                               InfixOp eFalse (Op "|") ee
     ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
 
+    -- e?  means simply  e[_]  or equivalently   exists x. e[x]
     ds (PostfixOp e (Ident l "?"))  = ds $ ApplyD e (Variable (Ident l "_"))
     ds (PostfixOp e (Ident l op))   = ds =<< call "post" l op e
 
@@ -643,9 +644,10 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
        pure $ Lam i body
 
 -------------------- e |>{fx} t -----------------------
+-- M+[ t1 |>fx t2 ]pi = x := check<fx>{ M[t1]pi }
+--                      chekc<succeeds>{ z := M+[t2]E; z[x] }
 dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
-   = eCheck fx <$>
-     do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
+   = do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
         ; (e2, z) <- defineDE "z" (mDesugarExpr MV t2)
         ; pure (eSeq [e1, eCheck [effSucceeds] (eSeq [e2, eApplyD z x])]) }
 
@@ -931,8 +933,10 @@ syntaxFixes = pure . f
 
         -- PAMP2
         g :: SrcExpr -> [SrcExpr]
-        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
-        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs) = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
+        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs)
+          = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
+        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs)
+          = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
         g e = [f e]
 
 
