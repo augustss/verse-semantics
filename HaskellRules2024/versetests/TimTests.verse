@@ -128,7 +128,7 @@ test(R00){allow{f():=allow{:nat}; f[]}}
 #test(U00){operator'-'[3]}
 
 # Depends on Abstraction propagation policy.
-test(D00){f()<computes>:=a=b where a&b:int => f[]=f[]}		#TODO:10.4:CHECK-STRENGTH
+test(D00){ (f()<computes>:=a=b) where a&b:int => f[]=f[]}		#TODO:10.4:CHECK-STRENGTH
 test(S00){f()<computes>:type{a=b where a&b:int} => f[]=f[]}	#FP:10.4:DESUGAR:EFF-COMPUTES
 test(D00){f():type{a=b where a&b:int} => f[]=f[]}
 test(U00){c:int => f(c):={a=b where a:any,b:any} => f[3]}

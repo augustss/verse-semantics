@@ -55,6 +55,8 @@ import Data.Scientific(Scientific)
 --
 --------------------------------------------------------------------------------
 
+type Val = Expr
+
 data Expr
   -- Values
   = Var Ident
@@ -417,8 +419,6 @@ bindSize bnd = exprSize (snd (unsafeUnbind bnd))
 --                 Values
 --
 --------------------------------------------------------------------------------
-
-type Val = Expr
 
 isVal :: Expr -> Bool
 isVal (Var v) = not (isUnderscore v)  -- "_" is not a valid identifier
