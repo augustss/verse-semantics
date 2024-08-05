@@ -46,7 +46,7 @@ miniEvalPrelude = ("miniprelude", "\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
 \false := array{};\n\
-\void       := lam y { fail         };\n\
+\void       := lam y { ()           };\n\
 \any        := lam y {            y };\n\
 \int        := lam y { isInt$[y]; y };\n\
 \rational   := lam y { isRat$[y]; y };\n\
@@ -77,7 +77,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
 \false := array{};\n\
-\void       := lam y { fail         };\n\
+\void       := lam y { ()           };\n\
 \any        := lam y {            y };\n\
 \int        := lam y { isInt$[y]; y };\n\
 \rational   := lam y { isRat$[y]; y };\n\
