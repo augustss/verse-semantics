@@ -22,16 +22,16 @@ unsat env = {- ppTrace "TRACE: unsat" msg -} res
 solver :: Solver -> Maybe UnsatReason
 solver s
   | Just r <- res = Just r
-  | null eqs      = {- ppTrace "TRACE: solve (SAT)" msg -} Nothing
+  | null facts    = {- ppTrace "TRACE: solve (SAT)" msg -} Nothing
   | otherwise     = solver s'
   where
     _msg          = pPrint (s_pos s')
     -- 1. check if the current solver state is unsatisfiable
     res           = check s
     -- 2. generate new equalities from the definitions
-    eqs           = generate s
+    facts         = generate s
     -- 3. update the solver state with the new equalities
-    s'            = propagate s eqs
+    s'            = propagate s facts
 
 {- Note [Solver-Rules]
 
@@ -271,11 +271,33 @@ known to have some primitive type (int, string, etc)
 -- | `generate s` returns a list of equalities that can be derived from the solver,
 --    but which are not yet known in the UF graph
 -----------------------------------------------------------------------------------
-generate :: Solver -> [Equality]
-generate s         = filter (not . known) (evalDefs s ++ pos)
+generate :: Solver -> [Fact]
+generate s = (FProp  <$> generateProps s)
+          ++ (FEqual <$> generateEqs   s)
+
+
+generateProps :: Solver -> [Prop]
+generateProps s = filter (not . knownProp s) (evalProps s)  -- TODO: why concat pos? they get filtered immediately?
+
+knownProp :: Solver -> Prop -> Bool
+knownProp s (MkProp r v) = isRel s r v
+
+evalProps :: Solver -> [Prop]
+evalProps s = concatMap (evalProp s) (s_pos s)
+
+evalProp :: Solver -> FailableAssump -> [Prop]
+evalProp s (A_RelOp IsComp gv)
+  = [ MkProp IsComp v' | gvs <- s_tups s, isEqual s gv (GVArr gvs), v' <- gvs ]
+evalProp _ _
+  = []
+
+generateEqs :: Solver -> [Equality]
+generateEqs s = filter (not . knownEq s) (evalDefs s ++ pos)  -- TODO: why concat pos? they get filtered immediately?
   where
-    pos            = [(GVVar x, y) | A_GVEq x y <- s_pos s]
-    known (v1, v2) = isEqual s v1 v2
+    pos       = [MkEqual (GVVar x) y | A_GVEq x y <- s_pos s]
+
+knownEq :: Solver -> Equality -> Bool
+knownEq s (MkEqual v1 v2) = isEqual s v1 v2
 
 evalDefs :: Solver -> [Equality]
 evalDefs s = {- ppTrace "TRACE: evalDefs" msg -} res
@@ -297,19 +319,30 @@ evalDef s (x, (op, GVArr [v1, v2])) = do
   o       <- primOpArith op
   LInt l1 <- evalsToLit s v1
   LInt l2 <- evalsToLit s v2
-  Just (GVVar x, GVLit (LInt (l1 `o` l2)))
+  Just (MkEqual (GVVar x) (GVLit (LInt (l1 `o` l2))))
 evalDef _ _ = Nothing
 
 -----------------------------------------------------------------------------------
 -- | `propagate s eqs` updates the solver state `s` with the new equalities `eqs`
 -----------------------------------------------------------------------------------
-propagate :: Solver -> [Equality] -> Solver
-propagate s eqs = s { s_uf = uf', s_lits = lits' }
+propagate :: Solver -> [Fact] -> Solver
+propagate s fs = s''
   where
-    uf'   = foldr (\(x, y) uf -> UF.union uf x y) (s_uf s) eqs
+    s'    = propagateEqs   s  [ e | FEqual e <- fs ]
+    s''   = propagateProps s' [ p | FProp  p <- fs ]
+
+propagateProps :: Solver -> [Prop] -> Solver
+propagateProps s ps = s { s_pos = s_pos' }
+  where
+    s_pos' = nubOrd (s_pos s ++ [A_RelOp r v | MkProp r v <- ps])
+
+propagateEqs :: Solver -> [Equality] -> Solver
+propagateEqs s eqs = s { s_uf = uf', s_lits = lits' }
+  where
+    uf'   = foldr (\(MkEqual x y) uf -> UF.union uf x y) (s_uf s) eqs
     lits' = nubOrd (s_lits s ++ eq_lits)
     -- new lits generated from eqs
-    eq_lits = concatMap (mapMaybe groundLit . (\(x, y) -> [x, y])) eqs
+    eq_lits = concatMap (\(MkEqual gv1 gv2) -> groundLit gv1 ++ groundLit gv2) eqs
 
 ------------------------------------------------------------------------------------
 -- `isEqual s v1 v2` returns true if v1 and v2 are provably equal in solver s
@@ -382,30 +415,49 @@ tryEqLits s v = [l | l <- s_lits s, isEqual s v (GVLit l)]
 
 data Solver = MkSolver
   { s_lits  :: [Lit]                -- ^ all the literals in the solver
+  , s_tups  :: [[GroundVal]]        -- ^ all the tuples in the solver
   , s_uf    :: UF.UF GroundVal      -- ^ the union-find data structure used to track equivalence classes (under equalities)
   , s_pos   :: [FailableAssump]     -- ^ all the positive equalities and predicates
   , s_neg   :: [FailableAssump]     -- ^ all the negative equalities and predicates (i.e. under "not")
   , s_def   :: [Definition]         -- ^ all the terms of the form `x = op[v]`
   }
 
-type Equality   = (GroundVal, GroundVal)
+data Fact
+  = FProp Prop
+  | FEqual Equality
+  deriving (Eq, Ord, Show)
+
+data Prop = MkProp PrimOp GroundVal
+  deriving (Eq, Ord, Show)
+
+data Equality = MkEqual GroundVal GroundVal
+  deriving (Eq, Ord, Show)
+
 type Definition = (Ident, (PrimOp, GroundVal))
 
 mkSolver :: [Assump] -> Solver
-mkSolver asms = MkSolver { s_lits = lits, s_uf = UF.new, s_pos = pos, s_neg = neg, s_def = defs }
+mkSolver asms = MkSolver { s_lits = lits, s_tups = tups, s_uf = UF.new, s_pos = pos, s_neg = neg, s_def = defs }
   where
-    defs = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
-    pos  = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | (_, (op, gv)) <- defs]
-    neg  = [asm | A_Neg asm <- asms]
-    lits = mapMaybe assumpGroundVal (pos ++ neg)
+    defs   = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
+    pos    = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | (_, (op, gv)) <- defs]
+    neg    = [asm | A_Neg asm <- asms]
+    lits   = concatMap groundLit    groundVals
+    tups   = concatMap assumpTuples groundVals
+    groundVals = nubOrd (assumpGroundVal <$> (pos ++ neg))
 
-assumpGroundVal :: FailableAssump -> Maybe Lit
-assumpGroundVal (A_GVEq  _ gv) = groundLit gv
-assumpGroundVal (A_RelOp _ gv) = groundLit gv
+assumpTuples :: GroundVal -> [[GroundVal]]
+assumpTuples (GVArr gvs) = gvs : concatMap assumpTuples gvs
+assumpTuples _           = []
 
-groundLit :: GroundVal -> Maybe Lit
-groundLit (GVLit l) = Just l
-groundLit _         = Nothing
+assumpGroundVal :: FailableAssump -> GroundVal
+assumpGroundVal (A_GVEq  _ gv) = gv
+assumpGroundVal (A_RelOp _ gv) = gv
+
+groundLit :: GroundVal -> [Lit]
+groundLit (GVLit l)   = [l]
+groundLit (GVArr gvs) = concatMap groundLit gvs
+groundLit _           = []
+
 ------------------------------------------------------------------------------------
 -- | Why is the solver returning UNSAT
 ------------------------------------------------------------------------------------
@@ -417,3 +469,6 @@ data UnsatReason
 instance Pretty UnsatReason where
   pPrint (Contra a)     = text "CONTRA"    <+> pPrint a
   pPrint (DiseqLit x y) = text "DISEQ-LIT" <+> pPrint x <+> pPrint y
+
+instance Pretty Equality where
+  pPrint (MkEqual x y) = pPrint x <+> text "=" <+> pPrint y

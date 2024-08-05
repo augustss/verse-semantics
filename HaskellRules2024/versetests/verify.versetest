@@ -244,3 +244,6 @@ verify("comparable00", fail){a:any => comparable[a]}
 verify("comparable01", pass){a:int => comparable[a]}
 verify("comparable02", pass){f(a:comparable):comparable => x:=f(2)}
 verify("comparable03", pass){f(a:comparable):comparable => x:=f[2]}
+verify("comp-tup", pass){f(x:comparable)<decides>:comparable := {(p,q):=x; p } }
+
+verify("blob", fail) { foo(f()<decides>:int) := {f[]} }

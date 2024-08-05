@@ -1,0 +1,1 @@
+verify("comp-tup", pass){f(x:comparable)<decides>:comparable := {(p,q):=x; p } }
