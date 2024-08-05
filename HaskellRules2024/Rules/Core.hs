@@ -12,7 +12,7 @@ module Rules.Core
   , Ident(..)
   , Lit(..), Ptr, Path(..)
   , isVal, isHNF, isComparable
-  , prep, norm
+  , valid, prep, norm
   , pPrintSmallExpr
 
     -- Assupmtions
@@ -20,7 +20,7 @@ module Rules.Core
 
     -- Rewriting
   , Rule, Context, isContext, (<@)
-  , everywhere, tryBefore
+  , stepRule, everywhere, tryBefore
   , NormResult(..), normalize, showNormResult
   , Fuel, lotsOfSteps
   , RuleEnv(..), extendRuleEnv

@@ -15,20 +15,24 @@ prop_Valid t0 =
 
 prop_Confluent =
   forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- qs1) ->
-    let (_res, np :<-- ps)  = normalize lotsOfSteps trs2024 p
-        (_res, nq :<-- qs2) = normalize lotsOfSteps trs2024 q
+    let (_resp, np :<-- ps)  = normalize lotsOfSteps trs2024 p
+        (_resq, nq :<-- qs2) = normalize lotsOfSteps trs2024 q
      in whenFail (do putStrLn "== TRACE #1 =="
                      displayTrace (np :<-- ps)
                      putStrLn "== TRACE #2 =="
                      displayTrace (nq :<-- (qs2 ++ qs1))) $
           norm np == norm nq
  where
+  arbFork :: Gen (Expr, Traced Expr)
   arbFork =
     do p <- prep `fmap` arbitrary
        permf <- liftArbitrary arbPermutation
-       let (_res, tr) = normalize lotsOfSteps (\e -> permf e (trs2024 e)) p
+       let perm_rules :: Rule
+           perm_rules = \env e -> permf e (trs2024 env e)
+           (_res, tr) = normalize lotsOfSteps perm_rules p
        return (p,tr)
 
+  shrinkFork :: (Expr, Traced Expr) -> [(Expr,Traced Expr)]
   shrinkFork (p, q :<-- tr) =
     [ (p', q' :<-- [(s,p')])
     | (p',s,q') <-
@@ -37,9 +41,9 @@ prop_Confluent =
                    | ((s,p'),q') <- tr `zip` (q : map snd tr)
                    ]
           _     -> [ (p',s,q')
-                   | p' <- shrink p ++ map snd (trs2024 p)
+                   | p' <- shrink p ++ map snd (stepRule trs2024 p)
                    , valid p'
-                   , (s,q') <- trs2024 p'
+                   , (s,q') <- stepRule trs2024 p'
                    ]
     ]
 
