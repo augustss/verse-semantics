@@ -37,7 +37,7 @@ test(S00){fv(:any) := 2=if(1) then 2 else 3}
 test(S00){fv(:any) := 3=if(1=2) then 2 else 3}
 test(S00){fv(:any) := if(1+1) then 2+1 else 3+1}
 test(S00){f(x:int):=x; f[3]=3}
-test(D00){f()<decides>:int => f[]}					#TODO:10.4:EFF:DECIDES
+test(D00){f()<decides>:int => f[]}		# This succeeds!
 test(S00){f():=3 => f[]=3}
 test(F00){f():=3 => f[]=4}
 test(D00){x:int => x=3}

@@ -1,5 +1,10 @@
 # Add new meetings at the top
 
+testeq( "M5Aug24-1", pass ) { G(X:int):void = if (X = 2) then G(2); G[7] } {()}
+testeq( "M5Aug24-2", pass ) { G(X:int):void = if (X = 2) then G(2); G[2] } {7}
+verify( "M5Aug24-3", fail ) { foo(f()<decides>:int)<succeeds> := {f[]} }  # current bug in desugaring!
+verify( "M5Aug24-4", pass ) { foo(f()<computes>:int)<succeeds> := {f[] = f[]} }
+
 # -----------------------------------------
 # Opacity and function arguments
 verify("Tim3Jul24-1", pass){ f1(x:int)<decides>:int := x>3
