@@ -194,7 +194,7 @@ sDesugarExpr = ds
     ds (Macro1 (Ident _ "some") _ e)    = Some <$> ds e
     ds (Macro1 (Ident _ "check") fx e)  = Check fx <$> ds e
 
-    -- assume{e}  ==   some(\x. e; x)
+    -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
     ds (Macro1 (Ident _ "assume") _ e)  = do { x <- newIdent (getLoc e) "x"
                                              ; e' <- ds e
                                              ; pure (Some (Lam x (Seq [e', Variable x]))) }
