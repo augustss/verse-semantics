@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiWayIf #-}
+
 module Rules.TRS2024 (
      evalRules, evalStep, recStep
    , blocked, choiceFree
@@ -140,11 +142,9 @@ applicationStep _env lhs =
  ++
   "APP-ISCOMP" `name`
   do Op IsComp :@: a <- [lhs]
-     case a of
-       Lit (LChar _) -> pure a
-       Lit (LInt _)  -> pure a
-       Lit (LStr _)  -> pure a
-       _             -> []
+     if | isComparable a -> pure a
+        | isHNF a        -> pure Fail
+        | otherwise      -> []
  ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]

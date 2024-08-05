@@ -45,14 +45,15 @@ miniEvalPrelude = ("miniprelude", "\
 \## Use FrontEnd/Makefile to update compiled prelude.\n\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
-\false    := array{};\n\
-\void     := lam y { fail };\n\
-\any      := lam y {            y };\n\
-\int      := lam y { isInt$[y]; y };\n\
-\rational := lam y { isRat$[y]; y };\n\
-\string   := lam y { isStr$[y]; y };\n\
-\char     := lam y { isChar$[y]; y };\n\
-\nat      := lam y { isInt$[y]; intGE$[y,0]; y };\n\
+\false := array{};\n\
+\void       := lam y { fail         };\n\
+\any        := lam y {            y };\n\
+\int        := lam y { isInt$[y]; y };\n\
+\rational   := lam y { isRat$[y]; y };\n\
+\string     := lam y { isStr$[y]; y };\n\
+\char       := lam y { isChar$[y]; y };\n\
+\comparable := lam y { isComp$[y]; y };\n\
+\nat        := lam y { isInt$[y]; intGE$[y,0]; y };\n\
 \Length   := lam y { isArr$[y]; arrLen$[y] };\n\
 \operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
 \operator'[]'     := lam t { lam a { isArr$[a]; arrMap$[t,a] } };\n\
@@ -75,16 +76,16 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \## Use FrontEnd/Makefile to update compiled prelude.\n\
 \## Small prelude with no checking of arithmetic.\n\
 \array{\n\
-\false    := array{};\n\
-\void     := lambda y { fail };\n\
-\any      := lambda y { y };\n\
-\int      := lambda y { isInt$[y]; y };\n\
-\rational := lam y { isRat$[y]; y };\n\
-\string   := lam y { isStr$[y]; y };\n\
-\char     := lam y { isChar$[y]; y };\n\
-\nat      := lam y { isInt$[y]; intGE$[y,0]; y };\n\
-\Length   := lam y { isArr$[y]; y >> some{int} };\n\
+\false := array{};\n\
+\void       := lam y { fail         };\n\
+\any        := lam y {            y };\n\
+\int        := lam y { isInt$[y]; y };\n\
+\rational   := lam y { isRat$[y]; y };\n\
+\string     := lam y { isStr$[y]; y };\n\
+\char       := lam y { isChar$[y]; y };\n\
 \comparable := lam y { isComp$[y]; y };\n\
+\nat        := lam y { isInt$[y]; intGE$[y,0]; y };\n\
+\Length   := lam y { isArr$[y]; y >> some{int} };\n\
 \operator'[]'     := lam t { lam a { isArr$[a]; arrMap$[t,a] } };\n\
 \operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\

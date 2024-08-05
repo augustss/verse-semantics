@@ -170,13 +170,13 @@ checkNeg s neg@(A_GVEq x gv)
 checkNeg s neg@(A_RelOp op gv)
   | isRel s op gv
   = Just (Contra neg)
-  | op == IsComp && isComparable s gv
+  | op == IsComp && isComparableGV s gv
   = Just (Contra neg)
   | otherwise
   = Nothing
 
-isComparable :: Solver -> GroundVal -> Bool
-isComparable s gv = isRel s IsInt gv || isRel s IsChar gv || isRel s IsStr gv
+isComparableGV :: Solver -> GroundVal -> Bool
+isComparableGV s gv = isRel s IsInt gv || isRel s IsChar gv || isRel s IsStr gv
 
 isRelOpLit1 :: PrimOp -> Lit -> Bool
 isRelOpLit1 IsInt  (LInt _)  = True

@@ -11,7 +11,7 @@ module Rules.Core
     Expr(..), pattern LitInt
   , Ident(..)
   , Lit(..), Ptr, Path(..)
-  , isVal, isHNF, isSkolem
+  , isVal, isHNF, isComparable
   , prep, norm
   , pPrintSmallExpr
 
@@ -433,6 +433,13 @@ isHNF (Lam {}) = True           -- valid e where (_,e) = unsafeUnbind bnd
 isHNF _        = False
 
 
+isComparable :: Expr -> Bool
+isComparable (Lit (LChar {})) = True
+isComparable (Lit (LInt  {})) = True
+isComparable (Lit (LStr  {})) = True
+isComparable (Arr es)         = all isComparable es
+isComparable _                = False -- ToDo: what about Path, Ptr, Rational?
+
 --------------------------------------------------------------------------------
 --
 --                 Valid expressions
@@ -543,9 +550,6 @@ instance Variables GroundVal where
   variables _f (GVLit {})  = []
   variables f  (GVArr gvs) = variables f gvs
 
-isSkolem :: Ident -> Bool
-isSkolem (Name ('$':_)) = True
-isSkolem _              = False
 
 --------------------------------------------------------------------------------
 --
