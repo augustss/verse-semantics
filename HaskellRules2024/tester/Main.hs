@@ -12,8 +12,9 @@ import FrontEnd.ToCore( convertToCore )
 import FrontEnd.Flags
 import FrontEnd.Expr as Src
 import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pParens
-                     , pString, pKeyword, many, lexeme, optional, string, skip, eof )
+                     , pString, pKeyword, many, optional, skip, eof )
 import FrontEnd.Prelude( findPrelude )
+import FrontEnd.Error
 
 import Rules.Core             as Rules
 import Rules.Verifier( verificationRules )
@@ -22,7 +23,7 @@ import TRS.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
 
-import Text.Megaparsec(getSourcePos, sourceLine, unPos)
+import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos )
 
 import GHC.Stack( HasCallStack )
 
@@ -95,22 +96,74 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     { testMName  :: !(Maybe String)
     , testLocn   :: !Loc
     , testType   :: !TestType                      -- Default test type
-    , testExcn   :: ![((String, Bool), TestType)]  -- The bool indicates the the string is just a prefix
+    , testStatus :: !TestStatus
     }
     deriving (Show)
 
-data TestType
-  = TPass                 -- test should pass
-  | TFail                 -- test should fail
-  | TSkip                 -- test should be skipped
-  | TBroken               -- test is currently broken (i.e., pass/fail is negated)
+data TestType = TPass | TFail | TSkip | TLoop   -- Expected behaviour
   deriving (Show, Eq)
+
+data TestStatus = TS_Normal
+                | TS_Broken   -- Test is currently broken (i.e., pass/fail is negated)
+                | TS_Skip     -- Test should be skipped
+                deriving( Show, Eq )
 
 testName :: TestInfo -> String
 testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocn ti)))) (testMName ti)
 
-data TestRes = Good | Bad | Excn | Skip
-  deriving (Eq, Show)
+data TestRes = TestRes { tr_info    :: TestInfo
+                       , tr_outcome :: TestOutcome }
+  deriving (Show)
+
+data TestOutcome = TO_Expected
+                 -- The rest are unexpected outcomes
+                 | TO_Unexpected            -- Should pass but failed, or vice versa
+                 | TO_Excn
+                 | TO_Abnormal NormResult   -- Could not reach a normal form;
+                                            -- the NormResult is never NormOK
+                 deriving( Eq, Show )
+
+skipTestRes :: TestRes -> Bool
+skipTestRes (TestRes { tr_info = info }) = testStatus info == TS_Skip
+
+expectedTestRes :: TestRes -> Bool
+-- Expected results, not skipped
+expectedTestRes (TestRes { tr_info = info, tr_outcome = TO_Expected })
+                  = testStatus info /= TS_Skip
+expectedTestRes _ = False
+
+unexpectedTestRes :: TestRes -> Bool
+-- Unexpected results, not skipped, not exception, not invalid
+unexpectedTestRes (TestRes { tr_info = info, tr_outcome = outcome })
+ = testStatus info /= TS_Skip
+ && (outcome == TO_Abnormal NormExpired || outcome == TO_Unexpected)
+
+outcomeIs :: TestOutcome -> TestRes -> Bool
+outcomeIs oc1 (TestRes { tr_outcome = oc2 }) = oc1 == oc2
+
+passedButShouldFail :: TestRes -> Bool
+passedButShouldFail (TestRes { tr_info = info, tr_outcome = TO_Unexpected })
+                      = testStatus info == TS_Normal && testType info == TFail
+passedButShouldFail _ = False
+
+failedButShouldPass :: TestRes -> Bool
+failedButShouldPass (TestRes { tr_info = info, tr_outcome = TO_Unexpected })
+                      = testStatus info == TS_Normal && testType info == TPass
+failedButShouldPass _ = False
+
+isLoopy :: TestRes -> Bool
+isLoopy (TestRes { tr_outcome = TO_Abnormal NormExpired } ) = True
+isLoopy _ = False
+
+isBrokenPass :: TestRes -> Bool
+isBrokenPass (TestRes { tr_info = info, tr_outcome = TO_Unexpected })
+               = testStatus info == TS_Broken
+isBrokenPass _ = False
+
+isBrokenFail :: TestRes -> Bool
+isBrokenFail (TestRes { tr_info = info, tr_outcome = TO_Expected })
+               = testStatus info == TS_Broken
+isBrokenFail _ = False
 
 -----------------------------------------------
 --
@@ -135,30 +188,56 @@ runTestFile tflg (fn, ts)
 
       ; res :: [TestRes] <- mapM (runTest tflg) tests_to_run
 
-      ; let n_tests   = length res
-            n_skipped = count Skip res
-            n_passed  = count Good res
-            n_failed  = count Bad  res
-            n_excn    = count Excn res
+      ; let n_tests = length res
+            n_skipped    = count skipTestRes          res
+            n_expected   = count expectedTestRes      res  -- Excludes skipped
+            n_unexpected = count unexpectedTestRes    res  -- Excludes skipped, invalid, exn
+            n_invalid    = count (outcomeIs (TO_Abnormal NormInvalid)) res
+            n_excn       = count (outcomeIs TO_Excn)       res
       ; putStrLn ""
       ; putStrLn "------------ Overall summary ---------------------------"
       ; putStrLn $ "Number of tests: " ++ show n_tests
-      ; when (n_passed > 0)  $ putStrLn $ printf "%5d passed" n_passed
-      ; when (n_failed > 0)  $ putStrLn $ printf "%5d failed" n_failed
-      ; when (n_excn > 0)    $ putStrLn $ printf "%5d threw an exception" n_excn
-      ; when (n_skipped > 0) $ putStrLn $ printf "%5d skipped" n_skipped
+      ; printNZ n_excn     "%5d CRASH: threw an exception"
+      ; printNZ n_invalid  "%5d CRASH: rewrite produced an invalid term"
+      ; printNZ n_expected "%5d PASS with expected results"
+      ; printNZ (count isBrokenFail res) "      including %d broken tests"
+      ; when (n_unexpected > 0)  $
+        do { putStrLn $ printf "%5d FAIL with unexpected results" n_unexpected
+           ; printSome failedButShouldPass res "   %5d should pass, but actually failed"
+           ; printSome passedButShouldFail res "   %5d should fail, but actually passed"
+           ; printSome isLoopy             res "   %5d went into an unexpected loop"
+           ; printSome isBrokenPass        res "   %5d expected broken, but actually passed" }
+      ; printNZ n_skipped  "%5d skipped"
       ; putStrLn "---------------------------------------------------------"
-      ; unless (n_passed == n_tests) $ exitWith (ExitFailure 1) }
+      ; unless (n_expected == n_tests) $ exitWith (ExitFailure 1) }
   where
-    count :: TestRes -> [TestRes] -> Int
-    count r rs = length (filter (== r) rs)
+    count :: (TestRes->Bool) -> [TestRes] -> Int
+    count p rs = length (filter p rs)
 
+printNZ :: Int -> String -> IO ()
+printNZ 0 _       = return ()
+printNZ n fmt_str = putStrLn $ printf fmt_str n
+
+printSome :: (TestRes -> Bool) -> [TestRes] -> String -> IO ()
+printSome pick_me res fmt_str
+  | null these = return ()
+  | otherwise  = do { putStrLn $ printf fmt_str (length these)
+                    ; putStrLn $ (render (text "         namely" <+>
+                                          fsep (punctuate comma (map pp these)))) }
+  where
+    these :: [TestRes]
+    these = filter pick_me res
+
+    pp :: TestRes -> Doc
+    pp (TestRes { tr_info = TestInfo { testMName = mname, testLocn = loc } })
+      | Just n <- mname = text n
+      | otherwise       = char 'L' <> int (unPos (sourceLine loc))
 
 widthTestName :: Int
-widthTestName = 10
+widthTestName = 15
 
 widthFileName :: Int
-widthFileName = 40
+widthFileName = 25
 
 
 -----------------------------------------------
@@ -184,7 +263,7 @@ timTestInfo (Ident loc status) = TestInfo
   { testMName = Nothing
   , testLocn = loc
   , testType = timTestType status
-  , testExcn = []
+  , testStatus = TS_Normal
   }
 
 timTestType :: String -> TestType
@@ -201,8 +280,8 @@ runTest tflg test@(TestVerify _ e)
   = doTestCatchingExn tflg test e (Array [])
 runTest tflg test@(TestEvalEq _ e1 e2)
   = doTestCatchingExn tflg test e1 e2
-runTest _    (TestTimCrash _ _)
-  = pure Excn
+runTest _    (TestTimCrash ti _)
+  = pure (TestRes { tr_info = timTestInfo ti, tr_outcome = TO_Excn } )
 
 
 mkFlags :: TestFlags -> Bool -> Flags
@@ -217,18 +296,20 @@ data TestMode = TEval | TVerify Effect deriving (Eq, Show)
 -- | `doTestCatchingExn` runs the actual test, catching any exceptions that are thrown during parsing, desugaring, or execution/verification
 doTestCatchingExn :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -> IO TestRes
 doTestCatchingExn tflg test p1 p2
-  | typ == TSkip = do { when (noisy tflg) (putStrLn $ test_herald ++ " skipped")
-                      ; pure Skip }
-  | otherwise    = do { catch (doTest tflg test p1 p2)
-                              (\e -> do { exn_handler e;  pure Excn} )
-                      }
+  | TS_Skip <- testStatus info
+  = do { when (noisy tflg) (putStrLn $ test_herald ++ "Skipped")
+       ; pure (TestRes { tr_info = info, tr_outcome = TO_Expected }) }
+  | otherwise
+  = do { catch (doTest tflg test p1 p2)
+               (\e -> do { exn_handler e
+                         ; pure (TestRes { tr_info = info, tr_outcome = TO_Excn }) }) }
   where
-    typ         = testType (testInfo test)
+    info        = testInfo test
     test_herald = testHerald test
     exn_handler :: SomeException -> IO ()
     exn_handler e
       = -- unless (noError tflg) $
-        do { putStrLn $ test_herald ++ " failure:"
+        do { putStrLn $ test_herald ++ "Failure:"
            ; putStrLn "The expression";       ppIndent p1
            ; putStrLn "or the expression";    ppIndent p2
            ; putStrLn "caused an exception:"; print e
@@ -264,29 +345,45 @@ addVerification _               = True
 checkResults :: TestFlags -> Test -> (SrcExpr, NormResult, Traced Expr) -> (SrcExpr, NormResult, Traced Expr) -> IO TestRes
 -- Really we should check res2, tr2 as well, but they are always boring
 checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
-  | res1 /= NormOK
-  = do { putStrLn (test_herald ++ " " ++ what ++ " " ++ showNormResult res1)
-       ; pure Bad }
-  | equivValue v1 v2 == expectOK
-  = do { success_handler; pure Good }
-  | otherwise
-  = do { failure_handler; pure Bad }
+  = do { show_result outcome
+       ; pure (TestRes { tr_info = info, tr_outcome = outcome }) }
   where
     v1           = TRS.term tr1
     v2           = TRS.term tr2
     n_steps      = length (TRS.trace tr1)
     test_herald  = testHerald test
-    typ          = testType (testInfo test)
-    expectOK     = typ == TPass
-    success_handler -- What to display if all is well
+    info         = testInfo test
+    typ          = testType info
+    status       = testStatus info
+
+    expect_pass  = typ == TPass
+    test_passed  = equivValue v1 v2
+
+    outcome :: TestOutcome
+    outcome = case res1 of
+       NormOK      | expected_result -> TO_Expected
+                   | otherwise       -> TO_Unexpected
+       NormExpired | typ == TLoop    -> TO_Expected
+       _                             -> TO_Abnormal res1
+
+    expected_result :: Bool
+    expected_result = case status of
+         TS_Normal -> expect_pass == test_passed
+         TS_Broken -> expect_pass /= test_passed
+         TS_Skip   -> errorMessage "Unexpected TS_Skip"
+
+    show_result :: TestOutcome -> IO ()
+    show_result TO_Expected -- What to display if all is well
       = when (noisy tflg) $
-          putStrLn $ test_herald ++ " Expected " ++ succ_or_fail expectOK
+          putStrLn $ test_herald ++ "Expected " ++ succ_what
                                  ++ " in " ++ printf "%5d" n_steps ++ " steps"
-    failure_handler -- What to display if test fails
-      | TBroken <- typ
-      = putStrLn $ test_herald ++ " Broken test now passes"
-      | otherwise
-      = do { putStrLn $ test_herald ++ " Unexpected " ++ succ_or_fail (not expectOK)
+
+    show_result TO_Unexpected -- What to display if test normalises but with wrong answer
+      | TS_Broken <- testStatus info
+      = putStrLn $ test_herald ++ "Broken test now passes"
+
+      | otherwise   -- TS_Normal
+      = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what
            ; unless (noError tflg) $
              do { putStrLn "-----------------------------------------------"
                 ; putStrLn "The expression"; ppIndent p1
@@ -300,14 +397,25 @@ checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
                     putStrLn "resp."
                     print v2 } }
 
-    what = case test of
-             TestVerify{}   -> "Verification"
-             TestEvalEq{}   -> "Evaluation"
-             TestTim{}      -> "TestTim"
-             TestTimCrash{} -> "TestTimCrash"
+    show_result TO_Excn
+      = putStrLn $ test_herald ++ "Crash: verification threw an exception"
+    show_result (TO_Abnormal NormInvalid)
+      = putStrLn $ test_herald ++ "Crash: rewrite yields invalid result"
+    show_result (TO_Abnormal NormExpired)
+      = putStrLn $ test_herald ++ "Unexpected loop"
+    show_result (TO_Abnormal NormOK)
+      = errorMessage "show_result"
 
-    succ_or_fail True  = "success"
-    succ_or_fail False = "failure"
+    succ_what = case typ of
+             TPass -> "success"
+             TFail -> "failure"
+             TLoop -> "loop   "
+             TSkip -> errorMessage "succ_what"
+
+    fail_what = case typ of
+             TPass -> "failure"
+             TFail -> "success"
+             _     -> errorMessage "fail_what"
 
 -- | `wrapTopEffect` wraps the expression in a toplevel check<EFF>{e} where EFF is Succeeds or Decides depending on the test.
 wrapTopEffect :: Test -> Expr -> Expr
@@ -320,11 +428,17 @@ equivValue :: Rules.Expr -> Rules.Expr -> Bool
 equivValue e1 e2 = Rules.norm e1 == Rules.norm e2
 
 testHerald :: Test -> String
+-- Prints fixed-width herald string
 testHerald test = printf "%-*s %-*s" widthTestName test_nm widthFileName loc_str
   where
-    test_nm  = fromMaybe "<anon>" (testMName ti)
-    loc_str  = prettyShow (testLocn ti)
-    ti       = testInfo test
+    test_nm   = fromMaybe "<anon>" (testMName ti)
+    loc_str   = filename ++ ":" ++ show (unPos (sourceLine loc))
+    loc ::Loc = testLocn ti
+    ti        = testInfo test
+    filename  = baseName (sourceName loc)
+
+baseName :: FilePath -> FilePath
+baseName = reverse . takeWhile (/= '/') . reverse
 
 noisy :: TestFlags -> Bool
 noisy = not . quiet
@@ -395,13 +509,9 @@ pTestInfo = do
       strOf _ = undefined
   mname <- fmap strOf <$> optional (pString <* pOp ",")
   typ <- pTestType
-  let
-    pSys :: P String
-    pSys = pIdent >>= \case Ident _ s -> pure s
-    pSysWild :: P (String, Bool)
-    pSysWild = (,) <$> pSys <*> (isJust <$> optional (lexeme (string "*")))
-  excns <- many ((,) <$> (pOp "," *> pSysWild) <*> (pOp "=" *> pTestType))
-  pure $ TestInfo mname loc typ excns
+  stat <- (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
+  pure (TestInfo { testMName = mname, testLocn = loc
+                 , testType = typ, testStatus = stat })
 
 pTestType :: P TestType
 pTestType = do
@@ -409,10 +519,16 @@ pTestType = do
   case map toLower $ unIdent i of
     "pass"    -> pure TPass
     "fail"    -> pure TFail
-    "skip"    -> pure TSkip
-    "broken"  -> pure TBroken
+    "loop"    -> pure TLoop
     _         -> fail "pTestType"
 
+pTestStatus :: P TestStatus
+pTestStatus = do
+  i <- pIdent
+  case map toLower $ unIdent i of
+    "skip"    -> pure TS_Skip
+    "broken"  -> pure TS_Broken
+    _         -> fail "pTestStatus"
 
 -----------------------------------------------
 --

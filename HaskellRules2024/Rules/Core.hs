@@ -319,7 +319,7 @@ pPrintPrecE lvl prec the_expr
        Op op      -> char '!' <> pPrint op
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
-       e1 :|: e2   -> sep [ mbPar0 $ ppr1 e1, char '|' <+> ppr1 e2 ]
+       e1 :|: e2   -> sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
        e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
        e@(_ :>: _) -> sep (punctuate semi $ map ppr1 (gatherSeqs e))
        e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ">>" <+> ppr1 e2
@@ -869,6 +869,9 @@ data NormResult
   | NormInvalid   -- A rewrite produced an invalid output
                   -- according to the `valid` predicate
   deriving( Eq )
+
+instance Show NormResult where
+   show = showNormResult
 
 showNormResult :: NormResult -> String
 showNormResult NormOK      = "reached a normal form"
