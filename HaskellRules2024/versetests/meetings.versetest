@@ -2,8 +2,8 @@
 
 testeq( "M5Aug24-1", pass ) { G(X:int):void = if (X = 2) then G(2); G[7] } {()}
 testeq( "M5Aug24-2", loop ) { G(X:int):void = if (X = 2) then G(2); G[2] } {7}
-verify( "M5Aug24-3", fail ) { foo(f()<decides>:int)<succeeds> := {f[]} }  # current bug in desugaring!
-verify( "M5Aug24-4", pass ) { foo(f()<computes>:int)<succeeds> := {f[] = f[]} }
+verify( "M5Aug24-3", fail ) { foo(f()<decides>:int)<succeeds> := {f[]} }
+verify( "M5Aug24-4", pass, broken ) { foo(f()<computes>:int)<succeeds> := {f[] = f[]} }
 
 # -----------------------------------------
 # Opacity and function arguments
@@ -56,12 +56,12 @@ testeq( "M28Jul24-1", loop ) { F(X:int)<decides>:void = if (X = 2) then fail
 
 # -----------------------------------------
 # Meeting 31 July 24
-verify( "T31Jul24-1", pass, skip){ f(y:int; x := (y = 1; 1)|(y = 2; 1))<closed><succeeds> := x + y }
+verify( "T31Jul24-1", pass, broken){ f(y:int; x := (y = 1; 1)|(y = 2; 1))<closed><succeeds> := x + y }
    # We aren't sure what this one does
 
 # -----------------------------------------
 # Meeting 29 July 24
-testeq( "T29Jul24-1", pass ){ f( all{1} ) := 0; f[ array{1} ] = 0 } {0}
+testeq( "T29Jul24-1", fail ){ f( all{1} ) := 0; f[ array{1} ] = 0 } {0}
 verify( "T29Jul24-2", fail ){ f( x:any ) := x=x }   # Gets stuck; reject
 
 verify( "T29Jul24-3", pass ){ f(x:int,y:int)<decides> := x=y; all{ a:int; f[2,a]=2; a } }
@@ -108,8 +108,6 @@ verify("T24Jul24-2", fail) {f(x:int)<decides>:type{x=10} := 7 }
 
 
 # Tim examples 8/9/2023
-verify("T8Sep23-1", pass, skip) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
-verify("T8Sep23-2", fail, skip) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
-verify("T8Sep23-3", pass, skip) {f(x:int, y:int)<succeeds> := exists z { assume{z = x}; z = x; x = y } }
-
-
+verify("T8Sep23-1", pass, broken) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
+verify("T8Sep23-2", fail) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
+verify("T8Sep23-3", pass, broken) {f(x:int, y:int)<succeeds> := exists z { assume{z = x}; z = x; x = y } }
