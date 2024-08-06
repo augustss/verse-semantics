@@ -11,6 +11,8 @@ import Data.Containers.ListUtils (nubOrd)
 -- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
 unsat :: RuleEnv -> Maybe UnsatReason
+-- Nothing <=> not unsatisfible
+-- Just r  <=> unsatisfiable for reason r
 -----------------------------------------------------------------------------------
 unsat env = {- ppTrace "TRACE: unsat" msg -} res
   where
@@ -56,7 +58,6 @@ s |- gv2 ~ gv1
 
 {- Note [Solver]
 ~~~~~~~~~~~~~~~~
-
 The solver maintains a "union-find" (UF) data structure
 `s_uf` that tracks all the equivalences between ground
 values that can be proved from the *positive* assumptions
