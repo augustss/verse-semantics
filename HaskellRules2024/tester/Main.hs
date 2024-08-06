@@ -100,7 +100,7 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     }
     deriving (Show)
 
-data TestType = TPass | TFail | TSkip | TLoop   -- Expected behaviour
+data TestType = TPass | TFail | TLoop   -- Expected behaviour
   deriving (Show, Eq)
 
 data TestStatus = TS_Normal
@@ -115,55 +115,76 @@ data TestRes = TestRes { tr_info    :: TestInfo
                        , tr_outcome :: TestOutcome }
   deriving (Show)
 
-data TestOutcome = TO_Expected
-                 -- The rest are unexpected outcomes
-                 | TO_Unexpected            -- Should pass but failed, or vice versa
+data TestOutcome = TO_Equal                -- Terminated, results equal
+                 | TO_NotEqual             -- Terminated, results differ
                  | TO_Excn
                  | TO_Abnormal NormResult   -- Could not reach a normal form;
                                             -- the NormResult is never NormOK
+                 | TO_Skipped               -- We didn't run this test
                  deriving( Eq, Show )
 
 skipTestRes :: TestRes -> Bool
 skipTestRes (TestRes { tr_info = info }) = testStatus info == TS_Skip
 
 expectedTestRes :: TestRes -> Bool
--- Expected results, not skipped
-expectedTestRes (TestRes { tr_info = info, tr_outcome = TO_Expected })
-                  = testStatus info /= TS_Skip
-expectedTestRes _ = False
+-- Expected results, not skipped; account for broken-ness
+expectedTestRes tr@(TestRes { tr_info = info })
+  = case testStatus info of
+      TS_Normal -> expectedOutcome tr
+      TS_Broken -> unexpectedOutcome tr
+      TS_Skip   -> False
+
+expectedOutcome :: TestRes -> Bool
+-- Expected results; ignore broken-ness
+expectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
+  = case testType info of
+      TPass -> outcome == TO_Equal
+      TFail -> outcome == TO_NotEqual
+      TLoop -> outcome == TO_Abnormal NormExpired
 
 unexpectedTestRes :: TestRes -> Bool
+unexpectedTestRes tr@(TestRes { tr_info = info })
+  = case testStatus info of
+      TS_Normal -> unexpectedOutcome tr
+      TS_Broken -> expectedOutcome tr
+      TS_Skip -> False
+
+unexpectedOutcome :: TestRes -> Bool
 -- Unexpected results, not skipped, not exception, not invalid
-unexpectedTestRes (TestRes { tr_info = info, tr_outcome = outcome })
- = testStatus info /= TS_Skip
- && (outcome == TO_Abnormal NormExpired || outcome == TO_Unexpected)
+unexpectedOutcome (TestRes { tr_info = info, tr_outcome = outcome })
+ = case testType info of
+      TPass -> outcome == TO_NotEqual || outcome == TO_Abnormal NormExpired
+      TFail -> outcome == TO_Equal    || outcome == TO_Abnormal NormExpired
+      TLoop -> outcome == TO_Equal    || outcome == TO_NotEqual
 
 outcomeIs :: TestOutcome -> TestRes -> Bool
 outcomeIs oc1 (TestRes { tr_outcome = oc2 }) = oc1 == oc2
 
 passedButShouldFail :: TestRes -> Bool
-passedButShouldFail (TestRes { tr_info = info, tr_outcome = TO_Unexpected })
-                      = testStatus info == TS_Normal && testType info == TFail
-passedButShouldFail _ = False
+passedButShouldFail (TestRes { tr_info = info, tr_outcome = outcome })
+  = case testType info of
+       TFail -> outcome == TO_Equal
+       _     -> False
 
 failedButShouldPass :: TestRes -> Bool
-failedButShouldPass (TestRes { tr_info = info, tr_outcome = TO_Unexpected })
-                      = testStatus info == TS_Normal && testType info == TPass
-failedButShouldPass _ = False
+failedButShouldPass (TestRes { tr_info = info, tr_outcome = outcome })
+  = case testType info of
+       TPass -> outcome == TO_NotEqual
+       _     -> False
 
-isLoopy :: TestRes -> Bool
-isLoopy (TestRes { tr_outcome = TO_Abnormal NormExpired } ) = True
-isLoopy _ = False
+failedWithLoop :: TestRes -> Bool
+failedWithLoop (TestRes { tr_info = info, tr_outcome = outcome })
+  = case testType info of
+       TLoop -> False
+       _     -> outcome == TO_Abnormal NormExpired
 
 isBrokenPass :: TestRes -> Bool
-isBrokenPass (TestRes { tr_info = info, tr_outcome = TO_Unexpected })
-               = testStatus info == TS_Broken
-isBrokenPass _ = False
+isBrokenPass tr@(TestRes { tr_info = info })
+  = testStatus info == TS_Broken && expectedOutcome tr
 
 isBrokenFail :: TestRes -> Bool
-isBrokenFail (TestRes { tr_info = info, tr_outcome = TO_Expected })
-               = testStatus info == TS_Broken
-isBrokenFail _ = False
+isBrokenFail tr@(TestRes { tr_info = info })
+   = testStatus info == TS_Broken && unexpectedOutcome tr
 
 -----------------------------------------------
 --
@@ -188,25 +209,27 @@ runTestFile tflg (fn, ts)
 
       ; res :: [TestRes] <- mapM (runTest tflg) tests_to_run
 
-      ; let n_tests = length res
+      ; let n_tests      = length res
             n_skipped    = count skipTestRes          res
-            n_expected   = count expectedTestRes      res  -- Excludes skipped
-            n_unexpected = count unexpectedTestRes    res  -- Excludes skipped, invalid, exn
+            expected     = filter expectedTestRes      res  -- Excludes skipped
+            n_expected   = length expected
+            unexpected   = filter unexpectedTestRes    res  -- Excludes skipped, invalid, exn
+            n_unexpected = length unexpected 
             n_invalid    = count (outcomeIs (TO_Abnormal NormInvalid)) res
             n_excn       = count (outcomeIs TO_Excn)       res
       ; putStrLn ""
       ; putStrLn "------------ Overall summary ---------------------------"
       ; putStrLn $ "Number of tests: " ++ show n_tests
-      ; printNZ n_excn     "%5d CRASH: threw an exception"
-      ; printNZ n_invalid  "%5d CRASH: rewrite produced an invalid term"
-      ; printNZ n_expected "%5d PASS with expected results"
-      ; printNZ (count isBrokenFail res) "      including %d broken tests"
+      ; printNZ n_excn     "%5d CRASHED: threw an exception"
+      ; printNZ n_invalid  "%5d CRASHED: rewrite produced an invalid term"
+      ; printNZ n_expected "%5d PASSED with expected results"
+      ; printSome isBrokenFail expected "      including %d broken tests"
       ; when (n_unexpected > 0)  $
-        do { putStrLn $ printf "%5d FAIL with unexpected results" n_unexpected
-           ; printSome failedButShouldPass res "   %5d should pass, but actually failed"
-           ; printSome passedButShouldFail res "   %5d should fail, but actually passed"
-           ; printSome isLoopy             res "   %5d went into an unexpected loop"
-           ; printSome isBrokenPass        res "   %5d expected broken, but actually passed" }
+        do { putStrLn $ printf "%5d FAILED with unexpected results, of which" n_unexpected
+           ; printSome failedButShouldPass unexpected "      %d should pass, but actually failed"
+           ; printSome passedButShouldFail unexpected "      %d should fail, but actually passed"
+           ; printSome failedWithLoop      unexpected "      %d went into an unexpected loop"
+           ; printSome isBrokenPass        unexpected "      %d expected broken, but actually passed" }
       ; printNZ n_skipped  "%5d skipped"
       ; putStrLn "---------------------------------------------------------"
       ; unless (n_expected == n_tests) $ exitWith (ExitFailure 1) }
@@ -222,7 +245,7 @@ printSome :: (TestRes -> Bool) -> [TestRes] -> String -> IO ()
 printSome pick_me res fmt_str
   | null these = return ()
   | otherwise  = do { putStrLn $ printf fmt_str (length these)
-                    ; putStrLn $ (render (text "         namely" <+>
+                    ; putStrLn $ (render (text "          namely" <+>
                                           fsep (punctuate comma (map pp these)))) }
   where
     these :: [TestRes]
@@ -298,7 +321,7 @@ doTestCatchingExn :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -
 doTestCatchingExn tflg test p1 p2
   | TS_Skip <- testStatus info
   = do { when (noisy tflg) (putStrLn $ test_herald ++ "Skipped")
-       ; pure (TestRes { tr_info = info, tr_outcome = TO_Expected }) }
+       ; pure (TestRes { tr_info = info, tr_outcome = TO_Skipped }) }
   | otherwise
   = do { catch (doTest tflg test p1 p2)
                (\e -> do { exn_handler e
@@ -342,11 +365,14 @@ addVerification _               = True
 
 -- | `checkResults` just compares the results of two evaluations and prints out the appropriate message,
 --   it does _not_ throw or catch any exceptions.
-checkResults :: TestFlags -> Test -> (SrcExpr, NormResult, Traced Expr) -> (SrcExpr, NormResult, Traced Expr) -> IO TestRes
+checkResults :: TestFlags -> Test
+             -> (SrcExpr, NormResult, Traced Expr)
+             -> (SrcExpr, NormResult, Traced Expr)
+             -> IO TestRes
 -- Really we should check res2, tr2 as well, but they are always boring
 checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
-  = do { show_result outcome
-       ; pure (TestRes { tr_info = info, tr_outcome = outcome }) }
+  = do { show_result
+       ; pure test_res }
   where
     v1           = TRS.term tr1
     v2           = TRS.term tr2
@@ -355,32 +381,28 @@ checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
     info         = testInfo test
     typ          = testType info
     status       = testStatus info
-
-    expect_pass  = typ == TPass
     test_passed  = equivValue v1 v2
 
     outcome :: TestOutcome
     outcome = case res1 of
-       NormOK      | expected_result -> TO_Expected
-                   | otherwise       -> TO_Unexpected
-       NormExpired | typ == TLoop    -> TO_Expected
-       _                             -> TO_Abnormal res1
+       NormOK | test_passed -> TO_Equal
+              | otherwise   -> TO_NotEqual
+       _                    -> TO_Abnormal res1
 
-    expected_result :: Bool
-    expected_result = case status of
-         TS_Normal -> expect_pass == test_passed
-         TS_Broken -> expect_pass /= test_passed
-         TS_Skip   -> errorMessage "Unexpected TS_Skip"
+    test_res = TestRes { tr_info = info, tr_outcome = outcome }
 
-    show_result :: TestOutcome -> IO ()
-    show_result TO_Expected -- What to display if all is well
+    show_result :: IO ()
+    show_result
+      | expectedTestRes test_res -- What to display if all is well
       = when (noisy tflg) $
-          putStrLn $ test_herald ++ "Expected " ++ succ_what
-                                 ++ " in " ++ printf "%5d" n_steps ++ " steps"
+        putStrLn $ test_herald ++ "Expected " ++ succ_what
+                               ++ " in " ++ printf "%5d" n_steps ++ " steps"
 
-    show_result TO_Unexpected -- What to display if test normalises but with wrong answer
-      | TS_Broken <- testStatus info
+      | TS_Broken <- status
       = putStrLn $ test_herald ++ "Broken test now passes"
+
+      | TO_Abnormal NormInvalid <- outcome
+      = putStrLn $ test_herald ++ "Crash: rewrite yields invalid result"
 
       | otherwise   -- TS_Normal
       = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what
@@ -397,20 +419,11 @@ checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
                     putStrLn "resp."
                     print v2 } }
 
-    show_result TO_Excn
-      = putStrLn $ test_herald ++ "Crash: verification threw an exception"
-    show_result (TO_Abnormal NormInvalid)
-      = putStrLn $ test_herald ++ "Crash: rewrite yields invalid result"
-    show_result (TO_Abnormal NormExpired)
-      = putStrLn $ test_herald ++ "Unexpected loop"
-    show_result (TO_Abnormal NormOK)
-      = errorMessage "show_result"
-
-    succ_what = case typ of
-             TPass -> "success"
-             TFail -> "failure"
-             TLoop -> "loop   "
-             TSkip -> errorMessage "succ_what"
+    succ_what = case (status, typ) of
+             (TS_Broken,_) -> "broken "
+             (_, TPass)    -> "success"
+             (_, TFail)    -> "failure"
+             (_, TLoop)    -> "loop   "
 
     fail_what = case typ of
              TPass -> "failure"
