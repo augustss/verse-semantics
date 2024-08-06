@@ -304,6 +304,16 @@ testeq("EV52",pass) { succ(x:any):=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
 # testeq("EV",pass) { first{:false} }         {:false}
 # testeq("EV",pass) { first(x:=1|2){x+1} }    {2}
 
-# testeq("EV52",pass) { tru
-#testeq("EV53",pass) { array{option{}, option{5}, option{1=2}, option{1=1}} }
-#                    { array{(), truth{5}, (), truth(1) }
+testeq("EV52",pass) { truth{1+2} } { truth{3} }
+testeq("EV53",pass) { a := truth{5}; a = truth{b:int}; b } { 5 }
+testeq("EV54",pass) { a := truth{5}; a? } { 5 }
+testeq("EV54b",pass) { a := truth{5}; a[5] } { 5 }
+testeq("EV55",pass) { true } { truth{()} }
+testeq("EV56",pass) { array{option{}, option{5}, option{1=2}, option{1=1}} }
+                    { array{(), truth{5}, (), truth{1} } }
+testeq("EV57",pass) { a := option{   }; if ((?int)[a]) 1 else 0 } { 1 }
+testeq("EV58",pass) { a := option{1  }; if ((?int)[a]) 1 else 0 } { 1 }
+testeq("EV59",pass) { a :=        1   ; if ((?int)[a]) 1 else 0 } { 0 }
+testeq("EV60",pass) { a := option{'x'}; if ((?int)[a]) 1 else 0 } { 0 }
+testeq("EV61",pass) { a := option{ }; if (a?) then 1 else 0 } { 0 }
+testeq("EV62",pass) { a := option{1}; if (a?) then 1 else 0 } { 1 }

@@ -159,10 +159,12 @@ sDesugarExpr = ds
     ds (PrefixOp (Op "-") e)     = do ds $ InfixOp (Lit (LInt 0)) (Op "-") e
     ds (PrefixOp (Op "+") e)     = ds e  -- Prefix "+"; maybe should have an isInt test?
     ds (PrefixOp (Op ":") e)     = Range [effSucceeds] <$> ds e
+{- This is just a function now
     ds (PrefixOp (Op "?") e)     = do x <- Variable <$> newIdent (getLoc e) "x"
                                       let ee = Let (InfixOp x (Op ":") e) (Truth x)
                                       ds $ Macro1 (Ident noLoc "type") [] $
                                               InfixOp eFalse (Op "|") ee
+-}
     ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
 
     -- e?  means simply  e[_]  or equivalently   exists x. e[x]
@@ -186,7 +188,7 @@ sDesugarExpr = ds
     ds (Option (Just e)) = do
       t <- newIdent (getLoc e) "t"
       ds $ If2 (eDefine t e) (Truth (Variable t))
-    ds (Truth e) = ds $ Map [InfixOp e (Op "=>") e]
+    ds (Truth e) = Truth <$> ds e
 
     ds (Macro1 (Ident _ "one")   _ e)   = One <$> ds e
     ds (Macro1 (Ident _ "all")   _ e)   = All <$> ds e
@@ -741,6 +743,16 @@ dsM_12 s (Array ts) (P i)                   -- MARRAYP
    where
      do_one :: SrcExpr -> Ident -> D SrcExpr
      do_one t j = dsM_12 s t (P (Variable j))
+
+-------------------- truth{t1} -----------------
+dsM_12 s (Truth t) E                       -- MTRUTHE
+   = Truth <$> dsM_12 s t E
+
+dsM_12 s (Truth t) (P i)                   -- MTRUTHP
+   = do { j <- newIdent (getLoc t) "j"
+        ; e <- dsM_12 s t (P (Variable j))
+        ; pure (eExists [j] (eSeq [ Unify i (Truth (Variable j))
+                                  , Truth e ])) }
 
 -------------------- t1 = t2 -----------------
 dsM_12 s (Unify t1 t2) pi                   -- MEQ

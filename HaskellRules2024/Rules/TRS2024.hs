@@ -146,6 +146,13 @@ applicationStep _env lhs =
         | isHNF a        -> pure Fail
         | otherwise      -> []
  ++
+  "APP-ISTRU" `name`
+  do Op IsTru :@: a <- [lhs]
+     case a of
+       Tru {}        -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
+         | otherwise -> []
+ ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]
      guard (isVal v)
@@ -161,6 +168,11 @@ arrayOpStep _env lhs =
   do Arr vs@(_:_) :@: v <- [lhs]
      guard (isVal v && all isVal vs)
      pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
+ ++
+  "APP-TRU" `name`
+  do Tru a :@: v <- [lhs]
+     guard (isVal v && isVal a)
+     pure ((v :=: a) :>: a)
  ++
   "APP-TUP-0" `name`
   do Arr [] :@: v <- [lhs]
@@ -195,6 +207,10 @@ unificationStep _env lhs =
   do (Arr vs :=: Arr vs') :>: e <- [lhs]
      guard (length vs == length vs')
      pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
+ ++
+  "U-TRU" `name`
+  do (Tru v :=: Tru v') :>: e <- [lhs]
+     pure (( v :=: v') :>: e)
  ++
   "U-FAIL" `name`
   do (a1 :=: a2) :>: _ <- [lhs]
@@ -377,6 +393,10 @@ valueCtx e
       let ei = es !! i
       (ctx,h) <- valueCtx ei
       pure (Arr (take i es ++ [ctx] ++ drop (i+1) es), h)
+  ++
+   do Tru a <- [e]
+      (ctx,h) <- valueCtx a
+      pure (Tru ctx, h)
 
 --------------------------------------------------------------------------------
 --

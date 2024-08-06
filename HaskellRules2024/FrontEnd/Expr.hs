@@ -720,6 +720,7 @@ getVisibleBinders = go
     go (Unify e1 e2)  = go e1 ++ go e2
     go (Range _fx e)  = go e
     go (Guard e1 _)   = go e1
+    go (Truth e)      = go e
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e

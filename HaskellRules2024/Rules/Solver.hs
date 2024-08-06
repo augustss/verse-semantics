@@ -360,6 +360,7 @@ isPrim _ (GVLit _)  = True
 isPrim s (GVArr vs) = all (isPrim s) vs
    -- Recursion in GVArr: a common case is: r=<>, not(r=<>)
    -- and that is definitely contradictory.  Test is T26Jul24-13.
+isPrim s (GVTru v) = isPrim s v
 
 isPrimV :: Solver -> Ident -> Bool
 isPrimV s x = not $ null [() | A_RelOp op (GVVar y) <- s_pos s, isTyOp op, isEqual s (GVVar x) (GVVar y)]
