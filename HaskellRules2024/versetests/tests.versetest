@@ -317,3 +317,7 @@ testeq("EV59",pass) { a :=        1   ; if ((?int)[a]) 1 else 0 } { 0 }
 testeq("EV60",pass) { a := option{'x'}; if ((?int)[a]) 1 else 0 } { 0 }
 testeq("EV61",pass) { a := option{ }; if (a?) then 1 else 0 } { 0 }
 testeq("EV62",pass) { a := option{1}; if (a?) then 1 else 0 } { 1 }
+
+testeq("AndyExe12", pass, broken)
+                    { exists A B { B = all{ exists C D { C = all{ (A = true) | (D = false) }; D = true; C } }; A = true; B } }
+                    { array{array{truth{array{}}}} }
