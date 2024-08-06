@@ -195,6 +195,8 @@ sDesugarExpr = ds
     ds (Macro1 (Ident _ "verify") _ e)  = Verify [] <$> ds e
     ds (Macro1 (Ident _ "some") _ e)    = Some <$> ds e
     ds (Macro1 (Ident _ "check") fx e)  = Check fx <$> ds e
+    ds (Macro1 (Ident _ "succeeds") _ e)= eCheck [effSucceeds] <$> ds e
+    ds (Macro1 (Ident _ "decides") _ e) = eCheck [effDecides] <$> ds e
 
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
     ds (Macro1 (Ident _ "assume") _ e)  = do { x <- newIdent (getLoc e) "x"
