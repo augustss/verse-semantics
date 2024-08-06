@@ -278,6 +278,7 @@ eGuard xs orig_e = foldr gd orig_e xs
 
 eCheck :: [Eff] -> SrcExpr -> SrcExpr
 eCheck fxs1 e
+  | null fxs1           = e
   | Check fxs2 e' <- e  = Check (fxs1 ++ fxs2) e'
   | otherwise           = Check fxs1 e
 
@@ -395,15 +396,15 @@ data Store = Store { refMap :: IM.IntMap SrcValue
 instance Pretty SrcExpr where
   pPrintPrec l p
     | l > prettyNormal = ppNormal
-    | otherwise = ppNice
+    | otherwise        = ppNice
     where
       -- Pretty-print the argument of a call f[a] or f(a)
-      --   A user call f[]    -->  ApplyD f (Array [])
-      --   A user call f[a]   -->  ApplyD f (a)
-      --   A user call f[a,b] -->  ApplyD f (Array [a,b])
+      --   A user call f[]    <-->  ApplyD f (Array [])
+      --   A user call f[a]   <-->  ApplyD f (a)
+      --   A user call f[a,b] <-->  ApplyD f (Array [a,b])
       -- Hence the special case for length es /= 1
-      ppA (Array es) | length es /= 1 = ppEs es
-      ppA e                           = ppr 0 e
+      ppArg (Array es) | length es /= 1 = ppEs es
+      ppArg e                           = ppr 0 e
 
       ppB (Blk es) = braces $ ppSeq l es
       ppB e        = braces $ ppr 0 e
@@ -431,9 +432,9 @@ instance Pretty SrcExpr where
           Tuple es   -> parens (ppEs es)
           Seq es     -> maybeParens (p > 0) $ ppSeq l es
 
-          ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppA a)
+          ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppArg a)
             where (q, ql, _) = fixity "()"
-          ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
+          ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppArg a)
             where (q, ql, _) = fixity "()"
 
           PrefixOp o e -> maybeParens (p > q) $ ppOp o <> ppr qr e
@@ -470,12 +471,14 @@ instance Pretty SrcExpr where
           Case1 bs ->
             maybeParens (p > 0) $ sep [ text "case", indent $ ppr 0 bs ]
           Case2 e bs ->
-            maybeParens (p > 0) $ sep [ text "case" <+> parens (pPrintL l e) <+> text "of",
+            maybeParens (p > 0) $ sep [ text "case" <+> parens (ppArg e) <+> text "of",
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $
                             cat [ text "fun" <> hcat (map ppArs ars)
                                 , indent (ppB b) ]
-                where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
+                where
+                  ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
+
           Blk es       -> braces $ ppSeq l es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e     -> parens (ppr 0 e)
@@ -522,6 +525,7 @@ instance Pretty SrcExpr where
           Truth e -> text "truth" <> braces (ppr 0 e)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
+
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)

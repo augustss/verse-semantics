@@ -65,7 +65,8 @@ desugar flgs add_verification
 
      -- Syntax fixes
      <=< traceDS "syntaxFixes"
-     <=< syntaxFixes)
+     <=< syntaxFixes
+     <=< traceDS "parsed" )
   where
     ds_model | add_verification = MV
              | otherwise        = MX
@@ -95,9 +96,16 @@ sDesugarExpr = ds
     ds (InfixOp e1 (Op ">>") e2) = Guard <$> ds e1 <*> ds e2
 
     -- Bindings
-    ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)  -- PCOLONT
-    ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
+    ds (InfixOp e1 (Op ":=") e2) = defn e1 e2 >>= ds
 
+    -- f(a)<fx> : ty  -->  f := fun(a){ :ty<fx> }
+    --        e : ty  -->  e := :ty<>
+    -- c.f. the ":" case of `defn`
+    ds (InfixOp e1 (Op ":")  e2)
+      | Just (f, a, fxs) <- getFun e1
+      = defn f (Function [(a,[])] (Range fxs e2)) >>= ds
+      | otherwise
+      = defn e1                   (Range [] e2)   >>= ds
 
     -- Function notation
     ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [closedId])] (eCheck [effSucceeds] e2)
@@ -291,22 +299,19 @@ defn (Variable i) e = pure $ eDefine i e
 
 -- Rule:   p(a)<fxs> := rhs   -->  p := fun(a){check<fxs>{rhs}}
 --         Adding <succeeds> if not present
+-- E.g. f(x)<decides> := 3    # NB: has no effect on caller, which still sees 3
 defn p e
-  | (p1, fxs) <- getEffs p
-  , Just (f, a, rs) <- getFun p1
-  = defn f (Function [(a, rs)] (eCheck (addSucceeds fxs) e))
+  | Just (f, a, fx) <- getFun p
+  = defn f (Function [(a, [])] (eCheck fx e))
 
--- Rule: (e1<fx>:e2 := e)    -->  (e1 :=        e |>{fx} e2)
--- Rule: (f(a)<fx>:e2 := e)  -->  (e1 := fun(a){e |>{fx} e2})
--- but adding <succeeds> if omittec leaving behind <open/closed>
+-- Rule: (f(a)<fx>:e2 := e)  -->  (e1 := fun(a){e |><fx> e2})
+-- Rule:       (e1:e2 := e)  -->  (e1 :=        e |><>   e2)
+-- but adding <succeeds> if omitted, leaving behind <open/closed>
 defn (InfixOp e1 (Op ":") e2) e
-   = case getFun e1' of
-       Just (f, a, rs) -> defn f (Function [(a,rs)] (OfType e fxs' e2))
-       Nothing         -> defn e1'                  (OfType e fxs' e2)
-  where
-    (e1', fxs) = getEffs e1
-    fxs' = addSucceeds fxs
-
+   | Just (f, a, fxs) <- getFun e1
+   = defn f (Function [(a,[])] (OfType e fxs e2))
+   | otherwise
+   = defn e1                   (OfType e []                e2)
 
 -- Rule: (:e2) := e  -->  (x:e2) := e, x fresh
 defn (PrefixOp op@(Op ":") e2) e
@@ -343,7 +348,6 @@ defn (InfixOp p1 op@(Op "->") p2) e = do
   pure $ eSeq [r1, r]
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
---defn p _ = impossible "defn" p
 
 
 addSucceeds :: [Eff] -> [Eff]
@@ -354,15 +358,16 @@ addSucceeds fx = fx
 --         Functions to take apart SrcExpr
 --------------------------------------------------------
 
--- Return function, argument, and attributes
 getFun :: SrcExpr -> Maybe (SrcExpr, SrcExpr, [Ident])
+-- f(a)<fx>  -->  Just (f, a, <fx>)
 getFun = gf []
   where
     gf rs (EffAttr e r) = gf (r:rs) e
-    gf rs (ApplyS f a) = Just (f, a, reverse rs)
-    gf _ _ = Nothing
+    gf rs (ApplyS f a)  = Just (f, a, addSucceeds (reverse rs))
+    gf _ _              = Nothing
 
-getEffs :: SrcExpr -> (SrcExpr, [Eff])  -- e<fx1><fx2> --> (e, [fx1,fx2])
+getEffs :: SrcExpr -> (SrcExpr, [Eff])
+-- e<fx1><fx2> --> (e, [fx1,fx2])
 getEffs orig_e = go orig_e []
   where
     go (EffAttr e fx) fxs
@@ -649,36 +654,41 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
 
 -------------------- e |>{fx} t -----------------------
 -- M+[ t1 |>fx t2 ]pi = x := check<fx>{ M[t1]pi }
---                      chekc<succeeds>{ z := M+[t2]E; z[x] }
+--                      check<succeeds>{ z := M+[t2]E; z[x] }
 dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
-   = do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
-        ; (e2, z) <- defineDE "z" (mDesugarExpr MV t2)
-        ; pure (eSeq [e1, eCheck [effSucceeds] (eSeq [e2, eApplyD z x])]) }
+   = do { (dx, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
+        ; (dz, z) <- defineDE "z" (mDesugarExpr MV t2)
+        ; pure (eSeq [dx, eCheck [effSucceeds] (eSeq [dz, eApplyD z x])]) }
 
 dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
     -- SLPJ: pi is unused, which seems suspicious
     -- But I think that's a correct reflection of opacity
-  = do { (e2, z) <- defineDE "z" (mDesugarExpr MI t2)
-       ; pure (eSeq [ e2
+  = do { (dz, z) <- defineDE "z" (mDesugarExpr MI t2)
+       ; pure (eSeq [ dz
                     , eGuard (getFree t1) (eSeq [eHavoc fx, eSome z]) ]) }
 
-dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
-  = do { (e1, x) <- defineDE "x" (dsM_12 s t1 pi)
+dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPEX
+  = do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 s t1 pi)
        ; e2 <- dsM_12 s (Range fx t2) (P x)
        ; pure (eSeq [e1,e2]) }
 
 -------------------- :{fx} t -----------------
 -- SLPJ: I don't think we want fx on Range at all
 
-dsM_12 MI (Range _fx t) (P i)                 -- MTYPE-
-  = do { (e, z) <- defineDE "z" (mDesugarExpr MI t)
-       ; pure (eSeq [e, eGuard (getFree i) (eSome z) ]) }
--- SLPJ: check this... it's not what is in the doc yet
---       ; pure (eSeq [e, eHavoc fx, eApplyD z i ]) }
+dsM_12 MI (Range fx t) (P e)                 -- MTYPE-
+  = do { (dz, z) <- defineDE "z" (mDesugarExpr MI t)
+       ; pure (eSeq [dz, eGuard (getFree e) (eSeq [eHavoc fx, eSome z]) ]) }
 
-dsM_12 s (Range _fx t) (P i)                  -- MTYPE+X
-  = do { (e, z) <- defineDE "z" (mDesugarExpr s t)
-       ; pure (eSeq [e, eApplyD z i]) }   -- z[x]
+dsM_12 s (Range fx t) (P e)                  -- MTYPE+X
+  | null fx
+  = do { (dz, z) <- defineDE "z" (mDesugarExpr s t)
+       ; pure (eSeq [ dz, eApplyD z e]) }
+
+  | otherwise
+  = do { y <- newIdent (getLoc t) "y"
+       ; (dz, z) <- defineDE "z" (mDesugarExpr s t)
+       ; pure (eSeq [ eDefine y (eCheck fx e)
+                    , eCheck [effSucceeds] (eSeq [dz, eApplyD z (Variable y)])]) }
 
 dsM_12 s (Range _fx t) E                      -- MTYPEE
   = do { x <- newIdent (getLoc t) "x"
@@ -699,9 +709,8 @@ dsM_12 s (DefineIE x y t) E                -- MSQUIGE
        eExists [i] <$> dsM_12 s (DefineIE x y t) (P (Variable i))
 
 dsM_12 s (DefineIE x y t) (P i)             -- MSQUIGP
-  = seqDE [ pure $ eDefine x i
-          ,        eDefine y <$> dsM_12 s t (P i)
-          ]
+  = do { body <- dsM_12 s t (P i)
+       ; pure (eSeq [eDefine x i, eDefine y body]) }
 
 -------------------- x := t -----------------
 dsM_12 s (DefineE x t) pi                   -- MBIND
