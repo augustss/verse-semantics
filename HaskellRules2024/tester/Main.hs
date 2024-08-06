@@ -214,7 +214,7 @@ runTestFile tflg (fn, ts)
             expected     = filter expectedTestRes      res  -- Excludes skipped
             n_expected   = length expected
             unexpected   = filter unexpectedTestRes    res  -- Excludes skipped, invalid, exn
-            n_unexpected = length unexpected 
+            n_unexpected = length unexpected
             n_invalid    = count (outcomeIs (TO_Abnormal NormInvalid)) res
             n_excn       = count (outcomeIs TO_Excn)       res
       ; putStrLn ""
