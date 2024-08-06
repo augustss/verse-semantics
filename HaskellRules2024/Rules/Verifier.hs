@@ -154,7 +154,16 @@ splitStep env lhs =
           rvs' = foldr (:>:) rest [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
           asm    = A_GVEq r (GVArr (map GVVar rs'))
       pure (pPrint asm, caseSplit (rs ++ rs') asm as ctx rvs')
-   -- LA: SPLIT_TRU ???
+
+   ++
+   "SPLIT-TRU" `nameWith`
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, Var r :=: Tru v :>: rest) <- proofX all_rs e
+      guard (r `elem` rs)
+      let r'  = skolsNotIn all_rs !! 0
+          rv' = (Var r' :=: v) :>: rest
+          asm    = A_GVEq r (GVTru (GVVar r'))
+      pure (pPrint asm, caseSplit (rs ++ [r']) asm as ctx rv')
 
 {- SPJ: I am not sure if we need SPLIT-APP at all.
         So I am commenting it out for now.
