@@ -15,6 +15,7 @@
 %format fvs e = "\mathsf{fvs}" e
 
 %format effects (g) (e) = "\mathcal{FX}(" g "," e ")"
+%format empty = " "
 
 %format beffects (s) (e) = "\textit{effects}_{" s "}(" e ")"
 %format beffectsfun (e) = "\textit{effectsfun}(" e ")"
@@ -181,7 +182,7 @@
 %format ioftype (e) (t) = e "\vartriangleright_I" t
 %format oftypeKW = "\vartriangleright"
 %format oftypefx (e) (fx) (t) = e "\vartriangleright\hspace{-1.3mm} \langle" fx "\rangle\," t
-%format colonfx fx t = : "\hspace{-0.2mm} \langle" fx "\rangle" t
+%format colonfx fx t = :t "\hspace{-0.2mm} \langle" fx "\rangle"
 %format at = "\, @\!\!"
 %format dot = "\! ."
 %format alpha = "\alpha"
