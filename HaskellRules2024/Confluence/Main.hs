@@ -10,9 +10,11 @@ import Test.QuickCheck
 trs2024 :: Rule
 trs2024 = TRS2024.evalRules
 
+prop_Valid :: Expr -> Bool
 prop_Valid t0 =
   valid (prep t0)
 
+prop_Confluent :: Property
 prop_Confluent =
   forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- qs1) ->
     let (_resp, np :<-- ps)  = normalize lotsOfSteps trs2024 p

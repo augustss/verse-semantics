@@ -61,7 +61,8 @@ convert (Lam i t)     = Rules.Lam (TRS.bind (toCoreIdent i) (convert t))
 convert (Some v)      = Rules.Some (convert v)
 convert (Check fxs t) = foldr addCheck (convert t) fxs
 convert (Src.Verify is t) = Rules.Verify (TRS.bindList (map toCoreIdent is) ([], convert t))
-convert Src.Fail          = Rules.Fail
+convert Src.Fail      = Rules.Fail
+convert (Src.Truth e) = Rules.Tru (convert e)
 convert e = impossible "convert" e
 
 addCheck :: Eff -> Rules.Expr -> Rules.Expr
@@ -136,6 +137,7 @@ scope sc = expr
     expr (Src.Lam i e)     = Src.Lam i <$> scopeD (S.insert i sc) e
     expr (Src.Verify is e) = Src.Verify is <$> scopeD sc' e
       where sc' = foldr S.insert sc is
+    expr (Src.Truth e)     = Src.Truth <$> expr e
     expr e = impossible "scope" e
 
     -- exprD for a new scope context, using current in-scope set

@@ -18,6 +18,9 @@ verify("Guard10",fail) { f(x:int):int := x; y := f[y] }
   # Guard10: y=f[y] must be stuck.  Shows the need for a guard
 verify("Guard11",pass) { f(x:int):int := 3; y := f[y] }
   # Guard11: y=f[y] is not stuck becuase f is transparent
+testeq("Guard11a",pass) { f(x:int):int := 3; y := f["monkey"] } {fail}
+  # Guard11a: Should fail, not get stuck; f["monkey"] fails the domain test
+
 verify("Guard12",fail) { (f(x:int):int) => y := f[y] }
   # Guard12: like Guard10
 verify("Guard13",fail) { (f(x:int):type{3}) => y := f[y] }
@@ -141,7 +144,9 @@ verify("HO4",fail) { f(g(z:int):int):int := {g(())} }
 verify("HO5",pass) { suc(x:int) := {99}; ex6(h(z:int):int) := {3}; ex6(suc) }
 verify("HO6",pass) { ex6(hog(z:int):int):int := {hog(3)}  }
 verify("HO7",pass) { suc(x:int) := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
-verify("HO8",fail) { suc(x:int) := {(x, 1)}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
+verify("HO8",fail) { suc(x:int) := {(x, 1)}
+                   ; ex6(h(z:int):int):int := {h(3)}
+                   ; ex6(suc) }
 verify("HO9",pass) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h(3)}; ex6(suc) }
 verify("HO10",fail) { suc(x:int):int := {x + 1}; ex6(h(z:int):int):int := {h((3, 3))}; ex6(suc) }
 verify("HO11",fail) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
@@ -175,7 +180,10 @@ verify("Dec8",pass) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:f
 verify("Dec9",fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 }
 verify("Dec10",fail) { foo(x:int)<decides> := { (x = 666) | (x = 42) } ; phil(z:foo):foo := 10 - z }
 
-verify("Dec8a",pass) { foo(x:int)<decides> := { (x = 666) } ; phil(z:foo) := (708 - z = 42) }
+verify("Dec8a",pass) { foo(x:int)<decides> := { x = 666 } ; phil(z:foo) := (708 - z = 42) }
+
+verify("Dec11",pass) { f(x:int)<decides> := 2 ; bar(y:int)<succeeds> := f[y] }
+  # Dec11: bar verifies despite foo's <decides>
 
 # Subtyping (passes, but apparently, should be rejected!)
 verify("ST1", pass) { wombat3(x:int) := x; f3( g(:nat):int ) := g[4];  f3[wombat3] }  # Need to #asktim
@@ -200,7 +208,8 @@ verify("PP1", pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
 
 # PP3a/b: to verify H's defn, we need to know X=1, so we need to
 #         call G() to the left of that defn
-verify("PP3a", fail) { F( X:int, G():type{X = 1} )
+verify("PP3a", fail, broken)
+                     { F( X:int, G():type{X = 1} )
                               := (H()<succeeds> := X = 1; H()
                                  ; G() )    # Call G last!
                         ; F(2, G1() := G1()) }
@@ -225,7 +234,7 @@ verify("blame0", pass) { f2( g() := 3 ) := g[] = 3 }
 
 # ---------------------------------------------
 # Array tests
-verify("ArrayX", skip) {a:=(1;2;),a=(1,2)}
+verify("ArrayX", pass, skip) {a:=(1;2;),a=(1,2)}
 verify("Array1", pass) { a := for{1..3}; a = array{1,2,3} }
 verify("Array2", pass) { ([]int)[ array{1,2} ] }
 verify("Array3", pass) { f():[]int := array{1,2,3} }

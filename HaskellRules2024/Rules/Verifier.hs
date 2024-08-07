@@ -73,6 +73,7 @@ groundValue :: [SkolIdent] -> Expr -> Maybe GroundVal
 groundValue _  (Lit l)               = Just (GVLit l)
 groundValue rs (Var v) | v `elem` rs = Just (GVVar v)
 groundValue rs (Arr vs)              = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
+groundValue rs (Tru v)               = do gv <- groundValue rs v; Just (GVTru gv)
 groundValue _  _                     = Nothing
 
 --------------------------------------------------------------------------------
@@ -153,6 +154,16 @@ splitStep env lhs =
           rvs' = foldr (:>:) rest [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
           asm    = A_GVEq r (GVArr (map GVVar rs'))
       pure (pPrint asm, caseSplit (rs ++ rs') asm as ctx rvs')
+
+   ++
+   "SPLIT-TRU" `nameWith`
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, Var r :=: Tru v :>: rest) <- proofX all_rs e
+      guard (r `elem` rs)
+      let r'  = skolsNotIn all_rs !! 0
+          rv' = (Var r' :=: v) :>: rest
+          asm    = A_GVEq r (GVTru (GVVar r'))
+      pure (pPrint asm, caseSplit (rs ++ [r']) asm as ctx rv')
 
 {- SPJ: I am not sure if we need SPLIT-APP at all.
         So I am commenting it out for now.

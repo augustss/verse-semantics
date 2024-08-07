@@ -11,6 +11,7 @@ import Prelude
 import TRS.Bind
 import Rules.Core
 import Epic.Print hiding ( (<>) )
+import FrontEnd.Error
 
 import Control.Monad( guard )
 import Data.List( (\\) )
@@ -146,6 +147,13 @@ applicationStep _env lhs =
         | isHNF a        -> pure Fail
         | otherwise      -> []
  ++
+  "APP-ISTRU" `name`
+  do Op IsTru :@: a <- [lhs]
+     case a of
+       Tru {}        -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
+         | otherwise -> []
+ ++
   "APP-LAM" `name`
   do Lam bnd :@: v <- [lhs]
      guard (isVal v)
@@ -161,6 +169,11 @@ arrayOpStep _env lhs =
   do Arr vs@(_:_) :@: v <- [lhs]
      guard (isVal v && all isVal vs)
      pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
+ ++
+  "APP-TRU" `name`
+  do Tru a :@: v <- [lhs]
+     guard (isVal v && isVal a)
+     pure ((v :=: a) :>: a)
  ++
   "APP-TUP-0" `name`
   do Arr [] :@: v <- [lhs]
@@ -195,6 +208,10 @@ unificationStep _env lhs =
   do (Arr vs :=: Arr vs') :>: e <- [lhs]
      guard (length vs == length vs')
      pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
+ ++
+  "U-TRU" `name`
+  do (Tru v :=: Tru v') :>: e <- [lhs]
+     pure (( v :=: v') :>: e)
  ++
   "U-FAIL" `name`
   do (a1 :=: a2) :>: _ <- [lhs]
@@ -377,6 +394,10 @@ valueCtx e
       let ei = es !! i
       (ctx,h) <- valueCtx ei
       pure (Arr (take i es ++ [ctx] ++ drop (i+1) es), h)
+  ++
+   do Tru a <- [e]
+      (ctx,h) <- valueCtx a
+      pure (Tru ctx, h)
 
 --------------------------------------------------------------------------------
 --
@@ -437,7 +458,43 @@ wrapExis xs orig_e = foldr wrap orig_e xs
 --
 --------------------------------------------------------------------------------
 
+{- Note [Blocked]
+~~~~~~~~~~~~~~~~~
+"blocked(e)" means "blocked on a local existential"
+   * e is not a HNF, AND
+   * e can only take a reduction step
+       to the left of the HOLE (if any)
+       by giving a value to at least one of the local existentials.
+
+Imagine HOLE is filled with (x=2) and we are considering substituing that (x=2)
+
+E1: exists x. x>3; HOLE                  (x>3) blocked because local exi x is free
+
+E2: exists x. (if(x=3) then e1 else e2); (x=3) is blocked becuase local exi x
+              HOLE                       is rigid under the 'if'
+
+E3: exists x. x>3; 7; HOLE               7 is blocked; it's fine to substitute
+                                         across the 7
+    NB: in more complicated cases the "7" might not go away, eg
+        exists x. all{ x>0; 7 }; x=2
+
+E4: exists x. if (x>1) then loop(); fail; HOLE    'fail' is not blocked;
+                                                  don't substitute across it
+
+E5: exists x. if (x>1) then loop(x); y>3; HOLE     (y>3) is not blocked, because the "outside"
+    where y is bound outside,                      may give it a value; then we might fail
+          by lambda or existential                 instead of calling loop(2)
+
+E6: exists x. x>3; if (y>1) then loop(x); HOLE     (y>1) is not blocked, because the "outside"
+    where y is bound outside,                      may give it a value; then we might fail
+          by lambda or existential                 instead of calling loop(2)
+
+-}
+
 type Expr_or_Context = Expr
+
+blocked :: Expr_or_Context -> Bool
+blocked ec = blkd (LX { exi_flexi = [], exi_rigid = []}) ec
 
 data LocalExis = LX { exi_flexi :: [Ident]   -- Flexible existentials
                     , exi_rigid :: [Ident]   -- Rigid existentials
@@ -446,9 +503,9 @@ data LocalExis = LX { exi_flexi :: [Ident]   -- Flexible existentials
 allExis :: LocalExis -> [Ident]
 allExis (LX { exi_flexi = flexi, exi_rigid = rigid }) = rigid ++ flexi
 
-isLocalExi :: LocalExis -> Ident -> Bool
-isLocalExi (LX { exi_flexi = flexi, exi_rigid = rigid }) x
-  = x `elem` flexi || x `elem` rigid
+isLocalFlexi :: LocalExis -> Ident -> Bool
+isLocalFlexi (LX { exi_flexi = flexi }) x
+  = x `elem` flexi
 
 isRigidExi :: LocalExis -> Ident -> Bool
 isRigidExi (LX { exi_rigid = rigid }) x = x `elem` rigid
@@ -461,33 +518,43 @@ makeRigid :: LocalExis -> LocalExis
 makeRigid (LX { exi_flexi = flexi, exi_rigid = rigid })
  = LX { exi_flexi = [], exi_rigid = rigid ++ flexi }
 
-blocked :: Expr_or_Context -> Bool
-blocked ec = blkd (LX [] []) ec
-
 blkd :: LocalExis -> Expr_or_Context-> Bool
+-- See Note [Blocked] for what this function means
+-- In the Context case (i.e. Expr has a HOLE), look only to the left of the HOLE
 -- SLPJ: need to update the document to reflect this function
 blkd _  HOLE        = True
-blkd lx (v :=: e)
-  | Var x1 <- v    -- x=x is blocked
-  , Var x2 <- e    --           ; SLPJ: discuss and check
-  , x1==x2          = isLocalExi lx x1
-  | otherwise       = blkd lx v || blkd lx e
-blkd lx (Var v)     = isRigidExi lx v
-blkd lx (e1 :>: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)
+
+blkd _  e | isVal e = False   -- See (E3)
+
+blkd lx (Var x :=: Var y) | x == y
+                          = isLocalFlexi lx x
+blkd lx (Var x :=: e)     = isRigidExi lx x -- See (E2)
+                          || blkd lx e    -- Blocked if *either* side is blocked
+blkd lx (hnf :=: e)       = assert (isHNF hnf) (show hnf) $
+                            blkd lx e
+
+blkd lx (e1 :>: e2)
+  | isVal e2        = blkd lx e1
+  | otherwise       = blkd lx e1 && (isContext e1 || blkd lx e2)  -- If HOLE is in e1, ignore e2
 blkd lx (e1 :|: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)  -- SLPJ: check
-blkd lx (One e)     = blkd (makeRigid lx) e
-blkd lx (All e)     = blkd (makeRigid lx) e
+blkd lx (One e)     = blkd (makeRigid lx) e   -- See (E2)
+blkd lx (All e)     = blkd (makeRigid lx) e   -- See (E2)
 blkd lx (Exi bnd)   = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
-blkd lx (v :>>: _)  = any (isLocalExi lx) (free v)
+blkd lx (v1 :@: v2) = case v1 of
+                        Var f -> isLocalFlexi lx f                -- Needed for (E2)!
+                        Op {} -> any (isLocalFlexi lx) (free v2)  -- See (E1)
+                        _     -> False
+
 blkd _  (Verify _)  = True
 blkd lx (Check _ e) = blkd lx e
-blkd lx (v1 :@: v2) = case v1 of
-                        Var f -> isLocalExi lx f
-                        Op {} -> any (isLocalExi lx) (free v2)
-                        _     -> False
-blkd lx (Some v)    = any (isLocalExi lx) (free v)
-blkd _  _           = False
+blkd lx (Some v)    = any (isLocalFlexi lx) (free v)
+blkd lx (v :>>: _)  = any (isLocalFlexi lx) (free v)
 
+blkd _  Fail        = False
+
+blkd _ e = errorMessage ("Uncovered case in blkd " ++ show e)
+
+---------------------
 choiceFree :: Expr_or_Context -> Bool
 -- (choiceFree ctx) means no choices to the left of the HOLE
 -- or, if no HOLE, anywhere

@@ -323,7 +323,7 @@ pMap :: P SrcExpr
 pMap = pKeyword "map" *> (Map <$> pBlockEs)
 
 pTruth :: P SrcExpr
-pTruth = pKeyword "truth" *> (Truth <$> pBraces pExpr1)
+pTruth = pKeyword "truth" *> (Truth <$> pBraces pExpr2)
 
 -- Try to mimic TimVerse by turning a tuple into an array
 -- A trailing ';' can be used, but not a trailing ','.
@@ -452,7 +452,7 @@ pDo :: P SrcExpr
 pDo = pKeyword "block" *> (Block <$> pBlockM)
 
 pOption :: P SrcExpr
-pOption = pKeyword "option" *> (Option <$> pBraces (optional pExpr1))
+pOption = pKeyword "option" *> (Option <$> pBraces (optional pExpr2))
 
 pSet :: P SrcExpr
 pSet = pKeyword "set" *> do

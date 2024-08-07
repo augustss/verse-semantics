@@ -6,7 +6,7 @@
 module FrontEnd.Expr(
       Loc, noLoc, mkLoc
 
-    , Ident(..), unIdent
+    , Ident(..), identLoc, identString
     , SrcExpr(..), Lit(..), Path(..)
     , SrcSmall, SrcCore, SrcBlk, SrcValue
 
@@ -278,6 +278,7 @@ eGuard xs orig_e = foldr gd orig_e xs
 
 eCheck :: [Eff] -> SrcExpr -> SrcExpr
 eCheck fxs1 e
+  | null fxs1           = e
   | Check fxs2 e' <- e  = Check (fxs1 ++ fxs2) e'
   | otherwise           = Check fxs1 e
 
@@ -355,8 +356,11 @@ instance Ord Ident where compare (Ident _ x) (Ident _ y) = compare x y
 instance Show Ident where
   show (Ident _ s) = show s
 
-unIdent :: Ident -> String
-unIdent (Ident _ s) = s
+identString :: Ident -> String
+identString (Ident _ s) = s
+
+identLoc :: Ident -> Loc
+identLoc (Ident l _) = l
 
 instance Pretty Ident where
   pPrintPrec _ _ (Ident _ i) = text i
@@ -364,10 +368,14 @@ instance Pretty Ident where
 
 --------------------------------------------------------
 --               Eff
+--
+-- Includes:
+--   Cardinality: <succeeds>, <decides>, <fails>
+--   Purity:      <computes>
+--   Open/closed: <open>, <closed>
 --------------------------------------------------------
 
 type Eff = Ident
-
 
 effSucceeds, effDecides, effFails, effComputes :: Eff
 effSucceeds = Ident noLoc "succeeds"
@@ -395,15 +403,15 @@ data Store = Store { refMap :: IM.IntMap SrcValue
 instance Pretty SrcExpr where
   pPrintPrec l p
     | l > prettyNormal = ppNormal
-    | otherwise = ppNice
+    | otherwise        = ppNice
     where
       -- Pretty-print the argument of a call f[a] or f(a)
-      --   A user call f[]    -->  ApplyD f (Array [])
-      --   A user call f[a]   -->  ApplyD f (a)
-      --   A user call f[a,b] -->  ApplyD f (Array [a,b])
+      --   A user call f[]    <-->  ApplyD f (Array [])
+      --   A user call f[a]   <-->  ApplyD f (a)
+      --   A user call f[a,b] <-->  ApplyD f (Array [a,b])
       -- Hence the special case for length es /= 1
-      ppA (Array es) | length es /= 1 = ppEs es
-      ppA e                           = ppr 0 e
+      ppArg (Array es) | length es /= 1 = ppEs es
+      ppArg e                           = ppr 0 e
 
       ppB (Blk es) = braces $ ppSeq l es
       ppB e        = braces $ ppr 0 e
@@ -431,17 +439,17 @@ instance Pretty SrcExpr where
           Tuple es   -> parens (ppEs es)
           Seq es     -> maybeParens (p > 0) $ ppSeq l es
 
-          ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppA a)
+          ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppArg a)
             where (q, ql, _) = fixity "()"
-          ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppA a)
+          ApplyD f a -> maybeParens (p > q) $ ppr ql f <> brackets (ppArg a)
             where (q, ql, _) = fixity "()"
 
           PrefixOp o e -> maybeParens (p > q) $ ppOp o <> ppr qr e
-            where (q, _, qr) = fixity ("pre" ++ unIdent o)
+            where (q, _, qr) = fixity ("pre" ++ identString o)
           PostfixOp e o -> maybeParens (p > q) $ ppr ql e <> ppOp o
-            where (q, ql, _) = fixity ("post" ++ unIdent o)
+            where (q, ql, _) = fixity ("post" ++ identString o)
           InfixOp e1 o e2 -> maybeParens (p > q) $ sep [ppr ql e1 <+> ppOp o, indent $ ppr qr e2]
-            where (q, ql, qr) = fixity (unIdent o)
+            where (q, ql, qr) = fixity (identString o)
 
           EffAttr f a -> maybeParens (p > q) $ ppr ql f <> text "<" <> ppr 0 a <> text ">"
             where (q, ql, _) = fixity "()"
@@ -470,12 +478,14 @@ instance Pretty SrcExpr where
           Case1 bs ->
             maybeParens (p > 0) $ sep [ text "case", indent $ ppr 0 bs ]
           Case2 e bs ->
-            maybeParens (p > 0) $ sep [ text "case" <+> parens (pPrintL l e) <+> text "of",
+            maybeParens (p > 0) $ sep [ text "case" <+> parens (ppArg e) <+> text "of",
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $
                             cat [ text "fun" <> hcat (map ppArs ars)
                                 , indent (ppB b) ]
-                where ppArs (e, rs) = parens (pPrintL l e) <> ppEffs rs
+                where
+                  ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
+
           Blk es       -> braces $ ppSeq l es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e     -> parens (ppr 0 e)
@@ -522,6 +532,7 @@ instance Pretty SrcExpr where
           Truth e -> text "truth" <> braces (ppr 0 e)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
+
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)
       ppVRA s i Nothing  (Just e) = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc "=") e)
@@ -720,6 +731,7 @@ getVisibleBinders = go
     go (Unify e1 e2)  = go e1 ++ go e2
     go (Range _fx e)  = go e
     go (Guard e1 _)   = go e1
+    go (Truth e)      = go e
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e

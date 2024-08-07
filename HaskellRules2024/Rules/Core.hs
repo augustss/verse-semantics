@@ -62,6 +62,7 @@ data Expr
   = Var Ident
   | Lit Lit
   | Arr [Val]
+  | Tru Val          -- truth{v}
   | Lam (Bind Expr)
   | Op PrimOp
 
@@ -107,7 +108,7 @@ data PrimOp
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr | IsChar | IsArr | IsComp
+ | IsInt | IsStr | IsChar | IsArr | IsComp | IsTru
 
  deriving
    ( Eq, Ord, Bounded, Enum, Show )
@@ -136,6 +137,7 @@ primOpString IsStr  = "isStr$"
 primOpString IsChar = "isChar$"
 primOpString IsArr  = "isArr$"
 primOpString IsComp = "isComp$"
+primOpString IsTru  = "isTru$"
 
 primOpCanFail :: PrimOp -> Bool
 
@@ -150,6 +152,7 @@ primOpCanFail IsStr  = True
 primOpCanFail IsChar = True
 primOpCanFail IsArr  = True
 primOpCanFail IsComp = True
+primOpCanFail IsTru  = True
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False
@@ -221,6 +224,7 @@ data GroundVal
   = GVVar {gv_var :: Ident}
   | GVLit Lit
   | GVArr [GroundVal]
+  | GVTru GroundVal
   deriving( Eq, Ord, Show )
 
 data Assump
@@ -258,6 +262,7 @@ instance Pretty GroundVal where
   pPrint (GVVar i)   = pPrint i
   pPrint (GVLit l)   = pPrint l
   pPrint (GVArr gvs) = char '<' <> fsep (punctuate comma $ map pPrint gvs) <> char '>'
+  pPrint (GVTru gv)  = text "truth" <> braces (pPrint gv)
 
 isPosAssump :: Assump -> Bool
 isPosAssump (A_Pos {})    = True
@@ -319,12 +324,13 @@ pPrintPrecE lvl prec the_expr
        Op op      -> char '!' <> pPrint op
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
-       e1 :|: e2   -> sep [ mbPar0 $ ppr1 e1, char '|' <+> ppr1 e2 ]
+       e1 :|: e2   -> sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
        e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
        e@(_ :>: _) -> sep (punctuate semi $ map ppr1 (gatherSeqs e))
        e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ">>" <+> ppr1 e2
 
        Arr as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
+       Tru a   -> text "truth" <> braces (ppr0 a)
        One e   -> text "one" <> braces (ppr0 e)
        All e   -> text "all" <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
@@ -396,6 +402,7 @@ exprSize (Op {})       = 1
 exprSize Fail          = 1
 exprSize HOLE          = 1
 exprSize (Arr as)      = 1 + sum (map exprSize as)
+exprSize (Tru a)       = 1 + exprSize a
 exprSize (Lam bnd)     = 1 + bindSize bnd
 exprSize (e1 :>: e2)   = 1 + exprSize e1 + exprSize e2
 exprSize (e1 :=: e2)   = 1 + exprSize e1 + exprSize e2
@@ -428,6 +435,7 @@ isHNF :: Expr -> Bool
 isHNF (Lit {}) = True
 isHNF (Op {})  = True
 isHNF (Arr es) = all isVal es   -- SLPJ: This had 'valid' stuff too, strangely
+isHNF (Tru e)  = isVal e
 isHNF (Lam {}) = True           -- valid e where (_,e) = unsafeUnbind bnd
                                 -- SLPJ: why valid????
 isHNF _        = False
@@ -438,6 +446,7 @@ isComparable (Lit (LChar {})) = True
 isComparable (Lit (LInt  {})) = True
 isComparable (Lit (LStr  {})) = True
 isComparable (Arr es)         = all isComparable es
+isComparable (Tru e)          = isComparable e
 isComparable _                = False -- ToDo: what about Path, Ptr, Rational?
 
 --------------------------------------------------------------------------------
@@ -477,6 +486,7 @@ prep :: Expr -> Expr
 prep (Var x)       = Var x
 prep (Lit k)       = Lit k
 prep (Arr as)      = prepVals as (\vs -> Arr vs)
+prep (Tru a)       = prepVal a Tru
 prep (Lam bnd)     = Lam (bind x (prep e)) where (x,e) = unsafeUnbind bnd
 prep (Op op)       = Op op
 prep (e1 :>: e2)   = prepSeq e1 e2
@@ -521,6 +531,7 @@ prepVals (a:as) f = prepVal a (\v -> prepVals as (f . (v:)))
 instance Variables Expr where
   variables f (Var x)      = variables f x
   variables f (Arr es)     = variables f es
+  variables f (Tru e)      = variables f e
   variables f (Lam bnd)    = variables f bnd
   variables f (e1 :=: e2)  = variables f (e1,e2)
   variables f (e1 :>: e2)  = variables f (e1,e2)
@@ -549,6 +560,7 @@ instance Variables GroundVal where
   variables _f (GVVar i)   = [i]
   variables _f (GVLit {})  = []
   variables f  (GVArr gvs) = variables f gvs
+  variables f  (GVTru gv)  = variables f gv
 
 
 --------------------------------------------------------------------------------
@@ -610,6 +622,7 @@ norm orig_e = alpha 0 orig_e
   skvar i = ident ("_r" ++ show i)
 
   alpha k (Arr es)     = Arr (map (alpha k) es)
+  alpha k (Tru e)      = Tru ((alpha k) e)
   alpha k (Lam bnd)    = Lam (bind x (alpha (k+1) e))
                        where x = var k; e = unbindAs x bnd
   alpha k (e1 :=: e2)  = alpha k e1 :=: alpha k e2
@@ -658,6 +671,7 @@ subst sub orig_e
   where
     go (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
     go (Arr es)     = Arr (map go es)
+    go (Tru e)      = Tru (go e)
     go (Lam bnd)    = Lam (substBind subst_e_ops sub bnd)
     go (e1 :=: e2)  = go e1 :=: go e2
     go (e1 :>: e2)  = go e1 :>: go e2
@@ -693,6 +707,7 @@ substSkol sub orig_e
   where
     go (Var x)      = Var (head $ [e | (y,e) <- sub, y == x] ++ [x])
     go (Arr es)     = Arr (map go es)
+    go (Tru e)      = Tru (go e)
     go (Lam bnd)    = Lam (substBind subst_e_ops sub bnd)
     go (e1 :=: e2)  = go e1 :=: go e2
     go (e1 :>: e2)  = go e1 :>: go e2
@@ -735,6 +750,7 @@ substGV :: Subst Ident -> GroundVal -> GroundVal
 substGV sub (GVVar x)  = GVVar (lookupIdSubst sub x)
 substGV _   (GVLit l)  = GVLit l
 substGV sub (GVArr vs) = GVArr (map (substGV sub) vs)
+substGV sub (GVTru v)  = GVTru (substGV sub v)
 
 lookupIdSubst :: Subst Ident -> Ident -> Ident
 lookupIdSubst sub x
@@ -783,6 +799,7 @@ everywhere step env orig_e
                          | i <- [0..length es-1]
                          , (s,e') <- everywhere step env (es!!i)
                          ]
+  recurse (Tru e)      = [ (s, Tru e')  | (s,e') <- everywhere step env e ]
   recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step env' e ]
                        where
                          (env',x,e) = walkInsideBind env bnd
@@ -870,6 +887,9 @@ data NormResult
                   -- according to the `valid` predicate
   deriving( Eq )
 
+instance Show NormResult where
+   show = showNormResult
+
 showNormResult :: NormResult -> String
 showNormResult NormOK      = "reached a normal form"
 showNormResult NormExpired = "ran out of fuel (Unexpected)"
@@ -915,6 +935,7 @@ instance Arbitrary Expr where
 
   shrink (Arr es)     = es
                      ++ [ Arr es' | es' <- shrink es ]
+  shrink (Tru e)      = [ e ] ++ [ Tru e'  | e' <- shrink e ]
   shrink (Lam bnd)    = shrinkBind Lam bnd
   shrink (e1 :=: e2)  = [ e1, e2 ]
                      ++ [ e1' :=: e2  | e1' <- shrink e1 ]
@@ -947,6 +968,7 @@ arbExprWith xs n =
   [ (1, Var `fmap` elements xs) | not (null xs) ] ++
   [ (1, LitInt `fmap` arbitrary)
   , (a, Arr `fmap` arbExprs)
+  , (a, Tru `fmap` arbExpr1)
   , (a, Lam `fmap` arbBind)
   , (1, Op  `fmap` arbitrary)
   , (b, liftM2 (:=:) arbExpr2 arbExpr2)
@@ -996,6 +1018,7 @@ type Context = Expr
 (<@) :: Context -> Expr -> Expr
 -- (C <@ e) fills the hole in C with e. Often written C[e]
 Arr as        <@ h = Arr (map (<@ h) as)
+Tru a         <@ h = Tru (a <@ h)
 Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
 (e1 :>: e2)   <@ h = (e1 <@ h) :>: (e2 <@ h)
 (e1 :=: e2)   <@ h = (e1 <@ h) :=: (e2 <@ h)
@@ -1015,6 +1038,7 @@ bvs :: Context -> [Ident]
 bvs ctx = explore [] ctx
  where
   explore xs (Arr es)     = foldr union [] (map (explore xs) es)
+  explore xs (Tru e)      = explore xs e
   explore xs (Lam bnd)    = exploreBind xs bnd
   explore xs (e1 :=: e2)  = explore xs e1 `union` explore xs e2
   explore xs (e1 :>: e2)  = explore xs e1 `union` explore xs e2
@@ -1035,6 +1059,7 @@ bvs ctx = explore [] ctx
 isContext :: Context -> Bool
 -- There is a HOLE, outside a Verify (SLPJ: is the "outside Verify" right?
 isContext (Arr es)     = any isContext es
+isContext (Tru e)      = isContext e
 isContext (Lam bnd)    = isContext e where (_,e) = unsafeUnbind bnd
 isContext (e1 :=: e2)  = isContext e1 || isContext e2
 isContext (e1 :>: e2)  = isContext e1 || isContext e2

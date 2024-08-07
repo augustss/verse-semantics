@@ -19,6 +19,7 @@ import Epic.Print
 import Data.Either
 import Data.Maybe
 import Data.IORef
+import Data.List( partition )
 import qualified Data.Set as S
 import Control.Monad
 
@@ -65,7 +66,8 @@ desugar flgs add_verification
 
      -- Syntax fixes
      <=< traceDS "syntaxFixes"
-     <=< syntaxFixes)
+     <=< syntaxFixes
+     <=< traceDS "parsed" )
   where
     ds_model | add_verification = MV
              | otherwise        = MX
@@ -95,9 +97,16 @@ sDesugarExpr = ds
     ds (InfixOp e1 (Op ">>") e2) = Guard <$> ds e1 <*> ds e2
 
     -- Bindings
-    ds (InfixOp e1 o@(Op ":")  e2) = ds =<< defn e1 (PrefixOp o e2)  -- PCOLONT
-    ds (InfixOp e1   (Op ":=") e2) = ds =<< defn e1 e2
+    ds (InfixOp e1 (Op ":=") e2) = defn e1 e2 >>= ds
 
+    -- f(a)<fx> : ty  -->  f := fun(a){ :ty<fx> }
+    --        e : ty  -->  e := :ty<>
+    -- c.f. the ":" case of `defn`
+    ds (InfixOp e1 (Op ":")  e2)
+      | Just (f, a, fxs) <- getFun e1
+      = defn f (Function [a] (Range fxs e2)) >>= ds
+      | otherwise
+      = defn e1              (Range [] e2)   >>= ds
 
     -- Function notation
     ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [closedId])] (eCheck [effSucceeds] e2)
@@ -150,6 +159,7 @@ sDesugarExpr = ds
     ds (Case2 _ _) = undefined
     ds (Block b)   = ds b                                               -- do e --> e
     ds (Blk es)    = ds $ eSeq es
+    ds e@(DefineV i) | isSrcUnderscore i = DefineV <$> newIdent (getLoc e) "x"
 
     ds (Seq es) = eSeq <$> mapM ds es
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
@@ -158,11 +168,13 @@ sDesugarExpr = ds
     ds (PrefixOp (Op "not") e)   = do e' <- ds e; pure $ If3 e' Fail eFalse
     ds (PrefixOp (Op "-") e)     = do ds $ InfixOp (Lit (LInt 0)) (Op "-") e
     ds (PrefixOp (Op "+") e)     = ds e  -- Prefix "+"; maybe should have an isInt test?
-    ds (PrefixOp (Op ":") e)     = Range [effSucceeds] <$> ds e
+    ds (PrefixOp (Op ":") e)     = Range [] <$> ds e
+{- Prefix '?' is just a function now
     ds (PrefixOp (Op "?") e)     = do x <- Variable <$> newIdent (getLoc e) "x"
                                       let ee = Let (InfixOp x (Op ":") e) (Truth x)
                                       ds $ Macro1 (Ident noLoc "type") [] $
                                               InfixOp eFalse (Op "|") ee
+-}
     ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
 
     -- e?  means simply  e[_]  or equivalently   exists x. e[x]
@@ -186,13 +198,15 @@ sDesugarExpr = ds
     ds (Option (Just e)) = do
       t <- newIdent (getLoc e) "t"
       ds $ If2 (eDefine t e) (Truth (Variable t))
-    ds (Truth e) = ds $ Map [InfixOp e (Op "=>") e]
+    ds (Truth e) = Truth <$> ds e
 
     ds (Macro1 (Ident _ "one")   _ e)   = One <$> ds e
     ds (Macro1 (Ident _ "all")   _ e)   = All <$> ds e
     ds (Macro1 (Ident _ "verify") _ e)  = Verify [] <$> ds e
     ds (Macro1 (Ident _ "some") _ e)    = Some <$> ds e
     ds (Macro1 (Ident _ "check") fx e)  = Check fx <$> ds e
+    ds (Macro1 (Ident _ "succeeds") _ e)= eCheck [effSucceeds] <$> ds e
+    ds (Macro1 (Ident _ "decides") _ e) = eCheck [effDecides] <$> ds e
 
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
     ds (Macro1 (Ident _ "assume") _ e)  = do { x <- newIdent (getLoc e) "x"
@@ -287,22 +301,19 @@ defn (Variable i) e = pure $ eDefine i e
 
 -- Rule:   p(a)<fxs> := rhs   -->  p := fun(a){check<fxs>{rhs}}
 --         Adding <succeeds> if not present
+-- E.g. f(x)<decides> := 3    # NB: has no effect on caller, which still sees 3
 defn p e
-  | (p1, fxs) <- getEffs p
-  , Just (f, a, rs) <- getFun p1
-  = defn f (Function [(a, rs)] (eCheck (addSucceeds fxs) e))
+  | Just (f, a, fx) <- getFun p
+  = defn f (Function [a] (eCheck fx e))
 
--- Rule: (e1<fx>:e2 := e)    -->  (e1 :=        e |>{fx} e2)
--- Rule: (f(a)<fx>:e2 := e)  -->  (e1 := fun(a){e |>{fx} e2})
--- but adding <succeeds> if omittec leaving behind <open/closed>
+-- Rule: (f(a)<fx>:e2 := e)  -->  (e1 := fun(a){e |><fx> e2})
+-- Rule:       (e1:e2 := e)  -->  (e1 :=        e |><>   e2)
+-- but adding <succeeds> if omitted, leaving behind <open/closed>
 defn (InfixOp e1 (Op ":") e2) e
-   = case getFun e1' of
-       Just (f, a, rs) -> defn f (Function [(a,rs)] (OfType e fxs' e2))
-       Nothing         -> defn e1'                  (OfType e fxs' e2)
-  where
-    (e1', fxs) = getEffs e1
-    fxs' = addSucceeds fxs
-
+   | Just (f, a, fxs) <- getFun e1
+   = defn f (Function [a] (OfType e fxs e2))
+   | otherwise
+   = defn e1              (OfType e []  e2)
 
 -- Rule: (:e2) := e  -->  (x:e2) := e, x fresh
 defn (PrefixOp op@(Op ":") e2) e
@@ -339,7 +350,6 @@ defn (InfixOp p1 op@(Op "->") p2) e = do
   pure $ eSeq [r1, r]
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
---defn p _ = impossible "defn" p
 
 
 addSucceeds :: [Eff] -> [Eff]
@@ -350,15 +360,20 @@ addSucceeds fx = fx
 --         Functions to take apart SrcExpr
 --------------------------------------------------------
 
--- Return function, argument, and attributes
-getFun :: SrcExpr -> Maybe (SrcExpr, SrcExpr, [Ident])
+getFun :: SrcExpr -> Maybe (SrcExpr, (SrcExpr,[Eff]), [Eff])
+-- f(a)<decides><closed>  -->  Just (f, (a,<closed), <decides>)
+-- The (SrcExpr,[Eff]) ends up on the Function;
+-- while the final [Eff] refers to the body of the function
 getFun = gf []
   where
-    gf rs (EffAttr e r) = gf (r:rs) e
-    gf rs (ApplyS f a) = Just (f, a, reverse rs)
-    gf _ _ = Nothing
+    gf rs (ApplyS f a) = Just (f, (a,fun_effs), addSucceeds body_effs)
+      where
+        (fun_effs, body_effs) = partition isOpenClosed rs
+    gf rs (EffAttr e r)       = gf (r:rs) e
+    gf _ _                    = Nothing
 
-getEffs :: SrcExpr -> (SrcExpr, [Eff])  -- e<fx1><fx2> --> (e, [fx1,fx2])
+getEffs :: SrcExpr -> (SrcExpr, [Eff])
+-- e<fx1><fx2> --> (e, [fx1,fx2])
 getEffs orig_e = go orig_e []
   where
     go (EffAttr e fx) fxs
@@ -645,36 +660,40 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
 
 -------------------- e |>{fx} t -----------------------
 -- M+[ t1 |>fx t2 ]pi = x := check<fx>{ M[t1]pi }
---                      chekc<succeeds>{ z := M+[t2]E; z[x] }
-dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+
-   = do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
-        ; (e2, z) <- defineDE "z" (mDesugarExpr MV t2)
-        ; pure (eSeq [e1, eCheck [effSucceeds] (eSeq [e2, eApplyD z x])]) }
-
+--                      check<succeeds>{ z := M+[t2]E; z[x] }
 dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
     -- SLPJ: pi is unused, which seems suspicious
     -- But I think that's a correct reflection of opacity
-  = do { (e2, z) <- defineDE "z" (mDesugarExpr MI t2)
-       ; pure (eSeq [ e2
-                    , eGuard (getFree t1) (eSeq [eHavoc fx, eSome z]) ]) }
+  = do { (dz, z) <- defineDE "z" (mDesugarExpr MI t2)
+       ; pure (eSeq [ dz, eGuard (getFree t1) (eSeq [eHavoc fx, eSome z]) ]) }
 
-dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPE2
-  = do { (e1, x) <- defineDE "x" (dsM_12 s t1 pi)
+dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+X
+   = do { (dx, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
+        ; (dz, z) <- defineDE "z" (mDesugarExpr MV t2)
+        ; pure (eSeq [dx, eCheck [effSucceeds] (eSeq [dz, eApplyD z x])]) }
+
+dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPEX
+  = do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 s t1 pi)
        ; e2 <- dsM_12 s (Range fx t2) (P x)
        ; pure (eSeq [e1,e2]) }
 
 -------------------- :{fx} t -----------------
--- SLPJ: I don't think we want fx on Range at all
+-- Roughly:  M_s[ :<fx> t ] (P e)  =  M_s[ e |><fx> t ] E
 
-dsM_12 MI (Range _fx t) (P i)                 -- MTYPE-
-  = do { (e, z) <- defineDE "z" (mDesugarExpr MI t)
-       ; pure (eSeq [e, eGuard (getFree i) (eSome z) ]) }
--- SLPJ: check this... it's not what is in the doc yet
---       ; pure (eSeq [e, eHavoc fx, eApplyD z i ]) }
+dsM_12 MI (Range fx t) (P e)                 -- MTYPE-
+  = do { (dz, z) <- defineDE "z" (mDesugarExpr MI t)
+       ; pure (eSeq [dz, eGuard (getFree e) (eSeq [eHavoc fx, eSome z]) ]) }
 
-dsM_12 s (Range _fx t) (P i)                  -- MTYPE+X
-  = do { (e, z) <- defineDE "z" (mDesugarExpr s t)
-       ; pure (eSeq [e, eApplyD z i]) }   -- z[x]
+dsM_12 s (Range fx t) (P e)                  -- MTYPE+X
+  | null fx
+  = do { (dz, z) <- defineDE "z" (mDesugarExpr s t)
+       ; pure (eSeq [ dz, eApplyD z e]) }
+
+  | otherwise
+  = do { y <- newIdent (getLoc t) "y"
+       ; (dz, z) <- defineDE "z" (mDesugarExpr s t)
+       ; pure (eSeq [ eDefine y (eCheck fx e)
+                    , eCheck [effSucceeds] (eSeq [dz, eApplyD z (Variable y)])]) }
 
 dsM_12 s (Range _fx t) E                      -- MTYPEE
   = do { x <- newIdent (getLoc t) "x"
@@ -695,9 +714,8 @@ dsM_12 s (DefineIE x y t) E                -- MSQUIGE
        eExists [i] <$> dsM_12 s (DefineIE x y t) (P (Variable i))
 
 dsM_12 s (DefineIE x y t) (P i)             -- MSQUIGP
-  = seqDE [ pure $ eDefine x i
-          ,        eDefine y <$> dsM_12 s t (P i)
-          ]
+  = do { body <- dsM_12 s t (P i)
+       ; pure (eSeq [eDefine x i, eDefine y body]) }
 
 -------------------- x := t -----------------
 dsM_12 s (DefineE x t) pi                   -- MBIND
@@ -741,6 +759,16 @@ dsM_12 s (Array ts) (P i)                   -- MARRAYP
    where
      do_one :: SrcExpr -> Ident -> D SrcExpr
      do_one t j = dsM_12 s t (P (Variable j))
+
+-------------------- truth{t1} -----------------
+dsM_12 s (Truth t) E                       -- MTRUTHE
+   = Truth <$> dsM_12 s t E
+
+dsM_12 s (Truth t) (P i)                   -- MTRUTHP
+   = do { j <- newIdent (getLoc t) "j"
+        ; e <- dsM_12 s t (P (Variable j))
+        ; pure (eExists [j] (eSeq [ Unify i (Truth (Variable j))
+                                  , Truth e ])) }
 
 -------------------- t1 = t2 -----------------
 dsM_12 s (Unify t1 t2) pi                   -- MEQ
