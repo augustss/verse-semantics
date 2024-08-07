@@ -451,7 +451,7 @@ mkSolver :: [Assump] -> Solver
 mkSolver asms = MkSolver { s_lits = lits, s_tups = tups, s_uf = UF.new, s_pos = pos, s_neg = neg, s_def = defs }
   where
     defs   = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
-    pos    = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | (_, (op, gv)) <- defs] -- TODO: delete defs from pos and see what happens; add a note to explain
+    pos    = [asm | A_Pos asm <- asms]
     neg    = [asm | A_Neg asm <- asms]
     lits   = concatMap groundLit    groundVals
     tups   = concatMap assumpTuples groundVals

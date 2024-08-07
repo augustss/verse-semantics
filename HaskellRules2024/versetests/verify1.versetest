@@ -1,1 +1,2 @@
-verify("comp-tup", pass){f(x:comparable)<decides>:comparable := {(p,q):=x; p } }
+
+test(N04){f(g():any):= ( g[]; f(g():=6)) }
