@@ -326,7 +326,7 @@ testeq("AndyExe12", pass, broken)
                     { exists A B { B = all{ exists C D { C = all{ (A = true) | (D = false) }; D = true; C } }; A = true; B } }
                     { array{array{truth{array{}}}} }
 
-testeq("AndyExe17", pass, broken)
+testeq("AndyExe17", pass)
                     { exists F {
                         F = function(A:any){ all{ (A = true; true) | (A = false; F(true)) } };
                         exists X Y {
@@ -335,6 +335,6 @@ testeq("AndyExe17", pass, broken)
                           Y } } }
                     { array{array{truth{array{}}}} }
 
-testeq("AndyExe19", pass, broken)
+testeq("AndyExe19", pass)
                     { exists Y Z { Y = all { 0 = Z }; Z = 0; Y } }
                     { array{0} }
