@@ -1,21 +1,2 @@
 See
 https://docs.google.com/document/d/1HGiPId2L7y_V4wylYQf98k5VK3Ldd-3GWapCAyh9sX0
-
-
-## Skipping Tests
-
-To tell the verifier *skip* tests in a file `path/to/file.verse` you can
-create a file `path/to/file.verse.skip` and add to it lines like:
-
-```
-skip(                 fail, "misparsed"){"f(g():any):=g[]; f(g():=6)"}
-skip("optional-name", fail, "some other reason"){"f(x:int)<decides>:=x=3, f[x:int]"}
-```
-
-So each line is of the form
-
-```
-skip(<optional-name-in-quotes>, pass|fail, "the-reason-it-is-skipped-in-quotes") { "exact code for test" }
-```
-
-These tests will then be "skipped" when running
