@@ -365,10 +365,14 @@ instance Pretty Ident where
 
 --------------------------------------------------------
 --               Eff
+--
+-- Includes:
+--   Cardinality: <succeeds>, <decides>, <fails>
+--   Purity:      <computes>
+--   Open/closed: <open>, <closed>
 --------------------------------------------------------
 
 type Eff = Ident
-
 
 effSucceeds, effDecides, effFails, effComputes :: Eff
 effSucceeds = Ident noLoc "succeeds"
