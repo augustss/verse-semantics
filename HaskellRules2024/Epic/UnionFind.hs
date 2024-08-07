@@ -5,6 +5,18 @@ import qualified Data.Map as M
 -- | A simple union find graph
 newtype UF a = MkUF { parent :: M.Map a a } deriving (Show)
 
+{-
+  x1 x2 x3 x4 x5
+
+  x1 ~ x2
+
+
+
+
+
+-}
+
+
 new :: UF a
 new = MkUF M.empty
 

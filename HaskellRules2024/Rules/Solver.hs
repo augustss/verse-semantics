@@ -27,11 +27,15 @@ solver s
   where
     _msg          = pPrint (s_pos s')
     -- 1. check if the current solver state is unsatisfiable
+    --    e.g. from [x = 1, x = 3] we get a contradication as 1 = 3
     res           = check s
     -- 2. generate new equalities from the definitions
+    --    e.g. from [x = add[a, 2], a = 1] generates a new equality `x=3` or `add[a, 2] = 3` (TODO: check)
     facts         = generate s
     -- 3. update the solver state with the new equalities
+    --    e.g. from the above we update the solver state with the new equality `x=3`
     s'            = propagate s facts
+
 
 {- Note [Solver-Rules]
 
@@ -412,14 +416,14 @@ tryEqLits s v = [l | l <- s_lits s, isEqual s v (GVLit l)]
 ------------------------------------------------------------------------------------
 
 
-
+-- "things we know"
 data Solver = MkSolver
-  { s_lits  :: [Lit]                -- ^ all the literals in the solver
-  , s_tups  :: [[GroundVal]]        -- ^ all the tuples in the solver
+  { s_lits  :: [Lit]                -- ^ all the literals in s_uf
+  , s_tups  :: [[GroundVal]]        -- ^ all the tuples   in s_uf
   , s_uf    :: UF.UF GroundVal      -- ^ the union-find data structure used to track equivalence classes (under equalities)
-  , s_pos   :: [FailableAssump]     -- ^ all the positive equalities and predicates
-  , s_neg   :: [FailableAssump]     -- ^ all the negative equalities and predicates (i.e. under "not")
-  , s_def   :: [Definition]         -- ^ all the terms of the form `x = op[v]`
+  , s_pos   :: [FailableAssump]     -- ^ all the `A_Pos` from the `Assump`   positive equalities and predicates
+  , s_neg   :: [FailableAssump]     -- ^ all the `A_Neg` from the `Assump`   negative equalities and predicates (i.e. under "not")
+  , s_def   :: [Definition]         -- ^ all the `A_PrimOp` from the `Assump` terms of the form `x = op[v]`
   }
 
 data Fact
@@ -435,11 +439,17 @@ data Equality = MkEqual GroundVal GroundVal
 
 type Definition = (Ident, (PrimOp, GroundVal))
 
+{-
+  x = Add[a, b]
+  a = 1
+  b = 2
+-}
+
 mkSolver :: [Assump] -> Solver
 mkSolver asms = MkSolver { s_lits = lits, s_tups = tups, s_uf = UF.new, s_pos = pos, s_neg = neg, s_def = defs }
   where
     defs   = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
-    pos    = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | (_, (op, gv)) <- defs]
+    pos    = [asm | A_Pos asm <- asms] ++ [ A_RelOp op gv | (_, (op, gv)) <- defs] -- TODO: delete defs from pos and see what happens; add a note to explain
     neg    = [asm | A_Neg asm <- asms]
     lits   = concatMap groundLit    groundVals
     tups   = concatMap assumpTuples groundVals
