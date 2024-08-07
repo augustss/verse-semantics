@@ -17,9 +17,11 @@ import Epic.Print
 
 -- General libraries
 import Data.IORef
-import Data.List( partition )
+import Data.List
 import qualified Data.Set as S
 import Control.Monad
+
+--import Debug.Trace
 
 --import qualified Data.Map as M
 
@@ -82,6 +84,18 @@ sDesugarExpr :: SrcExpr -> D SrcSmall
 sDesugarExpr = ds
   where
     ds :: SrcExpr -> D SrcSmall
+
+
+    -- These can happen when going via Andy's stuff
+{-
+    ds (ApplyD (Variable (Ident l s)) (Array [e1,e2])) | Just r <- stripPrefix "operator'" s =
+      ds (InfixOp e1 (Ident l (init r)) e2)
+    ds (ApplyD (Variable (Ident l s)) e) | Just r <- stripPrefix "prefix'" s =
+      ds (PrefixOp (Ident l (init r)) e)
+-}
+    ds (ApplyD (Variable (Ident l s)) e) | Just r <- stripPrefix "postfix'" s, r `elem` ["?'"] =
+      ds (PostfixOp e (Ident l (init r)))
+
 
     -- Application
     ds (ApplyD  e1 e2) = join (apply ApplyD <$> ds e1 <*> ds e2)
@@ -163,23 +177,20 @@ sDesugarExpr = ds
     -- Operators
     -- NB: Prefix '?' is just a function now; see note [Truth values] in Rules.Core
     ds (PrefixOp (Op "not") e)   = do e' <- ds e; pure $ If3 e' Fail eFalse
-    ds (PrefixOp (Op "-") e)     = do ds $ InfixOp (Lit (LInt 0)) (Op "-") e
-    ds (PrefixOp (Op "+") e)     = ds e  -- Prefix "+"; maybe should have an isInt test?
     ds (PrefixOp (Op ":") e)     = Range [] <$> ds e
-    ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
+    ds (PrefixOp (Ident l op) e) = ds =<< call Pre l op e
 
     -- e?  means simply  e[_]  or equivalently   exists x. e[x]
-    ds (PostfixOp e (Ident l "?")) = ds $ ApplyD e (Variable (Ident l "_"))
-
+    ds (PostfixOp e (Ident l "?"))  = ds $ ApplyD e (Variable (Ident l "_"))
     -- All other postfix ops
-    ds (PostfixOp e (Ident l op)) = ds =<< call "post" l op e
+    ds (PostfixOp e (Ident l op))   = ds =<< call Post l op e
 
     -- Infix ops
     ds (InfixOp e1 (Op "|") e2)     = Choice <$> ds e1 <*> ds e2
     ds (InfixOp e1 (Op "and") e2)   = ds $ Seq [e1, e2]                  -- XXX multiplicity?
     --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 Fail) Fail    -- XXX binding
     ds (InfixOp e1 (Op "or") e2)    = ds $ If2E e1 $ If2E e2 Fail
-    ds (InfixOp e1 (Ident l op) e2) = ds =<< call "in" l op (Array [e1, e2])
+    ds (InfixOp e1 (Ident l op) e2) = ds =<< call In l op (Array [e1, e2])
 
     -- Variables
     ds (Variable ident@(Ident _ v))
@@ -473,17 +484,23 @@ arrayElems = grp . map classify
 -- Calls
 --------------------------------------
 
-call :: String         -- "pre", "post", or "in" depending on prefix, postfix or infix
+data CallFixity = Pre | Post | In
+  deriving(Show)
+
+-- Use of an pre-/post-/in-fix operator
+call :: CallFixity     -- fixity of calls
      -> Loc -> String  -- Function
-     -> SrcExpr        -- Argumemt
+     -> SrcExpr        -- Argument
      -> D SrcExpr
--- Pick the appropriate form of apply for operators
--- SLPJ don't understand
-call _ loc op arg = return (ApplyD op_e arg)
+call fix loc op arg = return (ApplyD op_e arg)
   where
     op_e = case lookupPrimOp op of
               Just prim -> EPrim prim
-              Nothing   -> Variable (Ident loc op)
+              Nothing   -> Variable (Ident loc op')
+    op' = case fix of
+            Pre  -> "prefix'"   ++ op ++ "'"
+            Post -> "postfix'"  ++ op ++ "'"
+            In   -> "operator'" ++ op ++ "'"
 
 {-
 call p l s e = do

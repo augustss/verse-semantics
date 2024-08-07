@@ -148,7 +148,7 @@ Underscore is treated specially in two rules
 
 data PrimOp
  = -- Operations on integers
-   Add | Sub | Mul | Div
+   Add | Sub | Mul | Div | Neg
 
    -- Operations on arrays
  | ArrLen
@@ -173,6 +173,7 @@ primOpString Add = "intAdd$"
 primOpString Sub = "intSub$"
 primOpString Mul = "intMul$"
 primOpString Div = "intDiv$"
+primOpString Neg = "intNeg$"
 
 primOpString ArrLen   = "arrLen$"
 primOpString ArrMap   = "arrMap$"
@@ -213,6 +214,7 @@ primOpCanFail Add      = False
 primOpCanFail Sub      = False
 primOpCanFail Mul      = False
 primOpCanFail Div      = False
+primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
 primOpCanFail DotDot   = False
 primOpCanFail ArrMap   = False

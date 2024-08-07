@@ -114,13 +114,15 @@ pWordOp = do
     pure w
 -}
 
+-- Parses an identifier, which can be
+--   wombat
+--   operator'+'
+--   prefix'+'
+--   postfix'?'
+-- In TimVerse 'operator' is used instead of 'postfix'.
+-- In addition to real Verse we allow a trailing '$'.
+-- This is used by primitives.
 pWordOp :: P String
---   Parses        as
---   -----------------------
---   wombat        "wombat"
---   operator'+'   "+"
---   prefix'+'     "+"
---
 pWordOp = do
   w0 <- pWord
   suf <- optional (char '$')
@@ -130,7 +132,7 @@ pWordOp = do
            ; op <- takeWhile1P Nothing (`elem` opChars)
            ; _ <- char '\''
            ; skip
-           ; pure op }
+           ; pure (w ++ "'" ++ op ++ "'") }
    else pure w
 
 pIdent :: P Ident

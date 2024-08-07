@@ -68,6 +68,8 @@ miniEvalPrelude = ("miniprelude", "\
 \operator'>'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGT$[x,y]; x }};\n\
 \operator'>='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGE$[x,y]; x }};\n\
 \operator'<>'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[x,y]; x }};\n\
+\prefix'-'        := lam x { isInt$[x]; intNeg$[x] };\n\
+\prefix'+'        := lam x { isInt$[x]; x };\n\
 \}\n\
 \")
 
@@ -101,5 +103,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \operator'>'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGT$[x,y]; x }};\n\
 \operator'>='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGE$[x,y]; x }};\n\
 \operator'<>'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[x,y]; x }};\n\
+\prefix'-'        := lam x { isInt$[x]; x >> some{ lam z { z = intNeg$[x]; isInt$[z]; z } }}};\n\
+\prefix'+'        := lam x { isInt$[x]; x >> some{ lam z { z = x; isInt$[z]; z } }}};\n\
 \}\n\
 \")

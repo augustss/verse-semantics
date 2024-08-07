@@ -63,6 +63,10 @@ applicationStep _env lhs =
      guard (k2 /= 0)
      pure (LitInt (k1 `div` k2))
  ++
+  "APP-NEG" `name`
+  do Op Neg :@: LitInt k <- [lhs]
+     pure (LitInt (- k))
+ ++
   "APP-GT" `name`
   do Op Gt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 > k2)
