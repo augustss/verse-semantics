@@ -158,6 +158,7 @@ sDesugarExpr = ds
     ds (Case2 _ _) = undefined
     ds (Block b)   = ds b                                               -- do e --> e
     ds (Blk es)    = ds $ eSeq es
+    ds e@(DefineV i) | isSrcUnderscore i = DefineV <$> newIdent (getLoc e) "x"
 
     ds (Seq es) = eSeq <$> mapM ds es
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
