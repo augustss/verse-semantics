@@ -340,3 +340,12 @@ testeq("AndyExe17", pass)
 testeq("AndyExe19", pass)
                     { exists Y Z { Y = all { 0 = Z }; Z = 0; Y } }
                     { array{0} }
+
+# replacing 'for(1){1|2}' with 'array{1|2}' makes it pass.
+testeq("AndyChoice4", pass, broken)
+                    { all { Y := for(1) {1|2};
+                            Z := 4|5;
+                            (Y, Z)
+                          }
+                    }
+                    { array{ (array{1}, 4), (array{1}, 5), (array{2}, 4), (array{2}, 5) } }
