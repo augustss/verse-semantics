@@ -158,7 +158,8 @@ testeq("Pat19",pass,broken) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)
 testeq("TB1",pass) {(x:int) = 5}                         {5}
 testeq("TB2",pass) {ap0(f(x:int):int) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
 testeq("TB3",pass) {ap0(f(x:int):=1) := f[0]; succ(x:int):=x+1; ap0[succ]} {1}
-testeq("TB4",pass,broken) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ]} {:false}
+testeq("TB4",pass) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ]} {wrong}
+  # ap0[succ] gets stuck because succ[0] does not return 2
 testeq("TB5",pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 
 # DESUGAR HOW?
@@ -249,7 +250,8 @@ testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
 testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
 # These are very slow with alternative rules
 testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
-testeq("EV16",pass,broken) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int):=(); f[badsucc]}    {:false}
+testeq("EV16",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int):=(); f[badsucc]}  {wrong}
+  # EV16: this should go WRONG.. i.e. it gets stuck
 
 # Try CBV fixpoint combinator.
 # Too slow with some rules
@@ -258,14 +260,16 @@ testeq("EV17",pass) {
   fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
   fac[3] }                                                                     {6}
 
-### WRONG testeq("EV18",pass) {0[0]}                                {wrong}
-### WRONG testeq("EV19",pass) {operator'/'(1,0)}                    {wrong}
+testeq("EV18",pass) {0[0]}                                {wrong}
+testeq("EV19",pass) {operator'/'(1,0)}                    {wrong}
 
 testeq("EV20",pass) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
-### WRONG testeq("EV21",pass) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
+testeq("EV21",pass) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
 
-### WRONG testeq("EV22",pass) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
-testeq("EV23",pass, broken) {swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x))); p:any; swapGood[p] = (2,3); p } {(3,2)}
+testeq("EV22",pass) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
+testeq("EV23",broken) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
+                    ; p:any; swapGood[p] = (2,3); p }
+                    {(3,2)}
 
 # Confluence: Need local substitution, hence 'fail'
 testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}

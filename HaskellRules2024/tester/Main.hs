@@ -295,17 +295,10 @@ timTestType _     = TFail
 
 ----------------------------
 runTest :: TestFlags -> Test -> IO TestRes
-runTest tflg (TestTim    ts  e)
-  = runTest tflg (TestVerify (timTestInfo ts) e)
--- TestVerify: we try to verify
---   verify(;){ check<succeeds>{e} }
-runTest tflg test@(TestVerify _ e)
-  = doTestCatchingExn tflg test e (Array [])
-runTest tflg test@(TestEvalEq _ e1 e2)
-  = doTestCatchingExn tflg test e1 e2
-runTest _    (TestTimCrash ti _)
-  = pure (TestRes { tr_info = timTestInfo ti, tr_outcome = TO_Excn } )
-
+runTest tflg (TestTim    ts  e)        = runTest tflg (TestVerify (timTestInfo ts) e)
+runTest tflg test@(TestVerify _ e)     = doTestCatchingExn tflg test e (Array [])
+runTest tflg test@(TestEvalEq _ e1 e2) = doTestCatchingExn tflg test e1 e2
+runTest _    (TestTimCrash ti _)       = pure (TestRes { tr_info = timTestInfo ti, tr_outcome = TO_Excn })
 
 mkFlags :: TestFlags -> Bool -> Flags
 mkFlags tflg add_verification
@@ -342,46 +335,60 @@ doTestCatchingExn tflg test p1 p2
 -- | `doTest` does the actual work of parsing, converting to core, and evaluating/verifying; each of
 --    which can throw an exception.
 doTest :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -> IO TestRes
-doTest tflg test p1 p2 = do
-  let add_verif   = addVerification test
-  let flags       = mkFlags tflg    add_verif
-  c1             <- wrapTopEffect test <$> srcToCore flags add_verif p1
-  c2             <-                        srcToCore flags add_verif p2
-  let (res1, tr1) = evalExpr tflg c1
-  let (res2, tr2) = evalExpr tflg c2
-  res <- checkResults tflg test (p1, res1, tr1) (p2, res2, tr2)
-  -- Display the desugared output
-  when (showDesugared tflg) $
-    displayDoc (sep [text (testHerald test) <+> text "desugared:", pPrint c1])
-  -- Display the trace if asked for, regardless of success/failure
-  when (showTrace tflg) $
-    do { putStrLn "Trace is:"; display tr1 }
-  pure res
+doTest tflg test src1 src2 = do
+  do { let flags     = mkFlags tflg add_verif
+           add_verif = desugarForVerification test
 
+     ; core1 <- wrapTest add_verif <$> srcToCore flags add_verif src1
 
-addVerification :: Test -> Bool
-addVerification (TestEvalEq {}) = False
-addVerification _               = True
+     -- Display the desugared output
+     ; when (showDesugared tflg) $
+       displayDoc (sep [text (testHerald test) <+> text "desugared:", pPrint core1])
+
+     ; mb_core2 <- case src2 of
+                     Variable (Ident _ "wrong") -> pure Nothing
+                     _       -> do { core2 <- srcToCore flags False src2
+                                   ; pure (Just core2) }
+
+     ; res <- checkResults tflg test (src1, core1) (src2, mb_core2)
+
+     ; pure res }
+
+-- | `wrapTopEffect` wraps the expression in a toplevel verify if necessary
+wrapTest :: Bool -> Expr -> Expr
+wrapTest wrap_me core
+  | wrap_me   = Rules.Verify (bindList [] ([], Rules.Check Succeeds core))
+  | otherwise = core
+
+desugarForVerification :: Test -> Bool
+desugarForVerification TestEvalEq{}   = False
+desugarForVerification TestVerify{}   = True
+desugarForVerification TestTim{}      = True
+desugarForVerification TestTimCrash{} = True   -- Not sure
+
 
 -- | `checkResults` just compares the results of two evaluations and prints out the appropriate message,
 --   it does _not_ throw or catch any exceptions.
-checkResults :: TestFlags -> Test
-             -> (SrcExpr, NormResult, Traced Expr)
-             -> (SrcExpr, NormResult, Traced Expr)
-             -> IO TestRes
--- Really we should check res2, tr2 as well, but they are always boring
-checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
-  = do { show_result
-       ; pure test_res }
+checkResults :: TestFlags -> Test -> (SrcExpr, Expr) -> (SrcExpr, Maybe Expr) -> IO TestRes
+checkResults tflg test (src1, core1) (src2, mb_core2)
+  = do { show_result outcome
+
+       -- Display the trace if asked for, regardless of success/failure
+       ; when (showTrace tflg) $
+         do { putStrLn "Trace is:"; display tr1 }
+
+       ; pure (TestRes { tr_info = info, tr_outcome = outcome }) }
   where
+    (res1, tr1)  = evalExpr tflg core1
     v1           = TRS.term tr1
-    v2           = TRS.term tr2
     n_steps      = length (TRS.trace tr1)
+    mb_v2        = fmap (TRS.term . snd . evalExpr tflg) mb_core2
+                   -- Really we should check res2 as well, but it is always boring
     test_herald  = testHerald test
     info         = testInfo test
     typ          = testType info
     status       = testStatus info
-    test_passed  = equivValue v1 v2
+    test_passed  = equivValue v1 mb_v2
 
     outcome :: TestOutcome
     outcome = case res1 of
@@ -408,16 +415,10 @@ checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
       = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what
            ; unless (noError tflg) $
              do { putStrLn "-----------------------------------------------"
-                ; putStrLn "The expression"; ppIndent p1
+                ; putStrLn "The expression"; ppIndent src1
                 ; putStrLn "evaluates to";   ppIndent v1
-                ; putStrLn "while";          ppIndent p2
-                ; putStrLn "evaluates to";   ppIndent v2
-                ; putStrLn ""
-                ; when (prettyShow v1 == prettyShow v2) $ do
-                    putStrLn "The unpretty printed values are"
-                    print v1
-                    putStrLn "resp."
-                    print v2 } }
+                ; putStrLn "while";          ppIndent src2
+                ; putStrLn "evaluates to";   ppIndent mb_v2 } }
 
     succ_what = case (status, typ) of
              (TS_Broken,_) -> "broken "
@@ -430,15 +431,11 @@ checkResults tflg test (p1, res1, tr1) (p2, _res2, tr2)
              TFail -> "success"
              _     -> errorMessage "fail_what"
 
--- | `wrapTopEffect` wraps the expression in a toplevel check<EFF>{e} where EFF is Succeeds or Decides depending on the test.
-wrapTopEffect :: Test -> Expr -> Expr
-wrapTopEffect (TestVerify {}) c = Rules.Verify (bindList [] ([], Rules.Check Succeeds c))
-wrapTopEffect _               c = c
-
-
 -- | Equivalence on values (or stuck expressions)
-equivValue :: Rules.Expr -> Rules.Expr -> Bool
-equivValue e1 e2 = Rules.norm e1 == Rules.norm e2
+-- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
+equivValue :: Rules.Expr -> Maybe Rules.Expr -> Bool
+equivValue e1 (Just e2) = Rules.norm e1 == Rules.norm e2
+equivValue e1 Nothing   = not (isVal e1)
 
 testHerald :: Test -> String
 -- Prints fixed-width herald string
