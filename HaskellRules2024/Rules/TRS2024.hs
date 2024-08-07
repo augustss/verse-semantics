@@ -458,8 +458,8 @@ wrapExis xs orig_e = foldr wrap orig_e xs
 --
 --------------------------------------------------------------------------------
 
-{- Examples
-
+{- Note [Blocked]
+~~~~~~~~~~~~~~~~~
 Imagine HOLE is filled with (x=2) and we are considering substituing that (x=2)
 
 E1: exists x. x>3; HOLE                  (x>3) blocked because local exi x is free
