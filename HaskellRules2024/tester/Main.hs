@@ -371,7 +371,7 @@ desugarForVerification TestTimCrash{} = True   -- Not sure
 --   it does _not_ throw or catch any exceptions.
 checkResults :: TestFlags -> Test -> (SrcExpr, Expr) -> (SrcExpr, Maybe Expr) -> IO TestRes
 checkResults tflg test (src1, core1) (src2, mb_core2)
-  = do { show_result outcome
+  = do { show_result
 
        -- Display the trace if asked for, regardless of success/failure
        ; when (showTrace tflg) $

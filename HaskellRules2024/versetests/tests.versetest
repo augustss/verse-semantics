@@ -267,9 +267,9 @@ testeq("EV20",pass) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
 testeq("EV21",pass) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
 
 testeq("EV22",pass) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
-testeq("EV23",broken) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
-                    ; p:any; swapGood[p] = (2,3); p }
-                    {(3,2)}
+testeq("EV23",pass, broken) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
+                            ; p:any; swapGood[p] = (2,3); p }
+                            {(3,2)}
 
 # Confluence: Need local substitution, hence 'fail'
 testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}
