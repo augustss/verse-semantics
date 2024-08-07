@@ -27,12 +27,11 @@ import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos )
 
 import GHC.Stack( HasCallStack )
 
-import Data.List( isPrefixOf )
+import Data.List( isPrefixOf, isInfixOf, intercalate, find )
 import Data.Char( toLower )
 import Data.Maybe
-
 import Control.Monad( unless, when )
-
+import System.Directory( doesFileExist )
 import System.Exit( exitWith, ExitCode(..) )
 import Text.Printf
 
@@ -101,7 +100,12 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     deriving (Show)
 
 data TestType = TPass | TFail | TLoop   -- Expected behaviour
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show TestType where
+  show TPass = "pass"
+  show TFail = "fail"
+  show TLoop = "loop"
 
 data TestStatus = TS_Normal
                 | TS_Broken   -- Test is currently broken (i.e., pass/fail is negated)
@@ -481,7 +485,8 @@ parseSourceOnly fn = do
 readTests :: FilePath -> IO [Test]
 -- Read the test file, and parse it
 readTests fn = do
-  file <- readFile fn
+  file' <- readFile fn
+  file  <- eraseSkipped fn file' -- erase the lines corresponding to skipped tests
   let tests = parseDie pTestFile fn file
   pure tests
 
@@ -512,14 +517,18 @@ pTimTest =
   pKeyword "test" *> do
     TestTim <$> pParens pIdent <*> (pExprSeq <* optional (pOp ";"))
 
+pStringLit :: P String
+pStringLit = strOf <$> pString
+  where
+    strOf (Src.Lit (LStr s)) = s
+    strOf _ = undefined
+
 pTestInfo :: P TestInfo
 pTestInfo = do
-  loc <- getSourcePos
-  let strOf (Src.Lit (LStr s)) = s
-      strOf _ = undefined
-  mname <- fmap strOf <$> optional (pString <* pOp ",")
-  typ <- pTestType
-  stat <- (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
+  loc   <- getSourcePos
+  mname <- optional (pStringLit <* pOp ",")
+  typ   <- pTestType
+  stat  <- (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
   pure (TestInfo { testMName = mname, testLocn = loc
                  , testType = typ, testStatus = stat })
 
@@ -716,3 +725,68 @@ setPreludeFlag are_verifying test_flags flags
   where
     prel_name | are_verifying = preludeVerify test_flags
               | otherwise     = preludeEval   test_flags
+
+-----------------------------------------------
+--
+--    BrokenTests
+--      eraseSkipped :: FilePath -> String -> IO String
+--
+-----------------------------------------------
+
+eraseSkipped :: FilePath -> String -> IO String
+eraseSkipped fn file = do
+  broken <- parseSkipped (fn ++ ".skip")
+  pure $ unlines . map (eraseSkippedLine broken) . lines $ file
+
+eraseSkippedLine :: Skipped -> String -> String
+eraseSkippedLine broken l
+  | Just b <- bTest = dummyTest b
+  | otherwise       = l
+  where
+    bTest  = find (\b -> skipCode b `isInfixOf` l) broken
+
+dummyTest :: SkippedTest -> String
+dummyTest b = "verify(" ++ info ++ ") { 0 = 0 }"
+  where
+    info  = intercalate ", " [sname, show (skipType b), "skip" ]
+    sname = "\"" ++ fromMaybe "<anon>" (skipName b) ++ "\""
+
+type Skipped = [SkippedTest]
+
+-- | `Broken` is a data type that represents a test that is currently broken
+data SkippedTest = MkSkippedTest
+  { skipName   :: Maybe String -- ^ The name of the test (in quotes)
+  , skipType   :: TestType     -- ^ The type of the test (pass/fail)
+  , skipReason :: String       -- ^ The reason why the test is broken (in quotes)
+  , skipCode   :: String       -- ^ The exact string (single line) corresponding to the test (in quotes)
+  }
+  deriving (Show)
+
+parseSkipped :: FilePath -> IO Skipped
+parseSkipped fn = do
+  exists <- doesFileExist fn
+  if exists
+    then parseDie pSkippedFile fn <$> readFile fn
+    else pure mempty
+
+pSkippedFile :: P [SkippedTest]
+pSkippedFile = skip *> many pSkipped <* eof
+
+{-
+skip("name", pass|fail, "reason"){ test }
+-}
+pSkipped :: P SkippedTest
+pSkipped = do
+  pKeyword "skip" *> do
+    (tname, typ, reason) <- pParens pSkipInfo
+    code                 <- pBraces pStringLit
+    pure (MkSkippedTest { skipName = tname, skipType = typ
+                        , skipReason = reason, skipCode = code })
+
+
+pSkipInfo :: P (Maybe String, TestType, String)
+pSkipInfo = do
+    tname  <- optional (pStringLit <* pOp ",")
+    typ    <- pTestType <* pOp ","
+    reason <- pStringLit
+    pure (tname, typ, reason)

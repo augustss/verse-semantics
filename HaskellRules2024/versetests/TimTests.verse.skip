@@ -1,0 +1,3 @@
+skip(fail, "misparsed"){"f(g():any):=g[]; f(g():=6)"}
+skip("optional-fake-name", fail, "misparsed"){"f(x:int)<decides>:=x=3, f[x:int]"}
+skip(fail, "eff-interacts"){"f(g():int):int => h()<interacts>:int => f[h]"}

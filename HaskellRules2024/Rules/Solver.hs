@@ -441,18 +441,12 @@ data Equality = MkEqual GroundVal GroundVal
 
 type Definition = (Ident, (PrimOp, GroundVal))
 
-{-
-  x = Add[a, b]
-  a = 1
-  b = 2
--}
-
 mkSolver :: [Assump] -> Solver
 mkSolver asms = MkSolver { s_lits = lits, s_tups = tups, s_uf = UF.new, s_pos = pos, s_neg = neg, s_def = defs }
   where
     defs   = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
-    pos    = [asm | A_Pos asm <- asms]
-    neg    = [asm | A_Neg asm <- asms]
+    pos    = [asm           | A_Pos asm                  <- asms ]
+    neg    = [asm           | A_Neg asm                  <- asms ]
     lits   = concatMap groundLit    groundVals
     tups   = concatMap assumpTuples groundVals
     groundVals = nubOrd (assumpGroundVal <$> (pos ++ neg))

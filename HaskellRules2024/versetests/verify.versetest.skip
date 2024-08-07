@@ -1,0 +1,2 @@
+
+skip("ArrayX", pass, "funny parsing issue") {"a:=(1;2;),a=(1,2)"}
