@@ -1,5 +1,18 @@
 # Add new meetings at the top
 
+# Meeting 7 August
+verify( "M7Aug24-1", pass ) { G(f()<decides>:int):=3; G[ h():=3 ] }
+verify( "M7Aug24-2", fail ) { G(f()<decides>:int):=3; G[ h():="monkey" ] }
+   # h() := "monkey" does not have the right return type
+verify( "M7Aug24-3", pass ) { G(f()<decides>:int):=3; G[ h()<decides>:=3=4 ] }
+
+verify( "M7Aug24-4", fail ) { x:int := "monkey" }
+   # Manifestly, "monkey" does not have type int
+verify( "M7Aug24-5", pass ) { all{ x:int := (1 | 2) } }
+verify( "M7Aug24-6", fail ) { all{ x:int := (1 | "monkey") } }
+
+
+# Meeting 7 August
 testeq( "M5Aug24-1", pass ) { G(X:int):void = if (X = 2) then G(2); G[7] } {()}
 testeq( "M5Aug24-2", loop ) { G(X:int):void = if (X = 2) then G(2); G[2] } {7}
 verify( "M5Aug24-3", fail ) { foo(f()<decides>:int)<succeeds> := {f[]} }
