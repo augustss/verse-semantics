@@ -330,3 +330,7 @@ testeq("AndyExe17", pass, broken)
                           X = false;
                           Y } } }
                     { array{array{truth{array{}}}} }
+
+testeq("AndyExe19", pass, broken)
+                    { exists Y Z { Y = all { 0 = Z }; Z = 0; Y } }
+                    { array{0} }
