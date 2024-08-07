@@ -321,3 +321,12 @@ testeq("EV62",pass) { a := option{1}; if (a?) then 1 else 0 } { 1 }
 testeq("AndyExe12", pass, broken)
                     { exists A B { B = all{ exists C D { C = all{ (A = true) | (D = false) }; D = true; C } }; A = true; B } }
                     { array{array{truth{array{}}}} }
+
+testeq("AndyExe17", pass, broken)
+                    { exists F {
+                        F = function(A:any){ all{ (A = true; true) | (A = false; F(true)) } };
+                        exists X Y {
+                          Y = F(X);
+                          X = false;
+                          Y } } }
+                    { array{array{truth{array{}}}} }
