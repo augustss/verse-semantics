@@ -526,7 +526,7 @@ pTestInfo = do
 pTestType :: P TestType
 pTestType = do
   i <- pIdent
-  case map toLower $ unIdent i of
+  case map toLower $ identString i of
     "pass"    -> pure TPass
     "fail"    -> pure TFail
     "loop"    -> pure TLoop
@@ -535,7 +535,7 @@ pTestType = do
 pTestStatus :: P TestStatus
 pTestStatus = do
   i <- pIdent
-  case map toLower $ unIdent i of
+  case map toLower $ identString i of
     "skip"    -> pure TS_Skip
     "broken"  -> pure TS_Broken
     _         -> fail "pTestStatus"

@@ -169,7 +169,7 @@ sDesugarExpr = ds
     ds (PrefixOp (Op "-") e)     = do ds $ InfixOp (Lit (LInt 0)) (Op "-") e
     ds (PrefixOp (Op "+") e)     = ds e  -- Prefix "+"; maybe should have an isInt test?
     ds (PrefixOp (Op ":") e)     = Range [] <$> ds e
-{- '?' is just a function now
+{- Prefix '?' is just a function now
     ds (PrefixOp (Op "?") e)     = do x <- Variable <$> newIdent (getLoc e) "x"
                                       let ee = Let (InfixOp x (Op ":") e) (Truth x)
                                       ds $ Macro1 (Ident noLoc "type") [] $

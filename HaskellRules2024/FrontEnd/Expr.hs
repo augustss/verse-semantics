@@ -6,7 +6,7 @@
 module FrontEnd.Expr(
       Loc, noLoc, mkLoc
 
-    , Ident(..), unIdent
+    , Ident(..), identLoc, identString
     , SrcExpr(..), Lit(..), Path(..)
     , SrcSmall, SrcCore, SrcBlk, SrcValue
 
@@ -356,8 +356,11 @@ instance Ord Ident where compare (Ident _ x) (Ident _ y) = compare x y
 instance Show Ident where
   show (Ident _ s) = show s
 
-unIdent :: Ident -> String
-unIdent (Ident _ s) = s
+identString :: Ident -> String
+identString (Ident _ s) = s
+
+identLoc :: Ident -> Loc
+identLoc (Ident l _) = l
 
 instance Pretty Ident where
   pPrintPrec _ _ (Ident _ i) = text i
@@ -442,11 +445,11 @@ instance Pretty SrcExpr where
             where (q, ql, _) = fixity "()"
 
           PrefixOp o e -> maybeParens (p > q) $ ppOp o <> ppr qr e
-            where (q, _, qr) = fixity ("pre" ++ unIdent o)
+            where (q, _, qr) = fixity ("pre" ++ identString o)
           PostfixOp e o -> maybeParens (p > q) $ ppr ql e <> ppOp o
-            where (q, ql, _) = fixity ("post" ++ unIdent o)
+            where (q, ql, _) = fixity ("post" ++ identString o)
           InfixOp e1 o e2 -> maybeParens (p > q) $ sep [ppr ql e1 <+> ppOp o, indent $ ppr qr e2]
-            where (q, ql, qr) = fixity (unIdent o)
+            where (q, ql, qr) = fixity (identString o)
 
           EffAttr f a -> maybeParens (p > q) $ ppr ql f <> text "<" <> ppr 0 a <> text ">"
             where (q, ql, _) = fixity "()"

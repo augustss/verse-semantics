@@ -89,6 +89,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \comparable := lam y { isComp$[y]; y };\n\
 \nat        := lam y { isInt$[y]; intGE$[y,0]; y };\n\
 \Length     := lam y { isArr$[y]; y >> some{int} };\n\
+\prefix'?'        := lam t { lam x { if (truth{y:any} = x) then { truth{t[y]} } else { x = () } } };\n\
 \operator'[]'     := lam t { lam a { isArr$[a]; arrMap$[t,a] } };\n\
 \operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\
