@@ -202,14 +202,7 @@ runTestFile tflg (fn, ts)
  = do { putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
 
       ; let tests_to_run :: [Test]
-            tests_to_run = filter keep_this ts
-
-            -- With --only=tst, rum tests for which "tst" is a prefix of the test name
-            keep_this :: Test -> Bool
-            keep_this | Just only <- onlyTest tflg
-                      = \t -> only `isPrefixOf` testName (testInfo t)
-                      | otherwise
-                      = \_ -> True
+            tests_to_run = filter (keepOnly tflg) ts
 
       ; res :: [TestRes] <- mapM (runTest tflg) tests_to_run
 
@@ -240,6 +233,24 @@ runTestFile tflg (fn, ts)
   where
     count :: (TestRes->Bool) -> [TestRes] -> Int
     count p rs = length (filter p rs)
+
+
+keepOnly :: TestFlags -> Test -> Bool
+-- With --only=tst, rum tests for which "tst" matches the test name
+-- We support a postfix '*' for wildcard. Thus "foo*" matches anything
+-- starting with "foo"
+keepOnly tflg
+  | Just only <- onlyTest tflg
+  = case check_for_star only of
+      Just str -> \t -> str  `isPrefixOf` testName (testInfo t)
+      Nothing  -> \t -> only ==           testName (testInfo t)
+  | otherwise
+  = \_ -> True
+  where
+    check_for_star :: String -> Maybe String
+    check_for_star s = case reverse s of
+                         ('*':rs) -> Just (reverse rs)
+                         _        -> Nothing
 
 printNZ :: Int -> String -> IO ()
 printNZ 0 _       = return ()
