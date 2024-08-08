@@ -62,7 +62,7 @@ data Expr
   = Var Ident
   | Lit Lit
   | Arr [Val]
-  | Tru Val          -- truth{v}
+  | Tru Val          -- truth{v}; see Note [Truth values]
   | Lam (Bind Expr)
   | Op PrimOp
 
@@ -88,6 +88,31 @@ data Expr
   -- HOLE, only for contexts
   | HOLE
  deriving ( Eq, Ord, Show )
+
+{- Note [Truth values]
+~~~~~~~~~~~~~~~~~~~~~~
+As well as literals, arrays, lambdas, the language has a primitive value
+    Tru v
+called a "truth-value".  It behaves very like a 1-tuple, or like a
+singleton finite map [v => v]
+
+* Source syntax:  truth{v}
+
+* Rewrite rules
+    Primops:     isTru$[ truth{v} ]  --> truth{v}, otherwise fail
+                 isComp$[truth{v}] --> truth{isComp${v}]
+
+    Application: truth{v1}{v2}       --> v1=v2
+
+    Unification: truth{v1}=truth{v2} --> v1=v2
+                 truth{v1}=v2        --> fail,  if v2 is a non-truth HNF
+
+
+* Verification:
+    SPLIT-TRU    verify(R;A){P[r=truth{v}]
+                     --> verify(R,r1; A,r=truth{r1}){P[r1=v]}
+                         verify(R;    A,r/=truth{_}){P[fail]}
+-}
 
 --------------------------------------------------------------------------------
 --
