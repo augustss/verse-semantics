@@ -152,7 +152,7 @@ testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 testeq("Pat16",pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
 testeq("Pat17",pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
 testeq("Pat18",pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Pat19",pass, broken) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Pat19",pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq("TB1",pass) {(x:int) = 5}                         {5}
@@ -162,41 +162,39 @@ testeq("TB4",pass) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ
   # ap0[succ] gets stuck because succ[0] does not return 2
 testeq("TB5",pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 
-# DESUGAR HOW?
-#testeq("TB6",pass) {(p^ : int) := 2}                      {p:=new[int][2]}
-# XXX Not sure about these
-#testeq("TB7",pass,refimpl=skip,icfp=skip) {x? : int}                            { x : ?int }
-#testeq("TB8",pass,refimpl=skip,icfp=skip) {x[] : int}                           { x : []int }
+testeq("TB6",pass, skip) {(p^ : int) := 2}                      {p:=new[int][2]}
+testeq("TB10",pass, skip) {p^[](:int):int}                      {0}
+  # TB6,TB10: no pointers yet
+
+testeq("TB7",pass, broken) {x? : int}                            { x : ?int }
+testeq("TB8",pass, broken) {x[] : int}                           { x : []int }
+  # TB7,8 are these legal?
 
 testeq("TB9",pass) {all{i->x:(3,4,5); (i, x)}}           {(0,3),(1,4),(2,5)}
 
-# DESUGAR HOW?
-#testeq("TB10",pass) {p^[](:int):int}                      {0}
 
 # For
 #         Commented out until we implement 'for'; also re-add TRec3
-# testeq("For1",pass) {for(x:=1|2; y:=3|4) {x,y}}           {((1,3),(1,4),(2,3),(2,4))}
-# testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
-# testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
-# testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
-# testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-# testeq("For6",pass,POPLR=skip,Block=skip,ICFP*=skip,L2R=skip) {
-#   upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
-#   for(x:=upto[1,3]){x}}                           {(1,2,3)}
-# # SLOW with PLDI
-# testeq("For7",pass,pldi=skip)
-#             {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
-# testeq("For8",pass) {for(x:=1){x+1}}                      {array{2}}
-# testeq("For9",pass) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
-# testeq("For10",pass) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
-# # times out with ICFPK
-# testeq("For11",pass,icfp=skip,icfp51=skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
-# # Array access via choices
-# testeq("For12",pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
-# testeq("For13",pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
-# # Non-ANF array access
-# testeq("For14",pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
+testeq("For1",pass) {for(x:=1|2; y:=3|4) {x,y}}           {((1,3),(1,4),(2,3),(2,4))}
+testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
+testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
+testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
+testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
+testeq("For6",pass) {
+   upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
+   for(x:=upto[1,3]){x}}                           {(1,2,3)}
+testeq("For7",pass)  {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
+testeq("For8",pass) {for(x:=1){x+1}}                      {array{2}}
 
+# Skipping these since `f` is <iterates> and hence dodgy?
+testeq("For9",pass, skip) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
+testeq("For10",pass, skip) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
+testeq("For11",pass, skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
+
+# Array access via choices
+testeq("For12",pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
+testeq("For13",pass) {for (i->x:(3,4,5))  {(i,x)}}  {((0,3),(1,4),(2,5))}
+testeq("For14",pass) {for (x:int, x=(2,0,2)[x+1])  {x}}  {array {0}}
 
 # Joachim's tests
 # Check that BIND removes _one_ unification only

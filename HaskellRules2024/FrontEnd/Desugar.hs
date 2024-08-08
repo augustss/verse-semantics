@@ -16,7 +16,6 @@ import Rules.Core( PrimOp(..), allPrimOps, primOpString )
 import Epic.Print
 
 -- General libraries
-import Data.Maybe
 import Data.IORef
 import Data.List( partition )
 import qualified Data.Set as S
@@ -392,23 +391,33 @@ simpleMapEntry _ = Nothing
 
 defnArray :: [SrcPat] -> SrcExpr -> D SrcExpr
 -- Dealing with an array on the LHS of a ":=", i.e.  an "array pattern"
+-- For example
+--     (p1, p2, ..p3, p4) := e
+-- --->
+--     exists x1,x2,x3,x4.
+--       p1 := x1; p2 := x2; p3 := x3; p4 := x4
+--       arraySplice{ x1, x2, ..x3, x4 }
+--  -->
+--     exists x1,x2,x3,x4.
+--       p1 := x1; p2 := x2; p3 := x3; p4 := x4
+--       exists t1,t2.
+--         arrApp$[ ar{x1,x2}, x3, t1 ]
+--         arrApp$[ t, x4, t2 ]
+--         t2 = e
+
 defnArray ps e = do
-  let var p = do
-        let (wrap, ip) =
-              case p of
-                PrefixOp (Ident l "..") p' -> (PrefixOp (Ident l ".."), p')
-                _ -> (id, p)
-        case ip of
-          Variable v ->
-            pure (Nothing, wrap (DefineV v))
-          _ -> do
-            x <- newIdent (getLoc p) "x"
-            pure (Just (Variable x, ip), wrap (DefineV x))
-  (xps, es) <- unzip <$> mapM var ps
-  arr <- arraySplice es
-  let (xs, ps') = unzip $ catMaybes xps
-  bs <- zipWithM defn ps' xs
-  pure $ eSeq $ bs ++ [InfixOp arr (Op "=") e]
+  let do_one p
+        | (wrap_dots, payload) <- splitArrayArg p
+        = do { x <- newIdent (getLoc p) "x"
+             ; d <- defn payload (Variable x)
+            ; pure (x, d, wrap_dots (Variable x)) }
+  (xs, ds, es) <- unzip3 <$> mapM do_one ps
+  arr          <- arraySplice es
+  pure $ Exists xs $ eSeq $ ds ++ [Unify arr  e]
+
+splitArrayArg :: SrcExpr -> (SrcExpr -> SrcExpr, SrcExpr)
+splitArrayArg (PrefixOp (Ident l "..") e) = (PrefixOp (Ident l ".."), e)
+splitArrayArg other                       = (id,                  other)
 
 data ArrayElem  -- Used very locally, to communicate between `arrayElems` and `arraySplice`
   = EElems [SrcSmall]
@@ -429,18 +438,18 @@ arraySplice as
     app r (e : es) = do
       t <- newIdent noLoc "t"
       rest <- app (Variable t) es
-      pure $ eSeq [eAppend r (arr e) t, rest]
+      pure $ Exists [t] (eSeq [eAppend r (arr e) (Variable t), rest])
 
    -- app e1 [e2,e3]
    --  =  exists t1; append[e1,e2,t1]; app t1 [e3]
    --  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; app t2 []
    --  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; t2
 
-eAppend :: SrcExpr -> SrcExpr -> Ident -> SrcExpr
--- eAppend e1 e2 z  =   exists z. append$[ e1, e2, z ]
---   where append$[x,y,r] does (x++y)=r
-eAppend (Array xs) (Array ys) z = eDefine z (Array (xs ++ ys))
-eAppend x y z = Seq [DefineV z, ApplyD (EPrim ArrApp) (Array [x, y, Variable z])]
+eAppend :: SrcExpr -> SrcExpr -> SrcExpr -> SrcExpr
+-- eAppend e1 e2 t  =   append$[ e1, e2, t ]
+--   where append$[x,y,t] does (x++y)=t
+eAppend (Array xs) (Array ys) t = Unify (Array (xs ++ ys)) t
+eAppend x          y          t = Seq [ApplyD (EPrim ArrApp) (Array [x, y, t])]
 
 arrayElems :: [SrcSmall] -> [ArrayElem]
 -- Handle an array element, it can be ..e or e
