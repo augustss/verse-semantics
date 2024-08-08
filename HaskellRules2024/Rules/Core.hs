@@ -112,6 +112,32 @@ singleton finite map [v => v]
     SPLIT-TRU    verify(R;A){P[r=truth{v}]
                      --> verify(R,r1; A,r=truth{r1}){P[r1=v]}
                          verify(R;    A,r/=truth{_}){P[fail]}
+
+* Prelude
+    ?t = \x. if (truth{y:any} = x)
+             then truth{t[y]}
+             else x = ()
+       That is, given a type `t`, ?t is a type that checks if its
+       argument is a truth-value, and if so applies `t` to the payload
+
+Note [Treatment of underscore in Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Core we allow "_" in exactly two places:
+  * On LHS of ":", thus           _=e1; e2
+  * Binder of lambda, thus        \_.e
+
+Currently "_" is represented as a TRS.Bind.Ident, with string "_".
+See TRS.Bind
+      underscore   :: Ident
+      isUnderscore :: Ident -> Bool
+
+However underscore is not a "real" Ident; really it's a separate construct.
+So TRS.Bind.Variables ignores it, and it never shows up as a free variable.
+
+Underscore is treated specially in two rules
+  * UNDERSCORE-ELIM   _=v; e    --> e
+  * APP-LAM           (\_.e)[v] --> e
+
 -}
 
 --------------------------------------------------------------------------------

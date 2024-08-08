@@ -42,9 +42,11 @@ ident = Name
 underscore :: Ident
 -- `underscore` does not count as free or bound
 -- We use it only on the LHS of (_ = e1; e2)
+-- See Note [Treatment of underscore in Core] in Rules.Core
 underscore = Name "_"
 
 isUnderscore :: Ident -> Bool
+-- See Note [Treatment of underscore in Core] in Rules.Core
 isUnderscore x = x == underscore
 
 identsNotInPrefix :: String -> [Ident] -> [Ident]

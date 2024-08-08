@@ -210,6 +210,15 @@ srcUnderscore = Ident noLoc "_"
 isSrcUnderscore :: Ident -> Bool
 isSrcUnderscore (Ident _ s) = s == "_"
 
+{- Note [Treatment of underscore in SrcExpr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Underscore is:
+* parser:   parses "_" as an identifier (Ident "_")
+* sDesugar: passes it through
+* mDesugar: converts it to (exists x.x)
+* Used in thunks (\_.e); see eThunk
+-}
+
 existsXX :: SrcExpr
 -- Returns (exists x. x)
 -- This is what the source-code "_" desugars to
@@ -436,7 +445,7 @@ instance Pretty SrcExpr where
         case expr of
           Lit lit    -> ppr p lit
           Variable v -> ppr 0 v
-          EPrim s    -> char '!' <> pPrint s
+          EPrim s    -> pPrint s
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           Array es   -> text "array" <> braces (ppSeq l es)
           Tuple es   -> parens (ppEs es)
