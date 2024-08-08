@@ -8,7 +8,7 @@
 
 module Rules.Core
   ( -- The data type itself
-    Expr(..), pattern LitInt
+    Expr(..), Val, pattern LitInt
   , Ident(..)
   , Lit(..), Ptr, Path(..)
   , isVal, isHNF, isComparable
@@ -126,8 +126,9 @@ data PrimOp
 
    -- Operations on arrays
  | ArrLen
- | ArrMap     -- map$[f,<v1..vn>] = <f v1, .., f vn>
+ | ArrMap     -- arrMap$[f,<v1..vn>] = <f v1, .., f vn>
  | DotDot     -- dotDot$[m,n] = <m, m+1, .., n>
+ | ArrApp     -- arrApp$[ Arr as, Arr bs, r ] =  r=(as++bs); r
 
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
@@ -150,6 +151,7 @@ primOpString Div = "intDiv$"
 primOpString ArrLen   = "arrLen$"
 primOpString ArrMap   = "arrMap$"
 primOpString DotDot   = "dotDot$"
+primOpString ArrApp   = "arrApp$"
 
 primOpString Gt  = "intGT$"
 primOpString GEq = "intGE$"
@@ -178,6 +180,7 @@ primOpCanFail IsChar = True
 primOpCanFail IsArr  = True
 primOpCanFail IsComp = True
 primOpCanFail IsTru  = True
+primOpCanFail ArrApp = True
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False

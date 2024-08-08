@@ -8,7 +8,7 @@ module FrontEnd.Expr(
 
     , Ident(..), identLoc, identString
     , SrcExpr(..), Lit(..), Path(..)
-    , SrcSmall, SrcCore, SrcBlk, SrcValue
+    , SrcPat, SrcSmall, SrcCore, SrcBlk, SrcValue
 
       -- Predicates on SrcExpr
     , isLiteral, isAtomic, isValue
@@ -178,6 +178,9 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | EStore Store SrcExpr
 
   deriving (Eq, Ord, Show)
+
+-- SrcPat synonym is used for syntax of 'p' in the source language
+type SrcPat = SrcExpr
 
 -- SrcSmall synonym is used for the reduced subset of SrcExpr
 -- that is fed to the Main Desugaring (Fig 9)

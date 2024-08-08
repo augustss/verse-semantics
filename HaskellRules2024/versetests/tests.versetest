@@ -102,8 +102,8 @@ testeq("Array12",pass){ for(i := 1..4){i+1} }               {array{2,3,4,5} }
 testeq("Array13",pass){ a := array{7,8}; for(i:a){i+1} }    {array{8,9} }
 
 # Array expression splicing
-### SPLICE testeq("EV",pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
-### SPLICE testeq("EV",pass) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+testeq("Array14",pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
+testeq("Array15",pass) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
 
 #
 testeq("All1",pass) {all{:(1,2,3)}}                            {1,2,3}
@@ -150,9 +150,9 @@ testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 
 # Array LHS splicing
 testeq("Pat16",pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
-testeq("Pat17",pass,broken) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq("Pat18",pass,broken) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Pat19",pass,broken) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Pat17",pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Pat18",pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Pat19",pass, broken) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq("TB1",pass) {(x:int) = 5}                         {5}
@@ -342,7 +342,7 @@ testeq("AndyExe19", pass)
                     { array{0} }
 
 # replacing 'for(1){1|2}' with 'array{1|2}' makes it pass.
-testeq("AndyChoice4", pass, broken)
+testeq("AndyChoice4", pass)
                     { all { Y := for(1) {1|2};
                             Z := 4|5;
                             (Y, Z)

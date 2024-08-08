@@ -190,11 +190,44 @@ arrayOpStep _env lhs =
  ++
   -- arrMap$[f, <v1..vn>] = exists z1. z1=f[v1]; ..; exists zn. zn=f[vn];
   --                       <z1,..,zn>
-  "APP-MAPARR" `name`
+  "APP-ARRMAP" `name`
   do Op ArrMap :@: e@(Arr [fun, Arr es]) <- [lhs]
      let zs = take (length es) (identsNotIn (free e))
          do_one (z,v) body = Exi (bind z ((Var z :=: (fun :@: v)) :>: body))
      pure (foldr do_one (Arr (map Var zs)) (zs `zip` es))
+
+ ++
+  "APP-ARRAPP" `name`
+  do { Op ArrApp :@: Arr [e1,e2,res] <- [lhs]
+     ; (do { Arr vs1 <- [e1]; Arr vs2 <- [e2]; pure $ equateArr res (vs1++vs2) })
+     ++
+       (do { Just (ls,vs2) <- [dropEqualPrefix e1 res]; pure $ foldr (:>:) (equateArr e2 vs2) ls })
+     ++
+       (do { Just (ls,vs1) <- [dropEqualSuffix e2 res]; pure $ foldr (:>:) (equateArr e1 vs1) ls }) }
+
+equateArr :: Expr -> [Val] -> Expr
+-- (equateArr e vs)  returns  (Arr vs = e; Arr vs)
+-- It duplicates (Arr vs), but the rewrite engine will
+-- do that anyway even if we exi-bind it here
+equateArr e vs = (Arr vs :=: e) :>: Arr vs
+
+dropEqualPrefix :: Expr -> Expr -> Maybe ([Expr],[Val])
+dropEqualPrefix (Arr vs1) (Arr vs2) = drop_prefix vs1 vs2
+dropEqualPrefix _         _         = Nothing
+
+dropEqualSuffix :: Expr -> Expr -> Maybe ([Expr],[Val])
+dropEqualSuffix (Arr vs1) (Arr vs2) = case (drop_prefix (reverse vs1) (reverse vs2)) of
+                                        Nothing      -> Nothing
+                                        Just (ls,vs) -> Just (reverse ls, reverse vs)
+dropEqualSuffix _         _         = Nothing
+
+drop_prefix :: [Val] -> [Val] -> Maybe ([Expr],[Val])
+-- (drop_prefix xs (ys+zs)) =  (x1=y1; ..; xn=yn), zs
+-- Strips an initial prefix of xs from ys
+drop_prefix []     ys     = Just ([], ys)
+drop_prefix (x:xs) (y:ys) = fmap (\(ls,vs) -> (x:=:y : ls, vs)) $
+                            drop_prefix xs ys
+drop_prefix (_:_)  []     = Nothing
 
 --------------------------------------------------------------------------------
 unificationStep :: Rule

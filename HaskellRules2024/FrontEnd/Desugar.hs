@@ -16,7 +16,6 @@ import Rules.Core( PrimOp(..), allPrimOps, primOpString )
 import Epic.Print
 
 -- General libraries
-import Data.Either
 import Data.Maybe
 import Data.IORef
 import Data.List( partition )
@@ -137,50 +136,46 @@ sDesugarExpr = ds
 
     -- Array
     ds (Array es) = arraySplice =<< mapM elm es
-      where elm (PrefixOp (Ident l "..") e) = PrefixOp (Ident l "..") <$> ds e
-            elm e = ds e
+      where
+        -- SLPJ why not just to (mapM ds es)?
+        elm (PrefixOp dd@(Ident _ "..") e) = PrefixOp dd <$> ds e
+        elm e                              = ds e
 
     -- Let and where
     --    (let e in b)  --> e; b
-    --    (e1 where e2) --> e1 where e2   Need to keep this M-desugaring!
+    --    (e1 where e2) --> e1 where e2   Need to keep this for M-desugaring!
     ds (Let e b) = do { e' <- ds e; b' <- ds b; pure (Seq [e',b']) }
     ds (InfixOp e1 (Op "where") e2) = Where <$> ds e1 <*> ds e2
 
--- ToDo: old desugaring of where
---    ds (InfixOp e1 (Op "where") e2) = do
---      x <- newIdent (getLoc e1) "x"
---      ds $ eSeq [eDefine x e1, e2, Variable x]
-
     -- Do and case
-    ds (Case1 b) = do
-      let l = getLoc b
-      x <- Variable <$> newIdent l "x"
-      ds $ Function [(InfixOp x (Op ":") eAny, [])] $ Case2 x b
-    ds (Case2 _ _) = undefined
-    ds (Block b)   = ds b                                               -- do e --> e
-    ds (Blk es)    = ds $ eSeq es
-    ds e@(DefineV i) | isSrcUnderscore i = DefineV <$> newIdent (getLoc e) "x"
+    ds (Case1 b)     = do { let l = getLoc b
+                          ; x <- Variable <$> newIdent l "x"
+                          ; ds $ Function [(InfixOp x (Op ":") eAny, [])] $
+                                 Case2 x b }
+    ds (Case2 _ _)    = undefined
+    ds (Block b)      = ds b                              -- do e --> e
+    ds (Blk es)       = ds $ eSeq es
+    ds e@(DefineV {}) = pure e
+--      | isSrcUnderscore i = DefineV <$> newIdent (getLoc e) "x"
 
     ds (Seq es) = eSeq <$> mapM ds es
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
 
     -- Operators
+    -- NB: Prefix '?' is just a function now; see note [Truth values] in Rules.Core
     ds (PrefixOp (Op "not") e)   = do e' <- ds e; pure $ If3 e' Fail eFalse
     ds (PrefixOp (Op "-") e)     = do ds $ InfixOp (Lit (LInt 0)) (Op "-") e
     ds (PrefixOp (Op "+") e)     = ds e  -- Prefix "+"; maybe should have an isInt test?
     ds (PrefixOp (Op ":") e)     = Range [] <$> ds e
-{- Prefix '?' is just a function now
-    ds (PrefixOp (Op "?") e)     = do x <- Variable <$> newIdent (getLoc e) "x"
-                                      let ee = Let (InfixOp x (Op ":") e) (Truth x)
-                                      ds $ Macro1 (Ident noLoc "type") [] $
-                                              InfixOp eFalse (Op "|") ee
--}
     ds (PrefixOp (Ident l op) e) = ds =<< call "pre" l op e
 
     -- e?  means simply  e[_]  or equivalently   exists x. e[x]
-    ds (PostfixOp e (Ident l "?"))  = ds $ ApplyD e (Variable (Ident l "_"))
-    ds (PostfixOp e (Ident l op))   = ds =<< call "post" l op e
+    ds (PostfixOp e (Ident l "?")) = ds $ ApplyD e (Variable (Ident l "_"))
 
+    -- All other postfix ops
+    ds (PostfixOp e (Ident l op)) = ds =<< call "post" l op e
+
+    -- Infix ops
     ds (InfixOp e1 (Op "|") e2)     = Choice <$> ds e1 <*> ds e2
     ds (InfixOp e1 (Op "and") e2)   = ds $ Seq [e1, e2]                  -- XXX multiplicity?
     --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 Fail) Fail    -- XXX binding
@@ -289,7 +284,7 @@ apply2 con x1 x2 = pure $ con x1 x2
 -- Patterns
 --------------------------------------
 
-defn :: SrcExpr -> SrcExpr -> D SrcExpr
+defn :: SrcPat -> SrcExpr -> D SrcExpr
 -- Desugars (p := e) into an expression; see Fig 3, top group
 
 -- Rule: (i := e) -->  (i := e)
@@ -395,7 +390,7 @@ simpleMapEntry _ = Nothing
 -- Arrays
 --------------------------------------
 
-defnArray :: [SrcExpr] -> SrcExpr -> D SrcExpr
+defnArray :: [SrcPat] -> SrcExpr -> D SrcExpr
 -- Dealing with an array on the LHS of a ":=", i.e.  an "array pattern"
 defnArray ps e = do
   let var p = do
@@ -413,51 +408,57 @@ defnArray ps e = do
   arr <- arraySplice es
   let (xs, ps') = unzip $ catMaybes xps
   bs <- zipWithM defn ps' xs
---  traceM ("*** " ++ show bs)
   pure $ eSeq $ bs ++ [InfixOp arr (Op "=") e]
 
-arraySplice :: [SrcExpr] -> D SrcExpr
--- arraySplice [es1, ..e, es2] -->  arraySplice e1 ++ e ++ arraySplice es2
--- The args to arraySplice are all EElems or ESplice
-arraySplice as =
---  trace ("--- " ++ show (as, arrayElems as)) $
-  case arrayElems as of
-    []          -> pure $ Array []
-    e:es        -> app (arr e) $ map arr es
-  where arr (EElems es) = Array es
-        arr (ESplice e) = e
-
-        app r [] = pure r
-        app r (e : es) = do
-          t <- newIdent noLoc "t"
-          rest <- app (Variable t) es
-          pure $ eSeq [eAppend r e t, rest]
-
--- app e1 [e2,e3]
---  =  exists t1; append[e1,e2,t1]; app t1 [e3]
---  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; app t2 []
---  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; t2
-
-eAppend :: SrcExpr -> SrcExpr -> Ident -> SrcExpr
-eAppend (Array xs) (Array ys) z = eDefine z (Array (xs ++ ys))
-eAppend x y z = Seq [DefineV z, ApplyD (Variable (Ident noLoc "append$")) (Array [x, y, Variable z])]
-
 data ArrayElem  -- Used very locally, to communicate between `arrayElems` and `arraySplice`
-  = EElems [SrcExpr] | ESplice SrcExpr
+  = EElems [SrcSmall]
+  | ESplice SrcSmall
   deriving (Show)
 
-arrayElems :: [SrcExpr] -> [ArrayElem]
+arraySplice :: [SrcSmall] -> D SrcSmall
+-- arraySplice [es1, ..e, es2] -->  arraySplice e1 ++ (e ++ arraySplice es2)
+arraySplice as
+  = case arrayElems as of
+      []          -> pure $ Array []
+      e:es        -> app (arr e) es
+  where
+    arr (EElems es) = Array es
+    arr (ESplice e) = e
+
+    app r [] = pure r
+    app r (e : es) = do
+      t <- newIdent noLoc "t"
+      rest <- app (Variable t) es
+      pure $ eSeq [eAppend r (arr e) t, rest]
+
+   -- app e1 [e2,e3]
+   --  =  exists t1; append[e1,e2,t1]; app t1 [e3]
+   --  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; app t2 []
+   --  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; t2
+
+eAppend :: SrcExpr -> SrcExpr -> Ident -> SrcExpr
+-- eAppend e1 e2 z  =   exists z. append$[ e1, e2, z ]
+--   where append$[x,y,r] does (x++y)=r
+eAppend (Array xs) (Array ys) z = eDefine z (Array (xs ++ ys))
+eAppend x y z = Seq [DefineV z, ApplyD (EPrim ArrApp) (Array [x, y, Variable z])]
+
+arrayElems :: [SrcSmall] -> [ArrayElem]
 -- Handle an array element, it can be ..e or e
 -- Returns a list of [EElems es, ESplice e, ESplice e, .. ]
 -- Where we maximally group the EElems, for efficiency
-arrayElems = grp . map cls
-  where cls (PrefixOp (Ident _ "..") e) = Left e
-        cls e = Right e
-        grp [] = []
-        grp (Left e : as) = ESplice e : grp as
-        grp as =
-          let (rs, bs) = span isRight as
-          in  EElems [ e | Right e <- rs ] : grp bs
+arrayElems = grp . map classify
+  where
+    classify :: SrcSmall -> ArrayElem
+    classify (PrefixOp (Ident _ "..") e) = ESplice e
+    classify e                           = EElems [e]
+
+    grp :: [ArrayElem] -> [ArrayElem]
+    -- Group adjacent EElems together
+    grp []                = []
+    grp (ESplice e : as)  = ESplice e : grp as
+    grp (EElems es1 : as) = case grp as of
+                             EElems es2 : as' -> EElems (es1++es2) : as'
+                             as'              -> EElems es1        : as'
 
 --------------------------------------
 -- Calls
