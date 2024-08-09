@@ -278,7 +278,7 @@ $\begin{array}{@@{}l}
  \rulename{split-v} & |verify2 rs as (P^[r==gv; e])| & \movesto &
     |verify2 rs (as, r==gv) (P^[ e ]);| \\
     &&& |verify2 rs (as, noteq r gv) (P^[ fail ])|\\[1mm]
-  \rulename{split-op} & |verify2 (rs) as (P^[apply1N op gv]))| & \movesto &
+  \rulename{split-op} & |verify2 (rs) as (P^[apply1N op gv])| & \movesto &
           |verify2 (rs,r) (as, r = apply1N op gv) (P^[ r ]);| \\
     &&& |verify2 rs (as, not (apply1N op gv)) (P^[ fail ])| \\
     &&& \text{if $r \not\in R$} \\[1mm]
