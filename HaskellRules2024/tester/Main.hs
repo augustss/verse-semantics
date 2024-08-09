@@ -27,14 +27,14 @@ import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos )
 
 import GHC.Stack( HasCallStack )
 
-import Data.List( isPrefixOf, isInfixOf, intercalate, find )
+import Data.List( isPrefixOf )
 import Data.Char( toLower )
 import Data.Maybe
 import Control.Monad( unless, when )
 import System.Directory( doesFileExist )
 import System.Exit( exitWith, ExitCode(..) )
 import Text.Printf
-
+import qualified Data.Map as M
 import Control.Exception( catch, SomeException )
 import qualified Options.Applicative as OA
 
@@ -77,17 +77,16 @@ runTests test_flags
 data Test
   -- Test that two expressions evaluate to the same thing
   = TestEvalEq TestInfo SrcExpr SrcExpr     -- testeq( name, code ){ value }
-  | TestVerify TestInfo SrcExpr     -- verify( name, pass/fail){ code }
-  | TestTim { timTag :: TimTag              -- test(D00){ code }
-            , timExpr :: SrcExpr }
-  | TestTimCrash TimTag String             -- test(D00){ code-that-crashes-the-parser }
+  | TestVerify TestInfo SrcExpr             -- verify( name, pass/fail){ code }
   deriving (Show)
 
 testInfo :: Test -> TestInfo
 testInfo (TestEvalEq ti _ _) = ti
 testInfo (TestVerify ti _)   = ti
-testInfo (TestTim    ti _)   = timTestInfo ti
-testInfo (TestTimCrash ti _) = timTestInfo ti
+
+testSrc :: Test -> SrcExpr
+testSrc (TestEvalEq _ e1 _) = e1
+testSrc (TestVerify _ e)    = e
 
 data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code... }
                  -- The stuff in the parens is the TestInfo
@@ -310,10 +309,8 @@ timTestType _     = TFail
 
 ----------------------------
 runTest :: TestFlags -> Test -> IO TestRes
-runTest tflg (TestTim    ts  e)        = runTest tflg (TestVerify (timTestInfo ts) e)
 runTest tflg test@(TestVerify _ e)     = doTestCatchingExn tflg test e (Array [])
 runTest tflg test@(TestEvalEq _ e1 e2) = doTestCatchingExn tflg test e1 e2
-runTest _    (TestTimCrash ti _)       = pure (TestRes { tr_info = timTestInfo ti, tr_outcome = TO_Excn })
 
 mkFlags :: TestFlags -> Bool -> Flags
 mkFlags tflg add_verification
@@ -378,9 +375,6 @@ wrapTest wrap_me core
 desugarForVerification :: Test -> Bool
 desugarForVerification TestEvalEq{}   = False
 desugarForVerification TestVerify{}   = True
-desugarForVerification TestTim{}      = True
-desugarForVerification TestTimCrash{} = True   -- Not sure
-
 
 -- | `checkResults` just compares the results of two evaluations and prints out the appropriate message,
 --   it does _not_ throw or catch any exceptions.
@@ -496,10 +490,9 @@ parseSourceOnly fn = do
 readTests :: FilePath -> IO [Test]
 -- Read the test file, and parse it
 readTests fn = do
-  file' <- readFile fn
-  file  <- eraseSkipped fn file' -- erase the lines corresponding to skipped tests
-  let tests = parseDie pTestFile fn file
-  pure tests
+  tests <- parseDie pTestFile fn <$> readFile fn
+  skips <- parseSkipped (fn ++ ".skip")
+  pure   $ tests `skipping` skips
 
 -- Parse a file of tests
 pTestFile :: P [Test]
@@ -521,12 +514,15 @@ pTestVerify :: P Test
 pTestVerify =
   pKeyword "verify" *> do
     tId <- pParens pTestInfo
-    TestVerify tId <$> pBraces pExprSeq
+    src <- pExprSeq <* optional (pOp ";")
+    pure $ TestVerify tId src
 
 pTimTest :: P Test
 pTimTest =
   pKeyword "test" *> do
-    TestTim <$> pParens pIdent <*> (pExprSeq <* optional (pOp ";"))
+    tag <- pParens pIdent
+    src <- pExprSeq <* optional (pOp ";")
+    pure $ TestVerify (timTestInfo tag) src
 
 pStringLit :: P String
 pStringLit = strOf <$> pString
@@ -744,34 +740,25 @@ setPreludeFlag are_verifying test_flags flags
 --
 -----------------------------------------------
 
-eraseSkipped :: FilePath -> String -> IO String
-eraseSkipped fn file = do
-  broken <- parseSkipped (fn ++ ".skip")
-  pure $ unlines . map (eraseSkippedLine broken) . lines $ file
-
-eraseSkippedLine :: Skipped -> String -> String
-eraseSkippedLine broken l
-  | Just b <- bTest = dummyTest b
-  | otherwise       = l
-  where
-    bTest  = find (\b -> skipCode b `isInfixOf` l) broken
-
-dummyTest :: SkippedTest -> String
-dummyTest b = "verify(" ++ info ++ ") { 0 = 0 }"
-  where
-    info  = intercalate ", " [sname, show (skipType b), "skip" ]
-    sname = "\"" ++ fromMaybe "<anon>" (skipName b) ++ "\""
-
 type Skipped = [SkippedTest]
-
--- | `Broken` is a data type that represents a test that is currently broken
 data SkippedTest = MkSkippedTest
-  { skipName   :: Maybe String -- ^ The name of the test (in quotes)
-  , skipType   :: TestType     -- ^ The type of the test (pass/fail)
-  , skipReason :: String       -- ^ The reason why the test is broken (in quotes)
-  , skipCode   :: String       -- ^ The exact string (single line) corresponding to the test (in quotes)
+  { skipStatus :: TestStatus    -- ^ The type of the test (pass/fail)
+  , skipReason :: String        -- ^ The reason why the test is broken (in quotes)
+  , skipCode   :: SrcExpr       -- ^ The exact string (single line) corresponding to the test (in quotes)
   }
   deriving (Show)
+
+skipping :: [Test] -> Skipped -> [Test]
+skipping tests skips = skip1 <$> tests
+  where
+    m     = M.fromList [ (skipCode s, skipStatus s) | s <- skips ]
+    skip1 test = case M.lookup (testSrc test) m of
+                   Just status -> test `testWithStatus` status
+                   Nothing     -> test
+
+testWithStatus :: Test -> TestStatus -> Test
+testWithStatus (TestVerify ti e)    status = TestVerify (ti { testStatus = status }) e
+testWithStatus (TestEvalEq ti e e') status = TestEvalEq (ti { testStatus = status }) e e'
 
 parseSkipped :: FilePath -> IO Skipped
 parseSkipped fn = do
@@ -784,20 +771,21 @@ pSkippedFile :: P [SkippedTest]
 pSkippedFile = skip *> many pSkipped <* eof
 
 {-
-skip("name", pass|fail, "reason"){ test }
+skip("reason"){ test }
+broken("reason"){ test }
 -}
 pSkipped :: P SkippedTest
 pSkipped = do
-  pKeyword "skip" *> do
-    (tname, typ, reason) <- pParens pSkipInfo
-    code                 <- pBraces pStringLit
-    pure (MkSkippedTest { skipName = tname, skipType = typ
-                        , skipReason = reason, skipCode = code })
+  status <- pSkipTestStatus
+  reason <- pParens pStringLit
+  -- code   <- pBraces pExprSeq
+  code   <- pExprSeq <* optional (pOp ";")
+  pure (MkSkippedTest status reason code)
 
-
-pSkipInfo :: P (Maybe String, TestType, String)
-pSkipInfo = do
-    tname  <- optional (pStringLit <* pOp ",")
-    typ    <- pTestType <* pOp ","
-    reason <- pStringLit
-    pure (tname, typ, reason)
+pSkipTestStatus :: P TestStatus
+pSkipTestStatus = do
+  i <- pIdent
+  case map toLower $ identString i of
+    "skip"    -> pure TS_Skip
+    "broken"  -> pure TS_Broken
+    _         -> fail "pSkipType"

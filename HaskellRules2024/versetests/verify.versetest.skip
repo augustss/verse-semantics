@@ -1,2 +1,8 @@
 
-skip("ArrayX", pass, "funny parsing issue") {"a:=(1;2;),a=(1,2)"}
+skip("funny parsing issue") {a:=(1;2;),a=(1,2)}
+
+broken("fun call order")
+                     { F( X:int, G():type{X = 1} )
+                              := (H()<succeeds> := X = 1; H()
+                                 ; G() )    # Call G last!
+                        ; F(2, G1() := G1()) }
