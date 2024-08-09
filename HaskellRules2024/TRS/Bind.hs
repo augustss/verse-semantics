@@ -25,6 +25,15 @@ import Epic.Print
 
 --------------------------------------------------------------------------------
 
+{- Note [Overview of Bind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+...blah...
+
+* When to use unsafeUnbind
+
+-}
+
+
 newtype Ident = Name String
  deriving ( Eq, Ord )
 

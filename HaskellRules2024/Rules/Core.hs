@@ -100,12 +100,12 @@ singleton finite map [v => v]
 
 * Rewrite rules
     Primops:     isTru$[ truth{v} ]  --> truth{v}, otherwise fail
-                 isComp$[truth{v}] --> truth{isComp${v}]
+                 isComp$[truth{v}]   --> truth{isComp${v}]
 
-    Application: truth{v1}{v2}       --> v1=v2
+    APP-TRU:     truth{v1}{v2}       --> v1=v2;v1
 
-    Unification: truth{v1}=truth{v2} --> v1=v2
-                 truth{v1}=v2        --> fail,  if v2 is a non-truth HNF
+    U-TRU:       truth{v1}=truth{v2};e --> v1=v2;e
+                 truth{v1}=v2;e        --> fail,  if v2 is a non-truth HNF
 
 
 * Verification:
@@ -123,7 +123,7 @@ singleton finite map [v => v]
 Note [Treatment of underscore in Core]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In Core we allow "_" in exactly two places:
-  * On LHS of ":", thus           _=e1; e2
+  * On LHS of ";", thus           _=e1; e2
   * Binder of lambda, thus        \_.e
 
 Currently "_" is represented as a TRS.Bind.Ident, with string "_".
@@ -516,6 +516,7 @@ valid ((a :=: e1) :>: e2) = validL a && valid e1 && valid e2
 valid (e1 :|: e2)         = valid e1 && valid e2
 valid (a1 :@: a2)         = isVal a1 && isVal a2
 valid (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
+  -- SLPJ: todo: check binder is not _
 valid (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
 valid Fail                = True
 valid (One e)             = valid e
@@ -525,6 +526,7 @@ valid (a :>>: e)          = isVal a && valid e  -- Guard
 valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid e                   = isVal e
+  -- SLPJ: todo: check variable is not _
 
 validL :: Expr -> Bool
 -- Valid on the LHS of :=:
@@ -983,9 +985,9 @@ instance Arbitrary Expr where
    where
     xs = take 3 (identsNotIn [])
 
-  shrink (LitInt k) = [ LitInt k' | k' <- shrink k ]  -- SLPJ: other literals
+  shrink (LitInt k) = [ LitInt k' | k' <- shrink k ]  -- SLPJ: other literals?
 
-  shrink (Op _)       = [ LitInt 0, LitInt 1 ]   -- SLPJ: explain
+  shrink (Op _)       = [ LitInt 0, LitInt 1 ]   -- See Note [Shrinking expressions: ops] SLPJ: explain
 
   shrink (Arr es)     = es
                      ++ [ Arr es' | es' <- shrink es ]
@@ -1067,6 +1069,14 @@ instance CoArbitrary Expr where
 --
 --------------------------------------------------------------------------------
 
+{- Note [Contexts]
+~~~~~~~~~~~~~~~~~~
+... blah blah...
+
+* No HOLE inside Verify
+
+-}
+
 type Context = Expr
 
 (<@) :: Context -> Expr -> Expr
@@ -1089,6 +1099,7 @@ HOLE          <@ h = h
 e             <@ _ = e
 
 bvs :: Context -> [Ident]
+-- Returns all the binders that are in scope at the HOLE
 bvs ctx = explore [] ctx
  where
   explore xs (Arr es)     = foldr union [] (map (explore xs) es)
@@ -1104,14 +1115,14 @@ bvs ctx = explore [] ctx
   explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
   explore xs (Check _ e)  = explore xs e
   explore xs (Exi bnd)    = exploreBind xs bnd
-  explore _  (Verify {})  = error "bvs Verify undefined"
+  explore _  (Verify {})  = []  -- HOLE is not inside Verify{}
   explore xs HOLE         = xs
   explore _xs _e          = []
 
   exploreBind xs bnd = explore ([x] `union` xs) e where (x,e) = unsafeUnbind bnd
 
 isContext :: Context -> Bool
--- There is a HOLE, outside a Verify (SLPJ: is the "outside Verify" right?
+-- There is a HOLE, outside a Verify (SLPJ: is the "outside Verify" right?)
 isContext (Arr es)     = any isContext es
 isContext (Tru e)      = isContext e
 isContext (Lam bnd)    = isContext e where (_,e) = unsafeUnbind bnd

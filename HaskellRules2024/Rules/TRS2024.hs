@@ -288,7 +288,8 @@ existentialStep _env lhs =
      pure (pPrint x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
 
 
- ++  -- EXI-PUSH is necessary to let us do  exi x. f[y]; x=3; 3+1; blah
+ ++  -- EXI-PUSH is necessary to let us do
+     --    exi x. f[y]; x=3; 3+1; blah
      -- Here we want to substitute for x despite the intervening f[y]
   "EXI-PUSH" `nameWith`
   do (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] lhs
@@ -499,17 +500,41 @@ wrapExis xs orig_e = foldr wrap orig_e xs
        to the left of the HOLE (if any)
        by giving a value to at least one of the local existentials.
 
-Imagine HOLE is filled with (x=2) and we are considering substituing that (x=2)
+OR (see MV7 Simon/Koen 9 Aug 24)
+   * e cannot loop, or unify anything
+       to the left to the HOLE
+       except giving a value to at least one of the local existentials.
 
-E1: exists x. x>3; HOLE                  (x>3) blocked because local exi x is free
+  exists x. x>3; y>3; x=2
 
-E2: exists x. (if(x=3) then e1 else e2); (x=3) is blocked becuase local exi x
-              HOLE                       is rigid under the 'if'
+Be careful! "or unify anything"
+  exists x. x>3; y=3; x=2
+  if(y=3) then loop() else (); exists x. x>3; y=3; x=2
 
-E3: exists x. x>3; 7; HOLE               7 is blocked; it's fine to substitute
-                                         across the 7
+---- Examples -----
+
+Imagine HOLE is filled with (x=2) and we are considering substituing
+that (x=2) throughout
+
+E1:  exists x. x>3; HOLE                  (x>3) blocked because local exi x is free
+E1a: exists x. y>3; HOLE                  (y>3) NOT blocked because y is not "local exi"
+     where y is bound "outside"
+     by lamba, or an existential
+
+E2: exists x. (if(x=3) then e1 else e2);  (x=3) is blocked because local exi x
+              HOLE                        is rigid under the 'if'
+
+E2a: exists x. (if(y=3) then e1 else e2);  (y=3) is NOT blocked because we are waiting
+               HOLE                        for the "outside" to give us a value of y
+
+E2b: exists x. x=3; HOLE                   (x=3) is NOT blocked because local exi x
+
+E3: exists x. x>3; 7; HOLE                 7 is blocked; it's fine to substitute
+                                           across the 7
     NB: in more complicated cases the "7" might not go away, eg
         exists x. all{ x>0; 7 }; x=2
+
+E3a.  exists x. x>3; 1=2; x=2
 
 E4: exists x. if (x>1) then loop(); fail; HOLE    'fail' is not blocked;
                                                   don't substitute across it
@@ -522,6 +547,8 @@ E6: exists x. x>3; if (y>1) then loop(x); HOLE     (y>1) is not blocked, because
     where y is bound outside,                      may give it a value; then we might fail
           by lambda or existential                 instead of calling loop(2)
 
+-----------------
+Question (with Koen): could we simplify `blocked` by moving existentials around
 -}
 
 type Expr_or_Context = Expr
@@ -562,7 +589,7 @@ blkd _  e | isVal e = False   -- See (E3)
 blkd lx (Var x :=: Var y) | x == y
                           = isLocalFlexi lx x
 blkd lx (Var x :=: e)     = isRigidExi lx x -- See (E2)
-                          || blkd lx e    -- Blocked if *either* side is blocked
+                          || blkd lx e      -- Blocked if *either* side is blocked
 blkd lx (hnf :=: e)       = assert (isHNF hnf) (show hnf) $
                             blkd lx e
 
