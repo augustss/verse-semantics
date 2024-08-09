@@ -1,3 +1,6 @@
 skip("misparsed"){f(g():any):=g[]; f(g():=6)}
 skip("misparsed"){f(x:int)<decides>:=x=3, f[x:int]}
 skip("eff-interacts"){f(g():int):int => h()<interacts>:int => f[h]}
+
+
+skip("f1 seems unbound?"){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}		#FP:10.4:STRENGTH???

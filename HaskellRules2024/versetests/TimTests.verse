@@ -160,7 +160,7 @@ test(F00){int?='3'}
 #test(F00){1=(2=>3)}
 test(S00){1=>2}
 test(S00){(H->F)(1):=2}
-test(S00){(H->F)(1):=2}
+test(S00){(H->F)(1):=2}	# DUPLICATE
 #test(...){(G->F)(1):=2; G=(1=>2)} # Loops and not a bug: g is identity, so 1=>2 calls self.
 test(S00){(G->F)(1):=2; H:=(1=>2); G=H}
 test(S00){(G->F)(1):int; H:=(1=>3); G=H}

@@ -201,6 +201,10 @@ verify("FunPair3", pass) { f(a := (_,_)) := a=(_,_) }
 ### verify(pass) {a&b:any => f(:any)<computes>:any => c:=f[a] => d:=f[b] => a=b => c=d}
 ### verify(pass) {function(x:int,y:prefix'-'){x,y}[3,4]=(3,-4)}
 
+verify("multiline", pass){
+  1 + 2 +
+  3
+}
 
 # ------------------------------------------------------------
 # Proofs as programs

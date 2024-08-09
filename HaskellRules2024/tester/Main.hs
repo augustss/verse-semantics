@@ -91,10 +91,11 @@ testSrc (TestVerify _ e)    = e
 data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code... }
                  -- The stuff in the parens is the TestInfo
   TestInfo
-    { testMName  :: !(Maybe String)
-    , testLocn   :: !Loc
-    , testType   :: !TestType                      -- Default test type
-    , testStatus :: !TestStatus
+    { testMName    :: !(Maybe String)
+    , testLocStart :: !Loc
+    , testLocEnd   :: !Loc
+    , testType     :: !TestType                      -- Default test type
+    , testStatus   :: !TestStatus
     }
     deriving (Show)
 
@@ -112,7 +113,7 @@ data TestStatus = TS_Normal
                 deriving( Show, Eq )
 
 testName :: TestInfo -> String
-testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocn ti)))) (testMName ti)
+testName ti = fromMaybe ("L" ++ show (unPos (sourceLine (testLocStart ti)))) (testMName ti)
 
 data TestRes = TestRes { tr_info    :: TestInfo
                        , tr_outcome :: TestOutcome }
@@ -266,7 +267,7 @@ printSome pick_me res fmt_str
     these = filter pick_me res
 
     pp :: TestRes -> Doc
-    pp (TestRes { tr_info = TestInfo { testMName = mname, testLocn = loc } })
+    pp (TestRes { tr_info = TestInfo { testMName = mname, testLocStart = loc } })
       | Just n <- mname = text n
       | otherwise       = char 'L' <> int (unPos (sourceLine loc))
 
@@ -297,10 +298,11 @@ type TimTag = Src.Ident
 
 timTestInfo :: TimTag -> TestInfo
 timTestInfo (Ident loc status) = TestInfo
-  { testMName = Nothing
-  , testLocn = loc
-  , testType = timTestType status
-  , testStatus = TS_Normal
+  { testMName    = Nothing
+  , testLocStart = loc
+  , testLocEnd   = loc
+  , testType     = timTestType status
+  , testStatus   = TS_Normal
   }
 
 timTestType :: String -> TestType
@@ -422,6 +424,7 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
 
       | otherwise   -- TS_Normal
       = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what
+           ; when (logUnexpected tflg) $ writeUnexpectedToFile test_res
            ; unless (noError tflg) $
              do { putStrLn "-----------------------------------------------"
                 ; putStrLn "The expression"; ppIndent src1
@@ -440,6 +443,29 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
              TFail -> "success"
              _     -> errorMessage "fail_what"
 
+-- TODO: this is rather egregiously slow... but lets see if it matters on the TimTests...
+writeUnexpectedToFile :: TestRes -> IO ()
+writeUnexpectedToFile res = do
+    str <- readTestString info
+    appendFile log_fn str
+  where
+    info   = tr_info res
+    fn     = sourceName (testLocStart info)
+    log_fn = fn ++ "." ++ show (testType info)
+
+readTestString :: TestInfo -> IO String
+readTestString info = do
+  let loc  = testLocStart info
+  let loc' = testLocEnd info
+  let fn = sourceName loc
+  grabLines (unPos (sourceLine loc))  (unPos (sourceLine loc')) <$> readFile fn
+
+grabLines :: Int -> Int -> String -> String
+grabLines from to = unlines . take (to - from). drop (from - 1). lines
+
+-- >>> grabLines 4 8 (unlines ["1", "2","3","4","5","6","7","8","9","10"])
+-- "4\n5\n6\n7\n"
+
 -- | Equivalence on values (or stuck expressions)
 -- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
 equivValue :: Rules.Expr -> Maybe Rules.Expr -> Bool
@@ -452,7 +478,7 @@ testHerald test = printf "%-*s %-*s" widthTestName test_nm widthFileName loc_str
   where
     test_nm   = fromMaybe "<anon>" (testMName ti)
     loc_str   = filename ++ ":" ++ show (unPos (sourceLine loc))
-    loc ::Loc = testLocn ti
+    loc ::Loc = testLocStart ti
     ti        = testInfo test
     filename  = baseName (sourceName loc)
 
@@ -515,14 +541,17 @@ pTestVerify =
   pKeyword "verify" *> do
     tId <- pParens pTestInfo
     src <- pExprSeq <* optional (pOp ";")
-    pure $ TestVerify tId src
+    locEnd <- getSourcePos
+    pure $ TestVerify (tId { testLocEnd = locEnd }) src
 
 pTimTest :: P Test
 pTimTest =
   pKeyword "test" *> do
     tag <- pParens pIdent
     src <- pExprSeq <* optional (pOp ";")
-    pure $ TestVerify (timTestInfo tag) src
+    locEnd <- getSourcePos
+    let ti = (timTestInfo tag) { testLocEnd = locEnd }
+    pure $ TestVerify ti src
 
 pStringLit :: P String
 pStringLit = strOf <$> pString
@@ -536,7 +565,7 @@ pTestInfo = do
   mname <- optional (pStringLit <* pOp ",")
   typ   <- pTestType
   stat  <- (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
-  pure (TestInfo { testMName = mname, testLocn = loc
+  pure (TestInfo { testMName = mname, testLocStart = loc, testLocEnd = loc
                  , testType = typ, testStatus = stat })
 
 pTestType :: P TestType
@@ -575,6 +604,7 @@ data TestFlags = TestFlags
   , postProc       :: !Bool                -- Post processing
   , summary        :: !Bool                -- Produce a summary
   , showTrace      :: !Bool                -- Show traces
+  , logUnexpected  :: !Bool                -- Log unexpected results
   , onlyTest       :: !(Maybe String)      -- run only this test
   , testExpr       :: !(Maybe String)      -- use this expression as a test
   , maxSteps       :: !Int                 -- max number of rewrite steps
@@ -656,6 +686,10 @@ testFlags = TestFlags
   <*> OA.switch
       (  OA.long "trace"
       <> OA.help "Print rewrite traces"
+      )
+  <*> OA.switch
+      (  OA.long "log-unexpected"
+      <> OA.help "log unexpected results to file"
       )
   <*> OA.optional (OA.strOption
          ( OA.long "only-test"
