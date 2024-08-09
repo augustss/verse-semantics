@@ -31,7 +31,7 @@ import Data.List( isPrefixOf )
 import Data.Char( toLower )
 import Data.Maybe
 import Control.Monad( unless, when )
-import System.Directory( doesFileExist )
+import System.Directory( doesFileExist, removeFile )
 import System.Exit( exitWith, ExitCode(..) )
 import Text.Printf
 import qualified Data.Map as M
@@ -200,6 +200,8 @@ isBrokenFail tr@(TestRes { tr_info = info })
 runTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 runTestFile tflg (fn, ts)
  = do { putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
+
+      ; when (logUnexpected tflg) $ clearUnexpectedFiles fn
 
       ; let tests_to_run :: [Test]
             tests_to_run = filter (keepOnly tflg) ts
@@ -424,7 +426,7 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
 
       | otherwise   -- TS_Normal
       = do { putStrLn $ test_herald ++ "Unexpected " ++ fail_what
-           ; when (logUnexpected tflg) $ writeUnexpectedToFile test_res
+           ; when (logUnexpected tflg) $ logUnexpectedToFile test_res
            ; unless (noError tflg) $
              do { putStrLn "-----------------------------------------------"
                 ; putStrLn "The expression"; ppIndent src1
@@ -443,28 +445,6 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
              TFail -> "success"
              _     -> errorMessage "fail_what"
 
--- TODO: this is rather egregiously slow... but lets see if it matters on the TimTests...
-writeUnexpectedToFile :: TestRes -> IO ()
-writeUnexpectedToFile res = do
-    str <- readTestString info
-    appendFile log_fn str
-  where
-    info   = tr_info res
-    fn     = sourceName (testLocStart info)
-    log_fn = fn ++ "." ++ show (testType info)
-
-readTestString :: TestInfo -> IO String
-readTestString info = do
-  let loc  = testLocStart info
-  let loc' = testLocEnd info
-  let fn = sourceName loc
-  grabLines (unPos (sourceLine loc))  (unPos (sourceLine loc')) <$> readFile fn
-
-grabLines :: Int -> Int -> String -> String
-grabLines from to = unlines . take (to - from). drop (from - 1). lines
-
--- >>> grabLines 4 8 (unlines ["1", "2","3","4","5","6","7","8","9","10"])
--- "4\n5\n6\n7\n"
 
 -- | Equivalence on values (or stuck expressions)
 -- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
@@ -823,3 +803,46 @@ pSkipTestStatus = do
     "skip"    -> pure TS_Skip
     "broken"  -> pure TS_Broken
     _         -> fail "pSkipType"
+
+
+-----------------------------------------------
+--
+--    Log Unexpected Tests
+--      logUnexpectedToFile  -- saves an individual test
+--      eraseUnexpectedFiles -- removes all unexpected test logs
+--
+-----------------------------------------------
+
+-- TODO: this is rather egregiously slow... but lets see if it matters on the TimTests...
+logUnexpectedToFile :: TestRes -> IO ()
+logUnexpectedToFile res = do
+    putStrLn "Writing unexpected result to file"
+    str <- readTestString info
+    appendFile log_fn str
+  where
+    info   = tr_info res
+    fn     = sourceName (testLocStart info)
+    log_fn = fn ++ "." ++ show (testType info)
+
+clearUnexpectedFiles :: FilePath -> IO ()
+clearUnexpectedFiles fn = do
+  let pass_fn = fn ++ ".pass"
+  exists_pass <- doesFileExist pass_fn
+  when exists_pass $ removeFile pass_fn
+  let fail_fn = fn ++ ".fail"
+  exists_fail <- doesFileExist fail_fn
+  when exists_fail $ removeFile fail_fn
+
+
+readTestString :: TestInfo -> IO String
+readTestString info = do
+  let loc  = testLocStart info
+  let loc' = testLocEnd info
+  let fn = sourceName loc
+  grabLines (unPos (sourceLine loc))  (unPos (sourceLine loc')) <$> readFile fn
+
+grabLines :: Int -> Int -> String -> String
+grabLines from to = unlines . take (to - from). drop (from - 1). lines
+
+-- >>> grabLines 4 8 (unlines ["1", "2","3","4","5","6","7","8","9","10"])
+-- "4\n5\n6\n7\n"

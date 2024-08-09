@@ -1,7 +1,9 @@
 # Trivial tests
 verify("Triv-pass", pass){1}
 verify("plus1", pass){main() := { 1 + 2 = 3} }
+verify("plus1-blob", fail){main() := { 1 + 2 = 3} }
 verify("plus2", fail){main() := { 1 + 2 = 4} }
+verify("plus2-blob", pass){main() := { 1 + 2 = 4} }
 verify("Triv-fail", fail){check<succeeds>{0=1}}
 
 # Guard tests from https://docs.google.com/document/d/17Ytcy9I_fDzW-a1FGYQkLh3oObFg47Ge6GdRy-FZjLM/edit
