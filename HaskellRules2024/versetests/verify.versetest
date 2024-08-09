@@ -1,3 +1,4 @@
+
 # Trivial tests
 verify("Triv-pass", pass){1}
 verify("plus1", pass){main() := { 1 + 2 = 3} }
@@ -162,6 +163,8 @@ verify("HO16",pass) { bar1(x:int):type{_(:int):char} := { (y:int) => {'m' } } }
 verify("HO17",fail) { bar2(x:int):type{_(:int):char} := { (y:int) => { 3  } } } # REJECT the function returns an int not a string
 verify("HO18",fail) { bar3(x:int):type{_(:int):char} := { (y:nat) => { 'a'} } } # REJECT the function only works on naturals but is supposed to work on ints
 verify("HO19",pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEPT the function works on more than ints
+verify("HO20", fail, broken) { function( foo(x:int):type{int[x]} )<succeeds> { z := "monkey" ; foo[z] } }
+
 
 # Tim tests
 # Simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
@@ -217,6 +220,7 @@ verify("PP3a", fail, broken)
                               := (H()<succeeds> := X = 1; H()
                                  ; G() )    # Call G last!
                         ; F(2, G1() := G1()) }
+  # PP3a illustrates the case where Tim will verify but we do not.
 verify("PP3b", pass) { F( X:int, G():type{X = 1} )
                               := (G();    # Call G first!
                                   H()<succeeds> := X = 1; H())
@@ -238,12 +242,12 @@ verify("blame0", pass) { f2( g() := 3 ) := g[] = 3 }
 
 # ---------------------------------------------
 # Array tests
-verify("ArrayX", pass, broken) {a:=(1;2;),a=(1,2)}
+verify("ArrayV0", pass, broken) {a:=(1;2;),a=(1,2)}
   # Funny parsing
-verify("Array1", pass) { a := for{1..3}; a = array{1,2,3} }
-verify("Array2", pass) { ([]int)[ array{1,2} ] }
-verify("Array3", pass) { f():[]int := array{1,2,3} }
-verify("Array4", pass) { f():[]int := array{1,2,3} }
+verify("ArrayV1", pass) { a := for{1..3}; a = array{1,2,3} }
+verify("ArrayV2", pass) { ([]int)[ array{1,2} ] }
+verify("ArrayV3", pass) { f():[]int := array{1,2,3} }
+verify("ArrayV4", pass) { f():[]int := array{1,2,3} }
 
 # For now we just ignore 'computes' i.e. treat as 'succeeds'
 verify("computes00", pass) { f(x:int)<computes>:int = 1 }
@@ -260,8 +264,6 @@ verify("comparable02", pass){f(a:comparable):comparable => x:=f(2)}
 verify("comparable03", pass){f(a:comparable):comparable => x:=f[2]}
 verify("comp-tup", pass){f(x:comparable)<decides>:comparable := {(p,q):=x; p } }
 
-verify("blob", fail) { foo(f()<decides>:int) := {f[]} }
-
 # RI accepts, Tim's verifier rejects:
 verify("jan00", pass) { fi(x:int)<succeeds><closed>:int = {x};
                         ga(y:int) := { if (fi(y) = y) then 1 else 2 } }
@@ -269,3 +271,33 @@ verify("jan00", pass) { fi(x:int)<succeeds><closed>:int = {x};
 # RI accepts, Tim's verifier rejects:
 verify("jan01", pass) { h(x:int, y:int)<decides><closed>:int = { x = y };
                         if (h[2, 2]) then 1 else 2 }
+
+verify("blob", fail) { foo(f()<decides>:int) := {f[]} }
+
+# Finite types (from Google doc "Verse: more tricky cases")
+verify("Fin1", fail) { (y := if (y=2) then y+1 else 3); y }
+verify("Fin2", pass, broken) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin3", fail) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin4", fail) { y:int = y }
+verify("Fin5", fail) { y:type{3} = y }
+  # Tim actually accepts this, but only because type{3} is a singleton
+verify("Fin6", fail) { y:type{3|4} = y }
+verify("Fin7", pass) { check<decides>{ y:type{3|4} = 3; y=3 } }
+verify("Fin8a", pass) { check<succeeds>{ y:type{3|4} = 3; y } }
+  # Tim rejects this one
+verify("Fin8b", pass) { check<decides> { y:type{3|4} = 3; y } }
+  # Tim rejects this one too
+verify("Fin10", fail) { G(f(:int):type{3}) := { y := f[y] } }
+  # Tim accepts this, but only because type{3} is a singleton type
+verify("Fin11", fail) { G(f(:int):type{3|4}) := { y := f[y] } }
+verify("Fin12", pass, broken) { G( f(:int)<closed> := 1 ) := { y := f[y] } }
+
+# Examples from Google doc "Verse: tricky cases"
+verify("Tricky:T1", pass){ f(i:any)<succeeds>:int = { if((x:int,y:int)=i) then{ x+y } else{ 0 }}
+                         ; f[(2,3)] }
+verify("Tricky:L1", pass){ f():int := 0; y:any; int[y]; y=f[] }
+verify("Tricky:L2", fail){ f():int := 0; y:any; y="monkey"; int[y]; y=f[] }
+verify("Tricky:L3", fail){ x:int; y:int = x; y=x; x }
+verify("Tricky:L3a", fail){ foo(x:any)<succeeds> := {int[x]; y:int = x; y=x; x} }
+verify("Tricky:G1", fail){ foo(x:int):int := x; y := foo[y] }
+verify("Tricky:PC2", pass){ f(x := 1, y:= 2):int := 7; exists x y { f(x, y); x+y } }

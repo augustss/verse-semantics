@@ -410,22 +410,22 @@ defnArray :: [SrcPat] -> SrcExpr -> D SrcExpr
 --       p1 := x1; p2 := x2; p3 := x3; p4 := x4
 --       arraySplice{ x1, x2, ..x3, x4 }
 --  -->
---     exists x1,x2,x3,x4.
---       p1 := x1; p2 := x2; p3 := x3; p4 := x4
---       exists t1,t2.
---         arrApp$[ ar{x1,x2}, x3, t1 ]
---         arrApp$[ t, x4, t2 ]
---         t2 = e
+--       p1 := exists x1; p2 := exists x2; p3 := exists x3; p4 := exists x4
+--       arrApp$[ ar{x1,x2}, x3, exists t1 ]
+--       arrApp$[ t1, x4, exists t2 ]
+--       t2 = e
 
 defnArray ps e = do
   let do_one p
         | (wrap_dots, payload) <- splitArrayArg p
-        = do { x <- newIdent (getLoc p) "x"
-             ; d <- defn payload (Variable x)
-            ; pure (x, d, wrap_dots (Variable x)) }
-  (xs, ds, es) <- unzip3 <$> mapM do_one ps
-  arr          <- arraySplice es
-  pure $ Exists xs $ eSeq $ ds ++ [Unify arr  e]
+        = case payload of
+            Variable v -> pure (Nothing, wrap_docs (DefineV v))
+            _          -> do { x <- newIdent (getLoc p) "x"
+                             ; d <- defn payload (DefineV x)
+                             ; pure (Just d, wrap_dots (Variable x)) }
+  (ds, es) <- unzip3 <$> mapM do_one ps
+  arr      <- arraySplice es
+  pure $ eSeq $ catMaybes ds ++ [Unify arr  e]
 
 splitArrayArg :: SrcExpr -> (SrcExpr -> SrcExpr, SrcExpr)
 splitArrayArg (PrefixOp (Ident l "..") e) = (PrefixOp (Ident l ".."), e)
@@ -756,9 +756,9 @@ dsM_12 s (DefineE x t) pi                   -- MBIND
 
 -------------------- exists x -----------------
 -- Equivalent to to (y:any) provided any = \x.x
---   M_sig[ exists y ]E    = y := exists x.x
+--   M_sig[ exists y ]E    = exists y
 --   M_sig[ exists y ]P(i) = y := i
-dsM_12 _ (DefineV y) E     = pure $ eDefine' y existsXX
+dsM_12 _ (DefineV y) E     = pure $ DefineV y
 dsM_12 _ (DefineV y) (P i) = pure $ eDefine' y i
 
 -------------------- v >> t -----------------

@@ -1,5 +1,11 @@
 # Add new meetings at the top
 
+# Meeting 9 August
+testeq( "M9Aug24-1", pass, broken){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
+  # M9Aug24-1 uses bidirectional programming
+verify( "M9Aug24-2", pass){ F1(X:int)<closed><decides> := X = 1|2 }
+verify( "M9Aug24-3", pass){ F1(X:any)<closed><decides> := X = 1|2 }
+
 # Meeting 7 August
 verify( "M7Aug24-1", pass ) { G(f()<decides>:int):=3; G[ h():=3 ] }
 verify( "M7Aug24-2", fail ) { G(f()<decides>:int):=3; G[ h():="monkey" ] }

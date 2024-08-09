@@ -100,8 +100,10 @@ scope :: S.Set Src.Ident -> SrcExpr -> D SrcExpr
 --     to allow us to complain about shadowing
 scope sc = expr
   where
-    -- x := e  -->   x = e
+    -- x := e   -->  x = e
+    -- exists x -->  x
     expr (DefineE i e) = Unify (Variable i) <$> expr e
+    expr (DefineV i)   = Variable i
 
     expr e@Src.Lit{} = pure e
     expr e@EPrim{}   = pure e
