@@ -110,7 +110,8 @@ instance Show TestType where
 
 data TestStatus = TS_Normal
                 | TS_Broken   -- Test is currently broken (i.e., pass/fail is negated)
-                | TS_Skip     -- Test should be skipped
+                | TS_Skip     -- Test should be skipped, probably because it somehow
+                              --   crashes the entire implementation
                 deriving( Show, Eq )
 
 testName :: TestInfo -> String
