@@ -103,7 +103,7 @@ scope sc = expr
     -- x := e   -->  x = e
     -- exists x -->  x
     expr (DefineE i e) = Unify (Variable i) <$> expr e
-    expr (DefineV i)   = Variable i
+    expr (DefineV i)   = pure (Variable i)
 
     expr e@Src.Lit{} = pure e
     expr e@EPrim{}   = pure e

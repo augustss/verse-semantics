@@ -16,6 +16,7 @@ import Rules.Core( PrimOp(..), allPrimOps, primOpString )
 import Epic.Print
 
 -- General libraries
+import Data.Maybe( catMaybes )
 import Data.IORef
 import Data.List
 import qualified Data.Set as S
@@ -149,7 +150,9 @@ sDesugarExpr = ds
                                              , All (eSeq [e1', eThunk e2'])]))
 
     -- Array
-    ds (Array es) = arraySplice =<< mapM elm es
+    ds (Array es) = Array <$> ds (concatMap flattenAmpersand es)
+
+      arraySplice =<< mapM elm es
       where
         -- SLPJ why not just to (mapM ds es)?
         elm (PrefixOp dd@(Ident _ "..") e) = PrefixOp dd <$> ds e
@@ -249,6 +252,17 @@ sDesugarExpr = ds
 
     ds x = compos ds x
 
+flattenAmpersand :: SrcExpr -> [SrcExpr]
+-- (f&b) : int  -->   Just [f:int, g:int]
+flattenAmpersand (InfixOp (InfixOp p1 (Op "&") p2)  (Op ":") e2)
+  = [ InfixOp p (Op ":") e2 | p <- get p1 ++ get p2 ]
+flattenAmpersand e
+  = [ e ]
+  where
+    -- `get` flattens out all the nested `&` into a list
+    get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
+    get p                        = [p]
+
 checkEffs :: [Eff] -> D [Eff]
 checkEffs = mapM checkEff
   where
@@ -340,7 +354,7 @@ defn p@(EffAttr {}) e
 --defn (PostfixOp p (Ident _ "?")) e = defn p (Option $ Just e)
 -- Rule: (p1,...) := e  -->  (x1:any,...) = e; p1 := x1; ...
 
-defn (Array ps) e = defnArray ps e
+defn (Array ps) e = defnArray (concatMap flattenAmpersand ps) e
 
 -- Rule (p1 -> p2) := e  -->  p1 := x1; p2 := x2; (x1 -> x2) := e
 defn (InfixOp (Variable x1) (Op "->") (Variable x2)) e = pure $ DefineIE x1 x2 e
@@ -406,24 +420,28 @@ defnArray :: [SrcPat] -> SrcExpr -> D SrcExpr
 -- For example
 --     (p1, p2, ..p3, p4) := e
 -- --->
---     exists x1,x2,x3,x4.
---       p1 := x1; p2 := x2; p3 := x3; p4 := x4
---       arraySplice{ x1, x2, ..x3, x4 }
+--       p1 := x1; p2 := x2; p3 :=  x3; p4 := x4
+--       arraySplice{ exists x1, exists x2, ..exists x3, exists x4 }
 --  -->
---       p1 := exists x1; p2 := exists x2; p3 := exists x3; p4 := exists x4
---       arrApp$[ ar{x1,x2}, x3, exists t1 ]
---       arrApp$[ t1, x4, exists t2 ]
+--       p1 := x1; p2 := x2; p3 := x3; p4 := x4
+--       arrApp$[ ar{exists x1,exists x2}, exists x3, exists t1 ]
+--       arrApp$[ t1, exists x4, exists t2 ]
 --       t2 = e
+--
+-- Short cut if pi is a variable.  E.g. if p1 is a variable a, we et
+--       p2 := x2; p3 := x3; p4 := x4
+--       arraySplice{ exists a, exists x2, ..exists x3, exists x4 }
 
 defnArray ps e = do
   let do_one p
         | (wrap_dots, payload) <- splitArrayArg p
         = case payload of
-            Variable v -> pure (Nothing, wrap_docs (DefineV v))
+            Variable v -> -- Short cut for a common case: (a,b):=e
+                          pure (Nothing, wrap_dots (DefineV v))
             _          -> do { x <- newIdent (getLoc p) "x"
-                             ; d <- defn payload (DefineV x)
-                             ; pure (Just d, wrap_dots (Variable x)) }
-  (ds, es) <- unzip3 <$> mapM do_one ps
+                             ; d <- defn payload (Variable x)
+                             ; pure (Just d, wrap_dots (DefineV x)) }
+  (ds, es) <- unzip <$> mapM do_one ps
   arr      <- arraySplice es
   pure $ eSeq $ catMaybes ds ++ [Unify arr  e]
 
@@ -437,7 +455,8 @@ data ArrayElem  -- Used very locally, to communicate between `arrayElems` and `a
   deriving (Show)
 
 arraySplice :: [SrcSmall] -> D SrcSmall
--- arraySplice [es1, ..e, es2] -->  arraySplice e1 ++ (e ++ arraySplice es2)
+-- arraySplice [es1, ..e, es2]
+--   -->  e1 = arraySplice e1 ++ (e ++ arraySplice es2)
 arraySplice as
   = case arrayElems as of
       []          -> pure $ Array []
@@ -449,13 +468,13 @@ arraySplice as
     app r [] = pure r
     app r (e : es) = do
       t <- newIdent noLoc "t"
-      rest <- app (Variable t) es
-      pure $ Exists [t] (eSeq [eAppend r (arr e) (Variable t), rest])
+      rest <- app (DefineV t) es
+      pure $ eSeq [eAppend r (arr e) (Variable t), rest]
 
    -- app e1 [e2,e3]
-   --  =  exists t1; append[e1,e2,t1]; app t1 [e3]
-   --  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; app t2 []
-   --  =  exists t1; append[e1,e2,t1]; exists t2; append[t1,e3,t2]; t2
+   --  =  append[e1,e2,t1]; app (exists t1) [e3]
+   --  =  append[e1,e2,t1]; append[exists t1,e3,t2]; app (exists t2) []
+   --  =  append[e1,e2,t1]; append[exists t1,e3,t2]; exists t2
 
 eAppend :: SrcExpr -> SrcExpr -> SrcExpr -> SrcExpr
 -- eAppend e1 e2 t  =   append$[ e1, e2, t ]
