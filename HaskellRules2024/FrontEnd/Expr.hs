@@ -299,7 +299,8 @@ eExists :: [Ident] -> SrcExpr -> SrcExpr
 eExists [] e = e
 eExists is e = Exists is e
 
-eDefine :: Ident -> SrcExpr -> SrcExpr
+eDefine :: HasCallStack => Ident -> SrcExpr -> SrcExpr
+eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
 -- x := (e1; ...; en)   generates   exists x; e1; ... e(n-1); x=en
 -- Smart contructor, floats out nested defines
 eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
