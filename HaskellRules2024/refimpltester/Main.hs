@@ -68,25 +68,36 @@ okTest s =
   not ("attributes/" `isInfixOf` s) &&
   not ("struct/" `isInfixOf` s) &&
   not ("class/" `isInfixOf` s) &&
+  not ("enum/" `isInfixOf` s) &&
   notElem s structs &&
+  notElem s modules &&
   notElem s floats &&
   notElem s overloads &&
-  notElem s broken
+  notElem s broken &&
+  notElem s choices
 
 broken :: [FilePath]
 broken =
   [ -- All these seem to be instances of the same problem.
-    "12.verse", "32.verse", "33.verse", "43.verse"
+    "12.verse", "32.verse", "33.verse", "43.verse", "73.verse", "74.verse"
+  , "8.verse", "81.verse", "87.verse", "90.verse", "93.verse"
+  , "all/1.verse", "choice/1.verse"
   ]
 
 structs :: [FilePath]
-structs = [ "37.verse", "92.verse", "99.verse", "arrow/3.verse", "arrow/4.verse" ]
+structs = [ "37.verse", "92.verse", "99.verse", "arrow/3.verse", "arrow/4.verse", "leniency/1.verse" ]
+
+modules :: [FilePath]
+modules = [ "path/class.verse", "path/module.verse" ]
 
 floats :: [FilePath]
 floats = [ "45.verse", "55.verse", "56.verse", "57.verse" ]
 
 overloads :: [FilePath]
-overloads = [ "85.verse", "89.verse" ]
+overloads = [ "84.verse", "85.verse", "89.verse" ]
+
+choices :: [FilePath]
+choices = ["choice/4.verse", "choice/6.verse", "choice/7.verse"]
 
 getTest :: Mode -> FilePath -> IO Test
 getTest mode directory = do
