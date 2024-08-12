@@ -67,6 +67,7 @@ okTest s =
   not ("assume/" `isInfixOf` s) &&
   not ("attributes/" `isInfixOf` s) &&
   not ("struct/" `isInfixOf` s) &&
+  not ("class/" `isInfixOf` s) &&
   notElem s structs &&
   notElem s floats &&
   notElem s overloads &&
