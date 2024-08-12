@@ -21,6 +21,7 @@ import Data.List
 import qualified Data.Set as S
 import Control.Monad
 
+import GHC.Stack
 --import Debug.Trace
 
 --import qualified Data.Map as M
@@ -643,6 +644,11 @@ defineDE2 nm ds_rhs ds_body
                    then pure (eSeq [eDefine x rhs', body'])
                    else pure (eSeq [rhs',           body']) } }
 
+-- This avoids constructing '_ := e', which can happen with inputs like 'function(exists _){e}\
+eDefine' :: Ident -> SrcExpr -> SrcExpr
+eDefine' i e | isSrcUnderscore i = e
+             | otherwise         = eDefine i e
+
 {- Note [Avoiding clutter]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 In defineDE2 we are building a term looking like:
@@ -662,7 +668,7 @@ where `x` is complely fresh.   We can abbreviate this if
   Hence the user of `getAllIdents`.
 -}
 
-dsM_12 :: DsMode12 -> SrcSmall -> Pi -> D SrcCore
+dsM_12 :: HasCallStack => DsMode12 -> SrcSmall -> Pi -> D SrcCore
 -- This one does the heavy lifting
 
 -------------------- Functions -----------------------
@@ -752,8 +758,8 @@ dsM_12 s (DefineE x t) pi                   -- MBIND
 -- Equivalent to to (y:any) provided any = \x.x
 --   M_sig[ exists y ]E    = y := exists x.x
 --   M_sig[ exists y ]P(i) = y := i
-dsM_12 _ (DefineV y) E     = pure $ eDefine y existsXX
-dsM_12 _ (DefineV y) (P i) = pure $ eDefine y i
+dsM_12 _ (DefineV y) E     = pure $ eDefine' y existsXX
+dsM_12 _ (DefineV y) (P i) = pure $ eDefine' y i
 
 -------------------- v >> t -----------------
 dsM_12 s (Guard t1 t2) pi                   -- MGUARD
