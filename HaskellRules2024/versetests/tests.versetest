@@ -119,13 +119,9 @@ testeq("Splice5a",pass) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0,
 testeq("Splice6",pass){ f( ..(a:[]int), b:string ) :=
                              { (Length[a], b) }
                       ; f[1,2,3,"foo"] } {(3, "foo") }
-
-testeq("foo",pass){ f( ..a:[]int, b:string ) :=
-                             { (Length[a], b) }
-                      ; f[1,2,3,"foo"] } {(3, "foo") }
-testeq("foo2",pass){ f( a:int,b:int ) := a; f(3,4) }{3}
-testeq("foo3",pass){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
-testeq("foo4",pass){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
+testeq("Splice7",pass){ f( a:int,b:int ) := a; f(3,4) }{3}
+testeq("Splice8",pass){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
+testeq("Splice9",pass){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
 
 #
 testeq("All1",pass) {all{:(1,2,3)}}                            {1,2,3}

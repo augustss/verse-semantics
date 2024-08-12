@@ -443,8 +443,7 @@ defnArray :: [SrcPat] -> SrcSmall -> D SrcSmall
 
 defnArray ps rhs
   = do { (ds, es) <- unzip <$> mapM do_one_elem ps
-       ; arr      <- mkArray es
-       ; pure $ eSeq $ catMaybes ds ++ [Unify arr rhs] }
+       ; pure $ eSeq $ catMaybes ds ++ [Unify (Array es) rhs] }
   where
     do_one_elem :: SrcPat -> D (Maybe SrcSmall, SrcSmall)
     do_one_elem (PrefixOp (Op "..") p) = do { (md, e) <- do_one p
@@ -482,52 +481,6 @@ mkAppend (Array xs) (Array ys) = pure (Array (xs ++ ys))
 mkAppend x          y          = do { r    <- newIdent noLoc "r"
                                     ; pure $ eSeq [ ApplyD (EPrim ArrApp) (Array [x, y, DefineV r])
                                                   , Variable r ] }
-
-{-
-data ArrayElem e = EElem e | ESplice e
-  deriving (Show, Functor)
-
-arraySplice :: [SrcSmall] -> D SrcSmall
--- arraySplice [es1, ..e, es2]
---   -->  e1 = arraySplice e1 ++ (e ++ arraySplice es2)
-arraySplice as
-  = case arrayElems as of
-      []          -> pure $ Array []
-      e:es        -> app (arr e) es
-  where
-    arr (EElems es) = Array es
-    arr (ESplice e) = e
-
-    app r [] = pure r
-    app r (e : es) = do
-      t <- newIdent noLoc "t"
-      rest <- app (DefineV t) es
-      pure $ eSeq [eAppend r (arr e) (Variable t), rest]
-
-   -- app e1 [e2,e3]
-   --  =  append[e1,e2,t1]; app (exists t1) [e3]
-   --  =  append[e1,e2,t1]; append[exists t1,e3,t2]; app (exists t2) []
-   --  =  append[e1,e2,t1]; append[exists t1,e3,t2]; exists t2
-
-arrayElems :: [SrcSmall] -> [ArrayElem]
--- Handle an array element, it can be ..e or e
--- Returns a list of [EElems es, ESplice e, ESplice e, .. ]
--- Where we maximally group the EElems, for efficiency
-arrayElems = grp . map classify
-  where
-    classify :: SrcSmall -> ArrayElem
-    classify (PrefixOp (Ident _ "..") e) = ESplice e
-    classify e                           = EElems [e]
-
-    grp :: [ArrayElem] -> [ArrayElem]
-    -- Group adjacent EElems together
-    grp []                = []
-    grp (ESplice e : as)  = ESplice e : grp as
-    grp (EElems es1 : as) = case grp as of
-                             EElems es2 : as' -> EElems (es1++es2) : as'
-                             as'              -> EElems es1        : as'
--}
-
 
 
 --------------------------------------
@@ -836,18 +789,15 @@ dsM_12 s (Splice t) pi                       -- MARRAYE
 dsM_12 s (Array ts) E                       -- MARRAYE
    = do { elts <- mapM (\t -> dsM_12 s t E) ts; mkArray elts }
 
---      arraySplice =<< mapM elm es
---      where
---        -- SLPJ why not just to (mapM ds es)?
---        elm (PrefixOp dd@(Ident _ "..") e) = PrefixOp dd <$> ds e
---        elm e                              = ds e
-
+-- M[ <t1, .., tn> ] P(i)
+--   = i = <exists i1, ..., exists in>;
+--     <M[t1]P(i1), ..., M[tn]P(in}
 dsM_12 s (Array ts) (P i)                   -- MARRAYP
    = do { prs <- mapM do_one ts
-        ; let (ds, es) = unzip prs
-        ; arr <- mkArray es
-        ; res <- mkArray ds
-        ; pure (eSeq [ Unify i arr, res ]) }
+        ; let (exi_js, es) = unzip prs
+        ; exi_js_arr <- mkArray exi_js
+        ; res <- mkArray es
+        ; pure (eSeq [ Unify i exi_js_arr, res ]) }
    where
      do_one :: SrcExpr -> D (SrcExpr, SrcExpr)
      -- Returns the pattern-match decl, and the thing to put in the tuple
