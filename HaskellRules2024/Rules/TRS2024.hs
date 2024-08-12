@@ -533,6 +533,9 @@ E2a: exists x. (if(y=3) then e1 else e2);  (y=3) is NOT blocked because we are w
 
 E2b: exists x. x=3; HOLE                   (x=3) is NOT blocked because local exi x
 
+E2c: exists x. (if(x>3) then e1 else e2);  (x>3) is blocked because local exi x
+              HOLE                         is rigid under the 'if'
+
 E3: exists x. x>3; 7; HOLE                 7 is blocked; it's fine to substitute
                                            across the 7
     NB: in more complicated cases the "7" might not go away, eg
@@ -567,12 +570,15 @@ data LocalExis = LX { exi_flexi :: [Ident]   -- Flexible existentials
 allExis :: LocalExis -> [Ident]
 allExis (LX { exi_flexi = flexi, exi_rigid = rigid }) = rigid ++ flexi
 
-isLocalFlexi :: LocalExis -> Ident -> Bool
-isLocalFlexi (LX { exi_flexi = flexi }) x
-  = x `elem` flexi
 
-isRigidExi :: LocalExis -> Ident -> Bool
-isRigidExi (LX { exi_rigid = rigid }) x = x `elem` rigid
+isLocal :: LocalExis -> Ident -> Bool
+isLocal lx x = isFlexiLocal lx x || isRigidLocal lx x
+
+isFlexiLocal :: LocalExis -> Ident -> Bool
+isFlexiLocal (LX { exi_flexi = flexi }) x = x `elem` flexi
+
+isRigidLocal :: LocalExis -> Ident -> Bool
+isRigidLocal (LX { exi_rigid = rigid }) x = x `elem` rigid
 
 addFlexi :: LocalExis -> Ident -> LocalExis
 addFlexi (LX { exi_flexi = flexi, exi_rigid = rigid }) x
@@ -582,7 +588,7 @@ makeRigid :: LocalExis -> LocalExis
 makeRigid (LX { exi_flexi = flexi, exi_rigid = rigid })
  = LX { exi_flexi = [], exi_rigid = rigid ++ flexi }
 
-blkd :: LocalExis -> Expr_or_Context-> Bool
+blkd :: LocalExis -> Expr_or_Context -> Bool
 -- See Note [Blocked] for what this function means
 -- In the Context case (i.e. Expr has a HOLE), look only to the left of the HOLE
 -- SLPJ: need to update the document to reflect this function
@@ -591,8 +597,8 @@ blkd _  HOLE        = True
 blkd _  e | isVal e = False   -- See (E3)
 
 blkd lx (Var x :=: Var y) | x == y
-                          = isLocalFlexi lx x
-blkd lx (Var x :=: e)     = isRigidExi lx x -- See (E2)
+                          = isFlexiLocal lx x
+blkd lx (Var x :=: e)     = isRigidLocal lx x -- See (E2)
                           || blkd lx e      -- Blocked if *either* side is blocked
 blkd lx (hnf :=: e)       = assert (isHNF hnf) (show hnf) $
                             blkd lx e
@@ -605,14 +611,14 @@ blkd lx (One e)     = blkd (makeRigid lx) e   -- See (E2)
 blkd lx (All e)     = blkd (makeRigid lx) e   -- See (E2)
 blkd lx (Exi bnd)   = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
 blkd lx (v1 :@: v2) = case v1 of
-                        Var f -> isLocalFlexi lx f                -- Needed for (E2)!
-                        Op {} -> any (isLocalFlexi lx) (free v2)  -- See (E1)
+                        Var f -> isLocal lx f                -- Needed for (E2)!
+                        Op {} -> any (isLocal lx) (free v2)  -- See (E1)
                         _     -> False
 
 blkd _  (Verify _)  = True
 blkd lx (Check _ e) = blkd lx e
-blkd lx (Some v)    = any (isLocalFlexi lx) (free v)
-blkd lx (v :>>: _)  = any (isLocalFlexi lx) (free v)
+blkd lx (Some v)    = any (isLocal lx) (free v)
+blkd lx (v :>>: _)  = any (isLocal lx) (free v)
 
 blkd _  Fail        = False
 

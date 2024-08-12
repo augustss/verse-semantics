@@ -183,11 +183,13 @@ testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
 testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
 testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
 testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-# This uses a function with multiple results, that's not allowed.
+
+# For6: uses a function with multiple results, that's not allowed.
 #testeq("For6",pass) {
 #   upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
 #   for(x:=upto[1,3]){x}}                           {(1,2,3)}
-testeq("For7",pass)  {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
+
+testeq("For7",pass)  {for{for(x:=1|2|3){4|x}}}            {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
 testeq("For8",pass) {for(x:=1){x+1}}                      {array{2}}
 
 # Skipping these since `f` is <iterates> and hence dodgy?
@@ -353,7 +355,7 @@ testeq("AndyChoice4", pass)
                     }
                     { array{ (1, array{1}, 4), (1, array{1}, 5), (1, array{2}, 4), (1, array{2}, 5) } }
 
-testeq("AndyExe29", pass, broken)
+testeq("AndyExe29", pass)
                     {
                       exists X Y {
                         Y = all {
