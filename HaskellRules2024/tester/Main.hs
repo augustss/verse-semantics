@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TupleSections #-}
 module Main(main) where
 
 import Prelude
@@ -23,7 +24,7 @@ import TRS.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
 
-import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos )
+import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos, sepBy1 )
 
 import GHC.Stack( HasCallStack )
 
@@ -756,7 +757,8 @@ setPreludeFlag are_verifying test_flags flags
 
 type Skipped = [SkippedTest]
 data SkippedTest = MkSkippedTest
-  { skipStatus :: TestStatus    -- ^ The type of the test (pass/fail)
+  { skipName   :: Maybe String  -- ^ The name of the test (optional)
+  , skipStatus :: TestStatus    -- ^ The type of the test (pass/fail)
   , skipReason :: String        -- ^ The reason why the test is broken (in quotes)
   , skipCode   :: SrcExpr       -- ^ The exact string (single line) corresponding to the test (in quotes)
   }
@@ -791,10 +793,21 @@ broken("reason"){ test }
 pSkipped :: P SkippedTest
 pSkipped = do
   status <- pSkipTestStatus
-  reason <- pParens pStringLit
-  -- code   <- pBraces pExprSeq
+  (mname, reason) <- pParens pSkipInfo
   code   <- pExprSeq <* optional (pOp ";")
-  pure (MkSkippedTest status reason code)
+  pure (MkSkippedTest mname status reason code)
+
+pSkipInfo :: P (Maybe String, String)
+pSkipInfo = mkSkip <$> sepBy1 pStringLit (pOp ",")
+  where
+    mkSkip [a,b] = (Just a, b)
+    mkSkip [b]   = (Nothing, b)
+    mkSkip _     = undefined
+  -- pParens (pSkipName OA.<|> pSkipAnon)
+  -- where
+  --   pSkipName = (\n r -> (Just n, r)) <$> (pStringLit <* pOp ",") <*> pStringLit
+  --   pSkipAnon = (Nothing,) <$> pStringLit
+
 
 pSkipTestStatus :: P TestStatus
 pSkipTestStatus = do

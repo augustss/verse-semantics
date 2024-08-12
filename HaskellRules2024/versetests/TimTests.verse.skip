@@ -4,3 +4,4 @@ skip("eff-interacts"){f(g():int):int => h()<interacts>:int => f[h]}
 
 
 skip("f1 seems unbound?"){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}		#FP:10.4:STRENGTH???
+broken("misparsing &") {f(x&y:int):=(y,x) => f(3,5)=(5,3)}	#FP:10.4:CHECK:DESUGAR&

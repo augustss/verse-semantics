@@ -1,5 +1,5 @@
 
-skip("funny parsing issue") {a:=(1;2;),a=(1,2)}
+skip("ARRAYX", "funny parsing issue") {a:=(1;2;),a=(1,2)}
 
 broken("fun call order")
                      { F( X:int, G():type{X = 1} )
