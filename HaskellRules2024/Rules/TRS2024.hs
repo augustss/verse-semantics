@@ -607,7 +607,14 @@ blkd lx (e1 :>: e2)
   | isVal e2        = blkd lx e1
   | otherwise       = blkd lx e1 && (isContext e1 || blkd lx e2)  -- If HOLE is in e1, ignore e2
 blkd lx (e1 :|: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)  -- SLPJ: check
-blkd lx (One e)     = blkd (makeRigid lx) e   -- See (E2)
+
+blkd lx (One (e1 :|: _)) = blkd (makeRigid lx) e1
+blkd lx (One e)          = blkd (makeRigid lx) e         -- See (E2)
+  -- Tricky: AndyExe73
+  --   one{ (x>5; (\_.e1)) | \_.e2 }; x=7
+  -- We want to substitute for x=7, without worrying
+  --   about the second choice
+
 blkd lx (All e)     = blkd (makeRigid lx) e   -- See (E2)
 blkd lx (Exi bnd)   = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
 blkd lx (v1 :@: v2) = case v1 of

@@ -300,4 +300,6 @@ verify("Tricky:L2", fail){ f():int := 0; y:any; y="monkey"; int[y]; y=f[] }
 verify("Tricky:L3", fail){ x:int; y:int = x; y=x; x }
 verify("Tricky:L3a", fail){ foo(x:any)<succeeds> := {int[x]; y:int = x; y=x; x} }
 verify("Tricky:G1", fail){ foo(x:int):int := x; y := foo[y] }
+
 verify("Tricky:PC2", pass){ f(x := 1, y:= 2):int := 7; exists x y { f(x, y); x+y } }
+  # PC2: bidirectional programming and narrowing

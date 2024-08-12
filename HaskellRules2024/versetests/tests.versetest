@@ -385,4 +385,4 @@ testeq("AndyExe29", pass)
                       }
                     }
                     { array{} }
-testeq("AndyExe73",pass, broken) { Y := if (X = 1) then 1 else 2; X := 3; Y } { 2 }
+testeq("AndyExe73",pass) { Y := if (X = 1) then 1 else 2; X := 3; Y } { 2 }
