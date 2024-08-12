@@ -76,7 +76,7 @@ okTest s =
 broken :: [FilePath]
 broken =
   [ -- All these seem to be instances of the same problem.
-    "12.verse" -- , "17.verse", "19.verse", "21.verse", "32.verse", "33.verse"
+    "12.verse", "32.verse", "33.verse", "43.verse"
   ]
 
 structs :: [FilePath]
