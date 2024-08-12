@@ -347,7 +347,22 @@ testeq("AndyExe19", pass)
 testeq("AndyChoice4", pass)
                     { all { Y := for(1) {1|2};
                             Z := 4|5;
-                            (Y, Z)
+                            X := 1;
+                            (X, Y, Z)
                           }
                     }
-                    { array{ (array{1}, 4), (array{1}, 5), (array{2}, 4), (array{2}, 5) } }
+                    { array{ (1, array{1}, 4), (1, array{1}, 5), (1, array{2}, 4), (1, array{2}, 5) } }
+
+testeq("AndyExe29", pass, broken)
+                    {
+                      exists X Y {
+                        Y = all {
+                          exists I {
+                            X[I]
+                          }
+                        };
+                        X = ();
+                        Y
+                      }
+                    }
+                    { array{} }
