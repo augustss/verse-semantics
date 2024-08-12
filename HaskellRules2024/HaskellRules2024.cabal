@@ -80,6 +80,65 @@ executable tester
 
      default-language: Haskell2010
 
+executable refimpltester
+     import:           general-libs
+     hs-source-dirs:   refimpltester
+     build-depends:    verse-libs,
+                       megaparsec,
+                       optparse-applicative,
+                       HUnit,
+                       prettyprinter,
+                       comonad,
+                       semigroupoids,
+                       text,
+                       unordered-containers,
+                       bytestring,
+                       transformers,
+                       hashable,
+                       parsec,
+                       filepath,
+     hs-source-dirs:   ../VerseReferenceImpl/src
+
+     main-is:          Main.hs
+
+     default-language: GHC2021
+     ghc-options:      -Wall -Wno-name-shadowing
+
+     other-modules:
+        Control.Monad.Extras
+        Control.Monad.Ref
+        Control.Monad.Supply
+        Control.Monad.Verse
+        Control.Monad.Wrong
+        Data.Fix
+        Data.IntMap.Lazy.Extras
+        Data.IntMap.Strict.Extras
+        Language.Verse
+        Language.Verse.Access
+        Language.Verse.Contract
+        Language.Verse.Desugar
+        Language.Verse.Desugar.Exp
+        Language.Verse.Effect.Split
+        Language.Verse.Error
+        Language.Verse.Eval
+        Language.Verse.Ident
+        Language.Verse.Indent
+        Language.Verse.Intrinsic
+        Language.Verse.Label
+        Language.Verse.Loc
+        Language.Verse.Mode
+        Language.Verse.Parse.Exp
+        Language.Verse.Parse2
+        Language.Verse.Path
+        Language.Verse.Pos
+        Language.Verse.Rewrite
+        Language.Verse.Rewrite.Exp
+        Language.Verse.SimpleName
+        Language.Verse.Token
+        Language.Verse.Val
+
+           
+
 -- executable qctest
 --     import:           general-libs
 --     build-depends:    verse-libs,
