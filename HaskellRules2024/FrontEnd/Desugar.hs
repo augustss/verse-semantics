@@ -316,7 +316,7 @@ apply2 con x1 x2 = pure $ con x1 x2
 -- Patterns
 --------------------------------------
 
-defn :: SrcPat -> SrcExpr -> D SrcExpr
+defn :: (HasCallStack) => SrcPat -> SrcExpr -> D SrcExpr
 -- Desugars (p := e) into an expression; see Fig 3, top group
 -- Neither input is desugared; the result
 --   should have sDesugarExpr applied to it.

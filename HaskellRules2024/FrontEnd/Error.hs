@@ -20,7 +20,7 @@ internalErrorMsg s = error $ "internalError: " ++ s
 syntaxError :: (HasCallStack, Pretty loc) => loc -> String -> a
 syntaxError l s = errorMessage $ "syntax error: " ++ prettyShow l ++ " " ++ s
 
-errorMessage :: String -> a
+errorMessage :: (HasCallStack) => String -> a
 errorMessage msg = error $ "error: " ++ msg
 
 assert :: (HasCallStack) => Bool -> String -> a -> a
