@@ -233,7 +233,7 @@ runTestFile tflg (fn, ts)
            ; printSome isBrokenPass        unexpected "      %d expected broken, but actually passed" }
       ; printNZ n_skipped  "%5d skipped"
       ; putStrLn "---------------------------------------------------------"
-      ; unless (n_expected == n_tests) $ exitWith (ExitFailure 1) }
+      ; unless (n_expected + n_skipped == n_tests) $ exitWith (ExitFailure 1) }
   where
     count :: (TestRes->Bool) -> [TestRes] -> Int
     count p rs = length (filter p rs)
