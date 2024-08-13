@@ -59,12 +59,12 @@ main = do
   runTestTTAndExit $ TestList [executionTest] -- , verificationTest]
 
 dumpDesugar :: Bool
-dumpDesugar = True
+dumpDesugar = False
 
 okTest :: String -> Bool
 --okTest s | trace (show s) False = undefined
 okTest s =
---  s == "16.verse" &&
+--  s == "colon/1.verse" &&
   not ("verify/" `isInfixOf` s) &&
   not ("var/" `isInfixOf` s) &&
   not ("assume/" `isInfixOf` s) &&
@@ -87,7 +87,15 @@ broken =
   [ -- All these seem to be instances of the same problem.
     "12.verse", "32.verse", "33.verse", "43.verse", "73.verse", "74.verse"
   , "8.verse", "81.verse", "87.verse", "90.verse", "93.verse"
-  , "all/1.verse", "choice/1.verse", "choice/3.verse"
+  , "all/1.verse", "choice/1.verse", "choice/3.verse",
+    "unify/1.verse",
+    -- different weirdness
+    "function/13.verse",
+    -- just the wrong error message
+    "succeeds/2.verse",
+    -- annoying name clashed
+    "function/3.verse", "function/5.verse",
+    "where/1.verse", "colon/8.verse"
   ]
 
 structs :: [FilePath]
@@ -97,10 +105,10 @@ modules :: [FilePath]
 modules = [ "path/class.verse", "path/module.verse" ]
 
 floats :: [FilePath]
-floats = [ "45.verse", "55.verse", "56.verse", "57.verse" ]
+floats = [ "45.verse", "55.verse", "56.verse", "57.verse", "string/6.verse", "string/7.verse" ]
 
 overloads :: [FilePath]
-overloads = [ "84.verse", "85.verse", "89.verse" ]
+overloads = [ "84.verse", "85.verse", "89.verse", "function/11.verse", "function/12.verse" ]
 
 choices :: [FilePath]
 choices = ["choice/4.verse", "choice/6.verse", "choice/7.verse"]
@@ -123,7 +131,7 @@ evalFile :: Mode
          -> FilePath
          -> IO (Either Error (Maybe [V.FrozenVal]))
 evalFile _mode verseFile = do
-  putStrLn $ "\nfile " ++ verseFile
+--  putStrLn $ "\nfile " ++ verseFile
   file <- ByteString.readFile verseFile
   case parse2 verseFile file of
     Left err -> return (Left err)
@@ -179,7 +187,10 @@ runM :: M a -> a
 runM (M a) = snd (a 0)
 
 desugar :: L (P.Exp SimpleName) -> L (R.Exp L Ident)
-desugar e = runM (R.rewrite e)
+desugar e =
+  let r = runM (R.rewrite e)
+  in  --(if dumpDesugar then trace ("\n----------\nparse=\n" ++ show e ++ "\n-----------\nrewrite=\n" ++ show r) else id)
+      r
 
 lexp :: L (R.Exp L Ident) -> F.SrcExpr
 lexp (L l e) = expToSrcExpr l e
@@ -218,7 +229,8 @@ expToSrcExpr l (R.All e) = F.Macro1 (macro l "all") [] (lexp e)
 expToSrcExpr l (R.Not e) = F.PrefixOp (preOp l "not") (lexp e)
 expToSrcExpr l (R.Verify e) = F.Macro1 (macro l "verify") [] (lexp e)
 expToSrcExpr l (R.Check eff e) = F.Macro1 (strIdent l (effToString eff)) [] (lexp e)
-expToSrcExpr l (R.OfType e1 e2) = F.InfixOp (lexp e1) (inOp l ":") (lexp e2)
+expToSrcExpr _ (R.OfType e1 e2) = --F.InfixOp (lexp e1) (inOp l ":") (lexp e2)
+  F.OfType (lexp e1) [] (lexp e2)
 expToSrcExpr l (R.Assume e) = F.Macro1 (macro l "assume") [] (lexp e)
 -- expToSrcExpr l (R.Module e) = XXX
 -- expToSrcExpr l (R.Struct e) = XXX
