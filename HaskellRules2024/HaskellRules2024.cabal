@@ -39,7 +39,9 @@ executable confluence-check
     import:           general-libs
     hs-source-dirs:   Confluence
                       .
-    build-depends:
+    build-depends:    text,
+                      QuickCheck,
+                      verse-libs
 
     main-is:          Main.hs
 
@@ -53,10 +55,8 @@ executable confluence-check
                       Epic.Print
                       Epic.List
                       Epic.UnionFind
---                      Frontend.Error
+                      FrontEnd.Error
 
-    build-depends:    text,
-                      QuickCheck
 
 
 -- executable trsverifier
