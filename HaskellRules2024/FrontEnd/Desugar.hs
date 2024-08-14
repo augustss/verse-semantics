@@ -23,21 +23,18 @@ import qualified Data.Set as S
 import Control.Monad
 
 import GHC.Stack
---import Debug.Trace
-
---import qualified Data.Map as M
 
 -- QUESTIONS:
 --  x:int='a'   fail or wrong?, tests L93, L95
 
 -- TODO:
---  Add Length
 --  Add Err
 
 -- TODO:
 --  x:t=v is syntactic sugar for x:=(:t=v) and
 --  :t=v is a special form meaning it's not the same as (:t)=v, which is just unification.
 --  desugar function effects
+
 
 -----------------------------------------------
 --
@@ -114,10 +111,6 @@ sDesugarExpr = ds
     ds (InfixOp e1 (Op ":=") e2) = defn e1 e2 >>= ds
 
     ds (InfixOp e1 (Op ":")  e2)
-      | Just es <- getAmpersands e1
-        -- f&g : ty       -->  (f:ty, g:ty)
-      = ds (Array [ InfixOp e (Op ":") e2 | e <- es ])
-
       | Just (f, a, fxs) <- getFun e1
         -- f(a)<fx> : ty  -->  f := fun(a){ :ty<fx> }
         --        e : ty  -->  e := :ty<>
@@ -155,7 +148,7 @@ sDesugarExpr = ds
                                              , All (eSeq [e1', eThunk e2'])]))
 
     -- Array
-    ds (Array es) = Array <$> mapM ds (concatMap flattenAmpersandElt es)
+    ds (Array es) = Array <$> mapM ds es
 
     -- Let and where
     --    (let e in b)  --> e; b
@@ -181,7 +174,7 @@ sDesugarExpr = ds
     -- NB: Prefix '?' is just a function now; see note [Truth values] in Rules.Core
     ds (PrefixOp (Op "not") e)   = do e' <- ds e; pure $ If3 e' Fail eFalse
     ds (PrefixOp (Op ":") e)     = Range [] <$> ds e
-    ds (PrefixOp (Op "..") e)    = Splice   <$> ds e
+    ds (PrefixOp (Op "..") e)    = Splice   <$> ds e  -- See Note [Desugaring array splices]
     ds (PrefixOp (Ident l op) e) = ds =<< call Pre l op e
 
     -- e?  means simply  e[_]  or equivalently   exists x. e[x]
@@ -254,22 +247,6 @@ sDesugarExpr = ds
 
     ds x = compos ds x
 
-flattenAmpersandElt :: SrcExpr -> [SrcExpr]
-flattenAmpersandElt e = case getAmpersands e of
-                          Just es -> es
-                          Nothing -> [e]
-
-getAmpersands :: SrcExpr -> Maybe [SrcExpr]
--- `getAmpersands` flattens out all the nested `&` into a list
--- (e1 & e2 & 3)  -->   Just [e1,e2,e3]
--- e              -->   Nothing         # if e is not (e1&e2)
-getAmpersands e
-  | InfixOp _ (Op "&") _ <- e  = Just (get e)
-  | otherwise                  = Nothing
-  where
-    get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
-    get p                        = [p]
-
 checkEffs :: [Eff] -> D [Eff]
 checkEffs = mapM checkEff
   where
@@ -286,34 +263,6 @@ knownEffects = map (Ident noLoc) [
 closedId :: Ident
 closedId = Ident noLoc "closed"
 
-{-
---------------------------------------
--- Application
---------------------------------------
-
-apply :: (SrcValue -> SrcValue -> SrcExpr) -> SrcExpr -> SrcExpr -> D SrcExpr
--- val1[e2]  -->
-apply con e1 e2 | isValue e1 = apply1 con e1 e2   -- Easy special case.  Not really needed
--- e1[e2]  -->  f:=e1; f[e2]
-apply con e1 e2 = do
-  f <- newIdent (getLoc e1) "f"
-  r <- apply1 con (Variable f) e2
-  pure $ eSeq [eDefine f e1, r]
-
-apply1 :: (SrcValue -> SrcValue -> SrcExpr) -> SrcValue -> SrcExpr -> D SrcExpr
--- val1[val2]
-apply1 con x1 e2 | isValue e2 = apply2 con x1 e2   -- Easy special case.  Not really needed
--- val1[e2]  -->  a:=e2; val1[a]
-apply1 con x1 e2 = do
-  a <- newIdent (getLoc e2) "a"
-  r <- apply2 con x1 (Variable a)
-  pure $ eSeq [eDefine a e2, r]
-
--- val1[val2]  -->
-apply2 :: (SrcValue -> SrcValue -> SrcExpr) -> SrcValue -> SrcValue -> D SrcExpr
-apply2 con x1 x2 = pure $ con x1 x2
--}
-
 --------------------------------------
 -- Patterns
 --------------------------------------
@@ -328,7 +277,17 @@ defn (Variable (Ident _ "_")) e = do
   x <- newIdent (getLoc e) "u"
   pure $ eDefine x e
 
-defn (Variable i) e = pure $ eDefine i e
+defn (Variable i) e
+  | isSrcUnderscore i = pure e
+  | otherwise         = pure $ eDefine i e
+
+defn xs@(InfixOp _ (Op "&") _) e
+  = -- See Note [Desugaring ampersand]
+    do { es <- mapM (\p -> defn p e) (get xs)
+       ; pure $ Splice $ Array es }
+  where
+    get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
+    get p                        = [p]
 
 -- Rule:   p(a)<fxs> := rhs   -->  p := fun(a){check<fxs>{rhs}}
 --         Adding <succeeds> if not present
@@ -365,15 +324,18 @@ defn p@(EffAttr {}) e
 --defn (PostfixOp p (Ident _ "?")) e = defn p (Option $ Just e)
 -- Rule: (p1,...) := e  -->  (x1:any,...) = e; p1 := x1; ...
 
-defn (Array ps) e = defnArray (concatMap flattenAmpersandElt ps) e
+defn (Array ps) e = defnArray ps e
 
 -- Rule (p1 -> p2) := e  -->  p1 := x1; p2 := x2; (x1 -> x2) := e
-defn (InfixOp (Variable x1) (Op "->") (Variable x2)) e = pure $ DefineIE x1 x2 e
+defn (InfixOp (Variable x1) (Op "->") (Variable x2)) e
+  = pure $ DefineIE x1 x2 e
+
 defn (InfixOp x1@Variable{} op@(Op "->") p2) e = do
   x2 <- Variable <$> newIdent (getLoc p2) "x"
   r2 <- defn p2 x2
   r  <- defn (InfixOp x1 op x2) e
   pure $ eSeq [r2, r]
+
 defn (InfixOp p1 op@(Op "->") p2) e = do
   x1 <- Variable <$> newIdent (getLoc p2) "x"
   r1 <- defn p1 x1
@@ -426,18 +388,14 @@ simpleMapEntry _ = Nothing
 -- Arrays
 --------------------------------------
 
-defnArray :: [SrcPat] -> SrcSmall -> D SrcSmall
+defnArray :: [SrcPat] -> SrcExpr -> D SrcExpr
 -- Dealing with an array on the LHS of a ":=", i.e.  an "array pattern"
 -- For example
 --     (p1, p2, ..p3, p4) := e
 -- --->
 --       p1 := x1; p2 := x2; p3 :=  x3; p4 := x4
---       arraySplice{ exists x1, exists x2, ..exists x3, exists x4 }
---  -->
---       p1 := x1; p2 := x2; p3 := x3; p4 := x4
---       arrApp$[ ar{exists x1,exists x2}, exists x3, exists t1 ]
---       arrApp$[ t1, exists x4, exists t2 ]
---       t2 = e
+--       array{ exists x1, exists x2, ..exists x3, exists x4 } = e
+--  NB: the ".." part is dealt with in mDesugaring
 --
 -- Short cut if pi is a variable.  E.g. if p1 is a variable a, we et
 --       p2 := x2; p3 := x3; p4 := x4
@@ -448,9 +406,12 @@ defnArray ps rhs
        ; pure $ eSeq $ catMaybes ds ++ [Unify (Array es) rhs] }
   where
     do_one_elem :: SrcPat -> D (Maybe SrcSmall, SrcSmall)
-    do_one_elem (PrefixOp (Op "..") p) = do { (md, e) <- do_one p
-                                            ; pure (md, Splice e) }
-    do_one_elem p                      = do_one p
+    do_one_elem p
+      | PrefixOp (Op "..") p' <- p
+      = -- See Note [Desugaring array splices]
+        do { (md, e) <- do_one p'; pure (md, Splice e) }
+      | otherwise
+      = do_one p
 
     do_one :: SrcPat -> D (Maybe SrcSmall, SrcSmall)
     do_one pat
@@ -461,28 +422,6 @@ defnArray ps rhs
       = do { x <- newIdent (getLoc pat) "x"
            ; d <- defn pat (Variable x)
            ; pure (Just d, DefineV x) }
-
-mkArray :: [SrcSmall] -> D SrcSmall
-mkArray es
-  = case grabFirst es of
-      (e', [])  -> pure e'
-      (e', es') -> do { rest <- mkArray es'; mkAppend e' rest }
-  where
-    grabFirst :: [SrcSmall] -> (SrcSmall, [SrcSmall])
-    grabFirst []                 = (Array [], [])
-    grabFirst (Splice e : es')   = (e,es')
-    grabFirst (e        :   es') = go [e] es'
-      where
-        go elts []                   = (Array (reverse elts), [])
-        go elts es''@(Splice {} : _) = (Array (reverse elts), es'')
-        go elts (elt : es'')         = go (elt:elts) es''
-
-mkAppend :: SrcExpr -> SrcExpr -> D SrcExpr
--- eAppend e1 e2  =   e1 ++ e2
-mkAppend (Array xs) (Array ys) = pure (Array (xs ++ ys))
-mkAppend x          y          = do { r    <- newIdent noLoc "r"
-                                    ; pure $ eSeq [ ApplyD (EPrim ArrApp) (Array [x, y, DefineV r])
-                                                  , Variable r ] }
 
 
 --------------------------------------
@@ -589,6 +528,123 @@ _addDeref = pure . exprD S.empty
 
 --------------------------------------------------------
 --
+--           Array splicing: ..e
+--
+--------------------------------------------------------
+
+{- Note [Desugaring array splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes how the "array splicing" form ..e is handled.
+For example:
+
+* Expressions
+     (1, ..(3,4), 5,6)   =    (1,3,4,5,6)
+  The array (3,4) is "spliced" into the final array
+
+* Pattern bindings
+     (x, ..y) := (1,2,3,4)
+  Here x is bound to 1, and y is bound to (2,3,4)
+
+* f( x:int, ..y:[]int ){ x+Length[y] }; f[1,2,3]
+  Here x gets bound to 1, and y gets bound to (2,3). result is 1+2.
+
+Here is how "..e" is handled:
+
+Parsing: PrefixOp ".." e
+
+S-desugaring: (PrefixOp ".." e) to (Splice e)
+   This happens in two places
+    - sDesugarExpr on SrcExpr (PrefixOp ".." e)
+    - defnArray with a SrcPat (PrefixOp ".." e)
+
+In M-desugaring:
+  - Expression case: M[Array [t1, Splice t2] E
+      call mkArray [ M[t1]E, Splice (M[t2]E) ]
+
+  - Pattern case: M[Array [t1, Splice t2] P(i)
+      exists x1,x2
+      i = mkArray [ x1, ..x2 ]
+      mkArray [ M[t1]P(x1), Splice (M[t2]P(x2)) ]
+
+    Crucially, note that we desugar the original expressions ti
+                                    with M[..]P(xi)
+
+  - The function mkArray builds an array, using arrApp$ to take
+    account of arguments that are wrapped in Splice
+
+Note [Desugaring ampersand]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes how the "ampersand" form (x&y) is handled.
+
+Note that x&y can only occur in /patterns/, SrcPat, which themselves
+appear only in
+   p : t
+   p := t
+
+Parsing: (InfixOp e1 "&" e2)
+
+S-Desugaring:
+  Patterns, SrcPat, are desugared by `defn`. So we just need to say
+  how `defn` desugars
+     (x&y) := e
+  We turn it into
+     Splice (Array [defn x e, defn y e])
+
+M-Desugaring:
+  Given f( x&y:int, z:int ) := rhs
+  M-desugaring will see
+     f := fun( Array [Splice (Array [ x := :int, y := :int ])
+                     , x := :int ]
+             ){rhs}
+
+  If we had written
+     f( ..(x:int, y:int), z:int )
+  we'd get just the same output of S-desugaring.
+
+Wrinkles:
+
+(AMP1) What about (x&y):int?   S-Desugaring `defn` turns this into
+        (x&y):int
+   -->  (x&y) := :int
+   -->  Splice (Array [x:= :int, y:= :int])
+
+   Now M-Desugaring sees a "naked" splice.  Just drop the Splice, to get
+   an array, the same result as if you'd written
+      (x:int, y:int)
+   which is what we want.
+
+Tricky stuff!
+-}
+
+mkArray :: [SrcSmall] -> D SrcSmall
+-- mkArray [t1, t2, ..t3, t4]
+--   = exists r1 r2.
+--     arrApp$[ <t1,t2>, t3, r1 ];
+--     arrApp$[ r1, <t4>, r2 ];
+--     r2
+mkArray es
+  = case grabFirst es of
+      (e', [])  -> pure e'
+      (e', es') -> do { rest <- mkArray es'; mkAppend e' rest }
+  where
+    grabFirst :: [SrcSmall] -> (SrcSmall, [SrcSmall])
+    grabFirst []                 = (Array [], [])
+    grabFirst (Splice e : es')   = (e,es')
+    grabFirst (e        :   es') = go [e] es'
+      where
+        go elts []                   = (Array (reverse elts), [])
+        go elts es''@(Splice {} : _) = (Array (reverse elts), es'')
+        go elts (elt : es'')         = go (elt:elts) es''
+
+mkAppend :: SrcExpr -> SrcExpr -> D SrcExpr
+-- eAppend e1 e2  =   e1 ++ e2
+mkAppend (Array xs) (Array ys) = pure (Array (xs ++ ys))
+mkAppend x          y          = do { r    <- newIdent noLoc "r"
+                                    ; pure $ eSeq [ ApplyD (EPrim ArrApp) (Array [x, y, DefineV r])
+                                                  , Variable r ] }
+
+--------------------------------------------------------
+--
 --           The M-desugaring
 --     Desugaring Small Source -> Big Core
 --        Fig 9 in desugaring.pdf
@@ -648,7 +704,7 @@ defineDE2 nm ds_rhs ds_body
                    then pure (eSeq [eDefine x rhs', body'])
                    else pure (eSeq [rhs',           body']) } }
 
--- This avoids constructing '_ := e', which can happen with inputs like 'function(exists _){e}\
+-- This avoids constructing '_ := e', which can happen with inputs like 'function(exists _){e}
 eDefine' :: Ident -> SrcExpr -> SrcExpr
 eDefine' i e | isSrcUnderscore i = e
              | otherwise         = eDefine i e
@@ -785,11 +841,14 @@ dsM_12 s (Some t) E           = Some <$> dsM_12 s t E
 dsM_12 _ t@(Some {}) (P {})   = impossible "Some in pattern" t
 
 -------------------- array{t1,...tn} -----------------
-dsM_12 s (Splice t) pi                       -- MARRAYE
-   = Splice <$> dsM_12 s t pi
+dsM_12 s (Splice t) pi                       -- MSPLICE
+   = dsM_12 s t pi   -- See (AMP1) Note [Desugaring ampersand]
 
 dsM_12 s (Array ts) E                       -- MARRAYE
-   = do { elts <- mapM (\t -> dsM_12 s t E) ts; mkArray elts }
+   = do { elts <- mapM do_one ts; mkArray elts }
+   where
+     do_one (Splice t) = Splice <$> dsM_12 s t E
+     do_one t          =            dsM_12 s t E
 
 -- M[ <t1, .., tn> ] P(i)
 --   = i = <exists i1, ..., exists in>;
@@ -798,8 +857,8 @@ dsM_12 s (Array ts) (P i)                   -- MARRAYP
    = do { prs <- mapM do_one ts
         ; let (exi_js, es) = unzip prs
         ; exi_js_arr <- mkArray exi_js
-        ; res <- mkArray es
-        ; pure (eSeq [ Unify i exi_js_arr, res ]) }
+        ; res_arr    <- mkArray es
+        ; pure (eSeq [ Unify i exi_js_arr, res_arr ]) }
    where
      do_one :: SrcExpr -> D (SrcExpr, SrcExpr)
      -- Returns the pattern-match decl, and the thing to put in the tuple

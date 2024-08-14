@@ -303,3 +303,20 @@ verify("Tricky:G1", fail){ foo(x:int):int := x; y := foo[y] }
 
 verify("Tricky:PC2", pass, broken){ f(x := 1, y:= 2):int := 7; exists x y { f(x, y); x+y } }
   # PC2: bidirectional programming and narrowing
+
+verify("Ampersand1", pass){ f ( x&y : int ) := { x + y }; f[2,3]=5 }
+verify("Ampersand2", pass){ f ( x&y : int, q:int ) := { (q, x + y) }; f[2,3,7]=(7,5) }
+verify("Ampersand3", pass){ (x&y : int) := (4,5); x+y = 9 }
+verify("Ampersand4", pass){ ((f&g)(:int,:int):int) => f[3,4] }
+
+verify("Ampersand5", pass, broken)
+    { a&b&c:int =>
+      (f&g)(:int,:int):int =>
+      h(:int):int =>
+      x:=f[a,c] =>
+      y:=g[b,c] =>
+      f=g =>
+      h[x]=h[y] }
+  # Ampersand5: This rather complicated test comes from Tim's tests
+  # It's not really about "&"; rather, it involves unification of functions
+  # Actually, it seems to make the verifier loop, oddly.
