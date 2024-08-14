@@ -168,17 +168,15 @@ verify("HO20-suc",fail)
                       g( h(:int):string ) := { 0 };
                       main()<succeeds> := { g[ inc ] }
                     }
-
 verify("HO20-dec",fail)
                     { inc(x:int):int := {x};
                       g( h(:int):string ) := { 0 };
                       main()<decides> := { g[ inc ] }
                     }
-
 verify("FO20-suc", fail) { f(x:int):int := {x}; main() := { f[ 'm' ] } }
 verify("FO20-dec", pass) { f(x:int):int := {x}; main()<decides> := { f[ 'm' ] } }
 
-
+verify("circular", pass) { a:any => f(x:int):type{int[x]} => f[a] } #works because we "get lucky"
 
 
 # Tim tests
