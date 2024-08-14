@@ -209,13 +209,15 @@ sDesugarExpr = ds
       ds $ If2 (eDefine t e) (Truth (Variable t))
     ds (Truth e) = Truth <$> ds e
 
-    ds (Macro1 (Ident _ "one")   _ e)   = One <$> ds e
-    ds (Macro1 (Ident _ "all")   _ e)   = All <$> ds e
-    ds (Macro1 (Ident _ "verify") _ e)  = Verify [] <$> ds e
-    ds (Macro1 (Ident _ "some") _ e)    = Some <$> ds e
-    ds (Macro1 (Ident _ "check") fx e)  = Check fx <$> ds e
-    ds (Macro1 (Ident _ "succeeds") _ e)= eCheck [effSucceeds] <$> ds e
-    ds (Macro1 (Ident _ "decides") _ e) = eCheck [effDecides] <$> ds e
+    ds (Macro1 (Ident _ "one")   _ e)    = One <$> ds e
+    ds (Macro1 (Ident _ "all")   _ e)    = All <$> ds e
+    ds (Macro1 (Ident _ "verify") _ e)   = Verify [] <$> ds e
+    ds (Macro1 (Ident _ "some") _ e)     = Some <$> ds e
+    ds (Macro1 (Ident _ "check") fx e)   = Check fx <$> ds e
+    ds (Macro1 (Ident _ "expect") fx e)  = Check fx <$> ds e
+                                           -- I think "expect" is Tim's notation for "check"
+    ds (Macro1 (Ident _ "succeeds") _ e) = eCheck [effSucceeds] <$> ds e
+    ds (Macro1 (Ident _ "decides") _ e)  = eCheck [effDecides] <$> ds e
 
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
     ds (Macro1 (Ident _ "assume") _ e)  = do { x <- newIdent (getLoc e) "x"
