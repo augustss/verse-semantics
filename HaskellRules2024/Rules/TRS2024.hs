@@ -237,8 +237,8 @@ drop_prefix (_:_)  []     = Nothing
 unificationStep :: Rule
 unificationStep _env lhs =
   "U-LIT" `name`
-  do (LitInt k1 :=: LitInt k2) :>: e <- [lhs]
-     guard (k1 == k2)
+  do (Lit l1 :=: Lit l2) :>: e <- [lhs]
+     guard (l1 == l2)
      pure e
  ++
   "U-TUP" `name`
@@ -255,9 +255,9 @@ unificationStep _env lhs =
      guard (isHNF a1 && isHNF a2)
      guard $
        case (a1, a2) of
-         (LitInt k1, LitInt k2) -> k1 /= k2
-         (Arr vs, Arr vs')      -> length vs /= length vs'
-         (_,      _)            -> True
+         (Lit l1, Lit l2)  -> l1 /= l2
+         (Arr vs, Arr vs') -> length vs /= length vs'
+         (_,      _)       -> True
      pure Fail
  ++
   "U-OCCURS" `name`
