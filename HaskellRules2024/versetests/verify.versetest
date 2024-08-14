@@ -232,7 +232,7 @@ verify(":type5", pass) {a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}
 
 verify("TimEq", pass) {a:int => b:int => f(a):type{a=b} => {f[a],a=b}}
 
-# "Effective assupmtions"   These ones fail becaues we invoke the lemma too late
+# "Effective assumptions"   These ones fail becaues we invoke the lemma too late
 verify("PP2", fail) { (x : int) => g(z:int where x=100):type{x=100} => {x = 100; g[0]} }
 verify(":type1", fail) {x:int => f():type{x=0} => {x=0;f[]}}
 verify(":type6", fail) {a:int => b:int => f(a   ):type{a=b} => {a=b,f[a]}}
