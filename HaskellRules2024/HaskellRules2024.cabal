@@ -37,8 +37,11 @@ executable verse-repl
 executable confluence-check
     -- In the Confluence/ subdirectory
     import:           general-libs
-    hs-source-dirs:   Confluence, .
-    build-depends:
+    hs-source-dirs:   Confluence
+                      .
+    build-depends:    text,
+                      QuickCheck,
+                      verse-libs
 
     main-is:          Main.hs
 
@@ -52,9 +55,8 @@ executable confluence-check
                       Epic.Print
                       Epic.List
                       Epic.UnionFind
+                      FrontEnd.Error
 
-    build-depends:    text,
-                      QuickCheck
 
 
 -- executable trsverifier

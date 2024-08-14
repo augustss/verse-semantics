@@ -81,8 +81,8 @@ test(QR20){allow{x:int=x; x=3; x=5}}
 test(QR03){allow{x:int=x; not (x=3,x=5)}}
 test(QS00){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,4)}}
 test(QR20){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,5)}}
-#test(S00){xs:=(3,4); ys:=(3,4); if(allow{as:type{:int,:int}=as; as=xs; as=ys}) then 1 else false?}
-#test(S00){xs:=(3,4); ys:=(3,4); if(allow{x:int=3}) then 1 else 2}
+test(S00){xs:=(3,4); ys:=(3,4); if(allow{as:type{:int,:int}=as; as=xs; as=ys}) then 1 else false?}
+test(S00){xs:=(3,4); ys:=(3,4); if(allow{x:int=3}) then 1 else 2}
 
 # Shows that when unifying a flexible variable with an inflexible array, we need
 # to make a new flexible array.
@@ -373,7 +373,7 @@ test(S00){(1,2)=(1,2)}
 test(F00){(1,2)=(1,3)}
 test(S00){f(x:int):=x => f(3)=3}
 test(S00){a&b&c&d:int => (a,b)=(1,2) => nat[a]}
-test(S00){f(x&y:int):=(y,x) => f(3,5)=(5,3)}	#FP:10.4:CHECK:DESUGAR&
+test(S00){f(x&y:int):=(y,x) => f(3,5)=(5,3)}
 test(F00){f(x&y:int):=(y,x) => f[3,5]=(5,5)}
 test(F00){f(x&y:int):=(y,x) => f[3,5]=(3,3)}
 test(S00){a&b:int => c:=(a,b) => c=(a,b)}
@@ -2239,7 +2239,7 @@ test(QS00){a&b:int => f(:nat)<computes>:int => f[a] => allow{a=b} where f[a]}
 test(QS00){a&b:int => f(:nat):int => f[a] => allow{a=b} where f[a]}
 test(QD00){a&b:int => f(:nat)<computes>:int => f[a] => allow{a=b} where f[b]}
 test(QD00){a&b:int => f(:nat):int => f[a] => allow{a=b} where f[b]}
-#test(D00){a:int => (f&g)(:nat):int => f[a] => allow{f=g} where g[a]} # Pending call-multiple-functions.
+test(D00){a:int => (f&g)(:nat):int => f[a] => allow{f=g} where g[a]} # Pending call-multiple-functions.
 
 # Consider interaction of dominators, virtual elements, and functions as follows.
 test(QS00){a&b:int        => allow{c:=a=b} where int[a]}
@@ -3617,24 +3617,24 @@ test(S00){a&b&c&d:int => f(:int,:int)<computes>:any => if{f(a,b)=f(c,d),a=c,b=d}
 test(F00){f()<computes>:=3 => g()<computes>:=4 => c:=f()=g()}
 test(QS00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(0)}
 test(QD00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(1)}
-#test(S00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(0)}
-#test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(1)}
-#test(S00){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(0)}
-#test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(1)}
-#test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=h(0)}
-#test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=h(1)}
-#test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=h(0)}
-#test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=h(1)}
-#test(S00){(f&g)(:any)<computes>:any=>f(3)=4=>b:=g(3)=>f=g=>b=4}
-#test(S00){(f&g)(:any)<computes>:any=>f(3)=4=>b:=g(3)=>f=g=>b+1=5}
+test(S00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(0)}
+test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(1)}
+test(S00){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(0)}
+test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(1)}
+test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=h(0)}
+test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=h(1)}
+test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=h(0)}
+test(D00){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=h(1)}
+test(S00){(f&g)(:any)<computes>:any=>f(3)=4=>b:=g(3)=>f=g=>b=4}
+test(S00){(f&g)(:any)<computes>:any=>f(3)=4=>b:=g(3)=>f=g=>b+1=5}
 
 # Function eta conversion - concrete.
 test(F00){f()<computes>:=3,g()<computes>:=4,c:=f()=g()}
-#test(R04){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where f(0)=f(0)}
-#test(R04){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where g(0)=g(0)}
-#test(R04){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where h(0)=h(0)}
-#test(F00){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where f(0)=h(0)}
-#test(F00){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where g(0)=h(0)}
+test(R04){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where f(0)=f(0)}
+test(R04){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where g(0)=g(0)}
+test(R04){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where h(0)=h(0)}
+test(F00){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where f(0)=h(0)}
+test(F00){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where g(0)=h(0)}
 
 # Former verifier IsReady assertions.
 test(S00){G(x:=0|1):=2; for{G[_]}}

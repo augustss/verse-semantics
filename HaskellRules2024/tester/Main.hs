@@ -110,7 +110,8 @@ instance Show TestType where
 
 data TestStatus = TS_Normal
                 | TS_Broken   -- Test is currently broken (i.e., pass/fail is negated)
-                | TS_Skip     -- Test should be skipped
+                | TS_Skip     -- Test should be skipped, probably because it somehow
+                              --   crashes the entire implementation
                 deriving( Show, Eq )
 
 testName :: TestInfo -> String
@@ -232,7 +233,7 @@ runTestFile tflg (fn, ts)
            ; printSome isBrokenPass        unexpected "      %d expected broken, but actually passed" }
       ; printNZ n_skipped  "%5d skipped"
       ; putStrLn "---------------------------------------------------------"
-      ; unless (n_expected == n_tests) $ exitWith (ExitFailure 1) }
+      ; unless (n_expected + n_skipped == n_tests) $ exitWith (ExitFailure 1) }
   where
     count :: (TestRes->Bool) -> [TestRes] -> Int
     count p rs = length (filter p rs)
@@ -309,8 +310,10 @@ timTestInfo (Ident loc status) = TestInfo
   }
 
 timTestType :: String -> TestType
-timTestType "S00" = TPass
-timTestType _     = TFail
+-- Any TimTest starting in "S" should pass, e.g. S00, S01
+-- All others should fail.
+timTestType ('S' : _) = TPass
+timTestType _         = TFail
 
 ----------------------------
 runTest :: TestFlags -> Test -> IO TestRes

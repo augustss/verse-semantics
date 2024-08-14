@@ -95,17 +95,33 @@ testeq("Array5",pass){Length(array{_;_})}                   {2}
 
 testeq("Array6",pass){x:=(1,2); y:=(1,3); one{x=y}}         {:false}
 testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
-# This does not work left-to-right
 testeq("Array8",pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
-testeq("Array9",pass) { a := (0,1); a[0] }                  {0}
+testeq("Array9",pass){ a := (0,1); a[0] }                   {0}
 testeq("Array10",pass){ all{1..4} }                         {array{1,2,3,4} }
 testeq("Array11",pass){ for(1..4){7} }                      {array{7,7,7,7} }
 testeq("Array12",pass){ for(i := 1..4){i+1} }               {array{2,3,4,5} }
 testeq("Array13",pass){ a := array{7,8}; for(i:a){i+1} }    {array{8,9} }
+testeq("Array14",pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+testeq("Array15",pass) {Y := for( 1..3 ){ 1 } }             {array{1,1,1}}
+testeq("Array15",pass) {Y := for( 1..3 ){ 1|2 }}            { array{1,1,1} | array{1,1,2} | array{1,2,1}
+                                                            | array{1,2,2} | array{2,1,1} | array{2,1,2}
+                                                            | array{2,2,1} | array{2,2,2} }
 
 # Array expression splicing
-testeq("Array14",pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
-testeq("Array15",pass) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+#  ...in expressions
+testeq("Splice1",pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
+testeq("Splice2",pass) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+#  ...in patterns
+testeq("Splice3",pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Splice4",pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Splice5",pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice5a",pass) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice6",pass){ f( ..(a:[]int), b:string ) :=
+                             { (Length[a], b) }
+                      ; f[1,2,3,"foo"] } {(3, "foo") }
+testeq("Splice7",pass){ f( a:int,b:int ) := a; f(3,4) }{3}
+testeq("Splice8",pass){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
+testeq("Splice9",pass){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
 
 #
 testeq("All1",pass) {all{:(1,2,3)}}                            {1,2,3}
@@ -150,11 +166,6 @@ testeq("Pat13",pass) {i->x := 2; (i, x)}                   {2,2}
 testeq("Pat14",pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
 testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 
-# Array LHS splicing
-testeq("Pat16",pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
-testeq("Pat17",pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq("Pat18",pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Pat19",pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
 
 # L desugaring, i.e., l:t
 testeq("TB1",pass) {(x:int) = 5}                         {5}
@@ -183,10 +194,13 @@ testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
 testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
 testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
 testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-# This uses a function with multiple results, that's not allowed.
-#testeq("For6",pass) {
-#   upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
-#   for(x:=upto[1,3]){x}}                           {(1,2,3)}
+
+testeq("For6",fail) {upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
+                     for(x:=upto[1,3]){x}}
+                     {(1,2,3)}
+  # For6: fails because `upto` doesn't verify; it <iterates>, and Verse doe not allow that
+testeq("For6a",pass) {for(x:=1..3){x}}  {(1,2,3)}
+
 testeq("For7",pass)  {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
 testeq("For8",pass) {for(x:=1){x+1}}                      {array{2}}
 
@@ -272,6 +286,11 @@ testeq("EV22",pass) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:
 testeq("EV23",pass, broken) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
                             ; p:any; swapGood[p] = (2,3); p }
                             {(3,2)}
+testeq("EV23a",pass, broken) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) }
+                            ; p:any; swapGood[p] = (2,3); p }
+                            {(3,2)}
+verify("EV23b",fail) { swapGood(t:any) := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23c",pass) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) } }
 
 # Confluence: Need local substitution, hence 'fail'
 testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}
@@ -353,7 +372,7 @@ testeq("AndyChoice4", pass)
                     }
                     { array{ (1, array{1}, 4), (1, array{1}, 5), (1, array{2}, 4), (1, array{2}, 5) } }
 
-testeq("AndyExe29", pass, broken)
+testeq("AndyExe29", pass)
                     {
                       exists X Y {
                         Y = all {
@@ -366,3 +385,18 @@ testeq("AndyExe29", pass, broken)
                       }
                     }
                     { array{} }
+testeq("AndyExe73",pass) { Y := if (X = 1) then 1 else 2; X := 3; Y } { 2 }
+
+testeq("AndyChoice3",pass,broken) {
+    all {
+      Y := if (X = 1) { 1|2 } else { 3 };
+      Z := 4|5;
+      X := 1;
+      (X, Y, Z)
+    }
+  }
+  { ( (1, 1, 4)
+    , (1, 1, 5)
+    , (1, 2, 4)
+    , (1, 2, 5) )
+  }

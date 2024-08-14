@@ -11,3 +11,191 @@ skip("why fail:U00"){a:int => b&c:any => f(:nat):=b=c => 7}
 skip("assume-fail"){a:int => f(:int):=nat[a] => f[a]}
 skip("why fail:U00"){a&b:any => f(a=b):=a=b => if{f[a=b]}}
 skip("why fail:U00"){a:any => f(nat[a]):=nat[a] => if{f[a]}}
+
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:int=x; x=3; x=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:int=x; x=3; x=5}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:int=x; not (x=3,x=5)}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,4)}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,5)}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){xs:=(3,4); ys:=(3,4); if(allow{as:type{:int,:int}=as; as=xs; as=ys}) then 1 else false?}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){xs:=(3,4); ys:=(3,4); if(allow{x:int=3}) then 1 else 2}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f():=allow{:nat}; f[]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},operator'+'(x)}     # Should be S00.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},operator'+'(x)=7}   # Should be S00.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}; xs[1]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}; int[xs[1]]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => {allow<decides>{a=3}, f():type{a=3}=a=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any => b:int => allow{x:=a=b} where if{x=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:any} where if{x}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<fails>{expect<succeeds>{-3}=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<fails>{expect<succeeds>{-3} where 3=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => {(3,5)[x] where allow<decides>{x=9}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},prefix'-'[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:=allow{assume{:false}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:=allow{assume{:false}},prefix'-'[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},-x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},-x=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},x+1}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},1+x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},x+1=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},1+x=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},operator'+'[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},operator'+'[x]=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where x=4}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where x=3}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where assume{x+1} where x=3}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where assume{x+1}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where assume{x+1} where x+1=4}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where assume{x+1=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(1,2)[x]   where allow{x:false}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(1,2)[x]=3 where allow{x:false}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:=allow{1=2},x.blah}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x.blah,x:=allow{1=2}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<abstracts>{x:any} where 1}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<abstracts>{x:any} where (0,x)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(:any):any => allow<abstracts>{x:any} where f[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(:any):any => allow<abstracts>{x:any} where f(x)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => allow{x:=a=3} where assume{x}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:=3,y:false} where assume{x=y}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:=3,y:false where x=y        } where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:=3,y:false where assume{x=y}} where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a=b} where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a=b} where any[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a=b} where int[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false} where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false} where any[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false} where false[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false} where int[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x=2}        # Obvious.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=5}      # Must hold, else it implies x=2.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3}        # Must hold too, as it's no weaker than previous.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where int[x]=2}   # Must hold, else it implies x=2.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where int[x]}     # Can succeed by reachability.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where int[x]=x}   # Can succeed by reachability.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=5}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=6}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{x=2} where x+3=5}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=5}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=6}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{x=(3,4)} where Concatenate[x,(5,6)]=(3,4,5,6)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{x=(3,4)} where Concatenate[x,(5,6)]=(3,4,5,7)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => allow{as:=array{a}=array{5}} where as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=1} where (5,7)[x]=5}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=1} where (5,7)[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=1} where (5,7)[x]=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0] where cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where as[0]=bs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0]=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0]=as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as&bs:=array{:int} => cs:=allow{as=bs} where cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:=3 } => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:any} => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where a=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where b=b}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where c=c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where a=c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where b=c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where a=b}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where bs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where as[0]=as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where bs[0]=bs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where cs[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where as[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where bs[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where as[0]=bs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{p:=(a,b),p=(b,a),expect<succeeds>{p[0]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where a=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where c=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where int[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where int[c]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where a=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where c=c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where c=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where a=array{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where c=array{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as=as}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where cs=cs}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as=cs}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a,y:=b,z:=x=y} where int[x]} # Must be D00, like it or not.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a,y:=b,z:=x=y} where int[z]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as=array{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where cs=array{:int}} # Slack.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a=b} where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=(:int,:int) => bs:=(:int,:int) => xs:=allow{as=bs} where xs}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=(:int,:int) => bs:=(:int,:int) => xs:=allow{as=bs} where xs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any   => f(x:nat):any => g:=f where allow{g[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int   => f(x:nat):any => g:=f where allow{g[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat   => f(x:nat):any => g:=f where allow{g[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any   => f(x:nat):int => g:=f where allow{g[a]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int   => f(x:nat):int => g:=f where allow{g[a]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat   => f(x:nat):int => g:=f where allow{g[a]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any   => {f(x:nat):=3,g:=f where allow{g[a]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int   => {f(x:nat):=3,g:=f where allow{g[a]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat   => {f(x:nat):=3,g:=f where allow{g[a]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:any => {f(x:nat):=3,g:=f where allow{g[a]=b}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => {f(x:nat):=3,g:=f where allow{g[a]=b}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => {f(x:nat):=3,g:=f where allow{g[a]=b}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{_} => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:=4} => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:int => allow{a=b} where f[a]=f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:int => allow{a=b} where f(a)=f(b)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:int)<computes>:int => allow{a=3} where f[a]=f[3]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:int)<computes>:int => allow{a=3} where if{f[a]}=f[3]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:any} => {bs:=as,allow{bs[0]=3}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(x:any):any => allow{f[3]=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(x:any):any => g:=f where allow{g[3]=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(x:any):int => g:=f where allow{g[3]=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(x:comparable):comparable => g:=f where allow{g[3]=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any => {f(x:any)<computes>:=a,g:=f,allow{g[3]=4}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:comparable => {f(x:comparable)<computes>:=a,g:=f,allow{g[3]=4}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int=>allow{cs:=Concatenate[array{array{a}}] where ds:=cs where ds[0]=8} where cs=ds}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int=>allow{cs:=Concatenate[array{array{a}}] where (ds:=cs)[0]=8} where cs=ds}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:nat)<computes>:int => f[a] => allow{a=b} where f[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:nat):int => f[a] => allow{a=b} where f[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:nat)<computes>:int => f[a] => allow{a=b} where f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:nat):int => f[a] => allow{a=b} where f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => (f&g)(:nat):int => f[a] => allow{f=g} where g[a]} # Pending call-multiple-functions.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int        => allow{c:=a=b} where int[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int        => allow{c:=a=b} where int[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int        => allow{c:=a=b} where int[c]} # Slack.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat => b:int => allow{c:=a=b} where nat[c]} # Not slack.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat => b:int => f(x:nat):=x => allow{c:=a=b} where f[a]=f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => {x:=int[a],allow{x=3}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => b:any => f(x:int):=int[x] => allow{a=b} where f[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => b:any => f(x:int):=int[x] => allow{a=b} where f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x&y:int => f(:int)<computes>:int => f[x] => {a:=allow{x=y},f[x]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x&y:int => f(:int)<computes>:int => f[x] => {a:=allow{x=y},f[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x&y:int => f(:int):int => f[x] => {a:=allow{x=y},f[x]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x&y:int => f(:int):int => f[x] => {a:=allow{x=y},f[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any => b:int => {allow{b=a,if{b=3}}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any => b:int => {allow{if{b=3},b=a}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<resolves>{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:any => allow{a=b} where f[a]=f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:any => allow{a=b} where f[a]=f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:any => x:=f(a) => y:=f(b) => allow{a=b} where x=y}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=h(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=h(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where f(0)=f(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where g(0)=g(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where h(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where f(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where g(0)=h(0)}

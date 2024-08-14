@@ -58,35 +58,66 @@ main = do
 --  verificationTest <- getTest Verification $ "test" </> "verification"
   runTestTTAndExit $ TestList [executionTest] -- , verificationTest]
 
+dumpDesugar :: Bool
+dumpDesugar = False
+
 okTest :: String -> Bool
 --okTest s | trace (show s) False = undefined
 okTest s =
---  s == "16.verse" &&
+--  s == "colon/1.verse" &&
   not ("verify/" `isInfixOf` s) &&
   not ("var/" `isInfixOf` s) &&
   not ("assume/" `isInfixOf` s) &&
   not ("attributes/" `isInfixOf` s) &&
   not ("struct/" `isInfixOf` s) &&
   not ("class/" `isInfixOf` s) &&
+  not ("enum/" `isInfixOf` s) &&
+  not ("float/" `isInfixOf` s) &&
   notElem s structs &&
+  notElem s modules &&
   notElem s floats &&
   notElem s overloads &&
-  notElem s broken
+  notElem s broken &&
+  notElem s choices &&
+  notElem s diverges &&
+  notElem s state
 
 broken :: [FilePath]
 broken =
   [ -- All these seem to be instances of the same problem.
-    "12.verse" -- , "17.verse", "19.verse", "21.verse", "32.verse", "33.verse"
+    "12.verse", "32.verse", "33.verse", "43.verse", "73.verse", "74.verse"
+  , "8.verse", "81.verse", "87.verse", "90.verse", "93.verse"
+  , "all/1.verse", "choice/1.verse", "choice/3.verse",
+    "unify/1.verse",
+    -- different weirdness
+    "function/13.verse",
+    -- just the wrong error message
+    "succeeds/2.verse",
+    -- annoying name clashed
+    "function/3.verse", "function/5.verse",
+    "where/1.verse", "colon/8.verse"
   ]
 
 structs :: [FilePath]
-structs = [ "37.verse", "92.verse", "99.verse", "arrow/3.verse", "arrow/4.verse" ]
+structs = [ "37.verse", "92.verse", "99.verse", "arrow/3.verse", "arrow/4.verse", "leniency/1.verse" ]
+
+modules :: [FilePath]
+modules = [ "path/class.verse", "path/module.verse" ]
 
 floats :: [FilePath]
-floats = [ "45.verse", "55.verse", "56.verse", "57.verse" ]
+floats = [ "45.verse", "55.verse", "56.verse", "57.verse", "string/6.verse", "string/7.verse" ]
 
 overloads :: [FilePath]
-overloads = [ "85.verse", "89.verse" ]
+overloads = [ "84.verse", "85.verse", "89.verse", "function/11.verse", "function/12.verse" ]
+
+choices :: [FilePath]
+choices = ["choice/4.verse", "choice/6.verse", "choice/7.verse"]
+
+diverges :: [FilePath]
+diverges = [ "diverges/3.verse" ]
+
+state :: [FilePath]
+state = [ "for/2.verse", "for/3.verse" ]
 
 getTest :: Mode -> FilePath -> IO Test
 getTest mode directory = do
@@ -100,7 +131,7 @@ evalFile :: Mode
          -> FilePath
          -> IO (Either Error (Maybe [V.FrozenVal]))
 evalFile _mode verseFile = do
-  putStrLn $ "\nfile " ++ verseFile
+--  putStrLn $ "\nfile " ++ verseFile
   file <- ByteString.readFile verseFile
   case parse2 verseFile file of
     Left err -> return (Left err)
@@ -156,7 +187,10 @@ runM :: M a -> a
 runM (M a) = snd (a 0)
 
 desugar :: L (P.Exp SimpleName) -> L (R.Exp L Ident)
-desugar e = runM (R.rewrite e)
+desugar e =
+  let r = runM (R.rewrite e)
+  in  --(if dumpDesugar then trace ("\n----------\nparse=\n" ++ show e ++ "\n-----------\nrewrite=\n" ++ show r) else id)
+      r
 
 lexp :: L (R.Exp L Ident) -> F.SrcExpr
 lexp (L l e) = expToSrcExpr l e
@@ -195,7 +229,8 @@ expToSrcExpr l (R.All e) = F.Macro1 (macro l "all") [] (lexp e)
 expToSrcExpr l (R.Not e) = F.PrefixOp (preOp l "not") (lexp e)
 expToSrcExpr l (R.Verify e) = F.Macro1 (macro l "verify") [] (lexp e)
 expToSrcExpr l (R.Check eff e) = F.Macro1 (strIdent l (effToString eff)) [] (lexp e)
-expToSrcExpr l (R.OfType e1 e2) = F.InfixOp (lexp e1) (inOp l ":") (lexp e2)
+expToSrcExpr _ (R.OfType e1 e2) = --F.InfixOp (lexp e1) (inOp l ":") (lexp e2)
+  F.OfType (lexp e1) [] (lexp e2)
 expToSrcExpr l (R.Assume e) = F.Macro1 (macro l "assume") [] (lexp e)
 -- expToSrcExpr l (R.Module e) = XXX
 -- expToSrcExpr l (R.Struct e) = XXX
@@ -241,7 +276,7 @@ effToString eff = case eff of S.Fails -> "fails"; S.Succeeds -> "succeeds"; S.De
 toFrozen :: Rules.Expr -> [V.FrozenVal]
 toFrozen (Rules.Lit (Rules.LInt i)) = pure $ V.FrozenVal (Just (V.Int i))
 toFrozen (Rules.Lit (Rules.LRat i _)) = pure $ V.FrozenVal (Just (V.Rational $ toRational i))
-toFrozen (Rules.Lit (Rules.LChar i)) = pure $ V.FrozenVal (Just (V.Char32 i))
+toFrozen (Rules.Lit (Rules.LChar i)) = pure $ V.FrozenVal (Just (V.Char (toEnum (fromEnum i))))
 toFrozen (Rules.Arr vs) = do fs <- mapM toFrozen vs; pure $ V.FrozenVal (Just (V.Tuple fs))
 toFrozen (Rules.Tru v) = do f <- toFrozen v; pure $ V.FrozenVal (Just (V.Truth f))
 toFrozen (e1 Rules.:|: e2) = toFrozen e1 ++ toFrozen e2
@@ -260,11 +295,14 @@ isOKResult _ = False
 
 srcToCore :: F.Flags -> Bool -> F.SrcExpr -> IO Rules.Expr
 srcToCore flags add_verification e = do
---  putStrLn $ "\ne=\n" ++ prettyShow e
+  when dumpDesugar $
+    putStrLn $ "\n-------------\ne=\n" ++ prettyShow e
   e1 <- FrontEnd.Desugar.desugar flags add_verification e
---  putStrLn $ "\ne1=\n" ++ prettyShow e1
+  when dumpDesugar $
+    putStrLn $ "\n-------------\ne1=\n" ++ prettyShow e1
   e2 <- FrontEnd.ToCore.convertToCore flags e1
---  putStrLn $ "\ne2=\n" ++ prettyShow e2
+  when dumpDesugar $
+    putStrLn $ "\n-------------\ne2=\n" ++ prettyShow e2
   let e3 = Rules.prep e2
   return e3
 

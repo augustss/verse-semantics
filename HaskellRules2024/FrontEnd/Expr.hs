@@ -136,6 +136,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | DefineIE Ident Ident SrcExpr       -- (i->x) := e
   | Where SrcBlk SrcExpr               -- e1 where e2
   | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
+  | Splice SrcExpr                     -- Array splicing ..e
 
   -----------------------------------------------------------
   -- Big Core: only constructors below here appear in the output of M-desugaring
@@ -453,6 +454,7 @@ instance Pretty SrcExpr where
           EPrim s    -> pPrint s
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           Array es   -> text "array" <> braces (ppSeq l es)
+          Splice e   -> text "splice" <> braces (ppr 0 e)
           Tuple es   -> parens (ppEs es)
           Seq es     -> maybeParens (p > 0) $ ppSeq l es
 
@@ -687,6 +689,7 @@ compos f (Split e1 e2 e3)   = Split <$> f e1 <*> f e2 <*> f e3
 compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
+compos f (Splice e)         = Splice <$> f e
 compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
 storeMapA :: (Applicative a) => (SrcValue -> a SrcValue) -> Store -> a Store

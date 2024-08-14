@@ -377,7 +377,7 @@ pPrintPrecE lvl prec the_expr
        Fail       -> text "fail"
        Var x      -> pPrint x
        Lit i      -> pPrint i
-       Op op      -> char '!' <> pPrint op
+       Op op      -> pPrint op
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> sep [ ppr1 e1, char '|' <+> ppr1 e2 ]

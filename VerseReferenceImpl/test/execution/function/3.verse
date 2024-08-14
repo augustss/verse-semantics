@@ -1,12 +1,12 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-any(exists X) := X
+xany(exists X) := X
 
-Type := any
+Type := xany
 
-prefix'[]'(t:Type)(Xs:any) :=
+prefix'[]'(t:Type)(Xs:xany) :=
   for (X:Xs). t[X]
 
-Zip(Xs:[]any, Ys:[]any) := all:
+Zip(Xs:[]xany, Ys:[]xany) := all:
   I:int
   (Xs[I], Ys[I])
 
