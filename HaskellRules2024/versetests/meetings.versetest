@@ -29,6 +29,7 @@ verify("FCS7", fail) { f(x:int)<decides>:type{10} := 7 }
    # FCS8: 7 is not 10.  Rejected despite <decides>
 
 verify("FCS8", pass)   { f(3=4)<succeeds>:int := 7 }
+verify("FCS9", pass)   { f(3=4)<succeeds>:int := "monkey" }
 
 # --------- Round parens --------------
 verify("FCS10", fail){ f1(x:int)<decides>:int := x>3
