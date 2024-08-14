@@ -310,8 +310,10 @@ timTestInfo (Ident loc status) = TestInfo
   }
 
 timTestType :: String -> TestType
-timTestType "S00" = TPass
-timTestType _     = TFail
+-- Any TimTest starting in "S" should pass, e.g. S00, S01
+-- All others should fail.
+timTestType ('S' : _) = TPass
+timTestType _         = TFail
 
 ----------------------------
 runTest :: TestFlags -> Test -> IO TestRes
