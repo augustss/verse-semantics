@@ -120,7 +120,7 @@ verifyStep env lhs =
 
 splitStep :: Rule
 splitStep env lhs =
-   "SPLIT-K" `nameWith`
+   "SPLIT-V" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (Var r :=: v) :>: rest) <- proofX all_rs e
       guard (r `elem` all_rs)
