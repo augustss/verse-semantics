@@ -575,11 +575,28 @@ In M-desugaring:
 Note [Desugaring ampersand]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This Note describes how the "ampersand" form (x&y) is handled.
+First some premable:
 
-Note that x&y can only occur in /patterns/, SrcPat, which themselves
-appear only in
-   p : t
-   p := t
+* Note that x&y can only occur in /patterns/, SrcPat, which themselves
+  appear only in
+     p : t
+     p := t
+
+* Note also that the "&" notation has flattening behavior that is a bit
+  like "..e" notation.  E.g.
+        f( x&y:int, z:int ) := ...
+     means
+        f( x:int, y:int, z:int ) := ...
+
+  and
+      f( ..(1,2), 3 ) := ...
+   means
+      f( 1,2,3 ) := ...
+
+  This Note explains how we leverage Splice (from Note [Desugaring array splices]
+  to desugar "&" notation.
+
+Now to the payload.
 
 Parsing: (InfixOp e1 "&" e2)
 
