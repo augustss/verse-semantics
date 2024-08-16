@@ -1,5 +1,38 @@
 # Add new meetings at the top
 
+# Meeting 16 Aug 24
+verify("M16Aug24-1", fail){ f(x:int):=nat[x] => f[-3]  }
+verify("M16Aug24-2", pass){ f(x:int):nat := nat[x] => f[-3]  }
+verify("M16Aug24-3", pass){ f(x:int):type{nat[x]} => f[-3]  }
+verify("M16Aug24-4", fail){ (a:int) => (f(:int):=nat[a]) => f[a]  }
+  # foo2: just like foo1 but with (a:int) instead of 3
+
+# Meeting 14 Aug 24
+testeq("jan1", pass, broken){ (f(x:int)<succeeds>:= x); y:int; f[y]=3} {3}
+
+verify("jan2", pass){ f(x:int)<succeeds>:int = x; g(y:int):= {if(f(y)=y) then 1 else 2} ; g[3] }
+verify("jan3", pass){ h(x:int,y:int)<decides>:int= x=y; if(h[2,2]=2) then 1 else 2 }
+verify("jan4", pass){ h(x: int, y:int)<decides>:int= x=y; () => if(h[2,2]) then 1 else 2 }
+
+verify("jan5a", fail){ f(c:char):=1; as:any
+                       => as=array{_}
+                       =>  x:=as[0]
+                       => bs:=array{:int}
+                       => bs=as => f[x] }
+  # jan5a: x is an int, and f expects a char, so body of lambda fails
+
+verify("jan5b", pass, broken){ f(c:int):=1; as:any
+                               => as=array{_}
+                               => x:=as[0]
+                               => bs:=array{:int}
+                               => bs=as => f[x] }
+  # jan5b: x is an int, and f expects an int, so body of lambda succeeds
+
+verify("jan6a", pass) { ty(x:int)<succeeds>:int := if(x=0) then x else 0; g(z:ty)<succeeds>:int := z }
+verify("jan6b", pass) { ty(x:int)<succeeds>:int := x; g(z:ty)<succeeds>:int := z }
+verify("jan6c", pass) { ty(x:int)<succeeds> := { if(x=0) then x else 0 };
+                        g(z:ty)<succeeds>:int := z=0 }
+
 # ---------------------------------
 # Opacity and function arguments: 14 Aug 24
 verify("FCS1", pass){ f(x:int)<decides>:int := x>3
