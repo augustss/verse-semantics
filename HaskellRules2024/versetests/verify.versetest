@@ -306,7 +306,9 @@ verify("Tricky:PC2", pass, broken){ f(x := 1, y:= 2):int := 7; exists x y { f(x,
 
 verify("Ampersand1", pass){ f ( x&y : int ) := { x + y }; f[2,3]=5 }
 verify("Ampersand2", pass){ f ( x&y : int, q:int ) := { (q, x + y) }; f[2,3,7]=(7,5) }
-verify("Ampersand3", pass){ (x&y : int) := (4,5); x+y = 9 }
+verify("Ampersand3", pass){ (x&y : int) := 4; x+y = 8 }
+  # Ampersand3: Both x and are bound to 4,
+  #             just like in Ampersand4
 verify("Ampersand4", pass){ ((f&g)(:int,:int):int) => f[3,4] }
 
 verify("Ampersand5", pass, broken)

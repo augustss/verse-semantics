@@ -1,11 +1,17 @@
 # Add new meetings at the top
 
 # Meeting 16 Aug 24
-verify("M16Aug24-1", fail){ f(x:int):=nat[x] => f[-3]  }
-verify("M16Aug24-2", pass){ f(x:int):nat := nat[x] => f[-3]  }
-verify("M16Aug24-3", pass){ f(x:int):type{nat[x]} => f[-3]  }
-verify("M16Aug24-4", fail){ (a:int) => (f(:int):=nat[a]) => f[a]  }
-  # foo2: just like foo1 but with (a:int) instead of 3
+verify("M16Aug24-1", pass){ f(x:int):=nat[x] => f[-3]  }
+  # This is an odd one!  If it had been
+  #     (f(x:int)<succeeds>:int) => f[3]
+  # i.e.   (f := fun(x:int){ :<succeeds>int }
+  # it'd mean that f is a function that returns some int
+  # In the actual test case it promises to succeed, returning nat[x]
+verify("M16Aug24-2", pass){ (a:int) => (f(:int):=nat[a]) => f[a]  }
+  # M16Aug24-4: similar to M16Aug24-1
+
+verify("M16Aug24-3", pass){ f(x:int):nat := nat[x] => f[-3]  }
+verify("M16Aug24-4", pass){ f(x:int):type{nat[x]} => f[-3]  }
 
 # Meeting 14 Aug 24
 testeq("jan1", pass, broken){ (f(x:int)<succeeds>:= x); y:int; f[y]=3} {3}

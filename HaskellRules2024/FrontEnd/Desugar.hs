@@ -281,6 +281,9 @@ defn :: (HasCallStack) => SrcPat -> SrcExpr -> D SrcExpr
 -- Neither input is desugared; the result
 --   should have sDesugarExpr applied to it.
 
+defn (Parens p) e = defn p e
+defn (Tuple es) e = defn (Array es) e
+
 -- Rule: (i := e) -->  (i := e)
 defn (Variable (Ident _ "_")) e = do
   x <- newIdent (getLoc e) "u"
