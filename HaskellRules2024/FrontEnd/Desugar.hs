@@ -993,33 +993,35 @@ dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 
 ----------------------------------
 flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
+-- Implements M_sigma[ e ] P(i),
+-- when we don't want to push the P(i) into e
 
 flipToE MI t i                           -- MEQG
-  = do { e <- mDesugarExpr MI t
+  = -- See Note [flipToE in the M- case]
+    do { e <- mDesugarExpr MI t
        ; v <- newIdent (getLoc t) "v"
        ; pure (eGuard (getFree i) $
                eSome (Lam v (Variable v `Unify` e))) }
-
--- Deals with M_sigma[ t ] P(i)
--- when we don't want to push the P(i) further into t
--- NEW version   M-[t]P(i) = z := D-[t]; i ;; some( \v. v=z )     <--- correct
--- OLD version   M-[t]P(i) = i = D-[t]
---
---     f( x := 3 ) := ..
---     f( x := :type{3} ) : = ...
---     f( x := (3|4) ) := ..
-
---  = M-[ :type{t} ]P(i)
---  = z:= type{t}; i ;; some{z}
---  = z := \x. x=t; i ;; some{\}
-
---flipToE MI t (Variable r)  -- Short cut
---  = Unify <$> mDesugarExpr MI t <*> pure (Variable r)
-
-
-
 flipToE s t i
    = Unify i <$> dsM_12 s t E
+
+{- Note [flipToE in the M- case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f( x:=(1|2) ) := rhs
+When verifying we want:
+   verify(r){ x := some(\y. y=(1|2); y); ...rhs... }
+That is, in `rhs` we know that `x` is 1 or 2, but only
+one of them!  It's important that the choice is inside the `some`.
+We do /not/ want
+   verify(r){ z := (1|2); x := some(\y. y=z; y); ...rhs... }
+
+Hence
+  M-[t]P(i) = i ;; some( \v. v=D-[t] )     <--- correcta
+
+Previously we had (not good)
+  M-[t]P(i) = i = D-[t]
+-}
 
 -----------------------------------------------
 --
