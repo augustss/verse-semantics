@@ -25,7 +25,10 @@ commaSep l es = fsep $ punctuate comma (map (pPrintL l) es)
 
 ppTrace :: String -> Doc -> b -> b
 ppTrace herald doc result
-  = trace (render (text herald <> colon <+> doc)) result
+  = trace (showWithHerald herald doc) result
+
+showWithHerald :: String -> Doc -> String
+showWithHerald herald doc = render (sep [text herald <> colon, doc])
 
 pPrintL :: (Pretty a) => PrettyLevel -> a -> Doc
 pPrintL l = pPrintPrec l 0
