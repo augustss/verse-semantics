@@ -64,8 +64,6 @@ desugar flgs add_verification
      <=< addPrelude
 
      -- Syntax fixes
-     <=< traceDS "syntaxFixes"
-     <=< syntaxFixes
      <=< traceDS "parsed" )
   where
     ds_model | add_verification = MV
@@ -92,6 +90,12 @@ sDesugarExpr = ds
     ds (ApplyD (Variable (Ident l s)) e) | Just r <- stripPrefix "prefix'" s =
       ds (PrefixOp (Ident l (init r)) e)
 -}
+    --  Currently not done:
+    --     e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
+
+    ds (Parens e) = ds e
+    ds (Tuple es) = ds (Array es)
+
     ds (ApplyD (Variable (Ident l s)) e) | Just r <- stripPrefix "postfix'" s, r `elem` ["?'"] =
       ds (PostfixOp e (Ident l (init r)))
 
@@ -245,7 +249,10 @@ sDesugarExpr = ds
                              InfixOp (InfixOp i (Ident loc "->") a) (Ident loc ":") f])
                        (Array [i, a])
 
-    ds x = compos ds x
+    ds e@(EffAttr {}) = errorMessage (showWithHerald "Unexpected effects" (pPrint e))
+
+    ds e = compos ds e    -- Core expressions like Lit, Variable,
+                          -- DefineE, Unify, EPrim, etc
 
 checkEffs :: [Eff] -> D [Eff]
 checkEffs = mapM checkEff
@@ -1019,8 +1026,7 @@ flipToE s t i
 addPrelude :: SrcExpr -> D SrcExpr
 addPrelude orig_e
   = do { prel  <- getDFlagsX (snd . fPrelude)
-       ; prel1 <- syntaxFixes prel
-       ; return (addUsed (spl prel1) orig_e) }
+       ; return (addUsed (spl prel) orig_e) }
   where
     -- Split the prelude into an association list
     spl (Array ds) = map (\ e -> (nameOf e, e)) ds
@@ -1059,39 +1065,6 @@ lookupPrimOp s = lookup s prs
   where
     prs :: [(String,PrimOp)]
     prs = [(primOpString op, op) | op <- allPrimOps]
-
---------------------------------------------------------
---
---         syntaxFixes
---
---------------------------------------------------------
-
--- Do various early changes:
---  * (e)       -->  e             parens are there to stop the next from possibly firing
---  * e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
---  * (e1,...)  -->  array{e1,...} no need to distingush them anymore
---  * x&y:e     -->  array{x&y:e}  if outside an array
---                   x:e; y:e      if inside an array
-syntaxFixes :: SrcExpr -> D SrcExpr
-syntaxFixes = pure . f
-  where f :: SrcExpr -> SrcExpr
-        f (Parens e) = f e
-        f (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
-          f $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
-        f (Tuple es) = f (Array es)
-        f (Array es) = Array $ concatMap g es
-        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":" ) _) = f (Array [e])  -- PAMP1
-        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":=") _) = f (Array [e])  -- PAMP1
-        f e = composOp f e
-
-        -- PAMP2
-        g :: SrcExpr -> [SrcExpr]
-        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs)
-          = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
-        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs)
-          = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
-        g e = [f e]
-
 
 
 -----------------------------------------------
