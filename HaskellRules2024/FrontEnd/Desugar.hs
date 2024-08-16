@@ -217,9 +217,11 @@ sDesugarExpr = ds
     ds (Macro1 (Ident _ "decides") _ e)  = eCheck [effDecides] <$> ds e
 
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
-    ds (Macro1 (Ident _ "assume") _ e)  = do { x <- newIdent (getLoc e) "x"
-                                             ; e' <- ds e
-                                             ; pure (Some (Lam x (Seq [e', Variable x]))) }
+    ds (Macro1 (Ident _ "assume") fx e)  = do { x <- newIdent (getLoc e) "x"
+                                              ; e' <- ds e
+                                              ; pure (eSeq [ eHavoc fx
+                                                           , Some (Lam x (eSeq [Unify (Variable x) e'
+                                                                               , Variable x]))]) }
 
     -- first{e}        ==  if (x:=e) then x  else fail
     -- first(e1){e2}   ==  if e1     then e2 else fail
