@@ -1,16 +1,189 @@
-skip("misparsed"){f(g():any):=g[]; f(g():=6)}
-skip("misparsed"){f(x:int)<decides>:=x=3, f[x:int]}
+skip("bug: misparsed"){f(g():any):=g[]; f(g():=6)}
+skip("bug: misparsed"){f(x:int)<decides>:=x=3, f[x:int]}
 skip("eff-interacts"){f(g():int):int => h()<interacts>:int => f[h]}
 skip("f1 seems unbound?"){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}		#FP:10.4:STRENGTH???
 broken("misparsing &") {f(x&y:int):=(y,x) => f(3,5)=(5,3)}	#FP:10.4:CHECK:DESUGAR&
-
+broken("#asktim We accept, but Tim rejects") {a&b:int => f(a):type{a=b} => {f[x],x:=b}}   # We accept, but Tim rejects #AskTim, no valid `f` ...
+broken("#asktim FP? (note: 'Could be S00') We accept, but Tim rejects 'D00'"){a&b:int => f():type{a=b} => {(if{a=b} else f[]),a=b}} # Could be S00
+broken("#asktim FP? seems S00 to me? 'D00'"){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,y],x=y}}
+broken("#asktim FP? says 'Could tighten to S00' 'A00'"){1 where a:any} # Could tighten to S00.
+broken("#asktim FP? 'P00'"){f(:int):int => f() => 3}
+broken("#asktim FP? 'N04'"){x:=0,x:int=>3}
+broken("#asktim FP? 'N04'"){x:=0,y:int=>x:=1}
+broken("#asktim FP? let-desugaring? 'N00'"){let(x:=1){},x}
+broken("#asktim FP? let-desugaring? 'N00'"){let(){x:=1},x}
+broken("#asktim FP? let-desugaring? 'N00'"){let(x){x:=1}}
+broken("#asktim FP? let-desugaring? 'N00'"){let(x:=2){y:=x+1},x=2}
+broken("#asktim FP? let-desugaring? 'N00'"){let(x:=2){y:=x+1},y=3}
 
 skip("steps=600"){a&b:any => c:int => f(:nat):type{a=b} => {f[c], a=b}}         ##BAD
 skip("steps=600"){a:int => b&c:any => f(:nat):type{b=c} => {f[a],b=c}}
-skip("why fail:U00"){a:int => b&c:any => f(:nat):=b=c => 7}
-skip("assume-fail"){a:int => f(:int):=nat[a] => f[a]}
-skip("why fail:U00"){a&b:any => f(a=b):=a=b => if{f[a=b]}}
-skip("why fail:U00"){a:any => f(nat[a]):=nat[a] => if{f[a]}}
+skip("steps=700"){a&b:int => f(x&ytest(U00){a:any=>{f(if{c=1}):=8,c:=a}}	#TODO:10.4:WHY???:int):type{x=y} => {f[a,a],a=b}}
+skip("steps=800 'D00'"){a&b:int => f(x&y:nat):type{x=y} => {x:=a,y:=b,f[x,x],x=y}}
+skip("steps=800 'D00'"){a:int => c:any => f():type{c=(a,3)} => {f[],c=(3,a)}}
+skip("steps=800 'D00'"){a&b:int => c:any => f():type{c=(a,b)} => {f[],c=(b,a)}}
+skip("steps=800 'D00'"){a&b:int => c:any => f():type{c=(a,b)} => {c=(b,a),f[]}}
+skip("steps=800 'D00'"){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,x=y,f[x,y]}}
+skip("steps=800 'D00'"){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,x],a=b}}
+skip("steps=800 'D00'"){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,x],x=y}}
+skip("steps=800 'U00'"){a&b:any => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,x],x=y}}
+skip("steps=1600 'F00'"){as:=(:int,:int,:int) => {bs:=for(a:as,a=1){a},n:=Length[bs],n=1 or n=2 or n=3}}
+skip("steps=1600 'F00'"){as:=(:int,:int,:int) => {bs:=for(a:as,a=1){a},n:=Length[bs],n=0 or n=2 or n=3}}
+skip("steps=1600 'F00'"){as:=(:int,:int,:int) => {bs:=for(a:as,a=1){a},n:=Length[bs],n=0 or n=1 or n=3}}
+skip("steps=700 'D00'"){a&b:int => f(x&y:int):=x=y => g(a):int => h(b):int => f[g[1],h[2]]}
+skip("steps=1300 'F00'"){a&b&c:int => f(a,x&y:int):type{x=y} => g(b):int => h(c):int => f[3,g[1],h[2]]}
+
+# Are the next ones bad because we allow unification/equality on `any`,
+# instead of wrapping it in a check like $eq = \p. exi x,y. p = (x, y); comparable[x]; comparable[y]; x = y; x
+
+broken("bug: eq-comparable:U00"){a:int => b&c:any => f(:nat):=b=c => 7}
+broken("bug: eq-comparable:U00"){a&b:any => f(a=b):=a=b => if{f[a=b]}}
+broken("bug: eq-comparable:U00"){a:any => f(nat[a]):=nat[a] => if{f[a]}}
+broken("bug: eq-comparable:U00"){a&b:int => f(x:nat):any => if{x:=f[a],y:=f[b],x=y}}		#TODO:10.30:OK:IF:ANY
+broken("bug: eq-comparable:U00"){a:any=>{f(if{c=1}):=8,c:=a}}	#TODO:10.4:WHY???
+broken("bug: eq-comparable:U00"){f(x:any):=if(x=2){3}else{4}}	#TODO:10.4:CHECK-COMPARE-ANY
+broken("bug: eq-comparable:U00"){a&b:int => f(:int)<computes>:any => x:=f(a) => y:=f(b) => if{f(a)=f(b)}}
+broken("bug: eq-comparable:U00"){f(x:int)<computes>:any => a&b&c:int => if{f[a]=f[c]}}
+broken("bug: eq-comparable:D00"){a&b&c&d:int => f(:int,:int)<computes>:any => {f(a,b)=f(c,d),a=c,b=d}}
+broken("bug: top-level choice:X00"){function(1){2|3}}
+
+broken("bug: missing SPJ desugaring fix?: D00"){a:int => f(:int):=nat[a] => f[a]}
+
+broken("bug: hiding 'D00'"){x:int=3,x=3}
+broken("bug: hiding 'D00'"){x:int=3,nat[x]}
+broken("bug: hiding 'D00'"){x:int=3; nat[x]}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=3|5){x+1=4}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=3|5){x+1=6}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(){1=2}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=1){x=2}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=1|2){x=1}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=1|2){x=2}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=1|2){x=3}}
+broken("bug: missing check<succeeds> in function body 'D00'"){f:=function(a:int){a=3}}
+broken("bug: missing check<succeeds> in function body 'D00'"){f:=function(a:int,b:int){a=b}}
+broken("bug: missing check<succeeds> in function body 'U00'"){function(x:=x){x=1}}
+
+skip("bug: rationals 'F00'"){nat[2/3]}		#TODO:10.4:RATIONALS
+skip("bug: rationals 'F00'"){int[2/3]}		#TODO:10.4:RATIONALS
+
+
+broken("#asktim 'D00'"){x:int=>if{x=3,f():=x=3}} # Was S00 before UncommittableNegotiable.
+broken("#asktim 'F00'"){f():=2=3 => 4}							#TODO:10.4:ASSUME-FAIL:RANGE
+broken("#asktim 'D00'"){f(x:int):=x=3 => 4}
+broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y}}}
+broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y},a=b}}
+broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y},x=y}}
+broken("#asktim assume<succeeds> 'QS00'"){assume<succeeds>{123}}
+broken("#asktim assume<decides> 'QD00'"){a&b:any => {assume<decides>{a=b}}}
+broken("#asktim assume<decides> 'QD00'"){a&b&c&d:any => {assume<decides>{a=b},assume<decides>{c=d},assume{a=c}}}
+broken("#asktim assume<decides> 'QS00'"){assume<decides>{1}}
+broken("#asktim assume<decides> 'QS00'"){a&b:any     => {assume{a=b},assume<decides>{a=b}}}
+broken("#asktim assume<decides> 'QN00'"){assume<decides>{bogus}}
+
+broken("assume-false, dataflow, 'R20'"){x:=3,assume{x=5},x=5}
+broken("assume-false, dataflow, 'R20'"){x:=2,assume{x=3}}
+broken("assume-false, dataflow, 'R20'"){assume{x=3},x:=4}
+broken("assume-false, dataflow, 'R20'"){x:any,assume{x=2},x=3}
+
+
+skip("assume-false, paraconsistency 'N00'"){x:false => y}
+skip("assume-false, paraconsistency 'N00'"){x:false => y,1}
+skip("assume-false, paraconsistency 'F00'"){92=93 => 94=95}			#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){92=93 => 94=95,91}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){1=2 => 3=4}				#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){x:=let(false[]){3} => x=4}
+skip("assume-false, paraconsistency 'F00'"){x:=7=9 => 6=8}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){x:=7=9 => 6=8}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[0]=6}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[0]=10}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[0]=2}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as where 2=3}			#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[0] where 2=3}		#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => as where 8=9}			#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as=(_,_) where 2=3}	#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[1] where 2=3}		#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => as=(7,_)}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => as[0]=7}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => as[5]}			#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => 2=5}				#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){(a:=2,b:=3=4) => a=7}				#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(_,_) => x:=as[7] => as[8]}				#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(_,_) => x:=as[7] => as[8]=x}
+
+
+skip("assume-false, paraconsistency 'R20'){assume{x:int   where false[]}}
+skip("assume-false, paraconsistency 'D00'){assume{x:int   where 8=9    }=7} # D00 because of paraconsistency.	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'D00'){assume{x:int   where false[]}=7} # D00 because of paraconsistency.	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'R20'){assume{x:false where false[]}=7} # Succeeds because variable contradicts.
+skip("assume-false, paraconsistency 'R20'){assume{x:false              }=7}
+skip("assume-false, paraconsistency 'U00'){assume{x:any   where 3=4}=5}	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'D00'){assume{x:int   where 3=4}=5}	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'R20'){assume{x:=5    where 3=4}=5}
+skip("assume-false, paraconsistency 'F00'){assume{x:=6    where 3=4}=5}	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'R20'){assume{x:false where 3=4}=5}
+skip("assume-false, paraconsistency 'R20'){x:=2 where assume{x=3}}
+skip("assume-false, paraconsistency 'R20'){assume{2=3}}
+skip("assume-false, paraconsistency 'F00'){assume{2=3},4=5}			#TODO:10.4:ASSUME
+skip("assume-false, paraconsistency 'F00'){assume{false[]},4=5}
+skip("assume-false, paraconsistency 'F00'){a:=2,assume{a=3},4=5}		#TODO:10.4:ASSUME
+skip("assume-false, paraconsistency 'R20'"){assume{x=3},x:=4}
+skip("assume-false, paraconsistency 'R20'"){assume{x=(_,_,_)},x:=(_,_)}
+skip("assume-false, paraconsistency 'R20'"){assume{x=(_,_,_)},x:=(_,_)}
+
+
+
+broken("void-v-false 'QS00'"){:void=false}
+broken("false-desugaring 'U00'"){f(x:false,y:any):=y=1}
+broken("false-desugaring 'U00'"){f(x:false,y:any):=y=2}
+broken("false-desugaring 'F00'"){f(x:false,y:any):=y=1=2}
+broken("false-desugaring 'F00'{f():false}
+broken("false-desugaring 'QS00'){f(x:false):=x.blah}
+broken("false-desugaring 'QN05'){f(x:false,y:int):=y.blah}
+broken("false-desugaring 'QS00'){f(x:false,y:int):=x.blah}
+broken("false-desugaring 'F00'"){f(x:false,y:int):=false[y]}
+broken("false-desugaring 'C00'"){f(x:false,y:int):=y[0]}
+broken("false-desugaring 'D00'"){a&b:int => f():false => {if{a=b} else f(),a=b}}
+broken("false-desugaring 'F00'"){f(x:false):=if(x){1}else{2}=3}
+broken("false-desugaring 'F00'"){f():false}
+broken("false-desugaring 'QS00'"){f(x:false):=x.blah}
+broken("false-desugaring 'QN05'"){f(x:false,y:int):=y.blah}
+broken("false-desugaring 'QS00'"){f(x:false,y:int):=x.blah}
+broken("false-desugaring 'F00'"){f():false}
+broken("false-desugaring 'F00'"){if(f():false){1}else{2}}
+broken("false-desugaring 'F00'"){f(x:int):false}
+broken("false-desugaring 'F00'"){f():false}
+
+broken("effects 'U00'"){f(g()<computes>:int):int => g()<interacts>:int => f[g]}	#TODO:10.4:EFF
+broken("effects 'U00'"){f(g()<computes>:int):int => g():int => f[g]}				#TODO:10.4:EFF
+broken("effects 'U00'"){f(g()<computes>:int):int => f[g():int=3]}
+broken("effects 'U00'"){f(g()<computes>:int):int => f[g():type{3}=3]}
+broken("effects 'P00'"){f(g(:int)<computes>:int):int => f(g(x:int):type{3}=3)}
+broken("effects 'P00'"){f(g():int)<succeeds>:int => g()<resolves >:int => f(g)}
+broken("effects 'P00'"){f(g():int)<succeeds>:int => g()<interacts>:int => f(g)}
+broken("effects 'P00'"){f(g()<decides >:int):int => g()<resolves >:int => f(g)}
+broken("effects 'P00'"){f(g()<decides >:int):int => g()<interacts>:int => f(g)}
+broken("effects 'P00'"){f(g()<resolves>:int):int => g()<interacts>:int => f(g)}
+broken("effects 'P00'"){f(g()<computes>:int):int => g()<succeeds >:int => f(g)}
+broken("effects 'P00'"){f(g()<computes>:int):int => g()<resolves >:int => f(g)}
+broken("effects 'P00'"){f(g()<computes>:int):int => g()<interacts>:int => f(g)}
+broken("effects 'D00'"){f(x:int)<fails   >:=x=2}
+broken("effects 'S01'"){f(x:int)<fails   >:=2}
+broken("effects 'S01'"){f(x:int)<diverges>:=2}
+broken("effects 'F00'"){f(x:int)<diverges>:false}
+broken("effects 'U00'"){g(f(x:any)<throws_any>:any)<throws_any>:=f(3)=f(3)}	#TODO:FUN-OUT-EQ-EFF-THROWS
+broken("effects 'U00'"){g(f(x:any)<interacts           >:any)<interacts>:=f(3)=f(3)}	#TODO:FUN-OUT-EQ-EFF-INTERACTS
+broken("effects 'U00'"){g(f(x:int)<computes><resolves  >:any) := if{f[3]=f[3]}}
+broken("effects 'U00'"){f(x:int)<resolves >:int => f[3]}		#TODO:10.4:EFF-RESOLVES
+broken("effects 'P00'"){f(x:int)<resolves >:int => f(3)}
+broken("effects 'F00'"){f(x:int)<succeeds>:false}
+broken("effects 'S02'"){f()<iterates>:=1}
+broken("effects 'S02'"){f()<abstracts>:=1}
+
+broken("variant? 'S02'"){f(0)<covariant>:=1}
+broken("variant? 'S02'"){f(0)<contravariant>:=1}
+broken("variant? 'QS00'"){assume<succeeds>{1}}
+broken("variant? 'QS02'"){assume<covariant>{1}} # Bad name resolution error. Assume should resolve!
+
 
 skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:int=x; x=3; x=3}}
 skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:int=x; x=3; x=5}}
