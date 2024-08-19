@@ -64,8 +64,6 @@ desugar flgs add_verification
      <=< addPrelude
 
      -- Syntax fixes
-     <=< traceDS "syntaxFixes"
-     <=< syntaxFixes
      <=< traceDS "parsed" )
   where
     ds_model | add_verification = MV
@@ -92,6 +90,12 @@ sDesugarExpr = ds
     ds (ApplyD (Variable (Ident l s)) e) | Just r <- stripPrefix "prefix'" s =
       ds (PrefixOp (Ident l (init r)) e)
 -}
+    --  Currently not done:
+    --     e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
+
+    ds (Parens e) = ds e
+    ds (Tuple es) = ds (Array es)
+
     ds (ApplyD (Variable (Ident l s)) e) | Just r <- stripPrefix "postfix'" s, r `elem` ["?'"] =
       ds (PostfixOp e (Ident l (init r)))
 
@@ -213,9 +217,11 @@ sDesugarExpr = ds
     ds (Macro1 (Ident _ "decides") _ e)  = eCheck [effDecides] <$> ds e
 
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
-    ds (Macro1 (Ident _ "assume") _ e)  = do { x <- newIdent (getLoc e) "x"
-                                             ; e' <- ds e
-                                             ; pure (Some (Lam x (Seq [e', Variable x]))) }
+    ds (Macro1 (Ident _ "assume") fx e)  = do { x <- newIdent (getLoc e) "x"
+                                              ; e' <- ds e
+                                              ; pure (eSeq [ eHavoc fx
+                                                           , Some (Lam x (eSeq [Unify (Variable x) e'
+                                                                               , Variable x]))]) }
 
     -- first{e}        ==  if (x:=e) then x  else fail
     -- first(e1){e2}   ==  if e1     then e2 else fail
@@ -245,7 +251,10 @@ sDesugarExpr = ds
                              InfixOp (InfixOp i (Ident loc "->") a) (Ident loc ":") f])
                        (Array [i, a])
 
-    ds x = compos ds x
+    ds e@(EffAttr {}) = errorMessage (showWithHerald "Unexpected effects" (pPrint e))
+
+    ds e = compos ds e    -- Core expressions like Lit, Variable,
+                          -- DefineE, Unify, EPrim, etc
 
 checkEffs :: [Eff] -> D [Eff]
 checkEffs = mapM checkEff
@@ -271,6 +280,9 @@ defn :: (HasCallStack) => SrcPat -> SrcExpr -> D SrcExpr
 -- Desugars (p := e) into an expression; see Fig 3, top group
 -- Neither input is desugared; the result
 --   should have sDesugarExpr applied to it.
+
+defn (Parens p) e = defn p e
+defn (Tuple es) e = defn (Array es) e
 
 -- Rule: (i := e) -->  (i := e)
 defn (Variable (Ident _ "_")) e = do
@@ -575,11 +587,28 @@ In M-desugaring:
 Note [Desugaring ampersand]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This Note describes how the "ampersand" form (x&y) is handled.
+First some premable:
 
-Note that x&y can only occur in /patterns/, SrcPat, which themselves
-appear only in
-   p : t
-   p := t
+* Note that x&y can only occur in /patterns/, SrcPat, which themselves
+  appear only in
+     p : t
+     p := t
+
+* Note also that the "&" notation has flattening behavior that is a bit
+  like "..e" notation.  E.g.
+        f( x&y:int, z:int ) := ...
+     means
+        f( x:int, y:int, z:int ) := ...
+
+  and
+      f( ..(1,2), 3 ) := ...
+   means
+      f( 1,2,3 ) := ...
+
+  This Note explains how we leverage Splice (from Note [Desugaring array splices]
+  to desugar "&" notation.
+
+Now to the payload.
 
 Parsing: (InfixOp e1 "&" e2)
 
@@ -964,33 +993,35 @@ dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 
 ----------------------------------
 flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
+-- Implements M_sigma[ e ] P(i),
+-- when we don't want to push the P(i) into e
 
 flipToE MI t i                           -- MEQG
-  = do { e <- mDesugarExpr MI t
+  = -- See Note [flipToE in the M- case]
+    do { e <- mDesugarExpr MI t
        ; v <- newIdent (getLoc t) "v"
        ; pure (eGuard (getFree i) $
                eSome (Lam v (Variable v `Unify` e))) }
-
--- Deals with M_sigma[ t ] P(i)
--- when we don't want to push the P(i) further into t
--- NEW version   M-[t]P(i) = z := D-[t]; i ;; some( \v. v=z )     <--- correct
--- OLD version   M-[t]P(i) = i = D-[t]
---
---     f( x := 3 ) := ..
---     f( x := :type{3} ) : = ...
---     f( x := (3|4) ) := ..
-
---  = M-[ :type{t} ]P(i)
---  = z:= type{t}; i ;; some{z}
---  = z := \x. x=t; i ;; some{\}
-
---flipToE MI t (Variable r)  -- Short cut
---  = Unify <$> mDesugarExpr MI t <*> pure (Variable r)
-
-
-
 flipToE s t i
    = Unify i <$> dsM_12 s t E
+
+{- Note [flipToE in the M- case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f( x:=(1|2) ) := rhs
+When verifying we want:
+   verify(r){ x := some(\y. y=(1|2); y); ...rhs... }
+That is, in `rhs` we know that `x` is 1 or 2, but only
+one of them!  It's important that the choice is inside the `some`.
+We do /not/ want
+   verify(r){ z := (1|2); x := some(\y. y=z; y); ...rhs... }
+
+Hence
+  M-[t]P(i) = i ;; some( \v. v=D-[t] )     <--- correcta
+
+Previously we had (not good)
+  M-[t]P(i) = i = D-[t]
+-}
 
 -----------------------------------------------
 --
@@ -1002,8 +1033,7 @@ flipToE s t i
 addPrelude :: SrcExpr -> D SrcExpr
 addPrelude orig_e
   = do { prel  <- getDFlagsX (snd . fPrelude)
-       ; prel1 <- syntaxFixes prel
-       ; return (addUsed (spl prel1) orig_e) }
+       ; return (addUsed (spl prel) orig_e) }
   where
     -- Split the prelude into an association list
     spl (Array ds) = map (\ e -> (nameOf e, e)) ds
@@ -1042,39 +1072,6 @@ lookupPrimOp s = lookup s prs
   where
     prs :: [(String,PrimOp)]
     prs = [(primOpString op, op) | op <- allPrimOps]
-
---------------------------------------------------------
---
---         syntaxFixes
---
---------------------------------------------------------
-
--- Do various early changes:
---  * (e)       -->  e             parens are there to stop the next from possibly firing
---  * e1:e2=e3  -->  e1:e2 := e3   XXX should we do this?
---  * (e1,...)  -->  array{e1,...} no need to distingush them anymore
---  * x&y:e     -->  array{x&y:e}  if outside an array
---                   x:e; y:e      if inside an array
-syntaxFixes :: SrcExpr -> D SrcExpr
-syntaxFixes = pure . f
-  where f :: SrcExpr -> SrcExpr
-        f (Parens e) = f e
-        f (InfixOp (InfixOp (Variable i1) o@(Op ":") e2) (Ident l3  "=") e3) =
-          f $ InfixOp (InfixOp (Variable i1) o e2) (Ident l3 ":=") e3
-        f (Tuple es) = f (Array es)
-        f (Array es) = Array $ concatMap g es
-        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":" ) _) = f (Array [e])  -- PAMP1
-        f e@(InfixOp (InfixOp _ (Op "&") _) (Op ":=") _) = f (Array [e])  -- PAMP1
-        f e = composOp f e
-
-        -- PAMP2
-        g :: SrcExpr -> [SrcExpr]
-        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":" ) rhs)
-          = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
-        g (InfixOp (InfixOp e1 (Op "&") e2) o@(Op ":=") rhs)
-          = g (InfixOp e1 o rhs) ++ g (InfixOp e2 o rhs)
-        g e = [f e]
-
 
 
 -----------------------------------------------
