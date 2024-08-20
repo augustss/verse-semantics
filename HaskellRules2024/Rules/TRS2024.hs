@@ -376,7 +376,35 @@ oneAndAllStep _env lhs =
      let vs = choices e
      guard (all isVal vs)
      pure (Arr vs)
-
+ ++
+  "ITER-FAIL" `name`
+  do Iter Fail a _ g <- [lhs]
+     guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
+     pure (g :@: a)
+ ++
+  "ITER-VALUE" `name`
+  do Iter v a f g <- [lhs]
+     guard (isVal v)
+     guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
+     let f1 = identNotIn $ free (v, a, f, g)
+         app = Exi $ bind f1 $ Var f1 :=: (f :@: a) :>: (Var f1 :@: v)
+     pure $ IterC app Fail f g
+ ++
+  "ITER-CHOICE" `name`
+  do Iter (v :|: e) a f g <- [lhs]
+     guard (isVal v)
+     guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
+     let f1 = identNotIn $ free (v, a, f, g)
+         app = Exi $ bind f1 $ Var f1 :=: (f :@: a) :>: (Var f1 :@: v)
+     pure $ IterC app e f g
+ ++
+  "ITERC-DONE" `name`
+  do IterC (Arr [Lit (LInt 0), r]) _ _ _ <- [lhs]
+     pure r
+ ++
+  "ITERC-CONT" `name`
+  do IterC (Arr [Lit (LInt 1), a]) e f g <- [lhs]
+     pure $ Iter e a f g
 
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]

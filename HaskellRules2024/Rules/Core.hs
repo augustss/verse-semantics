@@ -78,6 +78,8 @@ data Expr
   | One Expr
   | All Expr
   -- | Split Expr  -- maybe later
+  | Iter  Expr Expr Expr Expr   -- last two are always lambdas
+  | IterC Expr Expr Expr Expr   -- last two are always lambdas
 
   -- Verifier
   | Some Val
@@ -389,6 +391,8 @@ pPrintPrecE lvl prec the_expr
        Tru a   -> text "truth" <> braces (ppr0 a)
        One e   -> text "one" <> braces (ppr0 e)
        All e   -> text "all" <> braces (ppr0 e)
+       Iter  e1 e2 e3 e4 -> text "iter"  <> parens (ppr0 e1) <> braces (sep (punctuate semi $ map ppr1 [e2,e3,e4]))
+       IterC e1 e2 e3 e4 -> text "iterC" <> parens (ppr0 e1) <> braces (sep (punctuate semi $ map ppr1 [e2,e3,e4]))
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
        Exi {}  -> mbPar0 $ sep [ text "exi" <+> fsep (map pPrint bndrs) <> char '.'
                                , indent (ppr0 body) ]
@@ -468,6 +472,8 @@ exprSize (e1 :>>: e2)  = 1 + exprSize e1 + exprSize e2
 exprSize (Exi bnd)     = 1 + bindSize bnd
 exprSize (One e)       = 1 + exprSize e
 exprSize (All e)       = 1 + exprSize e
+exprSize (Iter  e1 e2 e3 e4) = 1 + exprSize e1 + exprSize e2 + exprSize e3 + exprSize e4
+exprSize (IterC e1 e2 e3 e4) = 1 + exprSize e1 + exprSize e2 + exprSize e3 + exprSize e4
 exprSize (Some a)      = 1 + exprSize a
 exprSize (Check _ e)  = 1 + exprSize e
 exprSize (Verify bl)   = 10 + exprSize e
@@ -525,6 +531,12 @@ valid (One e)             = valid e
 valid (All e)             = valid e
 valid (Some a)            = isVal a
 valid (a :>>: e)          = isVal a && valid e  -- Guard
+valid (Iter e1 e2 (Lam b3) (Lam b4)) = valid e1 && validL e2 && valid eb3 && valid eb4
+  where (_, eb3) = unsafeUnbind b3; (_, eb4) = unsafeUnbind b4
+valid (Iter _ _ _ _) = False
+valid (IterC e1 e2 (Lam b3) (Lam b4)) = valid e1 && valid e2 && valid eb3 && valid eb4
+  where (_, eb3) = unsafeUnbind b3; (_, eb4) = unsafeUnbind b4
+valid (IterC _ _ _ _) = False
 valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid e                   = isVal e
@@ -560,6 +572,8 @@ prep (a :>>: e)    = prepVal a (\v -> v :>>: prep e)
 prep (Check fx e)  = Check fx (prep e)
 prep (Verify bl)   = Verify (bindList xs (as, prep e))
                      where (xs,(as,e)) = unsafeUnbindList bl
+prep (Iter e1 e2 e3 e4) = prepVal e2 $ \ v2 -> Iter (prep e1) v2 (prep e3) (prep e4)
+prep IterC{}       = error "prep IterC undefined"
 prep HOLE          = error "prep HOLE undefined"
 
 prepSeq :: Expr -> Expr -> Expr
@@ -602,6 +616,8 @@ instance Variables Expr where
   variables f (Check _ e)  = variables f e
   variables f (Exi bnd)    = variables f bnd
   variables f (Verify bnd) = variables f bnd
+  variables f (Iter  e1 e2 e3 e4) = variables f (e1, e2, e3, e4)
+  variables f (IterC e1 e2 e3 e4) = variables f (e1, e2, e3, e4)
   variables _ _            = []
 
 instance Variables FailableAssump where
@@ -699,6 +715,8 @@ norm orig_e = alpha 0 orig_e
                              sub = rs `zip` rs'
                              e'  = alpha (k+n) e
                          in Verify (bindList rs' (map (substAssump sub) as, substSkol sub e'))
+  alpha k (Iter  e1 e2 e3 e4) = Iter  (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
+  alpha k (IterC e1 e2 e3 e4) = IterC (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
   alpha _ e            = e
 
   alphaExi k xs (Exi bnd) = alphaExi k (x:xs) e
@@ -742,6 +760,8 @@ subst sub orig_e
     go (Check fx e) = Check fx (go e)
     go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
+    go (Iter  e1 e2 e3 e4) = Iter  (go e1) (go e2) (go e3) (go e4)
+    go (IterC e1 e2 e3 e4) = IterC (go e1) (go e2) (go e3) (go e4)
     go e            = e
 
     subst_e_ops :: SubstOps Expr Expr
@@ -778,6 +798,8 @@ substSkol sub orig_e
     go (Check fx e) = Check fx (go e)
     go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
+    go (Iter  e1 e2 e3 e4) = Iter  (go e1) (go e2) (go e3) (go e4)
+    go (IterC e1 e2 e3 e4) = IterC (go e1) (go e2) (go e3) (go e4)
     go e            = e
 
     subst_e_ops :: SubstOps SkolIdent Expr
@@ -883,6 +905,16 @@ everywhere step env orig_e
                        where
                          env' = extendRuleEnv env rs as
                          (rs,(as,e)) = alphaRenameVerify (skolVars env) bl
+  recurse (Iter e1 e2 e3 e4) =
+                         [ (s, Iter e1' e2 e3 e4) | (s,e1') <- everywhere step env e1 ] ++
+                         [ (s, Iter e1 e2' e3 e4) | (s,e2') <- everywhere step env e2 ] ++
+                         [ (s, Iter e1 e2 e3' e4) | (s,e3') <- everywhere step env e3 ] ++
+                         [ (s, Iter e1 e2 e3 e4') | (s,e4') <- everywhere step env e4 ]
+  recurse (IterC e1 e2 e3 e4) =
+                         [ (s, IterC e1' e2 e3 e4) | (s,e1') <- everywhere step env e1 ] ++
+                         [ (s, IterC e1 e2' e3 e4) | (s,e2') <- everywhere step env e2 ] ++
+                         [ (s, IterC e1 e2 e3' e4) | (s,e3') <- everywhere step env e3 ] ++
+                         [ (s, IterC e1 e2 e3 e4') | (s,e4') <- everywhere step env e4 ]
 
   recurse _            = []
 
@@ -1093,6 +1125,8 @@ Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
 Exi bnd       <@ h = Exi (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
 One e         <@ h = One (e <@ h)
 All e         <@ h = All (e <@ h)
+Iter  e1 e2 e3 e4 <@ h = Iter  (e1 <@ h) (e2 <@ h) (e3 <@ h) (e4 <@ h)
+IterC e1 e2 e3 e4 <@ h = IterC (e1 <@ h) (e2 <@ h) (e3 <@ h) (e4 <@ h)
 Some e        <@ h = Some (e <@ h)
 (e1 :>>: e2)  <@ h = (e1 <@ h) :>>: (e2 <@ h)
 Check fx e    <@ h = Check fx (e <@ h)
@@ -1113,6 +1147,8 @@ bvs ctx = explore [] ctx
   explore xs (e1 :@: e2)  = explore xs e1 `union` explore xs e2
   explore xs (One e)      = explore xs e
   explore xs (All e)      = explore xs e
+  explore xs (Iter e1 e2 e3 e4) = explore xs e1 `union` explore xs e2 `union` explore xs e3 `union` explore xs e4
+  explore xs (IterC e1 e2 e3 e4) = explore xs e1 `union` explore xs e2 `union` explore xs e3 `union` explore xs e4
   explore xs (Some e)     = explore xs e
   explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
   explore xs (Check _ e)  = explore xs e
@@ -1134,6 +1170,8 @@ isContext (e1 :|: e2)  = isContext e1 || isContext e2
 isContext (e1 :@: e2)  = isContext e1 || isContext e2
 isContext (One e)      = isContext e
 isContext (All e)      = isContext e
+isContext (Iter  e1 e2 e3 e4) = isContext e1 || isContext e2 || isContext e3 || isContext e4
+isContext (IterC e1 e2 e3 e4) = isContext e1 || isContext e2 || isContext e3 || isContext e4
 isContext (Some e)     = isContext e
 isContext (e1 :>>: e2) = isContext e1 || isContext e2
 isContext (Check _ e)  = isContext e

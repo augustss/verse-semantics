@@ -175,6 +175,9 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Map [SrcExpr]                  -- map{e1;e2; ... }
   | Truth SrcExpr                  -- truth{e}
 
+  -- generalized one/all
+  | Iter SrcExpr SrcExpr SrcExpr SrcExpr -- iter(e){a,f,g}
+
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
 
@@ -549,6 +552,7 @@ instance Pretty SrcExpr where
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
           Map es -> text "map" <> braces (ppSeq l es)
           Truth e -> text "truth" <> braces (ppr 0 e)
+          Iter e1 e2 e3 e4 -> text "iter" <> parens (ppr 0 e1) <> braces (sep (punctuate semi [ppr 0 e2, ppr 0 e3, ppr 0 e4]))
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
 
@@ -690,6 +694,7 @@ compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
 compos f (Splice e)         = Splice <$> f e
+compos f (Iter e1 e2 e3 e4) = Iter <$> f e1 <*> f e2 <*> f e3 <*> f e4
 compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
 storeMapA :: (Applicative a) => (SrcValue -> a SrcValue) -> Store -> a Store
@@ -769,6 +774,7 @@ getVisibleBinders = go
     go Fail       = []
 
     go Macro1 {}                        = []
+    go (Iter _ e2 _ _) = go e2  -- XXX is this right
 
     --go (Map es)      = concatMap go es
     go e = impossible "getVisibleBinders" e
@@ -808,6 +814,7 @@ getFree = fvs_blk
     fvs (One e)           = fvs e
     fvs (All e)           = fvs e
     fvs (Guard e1 e2)     = fvs e1 ++ fvs e2
+    fvs (Iter e1 e2 e3 e4) = fvs e1 ++ fvs e2 ++ fvs e3 ++ fvs e4
 
     -- In (if e1 then e2 else e3), the binders of e1 scope over e2
     fvs (If3 e1 e2 e3)    = (fvs e1 ++ fvs_blk e2) `remove` bs

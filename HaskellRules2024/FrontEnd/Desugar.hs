@@ -974,8 +974,14 @@ dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
    = do { e1 <- mDesugarExpr s t1
         ; e2 <- dsM_12 s t2 pi
         ; e3 <- dsM_12 s t3 pi
+        ; x <- newIdent (getLoc t1) "f"
+        ; let vs = Array $ map Variable $ getVisibleBinders e1 `intersect` getFree e2
+        ; pure $ Iter (Seq [e1, vs]) (Array []) (eThunk $ Lam x $ Seq [ Variable x `Unify` vs, Array [Lit (LInt 0), e2]]) (eThunk e3)
+        }
+{-
         ; pure (eForce (One (Choice (eSeq [e1, eThunk e2])
                                     (eThunk e3)))) }
+-}
 
 ---------- Other terms with P(i) ---------------
 
