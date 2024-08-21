@@ -311,7 +311,7 @@ evalExpr e = do
   ce <- srcToCore F.defaultFlags Prelude.False e
   let (r, tr) = Rules.normalize steps verificationRules ce
       v = term tr
-      steps = 2000
+      steps = 20000
   case r of
     Rules.NormOK | isOKResult v -> return (Just v)
                  | otherwise -> return Nothing
