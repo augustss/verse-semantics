@@ -640,6 +640,7 @@ choiceFree ((_ :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2
 choiceFree (_ :>>: e)          = choiceFree e
 choiceFree (Exi bnd)           = choiceFree e where (_,e) = unsafeUnbind bnd
 choiceFree (v1 :@: _)          = case v1 of
-                                   Op _ -> True -- all ops we support are choice-free right now
-                                   _    -> False
+                                   Op DotDot -> False
+                                   Op _      -> True  -- all other ops are choice-free
+                                   _         -> False -- may or may not be choice free
 choiceFree _                   = True
