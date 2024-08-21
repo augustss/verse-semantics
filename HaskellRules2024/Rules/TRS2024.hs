@@ -426,6 +426,10 @@ oneAndAllStep _env lhs =
   do IterC Fail _ _ _ <- [lhs]   -- could probably put this in evalCtx
      pure Fail
  ++
+  "ITERC-CHOICE" `name`
+  do IterC (e1 :|: e2) e f g <- [lhs]   -- could probably put this in evalCtx
+     pure $ IterC e1 e f g :|: IterC e2 e f g
+ ++
   "ITERC-SEQ" `name`
   do IterC (e1 :>: e2) e f g <- [lhs]   -- could probably put this in evalCtx
      pure $ e1 :>: IterC e2 e f g
