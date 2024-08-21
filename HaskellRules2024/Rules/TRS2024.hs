@@ -386,7 +386,7 @@ oneAndAllStep _env lhs =
   do Iter v a f g <- [lhs]
      guard (isVal v)
      guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
-     let f1 = identNotIn $ free (v, a, f, g)
+     let f1 = identNotIn $ free lhs
          app = Exi $ bind f1 $ Var f1 :=: (f :@: a) :>: (Var f1 :@: v)
      pure $ IterC app Fail f g
  ++
@@ -394,7 +394,7 @@ oneAndAllStep _env lhs =
   do Iter (v :|: e) a f g <- [lhs]
      guard (isVal v)
      guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
-     let f1 = identNotIn $ free (v, a, f, g)
+     let f1 = identNotIn $ free lhs
          app = Exi $ bind f1 $ Var f1 :=: (f :@: a) :>: (Var f1 :@: v)
      pure $ IterC app e f g
  ++
@@ -656,6 +656,8 @@ blkd lx (Some v)    = any (isLocal lx) (free v)
 blkd lx (v :>>: _)  = any (isLocal lx) (free v)
 
 blkd _  Fail        = False
+
+blkd lx (Iter e1 e2 _ _) = blkd (makeRigid lx) e1 && blkd lx e2
 
 blkd _ e = errorMessage ("Uncovered case in blkd " ++ show e)
 

@@ -974,14 +974,8 @@ dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
    = do { e1 <- mDesugarExpr s t1
         ; e2 <- dsM_12 s t2 pi
         ; e3 <- dsM_12 s t3 pi
-        ; x <- newIdent (getLoc t1) "f"
-        ; let vs = Array $ map Variable $ getVisibleBinders e1 `intersect` getFree e2
-        ; pure $ Iter (Seq [e1, vs]) (Array []) (eThunk $ Lam x $ Seq [ Variable x `Unify` vs, Array [Lit (LInt 0), e2]]) (eThunk e3)
+        ; encodeIf e1 e2 e3
         }
-{-
-        ; pure (eForce (One (Choice (eSeq [e1, eThunk e2])
-                                    (eThunk e3)))) }
--}
 
 ---------- Other terms with P(i) ---------------
 
@@ -996,6 +990,34 @@ dsM_12 s t@(One{}) (P i) = flipToE s t i
 
 dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 
+
+------- Encodings with iter ---------------------------
+-- if e1 e2 e3 = iter (e1; vs) <> (\ _ a . exi vs . a=vs; <0,e2>) (\_ . e3)
+--   where vs are the free variables also used in e2
+-- when vs is empty, we can use the simpler
+-- if e1 e2 e3 = iter e1 <> (\ _ _ . <0,e2>) (\_ . e3)
+encodeIf :: SrcCore -> SrcCore -> SrcCore -> D SrcCore
+encodeIf e1 e2 e3 = do
+  a <- newIdent (getLoc e1) "a"
+  let vs = getVisibleBinders e1 `intersect` getFree e2
+      evs = Array $ map Variable vs
+  if null vs then
+    pure $ Iter e1 (Array []) (eThunk $ eThunk $ eStop e2) (eThunk e3)
+   else
+    pure $ Iter (Seq [e1, evs]) (Array []) (eThunk $ Lam a $ eExists vs $ Seq [ Variable a `Unify` evs, eStop e2]) (eThunk e3)
+
+encodeOne :: SrcCore -> D SrcCore
+encodeOne e = do
+  a <- newIdent (getLoc e) "a"
+  pure $ Iter e (Array []) (eThunk $ Lam a $ eStop $ Variable a) Fail
+
+--encodeAll
+
+eStop :: SrcCore -> SrcCore
+eStop e = Array [Lit (LInt 0), e]
+
+eCont :: SrcCore -> SrcCore
+eCont e = Array [Lit (LInt 1), e]
 
 ----------------------------------
 flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
