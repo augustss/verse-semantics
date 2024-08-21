@@ -120,7 +120,7 @@ scope sc = expr
 
     expr (Block e)   = exprD e
     expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
-                          ; e2' <- scope sc' e2
+                          ; e2' <- scopeD sc' e2
                           ; pure $ eExists is $ eSeq [e1'', e2'] }
 
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2

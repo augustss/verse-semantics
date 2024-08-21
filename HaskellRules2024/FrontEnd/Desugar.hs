@@ -155,9 +155,9 @@ sDesugarExpr = ds
     ds (Array es) = Array <$> mapM ds es
 
     -- Let and where
-    --    (let e in b)  --> e; b
+    --    (let e in b)  --> let e in b    Need to keep this for M-desugaring and scope checking.
     --    (e1 where e2) --> e1 where e2   Need to keep this for M-desugaring!
-    ds (Let e b) = do { e' <- ds e; b' <- ds b; pure (Seq [e',b']) }
+    ds (Let e b) = Let <$> ds e <*> ds b
     ds (InfixOp e1 (Op "where") e2) = Where <$> ds e1 <*> ds e2
 
     -- Do and case
@@ -916,6 +916,12 @@ dsM_12 s (Where t1 t2) pi                   -- MWERE
   = do { (e1,z) <- defineDE "z" (dsM_12 s t1 pi)
        ; e2 <- mDesugarExpr s t2
        ; pure (eSeq [e1, e2, z]) }
+
+-------------------- let (t1){t2} -----------------
+dsM_12 s (Let t1 t2) pi                     -- MLET
+  = do { e1 <- mDesugarExpr s t1
+       ; e2 <- dsM_12 s t2 pi
+       ; pure (Let e1 e2) }
 
 -------------------- t1 ; t2 -----------------
 dsM_12 MX (Seq ts) pi                      -- MSEMIX
