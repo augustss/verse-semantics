@@ -791,6 +791,7 @@ getFree = fvs_blk
     fvs Fail              = []
     fvs (Wrong {})        = []
     fvs (Array es)        = concatMap fvs es
+    fvs (Truth e)         = fvs e
     fvs (Tuple es)        = concatMap fvs es
     fvs (EffAttr e _)     = fvs e
     fvs (PrefixOp _ e)    = fvs e
