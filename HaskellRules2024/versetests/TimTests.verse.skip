@@ -10,6 +10,9 @@ broken("#asktim FP? says 'Could tighten to S00' 'A00'"){1 where a:any} # Could t
 broken("#asktim FP? 'P00'"){f(:int):int => f() => 3}
 broken("#asktim FP? 'N04'"){x:=0,x:int=>3}
 broken("#asktim FP? 'N04'"){x:=0,y:int=>x:=1}
+broken("#asktim 'D00'"){x:int=>if{x=3,f():=x=3}} # Was S00 before UncommittableNegotiable.
+broken("#asktim 'F00'"){f():=2=3 => 4}							#TODO:10.4:ASSUME-FAIL:RANGE
+broken("#asktim 'D00'"){f(x:int):=x=3 => 4}
 broken("#asktim FP? let-desugaring? 'N00'"){let(x:=1){},x}
 broken("#asktim FP? let-desugaring? 'N00'"){let(){x:=1},x}
 broken("#asktim FP? let-desugaring? 'N00'"){let(x){x:=1}}
@@ -66,10 +69,6 @@ broken("bug: missing check<succeeds> in function body 'U00'"){function(x:=x){x=1
 skip("bug: rationals 'F00'"){nat[2/3]}		#TODO:10.4:RATIONALS
 skip("bug: rationals 'F00'"){int[2/3]}		#TODO:10.4:RATIONALS
 
-
-broken("#asktim 'D00'"){x:int=>if{x=3,f():=x=3}} # Was S00 before UncommittableNegotiable.
-broken("#asktim 'F00'"){f():=2=3 => 4}							#TODO:10.4:ASSUME-FAIL:RANGE
-broken("#asktim 'D00'"){f(x:int):=x=3 => 4}
 broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y}}}
 broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y},a=b}}
 broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y},x=y}}
