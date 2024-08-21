@@ -166,6 +166,22 @@ verify("HO19",pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } 
 verify("HO20", fail, broken) { function( foo(x:int):type{int[x]} )<succeeds> { z := "monkey" ; foo[z] } }
 
 
+verify("HO20-suc",fail)
+                    { inc(x:int):int := {x};
+                      g( h(:int):string ) := { 0 };
+                      main()<succeeds> := { g[ inc ] }
+                    }
+verify("HO20-dec",fail)
+                    { inc(x:int):int := {x};
+                      g( h(:int):string ) := { 0 };
+                      main()<decides> := { g[ inc ] }
+                    }
+verify("FO20-suc", fail) { f(x:int):int := {x}; main() := { f[ 'm' ] } }
+verify("FO20-dec", pass) { f(x:int):int := {x}; main()<decides> := { f[ 'm' ] } }
+
+verify("circular", pass) { a:any => f(x:int):type{int[x]} => f[a] } #works because we "get lucky"
+
+
 # Tim tests
 # Simplification of Tim's    `test(S00){f(x:int):=x, a:any => a=f => a[_]=3}`
 verify("Tim1", pass) { f(x:int) := x; foo(:any) := {f[_]=3} }

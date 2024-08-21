@@ -1,5 +1,8 @@
 # Add new meetings at the top
 
+verify("M21Aug24-1", pass){ (F():int = G[]) ; (G():int = 1); F[] }
+
+
 # Meeting 16 Aug 24
 verify("M16Aug24-1", pass){ f(x:int):=nat[x] => f[-3]  }
   # This is an odd one!  If it had been
