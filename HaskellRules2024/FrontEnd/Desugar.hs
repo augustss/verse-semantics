@@ -982,36 +982,58 @@ dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
 -- We allow all{e}, one{e} in patterns using flipToE
 --    (not very important)
 
-dsM_12 s (All t) E       = All <$> dsM_12 s t E
+dsM_12 s (All t) E       = encodeAll =<< dsM_12 s t E
 dsM_12 s t@(All{}) (P i) = flipToE s t i
 
-dsM_12 s (One t) E       = One <$> dsM_12 s t E
+dsM_12 s (One t) E       = encodeOne =<< dsM_12 s t E
 dsM_12 s t@(One{}) (P i) = flipToE s t i
 
 dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 
 
 ------- Encodings with iter ---------------------------
--- if e1 e2 e3 = iter (e1; vs) <> (\ _ a . exi vs . a=vs; <0,e2>) (\_ . e3)
+-- if(e1) e2 else e3  -->  iter (e1; <vs>) <> (\ _ a . exi vs . a=<vs>; <0,e2>) (\_ . e3)
 --   where vs are the free variables also used in e2
 -- when vs is empty, we can use the simpler
--- if e1 e2 e3 = iter e1 <> (\ _ _ . <0,e2>) (\_ . e3)
+--   if e1 e2 e3 = iter e1 <> (\ _ _ . <0,e2>) (\_ . e3)
+-- when vs is a singleton, we can use the simpler
+--   if e1 e2 e3 = iter (e1; v) <> (\ _ v . <0,e2>) (\_ . e3)
 encodeIf :: SrcCore -> SrcCore -> SrcCore -> D SrcCore
 encodeIf e1 e2 e3 = do
   a <- newIdent (getLoc e1) "a"
   let vs = getVisibleBinders e1 `intersect` getFree e2
       evs = Array $ map Variable vs
-  if null vs then
-    pure $ Iter e1 (Array []) (eThunk $ eThunk $ eStop e2) (eThunk e3)
-   else
-    pure $ Iter (Seq [e1, evs]) (Array []) (eThunk $ Lam a $ eExists vs $ Seq [ Variable a `Unify` evs, eStop e2]) (eThunk e3)
+  case vs of
+    []  -> pure $ Iter       e1        (Array []) (eThunk $ eThunk $                                           eStop e2)  (eThunk e3)
+    [v] -> pure $ Iter (Seq [e1, ev])  (Array []) (eThunk $ Lam v $                                            eStop e2)  (eThunk e3)
+      where ev = Variable v
+    _   -> pure $ Iter (Seq [e1, evs]) (Array []) (eThunk $ Lam a $ eExists vs $ Seq [ Variable a `Unify` evs, eStop e2]) (eThunk e3)
 
+-- one{e}  -->  Iter e <> (\ _ a . a) (\ _ . Fail)
 encodeOne :: SrcCore -> D SrcCore
 encodeOne e = do
   a <- newIdent (getLoc e) "a"
-  pure $ Iter e (Array []) (eThunk $ Lam a $ eStop $ Variable a) Fail
+  pure $ Iter e (Array []) (eThunk $ Lam a $ eStop $ Variable a) (eThunk Fail)
 
---encodeAll
+-- all{e}  -->  exi arr. Iter e 0 step (\ n . Length(arr) = n; arr)
+--   step n a = arr[n] = a; <1, n+1>
+encodeAll :: SrcCore -> D SrcCore
+encodeAll e = do
+  arr <- newIdent (getLoc e) "arr"
+  n   <- newIdent (getLoc e) "n"
+  a   <- newIdent (getLoc e) "a"
+  let earr = Variable arr
+      en   = Variable n
+      ea   = Variable a
+      step = Lam n $ Lam a $ Seq [ea `Unify` (earr `ApplyD` en), eCont (eAdd en (Lit (LInt 1)))]
+      done = Lam n $ earr `Unify` eMkArr en
+  pure $ Exists [arr] $ Iter e (Lit (LInt 0)) step done
+
+eAdd :: SrcCore -> SrcCore -> SrcCore
+eAdd x y = EPrim Add `ApplyD` Array [x, y]
+
+eMkArr :: SrcCore -> SrcCore
+eMkArr x = EPrim MkArr `ApplyD` x
 
 eStop :: SrcCore -> SrcCore
 eStop e = Array [Lit (LInt 0), e]

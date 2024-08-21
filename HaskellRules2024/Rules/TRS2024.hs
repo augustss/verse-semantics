@@ -169,6 +169,16 @@ applicationStep _env lhs =
 
 arrayOpStep :: Rule
 arrayOpStep _env lhs =
+  "APP-TUPK" `name`   -- This rule isn't needed, but it makes the reduction sequence much shorter
+                      -- when indexing with a constant
+  do Arr vs :@: Lit (LInt i) <- [lhs]
+     guard (all isVal vs)
+     let i' = fromInteger i
+     if 0 <= i' && i' < length vs then
+       pure (vs !! i')
+      else
+       pure Fail
+ ++
   "APP-TUP" `name`
   do Arr vs@(_:_) :@: v <- [lhs]
      guard (isVal v && all isVal vs)
@@ -208,6 +218,12 @@ arrayOpStep _env lhs =
        (do { Just (ls,vs2) <- [dropEqualPrefix e1 res]; pure $ foldr (:>:) (equateArr e2 vs2) ls })
      ++
        (do { Just (ls,vs1) <- [dropEqualSuffix e2 res]; pure $ foldr (:>:) (equateArr e1 vs1) ls }) }
+ ++
+  "APP-MKARR" `name`
+  do Op MkArr :@: Lit (LInt n) <- [lhs]
+     let vs = take (fromInteger n) (identsNotIn [])
+         exi i e = Exi (bind i e)
+     pure $ foldr exi (Arr $ map Var vs) vs
 
 equateArr :: Expr -> [Val] -> Expr
 -- (equateArr e vs)  returns  (Arr vs = e; Arr vs)
@@ -405,6 +421,14 @@ oneAndAllStep _env lhs =
   "ITERC-CONT" `name`
   do IterC (Arr [Lit (LInt 1), a]) e f g <- [lhs]
      pure $ Iter e a f g
+ ++
+  "ITERC-FAIL" `name`
+  do IterC Fail _ _ _ <- [lhs]   -- could probably put this in evalCtx
+     pure Fail
+ ++
+  "ITERC-SEQ" `name`
+  do IterC (e1 :>: e2) e f g <- [lhs]   -- could probably put this in evalCtx
+     pure $ e1 :>: IterC e2 e f g
 
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
@@ -657,7 +681,8 @@ blkd lx (v :>>: _)  = any (isLocal lx) (free v)
 
 blkd _  Fail        = False
 
-blkd lx (Iter e1 e2 _ _) = blkd (makeRigid lx) e1 && blkd lx e2
+blkd lx (Iter e1 _e2 _ _) = blkd (makeRigid lx) e1 -- && blkd lx e2
+blkd lx (IterC e1 _e2 _ _) = blkd lx e1 -- && blkd lx e2
 
 blkd _ e = errorMessage ("Uncovered case in blkd " ++ show e)
 
@@ -672,4 +697,11 @@ choiceFree (Exi bnd)           = choiceFree e where (_,e) = unsafeUnbind bnd
 choiceFree (v1 :@: _)          = case v1 of
                                    Op _ -> True -- all ops we support are choice-free right now
                                    _    -> False
+choiceFree (Iter  _ _ f g)     = choiceFreeIter f g
+choiceFree (IterC _ _ f g)     = choiceFreeIter f g
 choiceFree _                   = True
+
+choiceFreeIter :: Expr -> Expr -> Bool
+choiceFreeIter (Lam fbnd) (Lam gbnd) | Lam gbnd' <- snd (unsafeUnbind gbnd) =
+  choiceFree (snd (unsafeUnbind fbnd)) && choiceFree (snd (unsafeUnbind gbnd'))
+choiceFreeIter _ _ = False

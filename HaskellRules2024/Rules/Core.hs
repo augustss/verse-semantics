@@ -157,6 +157,7 @@ data PrimOp
  | ArrMap     -- arrMap$[f,<v1..vn>] = <f v1, .., f vn>
  | DotDot     -- dotDot$[m,n] = <m, m+1, .., n>
  | ArrApp     -- arrApp$[ Arr as, Arr bs, r ] =  r=(as++bs); r
+ | MkArr      -- mkArr$[n] = array{_, _, ..., _}  n elements
 
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
@@ -181,6 +182,7 @@ primOpString ArrLen   = "arrLen$"
 primOpString ArrMap   = "arrMap$"
 primOpString DotDot   = "dotDot$"
 primOpString ArrApp   = "arrApp$"
+primOpString MkArr    = "mkArr$"
 
 primOpString Gt  = "intGT$"
 primOpString GEq = "intGE$"
@@ -220,6 +222,7 @@ primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
 primOpCanFail DotDot   = False
 primOpCanFail ArrMap   = False
+primOpCanFail MkArr    = False
 
 --------------------------------------------------------------------------------
 --
@@ -518,28 +521,30 @@ isComparable _                = False -- ToDo: what about Path, Ptr, Rational?
 --------------------------------------------------------------------------------
 
 valid :: Expr -> Bool
+valid e = valid' e --let x = valid' e in if x then x else
+  -- case e of Iter e1 e2 e3 e4 -> error $ "valid " ++ prettyShow (e, valid' e1, valid' e2, valid' e3, valid' e4)
 -- Checks if an expression is syntactically valid,
 -- according to the syntax of desugaring.pdf
-valid ((a :=: e1) :>: e2) = validL a && valid e1 && valid e2
-valid (e1 :|: e2)         = valid e1 && valid e2
-valid (a1 :@: a2)         = isVal a1 && isVal a2
-valid (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
+valid' ((a :=: e1) :>: e2) = validL a && valid e1 && valid e2
+valid' (e1 :|: e2)         = valid e1 && valid e2
+valid' (a1 :@: a2)         = isVal a1 && isVal a2
+valid' (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
   -- SLPJ: todo: check binder is not _
-valid (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
-valid Fail                = True
-valid (One e)             = valid e
-valid (All e)             = valid e
-valid (Some a)            = isVal a
-valid (a :>>: e)          = isVal a && valid e  -- Guard
-valid (Iter e1 e2 (Lam b3) (Lam b4)) = valid e1 && validL e2 && valid eb3 && valid eb4
+valid' (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
+valid' Fail                = True
+valid' (One e)             = valid e
+valid' (All e)             = valid e
+valid' (Some a)            = isVal a
+valid' (a :>>: e)          = isVal a && valid e  -- Guard
+valid' (Iter e1 e2 (Lam b3) (Lam b4)) = valid e1 && valid e2 && valid eb3 && valid eb4
   where (_, eb3) = unsafeUnbind b3; (_, eb4) = unsafeUnbind b4
-valid (Iter _ _ _ _) = False
-valid (IterC e1 e2 (Lam b3) (Lam b4)) = valid e1 && valid e2 && valid eb3 && valid eb4
+valid' (Iter _ _ _ _) = False
+valid' (IterC e1 e2 (Lam b3) (Lam b4)) = valid e1 && valid e2 && valid eb3 && valid eb4
   where (_, eb3) = unsafeUnbind b3; (_, eb4) = unsafeUnbind b4
-valid (IterC _ _ _ _) = False
-valid (Check _ e)         = valid e
-valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
-valid e                   = isVal e
+valid' (IterC _ _ _ _) = False
+valid' (Check _ e)         = valid e
+valid' (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
+valid' e                   = isVal e
   -- SLPJ: todo: check variable is not _
 
 validL :: Expr -> Bool
