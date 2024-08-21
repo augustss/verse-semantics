@@ -13,7 +13,6 @@ broken("#asktim FP? 'N04'"){x:=0,y:int=>x:=1}
 broken("#asktim 'D00'"){x:int=>if{x=3,f():=x=3}} # Was S00 before UncommittableNegotiable.
 broken("#asktim 'F00'"){f():=2=3 => 4}							#TODO:10.4:ASSUME-FAIL:RANGE
 broken("#asktim 'D00'"){f(x:int):=x=3 => 4}
-broken("#asktim FP? let-desugaring? 'N00'"){let(x){x:=1}}
 
 skip("steps=600"){a&b:any => c:int => f(:nat):type{a=b} => {f[c], a=b}}         ##BAD
 skip("steps=600"){a:int => b&c:any => f(:nat):type{b=c} => {f[a],b=c}}
@@ -81,8 +80,6 @@ broken("assume-false, dataflow, 'R20'"){assume{x=3},x:=4}
 broken("assume-false, dataflow, 'R20'"){x:any,assume{x=2},x=3}
 
 
-skip("assume-false, paraconsistency 'N00'"){x:false => y}
-skip("assume-false, paraconsistency 'N00'"){x:false => y,1}
 skip("assume-false, paraconsistency 'F00'"){92=93 => 94=95}			#TODO:SKIP:ASSUME-FAIL
 skip("assume-false, paraconsistency 'F00'"){92=93 => 94=95,91}		#TODO:SKIP:ASSUME-FAIL
 skip("assume-false, paraconsistency 'F00'"){1=2 => 3=4}				#TODO:SKIP:ASSUME-FAIL
