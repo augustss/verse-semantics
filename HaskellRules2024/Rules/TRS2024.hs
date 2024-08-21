@@ -14,7 +14,7 @@ import Epic.Print hiding ( (<>) )
 import FrontEnd.Error
 
 import Control.Monad( guard )
-import Data.List( (\\) )
+import Data.List( (\\), isPrefixOf )
 
 --------------------------------------------------------------------------------
 --
@@ -701,12 +701,15 @@ choiceFree (Exi bnd)           = choiceFree e where (_,e) = unsafeUnbind bnd
 choiceFree (v1 :@: _)          = case v1 of
                                    Op DotDot -> False
                                    Op _      -> True  -- all other ops are choice-free
-                                   _         -> False -- may or may not be choice free
+--                                   _         -> False -- may or may not be choice free
+                                   _         -> cf v1
+  where cf (Var i) = "$arr" `isPrefixOf` show i
+        cf _ = False
 choiceFree (Iter  _ _ f g)     = choiceFreeIter f g
 choiceFree (IterC _ _ f g)     = choiceFreeIter f g
 choiceFree _                   = True
 
 choiceFreeIter :: Expr -> Expr -> Bool
-choiceFreeIter (Lam fbnd) (Lam gbnd) | Lam gbnd' <- snd (unsafeUnbind gbnd) =
-  choiceFree (snd (unsafeUnbind fbnd)) && choiceFree (snd (unsafeUnbind gbnd'))
-choiceFreeIter _ _ = False
+choiceFreeIter (Lam fbnd) (Lam gbnd) | Lam fbnd' <- snd (unsafeUnbind fbnd) =
+  choiceFree (snd (unsafeUnbind fbnd')) && choiceFree (snd (unsafeUnbind gbnd))
+choiceFreeIter _ _ = error "malformed iter"
