@@ -393,6 +393,7 @@ oneAndAllStep _env lhs =
      guard (all isVal vs)
      pure (Arr vs)
  ++
+  -- iter(fail,
   "ITER-FAIL" `name`
   do Iter Fail a _ g <- [lhs]
      guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
@@ -433,6 +434,11 @@ oneAndAllStep _env lhs =
   "ITERC-SEQ" `name`
   do IterC (e1 :>: e2) e f g <- [lhs]   -- could probably put this in evalCtx
      pure $ e1 :>: IterC e2 e f g
+ ++
+  "ITERC-EXI" `name`
+  do IterC exi_e1 e f g <- [lhs]   -- could probably put this in evalCtx
+     (exis,x,e1) <- matchExi_alphaRename (free lhs) exi_e1
+     pure $ Exi $ bind x $ IterC (exis <@ e1) e f g
 
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]

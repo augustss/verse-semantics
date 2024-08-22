@@ -63,6 +63,21 @@ checkStep env lhs =
    do Check eff Fail <- [lhs]
       guard (canFail eff)
       pure Fail
+{-
+   ++
+   "CHECK-ITER" `name`
+   do Check eff e@(Iter _ _ _ _) <- [lhs]
+      let (_e1, _e2, _x, _y, e3, _z, e4) = unpackIter e
+      -- pure $ Iter _e1 _e2 (Lam $ bind _x $ Lam $ bind _y $ Check eff e3) (Lam $ bind _z $ Check eff e4)
+      pure $ (Var underscore :=: Check eff e3) :>: Check eff e4
+
+unpackIter :: Expr -> (Expr, Expr, Ident, Ident, Expr, Ident, Expr)
+unpackIter (Iter e1 e2 (Lam e3) (Lam e4)) | (x, Lam e3') <- unsafeUnbind e3 =
+      let (y, e3'') = unsafeUnbind e3'
+          (z, e4') = unsafeUnbind e4
+      in  (e1, e2, x, y, e3'', z, e4')
+unpackIter _ = error "unpackIter: bad iter"      
+-}
 
 skolValue :: [SkolIdent] -> Expr -> Bool
 -- A value whose only free vars are skolems
@@ -245,3 +260,7 @@ proofX bs lhs =
   do Check fx x <- [lhs]
      (ctx, hole) <- proofX bs x
      pure (Check fx ctx, hole)
+ ++
+  do Iter x y z w <- [lhs]
+     (ctx, hole) <- proofX bs x
+     pure (Iter ctx y z w, hole)

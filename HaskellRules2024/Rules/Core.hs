@@ -91,6 +91,41 @@ data Expr
   | HOLE
  deriving ( Eq, Ord, Show )
 
+{- Note [iter]
+The iter (and helper iterc) construct is a fold over choices.
+
+In the expression iter(e,a){f,g}
+  * e is the choices we are iterating over
+  * a is the "accumulator", i.e., the result we are building up
+  * f is the thing to do if e is not fail
+  * g is the think to do if e is fail
+
+Both f and g are always explicit lambdas.  Anything else is invalid.
+The function f will be called with the value in a choice and the
+current accumulator (just like the function in a foldl/foldr).
+The function f must return one of two things
+  <0, r>    stop iteration and return r
+  <1, a>    continue iteration with new accumulator a
+
+The iterc construct is an intermediate which will reduce to iter
+again to keep iterating.  It is responsible for checking the
+return value of f.
+
+They have the following reduction rules:
+(ITER-FAIL)    iter(fail,  a){f, g}  -->  f[a]
+(ITER-VALUE)   iter(v,     a){f, g}  -->  iterc(f[v][a]){fail, f, g}
+(ITER-CHOICE)  iter(v | e, a){f, g}  -->  iterc(f[v][a]){e,    f, g}
+
+(ITERC-DONE)   iterc(<0,r>)   {_, _, _}  -->  r
+(ITERC-CONT)   iterc(<1,a>)   {e, f, g}  -->  iter(e, a){f, g}
+(ITERC-FAIL)   iterc(fail)    {_, _, _}  -->  fail
+(ITERC-CHOICE) iterc(e1 | e2) {e, f, g}  -->  iterc(e1){e, f, g} | iterc(e2, e, f, g}
+(ITERC-SEQ)    iterc(e1 ; e2) {e, f, g}  -->  e1; iterc(e2){e, f, g}
+(ITERC-EXI)    iterc(exi x.e1){e, f, g)  -->  exi x . iterc(e1){e, f, g}
+
+XXX iterc is pretty ugly.  It must be possible to do this better.
+-}
+
 {- Note [Truth values]
 ~~~~~~~~~~~~~~~~~~~~~~
 As well as literals, arrays, lambdas, the language has a primitive value
