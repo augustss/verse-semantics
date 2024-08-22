@@ -98,7 +98,7 @@ In the expression iter(e,a){f,g}
   * e is the choices we are iterating over
   * a is the "accumulator", i.e., the result we are building up
   * f is the thing to do if e is not fail
-  * g is the think to do if e is fail
+  * g is the thing to do if e is fail
 
 Both f and g are always explicit lambdas.  Anything else is invalid.
 The function f will be called with the value in a choice and the
@@ -112,18 +112,33 @@ again to keep iterating.  It is responsible for checking the
 return value of f.
 
 They have the following reduction rules:
-(ITER-FAIL)    iter(fail,  a){f, g}  -->  f[a]
-(ITER-VALUE)   iter(v,     a){f, g}  -->  iterc(f[v][a]){fail, f, g}
-(ITER-CHOICE)  iter(v | e, a){f, g}  -->  iterc(f[v][a]){e,    f, g}
+(ITER-FAIL)    iter(fail,  a){f; g}  -->  f[a]
+(ITER-VALUE)   iter(v,     a){f; g}  -->  iterc(f[v][a]){fail; f; g}
+(ITER-CHOICE)  iter(v | e, a){f; g}  -->  iterc(f[v][a]){e;    f; g}
 
-(ITERC-DONE)   iterc(<0,r>)   {_, _, _}  -->  r
-(ITERC-CONT)   iterc(<1,a>)   {e, f, g}  -->  iter(e, a){f, g}
-(ITERC-FAIL)   iterc(fail)    {_, _, _}  -->  fail
-(ITERC-CHOICE) iterc(e1 | e2) {e, f, g}  -->  iterc(e1){e, f, g} | iterc(e2, e, f, g}
-(ITERC-SEQ)    iterc(e1 ; e2) {e, f, g}  -->  e1; iterc(e2){e, f, g}
-(ITERC-EXI)    iterc(exi x.e1){e, f, g)  -->  exi x . iterc(e1){e, f, g}
+(ITERC-DONE)   iterc(<0,r>)   {_; _; _}  -->  r
+(ITERC-CONT)   iterc(<1,a>)   {e; f; g}  -->  iter(e, a){f; g}
+(ITERC-FAIL)   iterc(fail)    {_; _; _}  -->  fail
+(ITERC-CHOICE) iterc(e1 | e2) {e; f; g}  -->  iterc(e1){e; f; g} | iterc(e2){e; f; g}
+(ITERC-SEQ)    iterc(e1 ; e2) {e; f; g}  -->  e1; iterc(e2){e; f; g}
+(ITERC-EXI)    iterc(exi x.e1){e; f; g)  -->  exi x . iterc(e1){e; f; g}
 
 XXX iterc is pretty ugly.  It must be possible to do this better.
+
+Here's how if/one/all are encoded using iter.
+
+  * if(e1) e2 else e3  =  iter( (e1; <vs>),  <>){ (\ _ a . exi vs . a=<vs>; <0,e2>); (\_ . e3) }
+      where vs are the free variables also used in e2
+      if vs is empty or a singleton, we can simplify this
+
+  * one{e}  =  iter(e, <>){ (\ _ a . a); (\ _ . fail) }
+
+  * all{e}  =  exi arr. iter(e, 0){step; (\ n . mkArr$[n])}
+      where step = \ n a . arr[n] = a; <1, n+1>
+      Note how 'all' builds the array by just making a number of
+      equalities arr[i] = v_i, and then when we get to the end
+      we crate an array with the correct number of elements
+      using mkArr$.  The accumulator is the number of elements.
 -}
 
 {- Note [Truth values]

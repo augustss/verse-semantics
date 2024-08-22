@@ -1023,7 +1023,7 @@ encodeOne e = do
   a <- newIdent (getLoc e) "a"
   pure $ Iter e (Array []) (eThunk $ Lam a $ eStop $ Variable a) (eThunk Fail)
 
--- all{e}  -->  exi arr. Iter e 0 step (\ n . Length(arr) = n; arr)
+-- all{e}  -->  exi arr. Iter e 0 step (\ n . mkArr$[n])
 --   step n a = arr[n] = a; <1, n+1>
 encodeAll :: SrcCore -> D SrcCore
 encodeAll e = do
