@@ -693,7 +693,7 @@ testFlags = TestFlags
          ( OA.long "max-steps"
         <> OA.short 'm'
         <> OA.metavar "NUM"
-        <> OA.value 500   -- test M28Jul24-1 takes ages with 1000 steps
+        <> OA.value 1000   -- test M28Jul24-1 takes ages with 1000 steps
         <> OA.help "Maximum number of rewrite steps" )
   <*> OA.option OA.auto
          ( OA.long "max-norm-steps"
