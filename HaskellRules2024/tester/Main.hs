@@ -8,7 +8,7 @@ module Main(main) where
 
 import Prelude
 
-import FrontEnd.Desugar( desugar )
+import FrontEnd.Desugar( desugar, DError )
 import FrontEnd.ToCore( convertToCore )
 import FrontEnd.Flags
 import FrontEnd.Expr as Src
@@ -288,12 +288,12 @@ widthFileName = 25
 --
 -----------------------------------------------
 
-srcToCore :: Flags -> Bool -> SrcExpr -> IO Rules.Expr
+srcToCore :: Flags -> Bool -> SrcExpr -> IO (Rules.Expr, [DError])
 srcToCore flags add_verification e
-  = do { e1 :: SrcCore    <- FrontEnd.Desugar.desugar flags add_verification e
-       ; e2 :: Rules.Expr <- FrontEnd.ToCore.convertToCore flags e1
+  = do { (e1 :: SrcCore, errs1)    <- FrontEnd.Desugar.desugar flags add_verification e
+       ; (e2 :: Rules.Expr, errs2) <- FrontEnd.ToCore.convertToCore flags e1
        ; let e3 = Rules.prep e2
-       ; return e3 }
+       ; return (e3, errs1 ++ errs2) }
 
 evalExpr :: TestFlags -> Rules.Expr -> (NormResult, Traced Rules.Expr)
 evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
@@ -367,18 +367,24 @@ doTest tflg test src1 src2 = do
 
      ; mb_core2 <- case src2 of
                      Variable (Ident _ "wrong") -> pure Nothing
-                     _       -> do { core2 <- srcToCore flags False src2
+                     _       -> do { (core2, _) <- srcToCore flags False src2
                                    ; pure (Just core2) }
 
-     ; res <- checkResults tflg test (src1, core1) (src2, mb_core2)
+     ; checkResults tflg test (src1, core1) (src2, mb_core2)
 
-     ; pure res }
+     }
 
--- | `wrapTopEffect` wraps the expression in a toplevel verify if necessary
-wrapTest :: Bool -> Expr -> Expr
-wrapTest wrap_me core
-  | wrap_me   = Rules.Verify (bindList [] ([], Rules.Check Succeeds core))
+
+-- | `wrapTopEffect` wraps the expression in a toplevel verify if necessary,
+--   replacing the code with FAIL if there was a desugaring error (e.g. unbound variable)
+wrapTest :: Bool -> (Expr, [DError]) -> Expr
+wrapTest wrap_me (core, errs)
+  | wrap_me   = Rules.Verify (bindList [] ([], Rules.Check Succeeds core'))
   | otherwise = core
+  where
+    core' | null errs = core
+          | otherwise = Rules.Lit (LStr (prettyShow errs)) Rules.:>: Rules.Fail
+
 
 desugarForVerification :: Test -> Bool
 desugarForVerification TestEvalEq{}   = False

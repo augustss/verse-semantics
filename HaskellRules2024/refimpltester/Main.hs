@@ -297,10 +297,10 @@ srcToCore :: F.Flags -> Bool -> F.SrcExpr -> IO Rules.Expr
 srcToCore flags add_verification e = do
   when dumpDesugar $
     putStrLn $ "\n-------------\ne=\n" ++ prettyShow e
-  e1 <- FrontEnd.Desugar.desugar flags add_verification e
+  (e1,_) <- FrontEnd.Desugar.desugar flags add_verification e
   when dumpDesugar $
     putStrLn $ "\n-------------\ne1=\n" ++ prettyShow e1
-  e2 <- FrontEnd.ToCore.convertToCore flags e1
+  (e2,_) <- FrontEnd.ToCore.convertToCore flags e1
   when dumpDesugar $
     putStrLn $ "\n-------------\ne2=\n" ++ prettyShow e2
   let e3 = Rules.prep e2

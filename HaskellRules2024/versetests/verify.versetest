@@ -179,7 +179,7 @@ verify("HO20-dec",fail)
 verify("FO20-suc", fail) { f(x:int):int := {x}; main() := { f[ 'm' ] } }
 verify("FO20-dec", pass) { f(x:int):int := {x}; main()<decides> := { f[ 'm' ] } }
 
-verify("circular", pass) { a:any => f(x:int):type{int[x]} => f[a] } #works because we "get lucky"
+verify("circular", fail) { a:any => f(x:int):type{int[x]} => f[a] } #works because we "get lucky"
 
 
 # Tim tests

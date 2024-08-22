@@ -339,7 +339,7 @@ cDesugar add_verification
        ; putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flags) ++
              ", prelude=" ++ fst (fPrelude flags)
 
-       ; e' <- FrontEnd.Desugar.desugar flags add_verification (asSrcExpr e)
+       ; (e', _) <- FrontEnd.Desugar.desugar flags add_verification (asSrcExpr e)
 
        -- Display the result
        ; let display_result = not (fTraceDesugar flags)
@@ -354,8 +354,8 @@ cToCore
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { let flags = cs_flags s
-       ; putStrLn ("\n\n------- Convert to Core ---------")
-       ; e' <- FrontEnd.ToCore.convertToCore flags (asSrcExpr e)
+       ; putStrLn "\n\n------- Convert to Core ---------"
+       ; (e', _) <- FrontEnd.ToCore.convertToCore flags (asSrcExpr e)
        ; display e'
        ; pure (RulesCore e') }
 

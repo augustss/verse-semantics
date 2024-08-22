@@ -1,8 +1,10 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-orphans -Wno-dodgy-imports #-}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, DeriveFunctor #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 module FrontEnd.Desugar(
-      desugar
-    , D, runD, traceD, getDFlagsX, traceDS
+    desugar
+    , D, DError, runD, traceD, getDFlagsX, traceDS, putScopeErr
   ) where
 
 import Prelude hiding (pi)
@@ -43,7 +45,7 @@ import GHC.Stack
 -----------------------------------------------
 
 
-desugar :: Flags -> Bool -> SrcExpr -> IO SrcCore
+desugar :: Flags -> Bool -> SrcExpr -> IO (SrcCore, [DError])
 desugar flgs add_verification
   = runD flgs .
      (-- Heavy lifting: Fig 9
@@ -1141,7 +1143,9 @@ lookupPrimOp s = lookup s prs
 
 newtype D a = MkD (DEnv -> IO a)
 
-data DEnv = DEnv { nextNo :: !(IORef Int), dflags :: !Flags }
+newtype DError = MkDError Ident deriving (Eq, Ord, Show)
+
+data DEnv = DEnv { nextNo :: !(IORef Int), scopeErr :: !(IORef [DError]), dflags :: !Flags }
 
 instance Monad D where
   MkD m1 >>= k = MkD (\env -> do { r <- m1 env
@@ -1154,12 +1158,16 @@ instance Applicative D where
 instance Functor D where
   fmap f (MkD m) = MkD (\env -> f <$> m env)
 
-runD :: Flags -> D a -> IO a
+runD :: Flags -> D a -> IO (a, [DError])
 -- Runs the D monad
 runD flags (MkD thing_inside)
   = do { nextref <- newIORef 1
-       ; let env = DEnv { nextNo = nextref, dflags = flags }
-       ; thing_inside env }
+       ; scopeErrRef <- newIORef []
+       ; let env = DEnv { nextNo = nextref, scopeErr = scopeErrRef, dflags = flags }
+       ; res  <- thing_inside env
+       ; errs <- readIORef scopeErrRef
+       ; return (res, nub errs)
+       }
 
 traceDS :: String -> SrcExpr -> D SrcExpr
 traceDS msg e = do { traceD msg (pPrint e)
@@ -1168,15 +1176,17 @@ traceDS msg e = do { traceD msg (pPrint e)
 traceD :: String -> Doc -> D ()
 traceD msg doc
   = do { do_trace <- getDFlagsX fTraceDesugar
-       ; if do_trace
-         then doIO_D (putStrLn ("\n------- " ++ msg ++ "---------\n" ++ render doc))
-         else return () }
+       ; when do_trace $ doIO_D (putStrLn ("\n------- " ++ msg ++ "---------\n" ++ render doc))
+       }
 
 doIO_D :: IO a -> D a
 doIO_D io = MkD (\_ -> io)
 
 getDFlags :: D Flags
 getDFlags = MkD (\(DEnv { dflags = flags }) -> return flags)
+
+putScopeErr :: Ident -> D ()
+putScopeErr i = MkD (\(DEnv { scopeErr = ref }) -> modifyIORef ref (MkDError i:))
 
 getDFlagsX :: (Flags -> a) -> D a
 getDFlagsX f = f <$> getDFlags
@@ -1191,3 +1201,7 @@ newIdent :: Loc -> String -> D Ident
 newIdent l s = do
   n <- newInt
   pure $ Ident l $ "$" ++ s ++ show n
+
+
+instance Pretty DError where
+  pPrintPrec l p (MkDError i) = text "unbound identifer" <+> pPrintPrec l p i

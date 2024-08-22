@@ -31,7 +31,8 @@ import Debug.Trace ( traceM )
 --
 --------------------------------------------------------
 
-convertToCore :: Flags -> SrcCore -> IO Rules.Expr
+
+convertToCore :: Flags -> SrcCore -> IO (Rules.Expr, [DError])
 convertToCore flags src
   = runD flags $
     do { with_exis <- addScope src
@@ -203,4 +204,9 @@ errUndefined is = do
       [] -> pure ()
       i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
    else
-    mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)) is
+    mapM_ reportScopeErr is
+
+reportScopeErr :: Ident -> D ()
+reportScopeErr i@(Ident l _) = do
+  putScopeErr i;
+  traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)
