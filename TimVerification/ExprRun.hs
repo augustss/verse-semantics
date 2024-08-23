@@ -1,5 +1,5 @@
 --
--- from TimNotes/VerseRuntime-2024-Jun-09.txt
+-- from TimNotes/VerseRuntime-2024-Jun-09.txt, Verse Runtime Sketch 4
 --
 {-# OPTIONS_GHC -Wall -Wno-unused-imports -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -177,9 +177,6 @@ data EffTransacts1
 data EffImperatives1
   =  {-P_Imperatives   | -} P_Interacts | P_Throws    | P_Suspends {-x | P_No_Imperatives -}
   deriving (Eq, Ord, Show, Data)
-data EffBlocks1
-  =  {-P_Blocks        | -} P_Unblocked_Iterates | P_Unblocked_Reads | P_Unblocked_Writes | P_Unblocked_Imperatives {-x | P_Unblocks -}
-  deriving (Eq, Ord, Show, Data)
 
 --data PrimitiveEffect
 --  =  P_Effects       | P_No_Effects
@@ -190,7 +187,6 @@ ppEff = text . map toLower . drop 2 . show
 instance Pretty EffCardinality  where pPrint = ppEff
 instance Pretty EffTransacts1   where pPrint = ppEff
 instance Pretty EffImperatives1 where pPrint = ppEff
-instance Pretty EffBlocks1      where pPrint = ppEff
 
 data ESet a = ESet [a]   -- effect set, always ordered
   deriving (Eq, Ord, Show, Data)
@@ -204,21 +200,19 @@ eSetUnion (ESet xs) (ESet ys) = ESet (merge xs ys)
 eSetIntersect :: Ord a => ESet a -> ESet a -> ESet a
 eSetIntersect (ESet xs) (ESet ys) = ESet (intersect xs ys)
 
-data Effect = Eff EffCardinality (ESet EffTransacts1) (ESet EffImperatives1) (ESet EffBlocks1)
+data Effect = Eff EffCardinality (ESet EffTransacts1) (ESet EffImperatives1)
   deriving (Eq, Ord, Show, Data)
 
 instance Pretty Effect where
   pPrint e | Just s <- lookup e namedEffects = text ("<" ++ s ++ ">")
-  pPrint (Eff c t i b) =
-    text "<" <> fsep (punctuate (text " &") (pPrint c : ppt ++ ppi ++ ppb)) <> text ">"
+  pPrint (Eff c t i) =
+    text "<" <> fsep (punctuate (text " &") (pPrint c : ppt ++ ppi)) <> text ">"
     where ppt | t == P_No_Transacts = [text "no_transacts"]
               | t == P_Transacts = []
               | otherwise = map pPrint $ unSet t
           ppi | i == P_No_Imperatives = [text "no_imperatives"]
               | i == P_Imperatives = []
               | otherwise = map pPrint $ unSet i
-          ppb | b == P_Unblocked = [text "unblocked"]
-              | otherwise = map pPrint $ unSet b
 
 pattern P_Transacts :: ESet EffTransacts1
 pattern P_Transacts = ESet [P_Varies, P_Allocates, P_Reads, P_Writes]
@@ -228,10 +222,6 @@ pattern P_Imperatives :: ESet EffImperatives1
 pattern P_Imperatives = ESet [P_Interacts, P_Throws, P_Suspends]
 pattern P_No_Imperatives :: ESet EffImperatives1
 pattern P_No_Imperatives = ESet []
-pattern P_Blocked :: ESet EffBlocks1
-pattern P_Blocked = ESet []
-pattern P_Unblocked :: ESet EffBlocks1
-pattern P_Unblocked = ESet [P_Unblocked_Iterates, P_Unblocked_Reads, P_Unblocked_Writes, P_Unblocked_Imperatives]
 
 cardUnion :: EffCardinality -> EffCardinality -> EffCardinality
 cardUnion P_Abstracts _ = P_Abstracts
@@ -256,51 +246,47 @@ cardIntersect _ P_Fails = P_Fails
 cardIntersect P_Abstracts P_Abstracts = P_Abstracts
 
 effects :: Effect
-effects = Eff P_Abstracts P_Transacts P_Imperatives P_Blocked
+effects = Eff P_Abstracts P_Transacts P_Imperatives
 no_effects :: Effect
-no_effects = Eff P_Contradicts P_No_Transacts P_No_Imperatives P_Unblocked
+no_effects = Eff P_Contradicts P_No_Transacts P_No_Imperatives
 succeeds :: Effect
-succeeds = Eff P_Succeeds P_Transacts P_Imperatives P_Blocked
+succeeds = Eff P_Succeeds P_Transacts P_Imperatives
 fails :: Effect
-fails = Eff P_Fails P_Transacts P_Imperatives P_Blocked
+fails = Eff P_Fails P_Transacts P_Imperatives
 abstracts :: Effect
-abstracts = Eff P_Abstracts P_Transacts P_Imperatives P_Blocked
+abstracts = Eff P_Abstracts P_Transacts P_Imperatives
 contradicts :: Effect
-contradicts = Eff P_Contradicts P_Transacts P_Imperatives P_Blocked
+contradicts = Eff P_Contradicts P_Transacts P_Imperatives
 imperatives :: Effect
-imperatives = Eff P_Abstracts P_Transacts P_Imperatives P_Blocked
+imperatives = Eff P_Abstracts P_Transacts P_Imperatives
 unblocked :: Effect
-unblocked = Eff P_Abstracts P_Transacts P_Imperatives P_Unblocked
+unblocked = Eff P_Abstracts P_Transacts P_Imperatives
 blocked :: Effect
-blocked = Eff P_Abstracts P_Transacts P_Imperatives P_Blocked
+blocked = Eff P_Abstracts P_Transacts P_Imperatives
 only_succeeds :: Effect
-only_succeeds = Eff P_Succeeds P_No_Transacts P_No_Imperatives P_Unblocked
+only_succeeds = Eff P_Succeeds P_No_Transacts P_No_Imperatives
+only_fails :: Effect
+only_fails = Eff P_Fails P_No_Transacts P_No_Imperatives
+only_abstracts :: Effect
+only_abstracts = Eff P_Abstracts P_No_Transacts P_No_Imperatives
 no_transacts :: Effect
-no_transacts = Eff P_Abstracts P_No_Transacts P_Imperatives P_Blocked
+no_transacts = Eff P_Abstracts P_No_Transacts P_Imperatives
 no_imperatives :: Effect
-no_imperatives = Eff P_Abstracts P_Transacts P_No_Imperatives P_Blocked
+no_imperatives = Eff P_Abstracts P_Transacts P_No_Imperatives
 throws :: Effect
-throws = Eff P_Abstracts P_Transacts (ESet [P_Throws]) P_Blocked
+throws = Eff P_Abstracts P_Transacts (ESet [P_Throws])
 suspends :: Effect
-suspends = Eff P_Abstracts P_Transacts (ESet [P_Suspends]) P_Blocked
+suspends = Eff P_Abstracts P_Transacts (ESet [P_Suspends])
 interacts :: Effect
-interacts = Eff P_Abstracts P_Transacts (ESet [P_Interacts]) P_Blocked
+interacts = Eff P_Abstracts P_Transacts (ESet [P_Interacts])
 reads :: Effect
-reads = Eff P_Abstracts (ESet [P_Reads]) P_Imperatives P_Blocked
+reads = Eff P_Abstracts (ESet [P_Reads]) P_Imperatives
 writes :: Effect
-writes = Eff P_Abstracts (ESet [P_Writes]) P_Imperatives P_Blocked
-unblocked_iterates :: Effect
-unblocked_iterates = Eff P_Abstracts P_Transacts P_Imperatives (ESet [P_Unblocked_Iterates])
-unblocked_writes :: Effect
-unblocked_writes = Eff P_Abstracts P_Transacts P_Imperatives (ESet [P_Unblocked_Writes])
-unblocked_reads :: Effect
-unblocked_reads = Eff P_Abstracts P_Transacts P_Imperatives (ESet [P_Unblocked_Reads])
-unblocked_imperatives :: Effect
-unblocked_imperatives = Eff P_Abstracts P_Transacts P_Imperatives (ESet [P_Unblocked_Imperatives])
+writes = Eff P_Abstracts (ESet [P_Writes]) P_Imperatives
 succeeds_done :: Effect
-succeeds_done = Eff P_Succeeds P_Transacts P_Imperatives P_Unblocked
+succeeds_done = Eff P_Succeeds P_Transacts P_Imperatives
 fails_done :: Effect
-fails_done = Eff P_Fails P_Transacts P_Imperatives P_Unblocked
+fails_done = Eff P_Fails P_Transacts P_Imperatives
 
 namedEffects :: [(Effect, String)]
 namedEffects = [
@@ -313,6 +299,8 @@ namedEffects = [
   (unblocked, "unblocked"),
   (blocked, "blocked"),
   (only_succeeds, "only_succeeds"),
+  (only_fails, "only_fails"),
+  (only_abstracts, "only_abstracts"),
   (no_transacts, "no_transacts"),
   (no_imperatives, "no_imperatives"),
   (throws, "throws"),
@@ -320,21 +308,17 @@ namedEffects = [
   (interacts, "interacts"),
   (reads, "reads"),
   (writes, "writes"),
-  (unblocked_iterates, "unblocked_iterates"),
-  (unblocked_writes, "unblocked_writes"),
-  (unblocked_reads, "unblocked_reads"),
-  (unblocked_imperatives, "unblocked_imperatives"),
   (succeeds_done, "succeeds_done"),
   (fails_done, "fails_done")
   ]
 
 -- The join of two effects in the lattice.
 (.+) :: Effect -> Effect -> Effect
-Eff c t i b .+ Eff c' t' i' b' = Eff (cardUnion c c') (eSetUnion t t') (eSetUnion i i') (eSetIntersect b b')
+Eff c t i .+ Eff c' t' i' = Eff (cardUnion c c') (eSetUnion t t') (eSetUnion i i')
 
 -- The meet of two effects in the lattice.
 (.&) :: Effect -> Effect -> Effect
-Eff c t i b .& Eff c' t' i' b' = Eff (cardIntersect c c') (eSetIntersect t t') (eSetIntersect i i') (eSetUnion b b')
+Eff c t i .& Eff c' t' i' = Eff (cardIntersect c c') (eSetIntersect t t') (eSetIntersect i i')
 
 -- Order on Effects, fx0 has fewer (or same) effects than fx1.
 (<===) :: Effect -> Effect -> Bool
@@ -344,18 +328,6 @@ sequenceFx :: Effect -> Effect -> Effect
 sequenceFx fx0 fx1 = (fx0 .+ fx1) .&
   if (fx0 .& fx1) <=== fails then fails
   else                            effects
-
-downFx  :: Effect -> Effect
-downFx fx = unblocked .+ fx
-
-afterFx :: Effect -> Effect
-afterFx fx = (unblocked .+ fx)
-  .& (if (abstracts <=== (contradicts    .+ fx)) then blocked else unblocked_iterates)
-  .& (if (reads     <=== (no_transacts   .+ fx)) then blocked else unblocked_writes)
-  .& (if (writes    <=== (no_transacts   .+ fx)) then blocked else unblocked_reads .& unblocked_writes)
-  .& (if (throws    <=== (no_imperatives .+ fx)) then blocked else unblocked_imperatives)
-  .& (if (suspends  <=== (no_imperatives .+ fx)) then blocked else unblocked_imperatives)
-  .& (if (interacts <=== (no_imperatives .+ fx)) then blocked else unblocked_imperatives)
 
 -- Instead of rule FxWeaken we do subeffect matching when checking effects.
 isEffect :: Effect -> Effect -> Bool
@@ -464,7 +436,7 @@ data Operation
   | OpExists [Vertex]                                             -- exists u0 ...
   | OpIterate Vertex Variable Context Operation {-then-} Variable Operation {-else-} Operation
                                                                   -- iterate(u0) x0 c0 {op0} then x1 {op1} else {op2}
-  | OpCast Vertex [RHS]                                           -- cast(u) {head_0 => {op_0}; ...}
+  | OpCase Vertex [RHS]                                           -- case(u) {head_0 => {op_0}; ...}
 
   -- OpMetaVar is not a real Op, it's just for pretty printing a context
   | OpMetaVar String
@@ -494,7 +466,7 @@ instance Pretty Operation where -- XXX precedence
     text "iterate" <> parens (pPrint u0) <+> pPrint x0 <+> pPrint c <+> braces (pPrint op0),
     text "then" <+> pPrint x1 <+> braces (pPrint op1),
     text "else" <+> braces (pPrint op2) ]
-  pPrint (OpCast u rhss) = sep $ text "cast" <> parens (pPrint u) : map (nest 2 . pPrint) rhss
+  pPrint (OpCase u rhss) = sep $ text "case" <> parens (pPrint u) : map (nest 2 . pPrint) rhss
 
   pPrint (OpMetaVar s) = text s
 
@@ -525,16 +497,16 @@ listCtx :: [a] -> [(a -> [a], a)]
 listCtx [] = []
 listCtx (a : as) = (\ a' -> a':as, a) : [ (\ b' -> a : ctx b', b) | (ctx, b) <- listCtx as ]
 
-class ContextStartUp a where
+class ContextStartOp a where
   contextStartOp :: a -> [(Context -> Operation -> a, Context, Operation)]
 
-instance ContextStartUp Program where
+instance ContextStartOp Program where
   contextStartOp (Program c x op) =
     [(\ c' op' -> Program c' x op', c, op)]
   contextStartOp _ =
     []
 
-instance ContextStartUp Operation where
+instance ContextStartOp Operation where
   contextStartOp (OpIterate u0 x0 c op0 x1 op1 op2) =
     [(\ c' op0' -> OpIterate u0 x0 c' op0' x1 op1 op2, c, op0)]
   contextStartOp _ = []
@@ -548,7 +520,7 @@ contextSpan aop =
       ++ do (ctx, op1) <- contextSpan aop1; pure (\ op1' -> ctx (OpSeq aop0 op1'), op1)
     _ -> []
 
-programOp :: ContextStartUp a =>
+programOp :: ContextStartOp a =>
              a -> [(Context -> Operation -> a, Context, Operation)]
 programOp a =
   (do
@@ -569,7 +541,7 @@ unify (OpUnify u v) = do
    ,(OpUnify, v, u) ]
 unify _ = []
 
-programFlexible :: ContextStartUp a =>
+programFlexible :: ContextStartOp a =>
                    a -> [(Context -> Vertex -> a, Context, Vertex)]
 programFlexible a = do
   (ctx, c, OpExists us) <- programOp a
@@ -586,6 +558,7 @@ programFlexible a = do
 
 data Assumption
   = AEffect Effect Operation Context                                      -- fx{op}@c
+  | APending Effect Operation Context                                     -- pending(fx){op}@c
   | AReadPointer Pointer KnownValue Context                               -- P^:=kv@c
   -- For debugging
   | AComment String
@@ -593,6 +566,7 @@ data Assumption
 
 instance Pretty Assumption where
   pPrint (AEffect fx op c) = pPrint fx <> braces (pPrint op) <> text "@" <> pPrint c
+  pPrint (APending fx op c) = text "pending" <> parens (pPrint fx) <> braces (pPrint op) <> text "@" <> pPrint c
   pPrint (AReadPointer p kv c) = pPrint p <> text "^:=" <> pPrint kv <> text "@" <> pPrint c
   pPrint (AComment s) = text "#" <+> text s
 
@@ -768,28 +742,26 @@ allRules =
   P.<> effectRules
   P.<> simpleOpsRules
   P.<> unificationRules
+{-
   P.<> callingRules
   P.<> iterateChoiceRules
-  P.<> castRules
+  P.<> caseRules
   P.<> nativeRules
+-}
 
 ---------------------------------------------
 
 -----
 -- Program:
 programRules :: Rule Config
-programRules _ (A g :|- pg@(Program c x op)) =
+programRules _ (A g :|- (Program c x op)) =
   -- programIntro is startConfig
-  "ProgramUnblock" `name`
-  do
-    g' <- gAdd [AEffect unblocked op c] g
-    pure $ g' :|- pg
- ++
   "ProgramElim" `name`
   do
     AEffect fx op' c' <- g
     guard $ op == op' && c == c'
-    guard $ isEffect fx succeeds_done -- only_succeeds
+    --guard $ isEffect fx succeeds_done -- only_succeeds
+    guard $ isEffect fx only_succeeds
     pure $ A g :|- ProgramDone x
  ++
   -- Extra rule to get a nice failure
@@ -797,7 +769,7 @@ programRules _ (A g :|- pg@(Program c x op)) =
   do
     AEffect fx op' c' <- g
     guard $ op == op' && c == c'
-    guard $ isEffect fx fails_done
+    guard $ isEffect fx only_fails
     pure $ A g :|- ProgramFail
 programRules _ _ = []
 
@@ -810,12 +782,20 @@ effectRules _ (A g :|- pg) =
     (_ctx, c, op) <- programOp pg
     g' <- gAdd [AEffect effects op c] g
     pure $ g' :|- pg
-  -- FxWeaken is done with isEffect
+  -- FxWeaken, PendingWeaken is done with isEffect
  ++
   "FxStrengthen" `name`
   do
     let as = [ AEffect (fx0 .& fx1) op c
              | AEffect fx0 op c : rest <- tails g, AEffect fx1 op' c' <- rest
+             , op == op', c == c' ]
+    g' <- gAdd as g
+    pure $ g' :|- pg
+ ++
+  "PendingStrengthen" `name`
+  do
+    let as = [ APending (fx0 .& fx1) op c
+             | APending fx0 op c : rest <- tails g, APending fx1 op' c' <- rest
              , op == op', c == c' ]
     g' <- gAdd as g
     pure $ g' :|- pg
@@ -832,17 +812,37 @@ simpleOpsRules _ (A g :|- pg) =
  ++
   "SequenceIntro" `name`
   do
-    AEffect fx2 op01@(OpSeq op0 op1) c <- g
-    AEffect fx0 op0' c' <- g
-    guard $ op0 == op0' && c == c'
-    AEffect fx1 op1' c'' <- g
-    guard $ op1 == op1' && c == c''
-    let sFx = sequenceFx fx0 fx1
-        dFx = downFx fx2
-        aFx = afterFx fx0
-    g' <- gAdd [AEffect sFx op01 c, AEffect dFx op0 c, AEffect aFx op1 c] g
-    let g'' = g' -- addComment g' $ "SequenceFx"++prettyShow(fx0,fx1)++"="++prettyShow sFx++", DownFx("++prettyShow fx2++")="++prettyShow dFx++", AfterFx("++prettyShow fx0++")="++prettyShow aFx
-    pure $ g'' :|- pg
+    (_ctx, c, op01@(OpSeq op0 op1)) <- programOp pg
+    APending fxP op01' c' <- g
+    guard $ op01 == op01' && c == c'
+    APending fx0P op0' c'' <- g
+    guard $ op0 == op0' && c == c''
+    AEffect fx0 op0'' c''' <- g
+    guard $ op0 == op0'' && c == c'''
+    AEffect fx1 op1' c'''' <- g
+    guard $ op1 == op1' && c == c''''
+    g' <- gAdd [APending fxP op0 c,
+                APending (fx0 .+ fx0P) op1 c,
+                AEffect (sequenceFx fx0 fx1) op01 c] g
+    pure $ g' :|- pg
+
+-- XXX new rule
+ ++
+  "PropagatePending" `name`
+  do
+    APending fx (OpSeq op0 _op1) c <- g
+    g' <- gAdd [APending fx op0 c] g
+    pure $ g' :|- pg
+
+-- XXX new rule
+ ++
+  "SequenceIntroSucceeds" `name`
+  do
+    (_ctx, c, op01@(OpSeq op0 op1)) <- programOp pg
+    guard $ AEffect only_succeeds op0 c `elem` g
+    guard $ AEffect only_succeeds op1 c `elem` g
+    g' <- gAdd [AEffect only_succeeds op01 c] g
+    pure $ g' :|- pg
 
 addComment :: AssumptionSet -> String -> AssumptionSet
 addComment (A as) s = A (AComment s : as)
@@ -854,14 +854,14 @@ unificationRules _ (A g :|- pg) =
   "UnifyIntro" `name`
   do
     (_ctx, c, op@(OpUnify _u _v)) <- programOp pg
-    g' <- gAdd [AEffect abstracts op c] g
+    g' <- gAdd [AEffect (abstracts .& no_transacts .& no_imperatives) op c] g
     pure $ g' :|- pg
  ++
   "UnifyAtomSucceeds" `name`
   do
     (_ctx, c, op@(OpUnify (VertexHead (HeadAtom a)) (VertexHead (HeadAtom a')))) <- programOp pg
     guard $ a == a'
-    g' <- gAdd [AEffect succeeds op c] g
+    g' <- gAdd [AEffect (succeeds .& no_transacts .& no_imperatives) op c] g
     pure $ g' :|- pg
  ++
   "UnifyFails" `name`
@@ -869,16 +869,16 @@ unificationRules _ (A g :|- pg) =
     (_ctx, c, op) <- programOp pg
     (_ctx, VertexHead h, VertexHead h') <- unify op
     guard $ distinctHeads h h'
-    g' <- gAdd [AEffect fails op c] g
+    g' <- gAdd [AEffect (fails .& no_transacts .& no_imperatives) op c] g
     pure $ g' :|- pg
  ++
   "UnifySubstitute" `name`
   do
-    (ctx, c, op) <- programOp pg
+    (_ctx, c, op) <- programOp pg
     (_ctx, VertexVariable x, u) <- unify op
     (_ctx, c', VertexVariable x') <- programFlexible pg
     guard $ x == x' && c == c'
-    let pg' = ctx c OpNoop
+    let pg' = pg -- ctx c OpNoop
     pure $ remAsmDup $ subst u x (A g :|- pg')
  ++
   "UnifyTuples" `name`
@@ -887,6 +887,8 @@ unificationRules _ (A g :|- pg) =
     guard $ length vs == length us
     let ops = if null vs then OpNoop else opSeqs $ zipWith OpUnify vs us
     pure $ A g :|- ctx c ops
+{-
+
 
 -----
 -- Calling:
@@ -981,7 +983,7 @@ iterateChoiceRules _ (A g :|- pg) =
                            exists x0 x1 y1;
                            x0=u0(0);
                            op1[y1/x1,*/*];
-                           cast(y1) {
+                           case(y1) {
                                tuple{v1} => {op2[y1/x1,*/*]};
                                tuple{}   => {exists}
                            }]
@@ -1008,7 +1010,7 @@ iterateChoiceRules _ (A g :|- pg) =
           OpExists [vx0, vx1, vy1] +>
           OpCall vx0 u0 (VInteger 0) +>
           op1' +>
-          OpCast vy1 [RHS (PatHead $ HeadTuple [und]) op2',
+          OpCase vy1 [RHS (PatHead $ HeadTuple [und]) op2',
                       RHS (PatHead $ HeadTuple []) OpNoop]
     
     g' <- pure (A g) -- gAdd [{-XXX move pointers-}] g
@@ -1024,12 +1026,12 @@ iterateChoiceRules _ (A g :|- pg) =
     pure $ A g :|- ctx c (OpExists [vx0] +> OpUnify vx0 u0 +> op2')
 
 -----
--- Casting
-castRules :: Rule Config
-castRules _ (A g :|- pg) =
-  "CastElim" `name`
+-- Caseing
+caseRules :: Rule Config
+caseRules _ (A g :|- pg) =
+  "CaseElim" `name`
   do
-    (ctx, c, OpCast (VertexHead h) arms) <- programOp pg
+    (ctx, c, OpCase (VertexHead h) arms) <- programOp pg
     op <- [ opi | RHS (PatHead hi) opi <- arms, match hi h ]
     pure $ A g :|- ctx c op
 
@@ -1073,7 +1075,7 @@ nativeRules _ (A g :|- pg) =
     (ctx, c, OpCall (VInteger l) (VPrim "Length") v) <- programOp pg
     let vs = [ newIdents pg ("a" ++ show i) | i <- [ 0 .. l-1 ] ]
     pure $ A g :|- ctx c (OpExists vs +> OpUnify v (VTuple vs))
-  
+-}  
 
 ---------------------------------------------
 
@@ -1101,7 +1103,7 @@ freshen a aop = alphaConvertIdent isub aop
     opids :: Operation -> Writer [Ident] Operation
     opids op@(OpExists vs) = do tell [x | VertexVariable (Variable x) <- vs]; return op
     opids op@(OpIterate _u0 (Variable x0) (Context c0) _op0 (Variable x1) _op1 _op2) = do tell [x0, c0, x1]; return op
-    opids _op@(OpCast _ _) = undefined
+    opids _op@(OpCase _ _) = undefined
     opids op = return op
     lamids :: Lambda -> Writer [Ident] Lambda
     lamids lam@(Lambda (Variable i) (Variable x) _op) = do tell [i, x]; return lam
@@ -1143,8 +1145,10 @@ opOne u e0 = OpIterate (VTuple [false]) x0 c op0 x1 op1 op2
     c = newIdents e0u "c"
 
 -- XXX Output variable is always 'x'
+-- ProgramIntro
 startConfig :: Operation -> Config
-startConfig s = A [] :|- Program (newIdents s "c") (newIdents () "x") s
+startConfig op = A [APending no_effects op c] :|- Program c (newIdents () "x") op
+  where c = newIdents op "c"
 
 -- example1:  5=5
 -- Hand-desugared
@@ -1206,6 +1210,14 @@ example8 = OpExists [vp,vq] +> OpUnify (VTuple [a3,vp]) (VTuple [vq,a5])
         a3 = VInteger 3
         (vp, vq) = newIdents () ("p", "q")
 
+-- example8: ex p q . <3,p>=<5,5>
+-- Hand-desugared
+example8a :: Operation
+example8a = OpExists [vp,vq] +> OpUnify (VTuple [a3,vp]) (VTuple [a5,a5])
+  where a5 = VInteger 5
+        a3 = VInteger 3
+        (vp, vq) = newIdents () ("p", "q")
+
 -- example9: ex x p q . <3,p>=<q,5>; x = <p,q>
 -- Hand-desugared
 example9 :: Operation
@@ -1215,6 +1227,7 @@ example9 = OpExists [vx,vp,vq] +> OpUnify (VTuple [a3,vp]) (VTuple [vq,a5]) +> O
         (vp, vq) = newIdents () ("p", "q")
         vx = newIdents () "x"
 
+{-
 -- example10: ex x . x=<3,5>(1)
 -- Hand-desugared
 example10 :: Operation
@@ -1440,3 +1453,8 @@ main = do
   putStrLn "tests ok"
   --fpptr "ut" $ startConfig example26
   --pptr $ startConfig example19
+-}
+
+main :: IO ()
+main = do
+  pptr $ startConfig example4

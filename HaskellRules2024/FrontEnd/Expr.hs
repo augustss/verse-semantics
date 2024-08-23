@@ -136,6 +136,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | DefineIE Ident Ident SrcExpr       -- (i->x) := e
   | Where SrcBlk SrcExpr               -- e1 where e2
   | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
+  | Splice SrcExpr                     -- Array splicing ..e
 
   -----------------------------------------------------------
   -- Big Core: only constructors below here appear in the output of M-desugaring
@@ -299,7 +300,8 @@ eExists :: [Ident] -> SrcExpr -> SrcExpr
 eExists [] e = e
 eExists is e = Exists is e
 
-eDefine :: Ident -> SrcExpr -> SrcExpr
+eDefine :: HasCallStack => Ident -> SrcExpr -> SrcExpr
+eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
 -- x := (e1; ...; en)   generates   exists x; e1; ... e(n-1); x=en
 -- Smart contructor, floats out nested defines
 eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
@@ -441,13 +443,18 @@ instance Pretty SrcExpr where
 --          Define i (Range t) -> ppNice $ InfixOp (Variable i) (Ident noLoc ":") t
           _ -> ppNormal expr
 
+      ppIdent v -- Don't hide operator for now.
+                --x | l == prettyNormal, Just r <- stripPrefix "operator'" (unIdent v) = text (init r)
+                | otherwise = ppr 0 v
+
       ppNormal expr =
         case expr of
           Lit lit    -> ppr p lit
-          Variable v -> ppr 0 v
+          Variable v -> ppIdent v
           EPrim s    -> pPrint s
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           Array es   -> text "array" <> braces (ppSeq l es)
+          Splice e   -> text "splice" <> braces (ppr 0 e)
           Tuple es   -> parens (ppEs es)
           Seq es     -> maybeParens (p > 0) $ ppSeq l es
 
@@ -682,6 +689,7 @@ compos f (Split e1 e2 e3)   = Split <$> f e1 <*> f e2 <*> f e3
 compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
+compos f (Splice e)         = Splice <$> f e
 compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
 storeMapA :: (Applicative a) => (SrcValue -> a SrcValue) -> Store -> a Store
@@ -739,7 +747,6 @@ getVisibleBinders = go
     go (Tuple es)     = concatMap go es
     go (ApplyS e1 e2) = go e1 ++ go e2
     go (ApplyD e1 e2) = go e1 ++ go e2
-    go (Let _ e)      = go e   -- SLPJ: why not first arg?
     go (Unify e1 e2)  = go e1 ++ go e2
     go (Range _fx e)  = go e
     go (Guard e1 _)   = go e1
@@ -749,6 +756,7 @@ getVisibleBinders = go
                         --     So this would be wrong: go (If3 e _ _) = go e
     go For2{}     = []
     go Block{}    = []
+    go Let{}      = []  -- nothing visible from a let
     go Choice{}   = []
     go Function{} = []
     go Check {}   = []  -- check<fx>{ e } is a new scope
@@ -777,6 +785,7 @@ getFree = fvs_blk
     fvs Fail              = []
     fvs (Wrong {})        = []
     fvs (Array es)        = concatMap fvs es
+    fvs (Truth e)         = fvs e
     fvs (Tuple es)        = concatMap fvs es
     fvs (EffAttr e _)     = fvs e
     fvs (PrefixOp _ e)    = fvs e
@@ -854,10 +863,11 @@ getAllIdents orig_e = Epic.List.nub (execWriter (vars orig_e))
   where
     vars :: SrcExpr -> Writer [Ident] SrcExpr
     vars ev@(Variable i)       = do { tell [i]; pure ev }
-    vars ev@(PrefixOp op e)    = do { tell [op]; _ <- vars e; pure ev }
-    vars ev@(PostfixOp e op)   = do { tell [op]; _ <- vars e; pure ev }
-    vars ev@(InfixOp e1 op e2) = do { tell [op]; _ <- vars e1; _ <- vars e2; pure ev }
+    vars ev@(PrefixOp op e)    = do { tell [opName "prefix"   op]; _ <- vars e; pure ev }
+    vars ev@(PostfixOp e op)   = do { tell [opName "postfix"  op]; _ <- vars e; pure ev }
+    vars ev@(InfixOp e1 op e2) = do { tell [opName "operator" op]; _ <- vars e1; _ <- vars e2; pure ev }
     vars ev                    = compos vars ev
+    opName p (Ident l s) = Ident l (p ++ "'" ++ s ++ "'")
 
 getAllBinders :: SrcCore -> [Ident]
 -- Finds all binders in e

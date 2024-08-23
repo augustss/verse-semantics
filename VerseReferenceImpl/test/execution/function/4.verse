@@ -1,7 +1,7 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-any(exists X) := X
+xany(exists XX) := XX
 
-Identity(X:any) := X
+Identity(XX:xany) := XX
 
 X := F[1]
 

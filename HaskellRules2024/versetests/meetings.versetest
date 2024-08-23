@@ -1,5 +1,121 @@
 # Add new meetings at the top
 
+verify("M21Aug24-1", pass){ (F():int = G[]) ; (G():int = 1); F[] }
+
+
+# Meeting 16 Aug 24
+verify("M16Aug24-1", pass){ f(x:int):=nat[x] => f[-3]  }
+  # This is an odd one!  If it had been
+  #     (f(x:int)<succeeds>:int) => f[3]
+  # i.e.   (f := fun(x:int){ :<succeeds>int }
+  # it'd mean that f is a function that returns some int
+  # In the actual test case it promises to succeed, returning nat[x]
+verify("M16Aug24-2", pass){ (a:int) => (f(:int):=nat[a]) => f[a]  }
+  # M16Aug24-4: similar to M16Aug24-1
+
+verify("M16Aug24-3", pass){ f(x:int):nat := nat[x] => f[-3]  }
+verify("M16Aug24-4", pass){ f(x:int):type{nat[x]} => f[-3]  }
+
+# Meeting 14 Aug 24
+testeq("jan1", pass, broken){ (f(x:int)<succeeds>:= x); y:int; f[y]=3} {3}
+
+verify("jan2", pass){ f(x:int)<succeeds>:int = x; g(y:int):= {if(f(y)=y) then 1 else 2} ; g[3] }
+verify("jan3", pass){ h(x:int,y:int)<decides>:int= x=y; if(h[2,2]=2) then 1 else 2 }
+verify("jan4", pass){ h(x: int, y:int)<decides>:int= x=y; () => if(h[2,2]) then 1 else 2 }
+
+verify("jan5a", fail){ f(c:char):=1; as:any
+                       => as=array{_}
+                       =>  x:=as[0]
+                       => bs:=array{:int}
+                       => bs=as => f[x] }
+  # jan5a: x is an int, and f expects a char, so body of lambda fails
+
+verify("jan5b", pass, broken){ f(c:int):=1; as:any
+                               => as=array{_}
+                               => x:=as[0]
+                               => bs:=array{:int}
+                               => bs=as => f[x] }
+  # jan5b: x is an int, and f expects an int, so body of lambda succeeds
+
+verify("jan6a", pass) { ty(x:int)<succeeds>:int := if(x=0) then x else 0; g(z:ty)<succeeds>:int := z }
+verify("jan6b", pass) { ty(x:int)<succeeds>:int := x; g(z:ty)<succeeds>:int := z }
+verify("jan6c", pass) { ty(x:int)<succeeds> := { if(x=0) then x else 0 };
+                        g(z:ty)<succeeds>:int := z=0 }
+
+# ---------------------------------
+# Opacity and function arguments: 14 Aug 24
+verify("FCS1", pass){ f(x:int)<decides>:int := x>3
+                    ; g()<decides> := f["monkey"] }
+   # FCS1: f is opaque; call f["monkey"] is allowed by verifier even though domain test fails
+
+verify("FCS2", fail){ f(x:int)<decides>:int := x>3
+                    ; g()<succeeds> := f[4] }
+   # FCS2: f is opaque; can't prove f[4] succeeds, even though it does
+
+verify("FCS3", fail){ f(x:int)<closed><succeeds>:int := x+3
+                    ; g()<succeeds> := f["monkey"] }
+   # FCS3: f is opaque, and domain test fails, so g rejects the call
+
+verify("FCS4", pass){ f(x:int)<decides> := x>3
+                    ; g()<succeeds> := f[4] }
+   # f is transparent; call f[4] actually succeeds
+
+verify("FCS5", pass){ f(x:int)<decides> := x>3
+                    ; g()<decides> := f["monkey"] }
+   # FCS5: f["monkey"] is allowed by verifier even though domain test fails
+   #       same as FCS1, but this time transparent f
+
+verify("FCS6", fail) { f(x:int)<decides>:string := 7 }
+   # FCS7: 7 is not a string.  Rejected despite <decides>
+verify("FCS7", fail) { f(x:int)<decides>:type{10} := 7 }
+   # FCS8: 7 is not 10.  Rejected despite <decides>
+
+verify("FCS8", pass)   { f(3=4)<succeeds>:int := 7 }
+verify("FCS9", pass)   { f(3=4)<succeeds>:int := "monkey" }
+
+# --------- Round parens --------------
+verify("FCS10", fail){ f1(x:int)<decides>:int := x>3
+                     ; g()<decides> := f1("monkey") }
+   # FCS10: f1 is opaque; Round parens; can't prove f1("monkey") succeeds
+
+verify("FCS11", fail){ f1(x:int)<decides>:int := x>3
+                     ; g()<decides> := f1(2) }
+   # FCS11: f1 is opaque; Round parens; arg type matches,
+   # but since f1 is <decides> we can't prove f1(2) succeeds
+
+verify("FCS12", fail){ f2(x:int)<decides> := x>3
+                     ; g()<decides> := f2("monkey") }
+   # FCS12; can't prove f1("monkey") succeeds
+
+verify("FCS13", fail){ f2(x:int)<decides> := x>3
+                           ; g()<decides> := f2(2) }
+   # FCS13: Round parens; can't prove f1(2) succeeds
+
+verify("FCS14", pass){ f2(x:int)<decides> := x>3
+                           ; g()<decides> := f2(4) }
+   # FCS14: Round parens; this time we can prove that f2(4) succeeds
+
+# More function call semantics
+verify("TimL300", pass, broken) {a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}
+verify("TimL300-1", pass) { (g(x:int):int) => g["monkey"] => 3 }
+verify("TimL300-2", pass) { (g(x:int) :=3) => g["monkey"] => 3 }
+  # TimL300-1,2: more exotic versions of FCS6
+
+verify("TimL300-3", pass) { (g( f(x:int):string ):=4)  => g[ (x:int) =>"monkey"] => 3 }
+verify("TimL300-4", pass) { (g( f(x:int):string ):=4)  => g[ h(x:int):="monkey"] => 3 }
+verify("TimL300-5", pass) { (g( f(x:int):string ):int) => g[ h(x:int):="monkey"] => 3 }
+verify("TimL300-6", pass)   { (g( f(x:int):="monkey" ):int) => g[ h(x:int):="monkey"] => 3 }
+verify("TimL300-7", pass, broken) { (g( f(x:int):="not-monkey" ):int) => g[ h(x:int):="monkey"] => 3 }
+verify("TimL300-8", pass)   { f(x:int):int := 1; if (f["monkey"] >0) then{1} else{2} = 2 }
+verify("TimL300-9", pass, broken)   { f( g(x:int):string ):int := 1; if (f[(x:int)=>1] >0) then{1} else{2} = 2 }
+
+
+# Meeting 9 August
+testeq( "M9Aug24-1", pass, broken){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
+  # M9Aug24-1 uses bidirectional programming
+verify( "M9Aug24-2", pass){ F1(X:int)<closed><decides> := X = 1|2 }
+verify( "M9Aug24-3", pass){ F1(X:any)<closed><decides> := X = 1|2 }
+
 # Meeting 7 August
 verify( "M7Aug24-1", pass ) { G(f()<decides>:int):=3; G[ h():=3 ] }
 verify( "M7Aug24-2", fail ) { G(f()<decides>:int):=3; G[ h():="monkey" ] }
@@ -18,36 +134,6 @@ testeq( "M5Aug24-2", loop ) { G(X:int):void = if (X = 2) then G(2); G[2] } {7}
 verify( "M5Aug24-3", fail ) { foo(f()<decides>:int)<succeeds> := {f[]} }
 verify( "M5Aug24-4", pass, broken ) { foo(f()<computes>:int)<succeeds> := {f[] = f[]} }
 
-# -----------------------------------------
-# Opacity and function arguments
-verify("Tim3Jul24-1", pass){ f1(x:int)<decides>:int := x>3
-                           ; g()<decides> := f1["monkey"] }
-   # f1 is opaque; call f1["monkey"] is allowed by verifier even though domain test fails
-verify("Tim3Jul24-2", fail){ f1(x:int)<decides>:int := x>3
-                           ; g()<decides> := f1("monkey") }
-   # f1 is opaque; Round parens; can't prove f1("monkey") succeeds
-verify("Tim3Jul24-3", fail){ f1(x:int)<decides>:int := x>3
-                           ; g()<decides> := f1(2) }
-   # f1 is opaque; Round parens; can't prove f1(2) succeeds
-verify("Tim3Jul24-4", fail){ f1(x:int)<decides>:int := x>3
-                           ; g()<succeeds> := f1[4] }
-   # f1 is opaque; can't prove f1[4] succeeds, even though it always will
-
-verify("Tim3Jul24-5", pass){ f2(x:int)<decides> := x>3
-                           ; g()<decides> := f2["monkey"] }
-   # f2 is transparent; f2["monkey"] is allowed by verifier even though domain test fails
-verify("Tim3Jul24-6", fail){ f2(x:int)<decides> := x>3
-                           ; g()<decides> := f2("monkey") }
-   # Round parens; can't prove f1("monkey") succeeds
-verify("Tim3Jul24-7", fail){ f2(x:int)<decides> := x>3
-                           ; g()<decides> := f2(2) }
-   # Round parens; can't prove f1(2) succeeds
-verify("Tim3Jul24-8", pass){ f2(x:int)<decides> := x>3
-                           ; g()<decides> := f2(4) }
-   # Round parens; this time we can prove that f2(4) succeeds
-verify("Tim3Jul24-9", pass){ f2(x:int)<decides> := x>3
-                           ; g()<succeeds> := f2[4] }
-   # f2 is transparent; call f2[4] actually succeeds
 
 # -----------------------------------------
 # Slack 1 Aug 24

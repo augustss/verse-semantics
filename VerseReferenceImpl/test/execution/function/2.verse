@@ -1,7 +1,7 @@
 # Copyright Epic Games, Inc. All Rights Reserved.
-any(exists X) := X
+xany(exists X) := X
 
-Plus1(X:any) := X + 1
+Plus1(X:xany) := X + 1
 
 F(X:Plus1) := X
 

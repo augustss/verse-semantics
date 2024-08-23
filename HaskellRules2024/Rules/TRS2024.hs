@@ -63,6 +63,10 @@ applicationStep _env lhs =
      guard (k2 /= 0)
      pure (LitInt (k1 `div` k2))
  ++
+  "APP-NEG" `name`
+  do Op Neg :@: LitInt k <- [lhs]
+     pure (LitInt (- k))
+ ++
   "APP-GT" `name`
   do Op Gt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 > k2)
@@ -233,8 +237,8 @@ drop_prefix (_:_)  []     = Nothing
 unificationStep :: Rule
 unificationStep _env lhs =
   "U-LIT" `name`
-  do (LitInt k1 :=: LitInt k2) :>: e <- [lhs]
-     guard (k1 == k2)
+  do (Lit l1 :=: Lit l2) :>: e <- [lhs]
+     guard (l1 == l2)
      pure e
  ++
   "U-TUP" `name`
@@ -251,9 +255,9 @@ unificationStep _env lhs =
      guard (isHNF a1 && isHNF a2)
      guard $
        case (a1, a2) of
-         (LitInt k1, LitInt k2) -> k1 /= k2
-         (Arr vs, Arr vs')      -> length vs /= length vs'
-         (_,      _)            -> True
+         (Lit l1, Lit l2)  -> l1 /= l2
+         (Arr vs, Arr vs') -> length vs /= length vs'
+         (_,      _)       -> True
      pure Fail
  ++
   "U-OCCURS" `name`
@@ -284,7 +288,7 @@ existentialStep _env lhs =
  ++
   "EXI-FLOAT" `nameWith`
   do (v :=: exi_x_e1) :>: e2 <- [lhs]
-     (exis,x,e1) <- matchExi_alphaRename (free (v,e2)) exi_x_e1
+     (exis,x,e1) <- matchExi_alphaRename (free (v,e2,exi_x_e1)) exi_x_e1
      pure (pPrint x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
 
 
@@ -529,6 +533,9 @@ E2a: exists x. (if(y=3) then e1 else e2);  (y=3) is NOT blocked because we are w
 
 E2b: exists x. x=3; HOLE                   (x=3) is NOT blocked because local exi x
 
+E2c: exists x. (if(x>3) then e1 else e2);  (x>3) is blocked because local exi x
+              HOLE                         is rigid under the 'if'
+
 E3: exists x. x>3; 7; HOLE                 7 is blocked; it's fine to substitute
                                            across the 7
     NB: in more complicated cases the "7" might not go away, eg
@@ -563,12 +570,15 @@ data LocalExis = LX { exi_flexi :: [Ident]   -- Flexible existentials
 allExis :: LocalExis -> [Ident]
 allExis (LX { exi_flexi = flexi, exi_rigid = rigid }) = rigid ++ flexi
 
-isLocalFlexi :: LocalExis -> Ident -> Bool
-isLocalFlexi (LX { exi_flexi = flexi }) x
-  = x `elem` flexi
 
-isRigidExi :: LocalExis -> Ident -> Bool
-isRigidExi (LX { exi_rigid = rigid }) x = x `elem` rigid
+isLocal :: LocalExis -> Ident -> Bool
+isLocal lx x = isFlexiLocal lx x || isRigidLocal lx x
+
+isFlexiLocal :: LocalExis -> Ident -> Bool
+isFlexiLocal (LX { exi_flexi = flexi }) x = x `elem` flexi
+
+isRigidLocal :: LocalExis -> Ident -> Bool
+isRigidLocal (LX { exi_rigid = rigid }) x = x `elem` rigid
 
 addFlexi :: LocalExis -> Ident -> LocalExis
 addFlexi (LX { exi_flexi = flexi, exi_rigid = rigid }) x
@@ -578,7 +588,7 @@ makeRigid :: LocalExis -> LocalExis
 makeRigid (LX { exi_flexi = flexi, exi_rigid = rigid })
  = LX { exi_flexi = [], exi_rigid = rigid ++ flexi }
 
-blkd :: LocalExis -> Expr_or_Context-> Bool
+blkd :: LocalExis -> Expr_or_Context -> Bool
 -- See Note [Blocked] for what this function means
 -- In the Context case (i.e. Expr has a HOLE), look only to the left of the HOLE
 -- SLPJ: need to update the document to reflect this function
@@ -587,8 +597,8 @@ blkd _  HOLE        = True
 blkd _  e | isVal e = False   -- See (E3)
 
 blkd lx (Var x :=: Var y) | x == y
-                          = isLocalFlexi lx x
-blkd lx (Var x :=: e)     = isRigidExi lx x -- See (E2)
+                          = isFlexiLocal lx x
+blkd lx (Var x :=: e)     = isRigidLocal lx x -- See (E2)
                           || blkd lx e      -- Blocked if *either* side is blocked
 blkd lx (hnf :=: e)       = assert (isHNF hnf) (show hnf) $
                             blkd lx e
@@ -597,18 +607,25 @@ blkd lx (e1 :>: e2)
   | isVal e2        = blkd lx e1
   | otherwise       = blkd lx e1 && (isContext e1 || blkd lx e2)  -- If HOLE is in e1, ignore e2
 blkd lx (e1 :|: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)  -- SLPJ: check
-blkd lx (One e)     = blkd (makeRigid lx) e   -- See (E2)
+
+blkd lx (One (e1 :|: _)) = blkd (makeRigid lx) e1
+blkd lx (One e)          = blkd (makeRigid lx) e         -- See (E2)
+  -- Tricky: AndyExe73
+  --   one{ (x>5; (\_.e1)) | \_.e2 }; x=7
+  -- We want to substitute for x=7, without worrying
+  --   about the second choice
+
 blkd lx (All e)     = blkd (makeRigid lx) e   -- See (E2)
 blkd lx (Exi bnd)   = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
 blkd lx (v1 :@: v2) = case v1 of
-                        Var f -> isLocalFlexi lx f                -- Needed for (E2)!
-                        Op {} -> any (isLocalFlexi lx) (free v2)  -- See (E1)
+                        Var f -> isLocal lx f                -- Needed for (E2)!
+                        Op {} -> any (isLocal lx) (free v2)  -- See (E1)
                         _     -> False
 
 blkd _  (Verify _)  = True
 blkd lx (Check _ e) = blkd lx e
-blkd lx (Some v)    = any (isLocalFlexi lx) (free v)
-blkd lx (v :>>: _)  = any (isLocalFlexi lx) (free v)
+blkd lx (Some v)    = any (isLocal lx) (free v)
+blkd lx (v :>>: _)  = any (isLocal lx) (free v)
 
 blkd _  Fail        = False
 
@@ -623,6 +640,7 @@ choiceFree ((_ :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2
 choiceFree (_ :>>: e)          = choiceFree e
 choiceFree (Exi bnd)           = choiceFree e where (_,e) = unsafeUnbind bnd
 choiceFree (v1 :@: _)          = case v1 of
-                                   Op _ -> True -- all ops we support are choice-free right now
-                                   _    -> False
+                                   Op DotDot -> False
+                                   Op _      -> True  -- all other ops are choice-free
+                                   _         -> False -- may or may not be choice free
 choiceFree _                   = True

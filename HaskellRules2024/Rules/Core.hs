@@ -148,7 +148,7 @@ Underscore is treated specially in two rules
 
 data PrimOp
  = -- Operations on integers
-   Add | Sub | Mul | Div
+   Add | Sub | Mul | Div | Neg
 
    -- Operations on arrays
  | ArrLen
@@ -173,6 +173,7 @@ primOpString Add = "intAdd$"
 primOpString Sub = "intSub$"
 primOpString Mul = "intMul$"
 primOpString Div = "intDiv$"
+primOpString Neg = "intNeg$"
 
 primOpString ArrLen   = "arrLen$"
 primOpString ArrMap   = "arrMap$"
@@ -213,6 +214,7 @@ primOpCanFail Add      = False
 primOpCanFail Sub      = False
 primOpCanFail Mul      = False
 primOpCanFail Div      = False
+primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
 primOpCanFail DotDot   = False
 primOpCanFail ArrMap   = False
@@ -375,7 +377,7 @@ pPrintPrecE lvl prec the_expr
        Fail       -> text "fail"
        Var x      -> pPrint x
        Lit i      -> pPrint i
-       Op op      -> char '!' <> pPrint op
+       Op op      -> pPrint op
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> sep [ ppr1 e1, char '|' <+> ppr1 e2 ]

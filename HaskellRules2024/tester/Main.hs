@@ -3,11 +3,12 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TupleSections #-}
 module Main(main) where
 
 import Prelude
 
-import FrontEnd.Desugar( desugar )
+import FrontEnd.Desugar( desugar, DError )
 import FrontEnd.ToCore( convertToCore )
 import FrontEnd.Flags
 import FrontEnd.Expr as Src
@@ -23,7 +24,7 @@ import TRS.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
 
-import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos )
+import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos, sepBy1 )
 
 import GHC.Stack( HasCallStack )
 
@@ -109,7 +110,8 @@ instance Show TestType where
 
 data TestStatus = TS_Normal
                 | TS_Broken   -- Test is currently broken (i.e., pass/fail is negated)
-                | TS_Skip     -- Test should be skipped
+                | TS_Skip     -- Test should be skipped, probably because it somehow
+                              --   crashes the entire implementation
                 deriving( Show, Eq )
 
 testName :: TestInfo -> String
@@ -231,7 +233,7 @@ runTestFile tflg (fn, ts)
            ; printSome isBrokenPass        unexpected "      %d expected broken, but actually passed" }
       ; printNZ n_skipped  "%5d skipped"
       ; putStrLn "---------------------------------------------------------"
-      ; unless (n_expected == n_tests) $ exitWith (ExitFailure 1) }
+      ; unless (n_expected + n_skipped == n_tests) $ exitWith (ExitFailure 1) }
   where
     count :: (TestRes->Bool) -> [TestRes] -> Int
     count p rs = length (filter p rs)
@@ -286,12 +288,12 @@ widthFileName = 25
 --
 -----------------------------------------------
 
-srcToCore :: Flags -> Bool -> SrcExpr -> IO Rules.Expr
+srcToCore :: Flags -> Bool -> SrcExpr -> IO (Rules.Expr, [DError])
 srcToCore flags add_verification e
-  = do { e1 :: SrcCore    <- FrontEnd.Desugar.desugar flags add_verification e
-       ; e2 :: Rules.Expr <- FrontEnd.ToCore.convertToCore flags e1
+  = do { (e1 :: SrcCore, errs1)    <- FrontEnd.Desugar.desugar flags add_verification e
+       ; (e2 :: Rules.Expr, errs2) <- FrontEnd.ToCore.convertToCore flags e1
        ; let e3 = Rules.prep e2
-       ; return e3 }
+       ; return (e3, errs1 ++ errs2) }
 
 evalExpr :: TestFlags -> Rules.Expr -> (NormResult, Traced Rules.Expr)
 evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
@@ -308,8 +310,10 @@ timTestInfo (Ident loc status) = TestInfo
   }
 
 timTestType :: String -> TestType
-timTestType "S00" = TPass
-timTestType _     = TFail
+-- Any TimTest starting in "S" should pass, e.g. S00, S01
+-- All others should fail.
+timTestType ('S' : _) = TPass
+timTestType _         = TFail
 
 ----------------------------
 runTest :: TestFlags -> Test -> IO TestRes
@@ -363,18 +367,24 @@ doTest tflg test src1 src2 = do
 
      ; mb_core2 <- case src2 of
                      Variable (Ident _ "wrong") -> pure Nothing
-                     _       -> do { core2 <- srcToCore flags False src2
+                     _       -> do { (core2, _) <- srcToCore flags False src2
                                    ; pure (Just core2) }
 
-     ; res <- checkResults tflg test (src1, core1) (src2, mb_core2)
+     ; checkResults tflg test (src1, core1) (src2, mb_core2)
 
-     ; pure res }
+     }
 
--- | `wrapTopEffect` wraps the expression in a toplevel verify if necessary
-wrapTest :: Bool -> Expr -> Expr
-wrapTest wrap_me core
-  | wrap_me   = Rules.Verify (bindList [] ([], Rules.Check Succeeds core))
+
+-- | `wrapTopEffect` wraps the expression in a toplevel verify if necessary,
+--   replacing the code with FAIL if there was a desugaring error (e.g. unbound variable)
+wrapTest :: Bool -> (Expr, [DError]) -> Expr
+wrapTest wrap_me (core, errs)
+  | wrap_me   = Rules.Verify (bindList [] ([], Rules.Check Succeeds core'))
   | otherwise = core
+  where
+    core' | null errs = core
+          | otherwise = Rules.Lit (LStr (prettyShow errs)) Rules.:>: Rules.Fail
+
 
 desugarForVerification :: Test -> Bool
 desugarForVerification TestEvalEq{}   = False
@@ -756,7 +766,8 @@ setPreludeFlag are_verifying test_flags flags
 
 type Skipped = [SkippedTest]
 data SkippedTest = MkSkippedTest
-  { skipStatus :: TestStatus    -- ^ The type of the test (pass/fail)
+  { skipName   :: Maybe String  -- ^ The name of the test (optional)
+  , skipStatus :: TestStatus    -- ^ The type of the test (pass/fail)
   , skipReason :: String        -- ^ The reason why the test is broken (in quotes)
   , skipCode   :: SrcExpr       -- ^ The exact string (single line) corresponding to the test (in quotes)
   }
@@ -791,10 +802,21 @@ broken("reason"){ test }
 pSkipped :: P SkippedTest
 pSkipped = do
   status <- pSkipTestStatus
-  reason <- pParens pStringLit
-  -- code   <- pBraces pExprSeq
+  (mname, reason) <- pParens pSkipInfo
   code   <- pExprSeq <* optional (pOp ";")
-  pure (MkSkippedTest status reason code)
+  pure (MkSkippedTest mname status reason code)
+
+pSkipInfo :: P (Maybe String, String)
+pSkipInfo = mkSkip <$> sepBy1 pStringLit (pOp ",")
+  where
+    mkSkip [a,b] = (Just a, b)
+    mkSkip [b]   = (Nothing, b)
+    mkSkip _     = undefined
+  -- pParens (pSkipName OA.<|> pSkipAnon)
+  -- where
+  --   pSkipName = (\n r -> (Just n, r)) <$> (pStringLit <* pOp ",") <*> pStringLit
+  --   pSkipAnon = (Nothing,) <$> pStringLit
+
 
 pSkipTestStatus :: P TestStatus
 pSkipTestStatus = do

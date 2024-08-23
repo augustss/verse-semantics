@@ -1,6 +1,366 @@
-skip("misparsed"){f(g():any):=g[]; f(g():=6)}
-skip("misparsed"){f(x:int)<decides>:=x=3, f[x:int]}
+skip("bug: misparsed"){f(g():any):=g[]; f(g():=6)}
+skip("bug: misparsed"){f(x:int)<decides>:=x=3, f[x:int]}
 skip("eff-interacts"){f(g():int):int => h()<interacts>:int => f[h]}
-
-
 skip("f1 seems unbound?"){a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}		#FP:10.4:STRENGTH???
+broken("misparsing &") {f(x&y:int):=(y,x) => f(3,5)=(5,3)}	#FP:10.4:CHECK:DESUGAR&
+broken("#asktim We accept, but Tim rejects") {a&b:int => f(a):type{a=b} => {f[x],x:=b}}   # We accept, but Tim rejects #AskTim, no valid `f` ...
+broken("#asktim FP? (note: 'Could be S00') We accept, but Tim rejects 'D00'"){a&b:int => f():type{a=b} => {(if{a=b} else f[]),a=b}} # Could be S00
+broken("#asktim FP? seems S00 to me? 'D00'"){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,y],x=y}}
+broken("#asktim FP? says 'Could tighten to S00' 'A00'"){1 where a:any} # Could tighten to S00.
+broken("#asktim FP? 'P00'"){f(:int):int => f() => 3}
+broken("#asktim FP? 'N04'"){x:=0,x:int=>3}
+broken("#asktim FP? 'N04'"){x:=0,y:int=>x:=1}
+broken("#asktim 'D00'"){x:int=>if{x=3,f():=x=3}} # Was S00 before UncommittableNegotiable.
+broken("#asktim 'F00'"){f():=2=3 => 4}							#TODO:10.4:ASSUME-FAIL:RANGE
+broken("#asktim 'D00'"){f(x:int):=x=3 => 4}
+
+skip("steps=600"){a&b:any => c:int => f(:nat):type{a=b} => {f[c], a=b}}         ##BAD
+skip("steps=600"){a:int => b&c:any => f(:nat):type{b=c} => {f[a],b=c}}
+skip("steps=700"){a&b:int => f(x&ytest(U00){a:any=>{f(if{c=1}):=8,c:=a}}	#TODO:10.4:WHY???:int):type{x=y} => {f[a,a],a=b}}
+skip("steps=800 'D00'"){a&b:int => f(x&y:nat):type{x=y} => {x:=a,y:=b,f[x,x],x=y}}
+skip("steps=800 'D00'"){a:int => c:any => f():type{c=(a,3)} => {f[],c=(3,a)}}
+skip("steps=800 'D00'"){a&b:int => c:any => f():type{c=(a,b)} => {f[],c=(b,a)}}
+skip("steps=800 'D00'"){a&b:int => c:any => f():type{c=(a,b)} => {c=(b,a),f[]}}
+skip("steps=800 'D00'"){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,x=y,f[x,y]}}
+skip("steps=800 'D00'"){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,x],a=b}}
+skip("steps=800 'D00'"){a&b:int => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,x],x=y}}
+skip("steps=800 'U00'"){a&b:any => f(x&y:int):type{x=y} => {x:=a,y:=b,f[x,x],x=y}}
+skip("steps=1600 'F00'"){as:=(:int,:int,:int) => {bs:=for(a:as,a=1){a},n:=Length[bs],n=1 or n=2 or n=3}}
+skip("steps=1600 'F00'"){as:=(:int,:int,:int) => {bs:=for(a:as,a=1){a},n:=Length[bs],n=0 or n=2 or n=3}}
+skip("steps=1600 'F00'"){as:=(:int,:int,:int) => {bs:=for(a:as,a=1){a},n:=Length[bs],n=0 or n=1 or n=3}}
+skip("steps=700 'D00'"){a&b:int => f(x&y:int):=x=y => g(a):int => h(b):int => f[g[1],h[2]]}
+skip("steps=1300 'F00'"){a&b&c:int => f(a,x&y:int):type{x=y} => g(b):int => h(c):int => f[3,g[1],h[2]]}
+
+# Are the next ones bad because we allow unification/equality on `any`,
+# instead of wrapping it in a check like $eq = \p. exi x,y. p = (x, y); comparable[x]; comparable[y]; x = y; x
+
+broken("bug: eq-comparable:U00"){a:int => b&c:any => f(:nat):=b=c => 7}
+broken("bug: eq-comparable:U00"){a&b:any => f(a=b):=a=b => if{f[a=b]}}
+broken("bug: eq-comparable:U00"){a:any => f(nat[a]):=nat[a] => if{f[a]}}
+broken("bug: eq-comparable:U00"){a&b:int => f(x:nat):any => if{x:=f[a],y:=f[b],x=y}}		#TODO:10.30:OK:IF:ANY
+broken("bug: eq-comparable:U00"){a:any=>{f(if{c=1}):=8,c:=a}}	#TODO:10.4:WHY???
+broken("bug: eq-comparable:U00"){f(x:any):=if(x=2){3}else{4}}	#TODO:10.4:CHECK-COMPARE-ANY
+broken("bug: eq-comparable:U00"){a&b:int => f(:int)<computes>:any => x:=f(a) => y:=f(b) => if{f(a)=f(b)}}
+broken("bug: eq-comparable:U00"){f(x:int)<computes>:any => a&b&c:int => if{f[a]=f[c]}}
+broken("bug: eq-comparable:D00"){a&b&c&d:int => f(:int,:int)<computes>:any => {f(a,b)=f(c,d),a=c,b=d}}
+broken("bug: top-level choice:X00"){function(1){2|3}}
+
+broken("bug: missing SPJ desugaring fix?: D00"){a:int => f(:int):=nat[a] => f[a]}
+
+broken("bug: hiding 'D00'"){x:int=3,x=3}
+broken("bug: hiding 'D00'"){x:int=3,nat[x]}
+broken("bug: hiding 'D00'"){x:int=3; nat[x]}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=3|5){x+1=4}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=3|5){x+1=6}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(){1=2}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=1){x=2}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=1|2){x=1}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=1|2){x=2}}
+broken("bug: missing check<succeeds> in function body 'F00'"){function(x:=1|2){x=3}}
+broken("bug: missing check<succeeds> in function body 'D00'"){f:=function(a:int){a=3}}
+broken("bug: missing check<succeeds> in function body 'D00'"){f:=function(a:int,b:int){a=b}}
+broken("bug: missing check<succeeds> in function body 'U00'"){function(x:=x){x=1}}
+
+skip("bug: rationals 'F00'"){nat[2/3]}		#TODO:10.4:RATIONALS
+skip("bug: rationals 'F00'"){int[2/3]}		#TODO:10.4:RATIONALS
+
+broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y}}}
+broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y},a=b}}
+broken("#asktim assume<succeeds> 'QS00'"){a&b:int => {x:=a,y:=b,assume<succeeds>{x=y},x=y}}
+broken("#asktim assume<succeeds> 'QS00'"){assume<succeeds>{123}}
+broken("#asktim assume<decides> 'QD00'"){a&b:any => {assume<decides>{a=b}}}
+broken("#asktim assume<decides> 'QD00'"){a&b&c&d:any => {assume<decides>{a=b},assume<decides>{c=d},assume{a=c}}}
+broken("#asktim assume<decides> 'QS00'"){assume<decides>{1}}
+broken("#asktim assume<decides> 'QS00'"){a&b:any     => {assume{a=b},assume<decides>{a=b}}}
+broken("#asktim assume<decides> 'QN00'"){assume<decides>{bogus}}
+
+broken("assume-false, dataflow, 'R20'"){x:=3,assume{x=5},x=5}
+broken("assume-false, dataflow, 'R20'"){x:=2,assume{x=3}}
+broken("assume-false, dataflow, 'R20'"){assume{x=3},x:=4}
+broken("assume-false, dataflow, 'R20'"){x:any,assume{x=2},x=3}
+
+
+skip("assume-false, paraconsistency 'F00'"){92=93 => 94=95}			#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){92=93 => 94=95,91}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){1=2 => 3=4}				#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){x:=let(false[]){3} => x=4}
+skip("assume-false, paraconsistency 'F00'"){x:=7=9 => 6=8}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){x:=7=9 => 6=8}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[0]=6}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[0]=10}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[0]=2}				#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as where 2=3}			#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[0] where 2=3}		#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => as where 8=9}			#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as=(_,_) where 2=3}	#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(7,8=9) => as[1] where 2=3}		#TODO:SKIP:ASSUME-FAIL:CHECK-TUPLE-ARG
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => as=(7,_)}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => as[0]=7}		#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => as[5]}			#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(2,3=4) => 2=5}				#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){(a:=2,b:=3=4) => a=7}				#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(_,_) => x:=as[7] => as[8]}				#TODO:SKIP:ASSUME-FAIL
+skip("assume-false, paraconsistency 'F00'"){as:=(_,_) => x:=as[7] => as[8]=x}
+
+
+skip("assume-false, paraconsistency 'R20'){assume{x:int   where false[]}}
+skip("assume-false, paraconsistency 'D00'){assume{x:int   where 8=9    }=7} # D00 because of paraconsistency.	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'D00'){assume{x:int   where false[]}=7} # D00 because of paraconsistency.	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'R20'){assume{x:false where false[]}=7} # Succeeds because variable contradicts.
+skip("assume-false, paraconsistency 'R20'){assume{x:false              }=7}
+skip("assume-false, paraconsistency 'U00'){assume{x:any   where 3=4}=5}	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'D00'){assume{x:int   where 3=4}=5}	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'R20'){assume{x:=5    where 3=4}=5}
+skip("assume-false, paraconsistency 'F00'){assume{x:=6    where 3=4}=5}	#TODO:10.4:ASSUME-FAIL
+skip("assume-false, paraconsistency 'R20'){assume{x:false where 3=4}=5}
+skip("assume-false, paraconsistency 'R20'){x:=2 where assume{x=3}}
+skip("assume-false, paraconsistency 'R20'){assume{2=3}}
+skip("assume-false, paraconsistency 'F00'){assume{2=3},4=5}			#TODO:10.4:ASSUME
+skip("assume-false, paraconsistency 'F00'){assume{false[]},4=5}
+skip("assume-false, paraconsistency 'F00'){a:=2,assume{a=3},4=5}		#TODO:10.4:ASSUME
+skip("assume-false, paraconsistency 'R20'"){assume{x=3},x:=4}
+skip("assume-false, paraconsistency 'R20'"){assume{x=(_,_,_)},x:=(_,_)}
+skip("assume-false, paraconsistency 'R20'"){assume{x=(_,_,_)},x:=(_,_)}
+
+
+
+broken("void-v-false 'QS00'"){:void=false}
+broken("false-desugaring 'U00'"){f(x:false,y:any):=y=1}
+broken("false-desugaring 'U00'"){f(x:false,y:any):=y=2}
+broken("false-desugaring 'F00'"){f(x:false,y:any):=y=1=2}
+broken("false-desugaring 'F00'{f():false}
+broken("false-desugaring 'QS00'){f(x:false):=x.blah}
+broken("false-desugaring 'QN05'){f(x:false,y:int):=y.blah}
+broken("false-desugaring 'QS00'){f(x:false,y:int):=x.blah}
+broken("false-desugaring 'F00'"){f(x:false,y:int):=false[y]}
+broken("false-desugaring 'C00'"){f(x:false,y:int):=y[0]}
+broken("false-desugaring 'D00'"){a&b:int => f():false => {if{a=b} else f(),a=b}}
+broken("false-desugaring 'F00'"){f(x:false):=if(x){1}else{2}=3}
+broken("false-desugaring 'F00'"){f():false}
+broken("false-desugaring 'QS00'"){f(x:false):=x.blah}
+broken("false-desugaring 'QN05'"){f(x:false,y:int):=y.blah}
+broken("false-desugaring 'QS00'"){f(x:false,y:int):=x.blah}
+broken("false-desugaring 'F00'"){f():false}
+broken("false-desugaring 'F00'"){if(f():false){1}else{2}}
+broken("false-desugaring 'F00'"){f(x:int):false}
+broken("false-desugaring 'F00'"){f():false}
+
+broken("effects 'U00'"){f(g()<computes>:int):int => g()<interacts>:int => f[g]}	#TODO:10.4:EFF
+broken("effects 'U00'"){f(g()<computes>:int):int => g():int => f[g]}				#TODO:10.4:EFF
+broken("effects 'U00'"){f(g()<computes>:int):int => f[g():int=3]}
+broken("effects 'U00'"){f(g()<computes>:int):int => f[g():type{3}=3]}
+broken("effects 'P00'"){f(g(:int)<computes>:int):int => f(g(x:int):type{3}=3)}
+broken("effects 'P00'"){f(g():int)<succeeds>:int => g()<resolves >:int => f(g)}
+broken("effects 'P00'"){f(g():int)<succeeds>:int => g()<interacts>:int => f(g)}
+broken("effects 'P00'"){f(g()<decides >:int):int => g()<resolves >:int => f(g)}
+broken("effects 'P00'"){f(g()<decides >:int):int => g()<interacts>:int => f(g)}
+broken("effects 'P00'"){f(g()<resolves>:int):int => g()<interacts>:int => f(g)}
+broken("effects 'P00'"){f(g()<computes>:int):int => g()<succeeds >:int => f(g)}
+broken("effects 'P00'"){f(g()<computes>:int):int => g()<resolves >:int => f(g)}
+broken("effects 'P00'"){f(g()<computes>:int):int => g()<interacts>:int => f(g)}
+broken("effects 'D00'"){f(x:int)<fails   >:=x=2}
+broken("effects 'S01'"){f(x:int)<fails   >:=2}
+broken("effects 'S01'"){f(x:int)<diverges>:=2}
+broken("effects 'F00'"){f(x:int)<diverges>:false}
+broken("effects 'U00'"){g(f(x:any)<throws_any>:any)<throws_any>:=f(3)=f(3)}	#TODO:FUN-OUT-EQ-EFF-THROWS
+broken("effects 'U00'"){g(f(x:any)<interacts           >:any)<interacts>:=f(3)=f(3)}	#TODO:FUN-OUT-EQ-EFF-INTERACTS
+broken("effects 'U00'"){g(f(x:int)<computes><resolves  >:any) := if{f[3]=f[3]}}
+broken("effects 'U00'"){f(x:int)<resolves >:int => f[3]}		#TODO:10.4:EFF-RESOLVES
+broken("effects 'P00'"){f(x:int)<resolves >:int => f(3)}
+broken("effects 'F00'"){f(x:int)<succeeds>:false}
+broken("effects 'S02'"){f()<iterates>:=1}
+broken("effects 'S02'"){f()<abstracts>:=1}
+
+broken("variant? 'S02'"){f(0)<covariant>:=1}
+broken("variant? 'S02'"){f(0)<contravariant>:=1}
+broken("variant? 'QS00'"){assume<succeeds>{1}}
+broken("variant? 'QS02'"){assume<covariant>{1}} # Bad name resolution error. Assume should resolve!
+
+
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:int=x; x=3; x=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:int=x; x=3; x=5}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:int=x; not (x=3,x=5)}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,4)}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{as:type{_,_}=(_,_); as=(3,4); as=(3,5)}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){xs:=(3,4); ys:=(3,4); if(allow{as:type{:int,:int}=as; as=xs; as=ys}) then 1 else false?}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){xs:=(3,4); ys:=(3,4); if(allow{x:int=3}) then 1 else 2}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f():=allow{:nat}; f[]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},operator'+'(x)}     # Should be S00.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},operator'+'(x)=7}   # Should be S00.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}; xs[1]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:nat):=(3,:int) => {allow{xs:=f[a]}; int[xs[1]]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => {allow<decides>{a=3}, f():type{a=3}=a=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any => b:int => allow{x:=a=b} where if{x=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:any} where if{x}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<fails>{expect<succeeds>{-3}=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<fails>{expect<succeeds>{-3} where 3=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => {(3,5)[x] where allow<decides>{x=9}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},prefix'-'[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:=allow{assume{:false}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:=allow{assume{:false}},prefix'-'[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},-x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},-x=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},x+1}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},1+x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},x+1=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},1+x=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},operator'+'[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false},operator'+'[x]=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where x=4}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where x=3}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where assume{x+1} where x=3}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where assume{x+1}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where assume{x+1} where x+1=4}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{assume<decides>{x=3}} where assume{x+1=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(1,2)[x]   where allow{x:false}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(1,2)[x]=3 where allow{x:false}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:=allow{1=2},x.blah}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x.blah,x:=allow{1=2}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<abstracts>{x:any} where 1}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<abstracts>{x:any} where (0,x)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(:any):any => allow<abstracts>{x:any} where f[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(:any):any => allow<abstracts>{x:any} where f(x)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => allow{x:=a=3} where assume{x}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:=3,y:false} where assume{x=y}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:=3,y:false where x=y        } where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:=3,y:false where assume{x=y}} where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a=b} where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a=b} where any[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a=b} where int[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false} where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false} where any[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false} where false[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{x:false} where int[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x=2}        # Obvious.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=5}      # Must hold, else it implies x=2.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3}        # Must hold too, as it's no weaker than previous.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where int[x]=2}   # Must hold, else it implies x=2.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where int[x]}     # Can succeed by reachability.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where int[x]=x}   # Can succeed by reachability.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=5}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=6}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{x=2} where x+3=5}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=5}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=2} where x+3=6}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{x=(3,4)} where Concatenate[x,(5,6)]=(3,4,5,6)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:any => allow{x=(3,4)} where Concatenate[x,(5,6)]=(3,4,5,7)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => allow{as:=array{a}=array{5}} where as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=1} where (5,7)[x]=5}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=1} where (5,7)[x]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x:int => allow{x=1} where (5,7)[x]=7}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0] where cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where as[0]=bs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0]=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=array{b:int} => allow{cs:=as=bs} where cs[0]=as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as&bs:=array{:int} => cs:=allow{as=bs} where cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:=3 } => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:int} => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:any} => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where a=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where b=b}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where c=c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where a=c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where b=c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where a=b}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where bs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where as[0]=as[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where bs[0]=bs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where cs[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where as[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where bs[0]=cs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{:int} => bs:=array{:int} => allow{cs:=as=bs} where as[0]=bs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{p:=(a,b),p=(b,a),expect<succeeds>{p[0]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where a=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where c=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where int[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{c:=a=b} where int[c]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where a=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where c=c}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where c=a}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where a=array{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:=array{:int} => b:=array{:int} => allow{c:=a=b} where c=array{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as=as}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where cs=cs}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as=cs}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a,y:=b,z:=x=y} where int[x]} # Must be D00, like it or not.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a,y:=b,z:=x=y} where int[z]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where as=array{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{as:=array{a},bs:=array{b},cs:=as=bs} where cs=array{:int}} # Slack.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => allow{x:=a=b} where x}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=(:int,:int) => bs:=(:int,:int) => xs:=allow{as=bs} where xs}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=(:int,:int) => bs:=(:int,:int) => xs:=allow{as=bs} where xs[0]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any   => f(x:nat):any => g:=f where allow{g[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int   => f(x:nat):any => g:=f where allow{g[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat   => f(x:nat):any => g:=f where allow{g[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any   => f(x:nat):int => g:=f where allow{g[a]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int   => f(x:nat):int => g:=f where allow{g[a]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat   => f(x:nat):int => g:=f where allow{g[a]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any   => {f(x:nat):=3,g:=f where allow{g[a]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int   => {f(x:nat):=3,g:=f where allow{g[a]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat   => {f(x:nat):=3,g:=f where allow{g[a]}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:any => {f(x:nat):=3,g:=f where allow{g[a]=b}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => {f(x:nat):=3,g:=f where allow{g[a]=b}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => {f(x:nat):=3,g:=f where allow{g[a]=b}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{_} => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:=4} => bs:=as where allow{bs[0]=3}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:int => allow{a=b} where f[a]=f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:int => allow{a=b} where f(a)=f(b)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:int)<computes>:int => allow{a=3} where f[a]=f[3]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => f(:int)<computes>:int => allow{a=3} where if{f[a]}=f[3]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){as:=array{a:any} => {bs:=as,allow{bs[0]=3}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(x:any):any => allow{f[3]=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(x:any):any => g:=f where allow{g[3]=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(x:any):int => g:=f where allow{g[3]=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){f(x:comparable):comparable => g:=f where allow{g[3]=4}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any => {f(x:any)<computes>:=a,g:=f,allow{g[3]=4}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:comparable => {f(x:comparable)<computes>:=a,g:=f,allow{g[3]=4}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int=>allow{cs:=Concatenate[array{array{a}}] where ds:=cs where ds[0]=8} where cs=ds}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int=>allow{cs:=Concatenate[array{array{a}}] where (ds:=cs)[0]=8} where cs=ds}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:nat)<computes>:int => f[a] => allow{a=b} where f[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:nat):int => f[a] => allow{a=b} where f[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:nat)<computes>:int => f[a] => allow{a=b} where f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:nat):int => f[a] => allow{a=b} where f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => (f&g)(:nat):int => f[a] => allow{f=g} where g[a]} # Pending call-multiple-functions.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int        => allow{c:=a=b} where int[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int        => allow{c:=a=b} where int[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int        => allow{c:=a=b} where int[c]} # Slack.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat => b:int => allow{c:=a=b} where nat[c]} # Not slack.
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:nat => b:int => f(x:nat):=x => allow{c:=a=b} where f[a]=f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => {x:=int[a],allow{x=3}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => b:any => f(x:int):=int[x] => allow{a=b} where f[a]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:int => b:any => f(x:int):=int[x] => allow{a=b} where f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x&y:int => f(:int)<computes>:int => f[x] => {a:=allow{x=y},f[x]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x&y:int => f(:int)<computes>:int => f[x] => {a:=allow{x=y},f[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x&y:int => f(:int):int => f[x] => {a:=allow{x=y},f[x]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){x&y:int => f(:int):int => f[x] => {a:=allow{x=y},f[a]}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any => b:int => {allow{b=a,if{b=3}}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a:any => b:int => {allow{if{b=3},b=a}}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow<resolves>{:int}}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:any => allow{a=b} where f[a]=f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:any => allow{a=b} where f[a]=f[b]}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){a&b:int => f(:int)<computes>:any => x:=f(a) => y:=f(b) => allow{a=b} where x=y}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=f(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=g(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where h(0)=h(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where f(0)=h(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){(f&g)(:int)<computes>:int => allow{h:=f=g} where g(0)=h(1)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where f(0)=f(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where g(0)=g(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where h(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where f(0)=h(0)}
+skip("Skip all uses of 'allow' (Tim 7Aug24)"){allow{f(:int)<computes>:=3,g(:int)<computes>:=4,h:=f=g} where g(0)=h(0)}

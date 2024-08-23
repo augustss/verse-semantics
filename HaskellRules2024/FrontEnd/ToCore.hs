@@ -31,7 +31,8 @@ import Debug.Trace ( traceM )
 --
 --------------------------------------------------------
 
-convertToCore :: Flags -> SrcCore -> IO Rules.Expr
+
+convertToCore :: Flags -> SrcCore -> IO (Rules.Expr, [DError])
 convertToCore flags src
   = runD flags $
     do { with_exis <- addScope src
@@ -100,8 +101,10 @@ scope :: S.Set Src.Ident -> SrcExpr -> D SrcExpr
 --     to allow us to complain about shadowing
 scope sc = expr
   where
-    -- x := e  -->   x = e
+    -- x := e   -->  x = e
+    -- exists x -->  x
     expr (DefineE i e) = Unify (Variable i) <$> expr e
+    expr (DefineV i)   = pure (Variable i)
 
     expr e@Src.Lit{} = pure e
     expr e@EPrim{}   = pure e
@@ -117,7 +120,7 @@ scope sc = expr
 
     expr (Block e)   = exprD e
     expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
-                          ; e2' <- scope sc' e2
+                          ; e2' <- scopeD sc' e2
                           ; pure $ eExists is $ eSeq [e1'', e2'] }
 
     expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
@@ -199,4 +202,9 @@ errUndefined is = do
       [] -> pure ()
       i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
    else
-    mapM_ (\ i@(Ident l _) -> traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)) is
+    mapM_ reportScopeErr is
+
+reportScopeErr :: Ident -> D ()
+reportScopeErr i@(Ident l _) = do
+  putScopeErr i;
+  traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)
