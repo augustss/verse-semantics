@@ -147,12 +147,14 @@ sDesugarExpr = ds
     -- for(e1){e2} = arrMap$[ \t. t[], all{ e1; \_.e2 } ]
     ds (For1 e)     = do x <- newIdent (getLoc e) "x"
                          ds $ For2 (eDefine x e) (Variable x)
+{-
     ds (For2 e1 e2) = do e1' <- ds e1
                          e2' <- ds e2
                          pure (ApplyD (EPrim ArrMap)
                                       (Array [eForceLam
                                              , All (eSeq [e1', eThunk e2'])]))
-
+-}
+    ds (For2 e1 e2) = For2 <$> ds e1 <*> ds e2
     -- Array
     ds (Array es) = Array <$> mapM ds es
 
@@ -996,6 +998,9 @@ dsM_12 s t@(All{}) (P i) = flipToE s t i
 dsM_12 s (One t) E       = encodeOne =<< dsM_12 s t E
 dsM_12 s t@(One{}) (P i) = flipToE s t i
 
+dsM_12 s (For2 t1 t2) E   = do e1 <- dsM_12 s t1 E; e2 <- dsM_12 s t2 E; encodeFor e1 e2
+dsM_12 s t@(For2{}) (P i) = flipToE s t i
+
 dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 
 
@@ -1024,20 +1029,39 @@ encodeOne e = do
   pure $ Iter e (Array []) (eThunk $ Lam a $ eThunk $ Variable a) (eThunk Fail)
 
 -- all{e}  -->  exi arr. Iter e 0 step (\ n . mkArr$[n])
---   step n a c = arr[n] = a; c(n+1)
+--   step i v c  =  arr[i] = v; c(i+1)
 encodeAll :: SrcCore -> D SrcCore
 encodeAll e = do
   arr <- newIdent (getLoc e) "arr"
-  n   <- newIdent (getLoc e) "n"
-  a   <- newIdent (getLoc e) "a"
+  i   <- newIdent (getLoc e) "i"
+  v   <- newIdent (getLoc e) "v"
   c   <- newIdent (getLoc e) "c"
   let earr = Variable arr
-      en   = Variable n
+      ei   = Variable i
+      ev   = Variable v
+      ec   = Variable c
+      step = Lam i $ Lam v $ Lam c $ Seq [(earr `ApplyD` ei) `Unify` ev, ec `ApplyD` (eAdd ei (Lit (LInt 1)))]
+      done = Lam i $ earr `Unify` eMkArr ei
+  pure $ Exists [arr] $ Iter e (Lit (LInt 0)) step done
+
+-- for(e1){e2}  -->  exi arr. Iter (e1; <vs>) 0 step (\ n . mkArr$[n])
+--   step i a c = exi vs . a = <vs>; arr[n] = e2; c(i+1)
+encodeFor :: SrcCore -> SrcCore -> D SrcCore
+encodeFor e1 e2 = do
+  arr <- newIdent (getLoc e1) "arr"
+  i   <- newIdent (getLoc e1) "i"
+  a   <- newIdent (getLoc e1) "a"
+  c   <- newIdent (getLoc e1) "c"
+  let vs = getVisibleBinders e1 `intersect` getFree e2
+      evs = Array $ map Variable vs
+  let earr = Variable arr
+      ei   = Variable i
       ea   = Variable a
       ec   = Variable c
-      step = Lam n $ Lam a $ Lam c $ Seq [ea `Unify` (earr `ApplyD` en), ec `ApplyD` (eAdd en (Lit (LInt 1)))]
-      done = Lam n $ earr `Unify` eMkArr en
-  pure $ Exists [arr] $ Iter e (Lit (LInt 0)) step done
+      step = Lam i $ Lam a $ Lam c $
+             eExists vs $ Seq [ea `Unify` evs, (earr `ApplyD` ei) `Unify` e2, ec `ApplyD` (eAdd ei (Lit (LInt 1)))]
+      done = Lam i $ earr `Unify` eMkArr ei
+  pure $ Exists [arr] $ Iter (Seq [e1, evs]) (Lit (LInt 0)) step done
 
 eAdd :: SrcCore -> SrcCore -> SrcCore
 eAdd x y = EPrim Add `ApplyD` Array [x, y]
