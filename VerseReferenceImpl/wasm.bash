@@ -35,7 +35,14 @@ nix shell \
   --extra-experimental-features nix-command \
   --extra-experimental-features flakes \
   --command \
-wasm-opt www/static/versewasm.wizer.wasm -o www/static/versewasm.wizer.wasm -Oz
+wasm-opt \
+  www/static/versewasm.wizer.wasm \
+  -o www/static/versewasm.wizer.wasm \
+  -Oz \
+  --enable-bulk-memory \
+  --enable-multivalue \
+  --enable-nontrapping-float-to-int \
+  --enable-simd
 
 cd www
 npm install

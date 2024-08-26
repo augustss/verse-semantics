@@ -215,7 +215,7 @@ rewriteExp e = for e $ \ case
   Parse.Inst e1 e2 | isPredefined "option" e1 -> do
     x <- freshIdent $ loc e
     e' <- rewriteExp e2
-    pure $ IfThenElse (infixColonEqual Val x e') (Name <$> x) (Tuple [] <$ e)
+    pure $ IfThenElse (infixColonEqual Val x e') (Truth (Name <$> x) <$ x) (Tuple [] <$ e)
   Parse.Inst e1 e2 ->
     Inst <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Enum _attributes xs -> -- Ignore attributes
