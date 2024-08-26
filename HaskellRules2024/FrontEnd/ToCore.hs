@@ -56,8 +56,6 @@ convert (Exists is t)     = foldr do_one (convert t) is
                             do_one i e = Rules.Exi (TRS.bind (toCoreIdent i) e)
 
 convert (Guard v t)   = convert v Rules.:>>: convert t
-convert (One t)       = Rules.One (convert t)
-convert (All t)       = Rules.All (convert t)
 convert (Lam i t)     = Rules.Lam (TRS.bind (toCoreIdent i) (convert t))
 convert (Some v)      = Rules.Some (convert v)
 convert (Check fxs t) = foldr addCheck (convert t) fxs
@@ -131,8 +129,6 @@ scope sc = expr
 
     expr (Src.Check fx e) = Src.Check fx <$> exprD e
     expr (Src.Some e)     = Src.Some <$> exprD e
-    expr (Src.One e)      = Src.One <$> exprD e
-    expr (Src.All e)      = Src.All <$> exprD e
     expr (Src.Guard v e)  = Src.Guard <$> expr v <*> expr e
 
     expr (Src.OfType e1 eff e2) = Src.OfType <$> exprD e1 <*> pure eff <*> exprD e2

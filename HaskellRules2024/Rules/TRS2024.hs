@@ -367,78 +367,32 @@ choiceStep _env lhs =
 --------------------------------------------------------------------------------
 oneAndAllStep :: Rule
 oneAndAllStep _env lhs =
-  "ONE-FAIL" `name`
-  do One Fail <- [lhs]
-     pure Fail
- ++
-  "ONE-VALUE" `name`
-  do One v <- [lhs]
-     guard (isVal v)
-     pure v
- ++
-  "ONE-CHOICE" `name`
-  do One (v :|: _) <- [lhs]
-     guard (isVal v)
-     pure v
- ++
-  "ALL-FAIL" `name`
-  do All Fail <- [lhs]
-     pure (Arr [])
- ++
-  "ALL-CHOICE" `name`
-  do All e <- [lhs]
-     let choices (e1 :|: e2) = choices e1 ++ choices e2
-         choices e1          = [e1]
-     let vs = choices e
-     guard (all isVal vs)
-     pure (Arr vs)
- ++
-  -- iter(fail,
+  -- iter(fail,    u){f, g}  -->  g u
   "ITER-FAIL" `name`
   do Iter Fail a _ g <- [lhs]
      guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
      pure (g :@: a)
  ++
+  -- iter(v,       u){f, g}  -->  f u v g
   "ITER-VALUE" `name`
-  do Iter v a f g <- [lhs]
+  do Iter v u f g <- [lhs]
      guard (isVal v)
-     guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
+     guard (isVal u)            -- XXX Maybe bind 'a' if it's not a value?
      let f1 = identNotIn $ free lhs
-         app = Exi $ bind f1 $ Var f1 :=: (f :@: a) :>: (Var f1 :@: v)
-     pure $ IterC app Fail f g
+         f2 = identNotIn $ f1 : free lhs
+         res = Exi $ bind f1 $
+               Exi $ bind f2 $
+               (Var f1 :=: (f :@: u)) :>:
+               ((Var f2 :=: (Var f1 :@: v)) :>:
+                (Var f2 :@: g))
+     pure res
  ++
+  -- iter(e1 | e2, u){f, g}  -->  iter(e1, u){f, \ x . iter(e2, x){f, g} }
   "ITER-CHOICE" `name`
-  do Iter (v :|: e) a f g <- [lhs]
-     guard (isVal v)
-     guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
-     let f1 = identNotIn $ free lhs
-         app = Exi $ bind f1 $ Var f1 :=: (f :@: a) :>: (Var f1 :@: v)
-     pure $ IterC app e f g
- ++
-  "ITERC-DONE" `name`
-  do IterC (Arr [Lit (LInt 0), r]) _ _ _ <- [lhs]
-     pure r
- ++
-  "ITERC-CONT" `name`
-  do IterC (Arr [Lit (LInt 1), a]) e f g <- [lhs]
-     pure $ Iter e a f g
- ++
-  "ITERC-FAIL" `name`
-  do IterC Fail _ _ _ <- [lhs]   -- could probably put this in evalCtx
-     pure Fail
- ++
-  "ITERC-CHOICE" `name`
-  do IterC (e1 :|: e2) e f g <- [lhs]   -- could probably put this in evalCtx
-     pure $ IterC e1 e f g :|: IterC e2 e f g
- ++
-  "ITERC-SEQ" `name`
-  do IterC (e1 :>: e2) e f g <- [lhs]   -- could probably put this in evalCtx
-     pure $ e1 :>: IterC e2 e f g
- ++
-  "ITERC-EXI" `name`
-  do IterC exi_e1 e f g <- [lhs]   -- could probably put this in evalCtx
-     (exis,x,e1) <- matchExi_alphaRename (free lhs) exi_e1
-     pure $ Exi $ bind x $ IterC (exis <@ e1) e f g
+  do Iter (e1 :|: e2) u f g <- [lhs]
+     let x = identNotIn $ free lhs
+         res = Iter e1 u f (Lam $ bind x $ Iter e2 (Var x) f g)
+     pure res
 
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
@@ -670,14 +624,6 @@ blkd lx (e1 :>: e2)
   | otherwise       = blkd lx e1 && (isContext e1 || blkd lx e2)  -- If HOLE is in e1, ignore e2
 blkd lx (e1 :|: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)  -- SLPJ: check
 
-blkd lx (One (e1 :|: _)) = blkd (makeRigid lx) e1
-blkd lx (One e)          = blkd (makeRigid lx) e         -- See (E2)
-  -- Tricky: AndyExe73
-  --   one{ (x>5; (\_.e1)) | \_.e2 }; x=7
-  -- We want to substitute for x=7, without worrying
-  --   about the second choice
-
-blkd lx (All e)     = blkd (makeRigid lx) e   -- See (E2)
 blkd lx (Exi bnd)   = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
 blkd lx (v1 :@: v2) = case v1 of
                         Var f -> isLocal lx f                -- Needed for (E2)!
@@ -692,7 +638,6 @@ blkd lx (v :>>: _)  = any (isLocal lx) (free v)
 blkd _  Fail        = False
 
 blkd lx (Iter e1 _e2 _ _) = blkd (makeRigid lx) e1 -- && blkd lx e2
-blkd lx (IterC e1 _e2 _ _) = blkd lx e1 -- && blkd lx e2
 
 blkd _ e = errorMessage ("Uncovered case in blkd " ++ show e)
 
@@ -709,10 +654,9 @@ choiceFree (v1 :@: _)          = case v1 of
                                    Op _      -> True  -- all other ops are choice-free
 --                                   _         -> False -- may or may not be choice free
                                    _         -> cf v1
-  where cf (Var i) = "$arr" `isPrefixOf` show i
+  where cf (Var i) = "$arr" `isPrefixOf` show i   -- a hack for the 'all' encoding
         cf _ = False
 choiceFree (Iter  _ _ f g)     = choiceFreeIter f g
-choiceFree (IterC _ _ f g)     = choiceFreeIter f g
 choiceFree _                   = True
 
 choiceFreeIter :: Expr -> Expr -> Bool

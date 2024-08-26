@@ -237,14 +237,6 @@ proofX bs lhs =
      (ctx, hole) <- proofX (x : bs) e
      pure (Exi (bind x ctx), hole)
  ++
-  do One x <- [lhs]
-     (ctx, hole) <- proofX bs x
-     pure (One ctx, hole)
- ++
-  do All x <- [lhs]
-     (ctx, hole) <- proofX bs x
-     pure (All ctx, hole)
- ++
   do x :|: e  <- [lhs]
      (ctx, hole) <- proofX bs x
      pure (ctx :|: e, hole)

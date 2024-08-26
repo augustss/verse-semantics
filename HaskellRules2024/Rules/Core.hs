@@ -74,12 +74,8 @@ data Expr
   | Exi (Bind Expr)
   | Fail
 
-  -- One/all
-  | One Expr
-  | All Expr
-  -- | Split Expr  -- maybe later
-  | Iter  Expr Expr Expr Expr   -- last two are always lambdas
-  | IterC Expr Expr Expr Expr   -- last two are always lambdas
+  -- Iterator over choices
+  | Iter Expr Expr Expr Expr   -- last two are always lambdas
 
   -- Verifier
   | Some Val
@@ -101,43 +97,35 @@ In the expression iter(e,a){f,g}
   * g is the thing to do if e is fail
 
 Both f and g are always explicit lambdas.  Anything else is invalid.
-The function f will be called with the value in a choice and the
-current accumulator (just like the function in a foldl/foldr).
-The function f must return one of two things
-  <0, r>    stop iteration and return r
-  <1, a>    continue iteration with new accumulator a
+The function f will be called with
+  * current accumulator
+  * value from the first argument to iter.
+  * continuation
+If f wants iteration to terminate, it simply returns a value.
+If f wants iteration to continue, it calls the continuation with a new accumulator
 
 The iterc construct is an intermediate which will reduce to iter
 again to keep iterating.  It is responsible for checking the
 return value of f.
 
 They have the following reduction rules:
-(ITER-FAIL)    iter(fail,  a){f; g}  -->  f[a]
-(ITER-VALUE)   iter(v,     a){f; g}  -->  iterc(f[v][a]){fail; f; g}
-(ITER-CHOICE)  iter(v | e, a){f; g}  -->  iterc(f[v][a]){e;    f; g}
-
-(ITERC-DONE)   iterc(<0,r>)   {_; _; _}  -->  r
-(ITERC-CONT)   iterc(<1,a>)   {e; f; g}  -->  iter(e, a){f; g}
-(ITERC-FAIL)   iterc(fail)    {_; _; _}  -->  fail
-(ITERC-CHOICE) iterc(e1 | e2) {e; f; g}  -->  iterc(e1){e; f; g} | iterc(e2){e; f; g}
-(ITERC-SEQ)    iterc(e1 ; e2) {e; f; g}  -->  e1; iterc(e2){e; f; g}
-(ITERC-EXI)    iterc(exi x.e1){e; f; g)  -->  exi x . iterc(e1){e; f; g}
-
-XXX iterc is pretty ugly.  It must be possible to do this better.
+(ITER-FAIL)    iter(fail,    u){f, g}  -->  g u
+(ITER-VALUE)   iter(v,       u){f, g}  -->  f u v g
+(ITER-CHOICE)  iter(e1 | e2, u){f, g}  -->  iter(e1, u){f, \ x . iter(e2, x){f, g} }
 
 Here's how if/one/all are encoded using iter.
 
-  * if(e1) e2 else e3  =  iter( (e1; <vs>),  <>){ (\ _ a . exi vs . a=<vs>; <0,e2>); (\_ . e3) }
+  * if(e1) e2 else e3  =  iter( (e1; <vs>),  <>){ (\ _ a _ . exi vs . a=<vs>; e2); (\_ . e3) }
       where vs are the free variables also used in e2
       if vs is empty or a singleton, we can simplify this
 
-  * one{e}  =  iter(e, <>){ (\ _ a . a); (\ _ . fail) }
+  * one{e}  =  iter(e, <>){ (\ _ a _ . a); (\ _ . fail) }
 
   * all{e}  =  exi arr. iter(e, 0){step; (\ n . mkArr$[n])}
-      where step = \ n a . arr[n] = a; <1, n+1>
+      where step = \ n a c . arr[n] = a; c (n+1)
       Note how 'all' builds the array by just making a number of
       equalities arr[i] = v_i, and then when we get to the end
-      we crate an array with the correct number of elements
+      we create an array with the correct number of elements
       using mkArr$.  The accumulator is the number of elements.
 -}
 
@@ -442,10 +430,7 @@ pPrintPrecE lvl prec the_expr
 
        Arr as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> text "truth" <> braces (ppr0 a)
-       One e   -> text "one" <> braces (ppr0 e)
-       All e   -> text "all" <> braces (ppr0 e)
-       Iter  e1 e2 e3 e4 -> text "iter"  <> parens (ppr0 e1) <> braces (sep (punctuate semi $ map ppr1 [e2,e3,e4]))
-       IterC e1 e2 e3 e4 -> text "iterC" <> parens (ppr0 e1) <> braces (sep (punctuate semi $ map ppr1 [e2,e3,e4]))
+       Iter e1 e2 e3 e4 -> text "iter"  <> parens (ppr0 e1 <> comma <+> ppr0 e2) <> braces (sep (punctuate semi $ map ppr1 [e3,e4]))
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
        Exi {}  -> mbPar0 $ sep [ text "exi" <+> fsep (map pPrint bndrs) <> char '.'
                                , indent (ppr0 body) ]
@@ -523,10 +508,7 @@ exprSize (e1 :|: e2)   = 1 + exprSize e1 + exprSize e2
 exprSize (e1 :@: e2)   = 1 + exprSize e1 + exprSize e2
 exprSize (e1 :>>: e2)  = 1 + exprSize e1 + exprSize e2
 exprSize (Exi bnd)     = 1 + bindSize bnd
-exprSize (One e)       = 1 + exprSize e
-exprSize (All e)       = 1 + exprSize e
-exprSize (Iter  e1 e2 e3 e4) = 1 + exprSize e1 + exprSize e2 + exprSize e3 + exprSize e4
-exprSize (IterC e1 e2 e3 e4) = 1 + exprSize e1 + exprSize e2 + exprSize e3 + exprSize e4
+exprSize (Iter e1 e2 e3 e4) = 1 + exprSize e1 + exprSize e2 + exprSize e3 + exprSize e4
 exprSize (Some a)      = 1 + exprSize a
 exprSize (Check _ e)  = 1 + exprSize e
 exprSize (Verify bl)   = 10 + exprSize e
@@ -580,16 +562,15 @@ valid (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
   -- SLPJ: todo: check binder is not _
 valid (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
 valid Fail                = True
-valid (One e)             = valid e
-valid (All e)             = valid e
 valid (Some a)            = isVal a
 valid (a :>>: e)          = isVal a && valid e  -- Guard
-valid (Iter e1 e2 (Lam b3) (Lam b4)) = valid e1 && valid e2 && valid eb3 && valid eb4
-  where (_, eb3) = unsafeUnbind b3; (_, eb4) = unsafeUnbind b4
+valid (Iter e1 e2 (Lam b3) (Lam b4)) |
+    (_, Lam b3')  <- unsafeUnbind b3,
+    (_, Lam b3'') <- unsafeUnbind b3',
+    (_, eb3) <- unsafeUnbind b3'',
+    (_, eb4) <- unsafeUnbind b4 =
+      valid e1 && valid e2 && valid eb3 && valid eb4
 valid (Iter _ _ _ _) = False
-valid (IterC e1 e2 (Lam b3) (Lam b4)) = valid e1 && valid e2 && valid eb3 && valid eb4
-  where (_, eb3) = unsafeUnbind b3; (_, eb4) = unsafeUnbind b4
-valid (IterC _ _ _ _) = False
 valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid e                   = isVal e
@@ -618,15 +599,12 @@ prep (e1 :|: e2)   = prep e1 :|: prep e2
 prep (a1 :@: a2)   = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
 prep (Exi bnd)     = Exi (bind x (prep e)) where (x,e) = unsafeUnbind bnd
 prep Fail          = Fail
-prep (One e)       = One (prep e)
-prep (All e)       = All (prep e)
 prep (Some a)      = prepVal a (\v -> Some v)
 prep (a :>>: e)    = prepVal a (\v -> v :>>: prep e)
 prep (Check fx e)  = Check fx (prep e)
 prep (Verify bl)   = Verify (bindList xs (as, prep e))
                      where (xs,(as,e)) = unsafeUnbindList bl
 prep (Iter e1 e2 e3 e4) = prepVal e2 $ \ v2 -> Iter (prep e1) v2 (prep e3) (prep e4)
-prep IterC{}       = error "prep IterC undefined"
 prep HOLE          = error "prep HOLE undefined"
 
 prepSeq :: Expr -> Expr -> Expr
@@ -662,15 +640,12 @@ instance Variables Expr where
   variables f (e1 :>: e2)  = variables f (e1,e2)
   variables f (e1 :|: e2)  = variables f (e1,e2)
   variables f (e1 :@: e2)  = variables f (e1,e2)
-  variables f (One e)      = variables f e
-  variables f (All e)      = variables f e
   variables f (Some e)     = variables f e
   variables f (e1 :>>: e2) = variables f (e1,e2)
   variables f (Check _ e)  = variables f e
   variables f (Exi bnd)    = variables f bnd
   variables f (Verify bnd) = variables f bnd
-  variables f (Iter  e1 e2 e3 e4) = variables f (e1, e2, e3, e4)
-  variables f (IterC e1 e2 e3 e4) = variables f (e1, e2, e3, e4)
+  variables f (Iter e1 e2 e3 e4) = variables f (e1, e2, e3, e4)
   variables _ _            = []
 
 instance Variables FailableAssump where
@@ -756,8 +731,6 @@ norm orig_e = alpha 0 orig_e
   alpha k (e1 :>: e2)  = alpha k e1 :>: alpha k e2
   alpha k (e1 :|: e2)  = alpha k e1 :|: alpha k e2
   alpha k (e1 :@: e2)  = alpha k e1 :@: alpha k e2
-  alpha k (One e)      = One (alpha k e)
-  alpha k (All e)      = All (alpha k e)
   alpha k (Some e)     = Some (alpha k e)
   alpha k (e1 :>>: e2) = alpha k e1 :>>: alpha k e2
   alpha k (Check fx e) = Check fx (alpha k e)
@@ -768,8 +741,7 @@ norm orig_e = alpha 0 orig_e
                              sub = rs `zip` rs'
                              e'  = alpha (k+n) e
                          in Verify (bindList rs' (map (substAssump sub) as, substSkol sub e'))
-  alpha k (Iter  e1 e2 e3 e4) = Iter  (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
-  alpha k (IterC e1 e2 e3 e4) = IterC (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
+  alpha k (Iter e1 e2 e3 e4) = Iter  (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
   alpha _ e            = e
 
   alphaExi k xs (Exi bnd) = alphaExi k (x:xs) e
@@ -806,15 +778,12 @@ subst sub orig_e
     go (e1 :>: e2)  = go e1 :>: go e2
     go (e1 :|: e2)  = go e1 :|: go e2
     go (e1 :@: e2)  = go e1 :@: go e2
-    go (One e)      = One (go e)
-    go (All e)      = All (go e)
     go (Some e)     = Some (go e)
     go (e1 :>>: e2) = go e1 :>>: go e2
     go (Check fx e) = Check fx (go e)
     go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
-    go (Iter  e1 e2 e3 e4) = Iter  (go e1) (go e2) (go e3) (go e4)
-    go (IterC e1 e2 e3 e4) = IterC (go e1) (go e2) (go e3) (go e4)
+    go (Iter e1 e2 e3 e4) = Iter (go e1) (go e2) (go e3) (go e4)
     go e            = e
 
     subst_e_ops :: SubstOps Expr Expr
@@ -844,15 +813,12 @@ substSkol sub orig_e
     go (e1 :>: e2)  = go e1 :>: go e2
     go (e1 :|: e2)  = go e1 :|: go e2
     go (e1 :@: e2)  = go e1 :@: go e2
-    go (One e)      = One (go e)
-    go (All e)      = All (go e)
     go (Some e)     = Some (go e)
     go (e1 :>>: e2) = go e1 :>>: go e2
     go (Check fx e) = Check fx (go e)
     go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
-    go (Iter  e1 e2 e3 e4) = Iter  (go e1) (go e2) (go e3) (go e4)
-    go (IterC e1 e2 e3 e4) = IterC (go e1) (go e2) (go e3) (go e4)
+    go (Iter e1 e2 e3 e4) = Iter (go e1) (go e2) (go e3) (go e4)
     go e            = e
 
     subst_e_ops :: SubstOps SkolIdent Expr
@@ -947,8 +913,6 @@ everywhere step env orig_e
                       ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step env e2 ]
   recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step env e1 ]
                       ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step env e2 ]
-  recurse (One e)      = [ (s, One e')  | (s,e') <- everywhere step env e ]
-  recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step env e ]
   recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step env e ]
   recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step env e1 ]
                       ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step env e2 ]
@@ -963,11 +927,6 @@ everywhere step env orig_e
                          [ (s, Iter e1 e2' e3 e4) | (s,e2') <- everywhere step env e2 ] ++
                          [ (s, Iter e1 e2 e3' e4) | (s,e3') <- everywhere step env e3 ] ++
                          [ (s, Iter e1 e2 e3 e4') | (s,e4') <- everywhere step env e4 ]
-  recurse (IterC e1 e2 e3 e4) =
-                         [ (s, IterC e1' e2 e3 e4) | (s,e1') <- everywhere step env e1 ] ++
-                         [ (s, IterC e1 e2' e3 e4) | (s,e2') <- everywhere step env e2 ] ++
-                         [ (s, IterC e1 e2 e3' e4) | (s,e3') <- everywhere step env e3 ] ++
-                         [ (s, IterC e1 e2 e3 e4') | (s,e4') <- everywhere step env e4 ]
 
   recurse _            = []
 
@@ -1092,8 +1051,6 @@ instance Arbitrary Expr where
   shrink (e1 :@: e2)  = [ e1, e2 ]
                      ++ [ e1' :@: e2  | e1' <- shrink e1 ]
                      ++ [ e1  :@: e2' | e2' <- shrink e2 ]
-  shrink (One e)      = [ e ] ++ [ One e'  | e' <- shrink e ]
-  shrink (All e)      = [ e, One e ] ++ [ All e'  | e' <- shrink e ]
   shrink (Some e)     = [ e ] ++ [ Some e' | e' <- shrink e ]
   shrink (e1 :>>: e2) = [ e1, e2 ]
                      ++ [ e1' :>>: e2  | e1' <- shrink e1 ]
@@ -1120,8 +1077,6 @@ arbExprWith xs n =
   , (a, liftM2 (:@:) arbExpr2 arbExpr2)
   , (b, Exi `fmap` arbBind)
   , (1, return Fail)
-  , (b, One `fmap` arbExpr1)
-  , (b, All `fmap` arbExpr1)
 {-
   | Some Val
   | Val :>>: Expr    -- guard           |>   <-- black triangle
@@ -1176,10 +1131,7 @@ Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
 (e1 :|: e2)   <@ h = (e1 <@ h) :|: (e2 <@ h)
 (e1 :@: e2)   <@ h = (e1 <@ h) :@: (e2 <@ h)
 Exi bnd       <@ h = Exi (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
-One e         <@ h = One (e <@ h)
-All e         <@ h = All (e <@ h)
-Iter  e1 e2 e3 e4 <@ h = Iter  (e1 <@ h) (e2 <@ h) (e3 <@ h) (e4 <@ h)
-IterC e1 e2 e3 e4 <@ h = IterC (e1 <@ h) (e2 <@ h) (e3 <@ h) (e4 <@ h)
+Iter e1 e2 e3 e4 <@ h = Iter (e1 <@ h) (e2 <@ h) (e3 <@ h) (e4 <@ h)
 Some e        <@ h = Some (e <@ h)
 (e1 :>>: e2)  <@ h = (e1 <@ h) :>>: (e2 <@ h)
 Check fx e    <@ h = Check fx (e <@ h)
@@ -1198,10 +1150,7 @@ bvs ctx = explore [] ctx
   explore xs (e1 :>: e2)  = explore xs e1 `union` explore xs e2
   explore xs (e1 :|: e2)  = explore xs e1 `union` explore xs e2
   explore xs (e1 :@: e2)  = explore xs e1 `union` explore xs e2
-  explore xs (One e)      = explore xs e
-  explore xs (All e)      = explore xs e
   explore xs (Iter e1 e2 e3 e4) = explore xs e1 `union` explore xs e2 `union` explore xs e3 `union` explore xs e4
-  explore xs (IterC e1 e2 e3 e4) = explore xs e1 `union` explore xs e2 `union` explore xs e3 `union` explore xs e4
   explore xs (Some e)     = explore xs e
   explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
   explore xs (Check _ e)  = explore xs e
@@ -1221,10 +1170,7 @@ isContext (e1 :=: e2)  = isContext e1 || isContext e2
 isContext (e1 :>: e2)  = isContext e1 || isContext e2
 isContext (e1 :|: e2)  = isContext e1 || isContext e2
 isContext (e1 :@: e2)  = isContext e1 || isContext e2
-isContext (One e)      = isContext e
-isContext (All e)      = isContext e
-isContext (Iter  e1 e2 e3 e4) = isContext e1 || isContext e2 || isContext e3 || isContext e4
-isContext (IterC e1 e2 e3 e4) = isContext e1 || isContext e2 || isContext e3 || isContext e4
+isContext (Iter e1 e2 e3 e4) = isContext e1 || isContext e2 || isContext e3 || isContext e4
 isContext (Some e)     = isContext e
 isContext (e1 :>>: e2) = isContext e1 || isContext e2
 isContext (Check _ e)  = isContext e
