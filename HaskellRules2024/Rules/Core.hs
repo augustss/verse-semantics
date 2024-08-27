@@ -258,6 +258,7 @@ primOpCanFail IsArr  = True
 primOpCanFail IsComp = True
 primOpCanFail IsTru  = True
 primOpCanFail ArrApp = True
+primOpCanFail DotDot = True  -- can fail when the interval is empty
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False
@@ -266,7 +267,6 @@ primOpCanFail Mul      = False
 primOpCanFail Div      = False
 primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
-primOpCanFail DotDot   = False
 primOpCanFail ArrMap   = False
 primOpCanFail MkArr    = False
 
