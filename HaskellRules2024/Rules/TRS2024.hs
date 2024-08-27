@@ -14,7 +14,7 @@ import Epic.Print hiding ( (<>) )
 import FrontEnd.Error
 
 import Control.Monad( guard )
-import Data.List( (\\), isPrefixOf )
+import Data.List( (\\) )
 
 --------------------------------------------------------------------------------
 --
@@ -634,18 +634,24 @@ blkd _ e = errorMessage ("Uncovered case in blkd " ++ show e)
 choiceFree :: Expr_or_Context -> Bool
 -- (choiceFree ctx) means no choices to the left of the HOLE
 -- or, if no HOLE, anywhere
-choiceFree (_ :|: _)           = False
-choiceFree ((_ :=: e1) :>: e2) = choiceFree e1 && (isContext e1 || choiceFree e2)
-choiceFree (_ :>>: e)          = choiceFree e
-choiceFree (Exi bnd)           = choiceFree e where (_,e) = unsafeUnbind bnd
-choiceFree (v1 :@: _)          = case v1 of
-                                   Op DotDot -> False
-                                   Op _      -> True  -- all other ops are choice-free
---                                   _         -> False -- may or may not be choice free
-                                   _         -> cf v1
-  where cf (Var i) = "$cont" `isPrefixOf` show i   -- a hack for the 'all/for' encoding
-        cf _ = False
-choiceFree e@Iter{} | Just (_, _, (_, _, _, f), (_, g)) <- unIter e
-                               = choiceFree f && choiceFree g
-choiceFree Iter{}              = error "Malformed Iter"
-choiceFree _                   = True
+choiceFree = choiceFree' []
+
+-- The first argument to choiceFree' are functions known to be choice free.
+-- This is used for the iter construct.  In the case where iter(e){u;f;g}
+-- calls f, the continuation argument will have the same effects as f&g
+-- could have.  We can safely assume that the continuation is choice free,
+-- because if it's not this will already show up in the bodies of f and/or g.
+choiceFree' :: [Ident] -> Expr_or_Context -> Bool
+choiceFree' _  (_ :|: _)           = False
+choiceFree' fs ((_ :=: e1) :>: e2) = choiceFree' fs e1 && (isContext e1 || choiceFree' fs e2)
+choiceFree' fs (_ :>>: e)          = choiceFree' fs e
+choiceFree' fs (Exi bnd)           = choiceFree' fs e where (_,e) = unsafeUnbind bnd
+choiceFree' fs (v1 :@: _)          = case v1 of
+                                       Op DotDot -> False
+                                       Op _      -> True  -- all other ops are choice-free
+                                       Var f     -> f `elem` fs
+                                       _         -> False -- may or may not be choice free
+choiceFree' fs e@Iter{} | Just (_, _, (_, _, c, f), (_, g)) <- unIter e
+                                   = choiceFree' (c:fs) f && choiceFree' fs g
+choiceFree' _  Iter{}              = error "Malformed Iter"
+choiceFree' _  _                   = True
