@@ -1058,10 +1058,16 @@ encodeFor e1 e2 = do
       ei   = Variable i
       ea   = Variable a
       ec   = Variable c
-      step = Lam i $ Lam a $ Lam c $
-             eExists vs $ Seq [ea `Unify` evs, (earr `ApplyD` ei) `Unify` e2, ec `ApplyD` (eAdd ei (Lit (LInt 1)))]
+      (dom, arg, body) =
+        case vs of
+          []  -> (e1,            u, \ rest -> Seq rest) where u = srcUnderscore           -- No variables
+          [v] -> (Seq [e1, ev],  v, \ rest -> Seq rest) where ev = Variable v             -- Single variable, avoid the tuple
+          _   -> (Seq [e1, evs], a, \ rest -> eExists vs $ Seq $ (ea `Unify` evs) : rest) -- Many variables
+      step =
+        Lam i $ Lam arg $ Lam c $
+             body [(earr `ApplyD` ei) `Unify` e2, ec `ApplyD` (eAdd ei (Lit (LInt 1)))]
       done = Lam i $ earr `Unify` eMkArr ei
-  pure $ Exists [arr] $ Iter (Seq [e1, evs]) (Lit (LInt 0)) step done
+  pure $ Exists [arr] $ Iter dom (Lit (LInt 0)) step done
 
 eAdd :: SrcCore -> SrcCore -> SrcCore
 eAdd x y = EPrim Add `ApplyD` Array [x, y]
