@@ -643,8 +643,7 @@ choiceFree (v1 :@: _)          = case v1 of
                                    Op _      -> True  -- all other ops are choice-free
 --                                   _         -> False -- may or may not be choice free
                                    _         -> cf v1
-  where cf (Var i) = "$arr" `isPrefixOf` show i ||
-                     "$cont" `isPrefixOf` show i   -- a hack for the 'all/for' encoding
+  where cf (Var i) = "$cont" `isPrefixOf` show i   -- a hack for the 'all/for' encoding
         cf _ = False
 choiceFree e@Iter{} | Just (_, _, (_, _, _, f), (_, g)) <- unIter e
                                = choiceFree f && choiceFree g

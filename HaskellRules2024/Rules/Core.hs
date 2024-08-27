@@ -111,7 +111,7 @@ Iter has the following reduction rules:
 (ITER-VALUE)   iter(v,     ){u; f; g}  -->  f u v g
 (ITER-CHOICE)  iter(e1 | e2){u; f; g}  -->  iter(e1){u; f; \ x . iter(e2){x; f; g} }
 
-Note that ITER-CHOICE has no requirment on e1 being a value.
+Note that ITER-CHOICE has no requirement on e1 being a value.
 
 If choices are always under if/one/all/for then the rules
 CHOICE-ASSOC, CHOICE-FAIL-L, and CHOICE-FAIL-R are not needed.
