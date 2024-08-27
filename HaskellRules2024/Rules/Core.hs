@@ -121,19 +121,19 @@ Here's how if/one/all/for are encoded using iter.
 
   * one{e}  -->  iter(e){ <>; (\ _ a _ . a); (\ _ . fail) }
 
-  * all{e}  -->  exi arr. iter(e){ 0; step; (\ i . mkArr$[i]) }
-      where
-        step = \ i a c . arr[i] = a; c (i+1)
-      Note how 'all' builds the array by just making a number of
-      equalities arr[i] = v_i, and then when we get to the end
-      we create an array with the correct number of elements
-      using mkArr$.  The accumulator is the number of elements.
+  * all{e}  -->  iter(e){ <>; (\ a v c . c (snoc(a, v))); (\ a . a) }
+      The array is built in the accumulator, built up by snocing
+      new elements to the accumulator.
 
-  * for(e1){e2}  -->  exi arr. iter(e1; <vs>){ 0; step; (\ i . mkArr$[i]) }
+  * for(e1){e2}  -->  iter(e1; <vs>){ <>; step; (\ a . a) }
       where
-        step = \ i a c . exi vs . a = <vs>; arr[i] = e2; c (i+1)
+        step = \ a x c . exi vs . x = <vs>; c (snoc(a, e2))
       Where vs are the free variables of e1 also used in e2.
       If vs is empty or a singleton, we can simplify this.
+      The array is built in the accumulator, built up by snocing
+      new elements to the accumulator.
+
+where snoc xs x = arrApp$[xs, <x>, _]
 
 -}
 
@@ -202,7 +202,6 @@ data PrimOp
  | ArrLen
  | DotDot     -- dotDot$[m,n] = <m, m+1, .., n>
  | ArrApp     -- arrApp$[ Arr as, Arr bs, r ] =  r=(as++bs); r
- | MkArr      -- mkArr$[n] = array{_, _, ..., _}  n elements
 
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
@@ -226,7 +225,6 @@ primOpString Neg = "intNeg$"
 primOpString ArrLen   = "arrLen$"
 primOpString DotDot   = "dotDot$"
 primOpString ArrApp   = "arrApp$"
-primOpString MkArr    = "mkArr$"
 
 primOpString Gt  = "intGT$"
 primOpString GEq = "intGE$"
@@ -265,7 +263,6 @@ primOpCanFail Mul      = False
 primOpCanFail Div      = False
 primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
-primOpCanFail MkArr    = False
 
 --------------------------------------------------------------------------------
 --

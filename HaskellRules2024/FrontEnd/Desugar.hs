@@ -1028,54 +1028,49 @@ encodeOne e = do
   a <- newIdent (getLoc e) "a"
   pure $ Iter e (Array []) (eThunk $ Lam a $ eThunk $ Variable a) (eThunk Fail)
 
--- all{e}  -->  exi arr. Iter e 0 step (\ n . mkArr$[n])
---   step i v c  =  arr[i] = v; c(i+1)
+-- all{e}  -->  exi Iter e <> step (\ a -> a)
+--   step a v c  =  c(exi r . arrApp(a,<v>,r); r)
 encodeAll :: SrcCore -> D SrcCore
 encodeAll e = do
-  arr <- newIdent (getLoc e) "arr"
-  i   <- newIdent (getLoc e) "i"
+  a   <- newIdent (getLoc e) "a"
   v   <- newIdent (getLoc e) "v"
   c   <- newIdent (getLoc e) "cont"
-  let earr = Variable arr
-      ei   = Variable i
+  let ea   = Variable a
       ev   = Variable v
       ec   = Variable c
-      step = Lam i $ Lam v $ Lam c $ Seq [(earr `ApplyD` ei) `Unify` ev, ec `ApplyD` (eAdd ei (Lit (LInt 1)))]
-      done = Lam i $ earr `Unify` eMkArr ei
-  pure $ Exists [arr] $ Iter e (Lit (LInt 0)) step done
+      step = Lam a $ Lam v $ Lam c $ ec `ApplyD` (eSnoc ea ev)
+      done = Lam a $ ea
+  pure $ Iter e (Array []) step done
 
--- for(e1){e2}  -->  exi arr. Iter (e1; <vs>) 0 step (\ n . mkArr$[n])
---   step i a c = exi vs . a = <vs>; arr[n] = e2; c(i+1)
+-- for(e1){e2}  -->  Iter (e1; <vs>) <> step (\ a . a)
+--   step a x c = exi vs . x = <vs>; c(exi r . arrApp$(a, <e2>, r); r)
 encodeFor :: SrcCore -> SrcCore -> D SrcCore
 encodeFor e1 e2 = do
-  arr <- newIdent (getLoc e1) "arr"
-  i   <- newIdent (getLoc e1) "i"
   a   <- newIdent (getLoc e1) "a"
+  x   <- newIdent (getLoc e1) "x"
   c   <- newIdent (getLoc e1) "cont"
   let vs = getVisibleBinders e1 `intersect` getFree e2
       evs = Array $ map Variable vs
-  let earr = Variable arr
-      ei   = Variable i
-      ea   = Variable a
+  let ea   = Variable a
+      ex   = Variable x
       ec   = Variable c
       (dom, arg, body) =
         case vs of
           []  -> (e1,            u, \ rest -> Seq rest) where u = srcUnderscore           -- No variables
           [v] -> (Seq [e1, ev],  v, \ rest -> Seq rest) where ev = Variable v             -- Single variable, avoid the tuple
-          _   -> (Seq [e1, evs], a, \ rest -> eExists vs $ Seq $ (ea `Unify` evs) : rest) -- Many variables
-      step =
-        Lam i $ Lam arg $ Lam c $
-             body [(earr `ApplyD` ei) `Unify` e2, ec `ApplyD` (eAdd ei (Lit (LInt 1)))]
-      done = Lam i $ earr `Unify` eMkArr ei
-  pure $ Exists [arr] $ Iter dom (Lit (LInt 0)) step done
+          _   -> (Seq [e1, evs], x, \ rest -> eExists vs $ Seq $ (ex `Unify` evs) : rest) -- Many variables
+      step = Lam a $ Lam arg $ Lam c $ body [ec `ApplyD` (eSnoc ea e2)]
+      done = Lam a $ ea
+  pure $ Iter dom (Array []) step done
 
-eAdd :: SrcCore -> SrcCore -> SrcCore
-eAdd x y = EPrim Add `ApplyD` Array [x, y]
-
-eMkArr :: SrcCore -> SrcCore
-eMkArr x = EPrim MkArr `ApplyD` x
+-- snoc xs x = arrApp$[xs, <x>, _]
+eSnoc :: SrcCore -> SrcCore -> SrcCore
+eSnoc xs x =
+  let u = Ident (getLoc x) "u"
+  in  ApplyD (EPrim ArrApp) (Array [xs, Array [x], Exists [u] (Variable u)])
 
 ----------------------------------
+
 flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
 -- Implements M_sigma[ e ] P(i),
 -- when we don't want to push the P(i) into e

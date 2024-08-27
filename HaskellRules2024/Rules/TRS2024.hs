@@ -209,12 +209,6 @@ arrayOpStep _env lhs =
        (do { Just (ls,vs2) <- [dropEqualPrefix e1 res]; pure $ foldr (:>:) (equateArr e2 vs2) ls })
      ++
        (do { Just (ls,vs1) <- [dropEqualSuffix e2 res]; pure $ foldr (:>:) (equateArr e1 vs1) ls }) }
- ++
-  "APP-MKARR" `name`
-  do Op MkArr :@: Lit (LInt n) <- [lhs]
-     let vs = take (fromInteger n) (identsNotIn [])
-         exi i e = Exi (bind i e)
-     pure $ foldr exi (Arr $ map Var vs) vs
 
 equateArr :: Expr -> [Val] -> Expr
 -- (equateArr e vs)  returns  (Arr vs = e; Arr vs)
