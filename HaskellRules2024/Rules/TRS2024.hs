@@ -202,15 +202,6 @@ arrayOpStep _env lhs =
   do Op DotDot :@: Arr [Lit (LInt k1), Lit (LInt k2)] <- [lhs]
      pure (pPrint (k1,k2), foldr ((:|:) . Lit . LInt) Fail [k1..k2])
  ++
-  -- arrMap$[f, <v1..vn>] = exists z1. z1=f[v1]; ..; exists zn. zn=f[vn];
-  --                       <z1,..,zn>
-  "APP-ARRMAP" `name`
-  do Op ArrMap :@: e@(Arr [fun, Arr es]) <- [lhs]
-     let zs = take (length es) (identsNotIn (free e))
-         do_one (z,v) body = Exi (bind z ((Var z :=: (fun :@: v)) :>: body))
-     pure (foldr do_one (Arr (map Var zs)) (zs `zip` es))
-
- ++
   "APP-ARRAPP" `name`
   do { Op ArrApp :@: Arr [e1,e2,res] <- [lhs]
      ; (do { Arr vs1 <- [e1]; Arr vs2 <- [e2]; pure $ equateArr res (vs1++vs2) })

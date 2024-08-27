@@ -50,7 +50,7 @@ miniEvalPrelude = ("miniprelude", "\
 \Length     := lam y { isArr$[y]; arrLen$[y] };\n\
 \prefix'?'        := lam t { lam x { if (truth{y:any} = x) then { truth{t[y]} } else { x = () } } };\n\
 \operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
-\prefix'[]'       := lam t { lam a { isArr$[a]; arrMap$[t,a] } };\n\
+\prefix'[]'       := lam t { lam a   { isArr$[a]; for(x:a){t[x]} } };\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intAdd$[x,y] }};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intSub$[x,y] }};\n\
 \operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intMul$[x,y] }};\n\
@@ -82,7 +82,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \nat        := lam y { isInt$[y]; intGE$[y,0]; y };\n\
 \Length     := lam y { isArr$[y]; y >> some{int} };\n\
 \prefix'?'        := lam t { lam x { if (truth{y:any} = x) then { truth{t[y]} } else { x = () } } };\n\
-\prefix'[]'       := lam t { lam a { isArr$[a]; arrMap$[t,a] } };\n\
+\prefix'[]'       := lam t { lam a   { isArr$[a]; for(x:a){t[x]} } };\n\
 \operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intSub$[x,y]; isInt$[z]; z } }}};\n\

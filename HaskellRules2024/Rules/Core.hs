@@ -200,7 +200,6 @@ data PrimOp
 
    -- Operations on arrays
  | ArrLen
- | ArrMap     -- arrMap$[f,<v1..vn>] = <f v1, .., f vn>
  | DotDot     -- dotDot$[m,n] = <m, m+1, .., n>
  | ArrApp     -- arrApp$[ Arr as, Arr bs, r ] =  r=(as++bs); r
  | MkArr      -- mkArr$[n] = array{_, _, ..., _}  n elements
@@ -225,7 +224,6 @@ primOpString Div = "intDiv$"
 primOpString Neg = "intNeg$"
 
 primOpString ArrLen   = "arrLen$"
-primOpString ArrMap   = "arrMap$"
 primOpString DotDot   = "dotDot$"
 primOpString ArrApp   = "arrApp$"
 primOpString MkArr    = "mkArr$"
@@ -267,7 +265,6 @@ primOpCanFail Mul      = False
 primOpCanFail Div      = False
 primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
-primOpCanFail ArrMap   = False
 primOpCanFail MkArr    = False
 
 --------------------------------------------------------------------------------
