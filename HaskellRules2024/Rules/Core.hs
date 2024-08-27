@@ -104,7 +104,7 @@ The function f will be called with
   * value from the first argument to iter
   * continuation
 If f wants iteration to terminate, it simply returns a value.
-If f wants iteration to continue, it calls the continuation with a new accumulator
+If f wants iteration to continue, it calls the continuation with a new accumulator.
 
 Iter has the following reduction rules:
 (ITER-FAIL)    iter(fail,  ){u; f; g}  -->  g u
@@ -119,22 +119,23 @@ CHOICE-ASSOC, CHOICE-FAIL-L, and CHOICE-FAIL-R are not needed.
 Here's how if/one/all/for are encoded using iter.
 
   * if(e1) e2 else e3  -->  iter(e1; <vs>){ <>; (\ _ a _ . exi vs . a=<vs>; e2); (\_ . e3) }
-      Where vs are the free variables of e1 also used in e2.
+      Where vs are the bound variables of e1 also used in e2.
       If vs is empty or a singleton, we can simplify this.
       The accumulator plays no role here.
 
   * one{e}  -->  iter(e){ <>; (\ _ a _ . a); (\ _ . fail) }
+      The accumulator plays no role here.
 
   * all{e}  -->  iter(e){ <>; (\ a v c . c (snoc(a, v))); (\ a . a) }
-      The array is built in the accumulator, built up by snocing
+      The array is built in the accumulator; built up by snocing
       new elements to the accumulator.
 
   * for(e1){e2}  -->  iter(e1; <vs>){ <>; step; (\ a . a) }
       where
         step = \ a x c . exi vs . x = <vs>; c (snoc(a, e2))
-      Where vs are the free variables of e1 also used in e2.
+      Where vs are the bound variables of e1 also used in e2.
       If vs is empty or a singleton, we can simplify this.
-      The array is built in the accumulator, built up by snocing
+      The array is built in the accumulator; built up by snocing
       new elements to the accumulator.
 
 where snoc xs x = arrApp$[xs, <x>, _]
