@@ -1035,7 +1035,7 @@ encodeAll e = do
   arr <- newIdent (getLoc e) "arr"
   i   <- newIdent (getLoc e) "i"
   v   <- newIdent (getLoc e) "v"
-  c   <- newIdent (getLoc e) "c"
+  c   <- newIdent (getLoc e) "cont"
   let earr = Variable arr
       ei   = Variable i
       ev   = Variable v
@@ -1051,7 +1051,7 @@ encodeFor e1 e2 = do
   arr <- newIdent (getLoc e1) "arr"
   i   <- newIdent (getLoc e1) "i"
   a   <- newIdent (getLoc e1) "a"
-  c   <- newIdent (getLoc e1) "c"
+  c   <- newIdent (getLoc e1) "cont"
   let vs = getVisibleBinders e1 `intersect` getFree e2
       evs = Array $ map Variable vs
   let earr = Variable arr

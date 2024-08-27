@@ -14,6 +14,7 @@ module Rules.Core
   , isVal, isHNF, isComparable
   , valid, prep, norm
   , pPrintSmallExpr
+  , unIter
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -75,7 +76,7 @@ data Expr
   | Fail
 
   -- Iterator over choices
-  | Iter Expr Expr Expr Expr   -- last two are always lambdas
+  | Iter Expr Expr Expr Expr -- choice iteration; see Note [iter]
 
   -- Verifier
   | Some Val
@@ -88,45 +89,52 @@ data Expr
  deriving ( Eq, Ord, Show )
 
 {- Note [iter]
-The iter (and helper iterc) construct is a fold over choices.
+The iter construct is a fold over choices.
 
-In the expression iter(e,a){f,g}
+In the expression iter(e){u;f;g}
   * e is the choices we are iterating over
-  * a is the "accumulator", i.e., the result we are building up
-  * f is the thing to do if e is not fail
-  * g is the thing to do if e is fail
+  * u is the "accumulator", i.e., the result we are building up
+  * f is what to do if e does not fail
+  * g is what to do if e fails
 
 Both f and g are always explicit lambdas.  Anything else is invalid.
+The desugaring ensures this invariant, and the rules maintain it.
 The function f will be called with
   * current accumulator
-  * value from the first argument to iter.
+  * value from the first argument to iter
   * continuation
 If f wants iteration to terminate, it simply returns a value.
 If f wants iteration to continue, it calls the continuation with a new accumulator
 
-The iterc construct is an intermediate which will reduce to iter
-again to keep iterating.  It is responsible for checking the
-return value of f.
+Iter has the following reduction rules:
+(ITER-FAIL)    iter(fail,  ){u; f; g}  -->  g u
+(ITER-VALUE)   iter(v,     ){u; f; g}  -->  f u v g
+(ITER-CHOICE)  iter(e1 | e2){u; f; g}  -->  iter(e1){u; f; \ x . iter(e2){x; f; g} }
 
-They have the following reduction rules:
-(ITER-FAIL)    iter(fail,    u){f, g}  -->  g u
-(ITER-VALUE)   iter(v,       u){f, g}  -->  f u v g
-(ITER-CHOICE)  iter(e1 | e2, u){f, g}  -->  iter(e1, u){f, \ x . iter(e2, x){f, g} }
+Note that ITER-CHOICE has no requirment on e1 being a value.
 
-Here's how if/one/all are encoded using iter.
+Here's how if/one/all/for are encoded using iter.
 
-  * if(e1) e2 else e3  =  iter( (e1; <vs>),  <>){ (\ _ a _ . exi vs . a=<vs>; e2); (\_ . e3) }
-      where vs are the free variables also used in e2
-      if vs is empty or a singleton, we can simplify this
+  * if(e1) e2 else e3  -->  iter(e1; <vs>){ <>; (\ _ a _ . exi vs . a=<vs>; e2); (\_ . e3) }
+      Where vs are the free variables of e1 also used in e2.
+      If vs is empty or a singleton, we can simplify this.
 
-  * one{e}  =  iter(e, <>){ (\ _ a _ . a); (\ _ . fail) }
+  * one{e}  -->  iter(e){ <>; (\ _ a _ . a); (\ _ . fail) }
 
-  * all{e}  =  exi arr. iter(e, 0){step; (\ n . mkArr$[n])}
-      where step = \ n a c . arr[n] = a; c (n+1)
+  * all{e}  -->  exi arr. iter(e){ 0; step; (\ i . mkArr$[i]) }
+      where
+        step = \ i a c . arr[i] = a; c (i+1)
       Note how 'all' builds the array by just making a number of
       equalities arr[i] = v_i, and then when we get to the end
       we create an array with the correct number of elements
       using mkArr$.  The accumulator is the number of elements.
+
+  * for(e1){e2}  -->  exi arr. iter(e1; <vs>){ 0; step; (\ i . mkArr$[i]) }
+      where
+        step = \ i a c . exi vs . a = <vs>; arr[i] = e2; c (i+1)
+      Where vs are the free variables of e1 also used in e2.
+      If vs is empty or a singleton, we can simplify this.
+
 -}
 
 {- Note [Truth values]
@@ -430,7 +438,7 @@ pPrintPrecE lvl prec the_expr
 
        Arr as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> text "truth" <> braces (ppr0 a)
-       Iter e1 e2 e3 e4 -> text "iter"  <> parens (ppr0 e1 <> comma <+> ppr0 e2) <> braces (sep (punctuate semi $ map ppr1 [e3,e4]))
+       Iter e1 e2 e3 e4 -> text "iter"  <> parens (ppr0 e1) <> braces (sep (punctuate semi $ map ppr1 [e2,e3,e4]))
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
        Exi {}  -> mbPar0 $ sep [ text "exi" <+> fsep (map pPrint bndrs) <> char '.'
                                , indent (ppr0 body) ]
@@ -564,13 +572,10 @@ valid (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
 valid Fail                = True
 valid (Some a)            = isVal a
 valid (a :>>: e)          = isVal a && valid e  -- Guard
-valid (Iter e1 e2 (Lam b3) (Lam b4)) |
-    (_, Lam b3')  <- unsafeUnbind b3,
-    (_, Lam b3'') <- unsafeUnbind b3',
-    (_, eb3) <- unsafeUnbind b3'',
-    (_, eb4) <- unsafeUnbind b4 =
-      valid e1 && valid e2 && valid eb3 && valid eb4
-valid (Iter _ _ _ _) = False
+valid e@(Iter _ _ _ _)
+  | Just (e1, e2, (_, _, _, e3), (_, e4)) <- unIter e
+  = valid e1 && valid e2 && valid e3 && valid e4
+valid (Iter _ _ _ _)      = False
 valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid e                   = isVal e
@@ -741,7 +746,7 @@ norm orig_e = alpha 0 orig_e
                              sub = rs `zip` rs'
                              e'  = alpha (k+n) e
                          in Verify (bindList rs' (map (substAssump sub) as, substSkol sub e'))
-  alpha k (Iter e1 e2 e3 e4) = Iter  (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
+  alpha k (Iter e1 e2 e3 e4) = Iter (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
   alpha _ e            = e
 
   alphaExi k xs (Exi bnd) = alphaExi k (x:xs) e
@@ -1178,3 +1183,12 @@ isContext (Exi bnd)    = isContext e where (_,e) = unsafeUnbind bnd
 isContext (Verify {})  = False
 isContext HOLE         = True
 isContext _            = False
+
+-- Unpack a correct Iter construct
+unIter :: Expr -> Maybe (Expr, Expr, (Ident, Ident, Ident, Expr), (Ident, Expr))
+unIter (Iter e1 e2 (Lam b3) (Lam b4)) |
+    (x, Lam b3')  <- unsafeUnbind b3,
+    (y, Lam b3'') <- unsafeUnbind b3',
+    (z, eb3) <- unsafeUnbind b3'',
+    (w, eb4) <- unsafeUnbind b4 = Just (e1, e2, (x, y, z, eb3), (w, eb4))
+unIter _ = Nothing

@@ -369,15 +369,15 @@ oneAndAllStep :: Rule
 oneAndAllStep _env lhs =
   -- iter(fail,    u){f, g}  -->  g u
   "ITER-FAIL" `name`
-  do Iter Fail a _ g <- [lhs]
-     guard (isVal a)            -- XXX Maybe bind 'a' if it's not a value?
-     pure (g :@: a)
+  do Iter Fail u _ g <- [lhs]
+     guard (isVal u)            -- XXX Maybe bind 'u' if it's not a value?
+     pure (g :@: u)
  ++
   -- iter(v,       u){f, g}  -->  f u v g
   "ITER-VALUE" `name`
   do Iter v u f g <- [lhs]
      guard (isVal v)
-     guard (isVal u)            -- XXX Maybe bind 'a' if it's not a value?
+     guard (isVal u)            -- XXX Maybe bind 'u' if it's not a value?
      let f1 = identNotIn $ free lhs
          f2 = identNotIn $ f1 : free lhs
          res = Exi $ bind f1 $
@@ -654,12 +654,10 @@ choiceFree (v1 :@: _)          = case v1 of
                                    Op _      -> True  -- all other ops are choice-free
 --                                   _         -> False -- may or may not be choice free
                                    _         -> cf v1
-  where cf (Var i) = "$arr" `isPrefixOf` show i   -- a hack for the 'all' encoding
+  where cf (Var i) = "$arr" `isPrefixOf` show i ||
+                     "$cont" `isPrefixOf` show i   -- a hack for the 'all/for' encoding
         cf _ = False
-choiceFree (Iter  _ _ f g)     = choiceFreeIter f g
+choiceFree e@Iter{} | Just (_, _, (_, _, _, f), (_, g)) <- unIter e
+                               = choiceFree f && choiceFree g
+choiceFree Iter{}              = error "Malformed Iter"
 choiceFree _                   = True
-
-choiceFreeIter :: Expr -> Expr -> Bool
-choiceFreeIter (Lam fbnd) (Lam gbnd) | Lam fbnd' <- snd (unsafeUnbind fbnd) =
-  choiceFree (snd (unsafeUnbind fbnd')) && choiceFree (snd (unsafeUnbind gbnd))
-choiceFreeIter _ _ = error "malformed iter"
