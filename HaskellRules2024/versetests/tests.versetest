@@ -406,3 +406,8 @@ testeq("AndyChoice3",pass,broken) {
     , (1, 2, 4)
     , (1, 2, 5) )
   }
+
+testeq("Ampersand1", pass){ f ( x&y : int ) := { x + y }; f[2,3] } { 5 }
+testeq("Ampersand2", pass){ f ( x&y : int, q:int ) := { (q, x + y) }; f[2,3,7]} { (7,5) }
+testeq("Ampersand3", pass){ (x&y) := 4; x+y } { 8 }
+testeq("Ampersand4", pass){ f ( x&y&z : int ) := { x + y + z }; f[2,3,4] } { 9 }
