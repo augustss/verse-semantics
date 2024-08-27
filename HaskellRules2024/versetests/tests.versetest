@@ -103,9 +103,9 @@ testeq("Array12",pass){ for(i := 1..4){i+1} }               {array{2,3,4,5} }
 testeq("Array13",pass){ a := array{7,8}; for(i:a){i+1} }    {array{8,9} }
 testeq("Array14",pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
 testeq("Array15",pass) {Y := for( 1..3 ){ 1 } }             {array{1,1,1}}
-testeq("Array15",pass) {Y := for( 1..3 ){ 1|2 }}            { array{1,1,1} | array{1,1,2} | array{1,2,1}
-                                                            | array{1,2,2} | array{2,1,1} | array{2,1,2}
-                                                            | array{2,2,1} | array{2,2,2} }
+testeq("Array15",pass) {Y := all{for( 1..3 ){ 1|2 }}}       { array { array{1,1,1}, array{1,1,2}, array{1,2,1}
+                                                                    , array{1,2,2}, array{2,1,1}, array{2,1,2}
+                                                                    , array{2,2,1}, array{2,2,2} } }
 
 # Array expression splicing
 #  ...in expressions

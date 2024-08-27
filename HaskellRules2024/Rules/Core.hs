@@ -89,7 +89,7 @@ data Expr
  deriving ( Eq, Ord, Show )
 
 {- Note [iter]
-The iter construct is a fold over choices.
+The iter construct is a (left) fold over choices.
 
 In the expression iter(e){u;f;g}
   * e is the choices we are iterating over
@@ -113,11 +113,15 @@ Iter has the following reduction rules:
 
 Note that ITER-CHOICE has no requirment on e1 being a value.
 
+If choices are always under if/one/all/for then the rules
+CHOICE-ASSOC, CHOICE-FAIL-L, and CHOICE-FAIL-R are not needed.
+
 Here's how if/one/all/for are encoded using iter.
 
   * if(e1) e2 else e3  -->  iter(e1; <vs>){ <>; (\ _ a _ . exi vs . a=<vs>; e2); (\_ . e3) }
       Where vs are the free variables of e1 also used in e2.
       If vs is empty or a singleton, we can simplify this.
+      The accumulator plays no role here.
 
   * one{e}  -->  iter(e){ <>; (\ _ a _ . a); (\ _ . fail) }
 

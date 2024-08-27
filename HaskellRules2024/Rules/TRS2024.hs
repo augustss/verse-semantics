@@ -324,10 +324,14 @@ normalizationStep _env lhs =
 --------------------------------------------------------------------------------
 choiceStep :: Rule
 choiceStep _env lhs =
+{-
   "CHOICE-ASSOC" `name`
   do (e1 :|: e2) :|: e3 <- [lhs]
      pure (e1 :|: (e2 :|: e3))
  ++
+-}
+  -- CHOICE-FAIL-L and CHOICE-FAIL-R should not be needed,
+  -- but some dubious verification tests don't pass without them.
   "CHOICE-FAIL-L" `name`
   do Fail :|: e <- [lhs]
      pure e
