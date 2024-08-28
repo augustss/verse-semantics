@@ -59,7 +59,6 @@ data Exp f a
   | Block (f (Exp f a))
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
-  | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
   | Forall (f a)
   | Alloc2 !Access (f a) (f (Exp f a))
