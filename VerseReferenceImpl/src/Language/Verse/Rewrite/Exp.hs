@@ -64,6 +64,7 @@ data Exp f a
   | Alloc3 !Access (f a) (f (Exp f a)) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
+  | Array [f (Exp f a)]
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
@@ -119,6 +120,7 @@ instance ( Pretty (f (Exp f a))
       "alloc" <> parens (pretty x <> prettySpec access) <+> pretty e1 <> parens (pretty e2)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
+    Array es -> "array" <> encloseSep lbrace rbrace semi (pretty <$> es)
     Int x -> pretty x
     Float x -> pretty x
     Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape

@@ -215,6 +215,8 @@ desugarExp'' e pi = case extract e of
         fold (xs, es) =
           unify (name i) (Tuple xs <$ e) :*>: (Tuple es <$ e)
       in fold . unzip <$> traverse unfold es
+  Rewrite.Array es ->
+    desugarExp'' (L Language.Verse.Loc.minBound (Rewrite.Tuple es)) pi
   Rewrite.Truth e' ->
     valM pi (e $>) $ Truth <$> exists (desugarExp e')
   Rewrite.Int x ->
