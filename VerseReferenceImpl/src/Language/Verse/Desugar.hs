@@ -46,6 +46,7 @@ import Language.Verse.Intrinsic qualified as Intrinsic
 import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Mode
+import Language.Verse.Rewrite(parenInvokeM)
 import Language.Verse.Rewrite.Exp
   ( pattern Alloc2
   , pattern Alloc3
@@ -185,6 +186,9 @@ desugarExp'' e pi = case extract e of
     e1 <- desugarExp e1
     e2 <- desugarExp e2
     pure $ BracketInvoke e1 e2
+  Rewrite.ParenInvoke e1 e2 -> do
+    e' <- parenInvokeM e1 e2
+    desugarExp'' (L Language.Verse.Loc.minBound e') pi
   Rewrite.Exists x -> do
     tellExistsName Internal x
     pure . val pi (e $>) . Name $ extract x

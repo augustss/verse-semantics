@@ -58,6 +58,7 @@ data Exp f a
   | ForDo (f (Exp f a)) (f (Exp f a))
   | Block (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
+  | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
   | Forall (f a)
   | Alloc2 !Access (f a) (f (Exp f a))
@@ -112,6 +113,7 @@ instance ( Pretty (f (Exp f a))
     Module e -> "module" <> braces (pretty e)
     Struct e -> "struct" <> braces (pretty e)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
+    ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
     Exists x -> "exists" <+> pretty x
     Forall x -> "forall" <+> pretty x
     Alloc2 access x e ->
