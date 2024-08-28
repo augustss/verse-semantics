@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE ViewPatterns #-}
 module Desugar where
 import Prelude hiding ((<>))
 import Control.Monad
@@ -6,15 +7,19 @@ import Control.Monad.State
 import Control.Monad.Supply
 import Control.Monad.Wrong
 import Data.ByteString qualified as ByteString
+import qualified Data.Map as M
+import Data.Maybe
 import qualified Data.Text as Text
+import Language.Verse.Access
 import Language.Verse.Error
 import Language.Verse.Ident
 import Language.Verse.Label
 import Language.Verse.Loc
 import Language.Verse.Parse2
 import qualified Language.Verse.Rewrite.Exp as R
-import qualified Language.Verse.Rewrite2 as R
+import qualified Language.Verse.Rewrite as R
 import Epic.Print
+import Prettyprinter(pretty)
 
 parseFile :: FilePath
           -> IO (L (R.Exp L Ident))
@@ -41,15 +46,33 @@ runM (M a) = snd (a 0)
 
 ---------------------------------------------
 
-isName :: String -> L (R.Exp L Ident) -> Bool
-isName s (L _ (R.Name (Name t))) = s == Text.unpack t
+isName :: String -> R.Exp L Ident -> Bool
+isName s (R.Name (Name t)) = s == Text.unpack t
 isName _ _ = False
+
+unL :: L a -> a
+unL (L _ a) = a
+
+noL :: a -> L a
+noL a = L Language.Verse.Loc.minBound a
+
+unName :: Ident -> Id
+unName (Name t) = Text.unpack t
+unName _ = undefined
+
+isUnderscore :: Ident -> Bool
+isUnderscore i = unName i == "_"
 
 ---------------------------------------------
 
 data Atom = AInt Integer | AFloat Double | AChar Char
   deriving (Eq, Ord, Show)
-data Vertex = VIdent Id | VAtom Atom | VTuple Int Id | VCall Vertex Vertex
+data Vertex
+  = VIdent Id
+  | VAtom Atom
+  | VTuple Int Id
+  | VCall Vertex Vertex
+  | VUnresolved Id
   deriving (Eq, Ord, Show)
 data TimCore
   = Seq [TimCore]
@@ -57,7 +80,8 @@ data TimCore
   | Scope ScopeId TimCore
   | TimCore :|: TimCore
   | Exists [Id]
-  | Verify String ScopeId TimCore
+  | Verify String TimCore
+  | Define Id Vertex
   deriving (Eq, Ord, Show)
 
 instance Pretty Atom where
@@ -69,13 +93,15 @@ instance Pretty Vertex where
   pPrintPrec l p (VAtom a)  = pPrintPrec l p a
   pPrintPrec l p (VTuple n i) = maybeParens (p>0) $ text "tuple" <> parens (pPrintPrec l 0 n) <+> ppId l i
   pPrintPrec l _ (VCall v1 v2) = pPrintPrec l 1 v1 <> parens (pPrintPrec l 0 v2)
+  pPrintPrec l _ (VUnresolved i) = text "unresolved" <> braces (ppId l i)
 instance Pretty TimCore where
   pPrintPrec l p (Seq xs) = maybeParens (p > 0) $ sep $ punctuate (text ";") $ map (pPrintPrec l 0) xs
   pPrintPrec l _ (v1 :=: v2) = pPrintPrec l 1 v1 <+> text "=" <+> pPrintPrec l 1 v2
   pPrintPrec l _ (e1 :|: e2) = pPrintPrec l 1 e1 <+> text "|" <+> pPrintPrec l 1 e2
   pPrintPrec l _ (Scope c e) = text "scope" <> parens (ppId l c) <> braces (pPrintPrec l 0 e)
   pPrintPrec l _ (Exists is) = text "exists" <+> (hcat $ punctuate (text ",") $ map (ppId l) is)
-  pPrintPrec l _ (Verify fx c e) = text "verify" <> parens (text fx <> text "," <+> ppId l c) <> braces (pPrintPrec l 0 e)
+  pPrintPrec l _ (Verify fx e) = text "verify" <> parens (text fx) <> braces (pPrintPrec l 0 e)
+  pPrintPrec l _ (Define i v) = text "define" <> parens (ppId l i) <> braces (pPrintPrec l 0 v)
 
 ppId :: PrettyLevel -> String -> Doc
 ppId _ s = text s
@@ -113,23 +139,54 @@ newScope dsa = do
 desugar :: L (R.Exp L Ident) -> TimCore
 desugar e = flip evalState 1 $ do
   i <- newIdent "i"
-  j <- newIdent "j"
-  lds e (VIdent i) (VIdent j)
+  x <- newIdent "x"
+  c <- newIdent "c"
+  resolve . Scope c <$> lds (VIdent i) (VIdent x) e
 
-lds :: L (R.Exp L Ident) -> Vertex -> Vertex -> DS TimCore
-lds (L _ e) = ds e
+resolve :: TimCore -> TimCore
+resolve = flip evalState M.empty . rslvO
+  where rslvO (Seq es) = Seq <$> mapM rslvO es
+        rslvO (v1 :=: v2) = (:=:) <$> rslvV v1 <*> rslvV v2
+        rslvO (Scope c e) = Scope c <$> withExt (defsOf e) (rslvO e)
+        rslvO (e1 :|: e2) = (:|:) <$> rslvO e1 <*> rslvO e2
+        rslvO e@Exists{} = pure e
+        rslvO (Verify s e) = Verify s <$> rslvO e
+        rslvO e@Define{} = pure e
+        rslvV (VUnresolved i) = do
+          m <- get
+          pure $ fromMaybe (error $ "unbound " ++ show i) $ M.lookup i m
+        rslvV v@VIdent{} = pure v
+        rslvV v@VAtom{} = pure v
+        rslvV v@VTuple{} = pure v
+        rslvV (VCall v1 v2) = VCall <$> rslvV v1 <*> rslvV v2
 
-ds :: R.Exp L Ident -> Vertex -> Vertex -> DS TimCore
-ds e u v =
+defsOf :: TimCore -> [(Id, Vertex)]
+defsOf (Seq es) = concatMap defsOf es
+defsOf (Define i v) = [(i, v)]
+defsOf _ = []  -- relies on :|: and Verify having new scopes
+
+withExt :: [(Id, Vertex)] -> State (M.Map Id Vertex) a -> State (M.Map Id Vertex) a
+withExt defs ma = do
+  o <- get
+  put $ foldr (uncurry M.insert) o defs
+  a <- ma
+  put o
+  pure a
+
+lds :: Vertex -> Vertex -> L (R.Exp L Ident) -> DS TimCore
+lds u v (L _ e) = ds u v e
+
+ds :: Vertex -> Vertex -> R.Exp L Ident -> DS TimCore
+ds u v e =
   case e of
     --           (AtomSyntax)  syntax(opv,u,v){Num|Char|Path} ---> u=atom; v=atom
     R.Int x     ->  pure $ Seq [ u :=: atom, v :=: atom ] where atom = VAtom $ AInt   x
     R.Float x   ->  pure $ Seq [ u :=: atom, v :=: atom ] where atom = VAtom $ AFloat x
     R.Char32 x  ->  pure $ Seq [ u :=: atom, v :=: atom ] where atom = VAtom $ AChar  x
     --          (UnifySyntax)  syntax(opv,u,v){s0=s1}  ---> syntax(opv1,u,v){s0}; syntax(opv2,u,v){s1}
-    e1 R.:=: e2 ->  (+>) <$> lds e1 u v <*> lds e2 u v
+    e1 R.:=: e2 ->  (+>) <$> lds u v e1 <*> lds u v e2
     --         (ChoiceSyntax)  syntax(opv,u,v){s0|s1}  ---> scope c {syntax(opv1,u,v){s0}} | scope d {syntax(opv2,u,v){s1}}
-    e1 R.:|: e2 ->  (:|:) <$> (newScope $ lds e1 u v) <*> (newScope $ lds e2 u v)
+    e1 R.:|: e2 ->  (:|:) <$> (newScope $ lds u v e1) <*> (newScope $ lds u v e2)
     --          (RangeSyntax)  syntax(opv,u,v){s0..s1} ---> exists i j x y; syntax(opv1,i,x){s0}; syntax(opv2,j,y){s1}; TODO
     -- XXX
     --       (SequenceSyntax)  syntax(opv,u,v){s_0; ... s_n} --->
@@ -142,8 +199,8 @@ ds e u v =
       let n = length es
       is <- newIdents (n-1) "i"
       xs <- newIdents (n-1) "x"
-      ss <- sequence $ zipWith3 lds es (map VIdent is) (map VIdent xs)
-      s  <- lds (last es) u v
+      ss <- sequence $ zipWith3 lds (map VIdent is) (map VIdent xs) es
+      s  <- lds u v (last es)
       pure $ eseq $ [Exists is, Exists xs] ++ ss ++ [s]
     --          (TupleSyntax)  syntax(opv,u,v){s_0,...,s_n-1} ---> syntax(opv1,u,v){array{s_0,...,s_n-1}}
     -- No special tuple construct
@@ -162,7 +219,7 @@ ds e u v =
           uEq    = u :=: iTuple
           xTuple = VTuple n x
           vEq    = v :=: xTuple
-          f k s = lds s (VCall iTuple vk) (VCall xTuple vk) where vk = VAtom (AInt k)
+          f k s = lds (VCall iTuple vk) (VCall xTuple vk) s where vk = VAtom (AInt k)
       ss <- zipWithM f [0..] es
       pure $ eseq $ [uEq, vEq] ++ ss
 
@@ -171,10 +228,10 @@ ds e u v =
     --                             u=z; v=z;
     --                             syntax(opv1,h,f){s0};
     --                             z=f(x)
-    R.BracketInvoke q s0 | isName "postfix'?'" q -> do
+    R.BracketInvoke q s0 | isName "postfix'?'" (unL q) -> do
       f <- newIdent "f"; h <- newIdent "h"; x <- newIdent "x"; z <- newIdent "z"
       let vf = VIdent f; vh = VIdent h; vx = VIdent x; vz = VIdent z
-      e0 <- lds s0 vf vh
+      e0 <- lds vf vh s0
       pure $ eseq $ [Exists [f,h,x,z], u :=: vz, v :=: vz, e0, vz :=: VCall vf vx]
 
     --     (CallClosedSyntax)  syntax(opv,u,v){s0[s1]} --->
@@ -186,8 +243,8 @@ ds e u v =
     R.BracketInvoke s0 s1 -> do
       f <- newIdent "f"; h <- newIdent "h"; i <- newIdent "i"; x <- newIdent "x"; z <- newIdent "z"
       let vf = VIdent f; vh = VIdent h; vx = VIdent x; vz = VIdent z
-      e0 <- lds s0 vf vh
-      e1 <- lds s1 (VIdent i) vx
+      e0 <- lds vf vh s0
+      e1 <- lds (VIdent i) vx s1
       pure $ eseq $ [Exists [f,h,i,x,z], u :=: vz, v :=: vz, e0, e1, vz :=: VCall vf vx]
       
     --       (CallOpenSyntax)  syntax(opv,u,v){s0(s1)} --->
@@ -203,27 +260,38 @@ ds e u v =
     R.ParenInvoke s0 s1 -> do
       f <- newIdent "f"; h <- newIdent "h"; i <- newIdent "i"; x <- newIdent "x"; z <- newIdent "z"
       let vf = VIdent f; vh = VIdent h; vx = VIdent x; vz = VIdent z
-      e0 <- lds s0 vf vh
-      e1 <- lds s1 (VIdent i) vx
+      e0 <- lds vf vh s0
+      e1 <- lds (VIdent i) vx s1
       c <- newIdent "c"
-      pure $ eseq $ [Exists [f,h,i,x,z], u :=: vz, v :=: vz, e0, e1, Verify "succeeds+imperatives" c (vz :=: VCall vf vx)]
+      pure $ eseq $ [Exists [f,h,i,x,z], u :=: vz, v :=: vz, e0, e1, Verify "succeeds+imperatives" (Scope c (vz :=: VCall vf vx))]
       
-    R.Name n -> pure $ eseq [ u :=: i, v :=: i ] where i = VIdent (show n) -- XXX hack
-    _           ->  error $ "ds: " ++ show e
+    --     (UnderscoreSyntax)  syntax(opv,u,v){_} ---> syntax(opv1,u,v){:any}
+    R.Name n | isUnderscore n ->
+      ds u v (R.PrefixColon (noL $ R.Name (Name (Text.pack "any"))))
+
+    --     (UnderscoreDefine)  syntax(opv,u,v){_:=s} ---> syntax(opv1,u,v){s}
+    R.InfixColonEqual Internal R.Val ident s2 | isUnderscore (unL ident) -> lds u v s2
+    --          (IdentDefine)  syntax(opv,u,v){Ident:=s2} ---> define Ident {v}; syntax(opv1,u,v){s2}
+                                              | otherwise -> do
+      e2 <- lds u v s2
+      pure $ eseq [Define (unName $ unL ident) v, e2]
+
+    -- Hack to get rid of IfArchetypeName
+    R.IfArchetypeName _ e1 e2 | e1 == e2 -> lds u v e1
+
+    --                         G |- ProgramScope[sc,ProgramSpan[resolved(opv){u=definable; v=definable}]]
+    --          (IdentSyntax)  --------------------------------------------------------------------------
+    --                         G |- ProgramScope[sc,ProgramSpan[syntax(opv,u,v){Ident}                 ]]
+    --                           &  ProgramScope[sc,ScopeSpan[define Ident {definable}                 ]]
+    -- XXX This is implemented in the next pass.
+    R.Name n -> pure $ eseq [ u :=: i, v :=: i ] where i = VUnresolved (unName n)
+
+
+
+
+    _           ->  error $ "ds: " ++ show (pretty e) ++ "\n" ++ show e
+
 {-
-
-
-
-     (UnderscoreSyntax)  syntax(opv,u,v){_} ---> syntax(opv1,u,v){:any}
-
-                         G |- ProgramScope[sc,ProgramSpan[resolved(opv){u=definable; v=definable}]]
-          (IdentSyntax)  --------------------------------------------------------------------------
-                         G |- ProgramScope[sc,ProgramSpan[syntax(opv,u,v){Ident}                 ]]
-                           &  ProgramScope[sc,ScopeSpan[define Ident {definable}                 ]]
-
-                         This rule resolves a reference to an identifier Ident anywhere underneath
-                         a scope sc that is defined within the scope sc's ScopeSpan.
-                         TODO: Explain deterministic mechanism for detecting and producing ambiguous identifier errors.
 
        (DotIdentSyntax)  syntax(opv,u,v){s0.Ident} --->
                              exists f h z;
@@ -234,10 +302,6 @@ ds e u v =
                                      z=f(Path);
                                  }
                              }
-          (IdentDefine)  syntax(opv,u,v){Ident:=s2} ---> define Ident {v}; syntax(opv1,u,v){s2}
-
-     (UnderscoreDefine)  syntax(opv,u,v){_:=s} ---> syntax(opv1,u,v){s}
-
       (IdentSpecDefine)  syntax(opv,u,v){Ident<s1>:=s2} --->
                              verify(succeeds,U00) c {
                                  exists i x;
