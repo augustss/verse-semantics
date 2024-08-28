@@ -197,8 +197,9 @@ rewriteExp e = for e $ \ case
 
   Parse.Inst e1 e2 | isPredefined "array" e1 ->
     case e2 of
-      L _ (Parse.List es) -> Array <$> traverse rewriteExp es
-      _                   -> Array . (:[]) <$> rewriteExp e2
+      L _ (Parse.List es)  -> Array <$> traverse rewriteExp es
+      L _ (Parse.Tuple es) -> Array <$> traverse rewriteExp es
+      _                    -> Array . (:[]) <$> rewriteExp e2
 
   Parse.Inst e1 e2 | isPredefined "one" e1 ->
     One <$> rewriteExp e2

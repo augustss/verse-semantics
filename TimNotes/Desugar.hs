@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall #-}
 module Desugar where
 import Prelude hiding ((<>))
 import Control.Monad
@@ -5,6 +6,7 @@ import Control.Monad.State
 import Control.Monad.Supply
 import Control.Monad.Wrong
 import Data.ByteString qualified as ByteString
+import qualified Data.Text as Text
 import Language.Verse.Error
 import Language.Verse.Ident
 import Language.Verse.Label
@@ -39,11 +41,23 @@ runM (M a) = snd (a 0)
 
 ---------------------------------------------
 
+isName :: String -> L (R.Exp L Ident) -> Bool
+isName s (L _ (R.Name (Name t))) = s == Text.unpack t
+isName _ _ = False
+
+---------------------------------------------
+
 data Atom = AInt Integer | AFloat Double | AChar Char
   deriving (Eq, Ord, Show)
 data Vertex = VIdent Id | VAtom Atom | VTuple Int Id | VCall Vertex Vertex
   deriving (Eq, Ord, Show)
-data TimCore = Seq [TimCore] | Vertex :=: Vertex | Scope Id TimCore | TimCore :|: TimCore | Exists [Id]
+data TimCore
+  = Seq [TimCore]
+  | Vertex :=: Vertex
+  | Scope ScopeId TimCore
+  | TimCore :|: TimCore
+  | Exists [Id]
+  | Verify String ScopeId TimCore
   deriving (Eq, Ord, Show)
 
 instance Pretty Atom where
@@ -51,18 +65,23 @@ instance Pretty Atom where
   pPrintPrec l p (AFloat i) = pPrintPrec l p i
   pPrintPrec l p (AChar  i) = pPrintPrec l p i
 instance Pretty Vertex where
-  pPrintPrec _ _ (VIdent i) = text i
+  pPrintPrec l _ (VIdent i) = ppId l i
   pPrintPrec l p (VAtom a)  = pPrintPrec l p a
-  pPrintPrec l p (VTuple n i) = maybeParens (p>0) $ text "tuple" <> parens (pPrintPrec l 0 n) <+> text i
-  pPrintPrec l p (VCall v1 v2) = pPrintPrec l 1 v1 <> parens (pPrintPrec l 0 v2)
+  pPrintPrec l p (VTuple n i) = maybeParens (p>0) $ text "tuple" <> parens (pPrintPrec l 0 n) <+> ppId l i
+  pPrintPrec l _ (VCall v1 v2) = pPrintPrec l 1 v1 <> parens (pPrintPrec l 0 v2)
 instance Pretty TimCore where
   pPrintPrec l p (Seq xs) = maybeParens (p > 0) $ sep $ punctuate (text ";") $ map (pPrintPrec l 0) xs
   pPrintPrec l _ (v1 :=: v2) = pPrintPrec l 1 v1 <+> text "=" <+> pPrintPrec l 1 v2
   pPrintPrec l _ (e1 :|: e2) = pPrintPrec l 1 e1 <+> text "|" <+> pPrintPrec l 1 e2
-  pPrintPrec l _ (Scope c e) = text "scope" <> parens (text c) <> braces (pPrintPrec l 0 e)
-  pPrintPrec l _ (Exists is) = text "exists" <+> (hcat $ punctuate (text ",") $ map text is)
+  pPrintPrec l _ (Scope c e) = text "scope" <> parens (ppId l c) <> braces (pPrintPrec l 0 e)
+  pPrintPrec l _ (Exists is) = text "exists" <+> (hcat $ punctuate (text ",") $ map (ppId l) is)
+  pPrintPrec l _ (Verify fx c e) = text "verify" <> parens (text fx <> text "," <+> ppId l c) <> braces (pPrintPrec l 0 e)
+
+ppId :: PrettyLevel -> String -> Doc
+ppId _ s = text s
 
 type Id = String
+type ScopeId = Id
 type DS a = State Int a
 
 newIdents :: Int -> String -> DS [Id]
@@ -147,6 +166,17 @@ ds e u v =
       ss <- zipWithM f [0..] es
       pure $ eseq $ [uEq, vEq] ++ ss
 
+    --       (DeoptionSyntax)  syntax(opv,u,v){s0?} --->
+    --                             exists f h x;
+    --                             u=z; v=z;
+    --                             syntax(opv1,h,f){s0};
+    --                             z=f(x)
+    R.BracketInvoke q s0 | isName "postfix'?'" q -> do
+      f <- newIdent "f"; h <- newIdent "h"; x <- newIdent "x"; z <- newIdent "z"
+      let vf = VIdent f; vh = VIdent h; vx = VIdent x; vz = VIdent z
+      e0 <- lds s0 vf vh
+      pure $ eseq $ [Exists [f,h,x,z], u :=: vz, v :=: vz, e0, vz :=: VCall vf vx]
+
     --     (CallClosedSyntax)  syntax(opv,u,v){s0[s1]} --->
     --                             exists f h i x z;
     --                             u=z; v=z;
@@ -155,31 +185,35 @@ ds e u v =
     --                             z=f(x)
     R.BracketInvoke s0 s1 -> do
       f <- newIdent "f"; h <- newIdent "h"; i <- newIdent "i"; x <- newIdent "x"; z <- newIdent "z"
-      let vf = VIdent f; vx = VIdent x; vz = VIdent z
-      e0 <- lds s0 vf (VIdent h)
+      let vf = VIdent f; vh = VIdent h; vx = VIdent x; vz = VIdent z
+      e0 <- lds s0 vf vh
       e1 <- lds s1 (VIdent i) vx
       pure $ eseq $ [Exists [f,h,i,x,z], u :=: vz, v :=: vz, e0, e1, vz :=: VCall vf vx]
       
+    --       (CallOpenSyntax)  syntax(opv,u,v){s0(s1)} --->
+    --                             exists f h i x;
+    --                             u=z; v=z;
+    --                             syntax(opv1,h,f){s0};
+    --                             syntax(opv2,i,x){s1};
+    --                             verify(succeeds+imperatives,P00) c {
+    --                                 exists f1 x1 z;
+    --                                 f1=f; x1=x; z=f1(x1)
+    --                             }
+    -- XXX does not follow the above exactly
+    R.ParenInvoke s0 s1 -> do
+      f <- newIdent "f"; h <- newIdent "h"; i <- newIdent "i"; x <- newIdent "x"; z <- newIdent "z"
+      let vf = VIdent f; vh = VIdent h; vx = VIdent x; vz = VIdent z
+      e0 <- lds s0 vf vh
+      e1 <- lds s1 (VIdent i) vx
+      c <- newIdent "c"
+      pure $ eseq $ [Exists [f,h,i,x,z], u :=: vz, v :=: vz, e0, e1, Verify "succeeds+imperatives" c (vz :=: VCall vf vx)]
+      
+    R.Name n -> pure $ eseq [ u :=: i, v :=: i ] where i = VIdent (show n) -- XXX hack
     _           ->  error $ "ds: " ++ show e
 {-
 
 
 
-       (CallOpenSyntax)  syntax(opv,u,v){s0(s1)} --->
-                             exists f h i x;
-                             u=z; v=z;
-                             syntax(opv1,h,f){s0};
-                             syntax(opv2,i,x){s1};
-                             verify(succeeds+imperatives,P00) c {
-                                 exists f1 x1 z;
-                                 f1=f; x1=x; z=f1(x1)
-                             }
-
-       (DeoptionSyntax)  syntax(opv,u,v){s0?} --->
-                             exists f h x;
-                             u=z; v=z;
-                             syntax(opv1,h,f){s0};
-                             z=f(x)
      (UnderscoreSyntax)  syntax(opv,u,v){_} ---> syntax(opv1,u,v){:any}
 
                          G |- ProgramScope[sc,ProgramSpan[resolved(opv){u=definable; v=definable}]]
