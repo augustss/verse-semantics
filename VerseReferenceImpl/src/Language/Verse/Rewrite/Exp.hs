@@ -59,6 +59,7 @@ data Exp f a
   | Block (f (Exp f a))
   | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
+  | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
   | Forall (f a)
   | Alloc2 !Access (f a) (f (Exp f a))
@@ -113,6 +114,7 @@ instance ( Pretty (f (Exp f a))
     Module e -> "module" <> braces (pretty e)
     Struct e -> "struct" <> braces (pretty e)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
+    ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
     Exists x -> "exists" <+> pretty x
     Forall x -> "forall" <+> pretty x
     Alloc2 access x e ->
@@ -121,6 +123,7 @@ instance ( Pretty (f (Exp f a))
       "alloc" <> parens (pretty x <> prettySpec access) <+> pretty e1 <> parens (pretty e2)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
+    Array es -> "array" <> encloseSep lbrace rbrace semi (pretty <$> es)
     Int x -> pretty x
     Float x -> pretty x
     Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape

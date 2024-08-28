@@ -7,6 +7,7 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 module Language.Verse.Rewrite
   ( rewrite
+  , parenInvokeM
   ) where
 
 import Control.Applicative
@@ -195,8 +196,12 @@ rewriteExp e = for e $ \ case
   Parse.Do (extract -> Parse.Inst e1 e2) e3 | isPredefined "for" e1 ->
     ForDo <$> rewriteExp e2 <*> rewriteExp e3
 
-  -- Parse.Inst e1 e2 | isPredefined "array" e1 ->  -- Map array to tuple
-  --   Tuple <$> rewriteExp e2
+  Parse.Inst e1 e2 | isPredefined "array" e1 ->
+    case e2 of
+      L _ (Parse.List es)  -> Array <$> traverse rewriteExp es  -- array{1;2;3}
+      L _ (Parse.Tuple es) -> Array <$> traverse rewriteExp es  -- array{1,2,3}
+      _                    -> Array . (:[]) <$> rewriteExp e2
+
   Parse.Inst e1 e2 | isPredefined "one" e1 ->
     One <$> rewriteExp e2
   Parse.Inst e1 e2 | isPredefined "all" e1 ->
@@ -241,10 +246,8 @@ rewriteExp e = for e $ \ case
     ForDo <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Block e ->
     Block <$> rewriteExp e
-  Parse.ParenInvoke e1 e2 -> do
-    e1 <- rewriteExp e1
-    e2 <- rewriteExp e2
-    parenInvokeM e1 e2
+  Parse.ParenInvoke e1 e2 ->
+    ParenInvoke <$> rewriteExp e1 <*> rewriteExp e2
   Parse.BracketInvoke e1 e2 ->
     BracketInvoke <$> rewriteExp e1 <*> rewriteExp e2
   Parse.Exists x ->
