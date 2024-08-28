@@ -29,7 +29,7 @@ import Prettyprinter
 
 import Text.Show
 
-data Loc = Loc !Pos !Pos deriving Show
+data Loc = Loc !Pos !Pos deriving (Eq, Show)
 
 instance Semigroup Loc where
   Loc x y <> Loc x' y' = Loc (min x x') (max y y')
@@ -42,7 +42,7 @@ instance Pretty Loc where
 minBound :: Loc
 minBound = Loc Pos.minBound Pos.minBound
 
-data L a = L !Loc a deriving (Show, Functor, Foldable, Traversable)
+data L a = L !Loc a deriving (Eq, Show, Functor, Foldable, Traversable)
 
 instance Apply L where
   L x f <.> L y a = L (x <> y) (f a)

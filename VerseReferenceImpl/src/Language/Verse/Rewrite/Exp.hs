@@ -81,6 +81,12 @@ data Exp f a
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
   | Domain (f (Exp f a))
 
+deriving instance ( Eq (f (Exp f a))
+                  , Eq (f Text)
+                  , Eq (f a)
+                  , Eq a
+                  ) => Eq (Exp f a)
+
 deriving instance ( Show (f (Exp f a))
                   , Show (f Text)
                   , Show (f a)
@@ -156,9 +162,9 @@ instance ( Pretty (f (Exp f a))
         flatAlt (hardline <> rbrace) " }"
       prettySpec access = "<" <> pretty access <> ">"
 
-data Quantifier = Val | Fun | Var deriving Show
+data Quantifier = Val | Fun | Var deriving (Eq, Show)
 
-data OC = O | C deriving Show
+data OC = O | C deriving (Eq, Show)
 
 instance Pretty OC where
   pretty = \ case
