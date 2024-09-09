@@ -28,6 +28,7 @@ module FrontEnd.Expr(
 
     , getFree, getAllIdents, getVisibleBinders, getAllBinders, getVar
     , substMany
+    , prettyTim              -- pretty print in a Tim compatible way
   ) where
 
 import Prelude hiding ((<>))  -- Epic.Print exports (<>)
@@ -48,6 +49,8 @@ import GHC.Stack( HasCallStack )
 
 import Text.Megaparsec (SourcePos(..), mkPos, initialPos, sourcePosPretty)
 
+prettyTim :: PrettyLevel
+prettyTim = PrettyLevel 10
 
 {- Note [The SrcExpr lifecycle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -418,9 +421,9 @@ data Store = Store { refMap :: IM.IntMap SrcValue
 --------------------------------------------------------
 
 instance Pretty SrcExpr where
-  pPrintPrec l p
-    | l > prettyNormal = ppNormal
-    | otherwise        = ppNice
+  pPrintPrec lvl p
+    | lvl > prettyNormal = ppNormal
+    | otherwise          = ppNice
     where
       -- Pretty-print the argument of a call f[a] or f(a)
       --   A user call f[]    <-->  ApplyD f (Array [])
@@ -430,13 +433,13 @@ instance Pretty SrcExpr where
       ppArg (Array es) | length es /= 1 = ppEs es
       ppArg e                           = ppr 0 e
 
-      ppB (Blk es) = braces $ ppSeq l es
+      ppB (Blk es) = braces $ ppSeq lvl es
       ppB e        = braces $ ppr 0 e
 
-      ppEs = fsep . punctuate comma . map (pPrintPrec l 1)
+      ppEs = fsep . punctuate comma . map (pPrintPrec lvl 1)
 
       ppr :: (Pretty a) => Rational -> a -> Doc
-      ppr = pPrintPrec l
+      ppr = pPrintPrec lvl
 
       ppOp = ppr 0
 
@@ -456,10 +459,10 @@ instance Pretty SrcExpr where
           Variable v -> ppIdent v
           EPrim s    -> pPrint s
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
-          Array es   -> text "array" <> braces (ppSeq l es)
+          Array es   -> text "array" <> braces (ppSeq lvl es)
           Splice e   -> text "splice" <> braces (ppr 0 e)
           Tuple es   -> parens (ppEs es)
-          Seq es     -> maybeParens (p > 0) $ ppSeq l es
+          Seq es     -> maybeParens (p > 0) $ ppSeq lvl es
 
           ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppArg a)
             where (q, ql, _) = fixity "()"
@@ -503,12 +506,13 @@ instance Pretty SrcExpr where
             maybeParens (p > 0) $ sep [ text "case" <+> parens (ppArg e) <+> text "of",
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $
-                            cat [ text "fun" <> hcat (map ppArs ars)
+                            cat [ text fun <> hcat (map ppArs ars)
                                 , indent (ppB b) ]
                 where
                   ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
+                  fun = if lvl == prettyTim then "function" else "fun"
 
-          Blk es       -> braces $ ppSeq l es
+          Blk es       -> braces $ ppSeq lvl es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e     -> parens (ppr 0 e)
           Set e1 op e2 -> text "set" <+> ppr 0 (InfixOp e1 op e2)
@@ -516,6 +520,8 @@ instance Pretty SrcExpr where
           MRef i t e   -> ppVRA "ref" i t e
           MAlias i t e -> ppVRA "alias" i t e
 
+          Macro1 (Ident _ "one") _ e  -> ppNormal (One e)
+          Macro1 (Ident _ "all") _ e  -> ppNormal (All e)
           Macro1 (Ident _ m) rs e  -> cat [ text m <> ppEffs rs
                                           , indent (ppB e) ]
           Macro2 (Ident _ m) e1 e2 -> cat [text m <> parens (ppr 0 e1), indent (ppB e2)]
@@ -524,10 +530,10 @@ instance Pretty SrcExpr where
 
           ----
           DefineV i      -> text "exists" <+> pPrint i
-          DefineE i e    -> pPrintPrec l p (InfixOp (Variable i) (Ident noLoc ":=") e)
-          DefineIE i x e -> pPrintPrec l p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
-          Choice e1 e2   -> pPrintPrec l p (InfixOp e1 (Op "|") e2)
-          Unify e1 e2    -> pPrintPrec l p (InfixOp e1 (Op "=") e2)
+          DefineE i e    -> pPrintPrec lvl p (InfixOp (Variable i) (Ident noLoc ":=") e)
+          DefineIE i x e -> pPrintPrec lvl p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
+          Choice e1 e2   -> pPrintPrec lvl p (InfixOp e1 (Op "|") e2)
+          Unify e1 e2    -> pPrintPrec lvl p (InfixOp e1 (Op "=") e2)
           Fail           -> text "fail"
           Wrong s        -> text $ "WRONG'" ++ s ++ "'"
 
@@ -544,17 +550,23 @@ instance Pretty SrcExpr where
 
           Where e1 e2 -> maybeParens (p>0) $ sep [ ppr 0 e1, text "where" <+> ppr 0 e2 ]
           Some e      -> text "some" <> parens (ppr 0 e)
-          One e       -> text "one" <> parens (ppr 0 e)
-          All e       -> text "all" <> parens (ppr 0 e)
+          One e | lvl == prettyTim
+                      -> text "first" <> ppr 0 e
+                | otherwise
+                      -> text "one" <> parens (ppr 0 e)
+          All e | lvl == prettyTim
+                       -> text "for" <> ppr 0 e
+                | otherwise
+                       -> text "all" <> parens (ppr 0 e)
           Check fx e  -> text "check" <> ppEffs fx <> braces (ppr 0 e)
           Guard e1 e2 -> maybeParens (p>0) $ sep [ ppr 1 e1, text ";;" <+> ppr 1 e2 ]
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
-          Map es -> text "map" <> braces (ppSeq l es)
+          Map es -> text "map" <> braces (ppSeq lvl es)
           Truth e -> text "truth" <> braces (ppr 0 e)
           Iter e1 e2 e3 e4 -> text "iter" <> parens (ppr 0 e1) <> braces (sep (punctuate semi [ppr 0 e2, ppr 0 e3, ppr 0 e4]))
           EStore s e ->
-            maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec l p s <+> text "in", indent $ braces (pPrintPrec l 0 e)]
+            maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec lvl p s <+> text "in", indent $ braces (pPrintPrec lvl 0 e)]
 
       ppVRA _ _ Nothing  Nothing  = undefined
       ppVRA s i (Just t) Nothing  = text s <+> ppr 0 (InfixOp (Variable i) (Ident noLoc ":") t)

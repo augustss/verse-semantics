@@ -904,4 +904,4 @@ displayTest test = do
              "}"
 
 timShow :: SrcExpr -> String
-timShow = prettyShow
+timShow = render . pPrintL prettyTim
