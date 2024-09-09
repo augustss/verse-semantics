@@ -60,12 +60,19 @@ runTests test_flags
   , let fn = "<command-line>"
   = runTestFile test_flags (fn, parseDie pTestFile fn expr_string)
 
+  | timOutput test_flags
+  = mapM_ read_and_display (fileNames test_flags)
+
   | otherwise
   = mapM_ read_and_run (fileNames test_flags)
   where
     read_and_run :: FilePath -> IO ()
     read_and_run fn = do { tests <- readTests fn
                          ; runTestFile test_flags (fn, tests) }
+
+    read_and_display :: FilePath -> IO ()
+    read_and_display fn = do { tests <- readTests fn
+                             ; displayTestFile test_flags (fn, tests) }
 
 -----------------------------------------------
 --
@@ -603,6 +610,7 @@ data TestFlags = TestFlags
   , assumeVerified :: !Bool                -- turn succeeds into a no-op
   , timRun         :: !Bool                -- run Tim's verifier tests
   , timVerify      :: !Bool                -- verify Tim's verifier tests
+  , timOutput      :: !Bool                -- just display the test in Tim's syntax
   , showDesugared  :: !Bool                -- show desugared version just before evaluation
   , preludeEval    :: !String              -- use this prelude in TestEval
   , preludeVerify  :: !String              -- use this prelude in TestVerify
@@ -712,6 +720,9 @@ testFlags = TestFlags
   <*> OA.switch
          ( OA.long "tim-verify"
         <> OA.help "verify Tim test" )
+  <*> OA.switch
+         ( OA.long "tim-output"
+        <> OA.help "display as a Tim test" )
   <*> OA.switch
          ( OA.long "show-desugared"
         <> OA.help "show desugared version" )
@@ -868,3 +879,29 @@ grabLines from to = unlines . take (to - from). drop (from - 1). lines
 
 -- >>> grabLines 4 8 (unlines ["1", "2","3","4","5","6","7","8","9","10"])
 -- "4\n5\n6\n7\n"
+
+-----------------------------------------------
+--
+--     Display tests in Tim's format
+--     displayTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
+--
+-----------------------------------------------
+
+displayTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
+displayTestFile _tflg (_fn, ts) = mapM_ displayTest ts
+
+displayTest :: Test -> IO ()
+displayTest test = do
+  let retCode :: TestType -> String
+      retCode TFail = "F00"
+      retCode TPass = "S00"
+      retCode TLoop = "S00"  -- What should this be?
+  putStrLn $ "test(" ++ retCode (testType (testInfo test)) ++ "){(" ++
+             timShow (testSrc test) ++ ")" ++
+             (case test of
+                TestEvalEq _ _ e2 -> " = (" ++ timShow e2 ++ ")"
+                _ -> "") ++
+             "}"
+
+timShow :: SrcExpr -> String
+timShow = prettyShow
