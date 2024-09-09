@@ -638,7 +638,7 @@ choiceFree = choiceFree' []
 
 -- The first argument to choiceFree' are functions known to be choice free.
 -- This is used for the iter construct.  In the case where iter(e){u;f;g}
--- calls f, the continuation argument will have the same effects as f&g
+-- calls f, the continuation argument will have the same effects as e&f&g
 -- could have.  We can safely assume that the continuation is choice free,
 -- because if it's not this will already show up in the bodies of f and/or g.
 choiceFree' :: [Ident] -> Expr_or_Context -> Bool
