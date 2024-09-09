@@ -9,7 +9,7 @@ import Prettyprinter
 
 data Path = Path
   {-# UNPACK #-} !SimpleName
-  [(Maybe Path, SimpleName)] deriving Show
+  [(Maybe Path, SimpleName)] deriving (Eq, Show)
 
 instance Pretty Path where
   pretty (Path label pathIdents) =

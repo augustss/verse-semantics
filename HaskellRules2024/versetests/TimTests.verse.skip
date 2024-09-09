@@ -46,7 +46,6 @@ broken("bug: eq-comparable:D00"){a&b&c&d:int => f(:int,:int)<computes>:any => {f
 broken("bug: top-level choice:X00"){function(1){2|3}}
 
 broken("bug: missing SPJ desugaring fix?: D00"){a:int => f(:int):=nat[a] => f[a]}
-
 broken("bug: hiding 'D00'"){x:int=3,x=3}
 broken("bug: hiding 'D00'"){x:int=3,nat[x]}
 broken("bug: hiding 'D00'"){x:int=3; nat[x]}
@@ -125,6 +124,8 @@ skip("assume-false, paraconsistency 'R20'"){assume{x=(_,_,_)},x:=(_,_)}
 
 
 broken("void-v-false 'QS00'"){:void=false}
+
+## maybe the block below is actually due to paraconsistency; TRS trivially accepts as "domain" is false.
 broken("false-desugaring 'U00'"){f(x:false,y:any):=y=1}
 broken("false-desugaring 'U00'"){f(x:false,y:any):=y=2}
 broken("false-desugaring 'F00'"){f(x:false,y:any):=y=1=2}

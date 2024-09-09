@@ -6,7 +6,7 @@ module Language.Verse.Effect.Split
 
 import Prettyprinter
 
-data Effect = Fails | Succeeds | Decides deriving Show
+data Effect = Fails | Succeeds | Decides deriving (Eq, Show)
 
 instance Pretty Effect where
   pretty = \ case

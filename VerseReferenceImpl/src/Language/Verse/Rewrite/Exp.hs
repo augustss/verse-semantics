@@ -57,6 +57,7 @@ data Exp f a
   | IfThenElse (f (Exp f a)) (f (Exp f a)) (f (Exp f a))
   | ForDo (f (Exp f a)) (f (Exp f a))
   | Block (f (Exp f a))
+  | ParenInvoke (f (Exp f a)) (f (Exp f a))
   | BracketInvoke (f (Exp f a)) (f (Exp f a))
   | Exists (f a)
   | Forall (f a)
@@ -64,6 +65,7 @@ data Exp f a
   | Alloc3 !Access (f a) (f (Exp f a)) (f (Exp f a))
   | Set (f a) (f (Exp f a))
   | Tuple [f (Exp f a)]
+  | Array [f (Exp f a)]
   | Truth (f (Exp f a))
   | Int !Integer
   | Float {-# UNPACK #-} !Double
@@ -78,6 +80,12 @@ data Exp f a
   | Path !Path
   | IfArchetypeName (f a) (f (Exp f a)) (f (Exp f a))
   | Domain (f (Exp f a))
+
+deriving instance ( Eq (f (Exp f a))
+                  , Eq (f Text)
+                  , Eq (f a)
+                  , Eq a
+                  ) => Eq (Exp f a)
 
 deriving instance ( Show (f (Exp f a))
                   , Show (f Text)
@@ -111,6 +119,7 @@ instance ( Pretty (f (Exp f a))
     Module e -> "module" <> braces (pretty e)
     Struct e -> "struct" <> braces (pretty e)
     BracketInvoke e1 e2 -> pretty e1 <> brackets (pretty e2)
+    ParenInvoke e1 e2 -> pretty e1 <> parens (pretty e2)
     Exists x -> "exists" <+> pretty x
     Forall x -> "forall" <+> pretty x
     Alloc2 access x e ->
@@ -119,6 +128,7 @@ instance ( Pretty (f (Exp f a))
       "alloc" <> parens (pretty x <> prettySpec access) <+> pretty e1 <> parens (pretty e2)
     Set x e -> "set" <+> pretty x <+> equals <+> pretty e
     Tuple es -> tupled $ pretty <$> es
+    Array es -> "array" <> encloseSep lbrace rbrace semi (pretty <$> es)
     Int x -> pretty x
     Float x -> pretty x
     Char x -> "'" <> pretty (w2c x) <> "'"  -- FIXME add escape
@@ -152,9 +162,9 @@ instance ( Pretty (f (Exp f a))
         flatAlt (hardline <> rbrace) " }"
       prettySpec access = "<" <> pretty access <> ">"
 
-data Quantifier = Val | Fun | Var deriving Show
+data Quantifier = Val | Fun | Var deriving (Eq, Show)
 
-data OC = O | C deriving Show
+data OC = O | C deriving (Eq, Show)
 
 instance Pretty OC where
   pretty = \ case

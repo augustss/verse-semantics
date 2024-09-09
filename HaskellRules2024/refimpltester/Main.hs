@@ -241,6 +241,7 @@ expToSrcExpr _ (R.IfThenElse e1 e2 e3) = F.If3 (lexp e1) (lexp e2) (lexp e3)
 expToSrcExpr _ (R.ForDo e1 e2) = F.For2 (lexp e1) (lexp e2)
 expToSrcExpr _ (R.Block e) = F.Block (lexp e)
 expToSrcExpr _ (R.BracketInvoke f a) = F.ApplyD (lexp f) (lexp a)
+expToSrcExpr _ (R.ParenInvoke f a) = F.ApplyS (lexp f) (lexp a)
 expToSrcExpr _ (R.Exists (L l i)) = F.DefineV (ident l i)
 -- expToSrcExpr _ (Forall e) = XXX
 -- expToSrcExpr _ (Alloc2 ) = XXX
