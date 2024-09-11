@@ -456,7 +456,10 @@ instance Pretty SrcExpr where
       ppNormal expr =
         case expr of
           Lit lit    -> ppr p lit
-          Variable v -> ppIdent v
+          Variable v | lvl == prettyTim, Just s <- lookup v timRename
+                     -> text s
+                     | otherwise
+                     -> ppIdent v
           EPrim s    -> pPrint s
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           Array es   -> text "array" <> braces (ppSeq lvl es)
@@ -539,7 +542,11 @@ instance Pretty SrcExpr where
 
           Range fx e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
                         text "range" <> ppEffs fx <> braces (ppr 0 e)
-          Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <> text ".", ppr 0 e]
+          Exists is e | lvl == prettyTim
+                        -> let es = case e of Blk x -> x; _ -> [e]
+                           in  parens $ hsep $ punctuate (text ";") (map (\ i -> ppIdent i <+> text ": any") is ++ map (ppr 0) es)
+                      | otherwise
+                        -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <> text ".", ppr 0 e]
           Verify is e -> maybeParens (p > 0) $
                          cat [text "verify" <> parens (hsep (map (ppr 0) is))
                              , indent (braces (ppr 0 e)) ]
@@ -582,6 +589,11 @@ ppEffs rs = mconcat (map (\ r -> text "<" <> pPrint r <> text ">") rs)
 ppSeq :: PrettyLevel -> [SrcExpr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") $
              map (pPrintPrec l 0) es
+
+timRename :: [(Ident, String)]
+timRename = [ (Ident noLoc x, y) | (x, y) <-
+  [ ("intAdd$", "operator'+'")
+  ] ]
 
 --------------------------------------------------------
 --               Knowledge of fixity

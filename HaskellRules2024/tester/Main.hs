@@ -537,7 +537,7 @@ pTestVerify :: P Test
 pTestVerify =
   pKeyword "verify" *> do
     tId <- pParens pTestInfo
-    src <- pExprSeq <* optional (pOp ";")
+    src <- pBraces (pExprSeq <* optional (pOp ";"))
     locEnd <- getSourcePos
     pure $ TestVerify (tId { testLocEnd = locEnd }) src
 
@@ -894,14 +894,20 @@ displayTest :: Test -> IO ()
 displayTest test = do
   let retCode :: TestType -> String
       retCode TFail = "F00"
-      retCode TPass = "S00"
+      retCode TPass | ok = "S00"
+                    | otherwise = "F00"
       retCode TLoop = "S00"  -- What should this be?
+      ok = case test of
+             TestEvalEq _ _ (Wrong _) -> False
+             _ -> True
   putStrLn $ "test(" ++ retCode (testType (testInfo test)) ++ "){(" ++
              timShow (testSrc test) ++ ")" ++
              (case test of
-                TestEvalEq _ _ e2 -> " = (" ++ timShow e2 ++ ")"
+                TestEvalEq _ _ e2 | ok -> " = (" ++ timShow e2 ++ ")"
                 _ -> "") ++
              "}"
 
 timShow :: SrcExpr -> String
-timShow = render . pPrintL prettyTim
+timShow = renderStyle s . pPrintL prettyTim
+  where
+    s = style{ lineLength = 1000000, ribbonsPerLine = 1.2 }
