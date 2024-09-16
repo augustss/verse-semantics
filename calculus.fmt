@@ -154,6 +154,7 @@
 
 %% Function application with 1 argument, without parenthesis
 %format apply1N a b = a^ "[\!" b "]"
+%format apply1Np (a) b = a^ "[\!" b "]"
 
 %% Function application with many arguments
 %format applyN a (b) = a "\langle" b "\rangle"
@@ -290,6 +291,8 @@
 %format oneKW = "\textbf{one}"
 %format one (x) = "\textbf{one}\{" x "\}"
 %format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
+%format iterKW = "\textbf{iter}"
+%format iter (e) (a) (f) (g) = "\textbf{iter}(" e ")\{" a ";" f ";" g "\}"
 
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
@@ -522,6 +525,8 @@
 %format e_i
 %format e_f
 %format v_f
+%format e_g
+%format e_a
 
 %format eu = "eu"
 %format eu_1 = "eu_1"

@@ -40,8 +40,9 @@
           & |X| & ::= & |{x_1, xdots, x_n}|  \hspace{1cm} (n \geq 0)\\
       \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
           & |rs| & ::= & |{r_1, xdots, r_n}|  \hspace{1cm} (n \geq 0)\\
-      \text{Programs} & p  & ::=  & |one e| \quad \text{where} \; \freevars{e} = \{ \} \\
-      \text{Expressions} & |e| & ::= & |v| \vb |lv == e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail| \vb |def x e| \vb |apply1N v_1 v_2| \vb |one e| \vb |all e| \\
+      \text{Programs} & p  & ::=  & |check succeeds e| \quad \text{where} \; \freevars{e} = \{ \} \\
+      \text{Expressions} & |e| & ::= & |v| \vb |lv == e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail|
+                                     \vb |def x e| \vb |apply1N v_1 v_2| \vb |iter e_1 e_2 e_3 e_4| \\
       && \vb & |some v| \vb |v guard e| \vb |check fx e|
       \vb |verify2 rs as e| \\
       \text{Lvalues} & |lv| & ::= & |_| \vb |v| \\
@@ -72,6 +73,10 @@
   |subst e x v| & \text{Substitute |v| for |x| everywhere in |e|} \\
 \end{array}
 \\ \\
+\mbox{\em Note}\\
+\hspace{1em} \text{In |iter e_1 e_2 e_3 e_4| the |e_3| and |e_4| are always explicit lambdas.}\\
+\hspace{1em} \text{The |e_3| has three arguments, and the |e_4| has one.}
+\\ \\
 \mbox{\em Free variables and bound variables (give definitions)} \\
 %  \begin{array}{rcl}
 %       |fvs(hole)| & = & \{ \} \\
@@ -98,8 +103,7 @@ $\begin{array}{@@{}l}
   |blockedc X (l==P; e)| & = & |blockedc X P| \\
   |blockedc X (l==e; P)| & = & |blockede X e `and` blockedc X P| \\
   |blockedc X (check fx P)| & = & |blockedc X P| \\
-  |blockedc X (one (FC^[P]))| & = & |blockedc X P| \\
-  |blockedc X (all (VC^[P]))| & = & |blockedc X P| \\
+  |blockedc X (iter (FC^[P]) e_2 e_3 e_4 )| & = & |blockedc X P| \\
 \end{array}
 \\ \\[-1mm] 
 \begin{array}{rcl}
@@ -107,8 +111,7 @@ $\begin{array}{@@{}l}
   |blockede X (l==e_1; e_2)| & = & |blockede X e_1 `and` blockede X e_2|\\
   |blockede X (e_1 choice e_2)| & = & |blockede X e_1 `and` blockede X e_2|\\
   |blockede X fail| & = & |false| \\
-  |blockede X (one e)| & = & |blockede X e| \\
-  |blockede X (all e)| & = & |blockede X e| \\
+  |blockede X (iter e_1 e_2 e_3 e_4)| & = & |blockede X e_1| \\
   |blockede X (def x e)| & = & |blockede (X,x) e| \\
   |blockede X (apply1N v_1 v_2)| & = & (|v_1| = |x| \in |X|) \\
    & & |`or`| (|v_1| = |op| |`and`| |v_2 = V^[x]|) \hspace{2mm} \text{for some $|x| \in |X|$ and context |V|} \\
@@ -125,12 +128,11 @@ $\begin{array}{@@{}l}
   \\[2mm]
   |choicefreee (e_1 choice e_2)| & = & |false|\\
   |choicefreee fail| & = & |true|\\
-  |choicefreee (one e)| & = & |true|\\
-  |choicefreee (all e)| & = & |true|\\
+  |choicefreee (iter e_1 e_2 (lam (_ _ _) e_3) (lam _ e_4))| & = & |choicefreee e_3 `and` choicefreee e_4| \\
   |choicefreee (l==e_1; e_2)| & = & |choicefreee e_1 `and` choicefreee e_2|\\
   |choicefreee (v guard e)| & = & |choicefreee e|\\
   |choicefreee (def x e)| & = & |choicefreee e| \\
-  |choicefreee (apply1N v_1 v_2)| & = & \text{|v_1| is a choice-free primop |op|} \\
+  |choicefreee (apply1N v_1 v_2)| & = & \text{|v_1| is a choice-free primop. \lennart{Wrong for iter}} \\
   |choicefreee v|  & = & |true| \\
 \end{array}
 \end{array}
@@ -205,9 +207,8 @@ $\begin{array}{@@{}l}
     \\[-0.8em]
 
 \rulegroupname{Choice}
-\rulename{choice-assoc} & |(e_1 choice e_2) choice e_3| & \movesto & |e_1 choice (e_2 choice e_3)| \\
-\rulename{choice-fail-l} & |fail choice e| & \movesto & |e| \\
-\rulename{choice-fail-r} & |e choice fail| & \movesto & |e| \\
+\rulename{choice-fail-l} & |fail choice e| & \movesto & |e| & \text{Can be removed if all choices inside |iterKW|} \\
+\rulename{choice-fail-r} & |e choice fail| & \movesto & |e| & \text{Can be removed if all choices inside |iterKW|} \\
 \rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]|
     & \text{if |noteq C hole, blockedc emptyset C, choicefreec C|}\\
 \rulename{fail} & |C^[fail]| & \movesto & |fail|
@@ -215,12 +216,11 @@ $\begin{array}{@@{}l}
 
     \\[-0.8em]
 
-\rulegroupname{One and All}
-\rulename{one-fail}   & |one fail| & \movesto & |fail| \\
-\rulename{one-value}  & |one v| & \movesto & |v| \\
-\rulename{one-choice}  & |one (v choice e)| & \movesto & |v| \\
-\rulename{all-fail}   & |all fail| & \movesto & |tup ()| \\
-\rulename{all-choice} & |all (v_1 choice xdots choice v_n)| & \movesto & |tup (v_1, xdots, v_n)|  & n \geq 1 \\
+\rulegroupname{Iter}
+\rulename{iter-fail}    & |iter fail e_a e_f e_g| & \movesto & |apply1N e_g e_a| \\
+\rulename{iter-value}   & |iter v    e_a e_f e_g| & \movesto & |apply1Np (apply1Np (apply1N e_f e_a) v) e_g| \\
+\rulename{iter-choice}  & |iter (e_1 `choice` e_2) e_a e_f e_g| & \movesto &
+   \multicolumn{2}{l}{|iter e_1 e_a e_f (lam x (iter e_2 x e_f e_g))|} \\
 
 \end{array} \\
 \\[-0.8em]
