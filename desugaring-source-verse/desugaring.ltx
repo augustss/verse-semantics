@@ -536,8 +536,8 @@ $$
 \multicolumn{4}{l}{\textbf{Desugaring for execution}} \\
 |oftype e t| & = & |succeeds^{t^[e]}| \\
 |tlam x (def xs e_1) e_2| & = & |lam x (def xs (e_1; e_2))| & \text{The |xs| scope over |e_1| and |e_2|} \\
-|if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
-|for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+%% |if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+%% |for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
@@ -548,8 +548,32 @@ $$
 % |tlam x e_1 (oftype e_2 t)| & = & |verify (lam x (assume e_1; assert (t^[e_2]))); lam x (e_1; assume (forall y (t^[y])))| & \text{fresh |y|} \\
 |tlam x (def xs e_1) e_2| & = & |verify (lam x (def xs (assume e_1; assert e_2))); lam x (def xs (e_1; assume e_2))|
             & \text{The |xs| scope over |e_1| and |e_2|} \\
-|if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
-|for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+%% |if(def xs e_1) then e_2 else e_3| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+%% |for(def xs e_1){e_2}| & = & ... & \text{The |xs| scope over |e_1| and |e_2|} \\
+\end{array}
+
+\\ \\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\textbf{Desugar to |iterKW|, with thunks and |snoc|}} \\
+|one e| & = & |iter e emptytup (lam (_ v _) v) fail| \\
+|all e| & = & |iter e emptytup (lam (a v c) (apply1 c (applyN snoc (a, v)))) (lam a a)| \\
+|if(e_1) then e_2 else e_3| & = & |iter (e_1; thunk e_2) emptytup (lam (_ v _) (force v)) e_3| \\
+|for(e_1){e_2}| & = & |iter (e_1; thunk e_2) emptytup (lam (a v c) (apply1 c (applyN snoc (a, force v)))) (lam a a)| \\
+\end{array}
+
+\\ \\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\textbf{Desugar to |iterKW|, with tupled variables and |snoc|}} \\
+|if(e_1) then e_2 else e_3| & = & |iter (e_1; arr vs) emptytup ((lam (_ v _) (v==arr vs; e_2))) e_3| \\
+|for(e_1){e_2}| & = & |iter (e_1; arr vs) emptytup ((lam (a v c) (v==arr vs; apply1 c (applyN snoc (a, e_2))))) (lam a a)| \\
+\multicolumn{4}{l}{\text{where |vs| are the variables bound in |e_1| and free in |e_2|.}} \\
+\end{array}
+
+\\ \\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\textbf{Desugar to |iterKW|, with thunks and array element unification}} \\
+|all e| & = & |def a (iter e 0 ((lam (k v c) (apply1 a k == v; apply1 c (k+1)))) (lam k (apply1 len a == k)); a)| \\
+|for(e_1){e_2}| & = & |def a (iter (e_1; thunk e_2) 0 (lam (k v c) (apply1 a k == force v; apply1 c (k+1))) (lam k (apply1 len a == k)); a)| \\
 \end{array}
 
 \end{array}
@@ -1028,7 +1052,7 @@ In contrast to the other versions this uniquely identifies the next redex, so it
 \\ \\
 \end{array}
      $$
-  \caption{Block Core Verse Syntax} \label{fig:vc-syntax}
+  \caption{Block Core Verse Syntax} \label{fig:blk-vc-syntax}
 \end{figure}
 
 \newcommand{\rulenames}[1]{\rulename{#1}^*}
@@ -1167,7 +1191,7 @@ Starred rules can only be used when the \textit{next} function indicates them as
 \end{tabular}
 
 
-  \caption{Commuting effects} \label{fig:vc-syntax}
+  \caption{Commuting effects} \label{fig:comm-effs}
 \end{figure}
 
 

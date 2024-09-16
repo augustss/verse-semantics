@@ -58,12 +58,12 @@
 \\ \\
 \begin{array}{lrcl}
 \text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
-\text{Scope contexts}  & |SX| & ::= & |one hole| \vb |all hole| \vb |hole choice e| \vb |e choice hole| \\
+\text{Scope contexts}  & |SX| & ::= & |iter hole e_2 e_3 e_4| \vb |hole choice e| \vb |e choice hole| \\
 \text{Evaluation contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == e; C| \vb |def x C| \\
 \text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == e; P| \vb |def x P|  \\
-                       &     & \vb & |one (FC^[P])| \vb |all (VC^[P])| \vb |check fx P| \\
+                       &     & \vb & |iter (FC^[P]) e_2 e_3 e_4| \vb |check fx P| \\
 \text{First choice} & |FC| & ::= & |hole| \vb |FC `choice` e| \\
-\text{Value choice} & |VC| & ::= & |FC| \vb |v `choice` VC| \\
+% \text{Value choice} & |VC| & ::= & |FC| \vb |v `choice` VC| \\
 % \text{Choice-free exprs} & |cf| & ::= & |v | \vb |l==cf; cf| \vb op[v] \vb |one e| \vb |all e| \vb |cf guard cf| \\
 \end{array} \\
 \\

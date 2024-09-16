@@ -6,9 +6,9 @@ PAPERSRC = $(PAPERTEX) verifier_overview.tex verifier_examples.tex ../calculus.f
 
 $(PAPER).pdf: $(PAPERSRC)
 	$(LATEX) $(PAPER)
+	$(LATEX) $(PAPER)
 
 %.tex:   %.ltx   ../calculus.fmt
-	lhs2TeX $< > $@
 	lhs2TeX $< > $@
 
 clean:

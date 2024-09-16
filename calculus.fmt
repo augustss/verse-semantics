@@ -53,6 +53,8 @@
 
 %format cons (x) (y) = "\textbf{cons}(" x "," y ")"
 %format applyx a b = a "(" b ")"
+%format snoc = "\textbf{snoc}"
+%format len = "\textbf{length}"
 
 %% ----------------------
 %format ^ = " "
@@ -171,6 +173,7 @@
 %format lamhdr (x) = "\lambda" x".\,"
 %format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
 %format thunk (e) = "\lambda \langle\rangle.\," e
+%format force (e) = e "\langle\rangle"
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
 %format tlamx  (fx) (x) (y) (e1) (e2) = "\tlamFX{" fx "}" "(" x ")[" y "]\{" e1 "\}\{" e2 "\}"
