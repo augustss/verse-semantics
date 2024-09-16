@@ -1,0 +1,131 @@
+------------------------------------------------------------------------------------------------------------------------
+VerseGrammar.h: Abstract Syntax Tree Generation
+------------------------------------------------------------------------------------------------------------------------
+
+TODO: Merge relevant parts of: https://docs.google.com/document/d/1ah4nlEAlhbLeOs7y34zyHvTOoSuBUyJhE3fDYIzxzb4
+TODO: Merge the canonical text to concrete syntax to abstract syntax production rules into VerseSpecification.txt.
+
+We document this C++ VerseGrammar.h library by specifying an exact translation from the Verse grammar specified
+in the Verse Language Specification into named callback functions in a user-specified class. The callbacks are
+structured so that if each user-provided callback constructs an abstract syntax tree node from the parameters
+passed to it, then an abstract syntax tree will be generated for the whole program.
+
+This library is not a part of the Verse Language Specification, as the specification is standalone and defines
+syntax and semantics independent of this library.
+
+The Abstract Syntax Tree nodes comprise:
+
+	atom       # An atomic value: a number, path, character, or false.
+	identifier # An identifier consisting of an optional qualifier expression and a string.
+	call       # A call taking a single parameter, of the form f(a), f[a], or f<a>.
+	invoke     # A macro invocation m{a}, m(a){b}, etc, containing 1-3 invoke clauses.
+	escape     # A syntactic escape (unquote) from a macro definition's quasiquoted syntax.
+
+Code Production Rules:
+
+    Syntax          Grammar    VerseSyntax.h   MaxVerse
+	Example         Production Generator       Abstract Syntax
+	--------------  ---------- ---------       ----------------
+
+	0oFE            Char8      Char8           atom       (UTF-8 code unit)
+	0u12AB          Char32     Char32          atom       (unicode code point)
+	'c'             Char32     Char32          atom       (unicode code point)
+	3               Num        Num             atom       (natural number)
+	0x3A            Num        NumHex          atom       (natural number)
+	12.5f,1e-10d    Num        Num             atom       (floating point number)
+	1.5cm           Num        Num             call-of    (numeric units), e.g. units'cm'(1.5)
+	/iso.org/spec   Path       Path            atom       (path)
+	abc             Ident      Ident           identifier with no qualifier and empty quoted string
+	operator'+'     Ident      Ident           identifier with no qualifier and specified quoted string
+	(Actor:)Health  QualIdent  QualIdent       identifier with qualifier
+	(expr)          Base       Parenthesis     *          Passes expr through
+	"Hi"            String     String          invoke     (/Verse.org/Verse:)array{'H','i'}, containing UTF-8 code units
+	"Hi, {name}."   String     String          invoke     (/Verse.org/Verse:)Concatenate("Hi",(/Verse.org/Verse:)ToString(name),".")
+	<b;Hello>       Markup     InvokeMarkup    invoke     (something:)b{(/Verse.org/Markup:)Content:=(/Verse.org/Verse:)Concatenate("Hi",(/Verse.org/Verse:)ToMarkup(name),".")}.
+	<b;Hi, {name}.> Markup     InvokeMarkup    invoke     (something:)b{(/Verse.org/Markup:)Content:=(/Verse.org/Verse:)Concatenate("Hi",(/Verse.org/Verse:)ToMarkup(name),".")}.
+	<b;Hi, &name;.> Markup     InvokeMarkup    invoke     (/Verse.org/Verse:)Concatenate("Hi",(/Verse.org/Verse:)ToMarkup(name),".")
+	<b{a=b};Hello>  Markup     InvokeMarkup    invoke     B{a=b,(/Verse.org/Markup:)Content="Hello"}.
+	<b,i;Hello>     Markup     InvokeMarkup    invoke     B{(/Verse.org/Markup:)Content=I{(/Verse.org/Markup:)Content="Hello"}}.
+
+	if(a){b}else{c} If         If              invoke     (/Verse.org/Verse:)if(a){b}else{c}
+	for(a){bs}      Invoke     Invoke          invoke     See below.
+	for(a) in b     Invoke     Invoke          invoke     See below.
+
+	e<a>            Postfix    Call            call-with  expression e and single specifier a.
+	f[as]           Postfix    Call            call-at    function f and parameters as.
+	f(as)           Postfix    Call            call-of    function f and parameters as.
+	a^              Postfix    PostfixToken    invoke     operator'^'{a}
+	a?              Postfix    PostfixToken    invoke     operator'?'{a}
+	a.Ident         Postfix    PostfixToken    invoke     operator'.'{a,ident}
+				   			                
+	^a              Prefix     PrefixToken     call-at    prefix'^'(a)
+	?a              Prefix     PrefixToken     call-at    prefix'?'(a)
+	+a              Prefix     PrefixToken     call-at    prefix'+'(a)
+	-a              Prefix     PrefixToken     call-at    prefix'-'(a)
+	*a              Prefix     PrefixToken     call-at    prefix'*'(a)
+	[]a             Prefix     PrefixToken     call-at    prefix'[]'(a)
+	[a]b            Prefix     PrefixBraces    call-at    operator'[]'(a,b)
+				   			                
+	^{as}           Prefix     PrefixToken     call-at    :prefix'^' ((/Verse.org/Verse:)type<effects>{as})
+	?{as}           Prefix     PrefixToken     call-at    :prefix'?' ((/Verse.org/Verse:)type<effects>{as})
+	+{as}           Prefix     PrefixToken     call-at    :prefix'+' ((/Verse.org/Verse:)type<effects>{as})
+	-{as}           Prefix     PrefixToken     call-at    :prefix'-' ((/Verse.org/Verse:)type<effects>{as})
+	*{as}           Prefix     PrefixToken     call-at    :prefix'*' ((/Verse.org/Verse:)type<effects>{as})
+	[]{as}          Prefix     PrefixToken     call-at    :prefix'[]'((/Verse.org/Verse:)type<effects>{as})
+	[a]{bs}         Prefix     PrefixBraces    call-at    :operator'[]'(a,(/Verse.org/Verse:)type<effects>{bs})
+
+	a*b             Mul        InfixToken      call-at    operator'*'[a,b]
+	a/b             Mul        InfixToken      call-at    operator'/'[a,b]
+	a&b             Mul        InfixToken      invoke     operator'&'{a,b}
+				   			                
+	a+b, a-b        Add        InfixToken      call-at    operator'+'(a,b), operator'-'(a,b)
+
+	a..b            To         InfixToken      invoke     operator'..'[a,b]
+	a->b, a to b    To         InfixToken      invoke     operator'->'{a,b}
+	
+	a|b             Choose     InfixToken      invoke     operator'|' {a,b}
+				   			                
+	a>=b            Greater    InfixToken      call-at    operator'>='[a,b]
+	a>b             Greater    InfixToken      call-at    operator'>' [a,b]
+	
+	a<=b            Less       InfixToken      call-at    operator'<='[a,b]
+	a<b             Less       InfixToken      call-at    operator'<' [a,b]
+	
+	a<>b            NotEq      InfixToken      invoke     operator'<>'{a,b}, because a<>b means x=a where not x==b
+
+	a=b             Eq         InfixToken      invoke     operator'='{a,b}
+				   			                
+	not a           Not        PrefixToken     invoke     prefix'not'{a}
+
+	a and b         And        InfixToken      invoke     operator'and'{a,b}
+				   			                
+	a or b          Or         InfixToken      invoke     operator'or' {a,b}
+      
+	:t              Def        PrefixToken     invoke     prefix':'{t}
+	x:t             Def        (multiple)      invoke     operator':='(x){prefix':'{t}}                  ALT: operator':'(x){t}
+	x:t=v           Def        (multiple)      invoke     operator':='(operator':='(x){prefix':'{t}}){a} ALT: operator':='(operator':'(x){t}){v}
+	x:=v            Def        InfixBlock      invoke     operator':='(x){v}
+	a+=b            Def        InfixToken      invoke     operator'+='{a,b}
+	a-=b            Def        InfixToken      invoke     operator'-='{a,b}
+	a*=b            Def        InfixToken      invoke     operator'*='{a,b}
+	a/=b            Def        InfixToken      invoke     operator'/='{a,b}
+	a where bs      Def        InfixBlock      invoke     operator'where'(a){bs}
+	return 123      Def        PrefixBlock     invoke     return{123}
+	return          Def        PrefixBlock     invoke     return{}
+	..b             Def        InfixToken      invoke     prefix'..'{b}
+	&a              Def        Escape          escape
+ 
+	a=>bs           Fun        InfixBlock      invoke     operator'=>'(a){bs}
+				   			                
+	@attr; a        Expr       PrefixAttribute attribute  TODO!!
+	a @attr         Expr       PrefixAttribute attribute  TODO!!
+				   			                
+	1               Commas     Parenthesis     atom       1
+	1,2             Commas     Parenthesis     invoke     array{1,2}
+				   			                
+	1               List       Parenthesis     atom       1
+	1;              List       Parenthesis     atom       1
+	1; 2; 3         List       Parenthesis     invoke     array{1,2,3}
+
+Abstract syntax terms are generated with code snippet excluding any leading and trailing Space or Scan.
+

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+    <Type Name="Verse::future&lt;*&gt;">
+        <Intrinsic Name="cat"   Expression="Payload&amp;7"/>
+        <Intrinsic Name="immti" Expression="(Payload&gt;&gt;4)&amp;0x3FFF"/>
+        <Intrinsic Name="immts" Expression="Verse::ImmediateMethodsOfIndex[immti()].ImmediateNativeName"/>
+        <Intrinsic Name="immv"  Expression="(Payload&gt;&gt;19)&amp;0xFFFFFFFF"/>
+        <Intrinsic Name="inti"  Expression="(__int64)(Payload&gt;&gt;3)"/>
+        <Intrinsic Name="manh"  Expression="(managed*)Payload"/>
+        <DisplayString Condition="cat()==0">: box&lt;..&gt; = {manh()}</DisplayString>
+        <DisplayString Condition="cat()==1">: box&lt;integer_immediate&gt; = {inti(),d}</DisplayString>
+        <DisplayString Condition="cat()==3 &amp;&amp; immti()==Verse::Internal::MethodsIndexOf&lt;char8_t&gt;">: box&lt;char8_t&gt; = {char(immv())}</DisplayString>
+        <DisplayString Condition="cat()==3">: immediate box&lt; {immts(),sb}&gt; = {immv(),d}</DisplayString>
+        <DisplayString Condition="cat()==5">: any.suspension = {(suspension*)(Payload^5)}</DisplayString>
+        <DisplayString>: any.unknown = {Payload}</DisplayString>
+        <Expand>
+            <ExpandedItem Condition="cat()==0">manh()</ExpandedItem>
+        </Expand>
+    </Type>
+    <Type Name="Verse::span&lt;char8_t&gt;">
+        <DisplayString>: span&lt;char8_t&gt; = "{((char**)this)[0],[((char**)this)[1]-((char**)this)[0]]s8b}"</DisplayString>
+        <Expand>
+            <Synthetic Name="length"><DisplayString>{((char**)this)[1]-((char**)this)[0],d}</DisplayString></Synthetic>
+            <ArrayItems>
+                <Size>((char**)this)[1]-((char**)this)[0]</Size>
+                <ValuePointer>((char**)this)[0]</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+    <Type Name="Verse::span&lt;*&gt;">
+        <DisplayString>: span&lt;$T1&gt; = ..</DisplayString>
+        <Expand>
+            <Synthetic Name="length"><DisplayString>{((char**)this)[1]-((char**)this)[0],d}</DisplayString></Synthetic>
+            <ArrayItems>
+                <Size>((char**)this)[1]-((char**)this)[0]</Size>
+                <ValuePointer>((char**)this)[0]</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+    <Type Name="Verse::managed&lt;*&gt;">
+        <DisplayString>: {h_methods->immediate_cpp_name,sb} = {contents}</DisplayString>
+        <Expand>
+            <ExpandedItem>contents</ExpandedItem>
+        </Expand>
+    </Type>
+    <Type Name="Verse::managed&lt;Verse::managed_array_linear&lt;char8_t&gt;&gt;">
+        <DisplayString>: [{contents.length,d}]char = "{(char*)(this+1),[contents.length]s8b}"</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>contents.length</Size>
+                <ValuePointer>(char*)(this+1)</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+    <Type Name="Verse::managed&lt;Verse::managed_array_linear&lt;*&gt;&gt;">
+        <DisplayString>{h_methods->immediate_cpp_name,sb}[{contents.length,d}]</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>contents.length</Size>
+                <ValuePointer>($T1 *)(this+1)</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+    <Type Name="Verse::option&lt;*&gt;">
+        <DisplayString Condition="Exists==0">false</DisplayString>
+        <DisplayString Condition="Exists==1">true{{{*($T1*)&amp;T}}}</DisplayString>
+        <Expand>
+            <ExpandedItem>*($T1*)&amp;T</ExpandedItem>
+        </Expand>
+    </Type>
+</AutoVisualizer>

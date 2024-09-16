@@ -1,0 +1,16 @@
+# See https://EditorConfig.org
+root = true
+
+[*]
+end_of_line = crlf
+insert_final_newline = false
+
+[*.txt]
+indent_style = space
+indent_size = 4
+
+[*.{cpp,h,verse}]
+indent_style = tab
+
+[*.verse]
+charset = utf-8
