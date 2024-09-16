@@ -465,7 +465,13 @@ instance Pretty SrcExpr where
           Array es   -> text "array" <> braces (ppSeq lvl es)
           Splice e   -> text "splice" <> braces (ppr 0 e)
           Tuple es   -> parens (ppEs es)
-          Seq es     -> maybeParens (p > 0) $ ppSeq lvl es
+          Seq es     | lvl == prettyTim
+                     -> case es of
+                         []  -> ppNormal (Array [])
+                         [e] -> ppNormal e
+                         _   -> text "let()" <> braces (ppSeq lvl es)
+                     | otherwise
+                     -> maybeParens (p > 0) $ ppSeq lvl es
 
           ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppArg a)
             where (q, ql, _) = fixity "()"

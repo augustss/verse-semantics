@@ -24,7 +24,7 @@ import TRS.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
 
-import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos, sepBy1 )
+import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos, sepBy1, try )
 
 import GHC.Stack( HasCallStack )
 
@@ -104,6 +104,7 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     , testLocEnd   :: !Loc
     , testType     :: !TestType                      -- Default test type
     , testStatus   :: !TestStatus
+    , testTimSkip  :: !Bool                          -- skip this test when converting to Tim's format
     }
     deriving (Show)
 
@@ -314,6 +315,7 @@ timTestInfo (Ident loc status) = TestInfo
   , testLocEnd   = loc
   , testType     = timTestType status
   , testStatus   = TS_Normal
+  , testTimSkip  = False
   }
 
 timTestType :: String -> TestType
@@ -561,9 +563,10 @@ pTestInfo = do
   loc   <- getSourcePos
   mname <- optional (pStringLit <* pOp ",")
   typ   <- pTestType
-  stat  <- (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
+  stat  <- try (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
+  tim   <- (pOp "," *> pTimSkip) OA.<|> pure False
   pure (TestInfo { testMName = mname, testLocStart = loc, testLocEnd = loc
-                 , testType = typ, testStatus = stat })
+                 , testType = typ, testStatus = stat, testTimSkip = tim })
 
 pTestType :: P TestType
 pTestType = do
@@ -581,6 +584,13 @@ pTestStatus = do
     "skip"    -> pure TS_Skip
     "broken"  -> pure TS_Broken
     _         -> fail "pTestStatus"
+
+pTimSkip :: P Bool
+pTimSkip = do
+  i <- pIdent
+  case map toLower $ identString i of
+    "timskip" -> pure True
+    _         -> fail "pTimSkip"
 
 -----------------------------------------------
 --
@@ -891,6 +901,7 @@ displayTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 displayTestFile _tflg (_fn, ts) = mapM_ displayTest ts
 
 displayTest :: Test -> IO ()
+displayTest test | testTimSkip (testInfo test) = return ()
 displayTest test = do
   let retCode :: TestType -> String
       retCode TFail = "F00"
@@ -905,7 +916,8 @@ displayTest test = do
              (case test of
                 TestEvalEq _ _ e2 | ok -> " = (" ++ timShow e2 ++ ")"
                 _ -> "") ++
-             "}"
+             "}   # " ++ testName (testInfo test)
+             
 
 timShow :: SrcExpr -> String
 timShow = renderStyle s . pPrintL prettyTim

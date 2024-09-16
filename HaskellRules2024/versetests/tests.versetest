@@ -75,15 +75,15 @@ testeq("Unif16",pass) {1=1}                                 {1}
 #testeq("Unif17",pass)
 #            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
 testeq("Unif18",pass) {(1,2)=(1,2)}                         {(1,2)}
-testeq("Unif19",pass) {(x:any=>x)=(x:any=>x)}               {:false}
+testeq("Unif19",pass,timskip) {(x:any=>x)=(x:any=>x)}               {:false}
 
 # If BIND is implemented in parallel, it may forget to substitute in the substitutions
 testeq("Unif20",pass) {x:any; y:any; x=y; y=1}  {1}
 testeq("Unif21",pass) {x:any; y:any; x=1; y=x}  {1}
 # Needs alpha conversion
-testeq("Unif22",pass) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
+testeq("Unif22",pass,timskip) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
 # Needs alpha conversion
-testeq("Unif23",pass) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
+testeq("Unif23",pass,timskip) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
 
 
 # Arrays
