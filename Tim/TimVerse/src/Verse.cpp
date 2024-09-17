@@ -5823,7 +5823,7 @@ void TestScript() {
 
 	// Parse.
 	Print("Parsing...");
-	auto Filename = "Tests.verse"_VS;
+	auto Filename = "verse/Tests.verse"_VS;
 	auto Locus    = locus{Filename};
 	auto Syntax   = CoerceResult(ParseVerseSyntax(LoadTextFile(Filename),Locus));
 

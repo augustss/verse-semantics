@@ -133,7 +133,7 @@
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <FloatingPointModel>Precise</FloatingPointModel>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /EHs %(AdditionalOptions)</AdditionalOptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
@@ -244,32 +244,35 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Arithmetic.cpp" />
-    <ClCompile Include="Expose.cpp" />
-    <ClCompile Include="Kernel.cpp" />
-    <ClCompile Include="Verse.cpp" />
-    <ClCompile Include="Execute.cpp" />
-    <ClCompile Include="PlatformWin32.cpp" />
-    <ClCompile Include="Test.cpp" />
-    <ClCompile Include="Text.cpp" />
+    <ClCompile Include="src\Arithmetic.cpp" />
+    <ClCompile Include="src\Execute.cpp" />
+    <ClCompile Include="src\Expose.cpp" />
+    <ClCompile Include="src\Kernel.cpp" />
+    <ClCompile Include="src\PlatformWin32.cpp" />
+    <ClCompile Include="src\Test.cpp" />
+    <ClCompile Include="src\Text.cpp" />
+    <ClCompile Include="src\Verse.cpp" />
+    <ClCompile Include="src\VerseGrammarTest.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Terse.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="Terse.natvis" />
+    <ClInclude Include="src\Terse.h" />
+    <ClInclude Include="src\VerseGrammar.h" />
+    <ClInclude Include="src\VerseGrammarTests.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".editorconfig" />
-    <None Include="About.verse" />
-    <None Include="Tests.verse" />
-    <None Include="Verse.verse" />
+    <None Include="verse\About.verse" />
+    <None Include="verse\Tests.verse" />
+    <None Include="verse\Verse.verse" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="Terse.txt" />
-    <Text Include="VerseOverview.txt" />
-    <Text Include="VerseReference.txt" />
-    <Text Include="VerseSpecification.txt" />
+    <Natvis Include="spec\Terse.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="spec\Terse.txt" />
+    <Text Include="spec\VerseGrammar.txt" />
+    <Text Include="spec\VerseRuntimeSketch.txt" />
+    <Text Include="spec\VerseSpecification.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
