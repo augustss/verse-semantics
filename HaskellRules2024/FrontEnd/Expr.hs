@@ -49,9 +49,6 @@ import GHC.Stack( HasCallStack )
 
 import Text.Megaparsec (SourcePos(..), mkPos, initialPos, sourcePosPretty)
 
-prettyTim :: PrettyLevel
-prettyTim = PrettyLevel 10
-
 {- Note [The SrcExpr lifecycle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Source expressions are parsed into `SrcExpr`.
@@ -453,42 +450,16 @@ instance Pretty SrcExpr where
                 --x | l == prettyNormal, Just r <- stripPrefix "operator'" (unIdent v) = text (init r)
                 | otherwise = ppr 0 v
 
-{-
-      -- Print a sequence where Tim allows ';'
-      ppEB e | lvl /= prettyTim = ppr 0 e
-             | otherwise =
-               case e of
-                 Blk es -> ppSeq lvl es
-                 Seq es -> ppSeq lvl es
-                 _      -> ppr 0 e
--}
-      -- We have list of expressions that need to be considered a single expression.
-      -- This should have been 'block{es}', but Tim does not implement that.
-      -- It could have been 'let(){es}', but Tim has the wrong scope for that.
-      -- So we settle on 'array{e1, ..., en}[n]', which is pretty horrible.
-      block es = maybeParens (p>0) $
-                 --text "array" <> braces (ppSeq lvl es) <> brackets (text (show (length es - 1)))
-                 text "let()" <> braces (ppSeq lvl es)
-
       ppNormal expr =
         case expr of
           Lit lit    -> ppr p lit
-          Variable v | lvl == prettyTim, Just s <- lookup v timRename
-                     -> text s
-                     | otherwise
-                     -> ppIdent v
+          Variable v -> ppIdent v
           EPrim s    -> pPrint s
           QualVariable e v -> parens (ppr 0 e <> text ":") <> ppr 0 v
           Array es   -> text "array" <> braces (ppSeq lvl es)
           Splice e   -> text "splice" <> braces (ppr 0 e)
           Tuple es   -> parens (ppEs es)
-          Seq es     | lvl == prettyTim
-                     -> case es of
-                         []  -> ppNormal (Array [])
-                         [e] -> ppNormal e
-                         _   -> block es
-                     | otherwise
-                     -> maybeParens (p > 0) $ ppSeq lvl es
+          Seq es     -> maybeParens (p > 0) $ ppSeq lvl es
 
           ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppArg a)
             where (q, ql, _) = fixity "()"
@@ -532,11 +503,10 @@ instance Pretty SrcExpr where
             maybeParens (p > 0) $ sep [ text "case" <+> parens (ppArg e) <+> text "of",
                                            indent $ ppr 0 bs ]
           Function ars b -> maybeParens (p > 0) $
-                            cat [ text fun <> hcat (map ppArs ars)
+                            cat [ text "fun" <> hcat (map ppArs ars)
                                 , indent (ppB b) ]
                 where
                   ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
-                  fun = if lvl == prettyTim then "function" else "fun"
 
           Blk es       -> braces $ ppSeq lvl es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
@@ -565,11 +535,7 @@ instance Pretty SrcExpr where
 
           Range fx e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
                         text "range" <> ppEffs fx <> braces (ppr 0 e)
-          Exists is e | lvl == prettyTim
-                        -> let es = case e of Blk x -> x; _ -> [e]
-                           in  parens $ hsep $ punctuate (text ";") (map (\ i -> ppIdent i <+> text ": any") is ++ map (ppr 0) es)
-                      | otherwise
-                        -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <> text ".", ppr 0 e]
+          Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <> text ".", ppr 0 e]
           Verify is e -> maybeParens (p > 0) $
                          cat [text "verify" <> parens (hsep (map (ppr 0) is))
                              , indent (braces (ppr 0 e)) ]
@@ -580,14 +546,8 @@ instance Pretty SrcExpr where
 
           Where e1 e2 -> maybeParens (p>0) $ sep [ ppr 0 e1, text "where" <+> ppr 0 e2 ]
           Some e      -> text "some" <> parens (ppr 0 e)
-          One e | lvl == prettyTim
-                      -> text "first" <> ppr 0 e
-                | otherwise
-                      -> text "one" <> parens (ppr 0 e)
-          All e | lvl == prettyTim
-                       -> text "for" <> ppr 0 e
-                | otherwise
-                       -> text "all" <> parens (ppr 0 e)
+          One e       -> text "one" <> parens (ppr 0 e)
+          All e       -> text "all" <> parens (ppr 0 e)
           Check fx e  -> text "check" <> ppEffs fx <> braces (ppr 0 e)
           Guard e1 e2 -> maybeParens (p>0) $ sep [ ppr 1 e1, text ";;" <+> ppr 1 e2 ]
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
@@ -612,11 +572,6 @@ ppEffs rs = mconcat (map (\ r -> text "<" <> pPrint r <> text ">") rs)
 ppSeq :: PrettyLevel -> [SrcExpr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") $
              map (pPrintPrec l 0) es
-
-timRename :: [(Ident, String)]
-timRename = [ (Ident noLoc x, y) | (x, y) <-
-  [ ("intAdd$", "operator'+'")
-  ] ]
 
 --------------------------------------------------------
 --               Knowledge of fixity
