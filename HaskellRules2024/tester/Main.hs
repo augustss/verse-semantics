@@ -6,8 +6,6 @@
 {-# LANGUAGE TupleSections #-}
 module Main(main) where
 
-import Prelude
-
 import FrontEnd.Desugar( desugar, DError )
 import FrontEnd.ToCore( convertToCore )
 import FrontEnd.Flags
@@ -23,6 +21,7 @@ import TRS.Traced as TRS ( Traced, term, trace )
 import TRS.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
+import Data.Generics.Uniplate.Data( universeBi )
 
 import Text.Megaparsec( getSourcePos, sourceName, sourceLine, unPos, sepBy1, try )
 
@@ -31,7 +30,7 @@ import GHC.Stack( HasCallStack )
 import Data.List( isPrefixOf )
 import Data.Char( toLower )
 import Data.Maybe
-import Control.Monad( unless, when )
+import Control.Monad( unless, when, guard )
 import System.Directory( doesFileExist, removeFile )
 import System.Exit( exitWith, ExitCode(..) )
 import Text.Printf
@@ -104,12 +103,15 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
     , testLocEnd   :: !Loc
     , testType     :: !TestType                      -- Default test type
     , testStatus   :: !TestStatus
-    , testTimSkip  :: !Bool                          -- skip this test when converting to Tim's format
+    , testTimSkip  :: !TimSkip                       -- skip (or error code) when converting to Tim's format
     }
     deriving (Show)
 
 data TestType = TPass | TFail | TLoop   -- Expected behaviour
   deriving (Eq)
+
+data TimSkip = TimNone | TimSkip | TimError String
+  deriving (Eq, Show)
 
 instance Show TestType where
   show TPass = "pass"
@@ -315,7 +317,7 @@ timTestInfo (Ident loc status) = TestInfo
   , testLocEnd   = loc
   , testType     = timTestType status
   , testStatus   = TS_Normal
-  , testTimSkip  = False
+  , testTimSkip  = TimNone
   }
 
 timTestType :: String -> TestType
@@ -564,7 +566,7 @@ pTestInfo = do
   mname <- optional (pStringLit <* pOp ",")
   typ   <- pTestType
   stat  <- try (pOp "," *> pTestStatus) OA.<|> pure TS_Normal
-  tim   <- (pOp "," *> pTimSkip) OA.<|> pure False
+  tim   <- (pOp "," *> pTimSkip) OA.<|> pure TimNone
   pure (TestInfo { testMName = mname, testLocStart = loc, testLocEnd = loc
                  , testType = typ, testStatus = stat, testTimSkip = tim })
 
@@ -585,12 +587,17 @@ pTestStatus = do
     "broken"  -> pure TS_Broken
     _         -> fail "pTestStatus"
 
-pTimSkip :: P Bool
+pTimSkip :: P TimSkip
 pTimSkip = do
   i <- pIdent
-  case map toLower $ identString i of
-    "timskip" -> pure True
-    _         -> fail "pTimSkip"
+  guard (map toLower (identString i) == "tim")
+  _ <- pOp "="
+  sk <- pIdent
+  case identString sk of
+    "skip" -> pure TimSkip
+    s      -> pure (TimError s)
+ OA.<|>
+  pure TimNone
 
 -----------------------------------------------
 --
@@ -901,25 +908,152 @@ displayTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 displayTestFile _tflg (_fn, ts) = mapM_ displayTest ts
 
 displayTest :: Test -> IO ()
-displayTest test | testTimSkip (testInfo test) = return ()
+displayTest test | testTimSkip (testInfo test) == TimSkip  = return ()
+                 | hasUnimpPrimOp $ testSrc test           = return ()
+                 | testStatus (testInfo test) /= TS_Normal = return ()
 displayTest test = do
   let retCode :: TestType -> String
-      retCode TFail = "F00"
-      retCode TPass | ok = "S00"
+      retCode TFail | Just err <- bad = err
                     | otherwise = "F00"
+      retCode TPass | Just err <- bad = err
+                    | otherwise = "S00"
       retCode TLoop = "S00"  -- What should this be?
-      ok = case test of
-             TestEvalEq _ _ (Wrong _) -> False
-             _ -> True
-  putStrLn $ "test(" ++ retCode (testType (testInfo test)) ++ "){(" ++
-             timShow (testSrc test) ++ ")" ++
-             (case test of
-                TestEvalEq _ _ e2 | ok -> " = (" ++ timShow e2 ++ ")"
+
+      -- Error code, if this is a bad test.
+      bad = case testTimSkip (testInfo test) of
+              TimError s -> Just s
+              _ -> Nothing
+
+      -- How to wrap the computation and the result.
+      -- If there are choices we need to turn them into arrays.
+      wrap e | maybe False hasChoice res = "for{" ++ ee ++ "}"
+             | otherwise     = ee
+               where ee = timShow e
+
+      -- Result expression, if we need one
+      res = case test of
+              TestEvalEq _ _ e2 | isNothing bad -> Just e2
+              _ -> Nothing
+  putStrLn $ "test(" ++ retCode (testType (testInfo test)) ++ "){" ++
+             wrap (testSrc test) ++
+             (case res of
+                Just e -> " = " ++ wrap e
                 _ -> "") ++
              "}   # " ++ testName (testInfo test)
              
 
+hasChoice :: SrcExpr -> Bool
+hasChoice e = not $ null $ filter choicy $ universeBi e
+  where choicy (PrefixOp (Ident _ ":") (Variable (Ident _ "false"))) = True
+        choicy (InfixOp _ (Ident _ "|") _) = True
+        choicy _ = False
+
+hasUnimpPrimOp :: SrcExpr -> Bool
+hasUnimpPrimOp e =
+  let is = universeBi e
+      notImpIds = map (Ident noLoc) notImp
+      -- Comparisons are not implemented at all,
+      -- and arithmetic only works on constants.
+      notImp = words "< <= > >= <> + - * / intAdd$"
+  in  any (`elem` notImpIds) is
+
 timShow :: SrcExpr -> String
-timShow = renderStyle s . pPrintL prettyTim
+timShow = renderStyle s . ppTim 0
   where
     s = style{ lineLength = 1000000, ribbonsPerLine = 1.2 }
+
+-------------
+
+ppTim :: Rational -> SrcExpr -> Doc
+ppTim = pp False
+  where
+    ppr :: (Pretty a) => Rational -> a -> Doc
+    ppr = pPrintPrec prettyNormal
+
+    ppOp = ppr 0
+
+    ppEs :: [SrcExpr] -> Doc
+    ppEs = fsep . punctuate comma . map (pp False 1)
+
+    ppSeq :: [SrcExpr] -> Doc
+    ppSeq es = sep $ punctuate (text ";") $ map (pp False 0) es
+
+    ppBlock :: Rational -> [SrcExpr] -> Doc
+    -- We have list of expressions that need to be considered a single expression.
+    -- This should have been 'block{es}', but Tim does not implement that.
+    -- It could have been 'let(){es}', but Tim has the wrong scope for that.
+    -- So we settle on 'array{e1, ..., en}[n]', which is pretty horrible.
+    ppBlock prec es = maybeParens (prec > 0) $
+                      --text "array" <> braces (ppSeq lvl es) <> brackets (text (show (length es - 1)))
+                      text "let()" <> braces (ppSeq es)
+
+    ppArg :: SrcExpr -> Doc
+    ppArg (Array es) | length es /= 1 = ppEs es
+    ppArg e                           = pp False 0 e
+
+    ppBlk es = braces $ ppSeq es
+
+    ppEffs :: [Eff] -> Doc
+    ppEffs rs = mconcat (map (\ r -> text "<" <> pPrint r <> text ">") rs)
+
+    pp :: Bool -> Rational -> SrcExpr -> Doc  -- boolean indicates that ';' is allowed
+    pp sem prec expr =
+      case expr of
+        Src.Lit lit    -> ppr prec lit
+        Variable v | Just s <- lookup v timRename
+                     -> text s
+                   | otherwise
+                     -> ppr 0 v
+        Seq []       -> error "Seq []"
+        Seq [e]      -> pp sem prec e
+        Seq es | sem -> ppSeq es
+               | otherwise -> ppBlock prec es
+        PrefixOp o e -> maybeParens (prec > q) $ ppOp o <> pp False qr e
+          where (q, _, qr) = fixity ("pre" ++ identString o)
+        PostfixOp e o -> maybeParens (prec > q) $ pp False ql e <> ppOp o
+          where (q, ql, _) = fixity ("post" ++ identString o)
+        InfixOp e1 o e2 -> maybeParens (prec > q) $ sep [pp False ql e1 <+> ppOp o, indent $ pp False qr e2]
+          where (q, ql, qr) = fixity (identString o)
+        Parens (Tuple es) -> parens (ppEs es)
+        Parens e -> parens (pp False 0 e)
+        Tuple es -> parens (ppEs es)
+        Array es   -> text "array" <> braces (ppSeq es)
+        ApplyS  f a -> maybeParens (prec > q) $ pp False ql f <> parens (ppArg a)
+          where (q, ql, _) = fixity "()"
+        ApplyD f a -> maybeParens (prec > q) $ pp False ql f <> brackets (ppArg a)
+          where (q, ql, _) = fixity "()"
+        Blk es -> ppBlk es
+        Macro1 (Ident _ "one")  [] b -> text "first" <> pp False 10 b
+        Macro1 (Ident _ "all")  [] b -> text "for"   <> pp False 10 b
+        Macro1 (Ident _ "type") [] b -> text "type"  <> pp False 10 b
+        For1   b -> text "for" <>                         pp False 10 b
+        For2 e b -> text "for" <> parens (pp True 0 e) <> pp False 10 b
+        Function ars b -> maybeParens (prec > 0) $
+                          cat [ text "function" <> hcat (map ppArs ars)
+                              , indent (pp False 10 b) ]
+          where ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
+        If3 e1 e2 e3 -> maybeParens (prec > 0) $
+                        sep [text "if" <+> parens (pp True 0 e1) <+> text "then",
+                             indent $ pp False 0 e2,
+                             text "else",
+                             indent $ pp False 0 e3]
+        EffAttr f a -> maybeParens (prec > q) $ pp False ql f <> text "<" <> ppr 0 a <> text ">"
+          where (q, ql, _) = fixity "()"
+        Let e1 e2 -> maybeParens (prec > 0) $
+                     sep [text "let" <+> parens (pp True 0 e1),
+                          indent $ pp False 10 e2]
+        Truth (Array []) -> text "true"
+        Truth e -> text "truth" <> braces (pp True 0 e)
+        Option me -> text "option" <> braces (maybe empty (pp True 0) me)
+        Exists is e -> pp sem prec $ Seq $ vars ++ unBlk e
+          where vars = map (\ i -> InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))) is
+                unBlk (Blk es) = es
+                unBlk ee = [ee]
+
+        _ -> error $ "ppTim: unimplemented " ++ take 100 (show expr)
+
+timRename :: [(Src.Ident, String)]
+timRename = [ (Src.Ident noLoc x, y) | (x, y) <-
+  [ ("intAdd$", "operator'+'")
+  ] ]
+

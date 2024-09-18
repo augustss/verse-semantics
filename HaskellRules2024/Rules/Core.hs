@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
@@ -42,6 +43,7 @@ module Rules.Core
 import Prelude hiding( (<>) )
 import Epic.Print
 
+import Data.Data(Data)
 import Data.List( union, delete )
 import TRS.Bind
 import TRS.Traced
@@ -215,7 +217,7 @@ data PrimOp
  | IsInt | IsStr | IsChar | IsArr | IsComp | IsTru
 
  deriving
-   ( Eq, Ord, Bounded, Enum, Show )
+   ( Eq, Ord, Bounded, Enum, Show, Data )
 
 allPrimOps :: [PrimOp]
 allPrimOps = [minBound .. maxBound]
@@ -282,7 +284,7 @@ data Lit
   | LStr String             -- "str"
   | LPath Path              -- /path/to/something
   | LPtr Ptr                -- not a textual literal, just used when translating back.
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data)
 
 pattern LitInt :: Integer -> Expr
 pattern LitInt i = Lit (LInt i)
@@ -314,7 +316,7 @@ type Ptr = Int    -- ToDo: newtype
 --------------------------------------------------------
 
 newtype Path = Path String
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 instance Pretty Path where
   pPrintPrec _ _ (Path s) = text s

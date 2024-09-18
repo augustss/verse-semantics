@@ -45,7 +45,8 @@ testeq("Unif",pass) {1=2}                                 {:false}
 # So comment out all unifications involving functions
 # no prefix'op'
 #testeq("Unif1",pass) {1=prefix'-'}            {:false}
-testeq("Unif2",pass) {1=(1,2)}                             {:false}
+# tim=skip: runtime stalled
+testeq("Unif2",pass,tim=skip) {1=(1,2)}                             {:false}
 
 # ICFP rules gets stuck on any lambda comparison
 #testeq("Unif3",pass) {1=(x:any=>x)}                        {:false}
@@ -75,15 +76,18 @@ testeq("Unif16",pass) {1=1}                                 {1}
 #testeq("Unif17",pass)
 #            {prefix'-'=prefix'-'}                 {prefix'-'}  # or maybe this shouldn't work?
 testeq("Unif18",pass) {(1,2)=(1,2)}                         {(1,2)}
-testeq("Unif19",pass,timskip) {(x:any=>x)=(x:any=>x)}               {:false}
+# tim=skip: functions cannot be compared
+testeq("Unif19",pass,tim=skip) {(x:any=>x)=(x:any=>x)}       {:false}
 
 # If BIND is implemented in parallel, it may forget to substitute in the substitutions
 testeq("Unif20",pass) {x:any; y:any; x=y; y=1}  {1}
 testeq("Unif21",pass) {x:any; y:any; x=1; y=x}  {1}
 # Needs alpha conversion
-testeq("Unif22",pass,timskip) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
+# tim=skip: cycles rejected by the verifier
+testeq("Unif22",pass,tim=skip) {x:any; y:any; x=y; y=(x,x)}  {x:any; x=(x,x)} # check for occurs check
 # Needs alpha conversion
-testeq("Unif23",pass,timskip) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
+# tim=skip: cycles rejected by the verifier
+testeq("Unif23",pass,tim=skip) {x:any; y:any; y=(x,x); x=y}  {x:any; x=(x,x)} # check for occurs check
 
 
 # Arrays
@@ -91,37 +95,42 @@ testeq("Array1",pass){array{1;2;3}}                         {1,2,3}
 testeq("Array2",pass){array{}}                              {()}
 testeq("Array3",pass){Length(array{1;2;3})}                 {3}
 testeq("Array4",pass){Length(array{})}                      {0}
-testeq("Array5",pass){Length(array{_;_})}                   {2}
+# tim=skip: Tim doesn't allow this
+testeq("Array5",pass,tim=skip){Length(array{_;_})}                   {2}
 
 testeq("Array6",pass){x:=(1,2); y:=(1,3); one{x=y}}         {:false}
 testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
-testeq("Array8",pass){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
+# tim=skip: looks reasonable, but Tim rejects
+testeq("Array8",pass,tim=skip){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 testeq("Array9",pass){ a := (0,1); a[0] }                   {0}
 testeq("Array10",pass){ all{1..4} }                         {array{1,2,3,4} }
 testeq("Array11",pass){ for(1..4){7} }                      {array{7,7,7,7} }
 testeq("Array12",pass){ for(i := 1..4){i+1} }               {array{2,3,4,5} }
 testeq("Array13",pass){ a := array{7,8}; for(i:a){i+1} }    {array{8,9} }
-testeq("Array14",pass) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
+# tim=skip: unsupported LHS
+testeq("Array14",pass,tim=skip) {(a,b,c,d) := (0,1,2,3); (a, d)}      {(0, 3)}
 testeq("Array15",pass) {Y := for( 1..3 ){ 1 } }             {array{1,1,1}}
-testeq("Array15",pass) {Y := all{for( 1..3 ){ 1|2 }}}       { array { array{1,1,1}, array{1,1,2}, array{1,2,1}
+# tim=skip: runtime bug
+testeq("Array16",pass,tim=skip) {Y := all{for( 1..3 ){ 1|2 }}}       { array { array{1,1,1}, array{1,1,2}, array{1,2,1}
                                                                     , array{1,2,2}, array{2,1,1}, array{2,1,2}
                                                                     , array{2,2,1}, array{2,2,2} } }
 
 # Array expression splicing
 #  ...in expressions
-testeq("Splice1",pass) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
-testeq("Splice2",pass) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
+# tim=skip: Tim does not support splicing
+testeq("Splice1",pass,tim=skip) {a:=(1,2); (0,..a,3)}                 {0,1,2,3}
+testeq("Splice2",pass,tim=skip) {a:=(1,2); (0,..a,3,..a)}             {0,1,2,3,1,2}
 #  ...in patterns
-testeq("Splice3",pass) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
-testeq("Splice4",pass) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
-testeq("Splice5",pass) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-testeq("Splice5a",pass) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
-testeq("Splice6",pass){ f( ..(a:[]int), b:string ) :=
+testeq("Splice3",pass,tim=skip) {(a,..b)   := (0,1,2,3); (a, b)}      {(0, (1,2,3))}
+testeq("Splice4",pass,tim=skip) {(..b,a)   := (0,1,2,3); (a, b)}      {(3, (0,1,2))}
+testeq("Splice5",pass,tim=skip) {(a,..b,c) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice5a",pass,tim=skip) {(a:int,..b:[]int,c:int) := (0,1,2,3); (a, b, c)}   {(0, (1,2), 3)}
+testeq("Splice6",pass,tim=skip){ f( ..(a:[]int), b:string ) :=
                              { (Length[a], b) }
                       ; f[1,2,3,"foo"] } {(3, "foo") }
 testeq("Splice7",pass){ f( a:int,b:int ) := a; f(3,4) }{3}
-testeq("Splice8",pass){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
-testeq("Splice9",pass){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
+testeq("Splice8",pass,tim=skip){ ( a:int,b:int, ..c:[]int, d ) := (1,2,3,4,5); (a,b,c,d) }{(1,2,(3,4),5)}
+testeq("Splice9",pass,tim=skip){ ( 3, ..(2,7,2), 4) }{(3,2,7,2,4)}
 
 #
 testeq("All1",pass) {all{:(1,2,3)}}                            {1,2,3}
@@ -141,7 +150,8 @@ testeq("Fun6",pass) {one{ pair := (1, function(n:int){pair[0]})
                         ; pair[0]}}  {1}
    # Needs recursion
 
-testeq("Fun7",pass) {one{ pair := (1, function(n:int){if (n = 0) {1} else  {n * pair[1](n-1)}})
+# tim=skip: hits a VERSE_ENSURE
+testeq("Fun7",pass,tim=skip) {one{ pair := (1, function(n:int){if (n = 0) {1} else  {n * pair[1](n-1)}})
                         ; pair[1](5) } }  {120}
    # Needs recursion
 testeq("Fun8",pass) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
@@ -149,7 +159,8 @@ testeq("Fun8",pass) {f(x:int, y:int):=2*x+y; f(2,3)}  {7}
 # P desugaring, i.e., p:=e
 testeq("Pat1",pass) {x:=1}                                {1}
 testeq("Pat2",pass) {x:=1; x}                             {1}
-testeq("Pat3",pass) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
+# tim=skip: cannot compare functions
+testeq("Pat3",pass,tim=skip) {f(x:int):=x+1; f[10]}                {(fn(x:int){x+1})[10]}
 testeq("Pat4",pass) {f(x:int)(y:int):=x*10+y; f[2][3]}    {23}
 testeq("Pat5",pass) {:int:=5}                             {5}       # LA is this even allowed
 # fail/wrong? testeq("Pat",pass) {:int:=(1,2)}                         {:false}  # LA is this even allowed
@@ -161,8 +172,10 @@ testeq("Pat9",pass) {succ(x:any):int:=x+1; succ[5]}       {6}
 # XXX Not sure about these
 #testeq("Pat10",pass) {x? := 5; x}                          {array{5}}
 #testeq("Pat11",pass) {x? := 1/0; x}                        {array{}}
-testeq("Pat12",pass) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
-testeq("Pat13",pass) {i->x := 2; (i, x)}                   {2,2}
+# tim=skip: unsupported LHS
+testeq("Pat12",pass,tim=skip) {(x,y,z) := (1,2,3); z,y,x}           {3,2,1}
+# tim=skip: unsupported LHS
+testeq("Pat13",pass,tim=skip) {i->x := 2; (i, x)}                   {2,2}
 testeq("Pat14",pass) {f(x:int where y:=2*x):=y; f[3]}      {6}
 testeq("Pat15",pass) { x := ((:any) => 1)[x+1] }           {1}
 
@@ -175,8 +188,10 @@ testeq("TB4",pass) {ap0(f(x:int):=2)<closed> := f[0]; succ(x:int):=x+1; ap0[succ
   # ap0[succ] gets stuck because succ[0] does not return 2
 testeq("TB5",pass) {ap(f():int) := f[]; five():=5; ap[five]} {5}
 
-testeq("TB6",pass, skip) {(p^ : int) := 2}                      {p:=new[int][2]}
-testeq("TB10",pass, skip) {p^[](:int):int}                      {0}
+# tim=skip: pointers
+testeq("TB6",pass, skip, tim=skip) {(p^ : int) := 2}                      {p:=new[int][2]}
+# tim=skip: pointers
+testeq("TB10",pass, skip, tim=skip) {p^[](:int):int}                      {0}
   # TB6,TB10: no pointers yet
 
 # These crash, so comment them out
@@ -201,13 +216,15 @@ testeq("For6",fail) {upto(i:int, n:int) := { if (i > n) then :false else i | upt
   # For6: fails because `upto` doesn't verify; it <iterates>, and Verse doe not allow that
 testeq("For6a",pass) {for(x:=1..3){x}}  {(1,2,3)}
 
-testeq("For7",pass)  {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
+# tim=skip: runtime bug
+testeq("For7",pass,tim=skip)  {for{for(x:=1|2|3){4|x}}}             {((4,4,4),(4,4,3),(4,2,4),(4,2,3),(1,4,4),(1,4,3),(1,2,4),(1,2,3))}
 testeq("For8",pass) {for(x:=1){x+1}}                      {array{2}}
 
 # Skipping these since `f` is <iterates> and hence dodgy?
-testeq("For9",pass, skip) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
-testeq("For10",pass, skip) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
-testeq("For11",pass, skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
+# tim=skip: functions cannot iterate
+testeq("For9",pass, skip,tim=skip) {f():=1|2; for(f[]; x:=3|4){x}}       {(3,4,3,4)}
+testeq("For10",pass, skip,tim=skip) {f():=1|2; for(x:=3|4; f[]){x}}       {(3,3,4,4)}
+testeq("For11",pass, skip,tim=skip) {f():=1|2; for(f[]; x:=3|4; f[]){x}}  {(3,3,4,4,3,3,4,4)}
 
 # Array access via choices
 testeq("For12",pass) {for ((3,4,5)[x:int])  {x}}  {(0,1,2)}
@@ -222,10 +239,11 @@ testeq("let1",pass) { let(x:=1){x+2} } { 3 }
 
 # Joachim's tests
 # Check that BIND removes _one_ unification only
-testeq("JB1",pass) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
-testeq("JB2",pass) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
+# tim=skip: cannot compare functions
+testeq("JB1",pass,tim=skip) {x:any; x = (y:any => 1); x = (y:any => 2)}  {(y:any => 1) = (y:any => 2)}
+testeq("JB2",pass,tim=skip) {x:any; x = (y:any => 1); x = (y:any => 1)}  {(y:any => 1) = (y:any => 1)}
 testeq("JB3",pass) {x:any; y:any; x = y; x = y; x = 1}  {1}
-testeq("JB4",pass) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
+testeq("JB4",pass,tim=skip) {x:any; y:any; x = y; x = y; x = (z:any => 1)}  {(z:any => 1) = (z:any => 1)}
 
 # "Dom1": Unification in the domain
 testeq("Dom1",pass) {f9( x := 3|4):int := x+1; all{ y:int; f9[y]; y }} {(3,4)}
@@ -268,35 +286,38 @@ testeq("EV10",pass) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):
 
 testeq("EV11",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[0]}}     {1}
 testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[2]}}     {:false}
+# tim=xskip: bug
 testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
 testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
 # These are very slow with alternative rules
 testeq("EV15",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; succ(x:int):=x+1; f[succ]}   {1}
-testeq("EV16",pass) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int):=(); f[badsucc]}  {wrong}
+testeq("EV16",pass,tim=F00) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsucc(x:int):=(); f[badsucc]}  {wrong}
   # EV16: this should go WRONG.. i.e. it gets stuck
 
 # Try CBV fixpoint combinator.
 # Too slow with some rules
+# tim=xskip: recursion
 testeq("EV17",pass) {
   Z(f:any) := ((x:any) => f[(v:any)=>x[x][v]])[(x:any) => f[(v:any)=>x[x][v]]];
   fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
   fac[3] }                                                                     {6}
 
-testeq("EV18",pass) {0[0]}                                {wrong}
-testeq("EV19",pass) {operator'/'(1,0)}                    {wrong}
+testeq("EV18",pass,tim=C00) {0[0]}                                {wrong}
+testeq("EV19",pass,tim=P00) {operator'/'(1,0)}                    {wrong}
 
 testeq("EV20",pass) {f(x:int)<succeeds>:=x<10; f[3]}      {3}
 testeq("EV21",pass) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
 
-testeq("EV22",pass) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
+testeq("EV22",pass,tim=A00) {swapBad  := (t:any => (x:any; y:any;           (y, x))); p:any; swapBad [p] = (2,3); p } {wrong}
 testeq("EV23",pass, broken) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
                             ; p:any; swapGood[p] = (2,3); p }
                             {(3,2)}
 testeq("EV23a",pass, broken) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) }
                             ; p:any; swapGood[p] = (2,3); p }
                             {(3,2)}
-verify("EV23b",fail) { swapGood(t:any) := { x:any; y:any; t=(x, y); (y, x) } }
-verify("EV23c",pass) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) } }
+verify("EV23b",fail,tim=A00) { swapGood(t:any) := { x:any; y:any; t=(x, y); (y, x) } }
+# tim=skip: Tim does not allow this.  Bug?
+verify("EV23c",pass,tim=skip) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) } }
 
 # Confluence: Need local substitution, hence 'fail'
 testeq("EV24",fail)  {x : int; if (              x = 1; x > 1)  {42} else {23}} {23}
@@ -336,26 +357,28 @@ testeq("EV52",pass) { succ(x:any):=intAdd$[x,1]; y:type{:succ}=1; y }     { 2 }
 # testeq("EV",pass) { first(x:=1|2){x+1} }    {2}
 
 testeq("EV52",pass) { truth{1+2} } { truth{3} }
-testeq("EV53",pass) { a := truth{5}; a = truth{b:int}; b } { 5 }
-testeq("EV54",pass) { a := truth{5}; a? } { 5 }
-testeq("EV54b",pass) { a := truth{5}; a[5] } { 5 }
-testeq("EV55",pass) { true } { truth{()} }
-testeq("EV56",pass) { array{option{}, option{5}, option{1=2}, option{1=1}} }
+# tim=skip: Tim does not implement truth
+testeq("EV53",pass,tim=skip) { a := truth{5}; a = truth{b:int}; b } { 5 }
+testeq("EV54",pass,tim=skip) { a := truth{5}; a? } { 5 }
+testeq("EV54b",pass,tim=skip) { a := truth{5}; a[5] } { 5 }
+testeq("EV55",pass,tim=skip) { true } { truth{()} }
+testeq("EV56",pass,tim=skip) { array{option{}, option{5}, option{1=2}, option{1=1}} }
                     { array{(), truth{5}, (), truth{1} } }
-testeq("EV57",pass) { a := option{   }; if ((?int)[a]) 1 else 0 } { 1 }
-testeq("EV58",pass) { a := option{1  }; if ((?int)[a]) 1 else 0 } { 1 }
-testeq("EV59",pass) { a :=        1   ; if ((?int)[a]) 1 else 0 } { 0 }
-testeq("EV60",pass) { a := option{'x'}; if ((?int)[a]) 1 else 0 } { 0 }
-testeq("EV61",pass) { a := option{ }; if (a?) then 1 else 0 } { 0 }
-testeq("EV62",pass) { a := option{1}; if (a?) then 1 else 0 } { 1 }
+# tim=skip: Tim is not happy with this. Bug?
+testeq("EV57",pass,tim=skip) { a := option{   }; if ((?int)[a]) 1 else 0 } { 1 }
+testeq("EV58",pass,tim=skip) { a := option{1  }; if ((?int)[a]) 1 else 0 } { 1 }
+testeq("EV59",pass,tim=skip) { a :=        1   ; if ((?int)[a]) 1 else 0 } { 0 }
+testeq("EV60",pass,tim=skip) { a := option{'x'}; if ((?int)[a]) 1 else 0 } { 0 }
+testeq("EV61",pass,tim=skip) { a := option{ }; if (a?) then 1 else 0 } { 0 }
+testeq("EV62",pass,tim=skip) { a := option{1}; if (a?) then 1 else 0 } { 1 }
 
 testeq("AndyExe12", pass, broken)
                     { exists A B { B = all{ exists C D { C = all{ (A = 1) | (D = 0) }
                                                        ; D = 1; C } }
                                  ; A = 1; B } }
                     { array{array{1}} }
-
-testeq("AndyExe17", pass)
+# tim=skip: seems to hang Tim's verifier
+testeq("AndyExe17", pass, tim=skip)
                     { exists F {
                         F = function(A:any){ all{ (A = true; true) | (A = false; F(true)) } };
                         exists X Y {
@@ -369,7 +392,8 @@ testeq("AndyExe19", pass)
                     { array{0} }
 
 # replacing 'for(1){1|2}' with 'array{1|2}' makes it pass.
-testeq("AndyChoice4", pass)
+# tim=skip: runtime bug
+testeq("AndyChoice4", pass, tim=skip)
                     { all { Y := for(1) {1|2};
                             Z := 4|5;
                             X := 1;

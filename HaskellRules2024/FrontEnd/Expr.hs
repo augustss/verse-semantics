@@ -28,7 +28,7 @@ module FrontEnd.Expr(
 
     , getFree, getAllIdents, getVisibleBinders, getAllBinders, getVar
     , substMany
-    , prettyTim              -- pretty print in a Tim compatible way
+    , fixity,
   ) where
 
 import Prelude hiding ((<>))  -- Epic.Print exports (<>)
@@ -36,8 +36,8 @@ import Prelude hiding ((<>))  -- Epic.Print exports (<>)
 import Rules.Core( Lit(..), Ptr, Path(..), PrimOp(..) )
 
 import FrontEnd.Error
-import Epic.Print
 import Epic.List
+import Epic.Print
 
 import Control.Monad.Identity
 import Control.Monad.Writer
@@ -184,7 +184,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
 
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 -- SrcPat synonym is used for syntax of 'p' in the source language
 type SrcPat = SrcExpr
@@ -414,7 +414,7 @@ isOpenClosed _                  = False
 
 data Store = Store { refMap :: IM.IntMap SrcValue
                    , outputs :: [SrcCore] }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data)
 
 --------------------------------------------------------
 --               Pretty printing
@@ -453,6 +453,23 @@ instance Pretty SrcExpr where
                 --x | l == prettyNormal, Just r <- stripPrefix "operator'" (unIdent v) = text (init r)
                 | otherwise = ppr 0 v
 
+{-
+      -- Print a sequence where Tim allows ';'
+      ppEB e | lvl /= prettyTim = ppr 0 e
+             | otherwise =
+               case e of
+                 Blk es -> ppSeq lvl es
+                 Seq es -> ppSeq lvl es
+                 _      -> ppr 0 e
+-}
+      -- We have list of expressions that need to be considered a single expression.
+      -- This should have been 'block{es}', but Tim does not implement that.
+      -- It could have been 'let(){es}', but Tim has the wrong scope for that.
+      -- So we settle on 'array{e1, ..., en}[n]', which is pretty horrible.
+      block es = maybeParens (p>0) $
+                 --text "array" <> braces (ppSeq lvl es) <> brackets (text (show (length es - 1)))
+                 text "let()" <> braces (ppSeq lvl es)
+
       ppNormal expr =
         case expr of
           Lit lit    -> ppr p lit
@@ -469,7 +486,7 @@ instance Pretty SrcExpr where
                      -> case es of
                          []  -> ppNormal (Array [])
                          [e] -> ppNormal e
-                         _   -> text "let()" <> braces (ppSeq lvl es)
+                         _   -> block es
                      | otherwise
                      -> maybeParens (p > 0) $ ppSeq lvl es
 
