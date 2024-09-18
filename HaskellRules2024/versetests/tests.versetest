@@ -286,7 +286,6 @@ testeq("EV10",pass) {succ(x:int):=x+1; f(c:int, a:=if(c=0)then :int else :succ):
 
 testeq("EV11",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[0]}}     {1}
 testeq("EV12",pass) {one{t:=type{0|1}; f(x:t)<closed>:=x+1; f[2]}}     {:false}
-# tim=xskip: bug
 testeq("EV13",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[0]}    {1}
 testeq("EV14",pass) {t:=type{:int}; f(x:t)<closed>:=x+1; f[()]}   {:false}
 # These are very slow with alternative rules
@@ -296,7 +295,6 @@ testeq("EV16",pass,tim=F00) {t:=type{:int => :int}; f(x:t)<closed>:=x[0]; badsuc
 
 # Try CBV fixpoint combinator.
 # Too slow with some rules
-# tim=xskip: recursion
 testeq("EV17",pass) {
   Z(f:any) := ((x:any) => f[(v:any)=>x[x][v]])[(x:any) => f[(v:any)=>x[x][v]]];
   fac := Z[(fc:any) => (n:any) => if (n=0) then 1 else n*fc[n-1]];
@@ -369,8 +367,8 @@ testeq("EV57",pass,tim=skip) { a := option{   }; if ((?int)[a]) 1 else 0 } { 1 }
 testeq("EV58",pass,tim=skip) { a := option{1  }; if ((?int)[a]) 1 else 0 } { 1 }
 testeq("EV59",pass,tim=skip) { a :=        1   ; if ((?int)[a]) 1 else 0 } { 0 }
 testeq("EV60",pass,tim=skip) { a := option{'x'}; if ((?int)[a]) 1 else 0 } { 0 }
-testeq("EV61",pass,tim=skip) { a := option{ }; if (a?) then 1 else 0 } { 0 }
-testeq("EV62",pass,tim=skip) { a := option{1}; if (a?) then 1 else 0 } { 1 }
+testeq("EV61",pass,tim=skip) { a := option{   }; if (a?) then 1 else 0 } { 0 }
+testeq("EV62",pass,tim=skip) { a := option{1  }; if (a?) then 1 else 0 } { 1 }
 
 testeq("AndyExe12", pass, broken)
                     { exists A B { B = all{ exists C D { C = all{ (A = 1) | (D = 0) }
