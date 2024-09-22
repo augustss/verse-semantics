@@ -41,3 +41,12 @@ Machine/.DS_Store
 Machine/src/.DS_Store
 Machine/src/Control/.DS_Store
 Machine/src/Control/Monad/.DS_Store
+*.vsidx
+*.db
+*.db-shm
+*.ipch
+*.db-wal
+*.opendb
+*.json
+Tim/TimVerse/.vs/Verse/v17/.suo
+Tim/TimVerse/VerseReference-x64-Release

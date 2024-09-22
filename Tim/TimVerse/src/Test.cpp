@@ -1,6 +1,9 @@
 //==============================================================================================================================================================
 // Tests of the library.
 
+// The Theory Group changes to TimVerse are fenced by this Pragma
+#define TG 1
+
 #include "Terse.h"
 using namespace Verse;
 #pragma warning (disable:4100 4189 4702)
@@ -1452,7 +1455,14 @@ void TestPrintFx() {
 	}
 }
 
+#ifdef TG
+// A different stating point is in Main.cpp::main()
+#else
 int main() {
+	runtests();
+}
+#endif
+int runtests() {
 	//TestPerformance();
 	//TestPrintFx();
 #ifdef NDEBUG
@@ -1464,4 +1474,4 @@ int main() {
 	TestArithmetic();
 	for(nat z=0; z<16384; z++) 
 		Print(), Print("loop: ",z),TestThreading();
-}
+} 

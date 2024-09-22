@@ -5816,14 +5816,22 @@ template<class unificand> result<tuple<>,error> Eval(const locus& Locus,const st
 //--------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Testing.
 
+
+
+void TestScript(const char*);
+
 void TestScript() {
+	TestScript("verse/Tests.verse");
+}
+
+void TestScript(const char* str) {
 	//TestParsing();
 	nat c0=Clock();
 	Print(), Print("--- testing compiler ---");
 
 	// Parse.
 	Print("Parsing...");
-	auto Filename = "verse/Tests.verse"_VS;
+	auto Filename = string(str);
 	auto Locus    = locus{Filename};
 	auto Syntax   = CoerceResult(ParseVerseSyntax(LoadTextFile(Filename),Locus));
 

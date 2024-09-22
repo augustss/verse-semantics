@@ -9,6 +9,9 @@
 #include "VerseGrammar.h"
 using namespace Verse::Grammar;
 
+// The Theory Group's version of TimVerse is fenced by this pragma
+#define TG 1
+
 // Types.
 struct test_error {
 	std::string Filename;
@@ -307,18 +310,16 @@ void TestParsing(const char* ExpectedErrorCode,const char* Code,const char* Chec
 	return TestParsing(ExpectedErrorCode,"immediate",(const char8*)Code);
 }
 
-// Main.
+#ifdef TG
+// The main was giving trouble in Visual Studio
+#else
 int main(int argc, char *argv[]) {
-	std::cout << "Hello.\r\n";
-
 	// Run TestParsing through included tests.
-#include "VerseGrammarTests.h"
-
+ #include "VerseGrammarTests.h"
 	// About.verse.
 	auto Filename = "About.verse";
 	auto String   = TestLoadTextFile(Filename);
 	std::cout << "Size " << String.size() << "\n";
 	TestParsing("S00",Filename,(char8*)String.c_str());
-
-	std::cout << "Bye.\r\n";
 }
+#endif
