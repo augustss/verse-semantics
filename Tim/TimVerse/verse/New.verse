@@ -76,4 +76,34 @@ test(F00):
 #  f(x:int):int= if( x = 0 ) { x } else { f(0) }
 #  f(x:int):= if( x = 0 ) { x } else { f(0) }
 
+# Bug! Runtime stalled
+test(R00):
+  # f(x:int):= x  # does not verify
+  # f(x:int):int= 1  # verifies and runs fine. Should it?
+  f(x:int):int= x 
+  a&b:int
+  b=f(a)
+  a=f(b)
+
+# Bug! This can only run if we execute f() ahead of g(). Effect inversion!
+test(S00):
+  f(x:int)<writes>:int= x
+  g(x:int)<reads>:void= 1
+  b:int
+  g(b)
+  b=f(1)
+
+# Ok? Unsure. variable a is unused, does it need to be resolved?
+test(A00):
+  a&b:int
+  b=1
+
+# Bug! We don't print 2 (Already seen. I wanted to check ordering)
+test(S00):
+  a&b:int
+  if(int[a]). Print(1)
+  if(int[b]). Print(2)
+  b=1
+  a=1
+
 
