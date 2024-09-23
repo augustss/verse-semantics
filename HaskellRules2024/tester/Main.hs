@@ -317,7 +317,7 @@ timTestInfo (Ident loc status) = TestInfo
   , testLocEnd   = loc
   , testType     = timTestType status
   , testStatus   = TS_Normal
-  , testTimSkip  = TimNone
+  , testTimSkip  = timSkip status
   }
 
 timTestType :: String -> TestType
@@ -325,6 +325,10 @@ timTestType :: String -> TestType
 -- All others should fail.
 timTestType ('S' : _) = TPass
 timTestType _         = TFail
+
+timSkip :: String -> TimSkip
+timSkip ('S' : _) = TimNone
+timSkip s         = TimError s
 
 ----------------------------
 runTest :: TestFlags -> Test -> IO TestRes
@@ -549,7 +553,7 @@ pTimTest :: P Test
 pTimTest =
   pKeyword "test" *> do
     tag <- pParens pIdent
-    src <- pExprSeq <* optional (pOp ";")
+    src <- pOp "{" *> pExprSeq <* optional (pOp ";") <* pOp "}"
     locEnd <- getSourcePos
     let ti = (timTestInfo tag) { testLocEnd = locEnd }
     pure $ TestVerify ti src
@@ -594,8 +598,8 @@ pTimSkip = do
   _ <- pOp "="
   sk <- pIdent
   case identString sk of
-    "skip" -> pure TimSkip
-    s      -> pure (TimError s)
+    's':'k':'i':'p':_ -> pure TimSkip
+    s                 -> pure (TimError s)
  OA.<|>
   pure TimNone
 
@@ -926,26 +930,24 @@ displayTest test = do
 
       -- How to wrap the computation and the result.
       -- If there are choices we need to turn them into arrays.
-      wrap e | maybe False hasChoice res = "for{" ++ ee ++ "}"
-             | otherwise     = ee
-               where ee = timShow e
+      wrap e | maybe False hasChoice res = "for{" ++ timShow True e ++ "}"
+             | otherwise                 = timShow False (Parens e)
 
       -- Result expression, if we need one
       res = case test of
               TestEvalEq _ _ e2 | isNothing bad -> Just e2
               _ -> Nothing
   putStrLn $ "test(" ++ retCode (testType (testInfo test)) ++ "){" ++
-             wrap (testSrc test) ++
              (case res of
-                Just e -> " = " ++ wrap e
-                _ -> "") ++
-             "}   # " ++ testName (testInfo test)
-             
+                Just e -> wrap (testSrc test) ++ " = " ++ wrap e
+                Nothing -> timShow True (testSrc test)
+             ) ++ "}   # " ++ testName (testInfo test)
 
 hasChoice :: SrcExpr -> Bool
 hasChoice e = not $ null $ filter choicy $ universeBi e
   where choicy (PrefixOp (Ident _ ":") (Variable (Ident _ "false"))) = True
         choicy (InfixOp _ (Ident _ "|") _) = True
+        choicy (Variable (Ident _ "fail")) = True
         choicy _ = False
 
 hasUnimpPrimOp :: SrcExpr -> Bool
@@ -954,18 +956,18 @@ hasUnimpPrimOp e =
       notImpIds = map (Ident noLoc) notImp
       -- Comparisons are not implemented at all,
       -- and arithmetic only works on constants.
-      notImp = words "< <= > >= <> + - * / intAdd$"
+      notImp = words "< <= > >= <> + - * / intAdd$ []"
   in  any (`elem` notImpIds) is
 
-timShow :: SrcExpr -> String
-timShow = renderStyle s . ppTim 0
+timShow :: Bool -> SrcExpr -> String
+timShow sem = renderStyle s . ppTim sem 0
   where
     s = style{ lineLength = 1000000, ribbonsPerLine = 1.2 }
 
 -------------
 
-ppTim :: Rational -> SrcExpr -> Doc
-ppTim = pp False
+ppTim :: Bool -> Rational -> SrcExpr -> Doc
+ppTim = pp
   where
     ppr :: (Pretty a) => Rational -> a -> Doc
     ppr = pPrintPrec prettyNormal
@@ -1026,6 +1028,7 @@ ppTim = pp False
         Macro1 (Ident _ "one")  [] b -> text "first" <> pp False 10 b
         Macro1 (Ident _ "all")  [] b -> text "for"   <> pp False 10 b
         Macro1 (Ident _ "type") [] b -> text "type"  <> pp False 10 b
+        Macro1 (Ident _ "check") fs b -> text "check" <> ppEffs fs <> pp False 10 b
         For1   b -> text "for" <>                         pp False 10 b
         For2 e b -> text "for" <> parens (pp True 0 e) <> pp False 10 b
         Function ars b -> maybeParens (prec > 0) $
@@ -1037,6 +1040,9 @@ ppTim = pp False
                              indent $ pp False 0 e2,
                              text "else",
                              indent $ pp False 0 e3]
+        If2 e1 e2 -> maybeParens (prec > 0) $
+                        sep [text "if" <+> parens (pp True 0 e1) <+> text "then",
+                             indent $ pp False 0 e2]
         EffAttr f a -> maybeParens (prec > q) $ pp False ql f <> text "<" <> ppr 0 a <> text ">"
           where (q, ql, _) = fixity "()"
         Let e1 e2 -> maybeParens (prec > 0) $
@@ -1055,5 +1061,6 @@ ppTim = pp False
 timRename :: [(Src.Ident, String)]
 timRename = [ (Src.Ident noLoc x, y) | (x, y) <-
   [ ("intAdd$", "operator'+'")
+  , ("fail", ":false")
   ] ]
 
