@@ -15,7 +15,6 @@ import Rules.TRS2024 as TRS2024
 import Epic.Print hiding ( (<>) )
 
 import Control.Monad (guard)
-import Data.List ((\\))
 import Rules.Solver (unsat)
 
 --------------------------------------------------------
@@ -30,7 +29,6 @@ verificationRules = everywhere verificationStep <> everywhere recStep
 verificationStep :: Rule
 verificationStep =  TRS2024.evalStep
                  <> guardStep
-                 <> checkStep
                  <> verifyStep
                  <> splitStep
 
@@ -39,7 +37,7 @@ guardStep :: Rule
 guardStep env lhs =
    "GUARD-ELIM" `nameWith`
    do v :>>: e <- [lhs]
-      guard (skolValue (skolVars env) v)
+      guard (TRS2024.skolValue (skolVars env) v)
       pure (pPrintSmallExpr v, e)
 
 {- Guards only have values to the left
@@ -51,37 +49,6 @@ guardStep env lhs =
 -}
 
 --------------------------------------------------------------------------------
-checkStep :: Rule
-checkStep env lhs =
-   "CHECK-SUC" `name`
-   do Check eff v <- [lhs]
-      guard (skolValue (skolVars env) v)
-      guard (canSucceed eff)
-      pure v
-   ++
-   "CHECK-FAIL" `name`
-   do Check eff Fail <- [lhs]
-      guard (canFail eff)
-      pure Fail
-{-
-   ++
-   "CHECK-ITER" `name`
-   do Check eff e@(Iter _ _ _ _) <- [lhs]
-      let (_e1, _e2, _x, _y, e3, _z, e4) = unpackIter e
-      -- pure $ Iter _e1 _e2 (Lam $ bind _x $ Lam $ bind _y $ Check eff e3) (Lam $ bind _z $ Check eff e4)
-      pure $ (Var underscore :=: Check eff e3) :>: Check eff e4
-
-unpackIter :: Expr -> (Expr, Expr, Ident, Ident, Expr, Ident, Expr)
-unpackIter (Iter e1 e2 (Lam e3) (Lam e4)) | (x, Lam e3') <- unsafeUnbind e3 =
-      let (y, e3'') = unsafeUnbind e3'
-          (z, e4') = unsafeUnbind e4
-      in  (e1, e2, x, y, e3'', z, e4')
-unpackIter _ = error "unpackIter: bad iter"      
--}
-
-skolValue :: [SkolIdent] -> Expr -> Bool
--- A value whose only free vars are skolems
-skolValue rs e = isVal e && null (free e \\ rs)
 
 groundValue :: [SkolIdent] -> Expr -> Maybe GroundVal
 -- Like skolValue, but no lambdas
