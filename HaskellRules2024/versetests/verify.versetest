@@ -1,3 +1,5 @@
+# For results running with Tim's verifier, see
+# https://docs.google.com/spreadsheets/d/13htHZ708wVow5NXENgF50E4nEPjqhgJAb17ZzjXy4D4/edit?usp=sharing
 
 # Trivial tests
 verify("Triv-pass", pass){1}

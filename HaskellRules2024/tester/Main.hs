@@ -62,6 +62,9 @@ runTests test_flags
   | timOutput test_flags
   = mapM_ read_and_display (fileNames test_flags)
 
+  | timCSV test_flags
+  = mapM_ read_and_csv (fileNames test_flags)
+
   | otherwise
   = mapM_ read_and_run (fileNames test_flags)
   where
@@ -72,6 +75,10 @@ runTests test_flags
     read_and_display :: FilePath -> IO ()
     read_and_display fn = do { tests <- readTests fn
                              ; displayTestFile test_flags (fn, tests) }
+
+    read_and_csv :: FilePath -> IO ()
+    read_and_csv fn = do { tests <- readTests fn
+                         ; displayCSV test_flags (fn, tests) }
 
 -----------------------------------------------
 --
@@ -110,7 +117,7 @@ data TestInfo =  -- Per-test info e.g.  verify(pass, ICFPEverify=skip){ ...code.
 data TestType = TPass | TFail | TLoop   -- Expected behaviour
   deriving (Eq)
 
-data TimSkip = TimNone | TimSkip | TimError String
+data TimSkip = TimNone | TimSkip String | TimError String
   deriving (Eq, Show)
 
 instance Show TestType where
@@ -598,7 +605,7 @@ pTimSkip = do
   _ <- pOp "="
   sk <- pIdent
   case identString sk of
-    's':'k':'i':'p':_ -> pure TimSkip
+    's':'k':'i':'p':s -> pure (TimSkip s)
     s                 -> pure (TimError s)
  OA.<|>
   pure TimNone
@@ -632,6 +639,7 @@ data TestFlags = TestFlags
   , timRun         :: !Bool                -- run Tim's verifier tests
   , timVerify      :: !Bool                -- verify Tim's verifier tests
   , timOutput      :: !Bool                -- just display the test in Tim's syntax
+  , timCSV         :: !Bool                -- output status of Tim tests
   , showDesugared  :: !Bool                -- show desugared version just before evaluation
   , preludeEval    :: !String              -- use this prelude in TestEval
   , preludeVerify  :: !String              -- use this prelude in TestVerify
@@ -744,6 +752,9 @@ testFlags = TestFlags
   <*> OA.switch
          ( OA.long "tim-output"
         <> OA.help "display as a Tim test" )
+  <*> OA.switch
+         ( OA.long "tim-csv"
+        <> OA.help "displkay status of Tim tests" )
   <*> OA.switch
          ( OA.long "show-desugared"
         <> OA.help "show desugared version" )
@@ -903,6 +914,33 @@ grabLines from to = unlines . take (to - from). drop (from - 1). lines
 
 -----------------------------------------------
 --
+--     Display status of Tim conversion as a CSV
+--     displayCSV :: TestFlags -> (FilePath, [Test]) -> IO ()
+--
+-----------------------------------------------
+
+displayCSV :: TestFlags -> (FilePath, [Test]) -> IO ()
+displayCSV _tflg (_fn, ts) = mapM_ displayCSVTest ts
+
+displayCSVTest :: Test -> IO ()
+displayCSVTest test | TimSkip s <- testTimSkip (testInfo test)  = skipCSV (skipMsg s)
+                    | hasUnimpPrimOp $ testSrc test             = skipCSV "unimplemented"
+                    | testStatus (testInfo test) == TS_Skip     = skipCSV "marked skip"
+                    | testStatus (testInfo test) == TS_Broken   = skipCSV "marked broken"
+                    | otherwise                                 = skipCSV "OK"
+  where skipCSV msg = putStrLn $ show (testName (testInfo test)) ++ "," ++ show msg
+        skipMsg ('_':s) = skipMsg s
+        skipMsg ""      = "skip"
+        skipMsg "acc"   = "accepted"
+        skipMsg "rej"   = "rejected"
+        skipMsg "crash" = "crash"
+        skipMsg "any"   = ":any behaviour"
+        skipMsg "loop"  = "loops"
+        skipMsg "unimpl"= "unimplemented"
+        skipMsg s       = s
+
+-----------------------------------------------
+--
 --     Display tests in Tim's format
 --     displayTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 --
@@ -912,9 +950,9 @@ displayTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 displayTestFile _tflg (_fn, ts) = mapM_ displayTest ts
 
 displayTest :: Test -> IO ()
-displayTest test | testTimSkip (testInfo test) == TimSkip  = return ()
-                 | hasUnimpPrimOp $ testSrc test           = return ()
-                 | testStatus (testInfo test) /= TS_Normal = return ()
+displayTest test | TimSkip _ <- testTimSkip (testInfo test) = return ()
+                 | hasUnimpPrimOp $ testSrc test            = return ()
+                 | testStatus (testInfo test) /= TS_Normal  = return ()
 displayTest test = do
   let retCode :: TestType -> String
       retCode TFail | Just err <- bad = err
