@@ -165,7 +165,7 @@ asSrcExpr e = asParsed e
 
 asCore :: SomeExpr -> Rules.Expr
 asCore (RulesCore e) = e
-asCore _            = error "Current expresion has not been desugared to Core"
+asCore _             = error "Current expresion has not been desugared to Core"
 
 {-
 asDesugared :: Flags -> SomeExpr -> SrcExpr
@@ -300,6 +300,7 @@ flagTable =
   ,("postProcess", (fPostProcess,  \ b s -> s{fPostProcess=b}))
   ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
+  ,("evaltrace",   (fTraceEval,    \ b s -> s{fTraceEval=b}))
   ,("assumeVerified", (fAssumeVerified, \ b s -> s{fAssumeVerified=b}))
   ]
 
@@ -379,7 +380,7 @@ cEval
        ; let eval_it = Rules.normalize (fEvalSteps (cs_flags s))
                              (Rules.everywhere TRS2024.evalRules)
 
-       ; core_result <- showEvalResult "Evaluation" (eval_it prepd_expr)
+       ; core_result <- showEvalResult (fTraceEval $ cs_flags s) "Evaluation" (eval_it prepd_expr)
 
        ; pure (RulesCore core_result) }
 
@@ -397,13 +398,16 @@ cVerify
        ; putStrLn (prettyShow prepd_expr)
 
        ; putStrLn ("\n\n------- Verify ---------")
-       ; e' <- showEvalResult "Verification" (verify_it prepd_expr)
+       ; e' <- showEvalResult (fTraceVerify $ cs_flags s) "Verification" (verify_it prepd_expr)
 
        ; pure (RulesCore e') }
 
 
-showEvalResult :: String -> (NormResult, Traced Rules.Expr) -> IO Rules.Expr
-showEvalResult what (res, tr@(e' :<-- _))
+showEvalResult :: Bool -> String -> (NormResult, Traced Rules.Expr) -> IO Rules.Expr
+showEvalResult False _ (_, (e' :<-- _))
+  = do { putStrLn (prettyShow e')
+       ; return e' }
+showEvalResult _ what (res, tr@(e' :<-- _))
   = do { putStrLn (what ++ " " ++ showNormResult res)
        ; display tr
        ; return e' }
