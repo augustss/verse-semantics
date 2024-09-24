@@ -15,7 +15,7 @@ import FrontEnd.Desugar
 import FrontEnd.ToCore
 import FrontEnd.Parse(parseDie, pFile)
 import FrontEnd.Prelude( findPrelude )
-import FrontEnd.Error
+--import FrontEnd.Error
 
 -- Epic libraries
 import Epic.Repl
@@ -230,7 +230,7 @@ theCommandSet = CommandSet
 --  , c_exec = cParseLine
 
   -- c_exec :: CmdRunner deals with a command /starting/ with colon
-  , c_exec = errorMessage "c_exec: not done yet"
+  , c_exec = cParseLine
 
   , c_help   = helpMsg
   , c_greet  = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
@@ -408,6 +408,13 @@ showEvalResult what (res, tr@(e' :<-- _))
        ; display tr
        ; return e' }
 
+cParseLine :: CmdRunner CState
+cParseLine line s =
+  tryIt (pure s) (updateLastExpr s) $ do
+    let prog = parseDie (Parsed <$> pFile) "<interactive>" line
+    display prog
+    pure prog
+
 {-
 cTransform :: Bool                    -- True <=> display the result
            -> (SomeExpr -> SomeExpr)  -- How to transform
@@ -419,13 +426,6 @@ cTransform display_result tr =
        ; when display_result $ display e'
        ; pure e' }
 
-
-cParseLine :: CmdRunner CState
-cParseLine line s =
-  tryIt (pure s) (updateLastExpr s) $ do
-    let prog = parseDie ((Parsed <$> P.try pFile) <|> (Desugared <$> pCoreFile)) "<interactive>" line
-    display prog
-    pure prog
 
 cPcore :: CmdRunner CState
 cPcore line s =
