@@ -766,20 +766,23 @@ dsM_12 :: HasCallStack => DsMode12 -> SrcSmall -> Pi -> D SrcCore
 
 -------------------- Functions -----------------------
 dsM_12 MV t@(Function [(t1, _fx)] t2) pi        -- MCFUN+
-  = do r <- newIdent (getLoc t) "r"
+  = dsRule "MCFUN+" t $
+    do r <- newIdent (getLoc t) "r"
        body <- defineDE2 "j" (dsM_12 MI t1 (P (Variable r)))
                              (dsB_12 MV t2 pi)
        seqDE [ pure (eVerify [r] body)
              , dsM_12 MI t pi ]
 
-dsM_12 MI (Function [(t1, _fx)] t2) pi        -- MCFUN-
-  = do i   <- newIdent (getLoc t1) "i"
+dsM_12 MI t@(Function [(t1, _fx)] t2) pi        -- MCFUN-
+  = dsRule "MCFUN-" t $
+    do i   <- newIdent (getLoc t1) "i"
        body <- defineDE2 "j" (dsM_12 MV t1 (P (Variable i)))
                              (dsB_12 MI t2 pi)
        pure $ {- TODO: ISFUN -} Lam i body
 
-dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
-  = do i   <- newIdent (getLoc t1) "i"
+dsM_12 MX t@(Function [(t1, _fx)] t2) pi        -- MCFUNX
+  = dsRule "MCFUNX" t $
+    do i   <- newIdent (getLoc t1) "i"
        body <- defineDE2 "j" (dsM_12 MX t1 (P (Variable i)))
                              (dsB_12 MX t2 pi)
        pure $ Lam i body
@@ -787,76 +790,93 @@ dsM_12 MX (Function [(t1, _fx)] t2) pi        -- MCFUNX
 -------------------- e |>{fx} t -----------------------
 -- M+[ t1 |>fx t2 ]pi = x := check<fx>{ M[t1]pi }
 --                      check<succeeds>{ z := M+[t2]E; z[x] }
-dsM_12 MI (OfType t1 fx t2) _pi      -- MOFTYPE-
+dsM_12 MI t@(OfType t1 fx t2) _pi      -- MOFTYPE-
     -- SLPJ: pi is unused, which seems suspicious
     -- But I think that's a correct reflection of opacity
-  = do { (dz, z) <- defineDE "z" (mDesugarExpr MI t2)
+  = dsRule "MOFTYPE-" t $
+    do { (dz, z) <- defineDE "z" (mDesugarExpr MI t2)
        ; pure (eSeq [ dz, eGuard (getFree t1) (eSeq [eHavoc fx, eSome z]) ]) }
 
-dsM_12 MV (OfType t1 fx t2) pi      -- MOFTYPE+X
-   = do { (dx, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
+dsM_12 MV t@(OfType t1 fx t2) pi      -- MOFTYPE+X
+   = dsRule "MOFTYPE+X" t $
+     do { (dx, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
         ; (dz, z) <- defineDE "z" (mDesugarExpr MV t2)
         ; pure (eSeq [dx, eCheck [effSucceeds] (eSeq [dz, eApplyD z x])]) }
 
-dsM_12 s (OfType t1 fx t2) pi      -- MOFTYPEX
-  = do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 s t1 pi)
+dsM_12 s t@(OfType t1 fx t2) pi      -- MOFTYPEX
+  = dsRule "MOFTYPEX" t $
+    do { (e1, x) <- defineDE "x" (eCheck fx <$> dsM_12 s t1 pi)
        ; e2 <- dsM_12 s (Range fx t2) (P x)
        ; pure (eSeq [e1,e2]) }
 
 -------------------- :{fx} t -----------------
 -- Roughly:  M_s[ :<fx> t ] (P e)  =  M_s[ e |><fx> t ] E
 
-dsM_12 MI (Range fx t) (P e)                 -- MTYPE-
-  = do { (dz, z) <- defineDE "z" (mDesugarExpr MI t)
+dsM_12 MI tt@(Range fx t) (P e)                 -- MTYPE-
+  = dsRule "MTYPE-" tt $
+    do { (dz, z) <- defineDE "z" (mDesugarExpr MI t)
        ; pure (eSeq [dz, eGuard (getFree e) (eSeq [eHavoc fx, eSome z]) ]) }
 
-dsM_12 s (Range fx t) (P e)                  -- MTYPE+X
+dsM_12 s tt@(Range fx t) (P e)                  -- MTYPE+X
   | null fx
-  = do { (dz, z) <- defineDE "z" (mDesugarExpr s t)
+  = dsRule "MTYPE+Xa" tt $
+    do { (dz, z) <- defineDE "z" (mDesugarExpr s t)
        ; pure (eSeq [ dz, eApplyD z e]) }
 
   | otherwise
-  = do { y <- newIdent (getLoc t) "y"
+  = dsRule "MTYPE+Xa" tt $
+    do { y <- newIdent (getLoc t) "y"
        ; (dz, z) <- defineDE "z" (mDesugarExpr s t)
        ; pure (eSeq [ eDefine y (eCheck fx e)
                     , eCheck [effSucceeds] (eSeq [dz, eApplyD z (Variable y)])]) }
 
-dsM_12 s (Range _fx t) E                      -- MTYPEE
-  = do { x <- newIdent (getLoc t) "x"
+dsM_12 s tt@(Range _fx t) E                      -- MTYPEE
+  = dsRule "MTYPEE" tt $
+    do { x <- newIdent (getLoc t) "x"
        ; (e, z) <- defineDE "z" (mDesugarExpr s t)
        ; let z_app = eApplyD z (Variable x)   -- z[x]
        ; pure (Exists [x] (eSeq [e, z_app])) }
 
 -------------------- check<fx>{t} -----------------
-dsM_12 MI (Check _fx t) pi                  -- MCHECK-
-  = dsM_12 MI t pi
+dsM_12 MI tt@(Check _fx t) pi                  -- MCHECK-
+  = dsRule "MCHECK-" tt $
+    dsM_12 MI t pi
 
-dsM_12 s (Check fx t) pi                   -- MCHECK+X
-  = Check fx <$> dsM_12 s t pi
+dsM_12 s tt@(Check fx t) pi                   -- MCHECK+X
+  = dsRule "MCHECK+X" tt $
+    Check fx <$> dsM_12 s t pi
 
 -------------------- (x~>y) := t -----------------
-dsM_12 s (DefineIE x y t) E                -- MSQUIGE
-  = do i <- newIdent (getLoc t) "i"
+dsM_12 s tt@(DefineIE x y t) E                -- MSQUIGE
+  = dsRule "MSQUIGE" tt $
+    do i <- newIdent (getLoc t) "i"
        eExists [i] <$> dsM_12 s (DefineIE x y t) (P (Variable i))
 
-dsM_12 s (DefineIE x y t) (P i)             -- MSQUIGP
-  = do { body <- dsM_12 s t (P i)
+dsM_12 s tt@(DefineIE x y t) (P i)             -- MSQUIGP
+  = dsRule "MSQUIGP" tt $
+    do { body <- dsM_12 s t (P i)
        ; pure (eSeq [eDefine x i, eDefine y body]) }
 
 -------------------- x := t -----------------
-dsM_12 s (DefineE x t) pi                   -- MBIND
-  = eDefine x <$> dsM_12 s t pi
+dsM_12 s tt@(DefineE x t) pi                   -- MBIND
+  = dsRule "MBIND" tt $
+    eDefine x <$> dsM_12 s t pi
 
 -------------------- exists x -----------------
 -- Equivalent to to (y:any) provided any = \x.x
 --   M_sig[ exists y ]E    = exists y
 --   M_sig[ exists y ]P(i) = y := i
-dsM_12 _ (DefineV y) E     = pure $ DefineV y
-dsM_12 _ (DefineV y) (P i) = pure $ eDefine' y i
+dsM_12 _ tt@(DefineV y) E
+  = dsRule "MEXIE" tt $
+    pure $ DefineV y
+dsM_12 _ tt@(DefineV y) (P i)
+  = dsRule "MEXIP" tt $
+    pure $ eDefine' y i
 
 -------------------- v >> t -----------------
-dsM_12 s (Guard t1 t2) pi                   -- MGUARD
-  = Guard <$> dsM_12 s t1 E <*> dsM_12 s t2 pi
+dsM_12 s tt@(Guard t1 t2) pi                   -- MGUARD
+  = dsRule "MGUARD" tt $
+    Guard <$> dsM_12 s t1 E <*> dsM_12 s t2 pi
 
 -------------------- exi x. t -----------------
 -- dsM_12 s (Exists is t) pi@(P {})
@@ -864,21 +884,29 @@ dsM_12 s (Guard t1 t2) pi                   -- MGUARD
 --       ; e' <- dsM_12 s t pi
 --       ; pure (eSeq (us ++ [e'])) }
 --
-dsM_12 s (Exists is t) E      = Exists is <$> dsM_12 s t E
+dsM_12 s tt@(Exists is t) E
+  = dsRule "MEXISTS" tt $
+    Exists is <$> dsM_12 s t E
 dsM_12 _ t@(Exists {}) (P {}) = impossible "Exists in pattern" t
 
-dsM_12 s (Lam x t) E          = Lam x <$> dsM_12 s t E
+dsM_12 s tt@(Lam x t) E
+  = dsRule "MLAM" tt $
+  Lam x <$> dsM_12 s t E
 dsM_12 _ t@(Lam {}) (P {})    = impossible "Exists in pattern" t
 
-dsM_12 s (Some t) E           = Some <$> dsM_12 s t E
+dsM_12 s tt@(Some t) E
+  = dsRule "MSOME" tt $
+    Some <$> dsM_12 s t E
 dsM_12 _ t@(Some {}) (P {})   = impossible "Some in pattern" t
 
 -------------------- array{t1,...tn} -----------------
-dsM_12 s (Splice t) pi                       -- MSPLICE
-   = dsM_12 s t pi   -- See (AMP1) Note [Desugaring ampersand]
+dsM_12 s tt@(Splice t) pi                       -- MSPLICE
+   = dsRule "MSPLICE" tt $
+     dsM_12 s t pi   -- See (AMP1) Note [Desugaring ampersand]
 
-dsM_12 s (Array ts) E                       -- MARRAYE
-   = do { elts <- mapM do_one ts; mkArray elts }
+dsM_12 s tt@(Array ts) E                       -- MARRAYE
+   = dsRule "MARRAYE" tt $
+     do { elts <- mapM do_one ts; mkArray elts }
    where
      do_one (Splice t) = Splice <$> dsM_12 s t E
      do_one t          =            dsM_12 s t E
@@ -886,8 +914,9 @@ dsM_12 s (Array ts) E                       -- MARRAYE
 -- M[ <t1, .., tn> ] P(i)
 --   = i = <exists i1, ..., exists in>;
 --     <M[t1]P(i1), ..., M[tn]P(in}
-dsM_12 s (Array ts) (P i)                   -- MARRAYP
-   = do { prs <- mapM do_one ts
+dsM_12 s tt@(Array ts) (P i)                   -- MARRAYP
+   = dsRule "MARRAYP" tt $
+    do { prs <- mapM do_one ts
         ; let (exi_js, es) = unzip prs
         ; exi_js_arr <- mkArray exi_js
         ; res_arr    <- mkArray es
@@ -902,40 +931,47 @@ dsM_12 s (Array ts) (P i)                   -- MARRAYP
                             ; pure (DefineV j, e') }
 
 -------------------- truth{t1} -----------------
-dsM_12 s (Truth t) E                       -- MTRUTHE
-   = Truth <$> dsM_12 s t E
+dsM_12 s tt@(Truth t) E                       -- MTRUTHE
+   = dsRule "MTRUTHE" tt $
+     Truth <$> dsM_12 s t E
 
-dsM_12 s (Truth t) (P i)                   -- MTRUTHP
-   = do { j <- newIdent (getLoc t) "j"
+dsM_12 s tt@(Truth t) (P i)                   -- MTRUTHP
+   = dsRule "MTRUTHP" tt $
+     do { j <- newIdent (getLoc t) "j"
         ; e <- dsM_12 s t (P (Variable j))
         ; pure (eExists [j] (eSeq [ Unify i (Truth (Variable j))
                                   , Truth e ])) }
 
 -------------------- t1 = t2 -----------------
-dsM_12 s (Unify t1 t2) pi                   -- MEQ
-  = Unify <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
+dsM_12 s tt@(Unify t1 t2) pi                   -- MEQ
+  = dsRule "MUNIFY" tt $
+    Unify <$> dsM_12 s t1 pi <*> dsM_12 s t2 pi
 
 -------------------- t1  where t2 -----------------
-dsM_12 s (Where t1 t2) pi                   -- MWERE
-  = do { (e1,z) <- defineDE "z" (dsM_12 s t1 pi)
+dsM_12 s tt@(Where t1 t2) pi                   -- MWERE
+  = dsRule "MWERE" tt $
+    do { (e1,z) <- defineDE "z" (dsM_12 s t1 pi)
        ; e2 <- mDesugarExpr s t2
        ; pure (eSeq [e1, e2, z]) }
 
 -------------------- let (t1){t2} -----------------
-dsM_12 s (Let t1 t2) pi                     -- MLET
-  = do { e1 <- mDesugarExpr s t1
+dsM_12 s tt@(Let t1 t2) pi                     -- MLET
+  = dsRule "MLET" tt $
+    do { e1 <- mDesugarExpr s t1
        ; e2 <- dsM_12 s t2 pi
        ; pure (Let e1 e2) }
 
 -------------------- t1 ; t2 -----------------
-dsM_12 MX (Seq ts) pi                      -- MSEMIX
-  = do let (ts', t) = unSeq ts
+dsM_12 MX tt@(Seq ts) pi                      -- MSEMIX
+  = dsRule "MSIMIX" tt $
+    do let (ts', t) = unSeq ts
        es' <- mapM (mDesugarExpr MX) ts'
        e'  <- dsM_12 MX t pi
        pure $ eSeq (es' ++ [e'])
 
-dsM_12 s  (Seq ts) pi                      -- MSEMI
-  = do let (ts', t) = unSeq ts
+dsM_12 s  tt@(Seq ts) pi                      -- MSEMI
+  = dsRule "MSEMI" tt $
+    do let (ts', t) = unSeq ts
        es' <- mapM (mDesugarExpr MV) ts'
        e'  <- dsM_12 s t pi
        pure $ eSeq (es' ++ [e'])
@@ -943,45 +979,57 @@ dsM_12 s  (Seq ts) pi                      -- MSEMI
 -------------------- (t1 | t2) and fail -----------------
 dsM_12 s t@(Choice {}) (P i)                 -- MCHOICE
   = flipToE s t i
-dsM_12 s (Choice t1 t2) E                    -- MCHOICE
-  = Choice <$> dsM_12 s t1 E <*> dsM_12 s t2 E
+dsM_12 s tt@(Choice t1 t2) E                    -- MCHOICE
+  = dsRule "MCHOICE" tt $
+    Choice <$> dsM_12 s t1 E <*> dsM_12 s t2 E
 
 dsM_12 _ Fail _
-   = pure Fail
+  = dsRule "MFAIL" Fail $
+    pure Fail
 
 -------------------- k, op, x -----------------
 dsM_12 s t@(Lit{}) (P i)                   -- MCONST
   = flipToE s t i
 
 dsM_12 _ t@(Lit{}) E                       -- MCONST
-   = pure t
+  = dsRule "MCONSTE" t $
+    pure t
 
 dsM_12 _ t@(EPrim{}) E                     -- MPrim
-   = pure t
+  = dsRule "MPRIM" t $
+    pure t
 
 -------------------- Unerscore "_" -------------
 -- M_sigma[ _ ] E     = exists x.x
 -- M_sigma[ _ ] P(i) = i
-dsM_12 _ (Variable v) pi             -- MUNDER
+dsM_12 _ tt@(Variable v) pi             -- MUNDER
    | isSrcUnderscore v
-   = case pi of
+   = dsRule "MUNDER" tt $
+     case pi of
        E   -> pure existsXX
        P i -> pure i
 
-dsM_12 _ t@(Variable {}) E     = pure t
-dsM_12 s t@(Variable {}) (P i) = flipToE s t i
+dsM_12 _ t@(Variable {}) E
+  = dsRule "MVAR" t $
+    pure t
+dsM_12 s t@(Variable {}) (P i)
+  = flipToE s t i
 
 -------------------- t1[t2] -----------------
 -- Rule MVAR
-dsM_12 s t@(ApplyD {})  (P i) = flipToE s t i
-dsM_12 s (ApplyD t1 t2) E     = eApplyD <$> mDesugarExpr s t1 <*> mDesugarExpr s t2
+dsM_12 s t@(ApplyD {})  (P i)
+  = flipToE s t i
+dsM_12 s tt@(ApplyD t1 t2) E
+  = dsRule "MAPP" tt $
+    eApplyD <$> mDesugarExpr s t1 <*> mDesugarExpr s t2
 
 -------------------- if t1 then t2 else t3 ----
 -- Push `pi` into `t2` and `t3`
 -- and desugar (if e1 then e2 else e3) --> one{ (e1; \_.e2) | (\_.e3) }[]
 -- The key point is that existentials bound in e1 scope over e2
-dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
-   = do { e1 <- mDesugarExpr s t1
+dsM_12 s tt@(If3 t1 t2 t3) pi                 -- MIF
+   = dsRule "MIF" tt $
+     do { e1 <- mDesugarExpr s t1
         ; e2 <- dsM_12 s t2 pi
         ; e3 <- dsM_12 s t3 pi
         ; encodeIf e1 e2 e3
@@ -992,14 +1040,23 @@ dsM_12 s (If3 t1 t2 t3) pi                 -- MIF
 -- We allow all{e}, one{e} in patterns using flipToE
 --    (not very important)
 
-dsM_12 s (All t) E       = encodeAll =<< dsM_12 s t E
-dsM_12 s t@(All{}) (P i) = flipToE s t i
+dsM_12 s tt@(All t) E
+  = dsRule "MALL" tt $
+    encodeAll =<< dsM_12 s t E
+dsM_12 s t@(All{}) (P i)
+  = flipToE s t i
 
-dsM_12 s (One t) E       = encodeOne =<< dsM_12 s t E
-dsM_12 s t@(One{}) (P i) = flipToE s t i
+dsM_12 s tt@(One t) E
+  = dsRule "MONE" tt $
+    encodeOne =<< dsM_12 s t E
+dsM_12 s t@(One{}) (P i)
+  = flipToE s t i
 
-dsM_12 s (For2 t1 t2) E   = do e1 <- dsM_12 s t1 E; e2 <- dsM_12 s t2 E; encodeFor e1 e2
-dsM_12 s t@(For2{}) (P i) = flipToE s t i
+dsM_12 s tt@(For2 t1 t2) E
+  = dsRule "MFOR" tt $
+    do e1 <- dsM_12 s t1 E; e2 <- dsM_12 s t2 E; encodeFor e1 e2
+dsM_12 s t@(For2{}) (P i)
+  = flipToE s t i
 
 dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 
@@ -1077,12 +1134,14 @@ flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
 
 flipToE MI t i                           -- MEQG
   = -- See Note [flipToE in the M- case]
+    dsRule "MEQG" t $
     do { e <- mDesugarExpr MI t
        ; v <- newIdent (getLoc t) "v"
        ; pure (eGuard (getFree i) $
                eSome (Lam v (Variable v `Unify` e))) }
 flipToE s t i
-   = Unify i <$> dsM_12 s t E
+  = dsRule "MEQ" t $
+    Unify i <$> dsM_12 s t E
 
 {- Note [flipToE in the M- case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1199,6 +1258,14 @@ traceD msg doc
   = do { do_trace <- getDFlagsX fTraceDesugar
        ; when do_trace $ doIO_D (putStrLn ("\n------- " ++ msg ++ "---------\n" ++ render doc))
        }
+
+dsRule :: (Pretty a) => String -> a -> D a -> D a
+dsRule msg e da = do
+  do_trace <- getDFlagsX fTraceDesugar
+  a <- da
+  when do_trace $
+    doIO_D $ putStrLn $ "\n" ++ prettyShow e ++ "\n----> " ++ msg ++ "\n" ++ prettyShow a
+  pure a
 
 doIO_D :: IO a -> D a
 doIO_D io = MkD (\_ -> io)
