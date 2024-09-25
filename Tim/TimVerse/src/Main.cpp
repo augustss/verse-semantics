@@ -6,7 +6,7 @@
 #include <string> 
 
 // The theory group changs to the TimVerse are fenced by this pragma
-#define TG 1
+#include "Main.h"
 
 // Declaration of the function in Test.cpp
 int runtests();

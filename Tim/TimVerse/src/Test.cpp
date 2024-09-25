@@ -1,8 +1,8 @@
 //==============================================================================================================================================================
 // Tests of the library.
 
-// The Theory Group changes to TimVerse are fenced by this Pragma
-#define TG 1
+// The Theory Group changes to TimVerse are fenced by The TG Pragma
+#include "Main.h"
 
 #include "Terse.h"
 using namespace Verse;

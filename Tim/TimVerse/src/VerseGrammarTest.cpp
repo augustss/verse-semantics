@@ -9,8 +9,8 @@
 #include "VerseGrammar.h"
 using namespace Verse::Grammar;
 
-// The Theory Group's version of TimVerse is fenced by this pragma
-#define TG 1
+// The Theory Group's version of TimVerse is fenced by the TG pragma
+#include "Main.h"
 
 // Types.
 struct test_error {
