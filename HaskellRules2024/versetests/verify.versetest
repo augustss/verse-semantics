@@ -359,5 +359,3 @@ verify("Ampersand5", pass, broken)
   # It's not really about "&"; rather, it involves unification of functions
   # Actually, it seems to make the verifier loop, oddly.
 
-verify("Sep24a", pass) { F():type{1|2} = 1; X := F(); X = 1|2 }
-verify("Sep24b", fail) { F():type{1|2} = 1; X := F(); X = 1 }

@@ -210,3 +210,6 @@ verify("T24Jul24-2", fail) {f(x:int)<decides>:type{x=10} := 7 }
 verify("T8Sep23-1", pass, broken) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
 verify("T8Sep23-2", fail) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
 verify("T8Sep23-3", pass, broken) {f(x:int, y:int)<succeeds> := exists z { assume{z = x}; z = x; x = y } }
+
+verify("T24Sep24-1", pass) { F():type{1|2} = 1; X := F(); X = 1|2 }
+verify("T24Sep24-2", fail) { F():type{1|2} = 1; X := F(); X = 1 }
