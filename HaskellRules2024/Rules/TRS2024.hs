@@ -4,6 +4,7 @@ module Rules.TRS2024 (
      evalRules, evalStep, recStep
    , blocked, choiceFree
    , name, nameWith, iff
+   , skolValue
  ) where
 
 import Prelude
@@ -39,6 +40,7 @@ evalStep = applicationStep
            <> normalizationStep
            <> choiceStep
            <> oneAndAllStep
+           <> checkStep
 
 -- currently:  everywhere (evalRulesNoRec `tryBefore` rulesRec)
 -- better:    (everywhere evalRulesNoRec) `tryBefore` (everywhere rulesRec)
@@ -395,6 +397,24 @@ recStep _env lhs =
      pure (Var x :=: ctx <@ (Lam $ bind y $
                              Exi $ bind x $
                              (Var x :=: v) :>: body) )
+
+--------------------------------------------------------------------------------
+checkStep :: Rule
+checkStep env lhs =
+   "CHECK-SUC" `name`
+   do Check eff v <- [lhs]
+      guard (skolValue (skolVars env) v)
+      guard (canSucceed eff)
+      pure v
+   ++
+   "CHECK-FAIL" `name`
+   do Check eff Fail <- [lhs]
+      guard (canFail eff)
+      pure Fail
+
+skolValue :: [SkolIdent] -> Expr -> Bool
+-- A value whose only free vars are skolems
+skolValue rs e = isVal e && null (free e \\ rs)
 
 --------------------------------------------------------------------------------
 --
