@@ -1,10 +1,34 @@
-# Bug! These are two distinct x variables, but the verifier complains
+# Unsure what is wrong?
+#test(X00):
+#  f(x:int,y:int):= if(int[x]){x}else{y}
+#  a:int=1
+#  b:int=if(int[a]){1}else{2}
+#  f[a,b]
+#  a=1
+
+# Feature?  Seems like converges is lying
+test(S00):
+  f()<converges><fails>:= {Err();1=2}
+  #  f()<converges><fails>:int= {Err();1=2}  # opaque fun is rejected
+
+# Bug? 
+test(D00):
+  f(x:int, g():type{x=3}):=
+    x=3
+    if (x=0 or x=1 or x=3). g()
+
+test(S00):
+  f(x:int,g():type{x=3}):=
+    if (x=0 or x=1 or x=3). g()
+    x=3
+
+# Feature.
 test(N04):
    f(x:int):= 1
    x:int
    f(x)
 
-# Bug? This should not stall, should it?
+# Bug? This should not stall
 test(R00):
   f()<interacts> :void=  Print(1)
   f()
@@ -15,20 +39,15 @@ test(S00):
   Print("Where am I?")
   y:=2
 
-# Unsure? I was trying to get an array variable
-test(C00):
-  f(y:type(array{2})) := 1
-
 # Weird? Surprisingly succeeds
 test(S00):
   f(c:char):=1 
   as:any => as=array{_} =>  x:=as[0] => bs:array{:int}=> bs=as => f[x] 
 
-# Surprising in combination with the next example  (RI: ok)
+# Surprising in combination with the next example
 test(S00):
   ty(x:int)<succeeds>:int= if(x=0) then x else 0
   g(x:ty)<succeeds>:int=1 
-
 # The above complained about ty being abstract, but here it does not... 
 test(S00):
   ty(x:int)<succeeds>:int= x
@@ -44,7 +63,6 @@ test(S00):
   f(a:int) := a
   Print(f(x))
   x=2
-
 # Bug! Should not print ".." 
 test(S00):
   x:int
@@ -66,15 +84,15 @@ test(S00):
 test(D00):  # This one seems right even error is obscure
    x:int => f():type{x=0} =>  {if(x=1){f()}else{}; x=0}
 
-# OK.  loop does not hide failure
+# Loop does not hide failure
 test(F00):
   0 => {Err("Hello"),2=3}
   0 => {2=3,Err("Hello")}
 
 # Bug!  The first fails to verify. The second stalls the verifier.
 #test(S00):
-#  f(x:int):int= if( x = 0 ) { x } else { f(0) }
-#  f(x:int):= if( x = 0 ) { x } else { f(0) }
+#  f(x:int):int= if(x=0) {x} else {f(0)}
+#  f(x:int):= if(x=0){x} else {f(0)}
 
 # Bug! Runtime stalled
 test(R00):
@@ -106,4 +124,15 @@ test(S00):
   b=1
   a=1
 
+# Feature? Choice in types, is that allowed?
+test(X00):
+   f(x:type{3|3})<succeeds>:int := 55;
+   f[3]
+
+# looping does not prevent use of the assumption
+test(S00):
+  f(x:int,g():type{x=0}):=
+     x=0
+     Err()
+     g()
 
