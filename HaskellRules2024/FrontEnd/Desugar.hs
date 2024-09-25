@@ -697,11 +697,17 @@ data DsMode12
   deriving (Eq, Ord, Show)
 
 mDesugarExpr :: DsMode12 -> SrcSmall -> D SrcCore
-mDesugarExpr s t = dsM_12 s t E
+mDesugarExpr s t
+  = dsRule "DINIT" t $
+    dsM_12 s t E
 
 dsB_12 :: DsMode12 -> SrcSmall -> Pi -> SrcCore -> D SrcExpr
-dsB_12 s t E     _  = dsM_12 s t E
-dsB_12 s t (P f) j  = dsM_12 s t (P (ApplyD f j))
+dsB_12 s t E     _
+  = dsRule "BODY1" t $
+    dsM_12 s t E
+dsB_12 s t (P f) j
+  = dsRule "BODY2" t $
+    dsM_12 s t (P (ApplyD f j))
 -- SLPJ: Crucial chnage; this makes HO13 work
 --  = do z <- newIdent (getLoc t) "z";
 --       seqDE [ pure $ eDefine z (ApplyD f j)
