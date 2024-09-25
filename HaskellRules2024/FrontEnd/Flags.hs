@@ -29,6 +29,7 @@ data Flags = Flags
   , fAssumeVerified :: !Bool
   , fTraceDesugar :: !Bool
   , fTraceVerify  :: !Bool
+  , fTraceEval    :: !Bool
   , fPrelude      :: !(PreludeName, SrcExpr)
   , fNoWarn       :: !Bool
   , fDesugar      :: !Desugar
@@ -54,6 +55,7 @@ defaultFlags = Flags
   , fAssumeVerified = False
   , fTraceDesugar = False
   , fTraceVerify  = False
+  , fTraceEval    = True
   , fPrelude      = either error id $ findPrelude defaultPrelude
   , fNoWarn       = False
   , fDesugar      = DS12

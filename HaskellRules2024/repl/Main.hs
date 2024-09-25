@@ -15,7 +15,7 @@ import FrontEnd.Desugar
 import FrontEnd.ToCore
 import FrontEnd.Parse(parseDie, pFile)
 import FrontEnd.Prelude( findPrelude )
-import FrontEnd.Error
+--import FrontEnd.Error
 
 -- Epic libraries
 import Epic.Repl
@@ -165,7 +165,7 @@ asSrcExpr e = asParsed e
 
 asCore :: SomeExpr -> Rules.Expr
 asCore (RulesCore e) = e
-asCore _            = error "Current expresion has not been desugared to Core"
+asCore _             = error "Current expresion has not been desugared to Core"
 
 {-
 asDesugared :: Flags -> SomeExpr -> SrcExpr
@@ -230,7 +230,7 @@ theCommandSet = CommandSet
 --  , c_exec = cParseLine
 
   -- c_exec :: CmdRunner deals with a command /starting/ with colon
-  , c_exec = errorMessage "c_exec: not done yet"
+  , c_exec = cParseLine
 
   , c_help   = helpMsg
   , c_greet  = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
@@ -300,6 +300,7 @@ flagTable =
   ,("postProcess", (fPostProcess,  \ b s -> s{fPostProcess=b}))
   ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
+  ,("evaltrace",   (fTraceEval,    \ b s -> s{fTraceEval=b}))
   ,("assumeVerified", (fAssumeVerified, \ b s -> s{fAssumeVerified=b}))
   ]
 
@@ -379,7 +380,7 @@ cEval
        ; let eval_it = Rules.normalize (fEvalSteps (cs_flags s))
                              (Rules.everywhere TRS2024.evalRules)
 
-       ; core_result <- showEvalResult "Evaluation" (eval_it prepd_expr)
+       ; core_result <- showEvalResult (fTraceEval $ cs_flags s) "Evaluation" (eval_it prepd_expr)
 
        ; pure (RulesCore core_result) }
 
@@ -397,16 +398,26 @@ cVerify
        ; putStrLn (prettyShow prepd_expr)
 
        ; putStrLn ("\n\n------- Verify ---------")
-       ; e' <- showEvalResult "Verification" (verify_it prepd_expr)
+       ; e' <- showEvalResult (fTraceVerify $ cs_flags s) "Verification" (verify_it prepd_expr)
 
        ; pure (RulesCore e') }
 
 
-showEvalResult :: String -> (NormResult, Traced Rules.Expr) -> IO Rules.Expr
-showEvalResult what (res, tr@(e' :<-- _))
+showEvalResult :: Bool -> String -> (NormResult, Traced Rules.Expr) -> IO Rules.Expr
+showEvalResult False _ (_, (e' :<-- _))
+  = do { putStrLn (prettyShow e')
+       ; return e' }
+showEvalResult _ what (res, tr@(e' :<-- _))
   = do { putStrLn (what ++ " " ++ showNormResult res)
        ; display tr
        ; return e' }
+
+cParseLine :: CmdRunner CState
+cParseLine line s =
+  tryIt (pure s) (updateLastExpr s) $ do
+    let prog = parseDie (Parsed <$> pFile) "<interactive>" line
+    display prog
+    pure prog
 
 {-
 cTransform :: Bool                    -- True <=> display the result
@@ -419,13 +430,6 @@ cTransform display_result tr =
        ; when display_result $ display e'
        ; pure e' }
 
-
-cParseLine :: CmdRunner CState
-cParseLine line s =
-  tryIt (pure s) (updateLastExpr s) $ do
-    let prog = parseDie ((Parsed <$> P.try pFile) <|> (Desugared <$> pCoreFile)) "<interactive>" line
-    display prog
-    pure prog
 
 cPcore :: CmdRunner CState
 cPcore line s =

@@ -139,7 +139,8 @@ scope sc = expr
       where sc' = foldr S.insert sc is
     expr (Src.Truth e)     = Src.Truth <$> expr e
     expr (Src.Iter e1 e2 e3 e4) = Src.Iter <$> exprD e1 <*> expr e2 <*> exprD e3 <*> exprD e4
-    expr e = impossible "scope" e
+    expr e = error (show e)
+      --impossible "scope" e
 
     -- exprD for a new scope context, using current in-scope set
     exprD e = fst <$> defs sc e
