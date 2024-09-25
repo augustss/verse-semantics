@@ -1270,7 +1270,7 @@ dsRule msg e da = do
   do_trace <- getDFlagsX fTraceDesugar
   a <- da
   when do_trace $
-    doIO_D $ putStrLn $ "\n" ++ prettyShow e ++ "\n----> " ++ msg ++ "\n" ++ prettyShow a
+    doIO_D $ putStrLn $ "\n--------\n" ++ prettyShow e ++ "\n----> " ++ msg ++ "\n" ++ prettyShow a
   pure a
 
 doIO_D :: IO a -> D a
