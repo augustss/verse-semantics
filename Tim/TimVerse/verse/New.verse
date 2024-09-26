@@ -15,11 +15,11 @@ test(S00):
 test(D00):
   f(x:int, g():type{x=3}):=
     x=3
-    if (x=0 or x=1 or x=3). g()
+    if (x=0 or x=1 or x=3){g()}else{}
 
 test(S00):
   f(x:int,g():type{x=3}):=
-    if (x=0 or x=1 or x=3). g()
+    if (x=0 or x=1 or x=3){ g()}else{}
     x=3
 
 # Feature.
@@ -35,7 +35,7 @@ test(R00):
 
 # Bug! Print ok, and then nothing
 test(S00):
-  if (y=2). Print("ok")
+  if (y=2){Print("ok")}else{}
   Print("Where am I?")
   y:=2
 
@@ -119,8 +119,8 @@ test(A00):
 # Bug! We don't print 2 (Already seen. I wanted to check ordering)
 test(S00):
   a&b:int
-  if(int[a]). Print(1)
-  if(int[b]). Print(2)
+  if(int[a]){ Print(1)}else{}
+  if(int[b]){Print(2)}else{}
   b=1
   a=1
 
