@@ -692,7 +692,7 @@ alphaRename forb top_t
       | x `elem` full_forb = (x', subst [(x,Var x')] t)
       | otherwise          = (x, t)
       where
-        x' = identNotIn forb
+        x' = identNotIn full_forb
 
 alphaRenameVerify :: [Ident] -> BindList ([Assump], Expr) -> ([Ident], ([Assump], Expr))
 -- Open up a Verify block, avoiding any skolems in `forb`
