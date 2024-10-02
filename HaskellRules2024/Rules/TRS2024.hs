@@ -291,7 +291,7 @@ existentialStep _env lhs =
  ++
   "EXI-FLOAT" `nameWith`
   do (v :=: exi_x_e1) :>: e2 <- [lhs]
-     (exis,x,e1) <- matchExi_alphaRename (free (v,e2,exi_x_e1)) exi_x_e1
+     (exis,x,e1) <- matchExi_alphaRename (free (v,e2)) exi_x_e1
      pure (pPrint x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
 
 
