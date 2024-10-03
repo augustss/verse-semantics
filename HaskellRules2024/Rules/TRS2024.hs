@@ -294,8 +294,6 @@ existentialStep _env lhs =
   do (v :=: exi_x_e1) :>: e2 <- [lhs]
      (exis,x,e1) <- matchExi_alphaRename (free (v,e2)) exi_x_e1
      pure (pPrint x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
-
-
  ++  -- EXI-PUSH is necessary to let us do
      --    exi x. f[y]; x=3; 3+1; blah
      -- Here we want to substitute for x despite the intervening f[y]
