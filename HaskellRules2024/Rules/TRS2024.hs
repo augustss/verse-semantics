@@ -260,6 +260,7 @@ unificationStep _env lhs =
        case (a1, a2) of
          (Lit l1, Lit l2)  -> l1 /= l2
          (Arr vs, Arr vs') -> length vs /= length vs'
+         (Tru _,  Tru _)   -> False
          (_,      _)       -> True
      pure Fail
  ++
