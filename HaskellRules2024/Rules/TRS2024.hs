@@ -314,6 +314,36 @@ existentialStep _env lhs =
      pure ( pPrint x <+> text ":=" <+> pPrintSmallExpr v
           , wrapExis (exis \\ [x]) $
             subst [(x,v)] (ctx <@ e) )
+ ++
+  "EXI-APP" `nameWith`
+  do (exis,f,e) <- matchExi_alphaRename [] lhs
+     guard (f `elem` free e)
+     guard (onlyApps f e)
+     pure ( pPrint f
+          , let dummy = Lam (bind x (Exi (bind y (Var y))))
+                x:y:_ = identsNotIn []
+             in exis <@ Exi (bind f ((Var f :=: dummy) :>: e))
+          )
+
+onlyApps :: Ident -> Expr -> Bool
+onlyApps f (Var x)      = x /= f
+onlyApps f (Arr es)     = all (onlyApps f) es
+onlyApps f (Tru e)      = onlyApps f e
+onlyApps f (Lam bnd)    = onlyAppsBind f bnd
+onlyApps f (e1 :=: e2)  = onlyApps f e1 && onlyApps f e2
+onlyApps f (e1 :>: e2)  = onlyApps f e1 && onlyApps f e2
+onlyApps f (e1 :|: e2)  = onlyApps f e1 && onlyApps f e2
+onlyApps f (e1 :@: e2)  = e1 == Var f || (onlyApps f e1 && onlyApps f e2)
+onlyApps f (Iter e1 e2 e3 e4) = all (onlyApps f) [e1,e2,e3,e4]
+onlyApps f (Some e)     = onlyApps f e
+onlyApps f (e1 :>>: e2) = onlyApps f e1 && onlyApps f e2
+onlyApps f (Check _ e)  = onlyApps f e
+onlyApps f (Exi bnd)    = onlyAppsBind f bnd
+onlyApps _  (Verify {}) = error "onlyApps Verify"
+onlyApps _ _            = True
+
+onlyAppsBind :: Ident -> Bind Expr -> Bool
+onlyAppsBind f bnd = f == x || onlyApps f e where (x,e) = alphaRename [] bnd
 
 --------------------------------------------------------------------------------
 normalizationStep :: Rule
