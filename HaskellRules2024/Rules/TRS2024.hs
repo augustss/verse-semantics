@@ -49,19 +49,19 @@ evalStep = applicationStep
 applicationStep :: Rule
 applicationStep _env lhs =
   "APP-ADD" `name`
-  do Op Add :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op Add :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1+k2))
  ++
   "APP-SUB" `name`
-  do Op Sub :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op Sub :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1-k2))
  ++
   "APP-MUL" `name`
-  do Op Mul :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op Mul :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1*k2))
  ++
   "APP-DIV" `name`
-  do Op Div :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op Div :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k2 /= 0)
      pure (LitInt (k1 `div` k2))
  ++
@@ -70,52 +70,52 @@ applicationStep _env lhs =
      pure (LitInt (- k))
  ++
   "APP-GT" `name`
-  do Op Gt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op Gt :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 > k2)
      pure (LitInt k1)
  ++
   "APP-GT-FAIL" `name`
-  do Op Gt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op Gt :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 > k2))
      pure Fail
  ++
   "APP-LT" `name`
-  do Op Lt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op Lt :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 < k2)
      pure (LitInt k1)
  ++
   "APP-LT-FAIL" `name`
-  do Op Lt :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op Lt :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 < k2))
      pure Fail
  ++
   "APP-LE" `name`
-  do Op LEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op LEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 <= k2)
      pure (LitInt k1)
  ++
   "APP-LE-FAIL" `name`
-  do Op LEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op LEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 <= k2))
      pure Fail
  ++
   "APP-GE" `name`
-  do Op GEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op GEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 >= k2)
      pure (LitInt k1)
  ++
   "APP-GE-FAIL" `name`
-  do Op GEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op GEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 >= k2))
      pure Fail
  ++
   "APP-NE" `name`
-  do Op NEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op NEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 /= k2)
      pure (LitInt k1)
  ++
   "APP-NE-FAIL" `name`
-  do Op NEq :@: Arr [LitInt k1, LitInt k2] <- [lhs]
+  do Op NEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 /= k2))
      pure Fail
  ++
@@ -143,6 +143,7 @@ applicationStep _env lhs =
   "APP-ISARR" `name`
   do Op IsArr :@: a <- [lhs]
      case a of
+       Tup {}        -> pure a
        Arr {}        -> pure a
        _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
          | otherwise -> []
@@ -168,12 +169,22 @@ applicationStep _env lhs =
      pure (if isUnderscore x
            then body
            else Exi (bind x body))
+ ++
+  "APP-TRU" `name`
+  do Tru a :@: v <- [lhs]
+     guard (isVal v && isVal a)
+     pure ((v :=: a) :>: a)
+ ++
+  "APP-TUP-0" `name`
+  do Tup [] :@: v <- [lhs]
+     guard (isVal v)
+     pure Fail
 
 arrayOpStep :: Rule
 arrayOpStep _env lhs =
-  "APP-TUPK" `name`   -- This rule isn't needed, but it makes the reduction sequence much shorter
-                      -- when indexing with a constant
-  do Arr vs :@: Lit (LInt i) <- [lhs]
+  "APP-TUPK" `name`   -- This rule isn't needed, but it makes the reduction sequence
+                      -- much shorter when indexing with a constant
+  do Tup vs :@: Lit (LInt i) <- [lhs]
      guard (all isVal vs)
      let i' = fromInteger i
      if 0 <= i' && i' < length vs then
@@ -182,48 +193,58 @@ arrayOpStep _env lhs =
        pure Fail
  ++
   "APP-TUP" `name`
-  do Arr vs@(_:_) :@: v <- [lhs]
-     guard (isVal v && all isVal vs)
+  do Tup vs@(_:_) :@: v <- [lhs]
      pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
  ++
-  "APP-TRU" `name`
-  do Tru a :@: v <- [lhs]
-     guard (isVal v && isVal a)
-     pure ((v :=: a) :>: a)
- ++
-  "APP-TUP-0" `name`
-  do Arr [] :@: v <- [lhs]
-     guard (isVal v)
-     pure Fail
+  "APP-ARR" `nameWith`
+  do arr@(Arr sz e) :@: v <- [lhs]
+     pure (pPrint arr, (Var underscore :=: (Op DotDot :@: Tup [sz,v])) :>:
+                       (Some $ Lam $ bind underscore e) )
  ++
   "APP-LENGTH" `name`
-  do Op ArrLen :@: Arr xs <- [lhs]
+  do Op ArrLen :@: Tup xs <- [lhs]
      pure (LitInt (fromIntegral (length xs)))
  ++
   "APP-DOTDOT" `nameWith`
-  do Op DotDot :@: Arr [Lit (LInt k1), Lit (LInt k2)] <- [lhs]
+  do Op DotDot :@: Tup [Lit (LInt k1), Lit (LInt k2)] <- [lhs]
      pure (pPrint (k1,k2), foldr ((:|:) . Lit . LInt) Fail [k1..k2])
  ++
   "APP-ARRAPP" `name`
-  do { Op ArrApp :@: Arr [e1,e2,res] <- [lhs]
-     ; (do { Arr vs1 <- [e1]; Arr vs2 <- [e2]; pure $ equateArr res (vs1++vs2) })
+  do { Op ArrApp :@: Tup [e1,e2,res] <- [lhs]
+     ; (do { Tup vs1 <- [e1]; Tup vs2 <- [e2]; pure $ equateArr res (vs1++vs2) })
      ++
        (do { Just (ls,vs2) <- [dropEqualPrefix e1 res]; pure $ foldr (:>:) (equateArr e2 vs2) ls })
      ++
        (do { Just (ls,vs1) <- [dropEqualSuffix e2 res]; pure $ foldr (:>:) (equateArr e1 vs1) ls }) }
+ ++
+  "ARR-MAP" `nameWith`
+  do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
+     let x:y:_ = identsNotIn $ free arg
+     pure (pPrint arr, Exi $ bind x $
+                       (Var x :=: Some (Lam (bind underscore e))) :>:
+                       (Var underscore :=: (f :@: Var x))         :>:
+                       Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y)) )
+ ++
+  "TUP-MAP" `nameWith`
+  do Op ArrMap :@: arg@(Tup [f, arr@(Tup vs)]) <- [lhs]
+     let prs :: [(Ident,Val)]
+         prs = (identsNotIn $ free arg) `zip` vs
+         bind_one (x,v) e = Exi $ bind x $ (Var x :=: (f :@: v)) :>: e
+     pure (pPrint arr, foldr bind_one (Tup [Var x | (x,_) <- prs]) prs)
+
 
 equateArr :: Expr -> [Val] -> Expr
--- (equateArr e vs)  returns  (Arr vs = e; Arr vs)
--- It duplicates (Arr vs), but the rewrite engine will
+-- (equateArr e vs)  returns  (Tup vs = e; Tup vs)
+-- It duplicates (Tup vs), but the rewrite engine will
 -- do that anyway even if we exi-bind it here
-equateArr e vs = (Arr vs :=: e) :>: Arr vs
+equateArr e vs = (Tup vs :=: e) :>: Tup vs
 
 dropEqualPrefix :: Expr -> Expr -> Maybe ([Expr],[Val])
-dropEqualPrefix (Arr vs1) (Arr vs2) = drop_prefix vs1 vs2
+dropEqualPrefix (Tup vs1) (Tup vs2) = drop_prefix vs1 vs2
 dropEqualPrefix _         _         = Nothing
 
 dropEqualSuffix :: Expr -> Expr -> Maybe ([Expr],[Val])
-dropEqualSuffix (Arr vs1) (Arr vs2) = case (drop_prefix (reverse vs1) (reverse vs2)) of
+dropEqualSuffix (Tup vs1) (Tup vs2) = case (drop_prefix (reverse vs1) (reverse vs2)) of
                                         Nothing      -> Nothing
                                         Just (ls,vs) -> Just (reverse ls, reverse vs)
 dropEqualSuffix _         _         = Nothing
@@ -245,7 +266,7 @@ unificationStep _env lhs =
      pure e
  ++
   "U-TUP" `name`
-  do (Arr vs :=: Arr vs') :>: e <- [lhs]
+  do (Tup vs :=: Tup vs') :>: e <- [lhs]
      guard (length vs == length vs')
      pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
  ++
@@ -259,7 +280,7 @@ unificationStep _env lhs =
      guard $
        case (a1, a2) of
          (Lit l1, Lit l2)  -> l1 /= l2
-         (Arr vs, Arr vs') -> length vs /= length vs'
+         (Tup vs, Tup vs') -> length vs /= length vs'
          (Tru _,  Tru _)   -> False
          (_,      _)       -> True
      pure Fail
@@ -320,14 +341,15 @@ existentialStep _env lhs =
      guard (f `elem` free e)
      guard (onlyApps f e)
      pure ( pPrint f
-          , let dummy = Lam (bind x (Exi (bind y (Var y))))
-                x:y:_ = identsNotIn []
+          , let x = ident "x"
+                y = ident "y"
+                dummy = Lam (bind x (Exi (bind y (Var y))))
              in exis <@ Exi (bind f ((Var f :=: dummy) :>: e))
           )
 
 onlyApps :: Ident -> Expr -> Bool
 onlyApps f (Var x)      = x /= f
-onlyApps f (Arr es)     = all (onlyApps f) es
+onlyApps f (Tup es)     = all (onlyApps f) es
 onlyApps f (Tru e)      = onlyApps f e
 onlyApps f (Lam bnd)    = onlyAppsBind f bnd
 onlyApps f (e1 :=: e2)  = onlyApps f e1 && onlyApps f e2
@@ -398,13 +420,12 @@ oneAndAllStep _env lhs =
   do Iter v u f g <- [lhs]
      guard (isVal v)
      guard (isVal u)            -- XXX Maybe bind 'u' if it's not a value?
-     let f1 = identNotIn $ free lhs
-         f2 = identNotIn $ f1 : free lhs
+     let f1:f2:_ = identsNotIn $ free lhs
          res = Exi $ bind f1 $
                Exi $ bind f2 $
-               (Var f1 :=: (f :@: u)) :>:
-               ((Var f2 :=: (Var f1 :@: v)) :>:
-                (Var f2 :@: g))
+               (Var f1 :=: (f :@: u))      :>:
+               (Var f2 :=: (Var f1 :@: v)) :>:
+               (Var f2 :@: g)
      pure res
  ++
   -- iter(e1 | e2, u){f, g}  -->  iter(e1, u){f, \ x . iter(e2, x){f, g} }
@@ -472,7 +493,7 @@ iff conds = [()| and conds]
 isV :: Expr -> Expr -> Bool
 -- (isV x e) returns True if  e = < ..., < ..., x, ...>, ... >
 isV x e = x==e || case e of
-                    Arr es -> any (isV x) es
+                    Tup es -> any (isV x) es
                     _      -> False
 -}
 valueCtx :: Expr -> [(Context, Expr)]
@@ -481,11 +502,11 @@ valueCtx :: Expr -> [(Context, Expr)]
 valueCtx e
   = [(HOLE,e)]
   ++
-   do Arr es <- [e]
+   do Tup es <- [e]
       i <- [0..(length es - 1)]
       let ei = es !! i
       (ctx,h) <- valueCtx ei
-      pure (Arr (take i es ++ [ctx] ++ drop (i+1) es), h)
+      pure (Tup (take i es ++ [ctx] ++ drop (i+1) es), h)
   ++
    do Tru a <- [e]
       (ctx,h) <- valueCtx a

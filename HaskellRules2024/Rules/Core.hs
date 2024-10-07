@@ -17,6 +17,9 @@ module Rules.Core
   , pPrintSmallExpr
   , unIter
 
+    -- Particular expressions
+  , someAny
+
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
 
@@ -52,6 +55,8 @@ import Test.QuickCheck
 import Control.Monad( liftM2 )
 import Data.Scientific(Scientific)
 
+infixr 5 :>:
+
 --------------------------------------------------------------------------------
 --
 --            The main expression datatype
@@ -64,7 +69,7 @@ data Expr
   -- Values
   = Var Ident
   | Lit Lit
-  | Arr [Val]
+  | Tup [Val]
   | Tru Val          -- truth{v}; see Note [Truth values]
   | Lam (Bind Expr)
   | Op PrimOp
@@ -85,6 +90,8 @@ data Expr
   | Val :>>: Expr    -- guard |>   <-- black triangle
   | Check Effect Expr
   | Verify (BindList ([Assump],Expr))
+  | Arr    Val Expr
+  | Choose Val Expr
 
   -- HOLE, only for contexts
   | HOLE
@@ -195,6 +202,11 @@ Underscore is treated specially in two rules
 
 -}
 
+someAny :: Expr
+someAny = Some (Lam (bind x (Var x)))
+  where
+    x = ident "x"
+
 --------------------------------------------------------------------------------
 --
 --                 PrimOps
@@ -208,7 +220,8 @@ data PrimOp
    -- Operations on arrays
  | ArrLen
  | DotDot     -- dotDot$[m,n] = <m, m+1, .., n>
- | ArrApp     -- arrApp$[ Arr as, Arr bs, r ] =  r=(as++bs); r
+ | ArrApp     -- arrApp$[ Tup as, Tup bs, r ] =  r=(as++bs); r
+ | ArrMap     -- arrMap$[t,a]
 
    -- Relational
  | Gt | Lt | NEq | GEq | LEq
@@ -232,6 +245,7 @@ primOpString Neg = "intNeg$"
 primOpString ArrLen   = "arrLen$"
 primOpString DotDot   = "dotDot$"
 primOpString ArrApp   = "arrApp$"
+primOpString ArrMap   = "arrMap$"
 
 primOpString Gt  = "intGT$"
 primOpString GEq = "intGE$"
@@ -270,6 +284,7 @@ primOpCanFail Mul      = False
 primOpCanFail Div      = False
 primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
+primOpCanFail ArrMap   = False
 
 --------------------------------------------------------------------------------
 --
@@ -437,7 +452,7 @@ pPrintPrecE lvl prec the_expr
        e@(_ :>: _) -> sep (punctuate semi $ map ppr1 (gatherSeqs e))
        e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ">>" <+> ppr1 e2
 
-       Arr as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
+       Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> text "truth" <> braces (ppr0 a)
        Iter e1 e2 e3 e4 -> text "iter"  <> parens (ppr0 e1) <> braces (sep (punctuate semi $ map ppr1 [e2,e3,e4]))
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
@@ -455,6 +470,11 @@ pPrintPrecE lvl prec the_expr
                         , indent (braces (ppr0 body)) ]
            where
              (ids, (as, body)) = alphaRenameVerify (free bl) bl
+
+
+       Arr    v e -> text "Arr"    <> parens (ppr0 v) <> braces (ppr0 e)
+       Choose v e -> text "Choose" <> parens (ppr0 v) <> braces (ppr0 e)
+
   where
     ppr0 = pPrintPrecE lvl 0
     ppr1 = pPrintPrecE lvl 1
@@ -463,7 +483,7 @@ pPrintPrecE lvl prec the_expr
 
     -- Reduce clutter: omit the angle brackets for a multi-arg call.
     -- That is, print f[3,2] rather than f[<3,2>]
-    pp_call_arg (Arr es) = fsep (punctuate comma $ map ppr0 es)
+    pp_call_arg (Tup es) = fsep (punctuate comma $ map ppr0 es)
     pp_call_arg e2       = ppr0 e2
 
 pPrintSmallExpr :: Expr -> Doc
@@ -508,7 +528,7 @@ exprSize (Lit {})      = 1
 exprSize (Op {})       = 1
 exprSize Fail          = 1
 exprSize HOLE          = 1
-exprSize (Arr as)      = 1 + sum (map exprSize as)
+exprSize (Tup as)      = 1 + sum (map exprSize as)
 exprSize (Tru a)       = 1 + exprSize a
 exprSize (Lam bnd)     = 1 + bindSize bnd
 exprSize (e1 :>: e2)   = 1 + exprSize e1 + exprSize e2
@@ -519,10 +539,12 @@ exprSize (e1 :>>: e2)  = 1 + exprSize e1 + exprSize e2
 exprSize (Exi bnd)     = 1 + bindSize bnd
 exprSize (Iter e1 e2 e3 e4) = 1 + exprSize e1 + exprSize e2 + exprSize e3 + exprSize e4
 exprSize (Some a)      = 1 + exprSize a
-exprSize (Check _ e)  = 1 + exprSize e
+exprSize (Check _ e)   = 1 + exprSize e
 exprSize (Verify bl)   = 10 + exprSize e
                        where
                          (_rs,(_as,e)) = unsafeUnbindList bl
+exprSize (Arr v e)     = 1 + exprSize v + exprSize e
+exprSize (Choose v e)  = 1 + exprSize v + exprSize e
 
 bindSize :: Bind Expr -> Int
 bindSize bnd = exprSize (snd (unsafeUnbind bnd))
@@ -540,10 +562,10 @@ isVal e       = isHNF e
 isHNF :: Expr -> Bool
 isHNF (Lit {}) = True
 isHNF (Op {})  = True
-isHNF (Arr es) = all isVal es   -- SLPJ: This had 'valid' stuff too, strangely
+isHNF (Tup es) = all isVal es
+isHNF (Arr {}) = True
 isHNF (Tru e)  = isVal e
-isHNF (Lam {}) = True           -- valid e where (_,e) = unsafeUnbind bnd
-                                -- SLPJ: why valid????
+isHNF (Lam {}) = True
 isHNF _        = False
 
 
@@ -551,7 +573,7 @@ isComparable :: Expr -> Bool
 isComparable (Lit (LChar {})) = True
 isComparable (Lit (LInt  {})) = True
 isComparable (Lit (LStr  {})) = True
-isComparable (Arr es)         = all isComparable es
+isComparable (Tup es)         = all isComparable es
 isComparable (Tru e)          = isComparable e
 isComparable _                = False -- ToDo: what about Path, Ptr, Rational?
 
@@ -566,20 +588,25 @@ valid :: Expr -> Bool
 -- according to the syntax of desugaring.pdf
 valid ((a :=: e1) :>: e2) = validL a && valid e1 && valid e2
 valid (e1 :|: e2)         = valid e1 && valid e2
-valid (a1 :@: a2)         = isVal a1 && isVal a2
+valid (a1 :@: a2)         = is_val a1 && is_val a2
 valid (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
   -- SLPJ: todo: check binder is not _
 valid (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
 valid Fail                = True
-valid (Some a)            = isVal a
-valid (a :>>: e)          = isVal a && valid e  -- Guard
+valid (Some a)            = is_val a
+valid (a :>>: e)          = is_val a && valid e  -- Guard
 valid e@(Iter _ _ _ _)
   | Just (e1, e2, (_, _, _, e3), (_, e4)) <- unIter e
   = valid e1 && valid e2 && valid e3 && valid e4
 valid (Iter _ _ _ _)      = False
 valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
-valid e                   = isVal e
+valid (Arr    v e)        = is_val v && valid e
+valid (Choose v e)        = is_val v && valid e
+valid e                   = is_val e
+
+is_val :: Expr -> Bool
+is_val e = if isVal e then True else ppTrace "not valid" (pPrint e) False
   -- SLPJ: todo: check variable is not _
 
 validL :: Expr -> Bool
@@ -595,7 +622,7 @@ prep :: Expr -> Expr
 --   * (v=e) only to the left of `:>:`
 prep (Var x)       = Var x
 prep (Lit k)       = Lit k
-prep (Arr as)      = prepVals as (\vs -> Arr vs)
+prep (Tup as)      = prepVals as (\vs -> Tup vs)
 prep (Tru a)       = prepVal a Tru
 prep (Lam bnd)     = Lam (bind x (prep e)) where (x,e) = unsafeUnbind bnd
 prep (Op op)       = Op op
@@ -611,7 +638,9 @@ prep (Check fx e)  = Check fx (prep e)
 prep (Verify bl)   = Verify (bindList xs (as, prep e))
                      where (xs,(as,e)) = unsafeUnbindList bl
 prep (Iter e1 e2 e3 e4) = prepVal e2 $ \ v2 -> Iter (prep e1) v2 (prep e3) (prep e4)
-prep HOLE          = error "prep HOLE undefined"
+
+prep e  -- HOLE, Arr, Choose
+  = error ("prep bad: " ++ show e)
 
 prepSeq :: Expr -> Expr -> Expr
 prepSeq (a :=: e1) e2 = prepVal a (\v -> (v :=: prep e1) :>: prep e2)
@@ -639,7 +668,7 @@ prepVals (a:as) f = prepVal a (\v -> prepVals as (f . (v:)))
 
 instance Variables Expr where
   variables f (Var x)      = variables f x
-  variables f (Arr es)     = variables f es
+  variables f (Tup es)     = variables f es
   variables f (Tru e)      = variables f e
   variables f (Lam bnd)    = variables f bnd
   variables f (e1 :=: e2)  = variables f (e1,e2)
@@ -729,7 +758,7 @@ norm orig_e = alpha 0 orig_e
   var i = ident ("_" ++ show i)
   skvar i = ident ("_r" ++ show i)
 
-  alpha k (Arr es)     = Arr (map (alpha k) es)
+  alpha k (Tup es)     = Tup (map (alpha k) es)
   alpha k (Tru e)      = Tru ((alpha k) e)
   alpha k (Lam bnd)    = Lam (bind x (alpha (k+1) e))
                        where x = var k; e = unbindAs x bnd
@@ -777,7 +806,7 @@ subst sub orig_e
   | otherwise = go orig_e
   where
     go (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
-    go (Arr es)     = Arr (map go es)
+    go (Tup es)     = Tup (map go es)
     go (Tru e)      = Tru (go e)
     go (Lam bnd)    = Lam (substBind subst_e_ops sub bnd)
     go (e1 :=: e2)  = go e1 :=: go e2
@@ -812,7 +841,7 @@ substSkol sub orig_e
   | otherwise = go orig_e
   where
     go (Var x)      = Var (head $ [e | (y,e) <- sub, y == x] ++ [x])
-    go (Arr es)     = Arr (map go es)
+    go (Tup es)     = Tup (map go es)
     go (Tru e)      = Tru (go e)
     go (Lam bnd)    = Lam (substBind subst_e_ops sub bnd)
     go (e1 :=: e2)  = go e1 :=: go e2
@@ -907,7 +936,7 @@ everywhere :: Rule -> Rule
 everywhere step env orig_e
   = step env orig_e ++ recurse orig_e
  where
-  recurse (Arr es)     = [ (s, Arr (take i es ++ [e'] ++ drop (i+1) es))
+  recurse (Tup es)     = [ (s, Tup (take i es ++ [e'] ++ drop (i+1) es))
                          | i <- [0..length es-1]
                          , (s,e') <- everywhere step env (es!!i)
                          ]
@@ -1048,8 +1077,8 @@ instance Arbitrary Expr where
 
   shrink (Op _)       = [ LitInt 0, LitInt 1 ]   -- See Note [Shrinking expressions: ops] SLPJ: explain
 
-  shrink (Arr es)     = es
-                     ++ [ Arr es' | es' <- shrink es ]
+  shrink (Tup es)     = es
+                     ++ [ Tup es' | es' <- shrink es ]
   shrink (Tru e)      = [ e ] ++ [ Tru e'  | e' <- shrink e ]
   shrink (Lam bnd)    = shrinkBind Lam bnd
   shrink (e1 :=: e2)  = [ e1, e2 ]
@@ -1080,7 +1109,7 @@ arbExprWith xs n =
   frequency $
   [ (1, Var `fmap` elements xs) | not (null xs) ] ++
   [ (1, LitInt `fmap` arbitrary)
-  , (a, Arr `fmap` arbExprs)
+  , (a, Tup `fmap` arbExprs)
   , (a, Tru `fmap` arbExpr1)
   , (a, Lam `fmap` arbBind)
   , (1, Op  `fmap` arbitrary)
@@ -1136,7 +1165,7 @@ type Context = Expr
 
 (<@) :: Context -> Expr -> Expr
 -- (C <@ e) fills the hole in C with e. Often written C[e]
-Arr as        <@ h = Arr (map (<@ h) as)
+Tup as        <@ h = Tup (map (<@ h) as)
 Tru a         <@ h = Tru (a <@ h)
 Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
 (e1 :>: e2)   <@ h = (e1 <@ h) :>: (e2 <@ h)
@@ -1156,7 +1185,7 @@ bvs :: Context -> [Ident]
 -- Returns all the binders that are in scope at the HOLE
 bvs ctx = explore [] ctx
  where
-  explore xs (Arr es)     = foldr union [] (map (explore xs) es)
+  explore xs (Tup es)     = foldr union [] (map (explore xs) es)
   explore xs (Tru e)      = explore xs e
   explore xs (Lam bnd)    = exploreBind xs bnd
   explore xs (e1 :=: e2)  = explore xs e1 `union` explore xs e2
@@ -1176,7 +1205,7 @@ bvs ctx = explore [] ctx
 
 isContext :: Context -> Bool
 -- There is a HOLE, outside a Verify (SLPJ: is the "outside Verify" right?)
-isContext (Arr es)     = any isContext es
+isContext (Tup es)     = any isContext es
 isContext (Tru e)      = isContext e
 isContext (Lam bnd)    = isContext e where (_,e) = unsafeUnbind bnd
 isContext (e1 :=: e2)  = isContext e1 || isContext e2

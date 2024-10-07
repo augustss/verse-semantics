@@ -40,7 +40,7 @@ convertToCore flags src
 
 convert :: SrcCore -> Rules.Expr
 convert (Variable i)   = Rules.Var (toCoreIdent i)
-convert (Array ts)     = Rules.Arr (map convert ts)
+convert (Array ts)     = Rules.Tup (map convert ts)
 convert (EPrim op)     = Rules.Op op
 convert (Lit lit)      = Rules.Lit lit
 convert (ApplyD t1 t2) = convert t1 Rules.:@: convert t2

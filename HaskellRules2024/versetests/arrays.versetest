@@ -1,0 +1,4 @@
+verify("arr1", pass){ f( x:[]int ) : []int := x }
+verify("arr2", pass){ f( x:[]nat ) : []int := x }
+verify("arr3", pass){ f( x:[]nat )<decides> : nat := x[0] }
+testeq("arr4", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }

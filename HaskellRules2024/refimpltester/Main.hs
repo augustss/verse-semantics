@@ -278,7 +278,7 @@ toFrozen :: Rules.Expr -> [V.FrozenVal]
 toFrozen (Rules.Lit (Rules.LInt i)) = pure $ V.FrozenVal (Just (V.Int i))
 toFrozen (Rules.Lit (Rules.LRat i _)) = pure $ V.FrozenVal (Just (V.Rational $ toRational i))
 toFrozen (Rules.Lit (Rules.LChar i)) = pure $ V.FrozenVal (Just (V.Char (toEnum (fromEnum i))))
-toFrozen (Rules.Arr vs) = do fs <- mapM toFrozen vs; pure $ V.FrozenVal (Just (V.Tuple fs))
+toFrozen (Rules.Tup vs) = do fs <- mapM toFrozen vs; pure $ V.FrozenVal (Just (V.Tuple fs))
 toFrozen (Rules.Tru v) = do f <- toFrozen v; pure $ V.FrozenVal (Just (V.Truth f))
 toFrozen (e1 Rules.:|: e2) = toFrozen e1 ++ toFrozen e2
 toFrozen (Rules.Fail) = []
@@ -286,7 +286,7 @@ toFrozen e = error $ "toFrozen: " ++ prettyShow e
 
 isOKResult :: Rules.Expr -> Bool
 isOKResult (Rules.Lit _) = True
-isOKResult (Rules.Arr es) = all isOKResult es
+isOKResult (Rules.Tup es) = all isOKResult es
 isOKResult (Rules.Tru e) = isOKResult e
 isOKResult (e1 Rules.:|: e2) = isOKResult e1 && isOKResult e2
 isOKResult (Rules.Fail) = True

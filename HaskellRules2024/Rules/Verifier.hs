@@ -54,7 +54,7 @@ groundValue :: [SkolIdent] -> Expr -> Maybe GroundVal
 -- Like skolValue, but no lambdas
 groundValue _  (Lit l)               = Just (GVLit l)
 groundValue rs (Var v) | v `elem` rs = Just (GVVar v)
-groundValue rs (Arr vs)              = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
+groundValue rs (Tup vs)              = do { gvs <- mapM (groundValue rs) vs; Just (GVArr gvs) }
 groundValue rs (Tru v)               = do gv <- groundValue rs v; Just (GVTru gv)
 groundValue _  _                     = Nothing
 
@@ -64,12 +64,12 @@ verifyStep env lhs =
    "VERIFY-VAL" `name`
    do (_skols, _rs, _as, v) <- matchVerify env lhs
       guard (isVal v)
-      pure (Arr [])
+      pure (Tup [])
    ++
    "VERIFY-FAIL" `name`
    do (_skols, _rs, _as, e) <- matchVerify env lhs
       guard (e == Fail)
-      pure (Arr [])
+      pure (Tup [])
    ++
    "VERIFY-CHOICE" `name`
    do (_skols, rs, as, e1 :|: e2) <- matchVerify env lhs
@@ -80,7 +80,7 @@ verifyStep env lhs =
    do (_skols, rs, as, _e) <- matchVerify env lhs
       let env' = extendRuleEnv env rs as
       case unsat env' of
-        Just reason -> pure (pPrint reason, Arr [])
+        Just reason -> pure (pPrint reason, Tup [])
         Nothing     -> []
    ++
    "SKOLEMIZE" `nameWith`
@@ -114,6 +114,7 @@ splitStep env lhs =
    "SPLIT-OP" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, Op op :@: arg) <- proofX all_rs e
+      guard (op /= IsArr)   -- ToDo: this is a bit awkward
       Just gv <- [groundValue all_rs arg]
       guard (free gv `intersects` all_rs)
           -- At least one skolem in gv
@@ -122,15 +123,24 @@ splitStep env lhs =
           asm  = A_PrimOp r (AO_Prim op) gv
           asmF = A_RelOp op gv
       if primOpCanFail op
-        then pure (pPrint asm, caseSplit (r:rs) asmF as ctx (Var r))
+        then pure (pPrint asmF, caseSplit (r:rs) asmF as ctx (Var r))
         else pure (pPrint asm, Verify (bindList (r:rs) (asm : as, ctx <@ Var r)))
         -- Generate one or two 'verify' blocks, depending on
         -- whether or not the PrimOp can fail
 
    ++
+   "SPLIT-ISARR" `nameWith`
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, Op IsArr :@: Var r) <- proofX all_rs e
+      guard (r `elem` all_rs)   -- r is a skolem
+      let n    = skolNotIn all_rs
+          asmF = A_RelOp IsArr (GVVar r)
+      pure (pPrint asmF, caseSplit (n:rs) asmF as ctx (Arr (Var r) someAny))
+
+   ++
    "SPLIT-TUP" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
-      (ctx, Var r :=: Arr vs :>: rest) <- proofX all_rs e
+      (ctx, Var r :=: Tup vs :>: rest) <- proofX all_rs e
       guard (r `elem` rs)
       let rs'  = take (length vs) (skolsNotIn all_rs)
           rvs' = foldr (:>:) rest [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
