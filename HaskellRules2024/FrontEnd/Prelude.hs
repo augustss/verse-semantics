@@ -80,7 +80,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \char       := lam y { isChar$[y]; y };\n\
 \comparable := lam y { isComp$[y]; y };\n\
 \nat        := lam y { isInt$[y]; intGE$[y,0]; y };\n\
-\Length     := lam y { isArr$[y]; y >> some{int} };\n\
+\Length     := lam y { isArr$[y]; arrLen$[y] };\n\
 \prefix'?'        := lam t { lam x { if (truth{y:any} = x) then { truth{t[y]} } else { x = () } } };\n\
 \prefix'[]'       := lam t { lam a   { exi j { j = isArr$[a]; arrMap$[t,j] } } };\n\
 \operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[x,y] }};\n\

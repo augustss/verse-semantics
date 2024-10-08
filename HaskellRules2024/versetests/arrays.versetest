@@ -1,4 +1,29 @@
 verify("arr1", pass){ f( x:[]int ) : []int := x }
 verify("arr2", pass){ f( x:[]nat ) : []int := x }
-verify("arr3", pass){ f( x:[]nat )<decides> : nat := x[0] }
-testeq("arr4", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }
+
+# Indexing
+verify("arr-index1", pass){ f( x:[]nat )<decides> : nat := x[0] }
+
+verify("arr-index2", pass, broken){ f( x:[]nat where Length[x] > 0 )<succeeds> : nat := x[0] }
+verify("arr-index3", pass){ f( x:[]nat )<succeeds> : nat := if (z := x[0]) then { z } else { 99 } }
+verify("arr-index4", pass){ f( x:[]nat where x[0] )<succeeds> : nat := x[0] }
+testeq("arr-index5", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }
+verify("arr-index6", pass){ f( x:[]nat, i:nat )<succeeds> : nat := if (Length[x]>i) then {x[i]} else {88} }
+
+verify("arr5", pass, broken){ f( x:any )<succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
+# arr5: does isArr$ on the same thing twice return an array of the same length
+
+# Array unification
+verify("arr-uni1", pass){
+    f( x:[]int, y:[]int )<decides>:int := { if (x=y) then { Length[x]=Length[y] } else 99 } }
+
+verify("arr-uni2", pass, broken){
+    f( x:[]int, y:[]int )<fails>:int := (x=y) }
+verify("arr-uni2a", fail, broken){
+    f( x:[]int, y:[]int )<fails>:int := 2 }
+# arr-uni2, 2a:   <fails> not working
+
+verify("arr-uni3a", pass){
+    f( x:[]int, y:[]int )<succeeds>:int := if (x=y) then fail else 77 }
+verify("arr-uni3b", pass){
+    f( x:[]int, y:[]string )<succeeds>:int := if (x=y) then fail else 77 }

@@ -81,9 +81,12 @@ For example, in the above, x, y are provably equal as their roots
 are the same -- z. But x and a are not provably equal as their roots
 are different -- z and b.
 
-We write `s |- x ~ y` to denote that x and y are provably equal in solver s.
+We write `s |- x ~ y` to denote that x and y are provably equal in solver s,
+using
+  * Transitivity of equality
+  * Congruences
 
-The solver proceeds as follows:
+The solver proceeds as follows (equality saturation):
 
 0. Use the starting assumptions to build the initial solver state `s` comprising
   - `s_pos` the positive equalities e.g. `x = y`, predicates e.g. `int[x]`
@@ -96,12 +99,12 @@ The solver proceeds as follows:
    i.e. if `!s` can be derived, and if so, exits with the corresponding negative
     fact as the `UnsatReason`
 
-2. Next, (if the solver state is *not* inconsistent), the solver `generate`s
-   _new_ equalities from the definitions `s_def` and the UF structure.
-   To do so it iterates over `s_defs` and invokes `evalDef` on each term
-   of the form `x = op[v1, v2]` to see if there are literals l1 and l2
-   such that s |- v1 ~ l1 and s |- v2 ~ l2 and if so, we generate the
-   new equality `x = op[l1, l2]`
+2. Next, (if the solver state is *not* inconsistent -- this point is
+   efficiency-only), the solver `generate`s _new_ equalities from the
+   definitions `s_def` and the UF structure.  To do so it iterates over `s_defs`
+   and invokes `evalDef` on each term of the form `x = op[v1, v2]` to see if
+   there are literals l1 and l2 such that s |- v1 ~ l1 and s |- v2 ~ l2 and if
+   so, we generate the new equality `x = op[l1, l2]`
 
    If this set is empty, the solver exits with SAT.
 
@@ -216,9 +219,10 @@ isRelOpLit2 op l1 l2
 {- Note [Rules:Contradiction]
 
 Contradiction [!s]
+  where !s means "solver state s is a contradiction"
 
-k1, k2 in s   s |- k1 ~ k2
---------------------------- [c-lit]
+k1, k2 distinct literals in s   s |- k1 ~ k2
+-------------------------------------------- [c-lit]
 !s
 
 not (x = gv) in s    s |- x ~ gv     s |- x:prim

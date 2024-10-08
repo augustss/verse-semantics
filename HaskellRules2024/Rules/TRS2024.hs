@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE MultiWayIf #-}
 
 module Rules.TRS2024 (
@@ -140,14 +141,6 @@ applicationStep _env lhs =
        _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
          | otherwise -> []
  ++
-  "APP-ISARR" `name`
-  do Op IsArr :@: a <- [lhs]
-     case a of
-       Tup {}        -> pure a
-       Arr {}        -> pure a
-       _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
-         | otherwise -> []
- ++
   "APP-ISCOMP" `name`
   do Op IsComp :@: a <- [lhs]
      if | isComparable a -> pure a
@@ -182,8 +175,9 @@ applicationStep _env lhs =
 
 arrayOpStep :: Rule
 arrayOpStep _env lhs =
-  "APP-TUPK" `name`   -- This rule isn't needed, but it makes the reduction sequence
-                      -- much shorter when indexing with a constant
+  "APP-TUPK" `name`   -- <v1,..,vn>[k] --> vk
+                      -- This rule isn't needed, but it makes the reduction
+                      -- sequence much shorter when indexing with a constant
   do Tup vs :@: Lit (LInt i) <- [lhs]
      guard (all isVal vs)
      let i' = fromInteger i
@@ -192,32 +186,35 @@ arrayOpStep _env lhs =
       else
        pure Fail
  ++
-  "APP-TUP" `name`
+  "APP-TUP" `name`   -- <v1,..,vn>[v] --> (v=1;v1) | .. | (v=n;vn)
+                     -- This does narrrowing
   do Tup vs@(_:_) :@: v <- [lhs]
      pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
  ++
-  "APP-ARR" `nameWith`
+  "APP-ARR" `nameWith`  -- (Arr n e)[v] --> Dotdot$[n,v]; some(\_.e)
   do arr@(Arr sz e) :@: v <- [lhs]
      pure (pPrint arr, (Var underscore :=: (Op DotDot :@: Tup [sz,v])) :>:
                        (Some $ Lam $ bind underscore e) )
  ++
-  "APP-LENGTH" `name`
-  do Op ArrLen :@: Tup xs <- [lhs]
-     pure (LitInt (fromIntegral (length xs)))
+  "APP-LENGTH" `name`   -- Length$[<v1,..,vn>  --> n
+                        -- Length$[Arr(n){e}]  --> n
+  do Op ArrLen :@: arg <- [lhs]
+     case arg of
+       Tup xs   -> pure (LitInt (fromIntegral (length xs)))
+       Arr sz _ -> pure sz
+       _        -> []   -- No match here
  ++
-  "APP-DOTDOT" `nameWith`
-  do Op DotDot :@: Tup [Lit (LInt k1), Lit (LInt k2)] <- [lhs]
-     pure (pPrint (k1,k2), foldr ((:|:) . Lit . LInt) Fail [k1..k2])
+  "APP-ISARR" `name`    -- IsArr$[<v1,..,vn>] -->  <v1,..vn>
+                        -- IsArr$[Arr(n){e}]  -->  Arr(n){e}
+  do Op IsArr :@: a <- [lhs]
+     case a of
+       Tup {}        -> pure a
+       Arr {}        -> pure a
+       _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
+         | otherwise -> []
  ++
-  "APP-ARRAPP" `name`
-  do { Op ArrApp :@: Tup [e1,e2,res] <- [lhs]
-     ; (do { Tup vs1 <- [e1]; Tup vs2 <- [e2]; pure $ equateArr res (vs1++vs2) })
-     ++
-       (do { Just (ls,vs2) <- [dropEqualPrefix e1 res]; pure $ foldr (:>:) (equateArr e2 vs2) ls })
-     ++
-       (do { Just (ls,vs1) <- [dropEqualSuffix e2 res]; pure $ foldr (:>:) (equateArr e1 vs1) ls }) }
- ++
-  "ARR-MAP" `nameWith`
+  "ARR-MAP" `nameWith`   -- ArrMap$[Arr(n){e}]
+                         --   --> x:=some(\_.e); f[x]; Arr(n){f[e]}
   do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
      let x:y:_ = identsNotIn $ free arg
      pure (pPrint arr, Exi $ bind x $
@@ -225,12 +222,25 @@ arrayOpStep _env lhs =
                        (Var underscore :=: (f :@: Var x))         :>:
                        Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y)) )
  ++
-  "TUP-MAP" `nameWith`
+  "TUP-MAP" `nameWith`   -- ArrMap$[f, <v1,..,vn>]
+                         --   --> x1=f[v1]; ..; xn=f[vn]; <x1,..,xn>
   do Op ArrMap :@: arg@(Tup [f, arr@(Tup vs)]) <- [lhs]
      let prs :: [(Ident,Val)]
          prs = (identsNotIn $ free arg) `zip` vs
          bind_one (x,v) e = Exi $ bind x $ (Var x :=: (f :@: v)) :>: e
      pure (pPrint arr, foldr bind_one (Tup [Var x | (x,_) <- prs]) prs)
+ ++
+  "APP-DOTDOT" `nameWith`
+  do Op DotDot :@: Tup [Lit (LInt k1), Lit (LInt k2)] <- [lhs]
+     pure (pPrint (k1,k2), foldr ((:|:) . Lit . LInt) Fail [k1..k2])
+ ++
+  "APP-ARRAPP" `name`  -- Array append
+  do { Op ArrApp :@: Tup [e1,e2,res] <- [lhs]
+     ; (do { Tup vs1 <- [e1]; Tup vs2 <- [e2]; pure $ equateArr res (vs1++vs2) })
+     ++
+       (do { Just (ls,vs2) <- [dropEqualPrefix e1 res]; pure $ foldr (:>:) (equateArr e2 vs2) ls })
+     ++
+       (do { Just (ls,vs1) <- [dropEqualSuffix e2 res]; pure $ foldr (:>:) (equateArr e1 vs1) ls }) }
 
 
 equateArr :: Expr -> [Val] -> Expr
@@ -267,8 +277,18 @@ unificationStep _env lhs =
  ++
   "U-TUP" `name`
   do (Tup vs :=: Tup vs') :>: e <- [lhs]
-     guard (length vs == length vs')
-     pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
+     if (length vs == length vs')
+       then pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
+       else pure Fail
+ ++
+  "U-ARR" `name`
+  do (Arr n1 e1 :=: Arr n2 e2) :>: e <- [lhs]
+     let x = identNotIn $ free lhs
+     pure ((n1 :=: n2) :>:
+           (Exi $ bind x $
+           ((Var x :=: (Some $ Lam $ bind underscore e1)) :>:
+            (Var x :=: (Some $ Lam $ bind underscore e2)) :>:
+            e)))
  ++
   "U-TRU" `name`
   do (Tru v :=: Tru v') :>: e <- [lhs]
