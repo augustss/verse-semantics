@@ -84,6 +84,7 @@ data Expr
 
   -- Iterator over choices
   | Iter Expr Expr Expr Expr -- choice iteration; see Note [iter]
+  | All Expr
 
   -- Verifier
   | Some Val
@@ -455,6 +456,7 @@ pPrintPrecE lvl prec the_expr
        Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> text "truth" <> braces (ppr0 a)
        Iter e1 e2 e3 e4 -> text "iter"  <> parens (ppr0 e1) <> braces (sep (punctuate semi $ map ppr1 [e2,e3,e4]))
+       All e   -> text "all"  <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
        Exi {}  -> mbPar0 $ sep [ text "exi" <+> fsep (map pPrint bndrs) <> char '.'
                                , indent (ppr0 body) ]
@@ -538,6 +540,7 @@ exprSize (e1 :@: e2)   = 1 + exprSize e1 + exprSize e2
 exprSize (e1 :>>: e2)  = 1 + exprSize e1 + exprSize e2
 exprSize (Exi bnd)     = 1 + bindSize bnd
 exprSize (Iter e1 e2 e3 e4) = 1 + exprSize e1 + exprSize e2 + exprSize e3 + exprSize e4
+exprSize (All e)       = 1 + exprSize e
 exprSize (Some a)      = 1 + exprSize a
 exprSize (Check _ e)   = 1 + exprSize e
 exprSize (Verify bl)   = 10 + exprSize e
@@ -594,6 +597,7 @@ valid (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
 valid (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
 valid Fail                = True
 valid (Some a)            = is_val a
+valid (All e)             = valid e
 valid (a :>>: e)          = is_val a && valid e  -- Guard
 valid e@(Iter _ _ _ _)
   | Just (e1, e2, (_, _, _, e3), (_, e4)) <- unIter e
@@ -633,6 +637,7 @@ prep (a1 :@: a2)   = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
 prep (Exi bnd)     = Exi (bind x (prep e)) where (x,e) = unsafeUnbind bnd
 prep Fail          = Fail
 prep (Some a)      = prepVal a (\v -> Some v)
+prep (All e)       = All (prep e)
 prep (a :>>: e)    = prepVal a (\v -> v :>>: prep e)
 prep (Check fx e)  = Check fx (prep e)
 prep (Verify bl)   = Verify (bindList xs (as, prep e))
@@ -676,6 +681,7 @@ instance Variables Expr where
   variables f (e1 :|: e2)  = variables f (e1,e2)
   variables f (e1 :@: e2)  = variables f (e1,e2)
   variables f (Some e)     = variables f e
+  variables f (All e)      = variables f e
   variables f (e1 :>>: e2) = variables f (e1,e2)
   variables f (Check _ e)  = variables f e
   variables f (Exi bnd)    = variables f bnd
@@ -767,6 +773,7 @@ norm orig_e = alpha 0 orig_e
   alpha k (e1 :|: e2)  = alpha k e1 :|: alpha k e2
   alpha k (e1 :@: e2)  = alpha k e1 :@: alpha k e2
   alpha k (Some e)     = Some (alpha k e)
+  alpha k (All e)      = All (alpha k e)
   alpha k (e1 :>>: e2) = alpha k e1 :>>: alpha k e2
   alpha k (Check fx e) = Check fx (alpha k e)
   alpha k e@(Exi _)    = alphaExi k [] e
@@ -813,6 +820,7 @@ subst sub orig_e
     go (e1 :>: e2)  = go e1 :>: go e2
     go (e1 :|: e2)  = go e1 :|: go e2
     go (e1 :@: e2)  = go e1 :@: go e2
+    go (All e)      = All (go e)
     go (Some e)     = Some (go e)
     go (e1 :>>: e2) = go e1 :>>: go e2
     go (Check fx e) = Check fx (go e)
@@ -848,6 +856,7 @@ substSkol sub orig_e
     go (e1 :>: e2)  = go e1 :>: go e2
     go (e1 :|: e2)  = go e1 :|: go e2
     go (e1 :@: e2)  = go e1 :@: go e2
+    go (All e)      = All (go e)
     go (Some e)     = Some (go e)
     go (e1 :>>: e2) = go e1 :>>: go e2
     go (Check fx e) = Check fx (go e)
@@ -955,6 +964,7 @@ everywhere step env orig_e
                       ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step env e2 ]
   recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step env e1 ]
                       ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step env e ]
   recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step env e ]
   recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step env e1 ]
                       ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step env e2 ]
@@ -1093,6 +1103,7 @@ instance Arbitrary Expr where
   shrink (e1 :@: e2)  = [ e1, e2 ]
                      ++ [ e1' :@: e2  | e1' <- shrink e1 ]
                      ++ [ e1  :@: e2' | e2' <- shrink e2 ]
+  shrink (All e)      = [ e ] ++ [ All e'  | e' <- shrink e ]
   shrink (Some e)     = [ e ] ++ [ Some e' | e' <- shrink e ]
   shrink (e1 :>>: e2) = [ e1, e2 ]
                      ++ [ e1' :>>: e2  | e1' <- shrink e1 ]
@@ -1175,6 +1186,7 @@ Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
 Exi bnd       <@ h = Exi (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
 Iter e1 e2 e3 e4 <@ h = Iter (e1 <@ h) (e2 <@ h) (e3 <@ h) (e4 <@ h)
 Some e        <@ h = Some (e <@ h)
+All  e        <@ h = All  (e <@ h)
 (e1 :>>: e2)  <@ h = (e1 <@ h) :>>: (e2 <@ h)
 Check fx e    <@ h = Check fx (e <@ h)
 e@(Verify {}) <@ _ = e   -- No HOLE inside Verify. SLPJ: check
@@ -1193,6 +1205,7 @@ bvs ctx = explore [] ctx
   explore xs (e1 :|: e2)  = explore xs e1 `union` explore xs e2
   explore xs (e1 :@: e2)  = explore xs e1 `union` explore xs e2
   explore xs (Iter e1 e2 e3 e4) = explore xs e1 `union` explore xs e2 `union` explore xs e3 `union` explore xs e4
+  explore xs (All e)      = explore xs e
   explore xs (Some e)     = explore xs e
   explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
   explore xs (Check _ e)  = explore xs e
@@ -1213,6 +1226,7 @@ isContext (e1 :>: e2)  = isContext e1 || isContext e2
 isContext (e1 :|: e2)  = isContext e1 || isContext e2
 isContext (e1 :@: e2)  = isContext e1 || isContext e2
 isContext (Iter e1 e2 e3 e4) = isContext e1 || isContext e2 || isContext e3 || isContext e4
+isContext (All e)      = isContext e
 isContext (Some e)     = isContext e
 isContext (e1 :>>: e2) = isContext e1 || isContext e2
 isContext (Check _ e)  = isContext e
