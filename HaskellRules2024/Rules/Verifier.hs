@@ -31,6 +31,7 @@ verificationStep =  TRS2024.evalStep
                  <> guardStep
                  <> verifyStep
                  <> splitStep
+                 <> dotDotStep
 
 --------------------------------------------------------------------------------
 guardStep :: Rule
@@ -59,6 +60,25 @@ groundValue rs (Tru v)               = do gv <- groundValue rs v; Just (GVTru gv
 groundValue _  _                     = Nothing
 
 --------------------------------------------------------------------------------
+dotDotStep :: Rule
+dotDotStep env lhs =
+   "DOT-DOT-NARROW" `nameWith`
+   do (skols, rs, as, verify_body) <- matchVerify env lhs
+      (ctx, (flexis, e1@(Var x :=: Op DotDot :@: Var n) :>: e)) <- proofX skols verify_body
+      guard (n `elem` skols)
+      guard (x `elem` flexis)
+      pure ( pPrint e1
+           , Verify $ bindList rs $
+             (as, ctx <@ (Choose (Var n)
+                             ((Var x :=: Some(inrange n)) :>: Var x)
+                          :>: e)))
+
+inrange :: Ident -> Expr
+inrange n = Lam (bind x (Op Gt :@: Tup [Var x, LitInt 0] :>: Op Lt :@: Tup [Var x,Var n]))
+   where
+    x = identNotIn [n]
+
+--------------------------------------------------------------------------------
 verifyStep :: Rule
 verifyStep env lhs =
    "VERIFY-VAL" `name`
@@ -85,7 +105,7 @@ verifyStep env lhs =
    ++
    "SKOLEMIZE" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
-      (ctx, Some v) <- proofX all_rs e
+      (ctx, (_, Some v)) <- proofX all_rs e
       guard (skolValue all_rs v)
       guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
@@ -98,13 +118,11 @@ verifyStep env lhs =
 
 
 --------------------------------------------------------------------------------
-
-
 splitStep :: Rule
 splitStep env lhs =
    "SPLIT-V" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
-      (ctx, (Var r :=: v) :>: rest) <- proofX all_rs e
+      (ctx, (_, (Var r :=: v) :>: rest)) <- proofX all_rs e
       guard (r `elem` all_rs)
       Just gv <- [groundValue all_rs v]
       pure ( pPrint r <+> text "=" <+> pPrint v
@@ -113,8 +131,9 @@ splitStep env lhs =
    ++
    "SPLIT-OP" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
-      (ctx, Op op :@: arg) <- proofX all_rs e
-      guard (op /= IsArr)   -- ToDo: this is a bit awkward
+      (ctx, (_, Op op :@: arg)) <- proofX all_rs e
+      guard (op /= IsArr && op /= DotDot)   -- ToDo: this is a bit awkward
+           -- Can't split on DotDot because it produces many results
       Just gv <- [groundValue all_rs arg]
       guard (free gv `intersects` all_rs)
           -- At least one skolem in gv
@@ -131,7 +150,7 @@ splitStep env lhs =
    ++
    "SPLIT-ISARR" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
-      (ctx, Op IsArr :@: Var r) <- proofX all_rs e
+      (ctx, (_, Op IsArr :@: Var r)) <- proofX all_rs e
       guard (r `elem` all_rs)   -- r is a skolem
       let n    = skolNotIn all_rs
           asmF = A_RelOp IsArr (GVVar r)
@@ -140,7 +159,7 @@ splitStep env lhs =
    ++
    "SPLIT-TUP" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
-      (ctx, Var r :=: Tup vs :>: rest) <- proofX all_rs e
+      (ctx, (_, Var r :=: Tup vs :>: rest)) <- proofX all_rs e
       guard (r `elem` rs)
       let rs'  = take (length vs) (skolsNotIn all_rs)
           rvs' = foldr (:>:) rest [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
@@ -150,7 +169,7 @@ splitStep env lhs =
    ++
    "SPLIT-TRU" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
-      (ctx, Var r :=: Tru v :>: rest) <- proofX all_rs e
+      (ctx, (_, Var r :=: Tru v :>: rest)) <- proofX all_rs e
       guard (r `elem` rs)
       let r'  = skolsNotIn all_rs !! 0
           rv' = (Var r' :=: v) :>: rest
@@ -191,45 +210,54 @@ caseSplit rs a as ctx e
 -- | Contexts ------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
-proofX :: [Ident] -> Expr -> [(Context, Expr)]
+proofX :: [Ident] -> Expr -> [( Context    -- The context
+                              , ([Ident]   -- Flexible existentials bound by context
+                              ,  Expr ))]  -- The expression in the hole
 -- P context
-proofX bs lhs =
-   pure (HOLE,lhs)
+proofX bs lhs = go_px (LX { exi_flexi = [], exi_rigid = bs }) lhs
+
+go_px :: LocalExis -> Expr -> [(Context, ([Ident], Expr))]
+go_px lx lhs =
+   pure (HOLE, (exi_flexi lx, lhs))
  ++
    do x :>: e <- [lhs]
-      (ctx, hole) <- proofX bs x
+      (ctx, hole) <- go_px lx x
       pure (ctx :>: e, hole)
  ++
    do cf :>: x <- [lhs]
       guard (TRS2024.choiceFree cf)
-      (ctx, hole) <- proofX bs x
+      (ctx, hole) <- go_px lx x
       pure (cf :>: ctx, hole)
  ++
    do v :=: x <- [lhs]
-      (ctx, hole) <- proofX bs x
+      (ctx, hole) <- go_px lx x
       pure (v :=: ctx, hole)
  ++
   do Exi bnd <- [lhs]
-     let (x,e) = alphaRename bs bnd
-     (ctx, hole) <- proofX (x : bs) e
+     let (x,e) = alphaRename (allExis lx) bnd
+     (ctx, hole) <- go_px (addFlexi lx x) e
      pure (Exi (bind x ctx), hole)
  ++
   do x :|: e  <- [lhs]
-     (ctx, hole) <- proofX bs x
+     (ctx, hole) <- go_px (makeRigid lx) x
      pure (ctx :|: e, hole)
  ++
   do e :|: x  <- [lhs]
-     (ctx, hole) <- proofX bs x
+     (ctx, hole) <- go_px (makeRigid lx) x
      pure (e :|: ctx, hole)
  ++
   do x :>>: e  <- [lhs]
-     (ctx, hole) <- proofX bs x
+     (ctx, hole) <- go_px lx x
      pure (ctx :>>: e, hole)
  ++
   do Check fx x <- [lhs]
-     (ctx, hole) <- proofX bs x
+     (ctx, hole) <- go_px lx x
      pure (Check fx ctx, hole)
  ++
+  do All x <- [lhs]
+     (ctx, hole) <- go_px (makeRigid lx) x
+     pure (All ctx, hole)
+ ++
   do Iter x y z w <- [lhs]
-     (ctx, hole) <- proofX bs x
+     (ctx, hole) <- go_px (makeRigid lx) x
      pure (Iter ctx y z w, hole)

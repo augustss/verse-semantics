@@ -6,6 +6,7 @@ module Rules.TRS2024 (
    , blocked, choiceFree
    , name, nameWith, iff
    , skolValue
+   , LocalExis(..), makeRigid, addFlexi, allExis
  ) where
 
 import Prelude

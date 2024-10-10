@@ -1,6 +1,10 @@
 verify("arr1", pass){ f( x:[]int ) : []int := x }
 verify("arr2", pass){ f( x:[]nat ) : []int := x }
 
+# for-loops
+verify("arr-for1", pass){ f( a:[]int ) : []int := for( i:int; x := a[i] ){ x } }
+verify("arr-for2", pass){ f( a:[]int ) : []int := for( i:int; x := a[i] ){ x+1 } }
+
 # Indexing
 verify("arr-index1", pass){ f( x:[]nat )<decides> : nat := x[0] }
 
@@ -21,7 +25,7 @@ verify("arr-uni2", pass, broken){
     f( x:[]int, y:[]int )<fails>:int := (x=y) }
 verify("arr-uni2a", fail, broken){
     f( x:[]int, y:[]int )<fails>:int := 2 }
-# arr-uni2, 2a:   <fails> not working
+  # arr-uni2, 2a:   <fails> annotation is not working
 
 verify("arr-uni3a", pass){
     f( x:[]int, y:[]int )<succeeds>:int := if (x=y) then fail else 77 }

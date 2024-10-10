@@ -809,6 +809,8 @@ getFree = fvs_blk
     fvs (Macro1 _ _ e)    = fvs e
     fvs (Macro2 _ e b)    = fvs e ++ fvs_blk b
     fvs (Split e1 e2 e3)  = fvs e1 ++ fvs e2 ++ fvs e3
+    fvs (For2 e1 e2)      = Epic.List.nub (fvs e1 ++ fvs e2)
+                            `remove` getVisibleBinders e1
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
     fvs (Range  _ e)      = fvs e
