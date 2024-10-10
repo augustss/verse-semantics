@@ -368,24 +368,41 @@ existentialStep _env lhs =
           )
 
 onlyApps :: Ident -> Expr -> Bool
-onlyApps f (Var x)      = x /= f
-onlyApps f (Tup es)     = all (onlyApps f) es
-onlyApps f (Tru e)      = onlyApps f e
-onlyApps f (Lam bnd)    = onlyAppsBind f bnd
-onlyApps f (e1 :=: e2)  = onlyApps f e1 && onlyApps f e2
-onlyApps f (e1 :>: e2)  = onlyApps f e1 && onlyApps f e2
-onlyApps f (e1 :|: e2)  = onlyApps f e1 && onlyApps f e2
-onlyApps f (e1 :@: e2)  = e1 == Var f || (onlyApps f e1 && onlyApps f e2)
-onlyApps f (Iter e1 e2 e3 e4) = all (onlyApps f) [e1,e2,e3,e4]
-onlyApps f (Some e)     = onlyApps f e
-onlyApps f (e1 :>>: e2) = onlyApps f e1 && onlyApps f e2
-onlyApps f (Check _ e)  = onlyApps f e
-onlyApps f (Exi bnd)    = onlyAppsBind f bnd
-onlyApps _  (Verify {}) = error "onlyApps Verify"
-onlyApps _ _            = True
+-- (onlyApps f e) returns True if the only occurrences of
+-- `f` in `e` are in applications f[v]
+onlyApps f orig_e = go orig_e
+  where
+    go (Lit {})     = True
+    go (Arr {})     = True
+    go (Op {})      = True
+    go Fail         = True
+    go HOLE         = True
 
-onlyAppsBind :: Ident -> Bind Expr -> Bool
-onlyAppsBind f bnd = f == x || onlyApps f e where (x,e) = alphaRename [] bnd
+    go (Var x)      = x /= f
+
+    go (Tup es)     = all go es
+    go (Tru e)      = go e
+    go (Lam bnd)    = go_bind bnd
+    go (e1 :=: e2)  = go e1 && go e2
+    go (e1 :>: e2)  = go e1 && go e2
+    go (e1 :|: e2)  = go e1 && go e2
+    go (e1 :@: e2)  = e1 == Var f || (go e1 && go e2)
+    go (Iter e1 e2 e3 e4) = all go [e1,e2,e3,e4]
+    go (Some e)     = go e
+    go (All e)      = go e
+    go (e1 :>>: e2) = go e1 && go e2
+    go (Check _ e)  = go e
+    go (Choose _ e) = go e
+    go (Exi bnd)    = go_bind bnd
+
+    -- ToDo: Lennart thought this was impossible. Why?
+    go (Verify bnd) = go e
+                    where
+                      (_,(_,e)) = alphaRenameVerify [f] bnd
+
+    go_bind bnd = f == x || go e
+                where
+                  (x,e) = alphaRename [f] bnd
 
 --------------------------------------------------------------------------------
 normalizationStep :: Rule
@@ -454,6 +471,18 @@ oneAndAllStep _env lhs =
      let x = identNotIn $ free lhs
          res = Iter e1 u f (Lam $ bind x $ Iter e2 (Var x) f g)
      pure res
+ ++
+  "ALL-FAIL" `name`
+  do All Fail <- [lhs]
+     pure (Tup [])
+ ++
+  "ALL-CHOICE" `name`
+  do All e <- [lhs]
+     let choices (e1 :|: e2) = choices e1 ++ choices e2
+         choices e1          = [e1]
+     let vs = choices e
+     guard (all isVal vs)
+     pure (Tup vs)
 
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
@@ -703,6 +732,7 @@ blkd lx (e1 :>: e2)
   | otherwise       = blkd lx e1 && (isContext e1 || blkd lx e2)  -- If HOLE is in e1, ignore e2
 blkd lx (e1 :|: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)  -- SLPJ: check
 
+blkd lx (All e)     = blkd (makeRigid lx) e   -- See (E2)
 blkd lx (Exi bnd)   = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
 blkd lx (v1 :@: v2) = case v1 of
                         Var f -> isLocal lx f                -- Needed for (E2)!
