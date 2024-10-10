@@ -191,9 +191,9 @@ arrayOpStep _env lhs =
   do Tup vs@(_:_) :@: v <- [lhs]
      pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
  ++
-  "APP-ARR" `nameWith`  -- (Arr n e)[v] --> Dotdot$[n,v]; some(\_.e)
+  "APP-ARR" `nameWith`  -- (Arr n e)[v] --> v = Dotdot$[n]; some(\_.e)
   do arr@(Arr sz e) :@: v <- [lhs]
-     pure (pPrint arr, (Var underscore :=: (Op DotDot :@: Tup [sz,v])) :>:
+     pure (pPrint arr, (v :=: (Op DotDot :@: sz)) :>:
                        (Some $ Lam $ bind underscore e) )
  ++
   "APP-LENGTH" `name`   -- Length$[<v1,..,vn>  --> n
@@ -230,9 +230,9 @@ arrayOpStep _env lhs =
          bind_one (x,v) e = Exi $ bind x $ (Var x :=: (f :@: v)) :>: e
      pure (pPrint arr, foldr bind_one (Tup [Var x | (x,_) <- prs]) prs)
  ++
-  "APP-DOTDOT" `nameWith`
-  do Op DotDot :@: Tup [Lit (LInt k1), Lit (LInt k2)] <- [lhs]
-     pure (pPrint (k1,k2), foldr ((:|:) . Lit . LInt) Fail [k1..k2])
+  "APP-DOTDOT" `nameWith`  -- DotDot$[k]  -->  0 | 1 | ... | k-1
+  do Op DotDot :@: (Lit (LInt k)) <- [lhs]
+     pure (pPrint k, foldr ((:|:) . Lit . LInt) Fail [0..(k-1)])
  ++
   "APP-ARRAPP" `name`  -- Array append
   do { Op ArrApp :@: Tup [e1,e2,res] <- [lhs]

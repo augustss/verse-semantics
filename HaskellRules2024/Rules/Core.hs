@@ -220,7 +220,7 @@ data PrimOp
 
    -- Operations on arrays
  | ArrLen
- | DotDot     -- dotDot$[m,n] = <m, m+1, .., n>
+ | DotDot     -- dotDot$[n] = <0, 1, .., n-1>
  | ArrApp     -- arrApp$[ Tup as, Tup bs, r ] =  r=(as++bs); r
  | ArrMap     -- arrMap$[t,a]
 
@@ -276,7 +276,7 @@ primOpCanFail IsArr  = True
 primOpCanFail IsComp = True
 primOpCanFail IsTru  = True
 primOpCanFail ArrApp = True
-primOpCanFail DotDot = True  -- can fail when the interval is empty
+primOpCanFail DotDot = True  -- Can fail when the interval is empty
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False
