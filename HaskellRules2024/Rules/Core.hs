@@ -18,7 +18,7 @@ module Rules.Core
   , unIter
 
     -- Particular expressions
-  , someAny
+  , someAny, inRange, coreSeq
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -203,10 +203,21 @@ Underscore is treated specially in two rules
 
 -}
 
+coreSeq :: [Expr] -> Expr
+-- coreSeq [e1,e2,e3]  =   e1 :>: (e2 :>: e3)
+coreSeq = foldr1 (:>:)
+
 someAny :: Expr
+-- The expression: some( any )
 someAny = Some (Lam (bind x (Var x)))
   where
     x = ident "x"
+
+inRange :: Val -> Val -> Expr
+-- (inrange i n) retuns the expression (i >= 0; i < n)
+inRange i n = coreSeq [ Var underscore :=: (Op GEq :@: Tup [i, LitInt 0])
+                      , Var underscore :=: (Op Lt :@: Tup [i,n])
+                      , i ]
 
 --------------------------------------------------------------------------------
 --

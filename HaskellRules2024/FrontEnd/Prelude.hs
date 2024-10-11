@@ -49,7 +49,7 @@ miniEvalPrelude = ("miniprelude", "\
 \nat        := lam y { isInt$[y]; intGE$[y,0]; y };\n\
 \Length     := lam y { isArr$[y]; arrLen$[y] };\n\
 \prefix'?'        := lam t { lam x { if (truth{y:any} = x) then { truth{t[y]} } else { x = () } } };\n\
-\operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intAdd$[ x, dotDot$[intAdd$[1,intSub$[y,x]]]] }};\n\
+\operator'..'     := lam p { exi x y i { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[i, intAdd$[1,intSub$[y,x]]]; intAdd$[i,x] }};\n\
 \prefix'[]'       := lam t { lam a   { exi j { j = isArr$[a]; arrMap$[t,j] } } };\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intAdd$[x,y] }};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intSub$[x,y] }};\n\
@@ -83,11 +83,11 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \Length     := lam y { isArr$[y]; arrLen$[y] };\n\
 \prefix'?'        := lam t { lam x { if (truth{y:any} = x) then { truth{t[y]} } else { x = () } } };\n\
 \prefix'[]'       := lam t { lam a   { exi j { j = isArr$[a]; arrMap$[t,j] } } };\n\
-\operator'..'     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intAdd$[ x, dotDot$[intAdd$[1,intSub$[y,x]]]] }};\n\
-\operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\
-\operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intSub$[x,y]; isInt$[z]; z } }}};\n\
-\operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intMul$[x,y]; isInt$[z]; z } }}};\n\
-\operator'/'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[y, 0]; (x,y) >> some{ lam z { z = intDiv$[x,y]; isInt$[z]; z } }}};\n\
+\operator'..'     := lam p { exi x y i { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[i, intAdd$[1,intSub$[y,x]]]; intAdd$[i,x] }};\n\
+\operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intAdd$[x,y] }};\n\
+\operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intSub$[x,y] }};\n\
+\operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intMul$[x,y] }};\n\
+\operator'/'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[y,0]; intDiv$[x,y] }};\n\
 \operator'<'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intLT$[x,y]; x }};\n\
 \operator'<='     := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intLE$[x,y]; x }};\n\
 \operator'>'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intGT$[x,y]; x }};\n\
@@ -97,3 +97,9 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \prefix'+'        := lam x { isInt$[x]; x >> some{ lam z { z = x; isInt$[z]; z } }};\n\
 \}\n\
 \")
+
+-- Ranjit had these, but I have no idea why
+-- \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\
+-- \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intSub$[x,y]; isInt$[z]; z } }}};\n\
+-- \operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intMul$[x,y]; isInt$[z]; z } }}};\n\
+-- \operator'/'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; intNE$[y, 0]; (x,y) >> some{ lam z { z = intDiv$[x,y]; isInt$[z]; z } }}};\n\

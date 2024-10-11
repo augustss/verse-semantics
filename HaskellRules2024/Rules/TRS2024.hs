@@ -7,6 +7,7 @@ module Rules.TRS2024 (
    , name, nameWith, iff
    , skolValue
    , LocalExis(..), makeRigid, addFlexi, allExis
+   , evalCtxLift
  ) where
 
 import Prelude
@@ -26,9 +27,10 @@ import Data.List( (\\) )
 --------------------------------------------------------------------------------
 
 evalRules :: Rule
-evalRules = everywhere evalStep <> everywhere recStep
+evalRules = everywhere (evalStep <> evalDotDotStep)
+         <> everywhere recStep
 
--- NB: (everywhere (evalStep <> recStep) does not work.
+-- NB: (everywhere (evalStep <> recStep)) does not work.
 -- Because evalStep tries top-level single step; we don't want to
 -- go off into recStep just becuase there is nothing to do at outermost
 -- level.    eg.  exists f. (f = \x. ..f..); f[3]
@@ -46,6 +48,14 @@ evalStep = applicationStep
 
 -- currently:  everywhere (evalRulesNoRec `tryBefore` rulesRec)
 -- better:    (everywhere evalRulesNoRec) `tryBefore` (everywhere rulesRec)
+
+evalDotDotStep :: Rule
+-- Used only for evaluation, not verification
+evalDotDotStep _env lhs =
+  "APP-DOTDOT" `nameWith`  -- DotDot$[v,k]  -->  v = (0 | 1 | ... | k-1); ()
+  do Op DotDot :@: Tup [v, Lit (LInt k)] <- [lhs]
+     let the_choice = foldr ((:|:) . Lit . LInt) Fail [0..(k-1)]
+     pure (pPrint k, (v :=: the_choice) :>: Tup [])
 
 --------------------------------------------------------------------------------
 applicationStep :: Rule
@@ -192,9 +202,9 @@ arrayOpStep _env lhs =
   do Tup vs@(_:_) :@: v <- [lhs]
      pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
  ++
-  "APP-ARR" `nameWith`  -- (Arr n e)[v] --> v = Dotdot$[n]; some(\_.e)
+  "APP-ARR" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
   do arr@(Arr sz e) :@: v <- [lhs]
-     pure (pPrint arr, (v :=: (Op DotDot :@: sz)) :>:
+     pure (pPrint arr, (Var underscore :=: (Op DotDot :@: Tup [v,sz])) :>:
                        (Some $ Lam $ bind underscore e) )
  ++
   "APP-LENGTH" `name`   -- Length$[<v1,..,vn>  --> n
@@ -219,9 +229,9 @@ arrayOpStep _env lhs =
   do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
      let x:y:_ = identsNotIn $ free arg
      pure (pPrint arr, Exi $ bind x $
-                       (Var x :=: Some (Lam (bind underscore e))) :>:
-                       (Var underscore :=: (f :@: Var x))         :>:
-                       Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y)) )
+                       coreSeq [ Var x :=: Some (Lam (bind underscore e))
+                               , Var underscore :=: (f :@: Var x)
+                               , Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y))] )
  ++
   "TUP-MAP" `nameWith`   -- ArrMap$[f, <v1,..,vn>]
                          --   --> x1=f[v1]; ..; xn=f[vn]; <x1,..,xn>
@@ -230,10 +240,6 @@ arrayOpStep _env lhs =
          prs = (identsNotIn $ free arg) `zip` vs
          bind_one (x,v) e = Exi $ bind x $ (Var x :=: (f :@: v)) :>: e
      pure (pPrint arr, foldr bind_one (Tup [Var x | (x,_) <- prs]) prs)
- ++
-  "APP-DOTDOT" `nameWith`  -- DotDot$[k]  -->  0 | 1 | ... | k-1
-  do Op DotDot :@: (Lit (LInt k)) <- [lhs]
-     pure (pPrint k, foldr ((:|:) . Lit . LInt) Fail [0..(k-1)])
  ++
   "APP-ARRAPP" `name`  -- Array append
   do { Op ArrApp :@: Tup [e1,e2,res] <- [lhs]
@@ -290,6 +296,10 @@ unificationStep _env lhs =
            ((Var x :=: (Some $ Lam $ bind underscore e1)) :>:
             (Var x :=: (Some $ Lam $ bind underscore e2)) :>:
             e)))
+ ++
+  "U-DOTDOT" `nameWith`   --   DotDot[k,n]  --> inRange[k,n]
+  do (k@(Lit {}) :=: (Op DotDot :@: n)) :>: e <- [lhs]
+     pure (pPrint lhs, (Var underscore :=: inRange k n) :>: e)
  ++
   "U-TRU" `name`
   do (Tru v :=: Tru v') :>: e <- [lhs]
@@ -461,9 +471,9 @@ oneAndAllStep _env lhs =
      let f1:f2:_ = identsNotIn $ free lhs
          res = Exi $ bind f1 $
                Exi $ bind f2 $
-               (Var f1 :=: (f :@: u))      :>:
-               (Var f2 :=: (Var f1 :@: v)) :>:
-               (Var f2 :@: g)
+               coreSeq [ Var f1 :=: (f :@: u)
+                       , Var f2 :=: (Var f1 :@: v)
+                       , Var f2 :@: g ]
      pure res
  ++
   -- iter(e1 | e2, u){f, g}  -->  iter(e1, u){f, \ x . iter(e2, x){f, g} }

@@ -14,6 +14,7 @@ import Rules.Core
 import Rules.TRS2024 as TRS2024
 import Epic.Print hiding ( (<>) )
 
+import Data.Maybe ( isJust )
 import Control.Monad (guard)
 import Rules.Solver (unsat)
 
@@ -61,22 +62,24 @@ groundValue _  _                     = Nothing
 
 --------------------------------------------------------------------------------
 dotDotStep :: Rule
+--   C[ P[ DotDot$[x,n] ]
+--     ---> if x is in flexis(P)
+--   verify(R,n;A){ P[ choose(n){x=some(inrange[n]);()} ] }
 dotDotStep env lhs =
-   "DOT-DOT-NARROW" `nameWith`
-   do (skols, rs, as, verify_body) <- matchVerify env lhs
-      (ctx, (flexis, e1@(Var x :=: Op DotDot :@: Var n) :>: e)) <- proofX skols verify_body
-      guard (n `elem` skols)
-      guard (x `elem` flexis)
-      pure ( pPrint e1
-           , Verify $ bindList rs $
-             (as, ctx <@ (Choose (Var n)
-                             ((Var x :=: Some(inrange n)) :>: Var x)
-                          :>: e)))
+   "DOTDOT-NARROW" `nameWith`
+  do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
+     guard (x `elem` exis)
+     let i = identNotIn (free v)
+     pure (pPrint e1, ctx <@ (Choose v
+                                (Var x :=: Some(Lam $ bind i (inRange (Var i) v)))))
 
-inrange :: Ident -> Expr
-inrange n = Lam (bind x (Op Gt :@: Tup [Var x, LitInt 0] :>: Op Lt :@: Tup [Var x,Var n]))
-   where
-    x = identNotIn [n]
+  ++
+  "DOTDOT-INRANGE" `nameWith`
+   do (all_rs, rs, as, e) <- matchVerify env lhs
+      (ctx, (_, e1@(Op DotDot :@: Tup [i, sz]))) <- proofX all_rs e
+      guard (isJust (groundValue all_rs i))
+      pure (pPrint e1, Verify $ bindList rs
+                         (as, ctx <@ inRange i sz))
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule

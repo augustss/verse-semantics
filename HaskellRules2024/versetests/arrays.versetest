@@ -31,3 +31,10 @@ verify("arr-uni3a", pass){
     f( x:[]int, y:[]int )<succeeds>:int := if (x=y) then fail else 77 }
 verify("arr-uni3b", pass){
     f( x:[]int, y:[]string )<succeeds>:int := if (x=y) then fail else 77 }
+
+
+verify("funny1", pass){
+  f( n:int )<decides> := {x := y+1; n>3; y:=7; x} }
+
+verify("arr-nest1", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1 } } }
+verify("arr-nest2", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1|2 } } }
