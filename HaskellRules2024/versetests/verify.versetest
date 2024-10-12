@@ -276,15 +276,6 @@ verify(":type4", fail,tim=skip_acc) {a:int => b:any => f(:int):type{a=b} => {a=b
 verify("blame0", pass) { f2( g() := 3 ) := g[] = 3 }
 
 # ---------------------------------------------
-# Array tests
-verify("ArrayV0", pass, broken) {a:=(1;2;),a=(1,2)}
-  # Funny parsing
-verify("ArrayV1", pass) { a := for{1..3}; a = array{1,2,3} }
-# ArrayV2-ArrayV4: prefix'[]' unimplemented
-verify("ArrayV2", pass) { ([]int)[ array{1,2} ] }
-verify("ArrayV3", pass) { f():[]int := array{1,2,3} }
-verify("ArrayV4", pass) { f():[]int := array{1,2,3} }
-
 # For now we just ignore 'computes' i.e. treat as 'succeeds'
 verify("computes00", pass) { f(x:int)<computes>:int = 1 }
 verify("computes01", fail,tim=V10) { f(x:int)<computes>:int = (x = 1) }

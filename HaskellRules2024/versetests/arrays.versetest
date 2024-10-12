@@ -1,3 +1,21 @@
+# -------------------------------------------------------
+#                   Array tests
+# -------------------------------------------------------
+
+verify("ArrayV0", pass, broken) {a:=(1;2;),a=(1,2)}
+  # ArrayV0: Funny parsing
+
+# ArrayV1a, V1b. In the verifier we never expand a n..m choice;
+# but we do track its size
+verify("ArrayV1a", fail) { a := for{1..3}; a = array{1,2,3} }
+verify("ArrayV1b", pass) { a := for{1..3}; Length[a] = 3 }
+
+# ArrayV2-ArrayV4: prefix'[]' unimplemented
+verify("ArrayV2", pass) { ([]int)[ array{1,2} ] }
+verify("ArrayV3", pass) { f():[]int := array{1,2,3} }
+verify("ArrayV4", pass) { f():[]int := array{1,2,3} }
+
+
 verify("arr1", pass){ f( x:[]int ) : []int := x }
 verify("arr2", pass){ f( x:[]nat ) : []int := x }
 
@@ -12,10 +30,13 @@ verify("arr-index2", pass, broken){ f( x:[]nat where Length[x] > 0 )<succeeds> :
 verify("arr-index3", pass){ f( x:[]nat )<succeeds> : nat := if (z := x[0]) then { z } else { 99 } }
 verify("arr-index4", pass){ f( x:[]nat where x[0] )<succeeds> : nat := x[0] }
 testeq("arr-index5", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }
-verify("arr-index6", pass){ f( x:[]nat, i:nat )<succeeds> : nat := if (Length[x]>i) then {x[i]} else {88} }
+verify("arr-index6", pass){
+   f( x:[]nat, i:nat )<succeeds> : nat
+      := if (Length[x]>i) then {x[i]} else {88} }
 
-verify("arr5", pass, broken){ f( x:any )<succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
-# arr5: does isArr$ on the same thing twice return an array of the same length
+verify("arr5", pass, broken)
+    { f( x:any )<succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
+    # arr5: does isArr$ on the same thing twice return an array of the same length
 
 # Array unification
 verify("arr-uni1", pass){
