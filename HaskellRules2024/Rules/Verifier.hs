@@ -32,7 +32,7 @@ verificationStep =  TRS2024.evalStep
                  <> guardStep
                  <> verifyStep
                  <> splitStep
-                 <> dotDotStep
+                 <> arrStep
 
 --------------------------------------------------------------------------------
 guardStep :: Rule
@@ -61,17 +61,19 @@ groundValue rs (Tru v)               = do gv <- groundValue rs v; Just (GVTru gv
 groundValue _  _                     = Nothing
 
 --------------------------------------------------------------------------------
-dotDotStep :: Rule
+arrStep :: Rule
 --   C[ P[ DotDot$[x,n] ]
 --     ---> if x is in flexis(P)
 --   verify(R,n;A){ P[ choose(n){x=some(inrange[n]);()} ] }
-dotDotStep env lhs =
+arrStep env lhs =
    "DOTDOT-NARROW" `nameWith`
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
      guard (x `elem` exis)
      let i = identNotIn (free v)
-     pure (pPrint e1, ctx <@ (Choose v
-                                (Var x :=: Some(Lam $ bind i (inRange (Var i) v)))))
+     pure (pPrint e1, wrapExis exis $
+                      ctx <@ (Choose v
+                                ((Var x :=: Some(Lam $ bind i (inRange (Var i) v)))
+                                 :>: Tup [])))
 
   ++
   "DOTDOT-INRANGE" `nameWith`
@@ -80,6 +82,20 @@ dotDotStep env lhs =
       guard (isJust (groundValue all_rs i))
       pure (pPrint e1, Verify $ bindList rs
                          (as, ctx <@ inRange i sz))
+
+  ++
+  "CHOOSE-EXPAND" `name`
+  do (ctx, Choose sz e) <- evalCtx [] lhs
+     guard (ctx /= HOLE)
+     let new_sz | choiceAndFailureFree ctx = sz
+                | otherwise                = someNat
+     pure (Choose new_sz (ctx <@ e))
+  ++
+  "ALL-CHOOSE" `name`
+  do All e@(Choose e1 e2) <- [lhs]
+     pure (if isVal e1 then Arr e1 e2
+           else let i = identNotIn (free e)
+                in Exi $ bind i ((Var i :=: e1) :>: Arr (Var i) e2))
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule
@@ -152,6 +168,9 @@ splitStep env lhs =
 
    ++
    "SPLIT-ISARR" `nameWith`
+       -- verify(R,r;A){ P[ isArr$[r] ] }
+       --  --> verify(R,r,n;A,isArr$[r]){ P[ Arr(n){some{any}}
+       --      ..and the fail case..
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Op IsArr :@: Var r)) <- proofX all_rs e
       guard (r `elem` all_rs)   -- r is a skolem
@@ -228,7 +247,7 @@ go_px lx lhs =
       pure (ctx :>: e, hole)
  ++
    do cf :>: x <- [lhs]
-      guard (TRS2024.choiceFree cf)
+      guard (TRS2024.choiceFreeLH cf)
       (ctx, hole) <- go_px lx x
       pure (cf :>: ctx, hole)
  ++

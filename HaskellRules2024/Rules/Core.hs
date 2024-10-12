@@ -18,7 +18,7 @@ module Rules.Core
   , unIter
 
     -- Particular expressions
-  , someAny, inRange, coreSeq
+  , someAny, someNat, inRange, coreSeq
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -92,7 +92,7 @@ data Expr
   | Check Effect Expr
   | Verify (BindList ([Assump],Expr))
   | Arr    Val Expr
-  | Choose Val Expr
+  | Choose Expr Expr
 
   -- HOLE, only for contexts
   | HOLE
@@ -213,6 +213,12 @@ someAny = Some (Lam (bind x (Var x)))
   where
     x = ident "x"
 
+someNat :: Expr
+-- The expression: some( nat )
+someNat = Some (Lam (bind x (Op GEq :@: Tup [Var x, LitInt 0])))
+  where
+    x = ident "x"
+
 inRange :: Val -> Val -> Expr
 -- (inrange i n) retuns the expression (i >= 0; i < n)
 inRange i n = coreSeq [ Var underscore :=: (Op GEq :@: Tup [i, LitInt 0])
@@ -287,7 +293,7 @@ primOpCanFail IsArr  = True
 primOpCanFail IsComp = True
 primOpCanFail IsTru  = True
 primOpCanFail ArrApp = True
-primOpCanFail DotDot = True  -- Can fail when the interval is empty
+primOpCanFail DotDot = True  -- Can fail when unification fails
 
 -- These operations /can't/ fail, and /do/ produce a value
 primOpCanFail Add      = False
@@ -485,8 +491,8 @@ pPrintPrecE lvl prec the_expr
              (ids, (as, body)) = alphaRenameVerify (free bl) bl
 
 
-       Arr    v e -> text "Arr"    <> parens (ppr0 v) <> braces (ppr0 e)
-       Choose v e -> text "Choose" <> parens (ppr0 v) <> braces (ppr0 e)
+       Arr    v  e  -> text "Arr"    <> parens (ppr0 v)  <> braces (ppr0 e)
+       Choose e1 e2 -> text "Choose" <> parens (ppr0 e1) <> braces (ppr0 e2)
 
   where
     ppr0 = pPrintPrecE lvl 0
@@ -558,7 +564,7 @@ exprSize (Verify bl)   = 10 + exprSize e
                        where
                          (_rs,(_as,e)) = unsafeUnbindList bl
 exprSize (Arr v e)     = 1 + exprSize v + exprSize e
-exprSize (Choose v e)  = 1 + exprSize v + exprSize e
+exprSize (Choose e1 e2)= 1 + exprSize e1 + exprSize e2
 
 bindSize :: Bind Expr -> Int
 bindSize bnd = exprSize (snd (unsafeUnbind bnd))
@@ -617,7 +623,7 @@ valid (Iter _ _ _ _)      = False
 valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid (Arr    v e)        = is_val v && valid e
-valid (Choose v e)        = is_val v && valid e
+valid (Choose e1 e2)      = valid e1 && valid e2
 valid e                   = is_val e
 
 is_val :: Expr -> Bool
@@ -1248,9 +1254,12 @@ isContext _            = False
 
 -- Unpack a correct Iter construct
 unIter :: Expr -> Maybe (Expr, Expr, (Ident, Ident, Ident, Expr), (Ident, Expr))
-unIter (Iter e1 e2 (Lam b3) (Lam b4)) |
-    (x, Lam b3')  <- unsafeUnbind b3,
-    (y, Lam b3'') <- unsafeUnbind b3',
-    (z, eb3) <- unsafeUnbind b3'',
-    (w, eb4) <- unsafeUnbind b4 = Just (e1, e2, (x, y, z, eb3), (w, eb4))
+-- iter e1 e2 (\x y z. e3) (\w. e4)
+--   returns (e1, e2, (x,y,z,e3), (w,e4))
+unIter (Iter e1 e2 (Lam b3) (Lam b4))
+    | (x, Lam b3')  <- unsafeUnbind b3
+    , (y, Lam b3'') <- unsafeUnbind b3'
+    , (z, eb3) <- unsafeUnbind b3''
+    , (w, eb4) <- unsafeUnbind b4
+    = Just (e1, e2, (x, y, z, eb3), (w, eb4))
 unIter _ = Nothing

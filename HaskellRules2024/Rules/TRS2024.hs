@@ -3,11 +3,11 @@
 
 module Rules.TRS2024 (
      evalRules, evalStep, recStep
-   , blocked, choiceFree
+   , blocked, choiceFreeLH, choiceAndFailureFree
    , name, nameWith, iff
    , skolValue
-   , LocalExis(..), makeRigid, addFlexi, allExis
-   , evalCtxLift
+   , LocalExis(..), makeRigid, addFlexi, allExis, wrapExis
+   , evalCtxLift, evalCtx
  ) where
 
 import Prelude
@@ -399,12 +399,12 @@ onlyApps f orig_e = go orig_e
     go (e1 :|: e2)  = go e1 && go e2
     go (e1 :@: e2)  = e1 == Var f || (go e1 && go e2)
     go (Iter e1 e2 e3 e4) = all go [e1,e2,e3,e4]
-    go (Some e)     = go e
-    go (All e)      = go e
-    go (e1 :>>: e2) = go e1 && go e2
-    go (Check _ e)  = go e
-    go (Choose _ e) = go e
-    go (Exi bnd)    = go_bind bnd
+    go (Some e)       = go e
+    go (All e)        = go e
+    go (e1 :>>: e2)   = go e1 && go e2
+    go (Check _ e)    = go e
+    go (Choose e1 e2) = go e1 && go e2
+    go (Exi bnd)      = go_bind bnd
 
     -- ToDo: Lennart thought this was impossible. Why?
     go (Verify bnd) = go e
@@ -444,7 +444,7 @@ choiceStep _env lhs =
   "CHOICE" `name`
   do (ctx, e1 :|: e2) <- evalCtx [] lhs
      guard (ctx /= HOLE)
-     guard (choiceFree ctx)
+     guard (choiceFreeLH ctx)
      guard (blocked ctx)
      pure ((ctx <@ e1) :|: (ctx <@ e2))
  ++
@@ -751,9 +751,10 @@ blkd lx (v1 :@: v2) = case v1 of
                         _     -> False
 
 blkd _  (Verify _)  = True
-blkd lx (Check _ e) = blkd lx e
-blkd lx (Some v)    = any (isLocal lx) (free v)
-blkd lx (v :>>: _)  = any (isLocal lx) (free v)
+blkd lx (Check _ e)  = blkd lx e
+blkd lx (Some v)     = any (isLocal lx) (free v)
+blkd lx (Choose _ e) = any (isLocal lx) (free e)
+blkd lx (v :>>: _)   = any (isLocal lx) (free v)
 
 blkd _  Fail        = False
 
@@ -762,10 +763,46 @@ blkd lx (Iter e1 _e2 _ _) = blkd (makeRigid lx) e1 -- && blkd lx e2
 blkd _ e = errorMessage ("Uncovered case in blkd " ++ show e)
 
 ---------------------
-choiceFree :: Expr_or_Context -> Bool
+choiceAndFailureFree :: Expr_or_Context -> Bool
+-- No choices or failure anyhere, to the left or to
+-- the right of the hole
+choiceAndFailureFree = go []
+  where
+    go _  (Var {})    = True
+    go _  (Lit {})    = True
+    go _  (Tup {})    = True
+    go _  (Tru {})    = True
+    go _  (Lam {})    = True
+    go _  (Op {})     = True
+    go _  (_ :=: _)   = False
+    go fs (e1 :>: e2) = go fs e1 && go fs e2
+    go fs (_ :>>: e)  = go fs e
+    go _  (_ :|: _)   = False
+    go _  Fail        = False
+    go fs (v1 :@: _)  = case v1 of
+                          Op op -> primOpCanFail op
+                          Var f -> f `elem` fs
+                          _     -> False
+
+    go fs (Exi bnd)   = go fs e where (_,e) = unsafeUnbind bnd
+    go _  (All {})    = True
+    go _  (Arr {})    = True
+    go _  (Some {})   = True
+    go _  HOLE        = True
+
+    go _  (Choose {}) = False
+    go fs (Check _ e) = go fs e
+    go _  (Verify {}) = True
+
+    go fs e@Iter{}
+      | Just (_, _, (_, _, c, f), (_, g)) <- unIter e
+                  = go (c:fs) f && go fs g
+      | otherwise = error "Malformed Iter"
+
+choiceFreeLH :: Expr_or_Context -> Bool
 -- (choiceFree ctx) means no choices to the left of the HOLE
 -- or, if no HOLE, anywhere
-choiceFree = choiceFree' []
+choiceFreeLH = choiceFree' []
 
 -- The first argument to choiceFree' are functions known to be choice free.
 -- This is used for the iter construct.  In the case where iter(e){u;f;g}
@@ -782,7 +819,13 @@ choiceFree' fs (v1 :@: _)          = case v1 of
                                        Op _      -> True  -- all other ops are choice-free
                                        Var f     -> f `elem` fs
                                        _         -> False -- may or may not be choice free
-choiceFree' fs e@Iter{} | Just (_, _, (_, _, c, f), (_, g)) <- unIter e
+choiceFree' fs e@Iter{}
+  | Just (_, _, (_, _, c, f), (_, g)) <- unIter e
                                    = choiceFree' (c:fs) f && choiceFree' fs g
-choiceFree' _  Iter{}              = error "Malformed Iter"
+  | otherwise                      = error "Malformed Iter"
+choiceFree' _ (Some {})            = True
+choiceFree' _ (All {})             = True
+choiceFree' _ (Arr {})             = True
+choiceFree' _ (Choose {})          = False
 choiceFree' _  _                   = True
+
