@@ -181,6 +181,7 @@ library verse-libs
                       Epic.OpParser
                       Epic.List
                       Epic.UnionFind
+                      FrontEnd.CopyHook
                       FrontEnd.Error
                       FrontEnd.Expr
                       FrontEnd.Flags

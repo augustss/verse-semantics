@@ -9,6 +9,7 @@ import Rules.TRS2024  as TRS2024
 import Rules.Verifier as Verifier
 import TRS.Traced
 
+import FrontEnd.CopyHook
 import FrontEnd.Flags( Flags(..), defaultFlags )
 import FrontEnd.Expr
 import FrontEnd.Desugar
@@ -39,6 +40,7 @@ import qualified Options.Applicative as OA
 
 main :: IO ()
 main = do
+  copyHook
   main_flags :: MainFlags <- mainArgs
   let cs1 = c_state theCommandSet
 

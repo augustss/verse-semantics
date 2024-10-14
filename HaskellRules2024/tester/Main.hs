@@ -6,6 +6,7 @@
 {-# LANGUAGE TupleSections #-}
 module Main(main) where
 
+import FrontEnd.CopyHook
 import FrontEnd.Desugar( desugar, DError )
 import FrontEnd.ToCore( convertToCore )
 import FrontEnd.Flags
@@ -47,6 +48,7 @@ import qualified Options.Applicative as OA
 
 main :: IO ()
 main = do
+  copyHook
   do { tflg <- testArgs
      ; runTests tflg }
 
