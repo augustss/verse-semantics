@@ -27,7 +27,7 @@ import Data.List( (\\) )
 --------------------------------------------------------------------------------
 
 evalRules :: Rule
-evalRules = everywhere (evalStep <> evalDotDotStep)
+evalRules = everywhere (evalStep)
          <> everywhere recStep
 
 -- NB: (everywhere (evalStep <> recStep)) does not work.
@@ -45,6 +45,7 @@ evalStep = applicationStep
            <> choiceStep
            <> oneAndAllStep
            <> checkStep
+           <> evalDotDotStep
 
 -- currently:  everywhere (evalRulesNoRec `tryBefore` rulesRec)
 -- better:    (everywhere evalRulesNoRec) `tryBefore` (everywhere rulesRec)

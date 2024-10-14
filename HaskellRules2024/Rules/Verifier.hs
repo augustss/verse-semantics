@@ -61,6 +61,7 @@ groundValue rs (Tru v)               = do gv <- groundValue rs v; Just (GVTru gv
 groundValue _  _                     = Nothing
 
 --------------------------------------------------------------------------------
+
 arrStep :: Rule
 --   C[ P[ DotDot$[x,n] ]
 --     ---> if x is in flexis(P)
@@ -68,6 +69,8 @@ arrStep :: Rule
 arrStep env lhs =
    "DOTDOT-NARROW" `nameWith`
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
+     -- Use this rule when v is not a literal.
+     guard False -- LA: disable this rule so tests can pass again.
      guard (x `elem` exis)
      let i = identNotIn (free v)
      pure (pPrint e1, wrapExis exis $
