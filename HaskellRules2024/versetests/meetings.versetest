@@ -10,7 +10,7 @@ verify("M16Aug24-1", pass){ f(x:int):=nat[x] => f[-3]  }
   # i.e.   (f := fun(x:int){ :<succeeds>int }
   # it'd mean that f is a function that returns some int
   # In the actual test case it promises to succeed, returning nat[x]
-verify("M16Aug24-2", pass){ (a:int) => (f(:int):=nat[a]) => f[a]  }
+verify("M16Aug24-2", pass, tim=skip_rej){ (a:int) => (f(:int):=nat[a]) => f[a]  }
   # M16Aug24-4: similar to M16Aug24-1
 
 verify("M16Aug24-3", pass){ f(x:int):nat := nat[x] => f[-3]  }
@@ -19,11 +19,11 @@ verify("M16Aug24-4", pass){ f(x:int):type{nat[x]} => f[-3]  }
 # Meeting 14 Aug 24
 testeq("jan1", pass, broken){ (f(x:int)<succeeds>:= x); y:int; f[y]=3} {3}
 
-verify("jan2", pass){ f(x:int)<succeeds>:int = x; g(y:int):= {if(f(y)=y) then 1 else 2} ; g[3] }
-verify("jan3", pass){ h(x:int,y:int)<decides>:int= x=y; if(h[2,2]=2) then 1 else 2 }
+verify("jan2", pass, tim=skip_rej){ f(x:int)<succeeds>:int = x; g(y:int):= {if(f(y)=y) then 1 else 2} ; g[3] }
+verify("jan3", pass, tim=skip_rej){ h(x:int,y:int)<decides>:int= x=y; if(h[2,2]=2) then 1 else 2 }
 verify("jan4", pass){ h(x: int, y:int)<decides>:int= x=y; () => if(h[2,2]) then 1 else 2 }
 
-verify("jan5a", fail){ f(c:char):=1; as:any
+verify("jan5a", fail,tim=D00){ f(c:char):=1; as:any
                        => as=array{_}
                        =>  x:=as[0]
                        => bs:=array{:int}
@@ -45,15 +45,15 @@ verify("jan6c", pass) { ty(x:int)<succeeds> := { if(x=0) then x else 0 };
 # ---------------------------------
 # Opacity and function arguments: 14 Aug 24
 verify("FCS1", pass){ f(x:int)<decides>:int := x>3
-                    ; g()<decides> := f["monkey"] }
-   # FCS1: f is opaque; call f["monkey"] is allowed by verifier even though domain test fails
+                    ; g()<decides> := f['m'] }
+   # FCS1: f is opaque; call f['m'] is allowed by verifier even though domain test fails
 
 verify("FCS2", fail){ f(x:int)<decides>:int := x>3
                     ; g()<succeeds> := f[4] }
    # FCS2: f is opaque; can't prove f[4] succeeds, even though it does
 
 verify("FCS3", fail){ f(x:int)<closed><succeeds>:int := x+3
-                    ; g()<succeeds> := f["monkey"] }
+                    ; g()<succeeds> := f['m'] }
    # FCS3: f is opaque, and domain test fails, so g rejects the call
 
 verify("FCS4", pass){ f(x:int)<decides> := x>3
@@ -61,22 +61,22 @@ verify("FCS4", pass){ f(x:int)<decides> := x>3
    # f is transparent; call f[4] actually succeeds
 
 verify("FCS5", pass){ f(x:int)<decides> := x>3
-                    ; g()<decides> := f["monkey"] }
-   # FCS5: f["monkey"] is allowed by verifier even though domain test fails
+                    ; g()<decides> := f['m'] }
+   # FCS5: f['m'] is allowed by verifier even though domain test fails
    #       same as FCS1, but this time transparent f
 
-verify("FCS6", fail) { f(x:int)<decides>:string := 7 }
-   # FCS7: 7 is not a string.  Rejected despite <decides>
-verify("FCS7", fail) { f(x:int)<decides>:type{10} := 7 }
+verify("FCS6", fail, tim=skip_acc) { f(x:int)<decides>:char := 7 }
+   # FCS7: 7 is not a char.  Rejected despite <decides>
+verify("FCS7", fail, tim=skip_acc) { f(x:int)<decides>:type{10} := 7 }
    # FCS8: 7 is not 10.  Rejected despite <decides>
 
 verify("FCS8", pass)   { f(3=4)<succeeds>:int := 7 }
-verify("FCS9", pass)   { f(3=4)<succeeds>:int := "monkey" }
+verify("FCS9", pass,tim=skip_rej)   { f(3=4)<succeeds>:int := 'm' }
 
 # --------- Round parens --------------
 verify("FCS10", fail){ f1(x:int)<decides>:int := x>3
-                     ; g()<decides> := f1("monkey") }
-   # FCS10: f1 is opaque; Round parens; can't prove f1("monkey") succeeds
+                     ; g()<decides> := f1('m') }
+   # FCS10: f1 is opaque; Round parens; can't prove f1('m') succeeds
 
 verify("FCS11", fail){ f1(x:int)<decides>:int := x>3
                      ; g()<decides> := f1(2) }
@@ -84,8 +84,8 @@ verify("FCS11", fail){ f1(x:int)<decides>:int := x>3
    # but since f1 is <decides> we can't prove f1(2) succeeds
 
 verify("FCS12", fail){ f2(x:int)<decides> := x>3
-                     ; g()<decides> := f2("monkey") }
-   # FCS12; can't prove f1("monkey") succeeds
+                     ; g()<decides> := f2('m') }
+   # FCS12; can't prove f1('m') succeeds
 
 verify("FCS13", fail){ f2(x:int)<decides> := x>3
                            ; g()<decides> := f2(2) }
@@ -97,49 +97,49 @@ verify("FCS14", pass){ f2(x:int)<decides> := x>3
 
 # More function call semantics
 verify("TimL300", pass, broken) {a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}
-verify("TimL300-1", pass) { (g(x:int):int) => g["monkey"] => 3 }
-verify("TimL300-2", pass) { (g(x:int) :=3) => g["monkey"] => 3 }
+verify("TimL300-1", pass) { (g(x:int):int) => g['m'] => 3 }
+verify("TimL300-2", pass) { (g(x:int) :=3) => g['m'] => 3 }
   # TimL300-1,2: more exotic versions of FCS6
 
-verify("TimL300-3", pass) { (g( f(x:int):string ):=4)  => g[ (x:int) =>"monkey"] => 3 }
-verify("TimL300-4", pass) { (g( f(x:int):string ):=4)  => g[ h(x:int):="monkey"] => 3 }
-verify("TimL300-5", pass) { (g( f(x:int):string ):int) => g[ h(x:int):="monkey"] => 3 }
-verify("TimL300-6", pass)   { (g( f(x:int):="monkey" ):int) => g[ h(x:int):="monkey"] => 3 }
-verify("TimL300-7", pass, broken) { (g( f(x:int):="not-monkey" ):int) => g[ h(x:int):="monkey"] => 3 }
-verify("TimL300-8", pass)   { f(x:int):int := 1; if (f["monkey"] >0) then{1} else{2} = 2 }
-verify("TimL300-9", pass, broken)   { f( g(x:int):string ):int := 1; if (f[(x:int)=>1] >0) then{1} else{2} = 2 }
+verify("TimL300-3", pass) { (g( f(x:int):char ):=4)  => g[ (x:int) =>'m'] => 3 }
+verify("TimL300-4", pass) { (g( f(x:int):char ):=4)  => g[ h(x:int):='m'] => 3 }
+verify("TimL300-5", pass) { (g( f(x:int):char ):int) => g[ h(x:int):='m'] => 3 }
+verify("TimL300-6", pass)   { (g( f(x:int):='m' ):int) => g[ h(x:int):='m'] => 3 }
+verify("TimL300-7", pass, broken) { (g( f(x:int):="not-monkey" ):int) => g[ h(x:int):='m'] => 3 }
+verify("TimL300-8", pass)   { f(x:int):int := 1; if (f['m'] >0) then{1} else{2} = 2 }
+verify("TimL300-9", pass, broken)   { f( g(x:int):char ):int := 1; if (f[(x:int)=>1] >0) then{1} else{2} = 2 }
 
 
 # Meeting 9 August
 testeq( "M9Aug24-1", pass, broken){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
   # M9Aug24-1 uses bidirectional programming
-verify( "M9Aug24-2", pass){ F1(X:int)<closed><decides> := X = 1|2 }
-verify( "M9Aug24-3", pass){ F1(X:any)<closed><decides> := X = 1|2 }
+verify( "M9Aug24-2", pass,tim=skip_rej){ F1(X:int)<closed><decides> := X = 1|2 }
+verify( "M9Aug24-3", pass,tim=skip_rej){ F1(X:any)<closed><decides> := X = 1|2 }
 
 # Meeting 7 August
 verify( "M7Aug24-1", pass ) { G(f()<decides>:int):=3; G[ h():=3 ] }
-verify( "M7Aug24-2", fail ) { G(f()<decides>:int):=3; G[ h():="monkey" ] }
-   # h() := "monkey" does not have the right return type
+verify( "M7Aug24-2", fail,tim=skip_acc ) { G(f()<decides>:int):=3; G[ h():='m' ] }
+   # h() := 'm' does not have the right return type
 verify( "M7Aug24-3", pass ) { G(f()<decides>:int):=3; G[ h()<decides>:=3=4 ] }
 
-verify( "M7Aug24-4", fail ) { x:int := "monkey" }
-   # Manifestly, "monkey" does not have type int
-verify( "M7Aug24-5", pass ) { all{ x:int := (1 | 2) } }
-verify( "M7Aug24-6", fail ) { all{ x:int := (1 | "monkey") } }
+verify( "M7Aug24-4", fail, tim=V10 ) { x:int := 'm' }
+   # Manifestly, 'm' does not have type int
+verify( "M7Aug24-5", pass, tim=skip_rej ) { all{ x:int := (1 | 2) } }
+verify( "M7Aug24-6", fail, tim=A00 ) { all{ x:int := (1 | 'm') } }
 
 
 # Meeting 7 August
-testeq( "M5Aug24-1", pass ) { G(X:int):void = if (X = 2) then G(2); G[7] } {()}
-testeq( "M5Aug24-2", loop ) { G(X:int):void = if (X = 2) then G(2); G[2] } {7}
-verify( "M5Aug24-3", fail ) { foo(f()<decides>:int)<succeeds> := {f[]} }
+testeq( "M5Aug24-1", pass, tim=skip_rej ) { G(X:int):void = if (X = 2) then G(2); G[7] } {()}
+testeq( "M5Aug24-2", loop, tim=skip_rej ) { G(X:int):void = if (X = 2) then G(2); G[2] } {7}
+verify( "M5Aug24-3", fail, tim=D00 ) { foo(f()<decides>:int)<succeeds> := {f[]} }
 verify( "M5Aug24-4", pass, broken ) { foo(f()<computes>:int)<succeeds> := {f[] = f[]} }
 
 
 # -----------------------------------------
 # Slack 1 Aug 24
-verify("S1Aug24-1", fail) { x:int; for{ (x=2;x) | (x=3;x) } }
+verify("S1Aug24-1", fail, tim=A00) { x:int; for{ (x=2;x) | (x=3;x) } }
   # S1Aug24-1: stuck because x is rigid inside the `all`.
-verify("S1Aug24-2", fail) { f(x:int,y:int)<decides><closed> := x=y
+verify("S1Aug24-2", fail, tim=A00) { f(x:int,y:int)<decides><closed> := x=y
                           ; exists a { f[a,a] } }
 verify("S1Aug24-3", pass) { f(x:int)<decides><closed> := x=3
                           ; exists a { f[a] } }
@@ -148,7 +148,7 @@ verify("S1Aug24-3", pass) { f(x:int)<decides><closed> := x=3
 # Email 28 July 24
 # Email thread with Andy/Lennart.  The loop in G stops Y getting a value,
 #  so this test fails with "out of fuel".
-testeq( "M28Jul24-1", loop ) { F(X:int)<decides>:void = if (X = 2) then fail
+testeq( "M28Jul24-1", loop, tim=skip_rej ) { F(X:int)<decides>:void = if (X = 2) then fail
                              ; Y := all{(F[1]; G[1]) | (G[2]; F[2])}
                              ; G(X:int):void = if (X = 2) then G(2)
                              ; Y } { array{1} }
@@ -161,10 +161,10 @@ verify( "T31Jul24-1", pass, broken){ f(y:int; x := (y = 1; 1)|(y = 2; 1))<closed
 # -----------------------------------------
 # Meeting 29 July 24
 testeq( "T29Jul24-1", pass ){ f( all{1} ) := 0; f[ array{1} ] = 0 } {0}
-verify( "T29Jul24-2", fail ){ f( x:any ) := x=x }   # Gets stuck; reject
+verify( "T29Jul24-2", fail, tim=skip_acc ){ f( x:any ) := x=x }   # Gets stuck; reject
 
 verify( "T29Jul24-3", pass ){ f(x:int,y:int)<decides> := x=y; all{ a:int; f[2,a]=2; a } }
-verify( "T29Jul24-4", fail ){ f(x:int):int = x; y:int; y=f[y] }   # Gets stuck
+verify( "T29Jul24-4", fail, tim=skip_acc ){ f(x:int):int = x; y:int; y=f[y] }   # Gets stuck
 
 # T29Jul24-5: reject because of ill-typed G in argument to F
 verify( "T29Jul24-5", fail ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y }
@@ -184,32 +184,32 @@ verify( "T26Jul24-2", pass ){ f( g():=3 )<succeeds> := g[] > 2 }
 # verify("T26Jul24-4", pass){ f( p := exists x { (x,x) } )<succeeds> :=  ((r,s):=p; r=s) }
   # Trickier still.  Domain is a pair with equal components
 # verify("T26Jul24-5", pass){ f( p := exists x { (x,x) } ) :=  ((r,s):=p; x=s) }
-  #  ..and x scopes over RHS
+  #  ..and x scopes over RHS 
 
 verify("T26Jul24-6", pass){ f( x:int, x  ) := x }
 verify("T26Jul24-7", pass){ f( x, x:int  ) := x }
 
 verify("T26Jul24-10",  pass){ f( x := 1|2 )<succeeds>          := x }
 verify("T26Jul24-11",  pass){ f( g() := 1|2        )<succeeds> := g[] > 0 }      # Tim can't do this
-verify("T26Jul24-11a", pass){ f( g() := 1|2        )<succeeds> := g[] = (1|2) }
-verify("T26Jul24-12",  pass){ f( g() := :type{1|2} )<succeeds> := g[] > 0 }      # Tim verifies this
-verify("T26Jul24-12b", pass){ f( g() := :type{1|2} )<succeeds> := g[] = (1|2) }  # Tim can't verify this
-verify("T26Jul24-13",  pass){ f( g() := 1|2        )<succeeds> := g[]; f( () => 1 ) }
+verify("T26Jul24-11a", pass,tim=skip_rej){ f( g() := 1|2        )<succeeds> := g[] = (1|2) }
+verify("T26Jul24-12",  pass){ f( g() := :type{1|2} )<succeeds> := g[] > 0 }      # Tim verifies this??? How?  there is no >
+verify("T26Jul24-12b", pass,tim=skip_rej){ f( g() := :type{1|2} )<succeeds> := g[] = (1|2) }  # Tim can't verify this
+verify("T26Jul24-13",  pass,tim=skip_rej){ f( g() := 1|2        )<succeeds> := g[]; f( () => 1 ) }
 
 # -----------------------------------------
 # Meeting 24 July 24: opacity and function result types
 #
-verify("T24Jul24-1", fail) { f(x:int)<decides>:string := 7 }
-  # Should be rejected despite <decides>: the string[7] fails and should be rejected
+verify("T24Jul24-1", fail, tim=skip_acc) { f(x:int)<decides>:char := 7 }
+  # Should be rejected despite <decides>: the char[7] fails and should be rejected
 
-verify("T24Jul24-2", fail) {f(x:int)<decides>:type{x=10} := 7 }
+verify("T24Jul24-2", fail, tim=skip_acc) {f(x:int)<decides>:type{x=10} := 7 }
   # ...Similarly
 
 
 # Tim examples 8/9/2023
 verify("T8Sep23-1", pass, broken) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
-verify("T8Sep23-2", fail) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
+verify("T8Sep23-2", fail,tim=skip_acc) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
 verify("T8Sep23-3", pass, broken) {f(x:int, y:int)<succeeds> := exists z { assume{z = x}; z = x; x = y } }
 
-verify("T24Sep24-1", pass) { F():type{1|2} = 1; X := F(); X = 1|2 }
-verify("T24Sep24-2", fail) { F():type{1|2} = 1; X := F(); X = 1 }
+verify("T24Sep24-1", pass,tim=skip_rej) { F():type{1|2} = 1; X := F(); X = 1|2 }
+verify("T24Sep24-2", fail,tim=P00) { F():type{1|2} = 1; X := F(); X = 1 }

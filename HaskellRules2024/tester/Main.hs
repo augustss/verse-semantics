@@ -1067,6 +1067,7 @@ ppTim = pp
         Macro1 (Ident _ "all")  [] b -> text "for"   <> pp False 10 b
         Macro1 (Ident _ "type") [] b -> text "type"  <> pp False 10 b
         Macro1 (Ident _ "check") fs b -> text "check" <> ppEffs fs <> pp False 10 b
+        Macro1 (Ident _ "assume") [] b -> text "assume"  <> pp False 10 b
         For1   b -> text "for" <>                         pp False 10 b
         For2 e b -> text "for" <> parens (pp True 0 e) <> pp False 10 b
         Function ars b -> maybeParens (prec > 0) $
