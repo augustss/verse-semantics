@@ -689,6 +689,10 @@ prepVals (a:as) f = prepVal a (\v -> prepVals as (f . (v:)))
 --------------------------------------------------------------------------------
 
 instance Variables Expr where
+  variables _ (Lit {})     = []
+  variables _ (Op {})      = []
+  variables _ Fail         = []
+  variables _ HOLE         = []
   variables f (Var x)      = variables f x
   variables f (Tup es)     = variables f es
   variables f (Tru e)      = variables f e
@@ -702,9 +706,10 @@ instance Variables Expr where
   variables f (e1 :>>: e2) = variables f (e1,e2)
   variables f (Check _ e)  = variables f e
   variables f (Exi bnd)    = variables f bnd
+  variables f (Arr v e)    = variables f (v,e)
+  variables f (Choose v e) = variables f (v,e)
   variables f (Verify bnd) = variables f bnd
   variables f (Iter e1 e2 e3 e4) = variables f (e1, e2, e3, e4)
-  variables _ _            = []
 
 instance Variables FailableAssump where
   variables f (A_GVEq i gv)  = [i] `union` variables f gv
@@ -781,6 +786,12 @@ norm orig_e = alpha 0 orig_e
   var i = ident ("_" ++ show i)
   skvar i = ident ("_r" ++ show i)
 
+  alpha _ e@(Lit {})     = e
+  alpha _ e@(Var {})     = e
+  alpha _ e@(Op {})     = e
+  alpha _ e@(Fail {})     = e
+  alpha _ e@(HOLE {})     = e
+
   alpha k (Tup es)     = Tup (map (alpha k) es)
   alpha k (Tru e)      = Tru ((alpha k) e)
   alpha k (Lam bnd)    = Lam (bind x (alpha (k+1) e))
@@ -791,6 +802,8 @@ norm orig_e = alpha 0 orig_e
   alpha k (e1 :@: e2)  = alpha k e1 :@: alpha k e2
   alpha k (Some e)     = Some (alpha k e)
   alpha k (All e)      = All (alpha k e)
+  alpha k (Arr v e)    = Arr (alpha k v) (alpha k e)
+  alpha k (Choose v e) = Choose (alpha k v) (alpha k e)
   alpha k (e1 :>>: e2) = alpha k e1 :>>: alpha k e2
   alpha k (Check fx e) = Check fx (alpha k e)
   alpha k e@(Exi _)    = alphaExi k [] e
@@ -801,7 +814,6 @@ norm orig_e = alpha 0 orig_e
                              e'  = alpha (k+n) e
                          in Verify (bindList rs' (map (substAssump sub) as, substSkol sub e'))
   alpha k (Iter e1 e2 e3 e4) = Iter (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
-  alpha _ e            = e
 
   alphaExi k xs (Exi bnd) = alphaExi k (x:xs) e
    where
@@ -829,6 +841,11 @@ subst sub orig_e
   | null sub  = orig_e      -- Short cut
   | otherwise = go orig_e
   where
+    go e@(Lit {})    = e
+    go e@(Op {})     = e
+    go e@(Fail {})   = e
+    go e@(HOLE {})   = e
+
     go (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
     go (Tup es)     = Tup (map go es)
     go (Tru e)      = Tru (go e)
@@ -842,9 +859,11 @@ subst sub orig_e
     go (e1 :>>: e2) = go e1 :>>: go e2
     go (Check fx e) = Check fx (go e)
     go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
+    go (Arr v e)    = Arr    (go v) (go e)
+    go (Choose v e) = Choose (go v) (go e)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
+
     go (Iter e1 e2 e3 e4) = Iter (go e1) (go e2) (go e3) (go e4)
-    go e            = e
 
     subst_e_ops :: SubstOps Expr Expr
     subst_e_ops = SubstOps { so_subst = subst
