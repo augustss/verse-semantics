@@ -28,7 +28,7 @@ verificationRules ::  Rule
 verificationRules = everywhere verificationStep <> everywhere recStep
 
 verificationStep :: Rule
-verificationStep =  TRS2024.evalStep
+verificationStep =  TRS2024.runtimeAndVerificationStep
                  <> guardStep
                  <> verifyStep
                  <> splitStep
@@ -70,7 +70,6 @@ arrStep env lhs =
    "DOTDOT-NARROW" `nameWith`
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
      -- Use this rule when v is not a literal.
-     guard False -- LA: disable this rule so tests can pass again.
      guard (x `elem` exis)
      let i = identNotIn (free v)
      pure (pPrint e1, wrapExis exis $

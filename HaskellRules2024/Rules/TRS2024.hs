@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 
 module Rules.TRS2024 (
-     evalRules, evalStep, recStep
+     runtimeRules, runtimeAndVerificationStep, recStep
    , blocked, choiceFreeLH, choiceAndFailureFree
    , name, nameWith, iff
    , skolValue
@@ -26,18 +26,19 @@ import Data.List( (\\) )
 --
 --------------------------------------------------------------------------------
 
-evalRules :: Rule
-evalRules = everywhere (evalStep)
-         <> everywhere recStep
+runtimeRules :: Rule
+-- Runtime only
+runtimeRules = everywhere (runtimeAndVerificationStep <> evalDotDotStep)
+               <> everywhere recStep
 
 -- NB: (everywhere (evalStep <> recStep)) does not work.
 -- Because evalStep tries top-level single step; we don't want to
 -- go off into recStep just becuase there is nothing to do at outermost
 -- level.    eg.  exists f. (f = \x. ..f..); f[3]
 
-evalStep :: Rule
--- Runtime evauation rules
-evalStep = applicationStep
+runtimeAndVerificationStep :: Rule
+-- Rules use for /both/ runtime /and/ verification
+runtimeAndVerificationStep = applicationStep
            <> arrayOpStep
            <> unificationStep
            <> existentialStep
@@ -45,7 +46,6 @@ evalStep = applicationStep
            <> choiceStep
            <> oneAndAllStep
            <> checkStep
-           <> evalDotDotStep
 
 -- currently:  everywhere (evalRulesNoRec `tryBefore` rulesRec)
 -- better:    (everywhere evalRulesNoRec) `tryBefore` (everywhere rulesRec)

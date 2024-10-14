@@ -24,7 +24,7 @@ module Rules.Core
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
 
     -- Rewriting
-  , Rule, (-=), Context, isContext, (<@)
+  , Rule, removeRule, Context, isContext, (<@)
   , stepRule, everywhere, tryBefore
   , NormResult(..), normalize, showNormResult
   , Fuel, lotsOfSteps
@@ -926,12 +926,13 @@ lookupIdSubst sub x
 
 type Rule = RuleEnv -> Expr -> [(String,Expr)]
 
-(-=) :: Rule -> String -> Rule
-rule -= name = \env e -> [ (lab,e')
-                         | (lab,e') <- rule env e
-                         -- matches when lab is "NAME" or "NAME(..."
-                         , not ((name ++ "(") `isPrefixOf` (lab ++ "("))
-                         ]
+removeRule :: Rule -> String -> Rule
+removeRule rule name
+  = \env e -> [ (lab,e')
+              | (lab,e') <- rule env e
+              -- matches when lab is "NAME" or "NAME(..."
+              , not ((name ++ "(") `isPrefixOf` (lab ++ "("))
+              ]
 
 data RuleEnv = RE { skolVars :: [Ident], assumps :: [Assump] }
 

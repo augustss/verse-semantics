@@ -9,7 +9,7 @@ import Test.QuickCheck
 --------------------------------------------------------------------------------
 
 trs2024_noREC :: Rule
-trs2024_noREC = TRS2024.evalRules -= "REC" -- no confluence with REC
+trs2024_noREC = TRS2024.runtimeRules `removeRule` "REC" -- no confluence with REC
 
 prop_Valid :: Expr -> Bool
 prop_Valid t0 =
