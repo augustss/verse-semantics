@@ -1,0 +1,15 @@
+protected_ref="refs/heads/main"
+while read local_ref local_sha remote_ref remote_sha
+do
+        if [ "$remote_ref" = "$protected_ref" ]; then
+        echo "Pushing to master."
+        echo "Is running make error free? (y/n)"
+        read confirmation < /dev/tty
+        if [ "$confirmation" != "y" ]; then
+                echo >&2 "$confirmation is not 'y', cancelling push"
+                exit 1
+        fi
+fi
+done
+
+exit 0
