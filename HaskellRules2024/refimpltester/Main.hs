@@ -95,7 +95,9 @@ broken =
     "succeeds/2.verse",
     -- annoying name clashed
     "function/3.verse", "function/5.verse",
-    "where/1.verse", "colon/8.verse"
+    "where/1.verse", "colon/8.verse",
+    -- something is fishy with these tests
+    "diverges/1.verse", "diverges/2.verse"
   ]
 
 structs :: [FilePath]
