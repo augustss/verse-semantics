@@ -52,11 +52,25 @@ runtimeAndVerificationStep = applicationStep
 
 evalDotDotStep :: Rule
 -- Used only for evaluation, not verification
+-- Also, try it /last/ so that U-DOTDOT gets first dibs
 evalDotDotStep _env lhs =
-  "APP-DOTDOT" `nameWith`  -- DotDot$[v,k]  -->  v = (0 | 1 | ... | k-1); ()
+  "DOTDOT-EXPAND" `nameWith`  -- DotDot$[v,k]  -->  v = (0 | 1 | ... | k-1); ()
   do Op DotDot :@: Tup [v, Lit (LInt k)] <- [lhs]
      let the_choice = foldr ((:|:) . Lit . LInt) Fail [0..(k-1)]
      pure (pPrint k, (v :=: the_choice) :>: Tup [])
+
+{- Here is a more conservative version, but we probably don't need it
+   because DotDot$ is rare except during verification.
+
+  -- Expand DotDot$[i,100] only if you really have to;
+  -- i.e. i is an existential we are blocked on
+  "DOTDOT-EXPAND" `nameWith`
+  do (exis, ctx, Op DotDot :@: Tup [Var x, Lit (LInt k)]) <- evalCtxLift (free lhs) lhs
+     guard (x `elem` exis)
+     guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
+     let the_choice = foldr ((:|:) . Lit . LInt) Fail [0..(k-1)]
+     pure (pPrint k, (Var x :=: the_choice) :>: Tup [])
+-}
 
 --------------------------------------------------------------------------------
 applicationStep :: Rule
@@ -203,18 +217,13 @@ arrayOpStep _env lhs =
   do Tup vs@(_:_) :@: v <- [lhs]
      pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
  ++
-  "APP-ARR" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
-  do arr@(Arr sz e) :@: v <- [lhs]
-     pure (pPrint arr, (Var underscore :=: (Op DotDot :@: Tup [v,sz])) :>:
-                       (Some $ Lam $ bind underscore e) )
- ++
   "APP-LENGTH" `name`   -- Length$[<v1,..,vn>  --> n
                         -- Length$[Arr(n){e}]  --> n
   do Op ArrLen :@: arg <- [lhs]
      case arg of
-       Tup xs   -> pure (LitInt (fromIntegral (length xs)))
-       Arr sz _ -> pure sz
-       _        -> []   -- No match here
+       Tup xs            -> pure (LitInt (fromIntegral (length xs)))
+       Arr (SizeIs sz) _ -> pure sz
+       _                 -> []   -- No match here
  ++
   "APP-ISARR" `name`    -- IsArr$[<v1,..,vn>] -->  <v1,..vn>
                         -- IsArr$[Arr(n){e}]  -->  Arr(n){e}
@@ -288,15 +297,6 @@ unificationStep _env lhs =
      if (length vs == length vs')
        then pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
        else pure Fail
- ++
-  "U-ARR" `name`
-  do (Arr n1 e1 :=: Arr n2 e2) :>: e <- [lhs]
-     let x = identNotIn $ free lhs
-     pure ((n1 :=: n2) :>:
-           (Exi $ bind x $
-           ((Var x :=: (Some $ Lam $ bind underscore e1)) :>:
-            (Var x :=: (Some $ Lam $ bind underscore e2)) :>:
-            e)))
  ++
   "U-DOTDOT" `nameWith`   --   DotDot[k,n]  --> inRange[k,n]
   do (k@(Lit {}) :=: (Op DotDot :@: n)) :>: e <- [lhs]
@@ -385,7 +385,6 @@ onlyApps :: Ident -> Expr -> Bool
 onlyApps f orig_e = go orig_e
   where
     go (Lit {})     = True
-    go (Arr {})     = True
     go (Op {})      = True
     go Fail         = True
     go HOLE         = True
@@ -404,13 +403,17 @@ onlyApps f orig_e = go orig_e
     go (All e)        = go e
     go (e1 :>>: e2)   = go e1 && go e2
     go (Check _ e)    = go e
-    go (Choose e1 e2) = go e1 && go e2
+    go (Arr    sz e)  = go_sz sz && go e
+    go (Choose sz e)  = go_sz sz && go e
     go (Exi bnd)      = go_bind bnd
 
     -- ToDo: Lennart thought this was impossible. Why?
     go (Verify bnd) = go e
                     where
                       (_,(_,e)) = alphaRenameVerify [f] bnd
+
+    go_sz Dunno = True
+    go_sz (SizeIs v) = go v
 
     go_bind bnd = f == x || go e
                 where
