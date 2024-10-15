@@ -153,7 +153,13 @@ we find that in fact `s |- x ~ 3` which is a contradiction.
 -- `check s` uses the `neg` assumptions and `lits` to check if !s holds
 -----------------------------------------------------------------------------------
 check :: Solver -> Maybe UnsatReason
-check s = firstJust (checkLits s : (checkNeg s <$> s_neg s))
+check s = firstJust
+  $  checkLits s
+  :  checkArith s
+  : (checkNeg s <$> s_neg s)
+
+checkArith :: Solver -> Maybe UnsatReason
+checkArith s = undefined
 
 -- [c-lit], i.e. k, k' yield a contradiction if s |- k ~ k'
 checkLits :: Solver -> Maybe UnsatReason
@@ -169,7 +175,7 @@ checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
 -- [c-eq-*] not (x = y) yields a contradiction if s |- x ~ gv and x OR gv are primitive
 checkNeg s neg@(A_GVEq x gv)
   | isEqual s (GVVar x) gv
-  , (isPrim s (GVVar x) || isPrim s gv)  -- See Note [Checking negated equalities]
+  , isPrim s (GVVar x) || isPrim s gv  -- See Note [Checking negated equalities]
   = Just (Contra neg)
   | otherwise
   = Nothing
@@ -474,11 +480,13 @@ groundLit _           = []
 data UnsatReason
    = Contra    FailableAssump
    | DiseqLit  Lit   Lit
+   | Arith
    deriving (Show)
 
 instance Pretty UnsatReason where
   pPrint (Contra a)     = text "CONTRA"    <+> pPrint a
   pPrint (DiseqLit x y) = text "DISEQ-LIT" <+> pPrint x <+> pPrint y
+  pPrint Arith          = text "ARITH"
 
 instance Pretty Equality where
   pPrint (MkEqual x y) = pPrint x <+> text "=" <+> pPrint y

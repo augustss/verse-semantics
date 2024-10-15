@@ -20,6 +20,7 @@ common general-libs
                       pretty,
                       megaparsec,
                       haskeline,
+                      toysolver >= 0.8,
                       scientific
 
 executable verse-repl
@@ -55,6 +56,7 @@ executable confluence-check
                       Epic.Print
                       Epic.List
                       Epic.UnionFind
+                      Epic.BellmanFord
                       FrontEnd.Error
 
 
@@ -140,7 +142,7 @@ executable refimpltester
         Language.Verse.Token
         Language.Verse.Val
 
-           
+
 
 -- executable qctest
 --     import:           general-libs
