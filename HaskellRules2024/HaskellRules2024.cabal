@@ -20,7 +20,6 @@ common general-libs
                       pretty,
                       megaparsec,
                       haskeline,
-                      toysolver >= 0.8,
                       scientific
 
 executable verse-repl

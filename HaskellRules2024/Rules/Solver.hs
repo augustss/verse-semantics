@@ -7,6 +7,7 @@ import Data.List ( nub )
 import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
+import Epic.BellmanFord (negativeCycle)
 
 -- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
@@ -160,6 +161,9 @@ check s = firstJust
 
 checkArith :: Solver -> Maybe UnsatReason
 checkArith s = undefined
+
+
+
 
 -- [c-lit], i.e. k, k' yield a contradiction if s |- k ~ k'
 checkLits :: Solver -> Maybe UnsatReason
@@ -480,13 +484,13 @@ groundLit _           = []
 data UnsatReason
    = Contra    FailableAssump
    | DiseqLit  Lit   Lit
-   | Arith
+   | Arith    [Ident]
    deriving (Show)
 
 instance Pretty UnsatReason where
   pPrint (Contra a)     = text "CONTRA"    <+> pPrint a
   pPrint (DiseqLit x y) = text "DISEQ-LIT" <+> pPrint x <+> pPrint y
-  pPrint Arith          = text "ARITH"
+  pPrint (Arith xs)     = text "ARITH"     <+> pPrint xs
 
 instance Pretty Equality where
   pPrint (MkEqual x y) = pPrint x <+> text "=" <+> pPrint y

@@ -132,7 +132,7 @@ verify("Opacity2", pass) {f(x:int := 3)<decides> := x=3 }
 verify("Opacity3", fail,tim=skip_acc) { f(x:int)<decides>:type{x=99999} := 100000 }
       # verify("Opacity3", fail) { f(x:int)<decides>:type{x=3} := x+1 }
 
-# Opacity4: Tim doesn't implement LHS y<succeeda>:three 
+# Opacity4: Tim doesn't implement LHS y<succeeda>:three
 verify("Opacity4", pass,tim=skip_acc) { three(x:int)<decides> := x = 3; main() := y<succeeds>:three := 3 }
       # Opacity4: 'main' should verify despite three's<decides>, because 'three' is transparent
 
@@ -349,4 +349,3 @@ verify("Ampersand5", pass, broken)
   # Ampersand5: This rather complicated test comes from Tim's tests
   # It's not really about "&"; rather, it involves unification of functions
   # Actually, it seems to make the verifier loop, oddly.
-
