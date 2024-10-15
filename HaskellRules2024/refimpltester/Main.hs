@@ -47,7 +47,7 @@ import qualified FrontEnd.ToCore
 import Data.Scientific
 import Data.Text(unpack)
 import qualified Rules.Core as Rules
-import Rules.Verifier( verificationRules )
+import Rules.TRS2024( runtimeRules )
 import TRS.Traced(term)
 import Epic.Print(prettyShow, display)
 --import Debug.Trace
@@ -319,7 +319,7 @@ srcToCore flags add_verification e = do
 evalExpr :: TestFlags -> F.SrcExpr -> IO (Maybe Rules.Expr)
 evalExpr tflg e = do
   ce <- srcToCore F.defaultFlags Prelude.False e
-  let (r, tr) = Rules.normalize steps verificationRules ce
+  let (r, tr) = Rules.normalize steps runtimeRules ce
       v = term tr
       steps = 20000
   when (showTrace tflg) $ do
