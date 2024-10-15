@@ -15,6 +15,7 @@ import Data.ByteString qualified as ByteString
 import Data.List
 --import Data.Maybe
 import Data.Traversable
+import qualified Options.Applicative as OA
 
 --import Language.Verse
 import qualified Language.Verse.Effect.Split as S
@@ -48,13 +49,14 @@ import Data.Text(unpack)
 import qualified Rules.Core as Rules
 import Rules.Verifier( verificationRules )
 import TRS.Traced(term)
-import Epic.Print(prettyShow)
+import Epic.Print(prettyShow, display)
 --import Debug.Trace
 
 main :: IO ()
 main = do
+  tflg <- testArgs
   setCurrentDirectory "../VerseReferenceImpl"  -- XXX
-  executionTest <- getTest Execution $ "test" </> "execution"
+  executionTest <- getTest tflg Execution $ "test" </> "execution"
 --  verificationTest <- getTest Verification $ "test" </> "verification"
   runTestTTAndExit $ TestList [executionTest] -- , verificationTest]
 
@@ -121,27 +123,32 @@ diverges = [ "diverges/3.verse" ]
 state :: [FilePath]
 state = [ "for/2.verse", "for/3.verse" ]
 
-getTest :: Mode -> FilePath -> IO Test
-getTest mode directory = do
+getTest :: TestFlags -> Mode -> FilePath -> IO Test
+getTest tflg mode directory = do
   filePaths <- listDirectory' directory
   putStrLn $ "Files found: " ++ show (length filePaths)
-  let verseFiles = take 10000 $ filter okTest $ sort $ filter ((== ".verse") . takeExtension) filePaths
+  let verseFiles = filter only $ filter okTest $ sort $ filter ((== ".verse") . takeExtension) filePaths
+      only s = case onlyTest tflg of
+                 Nothing -> True
+                 Just t  ->
+                   s == t || (directory </> s) == t
   --error $ show verseFiles
-  pure . TestList $ mkTestCase mode . (directory </>) <$> verseFiles
+  pure . TestList $ mkTestCase tflg mode . (directory </>) <$> verseFiles
 
-evalFile :: Mode
+evalFile :: TestFlags
+         -> Mode
          -> FilePath
          -> IO (Either Error (Maybe [V.FrozenVal]))
-evalFile _mode verseFile = do
+evalFile tflg _mode verseFile = do
 --  putStrLn $ "\nfile " ++ verseFile
   file <- ByteString.readFile verseFile
   case parse2 verseFile file of
     Left err -> return (Left err)
-    Right e -> pure <$> rulesEval e
+    Right e -> pure <$> rulesEval tflg e
 
-mkTestCase :: Mode -> FilePath -> Test
-mkTestCase mode verseFile = TestLabel verseFile . TestCase $
-  evalFile mode verseFile >>= \ case
+mkTestCase :: TestFlags -> Mode -> FilePath -> Test
+mkTestCase tflg mode verseFile = TestLabel verseFile . TestCase $
+  evalFile tflg mode verseFile >>= \ case
     Left e -> handleError e
     Right Nothing -> handleError StuckError
     Right (Just xs) -> do
@@ -165,10 +172,10 @@ listDirectory' x = do
 
 --------------------------
 
-rulesEval :: L (P.Exp SimpleName) -> IO (Maybe [V.FrozenVal])
-rulesEval e = do
+rulesEval :: TestFlags -> L (P.Exp SimpleName) -> IO (Maybe [V.FrozenVal])
+rulesEval tflg e = do
   --print e
-  mv <- evalExpr (lexp (desugar e))
+  mv <- evalExpr tflg (lexp (desugar e))
   --print v
   --when (v /= v) $ error "???"
   return $ toFrozen <$> mv
@@ -309,12 +316,16 @@ srcToCore flags add_verification e = do
   let e3 = Rules.prep e2
   return e3
 
-evalExpr :: F.SrcExpr -> IO (Maybe Rules.Expr)
-evalExpr e = do
+evalExpr :: TestFlags -> F.SrcExpr -> IO (Maybe Rules.Expr)
+evalExpr tflg e = do
   ce <- srcToCore F.defaultFlags Prelude.False e
   let (r, tr) = Rules.normalize steps verificationRules ce
       v = term tr
       steps = 20000
+  when (showTrace tflg) $ do
+    putStrLn "Trace is:"
+    display tr
+
   case r of
     Rules.NormOK | isOKResult v -> return (Just v)
                  | otherwise -> return Nothing
@@ -322,3 +333,31 @@ evalExpr e = do
       putStrLn "*** Ran out of fuel"
       return Nothing
     Rules.NormInvalid -> error $ "Invalid reduction result:\n" ++ prettyShow v
+
+data TestFlags = TestFlags
+  { onlyTest       :: !(Maybe String)      -- run only this test
+  , showTrace      :: !Bool                -- Show traces
+  }
+  deriving (Show)
+
+testArgs :: IO TestFlags
+-- Parse the TestFlags from the command line
+testArgs = do
+  let prf = OA.prefs OA.disambiguate
+  t <- OA.customExecParser prf $ OA.info (testFlags OA.<**> OA.helper)
+             ( OA.fullDesc
+            <> OA.progDesc "Run RI tests"
+            <> OA.header "tests - testing RI"
+             )
+  pure t
+
+testFlags :: OA.Parser TestFlags
+testFlags = TestFlags
+  <$> OA.optional (OA.strOption
+         ( OA.long "only-test"
+        <> OA.metavar "TEST"
+        <> OA.help "Run only test named TEST" ))
+  <*> OA.switch
+      (  OA.long "trace"
+      <> OA.help "Print rewrite traces"
+      )
