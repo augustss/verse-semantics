@@ -26,7 +26,7 @@ verify("arr-for2", pass){ f( a:[]int ) : []int := for( i:int; x := a[i] ){ x+1 }
 # Indexing
 verify("arr-index1", pass){ f( x:[]nat )<decides> : nat := x[0] }
 
-verify("arr-index2", pass, broken){ f( x:[]nat where Length[x] > 0 )<succeeds> : nat := x[0] }
+verify("arr-index2", pass){ f( x:[]nat where Length[x] > 0 )<succeeds> : nat := x[0] }
 verify("arr-index3", pass){ f( x:[]nat )<succeeds> : nat := if (z := x[0]) then { z } else { 99 } }
 verify("arr-index4", pass){ f( x:[]nat where x[0] )<succeeds> : nat := x[0] }
 testeq("arr-index5", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }

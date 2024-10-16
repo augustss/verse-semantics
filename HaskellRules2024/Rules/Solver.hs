@@ -8,6 +8,10 @@ import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 import Epic.BellmanFord (negativeCycle)
+import qualified Debug.Trace as Debug
+
+_traceShow :: Show a => String -> a -> a
+_traceShow msg x = Debug.trace (msg ++ ": " ++ show x) x
 
 -- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
@@ -156,14 +160,8 @@ we find that in fact `s |- x ~ 3` which is a contradiction.
 check :: Solver -> Maybe UnsatReason
 check s = firstJust
   $  checkLits s
-  -- :  checkArith s
+  :  checkArith s
   : (checkNeg s <$> s_neg s)
-
--- checkArith :: Solver -> Maybe UnsatReason
--- checkArith s = undefined
-
-
-
 
 -- [c-lit], i.e. k, k' yield a contradiction if s |- k ~ k'
 checkLits :: Solver -> Maybe UnsatReason
@@ -479,12 +477,101 @@ groundLit (GVArr gvs) = concatMap groundLit gvs
 groundLit _           = []
 
 ------------------------------------------------------------------------------------
+checkArith :: Solver -> Maybe UnsatReason
+------------------------------------------------------------------------------------
+checkArith = fmap reason . negativeCycle V0 . arithGraph
+  where
+    reason vs = Arith [ gv | GV gv <- vs ]
+
+data Vertex = GV GroundVal | V0
+  deriving (Eq, Ord, Show)
+
+------------------------------------------------------------------------------------
+
+{- Note [Arithmetic Graph]
+
+   We use `Epic.BellmanFord` to solve a restricted form of arithmetic "difference constraints"
+
+     https://www.cs.upc.edu/~oliveras/TDV/dl.pdf
+
+   which are of the form
+
+      gv - gv' <= k
+
+  (note that gv - gv' < k is the same as `gv - gv' <= k - 1`)
+
+  To do this we build a graph where
+
+    * vertices are ground values `gv`
+    * each constraint `gv - gv' <= k` yields a directed edge from `gv` to `gv'` with weight `k`
+
+  and then call `BellmanFord.negativeCycle` to search for a negative-weight cycle in the graph which
+  indicates the constraints are unsatisfiable.
+
+  We additionally account for constraints of the form k <= x  and x <= k
+
+    1. by adding vertices for the literal `k` e.g. `vk`
+    2. adding edges (vk, x, 0) and (x, vk, 0) and
+    3. adding edges (v0, vk, -k) and (vk, v0, k)
+
+  which then ends up creating a negative cycle e.g. if you have 10 <= x <= y <= z <= 5
+
+  that goes from
+
+      v10 -----> x -----> y -----> z -----> v5 ----[5]--> v0 ---[-10]--> v10
+
+  (edges without weights have weight 0)
+
+ -}
+
+
+arithGraph :: Solver -> [(Vertex, Vertex, Int)]
+arithGraph s = [ (GV u, GV v, w) | (u, v, w) <- edges ]
+  where
+    edges    = -- traceShow "ARITHGRAPH" $
+               concatMap (arithEdges True)  (s_pos s)
+            ++ concatMap (arithEdges False) (s_neg s)
+            ++ concatMap litEdges           (s_lits s)
+
+arithEdges :: Bool -> FailableAssump -> [(GroundVal, GroundVal, Int)]
+arithEdges = go
+  where
+    go True  (A_RelOp LEq (GVArr [gv1, gv2])) = arithLEq gv1 gv2
+    go True  (A_RelOp Lt  (GVArr [gv1, gv2])) = arithLt  gv1 gv2
+    go True  (A_RelOp Gt  (GVArr [gv1, gv2])) = arithLt  gv2 gv1
+    go True  (A_RelOp GEq (GVArr [gv1, gv2])) = arithLEq gv2 gv1
+    go False (A_RelOp LEq (GVArr [gv1, gv2])) = arithLt  gv2 gv1
+    go False (A_RelOp Lt  (GVArr [gv1, gv2])) = arithLEq gv2 gv1
+    go False (A_RelOp Gt  (GVArr [gv1, gv2])) = arithLEq gv1 gv2
+    go False (A_RelOp GEq (GVArr [gv1, gv2])) = arithLt  gv1 gv2
+    go _ _                                    = []
+
+arithLt :: GroundVal -> GroundVal -> [(GroundVal, GroundVal, Int)]
+arithLt gv1 gv2 = [(gv1, gv2, -1)]
+
+arithLEq :: GroundVal -> GroundVal -> [(GroundVal, GroundVal, Int)]
+arithLEq gv1 gv2 = [(gv1, gv2, 0)]
+
+litEdges :: Lit -> [(GroundVal, GroundVal, Int)]
+litEdges l =
+  case getLit l of
+   Just i ->  [ (zero, vi, negate i), (vi, zero, i) ] where vi = GVLit l
+   Nothing -> []
+
+getLit :: Lit -> Maybe Int
+getLit (LInt i) = Just (fromIntegral i)
+getLit _        = Nothing
+
+zero :: GroundVal
+zero = GVLit (LInt 0)
+
+------------------------------------------------------------------------------------
 -- | Why is the solver returning UNSAT
 ------------------------------------------------------------------------------------
 data UnsatReason
    = Contra    FailableAssump
    | DiseqLit  Lit   Lit
-   | Arith    [Ident]
+   | Arith    [GroundVal]
    deriving (Show)
 
 instance Pretty UnsatReason where

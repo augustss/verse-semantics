@@ -234,15 +234,6 @@ arrayOpStep _env lhs =
        _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
          | otherwise -> []
  ++
-  "ARR-MAP" `nameWith`   -- ArrMap$[Arr(n){e}]
-                         --   --> x:=some(\_.e); f[x]; Arr(n){f[e]}
-  do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
-     let x:y:_ = identsNotIn $ free arg
-     pure (pPrint arr, Exi $ bind x $
-                       coreSeq [ Var x :=: Some (Lam (bind underscore e))
-                               , Var underscore :=: (f :@: Var x)
-                               , Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y))] )
- ++
   "TUP-MAP" `nameWith`   -- ArrMap$[f, <v1,..,vn>]
                          --   --> x1=f[v1]; ..; xn=f[vn]; <x1,..,xn>
   do Op ArrMap :@: arg@(Tup [f, arr@(Tup vs)]) <- [lhs]
@@ -354,7 +345,6 @@ existentialStep _env lhs =
   do (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free (v,e1))
      pure (pPrint x, exis <@ ((v :=: e1) :>: Exi (bind x e2)))
-
   ++
   -- Do this last: most complex and expensive
   "EXI-SUBST" `nameWith`

@@ -86,6 +86,15 @@ arrStep env lhs =
                          (as, ctx <@ inRange i sz))
 
  ++
+  "ARR-MAP" `nameWith`   -- ArrMap$[f, Arr(n){e}]
+                         --   --> x:=some(\_.e); f[x]; Arr(n){f[e]}
+  do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
+     let x:y:_ = identsNotIn $ free arg
+     pure (pPrint arr, Exi $ bind x $
+                       coreSeq [ Var x :=: Some (Lam (bind underscore e))
+                               , Var underscore :=: (f :@: Var x)
+                               , Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y))] )
+ ++
   "APP-ARR" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
   do arr@(Arr (SizeIs sz) e) :@: v <- [lhs]
      pure (pPrint arr, (Var underscore :=: (Op DotDot :@: Tup [v,sz])) :>:
@@ -200,7 +209,7 @@ splitStep env lhs =
    ++
    "SPLIT-ISARR" `nameWith`
        -- verify(R,r;A){ P[ isArr$[r] ] }
-       --  --> verify(R,r;A,isArr$[r]){ P[ Arr(.){some{any}}
+       --  --> verify(R,r;A,isArr$[r]){ P[ Arr(.){some(any)} ] }
        --      ..and the fail case..
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Op IsArr :@: Var r)) <- proofX all_rs e
