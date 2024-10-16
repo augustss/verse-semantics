@@ -159,12 +159,6 @@ check s = firstJust
   :  checkArith s
   : (checkNeg s <$> s_neg s)
 
-checkArith :: Solver -> Maybe UnsatReason
-checkArith s = undefined
-
-
-
-
 -- [c-lit], i.e. k, k' yield a contradiction if s |- k ~ k'
 checkLits :: Solver -> Maybe UnsatReason
 checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing } <$> litGroups)
@@ -479,12 +473,54 @@ groundLit (GVArr gvs) = concatMap groundLit gvs
 groundLit _           = []
 
 ------------------------------------------------------------------------------------
+checkArith :: Solver -> Maybe UnsatReason
+------------------------------------------------------------------------------------
+checkArith = fmap Arith . negativeCycle zero . arithGraph
+
+arithGraph :: Solver -> [(GroundVal, GroundVal, Int)]
+arithGraph s = concatMap (arithEdges True)  (s_pos s)
+            ++ concatMap (arithEdges False) (s_neg s)
+            ++ concatMap litEdges           (s_lits s)
+
+arithEdges :: Bool -> FailableAssump -> [(GroundVal, GroundVal, Int)]
+arithEdges = go
+  where
+    go True  (A_RelOp LEq (GVArr [gv1, gv2])) = arithLEq gv1 gv2
+    go True  (A_RelOp Lt  (GVArr [gv1, gv2])) = arithLt  gv1 gv2
+    go True  (A_RelOp Gt  (GVArr [gv1, gv2])) = arithLt  gv2 gv1
+    go True  (A_RelOp GEq (GVArr [gv1, gv2])) = arithLEq gv2 gv1
+    go False (A_RelOp LEq (GVArr [gv1, gv2])) = arithLt  gv2 gv1
+    go False (A_RelOp Lt  (GVArr [gv1, gv2])) = arithLEq gv2 gv1
+    go False (A_RelOp Gt  (GVArr [gv1, gv2])) = arithLEq gv1 gv2
+    go False (A_RelOp GEq (GVArr [gv1, gv2])) = arithLt  gv1 gv2
+    go _ _                                    = []
+
+arithLt :: GroundVal -> GroundVal -> [(GroundVal, GroundVal, Int)]
+arithLt gv1 gv2 = [(gv1, gv2, -1)]
+
+arithLEq :: GroundVal -> GroundVal -> [(GroundVal, GroundVal, Int)]
+arithLEq gv1 gv2 = [(gv1, gv2, 0)]
+
+litEdges :: Lit -> [(GroundVal, GroundVal, Int)]
+litEdges l =
+  case getLit l of
+   Just i ->  [ (zero, vi, negate i), (vi, zero, i) ] where vi = GVLit l
+   Nothing -> []
+
+getLit :: Lit -> Maybe Int
+getLit (LInt i) = Just (fromIntegral i)
+getLit _        = Nothing
+
+zero :: GroundVal
+zero = GVLit (LInt 0)
+
+------------------------------------------------------------------------------------
 -- | Why is the solver returning UNSAT
 ------------------------------------------------------------------------------------
 data UnsatReason
    = Contra    FailableAssump
    | DiseqLit  Lit   Lit
-   | Arith    [Ident]
+   | Arith    [GroundVal]
    deriving (Show)
 
 instance Pretty UnsatReason where
