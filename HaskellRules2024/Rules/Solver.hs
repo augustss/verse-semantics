@@ -156,11 +156,11 @@ we find that in fact `s |- x ~ 3` which is a contradiction.
 check :: Solver -> Maybe UnsatReason
 check s = firstJust
   $  checkLits s
-  :  checkArith s
+  -- :  checkArith s
   : (checkNeg s <$> s_neg s)
 
-checkArith :: Solver -> Maybe UnsatReason
-checkArith s = undefined
+-- checkArith :: Solver -> Maybe UnsatReason
+-- checkArith s = undefined
 
 
 
