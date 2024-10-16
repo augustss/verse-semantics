@@ -8,10 +8,10 @@ import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 import Epic.BellmanFord (negativeCycle)
--- import qualified Debug.Trace as Debug
+import qualified Debug.Trace as Debug
 
--- traceShow :: Show a => String -> a -> a
--- traceShow msg x = Debug.trace (msg ++ ": " ++ show x) x
+_traceShow :: Show a => String -> a -> a
+_traceShow msg x = Debug.trace (msg ++ ": " ++ show x) x
 
 -- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
@@ -479,8 +479,14 @@ groundLit _           = []
 ------------------------------------------------------------------------------------
 checkArith :: Solver -> Maybe UnsatReason
 ------------------------------------------------------------------------------------
-checkArith = fmap Arith . negativeCycle zero . arithGraph
+checkArith = fmap reason . negativeCycle V0 . arithGraph
+  where
+    reason vs = Arith [ gv | GV gv <- vs ]
 
+data Vertex = GV GroundVal | V0
+  deriving (Eq, Ord, Show)
+
+------------------------------------------------------------------------------------
 
 {- Note [Arithmetic Graph]
 
@@ -499,7 +505,7 @@ checkArith = fmap Arith . negativeCycle zero . arithGraph
     * vertices are ground values `gv`
     * each constraint `gv - gv' <= k` yields a directed edge from `gv` to `gv'` with weight `k`
 
-  and then invoke the `BellmanFord.negativeCycle` to search for a negative-weight cycle in the graph which
+  and then call `BellmanFord.negativeCycle` to search for a negative-weight cycle in the graph which
   indicates the constraints are unsatisfiable.
 
   We additionally account for constraints of the form k <= x  and x <= k
@@ -519,8 +525,10 @@ checkArith = fmap Arith . negativeCycle zero . arithGraph
  -}
 
 
-arithGraph :: Solver -> [(GroundVal, GroundVal, Int)]
-arithGraph s = -- traceShow "ARITHGRAPH" $
+arithGraph :: Solver -> [(Vertex, Vertex, Int)]
+arithGraph s = [ (GV u, GV v, w) | (u, v, w) <- edges ]
+  where
+    edges    = -- traceShow "ARITHGRAPH" $
                concatMap (arithEdges True)  (s_pos s)
             ++ concatMap (arithEdges False) (s_neg s)
             ++ concatMap litEdges           (s_lits s)
