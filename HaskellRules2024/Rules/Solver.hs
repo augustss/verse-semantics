@@ -8,6 +8,7 @@ import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 import Epic.BellmanFord (negativeCycle)
+import qualified Epic.BellmanFord as BellmanFord
 -- import qualified Debug.Trace as Debug
 
 -- traceShow :: Show a => String -> a -> a
@@ -480,6 +481,44 @@ groundLit _           = []
 checkArith :: Solver -> Maybe UnsatReason
 ------------------------------------------------------------------------------------
 checkArith = fmap Arith . negativeCycle zero . arithGraph
+
+
+{- Note [Arithmetic Graph]
+
+   We use `Epic.BellmanFord` to solve a restricted form of arithmetic "difference constraints"
+
+     https://www.cs.upc.edu/~oliveras/TDV/dl.pdf
+
+   which are of the form
+
+      gv - gv' <= k
+
+  (note that gv - gv' < k is the same as `gv - gv' <= k - 1`)
+
+  To do this we build a graph where
+
+    * vertices are ground values `gv`
+    * each constraint `gv - gv' <= k` yields a directed edge from `gv` to `gv'` with weight `k`
+
+  and then invoke the `BellmanFord.negativeCycle` to search for a negative-weight cycle in the graph which
+  indicates the constraints are unsatisfiable.
+
+  We additionally account for constraints of the form k <= x  and x <= k
+
+    1. by adding vertices for the literal `k` e.g. `vk`
+    2. adding edges (vk, x, 0) and (x, vk, 0) and
+    3. adding edges (v0, vk, -k) and (vk, v0, k)
+
+  which then ends up creating a negative cycle e.g. if you have 10 <= x <= y <= z <= 5
+
+  that goes from
+
+      v10 -----> x -----> y -----> z -----> v5 ----[5]--> v0 ---[-10]--> v10
+
+  (edges without weights have weight 0)
+
+ -}
+
 
 arithGraph :: Solver -> [(GroundVal, GroundVal, Int)]
 arithGraph s = -- traceShow "ARITHGRAPH" $
