@@ -1,5 +1,9 @@
--- Implementation of the BellmanFord Algorithm
--- https://en.wikipedia.org/wiki/Bellman%E2%80%93Ford_algorithm
+-- | Implementation of the BellmanFord Algorithm
+--
+--     https://en.wikipedia.org/wiki/Bellman%E2%80%93Ford_algorithm
+--
+
+
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 

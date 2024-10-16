@@ -8,7 +8,6 @@ import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 import Epic.BellmanFord (negativeCycle)
-import qualified Epic.BellmanFord as BellmanFord
 -- import qualified Debug.Trace as Debug
 
 -- traceShow :: Show a => String -> a -> a
