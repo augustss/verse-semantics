@@ -121,8 +121,8 @@ If f wants iteration to terminate, it simply returns a value.
 If f wants iteration to continue, it calls the continuation with a new accumulator.
 
 Iter has the following reduction rules:
-(ITER-FAIL)    iter(fail,  ){u; f; g}  -->  g u
-(ITER-VALUE)   iter(v,     ){u; f; g}  -->  f u v g
+(ITER-FAIL)    iter(fail   ){u; f; g}  -->  g u
+(ITER-VALUE)   iter(v      ){u; f; g}  -->  f u v g
 (ITER-CHOICE)  iter(e1 | e2){u; f; g}  -->  iter(e1){u; f; \ x . iter(e2){x; f; g} }
 
 Note that ITER-CHOICE has no requirement on e1 being a value.
