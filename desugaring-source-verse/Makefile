@@ -2,13 +2,13 @@ LATEX=pdflatex -halt-on-error
 
 PAPER=desugaring
 PAPERTEX = $(PAPER).tex
-PAPERSRC = $(PAPERTEX) verifier_overview.tex verifier_examples.tex ../calculus.fmt core.tex verse-macros.tex
+PAPERSRC = $(PAPERTEX) verifier_overview.tex verifier_examples.tex ../LaTex/calculus.fmt core.tex verse-macros.tex
 
 $(PAPER).pdf: $(PAPERSRC)
 	$(LATEX) $(PAPER)
 	$(LATEX) $(PAPER)
 
-%.tex:   %.ltx   ../calculus.fmt
+%.tex:   %.ltx   ../LaTex/calculus.fmt
 	lhs2TeX $< > $@
 
 clean:
