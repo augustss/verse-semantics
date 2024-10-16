@@ -26,9 +26,9 @@ data Graph v = MkGraph
 mkGraph :: (Ord v) => v -> [(v, v, Int)] -> Graph v
 mkGraph src0 es = MkGraph src0 vs es''
   where
-    vs   = EL.nub (src0 : concatMap (\(u, v, _) -> [u, v]) es)
-    es'  = M.fromListWith (++) [(u, [(v, w)]) | (u, v, w) <- es]
-    es'' = M.insert src0 [(v, 0) | v <- vs, v /= src0] es'
+    vs    = EL.nub (src0 : concatMap (\(u, v, _) -> [u, v]) es)
+    es'   = es ++ [(src0, v, 0) | v <- vs, v /= src0]
+    es''  = M.fromListWith (++) [(u, [(v, w)]) | (u, v, w) <- es']
 
 
 type Dist v = M.Map v (Int, v)
@@ -111,21 +111,33 @@ getPred d v =
 -- | Examples
 ----------------------------------------------------------------------
 
-es0 :: [(String, String, Int)]
-es0 = [ ("x", "y", 0)
-      , ("x", "a", 0)
-      , ("y", "z", 0)
-      , ("z", "x", -1) ]
+-- es0 :: [(String, String, Int)]
+-- es0 = [ ("x", "y", 0)
+--       , ("x", "a", 0)
+--       , ("y", "z", 0)
+--       , ("z", "x", -1) ]
 
-es1 :: [(String, String, Int)]
-es1 = [ ("x", "y", 0)
-      , ("x", "a", 0)
-      , ("y", "z", 0)
-      , ("z", "x", 0) ]
+-- es1 :: [(String, String, Int)]
+-- es1 = [ ("x", "y", 0)
+--       , ("x", "a", 0)
+--       , ("y", "z", 0)
+--       , ("z", "x", 0) ]
 
+-- es2 :: [(String, String, Int)]
+-- es2 = [ ("o", "x", -1)
+--       , ("x", "o",  0) ]
+
+-- g2 :: Graph String
+-- g2 = mkGraph "o" es2
+
+-- >>> g2
+-- MkGraph {src = "o", vertices = ["o","x"], edges = fromList [("o",[("x",0),("x",-1)]),("x",[("o",0)])]}
 
 -- >>> negativeCycle "o" es0
 -- Just ["z","y","x"]
 
 -- >>> negativeCycle "o" es1
 -- Nothing
+
+-- >>> negativeCycle "o" es2
+-- Just ["o","x"]

@@ -8,6 +8,10 @@ import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 import Epic.BellmanFord (negativeCycle)
+-- import qualified Debug.Trace as Debug
+
+-- traceShow :: Show a => String -> a -> a
+-- traceShow msg x = Debug.trace (msg ++ ": " ++ show x) x
 
 -- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
@@ -478,7 +482,8 @@ checkArith :: Solver -> Maybe UnsatReason
 checkArith = fmap Arith . negativeCycle zero . arithGraph
 
 arithGraph :: Solver -> [(GroundVal, GroundVal, Int)]
-arithGraph s = concatMap (arithEdges True)  (s_pos s)
+arithGraph s = -- traceShow "ARITHGRAPH" $
+               concatMap (arithEdges True)  (s_pos s)
             ++ concatMap (arithEdges False) (s_neg s)
             ++ concatMap litEdges           (s_lits s)
 
