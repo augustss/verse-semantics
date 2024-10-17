@@ -280,8 +280,9 @@ unificationStep :: Rule
 unificationStep _env lhs =
   "U-LIT" `name`
   do (Lit l1 :=: Lit l2) :>: e <- [lhs]
-     guard (l1 == l2)
-     pure e
+     if l1 == l2
+       then pure e
+       else pure Fail
  ++
   "U-TUP" `name`
   do (Tup vs :=: Tup vs') :>: e <- [lhs]
@@ -302,10 +303,11 @@ unificationStep _env lhs =
      guard (isHNF a1 && isHNF a2)
      guard $
        case (a1, a2) of
-         (Lit l1, Lit l2)  -> l1 /= l2
-         (Tup vs, Tup vs') -> length vs /= length vs'
-         (Tru _,  Tru _)   -> False
-         (_,      _)       -> True
+         (Lit {}, Lit {}) -> False  -- Handled by U-LIT
+         (Tup {}, Tup {}) -> False  -- Handled by U-TUP
+         (Tru {}, Tru {}) -> False  -- Handled by U-TRU
+         (Arr {}, Arr {}) -> False  -- Handled by U-ARR (in Verify.hs)
+         (_,      _)      -> True
      pure Fail
  ++
   "U-OCCURS" `name`
