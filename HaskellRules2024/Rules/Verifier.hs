@@ -28,7 +28,7 @@ verificationRules ::  Rule
 verificationRules = everywhere verificationStep <> everywhere recStep
 
 verificationStep :: Rule
-verificationStep =  TRS2024.evalStep
+verificationStep =  TRS2024.runtimeAndVerificationStep
                  <> guardStep
                  <> verifyStep
                  <> splitStep
@@ -61,41 +61,81 @@ groundValue rs (Tru v)               = do gv <- groundValue rs v; Just (GVTru gv
 groundValue _  _                     = Nothing
 
 --------------------------------------------------------------------------------
+
 arrStep :: Rule
 --   C[ P[ DotDot$[x,n] ]
 --     ---> if x is in flexis(P)
 --   verify(R,n;A){ P[ choose(n){x=some(inrange[n]);()} ] }
 arrStep env lhs =
-   "DOTDOT-NARROW" `nameWith`
+   "DD-NARROW" `nameWith`
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
+     -- Use this rule when v is not a literal.
      guard (x `elem` exis)
      let i = identNotIn (free v)
      pure (pPrint e1, wrapExis exis $
-                      ctx <@ (Choose v
+                      ctx <@ (Choose (SizeIs v)
                                 ((Var x :=: Some(Lam $ bind i (inRange (Var i) v)))
                                  :>: Tup [])))
 
   ++
-  "DOTDOT-INRANGE" `nameWith`
+  "DD-INRANGE" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, e1@(Op DotDot :@: Tup [i, sz]))) <- proofX all_rs e
       guard (isJust (groundValue all_rs i))
       pure (pPrint e1, Verify $ bindList rs
                          (as, ctx <@ inRange i sz))
 
+ ++
+  "ARR-MAP" `nameWith`   -- ArrMap$[f, Arr(n){e}]
+                         --   --> x:=some(\_.e); f[x]; Arr(n){f[e]}
+  do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
+     let x:y:_ = identsNotIn $ free arg
+     pure (pPrint arr, Exi $ bind x $
+                       coreSeq [ Var x :=: Some (Lam (bind underscore e))
+                               , Var underscore :=: (f :@: Var x)
+                               , Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y))] )
+ ++
+  "APP-ARR" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
+  do arr@(Arr (SizeIs sz) e) :@: v <- [lhs]
+     pure (pPrint arr, (Var underscore :=: (Op DotDot :@: Tup [v,sz])) :>:
+                       (Some $ Lam $ bind underscore e) )
   ++
   "CHOOSE-EXPAND" `name`
   do (ctx, Choose sz e) <- evalCtx [] lhs
      guard (ctx /= HOLE)
      let new_sz | choiceAndFailureFree ctx = sz
-                | otherwise                = someNat
+                | otherwise                = Dunno
      pure (Choose new_sz (ctx <@ e))
   ++
   "ALL-CHOOSE" `name`
-  do All e@(Choose e1 e2) <- [lhs]
-     pure (if isVal e1 then Arr e1 e2
-           else let i = identNotIn (free e)
-                in Exi $ bind i ((Var i :=: e1) :>: Arr (Var i) e2))
+  do All (Choose sz e) <- [lhs]
+     pure (Arr sz e)
+ ++
+  "U-ARR" `name`
+  do (Arr sz1 e1 :=: Arr sz2 e2) :>: e <- [lhs]
+     let x = identNotIn $ free lhs
+         add_unif_size body
+          = case (sz1,sz2) of
+              (SizeIs n1, SizeIs n2) -> (n1 :=: n2) :>: body
+              _                      -> body
+     pure (add_unif_size $
+           (Exi $ bind x $
+           ((Var x :=: (Some $ Lam $ bind underscore e1)) :>:
+            (Var x :=: (Some $ Lam $ bind underscore e2)) :>:
+            e)))
+  ++
+  "SKOL-ARR-SIZE" `nameWith`  -- Make Arr(Dunno){e} behave like Arr(some(nat)){e}
+                              -- by skolemising the some(nat)
+  do (all_rs, rs, as, e) <- matchVerify env lhs
+     (ctx, (_, Arr Dunno eb)) <- proofX all_rs e
+     guard (blocked ctx)
+     let x  = identNotIn (occurs ctx)
+         r  = skolNotIn all_rs
+     pure ( sep [ text "r=" <> pPrint r, text "x=" <> pPrint x
+                , text "rs=" <> pPrint rs ]
+          , Verify $ bindList (r:rs)
+                (as, Exi $ bind x $
+                     Var x :=: (nat :@: Var r) :>: (ctx <@ Arr (SizeIs (Var x)) eb)))
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule
@@ -169,15 +209,13 @@ splitStep env lhs =
    ++
    "SPLIT-ISARR" `nameWith`
        -- verify(R,r;A){ P[ isArr$[r] ] }
-       --  --> verify(R,r,n;A,isArr$[r]){ P[ Arr(n){some{any}}
+       --  --> verify(R,r;A,isArr$[r]){ P[ Arr(.){some(any)} ] }
        --      ..and the fail case..
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Op IsArr :@: Var r)) <- proofX all_rs e
       guard (r `elem` all_rs)   -- r is a skolem
-      let n    = skolNotIn all_rs
-          asmF = A_RelOp IsArr (GVVar r)
-      pure (pPrint asmF, caseSplit (n:rs) asmF as ctx (Arr (Var r) someAny))
-
+      let asmF = A_RelOp IsArr (GVVar r)
+      pure (pPrint asmF, caseSplit rs asmF as ctx (Arr Dunno someAny))
    ++
    "SPLIT-TUP" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs

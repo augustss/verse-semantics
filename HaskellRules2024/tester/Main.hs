@@ -18,6 +18,7 @@ import FrontEnd.Error
 
 import Rules.Core             as Rules
 import Rules.Verifier( verificationRules )
+import Rules.TRS2024 ( runtimeRules )
 import TRS.Traced as TRS ( Traced, term, trace )
 import TRS.Bind( bindList )
 
@@ -314,8 +315,13 @@ srcToCore flags add_verification e
        ; let e3 = Rules.prep e2
        ; return (e3, errs1 ++ errs2) }
 
-evalExpr :: TestFlags -> Rules.Expr -> (NormResult, Traced Rules.Expr)
-evalExpr flags e = Rules.normalize (maxSteps flags) verificationRules e
+evalExpr :: TestFlags -> Test -> Rules.Expr -> (NormResult, Traced Rules.Expr)
+evalExpr flags test e
+  = Rules.normalize (maxSteps flags) rules e
+  where
+    rules = case test of
+              TestEvalEq {} -> runtimeRules
+              TestVerify {} -> verificationRules
 
 type TimTag = Src.Ident
 
@@ -426,10 +432,10 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
 
        ; pure (TestRes { tr_info = info, tr_outcome = outcome }) }
   where
-    (res1, tr1)  = evalExpr tflg core1
+    (res1, tr1)  = evalExpr tflg test core1
     v1           = TRS.term tr1
     n_steps      = length (TRS.trace tr1)
-    mb_v2        = fmap (TRS.term . snd . evalExpr tflg) mb_core2
+    mb_v2        = fmap (TRS.term . snd . evalExpr tflg test) mb_core2
                    -- Really we should check res2 as well, but it is always boring
     test_herald  = testHerald test
     info         = testInfo test

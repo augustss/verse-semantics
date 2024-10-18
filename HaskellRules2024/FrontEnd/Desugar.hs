@@ -218,7 +218,8 @@ sDesugarExpr = ds
     ds (Macro1 (Ident _ "expect") fx e)  = Check fx <$> ds e
                                            -- I think "expect" is Tim's notation for "check"
     ds (Macro1 (Ident _ "succeeds") _ e) = eCheck [effSucceeds] <$> ds e
-    ds (Macro1 (Ident _ "decides") _ e)  = eCheck [effDecides] <$> ds e
+    ds (Macro1 (Ident _ "decides")  _ e) = eCheck [effDecides]  <$> ds e
+    ds (Macro1 (Ident _ "fails")    _ e) = eCheck [effFails]    <$> ds e
 
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
     ds (Macro1 (Ident _ "assume") fx e)  = do { x <- newIdent (getLoc e) "x"

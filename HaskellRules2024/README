@@ -1,9 +1,2 @@
 See
 https://docs.google.com/document/d/1HGiPId2L7y_V4wylYQf98k5VK3Ldd-3GWapCAyh9sX0
-
-
-x:int=3
--->
-exi x. x = 3 |> int
-
-e |> t

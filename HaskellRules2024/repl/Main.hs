@@ -379,8 +379,7 @@ cEval
        ; putStrLn (prettyShow prepd_expr)
 
        ; putStrLn ("\n\n------- Evaluate ---------")
-       ; let eval_it = Rules.normalize (fEvalSteps (cs_flags s))
-                             (Rules.everywhere TRS2024.evalRules)
+       ; let eval_it = Rules.normalize (fEvalSteps (cs_flags s)) TRS2024.runtimeRules
 
        ; core_result <- showEvalResult (fTraceEval $ cs_flags s) "Evaluation" (eval_it prepd_expr)
 

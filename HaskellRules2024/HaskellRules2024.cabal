@@ -55,6 +55,7 @@ executable confluence-check
                       Epic.Print
                       Epic.List
                       Epic.UnionFind
+                      Epic.BellmanFord
                       FrontEnd.Error
 
 
@@ -140,7 +141,7 @@ executable refimpltester
         Language.Verse.Token
         Language.Verse.Val
 
-           
+
 
 -- executable qctest
 --     import:           general-libs
@@ -181,6 +182,7 @@ library verse-libs
                       Epic.OpParser
                       Epic.List
                       Epic.UnionFind
+                      Epic.BellmanFord
                       FrontEnd.CopyHook
                       FrontEnd.Error
                       FrontEnd.Expr

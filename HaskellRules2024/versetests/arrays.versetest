@@ -8,7 +8,8 @@ verify("ArrayV0", pass, broken) {a:=(1;2;),a=(1,2)}
 # ArrayV1a, V1b. In the verifier we never expand a n..m choice;
 # but we do track its size
 verify("ArrayV1a", fail) { a := for{1..3}; a = array{1,2,3} }
-verify("ArrayV1b", pass) { a := for{1..3}; Length[a] = 3 }
+verify("ArrayV1b", pass) { a := for{0..2}; Length[a] = 3 }
+verify("ArrayV1c", pass) { a := for{1..3}; Length[a] = 3 }
 
 # ArrayV2-ArrayV4: prefix'[]' unimplemented
 verify("ArrayV2", pass) { ([]int)[ array{1,2} ] }
@@ -25,14 +26,14 @@ verify("arr-for2", pass){ f( a:[]int ) : []int := for( i:int; x := a[i] ){ x+1 }
 
 # Indexing
 verify("arr-index1", pass){ f( x:[]nat )<decides> : nat := x[0] }
-
-verify("arr-index2", pass, broken){ f( x:[]nat where Length[x] > 0 )<succeeds> : nat := x[0] }
+verify("arr-index2", pass){ f( x:[]nat where Length[x] > 0 )<succeeds> : nat := x[0] }
 verify("arr-index3", pass){ f( x:[]nat )<succeeds> : nat := if (z := x[0]) then { z } else { 99 } }
 verify("arr-index4", pass){ f( x:[]nat where x[0] )<succeeds> : nat := x[0] }
 testeq("arr-index5", pass){ (inc := lam i {i+1}); arrMap$[ inc, array{1,2,3} ] } { array{2,3,4} }
 verify("arr-index6", pass){
    f( x:[]nat, i:nat )<succeeds> : nat
       := if (Length[x]>i) then {x[i]} else {88} }
+  # arr-index6 requires reasoning about array bounds
 
 verify("arr5", pass, broken)
     { f( x:any )<succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
@@ -42,17 +43,13 @@ verify("arr5", pass, broken)
 verify("arr-uni1", pass){
     f( x:[]int, y:[]int )<decides>:int := { if (x=y) then { Length[x]=Length[y] } else 99 } }
 
-verify("arr-uni2", pass, broken){
-    f( x:[]int, y:[]int )<fails>:int := (x=y) }
-verify("arr-uni2a", fail, broken){
-    f( x:[]int, y:[]int )<fails>:int := 2 }
-  # arr-uni2, 2a:   <fails> annotation is not working
+verify("arr-uni2", pass){ f( x:[]int, y:[]string )<fails>:int := (x=y) }
+verify("arr-uni2a", pass){ f( x:[]int, y:[]string )<succeeds>:int := if (x=y) then fail else 77 }
+  # arr-uni2,2a: we can see that the arrays have disjoint types => guaranteed to fail
 
-verify("arr-uni3a", pass){
-    f( x:[]int, y:[]int )<succeeds>:int := if (x=y) then fail else 77 }
-verify("arr-uni3b", pass){
-    f( x:[]int, y:[]string )<succeeds>:int := if (x=y) then fail else 77 }
-
+verify("arr-uni3", fail){ f( x:[]int, y:[]int )<fails>:int := (x=y) }
+verify("arr-uni3a", fail){ f( x:[]int, y:[]int )<succeeds>:int := if (x=y) then fail else 77 }
+  # arr-uni3,3a: here the arrays have non-disjoint types
 
 verify("funny1", pass){
   f( n:int )<decides> := {x := y+1; n>3; y:=7; x} }
