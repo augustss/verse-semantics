@@ -10,7 +10,7 @@
 module Rules.Core
   ( -- The data type itself
     Expr(..), Val, pattern LitInt
-  , Ident(..), ArrSize(..)
+  , Ident(..)
   , Lit(..), Ptr, Path(..)
   , isVal, isHNF, isComparable
   , valid, prep, norm
@@ -18,7 +18,7 @@ module Rules.Core
   , unIter
 
     -- Particular expressions
-  , someAny, nat, inRange, coreSeq
+  , someAny, nat, inRange, litInt, litIntZero, coreSeq, (>>>)
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -31,7 +31,7 @@ module Rules.Core
   , RuleEnv(..), extendRuleEnv
 
     -- Binding and substitution
-  , subst, bvs
+  , subst
   , unbindAs, unExis
   , alphaRename, matchExi_alphaRename, matchEq
   , alphaRenameVerify
@@ -91,16 +91,15 @@ data Expr
   | Val :>>: Expr    -- guard |>   <-- black triangle
   | Check Effect Expr
   | Verify (BindList ([Assump],Expr))
-  | Arr    ArrSize Expr
-  | Choose ArrSize Expr
+
+  | Arr    Val Expr
+  | Choose Val Expr
+  | Size   Val Expr
 
   -- HOLE, only for contexts
   | HOLE
  deriving ( Eq, Ord, Show )
 
-data ArrSize = Dunno | SizeIs Val
- deriving ( Eq, Ord, Show )
-  -- Used for array sizes
 
 {- Note [iter]
 The iter construct is a (left) fold over choices.
@@ -211,22 +210,32 @@ coreSeq :: [Expr] -> Expr
 -- coreSeq [e1,e2,e3]  =   e1 :>: (e2 :>: e3)
 coreSeq = foldr1 (:>:)
 
+(>>>) :: Expr -> Expr -> Expr
+-- e1 >>> e2  =   (_ = e1); e2
+e1 >>> e2 = (Var underscore :=: e1) :>: e2
+
 someAny :: Expr
 -- The expression: some( any )
 someAny = Some (Lam (bind x (Var x)))
   where
     x = ident "x"
 
+litInt :: Integer -> Expr
+litInt n = Lit (LInt n)
+
+litIntZero :: Expr
+litIntZero = litInt 0
+
 nat :: Expr
 -- nat = \x. isInt$[x]; x>=0
 nat = Lam (bind x ((Var underscore :=: (Op IsInt :@: Var x))
-               :>: (Op GEq :@: Tup [Var x, LitInt 0])))
+               :>: (Op GEq :@: Tup [Var x, litIntZero])))
   where
     x = ident "x"
 
 inRange :: Val -> Val -> Expr
 -- (inrange i n) retuns the expression (i >= 0; i < n)
-inRange i n = coreSeq [ Var underscore :=: (Op GEq :@: Tup [i, LitInt 0])
+inRange i n = coreSeq [ Var underscore :=: (Op GEq :@: Tup [i, litIntZero])
                       , Var underscore :=: (Op Lt :@: Tup [i,n])
                       , i ]
 
@@ -470,9 +479,9 @@ pPrintPrecE lvl prec the_expr
        Op op      -> pPrint op
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
-       e1 :|: e2   -> sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
+       e1 :|: e2   -> mbPar0 $ sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
        e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
-       e@(_ :>: _) -> sep (punctuate semi $ map ppr1 (gatherSeqs e))
+       e@(_ :>: _) -> mbPar0 $ sep (punctuate semi $ map ppr1 (gatherSeqs e))
        e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ">>" <+> ppr1 e2
 
        Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
@@ -498,13 +507,13 @@ pPrintPrecE lvl prec the_expr
 
        Arr    sz e  -> text "Arr"   <> ppr_sz sz <> braces (ppr0 e)
        Choose sz e -> text "Choose" <> ppr_sz sz <> braces (ppr0 e)
+       Size   sz e -> text "Size"   <> ppr_sz sz <> braces (ppr0 e)
 
   where
     ppr0 = pPrintPrecE lvl 0
     ppr1 = pPrintPrecE lvl 1
 
-    ppr_sz Dunno = empty
-    ppr_sz (SizeIs v) = parens (ppr0 v)
+    ppr_sz v = parens (ppr0 v)
 
     mbPar0 = maybeParens (prec > 0)
 
@@ -571,12 +580,9 @@ exprSize (Check _ e)   = 1 + exprSize e
 exprSize (Verify bl)   = 10 + exprSize e
                        where
                          (_rs,(_as,e)) = unsafeUnbindList bl
-exprSize (Arr sz e)    = 1 + arrSizeSize sz + exprSize e
-exprSize (Choose sz e) = 1 + arrSizeSize sz + exprSize e
-
-arrSizeSize :: ArrSize -> Int
-arrSizeSize Dunno      = 0
-arrSizeSize (SizeIs v) = exprSize v
+exprSize (Arr sz e)    = 1 + exprSize sz + exprSize e
+exprSize (Size sz e)   = 1 + exprSize sz + exprSize e
+exprSize (Choose sz e) = 1 + exprSize sz + exprSize e
 
 bindSize :: Bind Expr -> Int
 bindSize bnd = exprSize (snd (unsafeUnbind bnd))
@@ -634,13 +640,10 @@ valid e@(Iter _ _ _ _)
 valid (Iter _ _ _ _)      = False
 valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
-valid (Arr    sz e)       = valid_size sz && valid e
-valid (Choose sz e)       = valid_size sz && valid e
+valid (Arr    sz e)       = is_val sz && valid e
+valid (Size   sz e)       = is_val sz && valid e
+valid (Choose sz e)       = is_val sz && valid e
 valid e                   = is_val e
-
-valid_size :: ArrSize -> Bool
-valid_size Dunno      = True
-valid_size (SizeIs v) = is_val v
 
 is_val :: Expr -> Bool
 is_val e = if isVal e then True else ppTrace "not valid" (pPrint e) False
@@ -657,27 +660,36 @@ prep :: Expr -> Expr
 -- In particular:
 --   * A-normal form; e.g. args of `:@:` are values
 --   * (v=e) only to the left of `:>:`
-prep (Var x)       = Var x
-prep (Lit k)       = Lit k
-prep (Tup as)      = prepVals as (\vs -> Tup vs)
-prep (Tru a)       = prepVal a Tru
-prep (Lam bnd)     = Lam (bind x (prep e)) where (x,e) = unsafeUnbind bnd
-prep (Op op)       = Op op
-prep (e1 :>: e2)   = prepSeq e1 e2
-prep (a  :=: e)    = prepVal a (\v -> (v :=: prep e) :>: v)
-prep (e1 :|: e2)   = prep e1 :|: prep e2
-prep (a1 :@: a2)   = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
-prep (Exi bnd)     = Exi (bind x (prep e)) where (x,e) = unsafeUnbind bnd
-prep Fail          = Fail
-prep (Some a)      = prepVal a (\v -> Some v)
-prep (All e)       = All (prep e)
-prep (a :>>: e)    = prepVal a (\v -> v :>>: prep e)
-prep (Check fx e)  = Check fx (prep e)
-prep (Verify bl)   = Verify (bindList xs (as, prep e))
-                     where (xs,(as,e)) = unsafeUnbindList bl
+prep (Var x)      = Var x
+prep (Lit k)      = Lit k
+prep (Tup as)     = prepVals as (\vs -> Tup vs)
+prep (Tru a)      = prepVal a Tru
+prep (Lam bnd)    = Lam (bind x (prep e)) where (x,e) = unsafeUnbind bnd
+prep (Op op)      = Op op
+prep (e1 :>: e2)  = prepSeq e1 e2
+prep (a  :=: e)   = prepVal a (\v -> (v :=: prep e) :>: v)
+prep (e1 :|: e2)  = prep e1 :|: prep e2
+prep (Exi bnd)    = Exi (bind x (prep e)) where (x,e) = unsafeUnbind bnd
+prep Fail         = Fail
+prep (Some a)     = prepVal a (\v -> Some v)
+prep (All e)      = All (prep e)
+prep (a :>>: e)   = prepVal a (\v -> v :>>: prep e)
+prep (Check fx e) = Check fx (prep e)
+
+prep (a1 :@: Tup as) = prepVal a1 (\v1 -> prepVals as (\vs -> v1 :@: Tup vs))
+prep (a1 :@: a2)     = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
+   -- The Tup case for applications is just an optimisation.
+   -- If we have f[e1,e2], we prefer
+   --    a1:=e1; a2:=e2; f[a2,a2]
+   -- to
+   --    a := (a1:=e1; a2:=e2; <a1,a2>); f[a]
+
+prep (Verify bl)  = Verify (bindList xs (as, prep e))
+                    where (xs,(as,e)) = unsafeUnbindList bl
+
 prep (Iter e1 e2 e3 e4) = prepVal e2 $ \ v2 -> Iter (prep e1) v2 (prep e3) (prep e4)
 
-prep e  -- HOLE, Arr, Choose
+prep e  -- HOLE, Arr, Choose, Size
   = error ("prep bad: " ++ show e)
 
 prepSeq :: Expr -> Expr -> Expr
@@ -723,13 +735,10 @@ instance Variables Expr where
   variables f (Check _ e)   = variables f e
   variables f (Exi bnd)     = variables f bnd
   variables f (Arr sz e)    = variables f (sz,e)
+  variables f (Size sz e)   = variables f (sz,e)
   variables f (Choose sz e) = variables f (sz,e)
   variables f (Verify bnd)  = variables f bnd
   variables f (Iter e1 e2 e3 e4) = variables f (e1, e2, e3, e4)
-
-instance Variables ArrSize where
-  variables _ Dunno      = []
-  variables f (SizeIs v) = variables f v
 
 instance Variables FailableAssump where
   variables f (A_GVEq i gv)  = [i] `union` variables f gv
@@ -822,8 +831,9 @@ norm orig_e = alpha 0 orig_e
   alpha k (e1 :@: e2)  = alpha k e1 :@: alpha k e2
   alpha k (Some e)     = Some (alpha k e)
   alpha k (All e)      = All (alpha k e)
-  alpha k (Arr s e)    = Arr (alpha_sz k s) (alpha k e)
-  alpha k (Choose s e) = Choose (alpha_sz k s) (alpha k e)
+  alpha k (Arr  s e)   = Arr    (alpha k s) (alpha k e)
+  alpha k (Size s e)   = Size   (alpha k s) (alpha k e)
+  alpha k (Choose s e) = Choose (alpha k s) (alpha k e)
   alpha k (e1 :>>: e2) = alpha k e1 :>>: alpha k e2
   alpha k (Check fx e) = Check fx (alpha k e)
   alpha k e@(Exi _)    = alphaExi k [] e
@@ -834,9 +844,6 @@ norm orig_e = alpha 0 orig_e
                              e'  = alpha (k+n) e
                          in Verify (bindList rs' (map (substAssump sub) as, substSkol sub e'))
   alpha k (Iter e1 e2 e3 e4) = Iter (alpha k e1) (alpha k e2) (alpha k e3) (alpha k e4)
-
-  alpha_sz _ Dunno      = Dunno
-  alpha_sz k (SizeIs v) = SizeIs (alpha k v)
 
   alphaExi k xs (Exi bnd) = alphaExi k (x:xs) e
    where
@@ -882,14 +889,12 @@ subst sub orig_e
     go (e1 :>>: e2) = go e1 :>>: go e2
     go (Check fx e) = Check fx (go e)
     go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
-    go (Arr s e)    = Arr    (go_sz s) (go e)
-    go (Choose s e) = Choose (go_sz s) (go e)
+    go (Arr  s e)   = Arr    (go s) (go e)
+    go (Size s e)   = Size   (go s) (go e)
+    go (Choose s e) = Choose (go s) (go e)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
 
     go (Iter e1 e2 e3 e4) = Iter (go e1) (go e2) (go e3) (go e4)
-
-    go_sz Dunno = Dunno
-    go_sz (SizeIs v) = SizeIs (go v)
 
     subst_e_ops :: SubstOps Expr Expr
     subst_e_ops = SubstOps { so_subst = subst
@@ -1256,28 +1261,29 @@ e@(Verify {}) <@ _ = e   -- No HOLE inside Verify. SLPJ: check
 HOLE          <@ h = h
 e             <@ _ = e
 
-bvs :: Context -> [Ident]
+{-  Not used
+boundVars :: Context -> [Ident]
 -- Returns all the binders that are in scope at the HOLE
-bvs ctx = explore [] ctx
+boundVars ctx = explore [] ctx
  where
-  explore xs (Tup es)     = foldr union [] (map (explore xs) es)
-  explore xs (Tru e)      = explore xs e
-  explore xs (Lam bnd)    = exploreBind xs bnd
-  explore xs (e1 :=: e2)  = explore xs e1 `union` explore xs e2
-  explore xs (e1 :>: e2)  = explore xs e1 `union` explore xs e2
-  explore xs (e1 :|: e2)  = explore xs e1 `union` explore xs e2
-  explore xs (e1 :@: e2)  = explore xs e1 `union` explore xs e2
-  explore xs (Iter e1 e2 e3 e4) = explore xs e1 `union` explore xs e2 `union` explore xs e3 `union` explore xs e4
-  explore xs (All e)      = explore xs e
-  explore xs (Some e)     = explore xs e
-  explore xs (e1 :>>: e2) = explore xs e1 `union` explore xs e2
-  explore xs (Check _ e)  = explore xs e
-  explore xs (Exi bnd)    = exploreBind xs bnd
-  explore _  (Verify {})  = []  -- HOLE is not inside Verify{}
-  explore xs HOLE         = xs
-  explore _xs _e          = []
+  go xs (Tup es)     = foldr union [] (map (go xs) es)
+  go xs (Tru e)      = go xs e
+  go xs (Lam bnd)    = goBind xs bnd
+  go xs (e1 :=: e2)  = go xs e1 `union` go xs e2
+  go xs (e1 :>: e2)  = go xs e1 `union` go xs e2
+  go xs (e1 :|: e2)  = go xs e1 `union` go xs e2
+  go xs (e1 :@: e2)  = go xs e1 `union` go xs e2
+  go xs (Iter e1 e2 e3 e4) = go xs e1 `union` go xs e2 `union` go xs e3 `union` go xs e4
+  go xs (All e)      = go xs e
+  go xs (Some e)     = go xs e
+  go xs (e1 :>>: e2) = go xs e1 `union` go xs e2
+  go xs (Check _ e)  = go xs e
+  go xs (Exi bnd)    = goBind xs bnd
+  go _  (Verify {})  = []  -- HOLE is not inside Verify{}
+  go xs HOLE         = xs
 
-  exploreBind xs bnd = explore ([x] `union` xs) e where (x,e) = unsafeUnbind bnd
+  goBind xs bnd = go ([x] `union` xs) e where (x,e) = unsafeUnbind bnd
+-}
 
 isContext :: Context -> Bool
 -- There is a HOLE, outside a Verify (SLPJ: is the "outside Verify" right?)

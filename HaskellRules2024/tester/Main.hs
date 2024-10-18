@@ -14,7 +14,6 @@ import FrontEnd.Expr as Src
 import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pParens
                      , pString, pKeyword, many, optional, skip, eof )
 import FrontEnd.Prelude( findPrelude )
-import FrontEnd.Error
 
 import Rules.Core             as Rules
 import Rules.Verifier( verificationRules )
@@ -483,7 +482,7 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
     fail_what = case typ of
              TPass -> "failure"
              TFail -> "success"
-             _     -> errorMessage "fail_what"
+             TLoop -> "loop"
 
 
 -- | Equivalence on values (or stuck expressions)

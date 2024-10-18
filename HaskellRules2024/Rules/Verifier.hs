@@ -73,7 +73,7 @@ arrStep env lhs =
      guard (x `elem` exis)
      let i = identNotIn (free v)
      pure (pPrint e1, wrapExis exis $
-                      ctx <@ (Choose (SizeIs v)
+                      ctx <@ (Choose v
                                 ((Var x :=: Some(Lam $ bind i (inRange (Var i) v)))
                                  :>: Tup [])))
 
@@ -96,46 +96,33 @@ arrStep env lhs =
                                , Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y))] )
  ++
   "APP-ARR" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
-  do arr@(Arr (SizeIs sz) e) :@: v <- [lhs]
-     pure (pPrint arr, (Var underscore :=: (Op DotDot :@: Tup [v,sz])) :>:
+  do arr@(Arr sz e) :@: v <- [lhs]
+     pure (pPrint arr, (Op DotDot :@: Tup [v,sz]) >>>
                        (Some $ Lam $ bind underscore e) )
   ++
-  "CHOOSE-EXPAND" `name`
-  do (ctx, Choose sz e) <- evalCtx [] lhs
-     guard (ctx /= HOLE)
-     let new_sz | choiceAndFailureFree ctx = sz
-                | otherwise                = Dunno
-     pure (Choose new_sz (ctx <@ e))
-  ++
   "ALL-CHOOSE" `name`
-  do All (Choose sz e) <- [lhs]
-     pure (Arr sz e)
+     -- all{ C[ choose(v){e} ] }
+     -- --> n := size(v){ C[ some(\_.e) ] } ;
+     --     Arr(n){ C[e] }
+     -- if boundvars(C) disjoint from freevars(v)
+  do All all_body <- [lhs]
+     (exis, ctx, Choose sz e) <- evalCtxLift [] all_body
+     guard (free sz `disjointFrom` exis)
+     let n = identNotIn $ free all_body
+     pure ( Exi $ bind n $
+            (Var n :=: Size sz (wrapExis exis $
+                                ctx <@ Some (Lam $ bind underscore e)))
+            :>:
+            (Arr (Var n) (wrapExis exis (ctx <@ e))) )
  ++
   "U-ARR" `name`
-  do (Arr sz1 e1 :=: Arr sz2 e2) :>: e <- [lhs]
+  do (Arr n1 e1 :=: Arr n2 e2) :>: e <- [lhs]
      let x = identNotIn $ free lhs
-         add_unif_size body
-          = case (sz1,sz2) of
-              (SizeIs n1, SizeIs n2) -> (n1 :=: n2) :>: body
-              _                      -> body
-     pure (add_unif_size $
-           (Exi $ bind x $
-           ((Var x :=: (Some $ Lam $ bind underscore e1)) :>:
-            (Var x :=: (Some $ Lam $ bind underscore e2)) :>:
-            e)))
-  ++
-  "SKOL-ARR-SIZE" `nameWith`  -- Make Arr(Dunno){e} behave like Arr(some(nat)){e}
-                              -- by skolemising the some(nat)
-  do (all_rs, rs, as, e) <- matchVerify env lhs
-     (ctx, (_, Arr Dunno eb)) <- proofX all_rs e
-     guard (blocked ctx)
-     let x  = identNotIn (occurs ctx)
-         r  = skolNotIn all_rs
-     pure ( sep [ text "r=" <> pPrint r, text "x=" <> pPrint x
-                , text "rs=" <> pPrint rs ]
-          , Verify $ bindList (r:rs)
-                (as, Exi $ bind x $
-                     Var x :=: (nat :@: Var r) :>: (ctx <@ Arr (SizeIs (Var x)) eb)))
+     pure ( (n1 :=: n2) :>:
+            (Exi $ bind x $
+            ((Var x :=: (Some $ Lam $ bind underscore e1)) :>:
+             (Var x :=: (Some $ Lam $ bind underscore e2)) :>:
+             e)) )
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule
@@ -152,8 +139,8 @@ verifyStep env lhs =
    ++
    "VERIFY-CHOICE" `name`
    do (_skols, rs, as, e1 :|: e2) <- matchVerify env lhs
-      pure (  (Var underscore :=: (Verify $ bindList rs (as,e1)))
-          :>: (Verify $ bindList rs (as,e2)) )
+      pure (     (Verify $ bindList rs (as,e1))
+             >>> (Verify $ bindList rs (as,e2)) )
    ++
    "SOLVER" `nameWith`
    do (_skols, rs, as, _e) <- matchVerify env lhs
@@ -209,13 +196,21 @@ splitStep env lhs =
    ++
    "SPLIT-ISARR" `nameWith`
        -- verify(R,r;A){ P[ isArr$[r] ] }
-       --  --> verify(R,r;A,isArr$[r]){ P[ Arr(.){some(any)} ] }
+       --  --> verify(R,r,n;A,isArr$[r],isInt$[n], n>=0){ P[ Arr(.){some(any)} ] }
        --      ..and the fail case..
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Op IsArr :@: Var r)) <- proofX all_rs e
       guard (r `elem` all_rs)   -- r is a skolem
-      let asmF = A_RelOp IsArr (GVVar r)
-      pure (pPrint asmF, caseSplit rs asmF as ctx (Arr Dunno someAny))
+      let n        = skolNotIn all_rs
+          r_asm    = A_RelOp IsArr (GVVar r)
+          n_asms   = [ A_RelOp IsInt (GVVar n)
+                     , A_RelOp GEq (GVArr [GVVar n, GVLit (LInt 0)]) ]
+          neg_asms = [A_Neg r_asm]
+          pos_asms = map A_Pos (r_asm:n_asms)
+      pure ( pPrint r
+           , (Verify (bindList rs (neg_asms ++ as, ctx <@ Fail)))
+             >>>
+             (Verify (bindList (n:rs) (pos_asms ++ as, ctx <@ Arr (Var n) someAny))) )
    ++
    "SPLIT-TUP" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
@@ -262,8 +257,8 @@ matchVerify _ _ = []
 
 caseSplit :: [Ident] -> FailableAssump -> [Assump] -> Context -> Expr -> Expr
 caseSplit rs a as ctx e
-  = (Var underscore :=: Verify (bindList rs (A_Neg a : as, ctx <@ Fail)))
-    :>:
+  = Verify (bindList rs (A_Neg a : as, ctx <@ Fail))
+    >>>
     Verify (bindList rs (A_Pos a : as, ctx <@ e))
 
 --------------------------------------------------------------------------------

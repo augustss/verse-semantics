@@ -7,6 +7,7 @@ module TRS.Bind
   ( Ident(..), SkolIdent
   , ident, underscore, isUnderscore
   , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn, skolsNotIn
+  , disjointFrom
 
   , Variables(..)
   , free, occurs, intersects, includes
@@ -84,6 +85,9 @@ skolsNotIn forb = identsNotInPrefix "$r" forb
 
 identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
+
+disjointFrom :: [Ident] -> [Ident] -> Bool
+disjointFrom xs ys = not (any (`elem` ys) xs)
 
 --------------------------------------------------------------------------------
 
