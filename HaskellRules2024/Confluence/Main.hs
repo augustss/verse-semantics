@@ -15,6 +15,22 @@ prop_Valid :: Expr -> Bool
 prop_Valid t0 =
   valid (prep t0)
 
+prop_ValidTrace :: Property
+prop_ValidTrace =
+  forAllShrink arbExpr shrinkExpr $ \p ->
+    let (resp, np :<-- ps)  = normalize lotsOfSteps trs2024_noREC p
+     in whenFail (do putStrLn "== TRACE =="
+                     displayTrace (np :<-- ps)) $
+          resp /= NormInvalid ==>
+            valid np && all valid [ q | (_,q) <- ps ]
+ where
+  arbExpr :: Gen Expr
+  arbExpr =
+    do prep `fmap` arbitrary
+
+  shrinkExpr :: Expr -> [Expr]
+  shrinkExpr p = [ p' | p' <- shrink p, valid p' ]
+
 prop_Confluent :: Property
 prop_Confluent =
   forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- qs1) ->
@@ -25,7 +41,8 @@ prop_Confluent =
                      putStrLn "== TRACE #2 =="
                      displayTrace (nq :<-- (qs2 ++ qs1))) $
           resp /= NormInvalid && resq /= NormInvalid ==>
-            norm np == norm nq
+            all valid (np : nq : [ q | (_,q) <- ps ++ qs2 ])
+            && norm np == norm nq
  where
   arbFork :: Gen (Expr, Traced Expr)
   arbFork =
@@ -45,7 +62,7 @@ prop_Confluent =
                    | ((s,p'),q') <- tr `zip` (q : map snd tr)
                    ]
           _     -> [ (p',s,q')
-                   | p' <- shrink p ++ map snd (stepRule trs2024_noREC p)
+                   | p' <- shrink p -- ++ map snd (stepRule trs2024_noREC p)
                    , valid p'
                    , (s,q') <- stepRule trs2024_noREC p'
                    ]
@@ -55,6 +72,7 @@ prop_Confluent =
 
 main :: IO ()
 --main = quickCheck prop_Valid
+--main = quickCheckWith stdArgs{ maxSuccess = 9999 } prop_ValidTrace
 main = quickCheckWith stdArgs{ maxSuccess = 9999 } prop_Confluent
 
 --------------------------------------------------------------------------------
