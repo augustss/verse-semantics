@@ -837,7 +837,7 @@ status lx (Verify bl)
   --    exi f.  verify{ ...f...}; f = \x.some(int)
   -- Alternative: look inside the verify
 
-status lx (Check _ e) = status lx e
+status lx (Check _ e) = status (makeRigid lx) e
 status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
                    | otherwise                 = SomethingToDo
 status _  (Choose {}) = SomethingToDo
