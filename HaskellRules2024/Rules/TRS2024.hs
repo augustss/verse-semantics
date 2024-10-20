@@ -38,11 +38,12 @@ runtimeRules = everywhere (runtimeAndVerificationStep <> evalDotDotStep)
 
 runtimeAndVerificationStep :: Rule
 -- Rules use for /both/ runtime /and/ verification
-runtimeAndVerificationStep = applicationStep
+runtimeAndVerificationStep
+           =  normalizationStep
+           <> applicationStep
            <> arrayOpStep
            <> unificationStep
            <> existentialStep
-           <> normalizationStep
            <> choiceStep
            <> oneAndAllStep
            <> checkStep
@@ -357,8 +358,8 @@ existentialStep _env lhs =
      guard (x `notElem` free v)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
      pure ( pPrint x <+> text ":=" <+> pPrintSmallExpr v
-            $$ (text "root" <+> (pPrint lhs))
-            $$ (text "ctx" <+> (pPrint ctx))
+--            $$ (text "root" <+> (pPrint lhs))
+--            $$ (text "ctx" <+> (pPrint ctx))
           , wrapExis (exis \\ [x]) $
             subst [(x,v)] (ctx <@ e) )
  ++
@@ -840,7 +841,7 @@ status lx (Check _ e) = status lx e
 status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
                    | otherwise                 = SomethingToDo
 status _  (Choose {}) = SomethingToDo
-status _  (Size {})   = SomethingToDo       -- ToDo: not sure!!
+status lx (Size _ e)  = status lx e
 status lx (v :>>: e) | any (isLocal lx) (free v) = blockedStatus
                      | otherwise                 = status lx e
 

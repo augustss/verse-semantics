@@ -24,6 +24,12 @@ verify("arr2", pass){ f( x:[]nat ) : []int := x }
 verify("arr-for1", pass){ f( a:[]int ) : []int := for( i:int; x := a[i] ){ x } }
 verify("arr-for2", pass){ f( a:[]int ) : []int := for( i:int; x := a[i] ){ x+1 } }
 
+# arr-for3b filters the array elements
+# arr-for3c has a choice in the range
+verify("arr-for3a", pass){ f( n:int ) : []int := for(i:=1..n){i} }
+verify("arr-for3b", pass){ f( n:int ) : []int := for(i:=1..n; i>3){i} }
+verify("arr-for3c", pass){ f( n:int ) : int := Length [ all { for(i:=1..n){i | i+1} } ] }
+
 # Indexing
 verify("arr-index1", pass){ f( x:[]nat )<decides> : nat := x[0] }
 verify("arr-index2", pass){ f( x:[]nat where Length[x] > 0 )<succeeds> : nat := x[0] }
@@ -35,9 +41,14 @@ verify("arr-index6", pass){
       := if (Length[x]>i) then {x[i]} else {88} }
   # arr-index6 requires reasoning about array bounds
 
-verify("arr5", pass, broken)
-    { f( x:any )<succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
-    # arr5: does isArr$ on the same thing twice return an array of the same length
+# arr5: does isArr$ on the same thing twice, returning an array of the same length
+verify("arr5a", pass )
+    { f( x:[]nat )<succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
+    # arr5: does isArr$ on the same thing twice, returning an array of the same length
+verify("arr5b", pass )
+    { f( x:any )<succeeds>:int := { if (y:=([]int)[x]; z:=([]nat)[x])
+                                    then {Length[y]=Length[z]}
+                                    else { 0 } } }
 
 # Array unification
 verify("arr-uni1", pass){

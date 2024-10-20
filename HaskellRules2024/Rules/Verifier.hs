@@ -25,13 +25,16 @@ import Rules.Solver (unsat)
 --------------------------------------------------------
 
 verificationRules ::  Rule
-verificationRules = everywhere verificationStep <> everywhere recStep
+verificationRules
+  = everywhere verificationStep
+    -- Do all simple evaluation and normalisation before splitting
+    <> everywhere splitStep
+    <> everywhere recStep
 
 verificationStep :: Rule
 verificationStep =  TRS2024.runtimeAndVerificationStep
                  <> guardStep
                  <> verifyStep
-                 <> splitStep
                  <> arrStep
 
 --------------------------------------------------------------------------------
@@ -65,7 +68,7 @@ groundValue _  _                     = Nothing
 arrStep :: Rule
 --   C[ P[ DotDot$[x,n] ]
 --     ---> if x is in flexis(P)
---   verify(R,n;A){ P[ choose(n){x=some(inrange[n]);()} ] }
+--   verify(R,n;A){ P[ x = choose(n){some(\i. inrange[i,n])}; x ] }
 arrStep env lhs =
    "DD-NARROW" `nameWith`
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
@@ -73,9 +76,9 @@ arrStep env lhs =
      guard (x `elem` exis)
      let i = identNotIn (free v)
      pure (pPrint e1, wrapExis exis $
-                      ctx <@ (Choose v
-                                ((Var x :=: Some(Lam $ bind i (inRange (Var i) v)))
-                                 :>: Tup [])))
+                      ctx <@ ((Var x :=: Choose v
+                                  (Some(Lam $ bind i (inRange (Var i) v))))
+                              :>: Var x))
 
   ++
   "DD-INRANGE" `nameWith`
@@ -123,6 +126,15 @@ arrStep env lhs =
             ((Var x :=: (Some $ Lam $ bind underscore e1)) :>:
              (Var x :=: (Some $ Lam $ bind underscore e2)) :>:
              e)) )
+ ++
+  "SIZE1" `name`  -- Size(n){v} --> n
+  do Size n v <- [lhs]
+     guard (isVal v)
+     pure n
+ ++
+  "SIZE-FAIL" `name`  -- Size(n){fail} --> some(nat)
+  do Size _ Fail <- [lhs]
+     pure someNat
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule
@@ -196,7 +208,7 @@ splitStep env lhs =
    ++
    "SPLIT-ISARR" `nameWith`
        -- verify(R,r;A){ P[ isArr$[r] ] }
-       --  --> verify(R,r,n;A,isArr$[r],isInt$[n], n>=0){ P[ Arr(.){some(any)} ] }
+       --  --> verify(R,r,n;A,isArr$[r],isInt$[n], n=arrLen$[r], n>=0){ P[ Arr(.){some(any)} ] }
        --      ..and the fail case..
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Op IsArr :@: Var r)) <- proofX all_rs e
@@ -206,7 +218,7 @@ splitStep env lhs =
           n_asms   = [ A_RelOp IsInt (GVVar n)
                      , A_RelOp GEq (GVArr [GVVar n, GVLit (LInt 0)]) ]
           neg_asms = [A_Neg r_asm]
-          pos_asms = map A_Pos (r_asm:n_asms)
+          pos_asms = A_PrimOp n (AO_Prim ArrLen) (GVVar r) : map A_Pos (r_asm:n_asms)
       pure ( pPrint r
            , (Verify (bindList rs (neg_asms ++ as, ctx <@ Fail)))
              >>>
@@ -304,6 +316,10 @@ go_px lx lhs =
   do x :>>: e  <- [lhs]
      (ctx, hole) <- go_px lx x
      pure (ctx :>>: e, hole)
+ ++
+  do Size sz e <- [lhs]
+     (ctx, hole) <- go_px lx e
+     pure (Size sz ctx, hole)
  ++
   do Check fx x <- [lhs]
      (ctx, hole) <- go_px lx x

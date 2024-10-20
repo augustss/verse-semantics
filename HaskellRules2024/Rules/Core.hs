@@ -18,7 +18,7 @@ module Rules.Core
   , unIter
 
     -- Particular expressions
-  , someAny, nat, inRange, litInt, litIntZero, coreSeq, (>>>)
+  , someAny, someNat, nat, inRange, litInt, litIntZero, coreSeq, (>>>)
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -40,7 +40,7 @@ module Rules.Core
   , Effect(..), canSucceed, canFail
 
   -- Primops
-  , PrimOp(..), allPrimOps, primOpString, primOpCanFail
+  , PrimOp(..), allPrimOps, primOpString, primOpCanFail, primOpIsTypeTest
   ) where
 
 import Prelude hiding( (<>) )
@@ -220,6 +220,10 @@ someAny = Some (Lam (bind x (Var x)))
   where
     x = ident "x"
 
+someNat :: Expr
+-- The expression: some( nat )
+someNat = Some nat
+
 litInt :: Integer -> Expr
 litInt n = Lit (LInt n)
 
@@ -228,14 +232,18 @@ litIntZero = litInt 0
 
 nat :: Expr
 -- nat = \x. isInt$[x]; x>=0
-nat = Lam (bind x ((Var underscore :=: (Op IsInt :@: Var x))
-               :>: (Op GEq :@: Tup [Var x, litIntZero])))
+nat = Lam $ bind x $
+      coreSeq [ Var underscore :=: (Op IsInt :@: Var x)
+              , Var underscore :=: (Op GEq :@: Tup [Var x, litIntZero])
+              , Var x ]
   where
     x = ident "x"
 
 inRange :: Val -> Val -> Expr
--- (inrange i n) retuns the expression (i >= 0; i < n)
-inRange i n = coreSeq [ Var underscore :=: (Op GEq :@: Tup [i, litIntZero])
+-- (inrange i n) retuns the expression (isInt$[i]; i >= 0; i < n; i)
+inRange i n = coreSeq [ Var underscore :=: (Op IsInt :@: i)
+                      , Var underscore :=: (Op IsInt :@: n)
+                      , Var underscore :=: (Op GEq :@: Tup [i, litIntZero])
                       , Var underscore :=: (Op Lt :@: Tup [i,n])
                       , i ]
 
@@ -259,7 +267,8 @@ data PrimOp
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr | IsChar | IsArr | IsComp | IsTru
+ | IsInt | IsStr | IsChar | IsArr | IsTru
+ | IsComp
 
  deriving
    ( Eq, Ord, Bounded, Enum, Show, Data )
@@ -317,6 +326,15 @@ primOpCanFail Div      = False
 primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
 primOpCanFail ArrMap   = False
+
+primOpIsTypeTest :: PrimOp -> Bool
+primOpIsTypeTest IsInt  = True
+primOpIsTypeTest IsStr  = True
+primOpIsTypeTest IsChar = True
+primOpIsTypeTest IsTru  = True
+primOpIsTypeTest IsArr  = True
+primOpIsTypeTest IsComp = False  -- Not really a type test
+primOpIsTypeTest _      = False
 
 --------------------------------------------------------------------------------
 --
@@ -1032,10 +1050,11 @@ everywhere step env orig_e
                       ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step env e2 ]
   recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step env e1 ]
                       ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step env e2 ]
-  recurse (All e)      = [ (s, All e')  | (s,e') <- everywhere step env e ]
-  recurse (Some e)     = [ (s, Some e') | (s,e') <- everywhere step env e ]
-  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2)  | (s,e1') <- everywhere step env e1 ]
-                      ++ [ (s, e1  :>>: e2') | (s,e2') <- everywhere step env e2 ]
+  recurse (All e)      = [ (s, All e')      | (s,e') <- everywhere step env e ]
+  recurse (Some e)     = [ (s, Some e')     | (s,e') <- everywhere step env e ]
+  recurse (Size sz e)  = [ (s, Size sz e')  | (s,e') <- everywhere step env e ]
+  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2) | (s,e1') <- everywhere step env e1 ]
+                      ++ [ (s, e1 :>>: e2') | (s,e2') <- everywhere step env e2 ]
   recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step env e ]
   recurse (Verify bl)  = [ (s, Verify (bindList rs (as,e')))
                          | (s,e') <- everywhere step env' e ]
@@ -1244,6 +1263,11 @@ type Context = Expr
 
 (<@) :: Context -> Expr -> Expr
 -- (C <@ e) fills the hole in C with e. Often written C[e]
+HOLE          <@ h = h
+e@(Var {})    <@ _ = e
+e@(Lit {})    <@ _ = e
+e@(Op  {})    <@ _ = e
+Fail          <@ _ = Fail
 Tup as        <@ h = Tup (map (<@ h) as)
 Tru a         <@ h = Tru (a <@ h)
 Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
@@ -1258,8 +1282,9 @@ All  e        <@ h = All  (e <@ h)
 (e1 :>>: e2)  <@ h = (e1 <@ h) :>>: (e2 <@ h)
 Check fx e    <@ h = Check fx (e <@ h)
 e@(Verify {}) <@ _ = e   -- No HOLE inside Verify. SLPJ: check
-HOLE          <@ h = h
-e             <@ _ = e
+Size   v e    <@ h = Size   v (e <@ h)
+Arr    v e    <@ h = Arr    v (e <@ h)
+Choose v e    <@ h = Choose v (e <@ h)
 
 {-  Not used
 boundVars :: Context -> [Ident]
