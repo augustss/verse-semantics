@@ -600,7 +600,6 @@ isHNF (Tru e)  = isVal e
 isHNF (Lam {}) = True
 isHNF _        = False
 
-
 isComparable :: Expr -> Bool
 isComparable (Lit (LChar {})) = True
 isComparable (Lit (LInt  {})) = True
