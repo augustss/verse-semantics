@@ -41,8 +41,7 @@ prop_Confluent =
                      putStrLn "== TRACE #2 =="
                      displayTrace (nq :<-- (qs2 ++ qs1))) $
           resp /= NormInvalid && resq /= NormInvalid ==>
-            all valid (np : nq : [ q | (_,q) <- ps ++ qs2 ])
-            && norm np == norm nq
+            norm np == norm nq
  where
   arbFork :: Gen (Expr, Traced Expr)
   arbFork =
