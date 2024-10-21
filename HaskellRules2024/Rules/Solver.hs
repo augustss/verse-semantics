@@ -160,6 +160,7 @@ we find that in fact `s |- x ~ 3` which is a contradiction.
 check :: Solver -> Maybe UnsatReason
 check s = firstJust
   $  checkLits s
+  :  checkTypes s
   :  checkArith s
   : (checkNeg s <$> s_neg s)
 
@@ -171,10 +172,25 @@ checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing
    litRep l   = UF.find (s_uf cc) (GVLit l)
    lits       = nub (s_lits cc)
 
+checkTypes :: Solver -> Maybe UnsatReason
+-- Return (Just reason) if the solver has contradictory type tests
+--    e.g. IsInt[r], IsStr[s]  where  r=s
+checkTypes s
+  | (pos1,pos2) : _ <- [ (pos1, pos2)
+                       | pos1@(A_RelOp op1 gv1) <- s_pos s
+                       , primOpIsTypeTest op1
+                       , pos2@(A_RelOp op2 gv2) <- s_pos s
+                       , primOpIsTypeTest op2
+                       , op1 /= op2
+                       , isEqual s gv1 gv2 ]
+  = Just (Contra2 pos1 pos2)
+  | otherwise
+  = Nothing
+
 -- Can we derive !s, see Note [Rules:Contradiction]
 checkNeg :: Solver -> FailableAssump -> Maybe UnsatReason
 
--- [c-eq-*] not (x = y) yields a contradiction if s |- x ~ gv and x OR gv are primitive
+-- [c-eq-*] not (x = ) yields a contradiction if s |- x ~ gv and x OR gv are primitive
 checkNeg s neg@(A_GVEq x gv)
   | isEqual s (GVVar x) gv
   , isPrim s (GVVar x) || isPrim s gv  -- See Note [Checking negated equalities]
@@ -309,7 +325,10 @@ evalProp _ _
   = []
 
 generateEqs :: Solver -> [Equality]
-generateEqs s = filter (not . knownEq s) (evalDefs s ++ pos)  -- TODO: why concat pos? they get filtered immediately?
+generateEqs s = filter (not . knownEq s) $
+                (pos ++         -- TODO: why concat pos? don't they get filtered out immediately?
+                 evalDefs s ++
+                 cseDefs s)
   where
     pos       = [MkEqual (GVVar x) y | A_GVEq x y <- s_pos s]
 
@@ -338,6 +357,16 @@ evalDef s (x, (op, GVArr [v1, v2])) = do
   LInt l2 <- evalsToLit s v2
   Just (MkEqual (GVVar x) (GVLit (LInt (l1 `o` l2))))
 evalDef _ _ = Nothing
+
+cseDefs :: Solver -> [Equality]
+-- If we have defs  x = Op[gv1], y = Op[gv2], and s |- gv1 ~ gv2, then generate x=y
+cseDefs s
+  = [ MkEqual (GVVar x) (GVVar y)
+    | (x, (opx,gvx)) <- s_def s
+    , (y, (opy,gvy)) <- s_def s
+    , x /= y
+    , opx == opy
+    , isEqual s gvx gvy ]
 
 -----------------------------------------------------------------------------------
 -- | `propagate s eqs` updates the solver state `s` with the new equalities `eqs`
@@ -570,14 +599,16 @@ zero = GVLit (LInt 0)
 ------------------------------------------------------------------------------------
 data UnsatReason
    = Contra    FailableAssump
+   | Contra2   FailableAssump FailableAssump
    | DiseqLit  Lit   Lit
    | Arith    [GroundVal]
    deriving (Show)
 
 instance Pretty UnsatReason where
-  pPrint (Contra a)     = text "CONTRA"    <+> pPrint a
-  pPrint (DiseqLit x y) = text "DISEQ-LIT" <+> pPrint x <+> pPrint y
-  pPrint (Arith xs)     = text "ARITH"     <+> pPrint xs
+  pPrint (Contra a)      = text "CONTRA"    <+> pPrint a
+  pPrint (Contra2 a1 a2) = text "CONTRA2"   <+> pPrint a1 <+> pPrint a2
+  pPrint (DiseqLit x y)  = text "DISEQ-LIT" <+> pPrint x <+> pPrint y
+  pPrint (Arith xs)      = text "ARITH"     <+> pPrint xs
 
 instance Pretty Equality where
   pPrint (MkEqual x y) = pPrint x <+> text "=" <+> pPrint y

@@ -1092,13 +1092,13 @@ encodeOne e = do
   a <- newIdent (getLoc e) "a"
   pure $ Iter e (Array []) (eThunk $ Lam a $ eThunk $ Variable a) (eThunk Fail)
 
--- all{e}  -->  exi Iter e <> step (\ a -> a)
---   step a v c  =  c(exi r . arrApp(a,<v>,r); r)
 encodeAll :: SrcCore -> D SrcCore
 encodeAll e = pure (All e)
 
 {-   For now, I'm reverting to leaveing `All` with `All`, instead of using `iter`
      The `iter` encoding is below
+-- all{e}  -->  exi Iter e <> step (\ a -> a)
+--   step a v c  =  c(exi r . arrApp(a,<v>,r); r)
 encodeAll e = do
   a   <- newIdent (getLoc e) "a"
   v   <- newIdent (getLoc e) "v"
@@ -1111,15 +1111,15 @@ encodeAll e = do
   pure $ Iter e (Array []) step done
 -}
 
--- for(e1){e2}  -->  Iter (e1; <vs>) <> step (\ a . a)
---   step a x c = exi vs . x = <vs>; c(exi r . arrApp$(a, <e2>, r); r)
 encodeFor :: SrcCore -> SrcCore -> D SrcCore
 encodeFor e1 e2 = pure (ApplyD (EPrim ArrMap)
-                               (Array [eForceLam
+                               (Array [ eForceLam
                                       , All (eSeq [e1, eThunk e2])]))
 
 {- Reverting to encoding `for` using `All`. The `iter` encoding is below:a
 
+-- for(e1){e2}  -->  Iter (e1; <vs>) <> step (\ a . a)
+--   step a x c = exi vs . x = <vs>; c(exi r . arrApp$(a, <e2>, r); r)
 encodeFor e1 e2 = do
   a   <- newIdent (getLoc e1) "a"
   x   <- newIdent (getLoc e1) "x"

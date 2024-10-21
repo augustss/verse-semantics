@@ -254,11 +254,16 @@ verify("PP3a", fail, broken)
                                  ; G() )    # Call G last!
                         ; F(2, G1() := G1()) }
   # PP3a illustrates the case where Tim will verify but we do not.
+
 # PP3b: Tim's verifier loops
-verify("PP3b", pass,tim=skip_loop) { F( X:int, G():type{X = 1} )
-                              := (G();    # Call G first!
-                                  H()<succeeds> := X = 1; H())
-                        ; F(2, G1() := G1()) }
+# Our verifier now loops too; in an earlier iteration (say early Oct 24) it didn't
+# It dependes delicately on whether we try to verify the arg G1():=G1()
+#    (which makes the verifier loop) or whether we skolemise an impossible thing
+verify("PP3b", pass, broken, tim=skip_loop)
+   { F( X:int, G():type{X = 1} )
+          := (G();    # Call G first!
+              H()<succeeds> := X = 1; H())
+   ; F(2, G1() := G1()) }
 
 verify(":type2", pass) {x:int => f():type{x=0} => {f[],x=0}}
 verify(":type5", pass) {a:int => b:any => f(:int):type{a=b} => {f[a],a=b}}
@@ -303,8 +308,14 @@ verify("blob", fail,tim=D00) { foo(f()<decides>:int) := {f[]} }
 
 # Finite types (from Google doc "Verse: more tricky cases")
 verify("Fin1", fail) { (y := if (y=2) then y+1 else 3); y }
-verify("Fin2", pass, broken) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
-verify("Fin3", fail) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin2", pass) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin3", pass) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin2a", pass, broken ) { (y:type{3}   := if (y=2) then y+1 else 3); if (y=3) then 1 else fail  }
+  # Fin2a should work because all clients of y should see some(\_.3)
+
+verify("Fin3a", fail ) { (y:type{3|4} := if (y=2) then y+1 else 3); if (y=3) then 1 else fail }
+  # Fin3a fails, I think, because clients of y see some(\_.3|4)
+
 verify("Fin4", fail,tim=V10) { y:int = y }
 verify("Fin5", fail,tim=skip_acc) { y:type{3} = y }
   # Tim actually accepts this, but only because type{3} is a singleton

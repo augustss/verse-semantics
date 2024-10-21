@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RecordWildCards,MultiWayIf #-}
 
 module Rules.TRS2024 (
      runtimeRules, runtimeAndVerificationStep, recStep
@@ -38,11 +38,12 @@ runtimeRules = everywhere (runtimeAndVerificationStep <> evalDotDotStep)
 
 runtimeAndVerificationStep :: Rule
 -- Rules use for /both/ runtime /and/ verification
-runtimeAndVerificationStep = applicationStep
+runtimeAndVerificationStep
+           =  normalizationStep
+           <> applicationStep
            <> arrayOpStep
            <> unificationStep
            <> existentialStep
-           <> normalizationStep
            <> choiceStep
            <> oneAndAllStep
            <> checkStep
@@ -221,9 +222,9 @@ arrayOpStep _env lhs =
                         -- Length$[Arr(n){e}]  --> n
   do Op ArrLen :@: arg <- [lhs]
      case arg of
-       Tup xs            -> pure (LitInt (fromIntegral (length xs)))
-       Arr (SizeIs sz) _ -> pure sz
-       _                 -> []   -- No match here
+       Tup xs   -> pure (LitInt (fromIntegral (length xs)))
+       Arr sz _ -> pure sz
+       _        -> []   -- No match here
  ++
   "APP-ISARR" `name`    -- IsArr$[<v1,..,vn>] -->  <v1,..vn>
                         -- IsArr$[Arr(n){e}]  -->  Arr(n){e}
@@ -357,6 +358,8 @@ existentialStep _env lhs =
      guard (x `notElem` free v)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
      pure ( pPrint x <+> text ":=" <+> pPrintSmallExpr v
+--            $$ (text "root" <+> (pPrint lhs))
+--            $$ (text "ctx" <+> (pPrint ctx))
           , wrapExis (exis \\ [x]) $
             subst [(x,v)] (ctx <@ e) )
  ++
@@ -395,17 +398,15 @@ onlyApps f orig_e = go orig_e
     go (All e)        = go e
     go (e1 :>>: e2)   = go e1 && go e2
     go (Check _ e)    = go e
-    go (Arr    sz e)  = go_sz sz && go e
-    go (Choose sz e)  = go_sz sz && go e
+    go (Arr    sz e)  = go sz && go e
+    go (Size   sz e)  = go sz && go e
+    go (Choose sz e)  = go sz && go e
     go (Exi bnd)      = go_bind bnd
 
     -- ToDo: Lennart thought this was impossible. Why?
     go (Verify bnd) = go e
                     where
                       (_,(_,e)) = alphaRenameVerify [f] bnd
-
-    go_sz Dunno = True
-    go_sz (SizeIs v) = go v
 
     go_bind bnd = f == x || go e
                 where
@@ -437,12 +438,15 @@ choiceStep _env lhs =
   do e :|: Fail <- [lhs]
      pure e
  ++
-  "CHOICE" `name`
-  do (ctx, e1 :|: e2) <- evalCtx [] lhs
+  "CHOICE" `nameWith`
+  do (ctx, the_choice@(e1 :|: e2)) <- evalCtx [] lhs
      guard (ctx /= HOLE)
      guard (choiceFreeLH ctx)
      guard (blocked ctx)
-     pure ((ctx <@ e1) :|: (ctx <@ e2))
+     pure ( pPrint the_choice
+            $$ (text "root" <+> (pPrint lhs))
+            $$ (text "ctx" <+> (pPrint ctx))
+          , (ctx <@ e1) :|: (ctx <@ e2))
  ++
   "FAIL" `name`
   do (ctx, Fail) <- evalCtx [] lhs
@@ -593,7 +597,7 @@ evalCtx zs lhs =
 
 evalCtxLift :: [Ident] -> Expr
             -> [( [Ident]  -- All the 'exists x' bits
-                , Context  -- All the other bits
+                , Context  -- All the other bits; does not bind any variables
                 , Expr)]   -- The expression in the middle
 -- E.g.   evalCtxtLift (exi x. x=3; exi y. y=5; x+y)
 --        returns  ( [x,y]
@@ -635,23 +639,22 @@ wrapExis xs orig_e = foldr wrap orig_e xs
        to the left of the HOLE (if any)
        by giving a value to at least one of the local existentials.
 
-OR (see MV7 Simon/Koen 9 Aug 24)
+OR (alternative defn, see MV7 Simon/Koen 9 Aug 24)
    * e cannot loop, or unify anything
        to the left to the HOLE
        except giving a value to at least one of the local existentials.
 
   exists x. x>3; y>3; x=2
 
-Be careful! "or unify anything"
-  exists x. x>3; y=3; x=2
-  if(y=3) then loop() else (); exists x. x>3; y=3; x=2
+Be careful! "or unify anything".  Must substitue y=3, not x=2 here:
+  exists y. if(y=3) then loop() else (); exists x. x>3; y=3; x=2
 
 ---- Examples -----
 
 Imagine HOLE is filled with (x=2) and we are considering substituing
 that (x=2) throughout
 
-E1:  exists x. x>3; HOLE                  (x>3) blocked because local exi x is free
+E1:  exists x. x>3; HOLE                  (x>3) blocked because (x>3) is stuck on local exi x
 E1a: exists x. y>3; HOLE                  (y>3) NOT blocked because y is not "local exi"
      where y is bound "outside"
      by lamba, or an existential
@@ -691,12 +694,13 @@ Question (with Koen): could we simplify `blocked` by moving existentials around
 
 type Expr_or_Context = Expr
 
-blocked :: Expr_or_Context -> Bool
-blocked ec = blkd (LX { exi_flexi = [], exi_rigid = []}) ec
-
 data LocalExis = LX { exi_flexi :: [Ident]   -- Flexible existentials
                     , exi_rigid :: [Ident]   -- Rigid existentials
                     }
+
+instance Pretty LocalExis where
+  pPrint (LX { .. } ) = text "LX" <> braces( sep [ text "flx=" <> pPrint exi_flexi
+                                                 , text "rig=" <> pPrint exi_rigid ])
 
 allExis :: LocalExis -> [Ident]
 allExis (LX { exi_flexi = flexi, exi_rigid = rigid }) = rigid ++ flexi
@@ -706,7 +710,7 @@ isLocal :: LocalExis -> Ident -> Bool
 isLocal lx x = isFlexiLocal lx x || isRigidLocal lx x
 
 isFlexiLocal :: LocalExis -> Ident -> Bool
-isFlexiLocal (LX { exi_flexi = flexi }) x = x `elem` flexi
+isFlexiLocal (LX { exi_flexi = flexi }) x = isUnderscore x || x `elem` flexi
 
 isRigidLocal :: LocalExis -> Ident -> Bool
 isRigidLocal (LX { exi_rigid = rigid }) x = x `elem` rigid
@@ -719,44 +723,144 @@ makeRigid :: LocalExis -> LocalExis
 makeRigid (LX { exi_flexi = flexi, exi_rigid = rigid })
  = LX { exi_flexi = [], exi_rigid = rigid ++ flexi }
 
+---------------------
+data Status
+  = SomethingToDo
+    -- Something to do to the left of the hole, including calling
+    -- functions, unifying variables from outside, failure, choice, loop
+
+  | BlockedOnExi HolePresent
+    -- Everything to the left of the hole is stuck,
+    -- awaiting the value of a LocalExi
+
+  | NothingToDo  HolePresent
+    -- Value(s) optionally with a hole to the right
+    -- Key cases  status HOLE   = ValuesOnly HasHole
+    --            status <val>  = ValuesOnly NoHole
+
+data HolePresent = HasHole | NoHole
+
+instance Pretty Status where
+  pPrint SomethingToDo     = text "SomethingToDo"
+  pPrint (BlockedOnExi hp) = text "BlockedOnExi" <> parens (pPrint hp)
+  pPrint (NothingToDo hp)  = text "NothingToDo"  <> parens (pPrint hp)
+
+instance Pretty HolePresent where
+  pPrint HasHole = text "HasHole"
+  pPrint NoHole  = text "NoHole"
+
+blockedStatus, valueStatus :: Status
+blockedStatus = BlockedOnExi NoHole
+valueStatus   = NothingToDo  NoHole
+
+andStatus :: Status -> Status -> Status
+-- `andStatus` tries hard to be lazy in its second argument
+andStatus SomethingToDo          _               = SomethingToDo
+andStatus (NothingToDo HasHole)  _               = NothingToDo HasHole
+andStatus (NothingToDo NoHole)   s               = s
+andStatus (BlockedOnExi HasHole) _               = BlockedOnExi HasHole
+andStatus (BlockedOnExi NoHole) (NothingToDo hp) = BlockedOnExi hp
+andStatus (BlockedOnExi NoHole) s                = s
+
+addSomethingToDo :: Status -> Status
+-- If the inner thing has nothing further to do, and is not blocked,
+-- and does not contain a HOLE, then we can do something;
+-- otherwis just pass on the inner status
+addSomethingToDo (NothingToDo NoHole) = SomethingToDo
+addSomethingToDo s                    = s
+
+---------------------------------------------------
+blocked :: Expr_or_Context -> Bool
+-- Returns True if everything to the left of the HOLE is stuck,
+-- so the expression in the HOLE is really the next thing to do.
+blocked = blkd (LX { exi_flexi = [], exi_rigid = []})
+
 blkd :: LocalExis -> Expr_or_Context -> Bool
--- See Note [Blocked] for what this function means
--- In the Context case (i.e. Expr has a HOLE), look only to the left of the HOLE
--- SLPJ: need to update the document to reflect this function
-blkd _  HOLE        = True
+blkd lx e = case status lx e of
+               BlockedOnExi _ -> True
+               NothingToDo _  -> True
+               SomethingToDo  -> False
 
-blkd _  e | isVal e = False   -- See (E3)
+---------------------------------------------------
+status :: LocalExis -> Expr_or_Context -> Status
+-- This is the main workhorse function
+-- It returns the status of the expression /to the left of the HOLE/
+-- (or all of it if there is no hole)
 
-blkd lx (Var x :=: Var y) | x == y
-                          = isFlexiLocal lx x
-blkd lx (Var x :=: e)     = isRigidLocal lx x -- See (E2)
-                          || blkd lx e      -- Blocked if *either* side is blocked
-blkd lx (hnf :=: e)       = assert (isHNF hnf) (show hnf) $
-                            blkd lx e
+status _  HOLE = NothingToDo HasHole
+  -- We want (exi x. x=3; blah) to substitute right away!
 
-blkd lx (e1 :>: e2)
-  | isVal e2        = blkd lx e1
-  | otherwise       = blkd lx e1 && (isContext e1 || blkd lx e2)  -- If HOLE is in e1, ignore e2
-blkd lx (e1 :|: e2) = blkd lx e1 && (isContext e1 || blkd lx e2)  -- SLPJ: check
+status _  e | isVal e = valueStatus
 
-blkd lx (All e)     = blkd (makeRigid lx) e   -- See (E2)
-blkd lx (Exi bnd)   = blkd (addFlexi lx x) e where (x,e) = alphaRename (allExis lx) bnd
-blkd lx (v1 :@: v2) = case v1 of
-                        Var f -> isLocal lx f                -- Needed for (E2)!
-                        Op {} -> any (isLocal lx) (free v2)  -- See (E1)
-                        _     -> False
+status lx (Var x :=: Var y)  -- (x=x) is blocked pending getting a value for x
+  | x == y, isLocal lx x
+  = blockedStatus
 
-blkd _  (Verify _)  = True
-blkd lx (Check _ e)  = blkd lx e
-blkd lx (Some v)     = any (isLocal lx) (free v)
-blkd lx (Choose _ e) = any (isLocal lx) (free e)
-blkd lx (v :>>: _)   = any (isLocal lx) (free v)
+status lx (Var x :=: rhs)
+  | isFlexiLocal lx x
+  = addSomethingToDo (status lx rhs)
+    -- addSomethingToDO: if RHS is value, substitute!
 
-blkd _  Fail        = False
+  | Var y <- rhs
+  , isFlexiLocal lx y
+  = SomethingToDo
 
-blkd lx (Iter e1 _e2 _ _) = blkd (makeRigid lx) e1 -- && blkd lx e2
+  | isRigidLocal lx x
+  = blockedStatus  -- See (E2)
 
-blkd _ e = errorMessage ("Uncovered case in blkd " ++ show e)
+  -- Otherwise the case (Var x :=: rhs), where x is not local,
+  -- falls through to the following (val :=: rhs) case
+
+status lx (_val :=: rhs)     -- e.g. x=blah, where x is bound "outside", or hnf=blah
+  = addSomethingToDo (status lx rhs)
+
+status lx (e1 :>: e2) = status lx e1 `andStatus` status lx e2
+
+status lx (All body) -- See (E2)
+  = addSomethingToDo (status (makeRigid lx) body)
+    -- addSomethingToDo: we still have do to the `all` itself
+
+status lx (Exi bnd) = status (addFlexi lx x) e
+  where
+    (x,e) = alphaRename (allExis lx) bnd
+
+status lx (v1 :@: v2)
+  | blocked_on_local v1 = blockedStatus  -- Needed for (E2)!
+  | blocked_on_local v2 = blockedStatus  -- See (E1)
+  | otherwise           = SomethingToDo
+  where
+    blocked_on_local :: Val -> Bool
+    -- True if the value (a primop argument) mentions a locally-bound existential,
+    -- but /not/ if that existential is only mentioned under a lambda
+    blocked_on_local (Var x)  = isLocal lx x
+    blocked_on_local (Tup vs) = any blocked_on_local vs
+    blocked_on_local (Tru v)  = blocked_on_local v
+    blocked_on_local _        = False   -- In particular do not look inside lambdas
+
+status _  Fail        = SomethingToDo
+status lx (e1 :|: e2) = status lx e1 `andStatus` status lx e2
+  -- We must skolemise in verify(){check<succeeds>{ (x=some{t}; blah) | more-blah }}
+  --               and in verify(){check<succeeds>{ v | (x=some{t}; blah) }}
+
+status lx (Verify bl)
+  = status (makeRigid lx) e
+  where
+    (_, (_,e)) = alphaRenameVerify (allExis lx) bl
+  -- We need this for
+  --    exi f.  verify{ ...f...}; f = \x.some(int)
+
+status lx (Check _ e) = status (makeRigid lx) e
+status _  (Choose {}) = SomethingToDo
+status lx (Size _ e)  = status lx e
+status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
+                   | otherwise                 = SomethingToDo
+status lx (v :>>: e) | any (isLocal lx) (free v) = blockedStatus
+                     | otherwise                 = status lx e
+
+status lx (Iter e1 _e2 _ _) = status (makeRigid lx) e1 -- ToDo: not sure!!
+
+status _ e = errorMessage ("Uncovered case in status " ++ show e)
+
 
 ---------------------
 choiceAndFailureFree :: Expr_or_Context -> Bool
@@ -783,6 +887,7 @@ choiceAndFailureFree = go []
     go fs (Exi bnd)   = go fs e where (_,e) = unsafeUnbind bnd
     go _  (All {})    = True
     go _  (Arr {})    = True
+    go _  (Size {})   = True
     go _  (Some {})   = True
     go _  HOLE        = True
 
@@ -812,6 +917,7 @@ choiceFree' fs (_ :>>: e)          = choiceFree' fs e
 choiceFree' fs (Exi bnd)           = choiceFree' fs e where (_,e) = unsafeUnbind bnd
 choiceFree' fs (v1 :@: _)          = case v1 of
                                        Op DotDot -> False
+                                       Op ArrMap -> False
                                        Op _      -> True  -- all other ops are choice-free
                                        Var f     -> f `elem` fs
                                        _         -> False -- may or may not be choice free
@@ -822,6 +928,7 @@ choiceFree' fs e@Iter{}
 choiceFree' _ (Some {})            = True
 choiceFree' _ (All {})             = True
 choiceFree' _ (Arr {})             = True
+choiceFree' _ (Size {})            = True
 choiceFree' _ (Choose {})          = False
 choiceFree' _  _                   = True
 
