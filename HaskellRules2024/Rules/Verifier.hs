@@ -98,7 +98,7 @@ arrStep env lhs =
                                , Var underscore :=: (f :@: Var x)
                                , Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y))] )
  ++
-  "APP-ARR" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
+  "ARR-APP" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
   do arr@(Arr sz e) :@: v <- [lhs]
      pure (pPrint arr, (Op DotDot :@: Tup [v,sz]) >>>
                        (Some $ Lam $ bind underscore e) )
@@ -118,7 +118,7 @@ arrStep env lhs =
             :>:
             (Arr (Var n) (wrapExis exis (ctx <@ e))) )
  ++
-  "U-ARR" `name`
+  "U-ARRAY" `name`
   do (Arr n1 e1 :=: Arr n2 e2) :>: e <- [lhs]
      let x = identNotIn $ free lhs
      pure ( (n1 :=: n2) :>:

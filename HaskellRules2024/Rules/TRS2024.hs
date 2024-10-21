@@ -694,9 +694,6 @@ Question (with Koen): could we simplify `blocked` by moving existentials around
 
 type Expr_or_Context = Expr
 
-blocked :: Expr_or_Context -> Bool
-blocked ec = blkd (LX { exi_flexi = [], exi_rigid = []}) ec
-
 data LocalExis = LX { exi_flexi :: [Ident]   -- Flexible existentials
                     , exi_rigid :: [Ident]   -- Rigid existentials
                     }
@@ -728,15 +725,18 @@ makeRigid (LX { exi_flexi = flexi, exi_rigid = rigid })
 
 ---------------------
 data Status
-  = SomethingToDo -- Something to do to the left of the hole, including
-                  -- calling functions, unifying variables from outside, failure, choice, loop
+  = SomethingToDo
+    -- Something to do to the left of the hole, including calling
+    -- functions, unifying variables from outside, failure, choice, loop
 
   | BlockedOnExi HolePresent
-                  -- Everything to the left of the hole is stuck, awaiting the value of a LocalExi
+    -- Everything to the left of the hole is stuck,
+    -- awaiting the value of a LocalExi
 
-  | NothingToDo  HolePresent   -- Value(s) optionally with a hole to the right
-                               -- Key cases  status HOLE   = ValuesOnly HasHole
-                               --            status <val>  = ValuesOnly NoHole
+  | NothingToDo  HolePresent
+    -- Value(s) optionally with a hole to the right
+    -- Key cases  status HOLE   = ValuesOnly HasHole
+    --            status <val>  = ValuesOnly NoHole
 
 data HolePresent = HasHole | NoHole
 
@@ -754,13 +754,26 @@ blockedStatus = BlockedOnExi NoHole
 valueStatus   = NothingToDo  NoHole
 
 andStatus :: Status -> Status -> Status
--- `andStatus` Tries hard to be lazy in its second argument
+-- `andStatus` tries hard to be lazy in its second argument
 andStatus SomethingToDo          _               = SomethingToDo
 andStatus (NothingToDo HasHole)  _               = NothingToDo HasHole
 andStatus (NothingToDo NoHole)   s               = s
 andStatus (BlockedOnExi HasHole) _               = BlockedOnExi HasHole
 andStatus (BlockedOnExi NoHole) (NothingToDo hp) = BlockedOnExi hp
 andStatus (BlockedOnExi NoHole) s                = s
+
+addSomethingToDo :: Status -> Status
+-- If the inner thing has nothing further to do, and is not blocked,
+-- and does not contain a HOLE, then we can do something;
+-- otherwis just pass on the inner status
+addSomethingToDo (NothingToDo NoHole) = SomethingToDo
+addSomethingToDo s                    = s
+
+---------------------------------------------------
+blocked :: Expr_or_Context -> Bool
+-- Returns True if everything to the left of the HOLE is stuck,
+-- so the expression in the HOLE is really the next thing to do.
+blocked = blkd (LX { exi_flexi = [], exi_rigid = []})
 
 blkd :: LocalExis -> Expr_or_Context -> Bool
 blkd lx e = case status lx e of
@@ -770,21 +783,23 @@ blkd lx e = case status lx e of
 
 ---------------------------------------------------
 status :: LocalExis -> Expr_or_Context -> Status
--- This is the workhorse function
+-- This is the main workhorse function
+-- It returns the status of the expression /to the left of the HOLE/
+-- (or all of it if there is no hole)
 
 status _  HOLE = NothingToDo HasHole
-  -- we want (exi x. x=3; blah) to substitute right away!
+  -- We want (exi x. x=3; blah) to substitute right away!
 
 status _  e | isVal e = valueStatus
 
-status lx (Var x :=: Var y)
-  | x == y, isLocal lx x = blockedStatus
+status lx (Var x :=: Var y)  -- (x=x) is blocked pending getting a value for x
+  | x == y, isLocal lx x
+  = blockedStatus
 
 status lx (Var x :=: rhs)
   | isFlexiLocal lx x
-  = case status lx rhs of  -- If RHS is value, substitute!
-       NothingToDo NoHole  -> SomethingToDo
-       other_status        -> other_status
+  = addSomethingToDo (status lx rhs)
+    -- addSomethingToDO: if RHS is value, substitute!
 
   | Var y <- rhs
   , isFlexiLocal lx y
@@ -793,19 +808,17 @@ status lx (Var x :=: rhs)
   | isRigidLocal lx x
   = blockedStatus  -- See (E2)
 
-  -- Otherwise fall through to the main (:=:) case
+  -- Otherwise the case (Var x :=: rhs), where x is not local,
+  -- falls through to the following (val :=: rhs) case
 
-status lx (_ :=: rhs)     -- e.g. x=blah, where x is bound "outside", or hnf=blah
-  = case status lx rhs of
-      NothingToDo NoHole -> SomethingToDo
-      other_status       -> other_status
+status lx (_val :=: rhs)     -- e.g. x=blah, where x is bound "outside", or hnf=blah
+  = addSomethingToDo (status lx rhs)
 
 status lx (e1 :>: e2) = status lx e1 `andStatus` status lx e2
 
 status lx (All body) -- See (E2)
-  = case status (makeRigid lx) body of
-       NothingToDo NoHole -> SomethingToDo   -- We still have do to the `all` itself
-       other_status       -> other_status
+  = addSomethingToDo (status (makeRigid lx) body)
+    -- addSomethingToDo: we still have do to the `all` itself
 
 status lx (Exi bnd) = status (addFlexi lx x) e
   where
@@ -835,16 +848,14 @@ status lx (Verify bl)
     (_, (_,e)) = alphaRenameVerify (allExis lx) bl
   -- We need this for
   --    exi f.  verify{ ...f...}; f = \x.some(int)
-  -- Alternative: look inside the verify
 
 status lx (Check _ e) = status (makeRigid lx) e
-status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
-                   | otherwise                 = SomethingToDo
 status _  (Choose {}) = SomethingToDo
 status lx (Size _ e)  = status lx e
+status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
+                   | otherwise                 = SomethingToDo
 status lx (v :>>: e) | any (isLocal lx) (free v) = blockedStatus
                      | otherwise                 = status lx e
-
 
 status lx (Iter e1 _e2 _ _) = status (makeRigid lx) e1 -- ToDo: not sure!!
 
