@@ -67,3 +67,14 @@ verify("funny1", pass){
 
 verify("arr-nest1", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1 } } }
 verify("arr-nest2", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1|2 } } }
+verify("arr-nest3", pass){ f( n:int ) : [][]type{1|2} := all{ for(i:=1..n){ 1|2 } } }
+
+verify("arr-fail1", pass){ f( n:int )<decides> : []int = for(i:=1..n){fail} }
+# This won't fail for n <= 0
+verify("arr-fail2", fail, broken){ f( n:int )<fails> : []int = for(i:=1..n){fail} }
+# This won't succeed for n > 0
+verify("arr-fail2", fail){ f( n:int )<succeeds> : []int = for(i:=1..n){fail} }
+
+verify("arr-elem1", pass, broken){ f(n:int):[]type{1|2} = all{i := 1..n; if (i = 2) then 1 else 2} }
+verify("arr-elem1", pass, broken){ f(n:int):[]type{1|2} = all{(i := 1..n); if (i = 2) then 1 else 2} }
+verify("arr-elem2", fail){ f(n:int):type{(:[]type{1})|(:[]type{2})} = all{(i := 1..n); if (i = 2) then 1 else 2} }
