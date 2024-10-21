@@ -665,7 +665,7 @@ prep (Op op)       = Op op
 prep (e1 :>: e2)   = prepSeq e1 e2
 prep (a  :=: e)    = prepVal a (\v -> (v :=: prep e) :>: v)
 prep (e1 :|: e2)   = prep e1 :|: prep e2
-prep (a1 :@: a2)   = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
+prep (a1 :@: a2)   = prepVals [a1,a2] (\vs -> (vs!!0) :@: (vs!!1)) -- avoiding -Wincomplete-uni-patterns by using !!
 prep (Exi bnd)     = Exi (bind x (prep e)) where (x,e) = unsafeUnbind bnd
 prep Fail          = Fail
 prep (Some a)      = prepVal a (\v -> Some v)
@@ -686,16 +686,17 @@ prepSeq e1         e2 = (Var underscore :=: prep e1) :>: prep e2
 prepVal :: Expr -> (Val -> Expr) -> Expr
 -- (prepVal e K) makes applies K to the value of e,
 -- perhaps by adding an existential, thus (exi x. x = e; K[x])
-prepVal a k
-  | isVal pa  = k pa
-  | otherwise = Exi (bind x ((Var x :=: pa) :>: k (Var x)))
- where
-  pa = prep a
-  x  = identNotIn (free (k pa))  -- UGH!  SLPJ: quadratic in prepVals
+prepVal a k = prepVals [a] (k . head) -- avoiding -Wincomplete-uni-patterns by using head
 
 prepVals :: [Expr] -> ([Val] -> Expr) -> Expr
-prepVals []     f = f []
-prepVals (a:as) f = prepVal a (\v -> prepVals as (f . (v:)))
+prepVals as k = name (xs `zip` map prep as) k
+ where
+  xs = identsNotIn (free (k [HOLE | _ <- as] : as))
+
+  name []          h = h []
+  name ((x,a):xas) h
+    | isVal a        = name xas (h . (a:))
+    | otherwise      = Exi (bind x ((Var x :=: a) :>: name xas (h . (Var x :))))
 
 --------------------------------------------------------------------------------
 --
