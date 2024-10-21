@@ -1146,20 +1146,30 @@ instance Arbitrary Expr where
    where
     xs = take 3 (identsNotIn [])
 
-  shrink (LitInt k) = [ LitInt k' | k' <- shrink k ]  -- SLPJ: other literals?
-
-  shrink (Op _)       = [ LitInt 0, LitInt 1 ]   -- See Note [Shrinking expressions: ops] SLPJ: explain
-
+  shrink (LitInt k)   = [ LitInt k' | k' <- shrink k ]  -- SLPJ: other literals?
+  shrink (Op op)      = [ LitInt 0, LitInt 1 ] ++ [ Op IsInt | op /= IsInt ]   -- See Note [Shrinking expressions: ops] SLPJ: explain
   shrink (Tup es)     = es
                      ++ [ Tup es' | es' <- shrink es ]
   shrink (Tru e)      = [ e ] ++ [ Tru e'  | e' <- shrink e ]
   shrink (Lam bnd)    = shrinkBind Lam bnd
+{-
+  -- this shrink rule only makes sense if = can appear by itself:
   shrink (e1 :=: e2)  = [ e1, e2 ]
                      ++ [ e1' :=: e2  | e1' <- shrink e1 ]
                      ++ [ e1  :=: e2' | e2' <- shrink e2 ]
-  shrink (e1 :>: e2)  = [ e1, e2 ]
-                     ++ [ e1' :>: e2  | e1' <- shrink e1 ]
-                     ++ [ e1  :>: e2' | e2' <- shrink e2 ]
+-}
+  shrink ((v :=: e1) :>: e2)
+                      = [ v, e1, e2 ]
+                     ++ [ Exi (bind x ((Var x :=: e1) :>: e2))
+                        | v == Var underscore
+                        , let x = identNotIn (free (e1,e2))
+                        ]
+                     ++ [ (w :=: d1) :>: ((v :=: d2) :>: e2)
+                        | (w :=: d1) :>: d2 <- [e1]
+                        ]
+                     ++ [ (v' :=: e1)  :>: e2  | v'  <- shrink v  ]
+                     ++ [ (v  :=: e1') :>: e2  | e1' <- shrink e1 ]
+                     ++ [ (v  :=: e1)  :>: e2' | e2' <- shrink e2 ]
   shrink (e1 :|: e2)  = [ e1, e2 ]
                      ++ [ e1' :|: e2  | e1' <- shrink e1 ]
                      ++ [ e1  :|: e2' | e2' <- shrink e2 ]
