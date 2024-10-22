@@ -54,7 +54,8 @@ verify("arr5b", pass )
 verify("arr-uni1", pass){
     f( x:[]int, y:[]int )<decides>:int := { if (x=y) then { Length[x]=Length[y] } else 99 } }
 
-verify("arr-uni2", pass){ f( x:[]int, y:[]string )<fails>:int := (x=y) }
+verify("arr-uni2", fail, broken){ f( x:[]int, y:[]string )<fails>:int := (x=y) }
+  # Should be rejected because arrays might be empty
 verify("arr-uni2a", pass){ f( x:[]int, y:[]string )<succeeds>:int := if (x=y) then fail else 77 }
   # arr-uni2,2a: we can see that the arrays have disjoint types => guaranteed to fail
 
