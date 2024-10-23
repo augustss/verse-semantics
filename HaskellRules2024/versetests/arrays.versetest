@@ -77,5 +77,5 @@ verify("arr-fail2", fail, broken){ f( n:int )<fails>    : []int = for(i:=1..n){f
 verify("arr-fail3", fail)        { f( n:int )<succeeds> : []int = for(i:=1..n){fail} }
 
 verify("arr-elem1", pass, broken){ f(n:int):[]type{1|2} = all{i := 1..n; if (i = 2) then 1 else 2} }
-verify("arr-elem1", pass, broken){ f(n:int):[]type{1|2} = all{(i := 1..n); if (i = 2) then 1 else 2} }
-verify("arr-elem2", fail){ f(n:int):type{(:[]type{1})|(:[]type{2})} = all{(i := 1..n); if (i = 2) then 1 else 2} }
+verify("arr-elem2", pass, broken){ f(n:int):[]type{1|2} = all{(i := 1..n); if (i = 2) then 1 else 2} }
+verify("arr-elem3", fail){ f(n:int):type{(:[]type{1})|(:[]type{2})} = all{(i := 1..n); if (i = 2) then 1 else 2} }
