@@ -118,14 +118,17 @@ arrStep env lhs =
             :>:
             (Arr (Var n) (wrapExis exis (ctx <@ e))) )
  ++
-  "U-ARRAY" `name`
+  "U-ARRAY" `name`  -- Arr n1 e1 = Arr n2 e2; e
+                    -- --> (n1=n2); one{ n1=0 | some(\_.e1) = some(\_.e2) }; e
   do (Arr n1 e1 :=: Arr n2 e2) :>: e <- [lhs]
-     let x = identNotIn $ free lhs
-     pure ( (n1 :=: n2) :>:
-            (Exi $ bind x $
-            ((Var x :=: (Some $ Lam $ bind underscore e1)) :>:
-             (Var x :=: (Some $ Lam $ bind underscore e2)) :>:
-             e)) )
+     pure (coreSeq [ n1 :=: n2
+                   , Var underscore
+                       :=: mkOne (((n1 :=: litIntZero) :>: Tup [])
+                                  :|:
+                                  mkEqual (Some $ Lam $ bind underscore e2)
+                                          (Some $ Lam $ bind underscore e1)
+                                          (Tup []))
+                   , e ])
  ++
   "SIZE1" `name`  -- Size(n){v} --> n
   do Size n v <- [lhs]

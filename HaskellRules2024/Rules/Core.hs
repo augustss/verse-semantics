@@ -19,6 +19,7 @@ module Rules.Core
 
     -- Particular expressions
   , someAny, someNat, nat, inRange, litInt, litIntZero, coreSeq, (>>>)
+  , mkEqual, mkOne
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -209,6 +210,25 @@ Underscore is treated specially in two rules
 coreSeq :: [Expr] -> Expr
 -- coreSeq [e1,e2,e3]  =   e1 :>: (e2 :>: e3)
 coreSeq = foldr1 (:>:)
+
+mkEqual :: Expr -> Expr -> Expr -> Expr
+-- mkEqual e1 e2 e3 =   (e1 :=: e2); e3
+-- Or more precisely   exists x. (x=e1; x=e2; e3)
+mkEqual e1 e2 e3
+  = Exi $ bind x $
+    coreSeq [Var x :=: e1, Var x :=: e2, e3]
+  where
+    x = identNotIn $ free (e1,e2,e3)
+
+mkOne :: Expr -> Expr
+-- one{e}  -->  Iter e <> (\ _ a _ . a) (\ _ . Fail)
+mkOne e = Iter e (Tup [])  f g
+  where
+   a = ident "a"
+   f = Lam $ bind underscore $
+       Lam $ bind a $
+       Lam $ bind underscore (Var a)
+   g = Lam $ bind underscore $ Fail
 
 (>>>) :: Expr -> Expr -> Expr
 -- e1 >>> e2  =   (_ = e1); e2
