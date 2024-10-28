@@ -79,6 +79,7 @@ toCoreEff eff
   | eff == effSucceeds = Just Rules.Succeeds
   | eff == effComputes = Just Rules.Succeeds
   | eff == effDecides  = Just Rules.Decides
+  | eff == effFails    = Just Rules.Fails
   | otherwise          = Nothing -- error "toCoreEff" (prettyShow eff)
 
 

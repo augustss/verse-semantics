@@ -18,7 +18,8 @@ module Rules.Core
   , unIter
 
     -- Particular expressions
-  , someAny, someNat, nat, inRange, litInt, litIntZero, coreSeq, (>>>)
+  , someAny, someNat, nat, inRange, inRangeType
+  , litInt, litIntZero, coreSeq, (>>>)
   , mkEqual, mkOne
 
     -- Assupmtions
@@ -267,6 +268,13 @@ inRange i n = coreSeq [ Var underscore :=: (Op IsInt :@: i)
                       , Var underscore :=: (Op Lt :@: Tup [i,n])
                       , i ]
 
+inRangeType :: Val -> Expr
+-- inRangeType n =    \i. inrange[i,n]
+inRangeType n
+ = Lam $ bind i (inRange (Var i) n)
+ where
+   i = identNotIn (free n)
+
 --------------------------------------------------------------------------------
 --
 --                 PrimOps
@@ -279,7 +287,7 @@ data PrimOp
 
    -- Operations on arrays
  | ArrLen
- | DotDot     -- dotDot$[n] = <0, 1, .., n-1>
+ | DotDot     -- dotDot$[v,n] = (v = (0 | 1 | .. | n)); ()
  | ArrApp     -- arrApp$[ Tup as, Tup bs, r ] =  r=(as++bs); r
  | ArrMap     -- arrMap$[t,a]
 
@@ -1172,7 +1180,8 @@ normalize fuel rule orig_e = go fuel [] orig_e
       []                        -> (NormOK,      e  :<-- tr)
       (s,e'):_ | fuel_left==0   -> (NormExpired, e  :<-- tr)
                | not (valid e') -> (NormInvalid, e' :<-- tr')
-               | otherwise      -> go (fuel_left-1) tr' e'
+               | otherwise      -> -- ppTrace "norm" (text s) $
+                                   go (fuel_left-1) tr' e'
               where
                tr' = (s,e):tr
 

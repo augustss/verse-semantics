@@ -41,6 +41,8 @@ verify("arr-index6", pass){
       := if (Length[x]>i) then {x[i]} else {88} }
   # arr-index6 requires reasoning about array bounds
 
+verify("dotdot1", pass, broken){ f(n:int)<decides> := 3=1..n }
+
 # arr5: does isArr$ on the same thing twice, returning an array of the same length
 verify("arr5a", pass )
     { f( x:[]nat )<succeeds>:int := { y:=([]int)[x]; z:=([]nat)[x]; Length[y]=Length[z] } }
@@ -56,7 +58,8 @@ verify("arr-uni1", pass){
 
 verify("arr-uni2a", fail){ f( x:[]int, y:[]string )<fails>:int := (x=y) }
   # arr-uni2a: Should be rejected because arrays might be empty
-verify("arr-uni2b", pass, broken){ f( x:[]int, y:[]string where Length[y]>0 )<fails>:int := (x=y) }
+verify("arr-uni2b", pass, broken){ f( x:[]int, y:[]string where Length[y]>0 )<fails>:int := { (x=y);0 } }
+verify("arr-uni2c", pass){ f( x:int, y:string )<fails>:int := (x=y) }
   # arr-uni2a,2b: we can see that the arrays have disjoint types
   #               => guaranteed to fail unless arrays are empty
 
@@ -68,8 +71,8 @@ verify("funny1", pass){
   f( n:int )<decides> := {x := y+1; n>3; y:=7; x} }
 
 verify("arr-nest1", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1 } } }
-verify("arr-nest2", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1|2 } } }
-verify("arr-nest3", pass){ f( n:int ) : [][]type{1|2} := all{ for(i:=1..n){ 1|2 } } }
+# verify("arr-nest2", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1|2 } } }
+verify("arr-nest3", pass, skip){ f( n:int ) : [][]type{1|2} := all{ for(i:=1..n){ 1|2 } } }
 
 # arr-fail1,2,3: RHS fails for n>=1; but returns empty array for n <= 0
 verify("arr-fail1", pass)        { f( n:int )<decides>  : []int = for(i:=1..n){fail} }

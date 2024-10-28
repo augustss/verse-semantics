@@ -256,10 +256,9 @@ verify("PP3a", fail, broken)
   # PP3a illustrates the case where Tim will verify but we do not.
 
 # PP3b: Tim's verifier loops
-# Our verifier now loops too; in an earlier iteration (say early Oct 24) it didn't
 # It dependes delicately on whether we try to verify the arg G1():=G1()
 #    (which makes the verifier loop) or whether we skolemise an impossible thing
-verify("PP3b", pass, broken, tim=skip_loop)
+verify("PP3b", pass, tim=skip_loop)
    { F( X:int, G():type{X = 1} )
           := (G();    # Call G first!
               H()<succeeds> := X = 1; H())
