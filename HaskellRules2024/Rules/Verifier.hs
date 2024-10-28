@@ -74,12 +74,9 @@ arrStep env lhs =
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
      -- Use this rule when v is not a literal.
      guard (x `elem` exis)
-     let i = identNotIn (free v)
      pure (pPrint e1, wrapExis exis $
-                      ctx <@ ((Var x :=: Choose v
-                                  (Some(Lam $ bind i (inRange (Var i) v))))
+                      ctx <@ ((Var x :=: Choose v (Some (inRangeType v)))
                               :>: Var x))
-
   ++
   "DD-INRANGE" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
@@ -117,6 +114,31 @@ arrStep env lhs =
                                 ctx <@ Some (Lam $ bind underscore e)))
             :>:
             (Arr (Var n) (wrapExis exis (ctx <@ e))) )
+
+{-    Failed attempt, because CHOOSE-X applies repeatedly
+  "ALL-CHOOSE" `name`
+     -- all{ C[ choose(v){e} ] }
+     -- --> Arr(n){ C[e] }
+     -- if boundvars(C) disjoint from freevars(v)
+  do All (Choose n e) <- [lhs]
+     pure ( Arr n e )
+ ++
+  "CHOOSE-X" `name`
+     -- C[ choose(v){e} ]
+     -- --> n := size(v){ C[ some(\_.e) ] } ;
+     --     choose(n){ C[e] }
+     -- if boundvars(C) disjoint from freevars(v)
+  do let lhs_fvs = free lhs
+     (exis, ctx, Choose sz e) <- evalCtxLift lhs_fvs lhs
+     guard (ctx /= HOLE)
+     guard (free sz `disjointFrom` exis)
+     let n = identNotIn lhs_fvs
+     pure ( Exi $ bind n $
+            (Var n :=: Size sz (wrapExis exis $
+                                ctx <@ Some (Lam $ bind underscore e)))
+            :>:
+            (Choose (Var n) (wrapExis exis (ctx <@ e))) )
+-}
  ++
   "U-ARRAY" `name`  -- Arr n1 e1 = Arr n2 e2; e
                     -- --> (n1=n2); one{ n1=0 | some(\_.e1) = some(\_.e2) }; e
@@ -135,9 +157,9 @@ arrStep env lhs =
      guard (isVal v)
      pure n
  ++
-  "SIZE-FAIL" `name`  -- Size(n){fail} --> some(nat)
-  do Size _ Fail <- [lhs]
-     pure someNat
+  "SIZE-FAIL" `name`  -- Size(n){fail} --> some(inrange[n])
+  do Size n Fail <- [lhs]
+     pure (Some (inRangeType n))
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule
@@ -168,7 +190,6 @@ verifyStep env lhs =
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Some v)) <- proofX all_rs e
       guard (skolValue all_rs v)
-      guard (blocked ctx)
       let x  = identNotIn (occurs ctx)
           r  = skolNotIn all_rs
       pure ( sep [ text "r=" <> pPrint r, text "x=" <> pPrint x
@@ -284,7 +305,10 @@ proofX :: [Ident] -> Expr -> [( Context    -- The context
                               , ([Ident]   -- Flexible existentials bound by context
                               ,  Expr ))]  -- The expression in the hole
 -- P context
-proofX bs lhs = go_px (LX { exi_flexi = [], exi_rigid = bs }) lhs
+proofX bs lhs
+  = do { (ctx, stuff) <- go_px (LX { exi_flexi = [], exi_rigid = bs }) lhs
+       ; guard (blocked ctx)
+       ; pure (ctx, stuff) }
 
 go_px :: LocalExis -> Expr -> [(Context, ([Ident], Expr))]
 go_px lx lhs =

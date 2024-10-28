@@ -291,9 +291,9 @@ unificationStep _env lhs =
        then pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
        else pure Fail
  ++
-  "U-DOTDOT" `nameWith`   --   DotDot[k,n]  --> inRange[k,n]
-  do (k@(Lit {}) :=: (Op DotDot :@: n)) :>: e <- [lhs]
-     pure (pPrint lhs, (Var underscore :=: inRange k n) :>: e)
+  "U-DOTDOT" `nameWith`   --   DotDot[k,n]  --> inRange[k,n]; ()
+  do Op DotDot :@: Tup [k@(Lit {}), n] <- [lhs]
+     pure (pPrint lhs, (Var underscore :=: inRange k n) :>: Tup [])
  ++
   "U-TRU" `name`
   do (Tru v :=: Tru v') :>: e <- [lhs]
@@ -769,6 +769,11 @@ addSomethingToDo :: Status -> Status
 addSomethingToDo (NothingToDo NoHole) = SomethingToDo
 addSomethingToDo s                    = s
 
+addUnify :: Ident -> Status -> Status
+addUnify x s
+  | isUnderscore x = s                  -- Unifying with "_" is a no-op
+  | otherwise      = addSomethingToDo s -- Otherwise substitute
+
 ---------------------------------------------------
 blocked :: Expr_or_Context -> Bool
 -- Returns True if everything to the left of the HOLE is stuck,
@@ -797,13 +802,12 @@ status lx (Var x :=: Var y)  -- (x=x) is blocked pending getting a value for x
   = blockedStatus
 
 status lx (Var x :=: rhs)
-  | isFlexiLocal lx x
-  = addSomethingToDo (status lx rhs)
-    -- addSomethingToDO: if RHS is value, substitute!
-
   | Var y <- rhs
   , isFlexiLocal lx y
-  = SomethingToDo
+  = addUnify y (NothingToDo NoHole)
+
+  | isFlexiLocal lx x
+  = addUnify x (status lx rhs)
 
   | isRigidLocal lx x
   = blockedStatus  -- See (E2)
@@ -842,12 +846,13 @@ status lx (e1 :|: e2) = status lx e1 `andStatus` status lx e2
   -- We must skolemise in verify(){check<succeeds>{ (x=some{t}; blah) | more-blah }}
   --               and in verify(){check<succeeds>{ v | (x=some{t}; blah) }}
 
-status lx (Verify bl)
-  = status (makeRigid lx) e
-  where
-    (_, (_,e)) = alphaRenameVerify (allExis lx) bl
+status _ (Verify {})
+  = NothingToDo NoHole   -- There should be no HOLE inside a verify{}
   -- We need this for
   --    exi f.  verify{ ...f...}; f = \x.some(int)
+  --
+  -- Earlier version looked inside verify{}
+  --    (_, (_,e)) = alphaRenameVerify (allExis lx) bl
 
 status lx (Check _ e) = status (makeRigid lx) e
 status _  (Choose {}) = SomethingToDo
