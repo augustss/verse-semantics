@@ -7,9 +7,9 @@ all: verse-densem.pdf
 LATEX=pdflatex -halt-on-error
 
 PAPERTEX = verse-densem.tex
-PAPERSRC = $(PAPERTEX) ../verse.bib
+PAPERSRC = $(PAPERTEX) ../LaTex/verse.bib
 
-verse-densem.tex: verse-densem.ltx ../calculus.fmt
+verse-densem.tex: verse-densem.ltx ../LaTex/calculus.fmt
 
 verse-densem.pdf: $(PAPERSRC)
 	$(LATEX) verse-densem
