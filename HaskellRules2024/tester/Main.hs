@@ -651,6 +651,7 @@ data TestFlags = TestFlags
   , preludeEval    :: !String              -- use this prelude in TestEval
   , preludeVerify  :: !String              -- use this prelude in TestVerify
   , desugarRules   :: !Desugar             -- desugaring rules
+  , allAsIter      :: !Bool                -- encode all as iter
   , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -780,6 +781,9 @@ testFlags = TestFlags
         <> OA.metavar "Name"
         <> OA.value (fDesugar defaultFlags)
         <> OA.help "Desugaring rules to use" )
+  <*> OA.switch
+         ( OA.long "all-as-iter"
+        <> OA.help "encode all with iter" )
   <*> OA.many (OA.argument OA.str (OA.metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
@@ -793,7 +797,8 @@ testFlagsToFlags t =
              fNoFuelStop = ignoreFuelStop t,
              fAssumeVerified = assumeVerified t,
              fTraceDesugar = verbose t,
-             fDesugar = desugarRules t
+             fDesugar = desugarRules t,
+             fAllAsIter = allAsIter t
            }
 
 setPreludeFlag :: Bool    -- True <=> verifying

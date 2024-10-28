@@ -1093,13 +1093,17 @@ encodeOne e = do
   pure $ Iter e (Array []) (eThunk $ Lam a $ eThunk $ Variable a) (eThunk Fail)
 
 encodeAll :: SrcCore -> D SrcCore
-encodeAll e = pure (All e)
+encodeAll e = do
+  asIter <- getDFlagsX fAllAsIter
+  if asIter then
+    encodeAllAsIter e
+   else
+    pure (All e)
 
-{-   For now, I'm reverting to leaveing `All` with `All`, instead of using `iter`
-     The `iter` encoding is below
 -- all{e}  -->  exi Iter e <> step (\ a -> a)
 --   step a v c  =  c(exi r . arrApp(a,<v>,r); r)
-encodeAll e = do
+encodeAllAsIter :: SrcCore -> D SrcCore
+encodeAllAsIter e = do
   a   <- newIdent (getLoc e) "a"
   v   <- newIdent (getLoc e) "v"
   c   <- newIdent (getLoc e) "cont"
@@ -1109,18 +1113,21 @@ encodeAll e = do
       step = Lam a $ Lam v $ Lam c $ ec `ApplyD` (eSnoc ea ev)
       done = Lam a $ ea
   pure $ Iter e (Array []) step done
--}
 
 encodeFor :: SrcCore -> SrcCore -> D SrcCore
-encodeFor e1 e2 = pure (ApplyD (EPrim ArrMap)
-                               (Array [ eForceLam
-                                      , All (eSeq [e1, eThunk e2])]))
-
-{- Reverting to encoding `for` using `All`. The `iter` encoding is below:a
+encodeFor e1 e2 = do
+  asIter <- getDFlagsX fAllAsIter
+  if asIter then
+    encodeForAsIter e1 e2
+   else
+    pure (ApplyD (EPrim ArrMap)
+                 (Array [ eForceLam
+                        , All (eSeq [e1, eThunk e2])]))
 
 -- for(e1){e2}  -->  Iter (e1; <vs>) <> step (\ a . a)
 --   step a x c = exi vs . x = <vs>; c(exi r . arrApp$(a, <e2>, r); r)
-encodeFor e1 e2 = do
+encodeForAsIter :: SrcCore -> SrcCore -> D SrcCore
+encodeForAsIter e1 e2 = do
   a   <- newIdent (getLoc e1) "a"
   x   <- newIdent (getLoc e1) "x"
   c   <- newIdent (getLoc e1) "cont"
@@ -1143,7 +1150,6 @@ eSnoc :: SrcCore -> SrcCore -> SrcCore
 eSnoc xs x =
   let u = Ident (getLoc x) "u"
   in  ApplyD (EPrim ArrApp) (Array [xs, Array [x], Exists [u] (Variable u)])
--}
 
 ----------------------------------
 

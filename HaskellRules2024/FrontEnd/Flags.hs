@@ -34,6 +34,7 @@ data Flags = Flags
   , fNoWarn       :: !Bool
   , fDesugar      :: !Desugar
   , fKeepIf       :: !Bool
+  , fAllAsIter    :: !Bool
   }
   deriving (Show)
 
@@ -60,6 +61,7 @@ defaultFlags = Flags
   , fNoWarn       = False
   , fDesugar      = DS12
   , fKeepIf       = False
+  , fAllAsIter    = False
   }
 
 showFlags :: Flags -> String
