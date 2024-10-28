@@ -813,12 +813,12 @@ getFree = fvs_blk
                             `remove` getVisibleBinders e1
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
-    fvs (Range  _ e)      = fvs e
-    fvs (Check _ e)       = fvs e
-    fvs (Some e)          = fvs e
-    fvs (One e)           = fvs e
-    fvs (All e)           = fvs e
-    fvs (Guard e1 e2)     = fvs e1 ++ fvs e2
+    fvs (Range  _ e)      = fvs_blk e
+    fvs (Check _ e)       = fvs_blk e
+    fvs (Some e)          = fvs_blk e
+    fvs (One e)           = fvs_blk e
+    fvs (All e)           = fvs_blk e
+    fvs (Guard e1 e2)     = fvs e1 ++ fvs_blk e2
     fvs (Iter e1 e2 e3 e4) = fvs e1 ++ fvs e2 ++ fvs e3 ++ fvs e4
 
     -- In (if e1 then e2 else e3), the binders of e1 scope over e2

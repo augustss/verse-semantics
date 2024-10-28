@@ -735,8 +735,8 @@ data Status
 
   | NothingToDo  HolePresent
     -- Value(s) optionally with a hole to the right
-    -- Key cases  status HOLE   = ValuesOnly HasHole
-    --            status <val>  = ValuesOnly NoHole
+    -- Key cases  status HOLE   = NothingToDo HasHole
+    --            status <val>  = NothingToDo NoHole
 
 data HolePresent = HasHole | NoHole
 
