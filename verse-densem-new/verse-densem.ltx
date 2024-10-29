@@ -1,0 +1,523 @@
+%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
+\documentclass[acmsmall,review,dvipsnames]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
+%% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For single-blind review submission, w/ CCS and ACM Reference
+%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission, w/ required CCS and ACM Reference
+%\documentclass[acmsmall]{acmart}\settopmatter{}
+
+\let\Bbbk\relax % polycode defines that again?
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include ../LaTex/calculus.fmt
+
+\newcommand{\ie}{\emph{i.e.}}	% \mbox keeps the last period from
+\newcommand{\Ie}{\emph{I.e.}}	% looking like an end-of-sentence.
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\Eg}{\emph{E.g.}}
+\newcommand{\etc}{\emph{etc.}}
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\vs}{\emph{vs.}}
+
+\newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
+
+\RequirePackage[utf8]{inputenc}
+
+%% Journal information
+%% Supplied to authors by publisher for camera-ready submission;
+%% use defaults for review submission.
+%%\acmJournal{}
+%%\acmVolume{}
+%%\acmNumber{} % CONF = POPL or ICFP or OOPSLA
+%%\acmArticle{}
+%%\acmYear{}
+%%\acmMonth{}
+%%\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+%% \startPage{1}
+
+%% -------------- Copyright information ------------------
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission;
+%% use 'none' for review submission.
+\setcopyright{none}
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2018}           %% If different from \acmYear
+
+%% ------------- Bibliography style -------------------
+\bibliographystyle{ACM-Reference-Format}
+\DeclareUnicodeCharacter{1D706}{$\lambda$}
+\DeclareUnicodeCharacter{209B}{${}_s$}
+%% Citation style
+%% Note: author/year citations are required for papers published as an
+%% issue of PACMPL.
+\citestyle{acmauthoryear}   %% For author/year citations
+
+
+
+%% Some recommended packages.
+\usepackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\usepackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+
+\usepackage{mathpartir}
+
+\usepackage{stmaryrd}
+\usepackage{colortbl}
+\usepackage{bussproofs}
+\usepackage{mathtools}
+% \usepackage{amsmath}
+\usepackage{verbatim}
+\usepackage[capitalize]{cleveref}   % \cref and \Cref
+\usepackage{textgreek} % \textalpha etc.
+\usepackage{longtable}
+\usepackage{dsfont}    % double-stroke font \mathds
+
+% This makes a tt font that is slightly smaller.
+% \usepackage[scaled=0.8]{beramono}
+
+% This incantation makes tt be Latin Modern Mono Light Cond
+% which is narrower than normal tt.
+%\usepackage{lmodern}
+%\DeclareFontFamily{T1}{lmttc}{\hyphenchar \font-1 }
+%\DeclareFontShape{T1}{lmttc}{m}{n}
+%     {<-> ec-lmtlc10}{}
+%\DeclareFontShape{T1}{lmttc}{m}{it}
+%     {<->sub*lmttc/m/sl}{}
+%\DeclareFontShape{T1}{lmttc}{m}{sl}
+%     {<-> ec-lmtlco10}{}
+%\renewcommand{\ttdefault}{lmttc}
+
+% ---------------- Boxed figures ------------------
+\usepackage{float}
+\floatstyle{boxed}
+\restylefloat{figure}
+
+% ---------------- Full Verse ----------------
+\newif\iffullverse
+\fullversefalse
+% use \iffullverse \else \fi
+
+% ---------------- Useful macros ----------------
+\renewcommand{\arraystretch}{1.1}
+
+% Name of the language
+\newcommand{\versecalc}{$\mathcal{VC}$}
+
+% Typesetting rewrite rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+\newcommand{\vb}{\; |vbar| \;}    % Vertical bar
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % head-normal form
+\newcommand{\subst}[3]{#1\{#3/#2\}}
+
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movestoX}{\rightsquigarrow}
+\newcommand{\movesfromX}{\leftsquigarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+
+% Arrows with explanation, including the common cases of one, two or a repated rule
+\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+
+% ------------------- Local notational macros -----------------
+\newcommand{\vtt}[1]{\text{\tt #1}}
+
+%%\newcommand{\clamsymx}{\Rightarrow}
+%%\newcommand{\clamsym}{$\clamsymx$}
+\newcommand{\clamx}[2]{lam (#1) in #2}
+\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
+
+\newcommand{\tuple}[1]{\langle #1 \rangle}
+\newcommand{\Value}{W}
+\newcommand{\Term}{Term}
+\newcommand{\Labels}{Labels}
+\newcommand{\Forml}{Form}
+\newcommand{\Env}{Env}
+\newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
+\newcommand{\mcompr}[2]{[ #1 \vb #2 ]}
+\newcommand{\mbind}[2]{ #1 \leftarrow #2 }
+\newcommand{\malt}{\diamond}
+\newcommand{\append}{+\!\!+\,}
+
+\newcommand{\setform}[1]{\left\{ #1 \right\}}
+\newcommand{\lcompr}[2]{[ #1 \vb #2 ]}
+\newcommand{\scompr}[2]{\{ #1 \vb #2 \}}
+\newcommand{\sbind}[2]{ #1 \in #2 }
+
+\newcommand{\semfun}[1]{\mathcal{#1}}
+\newcommand{\semapp}[3]{\semfun{#1}\llbracket #2 \rrbracket\, #3}
+\newcommand{\envapp}[2]{\semfun{R}\llbracket #1 \rrbracket #2}
+\newcommand{\folapp}[2]{\semfun{L}\llbracket #1 \rrbracket #2}
+\newcommand{\sfolapp}[2]{\semfun{S}\llbracket #1 \rrbracket #2}
+\newcommand{\termapp}[2]{\semfun{T}\llbracket #1 \rrbracket #2}
+\newcommand{\liftrel}[1]{\hat{#1}}
+\newcommand{\cons}{{:}}           % Cons for value sequences, V*
+\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
+\newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket \llbracket #3 \rrbracket\, #4}
+
+% extend envt
+\newcommand{\extendrho}[2]{#1[#2]}
+
+% The collection type
+\newcommand{\mtype}{\Value^{*}}
+\newcommand{\mtyped}{\Value^{?}}
+\newcommand{\mempty}{\mathit{empty}}
+\newcommand{\munit}{\mathit{unit}}
+\newcommand{\msing}[1]{\{#1\}}
+\newcommand{\munits}[1]{\munit(#1)}
+\newcommand{\mintersect}{\Cap}
+\newcommand{\munion}{\Cup}
+\newcommand{\msemi}{\fatsemi}
+\newcommand{\mone}{\mathit{one}}
+\newcommand{\mall}{\mathit{all}}
+\newcommand{\msucceeds}{\mathit{succeeds}}
+\newcommand{\mdecides}{\mathit{decides}}
+\newcommand{\mtag}{\mathit{tag}}
+\newcommand{\mtage}[1]{([],#1)}
+\newcommand{\mlift}[1]{#1_{\bot}}
+\newcommand{\mplus}{\oplus}
+\newcommand{\mcross}{\scalebox{1.5}{$\Cup$}}
+\newcommand{\powerset}[1]{{\mathcal P}(#1)}
+\newcommand{\wrong}{\mathbf{wrong}}
+\newcommand{\apply}{\mathit{apply}}
+\newcommand{\ran}{\mathbf{ran}}
+\newcommand{\dom}{\mathbf{dom}}
+
+% ----------------- Author comments ---------------------
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\definecolor{dkgreen}{rgb}{0,0.3,0}
+\definecolor{olive}{rgb}{0.5, 0.5, 0.0}
+\definecolor{dkblue}{rgb}{0,0.1,0.5}
+
+\iftrue  % iftrue to enable, iffalse to disable
+\newcommand{\simon}[1]{{\color{dkblue} [{SLPJ}: #1]}}
+\newcommand{\lennart}[1]{{\color{dkcyan} [{LA}: #1]}}
+\newcommand{\joachim}[1]{{\color{dkblue} [{JB}: #1]}}
+\newcommand{\koen}[1]{{\color{dkred} [{KC}: #1]}}
+\newcommand{\olin}[1]{{\color{dkgreen} [{OS}: #1]}}
+\newcommand{\ranjit}[1]{{\color{orange} [{RJ}: #1]}}
+\else
+\newcommand{\simon}[1]{}
+\newcommand{\lennart}[1]{}
+\newcommand{\joachim}[1]{}
+\newcommand{\koen}[1]{}
+\newcommand{\olin}[1]{}
+\newcommand{\ranjit}[1]{}
+\fi
+% ---------------- End of comments -----------------
+
+
+
+\begin{document}
+
+%% Title information
+% \title{The essence of functional logic programming}
+\title{A Denotational Semantics Verse}
+
+                                        %% [Short Title] is optional;
+                                        %% when present, will be used in
+                                        %% header instead of Full Title.
+% \titlenote{with title note}             %% \titlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+% \subtitle{Subtitle}                     %% \subtitle is optional
+% \subtitlenote{with subtitle note}       %% \subtitlenote is optional;
+                                        %% can be repeated if necessary;
+                                        %% contents suppressed with 'anonymous'
+
+
+%% Author information
+%% Contents and number of authors suppressed with 'anonymous'.
+%% Each author should be introduced by \author, followed by
+%% \authornote (optional), \orcid (optional), \affiliation, and
+%% \email.
+%% An author may have multiple affiliations and/or emails; repeat the
+%% appropriate command.
+%% Many elements are not rendered, but should be provided for metadata
+%% extraction tools.
+
+%% Author with single affiliation.
+\author{Lennart Augustsson}
+\orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
+\affiliation{
+  \position{Position1}
+  \institution{Epic Games}            %% \institution is required
+  \streetaddress{Street1 Address1}
+  \city{City1}
+  \state{State1}
+  \postcode{Post-Code1}
+  \country{Sweden}                    %% \country is recommended
+}
+\email{lennart.augustsson@@epicgames.com}          %% \email is recommended
+
+
+%% ---------------- Abstract ---------------------
+%% Note: \begin{abstract}...\end{abstract} environment must come
+%% before \maketitle command
+% \begin{abstract}
+%   This document offers a small denotational semantics for the Verse Calculus.
+% \end{abstract}
+
+
+%% ---------------- Classification ---------------------
+%% 2012 ACM Computing Classification System (CSS) concepts
+%% Generate at 'http://dl.acm.org/ccs/ccs.cfm'.
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10011007.10011006.10011008</concept_id>
+<concept_desc>Software and its engineering~General programming languages</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10003456.10003457.10003521.10003525</concept_id>
+<concept_desc>Social and professional topics~History of programming languages</concept_desc>
+<concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Software and its engineering~General programming languages}
+\ccsdesc[300]{Social and professional topics~History of programming languages}
+%% End of generated code
+
+
+%% Keywords
+%% comma separated list
+% \keywords{keyword1, keyword2, keyword3}  %% \keywords are mandatory in final camera-ready submission
+
+
+%% \maketitle
+%% Note: \maketitle command must come after title commands, author
+%% commands, abstract environment, Computing Classification System
+%% environment and commands, and keywords command.
+\maketitle
+
+% \textbf{Note} \textit{This is a working draft.  It's not secret, but it's very much
+%   a work in progress.  So please don't share it; if there is anyone you think would be
+%   interested/helpful, do suggest them to us.}
+
+\section{Introduction}
+
+This paper is a first attempt at a denotational semantics for \versecalc{}.
+
+\section{Syntax of Core Verse}
+
+%format funk k (e) (x) (rhs) = "\textbf{fun}_"k"(" e ")\{\lambda" x".\," rhs "\}"
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lr@@{\;}r@@{\;}l}
+    \text{Integers} & k \\
+    \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+%     \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Expressions} & e  & ::=  &
+        |x|
+    \vb |k|
+    \vb |o|
+    \vb |apply1N e_1 e_2|
+    \vb |e_1 == e_2|
+    \vb |e_1 ; e_2|
+    \vb |def x e|
+    \vb |:e|
+    \vb |fail|
+    \\
+    & &
+    \vb &
+        |arr (e_1, e_2)|
+    \vb |funk c e_1 x e_2|
+    \vb |funk o e_1 x e_2|
+       %%       \vb |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e|
+       \\
+%       && \vb & |succeeds e| \vb |decides e| \\
+%       && \vb & |if e_1 then lam x e_2 else e_3| \vb |for e_1 do lam x e_2| \\
+%       & & \vb & |hastype e_1 e_2| \\
+    \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int|
+    \end{array} \\
+    \\[-3mm]
+  \end{array}
+  $$
+\caption{The Verse calculus: syntax} \label{fig:syntax}
+\end{figure}
+
+The syntax of \versecalc{} is given in \cref{fig:syntax}.
+
+\section{A denotational semantics}
+
+\newcommand{\sconcat}{\bowtie}
+\newcommand{\shead}{\mathit{head}}
+\newcommand{\stuple}{\mathit{tuple}}
+\newcommand{\scons}{:}
+
+\newcommand{\semfcn}{\Value \rightharpoonup \Value}
+\newcommand{\fcn}{\mathbf{fcn}}
+\newcommand{\get}[1]{\mathbf{sing}(#1)}
+
+\begin{figure}
+$
+\begin{array}{l}
+\text{\bf Domains} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + \tuple{\Value,\Value} + (\semfcn) \\
+%% \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
+\Env & = & Ident \rightarrow \Value \\
+\mtype & = & \text{set of } \Value \\
+\end{array}
+\\[7mm]
+\text{\bf Value semantics of expressions} \\
+
+  \begin{array}{rcll}
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{|x|}{\rho} & = & \msing{\rho(x)} \\
+  \semapp{E}{|k|}{\rho} & = & \msing{k} \\
+  \semapp{E}{|o|}{\rho} & = & \semapp{O}{|o|}{} \\
+  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
+    \{ r \, || \, f \in \semapp{E}{|e_1|}{\rho}, \; a \in \semapp{E}{|e_2|}{\rho}), \; r \in \apply(f, a) \} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+    \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
+  \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
+  \semapp{E}{|:e|}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
+    \{ r \, || \, f \in \semapp{E}{|e|}{\rho}, \; a \in \Value, \; r \in \apply(f, a) \} \\
+  \semapp{E}{|fail|}{\rho} & = & \emptyset \\
+  \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
+    \{ \tuple{x,y} \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
+  \semapp{E}{|funk c e_1 a e_2|}{\rho} & = & \{ \fcn \{ (x, y) \, || \, x \in \Value, w \in \semappp{M}{e_1}{\msing{x}}{\rho}, y \in \get{\semapp{E}{e_2}{\extendrho{\rho}{a \mapsto w}}} \} \} \\
+  \semapp{E}{|funk o e_1 a e_2|}{\rho} & = &
+     \{ f \; ||
+     \begin{array}[t]{l}
+       f \in \semfcn, \, \forall x \in \Value . \\ \forall w \in \semappp{M}{e_1}{\msing{x}}{\rho} . \\ f(x) \in \semapp{E}{e_2}{\extendrho{\rho}{a \mapsto w}} \}
+     \end{array} \\
+  \end{array} \\ \\
+    
+  \begin{array}{rcll}
+  \semapp{O}{|op|}{} & : & (\semfcn)^{*} \\
+  \semapp{O}{|gt|}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, || \, x \in \mathbb{Z}, y \in \mathbb{Z}, x > y \} \} & \text{one function} \\
+  \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \in \mathbb{Z} \} \} & \text{one function} \\
+  \semapp{O}{|add|}{} & = & \{ f \, || \, f \in \semfcn, \; \forall x,y \in \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
+  \end{array} \\ \\
+  
+\begin{array}{rcll}
+\apply & : & (\Value \times \Value) \rightarrow \mtype \\
+\apply( \tuple{w_0, w_1}, k) & = & \msing{w_k} & 0 \leq k \leq 1 \\
+\apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
+\textbf{alternative:\hspace{6em}}               & = & \{ y \, || \, (x, y) \in f, \; x=w \} & f \in \semfcn \\
+\apply( f, w ) & = & \emptyset & \text{otherwise} \\
+%%\end{array}
+\\
+
+%% \begin{array}{rcll}
+\dom & : & (\Value \rightharpoonup \Value) \rightarrow \mtype \\
+\dom(f) & = & \{ x \, || \, (x,y) \in f \} \\
+
+\\
+
+\ran & : & (\Value \rightharpoonup \Value) \rightarrow \mtype \\
+\ran(f) & = & \{ y \, || \, (x,y) \in f \} \\
+
+\\
+
+\fcn & : & (\tuple{\Value,\Value})^{*} \rightarrow (\semfcn) \\
+\fcn & & \multicolumn{2}{l}{\text{indicates a function made from a set of pairs} } \\
+
+\\
+
+\get{} & : & \mtype \rightarrow \mtype \\
+\get{\{x\}} & = & \{ x \} \\
+\get{s} & = & \emptyset & \text{if the cardinality of s is not 1} \\
+
+\end{array}
+
+\end{array}
+$
+\caption{Expression semantics}
+\label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+\text{\bf Match semantics of expressions} \\
+
+  \begin{array}{rcll}
+  \semappp{M}{|e|}{}{} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
+  \semappp{M}{|x|}{u}{\rho} & = & \msing{\rho(x)} \cap u \\
+  \semappp{M}{|k|}{u}{\rho} & = & \msing{k} \cap u \\
+  \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \cap u \\
+  \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & %% \apply(\semappp{M}{|e_1|}{\rho}, \; \semappp{M}{|e_2|}{\rho}) \\
+    \{ r \, || \, f \in \semapp{E}{|e_1|}{\rho}, \; a \in \semapp{E}{|e_2|}{\rho}), \; r \in \apply(f, a) \} \cap u \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & %% \semappp{M}{|e_1|}{\rho} \; \msemi      \; \semappp{M}{|e_2|}{\rho} \\
+    \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semappp{M}{|e_2|}{u}{\rho}) \} \\
+  \semappp{M}{|def x e|}{u}{\rho} & = & \bigcup_{w \in \Value}\, \semappp{M}{e}{u}{(\extendrho{\rho}{x \mapsto w})} \\
+  \semappp{M}{|:e|}{u}{\rho} & = & %% \ran(\semappp{M}{|e|}{\rho}) \\
+    \{ r \, || \, f \in \semappp{M}{|e|}{\rho}, \; a \in u, \; r \in \apply(f, a) \} \\
+  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+  \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
+    \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \in u, \; x \in \semappp{M}{|e_1|}{u_1}{\rho}, \; y \in \semappp{M}{e_2}{u_2}{\rho}) \} \\
+  \semappp{M}{|funk c e_1 a e_2|}{u}{\rho} & = & TBD \\
+  \semappp{M}{|funk o e_1 a e_2|}{u}{\rho} & = & TBD \\
+\\
+    
+  \end{array} \\ \\
+  
+
+\end{array}
+$
+\caption{Expression match semantics}
+\label{fig:den-sem2}
+\end{figure}
+
+The semantic value domain has these components
+\begin{itemize}
+\item $\mathbb{Z}$, the integers
+\item $\tuple{\Value,\Value}$ finite tuples of values, just pairs in this exposition to reduce clutter.
+\item $\semfcn$ (computable) functions from values to values.  The function can be partial,
+  i.e., the function domain, $\dom$, can be a subset of $\Value$,
+  and the range, $\ran$, can also be a subset of $\Value$.
+  Note that a function always maps a single value to a single value.
+  Functions are defined as a set of pairs, as in set theory.
+  The notation $\fcn$ is used to indicate that we are defining a function using pairs.
+\end{itemize}
+
+The semantic valuation function $\semapp{E}{e}{\rho}$ maps an expression in the given environment to
+a set of values.
+It has to be a set since an expressions like |def x (apply1 gt (arr (x, 0)))| can be any non-negative integer.
+
+The $\apply$ function does function application handling both tuples and functions.
+If the argument is not in the domain of the function it returns an empty set,
+otherwise a singleton with the result.
+
+The denotation of |gt| and |int| are singleton functions,
+whereas the denoation of |add| is the set of all function that behave like $+$ on (pairs of) integers,
+but are otherwise unconstrained.
+
+For now, functions are not represented as in SourceVerse, but need some desugaring.
+The domain expressions transforms the function input, which is then bound in the function body.
+Here are some examples:
+
+\begin{tabular}{ll}
+  |function((x:int))(x+1)|         & |funk o (:int) x (add(x,1))| \\
+  |function((x:int,y:succ))(x+y)|  & |funk o (arr (:int, :succ)) p (def (x y) (p = arr (x,y); add(x,y)))| \\
+\end{tabular}
+
+\end{document}
