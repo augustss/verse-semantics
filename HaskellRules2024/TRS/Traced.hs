@@ -3,8 +3,10 @@
 module TRS.Traced(
   Traced(..), term, trace, start, (++>), loop,
   showTrace, showRevTrace, filterTrace,
-  displayTrace, displayRevTrace
+  displayTrace, displayRevTrace,
+  PrettyBrief(..)
   ) where
+import Prelude hiding( (<>) )
 import Epic.Print
 
 data Traced a = a :<-- [(String,a)]
@@ -43,28 +45,32 @@ loop (xx :<-- tr) = xx :<-- find xx tr
     | y == x    = [(s,y)]
     | otherwise = (s,y) : find x sys
 
-displayTrace, displayRevTrace :: Pretty a => Traced a -> IO ()
+displayTrace, displayRevTrace :: PrettyBrief a => Traced a -> IO ()
 displayTrace    tr = mapM_ putStrLn (showTrace tr)
 displayRevTrace tr = mapM_ putStrLn (showRevTrace tr)
 
-instance Pretty a => Pretty (Traced a) where
+instance PrettyBrief a => Pretty (Traced a) where
   pPrint tr = vcat (pPrintTrace tr)
 
-showTrace, showRevTrace :: Pretty a => Traced a -> [String]
+showTrace, showRevTrace :: PrettyBrief a => Traced a -> [String]
 showTrace    tr = map render (pPrintTrace    tr)
 showRevTrace tr = map render (pPrintRevTrace tr)
 
-pPrintTrace, pPrintRevTrace :: forall a. Pretty a => Traced a -> [Doc]
+class Pretty a => PrettyBrief a where
+   pPrintBrief :: a -> Doc
+
+pPrintTrace, pPrintRevTrace :: forall a. PrettyBrief a => Traced a -> [Doc]
 pPrintTrace (res_expr :<-- tr) =  go 1 empty (reverse tr) -- Print forwards
   where
     go :: Int -> Doc -> [(String,a)] -> [Doc]
     go _ herald [] = [pp_item herald res_expr]
-    go n herald ((s,e):ses) = pp_item herald e : go (n+1) (mkarrow n s) ses
+    go n herald ((s,e):ses) = pp_item herald e : go (n+1) (mkarrow n s e) ses
 
+--    pp_item herald _e = herald
     pp_item herald e = vcat [text "", herald, indent (pPrint e)]
       -- (text "") adds a blank line
 
-    mkarrow n s = text (show n ++ ":--"++s++"-->")
+    mkarrow n s _e = text (show n ++ ":--"++s++"-->") <> braces (pPrintBrief _e)
 
 pPrintRevTrace (x :<-- tr) =  -- Print backwards, with terminal state first
   pPrint x : [text ("<--"++n++"--") <+> pPrint y | (n,y) <- tr ]

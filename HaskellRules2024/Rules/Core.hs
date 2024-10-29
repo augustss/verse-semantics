@@ -20,7 +20,7 @@ module Rules.Core
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkEqual, mkOne
+  , mkApp, mkEqual, mkOne, lamUnderscore, someUnderscore
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -226,14 +226,18 @@ mkOne :: Expr -> Expr
 mkOne e = Iter e (Tup [])  f g
   where
    a = ident "a"
-   f = Lam $ bind underscore $
-       Lam $ bind a $
-       Lam $ bind underscore (Var a)
-   g = Lam $ bind underscore $ Fail
+   f = lamUnderscore $
+       Lam $ bind a  $
+       lamUnderscore $
+       (Var a)
+   g = lamUnderscore $ Fail
 
 (>>>) :: Expr -> Expr -> Expr
 -- e1 >>> e2  =   (_ = e1); e2
 e1 >>> e2 = (Var underscore :=: e1) :>: e2
+
+lamUnderscore :: Expr -> Expr
+lamUnderscore e = Lam (bind underscore e)
 
 someAny :: Expr
 -- The expression: some( any )
@@ -244,6 +248,22 @@ someAny = Some (Lam (bind x (Var x)))
 someNat :: Expr
 -- The expression: some( nat )
 someNat = Some nat
+
+someUnderscore :: Expr -> Expr
+-- The expression: some( \_.e )
+someUnderscore e = Some (lamUnderscore e)
+
+mkApp :: Expr -> Expr -> Expr
+mkApp fun arg
+  = anf xf fun $ \ f ->
+    anf xa arg $ \ a ->
+    f :@: a
+  where
+    xf:xa:_ = identsNotIn (free (fun,arg))
+
+    anf x e k | isVal e   = k e
+              | otherwise = Exi (bind x ((Var x :=: e) :>:
+                                         k (Var x)))
 
 litInt :: Integer -> Expr
 litInt n = Lit (LInt n)
@@ -511,6 +531,9 @@ canFail Fails    = True
 
 instance Pretty Expr where
   pPrintPrec = pPrintPrecE
+
+instance PrettyBrief Expr where
+  pPrintBrief e = text "size:" <> int (exprSize e)
 
 instance Pretty PrimOp where
   pPrint op = text (primOpString op)
@@ -1180,7 +1203,7 @@ normalize fuel rule orig_e = go fuel [] orig_e
       []                        -> (NormOK,      e  :<-- tr)
       (s,e'):_ | fuel_left==0   -> (NormExpired, e  :<-- tr)
                | not (valid e') -> (NormInvalid, e' :<-- tr')
-               | otherwise      -> -- ppTrace "norm" (text s) $
+               | otherwise      -> -- ppTrace "norm" (int fuel <+> text s <> braces (pPrintBrief e')) $
                                    go (fuel_left-1) tr' e'
               where
                tr' = (s,e):tr

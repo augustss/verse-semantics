@@ -70,7 +70,7 @@ arrStep :: Rule
 --     ---> if x is in flexis(P)
 --   verify(R,n;A){ P[ x = choose(n){some(\i. inrange[i,n])}; x ] }
 arrStep env lhs =
-   "DD-NARROW" `nameWith`
+  "DD-NARROW" `nameWith`
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
      -- Use this rule when v is not a literal.
      guard (x `elem` exis)
@@ -85,20 +85,29 @@ arrStep env lhs =
       pure (pPrint e1, Verify $ bindList rs
                          (as, ctx <@ inRange i sz))
 
- ++
+  ++
   "ARR-MAP" `nameWith`   -- ArrMap$[f, Arr(n){e}]
-                         --   --> x:=some(\_.e); f[x]; Arr(n){f[e]}
+                         --   --> n:=size(1){f[some(\_.e)]};
+                         --       choose(n){Arr(v){f[e]}}
   do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
-     let x:y:_ = identsNotIn $ free arg
-     pure (pPrint arr, Exi $ bind x $
-                       coreSeq [ Var x :=: Some (Lam (bind underscore e))
-                               , Var underscore :=: (f :@: Var x)
-                               , Arr v (Exi $ bind y $ (Var y :=: e) :>: (f :@: Var y))] )
- ++
+     let n = identNotIn $ free arg
+     pure (pPrint arr, Exi $ bind n $
+                       coreSeq [ Var n :=: Size (litInt 1) (mkApp f (someUnderscore e))
+                               , Choose (Var n) (Arr v (mkApp f e)) ])
+  ++
   "ARR-APP" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
   do arr@(Arr sz e) :@: v <- [lhs]
-     pure (pPrint arr, (Op DotDot :@: Tup [v,sz]) >>>
-                       (Some $ Lam $ bind underscore e) )
+     pure (pPrint arr, (Op DotDot :@: Tup [v,sz]) >>> someUnderscore e )
+  ++
+  "CHOOSE0" `name`
+  do Choose (LitInt k) _ <- [lhs]
+     guard (k==0)
+     pure Fail
+  ++
+  "CHOOSE1" `name`
+  do Choose (LitInt k) e <- [lhs]
+     guard (k==1)
+     pure (someUnderscore e)
   ++
   "ALL-CHOOSE" `name`
      -- all{ C[ choose(v){e} ] }
@@ -147,19 +156,46 @@ arrStep env lhs =
                    , Var underscore
                        :=: mkOne (((n1 :=: litIntZero) :>: Tup [])
                                   :|:
-                                  mkEqual (Some $ Lam $ bind underscore e2)
-                                          (Some $ Lam $ bind underscore e1)
+                                  mkEqual (someUnderscore e2)
+                                          (someUnderscore e1)
                                           (Tup []))
                    , e ])
  ++
-  "SIZE1" `name`  -- Size(n){v} --> n
-  do Size n v <- [lhs]
-     guard (isVal v)
-     pure n
+  "SIZE0" `name`  -- Size(0){e} --> 0
+  do Size (LitInt n) _ <- [lhs]
+     guard (n==0)
+     pure (litInt 0)
  ++
-  "SIZE-FAIL" `name`  -- Size(n){fail} --> some(inrange[n])
-  do Size n Fail <- [lhs]
-     pure (Some (inRangeType n))
+  "SIZEn" `name`  -- Size(n){v1 | v2 | ...} --> some(nat)
+  do Size n e <- [lhs]
+     case multiplicity e of
+       MDunno -> []      -- Rule does not apply
+       MMany  -> pure someNat
+       MOne   -> pure n
+       MZero | LitInt 1 <- n -> pure (litInt 0)
+             | otherwise     -> pure (Some (inRangeType n))
+
+------------------------------
+data Mult = MZero   -- Exactly zero
+          | MOne    -- Exactly one
+          | MMany   -- Definitely more than one
+          | MDunno
+
+choiceMult :: Mult -> Mult -> Mult
+choiceMult MZero m   = m
+choiceMult MOne  MZero  = MOne
+choiceMult MOne  MOne   = MMany
+choiceMult MOne  MMany  = MMany
+choiceMult MOne  MDunno = MDunno
+choiceMult MMany  _     = MMany
+choiceMult MDunno MMany = MMany
+choiceMult MDunno _     = MDunno
+
+multiplicity :: Expr -> Mult
+multiplicity Fail          = MZero
+multiplicity (e1 :|: e2)   = multiplicity e1 `choiceMult` multiplicity e2
+multiplicity e | isVal e   = MOne
+               | otherwise = MDunno
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule
