@@ -117,6 +117,8 @@ arrStep env lhs =
   do All all_body <- [lhs]
      (exis, ctx, Choose sz e) <- evalCtxLift [] all_body
      guard (free sz `disjointFrom` exis)
+     guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
+       -- This guard seems to make no difference either way
      let n = identNotIn $ free all_body
      pure ( Exi $ bind n $
             (Var n :=: Size sz (wrapExis exis $
