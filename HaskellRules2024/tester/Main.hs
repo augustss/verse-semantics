@@ -624,6 +624,9 @@ pTimSkip = do
 --
 -----------------------------------------------
 
+data TraceLevel = NoTrace | BriefTrace | NormalTrace
+  deriving (Eq, Show)
+
 data TestFlags = TestFlags
   { dfs            :: !Bool                -- just find one normal form
   , split          :: !Bool                -- use split
@@ -652,6 +655,7 @@ data TestFlags = TestFlags
   , preludeVerify  :: !String              -- use this prelude in TestVerify
   , desugarRules   :: !Desugar             -- desugaring rules
   , allAsIter      :: !Bool                -- encode all as iter
+  , xxxTrace       :: !TraceLevel          -- how much to trace
   , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -784,6 +788,11 @@ testFlags = TestFlags
   <*> OA.switch
          ( OA.long "all-as-iter"
         <> OA.help "encode all with iter" )
+  <*> (OA.flag' BriefTrace (OA.long "brief-trace" <>
+                            OA.help "Print brief rewrite trace")
+       OA.<|>
+       OA.flag NoTrace NormalTrace (OA.long "xxxtrace" <>
+                                    OA.help "Print rewrite trace") )
   <*> OA.many (OA.argument OA.str (OA.metavar "FILES..."))
 
 testFlagsToFlags :: TestFlags -> Flags
