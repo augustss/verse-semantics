@@ -124,14 +124,17 @@ arrStep env lhs =
             :>:
             (Arr (Var n) (wrapExis exis (ctx <@ e))) )
 
-{-    Failed attempt, because CHOOSE-X applies repeatedly
+{-    CHOOSE-X does not seems to work quite right, and is much slower
+-}
+{-
+  ++
   "ALL-CHOOSE" `name`
      -- all{ C[ choose(v){e} ] }
      -- --> Arr(n){ C[e] }
      -- if boundvars(C) disjoint from freevars(v)
   do All (Choose n e) <- [lhs]
      pure ( Arr n e )
- ++
+  ++
   "CHOOSE-X" `name`
      -- C[ choose(v){e} ]
      -- --> n := size(v){ C[ some(\_.e) ] } ;
@@ -141,6 +144,11 @@ arrStep env lhs =
      (exis, ctx, Choose sz e) <- evalCtxLift lhs_fvs lhs
      guard (ctx /= HOLE)
      guard (free sz `disjointFrom` exis)
+     guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
+        -- Need 'blkd' to avoid CHOOSE-X applying repeatedly in
+        --    C[choose(v){e}] --> exists n. n = size(v){C[some(\_.e)]}
+        --                                  choose(n){C[e]}
+        -- Don't engulf just the "n=size" part!!
      let n = identNotIn lhs_fvs
      pure ( Exi $ bind n $
             (Var n :=: Size sz (wrapExis exis $

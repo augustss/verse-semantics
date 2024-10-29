@@ -3,7 +3,7 @@
 
 module Rules.TRS2024 (
      runtimeRules, runtimeAndVerificationStep, recStep
-   , blocked, choiceFreeLH, choiceAndFailureFree
+   , blocked, blkd, choiceFreeLH, choiceAndFailureFree
    , name, nameWith, iff
    , skolValue
    , LocalExis(..), makeRigid, addFlexi, allExis, wrapExis
