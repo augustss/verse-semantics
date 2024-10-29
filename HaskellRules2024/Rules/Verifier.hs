@@ -392,6 +392,6 @@ go_px lx lhs =
      (ctx, hole) <- go_px (makeRigid lx) x
      pure (All ctx, hole)
  ++
-  do Iter x y z w <- [lhs]
+  do Iter x y z <- [lhs]
      (ctx, hole) <- go_px (makeRigid lx) x
-     pure (Iter ctx y z w, hole)
+     pure (Iter ctx y z, hole)

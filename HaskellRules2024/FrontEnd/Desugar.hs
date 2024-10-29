@@ -1069,28 +1069,28 @@ dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 
 
 ------- Encodings with iter ---------------------------
--- if(e1) e2 else e3  -->  iter (e1; <vs>) <> (\ _ a _ . exi vs . a=<vs>; e2) (\_ . e3)
+-- if(e1) e2 else e3  -->  iter (e1; <vs>) <> (\ a _ . exi vs . a=<vs>; e2) (\_.e3)
 --   where vs are the free variables also used in e2
 -- when vs is empty, we can use the simpler
---   if e1 e2 e3 = iter e1 <> (\ _ _ _ . e2) (\_ . e3)
+--   if e1 e2 e3 = iter e1 <> (\ _ _ . e2) (\_.e3)
 -- when vs is a singleton, we can use the simpler
---   if e1 e2 e3 = iter (e1; v) <> (\ _ v _ . e2) (\_ . e3)
+--   if e1 e2 e3 = iter (e1; v) <> (\ v _ . e2) (\_.e3)
 encodeIf :: SrcCore -> SrcCore -> SrcCore -> D SrcCore
 encodeIf e1 e2 e3 = do
   a <- newIdent (getLoc e1) "a"
   let vs = getVisibleBinders e1 `intersect` getFree e2
       evs = Array $ map Variable vs
   case vs of
-    []  -> pure $ Iter       e1        (Array []) (eThunk $ eThunk $ eThunk $                                            e2)  (eThunk e3)
-    [v] -> pure $ Iter (Seq [e1, ev])  (Array []) (eThunk $ Lam v  $ eThunk $                                            e2)  (eThunk e3)
+    []  -> pure $ Iter       e1        (eThunk $ eThunk $                                            e2)  (eThunk e3)
+    [v] -> pure $ Iter (Seq [e1, ev])  (Lam v  $ eThunk $                                            e2)  (eThunk e3)
       where ev = Variable v
-    _   -> pure $ Iter (Seq [e1, evs]) (Array []) (eThunk $ Lam a  $ eThunk $ eExists vs $ Seq [ Variable a `Unify` evs, e2]) (eThunk e3)
+    _   -> pure $ Iter (Seq [e1, evs]) (Lam a  $ eThunk $ eExists vs $ Seq [ Variable a `Unify` evs, e2]) (eThunk e3)
 
--- one{e}  -->  Iter e <> (\ _ a _ . a) (\ _ . Fail)
+-- one{e}  -->  Iter e <> (\ a _ . a) (\_.Fail)
 encodeOne :: SrcCore -> D SrcCore
 encodeOne e = do
   a <- newIdent (getLoc e) "a"
-  pure $ Iter e (Array []) (eThunk $ Lam a $ eThunk $ Variable a) (eThunk Fail)
+  pure $ Iter e (Lam a $ eThunk $ Variable a) (eThunk Fail)
 
 encodeAll :: SrcCore -> D SrcCore
 encodeAll e = do
@@ -1104,15 +1104,12 @@ encodeAll e = do
 --   step a v c  =  c(exi r . arrApp(a,<v>,r); r)
 encodeAllAsIter :: SrcCore -> D SrcCore
 encodeAllAsIter e = do
-  a   <- newIdent (getLoc e) "a"
-  v   <- newIdent (getLoc e) "v"
-  c   <- newIdent (getLoc e) "cont"
-  let ea   = Variable a
-      ev   = Variable v
-      ec   = Variable c
-      step = Lam a $ Lam v $ Lam c $ ec `ApplyD` (eSnoc ea ev)
-      done = Lam a $ ea
-  pure $ Iter e (Array []) step done
+  v   <- newIdent (getLoc e) "v"   -- value from choice
+  a   <- newIdent (getLoc e) "a"   -- accumulator
+  let ev   = Variable v
+      ea   = Variable a
+      cons = Lam v $ Lam a $ eCons ev (eForce ea)
+  pure $ Iter e cons (eThunk $ Array [])
 
 encodeFor :: SrcCore -> SrcCore -> D SrcCore
 encodeFor e1 e2 = do
@@ -1130,26 +1127,23 @@ encodeForAsIter :: SrcCore -> SrcCore -> D SrcCore
 encodeForAsIter e1 e2 = do
   a   <- newIdent (getLoc e1) "a"
   x   <- newIdent (getLoc e1) "x"
-  c   <- newIdent (getLoc e1) "cont"
   let vs = getVisibleBinders e1 `intersect` getFree e2
       evs = Array $ map Variable vs
   let ea   = Variable a
       ex   = Variable x
-      ec   = Variable c
       (dom, arg, body) =
         case vs of
           []  -> (e1,            u, \ rest -> Seq rest) where u = srcUnderscore           -- No variables
           [v] -> (Seq [e1, ev],  v, \ rest -> Seq rest) where ev = Variable v             -- Single variable, avoid the tuple
           _   -> (Seq [e1, evs], x, \ rest -> eExists vs $ Seq $ (ex `Unify` evs) : rest) -- Many variables
-      step = Lam a $ Lam arg $ Lam c $ body [ec `ApplyD` (eSnoc ea e2)]
-      done = Lam a $ ea
-  pure $ Iter dom (Array []) step done
+      cons = Lam arg $ Lam a $ body [eCons e2 (eForce ea)]
+  pure $ Iter dom cons (eThunk $ Array [])
 
--- snoc xs x = arrApp$[xs, <x>, _]
-eSnoc :: SrcCore -> SrcCore -> SrcCore
-eSnoc xs x =
+-- cons x xs = arrApp$[<x>, xs, _]
+eCons :: SrcCore -> SrcCore -> SrcCore
+eCons x xs =
   let u = Ident (getLoc x) "u"
-  in  ApplyD (EPrim ArrApp) (Array [xs, Array [x], Exists [u] (Variable u)])
+  in  Exists [u] $ ApplyD (EPrim ArrApp) (Array [Array [x], xs, Variable u])
 
 ----------------------------------
 

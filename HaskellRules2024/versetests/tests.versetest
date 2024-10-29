@@ -104,6 +104,8 @@ testeq("Array7",pass){x:any; y:any; x=(1,1); x=y; y=(2,2); y} {:false}
 testeq("Array8",pass,tim=skip){all{x:any; all{(x=1)|(x=0)}; x=0|1}}  {(0,1)}
 testeq("Array9",pass){ a := (0,1); a[0] }                   {0}
 testeq("Array10",pass){ all{1..4} }                         {array{1,2,3,4} }
+testeq("Array10a",pass){ all{1|2} }                         {array{1,2} }
+testeq("Array10b",pass){ all{1} }                         {array{1} }
 testeq("Array11",pass){ for(1..4){7} }                      {array{7,7,7,7} }
 testeq("Array12",pass){ for(i := 1..4){i+1} }               {array{2,3,4,5} }
 testeq("Array13",pass){ a := array{7,8}; for(i:a){i+1} }    {array{8,9} }

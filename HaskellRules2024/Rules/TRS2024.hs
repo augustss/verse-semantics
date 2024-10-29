@@ -393,7 +393,7 @@ onlyApps f orig_e = go orig_e
     go (e1 :>: e2)  = go e1 && go e2
     go (e1 :|: e2)  = go e1 && go e2
     go (e1 :@: e2)  = e1 == Var f || (go e1 && go e2)
-    go (Iter e1 e2 e3 e4) = all go [e1,e2,e3,e4]
+    go (Iter e1 e2 e3) = all go [e1,e2,e3]
     go (Some e)       = go e
     go (All e)        = go e
     go (e1 :>>: e2)   = go e1 && go e2
@@ -457,31 +457,25 @@ choiceStep _env lhs =
 --------------------------------------------------------------------------------
 oneAndAllStep :: Rule
 oneAndAllStep _env lhs =
-  -- iter(fail,    u){f, g}  -->  g u
+  -- iter(fail){f, g}  -->  g <>
   "ITER-FAIL" `name`
-  do Iter Fail u _ g <- [lhs]
-     guard (isVal u)            -- XXX Maybe bind 'u' if it's not a value?
-     pure (g :@: u)
+  do Iter Fail _ g <- [lhs]
+     pure (g :@: Tup [])
  ++
-  -- iter(v,       u){f, g}  -->  f u v g
+  -- iter(v){f, g}  -->  f v g
   "ITER-VALUE" `name`
-  do Iter v u f g <- [lhs]
+  do Iter v f g <- [lhs]
      guard (isVal v)
-     guard (isVal u)            -- XXX Maybe bind 'u' if it's not a value?
-     let f1:f2:_ = identsNotIn $ free lhs
+     let f1:_ = identsNotIn $ free lhs
          res = Exi $ bind f1 $
-               Exi $ bind f2 $
-               coreSeq [ Var f1 :=: (f :@: u)
-                       , Var f2 :=: (Var f1 :@: v)
-                       , Var f2 :@: g ]
+               coreSeq [ Var f1 :=: (f :@: v)
+                       , Var f1 :@: g ]
      pure res
  ++
-  -- iter(e1 | e2, u){f, g}  -->  iter(e1, u){f, \ x . iter(e2, x){f, g} }
+  -- iter(e1 | e2){f, g}  -->  iter(e1){f, \ _ . iter(e2){f, g} }
   "ITER-CHOICE" `name`
-  do Iter (e1 :|: e2) u f g <- [lhs]
-     let x = identNotIn $ free lhs
-         res = Iter e1 u f (Lam $ bind x $ Iter e2 (Var x) f g)
-     pure res
+  do Iter (e1 :|: e2) f g <- [lhs]
+     pure $ Iter e1 f (Lam $ bind underscore $ Iter e2 f g)
  ++
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
@@ -862,10 +856,9 @@ status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
 status lx (v :>>: e) | any (isLocal lx) (free v) = blockedStatus
                      | otherwise                 = status lx e
 
-status lx (Iter e1 _e2 _ _) = status (makeRigid lx) e1 -- ToDo: not sure!!
+status lx (Iter e1 _ _) = status (makeRigid lx) e1 -- ToDo: not sure!!
 
 status _ e = errorMessage ("Uncovered case in status " ++ show e)
-
 
 ---------------------
 choiceAndFailureFree :: Expr_or_Context -> Bool
@@ -901,8 +894,8 @@ choiceAndFailureFree = go []
     go _  (Verify {}) = True
 
     go fs e@Iter{}
-      | Just (_, _, (_, _, c, f), (_, g)) <- unIter e
-                  = go (c:fs) f && go fs g
+      | Just (_, (_, _, f), g) <- unIter e
+                  = go fs f && go fs g
       | otherwise = error "Malformed Iter"
 
 choiceFreeLH :: Expr_or_Context -> Bool
@@ -910,10 +903,10 @@ choiceFreeLH :: Expr_or_Context -> Bool
 -- or, if no HOLE, anywhere
 choiceFreeLH = choiceFree' []
 
--- The first argument to choiceFree' are functions known to be choice free.
--- This is used for the iter construct.  In the case where iter(e){u;f;g}
--- calls f, the continuation argument will have the same effects as e&f&g
--- could have.  We can safely assume that the continuation is choice free,
+-- The first argument to choiceFree' are functions (thunks) known to be choice free.
+-- This is used for the iter construct.  In the case where iter(e){f;g}
+-- calls f, the thunk argument will have the same effects as e&f&g
+-- could have.  We can safely assume that the thunk is choice free,
 -- because if it's not this will already show up in the bodies of f and/or g.
 choiceFree' :: [Ident] -> Expr_or_Context -> Bool
 choiceFree' _  (_ :|: _)           = False
@@ -927,8 +920,8 @@ choiceFree' fs (v1 :@: _)          = case v1 of
                                        Var f     -> f `elem` fs
                                        _         -> False -- may or may not be choice free
 choiceFree' fs e@Iter{}
-  | Just (_, _, (_, _, c, f), (_, g)) <- unIter e
-                                   = choiceFree' (c:fs) f && choiceFree' fs g
+  | Just (_, (_, t, f), g) <- unIter e
+                                   = choiceFree' (t:fs) f && choiceFree' fs g
   | otherwise                      = error "Malformed Iter"
 choiceFree' _ (Some {})            = True
 choiceFree' _ (All {})             = True
