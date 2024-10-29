@@ -316,8 +316,6 @@
 
 \section{Introduction}
 
-This paper is a first attempt at a denotational semantics for \versecalc{}.
-
 \section{Syntax of Core Verse}
 
 %format funk k (e) (x) (rhs) = "\textbf{fun}_"k"(" e ")\{\lambda" x".\," rhs "\}"
@@ -519,5 +517,9 @@ Here are some examples:
   |function((x:int))(x+1)|         & |funk o (:int) x (add(x,1))| \\
   |function((x:int,y:succ))(x+y)|  & |funk o (arr (:int, :succ)) p (def (x y) (p = arr (x,y); add(x,y)))| \\
 \end{tabular}
+
+\vspace{2em}
+Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the cases I've covered.
+Hopefully it will hold for the rest too.
 
 \end{document}
