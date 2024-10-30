@@ -170,7 +170,7 @@
 \newcommand{\liftrel}[1]{\hat{#1}}
 \newcommand{\cons}{{:}}           % Cons for value sequences, V*
 \newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
-\newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket \llbracket #3 \rrbracket\, #4}
+\newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4}
 \newcommand{\semap}[2]{\semfun{#1}\llbracket #2 \rrbracket #2}
 
 % extend envt
@@ -507,7 +507,7 @@ $
   \semappp{B}{|e|}{u}{\rho} & = &
   \{ \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n} \\
   & & || \;
-    w \in \bigcup_{w_1 \in \Value}\, \mydots \bigcup_{w_n \in \Value}\, \semapp{M}{e}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}
+    w \in \bigcup_{w_1 \in \Value}\, \mydots \bigcup_{w_n \in \Value}\, \semappp{M}{e}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}
     \} \\
     & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
