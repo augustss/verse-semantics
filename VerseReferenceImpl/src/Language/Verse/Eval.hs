@@ -753,6 +753,11 @@ invoke' loc var1 var2 s s' = lift (readVar' var1) >>= \ case
     var <- invokeTuple loc xs var2
     lift $ unifyEq s.choiceFree s'.choiceFree
     pure var
+  Val.Truth x -> do
+    lift $ unifyEq s.storeFree s'.storeFree
+    lift $ unifyEq s.choiceFree s'.choiceFree
+    unify' loc x var2
+    pure var2
   Val.Enum _ _ xs -> do
     lift $ unifyEq s.storeFree s'.storeFree
     _ <- lift $ readVar s.choiceFree
