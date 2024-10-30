@@ -389,7 +389,7 @@ T^{*} & = & \text{set of } T \\
   \semapp{P}{|e|}{} & : & \Value + |Wrong| \\
   \semapp{P}{|e|}{} & = & \left\{
   \begin{array}{ll}
-    w,       & \text{if} \{w\} = \semapp{E}{|e|}{\rho_0} \\
+    w,       & \text{if} \{w\} = \semapp{S}{|e|}{\rho_0} \\
     |Wrong|, & \text{otherwise}
   \end{array}
   \right.
@@ -411,18 +411,18 @@ T^{*} & = & \text{set of } T \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
     \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
-  \semapp{E}{|x := e|}{\rho} & = & \msing{x} \;\cap\; \semapp{E}{e}{\rho} \\
+  \semapp{E}{|x := e|}{\rho} & = & \msing{\rho(x)} \;\cap\; \semapp{E}{e}{\rho} \\
   \semapp{E}{|:e|}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
     \{ r \, || \, f \in \semapp{E}{|e|}{\rho}, \; a \in \Value, \; r \in \apply(f, a) \} \\
   \semapp{E}{|fail|}{\rho} & = & \emptyset \\
   \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
     \{ \tuple{x,y} \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
-  \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ \fcn \{ (x, y) \, || \, x \in \Value, \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho}, y \in \get{\semapp{E}{e_2}{(\rho \circ \rho_e)}} \} \} \\
+  \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ \fcn \{ (x, y) \, || \, x \in \Value, \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho}, y \in \get{\semapp{S}{e_2}{(\rho \circ \rho_e)}} \} \} \\
   \semapp{E}{|funk o e_1 e_2|}{\rho} & = &
      \{ f \; ||
      \begin{array}[t]{l}
        f \in \semfcn, \, \forall x \in \Value . \\ \forall \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho} . \\
-       f(x) \in \semapp{E}{e_2}{(\rho \circ \rho_e)} \}
+       f(x) \in \semapp{S}{e_2}{(\rho \circ \rho_e)} \}
      \end{array} \\
 
   \end{array} \\ \\
@@ -522,7 +522,7 @@ $
   \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & %% \semappp{M}{|e_1|}{\rho} \; \msemi      \; \semappp{M}{|e_2|}{\rho} \\
     \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semappp{M}{|e_2|}{u}{\rho}) \} \\
-  \semappp{M}{|x := e|}{u}{\rho} & = & \msing{x} \;\cap\; \semappp{M}{e}{u}{\rho} \\
+  \semappp{M}{|x := e|}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
   \semappp{M}{|:e|}{u}{\rho} & = & %% \ran(\semappp{M}{|e|}{\rho}) \\
     \{ r \, || \, f \in \semappp{M}{|e|}{\rho}, \; a \in u, \; r \in \apply(f, a) \} \\
   \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
