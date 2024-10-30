@@ -171,6 +171,7 @@
 \newcommand{\cons}{{:}}           % Cons for value sequences, V*
 \newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
 \newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket \llbracket #3 \rrbracket\, #4}
+\newcommand{\semap}[2]{\semfun{#1}\llbracket #2 \rrbracket #2}
 
 % extend envt
 \newcommand{\extendrho}[2]{#1[#2]}
@@ -318,7 +319,7 @@
 
 \section{Syntax of Core Verse}
 
-%format funk k (e) (x) (rhs) = "\textbf{fun}_"k"(" e ")\{\lambda" x".\," rhs "\}"
+%format funk k (e) (rhs) = "\textbf{fun}_"k"(" e ")\{" rhs "\}"
 
 \begin{figure}
   $$
@@ -335,15 +336,15 @@
     \vb |apply1N e_1 e_2|
     \vb |e_1 == e_2|
     \vb |e_1 ; e_2|
-    \vb |def x e|
+    \vb |x := e|
     \vb |:e|
     \vb |fail|
     \\
     & &
     \vb &
         |arr (e_1, e_2)|
-    \vb |funk c e_1 x e_2|
-    \vb |funk o e_1 x e_2|
+    \vb |funk c e_1 e_2|
+    \vb |funk o e_1 e_2|
        %%       \vb |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e|
        \\
 %       && \vb & |succeeds e| \vb |decides e| \\
@@ -377,13 +378,30 @@ $
 \begin{array}{rcll}
 \Value & = & \mathbb{Z} + \tuple{\Value,\Value} + (\semfcn) \\
 %% \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
-\Env & = & Ident \rightarrow \Value \\
-\mtype & = & \text{set of } \Value \\
+\Env & = & |Ident| \rightarrow \Value \\
+T^{*} & = & \text{set of } T \\
 \end{array}
-\\[7mm]
-\text{\bf Value semantics of expressions} \\
+\\ \\
+
 
   \begin{array}{rcll}
+\multicolumn{4}{l}{\text{\bf Valuation semantics of a closed program}} \\
+  \semapp{P}{|e|}{} & : & \Value + |Wrong| \\
+  \semapp{P}{|e|}{} & = & \left\{
+  \begin{array}{ll}
+    w,       & \text{if} \{w\} = \semapp{E}{|e|}{\rho_0} \\
+    |Wrong|, & \text{otherwise}
+  \end{array}
+  \right.
+\\ \\
+
+\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
+  \semapp{S}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{S}{|e|}{\rho} & = &
+  \bigcup_{w_1 \in \Value}\, \mydots \bigcup_{w_n \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \\
+  & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|x|}{\rho} & = & \msing{\rho(x)} \\
   \semapp{E}{|k|}{\rho} & = & \msing{k} \\
@@ -393,18 +411,20 @@ $
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
     \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
-  \semapp{E}{|def x e|}{\rho} & = & \bigcup_{w \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x \mapsto w})} \\
+  \semapp{E}{|x := e|}{\rho} & = & \msing{x} \;\cap\; \semapp{E}{e}{\rho} \\
   \semapp{E}{|:e|}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
     \{ r \, || \, f \in \semapp{E}{|e|}{\rho}, \; a \in \Value, \; r \in \apply(f, a) \} \\
   \semapp{E}{|fail|}{\rho} & = & \emptyset \\
   \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
     \{ \tuple{x,y} \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
-  \semapp{E}{|funk c e_1 a e_2|}{\rho} & = & \{ \fcn \{ (x, y) \, || \, x \in \Value, w \in \semappp{M}{e_1}{\msing{x}}{\rho}, y \in \get{\semapp{E}{e_2}{\extendrho{\rho}{a \mapsto w}}} \} \} \\
-  \semapp{E}{|funk o e_1 a e_2|}{\rho} & = &
+  \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ \fcn \{ (x, y) \, || \, x \in \Value, \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho}, y \in \get{\semapp{E}{e_2}{(\rho \circ \rho_e)}} \} \} \\
+  \semapp{E}{|funk o e_1 e_2|}{\rho} & = &
      \{ f \; ||
      \begin{array}[t]{l}
-       f \in \semfcn, \, \forall x \in \Value . \\ \forall w \in \semappp{M}{e_1}{\msing{x}}{\rho} . \\ f(x) \in \semapp{E}{e_2}{\extendrho{\rho}{a \mapsto w}} \}
+       f \in \semfcn, \, \forall x \in \Value . \\ \forall \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho} . \\
+       f(x) \in \semapp{E}{e_2}{(\rho \circ \rho_e)} \}
      \end{array} \\
+
   \end{array} \\ \\
     
   \begin{array}{rcll}
@@ -414,6 +434,30 @@ $
   \semapp{O}{|add|}{} & = & \{ f \, || \, f \in \semfcn, \; \forall x,y \in \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
   \end{array} \\ \\
   
+\text{\bf Defined identifiers} \\
+  \begin{array}{rcll}
+  \semapp{I}{|e|}{} & : & |[Ident]| \\
+  \semapp{I}{|apply1N e_1 e_2|}{} & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
+  \semapp{I}{|e_1 = e_2|}{}       & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
+  \semapp{I}{|e_1 ; e_2|}{}       & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
+  \semapp{I}{|x := e|}{}          & = & |[x]| <> \semapp{I}{|e|}{} \\
+  \semapp{I}{|:e|}{}              & = & \semapp{I}{|e|}{} \\
+  \semapp{I}{|arr (e_1, e_2)|}{}  & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
+  \semapp{I}{|e|}                 & = & |[]| & \text{otherwise} \\
+  \end{array} \\ \\
+    
+\end{array}
+$
+\caption{Expression semantics}
+\label{fig:den-sem1}
+\end{figure}
+
+
+\begin{figure}
+$
+\begin{array}{l}
+\text{\bf Utility functions} \\
+
 \begin{array}{rcll}
 \apply & : & (\Value \times \Value) \rightarrow \mtype \\
 \apply( \tuple{w_0, w_1}, k) & = & \msing{w_k} & 0 \leq k \leq 1 \\
@@ -447,17 +491,29 @@ $
 
 \end{array}
 $
-\caption{Expression semantics}
-\label{fig:den-sem1}
+\caption{Utility function}
+\label{fig:den-sem-util}
 \end{figure}
 
 \begin{figure}
 $
 \begin{array}{l}
-\text{\bf Match semantics of expressions} \\
 
+\text{\bf Match semantics} \\
+\\
   \begin{array}{rcll}
-  \semappp{M}{|e|}{}{} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
+%\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
+  \semapp{B}{|e|} & : & \mtype \rightarrow \Env \rightarrow \Env^{*} \\
+  \semappp{B}{|e|}{u}{\rho} & = &
+  \{ \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n} \\
+  & & || \;
+    w \in \bigcup_{w_1 \in \Value}\, \mydots \bigcup_{w_n \in \Value}\, \semapp{M}{e}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}
+    \} \\
+    & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+    
+%\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
+  \semapp{M}{|e|} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
   \semappp{M}{|x|}{u}{\rho} & = & \msing{\rho(x)} \cap u \\
   \semappp{M}{|k|}{u}{\rho} & = & \msing{k} \cap u \\
   \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \cap u \\
@@ -466,14 +522,14 @@ $
   \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & %% \semappp{M}{|e_1|}{\rho} \; \msemi      \; \semappp{M}{|e_2|}{\rho} \\
     \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semappp{M}{|e_2|}{u}{\rho}) \} \\
-  \semappp{M}{|def x e|}{u}{\rho} & = & \bigcup_{w \in \Value}\, \semappp{M}{e}{u}{(\extendrho{\rho}{x \mapsto w})} \\
+  \semappp{M}{|x := e|}{u}{\rho} & = & \msing{x} \;\cap\; \semappp{M}{e}{u}{\rho} \\
   \semappp{M}{|:e|}{u}{\rho} & = & %% \ran(\semappp{M}{|e|}{\rho}) \\
     \{ r \, || \, f \in \semappp{M}{|e|}{\rho}, \; a \in u, \; r \in \apply(f, a) \} \\
   \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
   \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
     \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \in u, \; x \in \semappp{M}{|e_1|}{u_1}{\rho}, \; y \in \semappp{M}{e_2}{u_2}{\rho}) \} \\
-  \semappp{M}{|funk c e_1 a e_2|}{u}{\rho} & = & TBD \\
-  \semappp{M}{|funk o e_1 a e_2|}{u}{\rho} & = & TBD \\
+  \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & TBD \\
+  \semappp{M}{|funk o e_1 e_2|}{u}{\rho} & = & TBD \\
 \\
     
   \end{array} \\ \\
@@ -508,15 +564,6 @@ otherwise a singleton with the result.
 The denotation of |gt| and |int| are singleton functions,
 whereas the denoation of |add| is the set of all function that behave like $+$ on (pairs of) integers,
 but are otherwise unconstrained.
-
-For now, functions are not represented as in SourceVerse, but need some desugaring.
-The domain expressions transforms the function input, which is then bound in the function body.
-Here are some examples:
-
-\begin{tabular}{ll}
-  |function((x:int))(x+1)|         & |funk o (:int) x (add(x,1))| \\
-  |function((x:int,y:succ))(x+y)|  & |funk o (arr (:int, :succ)) p (def (x y) (p = arr (x,y); add(x,y)))| \\
-\end{tabular}
 
 \vspace{2em}
 Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the cases I've covered.
