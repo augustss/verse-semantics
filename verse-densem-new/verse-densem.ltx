@@ -417,7 +417,13 @@ T^{*} & = & \text{set of } T \\
   \semapp{E}{|fail|}{\rho} & = & \emptyset \\
   \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
     \{ \tuple{x,y} \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
-  \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ \fcn \{ (x, y) \, || \, x \in \Value, \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho}, y \in \get{\semapp{S}{e_2}{(\rho \circ \rho_e)}} \} \} \\
+    \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ \fcn \{ (x, y) \, || \, x \in \Value, \\
+    %%    & & \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho}, \\
+    & & w_1 \in \Value, \mydots, w_n \in \Value, \\
+    & & \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+    & & \_w \in \semappp{M}{|e_1|}{x}{\rho'}, \\
+    & & y \in \semapp{S}{e_2}{\rho'} \} \\
+    & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e_1|} \\
   \semapp{E}{|funk o e_1 e_2|}{\rho} & = &
      \{ f \; ||
      \begin{array}[t]{l}
