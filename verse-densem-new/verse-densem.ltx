@@ -417,19 +417,24 @@ T^{*} & = & \text{set of } T \\
   \semapp{E}{|fail|}{\rho} & = & \emptyset \\
   \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
     \{ \tuple{x,y} \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
-    \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ \fcn \{ (x, y) \, || \, x \in \Value, \\
-    %%    & & \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho}, \\
-    & & w_1 \in \Value, \mydots, w_n \in \Value, \\
-    & & \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
-    & & \_w \in \semappp{M}{|e_1|}{x}{\rho'}, \\
-    & & y \in \semapp{S}{e_2}{\rho'} \} \\
-    & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e_1|} \\
-  \semapp{E}{|funk o e_1 e_2|}{\rho} & = &
-     \{ f \; ||
-     \begin{array}[t]{l}
-       f \in \semfcn, \, \forall x \in \Value . \\ \forall \rho_e \in \semappp{B}{e_1}{\msing{x}}{\rho} . \\
-       f(x) \in \semapp{S}{e_2}{(\rho \circ \rho_e)} \}
-     \end{array} \\
+  \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      f \in \semfcn, 
+      \forall x \in \Value, \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+      |if|\; \bar{\rho} = \emptyset\; |then|\; x \not\in \dom(f) \\
+      |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
+    \end{array} \\
+    & & \} \\
+  \semapp{E}{|funk o e_1 e_2|}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      f \in \semfcn, 
+      \forall x \in \Value, \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+      |if|\; \bar{\rho} = \emptyset\; |then|\; \textbf{T} \\
+      |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
+    \end{array} \\
+    & & \} \\
 
   \end{array} \\ \\
     
@@ -440,18 +445,6 @@ T^{*} & = & \text{set of } T \\
   \semapp{O}{|add|}{} & = & \{ f \, || \, f \in \semfcn, \; \forall x,y \in \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
   \end{array} \\ \\
   
-\text{\bf Defined identifiers} \\
-  \begin{array}{rcll}
-  \semapp{I}{|e|}{} & : & |[Ident]| \\
-  \semapp{I}{|apply1N e_1 e_2|}{} & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
-  \semapp{I}{|e_1 = e_2|}{}       & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
-  \semapp{I}{|e_1 ; e_2|}{}       & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
-  \semapp{I}{|x := e|}{}          & = & |[x]| <> \semapp{I}{|e|}{} \\
-  \semapp{I}{|:e|}{}              & = & \semapp{I}{|e|}{} \\
-  \semapp{I}{|arr (e_1, e_2)|}{}  & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
-  \semapp{I}{|e|}                 & = & |[]| & \text{otherwise} \\
-  \end{array} \\ \\
-    
 \end{array}
 $
 \caption{Expression semantics}
@@ -464,6 +457,18 @@ $
 \begin{array}{l}
 \text{\bf Utility functions} \\
 
+\text{\bf Defined identifiers} \\
+  \begin{array}{rcll}
+  \semapp{I}{|e|}{} & : & |[Ident]| \\
+  \semapp{I}{|apply1N e_1 e_2|}{} & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
+  \semapp{I}{|e_1 = e_2|}{}       & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
+  \semapp{I}{|e_1 ; e_2|}{}       & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
+  \semapp{I}{|x := e|}{}          & = & |[x]| <> \semapp{I}{|e|}{} \\
+  \semapp{I}{|:e|}{}              & = & \semapp{I}{|e|}{} \\
+  \semapp{I}{|arr (e_1, e_2)|}{}  & = & \semapp{I}{|e_1|}{} |<>| \semapp{I}{|e_2|}{} \\
+  \semapp{I}{|e|}                 & = & |[]| & \text{otherwise} \\
+  \end{array} \\ \\
+    
 \begin{array}{rcll}
 \apply & : & (\Value \times \Value) \rightarrow \mtype \\
 \apply( \tuple{w_0, w_1}, k) & = & \msing{w_k} & 0 \leq k \leq 1 \\
@@ -511,11 +516,13 @@ $
 %\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
   \semapp{B}{|e|} & : & \mtype \rightarrow \Env \rightarrow \Env^{*} \\
   \semappp{B}{|e|}{u}{\rho} & = &
-  \{ \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n} \\
-  & & || \;
-    w \in \bigcup_{w_1 \in \Value}\, \mydots \bigcup_{w_n \in \Value}\, \semappp{M}{e}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}
-    \} \\
-    & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+  \{ \rho' \; || 
+  \begin{array}[t]{l}
+  w_1 \in \Value, \mydots, w_n \in \Value, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
+  \end{array} \\
+  & &  \} \; \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
     
 %\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
@@ -552,7 +559,7 @@ The semantic value domain has these components
 \item $\mathbb{Z}$, the integers
 \item $\tuple{\Value,\Value}$ finite tuples of values, just pairs in this exposition to reduce clutter.
 \item $\semfcn$ (computable) functions from values to values.  The function can be partial,
-  i.e., the function domain, $\dom$, can be a subset of $\Value$,
+  \ie, the function domain, $\dom$, can be a subset of $\Value$,
   and the range, $\ran$, can also be a subset of $\Value$.
   Note that a function always maps a single value to a single value.
   Functions are defined as a set of pairs, as in set theory.
@@ -574,5 +581,26 @@ but are otherwise unconstrained.
 \vspace{2em}
 Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the cases I've covered.
 Hopefully it will hold for the rest too.
+
+The equation for closed functions in words.
+\begin{itemize}
+\item The denotation is a set of functions drawn from all possible functions (partial and total),
+  $\{ f || f \in \semfcn, \mydots \}$
+\item For every possible argument, $x$, $\forall x \in \Value,$
+\item Find all possible ways in which $e_1$ can match $x$.  The result is the original environment
+  extended with the different ways to ``solve'' for the variables bound in $e_1$.
+  $ |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho} $
+\item If $x$ does not match $e_1$ in any way, then $x$ is not in the domain of the function we are defining,
+  so it must not be in the domain of $f$ either.
+  $|if|\; \bar{\rho} = \emptyset\; |then|\; x \not\in \dom(f)$
+\item If $x$ does match $e_1$ then $x$ must be in the domain of $f$.
+  $ |else|\; x \in \dom(f) $
+\item \textbf{And} the image of $x$ (\ie, $f(x)$) must be in the denotation of $e_2$
+  for all the different ways we can match in $e_1$.
+  $ \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'} $
+\end{itemize}
+
+The explanation for open functions is almost identical.  The only difference is that if $e_1$ does not match $x$,
+\ie, the $x$ is not in the domain of the function we are defining, then we accept $f$ without further ado.
 
 \end{document}
