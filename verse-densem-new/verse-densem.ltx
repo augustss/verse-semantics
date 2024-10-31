@@ -420,7 +420,7 @@ T^{*} & = & \text{set of } T \\
   \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \in \semfcn, 
-      \forall x \in \Value, \\
+      \forall x \in \Value. \\
       |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; x \not\in \dom(f) \\
       |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
@@ -429,7 +429,7 @@ T^{*} & = & \text{set of } T \\
   \semapp{E}{|funk o e_1 e_2|}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \in \semfcn, 
-      \forall x \in \Value, \\
+      \forall x \in \Value. \\
       |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; \textbf{T} \\
       |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
@@ -581,6 +581,10 @@ but are otherwise unconstrained.
 \vspace{2em}
 Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the cases I've covered.
 Hopefully it will hold for the rest too.
+
+WARNING: The notation is a little confusing, sometimes $x \in e$ is a binding occurence of x,
+and sometimes it is a membership test. The |let| is used in the same way as |let| in Haskell list comprehensions.
+The |if| construct is the logical connective, not the descriminator for Booleans.
 
 The equation for closed functions in words.
 \begin{itemize}
