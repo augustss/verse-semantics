@@ -421,7 +421,7 @@ T^{*} & = & \text{set of } T \\
     \begin{array}[t]{l}
       f \in \semfcn, 
       \forall x \in \Value. \\
-      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; x \not\in \dom(f) \\
       |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
     \end{array} \\
@@ -430,7 +430,7 @@ T^{*} & = & \text{set of } T \\
     \begin{array}[t]{l}
       f \in \semfcn, 
       \forall x \in \Value. \\
-      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; \textbf{T} \\
       |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
     \end{array} \\
