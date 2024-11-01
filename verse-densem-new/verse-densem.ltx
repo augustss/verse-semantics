@@ -398,7 +398,8 @@ T^{*} & = & \text{set of } T \\
 \multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
   \semapp{S}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{S}{|e|}{\rho} & = &
-  \bigcup_{w_1 \in \Value}\, \mydots \bigcup_{w_n \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \\
+  \{ \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
+          w_1 \in \Value, \mydots, w_n \in \Value \} \\
   & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 \multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
@@ -407,7 +408,7 @@ T^{*} & = & \text{set of } T \\
   \semapp{E}{|k|}{\rho} & = & \msing{k} \\
   \semapp{E}{|o|}{\rho} & = & \semapp{O}{|o|}{} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
-    \{ r \, || \, f \in \semapp{E}{|e_1|}{\rho}, \; a \in \semapp{E}{|e_2|}{\rho}), \; r \in \apply(f, a) \} \\
+    \{ r \, || \, f \in \semapp{E}{|e_1|}{\rho}, \; a \in \semapp{E}{|e_2|}{\rho}, \; r \in \apply(f, a) \} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
     \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
@@ -451,6 +452,72 @@ $
 \label{fig:den-sem1}
 \end{figure}
 
+\begin{figure}
+$
+\begin{array}{l}
+
+\text{\bf Match semantics} \\
+\\
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
+  \semapp{B}{|e|} & : & \mtype \rightarrow \Env \rightarrow \Env^{*} \\
+  \semappp{B}{|e|}{u}{\rho} & = &
+  \{ \rho' \; || 
+  \begin{array}[t]{l}
+  w_1 \in \Value, \mydots, w_n \in \Value, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
+  \end{array} \\
+  & &  \} \; \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+    
+  \semapp{N}{|e|}{} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
+  \semappp{N}{|e|}{u}{\rho} & = &
+  \{ \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
+          w_1 \in \Value, \mydots, w_n \in \Value \} \\
+  & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+%\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
+  \semapp{M}{|e|} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
+  \semappp{M}{|x|}{u}{\rho} & = & \msing{\rho(x)} \cap u \\
+  \semappp{M}{|k|}{u}{\rho} & = & \msing{k} \cap u \\
+  \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \cap u \\
+  \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & %% \apply(\semappp{M}{|e_1|}{\rho}, \; \semappp{M}{|e_2|}{\rho}) \\
+    \{ r \, || \, f \in \semapp{E}{|e_1|}{\rho}, \; a \in \semapp{E}{|e_2|}{\rho}, \; r \in \apply(f, a) \} \cap u \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & %% \semappp{M}{|e_1|}{\rho} \; \msemi      \; \semappp{M}{|e_2|}{\rho} \\
+    \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semappp{M}{|e_2|}{u}{\rho}) \} \\
+  \semappp{M}{|x := e|}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
+  \semappp{M}{|:e|}{u}{\rho} & = & %% \ran(\semappp{M}{|e|}{\rho}) \\
+    \{ r \, || \, f \in \semapp{E}{|e|}{\rho}, \; a \in u, \; r \in \apply(f, a) \} \\
+  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+  \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
+    \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \in u, \; x \in \semappp{M}{|e_1|}{u_1}{\rho}, \; y \in \semappp{M}{e_2}{u_2}{\rho}) \} \\
+  %% \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & TBD \\
+  \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      g \in u, g \in \semfcn, \\
+      f \in \semfcn, \\
+      \forall x \in \Value. \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
+      |if|\; \bar{\rho} = \emptyset\; |then|\; x \not\in \dom(f) \\
+      |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. \\
+      \hspace{2em} \forall x' \in \semappp{M}{e_1}{x}{\rho'},\, \\
+      \hspace{2em} x' \in \dom(g) \land \\
+      \hspace{2em} f(x) \in \semappp{N}{e_2}{\msing{g(x')}}{\rho'}
+    \end{array} \\
+    & & \} \\
+  \semappp{M}{|funk o e_1 e_2|}{u}{\rho} & = & TBD \\
+\\
+    
+  \end{array} \\ \\
+  
+
+\end{array}
+$
+\caption{Expression match semantics}
+\label{fig:den-sem2}
+\end{figure}
 
 \begin{figure}
 $
@@ -506,53 +573,6 @@ $
 \label{fig:den-sem-util}
 \end{figure}
 
-\begin{figure}
-$
-\begin{array}{l}
-
-\text{\bf Match semantics} \\
-\\
-  \begin{array}{rcll}
-%\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
-  \semapp{B}{|e|} & : & \mtype \rightarrow \Env \rightarrow \Env^{*} \\
-  \semappp{B}{|e|}{u}{\rho} & = &
-  \{ \rho' \; || 
-  \begin{array}[t]{l}
-  w_1 \in \Value, \mydots, w_n \in \Value, \\
-  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
-  \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
-  \end{array} \\
-  & &  \} \; \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
-\\
-    
-%\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
-  \semapp{M}{|e|} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
-  \semappp{M}{|x|}{u}{\rho} & = & \msing{\rho(x)} \cap u \\
-  \semappp{M}{|k|}{u}{\rho} & = & \msing{k} \cap u \\
-  \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \cap u \\
-  \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & %% \apply(\semappp{M}{|e_1|}{\rho}, \; \semappp{M}{|e_2|}{\rho}) \\
-    \{ r \, || \, f \in \semapp{E}{|e_1|}{\rho}, \; a \in \semapp{E}{|e_2|}{\rho}), \; r \in \apply(f, a) \} \cap u \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
-  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & %% \semappp{M}{|e_1|}{\rho} \; \msemi      \; \semappp{M}{|e_2|}{\rho} \\
-    \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semappp{M}{|e_2|}{u}{\rho}) \} \\
-  \semappp{M}{|x := e|}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
-  \semappp{M}{|:e|}{u}{\rho} & = & %% \ran(\semappp{M}{|e|}{\rho}) \\
-    \{ r \, || \, f \in \semappp{M}{|e|}{\rho}, \; a \in u, \; r \in \apply(f, a) \} \\
-  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
-  \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
-    \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \in u, \; x \in \semappp{M}{|e_1|}{u_1}{\rho}, \; y \in \semappp{M}{e_2}{u_2}{\rho}) \} \\
-  \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & TBD \\
-  \semappp{M}{|funk o e_1 e_2|}{u}{\rho} & = & TBD \\
-\\
-    
-  \end{array} \\ \\
-  
-
-\end{array}
-$
-\caption{Expression match semantics}
-\label{fig:den-sem2}
-\end{figure}
 
 The semantic value domain has these components
 \begin{itemize}
@@ -564,6 +584,7 @@ The semantic value domain has these components
   Note that a function always maps a single value to a single value.
   Functions are defined as a set of pairs, as in set theory.
   The notation $\fcn$ is used to indicate that we are defining a function using pairs.
+  Since a function is a set of pairs, there is no notion of non-terminating functions.
 \end{itemize}
 
 The semantic valuation function $\semapp{E}{e}{\rho}$ maps an expression in the given environment to
@@ -579,8 +600,9 @@ whereas the denoation of |add| is the set of all function that behave like $+$ o
 but are otherwise unconstrained.
 
 \vspace{2em}
-Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the cases I've covered.
-Hopefully it will hold for the rest too.
+Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the non-function cases.
+It is tantalizingly close to be (obvioisly) true for functions as well.  Maybe it can be tweaked.
+
 
 WARNING: The notation is a little confusing, sometimes $x \in e$ is a binding occurence of x,
 and sometimes it is a membership test. The |let| is used in the same way as |let| in Haskell list comprehensions.
