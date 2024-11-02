@@ -493,7 +493,7 @@ $
     \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; a \inb u, \; r \inb \apply(f, a) \} \\
   \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
   \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
-    \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \inb u, \; x \inb \semappp{M}{|e_1|}{u_1}{\rho}, \; y \inb \semappp{M}{e_2}{u_2}{\rho}) \} \\
+    \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \inb u, \; x \inb \semappp{M}{|e_1|}{\msing{u_1}}{\rho}, \; y \inb \semappp{M}{e_2}{\msing{u_2}}{\rho}) \} \\
   %% \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & TBD \\
   \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
@@ -579,7 +579,7 @@ The semantic value domain has these components
 \begin{itemize}
 \item $\mathbb{Z}$, the integers
 \item $\tuple{\Value,\Value}$ finite tuples of values, just pairs in this exposition to reduce clutter.
-\item $\semfcn$ (computable) functions from values to values.  The function can be partial,
+\item $\semfcn$ (computable, provably terminating) functions from values to values.  The function can be partial,
   \ie, the function domain, $\dom$, can be a subset of $\Value$,
   and the range, $\ran$, can also be a subset of $\Value$.
   Note that a function always maps a single value to a single value.
