@@ -70,7 +70,7 @@ allWs :: WS
 allWs = Set $
   nonFcn ++
   [ unSing (dO o) | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, id1, id01, f01, inc, comp ]
+  map VFcn [ id0, id1, id01, f01, fsucc, fpred, comp, ho1 ]
   where
     nonFcn =
       allInts ++
@@ -79,12 +79,20 @@ allWs = Set $
     id1 = Fcn [(VInt 1, VInt 1)]
     id01 = Fcn [(VInt 0, VInt 0), (VInt 1, VInt 1)]
     f01 = Fcn [(VInt 0, VInt 0), (VInt 1, VInt 2)]
-    inc = Fcn [(x, vadd x (VInt 1)) | x <- allInts ]
     comp = Fcn [(w, w) | w <- nonFcn ]
+    -- The function that accepts succ/pred as an argument and returns 2/0
+    ho1 = Fcn [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0)]
+
+fsucc :: Fcn Val Val
+fsucc = Fcn [(x, vadd x (VInt 1)) | x <- allInts ]
+
+fpred :: Fcn Val Val
+fpred = Fcn [(x, vadd x (VInt 3)) | x <- allInts ]
 
 rho0 :: Env
 rho0 = M.fromList $
-  [ (n, unSing (dO o)) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd) ] ]
+  [ (n, unSing (dO o)) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd) ] ] ++
+  [ ("succ", VFcn fsucc), ("pred", VFcn fpred) ]
 
 type W = Val
 type WS = Set W
@@ -165,6 +173,9 @@ dO Oadd = sing $ VFcn $ Fcn [ (VPair x y, vadd x y) | x <- allInts, y <- allInts
 eB :: Exp -> WS -> Env -> Set Env
 eB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
 
+dN :: Exp -> WS -> Env -> WS
+dN e u rho = tryAll rho (dI e) (dM e u)
+
 dM :: Exp -> WS -> Env -> WS
 dM (Var x) u rho = find x rho `isect` u
 dM (Int k) u _rho = sing (VInt k) `isect` u
@@ -177,6 +188,28 @@ dM (Colon e) u rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet u, r <- unSet
 dM Fail _u _rho = empty
 dM (Pair e1 e2) u rho = mkSet [ VPair x y | VPair u1 u2 <- unSet u,
                                             x <- unSet $ dM e1 (sing u1) rho, y <- unSet $ dM e2 (sing u2) rho ]
+dM (FunC e1 e2) u rho = mkSet
+  [ VFcn f | VFcn f <- unSet allWs,
+             VFcn g <- unSet u,
+             forAll allWs $ \ x ->
+               let rhos = eB e1 (sing x) rho in
+                 if isEmpty rhos then not (x `inDom` f)
+                 else inDom x f && forAll rhos (\ rho' ->
+                                                  forAll (dM e1 (sing x) rho')
+                                                         (\ x' -> x' `inDom` g &&
+                                                                  ap f x `sIn` dN e2 (sing (ap g x')) rho'))
+  ]
+dM (FunO e1 e2) u rho = mkSet
+  [ VFcn f | VFcn f <- unSet allWs,
+             VFcn g <- unSet u,
+             forAll allWs $ \ x ->
+               let rhos = eB e1 (sing x) rho in
+                 if isEmpty rhos then True
+                 else inDom x f && forAll rhos (\ rho' ->
+                                                  forAll (dM e1 (sing x) rho')
+                                                         (\ x' -> x' `inDom` g &&
+                                                                  ap f x `sIn` dN e2 (sing (ap g x')) rho'))
+  ]
 
 -----
 
@@ -205,3 +238,11 @@ ex5 = dP $ App exp4 (Int 2)
 -- Using exp3 in its domain is fine
 ex6 :: Val
 ex6 = dP $ App exp3 (Int 1)
+
+exp7 :: Exp
+exp7 = FunC arg (App (Var "f") (Int 1))
+  where arg = Def "f" (FunC cint cint)
+        cint = Colon (Var "int")
+
+ex7 :: Val
+ex7 = dP $ App exp7 (Var "succ")
