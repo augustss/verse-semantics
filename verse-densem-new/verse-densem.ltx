@@ -668,4 +668,13 @@ The equation for closed functions in words.
 The explanation for open functions is almost identical.  The only difference is that if $e_1$ does not match $x$,
 \ie, the $x$ is not in the domain of the function we are defining, then we accept $f$ without further ado.
 
+The denotation of |if| is not obvious.  What should it be?
+Consider the following program\\
+|vif (x:int; x*x=1) (vif (x=1) (y:int; y<=0) (y:int; y>=0)) 999| \\
+There are two solutions for |x|, namely $-1$ and $1$.
+They are not ordered so it is not clear what the value of |x| should have then the |then| branch.
+One alternative would be to say that it is |Wrong|.
+The semantic equation takes another approach and says that we should unify all possible |then| branches,
+and so the result is $0$.
+
 \end{document}
