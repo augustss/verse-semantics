@@ -339,17 +339,13 @@
     \vb |e_1 ; e_2|
     \vb |x := e|
     \vb |:e|
-    \vb |fail|
+%FAIL    \vb |fail|
     \\
     & &
     \vb & |vif e_1 e_2 e_3|
     \vb |arr (e_1, e_2)|
     \vb |funk q e_1 e_2|
-       %%       \vb |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e|
-       \\
-%       && \vb & |succeeds e| \vb |decides e| \\
-%       && \vb & |if e_1 then lam x e_2 else e_3| \vb |for e_1 do lam x e_2| \\
-%       & & \vb & |hastype e_1 e_2| \\
+    \\
     \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
     \text{Openness} & q & ::= & |open| \vb |closed| \\
     \end{array} \\
@@ -372,7 +368,7 @@ The syntax of \versecalc{} is given in \cref{fig:syntax}.
 \newcommand{\fcn}{\mathbf{fcn}}
 \newcommand{\get}[1]{\mathbf{sing}(#1)}
 
-\newcommand{\dtuple}{\tuple{\Value,\Value}}
+\newcommand{\dtuple}{\tuple{\Value}}
 
 \begin{figure}
 $
@@ -380,7 +376,7 @@ $
 \textbf{Domains} \\
 \begin{array}{rcll}
 \Value & = & \mathbb{Z} + \dtuple + (\semfcn) \\
-%% \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
+\dtuple & = & \text{a finite tuple of values $\Value$} \\
 \Env & = & |Ident| \rightarrow \Value \\
 W^{*} & = & \text{set of } W \\
 Env^{*} & = & \text{set of } Env \\
@@ -419,7 +415,7 @@ Env^{*} & = & \text{set of } Env \\
   \semapp{E}{|x := e|}{\rho} & = & \msing{\rho(x)} \;\cap\; \semapp{E}{e}{\rho} \\
   \semapp{E}{|:e|}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
     \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} \\
-  \semapp{E}{|fail|}{\rho} & = & \emptyset \\
+%FAIL  \semapp{E}{|fail|}{\rho} & = & \emptyset \\
   \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
   \left\{
   \begin{array}{ll}
@@ -428,8 +424,8 @@ Env^{*} & = & \text{set of } Env \\
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
-  \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
-    \{ \tuple{x,y} \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho}) \} \\
+  \semapp{E}{|arr (e_1, xdots, e_n)|}{\rho} & = &
+    \{ \tuple{x_1,\mydots,x_n} \, || \, x_1 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho}) \} \\
   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \inb \semfcn, 
@@ -505,7 +501,7 @@ $
   \semappp{M}{|x := e|}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
   \semappp{M}{|:e|}{u}{\rho} & = &
     \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; r \inb \apply(f, u) \} \\
-  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+%FAIL  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
   \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
   \left\{
   \begin{array}{ll}
@@ -514,9 +510,9 @@ $
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
-  \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
-  \{ \tuple{x_1,x_2} \, || \, u \in \dtuple, |let|\; \tuple{u_1,u_2} = u, \\
-  & & \hspace{0.5em} x_1 \inb \semappp{M}{|e_1|}{u_1}{\rho}, \; x_2 \inb \semappp{M}{e_2}{u_2}{\rho}) \} \\
+  \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
+  \{ \tuple{x_1,\mydots,x_2} \, || \, u \in \dtuple, |let|\; \tuple{u_1,\mydots,u_n} = u, \\
+  & & \hspace{0.5em} x_1 \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, x_n \inb \semappp{M}{e_n}{u_n}{\rho}) \} \\
   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \inb \semfcn, \\
@@ -570,7 +566,7 @@ $
     
 \begin{array}{rcll}
 \apply & : & (\Value \times \Value) \rightarrow \mtype \\
-\apply( \tuple{w_0, w_1}, k) & = & \msing{w_k} & 0 \leq k \leq 1 \\
+\apply( \tuple{w_0, \mydots,\, w_n}, k) & = & \msing{w_k} & 0 \leq k \leq n \\
 \apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
 \textbf{alternative:\hspace{6em}}               & = & \{ y \, || \, (x, y) \inb f, \; x=w \} & f \inb \semfcn \\
 \apply( f, w ) & = & \emptyset & \text{otherwise} \\
@@ -609,7 +605,7 @@ $
 The semantic value domain has these components
 \begin{itemize}
 \item $\mathbb{Z}$, the integers
-\item $\tuple{\Value,\Value}$ finite tuples of values, just pairs in this exposition to reduce clutter.
+\item $\dtuple$ finite tuples of values.
 \item $\semfcn$ (computable, provably terminating) functions from values to values.  The function can be partial,
   \ie, the function domain, $\dom$, can be a subset of $\Value$,
   and the range, $\ran$, can also be a subset of $\Value$.

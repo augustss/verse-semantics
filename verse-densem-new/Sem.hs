@@ -9,7 +9,7 @@ type Ident = String
 
 data Exp
   = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
-  | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Pair Exp Exp
+  | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
   | If Exp Exp Exp | Fun OC Exp Exp
   deriving (Eq, Ord, Show)
 
@@ -19,12 +19,12 @@ data Op = Oint | Ogt | Oadd
 data OC = Open | Closed
   deriving (Eq, Ord, Show)
 
-data Val = VInt Integer | VPair Val Val | VFcn (Fcn Val Val)
+data Val = VInt Integer | VTup [Val] | VFcn (Fcn Val Val)
   deriving (Eq, Ord)
 
 instance Show Val where
   showsPrec p (VInt i) = showsPrec p i
-  showsPrec p (VPair a b) = showsPrec p (a, b)
+  showsPrec p (VTup vs) = showsPrec p vs
   showsPrec p (VFcn f) = showsPrec p f
 
 data RVal = RVal Val | Wrong String
@@ -106,7 +106,7 @@ allWs = Set $
   where
     nonFcn =
       allInts ++
-      [VPair x y | x <- allInts, y <- allInts]
+      [VTup [x, y] | x <- allInts, y <- allInts]
     id0 = Fcn "id0" [(VInt 0, VInt 0)]
     id1 = Fcn "id1" [(VInt 1, VInt 1)]
     id01 = Fcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
@@ -162,8 +162,7 @@ tryAll :: Env -> [Ident] -> (Env -> WS) -> WS
 tryAll rho xs ev = sUnion $ map ev $ genRhos rho xs
 
 apply :: Val -> Val -> Set Val
-apply (VPair w0 w1) (VInt k) | k == 0 = sing w0
-                             | k == 1 = sing w1
+apply (VTup ws) (VInt k) | 0 <= k' && k' < length ws = sing (ws !! k')  where k' = fromInteger k
 apply (VFcn (Fcn _ xys)) w = maybe empty sing $ lookup w xys
 apply _ _ = empty
 
@@ -177,7 +176,7 @@ dI :: Exp -> [Ident]
 dI (App e1 e2) = dI e1 <> dI e2
 dI (Equ e1 e2) = dI e1 <> dI e2
 dI (Seq e1 e2) = dI e1 <> dI e2
-dI (Pair e1 e2) = dI e1 <> dI e2
+dI (Tup es) = concat (map dI es)
 dI (Def i e) = [i] <> dI e
 dI (Colon e) = dI e
 dI _ = []
@@ -213,7 +212,8 @@ dE (If e1 e2 e3) rho =
   case unSet $ sUnion [ dB e1 w rho | w <- unSet allWs ] of
     [] -> dE e3 rho
     rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]
-dE (Pair e1 e2) rho = mkSet [ VPair x y | x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
+dE (Tup es) rho = mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
+  --[ VPair x y | x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
 dE (Fun q e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
         forAll allWs $ \ x ->
@@ -225,8 +225,8 @@ dE (Fun q e1 e2) rho = mkSet
 
 dO :: Op -> WS
 dO Oint = sing $ VFcn $ Fcn "int" [ (x, x) | x <- allInts ]
-dO Ogt  = sing $ VFcn $ Fcn "gt"  [ (VPair x y, x) | x <- allInts, y <- allInts, x > y]
-dO Oadd = sing $ VFcn $ Fcn "add" [ (VPair x y, vadd x y) | x <- allInts, y <- allInts]
+dO Ogt  = sing $ VFcn $ Fcn "gt"  [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y]
+dO Oadd = sing $ VFcn $ Fcn "add" [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
 
 dB :: Exp -> W -> Env -> Set Env
 dB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
@@ -248,8 +248,9 @@ dM (If e1 e2 e3) u rho =
   case unSet $ sUnion [ dB e1 w rho | w <- unSet allWs ] of
     [] -> dM e3 u rho
     rhos -> sUnion [ dM e2 u rho' | rho' <- rhos ]
-dM (Pair e1 e2) u rho = mkSet [ VPair x y | VPair u1 u2 <- [u],
-                                x <- unSet $ dM e1 u1 rho, y <- unSet $ dM e2 u2 rho ]
+dM (Tup es) u rho | VTup us <- u, length us == length us =
+                      mkSet $ map VTup $ sequence $ zipWith (\ e v -> unSet $ dM e v rho) es us
+                  | otherwise = empty
 dM (Fun q e1 e2) u rho = mkSet
   [ VFcn f | VFcn g <- [u],
              VFcn f <- unSet allWs,
@@ -266,7 +267,7 @@ dM (Fun q e1 e2) u rho = mkSet
 
 -- x:=2; y:=1; add[(x,y)]
 exp1 :: Exp
-exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Pair (Var "x") (Var "y")))
+exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))
 
 ex1 :: RVal
 ex1 = dP exp1
@@ -288,7 +289,7 @@ ex3 = dP exp3
 
 -- fun_c(x:int){add[(x,1)]}
 exp4 :: Exp
-exp4 = Fun Closed (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Pair (Var "x") (Int 1)))
+exp4 = Fun Closed (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Tup [Var "x", Int 1]))
 
 ex4 :: RVal
 ex4 = dP exp4
