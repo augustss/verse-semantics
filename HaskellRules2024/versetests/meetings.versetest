@@ -1,5 +1,9 @@
 # Add new meetings at the top
 
+verify("M4Nov24-1", fail){ f(1):=1; g( h(:int):int ) := h[1]; g[f] }
+verify("M4Nov24-2", pass){ f(x:int):=x; g( h(:int):int ) := h[1]; g[f] }
+  # Test that the call to g[f] checks that f truly satisfies the domain of g.
+
 verify("M21Aug24-1", pass){ (F():int = G[]) ; (G():int = 1); F[] }
 
 
