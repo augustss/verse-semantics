@@ -1217,7 +1217,7 @@ instance Arbitrary Expr where
   shrink (Op op)      = [ LitInt 0, LitInt 1 ] ++ [ Op IsInt | op /= IsInt ]   -- See Note [Shrinking expressions: ops] SLPJ: explain
   shrink (Tup es)     = es
                      ++ [ Tup es' | es' <- shrink es ]
-  shrink (Tru e)      = [ e ] ++ [ Tru e'  | e' <- shrink e ]
+  shrink (Tru e)      = [ e, Tup [e] ] ++ [ Tru e' | e' <- shrink e ]
   shrink (Lam bnd)    = shrinkBind Lam bnd
 {-
   -- this shrink rule only makes sense if = can appear by itself:
