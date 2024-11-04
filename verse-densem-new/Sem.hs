@@ -92,10 +92,10 @@ allWs = Set $
     comp = Fcn "comparable" [(w, w) | w <- nonFcn ]
     -- The function that accepts succ/int/pred as an argument and returns 2/1/0
     ho1 = Fcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0), (VFcn fint, VInt 1),
-                     (VFcn comp, VInt 1)
+                     (VFcn fsucc2, VInt 3), (VFcn comp, VInt 1)
                     ]
     ho2 = Fcn "ho2" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                     (VFcn comp, VInt 2)
+                     (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2)
                     ]
 
 fint :: Fcn Val Val
@@ -235,12 +235,15 @@ dM (FunO e1 e2) u rho = mkSet
 
 -----
 
+-- x:=2; y:=1; add[(x,y)]
 ex1 :: Val
 ex1 = dP $ Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Pair (Var "x") (Var "y")))
 
+-- fun_c(x:int){x}
 ex2 :: Val
 ex2 = dP $ FunC (Def "x" (Colon (Var "int"))) (Var "x")
 
+-- fun_o(x:int){x}
 exp3 :: Exp
 exp3 = FunO (Def "x" (Colon (Var "int"))) (Var "x")
 
@@ -248,6 +251,7 @@ exp3 = FunO (Def "x" (Colon (Var "int"))) (Var "x")
 ex3 :: Val
 ex3 = dP exp3
 
+-- fun_c(x:int){add[(x,1)]}
 exp4 :: Exp
 exp4 = FunC (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Pair (Var "x") (Int 1)))
 
@@ -261,6 +265,7 @@ ex5 = dP $ App exp4 (Int 2)
 ex6 :: Val
 ex6 = dP $ App exp3 (Int 1)
 
+-- fun_c(f := fun_c(:int){:int}){f[1]}
 exp7 :: Exp
 exp7 = FunC arg (App (Var "f") (Int 1))
   where arg = Def "f" (FunC cint cint)
@@ -275,7 +280,7 @@ ex8 = dP $ App exp7 (Var "int")
 ex9 :: Val
 ex9 = dP $ App exp7 exp4
 
-{- Not yet
+-- fun_c(f := fun_c(:succ){:int}){f[1]}
 exp10 :: Exp
 exp10 = FunC arg (App (Var "f") (Int 1))
   where arg = Def "f" (FunC csucc cint)
@@ -283,6 +288,4 @@ exp10 = FunC arg (App (Var "f") (Int 1))
         cint = Colon (Var "int")
 
 ex10 :: Val
-ex10 = dP $ exp10 
-
--}
+ex10 = dP $ App exp10 (Var "int")
