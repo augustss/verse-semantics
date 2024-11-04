@@ -10,10 +10,13 @@ type Ident = String
 data Exp
   = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
   | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Pair Exp Exp
-  | If Exp Exp Exp | FunC Exp Exp | FunO Exp Exp
+  | If Exp Exp Exp | Fun OC Exp Exp
   deriving (Eq, Ord, Show)
 
 data Op = Oint | Ogt | Oadd
+  deriving (Eq, Ord, Show)
+
+data OC = Open | Closed
   deriving (Eq, Ord, Show)
 
 data Val = VInt Integer | VPair Val Val | VFcn (Fcn Val Val)
@@ -60,9 +63,11 @@ mkSet = Set . remdup . sort
 sUnion :: (Ord a) => [Set a] -> Set a
 sUnion = mkSet . concatMap unSet
 
+{-
 sIsect :: (Ord a) => [Set a] -> Set a
 sIsect [] = undefined
 sIsect as = foldr1 isect as
+-}
 
 isect :: Ord a => Set a -> Set a -> Set a
 isect s1 s2 = mkSet $ unSet s1 `intersect` unSet s2
@@ -185,7 +190,7 @@ dP e =
 
 dP' :: Exp -> RVal
 dP' e =
-  case dL e allWs rho0 of
+  case sUnion [ dL e w rho0 | w <- unSet allWs ] of
     Set [w] -> RVal w
     Set ws -> Wrong $ show ws
 
@@ -205,23 +210,16 @@ dE (Def x e) rho = find x rho `isect` dE e rho
 dE (Colon e) rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet allWs, r <- unSet $ apply f a ]
 dE Fail _rho = empty
 dE (If e1 e2 e3) rho =
-  case unSet $ dB e1 allWs rho of
+  case unSet $ sUnion [ dB e1 w rho | w <- unSet allWs ] of
     [] -> dE e3 rho
-    rhos -> sIsect [ dE e2 rho' | rho' <- rhos ]
+    rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]
 dE (Pair e1 e2) rho = mkSet [ VPair x y | x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
-dE (FunC e1 e2) rho = mkSet
+dE (Fun q e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
         forAll allWs $ \ x ->
-          let rhos = dB e1 (sing x) rho in
+          let rhos = dB e1 x rho in
 --            trace ("f,x=" ++ show (f, x) ++ " rhos=" ++ show rhos) $
-            if isEmpty rhos then not (inDom x f)
-            else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dD e2 rho')
-  ]
-dE (FunO e1 e2) rho = mkSet
-  [ VFcn f | VFcn f <- unSet allWs,
-        forAll allWs $ \ x ->
-          let rhos = dB e1 (sing x) rho in
-            if isEmpty rhos then True
+            if isEmpty rhos then not (inDom x f) || q == Open
             else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dD e2 rho')
   ]
 
@@ -230,49 +228,38 @@ dO Oint = sing $ VFcn $ Fcn "int" [ (x, x) | x <- allInts ]
 dO Ogt  = sing $ VFcn $ Fcn "gt"  [ (VPair x y, x) | x <- allInts, y <- allInts, x > y]
 dO Oadd = sing $ VFcn $ Fcn "add" [ (VPair x y, vadd x y) | x <- allInts, y <- allInts]
 
-dB :: Exp -> WS -> Env -> Set Env
+dB :: Exp -> W -> Env -> Set Env
 dB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
 
-dL :: Exp -> WS -> Env -> WS
+dL :: Exp -> W -> Env -> WS
 dL e u rho = tryAll rho (dI e) (dM e u)
 
-dM :: Exp -> WS -> Env -> WS
-dM (Var x) u rho = find x rho `isect` u
-dM (Int k) u _rho = sing (VInt k) `isect` u
-dM (Prim o) u _rho = dO o `isect` u
-dM (App e1 e2) u rho = mkSet [ r | f <- unSet $ dE e1 rho, a <- unSet $ dE e2 rho, r <- unSet $ apply f a ] `isect` u
+dM :: Exp -> W -> Env -> WS
+dM (Var x) u rho = find x rho `isect` sing u
+dM (Int k) u _rho = sing (VInt k) `isect` sing u
+dM (Prim o) u _rho = dO o `isect` sing u
+dM (App e1 e2) u rho = mkSet [ r | f <- unSet $ dE e1 rho, a <- unSet $ dE e2 rho, r <- unSet $ apply f a ] `isect` sing u
 dM (Equ e1 e2) u rho = dM e1 u rho `isect` dM e2 u rho
 dM (Seq e1 e2) u rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dM e2 u rho ]
 dM (Def x e) u rho = find x rho `isect` dM e u rho
-dM (Colon e) u rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet u, r <- unSet $ apply f a ]
+dM (Colon e) u rho = mkSet [ r | f <- unSet $ dE e rho, r <- unSet $ apply f u ]
 dM Fail _u _rho = empty
 dM (If e1 e2 e3) u rho =
-  case unSet $ dB e1 allWs rho of
+  case unSet $ sUnion [ dB e1 w rho | w <- unSet allWs ] of
     [] -> dM e3 u rho
-    rhos -> sIsect [ dM e2 u rho' | rho' <- rhos ]
-dM (Pair e1 e2) u rho = mkSet [ VPair x y | VPair u1 u2 <- unSet u,
-                                x <- unSet $ dM e1 (sing u1) rho, y <- unSet $ dM e2 (sing u2) rho ]
-dM (FunC e1 e2) u rho = mkSet
-  [ VFcn f | VFcn f <- unSet allWs,
-             VFcn g <- unSet u,
+    rhos -> sUnion [ dM e2 u rho' | rho' <- rhos ]
+dM (Pair e1 e2) u rho = mkSet [ VPair x y | VPair u1 u2 <- [u],
+                                x <- unSet $ dM e1 u1 rho, y <- unSet $ dM e2 u2 rho ]
+dM (Fun q e1 e2) u rho = mkSet
+  [ VFcn f | VFcn g <- [u],
+             VFcn f <- unSet allWs,
              forAll allWs $ \ x ->
-               let rhos = dB e1 (sing x) rho in
-                 if isEmpty rhos then not (x `inDom` f)
+               let rhos = dB e1 x rho in
+                 if isEmpty rhos then not (x `inDom` f) || q == Open
                  else inDom x f && forAll rhos (\ rho' ->
-                                                  forAll (dM e1 (sing x) rho')
+                                                  forAll (dM e1 x rho')
                                                          (\ x' -> x' `inDom` g &&
-                                                                  ap f x `sIn` dL e2 (sing (ap g x')) rho'))
-  ]
-dM (FunO e1 e2) u rho = mkSet
-  [ VFcn f | VFcn f <- unSet allWs,
-             VFcn g <- unSet u,
-             forAll allWs $ \ x ->
-               let rhos = dB e1 (sing x) rho in
-                 if isEmpty rhos then True
-                 else inDom x f && forAll rhos (\ rho' ->
-                                                  forAll (dM e1 (sing x) rho')
-                                                         (\ x' -> x' `inDom` g &&
-                                                                  ap f x `sIn` dL e2 (sing (ap g x')) rho'))
+                                                                  ap f x `sIn` dL e2 (ap g x') rho'))
   ]
 
 -----
@@ -286,14 +273,14 @@ ex1 = dP exp1
 
 -- fun_c(x:int){x}
 exp2 :: Exp
-exp2 = FunC (Def "x" (Colon (Var "int"))) (Var "x")
+exp2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x")
 
 ex2 :: RVal
 ex2 = dP exp2
 
 -- fun_o(x:int){x}
 exp3 :: Exp
-exp3 = FunO (Def "x" (Colon (Var "int"))) (Var "x")
+exp3 = Fun Open (Def "x" (Colon (Var "int"))) (Var "x")
 
 -- Goes wrong, as it should
 ex3 :: RVal
@@ -301,7 +288,7 @@ ex3 = dP exp3
 
 -- fun_c(x:int){add[(x,1)]}
 exp4 :: Exp
-exp4 = FunC (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Pair (Var "x") (Int 1)))
+exp4 = Fun Closed (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Pair (Var "x") (Int 1)))
 
 ex4 :: RVal
 ex4 = dP exp4
@@ -321,8 +308,8 @@ ex6 = dP exp6
 
 -- fun_c(f := fun_c(:int){:int}){f[1]}
 exp7 :: Exp
-exp7 = FunC arg (App (Var "f") (Int 1))
-  where arg = Def "f" (FunC cint cint)
+exp7 = Fun Closed arg (App (Var "f") (Int 1))
+  where arg = Def "f" (Fun Closed cint cint)
         cint = Colon (Var "int")
 
 exp8 :: Exp
@@ -345,8 +332,8 @@ ex10 = dP exp10
 
 -- fun_c(f := fun_c(:succ){:int}){f[1]}
 exp11 :: Exp
-exp11 = FunC arg (App (Var "f") (Int 1))
-  where arg = Def "f" (FunC csucc cint)
+exp11 = Fun Closed arg (App (Var "f") (Int 1))
+  where arg = Def "f" (Fun Closed csucc cint)
         csucc = Colon (Var "succ")
         cint = Colon (Var "int")
 
@@ -362,7 +349,7 @@ ex12 = dP exp12
 -- Should fail, function domain not large enough.
 -- ex7[fun_c(0){0}]
 exp13 :: Exp
-exp13 = App exp7 (FunC (Int 0) (Int 0))
+exp13 = App exp7 (Fun Closed (Int 0) (Int 0))
 
 ex13 :: RVal
 ex13 = dP exp13
@@ -371,27 +358,27 @@ ex13 = dP exp13
 -- even though it handles the f[1].
 -- ex7[fun_c(1){1}]
 exp14 :: Exp
-exp14 = App exp7 (FunC (Int 1) (Int 1))
+exp14 = App exp7 (Fun Closed (Int 1) (Int 1))
 
 ex14 :: RVal
 ex14 = dP exp14
 
 exp15 :: Exp
-exp15 = App exp7 (FunC (Colon (Var "int")) (Int 0))
+exp15 = App exp7 (Fun Closed (Colon (Var "int")) (Int 0))
 
 ex15 :: RVal
 ex15 = dP exp15
 
 exp16 :: Exp
-exp16 = App exp11 (FunC (Colon (Var "int")) (Int 0))
+exp16 = App exp11 (Fun Closed (Colon (Var "int")) (Int 0))
 
 ex16 :: RVal
 ex16 = dP exp16
 
 -- fun_c(f := fun_c(:int){:succ}){f[1]}
 exp17 :: Exp
-exp17 = FunC arg (App (Var "f") (Int 1))
-  where arg = Def "f" (FunC cint csucc)
+exp17 = Fun Closed arg (App (Var "f") (Int 1))
+  where arg = Def "f" (Fun Closed cint csucc)
         csucc = Colon (Var "succ")
         cint = Colon (Var "int")
 
@@ -405,7 +392,7 @@ ex18 :: RVal
 ex18 = dP exp18
 
 exp19 :: Exp
-exp19 = App exp17 (FunC (Colon (Var "int")) (Int 0))
+exp19 = App exp17 (Fun Closed (Colon (Var "int")) (Int 0))
 
 ex19 :: RVal
 ex19 = dP exp19
