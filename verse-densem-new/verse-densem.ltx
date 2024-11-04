@@ -508,7 +508,20 @@ $
       \hspace{2em} f(x) \in \semappp{L}{e_2}{\msing{g(x')}}{\rho'}
     \end{array} \\
     & & \} \\
-  \semappp{M}{|funk o e_1 e_2|}{u}{\rho} & = & \textit{analagous} \\
+  \semappp{M}{|funk o e_1 e_2|}{u}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      f \inb \semfcn, \\
+      g \inb u, g \in \semfcn, \\
+      \forall x \inb \Value. \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
+      |if|\; \bar{\rho} = \emptyset\; |then|\; \textbf{T} \\
+      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. \\
+      \hspace{2em} \forall x' \inb \semappp{M}{e_1}{\msing{x}}{\rho'},\, \\
+      \hspace{2em} x' \in \dom(g) \land \\
+      \hspace{2em} f(x) \in \semappp{L}{e_2}{\msing{g(x')}}{\rho'}
+    \end{array} \\
+    & & \} \\
+
 \\
     
   \end{array} \\ \\
@@ -584,8 +597,7 @@ The semantic value domain has these components
   and the range, $\ran$, can also be a subset of $\Value$.
   Note that a function always maps a single value to a single value.
   Functions are defined as a set of pairs, as in set theory.
-  The notation $\fcn$ is used to indicate that we are defining a function using pairs.
-  Since a function is a set of pairs, there is no notion of non-terminating functions.
+  Since a function is a set of pairs of values, there is no notion of non-terminating functions.
 \end{itemize}
 
 The semantic valuation function $\semapp{E}{e}{\rho}$ maps an expression in the given environment to
