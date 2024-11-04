@@ -80,7 +80,7 @@ allWs :: WS
 allWs = Set $
   nonFcn ++
   [ unSing (dO o) | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, id1, id01, f01, const0, const1, fsucc, fsucc2, fpred, comp, ho1, ho2, ho3 ]
+  map VFcn [ id0, id1, id01, f01, const0, const1, const2, const3, fsucc, fsucc2, fpred, comp, ho1, ho2, ho3 ]
   where
     nonFcn =
       allInts ++
@@ -91,16 +91,21 @@ allWs = Set $
     f01 = Fcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
     const0 = Fcn "const0" [(x, VInt 0) | x <- allInts]
     const1 = Fcn "const1" [(x, VInt 1) | x <- allInts]
+    const2 = Fcn "const2" [(x, VInt 2) | x <- allInts]
+    const3 = Fcn "const3" [(x, VInt 3) | x <- allInts]
     comp = Fcn "comparable" [(w, w) | w <- nonFcn ]
     -- The function that accepts f:int->int as an argument and returns f[1]
     ho1 = Fcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0), (VFcn fint, VInt 1),
-                     (VFcn fsucc2, VInt 3), (VFcn comp, VInt 1), (VFcn const0, VInt 0)
+                     (VFcn fsucc2, VInt 3), (VFcn comp, VInt 1),
+                     (VFcn const0, VInt 0), (VFcn const1, VInt 1), (VFcn const2, VInt 2), (VFcn const3, VInt 3)
                     ]
     ho2 = Fcn "ho2" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                     (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2), (VFcn const0, VInt 0)
+                     (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
+                     (VFcn const0, VInt 0), (VFcn const1, VInt 1), (VFcn const2, VInt 2), (VFcn const3, VInt 3)
                     ]
     ho3 = Fcn "ho3" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                     (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2), (VFcn const0, VInt 1)
+                     (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
+                     (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
                     ]
 
 fint :: Fcn Val Val
@@ -157,12 +162,18 @@ dI _ = []
 
 dP :: Exp -> W
 dP e =
-  case dS e rho0 of
+  case dD e rho0 of
     Set [w] -> w
     Set ws -> error $ "dP: " ++ show ws
 
-dS :: Exp -> Env -> WS
-dS e rho = tryAll rho (dI e) (dE e)
+dP' :: Exp -> W
+dP' e =
+  case dL e allWs rho0 of
+    Set [w] -> w
+    Set ws -> error $ "dP: " ++ show ws
+
+dD :: Exp -> Env -> WS
+dD e rho = tryAll rho (dI e) (dE e)
 
 dE :: Exp -> Env -> WS
 --dE e rho | trace ("dE " ++ show (e, rho)) False = undefined
@@ -182,14 +193,14 @@ dE (FunC e1 e2) rho = mkSet
           let rhos = dB e1 (sing x) rho in
 --            trace ("f,x=" ++ show (f, x) ++ " rhos=" ++ show rhos) $
             if isEmpty rhos then not (inDom x f)
-            else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dS e2 rho')
+            else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dD e2 rho')
   ]
 dE (FunO e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
         forAll allWs $ \ x ->
           let rhos = dB e1 (sing x) rho in
             if isEmpty rhos then True
-            else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dS e2 rho')
+            else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dD e2 rho')
   ]
 
 dO :: Op -> WS
@@ -200,8 +211,8 @@ dO Oadd = sing $ VFcn $ Fcn "add" [ (VPair x y, vadd x y) | x <- allInts, y <- a
 dB :: Exp -> WS -> Env -> Set Env
 dB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
 
-dN :: Exp -> WS -> Env -> WS
-dN e u rho = tryAll rho (dI e) (dM e u)
+dL :: Exp -> WS -> Env -> WS
+dL e u rho = tryAll rho (dI e) (dM e u)
 
 dM :: Exp -> WS -> Env -> WS
 dM (Var x) u rho = find x rho `isect` u
@@ -224,7 +235,7 @@ dM (FunC e1 e2) u rho = mkSet
                  else inDom x f && forAll rhos (\ rho' ->
                                                   forAll (dM e1 (sing x) rho')
                                                          (\ x' -> x' `inDom` g &&
-                                                                  ap f x `sIn` dN e2 (sing (ap g x')) rho'))
+                                                                  ap f x `sIn` dL e2 (sing (ap g x')) rho'))
   ]
 dM (FunO e1 e2) u rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
@@ -235,7 +246,7 @@ dM (FunO e1 e2) u rho = mkSet
                  else inDom x f && forAll rhos (\ rho' ->
                                                   forAll (dM e1 (sing x) rho')
                                                          (\ x' -> x' `inDom` g &&
-                                                                  ap f x `sIn` dN e2 (sing (ap g x')) rho'))
+                                                                  ap f x `sIn` dL e2 (sing (ap g x')) rho'))
   ]
 
 -----
@@ -244,9 +255,12 @@ dM (FunO e1 e2) u rho = mkSet
 ex1 :: Val
 ex1 = dP $ Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Pair (Var "x") (Var "y")))
 
+exp2 :: Exp
+exp2 = FunC (Def "x" (Colon (Var "int"))) (Var "x")
+
 -- fun_c(x:int){x}
 ex2 :: Val
-ex2 = dP $ FunC (Def "x" (Colon (Var "int"))) (Var "x")
+ex2 = dP exp2
 
 -- fun_o(x:int){x}
 exp3 :: Exp
@@ -319,8 +333,17 @@ exp15 = FunC arg (App (Var "f") (Int 1))
         csucc = Colon (Var "succ")
         cint = Colon (Var "int")
 
+ex15 :: Val
+ex15 = dP exp15
+
 ex16 :: Val
 ex16 = dP $ App exp15 (Var "int")
 
 ex17 :: Val
 ex17 = dP $ App exp15 (FunC (Colon (Var "int")) (Int 0))
+
+allExs :: [Val]
+allExs = [ex1, ex2, ex4, ex5, ex6, ex7, ex8, ex9, ex10, ex13, ex14, ex15, ex16, ex17]
+
+allOK :: Bool
+allOK = show allExs == "[3,int,succ,3,1,2,1,2,2,0,0,ho3,2,1]"

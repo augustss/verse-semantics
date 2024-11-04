@@ -390,15 +390,15 @@ T^{*} & = & \text{set of } T \\
   \semapp{P}{|e|}{} & : & \Value + |Wrong| \\
   \semapp{P}{|e|}{} & = & \left\{
   \begin{array}{ll}
-    w,       & \text{if} \{w\} = \semapp{S}{|e|}{\rho_0} \\
+    w,       & \text{if} \{w\} = \semapp{D}{|e|}{\rho_0} \\
     |Wrong|, & \text{otherwise}
   \end{array}
   \right.
 \\ \\
 
 \multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
-  \semapp{S}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{S}{|e|}{\rho} & = &
+  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{D}{|e|}{\rho} & = &
   \{ \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
           w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
@@ -425,7 +425,7 @@ T^{*} & = & \text{set of } T \\
       \forall x \inb \Value. \\
       |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; x \not\in \dom(f) \\
-      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
+      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
     \end{array} \\
     & & \} \\
   \semapp{E}{|funk o e_1 e_2|}{\rho} & = & \{ f \; ||
@@ -434,7 +434,7 @@ T^{*} & = & \text{set of } T \\
       \forall x \inb \Value. \\
       |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; \textbf{T} \\
-      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
+      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
     \end{array} \\
     & & \} \\
 
@@ -472,8 +472,8 @@ $
   & &  \} \; \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
     
-  \semapp{N}{|e|}{} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
-  \semappp{N}{|e|}{u}{\rho} & = &
+  \semapp{L}{|e|}{} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
+  \semappp{L}{|e|}{u}{\rho} & = &
   \{ \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
           w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
@@ -505,7 +505,7 @@ $
       |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. \\
       \hspace{2em} \forall x' \inb \semappp{M}{e_1}{\msing{x}}{\rho'},\, \\
       \hspace{2em} x' \in \dom(g) \land \\
-      \hspace{2em} f(x) \in \semappp{N}{e_2}{\msing{g(x')}}{\rho'}
+      \hspace{2em} f(x) \in \semappp{L}{e_2}{\msing{g(x')}}{\rho'}
     \end{array} \\
     & & \} \\
   \semappp{M}{|funk o e_1 e_2|}{u}{\rho} & = & \textit{analagous} \\
@@ -605,6 +605,7 @@ Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ fo
 \lennart{
 It is tantalizingly close to be (obviously) true for functions as well.
 I think it's true for functions as well, but it's not clear to me.}
+Experiments with the Haskell implementation all confirm that $\semapp{E}{e}{\rho} = \semappp{M}{e}{\Value}{\rho}$.
 
 To make notation a little clearer in set comprehension we use $x \inb e$ to indicate a binding occurence of x,
 and $x \in e$ for a membership test.
@@ -627,7 +628,7 @@ The equation for closed functions in words.
   $ |else|\; x \in \dom(f) $
 \item \textbf{And} the image of $x$ (\ie, $f(x)$) must be in the denotation of $e_2$
   for all the different ways we can match in $e_1$.
-  $ \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'} $
+  $ \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'} $
 \end{itemize}
 
 The explanation for open functions is almost identical.  The only difference is that if $e_1$ does not match $x$,
