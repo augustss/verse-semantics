@@ -32,7 +32,9 @@ inDom :: Ord a => a -> Fcn a b -> Bool
 inDom x (Fcn _ xys) = x `elem` map fst xys
 
 newtype Set a = Set { unSet :: [a] }
-  deriving (Show)
+
+instance Show a => Show (Set a) where
+  showsPrec p (Set s) = showsPrec p s
 
 type Env = M.Map Ident Val
 
