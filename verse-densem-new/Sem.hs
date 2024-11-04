@@ -73,7 +73,7 @@ allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
 vadd :: Val -> Val -> Val
-vadd (VInt x) (VInt y) = VInt (x + y `mod` maxVInt)
+vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
 vadd _ _ = undefined
 
 allWs :: WS
