@@ -524,10 +524,11 @@ $
       \forall x \inb \Value. \\
       |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. \\
-      \hspace{2em} \forall x' \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
-      \hspace{3em} x' \in \dom(g) \land \\
-      \hspace{3em} f(x) \in \semappp{L}{e_2}{(g(x'))}{\rho'}
+      |else|\; x \in \dom(f) \land \\
+      \hspace{2em} \forall \rho' \inb \bar{\rho}. \\
+      \hspace{3em} \forall x' \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
+      \hspace{4em} x' \in \dom(g) \land \\
+      \hspace{4em} f(x) \in \semappp{L}{e_2}{(g(x'))}{\rho'}
     \end{array} \\
     & & \} \\
 
