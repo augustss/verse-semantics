@@ -7,8 +7,10 @@ import Data.Maybe
 
 type Ident = String
 
-data Exp = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Pair Exp Exp |
-           FunC Exp Exp | FunO Exp Exp
+data Exp
+  = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
+  | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Pair Exp Exp
+  | If Exp Exp Exp | FunC Exp Exp | FunO Exp Exp
   deriving (Eq, Ord, Show)
 
 data Op = Oint | Ogt | Oadd
@@ -31,10 +33,10 @@ instance Show RVal where
 data Fcn a b = Fcn String [(a, b)]    -- mapping from a to b
 
 instance Eq (Fcn a b) where
-  Fcn f _ == Fcn f'  =  f == f'
+  Fcn f _ == Fcn f' _  =  f == f'
 
 instance Ord (Fcn a b) where
-  Fcn f _ `compare` Fcn f'  =  f `compare` f'
+  Fcn f _ `compare` Fcn f' _  =  f `compare` f'
 
 instance Show (Fcn a b) where
   show (Fcn s _) = s
@@ -57,6 +59,10 @@ mkSet = Set . remdup . sort
 
 sUnion :: (Ord a) => [Set a] -> Set a
 sUnion = mkSet . concatMap unSet
+
+sIsect :: (Ord a) => [Set a] -> Set a
+sIsect [] = undefined
+sIsect as = foldr1 isect as
 
 isect :: Ord a => Set a -> Set a -> Set a
 isect s1 s2 = mkSet $ unSet s1 `intersect` unSet s2
@@ -198,6 +204,10 @@ dE (Seq e1 e2) rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho
 dE (Def x e) rho = find x rho `isect` dE e rho
 dE (Colon e) rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet allWs, r <- unSet $ apply f a ]
 dE Fail _rho = empty
+dE (If e1 e2 e3) rho =
+  case unSet $ dB e1 allWs rho of
+    [] -> dE e3 rho
+    rhos -> sIsect [ dE e2 rho' | rho' <- rhos ]
 dE (Pair e1 e2) rho = mkSet [ VPair x y | x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
 dE (FunC e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
@@ -236,6 +246,10 @@ dM (Seq e1 e2) u rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dM e2 u
 dM (Def x e) u rho = find x rho `isect` dM e u rho
 dM (Colon e) u rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet u, r <- unSet $ apply f a ]
 dM Fail _u _rho = empty
+dM (If e1 e2 e3) u rho =
+  case unSet $ dB e1 allWs rho of
+    [] -> dM e3 u rho
+    rhos -> sIsect [ dM e2 u rho' | rho' <- rhos ]
 dM (Pair e1 e2) u rho = mkSet [ VPair x y | VPair u1 u2 <- unSet u,
                                 x <- unSet $ dM e1 (sing u1) rho, y <- unSet $ dM e2 (sing u2) rho ]
 dM (FunC e1 e2) u rho = mkSet

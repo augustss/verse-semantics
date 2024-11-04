@@ -425,7 +425,7 @@ Env^{*} & = & \text{set of } Env \\
     \bigcap_{\rho' \dot{\in} \bar{\rho}} \semapp{E}{|e_2|}{\rho'} & \text{otherwise} \\
   \end{array}
   \right. \\
-  & &  |where|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho} \\
+  & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\msing{x}}{\rho} \\
   \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
     \{ \tuple{x,y} \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho}) \} \\
   \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ f \; ||
@@ -446,9 +446,13 @@ Env^{*} & = & \text{set of } Env \\
       |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
     \end{array} \\
     & & \} \\
-\\
+    \\ 
+  \semapp{C}{|e|} & : & \Env \rightarrow \Env^{*} \\
+  \semapp{C}{|e|}{\rho} & = & \text{like } \semapp{B}{} \text{ but using } \semapp{E}{} \text{ instead of } \semapp{M}{}
+
+
 %\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
-\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
+%\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
 
   \end{array} \\ \\
     
@@ -505,7 +509,7 @@ $
     \bigcap_{\rho' \dot{\in} \bar{\rho}} \semapp{M}{|e_2|}{u}{\rho'} & \text{otherwise} \\
   \end{array}
   \right. \\
-  & &  |where|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho} \\
+  & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\msing{x}}{\rho} \\
   \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
     \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \inb u, \; x \inb \semappp{M}{|e_1|}{\msing{u_1}}{\rho}, \; y \inb \semappp{M}{e_2}{\msing{u_2}}{\rho}) \} \\
   %% \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & TBD \\
