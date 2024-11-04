@@ -119,6 +119,9 @@ The function f will be called with
   * value from the first argument to iter
   * a thunk for the value of the rest of the choices
 
+Iter is just a fold over the choices, with the following property
+   iter( v1 | v2 | .. vn ){f;g} = f[v1, f[ v2, ... f[vn, g[] ] ] ]
+
 Iter has the following reduction rules:
 (ITER-FAIL)    iter(fail   ){f; g}  -->  g <>
 (ITER-VALUE)   iter(v      ){f; g}  -->  f v g
@@ -368,6 +371,7 @@ primOpCanFail ArrLen   = False
 primOpCanFail ArrMap   = False
 
 primOpIsTypeTest :: PrimOp -> Bool
+-- Type tests; all mutually exclusive
 primOpIsTypeTest IsInt  = True
 primOpIsTypeTest IsStr  = True
 primOpIsTypeTest IsChar = True
