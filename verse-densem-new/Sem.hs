@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-module Sem where
+module Main where
 import Data.List hiding (find)
 import qualified Data.Map as M
 import Data.Maybe
@@ -22,8 +22,19 @@ instance Show Val where
   showsPrec p (VPair a b) = showsPrec p (a, b)
   showsPrec p (VFcn f) = showsPrec p f
 
+data RVal = RVal Val | Wrong String
+
+instance Show RVal where
+  showsPrec p (RVal v) = showsPrec p v
+  showsPrec _ (Wrong s) = showString $ "Wrong(" ++ s ++ ")"
+
 data Fcn a b = Fcn String [(a, b)]    -- mapping from a to b
-  deriving (Eq, Ord)
+
+instance Eq (Fcn a b) where
+  Fcn f _ == Fcn f'  =  f == f'
+
+instance Ord (Fcn a b) where
+  Fcn f _ `compare` Fcn f'  =  f `compare` f'
 
 instance Show (Fcn a b) where
   show (Fcn s _) = s
@@ -160,23 +171,24 @@ dI (Def i e) = [i] <> dI e
 dI (Colon e) = dI e
 dI _ = []
 
-dP :: Exp -> W
+dP :: Exp -> RVal
 dP e =
   case dD e rho0 of
-    Set [w] -> w
-    Set ws -> error $ "dP: " ++ show ws
+    Set [w] -> RVal w
+    Set ws -> Wrong $ show ws
 
-dP' :: Exp -> W
+dP' :: Exp -> RVal
 dP' e =
   case dL e allWs rho0 of
-    Set [w] -> w
-    Set ws -> error $ "dP: " ++ show ws
+    Set [w] -> RVal w
+    Set ws -> Wrong $ show ws
 
 dD :: Exp -> Env -> WS
 dD e rho = tryAll rho (dI e) (dE e)
 
 dE :: Exp -> Env -> WS
 --dE e rho | trace ("dE " ++ show (e, rho)) False = undefined
+-- dE e rho = dM e allWs rho
 dE (Var x) rho = find x rho
 dE (Int k) _rho = sing $ VInt k
 dE (Prim o) _rho = dO o
@@ -225,7 +237,7 @@ dM (Def x e) u rho = find x rho `isect` dM e u rho
 dM (Colon e) u rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet u, r <- unSet $ apply f a ]
 dM Fail _u _rho = empty
 dM (Pair e1 e2) u rho = mkSet [ VPair x y | VPair u1 u2 <- unSet u,
-                                            x <- unSet $ dM e1 (sing u1) rho, y <- unSet $ dM e2 (sing u2) rho ]
+                                x <- unSet $ dM e1 (sing u1) rho, y <- unSet $ dM e2 (sing u2) rho ]
 dM (FunC e1 e2) u rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
              VFcn g <- unSet u,
@@ -252,14 +264,17 @@ dM (FunO e1 e2) u rho = mkSet
 -----
 
 -- x:=2; y:=1; add[(x,y)]
-ex1 :: Val
-ex1 = dP $ Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Pair (Var "x") (Var "y")))
+exp1 :: Exp
+exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Pair (Var "x") (Var "y")))
 
+ex1 :: RVal
+ex1 = dP exp1
+
+-- fun_c(x:int){x}
 exp2 :: Exp
 exp2 = FunC (Def "x" (Colon (Var "int"))) (Var "x")
 
--- fun_c(x:int){x}
-ex2 :: Val
+ex2 :: RVal
 ex2 = dP exp2
 
 -- fun_o(x:int){x}
@@ -267,22 +282,28 @@ exp3 :: Exp
 exp3 = FunO (Def "x" (Colon (Var "int"))) (Var "x")
 
 -- Goes wrong, as it should
-ex3 :: Val
+ex3 :: RVal
 ex3 = dP exp3
 
 -- fun_c(x:int){add[(x,1)]}
 exp4 :: Exp
 exp4 = FunC (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Pair (Var "x") (Int 1)))
 
-ex4 :: Val
+ex4 :: RVal
 ex4 = dP exp4
 
-ex5 :: Val
-ex5 = dP $ App exp4 (Int 2)
+exp5 :: Exp
+exp5 = App exp4 (Int 2)
+
+ex5 :: RVal
+ex5 = dP exp5
+
+exp6 :: Exp
+exp6 = App exp3 (Int 1)
 
 -- Using exp3 in its domain is fine
-ex6 :: Val
-ex6 = dP $ App exp3 (Int 1)
+ex6 :: RVal
+ex6 = dP exp6
 
 -- fun_c(f := fun_c(:int){:int}){f[1]}
 exp7 :: Exp
@@ -290,60 +311,104 @@ exp7 = FunC arg (App (Var "f") (Int 1))
   where arg = Def "f" (FunC cint cint)
         cint = Colon (Var "int")
 
-ex7 :: Val
-ex7 = dP $ App exp7 (Var "succ")
+exp8 :: Exp
+exp8 = App exp7 (Var "succ")
 
-ex8 :: Val
-ex8 = dP $ App exp7 (Var "int")
+ex8 :: RVal
+ex8 = dP exp8
 
-ex9 :: Val
-ex9 = dP $ App exp7 exp4
+exp9 :: Exp
+exp9 = App exp7 (Var "int")
+
+ex9 :: RVal
+ex9 = dP exp9
+
+exp10 :: Exp
+exp10 = App exp7 exp4
+
+ex10 :: RVal
+ex10 = dP exp10
 
 -- fun_c(f := fun_c(:succ){:int}){f[1]}
-exp10 :: Exp
-exp10 = FunC arg (App (Var "f") (Int 1))
+exp11 :: Exp
+exp11 = FunC arg (App (Var "f") (Int 1))
   where arg = Def "f" (FunC csucc cint)
         csucc = Colon (Var "succ")
         cint = Colon (Var "int")
 
-ex10 :: Val
-ex10 = dP $ App exp10 (Var "int")
+ex11 :: RVal
+ex11 = dP exp11
+
+exp12 :: Exp
+exp12 = App exp11 (Var "int")
+
+ex12 :: RVal
+ex12 = dP exp12
 
 -- Should fail, function domain not large enough.
 -- ex7[fun_c(0){0}]
-ex11 :: Val
-ex11 = dP $ App exp7 (FunC (Int 0) (Int 0))
+exp13 :: Exp
+exp13 = App exp7 (FunC (Int 0) (Int 0))
+
+ex13 :: RVal
+ex13 = dP exp13
 
 -- Should fail, function domain not large enough,
 -- even though it handles the f[1].
 -- ex7[fun_c(1){1}]
-ex12 :: Val
-ex12 = dP $ App exp7 (FunC (Int 1) (Int 1))
+exp14 :: Exp
+exp14 = App exp7 (FunC (Int 1) (Int 1))
 
-ex13 :: Val
-ex13 = dP $ App exp7 (FunC (Colon (Var "int")) (Int 0))
+ex14 :: RVal
+ex14 = dP exp14
 
-ex14 :: Val
-ex14 = dP $ App exp10 (FunC (Colon (Var "int")) (Int 0))
+exp15 :: Exp
+exp15 = App exp7 (FunC (Colon (Var "int")) (Int 0))
+
+ex15 :: RVal
+ex15 = dP exp15
+
+exp16 :: Exp
+exp16 = App exp11 (FunC (Colon (Var "int")) (Int 0))
+
+ex16 :: RVal
+ex16 = dP exp16
 
 -- fun_c(f := fun_c(:int){:succ}){f[1]}
-exp15 :: Exp
-exp15 = FunC arg (App (Var "f") (Int 1))
+exp17 :: Exp
+exp17 = FunC arg (App (Var "f") (Int 1))
   where arg = Def "f" (FunC cint csucc)
         csucc = Colon (Var "succ")
         cint = Colon (Var "int")
 
-ex15 :: Val
-ex15 = dP exp15
+ex17 :: RVal
+ex17 = dP exp17
 
-ex16 :: Val
-ex16 = dP $ App exp15 (Var "int")
+exp18 :: Exp
+exp18 = App exp17 (Var "int")
 
-ex17 :: Val
-ex17 = dP $ App exp15 (FunC (Colon (Var "int")) (Int 0))
+ex18 :: RVal
+ex18 = dP exp18
 
-allExs :: [Val]
-allExs = [ex1, ex2, ex4, ex5, ex6, ex7, ex8, ex9, ex10, ex13, ex14, ex15, ex16, ex17]
+exp19 :: Exp
+exp19 = App exp17 (FunC (Colon (Var "int")) (Int 0))
+
+ex19 :: RVal
+ex19 = dP exp19
+
+allExps :: [Exp]
+allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9, exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19]
+
+refExps :: String
+refExps = "[3,int,Wrong([comparable,int]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1]"
 
 allOK :: Bool
-allOK = show allExs == "[3,int,succ,3,1,2,1,2,2,0,0,ho3,2,1]"
+allOK = show (map dP allExps) == refExps
+
+allOK' :: Bool
+allOK' = show (map dP' allExps) == refExps
+
+main :: IO ()
+main = do
+  print allOK
+  print allOK'
