@@ -15,10 +15,18 @@ data Op = Oint | Ogt | Oadd
   deriving (Eq, Ord, Show)
 
 data Val = VInt Integer | VPair Val Val | VFcn (Fcn Val Val)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Val where
+  showsPrec p (VInt i) = showsPrec p i
+  showsPrec p (VPair a b) = showsPrec p (a, b)
+  showsPrec p (VFcn f) = showsPrec p f
 
 data Fcn a b = Fcn String [(a, b)]    -- mapping from a to b
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show (Fcn a b) where
+  show (Fcn s _) = s
 
 inDom :: Ord a => a -> Fcn a b -> Bool
 inDom x (Fcn _ xys) = x `elem` map fst xys
