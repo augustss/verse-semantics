@@ -722,15 +722,22 @@ data Status
   = SomethingToDo
     -- Something to do to the left of the hole, including calling
     -- functions, unifying variables from outside, failure, choice, loop
+    -- Also stuck terms like 3[4]
 
   | BlockedOnExi HolePresent
     -- Everything to the left of the hole is stuck,
-    -- awaiting the value of a LocalExi
+    -- awaiting the value of one of the LocalExis
 
   | NothingToDo  HolePresent
     -- Value(s) optionally with a hole to the right
     -- Key cases  status HOLE   = NothingToDo HasHole
     --            status <val>  = NothingToDo NoHole
+
+-- Possible alternative; instead of (NothingToDo HolePresent), have
+-- two constructors:   HoleStatus and ValueStatus, corresponding to
+-- "two key cases" above.  Downside of that: would allow fewer reductions
+--     exists x. x>3; 43; x=7
+-- We probably don't really care about this.
 
 data HolePresent = HasHole | NoHole
 
@@ -822,10 +829,9 @@ status lx (Exi bnd) = status (addFlexi lx x) e
   where
     (x,e) = alphaRename (allExis lx) bnd
 
-status lx (v1 :@: v2)
-  | blocked_on_local v1 = blockedStatus  -- Needed for (E2)!
-  | blocked_on_local v2 = blockedStatus  -- See (E1)
-  | otherwise           = SomethingToDo
+status lx (Op {} :@: arg)
+  | blocked_on_local arg = blockedStatus
+  | otherwise            = SomethingToDo
   where
     blocked_on_local :: Val -> Bool
     -- True if the value (a primop argument) mentions a locally-bound existential,
@@ -834,6 +840,13 @@ status lx (v1 :@: v2)
     blocked_on_local (Tup vs) = any blocked_on_local vs
     blocked_on_local (Tru v)  = blocked_on_local v
     blocked_on_local _        = False   -- In particular do not look inside lambdas
+
+status lx (Var f :@: _arg)
+  | isLocal lx f = blockedStatus   -- exists x. x[3]; x=(\y.y)
+  | otherwise    = SomethingToDo
+
+status _lx (_hnf :@: _arg)
+  = SomethingToDo
 
 status _  Fail        = SomethingToDo
 status lx (e1 :|: e2) = status lx e1 `andStatus` status lx e2
