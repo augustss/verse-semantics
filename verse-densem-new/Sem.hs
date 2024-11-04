@@ -80,7 +80,7 @@ allWs :: WS
 allWs = Set $
   nonFcn ++
   [ unSing (dO o) | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, id1, id01, f01, fsucc, fsucc2, fpred, comp, ho1, ho2 ]
+  map VFcn [ id0, id1, id01, f01, const0, const1, fsucc, fsucc2, fpred, comp, ho1, ho2, ho3 ]
   where
     nonFcn =
       allInts ++
@@ -89,13 +89,18 @@ allWs = Set $
     id1 = Fcn "id1" [(VInt 1, VInt 1)]
     id01 = Fcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
     f01 = Fcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
+    const0 = Fcn "const0" [(x, VInt 0) | x <- allInts]
+    const1 = Fcn "const1" [(x, VInt 1) | x <- allInts]
     comp = Fcn "comparable" [(w, w) | w <- nonFcn ]
-    -- The function that accepts succ/int/pred as an argument and returns 2/1/0
+    -- The function that accepts f:int->int as an argument and returns f[1]
     ho1 = Fcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0), (VFcn fint, VInt 1),
-                     (VFcn fsucc2, VInt 3), (VFcn comp, VInt 1)
+                     (VFcn fsucc2, VInt 3), (VFcn comp, VInt 1), (VFcn const0, VInt 0)
                     ]
     ho2 = Fcn "ho2" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                     (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2)
+                     (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2), (VFcn const0, VInt 0)
+                    ]
+    ho3 = Fcn "ho3" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
+                     (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2), (VFcn const0, VInt 1)
                     ]
 
 fint :: Fcn Val Val
@@ -289,3 +294,33 @@ exp10 = FunC arg (App (Var "f") (Int 1))
 
 ex10 :: Val
 ex10 = dP $ App exp10 (Var "int")
+
+-- Should fail, function domain not large enough.
+-- ex7[fun_c(0){0}]
+ex11 :: Val
+ex11 = dP $ App exp7 (FunC (Int 0) (Int 0))
+
+-- Should fail, function domain not large enough,
+-- even though it handles the f[1].
+-- ex7[fun_c(1){1}]
+ex12 :: Val
+ex12 = dP $ App exp7 (FunC (Int 1) (Int 1))
+
+ex13 :: Val
+ex13 = dP $ App exp7 (FunC (Colon (Var "int")) (Int 0))
+
+ex14 :: Val
+ex14 = dP $ App exp10 (FunC (Colon (Var "int")) (Int 0))
+
+-- fun_c(f := fun_c(:int){:succ}){f[1]}
+exp15 :: Exp
+exp15 = FunC arg (App (Var "f") (Int 1))
+  where arg = Def "f" (FunC cint csucc)
+        csucc = Colon (Var "succ")
+        cint = Colon (Var "int")
+
+ex16 :: Val
+ex16 = dP $ App exp15 (Var "int")
+
+ex17 :: Val
+ex17 = dP $ App exp15 (FunC (Colon (Var "int")) (Int 0))
