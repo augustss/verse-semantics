@@ -163,14 +163,14 @@ dE (Pair e1 e2) rho = mkSet [ VPair x y | x <- unSet $ dE e1 rho, y <- unSet $ d
 dE (FunC e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
         forAll allWs $ \ x ->
-          let rhos = eB e1 (sing x) rho in
+          let rhos = dB e1 (sing x) rho in
             if isEmpty rhos then not (inDom x f)
             else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dS e2 rho')
   ]
 dE (FunO e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
         forAll allWs $ \ x ->
-          let rhos = eB e1 (sing x) rho in
+          let rhos = dB e1 (sing x) rho in
             if isEmpty rhos then True
             else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dS e2 rho')
   ]
@@ -180,8 +180,8 @@ dO Oint = sing $ VFcn $ Fcn "int" [ (x, x) | x <- allInts ]
 dO Ogt  = sing $ VFcn $ Fcn "gt"  [ (VPair x y, x) | x <- allInts, y <- allInts, x > y]
 dO Oadd = sing $ VFcn $ Fcn "add" [ (VPair x y, vadd x y) | x <- allInts, y <- allInts]
 
-eB :: Exp -> WS -> Env -> Set Env
-eB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
+dB :: Exp -> WS -> Env -> Set Env
+dB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
 
 dN :: Exp -> WS -> Env -> WS
 dN e u rho = tryAll rho (dI e) (dM e u)
@@ -202,7 +202,7 @@ dM (FunC e1 e2) u rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
              VFcn g <- unSet u,
              forAll allWs $ \ x ->
-               let rhos = eB e1 (sing x) rho in
+               let rhos = dB e1 (sing x) rho in
                  if isEmpty rhos then not (x `inDom` f)
                  else inDom x f && forAll rhos (\ rho' ->
                                                   forAll (dM e1 (sing x) rho')
@@ -213,7 +213,7 @@ dM (FunO e1 e2) u rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
              VFcn g <- unSet u,
              forAll allWs $ \ x ->
-               let rhos = eB e1 (sing x) rho in
+               let rhos = dB e1 (sing x) rho in
                  if isEmpty rhos then True
                  else inDom x f && forAll rhos (\ rho' ->
                                                   forAll (dM e1 (sing x) rho')
