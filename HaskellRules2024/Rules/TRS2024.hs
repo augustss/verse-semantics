@@ -853,6 +853,8 @@ status lx (e1 :|: e2) = status lx e1 `andStatus` status lx e2
   -- We must skolemise in verify(){check<succeeds>{ (x=some{t}; blah) | more-blah }}
   --               and in verify(){check<succeeds>{ v | (x=some{t}; blah) }}
 
+status lx (Iter e1 _ _) = status (makeRigid lx) e1 -- ToDo: not sure!!
+
 status _ (Verify {})
   = NothingToDo NoHole   -- There should be no HOLE inside a verify{}
   -- We need this for
@@ -868,8 +870,6 @@ status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
                    | otherwise                 = SomethingToDo
 status lx (v :>>: e) | any (isLocal lx) (free v) = blockedStatus
                      | otherwise                 = status lx e
-
-status lx (Iter e1 _ _) = status (makeRigid lx) e1 -- ToDo: not sure!!
 
 status _ e = errorMessage ("Uncovered case in status " ++ show e)
 
