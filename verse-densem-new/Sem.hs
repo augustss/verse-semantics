@@ -80,7 +80,7 @@ allWs :: WS
 allWs = Set $
   nonFcn ++
   [ unSing (dO o) | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, id1, id01, f01, fsucc, fpred, comp, ho1 ]
+  map VFcn [ id0, id1, id01, f01, fsucc, fsucc2, fpred, comp, ho1, ho2 ]
   where
     nonFcn =
       allInts ++
@@ -90,11 +90,22 @@ allWs = Set $
     id01 = Fcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
     f01 = Fcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
     comp = Fcn "comparable" [(w, w) | w <- nonFcn ]
-    -- The function that accepts succ/pred as an argument and returns 2/0
-    ho1 = Fcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0)]
+    -- The function that accepts succ/int/pred as an argument and returns 2/1/0
+    ho1 = Fcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0), (VFcn fint, VInt 1),
+                     (VFcn comp, VInt 1)
+                    ]
+    ho2 = Fcn "ho2" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
+                     (VFcn comp, VInt 2)
+                    ]
+
+fint :: Fcn Val Val
+fint = Fcn "int" [(x, x) | x <- allInts ]
 
 fsucc :: Fcn Val Val
 fsucc = Fcn "succ" [(x, vadd x (VInt 1)) | x <- allInts ]
+
+fsucc2 :: Fcn Val Val
+fsucc2 = Fcn "succ2" [(x, vadd x (VInt 2)) | x <- allInts ]
 
 fpred :: Fcn Val Val
 fpred = Fcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
@@ -164,6 +175,7 @@ dE (FunC e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
         forAll allWs $ \ x ->
           let rhos = dB e1 (sing x) rho in
+--            trace ("f,x=" ++ show (f, x) ++ " rhos=" ++ show rhos) $
             if isEmpty rhos then not (inDom x f)
             else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dS e2 rho')
   ]
@@ -256,3 +268,21 @@ exp7 = FunC arg (App (Var "f") (Int 1))
 
 ex7 :: Val
 ex7 = dP $ App exp7 (Var "succ")
+
+ex8 :: Val
+ex8 = dP $ App exp7 (Var "int")
+
+ex9 :: Val
+ex9 = dP $ App exp7 exp4
+
+{- Not yet
+exp10 :: Exp
+exp10 = FunC arg (App (Var "f") (Int 1))
+  where arg = Def "f" (FunC csucc cint)
+        csucc = Colon (Var "succ")
+        cint = Colon (Var "int")
+
+ex10 :: Val
+ex10 = dP $ exp10 
+
+-}
