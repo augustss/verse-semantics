@@ -342,8 +342,8 @@
     \vb |fail|
     \\
     & &
-    \vb &
-        |arr (e_1, e_2)|
+    \vb & |vif e_1 e_2 e_3|
+    \vb |arr (e_1, e_2)|
     \vb |funk c e_1 e_2|
     \vb |funk o e_1 e_2|
        %%       \vb |e_1 choice e_2| \vb |fail| \vb |one e| \vb |all e|
@@ -375,18 +375,19 @@ The syntax of \versecalc{} is given in \cref{fig:syntax}.
 \begin{figure}
 $
 \begin{array}{l}
-\text{\bf Domains} \\
+\textbf{Domains} \\
 \begin{array}{rcll}
 \Value & = & \mathbb{Z} + \tuple{\Value,\Value} + (\semfcn) \\
 %% \tuple{\Value} & = & \text{a finite tuple of values $\Value$} \\
 \Env & = & |Ident| \rightarrow \Value \\
-T^{*} & = & \text{set of } T \\
+W^{*} & = & \text{set of } W \\
+Env^{*} & = & \text{set of } Env \\
 \end{array}
 \\ \\
 
 
   \begin{array}{rcll}
-\multicolumn{4}{l}{\text{\bf Valuation semantics of a closed program}} \\
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of a closed program}} \\
   \semapp{P}{|e|}{} & : & \Value + |Wrong| \\
   \semapp{P}{|e|}{} & = & \left\{
   \begin{array}{ll}
@@ -396,14 +397,14 @@ T^{*} & = & \text{set of } T \\
   \right.
 \\ \\
 
-\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
   \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{D}{|e|}{\rho} & = &
   \{ \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
           w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
-\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|x|}{\rho} & = & \msing{\rho(x)} \\
   \semapp{E}{|k|}{\rho} & = & \msing{k} \\
@@ -417,6 +418,14 @@ T^{*} & = & \text{set of } T \\
   \semapp{E}{|:e|}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
     \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} \\
   \semapp{E}{|fail|}{\rho} & = & \emptyset \\
+  \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{E}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    \bigcap_{\rho' \dot{\in} \bar{\rho}} \semapp{E}{|e_2|}{\rho'} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  |where|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho} \\
   \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
     \{ \tuple{x,y} \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho}) \} \\
   \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ f \; ||
@@ -437,16 +446,13 @@ T^{*} & = & \text{set of } T \\
       |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
     \end{array} \\
     & & \} \\
+\\
+%\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
+\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
 
   \end{array} \\ \\
     
-  \begin{array}{rcll}
-  \semapp{O}{|op|}{} & : & (\semfcn)^{*} \\
-  \semapp{O}{|gt|}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z}, x > y \} \} & \text{one function} \\
-  \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \inb \mathbb{Z} \} \} & \text{one function} \\
-  \semapp{O}{|add|}{} & = & \{ f \, || \, f \inb \semfcn, \; \forall x,y \inb \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
-  \end{array} \\ \\
-  
+
 \end{array}
 $
 \caption{Expression semantics}
@@ -469,14 +475,14 @@ $
   |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
   \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
   \end{array} \\
-  & &  \} \; \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+  & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
     
   \semapp{L}{|e|}{} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
   \semappp{L}{|e|}{u}{\rho} & = &
   \{ \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
           w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
-  & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+  & & |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 %\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
   \semapp{M}{|e|} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
@@ -492,6 +498,14 @@ $
   \semappp{M}{|:e|}{u}{\rho} & = & %% \ran(\semappp{M}{|e|}{\rho}) \\
     \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; a \inb u, \; r \inb \apply(f, a) \} \\
   \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+  \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{M}{|e_3|}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    \bigcap_{\rho' \dot{\in} \bar{\rho}} \semapp{M}{|e_2|}{u}{\rho'} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  |where|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho} \\
   \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
     \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \inb u, \; x \inb \semappp{M}{|e_1|}{\msing{u_1}}{\rho}, \; y \inb \semappp{M}{e_2}{\msing{u_2}}{\rho}) \} \\
   %% \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & TBD \\
@@ -538,6 +552,14 @@ $
 \begin{array}{l}
 \text{\bf Utility functions} \\
 
+\text{\bf Predefined functions} \\
+  \begin{array}{rcll}
+  \semapp{O}{|op|}{} & : & (\semfcn)^{*} \\
+  \semapp{O}{|gt|}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z}, x > y \} \} & \text{one function} \\
+  \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \inb \mathbb{Z} \} \} & \text{one function} \\
+  \semapp{O}{|add|}{} & = & \{ f \, || \, f \inb \semfcn, \; \forall x,y \inb \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
+  \end{array} \\ \\
+  
 \text{\bf Defined identifiers} \\
   \begin{array}{rcll}
   \semapp{I}{|e|}{} & : & |[Ident]| \\

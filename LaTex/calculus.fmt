@@ -316,6 +316,7 @@
 %format square(x) = x "^2"
 %format univ (x) (y) = "\nu" x ".\," y
 %format myite (x) (y) (z) = "\textbf{if}\;" x "\;\{" y "\}\;\{" z "\}"
+%format vif (x) (y) (z) = "\textbf{if}(" x ")\{" y "\}\,\textbf{else}\,\{" z "\}"
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
