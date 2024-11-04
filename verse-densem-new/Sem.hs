@@ -17,11 +17,11 @@ data Op = Oint | Ogt | Oadd
 data Val = VInt Integer | VPair Val Val | VFcn (Fcn Val Val)
   deriving (Eq, Ord, Show)
 
-data Fcn a b = Fcn [(a, b)]    -- mapping from a to b
+data Fcn a b = Fcn String [(a, b)]    -- mapping from a to b
   deriving (Eq, Ord, Show)
 
 inDom :: Ord a => a -> Fcn a b -> Bool
-inDom x (Fcn xys) = x `elem` map fst xys
+inDom x (Fcn _ xys) = x `elem` map fst xys
 
 newtype Set a = Set { unSet :: [a] }
   deriving (Show)
@@ -75,19 +75,19 @@ allWs = Set $
     nonFcn =
       allInts ++
       [VPair x y | x <- allInts, y <- allInts]
-    id0 = Fcn [(VInt 0, VInt 0)]
-    id1 = Fcn [(VInt 1, VInt 1)]
-    id01 = Fcn [(VInt 0, VInt 0), (VInt 1, VInt 1)]
-    f01 = Fcn [(VInt 0, VInt 0), (VInt 1, VInt 2)]
-    comp = Fcn [(w, w) | w <- nonFcn ]
+    id0 = Fcn "id0" [(VInt 0, VInt 0)]
+    id1 = Fcn "id1" [(VInt 1, VInt 1)]
+    id01 = Fcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
+    f01 = Fcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
+    comp = Fcn "comparable" [(w, w) | w <- nonFcn ]
     -- The function that accepts succ/pred as an argument and returns 2/0
-    ho1 = Fcn [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0)]
+    ho1 = Fcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0)]
 
 fsucc :: Fcn Val Val
-fsucc = Fcn [(x, vadd x (VInt 1)) | x <- allInts ]
+fsucc = Fcn "succ" [(x, vadd x (VInt 1)) | x <- allInts ]
 
 fpred :: Fcn Val Val
-fpred = Fcn [(x, vadd x (VInt 3)) | x <- allInts ]
+fpred = Fcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
 
 rho0 :: Env
 rho0 = M.fromList $
@@ -111,11 +111,11 @@ tryAll rho xs ev = sUnion $ map ev $ genRhos rho xs
 apply :: Val -> Val -> Set Val
 apply (VPair w0 w1) (VInt k) | k == 0 = sing w0
                              | k == 1 = sing w1
-apply (VFcn (Fcn xys)) w = maybe empty sing $ lookup w xys
+apply (VFcn (Fcn _ xys)) w = maybe empty sing $ lookup w xys
 apply _ _ = empty
 
 ap :: Ord a => Fcn a b -> a -> b
-ap (Fcn xys) x = fromMaybe undefined $ lookup x xys
+ap (Fcn _ xys) x = fromMaybe undefined $ lookup x xys
 
 find :: Ident -> Env -> WS
 find x rho = sing $ fromMaybe (error $ "find: undefined " ++ show (x, rho)) $ M.lookup x rho
@@ -166,9 +166,9 @@ dE (FunO e1 e2) rho = mkSet
   ]
 
 dO :: Op -> WS
-dO Oint = sing $ VFcn $ Fcn [ (x, x) | x <- allInts ]
-dO Ogt  = sing $ VFcn $ Fcn [ (VPair x y, x) | x <- allInts, y <- allInts, x > y]
-dO Oadd = sing $ VFcn $ Fcn [ (VPair x y, vadd x y) | x <- allInts, y <- allInts]
+dO Oint = sing $ VFcn $ Fcn "int" [ (x, x) | x <- allInts ]
+dO Ogt  = sing $ VFcn $ Fcn "gt"  [ (VPair x y, x) | x <- allInts, y <- allInts, x > y]
+dO Oadd = sing $ VFcn $ Fcn "add" [ (VPair x y, vadd x y) | x <- allInts, y <- allInts]
 
 eB :: Exp -> WS -> Env -> Set Env
 eB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
