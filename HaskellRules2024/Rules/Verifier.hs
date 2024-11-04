@@ -42,7 +42,7 @@ guardStep :: Rule
 guardStep env lhs =
    "GUARD-ELIM" `nameWith`
    do v :>>: e <- [lhs]
-      guard (TRS2024.skolValue (skolVars env) v)
+      guard (skolValue (skolVars env) v)
       pure (pPrintSmallExpr v, e)
 
 {- Guards only have values to the left
@@ -70,6 +70,14 @@ arrStep :: Rule
 --     ---> if x is in flexis(P)
 --   verify(R,n;A){ P[ x = choose(n){some(\i. inrange[i,n])}; x ] }
 arrStep env lhs =
+  "DD-DODGY" `name`   -- v = DotDot[i,n];e  --> i = v; _ = DotDot[v,n]; e
+                      -- Dodgy because it overlaps with DD-NARROW
+  do (v :=: Op DotDot :@: Tup [i, n]) :>: e <- [lhs]
+     guard (skolValue (skolVars env) v)
+     pure (coreSeq [ i :=: v
+                   , Var underscore :=: Op DotDot :@: Tup [v,n]
+                   , e ])
+  ++
   "DD-NARROW" `nameWith`
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
      -- Use this rule when v is not a literal.

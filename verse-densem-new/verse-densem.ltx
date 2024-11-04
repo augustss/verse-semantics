@@ -160,6 +160,7 @@
 \newcommand{\lcompr}[2]{[ #1 \vb #2 ]}
 \newcommand{\scompr}[2]{\{ #1 \vb #2 \}}
 \newcommand{\sbind}[2]{ #1 \in #2 }
+\newcommand{\inb}{\,\dot{\in}\,}
 
 \newcommand{\semfun}[1]{\mathcal{#1}}
 \newcommand{\semapp}[3]{\semfun{#1}\llbracket #2 \rrbracket\, #3}
@@ -389,16 +390,17 @@ T^{*} & = & \text{set of } T \\
   \semapp{P}{|e|}{} & : & \Value + |Wrong| \\
   \semapp{P}{|e|}{} & = & \left\{
   \begin{array}{ll}
-    w,       & \text{if} \{w\} = \semapp{S}{|e|}{\rho_0} \\
+    w,       & \text{if} \{w\} = \semapp{D}{|e|}{\rho_0} \\
     |Wrong|, & \text{otherwise}
   \end{array}
   \right.
 \\ \\
 
 \multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
-  \semapp{S}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{S}{|e|}{\rho} & = &
-  \bigcup_{w_1 \in \Value}\, \mydots \bigcup_{w_n \in \Value}\, \semapp{E}{e}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \\
+  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{D}{|e|}{\rho} & = &
+  \{ \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
+          w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 \multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
@@ -407,32 +409,32 @@ T^{*} & = & \text{set of } T \\
   \semapp{E}{|k|}{\rho} & = & \msing{k} \\
   \semapp{E}{|o|}{\rho} & = & \semapp{O}{|o|}{} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
-    \{ r \, || \, f \in \semapp{E}{|e_1|}{\rho}, \; a \in \semapp{E}{|e_2|}{\rho}), \; r \in \apply(f, a) \} \\
+    \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
-    \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
+    \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho}) \} \\
   \semapp{E}{|x := e|}{\rho} & = & \msing{\rho(x)} \;\cap\; \semapp{E}{e}{\rho} \\
   \semapp{E}{|:e|}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
-    \{ r \, || \, f \in \semapp{E}{|e|}{\rho}, \; a \in \Value, \; r \in \apply(f, a) \} \\
+    \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} \\
   \semapp{E}{|fail|}{\rho} & = & \emptyset \\
   \semapp{E}{|arr (e_1, e_2)|}{\rho} & = &
-    \{ \tuple{x,y} \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semapp{E}{|e_2|}{\rho}) \} \\
+    \{ \tuple{x,y} \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho}) \} \\
   \semapp{E}{|funk c e_1 e_2|}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
-      f \in \semfcn, 
-      \forall x \in \Value. \\
+      f \inb \semfcn, 
+      \forall x \inb \Value. \\
       |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; x \not\in \dom(f) \\
-      |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
+      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
     \end{array} \\
     & & \} \\
   \semapp{E}{|funk o e_1 e_2|}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
-      f \in \semfcn, 
-      \forall x \in \Value. \\
+      f \inb \semfcn, 
+      \forall x \inb \Value. \\
       |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
       |if|\; \bar{\rho} = \emptyset\; |then|\; \textbf{T} \\
-      |else|\; x \in \dom(f) \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'}
+      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
     \end{array} \\
     & & \} \\
 
@@ -440,9 +442,9 @@ T^{*} & = & \text{set of } T \\
     
   \begin{array}{rcll}
   \semapp{O}{|op|}{} & : & (\semfcn)^{*} \\
-  \semapp{O}{|gt|}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, || \, x \in \mathbb{Z}, y \in \mathbb{Z}, x > y \} \} & \text{one function} \\
-  \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \in \mathbb{Z} \} \} & \text{one function} \\
-  \semapp{O}{|add|}{} & = & \{ f \, || \, f \in \semfcn, \; \forall x,y \in \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
+  \semapp{O}{|gt|}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z}, x > y \} \} & \text{one function} \\
+  \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \inb \mathbb{Z} \} \} & \text{one function} \\
+  \semapp{O}{|add|}{} & = & \{ f \, || \, f \inb \semfcn, \; \forall x,y \inb \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
   \end{array} \\ \\
   
 \end{array}
@@ -451,6 +453,85 @@ $
 \label{fig:den-sem1}
 \end{figure}
 
+\begin{figure}
+$
+\begin{array}{l}
+
+\text{\bf Match semantics} \\
+\\
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
+  \semapp{B}{|e|} & : & \mtype \rightarrow \Env \rightarrow \Env^{*} \\
+  \semappp{B}{|e|}{u}{\rho} & = &
+  \{ \rho' \; || 
+  \begin{array}[t]{l}
+  w_1 \inb \Value, \mydots, w_n \inb \Value, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
+  \end{array} \\
+  & &  \} \; \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+    
+  \semapp{L}{|e|}{} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
+  \semappp{L}{|e|}{u}{\rho} & = &
+  \{ \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
+          w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+%\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
+  \semapp{M}{|e|} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
+  \semappp{M}{|x|}{u}{\rho} & = & \msing{\rho(x)} \cap u \\
+  \semappp{M}{|k|}{u}{\rho} & = & \msing{k} \cap u \\
+  \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \cap u \\
+  \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & %% \apply(\semappp{M}{|e_1|}{\rho}, \; \semappp{M}{|e_2|}{\rho}) \\
+    \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \cap u \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & %% \semappp{M}{|e_1|}{\rho} \; \msemi      \; \semappp{M}{|e_2|}{\rho} \\
+    \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semappp{M}{|e_2|}{u}{\rho}) \} \\
+  \semappp{M}{|x := e|}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
+  \semappp{M}{|:e|}{u}{\rho} & = & %% \ran(\semappp{M}{|e|}{\rho}) \\
+    \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; a \inb u, \; r \inb \apply(f, a) \} \\
+  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+  \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
+    \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \inb u, \; x \inb \semappp{M}{|e_1|}{\msing{u_1}}{\rho}, \; y \inb \semappp{M}{e_2}{\msing{u_2}}{\rho}) \} \\
+  %% \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & TBD \\
+  \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      f \inb \semfcn, \\
+      g \inb u, g \in \semfcn, \\
+      \forall x \inb \Value. \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
+      |if|\; \bar{\rho} = \emptyset\; |then|\; x \not\in \dom(f) \\
+      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. \\
+      \hspace{2em} \forall x' \inb \semappp{M}{e_1}{\msing{x}}{\rho'},\, \\
+      \hspace{2em} x' \in \dom(g) \land \\
+      \hspace{2em} f(x) \in \semappp{L}{e_2}{\msing{g(x')}}{\rho'}
+    \end{array} \\
+    & & \} \\
+  \semappp{M}{|funk o e_1 e_2|}{u}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      f \inb \semfcn, \\
+      g \inb u, g \in \semfcn, \\
+      \forall x \inb \Value. \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{\msing{x}}{\rho}, \\
+      |if|\; \bar{\rho} = \emptyset\; |then|\; \textbf{T} \\
+      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. \\
+      \hspace{2em} \forall x' \inb \semappp{M}{e_1}{\msing{x}}{\rho'},\, \\
+      \hspace{2em} x' \in \dom(g) \land \\
+      \hspace{2em} f(x) \in \semappp{L}{e_2}{\msing{g(x')}}{\rho'}
+    \end{array} \\
+    & & \} \\
+
+\\
+    
+  \end{array} \\ \\
+  
+
+\end{array}
+$
+\caption{Expression match semantics}
+\label{fig:den-sem2}
+\end{figure}
 
 \begin{figure}
 $
@@ -473,19 +554,19 @@ $
 \apply & : & (\Value \times \Value) \rightarrow \mtype \\
 \apply( \tuple{w_0, w_1}, k) & = & \msing{w_k} & 0 \leq k \leq 1 \\
 \apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
-\textbf{alternative:\hspace{6em}}               & = & \{ y \, || \, (x, y) \in f, \; x=w \} & f \in \semfcn \\
+\textbf{alternative:\hspace{6em}}               & = & \{ y \, || \, (x, y) \inb f, \; x=w \} & f \inb \semfcn \\
 \apply( f, w ) & = & \emptyset & \text{otherwise} \\
 %%\end{array}
 \\
 
 %% \begin{array}{rcll}
 \dom & : & (\Value \rightharpoonup \Value) \rightarrow \mtype \\
-\dom(f) & = & \{ x \, || \, (x,y) \in f \} \\
+\dom(f) & = & \{ x \, || \, (x,y) \inb f \} \\
 
 \\
 
 \ran & : & (\Value \rightharpoonup \Value) \rightarrow \mtype \\
-\ran(f) & = & \{ y \, || \, (x,y) \in f \} \\
+\ran(f) & = & \{ y \, || \, (x,y) \inb f \} \\
 
 \\
 
@@ -506,64 +587,17 @@ $
 \label{fig:den-sem-util}
 \end{figure}
 
-\begin{figure}
-$
-\begin{array}{l}
-
-\text{\bf Match semantics} \\
-\\
-  \begin{array}{rcll}
-%\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
-  \semapp{B}{|e|} & : & \mtype \rightarrow \Env \rightarrow \Env^{*} \\
-  \semappp{B}{|e|}{u}{\rho} & = &
-  \{ \rho' \; || 
-  \begin{array}[t]{l}
-  w_1 \in \Value, \mydots, w_n \in \Value, \\
-  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
-  \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
-  \end{array} \\
-  & &  \} \; \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
-\\
-    
-%\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
-  \semapp{M}{|e|} & : & \mtype \rightarrow \Env \rightarrow \mtype \\
-  \semappp{M}{|x|}{u}{\rho} & = & \msing{\rho(x)} \cap u \\
-  \semappp{M}{|k|}{u}{\rho} & = & \msing{k} \cap u \\
-  \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \cap u \\
-  \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = & %% \apply(\semappp{M}{|e_1|}{\rho}, \; \semappp{M}{|e_2|}{\rho}) \\
-    \{ r \, || \, f \in \semapp{E}{|e_1|}{\rho}, \; a \in \semapp{E}{|e_2|}{\rho}), \; r \in \apply(f, a) \} \cap u \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
-  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & %% \semappp{M}{|e_1|}{\rho} \; \msemi      \; \semappp{M}{|e_2|}{\rho} \\
-    \{ y \, || \, x \in \semapp{E}{|e_1|}{\rho}, \; y \in \semappp{M}{|e_2|}{u}{\rho}) \} \\
-  \semappp{M}{|x := e|}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
-  \semappp{M}{|:e|}{u}{\rho} & = & %% \ran(\semappp{M}{|e|}{\rho}) \\
-    \{ r \, || \, f \in \semappp{M}{|e|}{\rho}, \; a \in u, \; r \in \apply(f, a) \} \\
-  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
-  \semappp{M}{|arr (e_1, e_2)|}{u}{\rho} & = &
-    \{ \tuple{x,y} \, || \, \tuple{u_1,u_2} \in u, \; x \in \semappp{M}{|e_1|}{u_1}{\rho}, \; y \in \semappp{M}{e_2}{u_2}{\rho}) \} \\
-  \semappp{M}{|funk c e_1 e_2|}{u}{\rho} & = & TBD \\
-  \semappp{M}{|funk o e_1 e_2|}{u}{\rho} & = & TBD \\
-\\
-    
-  \end{array} \\ \\
-  
-
-\end{array}
-$
-\caption{Expression match semantics}
-\label{fig:den-sem2}
-\end{figure}
 
 The semantic value domain has these components
 \begin{itemize}
 \item $\mathbb{Z}$, the integers
 \item $\tuple{\Value,\Value}$ finite tuples of values, just pairs in this exposition to reduce clutter.
-\item $\semfcn$ (computable) functions from values to values.  The function can be partial,
+\item $\semfcn$ (computable, provably terminating) functions from values to values.  The function can be partial,
   \ie, the function domain, $\dom$, can be a subset of $\Value$,
   and the range, $\ran$, can also be a subset of $\Value$.
   Note that a function always maps a single value to a single value.
   Functions are defined as a set of pairs, as in set theory.
-  The notation $\fcn$ is used to indicate that we are defining a function using pairs.
+  Since a function is a set of pairs of values, there is no notion of non-terminating functions.
 \end{itemize}
 
 The semantic valuation function $\semapp{E}{e}{\rho}$ maps an expression in the given environment to
@@ -579,12 +613,17 @@ whereas the denoation of |add| is the set of all function that behave like $+$ o
 but are otherwise unconstrained.
 
 \vspace{2em}
-Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the cases I've covered.
-Hopefully it will hold for the rest too.
+Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the non-function cases.
+\lennart{
+It is tantalizingly close to be (obviously) true for functions as well.
+I think it's true for functions as well, but it's not clear to me.}
+Experiments with the Haskell implementation all confirm that $\semapp{E}{e}{\rho} = \semappp{M}{e}{\Value}{\rho}$.
 
-WARNING: The notation is a little confusing, sometimes $x \in e$ is a binding occurence of x,
-and sometimes it is a membership test. The |let| is used in the same way as |let| in Haskell list comprehensions.
+To make notation a little clearer in set comprehension we use $x \inb e$ to indicate a binding occurence of x,
+and $x \in e$ for a membership test.
+The |let| is used in the same way as |let| in Haskell list comprehensions.
 The |if| construct is the logical connective, not the descriminator for Booleans.
+The \textbf{T} stands for the always true proposition.
 
 The equation for closed functions in words.
 \begin{itemize}
@@ -601,7 +640,7 @@ The equation for closed functions in words.
   $ |else|\; x \in \dom(f) $
 \item \textbf{And} the image of $x$ (\ie, $f(x)$) must be in the denotation of $e_2$
   for all the different ways we can match in $e_1$.
-  $ \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{S}{e_2}{\rho'} $
+  $ \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'} $
 \end{itemize}
 
 The explanation for open functions is almost identical.  The only difference is that if $e_1$ does not match $x$,
