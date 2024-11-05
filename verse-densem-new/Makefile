@@ -43,3 +43,8 @@ realclean:
 	$(LATEX) $<
 	$(LATEX) $<
 
+test:	Sem
+	./Sem
+
+Sem:	Sem.hs
+	ghc -O2 Sem.hs

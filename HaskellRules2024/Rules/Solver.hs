@@ -168,9 +168,17 @@ check s = firstJust
 checkLits :: Solver -> Maybe UnsatReason
 checkLits cc = firstJust (\case { l1:l2:_ -> Just (DiseqLit l1 l2); _ -> Nothing } <$> litGroups)
   where
-   litGroups  = groupKey litRep lits
-   litRep l   = UF.find (s_uf cc) (GVLit l)
-   lits       = nub (s_lits cc)
+   -- litGroups: group literals: each group are known to be equal to each other
+   -- If any of these groups is not a singleton, contradiction!
+   litGroups :: [[Lit]]
+   litGroups = groupKey litRep lits
+
+   litRep :: Lit -> GroundVal   -- Get the representative of this literal
+   litRep l = UF.find (s_uf cc) (GVLit l)
+
+   -- lits is all the literals mentioned anywhere
+   lits :: [Lit]
+   lits = nub (s_lits cc)
 
 checkTypes :: Solver -> Maybe UnsatReason
 -- Return (Just reason) if the solver has contradictory type tests
@@ -330,7 +338,7 @@ generateEqs s = filter (not . knownEq s) $
                  evalDefs s ++
                  cseDefs s)
   where
-    pos       = [MkEqual (GVVar x) y | A_GVEq x y <- s_pos s]
+    pos = [MkEqual (GVVar x) y | A_GVEq x y <- s_pos s]
 
 knownEq :: Solver -> Equality -> Bool
 knownEq s (MkEqual v1 v2) = isEqual s v1 v2
@@ -359,7 +367,8 @@ evalDef s (x, (op, GVArr [v1, v2])) = do
 evalDef _ _ = Nothing
 
 cseDefs :: Solver -> [Equality]
--- If we have defs  x = Op[gv1], y = Op[gv2], and s |- gv1 ~ gv2, then generate x=y
+-- Congruence closure:
+--  if we have defs  x = Op[gv1], y = Op[gv2], and s |- gv1 ~ gv2, then generate x=y
 cseDefs s
   = [ MkEqual (GVVar x) (GVVar y)
     | (x, (opx,gvx)) <- s_def s
