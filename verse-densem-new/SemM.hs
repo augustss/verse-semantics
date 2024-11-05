@@ -345,13 +345,15 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
   vf@(VFcn f) <- allWs
   guard $
     forAll allWs $ \ x ->
-      let rhos = dB e1 (Just x) rho
-      in  if isEmpty rhos then not (x `inDom` f) || q == Open
-          else x `inDom` f &&
-               forAll rhos
-                      (\ rho' -> forAll (dM e1 (Just x) rho')
-                                        (\ x' -> x' `inDom` g &&
-                                                 ap f x `sIn` dL e2 (Just $ ap g x') rho'))
+      ifEmpty
+        (dB e1 (Just x) rho)                 -- possible ways x can match e1
+        (not (x `inDom` f) || q == Open)     -- if none
+        $ \ rhos ->                          -- if at least one
+             x `inDom` f &&
+             forAll rhos
+                    (\ rho' -> forAll (dM e1 (Just x) rho')
+                                      (\ x' -> x' `inDom` g &&
+                                               ap f x `sIn` dL e2 (Just $ ap g x') rho'))
   return vf
                               | otherwise = empty
 
