@@ -21,7 +21,7 @@ prop_ValidTrace =
     let (resp, np :<-- ps)  = normalize lotsOfSteps trs2024_noREC p
      in whenFail (do putStrLn "== TRACE =="
                      displayTrace (np :<-- ps)) $
-          resp /= NormInvalid ==>
+          resp == NormOK ==>
             valid np && all valid [ q | (_,q) <- ps ]
  where
   arbExpr :: Gen Expr
@@ -36,11 +36,12 @@ prop_Confluent =
   forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- qs1) ->
     let (resp, np :<-- ps)  = normalize lotsOfSteps trs2024_noREC p
         (resq, nq :<-- qs2) = normalize lotsOfSteps trs2024_noREC q
-     in whenFail (do putStrLn "== TRACE #1 =="
+     in whenFail' (writeFile "counterexample.txt" (show p)) $
+        whenFail (do putStrLn "== TRACE #1 =="
                      displayTrace (np :<-- ps)
                      putStrLn "== TRACE #2 =="
                      displayTrace (nq :<-- (qs2 ++ qs1))) $
-          resp /= NormInvalid && resq /= NormInvalid ==>
+          resp == NormOK && resq == NormOK ==>
             norm np == norm nq
  where
   arbFork :: Gen (Expr, Traced Expr)
