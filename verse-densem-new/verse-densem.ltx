@@ -353,10 +353,8 @@
     \\[-3mm]
   \end{array}
   $$
-\caption{The Verse calculus: syntax} \label{fig:syntax}
+\caption{The MiniVerse syntax} \label{fig:syntax}
 \end{figure}
-
-The syntax of \versecalc{} is given in \cref{fig:syntax}.
 
 \section{A denotational semantics}
 
@@ -374,7 +372,7 @@ The syntax of \versecalc{} is given in \cref{fig:syntax}.
 \begin{figure}
 $
 \begin{array}{l}
-\textbf{Domains} \\
+\textbf{Domains (sets)} \\
 \begin{array}{rcll}
 \Value & = & \mathbb{Z} + \dtuple + (\semfcn) \\
 \dtuple & = & \text{a finite tuple of values $\Value$} \\
@@ -396,13 +394,6 @@ Env^{*} & = & \text{set of } Env \\
   \right.
 \\ \\
 
-%\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
-  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{D}{|e|}{\rho} & = &
-  \{ \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
-          w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
-  & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
-\\
 %\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
   \semapp{E}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|x|}{\rho} & = & \msing{\rho(x)} \\
@@ -437,6 +428,15 @@ Env^{*} & = & \text{set of } Env \\
     \end{array} \\
     & & \} \\
     \\ 
+
+    %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
+  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{D}{|e|}{\rho} & = &
+  \{ \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
+          w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+
   \semapp{C}{|e|} & : & \Env \rightarrow \Env^{*} \\
   \semappp{C}{|e|}{\rho} & = &
   \{ \rho' \; || 
