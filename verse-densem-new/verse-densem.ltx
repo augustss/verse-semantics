@@ -326,7 +326,7 @@
   $$
   \begin{array}{l}
     \textbf{Syntax} \\
-    \begin{array}{lr@@{\;}r@@{\;}l}
+    \begin{array}{lr@@{\;}r@@{\;}ll}
     \text{Integers} & k \\
     \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
 %     \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
@@ -343,8 +343,9 @@
     \\
     & &
     \vb & |vif e_1 e_2 e_3|
-    \vb |arr (e_1, e_2)|
+    \vb |arr (e_1, xdots, e_n)|
     \vb |funk q e_1 e_2|
+    & |n >= 0|
     \\
     \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
     \text{Openness} & q & ::= & |open| \vb |closed| \\
