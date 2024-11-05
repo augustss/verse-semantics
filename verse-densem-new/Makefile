@@ -23,6 +23,7 @@ clean:
 	-rm -f verse-densem.tex
 	-rm -f verse-densem.aux verse-densem.log verse-densem.out \
                verse-densem.pdf verse-densem.bbl verse-densem.blg
+	-rm -f Sem SemDo SemM
 
 # Total reset -- delete intermediates *and* final derives
 realclean:
@@ -30,6 +31,7 @@ realclean:
 	-rm -f verse-densem.aux verse-densem.log verse-densem.out \
                verse-densem.pdf verse-densem.bbl verse-densem.blg
 	-rm -f verse-densem.pdf
+	-rm -f Sem SemDo SemM
 
 # Implicit rules
 ################
@@ -43,8 +45,20 @@ realclean:
 	$(LATEX) $<
 	$(LATEX) $<
 
-test:	Sem
+testSem:	Sem
 	./Sem
 
 Sem:	Sem.hs
 	ghc -O2 Sem.hs
+
+testSemDo:	SemDo
+	./SemDo
+
+SemDo:	SemDo.hs
+	ghc -O2 SemDo.hs
+
+testSemM:	SemM
+	./SemM
+
+SemM:	SemM.hs
+	ghc -O2 SemM.hs
