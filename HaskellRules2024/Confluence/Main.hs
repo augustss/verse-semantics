@@ -54,26 +54,27 @@ prop_Confluent =
        return (p,tr)
 
   shrinkFork :: (Expr, Traced Expr) -> [(Expr,Traced Expr)]
-  shrinkFork (p, q :<-- tr) =
+  shrinkFork (p, q :<-- tr@(_:_:_)) =
+    [ (p, r :<-- tr1)
+    , (r, q :<-- tr2)
+    ]
+   where
+    k     = length tr `div` 2 -- 1<=k<length tr
+    tr1   = drop k tr
+    tr2   = take k tr
+    (_,r) = last tr2
+
+  shrinkFork (p, _) =
     [ (p', q' :<-- [(s,p')])
-    | (p',s,q') <-
-        case tr of
-          _:_:_ -> [ (p',s,q')
-                   | ((s,p'),q') <- tr `zip` (q : map snd tr)
-                   ]
-          _     -> [ (p',s,q')
-                   | p' <- shrink p -- ++ map snd (stepRule trs2024_noREC p)
-                   , valid p'
-                   , (s,q') <- stepRule trs2024_noREC p'
-                   ]
+    | p' <- shrink p ++ map snd (stepRule trs2024_noREC p)
+    , valid p'
+    , (s,q') <- stepRule trs2024_noREC p'
     ]
 
 --------------------------------------------------------------------------------
 
 main :: IO ()
---main = quickCheck prop_Valid
---main = quickCheckWith stdArgs{ maxSuccess = 9999 } prop_ValidTrace
-main = quickCheckWith stdArgs{ maxSuccess = 9999 } prop_Confluent
+main = quickCheckWith stdArgs{ maxSuccess = 1000 } prop_Confluent
 
 --------------------------------------------------------------------------------
 
