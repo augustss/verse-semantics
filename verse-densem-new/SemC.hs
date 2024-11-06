@@ -12,6 +12,7 @@ import Prelude(Show(..), Ord(..), Eq(..), Num(..), Integral(..),
                ($), (.), not, (&&), (||), otherwise, snd, putStrLn,
                )
 import qualified Prelude
+import qualified Control.Monad as Monad
 import Data.List
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -124,6 +125,12 @@ isEmpty = S.null
 
 sIn :: Ord a => a -> Set a -> Bool
 sIn = S.member
+
+getSing :: Set a -> Maybe a
+getSing s =
+  case S.toList s of
+    [x] -> Just x
+    _   -> Nothing
 
 -- Check if a predicate holds for all values in the set
 forAll :: Set a -> (a -> Bool) -> Bool
@@ -274,11 +281,11 @@ pre lr s = (\ (l,x) -> (lr:l,x)) <$> s
 unit :: Val -> WS
 unit v = return (noLbls, v)
 
-sortLbl :: WS -> [[Val]]
+sortLbl :: WS -> [Set Val]
 sortLbl = sortl . unSet
   where sortl [] = []
         sortl s =
-          let ws = [ w | ([], w) <- s ]
+          let ws = mkSet [ w | ([], w) <- s ]
               rest = sortl [ (l, w) | (L : l, w) <- s ] ++ sortl [ (l, w) | (R : l, w) <- s ]
           in  if null ws then rest else ws : rest
 
@@ -394,7 +401,8 @@ dM (If e1 e2 e3) u rho =
     (dM e3 u rho)
     (\ rhos -> do
         rho' <- rhos
-        dM e2 u rho'
+        let vs = sortLbl (dM e2 u rho') !! 0
+        (noLbls,) <$> vs
     )
 dM (Tup es) (Just u) rho | VTup us <- u, length es == length us =
                             vtup <$> mapM (\ (e, v) -> dM e (Just v) rho) (zip es us)
@@ -433,9 +441,10 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
 dM (Choice e1 e2) u rho =
   pre L (dL e1 u rho) `sunion` pre R (dL e2 u rho)
 dM (All e) u rho = unit tup `isectM` u
-  where xss = sortLbl (dE e rho)
-        tup | all ((== 1) . length) xss = VTup $ map (!!0) xss
-            | otherwise = error "All"
+  where tup =
+          case Monad.mapM getSing $ sortLbl (dE e rho) of
+            Nothing -> error "All"
+            Just xs -> VTup xs
 
 dM e Nothing rho = do  -- if nothing else matches then try all possible u
    u <- allWs
@@ -620,14 +629,18 @@ exp27 = Fun Closed (Def "x" (Choice (Int 1) (Int 0))) (Var "x")
 exp28 :: Exp
 exp28 = All $ Colon exp27
 
+-- if (1 | 2){2}else{0}
+exp29 :: Exp
+exp29 = If (Int 1 `Choice` Int 2) (Int 2) (Int 0)
+
 allExps :: [Exp]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp23, exp24, exp26, exp28
+           exp20, exp21, exp22, exp23, exp24, exp26, exp28, exp29
           ]
 
 refExps :: String
-refExps = "[3,int,Wrong([([],comparable),([],int)]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3,[1,2],[1,2,3],[0,1],[1,0]]"
+refExps = "[3,int,Wrong([([],comparable),([],int)]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3,[1,2],[1,2,3],[0,1],[1,0],2]"
 
 allRes :: [RVal]
 allRes = map dP allExps
