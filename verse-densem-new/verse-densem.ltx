@@ -401,7 +401,7 @@ Env^{*} & = & \text{set of } Env \\
   \semapp{E}{|o|}{\rho} & = & \semapp{O}{|o|}{} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
     \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \\
-  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{D}{|e_1|}{\rho} \; \cap \; \semapp{D}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
     \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho} \} \\
   \semapp{E}{|x := e|}{\rho} & = & \msing{\rho(x)} \;\cap\; \semapp{E}{e}{\rho} \\
@@ -411,8 +411,8 @@ Env^{*} & = & \text{set of } Env \\
   \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
   \left\{
   \begin{array}{ll}
-    \semapp{E}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
-    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{E}{|e_2|}{\rho'} & \text{otherwise} \\
+    \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{|e_2|}{\rho'} & \text{otherwise} \\
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
@@ -498,7 +498,7 @@ $
   \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \cap \msing{u} \\
   \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = &
     \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \cap \msing{u} \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{L}{|e_1|}{u}{\rho} \; \cap \; \semappp{L}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
     \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semappp{M}{|e_2|}{u}{\rho}) \} \\
   \semappp{M}{|x := e|}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
@@ -508,8 +508,8 @@ $
   \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
   \left\{
   \begin{array}{ll}
-    \semapp{M}{|e_3|}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
-    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{M}{|e_2|}{u}{\rho'} & \text{otherwise} \\
+    \semapp{L}{|e_3|}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{L}{|e_2|}{u}{\rho'} & \text{otherwise} \\
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
@@ -723,7 +723,7 @@ $
   \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = &
     \{ (l \bowtie l' \bowtie l'', r) \, || \, (l,f) \inb \semapp{E}{|e_1|}{\rho},\; (l',a) \inb \semapp{E}{|e_2|}{\rho}, \\
     & & \hspace{0.5em}(l'',r) \inb \apply(f, a) \} \capu u \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{L}{|e_1|}{u}{\rho} \; \Cap \; \semappp{L}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \Cap \; \semappp{M}{|e_2|}{u}{\rho} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
     \{ (l \bowtie l', y) \, || \, (l,x) \inb \semapp{E}{|e_1|}{\rho}, \; (l',y) \inb \semappp{M}{|e_2|}{u}{\rho}) \} \\
   \semappp{M}{|e_1 `choice` e_2|}{u}{\rho} & = & \prelbl([L],\semappp{L}{|e_1|}{u}{\rho}) \cup \prelbl([R],\semappp{L}{|e_1|}{u}{\rho}) \\
@@ -734,8 +734,8 @@ $
   \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
   \left\{
   \begin{array}{ll}
-    \semapp{M}{|e_3|}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
-    XXX \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{M}{|e_2|}{u}{\rho'} & \text{otherwise} \\
+    \semapp{L}{|e_3|}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    XXX \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{L}{|e_2|}{u}{\rho'} & \text{otherwise} \\
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
