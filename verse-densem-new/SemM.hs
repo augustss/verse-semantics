@@ -338,7 +338,7 @@ dM (If e1 e2 e3) u rho =
         rho' <- rhos
         dM e2 u rho'
     )
-dM (Tup es) (Just u) rho | VTup us <- u, length us == length us =
+dM (Tup es) (Just u) rho | VTup us <- u, length es == length us =
                              VTup <$> mapM (\ (e, v) -> dM e (Just v) rho) (zip es us)
                          | otherwise = empty
 dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
