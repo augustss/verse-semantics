@@ -24,6 +24,9 @@ ifThenElse :: Bool -> a -> a -> a
 ifThenElse False _ x = x
 ifThenElse True  x _ = x
 
+implies :: Bool -> Bool -> Bool
+x `implies` y = not x || y
+
 --------------------
 ---- Abstract syntax
 
@@ -306,13 +309,16 @@ dO Oadd = return $ VFcn $ mkFcn "add" [ (VTup [x, y], vadd x y) | x <- allInts, 
 -- P, top level program
 dP :: Exp -> RVal
 dP e =
-  case unSet $ dL e Nothing rho0 of
+  case unSet $ dD e rho0 of
     [w] -> RVal w
     ws  -> Wrong $ show ws
 
 -- E, expression
 dE :: Exp -> Env -> WS
 dE e rho = dM e Nothing rho
+
+dD :: Exp -> Env -> WS
+dD e rho = dL e Nothing rho
 
 --------------------
 ---- Semantic equations, matching
@@ -341,6 +347,25 @@ dM (If e1 e2 e3) u rho =
 dM (Tup es) (Just u) rho | VTup us <- u, length es == length us =
                              VTup <$> mapM (\ (e, v) -> dM e (Just v) rho) (zip es us)
                          | otherwise = empty
+{- fails for ex4
+   fun_c(x:int){add[(x,1)]}
+-- Simon's version
+dM (Fun q e1 e2) Nothing rho = do
+  let xs = dI e1
+  vf@(VFcn f) <- allWs
+  guard $
+    forAll allWs $ \ x ->
+      forAll (genRhos rho xs) $ \ rho' ->
+        not (isEmpty (dM e1 (Just x) rho')) `implies`
+        (x `inDom` f && ap f x `sIn` dD e2 rho')
+  guard $
+    (q == Closed) `implies`
+      (forAll allWs $ \ x ->
+         forAll (genRhos rho xs) $ \ rho' ->
+           not (x `inDom` f) `implies` isEmpty (dM e1 (Just x) rho')
+      )
+  return vf
+-}
 dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
   vf@(VFcn f) <- allWs
   guard $
@@ -358,8 +383,8 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
                               | otherwise = empty
 
 dM e Nothing rho = do  -- if nothing else matches then try all possible u
-   u <- allWs
-   dM e (Just u) rho
+  u <- allWs
+  dM e (Just u) rho
 
 -- L, expression matching in a scope
 dL :: Exp -> Maybe W -> Env -> WS
