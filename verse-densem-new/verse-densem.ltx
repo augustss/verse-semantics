@@ -181,7 +181,7 @@
 \newcommand{\mtype}{\Value^{*}}
 \newcommand{\mtyped}{\Value^{?}}
 \newcommand{\mempty}{\mathit{empty}}
-\newcommand{\munit}{\mathit{unit}}
+\newcommand{\munit}{\textbf{unit}}
 \newcommand{\msing}[1]{\{#1\}}
 \newcommand{\munits}[1]{\munit(#1)}
 \newcommand{\mintersect}{\Cap}
@@ -603,6 +603,171 @@ $
 $
 \caption{Utility function}
 \label{fig:den-sem-util}
+\end{figure}
+
+\newcommand{\LblsValue}{LW}
+\newcommand{\semfcnc}{\Value \rightharpoonup \LblsValue}
+\newcommand{\Ltag}{\textbf{L}}
+\newcommand{\Rtag}{\textbf{R}}
+\newcommand{\mtypec}{LW^{*}}
+\newcommand{\capu}{\cap\hspace{-0.6em}\bullet\,}
+\newcommand{\prelbl}{\textbf{prelbl}}
+\newcommand{\unlbl}{\textbf{unlbl}}
+
+\begin{figure}
+$
+\begin{array}{l}
+\textbf{Domains (sets)} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + \dtuple + (\semfcnc) \\
+\dtuple & = & \text{a finite tuple of values $\Value$} \\
+\Env & = & |Ident| \rightarrow \Value \\
+LW & = & [L] \times \Value \\
+W^{*} & = & \text{set of } W \\
+LW^{*} & = & \text{set of } LW \\
+Env^{*} & = & \text{set of } Env \\
+L & = & \Ltag + \Rtag
+\end{array}
+\\ \\
+
+
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of a closed program}} \\
+  \semapp{P}{|e|}{} & : & \Value + |Wrong| \\
+  \semapp{P}{|e|}{} & = & \left\{
+  \begin{array}{ll}
+    w,       & \text{if} \{([],w)\} = \semapp{D}{|e|}{\rho_0} \\
+    |Wrong|, & \text{otherwise}
+  \end{array}
+  \right.
+\\ \\
+
+  \semapp{E}{|e|}{} & : & \Env \rightarrow \mtypec \\
+  \semapp{E}{|e|}{\rho} & = & \bigcup_{u \inb \Value}\semapp{M}{|e|}{u}{\rho} \\
+\\
+    %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
+  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtypec \\
+  \semapp{D}{|e|}{\rho} & = &
+  \{ r\, ||  \,
+  w_1 \inb \Value, \mydots, w_n \inb \Value,\\
+  & & \hspace{0.5em} r \inb \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \} \\
+  & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+
+  \semapp{C}{|e|} & : & \Env \rightarrow \Env^{*} \\
+  \semappp{C}{|e|}{\rho} & = &
+  \{ \rho' \; || 
+  \begin{array}[t]{l}
+  w_1 \inb \Value, \mydots, w_n \inb \Value, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  \emptyset \neq \semappp{E}{e}{\rho'} \\
+  \end{array} \\
+  & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+
+
+%\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
+%\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
+
+  \end{array} \\ \\
+
+  \begin{array}{rcll}
+    \munits{s} & = & \{ ([], x) \} & \text{singleton set of a value with no labels} \\
+    s \capu u & = & \{ (l, u)\, ||\, (l, x) \inb s, x = u \} \\
+    \unlbl((l,x)) & = & x \\
+    \prelbl(l, s) & = & \{ (l \bowtie l', x)\, ||\, (l',x) \inb s \} \\
+\\
+\apply & : & (\Value \times \Value) \rightarrow \mtypec \\
+\apply( \tuple{w_0, \mydots,\, w_n}, k) & = & \msing{(\Rtag^k\Ltag,w_k)} & 0 \leq k \leq n \\
+\apply( f, w ) & = & \msing{f(w)} & f \in \semfcnc, w \in \dom(f) \\
+\apply( f, w ) & = & \emptyset & \text{otherwise} \\
+
+  \end{array}
+
+\end{array}
+$
+\caption{Expression semantics, with choice}
+\label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+
+\text{\bf Match semantics} \\
+\\
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
+  \semapp{B}{|e|} & : & \Value \rightarrow \Env \rightarrow \Env^{*} \\
+  \semappp{B}{|e|}{u}{\rho} & = &
+  \{ \rho' \; || 
+  \begin{array}[t]{l}
+  w_1 \inb \Value, \mydots, w_n \inb \Value, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
+  \end{array} \\
+  & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+    
+  \semapp{L}{|e|}{} & : & \Value \rightarrow \Env \rightarrow \mtypec \\
+  \semappp{L}{|e|}{u}{\rho} & = &
+  \{ r\, ||  \,
+  w_1 \inb \Value, \mydots, w_n \inb \Value \\
+  & & \hspace{0.5em} r \inb \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \} \\
+  & & |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+\\
+%\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
+  \semapp{M}{|e|} & : & \Value \rightarrow \Env \rightarrow \mtypec \\
+  \semappp{M}{|x|}{u}{\rho} & = & \munits{\rho(x)} \capu u \\
+  \semappp{M}{|k|}{u}{\rho} & = & \munits{k} \capu u \\
+  \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \capu u \\
+  \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = &
+    \{ (l \bowtie l' \bowtie l'', r) \, || \, (l,f) \inb \semapp{E}{|e_1|}{\rho},\; (l',a) \inb \semapp{E}{|e_2|}{\rho}, \\
+    & & \hspace{0.5em}(l'',r) \inb \apply(f, a) \} \capu u \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{L}{|e_1|}{u}{\rho} \; \cap \; \semappp{L}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
+    \{ (l \bowtie l', y) \, || \, (l,x) \inb \semapp{E}{|e_1|}{\rho}, \; (l',y) \inb \semappp{M}{|e_2|}{u}{\rho}) \} \\
+  \semappp{M}{|e_1 `choice` e_2|}{u}{\rho} & = & \prelbl([L],\semappp{L}{|e_1|}{u}{\rho}) \cup \prelbl([R],\semappp{L}{|e_1|}{u}{\rho}) \\
+  \semappp{M}{|x := e|}{u}{\rho} & = & \semappp{M}{e}{u}{\rho} \capu \rho(x) \\
+  \semappp{M}{|:e|}{u}{\rho} & = &
+    \{ (l \bowtie l',r) \, || \, (l,f) \inb \semapp{E}{|e|}{\rho}, \; (r,l') \inb \apply(f, u) \} \\
+%FAIL  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+  \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{M}{|e_3|}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    XXX \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{M}{|e_2|}{u}{\rho'} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
+  \semappp{M}{|all e|}{\rho} & = & XXX \semapp{E}{e}{\rho} \\
+  \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
+  \{ ((l_1 \bowtie \mydots \bowtie l_n, \tuple{x_1,\mydots,x_n}) \, || \, u \in \dtuple,
+  \exists u_1 \mydots u_n .\, u = \tuple{u_1,\mydots,u_n}, \\
+  & & \hspace{0.5em} (l_1,x_1) \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, (l_n,x_n) \inb \semappp{M}{e_n}{u_n}{\rho}) \} \\
+  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      f \inb \semfcn, \\
+      g \in \semfcn, \\
+      \forall x \inb \Value. \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+      |else|\; x \in \dom(f) \land \\
+      \hspace{2em} \forall \rho' \inb \bar{\rho}. \\
+      \hspace{3em} \forall (l,x') \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
+      \hspace{4em} x' \in \dom(g) \land \\
+      \hspace{4em} f(x) \in \prelbl(l,\semappp{L}{e_2}{(\unlbl(g(x')))}{\rho'})
+    \end{array} \\
+    & & \} \\
+
+\\
+    
+  \end{array} \\ \\
+  
+
+\end{array}
+$
+\caption{Expression match semantics, with choice}
+\label{fig:den-sem2}
 \end{figure}
 
 
