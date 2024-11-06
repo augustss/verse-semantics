@@ -68,3 +68,5 @@ testSemC:	SemC
 
 SemC:	SemC.hs
 	ghc -O2 SemC.hs
+
+testall:	testSem testSemDo testSemM testSemC

@@ -325,7 +325,7 @@ dE (Var x) rho = lookupEnv x rho
 dE (Int k) _rho = return $ VInt k
 dE (Prim o) _rho = dO o
 dE (App e1 e2) rho = applys (dE e1 rho) (dE e2 rho)
-dE (Equ e1 e2) rho = dE e1 rho `isect` dE e2 rho
+dE (Equ e1 e2) rho = dD e1 rho `isect` dD e2 rho
 dE (Seq e1 e2) rho = do
   _ <- dE e1 rho
   dE e2 rho
@@ -375,7 +375,7 @@ dM (Var x) u rho = lookupEnv x rho `isect` return u
 dM (Int k) u _rho = return (VInt k) `isect` return u
 dM (Prim o) u _rho = dO o `isect` return u
 dM (App e1 e2) u rho = applys (dE e1 rho) (dE e2 rho) `isect` return u
-dM (Equ e1 e2) u rho = dM e1 u rho `isect` dM e2 u rho
+dM (Equ e1 e2) u rho = dL e1 u rho `isect` dL e2 u rho
 dM (Seq e1 e2) u rho = do { _ <- dE e1 rho; dM e2 u rho }
 dM (Def x e) u rho = lookupEnv x rho `isect` dM e u rho
 dM (Colon e) u rho = do f <- dE e rho; apply f u

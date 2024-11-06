@@ -401,9 +401,9 @@ Env^{*} & = & \text{set of } Env \\
   \semapp{E}{|o|}{\rho} & = & \semapp{O}{|o|}{} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
     \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \\
-  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{D}{|e_1|}{\rho} \; \cap \; \semapp{D}{|e_2|}{\rho} \\
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
-    \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho}) \} \\
+    \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho} \} \\
   \semapp{E}{|x := e|}{\rho} & = & \msing{\rho(x)} \;\cap\; \semapp{E}{e}{\rho} \\
   \semapp{E}{|:e|}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
     \{ r \, || \, f \inb \semapp{E}{|e|}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} \\
@@ -432,8 +432,9 @@ Env^{*} & = & \text{set of } Env \\
     %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
   \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{D}{|e|}{\rho} & = &
-  \{ \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
-          w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  \{ r\, ||  \,
+  w_1 \inb \Value, \mydots, w_n \inb \Value,\\
+  & & \hspace{0.5em} r \inb \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \} \\
   & & \text{where} |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 
@@ -485,8 +486,9 @@ $
     
   \semapp{L}{|e|}{} & : & \Value \rightarrow \Env \rightarrow \mtype \\
   \semappp{L}{|e|}{u}{\rho} & = &
-  \{ \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})}\, ||  \,
-          w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  \{ r\, ||  \,
+  w_1 \inb \Value, \mydots, w_n \inb \Value \\
+  & & \hspace{0.5em} r \inb \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \} \\
   & & |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 %\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
@@ -496,7 +498,7 @@ $
   \semappp{M}{|o|}{u}{\rho} & = & \semapp{O}{|o|}{} \cap \msing{u} \\
   \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = &
     \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \cap \msing{u} \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \cap \; \semappp{M}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{L}{|e_1|}{u}{\rho} \; \cap \; \semappp{L}{|e_2|}{u}{\rho} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
     \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semappp{M}{|e_2|}{u}{\rho}) \} \\
   \semappp{M}{|x := e|}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
@@ -512,7 +514,8 @@ $
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
   \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
-  \{ \tuple{x_1,\mydots,x_n} \, || \, u \in \dtuple, |let|\; \tuple{u_1,\mydots,u_n} = u, \\
+  \{ \tuple{x_1,\mydots,x_n} \, || \, u \in \dtuple,
+  \exists u_1 \mydots u_n .\, u = \tuple{u_1,\mydots,u_n}, \\
   & & \hspace{0.5em} x_1 \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, x_n \inb \semappp{M}{e_n}{u_n}{\rho}) \} \\
   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
