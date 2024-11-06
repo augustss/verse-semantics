@@ -62,3 +62,9 @@ testSemM:	SemM
 
 SemM:	SemM.hs
 	ghc -O2 SemM.hs
+
+testSemC:	SemC
+	./SemC
+
+SemC:	SemC.hs
+	ghc -O2 SemC.hs

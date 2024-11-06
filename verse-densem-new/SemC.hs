@@ -5,17 +5,18 @@
 -- Use do notation for the set expressions.
 -- Also, combine dE and dM in an efficient way.
 
-module Main(main) where
+module Main where
 import Prelude(Show(..), Ord(..), Eq(..), Num(..), Integral(..),
                Bool(..), String, IO, Integer,
                sequence, error, uncurry, undefined, showString, traverse,
-               print, ($), (.), not, (&&), (||), otherwise, snd
+               ($), (.), not, (&&), (||), otherwise, snd, putStrLn,
                )
+import qualified Prelude
 import Data.List
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
-import Debug.Trace
+--import Debug.Trace
 
 --------------------
 ---- Because of RebindableSyntax
@@ -46,7 +47,7 @@ data OC = Open | Closed
 --------------------
 ---- Values
 
-data Val = VInt Integer | VTup [Val] | VFcn (Fcn Val Val)
+data Val = VInt Integer | VTup [Val] | VFcn (Fcn Val (Lbls, Val))
   deriving (Eq, Ord)
 
 data RVal = RVal Val | Wrong String
@@ -70,8 +71,11 @@ vadd _ _ = undefined
 
 data Fcn a b = Fcn String (M.Map a b)    -- mapping from a to b
 
-mkFcn :: (Ord a) => String -> [(a, b)] -> Fcn a b
-mkFcn s xys = Fcn s (M.fromList xys)
+mkFcn :: String -> [(W, W)] -> Fcn W LW
+mkFcn s xys = mkFcn' s [(x, (noLbls, y)) | (x, y) <- xys]
+
+mkFcn' :: String -> [(W, LW)] -> Fcn W LW
+mkFcn' s xys = Fcn s $ M.fromList xys
 
 instance Eq (Fcn a b) where
   Fcn f _ == Fcn f' _  =  f == f'
@@ -81,6 +85,9 @@ instance Ord (Fcn a b) where
 
 instance Show (Fcn a b) where
   show (Fcn s _) = s
+
+fcnName :: Fcn a b -> String
+fcnName (Fcn s _) = s
 
 -- Domain test
 inDom :: Ord a => a -> Fcn a b -> Bool
@@ -156,8 +163,8 @@ isectM :: WS -> Maybe Val -> WS
 isectM s Nothing = s
 isectM s (Just u) = S.filter (\ (_, x) -> x == u) s
 
-traceS :: String -> Set ()
-traceS s = trace s (return ())
+--traceS :: String -> Set ()
+--traceS s = trace s (return ())
 
 --------------------
 ---- Environment
@@ -193,18 +200,26 @@ maxVInt = 4
 allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
-allWs :: WS
-allWs = S.fromList $ map (noLbls,) $
+allWs :: Set Val
+allWs = S.fromList $
   nonFcn ++
   [ unSing (dO o) | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, id1, id01, f01, const0, const1, const2, const3, fsucc, fsucc2, fpred, comp, ho1, ho2, ho3 ]
+  map VFcn [ id0, id1, f01, const0, const1, const2, const3, fsucc, fsucc2,
+             fpred, comp, ho1, ho2, ho3,
+             id01, id01LR, id01RL
+           ]
   where
     nonFcn =
       allInts ++
-      [VTup [x, y] | x <- allInts, y <- allInts]
+      [VTup []] ++
+      [VTup [x] | x <- allInts] ++
+      [VTup [x, y] | x <- allInts, y <- allInts] ++
+      [VTup [x, y, z] | x <- allInts, y <- allInts, z <- allInts]
     id0 = mkFcn "id0" [(VInt 0, VInt 0)]
     id1 = mkFcn "id1" [(VInt 1, VInt 1)]
     id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
+    id01LR = mkFcn' "id01LR" [(VInt 0, ([L], VInt 0)), (VInt 1, ([R], VInt 1))]
+    id01RL = mkFcn' "id01RL" [(VInt 0, ([R], VInt 0)), (VInt 1, ([L], VInt 1))]
     f01 = mkFcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
     const0 = mkFcn "const0" [(x, VInt 0) | x <- allInts]
     const1 = mkFcn "const1" [(x, VInt 1) | x <- allInts]
@@ -225,16 +240,16 @@ allWs = S.fromList $ map (noLbls,) $
                        (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
                       ]
 
-fint :: Fcn Val Val
+fint :: Fcn W LW
 fint = mkFcn "int" [(x, x) | x <- allInts ]
 
-fsucc :: Fcn Val Val
+fsucc :: Fcn W LW
 fsucc = mkFcn "succ" [(x, vadd x (VInt 1)) | x <- allInts ]
 
-fsucc2 :: Fcn Val Val
+fsucc2 :: Fcn W LW
 fsucc2 = mkFcn "succ2" [(x, vadd x (VInt 2)) | x <- allInts ]
 
-fpred :: Fcn Val Val
+fpred :: Fcn W LW
 fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
 
 --------------------
@@ -259,26 +274,30 @@ pre lr s = (\ (l,x) -> (lr:l,x)) <$> s
 unit :: Val -> WS
 unit v = return (noLbls, v)
 
-sortLbl :: WS -> [Val]
+sortLbl :: WS -> [[Val]]
 sortLbl = sortl . unSet
   where sortl [] = []
         sortl s =
-          case [ w | ([], w) <- s ] of
-            _:_:_ -> error "sortLbl"  -- > 1 element
-            ws -> ws ++ sortl [ (l, w) | (L : l, w) <- s ] ++ sortl [ (l, w) | (R : l, w) <- s ]
+          let ws = [ w | ([], w) <- s ]
+              rest = sortl [ (l, w) | (L : l, w) <- s ] ++ sortl [ (l, w) | (R : l, w) <- s ]
+          in  if null ws then rest else ws : rest
+
+preLbls :: Lbls -> WS -> WS
+preLbls l s = (\ (l',x) -> (l >< l',x)) <$> s
 
 --------------------
 ---- Aux
 
-type W = (Lbls, Val)
-type WS = Set W
+type W = Val
+type LW = (Lbls, W)
+type WS = Set LW
 
 -- Given an initial environment, rho, and some identifiers,
 -- generate all environments where rho has been extended with
 -- the given identifiers bound to all possible value.
 genRhos :: Env -> [Ident] -> Set Env
 genRhos rho xs = 
-  let exts = sequence $ map (\ x -> map (x,) (map snd $ unSet allWs)) xs
+  let exts = sequence $ map (\ x -> map (x,) (unSet allWs)) xs
   in  mkSet $ map (foldr (uncurry M.insert) rho) exts
 
 -- Generate all possible environment extensions and then
@@ -295,8 +314,11 @@ tryAll rho xs ev = do
 -- NOTE: if the non-function case gives an error, then the way
 -- we deal with existentials will not work since it generates
 -- a lot of non-functions.
-apply :: Val -> Val -> Set Val
-apply (VTup ws) (VInt k) | 0 <= k' && k' < length ws = return (ws !! k')  where k' = fromInteger k
+apply :: W -> W -> Set LW
+apply (VTup ws) (VInt k) | 0 <= k' && k' < l = return (lbl, ws !! k')
+  where k' = fromInteger k
+        l = length ws
+        lbl = L : replicate k' R
 apply (VFcn (Fcn _ xys)) w = maybe empty return $ M.lookup w xys
 apply _ _ = empty
 
@@ -305,8 +327,8 @@ applys :: WS -> WS -> WS
 applys fs as = do
   (lf, f) <- fs
   (la, a) <- as
-  let l = lf >< la
-  (l,) <$> apply f a
+  (lr, r) <- apply f a
+  return (lf >< la >< lr, r)
 
 --------------------
 ---- Find all identifiers defined by := in this scope
@@ -363,9 +385,9 @@ dM (Int k) u _rho = unit (VInt k) `isectM` u
 dM (Prim o) u _rho = dO o `isectM` u
 dM (App e1 e2) u rho = applys (dE e1 rho) (dE e2 rho) `isectM` u
 dM (Equ e1 e2) u rho = dM e1 u rho `isect` dM e2 u rho
-dM (Seq e1 e2) u rho = do (l, _) <- dE e1 rho; (l', w) <- dM e2 u rho; return (l >< l', w)
+dM (Seq e1 e2) u rho = do (l, _) <- dE e1 rho; preLbls l $ dM e2 u rho
 dM (Def x e) u rho = dM e u rho `isectM` Just (lookupEnv x rho)
-dM (Colon e) (Just u) rho = do (l, f) <- dE e rho; r <- apply f u; return (l, r)
+dM (Colon e) (Just u) rho = do (l, f) <- dE e rho; preLbls l $ apply f u
 dM Fail _u _rho = empty
 dM (If e1 e2 e3) u rho =
   ifEmpty (dB e1 Nothing rho)
@@ -374,37 +396,49 @@ dM (If e1 e2 e3) u rho =
         rho' <- rhos
         dM e2 u rho'
     )
-dM (Tup es) (Just u) rho | VTup us <- u, length us == length us =
-                                vtup <$> mapM (\ (e, v) -> dM e (Just v) rho) (zip es us)
-                              | otherwise = empty
+dM (Tup es) (Just u) rho | VTup us <- u, length es == length us =
+                            vtup <$> mapM (\ (e, v) -> dM e (Just v) rho) (zip es us)
+                         | otherwise = empty
   where vtup lvs = (concLbls ls, VTup vs) where (ls, vs) = unzip lvs
 dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
-  vf@(_, VFcn f) <- allWs
-  () <- traceS ("trying f=" ++ show f)
+  vf@(VFcn f) <- allWs
+--  () <- traceS ("trying f,g=" ++ show (f,g))
   guard $
-    forAll allWs $ \ lx@(_,x) ->
-      trace ("trying x=" ++ show (x, e1, dB e1 (Just x) rho)) (
+    forAll allWs $ \ x ->
+--      trace ("trying x=" ++ show x)
+      (
       ifEmpty
         (dB e1 (Just x) rho)                -- possible ways x can match e1
         (not (x `inDom` f) || q == Open)     -- if none
         $ \ rhos ->                          -- if at least one
-             trace ("x in e1 " ++ show (length rhos, x `inDom` f)) $
+--             trace ("x in e1 " ++ show (length rhos, x `inDom` f)) $
              x `inDom` f &&
              forAll rhos
                     (\ rho' -> forAll (dM e1 (Just x) rho')
-                                      (\ (lx', x') -> x' `inDom` g &&
-                                                      ap f x `sIn` (snd <$> dL e2 (Just (ap g x')) rho')))
+                                      (\ (l, x') ->
+--                                         trace ("e1(x) x,l,x'=" ++ show (x, l, x')) $
+                                         x' `inDom` g &&
+                                         (
+--                                         trace ("f(x)=" ++ show (ap f x)) $
+--                                         trace ("g(x')=" ++ show (ap g x')) $
+                                         ap f x `sIn` (preLbls l $ dL e2 (Just (snd $ ap g x')) rho')
+                                         )
+                                      )
+                    )
+--             && trace ("success u,f" ++ show (u,f,ee)) True
       )
-  return vf
+  unit vf
                               | otherwise = empty
 
 dM (Choice e1 e2) u rho =
   pre L (dL e1 u rho) `sunion` pre R (dL e2 u rho)
-dM (All e) u rho = unit (VTup xs) `isectM` u
-  where xs = sortLbl (dE e rho)
+dM (All e) u rho = unit tup `isectM` u
+  where xss = sortLbl (dE e rho)
+        tup | all ((== 1) . length) xss = VTup $ map (!!0) xss
+            | otherwise = error "All"
 
 dM e Nothing rho = do  -- if nothing else matches then try all possible u
-   (_,u) <- allWs
+   u <- allWs
    dM e (Just u) rho
 
 -- L, expression matching in a scope
@@ -572,19 +606,34 @@ exp23 :: Exp
 exp23 = All $ Choice (Int 1) (Int 2)
 
 exp24 :: Exp
-exp24 = Fun Closed (Def "x" (Choice (Int 0) (Int 1))) (Var "x")
+exp24 = All $ Colon $ Tup [Int 1, Int 2, Int 3]
+
+exp25 :: Exp
+exp25 = Fun Closed (Def "x" (Choice (Int 0) (Int 1))) (Var "x")
+
+exp26 :: Exp
+exp26 = All $ Colon exp25
+
+exp27 :: Exp
+exp27 = Fun Closed (Def "x" (Choice (Int 1) (Int 0))) (Var "x")
+
+exp28 :: Exp
+exp28 = All $ Colon exp27
 
 allExps :: [Exp]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp23
+           exp20, exp21, exp22, exp23, exp24, exp26, exp28
           ]
 
 refExps :: String
-refExps = "[3,int,Wrong([([],comparable),([],int)]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3,[1,2]]"
+refExps = "[3,int,Wrong([([],comparable),([],int)]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3,[1,2],[1,2,3],[0,1],[1,0]]"
+
+allRes :: [RVal]
+allRes = map dP allExps
 
 allOK :: Bool
-allOK = show (map dP allExps) == refExps
+allOK = show allRes == refExps
 
 _used :: [RVal]
 _used = [ex1, ex2, ex3, ex4, ex5, ex6, ex8, ex9,
@@ -593,4 +642,10 @@ _used = [ex1, ex2, ex3, ex4, ex5, ex6, ex8, ex9,
 
 main :: IO ()
 main = Prelude.do
-  print allOK
+  putStrLn "Start"
+  if allOK then
+    putStrLn "Success"
+   else Prelude.do
+    putStrLn "Failure:"
+    putStrLn $ show allRes
+    putStrLn $ refExps
