@@ -417,7 +417,7 @@ Env^{*} & = & \text{set of } Env \\
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
   \semapp{E}{|arr (e_1, xdots, e_n)|}{\rho} & = &
-    \{ \tuple{x_1,\mydots,x_n} \, || \, x_1 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho}) \} \\
+    \{ \tuple{x_1,\mydots,x_n} \, || \, x_1 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho} \} \\
   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \inb \semfcn, 
@@ -516,7 +516,7 @@ $
   \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
   \{ \tuple{x_1,\mydots,x_n} \, || \, u \in \dtuple,
   \exists u_1 \mydots u_n .\, u = \tuple{u_1,\mydots,u_n}, \\
-  & & \hspace{0.5em} x_1 \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, x_n \inb \semappp{M}{e_n}{u_n}{\rho}) \} \\
+  & & \hspace{0.5em} x_1 \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, x_n \inb \semappp{M}{e_n}{u_n}{\rho} \} \\
   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \inb \semfcn, \\
@@ -743,7 +743,7 @@ $
   \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
   \{ ((l_1 \bowtie \mydots \bowtie l_n, \tuple{x_1,\mydots,x_n}) \, || \, u \in \dtuple,
   \exists u_1 \mydots u_n .\, u = \tuple{u_1,\mydots,u_n}, \\
-  & & \hspace{0.5em} (l_1,x_1) \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, (l_n,x_n) \inb \semappp{M}{e_n}{u_n}{\rho}) \} \\
+  & & \hspace{0.5em} (l_1,x_1) \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, (l_n,x_n) \inb \semappp{M}{e_n}{u_n}{\rho} \} \\
   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \inb \semfcnc, \\
