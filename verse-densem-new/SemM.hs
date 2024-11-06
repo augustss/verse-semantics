@@ -347,8 +347,8 @@ dM (If e1 e2 e3) u rho =
 dM (Tup es) (Just u) rho | VTup us <- u, length es == length us =
                              VTup <$> mapM (\ (e, v) -> dM e (Just v) rho) (zip es us)
                          | otherwise = empty
-{- fails for ex4
-   fun_c(x:int){add[(x,1)]}
+{- fails for ex2
+   fun_c(x:int){x}
 -- Simon's version
 dM (Fun q e1 e2) Nothing rho = do
   let xs = dI e1
@@ -366,6 +366,7 @@ dM (Fun q e1 e2) Nothing rho = do
       )
   return vf
 -}
+
 dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
   vf@(VFcn f) <- allWs
   guard $
