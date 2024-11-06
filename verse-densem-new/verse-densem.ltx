@@ -723,7 +723,7 @@ $
   \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = &
     \{ (l \bowtie l' \bowtie l'', r) \, || \, (l,f) \inb \semapp{E}{|e_1|}{\rho},\; (l',a) \inb \semapp{E}{|e_2|}{\rho}, \\
     & & \hspace{0.5em}(l'',r) \inb \apply(f, a) \} \capu u \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{L}{|e_1|}{u}{\rho} \; \cap \; \semappp{L}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{L}{|e_1|}{u}{\rho} \; \Cap \; \semappp{L}{|e_2|}{u}{\rho} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
     \{ (l \bowtie l', y) \, || \, (l,x) \inb \semapp{E}{|e_1|}{\rho}, \; (l',y) \inb \semappp{M}{|e_2|}{u}{\rho}) \} \\
   \semappp{M}{|e_1 `choice` e_2|}{u}{\rho} & = & \prelbl([L],\semappp{L}{|e_1|}{u}{\rho}) \cup \prelbl([R],\semappp{L}{|e_1|}{u}{\rho}) \\
