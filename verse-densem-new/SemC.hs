@@ -37,6 +37,7 @@ data Exp
   | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
   | If Exp Exp Exp | Fun OC Exp Exp
   | Choice Exp Exp | All Exp
+  | Where Exp Exp
   deriving (Eq, Ord)
 
 data Op = Oint | Ogt | Oadd
@@ -52,6 +53,7 @@ instance Show Exp where
   showsPrec _ (App e1 e2) = showsPrec 11 e1 . showString "[" . showsPrec 0 e2 . showString "]"
   showsPrec p (Equ e1 e2) = showParen (p > 5) $ showsPrec 6 e1 . showString " = " . showsPrec 6 e2
   showsPrec p (Seq e1 e2) = showParen (p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
+  showsPrec p (Where e1 e2) = showParen (p > 1) $ showsPrec 3 e1 . showString " where " . showsPrec 3 e2
   showsPrec p (Def x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
   showsPrec _ (Colon e) = showString ":" . showsPrec 10 e
   showsPrec _ Fail = showString "fail"
@@ -71,7 +73,7 @@ showBraces a = showString "{" . a . showString "}"
 --------------------
 ---- Values
 
-data Val = VInt Integer | VTup [Val] | VFcn (Fcn Val (Lbls, Val))
+data Val = VInt Integer | VTup [Val] | VFcn Fcn
   deriving (Eq, Ord)
 
 data RVal = RVal Val | Wrong String
@@ -93,32 +95,34 @@ vadd _ _ = undefined
 ---- Functions as tables
 -- All functions have a unique name
 
-data Fcn a b = Fcn String (M.Map a b)    -- mapping from a to b
+data Fcn = Fcn String (M.Map W LW)
 
-mkFcn :: String -> [(W, W)] -> Fcn W LW
+mkFcn :: String -> [(W, W)] -> Fcn
 mkFcn s xys = mkFcn' s [(x, (noLbls, y)) | (x, y) <- xys]
 
-mkFcn' :: String -> [(W, LW)] -> Fcn W LW
+mkFcn' :: String -> [(W, LW)] -> Fcn
 mkFcn' s xys = Fcn s $ M.fromList xys
 
-instance Eq (Fcn a b) where
+instance Eq Fcn where
   Fcn f _ == Fcn f' _  =  f == f'
 
-instance Ord (Fcn a b) where
+instance Ord Fcn where
   Fcn f _ `compare` Fcn f' _  =  f `compare` f'
 
-instance Show (Fcn a b) where
+instance Show Fcn where
   show (Fcn s _) = s
 
-fcnName :: Fcn a b -> String
+fcnName :: Fcn -> String
 fcnName (Fcn s _) = s
 
 -- Domain test
-inDom :: Ord a => a -> Fcn a b -> Bool
+inDom :: W -> Fcn -> Bool
+inDom _ (Fcn "any" _) = True  -- ANY hack
 inDom x (Fcn _ xys) = M.member x xys
 
 -- Application when the argument is in the domain
-ap :: (Show a, Ord a) => Fcn a b -> a -> b
+ap :: Fcn -> W -> LW
+ap (Fcn "any" _) x = (noLbls, x)
 ap (Fcn f xys) x =
   fromMaybe (error $ "ap: outside domain " ++ f ++ " " ++ show x) $
   M.lookup x xys
@@ -242,14 +246,15 @@ allWs = mkSet $
              fpred, comp, ho1, ho2, ho3,
              id01, id01LR, id01RL,
              f0L1, f0R2, f0t12
+             -- ,fany
            ]
   where
     nonFcn =
       allInts ++
       [VTup []] ++
       [VTup [x] | x <- allInts] ++
-      [VTup [x, y] | x <- allInts, y <- allInts] ++
-      [VTup [x, y, z] | x <- allInts, y <- allInts, z <- allInts]
+      [VTup [x, y] | x <- allInts, y <- allInts]
+-- ++      [VTup [x, y, z] | x <- allInts, y <- allInts, z <- allInts]
     id0 = mkFcn "id0" [(VInt 0, VInt 0)]
     id1 = mkFcn "id1" [(VInt 1, VInt 1)]
     id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
@@ -277,17 +282,18 @@ allWs = mkSet $
                        (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
                        (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
                       ]
+    fany = mkFcn "any" [] -- ANY hack, see apply & inDom
 
-fint :: Fcn W LW
+fint :: Fcn
 fint = mkFcn "int" [(x, x) | x <- allInts ]
 
-fsucc :: Fcn W LW
+fsucc :: Fcn
 fsucc = mkFcn "succ" [(x, vadd x (VInt 1)) | x <- allInts ]
 
-fsucc2 :: Fcn W LW
+fsucc2 :: Fcn
 fsucc2 = mkFcn "succ2" [(x, vadd x (VInt 2)) | x <- allInts ]
 
-fpred :: Fcn W LW
+fpred :: Fcn
 fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
 
 --------------------
@@ -336,7 +342,7 @@ commonLbls = Lbls . longestPrefix . map unLbls . unSet
 
 longestPrefix :: Eq a => [[a]] -> [a]
 longestPrefix [] = []
-longestPrefix (x:xs) = last $ filter (\ p -> all (isPrefixOf p) xs) $ inits x
+longestPrefix (x:xs) = last $ filter (\ p -> all (isPrefixOf p) xs) $ subsequences x
 
 --------------------
 ---- Aux
@@ -372,6 +378,7 @@ apply (VTup ws) (VInt k) | 0 <= k' && k' < l = return (lbl, ws !! k')
   where k' = fromInteger k
         l = length ws
         lbl = Lbls $ L : replicate k' R
+apply (VFcn (Fcn "any" _)) w = unit w  -- ANY hack
 apply (VFcn (Fcn _ xys)) w = maybe empty return $ M.lookup w xys
 apply _ _ = empty
 
@@ -397,6 +404,7 @@ dI' :: Exp -> [Ident]
 dI' (App e1 e2) = dI' e1 ++ dI' e2
 dI' (Equ e1 e2) = dI' e1 ++ dI' e2
 dI' (Seq e1 e2) = dI' e1 ++ dI' e2
+dI' (Where e1 e2) = dI' e1 ++ dI' e2
 dI' (Tup es) = concat (map dI' es)
 dI' (Def i e) = i : dI' e
 dI' (Colon e) = dI' e
@@ -439,6 +447,7 @@ dM (Prim o) u _rho = dO o `isectM` u
 dM (App e1 e2) u rho = applys (dE e1 rho) (dE e2 rho) `isectM` u
 dM (Equ e1 e2) u rho = dL e1 u rho `isect` dL e2 u rho
 dM (Seq e1 e2) u rho = do (l, _) <- dE e1 rho; preLbls l $ dM e2 u rho
+dM (Where e1 e2) u rho = do (l, x) <- dE e1 rho; (l', _) <- dM e2 u rho; return (l >< l', x)
 dM (Def x e) u rho = dM e u rho `isectM` Just (lookupEnv x rho)
 dM (Colon e) (Just u) rho = do (l, f) <- dE e rho; preLbls l $ apply f u
 dM Fail _u _rho = empty
@@ -475,7 +484,7 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
 --      trace ("trying x=" ++ show x)
       (
       ifEmpty
-        (dB' e1 (Just x) rho)                 -- possible ways x can match e1
+        (dB' e1 (Just x) rho)                -- possible ways x can match e1
         (not (x `inDom` f) || q == Open)     -- if none
         $ \ rhos ->                          -- if at least one
              let l = commonLbls (fst <$> rhos) in
@@ -687,7 +696,7 @@ exp23 :: Exp
 exp23 = All $ Choice (Int 1) (Int 2)
 
 exp24 :: Exp
-exp24 = All $ Colon $ Tup [Int 1, Int 2, Int 3]
+exp24 = All $ Colon $ Tup [Int 2, Int 3]
 
 -- fun_c(x:=(0|1)){x}
 --  denotation { [0->L0, 1->R1] }
@@ -733,14 +742,20 @@ exp34 :: Exp
 exp34 = Fun Closed (Def "x" cint `Seq` cint) (Int 0)
   where cint = Colon (Var "int")
 
+-- fun_c((x:=a; x:int) where a:int){x}
+exp35 :: Exp
+exp35 = Fun Closed (((Var "x" `Equ` Var "a") `Seq` Def "x" cint) `Where` Def "a" cint) (Var "x")
+  where cint = Colon (Var "int")
+
 allExps :: [Exp]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp23, exp24, exp26, exp28, exp29, exp31, exp33
+           exp20, exp21, exp22, exp23, exp24, exp26, exp28, exp29, exp31, exp33,
+           exp34, exp35
           ]
 
 refExps :: String
-refExps = "[3,int,Wrong([(-,comparable),(-,int)]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3,[1,2],[1,2,3],[0,1],[1,0],2,[1,2],[1,2]]"
+refExps = "[3,int,Wrong([(-,comparable),(-,int)]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3,[1,2],[2,3],[0,1],[1,0],2,[1,2],[1,2],const0,int]"
 
 allRes :: [RVal]
 allRes = map dP allExps
