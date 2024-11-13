@@ -400,7 +400,7 @@ evalChoice loc e1 e2 s s' = do
   var <- lift freshVar'
   fork' do
     _ <- lift $ readVar s.choiceFree
-    unify' loc var =<<  evalExp e1 s s' <|> evalExp e2 s s'
+    unify' loc var =<< evalExp e1 s s' <|> evalExp e2 s s'
   pure var
 
 evalOne
