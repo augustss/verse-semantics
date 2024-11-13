@@ -776,14 +776,15 @@ $
 \\ \\
 \begin{array}{rrcll}
 \text{Sorting choices} & \sortlbl & : & \powerset{\Lbl \times \alpha} \rightarrow [\powerset{\alpha}] \\
-& \sortlbl & = & \textit{Sort according to label order}\\
+& \sortlbl & = & \textit{Sort set according to label order}\\
 %% \end{array} \\
  \\
 
 %% \begin{array}{rrcll}
- \text{All} & \mall & : & [\mtype] \rightarrow \Value \\
-            & \mall([\{w_0\}, \mydots, \{w_n\}]) & = & [0 \fmapsto (\lblemp, w_0), \mydots, n \fmapsto (\lblemp, w_n)] \\
-            & \mall(s) & = & \wrong & \text{otherwise}
+ \text{All} & \mall & : & [\mtype] \rightarrow \mtypec \\
+ & \mall([\{s_0\}, \mydots, \{s_n\}]) & = &
+ \{ [0 \fmapsto (\lblemp, w_0), \mydots, n \fmapsto (\lblemp, w_n)] || \\
+ & & & \hspace{0.5em} w_0 \inb s_0, \, \mydots, \, w_n \inb s_n \}
 \end{array}
 
 \end{array}
@@ -845,7 +846,7 @@ $
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
 
   \semappp{M}{|forb e_1 e_2|}{u}{\rho} & = & XXX  \\
-  \semappp{M}{|all e|}{u}{\rho} & = & \munit(\mall(\sortlbl(\semapp{D}{e}{\rho}))) \capu u \\
+  \semappp{M}{|all e|}{u}{\rho} & = & \mall(\sortlbl(\semapp{D}{e}{\rho})) \capu u \\
 
   \semappp{M}{|arr (e_0, xdots e_n)|}{u}{\rho} & = &
   \{ (l_1 \bowtie \mydots \bowtie l_n, \mkfcn{0 \fmapsto w_0,\mydots, n \fmapsto w_n}) \, || \, u \in \semfcnc, \\
