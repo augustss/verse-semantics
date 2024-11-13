@@ -10,7 +10,7 @@ import Prelude(Show(..), Ord(..), Eq(..), Num(..), Integral(..),
                Bool(..), String, IO, Integer,
                sequence, error, uncurry, undefined, showString, traverse,
                ($), (.), not, (&&), (||), otherwise, snd, putStrLn,
-               showParen, fst,
+               showParen,
                )
 import qualified Prelude
 import qualified Control.Monad as Monad
@@ -18,7 +18,11 @@ import Data.List
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
-import Debug.Trace
+--import Debug.Trace
+import GHC.Stack
+
+implies :: Bool -> Bool -> Bool
+implies x y = not x || y
 
 --------------------
 ---- Because of RebindableSyntax
@@ -36,7 +40,7 @@ data Exp
   = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
   | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
   | If Exp Exp Exp | Fun OC Exp Exp
-  | Choice Exp Exp | All Exp
+  | Choice Exp Exp | All Exp | For Exp Exp
   | Where Exp Exp
   deriving (Eq, Ord)
 
@@ -63,6 +67,7 @@ instance Show Exp where
                               showBraces (showsPrec 0 e3)
   showsPrec p (Choice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " | " . showsPrec 5 e2
   showsPrec _ (All e) = showString "all" . showBraces (showsPrec 0 e)
+  showsPrec _ (For e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
   showsPrec _ (Fun q e1 e2) = showString (if q == Open then "fun_o" else "fun_c") .
                               showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2)
@@ -121,7 +126,7 @@ inDom _ (Fcn "any" _) = True  -- ANY hack
 inDom x (Fcn _ xys) = M.member x xys
 
 -- Application when the argument is in the domain
-ap :: Fcn -> W -> LW
+ap :: HasCallStack => Fcn -> W -> LW
 ap (Fcn "any" _) x = (noLbls, x)
 ap (Fcn f xys) x =
   fromMaybe (error $ "ap: outside domain " ++ f ++ " " ++ show x) $
@@ -166,6 +171,9 @@ getSing s =
 -- Check if a predicate holds for all values in the set
 forAll :: Set a -> (a -> Bool) -> Bool
 forAll xs p = all p (unSet xs)
+
+exists :: Set a -> (a -> Bool) -> Bool
+exists xs p = any p (unSet xs)
 
 -- It's impossible to make Set a monad since there is an Ord constraint on the elements.
 -- So we have to make do with RebindableSyntax and defining return, >>=, >>, etc.
@@ -245,6 +253,7 @@ allWs = mkSet $
   map VFcn [ id0, id1, f01, const0, const1, const2, const3, fsucc, fsucc2,
              fpred, comp, ho1, ho2, ho3,
              id01, id01LR, id01RL,
+             id012, id310, id012x, id310x,
              f0L1, f0R2, f0t12
              -- ,fany
            ]
@@ -260,6 +269,10 @@ allWs = mkSet $
     id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
     id01LR = mkFcn' "id01LR" [(VInt 0, (Lbls [L], VInt 0)), (VInt 1, (Lbls [R], VInt 1))]
     id01RL = mkFcn' "id01RL" [(VInt 0, (Lbls [R], VInt 0)), (VInt 1, (Lbls [L], VInt 1))]
+    id012 = mkFcn' "id012" [(VInt 0, (Lbls [L,L], VInt 0)), (VInt 1, (Lbls [L,R], VInt 1)), (VInt 2, (Lbls [R], VInt 2))]
+    id310 = mkFcn' "id310" [(VInt 3, (Lbls [L,L], VInt 3)), (VInt 1, (Lbls [L,R], VInt 1)), (VInt 0, (Lbls [R], VInt 0))]
+    id012x = mkFcn' "id012x" [(VInt 0, (Lbls [L,L,L], VInt 0)), (VInt 1, (Lbls [L,R,L], VInt 1)), (VInt 2, (Lbls [L,R], VInt 2))]
+    id310x = mkFcn' "id310x" [(VInt 3, (Lbls [R,L,L], VInt 3)), (VInt 1, (Lbls [R,R,L], VInt 1)), (VInt 0, (Lbls [R,R], VInt 0))]
     f01 = mkFcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
     f0L1 = mkFcn' "f0L1" [(VInt 0, (Lbls [L], VInt 1))]
     f0R2 = mkFcn' "f0R2" [(VInt 0, (Lbls [R], VInt 2))]
@@ -282,7 +295,7 @@ allWs = mkSet $
                        (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
                        (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
                       ]
-    fany = mkFcn "any" [] -- ANY hack, see apply & inDom
+--    fany = mkFcn "any" [] -- ANY hack, see apply & inDom
 
 fint :: Fcn
 fint = mkFcn "int" [(x, x) | x <- allInts ]
@@ -324,7 +337,7 @@ pre l s = (\ (Lbls ls,x) -> (Lbls (l:ls),x)) <$> s
 unit :: Val -> WS
 unit v = return (noLbls, v)
 
-sortLbl :: WS -> [Set Val]
+sortLbl :: Ord a => Set (Lbls, a) -> [Set a]
 sortLbl = sortl . unSet
   where sortl [] = []
         sortl s =
@@ -452,18 +465,41 @@ dM (Def x e) u rho = dM e u rho `isectM` Just (lookupEnv x rho)
 dM (Colon e) (Just u) rho = do (l, f) <- dE e rho; preLbls l $ apply f u
 dM Fail _u _rho = empty
 dM (If e1 e2 e3) u rho =
-  ifEmpty (dB e1 Nothing rho)
-    (dL e3 u rho)
-    (\ rhos -> do
-        rho' <- rhos
-        case sortLbl (dL e2 u rho') of
-          [] -> empty
-          vs : _ -> (noLbls,) <$> vs
-    )
+  case sortLbl $ dB' e1 Nothing rho of
+    []     -> dL e3 u rho
+    rhos:_ -> do    -- explicitely pick the first alternative
+      rho' <- rhos
+      dL e2 u rho'
 dM (Tup es) (Just u) rho | VTup us <- u, length es == length us =
                             vtup <$> mapM (\ (e, v) -> dM e (Just v) rho) (zip es us)
                          | otherwise = empty
   where vtup lvs = (concLbls ls, VTup vs) where (ls, vs) = unzip lvs
+{-
+dM (Fun q e1 e2) Nothing rho = do
+  vf@(VFcn f) <- allWs
+--  () <- trace ("trying f=" ++ show f) (return ())
+  let xs = dI e1
+  guard $
+            forAll allWs $ \ x ->
+--               trace ("trying x=" ++ show x) $
+               forAll (genRhos rho xs) $ \ rho' ->
+--                 trace ("trying rho'=" ++ show rho') $
+                 let w1 = dM e1 (Just x) rho' in
+--                 trace ("w1=" ++ show w1) $
+--                 trace ("x `in` dom(f)=" ++ show (x `inDom` f)) $
+--                 trace ("f(x)=" ++ if x `inDom` f then show (ap f x) else "NA") $
+                 not (isEmpty w1)
+                 `implies`
+                (x `inDom` f && ap f x `sIn` dD e2 rho')
+  guard $
+            (q == Closed)
+            `implies`
+            (forAll allWs $ \ x ->
+              (x `inDom` f) `implies`
+                (exists (genRhos rho (dI e1)) (\ rho' -> not (isEmpty (dM e1 (Just x) rho'))))
+            )
+  unit vf
+-}
 {-
 dM (Fun q e1 e2) Nothing rho = do
   vf@(VFcn f) <- allWs
@@ -478,7 +514,7 @@ dM (Fun q e1 e2) Nothing rho = do
 -}
 dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
   vf@(VFcn f) <- allWs
---  trace ("trying f,g=" ++ show (f,g)) $
+--  () <- trace ("trying f,g=" ++ show (f,g)) (return ())
   guard $
     forAll allWs $ \ x ->
 --      trace ("trying x=" ++ show x)
@@ -487,14 +523,14 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
         (dB' e1 (Just x) rho)                -- possible ways x can match e1
         (not (x `inDom` f) || q == Open)     -- if none
         $ \ rhos ->                          -- if at least one
-             let l = commonLbls (fst <$> rhos) in
---             trace ("x in e1 " ++ show (rhos, x `inDom` f, l, e1)) $
+--             let l = commonLbls (fst <$> rhos) in
+--             trace ("x in e1 " ++ show (rhos, x `inDom` f, e1)) $
              x `inDom` f &&
 -- This needs to change.  With multiple rhos we should maybe
 -- intersect all the (dL e2)s
              forAll rhos
                     (\ (_, rho') -> forAll (dM e1 (Just x) rho')
-                                      (\ (_, x') ->
+                                      (\ (l, x') ->
 --                                         trace ("e1(x) x,l,x'=" ++ show (x, l, x')) $
                                          x' `inDom` g &&
                                          (
@@ -515,8 +551,9 @@ dM (Choice e1 e2) u rho =
 dM (All e) u rho = unit tup `isectM` u
   where tup =
           case Monad.mapM getSing $ sortLbl (dE e rho) of
-            Nothing -> error "All"
+            Nothing -> error "All: multivalued"
             Just xs -> VTup xs
+dM (For _e1 _e2) _u _rho = error "for not implemented"
 
 dM e Nothing rho = do  -- if nothing else matches then try all possible u
    u <- allWs
@@ -699,7 +736,7 @@ exp24 :: Exp
 exp24 = All $ Colon $ Tup [Int 2, Int 3]
 
 -- fun_c(x:=(0|1)){x}
---  denotation { [0->L0, 1->R1] }
+--  denotation id01LR = { [0->L0, 1->R1] }
 exp25 :: Exp
 exp25 = Fun Closed (Def "x" (Choice (Int 0) (Int 1))) (Var "x")
 
@@ -707,7 +744,7 @@ exp26 :: Exp
 exp26 = All $ Colon exp25
 
 -- fun_c(x:=(1|0)){x}
---  denotation { [0->R0, 1->L1] }
+--  denotation id01RL = { [0->R0, 1->L1] }
 exp27 :: Exp
 exp27 = Fun Closed (Def "x" (Choice (Int 1) (Int 0))) (Var "x")
 
@@ -746,6 +783,32 @@ exp34 = Fun Closed (Def "x" cint `Seq` cint) (Int 0)
 exp35 :: Exp
 exp35 = Fun Closed (((Var "x" `Equ` Var "a") `Seq` Def "x" cint) `Where` Def "a" cint) (Var "x")
   where cint = Colon (Var "int")
+
+-- fun_c(a:=0|1; x:=a){x}
+exp36 :: Exp
+exp36 = Fun Closed ((Def "a" (Int 0 `Choice` Int 1)) `Seq` (Def "x" (Var "a"))) (Var "x")
+
+-- fun_c(x:=0|1|2){x}
+exp37 :: Exp
+exp37 = Fun Closed (Def "x" (Int 0 `Choice` Int 1 `Choice` Int 2)) (Var "x")
+
+-- fun_c(x:=3|1|0){x}
+exp38 :: Exp
+exp38 = Fun Closed (Def "x" (Int 3 `Choice` Int 1 `Choice` Int 0)) (Var "x")
+
+-- fun_c(x:=0|1|2){x} = fun_c(x:=3|1|0){x}
+-- denotation {}
+exp39 :: Exp
+exp39 = exp37 `Equ` exp38
+
+-- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(3|1|0)){x}
+-- 0->L,LL0, 1->L,RL1, 2->L,R2, 3->R,LL3, 1->R,RL1, 0->R,R0
+exp40 :: Exp
+exp40 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
+                    Def "x" (If (Var "a" `Equ` Int 0)
+                                (Int 0 `Choice` Int 1 `Choice` Int 2)
+                                (Int 3 `Choice` Int 1 `Choice` Int 0)))
+                   (Var "x")
 
 allExps :: [Exp]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
