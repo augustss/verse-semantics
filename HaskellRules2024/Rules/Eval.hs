@@ -136,7 +136,7 @@ eval inChoicefreeC flexis ((v :=: e1) :>: e2) =
       
       | otherwise ->
         case eval False [] eL of
-          FAIL -> eval inChoicefreeC flexis ((v :=: eR) :>: e2)
+          FAIL -> eval False flexis ((v :=: eR) :>: e2)
           rL   -> case eval False [] eR of
                     FAIL -> eval False flexis ((v :=: toExpr rL) :>: e2)
                     rR   -> evalSeqBlkd False flexis (v, toExpr rL :|: toExpr rR) e2
@@ -167,8 +167,13 @@ evalSeqBlkd inChoicefreeC flexis (v, e1') e2 =
 -- SUBST, but with occurs check
 substCheck :: Ident -> Val -> Expr -> Result
 substCheck x v e
-  | x `elem` free v = FAIL
-  | otherwise       = SUBST [] (x,v) e
+  | occurs x v = FAIL
+  | otherwise  = SUBST [] (x,v) e
+ where
+  occurs x (Var y)  = x==y
+  occurs x (Tup vs) = any (occurs x) vs
+  occurs x (Tru t)  = occurs x t
+  occurs x _        = False
 
 -- unifying HNF values
 unify :: Val -> Val -> Expr -> Maybe Expr
