@@ -129,17 +129,15 @@ eval inChoicefreeC flexis ((v :=: e1) :>: e2) =
         Nothing -> FAIL
         Just e  -> eval inChoicefreeC flexis e
     
-    -- v=(eL|eR);e2 --> (v=eL;e2)|(v=eR;e2)
     (v, eL :||: eR)
       | inChoicefreeC ->
+        -- v=(eL|eR);e2 --> (v=eL;e2)|(v=eR;e2)
         eval inChoicefreeC flexis (((v :=: eL) :>: e2) :|: ((v :=: eR) :>: e2))
       
       | otherwise ->
-        case eval False [] eL of
-          FAIL -> eval False flexis ((v :=: eR) :>: e2)
-          rL   -> case eval False [] eR of
-                    FAIL -> eval False flexis ((v :=: toExpr rL) :>: e2)
-                    rR   -> evalSeqBlkd False flexis (v, toExpr rL :|: toExpr rR) e2
+        -- e|fail -> e  OR  fail|e -> e
+        evalChoiceTry eL eR flexis (\e1' -> ((v:=:e1'):>:e2))
+          (\e1' -> evalSeqBlkd False flexis (v,e1') e2)
 
     (v, r1) -> evalSeqBlkd inChoicefreeC flexis (v, toExpr r1) e2
 
@@ -156,13 +154,26 @@ evalSeqBlkd inChoicefreeC flexis (v, e1') e2 =
     -- v=e1';fail --> fail
     FAIL                        -> FAIL
 
-    -- v=e1';(eL|eR) --> (v=e1';eL)|(v=e1';eR)  when e1' is blkd&choicefree
-    eL :||: eR | choicefree_e1' -> ((v:=:e1'):>:eL) :||: ((v:=:e1'):>:eR)
+    eL :||: eR
+      -- v=e1';(eL|eR) --> (v=e1';eL)|(v=e1';eR)  when e1' is blkd&choicefree
+      | choicefree_e1' -> ((v:=:e1'):>:eL) :||: ((v:=:e1'):>:eR)
+
+      | otherwise ->
+        evalChoiceTry eL eR flexis (\e2' -> (v:=:e1'):>:e2')
+          (\e2' -> BLKD ((v:=:e1'):>:e2'))
 
     -- v=e1';e2' == v=e1';e2'
     r2                          -> BLKD ((v :=: e1') :>: toExpr r2)
  where
   choicefree_e1' = choicefree e1'
+
+evalChoiceTry :: Expr -> Expr -> [Ident] -> (Expr -> Expr) -> (Expr -> Result) -> Result
+evalChoiceTry eL eR flexis k choicy =
+  case eval False [] eL of
+    FAIL -> eval False flexis (k eR)
+    rL   -> case eval False [] eR of
+              FAIL -> eval False flexis (k (toExpr rL))
+              rR   -> choicy (toExpr rL :|: toExpr rR)
 
 -- SUBST, but with occurs check
 substCheck :: Ident -> Val -> Expr -> Result
