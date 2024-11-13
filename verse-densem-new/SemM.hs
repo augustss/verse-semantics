@@ -127,6 +127,9 @@ sIn = S.member
 forAll :: Set a -> (a -> Bool) -> Bool
 forAll xs p = all p (unSet xs)
 
+exists :: Set a -> (a -> Bool) -> Bool
+exists xs p = any p (unSet xs)
+
 -- It's impossible to make Set a monad since there is an Ord constraint on the elements.
 -- So we have to make do with RebindableSyntax and defining return, >>=, >>, etc.
 
@@ -347,8 +350,6 @@ dM (If e1 e2 e3) u rho =
 dM (Tup es) (Just u) rho | VTup us <- u, length es == length us =
                              VTup <$> mapM (\ (e, v) -> dM e (Just v) rho) (zip es us)
                          | otherwise = empty
-{- fails for ex2
-   fun_c(x:int){x}
 -- Simon's version
 dM (Fun q e1 e2) Nothing rho = do
   let xs = dI e1
@@ -361,11 +362,10 @@ dM (Fun q e1 e2) Nothing rho = do
   guard $
     (q == Closed) `implies`
       (forAll allWs $ \ x ->
-         forAll (genRhos rho xs) $ \ rho' ->
-           not (x `inDom` f) `implies` isEmpty (dM e1 (Just x) rho')
+        (x `inDom` f) `implies`
+        (exists (genRhos rho (dI e1)) (\ rho' -> not (isEmpty (dM e1 (Just x) rho'))))
       )
   return vf
--}
 
 dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
   vf@(VFcn f) <- allWs

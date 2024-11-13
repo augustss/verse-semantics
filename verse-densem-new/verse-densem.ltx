@@ -368,14 +368,15 @@
 \newcommand{\get}[1]{\mathbf{sing}(#1)}
 
 \newcommand{\dtuple}{\tuple{\Value}}
+\newcommand{\fmapsto}{\!\mapsto\!}
+\newcommand{\mkfcn}[1]{[#1]}
 
 \begin{figure}
 $
 \begin{array}{l}
 \textbf{Domains (sets)} \\
 \begin{array}{rcll}
-\Value & = & \mathbb{Z} + \dtuple + (\semfcn) \\
-\dtuple & = & \text{a finite tuple of values $\Value$} \\
+\Value & = & \mathbb{Z} + (\semfcn) \\
 \Env & = & |Ident| \rightarrow \Value \\
 W^{*} & = & \text{set of } W \\
 Env^{*} & = & \text{set of } Env \\
@@ -416,15 +417,24 @@ Env^{*} & = & \text{set of } Env \\
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
-  \semapp{E}{|arr (e_1, xdots, e_n)|}{\rho} & = &
-    \{ \tuple{x_1,\mydots,x_n} \, || \, x_1 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho} \} \\
+  \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
+    \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho} \} \\
   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
-      f \inb \semfcn, 
+      f \inb \semfcn, \\
+
+      % Simon's version
       \forall x \inb \Value. \\
-      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
-      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+      \hspace{0.5em} |let|\; \bar{x} = \semapp{I}{e_1}, \\
+      \hspace{0.5em}\forall \bar{w} \inb \overline{\Value}. \\
+      \hspace{1em} (\semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset) \\
+      \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})}
+
+%%      \forall x \inb \Value. \\
+%%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+%%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+
     \end{array} \\
     & & \} \\
     \\ 
@@ -434,7 +444,7 @@ Env^{*} & = & \text{set of } Env \\
   \semapp{D}{|e|}{\rho} & = &
   \{ r\, ||  \,
   w_1 \inb \Value, \mydots, w_n \inb \Value,\\
-  & & \hspace{0.5em} r \inb \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \} \\
+  & & \hspace{0.5em} r \inb \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n})} \} \\
   & & |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 
@@ -443,7 +453,7 @@ Env^{*} & = & \text{set of } Env \\
   \{ \rho' \; || 
   \begin{array}[t]{l}
   w_1 \inb \Value, \mydots, w_n \inb \Value, \\
-  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n}, \\
   \emptyset \neq \semappp{E}{e}{\rho'} \\
   \end{array} \\
   & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
@@ -478,7 +488,7 @@ $
   \{ \rho' \; || 
   \begin{array}[t]{l}
   w_1 \inb \Value, \mydots, w_n \inb \Value, \\
-  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n}, \\
   \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
   \end{array} \\
   & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
@@ -488,7 +498,7 @@ $
   \semappp{L}{|e|}{u}{\rho} & = &
   \{ r\, ||  \,
   w_1 \inb \Value, \mydots, w_n \inb \Value \\
-  & & \hspace{0.5em} r \inb \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \} \\
+  & & \hspace{0.5em} r \inb \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n})} \} \\
   & & |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 %\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
@@ -513,10 +523,9 @@ $
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
-  \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
-  \{ \tuple{x_1,\mydots,x_n} \, || \, u \in \dtuple,
-  \exists u_1 \mydots u_n .\, u = \tuple{u_1,\mydots,u_n}, \\
-  & & \hspace{0.5em} x_1 \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, x_n \inb \semappp{M}{e_n}{u_n}{\rho} \} \\
+  \semappp{M}{|arr (e_0, xdots e_n)|}{u}{\rho} & = &
+  \{ \mkfcn{0 \fmapsto x_0,\mydots, n \fmapsto x_n} \, || \, u \in \semfcn, \, \dom(u) = \{0,\mydots,n\}, \\
+  & & \hspace{0.5em} x_0 \inb \semappp{M}{|e_1|}{(u(0))}{\rho}, \,\mydots,\, x_n \inb \semappp{M}{e_n}{(u(n))}{\rho} \} \\
   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \inb \semfcn, \\
@@ -570,9 +579,8 @@ $
     
 \begin{array}{rcll}
 \apply & : & (\Value \times \Value) \rightarrow \mtype \\
-\apply( \tuple{w_0, \mydots,\, w_n}, k) & = & \msing{w_k} & 0 \leq k \leq n \\
 \apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
-\textbf{alternative:\hspace{6em}}               & = & \{ y \, || \, (x, y) \inb f, \; x=w \} & f \inb \semfcn \\
+\textbf{alternative:\hspace{6em}}               & = & \{ y \, || \, (x, y) \inb f, \; x=w \} & f \in \semfcn \\
 \apply( f, w ) & = & \emptyset & \text{otherwise} \\
 %%\end{array}
 \\
@@ -650,7 +658,7 @@ L & = & \Ltag + \Rtag
   \semapp{D}{|e|}{\rho} & = &
   \{ r\, ||  \,
   w_1 \inb \Value, \mydots, w_n \inb \Value,\\
-  & & \hspace{0.5em} r \inb \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \} \\
+  & & \hspace{0.5em} r \inb \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n})} \} \\
   & & |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 
@@ -659,7 +667,7 @@ L & = & \Ltag + \Rtag
   \{ \rho' \; || 
   \begin{array}[t]{l}
   w_1 \inb \Value, \mydots, w_n \inb \Value, \\
-  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n}, \\
   \emptyset \neq \semappp{E}{e}{\rho'} \\
   \end{array} \\
   & &  \} \; |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\
@@ -702,7 +710,7 @@ $
   \{ \rho' \; || 
   \begin{array}[t]{l}
   w_1 \inb \Value, \mydots, w_n \inb \Value, \\
-  |let|\; \rho' = \extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n}, \\
+  |let|\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n}, \\
   \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
   \end{array} \\
   & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
@@ -712,7 +720,7 @@ $
   \semappp{L}{|e|}{u}{\rho} & = &
   \{ r\, ||  \,
   w_1 \inb \Value, \mydots, w_n \inb \Value \\
-  & & \hspace{0.5em} r \inb \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \mapsto w_1, \mydots, x_n \mapsto w_n})} \} \\
+  & & \hspace{0.5em} r \inb \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n})} \} \\
   & & |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
 \\
 %\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\

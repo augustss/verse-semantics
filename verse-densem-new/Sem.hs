@@ -115,6 +115,9 @@ forAll xs p = all p (unSet xs)
 forAllL :: [a] -> (a -> Bool) -> Bool
 forAllL xs p = all p xs
 
+existsL :: [a] -> (a -> Bool) -> Bool
+existsL xs p = any p xs
+
 --------------------
 ---- Environment
 
@@ -284,7 +287,7 @@ dE (If e1 e2 e3) rho =
     [] -> dE e3 rho
     rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]
 dE (Tup es) rho = mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
-{- Simon's version.  Broken for ex2
+-- Simon's version.
 dE (Fun q e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs
            , forAll allWs $ \ x ->
@@ -295,14 +298,12 @@ dE (Fun q e1 e2) rho = mkSet
            , (q == Closed)
              `implies`
              (forAll allWs $ \ x ->
-                forAllL (genRhos rho xs) $ \ rho' ->
-                  not (x `inDom` f)
-                  `implies`
-                  isEmpty (dM e1 x rho')
+               (x `inDom` f) `implies`
+                 (existsL (genRhos rho (dI e1)) (\ rho' -> not (isEmpty (dM e1 x rho'))))
              )
   ]
   where xs = dI e1
--}
+{-
 dE (Fun q e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
         forAll allWs $ \ x ->
@@ -311,7 +312,7 @@ dE (Fun q e1 e2) rho = mkSet
             if isEmpty rhos then not (inDom x f) || q == Open
             else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dD e2 rho')
   ]
-
+-}
 
 -- Get all possible "solutions", i.e., assignments to the existentials in e.
 dC :: Exp -> Env -> Set Env
