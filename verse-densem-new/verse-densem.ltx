@@ -419,16 +419,19 @@ Env^{*} & = & \text{set of } Env \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
   \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
     \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho} \} \\
-  \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \; ||
-    \begin{array}[t]{l}
-      f \inb \semfcn, \\
+  \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \;
+    \begin{array}[t]{ll}
+      || & f \inb \semfcn \\
 
       % Simon's version
-      \forall x \inb \Value. \\
-      \hspace{0.5em} |let|\; \bar{x} = \semapp{I}{e_1}, \\
-      \hspace{0.5em}\forall \bar{w} \inb \overline{\Value}. \\
-      \hspace{1em} (\semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset) \\
-      \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})}
+      , & \forall x \inb \Value. 
+       \hspace{0.5em} |let|\; \bar{x} = \semapp{I}{e_1}, \\
+      & \hspace{0.5em}\forall \bar{w} \inb \overline{\Value}. \\
+      & \hspace{1em} (\semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset) \\
+      & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})}
+       \\
+      , & q=|closed| \implies \forall x \inb \Value. \\
+      & \hspace{0.5em} x \in \dom(f) \implies (\exists \bar{w} \inb \overline{\Value}.\, \semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset)
 
 %%      \forall x \inb \Value. \\
 %%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
