@@ -659,13 +659,15 @@ $
 \newcommand{\mtypec}{LW^{*}}
 \newcommand{\capu}{\cap\hspace{-0.6em}\bullet\,}
 \newcommand{\prelbl}{\textbf{prelbl}}
-\newcommand{\unlbl}{\textbf{U}}
+\newcommand{\unlbl}{\textbf{unlbl}}
 \newcommand{\LblValue}{LW}
 \newcommand{\Lbl}{\mathbf{Lbl}}
 \newcommand{\lblemp}{\epsilon}
 \newcommand{\lbll}[1]{{\bf L}\;#1}
 \newcommand{\lblr}[1]{{\bf R}\;#1}
 \newcommand{\lblseq}[2]{#1 \sconcat #2}
+\newcommand{\sortlbl}{\textbf{sortLbl}}
+
 
 \begin{figure}
 $
@@ -723,11 +725,22 @@ Env^{*} & = & \powerset{Env} \\
 
   \end{array} \\ \\
 
+\end{array}
+$
+\caption{Expression semantics, with choice}
+\label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+  
+
   \begin{array}{rcll}
     \munits{s} & = & \{ (\lblemp, x) \} & \text{singleton set of a value with no labels} \\
     s \capu u & = & \{ (l, x)\, ||\, (l, x) \inb s, x = u \} \\
-    \unlbl((l,x)) & = & x \\
-%%    \prelbl(l, s) & = & \{ (l \bowtie l', x)\, ||\, (l',x) \inb s \} \\
+    \unlbl(l,x) & = & x \\
+    \prelbl(l, s) & = & \{ (l \bowtie l', x)\, ||\, (l',x) \inb s \} \\
 \\
 \apply & : & (\Value \times \Value) \rightarrow \mtypec \\
 \apply( \tuple{w_0, \mydots,\, w_n}, k) & = & \msing{(\Rtag^k\Ltag,w_k)} & 0 \leq k \leq n \\
@@ -747,10 +760,35 @@ Env^{*} & = & \powerset{Env} \\
 
   \end{array}
 
+\\ \\
+
+
+\begin{array}{rrcll}
+\text{Comparison} & (<) & : & \Lbl \rightarrow \Lbl\rightarrow Bool \\
+& (\lbll l_1) < (\lbll l_2) & = & l_1 < l_2 \\
+& (\lblr l_1) < (\lblr l_2) & = & l_1 < l_2 \\
+& (\lbll l_1) < (\lblr l_2) & = & True \\
+& (\lblr l_1) < (\lbll l_2) & = & False \\
+& (\lblseq{l_1}{l_2}) < (\lblseq{l_3}{l_4}) & = &
+(l_1 < l_3) \vee (l_1 = l_3 \wedge l_2 < l_4)\\
+\end{array}
+
+\\ \\
+\begin{array}{rrcll}
+\text{Sorting choices} & \sortlbl & : & \powerset{\Lbl \times \alpha} \rightarrow [\powerset{\alpha}] \\
+& \sortlbl & = & \textit{Sort according to label order}\\
+%% \end{array} \\
+ \\
+
+%% \begin{array}{rrcll}
+ \text{All} & \mall & : & [\mtype] \rightarrow \Value \\
+            & \mall([\{w_0\}, \mydots, \{w_n\}]) & = & [0 \fmapsto (\lblemp, w_0), \mydots, n \fmapsto (\lblemp, w_n)] \\
+            & \mall(s) & = & \wrong & \text{otherwise}
+\end{array}
 
 \end{array}
 $
-\caption{Expression semantics, with choice}
+\caption{Misc}
 \label{fig:den-sem1}
 \end{figure}
 
@@ -790,7 +828,7 @@ $
     & & \hspace{0.5em}(l'',r) \inb \apply(f, a) \} \capu u \\
   \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \mintersect \; \semappp{M}{|e_2|}{u}{\rho} \\
   \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & \semapp{E}{|e_1|}{\rho}   \; \msemi \; \semappp{M}{|e_2|}{u}{\rho} \\
-  \semappp{M}{|e_1 `choice` e_2|}{u}{\rho} & = & \semappp{L}{|e_1|}{u}{\rho}) \munion \semappp{L}{|e_1|}{u}{\rho} \\
+  \semappp{M}{|e_1 `choice` e_2|}{u}{\rho} & = & \semappp{L}{|e_1|}{u}{\rho} \munion \semappp{L}{|e_1|}{u}{\rho} \\
   \semappp{M}{|x := e|}{u}{\rho} & = & \semappp{M}{e}{u}{\rho} \capu \rho(x) \\
 
   \semappp{M}{|:e|}{u}{\rho} & = &
@@ -807,12 +845,13 @@ $
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
 
   \semappp{M}{|forb e_1 e_2|}{u}{\rho} & = & XXX  \\
+  \semappp{M}{|all e|}{u}{\rho} & = & \munit(\mall(\sortlbl(\semapp{D}{e}{\rho}))) \capu u \\
 
   \semappp{M}{|arr (e_0, xdots e_n)|}{u}{\rho} & = &
   \{ (l_1 \bowtie \mydots \bowtie l_n, \mkfcn{0 \fmapsto w_0,\mydots, n \fmapsto w_n}) \, || \, u \in \semfcnc, \\
   & & \hspace{0.5em} \dom(u) = \{0,\mydots,n\}, \\
-  & & \hspace{0.5em} (l_0,w_0) \inb \semappp{M}{|e_1|}{(\unlbl(u(0)))}{\rho},
-      \,\mydots,\, (l_n,w_n) \inb \semappp{M}{e_n}{(\unlbl(u(n)))}{\rho} \} \\
+  & & \hspace{0.5em} (l_0,w_0) \inb \semappp{M}{|e_1|}{(\unlbl(u(0)))}{\rho}, \,\mydots,\, \\
+  & & \hspace{0.5em}  (l_n,w_n) \inb \semappp{M}{e_n}{(\unlbl(u(n)))}{\rho} \} \\
 
 %%  & & \text{XXX above definition looks wrong} \\
 %%  \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &

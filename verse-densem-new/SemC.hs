@@ -348,6 +348,9 @@ sortLbl = sortl . unSet
 preLbls :: Lbls -> WS -> WS
 preLbls l s = (\ (l',x) -> (l >< l',x)) <$> s
 
+unLbl :: (Lbls, W) -> W
+unLbl (_, w) = w
+
 -- Common structure of a set of labels.
 -- XXX Just prefix now.
 commonLbls :: Set Lbls -> Lbls
@@ -520,7 +523,7 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
 --      trace ("trying x=" ++ show x)
       (
       ifEmpty
-        (dB' e1 (Just x) rho)                -- possible ways x can match e1
+        (dB e1 (Just x) rho)                -- possible ways x can match e1
         (not (x `inDom` f) || q == Open)     -- if none
         $ \ rhos ->                          -- if at least one
 --             let l = commonLbls (fst <$> rhos) in
@@ -529,7 +532,7 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
 -- This needs to change.  With multiple rhos we should maybe
 -- intersect all the (dL e2)s
              forAll rhos
-                    (\ (_, rho') -> forAll (dM e1 (Just x) rho')
+                    (\ rho' -> forAll (dM e1 (Just x) rho')
                                       (\ (l, x') ->
 --                                         trace ("e1(x) x,l,x'=" ++ show (x, l, x')) $
                                          x' `inDom` g &&
@@ -537,7 +540,7 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
 --                                         trace ("f(x)=" ++ show (ap f x)) $
 --                                         trace ("g(x')=" ++ show (ap g x')) $
 --                                         trace ("e2(g(x'))=" ++ show (dL e2 (Just (snd $ ap g x')) rho')) $
-                                         ap f x `sIn` (preLbls l $ dL e2 (Just (snd $ ap g x')) rho')
+                                         ap f x `sIn` (preLbls l $ dL e2 (Just (unLbl $ ap g x')) rho')
                                          )
                                       )
                     )
