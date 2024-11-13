@@ -421,11 +421,20 @@ Env^{*} & = & \text{set of } Env \\
     \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho} \} \\
   \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
-      f \inb \semfcn, 
+      f \inb \semfcn, \\
+
+      % Simon's version
       \forall x \inb \Value. \\
-      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
-      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+      \hspace{0.5em} |let|\; \bar{x} = \semapp{I}{e_1}, \\
+      \hspace{0.5em}\forall \bar{w} \inb \overline{\Value}. \\
+      \hspace{1em} (\semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset) \\
+      \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})}
+
+%%      \forall x \inb \Value. \\
+%%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+%%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+
     \end{array} \\
     & & \} \\
     \\ 
