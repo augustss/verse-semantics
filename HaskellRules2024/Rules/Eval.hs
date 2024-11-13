@@ -81,6 +81,28 @@ eval inChoicefreeC flexis (Exi bnd) =
  where
   (x, e) = alphaRename flexis bnd
 
+-- replace All with Iter when we can, then just remove this bit
+eval inChoicefreeC flexis (All e) = evalAll [e]
+ where
+  evalAll [] =
+    VAL (Tup [])
+  
+  evalAll (e:es) =
+    case eval False [] e of
+      FAIL ->
+        evalAll es
+
+      VAL v ->
+        case evalAll es of
+          VAL (Tup vs) -> VAL (Tup (v:vs))
+          r            -> BLKD (All (v :|: toExpr r))
+
+      e1 :||: e2 ->
+        evalAll (e1:e2:es)
+
+      r ->
+        BLKD (All (foldr1 (:|:) (toExpr r : es)))
+
 eval inChoicefreeC flexis (Iter e cons nil) =
   case eval False [] e of
     -- iter(cons,nil){fail} --> <>
@@ -167,6 +189,7 @@ evalSeqBlkd inChoicefreeC flexis (v, e1') e2 =
  where
   choicefree_e1' = choicefree e1'
 
+-- try to find places where to use e|fail->e and fail|e->e
 evalChoiceTry :: Expr -> Expr -> [Ident] -> (Expr -> Expr) -> (Expr -> Result) -> Result
 evalChoiceTry eL eR flexis k choicy =
   case eval False [] eL of
