@@ -214,7 +214,7 @@ substOccursCheck x v e =
         if x `elem` free e
           then Exi (bind x ((Var x :=: v) :>: e))
           else e
-  check _ v         = error ("missing case in occurs check: " ++ show v)
+  check _ v         = Just v
 
 -- unifying HNF values
 unify :: Val -> Val -> Expr -> Maybe Expr
