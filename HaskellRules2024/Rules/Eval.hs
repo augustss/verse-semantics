@@ -32,24 +32,53 @@ exis (z:zs) e = Exi (bind z (exis zs e))
 
 --------------------------------------------------------------------------------
 
--- eval inCoicefreeC rigids flexis e = r:
+data Env
+  = Env
+  { inChoiceFreeC :: Bool    -- are we in a choiceFree context?
+  , rigids        :: [Ident] -- what rigid variables are in scope (only used for alphaRename)
+  , flexis        :: [Ident] -- what flexible variables are in scope
+  }
+
+-- starting Env
+env0 :: Env
+env0 = Env True [] []
+
+-- what variables are in scope
+vars :: Env -> [Ident]
+vars env = flexis env ++ rigids env
+
+-- start a new scope; reset choicefree-ness and make all flexis rigid
+newScope :: Env -> Env
+newScope env = env{ inChoiceFreeC = True, rigids = vars env, flexis = [] }
+
+-- add a flexible variable
+flexi :: Ident -> Env -> Env
+flexi x env = env{ flexis = x : flexis env }
+
+-- update choicefree-ness
+(/\) :: Bool -> Env -> Env
+chf /\ env = env{ inChoiceFreeC = chf && inChoiceFreeC env }
+
+--------------------------------------------------------------------------------
+
+-- eval env e = r:
 -- 1. e === toExpr r
 -- 2. if r = SUBST zs (x,v) e', then:
---    - x is in flexis
+--    - x is in flexis env
 --    - zs are exi-bound somewhere in the original e
--- 3. inChoiceFreeC says if we are operating inside a choicefree context
+-- 3. inChoiceFreeC env says if we are operating inside a choicefree context
 --    (important for if we can apply the CHOICE rule or not)
-eval :: Bool -> [Ident] -> [Ident] -> Expr -> Result
-eval inChoicefreeC rigids flexis Fail        = FAIL
-eval inChoicefreeC rigids flexis v | isVal v = VAL v
-eval inChoicefreeC rigids flexis (e1 :|: e2) = e1 :||: e2
+eval :: Env -> Expr -> Result
+eval env Fail        = FAIL
+eval env v | isVal v = VAL v
+eval env (e1 :|: e2) = e1 :||: e2
 
-eval inChoicefreeC rigids flexis e@(f :@: v) =
+eval env e@(f :@: v) =
   case (f, v) of
     -- (\x.b)a --> exi x.x=a; b
     (Lam bnd, a) ->
-      let (x,b) = alphaRename (flexis++rigids) bnd in
-        eval inChoicefreeC rigids flexis (Exi (bind x ((Var x :=: a) :>: b)))
+      let (x,b) = alphaRename (vars env) bnd in
+        eval env (Exi (bind x ((Var x :=: a) :>: b)))
 
     -- a+b --> "a+b"
     (Op Add, Tup [Lit (LInt a),Lit (LInt b)]) ->
@@ -62,11 +91,11 @@ eval inChoicefreeC rigids flexis e@(f :@: v) =
 
     _ -> BLKD e
 
-eval inChoicefreeC rigids flexis (Exi bnd) =
-  case eval inChoicefreeC rigids (x:flexis) e of
+eval env (Exi bnd) =
+  case eval (flexi x env) e of
     SUBST zs (y,w) e'
       -- exi x . Exi zs . x=w; e' --> Exi zs . e'{w/x}
-      | y==x             -> eval inChoicefreeC rigids flexis (exis zs (subst [(x,w)] e'))
+      | y==x             -> eval env (exis zs (subst [(x,w)] e'))
       -- exi x . Exi zs . y=w; e' --> Exi x,zs . y=w; e'
       | otherwise        -> SUBST (x:zs) (y,w) e'
     
@@ -79,15 +108,15 @@ eval inChoicefreeC rigids flexis (Exi bnd) =
      where
       e' = toExpr r
  where
-  (x, e) = alphaRename (flexis++rigids) bnd
+  (x, e) = alphaRename (vars env) bnd
 
-eval inChoicefreeC rigids flexis (All e) = evalAll [e]
+eval env (All e) = evalAll [e]
  where
   evalAll [] =
     VAL (Tup [])
   
   evalAll (e:es) =
-    case eval False (flexis++rigids) [] e of
+    case eval (newScope env) e of
       FAIL ->
         evalAll es
 
@@ -102,15 +131,15 @@ eval inChoicefreeC rigids flexis (All e) = evalAll [e]
       r ->
         BLKD (All (foldr1 (:|:) (toExpr r : es)))
 
-eval inChoicefreeC rigids flexis (Iter e cons nil) =
-  case eval False (flexis++rigids) [] e of
+eval env (Iter e cons nil) =
+  case eval (newScope env) e of
     -- iter(cons,nil){fail} --> <>
     FAIL ->
-      eval inChoicefreeC rigids flexis (nil :@: Tup [])
+      eval env (nil :@: Tup [])
 
     -- iter(cons,nil){v} --> exi f. f=cons(v); f(nil)
     VAL v ->
-      eval inChoicefreeC rigids flexis $
+      eval env $
         Exi $ bind f $
           (Var f :=: (cons :@: v)) :>: (Var f :@: nil)
      where
@@ -118,7 +147,7 @@ eval inChoicefreeC rigids flexis (Iter e cons nil) =
     
     -- iter(cons,nil){e1|e2} --> iter(cons,\_.iter(cons,nil){e2}){e1}
     e1 :||: e2 ->
-      eval inChoicefreeC rigids flexis $
+      eval env $
         Iter e1 cons $
           Lam $ bind underscore $
             Iter e2 cons nil
@@ -126,8 +155,8 @@ eval inChoicefreeC rigids flexis (Iter e cons nil) =
     r ->
       BLKD (Iter (toExpr r) cons nil)
 
-eval inChoicefreeC rigids flexis ((v :=: e1) :>: e2) =
-  case (v, eval inChoicefreeC rigids flexis e1) of
+eval env ((v :=: e1) :>: e2) =
+  case (v, eval env e1) of
     -- v=fail; e2 --> fail
     (v, FAIL) ->
       FAIL
@@ -137,64 +166,64 @@ eval inChoicefreeC rigids flexis ((v :=: e1) :>: e2) =
       SUBST zs (y,w) ((v :=: e1') :>: e2)
 
     -- x=v1; e2 == x=v1; e2
-    (Var x, VAL v1) | x `elem` flexis ->
+    (Var x, VAL v1) | x `elem` flexis env ->
       substOccursCheck x v1 e2
 
     -- v=y; e2 --> y=v; e2
-    (v, VAL (Var y)) | y `elem` flexis ->
+    (v, VAL (Var y)) | y `elem` flexis env ->
       substOccursCheck y v e2
 
     -- hnf1=hnf2; e2 --> --DO-THE-UNIFICATION--
     (hnf1, VAL hnf2) | isHNF hnf1 && isHNF hnf2 ->
       case unify hnf1 hnf2 e2 of
         Nothing -> FAIL
-        Just e  -> eval inChoicefreeC rigids flexis e
+        Just e  -> eval env e
     
     (v, eL :||: eR)
-      | inChoicefreeC ->
+      | inChoiceFreeC env ->
         -- v=(eL|eR);e2 --> (v=eL;e2)|(v=eR;e2)
-        eval inChoicefreeC rigids flexis (((v :=: eL) :>: e2) :|: ((v :=: eR) :>: e2))
+        eval env (((v :=: eL) :>: e2) :|: ((v :=: eR) :>: e2))
       
       | otherwise ->
         -- e|fail -> e  OR  fail|e -> e
-        evalChoiceTry eL eR rigids flexis (\e1' -> ((v:=:e1'):>:e2))
-          (\e1' -> evalSeqBlkd False rigids flexis (v,e1') e2)
+        evalChoiceTry eL eR env (\e1' -> ((v:=:e1'):>:e2))
+          (\e1' -> evalSeqBlkd env (v,e1') e2)
 
-    (v, r1) -> evalSeqBlkd inChoicefreeC rigids flexis (v, toExpr r1) e2
+    (v, r1) -> evalSeqBlkd env (v, toExpr r1) e2
 
-eval _ _ _ e =
+eval _ e =
   error ("eval unimplemented for " ++ show e)
 
 -- eval for (v:=:e1'):>:e2, where we know that e1 is blkd
-evalSeqBlkd :: Bool -> [Ident] -> [Ident] -> (Val,Expr) -> Expr -> Result
-evalSeqBlkd inChoicefreeC rigids flexis (v, e1') e2 =
-  case eval (inChoicefreeC && choicefree_e1') rigids flexis e2 of
+evalSeqBlkd :: Env -> (Val,Expr) -> Expr -> Result
+evalSeqBlkd env (v, e1') e2 =
+  case eval (choicefree_e1' /\ env) e2 of
     -- v=e1';Exi zs. y=w;e2' --> Exi zs. y=w;v=e1';e2'   [v=e1' is blkd, so this is OK]
-    SUBST zs (y,w) e2'          -> SUBST zs (y,w) ((v :=: e1') :>: e2')
+    SUBST zs (y,w) e2' -> SUBST zs (y,w) ((v :=: e1') :>: e2')
 
     -- v=e1';fail --> fail
-    FAIL                        -> FAIL
+    FAIL               -> FAIL
 
     eL :||: eR
       -- v=e1';(eL|eR) --> (v=e1';eL)|(v=e1';eR)  when e1' is blkd&choicefree
       | choicefree_e1' -> ((v:=:e1'):>:eL) :||: ((v:=:e1'):>:eR)
 
       | otherwise ->
-        evalChoiceTry eL eR rigids flexis (\e2' -> (v:=:e1'):>:e2')
+        evalChoiceTry eL eR (False /\ env) (\e2' -> (v:=:e1'):>:e2')
           (\e2' -> BLKD ((v:=:e1'):>:e2'))
 
     -- v=e1';e2' == v=e1';e2'
-    r2                          -> BLKD ((v :=: e1') :>: toExpr r2)
+    r2                 -> BLKD ((v :=: e1') :>: toExpr r2)
  where
   choicefree_e1' = choicefree e1'
 
 -- try to find places where to use e|fail->e and fail|e->e
-evalChoiceTry :: Expr -> Expr -> [Ident] -> [Ident] -> (Expr -> Expr) -> (Expr -> Result) -> Result
-evalChoiceTry eL eR rigids flexis k choicy =
-  case eval False (flexis++rigids) [] eL of
-    FAIL -> eval False rigids flexis (k eR)
-    rL   -> case eval False (flexis++rigids) [] eR of
-              FAIL -> eval False rigids flexis (k (toExpr rL))
+evalChoiceTry :: Expr -> Expr -> Env -> (Expr -> Expr) -> (Expr -> Result) -> Result
+evalChoiceTry eL eR env k choicy =
+  case eval (False /\ newScope env) eL of
+    FAIL -> eval env (k eR)
+    rL   -> case eval (False /\ newScope env) eR of
+              FAIL -> eval env (k (toExpr rL))
               rR   -> choicy (toExpr rL :|: toExpr rR)
 
 -- SUBST, REC, U-OCCURS in one step
