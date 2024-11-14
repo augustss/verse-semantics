@@ -318,7 +318,7 @@
 
 \section{Introduction}
 
-\section{Syntax of Core Verse}
+\section{Syntax of MiniVerse}
 
 %format funk k (e) (rhs) = "\textbf{fun}_"k"(" e ")\{" rhs "\}"
 
@@ -419,16 +419,19 @@ Env^{*} & = & \text{set of } Env \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
   \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
     \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho} \} \\
-  \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \; ||
-    \begin{array}[t]{l}
-      f \inb \semfcn, \\
+  \semapp{E}{|funk q e_1 e_2|}{\rho} & = & \{ f \;
+    \begin{array}[t]{ll}
+      || & f \inb \semfcn \\
 
       % Simon's version
-      \forall x \inb \Value. \\
-      \hspace{0.5em} |let|\; \bar{x} = \semapp{I}{e_1}, \\
-      \hspace{0.5em}\forall \bar{w} \inb \overline{\Value}. \\
-      \hspace{1em} (\semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset) \\
-      \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})}
+      , & \forall x \inb \Value. 
+       \hspace{0.5em} |let|\; \bar{x} = \semapp{I}{e_1}, \\
+      & \hspace{0.5em}\forall \bar{w} \inb \overline{\Value}. \\
+      & \hspace{1em} (\semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset) \\
+      & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})}
+       \\
+      , & q=|closed| \implies \forall x \inb \Value. \\
+      & \hspace{0.5em} x \in \dom(f) \implies (\exists \bar{w} \inb \overline{\Value}.\, \semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset)
 
 %%      \forall x \inb \Value. \\
 %%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
@@ -524,8 +527,8 @@ $
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
   \semappp{M}{|arr (e_0, xdots e_n)|}{u}{\rho} & = &
-  \{ \mkfcn{0 \fmapsto x_0,\mydots, n \fmapsto x_n} \, || \, u \in \semfcn, \, \dom(u) = \{0,\mydots,n\}, \\
-  & & \hspace{0.5em} x_0 \inb \semappp{M}{|e_1|}{(u(0))}{\rho}, \,\mydots,\, x_n \inb \semappp{M}{e_n}{(u(n))}{\rho} \} \\
+  \{ \mkfcn{0 \fmapsto w_0,\mydots, n \fmapsto w_n} \, || \, u \in \semfcn, \, \dom(u) = \{0,\mydots,n\}, \\
+  & & \hspace{0.5em} w_0 \inb \semappp{M}{|e_1|}{(u(0))}{\rho}, \,\mydots,\, w_n \inb \semappp{M}{e_n}{(u(n))}{\rho} \} \\
   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \inb \semfcn, \\
@@ -613,6 +616,45 @@ $
 \label{fig:den-sem-util}
 \end{figure}
 
+\newpage
+\section{Choice}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lr@@{\;}r@@{\;}ll}
+    \text{Integers} & k \\
+    \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+%     \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Expressions} & e  & ::=  &
+        |x|
+    \vb |k|
+    \vb |o|
+    \vb |apply1N e_1 e_2|
+    \vb |e_1 == e_2|
+    \vb |e_1 ; e_2|
+    \vb |x := e|
+    \vb |:e|
+%FAIL    \vb |fail|
+    \\
+    & &
+    \vb & |vif e_1 e_2 e_3|
+    \vb |arr (e_1, xdots, e_n)|
+    \vb |funk q e_1 e_2|
+    & |n >= 0|
+    \\
+    & & \vb & |e_1 `choice` e_2| \vb |forb e_1 e_2|
+    \\
+    \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
+    \text{Openness} & q & ::= & |open| \vb |closed| \\
+    \end{array} \\
+    \\[-3mm]
+  \end{array}
+  $$
+\caption{The MiniVerse syntax, with choice} \label{fig:syntax}
+\end{figure}
+
 \newcommand{\LblsValue}{LW}
 \newcommand{\semfcnc}{\Value \rightharpoonup \LblsValue}
 \newcommand{\Ltag}{\textbf{L}}
@@ -621,6 +663,14 @@ $
 \newcommand{\capu}{\cap\hspace{-0.6em}\bullet\,}
 \newcommand{\prelbl}{\textbf{prelbl}}
 \newcommand{\unlbl}{\textbf{unlbl}}
+\newcommand{\LblValue}{LW}
+\newcommand{\Lbl}{\mathbf{Lbl}}
+\newcommand{\lblemp}{\epsilon}
+\newcommand{\lbll}[1]{{\bf L}\;#1}
+\newcommand{\lblr}[1]{{\bf R}\;#1}
+\newcommand{\lblseq}[2]{#1 \sconcat #2}
+\newcommand{\sortlbl}{\textbf{sortLbl}}
+
 
 \begin{figure}
 $
@@ -630,11 +680,11 @@ $
 \Value & = & \mathbb{Z} + \dtuple + (\semfcnc) \\
 \dtuple & = & \text{a finite tuple of values $\Value$} \\
 \Env & = & |Ident| \rightarrow \Value \\
-LW & = & [L] \times \Value \\
-W^{*} & = & \text{set of } W \\
-LW^{*} & = & \text{set of } LW \\
-Env^{*} & = & \text{set of } Env \\
-L & = & \Ltag + \Rtag
+\LblValue & = & \Lbl \times \Value & \text{Label $\Lbl$ and value $\Value$} \\
+\textbf{data}\; \Lbl & = & \lblemp \vb (\lblseq{\Lbl}{\Lbl}) \vb \lbll{\Lbl} \vb \lblr{\Lbl} \\
+%%% W^{*} & = & \text{set of } W \\
+LW^{*} & = & \powerset{LW} \\
+Env^{*} & = & \powerset{Env} \\
 \end{array}
 \\ \\
 
@@ -678,10 +728,21 @@ L & = & \Ltag + \Rtag
 
   \end{array} \\ \\
 
+\end{array}
+$
+\caption{Expression semantics, with choice}
+\label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+  
+
   \begin{array}{rcll}
-    \munits{s} & = & \{ ([], x) \} & \text{singleton set of a value with no labels} \\
-    s \capu u & = & \{ (l, u)\, ||\, (l, x) \inb s, x = u \} \\
-    \unlbl((l,x)) & = & x \\
+    \munits{s} & = & \{ (\lblemp, x) \} & \text{singleton set of a value with no labels} \\
+    s \capu u & = & \{ (l, x)\, ||\, (l, x) \inb s, x = u \} \\
+    \unlbl(l,x) & = & x \\
     \prelbl(l, s) & = & \{ (l \bowtie l', x)\, ||\, (l',x) \inb s \} \\
 \\
 \apply & : & (\Value \times \Value) \rightarrow \mtypec \\
@@ -689,11 +750,49 @@ L & = & \Ltag + \Rtag
 \apply( f, w ) & = & \msing{f(w)} & f \in \semfcnc, w \in \dom(f) \\
 \apply( f, w ) & = & \emptyset & \text{otherwise} \\
 
+ \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+  s_1 \munion s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lbll{l},w)}{\sbind{(l,w)}{s_1}} \cup
+                                              \scompr{(\lblr{l}, w)}{\sbind{(l,w)}{s_2}}} \\[1mm]
+ \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+  s_1 \mintersect s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lblseq{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2}} \\[1mm]
+ \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+  s_1 \msemi s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lblseq{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}}} \\[1mm]
+
   \end{array}
+
+\\ \\
+
+
+\begin{array}{rrcll}
+\text{Comparison} & (<) & : & \Lbl \rightarrow \Lbl\rightarrow Bool \\
+& (\lbll l_1) < (\lbll l_2) & = & l_1 < l_2 \\
+& (\lblr l_1) < (\lblr l_2) & = & l_1 < l_2 \\
+& (\lbll l_1) < (\lblr l_2) & = & True \\
+& (\lblr l_1) < (\lbll l_2) & = & False \\
+& (\lblseq{l_1}{l_2}) < (\lblseq{l_3}{l_4}) & = &
+(l_1 < l_3) \vee (l_1 = l_3 \wedge l_2 < l_4)\\
+\end{array}
+
+\\ \\
+\begin{array}{rrcll}
+\text{Sorting choices} & \sortlbl & : & \powerset{\Lbl \times \alpha} \rightarrow [\powerset{\alpha}] \\
+& \sortlbl & = & \textit{Sort set according to label order}\\
+%% \end{array} \\
+ \\
+
+%% \begin{array}{rrcll}
+ \text{All} & \mall & : & [\mtype] \rightarrow \mtypec \\
+ & \mall([\{s_0\}, \mydots, \{s_n\}]) & = &
+ \{ [0 \fmapsto (\lblemp, w_0), \mydots, n \fmapsto (\lblemp, w_n)] || \\
+ & & & \hspace{0.5em} w_0 \inb s_0, \, \mydots, \, w_n \inb s_n \}
+\end{array}
 
 \end{array}
 $
-\caption{Expression semantics, with choice}
+\caption{Misc}
 \label{fig:den-sem1}
 \end{figure}
 
@@ -731,27 +830,38 @@ $
   \semappp{M}{|apply1N e_1 e_2|}{u}{\rho} & = &
     \{ (l \bowtie l' \bowtie l'', r) \, || \, (l,f) \inb \semapp{E}{|e_1|}{\rho},\; (l',a) \inb \semapp{E}{|e_2|}{\rho}, \\
     & & \hspace{0.5em}(l'',r) \inb \apply(f, a) \} \capu u \\
-  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \Cap \; \semappp{M}{|e_2|}{u}{\rho} \\
-  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = &
-    \{ (l \bowtie l', y) \, || \, (l,x) \inb \semapp{E}{|e_1|}{\rho}, \; (l',y) \inb \semappp{M}{|e_2|}{u}{\rho}) \} \\
-  \semappp{M}{|e_1 `choice` e_2|}{u}{\rho} & = & \prelbl([L],\semappp{L}{|e_1|}{u}{\rho}) \cup \prelbl([R],\semappp{L}{|e_1|}{u}{\rho}) \\
+  \semappp{M}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{M}{|e_1|}{u}{\rho} \; \mintersect \; \semappp{M}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 ; e_2|}{u}{\rho}      & = & \semapp{E}{|e_1|}{\rho}   \; \msemi \; \semappp{M}{|e_2|}{u}{\rho} \\
+  \semappp{M}{|e_1 `choice` e_2|}{u}{\rho} & = & \semappp{L}{|e_1|}{u}{\rho} \munion \semappp{L}{|e_1|}{u}{\rho} \\
   \semappp{M}{|x := e|}{u}{\rho} & = & \semappp{M}{e}{u}{\rho} \capu \rho(x) \\
+
   \semappp{M}{|:e|}{u}{\rho} & = &
     \{ (l \bowtie l',r) \, || \, (l,f) \inb \semapp{E}{|e|}{\rho}, \; (r,l') \inb \apply(f, u) \} \\
 %FAIL  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+
   \semappp{M}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
   \left\{
   \begin{array}{ll}
     \semapp{L}{|e_3|}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
-    XXX \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{L}{|e_2|}{u}{\rho'} & \text{otherwise} \\
+    XXX  & \text{otherwise} \\
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
-  \semappp{M}{|all e|}{\rho} & = & XXX \semapp{E}{e}{\rho} \\
-  \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
-  \{ ((l_1 \bowtie \mydots \bowtie l_n, \tuple{x_1,\mydots,x_n}) \, || \, u \in \dtuple,
-  \exists u_1 \mydots u_n .\, u = \tuple{u_1,\mydots,u_n}, \\
-  & & \hspace{0.5em} (l_1,x_1) \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, (l_n,x_n) \inb \semappp{M}{e_n}{u_n}{\rho} \} \\
+
+  \semappp{M}{|forb e_1 e_2|}{u}{\rho} & = & XXX  \\
+  \semappp{M}{|all e|}{u}{\rho} & = & \mall(\sortlbl(\semapp{D}{e}{\rho})) \capu u \\
+
+  \semappp{M}{|arr (e_0, xdots e_n)|}{u}{\rho} & = &
+  \{ (l_1 \bowtie \mydots \bowtie l_n, \mkfcn{0 \fmapsto w_0,\mydots, n \fmapsto w_n}) \, || \, u \in \semfcnc, \\
+  & & \hspace{0.5em} \dom(u) = \{0,\mydots,n\}, \\
+  & & \hspace{0.5em} (l_0,w_0) \inb \semappp{M}{|e_1|}{(\unlbl(u(0)))}{\rho}, \,\mydots,\, \\
+  & & \hspace{0.5em}  (l_n,w_n) \inb \semappp{M}{e_n}{(\unlbl(u(n)))}{\rho} \} \\
+
+%%  & & \text{XXX above definition looks wrong} \\
+%%  \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
+%%  \{ ((l_1 \bowtie \mydots \bowtie l_n, \tuple{x_1,\mydots,x_n}) \, || \, u \in \dtuple,
+%%  \exists u_1 \mydots u_n .\, u = \tuple{u_1,\mydots,u_n}, \\
+%%  & & \hspace{0.5em} (l_1,x_1) \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, (l_n,x_n) \inb \semappp{M}{e_n}{u_n}{\rho} \} \\
   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
     \begin{array}[t]{l}
       f \inb \semfcnc, \\

@@ -199,6 +199,7 @@
 %format colonequals = "\colonequals"
 %format dollar = "\$"
 %format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\," b
+%format forb (a) b = "\textbf{for}(" a ")\,\{" b "\}"
 
 %format blam (x) (fx) (e) = "\lambda_{" fx "}" x".\," e
 
