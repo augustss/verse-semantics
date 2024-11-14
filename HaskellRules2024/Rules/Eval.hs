@@ -233,14 +233,14 @@ substOccursCheck x v e =
     Nothing -> FAIL
     Just v' -> SUBST [] (x,v') e
  where
-  check x (Var y)       = Nothing
-  check x (Tup vs)      = Tup `fmap` sequence [ check x v | v <- vs ]
-  check x (Tru v)       = Tru `fmap` check x v
+  check x (Var y) | x==y = Nothing
+  check x (Tup vs)       = Tup `fmap` sequence [ check x v | v <- vs ]
+  check x (Tru v)        = Tru `fmap` check x v
   check x (Lam bnd)
-    | x `elem` free bnd = 
+    | x `elem` free bnd  = 
       let (y,e) = alphaRename (x : free v) bnd in
         Just $ Lam $ bind y $ Exi (bind x ((Var x :=: v) :>: e))
-  check _ v             = Just v
+  check _ v              = Just v
 
 -- unifying HNF values
 unify :: Val -> Val -> Expr -> Maybe Expr
