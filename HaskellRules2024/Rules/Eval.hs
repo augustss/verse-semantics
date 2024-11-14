@@ -46,7 +46,7 @@ eval inChoicefreeC flexis (e1 :|: e2) = e1 :||: e2
 
 eval inChoicefreeC flexis e@(f :@: v) =
   case (f, v) of
-    -- (\x.a)b --> exi x.x=a; b
+    -- (\x.b)a --> exi x.x=a; b
     (Lam bnd, a) ->
       let (x,b) = alphaRename flexis bnd in
         eval inChoicefreeC flexis (Exi (bind x ((Var x :=: a) :>: b)))
@@ -139,11 +139,11 @@ eval inChoicefreeC flexis ((v :=: e1) :>: e2) =
 
     -- x=v1; e2 == x=v1; e2
     (Var x, VAL v1) | x `elem` flexis ->
-      substCheck x v1 e2
+      substOccursCheck x v1 e2
 
     -- v=y; e2 --> y=v; e2
     (v, VAL (Var y)) | y `elem` flexis ->
-      substCheck y v e2
+      substOccursCheck y v e2
 
     -- hnf1=hnf2; e2 --> --DO-THE-UNIFICATION--
     (hnf1, VAL hnf2) | isHNF hnf1 && isHNF hnf2 ->
@@ -198,16 +198,23 @@ evalChoiceTry eL eR flexis k choicy =
               FAIL -> eval False flexis (k (toExpr rL))
               rR   -> choicy (toExpr rL :|: toExpr rR)
 
--- SUBST, but with occurs check
-substCheck :: Ident -> Val -> Expr -> Result
-substCheck x v e
-  | occurs x v = FAIL
-  | otherwise  = SUBST [] (x,v) e
+-- SUBST, REC, U-OCCURS in one step
+substOccursCheck :: Ident -> Val -> Expr -> Result
+substOccursCheck x v e =
+  case check x v of
+    Nothing -> FAIL
+    Just v' -> SUBST [] (x,v') e
  where
-  occurs x (Var y)  = x==y
-  occurs x (Tup vs) = any (occurs x) vs
-  occurs x (Tru t)  = occurs x t
-  occurs x _        = False
+  check x (Var y)   = Nothing
+  check x (Tup vs)  = Tup `fmap` sequence [ check x v | v <- vs ]
+  check x (Tru v)   = Tru `fmap` check x v
+  check x (Lam bnd) =
+    let (y,e) = alphaRename (x : free v) bnd in
+      Just $ Lam $ bind y $
+        if x `elem` free e
+          then Exi (bind x ((Var x :=: v) :>: e))
+          else e
+  check _ v         = error ("missing case in occurs check: " ++ show v)
 
 -- unifying HNF values
 unify :: Val -> Val -> Expr -> Maybe Expr
