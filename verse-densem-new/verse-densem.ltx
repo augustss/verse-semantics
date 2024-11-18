@@ -956,38 +956,38 @@ $
   \begin{array}{rcll}
 %\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
   \semappp{E}{|e|}{}{} & : & Ident \rightarrow \Env \rightarrow \Env^{*} \\
-  \semappp{E}{|x|}{u}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto \rho(x)}} \\
-  \semappp{E}{|k|}{u}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto k}} \\
-  \semappp{E}{|o|}{u}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto \semapp{O}{|o|}{}}} \\
-  \semappp{E}{|apply1N e_1 e_2|}{u}{\rho} & = &
+  \semappp{E}{|x|}{v}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto \rho(x)}} \\
+  \semappp{E}{|k|}{v}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto k}} \\
+  \semappp{E}{|o|}{v}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto \semapp{O}{|o|}{}}} \\
+  \semappp{E}{|apply1N e_1 e_2|}{v}{\rho} & = &
   \{ \extendrho{\rho''}{u \fmapsto r} \,
   || \, \rho'  \inb \semappp{E}{|e_1|}{f}{\rho}, \;
         \rho'' \inb \semappp{E}{|e_2|}{a}{\rho'}, \; \\
 & & \hspace{0.5em}             r \inb \apply(\rho''(f), \rho''(a)) \} & f, a \text{ fresh}\\
-  \semappp{E}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{E}{|e_1|}{u}{\rho} \; \cap \; \semappp{E}{|e_2|}{u}{\rho} \\
-  \semappp{E}{|e_1 ; e_2|}{u}{\rho}      & = &
-    \{ \rho'' \, || \, \rho' \inb \semappp{E}{|e_1|}{x}{\rho}, \; \rho'' \inb \semappp{E}{|e_2|}{u}{\rho'} \} & x \text{ fresh}\\
-  \semappp{E}{|x := e|}{u}{\rho} & = & %% \msing{\rho(x)} \;\cap\; \semappp{E}{e}{u}{\rho} \\
-    \semappp{E}{|x = e|}{u}{\rho} \\
+  \semappp{E}{|e_1 = e_2|}{v}{\rho}      & = & \semappp{E}{|e_1|}{v}{\rho} \; \cap \; \semappp{E}{|e_2|}{v}{\rho} \\
+  \semappp{E}{|e_1 ; e_2|}{v}{\rho}      & = &
+    \{ \rho'' \, || \, \rho' \inb \semappp{E}{|e_1|}{x}{\rho}, \; \rho'' \inb \semappp{E}{|e_2|}{v}{\rho'} \} & x \text{ fresh}\\
+  \semappp{E}{|x := e|}{v}{\rho} & = & %% \msing{\rho(x)} \;\cap\; \semappp{E}{e}{v}{\rho} \\
+    \semappp{E}{|x = e|}{v}{\rho} \\
     
-  \semappp{E}{|:e|}{u}{\rho} & = & %% \ran(\semappp{E}{|e|}{u}{\rho}) \\
+  \semappp{E}{|:e|}{v}{\rho} & = & %% \ran(\semappp{E}{|e|}{v}{\rho}) \\
     \{ \extendrho{\rho'}{u \fmapsto r} \, || \,
     \rho' \inb \semappp{E}{|e|}{f}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} & f \text{ fresh} \\
 
-%FAIL  \semappp{E}{|fail|}{u}{\rho} & = & \emptyset \\
+%FAIL  \semappp{E}{|fail|}{v}{\rho} & = & \emptyset \\
 
-  \semappp{E}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
+  \semappp{E}{|vif e_1 e_2 e_3|}{v}{\rho} & = &
   \left\{
   \begin{array}{ll}
-    \semappp{D}{|e_3|}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
-    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semappp{D}{|e_2|}{u}{\rho'} & \text{otherwise} \\
+    \semappp{D}{|e_3|}{v}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semappp{D}{|e_2|}{v}{\rho'} & \text{otherwise} \\
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{D}{e_1}{x}{\rho} & x \text{ fresh}\\
 
-%  \semappp{E}{|arr (e_0, xdots, e_n)|}{u}{\rho} & = &
-%    \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semappp{E}{|e_1|}{u}{\rho}, \,\mydots,\, x_n \inb \semappp{E}{|e_n|}{u}{\rho} \} \\
-  \semappp{E}{|funk q e_1 e_2|}{u}{\rho} & = & \{ \extendrho{\rho}{u \fmapsto f} \; \\
+%  \semappp{E}{|arr (e_0, xdots, e_n)|}{v}{\rho} & = &
+%    \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semappp{E}{|e_1|}{v}{\rho}, \,\mydots,\, x_n \inb \semappp{E}{|e_n|}{v}{\rho} \} \\
+  \semappp{E}{|funk q e_1 e_2|}{v}{\rho} & = & \{ \extendrho{\rho}{u \fmapsto f} \; \\
     & & 
     \begin{array}[t]{lll}
       || & f \inb \semfcn \\
@@ -1000,9 +1000,9 @@ $
       & \hspace{0.5em} \exists \rho' \in \semapp{X}{e}{\rho}.\, \semapppp{M}{e_1}{v}{x}{\rho'} \neq \emptyset \\
 
 %%      \forall x \inb \Value. \\
-%%      |let|\; \bar{u}{\rho} = \semappp{B}{e_1}{x}{u}{\rho}, \\
-%%      |if|\; \bar{u}{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{u}{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+%%      |let|\; \bar{v}{\rho} = \semappp{B}{e_1}{x}{v}{\rho}, \\
+%%      |if|\; \bar{v}{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{v}{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
 
     \end{array} \\
     & & \} & v \text{ fresh} \\
@@ -1014,7 +1014,7 @@ $
   & & |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\[1mm]
 
   \semappp{D}{|e|}{}{} & : & Ident \rightarrow \Env \rightarrow \Env^{*} \\
-  \semappp{D}{|e|}{u}{\rho} & = & \{ \rho'' \; || \; \rho' \inb \semapp{X}{e}{\rho}, \rho'' \inb \semappp{E}{|e|}{u}{\rho'} \} \\
+  \semappp{D}{|e|}{v}{\rho} & = & \{ \rho'' \; || \; \rho' \inb \semapp{X}{e}{\rho}, \rho'' \inb \semappp{E}{|e|}{v}{\rho'} \} \\
 \\
   \semapp{V}{|e|}{} & : & \Env \rightarrow \mtype \\
   \semapp{V}{|e|}{\rho} & = & \{ \rho'(x) \; || \; \rho' \inb \semappp{D}{|e|}{x}{\rho} \} & x \text{ fresh} \\
