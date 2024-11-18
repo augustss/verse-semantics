@@ -476,11 +476,6 @@ $
 \\
   \begin{array}{rcll}
 %\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
-  \semapp{B}{|e|} & : & \Value \rightarrow \Env \rightarrow \Env^{*} \\
-  \semappp{B}{|e|}{u}{\rho} & = &
-  \{ \rho' \; || \; \rho' \inb \semapp{X}{e}{\rho}, \emptyset \neq \semappp{M}{e}{u}{\rho'} \} \\
-\\
-
   \semapp{L}{|e|}{} & : & \Value \rightarrow \Env \rightarrow \mtype \\
   \semappp{L}{|e|}{u}{\rho} & = & \{ r \; || \; \rho' \inb \semapp{X}{e}{\rho}, r \inb \semapp{M}{|e|}{u}{\rho'} \} \\
 \\
@@ -509,29 +504,30 @@ $
   \semappp{M}{|arr (e_0, xdots e_n)|}{u}{\rho} & = &
   \{ \mkfcn{0 \fmapsto w_0,\mydots, n \fmapsto w_n} \, || \, u \in \semfcn, \, \dom(u) = \{0,\mydots,n\}, \\
   & & \hspace{0.5em} w_0 \inb \semappp{M}{|e_1|}{(u(0))}{\rho}, \,\mydots,\, w_n \inb \semappp{M}{e_n}{(u(n))}{\rho} \} \\
-  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
-    \begin{array}[t]{l}
-      f \inb \semfcn, \\
-      g \in \semfcn, \\
-      \forall x \inb \Value. \\
-      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
-      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-      |else|\; x \in \dom(f) \land \\
-      \hspace{2em} \forall \rho' \inb \bar{\rho}. \\
-      \hspace{3em} \forall x' \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
-      \hspace{4em} x' \in \dom(g) \land \\
-      \hspace{4em} f(x) \in \semappp{L}{e_2}{(g(x'))}{\rho'}
-    \end{array} \\
-    & & \} \\
+%  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
+%    \begin{array}[t]{l}
+%      f \inb \semfcn, \\
+%      g \in \semfcn, \\
+%      \forall x \inb \Value. \\
+%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%      |else|\; x \in \dom(f) \land \\
+%      \hspace{2em} \forall \rho' \inb \bar{\rho}. \\
+%      \hspace{3em} \forall x' \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
+%     \hspace{4em} x' \in \dom(g) \land \\
+%      \hspace{4em} f(x) \in \semappp{L}{e_2}{(g(x'))}{\rho'}
+%    \end{array} \\
+%    & & \} \\
 
-  \multicolumn{1}{l}{\text{\bf SPJ version}} \\
-  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
-    \begin{array}[t]{l}
-      f \inb \semfcn, \\
-      g \in \semfcn,  \\
-      \forall x \in \Value, \rho' \in \semapp{X}{e_1}{\rho}. \\
-      \forall y \in \semapp{M}{e_1}{x}{\rho'}.  \\
-      y \in \dom(g) \implies f(x) \in \semapp{L}{e_2}{g(y)}{\rho'} \}
+  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f
+    \begin{array}[t]{l@@{\;}l}
+      || & f \inb \semfcn \\
+      ,  & g \in \semfcn  \\
+      ,  & \forall x \in \Value, \rho' \in \semapp{X}{e_1}{\rho},y \in \semapp{M}{e_1}{x}{\rho'}.  \\
+         & \hspace{0.5em} y \in \dom(g) \land f(x) \in \semapp{L}{e_2}{g(y)}{\rho'} \\
+      , & q=|closed| \implies \forall x \inb \dom(f). \\
+        & \hspace{0.5em} \exists \rho' \in \semapp{X}{e}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+     \}
     \end{array}
 \\
     
