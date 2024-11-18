@@ -424,14 +424,11 @@ Env^{*} & = & \text{set of } Env \\
       || & f \inb \semfcn \\
 
       % Simon's version
-      , & \forall x \inb \Value. 
-       \hspace{0.5em} |let|\; \bar{x} = \semapp{I}{e_1}, \\
-      & \hspace{0.5em}\forall \bar{w} \inb \overline{\Value}. \\
-      & \hspace{1em} (\semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset) \\
-      & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})}
-       \\
-      , & q=|closed| \implies \forall x \inb \Value. \\
-      & \hspace{0.5em} x \in \dom(f) \implies (\exists \bar{w} \inb \overline{\Value}.\, \semappp{M}{e_1}{x}{(\extendrho{\rho}{\bar{x} \fmapsto \bar{w}})} \neq \emptyset)
+      , & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e}{\rho}. \\
+        & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
+        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
+      , & q=|closed| \implies \forall x \inb \dom(f). \\
+      & \hspace{0.5em} \exists \rho' \in \semapp{X}{e}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
 
 %%      \forall x \inb \Value. \\
 %%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
@@ -443,24 +440,16 @@ Env^{*} & = & \text{set of } Env \\
     \\ 
 
     %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
-  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{D}{|e|}{\rho} & = &
-  \{ r\, ||  \,
-  w_1 \inb \Value, \mydots, w_n \inb \Value,\\
-  & & \hspace{0.5em} r \inb \semapp{E}{|e|}{(\extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n})} \} \\
-  & & |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\
-\\
+  \semapp{X}{|e|} & : & \Env \rightarrow \Env^{*} \\
+  \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{\bar{x} \fmapsto \bar{w}} \; || \;   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  & & |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\[1mm]
 
   \semapp{C}{|e|} & : & \Env \rightarrow \Env^{*} \\
   \semappp{C}{|e|}{\rho} & = &
-  \{ \rho' \; || 
-  \begin{array}[t]{l}
-  w_1 \inb \Value, \mydots, w_n \inb \Value, \\
-  |let|\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n}, \\
-  \emptyset \neq \semappp{E}{e}{\rho'} \\
-  \end{array} \\
-  & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+  \{ \rho' \; ||  \; \rho' \inb \semapp{X}{e}{\rho},  \emptyset \neq \semappp{E}{e}{\rho'} \} \\[1mm]
 
+  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{D}{|e|}{\rho} & = & \{ r \; || \; \rho \inb \semapp{X}{e}{\rho}, r \inb \semapp{E}{|e|}{\rho'} \} \\
 
 %\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
 %\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
@@ -488,21 +477,11 @@ $
 %\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
   \semapp{B}{|e|} & : & \Value \rightarrow \Env \rightarrow \Env^{*} \\
   \semappp{B}{|e|}{u}{\rho} & = &
-  \{ \rho' \; || 
-  \begin{array}[t]{l}
-  w_1 \inb \Value, \mydots, w_n \inb \Value, \\
-  |let|\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n}, \\
-  \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
-  \end{array} \\
-  & &  \} \; |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+  \{ \rho' \; || \; \rho' \inb \semapp{X}{e}{\rho}, \emptyset \neq \semappp{M}{e}{u}{\rho'} \} \\
 \\
-    
+
   \semapp{L}{|e|}{} & : & \Value \rightarrow \Env \rightarrow \mtype \\
-  \semappp{L}{|e|}{u}{\rho} & = &
-  \{ r\, ||  \,
-  w_1 \inb \Value, \mydots, w_n \inb \Value \\
-  & & \hspace{0.5em} r \inb \semapp{M}{|e|}{u}{(\extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n})} \} \\
-  & & |where| |[x_1,xdots,x_n]| = \semapp{I}{|e|} \\
+  \semappp{L}{|e|}{u}{\rho} & = & \{ r \; || \; \rho' \inb \semapp{X}{e}{\rho}, r \inb \semapp{M}{|e|}{u}{\rho'} \} \\
 \\
 %\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
   \semapp{M}{|e|} & : & \Value \rightarrow \Env \rightarrow \mtype \\
@@ -544,6 +523,15 @@ $
     \end{array} \\
     & & \} \\
 
+  \multicolumn{1}{l}{\text{\bf SPJ version}} \\
+  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      f \inb \semfcn, \\
+      g \in \semfcn,  \\
+      \forall x \in \Value, \rho' \in \semapp{X}{e_1}{\rho}. \\
+      \forall y \in \semapp{M}{e_1}{x}{\rho'}.  \\
+      y \in \dom(g) \implies f(x) \in \semapp{L}{e_2}{g(y)}{\rho'} \}
+    \end{array}
 \\
     
   \end{array} \\ \\
