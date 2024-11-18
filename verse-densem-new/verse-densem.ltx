@@ -956,11 +956,11 @@ $
   \begin{array}{rcll}
 %\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
   \semappp{E}{|e|}{}{} & : & Ident \rightarrow \Env \rightarrow \Env^{*} \\
-  \semappp{E}{|x|}{v}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto \rho(x)}} \\
-  \semappp{E}{|k|}{v}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto k}} \\
-  \semappp{E}{|o|}{v}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto \semapp{O}{|o|}{}}} \\
+  \semappp{E}{|x|}{v}{\rho} & = & \msing{\extendrho{\rho}{v \fmapsto \rho(x)}} \\
+  \semappp{E}{|k|}{v}{\rho} & = & \msing{\extendrho{\rho}{v \fmapsto k}} \\
+  \semappp{E}{|o|}{v}{\rho} & = & \msing{\extendrho{\rho}{v \fmapsto \semapp{O}{|o|}{}}} \\
   \semappp{E}{|apply1N e_1 e_2|}{v}{\rho} & = &
-  \{ \extendrho{\rho''}{u \fmapsto r} \,
+  \{ \extendrho{\rho''}{v \fmapsto r} \,
   || \, \rho'  \inb \semappp{E}{|e_1|}{f}{\rho}, \;
         \rho'' \inb \semappp{E}{|e_2|}{a}{\rho'}, \; \\
 & & \hspace{0.5em}             r \inb \apply(\rho''(f), \rho''(a)) \} & f, a \text{ fresh}\\
@@ -971,7 +971,7 @@ $
     \semappp{E}{|x = e|}{v}{\rho} \\
     
   \semappp{E}{|:e|}{v}{\rho} & = & %% \ran(\semappp{E}{|e|}{v}{\rho}) \\
-    \{ \extendrho{\rho'}{u \fmapsto r} \, || \,
+    \{ \extendrho{\rho'}{v \fmapsto r} \, || \,
     \rho' \inb \semappp{E}{|e|}{f}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} & f \text{ fresh} \\
 
 %FAIL  \semappp{E}{|fail|}{v}{\rho} & = & \emptyset \\
