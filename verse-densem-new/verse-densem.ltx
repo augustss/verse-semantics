@@ -172,6 +172,7 @@
 \newcommand{\cons}{{:}}           % Cons for value sequences, V*
 \newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
 \newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4}
+\newcommand{\semapppp}[5]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4 \, #5}
 \newcommand{\semap}[2]{\semfun{#1}\llbracket #2 \rrbracket #2}
 
 % extend envt
@@ -424,7 +425,7 @@ Env^{*} & = & \text{set of } Env \\
       || & f \inb \semfcn \\
 
       % Simon's version
-      , & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e}{\rho}. \\
+      , & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
         & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
         & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
       , & q=|closed| \implies \forall x \inb \dom(f). \\
@@ -441,7 +442,7 @@ Env^{*} & = & \text{set of } Env \\
 
     %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
   \semapp{X}{|e|} & : & \Env \rightarrow \Env^{*} \\
-  \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{\bar{x} \fmapsto \bar{w}} \; || \;   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n } \; || \;   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\[1mm]
 
   \semapp{C}{|e|} & : & \Env \rightarrow \Env^{*} \\
@@ -449,7 +450,7 @@ Env^{*} & = & \text{set of } Env \\
   \{ \rho' \; ||  \; \rho' \inb \semapp{X}{e}{\rho},  \emptyset \neq \semappp{E}{e}{\rho'} \} \\[1mm]
 
   \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
-  \semapp{D}{|e|}{\rho} & = & \{ r \; || \; \rho \inb \semapp{X}{e}{\rho}, r \inb \semapp{E}{|e|}{\rho'} \} \\
+  \semapp{D}{|e|}{\rho} & = & \{ r \; || \; \rho' \inb \semapp{X}{e}{\rho}, r \inb \semapp{E}{|e|}{\rho'} \} \\
 
 %\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
 %\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
@@ -946,5 +947,83 @@ and so the result is $\{-1,1\}$.
 
 \textbf{Note:} The given semantics does not treat tuples as functions, except for function application.
 This can probably be easily fixed.
+
+\begin{figure}
+$
+\begin{array}{l}
+
+  
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
+  \semappp{E}{|e|}{}{} & : & Ident \rightarrow \Env \rightarrow \Env^{*} \\
+  \semappp{E}{|x|}{u}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto \rho(x)}} \\
+  \semappp{E}{|k|}{u}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto k}} \\
+  \semappp{E}{|o|}{u}{\rho} & = & \msing{\extendrho{\rho}{u \fmapsto \semapp{O}{|o|}{}}} \\
+  \semappp{E}{|apply1N e_1 e_2|}{u}{\rho} & = &
+  \{ \extendrho{\rho''}{u \fmapsto r} \,
+  || \, \rho'  \inb \semappp{E}{|e_1|}{f}{\rho}, \;
+        \rho'' \inb \semappp{E}{|e_2|}{a}{\rho'}, \; \\
+& & \hspace{0.5em}             r \inb \apply(\rho''(f), \rho''(a)) \} & f, a \text{ fresh}\\
+  \semappp{E}{|e_1 = e_2|}{u}{\rho}      & = & \semappp{E}{|e_1|}{u}{\rho} \; \cap \; \semappp{E}{|e_2|}{u}{\rho} \\
+  \semappp{E}{|e_1 ; e_2|}{u}{\rho}      & = &
+    \{ \rho'' \, || \, \rho' \inb \semappp{E}{|e_1|}{x}{\rho}, \; \rho'' \inb \semappp{E}{|e_2|}{u}{\rho'} \} & x \text{ fresh}\\
+  \semappp{E}{|x := e|}{u}{\rho} & = & %% \msing{\rho(x)} \;\cap\; \semappp{E}{e}{u}{\rho} \\
+    \semappp{E}{|x = e|}{u}{\rho} \\
+    
+  \semappp{E}{|:e|}{u}{\rho} & = & %% \ran(\semappp{E}{|e|}{u}{\rho}) \\
+    \{ \extendrho{\rho'}{u \fmapsto r} \, || \,
+    \rho' \inb \semappp{E}{|e|}{f}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} & f \text{ fresh} \\
+
+%FAIL  \semappp{E}{|fail|}{u}{\rho} & = & \emptyset \\
+%  \semappp{E}{|vif e_1 e_2 e_3|}{u}{\rho} & = &
+%  \left\{
+%  \begin{array}{ll}
+%    \semapp{D}{|e_3|}{u}{\rho} & \text{if}\; \bar{u}{\rho} = \emptyset \\
+%    \bigcup_{\rho' \dot{\in} \bar{u}{\rho}} \semapp{D}{|e_2|}{\rho'} & \text{otherwise} \\
+%  \end{array}
+%  \right. \\
+%  & &  |where|\; \bar{u}{\rho} = \semappp{C}{e_1}{u}{\rho} \\
+%  \semappp{E}{|arr (e_0, xdots, e_n)|}{u}{\rho} & = &
+%    \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semappp{E}{|e_1|}{u}{\rho}, \,\mydots,\, x_n \inb \semappp{E}{|e_n|}{u}{\rho} \} \\
+    \semappp{E}{|funk q e_1 e_2|}{u}{\rho} & = & \{ \extendrho{\rho}{u \fmapsto f} \; \\
+    & & 
+    \begin{array}[t]{lll}
+      || & f \inb \semfcn \\
+
+      % Simon's version
+      , & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+        & \hspace{1em} (\semapppp{M}{e_1}{v}{x}{\rho'} \neq \emptyset)  \\
+        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
+      , & q=|closed| \implies \forall x \inb \dom(f). \\
+      & \hspace{0.5em} \exists \rho' \in \semapp{X}{e}{\rho}.\, \semapppp{M}{e_1}{v}{x}{\rho'} \neq \emptyset \\
+
+%%      \forall x \inb \Value. \\
+%%      |let|\; \bar{u}{\rho} = \semappp{B}{e_1}{x}{u}{\rho}, \\
+%%      |if|\; \bar{u}{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{u}{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+
+    \end{array} \\
+    & & \} & v \text{ fresh} \\
+    \\ 
+
+    %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
+  \semapp{X}{|e|} & : & \Env \rightarrow \Env^{*} \\
+  \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n } \; || \;   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  & & |where [x_1,xdots,x_n]| = \semapp{I}{|e|} \\[1mm]
+
+  \semapp{D}{|e|}{} & : & \Env \rightarrow \mtype \\
+  \semapp{D}{|e|}{\rho} & = & \{ \rho''(x) \; || \; \rho' \inb \semapp{X}{e}{\rho}, \rho'' \inb \semappp{E}{|e|}{x}{\rho'} \} & x \text{ fresh} \\
+
+%\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
+%\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
+
+  \end{array} \\ \\
+
+\end{array}
+$
+\caption{Expression semantics, destination passing}
+\label{fig:den-sem-dest1}
+\end{figure}
+
 
 \end{document}
