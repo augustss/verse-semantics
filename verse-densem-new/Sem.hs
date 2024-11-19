@@ -6,23 +6,7 @@ import qualified Data.Set as S
 import Data.Maybe
 --import Debug.Trace
 
---------------------
----- Abstract syntax
-
-type Ident = String
-
-data Exp
-  = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
-  | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
-  | If Exp Exp Exp | Fun OC Exp Exp
-  deriving (Eq, Ord, Show)
-
-data Op = Oint | Ogt | Oadd
-  deriving (Eq, Ord, Show)
-
-data OC = Open | Closed
-  deriving (Eq, Ord, Show)
-
+import Exp
 
 --------------------
 ---- Values
@@ -148,7 +132,7 @@ allWs :: WS
 allWs = S.fromList $
   nonFcn ++
   [ unSing (dO o) | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, id1, id01, f01, const0, const1, const2, const3, fsucc, fsucc2, fpred, comp, ho1, ho2, ho3 ]
+  map VFcn [ id0, id1, id01, f01, const0, const1, const2, const3, fsucc, fsucc2, fpred, comp, ho1, ho2, ho3, ho4 ]
   where
     nonFcn =
       allInts ++
@@ -175,6 +159,7 @@ allWs = S.fromList $
                        (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
                        (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
                       ]
+    ho4 = mkFcn "ho4" [(VFcn id0, VInt 0)]
 
 fint :: Fcn Val Val
 fint = mkFcn "int" [(x, x) | x <- allInts ]
@@ -313,6 +298,7 @@ dE (Fun q e1 e2) rho = mkSet
             else inDom x f && forAll rhos (\ rho' -> ap f x `sIn` dD e2 rho')
   ]
 -}
+dE _ _ = undefined
 
 -- Get all possible "solutions", i.e., assignments to the existentials in e.
 dC :: Exp -> Env -> Set Env
@@ -360,6 +346,7 @@ dM (Fun q e1 e2) u rho = mkSet
                                                          (\ x' -> x' `inDom` g &&
                                                                   ap f x `sIn` dL e2 (ap g x') rho'))
   ]
+dM _ _ _ = undefined
 
 -- Solve
 -- (Like C, but for M)
@@ -516,6 +503,15 @@ exp21 = If (Int 1 `Equ` Int 3) (Int 2) (Int 0)
 exp22 :: Exp
 exp22 = If (Def "x" (Colon (Var "int"))) (Var "x") (Int 999) `Equ` Int 3
 
+-- f:=fun_c(g:=fun_c(0){0}){g[0]} ; f[fun_c(0){0}]
+exp40 :: Exp
+exp40 = Def "f" (Fun Closed (Def "g" (Fun Closed (Int 0) (Int 0))) (App (Var "g") (Int 0))) `Seq` App (Var "f") (Fun Closed (Int 0) (Int 0))
+
+-- f:=fun_c(g:=fun_c(:int){:int}){g[0]} ; f[fun_c(0){0}]
+exp41 :: Exp
+exp41 = Def "f" (Fun Closed (Def "g" (Fun Closed cint cint)) (App (Var "g") (Int 0))) `Seq` App (Var "f") (Fun Closed (Int 0) (Int 0))
+  where cint = Colon (Var "int")
+
 allExps :: [Exp]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
@@ -533,5 +529,6 @@ allOK' = show (map dP' allExps) == refExps
 
 main :: IO ()
 main = do
-  print allOK
-  print allOK'
+  print $ dE exp40 rho0
+--  print allOK
+--  print allOK'

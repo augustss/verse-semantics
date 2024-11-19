@@ -12,6 +12,7 @@ import Data.List
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
+import Exp
 --import Debug.Trace
 
 --------------------
@@ -20,24 +21,6 @@ import Data.Maybe
 ifThenElse :: Bool -> a -> a -> a
 ifThenElse False _ x = x
 ifThenElse True  x _ = x
-
---------------------
----- Abstract syntax
-
-type Ident = String
-
-data Exp
-  = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
-  | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
-  | If Exp Exp Exp | Fun OC Exp Exp
-  deriving (Eq, Ord, Show)
-
-data Op = Oint | Ogt | Oadd
-  deriving (Eq, Ord, Show)
-
-data OC = Open | Closed
-  deriving (Eq, Ord, Show)
-
 
 --------------------
 ---- Values
@@ -349,6 +332,7 @@ dE (Fun q e1 e2) rho = do
           else x `inDom` f &&
                forAll rhos (\ rho' -> ap f x `sIn` dD e2 rho')
   return vf
+dE _ _ = undefined
 
 -- Get all possible "solutions", i.e., assignments to the existentials in e.
 dC :: Exp -> Env -> Set Env
@@ -402,6 +386,7 @@ dM (Fun q e1 e2) u rho | VFcn g <- u = do
                                                  ap f x `sIn` dL e2 (ap g x') rho'))
   return vf
                        | otherwise = empty
+dM _ _ _ = undefined
 
 -- Solve
 -- (Like C, but for M)

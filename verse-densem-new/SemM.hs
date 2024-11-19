@@ -15,6 +15,7 @@ import Data.List
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
+import Exp
 --import Debug.Trace
 
 --------------------
@@ -26,24 +27,6 @@ ifThenElse True  x _ = x
 
 implies :: Bool -> Bool -> Bool
 x `implies` y = not x || y
-
---------------------
----- Abstract syntax
-
-type Ident = String
-
-data Exp
-  = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
-  | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
-  | If Exp Exp Exp | Fun OC Exp Exp
-  deriving (Eq, Ord, Show)
-
-data Op = Oint | Ogt | Oadd
-  deriving (Eq, Ord, Show)
-
-data OC = Open | Closed
-  deriving (Eq, Ord, Show)
-
 
 --------------------
 ---- Values
@@ -382,7 +365,10 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
                                                ap f x `sIn` dL e2 (Just $ ap g x') rho'))
   return vf
                               | otherwise = empty
-
+dM Choice{} _ _ = undefined
+dM All{} _ _ = undefined
+dM For{} _ _ = undefined
+dM Where{} _ _ = undefined
 dM e Nothing rho = do  -- if nothing else matches then try all possible u
   u <- allWs
   dM e (Just u) rho
