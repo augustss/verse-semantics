@@ -3,9 +3,10 @@ module Main where
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
---import Debug.Trace
+import GHC.Stack
 import Exp
 import Examples
+--import Debug.Trace
 
 --------------------
 ---- Values
@@ -51,7 +52,7 @@ inDom :: Ord a => a -> Fcn a b -> Bool
 inDom x (Fcn _ xys) = M.member x xys
 
 -- Application when the argument is in the domain
-ap :: (Show a, Ord a) => Fcn a b -> a -> b
+ap :: (HasCallStack, Show a, Ord a) => Fcn a b -> a -> b
 ap (Fcn f xys) x =
   fromMaybe (error $ "ap: outside domain " ++ f ++ " " ++ show x) $
   M.lookup x xys
@@ -93,10 +94,13 @@ sIn = S.member
 
 -- Check if a predicate holds for all values in the set
 forAll :: Set a -> (a -> Bool) -> Bool
-forAll xs p = all p (unSet xs)
+forAll = forAllL . unSet
 
 forAllL :: [a] -> (a -> Bool) -> Bool
 forAllL xs p = all p xs
+
+exists :: Set a -> (a -> Bool) -> Bool
+exists = existsL . unSet
 
 existsL :: [a] -> (a -> Bool) -> Bool
 existsL xs p = any p xs
@@ -106,7 +110,7 @@ existsL xs p = any p xs
 
 type Env = M.Map Ident Val
 
-lookupEnv :: Ident -> Env -> WS
+lookupEnv :: HasCallStack => Ident -> Env -> WS
 lookupEnv x rho = sing $ fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $ M.lookup x rho
 
 -- Initial environment
@@ -229,9 +233,12 @@ dP' e =
     [w] -> RVal w
     ws  -> Wrong $ show ws
 
+dX :: Exp -> Env -> Set Env
+dX e rho = mkSet $ genRhos rho (dI e)
+
 -- D, expression in a scope
 dD :: Exp -> Env -> WS
-dD e rho = tryAll rho (dI e) (dE e)
+dD e rho = mkSet [ r | rho' <- unSet $ dX e rho, r <- unSet $ dE e rho' ]
 
 -- E, expression
 dE :: Exp -> Env -> WS
@@ -257,7 +264,7 @@ dE (Tup es) rho = mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
 dE (Fun q e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs
            , forAll allWs $ \ x ->
-               forAllL (genRhos rho xs) $ \ rho' ->
+               forAll (dX e1 rho) $ \ rho' ->
                  not (isEmpty (dM e1 x rho'))
                  `implies`
                 (x `inDom` f && ap f x `sIn` dD e2 rho')
@@ -265,11 +272,10 @@ dE (Fun q e1 e2) rho = mkSet
              `implies`
              (forAll allWs $ \ x ->
                (x `inDom` f) `implies`
-                 (existsL (genRhos rho (dI e1)) (\ rho' -> not (isEmpty (dM e1 x rho'))))
+                 (exists (dX e1 rho) (\ rho' -> not (isEmpty (dM e1 x rho'))))
              )
   ]
-  where xs = dI e1
-{-
+{- old version
 dE (Fun q e1 e2) rho = mkSet
   [ VFcn f | VFcn f <- unSet allWs,
         forAll allWs $ \ x ->
@@ -283,7 +289,7 @@ dE _ _ = undefined
 
 -- Get all possible "solutions", i.e., assignments to the existentials in e.
 dC :: Exp -> Env -> Set Env
-dC e rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dE e rho' ]
+dC e rho = mkSet [ rho' | rho' <- unSet $ dX e rho, not (isEmpty (dE e rho')) ]
 
 implies :: Bool -> Bool -> Bool
 implies x y = not x || y
@@ -294,12 +300,12 @@ implies x y = not x || y
 -- L, expression matching in a scope
 -- (Like D, but for M)
 dL :: Exp -> W -> Env -> WS
-dL e u rho = tryAll rho (dI e) (dM e u)
+dL e u rho = mkSet [ r | rho' <- unSet $ dX e rho, r <- unSet $ dM e u rho' ]
 
 -- M, expression matching
 -- Match the value u against the expression, returning all possible
 -- values of the expression that makes it match u.
-dM :: Exp -> W -> Env -> WS
+dM :: HasCallStack => Exp -> W -> Env -> WS
 dM (Var x) u rho = lookupEnv x rho `isect` sing u
 dM (Int k) u _rho = sing (VInt k) `isect` sing u
 dM (Prim o) u _rho = dO o `isect` sing u
@@ -318,6 +324,25 @@ dM (Tup es) u rho | VTup us <- u, length us == length us =
                       mkSet $ map VTup $ sequence $ zipWith (\ e v -> unSet $ dM e v rho) es us
                   | otherwise = empty
 dM (Fun q e1 e2) u rho = mkSet
+  [ VFcn f | VFcn f <- unSet allWs
+           , VFcn g <- [u]
+           , forAll allWs $ \ x ->
+               forAll (dX e1 rho) $ \ rho' ->
+                 forAll (dM e1 x rho') $ \ y ->
+                   (x `inDom` f) &&
+                   (y `inDom` g) &&
+                   (ap f x `sIn`
+                      dL e2 (ap g y) rho')
+           , (q == Closed)
+             `implies`
+             (forAll allWs $ \ x ->
+               (x `inDom` f) `implies`
+                 (exists (dX e1 rho) $ \ rho' ->
+                    not (isEmpty (dM e1 x rho')))
+             )
+  ]
+
+{-
   [ VFcn f | VFcn g <- [u],
              VFcn f <- unSet allWs,
              forAll allWs $ \ x ->
@@ -328,6 +353,7 @@ dM (Fun q e1 e2) u rho = mkSet
                                                          (\ x' -> x' `inDom` g &&
                                                                   ap f x `sIn` dL e2 (ap g x') rho'))
   ]
+-}
 dM _ _ _ = undefined
 
 -- Solve

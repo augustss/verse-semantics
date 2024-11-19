@@ -349,7 +349,7 @@
     & |n >= 0|
     \\
     \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
-    \text{Openness} & q & ::= & |open| \vb |closed| \\
+    \text{Aperture} & q & ::= & |open| \vb |closed| \\
     \end{array} \\
     \\[-3mm]
   \end{array}
@@ -429,7 +429,7 @@ Env^{*} & = & \text{set of } Env \\
         & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
         & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
       , & q=|closed| \implies \forall x \inb \dom(f). \\
-      & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+      & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
 
 %%      \forall x \inb \Value. \\
 %%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
@@ -504,20 +504,6 @@ $
   \semappp{M}{|arr (e_0, xdots e_n)|}{u}{\rho} & = &
   \{ \mkfcn{0 \fmapsto w_0,\mydots, n \fmapsto w_n} \, || \, u \in \semfcn, \, \dom(u) = \{0,\mydots,n\}, \\
   & & \hspace{0.5em} w_0 \inb \semappp{M}{|e_1|}{(u(0))}{\rho}, \,\mydots,\, w_n \inb \semappp{M}{e_n}{(u(n))}{\rho} \} \\
-%  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
-%    \begin{array}[t]{l}
-%      f \inb \semfcn, \\
-%      g \in \semfcn, \\
-%      \forall x \inb \Value. \\
-%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
-%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-%      |else|\; x \in \dom(f) \land \\
-%      \hspace{2em} \forall \rho' \inb \bar{\rho}. \\
-%      \hspace{3em} \forall x' \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
-%     \hspace{4em} x' \in \dom(g) \land \\
-%      \hspace{4em} f(x) \in \semappp{L}{e_2}{(g(x'))}{\rho'}
-%    \end{array} \\
-%    & & \} \\
 
   \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f
     \begin{array}[t]{l@@{\;}l}
@@ -525,13 +511,28 @@ $
       ,  & g \in \semfcn  \\
       ,  & \forall x \inb \Value, \forall \rho' \inb \semapp{X}{e_1}{\rho},
            \forall y \inb \semapp{M}{e_1}{x}{\rho'}.  \\
-         & \hspace{0.5em} y \in \dom(g) \land f(x) \in \semapp{L}{e_2}{g(y)}{\rho'} \\
+         & \hspace{0.5em} y \in \dom(g) \land f(x) \in \semapp{L}{e_2}{(g(y))}{\rho'} \\
       , & q=|closed| \implies \forall x \inb \dom(f). \\
-        & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+        & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
      \}
     \end{array}
 \\
-    
+   \text{Old version} \\    
+  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
+    \begin{array}[t]{l}
+      f \inb \semfcn, \\
+      g \in \semfcn, \\
+      \forall x \inb \Value. \\
+      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+      |else|\; x \in \dom(f) \land \\
+      \hspace{2em} \forall \rho' \inb \bar{\rho}. \\
+      \hspace{3em} \forall x' \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
+     \hspace{4em} x' \in \dom(g) \land \\
+      \hspace{4em} f(x) \in \semappp{L}{e_2}{(g(x'))}{\rho'}
+    \end{array} \\
+    & & \} \\
+
   \end{array} \\ \\
   
 
