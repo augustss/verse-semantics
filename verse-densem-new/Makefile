@@ -23,7 +23,7 @@ clean:
 	-rm -f verse-densem.tex
 	-rm -f verse-densem.aux verse-densem.log verse-densem.out \
                verse-densem.pdf verse-densem.bbl verse-densem.blg
-	-rm -f Sem SemDo SemM
+	-rm -f Sem SemDo SemM SemC *.o *.hi
 
 # Total reset -- delete intermediates *and* final derives
 realclean:
@@ -48,25 +48,25 @@ realclean:
 testSem:	Sem
 	./Sem
 
-Sem:	Sem.hs
-	ghc -O2 Sem.hs
+Sem:	Sem.hs Exp.hs Examples.hs
+	ghc -O2 --make Sem.hs
 
 testSemDo:	SemDo
 	./SemDo
 
-SemDo:	SemDo.hs
-	ghc -O2 SemDo.hs
+SemDo:	SemDo.hs Exp.hs Examples.hs
+	ghc -O2 --make SemDo.hs
 
 testSemM:	SemM
 	./SemM
 
-SemM:	SemM.hs
-	ghc -O2 SemM.hs
+SemM:	SemM.hs Exp.hs Examples.hs
+	ghc -O2 --make SemM.hs
 
 testSemC:	SemC
 	./SemC
 
-SemC:	SemC.hs
-	ghc -O2 SemC.hs
+SemC:	SemC.hs Exp.hs Examples.hs
+	ghc -O2 --make SemC.hs
 
 testall:	testSem testSemDo testSemM testSemC

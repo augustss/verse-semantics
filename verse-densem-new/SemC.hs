@@ -544,12 +544,11 @@ dB' e u rho = do
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp23, exp24, exp26, exp28, exp29, exp31, exp33,
+           exp20, exp21, exp22, exp23, exp24, exp25, exp26, exp27, exp28, exp29, exp30, exp31, exp41, exp33,
            exp34, exp35
           ]
 
-refExps :: String
-refExps = "[3,int,Wrong([(-,comparable),(-,int)]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3,[1,2],[2,3],[0,1],[1,0],2,[1,2],[1,2],const0,int]"
+-- broken: exp32
 
 {-
 dens :: [(Exp, WS)]

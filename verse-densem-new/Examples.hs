@@ -147,7 +147,7 @@ exp24 = All (Colon $ Tup [Int 2, Int 3])
 --  denotation id01LR = { [0->L0, 1->R1] }
 exp25 :: Example
 exp25 = Fun Closed (Def "x" (Choice (Int 0) (Int 1))) (Var "x")
-      === "XXX"
+      === "id01LR"
 
 exp26 :: Example
 exp26 = All (Colon (fst exp25))
@@ -171,18 +171,24 @@ exp29 = If (Int 1 `Choice` Int 2) (Int 2) (Int 0)
 -- fun_c(0){1|2}
 exp30 :: Example
 exp30 = Fun Closed (Int 0) (Int 1 `Choice` Int 2)
-      === "XXX"
+      === "Wrong"
 
 -- all{exp30[0]}
 exp31 :: Example
 exp31 = All (App (fst exp30) (Int 0))
       === "[1,2]"
 
--- fun_c(() where y:=1|2) := if (y = 1) then (1, _) else (_, 2)
+-- (1, :int) = (:int, 2)
+exp41 :: Example
+exp41 = (Tup [Int 1, cint]) `Equ` (Tup [cint, Int 2])
+      === "[1,2]"
+  where cint = Colon (Var "int")
+
+-- fun_c(y:=1|2; 0) := if (y = 1) then (1, :int) else (:int, 2)
 exp32 :: Example
 exp32 = Fun Closed (Def "y" (Choice (Int 1) (Int 2)) `Seq` Int 0)
                    (If (Var "y" `Equ` Int 1) (Tup [Int 1, cint]) (Tup [cint, Int 2]))
-      === "[1,2]"
+      === "f0t12"
   where cint = Colon (Var "int")
 
 -- (1, :int) = (:int, 2)
@@ -206,23 +212,23 @@ exp35 = Fun Closed (((Var "x" `Equ` Var "a") `Seq` Def "x" cint) `Where` Def "a"
 -- fun_c(a:=0|1; x:=a){x}
 exp36 :: Example
 exp36 = Fun Closed ((Def "a" (Int 0 `Choice` Int 1)) `Seq` (Def "x" (Var "a"))) (Var "x")
-      === "XXX"
+      === "XXX2"
 
 -- fun_c(x:=0|1|2){x}
 exp37 :: Example
 exp37 = Fun Closed (Def "x" (Int 0 `Choice` Int 1 `Choice` Int 2)) (Var "x")
-      === "XXX"
+      === "XXX3"
 
 -- fun_c(x:=3|1|0){x}
 exp38 :: Example
 exp38 = Fun Closed (Def "x" (Int 3 `Choice` Int 1 `Choice` Int 0)) (Var "x")
-      === "XXX"
+      === "XXX4"
 
 -- fun_c(x:=0|1|2){x} = fun_c(x:=3|1|0){x}
 -- denotation {}
 exp39 :: Example
 exp39 = fst exp37 `Equ` fst exp38
-      === "XXX"
+      === "XXX5"
 
 -- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(3|1|0)){x}
 -- 0->L,LL0, 1->L,RL1, 2->L,R2, 3->R,LL3, 1->R,RL1, 0->R,R0
@@ -232,4 +238,4 @@ exp40 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
                                 (Int 0 `Choice` Int 1 `Choice` Int 2)
                                 (Int 3 `Choice` Int 1 `Choice` Int 0)))
                    (Var "x")
-      === "XXX"
+      === "XXX6"
