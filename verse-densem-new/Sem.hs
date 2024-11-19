@@ -5,8 +5,8 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
 --import Debug.Trace
-
 import Exp
+import Examples
 
 --------------------
 ---- Values
@@ -23,7 +23,7 @@ instance Show Val where
 
 instance Show RVal where
   showsPrec p (RVal v) = showsPrec p v
-  showsPrec _ (Wrong s) = showString $ "Wrong(" ++ s ++ ")"
+  showsPrec _ (Wrong _) = showString $ "Wrong"
 
 vadd :: Val -> Val -> Val
 vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
@@ -355,154 +355,6 @@ dB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u r
 
 
 
---------------------
----- Examples
-
--- x:=2; y:=1; add[(x,y)]
-exp1 :: Exp
-exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))
-
-ex1 :: RVal
-ex1 = dP exp1
-
--- fun_c(x:int){x}
-exp2 :: Exp
-exp2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x")
-
-ex2 :: RVal
-ex2 = dP exp2
-
--- fun_o(x:int){x}
-exp3 :: Exp
-exp3 = Fun Open (Def "x" (Colon (Var "int"))) (Var "x")
-
--- Goes wrong, as it should
-ex3 :: RVal
-ex3 = dP exp3
-
--- fun_c(x:int){add[(x,1)]}
-exp4 :: Exp
-exp4 = Fun Closed (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Tup [Var "x", Int 1]))
-
-ex4 :: RVal
-ex4 = dP exp4
-
-exp5 :: Exp
-exp5 = App exp4 (Int 2)
-
-ex5 :: RVal
-ex5 = dP exp5
-
-exp6 :: Exp
-exp6 = App exp3 (Int 1)
-
--- Using exp3 in its domain is fine
-ex6 :: RVal
-ex6 = dP exp6
-
--- fun_c(f := fun_c(:int){:int}){f[1]}
-exp7 :: Exp
-exp7 = Fun Closed arg (App (Var "f") (Int 1))
-  where arg = Def "f" (Fun Closed cint cint)
-        cint = Colon (Var "int")
-
-exp8 :: Exp
-exp8 = App exp7 (Var "succ")
-
-ex8 :: RVal
-ex8 = dP exp8
-
-exp9 :: Exp
-exp9 = App exp7 (Var "int")
-
-ex9 :: RVal
-ex9 = dP exp9
-
-exp10 :: Exp
-exp10 = App exp7 exp4
-
-ex10 :: RVal
-ex10 = dP exp10
-
--- fun_c(f := fun_c(:succ){:int}){f[1]}
-exp11 :: Exp
-exp11 = Fun Closed arg (App (Var "f") (Int 1))
-  where arg = Def "f" (Fun Closed csucc cint)
-        csucc = Colon (Var "succ")
-        cint = Colon (Var "int")
-
-ex11 :: RVal
-ex11 = dP exp11
-
-exp12 :: Exp
-exp12 = App exp11 (Var "int")
-
-ex12 :: RVal
-ex12 = dP exp12
-
--- Should fail, function domain not large enough.
--- ex7[fun_c(0){0}]
-exp13 :: Exp
-exp13 = App exp7 (Fun Closed (Int 0) (Int 0))
-
-ex13 :: RVal
-ex13 = dP exp13
-
--- Should fail, function domain not large enough,
--- even though it handles the f[1].
--- ex7[fun_c(1){1}]
-exp14 :: Exp
-exp14 = App exp7 (Fun Closed (Int 1) (Int 1))
-
-ex14 :: RVal
-ex14 = dP exp14
-
-exp15 :: Exp
-exp15 = App exp7 (Fun Closed (Colon (Var "int")) (Int 0))
-
-ex15 :: RVal
-ex15 = dP exp15
-
-exp16 :: Exp
-exp16 = App exp11 (Fun Closed (Colon (Var "int")) (Int 0))
-
-ex16 :: RVal
-ex16 = dP exp16
-
--- fun_c(f := fun_c(:int){:succ}){f[1]}
-exp17 :: Exp
-exp17 = Fun Closed arg (App (Var "f") (Int 1))
-  where arg = Def "f" (Fun Closed cint csucc)
-        csucc = Colon (Var "succ")
-        cint = Colon (Var "int")
-
-ex17 :: RVal
-ex17 = dP exp17
-
-exp18 :: Exp
-exp18 = App exp17 (Var "int")
-
-ex18 :: RVal
-ex18 = dP exp18
-
-exp19 :: Exp
-exp19 = App exp17 (Fun Closed (Colon (Var "int")) (Int 0))
-
-ex19 :: RVal
-ex19 = dP exp19
-
--- if (1=1){2}else{0}
-exp20 :: Exp
-exp20 = If (Int 1 `Equ` Int 1) (Int 2) (Int 0)
-
--- if (1=3){2}else{0}
-exp21 :: Exp
-exp21 = If (Int 1 `Equ` Int 3) (Int 2) (Int 0)
-
--- if (x:int){x}{999} = 3
-exp22 :: Exp
-exp22 = If (Def "x" (Colon (Var "int"))) (Var "x") (Int 999) `Equ` Int 3
-
 -- f:=fun_c(g:=fun_c(0){0}){g[0]} ; f[fun_c(0){0}]
 exp40 :: Exp
 exp40 = Def "f" (Fun Closed (Def "g" (Fun Closed (Int 0) (Int 0))) (App (Var "g") (Int 0))) `Seq` App (Var "f") (Fun Closed (Int 0) (Int 0))
@@ -512,23 +364,15 @@ exp41 :: Exp
 exp41 = Def "f" (Fun Closed (Def "g" (Fun Closed cint cint)) (App (Var "g") (Int 0))) `Seq` App (Var "f") (Fun Closed (Int 0) (Int 0))
   where cint = Colon (Var "int")
 
-allExps :: [Exp]
+allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
            exp20, exp21, exp22
           ]
 
-refExps :: String
-refExps = "[3,int,Wrong([comparable,int]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3]"
-
-allOK :: Bool
-allOK = show (map dP allExps) == refExps
-
-allOK' :: Bool
-allOK' = show (map dP' allExps) == refExps
-
 main :: IO ()
 main = do
-  print $ dE exp40 rho0
---  print allOK
---  print allOK'
+  putStrLn "Start dP"
+  runExamples (show . dP) allExps
+  putStrLn "Start dP'"
+  runExamples (show . dP') allExps
