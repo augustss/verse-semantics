@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
 module Main where
-import Data.List
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
@@ -205,25 +204,6 @@ apply (VFcn (Fcn _ xys)) w = maybe empty sing $ M.lookup w xys
 apply _ _ = empty
 
 --------------------
----- Find all identifiers defined by := in this scope
-
-dI :: Exp -> [Ident]
-dI = checkDup . sort . dI'
-  where
-    checkDup (x:x':xs) | x == x' = error $ "Duplicate definition of " ++ x
-                       | otherwise = x : checkDup (x':xs)
-    checkDup xs = xs
-
-dI' :: Exp -> [Ident]
-dI' (App e1 e2) = dI' e1 ++ dI' e2
-dI' (Equ e1 e2) = dI' e1 ++ dI' e2
-dI' (Seq e1 e2) = dI' e1 ++ dI' e2
-dI' (Tup es) = concat (map dI' es)
-dI' (Def i e) = i : dI' e
-dI' (Colon e) = dI' e
-dI' _ = []
-
---------------------
 ---- Primitive functions
 
 dO :: Op -> WS
@@ -264,6 +244,7 @@ dE (Prim o) _rho = dO o
 dE (App e1 e2) rho = mkSet [ r | f <- unSet $ dE e1 rho, a <- unSet $ dE e2 rho, r <- unSet $ apply f a ]
 dE (Equ e1 e2) rho = dD e1 rho `isect` dD e2 rho
 dE (Seq e1 e2) rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
+dE (Where e1 e2) rho = mkSet [ x | x <- unSet $ dE e1 rho, _y <- unSet $ dE e2 rho ]
 dE (Def x e) rho = lookupEnv x rho `isect` dE e rho
 dE (Colon e) rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet allWs, r <- unSet $ apply f a ]
 dE Fail _rho = empty
@@ -325,6 +306,7 @@ dM (Prim o) u _rho = dO o `isect` sing u
 dM (App e1 e2) u rho = mkSet [ r | f <- unSet $ dE e1 rho, a <- unSet $ dE e2 rho, r <- unSet $ apply f a ] `isect` sing u
 dM (Equ e1 e2) u rho = dL e1 u rho `isect` dL e2 u rho
 dM (Seq e1 e2) u rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dM e2 u rho ]
+dM (Where e1 e2) u rho = mkSet [ x | x <- unSet $ dM e1 u rho, _y <- unSet $ dE e2 rho ]
 dM (Def x e) u rho = lookupEnv x rho `isect` dM e u rho
 dM (Colon e) u rho = mkSet [ r | f <- unSet $ dE e rho, r <- unSet $ apply f u ]
 dM Fail _u _rho = empty
@@ -367,12 +349,12 @@ exp41 = Def "f" (Fun Closed (Def "g" (Fun Closed cint cint)) (App (Var "g") (Int
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22
+           exp20, exp21, exp22, exp33, exp34, exp35
           ]
 
 main :: IO ()
 main = do
   putStrLn "Start dP"
-  runExamples (show . dP) allExps
+  runExamples dP allExps
   putStrLn "Start dP'"
-  runExamples (show . dP') allExps
+  runExamples dP' allExps

@@ -45,3 +45,23 @@ instance Show Exp where
 showBraces :: (String -> String) -> (String -> String)
 showBraces a = showString "{" . a . showString "}"
 
+--------------------
+---- Find all identifiers defined by := in this scope
+
+dI :: Exp -> [Ident]
+dI = checkDup . sort . dI'
+  where
+    checkDup (x:x':xs) | x == x' = error $ "Duplicate definition of " ++ x
+                       | otherwise = x : checkDup (x':xs)
+    checkDup xs = xs
+
+dI' :: Exp -> [Ident]
+dI' (App e1 e2) = dI' e1 ++ dI' e2
+dI' (Equ e1 e2) = dI' e1 ++ dI' e2
+dI' (Seq e1 e2) = dI' e1 ++ dI' e2
+dI' (Where e1 e2) = dI' e1 ++ dI' e2
+dI' (Tup es) = concat (map dI' es)
+dI' (Def i e) = i : dI' e
+dI' (Colon e) = dI' e
+dI' _ = []
+

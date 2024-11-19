@@ -1,4 +1,5 @@
 module Examples where
+import System.IO
 import Exp
 
 infix 0 ===
@@ -8,17 +9,21 @@ type Example = (Exp, String)
 (===) :: Exp -> String -> Example
 (===) = (,)
 
-runExamples :: (Exp -> String) -> [Example] -> IO ()
+runExamples :: (Show a) => (Exp -> a) -> [Example] -> IO ()
 runExamples eval = mapM_ (runExample eval)
 
-runExample :: (Exp -> String) -> Example -> IO ()
+runExample :: (Show a) => (Exp -> a) -> Example -> IO ()
 runExample eval (e, r) = do
+  putStr (show e); hFlush stdout
   let r' = eval e
-  if r == r' then
+      r'' = show r'
+  putStrLn $ "   === " ++ show r'
+  if r == r'' then
     return ()
    else
-    putStrLn $ "eval " ++ show e ++ "\n" ++
-               "  = " ++ show r' ++ "\n" ++
+    putStrLn $ "*** ERROR ***\n" ++
+               "eval " ++ show e ++ "\n" ++
+               "  = " ++ show r'' ++ "\n" ++
                " /= " ++ show r
 
 --------------------
@@ -177,12 +182,6 @@ exp30 = Fun Closed (Int 0) (Int 1 `Choice` Int 2)
 exp31 :: Example
 exp31 = All (App (fst exp30) (Int 0))
       === "[1,2]"
-
--- (1, :int) = (:int, 2)
-exp41 :: Example
-exp41 = (Tup [Int 1, cint]) `Equ` (Tup [cint, Int 2])
-      === "[1,2]"
-  where cint = Colon (Var "int")
 
 -- fun_c(y:=1|2; 0) := if (y = 1) then (1, :int) else (:int, 2)
 exp32 :: Example

@@ -263,25 +263,6 @@ applys fs as = do
   apply f a
 
 --------------------
----- Find all identifiers defined by := in this scope
-
-dI :: Exp -> [Ident]
-dI = checkDup . sort . dI'
-  where
-    checkDup (x:x':xs) | x == x' = error $ "Duplicate definition of " ++ x
-                       | otherwise = x : checkDup (x':xs)
-    checkDup xs = xs
-
-dI' :: Exp -> [Ident]
-dI' (App e1 e2) = dI' e1 ++ dI' e2
-dI' (Equ e1 e2) = dI' e1 ++ dI' e2
-dI' (Seq e1 e2) = dI' e1 ++ dI' e2
-dI' (Tup es) = concat (map dI' es)
-dI' (Def i e) = i : dI' e
-dI' (Colon e) = dI' e
-dI' _ = []
-
---------------------
 ---- Primitive functions
 
 dO :: Op -> WS
@@ -321,6 +302,10 @@ dM (Prim o) u _rho = dO o `isectM` u
 dM (App e1 e2) u rho = applys (dE e1 rho) (dE e2 rho) `isectM` u
 dM (Equ e1 e2) u rho = dL e1 u rho `isect` dL e2 u rho
 dM (Seq e1 e2) u rho = do { _ <- dE e1 rho; dM e2 u rho }
+dM (Where e1 e2) u rho = do
+  x <- dM e1 u rho
+  _ <- dE e2 rho
+  return x
 dM (Def x e) u rho = lookupEnv x rho `isect` dM e u rho
 dM (Colon e) (Just u) rho = do f <- dE e rho; apply f u
 dM Fail _u _rho = empty
@@ -369,7 +354,6 @@ dM (Fun q e1 e2) (Just u) rho | VFcn g <- u = do
 dM Choice{} _ _ = undefined
 dM All{} _ _ = undefined
 dM For{} _ _ = undefined
-dM Where{} _ _ = undefined
 dM e Nothing rho = do  -- if nothing else matches then try all possible u
   u <- allWs
   dM e (Just u) rho
@@ -390,9 +374,9 @@ dB e u rho = do
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22
+           exp20, exp21, exp22, exp33, exp34, exp35
           ]
 
 main :: IO ()
 main = Prelude.do
-  runExamples (show . dP) allExps
+  runExamples dP allExps

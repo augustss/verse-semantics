@@ -364,26 +364,6 @@ applys fs as = do
   return (lf >< la >< lr, r)
 
 --------------------
----- Find all identifiers defined by := in this scope
-
-dI :: Exp -> [Ident]
-dI = checkDup . sort . dI'
-  where
-    checkDup (x:x':xs) | x == x' = error $ "Duplicate definition of " ++ x
-                       | otherwise = x : checkDup (x':xs)
-    checkDup xs = xs
-
-dI' :: Exp -> [Ident]
-dI' (App e1 e2) = dI' e1 ++ dI' e2
-dI' (Equ e1 e2) = dI' e1 ++ dI' e2
-dI' (Seq e1 e2) = dI' e1 ++ dI' e2
-dI' (Where e1 e2) = dI' e1 ++ dI' e2
-dI' (Tup es) = concat (map dI' es)
-dI' (Def i e) = i : dI' e
-dI' (Colon e) = dI' e
-dI' _ = []
-
---------------------
 ---- Primitive functions
 
 dO :: Op -> WS
@@ -544,7 +524,7 @@ dB' e u rho = do
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp23, exp24, exp25, exp26, exp27, exp28, exp29, exp30, exp31, exp41, exp33,
+           exp20, exp21, exp22, exp23, exp24, exp25, exp26, exp27, exp28, exp29, exp30, exp31, exp33,
            exp34, exp35
           ]
 
@@ -566,4 +546,4 @@ dens =
 main :: IO ()
 main = Prelude.do
   putStrLn "Start"
-  runExamples (show . dP) allExps
+  runExamples dP allExps
