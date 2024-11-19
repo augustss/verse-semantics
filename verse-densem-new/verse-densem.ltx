@@ -425,11 +425,11 @@ Env^{*} & = & \text{set of } Env \\
       || & f \inb \semfcn \\
 
       % Simon's version
-      , & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+      , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
         & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
         & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
       , & q=|closed| \implies \forall x \inb \dom(f). \\
-      & \hspace{0.5em} \exists \rho' \in \semapp{X}{e}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+      & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
 
 %%      \forall x \inb \Value. \\
 %%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
@@ -523,10 +523,11 @@ $
     \begin{array}[t]{l@@{\;}l}
       || & f \inb \semfcn \\
       ,  & g \in \semfcn  \\
-      ,  & \forall x \in \Value, \rho' \in \semapp{X}{e_1}{\rho},y \in \semapp{M}{e_1}{x}{\rho'}.  \\
+      ,  & \forall x \inb \Value, \forall \rho' \inb \semapp{X}{e_1}{\rho},
+           \forall y \inb \semapp{M}{e_1}{x}{\rho'}.  \\
          & \hspace{0.5em} y \in \dom(g) \land f(x) \in \semapp{L}{e_2}{g(y)}{\rho'} \\
       , & q=|closed| \implies \forall x \inb \dom(f). \\
-        & \hspace{0.5em} \exists \rho' \in \semapp{X}{e}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+        & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
      \}
     \end{array}
 \\
