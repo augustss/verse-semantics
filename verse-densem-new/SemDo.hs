@@ -2,9 +2,9 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE QualifiedDo #-}
 module Main where
-import Prelude(Show(..), Ord(..), Eq(..), Num(..), Integral(..),
-               Bool(..), String, IO, Integer,
-               sequence, error, uncurry, undefined, showString, traverse,
+import Prelude(Show(..), Ord(..), Eq(..), Num(..),
+               Bool(..), String, IO,
+               sequence, error, uncurry, undefined, traverse,
                ($), (.), not, (&&), (||), otherwise,
                putStrLn,
                )
@@ -14,6 +14,9 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
 import Exp
+import Val
+import Set
+import Env
 import Examples
 --import Debug.Trace
 
@@ -25,92 +28,7 @@ ifThenElse False _ x = x
 ifThenElse True  x _ = x
 
 --------------------
----- Values
-
-data Val = VInt Integer | VTup [Val] | VFcn (Fcn Val Val)
-  deriving (Eq, Ord)
-
-data RVal = RVal Val | Wrong String
-
-instance Show Val where
-  showsPrec p (VInt i) = showsPrec p i
-  showsPrec p (VTup vs) = showsPrec p vs
-  showsPrec p (VFcn f) = showsPrec p f
-
-instance Show RVal where
-  showsPrec p (RVal v) = showsPrec p v
-  showsPrec _ (Wrong _) = showString $ "Wrong"
-
-vadd :: Val -> Val -> Val
-vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
-vadd _ _ = undefined
-
---------------------
----- Functions as tables
--- All functions have a unique name
-
-data Fcn a b = Fcn String (M.Map a b)    -- mapping from a to b
-
-mkFcn :: (Ord a) => String -> [(a, b)] -> Fcn a b
-mkFcn s xys = Fcn s (M.fromList xys)
-
-instance Eq (Fcn a b) where
-  Fcn f _ == Fcn f' _  =  f == f'
-
-instance Ord (Fcn a b) where
-  Fcn f _ `compare` Fcn f' _  =  f `compare` f'
-
-instance Show (Fcn a b) where
-  show (Fcn s _) = s
-
--- Domain test
-inDom :: Ord a => a -> Fcn a b -> Bool
-inDom x (Fcn _ xys) = M.member x xys
-
--- Application when the argument is in the domain
-ap :: (Show a, Ord a) => Fcn a b -> a -> b
-ap (Fcn f xys) x =
-  fromMaybe (error $ "ap: outside domain " ++ f ++ " " ++ show x) $
-  M.lookup x xys
-
---------------------
----- Sets
-
-type Set a = S.Set a
-
-unSet :: Set a -> [a]
-unSet = S.toList
-
-mkSet :: (Ord a) => [a] -> Set a
-mkSet = S.fromList
-
-sUnion :: (Ord a) => [Set a] -> Set a
-sUnion = S.unions
-
-isect :: Ord a => Set a -> Set a -> Set a
-isect = S.intersection
-
---sing :: a -> Set a
---sing = S.singleton
-
-unSing :: Set a -> a
-unSing s =
-  case unSet s of
-    [x] -> x
-    _   -> error "unSing"
-
-empty :: Set a
-empty = S.empty
-
-isEmpty :: Set a -> Bool
-isEmpty = S.null
-
-sIn :: Ord a => a -> Set a -> Bool
-sIn = S.member
-
--- Check if a predicate holds for all values in the set
-forAll :: Set a -> (a -> Bool) -> Bool
-forAll xs p = all p (unSet xs)
+-- Set
 
 -- It's impossible to make Set a monad since there is an Ord constraint on the elements.
 -- So we have to make do with RebindableSyntax and defining return, >>= and >>
@@ -143,80 +61,7 @@ infixl 4 <$>
 (<$>) = S.map
 
 --------------------
----- Environment
-
-type Env = M.Map Ident Val
-
-lookupEnv :: Ident -> Env -> WS
-lookupEnv x rho = return $ fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $ M.lookup x rho
-
--- Initial environment
-rho0 :: Env
-rho0 = M.fromList $
-  [ (n, unSing (dO o)) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd) ] ] ++
-  [ ("succ", VFcn fsucc), ("pred", VFcn fpred) ] ++
-  [ ("false", VTup []) ]
-
---------------------
----- "Universal" set of values
--- This is a carefully selected set of values to make
--- the examples work.
-
-maxVInt :: Integer
-maxVInt = 4
-
-allInts :: [Val]
-allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
-
-allWs :: WS
-allWs = S.fromList $
-  nonFcn ++
-  [ unSing (dO o) | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, id1, id01, f01, const0, const1, const2, const3, fsucc, fsucc2, fpred, comp, ho1, ho2, ho3 ]
-  where
-    nonFcn =
-      allInts ++
-      [VTup [x, y] | x <- allInts, y <- allInts]
-    id0 = mkFcn "id0" [(VInt 0, VInt 0)]
-    id1 = mkFcn "id1" [(VInt 1, VInt 1)]
-    id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
-    f01 = mkFcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
-    const0 = mkFcn "const0" [(x, VInt 0) | x <- allInts]
-    const1 = mkFcn "const1" [(x, VInt 1) | x <- allInts]
-    const2 = mkFcn "const2" [(x, VInt 2) | x <- allInts]
-    const3 = mkFcn "const3" [(x, VInt 3) | x <- allInts]
-    comp = mkFcn "comparable" [(w, w) | w <- nonFcn ]
-    -- The function that accepts f:int->int as an argument and returns f[1]
-    ho1 = mkFcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0), (VFcn fint, VInt 1),
-                       (VFcn fsucc2, VInt 3), (VFcn comp, VInt 1),
-                       (VFcn const0, VInt 0), (VFcn const1, VInt 1), (VFcn const2, VInt 2), (VFcn const3, VInt 3)
-                      ]
-    ho2 = mkFcn "ho2" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                       (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
-                       (VFcn const0, VInt 0), (VFcn const1, VInt 1), (VFcn const2, VInt 2), (VFcn const3, VInt 3)
-                      ]
-    ho3 = mkFcn "ho3" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                       (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
-                       (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
-                      ]
-
-fint :: Fcn Val Val
-fint = mkFcn "int" [(x, x) | x <- allInts ]
-
-fsucc :: Fcn Val Val
-fsucc = mkFcn "succ" [(x, vadd x (VInt 1)) | x <- allInts ]
-
-fsucc2 :: Fcn Val Val
-fsucc2 = mkFcn "succ2" [(x, vadd x (VInt 2)) | x <- allInts ]
-
-fpred :: Fcn Val Val
-fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
-
---------------------
 ---- Aux
-
-type W = Val
-type WS = Set W
 
 -- Given an initial environment, rho, and some identifiers,
 -- generate all environments where rho has been extended with
@@ -253,15 +98,6 @@ applys fs as = do
   apply f a
 
 --------------------
----- Primitive functions
-
-dO :: Op -> WS
-dO Oint = return $ VFcn $ mkFcn "int" [ (x, x) | x <- allInts ]
-dO Ogt  = return $ VFcn $ mkFcn "gt"  [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y]
--- add is a single function, not many as in the doc.
-dO Oadd = return $ VFcn $ mkFcn "add" [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
-
---------------------
 ---- Semantic equations, valuation
 
 -- P, top level program
@@ -287,9 +123,9 @@ dE :: Exp -> Env -> WS
 -- Use the next line to avoid having equations for E.
 -- It is a massive slowdown:  5s to 8m
 --dE e rho = sUnion [ dM e w rho | w <- unSet allWs ]
-dE (Var x) rho = lookupEnv x rho
+dE (Var x) rho = return $ lookupEnv x rho
 dE (Int k) _rho = return $ VInt k
-dE (Prim o) _rho = dO o
+dE (Prim o) _rho = return $ dO o
 dE (App e1 e2) rho = applys (dE e1 rho) (dE e2 rho)
 dE (Equ e1 e2) rho = dD e1 rho `isect` dD e2 rho
 dE (Seq e1 e2) rho = do
@@ -299,7 +135,7 @@ dE (Where e1 e2) rho = do
   x <- dE e1 rho
   _ <- dE e2 rho
   return x
-dE (Def x e) rho = lookupEnv x rho `isect` dE e rho
+dE (Def x e) rho = return (lookupEnv x rho) `isect` dE e rho
 dE (Colon e) rho = applys (dE e rho) allWs
 dE Fail _rho = empty
 dE (If e1 e2 e3) rho =
@@ -342,9 +178,9 @@ dL e u rho = tryAll rho (dI e) (dM e u)
 -- Match the value u against the expression, returning all possible
 -- values of the expression that makes it match u.
 dM :: Exp -> W -> Env -> WS
-dM (Var x) u rho = lookupEnv x rho `isect` return u
+dM (Var x) u rho = return (lookupEnv x rho) `isect` return u
 dM (Int k) u _rho = return (VInt k) `isect` return u
-dM (Prim o) u _rho = dO o `isect` return u
+dM (Prim o) u _rho = return (dO o) `isect` return u
 dM (App e1 e2) u rho = applys (dE e1 rho) (dE e2 rho) `isect` return u
 dM (Equ e1 e2) u rho = dL e1 u rho `isect` dL e2 u rho
 dM (Seq e1 e2) u rho = do { _ <- dE e1 rho; dM e2 u rho }
@@ -352,7 +188,7 @@ dM (Where e1 e2) u rho = do
   x <- dM e1 u rho
   _ <- dE e2 rho
   return x
-dM (Def x e) u rho = lookupEnv x rho `isect` dM e u rho
+dM (Def x e) u rho = return (lookupEnv x rho) `isect` dM e u rho
 dM (Colon e) u rho = do f <- dE e rho; apply f u
 dM Fail _u _rho = empty
 dM (If e1 e2 e3) u rho =

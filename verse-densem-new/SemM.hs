@@ -6,9 +6,9 @@
 -- Also, combine dE and dM in an efficient way.
 
 module Main(main) where
-import Prelude(Show(..), Ord(..), Eq(..), Num(..), Integral(..),
-               Bool(..), String, IO, Integer,
-               sequence, error, uncurry, undefined, showString, traverse,
+import Prelude(Show(..), Ord(..), Eq(..), Num(..),
+               Bool(..), String, IO,
+               sequence, error, uncurry, undefined, traverse,
                ($), (.), not, (&&), (||), otherwise,
                )
 import Data.List
@@ -16,6 +16,8 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
 import Exp
+import Val
+import Set
 import Examples
 --import Debug.Trace
 
@@ -30,89 +32,7 @@ implies :: Bool -> Bool -> Bool
 x `implies` y = not x || y
 
 --------------------
----- Values
-
-data Val = VInt Integer | VTup [Val] | VFcn (Fcn Val Val)
-  deriving (Eq, Ord)
-
-data RVal = RVal Val | Wrong String
-
-instance Show Val where
-  showsPrec p (VInt i) = showsPrec p i
-  showsPrec p (VTup vs) = showsPrec p vs
-  showsPrec p (VFcn f) = showsPrec p f
-
-instance Show RVal where
-  showsPrec p (RVal v) = showsPrec p v
-  showsPrec _ (Wrong _) = showString $ "Wrong"
-
-vadd :: Val -> Val -> Val
-vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
-vadd _ _ = undefined
-
---------------------
----- Functions as tables
--- All functions have a unique name
-
-data Fcn a b = Fcn String (M.Map a b)    -- mapping from a to b
-
-mkFcn :: (Ord a) => String -> [(a, b)] -> Fcn a b
-mkFcn s xys = Fcn s (M.fromList xys)
-
-instance Eq (Fcn a b) where
-  Fcn f _ == Fcn f' _  =  f == f'
-
-instance Ord (Fcn a b) where
-  Fcn f _ `compare` Fcn f' _  =  f `compare` f'
-
-instance Show (Fcn a b) where
-  show (Fcn s _) = s
-
--- Domain test
-inDom :: Ord a => a -> Fcn a b -> Bool
-inDom x (Fcn _ xys) = M.member x xys
-
--- Application when the argument is in the domain
-ap :: (Show a, Ord a) => Fcn a b -> a -> b
-ap (Fcn f xys) x =
-  fromMaybe (error $ "ap: outside domain " ++ f ++ " " ++ show x) $
-  M.lookup x xys
-
---------------------
 ---- Sets
-
-type Set a = S.Set a
-
-unSet :: Set a -> [a]
-unSet = S.toList
-
-mkSet :: (Ord a) => [a] -> Set a
-mkSet = S.fromList
-
-isect :: Ord a => Set a -> Set a -> Set a
-isect = S.intersection
-
-unSing :: Set a -> a
-unSing s =
-  case unSet s of
-    [x] -> x
-    _   -> error "unSing"
-
-empty :: Set a
-empty = S.empty
-
-isEmpty :: Set a -> Bool
-isEmpty = S.null
-
-sIn :: Ord a => a -> Set a -> Bool
-sIn = S.member
-
--- Check if a predicate holds for all values in the set
-forAll :: Set a -> (a -> Bool) -> Bool
-forAll xs p = all p (unSet xs)
-
-exists :: Set a -> (a -> Bool) -> Bool
-exists xs p = any p (unSet xs)
 
 -- It's impossible to make Set a monad since there is an Ord constraint on the elements.
 -- So we have to make do with RebindableSyntax and defining return, >>=, >>, etc.
@@ -171,9 +91,6 @@ rho0 = M.fromList $
 ---- "Universal" set of values
 -- This is a carefully selected set of values to make
 -- the examples work.
-
-maxVInt :: Integer
-maxVInt = 4
 
 allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]

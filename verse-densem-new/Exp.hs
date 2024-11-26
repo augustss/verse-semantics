@@ -1,5 +1,6 @@
 module Exp where
 import Data.List
+import Data.Data
 
 --------------------
 ---- Abstract syntax
@@ -12,13 +13,13 @@ data Exp
   | If Exp Exp Exp | Fun OC Exp Exp
   | Choice Exp Exp | All Exp | For Exp Exp
   | Where Exp Exp
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data)
 
 data Op = Oint | Ogt | Oadd
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 data OC = Open | Closed
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 instance Show Exp where
   showsPrec _ (Var s) = showString s

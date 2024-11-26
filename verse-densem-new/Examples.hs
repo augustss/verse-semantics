@@ -238,3 +238,11 @@ exp40 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
                                 (Int 3 `Choice` Int 1 `Choice` Int 0)))
                    (Var "x")
       === "XXX6"
+
+exp43 :: Example
+exp43 = Def "x" (Int 1 `Choice` Int 2) `Seq` If (Var "x" `Equ` Int 1) (Int 0 `Choice` Int 1) (Int 2 `Choice` Int 1 `Choice` Int 0)
+      === "XXX7"
+
+exp44 :: Example
+exp44 = If (Var "x" `Equ` Int 1) (Int 0 `Choice` Int 1) (Int 2 `Choice` Int 1 `Choice` Int 0) `Seq` Def "x" (Int 1 `Choice` Int 2)
+      === "XXX7"
