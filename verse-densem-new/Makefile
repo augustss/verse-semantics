@@ -69,4 +69,12 @@ testSemC:	SemC
 SemC:	SemC.hs Exp.hs Examples.hs
 	ghc -O2 --make SemC.hs
 
-testall:	testSem testSemDo testSemM testSemC
+testPlanC:	PlanC
+	./PlanC
+
+PlanC:	PlanC.hs Exp.hs Examples.hs
+	ghc -O2 --make PlanC.hs
+
+
+
+testall:	testSem testSemDo testSemM testSemC testPlanC

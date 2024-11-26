@@ -1,4 +1,4 @@
-module PlanC where
+--module PlanC where
 import Control.Monad hiding (ap)
 import Control.Monad.State.Strict
 import qualified Data.Map as M
@@ -20,7 +20,7 @@ implies x y = not x || y
 
 data CExp = CVal CVal | CApp CVal CVal
           | CEqu CExp CExp | CSeq CExp CExp | CWhere CExp CExp | CExi Ident
-          | CIf CExp CExp CExp | CLam OC Ident CExp
+          | CIf CExp CExp CExp | CLam OC Ident CExp CExp
           | CFail
   deriving (Eq, Ord, Data)
 
@@ -47,9 +47,9 @@ instance Show CExp where
   showsPrec _ (CIf e1 e2 e3) = showString "if " . showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2) .
                               showBraces (showsPrec 0 e3)
-  showsPrec _ (CLam q i e) = showString (if q == Open then "lam_o" else "lam_c") .
-                              showParen True (showString i) .
-                              showBraces (showsPrec 0 e)
+  showsPrec _ (CLam q i e1 e2) = showString (if q == Open then "lam_o" else "lam_c") .
+                              showParen True (showString i) . showParen True (showsPrec 0 e1) .
+                              showBraces (showsPrec 0 e2)
 
 instance Show CVal where
   showsPrec _ (CVar s) = showString s
@@ -119,7 +119,7 @@ syntaxN u (Fun q e0 e1) = do
   k <- newVar "k"
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
-  pure $ CLam q i $ cseqs [ CExi x, cVar x `CEqu` c0, CExi k, k =.= CApp (CVar u) (CVar x), c1 ]
+  pure $ CLam q i (cseqs [ CExi x, cVar x `CEqu` c0 ]) (cseqs [CExi k, k =.= CApp (CVar u) (CVar x), c1 ])
 syntaxN _ Fail = pure CFail
 syntaxN _ Choice{} = undefined
 syntaxN _ All{} = undefined
@@ -167,7 +167,7 @@ seqAssoc (CSeq e1 e2) = seqApp (seqAssoc e1) (seqAssoc e2)
         xSeq s1 s2 = CSeq s1 s2
 seqAssoc (CWhere e1 e2) = CWhere (seqAssoc e1) (seqAssoc e2)
 seqAssoc (CIf e1 e2 e3) = CIf (seqAssoc e1) (seqAssoc e2) (seqAssoc e3)
-seqAssoc (CLam q x e) = CLam q x (seqAssoc e)
+seqAssoc (CLam q x e1 e2) = CLam q x (seqAssoc e1) (seqAssoc e2)
 seqAssoc e = e
 
 -- Turn 'CExi x; ...; x = e' into '...; e'
@@ -188,7 +188,7 @@ allVariables :: CExp -> [Ident]
 allVariables e =
   [ i | CVar i <- universeBi e ] ++
   [ i | CExi i <- universeBi e ] ++
-  [ i | CLam _ i _ <- universeBi e ]
+  [ i | CLam _ i _ _ <- universeBi e ]
 
 -------------------------------------------
 
@@ -214,20 +214,19 @@ dE (CWhere e1 e2) rho | isEmpty (dE e2 rho) = empty
 dE (CExi _)         _                       = sing $ VInt 99999
 dE CFail            _                       = empty
 dE (CIf _e1 _e2 _e3)   _                       = error "CIf"
-dE (CLam q i e)   rho                       = mkSet
+dE (CLam q i e1 e2)   rho                   = mkSet
   [ VFcn f
   | VFcn f <- unSet allWs
   , forAll allWs $ \ w ->
-      forAllL (dX e rho) $ \ rho' ->
-        let ws = dE e (extend rho' i w) in
-          not (isEmpty ws)
-          `implies`
-          (w `inDom` f  &&  ap f w `sIn` ws)
+      forAllL (dX e1 rho) $ \ rho' ->
+        not (isEmpty (dE e1 (extend rho' i w)))
+        `implies`
+        (w `inDom` f  &&  ap f w `sIn` dD e2 rho')
   , (q == Closed)
     `implies`
     (forAll allWs $ \ w ->
        (w `inDom` f) `implies`
-         (existsL (dX e rho) $ \rho' -> not (isEmpty (dE e (extend rho' i w)))))
+         (existsL (dX e1 rho) $ \rho' -> not (isEmpty (dE e1 (extend rho' i w)))))
   ]
 
 dX :: CExp -> Env -> [Env]
@@ -241,12 +240,31 @@ dD e rho = sUnion [ dE e rho' | rho' <- dX e rho ]
 den :: Exp -> WS
 den e = dD (cleanup $ syntax "_" e) rho0
 
+dP :: Exp -> RVal
+dP e =
+  case unSet (den e) of
+    [v] -> RVal v
+    _   -> Wrong ""
+
 xx1, xx2 :: Exp
 xx1 = Fun Closed (Def "x" (Int 1)) (Var "x")
 xx2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x" `Equ` Int 1)
 
+{-
 xx3 :: CExp
 xx3 = CLam Closed "i1" $ cseqs [cVar "i1" `CEqu` cInt 1]
 
 xx4 :: CExp
 xx4 = CLam Closed "i1" $ cseqs [cVar "i1" `CEqu` CVal (CPrim Oint), cVar "i1" `CEqu` cInt 1]
+-}
+
+allExps :: [Example]
+allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
+           exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
+           exp20, exp21, exp22, exp33, exp34, exp35
+          ]
+
+main :: IO ()
+main = do
+  putStrLn "Start"
+  runExamples dP allExps
