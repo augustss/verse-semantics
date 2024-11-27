@@ -12,7 +12,7 @@ data Exp
   | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
   | If Exp Exp Exp | Fun OC Exp Exp
   | Choice Exp Exp | All Exp | For Exp Exp
-  | Where Exp Exp
+  | Where Exp Exp | Def2 Ident Ident Exp
   deriving (Eq, Ord, Data)
 
 data Op = Oint | Ogt | Oadd
@@ -30,6 +30,7 @@ instance Show Exp where
   showsPrec p (Seq e1 e2) = showParen (p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
   showsPrec p (Where e1 e2) = showParen (p > 1) $ showsPrec 3 e1 . showString " where " . showsPrec 3 e2
   showsPrec p (Def x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
+  showsPrec p (Def2 x y e) = showParen (p > 5) $ showString x . showString "~>" . showString y . showString " := " . showsPrec 6 e
   showsPrec _ (Colon e) = showString ":" . showsPrec 10 e
   showsPrec _ Fail = showString "fail"
   showsPrec _ (Tup es) = showString "<" . showString (intercalate "," $ map show es) . showString ">"
@@ -63,6 +64,7 @@ dI' (Seq e1 e2) = dI' e1 ++ dI' e2
 dI' (Where e1 e2) = dI' e1 ++ dI' e2
 dI' (Tup es) = concat (map dI' es)
 dI' (Def i e) = i : dI' e
+dI' (Def2 i1 i2 e) = i1 : i2 : dI' e
 dI' (Colon e) = dI' e
 dI' _ = []
 

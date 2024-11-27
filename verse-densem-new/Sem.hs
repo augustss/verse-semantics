@@ -74,6 +74,7 @@ dE (Equ e1 e2) rho = dD e1 rho `isect` dD e2 rho
 dE (Seq e1 e2) rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
 dE (Where e1 e2) rho = mkSet [ x | x <- unSet $ dE e1 rho, _y <- unSet $ dE e2 rho ]
 dE (Def x e) rho = sing (lookupEnv x rho) `isect` dE e rho
+dE (Def2 x y e) rho = sing (lookupEnv x rho) `isect` sing (lookupEnv y rho) `isect` dE e rho
 dE (Colon (Var "any")) _ = allWs                         -- hack for any
 dE (Colon e) rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet allWs, r <- unSet $ apply f a ]
 dE Fail _rho = empty
@@ -139,6 +140,8 @@ dM (Equ e1 e2) u rho = dL e1 u rho `isect` dL e2 u rho
 dM (Seq e1 e2) u rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dM e2 u rho ]
 dM (Where e1 e2) u rho = mkSet [ x | x <- unSet $ dM e1 u rho, _y <- unSet $ dE e2 rho ]
 dM (Def x e) u rho = sing (lookupEnv x rho) `isect` dM e u rho
+dM (Def2 x y e) u rho | lookupEnv x rho == u = sing (lookupEnv y rho) `isect` dM e u rho
+                      | otherwise            = empty
 dM (Colon e) u rho = mkSet [ r | f <- unSet $ dE e rho, r <- unSet $ apply f u ]
 dM Fail _u _rho = empty
 dM (If e1 e2 e3) u rho =
@@ -213,7 +216,8 @@ exp41 = Def "f" (Fun Closed (Def "g" (Fun Closed cint cint)) (App (Var "g") (Int
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp33, exp34, exp35, exp47, exp48, exp49, exp50
+           exp20, exp21, exp22, exp33, exp34, exp35, exp47, exp48, exp49, exp50,
+           exp51, exp52
           ]
 
 main :: IO ()

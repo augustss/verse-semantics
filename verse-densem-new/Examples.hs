@@ -282,3 +282,13 @@ exp49 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
 exp50 :: Example
 exp50 = App (fst exp49) (Int 0)
       === "1"
+
+-- fun_x(x~>y:= :succ) := x
+exp51 :: Example
+exp51 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "x")
+      === "int"
+
+-- fun_x(x~>y:= :succ) := y
+exp52 :: Example
+exp52 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "y")
+      === "succ"
