@@ -48,31 +48,33 @@ realclean:
 testSem:	Sem
 	./Sem
 
-Sem:	Sem.hs Exp.hs Examples.hs
+HS=Env.hs Examples.hs Exp.hs Set.hs Val.hs
+
+Sem:	Sem.hs $(HS)
 	ghc -O2 --make Sem.hs
 
 testSemDo:	SemDo
 	./SemDo
 
-SemDo:	SemDo.hs Exp.hs Examples.hs
+SemDo:	SemDo.hs $(HS)
 	ghc -O2 --make SemDo.hs
 
 testSemM:	SemM
 	./SemM
 
-SemM:	SemM.hs Exp.hs Examples.hs
+SemM:	SemM.hs $(HS)
 	ghc -O2 --make SemM.hs
 
 testSemC:	SemC
 	./SemC
 
-SemC:	SemC.hs Exp.hs Examples.hs
+SemC:	SemC.hs $(HS)
 	ghc -O2 --make SemC.hs
 
 testPlanC:	PlanC
 	./PlanC
 
-PlanC:	PlanC.hs Exp.hs Examples.hs
+PlanC:	PlanC.hs $(HS)
 	ghc -O2 --make PlanC.hs
 
 

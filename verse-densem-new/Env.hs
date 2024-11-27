@@ -66,7 +66,8 @@ allWs = S.fromList $
                        (VFcn fsuccsucc, VInt 0), (VFcn comp, VInt 2),
                        (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
                       ]
-    ho4 = mkFcn "ho4" [(VFcn fsucc, VInt 2), (VFcn succ0, VInt 2), (VFcn const1, VInt 2)]
+    ho4 = mkFcn "ho4" $ [(VFcn fsucc, VInt 2), (VFcn succ0, VInt 2), (VFcn const1, VInt 2)]
+                      ++ [ (VTup [VInt 1,i], VInt 2) | i <- allInts ]
 
 fid1 :: Fcn Val Val
 fid1 = mkFcn "id1" [(VInt 1, VInt 1)]

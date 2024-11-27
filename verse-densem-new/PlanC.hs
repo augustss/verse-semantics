@@ -11,7 +11,7 @@ import Val
 import Set
 import Env
 import Examples
---import Debug.Trace
+import Debug.Trace
 
 implies :: Bool -> Bool -> Bool
 implies x y = not x || y
@@ -74,7 +74,6 @@ syntax :: Ident -> Exp -> CExp
 syntax u e = evalState (syntaxN u e) 1
 
 syntaxN :: Ident -> Exp -> N CExp
-syntaxN u (Var "any") = mustBeVar u                         -- hack for any
 syntaxN u (Int k) = pure $ u =.= CInt k
 syntaxN u (Var x) = pure $ u =.= CVar x
 syntaxN u (Prim p) = pure $ u =.= CPrim p
@@ -85,6 +84,7 @@ syntaxN u (Tup es) = do
   pure $ cseqs $ map CExi us ++ [u =.= CTup (map CVar us)] ++ cs ++ [CTup cs]
 syntaxN u (App e0 e1) = (u =.=) <$> (CApp <$> syntaxN "_" e0 <*> syntaxN "_" e1)
 syntaxN u (Equ e0 e1) = CEqu <$> syntaxN u e0 <*> syntaxN u e1
+syntaxN "_" (Def x (Colon (Var "any"))) = pure $ CExi x   -- hack for x:any
 syntaxN u (Def x e) = do
   c <- syntaxN u e
   pure $ cseqs [CExi x, CVar x `CEqu` c]
@@ -197,17 +197,17 @@ dE (CIf e1 e2 e3) rho                       = do
     [] -> dE e3 rho
     rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]  -- XX Not the correct semantics
 dE (CLam q i e1 e2)   rho                   = mkSet
-  [ VFcn f
-  | VFcn f <- unSet allWs
+  [ f
+  | f <- unSet allWs, function f
   , forAll allWs $ \ w ->
       forAllL (dX e1 rho) $ \ rho' ->
         not (isEmpty (dE e1 (extend rho' i w)))
         `implies`
-        (w `inDom` f  &&  ap f w `sIn` dD e2 rho')
+        (w `inDomV` f  &&  apV f w `sIn` dD e2 rho')
   , (q == Closed)
     `implies`
     (forAll allWs $ \ w ->
-       (w `inDom` f) `implies`
+       (w `inDomV` f) `implies`
          (existsL (dX e1 rho) $ \rho' -> not (isEmpty (dE e1 (extend rho' i w)))))
   ]
 
@@ -237,6 +237,43 @@ allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
 main :: IO ()
 main = do
   putStrLn "Start"
-  print $ den (fst exp47)
-  print $ den (fst exp48)
+--  print $ den (fst exp47)
   runExamples dP allExps
+
+{-
+aaa = Fun Closed aaa1 (Int 2)
+aaa1 = Fun Closed (Int 0) (Int 1)
+
+bbb = CLam Closed "i1"
+           (CLam Closed "i2"
+                 (CExi "x3" `CSeq` (CVar "x3" `CEqu` (CVar "i2" `CEqu` CInt 0)))
+                 (CExi "k4" `CSeq` (CVar "k4" `CEqu` CApp (CVar "i1") (CVar "x3")) `CSeq` (CVar "k4" `CEqu` CInt 1))
+           )
+           (CInt 2)
+
+bbc = CLam Closed "i1"
+           (CLam Closed "i2"
+                 (CExi "x3" `CSeq` (CVar "x3" `CEqu` CInt 0) `CSeq` (CVar "i2" `CEqu` CInt 0))
+                 (CInt 1 `CEqu` CApp (CVar "i1") (CVar "x3"))
+           )
+           (CInt 2)
+
+bbd = CLam Open "i1"
+           (CLam Open "i2"
+                 (CVar "i2" `CEqu` CInt 0)
+                 (CInt 1 `CEqu` CApp (CVar "i1") (CInt 0))
+           )
+           (CInt 2)
+
+CLam q i e1 e2 = bbd
+rho' = rho0
+
+xxx = [ VFcn f | VFcn f <- unSet allWs,
+        forAll allWs $ \ w ->
+--          trace (show (w, dE e1 (extend rho' i w))) $
+          not (isEmpty (dE e1 (extend rho' i w)))
+          `implies`
+--          trace (show (f, w, w `inDom` f, apply (VFcn f) w))
+          (w `inDom` f  &&  ap f w `sIn` dD e2 rho')
+      ]
+-}

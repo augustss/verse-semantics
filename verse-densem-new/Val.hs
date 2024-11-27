@@ -47,6 +47,21 @@ ap (Fcn f xys) x =
   fromMaybe (error $ "ap: outside domain " ++ f ++ " " ++ show x) $
   M.lookup x xys
 
+inDomV :: Val -> Val -> Bool
+inDomV x (VFcn f) = inDom x f
+inDomV (VInt x) (VTup vs) = 0 <= x && x < toInteger (length vs)
+inDomV _ _ = False
+
+apV :: Val -> Val -> Val
+apV (VFcn f) x = ap f x
+apV (VTup vs) (VInt x) = vs !! fromInteger x
+apV _ _ = error "apV outside domain"
+
+function :: Val -> Bool
+function (VFcn _) = True
+function (VTup _) = True
+function _ = False
+
 --------------------
 
 maxVInt :: Integer

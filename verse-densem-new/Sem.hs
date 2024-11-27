@@ -7,7 +7,7 @@ import Val
 import Set
 import Env
 import Examples
-import Debug.Trace
+--import Debug.Trace
 
 --------------------
 ---- Aux
@@ -84,16 +84,16 @@ dE (If e1 e2 e3) rho =
 dE (Tup es) rho = mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
 -- Simon's version.
 dE (Fun q e1 e2) rho = mkSet
-  [ VFcn f | VFcn f <- unSet allWs
+  [ f | f <- unSet allWs, function f
            , forAll allWs $ \ x ->
                forAll (dX e1 rho) $ \ rho' ->
                  not (isEmpty (dM e1 x rho'))
                  `implies`
-                (x `inDom` f && ap f x `sIn` dD e2 rho')
+                (x `inDomV` f && apV f x `sIn` dD e2 rho')
            , (q == Closed)
              `implies`
              (forAll allWs $ \ x ->
-               (x `inDom` f) `implies`
+               (x `inDomV` f) `implies`
                  (exists (dX e1 rho) (\ rho' -> not (isEmpty (dM e1 x rho'))))
              )
   ]
@@ -146,19 +146,19 @@ dM (Tup es) u rho | VTup us <- u, length us == length us =
                       mkSet $ map VTup $ sequence $ zipWith (\ e v -> unSet $ dM e v rho) es us
                   | otherwise = empty
 dM (Fun q e1 e2) u rho = mkSet
-  [ VFcn f | VFcn f <- unSet allWs
-           , VFcn g <- [u]
+  [ f | f <- unSet allWs, function f
+           , g <- [u], function g
            , forAll allWs $ \ x ->
                forAll (dX e1 rho) $ \ rho' ->
                  forAll (dM e1 x rho') $ \ y ->
-                   (x `inDom` f) &&
-                   (y `inDom` g) &&
-                   (ap f x `sIn`
-                      dL e2 (ap g y) rho')
+                   (x `inDomV` f) &&
+                   (y `inDomV` g) &&
+                   (apV f x `sIn`
+                      dL e2 (apV g y) rho')
            , (q == Closed)
              `implies`
              (forAll allWs $ \ x ->
-               (x `inDom` f) `implies`
+               (x `inDomV` f) `implies`
                  (exists (dX e1 rho) $ \ rho' ->
                     not (isEmpty (dM e1 x rho')))
              )
@@ -197,13 +197,13 @@ exp41 = Def "f" (Fun Closed (Def "g" (Fun Closed cint cint)) (App (Var "g") (Int
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp33, exp34, exp35
+           exp20, exp21, exp22, exp33, exp34, exp35, exp47, exp48
           ]
 
 main :: IO ()
 main = do
-  print $ dD (Fun Closed (Fun Closed (Int 1) (Int 1)) (Int 2)) rho0
-  print $ dD (fst exp47) rho0
+--  print $ dD (fst exp47) rho0
+--  print $ dD (fst exp48) rho0
   putStrLn "Start dP"
   runExamples dP allExps
   putStrLn "Start dP'"
