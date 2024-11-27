@@ -1,88 +1,16 @@
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 import qualified Data.Map as M
-import qualified Data.Set as S
-import Data.Maybe
 import GHC.Stack
 import Exp
 import Val
 import Set
+import Env
 import Examples
---import Debug.Trace
-
---------------------
----- Environment
-
-type Env = M.Map Ident Val
-
-lookupEnv :: HasCallStack => Ident -> Env -> WS
-lookupEnv x rho = sing $ fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $ M.lookup x rho
-
--- Initial environment
-rho0 :: Env
-rho0 = M.fromList $
-  [ (n, unSing (dO o)) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd) ] ] ++
-  [ ("succ", VFcn fsucc), ("pred", VFcn fpred) ] ++
-  [ ("false", VTup []) ]
-
---------------------
----- "Universal" set of values
--- This is a carefully selected set of values to make
--- the examples work.
-
-allInts :: [Val]
-allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
-
-allWs :: WS
-allWs = S.fromList $
-  nonFcn ++
-  [ unSing (dO o) | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, id1, id01, f01, const0, const1, const2, const3, fsucc, fsucc2, fpred, comp, ho1, ho2, ho3, ho4 ]
-  where
-    nonFcn =
-      allInts ++
-      [VTup [x, y] | x <- allInts, y <- allInts]
-    id0 = mkFcn "id0" [(VInt 0, VInt 0)]
-    id1 = mkFcn "id1" [(VInt 1, VInt 1)]
-    id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
-    f01 = mkFcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
-    const0 = mkFcn "const0" [(x, VInt 0) | x <- allInts]
-    const1 = mkFcn "const1" [(x, VInt 1) | x <- allInts]
-    const2 = mkFcn "const2" [(x, VInt 2) | x <- allInts]
-    const3 = mkFcn "const3" [(x, VInt 3) | x <- allInts]
-    comp = mkFcn "comparable" [(w, w) | w <- nonFcn ]
-    -- The function that accepts f:int->int as an argument and returns f[1]
-    ho1 = mkFcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0), (VFcn fint, VInt 1),
-                       (VFcn fsucc2, VInt 3), (VFcn comp, VInt 1),
-                       (VFcn const0, VInt 0), (VFcn const1, VInt 1), (VFcn const2, VInt 2), (VFcn const3, VInt 3)
-                      ]
-    ho2 = mkFcn "ho2" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                       (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
-                       (VFcn const0, VInt 0), (VFcn const1, VInt 1), (VFcn const2, VInt 2), (VFcn const3, VInt 3)
-                      ]
-    ho3 = mkFcn "ho3" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                       (VFcn fsucc2, VInt 0), (VFcn comp, VInt 2),
-                       (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
-                      ]
-    ho4 = mkFcn "ho4" [(VFcn id0, VInt 0)]
-
-fint :: Fcn Val Val
-fint = mkFcn "int" [(x, x) | x <- allInts ]
-
-fsucc :: Fcn Val Val
-fsucc = mkFcn "succ" [(x, vadd x (VInt 1)) | x <- allInts ]
-
-fsucc2 :: Fcn Val Val
-fsucc2 = mkFcn "succ2" [(x, vadd x (VInt 2)) | x <- allInts ]
-
-fpred :: Fcn Val Val
-fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
+import Debug.Trace
 
 --------------------
 ---- Aux
-
-type W = Val
-type WS = Set W
 
 -- Given an initial environment, rho, and some identifiers,
 -- generate all environments where rho has been extended with
@@ -108,15 +36,6 @@ apply :: Val -> Val -> Set Val
 apply (VTup ws) (VInt k) | 0 <= k' && k' < length ws = sing (ws !! k')  where k' = fromInteger k
 apply (VFcn (Fcn _ xys)) w = maybe empty sing $ M.lookup w xys
 apply _ _ = empty
-
---------------------
----- Primitive functions
-
-dO :: Op -> WS
-dO Oint = sing $ VFcn $ mkFcn "int" [ (x, x) | x <- allInts ]
-dO Ogt  = sing $ VFcn $ mkFcn "gt"  [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y]
--- add is a single function, not many as in the doc.
-dO Oadd = sing $ VFcn $ mkFcn "add" [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
 
 --------------------
 ---- Semantic equations, valuation
@@ -147,14 +66,15 @@ dE :: Exp -> Env -> WS
 -- Use the next line to avoid having equations for E.
 -- It is a massive slowdown:  5s to 8m
 --dE e rho = sUnion [ dM e w rho | w <- unSet allWs ]
-dE (Var x) rho = lookupEnv x rho
+dE (Var x) rho = sing $ lookupEnv x rho
 dE (Int k) _rho = sing $ VInt k
-dE (Prim o) _rho = dO o
+dE (Prim o) _rho = sing $ dO o
 dE (App e1 e2) rho = mkSet [ r | f <- unSet $ dE e1 rho, a <- unSet $ dE e2 rho, r <- unSet $ apply f a ]
 dE (Equ e1 e2) rho = dD e1 rho `isect` dD e2 rho
 dE (Seq e1 e2) rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
 dE (Where e1 e2) rho = mkSet [ x | x <- unSet $ dE e1 rho, _y <- unSet $ dE e2 rho ]
-dE (Def x e) rho = lookupEnv x rho `isect` dE e rho
+dE (Def x e) rho = sing (lookupEnv x rho) `isect` dE e rho
+dE (Colon (Var "any")) _ = allWs                         -- hack for any
 dE (Colon e) rho = mkSet [ r | f <- unSet $ dE e rho, a <- unSet allWs, r <- unSet $ apply f a ]
 dE Fail _rho = empty
 dE (If e1 e2 e3) rho =
@@ -208,14 +128,14 @@ dL e u rho = mkSet [ r | rho' <- unSet $ dX e rho, r <- unSet $ dM e u rho' ]
 -- Match the value u against the expression, returning all possible
 -- values of the expression that makes it match u.
 dM :: HasCallStack => Exp -> W -> Env -> WS
-dM (Var x) u rho = lookupEnv x rho `isect` sing u
+dM (Var x) u rho = sing (lookupEnv x rho) `isect` sing u
 dM (Int k) u _rho = sing (VInt k) `isect` sing u
-dM (Prim o) u _rho = dO o `isect` sing u
+dM (Prim o) u _rho = sing (dO o) `isect` sing u
 dM (App e1 e2) u rho = mkSet [ r | f <- unSet $ dE e1 rho, a <- unSet $ dE e2 rho, r <- unSet $ apply f a ] `isect` sing u
 dM (Equ e1 e2) u rho = dL e1 u rho `isect` dL e2 u rho
 dM (Seq e1 e2) u rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dM e2 u rho ]
 dM (Where e1 e2) u rho = mkSet [ x | x <- unSet $ dM e1 u rho, _y <- unSet $ dE e2 rho ]
-dM (Def x e) u rho = lookupEnv x rho `isect` dM e u rho
+dM (Def x e) u rho = sing (lookupEnv x rho) `isect` dM e u rho
 dM (Colon e) u rho = mkSet [ r | f <- unSet $ dE e rho, r <- unSet $ apply f u ]
 dM Fail _u _rho = empty
 dM (If e1 e2 e3) u rho =
@@ -263,8 +183,7 @@ dM _ _ _ = undefined
 dB :: Exp -> W -> Env -> Set Env
 dB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
 
-
-
+{-
 -- f:=fun_c(g:=fun_c(0){0}){g[0]} ; f[fun_c(0){0}]
 exp40 :: Exp
 exp40 = Def "f" (Fun Closed (Def "g" (Fun Closed (Int 0) (Int 0))) (App (Var "g") (Int 0))) `Seq` App (Var "f") (Fun Closed (Int 0) (Int 0))
@@ -273,6 +192,7 @@ exp40 = Def "f" (Fun Closed (Def "g" (Fun Closed (Int 0) (Int 0))) (App (Var "g"
 exp41 :: Exp
 exp41 = Def "f" (Fun Closed (Def "g" (Fun Closed cint cint)) (App (Var "g") (Int 0))) `Seq` App (Var "f") (Fun Closed (Int 0) (Int 0))
   where cint = Colon (Var "int")
+-}
 
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
@@ -282,7 +202,10 @@ allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
 
 main :: IO ()
 main = do
+  print $ dD (Fun Closed (Fun Closed (Int 1) (Int 1)) (Int 2)) rho0
+  print $ dD (fst exp47) rho0
   putStrLn "Start dP"
   runExamples dP allExps
   putStrLn "Start dP'"
   runExamples dP' allExps
+

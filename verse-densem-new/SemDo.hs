@@ -4,7 +4,7 @@
 module Main where
 import Prelude(Show(..), Ord(..), Eq(..), Num(..),
                Bool(..), String, IO,
-               sequence, error, uncurry, undefined, traverse,
+               sequence, uncurry, undefined, traverse,
                ($), (.), not, (&&), (||), otherwise,
                putStrLn,
                )

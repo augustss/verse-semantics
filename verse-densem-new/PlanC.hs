@@ -4,40 +4,31 @@ import Control.Monad.State.Strict
 import qualified Data.Map as M
 import Data.List
 import Data.Data
-import Data.Generics.Uniplate.Data(universeBi, transform, universe)
+--import Data.Generics.Uniplate.Data(universeBi, transform, universe)
 --import Data.Maybe
 import Exp hiding (dI)
 import Val
 import Set
 import Env
 import Examples
-import Debug.Trace
+--import Debug.Trace
 
 implies :: Bool -> Bool -> Bool
 implies x y = not x || y
 
 --------------------------------------------------
 
-data CExp = CVal CVal | CApp CVal CVal
+data CExp = CVar Ident | CInt Integer | CPrim Op | CTup [CExp] | CApp CExp CExp
           | CEqu CExp CExp | CSeq CExp CExp | CWhere CExp CExp | CExi Ident
           | CIf CExp CExp CExp | CLam OC Ident CExp CExp
           | CFail
   deriving (Eq, Ord, Data)
 
-data CVal = CVar Ident | CInt Integer | CPrim Op | CTup [CVal]
-  deriving (Eq, Ord, Data)
-
-cVar :: Ident -> CExp
-cVar = CVal . CVar
-
-cInt :: Integer -> CExp
-cInt = CVal . CInt
-
-cTup :: [CVal] -> CExp
-cTup = CVal . CTup
-
 instance Show CExp where
-  showsPrec p (CVal v) = showsPrec p v
+  showsPrec _ (CVar s) = showString s
+  showsPrec p (CInt i) = showsPrec p i
+  showsPrec _ (CPrim o) = showString (drop 1 $ show o)
+  showsPrec _ (CTup es) = showString "<" . showString (intercalate "," $ map show es) . showString ">"
   showsPrec _ (CApp e1 e2) = showsPrec 11 e1 . showString "[" . showsPrec 0 e2 . showString "]"
   showsPrec p (CEqu e1 e2) = showParen (p > 5) $ showsPrec 6 e1 . showString " = " . showsPrec 6 e2
   showsPrec p (CSeq e1 e2) = showParen (p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
@@ -51,16 +42,12 @@ instance Show CExp where
                               showParen True (showString i) . showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2)
 
-instance Show CVal where
-  showsPrec _ (CVar s) = showString s
-  showsPrec p (CInt i) = showsPrec p i
-  showsPrec _ (CPrim o) = showString (drop 1 $ show o)
-  showsPrec _ (CTup es) = showString "<" . showString (intercalate "," $ map show es) . showString ">"
-
 dI :: CExp -> [Ident]
+dI (CApp e1 e2) = dI e1 `union` dI e2
 dI (CEqu e1 e2) = dI e1 `union` dI e2
 dI (CSeq e1 e2) = dI e1 `union` dI e2
 dI (CWhere e1 e2) = dI e1 `union` dI e2
+dI (CTup es) = foldr union [] (map dI es)
 dI (CExi x) = [x]
 dI _ = []
 
@@ -87,74 +74,60 @@ syntax :: Ident -> Exp -> CExp
 syntax u e = evalState (syntaxN u e) 1
 
 syntaxN :: Ident -> Exp -> N CExp
-syntaxN u (Int k) = pure $ u =.= cInt k
-syntaxN u (Var x) = pure $ u =.= cVar x
-syntaxN u (Prim p) = pure $ u =.= CVal (CPrim p)
-syntaxN "_" (Tup es) = do
-  (css, xs) <- unzip <$> mapM (syntaxNVal "t") es
-  pure $ cseqs $ concat css ++ [cTup xs]
+syntaxN u (Var "any") = mustBeVar u                         -- hack for any
+syntaxN u (Int k) = pure $ u =.= CInt k
+syntaxN u (Var x) = pure $ u =.= CVar x
+syntaxN u (Prim p) = pure $ u =.= CPrim p
+syntaxN "_" (Tup es) = CTup <$> mapM (syntaxN "_") es
 syntaxN u (Tup es) = do
-  xs <- newVars (length es) "x"
   us <- newVars (length es) "u"
   cs <- zipWithM syntaxN us es
-  let cs' = zipWith (\ x c -> cVar x `CEqu` c) xs cs
-  pure $ cseqs $ map CExi us ++ [u =.= cTup (map CVar us)] ++ cs' ++ [cTup $ map CVar xs]
-syntaxN u (App e0 e1) = do
-  (c0, f) <- syntaxNVal "f" e0
-  (c1, x) <- syntaxNVal "x" e1
-  pure $ cseqs $ c0 ++ c1 ++ [u =.= CApp f x]
+  pure $ cseqs $ map CExi us ++ [u =.= CTup (map CVar us)] ++ cs ++ [CTup cs]
+syntaxN u (App e0 e1) = (u =.=) <$> (CApp <$> syntaxN "_" e0 <*> syntaxN "_" e1)
 syntaxN u (Equ e0 e1) = CEqu <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (Def x e) = do
   c <- syntaxN u e
-  pure $ cseqs [CExi x, cVar x `CEqu` c]
+  pure $ cseqs [CExi x, CVar x `CEqu` c]
 syntaxN u (Colon e) = do
-  (c, f) <- syntaxNVal "f" e
-  pure $ cseqs $ c ++ [CApp f (CVar u)]
+  u' <- mustBeVar u
+  CApp <$> syntaxN "_" e <*> pure u'
 syntaxN u (Seq e0 e1) = CSeq <$> syntaxN "_" e0 <*> syntaxN u e1
 syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
 syntaxN u (If e0 e1 e2) = CIf <$> syntaxN "_" e0 <*> syntaxN u e1 <*> syntaxN u e2
+syntaxN "_" (Fun q e0 e1) = do
+  i <- newVar "i"
+  CLam q i <$> syntaxN i e0 <*> syntaxN "_" e1
 syntaxN u (Fun q e0 e1) = do
   i <- newVar "i"
   x <- newVar "x"
   k <- newVar "k"
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
-  pure $ CLam q i (cseqs [ CExi x, cVar x `CEqu` c0 ]) (cseqs [CExi k, k =.= CApp (CVar u) (CVar x), c1 ])
+  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k, k =.= CApp (CVar u) (CVar x), c1 ])
 syntaxN _ Fail = pure CFail
 syntaxN _ Choice{} = undefined
 syntaxN _ All{} = undefined
 syntaxN _ For{} = undefined
 
--- Put the expression in a variable.
--- The special cases vastly reduce the number of existentials.
-syntaxNVal :: String -> Exp -> N ([CExp], CVal)
-syntaxNVal _ (Int k) = pure ([], CInt k)
-syntaxNVal _ (Var x) = pure ([], CVar x)
-syntaxNVal _ (Prim p) = pure ([], CPrim p)
-syntaxNVal s (Tup es) = do
-  (css, xs) <- unzip <$> mapM (syntaxNVal s) es
-  return (concat css, CTup xs)
-syntaxNVal s e = do
-  x <- newVar s
-  c <- syntaxN "_" e
-  return ([CExi x, cVar x `CEqu` c], CVar x)
-
---mustBeVar :: Ident -> N CExp
---mustBeVar "_" = do u <- newVar "u"; pure (CExi u `CSeq` CVar u)
---mustBeVar u = pure (CVar u)
+mustBeVar :: Ident -> N CExp
+mustBeVar "_" = do u <- newVar "u"; pure (CExi u `CSeq` CVar u)
+mustBeVar u = pure (CVar u)
 
 infix 4 =.=
 
 (=.=) :: Ident -> CExp -> CExp
 "_" =.= c                 = c
-u   =.= CApp (CVar "_") _ = cVar u
-u   =.= c                 = cVar u `CEqu` c
+u   =.= CApp (CVar "_") _ = CVar u
+u   =.= c                 = CVar u `CEqu` c
 
+{-
 -- Remove some nonsense
 cleanup :: CExp -> CExp
 cleanup =
+{-
   seqAssoc .
   removeExis .
+-}
   seqAssoc
 
 -- Flatten Seq into its right associative form, remove values to the left of ;
@@ -163,13 +136,21 @@ seqAssoc (CEqu e1 e2) = CEqu (seqAssoc e1) (seqAssoc e2)
 seqAssoc (CSeq e1 e2) = seqApp (seqAssoc e1) (seqAssoc e2)
   where seqApp (CSeq s1 s2) s3 = xSeq s1 (seqApp s2 s3)
         seqApp s1 s2 = xSeq s1 s2
-        xSeq (CVal _) s = s
+        xSeq s1 s2 | isVal s1 = s2
         xSeq s1 s2 = CSeq s1 s2
 seqAssoc (CWhere e1 e2) = CWhere (seqAssoc e1) (seqAssoc e2)
 seqAssoc (CIf e1 e2 e3) = CIf (seqAssoc e1) (seqAssoc e2) (seqAssoc e3)
 seqAssoc (CLam q x e1 e2) = CLam q x (seqAssoc e1) (seqAssoc e2)
 seqAssoc e = e
 
+isVal :: CExp -> Bool
+isVal CInt{} = True
+isVal CVar{} = True
+isVal CPrim{} = True
+isVal _ = False
+-}
+
+{-
 -- Turn 'CExi x; ...; x = e' into '...; e'
 -- if those are the only two occurences of x.
 removeExis :: CExp -> CExp
@@ -189,6 +170,7 @@ allVariables e =
   [ i | CVar i <- universeBi e ] ++
   [ i | CExi i <- universeBi e ] ++
   [ i | CLam _ i _ _ <- universeBi e ]
+-}
 
 -------------------------------------------
 
@@ -197,15 +179,12 @@ apply (VTup ws) (VInt k) | 0 <= k' && k' < length ws = sing (ws !! k')  where k'
 apply (VFcn (Fcn _ xys)) w = maybe empty sing $ M.lookup w xys
 apply _ _ = empty
 
-dV :: CVal -> Env -> W
-dV (CVar x)  rho = lookupEnv x rho
-dV (CInt k)    _ = VInt k
-dV (CPrim p)   _ = dO p
-dV (CTup es) rho = VTup (map (flip dV rho) es)
-
 dE :: CExp -> Env -> WS
-dE (CVal v)       rho                       = sing (dV v rho)
-dE (CApp e1 e2)   rho                       = apply (dV e1 rho) (dV e2 rho)
+dE (CVar x)  rho                            = sing $ lookupEnv x rho
+dE (CInt k)    _                            = sing $ VInt k
+dE (CPrim p)   _                            = sing $ dO p
+dE (CTup es) rho                            = mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
+dE (CApp e1 e2)   rho                       = mkSet [ r | v1 <- unSet $ dE e1 rho, v2 <- unSet $ dE e2 rho, r <- unSet $ apply v1 v2 ]
 dE (CEqu e1 e2)   rho                       = dE e1 rho `isect` dE e2 rho
 dE (CSeq e1 e2)   rho | isEmpty (dE e1 rho) = empty
                       | otherwise           = dE e2 rho
@@ -213,7 +192,10 @@ dE (CWhere e1 e2) rho | isEmpty (dE e2 rho) = empty
                       | otherwise           = dE e1 rho
 dE (CExi _)         _                       = sing $ VInt 99999
 dE CFail            _                       = empty
-dE (CIf _e1 _e2 _e3)   _                       = error "CIf"
+dE (CIf e1 e2 e3) rho                       = do
+  case [ rho' | rho' <- dX e1 rho, not (isEmpty (dE e1 rho')) ] of
+    [] -> dE e3 rho
+    rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]  -- XX Not the correct semantics
 dE (CLam q i e1 e2)   rho                   = mkSet
   [ VFcn f
   | VFcn f <- unSet allWs
@@ -238,7 +220,7 @@ dD :: CExp -> Env -> WS
 dD e rho = sUnion [ dE e rho' | rho' <- dX e rho ]
 
 den :: Exp -> WS
-den e = dD (cleanup $ syntax "_" e) rho0
+den e = dD (syntax "_" e) rho0
 
 dP :: Exp -> RVal
 dP e =
@@ -246,25 +228,15 @@ dP e =
     [v] -> RVal v
     _   -> Wrong ""
 
-xx1, xx2 :: Exp
-xx1 = Fun Closed (Def "x" (Int 1)) (Var "x")
-xx2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x" `Equ` Int 1)
-
-{-
-xx3 :: CExp
-xx3 = CLam Closed "i1" $ cseqs [cVar "i1" `CEqu` cInt 1]
-
-xx4 :: CExp
-xx4 = CLam Closed "i1" $ cseqs [cVar "i1" `CEqu` CVal (CPrim Oint), cVar "i1" `CEqu` cInt 1]
--}
-
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp33, exp34, exp35
+           exp20, exp21, exp22, exp33, exp34, exp35, exp45, exp46, exp47, exp48
           ]
 
 main :: IO ()
 main = do
   putStrLn "Start"
+  print $ den (fst exp47)
+  print $ den (fst exp48)
   runExamples dP allExps

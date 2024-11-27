@@ -246,3 +246,26 @@ exp43 = Def "x" (Int 1 `Choice` Int 2) `Seq` If (Var "x" `Equ` Int 1) (Int 0 `Ch
 exp44 :: Example
 exp44 = If (Var "x" `Equ` Int 1) (Int 0 `Choice` Int 1) (Int 2 `Choice` Int 1 `Choice` Int 0) `Seq` Def "x" (Int 1 `Choice` Int 2)
       === "XXX7"
+
+-- fun_c(x:=1){x}
+exp45 :: Example
+exp45 = Fun Closed (Def "x" (Int 1)) (Var "x")
+      === "id1"
+
+-- fun_c(x:int){x=1}
+exp46 :: Example
+exp46 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x" `Equ` Int 1)
+      === "Wrong"
+
+-- f:=fun_c(fun_c(0){1}){2}; h:= :any; f[h]; h
+exp47 :: Example
+exp47 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
+        Def "h" (Colon (Var "any")) `Seq`
+        App {-(Var "f")-}f (Var "h") `Seq`
+        Var "h"
+      === "Wrong"
+  where f = Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)
+
+exp48 :: Example
+exp48 = App (fst exp47) (Int 0)
+      === "1"
