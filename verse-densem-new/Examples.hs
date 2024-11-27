@@ -263,9 +263,22 @@ exp47 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
         Def "h" (Colon (Var "any")) `Seq`
         App {-(Var "f")-}f (Var "h") `Seq`
         Var "h"
-      === "Wrong"
+      === "succ0"
   where f = Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)
 
 exp48 :: Example
 exp48 = App (fst exp47) (Int 0)
+      === "1"
+
+-- f:=fun_c(fun_o(0){1}){2}; h:= :any; f[h]; h
+exp49 :: Example
+exp49 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
+        Def "h" (Colon (Var "any")) `Seq`
+        App {-(Var "f")-}f (Var "h") `Seq`
+        Var "h"
+      === "Wrong"
+  where f = Fun Closed (Fun Open (Int 0) (Int 1)) (Int 2)
+
+exp50 :: Example
+exp50 = App (fst exp49) (Int 0)
       === "1"

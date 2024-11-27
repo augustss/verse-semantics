@@ -1,6 +1,7 @@
 module Val where
 import qualified Data.Map as M
 import Data.Maybe
+import Set
 
 --------------------
 ---- Values
@@ -61,6 +62,11 @@ function :: Val -> Bool
 function (VFcn _) = True
 function (VTup _) = True
 function _ = False
+
+domV :: Val -> Set Val
+domV (VFcn (Fcn _ m)) = mkSet (M.keys m)
+domV (VTup es) = mkSet [ VInt (toInteger i) | i <- [0..length es-1] ]
+domV _ = error "domV"
 
 --------------------
 

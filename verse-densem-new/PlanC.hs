@@ -211,6 +211,9 @@ dE (CLam q i e1 e2)   rho                   = mkSet
          (existsL (dX e1 rho) $ \rho' -> not (isEmpty (dE e1 (extend rho' i w)))))
   ]
 
+--domE :: Exp -> Env -> WS
+--domE e rho = mkSet [ x | x <- unSet allWs, rho' <- unSet $ dX e rho, not (isEmpty (dM e x rho') ) ]
+
 dX :: CExp -> Env -> [Env]
 dX e rho = 
   let exts = sequence $ map (\ x -> map (x,) (unSet allWs)) (dI e)
@@ -231,14 +234,14 @@ dP e =
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp33, exp34, exp35, exp45, exp46, exp47, exp48
+           exp20, exp21, exp22, exp33, exp34, exp35, exp45, exp46, exp49, exp50
           ]
 
 main :: IO ()
 main = do
   putStrLn "Start"
---  print $ den (fst exp47)
-  runExamples dP allExps
+  print $ den (fst exp47)
+--  runExamples dP allExps
 
 {-
 aaa = Fun Closed aaa1 (Int 2)

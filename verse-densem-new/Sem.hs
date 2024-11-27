@@ -89,7 +89,10 @@ dE (Fun q e1 e2) rho = mkSet
                forAll (dX e1 rho) $ \ rho' ->
                  not (isEmpty (dM e1 x rho'))
                  `implies`
-                (x `inDomV` f && apV f x `sIn` dD e2 rho')
+                ( x `inDomV` f &&
+--                  trace ("good " ++ show (f, e1, x)) True &&
+                  apV f x `sIn` dD e2 rho')
+--           , trace ("all good " ++ show (ee, f)) True
            , (q == Closed)
              `implies`
              (forAll allWs $ \ x ->
@@ -148,6 +151,11 @@ dM (Tup es) u rho | VTup us <- u, length us == length us =
 dM (Fun q e1 e2) u rho = mkSet
   [ f | f <- unSet allWs, function f
            , g <- [u], function g
+
+           , (q == Closed)
+             `implies`
+             (domV u == domE e1 rho)
+
            , forAll allWs $ \ x ->
                forAll (dX e1 rho) $ \ rho' ->
                  forAll (dM e1 x rho') $ \ y ->
@@ -162,6 +170,10 @@ dM (Fun q e1 e2) u rho = mkSet
                  (exists (dX e1 rho) $ \ rho' ->
                     not (isEmpty (dM e1 x rho')))
              )
+
+--  , trace (show (f, (u, domV u), (e1, domE e1 rho), domV u == domE e1 rho)) True
+
+--           , trace ("*** " ++ show f) True
   ]
 
 {-
@@ -177,6 +189,10 @@ dM (Fun q e1 e2) u rho = mkSet
   ]
 -}
 dM _ _ _ = undefined
+
+domE :: Exp -> Env -> WS
+domE e rho = mkSet [ x | x <- unSet allWs, rho' <- unSet $ dX e rho, not (isEmpty (dM e x rho') ) ]
+
 
 -- Solve
 -- (Like C, but for M)
@@ -197,15 +213,12 @@ exp41 = Def "f" (Fun Closed (Def "g" (Fun Closed cint cint)) (App (Var "g") (Int
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp33, exp34, exp35, exp47, exp48
+           exp20, exp21, exp22, exp33, exp34, exp35, exp47, exp48, exp49, exp50
           ]
 
 main :: IO ()
 main = do
---  print $ dD (fst exp47) rho0
---  print $ dD (fst exp48) rho0
   putStrLn "Start dP"
   runExamples dP allExps
   putStrLn "Start dP'"
   runExamples dP' allExps
-

@@ -39,7 +39,7 @@ allWs :: WS
 allWs = S.fromList $
   nonFcn ++
   [ dO o | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, fid1, id01, f01, const0, const1, const2, const3, fsucc, fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4 ]
+  map VFcn [ id0, fid1, id01, f01, const0, const1, const2, const3, fsucc, fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5 ]
   where
     nonFcn =
       allInts ++
@@ -55,19 +55,20 @@ allWs = S.fromList $
     comp = mkFcn "comparable" [(w, w) | w <- nonFcn ]
     -- The function that accepts f:int->int as an argument and returns f[1]
     ho1 = mkFcn "ho1" [(VFcn fsucc, VInt 2), (VFcn fpred, VInt 0), (VFcn fint, VInt 1),
-                       (VFcn fsuccsucc, VInt 3), (VFcn comp, VInt 1),
+                       (VFcn fsuccsucc, VInt 3), --(VFcn comp, VInt 1),
                        (VFcn const0, VInt 0), (VFcn const1, VInt 1), (VFcn const2, VInt 2), (VFcn const3, VInt 3)
                       ]
     ho2 = mkFcn "ho2" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                       (VFcn fsuccsucc, VInt 0), (VFcn comp, VInt 2),
+                       (VFcn fsuccsucc, VInt 0), --(VFcn comp, VInt 2),
                        (VFcn const0, VInt 0), (VFcn const1, VInt 1), (VFcn const2, VInt 2), (VFcn const3, VInt 3)
                       ]
     ho3 = mkFcn "ho3" [(VFcn fsucc, VInt 3), (VFcn fpred, VInt 1), (VFcn fint, VInt 2),
-                       (VFcn fsuccsucc, VInt 0), (VFcn comp, VInt 2),
+                       (VFcn fsuccsucc, VInt 0), --(VFcn comp, VInt 2),
                        (VFcn const0, VInt 1), (VFcn const1, VInt 2), (VFcn const2, VInt 3), (VFcn const3, VInt 0)
                       ]
     ho4 = mkFcn "ho4" $ [(VFcn fsucc, VInt 2), (VFcn succ0, VInt 2), (VFcn const1, VInt 2)]
                       ++ [ (VTup [VInt 1,i], VInt 2) | i <- allInts ]
+    ho5 = mkFcn "ho5" [(VFcn succ0, VInt 2)]
 
 fid1 :: Fcn Val Val
 fid1 = mkFcn "id1" [(VInt 1, VInt 1)]
