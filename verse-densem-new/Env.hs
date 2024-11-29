@@ -39,7 +39,8 @@ allWs :: WS
 allWs = S.fromList $
   nonFcn ++
   [ dO o | o <- [Oint, Ogt, Oadd] ] ++
-  map VFcn [ id0, fid1, id01, f01, const0, const1, const2, const3, fsucc, fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5 ]
+  map VFcn [ id0, fid1, id01, f01, const0, const1, const2, const3, fsucc,
+             fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7 ]
   where
     nonFcn =
       allInts ++
@@ -69,6 +70,8 @@ allWs = S.fromList $
     ho4 = mkFcn "ho4" $ [(VFcn fsucc, VInt 2), (VFcn succ0, VInt 2), (VFcn const1, VInt 2)]
                       ++ [ (VTup [VInt 1,i], VInt 2) | i <- allInts ]
     ho5 = mkFcn "ho5" [(VFcn succ0, VInt 2)]
+    ho6 = mkFcn "h06" [(VInt 0, VFcn fint)]
+    ho7 = mkFcn "h07" [(VInt 0, VFcn comp)]
 
 fid1 :: Fcn Val Val
 fid1 = mkFcn "id1" [(VInt 1, VInt 1)]

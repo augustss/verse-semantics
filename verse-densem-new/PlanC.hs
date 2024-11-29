@@ -21,7 +21,7 @@ implies x y = not x || y
 data CExp = CVar Ident | CInt Integer | CPrim Op | CTup [CExp] | CApp CExp CExp
           | CEqu CExp CExp | CSeq CExp CExp | CWhere CExp CExp | CExi Ident
           | CIf CExp CExp CExp | CLam OC Ident CExp CExp
-          | CFail
+          | CFail | COfType CExp CExp
   deriving (Eq, Ord, Data)
 
 instance Show CExp where
@@ -41,12 +41,14 @@ instance Show CExp where
   showsPrec _ (CLam q i e1 e2) = showString (if q == Open then "lam_o" else "lam_c") .
                               showParen True (showString i) . showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2)
+  showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
 
 dI :: CExp -> [Ident]
 dI (CApp e1 e2) = dI e1 `union` dI e2
 dI (CEqu e1 e2) = dI e1 `union` dI e2
 dI (CSeq e1 e2) = dI e1 `union` dI e2
 dI (CWhere e1 e2) = dI e1 `union` dI e2
+dI (COfType e1 e2) = dI e1 `union` dI e2
 dI (CTup es) = foldr union [] (map dI es)
 dI (CExi x) = [x]
 dI _ = []
@@ -88,9 +90,15 @@ syntaxN "_" (Def x (Colon (Var "any"))) = pure $ CExi x   -- hack for x:any
 syntaxN u (Def x e) = do
   c <- syntaxN u e
   pure $ cseqs [CExi x, CVar x `CEqu` c]
-syntaxN u (Colon e) = do
-  u' <- mustBeVar u
-  CApp <$> syntaxN "_" e <*> pure u'
+syntaxN u (Def2 x y e) = do
+  c <- syntaxN u e
+  pure $ cseqs [CExi x, u === CVar x, CExi y, CVar y `CEqu` c]
+syntaxN "_" (Colon e) = do
+  x <- newVar "x"
+  c <- syntaxN x e
+  pure [ CExi x, c ]
+syntaxN u (Colon e) =
+  COfType <$> pure (CVar u) <*> syntaxN "_" e
 syntaxN u (Seq e0 e1) = CSeq <$> syntaxN "_" e0 <*> syntaxN u e1
 syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
 syntaxN u (If e0 e1 e2) = CIf <$> syntaxN "_" e0 <*> syntaxN u e1 <*> syntaxN u e2
@@ -185,6 +193,7 @@ dE (CInt k)    _                            = sing $ VInt k
 dE (CPrim p)   _                            = sing $ dO p
 dE (CTup es) rho                            = mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
 dE (CApp e1 e2)   rho                       = mkSet [ r | v1 <- unSet $ dE e1 rho, v2 <- unSet $ dE e2 rho, r <- unSet $ apply v1 v2 ]
+dE (COfType e1 e2) rho                      = dE (CApp e2 e1) rho
 dE (CEqu e1 e2)   rho                       = dE e1 rho `isect` dE e2 rho
 dE (CSeq e1 e2)   rho | isEmpty (dE e1 rho) = empty
                       | otherwise           = dE e2 rho
@@ -199,6 +208,7 @@ dE (CIf e1 e2 e3) rho                       = do
 dE (CLam q i e1 e2)   rho                   = mkSet
   [ f
   | f <- unSet allWs, function f
+--  , (q == Closed) `implies` hackyDomainTest i e1 e2 rho
   , forAll allWs $ \ w ->
       forAllL (dX e1 rho) $ \ rho' ->
         not (isEmpty (dE e1 (extend rho' i w)))
@@ -210,6 +220,13 @@ dE (CLam q i e1 e2)   rho                   = mkSet
        (w `inDomV` f) `implies`
          (existsL (dX e1 rho) $ \rho' -> not (isEmpty (dE e1 (extend rho' i w)))))
   ]
+
+-- Check that e1 and e2 fail on exactly the same inputs.
+hackyDomainTest :: Ident -> CExp -> CExp -> Env -> Bool
+hackyDomainTest i e1 e2 rho =
+  forAll allWs $ \ w ->
+    forAllL (dX e1 rho) $ \ rho' ->
+      isEmpty (dE e1 (extend rho' i w)) == isEmpty (dD e2 rho')
 
 --domE :: Exp -> Env -> WS
 --domE e rho = mkSet [ x | x <- unSet allWs, rho' <- unSet $ dX e rho, not (isEmpty (dM e x rho') ) ]
@@ -240,8 +257,8 @@ allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
 main :: IO ()
 main = do
   putStrLn "Start"
-  print $ den (fst exp47)
---  runExamples dP allExps
+--  print $ den (fst exp47)
+  runExamples dP allExps
 
 {-
 aaa = Fun Closed aaa1 (Int 2)

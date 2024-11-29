@@ -29,6 +29,9 @@ runExample eval (e, r) = do
 --------------------
 ---- Examples
 
+cint :: Exp
+cint = Colon (Prim Oint)
+
 -- x:=2; y:=1; add[(x,y)]
 exp1 :: Example
 exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))
@@ -62,7 +65,6 @@ exp7 :: Example
 exp7 = Fun Closed arg (App (Var "f") (Int 1))
      === "ho1"
   where arg = Def "f" (Fun Closed cint cint)
-        cint = Colon (Var "int")
 
 exp8 :: Example
 exp8 = App (fst exp7) (Var "succ")
@@ -82,7 +84,6 @@ exp11 = Fun Closed arg (App (Var "f") (Int 1))
       === "ho2"
   where arg = Def "f" (Fun Closed csucc cint)
         csucc = Colon (Var "succ")
-        cint = Colon (Var "int")
 
 exp12 :: Example
 exp12 = App (fst exp11) (Var "int")
@@ -115,7 +116,6 @@ exp17 = Fun Closed arg (App (Var "f") (Int 1))
       === "ho3"
   where arg = Def "f" (Fun Closed cint csucc)
         csucc = Colon (Var "succ")
-        cint = Colon (Var "int")
 
 exp18 :: Example
 exp18 = App (fst exp17) (Var "int")
@@ -188,25 +188,21 @@ exp32 :: Example
 exp32 = Fun Closed (Def "y" (Choice (Int 1) (Int 2)) `Seq` Int 0)
                    (If (Var "y" `Equ` Int 1) (Tup [Int 1, cint]) (Tup [cint, Int 2]))
       === "f0t12"
-  where cint = Colon (Var "int")
 
 -- (1, :int) = (:int, 2)
 exp33 :: Example
 exp33 = Tup [Int 1, cint] `Equ` Tup [cint, Int 2]
       === "[1,2]"
-  where cint = Colon (Var "int")
 
 -- fun_c(x:=:int; :int){0}
 exp34 :: Example
 exp34 = Fun Closed (Def "x" cint `Seq` cint) (Int 0)
       === "const0"
-  where cint = Colon (Var "int")
 
 -- fun_c((x:=a; x:int) where a:int){x}
 exp35 :: Example
 exp35 = Fun Closed (((Var "x" `Equ` Var "a") `Seq` Def "x" cint) `Where` Def "a" cint) (Var "x")
       === "int"
-  where cint = Colon (Var "int")
 
 -- fun_c(a:=0|1; x:=a){x}
 exp36 :: Example
@@ -292,3 +288,15 @@ exp51 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "x")
 exp52 :: Example
 exp52 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "y")
       === "succ"
+
+exp53 :: Example
+exp53 = Fun Open (Def "x" cint) (Var "x")
+      === "Wrong"
+
+exp54 :: Example
+exp54 = Fun Closed (Int 0) (fst exp53)
+      === "Wrong"
+
+exp55 :: Example
+exp55 = App (App (fst exp54) (Int 0)) (Int 2)
+      === "2"
