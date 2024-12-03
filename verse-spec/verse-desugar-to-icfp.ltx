@@ -1,0 +1,144 @@
+% ----------------------------------------------------
+%
+%          Desugar to ICFP lambdas
+%
+%         Was: desugaring.ltx
+%
+% ----------------------------------------------------
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\mbox{\bf Syntax} \\
+\multicolumn{1}{c}{\begin{array}{rcll}
+  |si| & ::= &  |sipat e|  \vb |sibody| \\
+  |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\
+\end{array}} \\
+
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Auxiliary functions:} $|De2 md t| = |e|$, $|DB md j si t| = |e|, |havoc fx = e|$}} \\[0.02in]
+\rulename{dinit}   & |De2 md t | & = & |DMe2 md sibody t| \\[1mm]
+\rulename{dbody1}   & |DB md j sibody t| & = & |DMe2 md sibody t|\\
+\rulename{dbody2}   & |DB md j (sipat f) t| & = & |DMe2 md (sipat (apply1N f j)) t|\\[1mm]
+% \rulename{hide}     & |Hide t|  & = & |forall (r_1 r_2) (assume (r_1 == apply1N t r_2); r_1)| \\[1mm]
+\rulename{funchk-e}     & |FunCheck sibody| & = & |tup ()| \\
+\rulename{funchk-p}     & |FunCheck (sipat f)| & = & |apply1N isFun f| \\[1mm]
+
+\rulename{havoc-succ}     & |havoc2 succeeds e|  & = & |e| \\
+\rulename{havoc-fail}     & |havoc2 fails e|  & = & |fail| \\
+\rulename{havoc-dec}     & |havoc2 decides e|  & = & |some (lam x x) == tup(); e| \\[1mm]
+\end{array} \\
+
+\begin{array}{lr@@{\;}c@@{\;}ll}
+\multicolumn{5}{l}{\mbox{{\bf Desugaring expressions:} $|DMe2 md si t| = |e|$}} \\[0.02in]
+
+\multicolumn{4}{l}{\mbox{\it Closed functions}} \\
+ \rulename{mcfun+} &  |DMe2 mdpos si (functionOC closed t_1 t_2)|
+ & = & \multicolumn{2}{@@{}l}{|verify2 r () (j := DMe2 mdneg (sipat r) t_1; DB mdpos j si t_2 );|} \\
+    &&& |DMe2 mdneg si (functionOC closed t_1 t_2)| \\[1mm]
+\rulename{mcfun-} &  |DMe2 mdneg si (functionOC closed t_1 t_2)|
+& = & |FunCheck si; lam i (j := DMe2 mdpos (sipat i) t_1;
+                    DB mdneg j si t_2)| \\[1mm]
+\rulename{mcfunx}& |DMe2 mdx si (functionOC closed t_1 t_2)|
+& = & |FunCheck si; lam i (j := DMe2 mdx (sipat i) t_1; DB mdx j si t_2)| \\[2mm]
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+
+%--------- (t1 |><fx> t2) ----------------
+\multicolumn{4}{l}{\mbox{\it Type rules}} \\
+\rulename{moftype-} & |DMe2 mdneg si (oftypefx t_1 fx t_2)|
+  & = & |z := De2 mdneg t_2; freevars t_1 guard (havoc2 fx (some z))| \\
+\rulename{moftype+x} & |DMe2 md si (oftypefx t_1 fx t_2)| & = &
+  \begin{array}[t]{@@{}l}
+  |y := check fx (DMe2 mdx si t_1);| \\
+  |check succeeds (z := De2 mdx t_2; apply1N z y)|
+  \end{array}   & |md|\in\{|mdpos|,|mdx|\} \\
+
+%--------- (:<fx> t) ----------------
+\rulename{mtype-}  & |DMe2 mdneg (sipat e) (colonfx fx t)| & = & |z:=De2 mdneg t; freevars e guard (havoc2 fx (some z))| \\
+\rulename{mtype+x1} & |DMe2 md    (sipat e) (colonfx empty t)| & = & |y := e; z:=De2 md t; apply1N z y|  & |md|\in\{|mdpos|,|mdx|\}\\
+\rulename{mtype+x2} & |DMe2 md    (sipat e) (colonfx fx t)| & = &
+  \begin{array}[t]{@@{}l}
+  |y := check fx e;| \\
+  |check succeeds (z := De2 mdx t; apply1N z y)|
+  \end{array}   & |md|\in\{|mdpos|,|mdx|\} \\
+\rulename{mtypee}  & |DMe2 md sibody (colonfx fx t)| & = & |def x (z:=De2 md t; apply1N z x)| \\
+
+%--------- check<fx>{t} ----------------
+\rulename{mcheck-}  & |DMe2 mdneg si (check fx t)| & = & |DMe2 mdneg si t| \\
+\rulename{mcheck+x} & |DMe2 md    si (check fx t)| & = & |check fx (DMe2 md si t)| & |md|\in\{|mdpos|,|mdx|\} \\
+
+\rulename{msquige} & |DMe2 md sibody (squig x y := t)|
+     & = & |def i (DMe2 md (sipat i) (squig x y := t))| \\
+\rulename{msquigp} & |DMe2 md (sipat i) (squig x y := t)|
+     & = & |x := i; y := DMe2 md (sipat i) t| \\
+\rulename{marraye} & |DMe2 md sibody (arr(t_1, xdots, t_n))| & = &
+    |arr (DMe2 md sibody t_1, xdots, DMe2 md sibody t_n)| \\
+\rulename{marrayp} & |DMe2 md (sipat i) (arr(t_1, xdots, t_n))| & = &
+    \multicolumn{2}{@@{}l}{|def (i_1 xdots i_n) (i == arr (i_1, xdots, i_n));
+     arr (DMe2 md (sipat i_1) t_1, xdots, DMe2 md (sipat i_n) t_n)|}
+    \\[2mm]
+
+\end{array}
+\\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{l}{\mbox{\it Propagation rules}} \\
+\rulename{mbind}   & |DMe2 md si (x:=t)|         & = & |x := DMe2 md si t| \\
+\rulename{meq}     & |DMe2 md si (t_1=t_2)|      & = & |(DMe2 md si t_1) = (DMe2 md si t_2)| \\
+\rulename{msemi}   & |DMe2 md si (t_1 ; t_2)|    & = & |De2 md t_1 ; DMe2 md si t_2| \\
+\rulename{mchoice} & |DMe2 md si (t_1 `choice` t_2)| & = & |(DMe2 md si t_1) `choice` (DMe2 md si t_2)| \\
+\rulename{mif} & |DMe2 md si (if t_1 then t_2 else t_3|
+  & = & \multicolumn{2}{@@{}l}{|if (De2 md t_1) then (DMe2 md si t_2) else (DMe2 md si t_3)|} \\[2mm]
+
+\multicolumn{4}{l}{\mbox{\it Equality rules}} \\
+\rulename{mconst}  & |DMe2 md sibody k|                  & = & |k| \\
+nnn\rulename{mvar}    & |DMe2 md sibody y|                  & = & |y| \\
+\rulename{mapp}    & |DMe2 md sibody (apply1N t_1 t_2)|  & = & |f := De2 md t_1; a := De2 md t_2; apply1N f a| \\
+\rulename{meq}     & |DMe2 md (sipat e) t| & = & |DMe2 md sibody t = e|
+\end{array}
+\end{array}$$
+\caption{{\bf DS12}: Small Source to Big Core } \label{fig:ds12}
+\end{figure}
+
+
+\begin{figure}[t]
+  $$
+\begin{array}{@@{}l}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
+\multicolumn{4}{@@{}l}{\mbox{\it Desugaring rules for open functions}} \\
+\rulename{mofun+}  & |DMe (inp2 f si mdpos) (functionOCX open t_1 fx t_2)|
+& = & \multicolumn{2}{@@{}l}{|verify(forall i (j := Me (inp2 i solve mdneg) t_1;
+                                            check fx (z := DAe (inp f si) j; (Me (inp z si) t_2)))); |} \\
+& &   & |DMe (inp2 f si mdneg) (functionOCX open t_1 fx t_2)| \\[1mm]
+
+\rulename{mofun-}  & |DMe (inp2 f si mdneg) (functionOCX open t_1 fx t_2)|
+ & = & |defhdr h olamKW| \left( \begin{array}{@@{}l@@{}}
+    |h,| \\
+    |lam i (j := Me (inp2 i infer mdx) t_1; arr (j, x_1, dots, x_n)), | \\
+    |lamhdr x| \begin{array}[t]{@@{}l@@{}}
+      |(arr (j, x_1, dots, x_n):= x; havoc fx;| \\
+      |z :=  DAe (inp f si) j; Me (inp2 z si mdneg) t_2)|
+      \end{array}
+   \end{array} \right) \\
+    && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}} \\
+
+\rulename{mofunx}  & |DMe (inp2 f si mdx) (functionOCX open t_1 fx t_2)|
+  & = & |defhdr h olamKW| \left( \begin{array}{@@{}l@@{}}
+    |h,| \\
+    |lam i (j := Me (inp2 i infer mdx) t_1; arr (j, x_1, dots, x_n)), | \\
+    |lam x (arr (j, x_1, dots, x_n):= x; z :=  DAe (inp f si) j; Me (inp2 z si mdx) t_2)|
+   \end{array} \right) \\
+    && \multicolumn{2}{l}{\text{where |x_1, dots, x_n| are the variables bound by |t_1|}}
+\end{array}
+\end{array}
+$$
+\caption{Extra stuff for open functions} \label{fig:open}
+\end{figure}
+

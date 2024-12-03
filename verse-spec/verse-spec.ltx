@@ -1,0 +1,107 @@
+\documentclass[acmsmall,screen,review]{acmart}\settopmatter{}
+
+\let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+% Boxed figures
+\floatstyle{boxed}
+\restylefloat{figure}
+
+\usepackage{../LaTex/quiver}
+\usepackage{framed}
+\usepackage{amssymb}
+\usepackage{cleveref}   % \Cref etc
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+\usepackage{conteq}
+\usepackage{textgreek}
+\usepackage{xspace}
+\usepackage{mathtools}
+\usepackage{graphicx}
+
+% \renewcommand{\arraystretch}{1.1}
+
+% Useful Latex macros
+\input{../LaTex/verse-macros}
+
+\begin{document}
+
+\title{The Specification of Verse}
+\author{Timm, Jan, Andy S, Simon, Lennart, Koen, Ranjit \today}
+\maketitle
+
+\section{Overview}
+
+\begin{itemize}
+\item {\bf Source Verse} is (an approximation of) the full source language.
+\item The \emph{superficial-desugar} pass desugars Source Verse into {\bf Essential Verse},
+  whose distinctive feature is TimLambdas.  Essential Verse is a subset of Source Verse.
+\item We have three different approaches to the denotational semantics of Essential Source Verse:
+  \begin{itemize}
+  \item Plan A: a direct denotational semantics.
+  \item Plan B: desugar into {\bf Destination Passing Style Verse} (DPS Verse), then give a semantics to that.
+  \item Plan C: desugar into {\bf Mini Verse}, still in expression style, and give a semantics to that.
+  \item Plan D: (older) desguar into {\bf ICFP Verse}, whose lambdas are simpler.
+  \end{itemize}
+
+\item The rewrite rules
+
+\item The verification rules
+
+\end{itemize}
+
+% -------------------------------------------------------------
+%               Source Verse
+% -------------------------------------------------------------
+
+\section{Source Verse, Essential Verse, and desugaring}
+
+\input{verse-source}
+
+% -------------------------------------------------------------
+%               Denotational semantics: Plan A
+% -------------------------------------------------------------
+
+\section{Denotational semantics Plan A: direct}
+
+\input{verse-densem-planA}
+
+
+% -------------------------------------------------------------
+%               Denotational semantics: Plan B
+% -------------------------------------------------------------
+
+\section{Denotational semantics Plan B: destination passing style}
+
+{\bf Currently in google doc}
+
+% -------------------------------------------------------------
+%               Denotational semantics: Plan C
+% -------------------------------------------------------------
+
+\section{Denotational semantics Plan C: expression style}
+
+{\bf Currently in google doc}
+
+% -------------------------------------------------------------
+%               Semantics: Plan D
+% -------------------------------------------------------------
+
+\section{Semantics Plan D: desugar to ICFP lambdas}
+
+\input{verse-desugar-to-icfp}
+
+% -------------------------------------------------------------
+%               Rewrite and verification rules
+% -------------------------------------------------------------
+
+\section{Rewrite and verification rules: runtime and verification}
+
+\input{verse-rules}
+
+\end{document}

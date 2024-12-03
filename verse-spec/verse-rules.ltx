@@ -1,0 +1,298 @@
+% ----------------------------------------------------
+%
+%        Rewrite and verification rules
+%
+% ----------------------------------------------------
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+
+%  -------------------------- Syntax -----------------------
+\begin{figure}[t]
+  $$
+\begin{array}{l}
+\mbox{\em Syntax} \\
+  \begin{array}{lrcl@@{}}
+      \text{Integers} & k \\
+      \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+          & |X| & ::= & |{x_1, xdots, x_n}|  \hspace{1cm} (n \geq 0)\\
+      \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
+          & |rs| & ::= & |{r_1, xdots, r_n}|  \hspace{1cm} (n \geq 0)\\
+      \text{Programs} & p  & ::=  & |check succeeds e| \quad \text{where} \; \freevars{e} = \{ \} \\
+      \text{Expressions} & |e| & ::= & |v| \vb |lv == e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail|
+                                     \vb |def x e| \vb |apply1N v_1 v_2| \vb |iter e_1 e_2 e_3 e_4| \\
+      && \vb & |some v| \vb |v guard e| \vb |check fx e|
+      \vb |verify2 rs as e| \\
+      \text{Lvalues} & |lv| & ::= & |_| \vb |v| \\
+      \text{Values} & |v| & ::= & x  \vb \hnf \\
+      \text{Ground values} & |gv| & ::= & |k| \vb |r| \vb |arr (gv_1, xdots, gv_n)| \\
+      \text{Head values} & \hnf & ::= & |k| \vb |r|  \vb |op| \vb |arr (v_1, xdots, v_n)| \vb |lam x e|
+             \vb |olam v (lam x e)|\\
+      \text{Prim operators} & |op|  & ::= & |add| \vb |sub| \vb |gt| \vb |isInt| \vb \ldots \\
+      \text{Effects} & |fx| & ::= & |succeeds| \vb |decides| \vb |fails|  \\
+      \text{Assumptions} & |a| & ::= & |r = gv| \vb |noteq r gv| \vb |r = apply1N op gv| \vb |not (apply1N op gv)| \\
+      & |as| & ::= & |{a_1, xdots, a_n}|   \hspace{1cm} (n \geq 0)
+\end{array}
+\\ \\
+\begin{array}{lrcl}
+\text{Value contexts}  & |V| & ::= & \hole \vb |tup (v_1, xdots, V, xdots, v_n)|\\
+\text{Scope contexts}  & |SX| & ::= & |iter hole e_2 e_3 e_4| \vb |hole choice e| \vb |e choice hole| \\
+\text{Evaluation contexts}  & |C| & ::= & |hole| \vb |lv == C; e| \vb |lv == e; C| \vb |def x C| \\
+\text{Proof contexts}  & |P| & ::= & |hole| \vb |lv == P; e| \vb |lv == e; P| \vb |def x P|  \\
+                       &     & \vb & |iter (FC^[P]) e_2 e_3 e_4| \vb |check fx P| \\
+\text{First choice} & |FC| & ::= & |hole| \vb |FC `choice` e| \\
+% \text{Value choice} & |VC| & ::= & |FC| \vb |v `choice` VC| \\
+% \text{Choice-free exprs} & |cf| & ::= & |v | \vb |l==cf; cf| \vb op[v] \vb |one e| \vb |all e| \vb |cf guard cf| \\
+\end{array} \\
+\\
+
+\mbox{\em Substitution} \\
+\begin{array}{ll}
+  |subst e x v| & \text{Substitute |v| for |x| everywhere in |e|} \\
+\end{array}
+\\ \\
+\mbox{\em Note}\\
+\hspace{1em} \text{In |iter e_1 e_2 e_3 e_4| the |e_3| and |e_4| are always explicit lambdas.}\\
+\hspace{1em} \text{The |e_3| has three arguments, and the |e_4| has one.}
+\\ \\
+\mbox{\em Free variables and bound variables (give definitions)} \\
+%  \begin{array}{rcl}
+%       |fvs(hole)| & = & \{ \} \\
+%       |fvs(v==E; e)| & = & |fvs(v) `cup` fvs(E) `cup` fvs(e)| \\
+%       |fvs(v==ef; E)| & = & |fvs(v) `cup` fvs(ef) `cup` fvs(E)| \\
+%       |fvs(def x E)| & = & |{x} `cup` fvs(E)| |-- this is correct| \\
+%    \end{array}
+\end{array}
+     $$
+  \caption{Core Verse Syntax} \label{fig:vc-syntax}
+\end{figure}
+
+\begin{figure}
+$\begin{array}{@@{}l}
+\begin{array}{rcll}
+  |validc x Y hole| & = & \mathit{true} \\
+  |validc x Y (def y C)| & = & |validc x (Y,y) C| \\
+  |validc x Y (l==e; C)| & = & |blockedc (x,Y) (l==e; C)| & \text{if $|x| \in \freevars{e}$} \\
+  |validc x Y (l==e; C)| & = & |blockede (x,Y) e `and` validc x Y C| & \text{if $|x| \not\in \freevars{e}$} \\
+  & & |`or` validc x (Y `delete` freevars e) C|
+\\[2mm]
+  |blockedc X hole| & = & |true| \\
+  |blockedc X (def x P)| & = & |blockedc (X,x) P| \\
+  |blockedc X (l==P; e)| & = & |blockedc X P| \\
+  |blockedc X (l==e; P)| & = & |blockede X e `and` blockedc X P| \\
+  |blockedc X (check fx P)| & = & |blockedc X P| \\
+  |blockedc X (iter (FC^[P]) e_2 e_3 e_4 )| & = & |blockedc X P| \\
+\end{array}
+\\ \\[-1mm] 
+\begin{array}{rcl}
+  |blockede X v| & = & |false|\\
+  |blockede X (l==e_1; e_2)| & = & |blockede X e_1 `and` blockede X e_2|\\
+  |blockede X (e_1 choice e_2)| & = & |blockede X e_1 `and` blockede X e_2|\\
+  |blockede X fail| & = & |false| \\
+  |blockede X (iter e_1 e_2 e_3 e_4)| & = & |blockede X e_1| \\
+  |blockede X (def x e)| & = & |blockede (X,x) e| \\
+  |blockede X (apply1N v_1 v_2)| & = & (|v_1| = |x| \in |X|) \\
+   & & |`or`| (|v_1| = |op| |`and`| |v_2 = V^[x]|) \hspace{2mm} \text{for some $|x| \in |X|$ and context |V|} \\
+  |blockede X (e_1 guard e_2)| & = & |X| \cap \freevars{|v|} \not= \emptyset\\
+  |blockede X (verify2 rs as e)| & = & |true| \\
+  |blockede X (check fx e)| & = & |blockede X e| \\
+\end{array}
+\\ \\[-1mm]
+\begin{array}{rcl}
+  |choicefreec hole| & = & |true| \\
+  |choicefreec (def x C)| & = & |choicefreec C| \\
+  |choicefreec (l==C; e)| & = & |choicefreec C| \\
+  |choicefreec (l==e; C)| & = & |choicefreee e `and` choicefreec C| \\
+  \\[2mm]
+  |choicefreee (e_1 choice e_2)| & = & |false|\\
+  |choicefreee fail| & = & |true|\\
+  |choicefreee (iter e_1 e_2 (lam (_ _ _) e_3) (lam _ e_4))| & = & |choicefreee e_3 `and` choicefreee e_4| \\
+  |choicefreee (l==e_1; e_2)| & = & |choicefreee e_1 `and` choicefreee e_2|\\
+  |choicefreee (v guard e)| & = & |choicefreee e|\\
+  |choicefreee (def x e)| & = & |choicefreee e| \\
+  |choicefreee (apply1N v_1 v_2)| & = & \text{|v_1| is a choice-free primop. \lennart{Wrong for iter}} \\
+  |choicefreee v|  & = & |true| \\
+\end{array}
+\end{array}
+$
+  \caption{Blocked expressions and contexts} \label{fig:vc-contexts}
+\end{figure}
+
+\newcommand{\alphamark}{use $\alpha$}
+
+% -----------------------------------------------------
+%                 Rewrite rules
+% -----------------------------------------------------
+
+\begin{figure}
+$\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Structural rules}
+\rulename{exi-swap} & |def x (def y e)| & \leftrightarrow & |def y (def x e)| \\
+\rulename{exi-swiz1} & |l == def x e_1; e_2| & \leftrightarrow & |def x (l==e_1; e_2| & |x| \not\in |freevars e_2|\\
+\rulename{exi-swiz2} & |l == e_1; def x e_2| & \leftrightarrow & |def x (l==e_1; e_2| & |x| \not\in |freevars e_1|\\
+\rulename{var-swap} & |x == y; e| & \leftrightarrow & |y == x; e| \\
+\rulename{exi-alpha} & |def x e| & \leftrightarrow & |def y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
+\rulename{lam-alpha} & |lam x e| & \leftrightarrow & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
+\\[-0.8em]
+
+\rulegroupname{Application}
+\rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
+\rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
+\rulename{app-lam}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
+                                                  & \text{if $x \not\in \freevars{|v|}$} \\
+\rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_nm1)) v| & \movesto &
+                            |(v == 0^^^ v_0) choice xdots choice (v == (n-1)^^^ v_nm1)| & n \geq 0 \\
+\rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail|
+\end{array}
+\\ \\[-0.8em]
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Unification}
+  \rulename{u-lit}   & |k == k; e| & \movesto & |e| & \\
+  \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|
+       & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n' `eqsemi` e| & n \geq 0\\
+  \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
+  \rulename{u-occurs} & |x==V^[x]; e| & \movesto & |fail| & \text{if $|V| \ne |hole|$} \\
+  \rulename{u-swap} & |hnf == x; e| & \movesto & |x == hnf; e| \\
+\\[-0.8em]
+
+\rulegroupname{Existentials}
+
+%\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
+%  & \text{$|v|\ne|V^[x]|$} \\
+\rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
+  & \text{if |blockedc (singleton x) C|, |((singleton x) `cup` boundvars C) `disjoint` freevars v|}  \\
+%\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
+%  & \text{if |validc x emptyset C|, $x \not= y$}  \\
+\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+% \rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $|noteq C hole|, x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
+% \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
+\end{array}
+\\ \\[-0.8em]
+\begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Normalization}
+%\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
+%\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{seq-assoc} & |lv_2 == (lv_1 == e_1; e_2); e_3| & \movesto & |lv_1 == e_1; lv_2 == e_2; e_3| \\
+% \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
+% \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
+% \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
+\rulename{seq-elim} & |_ == v ; e| & \movesto & |e| \\
+\rulename{rec} & |z = V^[lam x e_1]; e_2| & \movesto & \multicolumn{2}{l}{|z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
+  \hspace{4mm} \text{$|z| \in \freevars{|lam x e_1|}$}} \\
+
+    \\[-0.8em]
+
+\rulegroupname{Choice}
+\rulename{choice-fail-l} & |fail choice e| & \movesto & |e| & \text{Can be removed if all choices inside |iterKW|} \\
+\rulename{choice-fail-r} & |e choice fail| & \movesto & |e| & \text{Can be removed if all choices inside |iterKW|} \\
+\rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]|
+    & \text{if |noteq C hole, blockedc emptyset C, choicefreec C|}\\
+\rulename{fail} & |C^[fail]| & \movesto & |fail|
+    & \text{if |noteq C hole, blockedc emptyset C, choicefreec C|}\\
+
+    \\[-0.8em]
+
+\rulegroupname{Iter}
+\rulename{iter-fail}    & |iter fail e_a e_f e_g| & \movesto & |apply1N e_g e_a| \\
+\rulename{iter-value}   & |iter v    e_a e_f e_g| & \movesto & |apply1Np (apply1Np (apply1N e_f e_a) v) e_g| \\
+\rulename{iter-choice}  & |iter (e_1 `choice` e_2) e_a e_f e_g| & \movesto &
+   \multicolumn{2}{l}{|iter e_1 e_a e_f (lam x (iter e_2 x e_f e_g))|} \\
+
+\end{array} \\
+\\[-0.8em]
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\rulegroupname{Open Lambdas}
+  \rulename{u-olam}   & |olam z_1 v_1 == olam z_2 v_2; e| & \movesto & \multicolumn{2}{@@{}l}{|def z_3 (z_1 == olam z_3 v_2; z_2 == olam z_3 v_1); e|} \\
+  \rulename{app-olam} & |apply1N (olam z v_1) v_2| & \movesto & |def x (x == apply1N z v_2; x == apply1N v_1 v_2; x| \\
+  \rulename{exi-app} & |def z e| & \movesto &
+  \multicolumn{2}{@@{}l}{|subst e z ((lam x (def y y)))| \hspace{5mm} \text{if |z| occurs in |e| only as |apply1N z v|}}
+\end{array}
+\\
+\text{\textit{Note}: In rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.} \\
+\end{array}$
+
+\caption{\textbf{The \vcname: Rewrite rules for execution}} \label{fig:rules}
+\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
+\end{figure}
+
+% ----------------------------------------
+%             Verification rules
+% ----------------------------------------
+
+\begin{figure}[t]
+$\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+  \multicolumn{5}{l}{\textit{Auxiliary functions}} \\
+  & |skolval X v| & = & |X| \cap |freevars v| = \emptyset \\[2mm]
+
+
+\multicolumn{5}{l}{\textit{Guard}} \\
+\rulename{guard-elim} & |v guard e| & \movesto & |e| & \text{if $\skol{|v|}$}\\
+\end{array} \\
+\\[-2mm]
+
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\multicolumn{5}{l}{\textit{Check}} \\
+\rulename{check-fail}   & |check fx fail|  & \movesto & |fail|
+   & \text{$|fx| \in \{|fails|,|decides|\}$}\\
+  \rulename{check-suc}    & |check fx v|  & \movesto & |v| & \text{$\skol{|v|}, |fx| \in \{|succeeds|,|decides|\}$} \\
+  \rulename{check-choice} & |check succeeds (v choice e)|  & \movesto & |v choice (check fails e)| & \text{$\skol{|v|}$} \\
+\end{array} \\
+\\[-0.6em]
+
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\multicolumn{5}{l}{\textit{Verify} \hspace{3mm} \text{All rules require |blockedc emptyset P|}} \\
+\rulename{solver} & |verify2 rs as e| & \movesto & |tup ()| \hspace{5mm} \text{if $|rs;as| \vDash \mathit{inconsistent}$} \\
+  \rulename{verify-val} & |verify2 rs as v|      & \movesto & |tup ()| & \\
+  \rulename{verify-choice} & |verify2 rs as (e_1 choice e_2)|      & \movesto & |verify2 rs as e_1 ; verify2 rs as e_2| & \\
+  \rulename{verify-fail} & |verify2 rs as fail|    & \movesto & |tup ()| & \\[1mm]
+  \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
+  & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
+  &&& \text{if $|r| \notin |rs|$ and |skolval (boundvars P) v|} \\
+ \rulename{split-v} & |verify2 rs as (P^[r==gv; e])| & \movesto &
+    |verify2 rs (as, r==gv) (P^[ e ]);| \\
+    &&& |verify2 rs (as, noteq r gv) (P^[ fail ])|\\[1mm]
+  \rulename{split-op} & |verify2 (rs) as (P^[apply1N op gv])| & \movesto &
+          |verify2 (rs,r) (as, r = apply1N op gv) (P^[ r ]);| \\
+    &&& |verify2 rs (as, not (apply1N op gv)) (P^[ fail ])| \\
+    &&& \text{if $r \not\in R$} \\[1mm]
+ \rulename{split-tup} & \multicolumn{3}{l}{|verify2 rs as (P^[r==tup (v_1, xdots, v_n); e])|} \\
+     && \movesto & |verifyKW|
+           \begin{array}[t]{@@{}l}
+             |(rs, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
+             |{ P^[ r_1==v_1; xdots; r_n == v_n; e ] };|
+           \end{array}\\
+    &&& |verify2 rs (as, noteq r (tup (_, xdots,_))) (P^[ fail ])| \\  \\[-2mm]
+\end{array}\\
+
+\end{array}$
+\\[0.1in]
+\caption{TRS Verifier Rewrite Rules}
+\label{fig:spj-verifier-rewrite-rules}
+\end{figure}
+
+% --------------------------- Structural rules ----------------
+  \begin{figure}
+    $$
+    \begin{array}{l}
+      \textit{Structural rules} \\
+      \begin{array}{lr@@{\;}c@@{\;}ll}
+      \rulename{exi-swap} & |def x (def y e)| & \movesto & |def y (def x e)| \\
+      \rulename{val-swap} & |eq; x==v; e| & \movesto & |x==v; eq; e| \\
+      \text{\lennart{Plan D:}}\\
+      \rulename{var-swap-subst} & |X^[x==y]| & \movesto & |subst X y x^[y==x]| \\
+      % \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
+      \end{array} \\
+
+     \end{array}
+     $$
+    \caption{The Verse calculus: Structural Rules}
+    \Description{The Verse calculus: Structural Rules}
+      \label{fig:rules-structural}  \label{fig:structural}
+   \end{figure}

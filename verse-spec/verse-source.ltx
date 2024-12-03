@@ -1,0 +1,227 @@
+% ----------------------------------------------------
+%
+%            Source Verse, Essential Verse
+%        and desugaring from the former to the latter
+%
+% ----------------------------------------------------
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\subsection{Source Verse}
+
+\begin{figure}
+$$
+\begin{array}{lrcll}
+\textbf{Terms} & |t| & ::= & |x|               & \text{Variable} \\
+&      & \vb & |_|               & \text{Wildcard} \\
+&      & \vb & |k|               & \text{Constant} \\
+&      & \vb & |t_1 ; t_2|       & \text{Sequencing} \\
+&      & \vb & |t_1^[t_2]|       & \text{Function application} \\
+&      & \vb & |t_1^(t_2)|       & \text{Non-failing function application} \\
+&      & \vb & |def x t|         & \text{Existential} \\
+&      & \vb & |t_1 `choice` t_2| & \text{Choice} \\
+&      & \vb & |t_1 = t_2|       & \text{Unification} \\
+&      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+&      & \vb & |for(t_1) do t_2|     & \text{Finite loop} \\
+&      & \vb & |check fx t|     & \text{Effects check} \\
+&      & \vb & |array (t_1; xdots; t_n)| & \text{Array}, n \geq 0 \\
+&      & \vb & |t_1, xdots, t_n|  & \text{Array}, n \geq 2 \\
+&      & \vb & |()|              & \text{Empty array} \\
+&      & \vb & |t_1 eqgt t_2|    & \text{Lambda expression} \\
+&      & \vb & |p := t|          & \text{General definition} \\
+&      & \vb & |p : t|           & \text{Type ascription} \\
+&      & \vb & |op_b t|          & \text{Prefix operator} \\
+&      & \vb & |t op_a|          & \text{Postfix operator} \\
+&      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
+&      & \vb & |: t|             & \text{Range} \\
+&      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
+&      & \vb & |functionOC oc (a_1 xdots a_n) t|    & \text{Function}\;(n\geq 1) \\
+&      & \vb & |if(t) then t|    & \text{Conditional expression} \\
+&      & \vb & |if(t) else t|    & \text{Conditional expression} \\
+&      & \vb & |if{t}|           & \text{Conditional expression} \\
+&      & \vb & |for{t}|          & \text{Finite loop} \\
+&      & \vb & |let(t) in t|     & \text{Local binding} \\
+&      & \vb & |block t|         & \text{Scope delimiter} \\
+&      & \vb & |case(t) of {t_1; xdots t_n}|    & \text{Case expression} \\
+&      & \vb & |case{t_1; xdots t_n}| & \text{Case expression} \\
+&      & \vb & |type^{t}|         & \text{Type definition} \\
+&      & \vb & |option^{}|        & \text{Create an option} \\
+&      & \vb & |option^{t}|       & \text{Create an option} \\
+&      & \vb & |truth^{t} |       & \text{Singleton map} \\
+&      & \vb & |amap (t_1; xdots; t_n) | & \text{Map}, n \geq 0 \\
+\\
+\text{\bf Arguments} &
+ |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
+\\[2mm]
+\text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |squig p_1 p_2| \\
+&     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
+& |xsl| & ::= & x \vb  |xsl amp x|
+\\[2mm]
+\text{\bf Operators} &
+ |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \vb ..  & \text{Prefix}\\
+& |op_a| & ::= &  ? \vb |hat| & \text{Postfix}\\
+& |op_i| & ::= &  + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb .. & \text{Infix} \\
+&        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
+\end{array}
+$$
+\caption{Source Verse expressions} \label{fig:source-verse-expr}
+\end{figure}
+
+
+% -------------------------------------------------------------
+%               Essential Verse
+% -------------------------------------------------------------
+
+\subsection{Essential Verse}
+
+\begin{figure}
+$$
+\begin{array}{rcll}
+  |x,y,f| &     & \textit{Variable} \\
+  |k| &     & \textit{Constant} \\[2mm]
+
+\multicolumn{4}{l}{\text{\bf Constants}} \\
+ |k| & ::= & |int| \vb |rat| \vb |path| & \text{integer, rational, path} \\
+ & \vb &   |str| \vb |char| & \text{string, character}
+\\[2mm]
+
+\multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
+  |t| & ::= & |x|                        & \text{Variable} \\
+      & \vb & |k|                        & \text{Constant} \\
+      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
+      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
+      & \vb & |t_1 = t_2|                 & \text{Unification} \\
+      & \vb & |x := t|                    & \text{Definition} \\
+      & \vb & |squi x y := t|          & \text{Definition} \\
+      & \vb & |:t|                        & \text{Range} \\
+      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
+      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+      & \vb & |for(t_1) do t_2|           & \text{Finite loop} \\
+      & \vb & |check fx t|                & \text{Effects check} \\
+      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
+      & \vb & |functionOC oc t_1 t_2|     & \text{Function} \\
+      & \vb & |oftype t_1 t_2|            & \text{Type annotation}\\
+      & \vb & |amap (t_1, xdots, t_n) |   & \text{Map}, n \geq 0 \\
+\\
+  |oc| & ::=  & |open| \vb |closed| & \text{Open vs closed functions}
+\end{array}
+$$
+\\
+Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
+\caption{Small Source Verse} \label{fig:small-source-verse}
+\end{figure}
+
+
+% -------------------------------------------------------------
+%       Desugaring  Source Verse --> Essential Verse
+% -------------------------------------------------------------
+
+\subsection{Desugaring Source Verse into Essential Verse}
+
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
+\begin{array}{lrcll}
+\multicolumn{4}{l}{\textbf{Rewriting terms that use patterns:  |p:t| and |p := t|}} \\
+% \rulename{dscolont} &  |p (eff fx) : t| & \rightarrow & |p := colonfx fx t| \\[1mm]
+\rulename{dscolont} &  |p : t| & \rightarrow & |p := :t| \\[1mm]
+\rulename{dswild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
+\rulename{dswild2} &  |(: t_1) := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
+\rulename{dscolonb} &  |(p (eff fx): t_1) := t_2| & \rightarrow & |p := oftypefx t_2 fx t_1| \\
+\rulename{dsfx} &  |p (fxb fx) := t| & \rightarrow & |p := check fx t| \\
+\rulename{dspapp} &   |p a := t| & \rightarrow & |p := function a t| \\
+  %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
+\rulename{dspfun1} &  |(squig p_1 p_2) := t| & \rightarrow
+    & |p_1 := (x_1:any); (squig x_1 p_2) := t| & \text{|p_1| not a variable} \\
+\rulename{dspfun2} &  |(squig p_1 p_2) := t| & \rightarrow
+    & |p_2 := (x_2:any); (squig p_1 x_2) := t| & \text{|p_2| not a variable} \\
+% \begin{array}[t]{@@{}l@@{}}
+%    |p_1 := (x_1:any); p_2 := (x_2:any);| \\
+%    |(x_1 squiggt x_2) := t|
+%  \end{array}  & \text{|p_1| or |p_2| not a variable} \\
+\rulename{dsparr} &  |ar (p_1; xdots; p_n) := t| & \rightarrow &
+      \begin{array}[t]{@@{}l@@{}}
+        |ar(x_1:any;xdots;x_n:any) == t;|\\
+        |p_1 := x_1; xdots; p_n := x_n |
+      \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
+\rulename{dspamp1} & |xsl amp x := t| & \rightarrow & |ar(xsl amp x := t)| & \text{outside an array}\\
+\rulename{dspamp2} & |ar(xdots; xsl amp x := t; xdots)| & \rightarrow & |ar(xdots; xsl := t; x := t; xdots)| & \text{inside an array}\\
+\end{array} \\
+\\
+\begin{array}{lrcll}
+\multicolumn{5}{l}{\textbf{Application and unification}} \\
+\rulename{dswhere} &  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
+\rulename{dsapp}   & |t_1^(t_2)| & \rightarrow & |check succeeds (t_1^[t_2])| \\
+\\
+\multicolumn{5}{l}{\textbf{Array splice}} \\
+\rulename{dssplice} & \multicolumn{3}{l}{\quad|ar (t_1; xdots; t_km1; ..t_k; t_kp1; xdots; t_n)|} \\
+&  & \rightarrow & \multicolumn{2}{l}{|^append[ar(t_1; xdots; t_km1), append^[t_k, ar(t_kp1; xdots; t_n)]]|}\\
+&  & \multicolumn{3}{l}{\text{where |append| is a reversible function appending two arrays}} \\
+\\
+\multicolumn{5}{l}{\textbf{Array notation}} \\
+\rulename{dsunit} &  |()| & \rightarrow & |ar ()| \\
+\rulename{dstuple} &  |t_1, xdots, t_n| & \rightarrow & |ar (t_1; xdots; t_n)| \\
+\\
+\multicolumn{5}{l}{\textbf{Map notation}} \\
+\rulename{dsmap}  &  |amap (t_1, xdots, t_n)| & \rightarrow & \multicolumn{2}{l}{|mkMap^(for(f : ar (t_1; xdots; t_n); squig i a : f){(i,a)})|} \\
+                  &                           &             & & \text{fresh |f|,|i|,|a|}
+\\
+\multicolumn{5}{l}{\textbf{Function notation}} \\
+\rulename{dstype} &  |type^{t}| & \rightarrow & |functionOCX closed (x:=t) succeeds x| & \text{fresh |x|}\\
+\rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |functionOCX closed (t_1) succeeds t_2| \\
+\rulename{dsfun1} &  |functionOC oc (a_1 a_2 xdots a_n) t| & \rightarrow & |functionOC oc a_1 (functionOC oc (a_2 xdots a_n) t| \\
+\rulename{dsfun2a}  &   |functionOC oc (apeff a fx) b| & \rightarrow & |functionOCX oc a fx b| & \\
+\rulename{dsfun2b}  &   |functionOC oc a b| & \rightarrow & |functionOCX oc a succeeds b| & \\
+% \rulename{dsfun3}  &   |functionOCX oc a (eff fx) b| & \rightarrow & |functionOC oc a (check fx b)| & \\
+\\
+\multicolumn{5}{l}{\textbf{Conditional and for-loop notation}} \\
+\rulename{dsif1} & |if{e}| & \rightarrow & |if(e) else false| \\
+\rulename{dsif2} &  |if(e_1) then e_2| & \rightarrow & |if(e_1) then e_2 else false| \\
+\rulename{dsif3} &  |if(e_1) else e_2| & \rightarrow & |if (x := e_1) then x else e_2| & \text{|x| fresh} \\
+\rulename{dsfor} &  |for{e}| & \rightarrow & |for (x := e) { x }| & \text{|x| fresh} \\
+\end{array}
+\end{array}
+$$
+\caption{Source Verse to Essential Verse rewriting (1)} \label{fig:sv-to-sv-1}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{lrcll}
+  \multicolumn{5}{l}{\textbf{Operators}} \\
+\rulename{dspreq} &  |?e|     & \rightarrow & |type{false `choice` let (x:e){truth^{x}}}| & \text{|x| fresh} \\
+\rulename{dspostq} & |e?|     & \rightarrow & |e^[_]| \\
+\rulename{dsop1} &   |op_b e| & \rightarrow & |prefix op_b [e]| & \text{if |op_b| can fail}\\
+\rulename{dsop2} &   |op_b e| & \rightarrow & |prefix op_b (e)| \\
+\rulename{dsop3} &   |e op_a| & \rightarrow & |postfix op_a [e]| & \text{if |op_a| can fail}\\
+\rulename{dsop4} &   |e op_a| & \rightarrow & |postfix op_a (e)| \\
+\rulename{dsop5} &   |e_1 op_i e_2| & \rightarrow & |operator op_i [e_1, e_2]| & \text{if |op_i| can fail}\\
+\rulename{dsop6} &   |e_1 op_i e_2| & \rightarrow & |operator op_i (e_1, e_2)| \\
+\rulename{dsand} &   |e_1 srcand e_2| & \rightarrow & |e_1; e_2| \\
+\rulename{dsor}  &   |e_1 srcor e_2| & \rightarrow & |if(e_1) else if (e_2) else :false| \\
+\rulename{dsbang} &   |!e| & \rightarrow & |if e then :false else false| \\
+  \\
+  \multicolumn{5}{l}{\textbf{Let, block, case}} \\
+\rulename{dslet}   &    |let(e) in b| & \rightarrow & |e; b| & \textit{see note} \\
+\rulename{dsblock} &    |block b| & \rightarrow & |b| & \textit{see note}  \\
+\rulename{dscase1} &    |case{e_1; xdots e_n}| & \rightarrow & |(x:any) => case(x){e_1; xdots e_n}| & \text{|x| fresh} \\
+\rulename{dscase2} &    |case(e){e_1; xdots e_n}| & \rightarrow & |x:=e; e_1^[x] srcor xdots srcor e_n^[x]| & \text{|x| fresh} \\
+  \multicolumn{5}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
+  \\
+  \multicolumn{5}{l}{\textbf{Misc}} \\
+\rulename{dswild} &  |_| & \rightarrow & |x:any| & \text{|x| fresh} \\
+\rulename{dsopt1} &   |option^{}| & \rightarrow & |false| \\
+\rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then truth^{x} else false| & \text{|x| fresh} \\
+\rulename{dstruth} &  |truth^{e}| & \rightarrow & |amap(e eqgt e)| \\
+\end{array}
+$$
+{\em Note}: The desugaring assumes a scope correct Verse program.
+This means that there can be no variable name clashes in |let| and |block|.
+pA more robust desugaring could \textalpha-convert such clashes.
+\caption{Source Verse to Source Verse rewriting (2)} \label{fig:sv-to-sv-2}
+\end{figure}
