@@ -11,8 +11,7 @@ verify("M20Nov24-2", pass){ f(x:comparable):= { if (int[x]) then { x+1 } else 0 
 # Tim: Paraconsistency
 #    Knowing x:false tells us things about x but not about anything else
 verify("M20Nov24-3", pass){ f(x:false):= x+1 }
-verify("M20Nov24-4", pass, broken){ f(x:false)<succeeds> := "wombat"+1 }
-   # Our verifier 
+verify("M20Nov24-4", pass){ f(x:false)<succeeds> := "wombat"+1 }
 
 verify("M4Nov24-1", fail){ f(1):=1; g( h(:int):int ) := h[1]; g[f] }
 verify("M4Nov24-2", pass){ f(x:int):=x; g( h(:int):int ) := h[1]; g[f] }
