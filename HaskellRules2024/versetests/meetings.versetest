@@ -1,5 +1,19 @@
 # Add new meetings at the top
 
+verify("M22Nov24-1", fail){ if( (x:=1) | (x:=2) ) then {x} else 0 }
+  # The 'x' in the then-branch is unbound
+
+verify("M20Nov24-1", pass){ f(x:string):= { if (int[x]) then { x[1] } else 0 } }
+ # M20Nov24-1: the int[x] is contradictory with x:string,
+ # so we ingore the bad-ness of x[1]
+verify("M20Nov24-2", pass){ f(x:comparable):= { if (int[x]) then { x+1 } else 0 } }
+
+# Tim: Paraconsistency
+#    Knowing x:false tells us things about x but not about anything else
+verify("M20Nov24-3", pass){ f(x:false):= x+1 }
+verify("M20Nov24-4", pass, broken){ f(x:false)<succeeds> := "wombat"+1 }
+   # Our verifier 
+
 verify("M4Nov24-1", fail){ f(1):=1; g( h(:int):int ) := h[1]; g[f] }
 verify("M4Nov24-2", pass){ f(x:int):=x; g( h(:int):int ) := h[1]; g[f] }
   # Test that the call to g[f] checks that f truly satisfies the domain of g.
