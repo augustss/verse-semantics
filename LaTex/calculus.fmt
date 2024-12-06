@@ -76,11 +76,19 @@
 %format (Me  (i) (e)) = "\Me{"  ^ i "}{" ^e "}"
 %format (DMe (i) (e))  = "{\mathcal M}\llbracket" e "\rrbracket{}" i
 %format (DMe2 (m) (i) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}" i
+%format (DMe3 (m) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}"
 %format (MMe (m) (i) (e)) = "\MMe{" ^ i "}{" ^e "}{" ^m "}"
 
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
 %format (DB (m) (j) (pi) (t)) = "{\mathcal B}_{" m "}\llbracket{}" t "\rrbracket{}" pi "\," j
 %format (De2 md (x))      = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
+
+% New desugaring, just does the wrapping part:
+%format (SS u (e))    = "{\mathcal S}\llbracket" e "\rrbracket" u
+%format (checkfun q x e)  = "{\mathcal K}_{" q "}\llbracket" e "\rrbracket" x
+%format `ueq`         = "\,\mathring{=}\,"
+%format underscore    = "\bullet"
+
 %format FunCheck (pi) = "{\mathcal F}(" pi ")"
 
 %%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
@@ -360,10 +368,14 @@
 %format function (x) (rhs) = functionKW "\," x "\,\{" rhs "\}"
 %format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionX (x) (fx) (rhs) = functionKW "(" x ")" fx "\{" rhs "\}"
+%format funk k (e) (rhs) = functionKW "_"k"(" e ")\{" rhs "\}"
 
 %% functionOC has open/closed subscript
 %format functionOC (oc) (x) (rhs) = functionKW "_{" oc "}(" x ")\{" rhs "\}"
 %format functionOCX (oc) (x) (fx) (rhs) = functionKW "_{" oc "}(" x ")\langle" fx "\rangle\{" rhs "\}"
+%format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
+%format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
+
 
 %% -------End of f unctions ---------------
 

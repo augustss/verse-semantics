@@ -23,6 +23,7 @@
 \usepackage{xspace}
 \usepackage{mathtools}
 \usepackage{graphicx}
+\usepackage{tikz}
 
 % \renewcommand{\arraystretch}{1.1}
 
@@ -63,14 +64,6 @@
 
 \input{verse-source}
 
-% -------------------------------------------------------------
-%               Denotational semantics: Plan A
-% -------------------------------------------------------------
-
-\section{Denotational semantics Plan A: direct}
-
-\input{verse-densem-planA}
-
 
 % -------------------------------------------------------------
 %               Denotational semantics: Plan B
@@ -86,7 +79,8 @@
 
 \section{Denotational semantics Plan C: expression style}
 
-{\bf Currently in google doc}
+\input{verse-densem-planC}
+
 
 % -------------------------------------------------------------
 %               Semantics: Plan D
@@ -103,5 +97,13 @@
 \section{Rewrite and verification rules: runtime and verification}
 
 \input{verse-rules}
+
+% -------------------------------------------------------------
+%               Denotational semantics: Plan A
+% -------------------------------------------------------------
+
+\section{Denotational semantics Plan A: direct}
+
+\input{verse-densem-planA}
 
 \end{document}

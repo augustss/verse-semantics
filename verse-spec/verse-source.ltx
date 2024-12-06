@@ -80,39 +80,36 @@ $$
 
 \begin{figure}
 $$
-\begin{array}{rcll}
-  |x,y,f| &     & \textit{Variable} \\
-  |k| &     & \textit{Constant} \\[2mm]
+\begin{array}{lrcll}
+\text{Variables} &  |x,y,f| &     \\
 
-\multicolumn{4}{l}{\text{\bf Constants}} \\
- |k| & ::= & |int| \vb |rat| \vb |path| & \text{integer, rational, path} \\
- & \vb &   |str| \vb |char| & \text{string, character}
-\\[2mm]
-
-\multicolumn{4}{l}{\text{\bf Small Source Verse terms}} \\
-  |t| & ::= & |x|                        & \text{Variable} \\
-      & \vb & |k|                        & \text{Constant} \\
-      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
-      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
-      & \vb & |t_1 = t_2|                 & \text{Unification} \\
-      & \vb & |x := t|                    & \text{Definition} \\
-      & \vb & |squi x y := t|          & \text{Definition} \\
-      & \vb & |:t|                        & \text{Range} \\
-      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
-      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
-      & \vb & |for(t_1) do t_2|           & \text{Finite loop} \\
-      & \vb & |check fx t|                & \text{Effects check} \\
-      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
-      & \vb & |functionOC oc t_1 t_2|     & \text{Function} \\
-      & \vb & |oftype t_1 t_2|            & \text{Type annotation}\\
-      & \vb & |amap (t_1, xdots, t_n) |   & \text{Map}, n \geq 0 \\
+\text{Constants} & |k| & ::= & \textit{integer constants} \\
+                 &     & \vb & \textit{string constants} \\
 \\
-  |oc| & ::=  & |open| \vb |closed| & \text{Open vs closed functions}
+\text{Terms} &  |t| & ::= & |x|                        & \text{Variable} \\
+&      & \vb & |k|                        & \text{Constant} \\
+&      & \vb & |o|                        & \text{Primops} \\
+&      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
+&      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
+&      & \vb & |t_1 = t_2|                 & \text{Unification} \\
+&      & \vb & |x := t|                    & \text{Definition} \\
+&      & \vb & |squig x y := t|          & \text{Definition} \\
+&      & \vb & |:t|                        & \text{Range} \\
+&      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
+&      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
+&      & \vb & |for(t_1) do t_2|           & \text{Finite loop} \\
+&      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
+&      & \vb & |functionOC q t_1 t_2|     & \text{Function} \\
+&      & \vb & |oftype t_1 t_2|            & \text{Type annotation}\\
+&      & \vb & |check fx t|                & \text{Effects check} \\
+\\
+\text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
+\text{Aperture} &  |q| & ::=  & |open| \vb |closed| & \text{Open vs closed functions}
 \end{array}
 $$
 \\
 Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator op|.
-\caption{Small Source Verse} \label{fig:small-source-verse}
+\caption{Essential Verse} \label{fig:small-source-verse}
 \end{figure}
 
 

@@ -1,0 +1,161 @@
+% ----------------------------------------------------
+%
+%        Denotational semantics: Plan A
+%
+%         Was: desugaring.ltx
+%
+% ----------------------------------------------------
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\subsection{Desugaring to do wrapping}
+
+\begin{figure}
+$$
+% ------------- Syntax of Mini Verse ---------------
+\begin{array}{l}
+\textbf{Syntax of Mini Verse} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}l}
+  \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N e_1 e_2| \vb e_1; e_2
+     \vb |e_1 == e_2| \vb |defKW x| \vb |e_1 `choice` e_2| \vb |fail| \\
+  && \vb & |arr (e_1, dots, e_n)| \vb |oftype t_1 t_2| \vb |check fx e| \\
+  && \vb & |vif t_1 t_2 t_3| \vb |all e|  \\
+  && \vb & |lamOC q i e_1 e_2| \\
+\multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x y|; |defKW x| instead of |x:=e|; and lambda changes form}}
+\end{array}
+\\ \\
+% ------------- Desugaring ---------------
+\textbf{Desugaring Essential Verse into Mini Verse} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\text{Inputs} & |u| & ::= & |underscore| \vb x \\
+\\
+\rulename{dsk}   & |SS u k| & = & |u `ueq` k| \\
+\rulename{dsvar}   & |SS u x| & = & |u `ueq` x| \\
+\rulename{dsprim}   & |SS u o| & = & |u `ueq` o| \\
+\rulename{dsfail}   & |SS u fail| & = & |fail| \\
+\rulename{dsapp}   & |SS u (apply1N t_1 t_2)| & = & |u `ueq` apply1N ((SS underscore t_1)) (SS underscore t_2)| \\
+\rulename{dseq}   & |SS u (t_1 == t_2)| & = & |(SS u t_1) = (SS u t_2)| \\
+\rulename{dschoice}   & |SS u (t_1 `choice` t_2)| & = & |SS u t_1 `choice` SS u t_2| \\
+\rulename{dssemi}   & |SS u (t_1 ; t_2)| & = & |SS underscore t_1 ; SS u t_2| \\
+\rulename{dsdef}   & |SS u (x := t)| & = & |defKW x; x = SS u t| \\
+\rulename{dssquig}   & |SS u (squig i x := t)| & = & |defKW i; u `ueq` i; defKW x; x = SS u t| \\
+
+\rulename{dscol1}   & |SS underscore (: t)| & = & |oftype ((defKW x; x)) (SS underscore t)| \\
+\rulename{dscol2}   & |SS x (: t)| & = & |oftype x (SS underscore t)| \\
+\rulename{dsoftype}   & |SS u (oftype t_1 t_2)| & = & |u `ueq` (oftype (SS underscore t_1) (SS underscore t_2))| \\
+\rulename{dstup1}   & |SS underscore (arr (t_1, dots, t_n))|
+   & = & |arr( (SS underscore t_1), dots, (SS underscore t_n))| \\
+\rulename{dstup2}   & |SS x (arr (t_1, dots, t_n))|
+   & = & |defKW x_1, dots, x_n; x = arr(x_1, dots, x_n); arr( (SS x_1 t_1), dots, (SS x_n t_n))| \\
+\multicolumn{2}{l}
+  {\rulename{dsif} \;\; \hfill |SS u (vif t_1 t_2 t_3)|}
+  & = & |vif(SS underscore t_1) (SS u t_2) (SS u t_3)| \\
+\rulename{dsall} & |SS u (all t)|
+   & = & |u `ueq` all (SS underscore t)| \\
+\rulename{dstuple1}   & |SS underscore (functionOC q t_1 t_n)|
+   & = & |lamOC q i (SS i t_1) (SS underscore t_2)| \\
+\rulename{dstuple1}   & |SS f (functionOC q t_1 t_n)|
+& = & |lamOC q i (defKW x; x = SS i t_1) (defKW k; checkfun q f e; k `ueq` apply1N f x; SS k t_2)| \\
+\\
+\multicolumn{4}{l}{\textbf{Auxiliary functions}} \\
+& |underscore `ueq`  e| & = & |e| \\
+& |x `ueq`  e| & = & |x = e| \\
+\\
+& |checkfun open f e| & = & |e| \\
+& |checkfun closed f e| & = & |lamOC closed x (apply1N f x) (x == SS underscore e)|
+\end{array}
+\end{array}
+$$
+\caption{Plan C: Desugaring Essential Verse to Mini Verse}
+\end{figure}
+
+% ------------- Denotional semantics of Mini Verse -------------------
+
+\subsection{Denotional semantics of Mini Verse}
+
+\begin{figure}
+$$
+\begin{array}{l}
+
+
+\textbf{Domains (sets)} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + (\semfcn) \\
+\Env & = & |Ident| \rightarrow \Value \\
+W^{*} & = & \text{set of } W \\
+Env^{*} & = & \text{set of } Env \\
+\end{array}
+\\ \\
+\begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
+  \semap{E}{|e|} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{|x|}{\rho} & = & \msing{\rho(x)} \\
+  \semapp{E}{|k|}{\rho} & = & \msing{k} \\
+  \semapp{E}{|o|}{\rho} & = & \semapp{O}{|o|}{} \\
+  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
+    \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
+  \semapp{E}{|e_1 ; e_2|}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+    \{ y \, || \, x \inb \semapp{E}{|e_1|}{\rho}, \; y \inb \semapp{E}{|e_2|}{\rho} \} \\
+  \semapp{E}{|defKW x|}{\rho} & = & \msing{|emptytup|} \\
+  \semapp{E}{|fail|}{\rho} & = & \mempty \\
+  \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
+    \{ \mkfcn{ \{ (i,x_i) \vb i \in 0 \ldots n \} } \, || \, x_0 \inb \semapp{E}{|e_1|}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{|e_n|}{\rho} \} \\[1mm]
+  \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \mempty \\
+    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{|e_2|}{\rho'} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\[1mm]
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semclose{q}{\{ f \in \semfcn \;
+    \begin{array}[t]{@@{}l@@{\;}l}
+      || & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+        & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty) \\
+        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
+
+%%      \forall x \inb \Value. \\
+%%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+%%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+
+    \end{array} \\
+\end{array}
+\\
+\begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
+\semap{D}{|e|} & : & \Env \rightarrow \mtype \\
+\semapp{D}{|e|}{\rho} & = & \bigcup_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
+\semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n }
+                                  \vb   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  & & |where [x_1,xdots,x_n]| = \semap{I}{|e|} \\[1mm]
+
+\semap{I}{|e|} & : & [\mathit{Ident}] \\
+\semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
+
+  \semapp{O}{|op|}{} & : & (\semfcn)^{*} \\
+  \semapp{O}{|gt|}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z}, x > y \} \} & \text{one function} \\
+  \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \inb \mathbb{Z} \} \} & \text{one function} \\
+  \semapp{O}{|add|}{} & = & \{ f \, || \, f \inb \semfcn, \; \forall x,y \inb \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\ \\
+\hline \\[-2mm]
+\apply & : & (\Value \times \Value) \rightarrow \mtype \\
+\apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
+\apply( f, w ) & = & \mempty & \text{otherwise} \\[1mm]
+
+\semclose{open}{F} & = & F \\
+\semclose{closed}{F} & = & \{ f \inb F \vb \forall f' \in F. \dom{f} \subseteq \dom{f'} \} \\[1mm]
+
+
+\fcn & : & (\tuple{\Value,\Value})^{*} \rightarrow (\semfcn) \\
+\fcn & & \multicolumn{2}{l}{\text{indicates a function made from a set of pairs} } \\
+
+
+\end{array}
+\end{array}
+$$
+\caption{Plan C: Denotational semantics of Mini Verse (without choice)}
+\end{figure}
+

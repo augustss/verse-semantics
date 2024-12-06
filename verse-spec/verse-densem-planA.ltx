@@ -12,58 +12,8 @@
 %include forall.fmt
 %include ../LaTex/calculus.fmt
 
-\subsection{Syntax of MiniVerse}
-
-%format funk k (e) (rhs) = "\textbf{fun}_"k"(" e ")\{" rhs "\}"
-
-\begin{figure}
-  $$
-  \begin{array}{l}
-    \textbf{Syntax} \\
-    \begin{array}{lr@@{\;}r@@{\;}ll}
-    \text{Integers} & k \\
-    \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
-%     \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
-    \text{Expressions} & e  & ::=  &
-        |x|
-    \vb |k|
-    \vb |o|
-    \vb |apply1N e_1 e_2|
-    \vb |e_1 == e_2|
-    \vb |e_1 ; e_2|
-    \vb |x := e|
-    \vb |:e|
-%FAIL    \vb |fail|
-    \\
-    & &
-    \vb & |vif e_1 e_2 e_3|
-    \vb |arr (e_1, xdots, e_n)|
-    \vb |funk q e_1 e_2|
-    & |n >= 0|
-    \\
-    \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
-    \text{Aperture} & q & ::= & |open| \vb |closed| \\
-    \end{array} \\
-    \\[-3mm]
-  \end{array}
-  $$
-\caption{The MiniVerse syntax} \label{fig:syntax}
-\end{figure}
-
 \subsection{A denotational semantics}
 
-\newcommand{\sconcat}{\bowtie}
-\newcommand{\shead}{\mathit{head}}
-\newcommand{\stuple}{\mathit{tuple}}
-\newcommand{\scons}{:}
-
-\newcommand{\semfcn}{\Value \rightharpoonup \Value}
-\newcommand{\fcn}{\mathbf{fcn}}
-\newcommand{\get}[1]{\mathbf{sing}(#1)}
-
-\newcommand{\dtuple}{\tuple{\Value}}
-\newcommand{\fmapsto}{\!\mapsto\!}
-\newcommand{\mkfcn}[1]{[#1]}
 
 \begin{figure}
 $
@@ -157,7 +107,7 @@ Env^{*} & = & \text{set of } Env \\
 
 \end{array}
 $
-\caption{Expression semantics}
+\caption{Plan A: Expression semantics}
 \label{fig:den-sem1}
 \end{figure}
 
@@ -231,7 +181,7 @@ $
 
 \end{array}
 $
-\caption{Expression match semantics}
+\caption{Plan A: Expression match semantics}
 \label{fig:den-sem2}
 \end{figure}
 
@@ -292,7 +242,7 @@ $
 
 \end{array}
 $
-\caption{Utility function}
+\caption{Plan A: Utility function}
 \label{fig:den-sem-util}
 \end{figure}
 
@@ -332,7 +282,7 @@ $
     \\[-3mm]
   \end{array}
   $$
-\caption{The MiniVerse syntax, with choice} \label{fig:syntax}
+\caption{Plan A: The MiniVerse syntax, with choice} \label{fig:syntax}
 \end{figure}
 
 \newcommand{\LblsValue}{LW}
@@ -410,7 +360,7 @@ Env^{*} & = & \powerset{Env} \\
 
 \end{array}
 $
-\caption{Expression semantics, with choice}
+\caption{Plan A: Expression semantics, with choice}
 \label{fig:den-sem1}
 \end{figure}
 
@@ -472,7 +422,7 @@ $
 
 \end{array}
 $
-\caption{Misc}
+\caption{Plan A: Misc}
 \label{fig:den-sem1}
 \end{figure}
 
@@ -564,7 +514,7 @@ $
 
 \end{array}
 $
-\caption{Expression match semantics, with choice}
+\caption{Plan A: Expression match semantics, with choice}
 \label{fig:den-sem2}
 \end{figure}
 
