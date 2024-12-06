@@ -44,7 +44,8 @@ allWs = S.fromList $
   where
     nonFcn =
       allInts ++
-      [VTup [x, y] | x <- allInts, y <- allInts]
+      --[VTup [x, y] | x <- allInts, y <- allInts]
+      [VTup [VInt 2, VInt 1]]
     id0 = mkFcn "id0" [(VInt 0, VInt 0)]
     id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
     f01 = mkFcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
@@ -70,8 +71,8 @@ allWs = S.fromList $
     ho4 = mkFcn "ho4" $ [(VFcn fsucc, VInt 2), (VFcn succ0, VInt 2), (VFcn const1, VInt 2)]
                       ++ [ (VTup [VInt 1,i], VInt 2) | i <- allInts ]
     ho5 = mkFcn "ho5" [(VFcn succ0, VInt 2)]
-    ho6 = mkFcn "h06" [(VInt 0, VFcn fint)]
-    ho7 = mkFcn "h07" [(VInt 0, VFcn comp)]
+    ho6 = mkFcn "ho6" [(VInt 0, VFcn fint)]
+    ho7 = mkFcn "ho7" [(VInt 0, VFcn comp)]
 
 fid1 :: Fcn Val Val
 fid1 = mkFcn "id1" [(VInt 1, VInt 1)]
@@ -87,6 +88,9 @@ fsuccsucc = mkFcn "succsucc" [(x, vadd x (VInt 2)) | x <- allInts ]
 
 fpred :: Fcn Val Val
 fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
+
+getW :: String -> W
+getW s = ([ w | w <- unSet allWs, show w == s ] ++ [error $ "undefined " ++ s]) !! 0
 
 --------------------
 ---- Primitive functions

@@ -157,7 +157,7 @@ dM (Fun q e1 e2) u rho = mkSet
 
            , (q == Closed)
              `implies`
-             (domV u == domE e1 rho)
+             (domV u == rangeE e1 rho)
 
            , forAll allWs $ \ x ->
                forAll (dX e1 rho) $ \ rho' ->
@@ -193,8 +193,11 @@ dM (Fun q e1 e2) u rho = mkSet
 -}
 dM _ _ _ = undefined
 
-domE :: Exp -> Env -> WS
-domE e rho = mkSet [ x | x <- unSet allWs, rho' <- unSet $ dX e rho, not (isEmpty (dM e x rho') ) ]
+--domE :: Exp -> Env -> WS
+--domE e rho = mkSet [ x | x <- unSet allWs, rho' <- unSet $ dX e rho, not (isEmpty (dM e x rho') ) ]
+
+rangeE :: Exp -> Env -> WS
+rangeE e rho = mkSet [ r | x <- unSet allWs, rho' <- unSet $ dX e rho, r <- unSet $ dM e x rho' ]
 
 close :: OC -> [W] -> [W]
 close _ [] = []
@@ -202,7 +205,7 @@ close _ [f] = [f]
 close Open fs = fs
 close Closed fs =
   let r = [ f | f <- fs, forAllL fs (\ f' -> domV f `lessEq` domV f') ]
-  in  trace ("close " ++ show (fs, r))
+  in  --trace ("close " ++ show (fs, r))
       r
 
 
@@ -211,21 +214,14 @@ close Closed fs =
 dB :: Exp -> W -> Env -> Set Env
 dB e u rho = mkSet [ rho' | rho' <- genRhos rho (dI e), not $ isEmpty $ dM e u rho' ]
 
-{-
--- f:=fun_c(g:=fun_c(0){0}){g[0]} ; f[fun_c(0){0}]
-exp40 :: Exp
-exp40 = Def "f" (Fun Closed (Def "g" (Fun Closed (Int 0) (Int 0))) (App (Var "g") (Int 0))) `Seq` App (Var "f") (Fun Closed (Int 0) (Int 0))
-
--- f:=fun_c(g:=fun_c(:int){:int}){g[0]} ; f[fun_c(0){0}]
-exp41 :: Exp
-exp41 = Def "f" (Fun Closed (Def "g" (Fun Closed cint cint)) (App (Var "g") (Int 0))) `Seq` App (Var "f") (Fun Closed (Int 0) (Int 0))
-  where cint = Colon (Var "int")
--}
-
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp33, exp34, exp35, exp47, exp48, exp49, exp50,
+           exp20, exp21, exp22,
+           {-Choice: exp23,exp24,exp25,exp26,exp27,exp28,exp29,exp30,exp31,exp32,-}
+           exp33, exp34, exp35,
+           {-Choice: exp36, exp37, exp38, exp39, exp40, exp43, exp44, -}
+           exp45, exp46, exp47, exp48, exp49, exp50,
            exp51, exp52, exp53, exp54, exp55
           ]
 
@@ -233,5 +229,5 @@ main :: IO ()
 main = do
   putStrLn "Start dP"
   runExamples dP allExps
-  putStrLn "Start dP'"
-  runExamples dP' allExps
+--  putStrLn "Start dP'"
+--  runExamples dP' allExps

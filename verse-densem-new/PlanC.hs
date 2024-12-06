@@ -270,7 +270,7 @@ dP :: Exp -> RVal
 dP e =
   case unSet (den e) of
     [v] -> RVal v
-    _   -> Wrong ""
+    vs   -> Wrong $ show vs
 
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
@@ -281,43 +281,4 @@ allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
 main :: IO ()
 main = do
   putStrLn "Start"
---  print $ den (fst exp47)
   runExamples dP allExps
-
-{-
-aaa = Fun Closed aaa1 (Int 2)
-aaa1 = Fun Closed (Int 0) (Int 1)
-
-bbb = CLam Closed "i1"
-           (CLam Closed "i2"
-                 (CExi "x3" `CSeq` (CVar "x3" `CEqu` (CVar "i2" `CEqu` CInt 0)))
-                 (CExi "k4" `CSeq` (CVar "k4" `CEqu` CApp (CVar "i1") (CVar "x3")) `CSeq` (CVar "k4" `CEqu` CInt 1))
-           )
-           (CInt 2)
-
-bbc = CLam Closed "i1"
-           (CLam Closed "i2"
-                 (CExi "x3" `CSeq` (CVar "x3" `CEqu` CInt 0) `CSeq` (CVar "i2" `CEqu` CInt 0))
-                 (CInt 1 `CEqu` CApp (CVar "i1") (CVar "x3"))
-           )
-           (CInt 2)
-
-bbd = CLam Open "i1"
-           (CLam Open "i2"
-                 (CVar "i2" `CEqu` CInt 0)
-                 (CInt 1 `CEqu` CApp (CVar "i1") (CInt 0))
-           )
-           (CInt 2)
-
-CLam q i e1 e2 = bbd
-rho' = rho0
-
-xxx = [ VFcn f | VFcn f <- unSet allWs,
-        forAll allWs $ \ w ->
---          trace (show (w, dE e1 (extend rho' i w))) $
-          not (isEmpty (dE e1 (extend rho' i w)))
-          `implies`
---          trace (show (f, w, w `inDom` f, apply (VFcn f) w))
-          (w `inDom` f  &&  ap f w `sIn` dD e2 rho')
-      ]
--}

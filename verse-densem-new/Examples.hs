@@ -45,7 +45,7 @@ exp2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x")
 -- fun_o(x:int){x}
 exp3 :: Example
 exp3 = Fun Open (Def "x" (Colon (Var "int"))) (Var "x")
-     === "Wrong"
+     === "Wrong[comparable,int]"
 
 -- fun_c(x:int){add[(x,1)]}
 exp4 :: Example
@@ -93,14 +93,14 @@ exp12 = App (fst exp11) (Var "int")
 -- ex7[fun_c(0){0}]
 exp13 :: Example
 exp13 = App (fst exp7) (Fun Closed (Int 0) (Int 0))
-      === "Wrong"
+      === "Wrong[]"
 
 -- Should fail, function domain not large enough,
 -- even though it handles the f[1].
 -- ex7[fun_c(1){1}]
 exp14 :: Example
 exp14 = App (fst exp7) (Fun Closed (Int 1) (Int 1))
-      === "Wrong"
+      === "Wrong[]"
 
 exp15 :: Example
 exp15 = App (fst exp7) (Fun Closed (Colon (Var "int")) (Int 0))
@@ -251,7 +251,7 @@ exp45 = Fun Closed (Def "x" (Int 1)) (Var "x")
 -- fun_c(x:int){x=1}
 exp46 :: Example
 exp46 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x" `Equ` Int 1)
-      === "Wrong"
+      === "Wrong[]"
 
 -- f:=fun_c(fun_c(0){1}){2}; h:= :any; f[h]; h
 exp47 :: Example
@@ -272,7 +272,7 @@ exp49 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
         Def "h" (Colon (Var "any")) `Seq`
         App {-(Var "f")-}f (Var "h") `Seq`
         Var "h"
-      === "Wrong"
+      === "Wrong[const1,succ,succ0]"
   where f = Fun Closed (Fun Open (Int 0) (Int 1)) (Int 2)
 
 exp50 :: Example
@@ -291,11 +291,11 @@ exp52 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "y")
 
 exp53 :: Example
 exp53 = Fun Open (Def "x" cint) (Var "x")
-      === "Wrong"
+      === "Wrong[comparable,int]"
 
 exp54 :: Example
 exp54 = Fun Closed (Int 0) (fst exp53)
-      === "Wrong"
+      === "Wrong[ho6,ho7]"
 
 exp55 :: Example
 exp55 = App (App (fst exp54) (Int 0)) (Int 2)

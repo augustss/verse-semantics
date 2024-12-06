@@ -18,7 +18,7 @@ instance Show Val where
 
 instance Show RVal where
   showsPrec p (RVal v) = showsPrec p v
-  showsPrec _ (Wrong _) = showString $ "Wrong"
+  showsPrec _ (Wrong s) = showString $ "Wrong" ++ s
 
 --------------------
 ---- Functions as tables
