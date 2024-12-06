@@ -38,7 +38,7 @@ instance Show CExp where
   showsPrec _ (CIf e1 e2 e3) = showString "if " . showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2) .
                               showBraces (showsPrec 0 e3)
-  showsPrec _ (CLam q i e1 e2) = showString (if q == Open then "lam_o" else "lam_c") .
+  showsPrec _ (CLam q i e1 e2) = showString ("lam" ++ [show q !! 0]) .
                               showParen True (showString i) . showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2)
   showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
@@ -92,13 +92,16 @@ syntaxN u (Def x e) = do
   pure $ cseqs [CExi x, CVar x `CEqu` c]
 syntaxN u (Def2 x y e) = do
   c <- syntaxN u e
-  pure $ cseqs [CExi x, u === CVar x, CExi y, CVar y `CEqu` c]
+  pure $ cseqs [CExi x, u =.= CVar x, CExi y, CVar y `CEqu` c]
+{-
 syntaxN "_" (Colon e) = do
   x <- newVar "x"
   c <- syntaxN x e
-  pure [ CExi x, c ]
+  pure $ cseqs [ CExi x, c ]
 syntaxN u (Colon e) =
   COfType <$> pure (CVar u) <*> syntaxN "_" e
+-}
+syntaxN u (Colon e) = CApp <$> syntaxN "_" e <*> mustBeVar u
 syntaxN u (Seq e0 e1) = CSeq <$> syntaxN "_" e0 <*> syntaxN u e1
 syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
 syntaxN u (If e0 e1 e2) = CIf <$> syntaxN "_" e0 <*> syntaxN u e1 <*> syntaxN u e2
@@ -111,11 +114,19 @@ syntaxN u (Fun q e0 e1) = do
   k <- newVar "k"
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
-  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k, k =.= CApp (CVar u) (CVar x), c1 ])
+  cq <- checkQ q u e0
+  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs $ cq ++ [CExi k, k =.= CApp (CVar u) (CVar x), c1 ])
 syntaxN _ Fail = pure CFail
 syntaxN _ Choice{} = undefined
 syntaxN _ All{} = undefined
 syntaxN _ For{} = undefined
+
+checkQ :: OC -> Ident -> Exp -> N [CExp]
+checkQ Open _ _ = pure []
+checkQ Closed f e = do
+  a <- newVar "a"
+  e' <- syntaxN "_" e
+  pure [ CLam Closed a (CApp (CVar f) (CVar a)) (CVar a `CEqu` e') ]
 
 mustBeVar :: Ident -> N CExp
 mustBeVar "_" = do u <- newVar "u"; pure (CExi u `CSeq` CVar u)
@@ -205,22 +216,34 @@ dE (CIf e1 e2 e3) rho                       = do
   case [ rho' | rho' <- dX e1 rho, not (isEmpty (dE e1 rho')) ] of
     [] -> dE e3 rho
     rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]  -- XX Not the correct semantics
-dE (CLam q i e1 e2)   rho                   = mkSet
+dE (CLam q i e1 e2)   rho                     = mkSet $ close q
   [ f
   | f <- unSet allWs, function f
 --  , (q == Closed) `implies` hackyDomainTest i e1 e2 rho
   , forAll allWs $ \ w ->
-      forAllL (dX e1 rho) $ \ rho' ->
-        not (isEmpty (dE e1 (extend rho' i w)))
+      forAllL (dX e1 (extend rho i w)) $ \ rho' ->
+        not (isEmpty (dE e1 rho'))
         `implies`
         (w `inDomV` f  &&  apV f w `sIn` dD e2 rho')
+{-
   , (q == Closed)
     `implies`
     (forAll allWs $ \ w ->
        (w `inDomV` f) `implies`
          (existsL (dX e1 rho) $ \rho' -> not (isEmpty (dE e1 (extend rho' i w)))))
+-}
   ]
 
+close :: OC -> [W] -> [W]
+close _ [] = []
+close _ [f] = [f]
+close Open fs = fs
+close Closed fs =
+  let r = [ f | f <- fs, forAllL fs (\ f' -> domV f `lessEq` domV f') ]
+  in  --trace ("close " ++ show (fs, r))
+      r
+
+{-
 -- Check that e1 and e2 fail on exactly the same inputs.
 hackyDomainTest :: Ident -> CExp -> CExp -> Env -> Bool
 hackyDomainTest i e1 e2 rho =
@@ -230,6 +253,7 @@ hackyDomainTest i e1 e2 rho =
 
 --domE :: Exp -> Env -> WS
 --domE e rho = mkSet [ x | x <- unSet allWs, rho' <- unSet $ dX e rho, not (isEmpty (dM e x rho') ) ]
+-}
 
 dX :: CExp -> Env -> [Env]
 dX e rho = 

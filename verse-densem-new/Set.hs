@@ -49,3 +49,6 @@ exists = existsL . unSet
 existsL :: [a] -> (a -> Bool) -> Bool
 existsL xs p = any p xs
 
+lessEq :: (Ord a) => Set a -> Set a -> Bool
+lessEq x y = S.isSubsetOf x y
+

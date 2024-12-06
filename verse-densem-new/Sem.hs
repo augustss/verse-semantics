@@ -196,6 +196,15 @@ dM _ _ _ = undefined
 domE :: Exp -> Env -> WS
 domE e rho = mkSet [ x | x <- unSet allWs, rho' <- unSet $ dX e rho, not (isEmpty (dM e x rho') ) ]
 
+close :: OC -> [W] -> [W]
+close _ [] = []
+close _ [f] = [f]
+close Open fs = fs
+close Closed fs =
+  let r = [ f | f <- fs, forAllL fs (\ f' -> domV f `lessEq` domV f') ]
+  in  trace ("close " ++ show (fs, r))
+      r
+
 
 -- Solve
 -- (Like C, but for M)
