@@ -23,7 +23,7 @@ $$
   \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N e_1 e_2| \vb e_1; e_2
      \vb |e_1 == e_2| \vb |defKW x| \vb |e_1 `choice` e_2| \vb |fail| \\
   && \vb & |arr (e_1, dots, e_n)| \vb |oftype t_1 t_2| \vb |check fx e| \\
-  && \vb & |vif t_1 t_2 t_3| \vb |all e|  \\
+  && \vb & |vif t_1 t_2 t_3| \vb |fordo t_1 t_2| \vb |all e| \\
   && \vb & |lamOC q i e_1 e_2| \\
 \multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x y|; |defKW x| instead of |x:=e|; and lambda changes form}}
 \end{array}
@@ -51,11 +51,11 @@ $$
    & = & |arr( (SS underscore t_1), dots, (SS underscore t_n))| \\
 \rulename{dstup2}   & |SS x (arr (t_1, dots, t_n))|
    & = & |defKW x_1, dots, x_n; x = arr(x_1, dots, x_n); arr( (SS x_1 t_1), dots, (SS x_n t_n))| \\
-\rulename{dsfor}   & |SS x (fordo t_1 t_2))|
-   & = & |u `ueq` fordo (SS underscore t_1) (SS underscore t_2)| \\
 \multicolumn{2}{l}
   {\rulename{dsif} \;\; \hfill |SS u (vif t_1 t_2 t_3)|}
   & = & |vif(SS underscore t_1) (SS u t_2) (SS u t_3)| \\
+\rulename{dsfor}   & |SS x (fordo t_1 t_2))|
+   & = & |u `ueq` fordo (SS underscore t_1) (SS underscore t_2)| \\
 \rulename{dsall} & |SS u (all t)|
    & = & |u `ueq` all (SS underscore t)| \\
 \rulename{dsfun1}   & |SS underscore (functionOC q t_1 t_n)|
