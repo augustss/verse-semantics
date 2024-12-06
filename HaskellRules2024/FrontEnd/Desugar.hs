@@ -4,7 +4,7 @@
 {-# HLINT ignore "Use camelCase" #-}
 module FrontEnd.Desugar(
     desugar
-    , D, DError, runD, traceD, getDFlagsX, traceDS, putScopeErr
+    , DsM, DError, runD, traceD, getDFlagsX, traceDS, putScopeErr
   ) where
 
 import Prelude hiding (pi)
@@ -79,10 +79,10 @@ desugar flgs add_verification
 --
 --------------------------------------------------------
 
-sDesugarExpr :: SrcExpr -> D SrcSmall
+sDesugarExpr :: SrcExpr -> DsM SrcSmall
 sDesugarExpr = ds
   where
-    ds :: SrcExpr -> D SrcSmall
+    ds :: SrcExpr -> DsM SrcSmall
 
 
     -- These can happen when going via Andy's stuff
@@ -261,7 +261,7 @@ sDesugarExpr = ds
     ds e = compos ds e    -- Core expressions like Lit, Variable,
                           -- DefineE, Unify, EPrim, etc
 
-checkEffs :: [Eff] -> D [Eff]
+checkEffs :: [Eff] -> DsM [Eff]
 checkEffs = mapM checkEff
   where
     checkEff (Ident _ "invariant") = pure closedId
@@ -281,7 +281,7 @@ closedId = Ident noLoc "closed"
 -- Patterns
 --------------------------------------
 
-defn :: (HasCallStack) => SrcPat -> SrcExpr -> D SrcExpr
+defn :: (HasCallStack) => SrcPat -> SrcExpr -> DsM SrcExpr
 -- Desugars (p := e) into an expression; see Fig 3, top group
 -- Neither input is desugared; the result
 --   should have sDesugarExpr applied to it.
@@ -405,7 +405,7 @@ simpleMapEntry _ = Nothing
 -- Arrays
 --------------------------------------
 
-defnArray :: [SrcPat] -> SrcExpr -> D SrcExpr
+defnArray :: [SrcPat] -> SrcExpr -> DsM SrcExpr
 -- Dealing with an array on the LHS of a ":=", i.e.  an "array pattern"
 -- For example
 --     (p1, p2, ..p3, p4) := e
@@ -422,7 +422,7 @@ defnArray ps rhs
   = do { (ds, es) <- unzip <$> mapM do_one_elem ps
        ; pure $ eSeq $ catMaybes ds ++ [Unify (Array es) rhs] }
   where
-    do_one_elem :: SrcPat -> D (Maybe SrcSmall, SrcSmall)
+    do_one_elem :: SrcPat -> DsM (Maybe SrcSmall, SrcSmall)
     do_one_elem p
       | PrefixOp (Op "..") p' <- p
       = -- See Note [Desugaring array splices]
@@ -430,7 +430,7 @@ defnArray ps rhs
       | otherwise
       = do_one p
 
-    do_one :: SrcPat -> D (Maybe SrcSmall, SrcSmall)
+    do_one :: SrcPat -> DsM (Maybe SrcSmall, SrcSmall)
     do_one pat
       | Variable v <- pat
       = -- Short cut for a common case: (a,b):=e
@@ -452,7 +452,7 @@ data CallFixity = Pre | Post | In
 call :: CallFixity     -- fixity of calls
      -> Loc -> String  -- Function
      -> SrcExpr        -- Argument
-     -> D SrcExpr
+     -> DsM SrcExpr
 call fix loc op arg = return (ApplyD op_e arg)
   where
     op_e = case lookupPrimOp op of
@@ -489,7 +489,7 @@ call p l s e = do
 --
 --------------------------------------------------------
 
-_addDeref :: SrcExpr -> D SrcExpr
+_addDeref :: SrcExpr -> DsM SrcExpr
 _addDeref = pure . exprD S.empty
   where
     expr _ e@Lit{} = e
@@ -650,7 +650,7 @@ Wrinkles:
 Tricky stuff!
 -}
 
-mkArray :: [SrcSmall] -> D SrcSmall
+mkArray :: [SrcSmall] -> DsM SrcSmall
 -- mkArray [t1, t2, ..t3, t4]
 --   = exists r1 r2.
 --     arrApp$[ <t1,t2>, t3, r1 ];
@@ -670,13 +670,47 @@ mkArray es
         go elts es''@(Splice {} : _) = (Array (reverse elts), es'')
         go elts (elt : es'')         = go (elt:elts) es''
 
-mkAppend :: SrcExpr -> SrcExpr -> D SrcExpr
+mkAppend :: SrcExpr -> SrcExpr -> DsM SrcExpr
 -- eAppend e1 e2  =   e1 ++ e2
 mkAppend (Array xs) (Array ys) = pure (Array (xs ++ ys))
 mkAppend x          y          = do { r    <- newIdent noLoc "r"
                                     ; pure $ eSeq [ ApplyD (EPrim ArrApp) (Array [x, y, DefineV r])
                                                   , Variable r ] }
 
+--------------------------------------------------------
+--
+--     Desugaring Essential Verse to Mini Verse
+--        Fig 5 in verse-spec.pdf
+--
+--------------------------------------------------------
+
+data Input
+  = P Ident    -- ^ An input variable x
+  | NoInput    -- ^ Typeset as bullet or underscore
+  deriving (Eq, Ord, Show)
+
+essToMini :: SrcSmall -> SrcMini
+essToMini e = go NoInput e
+  where
+    go inp e@(Lit {})     = return (inp `ueq` e)
+    go inp e@(Var {})     = return (inp `ueq` e)
+    go inp e@(EPrim {})   = return (inp `ueq` e)
+    go inp Fail           = Fail
+    go inp (Unify  e1 e2) = Unify  <$> go inp e1 <*> go NoInput e2
+    go inp (Choice e1 e2) = Choice <$> go inp e1 <*> go NoInput e2
+    go inp (ApplyD t1 t2) = do { e1 <- go NoInput t1
+                               ; e2 <- go NoInput t2
+                               ; return (inp `ueq` ApplyD t1' t2') }
+    go inp (Seq ts)       = do { let (ts,t) = unSeq ts
+                               ; es <- mapM (go NoInput) ts
+                               ; e  <- go inp t
+                               ; return (eSeq (es ++ [e])) }
+    go inp (DefineE x t)  = do { e <- go inp t
+                               ; return (eSeq [DefineV x, e)] }
+
+
+    ueq NoInput e = e
+    ueq (P x) e   = Unify (Var x) e
 --------------------------------------------------------
 --
 --           The M-desugaring
@@ -697,12 +731,12 @@ data DsMode12
   | MI -- ^ - "checking" ("implementation")
   deriving (Eq, Ord, Show)
 
-mDesugarExpr :: DsMode12 -> SrcSmall -> D SrcCore
+mDesugarExpr :: DsMode12 -> SrcSmall -> DsM SrcCore
 mDesugarExpr s t
   = dsRule "DINIT" t $
     dsM_12 s t E
 
-dsB_12 :: DsMode12 -> SrcSmall -> Pi -> SrcCore -> D SrcExpr
+dsB_12 :: DsMode12 -> SrcSmall -> Pi -> SrcCore -> DsM SrcExpr
 dsB_12 s t E     _
   = dsRule "BODY1" t $
     dsM_12 s t E
@@ -714,11 +748,11 @@ dsB_12 s t (P f) j
 --       seqDE [ pure $ eDefine z (ApplyD f j)
 --             , dsM_12 s t (P (Variable z))]
 
-seqDE :: [D SrcCore] -> D SrcCore
+seqDE :: [DsM SrcCore] -> DsM SrcCore
 seqDE ds = eSeq <$> sequence ds
 
-defineDE :: String -> D SrcExpr
-         -> D (SrcExpr,   -- The defn
+defineDE :: String -> DsM SrcExpr
+         -> DsM (SrcExpr,   -- The defn
                SrcExpr)   -- The use
 -- define "x" de   returns   x := e, along with x itself
 -- But (just to save clutter) if the rhs turns out to be tiny,
@@ -731,9 +765,9 @@ defineDE nm ds_rhs
                  ; pure (eDefine x rhs', Variable x) } }
 
 defineDE2 :: String
-          -> D SrcSmall              -- The RHS
-          -> (SrcCore -> D SrcCore)  -- The body
-          -> D SrcCore               -- z := rhs; body
+          -> DsM SrcSmall              -- The RHS
+          -> (SrcCore -> DsM SrcCore)  -- The body
+          -> DsM SrcCore               -- z := rhs; body
 defineDE2 nm ds_rhs ds_body
   = do { rhs' <- ds_rhs
        ; if isAtomic rhs'
@@ -768,7 +802,7 @@ where `x` is complely fresh.   We can abbreviate this if
   Hence the user of `getAllIdents`.
 -}
 
-dsM_12 :: HasCallStack => DsMode12 -> SrcSmall -> Pi -> D SrcCore
+dsM_12 :: HasCallStack => DsMode12 -> SrcSmall -> Pi -> DsM SrcCore
 -- This one does the heavy lifting
 
 -------------------- Functions -----------------------
@@ -929,7 +963,7 @@ dsM_12 s tt@(Array ts) (P i)                   -- MARRAYP
         ; res_arr    <- mkArray es
         ; pure (eSeq [ Unify i exi_js_arr, res_arr ]) }
    where
-     do_one :: SrcExpr -> D (SrcExpr, SrcExpr)
+     do_one :: SrcExpr -> DsM (SrcExpr, SrcExpr)
      -- Returns the pattern-match decl, and the thing to put in the tuple
      do_one (Splice e) = do { (d, e') <- do_one e
                             ; pure (Splice d, Splice e') }
@@ -1075,7 +1109,7 @@ dsM_12 s t pi = error $ "TODO: dsM_12 " ++ show (s, pi, t)
 --   if e1 e2 e3 = iter e1 <> (\ _ _ . e2) (\_.e3)
 -- when vs is a singleton, we can use the simpler
 --   if e1 e2 e3 = iter (e1; v) <> (\ v _ . e2) (\_.e3)
-encodeIf :: SrcCore -> SrcCore -> SrcCore -> D SrcCore
+encodeIf :: SrcCore -> SrcCore -> SrcCore -> DsM SrcCore
 encodeIf e1 e2 e3 = do
   a <- newIdent (getLoc e1) "a"
   let vs = getVisibleBinders e1 `intersect` getFree e2
@@ -1087,12 +1121,12 @@ encodeIf e1 e2 e3 = do
     _   -> pure $ Iter (Seq [e1, evs]) (Lam a  $ eThunk $ eExists vs $ Seq [ Variable a `Unify` evs, e2]) (eThunk e3)
 
 -- one{e}  -->  Iter e <> (\ a _ . a) (\_.Fail)
-encodeOne :: SrcCore -> D SrcCore
+encodeOne :: SrcCore -> DsM SrcCore
 encodeOne e = do
   a <- newIdent (getLoc e) "a"
   pure $ Iter e (Lam a $ eThunk $ Variable a) (eThunk Fail)
 
-encodeAll :: SrcCore -> D SrcCore
+encodeAll :: SrcCore -> DsM SrcCore
 encodeAll e = do
   asIter <- getDFlagsX fAllAsIter
   if asIter then
@@ -1102,7 +1136,7 @@ encodeAll e = do
 
 -- all{e}  -->  exi Iter e <> step (\ a -> a)
 --   step a v c  =  c(exi r . arrApp(a,<v>,r); r)
-encodeAllAsIter :: SrcCore -> D SrcCore
+encodeAllAsIter :: SrcCore -> DsM SrcCore
 encodeAllAsIter e = do
   v   <- newIdent (getLoc e) "v"   -- value from choice
   a   <- newIdent (getLoc e) "a"   -- accumulator
@@ -1111,7 +1145,7 @@ encodeAllAsIter e = do
       cons = Lam v $ Lam a $ eCons ev (eForce ea)
   pure $ Iter e cons (eThunk $ Array [])
 
-encodeFor :: SrcCore -> SrcCore -> D SrcCore
+encodeFor :: SrcCore -> SrcCore -> DsM SrcCore
 encodeFor e1 e2 = do
   asIter <- getDFlagsX fAllAsIter
   if asIter then
@@ -1123,7 +1157,7 @@ encodeFor e1 e2 = do
 
 -- for(e1){e2}  -->  Iter (e1; <vs>) <> step (\ a . a)
 --   step a x c = exi vs . x = <vs>; c(exi r . arrApp$(a, <e2>, r); r)
-encodeForAsIter :: SrcCore -> SrcCore -> D SrcCore
+encodeForAsIter :: SrcCore -> SrcCore -> DsM SrcCore
 encodeForAsIter e1 e2 = do
   a   <- newIdent (getLoc e1) "a"
   x   <- newIdent (getLoc e1) "x"
@@ -1147,7 +1181,7 @@ eCons x xs =
 
 ----------------------------------
 
-flipToE :: DsMode12 -> SrcSmall -> SrcCore -> D SrcCore
+flipToE :: DsMode12 -> SrcSmall -> SrcCore -> DsM SrcCore
 -- Implements M_sigma[ e ] P(i),
 -- when we don't want to push the P(i) into e
 
@@ -1187,7 +1221,7 @@ Previously we had (not good)
 -----------------------------------------------
 
 
-addPrelude :: SrcExpr -> D SrcExpr
+addPrelude :: SrcExpr -> DsM SrcExpr
 addPrelude orig_e
   = do { prel  <- getDFlagsX (snd . fPrelude)
        ; return (addUsed (spl prel) orig_e) }
@@ -1232,33 +1266,34 @@ lookupPrimOp s = lookup s prs
 
 
 -----------------------------------------------
---      The desugaring monad: D
+--      The desugaring monad: DsM
 --
 --   It is an IO monad (for tracing), with an env that carries
---       a mutable fresh-variable supply
---       the Flags
+--       * a mutable fresh-variable supply
+--       * a way to report errors
+--       * the Flags
 --
 -----------------------------------------------
 
-newtype D a = MkD (DEnv -> IO a)
+newtype DsM a = MkD (DEnv -> IO a)
 
 newtype DError = MkDError Ident deriving (Eq, Ord, Show)
 
 data DEnv = DEnv { nextNo :: !(IORef Int), scopeErr :: !(IORef [DError]), dflags :: !Flags }
 
-instance Monad D where
+instance Monad DsM where
   MkD m1 >>= k = MkD (\env -> do { r <- m1 env
                                  ; let MkD m2 = k r
                                  ; m2 env })
-instance Applicative D where
+instance Applicative DsM where
   pure x = MkD (\_ -> return x)
   (<*>) = ap
 
-instance Functor D where
+instance Functor DsM where
   fmap f (MkD m) = MkD (\env -> f <$> m env)
 
-runD :: Flags -> D a -> IO (a, [DError])
--- Runs the D monad
+runD :: Flags -> DsM a -> IO (a, [DError])
+-- Runs the DsM monad
 runD flags (MkD thing_inside)
   = do { nextref <- newIORef 1
        ; scopeErrRef <- newIORef []
@@ -1268,17 +1303,17 @@ runD flags (MkD thing_inside)
        ; return (res, nub errs)
        }
 
-traceDS :: String -> SrcExpr -> D SrcExpr
+traceDS :: String -> SrcExpr -> DsM SrcExpr
 traceDS msg e = do { traceD msg (pPrint e)
                    ; pure e }
 
-traceD :: String -> Doc -> D ()
+traceD :: String -> Doc -> DsM ()
 traceD msg doc
   = do { do_trace <- getDFlagsX fTraceDesugar
-       ; when do_trace $ doIO_D (putStrLn ("\n------- " ++ msg ++ "---------\n" ++ render doc))
+       ; when do_trace $ doIO_DsM (putStrLn ("\n------- " ++ msg ++ "---------\n" ++ render doc))
        }
 
-dsRule :: (Pretty a) => String -> a -> D a -> D a
+dsRule :: (Pretty a) => String -> a -> DsM a -> DsM a
 dsRule msg e da = do
   do_trace <- getDFlagsX fTraceDesugar
   a <- da
@@ -1286,25 +1321,25 @@ dsRule msg e da = do
     doIO_D $ putStrLn $ "\n--------\n" ++ prettyShow e ++ "\n----> " ++ msg ++ "\n" ++ prettyShow a
   pure a
 
-doIO_D :: IO a -> D a
+doIO_D :: IO a -> DsM a
 doIO_D io = MkD (\_ -> io)
 
-getDFlags :: D Flags
+getDFlags :: DsM Flags
 getDFlags = MkD (\(DEnv { dflags = flags }) -> return flags)
 
-putScopeErr :: Ident -> D ()
+putScopeErr :: Ident -> DsM ()
 putScopeErr i = MkD (\(DEnv { scopeErr = ref }) -> modifyIORef ref (MkDError i:))
 
-getDFlagsX :: (Flags -> a) -> D a
+getDFlagsX :: (Flags -> a) -> DsM a
 getDFlagsX f = f <$> getDFlags
 
-newInt :: D Int
+newInt :: DsM Int
 newInt = MkD $ \(DEnv { nextNo = ref }) ->
   do { n <- readIORef ref
      ; writeIORef ref (n+1)
      ; return n }
 
-newIdent :: Loc -> String -> D Ident
+newIdent :: Loc -> String -> DsM Ident
 newIdent l s = do
   n <- newInt
   pure $ Ident l $ "$" ++ s ++ show n
