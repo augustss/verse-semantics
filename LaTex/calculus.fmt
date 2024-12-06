@@ -76,7 +76,7 @@
 %format (Me  (i) (e)) = "\Me{"  ^ i "}{" ^e "}"
 %format (DMe (i) (e))  = "{\mathcal M}\llbracket" e "\rrbracket{}" i
 %format (DMe2 (m) (i) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}" i
-%format (DMe3 (m) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}"
+%format (DMe3 (m) (pi) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}"pi
 %format (MMe (m) (i) (e)) = "\MMe{" ^ i "}{" ^e "}{" ^m "}"
 
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
@@ -86,8 +86,8 @@
 % New desugaring, just does the wrapping part:
 %format (SS u (e))    = "{\mathcal S}\llbracket" e "\rrbracket" u
 %format (checkfun q x e)  = "{\mathcal K}_{" q "}\llbracket" e "\rrbracket" x
-%format `ueq`         = "\,\mathring{=}\,"
-%format underscore    = "\bullet"
+%format `ueq`         = "\;\mathring{=}\;"
+%format underscore    = "{\circ}"
 
 %format FunCheck (pi) = "{\mathcal F}(" pi ")"
 
@@ -176,7 +176,7 @@
 %format olamKW = "\textbf{olam}"
 %format inapplic (x) (y) = "\textbf{inapplic}(" x "," y ")"
 
-%format lam (x) (e) = "\lambda" x".\," e
+%format lam (x) (e) = "\lambda" x" .\," e
 %format lam2 x r e = "\lambda"x"\!\shortrightarrow{}\!"r".\," e
 %format lamhdr (x) = "\lambda" x".\,"
 %format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
@@ -207,7 +207,7 @@
 %format colonequals = "\colonequals"
 %format dollar = "\$"
 %format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\," b
-%format forb (a) b = "\textbf{for}(" a ")\,\{" b "\}"
+%format forb (a) b = "\textbf{for}(" a ")\{" b "\}"
 
 %format blam (x) (fx) (e) = "\lambda_{" fx "}" x".\," e
 
@@ -305,6 +305,7 @@
 %format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
 %format iterKW = "\textbf{iter}"
 %format iter (e) (a) (f) (g) = "\textbf{iter}(" e ")\{" a ";" f ";" g "\}"
+%format iter2 (k) (e) (z) = "\textbf{iter}(" k ")\{"e "\}\{" z "\}"
 
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"

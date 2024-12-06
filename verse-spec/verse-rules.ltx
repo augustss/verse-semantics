@@ -15,7 +15,7 @@
 \begin{figure}[t]
   $$
 \begin{array}{l}
-\mbox{\em Syntax} \\
+\textbf{Execution Core Syntax} \\
   \begin{array}{lrcl@@{}}
       \text{Integers} & k \\
       \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
@@ -24,7 +24,7 @@
           & |rs| & ::= & |{r_1, xdots, r_n}|  \hspace{1cm} (n \geq 0)\\
       \text{Programs} & p  & ::=  & |check succeeds e| \quad \text{where} \; \freevars{e} = \{ \} \\
       \text{Expressions} & |e| & ::= & |v| \vb |lv == e_1 ; e_2| \vb |e_1 choice e_2| \vb |fail|
-                                     \vb |def x e| \vb |apply1N v_1 v_2| \vb |iter e_1 e_2 e_3 e_4| \\
+                                     \vb |def x e| \vb |apply1N v_1 v_2| \vb |iter2 v_1 e v_2| \\
       && \vb & |some v| \vb |v guard e| \vb |check fx e|
       \vb |verify2 rs as e| \\
       \text{Lvalues} & |lv| & ::= & |underscore| \vb |v| \\
@@ -68,7 +68,7 @@
 %    \end{array}
 \end{array}
      $$
-  \caption{Core Verse Syntax} \label{fig:vc-syntax}
+  \caption{Execution Core Syntax} \label{fig:vc-syntax}
 \end{figure}
 
 \begin{figure}

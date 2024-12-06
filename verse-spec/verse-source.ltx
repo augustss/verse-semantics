@@ -97,10 +97,10 @@ $$
 &      & \vb & |:t|                        & \text{Range} \\
 &      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
 &      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
-&      & \vb & |for(t_1) do t_2|           & \text{Finite loop} \\
+&      & \vb & |fordo t_1 t_2|           & \text{Finite loop} \\
 &      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
 &      & \vb & |functionOC q t_1 t_2|     & \text{Function} \\
-&      & \vb & |oftype t_1 t_2|            & \text{Type annotation}\\
+&      & \vb & |oftypefx t_1 fx t_2|       & \text{Type annotation}\\
 &      & \vb & |check fx t|                & \text{Effects check} \\
 \\
 \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\

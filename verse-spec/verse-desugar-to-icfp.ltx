@@ -19,62 +19,66 @@ $$
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
  \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N e_1 e_2| \vb |e_1; e_2|
      \vb |e_1 == e_2| \vb |defKW x| \vb |e_1 `choice` e_2| \vb  |arr (e_1, dots, e_n)| \\
-  && \vb & |if(e_1) then e_2 else e_3| \vb |all e|  \\
-  && \vb & |lam x e| \\
+  && \vb & |lam x e| \vb |iter2 v_1 e v_2|\\
   && \vb & |some v| \vb |v guard e| \vb |check fx e| \vb |verify2 rs as e| \\
 \multicolumn{4}{l}{\hspace{3mm}\text{Note: ordinary |lam x e|; no |oftype e_1 e_2|; add |verifyKW| and |someKW| }} \\[2mm]
 \end{array}\\
 
-\mbox{{\bf Desugaring Mini Verse into Core Verse:} $|DMe3 md t| = |e|$} \\
+\mbox{{\bf Desugaring Mini Verse into Core Verse:} $|DMe3 md si t| = |e|$} \\
 
 % -------------- Syntax ----------------
 \multicolumn{1}{c}{\begin{array}{rcll}
-  |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\[1mm]
+  |md| & ::= & |mdx| \vb |mdpos| \vb |mdneg|  & \text{``Mode'': execution, verify, check} \\
+  |si| & ::= & \text{Set of in-scope lambda-bound variables} \\[1mm]
 \end{array}} \\
 
 
 % -------------- Basic rules ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\rulename{mconst}  & |DMe3 md  k|                  & = & |k| \\
-\rulename{mvar}    & |DMe3 md x|                  & = & |x| \\
-\rulename{mop}    & |DMe3 md o|                  & = & |o| \\
-\rulename{mapp}    & |DMe3 md (apply1N e_1 e_2)|
-    & = & |defKW f a; f = DMe3 md e_1; a = DMe3 md e_2; apply1N f a| \\
-\rulename{marraye} & |DMe3 md (arr(e_1, xdots, e_n))|
-    & = & |arr (DMe3 md e_1, xdots, DMe3 md e_n)| \\
-\rulename{mbind}   & |DMe3 md (defKW x)|          & = & |defKW x| \\
-\rulename{meq}     & |DMe3 md (e_1=e_2)|          & = & |(DMe3 md e_1) = (DMe3 md e_2)| \\
-\rulename{msemi}   & |DMe3 md (e_1 ; e_2)|        & = & |DMe3 md e_1 ; DMe3 md e_2| \\
-\rulename{mchoice} & |DMe3 md (e_1 `choice` e_2)| & = & |(DMe3 md e_1) `choice` (DMe3 md e_2)| \\
-\rulename{mif} & |DMe3 md (if e_1 then e_2 else e_3|
-  & = & \multicolumn{2}{@@{}l}{|if (DMe3 md e_1) then (DMe3 md e_2) else (DMe3 md e_3)|} \\[2mm]
+\rulename{mconst}  & |DMe3 md si k|                  & = & |k| \\
+\rulename{mvar}    & |DMe3 md si x|                  & = & |x| \\
+\rulename{mop}    & |DMe3 md si o|                  & = & |o| \\
+\rulename{mapp}    & |DMe3 md si (apply1N e_1 e_2)|
+   & = & |apply1N ((DMe3 md si e_1)) (DMe3 md si e_2)| \\
+\rulename{marraye} & |DMe3 md si (arr(e_1, xdots, e_n))|
+    & = & |arr (DMe3 md si e_1, xdots, DMe3 md si e_n)| \\
+\rulename{mbind}   & |DMe3 md si (defKW x)|          & = & |defKW x| \\
+\rulename{meq}     & |DMe3 md si (e_1=e_2)|          & = & |(DMe3 md si e_1) = (DMe3 md si e_2)| \\
+\rulename{msemi}   & |DMe3 md si (e_1 ; e_2)|        & = & |DMe3 md si e_1 ; DMe3 md si e_2| \\
+\rulename{mchoice} & |DMe3 md si (e_1 `choice` e_2)| & = & |(DMe3 md si e_1) `choice` (DMe3 md si e_2)| \\
+\rulename{mfor}    & |DMe3 md si (fordo e_1 e_2)|
+   & = & |iter2 (lam (a r) (cons (force a) (force r))) (DMe3 md si e_1; lam underscore (DMe3 md si e_2)) (lam underscore emptytup)| \\
+\multicolumn{2}{l}{\rulename{mif} \;\; \hfill |DMe3 md si (if e_1 then e_2 else e_3|}
+& = & \multicolumn{2}{@@{}l}{|iter2 (lam (a underscore) (force a))
+        (DMe3 md si e_1; lam underscore (DMe3 md si e_2))
+        (lam underscore (DMe3 md si e_3))|}  \\[2mm]
 \end{array}
 \\
 
 %--------- (e1 |> e2) and check<fx>{e}----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{moftype-} & |DMe3 mdneg (oftypefx e_1 fx e_2)|
-  & = & |z := DMe3 mdneg e_2; freevars e_1 guard (havoc2 fx (some z))| \\
-\rulename{moftype+x} & |DMe3 md (oftypefx e_1 fx e_2)| & = &
+\rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
+  & = & |z := DMe3 mdneg si e_2; si guard (havoc2 fx (some z))| \\
+\rulename{moftype+x} & |DMe3 md si (oftypefx e_1 fx e_2)| & = &
   \begin{array}[t]{@@{}l}
-  |y := check fx (DMe3 md e_1);| \\
-  |check succeeds (z := DMe3 md e_2; apply1N z y)|
+  |y := check fx (DMe3 md si e_1);| \\
+  |check succeeds (apply1N ((DMe3 md si e_2)) y)|
   \end{array}   & |md|\in\{|mdpos|,|mdx|\} \\
-\rulename{mcheck-}  & |DMe3 mdneg (check fx e)| & = & |DMe3 mdneg t| \\
-\rulename{mcheck+x} & |DMe3 md    (check fx e)| & = & |check fx (DMe3 md t)| & |md|\in\{|mdpos|,|mdx|\} \\[2mm]
+\rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si t| \\
+\rulename{mcheck+x} & |DMe3 md    si (check fx e)| & = & |check fx (DMe3 md si t)| & |md|\in\{|mdpos|,|mdx|\} \\[2mm]
 \end{array}
 \\
 % -------------- Function rules ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
   \multicolumn{4}{l}{\mbox{\it Closed functions}} \\
- \rulename{mcfun+} &  |DMe3 mdpos (lamOC closed x e_1 e_2)|
- & = & \multicolumn{2}{@@{}l}{|verify2 x () (DMe3 mdneg t_1; DMe3 mdpos t_2);|}
-                                |DMe3 mdneg (lamOC closed x e_1 e_2)| \\[1mm]
-\rulename{mcfun-} &  |DMe3 mdneg (lamOC closed x e_1 e_2)|
-& = & |lam i (DMe3 mdpos e_1; DMe3 mdneg e_2)| \\[1mm]
-\rulename{mcfunx}& |DMe3 mdx (lamOC closed x e_1 e_2)|
-& = & |lam i (DMe3 mdx e_1; DMe3 mdx e_2)| \\[2mm]
+ \rulename{mcfun+} &  |DMe3 mdpos si (lamOC closed x e_1 e_2)|
+ & = & \multicolumn{2}{@@{}l}{|verify2 x () (DMe3 mdneg ((si + x)) t_1; DMe3 mdpos ((si +x)) t_2);|} \\
+ & & &       |DMe3 mdneg si (lamOC closed x e_1 e_2)| \\[1mm]
+\rulename{mcfun-} &  |DMe3 mdneg si (lamOC closed x e_1 e_2)|
+& = & |lam x (DMe3 mdpos ((si + x)) e_1; DMe3 mdneg ((si + x)) e_2)| \\[1mm]
+\rulename{mcfunx}& |DMe3 mdx si (lamOC closed x e_1 e_2)|
+& = & |lam x (DMe3 mdx ((si + x)) e_1; DMe3 mdx ((si + x)) e_2)| \\[2mm]
 \end{array} \\
 % -------------- Auxiliary functions ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
