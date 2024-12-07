@@ -685,8 +685,8 @@ mkAppend x          y          = do { r    <- newIdent noLoc "r"
 --------------------------------------------------------
 
 data Input
-  = P Ident    -- ^ An input variable x
-  | NoInput    -- ^ Typeset as bullet or underscore
+  = NoInput    -- ^ Typeset as bullet, circle, or underscore
+  | P Ident    -- ^ An input variable x
   deriving (Eq, Ord, Show)
 
 essToMini :: SrcSmall -> SrcMini
@@ -707,10 +707,14 @@ essToMini e = go NoInput e
                                ; return (eSeq (es ++ [e])) }
     go inp (DefineE x t)  = do { e <- go inp t
                                ; return (eSeq [DefineV x, e)] }
+    go inp (DefineIE x y t)  = do { e <- go inp t
+                                  ; return (eSeq [DefineV x, inp `ueq` Var i, DefineV y, e)] }
 
 
     ueq NoInput e = e
     ueq (P x) e   = Unify (Var x) e
+
+
 --------------------------------------------------------
 --
 --           The M-desugaring
