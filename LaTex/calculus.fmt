@@ -433,7 +433,7 @@
 %% %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
 %format (eff (fx)) = "\langle" fx "\rangle"
-%format apeff g x = g "\langle" x "\rangle"
+%format (apeff g x) = g "\langle" x "\rangle"
 %format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 %format arrayty = "[]"

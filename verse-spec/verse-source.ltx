@@ -68,9 +68,30 @@ $$
 &        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
 \end{array}
 $$
-\caption{Source Verse expressions} \label{fig:source-verse-expr}
+\caption{Source Verse expressions, part 1} \label{fig:source-verse-expr}
 \end{figure}
 
+\begin{figure}
+$$
+\begin{array}{lrcll}
+\text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p (apeff t fx)| \vb  |squig p_1 p_2| \\
+&     & \vb & |: t| \vb |p : t| \\
+ & & \vb & |p_1, xdots, p_n| \vb |..p| & \text{Array splicing} \\
+& |xsl| & ::= & x \vb  |xsl amp x|
+\\[2mm]
+\text{\bf Effects} &
+ |fx| & ::= & |fails|  \vb |succeeds| \vb |decides| \\
+ & & & \text{if |eff fx| is omitted, assume |succeeds|}
+\\[2mm]
+\text{\bf Operators} &
+ |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \vb ..  & \text{Prefix}\\
+& |op_a| & ::= &  ? \vb |hat| & \text{Postfix}\\
+& |op_i| & ::= &  + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb .. & \text{Infix} \\
+&        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
+\end{array}
+$$
+\caption{Source Verse expressions, part 2} \label{fig:source-verse-expr2}
+\end{figure}
 
 % -------------------------------------------------------------
 %               Essential Verse
@@ -92,9 +113,9 @@ $$
 &      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
 &      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
 &      & \vb & |t_1 = t_2|                 & \text{Unification} \\
-&      & \vb & |x := t|                    & \text{Definition} \\
-&      & \vb & |squig x y := t|          & \text{Definition} \\
-&      & \vb & |:t|                        & \text{Range} \\
+&      & \vb & |x := t|                   & \text{Definition} \\
+&      & \vb & |squig x y := t|           & \text{Definition} \\
+&      & \vb & |colonfx fx t|             & \text{Range} \\
 &      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
 &      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
 &      & \vb & |fordo t_1 t_2|           & \text{Finite loop} \\
@@ -126,7 +147,8 @@ $$
 \begin{array}{lrcll}
 \multicolumn{4}{l}{\textbf{Rewriting terms that use patterns:  |p:t| and |p := t|}} \\
 % \rulename{dscolont} &  |p (eff fx) : t| & \rightarrow & |p := colonfx fx t| \\[1mm]
-\rulename{dscolont} &  |p : t| & \rightarrow & |p := :t| \\[1mm]
+\rulename{dscol1} &  |p (apeff t_1 fx) : t_2| & \rightarrow & |p := functionOC c t_1 (colonfx fx t_2)| \\[1mm]
+\rulename{dscol2} &  |p : t| & \rightarrow & |p := :t| & \text{\rulename{dscol1} does not apply} \\[1mm]
 \rulename{dswild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
 \rulename{dswild2} &  |(: t_1) := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
 \rulename{dscolonb} &  |(p (eff fx): t_1) := t_2| & \rightarrow & |p := oftypefx t_2 fx t_1| \\
