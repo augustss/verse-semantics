@@ -121,7 +121,9 @@ sDesugarExpr = ds
         -- f(a)<fx> : ty  -->  f := fun(a){ :ty<fx> }
         --        e : ty  -->  e := :ty<>
         -- c.f. the ":" case of `defn`
-      = defn f (Function [a] (Range fxs e2)) >>= ds
+      = defn f (Function [a] (Check fxs (Range [] e2))) >>= ds
+             -- Dec 24: experimenting with splitting Range fxs
+             --         into a spararate Check
 
       | otherwise
       = defn e1 (Range [] e2) >>= ds
@@ -318,7 +320,8 @@ defn p e
 -- but adding <succeeds> if omitted, leaving behind <open/closed>
 defn (InfixOp e1 (Op ":") e2) e
    | Just (f, a, fxs) <- getFun e1
-   = defn f (Function [a] (OfType e fxs e2))
+   = defn f (Function [a] (Check fxs (OfType e [] e2)))
+       -- Dec 24: experimenting witn splitting OfType fxs to have separate Check
    | otherwise
    = defn e1              (OfType e []  e2)
 
@@ -680,39 +683,151 @@ mkAppend x          y          = do { r    <- newIdent noLoc "r"
 --------------------------------------------------------
 --
 --     Desugaring Essential Verse to Mini Verse
---        Fig 5 in verse-spec.pdf
+--        Fig 6 in verse-spec.pdf
 --
 --------------------------------------------------------
 
 data Input
-  = NoInput    -- ^ Typeset as bullet, circle, or underscore
-  | P Ident    -- ^ An input variable x
+  = NoInput      -- ^ Typeset as bullet, circle, or underscore
+  | P SrcMini    -- ^ An input variable x
   deriving (Eq, Ord, Show)
 
 essToMini :: SrcSmall -> SrcMini
+-- Essential Verse --> Mini Verse
 essToMini e = go NoInput e
   where
-    go inp e@(Lit {})     = return (inp `ueq` e)
-    go inp e@(Var {})     = return (inp `ueq` e)
-    go inp e@(EPrim {})   = return (inp `ueq` e)
-    go inp Fail           = Fail
+    go inp e@(Lit {})     = inp `ueq` return e
+    go inp e@(Var {})     = inp `ueq` return e
+    go inp e@(EPrim {})   = inp `ueq` return e
+    go inp Fail           = return Fail
     go inp (Unify  e1 e2) = Unify  <$> go inp e1 <*> go NoInput e2
     go inp (Choice e1 e2) = Choice <$> go inp e1 <*> go NoInput e2
-    go inp (ApplyD t1 t2) = do { e1 <- go NoInput t1
-                               ; e2 <- go NoInput t2
-                               ; return (inp `ueq` ApplyD t1' t2') }
+    go inp (ApplyD t1 t2) = inp `ueq` (ApplyD <$> go NoInput t1 <*> go NoInput t2)
     go inp (Seq ts)       = do { let (ts,t) = unSeq ts
                                ; es <- mapM (go NoInput) ts
                                ; e  <- go inp t
                                ; return (eSeq (es ++ [e])) }
+
+    -- x:=t and x~>y:=t
     go inp (DefineE x t)  = do { e <- go inp t
                                ; return (eSeq [DefineV x, e)] }
     go inp (DefineIE x y t)  = do { e <- go inp t
-                                  ; return (eSeq [DefineV x, inp `ueq` Var i, DefineV y, e)] }
+                                  ; return (eSeq [ DefineV x, inp `ueq` pure (Var x)
+                                                 , DefineV y, e)] }
+
+    -- If, for, all
+    go inp (If3 t1 t2 t3) = If3  <$> go NoInput t1 <*> go inp t2 <*> go inp t3
+    go inp (For2 t1 t2)   = inp `ueq` (For2 <$> go NoInput t1 <*> go inp t2 <*> go inp t3)
+    go inp (All t)        = inp `ueq` (All <$> go NoInput t)
+
+    -- (:t)
+    go inp (Range fxs t) = assert (null fxs) (show fxs) $
+                           case inp of
+                             NoInput -> do { e <- go NoInput t
+                                           ; return (Check (eSeq [DefineV identX, Var identX]) e) }
+                             P i     -> OfType i [] <$> go NoInput t
+
+    -- check<fx>{t}
+    go inp (Check fx t)  = case inp of
+                              NoInput -> Check fx <$> go NoInput t
+                              P i -> do { k <- newIdent (getLoc t) "k"
+                                        ; e <- go (P k) t
+                                        ; return (eSeq [ DefineV k
+                                                       , Unify (Var k) (Check fx i)
+                                                       , e ]) }
+
+    -- t1 |> t2
+    go inp (OfType t1 fxs t2) = assert (null fxs) (show fxs) $
+                                inp `ueq` (OfType <$> go NoInput t1 <*> go NoInput t2)
+
+    -- Arrays: <t1, .., tn>.  Need to take care of splices
+    go inp (Array ts)
+      = case inp of
+          NoInput -> do { es <- mapM do_one ts
+                        ; return (Array es) }
+                   where
+                     do_one (Splice t) = Splice <$> go NoInput t
+                     do_one t          =            go NoInput t
+
+          P i -> do { prs <- mapM do_one ts
+                     ; let (exi_js, es) = unzip prs
+                     ; exi_js_arr <- mkArray exi_js
+                     ; res_arr    <- mkArray es
+                     ; pure (eSeq [ Unify i exi_js_arr, res_arr ]) }
+              where
+                do_one :: SrcExpr -> DsM (SrcExpr, SrcExpr)
+                -- Returns the pattern-match decl, and the thing to put in the tuple
+                do_one (Splice t) = do { (d, e) <- do_one t
+                                       ; pure (Splice d, Splice e) }
+                do_one         t  = do { j <- newIdent (getLoc e) "j"
+                                       ; e <- go (P (Variable j)) t
+                                       ; pure (DefineV j, e) }
+
+    -- Functions
+    go inp (Function [(t1,fx)] t2)
+      = assert (null fx) (show fx) $
+        case inp of
+          NoInput -> do { i <- newIdent (getLoc t1) "i"
+                        ; XDLam Closed <$> go (P (Var i)) t1 <*> go NoInput t2 }
+          P f -> do { i <- newIdent (getLoc t1) "i"
+                    ; x <- newIdent (getLoc t2) "x"
+                    ; e1 <- go (P (Var i)) t2
+                    ; e2 <- go (P (ApplyD f (Var x))) t2
+                    ; return (XDLam Closed (eDefine x e1) e2) } 
 
 
-    ueq NoInput e = e
-    ueq (P x) e   = Unify (Var x) e
+    ueq :: Input -> DsM SrcMini -> DsM SrcMini
+    ueq NoInput ds_e  = ds_e
+    ueq (P inp) ds_e  = Unify inp <$> ds_e
+
+
+--------------------------------------------------------
+--
+--     Desugaring Mini Verse to Big Core
+--        Fig 8 in verse-spec.pdf
+--
+--------------------------------------------------------
+
+miniToCore :: DsMode -> SrcMini -> DsM SrcCore
+miniToCore md e = go md e
+  where
+    go _md e@(Lit {})     = return e   -- MCONST
+    go _md e@(Var {})     = return e   -- MVAR
+    go _md e@(EPrin {})   = return e   -- MOP
+    go _md e@(DefineV {}) = return e   -- MBIND
+
+    -- MARRAY, MSEMI, MEQ, MCHOICE
+    go md (Array es)     = do { es' <- mapM (go md) es; return (Array es') }
+    go md (Seq es)       = do { es' <- mapM (go md) es; return (Seq es') }
+    go md (Unify e1 e2)  = Unify <$> go md e1 <*> go md e2
+    go md (Choice e1 e2) = Choice <$> go md e1 <*> go md e2
+
+    -- MFOR, MIF
+    go md (For2 e1 e2)   = encodeFor2 <$> (go md e1) <*> go md e2
+    go md (If3 e1 e2 e3) = encodeIf2 <$> (go md e1) <*> go md e2 <*> go md e3
+
+    -- (e1 |> e2)
+    go MI (OfType 
+
+encodeFor2 :: SrcCore -> SrcCore -> SrcCore
+encodeFor2 e1 e2 = Iter (eSeq [e1, eThunk e2]) eCons2 eNil2
+   where
+     eCons2 :: SrcCore
+     -- eCons2 = \ a r. a[] : r[]
+     eCons2 = Lam a $ Lam r $ (eCons (eForce a) (eForce r))
+        where
+          r = Ident noLoc "r"
+          a = Ident noLoc "a"
+
+     eNil2 :: SrcCore
+     -- eNil2 = \_. <>
+     eNil = eThunk (Array [])
+
+encodeIf2 :: SrcCore -> SrcCore -> SrcCore -> SrcCore
+encodeIf2 e1 e2 e3 = Iter (eSeq [e1, eThunk e2]) eNext eElse
+  where
+    eNext = Lam a $ eThunk (eForce a)
+    eElse = eThunk e3
 
 
 --------------------------------------------------------
@@ -729,18 +844,18 @@ data Pi
   | E          -- ^ E
   deriving (Eq, Ord, Show)
 
-data DsMode12
+data DsMode
   = MX -- ^ x "execution"
   | MV -- ^ + "verification"
   | MI -- ^ - "checking" ("implementation")
   deriving (Eq, Ord, Show)
 
-mDesugarExpr :: DsMode12 -> SrcSmall -> DsM SrcCore
+mDesugarExpr :: DsMode -> SrcSmall -> DsM SrcCore
 mDesugarExpr s t
   = dsRule "DINIT" t $
     dsM_12 s t E
 
-dsB_12 :: DsMode12 -> SrcSmall -> Pi -> SrcCore -> DsM SrcExpr
+dsB_12 :: DsMode -> SrcSmall -> Pi -> SrcCore -> DsM SrcExpr
 dsB_12 s t E     _
   = dsRule "BODY1" t $
     dsM_12 s t E
@@ -806,7 +921,7 @@ where `x` is complely fresh.   We can abbreviate this if
   Hence the user of `getAllIdents`.
 -}
 
-dsM_12 :: HasCallStack => DsMode12 -> SrcSmall -> Pi -> DsM SrcCore
+dsM_12 :: HasCallStack => DsMode -> SrcSmall -> Pi -> DsM SrcCore
 -- This one does the heavy lifting
 
 -------------------- Functions -----------------------
@@ -1185,7 +1300,7 @@ eCons x xs =
 
 ----------------------------------
 
-flipToE :: DsMode12 -> SrcSmall -> SrcCore -> DsM SrcCore
+flipToE :: DsMode -> SrcSmall -> SrcCore -> DsM SrcCore
 -- Implements M_sigma[ e ] P(i),
 -- when we don't want to push the P(i) into e
 

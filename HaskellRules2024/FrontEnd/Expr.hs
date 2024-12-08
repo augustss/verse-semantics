@@ -126,7 +126,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Return SrcExpr               -- return e
 
   -----------------------------------------------------------
-  -- Small Source Verse
+  -- Essential Verse
   -- Only constructors below here appear in the output of S-desugaring
   -- See Note [How SrcExpr is parsed] and the dsSmall function
   | DefineV Ident                      -- (exists i)  Bring `i` into scope in the entire
@@ -137,6 +137,13 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Where SrcBlk SrcExpr               -- e1 where e2
   | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
   | Splice SrcExpr                     -- Array splicing ..e
+
+  -----------------------------------------------------------
+  -- Mini Verse
+  -- Only constructors below here appear in the output of the unwrapping desugaring
+  -- See Note [How SrcExpr is parsed] and the dsSmall function
+
+  | XDLam Aperture Ident SrcExpr SrcExpr  -- Lambda with explicit domain
 
   -----------------------------------------------------------
   -- Big Core: only constructors below here appear in the output of M-desugaring
@@ -181,6 +188,9 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
 
+  deriving (Eq, Ord, Show, Data)
+
+data Aperture = Open | Closed
   deriving (Eq, Ord, Show, Data)
 
 -- SrcPat synonym is used for syntax of 'p' in the source language
