@@ -58,14 +58,14 @@ $$
 %--------- (e1 |> e2) and check<fx>{e}----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
-  & = & |z := DMe3 mdneg si e_2; si guard (havoc2 fx (some z))| \\
-\rulename{moftype+x} & |DMe3 md si (oftypefx e_1 fx e_2)| & = &
+\rulename{moftype-} & |DMe3 mdneg si (oftype e_1 e_2)|
+  & = & |z := DMe3 mdneg si e_2; si guard (some z)| \\
+\rulename{moftype+x} & |DMe3 md si (oftype e_1 e_2)| & = &
   \begin{array}[t]{@@{}l}
-  |y := check fx (DMe3 md si e_1);| \\
+  |y := DMe3 md si e_1;| \\
   |check succeeds (apply1N ((DMe3 md si e_2)) y)|
   \end{array}   & |md|\in\{|mdpos|,|mdx|\} \\
-\rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si t| \\
+\rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |havoc2 fx (DMe3 mdneg si t)| \\
 \rulename{mcheck+x} & |DMe3 md    si (check fx e)| & = & |check fx (DMe3 md si t)| & |md|\in\{|mdpos|,|mdx|\} \\[2mm]
 \end{array}
 \\

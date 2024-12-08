@@ -48,7 +48,7 @@ $$
 \rulename{dscol2}   & |SS x (: t)| & = & |oftype x (SS underscore t)| \\
 \rulename{dschk1}   & |SS underscore (check fx t)| & = & |check fx (SS underscore t)| \\
 \rulename{dschk2}   & |SS e (check fx t)| & = & |defKW k; k = check fx e; SS k t| \\
-\rulename{dsoftype}   & |SS u (oftypefx t_1 fx t_2)| & = & |u `ueq` (oftypefx (SS underscore t_1) fx (SS underscore t_2))| \\
+\rulename{dsoftype}   & |SS u (oftype t_1 t_2)| & = & |u `ueq` (oftype (SS underscore t_1) (SS underscore t_2))| \\
 \rulename{dstup1}   & |SS underscore (arr (t_1, dots, t_n))|
    & = & |arr( (SS underscore t_1), dots, (SS underscore t_n))| \\
 \rulename{dstup2}   & |SS x (arr (t_1, dots, t_n))|
