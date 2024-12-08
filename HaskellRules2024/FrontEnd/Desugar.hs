@@ -789,8 +789,9 @@ essToMini e = go NoInput e
 --------------------------------------------------------
 
 miniToCore :: DsMode -> SrcMini -> DsM SrcCore
-miniToCore md e = go md e
+miniToCore md e = go (md e
   where
+    go :: (DsMode, [Ident) -> SrcMini -> DsM SrcCore
     go _md e@(Lit {})     = return e   -- MCONST
     go _md e@(Var {})     = return e   -- MVAR
     go _md e@(EPrin {})   = return e   -- MOP
@@ -807,7 +808,32 @@ miniToCore md e = go md e
     go md (If3 e1 e2 e3) = encodeIf2 <$> (go md e1) <*> go md e2 <*> go md e3
 
     -- (e1 |> e2)
-    go MI (OfType 
+    go md (OfType e1 e2)
+      | (MI,xs) <- md = do { (dz, z) <- defineDE "z" (go md e2)
+                           ; return (eSeq [ dz, eGuard xs (eSome z) ]) }
+      | otherwise     = do { (dy, y) <- defineDE "z" (go md e1)
+                           ; e2' <- go md e2
+                           ; retrun (eSeq [ dy, eCheck [effSucceeds] (ApplyD e2' y) ]) }
+
+    go md (Check fx e)
+      | (MI,_) <- md = do { e' <- go md e
+                          ; return (eSeq [ eHavoc fx, e' ]) }
+      | otherwise    = do { e' <- go md e
+                          ; return (Check fx e') }
+
+    go (MV,xs) e@(XDLam Closed x e1 e2)
+      = do { e1' <- go (MI, x:xs) e1
+           ; e2' <- go (MV, x:xs) e2
+           ; efun <- go (MI, xs)
+           ; return (eSeq [ eVerify [x] (eSeq [e1',e2']), efun ]) }
+    go (MI,xs) e@(XDLam Closed x e1 e2)
+      = do { e1' <- go (MV, x:xs) e1
+           ; e2' <- go (MI, x:xs) e2
+           ; return (Lam x (eSeq [ e1', e2' ])) }
+    go (Mx,xs) e@(XDLam Closed x e1 e2)
+      = do { e1' <- go (MX, x:xs) e1
+           ; e2' <- go (MX, x:xs) e2
+           ; return (Lam x (eSeq [ e1', e2' ])) }
 
 encodeFor2 :: SrcCore -> SrcCore -> SrcCore
 encodeFor2 e1 e2 = Iter (eSeq [e1, eThunk e2]) eCons2 eNil2
