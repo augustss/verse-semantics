@@ -735,7 +735,7 @@ essToMini = go NoInput
                              NoInput -> do { e <- go NoInput t
                                            ; x <- newIdent (getLoc t) "x"
                                            ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
-                             PI i    -> OfType i [] <$> go NoInput t
+                             PI i    -> ApplyD <$> go NoInput t <$> pure i
 
     -- check<fx>{t}
     go inp (Check fx t)  = case inp of
