@@ -21,7 +21,7 @@ implies x y = not x || y
 
 data CExp = CVar Ident | CInt Integer | CPrim Op | CTup [CExp] | CApp CExp CExp
           | CEqu CExp CExp | CSeq CExp CExp | CWhere CExp CExp | CExi Ident
-          | CIf CExp CExp CExp | CLam OC Ident CExp CExp
+          | CIf CExp CExp CExp | CLam OC Ident CExp CExp (Maybe (Ident, CExp))
           | CFail | COfType CExp CExp
           | CChoice CExp CExp | CFor CExp CExp | CAll CExp
           | CDef Ident CExp
@@ -34,22 +34,22 @@ instance Show CExp where
   showsPrec _ (CTup es) = showString "<" . showString (intercalate "," $ map show es) . showString ">"
   showsPrec _ (CApp e1 e2) = showsPrec 11 e1 . showString "[" . showsPrec 0 e2 . showString "]"
   showsPrec p (CEqu e1 e2) = showParen (p > 5) $ showsPrec 6 e1 . showString " = " . showsPrec 6 e2
-  showsPrec p (CSeq e1 e2) = showParen (p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
+  showsPrec p (CSeq e1 e2) = showParen (True || p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
   showsPrec p (CWhere e1 e2) = showParen (p > 1) $ showsPrec 3 e1 . showString " where " . showsPrec 3 e2
   showsPrec _ (CExi i) = showString "exi " . showString i
   showsPrec _ CFail = showString "fail"
   showsPrec _ (CIf e1 e2 e3) = showString "if " . showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2) .
                               showBraces (showsPrec 0 e3)
-  showsPrec _ (CLam q i e1 e2) = showString ("lam" ++ [show q !! 0]) .
+  showsPrec _ (CLam q i e1 e2 me3) = showString ("lam" ++ [show q !! 0]) .
                               showParen True (showString i) . showParen True (showsPrec 0 e1) .
-                              showBraces (showsPrec 0 e2)
+                              showBraces (showsPrec 0 e2) .
+                              showBraces (maybe (showString "") (showsPrec 0) me3)
   showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
   showsPrec p (CChoice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " | " . showsPrec 5 e2
   showsPrec _ (CAll e) = showString "all" . showBraces (showsPrec 0 e)
   showsPrec _ (CFor e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
   showsPrec p (CDef x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
-
 
 dI :: CExp -> [Ident]
 dI (CApp e1 e2) = dI e1 `union` dI e2
@@ -118,7 +118,7 @@ syntaxN u (For e0 e1) = (u =.=) <$> (CFor <$> syntaxN "_" e0 <*> syntaxN "_" e1)
 syntaxN u (All e) = (u =.=) <$> (CAll <$> syntaxN "_" e)
 syntaxN "_" (Fun q e0 e1) = do
   i <- newVar "i"
-  CLam q i <$> syntaxN i e0 <*> syntaxN "_" e1
+  CLam q i <$> syntaxN i e0 <*> syntaxN "_" e1 <*> pure Nothing
 syntaxN u (Fun q e0 e1) = do
   i <- newVar "i"
   x <- newVar "x"
@@ -126,14 +126,13 @@ syntaxN u (Fun q e0 e1) = do
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
-  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs $ cq ++ [CExi k `CSeq` (k =.= CApp (CVar u) (CVar x)), c1 ])
+  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k `CSeq` (k =.= CApp (CVar u) (CVar x)), c1 ]) cq
 
-checkQ :: OC -> Ident -> Exp -> N [CExp]
-checkQ Open _ _ = pure []
+checkQ :: OC -> Ident -> Exp -> N (Maybe (Ident, CExp))
+checkQ Open _ _ = pure Nothing
 checkQ Closed f e = do
-  a <- newVar "a"
-  e' <- syntaxN "_" e
-  pure [ CLam Closed a (CApp (CVar f) (CVar a)) (CVar a `CEqu` e') ]
+    e' <- syntaxN "_" e
+    pure (Just (f, e'))
 
 mustBeVar :: Ident -> N CExp
 mustBeVar "_" = do u <- newVar "u"; pure (CExi u `CSeq` CVar u)
@@ -156,7 +155,7 @@ redef = re []
         re vs (CSeq e1 e2) = CSeq (re vs e1) (re (allVars e1 ++ vs) e2)
         re vs (CEqu e1 e2) = CEqu (re vs e1) (re (allVars e1 ++ vs) e2)
         re vs (CApp e1 e2) = CApp (re vs e1) (re (allVars e1 ++ vs) e2)
-        re _ (CLam q i e1 e2) = CLam q i (re [] e1) (re [] e2)
+        re _ (CLam q i e1 e2 me3) = CLam q i (re [] e1) (re [] e2) me3
         re _ e = e
 
 allVars :: CExp -> [Ident]
@@ -190,9 +189,10 @@ dE (CIf e1 e2 e3) rho                       = do
     [] -> dE e3 rho
     rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]  -- XX Not the correct semantics
 
-dE (CLam q i (CDef x e1) e2)   rho          = mkSet $ close q
+dE (CLam q i (CDef x e1) e2 me3)   rho      = mkSet $ close q
   [ f
   | f <- unSet allWs, function f
+  , chkClsd me3 rho
   , forAll allWs $ \ w ->
       forAllL (dX e1 (extend rho i w)) $ \ rho' ->
         let w1s = dE e1 rho' in
@@ -204,25 +204,57 @@ dE (CLam q i (CDef x e1) e2)   rho          = mkSet $ close q
                
   ]
 
-dE (CLam q i e1 e2)   rho                     = mkSet $ close q
+dE (CLam q i e1 e2 me3)   rho                     = mkSet $ close q
   [ f
   | f <- unSet allWs, function f
---  , (q == Closed) `implies` hackyDomainTest i e1 e2 rho
+  , chkClsd me3 rho
   , forAll allWs $ \ w ->
       forAllL (dX e1 (extend rho i w)) $ \ rho' ->
         not (isEmpty (dE e1 rho'))
         `implies`
         (w `inDomV` f  &&  apV f w `sIn` dD e2 rho')
-{-
-  , (q == Closed)
-    `implies`
-    (forAll allWs $ \ w ->
-       (w `inDomV` f) `implies`
-         (existsL (dX e1 rho) $ \rho' -> not (isEmpty (dE e1 (extend rho' i w)))))
--}
   ]
-
+{-
+dE ee@(CChkClsd x e) rho =
+  case lookupEnv x rho of
+    v@VFcn{} -> chk v
+    v@VTup{} -> chk v
+    _ -> empty
+  where
+    chk v =
+      let xDom = domV' v
+          eRng = dD e rho
+      in  --trace ("\n=== " ++ show (ee, v, xDom == eRng)) $
+        if xDom == eRng then   -- `lessEq` ??
+          trace ("\n=== " ++ show (ee, lookupEnv x rho, xDom == eRng)) $
+          sing (VInt 88888)
+        else
+          empty
+-}
 dE e _ = error $ "unimplemented " ++ show e
+
+domV' :: Val -> Set Val
+domV' v@VFcn{} = domV v
+domV' v@VTup{} = domV v
+domV' _ = empty
+
+chkClsd :: Maybe (Ident, CExp) -> Env -> Bool
+chkClsd Nothing _ = True
+chkClsd (Just (x, e)) rho =
+  case lookupEnv x rho of
+    v@VFcn{} -> chk v
+    v@VTup{} -> chk v
+    _ -> False
+  where
+    chk v =
+      let xDom = domV' v
+          eRng = dD e rho
+      in  --trace ("\n=== " ++ show (ee, v, xDom == eRng)) $
+        if xDom == eRng then   -- `lessEq` ??
+          --trace ("\n=== " ++ show (ee, lookupEnv x rho, xDom == eRng)) $
+          True
+        else
+          False
 
 close :: OC -> [W] -> [W]
 close _ [] = []
@@ -232,18 +264,6 @@ close Closed fs =
   let r = [ f | f <- fs, forAllL fs (\ f' -> domV f `lessEq` domV f') ]
   in  --trace ("close " ++ show (fs, r))
       r
-
-{-
--- Check that e1 and e2 fail on exactly the same inputs.
-hackyDomainTest :: Ident -> CExp -> CExp -> Env -> Bool
-hackyDomainTest i e1 e2 rho =
-  forAll allWs $ \ w ->
-    forAllL (dX e1 rho) $ \ rho' ->
-      isEmpty (dE e1 (extend rho' i w)) == isEmpty (dD e2 rho')
-
---domE :: Exp -> Env -> WS
---domE e rho = mkSet [ x | x <- unSet allWs, rho' <- unSet $ dX e rho, not (isEmpty (dM e x rho') ) ]
--}
 
 dX :: CExp -> Env -> [Env]
 dX e rho = 
@@ -265,7 +285,13 @@ dP e =
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp33, exp34, exp35, exp45, exp46, exp49, exp50
+           exp20, exp21, exp22,
+           {-Choice: exp23,exp24,exp25,exp26,exp27,exp28,exp29,exp30,exp31,exp32,-}
+           exp33, exp34, exp35,
+           {-Choice: exp36, exp37, exp38, exp39, exp40, exp43, exp44, -}
+           exp45, exp46, exp47, exp48, exp49, exp50,
+           --exp51, exp52,  -- The CDef hack fails for ~>
+           exp53, exp54, exp55, exp56, exp57, exp58
           ]
 
 main :: IO ()
