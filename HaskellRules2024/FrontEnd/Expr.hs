@@ -323,8 +323,8 @@ eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
 eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
                    where
                      (floats, rhs) = unSeq ts
--- eDefine x rhs = eSeq [ DefineV x, Unify (Variable x) rhs ]
-eDefine x rhs = DefineE x rhs
+eDefine x rhs = eSeq [ DefineV x, Unify (Variable x) rhs ]
+-- eDefine x rhs = DefineE x rhs
 
 eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
 -- (eApply f x)  returns  f[x]

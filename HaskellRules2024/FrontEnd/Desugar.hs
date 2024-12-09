@@ -719,16 +719,18 @@ essToMini = go NoInput
                                      NoInput -> return (eSeq [DefineV x,                       e])
                                      PI i    -> return (eSeq [DefineV x, Unify (Variable x) i, e]) }
 
-    -- DSIF, DSFOR, DSALL: If, for, all
+    -- DSIF, DSFOR, DSALL, DSONE: If, for, all
     go inp (If3 t1 t2 t3) = If3  <$> go NoInput t1 <*> go inp t2 <*> go inp t3
     go inp (For2 t1 t2)   = inp `ueq` (For2 <$> go NoInput t1 <*> go inp t2)
     go inp (All t)        = inp `ueq` (All <$> go NoInput t)
+    go inp (One t)        = inp `ueq` (One <$> go NoInput t)
 
     -- DSCOL1, DSCOL2: (:t)
     go inp (Range fxs t) = assert (null fxs) (show fxs) $
                            case inp of
                              NoInput -> do { e <- go NoInput t
-                                           ; return (eSeq [DefineV identX, ApplyD e (Variable identX)]) }
+                                           ; x <- newIdent (getLoc t) "x"
+                                           ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
                              PI i    -> OfType i [] <$> go NoInput t
 
     -- check<fx>{t}
@@ -771,16 +773,21 @@ essToMini = go NoInput
     go NoInput (Lam x t)  -- Pass through ICFP lambdas in the NoInput case only
       = Lam x <$> go NoInput t
 
-    go inp (Function [(t1,fx)] t2)
-      = assert (null fx) (show fx) $
-        case inp of
+    go inp t@(Function [(t1,fx)] t2)
+      = case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"
                         ; XDLam Closed i <$> go (PI (Variable i)) t1 <*> go NoInput t2 }
           PI f -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
                      ; e1 <- go (PI (Variable i)) t1
                      ; e2 <- go (PI (ApplyD f (Variable x))) t2
-                     ; return (XDLam Closed i (eDefine x e1) e2) }
+                     ; return (XDLam aperture i (eDefine x e1) e2) }
+      where
+        aperture = case fx of
+                     []                 -> Closed
+                     [Ident _ "closed"] -> Closed
+                     [Ident _ "open"]   -> Open
+                     _ -> error "Bad fx in function" (pPrint t)
 
     go inp t = error $ "TODO: essToMini " ++ show (inp, t)
 
@@ -814,7 +821,9 @@ miniToCore orig_md = go (orig_md,[])
 
     -- MFOR, MIF
     go md (For2 e1 e2)   = encodeFor2 <$> (go md e1) <*> go md e2
-    go md (If3 e1 e2 e3) = encodeIf2 <$> (go md e1) <*> go md e2 <*> go md e3
+    go md (If3 e1 e2 e3) = encodeIf2  <$> (go md e1) <*> go md e2 <*> go md e3
+    go md (All e)        = encodeAll2 (go md e)
+    go md (One e)        = encodeOne2 (go md e)
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
     go md (OfType e1 _fx e2)
@@ -873,6 +882,15 @@ encodeIf2 e1 e2 e3 = Iter (eSeq [e1, eThunk e2]) eNext eElse
     eNext = Lam a $ eThunk (eForce (Variable a))
     eElse = eThunk e3
 
+encodeAll2 :: DsM SrcCore -> DsM SrcCore
+-- If doing 'all' via 'iter' do    all{e} --> for(v:=e){v}
+encodeAll2 ds_e = do { asIter <- getDFlagsX fAllAsIter
+                     ; e <- ds_e
+                     ; if asIter
+                       then do { v <- newIdent (getLoc e) "v"
+                               ; pure (encodeFor2 (eSeq [ DefineV v, Unify (Variable v) e ])
+                                                  (Variable v)) }
+                       else pure (All e) }
 
 --------------------------------------------------------
 --
@@ -957,7 +975,7 @@ where `x` is complely fresh.   We can abbreviate this if
 
 * `rhs` is atomic; then just use `rhs` rather than `x`
 
-* `x` is not used in rhs.  Since `rhs` is a SrcExpr, its binding structure
+* `x` is not used in body.  Since `body` is a SrcExpr, its binding structure
   is not obvious, and it's awkward to get its true free variables. But since
   `x` is fresh anyway it suffices to look for /any/ occurrence of `x`. At worst
   we'll create a binding we don't really need.
