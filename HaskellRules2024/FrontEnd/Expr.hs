@@ -7,8 +7,8 @@ module FrontEnd.Expr(
       Loc, noLoc, mkLoc
 
     , Ident(..), identLoc, identString
-    , SrcExpr(..), Lit(..), Path(..)
-    , SrcPat, SrcSmall, SrcCore, SrcBlk, SrcValue
+    , SrcExpr(..), Lit(..), Path(..), Aperture(..)
+    , SrcPat, SrcEssential, SrcMini, SrcCore, SrcBlk, SrcValue
 
       -- Predicates on SrcExpr
     , isLiteral, isAtomic, isValue
@@ -18,7 +18,7 @@ module FrontEnd.Expr(
     , eAll, eExists, eCheck, eDefine, eApplyD, eVerify
     , eThunk, eForce, eForceLam, existsXX, eSomeAny
     , eSeq, fvArray
-    , srcUnderscore, isSrcUnderscore
+    , srcUnderscore, isSrcUnderscore, identX
 
     , Store(..), Ptr
     , Eff, effSucceeds, effDecides, effFails, effComputes, isOpenClosed
@@ -55,7 +55,7 @@ import Text.Megaparsec (SourcePos(..), mkPos, initialPos, sourcePosPretty)
   At this stage lots of things appear as Macro1/2 or InfixOp;
   See Note [How SrcExpr is parsed]
 
-* S-desugaring ("S" for superficial) desugars into `SrcSmall`.
+* S-desugaring ("S" for superficial) desugars into `SrcEssential`.
   Here we convert lots of InfixOp/Macro1/2 into proper data constructors.
   This is done by `sDesugarExpr`.
 
@@ -196,9 +196,12 @@ data Aperture = Open | Closed
 -- SrcPat synonym is used for syntax of 'p' in the source language
 type SrcPat = SrcExpr
 
--- SrcSmall synonym is used for the reduced subset of SrcExpr
--- that is fed to the Main Desugaring (Fig 9)
-type SrcSmall = SrcExpr
+-- SrcEssential synonym is used for the reduced subset of SrcExpr
+-- where superficial syntactic sugar has been removed
+type SrcEssential = SrcExpr
+
+-- SrcMini synonym is used for the result of the "wrapping" desugaring
+type SrcMini = SrcExpr
 
 -- SrcCore synonym is used for the very reduced subset of SrcExpr
 -- that can be directly translated to Rules.Core.Expr
@@ -427,6 +430,11 @@ data Store = Store { refMap :: IM.IntMap SrcValue
 --               Pretty printing
 --------------------------------------------------------
 
+instance Pretty Aperture where
+  pPrintPrec _ _ q = case q of
+                        Open   -> char 'o'
+                        Closed -> char 'c'
+
 instance Pretty SrcExpr where
   pPrintPrec lvl p
     | lvl > prettyNormal = ppNormal
@@ -560,6 +568,8 @@ instance Pretty SrcExpr where
           All e       -> text "all" <> parens (ppr 0 e)
           Check fx e  -> text "check" <> ppEffs fx <> braces (ppr 0 e)
           Guard e1 e2 -> maybeParens (p>0) $ sep [ ppr 1 e1, text ";;" <+> ppr 1 e2 ]
+          XDLam q i e1 e2 -> maybeParens (p > 0) $ text "\\" <> parens (ppr 0 q) <> ppr 0 i <> text "."
+                                                   <> braces (ppr 0 e1) <> braces (ppr 0 e2)
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
           Map es -> text "map" <> braces (ppSeq lvl es)
@@ -701,6 +711,7 @@ compos f (Verify is e)      = Verify is <$> f e
 compos f (OfType e1 fx e2)  = OfType <$> f e1 <*> pure fx <*> f e2
 compos _ e@EPrim{}          = pure e
 compos f (Lam i e)          = Lam i <$> f e
+compos f (XDLam q i e1 e2)  = XDLam q i <$> f e1 <*> f e2
 compos f (Split e1 e2 e3)   = Split <$> f e1 <*> f e2 <*> f e3
 compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
