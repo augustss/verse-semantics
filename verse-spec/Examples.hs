@@ -272,7 +272,7 @@ exp49 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
         Def "h" (Colon (Var "any")) `Seq`
         App {-(Var "f")-}f (Var "h") `Seq`
         Var "h"
-      === "Wrong[const1,succ,succ0]"
+      === "Wrong[[1,2],const1,succ,succ0]"
   where f = Fun Closed (Fun Open (Int 0) (Int 1)) (Int 2)
 
 exp50 :: Example

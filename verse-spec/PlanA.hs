@@ -71,8 +71,12 @@ dE (Int k) _rho = sing $ VInt k
 dE (Prim o) _rho = sing $ dO o
 dE (App e1 e2) rho = mkSet [ r | f <- unSet $ dE e1 rho, a <- unSet $ dE e2 rho, r <- unSet $ apply f a ]
 dE (Equ e1 e2) rho = dD e1 rho `isect` dD e2 rho
-dE (Seq e1 e2) rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
-dE (Where e1 e2) rho = mkSet [ x | x <- unSet $ dE e1 rho, _y <- unSet $ dE e2 rho ]
+dE (Seq e1 e2) rho | isEmpty (dE e1 rho) = empty
+                   | otherwise = dE e2 rho
+                   -- WAS: mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dE e2 rho ]
+dE (Where e1 e2) rho | isEmpty (dE e2 rho) = empty
+                     | otherwise = dE e1 rho
+                     -- WAS: mkSet [ x | x <- unSet $ dE e1 rho, _y <- unSet $ dE e2 rho ]
 dE (Def x e) rho = sing (lookupEnv x rho) `isect` dE e rho
 dE (Def2 x y e) rho = sing (lookupEnv x rho) `isect` sing (lookupEnv y rho) `isect` dE e rho
 dE (Colon (Var "any")) _ = allWs                         -- hack for any
@@ -137,8 +141,12 @@ dM (Int k) u _rho = sing (VInt k) `isect` sing u
 dM (Prim o) u _rho = sing (dO o) `isect` sing u
 dM (App e1 e2) u rho = mkSet [ r | f <- unSet $ dE e1 rho, a <- unSet $ dE e2 rho, r <- unSet $ apply f a ] `isect` sing u
 dM (Equ e1 e2) u rho = dL e1 u rho `isect` dL e2 u rho
-dM (Seq e1 e2) u rho = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dM e2 u rho ]
-dM (Where e1 e2) u rho = mkSet [ x | x <- unSet $ dM e1 u rho, _y <- unSet $ dE e2 rho ]
+dM (Seq e1 e2) u rho | isEmpty (dE e1 rho) = empty
+                     | otherwise = dM e2 u rho
+                     -- WAS:  = mkSet [ y | _x <- unSet $ dE e1 rho, y <- unSet $ dM e2 u rho ]
+dM (Where e1 e2) u rho | isEmpty (dE e2 rho) = empty
+                       | otherwise = dM e1 u rho
+                       -- WAS: mkSet [ x | x <- unSet $ dM e1 u rho, _y <- unSet $ dE e2 rho ]
 dM (Def x e) u rho = sing (lookupEnv x rho) `isect` dM e u rho
 dM (Def2 x y e) u rho | lookupEnv x rho == u = sing (lookupEnv y rho) `isect` dM e u rho
                       | otherwise            = empty
@@ -229,5 +237,5 @@ main :: IO ()
 main = do
   putStrLn "Start dP"
   runExamples dP allExps
---  putStrLn "Start dP'"
---  runExamples dP' allExps
+  putStrLn "Start dP'"
+  runExamples dP' allExps
