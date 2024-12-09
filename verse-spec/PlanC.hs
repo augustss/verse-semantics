@@ -5,7 +5,7 @@ import Control.Monad.State.Strict
 import qualified Data.Map as M
 import Data.List
 import Data.Data
---import Data.Generics.Uniplate.Data(universeBi, transform, universe)
+import Data.Generics.Uniplate.Data(universe)
 --import Data.Maybe
 import Exp hiding (dI)
 import Val
@@ -24,7 +24,7 @@ data CExp = CVar Ident | CInt Integer | CPrim Op | CTup [CExp] | CApp CExp CExp
           | CIf CExp CExp CExp | CLam OC Ident CExp CExp
           | CFail | COfType CExp CExp
           | CChoice CExp CExp | CFor CExp CExp | CAll CExp
-          | CChkClsd
+          | CDef Ident CExp
   deriving (Eq, Ord, Data)
 
 instance Show CExp where
@@ -48,6 +48,7 @@ instance Show CExp where
   showsPrec p (CChoice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " | " . showsPrec 5 e2
   showsPrec _ (CAll e) = showString "all" . showBraces (showsPrec 0 e)
   showsPrec _ (CFor e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
+  showsPrec p (CDef x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
 
 
 dI :: CExp -> [Ident]
@@ -125,18 +126,14 @@ syntaxN u (Fun q e0 e1) = do
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
-  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs $ cq ++ [CExi k, k =.= CApp (CVar u) (CVar x), c1 ])
+  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs $ cq ++ [CExi k `CSeq` (k =.= CApp (CVar u) (CVar x)), c1 ])
 
 checkQ :: OC -> Ident -> Exp -> N [CExp]
 checkQ Open _ _ = pure []
 checkQ Closed f e = do
-  e' <- syntaxN "_" e
-  pure [CChkClsd f e']
-  {-do
   a <- newVar "a"
   e' <- syntaxN "_" e
   pure [ CLam Closed a (CApp (CVar f) (CVar a)) (CVar a `CEqu` e') ]
-  -}
 
 mustBeVar :: Ident -> N CExp
 mustBeVar "_" = do u <- newVar "u"; pure (CExi u `CSeq` CVar u)
@@ -147,6 +144,23 @@ infix 4 =.=
 (=.=) :: Ident -> CExp -> CExp
 "_" =.= c                 = c
 u   =.= c                 = CVar u `CEqu` c
+
+-------------------------------------------
+
+-- Reintroduce CDef for definitions only mentioned to the right.
+-- Together with the direct semantics for CDef this is a big speedup.
+redef :: CExp -> CExp
+redef = re []
+  where re vs (CSeq (CExi x) (CEqu (CVar x') e)) | x == x', x `notElem` vs = CDef x (re vs e)
+        re vs (CSeq (CSeq e1 e2) e3) = re vs (CSeq e1 (CSeq e2 e3))
+        re vs (CSeq e1 e2) = CSeq (re vs e1) (re (allVars e1 ++ vs) e2)
+        re vs (CEqu e1 e2) = CEqu (re vs e1) (re (allVars e1 ++ vs) e2)
+        re vs (CApp e1 e2) = CApp (re vs e1) (re (allVars e1 ++ vs) e2)
+        re _ (CLam q i e1 e2) = CLam q i (re [] e1) (re [] e2)
+        re _ e = e
+
+allVars :: CExp -> [Ident]
+allVars e = [ i | CVar i <- universe e ]
 
 -------------------------------------------
 
@@ -164,6 +178,7 @@ dE (CTup es) rho                            = mkSet $ map VTup $ sequence $ map 
 dE (CApp e1 e2)   rho                       = mkSet [ r | v1 <- unSet $ dE e1 rho, v2 <- unSet $ dE e2 rho, r <- unSet $ apply v1 v2 ]
 dE (COfType e1 e2) rho                      = dE (CApp e2 e1) rho
 dE (CEqu e1 e2)   rho                       = dE e1 rho `isect` dE e2 rho
+dE (CSeq (CDef x e1) e2) rho                = mkSet [ v2 | v1 <- unSet $ dE e1 rho, v2 <- unSet $ dE e2 (extend rho x v1) ]
 dE (CSeq e1 e2)   rho | isEmpty (dE e1 rho) = empty
                       | otherwise           = dE e2 rho
 dE (CWhere e1 e2) rho | isEmpty (dE e2 rho) = empty
@@ -174,6 +189,21 @@ dE (CIf e1 e2 e3) rho                       = do
   case [ rho' | rho' <- dX e1 rho, not (isEmpty (dE e1 rho')) ] of
     [] -> dE e3 rho
     rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]  -- XX Not the correct semantics
+
+dE (CLam q i (CDef x e1) e2)   rho          = mkSet $ close q
+  [ f
+  | f <- unSet allWs, function f
+  , forAll allWs $ \ w ->
+      forAllL (dX e1 (extend rho i w)) $ \ rho' ->
+        let w1s = dE e1 rho' in
+          not (isEmpty w1s)
+          `implies`
+          (forAll w1s $ \ xw ->
+             let rho'' = extend rho' x xw in
+               (w `inDomV` f  &&  apV f w `sIn` dD e2 rho''))
+               
+  ]
+
 dE (CLam q i e1 e2)   rho                     = mkSet $ close q
   [ f
   | f <- unSet allWs, function f
@@ -191,6 +221,7 @@ dE (CLam q i e1 e2)   rho                     = mkSet $ close q
          (existsL (dX e1 rho) $ \rho' -> not (isEmpty (dE e1 (extend rho' i w)))))
 -}
   ]
+
 dE e _ = error $ "unimplemented " ++ show e
 
 close :: OC -> [W] -> [W]
@@ -223,7 +254,7 @@ dD :: CExp -> Env -> WS
 dD e rho = sUnion [ dE e rho' | rho' <- dX e rho ]
 
 den :: Exp -> WS
-den e = dD (syntax "_" e) rho0
+den e = dD (redef $ syntax "_" e) rho0
 
 dP :: Exp -> RVal
 dP e =
