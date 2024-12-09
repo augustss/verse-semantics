@@ -314,3 +314,8 @@ exp56 = Fun Closed (Def "x" cint `Where` Def "y" exp56c) (Var "y")
 exp57 :: Example
 exp57 = Fun Closed (Def "x" cint) exp56c
       === "Wrong[]"
+
+-- fun_c(<x:int,y:int>){y+x}
+exp58 :: Example
+exp58 = Fun Closed (Tup [Def "x" cint, Def "y" cint]) (App (Prim Oadd) (Tup [Var "y", Var "x"]))
+      === "add"
