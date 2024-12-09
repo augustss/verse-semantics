@@ -312,6 +312,7 @@
 %format split (x) (y) (z) = "\textbf{split}\{" x "\}\langle" y "," z "\rangle"
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
+%format defintro (x) = "\exists" x
 %format defhdr (x) = "\exists" x ".\,"
 %format def (x) (y) = "\exists" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
