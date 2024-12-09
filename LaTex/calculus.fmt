@@ -87,7 +87,7 @@
 %format (SS u (e))    = "{\mathcal S}\llbracket" e "\rrbracket" u
 %format (checkfun q x e)  = "{\mathcal K}_{" q "}\llbracket" e "\rrbracket" x
 %format `ueq`         = "\;\mathring{=}\;"
-%format underscore    = "{\circ}"
+%format underscore    = "{\bullet}"
 
 %format FunCheck (pi) = "{\mathcal F}(" pi ")"
 
