@@ -66,7 +66,7 @@ function _ = False
 domV :: Val -> Set Val
 domV (VFcn (Fcn _ m)) = mkSet (M.keys m)
 domV (VTup es) = mkSet [ VInt (toInteger i) | i <- [0..length es-1] ]
-domV _ = error "domV"
+domV v = error $ "domV: " ++ show v
 
 --------------------
 

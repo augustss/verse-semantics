@@ -279,12 +279,12 @@ exp50 :: Example
 exp50 = App (fst exp49) (Int 0)
       === "1"
 
--- fun_x(x~>y:= :succ) := x
+-- fun_c(x~>y:= :succ) := x
 exp51 :: Example
 exp51 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "x")
       === "int"
 
--- fun_x(x~>y:= :succ) := y
+-- fun_c(x~>y:= :succ) := y
 exp52 :: Example
 exp52 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "y")
       === "succ"
@@ -300,3 +300,17 @@ exp54 = Fun Closed (Int 0) (fst exp53)
 exp55 :: Example
 exp55 = App (App (fst exp54) (Int 0)) (Int 2)
       === "2"
+
+exp56c :: Exp
+exp56c = App (Prim Ogt) (Tup [Var "x", Int 0])
+
+-- fun_c(x:int where y:= x>0){y}
+exp56 :: Example
+exp56 = Fun Closed (Def "x" cint `Where` Def "y" exp56c) (Var "y")
+      === "id123"
+
+-- fun_c(x:int){x>0}
+-- This function does not always succeed for its domain.
+exp57 :: Example
+exp57 = Fun Closed (Def "x" cint) exp56c
+      === "Wrong[]"

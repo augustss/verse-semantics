@@ -24,6 +24,7 @@ data CExp = CVar Ident | CInt Integer | CPrim Op | CTup [CExp] | CApp CExp CExp
           | CIf CExp CExp CExp | CLam OC Ident CExp CExp
           | CFail | COfType CExp CExp
           | CChoice CExp CExp | CFor CExp CExp | CAll CExp
+          | CChkClsd
   deriving (Eq, Ord, Data)
 
 instance Show CExp where
@@ -129,9 +130,13 @@ syntaxN u (Fun q e0 e1) = do
 checkQ :: OC -> Ident -> Exp -> N [CExp]
 checkQ Open _ _ = pure []
 checkQ Closed f e = do
+  e' <- syntaxN "_" e
+  pure [CChkClsd f e']
+  {-do
   a <- newVar "a"
   e' <- syntaxN "_" e
   pure [ CLam Closed a (CApp (CVar f) (CVar a)) (CVar a `CEqu` e') ]
+  -}
 
 mustBeVar :: Ident -> N CExp
 mustBeVar "_" = do u <- newVar "u"; pure (CExi u `CSeq` CVar u)
@@ -142,58 +147,6 @@ infix 4 =.=
 (=.=) :: Ident -> CExp -> CExp
 "_" =.= c                 = c
 u   =.= c                 = CVar u `CEqu` c
-
-{-
--- Remove some nonsense
-cleanup :: CExp -> CExp
-cleanup =
-{-
-  seqAssoc .
-  removeExis .
--}
-  seqAssoc
-
--- Flatten Seq into its right associative form, remove values to the left of ;
-seqAssoc :: CExp -> CExp
-seqAssoc (CEqu e1 e2) = CEqu (seqAssoc e1) (seqAssoc e2)
-seqAssoc (CSeq e1 e2) = seqApp (seqAssoc e1) (seqAssoc e2)
-  where seqApp (CSeq s1 s2) s3 = xSeq s1 (seqApp s2 s3)
-        seqApp s1 s2 = xSeq s1 s2
-        xSeq s1 s2 | isVal s1 = s2
-        xSeq s1 s2 = CSeq s1 s2
-seqAssoc (CWhere e1 e2) = CWhere (seqAssoc e1) (seqAssoc e2)
-seqAssoc (CIf e1 e2 e3) = CIf (seqAssoc e1) (seqAssoc e2) (seqAssoc e3)
-seqAssoc (CLam q x e1 e2) = CLam q x (seqAssoc e1) (seqAssoc e2)
-seqAssoc e = e
-
-isVal :: CExp -> Bool
-isVal CInt{} = True
-isVal CVar{} = True
-isVal CPrim{} = True
-isVal _ = False
--}
-
-{-
--- Turn 'CExi x; ...; x = e' into '...; e'
--- if those are the only two occurences of x.
-removeExis :: CExp -> CExp
-removeExis ae =
-  let allxs = allVariables ae
-      exixs = [ i | CExi i <- universe ae ]
-      lhsxs = [ i | CVal (CVar i) `CEqu` _ <- universeBi ae ]
-      remxs = [ i | i <- lhsxs, i `elem` exixs, length (filter (== i) allxs) == 2 ]
-      remvar (CExi x) | x `elem` remxs = CVal (CInt 99)          -- make it harmless constant
-      remvar (CVal (CVar x) `CEqu` e) | x `elem` remxs = e
-      remvar e = e
-  in  --trace ("removeExis " ++ show remxs) $
-      transform remvar ae
-
-allVariables :: CExp -> [Ident]
-allVariables e =
-  [ i | CVar i <- universeBi e ] ++
-  [ i | CExi i <- universeBi e ] ++
-  [ i | CLam _ i _ _ <- universeBi e ]
--}
 
 -------------------------------------------
 
