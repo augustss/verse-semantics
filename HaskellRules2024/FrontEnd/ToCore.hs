@@ -46,9 +46,14 @@ convert (Lit lit)      = Rules.Lit lit
 convert (ApplyD t1 t2) = convert t1 Rules.:@: convert t2
 convert (Unify t1 t2)  = convert t1 Rules.:=: convert t2
 convert (Choice t1 t2) = convert t1 Rules.:|: convert t2
-convert (Seq ts)       = foldr ((Rules.:>:) . convert) (convert last_t) rest_ts
+convert (Seq ts)       = foldr add (convert last_t) rest_ts
                        where
                          (rest_ts, last_t) = unSeq ts
+                         add (Variable{}) e = e
+                         add t            e = convert t Rules.:>: e
+                         -- This `add` is aimed at (exists x; e), which will by now
+                         -- have turned into  exists x ..... (x; e)....
+                         -- We don't really want that "x;" just useless clutter.
 
 convert (Exists is t)     = foldr do_one (convert t) is
                           where

@@ -131,6 +131,8 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   -- See Note [How SrcExpr is parsed] and the dsSmall function
   | DefineV Ident                      -- (exists i)  Bring `i` into scope in the entire
                                        --    innermost scoping context, with no type constraint
+                                       -- This is a valid expression; eg <exists x, exists y>
+                                       -- is like (exists x; exists y; <x,y>)
   | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
   | OfType SrcExpr [Eff] SrcExpr       -- e |>{fx} t
   | DefineIE Ident Ident SrcExpr       -- (i->x) := e

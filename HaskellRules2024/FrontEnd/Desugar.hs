@@ -202,6 +202,7 @@ sDesugarExpr = ds
     -- Variables
     ds (Variable ident@(Ident _ v))
       | v == "fail"                 = return Fail
+      | v == "_"                    = return existsXX
       | Just op <- lookupPrimOp v   = return (EPrim op)
       | otherwise                   = return (Variable ident)
 
@@ -243,8 +244,10 @@ sDesugarExpr = ds
            --  is   type{t} --> \x. x=t
            -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
 
-    -- (exists x. e) --> (exists x; e)
-    ds (Exists xs b) = do { b' <- ds b; return (eSeq (map DefineV xs ++ [b'])) }
+    -- I want to desugar Exists to DefineV; but to do that I need to make up
+    -- fresh identifiers (easy) and substitute the fresh one for the old one
+    -- (not so easy).  So for now I am just keeping Exists.
+    ds (Exists xs b) = Exists xs <$> ds b
 
     ds (Map es) | Just kvs <- mapM simpleMapEntry es =
       ds $ ApplyD (eMkMap noLoc) $ Array [ Array [k, v] | (k, v) <- kvs ]
@@ -703,7 +706,7 @@ essToMini = go NoInput
     go inp e@(Variable {}) = inp `ueq` return e
     go inp e@(EPrim {})    = inp `ueq` return e
     go _inp Fail           = return Fail
-    go inp (Unify  e1 e2)  = Unify  <$> go inp e1 <*> go NoInput e2
+    go inp (Unify  e1 e2)  = Unify  <$> go inp e1 <*> go inp e2
     go inp (Choice e1 e2)  = Choice <$> go inp e1 <*> go NoInput e2
     go inp (ApplyD t1 t2)  = inp `ueq` (ApplyD <$> go NoInput t1 <*> go NoInput t2)
     go inp (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
@@ -712,6 +715,7 @@ essToMini = go NoInput
                                 ; return (eSeq (es ++ [e])) }
 
     -- DSEXISTS (exists x);  DSDEF (x:=t); DSSQUIG (x~>y:=t)
+    go inp (Exists xs e)    = Exists xs <$> go inp e   -- Just propate Exists
     go _inp (DefineV x)     = return (DefineV x)
     go inp (DefineE x t)    = do { e <- go inp t; return (eSeq [DefineV x, Unify (Variable x) e]) }
     go inp (DefineIE x y t) = do { e <- go inp (DefineE y t)
@@ -743,10 +747,17 @@ essToMini = go NoInput
                                                         , e ]) }
 
     -- t1 |> t2
-    go inp (OfType t1 fxs t2) = assert (null fxs) (show fxs) $
-                                inp `ueq` (OfType <$> go NoInput t1 <*> pure [] <*> go NoInput t2)
+    go inp (OfType t1 fxs t2)
+      = assert (null fxs) (show fxs) $
+        do { r <- newIdent (getLoc t2) "r"
+           ; e1 <- go inp t1
+           ; e2 <- go NoInput t2
+           ; return (eSeq [ DefineV r, Unify (Variable r) e1
+                          , Check [effSucceeds] (OfType (Variable r) [] e2) ]) }
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
+    go inp (Splice t) = go inp t
+
     go inp (Array ts)
       = case inp of
           NoInput -> do { es <- mapM do_one ts
@@ -807,10 +818,11 @@ miniToCore :: DsMode -> SrcMini -> DsM SrcCore
 miniToCore orig_md = go (orig_md,[])
   where
     go :: (DsMode, [Ident]) -> SrcMini -> DsM SrcCore
-    go _md e@(Lit {})      = return e   -- MCONST
-    go _md e@(Variable {}) = return e   -- MVAR
-    go _md e@(EPrim {})    = return e   -- MOP
-    go _md e@(DefineV {})  = return e   -- MBIND
+    go _md Fail            = return Fail  -- MFAIL
+    go _md e@(Lit {})      = return e     -- MCONST
+    go _md e@(Variable {}) = return e     -- MVAR
+    go _md e@(EPrim {})    = return e     -- MOP
+    go _md e@(DefineV {})  = return e     -- MBIND
 
     -- MARRAY, MSEMI, MEQ, MCHOICE, MAPP
     go md (Array es)     = do { es' <- mapM (go md) es; return (Array es') }
@@ -818,20 +830,19 @@ miniToCore orig_md = go (orig_md,[])
     go md (Unify e1 e2)  = Unify <$> go md e1 <*> go md e2
     go md (Choice e1 e2) = Choice <$> go md e1 <*> go md e2
     go md (ApplyD e1 e2) = ApplyD <$> go md e1 <*> go md e2
+    go md (Exists xs e)  = Exists xs <$> go md e
 
     -- MFOR, MIF
     go md (For2 e1 e2)   = encodeFor2 <$> (go md e1) <*> go md e2
     go md (If3 e1 e2 e3) = encodeIf2  <$> (go md e1) <*> go md e2 <*> go md e3
-    go md (All e)        = encodeAll2 (go md e)
-    go md (One e)        = encodeOne2 (go md e)
+    go md (One e)        = encodeOne2 <$> go md e
+    go md (All e)        = encodeAll2 =<< go md e
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
     go md (OfType e1 _fx e2)
       | (MI,xs) <- md = do { (dz, z) <- defineDE "z" (go md e2)
                            ; return (eSeq [ dz, eGuard xs (eSome z) ]) }
-      | otherwise     = do { (dy, y) <- defineDE "z" (go md e1)
-                           ; e2' <- go md e2
-                           ; return (eSeq [ dy, eCheck [effSucceeds] (ApplyD e2' y) ]) }
+      | otherwise     = ApplyD <$> go md e2 <*> go md e1
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md (Check fx e)
@@ -862,6 +873,7 @@ miniToCore orig_md = go (orig_md,[])
     go md e = error $ "TODO: miniToCore " ++ show (md, e)
 
 encodeFor2 :: SrcCore -> SrcCore -> SrcCore
+-- for2(e1){e2} = iter(e1; \_.e2){ (\a r. cons[ a[], r[] ]), (\_.<>) }
 encodeFor2 e1 e2 = Iter (eSeq [e1, eThunk e2]) eCons2 eNil2
    where
      eCons2 :: SrcCore
@@ -876,21 +888,28 @@ encodeFor2 e1 e2 = Iter (eSeq [e1, eThunk e2]) eCons2 eNil2
      eNil2 = eThunk (Array [])
 
 encodeIf2 :: SrcCore -> SrcCore -> SrcCore -> SrcCore
+-- if(e1){e2}else{e3} = iter(e1; \_.e2){ (\a _. a[]), (\_.e3) }
 encodeIf2 e1 e2 e3 = Iter (eSeq [e1, eThunk e2]) eNext eElse
   where
     a = Ident noLoc "a"
     eNext = Lam a $ eThunk (eForce (Variable a))
     eElse = eThunk e3
 
-encodeAll2 :: DsM SrcCore -> DsM SrcCore
+encodeAll2 :: SrcCore -> DsM SrcCore
 -- If doing 'all' via 'iter' do    all{e} --> for(v:=e){v}
-encodeAll2 ds_e = do { asIter <- getDFlagsX fAllAsIter
-                     ; e <- ds_e
-                     ; if asIter
-                       then do { v <- newIdent (getLoc e) "v"
-                               ; pure (encodeFor2 (eSeq [ DefineV v, Unify (Variable v) e ])
-                                                  (Variable v)) }
-                       else pure (All e) }
+encodeAll2 e = do { asIter <- getDFlagsX fAllAsIter
+                  ; if asIter
+                    then do { v <- newIdent (getLoc e) "v"
+                            ; pure (encodeFor2 (eSeq [ DefineV v, Unify (Variable v) e ])
+                                               (Variable v)) }
+                    else pure (All e) }
+
+encodeOne2 :: SrcCore -> SrcCore
+-- one{e} = iter(\a _. a){e}{\_.fail}
+encodeOne2 e = Iter e eNext (eThunk Fail)
+  where
+    a = Ident noLoc "a"
+    eNext = Lam a $ eThunk (eForce (Variable a))
 
 --------------------------------------------------------
 --
