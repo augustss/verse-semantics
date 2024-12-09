@@ -92,10 +92,10 @@ toCoreEff eff
 --
 --------------------------------------------------------
 
-addScope :: SrcCore -> D SrcCore
+addScope :: SrcCore -> DsM SrcCore
 addScope e = scope S.empty (Block e)
 
-scope :: S.Set Src.Ident -> SrcExpr -> D SrcExpr
+scope :: S.Set Src.Ident -> SrcExpr -> DsM SrcExpr
 -- The input expression is in BigCore, after desugaring,
 -- but still with x := e stuff
 -- In  (scope sc expr), `sc` is a set of identifiers already in scope
@@ -151,12 +151,12 @@ scope sc = expr
     -- exprD for a new scope context, with an extended in-scope set
     scopeD sc' e = fst <$> defs sc' e
 
-    defs :: S.Set Ident -> SrcExpr -> D (SrcExpr, S.Set Ident)
+    defs :: S.Set Ident -> SrcExpr -> DsM (SrcExpr, S.Set Ident)
     -- `e` starts a new scoping context.  Wrap it in an `Exists`
     defs sc' e = do { (is, e', s) <- defs' sc' e
                    ; pure (eExists is e', s) }
 
-    defs' :: S.Set Ident -> SrcExpr -> D ([Ident], SrcExpr, S.Set Ident)
+    defs' :: S.Set Ident -> SrcExpr -> DsM ([Ident], SrcExpr, S.Set Ident)
     -- Find identifers bound in `e`, and return them
     -- along with extended scope-set and transformed `e`.
     -- 'as' is the set of in-scope variables
@@ -181,7 +181,7 @@ scope sc = expr
       pure (is, e', sc')
 
 
-errShadow :: [(Ident, Ident)] -> D ()
+errShadow :: [(Ident, Ident)] -> DsM ()
 errShadow is = do
   no_warn <- getDFlagsX fNoWarn
   if no_warn then
@@ -191,12 +191,12 @@ errShadow is = do
    else
     mapM_ (\ (i@(Ident li _), (Ident lj _)) -> traceM $ "warning shadowing " ++ prettyShow (li, i, lj)) is
 
-errMultiple :: [[Ident]] -> D ()
+errMultiple :: [[Ident]] -> DsM ()
 errMultiple =
   mapM_ (\ is -> errorMessage $ "multiply defined: " ++ prettyShow (head is) ++
                          prettyShow [ l | Ident l _ <- is ])
 
-errUndefined :: [Ident] -> D ()
+errUndefined :: [Ident] -> DsM ()
 errUndefined is = do
   no_warn <- getDFlagsX fNoWarn
   if no_warn then
@@ -206,7 +206,7 @@ errUndefined is = do
    else
     mapM_ reportScopeErr is
 
-reportScopeErr :: Ident -> D ()
+reportScopeErr :: Ident -> DsM ()
 reportScopeErr i@(Ident l _) = do
   putScopeErr i;
   traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)

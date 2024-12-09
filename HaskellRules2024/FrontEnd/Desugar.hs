@@ -46,27 +46,33 @@ import GHC.Stack
 
 
 desugar :: Flags -> Bool -> SrcExpr -> IO (SrcCore, [DError])
-desugar flgs add_verification
-  = runD flgs .
-     (-- Heavy lifting: Fig 9
-         traceDS "Main desugaring"
-     <=< mDesugarExpr ds_model
+desugar flgs add_verification e_parsed
+  = runD flgs $
+    do { _ <- traceDS "parsed" e_parsed
 
-     -- Side effects
---   <=<  traceDS "addDeref"
---   <=< addDeref
+       -- Prepend prelude from
+       --    verifyprelude.verse, mediumprelude.verse
+       ; e_prel <- addPrelude e_parsed
+       ; _ <- traceDS "Add prelude" e_prel
 
-     -- Desugar into Small Source
-     <=< traceDS "Desugar to Small Source"
-     <=< sDesugarExpr
+       -- Desugar into Essential Verse by doing superficial desugaring
+       ; e_essential <- sDesugarExpr e_prel
+       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential
 
-     -- Prepends prelude from
-     --    verifyprelude.verse, mediumprelude.verse
-     <=< traceDS "Add prelude"
-     <=< addPrelude
+--       -- Side effects
+--       ; addDeref e_essential
+--       ; traceDS "addDeref"
 
-     -- Syntax fixes
-     <=< traceDS "parsed" )
+       ; if fTwoStageDesugar flgs
+         then do { e_mini <- essToMini e_essential
+                 ; _ <- traceDS "Desugar Essential Verse into Mini Verse" e_mini
+                 ; e_ds <- miniToCore ds_model e_mini
+                 ; traceDS "Desugar Mini Verse into Core Verse" e_ds }
+
+         else do { e_ds <- mDesugarExpr ds_model e_essential
+                 ; traceDS "Main desugaring" e_ds }
+       }
+
   where
     ds_model | add_verification = MV
              | otherwise        = MX
@@ -147,16 +153,10 @@ sDesugarExpr = ds
 
     -- For-loops
     -- for(e1){e2} = arrMap$[ \t. t[], all{ e1; \_.e2 } ]
-    ds (For1 e)     = do x <- newIdent (getLoc e) "x"
-                         ds $ For2 (eDefine x e) (Variable x)
-{-
-    ds (For2 e1 e2) = do e1' <- ds e1
-                         e2' <- ds e2
-                         pure (ApplyD (EPrim ArrMap)
-                                      (Array [eForceLam
-                                             , All (eSeq [e1', eThunk e2'])]))
--}
+    ds (For1 e)     = do { x <- newIdent (getLoc e) "x"
+                         ; ds $ For2 (eDefine x e) (Variable x) }
     ds (For2 e1 e2) = For2 <$> ds e1 <*> ds e2
+
     -- Array
     ds (Array es) = Array <$> mapM ds es
 
@@ -243,7 +243,8 @@ sDesugarExpr = ds
            --  is   type{t} --> \x. x=t
            -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
 
-    ds (Exists xs b) = Exists xs <$> ds b
+    -- (exists x. e) --> (exists x; e)
+    ds (Exists xs b) = do { b' <- ds b; return (eSeq (map DefineV xs ++ [b'])) }
 
     ds (Map es) | Just kvs <- mapM simpleMapEntry es =
       ds $ ApplyD (eMkMap noLoc) $ Array [ Array [k, v] | (k, v) <- kvs ]
@@ -692,56 +693,56 @@ data Input
   | PI SrcMini    -- ^ An input variable x
   deriving (Eq, Ord, Show)
 
-essToMini :: SrcEssential -> SrcMini
+essToMini :: SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
-essToMini e = go NoInput e
+essToMini = go NoInput
   where
+
+    -- Simple cases: DSK, DSVAR, DSPRIM, DSFAIL, DSEQ, DSUNIFY, DSCHOICE, DSSEMI
     go inp e@(Lit {})      = inp `ueq` return e
     go inp e@(Variable {}) = inp `ueq` return e
     go inp e@(EPrim {})    = inp `ueq` return e
-    go inp Fail            = return Fail
+    go _inp Fail           = return Fail
     go inp (Unify  e1 e2)  = Unify  <$> go inp e1 <*> go NoInput e2
     go inp (Choice e1 e2)  = Choice <$> go inp e1 <*> go NoInput e2
     go inp (ApplyD t1 t2)  = inp `ueq` (ApplyD <$> go NoInput t1 <*> go NoInput t2)
-    go inp (Seq ts)        = do { let (ts,t) = unSeq ts
+    go inp (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
                                 ; es <- mapM (go NoInput) ts
                                 ; e  <- go inp t
                                 ; return (eSeq (es ++ [e])) }
 
-    -- x:=t and x~>y:=t
-    go inp (DefineE x t)  = do { e <- go inp t; return (eSeq [DefineV x, e]) }
-    go inp (DefineIE x y t) = case inp of
-                                NoInput -> do { e <- go inp t; return (eSeq [DefineV x, e]) }
-                                PI i    -> do { e <- go inp t
-                                              ; return (eSeq [ DevineV j, Unify (Variable j) i
-                                                             , DefineV x, e]) }
-                                  ; return (eSeq [ DefineV x, inp `ueq` pure (Variable x)
-                                                 , DefineV y, e ]) }
+    -- DSEXISTS (exists x);  DSDEF (x:=t); DSSQUIG (x~>y:=t)
+    go _inp (DefineV x)     = return (DefineV x)
+    go inp (DefineE x t)    = do { e <- go inp t; return (eSeq [DefineV x, Unify (Variable x) e]) }
+    go inp (DefineIE x y t) = do { e <- go inp (DefineE y t)
+                                 ; case inp of
+                                     NoInput -> return (eSeq [DefineV x,                       e])
+                                     PI i    -> return (eSeq [DefineV x, Unify (Variable x) i, e]) }
 
-    -- If, for, all
+    -- DSIF, DSFOR, DSALL: If, for, all
     go inp (If3 t1 t2 t3) = If3  <$> go NoInput t1 <*> go inp t2 <*> go inp t3
     go inp (For2 t1 t2)   = inp `ueq` (For2 <$> go NoInput t1 <*> go inp t2)
     go inp (All t)        = inp `ueq` (All <$> go NoInput t)
 
-    -- (:t)
+    -- DSCOL1, DSCOL2: (:t)
     go inp (Range fxs t) = assert (null fxs) (show fxs) $
                            case inp of
                              NoInput -> do { e <- go NoInput t
-                                           ; return (Check (eSeq [DefineV identX, Variable identX]) e) }
+                                           ; return (eSeq [DefineV identX, ApplyD e (Variable identX)]) }
                              PI i    -> OfType i [] <$> go NoInput t
 
     -- check<fx>{t}
     go inp (Check fx t)  = case inp of
                               NoInput -> Check fx <$> go NoInput t
                               PI i -> do { k <- newIdent (getLoc t) "k"
-                                         ; e <- go (P k) t
+                                         ; e <- go (PI (Variable k)) t
                                          ; return (eSeq [ DefineV k
                                                         , Unify (Variable k) (Check fx i)
                                                         , e ]) }
 
     -- t1 |> t2
     go inp (OfType t1 fxs t2) = assert (null fxs) (show fxs) $
-                                inp `ueq` (OfType <$> go NoInput t1 <*> go NoInput t2)
+                                inp `ueq` (OfType <$> go NoInput t1 <*> pure [] <*> go NoInput t2)
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go inp (Array ts)
@@ -762,22 +763,26 @@ essToMini e = go NoInput e
                 -- Returns the pattern-match decl, and the thing to put in the tuple
                 do_one (Splice t) = do { (d, e) <- do_one t
                                        ; pure (Splice d, Splice e) }
-                do_one         t  = do { j <- newIdent (getLoc e) "j"
+                do_one         t  = do { j <- newIdent (getLoc t) "j"
                                        ; e <- go (PI (Variable j)) t
                                        ; pure (DefineV j, e) }
 
     -- Functions
+    go NoInput (Lam x t)  -- Pass through ICFP lambdas in the NoInput case only
+      = Lam x <$> go NoInput t
+
     go inp (Function [(t1,fx)] t2)
       = assert (null fx) (show fx) $
         case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"
-                        ; XDLam Closed <$> go (PI (Variable i)) t1 <*> go NoInput t2 }
+                        ; XDLam Closed i <$> go (PI (Variable i)) t1 <*> go NoInput t2 }
           PI f -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
                      ; e1 <- go (PI (Variable i)) t1
                      ; e2 <- go (PI (ApplyD f (Variable x))) t2
-                     ; return (XDLam Closed i (eDefine x e1) e2) } 
+                     ; return (XDLam Closed i (eDefine x e1) e2) }
 
+    go inp t = error $ "TODO: essToMini " ++ show (inp, t)
 
     ueq :: Input -> DsM SrcMini -> DsM SrcMini
     ueq NoInput  ds_e  = ds_e
@@ -792,7 +797,7 @@ essToMini e = go NoInput e
 --------------------------------------------------------
 
 miniToCore :: DsMode -> SrcMini -> DsM SrcCore
-miniToCore md e = go (md,[]) e
+miniToCore orig_md = go (orig_md,[])
   where
     go :: (DsMode, [Ident]) -> SrcMini -> DsM SrcCore
     go _md e@(Lit {})      = return e   -- MCONST
@@ -800,50 +805,59 @@ miniToCore md e = go (md,[]) e
     go _md e@(EPrim {})    = return e   -- MOP
     go _md e@(DefineV {})  = return e   -- MBIND
 
-    -- MARRAY, MSEMI, MEQ, MCHOICE
+    -- MARRAY, MSEMI, MEQ, MCHOICE, MAPP
     go md (Array es)     = do { es' <- mapM (go md) es; return (Array es') }
     go md (Seq es)       = do { es' <- mapM (go md) es; return (Seq es') }
     go md (Unify e1 e2)  = Unify <$> go md e1 <*> go md e2
     go md (Choice e1 e2) = Choice <$> go md e1 <*> go md e2
+    go md (ApplyD e1 e2) = ApplyD <$> go md e1 <*> go md e2
 
     -- MFOR, MIF
     go md (For2 e1 e2)   = encodeFor2 <$> (go md e1) <*> go md e2
     go md (If3 e1 e2 e3) = encodeIf2 <$> (go md e1) <*> go md e2 <*> go md e3
 
-    -- (e1 |> e2)
-    go md (OfType e1 e2)
+    -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
+    go md (OfType e1 _fx e2)
       | (MI,xs) <- md = do { (dz, z) <- defineDE "z" (go md e2)
                            ; return (eSeq [ dz, eGuard xs (eSome z) ]) }
       | otherwise     = do { (dy, y) <- defineDE "z" (go md e1)
                            ; e2' <- go md e2
-                           ; retrun (eSeq [ dy, eCheck [effSucceeds] (ApplyD e2' y) ]) }
+                           ; return (eSeq [ dy, eCheck [effSucceeds] (ApplyD e2' y) ]) }
 
+    -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md (Check fx e)
       | (MI,_) <- md = do { e' <- go md e
                           ; return (eSeq [ eHavoc fx, e' ]) }
       | otherwise    = do { e' <- go md e
                           ; return (Check fx e') }
 
+    -- Functions proper: MCFUN+, MCFUN-, MCFUNX
     go (MV,xs) e@(XDLam Closed x e1 e2)
-      = do { e1' <- go (MI, x:xs) e1
-           ; e2' <- go (MV, x:xs) e2
-           ; efun <- go (MI, xs)
+      = do { e1'  <- go (MI, x:xs) e1
+           ; e2'  <- go (MV, x:xs) e2
+           ; efun <- go (MI, xs) e
            ; return (eSeq [ eVerify [x] (eSeq [e1',e2']), efun ]) }
-    go (MI,xs) e@(XDLam Closed x e1 e2)
+    go (MI,xs) (XDLam Closed x e1 e2)
       = do { e1' <- go (MV, x:xs) e1
            ; e2' <- go (MI, x:xs) e2
            ; return (Lam x (eSeq [ e1', e2' ])) }
-    go (MX,xs) e@(XDLam Closed x e1 e2)
+    go (MX,xs) (XDLam Closed x e1 e2)
       = do { e1' <- go (MX, x:xs) e1
            ; e2' <- go (MX, x:xs) e2
            ; return (Lam x (eSeq [ e1', e2' ])) }
+
+    -- ICFP lambdas
+    go md (Lam x t)  -- Pass through ICFP lambdas
+      = Lam x <$> go md t
+
+    go md e = error $ "TODO: miniToCore " ++ show (md, e)
 
 encodeFor2 :: SrcCore -> SrcCore -> SrcCore
 encodeFor2 e1 e2 = Iter (eSeq [e1, eThunk e2]) eCons2 eNil2
    where
      eCons2 :: SrcCore
      -- eCons2 = \ a r. a[] : r[]
-     eCons2 = Lam a $ Lam r $ (eCons (eForce a) (eForce r))
+     eCons2 = Lam a $ Lam r $ (eCons (eForce (Variable a)) (eForce (Variable r)))
         where
           r = Ident noLoc "r"
           a = Ident noLoc "a"
@@ -1459,7 +1473,9 @@ traceDS msg e = do { traceD msg (pPrint e)
 traceD :: String -> Doc -> DsM ()
 traceD msg doc
   = do { do_trace <- getDFlagsX fTraceDesugar
-       ; when do_trace $ doIO_DsM (putStrLn ("\n------- " ++ msg ++ "---------\n" ++ render doc))
+       ; when do_trace $ doIO_D $
+         do { putStrLn ("\n------- " ++ msg ++ "---------")
+            ; putStrLn (render (indent doc)) }
        }
 
 dsRule :: (Pretty a) => String -> a -> DsM a -> DsM a

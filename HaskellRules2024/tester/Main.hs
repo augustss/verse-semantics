@@ -655,6 +655,7 @@ data TestFlags = TestFlags
   , preludeVerify  :: !String              -- use this prelude in TestVerify
   , desugarRules   :: !Desugar             -- desugaring rules
   , allAsIter      :: !Bool                -- encode all as iter
+  , twoStageDesugar:: !Bool                -- use two-stage desugaring
   , xxxTrace       :: !TraceLevel          -- how much to trace
   , fileNames      :: ![FilePath]          -- input files
   }
@@ -788,6 +789,9 @@ testFlags = TestFlags
   <*> OA.switch
          ( OA.long "all-as-iter"
         <> OA.help "encode all with iter" )
+  <*> OA.switch
+         ( OA.long "two-stage-desugar"
+        <> OA.help "use two-stage desugaring" )
   <*> (OA.flag' BriefTrace (OA.long "brief-trace" <>
                             OA.help "Print brief rewrite trace")
        OA.<|>
@@ -807,7 +811,8 @@ testFlagsToFlags t =
              fAssumeVerified = assumeVerified t,
              fTraceDesugar = verbose t,
              fDesugar = desugarRules t,
-             fAllAsIter = allAsIter t
+             fAllAsIter = allAsIter t,
+             fTwoStageDesugar = twoStageDesugar t
            }
 
 setPreludeFlag :: Bool    -- True <=> verifying
