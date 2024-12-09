@@ -42,7 +42,7 @@ $$
 \rulename{dschoice}   & |SS u (t_1 `choice` t_2)| & = & |SS u t_1 `choice` SS u t_2| \\
 \rulename{dssemi}   & |SS u (t_1 ; t_2)| & = & |SS underscore t_1 ; SS u t_2| \\
 \rulename{dsdef}   & |SS u (x := t)| & = & |defKW x; x = SS u t| \\
-\rulename{dssquig}   & |SS u (squig i x := t)| & = & |defKW i; u `ueq` i; defKW x; x = SS u t| \\
+\rulename{dssquig}   & |SS u (squig i x := t)| & = & |defKW i; u `ueq` i; SS u (x := t)| \\
 
 \rulename{dscol1}   & |SS underscore (: t)| & = & |oftype ((defKW x; x)) (SS underscore t)| \\
 \rulename{dscol2}   & |SS x (: t)| & = & |oftype x (SS underscore t)| \\
