@@ -1,4 +1,5 @@
---module PlanC where
+{-# OPTIONS_GHC -Wall #-}
+module Main where
 import Control.Monad hiding (ap)
 import Control.Monad.State.Strict
 import qualified Data.Map as M
@@ -11,7 +12,7 @@ import Val
 import Set
 import Env
 import Examples
-import Debug.Trace
+--import Debug.Trace
 
 implies :: Bool -> Bool -> Bool
 implies x y = not x || y
@@ -22,6 +23,7 @@ data CExp = CVar Ident | CInt Integer | CPrim Op | CTup [CExp] | CApp CExp CExp
           | CEqu CExp CExp | CSeq CExp CExp | CWhere CExp CExp | CExi Ident
           | CIf CExp CExp CExp | CLam OC Ident CExp CExp
           | CFail | COfType CExp CExp
+          | CChoice CExp CExp | CFor CExp CExp | CAll CExp
   deriving (Eq, Ord, Data)
 
 instance Show CExp where
@@ -42,6 +44,10 @@ instance Show CExp where
                               showParen True (showString i) . showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2)
   showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
+  showsPrec p (CChoice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " | " . showsPrec 5 e2
+  showsPrec _ (CAll e) = showString "all" . showBraces (showsPrec 0 e)
+  showsPrec _ (CFor e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
+
 
 dI :: CExp -> [Ident]
 dI (CApp e1 e2) = dI e1 `union` dI e2
@@ -79,13 +85,12 @@ syntaxN :: Ident -> Exp -> N CExp
 syntaxN u (Int k) = pure $ u =.= CInt k
 syntaxN u (Var x) = pure $ u =.= CVar x
 syntaxN u (Prim p) = pure $ u =.= CPrim p
-syntaxN "_" (Tup es) = CTup <$> mapM (syntaxN "_") es
-syntaxN u (Tup es) = do
-  us <- newVars (length es) "u"
-  cs <- zipWithM syntaxN us es
-  pure $ cseqs $ map CExi us ++ [u =.= CTup (map CVar us)] ++ cs ++ [CTup cs]
+syntaxN _ Fail = pure CFail
 syntaxN u (App e0 e1) = (u =.=) <$> (CApp <$> syntaxN "_" e0 <*> syntaxN "_" e1)
 syntaxN u (Equ e0 e1) = CEqu <$> syntaxN u e0 <*> syntaxN u e1
+syntaxN u (Choice e0 e1) = CChoice <$> syntaxN u e0 <*> syntaxN u e1
+syntaxN u (Seq e0 e1) = CSeq <$> syntaxN "_" e0 <*> syntaxN u e1
+syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
 syntaxN "_" (Def x (Colon (Var "any"))) = pure $ CExi x   -- hack for x:any
 syntaxN u (Def x e) = do
   c <- syntaxN u e
@@ -93,18 +98,22 @@ syntaxN u (Def x e) = do
 syntaxN u (Def2 x y e) = do
   c <- syntaxN u e
   pure $ cseqs [CExi x, u =.= CVar x, CExi y, CVar y `CEqu` c]
-{-
 syntaxN "_" (Colon e) = do
   x <- newVar "x"
-  c <- syntaxN x e
-  pure $ cseqs [ CExi x, c ]
+  e' <- syntaxN "_" e
+  pure $ COfType (CExi x `CSeq` CVar x) e'
 syntaxN u (Colon e) =
   COfType <$> pure (CVar u) <*> syntaxN "_" e
--}
-syntaxN u (Colon e) = CApp <$> syntaxN "_" e <*> mustBeVar u
-syntaxN u (Seq e0 e1) = CSeq <$> syntaxN "_" e0 <*> syntaxN u e1
-syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
+-- Chk
+syntaxN u (OfType e0 e1) = (u =.=) <$> (COfType <$> syntaxN "_" e0 <*> syntaxN "_" e1)
+syntaxN "_" (Tup es) = CTup <$> mapM (syntaxN "_") es
+syntaxN u (Tup es) = do
+  us <- newVars (length es) "u"
+  cs <- zipWithM syntaxN us es
+  pure $ cseqs $ map CExi us ++ [u =.= CTup (map CVar us)] ++ [CTup cs]
 syntaxN u (If e0 e1 e2) = CIf <$> syntaxN "_" e0 <*> syntaxN u e1 <*> syntaxN u e2
+syntaxN u (For e0 e1) = (u =.=) <$> (CFor <$> syntaxN "_" e0 <*> syntaxN "_" e1)
+syntaxN u (All e) = (u =.=) <$> (CAll <$> syntaxN "_" e)
 syntaxN "_" (Fun q e0 e1) = do
   i <- newVar "i"
   CLam q i <$> syntaxN i e0 <*> syntaxN "_" e1
@@ -116,10 +125,6 @@ syntaxN u (Fun q e0 e1) = do
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
   pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs $ cq ++ [CExi k, k =.= CApp (CVar u) (CVar x), c1 ])
-syntaxN _ Fail = pure CFail
-syntaxN _ Choice{} = undefined
-syntaxN _ All{} = undefined
-syntaxN _ For{} = undefined
 
 checkQ :: OC -> Ident -> Exp -> N [CExp]
 checkQ Open _ _ = pure []
@@ -136,7 +141,6 @@ infix 4 =.=
 
 (=.=) :: Ident -> CExp -> CExp
 "_" =.= c                 = c
-u   =.= CApp (CVar "_") _ = CVar u
 u   =.= c                 = CVar u `CEqu` c
 
 {-
@@ -199,6 +203,7 @@ apply (VFcn (Fcn _ xys)) w = maybe empty sing $ M.lookup w xys
 apply _ _ = empty
 
 dE :: CExp -> Env -> WS
+dE (CVar "_") _                             = error "stray _"
 dE (CVar x)  rho                            = sing $ lookupEnv x rho
 dE (CInt k)    _                            = sing $ VInt k
 dE (CPrim p)   _                            = sing $ dO p
@@ -233,6 +238,7 @@ dE (CLam q i e1 e2)   rho                     = mkSet $ close q
          (existsL (dX e1 rho) $ \rho' -> not (isEmpty (dE e1 (extend rho' i w)))))
 -}
   ]
+dE e _ = error $ "unimplemented " ++ show e
 
 close :: OC -> [W] -> [W]
 close _ [] = []

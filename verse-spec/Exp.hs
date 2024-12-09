@@ -13,6 +13,7 @@ data Exp
   | If Exp Exp Exp | Fun OC Exp Exp
   | Choice Exp Exp | All Exp | For Exp Exp
   | Where Exp Exp | Def2 Ident Ident Exp
+  | OfType Exp Exp
   deriving (Eq, Ord, Data)
 
 data Op = Oint | Ogt | Oadd
@@ -43,6 +44,7 @@ instance Show Exp where
   showsPrec _ (Fun q e1 e2) = showString (if q == Open then "fun_o" else "fun_c") .
                               showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2)
+  showsPrec p (OfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
 
 showBraces :: (String -> String) -> (String -> String)
 showBraces a = showString "{" . a . showString "}"
