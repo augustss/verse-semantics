@@ -585,13 +585,13 @@ S-desugaring: (PrefixOp ".." e) to (Splice e)
     - sDesugarExpr on SrcExpr (PrefixOp ".." e)
     - defnArray with a SrcPat (PrefixOp ".." e)
 
-In M-desugaring:
-  - Expression case: M[Array [t1, Splice t2] E
-      call mkArray [ M[t1]E, Splice (M[t2]E) ]
+In M-desugaring (wrapping):
+  - Expression case: M[Array [t1, Splice t2] _
+      call mkArray [ M[t1]_, Splice (M[t2]_) ]
 
   - Pattern case: M[Array [t1, Splice t2] P(i)
       exists x1,x2
-      i = mkArray [ x1, ..x2 ]
+      i = mkArray [ x1, Splice x2 ]
       mkArray [ M[t1]P(x1), Splice (M[t2]P(x2)) ]
 
     Crucially, note that we desugar the original expressions ti
@@ -599,6 +599,15 @@ In M-desugaring:
 
   - The function mkArray builds an array, using arrApp$ to take
     account of arguments that are wrapped in Splice
+
+
+How to typeset in Fig 6:
+   Idea:  mkArray <t1,Splice t2, t3, t4> <e1, e2, e3, e4>  = <e1> ++ e2 ++<e3,e4>
+
+   auxfun (Splice t) e = e
+   auxfun (t) e        = <e>
+      where (ts', splices) = split ts
+
 
 Note [Desugaring ampersand]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
