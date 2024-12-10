@@ -868,7 +868,7 @@ miniToCore orig_md = go (orig_md,[])
     go md (OfType e1 _fx e2)
       | (MI,xs) <- md = do { (dz, z) <- defineDE "z" (go md e2)
                            ; return (eSeq [ dz, eGuard xs (eSome z) ]) }
-      | otherwise
+      | (MV,_) <- md
       = do { e1' <- go md e1
            ; e2' <- go md e2
            ; if isAtomic e1'  -- Just an optimisation
@@ -876,6 +876,8 @@ miniToCore orig_md = go (orig_md,[])
              else do { r <- newIdent (getLoc e1) "r"
                      ; return (eSeq [ DefineV r, eUnify (Variable r) e1'
                                     , Check [effSucceeds] (ApplyD e2' (Variable r)) ]) } }
+      | (MX,_) <- md
+      = ApplyD <$> go md e2 <*> go md e1
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md (Check fx e)

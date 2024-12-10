@@ -19,8 +19,8 @@ $$
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
  \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N e_1 e_2| \vb |e_1; e_2|
      \vb |e_1 == e_2| \vb |defKW x| \vb |e_1 `choice` e_2|  \\
-  && \vb &  |arr (e_1, dots, e_n)| \vb |truth e| \vb |lam x e| \vb |iter2 v_1 e v_2|\\
-  && \vb & |some v| \vb |v guard e| \vb |check fx e| \vb |verify2 rs as e| \\
+  && \vb &  |arr (e_1, dots, e_n)| \vb |truth e| \vb |lam x e| \vb |iter2 v e_1 e_2|\\
+  && \vb & |some e| \vb |v guard e| \vb |check fx e| \vb |verify2 rs as e| \\
 \multicolumn{4}{l}{\hspace{3mm}\text{Note: ordinary |lam x e|; no |oftype e_1 e_2|; add |verifyKW| and |someKW| }} \\[2mm]
 \end{array}\\
 
@@ -49,23 +49,26 @@ $$
 \rulename{msemi}   & |DMe3 md si (e_1 ; e_2)|        & = & |DMe3 md si e_1 ; DMe3 md si e_2| \\
 \rulename{mchoice} & |DMe3 md si (e_1 `choice` e_2)| & = & |(DMe3 md si e_1) `choice` (DMe3 md si e_2)| \\
 \rulename{mfor}    & |DMe3 md si (fordo e_1 e_2)|
-   & = & |iter2 (lam (a r) (cons (force a) (force r))) (DMe3 md si e_1; lam underscore (DMe3 md si e_2)) (lam underscore emptytup)| \\
+   & = & |iter2 (lam (a r) (cons (force a) (force r))) (DMe3 md si e_1; lam underscore (DMe3 md si e_2)) emptytup| \\
 \multicolumn{2}{l}{\rulename{mif} \;\; \hfill |DMe3 md si (if e_1 then e_2 else e_3|}
 & = & \multicolumn{2}{@@{}l}{|iter2 (lam (a underscore) (force a))
         (DMe3 md si e_1; lam underscore (DMe3 md si e_2))
-        (lam underscore (DMe3 md si e_3))|}  \\[2mm]
+        (DMe3 md si e_3)|}  \\
+\rulename{mone}    & |DMe3 md si (one e)| & = & |iter2 (lam (a underscore) a) (DMe3 md si e) fail| \\
+\rulename{mall}    & |DMe3 md si (all e)| & = & |DMe3 md si (fordo (defintro v; v==e) v| \\[2mm]
 \end{array}
 \\
 
 %--------- (e1 |> e2) and check<fx>{e}----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
+\rulename{moftype+} & |DMe3 mdpos si (oftype e_1 e_2)|
+& = & |defintro r; r == DMe3 md si e_1;
+       check succeeds (apply1N ((DMe3 md si e_2)) r)| \\
 \rulename{moftype-} & |DMe3 mdneg si (oftype e_1 e_2)|
   & = & |si guard (some (DMe3 mdneg si e_2))| \\
-\rulename{moftype+x} & |DMe3 md si (oftype e_1 e_2)|
-& = & |defintro r; r == DMe3 md si e_1;
-       check succeeds (apply1N ((DMe3 md si e_2)) r)|
-   & |md|\in\{|mdpos|,|mdx|\} \\
+\rulename{moftypex} & |DMe3 mdx si (oftype e_1 e_2)|
+& = & |apply1N ((DMe3 md si e_2)) (DMe3 md si e_1))| \\
 \rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |havoc2 fx (DMe3 mdneg si e)| \\
 \rulename{mcheck+x} & |DMe3 md    si (check fx e)| & = & |check fx (DMe3 md si e)| & |md|\in\{|mdpos|,|mdx|\} \\[2mm]
 \end{array}
