@@ -18,6 +18,9 @@ sUnion = S.unions
 isect :: Ord a => Set a -> Set a -> Set a
 isect = S.intersection
 
+xunion :: Ord a => Set a -> Set a -> Set a
+xunion = S.union
+
 sing :: a -> Set a
 sing = S.singleton
 
