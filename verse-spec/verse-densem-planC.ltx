@@ -90,8 +90,8 @@ $$
 \begin{array}{rcll}
 \Value & = & \mathbb{Z} + (\semfcn) \\
 \Env & = & |Ident| \rightarrow \Value \\
-W^{*} & = & \text{set of } W \\
-Env^{*} & = & \text{set of } Env \\
+W^{*} & = & \powerset{W} \\
+Env^{*} & = & \powerset{Env} \\
 \end{array}
 \\ \\
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
@@ -147,7 +147,7 @@ Env^{*} & = & \text{set of } Env \\
   \semapp{O}{|op|}{} & : & (\semfcn)^{*} \\
   \semapp{O}{|gt|}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z}, x > y \} \} & \text{one function} \\
   \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \inb \mathbb{Z} \} \} & \text{one function} \\
-  \semapp{O}{|add|}{} & = & \{ f \inb \semfcn \vb \forall x,y \in \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\ \\
+  \semapp{O}{|add|}{} & = & \{ \fcn \{ (\tuple{x,y},x+y) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z} \} \} & \text{one function} \\
 \hline \\[-2mm]
 \apply & : & (\Value \times \Value) \rightarrow \mtype \\
 \apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
