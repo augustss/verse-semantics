@@ -874,7 +874,7 @@ miniToCore orig_md = go (orig_md,[])
            ; if isAtomic e1'  -- Just an optimisation
              then return (Check [effSucceeds] (ApplyD e2' e1'))
              else do { r <- newIdent (getLoc e1) "r"
-                     ; return (eSeq [ DefineV r, eUnify (Variable r) e1
+                     ; return (eSeq [ DefineV r, eUnify (Variable r) e1'
                                     , Check [effSucceeds] (ApplyD e2' (Variable r)) ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
