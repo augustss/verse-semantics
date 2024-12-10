@@ -17,7 +17,7 @@ module FrontEnd.Expr(
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
     , eAll, eExists, eCheck, eDefine, eApplyD, eVerify
     , eThunk, eForce, eForceLam, existsXX, eSomeAny
-    , eSeq, fvArray
+    , eSeq, eUnify, fvArray
     , srcUnderscore, isSrcUnderscore, identX
 
     , Store(..), Ptr
@@ -243,6 +243,16 @@ existsXX :: SrcExpr
 -- This is what the source-code "_" desugars to
 existsXX = Exists [identX] (Variable identX)
 
+eUnify :: SrcExpr -> SrcExpr -> SrcExpr
+-- Smart constructors just floats things out of the arms
+eUnify e1 e2
+  | Seq es1 <- e1, (floats1, e1') <- unSeq es1
+  = eSeq (floats1 ++ [eUnify e1' e2])
+  | isValue e1, Seq es2 <- e2, (floats2, e2') <- unSeq es2
+  = eSeq (floats2 ++ [eUnify e1 e2'])
+  | otherwise
+  = Unify e1 e2
+
 eSeq :: [SrcExpr] -> SrcExpr
 eSeq = mk . concatMap flat
   where flat (Seq es) = es
@@ -318,15 +328,15 @@ eExists :: [Ident] -> SrcExpr -> SrcExpr
 eExists [] e = e
 eExists is e = Exists is e
 
-eDefine :: HasCallStack => Ident -> SrcExpr -> SrcExpr
+eDefine :: HasCallStack => Ident -> SrcEssential -> SrcEssential
+-- Generates (x:=e) in Essential Verse
 eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
--- x := (e1; ...; en)   generates   exists x; e1; ... e(n-1); x=en
+-- x := (e1; ...; en)   generates   e1; ... e(n-1); x:=en
 -- Smart contructor, floats out nested defines
 eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
                    where
                      (floats, rhs) = unSeq ts
-eDefine x rhs = eSeq [ DefineV x, Unify (Variable x) rhs ]
--- eDefine x rhs = DefineE x rhs
+eDefine x rhs = DefineE x rhs
 
 eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
 -- (eApply f x)  returns  f[x]
@@ -571,7 +581,7 @@ instance Pretty SrcExpr where
           Check fx e  -> text "check" <> ppEffs fx <> braces (ppr 0 e)
           Guard e1 e2 -> maybeParens (p>0) $ sep [ ppr 1 e1, text ";;" <+> ppr 1 e2 ]
           XDLam q i e1 e2 -> maybeParens (p > 0) $ text "\\" <> parens (ppr 0 q) <> ppr 0 i <> text "."
-                                                   <> braces (ppr 0 e1) <> braces (ppr 0 e2)
+                                                   <> cat [braces (ppr 0 e1), braces (ppr 0 e2)]
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
           Map es -> text "map" <> braces (ppSeq lvl es)

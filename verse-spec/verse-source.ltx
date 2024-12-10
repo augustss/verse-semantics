@@ -51,7 +51,7 @@ $$
 &      & \vb & |type^{t}|         & \text{Type definition} \\
 &      & \vb & |option^{}|        & \text{Create an option} \\
 &      & \vb & |option^{t}|       & \text{Create an option} \\
-&      & \vb & |truth^{t} |       & \text{Singleton map} \\
+&      & \vb & |truth t |       & \text{Singleton map} \\
 &      & \vb & |amap (t_1; xdots; t_n) | & \text{Map}, n \geq 0 \\
 \\
 \text{\bf Arguments} &
@@ -112,15 +112,17 @@ $$
 &      & \vb & |o|                        & \text{Primops} \\
 &      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
 &      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
+&      & \vb & |t_1 where t_2|             & \text{Reverse sequencing} \\
 &      & \vb & |t_1 = t_2|                 & \text{Unification} \\
-&      & \vb & |x := t|                   & \text{Definition} \\
-&      & \vb & |squig x y := t|           & \text{Definition} \\
-&      & \vb & |colonfx fx t|             & \text{Range} \\
+&      & \vb & |x := t|                    & \text{Definition} \\
+&      & \vb & |squig x y := t|            & \text{Definition} \\
+&      & \vb & |colonfx fx t|              & \text{Range} \\
 &      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
 &      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
-&      & \vb & |fordo t_1 t_2|           & \text{Finite loop} \\
+&      & \vb & |fordo t_1 t_2|             & \text{Finite loop} \\
 &      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
-&      & \vb & |functionOC q t_1 t_2|     & \text{Function} \\
+&      & \vb & |truth t|                   & \text{Truth value} \\
+&      & \vb & |functionOC q t_1 t_2|      & \text{Function} \\
 &      & \vb & |oftypefx t_1 fx t_2|       & \text{Type annotation}\\
 &      & \vb & |check fx t|                & \text{Effects check} \\
 \\
@@ -174,7 +176,8 @@ $$
 \\
 \begin{array}{lrcll}
 \multicolumn{5}{l}{\textbf{Application and unification}} \\
-\rulename{dswhere} &  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
+% \rulename{dswhere} &  |t_1 where t_2| & \rightarrow & |x := t_1 ; t_2; x| & \text{fresh |x|}\\
+% Don't desugar where
 \rulename{dsapp}   & |t_1^(t_2)| & \rightarrow & |check succeeds (t_1^[t_2])| \\
 \\
 \multicolumn{5}{l}{\textbf{Array splice}} \\
@@ -213,7 +216,7 @@ $$
 $$
 \begin{array}{lrcll}
   \multicolumn{5}{l}{\textbf{Operators}} \\
-\rulename{dspreq} &  |?e|     & \rightarrow & |type{false `choice` let (x:e){truth^{x}}}| & \text{|x| fresh} \\
+\rulename{dspreq} &  |?e|     & \rightarrow & |type{false `choice` let (x:e){truth x}}| & \text{|x| fresh} \\
 \rulename{dspostq} & |e?|     & \rightarrow & |e^[_]| \\
 \rulename{dsop1} &   |op_b e| & \rightarrow & |prefix op_b [e]| & \text{if |op_b| can fail}\\
 \rulename{dsop2} &   |op_b e| & \rightarrow & |prefix op_b (e)| \\
@@ -235,8 +238,8 @@ $$
   \multicolumn{5}{l}{\textbf{Misc}} \\
 \rulename{dswild} &  |_| & \rightarrow & |x:any| & \text{|x| fresh} \\
 \rulename{dsopt1} &   |option^{}| & \rightarrow & |false| \\
-\rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then truth^{x} else false| & \text{|x| fresh} \\
-\rulename{dstruth} &  |truth^{e}| & \rightarrow & |amap(e eqgt e)| \\
+\rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then (truth x) else false| & \text{|x| fresh} \\
+% \rulename{dstruth} &  |truth (e}| & \rightarrow & |amap(e eqgt e)| \\
 \end{array}
 $$
 {\em Note}: The desugaring assumes a scope correct Verse program.

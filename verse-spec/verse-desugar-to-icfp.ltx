@@ -18,8 +18,8 @@ $$
 \textbf{Syntax of Core Verse} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
  \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N e_1 e_2| \vb |e_1; e_2|
-     \vb |e_1 == e_2| \vb |defKW x| \vb |e_1 `choice` e_2| \vb  |arr (e_1, dots, e_n)| \\
-  && \vb & |lam x e| \vb |iter2 v_1 e v_2|\\
+     \vb |e_1 == e_2| \vb |defKW x| \vb |e_1 `choice` e_2|  \\
+  && \vb &  |arr (e_1, dots, e_n)| \vb |truth e| \vb |lam x e| \vb |iter2 v_1 e v_2|\\
   && \vb & |some v| \vb |v guard e| \vb |check fx e| \vb |verify2 rs as e| \\
 \multicolumn{4}{l}{\hspace{3mm}\text{Note: ordinary |lam x e|; no |oftype e_1 e_2|; add |verifyKW| and |someKW| }} \\[2mm]
 \end{array}\\
@@ -35,13 +35,15 @@ $$
 
 % -------------- Basic rules ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\rulename{mfail}  & |DMe3 md si fail|                  & = & |fail| \\
 \rulename{mconst}  & |DMe3 md si k|                  & = & |k| \\
 \rulename{mvar}    & |DMe3 md si x|                  & = & |x| \\
 \rulename{mop}    & |DMe3 md si o|                  & = & |o| \\
 \rulename{mapp}    & |DMe3 md si (apply1N e_1 e_2)|
    & = & |apply1N ((DMe3 md si e_1)) (DMe3 md si e_2)| \\
-\rulename{marraye} & |DMe3 md si (arr(e_1, xdots, e_n))|
+\rulename{mtup} & |DMe3 md si (arr(e_1, xdots, e_n))|
     & = & |arr (DMe3 md si e_1, xdots, DMe3 md si e_n)| \\
+\rulename{mtruth}    & |DMe3 md si (truth e)|                  & = & |truth (DMe3 md si e)| \\
 \rulename{mbind}   & |DMe3 md si (defKW x)|          & = & |defKW x| \\
 \rulename{meq}     & |DMe3 md si (e_1=e_2)|          & = & |(DMe3 md si e_1) = (DMe3 md si e_2)| \\
 \rulename{msemi}   & |DMe3 md si (e_1 ; e_2)|        & = & |DMe3 md si e_1 ; DMe3 md si e_2| \\
@@ -61,10 +63,8 @@ $$
 \rulename{moftype-} & |DMe3 mdneg si (oftype e_1 e_2)|
   & = & |z := DMe3 mdneg si e_2; si guard (some z)| \\
 \rulename{moftype+x} & |DMe3 md si (oftype e_1 e_2)| & = &
-  \begin{array}[t]{@@{}l}
-  |y := DMe3 md si e_1;| \\
-  |check succeeds (apply1N ((DMe3 md si e_2)) y)|
-  \end{array}   & |md|\in\{|mdpos|,|mdx|\} \\
+  |apply1N ((DMe3 md si e_2)) (DMe3 md si e_1) |
+   & |md|\in\{|mdpos|,|mdx|\} \\
 \rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |havoc2 fx (DMe3 mdneg si t)| \\
 \rulename{mcheck+x} & |DMe3 md    si (check fx e)| & = & |check fx (DMe3 md si t)| & |md|\in\{|mdpos|,|mdx|\} \\[2mm]
 \end{array}

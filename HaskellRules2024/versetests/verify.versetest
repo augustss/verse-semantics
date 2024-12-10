@@ -20,9 +20,11 @@ verify("Guard9",pass)  { f():int := 0; L1() := {y:int;  y = f[] } }
 # tim=skip: Guard10: Tim accepts this
 verify("Guard10",fail,tim=skip_acc) { f(x:int):int := x; y := f[y] }
   # Guard10: y=f[y] must be stuck.  Shows the need for a guard
-verify("Guard11",pass) { f(x:int):int := 3; y := f[y] }
-  # Guard11: y=f[y] is not stuck because f is transparent
-# tim=skip: Guard11: Tim crashes
+verify("Guard11",fail) { f(x:int):int := 3; y := f[y] }
+  # Guard11: y=f[y] is still stuck, just like Guard10
+  # tim=skip: Guard11: Tim crashes
+verify("Guard11b",pass) { f(x:int) := 3; y := f[y] }
+  # Guard11b: y=f[y] is not stuck because f is transparent
 testeq("Guard11a",pass,tim=skip_crash) { f(x:int):int := 3; y := f["monkey"] } {fail}
   # Guard11a: Should fail, not get stuck; f["monkey"] fails the domain test
 

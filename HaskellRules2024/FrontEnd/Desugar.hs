@@ -160,10 +160,14 @@ sDesugarExpr = ds
     -- Array
     ds (Array es) = Array <$> mapM ds es
 
-    -- Let and where
-    --    (let e in b)  --> let e in b    Need to keep this for M-desugaring and scope checking.
+    -- Let
+    --    (let e in b)  --> e; b          Assumes binders in b are not free in e
+    ds (Let e b)                    = do { e' <- ds e; b' <- ds b; return (eSeq [e',b']) }
+
+    -- Where
     --    (e1 where e2) --> e1 where e2   Need to keep this for M-desugaring!
-    ds (Let e b) = Let <$> ds e <*> ds b
+    --                                    Can't swap to (e2;e1) because that switches
+    --                                       the order of choices
     ds (InfixOp e1 (Op "where") e2) = Where <$> ds e1 <*> ds e2
 
     -- Do and case
@@ -706,9 +710,10 @@ essToMini = go NoInput
     go inp e@(Variable {}) = inp `ueq` return e
     go inp e@(EPrim {})    = inp `ueq` return e
     go _inp Fail           = return Fail
-    go inp (Unify  e1 e2)  = Unify  <$> go inp e1 <*> go inp e2
-    go inp (Choice e1 e2)  = Choice <$> go inp e1 <*> go NoInput e2
+    go inp (Unify  e1 e2)  = eUnify  <$> go inp e1 <*> go inp e2
+    go inp (Choice e1 e2)  = Choice <$> go inp e1 <*> go inp e2
     go inp (ApplyD t1 t2)  = inp `ueq` (ApplyD <$> go NoInput t1 <*> go NoInput t2)
+    go inp (Where t1 t2)   = do { e1 <- go inp t1; e2 <- go NoInput t2; return (eSeq [e1,e2]) }
     go inp (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
                                 ; es <- mapM (go NoInput) ts
                                 ; e  <- go inp t
@@ -717,11 +722,15 @@ essToMini = go NoInput
     -- DSEXISTS (exists x);  DSDEF (x:=t); DSSQUIG (x~>y:=t)
     go inp (Exists xs e)    = Exists xs <$> go inp e   -- Just propate Exists
     go _inp (DefineV x)     = return (DefineV x)
-    go inp (DefineE x t)    = do { e <- go inp t; return (eSeq [DefineV x, Unify (Variable x) e]) }
-    go inp (DefineIE x y t) = do { e <- go inp (DefineE y t)
-                                 ; case inp of
-                                     NoInput -> return (eSeq [DefineV x,                       e])
-                                     PI i    -> return (eSeq [DefineV x, Unify (Variable x) i, e]) }
+    go inp (DefineE x t)    = do { e <- go inp t; return (eSeq [DefineV x, eUnify (Variable x) e]) }
+    go inp (DefineIE x y t) = do { e <- go (PI (Variable x)) t
+                                 ; return (eSeq ([DefineV x] ++
+                                                 mb_unify    ++
+                                                 [ DefineV y, eUnify (Variable y) e])) }
+       where
+         mb_unify = case inp of
+                      NoInput -> []
+                      PI i    -> [eUnify i (Variable x)]
 
     -- DSIF, DSFOR, DSALL, DSONE: If, for, all
     go inp (If3 t1 t2 t3) = If3  <$> go NoInput t1 <*> go inp t2 <*> go inp t3
@@ -735,25 +744,27 @@ essToMini = go NoInput
                              NoInput -> do { e <- go NoInput t
                                            ; x <- newIdent (getLoc t) "x"
                                            ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
-                             PI i    -> ApplyD <$> go NoInput t <$> pure i
+                             PI i    -> OfType i [] <$> go NoInput t
 
-    -- check<fx>{t}
+    -- DSCHK: check<fx>{t}
     go inp (Check fx t)  = case inp of
                               NoInput -> Check fx <$> go NoInput t
                               PI i -> do { k <- newIdent (getLoc t) "k"
                                          ; e <- go (PI (Variable k)) t
                                          ; return (eSeq [ DefineV k
-                                                        , Unify (Variable k) (Check fx i)
+                                                        , eUnify (Variable k) (Check fx i)
                                                         , e ]) }
 
-    -- t1 |> t2
+    -- DSOFTYPE: t1 |> t2
     go inp (OfType t1 fxs t2)
       = assert (null fxs) (show fxs) $
-        do { r <- newIdent (getLoc t2) "r"
-           ; e1 <- go inp t1
+        do { e1 <- go inp t1
            ; e2 <- go NoInput t2
-           ; return (eSeq [ DefineV r, Unify (Variable r) e1
-                          , Check [effSucceeds] (OfType (Variable r) [] e2) ]) }
+           ; if isAtomic e1  -- Just an optimisation
+             then return (Check [effSucceeds] (OfType e1 [] e2))
+             else do { r <- newIdent (getLoc t2) "r"
+                     ; return (eSeq [ DefineV r, eUnify (Variable r) e1
+                                    , Check [effSucceeds] (OfType (Variable r) [] e2) ]) } }
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go inp (Splice t) = go inp t
@@ -761,7 +772,7 @@ essToMini = go NoInput
     go inp (Array ts)
       = case inp of
           NoInput -> do { es <- mapM do_one ts
-                        ; return (Array es) }
+                        ; mkArray es }
                    where
                      do_one (Splice t) = Splice <$> go NoInput t
                      do_one t          =            go NoInput t
@@ -770,7 +781,7 @@ essToMini = go NoInput
                      ; let (exi_js, es) = unzip prs
                      ; exi_js_arr <- mkArray exi_js
                      ; res_arr    <- mkArray es
-                     ; pure (eSeq [ Unify i exi_js_arr, res_arr ]) }
+                     ; pure (eSeq [ eUnify i exi_js_arr, res_arr ]) }
               where
                 do_one :: SrcExpr -> DsM (SrcExpr, SrcExpr)
                 -- Returns the pattern-match decl, and the thing to put in the tuple
@@ -780,10 +791,15 @@ essToMini = go NoInput
                                        ; e <- go (PI (Variable j)) t
                                        ; pure (DefineV j, e) }
 
-    -- Functions
-    go NoInput (Lam x t)  -- Pass through ICFP lambdas in the NoInput case only
-      = Lam x <$> go NoInput t
+    -- Truth
+    go inp (Truth t)
+      = case inp of
+          NoInput -> Truth <$> go NoInput t
+          PI i -> do { j <- newIdent (getLoc t) "j"
+                     ; e <- go (PI (Variable j)) t
+                     ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
 
+    -- Functions
     go inp t@(Function [(t1,fx)] t2)
       = case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"
@@ -792,7 +808,7 @@ essToMini = go NoInput
                      ; x <- newIdent (getLoc t2) "x"
                      ; e1 <- go (PI (Variable i)) t1
                      ; e2 <- go (PI (ApplyD f (Variable x))) t2
-                     ; return (XDLam aperture i (eDefine x e1) e2) }
+                     ; return (XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1]) e2) }
       where
         aperture = case fx of
                      []                 -> Closed
@@ -800,11 +816,19 @@ essToMini = go NoInput
                      [Ident _ "open"]   -> Open
                      _ -> error "Bad fx in function" (pPrint t)
 
+
+    -- Core constructs used (only) in the Prelude
+    -- Only used in the NoInput case
+    go NoInput (Lam x t)    = Lam x <$> go NoInput t
+    go NoInput (Some t)     = Some  <$> go NoInput t
+    go NoInput (Guard xs t) = Guard <$> go NoInput xs <*> go NoInput t
+
+    -- Report any un-handled cases
     go inp t = error $ "TODO: essToMini " ++ show (inp, t)
 
     ueq :: Input -> DsM SrcMini -> DsM SrcMini
     ueq NoInput  ds_e  = ds_e
-    ueq (PI inp) ds_e  = Unify inp <$> ds_e
+    ueq (PI inp) ds_e  = eUnify inp <$> ds_e
 
 
 --------------------------------------------------------
@@ -824,10 +848,11 @@ miniToCore orig_md = go (orig_md,[])
     go _md e@(EPrim {})    = return e     -- MOP
     go _md e@(DefineV {})  = return e     -- MBIND
 
-    -- MARRAY, MSEMI, MEQ, MCHOICE, MAPP
-    go md (Array es)     = do { es' <- mapM (go md) es; return (Array es') }
+    -- MTUP, MTRUTH, MSEMI, MEQ, MCHOICE, MAPP
+    go md (Array es)     = Array <$> mapM (go md) es
+    go md (Truth e)      = Truth <$> go md e
     go md (Seq es)       = do { es' <- mapM (go md) es; return (Seq es') }
-    go md (Unify e1 e2)  = Unify <$> go md e1 <*> go md e2
+    go md (Unify e1 e2)  = eUnify <$> go md e1 <*> go md e2
     go md (Choice e1 e2) = Choice <$> go md e1 <*> go md e2
     go md (ApplyD e1 e2) = ApplyD <$> go md e1 <*> go md e2
     go md (Exists xs e)  = Exists xs <$> go md e
@@ -866,9 +891,10 @@ miniToCore orig_md = go (orig_md,[])
            ; e2' <- go (MX, x:xs) e2
            ; return (Lam x (eSeq [ e1', e2' ])) }
 
-    -- ICFP lambdas
-    go md (Lam x t)  -- Pass through ICFP lambdas
-      = Lam x <$> go md t
+    -- Pass through Core constructs, used in Prelude
+    go md (Lam x t)    = Lam x <$> go md t
+    go md (Guard xs t) = Guard <$> go md xs <*> go md t
+    go md (Some t)     = Some  <$> go md t
 
     go md e = error $ "TODO: miniToCore " ++ show (md, e)
 
@@ -900,7 +926,7 @@ encodeAll2 :: SrcCore -> DsM SrcCore
 encodeAll2 e = do { asIter <- getDFlagsX fAllAsIter
                   ; if asIter
                     then do { v <- newIdent (getLoc e) "v"
-                            ; pure (encodeFor2 (eSeq [ DefineV v, Unify (Variable v) e ])
+                            ; pure (encodeFor2 (eSeq [ DefineV v, eUnify (Variable v) e ])
                                                (Variable v)) }
                     else pure (All e) }
 
@@ -909,7 +935,7 @@ encodeOne2 :: SrcCore -> SrcCore
 encodeOne2 e = Iter e eNext (eThunk Fail)
   where
     a = Ident noLoc "a"
-    eNext = Lam a $ eThunk (eForce (Variable a))
+    eNext = Lam a $ eThunk (Variable a)
 
 --------------------------------------------------------
 --

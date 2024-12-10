@@ -25,7 +25,7 @@ $$
   && \vb & |arr (e_1, dots, e_n)| \vb |oftype t_1 t_2| \vb |check fx e| \\
   && \vb & |vif t_1 t_2 t_3| \vb |fordo t_1 t_2| \vb |all e| \\
   && \vb & |lamOC q i e_1 e_2| \\
-\multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x y|; |defKW x| instead of |x:=e|; and lambda changes form}}
+\multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x y|; no |x:=e|; no |where|; and lambda changes form}}
 \end{array}
 \\ \\
 % ------------- Desugaring ---------------
@@ -38,28 +38,32 @@ $$
 \rulename{dsprim}   & |SS u o| & = & |u `ueq` o| \\
 \rulename{dsfail}   & |SS u fail| & = & |fail| \\
 \rulename{dsapp}   & |SS u (apply1N t_1 t_2)| & = & |u `ueq` apply1N ((SS underscore t_1)) (SS underscore t_2)| \\
-\rulename{dseq}   & |SS u (t_1 == t_2)| & = & |(SS u t_1) = (SS u t_2)| \\
+\rulename{dsunify}   & |SS u (t_1 == t_2)| & = & |(SS u t_1) = (SS u t_2)| \\
 \rulename{dschoice}   & |SS u (t_1 `choice` t_2)| & = & |SS u t_1 `choice` SS u t_2| \\
 \rulename{dssemi}   & |SS u (t_1 ; t_2)| & = & |SS underscore t_1 ; SS u t_2| \\
+\rulename{dswhere}   & |SS u (t_1 where t_2)| & = & |(SS u t_1); (SS underscore t_2)| \\
 \rulename{dsdef}   & |SS u (x := t)| & = & |defintro x; x = SS u t| \\
-\rulename{dssquig}   & |SS u (squig i x := t)| & = & |defintro i; u `ueq` i; SS u (x := t)| \\
+\rulename{dssquig}   & |SS u (squig x y := t)| & = & |defintro x; u `ueq` x; y := SS x t| \\
 
 \rulename{dscol1}   & |SS underscore (: t)| & = & |defintro x; apply1N ((SS underscore t)) x| & \text{|x| fresh}\\
-\rulename{dscol2}   & |SS e (: t)| & = & |defintro x; x == e; check succeeds (oftype x (SS underscore t))|  & \text{|x| fresh}\\
+\rulename{dscol2}   & |SS e (: t)| & = & |oftype e (SS underscore t)| \\
 \rulename{dschk}   & |SS u (check fx t)| & = & |check fx (SS u t)| \\
 % \rulename{dschk2}   & |SS e (check fx t)| & = & |def k (k = check fx e; SS k t)| \\
-\rulename{dsoftype}   & |SS u (oftype t_1 t_2)| & = & |u `ueq` (oftype (SS underscore t_1) (SS underscore t_2))| \\
+\rulename{dsoftype}   & |SS u (oftype t_1 t_2)|
+    & = & |defintro r; r == SS u t_1; check succeeds (oftype r (SS underscore t_2))| \\
 \rulename{dstup1}   & |SS underscore (arr (t_1, dots, t_n))|
    & = & |arr( (SS underscore t_1), dots, (SS underscore t_n))| \\
 \rulename{dstup2}   & |SS e (arr (t_1, dots, t_n))|
    & = & |defintro (x_1 dots x_n); e = arr(x_1, dots, x_n); arr( (SS x_1 t_1), dots, (SS x_n t_n))| & \text{|x_i| fresh}\\
+\rulename{dstruth1} & |SS underscore (truth t)| & = & |truth (SS underscore t)| \\
+\rulename{dstruth2} & |SS e (truth t)| & = & |defintro x; e == truth x; truth (SS x t)| & \text{|x| fresh} \\
 \multicolumn{2}{l}
   {\rulename{dsif} \;\; \hfill |SS u (vif t_1 t_2 t_3)|}
   & = & |vif(SS underscore t_1) (SS u t_2) (SS u t_3)| \\
 \rulename{dsfor}   & |SS u (fordo t_1 t_2)|
    & = & |u `ueq` fordo (SS underscore t_1) (SS underscore t_2)| \\
-\rulename{dsall} & |SS u (all t)|
-   & = & |u `ueq` all (SS underscore t)| \\
+\rulename{dsone} & |SS u (one t)| & = & |u `ueq` one (SS underscore t)| \\
+\rulename{dsall} & |SS u (all t)| & = & |u `ueq` all (SS underscore t)| \\
 \rulename{dsfun1}   & |SS underscore (functionOC q t_1 t_2)|
    & = & |lamOC q i (SS i t_1) (SS underscore t_2)| \\
 \rulename{dsfun2}   & |SS f (functionOC q t_1 t_2)|
@@ -74,8 +78,17 @@ $$
 \end{array}
 \end{array}
 $$
-\caption{Plan C: Desugaring Essential Verse to Mini Verse}
+\caption{Plan C: Desugaring Essential Verse to Mini Verse} \label{fig:wrapping}
 \end{figure}
+
+Key points about \Cref{fig:wrapping}, the Essential-Verse-to-Mini-Verse wrapping step:
+\begin{itemize}
+\item Essential Verse has |(t_1 where t_2)| as well as |(t_1 ; t_2)|.  We can't flip the
+  order without risking getting choices in the wrong order.  But aft
+er the wrapping
+  step we can replace |where| by ordering ``|;|'', because we have by then
+  feed |u| into |t_1| rather than |t_2|, which is the key difference.
+\end{itemize}
 
 % ------------- Denotional semantics of Mini Verse -------------------
 
