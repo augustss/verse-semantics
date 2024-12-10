@@ -116,18 +116,22 @@ Env^{*} & = & \text{set of } Env \\
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\[1mm]
+  \textit{succeeds function:} \\
   \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semclose{q}{\{ f \in \semfcn \;
     \begin{array}[t]{@@{}l@@{\;}l}
       || & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
         & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty) \\
         & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
-
-%%      \forall x \inb \Value. \\
-%%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
-%%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
-%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
-
     \end{array} \\
+  \textit{decides function:} \\
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semclose{q}{\{ f \in \semfcn \;
+    \begin{array}[t]{@@{}l@@{\;}l}
+      || & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+        & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty \land \semapp{D}{e_2}{\rho'} \neq \mempty) \\
+        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
+    \end{array} \\
+
+
 \end{array}
 \\
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
