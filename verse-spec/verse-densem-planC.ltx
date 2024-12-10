@@ -98,7 +98,7 @@ Env^{*} & = & \powerset{Env} \\
   \semap{E}{|e|} & : & \Env \rightarrow \mtype \\
   \semapp{E}{|x|}{\rho} & = & \msing{\rho(x)} \\
   \semapp{E}{|k|}{\rho} & = & \msing{k} \\
-  \semapp{E}{|o|}{\rho} & = & \semapp{O}{|o|}{} \\
+  \semapp{E}{|o|}{\rho} & = & \msing{\semapp{O}{|o|}{}} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
     \{ r \, || \, f \inb \semapp{E}{|e_1|}{\rho}, \; a \inb \semapp{E}{|e_2|}{\rho}, \; r \inb \apply(f, a) \} \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = & \semapp{E}{|e_1|}{\rho} \; \cap \; \semapp{E}{|e_2|}{\rho} \\
@@ -144,10 +144,10 @@ Env^{*} & = & \powerset{Env} \\
 \semap{I}{|e|} & : & [\mathit{Ident}] \\
 \semap{I}{|e|} & = & \text{the outer $\exists$-bound variables in |e|} \\[1mm]
 
-  \semapp{O}{|op|}{} & : & (\semfcn)^{*} \\
-  \semapp{O}{|gt|}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z}, x > y \} \} & \text{one function} \\
-  \semapp{O}{|int|}{} & = & \{ \fcn \{ (x,x) \, || \, x \inb \mathbb{Z} \} \} & \text{one function} \\
-  \semapp{O}{|add|}{} & = & \{ \fcn \{ (\tuple{x,y},x+y) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z} \} \} & \text{one function} \\
+  \semapp{O}{|op|}{} & : & \semfcn \\
+  \semapp{O}{|gt|}{} & = & \fcn \{ (\tuple{x,y},x) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z}, x > y \} \\
+  \semapp{O}{|int|}{} & = & \fcn \{ (x,x) \, || \, x \inb \mathbb{Z} \} \} \\
+  \semapp{O}{|add|}{} & = & \fcn \{ (\tuple{x,y},x+y) \, || \, x \inb \mathbb{Z}, y \inb \mathbb{Z} \} \\
 \hline \\[-2mm]
 \apply & : & (\Value \times \Value) \rightarrow \mtype \\
 \apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
@@ -165,5 +165,95 @@ Env^{*} & = & \powerset{Env} \\
 \end{array}
 $$
 \caption{Plan C: Idealised denotational semantics of Mini Verse (without choice)}
+\end{figure}
+
+% ------------- Denotional semantics of Mini Verse with choice -------------------
+
+\subsection{Denotional semantics of Mini Verse with choice}
+
+\begin{figure}
+$$
+\begin{array}{l}
+
+
+\textbf{Domains (sets)} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + (\semfcn) \\
+\Env & = & |Ident| \rightarrow \Value \\
+W^{*} & = & \powerset{[W]} \\
+Env^{*} & = & \powerset{Env} \\
+\end{array}
+\\ \\
+\begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
+  \semap{E}{|e|} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{|x|}{\rho} & = & \msing{[\rho(x)]} \\
+  \semapp{E}{|k|}{\rho} & = & \msing{[k]} \\
+  \semapp{E}{|o|}{\rho} & = & \msing{[\semapp{O}{|o|}{}]} \\
+  \semapp{E}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
+  \semapp{E}{|fail|}{\rho} & = & [] \\
+  \semapp{E}{|e_1 `choice` e_2|}{\rho} & = & \semapp{E}{|e_1|}{\rho} |++| \semapp{E}{|e_1|}{\rho} \\
+  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = &
+      [ \{ r \, ||\, f \inb |fs|,\, a \inb as, r \inb \apply(f, a) \} || \, |fs <-| \semapp{E}{|e_1|}{\rho}, \;
+          as |<-| \semapp{E}{|e_2|}{\rho} ]
+           \\
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = &
+      [ s_1 \cap s_2\, ||\, 
+           |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
+  \semapp{E}{|e_1 ; e_2|}{\rho}      & = &
+    [ \{ x_2 \, || \, x_1 \inb s_1, \; x_2 \inb s_2 \}\, ||\,
+      |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
+  \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
+    [ \{ \mkfcn{ \{ (i,x_i) \vb i \in 0 \ldots n \} } \, ||\, x_0 \inb s_0,\; \mydots,\; x_n \inb s_n \}\, \\
+      & & ||\, s_0 \inb \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n \inb \semapp{E}{|e_n|}{\rho} ] \\
+  \\
+  \textbf{Not done}\\
+  \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \mempty \\
+    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{|e_2|}{\rho'} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  |where|\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\[1mm]
+%  \textit{succeeds function:} \\
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semclose{q}{\{ f \in \semfcn \;
+    \begin{array}[t]{@@{}l@@{\;}l}
+      || & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+        & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty) \\
+        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
+    \end{array} \\
+%  \textit{decides function:} \\
+%  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semclose{q}{\{ f \in \semfcn \;
+%    \begin{array}[t]{@@{}l@@{\;}l}
+%      || & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+%        & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty \land \semapp{D}{e_2}{\rho'} \neq \mempty) \\
+%        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
+%    \end{array} \\
+
+
+\end{array}
+\\
+\begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
+\semap{D}{|e|} & : & \Env \rightarrow \mtype \\
+\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
+\end{array}
+\\
+\textbf{Notation}\\
+\begin{array}{lcll}
+  |[e_1,xdots,e_n]| & : & \mtype & \text{sequence of items} \\
+  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \mtype & \text{sequence comprehension (order preserving)}, \\
+                & & & \text{eliminating (trailing?) empty sets?} \\
+  |++| & : & \mtype \rightarrow \mtype \rightarrow \mtype & \text{sequence concatenation} \\
+  |[x_1,xdots,x_n] ++ [y_1,xdots,y_n]| & = & |[x_1,xdots,x_n,y_1,xdots,y_n]| \\
+  \hat{\cup} & : & \mtype \rightarrow \mtype \rightarrow \mtype & \text{elementwise union of sequences,} \\
+  |[x_1,xdots,x_n]| \hat{\cup} |[y_1,xdots,y_n]| & = & |[x_1 `cup` y_1,xdots,x_n `cup` y_n]| & \text{and pad shorter sequence with \mempty} \\
+  \hat{\bigcup} & & & \hat{\cup} \text{ extended to sets} \\
+  |re| & : & \mtype \rightarrow \mtype \\
+  |re(s)| & = & \text{remove all empty sets from s} \\
+\end{array}
+
+\end{array}
+$$
+\caption{Plan C: Idealised denotational semantics of Mini Verse with choice}
 \end{figure}
 
