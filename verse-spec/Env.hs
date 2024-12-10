@@ -44,8 +44,8 @@ allWs = S.fromList $
   where
     nonFcn =
       allInts ++
-      --[VTup [x, y] | x <- allInts, y <- allInts]
-      [VTup [VInt 2, VInt 1], VTup [VInt 1, VInt 2]]
+      [VTup [x, y] | x <- allInts, y <- allInts]
+      --[VTup [VInt 2, VInt 1], VTup [VInt 1, VInt 2]]
     id0 = mkFcn "id0" [(VInt 0, VInt 0)]
     id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
     id123 = mkFcn "id123" [(VInt 1, VInt 1), (VInt 2, VInt 2), (VInt 3, VInt 3)]

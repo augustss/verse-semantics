@@ -7,6 +7,10 @@ import Data.Data
 
 type Ident = String
 
+infixr 3 `Seq`
+infixr 1 `Where`
+infix  5 `Equ`
+
 data Exp
   = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
   | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
@@ -29,7 +33,7 @@ instance Show Exp where
   showsPrec _ (App e1 e2) = showsPrec 11 e1 . showString "[" . showsPrec 0 e2 . showString "]"
   showsPrec p (Equ e1 e2) = showParen (p > 5) $ showsPrec 6 e1 . showString " = " . showsPrec 6 e2
   showsPrec p (Seq e1 e2) = showParen (p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
-  showsPrec p (Where e1 e2) = showParen (p > 1) $ showsPrec 3 e1 . showString " where " . showsPrec 3 e2
+  showsPrec p (Where e1 e2) = showParen (p > 1) $ showsPrec 1 e1 . showString " where " . showsPrec 1 e2
   showsPrec p (Def x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
   showsPrec p (Def2 x y e) = showParen (p > 5) $ showString x . showString "~>" . showString y . showString " := " . showsPrec 6 e
   showsPrec _ (Colon e) = showString ":" . showsPrec 10 e

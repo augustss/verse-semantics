@@ -229,7 +229,7 @@ allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp33, exp34, exp35,
            {-Choice: exp36, exp37, exp38, exp39, exp40, exp43, exp44, -}
            exp45, exp46, exp47, exp48, exp49, exp50,
-           exp51, exp52, exp53, exp54, exp55, exp56, exp57, exp58
+           exp51, exp52, exp53, exp54, exp55, exp56, exp57, exp58, exp59, exp60
           ]
 
 main :: IO ()
@@ -238,3 +238,4 @@ main = do
   runExamples dP allExps
   putStrLn "Start dP'"
   runExamples dP' allExps
+  

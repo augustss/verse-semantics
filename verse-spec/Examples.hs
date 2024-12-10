@@ -272,7 +272,7 @@ exp49 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
         Def "h" (Colon (Var "any")) `Seq`
         App {-(Var "f")-}f (Var "h") `Seq`
         Var "h"
-      === "Wrong[[1,2],const1,succ,succ0]"
+      === "Wrong[[1,0],[1,1],[1,2],[1,3],const1,succ,succ0]"
   where f = Fun Closed (Fun Open (Int 0) (Int 1)) (Int 2)
 
 exp50 :: Example
@@ -319,3 +319,16 @@ exp57 = Fun Closed (Def "x" cint) exp56c
 exp58 :: Example
 exp58 = Fun Closed (Tup [Def "x" cint, Def "y" cint]) (App (Prim Oadd) (Tup [Var "y", Var "x"]))
       === "add"
+
+-- f := fun_c(0){:int}; f[0]
+exp59p :: Exp
+exp59p = Def "f" (Fun Closed (Int 0) cint) `Seq`
+         (App (Var "f") (Int 0) `Equ` Int 1)
+
+exp59 :: Example
+exp59 = exp59p
+      === "1"
+
+exp60 :: Example
+exp60 = exp59p `Seq` (App (Var "f") (Int 0) `Equ` Int 0)
+      === "Wrong[]"
