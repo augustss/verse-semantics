@@ -30,7 +30,7 @@ $$
 \\ \\
 % ------------- Desugaring ---------------
 \textbf{Desugaring Essential Verse into Mini Verse: wrapping} \\
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\begin{array}{@@{}l@@{}r@@{\;\;}c@@{\;\;}ll}
 \text{Inputs} & |u| & ::= & |underscore| \vb e \\
 \\
 \rulename{dsk}   & |SS u k| & = & |u `ueq` k| \\
@@ -50,16 +50,16 @@ $$
 \rulename{dschk}   & |SS u (check fx t)| & = & |check fx (SS u t)| \\
 % \rulename{dschk2}   & |SS e (check fx t)| & = & |def k (k = check fx e; SS k t)| \\
 \rulename{dsoftype}   & |SS u (oftype t_1 t_2)|
-    & = & |defintro r; r == SS u t_1; check succeeds (oftype r (SS underscore t_2))| \\
+%    & = & |defintro r; r == SS u t_1; check succeeds (oftype r (SS underscore t_2))| \\
+    & = & |oftype (SS u t_1) (SS underscore t_2)| \\
 \rulename{dstup1}   & |SS underscore (arr (t_1, dots, t_n))|
    & = & |arr( (SS underscore t_1), dots, (SS underscore t_n))| \\
 \rulename{dstup2}   & |SS e (arr (t_1, dots, t_n))|
    & = & |defintro (x_1 dots x_n); e = arr(x_1, dots, x_n); arr( (SS x_1 t_1), dots, (SS x_n t_n))| & \text{|x_i| fresh}\\
-\rulename{dstruth1} & |SS underscore (truth t)| & = & |truth (SS underscore t)| \\
-\rulename{dstruth2} & |SS e (truth t)| & = & |defintro x; e == truth x; truth (SS x t)| & \text{|x| fresh} \\
-\multicolumn{2}{l}
-  {\rulename{dsif} \;\; \hfill |SS u (vif t_1 t_2 t_3)|}
-  & = & |vif(SS underscore t_1) (SS u t_2) (SS u t_3)| \\
+\rulename{dstru1} & |SS underscore (truth t)| & = & |truth (SS underscore t)| \\
+\rulename{dstru2} & |SS e (truth t)| & = & |defintro x; e == truth x; truth (SS x t)| & \text{|x| fresh} \\
+\multicolumn{2}{@@{}l}{\rulename{dsif} \; \hfill |SS u (vif t_1 t_2 t_3)|}
+ & = & |vif(SS underscore t_1) (SS u t_2) (SS u t_3)| \\
 \rulename{dsfor}   & |SS u (fordo t_1 t_2)|
    & = & |u `ueq` fordo (SS underscore t_1) (SS underscore t_2)| \\
 \rulename{dsone} & |SS u (one t)| & = & |u `ueq` one (SS underscore t)| \\

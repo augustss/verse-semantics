@@ -179,7 +179,6 @@ sDesugarExpr = ds
     ds (Block b)      = ds b                              -- do e --> e
     ds (Blk es)       = ds $ eSeq es
     ds e@(DefineV {}) = pure e
---      | isSrcUnderscore i = DefineV <$> newIdent (getLoc e) "x"
 
     ds (Seq es) = eSeq <$> mapM ds es
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
@@ -204,9 +203,9 @@ sDesugarExpr = ds
     ds (InfixOp e1 (Ident l op) e2) = ds =<< call In l op (Array [e1, e2])
 
     -- Variables
-    ds (Variable ident@(Ident _ v))
+    ds (Variable ident@(Ident loc v))
       | v == "fail"                 = return Fail
-      | v == "_"                    = return existsXX
+      | v == "_"                    = DefineV <$> newIdent loc "wild"
       | Just op <- lookupPrimOp v   = return (EPrim op)
       | otherwise                   = return (Variable ident)
 
@@ -765,15 +764,8 @@ essToMini = go NoInput
                                                         , e ]) }
 
     -- DSOFTYPE: t1 |> t2
-    go inp (OfType t1 fxs t2)
-      = assert (null fxs) (show fxs) $
-        do { e1 <- go inp t1
-           ; e2 <- go NoInput t2
-           ; if isAtomic e1  -- Just an optimisation
-             then return (Check [effSucceeds] (OfType e1 [] e2))
-             else do { r <- newIdent (getLoc t2) "r"
-                     ; return (eSeq [ DefineV r, eUnify (Variable r) e1
-                                    , Check [effSucceeds] (OfType (Variable r) [] e2) ]) } }
+    go inp (OfType t1 fxs t2) = assert (null fxs) (show fxs) $
+                                OfType <$> go inp t1 <*> pure [] <*> go NoInput t2
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go inp (Splice t) = go inp t
@@ -876,7 +868,14 @@ miniToCore orig_md = go (orig_md,[])
     go md (OfType e1 _fx e2)
       | (MI,xs) <- md = do { (dz, z) <- defineDE "z" (go md e2)
                            ; return (eSeq [ dz, eGuard xs (eSome z) ]) }
-      | otherwise     = ApplyD <$> go md e2 <*> go md e1
+      | otherwise
+      = do { e1' <- go md e1
+           ; e2' <- go md e2
+           ; if isAtomic e1'  -- Just an optimisation
+             then return (Check [effSucceeds] (ApplyD e2' e1'))
+             else do { r <- newIdent (getLoc e1) "r"
+                     ; return (eSeq [ DefineV r, eUnify (Variable r) e1
+                                    , Check [effSucceeds] (ApplyD e2' (Variable r)) ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md (Check fx e)

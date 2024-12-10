@@ -76,7 +76,7 @@
 %format (Me  (i) (e)) = "\Me{"  ^ i "}{" ^e "}"
 %format (DMe (i) (e))  = "{\mathcal M}\llbracket" e "\rrbracket{}" i
 %format (DMe2 (m) (i) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}" i
-%format (DMe3 (m) (pi) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}"pi
+%format (DMe3 (m) (pi) (e)) = "{\mathcal V}_{" m "}\llbracket" e "\rrbracket{}"pi
 %format (MMe (m) (i) (e)) = "\MMe{" ^ i "}{" ^e "}{" ^m "}"
 
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
@@ -84,7 +84,7 @@
 %format (De2 md (x))      = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
 
 % New desugaring, just does the wrapping part:
-%format (SS u (e))    = "{\mathcal S}\llbracket" e "\rrbracket" u
+%format (SS u (e))    = "{\mathcal W}\llbracket" e "\rrbracket" u
 %format (checkfun q x e)  = "{\mathcal K}_{" q "}\llbracket" e "\rrbracket" x
 %format `ueq`         = "\;\mathring{=}\;"
 %format underscore    = "{\bullet}"
@@ -331,7 +331,7 @@
 %format square(x) = x "^2"
 %format univ (x) (y) = "\nu" x ".\," y
 %format myite (x) (y) (z) = "\textbf{if}\;" x "\;\{" y "\}\;\{" z "\}"
-%format vif (x) (y) (z) = "\textbf{if}(" x ")\{" y "\}\,\textbf{else}\,\{" z "\}"
+%format vif (x) (y) (z) = "\textbf{if}(" x ")\{" y "\}\textbf{else}\{" z "\}"
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
