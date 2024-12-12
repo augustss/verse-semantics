@@ -229,9 +229,11 @@ verifyStep env lhs =
       pure (Tup [])
    ++
    "VERIFY-CHOICE" `name`
-   do (_skols, rs, as, e1 :|: e2) <- matchVerify env lhs
-      pure (     (Verify $ bindList rs (as,e1))
-             >>> (Verify $ bindList rs (as,e2)) )
+   do (_skols, rs, as, e) <- matchVerify env lhs
+      (ctx, e1 :|: e2) <- evalCtx [] e
+      guard (blocked ctx)
+      pure (     (Verify $ bindList rs (as,ctx <@ e1))
+             >>> (Verify $ bindList rs (as,ctx <@ e2)) )
    ++
    "SOLVER" `nameWith`
    do (_skols, rs, as, _e) <- matchVerify env lhs

@@ -428,6 +428,7 @@ choiceStep _env lhs =
      pure (e1 :|: (e2 :|: e3))
  ++
 -}
+{-
   -- CHOICE-FAIL-L and CHOICE-FAIL-R should not be needed,
   -- but some dubious verification tests don't pass without them.
   "CHOICE-FAIL-L" `name`
@@ -448,6 +449,7 @@ choiceStep _env lhs =
             $$ (text "ctx" <+> (pPrint ctx))
           , (ctx <@ e1) :|: (ctx <@ e2))
  ++
+-}
   "FAIL" `name`
   do (ctx, Fail) <- evalCtx [] lhs
      guard (ctx /= HOLE)
@@ -472,10 +474,18 @@ oneAndAllStep _env lhs =
                        , Var f1 :@: g ]
      pure res
  ++
-  -- iter(e1 | e2){f, g}  -->  iter(e1){f, \ _ . iter(e2){f, g} }
+  -- iter(C[e1] | C[e2]){f, g}  -->  iter(C[e1]){f, \ _ . iter(C[e2]){f, g} }
   "ITER-CHOICE" `name`
-  do Iter (e1 :|: e2) f g <- [lhs]
-     pure $ Iter e1 f (Lam $ bind underscore $ Iter e2 f g)
+  do Iter e f g <- [lhs]
+     (ctx, the_choice@(e1 :|: e2)) <- evalCtx [] e
+     guard (choiceFreeLH ctx)
+     guard (blocked the_choice)
+     pure $ Iter (ctx <@ e1) f (Lam $ bind underscore $ Iter (ctx <@ e2) f g)
+ ++
+  "ALL-ITER" `name`
+  do All e <- [lhs]
+     pure (mkAll e)
+{-
  ++
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
@@ -488,6 +498,7 @@ oneAndAllStep _env lhs =
      let vs = choices e
      guard (all isVal vs)
      pure (Tup vs)
+-}
 
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
@@ -515,6 +526,28 @@ checkStep env lhs =
    do Check eff Fail <- [lhs]
       guard (canFail eff)
       pure Fail
+   ++
+   "CHECK-SUC-L" `name`
+   do Check eff (v :|: e) <- [lhs]
+      guard (skolValue (skolVars env) v)
+      guard (canSucceed eff)
+      pure (Iter e (lamUnderscore $ lamUnderscore wrong) (lamUnderscore v)) -- e must fail
+   ++
+   "CHECK-FAIL-L" `name`
+   do Check eff (Fail :|: e) <- [lhs]
+      pure (Check eff e)
+   ++
+   "CHECK-CHOICE-L" `name`
+   do Check eff ((e1 :|: e2) :|: e3) <- [lhs]
+      pure (Check eff (e1 :|: (e2 :|: e3)))
+   ++
+   "CHECK-CHOICE" `name`
+   do Check eff e <- [lhs]
+      (ctx, the_choice@(e1 :|: e2)) <- evalCtx [] e
+      guard (ctx /= HOLE)
+      guard (choiceFreeLH ctx) -- <-- may not be needed?
+      guard (blocked the_choice)
+      pure $ Check eff ((ctx <@ e1) :|: (ctx <@ e2))
 
 skolValue :: [SkolIdent] -> Expr -> Bool
 -- A value whose only free vars are skolems
@@ -849,7 +882,8 @@ status _lx (_hnf :@: _arg)
   = SomethingToDo
 
 status _  Fail        = SomethingToDo
-status lx (e1 :|: e2) = status lx e1 `andStatus` status lx e2
+status _  (e1 :|: e2) = BlockedOnExi (if isContext (e1 :|: e2) then HasHole else NoHole)
+  -- status lx e1 `andStatus` status lx e2
   -- We must skolemise in verify(){check<succeeds>{ (x=some{t}; blah) | more-blah }}
   --               and in verify(){check<succeeds>{ v | (x=some{t}; blah) }}
 
@@ -864,7 +898,7 @@ status _ (Verify {})
   --    (_, (_,e)) = alphaRenameVerify (allExis lx) bl
 
 status lx (Check _ e) = status (makeRigid lx) e
-status _  (Choose {}) = SomethingToDo
+status _  (Choose {}) = NothingToDo NoHole
 status lx (Size _ e)  = status lx e
 status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
                    | otherwise                 = SomethingToDo

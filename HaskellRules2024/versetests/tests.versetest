@@ -411,9 +411,9 @@ testeq("temp1", pass, tim=skip)
                     }
                     { array{ (1, array{1}, 4), (1, array{1}, 5), (1, array{2}, 4), (1, array{2}, 5) } }
 testeq("temp2", pass, tim=skip)
-                    { for(1){ 1|2 }
+                    { all{ for(1){ 1|2 } }
                     }
-                    { array{1} | array{2} }
+                    { array{ array{1}, array{2} } }
 
 testeq("temp3", pass, tim=skip)
                     { all { Y := for(1) {1|2};
