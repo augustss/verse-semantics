@@ -35,8 +35,8 @@ exis (z:zs) e = Exi (bind z (exis zs e))
 data Env
   = Env
   { inChoiceFreeC :: Bool    -- are we in a choiceFree context?
-  , rigids        :: [Ident] -- what rigid variables are in scope (only used for alphaRename)
   , flexis        :: [Ident] -- what flexible variables are in scope
+  , rigids        :: [Ident] -- what rigid variables are in scope (only used for alphaRename)
   }
 
 -- starting Env
@@ -197,7 +197,7 @@ eval _ e =
 -- eval for (v:=:e1'):>:e2, where we know that e1 is blkd
 evalSeqBlkd :: Env -> (Val,Expr) -> Expr -> Result
 evalSeqBlkd env (v, e1') e2 =
-  case eval (choicefree_e1' /\ env) e2 of
+  case eval env' e2 of
     -- v=e1';Exi zs. y=w;e2' --> Exi zs. y=w;v=e1';e2'   [v=e1' is blkd, so this is OK]
     SUBST zs (y,w) e2' -> SUBST zs (y,w) ((v :=: e1') :>: e2')
 
@@ -209,15 +209,17 @@ evalSeqBlkd env (v, e1') e2 =
       | choicefree_e1' -> ((v:=:e1'):>:eL) :||: ((v:=:e1'):>:eR)
 
       | otherwise ->
-        evalChoiceTry eL eR (False /\ env) (\e2' -> (v:=:e1'):>:e2')
+        evalChoiceTry eL eR env' (\e2' -> (v:=:e1'):>:e2')
           (\e2' -> BLKD ((v:=:e1'):>:e2'))
 
     -- v=e1';e2' == v=e1';e2'
     r2                 -> BLKD ((v :=: e1') :>: toExpr r2)
  where
   choicefree_e1' = choicefree e1'
+  env'           = choicefree_e1' /\ env
 
 -- try to find places where to use e|fail->e and fail|e->e
+-- PRE: inChoiceFreeC env == False
 evalChoiceTry :: Expr -> Expr -> Env -> (Expr -> Expr) -> (Expr -> Result) -> Result
 evalChoiceTry eL eR env k choicy =
   case eval (False /\ newScope env) eL of
