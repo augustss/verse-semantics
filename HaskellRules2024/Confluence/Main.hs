@@ -4,6 +4,7 @@ module Main where
 import Rules.Core
 import Rules.TRS2024 as TRS2024
 import TRS.Traced
+import TRS.Bind
 import Test.QuickCheck
 
 --------------------------------------------------------------------------------

@@ -20,7 +20,7 @@ module Rules.Core
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkApp, mkEqual, mkOne, lamUnderscore, someUnderscore
+  , mkApp, mkEqual, mkOne, mkAll, lamUnderscore, someUnderscore, wrong
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -54,7 +54,7 @@ import TRS.Bind
 import TRS.Traced
 import Test.QuickCheck
 
-import Control.Monad( liftM2 )
+import Control.Monad( liftM2, liftM3 )
 import Data.Scientific(Scientific)
 
 --import qualified Debug.Trace
@@ -226,6 +226,28 @@ mkOne e = Iter e f g
    f = Lam $ bind a $
        lamUnderscore (Var a)
    g = lamUnderscore $ Fail
+
+mkAll :: Expr -> Expr
+-- all{e}  -->  Iter e (\ as bs . as++bs) (\ _ . <>)
+mkAll e = Iter e f g
+  where
+   x   = ident "x"
+   xs  = ident "xs"
+   fxs = ident "fxs"
+   rs  = ident "rs"
+   z   = ident "z"
+   f = Lam $ bind x $
+       Lam $ bind fxs $
+       Exi $ bind xs $
+       Exi $ bind rs $
+       Exi $ bind z $
+       (Var xs :=: (Var fxs :@: Tup [])) :>:
+       (Var z :=: (Op ArrApp :@: Tup [Tup [Var x], Var xs, Var rs])) :>:
+       Var rs
+   g = lamUnderscore $ Tup []
+
+mkIf :: Expr -> Expr -> Expr -> Expr
+mkIf c a b = mkOne ((c :>: lamUnderscore a) :|: lamUnderscore b) :@: Tup []
 
 (>>>) :: Expr -> Expr -> Expr
 -- e1 >>> e2  =   (_ = e1); e2
@@ -518,6 +540,9 @@ canFail :: Effect -> Bool
 canFail Succeeds = False
 canFail Decides  = True
 canFail Fails    = True
+
+wrong :: Expr
+wrong = Lit (LInt 0) :@: Lit (LInt 0)
 
 --------------------------------------------------------------------------------
 --
@@ -1248,6 +1273,17 @@ instance Arbitrary Expr where
                      ++ [ e1' :@: e2  | e1' <- shrink e1 ]
                      ++ [ e1  :@: e2' | e2' <- shrink e2 ]
   shrink (All e)      = [ e ] ++ [ All e'  | e' <- shrink e ]
+  shrink (Iter e1 v1 v2)
+                      = [ e1
+                        , let f = identNotIn (free v1) in
+                            Exi (bind f ( (Var f :=: (v1 :@: Tup []))
+                                      :>: (Var f :@: Tup [])
+                                        ))
+                        , v2 :@: Tup []
+                        ]
+                     ++ [ Iter e1' v1 v2 | e1' <- shrink e1 ]
+                     ++ [ Iter e1 v1' v2 | v1' <- shrink v1 ]
+                     ++ [ Iter e1 v1 v2' | v2' <- shrink v2 ]
   shrink (Some e)     = [ e ] ++ [ Some e' | e' <- shrink e ]
   shrink (e1 :>>: e2) = [ e1, e2 ]
                      ++ [ e1' :>>: e2  | e1' <- shrink e1 ]
@@ -1273,6 +1309,9 @@ arbExprWith xs n =
   , (b, liftM2 (:|:) arbExpr2 arbExpr2)
   , (a, liftM2 (:@:) arbExpr2 arbExpr2)
   , (b, Exi `fmap` arbBind)
+  -- , (a, liftM3 Iter arbExpr2 arbExpr2 arbExpr2)
+  , (a, liftM3 mkIf arbExpr2 arbExpr2 arbExpr2)
+  , (a, mkOne `fmap` arbExpr1)
   , (1, return Fail)
 {-
   | Some Val
