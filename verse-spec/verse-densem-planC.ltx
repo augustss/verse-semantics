@@ -41,7 +41,7 @@ $$
 \rulename{dsunify}   & |SS u (t_1 == t_2)| & = & |(SS u t_1) = (SS u t_2)| \\
 \rulename{dschoice}   & |SS u (t_1 `choice` t_2)| & = & |SS u t_1 `choice` SS u t_2| \\
 \rulename{dssemi}   & |SS u (t_1 ; t_2)| & = & |SS underscore t_1 ; SS u t_2| \\
-\rulename{dswhere}   & |SS u (t_1 where t_2)| & = & |(SS u t_1); (SS underscore t_2)| \\
+\rulename{dswhere}   & |SS u (t_1 where t_2)| & = & |defintro r; r == (SS u t_1); (SS underscore t_2); r| \\
 \rulename{dsdef}   & |SS u (x := t)| & = & |defintro x; x = SS u t| \\
 \rulename{dssquig}   & |SS u (squig x y := t)| & = & |defintro x; u `ueq` x; y := SS x t| \\
 
