@@ -14,11 +14,11 @@ $(PAPER).pdf: $(PAPERSRC)
 	lhs2TeX $< > $@
 
 clean:
-	-rm -f verse-densem.tex
-	-rm -f verse-densem.aux verse-densem.log verse-densem.out \
-               verse-densem.pdf verse-densem.bbl verse-densem.blg
-	-rm -f verse-densem.pdf
-	-rm -f PlanA PlanADo PlanAM PlanC PlanAC PlanCC *.o *.hi
+	-rm -f verse-*.tex
+	-rm -f verse-spec.aux verse-spec.log verse-spec.out \
+               verse-spec.pdf verse-spec.bbl verse-spec.blg
+	-rm -f verse-spec.pdf
+	-rm -f PlanA PlanADo PlanAM PlanC PlanAC PlanCC *.o *.hi *~
 
 #####################
 
