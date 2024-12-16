@@ -13,6 +13,12 @@ $(PAPER).pdf: $(PAPERSRC)
 %.tex:   %.ltx   ../LaTex/calculus.fmt
 	lhs2TeX $< > $@
 
+clean:
+	-rm -f verse-densem.tex
+	-rm -f verse-densem.aux verse-densem.log verse-densem.out \
+               verse-densem.pdf verse-densem.bbl verse-densem.blg
+	-rm -f verse-densem.pdf
+	-rm -f PlanA PlanADo PlanAM PlanC PlanAC PlanCC *.o *.hi
 
 #####################
 
