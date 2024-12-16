@@ -74,9 +74,15 @@ $$
 \begin{figure}
 $$
 \begin{array}{lrcll}
-\text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p (apeff t fx)| \vb  |squig p_1 p_2| \\
-&     & \vb & |: t| \vb |p : t| \\
- & & \vb & |p_1, xdots, p_n| \vb |..p| & \text{Array splicing} \\
+  \text{\bf Patterns} & |p| & ::= & |_|   & \text{Wildcard} \\
+  & & \vb & |xsl|                         & \text{Variable} \\
+  & & \vb & |squig p_1 p_2|               & \text{Squiggle pattern} \\
+  & & \vb & |apply1np p t (eff fx)|       & \text{Function with effects} \\
+  & & \vb & |apply1np p (t)|              & \text{Short for |apply1np p t (eff succeeds)| } \\
+  & & \vb & |p : t|                       & \text{Type ascription}\\
+  & & \vb & |: t| & \text{Short for |(_ : t)|} \\
+  & & \vb & |p_1, xdots, p_n|  & \text{Tuple} \\
+  & & \vb & |..p| & \text{Array splice} \\
 & |xsl| & ::= & x \vb  |xsl amp x|
 \\[2mm]
 \text{\bf Effects} &
