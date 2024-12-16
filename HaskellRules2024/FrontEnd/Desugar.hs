@@ -742,12 +742,8 @@ essToMini = go NoInput
     go inp (All t)        = inp `ueq` (All <$> go NoInput t)
     go inp (One t)        = inp `ueq` (One <$> go NoInput t)
 
-    go inp e@(Choice e1 e2) = case inp of
-                                 NoInput -> Choice <$> go NoInput e1 <*> go NoInput e2
-                                 PI i    -> go_flip i e
-    go inp e@(ApplyD t1 t2) = case inp of
-                                NoInput -> ApplyD <$> go NoInput t1 <*> go NoInput t2
-                                PI i    -> go_flip i e
+    go inp (Choice e1 e2) = inp `ueq` (Choice <$> go NoInput e1 <*> go NoInput e2)
+    go inp (ApplyD t1 t2) = inp `ueq` (ApplyD <$> go NoInput t1 <*> go NoInput t2)
 
     -- DSCOL1, DSCOL2: (:t)
     go inp (Range fxs t) = case inp of
@@ -823,13 +819,20 @@ essToMini = go NoInput
     -- Report any un-handled cases
     go inp t = error $ "TODO: essToMini " ++ show (inp, t)
 
-    go_flip i t = do { t' <- encodeType t
-                     ; OfType i [] <$> go NoInput t' }
-
     ueq :: Input -> DsM SrcMini -> DsM SrcMini
-    ueq NoInput  ds_e  = ds_e
-    ueq (PI inp) ds_e  = eUnify inp <$> ds_e
+    ueq NoInput  ds_e = ds_e
+    ueq (PI inp) ds_e = do { e <- ds_e
+                           ; if surely_succeeds e
+                             then return (eUnify inp e)
+                             else
+                        do { i <- newIdent noLoc "i"
+                           ; pure (OfType inp [] (XDLam Closed i (Unify (Variable i) e) (Variable i))) } }
 
+    surely_succeeds e | isValue e = True
+    surely_succeeds (All {})      = True
+    surely_succeeds (One {})      = True
+    surely_succeeds (For2 {})     = True
+    surely_succeeds _             = False
 
 --------------------------------------------------------
 --
