@@ -127,9 +127,7 @@ sDesugarExpr = ds
         -- f(a)<fx> : ty  -->  f := fun(a){ :ty<fx> }
         --        e : ty  -->  e := :ty<>
         -- c.f. the ":" case of `defn`
-      = defn f (Function [a] (Check fxs (Range [] e2))) >>= ds
-             -- Dec 24: experimenting with splitting Range fxs
-             --         into a spararate Check
+      = defn f (Function [a] (Range fxs e2)) >>= ds
 
       | otherwise
       = defn e1 (Range [] e2) >>= ds
@@ -203,9 +201,8 @@ sDesugarExpr = ds
     ds (InfixOp e1 (Ident l op) e2) = ds =<< call In l op (Array [e1, e2])
 
     -- Variables
-    ds (Variable ident@(Ident loc v))
+    ds (Variable ident@(Ident _ v))
       | v == "fail"                 = return Fail
-      | v == "_"                    = DefineV <$> newIdent loc "wild"
       | Just op <- lookupPrimOp v   = return (EPrim op)
       | otherwise                   = return (Variable ident)
 
@@ -241,11 +238,7 @@ sDesugarExpr = ds
 
     -- type{t}  ==  Fun(x := t)<closed>{x}
     ds (Macro1 (Ident _ "type") _ e)
-      = do { x <- newIdent (getLoc e) "x"
-           ; ds $ Function [(eDefine x e, [closedId])] (Variable x) }
-           --  A more direct desugaring, which generates less verification clutter,
-           --  is   type{t} --> \x. x=t
-           -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
+      = do { e' <- ds e; encodeType e' }
 
     -- I want to desugar Exists to DefineV; but to do that I need to make up
     -- fresh identifiers (easy) and substitute the fresh one for the old one
@@ -316,7 +309,7 @@ defn xs@(InfixOp _ (Op "&") _) e
     get p                        = [p]
 
 -- Rule:   p(a)<fxs> := rhs   -->  p := fun(a){check<fxs>{rhs}}
---         Adding <succeeds> if not present
+--         Adding <succeeds> if not present (done by getFun)
 -- E.g. f(x)<decides> := 3    # NB: has no effect on caller, which still sees 3
 defn p e
   | Just (f, a, fx) <- getFun p
@@ -324,11 +317,10 @@ defn p e
 
 -- Rule: (f(a)<fx>:e2 := e)  -->  (e1 := fun(a){e |><fx> e2})
 -- Rule:       (e1:e2 := e)  -->  (e1 :=        e |><>   e2)
--- but adding <succeeds> if omitted, leaving behind <open/closed>
+-- but adding <succeeds> if omitted (done by getFun), leaving behind <open/closed>
 defn (InfixOp e1 (Op ":") e2) e
    | Just (f, a, fxs) <- getFun e1
-   = defn f (Function [a] (Check fxs (OfType e [] e2)))
-       -- Dec 24: experimenting witn splitting OfType fxs to have separate Check
+   = defn f (Function [a] (OfType e fxs e2))
    | otherwise
    = defn e1              (OfType e []  e2)
 
@@ -715,20 +707,24 @@ essToMini = go NoInput
 
     -- Simple cases: DSK, DSVAR, DSPRIM, DSFAIL, DSEQ, DSUNIFY, DSCHOICE, DSSEMI
     go inp e@(Lit {})      = inp `ueq` return e
-    go inp e@(Variable {}) = inp `ueq` return e
+    go inp e@(Variable v)
+       | isSrcUnderscore v = case inp of
+                               NoInput -> return existsXX
+                               PI i    -> return i
+       | otherwise         = inp `ueq` return e
     go inp e@(EPrim {})    = inp `ueq` return e
     go _inp Fail           = return Fail
     go inp (Unify  e1 e2)  = eUnify  <$> go inp e1 <*> go inp e2
-    go inp (Choice e1 e2)  = Choice <$> go inp e1 <*> go inp e2
-    go inp (ApplyD t1 t2)  = inp `ueq` (ApplyD <$> go NoInput t1 <*> go NoInput t2)
-    go inp (Where t1 t2)   = do { e1 <- go inp t1; e2 <- go NoInput t2; return (eSeq [e1,e2]) }
+    go inp (Where t1 t2)   = do { e1 <- go inp t1; e2 <- go NoInput t2
+                                ; r <- newIdent noLoc "r"
+                                ; return (eSeq [Unify (Variable r) e1, e2, Variable r]) }
     go inp (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
                                 ; es <- mapM (go NoInput) ts
                                 ; e  <- go inp t
                                 ; return (eSeq (es ++ [e])) }
 
     -- DSEXISTS (exists x);  DSDEF (x:=t); DSSQUIG (x~>y:=t)
-    go inp (Exists xs e)    = Exists xs <$> go inp e   -- Just propate Exists
+    go inp (Exists xs e)    = Exists xs <$> go inp e   -- Just propagate Exists
     go _inp (DefineV x)     = return (DefineV x)
     go inp (DefineE x t)    = do { e <- go inp t; return (eSeq [DefineV x, eUnify (Variable x) e]) }
     go inp (DefineIE x y t) = do { e <- go (PI (Variable x)) t
@@ -746,26 +742,26 @@ essToMini = go NoInput
     go inp (All t)        = inp `ueq` (All <$> go NoInput t)
     go inp (One t)        = inp `ueq` (One <$> go NoInput t)
 
+    go inp e@(Choice e1 e2) = case inp of
+                                 NoInput -> Choice <$> go NoInput e1 <*> go NoInput e2
+                                 PI i    -> go_flip i e
+    go inp e@(ApplyD t1 t2) = case inp of
+                                NoInput -> ApplyD <$> go NoInput t1 <*> go NoInput t2
+                                PI i    -> go_flip i e
+
     -- DSCOL1, DSCOL2: (:t)
-    go inp (Range fxs t) = assert (null fxs) (show fxs) $
-                           case inp of
-                             NoInput -> do { e <- go NoInput t
+    go inp (Range fxs t) = case inp of
+                             NoInput -> assert (null fxs) (show fxs) $
+                                        do { e <- go NoInput t
                                            ; x <- newIdent (getLoc t) "x"
                                            ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
-                             PI i    -> OfType i [] <$> go NoInput t
+                             PI i    -> OfType i fxs <$> go NoInput t
 
     -- DSCHK: check<fx>{t}
-    go inp (Check fx t)  = case inp of
-                              NoInput -> Check fx <$> go NoInput t
-                              PI i -> do { k <- newIdent (getLoc t) "k"
-                                         ; e <- go (PI (Variable k)) t
-                                         ; return (eSeq [ DefineV k
-                                                        , eUnify (Variable k) (Check fx i)
-                                                        , e ]) }
+    go inp (Check fx t)  = Check fx <$> go inp t
 
     -- DSOFTYPE: t1 |> t2
-    go inp (OfType t1 fxs t2) = assert (null fxs) (show fxs) $
-                                OfType <$> go inp t1 <*> pure [] <*> go NoInput t2
+    go inp (OfType t1 fxs t2) = OfType <$> go inp t1 <*> pure fxs <*> go NoInput t2
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go inp (Splice t) = go inp t
@@ -827,6 +823,9 @@ essToMini = go NoInput
     -- Report any un-handled cases
     go inp t = error $ "TODO: essToMini " ++ show (inp, t)
 
+    go_flip i t = do { t' <- encodeType t
+                     ; OfType i [] <$> go NoInput t' }
+
     ueq :: Input -> DsM SrcMini -> DsM SrcMini
     ueq NoInput  ds_e  = ds_e
     ueq (PI inp) ds_e  = eUnify inp <$> ds_e
@@ -865,26 +864,25 @@ miniToCore orig_md = go (orig_md,[])
     go md (All e)        = encodeAll2 =<< go md e
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
-    go md (OfType e1 _fx e2)
+    go md (OfType e1 fx e2)
       | (MI,xs) <- md = do { (dz, z) <- defineDE "z" (go md e2)
-                           ; return (eSeq [ dz, eGuard xs (eSome z) ]) }
-      | (MV,_) <- md
+                           ; return (eGuard xs (eSeq [ eHavoc fx, dz, eSome z])) }
+      | null fx
+      = ApplyD <$> go md e2 <*> go md e1
+
+      | otherwise
       = do { e1' <- go md e1
            ; e2' <- go md e2
            ; if isAtomic e1'  -- Just an optimisation
              then return (Check [effSucceeds] (ApplyD e2' e1'))
              else do { r <- newIdent (getLoc e1) "r"
-                     ; return (eSeq [ DefineV r, eUnify (Variable r) e1'
+                     ; return (eSeq [ DefineV r, eUnify (Variable r) (Check fx e1')
                                     , Check [effSucceeds] (ApplyD e2' (Variable r)) ]) } }
-      | (MX,_) <- md
-      = ApplyD <$> go md e2 <*> go md e1
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md (Check fx e)
-      | (MI,_) <- md = do { e' <- go md e
-                          ; return (eSeq [ eHavoc fx, e' ]) }
-      | otherwise    = do { e' <- go md e
-                          ; return (Check fx e') }
+      | (MI,_) <- md = go md e
+      | otherwise    = Check fx <$> go md e
 
     -- Functions proper: MCFUN+, MCFUN-, MCFUNX
     go (MV,xs) e@(XDLam Closed x e1 e2)
@@ -907,6 +905,15 @@ miniToCore orig_md = go (orig_md,[])
     go md (Some t)     = Some  <$> go md t
 
     go md e = error $ "TODO: miniToCore " ++ show (md, e)
+
+encodeType :: SrcEssential -> DsM SrcEssential
+-- Encodes type{e}, returnng  fun(x:=e}{x}
+-- You might think that a more direct desugaring would be
+--      type{t} --> \x. x=t
+-- using a ICFP lambda.
+-- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
+encodeType e = do { x <- newIdent noLoc "x"
+                  ; return (Function [(eDefine x e, [closedId])] (Variable x)) }
 
 encodeFor2 :: SrcCore -> SrcCore -> SrcCore
 -- for2(e1){e2} = iter(e1; \_.e2){ (\a r. cons[ a[], r[] ]), (\_.<>) }
@@ -1448,6 +1455,15 @@ Hence
 
 Previously we had (not good)
   M-[t]P(i) = i = D-[t]
+
+
+f := fun( x := 1|2 ){ rhs }
+f := fun( x := :type{1|2} ){rhs}
+-->
+f := \i.{ x := (i |>  \j{j=1|2}{j} }{ rhs }
+
+
+
 -}
 
 -----------------------------------------------

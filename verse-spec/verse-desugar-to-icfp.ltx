@@ -55,21 +55,24 @@ $$
         (DMe3 md si e_1; lam underscore (DMe3 md si e_2))
         (DMe3 md si e_3)|}  \\
 \rulename{mone}    & |DMe3 md si (one e)| & = & |iter2 (lam (a underscore) a) (DMe3 md si e) fail| \\
-\rulename{mall}    & |DMe3 md si (all e)| & = & |DMe3 md si (fordo (defintro v; v==e) v| \\[2mm]
+\rulename{mall}    & |DMe3 md si (all e)| & = & |DMe3 md si (fordo (defintro v; v==e) v)| \\[2mm]
 \end{array}
 \\
 
 %--------- (e1 |> e2) and check<fx>{e}----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{moftype+} & |DMe3 mdpos si (oftype e_1 e_2)|
-& = & |defintro r; r == DMe3 md si e_1;
-       check succeeds (apply1N ((DMe3 md si e_2)) r)| \\
-\rulename{moftype-} & |DMe3 mdneg si (oftype e_1 e_2)|
-  & = & |si guard (some (DMe3 mdneg si e_2))| \\
-\rulename{moftypex} & |DMe3 mdx si (oftype e_1 e_2)|
-& = & |apply1N ((DMe3 md si e_2)) (DMe3 md si e_1))| \\
-\rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |havoc2 fx (DMe3 mdneg si e)| \\
+\rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
+  & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
+\rulename{moftype+x1} & |DMe3 md si (oftypefx e_1 empty e_2)|
+& = & |apply1N ((DMe3 md si e_2)) (DMe3 md si e_1)| &   |md|\in\{|mdpos|,|mdx|\} \\
+\rulename{moftype+x2} & |DMe3 mdpos si (oftypefx e_1 fx e_2)|
+& = & \begin{array}[t]{@@{}l}
+       |defintro r; r == check fx (DMe3 mdpos si e_1);| \\
+       |check succeeds (apply1N ((DMe3 mdpos si e_2)) r)|
+      \end{array}
+     & |md|\in\{|mdpos|,|mdx|\} \\
+\rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si e| \\
 \rulename{mcheck+x} & |DMe3 md    si (check fx e)| & = & |check fx (DMe3 md si e)| & |md|\in\{|mdpos|,|mdx|\} \\[2mm]
 \end{array}
 \\

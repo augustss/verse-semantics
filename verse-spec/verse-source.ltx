@@ -108,6 +108,7 @@ $$
                  &     & \vb & \textit{string constants} \\
 \\
 \text{Terms} &  |t| & ::= & |x|                        & \text{Variable} \\
+&      & \vb & |_|                        & \text{Underscore} \\
 &      & \vb & |k|                        & \text{Constant} \\
 &      & \vb & |o|                        & \text{Primops} \\
 &      & \vb & |t_1^[t_2]|                 & \text{Function application} \\
@@ -116,14 +117,14 @@ $$
 &      & \vb & |t_1 = t_2|                 & \text{Unification} \\
 &      & \vb & |x := t|                    & \text{Definition} \\
 &      & \vb & |squig x y := t|            & \text{Definition} \\
-&      & \vb & |colonfx fx t|              & \text{Range} \\
 &      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
 &      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
 &      & \vb & |fordo t_1 t_2|             & \text{Finite loop} \\
 &      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
 &      & \vb & |truth t|                   & \text{Truth value} \\
 &      & \vb & |functionOC q t_1 t_2|      & \text{Function} \\
-&      & \vb & |oftypefx t_1 fx t_2|       & \text{Type annotation}\\
+&      & \vb & |colonfx fx t|              & \text{Range} \\
+&      & \vb & |oftypefx t_1 fx t_2|       & \text{Opacity}\\
 &      & \vb & |check fx t|                & \text{Effects check} \\
 \\
 \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
@@ -236,7 +237,6 @@ $$
   \multicolumn{5}{l}{\lennart{This desugaring does not work for multivalued |e_i|.}} \\
   \\
   \multicolumn{5}{l}{\textbf{Misc}} \\
-\rulename{dswild} &  |_| & \rightarrow & |x:any| & \text{|x| fresh} \\
 \rulename{dsopt1} &   |option^{}| & \rightarrow & |false| \\
 \rulename{dsopt2} &   |option^{e}| & \rightarrow & |if(x:=e)then (truth x) else false| & \text{|x| fresh} \\
 % \rulename{dstruth} &  |truth (e}| & \rightarrow & |amap(e eqgt e)| \\
