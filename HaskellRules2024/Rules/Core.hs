@@ -1316,6 +1316,7 @@ arbExprWith xs n =
   -- , (a, liftM3 Iter arbExpr2 arbExpr2 arbExpr2)
   , (a, liftM3 mkIf arbExpr2 arbExpr2 arbExpr2)
   , (a, mkOne `fmap` arbExpr1)
+  , (a, Check Succeeds `fmap` arbExpr1)
   , (1, return Fail)
 {-
   | Some Val
