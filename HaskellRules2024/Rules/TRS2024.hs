@@ -525,22 +525,49 @@ recStep _env lhs =
 --------------------------------------------------------------------------------
 checkStep :: Rule
 checkStep env lhs =
-   "CHECK-SUC" `name`
-   do Check eff v <- [lhs]
-      guard (skolValue (skolVars env) v)
-      guard (canSucceed eff)
-      pure v
-   ++
-   "CHECK-FAIL" `name`
-   do Check eff Fail <- [lhs]
-      guard (canFail eff)
-      pure Fail
+   "CHECK" `name`
+   do Check eff e <- [lhs]
+      pure (mkCheck eff e)
+ where
+  mkCheck eff e =
+    Exi $ bind l $
+          (Var l :=: Iter (Exi $ bind x $ (Var x :=: e)
+                                      :>: ((Var underscore :=: (Op IsGround :@: Var x))
+                                      :>: Var x))
+                          (Lam $ bind a $ Lam $ bind f $ Tup [Var a,Var f])
+                          (lamUnderscore $ Tup []))
+      :>: Iter (Exi $ bind a $ Exi $ bind f $
+                   (Tup [Var a,Var f] :=: Var l)
+               :>: if canSucceed eff
+                     then Exi $ bind x $
+                              (Var x :=: (Var f :@: Tup []))
+                          :>: Iter ((Var x :=: Tup []) :>: Tup [])
+                                   (lamUnderscore $ lamUnderscore $
+                                     lamUnderscore $ Var a)
+                                   (lamUnderscore $ lamUnderscore $ wrong)
+                     else lamUnderscore $ wrong
+               )
+               (Lam $ bind x $ lamUnderscore $
+                 Var x :@: Tup [])
+               (lamUnderscore $
+                 if canFail eff
+                   then Fail
+                   else wrong)
+   where
+    x:a:f:l:_ = identsNotIn (free e)
+
+{-
    ++
    "CHECK-SUC-L" `name`
    do Check eff (v :|: e) <- [lhs]
       guard (skolValue (skolVars env) v)
       guard (canSucceed eff)
       pure (Iter e (lamUnderscore $ lamUnderscore wrong) (lamUnderscore v)) -- e must fail
+   ++
+   "CHECK-FAIL" `name`
+   do Check eff Fail <- [lhs]
+      guard (canFail eff)
+      pure Fail
    ++
    "CHECK-FAIL-L" `name`
    do Check eff (Fail :|: e) <- [lhs]
@@ -552,11 +579,12 @@ checkStep env lhs =
    ++
    "CHECK-CHOICE" `name`
    do Check eff e <- [lhs]
-      (ctx, the_choice@(e1 :|: e2)) <- evalCtx [] e
+      (ctx, e1 :|: e2) <- evalCtx [] e
       guard (ctx /= HOLE)
       guard (choiceFreeLH ctx) -- <-- may not be needed?
-      guard (blocked the_choice)
+      guard (blocked e)
       pure $ Check eff ((ctx <@ e1) :|: (ctx <@ e2))
+-}
 
 skolValue :: [SkolIdent] -> Expr -> Bool
 -- A value whose only free vars are skolems
@@ -905,7 +933,7 @@ status _ (Verify {})
   -- Earlier version looked inside verify{}
   --    (_, (_,e)) = alphaRenameVerify (allExis lx) bl
 
-status lx (Check _ e) = status (makeRigid lx) e
+status lx (Check _ e) = SomethingToDo
 status _  (Choose {}) = NothingToDo NoHole
 status lx (Size _ e)  = status lx e
 status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
