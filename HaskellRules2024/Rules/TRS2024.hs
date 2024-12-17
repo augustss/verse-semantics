@@ -474,36 +474,40 @@ oneAndAllStep _env lhs =
   do Iter v f g <- [lhs]
      guard (isVal v)
      let f1:_ = identsNotIn $ free lhs
-         res = Exi $ bind f1 $
-               coreSeq [ Var f1 :=: (f :@: v)
-                       , Var f1 :@: g ]
-     pure res
+     pure (Exi $ bind f1 $
+             (Var f1 :=: (f :@: v)) :>: (Var f1 :@: g))
+     
  ++
   -- iter(C[e1] | C[e2]){f, g}  -->  iter(C[e1]){f, \ _ . iter(C[e2]){f, g} }
   "ITER-CHOICE" `name`
   do Iter e f g <- [lhs]
-     (ctx, the_choice@(e1 :|: e2)) <- evalCtx [] e
+     (ctx, e1 :|: e2) <- evalCtx [] e
      guard (choiceFreeLH ctx)
-     guard (blocked the_choice)
+     guard (blocked ctx)  -- was: e
      pure $ Iter (ctx <@ e1) f (Lam $ bind underscore $ Iter (ctx <@ e2) f g)
  ++
-  "ALL-ITER" `name`
-  do All e <- [lhs]
-     pure (mkAll e)
-{-
- ++
+  -- all(fail)  -->  <>
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
      pure (Tup [])
  ++
+  -- all(v)  -->  <v>
+  "ALL-VALUE" `name`
+  do All v <- [lhs]
+     guard (isVal v)
+     pure (Tup [v])
+ ++
+  -- all(C[e1] | C[e2])  -->  all(C[e1])++all(C[e2])
   "ALL-CHOICE" `name`
   do All e <- [lhs]
-     let choices (e1 :|: e2) = choices e1 ++ choices e2
-         choices e1          = [e1]
-     let vs = choices e
-     guard (all isVal vs)
-     pure (Tup vs)
--}
+     (ctx, e1 :|: e2) <- evalCtx [] e
+     guard (choiceFreeLH ctx)
+     guard (blocked ctx)  -- was: e
+     let xs:ys:_ = identsNotIn $ free lhs
+     pure (Exi $ bind xs $ Exi $ bind ys $
+                 (Var xs :=: All (ctx <@ e1))
+             :>: (Var ys :=: All (ctx <@ e2))
+             :>: (Op ArrApp :@: Tup [Var xs, Var ys]))
 
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
@@ -859,9 +863,8 @@ status lx (_val :=: rhs)     -- e.g. x=blah, where x is bound "outside", or hnf=
 
 status lx (e1 :>: e2) = status lx e1 `andStatus` status lx e2
 
-status lx (All body) -- See (E2)
-  = addSomethingToDo (status (makeRigid lx) body)
-    -- addSomethingToDo: we still have do to the `all` itself
+-- this should be removed once we remove All
+status lx (All body) = status lx (mkAll body)
 
 status lx (Exi bnd) = status (addFlexi lx x) e
   where
