@@ -868,6 +868,9 @@ status _  HOLE = NothingToDo HasHole
 
 status _  e | isVal e = valueStatus
 
+status lx (_ :=: e@(_ :>: _)) =
+  SomethingToDo
+
 status lx (Var x :=: Var y)  -- (x=x) is blocked pending getting a value for x
   | x == y, isLocal lx x
   = blockedStatus
@@ -923,7 +926,14 @@ status _  (e1 :|: e2) = BlockedOnExi (if isContext (e1 :|: e2) then HasHole else
   -- We must skolemise in verify(){check<succeeds>{ (x=some{t}; blah) | more-blah }}
   --               and in verify(){check<succeeds>{ v | (x=some{t}; blah) }}
 
-status lx (Iter e1 _ _) = status (makeRigid lx) e1 -- ToDo: not sure!!
+status lx (Iter e _ _)
+  | isVal e   = SomethingToDo
+  | otherwise =
+  case status (makeRigid lx) e of
+    SomethingToDo             -> SomethingToDo
+    _ | choicy e == Just True -> SomethingToDo
+    NothingToDo hasHole       -> NothingToDo hasHole -- or BlockedOnExi??
+    BlockedOnExi hasHole      -> BlockedOnExi hasHole
 
 status _ (Verify {})
   = NothingToDo NoHole   -- There should be no HOLE inside a verify{}
@@ -942,6 +952,21 @@ status lx (v :>>: e) | any (isLocal lx) (free v) = blockedStatus
                      | otherwise                 = status lx e
 
 status _ e = errorMessage ("Uncovered case in status " ++ show e)
+
+
+-- choicy e returns Just True  if e = C[e1|e2] and C is choicefreeLH
+-- choicy e returns Nothing    if e = C[e1|e2] and C is NOT choicefreeLH
+-- choicy e returns Just False if e /= C[e1|e2]
+choicy :: Expr -> Maybe Bool
+choicy (Op{} :@: _) = Just False
+choicy (_ :@: _)    = Nothing
+choicy (_ :|: _)    = Just True
+choicy (Exi bnd)    = choicy e where (_,e) = unsafeUnbind bnd
+choicy (_ :=: e)    = choicy e
+choicy (e1 :>: e2)
+  | isContext e1    = choicy e1
+  | otherwise       = choicy e1 >>= \c -> if c then Just True else choicy e2
+choicy _            = Just False
 
 ---------------------
 choiceAndFailureFree :: Expr_or_Context -> Bool
