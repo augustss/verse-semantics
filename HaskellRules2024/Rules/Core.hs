@@ -54,7 +54,7 @@ import TRS.Bind
 import TRS.Traced
 import Test.QuickCheck
 
-import Control.Monad( liftM2, liftM3 )
+import Control.Monad( liftM2 )
 import Data.Scientific(Scientific)
 
 --import qualified Debug.Trace
