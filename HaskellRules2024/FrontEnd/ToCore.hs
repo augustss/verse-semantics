@@ -61,14 +61,14 @@ convert (Some v)      = Rules.Some (convert v)
 convert (Check fxs t) = foldr addCheck (convert t) fxs
 convert (Src.Verify is t) = Rules.Verify (TRS.bindList (map toCoreIdent is) ([], convert t))
 convert Src.Fail      = Rules.Fail
-convert (Src.All e)   = Rules.All (convert e)
+convert (Src.All e)   = Rules.mkAll (convert e)
 convert (Src.Truth e) = Rules.Tru (convert e)
 convert (Src.Iter e1 e2 e3) = Rules.Iter (convert e1) (convert e2) (convert e3)
 convert e = impossible "convert" e
 
 addCheck :: Eff -> Rules.Expr -> Rules.Expr
 addCheck fx e = case toCoreEff fx of
-                  Just fx' -> Rules.Check fx' e
+                  Just fx' -> Rules.mkCheck fx' e
                   Nothing  -> e
 
 toCoreIdent :: Ident -> Rules.Ident

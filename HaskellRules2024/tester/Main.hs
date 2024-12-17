@@ -408,7 +408,7 @@ doTest tflg test src1 src2 = do
 --   replacing the code with FAIL if there was a desugaring error (e.g. unbound variable)
 wrapTest :: Bool -> (Expr, [DError]) -> Expr
 wrapTest wrap_me (core, errs)
-  | wrap_me   = Rules.Verify (bindList [] ([], Rules.Check Succeeds core'))
+  | wrap_me   = Rules.Verify (bindList [] ([], Rules.mkCheck Succeeds core'))
   | otherwise = core
   where
     core' | null errs = core

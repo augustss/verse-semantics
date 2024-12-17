@@ -46,7 +46,7 @@ runtimeAndVerificationStep
            <> existentialStep
            <> choiceStep
            <> oneAndAllStep
-           <> checkStep
+           -- <> checkStep
 
 -- currently:  everywhere (evalRulesNoRec `tryBefore` rulesRec)
 -- better:    (everywhere evalRulesNoRec) `tryBefore` (everywhere rulesRec)
@@ -400,9 +400,9 @@ onlyApps f orig_e = go orig_e
     go (e1 :@: e2)  = e1 == Var f || (go e1 && go e2)
     go (Iter e1 e2 e3) = all go [e1,e2,e3]
     go (Some e)       = go e
-    go (All e)        = go e
+    --go (All e)        = go e
     go (e1 :>>: e2)   = go e1 && go e2
-    go (Check _ e)    = go e
+    --go (Check _ e)    = go e
     go (Arr    sz e)  = go sz && go e
     go (Size   sz e)  = go sz && go e
     go (Choose sz e)  = go sz && go e
@@ -485,6 +485,7 @@ oneAndAllStep _env lhs =
      guard (choiceFreeLH ctx)
      guard (blocked ctx)  -- was: e
      pure $ Iter (ctx <@ e1) f (Lam $ bind underscore $ Iter (ctx <@ e2) f g)
+{-
  ++
   -- all(fail)  -->  <>
   "ALL-FAIL" `name`
@@ -508,7 +509,7 @@ oneAndAllStep _env lhs =
                  (Var xs :=: All (ctx <@ e1))
              :>: (Var ys :=: All (ctx <@ e2))
              :>: (Op ArrApp :@: Tup [Var xs, Var ys]))
-
+-}
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
 --   if x/=y, and x free in body
@@ -523,6 +524,7 @@ recStep _env lhs =
                              (Var x :=: v) :>: body) )
 
 --------------------------------------------------------------------------------
+{-
 checkStep :: Rule
 checkStep env lhs =
    "CHECK" `name`
@@ -555,7 +557,7 @@ checkStep env lhs =
                    else wrong)
    where
     x:a:f:l:_ = identsNotIn (free e)
-
+-}
 {-
    ++
    "CHECK-SUC-L" `name`
@@ -895,7 +897,7 @@ status lx (_val :=: rhs)     -- e.g. x=blah, where x is bound "outside", or hnf=
 status lx (e1 :>: e2) = status lx e1 `andStatus` status lx e2
 
 -- this should be removed once we remove All
-status lx (All body) = status lx (mkAll body)
+--status lx (All body) = status lx (mkAll body)
 
 status lx (Exi bnd) = status (addFlexi lx x) e
   where
@@ -943,7 +945,7 @@ status _ (Verify {})
   -- Earlier version looked inside verify{}
   --    (_, (_,e)) = alphaRenameVerify (allExis lx) bl
 
-status lx (Check _ e) = SomethingToDo
+--status lx (Check _ e) = SomethingToDo
 status _  (Choose {}) = NothingToDo NoHole
 status lx (Size _ e)  = status lx e
 status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
@@ -991,14 +993,14 @@ choiceAndFailureFree = go []
                           _     -> False
 
     go fs (Exi bnd)   = go fs e where (_,e) = unsafeUnbind bnd
-    go _  (All {})    = True
+    -- go _  (All {})    = True
     go _  (Arr {})    = True
     go _  (Size {})   = True
     go _  (Some {})   = True
     go _  HOLE        = True
 
     go _  (Choose {}) = False
-    go fs (Check _ e) = go fs e
+    -- go fs (Check _ e) = go fs e
     go _  (Verify {}) = True
 
     go fs e@Iter{}
@@ -1032,7 +1034,7 @@ choiceFree' fs e@Iter{}
                                    = choiceFree' (t:fs) f && choiceFree' fs g
   | otherwise                      = error "Malformed Iter"
 choiceFree' _ (Some {})            = True
-choiceFree' _ (All {})             = True
+--choiceFree' _ (All {})             = True
 choiceFree' _ (Arr {})             = True
 choiceFree' _ (Size {})            = True
 choiceFree' _ (Choose {})          = False

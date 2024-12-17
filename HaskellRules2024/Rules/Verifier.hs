@@ -122,7 +122,7 @@ arrStep env lhs =
      -- --> n := size(v){ C[ some(\_.e) ] } ;
      --     Arr(n){ C[e] }
      -- if boundvars(C) disjoint from freevars(v)
-  do All all_body <- [lhs]
+  do Just all_body <- [matchAll lhs]
      (exis, ctx, Choose sz e) <- evalCtxLift [] all_body
      guard (free sz `disjointFrom` exis)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
@@ -403,14 +403,14 @@ go_px lx lhs =
   do Size sz e <- [lhs]
      (ctx, hole) <- go_px lx e
      pure (Size sz ctx, hole)
- ++
-  do Check fx x <- [lhs]
-     (ctx, hole) <- go_px lx x
-     pure (Check fx ctx, hole)
- ++
-  do All x <- [lhs]
-     (ctx, hole) <- go_px (makeRigid lx) x
-     pure (All ctx, hole)
+-- ++
+--  do Check fx x <- [lhs]
+--     (ctx, hole) <- go_px lx x
+--     pure (Check fx ctx, hole)
+-- ++
+--  do All x <- [lhs]
+--     (ctx, hole) <- go_px (makeRigid lx) x
+--     pure (All ctx, hole)
  ++
   do Iter x y z <- [lhs]
      (ctx, hole) <- go_px (makeRigid lx) x
