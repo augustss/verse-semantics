@@ -412,7 +412,7 @@ wrapTest wrap_me (core, errs)
   | otherwise = core
   where
     core' | null errs = core
-          | otherwise = Rules.Lit (LStr (prettyShow errs)) Rules.:>: Rules.Fail
+          | otherwise = (Rules.Lit (LInt 0) Rules.:=: Rules.Lit (LStr (prettyShow errs))) Rules.:>: Rules.Fail
 
 
 desugarForVerification :: Test -> Bool
