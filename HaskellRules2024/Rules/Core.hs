@@ -833,8 +833,8 @@ prepVals as k = name (xs `zip` map prep as) k
 
   name []          h = h []
   name ((x,a):xas) h
-    | isVal a        = name xas (h . (a:))
-    | otherwise      = Exi (bind x ((Var x :=: a) :>: name xas (h . (Var x :))))
+    | isVal a || a == Var underscore = name xas (h . (a:))
+    | otherwise                      = Exi (bind x ((Var x :=: a) :>: name xas (h . (Var x :))))
 
 --------------------------------------------------------------------------------
 --
