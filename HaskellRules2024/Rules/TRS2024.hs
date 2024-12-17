@@ -870,8 +870,7 @@ status _  HOLE = NothingToDo HasHole
 
 status _  e | isVal e = valueStatus
 
-status lx (_ :=: e@(_ :>: _)) =
-  SomethingToDo
+status _ (_ :=: (_ :>: _)) = SomethingToDo
 
 status lx (Var x :=: Var y)  -- (x=x) is blocked pending getting a value for x
   | x == y, isLocal lx x
