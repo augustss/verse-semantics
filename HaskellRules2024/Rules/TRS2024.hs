@@ -75,7 +75,7 @@ evalDotDotStep _env lhs =
 
 --------------------------------------------------------------------------------
 applicationStep :: Rule
-applicationStep _env lhs =
+applicationStep env lhs =
   "APP-ADD" `name`
   do Op Add :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1+k2))
@@ -146,6 +146,11 @@ applicationStep _env lhs =
   do Op NEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 /= k2))
      pure Fail
+ ++
+  "APP-ISGROUND" `name`
+   do Op IsGround :@: a <- [lhs]
+      guard (skolValue (skolVars env) a)
+      pure a
  ++
   "APP-ISINT" `name`
   do Op IsInt :@: a <- [lhs]

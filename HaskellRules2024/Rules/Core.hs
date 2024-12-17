@@ -332,7 +332,7 @@ data PrimOp
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr | IsChar | IsArr | IsTru
+ | IsInt | IsStr | IsChar | IsArr | IsTru | IsGround
  | IsComp
 
  deriving
@@ -359,12 +359,13 @@ primOpString Lt  = "intLT$"
 primOpString LEq = "intLE$"
 primOpString NEq = "intNE$"
 
-primOpString IsInt  = "isInt$"
-primOpString IsStr  = "isStr$"
-primOpString IsChar = "isChar$"
-primOpString IsArr  = "isArr$"
-primOpString IsComp = "isComp$"
-primOpString IsTru  = "isTru$"
+primOpString IsInt    = "isInt$"
+primOpString IsStr    = "isStr$"
+primOpString IsChar   = "isChar$"
+primOpString IsArr    = "isArr$"
+primOpString IsComp   = "isComp$"
+primOpString IsTru    = "isTru$"
+primOpString IsGround = "isGround$"
 
 primOpCanFail :: PrimOp -> Bool
 
@@ -391,6 +392,9 @@ primOpCanFail Div      = False
 primOpCanFail Neg      = False
 primOpCanFail ArrLen   = False
 primOpCanFail ArrMap   = False
+
+-- These operations can't fail, and produce no value
+primOpCanFail IsGround = False
 
 primOpIsTypeTest :: PrimOp -> Bool
 -- Type tests; all mutually exclusive
