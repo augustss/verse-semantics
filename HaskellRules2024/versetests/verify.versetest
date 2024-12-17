@@ -308,7 +308,8 @@ verify("blob", fail,tim=D00) { foo(f()<decides>:int) := {f[]} }
 # Finite types (from Google doc "Verse: more tricky cases")
 verify("Fin1", fail) { (y := if (y=2) then y+1 else 3); y }
 verify("Fin2", pass) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
-verify("Fin3", pass) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin3", fail, broken) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin3x", fail, broken) { (y:type{3|4} := 3); y=3 }
 verify("Fin2a", pass, broken ) { (y:type{3}   := if (y=2) then y+1 else 3); if (y=3) then 1 else fail  }
   # Fin2a should work because all clients of y should see some(\_.3)
 
@@ -359,3 +360,10 @@ verify("Ampersand5", pass, broken)
   # Ampersand5: This rather complicated test comes from Tim's tests
   # It's not really about "&"; rather, it involves unification of functions
   # Actually, it seems to make the verifier loop, oddly.
+
+# tests for variables not getting a value
+verify("exitop1", pass, broken){ x:int; f():int := {x}; 5 }   # should these verify or not? #asktim
+verify("exitop2", pass, broken){ x:int; f():int := {x}; f[] }
+verify("exitop3", pass, broken){ x:int; f():int := {x}; f[]; 5 }
+verify("exitop4", pass){ x:int; f():int := {x}; f[]; x=3; 5 }
+verify("exitop5", fail){ x:int; f():int := {x}; f[]=3; 5 }
