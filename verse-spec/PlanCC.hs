@@ -174,6 +174,7 @@ dE (CVar x)  rho                            = [sing $ lookupEnv x rho]
 dE (CInt k)    _                            = [sing $ VInt k]
 dE (CPrim p)   _                            = [sing $ dO p]
 dE (CTup es) rho                            = undefined -- mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
+                                              -- sequence $ map (\ e -> dE e rho) es
 dE (CApp e1 e2)   rho                       = re [ mkSet [ r | v1 <- unSet s1, v2 <- unSet s2, r <- unSet $ apply v1 v2 ]
                                                  | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (COfType e1 e2) rho                      = dE (CApp e2 e1) rho
@@ -322,3 +323,42 @@ main :: IO ()
 main = do
   putStrLn "Start"
   runExamples dP allExps
+
+{-
+\x.(e1){e2}
+
+ r' <- X[e1]r[x:=w]
+ D[e1]r'
+  
+
+
+  f(0)<decides>={3=4}
+  fun_c(r:=(3=4); 0)=r
+
+var y:int=0;
+for(1|2; y+=1){Print[y]}
+all2{1|2; y+=1; \_.Print[y]}
+all2{(1; y+=1; \_.Print[y]) | (2; y+=1; \_.Print[y]) }
+a1 := all{1; y+=1; \_.Print[y]}; a2 := all{2; y+=1; \_.Print[y]}; a1++a2
+a1 := all(y+=1; \_.Print[y]}; a2 := all{y+=1; \_.Print[y]}; a1++a2
+# set y=1
+a1 := all(\_.Print[^y]}; a2 := all{y+=1; \_.Print[^y]}; a1++a2
+a1 := (x:=(\_.Print[^y])[]; <x>); a2 := all{y+=1; \_.Print[^y]}; a1++a2
+a1 := (x:=Print[^y]; <x>); a2 := all{y+=1; \_.Print[^y]}; a1++a2
+a1 := (x:=Print[1]; <x>); a2 := all{y+=1; \_.Print[^y]}; a1++a2
+# print 1
+a1 := (x:=1; <x>); a2 := all{y+=1; \_.Print[^y]}; a1++a2
+a1 := <1>; a2 := all{y+=1; \_.Print[^y]}; a1++a2
+# set y=2
+a1 := <1>; a2 := all{\_.Print[^y]}; a1++a2
+a1 := <1>; a2 := (\_.Print[^y])[]; a1++a2
+a1 := <1>; a2 := (x := (\_.Print[^y])[]; <x>); a1++a2
+a1 := <1>; a2 := (x := Print[^y]; <x>); a1++a2
+a1 := <1>; a2 := (x := Print[2]; <x>); a1++a2
+# print 2
+a1 := <1>; a2 := (x := 2; <x>); a1++a2
+a1 := <1>; a2 := <2>; a1++a2
+<1>++<2>
+<1,2>
+
+-}

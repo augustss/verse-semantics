@@ -1,28 +1,33 @@
 module Set where
+import Data.List
 import qualified Data.Set as S
 
 --------------------
 ---- Sets
 
-type Set a = S.Set a
+newtype Set a = Set { uSet :: S.Set a }
+  deriving (Eq)
+
+instance (Show a) => Show (Set a) where
+  show s = "{" ++ intercalate "," (map show (unSet s)) ++ "}"
 
 unSet :: Set a -> [a]
-unSet = S.toList
+unSet = S.toList . uSet
 
 mkSet :: (Ord a) => [a] -> Set a
-mkSet = S.fromList
+mkSet = Set . S.fromList
 
 sUnion :: (Ord a) => [Set a] -> Set a
-sUnion = S.unions
+sUnion = Set . S.unions . map uSet
 
 isect :: Ord a => Set a -> Set a -> Set a
-isect = S.intersection
+isect (Set x) (Set y) = Set $ S.intersection x y
 
 xunion :: Ord a => Set a -> Set a -> Set a
-xunion = S.union
+xunion (Set x) (Set y) = Set $ S.union x y
 
 sing :: a -> Set a
-sing = S.singleton
+sing = Set . S.singleton
 
 unSing :: Set a -> a
 unSing s =
@@ -31,13 +36,16 @@ unSing s =
     _   -> error "unSing"
 
 empty :: Set a
-empty = S.empty
+empty = Set $ S.empty
 
 isEmpty :: Set a -> Bool
-isEmpty = S.null
+isEmpty = S.null . uSet
 
 sIn :: Ord a => a -> Set a -> Bool
-sIn = S.member
+sIn x (Set s) = S.member x s
+
+smap :: (Ord b) => (a -> b) -> Set a -> Set b
+smap f = Set . S.map f . uSet
 
 -- Check if a predicate holds for all values in the set
 forAll :: Set a -> (a -> Bool) -> Bool
@@ -53,5 +61,4 @@ existsL :: [a] -> (a -> Bool) -> Bool
 existsL xs p = any p xs
 
 lessEq :: (Ord a) => Set a -> Set a -> Bool
-lessEq x y = S.isSubsetOf x y
-
+lessEq (Set x) (Set y) = S.isSubsetOf x y

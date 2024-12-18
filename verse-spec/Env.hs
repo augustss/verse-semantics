@@ -36,7 +36,7 @@ allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
 allWs :: WS
-allWs = S.fromList $
+allWs = mkSet $
   nonFcn ++
   [ dO o | o <- [Oint, Ogt, Oadd] ] ++
   map VFcn [ id0, fid1, id01, f01, const0, const1, const2, const3, fsucc,

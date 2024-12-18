@@ -11,7 +11,6 @@ import Prelude(Show(..), Ord(..), Eq(..), Num(..),
 import qualified Prelude
 import Data.List
 import qualified Data.Map as M
-import qualified Data.Set as S
 import Data.Maybe
 import Exp
 import Val
@@ -34,13 +33,13 @@ ifThenElse True  x _ = x
 -- So we have to make do with RebindableSyntax and defining return, >>= and >>
 
 return :: a -> Set a
-return = S.singleton
+return = sing
 
 (>>=) :: (Ord b) => Set a -> (a -> Set b) -> Set b
-s >>= f = S.unions $ map f $ S.toList s
+s >>= f = sUnion $ map f $ unSet s
 
 (>>) :: Set a -> Set b -> Set b
-s >> t = if S.null s then S.empty else t
+s >> t = if isEmpty s then empty else t
 
 fail :: String -> Set a
 fail _ = empty
@@ -50,15 +49,15 @@ guard False = empty
 guard True  = return ()
 
 ifEmpty :: Set a -> b -> (Set a -> b) -> b
-ifEmpty s n f | S.null s  = n
+ifEmpty s n f | isEmpty s  = n
               | otherwise = f s
 
 mapM :: (Ord b) => (a -> Set b) -> [a] -> Set [b]
-mapM f = S.fromList . traverse (S.toList . f)
+mapM f = mkSet . traverse (unSet . f)
 
 infixl 4 <$>
 (<$>) :: Ord b => (a -> b) -> Set a -> Set b
-(<$>) = S.map
+(<$>) = smap
 
 --------------------
 ---- Aux
