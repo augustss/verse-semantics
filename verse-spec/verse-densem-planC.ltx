@@ -31,54 +31,54 @@ $$
 % ------------- Desugaring ---------------
 \textbf{Desugaring Essential Verse into Mini Verse: wrapping} \\
 \begin{array}{@@{}l@@{\,}r@@{\;\;}c@@{\;\;}l@@{}l}
-  \text{Inputs} & |wu| & ::= & |apeff u fx| \\
+  \text{Inputs} & |wu| & ::= & \multicolumn{2}{@@{}l}{|apeff u fx| \qquad \text{We often abbreviate |apeff emp fx| to just |eff fx|}}\\
                 & |u|  & ::= & |emp| \vb |e| \\
 \\
-\rulename{dsk}      & |SS wu k| & = & |wu `ueq` k| \\
-\rulename{dsvar}    & |SS wu x| & = & |wu `ueq` x| \\
-\rulename{dsapp}    & |SS wu (apply1N t_1 t_2)| & = & |wu `ueq` apply1N ((SS wuinit t_1)) (SS wuinit t_2)| \\
-\rulename{dschoice} & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` SS wuinit t_1 `choice` SS wuinit t_2| \\
-\rulename{dsprim}   & |SS wu o| & = & |wu `ueq` o| \\
-\rulename{dsfor}   & |SS wu (fordo t_1 t_2)|
+\rulename{wconst}      & |SS wu k| & = & |wu `ueq` k| \\
+\rulename{wprim}   & |SS wu o| & = & |wu `ueq` o| \\
+\rulename{wvar}    & |SS wu x| & = & |wu `ueq` x| \\
+\rulename{wapp}    & |SS wu (apply1N t_1 t_2)| & = & |wu `ueq` apply1N ((SS wuinit t_1)) (SS wuinit t_2)| \\
+\rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` SS wuinit t_1 `choice` SS wuinit t_2| \\
+\rulename{wfor}   & |SS wu (fordo t_1 t_2)|
    & = & |wu `ueq` fordo (SS wuinit t_1) (SS wuinit t_2)| \\
-\rulename{dsone} & |SS wu (one t)| & = & |wu `ueq` one (SS wuinit t)| \\
-\rulename{dsall} & |SS wu (all t)| & = & |wu `ueq` all (SS wuinit t)| \\
-\rulename{dswild1}    & |SS (eff fx) _| & = & |defintro x; x| \\
-\rulename{dswild2}    & |SS (apeff e fx) _| & = & |e| \\
-\rulename{dsfail}   & |SS wu fail| & = & |fail| \\
-\rulename{dsunify}   & |SS wu (t_1 == t_2)| & = & |(SS wu t_1) = (SS wu t_2)| \\
-\rulename{dssemi}   & |SS wu (t_1 ; t_2)| & = & |SS wuinit t_1 ; SS wu t_2| \\
-\rulename{dswhere}   & |SS wu (t_1 where t_2)| & = & |defintro r; r == (SS wu t_1); (SS wuinit t_2); r| \\
-\multicolumn{2}{@@{}l}{\rulename{dsif} \; \hfill |SS wu (vif t_1 t_2 t_3)|}
+\rulename{wone} & |SS wu (one t)| & = & |wu `ueq` one (SS wuinit t)| \\
+\rulename{wall} & |SS wu (all t)| & = & |wu `ueq` all (SS wuinit t)| \\
+\rulename{wwild1}    & |SS (eff fx) _| & = & |defintro x; x| \\
+\rulename{wwild2}    & |SS (apeff e fx) _| & = & |e| \\
+\rulename{wfail}   & |SS wu fail| & = & |fail| \\
+\rulename{wunify}   & |SS wu (t_1 == t_2)| & = & |(SS wu t_1) = (SS wu t_2)| \\
+\rulename{wsemi}\asktim   & |SS wu (t_1 ; t_2)| & = & |SS wuinit t_1 ; SS wu t_2| \\
+\rulename{wwhere}   & |SS wu (t_1 where t_2)| & = & |defintro r; r == (SS wu t_1); (SS wuinit t_2); r| \\
+\multicolumn{2}{@@{}l}{\rulename{wif} \; \hfill |SS wu (vif t_1 t_2 t_3)|}
  & = & |vif(SS wuinit t_1) (SS wu t_2) (SS wu t_3)| \\
-\rulename{dsdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
-\rulename{dssquig}   & |SS wu (squig x y := t)| & = & |defintro x; wu `ueq` x; y := SS x t| \\
-\rulename{dschk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
-\rulename{dscol1}   & |SS (eff fx) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
-\rulename{dscol2}   & |SS (apeff e fx) (: t)| & = & |oftypefx e fx (SS wuinit t)| \\
-\rulename{dsoftype}   & |SS (apeff u fx_2) (oftypefx t_1 fx_1 t_2)|
+\rulename{wdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
+\rulename{wsquig}   & |SS (apeff u fx) (squig x y := t)| & = & |defintro x; apeff u fx `ueq` x; y := SS (apeff x fx) t| \\
+\rulename{wchk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
+\rulename{wcol1}\asktim   & |SS (eff fx) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
+\rulename{wcol2}   & |SS (apeff e empty) (: t)| & = & |apply1N ((SS wuinit t)) e| \\
+\rulename{wcol3}   & |SS (apeff e fx) (: t)| & = & |oftypefx e fx (SS wuinit t)| \\
+\rulename{wopaque}\asktim   & |SS (apeff u fx_2) (oftypefx t_1 fx_1 t_2)|
     & = & |oftypefx (SS (apeff u empty) t_1) (andeffects fx_1 fx_2) (SS wuinit t_2)| \\
-\rulename{dstup1}   & |SS (eff fx) (arr (t_1, xdots, t_n))|
+\rulename{wtup1}   & |SS (eff fx) (arr (t_1, xdots, t_n))|
    & = & |arr( (SS (eff fx) t_1), xdots, (SS (eff fx) t_n))| \\
-\rulename{dstup2}   & |SS (apeff e fx) (arr (t_1, xdots, t_n))|
+\rulename{wtup2}   & |SS (apeff e fx) (arr (t_1, xdots, t_n))|
 & = & \begin{array}[t]{@@{}l}
   |defintro (x_1 xdots x_n); e = arr(x_1, xdots, x_n);| \\
   |arr( (SS (apeff x_1 fx) t_1), xdots, (SS (apeff x_n fx) t_n))|
   \end{array} & \text{|x_i| fresh}\\
-\rulename{dstru1} & |SS (eff fx) (truth t)| & = & |truth (SS (eff fx) t)| \\
-\rulename{dstru2} & |SS (apeff e fx) (truth t)| & = & |defintro x; e == truth x; truth (SS (apeff x fx) t)| & \text{|x| fresh} \\
-\rulename{dsfun1}   & |SS (eff fx_2) (functionOCX q t_1 fx_1 t_2)|
+\rulename{wtru1} & |SS (eff fx) (truth t)| & = & |truth (SS (eff fx) t)| \\
+\rulename{wtru2} & |SS (apeff e fx) (truth t)| & = & |defintro x; e == truth x; truth (SS (apeff x fx) t)| & \text{|x| fresh} \\
+\rulename{wfun1} \asktim   & |SS (eff fx_2) (functionOCX q t_1 fx_1 t_2)|
    & = & |lamOC q i (SS (apeff i empty) t_1) (check fx_1 (SS (eff fx_1) t_2))| & \text{|i| fresh} \\
-\rulename{dsfun2}   & |SS (apeff f fx_2) (functionOCX q t_1 fx_1 t_2)|
+\rulename{wfun2}   & |SS (apeff f fx_2) (functionOCX q t_1 fx_1 t_2)|
 & = & |lamOCv q i (defintro x; x = SS (apeff i empty) t_1)
            (checkfun q f t_1; check fx_1 (SS (apeff (apply1N f x) fx_1) t_2))|  & \text{|i,x| fresh}\\
-\end{array} \\
-\\
+\end{array} \\[1mm]
 \textbf{Auxiliary functions} \\
 \hspace{3cm}
 \begin{array}{@@{}l@@{\;\;}r@@{\;\;}c@@{\;\;}ll}
-\rulename{dsp1} & |eff fx `ueq`  e_2| & = & |e_2| \\
-\rulename{dsp2} & |apeff e_1 fx `ueq`  e_2|
+\rulename{wp1} & |apeff emp fx `ueq`  e_2| & = & |e_2| \\
+\rulename{wp2} \asktim & |apeff e_1 fx `ueq`  e_2|
 %  & = & |e_1 = e_2|  & \text{if |e_2| guarantees to succeed (once)}\\
  & = & |oftypefx e_1 empty ((lam i (i == e_2)))| & \text{$|i| \not\in |freevars e_2|$}
 \\[2mm]

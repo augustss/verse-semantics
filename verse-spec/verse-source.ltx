@@ -67,27 +67,25 @@ $$
 \begin{figure}
 $$
 \begin{array}{lrcll}
-  \text{\bf Patterns} & |p| & ::= & |_|   & \text{Wildcard} \\
+  \text{\bf Patterns} \asktim & |p| & ::= & |_|   & \text{Wildcard} \\
   & & \vb & |xsl|                         & \text{Variable} \\
   & & \vb & |squig p_1 p_2|               & \text{Squiggle pattern} \\
   & & \vb & |apply1np p t (eff fx)|       & \text{Function with effects} \\
   & & \vb & |apply1np p (t)|              & \text{Short for |apply1np p t (eff succeeds)| } \\
   & & \vb & |p : t (eff fx)|              & \text{Type ascription}\\
-  & & \vb & |p : t|                       & \text{Short for |p:t (eff succeeds)|}\\
+  & & \vb & |p : t|                       & \text{Short for |p:t (eff decides)|}\asktim\\
   & & \vb & |: t| & \text{Short for |(_ : t)|} \\
   & & \vb & |p_1, xdots, p_n|  & \text{Tuple} \\
   & & \vb & |..p| & \text{Array splice} \\
 & |xsl| & ::= & x \vb  |xsl amp x|
 \\[2mm]
 \text{\bf Effects} &
- |fx| & ::= & |fails|  \vb |succeeds| \vb |decides| \vb |emp| \vb |fx_1,fx_2| \\
- & & & \text{if |eff fx| is omitted, assume |succeeds|}
-\\[2mm]
-\text{\bf Operators} &
- |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \vb ..  & \text{Prefix}\\
-& |op_a| & ::= &  ? \vb |hat| & \text{Postfix}\\
-& |op_i| & ::= &  + \vb - \vb * \vb / \vb |srcand| \vb |srcor| \vb : \vb .. & \text{Infix} \\
-&        & \vb & < \vb <= \vb > \vb >= \vb <> \vb |minusgt| \\
+|fx| & ::= & |emp| \vb |fx_1,fx_2| \\
+&     & \vb & |fails|  \vb |succeeds| \vb |decides| \\
+&     & \vb & \ldots \\
+
+& |andeffects fx_1 fx_2| & = & \multicolumn{2}{l}{\text{Effect intersection; e.g |andeffects succeeds decides = succeeds|}}
+
 \end{array}
 $$
 \caption{Source Verse expressions, part 2} \label{fig:source-verse-expr2}
@@ -121,9 +119,9 @@ $$
 &      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
 &      & \vb & |fordo t_1 t_2|             & \text{Finite loop} \\
 &      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
-&      & \vb & |truth t|                   & \text{Truth value} \\
-&      & \vb & |functionOCX q t_1 fx t_2|      & \text{Function} \\
-&      & \vb & |colonfx fx t|              & \text{Range} \\
+&      & \vb & |truth t|                  & \text{Truth value} \\
+&      & \vb & |functionOCX q t_1 fx t_2|  & \text{Function} \\
+&      & \vb & |: t|                      & \text{Range} \\
 &      & \vb & |oftypefx t_1 fx t_2|       & \text{Opacity}\\
 &      & \vb & |check fx t|                & \text{Effects check} \\
 \\
@@ -148,7 +146,7 @@ Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator
 $$
 \begin{array}{@@{}l}
 \begin{array}{lrcll}
-\multicolumn{4}{l}{\textbf{Abbreviations for |p:t|}} \\
+\multicolumn{4}{l}{\textbf{Abbreviations for |p := e|}\; \asktim} \\
 \rulename{dscol1} &  |p : t = e| & \rightarrow & |p:t := e| \\
 \rulename{dscol2} &  |:t = e| & \rightarrow & |:t := e| \\
 \rulename{dscol3} &  |p : t| & \rightarrow & |p := : t| \\[2mm]
@@ -161,7 +159,7 @@ $$
 \rulename{dsfun1a} &  |apply1np p t_1 := t_2|
   & \rightarrow & |apply1np p t_1 (eff (openeff,succeeds)) := t_2| \\
 \rulename{dsty1} & |p : t_1 (eff fx) := t_2| & \rightarrow & |p := oftypefx t_2 fx t_1|  \\
-\rulename{dsty2} & |p : t_1  := t_2| & \rightarrow & |p : t_1 (eff succeeds) := t_2|  \\
+\rulename{dsty2}\asktim & |p : t_1  := t_2| & \rightarrow & |p : t_1 (eff decides) := t_2|  \\
 \rulename{dssquig1} &  |(squig p_1 p_2) := t| & \rightarrow
     & |p_1 := (x_1:any); (squig x_1 p_2) := t| & \text{|p_1| not a variable} \\
 \rulename{dssquig2} &  |(squig p_1 p_2) := t| & \rightarrow

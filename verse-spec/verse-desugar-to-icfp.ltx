@@ -64,9 +64,7 @@ $$
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
 \rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
   & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
-\rulename{moftype+x1} & |DMe3 md si (oftypefx e_1 empty e_2)|
-& = & |apply1N ((DMe3 md si e_2)) (DMe3 md si e_1)| &   |md|\in\{|mdpos|,|mdx|\} \\
-\rulename{moftype+x2} & |DMe3 md si (oftypefx e_1 fx e_2)|
+\rulename{moftype+x} & |DMe3 md si (oftypefx e_1 fx e_2)|
 & = & \begin{array}[t]{@@{}l}
        |defintro r; r == check fx (DMe3 md si e_1);| \\
        |check succeeds (apply1N ((DMe3 md si e_2)) r)|
