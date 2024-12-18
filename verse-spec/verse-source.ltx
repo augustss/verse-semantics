@@ -39,7 +39,7 @@ $$
 &      & \vb & |t_1 op_i t_2|    & \text{Infix operator} \\
 &      & \vb & |: t|             & \text{Range} \\
 &      & \vb & |t_1 where t_2|   & \text{Reverse sequencing} \\
-&      & \vb & |functionOC oc (a_1 xdots a_n) t|    & \text{Function}\;(n\geq 1) \\
+&      & \vb & |functionOCX q t fx t|    & \text{Function} \\
 &      & \vb & |if(t) then t|    & \text{Conditional expression} \\
 &      & \vb & |if(t) else t|    & \text{Conditional expression} \\
 &      & \vb & |if{t}|           & \text{Conditional expression} \\
@@ -54,13 +54,6 @@ $$
 &      & \vb & |truth t |       & \text{Singleton map} \\
 &      & \vb & |amap (t_1; xdots; t_n) | & \text{Map}, n \geq 0 \\
 \\
-\text{\bf Arguments} &
- |a| & ::= & |(t)|  \vb |()| \vb |apeff a fx|
-\\[2mm]
-\text{\bf Patterns} & |p| & ::= & |_| \vb |xsl| \vb |p a| \vb  |squig p_1 p_2| \\
-&     & \vb & |: t| \vb |p : t|  \vb |p_1, xdots, p_n| \vb |..p| \\
-& |xsl| & ::= & x \vb  |xsl amp x|
-\\[2mm]
 \text{\bf Operators} &
  |op_b| & ::= &  ! \vb - \vb + \vb |hat| \vb ? \vb |arrayty| \vb ..  & \text{Prefix}\\
 & |op_a| & ::= &  ? \vb |hat| & \text{Postfix}\\
@@ -79,14 +72,15 @@ $$
   & & \vb & |squig p_1 p_2|               & \text{Squiggle pattern} \\
   & & \vb & |apply1np p t (eff fx)|       & \text{Function with effects} \\
   & & \vb & |apply1np p (t)|              & \text{Short for |apply1np p t (eff succeeds)| } \\
-  & & \vb & |p : t|                       & \text{Type ascription}\\
+  & & \vb & |p : t (eff fx)|              & \text{Type ascription}\\
+  & & \vb & |p : t|                       & \text{Short for |p:t (eff succeeds)|}\\
   & & \vb & |: t| & \text{Short for |(_ : t)|} \\
   & & \vb & |p_1, xdots, p_n|  & \text{Tuple} \\
   & & \vb & |..p| & \text{Array splice} \\
 & |xsl| & ::= & x \vb  |xsl amp x|
 \\[2mm]
 \text{\bf Effects} &
- |fx| & ::= & |fails|  \vb |succeeds| \vb |decides| \\
+ |fx| & ::= & |fails|  \vb |succeeds| \vb |decides| \vb |emp| \vb |fx_1,fx_2| \\
  & & & \text{if |eff fx| is omitted, assume |succeeds|}
 \\[2mm]
 \text{\bf Operators} &
@@ -128,7 +122,7 @@ $$
 &      & \vb & |fordo t_1 t_2|             & \text{Finite loop} \\
 &      & \vb & |array (t_1, xdots, t_n)|   & \text{Array}, n \geq 0 \\
 &      & \vb & |truth t|                   & \text{Truth value} \\
-&      & \vb & |functionOC q t_1 t_2|      & \text{Function} \\
+&      & \vb & |functionOCX q t_1 fx t_2|      & \text{Function} \\
 &      & \vb & |colonfx fx t|              & \text{Range} \\
 &      & \vb & |oftypefx t_1 fx t_2|       & \text{Opacity}\\
 &      & \vb & |check fx t|                & \text{Effects check} \\
@@ -154,19 +148,23 @@ Variables can be alphanumeric, but also |prefix op|, |postfix op|, and |operator
 $$
 \begin{array}{@@{}l}
 \begin{array}{lrcll}
-\multicolumn{4}{l}{\textbf{Rewriting terms that use patterns:  |p:t| and |p := t|}} \\
-% \rulename{dscolont} &  |p (eff fx) : t| & \rightarrow & |p := colonfx fx t| \\[1mm]
-\rulename{dscol1} &  |p (apeff t_1 fx) : t_2| & \rightarrow & |p := functionOC c t_1 (colonfx fx t_2)| \\[1mm]
-\rulename{dscol2} &  |p : t| & \rightarrow & |p := :t| & \text{\rulename{dscol1} does not apply} \\[1mm]
+\multicolumn{4}{l}{\textbf{Abbreviations for |p:t|}} \\
+\rulename{dscol1} &  |p : t = e| & \rightarrow & |p:t := e| \\
+\rulename{dscol2} &  |:t = e| & \rightarrow & |:t := e| \\
+\rulename{dscol3} &  |p : t| & \rightarrow & |p := : t| \\[2mm]
+
+\multicolumn{4}{l}{\textbf{Rewriting |p := t|}} \\
 \rulename{dswild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
-\rulename{dswild2} &  |(: t_1) := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
-\rulename{dscolonb} &  |(p (eff fx): t_1) := t_2| & \rightarrow & |p := oftypefx t_2 fx t_1| \\
-\rulename{dsfx} &  |p (fxb fx) := t| & \rightarrow & |p := check fx t| \\
-\rulename{dspapp} &   |p a := t| & \rightarrow & |p := function a t| \\
-  %% |(p?) := t| & \rightarrow & |p := option^{t}| \\
-\rulename{dspfun1} &  |(squig p_1 p_2) := t| & \rightarrow
+\rulename{dswild2} &  |: t_1 := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
+\rulename{dsfun1} &  |apply1np p t_1 (eff (q,fx)) := t_2|
+    & \rightarrow & |p := functionOCX q (t_1) fx t_2| \\
+\rulename{dsfun1a} &  |apply1np p t_1 := t_2|
+  & \rightarrow & |apply1np p t_1 (eff (openeff,succeeds)) := t_2| \\
+\rulename{dsty1} & |p : t_1 (eff fx) := t_2| & \rightarrow & |p := oftypefx t_2 fx t_1|  \\
+\rulename{dsty2} & |p : t_1  := t_2| & \rightarrow & |p : t_1 (eff succeeds) := t_2|  \\
+\rulename{dssquig1} &  |(squig p_1 p_2) := t| & \rightarrow
     & |p_1 := (x_1:any); (squig x_1 p_2) := t| & \text{|p_1| not a variable} \\
-\rulename{dspfun2} &  |(squig p_1 p_2) := t| & \rightarrow
+\rulename{dssquig2} &  |(squig p_1 p_2) := t| & \rightarrow
     & |p_2 := (x_2:any); (squig p_1 x_2) := t| & \text{|p_2| not a variable} \\
 % \begin{array}[t]{@@{}l@@{}}
 %    |p_1 := (x_1:any); p_2 := (x_2:any);| \\

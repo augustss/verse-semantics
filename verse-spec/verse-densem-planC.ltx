@@ -30,54 +30,57 @@ $$
 \\ \\
 % ------------- Desugaring ---------------
 \textbf{Desugaring Essential Verse into Mini Verse: wrapping} \\
-\begin{array}{@@{}l@@{}r@@{\;\;}c@@{\;\;}ll}
-\text{Inputs} & |u| & ::= & |underscore| \vb e \\
+\begin{array}{@@{}l@@{\,}r@@{\;\;}c@@{\;\;}l@@{}l}
+  \text{Inputs} & |wu| & ::= & |apeff u fx| \\
+                & |u|  & ::= & |emp| \vb |e| \\
 \\
-\rulename{dsk}      & |SS u k| & = & |u `ueq` k| \\
-\rulename{dsvar}    & |SS u x| & = & |u `ueq` x| \\
-\rulename{dsapp}    & |SS u (apply1N t_1 t_2)| & = & |u `ueq` apply1N ((SS underscore t_1)) (SS underscore t_2)| \\
-\rulename{dschoice} & |SS u (t_1 `choice` t_2)| & = & |u `ueq` SS underscore t_1 `choice` SS underscore t_2| \\
-\rulename{dsprim}   & |SS u o| & = & |u `ueq` o| \\
-\rulename{dsfor}   & |SS u (fordo t_1 t_2)|
-   & = & |u `ueq` fordo (SS underscore t_1) (SS underscore t_2)| \\
-\rulename{dsone} & |SS u (one t)| & = & |u `ueq` one (SS underscore t)| \\
-\rulename{dsall} & |SS u (all t)| & = & |u `ueq` all (SS underscore t)| \\
-\rulename{dswild1}    & |SS underscore _| & = & |defintro x; x| \\
-\rulename{dswild2}    & |SS e _| & = & |e| \\
-\rulename{dsfail}   & |SS u fail| & = & |fail| \\
-\rulename{dsunify}   & |SS u (t_1 == t_2)| & = & |(SS u t_1) = (SS u t_2)| \\
-\rulename{dssemi}   & |SS u (t_1 ; t_2)| & = & |SS underscore t_1 ; SS u t_2| \\
-\rulename{dswhere}   & |SS u (t_1 where t_2)| & = & |defintro r; r == (SS u t_1); (SS underscore t_2); r| \\
-\rulename{dsdef}   & |SS u (x := t)| & = & |defintro x; x = SS u t| \\
-\rulename{dssquig}   & |SS u (squig x y := t)| & = & |defintro x; u `ueq` x; y := SS x t| \\
-
-\rulename{dscol1}   & |SS underscore (: t)| & = & |defintro x; apply1N ((SS underscore t)) x| & \text{|x| fresh}\\
-\rulename{dscol2}   & |SS e (colonfx fx t)| & = & |oftypefx e fx (SS underscore t)| \\
-\rulename{dschk}   & |SS u (check fx t)| & = & |check fx (SS u t)| \\
-% \rulename{dschk2}   & |SS e (check fx t)| & = & |def k (k = check fx e; SS k t)| \\
-\rulename{dsoftype}   & |SS u (oftypefx t_1 fx t_2)|
-%    & = & |defintro r; r == SS u t_1; check succeeds (oftype r (SS underscore t_2))| \\
-    & = & |oftypefx (SS u t_1) fx (SS underscore t_2)| \\
-\rulename{dstup1}   & |SS underscore (arr (t_1, xdots, t_n))|
-   & = & |arr( (SS underscore t_1), xdots, (SS underscore t_n))| \\
-\rulename{dstup2}   & |SS e (arr (t_1, xdots, t_n))|
-   & = & |defintro (x_1 xdots x_n); e = arr(x_1, xdots, x_n); arr( (SS x_1 t_1), xdots, (SS x_n t_n))| & \text{|x_i| fresh}\\
-\rulename{dstru1} & |SS underscore (truth t)| & = & |truth (SS underscore t)| \\
-\rulename{dstru2} & |SS e (truth t)| & = & |defintro x; e == truth x; truth (SS x t)| & \text{|x| fresh} \\
-\multicolumn{2}{@@{}l}{\rulename{dsif} \; \hfill |SS u (vif t_1 t_2 t_3)|}
- & = & |vif(SS underscore t_1) (SS u t_2) (SS u t_3)| \\
-\rulename{dsfun1}   & |SS underscore (functionOC q t_1 t_2)|
-   & = & |lamOC q i (SS i t_1) (SS underscore t_2)| & \text{|i| fresh} \\
-\rulename{dsfun2}   & |SS f (functionOC q t_1 t_2)|
-& = & |lamOC q i (defintro x; x = SS i t_1) (checkfun q f t_1; SS (apply1N f x) t_2)|  & \text{|i,x| fresh}\\
+\rulename{dsk}      & |SS wu k| & = & |wu `ueq` k| \\
+\rulename{dsvar}    & |SS wu x| & = & |wu `ueq` x| \\
+\rulename{dsapp}    & |SS wu (apply1N t_1 t_2)| & = & |wu `ueq` apply1N ((SS wuinit t_1)) (SS wuinit t_2)| \\
+\rulename{dschoice} & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` SS wuinit t_1 `choice` SS wuinit t_2| \\
+\rulename{dsprim}   & |SS wu o| & = & |wu `ueq` o| \\
+\rulename{dsfor}   & |SS wu (fordo t_1 t_2)|
+   & = & |wu `ueq` fordo (SS wuinit t_1) (SS wuinit t_2)| \\
+\rulename{dsone} & |SS wu (one t)| & = & |wu `ueq` one (SS wuinit t)| \\
+\rulename{dsall} & |SS wu (all t)| & = & |wu `ueq` all (SS wuinit t)| \\
+\rulename{dswild1}    & |SS (eff fx) _| & = & |defintro x; x| \\
+\rulename{dswild2}    & |SS (apeff e fx) _| & = & |e| \\
+\rulename{dsfail}   & |SS wu fail| & = & |fail| \\
+\rulename{dsunify}   & |SS wu (t_1 == t_2)| & = & |(SS wu t_1) = (SS wu t_2)| \\
+\rulename{dssemi}   & |SS wu (t_1 ; t_2)| & = & |SS wuinit t_1 ; SS wu t_2| \\
+\rulename{dswhere}   & |SS wu (t_1 where t_2)| & = & |defintro r; r == (SS wu t_1); (SS wuinit t_2); r| \\
+\multicolumn{2}{@@{}l}{\rulename{dsif} \; \hfill |SS wu (vif t_1 t_2 t_3)|}
+ & = & |vif(SS wuinit t_1) (SS wu t_2) (SS wu t_3)| \\
+\rulename{dsdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
+\rulename{dssquig}   & |SS wu (squig x y := t)| & = & |defintro x; wu `ueq` x; y := SS x t| \\
+\rulename{dschk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
+\rulename{dscol1}   & |SS (eff fx) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
+\rulename{dscol2}   & |SS (apeff e fx) (: t)| & = & |oftypefx e fx (SS wuinit t)| \\
+\rulename{dsoftype}   & |SS (apeff u fx_2) (oftypefx t_1 fx_1 t_2)|
+    & = & |oftypefx (SS (apeff u empty) t_1) (andeffects fx_1 fx_2) (SS wuinit t_2)| \\
+\rulename{dstup1}   & |SS (eff fx) (arr (t_1, xdots, t_n))|
+   & = & |arr( (SS (eff fx) t_1), xdots, (SS (eff fx) t_n))| \\
+\rulename{dstup2}   & |SS (apeff e fx) (arr (t_1, xdots, t_n))|
+& = & \begin{array}[t]{@@{}l}
+  |defintro (x_1 xdots x_n); e = arr(x_1, xdots, x_n);| \\
+  |arr( (SS (apeff x_1 fx) t_1), xdots, (SS (apeff x_n fx) t_n))|
+  \end{array} & \text{|x_i| fresh}\\
+\rulename{dstru1} & |SS (eff fx) (truth t)| & = & |truth (SS (eff fx) t)| \\
+\rulename{dstru2} & |SS (apeff e fx) (truth t)| & = & |defintro x; e == truth x; truth (SS (apeff x fx) t)| & \text{|x| fresh} \\
+\rulename{dsfun1}   & |SS (eff fx_2) (functionOCX q t_1 fx_1 t_2)|
+   & = & |lamOC q i (SS (apeff i empty) t_1) (check fx_1 (SS (eff fx_1) t_2))| & \text{|i| fresh} \\
+\rulename{dsfun2}   & |SS (apeff f fx_2) (functionOCX q t_1 fx_1 t_2)|
+& = & |lamOCv q i (defintro x; x = SS (apeff i empty) t_1)
+           (checkfun q f t_1; check fx_1 (SS (apeff (apply1N f x) fx_1) t_2))|  & \text{|i,x| fresh}\\
 \end{array} \\
 \\
 \textbf{Auxiliary functions} \\
 \hspace{3cm}
-\begin{array}{@@{}l@@{}r@@{\;\;}c@@{\;\;}ll}
-& |underscore `ueq`  e_2| & = & |e_2| \\
-& |e_1 `ueq`  e_2| & = & |e_1 = e_2|  & \text{if |e_2| guarantees to succeed (once)}\\
-& & = & |oftypefx e_1 empty (lamOC closed i (i == e_2) i)| & \text{otherwise, $|i| \not\in |fvs e_2|$}
+\begin{array}{@@{}l@@{\;\;}r@@{\;\;}c@@{\;\;}ll}
+\rulename{dsp1} & |eff fx `ueq`  e_2| & = & |e_2| \\
+\rulename{dsp2} & |apeff e_1 fx `ueq`  e_2|
+%  & = & |e_1 = e_2|  & \text{if |e_2| guarantees to succeed (once)}\\
+ & = & |oftypefx e_1 empty ((lam i (i == e_2)))| & \text{$|i| \not\in |freevars e_2|$}
 \\[2mm]
 & |checkfun open f e| & = & |emptytup| \\
 & |checkfun closed f e| & = & |lamOC closed x (apply1N f x) (x == SS underscore e)|

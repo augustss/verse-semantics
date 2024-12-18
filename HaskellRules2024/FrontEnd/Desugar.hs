@@ -363,6 +363,24 @@ defn (InfixOp p1 op@(Op "->") p2) e = do
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
+eDefine :: HasCallStack => Ident -> SrcEssential -> SrcEssential
+-- Generates (x:=e) in Essential Verse
+eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
+-- x := (e1; ...; en)   generates   e1; ... e(n-1); x:=en
+-- Smart contructor, floats out nested defines
+eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
+                   where
+                     (floats, rhs) = unSeq ts
+eDefine x rhs = DefineE x rhs
+
+encodeType :: SrcEssential -> DsM SrcEssential
+-- Encodes type{e}, returning  fun(x:=e}{x}
+-- You might think that a more direct desugaring would be
+--      type{t} --> \x. x=t
+-- using a ICFP lambda.
+-- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
+encodeType e = do { x <- newIdent noLoc "x"
+                  ; return (Function [(eDefine x e, [closedId])] (Variable x)) }
 
 addSucceeds :: [Eff] -> [Eff]
 addSucceeds [] = [effSucceeds]   -- Default is <succeeds>
@@ -715,9 +733,9 @@ essToMini = go NoInput
     go inp e@(EPrim {})    = inp `ueq` return e
     go _inp Fail           = return Fail
     go inp (Unify  e1 e2)  = eUnify  <$> go inp e1 <*> go inp e2
-    go inp (Where t1 t2)   = do { e1 <- go inp t1; e2 <- go NoInput t2
-                                ; r <- newIdent noLoc "r"
-                                ; return (eSeq [Unify (Variable r) e1, e2, Variable r]) }
+    go inp (Where t1 t2)   = do { (dr, r) <- defineDE "r" (go inp t1)
+                                ; e2 <- go NoInput t2
+                                ; return (eSeq [dr, e2, r]) }
     go inp (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
                                 ; es <- mapM (go NoInput) ts
                                 ; e  <- go inp t
@@ -822,17 +840,8 @@ essToMini = go NoInput
     ueq :: Input -> DsM SrcMini -> DsM SrcMini
     ueq NoInput  ds_e = ds_e
     ueq (PI inp) ds_e = do { e <- ds_e
-                           ; if surely_succeeds e
-                             then return (eUnify inp e)
-                             else
-                        do { i <- newIdent noLoc "i"
-                           ; pure (OfType inp [] (XDLam Closed i (Unify (Variable i) e) (Variable i))) } }
-
-    surely_succeeds e | isValue e = True
-    surely_succeeds (All {})      = True
-    surely_succeeds (One {})      = True
-    surely_succeeds (For2 {})     = True
-    surely_succeeds _             = False
+                           ; i <- newIdent noLoc "i"
+                           ; pure (OfType inp [] (Lam i (Unify (Variable i) e))) }
 
 --------------------------------------------------------
 --
@@ -909,15 +918,6 @@ miniToCore orig_md = go (orig_md,[])
 
     go md e = error $ "TODO: miniToCore " ++ show (md, e)
 
-encodeType :: SrcEssential -> DsM SrcEssential
--- Encodes type{e}, returnng  fun(x:=e}{x}
--- You might think that a more direct desugaring would be
---      type{t} --> \x. x=t
--- using a ICFP lambda.
--- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
-encodeType e = do { x <- newIdent noLoc "x"
-                  ; return (Function [(eDefine x e, [closedId])] (Variable x)) }
-
 encodeFor2 :: SrcCore -> SrcCore -> SrcCore
 -- for2(e1){e2} = iter(e1; \_.e2){ (\a r. cons[ a[], r[] ]), (\_.<>) }
 encodeFor2 e1 e2 = Iter (eSeq [e1, eThunk e2]) eCons2 eNil2
@@ -989,7 +989,7 @@ dsB_12 s t E     _
 dsB_12 s t (P f) j
   = dsRule "BODY2" t $
     dsM_12 s t (P (ApplyD f j))
--- SLPJ: Crucial chnage; this makes HO13 work
+-- SLPJ: Crucial cnhage; this makes HO13 work
 --  = do z <- newIdent (getLoc t) "z";
 --       seqDE [ pure $ eDefine z (ApplyD f j)
 --             , dsM_12 s t (P (Variable z))]
@@ -999,7 +999,7 @@ seqDE ds = eSeq <$> sequence ds
 
 defineDE :: String -> DsM SrcExpr
          -> DsM (SrcExpr,   -- The defn
-               SrcExpr)   -- The use
+                 SrcExpr)   -- The use
 -- define "x" de   returns   x := e, along with x itself
 -- But (just to save clutter) if the rhs turns out to be tiny,
 --   just return it alone
@@ -1008,7 +1008,7 @@ defineDE nm ds_rhs
        ; if isAtomic rhs'
          then pure (eSeq [], rhs')
          else do { x <- newIdent (getLoc rhs') nm
-                 ; pure (eDefine x rhs', Variable x) } }
+                 ; pure (coreDefine x rhs', Variable x) } }
 
 defineDE2 :: String
           -> DsM SrcEssential              -- The RHS
@@ -1021,13 +1021,19 @@ defineDE2 nm ds_rhs ds_body
          else do { x <- newIdent (getLoc rhs') nm
                  ; body' <- ds_body (Variable x)
                  ; if x `elem` getAllIdents body'  -- See Note [Avoiding clutter]
-                   then pure (eSeq [eDefine x rhs', body'])
-                   else pure (eSeq [rhs',           body']) } }
+                   then pure (eSeq [coreDefine x rhs', body'])
+                   else pure (eSeq [rhs'   ,           body']) } }
 
 -- This avoids constructing '_ := e', which can happen with inputs like 'function(exists _){e}
-eDefine' :: Ident -> SrcExpr -> SrcExpr
-eDefine' i e | isSrcUnderscore i = e
-             | otherwise         = eDefine i e
+coreDefine' :: Ident -> SrcCore -> SrcCore
+coreDefine' i e | isSrcUnderscore i = e
+                | otherwise         = eDefine i e
+
+coreDefine :: Ident -> SrcCore -> SrcCore
+coreDefine x (Seq ts) = eSeq (floats ++ [coreDefine x rhs])
+                      where
+                        (floats, rhs) = unSeq ts
+coreDefine x rhs = eSeq [ DefineV x, Unify (Variable x) rhs ]
 
 {- Note [Avoiding clutter]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1114,7 +1120,7 @@ dsM_12 s tt@(Range fx t) (P e)                  -- MTYPE+X
   = dsRule "MTYPE+Xa" tt $
     do { y <- newIdent (getLoc t) "y"
        ; (dz, z) <- defineDE "z" (mDesugarExpr s t)
-       ; pure (eSeq [ eDefine y (eCheck fx e)
+       ; pure (eSeq [ coreDefine y (eCheck fx e)
                     , eCheck [effSucceeds] (eSeq [dz, eApplyD z (Variable y)])]) }
 
 dsM_12 s tt@(Range _fx t) E                      -- MTYPEE
@@ -1142,12 +1148,12 @@ dsM_12 s tt@(DefineIE x y t) E                -- MSQUIGE
 dsM_12 s tt@(DefineIE x y t) (P i)             -- MSQUIGP
   = dsRule "MSQUIGP" tt $
     do { body <- dsM_12 s t (P i)
-       ; pure (eSeq [eDefine x i, eDefine y body]) }
+       ; pure (eSeq [coreDefine x i, coreDefine y body]) }
 
 -------------------- x := t -----------------
 dsM_12 s tt@(DefineE x t) pi                   -- MBIND
   = dsRule "MBIND" tt $
-    eDefine x <$> dsM_12 s t pi
+    coreDefine x <$> dsM_12 s t pi
 
 -------------------- exists x -----------------
 -- Equivalent to to (y:any) provided any = \x.x
@@ -1158,7 +1164,7 @@ dsM_12 _ tt@(DefineV y) E
     pure $ DefineV y
 dsM_12 _ tt@(DefineV y) (P i)
   = dsRule "MEXIP" tt $
-    pure $ eDefine' y i
+    pure $ coreDefine' y i
 
 -------------------- v >> t -----------------
 dsM_12 s tt@(Guard t1 t2) pi                   -- MGUARD
@@ -1167,7 +1173,7 @@ dsM_12 s tt@(Guard t1 t2) pi                   -- MGUARD
 
 -------------------- exi x. t -----------------
 -- dsM_12 s (Exists is t) pi@(P {})
---  = do { let us = [ eDefine i eSomeAny | i <- is ]
+--  = do { let us = [ coreDefine i eSomeAny | i <- is ]
 --       ; e' <- dsM_12 s t pi
 --       ; pure (eSeq (us ++ [e'])) }
 --

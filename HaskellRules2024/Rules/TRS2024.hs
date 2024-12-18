@@ -1017,7 +1017,9 @@ choiceFreeLH = choiceFree' []
 -- calls f, the thunk argument will have the same effects as e&f&g
 -- could have.  We can safely assume that the thunk is choice free,
 -- because if it's not this will already show up in the bodies of f and/or g.
-choiceFree' :: [Ident] -> Expr_or_Context -> Bool
+choiceFree' :: [Ident]           -- These functions are known to be choice-free
+            -> Expr_or_Context
+            -> Bool
 choiceFree' _  (_ :|: _)           = False
 choiceFree' fs ((_ :=: e1) :>: e2) = choiceFree' fs e1 && (isContext e1 || choiceFree' fs e2)
 choiceFree' fs (_ :>>: e)          = choiceFree' fs e

@@ -27,9 +27,10 @@
 
 %format fx_1
 %format fx_2
-%format andeffects (fx1) (fx2) = fx1 "\ast" fx2
+%format andeffects (fx1) (fx2) = fx1 "\!\ast\!" fx2
 
 %% --------- Effects ------------
+%format fx = "\omega"
 %format succeeds = "\textbf{succeeds}"
 %format succeedsE (e) = "\textbf{succeeds}\{" e "\}"
 %format decides = "\textbf{decides}"
@@ -43,6 +44,8 @@
 %format contradicts = "\textbf{contradicts}"
 %format closed = "\textbf{c}"
 %format open = "\textbf{o}"
+%format openeff = "\textbf{open}"
+%format closedeff = "\textbf{closed}"
 %format diverges = "\textbf{diverges}"
 %format transacts = "\textbf{transacts}"
 %format interacts = "\textbf{interacts}"
@@ -83,11 +86,16 @@
 %format (DB (m) (j) (pi) (t)) = "{\mathcal B}_{" m "}\llbracket{}" t "\rrbracket{}" pi "\," j
 %format (De2 md (x))      = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
 
+% ----------------------------------------------------
 % New desugaring, just does the wrapping part:
+% ----------------------------------------------------
 %format (SS u (e))    = "{\mathcal W}\llbracket" e "\rrbracket" u
 %format (checkfun q x e)  = "{\mathcal K}_{" q "}\llbracket" e "\rrbracket" x
 %format `ueq`         = "\;\mathring{=}\;"
 %format underscore    = "{\bullet}"
+%   Input for wrapping
+%format wu            = "\kappa"
+%format wuinit        = "\langle \rangle"
 
 %format FunCheck (pi) = "{\mathcal F}(" pi ")"
 
@@ -379,7 +387,7 @@
 %format functionOC (oc) (x) (rhs) = functionKW "_{" oc "}(" x ")\{" rhs "\}"
 %format functionOCX (oc) (x) (fx) (rhs) = functionKW "_{" oc "}(" x ")\langle" fx "\rangle\{" rhs "\}"
 %format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
-%format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
+%format lamOCv (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".\begin{array}[t]{@{}l} (" t1 ") \\ \{" t2 "\} \end{array}"
 
 
 %% -------End of f unctions ---------------
@@ -433,8 +441,9 @@
 %format CX = "CX"
 %format eqgt = "\!=>\!\!"
 %format squig (x) (y) = x "\!" squiggt "\!" y
-%format squiggt = "\leadsto"
-%% %format squiggt = "\!-\!\!>\!\!\!"
+%format squiggt = "\rightarrow"
+% %format squiggt = "\leadsto"
+% %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
 %format (eff (fx)) = "\langle" fx "\rangle"
 %format (apeff g x) = g "\langle" x "\rangle"

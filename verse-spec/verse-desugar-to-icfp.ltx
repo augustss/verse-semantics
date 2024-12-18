@@ -50,12 +50,12 @@ $$
 \rulename{mchoice} & |DMe3 md si (e_1 `choice` e_2)| & = & |(DMe3 md si e_1) `choice` (DMe3 md si e_2)| \\
 \rulename{mfor}    & |DMe3 md si (fordo e_1 e_2)|
    & = & |iter2 (lam (a r) (cons (force a) (force r))) (DMe3 md si e_1; lam underscore (DMe3 md si e_2)) emptytup| \\
+\rulename{mone}    & |DMe3 md si (one e)| & = & |iter2 (lam (a underscore) a) (DMe3 md si e) fail| \\
+\rulename{mall}    & |DMe3 md si (all e)| & = & |DMe3 md si (fordo (defintro v; v==e) v)| \\
 \multicolumn{2}{l}{\rulename{mif} \;\; \hfill |DMe3 md si (if e_1 then e_2 else e_3|}
 & = & \multicolumn{2}{@@{}l}{|iter2 (lam (a underscore) (force a))
         (DMe3 md si e_1; lam underscore (DMe3 md si e_2))
-        (DMe3 md si e_3)|}  \\
-\rulename{mone}    & |DMe3 md si (one e)| & = & |iter2 (lam (a underscore) a) (DMe3 md si e) fail| \\
-\rulename{mall}    & |DMe3 md si (all e)| & = & |DMe3 md si (fordo (defintro v; v==e) v)| \\[2mm]
+        (DMe3 md si e_3)|}  \\[2mm]
 \end{array}
 \\
 
@@ -66,10 +66,10 @@ $$
   & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
 \rulename{moftype+x1} & |DMe3 md si (oftypefx e_1 empty e_2)|
 & = & |apply1N ((DMe3 md si e_2)) (DMe3 md si e_1)| &   |md|\in\{|mdpos|,|mdx|\} \\
-\rulename{moftype+x2} & |DMe3 mdpos si (oftypefx e_1 fx e_2)|
+\rulename{moftype+x2} & |DMe3 md si (oftypefx e_1 fx e_2)|
 & = & \begin{array}[t]{@@{}l}
-       |defintro r; r == check fx (DMe3 mdpos si e_1);| \\
-       |check succeeds (apply1N ((DMe3 mdpos si e_2)) r)|
+       |defintro r; r == check fx (DMe3 md si e_1);| \\
+       |check succeeds (apply1N ((DMe3 md si e_2)) r)|
       \end{array}
      & |md|\in\{|mdpos|,|mdx|\} \\
 \rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si e| \\

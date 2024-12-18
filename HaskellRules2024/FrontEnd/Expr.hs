@@ -15,7 +15,7 @@ module FrontEnd.Expr(
 
       -- Building SrcExpr
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
-    , eAll, eExists, eCheck, eDefine, eApplyD, eVerify
+    , eAll, eExists, eCheck, eApplyD, eVerify
     , eThunk, eForce, eForceLam, existsXX, eSomeAny
     , eSeq, eUnify, fvArray
     , srcUnderscore, isSrcUnderscore, identX
@@ -327,16 +327,6 @@ eExists :: [Ident] -> SrcExpr -> SrcExpr
 -- Smart constructor, drops empty list of binders
 eExists [] e = e
 eExists is e = Exists is e
-
-eDefine :: HasCallStack => Ident -> SrcEssential -> SrcEssential
--- Generates (x:=e) in Essential Verse
-eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
--- x := (e1; ...; en)   generates   e1; ... e(n-1); x:=en
--- Smart contructor, floats out nested defines
-eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
-                   where
-                     (floats, rhs) = unSeq ts
-eDefine x rhs = DefineE x rhs
 
 eApplyD :: SrcExpr -> SrcExpr -> SrcExpr
 -- (eApply f x)  returns  f[x]
