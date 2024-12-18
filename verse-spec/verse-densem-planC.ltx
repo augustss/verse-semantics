@@ -156,7 +156,6 @@ Env^{*} & = & \powerset{Env} \\
 \semclose{|open|}{F} & = & F \\
 \semclose{|closed|}{F} & = & \{ f \inb F \vb \forall f' \in F. \dom{f} \subseteq \dom{f'} \} \\[1mm]
 
-
 \fcn & : & (\tuple{\Value,\Value})^{*} \rightarrow (\semfcn) \\
 \fcn & & \multicolumn{2}{l}{\text{indicates a function made from a set of pairs} } \\
 
@@ -213,15 +212,19 @@ Env^{*} & = & \powerset{Env} \\
     \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{|e_2|}{\rho'} & \text{otherwise} \\
   \end{array}
   \right. \\
-  & &  |where|\; \bar{\rho} = \{ \rho' || \rho' \inb \semapp{X}{|e_1|}{\rho}, \; \semapp{E}{|e_1|}{\rho'} \neq [] \}
+  & &  |where|\; \bar{\rho} = \{ \rho' ||\, \rho' \inb \semapp{X}{|e_1|}{\rho}, \; \semapp{E}{|e_1|}{\rho'} \neq [] \}
   \\[1mm]
 
   \textbf{Not done}\\
 
 %  \textit{succeeds function:} \\
-  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semclose{q}{\{ f \in \semfcn \;
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = &
+    \semclose{q}
+      {\{ f\,
     \begin{array}[t]{@@{}l@@{\;}l}
-      || & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+      || & \forall x \inb \Value,\,\\
+         & \forall \rho' \in \semapp{X}{e_1}{\rho}, \\
+         & f \inb \semfcn, \\
         & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty) \\
         & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
     \end{array} \\
