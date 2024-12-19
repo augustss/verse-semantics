@@ -839,7 +839,7 @@ essToMini = go NoInput
 
     ueq :: Input -> DsM SrcMini -> DsM SrcMini
     ueq NoInput  ds_e = ds_e
-    ueq (PI inp) ds_e = do { e <- ds_e
+    ueq (PI inp) ds_e = do { e <- ds_e  -- See test `blame0` for a simple example
                            ; i <- newIdent noLoc "i"
                            ; pure (OfType inp [] (Lam i (Unify (Variable i) e))) }
 

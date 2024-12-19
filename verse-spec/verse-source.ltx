@@ -156,7 +156,7 @@ $$
 \rulename{dswild2} &  |: t_1 := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
 \rulename{dsfun1} &  |apply1np p t_1 (eff (q,fx)) := t_2|
     & \rightarrow & |p := functionOCX q (t_1) fx t_2| \\
-\rulename{dsfun1a} &  |apply1np p t_1 := t_2|
+\rulename{dsfun2} &  |apply1np p t_1 := t_2|
   & \rightarrow & |apply1np p t_1 (eff (openeff,succeeds)) := t_2| \\
 \rulename{dsty1} & |p : t_1 (eff fx) := t_2| & \rightarrow & |p := oftypefx t_2 fx t_1|  \\
 \rulename{dsty2}\asktim & |p : t_1  := t_2| & \rightarrow & |p : t_1 (eff decides) := t_2|  \\

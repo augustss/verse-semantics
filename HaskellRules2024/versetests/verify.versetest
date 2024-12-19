@@ -22,11 +22,11 @@ verify("Guard9",pass)  { f():int := 0; L1() := {y:int;  y = f[] } }
 verify("Guard10",fail,tim=skip_acc) { f(x:int):int := x; y := f[y] }
   # Guard10: y=f[y] must be stuck.  Shows the need for a guard
 
-verify("Guard11",fail, broken) { f(x:int):int := 3; y := f[y] }
+verify("Guard11",fail) { f(x:int):int := 3; y := f[y] }
   # Guard11: y=f[y] is still stuck, becuase f is opaque,
   #    just like Guard10, so this should be rejected despite the
   #    fact that the actual result, 3, is independent of x
-  # Wrongly accepted by the old M-desugaring, hence broken
+  # Wrongly accepted by the old M-desugaring
   # tim=skip: Guard11: Tim crashes
 
 testeq("Guard11a",pass,tim=skip_crash) { f(x:int):int := 3; y := f["monkey"] } {fail}
@@ -255,7 +255,7 @@ verify("PP1", pass) { foo(a:int, b:int, pf:type{a=b}) := { a = b } }
 
 # PP3a/b: to verify H's defn, we need to know X=1, so we need to
 #         call G() to the left of that defn
-verify("PP3a", fail, broken)
+verify("PP3a", pass, broken)
                      { F( X:int, G():type{X = 1} )
                               := (H()<succeeds> := X = 1; H()
                                  ; G() )    # Call G last!
@@ -313,6 +313,7 @@ verify("jan01", pass,tim=skip_rej) { h(x:int, y:int)<decides><closed>:int = { x 
 verify("blob", fail,tim=D00) { foo(f()<decides>:int)<succeeds> := {f[]} }
 
 # Finite types (from Google doc "Verse: more tricky cases")
+
 verify("Fin1", fail) { (y := if (y=2) then y+1 else 3); y }
 verify("Fin2", pass) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
 verify("Fin3", fail, broken) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
@@ -324,8 +325,17 @@ verify("Fin3a", fail ) { (y:type{3|4} := if (y=2) then y+1 else 3); if (y=3) the
   # Fin3a fails, I think, because clients of y see some(\_.3|4)
 
 verify("Fin4", fail,tim=V10) { y:int = y }
-verify("Fin5", fail,tim=skip_acc) { y:type{3} = y }
+
+verify("Fin5", pass,tim=skip_acc) { y:type{3} = y }
+  # Fin5 succeeds because we try to find a y satisfying y=y,
+  #     with the clue that y has type{3}; that is easy
   # Tim actually accepts this, but only because type{3} is a singleton
+testeq("Fin5a", pass) { all{ x:type{1|2} } }{ array{1,2} }
+  # Fin5a ends up enumerating the x's that pass
+verify("Fin5b", pass,tim=skip_acc) { all{ y:type{3|4} = y } }
+  # Fin5a succeeds because we try to find a y satisfying y=y,
+  #     with the clue that y has type{3|4}; that is easy
+
 verify("Fin6", fail,tim=V10) { y:type{3|4} = y }
 verify("Fin7", pass,tim=skip_rej) { check<decides>{ y:type{3|4} = 3; y=3 } }
 verify("Fin8a", pass,tim=skip_rej) { check<succeeds>{ y:type{3|4} = 3; y } }
