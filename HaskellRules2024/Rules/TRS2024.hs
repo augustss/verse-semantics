@@ -46,7 +46,7 @@ runtimeAndVerificationStep
            <> existentialStep
            <> choiceStep
            <> oneAndAllStep
-           <> checkStep
+           -- <> checkStep
 
 -- currently:  everywhere (evalRulesNoRec `tryBefore` rulesRec)
 -- better:    (everywhere evalRulesNoRec) `tryBefore` (everywhere rulesRec)
@@ -75,7 +75,7 @@ evalDotDotStep _env lhs =
 
 --------------------------------------------------------------------------------
 applicationStep :: Rule
-applicationStep _env lhs =
+applicationStep env lhs =
   "APP-ADD" `name`
   do Op Add :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1+k2))
@@ -146,6 +146,11 @@ applicationStep _env lhs =
   do Op NEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 /= k2))
      pure Fail
+ ++
+  "APP-ISGROUND" `name`
+   do Op IsGround :@: a <- [lhs]
+      guard (skolValue (skolVars env) a)
+      pure a
  ++
   "APP-ISINT" `name`
   do Op IsInt :@: a <- [lhs]
@@ -395,9 +400,9 @@ onlyApps f orig_e = go orig_e
     go (e1 :@: e2)  = e1 == Var f || (go e1 && go e2)
     go (Iter e1 e2 e3) = all go [e1,e2,e3]
     go (Some e)       = go e
-    go (All e)        = go e
+    --go (All e)        = go e
     go (e1 :>>: e2)   = go e1 && go e2
-    go (Check _ e)    = go e
+    --go (Check _ e)    = go e
     go (Arr    sz e)  = go sz && go e
     go (Size   sz e)  = go sz && go e
     go (Choose sz e)  = go sz && go e
@@ -428,6 +433,7 @@ choiceStep _env lhs =
      pure (e1 :|: (e2 :|: e3))
  ++
 -}
+{-
   -- CHOICE-FAIL-L and CHOICE-FAIL-R should not be needed,
   -- but some dubious verification tests don't pass without them.
   "CHOICE-FAIL-L" `name`
@@ -448,6 +454,7 @@ choiceStep _env lhs =
             $$ (text "ctx" <+> (pPrint ctx))
           , (ctx <@ e1) :|: (ctx <@ e2))
  ++
+-}
   "FAIL" `name`
   do (ctx, Fail) <- evalCtx [] lhs
      guard (ctx /= HOLE)
@@ -467,28 +474,42 @@ oneAndAllStep _env lhs =
   do Iter v f g <- [lhs]
      guard (isVal v)
      let f1:_ = identsNotIn $ free lhs
-         res = Exi $ bind f1 $
-               coreSeq [ Var f1 :=: (f :@: v)
-                       , Var f1 :@: g ]
-     pure res
+     pure (Exi $ bind f1 $
+             (Var f1 :=: (f :@: v)) :>: (Var f1 :@: g))
+     
  ++
-  -- iter(e1 | e2){f, g}  -->  iter(e1){f, \ _ . iter(e2){f, g} }
+  -- iter(C[e1] | C[e2]){f, g}  -->  iter(C[e1]){f, \ _ . iter(C[e2]){f, g} }
   "ITER-CHOICE" `name`
-  do Iter (e1 :|: e2) f g <- [lhs]
-     pure $ Iter e1 f (Lam $ bind underscore $ Iter e2 f g)
+  do Iter e f g <- [lhs]
+     (ctx, e1 :|: e2) <- evalCtx [] e
+     guard (choiceFreeLH ctx)
+     guard (blocked ctx)  -- was: e
+     pure $ Iter (ctx <@ e1) f (Lam $ bind underscore $ Iter (ctx <@ e2) f g)
+{-
  ++
+  -- all(fail)  -->  <>
   "ALL-FAIL" `name`
   do All Fail <- [lhs]
      pure (Tup [])
  ++
+  -- all(v)  -->  <v>
+  "ALL-VALUE" `name`
+  do All v <- [lhs]
+     guard (isVal v)
+     pure (Tup [v])
+ ++
+  -- all(C[e1] | C[e2])  -->  all(C[e1])++all(C[e2])
   "ALL-CHOICE" `name`
   do All e <- [lhs]
-     let choices (e1 :|: e2) = choices e1 ++ choices e2
-         choices e1          = [e1]
-     let vs = choices e
-     guard (all isVal vs)
-     pure (Tup vs)
-
+     (ctx, e1 :|: e2) <- evalCtx [] e
+     guard (choiceFreeLH ctx)
+     guard (blocked ctx)  -- was: e
+     let xs:ys:_ = identsNotIn $ free lhs
+     pure (Exi $ bind xs $ Exi $ bind ys $
+                 (Var xs :=: All (ctx <@ e1))
+             :>: (Var ys :=: All (ctx <@ e2))
+             :>: (Op ArrApp :@: Tup [Var xs, Var ys]))
+-}
 recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
 --   if x/=y, and x free in body
@@ -503,18 +524,69 @@ recStep _env lhs =
                              (Var x :=: v) :>: body) )
 
 --------------------------------------------------------------------------------
+{-
 checkStep :: Rule
 checkStep env lhs =
-   "CHECK-SUC" `name`
-   do Check eff v <- [lhs]
+   "CHECK" `name`
+   do Check eff e <- [lhs]
+      pure (mkCheck eff e)
+ where
+  mkCheck eff e =
+    Exi $ bind l $
+          (Var l :=: Iter (Exi $ bind x $ (Var x :=: e)
+                                      :>: ((Var underscore :=: (Op IsGround :@: Var x))
+                                      :>: Var x))
+                          (Lam $ bind a $ Lam $ bind f $ Tup [Var a,Var f])
+                          (lamUnderscore $ Tup []))
+      :>: Iter (Exi $ bind a $ Exi $ bind f $
+                   (Tup [Var a,Var f] :=: Var l)
+               :>: if canSucceed eff
+                     then Exi $ bind x $
+                              (Var x :=: (Var f :@: Tup []))
+                          :>: Iter ((Var x :=: Tup []) :>: Tup [])
+                                   (lamUnderscore $ lamUnderscore $
+                                     lamUnderscore $ Var a)
+                                   (lamUnderscore $ lamUnderscore $ wrong)
+                     else lamUnderscore $ wrong
+               )
+               (Lam $ bind x $ lamUnderscore $
+                 Var x :@: Tup [])
+               (lamUnderscore $
+                 if canFail eff
+                   then Fail
+                   else wrong)
+   where
+    x:a:f:l:_ = identsNotIn (free e)
+-}
+{-
+   ++
+   "CHECK-SUC-L" `name`
+   do Check eff (v :|: e) <- [lhs]
       guard (skolValue (skolVars env) v)
       guard (canSucceed eff)
-      pure v
+      pure (Iter e (lamUnderscore $ lamUnderscore wrong) (lamUnderscore v)) -- e must fail
    ++
    "CHECK-FAIL" `name`
    do Check eff Fail <- [lhs]
       guard (canFail eff)
       pure Fail
+   ++
+   "CHECK-FAIL-L" `name`
+   do Check eff (Fail :|: e) <- [lhs]
+      pure (Check eff e)
+   ++
+   "CHECK-CHOICE-L" `name`
+   do Check eff ((e1 :|: e2) :|: e3) <- [lhs]
+      pure (Check eff (e1 :|: (e2 :|: e3)))
+   ++
+   "CHECK-CHOICE" `name`
+   do Check eff e <- [lhs]
+      (ctx, e1 :|: e2) <- evalCtx [] e
+      guard (ctx /= HOLE)
+      guard (choiceFreeLH ctx) -- <-- may not be needed?
+      guard (blocked e)
+      pure $ Check eff ((ctx <@ e1) :|: (ctx <@ e2))
+-}
 
 skolValue :: [SkolIdent] -> Expr -> Bool
 -- A value whose only free vars are skolems
@@ -798,6 +870,8 @@ status _  HOLE = NothingToDo HasHole
 
 status _  e | isVal e = valueStatus
 
+status _ (_ :=: (_ :>: _)) = SomethingToDo
+
 status lx (Var x :=: Var y)  -- (x=x) is blocked pending getting a value for x
   | x == y, isLocal lx x
   = blockedStatus
@@ -821,9 +895,8 @@ status lx (_val :=: rhs)     -- e.g. x=blah, where x is bound "outside", or hnf=
 
 status lx (e1 :>: e2) = status lx e1 `andStatus` status lx e2
 
-status lx (All body) -- See (E2)
-  = addSomethingToDo (status (makeRigid lx) body)
-    -- addSomethingToDo: we still have do to the `all` itself
+-- this should be removed once we remove All
+--status lx (All body) = status lx (mkAll body)
 
 status lx (Exi bnd) = status (addFlexi lx x) e
   where
@@ -849,11 +922,19 @@ status _lx (_hnf :@: _arg)
   = SomethingToDo
 
 status _  Fail        = SomethingToDo
-status lx (e1 :|: e2) = status lx e1 `andStatus` status lx e2
+status _  (e1 :|: e2) = BlockedOnExi (if isContext (e1 :|: e2) then HasHole else NoHole)
+  -- status lx e1 `andStatus` status lx e2
   -- We must skolemise in verify(){check<succeeds>{ (x=some{t}; blah) | more-blah }}
   --               and in verify(){check<succeeds>{ v | (x=some{t}; blah) }}
 
-status lx (Iter e1 _ _) = status (makeRigid lx) e1 -- ToDo: not sure!!
+status lx (Iter e _ _)
+  | isVal e   = SomethingToDo
+  | otherwise =
+  case status (makeRigid lx) e of
+    SomethingToDo             -> SomethingToDo
+    _ | choicy e == Just True -> SomethingToDo
+    NothingToDo hasHole       -> NothingToDo hasHole -- or BlockedOnExi??
+    BlockedOnExi hasHole      -> BlockedOnExi hasHole
 
 status _ (Verify {})
   = NothingToDo NoHole   -- There should be no HOLE inside a verify{}
@@ -863,8 +944,8 @@ status _ (Verify {})
   -- Earlier version looked inside verify{}
   --    (_, (_,e)) = alphaRenameVerify (allExis lx) bl
 
-status lx (Check _ e) = status (makeRigid lx) e
-status _  (Choose {}) = SomethingToDo
+--status lx (Check _ e) = SomethingToDo
+status _  (Choose {}) = NothingToDo NoHole
 status lx (Size _ e)  = status lx e
 status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
                    | otherwise                 = SomethingToDo
@@ -872,6 +953,21 @@ status lx (v :>>: e) | any (isLocal lx) (free v) = blockedStatus
                      | otherwise                 = status lx e
 
 status _ e = errorMessage ("Uncovered case in status " ++ show e)
+
+
+-- choicy e returns Just True  if e = C[e1|e2] and C is choicefreeLH
+-- choicy e returns Nothing    if e = C[e1|e2] and C is NOT choicefreeLH
+-- choicy e returns Just False if e /= C[e1|e2]
+choicy :: Expr -> Maybe Bool
+choicy (Op{} :@: _) = Just False
+choicy (_ :@: _)    = Nothing
+choicy (_ :|: _)    = Just True
+choicy (Exi bnd)    = choicy e where (_,e) = unsafeUnbind bnd
+choicy (_ :=: e)    = choicy e
+choicy (e1 :>: e2)
+  | isContext e1    = choicy e1
+  | otherwise       = choicy e1 >>= \c -> if c then Just True else choicy e2
+choicy _            = Just False
 
 ---------------------
 choiceAndFailureFree :: Expr_or_Context -> Bool
@@ -896,14 +992,14 @@ choiceAndFailureFree = go []
                           _     -> False
 
     go fs (Exi bnd)   = go fs e where (_,e) = unsafeUnbind bnd
-    go _  (All {})    = True
+    -- go _  (All {})    = True
     go _  (Arr {})    = True
     go _  (Size {})   = True
     go _  (Some {})   = True
     go _  HOLE        = True
 
     go _  (Choose {}) = False
-    go fs (Check _ e) = go fs e
+    -- go fs (Check _ e) = go fs e
     go _  (Verify {}) = True
 
     go fs e@Iter{}
@@ -937,7 +1033,7 @@ choiceFree' fs e@Iter{}
                                    = choiceFree' (t:fs) f && choiceFree' fs g
   | otherwise                      = error "Malformed Iter"
 choiceFree' _ (Some {})            = True
-choiceFree' _ (All {})             = True
+--choiceFree' _ (All {})             = True
 choiceFree' _ (Arr {})             = True
 choiceFree' _ (Size {})            = True
 choiceFree' _ (Choose {})          = False

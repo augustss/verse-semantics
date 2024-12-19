@@ -76,11 +76,19 @@
 %format (Me  (i) (e)) = "\Me{"  ^ i "}{" ^e "}"
 %format (DMe (i) (e))  = "{\mathcal M}\llbracket" e "\rrbracket{}" i
 %format (DMe2 (m) (i) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}" i
+%format (DMe3 (m) (pi) (e)) = "{\mathcal M}_{" m "}\llbracket" e "\rrbracket{}"pi
 %format (MMe (m) (i) (e)) = "\MMe{" ^ i "}{" ^e "}{" ^m "}"
 
 %format (XMe (i) (u) (m)) = "{\mathcal M}\llbracket{}" m "\rrbracket{}" i "^{" u "}"
 %format (DB (m) (j) (pi) (t)) = "{\mathcal B}_{" m "}\llbracket{}" t "\rrbracket{}" pi "\," j
 %format (De2 md (x))      = "{\mathcal D}_{" md "}\llbracket" x "\rrbracket"
+
+% New desugaring, just does the wrapping part:
+%format (SS u (e))    = "{\mathcal S}\llbracket" e "\rrbracket" u
+%format (checkfun q x e)  = "{\mathcal K}_{" q "}\llbracket" e "\rrbracket" x
+%format `ueq`         = "\;\mathring{=}\;"
+%format underscore    = "{\bullet}"
+
 %format FunCheck (pi) = "{\mathcal F}(" pi ")"
 
 %%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
@@ -168,7 +176,7 @@
 %format olamKW = "\textbf{olam}"
 %format inapplic (x) (y) = "\textbf{inapplic}(" x "," y ")"
 
-%format lam (x) (e) = "\lambda" x".\," e
+%format lam (x) (e) = "\lambda" x" .\," e
 %format lam2 x r e = "\lambda"x"\!\shortrightarrow{}\!"r".\," e
 %format lamhdr (x) = "\lambda" x".\,"
 %format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
@@ -199,7 +207,7 @@
 %format colonequals = "\colonequals"
 %format dollar = "\$"
 %format fordo (a) b = "\textbf{for}(" a ")\,\textbf{do}\," b
-%format forb (a) b = "\textbf{for}(" a ")\,\{" b "\}"
+%format forb (a) b = "\textbf{for}(" a ")\{" b "\}"
 
 %format blam (x) (fx) (e) = "\lambda_{" fx "}" x".\," e
 
@@ -297,12 +305,14 @@
 %format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
 %format iterKW = "\textbf{iter}"
 %format iter (e) (a) (f) (g) = "\textbf{iter}(" e ")\{" a ";" f ";" g "\}"
+%format iter2 (k) (e) (z) = "\textbf{iter}(" k ")\{"e "\}\{" z "\}"
 
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
 %format split (x) (y) (z) = "\textbf{split}\{" x "\}\langle" y "," z "\rangle"
 %% %format defKW = "\textbf{def}"
 %format defKW = "\exists{}"
+%format defintro (x) = "\exists" x
 %format defhdr (x) = "\exists" x ".\,"
 %format def (x) (y) = "\exists" x ".\," y
 %format dlet (x) (r) (b) = "\textbf{let}\;" x "=" r "\;\textbf{in}\,\{" b "\}"
@@ -360,10 +370,14 @@
 %format function (x) (rhs) = functionKW "\," x "\,\{" rhs "\}"
 %format functionP (x) (rhs) = functionKW "(" x ")\{" rhs "\}"
 %format functionX (x) (fx) (rhs) = functionKW "(" x ")" fx "\{" rhs "\}"
+%format funk k (e) (rhs) = functionKW "_"k"(" e ")\{" rhs "\}"
 
 %% functionOC has open/closed subscript
 %format functionOC (oc) (x) (rhs) = functionKW "_{" oc "}(" x ")\{" rhs "\}"
 %format functionOCX (oc) (x) (fx) (rhs) = functionKW "_{" oc "}(" x ")\langle" fx "\rangle\{" rhs "\}"
+%format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
+%format lamOC (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".(" t1 ")\{" t2 "\}"
+
 
 %% -------End of f unctions ---------------
 
@@ -420,7 +434,7 @@
 %% %format squiggt = "\!-\!\!>\!\!\!"
 %format minusgt = "-\!\!>"
 %format (eff (fx)) = "\langle" fx "\rangle"
-%format apeff g x = g "\langle" x "\rangle"
+%format (apeff g x) = g "\langle" x "\rangle"
 %format effs x = "\!\!<\!\!" x "\!\!>\!\!" dots
 %format effsR = "\!\!<\!\!r\!\!>\!\!" dots
 %format arrayty = "[]"

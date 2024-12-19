@@ -9,8 +9,7 @@ module Main where
 import Prelude(Show(..), Ord(..), Eq(..), Num(..), Integral(..),
                Bool(..), String, IO, Integer,
                sequence, error, uncurry, undefined, showString, traverse,
-               ($), (.), not, (&&), (||), otherwise, snd, putStrLn,
-               showParen,
+               ($), (.), not, (&&), (||), otherwise, putStrLn,
                )
 import qualified Prelude
 import qualified Control.Monad as Monad
@@ -20,6 +19,8 @@ import qualified Data.Set as S
 import Data.Maybe
 --import Debug.Trace
 import GHC.Stack
+import Exp
+import Examples
 
 implies :: Bool -> Bool -> Bool
 implies x y = not x || y
@@ -30,50 +31,6 @@ implies x y = not x || y
 ifThenElse :: Bool -> a -> a -> a
 ifThenElse False _ x = x
 ifThenElse True  x _ = x
-
---------------------
----- Abstract syntax
-
-type Ident = String
-
-data Exp
-  = Var Ident | Int Integer | Prim Op | App Exp Exp | Equ Exp Exp
-  | Seq Exp Exp | Def Ident Exp | Colon Exp | Fail | Tup [Exp]
-  | If Exp Exp Exp | Fun OC Exp Exp
-  | Choice Exp Exp | All Exp | For Exp Exp
-  | Where Exp Exp
-  deriving (Eq, Ord)
-
-data Op = Oint | Ogt | Oadd
-  deriving (Eq, Ord, Show)
-
-data OC = Open | Closed
-  deriving (Eq, Ord, Show)
-
-instance Show Exp where
-  showsPrec _ (Var s) = showString s
-  showsPrec p (Int i) = showsPrec p i
-  showsPrec _ (Prim o) = showString (drop 1 $ show o)
-  showsPrec _ (App e1 e2) = showsPrec 11 e1 . showString "[" . showsPrec 0 e2 . showString "]"
-  showsPrec p (Equ e1 e2) = showParen (p > 5) $ showsPrec 6 e1 . showString " = " . showsPrec 6 e2
-  showsPrec p (Seq e1 e2) = showParen (p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
-  showsPrec p (Where e1 e2) = showParen (p > 1) $ showsPrec 3 e1 . showString " where " . showsPrec 3 e2
-  showsPrec p (Def x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
-  showsPrec _ (Colon e) = showString ":" . showsPrec 10 e
-  showsPrec _ Fail = showString "fail"
-  showsPrec _ (Tup es) = showString "<" . showString (intercalate "," $ map show es) . showString ">"
-  showsPrec _ (If e1 e2 e3) = showString "if " . showParen True (showsPrec 0 e1) .
-                              showBraces (showsPrec 0 e2) .
-                              showBraces (showsPrec 0 e3)
-  showsPrec p (Choice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " | " . showsPrec 5 e2
-  showsPrec _ (All e) = showString "all" . showBraces (showsPrec 0 e)
-  showsPrec _ (For e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
-  showsPrec _ (Fun q e1 e2) = showString (if q == Open then "fun_o" else "fun_c") .
-                              showParen True (showsPrec 0 e1) .
-                              showBraces (showsPrec 0 e2)
-
-showBraces :: (String -> String) -> (String -> String)
-showBraces a = showString "{" . a . showString "}"
 
 --------------------
 ---- Values
@@ -90,7 +47,7 @@ instance Show Val where
 
 instance Show RVal where
   showsPrec p (RVal v) = showsPrec p v
-  showsPrec _ (Wrong s) = showString $ "Wrong(" ++ s ++ ")"
+  showsPrec _ (Wrong _) = showString $ "Wrong"
 
 vadd :: Val -> Val -> Val
 vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
@@ -407,26 +364,6 @@ applys fs as = do
   return (lf >< la >< lr, r)
 
 --------------------
----- Find all identifiers defined by := in this scope
-
-dI :: Exp -> [Ident]
-dI = checkDup . sort . dI'
-  where
-    checkDup (x:x':xs) | x == x' = error $ "Duplicate definition of " ++ x
-                       | otherwise = x : checkDup (x':xs)
-    checkDup xs = xs
-
-dI' :: Exp -> [Ident]
-dI' (App e1 e2) = dI' e1 ++ dI' e2
-dI' (Equ e1 e2) = dI' e1 ++ dI' e2
-dI' (Seq e1 e2) = dI' e1 ++ dI' e2
-dI' (Where e1 e2) = dI' e1 ++ dI' e2
-dI' (Tup es) = concat (map dI' es)
-dI' (Def i e) = i : dI' e
-dI' (Colon e) = dI' e
-dI' _ = []
-
---------------------
 ---- Primitive functions
 
 dO :: Op -> WS
@@ -584,256 +521,16 @@ dB' e u rho = do
   return (l, rho')
 
 
---------------------
----- Examples
-
--- x:=2; y:=1; add[(x,y)]
-exp1 :: Exp
-exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))
-
-ex1 :: RVal
-ex1 = dP exp1
-
--- fun_c(x:int){x}
-exp2 :: Exp
-exp2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x")
-
-ex2 :: RVal
-ex2 = dP exp2
-
--- fun_o(x:int){x}
-exp3 :: Exp
-exp3 = Fun Open (Def "x" (Colon (Var "int"))) (Var "x")
-
--- Goes wrong, as it should
-ex3 :: RVal
-ex3 = dP exp3
-
--- fun_c(x:int){add[(x,1)]}
-exp4 :: Exp
-exp4 = Fun Closed (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Tup [Var "x", Int 1]))
-
-ex4 :: RVal
-ex4 = dP exp4
-
-exp5 :: Exp
-exp5 = App exp4 (Int 2)
-
-ex5 :: RVal
-ex5 = dP exp5
-
-exp6 :: Exp
-exp6 = App exp3 (Int 1)
-
--- Using exp3 in its domain is fine
-ex6 :: RVal
-ex6 = dP exp6
-
--- fun_c(f := fun_c(:int){:int}){f[1]}
-exp7 :: Exp
-exp7 = Fun Closed arg (App (Var "f") (Int 1))
-  where arg = Def "f" (Fun Closed cint cint)
-        cint = Colon (Var "int")
-
-exp8 :: Exp
-exp8 = App exp7 (Var "succ")
-
-ex8 :: RVal
-ex8 = dP exp8
-
-exp9 :: Exp
-exp9 = App exp7 (Var "int")
-
-ex9 :: RVal
-ex9 = dP exp9
-
-exp10 :: Exp
-exp10 = App exp7 exp4
-
-ex10 :: RVal
-ex10 = dP exp10
-
--- fun_c(f := fun_c(:succ){:int}){f[1]}
-exp11 :: Exp
-exp11 = Fun Closed arg (App (Var "f") (Int 1))
-  where arg = Def "f" (Fun Closed csucc cint)
-        csucc = Colon (Var "succ")
-        cint = Colon (Var "int")
-
-ex11 :: RVal
-ex11 = dP exp11
-
-exp12 :: Exp
-exp12 = App exp11 (Var "int")
-
-ex12 :: RVal
-ex12 = dP exp12
-
--- Should fail, function domain not large enough.
--- ex7[fun_c(0){0}]
-exp13 :: Exp
-exp13 = App exp7 (Fun Closed (Int 0) (Int 0))
-
-ex13 :: RVal
-ex13 = dP exp13
-
--- Should fail, function domain not large enough,
--- even though it handles the f[1].
--- ex7[fun_c(1){1}]
-exp14 :: Exp
-exp14 = App exp7 (Fun Closed (Int 1) (Int 1))
-
-ex14 :: RVal
-ex14 = dP exp14
-
-exp15 :: Exp
-exp15 = App exp7 (Fun Closed (Colon (Var "int")) (Int 0))
-
-ex15 :: RVal
-ex15 = dP exp15
-
-exp16 :: Exp
-exp16 = App exp11 (Fun Closed (Colon (Var "int")) (Int 0))
-
-ex16 :: RVal
-ex16 = dP exp16
-
--- fun_c(f := fun_c(:int){:succ}){f[1]}
-exp17 :: Exp
-exp17 = Fun Closed arg (App (Var "f") (Int 1))
-  where arg = Def "f" (Fun Closed cint csucc)
-        csucc = Colon (Var "succ")
-        cint = Colon (Var "int")
-
-ex17 :: RVal
-ex17 = dP exp17
-
-exp18 :: Exp
-exp18 = App exp17 (Var "int")
-
-ex18 :: RVal
-ex18 = dP exp18
-
-exp19 :: Exp
-exp19 = App exp17 (Fun Closed (Colon (Var "int")) (Int 0))
-
-ex19 :: RVal
-ex19 = dP exp19
-
--- if (1=1){2}else{0}
-exp20 :: Exp
-exp20 = If (Int 1 `Equ` Int 1) (Int 2) (Int 0)
-
--- if (1=3){2}else{0}
-exp21 :: Exp
-exp21 = If (Int 1 `Equ` Int 3) (Int 2) (Int 0)
-
--- if (x:int){x}{999} = 3
-exp22 :: Exp
-exp22 = If (Def "x" (Colon (Var "int"))) (Var "x") (Int 999) `Equ` Int 3
-
-exp23 :: Exp
-exp23 = All $ Choice (Int 1) (Int 2)
-
-exp24 :: Exp
-exp24 = All $ Colon $ Tup [Int 2, Int 3]
-
--- fun_c(x:=(0|1)){x}
---  denotation id01LR = { [0->L0, 1->R1] }
-exp25 :: Exp
-exp25 = Fun Closed (Def "x" (Choice (Int 0) (Int 1))) (Var "x")
-
-exp26 :: Exp
-exp26 = All $ Colon exp25
-
--- fun_c(x:=(1|0)){x}
---  denotation id01RL = { [0->R0, 1->L1] }
-exp27 :: Exp
-exp27 = Fun Closed (Def "x" (Choice (Int 1) (Int 0))) (Var "x")
-
-exp28 :: Exp
-exp28 = All $ Colon exp27
-
--- if (1 | 2){2}else{0}
-exp29 :: Exp
-exp29 = If (Int 1 `Choice` Int 2) (Int 2) (Int 0)
-
--- fun_c(0){1|2}
-exp30 :: Exp
-exp30 = Fun Closed (Int 0) (Int 1 `Choice` Int 2)
-
--- all{exp30[0]}
-exp31 :: Exp
-exp31 = All $ App exp30 (Int 0)
-
--- fun_c(() where y:=1|2) := if (y = 1) then (1, _) else (_, 2)
-exp32 :: Exp
-exp32 = Fun Closed (Def "y" (Choice (Int 1) (Int 2)) `Seq` Int 0)
-                   (If (Var "y" `Equ` Int 1) (Tup [Int 1, cint]) (Tup [cint, Int 2]))
-  where cint = Colon (Var "int")
-
--- (1, :int) = (:int, 2)
-exp33 :: Exp
-exp33 = Tup [Int 1, cint] `Equ` Tup [cint, Int 2]
-  where cint = Colon (Var "int")
-
--- fun_c(x:=:int; :int){0}
-exp34 :: Exp
-exp34 = Fun Closed (Def "x" cint `Seq` cint) (Int 0)
-  where cint = Colon (Var "int")
-
--- fun_c((x:=a; x:int) where a:int){x}
-exp35 :: Exp
-exp35 = Fun Closed (((Var "x" `Equ` Var "a") `Seq` Def "x" cint) `Where` Def "a" cint) (Var "x")
-  where cint = Colon (Var "int")
-
--- fun_c(a:=0|1; x:=a){x}
-exp36 :: Exp
-exp36 = Fun Closed ((Def "a" (Int 0 `Choice` Int 1)) `Seq` (Def "x" (Var "a"))) (Var "x")
-
--- fun_c(x:=0|1|2){x}
-exp37 :: Exp
-exp37 = Fun Closed (Def "x" (Int 0 `Choice` Int 1 `Choice` Int 2)) (Var "x")
-
--- fun_c(x:=3|1|0){x}
-exp38 :: Exp
-exp38 = Fun Closed (Def "x" (Int 3 `Choice` Int 1 `Choice` Int 0)) (Var "x")
-
--- fun_c(x:=0|1|2){x} = fun_c(x:=3|1|0){x}
--- denotation {}
-exp39 :: Exp
-exp39 = exp37 `Equ` exp38
-
--- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(3|1|0)){x}
--- 0->L,LL0, 1->L,RL1, 2->L,R2, 3->R,LL3, 1->R,RL1, 0->R,R0
-exp40 :: Exp
-exp40 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
-                    Def "x" (If (Var "a" `Equ` Int 0)
-                                (Int 0 `Choice` Int 1 `Choice` Int 2)
-                                (Int 3 `Choice` Int 1 `Choice` Int 0)))
-                   (Var "x")
-
-allExps :: [Exp]
+allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22, exp23, exp24, exp26, exp28, exp29, exp31, exp33,
+           exp20, exp21, exp22, exp23, exp24, exp25, exp26, exp27, exp28, exp29, exp30, exp31, exp33,
            exp34, exp35
           ]
 
-refExps :: String
-refExps = "[3,int,Wrong([(-,comparable),(-,int)]),succ,3,1,ho1,2,1,2,ho2,2,Wrong([]),Wrong([]),0,0,ho3,2,1,2,0,3,[1,2],[2,3],[0,1],[1,0],2,[1,2],[1,2],const0,int]"
+-- broken: exp32
 
-allRes :: [RVal]
-allRes = map dP allExps
-
-allOK :: Bool
-allOK = show allRes == refExps
-
-_used :: [RVal]
-_used = [ex1, ex2, ex3, ex4, ex5, ex6, ex8, ex9,
-         ex10, ex11, ex12, ex13, ex14, ex15, ex16, ex17, ex18, ex19
-        ]
-
+{-
 dens :: [(Exp, WS)]
 dens =
   [(exp25, sfn "id01LR"), (exp27, sfn "id01RL")
@@ -844,26 +541,9 @@ dens =
         fn s = VFcn $ Fcn s M.empty
         sfn :: String -> WS
         sfn = unit . fn
-
-check :: IO ()
-check = do
-  if (all (\ (e, v) -> dE e rho0 == v) dens) then
-    putStrLn "OK"
-   else Prelude.do
-    let f (e, v) = Prelude.do
-          let v' = dE e rho0
-          if v == v' then
-            Prelude.return ()
-           else
-            Prelude.print (e, v, v')
-    Prelude.mapM_ f dens
+-}
 
 main :: IO ()
 main = Prelude.do
   putStrLn "Start"
-  if allOK then
-    putStrLn "Success"
-   else Prelude.do
-    putStrLn "Failure:"
-    putStrLn $ refExps
-    putStrLn $ show allRes
+  runExamples dP allExps

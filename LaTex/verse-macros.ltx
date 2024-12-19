@@ -1,0 +1,335 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+% Typesetting rewrite rules
+
+% Name of the language
+% \newcommand{\versecalc}{$\mathcal{VC}$}
+% \newcommand{\calcname}{\versecalc\xspace}
+%%\newcommand{\mypara}[1]{\smallskip\noindent\textbf{#1}\xspace}  ACMART gives warning about use of \\smallskip for some reason
+% \newcommand{\mypara}[1]{\vskip\smallskipamount\noindent\textbf{#1}\xspace}
+
+% \newcommand{\calcname}{Fresh Calculus\xspace}
+% \newcommand{\lcalcname}{Lenient Calculus\xspace}
+% \newcommand{\calcshort}{FC\xspace}
+% \newcommand{\vcshort}{VC\xspace}
+\newcommand{\vcname}{Verse Calculus\xspace}
+
+% Right arrow for rewrites
+\newcommand{\movesto}{\longrightarrow}
+\newcommand{\movesfrom}{\longleftarrow}
+\newcommand{\convertible}{\longleftrightarrow^{\ast}}
+\newcommand{\movestoX}{\rightsquigarrow}
+\newcommand{\movesfromX}{\leftsquigarrow}
+
+% Arrows with explanation, including the common cases of one, two or a repeated rule
+\newcommand{\movestoC}[1]{\movesto\!\!\{#1\}}
+\newcommand{\movestoR}[1]{\movestoC{\rulename{#1}}}
+\newcommand{\movestoRR}[2]{\movestoC{\rulename{#1}, \rulename{#2}}}
+\newcommand{\movestoRn}[2]{\movestoC{\rulename{#1} \times #2}}
+
+
+\newcommand{\rightarrowdbl}{\rightarrow\mathrel{\mkern-14mu}\rightarrow}
+\newcommand{\xrightarrowdbl}[2][]{%
+  \xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow
+}
+\newcommand{\leftarrowdbl}{\leftarrow\mathrel{\mkern-14mu}\leftarrow}
+\newcommand{\xleftarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\xleftarrow[#1]{#2}%
+}
+
+\newcommand{\xleftrightarrowdbl}[2][]{%
+  \leftarrow\mathrel{\mkern-14mu}\leftarrow\mathrel{\mkern-14mu}\xrightarrow[#1]{#2}\mathrel{\mkern-14mu}\rightarrow}
+
+
+\newcommand{\rr}{\ensuremath{\mathcal{R}}\xspace}
+\newcommand{\rs}{\ensuremath{\mathcal{S}}\xspace}
+\newcommand{\rt}{\ensuremath{\mathcal{T}}\xspace}
+\newcommand{\rrhat}{\trel{\rr}}
+\newcommand{\rshat}{\trel{\rs}}
+\newcommand{\rthat}{\trel{\rt}}
+\newcommand{\goone}[1]{\xrightarrow{\epsilon}_{\alignsubscript{#1}}}
+\newcommand{\go}[1]{\xrightarrow{}_{\alignsubscript{#1}}}
+\newcommand{\gos}[1]{\xrightarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\lgos}[1]{\xleftarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\gok}[2]{\xrightarrowdbl{#2}_{\alignsubscript{#1}}}
+
+\newcommand{\trel}[1]{\ensuremath{\widehat{#1}}}
+\newcommand{\tstep}[3]{\ensuremath{#2 \go{\trel{#1}} #3}}
+
+\newcommand{\rstepo}[3]{\ensuremath{#2 \goone{#1} #3}}
+\newcommand{\rstep}[3]{\ensuremath{#2 \go{#1} #3}}
+\newcommand{\rsteps}[3]{\ensuremath{#2 \gos{#1} #3}}
+\newcommand{\lsteps}[3]{\ensuremath{#2 \lgos{#1} #3}}
+\newcommand{\rstepk}[4]{\ensuremath{#3 \gok{#1}{#2} #4}}
+\newcommand{\ungoone}[1]{\xleftarrow{\epsilon}_{\alignsubscript{#1}}}
+\newcommand{\ungo}[1]{\xleftarrow{}_{\alignsubscript{#1}}}
+\newcommand{\ungos}[1]{\xleftarrowdbl{}_{\alignsubscript{#1}}}
+\newcommand{\ungok}[2]{\xleftarrowdbl{#2}_{\alignsubscript{#1}}}
+\newcommand{\unrstepo}[3]{\ensuremath{#2 \ungoone{#1} #3}}
+\newcommand{\unrstep}[3]{\ensuremath{#2 \ungo{#1} #3}}
+\newcommand{\unrsteps}[3]{\ensuremath{#2 \ungos{#1} #3}}
+\newcommand{\unrstepk}[4]{\ensuremath{#3 \ungok{#1}{#2} #4}}
+\newcommand{\univ}{\ensuremath{\mathcal{E}}}
+\newcommand{\join}[3]{{#2} \downarrow_{\alignsubscript{#1}} {#3}}
+\newcommand{\dia}{\ensuremath{\diamond}}
+
+\newcommand{\rnk}{\ensuremath{\rho}}
+\newcommand{\rord}{\ensuremath{\mathcal{O}}}
+\newcommand{\runi}{\ensuremath{\mathcal{U}}}
+\newcommand{\runihat}{\ensuremath{\trel{\mathcal{U}}}}
+\newcommand{\rstr}{\ensuremath{\mathcal{S}}}
+\newcommand{\rapp}{\ensuremath{\mathcal{A}}}
+\newcommand{\rapphat}{\ensuremath{\trel{\mathcal{A}}}}
+\newcommand{\rcon}{\ensuremath{\mathcal{N}}}
+\newcommand{\rconhat}{\ensuremath{\trel{\mathcal{N}}}}
+\newcommand{\rconm}{\ensuremath{\rcon'}}
+\newcommand{\rss}{\ensuremath{\mathcal{SS}}}
+
+\newcommand{\rgc}{\ensuremath{\mathcal{G}}}
+\newcommand{\rgchat}{\ensuremath{\trel{\mathcal{G}}}}
+\newcommand{\rfail}{\ensuremath{\mathcal{F}}}
+\newcommand{\rspc}{\ensuremath{\mathcal{C}}}
+\newcommand{\rspchat}{\ensuremath{\trel{\mathcal{C}}}}
+\newcommand{\norecursion}{no recursion\xspace}
+\newcommand{\noHYPHENrecursion}{no-recursion\xspace}
+\newcommand{\rdx}[1]{\ensuremath{\Delta_{\alignsubscript{#1}}}}
+\newcommand{\txr}[2]{\ensuremath{\rstep{#1}{\rdx{#2}}{\rdx{#2}'}}}
+\newcommand{\tx}[1]{\ensuremath{\rstep{#1}{\rdx{#1}}{\rdx{#1}'}}}
+\newcommand{\txi}[1]{\ensuremath{\rstep{}{\rdx{#1}}{\rdx{#1}'}}}
+
+
+\newcommand{\wf}[1]{\ensuremath{\vdash #1}}
+\newcommand{\wff}[5]{\ensuremath{#1 \vdash #2 \rightsquigarrow (#3 \mid #4 \mid #5)}}
+\newcommand{\wffv}[4]{\ensuremath{\vdash_|v| #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+\newcommand{\wffmany}[4]{\ensuremath{\vdash_{\!*} #1 \rightsquigarrow (#2 \mid #3 \mid #4)}}
+% \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+% \newcommand{\lvc}[1]{\colorbox{lightgray}{#1}}
+\newcommand{\lvc}[1]{#1}
+\newcommand{\relDescription}[1]{\ensuremath{\textrm{\textbf{#1}}}}
+\newcommand{\judgementHead}[2]{\ensuremath{\relDescription{#1}\hfill\fbox{#2}}}
+\newcommand{\judgementHeadNameOnly}[1]{\ensuremath{\relDescription{#1}\hfill}}
+
+
+%% Definitions for explaining skew confluence
+\newcommand{\inccon}[2]{\mathbin{\smash{\mathop{\xleftrightarrowdbl{\hphantom{#1}}}\limits_{\smash{\hbox{\raise0.55ex\hbox{\smash{$\scriptstyle#2$}}}}}^{\vbox to 0pt{\hbox{\lower0.95ex\hbox{\smash{$\scriptstyle#1$}}}\vss}}}}}
+\newcommand{\leqomega}{\mathrel{\leq_\omega}}
+\newcommand{\omegarr}{\omega_{\rr}}
+\newcommand{\leqomegarr}{\mathrel{\leq_{\omegarr}}}
+\newcommand{\preceqomegarr}{\mathrel{\preceq_{\omega_{\rr}}}}
+\newcommand{\downclose}{\mathord{\Downarrow_{\leqomega}\!}}
+
+
+%% GS: Add @@{} to match other changes made below to get more horizontal space in Figure 3
+%% \newcommand{\rulegroupname}[1]{\multicolumn{4}{l}{\textit{#1}}\\}
+\newcommand{\rulegroupname}[1]{\multicolumn{4}{@@{}l}{\textit{#1}}\\}
+\newcommand{\largerhs}[1]{\multicolumn{2}{@@{}l}{#1}}
+
+
+
+\newcommand{\ie}{\emph{i.e.}}   % \mbox keeps the last period from
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\Eg}{\emph{E.g.}}
+\newcommand{\etc}{\emph{etc.}}
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\vs}{\emph{vs.}}
+
+\newcommand{\verifier}{\textsc{TRSVerifier}\xspace}
+\newcommand{\mypara}[1]{\vskip\smallskipamount\noindent\textbf{#1}\xspace}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\vcshort}{VC\xspace}
+\newcommand{\isdone}[1]{\mathsf{Verified}(#1)}
+\newcommand{\mustKW}{\mathsf{Must}}
+\newcommand{\must}[2]{\ensuremath{\mustKW{}\langle #1 \rangle\{#2\}}}
+\newcommand{\mustSucceed}[1]{\must{|succeeds|}{#1}}
+\newcommand{\mustDecide}[1]{\must{|decides|}{#1}}
+\newcommand{\sucdec}[1]{\mathsf{sd}(#1)}
+\newcommand{\mustopKW}{\mathsf{Must_{op}}}
+\newcommand{\mustop}[2]{\ensuremath{\mustopKW{}\langle #1 \rangle\{#2\}}}
+
+\newcommand{\mustVerifyKW}{\mathsf{Prove}}
+\newcommand{\mustVerify}[1]{\ensuremath{\mustVerifyKW(#1)}}
+\newcommand{\proves}[2]{\ensuremath{#1 \vdash #2}}
+\newcommand{\lamvars}[1]{\mathsf{lams}(#1)}
+\newcommand{\UnAssume}[1]{\ensuremath{\lfloor #1 \rfloor}}
+\newcommand{\impl}[2]{{#1} \vdash {#2}}
+\newcommand{\FEnv}[1]{\ensuremath{\Gamma(#1)}}
+\newcommand{\Facts}[1]{\ensuremath{\mathsf{Facts}(#1)}}
+
+\newcommand{\tlamFX}[1]{\ensuremath{\mathsf{tlam}_{#1}}}
+% \newcommand{\De}[1]{\llbracket #1 \rrbracket}
+% \newcommand{\Fe}[2]{\llbracket #1 \triangleright #2 \rrbracket}
+% \newcommand{\Me}[2]{\llbracket #1 \blacktriangleright #2 \rrbracket}
+\newcommand{\Ae}[2]{\llbracket #1 \ \textbf{as}\ #2 \rrbracket}
+
+
+\newcommand{\vb}{\; |vbar| \;}
+\newcommand{\textquote}{'}
+
+% Get rid of this lot -------------------
+\newcommand{\vtt}[1]{\text{\tt #1}}
+\newcommand{\eff}{\mathit{eff}}   % Non-terminal for effects
+\newcommand{\clamx}[2]{lam (#1) in #2}
+\newcommand{\clam}[2]{\vtt{\clamx{#1}{#2}}}
+\newif\ifmatch
+\matchtrue
+\ifmatch
+\newcommand{\pmatch}[2]{$#1 \vtt{ :- } #2$}
+\else
+\newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
+\fi
+\newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
+
+
+% ------------------------------------------------------------
+%                        Desugaring
+% ------------------------------------------------------------
+
+\newcommand{\An}[1]{{\mathcal A}\llbracket #1 \rrbracket}
+\newcommand{\Cr}[1]{{\mathcal C}\llbracket #1 \rrbracket}
+\newcommand{\Bi}[1]{{\mathcal B}\llbracket #1 \rrbracket}
+\newcommand{\Vr}[1]{{\mathcal V}\llbracket #1 \rrbracket}
+\newcommand{\Vl}[1]{{\mathcal S}\llbracket #1 \rrbracket}
+\newcommand{\Th}[1]{{\mathcal H}\llbracket #1 \rrbracket}
+
+% Control if desugaring has named transformations or not
+\newif\ifdesugarops
+\desugaropstrue
+% \desugaropsfalse
+
+\ifdesugarops
+\newcommand{\Ane}[1]{{\mathcal A}\llbracket #1 \rrbracket}
+\newcommand{\Fne}[1]{{\mathcal F}\llbracket #1 \rrbracket}
+\newcommand{\De}[1]{{\mathcal D}\llbracket #1 \rrbracket}
+\newcommand{\Ve}[1]{{\mathcal V}\llbracket #1 \rrbracket}
+\newcommand{\Ie}[1]{{\mathcal I}\llbracket #1 \rrbracket}
+% \newcommand{\Me}[2]{{\mathcal M}\llbracket #1 \blacktriangleright #2 \rrbracket}
+\newcommand{\Me}[2]{{\mathcal M}\llbracket #2 \rrbracket #1}
+\newcommand{\DMe}[2]{{\mathcal M}\llbracket #2 \rrbracket #1}
+\newcommand{\Fe}[2]{{\mathcal F}\llbracket #2 \rrbracket #1}
+\newcommand{\MMe}[3]{{\mathcal M}_{#3}\llbracket #2 \rrbracket #1}
+\newcommand{\Ld}[2]{{\mathcal L}\llbracket #1 \rrbracket \, #2}
+\newcommand{\Pd}[2]{{\mathcal P}\llbracket #1 \rrbracket \, #2}
+\else
+\newcommand{\De}[1]{#1}
+\newcommand{\Me}[1]{#1}
+\newcommand{\Ld}[2]{#1 : #2}
+\newcommand{\Pd}[2]{#1 := #2}
+\fi
+
+% Names of rules
+\newcommand{\rulename}[1]{\textsc{\small #1}}
+
+% Hole in context
+\newcommand{\hole}{\square}
+\newcommand{\freevars}[1]{\mathsf{fvs}(#1)}
+\newcommand{\skol}[1]{\mathsf{skol}(#1)}
+\newcommand{\freevarsoutsidelambdas}[1]{\mathsf{fvsol}(#1)}
+\newcommand{\boundvars}[1]{\mathsf{bvs}(#1)}
+\newcommand{\valvars}[1]{\mathsf{vvs}(#1)}
+\newcommand{\disjoint}{\;\#\;}
+\newcommand{\hnf}{\mathit{hnf}}  % Head normal form
+
+\newcommand{\hexp}{h-expression}
+\newcommand{\Hexp}{H-expression}
+
+\newcommand{\coloredtext}[3]{\strut\ifmmode\text{\color{#1} [{#2}: #3]}\else{\color{#1} [{#2}: #3]}\fi}
+% \text in text mode implies a mbox and prevents wrapping, so only use \text in math mode
+% The strut is needed somehow, else \iffmode does not work in an \begin{array} cell?
+\definecolor{dkcyan}{rgb}{0.1, 0.3, 0.3}
+\newcommand{\lennart}{\coloredtext{dkcyan}{LA}}
+\newcommand{\simon}{\coloredtext{red}{SPJ}}
+\newcommand{\ranjit}{\coloredtext{green}{RJ}}
+\definecolor{dkblue}{rgb}{0.0, 0.0, 0.6}
+\newcommand{\joachim}{\coloredtext{dkblue}{JB}}
+
+\newenvironment{figurebox}{\begin{figure}\begin{framed}}{\end{framed}\end{figure}}
+\newenvironment{figurebox*}{\begin{figure*}\begin{framed}}{\end{framed}\end{figure*}}
+
+% Example environment
+\newcounter{example}
+\newenvironment{example}[1][]{\refstepcounter{example}\par\medskip
+   \noindent\textbf{Example~\theexample. #1} \rmfamily}{\medskip}
+
+
+% ---------------------------------------------------
+%             Denotational semantics
+% ---------------------------------------------------
+
+\newcommand{\tuple}[1]{\langle #1 \rangle}
+\newcommand{\Value}{W}
+\newcommand{\semfcn}{\Value \! \rightharpoonup \! \Value}
+\newcommand{\Term}{Term}
+\newcommand{\Labels}{Labels}
+\newcommand{\Forml}{Form}
+\newcommand{\Env}{Env}
+\newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
+\newcommand{\mcompr}[2]{[ #1 \vb #2 ]}
+\newcommand{\mbind}[2]{ #1 \leftarrow #2 }
+\newcommand{\malt}{\diamond}
+\newcommand{\append}{+\!\!+\,}
+\newcommand{\semclose}[2]{\textbf{close}_{#1}\,#2}
+\newcommand{\semapply}[2]{\apply(#1,#2)}
+\newcommand{\apply}{\mathbf{apply}}
+
+\newcommand{\setform}[1]{\left\{ #1 \right\}}
+\newcommand{\lcompr}[2]{[ #1 \vb #2 ]}
+\newcommand{\scompr}[2]{\{ #1 \vb #2 \}}
+\newcommand{\sbind}[2]{ #1 \in #2 }
+\newcommand{\inb}{\,\dot{\in}\,}
+
+\newcommand{\semfun}[1]{\mathcal{#1}}
+\newcommand{\semap}[2]{\semfun{#1}\llbracket #2 \rrbracket}
+\newcommand{\semapp}[3]{\semfun{#1}\llbracket #2 \rrbracket\, #3}
+\newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4}
+\newcommand{\semapppp}[5]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4 \, #5}
+
+\newcommand{\envapp}[2]{\semfun{R}\llbracket #1 \rrbracket #2}
+\newcommand{\folapp}[2]{\semfun{L}\llbracket #1 \rrbracket #2}
+\newcommand{\sfolapp}[2]{\semfun{S}\llbracket #1 \rrbracket #2}
+\newcommand{\termapp}[2]{\semfun{T}\llbracket #1 \rrbracket #2}
+\newcommand{\liftrel}[1]{\hat{#1}}
+\newcommand{\cons}{{:}}           % Cons for value sequences, V*
+
+\newcommand{\sconcat}{\bowtie}
+\newcommand{\shead}{\mathit{head}}
+\newcommand{\stuple}{\mathit{tuple}}
+\newcommand{\scons}{:}
+
+\newcommand{\fcn}{\mathbf{fcn}}
+\newcommand{\get}[1]{\mathbf{sing}(#1)}
+
+\newcommand{\dtuple}{\tuple{\Value}}
+\newcommand{\fmapsto}{\!\mapsto\!}
+\newcommand{\mkfcn}[1]{\fcn #1}
+
+
+% extend envt
+\newcommand{\extendrho}[2]{#1[#2]}
+
+% The collection type
+\newcommand{\mtype}{\Value^{*}}
+\newcommand{\mtyped}{\Value^{?}}
+\newcommand{\mempty}{\{\}}
+\newcommand{\munit}{\textbf{unit}}
+\newcommand{\msing}[1]{\{#1\}}
+\newcommand{\munits}[1]{\munit(#1)}
+\newcommand{\mintersect}{\Cap}
+\newcommand{\munion}{\Cup}
+\newcommand{\msemi}{\fatsemi}
+\newcommand{\mone}{\mathit{one}}
+\newcommand{\mall}{\mathit{all}}
+\newcommand{\msucceeds}{\mathit{succeeds}}
+\newcommand{\mdecides}{\mathit{decides}}
+\newcommand{\mtag}{\mathit{tag}}
+\newcommand{\mtage}[1]{([],#1)}
+\newcommand{\mlift}[1]{#1_{\bot}}
+\newcommand{\mplus}{\oplus}
+\newcommand{\mcross}{\scalebox{1.5}{$\Cup$}}
+\newcommand{\powerset}[1]{{\mathcal P}(#1)}
+\newcommand{\wrong}{\mathbf{wrong}}
+\newcommand{\ran}{\mathbf{ran}}
+\newcommand{\dom}{\mathbf{dom}}
