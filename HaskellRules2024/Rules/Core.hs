@@ -20,7 +20,7 @@ module Rules.Core
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkApp, mkEqual, mkOne, mkAll, matchAll, mkCheck, lamUnderscore, someUnderscore, wrong
+  , mkApp, mkEqual, mkOne, mkAll, matchAll, mkCheck, matchCheck, lamUnderscore, someUnderscore, wrong
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -236,16 +236,16 @@ mkAll_matchAll = (\e -> Iter e f g, match)
    f = Lam $ bind x $
        Lam $ bind fxs $
        Exi $ bind xs $
-       Exi $ bind rs $
-       Exi $ bind z $
        (Var xs :=: (Var fxs :@: Tup [])) :>:
-       (Var z :=: (Op ArrApp :@: Tup [Tup [Var x], Var xs, Var rs])) :>:
-       Var rs
+       (Exi $ bind rs $
+        Exi $ bind z $
+        (Var z :=: (Op ArrApp :@: Tup [Tup [Var x], Var xs, Var rs])) :>:
+        Var rs)
 
    g = lamUnderscore $ Tup []
 
-   match (Iter e f' g') | f' == f && g == g' = Just e
-   match _                                   = Nothing
+   match (Iter e f' g') | norm f' == norm f && norm g' == norm g = Just e
+   match _                                                       = Nothing
 
 mkAll :: Expr -> Expr
 mkAll = fst mkAll_matchAll
@@ -253,8 +253,46 @@ mkAll = fst mkAll_matchAll
 matchAll :: Expr -> Maybe Expr
 matchAll = snd mkAll_matchAll
 
-mkCheck :: Effect -> Expr -> Expr
-mkCheck eff e =
+mkCheck_matchCheck :: (Effect -> Expr -> Expr, Expr -> Maybe (Effect,Expr))
+mkCheck_matchCheck = (mk, match)
+ where
+  match e =
+    do Exi bnd <- pure e
+       let (_,exi_body) = unsafeUnbind bnd
+       ((_ :=: Iter chk_body _ _) :>: _) <- pure exi_body
+       case [ (eff,chk_body)
+            | eff <- [Succeeds, Decides, Fails]
+            , norm (mk eff chk_body) == norm e
+            ] of
+         (eff,body):_ -> pure (eff,body)
+         []           -> Nothing
+ 
+  mk eff e =
+    Exi $ bind l $
+          (Var l :=: Iter e
+                          (Lam $ bind a $ Lam $ bind f $ Tup [Var a,Var f])
+                          (lamUnderscore $ Tup []))
+      :>: Iter (Exi $ bind a $ Exi $ bind f $
+                   (Tup [Var a,Var f] :=: Var l)
+               :>: (Var underscore :=: (Op IsGround :@: Var a))
+               :>: if canSucceed eff
+                     then Exi $ bind x $
+                              (Var x :=: (Var f :@: Tup []))
+                          :>: Iter ((Var x :=: Tup []) :>: Tup [])
+                                   (lamUnderscore $ lamUnderscore $
+                                     lamUnderscore $ Var a)
+                                   (lamUnderscore $ lamUnderscore $ wrong)
+                     else lamUnderscore $ wrong
+               )
+               (Lam $ bind x $ lamUnderscore $
+                 Var x :@: Tup [])
+               (lamUnderscore $
+                 if canFail eff
+                   then Fail
+                   else wrong)
+   where
+    l:x:a:f:_ = identsNotIn (free e)
+{-
     Exi $ bind l $
           (Var l :=: Iter (Exi $ bind x $ (Var x :=: e)
                                       :>: ((Var underscore :=: (Op IsGround :@: Var x))
@@ -279,7 +317,14 @@ mkCheck eff e =
                    then Fail
                    else wrong)
    where
-    x:a:f:l:_ = identsNotIn (free e)
+    l:x:a:f:_ = identsNotIn (free e)
+-}
+
+mkCheck :: Effect -> Expr -> Expr
+mkCheck = fst mkCheck_matchCheck
+
+matchCheck :: Expr -> Maybe (Effect, Expr)
+matchCheck = snd mkCheck_matchCheck
 
 (>>>) :: Expr -> Expr -> Expr
 -- e1 >>> e2  =   (_ = e1); e2
@@ -603,6 +648,10 @@ pPrintPrecE lvl prec the_expr
        Var x      -> pPrint x
        Lit i      -> pPrint i
        Op op      -> pPrint op
+
+       -- special patterns we want to see
+       e | Just body      <- matchAll e   -> text "ALL" <> braces (ppr0 body)
+       e | Just (fx,body) <- matchCheck e -> text ("CHECK<" ++ show fx ++ ">") <> braces (ppr0 body)
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> mbPar0 $ sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
