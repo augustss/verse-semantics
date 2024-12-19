@@ -180,11 +180,39 @@ arrStep env lhs =
                    , e ])
  ++
   "SIZE0" `name`  -- Size(0){e} --> 0
+  do Size (LitInt 0) _ <- [lhs]
+     pure (litInt 0)
+ ++
+  "SIZE-VAL" `name`  -- Size(n){v} --> n
+  do Size n v <- [lhs]
+     guard (isVal n)
+     guard (isVal v)
+     pure n
+ ++
+  "SIZE-FAIL" `name`  -- Size(n){fail} --> 0
+  do Size n Fail <- [lhs]
+     pure (LitInt 0)
+ ++
+  "SIZE-CHOICE" `name`  -- Size(n){C[e1|e2]} --> Size(n){C[e1]} + Size(n){C[e2]}
+  do Size n e <- [lhs]
+     guard (isVal n)
+     (ctx, e1 :|: e2) <- evalCtx [] e
+     guard (choiceFreeLH ctx)
+     guard (blocked ctx)  -- was: e
+     let x:y:_ = identsNotIn (free e)
+     pure $ Exi $ bind x $ Exi $ bind y $
+           (Var x :=: Size n (ctx <@ e1))
+       :>: (Var y :=: Size n (ctx <@ e2))
+       :>: (Op Add :@: Tup [Var x, Var y])
+
+{-
+ ++
+  "SIZE0" `name`  -- Size(0){e} --> 0
   do Size (LitInt n) _ <- [lhs]
      guard (n==0)
      pure (litInt 0)
  ++
-  "SIZEn" `name`  -- Size(n){v1 | v2 | ...} --> some(nat)
+  "SIZEn" `name`  -- Size(n){v1 | v2 | ...} --> some(nat) -- rules SIZE1, SIZEF0, SIZEFn, SIZEN
   do Size n e <- [lhs]
      case multiplicity e of
        MDunno -> []      -- Rule does not apply
@@ -214,6 +242,7 @@ multiplicity Fail          = MZero
 multiplicity (e1 :|: e2)   = multiplicity e1 `choiceMult` multiplicity e2
 multiplicity e | isVal e   = MOne
                | otherwise = MDunno
+-}
 
 --------------------------------------------------------------------------------
 verifyStep :: Rule
