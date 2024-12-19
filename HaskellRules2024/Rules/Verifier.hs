@@ -100,7 +100,7 @@ arrStep env lhs =
   do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
      let n = identNotIn $ free arg
      pure (pPrint arr, Exi $ bind n $
-                       coreSeq [ Var n :=: Size (litInt 1) (mkApp f (someUnderscore e))
+                       coreSeq [ Var n :=: mkSize (litInt 1) (mkApp f (someUnderscore e))
                                , Choose (Var n) (Arr v (mkApp f e)) ])
   ++
   "ARR-APP" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
@@ -129,7 +129,7 @@ arrStep env lhs =
        -- This guard seems to make no difference either way
      let n = identNotIn $ free all_body
      pure ( Exi $ bind n $
-            (Var n :=: Size sz (wrapExis exis $
+            (Var n :=: mkSize sz (wrapExis exis $
                                 ctx <@ Some (Lam $ bind underscore e)))
             :>:
             (Arr (Var n) (wrapExis exis (ctx <@ e))) )
@@ -161,7 +161,7 @@ arrStep env lhs =
         -- Don't engulf just the "n=size" part!!
      let n = identNotIn lhs_fvs
      pure ( Exi $ bind n $
-            (Var n :=: Size sz (wrapExis exis $
+            (Var n :=: mkSize sz (wrapExis exis $
                                 ctx <@ Some (Lam $ bind underscore e)))
             :>:
             (Choose (Var n) (wrapExis exis (ctx <@ e))) )
@@ -178,6 +178,7 @@ arrStep env lhs =
                                           (someUnderscore e1)
                                           (Tup []))
                    , e ])
+{-
  ++
   "SIZE0" `name`  -- Size(0){e} --> 0
   do Size (LitInt 0) _ <- [lhs]
@@ -204,7 +205,7 @@ arrStep env lhs =
            (Var x :=: Size n (ctx <@ e1))
        :>: (Var y :=: Size n (ctx <@ e2))
        :>: (Op Add :@: Tup [Var x, Var y])
-
+-}
 {-
  ++
   "SIZE0" `name`  -- Size(0){e} --> 0
@@ -428,10 +429,10 @@ go_px lx lhs =
   do x :>>: e  <- [lhs]
      (ctx, hole) <- go_px lx x
      pure (ctx :>>: e, hole)
- ++
-  do Size sz e <- [lhs]
-     (ctx, hole) <- go_px lx e
-     pure (Size sz ctx, hole)
+-- ++
+--  do Size sz e <- [lhs]
+--     (ctx, hole) <- go_px lx e
+--     pure (Size sz ctx, hole)
 -- ++
 --  do Check fx x <- [lhs]
 --     (ctx, hole) <- go_px lx x

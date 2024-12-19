@@ -20,7 +20,8 @@ module Rules.Core
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkApp, mkEqual, mkOne, mkAll, matchAll, mkCheck, matchCheck, lamUnderscore, someUnderscore, wrong
+  , mkApp, mkEqual, mkOne, mkAll, matchAll, mkCheck, matchCheck, mkSize
+  , lamUnderscore, someUnderscore, wrong
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -98,7 +99,7 @@ data Expr
 
   | Arr    Val Expr
   | Choose Val Expr
-  | Size   Val Expr
+  -- | Size   Val Expr
 
   -- HOLE, only for contexts
   | HOLE
@@ -325,6 +326,17 @@ mkCheck = fst mkCheck_matchCheck
 
 matchCheck :: Expr -> Maybe (Effect, Expr)
 matchCheck = snd mkCheck_matchCheck
+
+mkSize :: Val -> Expr -> Expr
+mkSize n e =
+  Iter e (lamUnderscore $ Lam $ bind f $
+    Exi $ bind s $
+          (Var s :=: (Var f :@: Tup []))
+      :>: (Op Add :@: Tup [n,Var s])
+  )
+  (lamUnderscore $ Lit (LInt 0))
+ where
+  f:s:_ = identsNotIn (free n)
 
 (>>>) :: Expr -> Expr -> Expr
 -- e1 >>> e2  =   (_ = e1); e2
@@ -682,7 +694,7 @@ pPrintPrecE lvl prec the_expr
 
        Arr    sz e  -> text "Arr"   <> ppr_sz sz <> braces (ppr0 e)
        Choose sz e -> text "Choose" <> ppr_sz sz <> braces (ppr0 e)
-       Size   sz e -> text "Size"   <> ppr_sz sz <> braces (ppr0 e)
+       --Size   sz e -> text "Size"   <> ppr_sz sz <> braces (ppr0 e)
 
   where
     ppr0 = pPrintPrecE lvl 0
@@ -756,7 +768,7 @@ exprSize (Verify bl)   = 10 + exprSize e
                        where
                          (_rs,(_as,e)) = unsafeUnbindList bl
 exprSize (Arr sz e)    = 1 + exprSize sz + exprSize e
-exprSize (Size sz e)   = 1 + exprSize sz + exprSize e
+--exprSize (Size sz e)   = 1 + exprSize sz + exprSize e
 exprSize (Choose sz e) = 1 + exprSize sz + exprSize e
 
 bindSize :: Bind Expr -> Int
@@ -815,7 +827,7 @@ valid (Iter _ _ _)       = False
 --valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid (Arr    sz e)       = is_val sz && valid e
-valid (Size   sz e)       = is_val sz && valid e
+--valid (Size   sz e)       = is_val sz && valid e
 valid (Choose sz e)       = is_val sz && valid e
 valid e                   = is_val e
 
@@ -910,7 +922,7 @@ instance Variables Expr where
   --variables f (Check _ e)   = variables f e
   variables f (Exi bnd)     = variables f bnd
   variables f (Arr sz e)    = variables f (sz,e)
-  variables f (Size sz e)   = variables f (sz,e)
+  --variables f (Size sz e)   = variables f (sz,e)
   variables f (Choose sz e) = variables f (sz,e)
   variables f (Verify bnd)  = variables f bnd
   variables f (Iter e1 e2 e3) = variables f (e1, e2, e3)
@@ -1007,7 +1019,7 @@ norm orig_e = alpha 0 orig_e
   alpha k (Some e)     = Some (alpha k e)
   --alpha k (All e)      = All (alpha k e)
   alpha k (Arr  s e)   = Arr    (alpha k s) (alpha k e)
-  alpha k (Size s e)   = Size   (alpha k s) (alpha k e)
+  --alpha k (Size s e)   = Size   (alpha k s) (alpha k e)
   alpha k (Choose s e) = Choose (alpha k s) (alpha k e)
   alpha k (e1 :>>: e2) = alpha k e1 :>>: alpha k e2
   --alpha k (Check fx e) = Check fx (alpha k e)
@@ -1065,7 +1077,7 @@ subst sub orig_e
     --go (Check fx e) = Check fx (go e)
     go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
     go (Arr  s e)   = Arr    (go s) (go e)
-    go (Size s e)   = Size   (go s) (go e)
+    --go (Size s e)   = Size   (go s) (go e)
     go (Choose s e) = Choose (go s) (go e)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
 
@@ -1209,7 +1221,7 @@ everywhere step env orig_e
                       ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step env e2 ]
   --recurse (All e)      = [ (s, All e')      | (s,e') <- everywhere step env e ]
   recurse (Some e)     = [ (s, Some e')     | (s,e') <- everywhere step env e ]
-  recurse (Size sz e)  = [ (s, Size sz e')  | (s,e') <- everywhere step env e ]
+  --recurse (Size sz e)  = [ (s, Size sz e')  | (s,e') <- everywhere step env e ]
   recurse (e1 :>>: e2) = [ (s, e1' :>>: e2) | (s,e1') <- everywhere step env e1 ]
                       ++ [ (s, e1 :>>: e2') | (s,e2') <- everywhere step env e2 ]
   --recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step env e ]
@@ -1464,7 +1476,7 @@ Some e        <@ h = Some (e <@ h)
 (e1 :>>: e2)  <@ h = (e1 <@ h) :>>: (e2 <@ h)
 --Check fx e    <@ h = Check fx (e <@ h)
 e@(Verify {}) <@ _ = e   -- No HOLE inside Verify. SLPJ: check
-Size   v e    <@ h = Size   v (e <@ h)
+--Size   v e    <@ h = Size   v (e <@ h)
 Arr    v e    <@ h = Arr    v (e <@ h)
 Choose v e    <@ h = Choose v (e <@ h)
 

@@ -404,7 +404,7 @@ onlyApps f orig_e = go orig_e
     go (e1 :>>: e2)   = go e1 && go e2
     --go (Check _ e)    = go e
     go (Arr    sz e)  = go sz && go e
-    go (Size   sz e)  = go sz && go e
+    --go (Size   sz e)  = go sz && go e
     go (Choose sz e)  = go sz && go e
     go (Exi bnd)      = go_bind bnd
 
@@ -946,7 +946,7 @@ status _ (Verify {})
 
 --status lx (Check _ e) = SomethingToDo
 status _  (Choose {}) = NothingToDo NoHole
-status lx (Size _ e)  = status lx e
+--status lx (Size _ e)  = status lx e
 status lx (Some v) | any (isLocal lx) (free v) = blockedStatus
                    | otherwise                 = SomethingToDo
 status lx (v :>>: e) | any (isLocal lx) (free v) = blockedStatus
@@ -994,7 +994,7 @@ choiceAndFailureFree = go []
     go fs (Exi bnd)   = go fs e where (_,e) = unsafeUnbind bnd
     -- go _  (All {})    = True
     go _  (Arr {})    = True
-    go _  (Size {})   = True
+    --go _  (Size {})   = True
     go _  (Some {})   = True
     go _  HOLE        = True
 
@@ -1035,7 +1035,7 @@ choiceFree' fs e@Iter{}
 choiceFree' _ (Some {})            = True
 --choiceFree' _ (All {})             = True
 choiceFree' _ (Arr {})             = True
-choiceFree' _ (Size {})            = True
+--choiceFree' _ (Size {})            = True
 choiceFree' _ (Choose {})          = False
 choiceFree' _  _                   = True
 
