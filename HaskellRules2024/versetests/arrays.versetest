@@ -85,3 +85,12 @@ verify("arr-fail3", fail)        { f( n:int )<succeeds> : []int = for(i:=1..n){f
 verify("arr-elem1", pass){ f(n:int):[]type{1|2} = all{i := 1..n; if (i = 2) then 1 else 2} }
 verify("arr-elem2", pass){ f(n:int):[]type{1|2} = all{(i := 1..n); if (i = 2) then 1 else 2} }
 verify("arr-elem3", fail){ f(n:int):type{(:[]type{1})|(:[]type{2})} = all{(i := 1..n); if (i = 2) then 1 else 2} }
+
+# dotdot in the domain
+# needs verify( choose ) rule (we know what to do, just not implemented yet)
+verify("dom-dotdot1", pass, broken){ f( n:int, x:=1..n ):int := x }
+
+# size approximating sizes correctly?
+# I have no idea why these fail
+#verify("arrmapexp", pass){ f(n:int where n>0) := { (h := lam i {i+1}); arrMap$[ h, all{1..n} ] } }
+verify("choosefilter", pass, broken){ f(n:int where n >= 0) := { Length[all{i:=1..n}] = n } }
