@@ -78,8 +78,8 @@ $$
 \hspace{3cm}
 \begin{array}{@@{}l@@{\;\;}r@@{\;\;}c@@{\;\;}ll}
 \rulename{wp1} & |apeff emp fx `ueq`  e_2| & = & |e_2| \\
-\rulename{wp2} \asktim & |apeff e_1 fx `ueq`  e_2|
-%  & = & |e_1 = e_2|  & \text{if |e_2| guarantees to succeed (once)}\\
+\rulename{wp2} \asktim & |apeff e_1 empty `ueq`  e_2| & = & |e_1 == e_2| \\
+\rulename{wp3} \asktim & |apeff e_1 fx `ueq`  e_2|
  & = & |oftypefx e_1 empty ((lam i (i == e_2)))| & \text{$|i| \not\in |freevars e_2|$}
 \\[2mm]
 & |checkfun open f e| & = & |emptytup| \\
