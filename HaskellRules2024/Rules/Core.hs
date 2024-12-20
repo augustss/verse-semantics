@@ -255,6 +255,46 @@ matchAll :: Expr -> Maybe Expr
 matchAll = snd mkAll_matchAll
 
 mkCheck_matchCheck :: (Effect -> Expr -> Expr, Expr -> Maybe (Effect,Expr))
+mkCheck_matchCheck = (mk, \_ -> Nothing)
+ where
+  mk Fails e =
+    Exi $ bind a $
+          (Var a :=: mkAll e)
+      :>: Iter (Var a :=: Tup [])
+               (lamUnderscore $ lamUnderscore $ Fail)
+               (lamUnderscore $ wrongFx Fails (Var a))
+   where
+    a:_ = identsNotIn (free e)
+
+  mk Succeeds e =
+    Exi $ bind a $
+          (Var a :=: mkAll e)
+      :>: Iter (Exi $ bind x $
+                  (Tup [Var x] :=: Var a) :>: Var x)
+               (Lam $ bind x $ lamUnderscore $
+                  Var x)
+               (lamUnderscore $ wrongFx Succeeds (Var a))
+   where
+    a:x:_ = identsNotIn (free e)
+
+  mk Decides e =
+    Exi $ bind a $
+          (Var a :=: mkAll e)
+      :>: Iter (Exi $ bind n $
+                   (Var n :=: (Op ArrLen :@: Var a))
+               :>: (Op LEq :@: Tup [Var n, Lit (LInt 1)]))
+               (lamUnderscore $ lamUnderscore $
+                 Exi $ bind x $ 
+                   (Tup [Var x] :=: Var a) :>: Var x)
+               (lamUnderscore $
+                 wrongFx Decides (Var a))
+   where
+    a:x:n:_ = identsNotIn (free e)
+
+  wrongFx fx v =
+    Lit (LStr ("check<" ++ show fx ++ ">")) :@: v
+
+{-
 mkCheck_matchCheck = (mk, match)
  where
   match e =
@@ -293,6 +333,7 @@ mkCheck_matchCheck = (mk, match)
                    else wrong)
    where
     l:x:a:f:_ = identsNotIn (free e)
+-}
 {-
     Exi $ bind l $
           (Var l :=: Iter (Exi $ bind x $ (Var x :=: e)
