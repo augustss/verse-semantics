@@ -80,12 +80,10 @@ toCoreIdent :: Ident -> Rules.Ident
 toCoreIdent (Ident _ s) = Rules.Name s
 
 toCoreEff :: Eff -> Maybe Rules.Effect
-toCoreEff eff
-  | eff == effSucceeds = Just Rules.Succeeds
-  | eff == effComputes = Just Rules.Succeeds
-  | eff == effDecides  = Just Rules.Decides
-  | eff == effFails    = Just Rules.Fails
-  | otherwise          = Nothing -- error "toCoreEff" (prettyShow eff)
+toCoreEff ESucceeds = Just Rules.Succeeds
+toCoreEff EDecides  = Just Rules.Decides
+toCoreEff EFails    = Just Rules.Fails
+toCoreEff _         = Nothing -- error "toCoreEff" (prettyShow eff)
 
 
 --------------------------------------------------------

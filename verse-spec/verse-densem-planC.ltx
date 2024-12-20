@@ -21,19 +21,18 @@ $$
 \textbf{Syntax of Mini Verse} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
   \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N e_1 e_2| \vb e_1; e_2
-     \vb |e_1 == e_2| \vb |defintro x| \vb |e_1 `choice` e_2| \vb |fail| \\
+     \vb |e_1 == e_2| \vb |defintro x| \vb |e_1 `choice` e_2| \vb |fail|
+     \vb |lamOC q i e_1 e_2| \\
   && \vb & |arr (e_1, xdots, e_n)| \vb |oftypefx t_1 fx t_2| \vb |check fx e| \\
   && \vb & |vif t_1 t_2 t_3| \vb |fordo t_1 t_2| \vb |all e| \\
-  && \vb & |lamOC q i e_1 e_2| \\
 \multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x y|; no |x:=e|; no |where|; and lambda changes form}}
-\end{array}
-\\ \\
+\end{array} \\
+\\
 % ------------- Desugaring ---------------
-\textbf{Desugaring Essential Verse into Mini Verse: wrapping} \\
 \begin{array}{@@{}l@@{\,}r@@{\;\;}c@@{\;\;}l@@{}l}
   \text{Inputs} & |wu| & ::= & \multicolumn{2}{@@{}l}{|apeff u fx| \qquad \text{We often abbreviate |apeff emp fx| to just |eff fx|}}\\
-                & |u|  & ::= & |emp| \vb |e| \\
-\\
+                & |u|  & ::= & |emp| \vb |e| \\[2mm]
+
 \rulename{wconst}      & |SS wu k| & = & |wu `ueq` k| \\
 \rulename{wprim}   & |SS wu o| & = & |wu `ueq` o| \\
 \rulename{wvar}    & |SS wu x| & = & |wu `ueq` x| \\
@@ -52,7 +51,8 @@ $$
 \multicolumn{2}{@@{}l}{\rulename{wif} \; \hfill |SS wu (vif t_1 t_2 t_3)|}
  & = & |vif(SS wuinit t_1) (SS wu t_2) (SS wu t_3)| \\
 \rulename{wdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
-\rulename{wsquig}   & |SS (apeff u fx) (squig x y := t)| & = & |defintro x; apeff u fx `ueq` x; y := SS (apeff x fx) t| \\
+\rulename{wsquig1}   & |SS (eff fx) (squig x y := t)| & = & |defintro (x y); y == SS (eff fx) t| \\
+\rulename{wsquig2}   & |SS (apeff e fx) (squig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
 \rulename{wchk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
 \rulename{wcol1}\asktim   & |SS (eff fx) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
 \rulename{wcol2}   & |SS (apeff e empty) (: t)| & = & |apply1N ((SS wuinit t)) e| \\

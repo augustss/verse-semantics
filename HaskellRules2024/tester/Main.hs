@@ -375,7 +375,7 @@ doTestCatchingExn tflg test p1 p2
     exn_handler e
       = -- unless (noError tflg) $
         do { putStrLn $ test_herald ++ "Failure:"
-           ; putStrLn "The expression";       ppIndent p1
+           ; putStrLn "The expression";       putStrLn (show p1) -- ppIndent p1
            ; putStrLn "or the expression";    ppIndent p2
            ; putStrLn "caused an exception:"; print e
            ; putStrLn "" }

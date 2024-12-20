@@ -178,11 +178,13 @@ macros =
 
 
 macrosOp :: [String]
-macrosOp = ["in'='"]
-           ++ macros
+macrosOp = ["in'='"] ++ macros
 
-effects :: [String]
-effects = [ "decides", "diverges", "fails", "succeeds", "iterates", "closed", "open" ]
+lookupEffect :: String -> P Eff
+lookupEffect s
+  = case [ eff | eff <- allEffects, effString eff == s ] of
+      []      -> fail ("Unknown effect: " ++ s)
+      (eff:_) -> pure eff
 
 pKeyword :: String -> P ()
 pKeyword s = try $ do
@@ -196,12 +198,9 @@ pMacroName = try $ do
   guard (w `elem` macrosOp)
   pure $ Ident l w
 
-pEffectName :: P Ident
-pEffectName = try $ do
-  l <- getSourcePos
-  w <- pWord
-  guard (w `elem` effects)
-  pure $ Ident l w
+pEffectName :: P Eff
+pEffectName = try $ do w <- pWord
+                       lookupEffect w
 
 pKeywordOpt :: String -> P ()
 pKeywordOpt s = pKeyword s <|> pure ()
@@ -342,11 +341,8 @@ pMacro = try $ do
   (Macro1 n <$> many pAttr <*> pBlockM)
    <|> (Macro2 n <$> pParens pExprSeq <*> pBlockM)
 
-pAttr :: P Ident
-pAttr = pAngles pEffectId
-
-pEffectId :: P Ident
-pEffectId = pIdent <|> pEffectName
+pAttr :: P Eff
+pAttr = pAngles pEffectName
 
 pTerm :: P SrcExpr
 pTerm = do

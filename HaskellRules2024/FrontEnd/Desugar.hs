@@ -113,34 +113,29 @@ sDesugarExpr = ds
     ds (ApplyS  e1 e2) = applyS <$> ds e1 <*> ds e2
       where
         -- This replaces f(e) with check<succeeds>{f[e]}
-        applyS x y = eCheck [effSucceeds] (ApplyD x y)
+        applyS x y = eCheck [ESucceeds] (ApplyD x y)
 
     -- (e1 = e2)  --->  Unify
-    ds (InfixOp e1 (Op "=")  e2) = Unify <$> ds e1 <*> ds e2
+    ds (InfixOp e1 (Op "=")  e2)
+      | PrefixOp  (Op ":") _ <- e1 = defn e1 e2
+      | InfixOp _ (Op ":") _ <- e1 = defn e1 e2
+      | otherwise                  = Unify <$> ds e1 <*> ds e2
+
+    -- Guard
     ds (InfixOp e1 (Op ">>") e2) = Guard <$> ds e1 <*> ds e2
 
     -- Bindings
     ds (InfixOp e1 (Op ":=") e2) = defn e1 e2 >>= ds
-
-    ds (InfixOp e1 (Op ":")  e2)
-      | Just (f, a, fxs) <- getFun e1
-        -- f(a)<fx> : ty  -->  f := fun(a){ :ty<fx> }
-        --        e : ty  -->  e := :ty<>
-        -- c.f. the ":" case of `defn`
-      = defn f (Function [a] (Range fxs e2)) >>= ds
-
-      | otherwise
-      = defn e1 (Range [] e2) >>= ds
+    ds (InfixOp e1 (Op ":")  e2) = defn e1 (Range [] e2) >>= ds
 
     -- Function notation
-    ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [closedId])] (eCheck [effSucceeds] e2)
-       -- The e1=>e2 notation has an implicit check<succeeds>
+    ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [EClosed,ESucceeds])] e2
+       -- The e1=>e2 notation has an implicit <succeeds>
+
     ds (Function (a:as@(_:_)) b)  = ds $ Function [a] $ Function as b
-    ds (Function [(e1, effs)] e2) = do
-           e1' <- ds e1
-           e2' <- ds e2
-           effs' <- checkEffs effs
-           pure $ Function [(e1', effs')] e2'
+    ds (Function [(e1, effs)] e2) = do { e1' <- ds e1
+                                       ; e2' <- ds e2
+                                       ; pure $ Function [(e1', effs)] e2' }
 
     -- Conditionals
     -- We must retain IF3 (i.e `if e1 then e2 else e3`) because
@@ -220,9 +215,9 @@ sDesugarExpr = ds
     ds (Macro1 (Ident _ "check") fx e)   = Check fx <$> ds e
     ds (Macro1 (Ident _ "expect") fx e)  = Check fx <$> ds e
                                            -- I think "expect" is Tim's notation for "check"
-    ds (Macro1 (Ident _ "succeeds") _ e) = eCheck [effSucceeds] <$> ds e
-    ds (Macro1 (Ident _ "decides")  _ e) = eCheck [effDecides]  <$> ds e
-    ds (Macro1 (Ident _ "fails")    _ e) = eCheck [effFails]    <$> ds e
+    ds (Macro1 (Ident _ "succeeds") _ e) = eCheck [ESucceeds] <$> ds e
+    ds (Macro1 (Ident _ "decides")  _ e) = eCheck [EDecides]  <$> ds e
+    ds (Macro1 (Ident _ "fails")    _ e) = eCheck [EFails]    <$> ds e
 
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
     ds (Macro1 (Ident _ "assume") fx e)  = do { x <- newIdent (getLoc e) "x"
@@ -263,21 +258,6 @@ sDesugarExpr = ds
     ds e = compos ds e    -- Core expressions like Lit, Variable,
                           -- DefineE, Unify, EPrim, etc
 
-checkEffs :: [Eff] -> DsM [Eff]
-checkEffs = mapM checkEff
-  where
-    checkEff (Ident _ "invariant") = pure closedId
-    checkEff e | e `elem` knownEffects = pure e
-               | otherwise = errorMessage $ "unknown effect: " ++ show e
-
-
-knownEffects :: [Ident]
-knownEffects = map (Ident noLoc) [
-  "succeeds", "decides", "iterates", "allocates", "reads", "writes", "interacts", "transacts", "open"
-  ] ++ [closedId]
-
-closedId :: Ident
-closedId = Ident noLoc "closed"
 
 --------------------------------------
 -- Patterns
@@ -308,22 +288,6 @@ defn xs@(InfixOp _ (Op "&") _) e
     get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
     get p                        = [p]
 
--- Rule:   p(a)<fxs> := rhs   -->  p := fun(a){check<fxs>{rhs}}
---         Adding <succeeds> if not present (done by getFun)
--- E.g. f(x)<decides> := 3    # NB: has no effect on caller, which still sees 3
-defn p e
-  | Just (f, a, fx) <- getFun p
-  = defn f (Function [a] (eCheck fx e))
-
--- Rule: (f(a)<fx>:e2 := e)  -->  (e1 := fun(a){e |><fx> e2})
--- Rule:       (e1:e2 := e)  -->  (e1 :=        e |><>   e2)
--- but adding <succeeds> if omitted (done by getFun), leaving behind <open/closed>
-defn (InfixOp e1 (Op ":") e2) e
-   | Just (f, a, fxs) <- getFun e1
-   = defn f (Function [a] (OfType e fxs e2))
-   | otherwise
-   = defn e1              (OfType e []  e2)
-
 -- Rule: (:e2) := e  -->  (x:e2) := e, x fresh
 defn (PrefixOp op@(Op ":") e2) e
   = do { u <- newIdent (getLoc e2) "u"
@@ -332,9 +296,12 @@ defn (PrefixOp op@(Op ":") e2) e
 -- Rule: (f(a) := e)  -->  (f := function(a){e})
 -- Rule: (p<a> := e)  -->  ...
 
--- Rule: (p<fx> := e) -->  (p := check<fx>{e})
+defn (InfixOp e1 (Op ":") e2) e = defn_ty e1 e2 [] e
+defn (ApplyS f a)             e = defn_fun f a [] e
+
 defn p@(EffAttr {}) e
-  | not (null fxs) = defn p' (eCheck fxs e)
+  | ApplyS f a <- p'             = defn_fun f a fxs e
+  | InfixOp e1 (Op ":") e2 <- p' = defn_ty  e1 e2 fxs e
   where
     (p', fxs) = getEffs p
 
@@ -363,6 +330,18 @@ defn (InfixOp p1 op@(Op "->") p2) e = do
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
+defn_ty :: SrcPat -> SrcExpr -> [Eff] -> SrcExpr -> DsM SrcExpr
+defn_ty p t fxs1 rhs = defn p (OfType rhs (fxs1 ++ fxs2) t')
+  where
+    (t', fxs2) = getEffs t   -- Currently  x : int<succeeds> := t
+                             -- parses as x : (int <succeeds>)   Yuk
+
+defn_fun :: SrcPat -> SrcExpr -> [Eff] -> SrcExpr -> DsM SrcExpr
+-- f(x)<fxs> := rhs
+defn_fun f a fxs rhs = defn f (Function [(a,fxs')] rhs)
+  where
+    fxs' = addSucceeds (addAperture fxs)  -- Add default effects
+
 eDefine :: HasCallStack => Ident -> SrcEssential -> SrcEssential
 -- Generates (x:=e) in Essential Verse
 eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
@@ -380,38 +359,27 @@ encodeType :: SrcEssential -> DsM SrcEssential
 -- using a ICFP lambda.
 -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
 encodeType e = do { x <- newIdent noLoc "x"
-                  ; return (Function [(eDefine x e, [closedId])] (Variable x)) }
+                  ; return (Function [(eDefine x e, [EClosed])] (Variable x)) }
 
 addSucceeds :: [Eff] -> [Eff]
-addSucceeds [] = [effSucceeds]   -- Default is <succeeds>
-addSucceeds fx = fx
+addSucceeds effs | any isCardinalityEff effs = effs
+                 | otherwise                 = ESucceeds : effs
+
+addAperture :: [Eff] -> [Eff]
+-- Currently I'm making the default aperture be Closed
+addAperture effs | any isOpenClosed effs = effs
+                 | otherwise             = EClosed : effs
 
 --------------------------------------------------------
 --         Functions to take apart SrcExpr
 --------------------------------------------------------
 
-getFun :: SrcExpr -> Maybe (SrcExpr, (SrcExpr,[Eff]), [Eff])
--- f(a)<decides><closed>  -->  Just (f, (a,<closed), <decides>)
--- The (SrcExpr,[Eff]) ends up on the Function;
--- while the final [Eff] refers to the body of the function
-getFun = gf []
-  where
-    gf rs (ApplyS f a) = Just (f, (a,fun_effs), addSucceeds body_effs)
-      where
-        (fun_effs, body_effs) = partition isOpenClosed rs
-    gf rs (EffAttr e r)       = gf (r:rs) e
-    gf _ _                    = Nothing
-
 getEffs :: SrcExpr -> (SrcExpr, [Eff])
 -- e<fx1><fx2> --> (e, [fx1,fx2])
 getEffs orig_e = go orig_e []
   where
-    go (EffAttr e fx) fxs
-     | isOpenClosed fx    = wrap fx (go e fxs)
-     | otherwise          = go e (fx:fxs)
+    go (EffAttr e fx) fxs = go e (fx:fxs)
     go e              fxs = (e, fxs)
-
-    wrap fx (e, fxs) = (EffAttr e fx, fxs)
 
 --------------------------------------
 -- Maps
@@ -720,73 +688,80 @@ data Input
 
 essToMini :: SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
-essToMini = go NoInput
+essToMini orig_e = go_expr orig_e
   where
+    go_expr = go (NoInput,[])
+
+    go :: (Input, [Eff]) -> SrcEssential -> DsM SrcMini
+    -- Typically (go kap t) = e, where `kap::(Input,[Eff])` is short for `kappa`
 
     -- Simple cases: DSK, DSVAR, DSPRIM, DSFAIL, DSEQ, DSUNIFY, DSCHOICE, DSSEMI
-    go inp e@(Lit {})      = inp `ueq` return e
-    go inp e@(Variable v)
-       | isSrcUnderscore v = case inp of
-                               NoInput -> return existsXX
-                               PI i    -> return i
-       | otherwise         = inp `ueq` return e
-    go inp e@(EPrim {})    = inp `ueq` return e
-    go _inp Fail           = return Fail
-    go inp (Unify  e1 e2)  = eUnify  <$> go inp e1 <*> go inp e2
-    go inp (Where t1 t2)   = do { (dr, r) <- defineDE "r" (go inp t1)
-                                ; e2 <- go NoInput t2
+    go kap e@(Lit {})      = kap `ueq` return e
+    go kap e@(Variable v)
+       | isSrcUnderscore v = case kap of
+                               (NoInput,_) -> return existsXX
+                               (PI i,_)    -> return i
+       | otherwise         = kap `ueq` return e
+    go kap e@(EPrim {})    = kap `ueq` return e
+    go _kp Fail            = return Fail
+    go kap (Unify  e1 e2)  = eUnify  <$> go kap e1 <*> go kap e2
+    go kap (Where t1 t2)   = do { (dr, r) <- defineDE "r" (go kap t1)
+                                ; e2 <- go_expr t2
                                 ; return (eSeq [dr, e2, r]) }
-    go inp (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
-                                ; es <- mapM (go NoInput) ts
-                                ; e  <- go inp t
+    go kap (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
+                                ; es <- mapM go_expr ts
+                                ; e  <- go kap t
                                 ; return (eSeq (es ++ [e])) }
 
-    -- DSEXISTS (exists x);  DSDEF (x:=t); DSSQUIG (x~>y:=t)
-    go inp (Exists xs e)    = Exists xs <$> go inp e   -- Just propagate Exists
-    go _inp (DefineV x)     = return (DefineV x)
-    go inp (DefineE x t)    = do { e <- go inp t; return (eSeq [DefineV x, eUnify (Variable x) e]) }
-    go inp (DefineIE x y t) = do { e <- go (PI (Variable x)) t
-                                 ; return (eSeq ([DefineV x] ++
-                                                 mb_unify    ++
-                                                 [ DefineV y, eUnify (Variable y) e])) }
-       where
-         mb_unify = case inp of
-                      NoInput -> []
-                      PI i    -> [eUnify i (Variable x)]
-
     -- DSIF, DSFOR, DSALL, DSONE: If, for, all
-    go inp (If3 t1 t2 t3) = If3  <$> go NoInput t1 <*> go inp t2 <*> go inp t3
-    go inp (For2 t1 t2)   = inp `ueq` (For2 <$> go NoInput t1 <*> go inp t2)
-    go inp (All t)        = inp `ueq` (All <$> go NoInput t)
-    go inp (One t)        = inp `ueq` (One <$> go NoInput t)
+    go kap (If3 t1 t2 t3) = If3  <$> go_expr t1 <*> go kap t2 <*> go kap t3
+    go kap (For2 t1 t2)   = kap `ueq` (For2 <$> go_expr t1 <*> go kap t2)
+    go kap (All t)        = kap `ueq` (All <$> go_expr t)
+    go kap (One t)        = kap `ueq` (One <$> go_expr t)
+    go kap (Choice e1 e2) = kap `ueq` (Choice <$> go_expr e1 <*> go_expr e2)
+    go kap (ApplyD t1 t2) = kap `ueq` (ApplyD <$> go_expr t1 <*> go_expr t2)
 
-    go inp (Choice e1 e2) = inp `ueq` (Choice <$> go NoInput e1 <*> go NoInput e2)
-    go inp (ApplyD t1 t2) = inp `ueq` (ApplyD <$> go NoInput t1 <*> go NoInput t2)
+    -- DSEXISTS (exists x);  DSDEF (x:=t)
+    go kap (Exists xs e) = Exists xs <$> go kap e   -- Just propagate Exists
+    go _kp (DefineV x)   = return (DefineV x)
+    go kap (DefineE x t) = do { e <- go kap t; return (eSeq [DefineV x, eUnify (Variable x) e]) }
 
-    -- DSCOL1, DSCOL2: (:t)
-    go inp (Range fxs t) = case inp of
-                             NoInput -> assert (null fxs) (show fxs) $
-                                        do { e <- go NoInput t
-                                           ; x <- newIdent (getLoc t) "x"
-                                           ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
-                             PI i    -> OfType i fxs <$> go NoInput t
+    -- DSSQUIG (x~>y:=t)
+    go (inp,fxs) (DefineIE x y t)
+      = case inp of
+           NoInput -> do { e <- go (NoInput,fxs) t
+                         ; return (eSeq [DefineV x, DefineV y, eUnify (Variable y) e]) }
+           PI i    -> do { e <- go (PI (Variable x),fxs) t
+                         ; return (eSeq [ DefineV x, DefineV y
+                                        , eUnify (Variable x) i, eUnify (Variable y) e]) }
+
+    -- DSCOL1, DSCOL2, DSCOL3: (:t)
+    go (inp,fxs) (Range _ t)
+      = case inp of
+          NoInput -> do { e <- go_expr t
+                        ; x <- newIdent (getLoc t) "x"
+                        ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
+          PI i | null fxs  -> do { e <- go_expr t; return (ApplyD e i) }
+               | otherwise -> OfType i fxs <$> go_expr t
 
     -- DSCHK: check<fx>{t}
-    go inp (Check fx t)  = Check fx <$> go inp t
+    go kap (Check fx t)  = Check fx <$> go kap t
 
     -- DSOFTYPE: t1 |> t2
-    go inp (OfType t1 fxs t2) = OfType <$> go inp t1 <*> pure fxs <*> go NoInput t2
+    go (inp,fxs1) (OfType t1 fxs2 t2) = OfType <$> go (inp,[]) t1
+                                               <*> pure (intersectEffects fxs1 fxs2)
+                                               <*> go_expr t2
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
-    go inp (Splice t) = go inp t
+    go kap (Splice t) = go kap t
 
-    go inp (Array ts)
+    go (inp,fxs) (Array ts)
       = case inp of
           NoInput -> do { es <- mapM do_one ts
                         ; mkArray es }
                    where
-                     do_one (Splice t) = Splice <$> go NoInput t
-                     do_one t          =            go NoInput t
+                     do_one (Splice t) = Splice <$> go (NoInput,fxs) t
+                     do_one t          =            go (NoInput,fxs) t
 
           PI i -> do { prs <- mapM do_one ts
                      ; let (exi_js, es) = unzip prs
@@ -799,49 +774,79 @@ essToMini = go NoInput
                 do_one (Splice t) = do { (d, e) <- do_one t
                                        ; pure (Splice d, Splice e) }
                 do_one         t  = do { j <- newIdent (getLoc t) "j"
-                                       ; e <- go (PI (Variable j)) t
+                                       ; e <- go (PI (Variable j), fxs) t
                                        ; pure (DefineV j, e) }
 
     -- Truth
-    go inp (Truth t)
+    go (inp,fxs) (Truth t)
       = case inp of
-          NoInput -> Truth <$> go NoInput t
+          NoInput -> Truth <$> go (NoInput,fxs) t
           PI i -> do { j <- newIdent (getLoc t) "j"
-                     ; e <- go (PI (Variable j)) t
+                     ; e <- go (PI (Variable j),fxs) t
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
 
     -- Functions
-    go inp t@(Function [(t1,fx)] t2)
+    go (inp,_fxs2) (Function [(t1,fxs1)] t2)
       = case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"
-                        ; XDLam Closed i <$> go (PI (Variable i)) t1 <*> go NoInput t2 }
+                        ; XDLam Closed i <$> go (PI (Variable i),[]) t1
+                                         <*> (Check fxs1' <$> go (NoInput,fxs1') t2) }
           PI f -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
-                     ; e1 <- go (PI (Variable i)) t1
-                     ; e2 <- go (PI (ApplyD f (Variable x))) t2
-                     ; return (XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1]) e2) }
+                     ; e1 <- go (PI (Variable i),[]) t1
+                     ; e2 <- go (PI (ApplyD f (Variable x)), fxs1') t2
+                     ; return (XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
+                                                (Check fxs1' e2)) }
       where
-        aperture = case fx of
-                     []                 -> Closed
-                     [Ident _ "closed"] -> Closed
-                     [Ident _ "open"]   -> Open
-                     _ -> error "Bad fx in function" (pPrint t)
-
+        (aperture, fxs1') = getAperture fxs1
 
     -- Core constructs used (only) in the Prelude
     -- Only used in the NoInput case
-    go NoInput (Lam x t)    = Lam x <$> go NoInput t
-    go NoInput (Some t)     = Some  <$> go NoInput t
-    go NoInput (Guard xs t) = Guard <$> go NoInput xs <*> go NoInput t
+    go (NoInput,_) (Lam x t)    = Lam x <$> go_expr t
+    go (NoInput,_) (Some t)     = Some  <$> go_expr t
+    go (NoInput,_) (Guard xs t) = Guard <$> go_expr xs <*> go_expr t
 
     -- Report any un-handled cases
-    go inp t = error $ "TODO: essToMini " ++ show (inp, t)
+    go kap t = error $ "TODO: essToMini " ++ show (kap, t)
 
-    ueq :: Input -> DsM SrcMini -> DsM SrcMini
-    ueq NoInput  ds_e = ds_e
-    ueq (PI inp) ds_e = do { e <- ds_e  -- See test `blame0` for a simple example
-                           ; i <- newIdent noLoc "i"
-                           ; pure (OfType inp [] (Lam i (Unify (Variable i) e))) }
+    ueq :: (Input, [Eff]) -> DsM SrcMini -> DsM SrcMini
+    ueq (NoInput,_) ds_e = ds_e
+    ueq (PI inp, _) ds_e = do { e <- ds_e  -- See test `blame0` for a simple example
+                              ; i <- newIdent noLoc "i"
+                              ; pure (OfType inp [] (Lam i (Unify (Variable i) e))) }
+
+getAperture :: [Eff] -> (Aperture, [Eff])
+getAperture []                   = (Closed, [])    -- Current default is Closed; should really be open
+getAperture (EClosed : effs)     = (Closed, effs)
+getAperture (EOpen   : effs)     = (Open,   effs)
+getAperture (eff:effs)           = (oc, eff : effs')
+  where
+    (oc, effs') = getAperture effs
+
+intersectEffects :: [EffNoOC] -> [EffNoOC] -> [EffNoOC]
+intersectEffects []           effs2 = effs2
+intersectEffects (eff1:effs1) effs2 = map (intersectEff1 eff1) (intersectEffects effs1 effs2)
+
+intersectEff1 :: EffNoOC -> EffNoOC -> EffNoOC  -- Not expecting EOpen/EClosed
+intersectEff1 EIterates EFails    = EFails
+intersectEff1 EIterates EDecides  = EDecides
+intersectEff1 EIterates ESucceeds = ESucceeds
+intersectEff1 EIterates EIterates = EIterates
+
+intersectEff1 EDecides  EFails    = error "intersectEff-1"
+intersectEff1 EDecides  EDecides  = EDecides
+intersectEff1 EDecides  EIterates = EDecides
+intersectEff1 EDecides  ESucceeds = ESucceeds
+
+intersectEff1 ESucceeds EFails    = error "intersectEff-2"
+intersectEff1 ESucceeds ESucceeds = ESucceeds
+intersectEff1 ESucceeds EDecides  = ESucceeds
+intersectEff1 ESucceeds EIterates = ESucceeds
+
+intersectEff1 EFails    EFails  = EFails
+intersectEff1 EFails    eff     = error ("intersectEff-3 " ++ show eff)
+
+intersectEff1 eff1 eff2 = error ("intersectEff-4 " ++ show eff1 ++ " " ++ show eff2)
 
 --------------------------------------------------------
 --
@@ -886,10 +891,10 @@ miniToCore orig_md = go (orig_md,[])
       = do { e1' <- go md e1
            ; e2' <- go md e2
            ; if isAtomic e1'  -- Just an optimisation
-             then return (Check [effSucceeds] (ApplyD e2' e1'))
+             then return (Check [ESucceeds] (ApplyD e2' e1'))
              else do { r <- newIdent (getLoc e1) "r"
                      ; return (eSeq [ DefineV r, eUnify (Variable r) (Check fx e1')
-                                    , Check [effSucceeds] (ApplyD e2' (Variable r)) ]) } }
+                                    , Check [ESucceeds] (ApplyD e2' (Variable r)) ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md (Check fx e)
@@ -1094,7 +1099,7 @@ dsM_12 MV t@(OfType t1 fx t2) pi      -- MOFTYPE+X
    = dsRule "MOFTYPE+X" t $
      do { (dx, x) <- defineDE "x" (eCheck fx <$> dsM_12 MV t1 pi)
         ; (dz, z) <- defineDE "z" (mDesugarExpr MV t2)
-        ; pure (eSeq [dx, eCheck [effSucceeds] (eSeq [dz, eApplyD z x])]) }
+        ; pure (eSeq [dx, eCheck [ESucceeds] (eSeq [dz, eApplyD z x])]) }
 
 dsM_12 s t@(OfType t1 fx t2) pi      -- MOFTYPEX
   = dsRule "MOFTYPEX" t $
@@ -1121,7 +1126,7 @@ dsM_12 s tt@(Range fx t) (P e)                  -- MTYPE+X
     do { y <- newIdent (getLoc t) "y"
        ; (dz, z) <- defineDE "z" (mDesugarExpr s t)
        ; pure (eSeq [ coreDefine y (eCheck fx e)
-                    , eCheck [effSucceeds] (eSeq [dz, eApplyD z (Variable y)])]) }
+                    , eCheck [ESucceeds] (eSeq [dz, eApplyD z (Variable y)])]) }
 
 dsM_12 s tt@(Range _fx t) E                      -- MTYPEE
   = dsRule "MTYPEE" tt $

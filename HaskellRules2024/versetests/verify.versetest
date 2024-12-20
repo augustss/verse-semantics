@@ -140,7 +140,8 @@ verify("Opacity3", fail,tim=skip_acc) { f(x:int)<decides>:type{x=99999} := 10000
       # verify("Opacity3", fail) { f(x:int)<decides>:type{x=3} := x+1 }
 
 # Opacity4: Tim doesn't implement LHS y<succeeds>:three
-verify("Opacity4", pass,tim=skip_acc) { three(x:int)<decides> := x = 3; main() := y<succeeds>:three := 3 }
+verify("Opacity4", pass,tim=skip_acc) { three(x:int)<decides> := x = 3
+                                      ; main() := y:three<succeeds> := 3 }
       # Opacity4: 'main' should verify despite three's<decides>, because 'three' is transparent
 
 # if-then-else (negations)
@@ -185,7 +186,7 @@ verify("HO16",pass) { bar1(x:int):type{_(:int):char} := { (y:int) => {'m' } } }
 verify("HO17",fail,tim=V10) { bar2(x:int):type{_(:int):char} := { (y:int) => { 3  } } } # REJECT the function returns an int not a string
 verify("HO18",fail,tim=V10) { bar3(x:int):type{_(:int):char} := { (y:nat) => { 'a'} } } # REJECT the function only works on naturals but is supposed to work on ints
 verify("HO19",pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEPT the function works on more than ints
-verify("HO20", fail, broken) { function( foo(x:int):type{int[x]} )<succeeds> { z := "monkey" ; foo[z] } }
+verify("HO20", fail) { function( foo(x:int):type{int[x]} )<succeeds> { z := "monkey" ; foo[z] } }
 
 
 verify("HO20-suc",fail,tim=U00)

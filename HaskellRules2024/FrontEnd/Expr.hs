@@ -21,7 +21,7 @@ module FrontEnd.Expr(
     , srcUnderscore, isSrcUnderscore, identX
 
     , Store(..), Ptr
-    , Eff, effSucceeds, effDecides, effFails, effComputes, isOpenClosed
+    , Eff(..), EffNoOC, allEffects, effString, isOpenClosed, isCardinalityEff
     , Op, pattern Op
     , compos, composOp, unSeq
     , getLoc
@@ -273,11 +273,10 @@ eMkMap l = Variable (Ident l "mkMap$")
 eHavoc :: [Eff] -> SrcExpr
 eHavoc fx = eSeq (mapMaybe havoc1 fx)
   where
-    havoc1 x | x == effSucceeds = Just (eSeq [])
-             | x == effComputes = Just (eSeq [])
-             | x == effFails    = Just Fail
-             | x == effDecides  = Just (Unify eSomeAny (Array []))
-             | otherwise        = Nothing -- errorMessage $ "eHavoc: " ++ show fx
+    havoc1 ESucceeds = Just (eSeq [])
+    havoc1 EFails    = Just Fail
+    havoc1 EDecides  = Just (Unify eSomeAny (Array []))
+    havoc1 _         = Nothing -- errorMessage $ "eHavoc: " ++ show fx
 
 eThunk :: SrcExpr -> SrcExpr
 -- Delay `e` by wrapping it in a lambda (\_.e)
@@ -407,18 +406,44 @@ instance Pretty Ident where
 --   Open/closed: <open>, <closed>
 --------------------------------------------------------
 
-type Eff = Ident
+type EffNoOC = Eff   -- EffNoOC should not be EOpen or EClosed
 
-effSucceeds, effDecides, effFails, effComputes :: Eff
-effSucceeds = Ident noLoc "succeeds"
-effDecides  = Ident noLoc "decides"
-effFails    = Ident noLoc "fails"
-effComputes = Ident noLoc "computes"
+data Eff = EIterates | ESucceeds | EDecides | EFails
+         | EAllocates | EReads | EWrites | EInteracts | ETransacts | EComputes
+         | EOpen | EClosed
+         deriving( Eq, Ord, Show, Data, Bounded, Enum )
+
+allEffects :: [Eff]
+allEffects = [minBound..maxBound]
+
+effString :: Eff -> String
+effString EIterates  = "iterates"
+effString ESucceeds  = "succeeds"
+effString EDecides   = "decides"
+effString EFails     = "fails"
+effString EOpen      = "open"
+effString EClosed    = "closed"
+effString EAllocates = "allocates"
+effString EReads     = "reads"
+effString EWrites    = "writes"
+effString EInteracts = "interacts"
+effString ETransacts = "transacts"
+effString EComputes  = "computes"
+
+instance Pretty Eff where
+  pPrintPrec _ _ eff = text (effString eff)
+
+isCardinalityEff :: Eff -> Bool
+isCardinalityEff EIterates = True
+isCardinalityEff ESucceeds = True
+isCardinalityEff EDecides  = True
+isCardinalityEff EFails    = True
+isCardinalityEff _         = False
 
 isOpenClosed :: Eff -> Bool
-isOpenClosed (Ident _ "open")   = True
-isOpenClosed (Ident _ "closed") = True
-isOpenClosed _                  = False
+isOpenClosed EOpen   = True
+isOpenClosed EClosed = True
+isOpenClosed _       = False
 
 --------------------------------------------------------
 --               Store
