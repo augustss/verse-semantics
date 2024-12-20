@@ -70,8 +70,8 @@ $$
        |check succeeds (apply1N ((DMe3 md si e_2)) r)|
       \end{array}
      & |md|\in\{|mdpos|,|mdx|\} \\
-\rulename{mcheck-}  & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si e| \\
-\rulename{mcheck+x} & |DMe3 md    si (check fx e)| & = & |check fx (DMe3 md si e)| & |md|\in\{|mdpos|,|mdx|\} \\[2mm]
+\rulename{mcheck+} & |DMe3 mdpos    si (check fx e)| & = & |check fx (DMe3 mdpos si e)| \\
+\rulename{mcheck-x}\asktim  & |DMe3 md si (check fx e)| & = & |DMe3 md si e|  & |md|\in\{|mdneg|,|mdx|\} \\[2mm]
 \end{array}
 \\
 % -------------- Function rules ----------------

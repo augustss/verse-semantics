@@ -319,10 +319,12 @@ verify("Fin1", fail) { (y := if (y=2) then y+1 else 3); y }
 verify("Fin2", pass) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
 verify("Fin3", fail, broken) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
 verify("Fin3x", fail, broken) { (y:type{3|4} := 3); y=3 }
-verify("Fin2a", pass, broken ) { (y:type{3}   := if (y=2) then y+1 else 3); if (y=3) then 1 else fail  }
+verify("Fin2a", pass ) { (y:type{3}   := if (y=2) then y+1 else 3)
+                       ; if (y=3) then 1 else fail  }
   # Fin2a should work because all clients of y should see some(\_.3)
 
-verify("Fin3a", fail ) { (y:type{3|4} := if (y=2) then y+1 else 3); if (y=3) then 1 else fail }
+verify("Fin3a", fail ) { (y:type{3|4} := if (y=2) then y+1 else 3)
+                       ; if (y=3) then 1 else fail }
   # Fin3a fails, I think, because clients of y see some(\_.3|4)
 
 verify("Fin4", fail,tim=V10) { y:int = y }

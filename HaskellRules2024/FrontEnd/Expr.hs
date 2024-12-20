@@ -11,7 +11,7 @@ module FrontEnd.Expr(
     , SrcPat, SrcEssential, SrcMini, SrcCore, SrcBlk, SrcValue
 
       -- Predicates on SrcExpr
-    , isLiteral, isAtomic, isValue
+    , isConst, isAtomic, isValue
 
       -- Building SrcExpr
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
@@ -757,23 +757,22 @@ composOp f = runIdentity . compos (pure . f)
 getLoc :: SrcExpr -> Loc
 getLoc _ = noLoc
 
-isLiteral :: SrcExpr -> Bool
-isLiteral Lit{} = True
-isLiteral _ = False
+isConst :: SrcExpr -> Bool
+isConst Lit{}   = True
+isConst EPrim{} = True
+isConst _       = False
 
 -- Values, except lambda
 isValue :: SrcExpr -> Bool
 isValue Variable{} = True
-isValue EPrim{} = True
 isValue (Array es) = all isValue es
-isValue e = isLiteral e
+isValue e = isConst e
 
 isAtomic :: SrcExpr -> Bool
 -- True of small expressions
 isAtomic (Variable {}) = True
-isAtomic (Lit {})      = True
-isAtomic (EPrim {})    = True
-isAtomic _             = False
+isAtomic e             = isConst e
+
 
 
 

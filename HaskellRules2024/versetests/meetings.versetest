@@ -1,5 +1,25 @@
 # Add new meetings at the top
 
+
+verify("M20Dec24-0", pass){ f(x:int)<decides> := { x=(1|2) } }
+  # M20Dec24-0: f <decides>, not iterates, because x has one value in RHS
+
+verify("M20Dec24-1", pass){ f(x:int)<decides> := { x=(1|2) }
+                          ; all { y:int; f[y] } }
+  # M20Dec24-1: function is transparent, so inline it and everything is good
+
+verify("M20Dec24-2", fail){ f(x:int)<decides>:int := { x=(1|2) }
+                          ; all { y:int; f[y] } }
+  # M20Dec24-2: function is opaque, so the 'all' gets stuck
+
+verify("M20Dec24-3", pass){ f(x := 1|2)<decides>:int := x
+                          ; all {y:int; f[y] } }
+  # M20Dec24-3: f is opaque but the iteration is in the domain
+
+verify("M20Dec24-4", pass){ f(3)<succeeds>:int := 22; x:int; f[x] }
+
+
+
 verify("M22Nov24-1", fail){ if( (x:=1) | (x:=2) ) then {x} else 0 }
   # The 'x' in the then-branch is unbound
 
@@ -34,7 +54,7 @@ verify("M16Aug24-3", pass){ f(x:int):nat := nat[x] => f[-3]  }
 verify("M16Aug24-4", pass){ f(x:int):type{nat[x]} => f[-3]  }
 
 # Meeting 14 Aug 24
-testeq("jan1", pass, broken){ (f(x:int)<succeeds>:= x); y:int; f[y]=3} {3}
+testeq("jan1", pass){ (f(x:int)<succeeds>:= x); y:int; f[y]=3} {3}
 
 verify("jan2", pass, tim=skip_rej){ f(x:int)<succeeds>:int = x; g(y:int):= {if(f(y)=y) then 1 else 2} ; g[3] }
 verify("jan3", pass, tim=skip_rej){ h(x:int,y:int)<decides>:int= x=y; if(h[2,2]=2) then 1 else 2 }
@@ -113,7 +133,7 @@ verify("FCS14", pass){ f2(x:int)<decides> := x>3
    # FCS14: Round parens; this time we can prove that f2(4) succeeds
 
 # More function call semantics
-verify("TimL300", pass, broken) {a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}
+verify("TimL300", pass) {a:int => g(f()(x:int):=3):=4 => g[f1()(x:int):=a] => 3}
 verify("TimL300-1", pass) { (g(x:int):int) => g['m'] => 3 }
 verify("TimL300-2", pass) { (g(x:int) :=3) => g['m'] => 3 }
   # TimL300-1,2: more exotic versions of FCS6
@@ -122,13 +142,14 @@ verify("TimL300-3", pass) { (g( f(x:int):char ):=4)  => g[ (x:int) =>'m'] => 3 }
 verify("TimL300-4", pass) { (g( f(x:int):char ):=4)  => g[ h(x:int):='m'] => 3 }
 verify("TimL300-5", pass) { (g( f(x:int):char ):int) => g[ h(x:int):='m'] => 3 }
 verify("TimL300-6", pass)   { (g( f(x:int):='m' ):int) => g[ h(x:int):='m'] => 3 }
-verify("TimL300-7", pass, broken) { (g( f(x:int):="not-monkey" ):int) => g[ h(x:int):='m'] => 3 }
+verify("TimL300-7", pass) { (g( f(x:int):="not-monkey" ):int) => g[ h(x:int):='m'] => 3 }
 verify("TimL300-8", pass)   { f(x:int):int := 1; if (f['m'] >0) then{1} else{2} = 2 }
-verify("TimL300-9", pass, broken)   { f( g(x:int):char ):int := 1; if (f[(x:int)=>1] >0) then{1} else{2} = 2 }
+verify("TimL300-9", pass, broken)   { f( g(x:int):char ):int := 1
+                                    ; if (f[(x:int)=>1] >0) then{1} else{2} = 2 }
 
 
 # Meeting 9 August
-testeq( "M9Aug24-1", pass, broken){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
+testeq( "M9Aug24-1", pass){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
   # M9Aug24-1 uses bidirectional programming
 verify( "M9Aug24-2", pass,tim=skip_rej){ F1(X:int)<closed><decides> := X = 1|2 }
 verify( "M9Aug24-3", pass,tim=skip_rej){ F1(X:any)<closed><decides> := X = 1|2 }
@@ -172,7 +193,7 @@ testeq( "M28Jul24-1", loop, tim=skip_rej ) { F(X:int)<decides>:void = if (X = 2)
 
 # -----------------------------------------
 # Meeting 31 July 24
-verify( "T31Jul24-1", pass, broken){ f(y:int; x := (y = 1; 1)|(y = 2; 1))<closed><succeeds> := x + y }
+verify( "T31Jul24-1", pass){ f(y:int; x := (y = 1; 1)|(y = 2; 1))<closed><succeeds> := x + y }
    # We aren't sure what this one does
 
 # -----------------------------------------
@@ -183,8 +204,11 @@ verify( "T29Jul24-2", fail, tim=skip_acc ){ f( x:any ) := x=x }   # Gets stuck; 
 verify( "T29Jul24-3", pass ){ f(x:int,y:int)<decides> := x=y; all{ a:int; f[2,a]=2; a } }
 verify( "T29Jul24-4", fail, tim=skip_acc ){ f(x:int):int = x; y:int; y=f[y] }   # Gets stuck
 
-# T29Jul24-5: reject because of ill-typed G in argument to F
-verify( "T29Jul24-5", fail ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y }
+verify( "T29Jul24-5", fail ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y; F[3] }
+verify( "T29Jul24-6", pass ){ F( G():int = 'a'; X := G(); Y:int ) := X + Y }
+  # T29Jul24-5: reject because of ill-typed G in argument to F
+  # T29Jul24-6: accept because we can in general only verify
+  #             the domain at a call site; and here there are no calls
 
 # -----------------------------------------
 # Meeting 26 July 24
