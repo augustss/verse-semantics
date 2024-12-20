@@ -367,3 +367,9 @@ verify("exitop2", pass, broken){ x:int; f():int := {x}; f[] }
 verify("exitop3", pass, broken){ x:int; f():int := {x}; f[]; 5 }
 verify("exitop4", pass){ x:int; f():int := {x}; f[]; x=3; 5 }
 verify("exitop5", fail){ x:int; f():int := {x}; f[]=3; 5 }
+
+# tests for domains not given its variables a value
+verify("exidom1", pass){ f(y:any; x:int):int := { x } }   # should this really pass?
+verify("exidom2", fail){ f(y:int; x:int):int := { x } }
+verify("exidom3", fail){ f(y:int; x:int):int := { x+y } }
+
