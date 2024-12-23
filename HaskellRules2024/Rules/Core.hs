@@ -257,10 +257,37 @@ matchAll = snd mkAll_matchAll
 mkCheck_matchCheck :: (Effect -> Expr -> Expr, Expr -> Maybe (Effect,Expr))
 mkCheck_matchCheck = (mk, \_ -> Nothing)
  where
+  mk eff e =
+    Exi $ bind l $
+          (Var l :=: Iter e
+                          (Lam $ bind a $ Lam $ bind f $ Tup [Var a,Var f])
+                          (lamUnderscore $ Tup []))
+      :>: Iter (Exi $ bind a $ Exi $ bind f $
+                   (Tup [Var a,Var f] :=: Var l)
+               :>: (Var underscore :=: (Op IsGround :@: Var a))
+               :>: if canSucceed eff
+                     then Exi $ bind x $
+                              (Var x :=: (Var f :@: Tup []))
+                          :>: Iter ((Var x :=: Tup []) :>: Tup [])
+                                   (lamUnderscore $ lamUnderscore $
+                                     lamUnderscore $ Var a)
+                                   (lamUnderscore $ lamUnderscore $ wrongFx eff (Tup [Var a,Var x]))
+                     else lamUnderscore $ wrongFx eff (Tup [Var a])
+               )
+               (Lam $ bind x $ lamUnderscore $
+                 Var x :@: Tup [])
+               (lamUnderscore $
+                 if canFail eff
+                   then Fail
+                   else wrongFx eff (Tup []))
+   where
+    l:x:a:f:_ = identsNotIn (free e)
+
+{-
   mk Fails e =
     Exi $ bind a $
           (Var a :=: mkAll e)
-      :>: Iter (Var a :=: Tup [])
+      :>: Iter ((Var a :=: Tup []) :>: Tup [])
                (lamUnderscore $ lamUnderscore $ Fail)
                (lamUnderscore $ wrongFx Fails (Var a))
    where
@@ -277,6 +304,23 @@ mkCheck_matchCheck = (mk, \_ -> Nothing)
    where
     a:x:_ = identsNotIn (free e)
 
+  -- version with two Iters
+  mk Decides e =
+    Exi $ bind a $
+          (Var a :=: mkAll e)
+      :>: Iter ((Var a :=: Tup []) :>: Tup [])
+               (lamUnderscore $ lamUnderscore $ Fail)
+               (lamUnderscore $
+                 Iter (Exi $ bind x $
+                        (Tup [Var x] :=: Var a) :>: Var x)
+                      (Lam $ bind x $ lamUnderscore $
+                        Var x)
+                      (lamUnderscore $ wrongFx Decides (Var a))
+               )
+   where
+    a:x:_ = identsNotIn (free e)
+
+  -- version with Len
   mk Decides e =
     Exi $ bind a $
           (Var a :=: mkAll e)
@@ -290,6 +334,7 @@ mkCheck_matchCheck = (mk, \_ -> Nothing)
                  wrongFx Decides (Var a))
    where
     a:x:n:_ = identsNotIn (free e)
+-}
 
   wrongFx fx v =
     Lit (LStr ("check<" ++ show fx ++ ">")) :@: v
@@ -315,7 +360,7 @@ mkCheck_matchCheck = (mk, match)
                           (lamUnderscore $ Tup []))
       :>: Iter (Exi $ bind a $ Exi $ bind f $
                    (Tup [Var a,Var f] :=: Var l)
-               :>: (Var underscore :=: (Op IsGround :@: Var a))
+               -- :>: (Var underscore :=: (Op IsGround :@: Var a))
                :>: if canSucceed eff
                      then Exi $ bind x $
                               (Var x :=: (Var f :@: Tup []))
