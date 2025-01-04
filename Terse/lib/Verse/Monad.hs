@@ -1,0 +1,715 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+module Verse.Monad
+  ( VerseT
+  , runVerseT
+  , ask
+  , local
+  , liftPut
+  , all'
+  , one
+  , if'
+  , Stream (..)
+  , split
+  , fork
+  , stuck
+  , Var
+  , Vars (..)
+  , ZipVars_ (..)
+  , freshVar
+  , newVar
+  , readVar
+  , unifyVar
+  , VarsRef
+  , newVarsRef
+  , readVarsRef
+  , writeVarsRef
+  ) where
+
+import Control.Applicative
+import Control.Arrow (first)
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.State.Strict
+
+import Data.Function
+import Data.Functor
+import Data.Functor.Compose
+import Data.HashMap.Strict qualified as Strict (HashMap)
+import Data.Kind
+import Data.Monoid (Ap (..), Sum (..))
+
+import GHC.Exts (Any)
+
+import Unsafe.Coerce (unsafeCoerce)
+
+import Fix
+import IntMap (IntMap, (!))
+import IntMap qualified
+import Ref
+
+newtype VerseT (m :: Type -> Type) a = VerseT
+  { unVerseT
+    :: forall r . R
+    -> S
+    -> Var m ()
+    -> Mem m
+    -> Yield r m
+    -> Succeed r m a
+    -> Fail r m
+    -> Fail r m
+    -> m r
+  }
+
+newtype R = R { level :: Level }
+
+type Level = Sum Int
+
+newtype S = S { count :: Int }
+
+data Mem m = Mem
+  { label :: {-# UNPACK #-} !Label
+  , heap :: !(Heap m)
+  }
+
+type Label = Int
+
+type Heap m = IntMap (SomeVars m)
+
+data SomeVars m = forall a . Vars a m => SomeVars !a
+
+newtype Yield r m = Yield
+  { unYield
+    :: forall a . Level
+    -> S
+    -> Mem m
+    -> Handler m a
+    -> Succeed r m a
+    -> Fail r m
+    -> Fail r m
+    -> m r
+  }
+
+type Handler m a = (a -> VerseT m ()) -> VerseT m ()
+
+type Succeed r m a = S -> Mem m -> a -> Fail r m -> Fail r m -> m r
+
+type Fail r m = Var m () -> Mem m -> m r
+
+instance Functor (VerseT m) where
+  fmap f m = VerseT $ \ r s h mem yk sk ->
+    unVerseT m r s h mem yk $ \ s mem -> sk s mem . f
+
+instance Applicative (VerseT m) where
+  pure x = VerseT $ \ _r s _h mem _yk sk ->
+    sk s mem x
+  f <*> x = VerseT $ \ r s h mem yk sk ->
+    unVerseT f r s h mem yk $ \ s mem f ->
+    unVerseT x r s h mem yk $ \ s mem x ->
+    sk s mem $ f x
+
+instance Alternative (VerseT m) where
+  empty = VerseT $ \ _r _s h mem _yk _sk _fk ek ->
+    ek h mem
+  x <|> y = VerseT $ \ r s h mem yk sk fk ek ->
+    unVerseT x r s h mem yk sk
+    (\ h mem -> unVerseT y r s h mem yk sk fk fk)
+    (\ h mem -> unVerseT y r s h mem yk sk fk ek)
+
+alt :: VerseT m a -> VerseT m a -> VerseT m a -> VerseT m a
+alt x y z = VerseT $ \ r s h mem yk sk fk ek ->
+  unVerseT x r s h mem yk sk
+  (\ h mem -> unVerseT y r s h mem yk sk fk fk)
+  (\ h mem -> unVerseT z r s h mem yk sk fk ek)
+
+instance Monad (VerseT m) where
+  x >>= f = VerseT $ \ r s h mem yk sk ->
+    unVerseT x r s h mem yk $ \ s mem x ->
+    unVerseT (f x) r s h mem yk sk
+
+instance MonadPlus (VerseT m)
+
+instance MonadTrans VerseT where
+  lift m = VerseT $ \ _r s _h mem _yk sk fk ek ->
+    m >>= \ x -> sk s mem x fk ek
+
+instance MonadIO m => MonadIO (VerseT m) where
+  liftIO = lift . liftIO
+
+instance MonadState s m => MonadState s (VerseT m) where
+  get = lift get
+  put = lift . put
+  state = lift . state
+
+yield :: Level -> Handler m a -> VerseT m a
+yield i f = VerseT $ \ _r s _h mem yk ->
+  unYield yk i s mem f
+
+getLevel :: VerseT m Level
+getLevel = VerseT $ \ r s _h mem _yk sk ->
+  sk s mem r.level
+
+putS :: S -> VerseT m ()
+putS s = VerseT $ \ _r _s _h mem _yk sk ->
+  sk s mem ()
+
+modifyCount :: (Int -> Int) -> VerseT m ()
+modifyCount f = VerseT $ \ _r s _h mem _yk sk ->
+  let
+    !s' = s { count = f s.count }
+  in
+    sk s' mem ()
+
+putMem :: Mem m -> VerseT m ()
+putMem mem = VerseT $ \ _r s _h _mem _yk sk ->
+  sk s mem ()
+
+putLabel :: Label -> VerseT m ()
+putLabel label = VerseT $ \ _r s _h Mem { heap } _yk sk ->
+  sk s Mem {..} ()
+
+getHeap :: VerseT m (Heap m)
+getHeap = VerseT $ \ _r s _h mem _yk sk ->
+  sk s mem mem.heap
+
+putHeap :: Heap m -> VerseT m ()
+putHeap heap = VerseT $ \ _r s _h mem _yk sk ->
+  sk s mem { heap } ()
+
+runVerseT :: (MonadRef m, Vars a m) => VerseT m a -> m (Maybe [a])
+runVerseT m = do
+  h <- fmap Var . newRef $ Bound MkBound { label = 0, binding = () }
+  let
+    sk s Mem {..} x fk _ek
+      | s.count == 0 =
+          runFindT' (findVars' (x, heap)) label >>= \ ((x, heap), label) ->
+          fmap (x:) <$> fk h Mem {..}
+      | otherwise =
+          pure Nothing
+  unVerseT m r s h mem yk sk fk ek
+  where
+    r = R { level = 0 }
+    s = S { count = 0 }
+    mem = Mem { label = 1, heap = mempty }
+    yk = Yield $ \ _i _s _mem _f _sk _fk _ek ->
+      pure Nothing
+    fk _h _mem =
+      pure $ Just []
+    ek _h _mem =
+      pure $ Just []
+
+ask :: VerseT m (Var m ())
+ask = VerseT $ \ _r s h mem _yk sk ->
+  sk s mem h
+
+local :: (Var m () -> Var m ()) -> VerseT m a -> VerseT m a
+local f m = VerseT $ \ r s h mem yk sk fk ek ->
+  unVerseT m r s (f h) mem yk sk (fk . f) (ek . f)
+
+liftPut :: Applicative m => m () -> m () -> VerseT m ()
+liftPut m n = VerseT $ \ _r s _h mem _yk sk fk ek ->
+  m *> sk s mem () (\ h mem -> n *> fk h mem) (\ h mem -> n *> ek h mem)
+
+all' :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m [a]
+all' = split >=> loop
+  where
+    loop = \ case
+      Done -> pure []
+      Step x m -> (x:) <$> (m >>= loop)
+
+one :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m a
+one = split >=> \ case
+  Done -> empty
+  Step x _m -> pure x
+
+if'
+  :: (MonadRef m, Vars a m)
+  => VerseT m a -> (a -> VerseT m b) -> VerseT m b -> VerseT m b
+if' m f n = split m >>= \ case
+  Done -> n
+  Step x _m -> f x
+
+split :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m (Stream m a)
+split m = split' m S { count = 0 } =<< getHeap
+
+split'
+  :: (MonadRef m, Vars a m)
+  => VerseT m a -> S -> Heap m -> VerseT m (Stream m a)
+split' m s heap = splitS m s heap >>= \ case
+  YieldS i s mem f f_s m_f m_e -> do
+    putLabel mem.label
+    level <- getLevel
+    if i > level then
+      stuck
+    else
+      yield i $ \ g -> f $ \ x -> split' (alt (f_s x) m_f m_e) s mem.heap >>= g
+  SucceedS s Mem {..} x m_f _m_e -> do
+    putLabel label
+    if s.count == 0 then do
+      (heap, x) <- runFindT $ findVars (heap, x)
+      putHeap heap
+      pure . Step x $ split m_f
+    else
+      stuck
+  FailS label -> do
+    putLabel label
+    pure Done
+
+data Stream m a = Done | Step a (VerseT m (Stream m a))
+
+splitS :: Monad m => VerseT m a -> S -> Heap m -> VerseT m (Split m a)
+splitS m !s' heap = VerseT $ \ r s h mem _yk sk fk ek ->
+  let
+    !r' = R { level = r.level <> 1 }
+    !mem' = Mem { label = mem.label, heap }
+  in
+    unVerseT m r' s' h mem' yieldS succeedS failS failS >>= \ x ->
+    sk s mem x fk ek
+
+yieldS :: Monad m => Yield (Split m a) m
+yieldS = Yield $ \ i s mem f sk fk ek ->
+  pure $
+  YieldS i s mem f
+  (liftS sk >=> reflect)
+  (liftF fk >>= reflect)
+  (liftF ek >>= reflect)
+
+succeedS :: Monad m => Succeed (Split m a) m a
+succeedS s mem x fk ek =
+  pure $
+  SucceedS s mem x
+  (liftF fk >>= reflect)
+  (liftF ek >>= reflect)
+
+failS :: Applicative m => Fail (Split m a) m
+failS _h = pure . FailS . (.label)
+
+reflect :: Split m a -> VerseT m a
+reflect = \ case
+  YieldS i s mem f f_s m_f m_e ->
+    putS s *>
+    putMem mem *>
+    alt (yield i $ \ g -> f $ f_s >=> g) m_f m_e
+  SucceedS s mem x m_f m_e -> do
+    putS s
+    putMem mem
+    alt (pure x) m_f m_e
+  FailS label -> do
+    putLabel label
+    empty
+
+fork :: Monad m => VerseT m () -> VerseT m ()
+fork m = forkS m >>= reflectF
+
+forkS :: Monad m => VerseT m () -> VerseT m (Split m ())
+forkS m = VerseT $ \ r s h mem _yk sk fk ek ->
+  unVerseT m r s h mem yieldF succeedF failF failF >>= \ x ->
+  sk s mem x fk ek
+
+reflectF :: Split m () -> VerseT m ()
+reflectF = \ case
+  YieldS i s mem f f_s m_f m_e -> do
+    putMem mem
+    level <- getLevel
+    if i < level then
+      yield i $ \ g -> f $ \ x -> do
+        putS s
+        alt (f_s x) m_f m_e >>= g
+    else do
+      putS s { count = s.count + 1 }
+      f $ \ x -> do
+        modifyCount $ subtract 1
+        alt (f_s x) m_f m_e
+  SucceedS s mem () m_f m_e -> do
+    putS s
+    putMem mem
+    alt (pure ()) m_f m_e
+  FailS label -> do
+    putLabel label
+    empty
+
+yieldF :: Monad m => Yield (Split m ()) m
+yieldF = Yield $ \ i s mem f sk fk ek ->
+  pure $
+  YieldS i s mem f
+  (liftS sk >=> reflectF)
+  (liftF fk >>= reflectF)
+  (liftF ek >>= reflectF)
+
+succeedF :: Monad m => Succeed (Split m ()) m ()
+succeedF s mem () fk ek =
+  pure $
+  SucceedS s mem ()
+  (liftF fk >>= reflectF)
+  (liftF ek >>= reflectF)
+
+failF :: Applicative m => Fail (Split m a) m
+failF = failS
+
+liftS :: Monad m => Succeed (Split m a) m b -> b -> VerseT m (Split m a)
+liftS f x = VerseT $ \ _r s _h mem _yk sk fk ek ->
+  f s mem x failS failS >>= \ x -> sk s mem x fk ek
+
+liftF :: Monad m => Fail (Split m a) m -> VerseT m (Split m a)
+liftF f = VerseT $ \ _r s h mem _yk sk fk ek ->
+  f h mem >>= \ x -> sk s mem x fk ek
+
+data Split m a
+  = forall b .
+    YieldS
+    {-# UNPACK #-} !Level
+    {-# UNPACK #-} !S
+    !(Mem m)
+    !(Handler m b)
+    !(b -> VerseT m a)
+    !(VerseT m a)
+    !(VerseT m a)
+  | SucceedS
+    {-# UNPACK #-} !S
+    !(Mem m)
+    !a
+    !(VerseT m a)
+    !(VerseT m a)
+  | FailS
+    {-# UNPACK #-}
+    !Label
+
+stuck :: VerseT m a
+stuck = VerseT $ \ r s _h mem yk ->
+  unYield yk r.level s mem (const $ pure ())
+
+newtype Var m a = Var (Ref m (VarState m a))
+
+class Vars a m where
+  vars
+    :: Applicative f
+    => (forall b . Vars b m => Var m b -> f (Var m b))
+    -> a -> f a
+
+instance Vars a m => Vars (Var m a) m where
+  vars f = f
+
+instance Vars (Heap m) m where
+  vars f = traverse $ \ (SomeVars x) -> SomeVars <$> vars f x
+
+instance Vars Bool m where
+  vars _ = pure
+
+instance Vars Char m where
+  vars _ = pure
+
+instance Vars Integer m where
+  vars _ = pure
+
+instance Vars () m where
+  vars _ = pure
+
+instance (Vars a m, Vars b m) => Vars (a, b) m where
+  vars f (x, y) = (,) <$> vars f x <*> vars f y
+
+instance Vars a m => Vars (Maybe a) m where
+  vars f = \ case
+    Nothing -> pure Nothing
+    Just x -> Just <$> vars f x
+
+instance Vars a m => Vars [a] m where
+  vars f = \ case
+    [] -> pure []
+    x:xs -> (:) <$> vars f x <*> vars f xs
+
+instance Vars (f (g a)) m => Vars (Compose f g a) m where
+  vars f = fmap Compose . vars f . getCompose
+
+instance Vars (f (Fix f)) m => Vars (Fix f) m where
+  vars f = fmap Fix . vars f . getFix
+
+instance Vars v m => Vars (Strict.HashMap k v) m where
+  vars f = traverse (vars f)
+
+class ZipVars_ a m where
+  zipVars_
+    :: Alternative f
+    => (forall b . ZipVars_ b m => Var m b -> Var m b -> f ())
+    -> a -> a -> f ()
+
+instance ZipVars_ a m => ZipVars_ (Var m a) m where
+  zipVars_ f = f
+
+instance ZipVars_ () m where
+  zipVars_ _ () () = pure ()
+
+instance (ZipVars_ a m, ZipVars_ b m) => ZipVars_ (a, b) m where
+  zipVars_ f (x1, y1) (x2, y2) =
+    zipVars_ f x1 x2 *>
+    zipVars_ f y1 y2
+
+instance ZipVars_ Bool m where
+  zipVars_ _ = curry $ \ case
+    (False, False) -> pure ()
+    (True, True) -> pure ()
+    _ -> empty
+
+instance ZipVars_ a m => ZipVars_ (Maybe a) m where
+  zipVars_ f = curry $ \ case
+    (Nothing, Nothing) -> pure ()
+    (Just x, Just y) -> zipVars_ f x y
+    _ -> empty
+
+instance ZipVars_ a m => ZipVars_ [a] m where
+  zipVars_ f = curry $ \ case
+    ([], []) -> pure ()
+    (x:xs, y:ys) -> zipVars_ f x y *> zipVars_ f xs ys
+    _ -> empty
+
+instance ZipVars_ (f (g a)) m => ZipVars_ (Compose f g a) m where
+  zipVars_ f = zipVars_ f `on` getCompose
+
+instance ZipVars_ (f (Fix f)) m => ZipVars_ (Fix f) m where
+  zipVars_ f = zipVars_ f `on` getFix
+
+data VarState m a
+  = Unbound !(Unbound m a)
+  | Bound !(Bound a)
+  | Link !(Var m a)
+
+data Root m a
+  = UnboundR !(Unbound m a)
+  | BoundR !(Bound a)
+
+data Unbound m a = MkUnbound
+  { label :: {-# UNPACK #-} !Label
+  , level :: {-# UNPACK #-} !Level
+  , susp :: !(Var m a -> Ap (VerseT m) ())
+  }
+
+data Bound a = MkBound
+  { label :: {-# UNPACK #-} !Label
+  , binding :: !a
+  }
+
+instance ZipVars_ a m => ZipVars_ (Bound a) m where
+  zipVars_ f x y
+    | x.label == y.label = pure ()
+    | otherwise = zipVars_ f x.binding y.binding
+
+freshVar :: MonadRef m => VerseT m (Var m a)
+freshVar = VerseT $ \ r s _h mem _yk sk fk ek ->
+  let
+    !label = mem.label
+    !mem' = Mem { label = label + 1, heap = mem.heap }
+    !level = r.level
+    !susp = const $ pure ()
+    !x = Unbound MkUnbound {..}
+  in
+    newRef x >>= \ ref ->
+    sk s mem' (Var ref) fk ek
+
+newVar :: MonadRef m => a -> VerseT m (Var m a)
+newVar = lift . fmap Var . newRef . Bound <=< newBound
+
+newBound :: a -> VerseT m (Bound a)
+newBound !binding = VerseT $ \ _r s _h mem _yk sk ->
+  let
+    !label = mem.label
+    !mem' = Mem { label = label + 1, heap = mem.heap }
+    !x = MkBound {..}
+  in
+    sk s mem' x
+
+readVar :: MonadRef m => Var m a -> VerseT m a
+readVar = fmap (.binding) . readBound
+
+readBound :: MonadRef m => Var m a -> VerseT m (Bound a)
+readBound var@(Var ref) = lift (readRef ref) >>= \ case
+  Link var -> readBound var
+  Bound x -> pure x
+  Unbound x -> readBound =<< readLink var x
+
+readLink :: MonadRef m => Var m a -> Unbound m a -> VerseT m (Var m a)
+readLink var x = yield x.level $ \ f ->
+  let
+    !label = x.label
+    !level = x.level
+    !susp = x.susp <> Ap . f
+  in
+    writeVar var $ Unbound MkUnbound {..}
+
+unifyVar :: (MonadRef m, ZipVars_ a m) => Var m a -> Var m a -> VerseT m ()
+unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
+  ((var1, UnboundR x1), (var2, UnboundR x2)) ->
+    when (x1.label /= x2.label) $ do
+      level <- getLevel
+      if x1.level < level then do
+        if x2.level < level then do
+          if x1.label < x2.label then do
+            var2 <- readLink var2 x2
+            unifyVar var1 var2
+          else do
+            var1 <- readLink var1 x1
+            unifyVar var1 var2
+        else do
+          writeVar var2 $ Link var1
+          getAp $ x2.susp var1
+      else if x2.level < level then do
+        writeVar var1 $ Link var2
+        getAp $ x1.susp var2
+      else if x1.label < x2.label then do
+        writeVar var2 $ Link var1
+        getAp $ x2.susp var1
+      else do
+        writeVar var1 $ Link var2
+        getAp $ x1.susp var2
+  ((var1, UnboundR x1), (var2, BoundR x2)) -> do
+    level <- getLevel
+    if x1.level < level then do
+      binding1 <- readVar var1
+      zipVars_ unifyVar binding1 x2.binding
+    else do
+      writeVar var1 $ Link var2
+      getAp $ x1.susp var2
+  ((var1, BoundR x1), (var2, UnboundR x2)) -> do
+    level <- getLevel
+    if x2.level < level then do
+      binding2 <- readVar var2
+      zipVars_ unifyVar x1.binding binding2
+    else do
+      writeVar var2 $ Link var1
+      getAp $ x2.susp var1
+  ((_var1, BoundR x1), (_var2, BoundR x2)) ->
+    zipVars_ unifyVar x1 x2
+
+writeVar :: MonadRef m => Var m a -> VarState m a -> VerseT m ()
+writeVar (Var ref) x = VerseT $ \ _r s _h mem _yk sk fk ek -> do
+  y <- readRef ref
+  writeRef ref x
+  sk s mem ()
+    (\ h mem -> writeRef ref y *> fk h mem)
+    (\ h mem -> writeRef ref y *> ek h mem)
+
+readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
+readRoot var@(Var ref) = lift (readRef ref) >>= \ case
+  Link var ->
+    readRoot var
+  Bound x ->
+    pure (var, BoundR x)
+  Unbound x ->
+    pure (var, UnboundR x)
+
+type FindT m = StateT (IntMap Any) (VerseT m)
+
+runFindT :: FindT m a -> VerseT m a
+runFindT = flip evalStateT mempty
+
+findVars :: (MonadRef m, Vars a m) => a -> FindT m a
+findVars = vars findVar
+
+findVar :: (MonadRef m, Vars a m) => Var m a -> FindT m (Var m a)
+findVar var@(Var ref) = lift (lift $ readRef ref) >>= \ case
+  Link var ->
+    findVar var
+  Bound x -> do
+    s <- get
+    (var@(Var ref), s) <- lift $ lookupInsertA x freshVar s
+    case s of
+      Nothing ->
+        pure var
+      Just !s -> do
+        put s
+        lift . (lift . writeRef ref . Bound <=< newBound) =<< findVars x.binding
+        pure var
+  Unbound x -> lift $ do
+    level <- getLevel
+    if x.level > level then
+      stuck
+    else
+      pure var
+  where
+    lookupInsertA k x =
+      fmap (first unsafeCoerce) .
+      IntMap.lookupInsertA k.label (unsafeCoerce <$> x)
+
+type FindT' m = StateT (IntMap Any, Int) m
+
+runFindT' :: Functor m => FindT' m a -> Label -> m (a, Label)
+runFindT' m = fmap (\ (x, (_, y)) -> (x, y)) . runStateT m . (mempty,)
+
+findVars' :: (MonadRef m, Vars a m) => a -> FindT' m a
+findVars' = vars findVar'
+
+findVar' :: (MonadRef m, Vars a m) => Var m a -> FindT' m (Var m a)
+findVar' var@(Var ref) = readRef ref >>= \ case
+  Link var ->
+    findVar' var
+  Bound x -> do
+    s <- gets fst
+    (var@(Var ref), s) <- lookupInsertA x freshVar' s
+    case s of
+      Nothing ->
+        pure var
+      Just s -> do
+        modify . first $ const s
+        writeRef ref . Bound =<< newBound' =<< findVars' x.binding
+        pure var
+  Unbound _ ->
+    pure var
+  where
+    lookupInsertA k x =
+      fmap (first unsafeCoerce) .
+      IntMap.lookupInsertA k.label (unsafeCoerce <$> x)
+
+freshVar' :: MonadRef m => FindT' m (Var m a)
+freshVar' = StateT $ \ s ->
+  let
+    !label = snd s
+    !s' = second' (+ 1) s
+    !level = 0
+    !susp = const $ pure ()
+    !x = Unbound MkUnbound {..}
+  in
+    newRef x >>= \ ref -> pure (Var ref, s')
+
+newBound' :: Applicative m => a -> FindT' m (Bound a)
+newBound' !binding = StateT $ \ s ->
+  let
+    !label = snd s
+    !s' = second' (+ 1) s
+    !x = MkBound {..}
+  in
+    pure (x, s')
+
+second' :: (b -> c) -> (d, b) -> (d, c)
+second' f (x, y) =
+  let
+    !y' = f y
+  in
+    (x, y')
+
+newtype VarsRef m a = VarsRef Label deriving Eq
+
+newVarsRef :: Vars a m => a -> VerseT m (VarsRef m a)
+newVarsRef x = VerseT $ \ _r s _h mem _yk sk ->
+  let
+    !label = mem.label
+    !mem' = Mem
+      { label = label + 1
+      , heap = IntMap.insert label (SomeVars x) mem.heap
+      }
+  in
+    sk s mem' (VarsRef label)
+
+readVarsRef :: VarsRef m a -> VerseT m a
+readVarsRef (VarsRef i) = getHeap <&> \ heap -> case heap!i of
+  SomeVars x -> unsafeCoerce x
+
+writeVarsRef :: Vars a m => VarsRef m a -> a -> VerseT m ()
+writeVarsRef (VarsRef i) x = VerseT $ \ _r s _h mem _yk sk fk ek ->
+  let
+    !y = mem.heap!i
+    !mem' = mem { heap = IntMap.insert i (SomeVars x) mem.heap }
+  in
+    sk s mem' () fk $ \ h mem ->
+    ek h mem { heap = IntMap.insert i y mem.heap }

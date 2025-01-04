@@ -1,0 +1,60 @@
+cabal-version:      3.4
+name:               terse
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            NONE
+author:             Andy Sonnenburg
+maintainer:         andy.sonnenburg@epicgames.com
+-- copyright:
+category:           Language
+build-type:         Simple
+-- extra-source-files:
+
+common warnings
+  ghc-options: -Wall
+
+library
+  import:           warnings
+  hs-source-dirs:   lib
+  exposed-modules:
+    Fix
+    IntMap
+    Loc
+    Ref
+    Text
+    Verse
+    Verse.Eval
+    Verse.Exp
+    Verse.Monad
+    Verse.Name
+    Verse.Parse
+    Verse.Val
+  build-depends:
+    attoparsec,
+    base ^>=4.19.0.0,
+    containers,
+    mtl,
+    prettyprinter,
+    prettyprinter-ansi-terminal,
+    text,
+    transformers,
+    unordered-containers
+  default-language: GHC2021
+
+executable terse
+  import:           warnings
+  main-is:          Main.hs
+  build-depends:
+    base ^>=4.19.0.0,
+    ansi-terminal,
+    directory,
+    filepath,
+    haskeline,
+    prettyprinter,
+    prettyprinter-ansi-terminal,
+    terse,
+    text,
+    transformers
+  hs-source-dirs:   exe
+  default-language: GHC2021
