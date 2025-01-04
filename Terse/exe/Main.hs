@@ -51,7 +51,7 @@ main = getArgs >>= \ case
       either outputErrLn (print . hcat . punctuate pipe . fmap pretty)
       where
         outputErrLn x = hNowSupportsANSI stderr >>= \ case
-          False -> hPutStrLn stderr $ show x
+          False -> hPrint stderr x
           True -> Terminal.hPutDoc stderr $ x <> hardline
     loop = parseInput >>= \ case
       Nothing -> pure ()

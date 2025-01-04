@@ -100,8 +100,8 @@ tup = (eq >>= loop []) <|> done0
     last1 x = \ case
       [] -> x
       x:xs -> last1 x xs
-    reverse2 x y xs =
-      foldl (flip (:)) [y, x] xs
+    reverse2 x y =
+      foldl (flip (:)) [y, x]
 
 eq :: Parser LExp
 eq = chainl1 less $ wrap2 (:=) <$ equal

@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Loc
@@ -62,7 +61,7 @@ prettyStuck xs =
         !x@(Loc i' _) = rowColumn i xs'
         !y@(Loc j' _) = rowColumn j xs'
       in
-        if (i' == j') then
+        if i' == j' then
           bolded (prettyLocRowColumn x y <> colon) <> line' <>
           indent 2 (prettyLocText i j)
         else
