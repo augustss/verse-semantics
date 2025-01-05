@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 module Parser
   ( Parser
@@ -36,11 +35,9 @@ import Prelude
   , ($)
   , (+)
   , (.)
-  , (/=)
   , (<)
   , (<>)
   , (==)
-  , (||)
   , const
   , mconcat
   , mempty
@@ -175,23 +172,35 @@ skipWhile f = Parser $ \ s ann yk sk fk ak ->
   let
     loop !z s =
       let
-        !x = Text.takeWhile f $ Unsafe.takeWord8 s.indexWord8 s.input
+        !x = Text.takeWhile f $ Unsafe.dropWord8 s.indexWord8 s.input
       in yk $ \ input ->
         let
           !n = Unsafe.lengthWord8 x
-          !indexWord8 = s.indexWord8 + n
-          !column = s.column + n
         in
           if Text.null input
           then
             if z
-            then sk () s { indexWord8, column } ann ak
-            else sk () s { indexWord8, column } ann fk
-          else loop (z || n /= 0) s
-            { input = s.input <> input
-            , indexWord8
-            , column
-            }
+            then
+              let
+                !indexWord8 = s.indexWord8 + n
+                !column = s.column + n
+              in
+                sk () s { indexWord8, column } ann ak
+            else
+              sk () s ann fk
+          else
+            if n == 0
+            then loop z s { input = s.input <> input }
+            else
+              let
+                !indexWord8 = s.indexWord8 + n
+                !column = s.column + n
+              in
+                loop True s
+                  { input = s.input <> input
+                  , indexWord8
+                  , column
+                  }
   in
     loop False s
 
@@ -200,27 +209,21 @@ takeWhile f = Parser $ \ s ann yk sk fk ak ->
   let
     loop z s =
       let
-        !x = Text.takeWhile f $ Unsafe.takeWord8 s.indexWord8 s.input
+        !x = Text.takeWhile f $ Unsafe.dropWord8 s.indexWord8 s.input
       in yk $ \ input ->
-        let
-          !n = Unsafe.lengthWord8 x
-          !indexWord8 = s.indexWord8 + n
-          !column = s.column + n
-        in
-          if Text.null input
-          then
-            let
-              !y = mconcat $ reverse (x:z)
-            in
-              if Text.null y
-              then sk y s { indexWord8, column } ann fk
-              else sk y s { indexWord8, column } ann ak
-          else
-            loop (x:z) s
-              { input = s.input <> input
-              , indexWord8
-              , column
-              }
+        if Text.null input
+        then
+          let
+            !y = mconcat $ reverse (x:z)
+            !n = Unsafe.lengthWord8 y
+            !indexWord8 = s.indexWord8 + n
+            !column = s.column + n
+          in
+            if Text.null y
+            then sk y s { indexWord8, column } ann fk
+            else sk y s { indexWord8, column } ann ak
+        else
+          loop (x:z) s { input = s.input <> input }
   in
     loop [] s
 
