@@ -6,57 +6,54 @@
 module Verse.Parse
   ( parse
   , parse'
-  , Result
-  , pattern Fail
-  , pattern Partial
-  , pattern Done
-  , eitherResult
+  , Result (..)
   ) where
 
 import Control.Applicative
 
-import Data.Attoparsec.Internal qualified as Internal
-import Data.Attoparsec.Internal.Types qualified as Internal
-import Data.Attoparsec.Text
-  ( Parser
-  , Result
-  , pattern Fail
-  , pattern Partial
-  , pattern Done
-  , char
-  , decimal
-  , eitherResult
-  , letter
-  , signed
-  , skipWhile
-  , takeWhile
-  )
-import Data.Attoparsec.Text qualified as Parser
 import Data.Char
 import Data.Functor
-import Data.Monoid (Any (..), (<>))
+import Data.Monoid ((<>))
 import Data.Text (Text)
 import Data.Text qualified as Text
 
 import Prelude
-  ( Either
-  , Int
+  ( Bool
+  , Either
   , Integer
-  , String
+  , Integral
+  , Num
   , ($)
+  , (&&)
   , (.)
-  , (<)
+  , (<=)
   , (=<<)
-  , (==)
   , (>>)
   , (>>=)
+  , (+)
+  , (*)
+  , (-)
   , flip
   , foldl
-  , otherwise
-  , undefined
+  , fromIntegral
+  , negate
+  , subtract
   )
 
 import Loc
+import Parser
+  ( Parser
+  , Result (..)
+  , char
+  , eof
+  , get
+  , runParser
+  , satisfy
+  , skipWhile
+  , takeWhile
+  )
+import Parser qualified
+import Pos
 
 import Verse.Exp
   ( ExpF
@@ -71,11 +68,11 @@ import Verse.Exp
   )
 import Verse.Exp qualified as Exp
 
-parse :: Text -> Either String LExp
-parse = Parser.parseOnly $ exp <* spaces <* endOfInput
+parse :: Text -> Either (Pos, [Text]) LExp
+parse = Parser.parse $ spaces *> exp <* eof
 
 parse' :: Text -> Result LExp
-parse' = Parser.parse $ exp <* spaces <* endOfInput
+parse' = runParser $ spaces *> exp <* eof
 
 exp :: Parser LExp
 exp = and
@@ -227,8 +224,8 @@ name = token $
   "operator'<'" <|>
   Text.cons <$> head <*> tail
   where
-    head = letter <|> char '_'
-    tail = takeWhile $ getAny . (Any . isAlpha <> Any . isDigit)
+    head = alpha <|> (char '_' $> '_')
+    tail = takeWhile isAlphaNum
 
 lparen :: Parser ()
 lparen = token . void $ char '('
@@ -264,10 +261,29 @@ equal :: Parser ()
 equal = token . void $ char '='
 
 token :: Parser a -> Parser a
-token m = spaces *> m
+token m = m <* spaces
 
 spaces :: Parser ()
 spaces = skipWhile isSpace
+
+alpha :: Parser Char
+alpha = satisfy isAlpha
+
+decimal :: Integral a => Parser a
+decimal = do
+  z <- fromIntegral . (subtract 48) . ord <$> satisfy isDecimal
+  Text.foldl' f z <$> takeWhile isDecimal
+  where
+    f z x = z * 10 + fromIntegral (ord x - 48)
+
+isDecimal :: Char -> Bool
+isDecimal x = '0' <= x && x <= '9'
+
+signed :: Num a => Parser a -> Parser a
+signed m =
+  negate <$> (char '-' *> m) <|>
+  char '+' *> m <|>
+  m
 
 chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
 chainl1 m n = do
@@ -280,21 +296,3 @@ chainl1 m n = do
       f <- n
       y <- m
       loop $ f x y
-
-get :: Parser Int
-get = Internal.Parser $ \ t !pos more _lose succ ->
-  succ t pos more $ Internal.fromPos pos
-
-endOfInput :: Parser ()
-endOfInput = Internal.Parser $ \ t pos more lose succ ->
-  if
-    | pos < Internal.atBufferEnd (undefined :: Text) t ->
-        lose t pos more [] "end of input"
-    | more == Internal.Complete ->
-        succ t pos more ()
-    | otherwise ->
-        let
-          lose' t' pos' more' _ctx _msg = succ t' pos' more' ()
-          succ' t' pos' more' _a = lose t' pos' more' [] "end of input"
-        in
-          Internal.runParser Internal.demandInput t pos more lose' succ'

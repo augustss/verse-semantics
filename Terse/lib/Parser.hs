@@ -13,13 +13,13 @@ module Parser
   , get
   , skipWhile
   , takeWhile
+  , satisfy
   , char
-  , tab
-  , newline
   , eof
   ) where
 
 import Control.Applicative
+import Control.Monad
 
 import Data.String
 import Data.Text (Text)
@@ -30,7 +30,8 @@ import Prelude
   ( Bool (..)
   , Char
   , Either (..)
-  , Functor (..)
+  , Int
+  , Maybe (..)
   , ($)
   , (&&)
   , (+)
@@ -38,13 +39,15 @@ import Prelude
   , (<)
   , (<>)
   , (==)
+  , (>=)
   , const
   , mconcat
   , mempty
   , reverse
   )
 
-import Pos
+import Pos (Pos (..))
+import Pos qualified
 
 newtype Parser a = Parser
   { unParser
@@ -64,42 +67,42 @@ data S = S
 
 type Yield r = (Text -> r) -> r
 
-type Succeed r a = a -> S -> [Text] -> Fail r -> r
+type Succeed r a = a -> S -> [Text] -> Yield r -> Fail r -> r
 
-type Fail r = S -> [Text] -> r
+type Fail r = S -> [Text] -> Yield r -> r
 
 data Result a
   = Yield (Text -> Result a)
-  | Pure a
+  | Pure a {-# UNPACK #-} !Text
   | Empty {-# UNPACK #-} !Text {-# UNPACK #-} !Pos [Text]
 
 runParser :: Parser a -> Text -> Result a
 runParser m input =
   let
-    s = S { input, pos = emptyPos }
+    s = S { input, pos = Pos.empty }
   in
     unParser m s [] yk sk fk fk
   where
     yk = Yield
-    sk x _s _ann _fk = Pure x
-    fk s = Empty s.input s.pos
+    sk x s _ann _yk _fk = Pure x s.input
+    fk s ann _yk = Empty s.input s.pos ann
 
 parse :: Parser a -> Text -> Either (Pos, [Text]) a
 parse m input =
   let
-    s = S { input, pos = emptyPos }
+    s = S { input, pos = Pos.empty }
   in
     unParser m s [] yk sk fk fk
   where
     yk f = f mempty
-    sk x _s _ann _fk = Right x
-    fk s ann = Left (s.pos, ann)
+    sk x _s _ann _yk _fk = Right x
+    fk s ann _yk = Left (s.pos, ann)
 
-done :: Result a -> Either (Text, Pos, [Text]) a
+done :: Result a -> (Text, Either (Pos, [Text]) a)
 done = \ case
   Yield f -> done $ f mempty
-  Pure x -> Right x
-  Empty input pos ann -> Left (input, pos, ann)
+  Pure x input -> (input, Right x)
+  Empty input pos ann -> (input, Left (pos, ann))
 
 step :: Result a -> Text -> Result a
 step = \ case
@@ -112,23 +115,32 @@ instance Functor Parser where
     unParser x s ann yk $ sk . f
 
 instance Applicative Parser where
-  pure x = Parser $ \ s ann _yk sk fk _ak ->
-    sk x s ann fk
+  pure x = Parser $ \ s ann yk sk fk _ak ->
+    sk x s ann yk fk
   f <*> x = Parser $ \ s ann yk sk fk ak ->
     unParser f s ann yk
-    (\ f s ann fk -> unParser x s ann yk (sk . f) fk ak)
+    (\ f s ann yk fk -> unParser x s ann yk (sk . f) fk ak)
     fk
     ak
 
 instance Alternative Parser where
-  empty = Parser $ \ s ann _yk _sk fk _ak ->
-    fk s ann
+  empty = Parser $ \ s ann yk _sk fk _ak ->
+    fk s ann yk
   x <|> y = Parser $ \ s ann yk sk fk ak ->
     unParser x s ann yk sk
-    (\ S { input } _ann -> unParser y s { input } ann yk sk fk ak)
+    (\ S { input } _ann yk -> unParser y s { input } ann yk sk fk ak)
     ak
 
-instance IsString (Parser ()) where
+instance Monad Parser where
+  x >>= f = Parser $ \ s ann yk sk fk ak ->
+    unParser x s ann yk
+    (\ x s ann yk fk -> unParser (f x) s ann yk sk fk ak)
+    fk
+    ak
+
+instance MonadPlus Parser
+
+instance (Text ~ a) => IsString (Parser a) where
   fromString (fromString -> x) =
     let
       !n = Unsafe.lengthWord8 x
@@ -142,31 +154,30 @@ instance IsString (Parser ()) where
               if Unsafe.lengthWord8 y < n
               then yk $ \ input ->
                 if Text.null input
-                then fk s ann
+                then fk s ann ($ mempty)
                 else loop s { input = s.input <> input }
               else
                 if Unsafe.takeWord8 n y == x
                 then
                   if n == 0
-                  then sk () s ann fk
+                  then sk x s ann yk fk
                   else
                     let
                       !indexWord8 = s.pos.indexWord8 + n
                       !column = s.pos.column + n
                       !pos = s.pos { indexWord8, column }
                     in
-                      sk () s { pos } ann ak
-                else fk s ann
+                      sk x s { pos } ann yk ak
+                else fk s ann yk
         in
           loop s
 
 infixl 0 <?>
 (<?>) :: Parser a -> Text -> Parser a
-m <?> ann = Parser $ \ s ->
-  unParser m s . (ann:)
+m <?> ann = Parser $ \ s -> unParser m s . (ann:)
 
-get :: Parser S
-get = Parser $ \ s ann _yk sk fk _ak -> sk s s ann fk
+get :: Parser Pos
+get = Parser $ \ s ann yk sk fk _ak -> sk s.pos s ann yk fk
 
 skipWhile :: (Char -> Bool) -> Parser ()
 skipWhile f = Parser $ \ s ann yk sk fk ak ->
@@ -174,7 +185,7 @@ skipWhile f = Parser $ \ s ann yk sk fk ak ->
     loop !z s =
       let
         !x = Unsafe.dropWord8 s.pos.indexWord8 s.input
-        !y = Text.takeWhile f x
+        (!y, !pos) = takeWhileAcc g x s.pos
         !n = Unsafe.lengthWord8 y
       in
         if n == Unsafe.lengthWord8 x
@@ -182,33 +193,20 @@ skipWhile f = Parser $ \ s ann yk sk fk ak ->
           if Text.null input
           then
             if z && n == 0
-            then sk () s ann fk
-            else
-              let
-                !indexWord8 = s.pos.indexWord8 + n
-                !column = s.pos.column + n
-                !pos = s.pos { indexWord8, column }
-              in
-                sk () s { pos } ann ak
-          else
-            let
-              !indexWord8 = s.pos.indexWord8 + n
-              !column = s.pos.column + n
-              !pos = s.pos { indexWord8, column }
-            in
-              loop (z && n == 0) s { input = s.input <> input, pos }
+            then sk () s ann ($ mempty) fk
+            else sk () s { pos } ann ($ mempty) ak
+          else loop (z && n == 0) s { input = s.input <> input, pos }
         else
           if z && n == 0
-          then sk () s ann fk
-          else
-            let
-              !indexWord8 = s.pos.indexWord8 + n
-              !column = s.pos.column + n
-              !pos = s.pos { indexWord8, column }
-            in
-              sk () s { pos } ann ak
+          then sk () s ann yk fk
+          else sk () s { pos } ann yk ak
   in
     loop True s
+  where
+    g x i z =
+      if f x
+      then Just (Pos.add z i x)
+      else Nothing
 
 takeWhile :: (Char -> Bool) -> Parser Text
 takeWhile f = Parser $ \ s ann yk sk fk ak ->
@@ -216,7 +214,7 @@ takeWhile f = Parser $ \ s ann yk sk fk ak ->
     loop z s =
       let
         !x = Unsafe.dropWord8 s.pos.indexWord8 s.input
-        !y = Text.takeWhile f x
+        (!y, !pos) = takeWhileAcc g x s.pos
         !n = Unsafe.lengthWord8 y
       in
         if n == Unsafe.lengthWord8 x
@@ -227,38 +225,47 @@ takeWhile f = Parser $ \ s ann yk sk fk ak ->
               !x = mconcat $ reverse (y:z)
             in
               if Text.null x
-              then sk x s ann fk
-              else
-                let
-                  !indexWord8 = s.pos.indexWord8 + n
-                  !column = s.pos.column + n
-                  !pos = s.pos { indexWord8, column }
-                in
-                  sk x s { pos } ann ak
-          else
-            let
-              !indexWord8 = s.pos.indexWord8 + n
-              !column = s.pos.column + n
-              !pos = s.pos { indexWord8, column }
-            in
-              loop (y:z) s { input = s.input <> input, pos }
+              then sk x s ann ($ mempty) fk
+              else sk x s { pos } ann ($ mempty) ak
+          else loop (y:z) s { input = s.input <> input, pos }
         else
           let
             !x = mconcat $ reverse (y:z)
           in
             if Text.null x
-            then sk x s ann fk
-            else
-              let
-                !indexWord8 = s.pos.indexWord8 + n
-                !column = s.pos.column + n
-                !pos = s.pos { indexWord8, column }
-              in
-                sk x s { pos } ann ak
+            then sk x s ann yk fk
+            else sk x s { pos } ann yk ak
   in
     loop [] s
+  where
+    g x i z =
+      if f x
+      then Just (Pos.add z i x)
+      else Nothing
 
-char :: Char -> Parser ()
+satisfy :: (Char -> Bool) -> Parser Char
+satisfy f = Parser $ \ s ann yk sk fk ak ->
+  let
+    loop s =
+      let
+        Unsafe.Iter x i = Unsafe.iter s.input s.pos.indexWord8
+      in
+        if f x
+        then
+          let
+            !pos = Pos.add s.pos i x
+          in
+            sk x s { pos } ann yk ak
+        else fk s ann yk
+  in
+    if Unsafe.lengthWord8 s.input == s.pos.indexWord8
+    then yk $ \ input ->
+      if Text.null input
+      then fk s ann ($ mempty)
+      else loop s { input = s.input <> input }
+    else loop s
+
+char :: Char -> Parser Char
 char x = Parser $ \ s ann yk sk fk ak ->
   let
     loop s =
@@ -268,63 +275,15 @@ char x = Parser $ \ s ann yk sk fk ak ->
         if y == x
         then
           let
-            !indexWord8 = s.pos.indexWord8 + i
-            !column = s.pos.column + 1
+            !pos = Pos.add s.pos i x
           in
-            sk () s { pos = s.pos { indexWord8, column } } ann ak
-        else fk s ann
+            sk x s { pos } ann yk ak
+        else fk s ann yk
   in
     if Unsafe.lengthWord8 s.input == s.pos.indexWord8
     then yk $ \ input ->
       if Text.null input
-      then fk s ann
-      else loop s { input = s.input <> input }
-    else loop s
-
-tab :: Parser ()
-tab = Parser $ \ s ann yk sk fk ak ->
-  let
-    loop s =
-      let
-        Unsafe.Iter x i = Unsafe.iter s.input s.pos.indexWord8
-      in
-        if x == '\t'
-        then
-          let
-            !indexWord8 = s.pos.indexWord8 + i
-            !column = s.pos.column + 8
-          in
-            sk () s { pos = s.pos { indexWord8, column } } ann ak
-        else fk s ann
-  in
-    if Unsafe.lengthWord8 s.input == s.pos.indexWord8
-    then yk $ \ input ->
-      if Text.null input
-      then fk s ann
-      else loop s { input = s.input <> input }
-    else loop s
-
-newline :: Parser ()
-newline = Parser $ \ s ann yk sk fk ak ->
-  let
-    loop s =
-      let
-        Unsafe.Iter x i = Unsafe.iter s.input s.pos.indexWord8
-      in
-        if x == '\n'
-        then
-          let
-            !indexWord8 = s.pos.indexWord8 + i
-            !row = s.pos.row + 1
-            !column = 0
-            !pos = Pos { indexWord8, rowIndexWord8 = indexWord8, row, column }
-          in sk () s { pos } ann ak
-        else fk s ann
-  in
-    if Unsafe.lengthWord8 s.input == s.pos.indexWord8
-    then yk $ \ input ->
-      if Text.null input
-      then fk s ann
+      then fk s ann ($ mempty)
       else loop s { input = s.input <> input }
     else loop s
 
@@ -333,6 +292,20 @@ eof = Parser $ \ s ann yk sk fk _ak ->
   if Unsafe.lengthWord8 s.input == s.pos.indexWord8
   then yk $ \ input ->
     if Text.null input
-    then sk () s ann fk
-    else fk s { input = s.input <> input } ann
-  else fk s ann
+    then sk () s ann ($ mempty) fk
+    else fk s { input = s.input <> input } ann yk
+  else fk s ann yk
+
+takeWhileAcc :: (Char -> Int -> a -> Maybe a) -> Text -> a -> (Text, a)
+takeWhileAcc f xs z = loop 0 z
+  where
+    loop !i !z =
+      if i >= Unsafe.lengthWord8 xs
+      then (xs, z)
+      else
+        let
+          Unsafe.Iter x j = Unsafe.iter xs i
+        in
+          case f x j z of
+            Nothing -> (Unsafe.takeWord8 i xs, z)
+            Just z -> loop (i + j) z

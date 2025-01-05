@@ -15,6 +15,7 @@ import Prettyprinter.Render.Terminal
 
 import Fix
 import Loc
+import Pos
 import Ref
 import Text (Text)
 
@@ -25,13 +26,9 @@ import Verse.Val
 run
   :: (MonadIO m, MonadRef m)
   => Text -> m (Either (Doc AnsiStyle) [Fix (Val Identity)])
-run xs = case parse xs of
-  Left e ->
-    pure . Left . annotate bold $ "Parse" <+> "error" <> colon <+> pretty e
-  Right x ->
-    let
-      prettyStuck' = prettyStuck xs
-    in
-      eval x <&> \ case
-        Right xs -> Right xs
-        Left xs -> Left $ prettyStuck' xs
+run input = case parse input of
+  Left (pos, ann) ->
+    pure . Left $ prettyParseError input pos ann
+  Right x -> eval x <&> \ case
+    Right xs -> Right xs
+    Left xs -> Left $ prettyStuckError input xs
