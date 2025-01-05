@@ -29,7 +29,6 @@ import Data.Attoparsec.Text
   , letter
   , signed
   , skipWhile
-  , string
   , takeWhile
   )
 import Data.Attoparsec.Text qualified as Parser
@@ -113,7 +112,7 @@ or :: Parser LExp
 or = chainl1 dotDot $ wrap2 (:|) <$ pipe
 
 dotDot :: Parser LExp
-dotDot = chainl1 plusMinus $ wrap2 (:..) <$ token (string "..")
+dotDot = chainl1 plusMinus $ wrap2 (:..) <$ token ".."
 
 plusMinus :: Parser LExp
 plusMinus =
