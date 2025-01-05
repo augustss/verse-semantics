@@ -21,6 +21,7 @@ library
     Fix
     IntMap
     Loc
+    Parser
     Ref
     Text
     Verse
