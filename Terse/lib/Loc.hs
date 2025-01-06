@@ -51,18 +51,19 @@ prettyStuckError xs =
     prettyStack =
       vcat . fmap prettyLoc
     prettyLoc (Loc i j) =
-      if i.row == j.row then
-        bolded (prettyLocRowColumn i j <> colon) <> line' <>
-        indent 2 (prettyLocText i j)
-      else
-        bolded (prettyLocRowColumn i j <> colon) <> line' <>
-        indent 2 (annotate (color Red) $ dot <> dot <> dot)
+      bolded (prettyLocRowColumn i j <> colon) <> line' <>
+      indent 2 (prettyLocText i j)
     prettyLocText i j =
       pretty (Text.sliceWord8 i.rowIndexWord8 i.indexWord8 xs) <>
-      annotate
-      (color Red)
-      (pretty $ Text.sliceWord8 i.indexWord8 j.indexWord8 xs) <>
-      pretty (Text.takeWhile (/= '\n') $ Unsafe.dropWord8 j.indexWord8 xs)
+      if i.rowIndexWord8 == j.rowIndexWord8 then
+        annotate
+        (color Red)
+        (pretty $ Text.sliceWord8 i.indexWord8 j.indexWord8 xs) <>
+        pretty (Text.takeWhile (/= '\n') $ Unsafe.dropWord8 j.indexWord8 xs)
+      else
+        annotate
+        (color Red)
+        (pretty . Text.takeWhile (/= '\n') $ Unsafe.dropWord8 i.indexWord8 xs)
     prettyLocRowColumn i j =
       pretty i <> pretty '-' <> pretty j
   in \ case
