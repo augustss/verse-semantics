@@ -33,8 +33,7 @@ library
     Verse.Parse
     Verse.Val
   build-depends:
-    attoparsec,
-    base ^>=4.19.0.0,
+    base,
     containers,
     mtl,
     prettyprinter,
@@ -48,7 +47,7 @@ executable terse
   import:           warnings
   main-is:          Main.hs
   build-depends:
-    base ^>=4.19.0.0,
+    base,
     ansi-terminal,
     directory,
     filepath,
