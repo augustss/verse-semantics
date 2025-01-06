@@ -142,35 +142,46 @@ instance MonadPlus Parser
 
 instance (Text ~ a) => IsString (Parser a) where
   fromString (fromString -> x) =
-    let
-      !n = Unsafe.lengthWord8 x
-    in
-      Parser $ \ s ann yk sk fk ak ->
-        let
-          loop s =
-            let
-              !y = Unsafe.dropWord8 s.pos.indexWord8 s.input
-            in
-              if Unsafe.lengthWord8 y < n
+    Parser $ \ s ann yk sk fk ak ->
+      let
+        loop x s =
+          let
+            !n_x = Unsafe.lengthWord8 x
+            !y = Unsafe.dropWord8 s.pos.indexWord8 s.input
+            !n_y = Unsafe.lengthWord8 y
+          in
+            if n_y < n_x
+            then
+              if Unsafe.takeWord8 n_y x == y
               then yk $ \ input ->
                 if Text.null input
                 then fk s ann ($ mempty)
-                else loop s { input = s.input <> input }
-              else
-                if Unsafe.takeWord8 n y == x
-                then
-                  if n == 0
-                  then sk x s ann yk fk
-                  else
-                    let
-                      !indexWord8 = s.pos.indexWord8 + n
-                      !column = s.pos.column + n
-                      !pos = s.pos { indexWord8, column }
-                    in
-                      sk x s { pos } ann yk ak
-                else fk s ann yk
-        in
-          loop s
+                else
+                  let
+                    !indexWord8 = s.pos.indexWord8 + n_y
+                    !column = s.pos.column + n_y
+                    !pos = s.pos { indexWord8, column }
+                  in
+                    loop (Unsafe.dropWord8 n_y x) s
+                      { input = s.input <> input
+                      , pos
+                      }
+              else fk s ann yk
+            else
+              if Unsafe.takeWord8 n_x y == x
+              then
+                if n_x == 0
+                then sk x s ann yk fk
+                else
+                  let
+                    !indexWord8 = s.pos.indexWord8 + n_x
+                    !column = s.pos.column + n_x
+                    !pos = s.pos { indexWord8, column }
+                  in
+                    sk x s { pos } ann yk ak
+              else fk s ann yk
+      in
+        loop x s
 
 infixl 0 <?>
 (<?>) :: Parser a -> Text -> Parser a
@@ -297,7 +308,7 @@ eof = Parser $ \ s ann yk sk fk _ak ->
   else fk s ann yk
 
 takeWhileAcc :: (Char -> Int -> a -> Maybe a) -> Text -> a -> (Text, a)
-takeWhileAcc f xs z = loop 0 z
+takeWhileAcc f !xs = loop 0
   where
     loop !i !z =
       if i >= Unsafe.lengthWord8 xs

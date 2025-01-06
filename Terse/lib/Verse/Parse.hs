@@ -224,7 +224,7 @@ name = token $
   "operator'<'" <|>
   Text.cons <$> head <*> tail
   where
-    head = alpha <|> (char '_' $> '_')
+    head = alpha <|> char '_'
     tail = takeWhile isAlphaNum
 
 lparen :: Parser ()

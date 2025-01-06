@@ -75,10 +75,10 @@ parseInput = getInputLine "> " >>= \ case
   Nothing -> pure Nothing
   Just (Text.pack -> xs) -> Just <$> parseWith (getInputLine' ". ") xs
   where
-    getInputLine' xs = getInputLine xs >>= \ case
-      Nothing -> pure mempty
-      Just [] -> pure mempty
-      Just xs -> pure . Text.pack $ '\n':xs
+    getInputLine' xs = getInputLine xs <&> \ case
+      Nothing -> mempty
+      Just [] -> mempty
+      Just xs -> Text.pack $ '\n':xs
 
 parseWith
   :: Monad m
