@@ -7,8 +7,6 @@ module Parser
   , runParser
   , parse
   , Result (..)
-  , done
-  , step
   , (<?>)
   , get
   , skipWhile
@@ -40,7 +38,6 @@ import Prelude
   , (<>)
   , (==)
   , (>=)
-  , const
   , mconcat
   , mempty
   , reverse
@@ -97,18 +94,6 @@ parse m input =
     yk f = f mempty
     sk x _s _ann _yk _fk = Right x
     fk s ann _yk = Left (s.pos, ann)
-
-done :: Result a -> (Text, Either (Pos, [Text]) a)
-done = \ case
-  Yield f -> done $ f mempty
-  Pure x input -> (input, Right x)
-  Empty input pos ann -> (input, Left (pos, ann))
-
-step :: Result a -> Text -> Result a
-step = \ case
-  Yield f -> f
-  x@Pure {} -> const x
-  x@Empty {} -> const x
 
 instance Functor Parser where
   fmap f x = Parser $ \ s ann yk sk ->
