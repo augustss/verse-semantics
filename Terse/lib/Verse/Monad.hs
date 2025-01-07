@@ -61,7 +61,7 @@ newtype VerseT (m :: Type -> Type) a = VerseT
     -> Yield r m
     -> Succeed r m a
     -> Fail r m
-    -> Fail r m
+    -> Empty r m
     -> m r
   }
 
@@ -90,15 +90,17 @@ newtype Yield r m = Yield
     -> Handler m a
     -> Succeed r m a
     -> Fail r m
-    -> Fail r m
+    -> Empty r m
     -> m r
   }
 
 type Handler m a = (a -> VerseT m ()) -> VerseT m ()
 
-type Succeed r m a = S -> Mem m -> a -> Fail r m -> Fail r m -> m r
+type Succeed r m a = S -> Mem m -> a -> Fail r m -> Empty r m -> m r
 
 type Fail r m = Var m () -> Mem m -> m r
+
+type Empty r m = Mem m -> m r
 
 instance Functor (VerseT m) where
   fmap f m = VerseT $ \ r s h mem yk sk ->
@@ -113,18 +115,18 @@ instance Applicative (VerseT m) where
     sk s mem $ f x
 
 instance Alternative (VerseT m) where
-  empty = VerseT $ \ _r _s h mem _yk _sk _fk ek ->
-    ek h mem
+  empty = VerseT $ \ _r _s _h mem _yk _sk _fk ek ->
+    ek mem
   x <|> y = VerseT $ \ r s h mem yk sk fk ek ->
     unVerseT x r s h mem yk sk
-    (\ h mem -> unVerseT y r s h mem yk sk fk fk)
-    (\ h mem -> unVerseT y r s h mem yk sk fk ek)
+    (\ h mem -> unVerseT y r s h mem yk sk fk $ fk h)
+    (\ mem -> unVerseT y r s h mem yk sk fk ek)
 
 alt :: VerseT m a -> VerseT m a -> VerseT m a -> VerseT m a
 alt x y z = VerseT $ \ r s h mem yk sk fk ek ->
   unVerseT x r s h mem yk sk
-  (\ h mem -> unVerseT y r s h mem yk sk fk fk)
-  (\ h mem -> unVerseT z r s h mem yk sk fk ek)
+  (\ h mem -> unVerseT y r s h mem yk sk fk $ fk h)
+  (\ mem -> unVerseT z r s h mem yk sk fk ek)
 
 instance Monad (VerseT m) where
   x >>= f = VerseT $ \ r s h mem yk sk ->
@@ -199,7 +201,7 @@ runVerseT m = do
       pure Nothing
     fk _h _mem =
       pure $ Just []
-    ek _h _mem =
+    ek _mem =
       pure $ Just []
 
 ask :: VerseT m (Var m ())
@@ -208,11 +210,11 @@ ask = VerseT $ \ _r s h mem _yk sk ->
 
 local :: (Var m () -> Var m ()) -> VerseT m a -> VerseT m a
 local f m = VerseT $ \ r s h mem yk sk fk ek ->
-  unVerseT m r s (f h) mem yk sk (fk . f) (ek . f)
+  unVerseT m r s (f h) mem yk sk fk ek
 
 liftPut :: Applicative m => m () -> m () -> VerseT m ()
 liftPut m n = VerseT $ \ _r s _h mem _yk sk fk ek ->
-  m *> sk s mem () (\ h mem -> n *> fk h mem) (\ h mem -> n *> ek h mem)
+  m *> sk s mem () (\ h mem -> n *> fk h mem) (\ mem -> n *> ek mem)
 
 all' :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m [a]
 all' = split >=> loop
@@ -267,7 +269,7 @@ splitS m !s' heap = VerseT $ \ r s h mem _yk sk fk ek ->
     !r' = R { level = r.level <> 1 }
     !mem' = Mem { label = mem.label, heap }
   in
-    unVerseT m r' s' h mem' yieldS succeedS failS failS >>= \ x ->
+    unVerseT m r' s' h mem' yieldS succeedS failS emptyS >>= \ x ->
     sk s mem x fk ek
 
 yieldS :: Monad m => Yield (Split m a) m
@@ -276,17 +278,20 @@ yieldS = Yield $ \ i s mem f sk fk ek ->
   YieldS i s mem f
   (liftS sk >=> reflect)
   (liftF fk >>= reflect)
-  (liftF ek >>= reflect)
+  (liftE ek >>= reflect)
 
 succeedS :: Monad m => Succeed (Split m a) m a
 succeedS s mem x fk ek =
   pure $
   SucceedS s mem x
   (liftF fk >>= reflect)
-  (liftF ek >>= reflect)
+  (liftE ek >>= reflect)
 
 failS :: Applicative m => Fail (Split m a) m
 failS _h = pure . FailS . (.label)
+
+emptyS :: Applicative m => Empty (Split m a) m
+emptyS = pure . FailS . (.label)
 
 reflect :: Split m a -> VerseT m a
 reflect = \ case
@@ -307,7 +312,7 @@ fork m = forkS m >>= reflectF
 
 forkS :: Monad m => VerseT m () -> VerseT m (Split m ())
 forkS m = VerseT $ \ r s h mem _yk sk fk ek ->
-  unVerseT m r s h mem yieldF succeedF failF failF >>= \ x ->
+  unVerseT m r s h mem yieldF succeedF failF emptyF >>= \ x ->
   sk s mem x fk ek
 
 reflectF :: Split m () -> VerseT m ()
@@ -338,25 +343,32 @@ yieldF = Yield $ \ i s mem f sk fk ek ->
   YieldS i s mem f
   (liftS sk >=> reflectF)
   (liftF fk >>= reflectF)
-  (liftF ek >>= reflectF)
+  (liftE ek >>= reflectF)
 
 succeedF :: Monad m => Succeed (Split m ()) m ()
 succeedF s mem () fk ek =
   pure $
   SucceedS s mem ()
   (liftF fk >>= reflectF)
-  (liftF ek >>= reflectF)
+  (liftE ek >>= reflectF)
 
 failF :: Applicative m => Fail (Split m a) m
 failF = failS
 
+emptyF :: Applicative m => Empty (Split m a) m
+emptyF = emptyS
+
 liftS :: Monad m => Succeed (Split m a) m b -> b -> VerseT m (Split m a)
 liftS f x = VerseT $ \ _r s _h mem _yk sk fk ek ->
-  f s mem x failS failS >>= \ x -> sk s mem x fk ek
+  f s mem x failS emptyS >>= \ x -> sk s mem x fk ek
 
 liftF :: Monad m => Fail (Split m a) m -> VerseT m (Split m a)
 liftF f = VerseT $ \ _r s h mem _yk sk fk ek ->
   f h mem >>= \ x -> sk s mem x fk ek
+
+liftE :: Monad m => Empty (Split m a) m -> VerseT m (Split m a)
+liftE f = VerseT $ \ _r s _h mem _yk sk fk ek ->
+  f mem >>= \ x -> sk s mem x fk ek
 
 data Split m a
   = forall b .
@@ -588,7 +600,7 @@ writeVar (Var ref) x = VerseT $ \ _r s _h mem _yk sk fk ek -> do
   writeRef ref x
   sk s mem ()
     (\ h mem -> writeRef ref y *> fk h mem)
-    (\ h mem -> writeRef ref y *> ek h mem)
+    (\ mem -> writeRef ref y *> ek mem)
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 readRoot var@(Var ref) = lift (readRef ref) >>= \ case
@@ -711,5 +723,5 @@ writeVarsRef (VarsRef i) x = VerseT $ \ _r s _h mem _yk sk fk ek ->
     !y = mem.heap!i
     !mem' = mem { heap = IntMap.insert i (SomeVars x) mem.heap }
   in
-    sk s mem' () fk $ \ h mem ->
-    ek h mem { heap = IntMap.insert i y mem.heap }
+    sk s mem' () fk $ \ mem ->
+    ek mem { heap = IntMap.insert i y mem.heap }
