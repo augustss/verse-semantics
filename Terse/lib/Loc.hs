@@ -27,7 +27,7 @@ instance Semigroup Loc where
   Loc i _ <> Loc _ j = Loc i j
 
 instance Pretty Loc where
-  pretty (Loc i j) = pretty i <> colon <> pretty j
+  pretty (Loc i j) = pretty i <> pretty '-' <> pretty j
 
 data L f = L !Loc !(f (L f))
 
@@ -50,10 +50,10 @@ prettyStuckError xs =
       xs <&> \ x -> indent 2 $ prettyStack x
     prettyStack =
       vcat . fmap prettyLoc
-    prettyLoc (Loc i j) =
-      bolded (prettyLocRowColumn i j <> colon) <> line' <>
-      indent 2 (prettyLocText i j)
-    prettyLocText i j =
+    prettyLoc loc =
+      bolded (pretty loc <> colon) <> line' <>
+      indent 2 (prettyLocText loc)
+    prettyLocText (Loc i j) =
       pretty (Text.sliceWord8 i.rowIndexWord8 i.indexWord8 xs) <>
       if i.rowIndexWord8 == j.rowIndexWord8 then
         annotate
@@ -64,8 +64,6 @@ prettyStuckError xs =
         annotate
         (color Red)
         (pretty . Text.takeWhile (/= '\n') $ Unsafe.dropWord8 i.indexWord8 xs)
-    prettyLocRowColumn i j =
-      pretty i <> pretty '-' <> pretty j
   in \ case
     [] -> bolded "Stuck"
     xs -> bolded ("Stuck" <+> "at") <> line' <> prettyStacks xs

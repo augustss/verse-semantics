@@ -83,5 +83,4 @@ prettyPosText input pos =
   (pretty . Text.takeWhile (/= '\n') $ Unsafe.dropWord8 pos.indexWord8 input)
 
 bolded :: Doc AnsiStyle -> Doc AnsiStyle
-bolded =
-  annotate bold
+bolded = annotate bold
