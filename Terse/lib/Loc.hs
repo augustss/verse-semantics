@@ -11,7 +11,6 @@ module Loc
   , prettyStuckError
   ) where
 
-import Data.Functor
 import Data.Text.Unsafe qualified as Unsafe
 
 import Prettyprinter
@@ -43,29 +42,36 @@ instance Pretty (f (L f)) => Pretty (L f) where
   pretty = pretty . unwrap
 
 prettyStuckError :: Text -> [[Loc]] -> Doc AnsiStyle
-prettyStuckError xs =
-  let
-    prettyStacks xs =
-      vcat . punctuate (line' <> bolded "and") $
-      xs <&> \ x -> indent 2 $ prettyStack x
-    prettyStack =
-      vcat . fmap prettyLoc
-    prettyLoc loc =
-      bolded (pretty loc <> colon) <> line' <>
-      indent 2 (prettyLocText loc)
-    prettyLocText (Loc i j) =
-      pretty (Text.sliceWord8 i.rowIndexWord8 i.indexWord8 xs) <>
-      if i.rowIndexWord8 == j.rowIndexWord8 then
-        annotate
-        (color Red)
-        (pretty $ Text.sliceWord8 i.indexWord8 j.indexWord8 xs) <>
-        pretty (Text.takeWhile (/= '\n') $ Unsafe.dropWord8 j.indexWord8 xs)
-      else
-        annotate
-        (color Red)
-        (pretty . Text.takeWhile (/= '\n') $ Unsafe.dropWord8 i.indexWord8 xs)
-  in \ case
-    [] -> bolded "Stuck"
-    xs -> bolded ("Stuck" <+> "at") <> line' <> prettyStacks xs
-  where
-    bolded = annotate bold
+prettyStuckError input = \ case
+  [] -> bolded "Stuck"
+  xs -> bolded ("Stuck" <+> "at") <> line' <> prettyStacks input xs
+
+prettyStacks :: Text -> [[Loc]] -> Doc AnsiStyle
+prettyStacks input xs =
+  vcat . punctuate (line' <> bolded "and") $
+  indent 2 . prettyStack input <$> xs
+
+prettyStack :: Text -> [Loc] -> Doc AnsiStyle
+prettyStack input =
+  vcat . fmap (prettyLoc input)
+
+prettyLoc :: Text -> Loc -> Doc AnsiStyle
+prettyLoc input loc =
+  bolded (pretty loc <> colon) <> line' <>
+  indent 2 (prettyLocText input loc)
+
+prettyLocText :: Text -> Loc -> Doc AnsiStyle
+prettyLocText input (Loc i j) =
+  pretty (Text.sliceWord8 i.rowIndexWord8 i.indexWord8 input) <>
+  if i.rowIndexWord8 == j.rowIndexWord8 then
+    annotate
+    (color Red)
+    (pretty $ Text.sliceWord8 i.indexWord8 j.indexWord8 input) <>
+    pretty (Text.takeWhile (/= '\n') $ Unsafe.dropWord8 j.indexWord8 input)
+  else
+    annotate
+    (color Red)
+    (pretty . Text.takeWhile (/= '\n') $ Unsafe.dropWord8 i.indexWord8 input)
+
+bolded :: Doc AnsiStyle -> Doc AnsiStyle
+bolded = annotate bold
