@@ -349,9 +349,6 @@ evalAppFun s1 s2 f x = case f of
 wrap :: (ExpF LExp -> EvalT m (Var m)) -> LExp -> EvalT m (Var m)
 wrap f (L i x) = local (\ r -> r { stack = i:r.stack }) $ f x
 
-insert :: MonadRef m => Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
-insert k = IntMap.insertWith (++) k . (:[])
-
 evalPlus :: MonadRef m => S m -> S m -> Var m -> Var m -> EvalT m (Var m)
 evalPlus s1 s2 var1 var2 = do
   (x1, x2) <- one $ (,) <$> readInteger var1 <*> readInteger var2 <|> stuck
@@ -415,12 +412,6 @@ readPair :: MonadRef m => Var m -> EvalT m (Var m, Var m)
 readPair = readVar >=> \ case
   Val.Tup [x1, x2] -> pure (x1, x2)
   _ -> empty
-
-minInt :: Int
-minInt = minBound
-
-maxInt :: Int
-maxInt = maxBound
 
 freeze :: MonadRef m => Var m -> EvalT m (Fix (Val Identity))
 freeze = lift . freeze'
@@ -568,6 +559,15 @@ removeStack' label =
     (put s')
     (modify $ \ s -> s { stacks = IntMap.insert label stack s.stacks })
 
+insert :: MonadRef m => Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
+insert k = IntMap.insertWith (++) k . (:[])
+
 infixr 3 ***
 (***) :: Monad m => (a -> m c) -> (b -> m d) -> (a, b) -> m (c, d)
 (f *** g) (x, y) = (,) <$> f x <*> g y
+
+minInt :: Int
+minInt = minBound
+
+maxInt :: Int
+maxInt = maxBound
