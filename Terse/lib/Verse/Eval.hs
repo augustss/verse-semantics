@@ -12,8 +12,8 @@ import Control.Category ((>>>))
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Reader
 import Control.Monad.State.Strict
-import Control.Monad.Trans.Reader
 
 import Data.Char
 import Data.Foldable
@@ -207,7 +207,7 @@ eval' s1 s2 = wrap $ \ case
           s3 <- freshS
           var2 <- localEnv (Env.insert x var1) $ eval' s1 s3 e2
           heap <- newHeap s3
-          fmap (var2:) . loop s3 <=< lift $ Monad.local (const heap) m
+          fmap (var2:) . loop s3 <=< lift $ local (const heap) m
     var <- freshVar
     fork' $ unifyVar var =<< newVar . Val.Tup =<< loop s1 =<< init s1
     pure var
@@ -334,7 +334,7 @@ evalAppFun s1 s2 f x = case f of
         Monad.Step (k, v) m -> readVar k >>= \ case
           Val.Int k | toInteger minInt <= k && k <= toInteger maxInt ->
             loop (insert (fromInteger k) v xs) <=<
-            lift $ Monad.local (const heap) m
+            lift $ local (const heap) m
           _ ->
             stuck
     var <- loop mempty <=< split $ do
@@ -446,13 +446,13 @@ newHeap s1 = do
   pure heap
 
 readHeap :: MonadRef m => EvalT m ()
-readHeap = lift $ Monad.readVar =<< Monad.ask
+readHeap = lift $ Monad.readVar =<< ask
 
 askHeap :: EvalT m (Heap m)
-askHeap = lift Monad.ask
+askHeap = lift ask
 
 localHeap :: (Heap m -> Heap m) -> EvalT m a -> EvalT m a
-localHeap f m = ReaderT $ Monad.local f . runReaderT m
+localHeap f m = ReaderT $ local f . runReaderT m
 
 fork' :: (MonadRef m, MonadState Mem m) => EvalT m () -> EvalT m ()
 fork' m = fork $ do

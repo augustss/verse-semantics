@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -7,8 +8,6 @@
 module Verse.Monad
   ( VerseT
   , runVerseT
-  , ask
-  , local
   , liftPut
   , all'
   , one
@@ -33,8 +32,10 @@ module Verse.Monad
 import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
+import Control.Monad.Reader.Class
 import Control.Monad.IO.Class
-import Control.Monad.State.Strict
+import Control.Monad.State.Class
+import Control.Monad.Trans.Class
 
 import Data.Function
 import Data.Functor
@@ -142,10 +143,20 @@ instance MonadTrans VerseT where
 instance MonadIO m => MonadIO (VerseT m) where
   liftIO = lift . liftIO
 
+instance MonadReader (Var m ()) (VerseT m) where
+  ask = VerseT $ \ _r s h mem _yk sk ->
+    sk s mem h
+  local f m = VerseT $ \ r s h mem yk sk fk ek ->
+    unVerseT m r s (f h) mem yk sk fk ek
+
 instance MonadState s m => MonadState s (VerseT m) where
   get = lift get
   put = lift . put
   state = lift . state
+
+liftPut :: Applicative m => m () -> m () -> VerseT m ()
+liftPut m n = VerseT $ \ _r s _h mem _yk sk fk ek ->
+  m *> sk s mem () (\ h mem -> n *> fk h mem) (\ mem -> n *> ek mem)
 
 yield :: Level -> Handler m a -> VerseT m a
 yield i f = VerseT $ \ _r s _h mem yk ->
@@ -187,11 +198,10 @@ runVerseT m = do
   h <- fmap Var . newRef $ Bound MkBound { label = 0, binding = () }
   let
     sk s Mem {..} x fk _ek
-      | s.count == 0 =
-          runFindT' (findVars' (x, heap)) label >>= \ ((x, heap), label) ->
-          fmap (x:) <$> fk h Mem {..}
-      | otherwise =
-          pure Nothing
+      | s.count == 0 = runFindT (findVars (x, heap)) 0 label >>= \ case
+          Nothing -> pure Nothing
+          Just ((x, heap), label) -> fmap (x:) <$> fk h Mem {..}
+      | otherwise = pure Nothing
   unVerseT m r s h mem yk sk fk ek
   where
     r = R { level = 0 }
@@ -203,18 +213,6 @@ runVerseT m = do
       pure $ Just []
     ek _mem =
       pure $ Just []
-
-ask :: VerseT m (Var m ())
-ask = VerseT $ \ _r s h mem _yk sk ->
-  sk s mem h
-
-local :: (Var m () -> Var m ()) -> VerseT m a -> VerseT m a
-local f m = VerseT $ \ r s h mem yk sk fk ek ->
-  unVerseT m r s (f h) mem yk sk fk ek
-
-liftPut :: Applicative m => m () -> m () -> VerseT m ()
-liftPut m n = VerseT $ \ _r s _h mem _yk sk fk ek ->
-  m *> sk s mem () (\ h mem -> n *> fk h mem) (\ mem -> n *> ek mem)
 
 all' :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m [a]
 all' = split >=> loop
@@ -249,13 +247,18 @@ split' m s heap = splitS m s heap >>= \ case
       stuck
     else
       yield i $ \ g -> f $ \ x -> split' (alt (f_s x) m_f m_e) s mem.heap >>= g
-  SucceedS s Mem {..} x m_f _m_e -> do
-    putLabel label
+  SucceedS s Mem {..} x m_f _m_e ->
     if s.count == 0 then do
-      (heap, x) <- runFindT $ findVars (heap, x)
-      putHeap heap
-      pure . Step x $ split m_f
-    else
+      level <- getLevel
+      lift (runFindT (findVars (heap, x)) level label) >>= \ case
+        Nothing ->
+          stuck
+        Just ((heap, x), label) -> do
+          putLabel label
+          putHeap heap
+          pure . Step x $ split m_f
+    else do
+      putLabel label
       stuck
   FailS label -> do
     putLabel label
@@ -555,8 +558,8 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
   ((var1, UnboundR x1), (var2, UnboundR x2)) ->
     when (x1.label /= x2.label) $ do
       level <- getLevel
-      if x1.level < level then do
-        if x2.level < level then do
+      if x1.level < level then
+        if x2.level < level then
           if x1.label < x2.label then do
             var2 <- readLink var2 x2
             unifyVar var1 var2
@@ -604,101 +607,109 @@ writeVar (Var ref) x = VerseT $ \ _r s _h mem _yk sk fk ek -> do
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 readRoot var@(Var ref) = lift (readRef ref) >>= \ case
-  Link var ->
-    readRoot var
-  Bound x ->
-    pure (var, BoundR x)
-  Unbound x ->
-    pure (var, UnboundR x)
+  Link var -> readRoot var
+  Bound x -> pure (var, BoundR x)
+  Unbound x -> pure (var, UnboundR x)
 
-type FindT m = StateT (IntMap Any) (VerseT m)
+newtype FindT m a = FindT
+  { unFindT :: In -> m (Out a)
+  }
 
-runFindT :: FindT m a -> VerseT m a
-runFindT = flip evalStateT mempty
+data In = In
+  { level :: {-# UNPACK #-} !Level
+  , label :: {-# UNPACK #-} !Label
+  , visited :: {-# UNPACK #-} !(IntMap Any)
+  }
+
+data Out a = Err | Out !a {-# UNPACK #-} !Label !(IntMap Any)
+
+instance Functor m => Functor (FindT m) where
+  fmap f x = FindT $ \ s -> unFindT x s <&> \ case
+    Err -> Err
+    Out x label visited -> Out (f x) label visited
+
+instance Monad m => Applicative (FindT m) where
+  pure x = FindT $ \ In {..} -> pure $! Out x label visited
+  f <*> x = FindT $ \ s@In {..} -> unFindT f s >>= \ case
+    Err -> pure Err
+    Out f label visited -> unFindT x In {..} <&> \ case
+      Err -> Err
+      Out x label visited -> Out (f x) label visited
+
+instance Monad m => Monad (FindT m) where
+  x >>= f = FindT $ \ s@In {..} -> unFindT x s >>= \ case
+    Err -> pure Err
+    Out x label visited -> unFindT (f x) In {..}
+
+instance MonadTrans FindT where
+  lift m = FindT $ \ In {..} -> m <&> \ x -> Out x label visited
+
+instance Monad m => MonadReader Level (FindT m) where
+  ask = FindT $ \ In {..} -> pure $! Out level label visited
+  local f m = FindT $ \ In {..} -> unFindT m In { level = f level, .. }
+
+instance (Monad m, a ~ Any) => MonadState (IntMap a) (FindT m) where
+  get = FindT $ \ In {..} -> pure $! Out visited label visited
+  put visited = FindT $ \ In { label } -> pure $! Out () label visited
+  state f = FindT $ \ In {..} -> case f visited of
+    (x, visited) -> pure $! Out x label visited
+
+instance Monad m => Alternative (FindT m) where
+  empty = FindT . const $ pure Err
+  x <|> y = FindT $ \ s -> unFindT x s >>= \ case
+    Err -> unFindT y s
+    s@Out {} -> pure s
+
+instance Monad m => MonadPlus (FindT m)
+
+instance MonadRef m => MonadRef (FindT m) where
+  type Ref (FindT m) = Ref m
+  newRef = lift . newRef
+  readRef = lift . readRef
+  writeRef = (lift .) . writeRef
+
+runFindT :: Functor m => FindT m a -> Level -> Label -> m (Maybe (a, Label))
+runFindT m level label = unFindT m In {..} <&> \ case
+  Err -> Nothing
+  Out x label _ -> Just (x, label)
+  where
+    visited = mempty
 
 findVars :: (MonadRef m, Vars a m) => a -> FindT m a
 findVars = vars findVar
 
 findVar :: (MonadRef m, Vars a m) => Var m a -> FindT m (Var m a)
-findVar var@(Var ref) = lift (lift $ readRef ref) >>= \ case
+findVar var@(Var ref) = readRef ref >>= \ case
   Link var ->
     findVar var
   Bound x -> do
-    s <- get
-    (var@(Var ref), s) <- lift $ lookupInsertA x freshVar s
+    (var@(Var ref), s) <- lookupInsertA x freshVar' =<< get
     case s of
       Nothing ->
         pure var
       Just !s -> do
         put s
-        lift . (lift . writeRef ref . Bound <=< newBound) =<< findVars x.binding
+        writeRef ref . Bound =<< newBound' =<< findVars x.binding
         pure var
-  Unbound x -> lift $ do
-    level <- getLevel
-    if x.level > level then
-      stuck
-    else
-      pure var
-  where
-    lookupInsertA k x =
-      fmap (first unsafeCoerce) .
-      IntMap.lookupInsertA k.label (unsafeCoerce <$> x)
-
-type FindT' m = StateT (IntMap Any, Int) m
-
-runFindT' :: Functor m => FindT' m a -> Label -> m (a, Label)
-runFindT' m = fmap (\ (x, (_, y)) -> (x, y)) . runStateT m . (mempty,)
-
-findVars' :: (MonadRef m, Vars a m) => a -> FindT' m a
-findVars' = vars findVar'
-
-findVar' :: (MonadRef m, Vars a m) => Var m a -> FindT' m (Var m a)
-findVar' var@(Var ref) = readRef ref >>= \ case
-  Link var ->
-    findVar' var
-  Bound x -> do
-    s <- gets fst
-    (var@(Var ref), s) <- lookupInsertA x freshVar' s
-    case s of
-      Nothing ->
-        pure var
-      Just s -> do
-        modify . first $ const s
-        writeRef ref . Bound =<< newBound' =<< findVars' x.binding
-        pure var
-  Unbound _ ->
+  Unbound x -> do
+    guard =<< asks (<= x.level)
     pure var
   where
     lookupInsertA k x =
       fmap (first unsafeCoerce) .
       IntMap.lookupInsertA k.label (unsafeCoerce <$> x)
 
-freshVar' :: MonadRef m => FindT' m (Var m a)
-freshVar' = StateT $ \ s ->
+freshVar' :: MonadRef m => FindT m (Var m a)
+freshVar' = FindT $ \ In {..} ->
   let
-    !label = snd s
-    !s' = second' (+ 1) s
-    !level = 0
     !susp = const $ pure ()
     !x = Unbound MkUnbound {..}
   in
-    newRef x >>= \ ref -> pure (Var ref, s')
+    newRef x <&> \ ref -> Out (Var ref) (label + 1) visited
 
-newBound' :: Applicative m => a -> FindT' m (Bound a)
-newBound' !binding = StateT $ \ s ->
-  let
-    !label = snd s
-    !s' = second' (+ 1) s
-    !x = MkBound {..}
-  in
-    pure (x, s')
-
-second' :: (b -> c) -> (d, b) -> (d, c)
-second' f (x, y) =
-  let
-    !y' = f y
-  in
-    (x, y')
+newBound' :: Applicative m => a -> FindT m (Bound a)
+newBound' !binding = FindT $ \ In {..} ->
+  pure $! Out MkBound {..} (label + 1) visited
 
 newtype VarsRef m a = VarsRef Label deriving Eq
 
