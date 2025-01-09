@@ -54,7 +54,9 @@ verify("M16Aug24-3", pass){ f(x:int):nat := nat[x] => f[-3]  }
 verify("M16Aug24-4", pass){ f(x:int):type{nat[x]} => f[-3]  }
 
 # Meeting 14 Aug 24
-testeq("jan1", pass){ (f(x:int)<succeeds>:= x); y:int; f[y]=3} {3}
+testeq("jan1", pass, broken){ (f(x:int)<succeeds>:= x); y:int; f[y]=3} {3}
+  # "jan1" pass relies on not having a check<succeeds> in the execution
+  # execution desugaring of f; or on not having check{} insist on ground-ness
 
 verify("jan2", pass, tim=skip_rej){ f(x:int)<succeeds>:int = x; g(y:int):= {if(f(y)=y) then 1 else 2} ; g[3] }
 verify("jan3", pass, tim=skip_rej){ h(x:int,y:int)<decides>:int= x=y; if(h[2,2]=2) then 1 else 2 }

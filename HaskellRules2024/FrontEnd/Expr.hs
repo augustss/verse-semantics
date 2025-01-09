@@ -134,7 +134,10 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
                                        -- This is a valid expression; eg <exists x, exists y>
                                        -- is like (exists x; exists y; <x,y>)
   | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
+
   | OfType SrcExpr [Eff] SrcExpr       -- e |>{fx} t
+                                       -- Empty [Eff] means "all effects" (not none!)
+
   | DefineIE Ident Ident SrcExpr       -- (i->x) := e
   | Where SrcBlk SrcExpr               -- e1 where e2
   | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3

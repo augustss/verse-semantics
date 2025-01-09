@@ -170,8 +170,8 @@ $$
 %  \end{array}  & \text{|p_1| or |p_2| not a variable} \\
 \rulename{dsparr} &  |ar (p_1; xdots; p_n) := t| & \rightarrow &
       \begin{array}[t]{@@{}l@@{}}
-        |ar(x_1:any;xdots;x_n:any) == t;|\\
-        |p_1 := x_1; xdots; p_n := x_n |
+        |p_1 := x_1; xdots; p_n := x_n | \\
+        |ar(x_1:any;xdots;x_n:any) == t;|
       \end{array}  & \text{none of |p_i| is |..p|} \\[1mm]
 \rulename{dspamp1} & |xsl amp x := t| & \rightarrow & |ar(xsl amp x := t)| & \text{outside an array}\\
 \rulename{dspamp2} & |ar(xdots; xsl amp x := t; xdots)| & \rightarrow & |ar(xdots; xsl := t; x := t; xdots)| & \text{inside an array}\\

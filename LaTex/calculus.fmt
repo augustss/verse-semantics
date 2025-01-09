@@ -27,7 +27,9 @@
 
 %format fx_1
 %format fx_2
-%format andeffects (fx1) (fx2) = fx1 "\!\ast\!" fx2
+
+%% Intersection of effects
+%format andeffects (fx1) (fx2) = fx1 "\cap" fx2
 
 %% --------- Effects ------------
 %format fx = "\omega"

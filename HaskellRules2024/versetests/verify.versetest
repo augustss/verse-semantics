@@ -322,6 +322,8 @@ verify("Fin3x", fail, broken) { (y:type{3|4} := 3); y=3 }
 verify("Fin2a", pass ) { (y:type{3}   := if (y=2) then y+1 else 3)
                        ; if (y=3) then 1 else fail  }
   # Fin2a should work because all clients of y should see some(\_.3)
+verify("Fin2b", pass ) { f(y:type{3})<succeeds> := if (y=3) then 1 else fail  }
+  # Fin2b should work because we know that y=3 (simpler than Fin2a)
 
 verify("Fin3a", fail ) { (y:type{3|4} := if (y=2) then y+1 else 3)
                        ; if (y=3) then 1 else fail }

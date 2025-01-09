@@ -284,20 +284,18 @@ defn xs@(InfixOp _ (Op "&") _) e
     get (InfixOp p1 (Op "&") p2) = get p1 ++ get p2
     get p                        = [p]
 
--- Rule: (:e2) := e  -->  (x:e2) := e, x fresh
+-- DSWILD1:   (:e2) := e  -->  (_:e2) := e
 defn (PrefixOp op@(Op ":") e2) e
-  = do { u <- newIdent (getLoc e2) "u"
-       ; defn (InfixOp (Variable u) op e2) e }
+  = defn (InfixOp (Variable srcUnderscore) op e2) e
 
 -- Rule: (f(a) := e)  -->  (f := function(a){e})
 -- Rule: (p<a> := e)  -->  ...
-
-defn (InfixOp e1 (Op ":") e2) e = defn_ty e1 e2 [] e
-defn (ApplyS f a)             e = defn_fun f a [] e
+defn (ApplyS f a)             e = defn_fun f a [] e       -- DSFUN2
+defn (InfixOp e1 (Op ":") e2) e = defn_ty e1 e2 [] e      -- DSTY2
 
 defn p@(EffAttr {}) e
-  | ApplyS f a <- p'             = defn_fun f a fxs e
-  | InfixOp e1 (Op ":") e2 <- p' = defn_ty  e1 e2 fxs e
+  | ApplyS f a <- p'             = defn_fun f a fxs e     -- DSFUN1
+  | InfixOp e1 (Op ":") e2 <- p' = defn_ty  e1 e2 fxs e   -- DSTY1
   where
     (p', fxs) = getEffs p
 
@@ -328,9 +326,13 @@ defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
 defn_ty :: SrcPat -> SrcExpr -> [Eff] -> SrcExpr -> DsM SrcExpr
 defn_ty p t fxs1 rhs = defn p (OfType rhs (fxs1 ++ fxs2) t')
+                       -- In OfType, an empty [Eff] means "all effects allowed"
   where
-    (t', fxs2) = getEffs t   -- Currently  x : int<succeeds> := t
-                             -- parses as x : (int <succeeds>)   Yuk
+    (t', fxs2) = getEffs t
+       -- Currently                   x : int<succeeds> := t
+       -- parses as                   x : (int <succeeds>) := t
+       -- but we want to treat it as  (x : int) <succeeds> := t
+       -- This getEffs call smooths over the discrepancy.  Yuk.
 
 defn_fun :: SrcPat -> SrcExpr -> [Eff] -> SrcExpr -> DsM SrcExpr
 -- f(x)<fxs> := rhs
@@ -897,24 +899,31 @@ miniToCore orig_md = go (orig_md,[])
     go md (All e)        = do { e' <- go md e; encodeAll e' }
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
-    go md (OfType e1 fx e2)
-      | (MI,xs) <- md = do { (dz, z) <- defineDE "z" (go md e2)
-                           ; return (eGuard xs (eSeq [ eHavoc fx, dz, eSome z])) }
-      | otherwise
-      = do { e1' <- go md e1
-           ; e2' <- go md e2
-           ; if isAtomic e1'  -- Just an optimisation
-             then return (Check [ESucceeds] (ApplyD e2' e1'))
-             else do { r <- newIdent (getLoc e1) "r"
-                     ; return (eSeq [ DefineV r, eUnify (Variable r) (Check fx e1')
-                                    , Check [ESucceeds] (ApplyD e2' (Variable r)) ]) } }
+    go md@(sig,xs) (OfType e1 fx e2)
+      = case sig of
+          MV -> do { body <- do_mx
+                   ; rest <- do_mi
+                   ; return (eSeq [eVerify [] body, rest]) }
+          MI -> do_mi
+          MX -> do_mx
+      where
+        do_mi = do { (dz, z) <- defineDE "z" (go md e2)
+                   ; return (eGuard xs (eSeq [ eHavoc fx, dz, eSome z])) }
+        do_mx = do { e1' <- go md e1
+                   ; e2' <- go md e2
+                   ; if isAtomic e1'  -- Just an optimisation
+                     then return (Check [ESucceeds] (ApplyD e2' e1'))
+                     else do { r <- newIdent (getLoc e1) "r"
+                             ; return (eSeq [ DefineV r, eUnify (Variable r) (Check fx e1')
+                                            , Check [ESucceeds] (ApplyD e2' (Variable r)) ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md@(m,_) (Check fx e)
       = case m of
            MV -> Check fx <$> go md e
            MI -> go md e
-           MX -> go md e  -- Drop the check here; see test `jan1`
+           MX -> Check fx <$> go md e
+                 -- go md e  -- Drop the check here; see test `jan1`
 
     -- Functions proper: MCFUN+, MCFUN-, MCFUNX
     go (MV,xs) e@(XDLam Closed x e1 e2)

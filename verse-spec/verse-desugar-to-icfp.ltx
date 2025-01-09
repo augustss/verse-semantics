@@ -55,23 +55,31 @@ $$
 \multicolumn{2}{l}{\rulename{mif} \;\; \hfill |DMe3 md si (if e_1 then e_2 else e_3|}
 & = & \multicolumn{2}{@@{}l}{|iter2 (lam (a underscore) (force a))
         (DMe3 md si e_1; lam underscore (DMe3 md si e_2))
-        (DMe3 md si e_3)|}  \\[2mm]
+        (DMe3 md si e_3)|}  \\
+\rulename{mcheck+} & |DMe3 mdpos    si (check fx e)| & = & |check fx (DMe3 mdpos si e)| \\
+\rulename{mcheck-} & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si e| \\
+\rulename{mcheckx} & |DMe3 mdx    si (check fx e)| & = & |check fx (DMe3 mdx si e)| \\
 \end{array}
 \\
 
 %--------- (e1 |> e2) and check<fx>{e}----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
-  & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
-\rulename{moftype+x} & |DMe3 md si (oftypefx e_1 fx e_2)|
+\rulename{moftype+} & |DMe3 mdpos si (oftypefx e_1 fx e_2)|
 & = & \begin{array}[t]{@@{}l}
-       |defintro r; r == check fx (DMe3 md si e_1);| \\
-       |check succeeds (apply1N ((DMe3 md si e_2)) r)|
-      \end{array}
-     & |md|\in\{|mdpos|,|mdx|\} \\
-\rulename{mcheck+} & |DMe3 mdpos    si (check fx e)| & = & |check fx (DMe3 mdpos si e)| \\
-\rulename{mcheck-x}\asktim  & |DMe3 md si (check fx e)| & = & |DMe3 md si e|  & |md|\in\{|mdneg|,|mdx|\} \\[2mm]
+  |verifyKW| (;) \left\{ \begin{array}{@@{}l}
+       |defintro r; r == check fx (DMe3 mdpos si e_1);| \\
+       |check succeeds (apply1N ((DMe3 mdpos si e_2)) r))|
+  \end{array} \right\} ; \\
+  |DMe3 mdneg si (oftypefx e_1 fx e_2|
+  \end{array} \\
+\rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
+ & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
+\rulename{moftypex} & |DMe3 mdx si (oftypefx e_1 fx e_2)|
+& = & \begin{array}[t]{@@{}l}
+    |defintro r; r == check fx (DMe3 mdx si e_1);| \\
+    |check succeeds (apply1N ((DMe3 mdx si e_2)) r))|
+  \end{array}
 \end{array}
 \\
 % -------------- Function rules ----------------
