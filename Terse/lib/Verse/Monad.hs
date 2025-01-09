@@ -324,14 +324,10 @@ reflectF = \ case
     putMem mem
     level <- getLevel
     if i < level then
-      yield i $ \ g -> f $ \ x -> do
-        putS s
-        alt (f_s x) m_f m_e >>= g
+      yield i $ \ g -> f $ \ x -> putS s >> alt (f_s x) m_f m_e >>= g
     else do
       putS s { count = s.count + 1 }
-      f $ \ x -> do
-        modifyCount $ subtract 1
-        alt (f_s x) m_f m_e
+      alt (f $ \ x -> modifyCount (subtract 1) *> f_s x) m_f m_e
   SucceedS s mem () m_f m_e -> do
     putS s
     putMem mem
