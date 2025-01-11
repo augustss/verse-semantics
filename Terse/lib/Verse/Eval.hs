@@ -59,6 +59,7 @@ type EvalT m = ReaderT (R m) (VerseT m)
 data R m = R
   { env :: !(Env m)
   , stack :: [Loc]
+  , first :: !Bool
   }
 
 data Mem = Mem
@@ -84,6 +85,7 @@ newR' = do
   pure R {..}
   where
     stack = mempty
+    first = False
 
 newEnv' :: MonadRef m => VerseT m (Env m)
 newEnv' =
@@ -124,7 +126,7 @@ eval' s1 s2 = wrap $ \ case
       x <- eval' s1 s3 x
       pure (s3, x:xs)) (s1, []) xs
     unifyS s1 s2
-    newVar $ Val.Tup xs
+    newTup xs
   e1 := e2 -> do
     s3 <- freshS
     var1 <- eval' s1 s3 e1
@@ -184,7 +186,7 @@ eval' s1 s2 = wrap $ \ case
     heap <- newHeap s1
     fork $ do
       i <- addStack
-      unifyVar var <=< newVar . Val.Tup <=< all' $ do
+      unifyVar var <=< newTup <=< all' . local (\ r -> r { first = False }) $ do
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
@@ -195,7 +197,7 @@ eval' s1 s2 = wrap $ \ case
     let
       init s1 = do
         heap <- newHeap s1
-        split $ do
+        local (\ r -> r { first = False }) . split $ do
           s1 <- newS
           s2 <- freshS
           localHeap (const heap) $ eval' s1 s2 e1
@@ -209,7 +211,7 @@ eval' s1 s2 = wrap $ \ case
           heap <- newHeap s3
           fmap (var2:) . loop s3 <=< lift $ local (const heap) m
     var <- freshVar
-    fork' $ unifyVar var =<< newVar . Val.Tup =<< loop s1 =<< init s1
+    fork' $ unifyVar var =<< newTup =<< loop s1 =<< init s1
     pure var
   One e -> do
     unifyChoiceFree s1 s2
@@ -217,7 +219,7 @@ eval' s1 s2 = wrap $ \ case
     heap <- newHeap s1
     fork $ do
       i <- addStack
-      unifyVar var <=< one $ do
+      unifyVar var <=< one . local (\ r -> r { first = True }) $ do
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
@@ -228,7 +230,8 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     heap <- newHeap s1
     fork' $ unifyVar var =<< if'
-      (do s1 <- newS
+      (local (\ r -> r { first = True }) $
+       do s1 <- newS
           s2 <- freshS
           localHeap (const heap) $ eval' s1 s2 e1)
       (\ var1 -> localEnv (Env.insert x var1) $ eval' s1 s2 e2)
@@ -301,10 +304,10 @@ evalAppFun s1 s2 f x = case f of
         readHeap
         lift $ Monad.writeVarsRef x1 x2
         unifyStoreFree s1 s2
-        newVar $ Val.Tup []
+        newTup []
       _ -> stuck
   Val.GetLine -> do
-    one $ (unifyVar x <=< newVar $ Val.Tup []) <|> stuck
+    one $ (unifyVar x =<< newTup []) <|> stuck
     unifyChoiceFree s1 s2
     readStoreFree s1
     readHeap
@@ -314,16 +317,14 @@ evalAppFun s1 s2 f x = case f of
   Val.ReadInt -> do
     x <- one $ readString x <|> stuck
     unifyS s1 s2
-    newVar . Val.Tup <=<
-      traverse (newPair <=< newInteger *** newString) $
-      reads x
+    newTup <=< traverse (newPair <=< newInteger *** newString) $ reads x
   Val.Print -> do
     unifyChoiceFree s1 s2
     readStoreFree s1
     readHeap
     liftIO . print . pretty =<< freeze x
     unifyStoreFree s1 s2
-    newVar $ Val.Tup []
+    newTup []
   Val.IntMap -> do
     unifyChoiceFree s1 s2
     heap <- newHeap s1
@@ -376,7 +377,7 @@ evalAppMap k = IntMap.lookup k >>> \ case
 type Var m = Fix (Compose (Monad.Var m) (Val (Monad.VarsRef m)))
 
 newString :: MonadRef m => String -> EvalT m (Var m)
-newString = newVar . Val.Tup <=< traverse newChar
+newString = newTup <=< traverse newChar
 
 newChar :: MonadRef m => Char -> EvalT m (Var m)
 newChar = newInt . ord
@@ -388,7 +389,10 @@ newInteger :: MonadRef m => Integer -> EvalT m (Var m)
 newInteger = newVar . Val.Int
 
 newPair :: MonadRef m => (Var m, Var m) -> EvalT m (Var m)
-newPair (x, y) = newVar $ Val.Tup [x, y]
+newPair (x, y) = newTup [x, y]
+
+newTup :: MonadRef m => [Var m] -> EvalT m (Var m)
+newTup = newVar . Val.Tup
 
 readString :: MonadRef m => Var m -> EvalT m String
 readString = readVar >=> \ case
@@ -490,7 +494,10 @@ unifyVar :: MonadRef m => Var m -> Var m -> EvalT m ()
 unifyVar = (lift .) . Monad.unifyVar `on` getCompose . getFix
 
 freshS :: MonadRef m => EvalT m (S m)
-freshS = lift freshS'
+freshS = do
+  choiceFree <- lift . bool Monad.freshVar (Monad.newVar ()) =<< asks (.first)
+  storeFree <- lift Monad.freshVar
+  pure S {..}
 
 freshS' :: MonadRef m => VerseT m (S m)
 freshS' = do
@@ -571,3 +578,8 @@ minInt = minBound
 
 maxInt :: Int
 maxInt = maxBound
+
+bool :: a -> a -> Bool -> a
+bool x y = \ case
+  False -> x
+  True -> y
