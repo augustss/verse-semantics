@@ -152,7 +152,7 @@ $$
 \rulename{dscol3} &  |p : t| & \rightarrow & |p := : t| \\[2mm]
 
 \multicolumn{4}{l}{\textbf{Rewriting |p := t|}} \\
-\rulename{dswild1} & |_ := t| & \rightarrow & |x := t| & \text{fresh |x|} \\
+\rulename{dswild1} & |_ := t| & \rightarrow & |t|  \\
 \rulename{dswild2} &  |: t_1 := t_2| & \rightarrow & |(_ : t_1) := t_2| \\
 \rulename{dsfun1} &  |apply1np p t_1 (eff (q,fx)) := t_2|
     & \rightarrow & |p := functionOCX q (t_1) fx t_2| \\

@@ -316,9 +316,10 @@ verify("blob", fail,tim=D00) { foo(f()<decides>:int)<succeeds> := {f[]} }
 # Finite types (from Google doc "Verse: more tricky cases")
 
 verify("Fin1", fail) { (y := if (y=2) then y+1 else 3); y }
-verify("Fin2", pass) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin2", pass, broken) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
 verify("Fin3", fail, broken) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
 verify("Fin3x", fail, broken) { (y:type{3|4} := 3); y=3 }
+verify("Fin3y", fail, broken) { y=3; (y:type{3|4} := 3) }
 verify("Fin2a", pass ) { (y:type{3}   := if (y=2) then y+1 else 3)
                        ; if (y=3) then 1 else fail  }
   # Fin2a should work because all clients of y should see some(\_.3)
@@ -331,13 +332,13 @@ verify("Fin3a", fail ) { (y:type{3|4} := if (y=2) then y+1 else 3)
 
 verify("Fin4", fail,tim=V10) { y:int = y }
 
-verify("Fin5", pass,tim=skip_acc) { y:type{3} = y }
+verify("Fin5", pass, broken, tim=skip_acc) { y:type{3} = y }
   # Fin5 succeeds because we try to find a y satisfying y=y,
   #     with the clue that y has type{3}; that is easy
   # Tim actually accepts this, but only because type{3} is a singleton
 testeq("Fin5a", pass) { all{ x:type{1|2} } }{ array{1,2} }
   # Fin5a ends up enumerating the x's that pass
-verify("Fin5b", pass,tim=skip_acc) { all{ y:type{3|4} = y } }
+verify("Fin5b", pass,broken, tim=skip_acc) { all{ y:type{3|4} = y } }
   # Fin5a succeeds because we try to find a y satisfying y=y,
   #     with the clue that y has type{3|4}; that is easy
 

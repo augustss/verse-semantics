@@ -135,8 +135,8 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
                                        -- is like (exists x; exists y; <x,y>)
   | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
 
-  | OfType SrcExpr [Eff] SrcExpr       -- e |>{fx} t
-                                       -- Empty [Eff] means "all effects" (not none!)
+  | OfType SrcExpr [Ident] [Eff] SrcExpr  -- e |>{fx} t, guarded by [xs]
+                                          -- Empty [Eff] means "all effects" (not none!)
 
   | DefineIE Ident Ident SrcExpr       -- (i->x) := e
   | Where SrcBlk SrcExpr               -- e1 where e2
@@ -588,9 +588,9 @@ instance Pretty SrcExpr where
                          cat [text "verify" <> parens (hsep (map (ppr 0) is))
                              , indent (braces (ppr 0 e)) ]
 
-          OfType e fx t -> --ppNormal (InfixOp e (Op ":") t)
-                           cat [ text "ofType" <> ppEffs fx <> parens (ppr 0 e)
-                               , indent (braces (ppr 0 t)) ]
+          OfType e xs fx t -> --ppNormal (InfixOp e (Op ":") t)
+                              cat [ text "ofType" <> pPrint xs <> ppEffs fx <> parens (ppr 0 e)
+                                  , indent (braces (ppr 0 t)) ]
 
           Where e1 e2 -> maybeParens (p>0) $ sep [ ppr 0 e1, text "where" <+> ppr 0 e2 ]
           Some e      -> text "some" <> parens (ppr 0 e)
@@ -738,7 +738,7 @@ compos f (Some e)           = Some <$> f e
 compos f (One e)            = One <$> f e
 compos f (All e)            = All <$> f e
 compos f (Verify is e)      = Verify is <$> f e
-compos f (OfType e1 fx e2)  = OfType <$> f e1 <*> pure fx <*> f e2
+compos f (OfType e1 xs fx e2) = OfType <$> f e1 <*> pure xs <*> pure fx <*> f e2
 compos _ e@EPrim{}          = pure e
 compos f (Lam i e)          = Lam i <$> f e
 compos f (XDLam q i e1 e2)  = XDLam q i <$> f e1 <*> f e2
@@ -911,7 +911,7 @@ getVar (Range _fx e)    = getVar e
 getVar Function{}       = []
 getVar (Exists _ e)     = getVar e
 getVar (Verify _ e)     = getVar e
-getVar (OfType e _ t)   = getVar e ++ getVar t
+getVar (OfType e _ _ t) = getVar e ++ getVar t
 getVar Lam{}            = []
 getVar Fail             = []
 getVar EPrim{}          = []

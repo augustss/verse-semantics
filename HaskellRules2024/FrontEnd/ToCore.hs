@@ -136,8 +136,6 @@ scope sc = expr
     expr (Src.Some e)     = Src.Some <$> exprD e
     expr (Src.Guard v e)  = Src.Guard <$> expr v <*> scopeD sc e
 
-    expr (Src.OfType e1 eff e2) = Src.OfType <$> exprD e1 <*> pure eff <*> exprD e2
-
     expr (Src.Exists is e) = Src.Exists is <$> scope (foldr S.insert sc is) e
     expr (Src.Lam i e)     = Src.Lam i <$> scopeD (S.insert i sc) e
     expr (Src.Verify is e) = Src.Verify is <$> scopeD sc' e
