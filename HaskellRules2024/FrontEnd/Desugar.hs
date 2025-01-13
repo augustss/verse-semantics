@@ -674,9 +674,17 @@ mkAppend x          y          = do { r    <- newIdent noLoc "r"
 --------------------------------------------------------
 --
 --     Desugaring Essential Verse to Mini Verse
+--        The W (wrapper introduction) transformation
 --        Fig 6 in verse-spec.pdf
 --
 --------------------------------------------------------
+
+data WContext   -- The context for the W transformation
+  = WC { wc_inp :: Input
+       , wc_fxs :: [Eff]   -- [] means "any effect"
+       , wc_gds :: [Ident] -- Variables to guard on at OfType
+       }
+  deriving( Show )
 
 data Input
   = NoInput      -- ^ Typeset as bullet, circle, or underscore
@@ -687,18 +695,18 @@ essToMini :: SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
 essToMini orig_e = go_expr orig_e
   where
-    go_expr = go (NoInput,[],[])
-              -- Do we want [] for the [Ident], when off-spine?
+    go_expr = go (WC { wc_inp = NoInput, wc_fxs = [], wc_gds = [] })
+              -- Do we want [] for the wc_gds, when off-spine?
 
-    go :: (Input, [Eff], [Ident]) -> SrcEssential -> DsM SrcMini
+    go :: WContext -> SrcEssential -> DsM SrcMini
     -- Typically (go kap t) = e, where `kap::(Input,[Eff])` is short for `kappa`
 
     -- Simple cases: WCONST, WVAR, WPRIM, WFAIL, WSEQ, WSUNIFY, WCHOICE, WSEMI
     go kap e@(Lit {})      = kap `ueq` return e
     go kap e@(Variable v)
-       | isSrcUnderscore v = case kap of
-                               (NoInput,_,_) -> return existsXX
-                               (PI i,_,_)    -> return i
+       | isSrcUnderscore v = case wc_inp kap of
+                               NoInput -> return existsXX
+                               PI i    -> return i
        | otherwise         = kap `ueq` return e
     go kap e@(EPrim {})    = kap `ueq` return e
     go _kp Fail            = return Fail
@@ -713,28 +721,31 @@ essToMini orig_e = go_expr orig_e
 
     -- WIF, WFOR, WALL, WONE: If, for, all
     go kap (If3 t1 t2 t3) = If3  <$> go_expr t1 <*> go kap t2 <*> go kap t3
-    go kap (For2 t1 t2)   = kap `ueq` (For2 <$> go_expr t1 <*> go kap t2)
-    go kap (All t)        = kap `ueq` (All <$> go_expr t)
-    go kap (One t)        = kap `ueq` (One <$> go_expr t)
+    go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go kap t2)
+    go kap (All t)        = kap `ueq` (All    <$> go_expr t)
+    go kap (One t)        = kap `ueq` (One    <$> go_expr t)
     go kap (Choice e1 e2) = kap `ueq` (Choice <$> go_expr e1 <*> go_expr e2)
     go kap (ApplyD t1 t2) = kap `ueq` (ApplyD <$> go_expr t1 <*> go_expr t2)
 
     -- WEXISTS (exists x);  WDEF (x:=t)
     go kap (Exists xs e) = Exists xs <$> go kap e   -- Just propagate Exists
     go _kp (DefineV x)   = return (DefineV x)
-    go kap (DefineE x t) = do { e <- go kap t; return (eSeq [DefineV x, eUnify (Variable x) e]) }
+    go kap (DefineE x t) = do { let kap' = kap { wc_gds = x : wc_gds kap}
+                                    -- Add `x` to the guards
+                              ; e <- go kap' t
+                              ; return (eSeq [DefineV x, eUnify (Variable x) e]) }
 
     -- WSQUIG (x~>y:=t)
-    go (inp,fxs,xs) (DefineIE x y t)
+    go kap@(WC{ wc_inp = inp }) (DefineIE x y t)
       = case inp of
-           NoInput -> do { e <- go (PI (Variable x),fxs,xs) t
+           NoInput -> do { e <- go (kap { wc_inp = PI (Variable x) }) t
                          ; return (eSeq [DefineV x, DefineV y, eUnify (Variable y) e]) }
-           PI i    -> do { e <- go (PI (Variable x),fxs,xs) t
+           PI i    -> do { e <- go (kap { wc_inp = PI (Variable x) }) t
                          ; return (eSeq [ DefineV x, DefineV y
                                         , eUnify (Variable x) i, eUnify (Variable y) e]) }
 
     -- WCOL1, WCOL2, WCOL3: (:t)
-    go (inp,fxs,xs) (Range _ t)
+    go (WC { wc_inp = inp, wc_fxs = fxs }) (Range _ t)
       = case inp of
           NoInput -> do { e <- go_expr t
                         ; x <- newIdent (getLoc t) "x"
@@ -746,23 +757,23 @@ essToMini orig_e = go_expr orig_e
     go kap (Check fx t)  = Check fx <$> go kap t
 
     -- WOFTYPE: t1 |> t2
-    go (inp,fxs1,xs) (OfType t1 ys fxs2 t2)
-      = eGuard xs $
-        OfType <$> go (inp,[]) t1
-        <*> pure ys
-        <*> pure (intersectEffects fxs1 fxs2)
-        <*> go_expr t2
+    go kap@(WC { wc_fxs = fxs1, wc_gds = xs }) (OfType t1 ys fxs2 t2)
+      = OfType <$> go (kap { wc_fxs = [], wc_gds = [] }) t1
+                   -- Push the input into t1, but we have dealt with effects and guards
+               <*> pure (xs ++ ys)
+               <*> pure (intersectEffects fxs1 fxs2)
+               <*> go_expr t2
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go kap (Splice t) = go kap t
 
-    go (inp,fxs,xs) (Array ts)
+    go kap@(WC { wc_inp = inp }) (Array ts)
       = case inp of
           NoInput -> do { es <- mapM do_one ts
                         ; mkArray es }
                    where
-                     do_one (Splice t) = Splice <$> go (NoInput,fxs,xs) t
-                     do_one t          =            go (NoInput,fxs,xs) t
+                     do_one (Splice t) = Splice <$> go kap t
+                     do_one t          =            go kap t
 
           PI i -> do { prs <- mapM do_one ts
                      ; let (exi_js, es) = unzip prs
@@ -775,27 +786,31 @@ essToMini orig_e = go_expr orig_e
                 do_one (Splice t) = do { (d, e) <- do_one t
                                        ; pure (Splice d, Splice e) }
                 do_one         t  = do { j <- newIdent (getLoc t) "j"
-                                       ; e <- go (PI (Variable j), fxs, xs) t
+                                       ; e <- go (kap { wc_inp = PI (Variable j) }) t
                                        ; pure (DefineV j, e) }
 
     -- Truth
-    go (inp,fxs,xs) (Truth t)
+    go kap@(WC { wc_inp = inp }) (Truth t)
       = case inp of
-          NoInput -> Truth <$> go (NoInput,fxs) t
+          NoInput -> Truth <$> go (kap { wc_inp = NoInput }) t
           PI i -> do { j <- newIdent (getLoc t) "j"
-                     ; e <- go (PI (Variable j),fxs,xs) t
+                     ; e <- go (kap { wc_inp = PI (Variable j) }) t
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
 
     -- Functions
-    go (inp,_fxs2,xs) (Function [(t1,fxs1)] t2)
+    go (WC { wc_inp = inp, wc_gds = xs }) (Function [(t1,fxs1)] t2)
+        -- NB: ignore wc_fxs
       = case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"
-                        ; XDLam Closed i <$> go (PI (Variable i),[]) t1
-                                         <*> (add_check <$> go (NoInput,fxs1') t2) }
+                        ; let kap_arg  = WC { wc_inp = PI( Variable i), wc_fxs = [],    wc_gds = xs }
+                              kap_body = WC { wc_inp = NoInput,         wc_fxs = fxs1', wc_gds = i : xs }
+                        ; XDLam Closed i <$> go kap_arg t1 <*> fmap add_check (go kap_body t2) }
           PI f -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
-                     ; e1 <- go (PI (Variable i),[]) t1
-                     ; e2 <- go (PI (ApplyD f (Variable x)), fxs1') t2
+                     ; let kap_arg  = WC { wc_inp = PI (Variable i),            wc_fxs = [],    wc_gds = xs }
+                           kap_body = WC { wc_inp = PI (ApplyD f (Variable x)), wc_fxs = fxs1', wc_gds = i : xs }
+                     ; e1 <- go kap_arg  t1
+                     ; e2 <- go kap_body t2
                      ; return (XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
                                                 (add_check e2)) }
       where
@@ -808,20 +823,21 @@ essToMini orig_e = go_expr orig_e
 
     -- Core constructs used (only) in the Prelude
     -- Only used in the NoInput case
-    go (NoInput,_) (Lam x t)    = Lam x <$> go_expr t
-    go (NoInput,_) (Some t)     = Some  <$> go_expr t
-    go (NoInput,_) (Guard xs t) = Guard <$> go_expr xs <*> go_expr t
+    go (WC { wc_inp = NoInput }) (Lam x t)    = Lam x <$> go_expr t
+    go (WC { wc_inp = NoInput }) (Some t)     = Some  <$> go_expr t
+    go (WC { wc_inp = NoInput }) (Guard xs t) = Guard <$> go_expr xs <*> go_expr t
 
     -- Report any un-handled cases
     go kap t = error $ "TODO: essToMini " ++ show (kap, t)
 
-    ueq :: (Input, [Eff], [Ident]) -> DsM SrcMini -> DsM SrcMini
-    ueq (NoInput,_,_)   ds_e = ds_e
-    ueq (PI inp, fxs,_) ds_e
-      | null fxs           = Unify inp <$> ds_e  -- See M20Dec24-3 for a simple example
-      | otherwise          = do { e <- ds_e    -- See test `blame0` for a simple example
-                                ; i <- newIdent noLoc "i"
-                                ; pure (OfType inp [] [] (Lam i (Unify (Variable i) e))) }
+    ueq :: WContext -> DsM SrcMini -> DsM SrcMini
+    ueq (WC { wc_inp = inp, wc_fxs = fxs }) ds_e
+      = case inp of
+           NoInput -> ds_e
+           PI i | null fxs  -> Unify i <$> ds_e  -- See M20Dec24-3 for a simple example
+                | otherwise -> do { e <- ds_e    -- See test `blame0` for a simple example
+                                  ; v <- newIdent noLoc "i"
+                                  ; pure (OfType i [] [] (Lam v (Unify (Variable v) e))) }
 
 getAperture :: [Eff] -> (Aperture, [Eff])
 getAperture []                   = (Closed, [])    -- Current default is Closed; should really be open
@@ -861,7 +877,7 @@ intersectEff1 eff1 eff2 = error ("intersectEff-4 " ++ show eff1 ++ " " ++ show e
 --------------------------------------------------------
 --
 --     Desugaring Mini Verse to Big Core
---        Fig 8 in verse-spec.pdf
+--        Fig 9 in verse-spec.pdf
 --
 --------------------------------------------------------
 
@@ -878,6 +894,7 @@ data DsMode
   deriving (Eq, Ord, Show)
 
 miniToCore :: DsMode -> SrcMini -> DsM SrcCore
+-- The V transformation; Fig 9 in verse-spec.pdf
 miniToCore orig_md = go (orig_md,[])
   where
     go :: (DsMode, [Ident]) -> SrcMini -> DsM SrcCore
