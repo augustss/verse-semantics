@@ -303,7 +303,7 @@ defn p@(EffAttr {}) e
 
 defn (Array ps) e = defnArray ps e
 
--- Rule (p1 -> p2) := e  -->  p1 := x1; p2 := x2; (x1 -> x2) := e
+-- Rule (p1 ~> p2) := e  -->  p1 := x1; p2 := x2; (x1 -> x2) := e
 defn (InfixOp (Variable x1) (Op "->") (Variable x2)) e
   = pure $ DefineIE x1 x2 e
 

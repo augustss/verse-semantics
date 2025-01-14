@@ -51,8 +51,8 @@ $$
 \multicolumn{2}{@@{}l}{\rulename{wif} \; \hfill |SS wu (vif t_1 t_2 t_3)|}
  & = & |vif(SS wuinit t_1) (SS wu t_2) (SS wu t_3)| \\
 \rulename{wdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
-\rulename{wsquig1}   & |SS (eff fx) (squig x y := t)| & = & |defintro (x y); y == SS (apeff x fx) t| \\
-\rulename{wsquig2}   & |SS (apeff e fx) (squig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
+\rulename{wsquig}   & |SS (apeff u fx) (squig x t)| & = & |apeff u fx `ueq` x; SS (apeff x fx) t| \\
+% \rulename{wsquig2}   & |SS (apeff e fx) (squig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
 \rulename{wchk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
 \rulename{wcol1}\asktim   & |SS (eff fx) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
 \rulename{wcol2}   & |SS (apeff e empty) (: t)| & = & |apply1N ((SS wuinit t)) e| \\

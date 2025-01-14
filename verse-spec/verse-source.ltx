@@ -114,7 +114,7 @@ $$
 &      & \vb & |t_1 where t_2|             & \text{Reverse sequencing} \\
 &      & \vb & |t_1 = t_2|                 & \text{Unification} \\
 &      & \vb & |x := t|                    & \text{Definition} \\
-&      & \vb & |squig x y := t|            & \text{Definition} \\
+&      & \vb & |squig x t|                 & \text{Capture input} \\
 &      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
 &      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
 &      & \vb & |fordo t_1 t_2|             & \text{Finite loop} \\
@@ -160,10 +160,8 @@ $$
   & \rightarrow & |apply1np p t_1 (eff (openeff,succeeds)) := t_2| \\
 \rulename{dsty1} & |p : t_1 (eff fx) := t_2| & \rightarrow & |p := oftypefx t_2 fx t_1|  \\
 \rulename{dsty2}\asktim & |p : t_1  := t_2| & \rightarrow & |p : t_1 (eff decides) := t_2|  \\
-\rulename{dssquig1} &  |(squig p_1 p_2) := t| & \rightarrow
-    & |p_1 := (x_1:any); (squig x_1 p_2) := t| & \text{|p_1| not a variable} \\
-\rulename{dssquig2} &  |(squig p_1 p_2) := t| & \rightarrow
-    & |p_2 := (x_2:any); (squig p_1 x_2) := t| & \text{|p_2| not a variable} \\
+\rulename{dssquig} &  |(squig p_1 p_2) := t| & \rightarrow
+    & |p_1 := (x:any); p_2 := (squig x t)| & \text{|x| fresh} \\
 % \begin{array}[t]{@@{}l@@{}}
 %    |p_1 := (x_1:any); p_2 := (x_2:any);| \\
 %    |(x_1 squiggt x_2) := t|
