@@ -6,7 +6,7 @@ import qualified Data.Set as S
 ---- Sets
 
 newtype Set a = Set { uSet :: S.Set a }
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance (Show a) => Show (Set a) where
   show s = "{" ++ intercalate "," (map show (unSet s)) ++ "}"

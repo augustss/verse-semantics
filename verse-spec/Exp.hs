@@ -18,6 +18,7 @@ data Exp
   | Choice Exp Exp | All Exp | For Exp Exp
   | Where Exp Exp | Def2 Ident Ident Exp
   | OfType Exp Exp
+  | UChoice Exp Exp
   deriving (Eq, Ord, Data)
 
 data Op = Oint | Ogt | Oadd
@@ -43,6 +44,7 @@ instance Show Exp where
                               showBraces (showsPrec 0 e2) .
                               showBraces (showsPrec 0 e3)
   showsPrec p (Choice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " | " . showsPrec 5 e2
+  showsPrec p (UChoice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " || " . showsPrec 5 e2
   showsPrec _ (All e) = showString "all" . showBraces (showsPrec 0 e)
   showsPrec _ (For e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
   showsPrec _ (Fun q e1 e2) = showString (if q == Open then "fun_o" else "fun_c") .

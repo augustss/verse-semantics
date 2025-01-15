@@ -1,21 +1,64 @@
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Control.Monad hiding (ap)
 import Control.Monad.State.Strict
 import qualified Data.Map as M
 import Data.List
 import Data.Data
+import Data.Maybe
 import Data.Generics.Uniplate.Data(universe)
+import Data.String
 --import Data.Maybe
 import Exp hiding (dI)
-import Val
+import ValC
 import Set
-import Env
-import Examples
+import EnvC
+import Examples hiding ((===))
 --import Debug.Trace
 
 implies :: Bool -> Bool -> Bool
 implies x y = not x || y
+
+--------------------------------------------------
+
+instance Num Exp where
+  fromInteger = Int
+  x + y = App (Prim Oadd) (Tup [x, y])
+
+instance IsString Exp where
+  fromString = Var
+
+int :: Exp -> Exp
+int = App (Prim Oint)
+
+infix 2 :=
+pattern (:=) :: Ident -> Exp -> Exp
+pattern x := e = Def x e
+
+infixl 3 :|
+pattern (:|) :: Exp -> Exp -> Exp
+pattern x :| y = Choice x y
+
+infixl 3 :||
+pattern (:||) :: Exp -> Exp -> Exp
+pattern x :|| y = UChoice x y
+
+infixl 4 ===
+(===) :: Exp -> Exp -> Exp
+(===) = Equ
+
+infixl 1 >:
+(>:) :: Exp -> Exp -> Exp
+(>:) = Seq
+
+infix 0 `wher`
+wher :: Exp -> Exp -> Exp
+wher = Where
+
+funq :: Exp -> Exp -> Exp
+funq e1 e2 = Fun Closed e1 e2
 
 --------------------------------------------------
 
@@ -25,6 +68,7 @@ data CExp = CVar Ident | CInt Integer | CPrim Op | CTup [CExp] | CApp CExp CExp
           | CFail | COfType CExp CExp
           | CChoice CExp CExp | CFor CExp CExp | CAll CExp
           | CDef Ident CExp
+          | CUChoice CExp CExp
   deriving (Eq, Ord, Data)
 
 instance Show CExp where
@@ -47,6 +91,7 @@ instance Show CExp where
                               showBraces (maybe (showString "") (showsPrec 0) me3)
   showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
   showsPrec p (CChoice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " | " . showsPrec 5 e2
+  showsPrec p (CUChoice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " || " . showsPrec 5 e2
   showsPrec _ (CAll e) = showString "all" . showBraces (showsPrec 0 e)
   showsPrec _ (CFor e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
   showsPrec p (CDef x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
@@ -91,6 +136,7 @@ syntaxN _ Fail = pure CFail
 syntaxN u (App e0 e1) = (u =.=) <$> (CApp <$> syntaxN "_" e0 <*> syntaxN "_" e1)
 syntaxN u (Equ e0 e1) = CEqu <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (Choice e0 e1) = CChoice <$> syntaxN u e0 <*> syntaxN u e1
+syntaxN u (UChoice e0 e1) = CUChoice <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (Seq e0 e1) = CSeq <$> syntaxN "_" e0 <*> syntaxN u e1
 syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
 syntaxN "_" (Def x (Colon (Var "any"))) = pure $ CExi x   -- hack for x:any
@@ -163,19 +209,23 @@ allVars e = [ i | CVar i <- universe e ]
 
 -------------------------------------------
 
-apply :: W -> W -> WS
-apply (VTup ws) (VInt k) | 0 <= k' && k' < length ws = sing (ws !! k')  where k' = fromInteger k
-apply (VFcn (Fcn _ xys)) w = maybe empty sing $ M.lookup w xys
-apply _ _ = empty
+apply :: W -> W -> [W]
+apply (VTup ws) (VInt k) | 0 <= k' && k' < length ws = [ws !! k']  where k' = fromInteger k
+apply (VFcn fs) w = [ y | Fcn _ xys <- fs, Just y <- [M.lookup w xys] ]
+apply _ _ = []
+
+cVTup :: [WS] -> WS
+cVTup wss = mkSet $ map VTup $ sequence $ map unSet wss
 
 dE :: CExp -> Env -> [WS]
 dE (CVar "_") _                             = error "stray _"
 dE (CVar x)  rho                            = [sing $ lookupEnv x rho]
 dE (CInt k)    _                            = [sing $ VInt k]
 dE (CPrim p)   _                            = [sing $ dO p]
-dE (CTup es) rho                            = undefined -- mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
-                                              -- sequence $ map (\ e -> dE e rho) es
-dE (CApp e1 e2)   rho                       = re [ mkSet [ r | v1 <- unSet s1, v2 <- unSet s2, r <- unSet $ apply v1 v2 ]
+dE (CTup es) rho                            = -- mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
+                                              map cVTup $ mapM (\ e -> dE e rho) es
+
+dE (CApp e1 e2)   rho                       = re [ mkSet [ r | v1 <- unSet s1, v2 <- unSet s2, r <- apply v1 v2 ]
                                                  | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (COfType e1 e2) rho                      = dE (CApp e2 e1) rho
 dE (CEqu e1 e2)   rho                       = re [ s1 `isect` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
@@ -189,6 +239,27 @@ dE (CWhere e1 e2)   rho                     = re [ if isEmpty s2 then empty else
                                                  | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (CExi _)         _                       = [sing $ VInt 99999]
 dE CFail            _                       = []
+dE (CLam Closed i e1 e2 Nothing) rho =
+  let alts :: SetX (Val, SetX [Maybe WS])
+      alts =  [ (w, r) | w <- unSet allWs, let r = useInput w, not (isEmptyX r) ]
+      useInput :: Val -> SetX [Maybe WS]
+      useInput w =       [ map (\ s -> if isEmpty s then Nothing else Just $ justOne $ dD e2 rho') w1s
+                         | rho' <- dX e1 rho
+                         , let w1s = dE e1 (extend rho' i w)
+                         , not $ all isEmpty w1s
+                         ]
+      justOne [x] = x
+      justOne _ = error "justOne"
+      inOuts :: Set (Val, [WS])
+      inOuts = mkSet [ (x, y) | (x, r) <- alts, Just y <- [joinSeqs r] ]
+      joinSeqs :: SetX [Maybe WS] -> Maybe [WS]
+      joinSeqs ss =
+        let wss = catMaybes $ concat ss
+            ws = foldl1 isect wss
+        in  if isEmpty ws then Nothing
+            else Just $ map (\ col -> if all isNothing col then empty else ws) $ transpose ss
+  in  error $ unlines $ "" : map show (unSet inOuts)
+
 {-
 dE (CIf e1 e2 e3) rho                       = do
   case [ rho' | rho' <- dX e1 rho, not (isEmpty (dE e1 rho')) ] of
@@ -239,13 +310,21 @@ dE ee@(CChkClsd x e) rho =
 -}
 -}
 dE (CChoice e1 e2) rho = dD e1 rho ++ dD e2 rho
+dE (CUChoice e1 e2)rho = re [ s1 `xunion` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (CAll e) rho =
-  let vs = dE e rho
+  let vs = squash $ dD e rho
   in  [ mkSet $ map VTup $ sequence $ map unSet vs ]
 dE e _ = error $ "unimplemented " ++ show e
 
+type SetX a = [a]
+isEmptyX :: SetX a -> Bool
+isEmptyX = null
+
 re :: [WS] -> [WS]
-re = filter (not . isEmpty)
+re = id -- filter (not . isEmpty)
+
+squash :: [WS] -> [WS]
+squash = filter (not . isEmpty)
 
 domV' :: Val -> Set Val
 domV' v@VFcn{} = domV v
@@ -284,7 +363,7 @@ close Closed fs =
 dX :: CExp -> Env -> [Env]
 dX e rho = 
   let exts = sequence $ map (\ x -> map (x,) (unSet allWs)) (dI e)
-  in  map (foldr (uncurry M.insert) rho) exts
+  in  map (foldr (\ (i,v) r -> extend r i v) rho) exts
 
 dD :: CExp -> Env -> [WS]
 dD e rho = xUnions [ dE e rho' | rho' <- dX e rho ]
@@ -299,7 +378,7 @@ xUnion xs [] = xs
 xUnion (x:xs) (y:ys) = xunion x y : xUnion xs ys
 
 den :: Exp -> [WS]
-den e = dD ({-redef $-} syntax "_" e) rho0
+den e = dD ({-redef $-} syntax "_" e) emptyEnv
 
 dP :: Exp -> RVal
 dP e =
@@ -361,4 +440,17 @@ a1 := <1>; a2 := <2>; a1++a2
 <1>++<2>
 <1,2>
 
+-}
+
+g1 :: Exp
+g1 = funq g1d "x"
+
+g1d = "x" := (0 :| 1 :| 0) `wher` "y" := 2 :| 3
+g1e = g1d >: "y"
+
+{-
+(0,{[Nothing,           Just [|x->0,y->3|],Nothing,Nothing,Nothing,           Just [|x->0,y->3|]],
+    [Just [|x->0,y->2|],Nothing,           Nothing,Nothing,Just [|x->0,y->2|],Nothing]})
+(1,{[Nothing,Nothing,Nothing,           Just [|x->1,y->3|],Nothing,Nothing],
+    [Nothing,Nothing,Just [|x->1,y->2|],Nothing,           Nothing,Nothing]})
 -}
