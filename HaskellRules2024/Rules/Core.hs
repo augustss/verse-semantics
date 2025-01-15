@@ -15,12 +15,12 @@ module Rules.Core
   , isVal, isHNF, isComparable
   , valid, prep, norm
   , pPrintSmallExpr
-  , unIter
+  , Iter(..), iterApply, iterChoiceFree
 
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkApp, mkEqual, mkOne, mkAll, matchAll, mkCheck, matchCheck, mkSize
+  , mkApp, mkEqual, mkIf, mkOne, mkAll, mkFor, matchAll, mkCheck, matchCheck, mkSize
   , lamUnderscore, someUnderscore, wrong
 
     -- Assupmtions
@@ -88,7 +88,7 @@ data Expr
   | Fail
 
   -- Iterator over choices
-  | Iter Expr Expr Expr -- choice iteration; see Note [iter]
+  | Iter Iter Expr Expr -- choice iteration; see Note [iter]
   -- | All Expr
 
   -- Verifier
@@ -105,28 +105,54 @@ data Expr
   | HOLE
  deriving ( Eq, Ord, Show )
 
+data Iter
+  = IterIf
+  | IterOne
+  | IterAll
+  | IterFor
+  | IterSize
+ deriving ( Eq, Ord )
+
+instance Show Iter where
+  show IterIf   = "IF"
+  show IterOne  = "ONE"
+  show IterAll  = "ALL"
+  show IterFor  = "FOR"
+  show IterSize = "SIZE"
+
+iterChoiceFree :: Iter -> Bool
+iterChoiceFree IterIf   = False
+iterChoiceFree IterOne  = True
+iterChoiceFree IterAll  = True
+iterChoiceFree IterFor  = False
+iterChoiceFree IterSize = True
+
+iterApply :: Iter -> Val -> Expr -> Expr
+iterApply IterIf    f _e0 = f :@: Tup []
+iterApply IterOne   v _e0 = v
+iterApply IterAll   v  e0 = prepVal e0 (\xs -> Op ArrApp :@: Tup [Tup [v], xs])
+iterApply IterFor   f  e0 = prepVal (f :@: Tup []) (\x -> iterApply IterAll x e0)
+iterApply IterSize _v  e0 = prepVal e0 (\n -> Op Add :@: Tup [Lit (LInt 1), n])
 
 {- Note [iter]
-The iter construct is a (left) fold over choices.
+The iter construct is a (right) fold over choices.
 
-In the expression iter(e){f;g}
+In the expression iter(f){e}{e0}
   * e is the choices we are iterating over
-  * f is what to do if e does not fail
-  * g is what to do if e fails, g is a thunk
+  * f is what to do if e produces a value (taken from a finite set of possibilities)
+  * e0 is what to do if e fails
 
-Both f and g are always explicit lambdas.  Anything else is invalid.
-The desugaring ensures this invariant, and the rules maintain it.
 The function f will be called with
   * value from the first argument to iter
   * a thunk for the value of the rest of the choices
 
 Iter is just a fold over the choices, with the following property
-   iter( v1 | v2 | .. vn ){f;g} = f[v1, f[ v2, ... f[vn, g[] ] ] ]
+   iter(f)( v1 | v2 | .. vn ){e0} = f[v1, f[ v2, ... f[vn, e0 ] ] ]
 
 Iter has the following reduction rules:
-(ITER-FAIL)    iter(fail   ){f; g}  -->  g <>
-(ITER-VALUE)   iter(v      ){f; g}  -->  f v g
-(ITER-CHOICE)  iter(e1 | e2){f; g}  -->  iter(e1){f; \ _ . iter(e2){f; g} }
+(ITER-VALUE)   iter(f){v      }{e0}  -->  f v (\_ . e0)
+(ITER-FAIL)    iter(f){fail   }{e0}  -->  e0
+(ITER-CHOICE)  iter(f){e1 | e2}{e0}  -->  iter(f){e1}{iter(f){e2}{e0}}
 
 Note that ITER-CHOICE has no requirement on e1 being a value.
 
@@ -135,23 +161,19 @@ CHOICE-ASSOC, CHOICE-FAIL-L, and CHOICE-FAIL-R are not needed.
 
 Here's how if/one/all/for are encoded using iter.
 
-  * if(e1) e2 else e3  -->  iter(e1; <vs>){ (\ a _ . exi vs . a=<vs>; e2); (\_ . e3) }
-      Where vs are the bound variables of e1 also used in e2.
-      If vs is empty or a singleton, we can simplify this.
+  * if(e1){e2}else{e3}  -->
+      --> iter(\ f _ . f[]){e1; \_ . e2}{\_ . e3}  ,  or
+      --> iter(\ v _ . v){e1; \_ . e2}{\_ . e3}[]  ,  alternatively.
 
-  * one{e}  -->  iter(e){ (\ a _ . a); (\_ . fail) }
+  * one{e}  -->  iter(\ v _ . v){e}{fail}
 
-  * all{e}  -->  iter(e){ (\ v r . cons(v, r[])); (\_ . <>) }
+  * all{e}  -->  iter(\ v r . cons(v, r[])){e}{<>}
       The array is built in the accumulator; built up by consing
       new elements.
 
-  * for(e1){e2}  -->  iter(e1; <vs>){ step; (\_ . <>) }
-      where
-        step = \ a r . exi vs . a = <vs>; cons(e2, r[]))
-      Where vs are the bound variables of e1 also used in e2.
-      If vs is empty or a singleton, we can simplify this.
+  * for(e1){e2}  -->  iter(\ f r . cons(f[],r[])){e1; \_ . e2}{<>}
 
-where cons x xs = arrApp$[<x>, xs, _]
+where cons(x,xs) = arrApp$[<x>, xs, _]
 
 -}
 
@@ -219,44 +241,30 @@ mkEqual e1 e2 e3
   where
     x = identNotIn $ free (e1,e2,e3)
 
+mkIf :: [Ident] -> Expr -> Expr -> Expr -> Expr
+mkIf xs e1 e2 e3 = Iter IterIf (mkExis xs (e1 :>: lamUnderscore e2)) (lamUnderscore e3)
+
+mkExis :: [Ident] -> Expr -> Expr
+mkExis []     e = e
+mkExis (x:xs) e = Exi (bind x (mkExis xs e))
+
 mkOne :: Expr -> Expr
--- one{e}  -->  Iter e (\ a _ . a) (\ _ . Fail)
-mkOne e = Iter e f g
-  where
-   a = ident "a"
-   f = Lam $ bind a $
-       lamUnderscore (Var a)
-   g = lamUnderscore $ Fail
+mkOne e = Iter IterOne e Fail
 
-mkAll_matchAll :: (Expr -> Expr, Expr -> Maybe Expr)
-mkAll_matchAll = (\e -> Iter e f g, match)
-  where
-   [x,xs,fxs,rs,z] = map ident (words "x xs fxs rs z")
-
-   -- all{e}  -->  Iter e (\ as bs . as++bs) (\ _ . <>)
-   f = Lam $ bind x $
-       Lam $ bind fxs $
-       Exi $ bind xs $
-       (Var xs :=: (Var fxs :@: Tup [])) :>:
-       (Exi $ bind rs $
-        Exi $ bind z $
-        (Var z :=: (Op ArrApp :@: Tup [Tup [Var x], Var xs, Var rs])) :>:
-        Var rs)
-
-   g = lamUnderscore $ Tup []
-
-   match (Iter e f' g') | norm f' == norm f && norm g' == norm g = Just e
-   match _                                                       = Nothing
+mkFor :: [Ident] -> Expr -> Expr -> Expr
+mkFor xs e1 e2 = Iter IterFor (mkExis xs (e1 :>: lamUnderscore e2)) (Tup [])
 
 mkAll :: Expr -> Expr
-mkAll = fst mkAll_matchAll
+mkAll e = Iter IterAll e (Tup [])
 
 matchAll :: Expr -> Maybe Expr
-matchAll = snd mkAll_matchAll
+matchAll (Iter IterAll e e0) | e0 == Tup [] = Just e
+matchAll _                                  = Nothing
 
 mkCheck_matchCheck :: (Effect -> Expr -> Expr, Expr -> Maybe (Effect,Expr))
 mkCheck_matchCheck = (mk, \_ -> Nothing)
  where
+{-
   mk eff e =
     Exi $ bind l $
           (Var l :=: Iter e
@@ -282,59 +290,31 @@ mkCheck_matchCheck = (mk, \_ -> Nothing)
                    else wrongFx eff (Tup []))
    where
     l:x:a:f:_ = identsNotIn (free e)
+-}
 
-{-
   mk Fails e =
-    Exi $ bind a $
-          (Var a :=: mkAll e)
-      :>: Iter ((Var a :=: Tup []) :>: Tup [])
-               (lamUnderscore $ lamUnderscore $ Fail)
-               (lamUnderscore $ wrongFx Fails (Var a))
-   where
-    a:_ = identsNotIn (free e)
+    mkIf [] e (wrongFx Fails (Tup [])) Fail
 
   mk Succeeds e =
-    Exi $ bind a $
-          (Var a :=: mkAll e)
-      :>: Iter (Exi $ bind x $
-                  (Tup [Var x] :=: Var a) :>: Var x)
-               (Lam $ bind x $ lamUnderscore $
-                  Var x)
-               (lamUnderscore $ wrongFx Succeeds (Var a))
+    prepVal (mkAll e) $ \a ->
+      mkIf [x]
+        ((Tup [Var x] :=: a) :>: Tup [])
+        (Var x)
+        (wrongFx Succeeds a)
    where
-    a:x:_ = identsNotIn (free e)
+    x = identNotIn (free e)
 
-  -- version with two Iters
   mk Decides e =
-    Exi $ bind a $
-          (Var a :=: mkAll e)
-      :>: Iter ((Var a :=: Tup []) :>: Tup [])
-               (lamUnderscore $ lamUnderscore $ Fail)
-               (lamUnderscore $
-                 Iter (Exi $ bind x $
-                        (Tup [Var x] :=: Var a) :>: Var x)
-                      (Lam $ bind x $ lamUnderscore $
-                        Var x)
-                      (lamUnderscore $ wrongFx Decides (Var a))
-               )
+    prepVal (mkAll e) $ \a ->
+      mkIf []
+        (Exi $ bind n $
+              (Var n :=: (Op ArrLen :@: a))
+          :>: (Op LEq :@: Tup [Var n, Lit (LInt 1)]))
+        (Exi $ bind x $ 
+          (Tup [Var x] :=: a) :>: Var x)
+        (wrongFx Decides a)
    where
-    a:x:_ = identsNotIn (free e)
-
-  -- version with Len
-  mk Decides e =
-    Exi $ bind a $
-          (Var a :=: mkAll e)
-      :>: Iter (Exi $ bind n $
-                   (Var n :=: (Op ArrLen :@: Var a))
-               :>: (Op LEq :@: Tup [Var n, Lit (LInt 1)]))
-               (lamUnderscore $ lamUnderscore $
-                 Exi $ bind x $ 
-                   (Tup [Var x] :=: Var a) :>: Var x)
-               (lamUnderscore $
-                 wrongFx Decides (Var a))
-   where
-    a:x:n:_ = identsNotIn (free e)
--}
+    x:n:_ = identsNotIn (free e)
 
   wrongFx fx v =
     Lit (LStr ("check<" ++ show fx ++ ">")) :@: v
@@ -414,15 +394,7 @@ matchCheck :: Expr -> Maybe (Effect, Expr)
 matchCheck = snd mkCheck_matchCheck
 
 mkSize :: Val -> Expr -> Expr
-mkSize n e =
-  Iter e (lamUnderscore $ Lam $ bind f $
-    Exi $ bind s $
-          (Var s :=: (Var f :@: Tup []))
-      :>: (Op Add :@: Tup [n,Var s])
-  )
-  (lamUnderscore $ Lit (LInt 0))
- where
-  f:s:_ = identsNotIn (free n)
+mkSize n e = prepVal (Iter IterSize e (Lit (LInt 0))) $ \s -> Op Mul :@: Tup [n,s]
 
 (>>>) :: Expr -> Expr -> Expr
 -- e1 >>> e2  =   (_ = e1); e2
@@ -446,16 +418,7 @@ someUnderscore :: Expr -> Expr
 someUnderscore e = Some (lamUnderscore e)
 
 mkApp :: Expr -> Expr -> Expr
-mkApp fun arg
-  = anf xf fun $ \ f ->
-    anf xa arg $ \ a ->
-    f :@: a
-  where
-    xf:xa:_ = identsNotIn (free (fun,arg))
-
-    anf x e k | isVal e   = k e
-              | otherwise = Exi (bind x ((Var x :=: e) :>:
-                                         k (Var x)))
+mkApp fun arg = prepVals [fun,arg] $ \(f:a:_) -> f :@: a
 
 litInt :: Integer -> Expr
 litInt n = Lit (LInt n)
@@ -759,7 +722,7 @@ pPrintPrecE lvl prec the_expr
 
        Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> text "truth" <> braces (ppr0 a)
-       Iter e1 e2 e3 -> text "iter"  <> parens (ppr0 e1) <> braces (sep (punctuate semi $ map ppr1 [e2,e3]))
+       Iter f e e0 -> text "iter"  <> parens (text (show f)) <> braces (ppr0 e) <> braces (ppr0 e0)
        --All e   -> text "all"  <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
        Exi {}  -> mbPar0 $ sep [ text "exi" <+> fsep (map pPrint bndrs) <> char '.'
@@ -846,7 +809,7 @@ exprSize (e1 :|: e2)   = 1 + exprSize e1 + exprSize e2
 exprSize (e1 :@: e2)   = 1 + exprSize e1 + exprSize e2
 exprSize (e1 :>>: e2)  = 1 + exprSize e1 + exprSize e2
 exprSize (Exi bnd)     = 1 + bindSize bnd
-exprSize (Iter e1 e2 e3) = 1 + exprSize e1 + exprSize e2 + exprSize e3
+exprSize (Iter _ e e0) = 1 + exprSize e + exprSize e0
 --exprSize (All e)       = 1 + exprSize e
 exprSize (Some a)      = 1 + exprSize a
 --exprSize (Check _ e)   = 1 + exprSize e
@@ -906,10 +869,7 @@ valid Fail                = True
 valid (Some a)            = is_val a
 --valid (All e)             = valid e
 valid (a :>>: e)          = is_val a && valid e  -- Guard
-valid e@(Iter _ _ _)
-  | Just (e1, (_, _, e2), e3) <- unIter e
-  = valid e1 && valid e2 && valid e3
-valid (Iter _ _ _)       = False
+valid (Iter _ e e0)       = valid e && valid e0
 --valid (Check _ e)         = valid e
 valid (Verify bl)         = valid e where (_, (_as,e)) = unsafeUnbindList bl
 valid (Arr    sz e)       = is_val sz && valid e
@@ -959,7 +919,7 @@ prep (a1 :@: a2)     = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
 prep (Verify bl)  = Verify (bindList xs (as, prep e))
                     where (xs,(as,e)) = unsafeUnbindList bl
 
-prep (Iter e1 e2 e3) = Iter (prep e1) (prep e2) (prep e3)
+prep (Iter f e e0) = Iter f (prep e) (prep e0)
 
 prep e  -- HOLE, Arr, Choose, Size
   = error ("prep bad: " ++ show e)
@@ -1011,7 +971,7 @@ instance Variables Expr where
   --variables f (Size sz e)   = variables f (sz,e)
   variables f (Choose sz e) = variables f (sz,e)
   variables f (Verify bnd)  = variables f bnd
-  variables f (Iter e1 e2 e3) = variables f (e1, e2, e3)
+  variables f (Iter _ e e0) = variables f (e, e0)
 
 instance Variables FailableAssump where
   variables f (A_GVEq i gv)  = [i] `union` variables f gv
@@ -1116,7 +1076,7 @@ norm orig_e = alpha 0 orig_e
                              sub = rs `zip` rs'
                              e'  = alpha (k+n) e
                          in Verify (bindList rs' (map (substAssump sub) as, substSkol sub e'))
-  alpha k (Iter e1 e2 e3) = Iter (alpha k e1) (alpha k e2) (alpha k e3)
+  alpha k (Iter f e e0) = Iter f (alpha k e) (alpha k e0)
 
   alphaExi k xs (Exi bnd) = alphaExi k (x:xs) e
    where
@@ -1167,7 +1127,7 @@ subst sub orig_e
     go (Choose s e) = Choose (go s) (go e)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
 
-    go (Iter e1 e2 e3) = Iter (go e1) (go e2) (go e3)
+    go (Iter f e e0) = Iter f (go e) (go e0)
 
     subst_e_ops :: SubstOps Expr Expr
     subst_e_ops = SubstOps { so_subst = subst
@@ -1202,7 +1162,7 @@ substSkol sub orig_e
     --go (Check fx e) = Check fx (go e)
     go (Exi bnd)    = Exi    (substBind  subst_e_ops sub bnd)
     go (Verify bl)  = Verify (substBinds subst_verify_ops sub bl)
-    go (Iter e1 e2 e3) = Iter (go e1) (go e2) (go e3)
+    go (Iter f e e0) = Iter f (go e) (go e0)
     go e            = e
 
     subst_e_ops :: SubstOps SkolIdent Expr
@@ -1316,10 +1276,9 @@ everywhere step env orig_e
                        where
                          env' = extendRuleEnv env rs as
                          (rs,(as,e)) = alphaRenameVerify (skolVars env) bl
-  recurse (Iter e1 e2 e3) =
-                         [ (s, Iter e1' e2 e3) | (s,e1') <- everywhere step env e1 ] ++
-                         [ (s, Iter e1 e2' e3) | (s,e2') <- everywhere step env e2 ] ++
-                         [ (s, Iter e1 e2 e3') | (s,e3') <- everywhere step env e3 ]
+  recurse (Iter f e e0) =
+                         [ (s, Iter f e' e0) | (s,e') <- everywhere step env e ] ++
+                         [ (s, Iter f e e0') | (s,e0') <- everywhere step env e0 ]
 
   recurse _            = []
 
@@ -1456,17 +1415,14 @@ instance Arbitrary Expr where
                      ++ [ e1' :@: e2  | e1' <- shrink e1 ]
                      ++ [ e1  :@: e2' | e2' <- shrink e2 ]
   --shrink (All e)      = [ e ] ++ [ All e'  | e' <- shrink e ]
-  shrink (Iter e1 v1 v2)
-                      = [ e1
-                        , let f = identNotIn (free v1) in
-                            Exi (bind f ( (Var f :=: (v1 :@: Tup []))
-                                      :>: (Var f :@: Tup [])
-                                        ))
-                        , v2 :@: Tup []
+  shrink (Iter f e e0)
+                      = [ e
+                        , e0
+                        , iterApply f (Tup []) e0
                         ]
-                     ++ [ Iter e1' v1 v2 | e1' <- shrink e1 ]
-                     ++ [ Iter e1 v1' v2 | v1' <- shrink v1 ]
-                     ++ [ Iter e1 v1 v2' | v2' <- shrink v2 ]
+                     ++ [ Iter f e' e0 | e' <- shrink e ]
+                     ++ [ Iter f e e0' | e0' <- shrink e0 ]
+                     ++ [ Iter f' e e0 | f' <- takeWhile (/=f) [IterOne,IterAll] ]
   shrink (Some e)     = [ e ] ++ [ Some e' | e' <- shrink e ]
   shrink (e1 :>>: e2) = [ e1, e2 ]
                      ++ [ e1' :>>: e2  | e1' <- shrink e1 ]
@@ -1556,7 +1512,7 @@ Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
 (e1 :|: e2)   <@ h = (e1 <@ h) :|: (e2 <@ h)
 (e1 :@: e2)   <@ h = (e1 <@ h) :@: (e2 <@ h)
 Exi bnd       <@ h = Exi (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
-Iter e1 e2 e3 <@ h = Iter (e1 <@ h) (e2 <@ h) (e3 <@ h)
+Iter f e e0   <@ h = Iter f (e <@ h) (e0 <@ h)
 Some e        <@ h = Some (e <@ h)
 --All  e        <@ h = All  (e <@ h)
 (e1 :>>: e2)  <@ h = (e1 <@ h) :>>: (e2 <@ h)
@@ -1599,7 +1555,7 @@ isContext (e1 :=: e2)  = isContext e1 || isContext e2
 isContext (e1 :>: e2)  = isContext e1 || isContext e2
 isContext (e1 :|: e2)  = isContext e1 || isContext e2
 isContext (e1 :@: e2)  = isContext e1 || isContext e2
-isContext (Iter e1 e2 e3) = isContext e1 || isContext e2 || isContext e3
+isContext (Iter _ e e0) = isContext e || isContext e0
 --isContext (All e)      = isContext e
 isContext (Some e)     = isContext e
 isContext (e1 :>>: e2) = isContext e1 || isContext e2
@@ -1609,6 +1565,7 @@ isContext (Verify {})  = False
 isContext HOLE         = True
 isContext _            = False
 
+{-
 -- Unpack a correct Iter construct
 unIter :: Expr -> Maybe (Expr, (Ident, Ident, Expr), Expr)
 -- iter e1 e2 (\x y z. e3) (\w. e4)
@@ -1620,3 +1577,4 @@ unIter (Iter e1 (Lam b2) (Lam b3))
     , isUnderscore z
     = Just (e1, (x, y, eb2), eb3)
 unIter _ = Nothing
+-}

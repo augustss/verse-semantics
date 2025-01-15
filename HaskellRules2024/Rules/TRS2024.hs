@@ -3,7 +3,7 @@
 
 module Rules.TRS2024 (
      runtimeRules, runtimeAndVerificationStep, recStep
-   , blocked, blkd, choiceFreeLH, choiceAndFailureFree
+   , blocked, blkd, choiceFreeLH
    , name, nameWith, iff
    , skolValue
    , LocalExis(..), makeRigid, addFlexi, allExis, wrapExis
@@ -312,7 +312,9 @@ unificationStep _env lhs =
          (Lit {}, Lit {}) -> False  -- Handled by U-LIT
          (Tup {}, Tup {}) -> False  -- Handled by U-TUP
          (Tru {}, Tru {}) -> False  -- Handled by U-TRU
-         (Arr {}, Arr {}) -> False  -- Handled by U-ARR (in Verify.hs)
+         (Tup {}, Arr {}) -> False  -- }
+         (Arr {}, Tup {}) -> False  -- } Handled by U-ARR (in Verify.hs)
+         (Arr {}, Arr {}) -> False  -- }
          (_,      _)      -> True
      pure Fail
  ++
@@ -398,7 +400,7 @@ onlyApps f orig_e = go orig_e
     go (e1 :>: e2)  = go e1 && go e2
     go (e1 :|: e2)  = go e1 && go e2
     go (e1 :@: e2)  = e1 == Var f || (go e1 && go e2)
-    go (Iter e1 e2 e3) = all go [e1,e2,e3]
+    go (Iter _ e e0) = all go [e,e0]
     go (Some e)       = go e
     --go (All e)        = go e
     go (e1 :>>: e2)   = go e1 && go e2
@@ -466,25 +468,22 @@ oneAndAllStep :: Rule
 oneAndAllStep _env lhs =
   -- iter(fail){f, g}  -->  g <>
   "ITER-FAIL" `name`
-  do Iter Fail _ g <- [lhs]
-     pure (g :@: Tup [])
+  do Iter _f Fail e0 <- [lhs]
+     pure e0
  ++
   -- iter(v){f, g}  -->  f v g
   "ITER-VALUE" `name`
-  do Iter v f g <- [lhs]
+  do Iter f v e0 <- [lhs]
      guard (isVal v)
-     let f1:_ = identsNotIn $ free lhs
-     pure (Exi $ bind f1 $
-             (Var f1 :=: (f :@: v)) :>: (Var f1 :@: g))
-     
+     pure (iterApply f v e0)
  ++
   -- iter(C[e1] | C[e2]){f, g}  -->  iter(C[e1]){f, \ _ . iter(C[e2]){f, g} }
   "ITER-CHOICE" `name`
-  do Iter e f g <- [lhs]
+  do Iter f e e0 <- [lhs]
      (ctx, e1 :|: e2) <- evalCtx [] e
      guard (choiceFreeLH ctx)
      guard (blocked ctx)  -- was: e
-     pure $ Iter (ctx <@ e1) f (Lam $ bind underscore $ Iter (ctx <@ e2) f g)
+     pure $ Iter f (ctx <@ e1) (Iter f (ctx <@ e2) e0)
 {-
  ++
   -- all(fail)  -->  <>
@@ -927,7 +926,7 @@ status _  (e1 :|: e2) = BlockedOnExi (if isContext (e1 :|: e2) then HasHole else
   -- We must skolemise in verify(){check<succeeds>{ (x=some{t}; blah) | more-blah }}
   --               and in verify(){check<succeeds>{ v | (x=some{t}; blah) }}
 
-status lx (Iter e _ _)
+status lx (Iter _ e _)
   | isVal e   = SomethingToDo
   | otherwise =
   case status (makeRigid lx) e of
@@ -969,6 +968,7 @@ choicy (e1 :>: e2)
   | otherwise       = choicy e1 >>= \c -> if c then Just True else choicy e2
 choicy _            = Just False
 
+{-
 ---------------------
 choiceAndFailureFree :: Expr_or_Context -> Bool
 -- No choices or failure anyhere, to the left or to
@@ -1002,11 +1002,11 @@ choiceAndFailureFree = go []
     -- go fs (Check _ e) = go fs e
     go _  (Verify {}) = True
 
-    go fs e@Iter{}
-      | Just (_, (_, _, f), g) <- unIter e
-                  = go fs f && go fs g
-      | otherwise = error "Malformed Iter"
+    go fs (Iter f e e0) = iterChoiceFree f && go fs e && go fs e0
+-}
 
+-- TODO: This function can be simplified now, the extra "fs" in choiceFree'
+-- is not used anymore
 choiceFreeLH :: Expr_or_Context -> Bool
 -- (choiceFree ctx) means no choices to the left of the HOLE
 -- or, if no HOLE, anywhere
@@ -1030,10 +1030,7 @@ choiceFree' fs (v1 :@: _)          = case v1 of
                                        Op _      -> True  -- all other ops are choice-free
                                        Var f     -> f `elem` fs
                                        _         -> False -- may or may not be choice free
-choiceFree' fs e@Iter{}
-  | Just (_, (_, t, f), g) <- unIter e
-                                   = choiceFree' (t:fs) f && choiceFree' fs g
-  | otherwise                      = error "Malformed Iter"
+choiceFree' fs (Iter f e e0)       = iterChoiceFree f && choiceFree' fs e && choiceFree' fs e0
 choiceFree' _ (Some {})            = True
 --choiceFree' _ (All {})             = True
 choiceFree' _ (Arr {})             = True

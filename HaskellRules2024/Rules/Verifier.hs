@@ -180,6 +180,33 @@ arrStep env lhs =
                    , e ])
 {-
  ++
+  "U-TUP-ARRAY" `name`  -- <v1,..,vk> = Arr n e1; e
+                    -- --> (n=k); v1=some{\_.e1}; ..; vk=some{\_.e1}; e
+  do (a1 :=: a2) :>: e <- [lhs]
+     let isTup (Tup _) = True
+         isTup _       = False
+
+         isArr (Arr _ _) = True
+         isArr _         = False
+
+         toArr (Tup vs) = Arr (Lit (LInt (fromIntegral (length vs)))) (foldr (:|:) Fail vs)
+         toArr a        = a
+     guard ((isTup a1 && isArr a2) || (isTup a2 && isArr a1))
+     pure ((toArr a1 :=: toArr a2) :>: e)
+-}
+
+{-  (vs, n, e1, e) <- [ (vs, n, e1, e)
+                       | 
+                       , (Tup vs, Arr n e1) <- [ (a1,a2), (a2,a1) ]
+                       ]
+     pure ( (n :=: Lit (LInt (fromIntegral (length vs))))
+        :>: foldr (:>:) e
+            [ v :=: Some (lamUnderscore e1) | v <- vs ]
+          )
+-}
+
+{-
+ ++
   "SIZE0" `name`  -- Size(0){e} --> 0
   do Size (LitInt 0) _ <- [lhs]
      pure (litInt 0)
@@ -442,6 +469,10 @@ go_px lx lhs =
 --     (ctx, hole) <- go_px (makeRigid lx) x
 --     pure (All ctx, hole)
  ++
-  do Iter x y z <- [lhs]
-     (ctx, hole) <- go_px (makeRigid lx) x
-     pure (Iter ctx y z, hole)
+  do Iter f e e0 <- [lhs]
+     (ctx, hole) <- go_px (makeRigid lx) e
+     pure (Iter f ctx e0, hole)
+ ++
+  do Iter f e e0 <- [lhs]
+     (ctx, hole) <- go_px (makeRigid lx) e0
+     pure (Iter f e ctx, hole)
