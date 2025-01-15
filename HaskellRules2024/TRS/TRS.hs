@@ -1,0 +1,151 @@
+{-# OPTIONS_GHC -Wno-x-partial #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+module TRS.TRS(
+  Rule, Rewrite,
+  name,
+  (-=),
+  Rec(..),
+  step, stepS, stepSS,
+  NormResult(..),
+  normalFormsFuelTracePlain,
+  normalFormFuelTracePlain,
+  TRSystem(..),
+  noRules,
+  ) where
+
+import Epic.List( nub, nubKey )
+import Epic.Print(Pretty, prettyShow)
+import TRS.Tarjan(tarjanAny, Result (..))
+import TRS.Traced
+import qualified Data.Set as S
+--import Control.Monad( unless )
+--import qualified Debug.Trace
+--import Data.Set( Set )
+import System.IO.Unsafe
+import Text.Printf
+
+--------------------------------------------------------------------------------
+
+type Rule a = RuleEnv a -> a -> [Rewrite a]
+type Rewrite a = (String, a)
+
+instance Show (Rule t) where
+  show _ = "<<Rule>>"
+
+-- This is used to give rules names.
+infix 7 `name`   -- must bind tighter than <>
+name :: String -> [a] -> [(String, a)]
+name s as = [(s,a) | a <- as]
+
+-- Remove a named rule.
+infixl 8 -=
+(-=) :: Rule a -> String -> Rule a
+rule -= nm = \ env a -> filter ((/= nm) . fst) (rule env a)
+
+noRules :: Rule a
+noRules _ _ = []
+
+--------------------------------------------------------------------------------
+
+class Rec t where
+  -- Convert a rule that matches at the top level to a rule that matches everywhere
+  rec :: Rule t -> Rule t
+
+step :: forall a . (Ord a, Rec a) => Rule a -> Rule a
+step rule env tt = nub $ rec rule env tt
+
+-- Traces are produced in reverse order, i.e. final result first
+normalFormsFuelTracePlain :: (Ord a, Rec a, Pretty a) => TRSystem a -> Int -> a -> NormResult a
+normalFormsFuelTracePlain sys an at | rulesHaveStructural sys = normalTarjan False sys an at
+                                    | otherwise = go an S.empty [start at]
+ where
+  go  0 _seen trs@(_:_)   = NormResult { nrDone = [], nrLeft = trs }
+  go _n _seen []          = NormResult { nrDone = [], nrLeft = [] }
+  go  n  seen (ttr@(t:<--tr):trs)
+--    | Debug.Trace.trace ("go: " ++ show (rn tr, t)) False = undefined
+    | t `S.member` seen = stepper "SEEN" ttr $
+                          go n seen trs
+    | null ts'          = stepper "DONE" ttr $
+                          addDone ttr $ go n seen' trs
+    | otherwise         =
+      stepper "STEP" ttr $
+      go (n-1) seen' ([t':<--((s,t):tr) | (s,t') <- ts'] ++ trs)
+   where
+    seen' = S.insert t seen
+    ts'   = stepS sys t
+
+singleStep :: Bool
+singleStep = False
+
+stepper :: (Pretty a) => String -> Traced a -> b -> b
+stepper msg (t:<--tr) x | not singleStep = x
+                        | otherwise = unsafePerformIO $ do
+  let s = case tr of ((ss,_):_) -> ss; _ -> "REFL"
+  printf "%s %10s %s\n" msg s (prettyShow t)
+  _ <- getLine
+  pure x
+
+addDone :: Traced a -> NormResult a -> NormResult a
+addDone a nr = nr{ nrDone = a : nrDone nr }
+
+-- Like normalFormsFuelTrace, but only does a depth first search
+normalFormFuelTracePlain :: (Ord a, Rec a, Pretty a) => TRSystem a -> Int -> a -> NormResult a
+normalFormFuelTracePlain sys an at | rulesHaveStructural sys = normalTarjan True sys an at
+                                   | otherwise = go an S.empty (start at)
+ where
+  go 0 _    tr   = NormResult { nrDone = [], nrLeft = [tr] }
+  go n seen ttr@(t :<-- tr)
+    | null ts'   = stepper "done" ttr $ NormResult { nrDone = [ttr], nrLeft = [] }
+    | null ts''  = NormResult { nrDone = [], nrLeft = [t0 :<-- ((s0, t) : tr)] }
+    | otherwise  =
+      stepper "STEP" ttr $
+      go (n-1) seen' (t' :<-- ((s, t) : tr))
+    where
+      seen' = S.insert t seen
+      ts'   = stepSS sys t
+      ts''  = filter ((`S.notMember` seen) . snd) ts'
+      (s, t') = head ts''
+      (s0,t0) = head ts'
+
+stepSS :: (Ord a, Rec a) => TRSystem a -> a -> [(String, a)]
+stepSS sys tt = t1s ++ t2s
+  where
+    t1s = nubKey snd $ rec (rules  sys) (ruleEnv sys) tt
+    t2s = nubKey snd $ {- rec -} (rules2 sys) (ruleEnv sys) tt
+
+--------------------------------------------------------------------------------------------------------
+
+normalTarjan :: (Ord a, Rec a, Pretty a) => Bool -> TRSystem a -> Int -> a -> NormResult a
+normalTarjan justOne sys fuel at =
+  let e = start at
+      arrow (a :<-- t) = [ b :<-- ((r,a):t) | (r,b) <- stepS sys a ]
+  in  case tarjanAny justOne fuel arrow e of
+        Finish xss -> NormResult { nrDone = map head xss, nrLeft = [] }
+        Timeout _  -> NormResult { nrDone = [], nrLeft = [e] }
+
+--------------------------------------------------------------------------------------------------------
+
+-- The rules2 field has rules that are used when none of the rules
+-- field apply anymore.
+-- This is a hack and not really a normal TRS.
+
+data TRSystem t = TRSystem
+  { sname               :: !String                    -- short system name, should be an identfier
+  , description         :: !String                    -- longer system description
+  , ruleEnv             :: !(RuleEnv t)               -- environment for running rule execution
+  , preProcess          :: !(RuleEnv t -> t -> t)     -- prepare a term for rule application, e.g., ANF
+  , postProcess         :: !(RuleEnv t -> t -> t)     -- post processing, e.g., undo ANF
+  , rules               :: !(Rule t)                  -- rewrite rules
+  , rules2              :: !(Rule t)                  -- hack
+  , rulesHaveStructural :: !Bool                      -- are any rules structural? (slower)
+  , confluenceRules     :: !(Rule t)                  -- structural rules for equivalence test
+  , validExpr           :: !(RuleEnv t -> t -> Bool)  -- is t valid for reduction
+  , sortRewrites        :: !([Rewrite t] -> [Rewrite t])  -- sort rewrites
+  , displayRules        :: !(String -> Bool)              -- which steps (rules) to show when printing trace
+  }
+--  deriving (Show)
+
+instance Show (TRSystem t) where
+  show _ = "<<TRSystem>>"

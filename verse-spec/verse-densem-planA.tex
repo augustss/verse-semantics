@@ -1,0 +1,1135 @@
+% ----------------------------------------------------
+%
+%        Denotational semantics: Plan A
+%
+%         Was: desugaring.ltx
+%
+% ----------------------------------------------------
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+%
+%
+\makeatletter
+\@ifundefined{lhs2tex.lhs2tex.sty.read}%
+  {\@namedef{lhs2tex.lhs2tex.sty.read}{}%
+   \newcommand\SkipToFmtEnd{}%
+   \newcommand\EndFmtInput{}%
+   \long\def\SkipToFmtEnd#1\EndFmtInput{}%
+  }\SkipToFmtEnd
+
+\newcommand\ReadOnlyOnce[1]{\@ifundefined{#1}{\@namedef{#1}{}}\SkipToFmtEnd}
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\rbind}{\mathbin{=\mkern-6.7mu<\!\!\!<}}% suggested by Neil Mitchell
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\usepackage{polytable}
+
+%mathindent has to be defined
+\@ifundefined{mathindent}%
+  {\newdimen\mathindent\mathindent\leftmargini}%
+  {}%
+
+\def\resethooks{%
+  \global\let\SaveRestoreHook\empty
+  \global\let\ColumnHook\empty}
+\newcommand*{\savecolumns}[1][default]%
+  {\g@addto@macro\SaveRestoreHook{\savecolumns[#1]}}
+\newcommand*{\restorecolumns}[1][default]%
+  {\g@addto@macro\SaveRestoreHook{\restorecolumns[#1]}}
+\newcommand*{\aligncolumn}[2]%
+  {\g@addto@macro\ColumnHook{\column{#1}{#2}}}
+
+\resethooks
+
+\newcommand{\onelinecommentchars}{\quad-{}- }
+\newcommand{\commentbeginchars}{\enskip\{-}
+\newcommand{\commentendchars}{-\}\enskip}
+
+\newcommand{\visiblecomments}{%
+  \let\onelinecomment=\onelinecommentchars
+  \let\commentbegin=\commentbeginchars
+  \let\commentend=\commentendchars}
+
+\newcommand{\invisiblecomments}{%
+  \let\onelinecomment=\empty
+  \let\commentbegin=\empty
+  \let\commentend=\empty}
+
+\visiblecomments
+
+\newlength{\blanklineskip}
+\setlength{\blanklineskip}{0.66084ex}
+
+\newcommand{\hsindent}[1]{\quad}% default is fixed indentation
+\let\hspre\empty
+\let\hspost\empty
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\EndFmtInput
+\makeatother
+%
+%
+%
+%
+%
+%
+% This package provides two environments suitable to take the place
+% of hscode, called "plainhscode" and "arrayhscode". 
+%
+% The plain environment surrounds each code block by vertical space,
+% and it uses \abovedisplayskip and \belowdisplayskip to get spacing
+% similar to formulas. Note that if these dimensions are changed,
+% the spacing around displayed math formulas changes as well.
+% All code is indented using \leftskip.
+%
+% Changed 19.08.2004 to reflect changes in colorcode. Should work with
+% CodeGroup.sty.
+%
+\ReadOnlyOnce{polycode.fmt}%
+\makeatletter
+
+\newcommand{\hsnewpar}[1]%
+  {{\parskip=0pt\parindent=0pt\par\vskip #1\noindent}}
+
+% can be used, for instance, to redefine the code size, by setting the
+% command to \small or something alike
+\newcommand{\hscodestyle}{}
+
+% The command \sethscode can be used to switch the code formatting
+% behaviour by mapping the hscode environment in the subst directive
+% to a new LaTeX environment.
+
+\newcommand{\sethscode}[1]%
+  {\expandafter\let\expandafter\hscode\csname #1\endcsname
+   \expandafter\let\expandafter\endhscode\csname end#1\endcsname}
+
+% "compatibility" mode restores the non-polycode.fmt layout.
+
+\newenvironment{compathscode}%
+  {\par\noindent
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \let\hspre\(\let\hspost\)%
+   \pboxed}%
+  {\endpboxed\)%
+   \par\noindent
+   \ignorespacesafterend}
+
+\newcommand{\compaths}{\sethscode{compathscode}}
+
+% "plain" mode is the proposed default.
+% It should now work with \centering.
+% This required some changes. The old version
+% is still available for reference as oldplainhscode.
+
+\newenvironment{plainhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\hspre\(\let\hspost\)%
+   \pboxed}%
+  {\endpboxed%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+\newenvironment{oldplainhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \(\pboxed}%
+  {\endpboxed\)%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+% Here, we make plainhscode the default environment.
+
+\newcommand{\plainhs}{\sethscode{plainhscode}}
+\newcommand{\oldplainhs}{\sethscode{oldplainhscode}}
+\plainhs
+
+% The arrayhscode is like plain, but makes use of polytable's
+% parray environment which disallows page breaks in code blocks.
+
+\newenvironment{arrayhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \(\parray}%
+  {\endparray\)%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+\newcommand{\arrayhs}{\sethscode{arrayhscode}}
+
+% The mathhscode environment also makes use of polytable's parray 
+% environment. It is supposed to be used only inside math mode 
+% (I used it to typeset the type rules in my thesis).
+
+\newenvironment{mathhscode}%
+  {\parray}{\endparray}
+
+\newcommand{\mathhs}{\sethscode{mathhscode}}
+
+% texths is similar to mathhs, but works in text mode.
+
+\newenvironment{texthscode}%
+  {\(\parray}{\endparray\)}
+
+\newcommand{\texths}{\sethscode{texthscode}}
+
+% The framed environment places code in a framed box.
+
+\def\codeframewidth{\arrayrulewidth}
+\RequirePackage{calc}
+
+\newenvironment{framedhscode}%
+  {\parskip=\abovedisplayskip\par\noindent
+   \hscodestyle
+   \arrayrulewidth=\codeframewidth
+   \tabular{@{}|p{\linewidth-2\arraycolsep-2\arrayrulewidth-2pt}|@{}}%
+   \hline\framedhslinecorrect\\{-1.5ex}%
+   \let\endoflinesave=\\
+   \let\\=\@normalcr
+   \(\pboxed}%
+  {\endpboxed\)%
+   \framedhslinecorrect\endoflinesave{.5ex}\hline
+   \endtabular
+   \parskip=\belowdisplayskip\par\noindent
+   \ignorespacesafterend}
+
+\newcommand{\framedhslinecorrect}[2]%
+  {#1[#2]}
+
+\newcommand{\framedhs}{\sethscode{framedhscode}}
+
+% The inlinehscode environment is an experimental environment
+% that can be used to typeset displayed code inline.
+
+\newenvironment{inlinehscode}%
+  {\(\def\column##1##2{}%
+   \let\>\undefined\let\<\undefined\let\\\undefined
+   \newcommand\>[1][]{}\newcommand\<[1][]{}\newcommand\\[1][]{}%
+   \def\fromto##1##2##3{##3}%
+   \def\nextline{}}{\) }%
+
+\newcommand{\inlinehs}{\sethscode{inlinehscode}}
+
+% The joincode environment is a separate environment that
+% can be used to surround and thereby connect multiple code
+% blocks.
+
+\newenvironment{joincode}%
+  {\let\orighscode=\hscode
+   \let\origendhscode=\endhscode
+   \def\endhscode{\def\hscode{\endgroup\def\@currenvir{hscode}\\}\begingroup}
+   %\let\SaveRestoreHook=\empty
+   %\let\ColumnHook=\empty
+   %\let\resethooks=\empty
+   \orighscode\def\hscode{\endgroup\def\@currenvir{hscode}}}%
+  {\origendhscode
+   \global\let\hscode=\orighscode
+   \global\let\endhscode=\origendhscode}%
+
+\makeatother
+\EndFmtInput
+%
+%
+%
+% First, let's redefine the forall, and the dot.
+%
+%
+% This is made in such a way that after a forall, the next
+% dot will be printed as a period, otherwise the formatting
+% of `comp_` is used. By redefining `comp_`, as suitable
+% composition operator can be chosen. Similarly, period_
+% is used for the period.
+%
+\ReadOnlyOnce{forall.fmt}%
+\makeatletter
+
+% The HaskellResetHook is a list to which things can
+% be added that reset the Haskell state to the beginning.
+% This is to recover from states where the hacked intelligence
+% is not sufficient.
+
+\let\HaskellResetHook\empty
+\newcommand*{\AtHaskellReset}[1]{%
+  \g@addto@macro\HaskellResetHook{#1}}
+\newcommand*{\HaskellReset}{\HaskellResetHook}
+
+\global\let\hsforallread\empty
+
+\newcommand\hsforall{\global\let\hsdot=\hsperiodonce}
+\newcommand*\hsperiodonce[2]{#2\global\let\hsdot=\hscompose}
+\newcommand*\hscompose[2]{#1}
+
+\AtHaskellReset{\global\let\hsdot=\hscompose}
+
+% In the beginning, we should reset Haskell once.
+\HaskellReset
+
+\makeatother
+\EndFmtInput
+% ----------------------
+%% Stuff for TimCore
+
+
+%% 'g' inferences
+
+
+
+
+
+%% Intersection of effects
+
+%% --------- Effects ------------
+
+
+%% ----------------------
+
+
+%% --------------------------
+%%        Desugaring rules
+%% --------------------------
+
+
+
+% ----------------------------------------------------
+% New desugaring, just does the wrapping part:
+% ----------------------------------------------------
+%   Input for wrapping
+
+
+%%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
+
+%% 'si' is short for "solve or infer" or "unification variable or not" resp
+
+%% 'md' is short for "mode" or "unification variable or not" resp
+
+%% flipsi is a no-op for now
+
+
+%% EXX is just EX, but with no argument
+
+
+
+
+%% ----------- Applications --------------
+%% %format applyx a b = a "@" b
+%% %format applyx a b = a "\," b
+
+%% Function application with no arguments
+
+%% Function application with 1 argument
+
+%% Function application with 1 argument, no parens
+
+%% Function application with 1 argument, without parenthesis
+
+%% Function application with many arguments
+
+%% ----------- End of Applications --------------
+
+
+
+
+
+%% Sequences e1; ...; en; v
+
+%% xs etc stole syntax used in examples.
+
+%% Old version: | for BNF, [] for choice
+%%%format choice = "[ \! ]"
+%%%format `choice` = "\mathop{[ \! ]}"
+%% 1mm is about 0.3em with the current font
+
+%% New version: tall | for BNF, fat | for choice
+%%format vbar = "\mathop{\bigm|}"
+%%format choice = "\boldsymbol{|}"
+%%format `choice` = "\mathop{\boldsymbol{|}}"
+
+
+
+
+%% %format ok = "\textbf{ok}"
+
+%% %format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
+%% %format eqsemiKW = "\fatsemi"
+
+%% Arrays and tuples
+%% %format arrKW = "\textbf{arr}"
+%% %format arr (x) = arrKW "\{" x "\}"
+
+%% %format vmap (x) = "\llangle" x "\rrangle"
+
+
+
+%%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
+%% %format defKW = "\textbf{def}"
+% only used in comments, but still prettier this way:
+%%%%format map = "\textbf{map}"
+
+%% -------Functions ---------------
+
+
+%% functionOC has open/closed subscript
+
+
+%% -------End of f unctions ---------------
+
+
+
+
+
+%% Unification
+%%%format == = "\!=\!"
+
+
+% format := = "\mapsto"
+% %format squiggt = "\leadsto"
+% %format squiggt = "\!-\!\!>\!\!\!"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%% We combined S and C into one
+
+
+%% ----------- Metatheory --------------
+
+
+%% ----------------------------
+%%         Verification
+%% ----------------------------
+
+%% assert = succeed, abbreviated to suc
+
+
+
+%% Effects checking, like succeeds{e}
+
+
+%% <fx> brackets
+
+\subsection{A denotational semantics}
+
+
+\begin{figure}
+$
+\begin{array}{l}
+\textbf{Domains (sets)} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + (\semfcn) \\
+\Env & = & \ensuremath{\Conid{Ident}} \rightarrow \Value \\
+W^{*} & = & \text{set of } W \\
+Env^{*} & = & \text{set of } Env \\
+\end{array}
+\\ \\
+
+
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of a closed program}} \\
+  \semapp{P}{\ensuremath{\Varid{e}}}{} & : & \Value + \ensuremath{\Conid{Wrong}} \\
+  \semapp{P}{\ensuremath{\Varid{e}}}{} & = & \left\{
+  \begin{array}{ll}
+    w,       & \text{if} \{w\} = \semapp{D}{\ensuremath{\Varid{e}}}{\rho_0} \\
+    \ensuremath{\Conid{Wrong}}, & \text{otherwise}
+  \end{array}
+  \right.
+\\ \\
+
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
+  \semapp{E}{\ensuremath{\Varid{e}}}{} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{\ensuremath{\Varid{x}}}{\rho} & = & \msing{\rho(x)} \\
+  \semapp{E}{\ensuremath{\Varid{k}}}{\rho} & = & \msing{k} \\
+  \semapp{E}{\ensuremath{\Varid{o}}}{\rho} & = & \semapp{O}{\ensuremath{\Varid{o}}}{} \\
+  \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}} [\!\Varid{e}_{\mathrm{2}}]}}{\rho} & = & %% \apply(\semapp{E}{|e_1|}{\rho}, \; \semapp{E}{|e_2|}{\rho}) \\
+    \{ r \, | \, f \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{\rho}, \; a \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{\rho}, \; r \inb \apply(f, a) \} \\
+  \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}}{\rho}      & = & \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{\rho} \; \cap \; \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{\rho} \\
+  \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}}{\rho}      & = & %% \semapp{E}{|e_1|}{\rho} \; \msemi      \; \semapp{E}{|e_2|}{\rho} \\
+    \{ y \, | \, x \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{\rho}, \; y \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{\rho} \} \\
+  \semapp{E}{\ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}}}{\rho} & = & \msing{\rho(x)} \;\cap\; \semapp{E}{e}{\rho} \\
+  \semapp{E}{\ensuremath{\mathbin{:}\Varid{e}}}{\rho} & = & %% \ran(\semapp{E}{|e|}{\rho}) \\
+    \{ r \, | \, f \inb \semapp{E}{\ensuremath{\Varid{e}}}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} \\
+%FAIL  \semapp{E}{|fail|}{\rho} & = & \emptyset \\
+  \semapp{E}{\ensuremath{\textbf{if}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}\textbf{else}\{\Varid{e}_{\mathrm{3}}\}}}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{D}{\ensuremath{\Varid{e}_{\mathrm{3}}}}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{\rho'} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  \ensuremath{\mathbf{where}}\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
+  \semapp{E}{\ensuremath{\langle\Varid{e}_{\mathrm{0}},\mydots,\Varid{e}_{\Varid{n}}\rangle}}{\rho} & = &
+    \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, | \, x_0 \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{\rho}, \,\mydots,\, x_n \inb \semapp{E}{\ensuremath{\Varid{e}_{\Varid{n}}}}{\rho} \} \\
+  \semapp{E}{\ensuremath{\textbf{fun}_\Varid{q}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}}}{\rho} & = & \{ f \;
+    \begin{array}[t]{ll}
+      | & f \inb \semfcn \\
+
+      % Simon's version
+      , & \forall x \inb \Value.  \forall \rho' \inb \semapp{X}{e_1}{\rho}. \\
+        & \hspace{1em} (\semappp{M}{e_1}{x}{\rho'} \neq \emptyset) \\
+        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}  \\
+      , & q=\ensuremath{\textbf{c}} \implies \forall x \inb \dom(f). \\
+      & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+
+%%      \forall x \inb \Value. \\
+%%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+%%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+
+    \end{array} \\
+    & & \} \\
+    \\ 
+
+    %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
+  \semapp{X}{\ensuremath{\Varid{e}}} & : & \Env \rightarrow \Env^{*} \\
+  \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n } \; | \;   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  & & \ensuremath{\mathbf{where}\;[\mskip1.5mu \Varid{x}_{\mathrm{1}},\mydots,\Varid{x}_{\Varid{n}}\mskip1.5mu]} = \semapp{I}{\ensuremath{\Varid{e}}} \\[1mm]
+
+  \semapp{C}{\ensuremath{\Varid{e}}} & : & \Env \rightarrow \Env^{*} \\
+  \semappp{C}{\ensuremath{\Varid{e}}}{\rho} & = &
+  \{ \rho' \; |  \; \rho' \inb \semapp{X}{e}{\rho},  \emptyset \neq \semappp{E}{e}{\rho'} \} \\[1mm]
+
+  \semapp{D}{\ensuremath{\Varid{e}}}{} & : & \Env \rightarrow \mtype \\
+  \semapp{D}{\ensuremath{\Varid{e}}}{\rho} & = & \{ r \; | \; \rho' \inb \semapp{X}{e}{\rho}, r \inb \semapp{E}{\ensuremath{\Varid{e}}}{\rho'} \} \\
+
+%\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
+%\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
+
+  \end{array} \\ \\
+
+\textbf{Alternative definition of } \semapp{E}{} \\
+\begin{array}{rcll}
+\semapp{E}{\ensuremath{\Varid{e}}}{\rho} & = & \bigcup_{u \inb \Value}\semapp{M}{\ensuremath{\Varid{e}}}{u}{\rho} \\
+\end{array} \\
+
+\end{array}
+$
+\caption{Plan A: Expression semantics}
+\label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+
+\text{\bf Match semantics} \\
+\\
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
+  \semapp{L}{\ensuremath{\Varid{e}}}{} & : & \Value \rightarrow \Env \rightarrow \mtype \\
+  \semappp{L}{\ensuremath{\Varid{e}}}{u}{\rho} & = & \{ r \; | \; \rho' \inb \semapp{X}{e}{\rho}, r \inb \semapp{M}{\ensuremath{\Varid{e}}}{u}{\rho'} \} \\
+\\
+%\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
+  \semapp{M}{\ensuremath{\Varid{e}}} & : & \Value \rightarrow \Env \rightarrow \mtype \\
+  \semappp{M}{\ensuremath{\Varid{x}}}{u}{\rho} & = & \msing{\rho(x)} \cap \msing{u} \\
+  \semappp{M}{\ensuremath{\Varid{k}}}{u}{\rho} & = & \msing{k} \cap \msing{u} \\
+  \semappp{M}{\ensuremath{\Varid{o}}}{u}{\rho} & = & \semapp{O}{\ensuremath{\Varid{o}}}{} \cap \msing{u} \\
+  \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}} [\!\Varid{e}_{\mathrm{2}}]}}{u}{\rho} & = &
+    \{ r \, | \, f \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{\rho}, \; a \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{\rho}, \; r \inb \apply(f, a) \} \cap \msing{u} \\
+  \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}}{u}{\rho}      & = & \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{u}{\rho} \; \cap \; \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{u}{\rho} \\
+  \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}}{u}{\rho}      & = &
+    \{ y \, | \, x \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{\rho}, \; y \inb \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{u}{\rho}) \} \\
+  \semappp{M}{\ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}}}{u}{\rho} & = & \msing{\rho(x)} \;\cap\; \semappp{M}{e}{u}{\rho} \\
+  \semappp{M}{\ensuremath{\mathbin{:}\Varid{e}}}{u}{\rho} & = &
+    \{ r \, | \, f \inb \semapp{E}{\ensuremath{\Varid{e}}}{\rho}, \; r \inb \apply(f, u) \} \\
+%FAIL  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+  \semappp{M}{\ensuremath{\textbf{if}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}\textbf{else}\{\Varid{e}_{\mathrm{3}}\}}}{u}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{L}{\ensuremath{\Varid{e}_{\mathrm{3}}}}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{L}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{u}{\rho'} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  \ensuremath{\mathbf{where}}\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
+  \semappp{M}{\ensuremath{\langle\Varid{e}_{\mathrm{0}},\mydots\;\Varid{e}_{\Varid{n}}\rangle}}{u}{\rho} & = &
+  \{ \mkfcn{0 \fmapsto w_0,\mydots, n \fmapsto w_n} \, | \, u \in \semfcn, \, \dom(u) = \{0,\mydots,n\}, \\
+  & & \hspace{0.5em} w_0 \inb \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{(u(0))}{\rho}, \,\mydots,\, w_n \inb \semappp{M}{e_n}{(u(n))}{\rho} \} \\
+
+  \semappp{M}{\ensuremath{\textbf{fun}_\Varid{q}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}}}{g}{\rho} & = & \{ f
+    \begin{array}[t]{l@{\;}l}
+      | & f \inb \semfcn \\
+      ,  & g \in \semfcn  \\
+      ,  & \forall x \inb \Value, \forall \rho' \inb \semapp{X}{e_1}{\rho},
+           \forall y \inb \semapp{M}{e_1}{x}{\rho'}.  \\
+         & \hspace{0.5em} x \in \dom(f) \land y \in \dom(g) \land f(x) \in \semapp{L}{e_2}{(g(y))}{\rho'} \\
+      , & q=\ensuremath{\textbf{c}} \implies \forall x \inb \dom(f). \\
+        & \hspace{0.5em} \exists \rho' \inb \semapp{X}{e_1}{\rho}.\, \semappp{M}{e_1}{x}{\rho'} \neq \emptyset \\
+     \}
+    \end{array}
+\\
+%   \text{Old version} \\    
+%  \semappp{M}{|funk q e_1 e_2|}{g}{\rho} & = & \{ f \; ||
+%    \begin{array}[t]{l}
+%      f \inb \semfcn, \\
+%      g \in \semfcn, \\
+%      \forall x \inb \Value. \\
+%      |let|\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+%      |if|\; \bar{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%      |else|\; x \in \dom(f) \land \\
+%      \hspace{2em} \forall \rho' \inb \bar{\rho}. \\
+%      \hspace{3em} \forall x' \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
+%     \hspace{4em} x' \in \dom(g) \land \\
+%      \hspace{4em} f(x) \in \semappp{L}{e_2}{(g(x'))}{\rho'}
+%    \end{array} \\
+%    & & \} \\
+
+  \end{array} \\ \\
+  
+
+\end{array}
+$
+\caption{Plan A: Expression match semantics}
+\label{fig:den-sem2}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+\text{\bf Utility functions} \\
+
+\text{\bf Predefined functions} \\
+  \begin{array}{rcll}
+  \semapp{O}{\ensuremath{\Varid{op}}}{} & : & (\semfcn)^{*} \\
+  \semapp{O}{\ensuremath{\textbf{gt}}}{} & = & \{ \fcn \{ (\tuple{x,y},x) \, | \, x \inb \mathbb{Z}, y \inb \mathbb{Z}, x > y \} \} & \text{one function} \\
+  \semapp{O}{\ensuremath{\textbf{int}}}{} & = & \{ \fcn \{ (x,x) \, | \, x \inb \mathbb{Z} \} \} & \text{one function} \\
+  \semapp{O}{\ensuremath{\textbf{add}}}{} & = & \{ f \, | \, f \inb \semfcn, \; \forall x,y \inb \mathbb{Z}.f(\tuple{x,y})=x+y \} & \text{many functions} \\
+  \end{array} \\ \\
+  
+\text{\bf Defined identifiers} \\
+  \begin{array}{rcll}
+  \semapp{I}{\ensuremath{\Varid{e}}}{} & : & \ensuremath{[\mskip1.5mu \Conid{Ident}\mskip1.5mu]} \\
+  \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{1}} [\!\Varid{e}_{\mathrm{2}}]}}{} & = & \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{} \ensuremath{<\!>} \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{} \\
+  \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}}{}       & = & \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{} \ensuremath{<\!>} \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{} \\
+  \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}}{}       & = & \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{} \ensuremath{<\!>} \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{} \\
+  \semapp{I}{\ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}}}{}          & = & \ensuremath{[\mskip1.5mu \Varid{x}\mskip1.5mu]} <> \semapp{I}{\ensuremath{\Varid{e}}}{} \\
+  \semapp{I}{\ensuremath{\mathbin{:}\Varid{e}}}{}              & = & \semapp{I}{\ensuremath{\Varid{e}}}{} \\
+  \semapp{I}{\ensuremath{\langle\Varid{e}_{\mathrm{1}},\Varid{e}_{\mathrm{2}}\rangle}}{}  & = & \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{} \ensuremath{<\!>} \semapp{I}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{} \\
+  \semapp{I}{\ensuremath{\Varid{e}}}                 & = & \ensuremath{[\mskip1.5mu \mskip1.5mu]} & \text{otherwise} \\
+  \end{array} \\ \\
+    
+\begin{array}{rcll}
+\apply & : & (\Value \times \Value) \rightarrow \mtype \\
+\apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
+\textbf{alternative:\hspace{6em}}               & = & \{ y \, | \, (x, y) \inb f, \; x=w \} & f \in \semfcn \\
+\apply( f, w ) & = & \emptyset & \text{otherwise} \\
+%%\end{array}
+\\
+
+%% \begin{array}{rcll}
+\dom & : & (\Value \rightharpoonup \Value) \rightarrow \mtype \\
+\dom(f) & = & \{ x \, | \, (x,y) \inb f \} \\
+
+\\
+
+\ran & : & (\Value \rightharpoonup \Value) \rightarrow \mtype \\
+\ran(f) & = & \{ y \, | \, (x,y) \inb f \} \\
+
+\\
+
+\fcn & : & (\tuple{\Value,\Value})^{*} \rightarrow (\semfcn) \\
+\fcn & & \multicolumn{2}{l}{\text{indicates a function made from a set of pairs} } \\
+
+\\
+
+\get{} & : & \mtype \rightarrow \mtype \\
+\get{\{x\}} & = & \{ x \} \\
+\get{s} & = & \emptyset & \text{if the cardinality of s is not 1} \\
+
+\end{array}
+
+\end{array}
+$
+\caption{Plan A: Utility function}
+\label{fig:den-sem-util}
+\end{figure}
+
+\newpage
+\subsection{Choice}
+
+\begin{figure}
+  $$
+  \begin{array}{l}
+    \textbf{Syntax} \\
+    \begin{array}{lr@{\;}r@{\;}ll}
+    \text{Integers} & k \\
+    \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+%     \text{Programs} & p  & ::=  & |succeeds e| \quad \text{where} \; \freevars{e} = \emptyset \\
+    \text{Expressions} & e  & ::=  &
+        \ensuremath{\Varid{x}}
+    \vb \ensuremath{\Varid{k}}
+    \vb \ensuremath{\Varid{o}}
+    \vb \ensuremath{\Varid{e}_{\mathrm{1}} [\!\Varid{e}_{\mathrm{2}}]}
+    \vb \ensuremath{\Varid{e}_{\mathrm{1}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{2}}}
+    \vb \ensuremath{\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}
+    \vb \ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}}
+    \vb \ensuremath{\mathbin{:}\Varid{e}}
+%FAIL    \vb |fail|
+    \\
+    & &
+    \vb & \ensuremath{\textbf{if}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}\textbf{else}\{\Varid{e}_{\mathrm{3}}\}}
+    \vb \ensuremath{\langle\Varid{e}_{\mathrm{1}},\mydots,\Varid{e}_{\Varid{n}}\rangle}
+    \vb \ensuremath{\textbf{fun}_\Varid{q}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}}
+    & \ensuremath{\Varid{n}\geq \mathrm{0}}
+    \\
+    & & \vb & \ensuremath{\Varid{e}_{\mathrm{1}}\hspace{0.19em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e}_{\mathrm{2}}} \vb \ensuremath{\textbf{for}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}}
+    \\
+    \text{Primops} & o  & ::= & \ensuremath{\textbf{gt}} \vb \ensuremath{\textbf{add}} \vb \ensuremath{\textbf{int}} \\
+    \text{Openness} & q & ::= & \ensuremath{\textbf{o}} \vb \ensuremath{\textbf{c}} \\
+    \end{array} \\
+    \\[-3mm]
+  \end{array}
+  $$
+\caption{Plan A: The MiniVerse syntax, with choice} \label{fig:syntax}
+\end{figure}
+
+\newcommand{\LblsValue}{LW}
+\newcommand{\semfcnc}{\Value \rightharpoonup \LblsValue}
+\newcommand{\Ltag}{\textbf{L}}
+\newcommand{\Rtag}{\textbf{R}}
+\newcommand{\mtypec}{LW^{*}}
+\newcommand{\capu}{\cap\hspace{-0.6em}\bullet\,}
+\newcommand{\prelbl}{\textbf{prelbl}}
+\newcommand{\unlbl}{\textbf{unlbl}}
+\newcommand{\LblValue}{LW}
+\newcommand{\Lbl}{\mathbf{Lbl}}
+\newcommand{\lblemp}{\epsilon}
+\newcommand{\lbll}[1]{{\bf L}\;#1}
+\newcommand{\lblr}[1]{{\bf R}\;#1}
+\newcommand{\lblseq}[2]{#1 \sconcat #2}
+\newcommand{\sortlbl}{\textbf{sortLbl}}
+
+
+\begin{figure}
+$
+\begin{array}{l}
+\textbf{Domains (sets)} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + \dtuple + (\semfcnc) \\
+\dtuple & = & \text{a finite tuple of values $\Value$} \\
+\Env & = & \ensuremath{\Conid{Ident}} \rightarrow \Value \\
+\LblValue & = & \Lbl \times \Value & \text{Label $\Lbl$ and value $\Value$} \\
+\textbf{data}\; \Lbl & = & \lblemp \vb (\lblseq{\Lbl}{\Lbl}) \vb \lbll{\Lbl} \vb \lblr{\Lbl} \\
+%%% W^{*} & = & \text{set of } W \\
+LW^{*} & = & \powerset{LW} \\
+Env^{*} & = & \powerset{Env} \\
+\end{array}
+\\ \\
+
+
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of a closed program}} \\
+  \semapp{P}{\ensuremath{\Varid{e}}}{} & : & \Value + \ensuremath{\Conid{Wrong}} \\
+  \semapp{P}{\ensuremath{\Varid{e}}}{} & = & \left\{
+  \begin{array}{ll}
+    w,       & \text{if} \{([],w)\} = \semapp{D}{\ensuremath{\Varid{e}}}{\rho_0} \\
+    \ensuremath{\Conid{Wrong}}, & \text{otherwise}
+  \end{array}
+  \right.
+\\ \\
+
+  \semapp{E}{\ensuremath{\Varid{e}}}{} & : & \Env \rightarrow \mtypec \\
+  \semapp{E}{\ensuremath{\Varid{e}}}{\rho} & = & \bigcup_{u \inb \Value}\semapp{M}{\ensuremath{\Varid{e}}}{u}{\rho} \\
+\\
+    %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
+  \semapp{D}{\ensuremath{\Varid{e}}}{} & : & \Env \rightarrow \mtypec \\
+  \semapp{D}{\ensuremath{\Varid{e}}}{\rho} & = &
+  \{ r\, |  \,
+  w_1 \inb \Value, \mydots, w_n \inb \Value,\\
+  & & \hspace{0.5em} r \inb \semapp{E}{\ensuremath{\Varid{e}}}{(\extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n})} \} \\
+  & & \ensuremath{\mathbf{where}\;[\mskip1.5mu \Varid{x}_{\mathrm{1}},\mydots,\Varid{x}_{\Varid{n}}\mskip1.5mu]} = \semapp{I}{\ensuremath{\Varid{e}}} \\
+\\
+
+  \semapp{C}{\ensuremath{\Varid{e}}} & : & \Env \rightarrow \Env^{*} \\
+  \semappp{C}{\ensuremath{\Varid{e}}}{\rho} & = &
+  \{ \rho' \; | 
+  \begin{array}[t]{l}
+  w_1 \inb \Value, \mydots, w_n \inb \Value, \\
+  \ensuremath{\mathbf{let}}\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n}, \\
+  \emptyset \neq \semappp{E}{e}{\rho'} \\
+  \end{array} \\
+  & &  \} \; \ensuremath{\mathbf{where}\;[\mskip1.5mu \Varid{x}_{\mathrm{1}},\mydots,\Varid{x}_{\Varid{n}}\mskip1.5mu]} = \semapp{I}{\ensuremath{\Varid{e}}} \\
+
+
+%\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
+%\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
+
+  \end{array} \\ \\
+
+\end{array}
+$
+\caption{Plan A: Expression semantics, with choice}
+\label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+  
+
+  \begin{array}{rcll}
+    \munits{s} & = & \{ (\lblemp, x) \} & \text{singleton set of a value with no labels} \\
+    s \capu u & = & \{ (l, x)\, |\, (l, x) \inb s, x = u \} \\
+    \unlbl(l,x) & = & x \\
+    \prelbl(l, s) & = & \{ (l \bowtie l', x)\, |\, (l',x) \inb s \} \\
+\\
+\apply & : & (\Value \times \Value) \rightarrow \mtypec \\
+\apply( \tuple{w_0, \mydots,\, w_n}, k) & = & \msing{(\Rtag^k\Ltag,w_k)} & 0 \leq k \leq n \\
+\apply( f, w ) & = & \msing{f(w)} & f \in \semfcnc, w \in \dom(f) \\
+\apply( f, w ) & = & \emptyset & \text{otherwise} \\
+
+ \munion & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+  s_1 \munion s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lbll{l},w)}{\sbind{(l,w)}{s_1}} \cup
+                                              \scompr{(\lblr{l}, w)}{\sbind{(l,w)}{s_2}}} \\[1mm]
+ \mintersect & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+  s_1 \mintersect s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lblseq{l_1}{l_2},w_1)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}, w_1=w_2}} \\[1mm]
+ \msemi & : & \mtype \rightarrow \mtype \rightarrow \mtype \\
+  s_1 \msemi s_2 & = &
+\multicolumn{2}{l}{\scompr{(\lblseq{l_1}{l_2}, w_2)}{\sbind{(l_1,w_1)}{s_1}, \sbind{(l_2,w_2)}{s_2}}} \\[1mm]
+
+  \end{array}
+
+\\ \\
+
+
+\begin{array}{rrcll}
+\text{Comparison} & (<) & : & \Lbl \rightarrow \Lbl\rightarrow Bool \\
+& (\lbll l_1) < (\lbll l_2) & = & l_1 < l_2 \\
+& (\lblr l_1) < (\lblr l_2) & = & l_1 < l_2 \\
+& (\lbll l_1) < (\lblr l_2) & = & True \\
+& (\lblr l_1) < (\lbll l_2) & = & False \\
+& (\lblseq{l_1}{l_2}) < (\lblseq{l_3}{l_4}) & = &
+(l_1 < l_3) \vee (l_1 = l_3 \wedge l_2 < l_4)\\
+\end{array}
+
+\\ \\
+\begin{array}{rrcll}
+\text{Sorting choices} & \sortlbl & : & \powerset{\Lbl \times \alpha} \rightarrow [\powerset{\alpha}] \\
+& \sortlbl & = & \textit{Sort set according to label order}\\
+%% \end{array} \\
+ \\
+
+%% \begin{array}{rrcll}
+ \text{All} & \mall & : & [\mtype] \rightarrow \mtypec \\
+ & \mall([\{s_0\}, \mydots, \{s_n\}]) & = &
+ \{ [0 \fmapsto (\lblemp, w_0), \mydots, n \fmapsto (\lblemp, w_n)] | \\
+ & & & \hspace{0.5em} w_0 \inb s_0, \, \mydots, \, w_n \inb s_n \}
+\end{array}
+
+\end{array}
+$
+\caption{Plan A: Misc}
+\label{fig:den-sem1}
+\end{figure}
+
+\begin{figure}
+$
+\begin{array}{l}
+
+\text{\bf Match semantics} \\
+\\
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Match semantics of a scoped expression}} \\
+  \semapp{B}{\ensuremath{\Varid{e}}} & : & \Value \rightarrow \Env \rightarrow \Env^{*} \\
+  \semappp{B}{\ensuremath{\Varid{e}}}{u}{\rho} & = &
+  \{ \rho' \; | 
+  \begin{array}[t]{l}
+  w_1 \inb \Value, \mydots, w_n \inb \Value, \\
+  \ensuremath{\mathbf{let}}\; \rho' = \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n}, \\
+  \emptyset \neq \semappp{M}{e}{u}{\rho'} \\
+  \end{array} \\
+  & &  \} \; \ensuremath{\mathbf{where}} \ensuremath{[\mskip1.5mu \Varid{x}_{\mathrm{1}},\mydots,\Varid{x}_{\Varid{n}}\mskip1.5mu]} = \semapp{I}{\ensuremath{\Varid{e}}} \\
+\\
+    
+  \semapp{L}{\ensuremath{\Varid{e}}}{} & : & \Value \rightarrow \Env \rightarrow \mtypec \\
+  \semappp{L}{\ensuremath{\Varid{e}}}{u}{\rho} & = &
+  \{ r\, |  \,
+  w_1 \inb \Value, \mydots, w_n \inb \Value \\
+  & & \hspace{0.5em} r \inb \semapp{M}{\ensuremath{\Varid{e}}}{u}{(\extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n})} \} \\
+  & & \ensuremath{\mathbf{where}} \ensuremath{[\mskip1.5mu \Varid{x}_{\mathrm{1}},\mydots,\Varid{x}_{\Varid{n}}\mskip1.5mu]} = \semapp{I}{\ensuremath{\Varid{e}}} \\
+\\
+%\multicolumn{4}{l}{\text{\bf Match semantics of an expression}} \\
+  \semapp{M}{\ensuremath{\Varid{e}}} & : & \Value \rightarrow \Env \rightarrow \mtypec \\
+  \semappp{M}{\ensuremath{\Varid{x}}}{u}{\rho} & = & \munits{\rho(x)} \capu u \\
+  \semappp{M}{\ensuremath{\Varid{k}}}{u}{\rho} & = & \munits{k} \capu u \\
+  \semappp{M}{\ensuremath{\Varid{o}}}{u}{\rho} & = & \semapp{O}{\ensuremath{\Varid{o}}}{} \capu u \\
+  \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}} [\!\Varid{e}_{\mathrm{2}}]}}{u}{\rho} & = &
+    \{ (l \bowtie l' \bowtie l'', r) \, | \, (l,f) \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{\rho},\; (l',a) \inb \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{\rho}, \\
+    & & \hspace{0.5em}(l'',r) \inb \apply(f, a) \} \capu u \\
+  \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}}{u}{\rho}      & = & \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{u}{\rho} \; \mintersect \; \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{u}{\rho} \\
+  \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}}{u}{\rho}      & = & \semapp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{\rho}   \; \msemi \; \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{u}{\rho} \\
+  \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}}\hspace{0.19em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e}_{\mathrm{2}}}}{u}{\rho} & = & \semappp{L}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{u}{\rho} \munion \semappp{L}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{u}{\rho} \\
+  \semappp{M}{\ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}}}{u}{\rho} & = & \semappp{M}{e}{u}{\rho} \capu \rho(x) \\
+
+  \semappp{M}{\ensuremath{\mathbin{:}\Varid{e}}}{u}{\rho} & = &
+    \{ (l \bowtie l',r) \, | \, (l,f) \inb \semapp{E}{\ensuremath{\Varid{e}}}{\rho}, \; (r,l') \inb \apply(f, u) \} \\
+%FAIL  \semappp{M}{|fail|}{u}{\rho} & = & \emptyset \\
+
+  \semappp{M}{\ensuremath{\textbf{if}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}\textbf{else}\{\Varid{e}_{\mathrm{3}}\}}}{u}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{L}{\ensuremath{\Varid{e}_{\mathrm{3}}}}{u}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    XXX  & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  \ensuremath{\mathbf{where}}\; \bar{\rho} = \semappp{C}{e_1}{\rho} \\
+
+  \semappp{M}{\ensuremath{\textbf{for}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}}}{u}{\rho} & = & XXX  \\
+  \semappp{M}{\ensuremath{\textbf{all}\{\Varid{e}\}}}{u}{\rho} & = & \mall(\sortlbl(\semapp{D}{e}{\rho})) \capu u \\
+
+  \semappp{M}{\ensuremath{\langle\Varid{e}_{\mathrm{0}},\mydots\;\Varid{e}_{\Varid{n}}\rangle}}{u}{\rho} & = &
+  \{ (l_1 \bowtie \mydots \bowtie l_n, \mkfcn{0 \fmapsto w_0,\mydots, n \fmapsto w_n}) \, | \, u \in \semfcnc, \\
+  & & \hspace{0.5em} \dom(u) = \{0,\mydots,n\}, \\
+  & & \hspace{0.5em} (l_0,w_0) \inb \semappp{M}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{(\unlbl(u(0)))}{\rho}, \,\mydots,\, \\
+  & & \hspace{0.5em}  (l_n,w_n) \inb \semappp{M}{e_n}{(\unlbl(u(n)))}{\rho} \} \\
+
+%%  & & \text{XXX above definition looks wrong} \\
+%%  \semappp{M}{|arr (e_1, xdots e_n)|}{u}{\rho} & = &
+%%  \{ ((l_1 \bowtie \mydots \bowtie l_n, \tuple{x_1,\mydots,x_n}) \, || \, u \in \dtuple,
+%%  \exists u_1 \mydots u_n .\, u = \tuple{u_1,\mydots,u_n}, \\
+%%  & & \hspace{0.5em} (l_1,x_1) \inb \semappp{M}{|e_1|}{u_1}{\rho}, \,\mydots,\, (l_n,x_n) \inb \semappp{M}{e_n}{u_n}{\rho} \} \\
+  \semappp{M}{\ensuremath{\textbf{fun}_\Varid{q}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}}}{g}{\rho} & = & \{ f \; |
+    \begin{array}[t]{l}
+      f \inb \semfcnc, \\
+      g \in \semfcnc, \\
+      \forall x \inb \Value. \\
+      \ensuremath{\mathbf{let}}\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho}, \\
+      \ensuremath{\textbf{if}}\; \bar{\rho} = \emptyset\; \ensuremath{\textbf{then}}\; (x \not\in \dom(f)) \lor (q == \ensuremath{\textbf{o}}) \\
+      \ensuremath{\textbf{else}}\; x \in \dom(f) \land \\
+      \hspace{2em} \forall \rho' \inb \bar{\rho}. \\
+      \hspace{3em} \forall (l,x') \inb \semappp{M}{e_1}{x}{\rho'}.\, \\
+      \hspace{4em} x' \in \dom(g) \land \\
+      \hspace{4em} f(x) \in \prelbl(l,\semappp{L}{e_2}{(\unlbl(g(x')))}{\rho'})
+    \end{array} \\
+    & & \} \\
+
+\\
+    
+  \end{array} \\ \\
+  
+
+\end{array}
+$
+\caption{Plan A: Expression match semantics, with choice}
+\label{fig:den-sem2}
+\end{figure}
+
+
+The semantic value domain has these components
+\begin{itemize}
+\item $\mathbb{Z}$, the integers
+\item $\dtuple$ finite tuples of values.
+\item $\semfcn$ (computable, provably terminating) functions from values to values.  The function can be partial,
+  \ie, the function domain, $\dom$, can be a subset of $\Value$,
+  and the range, $\ran$, can also be a subset of $\Value$.
+  Note that a function always maps a single value to a single value.
+  Functions are defined as a set of pairs, as in set theory.
+  Since a function is a set of pairs of values, there is no notion of non-terminating functions.
+\end{itemize}
+
+The semantic valuation function $\semapp{E}{e}{\rho}$ maps an expression in the given environment to
+a set of values.
+It has to be a set since an expressions like \ensuremath{\exists\Varid{x}.\,\textbf{gt}(\langle\Varid{x},\mathrm{0}\rangle)} can be any non-negative integer.
+
+The $\apply$ function does function application handling both tuples and functions.
+If the argument is not in the domain of the function it returns an empty set,
+otherwise a singleton with the result.
+
+The denotation of \ensuremath{\textbf{gt}} and \ensuremath{\textbf{int}} are singleton functions,
+whereas the denoation of \ensuremath{\textbf{add}} is the set of all function that behave like $+$ on (pairs of) integers,
+but are otherwise unconstrained.
+
+\vspace{2em}
+Note that $\semapp{E}{e}{\rho}$ is the same as $\semappp{M}{e}{\Value}{\rho}$ for the non-function cases.
+\lennart{
+It is tantalizingly close to be (obviously) true for functions as well.
+I think it's true for functions as well, but it's not clear to me.}
+Experiments with the Haskell implementation all confirm that $\semapp{E}{e}{\rho} = \semappp{M}{e}{\Value}{\rho}$.
+
+To make notation a little clearer in set comprehension we use $x \inb e$ to indicate a binding occurence of x,
+and $x \in e$ for a membership test.
+The \ensuremath{\mathbf{let}} is used in the same way as \ensuremath{\mathbf{let}} in Haskell list comprehensions.
+The \ensuremath{\textbf{if}} construct is the logical connective, not the descriminator for Booleans.
+The \textbf{T} stands for the always true proposition.
+
+The equation for closed functions in words.
+\begin{itemize}
+\item The denotation is a set of functions drawn from all possible functions (partial and total),
+  $\{ f | f \in \semfcn, \mydots \}$
+\item For every possible argument, $x$, $\forall x \in \Value,$
+\item Find all possible ways in which $e_1$ can match $x$.  The result is the original environment
+  extended with the different ways to ``solve'' for the variables bound in $e_1$.
+  $ \ensuremath{\mathbf{let}}\; \bar{\rho} = \semappp{B}{e_1}{x}{\rho} $
+\item If $x$ does not match $e_1$ in any way, then $x$ is not in the domain of the function we are defining,
+  so it must not be in the domain of $f$ either.
+  $\ensuremath{\textbf{if}}\; \bar{\rho} = \emptyset\; \ensuremath{\textbf{then}}\; x \not\in \dom(f)$
+\item If $x$ does match $e_1$ then $x$ must be in the domain of $f$.
+  $ \ensuremath{\textbf{else}}\; x \in \dom(f) $
+\item \textbf{And} the image of $x$ (\ie, $f(x)$) must be in the denotation of $e_2$
+  for all the different ways we can match in $e_1$.
+  $ \land \forall \rho' \in \bar{\rho}. f(x) \in \semapp{D}{e_2}{\rho'} $
+\end{itemize}
+
+The explanation for open functions is almost identical.  The only difference is that if $e_1$ does not match $x$,
+\ie, the $x$ is not in the domain of the function we are defining, then we accept $f$ without further ado.
+
+The denotation of \ensuremath{\textbf{if}} is not obvious.  What should it be?
+Consider the following program\\
+\ensuremath{\textbf{if}(\Varid{x}\mathbin{:}\textbf{int};\,\Varid{x}\mathbin{*}\Varid{x}\mathrel{=}\mathrm{1})\{\Varid{x}\}\textbf{else}\{\mathrm{999}\}} \\
+There are two solutions for \ensuremath{\Varid{x}}, namely $-1$ and $1$.
+They are not ordered so it is not clear what the value of \ensuremath{\Varid{x}} should have then the \ensuremath{\textbf{then}} branch.
+One alternative would be to say that it is \ensuremath{\Conid{Wrong}}.
+The semantic equation takes another approach and says that we should union all possible \ensuremath{\textbf{then}} branches,
+and so the result is $\{-1,1\}$.
+
+\textbf{Note:} The given semantics does not treat tuples as functions, except for function application.
+This can probably be easily fixed.
+
+\begin{figure}
+$
+\begin{array}{l}
+
+  
+  \begin{array}{rcll}
+%\multicolumn{4}{l}{\text{\bf Valuation semantics of an expression}} \\
+  \semappp{E}{\ensuremath{\Varid{e}}}{}{} & : & Ident \rightarrow \Env \rightarrow \Env^{*} \\
+  \semappp{E}{\ensuremath{\Varid{x}}}{v}{\rho} & = & \msing{\extendrho{\rho}{v \fmapsto \rho(x)}} \\
+  \semappp{E}{\ensuremath{\Varid{k}}}{v}{\rho} & = & \msing{\extendrho{\rho}{v \fmapsto k}} \\
+  \semappp{E}{\ensuremath{\Varid{o}}}{v}{\rho} & = & \msing{\extendrho{\rho}{v \fmapsto \semapp{O}{\ensuremath{\Varid{o}}}{}}} \\
+  \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{1}} [\!\Varid{e}_{\mathrm{2}}]}}{v}{\rho} & = &
+  \{ \extendrho{\rho''}{v \fmapsto r} \,
+  | \, \rho'  \inb \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{f}{\rho}, \;
+        \rho'' \inb \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{a}{\rho'}, \; \\
+& & \hspace{0.5em}             r \inb \apply(\rho''(f), \rho''(a)) \} & f, a \text{ fresh}\\
+  \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}\mathrel{=}\Varid{e}_{\mathrm{2}}}}{v}{\rho}      & = & \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{v}{\rho} \; \cap \; \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{v}{\rho} \\
+  \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}}}{v}{\rho}      & = &
+    \{ \rho'' \, | \, \rho' \inb \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{1}}}}{x}{\rho}, \; \rho'' \inb \semappp{E}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{v}{\rho'} \} & x \text{ fresh}\\
+  \semappp{E}{\ensuremath{\Varid{x}\mathrel{\coloneqq}\Varid{e}}}{v}{\rho} & = & %% \msing{\rho(x)} \;\cap\; \semappp{E}{e}{v}{\rho} \\
+    \semappp{E}{\ensuremath{\Varid{x}\mathrel{=}\Varid{e}}}{v}{\rho} \\
+    
+  \semappp{E}{\ensuremath{\mathbin{:}\Varid{e}}}{v}{\rho} & = & %% \ran(\semappp{E}{|e|}{v}{\rho}) \\
+    \{ \extendrho{\rho'}{v \fmapsto r} \, | \,
+    \rho' \inb \semappp{E}{\ensuremath{\Varid{e}}}{f}{\rho}, \; a \inb \Value, \; r \inb \apply(f, a) \} & f \text{ fresh} \\
+
+%FAIL  \semappp{E}{|fail|}{v}{\rho} & = & \emptyset \\
+
+  \semappp{E}{\ensuremath{\textbf{if}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}\textbf{else}\{\Varid{e}_{\mathrm{3}}\}}}{v}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semappp{D}{\ensuremath{\Varid{e}_{\mathrm{3}}}}{v}{\rho} & \text{if}\; \bar{\rho} = \emptyset \\
+    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semappp{D}{\ensuremath{\Varid{e}_{\mathrm{2}}}}{v}{\rho'} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  \ensuremath{\mathbf{where}}\; \bar{\rho} = \semappp{D}{e_1}{x}{\rho} & x \text{ fresh}\\
+
+%  \semappp{E}{|arr (e_0, xdots, e_n)|}{v}{\rho} & = &
+%    \{ \mkfcn{0 \fmapsto x_0, \mydots, n \fmapsto x_n} \, || \, x_0 \inb \semappp{E}{|e_1|}{v}{\rho}, \,\mydots,\, x_n \inb \semappp{E}{|e_n|}{v}{\rho} \} \\
+  \semappp{E}{\ensuremath{\textbf{fun}_\Varid{q}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}}\}}}{v}{\rho} & = & \{ \extendrho{\rho}{u \fmapsto f} \; \\
+    & & 
+    \begin{array}[t]{lll}
+      | & f \inb \semfcn \\
+
+      % Simon's version
+      , & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+        & \hspace{1em} (\semapppp{M}{e_1}{v}{x}{\rho'} \neq \emptyset)  \\
+        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{V}{e_2}{\rho'}  \\
+      , & q=\ensuremath{\textbf{c}} \implies \forall x \inb \dom(f). \\
+      & \hspace{0.5em} \exists \rho' \in \semapp{X}{e}{\rho}.\, \semapppp{M}{e_1}{v}{x}{\rho'} \neq \emptyset \\
+
+%%      \forall x \inb \Value. \\
+%%      |let|\; \bar{v}{\rho} = \semappp{B}{e_1}{x}{v}{\rho}, \\
+%%      |if|\; \bar{v}{\rho} = \emptyset\; |then|\; (x \not\in \dom(f)) \lor (q == |open|) \\
+%%      |else|\; x \in \dom(f) \land \forall \rho' \inb \bar{v}{\rho}. f(x) \in \semapp{D}{e_2}{\rho'}
+
+    \end{array} \\
+    & & \} & v \text{ fresh} \\
+    \\ 
+
+    %\multicolumn{4}{l}{\text{\bf Valuation semantics of a scoped expression}} \\
+  \semapp{X}{\ensuremath{\Varid{e}}} & : & \Env \rightarrow \Env^{*} \\
+  \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n } \; | \;   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
+  & & \ensuremath{\mathbf{where}\;[\mskip1.5mu \Varid{x}_{\mathrm{1}},\mydots,\Varid{x}_{\Varid{n}}\mskip1.5mu]} = \semapp{I}{\ensuremath{\Varid{e}}} \\[1mm]
+
+  \semappp{D}{\ensuremath{\Varid{e}}}{}{} & : & Ident \rightarrow \Env \rightarrow \Env^{*} \\
+  \semappp{D}{\ensuremath{\Varid{e}}}{v}{\rho} & = & \{ \rho'' \; | \; \rho' \inb \semapp{X}{e}{\rho}, \rho'' \inb \semappp{E}{\ensuremath{\Varid{e}}}{v}{\rho'} \} \\
+\\
+  \semapp{V}{\ensuremath{\Varid{e}}}{} & : & \Env \rightarrow \mtype \\
+  \semapp{V}{\ensuremath{\Varid{e}}}{\rho} & = & \{ \rho'(x) \; | \; \rho' \inb \semappp{D}{\ensuremath{\Varid{e}}}{x}{\rho} \} & x \text{ fresh} \\
+
+  %\multicolumn{4}{l}{\text{\bf Alternative valuation semantics}} \\
+%\semapp{E}{|e|}{\rho} & = & \semappp{M}{|e|}{\Value}{\rho}
+
+  \end{array} \\ \\
+
+\end{array}
+$
+\caption{Expression semantics, destination passing}
+\label{fig:den-sem-dest1}
+\end{figure}
+

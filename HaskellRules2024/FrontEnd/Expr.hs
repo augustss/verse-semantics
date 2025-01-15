@@ -111,7 +111,6 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
 
   | For1 SrcBlk                    -- for{e}
   | For2 SrcExpr SrcBlk            -- for(e1) in e2
-  | For2B [Ident] SrcExpr SrcBlk   -- for(exists is . e1) in e2
 
   | Let SrcExpr SrcBlk             -- let(e1) in e2
   | Block SrcBlk                   -- do e
@@ -187,8 +186,9 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Map [SrcExpr]                  -- map{e1;e2; ... }
   | Truth SrcExpr                  -- truth{e}
 
-  -- generalized one/all
-  | Iter SrcExpr SrcExpr SrcExpr -- iter(e){f,g}
+  -- simplified if/for
+  | IfThunk SrcExpr SrcExpr        -- if(f:=e1){f[]}else{e2}
+  | ForThunk SrcExpr               -- for(f:=e){f[]}
 
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
@@ -537,7 +537,6 @@ instance Pretty SrcExpr where
           For1 e1 -> maybeParens (p > 0) $ text "for" <+> ppB e1
           For2 e1 e2 -> maybeParens (p > 0) $ sep [text "for" <+> parens (ppr 0 e1) <+> text "do",
                                                       indent $ ppr 0 e2]
-          For2B is e1 e2 -> ppNormal $ For2 (Exists is e1) e2
 
           Let e1 e2 -> maybeParens (p > 0) $ sep [text "let" <+> parens (ppr 0 e1),
                                                    text "do",
@@ -604,7 +603,8 @@ instance Pretty SrcExpr where
           Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
           Map es -> text "map" <> braces (ppSeq lvl es)
           Truth e -> text "truth" <> braces (ppr 0 e)
-          Iter e1 e2 e3 -> text "iter" <> parens (ppr 0 e1) <> braces (sep (punctuate semi [ppr 0 e2, ppr 0 e3]))
+          IfThunk e1 e2 -> text "if!" <> parens (ppr 0 e1) <> braces (ppr 0 e2)
+          ForThunk e -> text "for!" <> braces (ppr 0 e)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec lvl p s <+> text "in", indent $ braces (pPrintPrec lvl 0 e)]
 
@@ -706,7 +706,6 @@ compos f (If2E e b)         = If2E <$> f e <*> f b
 compos f (If3 e b1 b2)      = If3 <$> f e <*> f b1 <*> f b2
 compos f (For1 b)           = For1 <$> f b
 compos f (For2 e b)         = For2 <$> f e <*> f b
-compos f (For2B is e b)     = For2B is <$> f e <*> f b
 compos f (Let e b)          = Let <$> f e <*> f b
 compos f (Block b)          = Block <$> f b
 compos f (Case1 b)          = Case1 <$> f b
@@ -747,7 +746,8 @@ compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
 compos f (Splice e)         = Splice <$> f e
-compos f (Iter e1 e2 e3)    = Iter <$> f e1 <*> f e2 <*> f e3
+compos f (IfThunk e1 e2)    = IfThunk <$> f e1 <*> f e2
+compos f (ForThunk e)       = ForThunk <$> f e
 compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
 storeMapA :: (Applicative a) => (SrcValue -> a SrcValue) -> Store -> a Store
@@ -826,7 +826,8 @@ getVisibleBinders = go
     go Fail       = []
 
     go Macro1 {}                        = []
-    go (Iter _ _ _) = []
+    go (IfThunk _ _) = []
+    go (ForThunk _)  = []
 
     --go (Map es)      = concatMap go es
     go e = impossible "getVisibleBinders" e
@@ -869,7 +870,8 @@ getFree = fvs_blk
     fvs (One e)           = fvs_blk e
     fvs (All e)           = fvs_blk e
     fvs (Guard e1 e2)     = fvs e1 ++ fvs_blk e2
-    fvs (Iter e1 e2 e3)   = fvs e1 ++ fvs e2 ++ fvs e3
+    fvs (IfThunk e1 e2)   = fvs e1 ++ fvs e2
+    fvs (ForThunk e)      = fvs e
 
     -- In (if e1 then e2 else e3), the binders of e1 scope over e2
     fvs (If3 e1 e2 e3)    = (fvs e1 ++ fvs_blk e2) `remove` bs

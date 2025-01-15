@@ -66,9 +66,12 @@ convert (Some v)      = Rules.Some (convert v)
 convert (Check fxs t) = foldr addCheck (convert t) fxs
 convert (Src.Verify is t) = Rules.Verify (TRS.bindList (map toCoreIdent is) ([], convert t))
 convert Src.Fail      = Rules.Fail
-convert (Src.All e)   = Rules.mkAll (convert e)
+convert (Src.All e)         = Rules.mkAll (convert e)
+convert (Src.One e)         = Rules.mkOne (convert e)
+convert (Src.IfThunk e1 e2) = Rules.mkIfThunk (convert e1) (convert e2)
+convert (Src.ForThunk e)    = Rules.mkForThunk (convert e)
 convert (Src.Truth e) = Rules.Tru (convert e)
-convert (Src.Iter e1 e2 e3) = Rules.Iter (convert e1) (convert e2) (convert e3)
+--convert (Src.Iter e1 e2 e3) = Rules.Iter (convert e1) (convert e2) (convert e3)
 convert e = impossible "convert" e
 
 addCheck :: Eff -> Rules.Expr -> Rules.Expr
@@ -118,10 +121,6 @@ scope sc = expr
     expr (Seq es)       = eSeq <$> mapM expr es
     expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
 
-    expr (For2 e1 e2) = do
-      (is, e1', sc') <- defs' sc e1
-      For2B is e1' <$> scopeD sc' e2
-
     expr (Block e)   = exprD e
     expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
                           ; e2' <- scopeD sc' e2
@@ -141,8 +140,10 @@ scope sc = expr
     expr (Src.Verify is e) = Src.Verify is <$> scopeD sc' e
       where sc' = foldr S.insert sc is
     expr (Src.Truth e)     = Src.Truth <$> expr e
+    expr (Src.One e)       = Src.One <$> exprD e
     expr (Src.All e)       = Src.All <$> exprD e
-    expr (Src.Iter e1 e2 e3) = Src.Iter <$> exprD e1 <*> expr e2 <*> exprD e3
+    expr (Src.IfThunk e1 e2) = Src.IfThunk <$> exprD e1 <*> exprD e2
+    expr (Src.ForThunk e)  = Src.ForThunk <$> exprD e
     expr e = error (show e)
       --impossible "scope" e
 

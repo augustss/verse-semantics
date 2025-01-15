@@ -20,7 +20,7 @@ module Rules.Core
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkApp, mkEqual, mkIf, mkOne, mkAll, mkFor, matchAll, mkCheck, matchCheck, mkSize
+  , mkApp, mkEqual, mkIf, mkIfThunk, mkOne, mkAll, mkFor, mkForThunk, matchAll, mkCheck, matchCheck, mkSize
   , lamUnderscore, someUnderscore, wrong
 
     -- Assupmtions
@@ -242,7 +242,12 @@ mkEqual e1 e2 e3
     x = identNotIn $ free (e1,e2,e3)
 
 mkIf :: [Ident] -> Expr -> Expr -> Expr -> Expr
-mkIf xs e1 e2 e3 = Iter IterIf (mkExis xs (e1 :>: lamUnderscore e2)) (lamUnderscore e3)
+mkIf xs e1 e2 e3 = Iter IterIf (mkExis xs (e1 :>: lamUnderscore e2)) e3
+
+mkIfThunk :: Expr -> Expr -> Expr
+mkIfThunk e1 e2 = mkIf [f] ((Var f :=: e1) :>: Var f) (Var f :@: Tup []) e2
+ where
+  f = identNotIn (free (e1,e2))
 
 mkExis :: [Ident] -> Expr -> Expr
 mkExis []     e = e
@@ -253,6 +258,11 @@ mkOne e = Iter IterOne e Fail
 
 mkFor :: [Ident] -> Expr -> Expr -> Expr
 mkFor xs e1 e2 = Iter IterFor (mkExis xs (e1 :>: lamUnderscore e2)) (Tup [])
+
+mkForThunk :: Expr -> Expr
+mkForThunk e = mkFor [f] ((Var f :=: e) :>: Var f) (Var f :@: Tup [])
+ where
+  f = identNotIn (free e)
 
 mkAll :: Expr -> Expr
 mkAll e = Iter IterAll e (Tup [])

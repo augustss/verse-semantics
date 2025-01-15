@@ -914,12 +914,10 @@ miniToCore orig_md = go (orig_md,[])
     go md (Exists xs e)  = Exists xs <$> go md e
 
     -- MFOR, MIF
-    go md (For2 e1 e2)   = do { e1' <- go md e1; e2' <- go md e2
-                              ; encodeFor e1' e2' }
-    go md (If3 e1 e2 e3) = do { e1' <- go md e1; e2' <- go md e2; e3' <- go md e3
-                              ; encodeIf e1' e2' e3' }
-    go md (One e)        = do { e' <- go md e; encodeOne e' }
-    go md (All e)        = do { e' <- go md e; encodeAll e' }
+    go md (For2 e1 e2)   = encodeFor <$> go md e1 <*> go md e2
+    go md (If3 e1 e2 e3) = encodeIf <$> go md e1 <*> go md e2 <*> go md e3
+    go md (One e)        = One <$> go md e
+    go md (All e)        = All <$> go md e
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
     go md@(sig,xs) (OfType e1 _xs fx e2)
@@ -988,119 +986,13 @@ shortCutDefnVerify e1 e2
   where
     pat_binders = getVisibleBinders e1
 
-
-{-
-encodeFor2 :: SrcCore -> SrcCore -> SrcCore
--- for2(e1){e2} = iter(e1; \_.e2){ (\a r. cons[ a[], r[] ]), (\_.<>) }
-encodeFor2 e1 e2 = Iter (eSeq [e1, eThunk e2]) eCons2 eNil2
-   where
-     eCons2 :: SrcCore
-     -- eCons2 = \ a r. a[] : r[]
-     eCons2 = Lam a $ Lam r $ (eCons (eForce (Variable a)) (eForce (Variable r)))
-        where
-          r = Ident noLoc "r"
-          a = Ident noLoc "a"
-
-     eNil2 :: SrcCore
-     -- eNil2 = \_. <>
-     eNil2 = eThunk (Array [])
-
-encodeIf2 :: SrcCore -> SrcCore -> SrcCore -> SrcCore
--- if(e1){e2}else{e3} = iter(e1; \_.e2){ (\a _. a[]), (\_.e3) }
-encodeIf2 e1 e2 e3 = Iter (eSeq [e1, eThunk e2]) eNext eElse
-  where
-    a = Ident noLoc "a"
-    eNext = Lam a $ eThunk (eForce (Variable a))
-    eElse = eThunk e3
-
-encodeAll2 :: SrcCore -> DsM SrcCore
--- If doing 'all' via 'iter' do    all{e} --> for(v:=e){v}
-encodeAll2 e = do { asIter <- getDFlagsX fAllAsIter
-                  ; if asIter
-                    then do { v <- newIdent (getLoc e) "v"
-                            ; pure (encodeFor2 (eSeq [ DefineV v, eUnify (Variable v) e ])
-                                               (Variable v)) }
-                    else pure (All e) }
-
-encodeOne2 :: SrcCore -> SrcCore
--- one{e} = iter(\a _. a){e}{\_.fail}
-encodeOne2 e = Iter e eNext (eThunk Fail)
-  where
-    a = Ident noLoc "a"
-    eNext = Lam a $ eThunk (Variable a)
--}
-
 ------- Encodings with iter ---------------------------
--- if(e1) e2 else e3  -->  iter (e1; <vs>) <> (\ a _ . exi vs . a=<vs>; e2) (\_.e3)
---   where vs are the free variables also used in e2
--- when vs is empty, we can use the simpler
---   if e1 e2 e3 = iter e1 <> (\ _ _ . e2) (\_.e3)
--- when vs is a singleton, we can use the simpler
---   if e1 e2 e3 = iter (e1; v) <> (\ v _ . e2) (\_.e3)
-encodeIf :: SrcCore -> SrcCore -> SrcCore -> DsM SrcCore
-encodeIf e1 e2 e3 = do
-  a <- newIdent (getLoc e1) "a"
-  let vs = getVisibleBinders e1 `intersect` getFree e2
-      evs = Array $ map Variable vs
-  case vs of
-    []  -> pure $ Iter       e1        (eThunk $ eThunk $                                            e2)  (eThunk e3)
-    [v] -> pure $ Iter (Seq [e1, ev])  (Lam v  $ eThunk $                                            e2)  (eThunk e3)
-      where ev = Variable v
-    _   -> pure $ Iter (Seq [e1, evs]) (Lam a  $ eThunk $ eExists vs $ Seq [ Variable a `Unify` evs, e2]) (eThunk e3)
 
--- one{e}  -->  Iter e <> (\ a _ . a) (\_.Fail)
-encodeOne :: SrcCore -> DsM SrcCore
-encodeOne e = do
-  a <- newIdent (getLoc e) "a"
-  pure $ Iter e (Lam a $ eThunk $ Variable a) (eThunk Fail)
+encodeIf :: SrcCore -> SrcCore -> SrcCore -> SrcCore
+encodeIf e1 e2 e3 = IfThunk (Seq [e1, eThunk e2]) e3
 
-encodeAll :: SrcCore -> DsM SrcCore
-encodeAll e = do
-  asIter <- getDFlagsX fAllAsIter
-  if asIter then
-    encodeAllAsIter e
-   else
-    pure (All e)
-
--- all{e}  -->  exi Iter e <> step (\ a -> a)
---   step a v c  =  c(exi r . arrApp(a,<v>,r); r)
-encodeAllAsIter :: SrcCore -> DsM SrcCore
-encodeAllAsIter e = do
-  v   <- newIdent (getLoc e) "v"   -- value from choice
-  a   <- newIdent (getLoc e) "a"   -- accumulator
-  let ev   = Variable v
-      ea   = Variable a
-      cons = Lam v $ Lam a $ eCons ev (eForce ea)
-  pure $ Iter e cons (eThunk $ Array [])
-
-encodeFor :: SrcCore -> SrcCore -> DsM SrcCore
-encodeFor e1 e2 = do
-  asIter <- getDFlagsX fAllAsIter
-  if asIter then
-    encodeForAsIter e1 e2
-   else
-    pure (ApplyD (EPrim ArrMap)
-                 (Array [ eForceLam
-                        , All (eSeq [e1, eThunk e2])]))
-
--- for(e1){e2}  -->  Iter (e1; <vs>) <> step (\ a . a)
---   step a x c = exi vs . x = <vs>; c(exi r . arrApp$(a, <e2>, r); r)
-encodeForAsIter :: SrcCore -> SrcCore -> DsM SrcCore
-encodeForAsIter e1 e2 = do
-  a   <- newIdent (getLoc e1) "a"
-  x   <- newIdent (getLoc e1) "x"
-  let vs = getVisibleBinders e1 `intersect` getFree e2
-      evs = Array $ map Variable vs
-  let ea   = Variable a
-      ex   = Variable x
-      (dom, arg, body) =
-        case vs of
-          []  -> (e1,            u, \ rest -> Seq rest) where u = srcUnderscore           -- No variables
-          [v] -> (Seq [e1, ev],  v, \ rest -> Seq rest) where ev = Variable v             -- Single variable, avoid the tuple
-          _   -> (Seq [e1, evs], x, \ rest -> eExists vs $ Seq $ (ex `Unify` evs) : rest) -- Many variables
-      cons = Lam arg $ Lam a $ body [eCons e2 (eForce ea)]
-  pure $ Iter dom cons (eThunk $ Array [])
-
+encodeFor :: SrcCore -> SrcCore -> SrcCore
+encodeFor e1 e2 = ForThunk (Seq [e1, eThunk e2])
 
 defineDE :: String -> DsM SrcExpr
          -> DsM (SrcExpr,   -- The defn
@@ -1120,14 +1012,6 @@ coreDefine x (Seq ts) = eSeq (floats ++ [coreDefine x rhs])
                       where
                         (floats, rhs) = unSeq ts
 coreDefine x rhs = eSeq [ DefineV x, Unify (Variable x) rhs ]
-
-
--- cons x xs = arrApp$[<x>, xs, _]
-eCons :: SrcCore -> SrcCore -> SrcCore
-eCons x xs =
-  let u = Ident (getLoc x) "u"
-  in  Exists [u] $ ApplyD (EPrim ArrApp) (Array [Array [x], xs, Variable u])
-
 
 -----------------------------------------------
 --

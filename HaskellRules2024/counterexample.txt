@@ -1,0 +1,1 @@
+Exi (Bind x (Var x :=: Iter (Exi (Bind x (Lit 0))) (Lam (Bind a (Lam (Bind f (Var a))))) (Lam (Bind _ (Tup []))) :>: (Var x :=: Var z :>: Var x)))

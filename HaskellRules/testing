@@ -1,0 +1,13 @@
+#!/bin/sh
+
+while [ 1 ]
+do
+  timeout 60 cabal run qctest -- --rules L2R --loopy --max-success 9999 --ignore-recursive > out
+  echo "-- tests --"
+  cat out
+  if grep Falsified out > /dev/null
+  then
+    echo "-- failure --" >> failures
+    cat out >> failures
+  fi
+done
