@@ -319,11 +319,11 @@ verify("blob", fail,tim=D00) { foo(f()<decides>:int)<succeeds> := {f[]} }
 # Finite types (from Google doc "Verse: more tricky cases")
 
 verify("Fin1", fail) { (y := if (y=2) then y+1 else 3); y }
-verify("Fin2", pass, broken) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
-verify("Fin3", fail, broken) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
-verify("Fin3x", fail, broken) { (y:type{3|4} := 3); y=3 }
-verify("Fin3y", fail, broken) { y=3; (y:type{3|4} := 3) }
-verify("Fin2a", pass ) { (y:type{3}   := if (y=2) then y+1 else 3)
+verify("Fin2", pass) { (y:type{3} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin3", fail) { (y:type{3|4} := if (y=2) then y+1 else 3); y=3 }
+verify("Fin3x", fail) { (y:type{3|4} := 3); y=3 }
+verify("Fin3y", fail) { y=3; (y:type{3|4} := 3) }
+verify("Fin2a", pass ) { (y:type{3} := 1+2)
                        ; if (y=3) then 1 else fail  }
   # Fin2a should work because all clients of y should see some(\_.3)
 verify("Fin2b", pass ) { f(y:type{3})<succeeds> := if (y=3) then 1 else fail  }
@@ -354,7 +354,7 @@ verify("Fin8b", pass,tim=skip_rej) { check<decides> { y:type{3|4} = 3; y } }
 verify("Fin10", fail,tim=skip_acc) { G(f(:int):type{3}) := { y := f[y] } }
   # Tim accepts this, but only because type{3} is a singleton type
 verify("Fin11", fail,tim=skip_acc) { G(f(:int):type{3|4}) := { y := f[y] } }
-verify("Fin12", pass, broken) { G( f(:int)<closed> := 1 ) := { y := f[y] } }
+verify("Fin12", pass) { G( f(:int)<closed> := 1 ) := { y := f[y] } }
 
 # Examples from Google doc "Verse: tricky cases"
 verify("Tricky:T1", pass){ f(i:any)<succeeds>:int = { if((x:int,y:int)=i) then{ x+y } else{ 0 }}

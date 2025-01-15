@@ -322,11 +322,11 @@ defn (InfixOp p1 op@(Op "->") p2) e = do
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
 defn_ty :: SrcPat -> SrcExpr -> [Eff] -> SrcExpr -> DsM SrcExpr
-defn_ty p t fxs1 rhs = defn p (OfType rhs xs (fxs1 ++ fxs2) t')
-                       -- In OfType, an empty [Eff] means "all effects allowed"
+defn_ty p t fxs1 rhs
+  = defn p (OfType rhs [] (fxs1 ++ fxs2) t')
+     -- NB1: [] for guards because they are added in essToMini
+     -- NB2: In OfType, an empty [Eff] means "all effects allowed"
   where
-    xs = getVisibleBinders p  -- Guard opactity by the binders of e1
-
     (t', fxs2) = getEffs t
        -- Currently                   x : int<succeeds> := t
        -- parses as                   x : (int <succeeds>) := t
@@ -682,7 +682,7 @@ mkAppend x          y          = do { r    <- newIdent noLoc "r"
 data WContext   -- The context for the W transformation
   = WC { wc_inp :: Input
        , wc_fxs :: [Eff]   -- [] means "any effect"
-       , wc_gds :: [Ident] -- Variables to guard on at OfType
+       , wc_gds :: [Ident] -- Lambda-bound variables to guard on at OfType
        }
   deriving( Show )
 
@@ -693,10 +693,12 @@ data Input
 
 essToMini :: SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
-essToMini orig_e = go_expr orig_e
+essToMini orig_e = go_expr kap_init orig_e
   where
-    go_expr = go (WC { wc_inp = NoInput, wc_fxs = [], wc_gds = [] })
-              -- Do we want [] for the wc_gds, when off-spine?
+    kap_init = WC { wc_inp = NoInput, wc_fxs = [], wc_gds = [] }
+
+    go_expr (WC { wc_gds = xs })    -- Inherit wc_ggs
+      = go (WC { wc_inp = NoInput, wc_fxs = [], wc_gds = xs })
 
     go :: WContext -> SrcEssential -> DsM SrcMini
     -- Typically (go kap t) = e, where `kap::(Input,[Eff])` is short for `kappa`
@@ -712,27 +714,25 @@ essToMini orig_e = go_expr orig_e
     go _kp Fail            = return Fail
     go kap (Unify  e1 e2)  = eUnify  <$> go kap e1 <*> go kap e2
     go kap (Where t1 t2)   = do { (dr, r) <- defineDE "r" (go kap t1)
-                                ; e2 <- go_expr t2
+                                ; e2 <- go_expr kap t2
                                 ; return (eSeq [dr, e2, r]) }
     go kap (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
-                                ; es <- mapM go_expr ts
+                                ; es <- mapM (go_expr kap) ts
                                 ; e  <- go kap t
                                 ; return (eSeq (es ++ [e])) }
 
     -- WIF, WFOR, WALL, WONE: If, for, all
-    go kap (If3 t1 t2 t3) = If3  <$> go_expr t1 <*> go kap t2 <*> go kap t3
-    go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go kap t2)
-    go kap (All t)        = kap `ueq` (All    <$> go_expr t)
-    go kap (One t)        = kap `ueq` (One    <$> go_expr t)
-    go kap (Choice e1 e2) = kap `ueq` (Choice <$> go_expr e1 <*> go_expr e2)
-    go kap (ApplyD t1 t2) = kap `ueq` (ApplyD <$> go_expr t1 <*> go_expr t2)
+    go kap (If3 t1 t2 t3) = If3  <$> go_expr kap t1 <*> go kap t2 <*> go kap t3
+    go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr kap t1 <*> go kap t2)
+    go kap (All t)        = kap `ueq` (All    <$> go_expr kap t)
+    go kap (One t)        = kap `ueq` (One    <$> go_expr kap t)
+    go kap (Choice e1 e2) = kap `ueq` (Choice <$> go_expr kap e1 <*> go_expr kap e2)
+    go kap (ApplyD t1 t2) = kap `ueq` (ApplyD <$> go_expr kap t1 <*> go_expr kap t2)
 
     -- WEXISTS (exists x);  WDEF (x:=t)
     go kap (Exists xs e) = Exists xs <$> go kap e   -- Just propagate Exists
     go _kp (DefineV x)   = return (DefineV x)
-    go kap (DefineE x t) = do { let kap' = kap { wc_gds = x : wc_gds kap}
-                                    -- Add `x` to the guards
-                              ; e <- go kap' t
+    go kap (DefineE x t) = do { e <- go kap t
                               ; return (eSeq [DefineV x, eUnify (Variable x) e]) }
 
     -- WSQUIG (x~>y:=t)
@@ -745,24 +745,24 @@ essToMini orig_e = go_expr orig_e
                                         , eUnify (Variable x) i, eUnify (Variable y) e]) }
 
     -- WCOL1, WCOL2, WCOL3: (:t)
-    go (WC { wc_inp = inp, wc_fxs = fxs }) (Range _ t)
+    go kap@(WC { wc_inp = inp, wc_fxs = fxs, wc_gds = xs }) (Range _ t)
       = case inp of
-          NoInput -> do { e <- go_expr t
+          NoInput -> do { e <- go_expr kap t
                         ; x <- newIdent (getLoc t) "x"
                         ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
-          PI i | null fxs  -> do { e <- go_expr t; return (ApplyD e i) }
-               | otherwise -> OfType i [] fxs <$> go_expr t
+          PI i | null fxs  -> do { e <- go_expr kap t; return (ApplyD e i) }
+               | otherwise -> OfType i (nub (xs ++ getFree i)) fxs <$> go_expr kap t
 
     -- WCHK: check<fx>{t}
     go kap (Check fx t)  = Check fx <$> go kap t
 
     -- WOFTYPE: t1 |> t2
-    go kap@(WC { wc_fxs = fxs1, wc_gds = xs }) (OfType t1 ys fxs2 t2)
+    go kap@(WC { wc_fxs = fxs1, wc_gds = xs }) (OfType t1 _ fxs2 t2)
       = OfType <$> go (kap { wc_fxs = [], wc_gds = [] }) t1
                    -- Push the input into t1, but we have dealt with effects and guards
-               <*> pure (xs ++ ys)
+               <*> pure (nub (xs ++ getFree t1))
                <*> pure (intersectEffects fxs1 fxs2)
-               <*> go_expr t2
+               <*> go_expr kap t2
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go kap (Splice t) = go kap t
@@ -823,9 +823,9 @@ essToMini orig_e = go_expr orig_e
 
     -- Core constructs used (only) in the Prelude
     -- Only used in the NoInput case
-    go (WC { wc_inp = NoInput }) (Lam x t)    = Lam x <$> go_expr t
-    go (WC { wc_inp = NoInput }) (Some t)     = Some  <$> go_expr t
-    go (WC { wc_inp = NoInput }) (Guard xs t) = Guard <$> go_expr xs <*> go_expr t
+    go kap@(WC { wc_inp = NoInput }) (Lam x t)    = Lam x <$> go_expr kap t
+    go kap@(WC { wc_inp = NoInput }) (Some t)     = Some  <$> go_expr kap t
+    go kap@(WC { wc_inp = NoInput }) (Guard xs t) = Guard <$> go_expr kap xs <*> go_expr kap t
 
     -- Report any un-handled cases
     go kap t = error $ "TODO: essToMini " ++ show (kap, t)
@@ -920,7 +920,7 @@ miniToCore orig_md = go (orig_md,[])
     go md (All e)        = All <$> go md e
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
-    go md@(sig,xs) (OfType e1 _xs fx e2)
+    go md@(sig,_xs) (OfType e1 xs fx e2)
       = case sig of
           MV -> do { body <- do_mx
                    ; rest <- do_mi
