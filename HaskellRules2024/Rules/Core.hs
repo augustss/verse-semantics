@@ -127,11 +127,18 @@ iterChoiceFree IterAll  = True
 iterChoiceFree IterFor  = False
 iterChoiceFree IterSize = True
 
+-- TODO: use a combinator for introducing vars for exprs
 iterApply :: Iter -> Val -> Expr -> Expr
 iterApply IterIf    f _e0 = f :@: Tup []
 iterApply IterOne   v _e0 = v
-iterApply IterFor   f  e0 = prepVal (f :@: Tup []) (\x -> iterApply IterAll x e0)
 iterApply IterSize _v  e0 = prepVal e0 (\n -> Op Add :@: Tup [Lit (LInt 1), n])
+iterApply IterFor   f  e0 =
+  Exi $ bind x $
+    (Var x :=: (f :@: Tup [])) :>:
+    iterApply IterAll (Var x) e0
+ where
+  x = identNotIn (free (f,e0))
+
 iterApply IterAll   v  e0
   | isVal e0 =
       Exi $ bind ys $
