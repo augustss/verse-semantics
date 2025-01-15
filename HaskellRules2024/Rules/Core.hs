@@ -290,130 +290,32 @@ matchAll _                                  = Nothing
 mkCheck_matchCheck :: (Effect -> Expr -> Expr, Expr -> Maybe (Effect,Expr))
 mkCheck_matchCheck = (mk, \_ -> Nothing)
  where
-{-
-  mk eff e =
-    Exi $ bind l $
-          (Var l :=: Iter e
-                          (Lam $ bind a $ Lam $ bind f $ Tup [Var a,Var f])
-                          (lamUnderscore $ Tup []))
-      :>: Iter (Exi $ bind a $ Exi $ bind f $
-                   (Tup [Var a,Var f] :=: Var l)
-               :>: (Var underscore :=: (Op IsGround :@: Var a))
-               :>: if canSucceed eff
-                     then Exi $ bind x $
-                              (Var x :=: (Var f :@: Tup []))
-                          :>: Iter ((Var x :=: Tup []) :>: Tup [])
-                                   (lamUnderscore $ lamUnderscore $
-                                     lamUnderscore $ Var a)
-                                   (lamUnderscore $ lamUnderscore $ wrongFx eff (Tup [Var a,Var x]))
-                     else lamUnderscore $ wrongFx eff (Tup [Var a])
-               )
-               (Lam $ bind x $ lamUnderscore $
-                 Var x :@: Tup [])
-               (lamUnderscore $
-                 if canFail eff
-                   then Fail
-                   else wrongFx eff (Tup []))
-   where
-    l:x:a:f:_ = identsNotIn (free e)
--}
-
   mk Fails e =
-    mkIf [] e (wrongFx Fails (Tup [])) Fail
-
-  mk Succeeds e =
-    Exi $ bind a $
-      (Var a :=: mkAll e) :>:
-      mkIf [x]
-        ((Tup [Var x] :=: Var a) :>: Tup [])
-        (Var x)
-        (wrongFx Succeeds (Var a))
+    mkIf [x] ((Var x :=: e) :>: Var x) (wrongFx Fails) Fail
    where
-    a:x:_ = identsNotIn (free e)
+    x = identNotIn (free e)
+ 
+  mk Succeeds e =
+    mkIfThunk
+      (Exi $ bind x $
+        (Tup [Var x] :=: mkAll e) :>: lamUnderscore (Var x))
+      (wrongFx Succeeds)
+   where
+    x:_ = identsNotIn (free e)
 
   mk Decides e =
-    Exi $ bind a $
-      (Var a :=: mkAll e) :>:
-      mkIf []
-        (Exi $ bind n $
-              (Var n :=: (Op ArrLen :@: Var a))
-          :>: (Op LEq :@: Tup [Var n, Lit (LInt 1)]))
-        (Exi $ bind x $ 
-          (Tup [Var x] :=: Var a) :>: Var x)
-        (wrongFx Decides (Var a))
+    mkIfThunk
+      (Exi $ bind a $ Exi $ bind n $
+        (Var a :=: mkAll e) :>:
+        (Var n :=: (Op ArrLen :@: Var a)) :>:
+        (Op LEq :@: Tup [Var n, Lit (LInt 1)]) >>>
+        lamUnderscore (Exi $ bind x $ (Var a :=: Tup [Var x]) :>: Var x))
+      (wrongFx Decides)
    where
-    a:x:n:_ = identsNotIn (free e)
+    a:n:x:_ = identsNotIn (free e)
 
-  wrongFx fx v =
-    Lit (LStr ("check<" ++ show fx ++ ">")) :@: v
-
-{-
-mkCheck_matchCheck = (mk, match)
- where
-  match e =
-    do Exi bnd <- pure e
-       let (_,exi_body) = unsafeUnbind bnd
-       ((_ :=: Iter chk_body _ _) :>: _) <- pure exi_body
-       case [ (eff,chk_body)
-            | eff <- [Succeeds, Decides, Fails]
-            , norm (mk eff chk_body) == norm e
-            ] of
-         (eff,body):_ -> pure (eff,body)
-         []           -> Nothing
- 
-  mk eff e =
-    Exi $ bind l $
-          (Var l :=: Iter e
-                          (Lam $ bind a $ Lam $ bind f $ Tup [Var a,Var f])
-                          (lamUnderscore $ Tup []))
-      :>: Iter (Exi $ bind a $ Exi $ bind f $
-                   (Tup [Var a,Var f] :=: Var l)
-               -- :>: (Var underscore :=: (Op IsGround :@: Var a))
-               :>: if canSucceed eff
-                     then Exi $ bind x $
-                              (Var x :=: (Var f :@: Tup []))
-                          :>: Iter ((Var x :=: Tup []) :>: Tup [])
-                                   (lamUnderscore $ lamUnderscore $
-                                     lamUnderscore $ Var a)
-                                   (lamUnderscore $ lamUnderscore $ wrong)
-                     else lamUnderscore $ wrong
-               )
-               (Lam $ bind x $ lamUnderscore $
-                 Var x :@: Tup [])
-               (lamUnderscore $
-                 if canFail eff
-                   then Fail
-                   else wrong)
-   where
-    l:x:a:f:_ = identsNotIn (free e)
--}
-{-
-    Exi $ bind l $
-          (Var l :=: Iter (Exi $ bind x $ (Var x :=: e)
-                                      :>: ((Var underscore :=: (Op IsGround :@: Var x))
-                                      :>: Var x))
-                          (Lam $ bind a $ Lam $ bind f $ Tup [Var a,Var f])
-                          (lamUnderscore $ Tup []))
-      :>: Iter (Exi $ bind a $ Exi $ bind f $
-                   (Tup [Var a,Var f] :=: Var l)
-               :>: if canSucceed eff
-                     then Exi $ bind x $
-                              (Var x :=: (Var f :@: Tup []))
-                          :>: Iter ((Var x :=: Tup []) :>: Tup [])
-                                   (lamUnderscore $ lamUnderscore $
-                                     lamUnderscore $ Var a)
-                                   (lamUnderscore $ lamUnderscore $ wrong)
-                     else lamUnderscore $ wrong
-               )
-               (Lam $ bind x $ lamUnderscore $
-                 Var x :@: Tup [])
-               (lamUnderscore $
-                 if canFail eff
-                   then Fail
-                   else wrong)
-   where
-    l:x:a:f:_ = identsNotIn (free e)
--}
+  wrongFx fx =
+    Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []
 
 mkCheck :: Effect -> Expr -> Expr
 mkCheck = fst mkCheck_matchCheck
@@ -738,9 +640,6 @@ pPrintPrecE lvl prec the_expr
        Lit i      -> pPrint i
        Op op      -> pPrint op
 
-       -- special patterns we want to see
-       e | Just (fx,body) <- matchCheck e -> text ("CHECK<" ++ show fx ++ ">") <> braces (ppr0 body)
-
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> mbPar0 $ sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
        e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
@@ -750,10 +649,10 @@ pPrintPrecE lvl prec the_expr
        Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> text "truth" <> braces (ppr0 a)
        Iter f e e0 -> {- text "iter"  <> parens (text (show f)) -} 
-                      text ("$"++show f) <> braces (ppr0 e) <> braces (ppr0 e0)
+                      text (show f) <> braces (ppr0 e) <> braces (ppr0 e0)
        --All e   -> text "all"  <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
-       Exi {}  -> mbPar0 $ sep [ text "exi" <+> fsep (map pPrint bndrs) <> char '.'
+       Exi {}  -> mbPar0 $ sep [ text "∃" <+> fsep (map pPrint bndrs) <> char '.'
                                , indent (ppr0 body) ]
                where
                   (bndrs, body) = unpackExis the_expr
@@ -793,6 +692,7 @@ pPrintSmallExpr e
   | otherwise       = text "<big>"
 
 gatherSeqs :: Expr -> [Expr]
+gatherSeqs ((Var u :=: e1) :>: e2) | isUnderscore u = e1 : gatherSeqs e2 -- just trying this out
 gatherSeqs (e1 :>: e2) = e1 : gatherSeqs e2
 gatherSeqs e           = [e]
 
