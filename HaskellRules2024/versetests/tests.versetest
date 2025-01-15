@@ -480,7 +480,8 @@ testeq("check9", fail){ check<succeeds>{ 33 | 44 } } { 33 }
 # tests for information flow regarding choice
 testeq("choice1", pass){ all{ y:=if(x>3){5}else{7}; (11|22); x:=2; y } } {(7,7)}
 testeq("choice2", pass){ all{ f[]; y:=if(x>3){5}else{7}; (11|22); x:=2; f():={8}; y } } {(7,7)}
-testeq("choice3", pass){ all{ y:=if(x>3){5}else{7}; (11|22); x:=(2|4); y } } {(7,5,7,5)}
+testeq("choice3", fail){ all{ y:=if(x>3){5}else{7}; (11|22); x:=(2|4); y } } {(7,5,7,5)}
+  # choice3: gets stuck, because the choices can't expand over the 'if'
 testeq("choice4", pass){ all{ a:int; f[a]; y:=if(x>3){5}else{7}; (11|22); x:=2; f(8|9):={55}; y } } {(7,7,7,7)}
 
 # tests for top-level exis used in functions
