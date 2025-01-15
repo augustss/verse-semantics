@@ -132,10 +132,20 @@ iterApply IterIf    f _e0 = f :@: Tup []
 iterApply IterOne   v _e0 = v
 iterApply IterFor   f  e0 = prepVal (f :@: Tup []) (\x -> iterApply IterAll x e0)
 iterApply IterSize _v  e0 = prepVal e0 (\n -> Op Add :@: Tup [Lit (LInt 1), n])
-iterApply IterAll   v  e0 =
-  prepVal e0 (\xs -> Exi $ bind ys $ (Var underscore :=: (Op ArrApp :@: Tup [Tup [v], xs, Var ys])) :>: Var ys)
+iterApply IterAll   v  e0
+  | isVal e0 =
+      Exi $ bind ys $
+        (Op ArrApp :@: Tup [Tup [v], e0, Var ys]) >>>
+        Var ys
+        
+  | otherwise =
+      Exi $ bind xs $
+      Exi $ bind ys $
+        (Var xs :=: e0) :>:
+        ((Op ArrApp :@: Tup [Tup [v], Var xs, Var ys]) >>>
+        Var ys)
  where
-  ys = identNotIn (free (v,e0))
+  xs:ys:_ = identsNotIn (free (v,e0))
 
 {- Note [iter]
 The iter construct is a (right) fold over choices.
@@ -245,7 +255,7 @@ mkEqual e1 e2 e3
     x = identNotIn $ free (e1,e2,e3)
 
 mkIf :: [Ident] -> Expr -> Expr -> Expr -> Expr
-mkIf xs e1 e2 e3 = Iter IterIf (mkExis xs (e1 :>: lamUnderscore e2)) e3
+mkIf xs e1 e2 e3 = Iter IterIf (mkExis xs (e1 >>> lamUnderscore e2)) e3
 
 mkIfThunk :: Expr -> Expr -> Expr
 mkIfThunk e1 e2 = mkIf [f] ((Var f :=: e1) :>: Var f) (Var f :@: Tup []) e2
@@ -309,25 +319,27 @@ mkCheck_matchCheck = (mk, \_ -> Nothing)
     mkIf [] e (wrongFx Fails (Tup [])) Fail
 
   mk Succeeds e =
-    prepVal (mkAll e) $ \a ->
+    Exi $ bind a $
+      (Var a :=: mkAll e) :>:
       mkIf [x]
-        ((Tup [Var x] :=: a) :>: Tup [])
+        ((Tup [Var x] :=: Var a) :>: Tup [])
         (Var x)
-        (wrongFx Succeeds a)
+        (wrongFx Succeeds (Var a))
    where
-    x = identNotIn (free e)
+    a:x:_ = identsNotIn (free e)
 
   mk Decides e =
-    prepVal (mkAll e) $ \a ->
+    Exi $ bind a $
+      (Var a :=: mkAll e) :>:
       mkIf []
         (Exi $ bind n $
-              (Var n :=: (Op ArrLen :@: a))
+              (Var n :=: (Op ArrLen :@: Var a))
           :>: (Op LEq :@: Tup [Var n, Lit (LInt 1)]))
         (Exi $ bind x $ 
-          (Tup [Var x] :=: a) :>: Var x)
-        (wrongFx Decides a)
+          (Tup [Var x] :=: Var a) :>: Var x)
+        (wrongFx Decides (Var a))
    where
-    x:n:_ = identsNotIn (free e)
+    a:x:n:_ = identsNotIn (free e)
 
   wrongFx fx v =
     Lit (LStr ("check<" ++ show fx ++ ">")) :@: v
@@ -724,7 +736,6 @@ pPrintPrecE lvl prec the_expr
        Op op      -> pPrint op
 
        -- special patterns we want to see
-       e | Just body      <- matchAll e   -> text "ALL" <> braces (ppr0 body)
        e | Just (fx,body) <- matchCheck e -> text ("CHECK<" ++ show fx ++ ">") <> braces (ppr0 body)
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
