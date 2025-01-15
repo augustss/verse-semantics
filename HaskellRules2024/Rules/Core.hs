@@ -305,14 +305,13 @@ mkCheck_matchCheck = (mk, \_ -> Nothing)
 
   mk Decides e =
     mkIfThunk
-      (Exi $ bind a $ Exi $ bind n $
+      (Exi $ bind a $ Exi $ bind x $
         (Var a :=: mkAll e) :>:
-        (Var n :=: (Op ArrLen :@: Var a)) :>:
-        (Op LEq :@: Tup [Var n, Lit (LInt 1)]) >>>
+        ((Tup [] :|: Tup [Var x]) :=: Var a) :>:
         lamUnderscore (Exi $ bind x $ (Var a :=: Tup [Var x]) :>: Var x))
       (wrongFx Decides)
    where
-    a:n:x:_ = identsNotIn (free e)
+    a:x:_ = identsNotIn (free e)
 
   wrongFx fx =
     Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []
