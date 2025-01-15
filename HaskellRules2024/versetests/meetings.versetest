@@ -252,6 +252,7 @@ verify("T24Jul24-2", fail, tim=skip_acc) {f(x:int)<decides>:type{x=10} := 7 }
 # Tim examples 8/9/2023
 #  These use 'assume' so they aren't real programs
 verify("T8Sep23-1", pass, broken) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
+verify("T8Sep23-1a", pass, broken) {f(x:int, y:int, g(z:int):type{x=z})<succeeds> := {g[z]; z:=x=y}}
 verify("T8Sep23-2", fail,tim=skip_acc) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
 verify("T8Sep23-3", pass, broken) {f(x:int, y:int)<succeeds> := exists z { assume{z = x}; z = x; x = y } }
 

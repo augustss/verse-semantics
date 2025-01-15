@@ -158,6 +158,9 @@ verify("Rec0c",pass) { f(n:int):int := if (n=0) then {0} else {f[n+1]} }
 verify("Rec1",pass) { sum(n:int):int := if (n < 1) then { 0 } else { n + sum(n-1) } }
 verify("Rec2",pass) { sum(n:any):int := if (0 < n) then { n + sum(n-1) } else { 0 } }
 verify("Rec3",pass) { sum(n:int):int := if (0 < n) then { n + sum(n-1) } else { n } }
+verify("RecVal1",fail) { x:int := x; x }
+verify("RecVal2",pass,broken) { x:type{5} := x; x }
+verify("RecVal3",pass,broken) { x:type{1|2|3} := x; x }
 
 ### Higher-order functions
 verify("HO1",pass) { f(g(z:int):int) := {g(3)} }
