@@ -722,7 +722,8 @@ pPrintPrecE lvl prec the_expr
 
        Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> text "truth" <> braces (ppr0 a)
-       Iter f e e0 -> text "iter"  <> parens (text (show f)) <> braces (ppr0 e) <> braces (ppr0 e0)
+       Iter f e e0 -> {- text "iter"  <> parens (text (show f)) -} 
+                      text ("$"++show f) <> braces (ppr0 e) <> braces (ppr0 e0)
        --All e   -> text "all"  <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
        Exi {}  -> mbPar0 $ sep [ text "exi" <+> fsep (map pPrint bndrs) <> char '.'
