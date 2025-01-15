@@ -130,9 +130,12 @@ iterChoiceFree IterSize = True
 iterApply :: Iter -> Val -> Expr -> Expr
 iterApply IterIf    f _e0 = f :@: Tup []
 iterApply IterOne   v _e0 = v
-iterApply IterAll   v  e0 = prepVal e0 (\xs -> Op ArrApp :@: Tup [Tup [v], xs])
 iterApply IterFor   f  e0 = prepVal (f :@: Tup []) (\x -> iterApply IterAll x e0)
 iterApply IterSize _v  e0 = prepVal e0 (\n -> Op Add :@: Tup [Lit (LInt 1), n])
+iterApply IterAll   v  e0 =
+  prepVal e0 (\xs -> Exi $ bind ys $ (Var underscore :=: (Op ArrApp :@: Tup [Tup [v], xs, Var ys])) :>: Var ys)
+ where
+  ys = identNotIn (free (v,e0))
 
 {- Note [iter]
 The iter construct is a (right) fold over choices.
