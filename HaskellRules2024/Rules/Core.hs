@@ -265,9 +265,7 @@ mkIf :: [Ident] -> Expr -> Expr -> Expr -> Expr
 mkIf xs e1 e2 e3 = Iter IterIf (mkExis xs (e1 >>> lamUnderscore e2)) e3
 
 mkIfThunk :: Expr -> Expr -> Expr
-mkIfThunk e1 e2 = mkIf [f] ((Var f :=: e1) :>: Var f) (Var f :@: Tup []) e2
- where
-  f = identNotIn (free (e1,e2))
+mkIfThunk e1 e2 = Iter IterIf e1 e2
 
 mkExis :: [Ident] -> Expr -> Expr
 mkExis []     e = e
@@ -280,9 +278,7 @@ mkFor :: [Ident] -> Expr -> Expr -> Expr
 mkFor xs e1 e2 = Iter IterFor (mkExis xs (e1 :>: lamUnderscore e2)) (Tup [])
 
 mkForThunk :: Expr -> Expr
-mkForThunk e = mkFor [f] ((Var f :=: e) :>: Var f) (Var f :@: Tup [])
- where
-  f = identNotIn (free e)
+mkForThunk e = Iter IterFor e (Tup [])
 
 mkAll :: Expr -> Expr
 mkAll e = Iter IterAll e (Tup [])
