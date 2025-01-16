@@ -288,7 +288,7 @@ matchAll (Iter IterAll e e0) | e0 == Tup [] = Just e
 matchAll _                                  = Nothing
 
 mkCheck_matchCheck :: (Effect -> Expr -> Expr, Expr -> Maybe (Effect,Expr))
-mkCheck_matchCheck = (mk, \_ -> Nothing)
+mkCheck_matchCheck = (mk, match)
  where
   mk Fails e =
     mkIf [x] ((Var x :=: e) :>: Var x) (wrongFx Fails) Fail
@@ -305,13 +305,32 @@ mkCheck_matchCheck = (mk, \_ -> Nothing)
 
   mk Decides e =
     mkIfThunk
-      (Exi $ bind a $ Exi $ bind x $
+      (Exi $ bind a $
         (Var a :=: mkAll e) :>:
-        ((Tup [] :|: Tup [Var x]) :=: Var a) :>:
-        lamUnderscore (Exi $ bind x $ (Var a :=: Tup [Var x]) :>: Var x))
+        (Exi $ bind y $
+          (Var a :=: (Tup [] :|: Tup [Var y])) :>:
+          lamUnderscore (Exi $ bind x $ (Var a :=: Tup [Var x]) :>: Var x)
+        )
+      )
       (wrongFx Decides)
    where
-    a:x:_ = identsNotIn (free e)
+    a:x:y:_ = identsNotIn (free e)
+
+  match e0@(Iter IterIf e1 _)
+    | (_ :=: e) :>: _ <- e1
+    , ce <- mk Fails e
+    , norm ce == norm e0
+    = Just (Fails, e)
+
+  match e0@(Iter IterIf (Exi bnd) _)
+    | (_, (_ :=: Iter IterAll e _) :>: _) <- unsafeUnbind bnd
+    = head $ [ Just (fx, e)
+             | fx <- [Succeeds, Decides]
+             , let ce = mk fx e
+             , norm ce == norm e0
+             ] ++ [Nothing]
+
+  match _ = Nothing
 
   wrongFx fx =
     Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []
@@ -638,6 +657,9 @@ pPrintPrecE lvl prec the_expr
        Var x      -> pPrint x
        Lit i      -> pPrint i
        Op op      -> pPrint op
+
+       -- special pretty printing to help debugging
+       e | Just (fx,b) <- matchCheck e -> text ("CHECK<" ++ show fx ++ ">") <> braces (ppr0 b)
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> mbPar0 $ sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
