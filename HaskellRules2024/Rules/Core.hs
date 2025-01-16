@@ -287,59 +287,57 @@ matchAll :: Expr -> Maybe Expr
 matchAll (Iter IterAll e e0) | e0 == Tup [] = Just e
 matchAll _                                  = Nothing
 
-mkCheck_matchCheck :: (Effect -> Expr -> Expr, Expr -> Maybe (Effect,Expr))
-mkCheck_matchCheck = (mk, match)
- where
-  mk Fails e =
-    mkIf [x] ((Var x :=: e) :>: Var x) (wrongFx Fails) Fail
-   where
-    x = identNotIn (free e)
- 
-  mk Succeeds e =
-    mkIfThunk
-      (Exi $ bind x $
-        (Tup [Var x] :=: mkAll e) :>: lamUnderscore (Var x))
-      (wrongFx Succeeds)
-   where
-    x:_ = identsNotIn (free e)
-
-  mk Decides e =
-    mkIfThunk
-      (Exi $ bind a $
-        (Var a :=: mkAll e) :>:
-        (Exi $ bind y $
-          (Var a :=: (Tup [] :|: Tup [Var y])) :>:
-          lamUnderscore (Exi $ bind x $ (Var a :=: Tup [Var x]) :>: Var x)
-        )
-      )
-      (wrongFx Decides)
-   where
-    a:x:y:_ = identsNotIn (free e)
-
-  match e0@(Iter IterIf e1 _)
-    | (_ :=: e) :>: _ <- e1
-    , ce <- mk Fails e
-    , norm ce == norm e0
-    = Just (Fails, e)
-
-  match e0@(Iter IterIf (Exi bnd) _)
-    | (_, (_ :=: Iter IterAll e _) :>: _) <- unsafeUnbind bnd
-    = head $ [ Just (fx, e)
-             | fx <- [Succeeds, Decides]
-             , let ce = mk fx e
-             , norm ce == norm e0
-             ] ++ [Nothing]
-
-  match _ = Nothing
-
-  wrongFx fx =
-    Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []
-
+-- encode check<fx>{e}
 mkCheck :: Effect -> Expr -> Expr
-mkCheck = fst mkCheck_matchCheck
+-- check<fails>{e} --> if(e){WRONG}{fail}
+mkCheck Fails e =
+  mkIfThunk (e >>> lamUnderscore (wrongFx Fails)) Fail
 
-matchCheck :: Expr -> Maybe (Effect, Expr)
-matchCheck = snd mkCheck_matchCheck
+-- check<succeeds>{e} --> if(<x>:=all{e}){x}{WRONG}
+mkCheck Succeeds e =
+  mkIfThunk
+    (Exi $ bind x $
+      (Tup [Var x] :=: mkAll e) :>: lamUnderscore (Var x))
+    (wrongFx Succeeds)
+ where
+  x:_ = identsNotIn (free e)
+
+-- check<decides>{e} --> if(a:=all{e};a=(<>|<_>)){<x>:=a;x}{WRONG}
+mkCheck Decides e =
+  mkIfThunk
+    (Exi $ bind a $
+      (Var a :=: mkAll e) :>:
+      (Exi $ bind y $
+        (Var a :=: (Tup [] :|: Tup [Var y])) :>:
+        lamUnderscore (Exi $ bind x $ (Var a :=: Tup [Var x]) :>: Var x)
+      )
+    )
+    (wrongFx Decides)
+ where
+  a:x:y:_ = identsNotIn (free e)
+
+-- WRONG for failed check
+wrongFx :: Effect -> Expr
+wrongFx fx =
+  Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []
+
+-- matches expression against encoding of check<fx>{e} --> Just(fx,e)
+matchCheck :: Expr -> Maybe (Effect,Expr)
+matchCheck e0@(Iter IterIf e1 _)
+  | (_ :=: e) :>: _ <- e1
+  , ce <- mkCheck Fails e
+  , norm ce == norm e0
+  = Just (Fails, e)
+
+matchCheck e0@(Iter IterIf (Exi bnd) _)
+  | (_, (_ :=: Iter IterAll e _) :>: _) <- unsafeUnbind bnd
+  = head $ [ Just (fx, e)
+           | fx <- [Succeeds, Decides]
+           , let ce = mkCheck fx e
+           , norm ce == norm e0
+           ] ++ [Nothing]
+
+matchCheck _ = Nothing
 
 mkSize :: Val -> Expr -> Expr
 mkSize n e = prepVal (Iter IterSize e (Lit (LInt 0))) $ \s -> Op Mul :@: Tup [n,s]
