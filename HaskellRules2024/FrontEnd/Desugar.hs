@@ -771,7 +771,10 @@ essToMini orig_e = go_expr orig_e
                      do_one (Splice t) = Splice <$> go kap t
                      do_one t          =            go kap t
 
-          PI i -> do { prs <- mapM do_one ts
+          PI i | null ts   -- Optimisation: instead of (i=<>; <>), just generate (i=<>)
+               -> pure (eUnify i (Array []))
+               | otherwise
+               -> do { prs <- mapM do_one ts
                      ; let (exi_js, es) = unzip prs
                      ; exi_js_arr <- mkArray exi_js
                      ; res_arr    <- mkArray es
@@ -933,7 +936,7 @@ miniToCore orig_md = go (orig_md,[])
                    ; if isAtomic e1'  -- Just an optimisation
                      then return (Check [ESucceeds] (ApplyD e2' e1'))
                      else do { r <- newIdent (getLoc e1) "r"
-                             ; return (eSeq [ DefineV r, eUnify (Variable r) (Check fx e1')
+                             ; return (eSeq [ DefineV r, eUnify (Variable r) (eCheck fx e1')
                                             , Check [ESucceeds] (ApplyD e2' (Variable r)) ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
