@@ -182,13 +182,26 @@ verify("HO11",fail,tim=P00) { ex6(h(z:int):int):int := {h()}; ex6((:int) => 1)}
 verify("HO12a",pass) { gg(x:int) := 1;  foo(f(g(:int):int):int) := { f(gg) } } # gg returns a float for any int
 verify("HO12b",pass) { gg(x:int) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # gg returns a float for any int
 verify("HO12",pass) { gg(x:int) := 1;  foo(f(g(:int):int):char):char:= { f(gg) } } # gg returns a float for any int
-verify("HO13",fail,tim=P00) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be rejected because f may apply gg to an negative number
+
+verify("HO13",fail,tim=P00) { gg(x:nat) := 1;  foo(f(g(:int):int):int):int := { f(gg) } }
+  # HO13: should be rejected because f may apply gg to an negative number
+
 verify("HO14",pass) { gg(x:any) := 1;  foo(f(g(:int):int):int):int := { f(gg) } } # should be accepted
-verify("HO15",fail,tim=P00) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } } # because f expects g to return an int, and it doesn't
+
+verify("HO15",fail,tim=P00) { gg(x:int) := (); foo(f(g(:int):int):int):int := { f(gg) } }
+  # HO15: because f expects g to return an int, and it doesn't
+
 verify("HO16",pass) { bar1(x:int):type{_(:int):char} := { (y:int) => {'m' } } }
-verify("HO17",fail,tim=V10) { bar2(x:int):type{_(:int):char} := { (y:int) => { 3  } } } # REJECT the function returns an int not a string
-verify("HO18",fail,tim=V10) { bar3(x:int):type{_(:int):char} := { (y:nat) => { 'a'} } } # REJECT the function only works on naturals but is supposed to work on ints
-verify("HO19",pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } } # ACCEPT the function works on more than ints
+
+verify("HO17",fail,tim=V10) { bar2(x:int):type{_(:int):char} := { (y:int) => { 3  } } }
+  # HO17: REJECT the function returns an int not a string
+
+verify("HO18",fail,tim=V10) { bar3(x:int):type{_(:int):char} := { (y:nat) => { 'a'} } }
+  # HO18: REJECT the function only works on naturals but is supposed to work on ints
+
+verify("HO19",pass) { bar4(x:int):type{_(:int):char} := { (y:any) => { 'a'} } }
+  # HO19: ACCEPT the function works on more than ints
+
 verify("HO20", fail) { function( foo(x:int):type{int[x]} )<succeeds> { z := "monkey" ; foo[z] } }
 
 
@@ -358,7 +371,10 @@ verify("Fin8b", pass,tim=skip_rej) { check<decides> { y:type{3|4} = 3; y } }
 verify("Fin10", fail,tim=skip_acc) { G(f(:int):type{3}) := { y := f[y] } }
   # Tim accepts this, but only because type{3} is a singleton type
 verify("Fin11", fail,tim=skip_acc) { G(f(:int):type{3|4}) := { y := f[y] } }
-verify("Fin12", pass) { G( f(:int)<closed> := 1 ) := { y := f[y] } }
+
+verify("Fin12", fail) { G( f(:int)<closed> := 1 ) := { y := f[y] } }
+  # Fin12: should fail because the input function might
+  #        examine y before returning 1
 
 # Examples from Google doc "Verse: tricky cases"
 verify("Tricky:T1", pass){ f(i:any)<succeeds>:int = { if((x:int,y:int)=i) then{ x+y } else{ 0 }}
