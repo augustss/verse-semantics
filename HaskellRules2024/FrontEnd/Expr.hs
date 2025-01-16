@@ -816,6 +816,7 @@ getVisibleBinders = go
     go Let{}      = []  -- nothing visible from a let
     go Choice{}   = []
     go Function{} = []
+    go XDLam{}    = []
     go Check {}   = []  -- check<fx>{ e } is a new scope
     go Some{}     = []  -- Ditto some(e), one{e}, all{e}
     go One{}      = []
@@ -880,10 +881,15 @@ getFree = fvs_blk
                             bs = getVisibleBinders e1
 
     fvs (Function args body)
-      = (foldr (++) (fvs_blk body) (map fvs arg_exprs)) `remove` arg_bndrs
+      = (nub $ foldr (++) (fvs_blk body) (map fvs arg_exprs)) `remove` arg_bndrs
       where
         arg_bndrs = foldr ((++) . getVisibleBinders) [] arg_exprs
         arg_exprs = map fst args
+
+    fvs (XDLam _ x e1 e2)
+      = (nub (fvs e1 ++ fvs_blk e2)) `remove` bndrs
+      where
+        bndrs = x : getVisibleBinders e1
 
     fvs e = impossible "getFree" e
 

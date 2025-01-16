@@ -346,7 +346,11 @@ verify("Fin5b", pass,broken, tim=skip_acc) { all{ y:type{3|4} = y } }
   #     with the clue that y has type{3|4}; that is easy
 
 verify("Fin6", fail,tim=V10) { y:type{3|4} = y }
-verify("Fin7", pass,tim=skip_rej) { check<decides>{ y:type{3|4} = 3; y=3 } }
+
+verify("Fin7a", pass) { f()<decides> := {y:type{3|4} = 3; y=3} }
+verify("Fin7b", fail) { f()<succeeds> := {y:type{3|4} = 3; y=3} }
+  # Fin7a,7b.  The (y=3) cannot see that y is in fact 3; just that it might be 3 or 4
+
 verify("Fin8a", pass,tim=skip_rej) { check<succeeds>{ y:type{3|4} = 3; y } }
   # Tim rejects this one
 verify("Fin8b", pass,tim=skip_rej) { check<decides> { y:type{3|4} = 3; y } }

@@ -364,7 +364,7 @@ splitStep env lhs =
    "SPLIT-TUP" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Var r :=: Tup vs :>: rest)) <- proofX all_rs e
-      guard (r `elem` rs)
+      guard (r `elem` all_rs)
       let rs'  = take (length vs) (skolsNotIn all_rs)
           rvs' = foldr (:>:) rest [ Var r' :=: v | (r', v) <- rs' `zip` vs ]
           asm    = A_GVEq r (GVArr (map GVVar rs'))
@@ -374,7 +374,7 @@ splitStep env lhs =
    "SPLIT-TRU" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Var r :=: Tru v :>: rest)) <- proofX all_rs e
-      guard (r `elem` rs)
+      guard (r `elem` all_rs)
       let r'  = skolsNotIn all_rs !! 0
           rv' = (Var r' :=: v) :>: rest
           asm    = A_GVEq r (GVTru (GVVar r'))
