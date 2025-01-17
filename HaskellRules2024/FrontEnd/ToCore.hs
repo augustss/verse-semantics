@@ -36,45 +36,6 @@ import Debug.Trace ( traceM )
 convertToCore :: Flags -> SrcCore -> IO (Core.Expr, [DError])
 convertToCore flags src = runD flags (convert src)
 
-{-
-convert :: SrcCore -> Rules.Expr
-convert (Variable i)   = Rules.Var (toCoreIdent i)
-convert (Array ts)     = Rules.Tup (map convert ts)
-convert (EPrim op)     = Rules.Op op
-convert (Lit lit)      = Rules.Lit lit
-convert (ApplyD t1 t2) = convert t1 Rules.:@: convert t2
-convert (Unify t1 t2)  = convert t1 Rules.:=: convert t2
-convert (Choice t1 t2) = convert t1 Rules.:|: convert t2
-convert (Seq ts)       = foldr add (convert last_t) rest_ts
-                       where
-                         (rest_ts, last_t) = unSeq ts
-                         add (Variable{}) e = e
-                         add t            e = convert t Rules.:>: e
-                         -- This `add` is aimed at (exists x; e), which will by now
-                         -- have turned into  exists x ..... (x; e)....
-                         -- We don't really want that "x;" just useless clutter.
-
-convert (Exists is t)     = foldr do_one (convert t) is
-                          where
-                            do_one :: Src.Ident -> Rules.Expr -> Rules.Expr
-                            do_one i e = Rules.Exi (TRS.bind (toCoreIdent i) e)
-
-convert (Guard v t)   = convert v Rules.:>>: convert t
-convert (Lam i t)     = Rules.Lam (TRS.bind (toCoreIdent i) (convert t))
-convert (Some v)      = Rules.Some (convert v)
-convert (Check fxs t) = foldr addCheck (convert t) fxs
-convert (Src.Verify is t) = Rules.Verify (TRS.bindList (map toCoreIdent is) ([], convert t))
-convert Src.Fail      = Rules.Fail
-convert (Src.All e)         = Rules.mkAll (convert e)
-convert (Src.One e)         = Rules.mkOne (convert e)
-convert (Src.IfThunk e1 e2) = Rules.mkIfThunk (convert e1) (convert e2)
-convert (Src.ForThunk e)    = Rules.mkForThunk (convert e)
-convert (Src.Truth e) = Rules.Tru (convert e)
---convert (Src.Iter e1 e2 e3) = Rules.Iter (convert e1) (convert e2) (convert e3)
-convert e = impossible "convert" e
--}
-
-
 --------------------------------------------------------
 --
 --             Adding scopes and converting
@@ -111,10 +72,6 @@ conv sc = expr
     expr (Exists is e)  = coreExis is <$> conv (foldr S.insert sc is) e
     expr (Lam i e)      = (Core.Lam . TRS.bind (toCoreIdent i)) <$> convD (S.insert i sc) e
 
-    --expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
-    --                      ; e2' <- scopeD sc' e2
-    --                      ; pure $ eExists is $ eSeq [e1'', e2'] }
-
     -- combinators
     expr (Seq es)       = Core.coreSeq <$> mapM expr es
     expr (Unify e1 e2)  = (Core.:=:) <$> expr e1 <*> expr e2
@@ -124,7 +81,7 @@ conv sc = expr
     -- verification
     expr (Verify is e)      = coreVerify is <$> convD (foldr S.insert sc is) e
     expr (Check [] e)       = exprD e
-    expr (Check (fx:fxs) e) = do errEff fx
+    expr (Check (fx:fxs) e) = do warnEff fx
                                  maybe id Core.mkCheck (toCoreEff fx) <$> exprD (Check fxs e)
     expr (Some e)           = Core.Some <$> exprD e
     expr (Guard v e)        = (Core.:>>:) <$> expr v <*> convD sc e
@@ -211,10 +168,10 @@ errUndefined is = do
    else
     mapM_ reportScopeErr is
 
-errEff :: Eff -> DsM ()
-errEff eff = case toCoreEff eff of
-               Nothing -> traceM $ "unsupported effect: " ++ show eff
-               Just _  -> pure ()
+warnEff :: Eff -> DsM ()
+warnEff eff = case toCoreEff eff of
+                Nothing -> traceM $ "unsupported effect: " ++ show eff
+                Just _  -> pure ()
 
 reportScopeErr :: Ident -> DsM ()
 reportScopeErr i@(Ident l _) = do
