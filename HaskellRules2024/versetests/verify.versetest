@@ -408,7 +408,7 @@ verify("Ampersand3a", pass){ x&y := 4; x+y = 8 }
   # Ampersand3a: Both x and are bound to 4,
 verify("Ampersand4", pass){ ((f&g)(:int,:int):int) => f[3,4] }
 
-verify("Ampersand5", pass, broken)
+verify("Ampersand5", fail)  # Koen says this should fail rather than pass
     { a&b&c:int =>
       (f&g)(:int,:int):int =>
       h(:int):int =>
@@ -418,7 +418,10 @@ verify("Ampersand5", pass, broken)
       h[x]=h[y] }
   # Ampersand5: This rather complicated test comes from Tim's tests
   # It's not really about "&"; rather, it involves unification of functions
-  # Actually, it seems to make the verifier loop, oddly.
+  # (( Actually, it seems to make the verifier loop, oddly. ))
+  # Koen (17/1): The verifier does not loop, it just takes a little more time. The test should fail, marking it as such.
+  # reason: (1) h is not marked as <computes>, so anything can happen when comparing h[x] to h[y]
+  # but even if that's not enough: (2) we have a counter example: a=1, b=c=2, f=g=(+), h=id. Then x:=1+2=3, y:=2+2=4, h[x]=3, h[y]=4.
 
 # tests for variables not getting a value
 verify("exitop1", pass, broken){ x:int; f():int := {x}; 5 }   # should these verify or not? #asktim
