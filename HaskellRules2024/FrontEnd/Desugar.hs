@@ -913,8 +913,8 @@ miniToCore orig_md = go (orig_md,[])
     go md (Exists xs e)  = Exists xs <$> go md e
 
     -- MFOR, MIF
-    go md (For2 e1 e2)   = encodeFor <$> go md e1 <*> go md e2
-    go md (If3 e1 e2 e3) = encodeIf <$> go md e1 <*> go md e2 <*> go md e3
+    go md (For2 e1 e2)   = For2 <$> go md e1 <*> go md e2
+    go md (If3 e1 e2 e3) = If3 <$> go md e1 <*> go md e2 <*> go md e3
     go md (One e)        = One <$> go md e
     go md (All e)        = All <$> go md e
 
@@ -988,12 +988,6 @@ shortCutDefnVerify e1 e2
     pat_binders = getVisibleBinders e1
 
 ------- Encodings with iter ---------------------------
-
-encodeIf :: SrcCore -> SrcCore -> SrcCore -> SrcCore
-encodeIf e1 e2 e3 = IfThunk (Seq [e1, eThunk e2]) e3
-
-encodeFor :: SrcCore -> SrcCore -> SrcCore
-encodeFor e1 e2 = ForThunk (Seq [e1, eThunk e2])
 
 defineDE :: String -> DsM SrcExpr
          -> DsM (SrcExpr,   -- The defn

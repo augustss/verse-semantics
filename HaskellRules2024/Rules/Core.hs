@@ -20,7 +20,7 @@ module Rules.Core
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkApp, mkEqual, mkIf, mkIfThunk, mkOne, mkAll, mkFor, mkForThunk, matchAll, mkCheck, matchCheck, mkSize
+  , mkExis, mkApp, mkEqual, mkIf, mkIfThunk, mkOne, mkAll, mkFor, mkForThunk, matchAll, mkCheck, matchCheck, mkSize
   , lamUnderscore, someUnderscore, wrong
 
     -- Assupmtions
@@ -248,9 +248,11 @@ Underscore is treated specially in two rules
 
 -}
 
+-- TODO: rename to mkSeq
 coreSeq :: [Expr] -> Expr
 -- coreSeq [e1,e2,e3]  =   e1 :>: (e2 :>: e3)
-coreSeq = foldr1 (:>:)
+coreSeq [] = Tup [] -- otherwise this crashes on an empty list
+coreSeq es = foldr1 (:>:) es
 
 mkEqual :: Expr -> Expr -> Expr -> Expr
 -- mkEqual e1 e2 e3 =   (e1 :=: e2); e3

@@ -9,7 +9,7 @@ module FrontEnd.ToCore(
 
 import Prelude hiding (pi)
 
-import qualified Rules.Core as Rules
+import qualified Rules.Core as Core
 import qualified TRS.Bind   as TRS
 
 import FrontEnd.Desugar
@@ -23,6 +23,7 @@ import Epic.Print
 -- General Haskell libraries
 import qualified Data.Set as S
 import Data.List   ( sort, group )
+import Control.Monad( when )
 import Debug.Trace ( traceM )
 
 --------------------------------------------------------
@@ -32,12 +33,10 @@ import Debug.Trace ( traceM )
 --------------------------------------------------------
 
 
-convertToCore :: Flags -> SrcCore -> IO (Rules.Expr, [DError])
-convertToCore flags src
-  = runD flags $
-    do { with_exis <- addScope src
-       ; return (convert with_exis) }
+convertToCore :: Flags -> SrcCore -> IO (Core.Expr, [DError])
+convertToCore flags src = runD flags (convert src)
 
+{-
 convert :: SrcCore -> Rules.Expr
 convert (Variable i)   = Rules.Var (toCoreIdent i)
 convert (Array ts)     = Rules.Tup (map convert ts)
@@ -73,92 +72,82 @@ convert (Src.ForThunk e)    = Rules.mkForThunk (convert e)
 convert (Src.Truth e) = Rules.Tru (convert e)
 --convert (Src.Iter e1 e2 e3) = Rules.Iter (convert e1) (convert e2) (convert e3)
 convert e = impossible "convert" e
-
-addCheck :: Eff -> Rules.Expr -> Rules.Expr
-addCheck fx e = case toCoreEff fx of
-                  Just fx' -> Rules.mkCheck fx' e
-                  Nothing  -> e
-
-toCoreIdent :: Ident -> Rules.Ident
-toCoreIdent (Ident _ s) = Rules.Name s
-
-toCoreEff :: Eff -> Maybe Rules.Effect
-toCoreEff ESucceeds = Just Rules.Succeeds
-toCoreEff EDecides  = Just Rules.Decides
-toCoreEff EFails    = Just Rules.Fails
-toCoreEff _         = Nothing -- error "toCoreEff" (prettyShow eff)
+-}
 
 
 --------------------------------------------------------
 --
---             Adding scopes
+--             Adding scopes and converting
 --
 --    Replace  x:=t by   exists x. ...(x=t)...
 --        "x:=t"    is represented by     DefineE x t
 --
 --------------------------------------------------------
 
-addScope :: SrcCore -> DsM SrcCore
-addScope e = scope S.empty (Block e)
+convert :: SrcCore -> DsM Core.Expr
+convert e = conv S.empty (Check [] e)
 
-scope :: S.Set Src.Ident -> SrcExpr -> DsM SrcExpr
+conv :: S.Set Src.Ident -> SrcExpr -> DsM Core.Expr
 -- The input expression is in BigCore, after desugaring,
 -- but still with x := e stuff
--- In  (scope sc expr), `sc` is a set of identifiers already in scope
+-- In  (conv sc expr), `sc` is a set of identifiers already in scope
 --     to allow us to complain about shadowing
-scope sc = expr
+conv sc = expr
   where
-    -- x := e   -->  x = e
-    -- exists x -->  x
-    expr (DefineE i e) = Unify (Variable i) <$> expr e
-    expr (DefineV i)   = pure (Variable i)
+    -- variables
+    expr (DefineE i e)  = expr (Unify (Variable i) e) -- x:=e     --> x=e
+    expr (DefineV i)    = expr (Variable i)           -- exists x --> x
+    expr (Variable i)   = do when (i `S.notMember` sc) (errUndefined [i])
+                             pure (Core.Var (toCoreIdent i))
 
-    expr e@Src.Lit{} = pure e
-    expr e@EPrim{}   = pure e
-    expr e@(Variable i) | i `S.member` sc = pure e
-                        | otherwise = do errUndefined [i]; pure e
-    expr (Array es)     = Array <$> mapM expr es
-    expr (Seq es)       = eSeq <$> mapM expr es
-    expr (ApplyD e1 e2) = ApplyD <$> expr e1 <*> expr e2
+    -- basic cases
+    expr (Lit a)        = pure (Core.Lit a)
+    expr (EPrim op)     = pure (Core.Op op)
+    expr (Array es)     = Core.Tup <$> mapM expr es
+    expr (Truth e)      = Core.Tru <$> expr e
+    expr (ApplyD e1 e2) = (Core.:@:) <$> expr e1 <*> expr e2
 
-    expr (Block e)   = exprD e
-    expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
-                          ; e2' <- scopeD sc' e2
-                          ; pure $ eExists is $ eSeq [e1'', e2'] }
+    -- binding/scope
+    expr (Exists is e)  = coreExis is <$> conv (foldr S.insert sc is) e
+    expr (Lam i e)      = (Core.Lam . TRS.bind (toCoreIdent i)) <$> convD (S.insert i sc) e
 
-    expr (Unify e1 e2) = Unify <$> expr e1 <*> expr e2
+    --expr (Let e1 e2) = do { (is, e1'', sc') <- defs' sc e1
+    --                      ; e2' <- scopeD sc' e2
+    --                      ; pure $ eExists is $ eSeq [e1'', e2'] }
 
-    expr (Choice e1 e2) = Choice <$> exprD e1 <*> exprD e2
-    expr Src.Fail       = pure Src.Fail
+    -- combinators
+    expr (Seq es)       = Core.coreSeq <$> mapM expr es
+    expr (Unify e1 e2)  = (Core.:=:) <$> expr e1 <*> expr e2
+    expr (Choice e1 e2) = (Core.:|:) <$> exprD e1 <*> exprD e2
+    expr Fail           = pure Core.Fail
 
-    expr (Src.Check fx e) = Src.Check fx <$> exprD e
-    expr (Src.Some e)     = Src.Some <$> exprD e
-    expr (Src.Guard v e)  = Src.Guard <$> expr v <*> scopeD sc e
+    -- verification
+    expr (Verify is e)      = coreVerify is <$> convD (foldr S.insert sc is) e
+    expr (Check [] e)       = exprD e
+    expr (Check (fx:fxs) e) = do errEff fx
+                                 maybe id Core.mkCheck (toCoreEff fx) <$> exprD (Check fxs e)
+    expr (Some e)           = Core.Some <$> exprD e
+    expr (Guard v e)        = (Core.:>>:) <$> expr v <*> convD sc e
 
-    expr (Src.Exists is e) = Src.Exists is <$> scope (foldr S.insert sc is) e
-    expr (Src.Lam i e)     = Src.Lam i <$> scopeD (S.insert i sc) e
-    expr (Src.Verify is e) = Src.Verify is <$> scopeD sc' e
-      where sc' = foldr S.insert sc is
-    expr (Src.Truth e)     = Src.Truth <$> expr e
-    expr (Src.One e)       = Src.One <$> exprD e
-    expr (Src.All e)       = Src.All <$> exprD e
-    expr (Src.IfThunk e1 e2) = Src.IfThunk <$> exprD e1 <*> exprD e2
-    expr (Src.ForThunk e)  = Src.ForThunk <$> exprD e
+    -- iter constructs
+    expr (One e)        = Core.mkOne <$> exprD e
+    expr (All e)        = Core.mkAll <$> exprD e
+    expr (If3 e1 e2 e3) = Core.mkIfThunk <$> exprD (eSeq [e1, eThunk e2]) <*> exprD e3
+    expr (For2 e1 e2)   = Core.mkForThunk <$> exprD (eSeq [e1, eThunk e2])
+
+    -- catch all, impossible case?
     expr e = error (show e)
-      --impossible "scope" e
 
-    -- exprD for a new scope context, using current in-scope set
-    exprD e = fst <$> defs sc e
+    -- for a new scope context, using current in-scope set
+    exprD     e = fst <$> defs sc  e
+    convD sc' e = fst <$> defs sc' e
 
-    -- exprD for a new scope context, with an extended in-scope set
-    scopeD sc' e = fst <$> defs sc' e
-
-    defs :: S.Set Ident -> SrcExpr -> DsM (SrcExpr, S.Set Ident)
+    defs :: S.Set Ident -> SrcExpr -> DsM (Core.Expr, S.Set Ident)
     -- `e` starts a new scoping context.  Wrap it in an `Exists`
     defs sc' e = do { (is, e', s) <- defs' sc' e
-                   ; pure (eExists is e', s) }
+                    ; pure (coreExis is e', s) }
 
-    defs' :: S.Set Ident -> SrcExpr -> DsM ([Ident], SrcExpr, S.Set Ident)
+    defs' :: S.Set Ident -> SrcExpr -> DsM ([Ident], Core.Expr, S.Set Ident)
     -- Find identifers bound in `e`, and return them
     -- along with extended scope-set and transformed `e`.
     -- 'as' is the set of in-scope variables
@@ -177,11 +166,25 @@ scope sc = expr
           errS = [ (i, j) | i <- is, j <- filter (== i) (S.toList as) ]
           sc' :: S.Set Ident = foldr S.insert as is
 
-      e' <- scope sc' e
+      e' <- conv sc' e
       errMultiple errM
       errShadow errS
       pure (is, e', sc')
 
+coreExis :: [Ident] -> Core.Expr -> Core.Expr
+coreExis is e = Core.mkExis (map toCoreIdent is) e
+
+coreVerify :: [Ident] -> Core.Expr -> Core.Expr
+coreVerify is e = Core.Verify (TRS.bindList (map toCoreIdent is) ([], e))
+
+toCoreIdent :: Ident -> Core.Ident
+toCoreIdent (Ident _ s) = Core.Name s
+
+toCoreEff :: Eff -> Maybe Core.Effect
+toCoreEff ESucceeds = Just Core.Succeeds
+toCoreEff EDecides  = Just Core.Decides
+toCoreEff EFails    = Just Core.Fails
+toCoreEff _         = Nothing -- error "toCoreEff" (prettyShow eff)
 
 errShadow :: [(Ident, Ident)] -> DsM ()
 errShadow is = do
@@ -207,6 +210,11 @@ errUndefined is = do
       i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
    else
     mapM_ reportScopeErr is
+
+errEff :: Eff -> DsM ()
+errEff eff = case toCoreEff eff of
+               Nothing -> traceM $ "unsupported effect: " ++ show eff
+               Just _  -> pure ()
 
 reportScopeErr :: Ident -> DsM ()
 reportScopeErr i@(Ident l _) = do
