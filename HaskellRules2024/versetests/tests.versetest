@@ -487,8 +487,5 @@ testeq("choice4", pass){ all{ a:int; f[a]; y:=if(x>3){5}else{7}; (11|22); x:=2; 
 # tests for top-level exis used in functions
 testeq("run-exitop1", pass){ x:int; f() := {x}; x=3; f[] } { 3 }
 testeq("run-exitop2", pass){ x:int; f():int := {x}; x=3; f[] } { 3 }
-testeq("run-exitop3", pass, broken){ x:int; f() := {x}; f[]=3; f[] } { 3 }
-testeq("run-exitop4", pass, broken){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
-   # Are these broken though? Right now, the check<succeeds> inside of these definition
-   # fails. is this what we want or not?
-
+testeq("run-exitop3", pass){ x:int; f() := {x}; f[]=3; f[] } { 3 }
+testeq("run-exitop4", pass, broken){ x:int; f():int := {x}; f[]=3; f[] } { 3 }   # not sure if this should be pass or fail
