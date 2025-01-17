@@ -1,3 +1,4 @@
+{-# LANGUAGE MonadComprehensions #-}
 module EnvC where
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -5,13 +6,13 @@ import Data.List
 import Data.Maybe
 import ValC
 import Exp
-import Set
+import SetX
 
 --------------------
 ---- Environment
 
 type W = Val
-type WS = Set W
+type WS = SetX W
 
 newtype Env = Env { unEnv :: M.Map Ident Val }
   deriving (Eq, Ord)
@@ -45,7 +46,9 @@ allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
 allWs :: WS
-allWs = mkSet $
+allWs = mkSet allWsL
+allWsL :: [W]
+allWsL =
   nonFcn ++
   [ dO o | o <- [Oint, Ogt, Oadd] ] ++
   map vFcn [ id0, fid1, id01, f01, const0, const1, const2, const3, fsucc,
@@ -89,23 +92,26 @@ allWs = mkSet $
                        (VTup [VInt 3, VInt 0], VInt 3)]
 -}
 
-fid1 :: Fcn Val Val
+allFcns :: [Fcn]
+allFcns = [ f | VFcn [f] <- allWsL ]
+
+fid1 :: Fcn
 fid1 = mkFcn "id1" [(VInt 1, VInt 1)]
 
-fint :: Fcn Val Val
+fint :: Fcn
 fint = mkFcn "int" [(x, x) | x <- allInts ]
 
-fsucc :: Fcn Val Val
+fsucc :: Fcn
 fsucc = mkFcn "succ" [(x, vadd x (VInt 1)) | x <- allInts ]
 
-fsuccsucc :: Fcn Val Val
+fsuccsucc :: Fcn
 fsuccsucc = mkFcn "succsucc" [(x, vadd x (VInt 2)) | x <- allInts ]
 
-fpred :: Fcn Val Val
+fpred :: Fcn
 fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
 
 getW :: String -> W
-getW s = ([ w | w <- unSet allWs, show w == s ] ++ [error $ "undefined " ++ s]) !! 0
+getW s = ([ w | w <- allWsL, show w == s ] ++ [error $ "undefined " ++ s]) !! 0
 
 --------------------
 ---- Primitive functions

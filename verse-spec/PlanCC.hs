@@ -1,11 +1,14 @@
 {-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MonadComprehensions #-}
 module Main where
+import Control.Arrow(second)
 import Control.Monad hiding (ap)
 import Control.Monad.State.Strict
 import qualified Data.Map as M
-import Data.List
+import Data.List hiding (union, intersect)
+import qualified Data.List as L
 import Data.Data
 import Data.Maybe
 import Data.Generics.Uniplate.Data(universe)
@@ -13,10 +16,10 @@ import Data.String
 --import Data.Maybe
 import Exp hiding (dI)
 import ValC
-import Set
+import SetX
 import EnvC
 import Examples hiding ((===))
---import Debug.Trace
+import Debug.Trace
 
 implies :: Bool -> Bool -> Bool
 implies x y = not x || y
@@ -97,12 +100,12 @@ instance Show CExp where
   showsPrec p (CDef x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
 
 dI :: CExp -> [Ident]
-dI (CApp e1 e2) = dI e1 `union` dI e2
-dI (CEqu e1 e2) = dI e1 `union` dI e2
-dI (CSeq e1 e2) = dI e1 `union` dI e2
-dI (CWhere e1 e2) = dI e1 `union` dI e2
-dI (COfType e1 e2) = dI e1 `union` dI e2
-dI (CTup es) = foldr union [] (map dI es)
+dI (CApp e1 e2) = dI e1 `L.union` dI e2
+dI (CEqu e1 e2) = dI e1 `L.union` dI e2
+dI (CSeq e1 e2) = dI e1 `L.union` dI e2
+dI (CWhere e1 e2) = dI e1 `L.union` dI e2
+dI (COfType e1 e2) = dI e1 `L.union` dI e2
+dI (CTup es) = foldr L.union [] (map dI es)
 dI (CExi x) = [x]
 dI _ = []
 
@@ -209,39 +212,60 @@ allVars e = [ i | CVar i <- universe e ]
 
 -------------------------------------------
 
+alt :: a -> [a]
+alt x = [x]
+
+{-
 apply :: W -> W -> [W]
 apply (VTup ws) (VInt k) | 0 <= k' && k' < length ws = [ws !! k']  where k' = fromInteger k
 apply (VFcn fs) w = [ y | Fcn _ xys <- fs, Just y <- [M.lookup w xys] ]
 apply _ _ = []
+-}
+
+sap :: W -> Fcn -> Maybe W
+sap a (Fcn _ xys) = M.lookup a xys
+
+applyVFcn :: W -> WS -> [WS]
+applyVFcn (VTup ws) as = undefined -- alt [ ws !! k' | VInt k <- as, let k' = fromInteger k, 0 <= k' && k' < length ws ]
+applyVFcn (VFcn fs) as = undefined -- joinSeqs [ map (sap a) fs | a <- unSet as ]
+applyVFcn _ _ = []
+
+joinSeqs :: [[Maybe W]] -> [WS]
+joinSeqs = map (mkSet . catMaybes) . transpose
+
+applySets :: WS -> WS -> [WS]
+applySets fs as = isectSetOfSeqs [ applyVFcn f as | f <- fs ]
 
 cVTup :: [WS] -> WS
-cVTup wss = mkSet $ map VTup $ sequence $ map unSet wss
+cVTup wss = fmap VTup $ cartProd wss
 
 dE :: CExp -> Env -> [WS]
-dE (CVar "_") _                             = error "stray _"
+dE (CVar "_") _                             = -- error "stray _"
+                                              [allWs]
 dE (CVar x)  rho                            = [sing $ lookupEnv x rho]
 dE (CInt k)    _                            = [sing $ VInt k]
 dE (CPrim p)   _                            = [sing $ dO p]
 dE (CTup es) rho                            = -- mkSet $ map VTup $ sequence $ map (\ e -> unSet (dE e rho)) es
                                               map cVTup $ mapM (\ e -> dE e rho) es
 
-dE (CApp e1 e2)   rho                       = re [ mkSet [ r | v1 <- unSet s1, v2 <- unSet s2, r <- apply v1 v2 ]
-                                                 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
+dE (CApp e1 e2)   rho                       = [ r | s1 <- dE e1 rho, s2 <- dE e2 rho, r <- applySets s1 s2 ]
 dE (COfType e1 e2) rho                      = dE (CApp e2 e1) rho
-dE (CEqu e1 e2)   rho                       = re [ s1 `isect` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
-{-
-dE (CSeq (CDef x e1) e2) rho                = re [ mkSet [ v2 | v1 <- unSet s1, v2 <- unSet s2 ]
-                                                 | s1 <- dE e1 rho, s2 <- dE e2 (extend rho x v1) ]
--}
-dE (CSeq e1 e2)   rho                       = re [ if isEmpty s1 then empty else s2
-                                                 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
-dE (CWhere e1 e2)   rho                     = re [ if isEmpty s2 then empty else s1
-                                                 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
+dE (CEqu e1 e2)   rho                       = [ s1 `intersect` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
+dE (CSeq e1 e2)   rho                       = [ if isEmpty s1 then empty else s2
+                                              | s1 <- dE e1 rho, s2 <- dE e2 rho ]
+dE (CWhere e1 e2)   rho                     = [ if isEmpty s2 then empty else s1
+                                              | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (CExi _)         _                       = [sing $ VInt 99999]
-dE CFail            _                       = []
-dE (CLam Closed i e1 e2 Nothing) rho =
+dE CFail            _                       = [empty]
+dE (CIf e1 e2 e3) rho                       =
+  let rhos = oneE e1 rho
+  in  if isEmpty rhos then
+        squash $ dD e3 rho
+      else
+        squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
+dE (CLam q i e1 e2 Nothing) rho =
   let alts :: SetX (Val, SetX [Maybe WS])
-      alts =  [ (w, r) | w <- unSet allWs, let r = useInput w, not (isEmptyX r) ]
+      alts =  [ (w, r) | w <- allWs, let r = useInput w, not (isEmpty r) ]
       useInput :: Val -> SetX [Maybe WS]
       useInput w =       [ map (\ s -> if isEmpty s then Nothing else Just $ justOne $ dD e2 rho') w1s
                          | rho' <- dX e1 rho
@@ -250,21 +274,27 @@ dE (CLam Closed i e1 e2 Nothing) rho =
                          ]
       justOne [x] = x
       justOne _ = error "justOne"
-      inOuts :: Set (Val, [WS])
-      inOuts = mkSet [ (x, y) | (x, r) <- alts, Just y <- [joinSeqs r] ]
+      inOuts :: SetX (Val, [WS])
+      inOuts = [ (x, y) | (x, r) <- alts, Just y <- [joinSeqs r] ]
       joinSeqs :: SetX [Maybe WS] -> Maybe [WS]
       joinSeqs ss =
-        let wss = catMaybes $ concat ss
-            ws = foldl1 isect wss
+        let ws = isectMany $ catMaybes $ concat ss
         in  if isEmpty ws then Nothing
             else Just $ map (\ col -> if all isNothing col then empty else ws) $ transpose ss
-  in  error $ unlines $ "" : map show (unSet inOuts)
+      inOuts' :: SetX (Val, [WS])
+      inOuts' = timTrim inOuts
+      inOutPairs :: SetX [(Val, WS)]
+      inOutPairs = fmap (\ (v, s) -> [ (v, x) | x <- s ] ) inOuts'
+      fcnDescs :: [ [ (Val, WS) ] ]
+      fcnDescs = undefined -- transpose inOutPairs
+      fcnDescs' :: [ [ (Val, WS) ] ]
+      fcnDescs' = undefined -- filter (not . all (isEmpty . snd)) fcnDescs
+      fcns = undefined -- map (getFcn q) fcnDescs'
+      vfcns = fmap VFcn $ cartProd fcns
+  in  --error $ show vfcns -- unlines $ "" : map show vfcns
+      [vfcns]
 
 {-
-dE (CIf e1 e2 e3) rho                       = do
-  case [ rho' | rho' <- dX e1 rho, not (isEmpty (dE e1 rho')) ] of
-    [] -> dE e3 rho
-    rhos -> sUnion [ dE e2 rho' | rho' <- rhos ]  -- XX Not the correct semantics
 
 dE (CLam q i (CDef x e1) e2 me3)   rho      = mkSet $ close q
   [ f
@@ -310,15 +340,54 @@ dE ee@(CChkClsd x e) rho =
 -}
 -}
 dE (CChoice e1 e2) rho = dD e1 rho ++ dD e2 rho
-dE (CUChoice e1 e2)rho = re [ s1 `xunion` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
+dE (CUChoice e1 e2)rho = re [ s1 `union` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (CAll e) rho =
   let vs = squash $ dD e rho
-  in  [ mkSet $ map VTup $ sequence $ map unSet vs ]
+  in  [ fmap VTup $ cartProd vs ]
 dE e _ = error $ "unimplemented " ++ show e
 
-type SetX a = [a]
-isEmptyX :: SetX a -> Bool
-isEmptyX = null
+getFcn :: OC -> SetX (Val, WS) -> SetX Fcn
+{-
+getFcn Closed xyss =
+  let d = mkSet [ x | (x, ys) <- xyss, not (isEmpty ys) ]
+  in  [ f
+      | f <- allFcns
+--      , trace (show (f, domFcn f, d)) True
+      , domFcn f == d
+--      , trace (show [(ap f x, ys) | (x, ys) <- xyss]) True
+      , all ( \ (x, ys) -> isEmpty ys || ap f x `sIn` ys) xyss
+      ]
+getFcn Open _ = error "getFcn: Open"
+-}
+getFcn q xyss = close q
+  [ f
+  | f <- mkSet allFcns
+  , domChk xyss f
+  , all ( \ (x, ys) -> isEmpty ys || ap f x `member` ys) xyss
+  ]
+domChk :: SetX (Val, WS) -> Fcn -> Bool
+domChk xyss f = all (\ (x, ys) -> if isEmpty ys then not (inDom x f) else inDom x f) xyss
+
+-- Pick first non-empty in a sequence.
+timTrim :: SetX (Val, [WS]) -> SetX (Val, [WS])
+timTrim ss =
+  let ss' = fmap (second trim) ss
+      trim s =
+        case span isEmpty s of
+          (xs, x : _) -> xs ++ [x]
+          _ -> undefined
+      n = maximumSet $ fmap (length . snd) ss'
+  in  fmap (second (\ s -> s ++ replicate (n - length s) empty)) ss'
+
+isectMany :: [WS] -> WS
+isectMany [] = error "isectMany"
+isectMany wss = foldl1 intersect wss
+
+isectSetOfSeqs :: SetX [WS] -> [WS]
+isectSetOfSeqs ss =
+  let n = minimumSet (fmap length ss)
+      ss' = fmap (take n) ss
+  in  foldSet xIntersect ss'
 
 re :: [WS] -> [WS]
 re = id -- filter (not . isEmpty)
@@ -326,7 +395,12 @@ re = id -- filter (not . isEmpty)
 squash :: [WS] -> [WS]
 squash = filter (not . isEmpty)
 
-domV' :: Val -> Set Val
+-- Evaluate e with all possible local environments.
+-- Return the environments that result in a non-empty sequence
+oneE :: CExp -> Env -> SetX Env
+oneE e rho = [ rho' | rho' <- dX e rho, not $ null $ squash $ dE e rho' ]
+
+domV' :: Val -> SetX Val
 domV' v@VFcn{} = domV v
 domV' v@VTup{} = domV v
 domV' _ = empty
@@ -351,40 +425,47 @@ chkClsd (Just (x, e)) rho =
           False
 -}
 
-close :: OC -> [W] -> [W]
-close _ [] = []
-close _ [f] = [f]
+close :: OC -> SetX Fcn -> SetX Fcn
 close Open fs = fs
 close Closed fs =
-  let r = [ f | f <- fs, forAllL fs (\ f' -> domV f `lessEq` domV f') ]
+  let r = [ f | f <- fs, forAll fs (\ f' -> dom f `isSubsetOf` dom f') ]
   in  --trace ("close " ++ show (fs, r))
       r
 
-dX :: CExp -> Env -> [Env]
-dX e rho = 
-  let exts = sequence $ map (\ x -> map (x,) (unSet allWs)) (dI e)
+dX :: CExp -> Env -> SetX Env
+dX e rho = mkSet $ dXL e rho
+
+dXL :: CExp -> Env -> [Env]
+dXL e rho = 
+  let exts = sequence $ map (\ x -> map (x,) allWsL) (dI e)
   in  map (foldr (\ (i,v) r -> extend r i v) rho) exts
 
 dD :: CExp -> Env -> [WS]
-dD e rho = xUnions [ dE e rho' | rho' <- dX e rho ]
+dD e rho = xUnions [ dE e rho' | rho' <- dXL e rho ]
 
 xUnions :: [[WS]] -> [WS]
 xUnions [] = []
 xUnions ss = foldr1 xUnion ss
 
+xIntersect :: [WS] -> [WS] -> [WS]
+xIntersect = zipWith intersect
+
 xUnion :: [WS] -> [WS] -> [WS]
 xUnion [] ys = ys
 xUnion xs [] = xs
-xUnion (x:xs) (y:ys) = xunion x y : xUnion xs ys
+xUnion (x:xs) (y:ys) = union x y : xUnion xs ys
 
 den :: Exp -> [WS]
-den e = dD ({-redef $-} syntax "_" e) emptyEnv
+den e = dD ({-redef $-} syntax "_" e) rho0
+
+dene :: Exp -> [WS]
+dene e = dD ({-redef $-} syntax "_" e) emptyEnv
 
 dP :: Exp -> RVal
 dP e =
   case den e of
-    [s] | [v] <- unSet s -> RVal v
-    vs                   -> Wrong $ show vs
+    [s] | [v] <- toList s -> RVal v
+    vs                    -> Wrong $ show vs
 
 allExps :: [Example]
 allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
@@ -403,54 +484,22 @@ main = do
   putStrLn "Start"
   runExamples dP allExps
 
-{-
-\x.(e1){e2}
-
- r' <- X[e1]r[x:=w]
- D[e1]r'
-  
-
-
-  f(0)<decides>={3=4}
-  fun_c(r:=(3=4); 0)=r
-
-var y:int=0;
-for(1|2; y+=1){Print[y]}
-all2{1|2; y+=1; \_.Print[y]}
-all2{(1; y+=1; \_.Print[y]) | (2; y+=1; \_.Print[y]) }
-a1 := all{1; y+=1; \_.Print[y]}; a2 := all{2; y+=1; \_.Print[y]}; a1++a2
-a1 := all(y+=1; \_.Print[y]}; a2 := all{y+=1; \_.Print[y]}; a1++a2
-# set y=1
-a1 := all(\_.Print[^y]}; a2 := all{y+=1; \_.Print[^y]}; a1++a2
-a1 := (x:=(\_.Print[^y])[]; <x>); a2 := all{y+=1; \_.Print[^y]}; a1++a2
-a1 := (x:=Print[^y]; <x>); a2 := all{y+=1; \_.Print[^y]}; a1++a2
-a1 := (x:=Print[1]; <x>); a2 := all{y+=1; \_.Print[^y]}; a1++a2
-# print 1
-a1 := (x:=1; <x>); a2 := all{y+=1; \_.Print[^y]}; a1++a2
-a1 := <1>; a2 := all{y+=1; \_.Print[^y]}; a1++a2
-# set y=2
-a1 := <1>; a2 := all{\_.Print[^y]}; a1++a2
-a1 := <1>; a2 := (\_.Print[^y])[]; a1++a2
-a1 := <1>; a2 := (x := (\_.Print[^y])[]; <x>); a1++a2
-a1 := <1>; a2 := (x := Print[^y]; <x>); a1++a2
-a1 := <1>; a2 := (x := Print[2]; <x>); a1++a2
-# print 2
-a1 := <1>; a2 := (x := 2; <x>); a1++a2
-a1 := <1>; a2 := <2>; a1++a2
-<1>++<2>
-<1,2>
-
--}
-
 g1 :: Exp
 g1 = funq g1d "x"
 
 g1d = "x" := (0 :| 1 :| 0) `wher` "y" := 2 :| 3
 g1e = g1d >: "y"
 
+g2 :: Exp
+g2 = funq (2 :| 3 >: "x" := 0 :| 1) "x"
+
 {-
 (0,{[Nothing,           Just [|x->0,y->3|],Nothing,Nothing,Nothing,           Just [|x->0,y->3|]],
     [Just [|x->0,y->2|],Nothing,           Nothing,Nothing,Just [|x->0,y->2|],Nothing]})
 (1,{[Nothing,Nothing,Nothing,           Just [|x->1,y->3|],Nothing,Nothing],
     [Nothing,Nothing,Just [|x->1,y->2|],Nothing,           Nothing,Nothing]})
+-}
+
+{-
+if (x:= 1||2) { 1..x }
 -}
