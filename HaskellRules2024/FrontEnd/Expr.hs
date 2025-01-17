@@ -182,13 +182,8 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Wrong String                   -- wrong
   | Fail                           -- :false
   | Exists [Ident] SrcExpr         -- exists xs . e
-  | Split SrcExpr SrcExpr SrcExpr  -- split(e1){e2}{e3}
   | Map [SrcExpr]                  -- map{e1;e2; ... }
   | Truth SrcExpr                  -- truth{e}
-
-  -- simplified if/for
-  | IfThunk SrcExpr SrcExpr        -- if(f:=e1){f[]}else{e2}
-  | ForThunk SrcExpr               -- for(f:=e){f[]}
 
   -- These are used when translating back from Rules.Core.SrcExpr
   | EStore Store SrcExpr
@@ -600,11 +595,8 @@ instance Pretty SrcExpr where
           XDLam q i e1 e2 -> maybeParens (p > 0) $ text "\\" <> parens (ppr 0 q) <> ppr 0 i <> text "."
                                                    <> cat [braces (ppr 0 e1), braces (ppr 0 e2)]
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
-          Split e1 e2 e3 -> text "split" <> sep [parens (ppr 0 e1), braces (ppr 0 e2), braces (ppr 0 e3)]
           Map es -> text "map" <> braces (ppSeq lvl es)
           Truth e -> text "truth" <> braces (ppr 0 e)
-          IfThunk e1 e2 -> text "if!" <> parens (ppr 0 e1) <> braces (ppr 0 e2)
-          ForThunk e -> text "for!" <> braces (ppr 0 e)
           EStore s e ->
             maybeParens (p > 0) $ fsep [text "store"<+> pPrintPrec lvl p s <+> text "in", indent $ braces (pPrintPrec lvl 0 e)]
 
@@ -741,13 +733,10 @@ compos f (OfType e1 fx e2)  = OfType <$> f e1 <*> pure fx <*> f e2
 compos _ e@EPrim{}          = pure e
 compos f (Lam i e)          = Lam i <$> f e
 compos f (XDLam q i e1 e2)  = XDLam q i <$> f e1 <*> f e2
-compos f (Split e1 e2 e3)   = Split <$> f e1 <*> f e2 <*> f e3
 compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
 compos f (Splice e)         = Splice <$> f e
-compos f (IfThunk e1 e2)    = IfThunk <$> f e1 <*> f e2
-compos f (ForThunk e)       = ForThunk <$> f e
 compos f (EStore s e)       = EStore <$> storeMapA f s <*> f e
 
 storeMapA :: (Applicative a) => (SrcValue -> a SrcValue) -> Store -> a Store
@@ -825,10 +814,7 @@ getVisibleBinders = go
     go OfType{}   = []
     go Lam{}      = []
     go Fail       = []
-
-    go Macro1 {}                        = []
-    go (IfThunk _ _) = []
-    go (ForThunk _)  = []
+    go Macro1 {}  = []
 
     --go (Map es)      = concatMap go es
     go e = impossible "getVisibleBinders" e
@@ -860,7 +846,6 @@ getFree = fvs_blk
     fvs (Verify is e)     = fvs e `remove` is
     fvs (Macro1 _ _ e)    = fvs e
     fvs (Macro2 _ e b)    = fvs e ++ fvs_blk b
-    fvs (Split e1 e2 e3)  = fvs e1 ++ fvs e2 ++ fvs e3
     fvs (For2 e1 e2)      = Epic.List.nub (fvs e1 ++ fvs e2)
                             `remove` getVisibleBinders e1
     fvs (DefineE _ e)     = fvs e
@@ -871,8 +856,6 @@ getFree = fvs_blk
     fvs (One e)           = fvs_blk e
     fvs (All e)           = fvs_blk e
     fvs (Guard e1 e2)     = fvs e1 ++ fvs_blk e2
-    fvs (IfThunk e1 e2)   = fvs e1 ++ fvs e2
-    fvs (ForThunk e)      = fvs e
 
     -- In (if e1 then e2 else e3), the binders of e1 scope over e2
     fvs (If3 e1 e2 e3)    = (fvs e1 ++ fvs_blk e2) `remove` bs
@@ -975,7 +958,6 @@ substMany sb = sub
     sub (Verify (i:is) e) = binder i (forall1 i) (Verify is e)
     sub e@Wrong{} = e
     sub (Macro1 i rs e) = Macro1 i rs (sub e)
-    sub (Split e1 e2 e3) = Split (sub e1) (sub e2) (sub e3)
     sub (If3 e1 e2 e3) = If3 (sub e1) (sub e2) (sub e3)
     sub Fail = Fail
     sub e = impossible "substMany" e
@@ -1018,7 +1000,6 @@ alphaConvert vs = alpha []
       where is' = map fresh is
             m' = foldr add m $ zip is is'
     alpha _ e@Wrong{} = e
-    alpha m (Split e f g) = Split (alpha m e) (alpha m f) (alpha m g)
     alpha m (If3 (Exists is e1) e2 e3) =
       let (is', e1', e2') = if3Hack (alpha m) is e1 e2
       in  If3 (Exists is' e1') e2' (alpha m e3)
