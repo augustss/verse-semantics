@@ -382,12 +382,12 @@ splitStep env lhs =
 
 {- SPJ: I am not sure if we need SPLIT-APP at all.
         So I am commenting it out for now.
-   ++
    -- Verify(rs ; as){ P[r[s]] }
    -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
+   ++
    "SPLIT-APP" `nameWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
-      (ctx, Var r :@: s) <- proofX all_rs e
+      (ctx, (_, Var r :@: s)) <- proofX all_rs e
       guard (r `elem` rs)
       Just gv <- [groundValue all_rs s]
       let r' = skolNotIn all_rs
