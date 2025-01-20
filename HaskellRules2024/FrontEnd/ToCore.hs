@@ -56,7 +56,6 @@ conv :: S.Set Src.Ident -> SrcExpr -> DsM Core.Expr
 conv sc = expr
   where
     -- variables
-    expr (DefineE i e)  = expr (Unify (Variable i) e) -- x:=e     --> x=e
     expr (DefineV i)    = expr (Variable i)           -- exists x --> x
     expr (Variable i)   = do when (i `S.notMember` sc) (errUndefined [i])
                              pure (Core.Var (toCoreIdent i))
