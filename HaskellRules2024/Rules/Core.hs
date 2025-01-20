@@ -131,7 +131,13 @@ iterChoiceFree IterSize = True
 iterApply :: Iter -> Val -> Expr -> Expr
 iterApply IterIf    f _e0 = f :@: Tup []
 iterApply IterOne   v _e0 = v
-iterApply IterSize _v  e0 = prepVal e0 (\n -> Op Add :@: Tup [Lit (LInt 1), n])
+iterApply IterSize _v  e0 =
+  Exi $ bind n $
+    (Var n :=: e0) :>:
+    Op Add :@: Tup [Lit (LInt 1), Var n]
+ where
+  n = identNotIn (free e0)
+
 iterApply IterFor   f  e0 =
   Exi $ bind x $
     (Var x :=: (f :@: Tup [])) :>:
@@ -342,7 +348,12 @@ matchCheck e0@(Iter IterIf (Exi bnd) _)
 matchCheck _ = Nothing
 
 mkSize :: Val -> Expr -> Expr
-mkSize n e = prepVal (Iter IterSize e (Lit (LInt 0))) $ \s -> Op Mul :@: Tup [n,s]
+mkSize n e =
+  Exi $ bind k $
+    (Var k :=: (Iter IterSize e (Lit (LInt 0))))
+    :>: Op Mul :@: Tup [n,Var k]
+ where
+  k = identNotIn (free (n,e))
 
 (>>>) :: Expr -> Expr -> Expr
 -- e1 >>> e2  =   (_ = e1); e2
