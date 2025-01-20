@@ -927,10 +927,16 @@ miniToCore orig_md = go (orig_md,[])
           MI -> do_mi
           MX -> do_mx
       where
-        do_mi = do { (dz, z) <- defineDE "z" (go md e2)
+        do_mi = do { (dz, z) <- defineDE "z" (go (MX,xs) e2)
+                         -- Very important: use MX here because we don't want
+                         -- to generate verify's inside the Some.
+                         -- Small example: M20Jan25-1
                    ; let gds = nub (xs ++ getFree e1)
                          -- Guard on both free vars of e1 and lambda-bound vars
+                         -- Example Fin4: y:int := y
+
                    ; return (eGuard gds (eSeq [ eHavoc fx, dz, eSome z])) }
+
         do_mx = do { e1' <- go md e1
                    ; e2' <- go md e2
                    ; if isAtomic e1'  -- Just an optimisation

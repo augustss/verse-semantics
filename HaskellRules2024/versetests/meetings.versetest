@@ -1,5 +1,11 @@
 # Add new meetings at the top
 
+verify("M20Jan25-1", pass){ f():type{(:string) => (:string)} := (x:any => x) }
+verify("M20Jan25-2", pass, broken){ (f():type{(:string) => (:string)} := (x:any => x))
+                          ; f[ (y:string) => "woo" ] }
+verify("M20Jan25-3", fail){ (f():type{(:string) => (:string)} := (x:any => x))
+                          ; f[ (y:string) => 77 ] }
+  # M20Jan25-1: small example involving a higher order function type
 
 verify("M20Dec24-0", pass){ f(x:int)<decides> := { x=(1|2) } }
   # M20Dec24-0: f <decides>, not iterates, because x has one value in RHS
