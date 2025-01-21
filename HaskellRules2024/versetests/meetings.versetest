@@ -1,14 +1,17 @@
 # Add new meetings at the top
 
 verify("M20Jan25-1", pass){ f():type{(:string) => (:string)} := (x:any => x) }
-verify("M20Jan25-2", pass, broken){ (f():type{(:string) => (:string)} := (x:any => x))
-                          ; f[ (y:string) => "woo" ] }
-verify("M20Jan25-3", fail){ (f():type{(:string) => (:string)} := (x:any => x))
-                          ; f[ (y:string) => 77 ] }
   # M20Jan25-1: small example involving a higher order function type
+verify("M20Jan25-2", pass, broken)
+                          { (f():type{(:string) => (:string)} := (x:any => x))
+                          ; string[ f[]["woo"] ] }
+verify("M20Jan25-3", fail){ (f():type{(:string) => (:string)} := (x:any => x))
+                          ; string[ f[][77] ] }
+verify("M20Jan25-4", fail){ (f():type{(:string) => (:string)} := (x:any => x))
+                          ; int[ f[]["woo"] ] }
 
-verify("M20Jan25-4", pass){ f(x:int)(y:int)(z:int):int := x+y+z }
-  # M20Jan25-4 is a 3-level curried function, just showing how that desugars
+verify("M20Jan25-5", pass){ f(x:int)(y:int)(z:int):int := x+y+z }
+  # M20Jan25-5 is a 3-level curried function, just showing how that desugars
 
 verify("M20Dec24-0", pass){ f(x:int)<decides> := { x=(1|2) } }
   # M20Dec24-0: f <decides>, not iterates, because x has one value in RHS
