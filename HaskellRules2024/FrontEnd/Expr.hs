@@ -21,7 +21,10 @@ module FrontEnd.Expr(
     , srcUnderscore, isSrcUnderscore, identX
 
     , Store(..), Ptr
-    , Eff(..), EffNoOC, allEffects, effString, isOpenClosed, isCardinalityEff
+
+    , Eff(..), EffNoOC, allEffects, effString, isOpenClosed
+    , isCardinalityEff, intersectEffects
+
     , Op, pattern Op
     , compos, composOp, unSeq
     , getLoc
@@ -315,10 +318,21 @@ eGuard xs orig_e = foldr gd orig_e xs
    gd x e = Guard (Variable x) e
 
 eCheck :: [Eff] -> SrcExpr -> SrcExpr
-eCheck fxs1 e
-  | null fxs1           = e
-  | Check fxs2 e' <- e  = Check (fxs1 ++ fxs2) e'
-  | otherwise           = Check fxs1 e
+-- Smart constructor for (Check fxs e):
+--  * Combines with nested Check
+--  * Combines with nested OfTpye
+--  * Discards entirely when effects are "all effects",
+--    or when the payload is a value and the effects are happy with that
+--
+-- These checks eliminate a lot of clutter. For example:
+--    type{e}, which desugars to fun(x:=e}<succeeds>{x}, where we don't
+--             want to generate check<succeeds>{x}
+eCheck [] e                           = e
+eCheck fxs e | isValue e
+             , all valueSatisfies fxs = e
+eCheck fxs1 (Check fxs2 e)            = Check (fxs1 `intersectEffects` fxs2) e
+eCheck fxs1 (OfType e1 fxs2 e2)       = OfType e1 (fxs1 `intersectEffects` fxs2) e2
+eCheck fxs e                          = Check fxs e
 
 eExists :: [Ident] -> SrcExpr -> SrcExpr
 -- Smart constructor, drops empty list of binders
@@ -438,10 +452,42 @@ isCardinalityEff EDecides  = True
 isCardinalityEff EFails    = True
 isCardinalityEff _         = False
 
+valueSatisfies :: EffNoOC -> Bool
+-- Is check<fx>{val} satisfied?
+valueSatisfies EFails = False
+valueSatisfies _      = True
+
 isOpenClosed :: Eff -> Bool
 isOpenClosed EOpen   = True
 isOpenClosed EClosed = True
 isOpenClosed _       = False
+
+intersectEffects :: [EffNoOC] -> [EffNoOC] -> [EffNoOC]
+-- [] means "all effects"
+intersectEffects effs1        []    = effs1
+intersectEffects []           effs2 = effs2
+intersectEffects (eff1:effs1) effs2 = map (intersectEff1 eff1) (intersectEffects effs1 effs2)
+
+intersectEff1 :: EffNoOC -> EffNoOC -> EffNoOC  -- Not expecting EOpen/EClosed
+intersectEff1 EIterates EFails    = EFails
+intersectEff1 EIterates EDecides  = EDecides
+intersectEff1 EIterates ESucceeds = ESucceeds
+intersectEff1 EIterates EIterates = EIterates
+
+intersectEff1 EDecides  EFails    = error "intersectEff-1"
+intersectEff1 EDecides  EDecides  = EDecides
+intersectEff1 EDecides  EIterates = EDecides
+intersectEff1 EDecides  ESucceeds = ESucceeds
+
+intersectEff1 ESucceeds EFails    = error "intersectEff-2"
+intersectEff1 ESucceeds ESucceeds = ESucceeds
+intersectEff1 ESucceeds EDecides  = ESucceeds
+intersectEff1 ESucceeds EIterates = ESucceeds
+
+intersectEff1 EFails    EFails  = EFails
+intersectEff1 EFails    eff     = error ("intersectEff-3 " ++ show eff)
+
+intersectEff1 eff1 eff2 = error ("intersectEff-4 " ++ show eff1 ++ " " ++ show eff2)
 
 --------------------------------------------------------
 --               Store

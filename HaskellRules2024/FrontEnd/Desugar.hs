@@ -70,7 +70,7 @@ desugar flgs add_verification e_parsed
        }
 
   where
-    ds_model | add_verification = MV
+    ds_model | add_verification = MV True
              | otherwise        = MX
 
 --------------------------------------------------------
@@ -803,7 +803,7 @@ essToMini orig_e = go_expr orig_e
           NoInput -> do { i <- newIdent (getLoc t1) "i"
                         ; let kap_arg  = WC { wc_inp = PI( Variable i), wc_fxs = [] }
                               kap_body = WC { wc_inp = NoInput,         wc_fxs = fxs1' }
-                        ; XDLam Closed i <$> go kap_arg t1 <*> fmap add_check (go kap_body t2) }
+                        ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1') (go kap_body t2) }
           PI f -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
                      ; let kap_arg  = WC { wc_inp = PI (Variable i),            wc_fxs = [] }
@@ -811,14 +811,9 @@ essToMini orig_e = go_expr orig_e
                      ; e1 <- go kap_arg  t1
                      ; e2 <- go kap_body t2
                      ; return (XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
-                                                (add_check e2)) }
+                                                (eCheck fxs1' e2)) }
       where
         (aperture, fxs1') = getAperture fxs1
-        add_check e@(OfType {}) = e
-        add_check e             = eCheck fxs1' e
-           -- eCheck discards fxs=[], meaning no check to perform
-           -- add_check discards the redundant check in
-           --   check<w>{ W[t1 |> t2]<w>] }
 
     -- Core constructs used (only) in the Prelude
     -- Only used in the NoInput case
@@ -846,33 +841,6 @@ getAperture (eff:effs)           = (oc, eff : effs')
   where
     (oc, effs') = getAperture effs
 
-intersectEffects :: [EffNoOC] -> [EffNoOC] -> [EffNoOC]
--- [] means "all effects"
-intersectEffects effs1        []    = effs1
-intersectEffects []           effs2 = effs2
-intersectEffects (eff1:effs1) effs2 = map (intersectEff1 eff1) (intersectEffects effs1 effs2)
-
-intersectEff1 :: EffNoOC -> EffNoOC -> EffNoOC  -- Not expecting EOpen/EClosed
-intersectEff1 EIterates EFails    = EFails
-intersectEff1 EIterates EDecides  = EDecides
-intersectEff1 EIterates ESucceeds = ESucceeds
-intersectEff1 EIterates EIterates = EIterates
-
-intersectEff1 EDecides  EFails    = error "intersectEff-1"
-intersectEff1 EDecides  EDecides  = EDecides
-intersectEff1 EDecides  EIterates = EDecides
-intersectEff1 EDecides  ESucceeds = ESucceeds
-
-intersectEff1 ESucceeds EFails    = error "intersectEff-2"
-intersectEff1 ESucceeds ESucceeds = ESucceeds
-intersectEff1 ESucceeds EDecides  = ESucceeds
-intersectEff1 ESucceeds EIterates = ESucceeds
-
-intersectEff1 EFails    EFails  = EFails
-intersectEff1 EFails    eff     = error ("intersectEff-3 " ++ show eff)
-
-intersectEff1 eff1 eff2 = error ("intersectEff-4 " ++ show eff1 ++ " " ++ show eff2)
-
 --------------------------------------------------------
 --
 --     Desugaring Mini Verse to Big Core
@@ -887,15 +855,20 @@ data Pi
   deriving (Eq, Ord, Show)
 
 data DsMode
-  = MX -- ^ x "execution"
-  | MV -- ^ + "verification"
-  | MI -- ^ - "checking" ("implementation")
+  = MX       -- ^ x "execution"
+  | MV Bool  -- ^ + "verification"; True <=> immediate consumer is a verify{}
+  | MI       -- ^ - "client" ("implementation")
   deriving (Eq, Ord, Show)
 
 miniToCore :: DsMode -> SrcMini -> DsM SrcCore
 -- The V transformation; Fig 9 in verse-spec.pdf
 miniToCore orig_md = go (orig_md,[])
   where
+    go_nt :: (DsMode,[Ident]) -> SrcMini -> DsM SrcCore
+    -- go_nt is just `go` in a non-tail context
+    go_nt (MV True, xs) = go (MV False, xs)
+    go_nt md            = go md
+
     go :: (DsMode, [Ident]) -> SrcMini -> DsM SrcCore
     go _md Fail            = return Fail  -- MFAIL
     go _md e@(Lit {})      = return e     -- MCONST
@@ -904,28 +877,33 @@ miniToCore orig_md = go (orig_md,[])
     go _md e@(DefineV {})  = return e     -- MBIND
 
     -- MTUP, MTRUTH, MSEMI, MEQ, MCHOICE, MAPP
-    go md (Array es)     = Array <$> mapM (go md) es
+    go md (Array es)     = Array <$> mapM (go_nt md) es
     go md (Truth e)      = Truth <$> go md e
-    go md (Seq es)       = do { es' <- mapM (go md) es; return (Seq es') }
-    go md (Unify e1 e2)  = eUnify <$> go md e1 <*> go md e2
-    go md (Choice e1 e2) = Choice <$> go md e1 <*> go md e2
-    go md (ApplyD e1 e2) = ApplyD <$> go md e1 <*> go md e2
+    go md (Seq es_seq)   = do { let (es,e) = unSeq es_seq
+                              ; es' <- mapM (go_nt md) es
+                              ; e'  <- go md e
+                              ; return (eSeq (es' ++ [e'])) }
+    go md (Unify e1 e2)  = eUnify <$> go_nt md e1 <*> go_nt md e2
+    go md (ApplyD e1 e2) = ApplyD <$> go_nt md e1 <*> go_nt md e2
+    go md (Choice e1 e2) = Choice <$> go md    e1 <*> go md    e2
     go md (Exists xs e)  = Exists xs <$> go md e
 
     -- MFOR, MIF
-    go md (For2 e1 e2)   = For2 <$> go md e1 <*> go md e2
-    go md (If3 e1 e2 e3) = If3 <$> go md e1 <*> go md e2 <*> go md e3
-    go md (One e)        = One <$> go md e
-    go md (All e)        = All <$> go md e
+    go md (For2 e1 e2)   = For2 <$> go_nt md e1 <*> go_nt md e2
+    go md (If3 e1 e2 e3) = If3 <$> go_nt md e1 <*> go_nt md e2 <*> go_nt md e3
+    go md (One e)        = One <$> go_nt md e
+    go md (All e)        = All <$> go_nt md e
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
     go md@(sig,xs) (OfType e1 fx e2)
       = case sig of
-          MV -> do { body <- do_mx
-                   ; rest <- do_mi
-                   ; return (eSeq [eVerify [] body, rest]) }
-          MI -> do_mi
-          MX -> do_mx
+          MX       -> do_mvmx
+          MI       -> do_mi
+          MV False -> do { body <- do_mvmx
+                         ; rest <- do_mi
+                         ; return (eSeq [eVerify [] body, rest]) }
+          MV True -> do { body <- do_mvmx
+                        ; return (eVerify [] body) }
       where
         do_mi = do { (dz, z) <- defineDE "z" (go (MX,xs) e2)
                          -- Very important: use MX here because we don't want
@@ -937,33 +915,39 @@ miniToCore orig_md = go (orig_md,[])
 
                    ; return (eGuard gds (eSeq [ eHavoc fx, dz, eSome z])) }
 
-        do_mx = do { e1' <- go md e1
-                   ; e2' <- go md e2
-                   ; if isAtomic e1'  -- Just an optimisation
-                     then return (Check [ESucceeds] (ApplyD e2' e1'))
-                     else do { r <- newIdent (getLoc e1) "r"
-                             ; return (eSeq [ DefineV r, eUnify (Variable r) (eCheck fx e1')
-                                            , Check [ESucceeds] (ApplyD e2' (Variable r)) ]) } }
+        do_mvmx = do { e1' <- go_nt md e1   -- Notice md; may be MV or MX
+                     ; e2' <- go_nt md e2
+                     ; if isAtomic e1'  -- Just an optimisation
+                       then return (Check [ESucceeds] (ApplyD e2' e1'))
+                       else do { r <- newIdent (getLoc e1) "r"
+                              ; return (eSeq [ DefineV r, eUnify (Variable r) (eCheck fx e1')
+                                             , Check [ESucceeds] (ApplyD e2' (Variable r)) ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md@(m,_) (Check fx e)
       = case m of
-           MV -> Check fx <$> go md e
-           MI -> go md e
-           MX -> Check fx <$> go md e
+           MV {} -> Check fx <$> go_nt md e   -- ToDo: check that go_mt
+           MI    -> go md e
+           MX    -> Check fx <$> go md e
                  -- go md e  -- Drop the check here; see test `jan1`
 
     -- Functions proper: MCFUN+, MCFUN-, MCFUNX
-    go (MV,xs) e@(XDLam Closed x e1 e2)
-      | shortCutDefnVerify e1 e2
-      = go (MI,xs) e
+    go (MV omit_client, xs) e@(XDLam Closed x e1 e2)
+      | omit_verify, omit_client = return (Array [])
+      | omit_verify              = go (MI,xs) e
+      | omit_client              = do_verify
       | otherwise
-      = do { e1'  <- go (MI, x:xs) e1
-           ; e2'  <- go (MV, x:xs) e2
+      = do { ever <- do_verify
            ; efun <- go (MI, xs) e
-           ; return (eSeq [ eVerify [x] (eSeq [e1',e2']), efun ]) }
+           ; return (eSeq [ever, efun]) }
+      where
+        omit_verify = shortCutDefnVerify e1 e2
+        do_verify = do { e1' <- go (MI,       x:xs) e1
+                       ; e2' <- go (MV True, x:xs) e2
+                       ; return (eVerify [x] (eSeq [e1',e2'])) }
+
     go (MI,xs) (XDLam Closed x e1 e2)
-      = do { e1' <- go (MV, x:xs) e1
+      = do { e1' <- go (MV False, x:xs) e1
            ; e2' <- go (MI, x:xs) e2
            ; return (Lam x (eSeq [ e1', e2' ])) }
     go (MX,xs) (XDLam Closed x e1 e2)

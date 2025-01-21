@@ -69,12 +69,12 @@ $$
 & = & \begin{array}[t]{@@{}l}
   |verifyKW| (;) \left\{ \begin{array}{@@{}l}
        |defintro r; r == check fx (DMe3 mdpos si e_1);| \\
-       |check succeeds (apply1N ((DMe3 mdpos si e_2)) r))|
+       |check succeeds (DMe3 mdpos si (apply1N e_2 r))|
   \end{array} \right\} ; \\
   |DMe3 mdneg si (oftypefx e_1 fx e_2|
   \end{array} \\
 \rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
- & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
+ & = & |si guard (havoc fx; some (DMe3 mdx emp e_2))| \\
 \rulename{moftypex} & |DMe3 mdx si (oftypefx e_1 fx e_2)|
 & = & \begin{array}[t]{@@{}l}
     |defintro r; r == check fx (DMe3 mdx si e_1);| \\
