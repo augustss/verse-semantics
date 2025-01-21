@@ -803,8 +803,11 @@ isConst _       = False
 -- Values, except lambda
 isValue :: SrcExpr -> Bool
 isValue Variable{} = True
+isValue (Lam {})   = True
+isValue (XDLam {}) = True
 isValue (Array es) = all isValue es
-isValue e = isConst e
+isValue (Truth e)  = isValue e
+isValue e          = isConst e
 
 isAtomic :: SrcExpr -> Bool
 -- True of small expressions

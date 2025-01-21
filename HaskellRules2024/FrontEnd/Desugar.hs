@@ -966,7 +966,8 @@ shortCutDefnVerify :: SrcMini -> SrcMini -> Bool
 -- True if the expression definitely verifies
 -- Used to reduce clutter, esp for type{e} = fun(x:=e){x}
 shortCutDefnVerify e1 e2
-  | isValue e2 = True
+  | isConst e2         = True
+  | Variable {} <- e2  = True
   | Check [ESucceeds] body <- e2
   = case body of
       Variable x       -> x `elem` pat_binders
