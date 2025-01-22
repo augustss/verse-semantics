@@ -694,11 +694,6 @@ pPrintPrecE lvl prec the_expr
        --                  , indent (braces (ppr0 e)) ]
 
        Verify bl ->
-{-
-       cat [ text "verify" <> parens (sep [ fsep (punctuate comma (map pPrint ids)) <> char ';'
-                                                       , fsep (punctuate comma (map pPrint as)) ])
-                        , indent (braces (ppr0 body)) ]
--}
          block (text "verify" <> parens (sep [ fsep (punctuate comma (map pPrint ids)) <> char ';'
                                              , fsep (punctuate comma (map pPrint as)) ]))
                body
