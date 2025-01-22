@@ -1121,7 +1121,7 @@ newInt = MkD $ \(DEnv { nextNo = ref }) ->
 newIdent :: Loc -> String -> DsM Ident
 newIdent l s = do
   n <- newInt
-  pure $ Ident l $ "$" ++ s ++ show n
+  pure $ Ident l $ s ++ show n -- do not put "$" here, "$" is reserved for skolems
 
 
 instance Pretty DError where
