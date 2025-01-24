@@ -113,3 +113,11 @@ convert' (L loc e) arg = case e of
         empty')
        e_x)
       e_f
+  Exi x e ->
+    L loc . CPS.Exi x <$> convert' e arg
+  Int x ->
+    pure . L loc $
+    CPS.AppSuccess arg.succeed (CPS.Int x) arg.state arg.fail arg.empty
+  Fail ->
+    pure . L loc $
+    CPS.AppFailure arg.fail
