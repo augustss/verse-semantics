@@ -252,6 +252,10 @@ arrayOpStep _env lhs =
   do { Op ArrApp :@: Tup [e1,e2,res] <- [lhs]
      ; (do { Tup vs1 <- [e1]; Tup vs2 <- [e2]; pure $ equateArr res (vs1++vs2) })
      ++
+       (do { Tup [] <- [e1]; pure $ (e2 :=: res) :>: res })
+     ++
+       (do { Tup [] <- [e2]; pure $ (e1 :=: res) :>: res })
+     ++
        (do { Just (ls,vs2) <- [dropEqualPrefix e1 res]; pure $ foldr (:>:) (equateArr e2 vs2) ls })
      ++
        (do { Just (ls,vs1) <- [dropEqualSuffix e2 res]; pure $ foldr (:>:) (equateArr e1 vs1) ls }) }
