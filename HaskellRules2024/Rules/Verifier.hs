@@ -92,29 +92,27 @@ arrStep env lhs =
       guard (isJust (groundValue all_rs i))
       pure (pPrint e1, Verify $ bindList rs
                          (as, ctx <@ inRange i sz))
-
   ++
-  "ARR-MAP" `nameWith`   -- ArrMap$[f, Arr(n){e}]
-                         --   --> n:=size(1){f[some(\_.e)]};
-                         --       choose(n){Arr(v){f[e]}}
-  do Op ArrMap :@: arg@(Tup [f, arr@(Arr v e)]) <- [lhs]
-     let n = identNotIn $ free arg
-     pure (pPrint arr, Exi $ bind n $
-                       coreSeq [ Var n :=: mkSize (litInt 1) (mkApp f (someUnderscore e))
-                               , Choose (Var n) (Arr v (mkApp f e)) ])
+  "ARR-MAP" `nameWith`   -- ArrMap$[f,a] --> for(x:a){f[x]}
+  do Op ArrMap :@: Tup [f, arr@(Arr _ _)] <- [lhs]
+     let x:i:_ = identsNotIn (free (f,arr))
+     pure (pPrint arr, Iter IterFor
+             ( Exi $ bind i $ Exi $ bind x $
+                 (Var x :=: (arr :@: Var i)) :>:
+                 lamUnderscore (f :@: Var x)
+             ) (Tup [])
+          )
   ++
   "ARR-APP" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
   do arr@(Arr sz e) :@: v <- [lhs]
      pure (pPrint arr, (Op DotDot :@: Tup [v,sz]) >>> someUnderscore e )
   ++
   "CHOOSE0" `name`
-  do Choose (LitInt k) _ <- [lhs]
-     guard (k==0)
+  do Choose (LitInt 0) _ <- [lhs]
      pure Fail
   ++
   "CHOOSE1" `name`
-  do Choose (LitInt k) e <- [lhs]
-     guard (k==1)
+  do Choose (LitInt 1) e <- [lhs]
      pure (someUnderscore e)
   ++
   "ALL-CHOOSE" `name`
@@ -122,17 +120,46 @@ arrStep env lhs =
      -- --> n := size(v){ C[ some(\_.e) ] } ;
      --     Arr(n){ C[e] }
      -- if boundvars(C) disjoint from freevars(v)
-  do Just all_body <- [matchAll lhs]
+  do Iter IterAll all_body e0 <- [lhs]
      (exis, ctx, Choose sz e) <- evalCtxLift [] all_body
      guard (free sz `disjointFrom` exis)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
        -- This guard seems to make no difference either way
-     let n = identNotIn $ free all_body
+     let n:a:b:_ = identsNotIn $ free all_body
      pure ( Exi $ bind n $
             (Var n :=: mkSize sz (wrapExis exis $
                                 ctx <@ Some (Lam $ bind underscore e)))
             :>:
-            (Arr (Var n) (wrapExis exis (ctx <@ e))) )
+            (Exi $ bind a $ Exi $ bind b $
+              (Var a :=: e0) :>:
+              (Op ArrApp :@: Tup [Arr (Var n) (wrapExis exis (ctx <@ e)),Var a,Var b]) >>>
+              Var b
+              )
+            )
+  ++
+  "FOR-CHOOSE" `name`
+     -- FOR{ C[ choose(v){e} ] }
+     -- --> n := size(v){ C[ some(\_.e) ] } ;
+     --     Arr(n){ C[e] }
+     -- if boundvars(C) disjoint from freevars(v)
+  do Iter IterFor for_body e0 <- [lhs]
+     (exis, ctx, Choose sz e) <- evalCtxLift [] for_body
+     guard (free sz `disjointFrom` exis)
+     guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
+       -- This guard seems to make no difference either way
+     let k:n:a:b:c:x:_ = identsNotIn $ free for_body
+     pure ( Exi $ bind n $ Exi $ bind k $
+            (Var k :=: Some (Lam $ bind x $ Op GEq :@: Tup [Var x, Lit (LInt 0)]))
+            :>:
+            (Var n :=: Some (Lam $ bind x $ Op GEq :@: Tup [Var x, Lit (LInt 0)]))
+            :>:
+            (Exi $ bind a $ Exi $ bind b $ Exi $ bind c $
+              (Var a :=: Choose (Var k) (Arr (Var n) (wrapExis exis (ctx <@ e)))) :>: 
+              (Var b :=: e0) :>:
+              (Op ArrApp :@: Tup [Var a,Var b,Var c]) >>>
+              Var c
+            )
+          )
 
 {-    CHOOSE-X does not seems to work quite right, and is much slower
 -}
@@ -167,7 +194,7 @@ arrStep env lhs =
             (Choose (Var n) (wrapExis exis (ctx <@ e))) )
 -}
  ++
-  "U-ARRAY" `name`  -- Arr n1 e1 = Arr n2 e2; e
+  "U-ARR" `name`  -- Arr n1 e1 = Arr n2 e2; e
                     -- --> (n1=n2); one{ n1=0 | some(\_.e1) = some(\_.e2) }; e
   do (Arr n1 e1 :=: Arr n2 e2) :>: e <- [lhs]
      pure (coreSeq [ n1 :=: n2
@@ -178,22 +205,16 @@ arrStep env lhs =
                                           (someUnderscore e1)
                                           (Tup []))
                    , e ])
-{-
  ++
-  "U-TUP-ARRAY" `name`  -- <v1,..,vk> = Arr n e1; e
+  "U-TUP-ARR" `name`  -- <v1,..,vk> = Arr n e1; e
                     -- --> (n=k); v1=some{\_.e1}; ..; vk=some{\_.e1}; e
-  do (a1 :=: a2) :>: e <- [lhs]
-     let isTup (Tup _) = True
-         isTup _       = False
-
-         isArr (Arr _ _) = True
-         isArr _         = False
-
-         toArr (Tup vs) = Arr (Lit (LInt (fromIntegral (length vs)))) (foldr (:|:) Fail vs)
-         toArr a        = a
-     guard ((isTup a1 && isArr a2) || (isTup a2 && isArr a1))
-     pure ((toArr a1 :=: toArr a2) :>: e)
--}
+  do (Tup vs :=: Arr n e1) :>: e <- [lhs]
+     pure ((Lit (LInt (fromIntegral (length vs))) :=: n) :>: foldr (\v -> ((v :=: e1) :>:)) e vs)
+ ++
+  "U-ARR-TUP" `name`  -- <v1,..,vk> = Arr n e1; e
+                    -- --> (n=k); v1=some{\_.e1}; ..; vk=some{\_.e1}; e
+  do (Arr n e1 :=: Tup vs) :>: e <- [lhs]
+     pure ((Lit (LInt (fromIntegral (length vs))) :=: n) :>: foldr (\v -> ((v :=: e1) :>:)) e vs)
 
 {-  (vs, n, e1, e) <- [ (vs, n, e1, e)
                        | 
