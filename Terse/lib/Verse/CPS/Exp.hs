@@ -14,7 +14,7 @@ import Verse.Name
 data ExpF a
   = Let
     {-# UNPACK #-} !Label
-    {-# UNPACK #-} !Label -- Parameter
+    {-# UNPACK #-} !Name -- Parameter
     {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Yield continuation
@@ -41,6 +41,7 @@ data ExpF a
     {-# UNPACK #-} !Label -- Failure continuation
     {-# UNPACK #-} !Label -- Empty continuation
     a
+    a
   | LetSuccess
     {-# UNPACK #-} !Label
     {-# UNPACK #-} !Label -- Parameter
@@ -48,15 +49,16 @@ data ExpF a
     {-# UNPACK #-} !Label -- Failure continuation
     {-# UNPACK #-} !Label -- Empty continuation
     a
+    a
   | AppSuccess
     {-# UNPACK #-} !Label -- Callee
     {-# UNPACK #-} !Val -- Argument
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Failure continuation
     {-# UNPACK #-} !Label -- Empty continuation
-  | LetFailure a
+  | LetFailure a a
   | AppFailure {-# UNPACK #-} !Label
-  | LetEmpty a
+  | LetEmpty a a
   | AppEmpty {-# UNPACK #-} !Label
   | LetEnv {-# UNPACK #-} !Label {-# UNPACK #-} !Label a
   | LetState {-# UNPACK #-} !Label a

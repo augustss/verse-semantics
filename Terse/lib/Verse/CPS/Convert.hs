@@ -71,3 +71,45 @@ convert' (L loc e) arg = case e of
   Var x ->
     pure . L loc $
     CPS.AppSuccess arg.succeed (CPS.Var x) arg.state arg.fail arg.empty
+  Abs x e -> do
+    f <- newLabel
+    env <- newLabel
+    state <- newLabel
+    yield <- newLabel
+    succeed <- newLabel
+    fail <- newLabel
+    empty <- newLabel
+    e <- convert' e Arg {..}
+    pure . L loc $
+      CPS.Let f x env state yield succeed fail empty e . L loc $
+      CPS.AppSuccess arg.succeed (CPS.Label f) arg.state arg.fail arg.empty
+  App e_f e_x -> do
+    succeed <- newLabel
+    f <- newLabel
+    state <- newLabel
+    fail <- newLabel
+    empty <- newLabel
+    succeed' <- newLabel
+    x <- newLabel
+    state' <- newLabel
+    fail' <- newLabel
+    empty' <- newLabel
+    e_f <- convert' e_f arg { succeed, empty = arg.empty }
+    e_x <- convert' e_x arg { succeed = succeed', state, fail, empty }
+    pure . L loc $ CPS.LetSuccess succeed f
+      state
+      fail
+      empty
+      (L loc $ CPS.LetSuccess succeed' x
+       state'
+       fail'
+       empty'
+       (L loc $ CPS.App f (CPS.Label x)
+        arg.env
+        state'
+        arg.yield
+        arg.succeed
+        fail'
+        empty')
+       e_x)
+      e_f
