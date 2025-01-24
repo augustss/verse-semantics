@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Main where
 
-import Rules.Core
-import Rules.TRS2024 as TRS2024
-import TRS.Traced
-import TRS.Bind
+import Core.Expr
+import Core.TRS2024 as TRS2024
+import Core.Traced
+import Core.Bind
 import Test.QuickCheck
 
 --------------------------------------------------------------------------------

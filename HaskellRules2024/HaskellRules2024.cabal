@@ -47,11 +47,11 @@ executable confluence-check
 
     -- In an executable, exposed-modules doesn't matter
     other-modules:
-                      Rules.Core
-                      Rules.Solver
-                      Rules.TRS2024
-                      TRS.Bind
-                      TRS.Traced
+                      Core.Expr
+                      Core.Solver
+                      Core.TRS2024
+                      Core.Bind
+                      Core.Traced
                       Epic.Print
                       Epic.List
                       Epic.UnionFind
@@ -191,12 +191,12 @@ library verse-libs
                       FrontEnd.Prelude
                       FrontEnd.Desugar
                       FrontEnd.ToCore
-                      Rules.Core
-                      Rules.Solver
-                      Rules.TRS2024
-                      Rules.Verifier
-                      TRS.Bind
-                      TRS.Traced
+                      Core.Expr
+                      Core.Solver
+                      Core.TRS2024
+                      Core.Verifier
+                      Core.Bind
+                      Core.Traced
 
 --                      Epic.Applicative
 --                      Epic.Lens

@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# HLINT ignore "Fuse foldr/map" #-}
-module TRS.Bind
+module Core.Bind
   ( Ident(..), SkolIdent
   , ident, underscore, isUnderscore
   , identsNotInPrefix, identsNotIn, identNotIn, skolNotIn, skolsNotIn

@@ -5,18 +5,18 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# HLINT ignore "Eta reduce" #-}
 
-module Rules.Verifier(
+module Core.Verifier(
     verificationRules
   ) where
 
-import TRS.Bind
-import Rules.Core
-import Rules.TRS2024 as TRS2024
+import Core.Bind
+import Core.Expr
+import Core.TRS2024 as TRS2024
 import Epic.Print hiding ( (<>) )
 
 import Data.Maybe ( isJust )
 import Control.Monad (guard)
-import Rules.Solver (unsat)
+import Core.Solver (unsat)
 
 --------------------------------------------------------
 --

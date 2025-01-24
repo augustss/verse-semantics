@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE RecordWildCards,MultiWayIf #-}
 
-module Rules.TRS2024 (
+module Core.TRS2024 (
      runtimeRules, runtimeAndVerificationStep, recStep
    , blocked, blkd, choiceFreeLH
    , name, nameWith, iff
@@ -12,8 +12,8 @@ module Rules.TRS2024 (
 
 import Prelude
 
-import TRS.Bind
-import Rules.Core
+import Core.Bind
+import Core.Expr
 import Epic.Print hiding ( (<>) )
 import FrontEnd.Error
 

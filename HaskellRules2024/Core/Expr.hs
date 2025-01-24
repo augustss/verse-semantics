@@ -7,7 +7,7 @@
 {-# HLINT ignore "Eta reduce" #-}
 {-# HLINT ignore "Use :" #-}
 
-module Rules.Core
+module Core.Expr
   ( -- The data type itself
     Expr(..), Val, pattern LitInt
   , Ident(..)
@@ -51,8 +51,8 @@ import Epic.Print
 
 import Data.Data(Data)
 import Data.List( union, delete, isPrefixOf )
-import TRS.Bind
-import TRS.Traced
+import Core.Bind
+import Core.Traced
 import Test.QuickCheck
 
 import Control.Monad( liftM2 )

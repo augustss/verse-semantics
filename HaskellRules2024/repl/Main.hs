@@ -4,10 +4,10 @@ module Main(main) where
 
 import Prelude
 
-import Rules.Core     as Rules
-import Rules.TRS2024  as TRS2024
-import Rules.Verifier as Verifier
-import TRS.Traced
+import Core.Expr     as Core
+import Core.TRS2024  as TRS2024
+import Core.Verifier as Verifier
+import Core.Traced
 
 import FrontEnd.CopyHook
 import FrontEnd.Flags( Flags(..), defaultFlags )
@@ -141,7 +141,7 @@ data SomeExpr = NoExpr
               | Parsed    SrcExpr
               | Desugared SrcExpr
               | Cores     [SrcCore]
-              | RulesCore Rules.Expr
+              | RulesCore Core.Expr
               deriving( Show )
 
 instance Pretty SomeExpr where
@@ -165,7 +165,7 @@ asSrcExpr :: SomeExpr -> SrcExpr
 asSrcExpr (Desugared e) = e
 asSrcExpr e = asParsed e
 
-asCore :: SomeExpr -> Rules.Expr
+asCore :: SomeExpr -> Core.Expr
 asCore (RulesCore e) = e
 asCore _             = error "Current expresion has not been desugared to Core"
 
@@ -373,13 +373,13 @@ cEval
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { putStrLn ("\n\n------- Prep'd ---------")
-       ; let core_expr, prepd_expr :: Rules.Expr
+       ; let core_expr, prepd_expr :: Core.Expr
              core_expr  = asCore e
              prepd_expr = prep core_expr
        ; putStrLn (prettyShow prepd_expr)
 
        ; putStrLn ("\n\n------- Evaluate ---------")
-       ; let eval_it = Rules.normalize (fEvalSteps (cs_flags s)) TRS2024.runtimeRules
+       ; let eval_it = Core.normalize (fEvalSteps (cs_flags s)) TRS2024.runtimeRules
 
        ; core_result <- showEvalResult (fTraceEval $ cs_flags s) "Evaluation" (eval_it prepd_expr)
 
@@ -391,9 +391,9 @@ cVerify
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { putStrLn ("\n\n------- Prep'd ---------")
-       ; let verify_it = Rules.normalize (fEvalSteps (cs_flags s))
-                              (Rules.everywhere Verifier.verificationRules)
-       ; let core_expr, prepd_expr :: Rules.Expr
+       ; let verify_it = Core.normalize (fEvalSteps (cs_flags s))
+                              (Core.everywhere Verifier.verificationRules)
+       ; let core_expr, prepd_expr :: Core.Expr
              core_expr  = asCore e
              prepd_expr = prep core_expr
        ; putStrLn (prettyShow prepd_expr)
@@ -404,7 +404,7 @@ cVerify
        ; pure (RulesCore e') }
 
 
-showEvalResult :: Bool -> String -> (NormResult, Traced Rules.Expr) -> IO Rules.Expr
+showEvalResult :: Bool -> String -> (NormResult, Traced Core.Expr) -> IO Core.Expr
 showEvalResult False _ (_, (e' :<-- _))
   = do { putStrLn (prettyShow e')
        ; return e' }

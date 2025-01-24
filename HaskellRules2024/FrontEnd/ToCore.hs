@@ -9,8 +9,8 @@ module FrontEnd.ToCore(
 
 import Prelude hiding (pi)
 
-import qualified Rules.Core as Core
-import qualified TRS.Bind   as TRS
+import qualified Core.Expr as Core
+import qualified Core.Bind as Bind
 
 import FrontEnd.Desugar
 import FrontEnd.Error
@@ -69,7 +69,7 @@ conv sc = expr
 
     -- binding/scope
     expr (Exists is e)  = coreExis is <$> conv (foldr S.insert sc is) e
-    expr (Lam i e)      = (Core.Lam . TRS.bind (toCoreIdent i)) <$> convD (S.insert i sc) e
+    expr (Lam i e)      = (Core.Lam . Bind.bind (toCoreIdent i)) <$> convD (S.insert i sc) e
 
     -- combinators
     expr (Seq es)       = Core.coreSeq <$> mapM expr es
@@ -131,7 +131,7 @@ coreExis :: [Ident] -> Core.Expr -> Core.Expr
 coreExis is e = Core.mkExis (map toCoreIdent is) e
 
 coreVerify :: [Ident] -> Core.Expr -> Core.Expr
-coreVerify is e = Core.Verify (TRS.bindList (map toCoreIdent is) ([], e))
+coreVerify is e = Core.Verify (Bind.bindList (map toCoreIdent is) ([], e))
 
 toCoreIdent :: Ident -> Core.Ident
 toCoreIdent (Ident _ s) = Core.Name s

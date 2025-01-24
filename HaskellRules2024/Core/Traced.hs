@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 
-module TRS.Traced(
+module Core.Traced(
   Traced(..), term, trace, start, (++>), loop,
   showTrace, showRevTrace, filterTrace,
   displayTrace, displayRevTrace,

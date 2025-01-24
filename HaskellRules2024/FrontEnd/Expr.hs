@@ -36,7 +36,7 @@ module FrontEnd.Expr(
 
 import Prelude hiding ((<>))  -- Epic.Print exports (<>)
 
-import Rules.Core( Lit(..), Ptr, Path(..), PrimOp(..) )
+import Core.Expr( Lit(..), Ptr, Path(..), PrimOp(..) )
 
 import FrontEnd.Error
 import Epic.List

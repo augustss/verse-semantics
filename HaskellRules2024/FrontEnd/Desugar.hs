@@ -12,7 +12,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
-import Rules.Core( PrimOp(..), allPrimOps, primOpString )
+import Core.Expr( PrimOp(..), allPrimOps, primOpString )
 
 -- Epic libraries
 import Epic.Print

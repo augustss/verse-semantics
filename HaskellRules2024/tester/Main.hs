@@ -15,11 +15,11 @@ import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pPare
                      , pString, pKeyword, many, optional, skip, eof )
 import FrontEnd.Prelude( findPrelude )
 
-import Rules.Core             as Rules
-import Rules.Verifier( verificationRules )
-import Rules.TRS2024 ( runtimeRules )
-import TRS.Traced as TRS ( Traced, term, trace )
-import TRS.Bind( bindList )
+import Core.Expr as Core
+import Core.Verifier( verificationRules )
+import Core.TRS2024 ( runtimeRules )
+import Core.Traced as TRS ( Traced, term, trace )
+import Core.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
 import Data.Generics.Uniplate.Data( universeBi )
@@ -307,16 +307,16 @@ widthFileName = 25
 --
 -----------------------------------------------
 
-srcToCore :: Flags -> Bool -> SrcExpr -> IO (Rules.Expr, [DError])
+srcToCore :: Flags -> Bool -> SrcExpr -> IO (Core.Expr, [DError])
 srcToCore flags add_verification e
   = do { (e1 :: SrcCore, errs1)    <- FrontEnd.Desugar.desugar flags add_verification e
-       ; (e2 :: Rules.Expr, errs2) <- FrontEnd.ToCore.convertToCore flags e1
-       ; let e3 = Rules.prep e2
+       ; (e2 :: Core.Expr, errs2) <- FrontEnd.ToCore.convertToCore flags e1
+       ; let e3 = Core.prep e2
        ; return (e3, errs1 ++ errs2) }
 
-evalExpr :: TestFlags -> Test -> Rules.Expr -> (NormResult, Traced Rules.Expr)
+evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Traced Core.Expr)
 evalExpr flags test e
-  = Rules.normalize (maxSteps flags) rules e
+  = Core.normalize (maxSteps flags) rules e
   where
     rules = case test of
               TestEvalEq {} -> runtimeRules
@@ -408,11 +408,11 @@ doTest tflg test src1 src2 = do
 --   replacing the code with FAIL if there was a desugaring error (e.g. unbound variable)
 wrapTest :: Bool -> (Expr, [DError]) -> Expr
 wrapTest wrap_me (core, errs)
-  | wrap_me   = Rules.Verify (bindList [] ([], Rules.mkCheck Succeeds core'))
+  | wrap_me   = Core.Verify (bindList [] ([], Core.mkCheck Succeeds core'))
   | otherwise = core
   where
     core' | null errs = core
-          | otherwise = (Rules.Lit (LInt 0) Rules.:=: Rules.Lit (LStr (prettyShow errs))) Rules.:>: Rules.Fail
+          | otherwise = (Core.Lit (LInt 0) Core.:=: Core.Lit (LStr (prettyShow errs))) Core.:>: Core.Fail
 
 
 desugarForVerification :: Test -> Bool
@@ -487,8 +487,8 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
 
 -- | Equivalence on values (or stuck expressions)
 -- e2=Nothing <=> e2=WRONG <=> e1 gets stuck without reaching a value
-equivValue :: Rules.Expr -> Maybe Rules.Expr -> Bool
-equivValue e1 (Just e2) = Rules.norm e1 == Rules.norm e2
+equivValue :: Core.Expr -> Maybe Core.Expr -> Bool
+equivValue e1 (Just e2) = Core.norm e1 == Core.norm e2
 equivValue e1 Nothing   = not (isVal e1)
 
 testHerald :: Test -> String

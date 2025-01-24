@@ -46,9 +46,9 @@ import qualified FrontEnd.Desugar
 import qualified FrontEnd.ToCore
 import Data.Scientific
 import Data.Text(unpack)
-import qualified Rules.Core as Rules
-import Rules.TRS2024( runtimeRules )
-import TRS.Traced(term)
+import qualified Core.Expr as Core
+import Core.TRS2024( runtimeRules )
+import Core.Traced(term)
 import Epic.Print(prettyShow, display)
 --import Debug.Trace
 
@@ -285,27 +285,27 @@ refImplEffToSrcEff S.Fails    = F.EFails
 refImplEffToSrcEff S.Succeeds = F.ESucceeds
 refImplEffToSrcEff S.Decides  = F.EDecides
 
-toFrozen :: Rules.Expr -> [V.FrozenVal]
-toFrozen (Rules.Lit (Rules.LInt i)) = pure $ V.FrozenVal (Just (V.Int i))
-toFrozen (Rules.Lit (Rules.LRat i _)) = pure $ V.FrozenVal (Just (V.Rational $ toRational i))
-toFrozen (Rules.Lit (Rules.LChar i)) = pure $ V.FrozenVal (Just (V.Char (toEnum (fromEnum i))))
-toFrozen (Rules.Tup vs) = do fs <- mapM toFrozen vs; pure $ V.FrozenVal (Just (V.Tuple fs))
-toFrozen (Rules.Tru v) = do f <- toFrozen v; pure $ V.FrozenVal (Just (V.Truth f))
-toFrozen (e1 Rules.:|: e2) = toFrozen e1 ++ toFrozen e2
-toFrozen (Rules.Fail) = []
+toFrozen :: Core.Expr -> [V.FrozenVal]
+toFrozen (Core.Lit (Core.LInt i)) = pure $ V.FrozenVal (Just (V.Int i))
+toFrozen (Core.Lit (Core.LRat i _)) = pure $ V.FrozenVal (Just (V.Rational $ toRational i))
+toFrozen (Core.Lit (Core.LChar i)) = pure $ V.FrozenVal (Just (V.Char (toEnum (fromEnum i))))
+toFrozen (Core.Tup vs) = do fs <- mapM toFrozen vs; pure $ V.FrozenVal (Just (V.Tuple fs))
+toFrozen (Core.Tru v) = do f <- toFrozen v; pure $ V.FrozenVal (Just (V.Truth f))
+toFrozen (e1 Core.:|: e2) = toFrozen e1 ++ toFrozen e2
+toFrozen (Core.Fail) = []
 toFrozen e = error $ "toFrozen: " ++ prettyShow e
 
-isOKResult :: Rules.Expr -> Bool
-isOKResult (Rules.Lit _) = True
-isOKResult (Rules.Tup es) = all isOKResult es
-isOKResult (Rules.Tru e) = isOKResult e
-isOKResult (e1 Rules.:|: e2) = isOKResult e1 && isOKResult e2
-isOKResult (Rules.Fail) = True
+isOKResult :: Core.Expr -> Bool
+isOKResult (Core.Lit _) = True
+isOKResult (Core.Tup es) = all isOKResult es
+isOKResult (Core.Tru e) = isOKResult e
+isOKResult (e1 Core.:|: e2) = isOKResult e1 && isOKResult e2
+isOKResult (Core.Fail) = True
 isOKResult _ = False
 
 --------------
 
-srcToCore :: F.Flags -> Bool -> F.SrcExpr -> IO Rules.Expr
+srcToCore :: F.Flags -> Bool -> F.SrcExpr -> IO Core.Expr
 srcToCore flags add_verification e = do
   when dumpDesugar $
     putStrLn $ "\n-------------\ne=\n" ++ prettyShow e
@@ -315,13 +315,13 @@ srcToCore flags add_verification e = do
   (e2,_) <- FrontEnd.ToCore.convertToCore flags e1
   when dumpDesugar $
     putStrLn $ "\n-------------\ne2=\n" ++ prettyShow e2
-  let e3 = Rules.prep e2
+  let e3 = Core.prep e2
   return e3
 
-evalExpr :: TestFlags -> F.SrcExpr -> IO (Maybe Rules.Expr)
+evalExpr :: TestFlags -> F.SrcExpr -> IO (Maybe Core.Expr)
 evalExpr tflg e = do
   ce <- srcToCore F.defaultFlags Prelude.False e
-  let (r, tr) = Rules.normalize steps runtimeRules ce
+  let (r, tr) = Core.normalize steps runtimeRules ce
       v = term tr
       steps = 20000
   when (showTrace tflg) $ do
@@ -329,12 +329,12 @@ evalExpr tflg e = do
     display tr
 
   case r of
-    Rules.NormOK | isOKResult v -> return (Just v)
-                 | otherwise -> return Nothing
-    Rules.NormExpired -> do
+    Core.NormOK | isOKResult v -> return (Just v)
+                | otherwise -> return Nothing
+    Core.NormExpired -> do
       putStrLn "*** Ran out of fuel"
       return Nothing
-    Rules.NormInvalid -> error $ "Invalid reduction result:\n" ++ prettyShow v
+    Core.NormInvalid -> error $ "Invalid reduction result:\n" ++ prettyShow v
 
 data TestFlags = TestFlags
   { onlyTest       :: !(Maybe String)      -- run only this test

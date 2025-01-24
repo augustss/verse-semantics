@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
-module Rules.Solver (unsat) where
-import Rules.Core
+module Core.Solver (unsat) where
+import Core.Expr
 import Epic.Print
 import qualified Epic.UnionFind as UF
 import Data.List ( nub )
