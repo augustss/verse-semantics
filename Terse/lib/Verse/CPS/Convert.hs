@@ -1,9 +1,12 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Verse.CPS.Convert
   ( convert
   ) where
+
+import Loc
 
 import Verse.CPS.Exp (Label)
 import Verse.CPS.Exp qualified as CPS
@@ -24,6 +27,7 @@ data Arg = Arg
   , yield :: {-# UNPACK #-} !CPS.Label
   , succeed :: {-# UNPACK #-} !CPS.Label
   , fail :: {-# UNPACK #-} !CPS.Label
+  , empty :: {-# UNPACK #-} !CPS.Label
   }
 
 newtype Convert a = Convert
@@ -58,6 +62,7 @@ convert x = runConvert $ do
   yield <- newLabel
   succeed <- newLabel
   fail <- newLabel
+  let empty = fail
   exp <- convert' x Arg {..}
   pure Result {..}
 
@@ -65,4 +70,4 @@ convert' :: LExp -> Arg -> Convert CPS.LExp
 convert' (L loc e) arg = case e of
   Var x ->
     pure . L loc $
-    AppSuccess arg.succeed (CPS.Var x) arg.state arg.fail arg.empty
+    CPS.AppSuccess arg.succeed (CPS.Var x) arg.state arg.fail arg.empty
