@@ -81,7 +81,7 @@ skolNotIn :: [SkolIdent] -> SkolIdent
 skolNotIn forb = head (skolsNotIn forb)
 
 skolsNotIn :: [SkolIdent] -> [SkolIdent]
-skolsNotIn forb = identsNotInPrefix "$r" forb
+skolsNotIn forb = identsNotInPrefix "$R" forb -- new skolems should not clash with existing existentials
 
 identNotIn :: [Ident] -> Ident
 identNotIn = head . identsNotIn
