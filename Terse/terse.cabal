@@ -26,8 +26,13 @@ library
     Ref
     Text
     Verse
+    Verse.CPS.Convert
+    Verse.CPS.Eval
+    Verse.CPS.Exp
+    Verse.CPS.Val
     Verse.Eval
     Verse.Exp
+    Verse.Fun
     Verse.Monad
     Verse.Name
     Verse.Parse

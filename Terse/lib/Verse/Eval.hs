@@ -34,15 +34,15 @@ import Loc
 import Ref
 
 import Verse.Exp
+import Verse.Fun (Fun)
+import Verse.Fun qualified as Fun
 import Verse.Monad (VerseT, runVerseT)
 import Verse.Monad qualified as Monad
 import Verse.Name
 import Verse.Val (Val)
 import Verse.Val qualified as Val
 
-eval
-  :: (MonadIO m, MonadRef m)
-  => LExp -> m (Either [[Loc]] [Fix (Val Identity)])
+eval :: LExp -> IO (Either [[Loc]] [Fix (Val Identity)])
 eval e = fmap done . flip runStateT Mem {..} . runVerseT $ do
   s1 <- newS'
   s2 <- freshS'
@@ -268,25 +268,25 @@ evalApp s1 s2 var1 var2 = readVar var1 >>= \ case
 
 evalAppFun
   :: (MonadIO m, MonadRef m, MonadState Mem m)
-  => S m -> S m -> Val.Fun -> Var m -> EvalT m (Var m)
+  => S m -> S m -> Fun -> Var m -> EvalT m (Var m)
 evalAppFun s1 s2 f x = case f of
-  Val.Plus -> do
+  Fun.Plus -> do
     (x1, x2) <- one $ readPair x <|> stuck
     evalPlus s1 s2 x1 x2
-  Val.Minus -> do
+  Fun.Minus -> do
     (x1, x2) <- one $ readPair x <|> stuck
     evalMinus s1 s2 x1 x2
-  Val.Less -> do
+  Fun.Less -> do
     (x1, x2) <- one $ readPair x <|> stuck
     evalLess s1 s2 x1 x2
-  Val.Alloc -> do
+  Fun.Alloc -> do
     unifyChoiceFree s1 s2
     readStoreFree s1
     readHeap
     var <- newVar . Val.Ptr <=< lift $ Monad.newVarsRef x
     unifyStoreFree s1 s2
     pure var
-  Val.Read -> readVar x >>= \ case
+  Fun.Read -> readVar x >>= \ case
     Val.Ptr x -> do
       unifyChoiceFree s1 s2
       readStoreFree s1
@@ -295,7 +295,7 @@ evalAppFun s1 s2 f x = case f of
       unifyStoreFree s1 s2
       pure var
     _ -> stuck
-  Val.Write -> do
+  Fun.Write -> do
     (x1, x2) <- one $ readPair x <|> stuck
     readVar x1 >>= \ case
       Val.Ptr x1 -> do
@@ -306,7 +306,7 @@ evalAppFun s1 s2 f x = case f of
         unifyStoreFree s1 s2
         newTup []
       _ -> stuck
-  Val.GetLine -> do
+  Fun.GetLine -> do
     one $ (unifyVar x =<< newTup []) <|> stuck
     unifyChoiceFree s1 s2
     readStoreFree s1
@@ -314,18 +314,18 @@ evalAppFun s1 s2 f x = case f of
     var <- newString =<< liftIO getLine
     unifyStoreFree s1 s2
     pure var
-  Val.ReadInt -> do
+  Fun.ReadInt -> do
     x <- one $ readString x <|> stuck
     unifyS s1 s2
     newTup <=< traverse (newPair <=< newInteger *** newString) $ reads x
-  Val.Print -> do
+  Fun.Print -> do
     unifyChoiceFree s1 s2
     readStoreFree s1
     readHeap
     liftIO . print . pretty =<< freeze x
     unifyStoreFree s1 s2
     newTup []
-  Val.IntMap -> do
+  Fun.Map -> do
     unifyChoiceFree s1 s2
     heap <- newHeap s1
     let

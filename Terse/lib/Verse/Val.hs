@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Verse.Val
   ( Val (..)
-  , Fun (..)
   , Env
   ) where
 
@@ -19,6 +18,7 @@ import Data.IntMap.Strict qualified as IntMap
 import Prettyprinter
 
 import Verse.Exp (LExp)
+import Verse.Fun (Fun)
 import Verse.Monad
 import Verse.Name
 
@@ -29,18 +29,6 @@ data Val f a
   | Fun !Fun
   | Ptr !(f a)
   | Map !(IntMap [a]) deriving Show
-
-data Fun
-  = Plus
-  | Minus
-  | Less
-  | Alloc
-  | Read
-  | Write
-  | GetLine
-  | ReadInt
-  | Print
-  | IntMap deriving (Show, Bounded, Enum)
 
 type Env = HashMap Name
 
@@ -78,19 +66,6 @@ instance (Pretty (f a), Pretty a) => Pretty (Val f a) where
             "fun" <>
             lparen <> "Arg" <> rparen <>
             lbrace <+> hcat (punctuate pipe $ f <$> x) <+> rbrace
-
-instance Pretty Fun where
-  pretty = \ case
-    Plus -> "operator'+'"
-    Minus -> "operator'-'"
-    Less -> "operator'<'"
-    Alloc -> "Alloc"
-    Read -> "Read"
-    Write -> "Write"
-    GetLine -> "GetLine"
-    ReadInt -> "ReadInt"
-    Print -> "Print"
-    IntMap -> "IntMap"
 
 instance Vars a m => Vars (Val f a) m where
   vars f = \ case
