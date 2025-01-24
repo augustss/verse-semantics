@@ -83,41 +83,117 @@ convert' (L loc e) arg = case e of
     pure . L loc $
       CPS.Let f x env state yield succeed fail empty e . L loc $
       CPS.AppSuccess arg.succeed (CPS.Label f) arg.state arg.fail arg.empty
-  App e_f e_x -> do
-    succeed <- newLabel
-    f <- newLabel
-    state <- newLabel
-    fail <- newLabel
-    empty <- newLabel
-    succeed' <- newLabel
-    x <- newLabel
-    state' <- newLabel
-    fail' <- newLabel
-    empty' <- newLabel
-    e_f <- convert' e_f arg { succeed, empty = arg.empty }
-    e_x <- convert' e_x arg { succeed = succeed', state, fail, empty }
-    pure . L loc $ CPS.LetSuccess succeed f
-      state
-      fail
-      empty
-      (L loc $ CPS.LetSuccess succeed' x
-       state'
-       fail'
-       empty'
-       (L loc $ CPS.App f (CPS.Label x)
-        arg.env
-        state'
-        arg.yield
-        arg.succeed
-        fail'
-        empty')
-       e_x)
-      e_f
+  App f x -> seq' f x arg $ \ f x arg ->
+    pure . L loc $ CPS.App f (CPS.Label x)
+      arg.env
+      arg.state
+      arg.yield
+      arg.succeed
+      arg.fail
+      arg.empty
   Exi x e ->
     L loc . CPS.Exi x <$> convert' e arg
   Int x ->
     pure . L loc $
     CPS.AppSuccess arg.succeed (CPS.Int x) arg.state arg.fail arg.empty
+  e1 :& e2 ->
+    seq_ e1 e2 arg
+  e1 := e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
+    pure . L loc $ CPS.Eq (CPS.Label x1) (CPS.Label x2)
+      arg.env
+      arg.state
+      arg.yield
+      arg.succeed
+      arg.empty
+  e1 :< e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
+    pure . L loc $ CPS.Less (CPS.Label x1) (CPS.Label x2)
+      arg.env
+      arg.state
+      arg.yield
+      arg.succeed
+      arg.empty
+  e1 :| e2 -> do
+    fail <- newLabel
+    empty <- newLabel
+    e1 <- convert' e1 arg { fail, empty }
+    e2 <- convert' e2 arg
+    pure . L loc . CPS.LetFailure fail e2 . L loc $ CPS.LetEmpty empty e2 e1
+  e1 :+ e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
+    pure . L loc $ CPS.Plus (CPS.Label x1) (CPS.Label x2)
+      arg.env
+      arg.state
+      arg.yield
+      arg.succeed
+  e1 :- e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
+    pure . L loc $ CPS.Minus (CPS.Label x1) (CPS.Label x2)
+      arg.env
+      arg.state
+      arg.yield
+      arg.succeed
   Fail ->
     pure . L loc $
     CPS.AppFailure arg.fail
+
+seq'
+  :: LExp -> LExp -> Arg
+  -> (Label -> Label -> Arg -> Convert CPS.LExp)
+  -> Convert CPS.LExp
+seq' e1 e2 arg f = do
+  succeed1 <- newLabel
+  x1 <- newLabel
+  state1 <- newLabel
+  fail1 <- newLabel
+  empty1 <- newLabel
+  succeed2 <- newLabel
+  x2 <- newLabel
+  state2 <- newLabel
+  fail2 <- newLabel
+  empty2 <- newLabel
+  e1 <- convert' e1 arg
+    { succeed = succeed1
+    , empty = arg.empty
+    }
+  e2 <- convert' e2 arg
+    { succeed = succeed2
+    , state = state1
+    , fail = fail1
+    , empty = empty1
+    }
+  e3 <- f x1 x2 arg
+    { state = state2
+    , fail = fail2
+    , empty = empty2
+    }
+  pure . L (extract e1) $ CPS.LetSuccess succeed1 x1
+    state1
+    fail1
+    empty1
+    (L (extract e2) $ CPS.LetSuccess succeed2 x2 state2 fail2 empty2 e3 e2)
+    e1
+
+seq_
+  :: LExp -> LExp -> Arg
+  -> Convert CPS.LExp
+seq_ e1 e2 arg = do
+  succeed1 <- newLabel
+  x1 <- newLabel
+  state1 <- newLabel
+  fail1 <- newLabel
+  empty1 <- newLabel
+  succeed2 <- newLabel
+  e1 <- convert' e1 arg
+    { succeed = succeed1
+    , empty = arg.empty
+    }
+  e2 <- convert' e2 arg
+    { succeed = succeed2
+    , state = state1
+    , fail = fail1
+    , empty = empty1
+    }
+  pure . L (extract e1) $ CPS.LetSuccess succeed1 x1
+    state1
+    fail1
+    empty1
+    e2
+    e1

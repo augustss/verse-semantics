@@ -56,9 +56,15 @@ data ExpF a
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Failure continuation
     {-# UNPACK #-} !Label -- Empty continuation
-  | LetFailure a a
+  | LetFailure
+    {-# UNPACK #-} !Label
+    a
+    a
   | AppFailure {-# UNPACK #-} !Label
-  | LetEmpty a a
+  | LetEmpty
+    {-# UNPACK #-} !Label
+    a
+    a
   | AppEmpty {-# UNPACK #-} !Label
   | LetEnv {-# UNPACK #-} !Label {-# UNPACK #-} !Label a
   | LetState {-# UNPACK #-} !Label a
@@ -76,7 +82,6 @@ data ExpF a
     {-# UNPACK #-} !Label -- Yield continuation
     {-# UNPACK #-} !Label -- Success continuation
     {-# UNPACK #-} !Label -- Empty continuation
-    !Label !Label
   | Less
     !Val -- Left
     !Val -- Right
@@ -99,7 +104,7 @@ data ExpF a
     {-# UNPACK #-} !Label -- Yield continuation
     {-# UNPACK #-} !Label -- Success continuation
     {-# UNPACK #-} !Label -- Failure continuation
-    deriving Show
+  deriving Show
 
 type Exp = Fix ExpF
 
