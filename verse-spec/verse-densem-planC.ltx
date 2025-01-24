@@ -36,14 +36,14 @@ $$
 \rulename{wconst}      & |SS wu k| & = & |wu `ueq` k| \\
 \rulename{wprim}   & |SS wu o| & = & |wu `ueq` o| \\
 \rulename{wvar}    & |SS wu x| & = & |wu `ueq` x| \\
+\rulename{wwild}    & |SS wu _| & = & |wu `ueq` (defintro x; x)| \\
+% \rulename{wwild2}    & |SS (apeff e fx) _| & = & |e| \\
 \rulename{wapp}    & |SS wu (apply1N t_1 t_2)| & = & |wu `ueq` apply1N ((SS wuinit t_1)) (SS wuinit t_2)| \\
 \rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` SS wuinit t_1 `choice` SS wuinit t_2| \\
 \rulename{wfor}   & |SS wu (fordo t_1 t_2)|
    & = & |wu `ueq` fordo (SS wuinit t_1) (SS wuinit t_2)| \\
 \rulename{wone} & |SS wu (one t)| & = & |wu `ueq` one (SS wuinit t)| \\
 \rulename{wall} & |SS wu (all t)| & = & |wu `ueq` all (SS wuinit t)| \\
-\rulename{wwild1}    & |SS (eff fx) _| & = & |defintro x; x| \\
-\rulename{wwild2}    & |SS (apeff e fx) _| & = & |e| \\
 \rulename{wfail}   & |SS wu fail| & = & |fail| \\
 \rulename{wunify}   & |SS wu (t_1 == t_2)| & = & |(SS wu t_1) = (SS wu t_2)| \\
 \rulename{wsemi}\asktim   & |SS wu (t_1 ; t_2)| & = & |SS wuinit t_1 ; SS wu t_2| \\
@@ -73,6 +73,10 @@ $$
 \rulename{wfun2}   & |SS (apeff f fx_2) (functionOCX q t_1 fx_1 t_2)|
 & = & |lamOCv q i (defintro x; x = SS (apeff i empty) t_1)
            (checkfun q f t_1; check fx_1 (SS (apeff (apply1N f x) fx_1) t_2))|  & \text{|i,x| fresh}\\
+\rulename{wtype1} \asktim   & |SS (eff fx) (type^{t})|
+   & = & |lam i (SS (apeff i empty) t)| & \text{|i| fresh} \\
+\rulename{wtype2} \asktim   & |SS (apeff f fx) (type^{t})|
+   & = & |lam i (SS (apeff (apply1N f i) empty) t)| & \text{|i| fresh} \\
 \end{array} \\[1mm]
 \textbf{Auxiliary functions} \\
 \hspace{3cm}

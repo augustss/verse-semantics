@@ -229,7 +229,7 @@ sDesugarExpr = ds
 
     -- type{t}  ==  Fun(x := t)<closed>{x}
     ds (Macro1 (Ident _ "type") _ e)
-      = do { e' <- ds e; encodeType e' }
+      = do { e' <- ds e; return (Type e') }
 
     -- I want to desugar Exists to DefineV; but to do that I need to make up
     -- fresh identifiers (easy) and substitute the fresh one for the old one
@@ -348,6 +348,7 @@ eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
                      (floats, rhs) = unSeq ts
 eDefine x rhs = DefineE x rhs
 
+{-
 encodeType :: SrcEssential -> DsM SrcEssential
 -- Encodes type{e}, returning  fun(x:=e}{x}
 -- You might think that a more direct desugaring would be
@@ -356,6 +357,7 @@ encodeType :: SrcEssential -> DsM SrcEssential
 -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
 encodeType e = do { x <- newIdent noLoc "x"
                   ; return (Function [(eDefine x e, [EClosed])] (Variable x)) }
+-}
 
 addSucceeds :: [Eff] -> [Eff]
 addSucceeds effs | any isCardinalityEff effs = effs
@@ -797,11 +799,19 @@ essToMini orig_e = go_expr orig_e
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
 
     -- Functions
+    go (WC { wc_inp = inp }) (Type t)
+      = do { i <- newIdent (getLoc t) "i"
+           ; let inp' = case inp of
+                           NoInput -> PI (Variable i)
+                           PI f    -> PI (ApplyD f (Variable i))
+           ; e <- go (WC { wc_inp = inp', wc_fxs = [] }) t
+           ; return (Lam i e) }
+
     go (WC { wc_inp = inp }) (Function [(t1,fxs1)] t2)
         -- NB: ignore wc_fxs
       = case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"
-                        ; let kap_arg  = WC { wc_inp = PI( Variable i), wc_fxs = [] }
+                        ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = [] }
                               kap_body = WC { wc_inp = NoInput,         wc_fxs = fxs1' }
                         ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1') (go kap_body t2) }
           PI f -> do { i <- newIdent (getLoc t1) "i"
@@ -905,7 +915,7 @@ miniToCore orig_md = go (orig_md,[])
           MV True -> do { body <- do_mvmx
                         ; return (eVerify [] body) }
       where
-        do_mi = do { (dz, z) <- defineDE "z" (go (MX,xs) e2)
+        do_mi = do { (dz, z) <- defineDE "z" (go (MI,xs) e2)
                          -- Very important: use MX here because we don't want
                          -- to generate verify's inside the Some.
                          -- Small example: M20Jan25-1

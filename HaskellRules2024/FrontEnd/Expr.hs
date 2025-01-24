@@ -123,6 +123,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Option (Maybe SrcExpr)       -- option{e}
   | Parens SrcExpr               -- (e)
 
+  | Type SrcBlk                  -- type{t}
   | Macro1 Ident [Eff] SrcBlk    -- m<a>{e}
   | Macro2 Ident SrcExpr SrcBlk  -- m(e1){e2}
   | Return SrcExpr               -- return e
@@ -596,6 +597,7 @@ instance Pretty SrcExpr where
                 where
                   ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
 
+          Type t       -> text "type" <> braces (ppr 0 t)
           Blk es       -> braces $ ppSeq lvl es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e     -> parens (ppr 0 e)
@@ -604,13 +606,9 @@ instance Pretty SrcExpr where
           MRef i t e   -> ppVRA "ref" i t e
           MAlias i t e -> ppVRA "alias" i t e
 
-          Macro1 (Ident _ "one") _ e  -> ppNormal (One e)
-          Macro1 (Ident _ "all") _ e  -> ppNormal (All e)
-          Macro1 (Ident _ m) rs e  -> cat [ text m <> ppEffs rs
-                                          , indent (ppB e) ]
+          Macro1 (Ident _ m) rs e  -> cat [ text m <> ppEffs rs, indent (ppB e) ]
           Macro2 (Ident _ m) e1 e2 -> cat [text m <> parens (ppr 0 e1), indent (ppB e2)]
-
-          Return e -> maybeParens (p>0) $ text "return" <+> ppr 2 e
+          Return e                 -> maybeParens (p>0) $ text "return" <+> ppr 2 e
 
           ----
           DefineV i      -> text "exists" <+> pPrint i
@@ -745,6 +743,7 @@ compos f (If3 e b1 b2)      = If3 <$> f e <*> f b1 <*> f b2
 compos f (For1 b)           = For1 <$> f b
 compos f (For2 e b)         = For2 <$> f e <*> f b
 compos f (Let e b)          = Let <$> f e <*> f b
+compos f (Type t)           = Type <$> f t
 compos f (Block b)          = Block <$> f b
 compos f (Case1 b)          = Case1 <$> f b
 compos f (Case2 e b)        = Case2 <$> f e <*> f b
@@ -849,6 +848,7 @@ getVisibleBinders = go
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e
+    go Type{}     = []
     go For2{}     = []
     go Block{}    = []
     go Let{}      = []  -- nothing visible from a let
@@ -899,6 +899,7 @@ getFree = fvs_blk
                             `remove` getVisibleBinders e1
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
+    fvs (Type t)          = fvs_blk t
     fvs (Range  _ e)      = fvs_blk e
     fvs (Check _ e)       = fvs_blk e
     fvs (Some e)          = fvs_blk e
@@ -937,6 +938,7 @@ getVar (ApplyS e1 e2)   = getVar e1 ++ getVar e2
 getVar (ApplyD e1 e2)   = getVar e1 ++ getVar e2
 getVar (If3 e _ _)      = getVar e
 getVar For2{}           = []
+getVar Type{}           = []
 getVar (Let _ e)        = getVar e
 getVar Block{}          = []
 getVar (Unify e1 e2)    = getVar e1 ++ getVar e2

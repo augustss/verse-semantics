@@ -123,6 +123,7 @@ $$
 &      & \vb & |functionOCX q t_1 fx t_2|  & \text{Function} \\
 &      & \vb & |: t|                      & \text{Range} \\
 &      & \vb & |oftypefx t_1 fx t_2|       & \text{Opacity}\\
+&      & \vb & |type^{t}|                  & \text{Type definition}\\
 &      & \vb & |check fx t|                & \text{Effects check} \\
 \\
 \text{Primops} & o  & ::= & |gt| \vb |add| \vb |int| \\
@@ -195,7 +196,9 @@ $$
                   &                           &             & & \text{fresh |f|,|i|,|a|}
 \\
 \multicolumn{5}{l}{\textbf{Function notation}} \\
-\rulename{dstype} &  |type^{t}| & \rightarrow & |functionOCX closed (x:=t) succeeds x| & \text{fresh |x|}\\
+% Not using dstype now
+% \rulename{dstype} &  |type^{t}| & \rightarrow & |functionOCX closed (x:=t) succeeds x| & \text{fresh |x|}\\
+
 \rulename{dsfarrow} &  |t_1 eqgt t_2| & \rightarrow & |functionOCX closed (t_1) succeeds t_2| \\
 \rulename{dsfun1} &  |functionOC oc (a_1 a_2 xdots a_n) t| & \rightarrow & |functionOC oc a_1 (functionOC oc (a_2 xdots a_n) t| \\
 \rulename{dsfun2a}  &   |functionOC oc (apeff a fx) b| & \rightarrow & |functionOCX oc a fx b| & \\

@@ -2,7 +2,7 @@
 
 verify("M20Jan25-1", pass){ f():type{(:string) => (:string)} := (x:any => x) }
   # M20Jan25-1: small example involving a higher order function type
-verify("M20Jan25-2", pass, broken)
+verify("M20Jan25-2", pass)
                           { (f():type{(:string) => (:string)} := (x:any => x))
                           ; string[ f[]["woo"] ] }
 verify("M20Jan25-3", fail){ (f():type{(:string) => (:string)} := (x:any => x))
