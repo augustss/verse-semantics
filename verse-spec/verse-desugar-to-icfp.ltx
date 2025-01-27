@@ -74,7 +74,7 @@ $$
   |DMe3 mdneg si (oftypefx e_1 fx e_2|
   \end{array} \\
 \rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
- & = & |si guard (havoc fx; some (DMe3 mdx emp e_2))| \\
+ & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
 \rulename{moftypex} & |DMe3 mdx si (oftypefx e_1 fx e_2)|
 & = & \begin{array}[t]{@@{}l}
     |defintro r; r == check fx (DMe3 mdx si e_1);| \\
