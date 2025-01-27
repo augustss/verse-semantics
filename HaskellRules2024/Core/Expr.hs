@@ -20,7 +20,7 @@ module Core.Expr
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkExis, mkApp, mkEqual, mkIf, mkIfThunk, mkOne, mkAll, mkFor, mkForThunk, matchAll, mkCheck, matchCheck, mkSize
+  , mkExis, mkApp, mkEqual, mkIf, mkOne, mkAll, mkFor, matchAll, mkCheck, matchCheck, mkSize
   , lamUnderscore, someUnderscore, wrong
 
     -- Assupmtions
@@ -269,11 +269,8 @@ mkEqual e1 e2 e3
   where
     x = identNotIn $ free (e1,e2,e3)
 
-mkIf :: [Ident] -> Expr -> Expr -> Expr -> Expr
-mkIf xs e1 e2 e3 = Iter IterIf (mkExis xs (e1 >>> lamUnderscore e2)) e3
-
-mkIfThunk :: Expr -> Expr -> Expr
-mkIfThunk e1 e2 = Iter IterIf e1 e2
+mkIf :: Expr -> Expr -> Expr
+mkIf e1 e2 = Iter IterIf e1 e2
 
 mkExis :: [Ident] -> Expr -> Expr
 mkExis []     e = e
@@ -282,11 +279,8 @@ mkExis (x:xs) e = Exi (bind x (mkExis xs e))
 mkOne :: Expr -> Expr
 mkOne e = Iter IterOne e Fail
 
-mkFor :: [Ident] -> Expr -> Expr -> Expr
-mkFor xs e1 e2 = Iter IterFor (mkExis xs (e1 :>: lamUnderscore e2)) (Tup [])
-
-mkForThunk :: Expr -> Expr
-mkForThunk e = Iter IterFor e (Tup [])
+mkFor :: Expr -> Expr
+mkFor e = Iter IterFor e (Tup [])
 
 mkAll :: Expr -> Expr
 mkAll e = Iter IterAll e (Tup [])
@@ -302,11 +296,11 @@ mkCheck Iterates e = e
 
 -- check<fails>{e} --> if(e){WRONG}{fail}
 mkCheck Fails e =
-  mkIfThunk (e >>> lamUnderscore (wrongFx Fails)) Fail
+  mkIf (e >>> lamUnderscore (wrongFx Fails)) Fail
 
 -- check<succeeds>{e} --> if(<x>:=all{e}){x}{WRONG}
 mkCheck Succeeds e =
-  mkIfThunk
+  mkIf
     (Exi $ bind x $
       (Tup [Var x] :=: mkAll e) :>: lamUnderscore (Var x))
     (wrongFx Succeeds)
@@ -315,7 +309,7 @@ mkCheck Succeeds e =
 
 -- check<decides>{e} --> if(a:=all{e};a=(<>|<_>)){<x>:=a;x}{WRONG}
 mkCheck Decides e =
-  mkIfThunk
+  mkIf
     (Exi $ bind a $
       (Var a :=: mkAll e) :>:
       (Exi $ bind y $

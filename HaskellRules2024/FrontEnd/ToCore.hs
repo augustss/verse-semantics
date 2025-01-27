@@ -94,8 +94,8 @@ conv sc = expr
     -- iter constructs
     expr (One e)        = Core.mkOne <$> exprD e
     expr (All e)        = Core.mkAll <$> exprD e
-    expr (If3 e1 e2 e3) = Core.mkIfThunk <$> exprD (eSeq [e1, eThunk e2]) <*> exprD e3
-    expr (For2 e1 e2)   = Core.mkForThunk <$> exprD (eSeq [e1, eThunk e2])
+    expr (If3 e1 e2 e3) = Core.mkIf  <$> exprD (eSeq [e1, eThunk e2]) <*> exprD e3
+    expr (For2 e1 e2)   = Core.mkFor <$> exprD (eSeq [e1, eThunk e2])
 
     -- catch all, impossible case?
     expr e = error (show e)
