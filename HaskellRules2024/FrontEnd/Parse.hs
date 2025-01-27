@@ -361,10 +361,14 @@ pTerm = do
   foldl apply fn <$> many pArg
 
 pFunction :: P SrcExpr
-pFunction = Function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlockM
+pFunction = mk_function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlockM
   where
     pArg :: P (SrcExpr, [Eff])
     pArg = (,) <$> pParens pExprSeq <*> many pAttr
+
+    mk_function :: [(SrcExpr,[Eff])] -> SrcBlk -> SrcExpr
+    mk_function []              body = body
+    mk_function ((arg,fx):args) body = Function arg fx (mk_function args body)
 
 pBlockEs :: P [SrcExpr]
 pBlockEs = pBraces (sepEndBy pExprT (pOp ";"))

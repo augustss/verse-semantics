@@ -101,7 +101,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
     QualVariable SrcExpr Ident   -- (e:)x
   | Tuple [SrcExpr]              -- e1,e2,...             -- Will be turned into Array
   | ApplyS SrcExpr SrcExpr       -- f(e)
-  | EffAttr SrcExpr Eff          -- f<e>
+  | EffAttr SrcExpr EffString    -- f<e>
 
   -- Prefix and infix operator application
   | PrefixOp Op SrcExpr          -- op e
@@ -123,10 +123,10 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Option (Maybe SrcExpr)       -- option{e}
   | Parens SrcExpr               -- (e)
 
-  | Type SrcBlk                  -- type{t}
-  | Macro1 Ident [Eff] SrcBlk    -- m<a>{e}
-  | Macro2 Ident SrcExpr SrcBlk  -- m(e1){e2}
-  | Return SrcExpr               -- return e
+  | Type SrcBlk                      -- type{t}
+  | Macro1 Ident [EffString] SrcBlk  -- m<a>{e}
+  | Macro2 Ident SrcExpr SrcBlk      -- m(e1){e2}
+  | Return SrcExpr                   -- return e
 
   -----------------------------------------------------------
   -- Essential Verse
@@ -136,7 +136,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
                                        --    innermost scoping context, with no type constraint
                                        -- This is a valid expression; eg <exists x, exists y>
                                        -- is like (exists x; exists y; <x,y>)
-  | Function [(SrcExpr, [Eff])] SrcBlk -- function(e)<eff>...{e}
+  | Function SrcExpr [EffString] SrcBlk -- function(e)<eff>{e}
 
   | OfType SrcExpr [Eff] SrcExpr  -- e |>{fx} t
                                   -- Empty [Eff] means "all effects" (not none!)
@@ -419,11 +419,19 @@ instance Pretty Ident where
 --   Open/closed: <open>, <closed>
 --------------------------------------------------------
 
+type EffString = Eff  -- For now
 type EffNoOC = Eff   -- EffNoOC should not be EOpen or EClosed
 
-data Eff = EIterates | ESucceeds | EDecides | EFails
-         | EAllocates | EReads | EWrites | EInteracts | ETransacts | EComputes
-         | EOpen | EClosed
+data Eff
+  = -- Cardinality effects
+    EIterates | ESucceeds | EDecides | EFails
+
+    -- Side effects
+  | EAllocates | EReads | EWrites | EInteracts | ETransacts
+  | EComputes          -- Pure, no side effets
+
+    -- Open/closed on functions
+  | EOpen | EClosed
          deriving( Eq, Ord, Show, Data, Bounded, Enum )
 
 allEffects :: [Eff]
@@ -591,10 +599,16 @@ instance Pretty SrcExpr where
           Case2 e bs ->
             maybeParens (p > 0) $ sep [ text "case" <+> parens (ppArg e) <+> text "of",
                                            indent $ ppr 0 bs ]
-          Function ars b -> maybeParens (p > 0) $
-                            cat [ text "fun" <> hcat (map ppArs ars)
-                                , indent (ppB b) ]
+          Function {} -> maybeParens (p > 0) $
+                         cat [ text "fun" <> hcat (map ppArs args)
+                             , indent (ppB body) ]
                 where
+                  -- Print fun(x:int)(y:int){body} rather than
+                  --       fun(x:int){fun(y:int){body}}
+                  (args,body) = split_args [] expr
+                  split_args acc (Function a fxs b) = split_args ((a,fxs):acc) b
+                  split_args acc b                  = (reverse acc, b)
+
                   ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
 
           Type t       -> text "type" <> braces (ppr 0 t)
@@ -747,8 +761,7 @@ compos f (Type t)           = Type <$> f t
 compos f (Block b)          = Block <$> f b
 compos f (Case1 b)          = Case1 <$> f b
 compos f (Case2 e b)        = Case2 <$> f e <*> f b
-compos f (Function ers b)   = Function <$> traverse g ers <*> f b
-  where g (e, r) = (,) <$> f e <*> pure r
+compos f (Function e fx b)  = Function <$> f e <*> pure fx <*> f b
 compos f (Blk es)           = Blk <$> traverse f es
 compos f (Option me)        = Option <$> traverse f me
 compos f (Parens e)         = Parens <$> f e
@@ -871,7 +884,7 @@ getVisibleBinders = go
 getFree :: HasCallStack => SrcExpr -> [Ident]
 getFree = fvs_blk
   where
-    fvs_blk e = Epic.List.nub (fvs e) `remove` getVisibleBinders e
+    fvs_blk e = fvs e `remove` getVisibleBinders e
 
     fvs :: HasCallStack => SrcExpr -> [Ident]
     fvs (Variable i)      = [i]
@@ -895,7 +908,7 @@ getFree = fvs_blk
     fvs (Verify is e)     = fvs e `remove` is
     fvs (Macro1 _ _ e)    = fvs e
     fvs (Macro2 _ e b)    = fvs e ++ fvs_blk b
-    fvs (For2 e1 e2)      = Epic.List.nub (fvs e1 ++ fvs e2)
+    fvs (For2 e1 e2)      = (fvs e1 ++ fvs e2)
                             `remove` getVisibleBinders e1
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
@@ -913,20 +926,17 @@ getFree = fvs_blk
                           where
                             bs = getVisibleBinders e1
 
-    fvs (Function args body)
-      = (nub $ foldr (++) (fvs_blk body) (map fvs arg_exprs)) `remove` arg_bndrs
-      where
-        arg_bndrs = foldr ((++) . getVisibleBinders) [] arg_exprs
-        arg_exprs = map fst args
+    fvs (Function arg _ body)
+      = (fvs arg ++ fvs_blk body) `remove` getVisibleBinders arg
 
     fvs (XDLam _ x e1 e2)
-      = (nub (fvs e1 ++ fvs_blk e2)) `remove` bndrs
+      = (fvs e1 ++ fvs_blk e2) `remove` bndrs
       where
         bndrs = x : getVisibleBinders e1
 
     fvs e = impossible "getFree" e
 
-    remove xs bndrs = filter (`notElem` bndrs) xs
+    remove xs bndrs = filter (`notElem` bndrs) (nub xs)
 
 getVar :: HasCallStack => SrcExpr -> [Ident]
 -- Get mutable variables

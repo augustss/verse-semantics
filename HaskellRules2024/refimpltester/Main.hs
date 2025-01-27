@@ -262,7 +262,7 @@ expToSrcExpr _ (R.Int i) = F.Lit (F.LInt i)
 expToSrcExpr _ (R.Float f) = F.Lit (F.LRat (fromFloatDigits f) (show f))
 expToSrcExpr _ (R.Char c) = F.Lit (F.LChar (toEnum (fromEnum c)))
 expToSrcExpr _ (R.Char32 c) = F.Lit (F.LChar c)
-expToSrcExpr _ (R.Lam e1 oc eff e2) = F.Function [(lexp e1, rs)] (lexp e2)
+expToSrcExpr _ (R.Lam e1 oc eff e2) = F.Function (lexp e1) rs (lexp e2)
   where rs = [ case oc of { R.O -> F.EOpen; R.C -> F.EClosed }
              , refImplEffToSrcEff eff
              ]

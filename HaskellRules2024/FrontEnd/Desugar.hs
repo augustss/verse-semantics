@@ -125,13 +125,10 @@ sDesugarExpr = ds
     ds (InfixOp e1 (Op ":")  e2) = defn e1 (Range [] e2) >>= ds
 
     -- Function notation
-    ds (InfixOp e1 (Op "=>") e2)  = ds $ Function [(e1, [EClosed,ESucceeds])] e2
+    ds (InfixOp e1 (Op "=>") e2)  = ds $ Function e1 [EClosed,ESucceeds] e2
        -- The e1=>e2 notation has an implicit <succeeds>
 
-    ds (Function (a:as@(_:_)) b)  = ds $ Function [a] $ Function as b
-    ds (Function [(e1, effs)] e2) = do { e1' <- ds e1
-                                       ; e2' <- ds e2
-                                       ; pure $ Function [(e1', effs)] e2' }
+    ds (Function e1 effs e2) = Function <$> ds e1 <*> pure effs <*> ds e2
 
     -- Conditionals
     -- We must retain IF3 (i.e `if e1 then e2 else e3`) because
@@ -162,8 +159,7 @@ sDesugarExpr = ds
     -- Do and case
     ds (Case1 b)     = do { let l = getLoc b
                           ; x <- Variable <$> newIdent l "x"
-                          ; ds $ Function [(InfixOp x (Op ":") eAny, [])] $
-                                 Case2 x b }
+                          ; ds $ Function (InfixOp x (Op ":") eAny) [] (Case2 x b) }
     ds (Case2 _ _)    = undefined
     ds (Block b)      = ds b                              -- do e --> e
     ds (Blk es)       = ds $ eSeq es
@@ -334,7 +330,7 @@ defn_ty p t fxs1 rhs
 
 defn_fun :: SrcPat -> SrcExpr -> [Eff] -> SrcExpr -> DsM SrcExpr
 -- f(x)<fxs> := rhs
-defn_fun f a fxs rhs = defn f (Function [(a,fxs')] rhs)
+defn_fun f a fxs rhs = defn f (Function a fxs' rhs)
   where
     fxs' = addSucceeds (addAperture fxs)  -- Add default effects
 
@@ -356,7 +352,7 @@ encodeType :: SrcEssential -> DsM SrcEssential
 -- using a ICFP lambda.
 -- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
 encodeType e = do { x <- newIdent noLoc "x"
-                  ; return (Function [(eDefine x e, [EClosed])] (Variable x)) }
+                  ; return (Function (eDefine x e) [EClosed] (Variable x)) }
 -}
 
 addSucceeds :: [Eff] -> [Eff]
@@ -492,7 +488,7 @@ _addDeref = pure . exprD S.empty
     expr s (Let e1 e2) = Let (expr s' e1) (exprD s' e2)
       where s' = defs s e1
     expr s (Block e) = Block (exprD s e)
-    expr s (Function [(a,rs)] e2) = Function [(a, rs)] (exprD s' e2)
+    expr s (Function a rs e2) = Function a rs (exprD s' e2)
       where s' = defs s a
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
     expr _ (DefineV i)      = DefineV i
@@ -807,7 +803,7 @@ essToMini orig_e = go_expr orig_e
            ; e <- go (WC { wc_inp = inp', wc_fxs = [] }) t
            ; return (Lam i e) }
 
-    go (WC { wc_inp = inp }) (Function [(t1,fxs1)] t2)
+    go (WC { wc_inp = inp }) (Function t1 fxs1 t2)
         -- NB: ignore wc_fxs
       = case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"

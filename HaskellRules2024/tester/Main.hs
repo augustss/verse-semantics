@@ -1091,10 +1091,17 @@ ppTim = pp
         Macro1 (Ident _ "assume") [] b -> text "assume"  <> pp False 10 b
         For1   b -> text "for" <>                         pp False 10 b
         For2 e b -> text "for" <> parens (pp True 0 e) <> pp False 10 b
-        Function ars b -> maybeParens (prec > 0) $
-                          cat [ text "function" <> hcat (map ppArs ars)
-                              , indent (pp False 10 b) ]
-          where ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
+        Function {} -> maybeParens (prec > 0) $
+                         cat [ text "function" <> hcat (map ppArs args)
+                             , indent (pp False 10 body) ]
+                where
+                  ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
+                  -- Print fun(x:int)(y:int){body} rather than
+                  --       fun(x:int){fun(y:int){body}}
+                  (args,body) = split_args [] expr
+                  split_args acc (Function a fxs b) = split_args ((a,fxs):acc) b
+                  split_args acc b                  = (reverse acc, b)
+
         If3 e1 e2 e3 -> maybeParens (prec > 0) $
                         sep [text "if" <+> parens (pp True 0 e1) <+> text "then",
                              indent $ pp False 0 e2,
