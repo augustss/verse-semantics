@@ -20,8 +20,10 @@ module Core.Expr
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
   , litInt, litIntZero, coreSeq, (>>>)
-  , mkExis, mkApp, mkEqual, mkIf, mkOne, mkAll, mkFor, matchAll, mkCheck, matchCheck, mkSize
+  , mkExis, mkApp, mkEqual, mkIf, mkOne, mkAll, mkFor, matchAll, mkCheck, matchCheck
+  , mkCount
   , lamUnderscore, someUnderscore, wrong
+  , mkDef
 
     -- Assupmtions
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
@@ -110,28 +112,28 @@ data Iter
   | IterOne
   | IterAll
   | IterFor
-  | IterSize
+  | IterCount
  deriving ( Eq, Ord )
 
 instance Show Iter where
-  show IterIf   = "IF"
-  show IterOne  = "ONE"
-  show IterAll  = "ALL"
-  show IterFor  = "FOR"
-  show IterSize = "SIZE"
+  show IterIf    = "IF"
+  show IterOne   = "ONE"
+  show IterAll   = "ALL"
+  show IterFor   = "FOR"
+  show IterCount = "COUNT"
 
 iterChoiceFree :: Iter -> Bool
-iterChoiceFree IterIf   = False
-iterChoiceFree IterOne  = True
-iterChoiceFree IterAll  = True
-iterChoiceFree IterFor  = False
-iterChoiceFree IterSize = True
+iterChoiceFree IterIf    = False
+iterChoiceFree IterOne   = True
+iterChoiceFree IterAll   = True
+iterChoiceFree IterFor   = False
+iterChoiceFree IterCount = True
 
 -- TODO: use a combinator for introducing vars for exprs
 iterApply :: Iter -> Val -> Expr -> Expr
-iterApply IterIf    f _e0 = f :@: Tup []
-iterApply IterOne   v _e0 = v
-iterApply IterSize _v  e0 =
+iterApply IterIf    f  _e0 = f :@: Tup []
+iterApply IterOne   v  _e0 = v
+iterApply IterCount _v  e0 =
   Exi $ bind n $
     (Var n :=: e0) :>:
     Op Add :@: Tup [Lit (LInt 1), Var n]
@@ -285,6 +287,9 @@ mkFor e = Iter IterFor e (Tup [])
 mkAll :: Expr -> Expr
 mkAll e = Iter IterAll e (Tup [])
 
+mkCount :: Expr -> Expr
+mkCount e = Iter IterCount e (Lit (LInt 0))
+
 matchAll :: Expr -> Maybe Expr
 matchAll (Iter IterAll e e0) | e0 == Tup [] = Just e
 matchAll _                                  = Nothing
@@ -344,14 +349,6 @@ matchCheck e0@(Iter IterIf (Exi bnd) _)
 
 matchCheck _ = Nothing
 
-mkSize :: Val -> Expr -> Expr
-mkSize n e =
-  Exi $ bind k $
-    (Var k :=: (Iter IterSize e (Lit (LInt 0))))
-    :>: Op Mul :@: Tup [n,Var k]
- where
-  k = identNotIn (free (n,e))
-
 (>>>) :: Expr -> Expr -> Expr
 -- e1 >>> e2  =   (_ = e1); e2
 e1 >>> e2 = (Var underscore :=: e1) :>: e2
@@ -373,8 +370,14 @@ someUnderscore :: Expr -> Expr
 -- The expression: some( \_.e )
 someUnderscore e = Some (lamUnderscore e)
 
+mkDef :: Ident -> Expr -> (Val -> Expr) -> Expr
+mkDef x e k | isVal e   = k e
+            | otherwise = Exi $ bind x $ (Var x :=: e) :>: k (Var x)
+
 mkApp :: Expr -> Expr -> Expr
-mkApp fun arg = prepVals [fun,arg] $ \(f:a:_) -> f :@: a
+mkApp fun arg = mkDef f fun $ \f' -> mkDef a arg $ \a' -> f' :@: a'
+ where
+  f:a:_ = identsNotIn (free (fun,arg))
 
 litInt :: Integer -> Expr
 litInt n = Lit (LInt n)
