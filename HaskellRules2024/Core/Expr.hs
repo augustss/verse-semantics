@@ -719,8 +719,8 @@ pPrintPrecE lvl prec the_expr
     pp_call_arg (Tup es) = fsep (punctuate comma $ map ppr0 es)
     pp_call_arg e2       = ppr0 e2
 
-    block  pq    hdr e   = block' pq hdr (ppr0 e)
-    block' [p,q] hdr doc = cat ([ hdr <> text [p], indent doc, text [q] ])
+    block  pq hdr e   = block' pq hdr (ppr0 e)
+    block' pq hdr doc = cat ([ hdr <> text (take 1 pq), indent doc, text (drop 1 pq) ])
 
 pPrintSmallExpr :: Expr -> Doc
 -- Show only a small expression; otherwise return "<big>"
