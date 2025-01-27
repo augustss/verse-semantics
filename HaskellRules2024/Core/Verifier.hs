@@ -115,27 +115,49 @@ arrStep env lhs =
   do Choose (LitInt 1) e <- [lhs]
      pure (someUnderscore e)
   ++
-  "ALL-CHOOSE" `name`
-     -- all{ C[ choose(v){e} ] }
-     -- --> n := size(v){ C[ some(\_.e) ] } ;
-     --     Arr(n){ C[e] }
-     -- if boundvars(C) disjoint from freevars(v)
-  do Iter IterAll all_body e0 <- [lhs]
-     (exis, ctx, Choose sz e) <- evalCtxLift [] all_body
-     guard (free sz `disjointFrom` exis)
+  "ITER-CHOOSE" `name`
+  do Iter f body e0 <- [lhs]
+     (exis, ctx, Choose n e) <- evalCtxLift [] body
+     guard (ctx /= HOLE)
+     guard (choiceFreeLH ctx)
+     guard (free n `disjointFrom` exis)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
-       -- This guard seems to make no difference either way
-     let n:a:b:_ = identsNotIn $ free all_body
-     pure ( Exi $ bind n $
-            (Var n :=: mkSize sz (wrapExis exis $
-                                ctx <@ Some (Lam $ bind underscore e)))
-            :>:
-            (Exi $ bind a $ Exi $ bind b $
-              (Var a :=: e0) :>:
-              (Op ArrApp :@: Tup [Arr (Var n) (wrapExis exis (ctx <@ e)),Var a,Var b]) >>>
-              Var b
-              )
-            )
+     let k = identNotIn (free lhs ++ exis)
+     pure $ Exi $ bind k $
+       (Var k :=: mkSize n (mkExis exis $ ctx <@ someUnderscore e)) :>:
+       Iter f (Choose (Var k) (mkExis exis $ ctx <@ e)) e0
+  ++
+  "ONE-CHOOSE" `name`
+  do Iter IterOne (Choose n e) e0 <- [lhs]
+     pure $ mkIf ((n :=: Lit (LInt 0)) :>: lamUnderscore e0)
+                 (someUnderscore e)
+  ++
+  "IF-CHOOSE" `name`
+  do Iter IterIf (Choose n e) e0 <- [lhs]
+     pure $ mkIf ((n :=: Lit (LInt 0)) :>: lamUnderscore e0)
+                 (mkApp (someUnderscore e) (Tup []))
+  ++
+  "ALL-CHOOSE" `name`
+  do Iter IterAll (Choose n e) e0 <- [lhs]
+     let ys:zs:_ = identsNotIn (free lhs)
+     pure $
+       mkDef ys e0 $ \ys' ->
+         Exi $ bind zs $
+           (Op ArrApp :@: Tup [ Arr n e, ys', Var zs ]) >>>
+           Var zs
+  ++
+  "FOR-CHOOSE" `name`
+  do Iter IterFor (Choose n e) e0 <- [lhs]
+     let k:xs:ys:zs:_ = identsNotIn (free lhs)
+     pure $
+       Exi $ bind k $ Exi $ bind xs $
+         (Var k  :=: mkSize (Lit (LInt 1)) (mkApp (someUnderscore e) (Tup []))) :>:
+         (Var xs :=: Choose (Var k) (Arr n (mkApp e (Tup [])))) :>:
+         (mkDef ys e0 $ \ys' ->
+           Exi $ bind zs $
+             (Op ArrApp :@: Tup [ Var xs, ys', Var zs ]) >>>
+             Var zs)
+{-
   ++
   "FOR-CHOOSE" `name`
      -- FOR{ C[ choose(v){e} ] }
@@ -160,7 +182,7 @@ arrStep env lhs =
               Var c
             )
           )
-
+-}
 {-    CHOOSE-X does not seems to work quite right, and is much slower
 -}
 {-
