@@ -1,7 +1,30 @@
 # Add new meetings at the top
 
+verify("M27Jan25-1", fail)
+  { loop():false = loop[]
+  ; x:int
+  ; f()<succeeds>:int =
+     { string[x] # or x = 2, etc.
+     ; loop[] # will hit this loop, and say f is verified
+     }
+  ; x = 1; f[] }
+  # M27Jan25-1: will crash at runtime, and so must be rejected
+
+testeq("M27Jan25-2", fail, broken)
+    { loop():false := loop[]; x:any; one{ char[x]; loop[] }; x=1 }
+    {1}
+  # M27Jan25-2: this should fail, because the one{} is stuck on
+  #             the rigid x, so don't bother with loop[]
+
 verify("M20Jan25-1", pass){ f():type{(:string) => (:string)} := (x:any => x) }
   # M20Jan25-1: small example involving a higher order function type
+verify("M20Jan25-1a", pass){ t := type{(:string) => (:string)}
+                           ; f():t := (x:any => x) }
+  # M20Jan25-1a: here we name t := type{stuff} and it still works
+verify("M20Jan25-1b", fail){ t := {(:string) => (:string)}
+                           ; f():type{t} := (x:any => x) }
+  # M20Jan25-1b: here we don't expect to be able to name `t`
+
 verify("M20Jan25-2", pass)
                           { (f():type{(:string) => (:string)} := (x:any => x))
                           ; string[ f[]["woo"] ] }
