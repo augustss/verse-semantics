@@ -670,18 +670,18 @@ pPrintPrecE lvl prec the_expr
        Op op      -> pPrint op
 
        -- special pretty printing to help debugging
-       e | Just (fx,b) <- matchCheck e -> block (text ("CHECK<" ++ show fx ++ ">")) b
+       e | Just (fx,b) <- matchCheck e -> block "{}" (text ("CHECK<" ++ show fx ++ ">")) b
 
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> mbPar0 $ sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
-       e1 :@: e2   -> ppr1 e1 <> brackets (pp_call_arg e2)
+       e1 :@: e2   -> block' "[]" (ppr1 e1) (pp_call_arg e2)
        e@(_ :>: _) -> mbPar0 $ sep (punctuate semi $ map ppr1 (gatherSeqs e))
        e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ">>" <+> ppr1 e2
 
        Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
-       Tru a   -> text "truth" <> braces (ppr0 a)
+       Tru a   -> block "{}" (text "truth") a
        Iter f e e0 -> {- text "iter"  <> parens (text (show f)) -} 
-                      block (text (show f)) e <> braces (ppr0 e0)
+                      block "{}" (text (show f)) e <> braces (ppr0 e0)
        --All e   -> text "all"  <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
        Exi {}  -> mbPar0 $ sep [ text "∃" <+> fsep (map pPrint bndrs) <> char '.'
@@ -689,20 +689,20 @@ pPrintPrecE lvl prec the_expr
                where
                   (bndrs, body) = unpackExis the_expr
 
-       Some e  -> text "some" <> parens (ppr0 e)
+       Some e  -> block "()" (text "some") e
        --Check fx e -> cat [ text "check" <> char '<' <> pPrint fx <> char '>'
        --                  , indent (braces (ppr0 e)) ]
 
        Verify bl ->
-         block (text "verify" <> parens (sep [ fsep (punctuate comma (map pPrint ids)) <> char ';'
+         block "{}" (text "verify" <> parens (sep [ fsep (punctuate comma (map pPrint ids)) <> char ';'
                                              , fsep (punctuate comma (map pPrint as)) ]))
                body
            where
              (ids, (as, body)) = alphaRenameVerify (free bl) bl
 
 
-       Arr    sz e -> block (text "Arr" <> ppr_sz sz) e
-       Choose sz e -> block (text "Choose" <> ppr_sz sz) e
+       Arr    sz e -> block "{}" (text "Arr" <> ppr_sz sz) e
+       Choose sz e -> block "{}" (text "Choose" <> ppr_sz sz) e
        --Size   sz e -> text "Size"   <> ppr_sz sz <> braces (ppr0 e)
 
   where
@@ -718,7 +718,8 @@ pPrintPrecE lvl prec the_expr
     pp_call_arg (Tup es) = fsep (punctuate comma $ map ppr0 es)
     pp_call_arg e2       = ppr0 e2
 
-    block hdr e = cat ([ hdr <> text "{", indent (ppr0 e), text "}" ])
+    block  pq    hdr e   = block' pq hdr (ppr0 e)
+    block' [p,q] hdr doc = cat ([ hdr <> text [p], indent doc, text [q] ])
 
 pPrintSmallExpr :: Expr -> Doc
 -- Show only a small expression; otherwise return "<big>"
