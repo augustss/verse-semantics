@@ -420,10 +420,7 @@ isectSetOfSeqs ss =
   in  foldSet xIntersect ss'
 
 unionSetOfSeqs :: SetX [WS] -> [WS]
-unionSetOfSeqs ss =
-  let n = minimumSet (fmap length ss)
-      ss' = fmap (take n) ss
-  in  foldSet xUnion ss'
+unionSetOfSeqs = foldSet xUnion
 
 re :: [WS] -> [WS]
 re = id -- filter (not . isEmpty)

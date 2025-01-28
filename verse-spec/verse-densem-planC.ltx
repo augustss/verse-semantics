@@ -170,6 +170,8 @@ $$
 
 \subsection{Denotional semantics of Mini Verse with choice}
 
+\newcommand{\applyf}{\textbf{applyf}}
+
 \begin{figure}
 $$
 \begin{array}{l}
@@ -189,11 +191,14 @@ Env^{*} & = & \powerset{Env} \\
   \semapp{E}{|k|}{\rho} & = & [\msing{k}] \\
   \semapp{E}{|o|}{\rho} & = & [\msing{\semapp{O}{|o|}{}}] \\
   \semapp{E}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
-  \semapp{E}{|fail|}{\rho} & = & [] \\
+  \semapp{E}{|fail|}{\rho} & = & [\{\}] \\
   \semapp{E}{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = &
-      [ \{ r \, ||\, f \inb |fs|,\, a \inb as, r \inb \apply(f, a) \} || \, |fs <-| \semapp{E}{|e_1|}{\rho}, \;
-          as |<-| \semapp{E}{|e_2|}{\rho} ]
+         [ r \, || \,
+           |fs <-| \semapp{E}{|e_1|}{\rho}, \;
+           |as <-| \semapp{E}{|e_2|}{\rho}, \;
+           |r| \inb \apply^{*}(fs, as) \}
+         ]
            \\
   \semapp{E}{|e_1 = e_2|}{\rho}      & = &
       [ s_1 \cap s_2\, ||\, 
@@ -215,19 +220,17 @@ Env^{*} & = & \powerset{Env} \\
   & &  |where|\; \bar{\rho} = \{ \rho' ||\, \rho' \inb \semapp{X}{|e_1|}{\rho}, \; \semapp{E}{|e_1|}{\rho'} \neq [] \}
   \\[1mm]
 
-  \textbf{Not done}\\
-
 %  \textit{succeeds function:} \\
-  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = &
-    \semclose{q}
-      {\{ f\,
-    \begin{array}[t]{@@{}l@@{\;}l}
-      || & \forall x \inb \Value,\,\\
-         & \forall \rho' \in \semapp{X}{e_1}{\rho}, \\
-         & f \inb \semfcn, \\
-        & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty) \\
-        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
-    \end{array} \\
+  \semapp{E}{|lamOC q x e_1 e_2 e_3|}{\rho} & = & XXX \\
+%    \semclose{q}
+%      {\{ f\,
+%    \begin{array}[t]{@@{}l@@{\;}l}
+%      || & \forall x \inb \Value,\,\\
+%         & \forall \rho' \in \semapp{X}{e_1}{\rho}, \\
+%         & f \inb \semfcn, \\
+%        & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty) \\
+%        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
+%    \end{array} \\
 %  \textit{decides function:} \\
 %  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semclose{q}{\{ f \in \semfcn \;
 %    \begin{array}[t]{@@{}l@@{\;}l}
@@ -238,7 +241,7 @@ Env^{*} & = & \powerset{Env} \\
 
 
 \end{array}
-\\
+\\ \\
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
 \semap{D}{|e|} & : & \Env \rightarrow \mtype \\
 \semapp{D}{|e|}{\rho} & = & \hat{\bigcup}_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
@@ -247,13 +250,19 @@ Env^{*} & = & \powerset{Env} \\
 %% \semapp{C}{|e|}{\rho} & = & xxx \\
 \end{array}
 \\
+\textbf{Auxiliary functions}\\
+\begin{array}{lcll}
+  \apply^{*} & : & (\mtype, \mtype) \rightarrow [\mtype] \\
+  \apply^{*}(|fss|, as) & = & \hat{\cup} \{ \applyf(fs, as) \, || \, |fs| \inb |fss| \} \\
+  \applyf & : & ([\semfcn], \mtype) \rightarrow [\mtype] \\
+  \applyf(|fs|, as) & = & \bar{\bigcup} \{ [ \apply(|f,a|) \, || \, |f| \inb |fs| ] \, || \, a \inb as \}
+      
+\end{array} \\ \\
 \textbf{Notation}\\
 \begin{array}{lcll}
-  |[e_1,xdots,e_n]| & : & \mtype & \text{sequence of items} \\
-                & & & \text{eliminating (trailing?) empty sets?} \\[2mm]
+  |[e_1,xdots,e_n]| & : & \mtype & \text{sequence of items} \\[2mm]
 
-  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \mtype & \text{sequence comprehension (order preserving)}, \\
-                & & & \text{eliminating (trailing?) empty sets?} \\[2mm]
+  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \mtype & \text{sequence comprehension (order preserving)}, \\[2mm]
 
   |++| & : & \mtype \rightarrow \mtype \rightarrow \mtype & \text{sequence concatenation} \\
   |[x_1,xdots,x_n] ++ [y_1,xdots,y_n]| & = & |[x_1,xdots,x_n,y_1,xdots,y_n]| \\[2mm]
@@ -261,7 +270,8 @@ Env^{*} & = & \powerset{Env} \\
   \hat{\cup} & : & \mtype \rightarrow \mtype \rightarrow \mtype & \text{elementwise union of sequences,} \\
   |[x_1,xdots,x_n]| \hat{\cup} |[y_1,xdots,y_n]| & = & |[x_1 `cup` y_1,xdots,x_n `cup` y_n]| & \text{right-padding shorter sequence with \mempty} \\[2mm]
 
-  \hat{\bigcup} & & & \hat{\cup} \text{ extended to sets} \\[2mm]
+  \hat{\bigcup} & : & \powerset{\mtype} \rightarrow \mtype \\
+  \hat{\bigcup} & = & \cdots & \hat{\cup} \text{ extended to sets} \\[2mm]
 
 %  |re| & : & \mtype \rightarrow \mtype & \text{remove all empty sets} \\
 %  |re(s)| & = & ... \\
