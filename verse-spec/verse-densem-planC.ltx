@@ -171,6 +171,7 @@ $$
 \subsection{Denotional semantics of Mini Verse with choice}
 
 \newcommand{\applyf}{\textbf{applyf}}
+\newcommand{\squash}{\textbf{squash}}
 
 \begin{figure}
 $$
@@ -214,14 +215,15 @@ Env^{*} & = & \powerset{Env} \\
   \left\{
   \begin{array}{ll}
     \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \mempty \\
-    \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{|e_2|}{\rho'} & \text{otherwise} \\
+    \squash(\hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \bar{\rho} \} & \text{otherwise} \\
+    %% \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{|e_2|}{\rho'} 
   \end{array}
   \right. \\
-  & &  |where|\; \bar{\rho} = \{ \rho' ||\, \rho' \inb \semapp{X}{|e_1|}{\rho}, \; \semapp{E}{|e_1|}{\rho'} \neq [] \}
+  & &  |where|\; \bar{\rho} = \semapp{R}{e_1}{\rho}
   \\[1mm]
 
 %  \textit{succeeds function:} \\
-  \semapp{E}{|lamOC q x e_1 e_2 e_3|}{\rho} & = & XXX \\
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & XXX \\
 %    \semclose{q}
 %      {\{ f\,
 %    \begin{array}[t]{@@{}l@@{\;}l}
@@ -244,19 +246,23 @@ Env^{*} & = & \powerset{Env} \\
 \\ \\
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
 \semap{D}{|e|} & : & \Env \rightarrow \mtype \\
-\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
-%% \\
+%\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
+\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \semapp{E}{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
+\semap{R}{|e|}{} & : & \Env \rightarrow \powerset{\Env} \\
+\semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \squash(\semapp{E}{|e|}{\rho}) \neq [] \} \\
 %% \semap{C}{|e|} & : & \Env -> \rightarrow [Env^{*}] \\
 %% \semapp{C}{|e|}{\rho} & = & xxx \\
 \end{array}
-\\
+\\ \\
 \textbf{Auxiliary functions}\\
 \begin{array}{lcll}
   \apply^{*} & : & (\mtype, \mtype) \rightarrow [\mtype] \\
   \apply^{*}(|fss|, as) & = & \hat{\cup} \{ \applyf(fs, as) \, || \, |fs| \inb |fss| \} \\
   \applyf & : & ([\semfcn], \mtype) \rightarrow [\mtype] \\
-  \applyf(|fs|, as) & = & \bar{\bigcup} \{ [ \apply(|f,a|) \, || \, |f| \inb |fs| ] \, || \, a \inb as \}
-      
+  \applyf(|fs|, as) & = & \bar{\bigcup} \{ [ \apply(|f,a|) \, || \, |f| \inb |fs| ] \, || \, a \inb as \} \\
+  \squash & : & \mtype \rightarrow \mtype \\
+  \squash(xs) & = & [ x \, || \, x \inb xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
+\\
 \end{array} \\ \\
 \textbf{Notation}\\
 \begin{array}{lcll}
