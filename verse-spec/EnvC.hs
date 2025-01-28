@@ -51,14 +51,16 @@ allWsL :: [W]
 allWsL =
   nonFcn ++
   [ dO o | o <- [Oint, Ogt, Oadd] ] ++
-  map vFcn [ id0, fid1, id01, f01, const0, const1, const2, const3, fsucc,
-             fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123 ]
+  map vFcn [ id0, fid1, id2, id3, id01, f01, const0, const1, const2, const3, fsucc,
+             fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123, f0t12 ]
   where
     nonFcn =
       allInts ++
       [VTup [x, y] | x <- allInts, y <- allInts]
       --[VTup [VInt 2, VInt 1], VTup [VInt 1, VInt 2]]
     id0 = mkFcn "id0" [(VInt 0, VInt 0)]
+    id2 = mkFcn "id2" [(VInt 2, VInt 2)]
+    id3 = mkFcn "id3" [(VInt 3, VInt 3)]
     id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
     id123 = mkFcn "id123" [(VInt 1, VInt 1), (VInt 2, VInt 2), (VInt 3, VInt 3)]
     f01 = mkFcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
@@ -86,6 +88,7 @@ allWsL =
     ho5 = mkFcn "ho5" [(vFcn succ0, VInt 2)]
     ho6 = mkFcn "ho6" [(VInt 0, vFcn fint)]
     ho7 = mkFcn "ho7" [(VInt 0, vFcn comp)]
+    f0t12 = mkFcn "f0t12" [(VInt 0, VTup [VInt 1, VInt 2])]
 {-
     gt0 = mkFcn "gt0" [(VTup [VInt 1, VInt 0], VInt 1),
                        (VTup [VInt 2, VInt 0], VInt 2),

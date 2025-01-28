@@ -3,6 +3,7 @@ module SetX(
   SetX,
   intersect,
   union,
+  unions,
   difference,
 --  nub,
   isEmpty,
@@ -19,18 +20,31 @@ module SetX(
   foldSet,
   cartProd,
   ) where
-import Data.List(intercalate, nub)
+import Control.Applicative
+import Data.List(intercalate, sort)
+import GHC.Stack
 
 -- Sets as lists with duplicates so it can be a monad.
 
 newtype SetX a = S [a]
-  deriving (Eq, Ord, Functor, Applicative, Monad)
+  deriving (Functor, Applicative, Monad, Alternative, MonadFail)
 
-instance (Show a) => Show (SetX a) where
-  show (S s) = "{" ++ intercalate "," (map show s) ++ "}"
+instance Ord a => Eq (SetX a) where
+  x == y  =  compare x y == EQ
 
-empty :: SetX a
-empty = S []
+instance Ord a => Ord (SetX a) where
+  compare x y = compare (toList x) (toList y)
+
+instance (Show a, Ord a) => Show (SetX a) where
+  show s =
+    case toList s of
+      [] -> "{}"
+      s@(a:_)
+        | length (show a) < 25 -> "{" ++ intercalate ","   (map show s) ++ "}"
+        | otherwise            -> "{" ++ intercalate ",\n" (map show s) ++ "}"
+
+--empty :: SetX a
+--empty = S []
 
 isEmpty :: SetX a -> Bool
 isEmpty (S []) = True
@@ -44,6 +58,9 @@ member x (S xs) = x `elem` xs
 union :: SetX a -> SetX a -> SetX a
 union (S a) (S b) = S (a ++ b)
 
+unions :: [SetX a] -> SetX a
+unions = foldr union empty
+
 intersect :: Eq a => SetX a -> SetX a -> SetX a
 intersect (S as) (S bs) = S [ a | a <- as, a `elem` bs ]
 
@@ -56,8 +73,12 @@ isSubsetOf (S as) (S bs) = all (\ a -> a `elem` bs) as
 mkSet :: [a] -> SetX a
 mkSet = S
 
-toList :: Eq a => SetX a -> [a]
-toList (S xs) = nub xs
+toList :: Ord a => SetX a -> [a]
+toList (S xs) = unDup $ sort xs
+  where
+    unDup (x:y:xs) | x == y    =     unDup (y:xs)
+                   | otherwise = x : unDup (y:xs)
+    unDup xs = xs
 
 -- Check if a predicate holds for all values in the set
 forAll :: SetX a -> (a -> Bool) -> Bool
@@ -84,6 +105,8 @@ sing x = S [x]
 cartProd :: [SetX a] -> SetX [a]
 cartProd = sequence
 
--- function should be commutative and associative
-foldSet :: (a -> a -> a) -> SetX a -> a
+-- Function should be commutative and associative.
+-- Set should be non-empty
+foldSet :: HasCallStack => (a -> a -> a) -> SetX a -> a
+foldSet _ (S []) = error "foldSet"
 foldSet f (S a) = foldl1 f a

@@ -102,10 +102,12 @@ exp14 :: Example
 exp14 = App (fst exp7) (Fun Closed (Int 1) (Int 1))
       === "Wrong[]"
 
+-- ex7[fun_c(:int){0}]
 exp15 :: Example
 exp15 = App (fst exp7) (Fun Closed (Colon (Var "int")) (Int 0))
       === "0"
 
+-- ex11[fun_c(:int){0}]
 exp16 :: Example
 exp16 = App (fst exp11) (Fun Closed (Colon (Var "int")) (Int 0))
       === "0"
@@ -142,31 +144,33 @@ exp22 = If (Def "x" (Colon (Var "int"))) (Var "x") (Int 999) `Equ` Int 3
 
 exp23 :: Example
 exp23 = All (Choice (Int 1) (Int 2))
-      === "[1,2]"
+      === "<1,2>"
 
 exp24 :: Example
 exp24 = All (Colon $ Tup [Int 2, Int 3])
-      === "[2,3]"
+      === "<2,3>"
 
 -- fun_c(x:=(0|1)){x}
 --  denotation id01LR = { [0->L0, 1->R1] }
 exp25 :: Example
 exp25 = Fun Closed (Def "x" (Choice (Int 0) (Int 1))) (Var "x")
-      === "id01LR"
+      === -- "id01LR"
+          "[id0,id1]"
 
 exp26 :: Example
 exp26 = All (Colon (fst exp25))
-      === "[0,1]"
+      === "<0,1>"
 
 -- fun_c(x:=(1|0)){x}
 --  denotation id01RL = { [0->R0, 1->L1] }
 exp27 :: Example
 exp27 = Fun Closed (Def "x" (Choice (Int 1) (Int 0))) (Var "x")
-      === "id01RL"
+      === -- "id01RL"
+          "[id1,id0]"
 
 exp28 :: Example
 exp28 = All (Colon (fst exp27))
-      === "[1,0]"
+      === "<1,0>"
 
 -- if (1 | 2){2}else{0}
 exp29 :: Example
@@ -192,7 +196,7 @@ exp32 = Fun Closed (Def "y" (Choice (Int 1) (Int 2)) `Seq` Int 0)
 -- (1, :int) = (:int, 2)
 exp33 :: Example
 exp33 = Tup [Int 1, cint] `Equ` Tup [cint, Int 2]
-      === "[1,2]"
+      === "<1,2>"
 
 -- fun_c(x:=:int; :int){0}
 exp34 :: Example
@@ -207,34 +211,47 @@ exp35 = Fun Closed (((Var "x" `Equ` Var "a") `Seq` Def "x" cint) `Where` Def "a"
 -- fun_c(a:=0|1; x:=a){x}
 exp36 :: Example
 exp36 = Fun Closed ((Def "a" (Int 0 `Choice` Int 1)) `Seq` (Def "x" (Var "a"))) (Var "x")
-      === "XXX2"
+      === "[id0,id1]"
 
 -- fun_c(x:=0|1|2){x}
 exp37 :: Example
 exp37 = Fun Closed (Def "x" (Int 0 `Choice` Int 1 `Choice` Int 2)) (Var "x")
-      === "XXX3"
+      === "[id0,id1,id2]"
 
 -- fun_c(x:=3|1|0){x}
 exp38 :: Example
 exp38 = Fun Closed (Def "x" (Int 3 `Choice` Int 1 `Choice` Int 0)) (Var "x")
-      === "XXX4"
+      === "[id3,id1,id0]"
 
 -- fun_c(x:=0|1|2){x} = fun_c(x:=3|1|0){x}
--- denotation {}
+-- denotation {}  XXX Is this right???
 exp39 :: Example
 exp39 = fst exp37 `Equ` fst exp38
-      === "XXX5"
+      === "Wrong[]"
 
 -- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(3|1|0)){x}
 -- 0->L,LL0, 1->L,RL1, 2->L,R2, 3->R,LL3, 1->R,RL1, 0->R,R0
+-- XXX Is this right???
 exp40 :: Example
 exp40 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
                     Def "x" (If (Var "a" `Equ` Int 0)
                                 (Int 0 `Choice` Int 1 `Choice` Int 2)
                                 (Int 3 `Choice` Int 1 `Choice` Int 0)))
                    (Var "x")
-      === "XXX6"
+      === "Wrong[]"
 
+-- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(3|1)){x}
+-- 0->L,LL0, 1->L,RL1, 2->L,R2, 3->R,LL3, 1->R,RL1, 0->R,R0
+-- XXX Is this right???
+exp41 :: Example
+exp41 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
+                    Def "x" (If (Var "a" `Equ` Int 0)
+                                (Int 0 `Choice` Int 1 `Choice` Int 2)
+                                (Int 3 `Choice` Int 1)))
+                   (Var "x")
+      === "Wrong[]"
+
+-- x:=1|2; if(x=1){0|1}else{2|1|0}
 exp43 :: Example
 exp43 = Def "x" (Int 1 `Choice` Int 2) `Seq` If (Var "x" `Equ` Int 1) (Int 0 `Choice` Int 1) (Int 2 `Choice` Int 1 `Choice` Int 0)
       === "XXX7"
@@ -248,7 +265,7 @@ exp45 :: Example
 exp45 = Fun Closed (Def "x" (Int 1)) (Var "x")
       === "id1"
 
--- fun_c(x:int){x=1}
+-- fun_c(x:int){x=1} -- XXX
 exp46 :: Example
 exp46 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x" `Equ` Int 1)
       === "Wrong[]"
@@ -320,7 +337,7 @@ exp58 :: Example
 exp58 = Fun Closed (Tup [Def "x" cint, Def "y" cint]) (App (Prim Oadd) (Tup [Var "y", Var "x"]))
       === "add"
 
--- f := fun_c(0){:int}; f[0]
+-- f := fun_c(0){:int}; f[0]=1
 exp59p :: Exp
 exp59p = Def "f" (Fun Closed (Int 0) cint) `Seq`
          (App (Var "f") (Int 0) `Equ` Int 1)

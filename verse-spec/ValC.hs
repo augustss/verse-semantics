@@ -17,12 +17,21 @@ data RVal = RVal Val | Wrong String
 
 instance Show Val where
   showsPrec p (VInt i) = showsPrec p i
-  showsPrec p (VTup vs) = showString "<" . foldr (.) id (intersperse (showString ", ") (map (showsPrec p) vs)) . showString ">"
+  showsPrec p (VTup vs) = showString "<" . foldr (.) id (intersperse (showString ",") (map (showsPrec p) vs)) . showString ">"
   showsPrec p (VFcn fs) = showString "F" . showsPrec p fs
 
 instance Show RVal where
-  showsPrec p (RVal v) = showsPrec p v
+  showsPrec _ (RVal v) = showString (showPretty v)
   showsPrec _ (Wrong s) = showString $ "Wrong" ++ s
+
+showPretty :: Val -> String
+showPretty (VInt i) = show i
+showPretty (VTup vs) = "<" ++ intercalate "," (map showPretty vs) ++ ">"
+showPretty (VFcn [f]) = show f
+showPretty (VFcn fs) = show fs
+
+showListWith :: (a -> String) -> [a] -> String
+showListWith f xs = "[" ++ intercalate "," (map f xs) ++ "]"
 
 --------------------
 ---- Functions as tables
