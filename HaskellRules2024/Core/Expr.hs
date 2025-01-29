@@ -1219,9 +1219,9 @@ everywhere step env orig_e
                          , (s,e') <- everywhere step env (es!!i)
                          ]
   recurse (Tru e)      = [ (s, Tru e')  | (s,e') <- everywhere step env e ]
-  recurse (Lam bnd)    = [ (s, Lam (bind x e')) | (s,e') <- everywhere step env' e ]
+  recurse (Lam _bnd)   = [] {- [ (s, Lam (bind x e')) | (s,e') <- everywhere step env' e ]
                        where
-                         (env',x,e) = walkInsideBind env bnd
+                         (env',x,e) = walkInsideBind env bnd -}
   recurse (Exi bnd)    = [ (s, Exi (bind x e')) | (s,e') <- everywhere step env' e ]
                        where
                          (env',x,e) = walkInsideBind env bnd
