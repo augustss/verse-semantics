@@ -448,6 +448,7 @@ instance Pretty Ident where
 --------------------------------------------------------
 
 type EffString = String
+
 data Eff = Eff { eff_card :: CardEff
                , eff_side :: SideEff }
   deriving( Eq, Ord, Show, Data )
@@ -460,9 +461,9 @@ data CardEff  -- Cardinality effects
   deriving( Eq, Ord, Data, Bounded, Enum )
 
 data SideEff    -- Side effects
-  =  SAllocates | SReads | SWrites | SInteracts | STransacts
-  | SComputes          -- Pure, no side effets
-  | STop               -- Any side effect
+  = SComputes          -- Pure, no side effets, bottom of lattice
+  | SAllocates | SReads | SWrites | SInteracts | STransacts
+  | STop               -- Any side effect, top of the lattice
   deriving( Eq, Ord, Data, Bounded, Enum )
 
 effTop :: Eff
