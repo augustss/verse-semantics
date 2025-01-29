@@ -311,3 +311,114 @@ $$
 $$
 \caption{Plan C: Idealised denotational semantics of Mini Verse with choice, notation}
 \end{figure}
+
+\newcommand{\newfcn}{\Value \hookrightarrow \Value}
+\newcommand{\mknewfcn}[1]{[ #1 ]}
+\newcommand{\perm}[1]{\textbf{perm}(#1)}
+
+\begin{figure}
+$$
+\begin{array}{l}
+
+\textbf{Domains (sets)} \\
+\begin{array}{rcll}
+\Value & = & \mathbb{Z} + (\newfcn) \\
+\newfcn & = & [\Value \times \Value] & \text{an orderered set of pairs} \\  
+\Env & = & |Ident| \rightarrow \Value \\
+\Ws & = & \powerset{\Value} \\
+W^{*} & = & [\Ws] \\
+Env^{*} & = & \powerset{Env} \\
+\end{array}
+\\ \\
+\begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
+  \semap{E}{|e|} & : & \Env \rightarrow \mtype \\
+  \semapp{E}{|x|}{\rho} & = & [\msing{\rho(x)}] \\
+  \semapp{E}{|k|}{\rho} & = & [\msing{k}] \\
+  \semapp{E}{|o|}{\rho} & = & [\perm{\semap{O}{|o|}}] \\
+  \semapp{E}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
+  \semapp{E}{|fail|}{\rho} & = & [\{\}] \\
+  \semapp{E}{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
+  \semapp{E}{|apply1N e_1 e_2|}{\rho} & = &
+         [ r \, || \,
+           |fs <-| \semapp{E}{|e_1|}{\rho}, \;
+           |as <-| \semapp{E}{|e_2|}{\rho}, \;
+           |r| \inb \applys(|fs|, as) \}
+         ]
+           \\
+
+  \semapp{E}{|e_1 = e_2|}{\rho}      & = &
+      [ s_1 \cap s_2\, ||\, 
+           |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
+
+  \semapp{E}{|e_1 ; e_2|}{\rho}      & = &
+    [ \{ x_2 \, || \, x_1 \inb s_1, \; x_2 \inb s_2 \}\, ||\,
+      |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
+
+  \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
+    [ \{ \mknewfcn{ (0,x_0),(1,x_1),\mydots,(n,x_n) } \, ||\, x_0 \inb s_0,\; \mydots,\; x_n \inb s_n \}\, \\
+      & & ||\, s_0 |<-| \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \semapp{E}{|e_n|}{\rho} ] \\[1mm]
+
+  \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \mempty \\
+    \squash(\hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \bar{\rho} \} & \text{otherwise} \\
+  \end{array}
+  \right. \\
+  & &  |where|\; \bar{\rho} = \semapp{R}{e_1}{\rho}
+  \\[1mm]
+
+%  \textit{succeeds function:} \\
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & XXX \\
+  & & |where|
+    \begin{array}[t]{r@@{\;}c@@{\;}l}
+      |xxx| & = & |yyy| \\
+    \end{array} \\
+
+
+%    \semclose{q}
+%      {\{ f\,
+%    \begin{array}[t]{@@{}l@@{\;}l}
+%      || & \forall x \inb \Value,\,\\
+%         & \forall \rho' \in \semapp{X}{e_1}{\rho}, \\
+%         & f \inb \semfcn, \\
+%        & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty) \\
+%        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
+%    \end{array} \\
+%  \textit{decides function:} \\
+%  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semclose{q}{\{ f \in \semfcn \;
+%    \begin{array}[t]{@@{}l@@{\;}l}
+%      || & \forall x \in \Value.  \forall \rho' \in \semapp{X}{e_1}{\rho}. \\
+%        & \hspace{1em} (\semapp{E}{e_1}{\rho'[x \fmapsto w]} \neq \mempty \land \semapp{D}{e_2}{\rho'} \neq \mempty) \\
+%        & \hspace{1em} \implies x \in \dom(f) \land f(x) \in \semapp{D}{e_2}{\rho'}} \}  \\
+%    \end{array} \\
+
+
+%\end{array}
+\\ \\
+%\begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
+\semap{D}{|e|} & : & \Env \rightarrow \mtype \\
+%\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
+\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \semapp{E}{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
+\semap{R}{|e|}{} & : & \Env \rightarrow \powerset{\Env} \\
+\semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \squash(\semapp{E}{|e|}{\rho'}) \neq [] \} \\
+%% \semap{C}{|e|} & : & \Env -> \rightarrow [Env^{*}] \\
+%% \semapp{C}{|e|}{\rho} & = & xxx \\
+\end{array}
+\\
+\\
+\begin{array}{rcll}
+  \applys & : & (\Ws, \Ws) \rightarrow [\Ws] \\
+  \applys(|fs|, as) & = & \hat{\bigcup} \{ \applyf|(f, a)| \, || \, |f| \inb |fs|, \, |f| \in (\newfcn), \, a \inb as \} \\
+  \applyf & : & (\newfcn, \Value) \rightarrow [\Ws] \\
+  \applyf(|f|, a) & = & [ \{ y \, || \, x=a \} \,  || \, (x, y) \inb f ] \\
+  & & \text{sequence of sets, all empty except at most one } \\
+  \perm{} & : & (\semfcn) \rightarrow \powerset{\newfcn} \\
+  \perm{f} & = & \text{take an ordinary function and produce all permutations of argument order} \\
+\end{array} \\
+\lennart{I think these are correct for Tim's new functions.  Lambdas still to be done.}
+\\
+\end{array}
+$$
+\caption{Plan C: Idealised denotational semantics of Mini Verse with choice, new functions}
+\end{figure}
