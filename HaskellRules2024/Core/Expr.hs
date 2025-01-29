@@ -297,6 +297,9 @@ matchAll _                                  = Nothing
 
 -- encode check<fx>{e}
 mkCheck :: Effect -> Expr -> Expr
+-- check<iterate>{e} --> e
+mkCheck Iterates e = e
+
 -- check<fails>{e} --> if(e){WRONG}{fail}
 mkCheck Fails e =
   mkIfThunk (e >>> lamUnderscore (wrongFx Fails)) Fail
@@ -620,24 +623,28 @@ data Effect
   = Fails
   | Succeeds
   | Decides
+  | Iterates
  deriving ( Eq, Ord )
 
 instance Show Effect where
   show Fails    = "fails"
   show Succeeds = "succeeds"
   show Decides  = "decides"
+  show Iterates = "iterates"
 
 instance Pretty Effect where
   pPrint eff = text (show eff)
 
 canSucceed :: Effect -> Bool
 -- True if one result is acceptable
+canSucceed Iterates = True
 canSucceed Succeeds = True
 canSucceed Decides  = True
 canSucceed Fails    = False
 
 canFail :: Effect -> Bool
 -- True if no results is acceptable
+canFail Iterates = True
 canFail Succeeds = False
 canFail Decides  = True
 canFail Fails    = True

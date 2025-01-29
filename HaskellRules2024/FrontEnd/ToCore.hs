@@ -34,7 +34,12 @@ import Debug.Trace ( traceM )
 
 
 convertToCore :: Flags -> SrcCore -> IO (Core.Expr, [DError])
-convertToCore flags src = runD flags (convert src)
+convertToCore flags src
+  = do { (core,errs) <- runD flags (convert src)
+       ; when (fTraceDesugar flags) $
+         do { putStrLn ("\n------- Convert to core ---------")
+            ; putStrLn (render (indent (pPrint core))) }
+       ; return (core,errs) }
 
 --------------------------------------------------------
 --
@@ -46,7 +51,7 @@ convertToCore flags src = runD flags (convert src)
 --------------------------------------------------------
 
 convert :: SrcCore -> DsM Core.Expr
-convert e = conv S.empty (Check [] e)
+convert e = conv S.empty (Check effTop e)
 
 conv :: S.Set Src.Ident -> SrcExpr -> DsM Core.Expr
 -- The input expression is in BigCore, after desugaring,
@@ -79,9 +84,10 @@ conv sc = expr
 
     -- verification
     expr (Verify is e)      = coreVerify is <$> convD (foldr S.insert sc is) e
-    expr (Check [] e)       = exprD e
-    expr (Check (fx:fxs) e) = do warnEff fx
-                                 maybe id Core.mkCheck (toCoreEff fx) <$> exprD (Check fxs e)
+    expr (Check eff e)      = case toCoreEff eff of
+                                Nothing   -> do { traceM $ "ignoring unsupported effect: " ++ show eff
+                                                ; exprD e }
+                                Just ceff -> Core.mkCheck ceff <$> exprD e
     expr (Some e)           = Core.Some <$> exprD e
     expr (Guard v e)        = (Core.:>>:) <$> expr v <*> convD sc e
 
@@ -137,10 +143,13 @@ toCoreIdent :: Ident -> Core.Ident
 toCoreIdent (Ident _ s) = Core.Name s
 
 toCoreEff :: Eff -> Maybe Core.Effect
-toCoreEff ESucceeds = Just Core.Succeeds
-toCoreEff EDecides  = Just Core.Decides
-toCoreEff EFails    = Just Core.Fails
-toCoreEff _         = Nothing -- error "toCoreEff" (prettyShow eff)
+-- ToDo: silently ignoring side effects for now
+toCoreEff (Eff { eff_card = card, eff_side = _side })
+  = case card of
+      CSucceeds -> Just Core.Succeeds
+      CDecides  -> Just Core.Decides
+      CFails    -> Just Core.Fails
+      CIterates -> Just Core.Iterates
 
 errShadow :: [(Ident, Ident)] -> DsM ()
 errShadow is = do
@@ -166,11 +175,6 @@ errUndefined is = do
       i@(Ident l _) : _ -> errorMessage $ "undefined: " ++ prettyShow (l, i)
    else
     mapM_ reportScopeErr is
-
-warnEff :: Eff -> DsM ()
-warnEff eff = case toCoreEff eff of
-                Nothing -> traceM $ "unsupported effect: " ++ show eff
-                Just _  -> pure ()
 
 reportScopeErr :: Ident -> DsM ()
 reportScopeErr i@(Ident l _) = do

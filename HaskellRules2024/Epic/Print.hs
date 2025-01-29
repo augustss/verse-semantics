@@ -84,3 +84,6 @@ ppStruct con fs =
       indent $ vcat $ punctuate comma $ map (\(f, v) -> text f <+> text "=" <+> v) fs,
       text "}"
     ]
+
+angleBrackets :: Doc -> Doc
+angleBrackets d = char '<' <> d <> char '>'

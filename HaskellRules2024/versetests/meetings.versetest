@@ -10,7 +10,7 @@ verify("M27Jan25-1", fail)
   ; x = 1; f[] }
   # M27Jan25-1: will crash at runtime, and so must be rejected
 
-testeq("M27Jan25-2", fail, broken)
+testeq("M27Jan25-2", fail, skip)
     { loop():false := loop[]; x:any; one{ char[x]; loop[] }; x=1 }
     {1}
   # M27Jan25-2: this should fail, because the one{} is stuck on

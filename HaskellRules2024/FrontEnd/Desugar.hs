@@ -57,16 +57,20 @@ desugar flgs add_verification e_parsed
 
        -- Desugar into Essential Verse by doing superficial desugaring
        ; e_essential <- sDesugarExpr e_prel
-       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential
+       ; let e_with_check | add_verification = Check effSucceeds e_essential
+                          | otherwise        = e_essential
+       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_with_check
 
---       -- Side effects
---       ; addDeref e_essential
---       ; traceDS "addDeref"
-
-       ; e_mini <- essToMini e_essential
+       ; e_mini <- essToMini e_with_check
        ; _ <- traceDS "Desugar Essential Verse into Mini Verse" e_mini
+
        ; e_ds <- miniToCore ds_model e_mini
-       ; traceDS "Desugar Mini Verse into Core Verse" e_ds
+
+       ; let e_with_verify | add_verification = Verify [] e_ds
+                           | otherwise        = e_ds
+       ; _ <- traceDS "Desugar Mini Verse into Core Verse" e_with_verify
+
+       ; return e_with_verify
        }
 
   where
@@ -109,7 +113,7 @@ sDesugarExpr = ds
     ds (ApplyS  e1 e2) = applyS <$> ds e1 <*> ds e2
       where
         -- This replaces f(e) with check<succeeds>{f[e]}
-        applyS x y = eCheck [ESucceeds] (ApplyD x y)
+        applyS x y = eCheck effSucceeds (ApplyD x y)
 
     -- (e1 = e2)  --->  Unify
     ds (InfixOp e1 (Op "=")  e2)
@@ -122,13 +126,13 @@ sDesugarExpr = ds
 
     -- Bindings
     ds (InfixOp e1 (Op ":=") e2) = defn e1 e2 >>= ds
-    ds (InfixOp e1 (Op ":")  e2) = defn e1 (Range [] e2) >>= ds
+    ds (InfixOp e1 (Op ":")  e2) = defn e1 (Range e2) >>= ds
 
     -- Function notation
-    ds (InfixOp e1 (Op "=>") e2)  = ds $ Function e1 [EClosed,ESucceeds] e2
+    ds (InfixOp e1 (Op "=>") e2)  = ds $ Function Closed e1 effSucceeds e2
        -- The e1=>e2 notation has an implicit <succeeds>
 
-    ds (Function e1 effs e2) = Function <$> ds e1 <*> pure effs <*> ds e2
+    ds (Function q e1 effs e2) = Function q <$> ds e1 <*> pure effs <*> ds e2
 
     -- Conditionals
     -- We must retain IF3 (i.e `if e1 then e2 else e3`) because
@@ -159,7 +163,7 @@ sDesugarExpr = ds
     -- Do and case
     ds (Case1 b)     = do { let l = getLoc b
                           ; x <- Variable <$> newIdent l "x"
-                          ; ds $ Function (InfixOp x (Op ":") eAny) [] (Case2 x b) }
+                          ; ds $ Function Closed (InfixOp x (Op ":") eAny) effTop (Case2 x b) }
     ds (Case2 _ _)    = undefined
     ds (Block b)      = ds b                              -- do e --> e
     ds (Blk es)       = ds $ eSeq es
@@ -171,7 +175,7 @@ sDesugarExpr = ds
     -- Operators
     -- NB: Prefix '?' is just a function now; see note [Truth values] in Rules.Core
     ds (PrefixOp (Op "not") e)   = do e' <- ds e; pure $ If3 e' Fail eFalse
-    ds (PrefixOp (Op ":") e)     = Range [] <$> ds e
+    ds (PrefixOp (Op ":") e)     = Range <$> ds e
     ds (PrefixOp (Op "..") e)    = Splice   <$> ds e  -- See Note [Desugaring array splices]
     ds (PrefixOp (Ident l op) e) = ds =<< call Pre l op e
 
@@ -204,23 +208,23 @@ sDesugarExpr = ds
     ds (Macro1 (Ident _ "all")   _ e)    = All <$> ds e
     ds (Macro1 (Ident _ "verify") _ e)   = Verify [] <$> ds e
     ds (Macro1 (Ident _ "some") _ e)     = Some <$> ds e
-    ds (Macro1 (Ident _ "check") fx e)   = Check fx <$> ds e
-    ds (Macro1 (Ident _ "expect") fx e)  = Check fx <$> ds e
+    ds (Macro1 (Ident _ "check") fx e)   = Check (toEff effTop fx) <$> ds e
+    ds (Macro1 (Ident _ "expect") fx e)  = Check (toEff effTop fx) <$> ds e
                                            -- I think "expect" is Tim's notation for "check"
-    ds (Macro1 (Ident _ "succeeds") _ e) = eCheck [ESucceeds] <$> ds e
-    ds (Macro1 (Ident _ "decides")  _ e) = eCheck [EDecides]  <$> ds e
-    ds (Macro1 (Ident _ "fails")    _ e) = eCheck [EFails]    <$> ds e
+    ds (Macro1 (Ident _ "succeeds") _ e) = eCheck effSucceeds <$> ds e
+    ds (Macro1 (Ident _ "decides")  _ e) = eCheck effDecides  <$> ds e
+    ds (Macro1 (Ident _ "fails")    _ e) = eCheck effFails    <$> ds e
 
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
     ds (Macro1 (Ident _ "assume") fx e)  = do { x <- newIdent (getLoc e) "x"
                                               ; e' <- ds e
-                                              ; pure (eSeq [ eHavoc fx
+                                              ; pure (eSeq [ eHavoc (toEff effTop fx)
                                                            , Some (Lam x (eSeq [Unify (Variable x) e'
                                                                                , Variable x]))]) }
 
     -- first{e}        ==  if (x:=e) then x  else fail
     -- first(e1){e2}   ==  if e1     then e2 else fail
-    ds (Macro1 (Ident _ "first") [] e)  = ds $ If2E e Fail  -- same as one{}
+    ds (Macro1 (Ident _ "first") _ e)   = ds $ If2E e Fail  -- same as one{}
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
 
     -- type{t}  ==  Fun(x := t)<closed>{x}
@@ -287,7 +291,7 @@ defn (InfixOp p (Op ":") e2) e = defn_ty p e2 [] e      -- DSTY2
 -- Rule: (f(a)<fxs> := e)  -->  (f := function(a)<fxs>{e})
 -- Rule: (p:ty<fxs> := e)  -->  e |><fxs> ty
 defn p@(EffAttr {}) e
-  | ApplyS p2 a <- p1            = defn_fun p2 a fxs e     -- DSFUN1
+  | ApplyS p2 a <- p1            = defn_fun p2 a fxs e    -- DSFUN1
   | InfixOp p2 (Op ":") e2 <- p1 = defn_ty  p2 e2 fxs e   -- DSTY1
   where
     (p1, fxs) = getEffs p
@@ -317,10 +321,11 @@ defn (InfixOp p1 op@(Op "->") p2) e = do
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
-defn_ty :: SrcPat -> SrcExpr -> [Eff] -> SrcExpr -> DsM SrcExpr
+defn_ty :: SrcPat -> SrcExpr -> [EffString] -> SrcExpr -> DsM SrcExpr
 defn_ty p t fxs1 rhs
-  = defn p (OfType rhs (fxs1 ++ fxs2) t')
-     -- NB: In OfType, an empty [Eff] means "all effects allowed"
+  = defn p (OfType rhs (toEff effTop (fxs1 ++ fxs2)) t')
+     -- effSucceeds:   x:type := rhs  -->   x := rhs |><decides> ty
+     --                See DSTY2 Fig 4
   where
     (t', fxs2) = getEffs t
        -- Currently                   x : int<succeeds> := t
@@ -328,11 +333,9 @@ defn_ty p t fxs1 rhs
        -- but we want to treat it as  (x : int) <succeeds> := t
        -- This getEffs call smooths over the discrepancy.  Yuk.
 
-defn_fun :: SrcPat -> SrcExpr -> [Eff] -> SrcExpr -> DsM SrcExpr
+defn_fun :: SrcPat -> SrcExpr -> [EffString] -> SrcExpr -> DsM SrcExpr
 -- f(x)<fxs> := rhs
-defn_fun f a fxs rhs = defn f (Function a fxs' rhs)
-  where
-    fxs' = addSucceeds (addAperture fxs)  -- Add default effects
+defn_fun f a fxs rhs = defn f (eFunction a fxs rhs)
 
 eDefine :: HasCallStack => Ident -> SrcEssential -> SrcEssential
 -- Generates (x:=e) in Essential Verse
@@ -344,31 +347,11 @@ eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
                      (floats, rhs) = unSeq ts
 eDefine x rhs = DefineE x rhs
 
-{-
-encodeType :: SrcEssential -> DsM SrcEssential
--- Encodes type{e}, returning  fun(x:=e}{x}
--- You might think that a more direct desugaring would be
---      type{t} --> \x. x=t
--- using a ICFP lambda.
--- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
-encodeType e = do { x <- newIdent noLoc "x"
-                  ; return (Function (eDefine x e) [EClosed] (Variable x)) }
--}
-
-addSucceeds :: [Eff] -> [Eff]
-addSucceeds effs | any isCardinalityEff effs = effs
-                 | otherwise                 = ESucceeds : effs
-
-addAperture :: [Eff] -> [Eff]
--- Currently I'm making the default aperture be Closed
-addAperture effs | any isOpenClosed effs = effs
-                 | otherwise             = EClosed : effs
-
 --------------------------------------------------------
 --         Functions to take apart SrcExpr
 --------------------------------------------------------
 
-getEffs :: SrcExpr -> (SrcExpr, [Eff])
+getEffs :: SrcExpr -> (SrcExpr, [EffString])
 -- e<fx1><fx2> --> (e, [fx1,fx2])
 getEffs orig_e = go orig_e []
   where
@@ -488,7 +471,7 @@ _addDeref = pure . exprD S.empty
     expr s (Let e1 e2) = Let (expr s' e1) (exprD s' e2)
       where s' = defs s e1
     expr s (Block e) = Block (exprD s e)
-    expr s (Function a rs e2) = Function a rs (exprD s' e2)
+    expr s (Function q a rs e2) = Function q a rs (exprD s' e2)
       where s' = defs s a
     expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
     expr _ (DefineV i)      = DefineV i
@@ -498,7 +481,7 @@ _addDeref = pure . exprD S.empty
     expr s (Set e1 (Ident l sop) e2) = set s e1 op (expr s e2)
       where op = Ident l ("in'" ++ sop ++ "'")
     expr s (MVar i (Just t) (Just e)) = DefineE i $ ApplyD (applyPrimD "new" (expr s t)) (expr s e)
-    expr s (Range fx e1) = Range fx (expr s e1)
+    expr s (Range e1) = Range (expr s e1)
     expr s (Macro1 m rs e1) = Macro1 m rs (exprD s e1)
     expr s (Exists is e) = Exists is (expr s e)
     expr s (OfType e fx t) = OfType (expr s e) fx (expr s t)
@@ -678,20 +661,40 @@ mkAppend x          y          = do { r    <- newIdent noLoc "r"
 
 data WContext   -- The context for the W transformation
   = WC { wc_inp :: Input
-       , wc_fxs :: [Eff]   -- [] means "any effect"
+       , wc_fxs :: EffContext
        }
   deriving( Show )
 
 data Input
   = NoInput      -- ^ Typeset as bullet, circle, or underscore
   | PI SrcMini    -- ^ An input variable x
-  deriving (Eq, Ord, Show)
+  deriving( Show )
+
+data EffContext
+  = DomCtxt       -- In the argument of a function, nothing to push down
+  | RngCtxt Eff   -- In the range of a function with effects Eff
+  deriving( Show )
+
+{- Note [Pushing down effects]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this partially opaque function
+  f(x:int)<decides> := ( e |> t, 7 )
+When verifying, a client should see
+  f = \i. x:=int[i]; ( (havoc<decides>; some(t)), 7 )
+The opaque bits, under the (e |> t) should inherit the <decides> from
+the function definition.  This is the "pushing down" in `essToMini`:
+
+* The EffContext pushes into the body (range) of the function
+* It gets intersected into any |> opacity constructs
+
+The EffContext is also used in essToMini 
+-}
 
 essToMini :: SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
 essToMini orig_e = go_expr orig_e
   where
-    kap_init = WC { wc_inp = NoInput, wc_fxs = [] }
+    kap_init = WC { wc_inp = NoInput, wc_fxs = DomCtxt }
 
     go_expr = go kap_init
 
@@ -712,7 +715,8 @@ essToMini orig_e = go_expr orig_e
                                 ; e2 <- go_expr t2
                                 ; return (eSeq [dr, e2, r]) }
     go kap (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
-                                ; es <- mapM go_expr ts
+                                ; es <- mapM (go (kap { wc_inp = NoInput })) ts
+                                        -- Push ambient effects into both sides
                                 ; e  <- go kap t
                                 ; return (eSeq (es ++ [e])) }
 
@@ -739,24 +743,31 @@ essToMini orig_e = go_expr orig_e
                          ; return (eSeq [ DefineV x, DefineV y
                                         , eUnify (Variable x) i, eUnify (Variable y) e]) }
 
+    -- WCHK: check<fx>{t}
+    go kap (Check fx t) = Check fx <$> go kap t
+
     -- WCOL1, WCOL2, WCOL3: (:t)
-    go (WC { wc_inp = inp, wc_fxs = fxs }) (Range _ t)
+    go (WC { wc_inp = inp, wc_fxs = cfxs }) (Range t)
       = case inp of
           NoInput -> do { e <- go_expr t
                         ; x <- newIdent (getLoc t) "x"
                         ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
-          PI i | null fxs  -> do { e <- go_expr t; return (ApplyD e i) }
-               | otherwise -> OfType i fxs <$> go_expr t
-
-    -- WCHK: check<fx>{t}
-    go kap (Check fx t)  = Check fx <$> go kap t
+          PI i -> case cfxs of
+                     DomCtxt     -> ApplyD <$> go_expr t <*> pure i
+                     RngCtxt fxs -> OfType i fxs <$> go_expr t
+                       -- See Note [Pushing down the effects]
 
     -- WOFTYPE: t1 |> t2
-    go kap@(WC { wc_fxs = fxs1 }) (OfType t1 fxs2 t2)
-      = OfType <$> go (kap { wc_fxs = [] }) t1
-                   -- Push the input into t1, but we have dealt with effects and guards
-               <*> pure (intersectEffects fxs1 fxs2)
+    go kap@(WC { wc_fxs = cfxs }) (OfType t1 fxs2 t2)
+      = OfType <$> go (kap { wc_fxs = DomCtxt }) t1
+              -- Push the input into t1, but OfType deals with effects,
+              -- so don't push RngCtxt into t1
+               <*> pure fxs'
                <*> go_expr t2
+      where
+        fxs' = case cfxs of
+                 DomCtxt      -> effSucceeds -- ToDo: ignore fxs2?
+                 RngCtxt fxs1 -> fxs1 `intersectEffects` fxs2
 
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go kap (Splice t) = go kap t
@@ -800,26 +811,24 @@ essToMini orig_e = go_expr orig_e
            ; let inp' = case inp of
                            NoInput -> PI (Variable i)
                            PI f    -> PI (ApplyD f (Variable i))
-           ; e <- go (WC { wc_inp = inp', wc_fxs = [] }) t
+           ; e <- go (WC { wc_inp = inp', wc_fxs = DomCtxt }) t
            ; return (Lam i e) }
 
-    go (WC { wc_inp = inp }) (Function t1 fxs1 t2)
+    go (WC { wc_inp = inp }) (Function aperture t1 fxs1 t2)
         -- NB: ignore wc_fxs
       = case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"
-                        ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = [] }
-                              kap_body = WC { wc_inp = NoInput,         wc_fxs = fxs1' }
-                        ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1') (go kap_body t2) }
+                        ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = DomCtxt }
+                              kap_body = WC { wc_inp = NoInput,         wc_fxs = RngCtxt fxs1 }
+                        ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1) (go kap_body t2) }
           PI f -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
-                     ; let kap_arg  = WC { wc_inp = PI (Variable i),            wc_fxs = [] }
-                           kap_body = WC { wc_inp = PI (ApplyD f (Variable x)), wc_fxs = fxs1' }
+                     ; let kap_arg  = WC { wc_inp = PI (Variable i),            wc_fxs = DomCtxt}
+                           kap_body = WC { wc_inp = PI (ApplyD f (Variable x)), wc_fxs = RngCtxt fxs1 }
                      ; e1 <- go kap_arg  t1
                      ; e2 <- go kap_body t2
                      ; return (XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
-                                                (eCheck fxs1' e2)) }
-      where
-        (aperture, fxs1') = getAperture fxs1
+                                                (eCheck fxs1 e2)) }
 
     -- Core constructs used (only) in the Prelude
     -- Only used in the NoInput case
@@ -831,21 +840,14 @@ essToMini orig_e = go_expr orig_e
     go kap t = error $ "TODO: essToMini " ++ show (kap, t)
 
     ueq :: WContext -> DsM SrcMini -> DsM SrcMini
-    ueq (WC { wc_inp = inp, wc_fxs = fxs }) ds_e
+    ueq (WC { wc_inp = inp, wc_fxs = cfxs }) ds_e
       = case inp of
            NoInput -> ds_e
-           PI i | null fxs  -> Unify i <$> ds_e  -- See M20Dec24-3 for a simple example
-                | otherwise -> do { e <- ds_e    -- See test `blame0` for a simple example
-                                  ; v <- newIdent noLoc "i"
-                                  ; pure (OfType i [] (Lam v (Unify (Variable v) e))) }
-
-getAperture :: [Eff] -> (Aperture, [Eff])
-getAperture []                   = (Closed, [])    -- Current default is Closed; should really be open
-getAperture (EClosed : effs)     = (Closed, effs)
-getAperture (EOpen   : effs)     = (Open,   effs)
-getAperture (eff:effs)           = (oc, eff : effs')
-  where
-    (oc, effs') = getAperture effs
+           PI i -> case cfxs of
+                    DomCtxt -> Unify i <$> ds_e  -- See M20Dec24-3 for a simple example
+                    RngCtxt fxs -> do { e <- ds_e    -- See test `blame0` for a simple example
+                                      ; v <- newIdent noLoc "i"
+                                      ; pure (OfType i fxs (Lam v (Unify (Variable v) e))) }
 
 --------------------------------------------------------
 --
@@ -863,6 +865,7 @@ data Pi
 data DsMode
   = MX       -- ^ x "execution"
   | MV Bool  -- ^ + "verification"; True <=> immediate consumer is a verify{}
+             -- The Bool is just an optimisation, allows us to omit useless code
   | MI       -- ^ - "client" ("implementation")
   deriving (Eq, Ord, Show)
 
@@ -924,10 +927,10 @@ miniToCore orig_md = go (orig_md,[])
         do_mvmx = do { e1' <- go_nt md e1   -- Notice md; may be MV or MX
                      ; e2' <- go_nt md e2
                      ; if isAtomic e1'  -- Just an optimisation
-                       then return (Check [ESucceeds] (ApplyD e2' e1'))
+                       then return (Check effSucceeds (ApplyD e2' e1'))
                        else do { r <- newIdent (getLoc e1) "r"
                               ; return (eSeq [ DefineV r, eUnify (Variable r) (eCheck fx e1')
-                                             , Check [ESucceeds] (ApplyD e2' (Variable r)) ]) } }
+                                             , Check effSucceeds (ApplyD e2' (Variable r)) ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
     go md@(m,_) (Check fx e)
@@ -974,7 +977,8 @@ shortCutDefnVerify :: SrcMini -> SrcMini -> Bool
 shortCutDefnVerify e1 e2
   | isConst e2         = True
   | Variable {} <- e2  = True
-  | Check [ESucceeds] body <- e2
+  | Check eff body <- e2
+  , eff == effSucceeds
   = case body of
       Variable x       -> x `elem` pat_binders
       _ | isConst body -> True

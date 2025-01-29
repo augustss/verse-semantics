@@ -180,12 +180,6 @@ macros =
 macrosOp :: [String]
 macrosOp = ["in'='"] ++ macros
 
-lookupEffect :: String -> P Eff
-lookupEffect s
-  = case [ eff | eff <- allEffects, effString eff == s ] of
-      []      -> fail ("Unknown effect: " ++ s)
-      (eff:_) -> pure eff
-
 pKeyword :: String -> P ()
 pKeyword s = try $ do
   w <- pWord
@@ -197,10 +191,6 @@ pMacroName = try $ do
   w <- pWordOp
   guard (w `elem` macrosOp)
   pure $ Ident l w
-
-pEffectName :: P Eff
-pEffectName = try $ do w <- pWord
-                       lookupEffect w
 
 pKeywordOpt :: String -> P ()
 pKeywordOpt s = pKeyword s <|> pure ()
@@ -341,7 +331,10 @@ pMacro = try $ do
   (Macro1 n <$> many pAttr <*> pBlockM)
    <|> (Macro2 n <$> pParens pExprSeq <*> pBlockM)
 
-pAttr :: P Eff
+pEffectName :: P EffString
+pEffectName = try pWord
+
+pAttr :: P EffString
 pAttr = pAngles pEffectName
 
 pTerm :: P SrcExpr
@@ -361,14 +354,14 @@ pTerm = do
   foldl apply fn <$> many pArg
 
 pFunction :: P SrcExpr
-pFunction = mk_function <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlockM
+pFunction = mk_fun <$> ((pKeyword "fn" <|> pKeyword "function") *> some pArg) <*> pBlockM
   where
-    pArg :: P (SrcExpr, [Eff])
+    pArg :: P (SrcExpr, [EffString])
     pArg = (,) <$> pParens pExprSeq <*> many pAttr
 
-    mk_function :: [(SrcExpr,[Eff])] -> SrcBlk -> SrcExpr
-    mk_function []              body = body
-    mk_function ((arg,fx):args) body = Function arg fx (mk_function args body)
+    mk_fun :: [(SrcExpr,[EffString])] -> SrcBlk -> SrcExpr
+    mk_fun []              body = body
+    mk_fun ((arg,fx):args) body = eFunction arg fx (mk_fun args body)
 
 pBlockEs :: P [SrcExpr]
 pBlockEs = pBraces (sepEndBy pExprT (pOp ";"))

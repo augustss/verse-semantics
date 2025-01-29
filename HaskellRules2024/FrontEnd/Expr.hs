@@ -7,7 +7,8 @@ module FrontEnd.Expr(
       Loc, noLoc, mkLoc
 
     , Ident(..), identLoc, identString
-    , SrcExpr(..), Lit(..), Path(..), Aperture(..)
+    , SrcExpr(..), Lit(..), Path(..)
+    , Aperture(..), defaultAperture
     , SrcPat, SrcEssential, SrcMini, SrcCore, SrcBlk, SrcValue
 
       -- Predicates on SrcExpr
@@ -17,13 +18,13 @@ module FrontEnd.Expr(
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
     , eAll, eExists, eCheck, eApplyD, eVerify
     , eThunk, eForce, eForceLam, existsXX, eSomeAny
-    , eSeq, eUnify, fvArray
+    , eSeq, eUnify, eFunction, fvArray
     , srcUnderscore, isSrcUnderscore, identX
 
     , Store(..), Ptr
 
-    , Eff(..), EffNoOC, allEffects, effString, isOpenClosed
-    , isCardinalityEff, intersectEffects
+    , EffString, Eff(..), intersectEffects, toEff, isTopEff
+    , CardEff(..), SideEff(..), effTop, effSucceeds, effDecides, effFails
 
     , Op, pattern Op
     , compos, composOp, unSeq
@@ -47,6 +48,7 @@ import Control.Monad.Writer
 import Data.Data (Data)
 import qualified Data.IntMap as IM
 import Data.Maybe
+import Data.List( partition )
 
 import GHC.Stack( HasCallStack )
 
@@ -136,10 +138,10 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
                                        --    innermost scoping context, with no type constraint
                                        -- This is a valid expression; eg <exists x, exists y>
                                        -- is like (exists x; exists y; <x,y>)
-  | Function SrcExpr [EffString] SrcBlk -- function(e)<eff>{e}
+  | Function Aperture SrcExpr Eff SrcBlk -- function(e)<eff>{e}
 
-  | OfType SrcExpr [Eff] SrcExpr  -- e |>{fx} t
-                                  -- Empty [Eff] means "all effects" (not none!)
+  | OfType SrcExpr Eff SrcExpr       -- e |>{fx} t
+                                     -- Empty [Eff] means "all effects" (not none!)
 
   | DefineIE Ident Ident SrcExpr       -- (i->x) := e
   | Where SrcBlk SrcExpr               -- e1 where e2
@@ -159,8 +161,8 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Variable Ident                     -- x
   | DefineE Ident SrcExpr              -- i := e
   | ApplyD SrcExpr SrcExpr             -- f[e]
-  | Range [Eff] SrcExpr                -- :{fx}e
-  | Check [Eff] SrcExpr                -- check<fx>{e}
+  | Range SrcExpr                      -- :e
+  | Check Eff SrcExpr                  -- check<fx>{e}
   | Array [SrcExpr]                    -- array{e1;e2;...}
   | Seq [SrcExpr]                      -- e1;e2;...
   | Choice SrcBlk SrcBlk               -- e1 | e2
@@ -194,9 +196,6 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
 
   deriving (Eq, Ord, Show, Data)
 
-data Aperture = Open | Closed
-  deriving (Eq, Ord, Show, Data)
-
 -- SrcPat synonym is used for syntax of 'p' in the source language
 type SrcPat = SrcExpr
 
@@ -213,6 +212,15 @@ type SrcCore  = SrcExpr
 
 type SrcValue = SrcExpr
 type SrcBlk   = SrcExpr
+
+--------------------------------------------------------
+--      Aperture: open or closed
+
+data Aperture = Open | Closed
+  deriving (Eq, Ord, Show, Data)
+
+defaultAperture :: Aperture
+defaultAperture = Closed  -- Just for now
 
 --------------------------------------------------------
 --      Smart constructors to construct SrcExpr
@@ -272,13 +280,13 @@ eMkMap :: Loc -> SrcExpr
 eMkMap l = Variable (Ident l "mkMap$")
 
 
-eHavoc :: [Eff] -> SrcExpr
-eHavoc fx = eSeq (mapMaybe havoc1 fx)
+eHavoc :: Eff -> SrcExpr
+eHavoc (Eff { eff_card = c }) = havoc1 c
   where
-    havoc1 ESucceeds = Just (eSeq [])
-    havoc1 EFails    = Just Fail
-    havoc1 EDecides  = Just (Unify eSomeAny (Array []))
-    havoc1 _         = Nothing -- errorMessage $ "eHavoc: " ++ show fx
+    havoc1 CSucceeds = eSeq []
+    havoc1 CFails    = Fail
+    havoc1 CDecides  = Unify eSomeAny (Array [])
+    havoc1 CIterates = error "eHavoc:iterates"
 
 eThunk :: SrcExpr -> SrcExpr
 -- Delay `e` by wrapping it in a lambda (\_.e)
@@ -318,19 +326,19 @@ eGuard xs orig_e = foldr gd orig_e xs
   where
    gd x e = Guard (Variable x) e
 
-eCheck :: [Eff] -> SrcExpr -> SrcExpr
+eCheck :: Eff -> SrcExpr -> SrcExpr
 -- Smart constructor for (Check fxs e):
 --  * Combines with nested Check
---  * Combines with nested OfTpye
+--  * Combines with nested OfType
 --  * Discards entirely when effects are "all effects",
 --    or when the payload is a value and the effects are happy with that
 --
 -- These checks eliminate a lot of clutter. For example:
 --    type{e}, which desugars to fun(x:=e}<succeeds>{x}, where we don't
 --             want to generate check<succeeds>{x}
-eCheck [] e                           = e
-eCheck fxs e | isValue e
-             , all valueSatisfies fxs = e
+eCheck fxs e
+  | isTopEff fxs                      = e
+  | isValue e, valueSatisfies fxs     = e
 eCheck fxs1 (Check fxs2 e)            = Check (fxs1 `intersectEffects` fxs2) e
 eCheck fxs1 (OfType e1 fxs2 e2)       = OfType e1 (fxs1 `intersectEffects` fxs2) e2
 eCheck fxs e                          = Check fxs e
@@ -349,6 +357,26 @@ eApplyD f x = ApplyD f x
 fvArray :: [Ident] -> SrcExpr
 fvArray [x] = Variable x
 fvArray xs = Array (map Variable xs)
+
+eFunction :: SrcExpr -> [EffString] -> SrcExpr -> SrcExpr
+eFunction arg fxs body
+  = Function aperture arg (toEff effSucceeds effs) body
+        -- effSucceeds: default is <succeeds>
+  where
+    (ocs, effs) = partition is_open_or_closed fxs
+
+    aperture
+      | has_open, not has_closed     = Open
+      | has_closed, not has_open     = Closed
+      | not has_open, not has_closed = defaultAperture
+      | otherwise = error "A function can't be both open and closed"
+
+    has_open   = any (== "open")   ocs
+    has_closed = any (== "closed") ocs
+
+    is_open_or_closed "open"   = True
+    is_open_or_closed "closed" = True
+    is_open_or_closed _        = False
 
 --------------------------------------------------------
 --            Decomposing SrcExpr
@@ -419,84 +447,123 @@ instance Pretty Ident where
 --   Open/closed: <open>, <closed>
 --------------------------------------------------------
 
-type EffString = Eff  -- For now
-type EffNoOC = Eff   -- EffNoOC should not be EOpen or EClosed
+type EffString = String
+data Eff = Eff { eff_card :: CardEff
+               , eff_side :: SideEff }
+  deriving( Eq, Ord, Show, Data )
 
-data Eff
-  = -- Cardinality effects
-    EIterates | ESucceeds | EDecides | EFails
+data CardEff  -- Cardinality effects
+  = CFails     -- {0}
+  | CSucceeds  -- {1}
+  | CDecides   -- {0,1}
+  | CIterates  -- {0,1,2,...}   Top of the lattice
+  deriving( Eq, Ord, Data, Bounded, Enum )
 
-    -- Side effects
-  | EAllocates | EReads | EWrites | EInteracts | ETransacts
-  | EComputes          -- Pure, no side effets
+data SideEff    -- Side effects
+  =  SAllocates | SReads | SWrites | SInteracts | STransacts
+  | SComputes          -- Pure, no side effets
+  | STop               -- Any side effect
+  deriving( Eq, Ord, Data, Bounded, Enum )
 
-    -- Open/closed on functions
-  | EOpen | EClosed
-         deriving( Eq, Ord, Show, Data, Bounded, Enum )
+effTop :: Eff
+effTop = Eff { eff_card = CIterates, eff_side = STop }
 
-allEffects :: [Eff]
-allEffects = [minBound..maxBound]
+effSucceeds, effDecides, effFails :: Eff
+effSucceeds = Eff { eff_card = CSucceeds, eff_side = STop }
+effDecides  = Eff { eff_card = CDecides,  eff_side = STop }
+effFails    = Eff { eff_card = CFails,    eff_side = STop }
 
-effString :: Eff -> String
-effString EIterates  = "iterates"
-effString ESucceeds  = "succeeds"
-effString EDecides   = "decides"
-effString EFails     = "fails"
-effString EOpen      = "open"
-effString EClosed    = "closed"
-effString EAllocates = "allocates"
-effString EReads     = "reads"
-effString EWrites    = "writes"
-effString EInteracts = "interacts"
-effString ETransacts = "transacts"
-effString EComputes  = "computes"
+isTopEff :: Eff -> Bool
+isTopEff eff = eff == effTop
+
+instance Show CardEff where
+  show CIterates  = "iterates"
+  show CSucceeds  = "succeeds"
+  show CDecides   = "decides"
+  show CFails     = "fails"
+
+instance Show SideEff where
+  show SAllocates = "allocates"
+  show SReads     = "reads"
+  show SWrites    = "writes"
+  show SInteracts = "interacts"
+  show STransacts = "transacts"
+  show SComputes  = "computes"
+  show STop       = "top"
 
 instance Pretty Eff where
-  pPrintPrec _ _ eff = text (effString eff)
+  pPrintPrec _ _ (Eff ceff seff) = pPrint ceff <> pPrint seff
 
-isCardinalityEff :: Eff -> Bool
-isCardinalityEff EIterates = True
-isCardinalityEff ESucceeds = True
-isCardinalityEff EDecides  = True
-isCardinalityEff EFails    = True
-isCardinalityEff _         = False
+instance Pretty CardEff where
+  pPrintPrec _ _ CIterates = empty   -- Suppress <iterates>
+  pPrintPrec _ _ eff       = angleBrackets (text (show eff))
 
-valueSatisfies :: EffNoOC -> Bool
+instance Pretty SideEff where
+  pPrintPrec _ _ STop = empty        -- Suppress <top>
+  pPrintPrec _ _ eff  = angleBrackets (text (show eff))
+
+toEff :: Eff -> [EffString] -> Eff
+toEff (Eff {eff_card = default_card, eff_side = default_side })
+      effs
+  | Just ce <- get_card effs
+  , Just se <- get_side effs
+  = Eff { eff_card = ce, eff_side = se }
+  | otherwise
+  = error ("toEff: " ++ show effs)
+  where
+    get_card :: [EffString] -> Maybe CardEff
+    get_card fxs = case get fxs of
+                      []   -> Just default_card
+                      [ce] -> Just ce
+                      _    -> error ("toEff1: " ++ (show fxs))
+    get_side :: [EffString] -> Maybe SideEff
+    get_side fxs = case get fxs of
+                      []   -> Just default_side
+                      [se] -> Just se
+                      _    -> error ("toEff2: " ++ (show fxs))
+
+    get :: (Enum a, Bounded a, Show a) => [EffString] -> [a]
+    get fxs = [ e | e <- [minBound..maxBound]
+                   , fx <- fxs
+                   , fx == show e ]
+
+valueSatisfies :: Eff -> Bool
 -- Is check<fx>{val} satisfied?
-valueSatisfies EFails = False
-valueSatisfies _      = True
+valueSatisfies (Eff { eff_card = CFails }) = False
+valueSatisfies _                           = True
 
-isOpenClosed :: Eff -> Bool
-isOpenClosed EOpen   = True
-isOpenClosed EClosed = True
-isOpenClosed _       = False
+intersectEffects :: Eff -> Eff -> Eff
+intersectEffects (Eff { eff_card = c1, eff_side = s1 })
+                 (Eff { eff_card = c2, eff_side = s2 })
+   = Eff { eff_card = c1 `intersectCard` c2
+         , eff_side = s1 `intersectSide` s2 }
 
-intersectEffects :: [EffNoOC] -> [EffNoOC] -> [EffNoOC]
--- [] means "all effects"
-intersectEffects effs1        []    = effs1
-intersectEffects []           effs2 = effs2
-intersectEffects (eff1:effs1) effs2 = map (intersectEff1 eff1) (intersectEffects effs1 effs2)
+intersectSide :: SideEff -> SideEff -> SideEff
+intersectSide STop s = s
+intersectSide s STop = s
+intersectSide s1 s2 | s1 == s2 = s1
+intersectSide s1 s2 = error ("intersectSide incomplete:" ++ show s1 ++ " " ++ show s2)
 
-intersectEff1 :: EffNoOC -> EffNoOC -> EffNoOC  -- Not expecting EOpen/EClosed
-intersectEff1 EIterates EFails    = EFails
-intersectEff1 EIterates EDecides  = EDecides
-intersectEff1 EIterates ESucceeds = ESucceeds
-intersectEff1 EIterates EIterates = EIterates
+intersectCard :: CardEff -> CardEff -> CardEff
+intersectCard CIterates CFails    = CFails
+intersectCard CIterates CDecides  = CDecides
+intersectCard CIterates CSucceeds = CSucceeds
+intersectCard CIterates CIterates = CIterates
 
-intersectEff1 EDecides  EFails    = error "intersectEff-1"
-intersectEff1 EDecides  EDecides  = EDecides
-intersectEff1 EDecides  EIterates = EDecides
-intersectEff1 EDecides  ESucceeds = ESucceeds
+intersectCard CDecides  CFails    = error "intersectCard-1"
+intersectCard CDecides  CDecides  = CDecides
+intersectCard CDecides  CIterates = CDecides
+intersectCard CDecides  CSucceeds = CSucceeds
 
-intersectEff1 ESucceeds EFails    = error "intersectEff-2"
-intersectEff1 ESucceeds ESucceeds = ESucceeds
-intersectEff1 ESucceeds EDecides  = ESucceeds
-intersectEff1 ESucceeds EIterates = ESucceeds
+intersectCard CSucceeds CFails    = error "intersectCard-2"
+intersectCard CSucceeds CSucceeds = CSucceeds
+intersectCard CSucceeds CDecides  = CSucceeds
+intersectCard CSucceeds CIterates = CSucceeds
 
-intersectEff1 EFails    EFails  = EFails
-intersectEff1 EFails    eff     = error ("intersectEff-3 " ++ show eff)
-
-intersectEff1 eff1 eff2 = error ("intersectEff-4 " ++ show eff1 ++ " " ++ show eff2)
+intersectCard CFails    CFails    = CFails
+intersectCard CFails    CDecides  = CFails
+intersectCard CFails    CIterates = CFails
+intersectCard CFails    CSucceeds = error "intersectCard-3"
 
 --------------------------------------------------------
 --               Store
@@ -511,7 +578,8 @@ data Store = Store { refMap :: IM.IntMap SrcValue
 --------------------------------------------------------
 
 instance Pretty Aperture where
-  pPrintPrec _ _ q = case q of
+  pPrintPrec _ _ q = angleBrackets $
+                     case q of
                         Open   -> char 'o'
                         Closed -> char 'c'
 
@@ -571,7 +639,7 @@ instance Pretty SrcExpr where
           InfixOp e1 o e2 -> maybeParens (p > q) $ sep [ppr ql e1 <+> ppOp o, indent $ ppr qr e2]
             where (q, ql, qr) = fixity (identString o)
 
-          EffAttr f a -> maybeParens (p > q) $ ppr ql f <> text "<" <> ppr 0 a <> text ">"
+          EffAttr f a -> maybeParens (p > q) $ ppr ql f <> text "<" <> text a <> text ">"
             where (q, ql, _) = fixity "()"
 
           If1 e1 -> maybeParens (p > 0) $ text "if" <+> ppB e1
@@ -606,10 +674,10 @@ instance Pretty SrcExpr where
                   -- Print fun(x:int)(y:int){body} rather than
                   --       fun(x:int){fun(y:int){body}}
                   (args,body) = split_args [] expr
-                  split_args acc (Function a fxs b) = split_args ((a,fxs):acc) b
-                  split_args acc b                  = (reverse acc, b)
+                  split_args acc (Function q a fxs b) = split_args ((q,a,fxs):acc) b
+                  split_args acc b                    = (reverse acc, b)
 
-                  ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
+                  ppArs (q, e, rs) = parens (ppArg e) <> pPrint q <> pPrint rs
 
           Type t       -> text "type" <> braces (ppr 0 t)
           Blk es       -> braces $ ppSeq lvl es
@@ -633,24 +701,24 @@ instance Pretty SrcExpr where
           Fail           -> text "fail"
           Wrong s        -> text $ "WRONG'" ++ s ++ "'"
 
-          Range fx e -> --pPrintPrec l p (PrefixOp (Ident noLoc ":") e)
-                        text "range" <> ppEffs fx <> braces (ppr 0 e)
+          Range e     -> ppNormal (PrefixOp (Ident noLoc ":") e)
           Exists is e -> maybeParens (p > 0) $ sep [text "exists" <+> hsep (map (ppr 0) is) <> text ".", ppr 0 e]
           Verify is e -> maybeParens (p > 0) $
-                         cat [text "verify" <> parens (hsep (map (ppr 0) is))
+                         cat [ text "verify" <> parens (hsep (map (ppr 0) is))
                              , indent (braces (ppr 0 e)) ]
 
           OfType e fx t -> --ppNormal (InfixOp e (Op ":") t)
-                           cat [ text "ofType" <> ppEffs fx <> parens (ppr 0 e)
+                           cat [ text "ofType" <> pPrint fx <> parens (ppr 0 e)
                                , indent (braces (ppr 0 t)) ]
 
           Where e1 e2 -> maybeParens (p>0) $ sep [ ppr 0 e1, text "where" <+> ppr 0 e2 ]
           Some e      -> text "some" <> parens (ppr 0 e)
           One e       -> text "one" <> parens (ppr 0 e)
           All e       -> text "all" <> parens (ppr 0 e)
-          Check fx e  -> text "check" <> ppEffs fx <> braces (ppr 0 e)
+          Check fx e  -> cat [ text "check" <> pPrint fx
+                             , indent (braces (ppr 0 e)) ]
           Guard e1 e2 -> maybeParens (p>0) $ sep [ ppr 1 e1, text ";;" <+> ppr 1 e2 ]
-          XDLam q i e1 e2 -> maybeParens (p > 0) $ text "\\" <> parens (ppr 0 q) <> ppr 0 i <> text "."
+          XDLam q i e1 e2 -> maybeParens (p > 0) $ text "\\" <> ppr 0 q <> ppr 0 i <> text "."
                                                    <> cat [braces (ppr 0 e1), braces (ppr 0 e2)]
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Map es -> text "map" <> braces (ppSeq lvl es)
@@ -666,8 +734,8 @@ instance Pretty SrcExpr where
 instance Pretty Store where
   pPrintPrec l _ (Store m _) = fsep . punctuate comma . map (pPrintPrec l 0) . IM.toList $ m -- XXX
 
-ppEffs :: [Eff] -> Doc
-ppEffs rs = mconcat (map (\ r -> text "<" <> pPrint r <> text ">") rs)
+ppEffs :: [EffString] -> Doc
+ppEffs rs = mconcat (map (\ r -> text "<" <> text r <> text ">") rs)
 
 ppSeq :: PrettyLevel -> [SrcExpr] -> Doc
 ppSeq l es = sep $ punctuate (text ";") $
@@ -761,7 +829,7 @@ compos f (Type t)           = Type <$> f t
 compos f (Block b)          = Block <$> f b
 compos f (Case1 b)          = Case1 <$> f b
 compos f (Case2 e b)        = Case2 <$> f e <*> f b
-compos f (Function e fx b)  = Function <$> f e <*> pure fx <*> f b
+compos f (Function q e fx b)= Function q <$> f e <*> pure fx <*> f b
 compos f (Blk es)           = Blk <$> traverse f es
 compos f (Option me)        = Option <$> traverse f me
 compos f (Parens e)         = Parens <$> f e
@@ -777,7 +845,7 @@ compos f (DefineE i e)      = DefineE i <$> f e
 compos f (DefineIE i x e)   = DefineIE i x <$> f e
 compos f (Choice e1 e2)     = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2)      = Unify <$> f e1 <*> f e2
-compos f (Range fx e)       = Range <$> pure fx <*> f e
+compos f (Range e)          = Range <$> f e
 compos _ e@Wrong{}          = pure e
 compos f (Exists is e)      = Exists is <$> f e
 compos f (Where e1 e2)      = Where <$> f e1 <*> f e2
@@ -855,7 +923,7 @@ getVisibleBinders = go
     go (ApplyS e1 e2) = go e1 ++ go e2
     go (ApplyD e1 e2) = go e1 ++ go e2
     go (Unify e1 e2)  = go e1 ++ go e2
-    go (Range _fx e)  = go e
+    go (Range e)      = go e
     go (Guard e1 _)   = go e1
     go (Truth e)      = go e
 
@@ -913,7 +981,7 @@ getFree = fvs_blk
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
     fvs (Type t)          = fvs_blk t
-    fvs (Range  _ e)      = fvs_blk e
+    fvs (Range e)         = fvs_blk e
     fvs (Check _ e)       = fvs_blk e
     fvs (Some e)          = fvs_blk e
     fvs (One e)           = fvs_blk e
@@ -926,7 +994,7 @@ getFree = fvs_blk
                           where
                             bs = getVisibleBinders e1
 
-    fvs (Function arg _ body)
+    fvs (Function _ arg _ body)
       = (fvs arg ++ fvs_blk body) `remove` getVisibleBinders arg
 
     fvs (XDLam _ x e1 e2)
@@ -959,7 +1027,7 @@ getVar (DefineIE _ _ e) = getVar e
 getVar Choice{}         = []
 getVar (Set _ _ e)      = getVar e
 getVar (MVar i t e)     = i : maybe [] getVar t ++ maybe [] getVar e
-getVar (Range _fx e)    = getVar e
+getVar (Range e)        = getVar e
 getVar Function{}       = []
 getVar (Exists _ e)     = getVar e
 getVar (Verify _ e)     = getVar e

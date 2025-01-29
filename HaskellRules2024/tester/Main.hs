@@ -7,7 +7,7 @@
 module Main(main) where
 
 import FrontEnd.CopyHook
-import FrontEnd.Desugar( desugar, DError )
+import FrontEnd.Desugar( desugar )
 import FrontEnd.ToCore( convertToCore )
 import FrontEnd.Flags
 import FrontEnd.Expr as Src
@@ -19,7 +19,6 @@ import Core.Expr as Core
 import Core.Verifier( verificationRules )
 import Core.TRS2024 ( runtimeRules )
 import Core.Traced as TRS ( Traced, term, trace )
-import Core.Bind( bindList )
 
 import Epic.Print hiding ( (<>) )
 import Data.Generics.Uniplate.Data( universeBi )
@@ -307,12 +306,20 @@ widthFileName = 25
 --
 -----------------------------------------------
 
-srcToCore :: Flags -> Bool -> SrcExpr -> IO (Core.Expr, [DError])
+srcToCore :: Flags -> Bool -> SrcExpr -> IO Core.Expr
 srcToCore flags add_verification e
-  = do { (e1 :: SrcCore, errs1)    <- FrontEnd.Desugar.desugar flags add_verification e
+  = do { (e1 :: SrcCore, errs1)   <- FrontEnd.Desugar.desugar flags add_verification e
        ; (e2 :: Core.Expr, errs2) <- FrontEnd.ToCore.convertToCore flags e1
        ; let e3 = Core.prep e2
-       ; return (e3, errs1 ++ errs2) }
+
+       -- Replaces the code with FAIL if there was a
+       --    desugaring error (e.g. unbound variable)
+       ; let errs = errs1 ++ errs2
+             e4 | null errs = e3
+                | otherwise = (Core.Lit (LInt 0) Core.:=: Core.Lit (LStr (prettyShow errs)))
+                              Core.:>: Core.Fail
+
+       ; return e4 }
 
 evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Traced Core.Expr)
 evalExpr flags test e
@@ -388,7 +395,7 @@ doTest tflg test src1 src2 = do
   do { let flags     = mkFlags tflg add_verif
            add_verif = desugarForVerification test
 
-     ; core1 <- wrapTest add_verif <$> srcToCore flags add_verif src1
+     ; core1 <- srcToCore flags add_verif src1
 
      -- Display the desugared output
      ; when (showDesugared tflg) $
@@ -396,24 +403,12 @@ doTest tflg test src1 src2 = do
 
      ; mb_core2 <- case src2 of
                      Variable (Ident _ "wrong") -> pure Nothing
-                     _       -> do { (core2, _) <- srcToCore flags False src2
+                     _       -> do { core2 <- srcToCore flags False src2
                                    ; pure (Just core2) }
 
      ; checkResults tflg test (src1, core1) (src2, mb_core2)
 
      }
-
-
--- | `wrapTopEffect` wraps the expression in a toplevel verify if necessary,
---   replacing the code with FAIL if there was a desugaring error (e.g. unbound variable)
-wrapTest :: Bool -> (Expr, [DError]) -> Expr
-wrapTest wrap_me (core, errs)
-  | wrap_me   = Core.Verify (bindList [] ([], Core.mkCheck Succeeds core'))
-  | otherwise = core
-  where
-    core' | null errs = core
-          | otherwise = (Core.Lit (LInt 0) Core.:=: Core.Lit (LStr (prettyShow errs))) Core.:>: Core.Fail
-
 
 desugarForVerification :: Test -> Bool
 desugarForVerification TestEvalEq{}   = False
@@ -1054,8 +1049,8 @@ ppTim = pp
 
     ppBlk es = braces $ ppSeq es
 
-    ppEffs :: [Eff] -> Doc
-    ppEffs rs = mconcat (map (\ r -> text "<" <> pPrint r <> text ">") rs)
+    ppEffs :: [EffString] -> Doc
+    ppEffs rs = mconcat (map (\ r -> text "<" <> text r <> text ">") rs)
 
     pp :: Bool -> Rational -> SrcExpr -> Doc  -- boolean indicates that ';' is allowed
     pp sem prec expr =
@@ -1095,12 +1090,11 @@ ppTim = pp
                          cat [ text "function" <> hcat (map ppArs args)
                              , indent (pp False 10 body) ]
                 where
-                  ppArs (e, rs) = parens (ppArg e) <> ppEffs rs
-                  -- Print fun(x:int)(y:int){body} rather than
-                  --       fun(x:int){fun(y:int){body}}
                   (args,body) = split_args [] expr
-                  split_args acc (Function a fxs b) = split_args ((a,fxs):acc) b
-                  split_args acc b                  = (reverse acc, b)
+                  split_args acc (Function q a fxs b) = split_args ((q,a,fxs):acc) b
+                  split_args acc b                    = (reverse acc, b)
+
+                  ppArs (q, e, rs) = parens (ppArg e) <> pPrint q <> pPrint rs
 
         If3 e1 e2 e3 -> maybeParens (prec > 0) $
                         sep [text "if" <+> parens (pp True 0 e1) <+> text "then",
