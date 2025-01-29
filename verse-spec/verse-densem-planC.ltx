@@ -137,6 +137,7 @@ Env^{*} & = & \powerset{Env} \\
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
 \semap{D}{|e|} & : & \Env \rightarrow \mtype \\
 \semapp{D}{|e|}{\rho} & = & \bigcup_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
+\semap{X}{e} & : & \Env \rightarrow \powerset{\Env} \\
 \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n }
                                   \vb   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & |where [x_1,xdots,x_n]| = \semap{I}{|e|} \\[1mm]
@@ -171,18 +172,20 @@ $$
 \subsection{Denotional semantics of Mini Verse with choice}
 
 \newcommand{\applyf}{\textbf{applyf}}
+\newcommand{\applys}{\textbf{applys}}
 \newcommand{\squash}{\textbf{squash}}
+\newcommand{\Ws}{\textit{Ws}}
 
 \begin{figure}
 $$
 \begin{array}{l}
 
-
 \textbf{Domains (sets)} \\
 \begin{array}{rcll}
 \Value & = & \mathbb{Z} + [\semfcn] \\
 \Env & = & |Ident| \rightarrow \Value \\
-W^{*} & = & [\powerset{W}] \\
+\Ws & = & \powerset{W} \\
+W^{*} & = & [\Ws] \\
 Env^{*} & = & \powerset{Env} \\
 \end{array}
 \\ \\
@@ -198,15 +201,18 @@ Env^{*} & = & \powerset{Env} \\
          [ r \, || \,
            |fs <-| \semapp{E}{|e_1|}{\rho}, \;
            |as <-| \semapp{E}{|e_2|}{\rho}, \;
-           |r| \inb \apply^{*}(fs, as) \}
+           |r| \inb \applys(fs, as) \}
          ]
            \\
+
   \semapp{E}{|e_1 = e_2|}{\rho}      & = &
       [ s_1 \cap s_2\, ||\, 
            |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
+
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = &
     [ \{ x_2 \, || \, x_1 \inb s_1, \; x_2 \inb s_2 \}\, ||\,
       |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
+
   \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
     [ \{ \mkfcn{ \{ (i,x_i) \vb i \in 0 \ldots n \} } \, ||\, x_0 \inb s_0,\; \mydots,\; x_n \inb s_n \}\, \\
       & & ||\, s_0 |<-| \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \semapp{E}{|e_n|}{\rho} ] \\[1mm]
@@ -216,7 +222,6 @@ Env^{*} & = & \powerset{Env} \\
   \begin{array}{ll}
     \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \mempty \\
     \squash(\hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \bar{\rho} \} & \text{otherwise} \\
-    %% \bigcup_{\rho' \dot{\in} \bar{\rho}} \semapp{D}{|e_2|}{\rho'} 
   \end{array}
   \right. \\
   & &  |where|\; \bar{\rho} = \semapp{R}{e_1}{\rho}
@@ -224,6 +229,13 @@ Env^{*} & = & \powerset{Env} \\
 
 %  \textit{succeeds function:} \\
   \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & XXX \\
+  & & |where|
+    \begin{array}[t]{r@@{\;}c@@{\;}l}
+      |alts| & = & bb \\
+      cc & = & dd \\
+    \end{array} \\
+
+
 %    \semclose{q}
 %      {\{ f\,
 %    \begin{array}[t]{@@{}l@@{\;}l}
@@ -242,28 +254,40 @@ Env^{*} & = & \powerset{Env} \\
 %    \end{array} \\
 
 
-\end{array}
+%\end{array}
 \\ \\
-\begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
+%\begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
 \semap{D}{|e|} & : & \Env \rightarrow \mtype \\
 %\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
 \semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \semapp{E}{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
 \semap{R}{|e|}{} & : & \Env \rightarrow \powerset{\Env} \\
-\semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \squash(\semapp{E}{|e|}{\rho}) \neq [] \} \\
+\semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \squash(\semapp{E}{|e|}{\rho'}) \neq [] \} \\
 %% \semap{C}{|e|} & : & \Env -> \rightarrow [Env^{*}] \\
 %% \semapp{C}{|e|}{\rho} & = & xxx \\
 \end{array}
-\\ \\
+\\
+
+\end{array}
+$$
+\caption{Plan C: Idealised denotational semantics of Mini Verse with choice}
+\end{figure}
+
+
+\begin{figure}
+$$
+\begin{array}{l}
+
 \textbf{Auxiliary functions}\\
 \begin{array}{lcll}
-  \apply^{*} & : & (\mtype, \mtype) \rightarrow [\mtype] \\
-  \apply^{*}(|fss|, as) & = & \hat{\cup} \{ \applyf(fs, as) \, || \, |fs| \inb |fss| \} \\
-  \applyf & : & ([\semfcn], \mtype) \rightarrow [\mtype] \\
+  \applys & : & (\Ws, \Ws) \rightarrow [\Ws] \\
+  \applys|(fss, as)| & = & \hat{\bigcup} \{ \applyf|(fs, as)| \, || \, |fs| \inb |fss|, \, |fs| \in [\semfcn] \} \\
+  \applyf & : & ([\semfcn], \Ws) \rightarrow [\Ws] \\
   \applyf(|fs|, as) & = & \bar{\bigcup} \{ [ \apply(|f,a|) \, || \, |f| \inb |fs| ] \, || \, a \inb as \} \\
   \squash & : & \mtype \rightarrow \mtype \\
   \squash(xs) & = & [ x \, || \, x \inb xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
 \\
 \end{array} \\ \\
+
 \textbf{Notation}\\
 \begin{array}{lcll}
   |[e_1,xdots,e_n]| & : & \mtype & \text{sequence of items} \\[2mm]
@@ -285,6 +309,5 @@ Env^{*} & = & \powerset{Env} \\
 
 \end{array}
 $$
-\caption{Plan C: Idealised denotational semantics of Mini Verse with choice}
+\caption{Plan C: Idealised denotational semantics of Mini Verse with choice, notation}
 \end{figure}
-

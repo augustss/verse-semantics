@@ -40,7 +40,7 @@ allWs = mkSet $
   nonFcn ++
   [ dO o | o <- [Oint, Ogt, Oadd] ] ++
   map VFcn [ id0, fid1, id01, f01, const0, const1, const2, const3, fsucc,
-             fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123 ]
+             fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123, succMod3 ]
   where
     nonFcn =
       allInts ++
@@ -74,6 +74,10 @@ allWs = mkSet $
     ho5 = mkFcn "ho5" [(VFcn succ0, VInt 2)]
     ho6 = mkFcn "ho6" [(VInt 0, VFcn fint)]
     ho7 = mkFcn "ho7" [(VInt 0, VFcn comp)]
+    succMod3 = mkFcn "succMod3" [(VInt 0, VInt 1),
+                                 (VInt 1, VInt 2),
+                                 (VInt 2, VInt 0),
+                                 (VInt 3, VInt 1)]
 {-
     gt0 = mkFcn "gt0" [(VTup [VInt 1, VInt 0], VInt 1),
                        (VTup [VInt 2, VInt 0], VInt 2),

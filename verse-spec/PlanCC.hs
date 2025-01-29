@@ -67,8 +67,8 @@ infix 0 `wher`
 wher :: Exp -> Exp -> Exp
 wher = Where
 
-funq :: Exp -> Exp -> Exp
-funq e1 e2 = Fun Closed e1 e2
+fun_c :: Exp -> Exp -> Exp
+fun_c e1 e2 = Fun Closed e1 e2
 
 --------------------------------------------------
 
@@ -509,7 +509,8 @@ allExps = [exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp45, exp46, exp47, exp48, {- UNSURE exp49, exp50, -}
            exp51, exp52,
            exp53, exp54,
-           exp55, exp56, exp57, {- SLOW exp58,-} exp59, exp60
+           exp55, exp56, exp57, {- SLOW exp58,-} exp59, exp60,
+           exp61, exp62
           ]
 
 main :: IO ()
@@ -519,16 +520,16 @@ main = do
 
 {-
 g0 :: Exp
-g0 = funq ("x" := 0 :| 1) "x"
+g0 = fun_c ("x" := 0 :| 1) "x"
 
 g1 :: Exp
-g1 = funq g1d "x"
+g1 = fun_c g1d "x"
 
 g1d = "x" := (0 :| 1 :| 0) `wher` "y" := 2 :| 3
 g1e = g1d >: "y"
 
 g2 :: Exp
-g2 = funq (2 :| 3 >: "x" := 0 :| 1) "x"
+g2 = fun_c (2 :| 3 >: "x" := 0 :| 1) "x"
 
 {-
 (0,{[Nothing,           Just [|x->0,y->3|],Nothing,Nothing,Nothing,           Just [|x->0,y->3|]],
@@ -542,5 +543,5 @@ if (x:= 1||2) { 1..x }
 -}
 
 g3 :: Exp
-g3 = funq ("x" := cint)("x" === 1)
+g3 = fun_c ("x" := cint)("x" === 1)
 -}

@@ -51,7 +51,7 @@ allWsL :: [W]
 allWsL =
   nonFcn ++
   [ dO o | o <- [Oint, Ogt, Oadd] ] ++
-  map vFcn [ id0, fid1, id2, id3, id01, f01, const0, const1, const2, const3, fsucc,
+  map vFcn [ id0, fid1, id2, id3, id01, f01, const0, const1, const2, const3, fsucc, -- succMod3,
              fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123, f0t12 ]
   where
     nonFcn =
@@ -89,6 +89,10 @@ allWsL =
     ho6 = mkFcn "ho6" [(VInt 0, vFcn fint)]
     ho7 = mkFcn "ho7" [(VInt 0, vFcn comp)]
     f0t12 = mkFcn "f0t12" [(VInt 0, VTup [VInt 1, VInt 2])]
+    succMod3 = mkFcn "succMod3" [(VInt 0, VInt 1),
+                                 (VInt 1, VInt 2),
+                                 (VInt 2, VInt 0),
+                                 (VInt 3, VInt 1)]
 {-
     gt0 = mkFcn "gt0" [(VTup [VInt 1, VInt 0], VInt 1),
                        (VTup [VInt 2, VInt 0], VInt 2),

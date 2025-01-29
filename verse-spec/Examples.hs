@@ -346,6 +346,21 @@ exp59 :: Example
 exp59 = exp59p
       === "1"
 
+-- exp59; f[0]=0
 exp60 :: Example
 exp60 = exp59p `Seq` (App (Var "f") (Int 0) `Equ` Int 0)
       === "Wrong[]"
+
+-- f := fun_c(:int){:int}; f = succ; f[0]
+exp61 :: Example
+exp61 = Def "f" (Fun Closed cint cint) `Seq`
+        Var "f" `Equ` Var "succ" `Seq`
+        App (Var "f") (Int 2)
+      === "3"
+
+-- f := fun_o(0){1}; f = fun_o(1){2}; <f[0], f[1]>
+exp62 :: Example
+exp62 = Def "f" (Fun Open (Int 0) (Int 1)) `Seq`
+        Var "f" `Equ` (Fun Open (Int 1) (Int 2)) `Seq`
+        Tup [App (Var "f") (Int 0), App (Var "f") (Int 1)]
+      === "<1,2>"
