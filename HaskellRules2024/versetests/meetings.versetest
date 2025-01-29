@@ -16,8 +16,16 @@ testeq("M27Jan25-2", fail, skip)
   # M27Jan25-2: this should fail, because the one{} is stuck on
   #             the rigid x, so don't bother with loop[]
 
+# M24Jan25-*: examples involving "gr 3" type
+verify("M24Jan25-1", pass){ f():(function (x:int)<decides>{x>3}) := 7 }
+verify("M24Jan25-2", fail){ f():(function (x:int)<decides>{x>3}) := 2 }
+verify("M24Jan25-3", pass){ (f():(function (x:int)<decides>{x>3}) := 7)
+                          ; (f[] > 3) }
+verify("M24Jan25-4", fail){ (f():(function (x:int)<decides>{x>3}) := 7)
+                          ; (f[] > 4) }
+
+# M20Jan25-*: examples involving a higher order function type
 verify("M20Jan25-1", pass){ f():type{(:string) => (:string)} := (x:any => x) }
-  # M20Jan25-1: small example involving a higher order function type
 verify("M20Jan25-1a", pass){ t := type{(:string) => (:string)}
                            ; f():t := (x:any => x) }
   # M20Jan25-1a: here we name t := type{stuff} and it still works
@@ -56,7 +64,7 @@ verify("M20Dec24-4", pass){ f(3)<succeeds>:int := 22; x:int; f[x] }
 
 
 verify("M22Nov24-1", fail){ if( (x:=1) | (x:=2) ) then {x} else 0 }
-  # The 'x' in the then-branch is unbound
+  # M22Nov24-1: the 'x' in the then-branch is unbound
 
 verify("M20Nov24-1", pass){ f(x:string):= { if (int[x]) then { x[1] } else 0 } }
  # M20Nov24-1: the int[x] is contradictory with x:string,
