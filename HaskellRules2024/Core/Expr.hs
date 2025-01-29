@@ -31,7 +31,7 @@ module Core.Expr
     -- Rewriting
   , Rule, removeRule, Context, isContext, (<@)
   , stepRule, everywhere, tryBefore
-  , NormResult(..), normalize, showNormResult
+  , NormResult(..), normalize, normalizeTrace, showNormResult
   , Fuel, lotsOfSteps
   , RuleEnv(..), extendRuleEnv
 
@@ -1317,15 +1317,15 @@ showNormResult NormOK      = "reached a normal form"
 showNormResult NormExpired = "ran out of fuel (Unexpected)"
 showNormResult NormInvalid = "reached an invalid expression -- yikes!"
 
-normalize :: Fuel    -- Maximum number of steps
-          -> Rule -> Expr
-          -> (NormResult, Traced Expr)
+normalizeTrace :: Fuel    -- Maximum number of steps
+               -> Rule -> Expr
+               -> (NormResult, Traced Expr)
 -- Repeatedly apply the first in the
 -- list of possiblities returned by the rule
-normalize fuel rule orig_e = go fuel [] orig_e
+normalizeTrace fuel rule orig_e = go fuel [] orig_e
  where
   go :: Int
-     -> [(String,Expr)]   -- Accumulating trace
+     -> [(String,Expr)]
      -> Expr
      -> (NormResult, Traced Expr)
   go fuel_left tr e =
@@ -1337,6 +1337,22 @@ normalize fuel rule orig_e = go fuel [] orig_e
                                    go (fuel_left-1) tr' e'
               where
                tr' = (s,e):tr
+
+normalize :: Fuel    -- Maximum number of steps
+          -> Rule -> Expr
+          -> (NormResult, Int, Expr)
+-- Repeatedly apply the first in the
+-- list of possiblities returned by the rule
+normalize fuel rule orig_e = go 0 orig_e
+ where
+  go :: Int
+     -> Expr
+     -> (NormResult, Expr)
+  go nr_steps e =
+    case stepRule rule e of
+      []                  -> (NormOK, nr_steps, e)
+      _ | nr_steps > fuel -> (NormExpired, nr_steps, e)
+      (_,e'):_            -> go (nr_steps+1) e'
 
 --------------------------------------------------------------------------------
 --

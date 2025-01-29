@@ -18,7 +18,7 @@ import FrontEnd.Prelude( findPrelude )
 import Core.Expr as Core
 import Core.Verifier( verificationRules )
 import Core.TRS2024 ( runtimeRules )
-import Core.Traced as TRS ( Traced, term, trace )
+import Core.Traced as TRS ( Traced, term, trace, start )
 
 import Epic.Print hiding ( (<>) )
 import Data.Generics.Uniplate.Data( universeBi )
@@ -323,8 +323,10 @@ srcToCore flags add_verification e
 
 evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Traced Core.Expr)
 evalExpr flags test e
-  = Core.normalize (maxSteps flags) rules e
+  | showTrace flags = Core.normalizeTrace (maxSteps flags) rules e
+  | otherwise       = (r, start e')
   where
+    (r,e') = Core.normalize (maxSteps flags) rules e
     rules = case test of
               TestEvalEq {} -> runtimeRules
               TestVerify {} -> verificationRules
