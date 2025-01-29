@@ -1348,11 +1348,12 @@ normalize fuel rule orig_e = go 0 orig_e
   go :: Int
      -> Expr
      -> (NormResult, Int, Expr)
-  go nr_steps e =
-    case stepRule rule e of
-      []                  -> (NormOK, nr_steps, e)
-      _ | nr_steps > fuel -> (NormExpired, nr_steps, e)
-      (_,e'):_            -> go (nr_steps+1) e'
+  go nr_steps e
+    | nr_steps > fuel = (NormExpired, nr_steps, e)
+    | otherwise       =
+        case stepRule rule e of
+          []       -> (NormOK, nr_steps, e)
+          (_,e'):_ -> go (nr_steps+1) e'
 
 --------------------------------------------------------------------------------
 --
