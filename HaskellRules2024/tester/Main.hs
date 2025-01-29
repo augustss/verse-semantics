@@ -321,12 +321,13 @@ srcToCore flags add_verification e
 
        ; return e4 }
 
-evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Traced Core.Expr)
+evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Int, Traced Core.Expr)
 evalExpr flags test e
-  | showTrace flags = Core.normalizeTrace (maxSteps flags) rules e
-  | otherwise       = (r, start e')
+  | showTrace flags = (r1,length (trace tr),tr)
+  | otherwise       = (r2,k,start e')
   where
-    (r,e') = Core.normalize (maxSteps flags) rules e
+    (r1,tr)   = Core.normalizeTrace (maxSteps flags) rules e
+    (r2,k,e') = Core.normalize (maxSteps flags) rules e
     rules = case test of
               TestEvalEq {} -> runtimeRules
               TestVerify {} -> verificationRules
@@ -428,10 +429,10 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
 
        ; pure (TestRes { tr_info = info, tr_outcome = outcome }) }
   where
-    (res1, tr1)  = evalExpr tflg test core1
+    (res1,ln1,tr1) = evalExpr tflg test core1
     v1           = TRS.term tr1
-    n_steps      = length (TRS.trace tr1)
-    mb_v2        = fmap (TRS.term . snd . evalExpr tflg test) mb_core2
+    n_steps      = ln1
+    mb_v2        = fmap ((\(_,_,tr) -> term tr) . evalExpr tflg test) mb_core2
                    -- Really we should check res2 as well, but it is always boring
     test_herald  = testHerald test
     info         = testInfo test

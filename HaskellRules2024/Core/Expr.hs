@@ -1347,7 +1347,7 @@ normalize fuel rule orig_e = go 0 orig_e
  where
   go :: Int
      -> Expr
-     -> (NormResult, Expr)
+     -> (NormResult, Int, Expr)
   go nr_steps e =
     case stepRule rule e of
       []                  -> (NormOK, nr_steps, e)
