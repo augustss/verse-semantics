@@ -157,6 +157,22 @@ arrStep env lhs =
            Exi $ bind zs $
              (Op ArrApp :@: Tup [ Var xs, ys', Var zs ]) >>>
              Var zs)
+  ++
+  "VERIFY-CHOOSE" `name`
+  do (_skols, rs, as, body) <- matchVerify env lhs
+     (exis, ctx, Choose n e) <- evalCtxLift [] body
+     guard (ctx /= HOLE)
+     guard (choiceFreeLH ctx)
+     guard (free n `disjointFrom` exis)
+     guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
+     let k = identNotIn (free lhs ++ exis)
+     pure $
+       Verify $ bindList rs
+       ( as
+       , Exi $ bind k $
+           (Var k :=: mkSize n (mkExis exis $ ctx <@ someUnderscore e)) :>:
+           (mkExis exis $ ctx <@ e)
+       )
 {-
   ++
   "FOR-CHOOSE" `name`
@@ -475,6 +491,7 @@ proofX :: [Ident] -> Expr -> [( Context    -- The context
 proofX bs lhs
   = do { (ctx, stuff) <- go_px (LX { exi_flexi = [], exi_rigid = bs }) lhs
        ; guard (blocked ctx)
+       --; guard (blkd (LX { exi_flexi = [], exi_rigid = bs}) ctx)
        ; pure (ctx, stuff) }
 
 go_px :: LocalExis -> Expr -> [(Context, ([Ident], Expr))]
