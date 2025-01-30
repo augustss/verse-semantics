@@ -3,7 +3,7 @@
 
 module Core.TRS2024 (
      runtimeRules, runtimeAndVerificationStep, recStep
-   , blocked, blkd, choiceFreeLH
+   , blocked, blkd, choiceFreeLH, choiceAndFailureFree
    , name, nameWith, iff
    , skolValue
    , LocalExis(..), makeRigid, addFlexi, allExis, wrapExis
@@ -972,42 +972,38 @@ choicy (e1 :>: e2)
   | otherwise       = choicy e1 >>= \c -> if c then Just True else choicy e2
 choicy _            = Just False
 
-{-
+-- {-
 ---------------------
 choiceAndFailureFree :: Expr_or_Context -> Bool
 -- No choices or failure anyhere, to the left or to
 -- the right of the hole
-choiceAndFailureFree = go []
+choiceAndFailureFree orig_e = go [] [orig_e]
   where
-    go _  (Var {})    = True
-    go _  (Lit {})    = True
-    go _  (Tup {})    = True
-    go _  (Tru {})    = True
-    go _  (Lam {})    = True
-    go _  (Op {})     = True
-    go _  (_ :=: _)   = False
-    go fs (e1 :>: e2) = go fs e1 && go fs e2
-    go fs (_ :>>: e)  = go fs e
-    go _  (_ :|: _)   = False
-    go _  Fail        = False
-    go fs (v1 :@: _)  = case v1 of
-                          Op op -> primOpCanFail op
-                          Var f -> f `elem` fs
-                          _     -> False
+    -- all OK
+    go _  []                 = True
+    go vs (v : es) | isVal v = go vs es
+    go vs ((e1 :>: e2)  :es) = go vs (e1:e2:es)
+    go vs ((_ :>>: e)   :es) = go vs (e:es)
+    go vs (Some {}      :es) = go vs es
+    go vs (Verify {}    :es) = go vs es
+    go vs (HOLE         :es) = go vs es
 
-    go fs (Exi bnd)   = go fs e where (_,e) = unsafeUnbind bnd
-    -- go _  (All {})    = True
-    go _  (Arr {})    = True
-    --go _  (Size {})   = True
-    go _  (Some {})   = True
-    go _  HOLE        = True
+    -- analyze
+    go vs (Exi bnd      :es) = go (x:vs) (e:es) where (x,e) = alphaRename (free es) bnd
+    go vs ((Var x :=: e):es) = x `elem` vs && x `notElem` free e && go (vs \\ [x]) (e:es)
+    go vs ((Op op :@: _):es) = not (primOpCanFail op) && go vs es
+    go vs (Iter f _ e0  :es) = iterChoiceFree f && go vs (e0:es)
 
-    go _  (Choose {}) = False
-    -- go fs (Check _ e) = go fs e
-    go _  (Verify {}) = True
+    -- all potentially bad
+    go _  ((_ :=: _)    :_ ) = False
+    go _  ((_ :@: _)    :_ ) = False
+    go _  (Choose {}    :_ ) = False
+    go _  ((_ :|: _)    :_ ) = False
+    go _  (Fail         :_ ) = False
 
-    go fs (Iter f e e0) = iterChoiceFree f && go fs e && go fs e0
--}
+    -- impossible
+    go _ e = error ("impossible: choiceAndFailureFree " ++ show e) 
+-- -}
 
 -- TODO: This function can be simplified now, the extra "fs" in choiceFree'
 -- is not used anymore
