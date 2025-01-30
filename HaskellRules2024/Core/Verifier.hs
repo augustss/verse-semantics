@@ -164,8 +164,16 @@ arrStep env lhs =
      (exis, ctx, Choose n e) <- evalCtxLift [] body
      guard (ctx /= HOLE)
      guard (choiceFreeLH ctx)
-     guard (free n `disjointFrom` exis)
+     --guard (free n `disjointFrom` exis) --  <-- needed for the solution using SIZE below
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
+     pure $
+       Verify $ bindList rs
+       ( as
+       , mkExis exis $ ctx <@ ((Op Gt :@: Tup [n, Lit (LInt 0)]) >>> someUnderscore e)
+       )
+
+{-
+     -- this seems to be correct but uses SIZE and is complicated
      let k = identNotIn (free lhs ++ exis)
      pure $
        Verify $ bindList rs
@@ -174,6 +182,8 @@ arrStep env lhs =
            (Var k :=: mkSize n (mkExis exis $ ctx <@ someUnderscore e)) :>:
            (mkExis exis $ ctx <@ e)
        )
+-}
+
 {-
   ++
   "FOR-CHOOSE" `name`
