@@ -346,10 +346,13 @@ mkSize :: Val -> Expr -> Expr
 mkSize n e =
   Exi $ bind k $
     (Var k :=: mkCount e) :>:
-    Iter IterOne (  ((n     :=: Lit (LInt 0)) :>: Lit (LInt 0))
-                :|: ((Var k :=: Lit (LInt 0)) :>: Some (Lam $ bind x $ (Op LEq :@: Tup [Lit (LInt 0),Var x]) >>> (Op Lt :@: Tup [Var x,n]) >>> Var x))
-                :|: ((Var k :=: Lit (LInt 1)) :>: n)
-                 )                              ( Some (Lam $ bind x $ (Op Lt :@: Tup [n,Var x]) >>> Var x))
+    Iter IterOne (  ((n :=: Lit (LInt 0))
+                      :>: Lit (LInt 0))
+                :|: ((Var k :=: Lit (LInt 0))
+                      :>: Some (Lam $ bind x $ (Op IsInt :@: Var x) >>> (Op LEq :@: Tup [Lit (LInt 0),Var x]) >>> (Op Lt :@: Tup [Var x,n]) >>> Var x))
+                :|: ((Var k :=: Lit (LInt 1))
+                      :>: n)
+                 ) ( Some (Lam $ bind x $ (Op IsInt :@: Var x) >>> (Op Lt :@: Tup [n,Var x]) >>> Var x))
  where
   k:x:_ = identsNotIn (free (n,e))
 
