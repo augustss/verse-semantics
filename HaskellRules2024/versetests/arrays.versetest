@@ -42,6 +42,7 @@ verify("arr-index6", pass){
   # arr-index6 requires reasoning about array bounds
 
 verify("dotdot1", pass, broken){ f(n:int)<decides> := 3=1..n }
+  # dotdot1 requires knowing that 1..n --> Choose(n){inrange(1,n)} --> all are unique
 
 # arr5: does isArr$ on the same thing twice, returning an array of the same length
 verify("arr5a", pass )
@@ -58,7 +59,7 @@ verify("arr-uni1", pass){
 
 verify("arr-uni2a", fail){ f( x:[]int, y:[]string )<fails>:int := (x=y) }
   # arr-uni2a: Should be rejected because arrays might be empty
-verify("arr-uni2b", pass, broken){ f( x:[]int, y:[]string where Length[y]>0 )<fails>:int := { (x=y);0 } }
+verify("arr-uni2b", pass){ f( x:[]int, y:[]string where Length[y]>0 )<fails>:int := { (x=y);0 } }
 verify("arr-uni2c", pass){ f( x:int, y:string )<fails>:int := (x=y) }
   # arr-uni2a,2b: we can see that the arrays have disjoint types
   #               => guaranteed to fail unless arrays are empty
@@ -74,10 +75,10 @@ verify("arr-nest1", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1 } } }
 verify("arr-nest2", pass){ f( x:[]int ) : []([]int) := all{ for( y:x ){ 1|2 } } }
 verify("arr-nest3", pass){ f( n:int ) : [][]type{1|2} := all{ for(i:=1..n){ 1|2 } } }
 
-# arr-fail1,2,3: RHS fails for n>=1; but returns empty array for n <= 0
+# arr-fail1: RHS fails for n>=1; but returns empty array for n <= 0, hence decides
 verify("arr-fail1", pass){ f( n:int )<decides>  : []int = for(i:=1..n){fail} }
-verify("arr-fail2", pass){ f( n:int )<decides>    : []int = for(i:=1..n){fail} }
-  # arr-fail2: if n<=0, f successfully returns an empty array, hence decides
+verify("arr-fail2", pass){ f( n:int where n<=0 )<succeeds>    : []int = for(i:=1..n){fail} }
+  # arr-fail2: if n<=0, f successfully returns an empty array, hence succeeds
 verify("arr-fail2a", pass){ f( n:int where n>0 )<fails>    : []int = for(i:=1..n){fail} }
   # arr-fail2a: Since n>0 this always fails
 verify("arr-fail3", fail)        { f( n:int )<succeeds> : []int = for(i:=1..n){fail} }
@@ -87,8 +88,8 @@ verify("arr-elem2", pass){ f(n:int):[]type{1|2} = all{(i := 1..n); if (i = 2) th
 verify("arr-elem3", fail){ f(n:int):type{(:[]type{1})|(:[]type{2})} = all{(i := 1..n); if (i = 2) then 1 else 2} }
 
 # dotdot in the domain
-# needs verify( choose ) rule (we know what to do, just not implemented yet)
-verify("dom-dotdot1", pass, broken){ f( n:int, x:=1..n ):int := x }
+# needs verify( choose ) rule (implemented now)
+verify("dom-dotdot1", pass){ f( n:int, x:=1..n ):int := x }
 
 # size approximating sizes correctly?
 # I have no idea why these fail
