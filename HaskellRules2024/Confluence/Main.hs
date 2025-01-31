@@ -19,7 +19,7 @@ prop_Valid t0 =
 prop_ValidTrace :: Property
 prop_ValidTrace =
   forAllShrink arbExpr shrinkExpr $ \p ->
-    let (resp, np :<-- ps)  = normalize lotsOfSteps trs2024_noREC p
+    let (resp, np :<-- ps)  = normalizeTrace lotsOfSteps trs2024_noREC p
      in whenFail (do putStrLn "== TRACE =="
                      displayTrace (np :<-- ps)) $
           resp == NormOK ==>
@@ -35,8 +35,8 @@ prop_ValidTrace =
 prop_Confluent :: Property
 prop_Confluent =
   forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- qs1) ->
-    let (resp, np :<-- ps)  = normalize lotsOfSteps trs2024_noREC p
-        (resq, nq :<-- qs2) = normalize lotsOfSteps trs2024_noREC q
+    let (resp, np :<-- ps)  = normalizeTrace lotsOfSteps trs2024_noREC p
+        (resq, nq :<-- qs2) = normalizeTrace lotsOfSteps trs2024_noREC q
      in whenFail' (writeFile "counterexample.txt" (show p)) $
         whenFail (do putStrLn "== TRACE #1 =="
                      displayTrace (np :<-- ps)
@@ -51,7 +51,7 @@ prop_Confluent =
        permf <- liftArbitrary arbPermutation
        let perm_rules :: Rule
            perm_rules = \env e -> permf e (trs2024_noREC env e)
-           (_res, tr) = normalize lotsOfSteps perm_rules p
+           (_res, tr) = normalizeTrace lotsOfSteps perm_rules p
        return (p,tr)
 
   shrinkFork :: (Expr, Traced Expr) -> [(Expr,Traced Expr)]

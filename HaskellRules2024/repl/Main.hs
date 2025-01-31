@@ -216,7 +216,7 @@ theCommandSet = CommandSet
       , Cmd "tocore [EXPR]"        "Convert [last] expression to Core"     cToCore
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
-          -- Use Koen's:  normalize :: Rule -> Expr -> Traced Expr
+          -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
 
@@ -379,7 +379,7 @@ cEval
        ; putStrLn (prettyShow prepd_expr)
 
        ; putStrLn ("\n\n------- Evaluate ---------")
-       ; let eval_it = Core.normalize (fEvalSteps (cs_flags s)) TRS2024.runtimeRules
+       ; let eval_it = Core.normalizeTrace (fEvalSteps (cs_flags s)) TRS2024.runtimeRules
 
        ; core_result <- showEvalResult (fTraceEval $ cs_flags s) "Evaluation" (eval_it prepd_expr)
 
@@ -391,7 +391,7 @@ cVerify
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { putStrLn ("\n\n------- Prep'd ---------")
-       ; let verify_it = Core.normalize (fEvalSteps (cs_flags s))
+       ; let verify_it = Core.normalizeTrace (fEvalSteps (cs_flags s))
                               (Core.everywhere Verifier.verificationRules)
        ; let core_expr, prepd_expr :: Core.Expr
              core_expr  = asCore e
