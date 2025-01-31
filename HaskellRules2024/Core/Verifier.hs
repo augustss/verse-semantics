@@ -152,9 +152,8 @@ arrStep env lhs =
      let k:xs:ys:zs:_ = identsNotIn (free lhs)
      pure $
        Exi $ bind k $ Exi $ bind xs $
-         (Var k  :=: mkSize (Lit (LInt 1))
-                       ( (Op Gt :@: Tup [n, Lit (LInt 0)])
-                     >>> mkApp (someUnderscore e) (Tup [])
+         (Var k  :=: mkSizeX n
+                       ( mkApp (someUnderscore e) (Tup [])
                        )) :>:
          (Var xs :=: Choose (Var k) (Arr n (mkApp e (Tup [])))) :>:
          (mkDef ys e0 $ \ys' ->
@@ -347,15 +346,31 @@ multiplicity e | isVal e   = MOne
 
 mkSize :: Val -> Expr -> Expr
 mkSize n e =
-  Exi $ bind k $
-    (Var k :=: mkCount e) :>:
-    Iter IterOne (  ((n :=: Lit (LInt 0))
-                      :>: Lit (LInt 0))
-                :|: ((Var k :=: Lit (LInt 0))
-                      :>: Some (Lam $ bind x $ (Op IsInt :@: Var x) >>> (Op LEq :@: Tup [Lit (LInt 0),Var x]) >>> (Op Lt :@: Tup [Var x,n]) >>> Var x))
-                :|: ((Var k :=: Lit (LInt 1))
-                      :>: n)
-                 ) ( Some (Lam $ bind x $ (Op IsInt :@: Var x) >>> (Op Lt :@: Tup [n,Var x]) >>> Var x))
+  Iter IterOne
+   (  ((n :=: Lit (LInt 0)) :>: Lit (LInt 0))
+  :|: ( Exi $ bind k $ (Var k :=: mkCount e) :>:
+        (  ((Var k :=: Lit (LInt 0))
+             :>: Some (Lam $ bind x $ (Op IsInt :@: Var x) >>> (Op LEq :@: Tup [Lit (LInt 0),Var x]) >>> (Op Lt :@: Tup [Var x,n]) >>> Var x))
+       :|: ((Var k :=: Lit (LInt 1))
+             :>: n)
+        )
+      )
+   ) ( Some (Lam $ bind x $ (Op IsInt :@: Var x) >>> (Op Lt :@: Tup [n,Var x]) >>> Var x))
+ where
+  k:x:_ = identsNotIn (free (n,e))
+
+mkSizeX :: Val -> Expr -> Expr
+mkSizeX n e =
+  Iter IterOne
+   (  ((n :=: Lit (LInt 0)) :>: Lit (LInt 1))
+  :|: ( Exi $ bind k $ (Var k :=: mkCount e) :>:
+        (  ((Var k :=: Lit (LInt 0))
+             :>: Lit (LInt 0))
+       :|: ((Var k :=: Lit (LInt 1))
+             :>: Lit (LInt 1))
+        )
+      )
+   ) ( Some (Lam $ bind x $ (Op IsInt :@: Var x) >>> (Op Lt :@: Tup [Lit (LInt 1),Var x]) >>> Var x))
  where
   k:x:_ = identsNotIn (free (n,e))
 
