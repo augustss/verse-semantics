@@ -98,8 +98,8 @@ arrStep env lhs =
   do Op ArrMap :@: Tup [f, arr@(Arr _ _)] <- [lhs]
      let x:i:_ = identsNotIn (free (f,arr))
      pure (pPrint arr, Iter IterFor
-             ( Exi $ bind i $ Exi $ bind x $
-                 (Var x :=: (arr :@: Var i)) :>:
+             ( Exi $ bind x $
+                 (Var x :=: Exi (bind i (arr :@: Var i))) :>:
                  lamUnderscore (f :@: Var x)
              ) (Tup [])
           )
