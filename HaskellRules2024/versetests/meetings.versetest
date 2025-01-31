@@ -15,6 +15,7 @@ testeq("M27Jan25-2", fail, skip)
     {1}
   # M27Jan25-2: this should fail, because the one{} is stuck on
   #             the rigid x, so don't bother with loop[]
+  # 'skip' for now because it takes ages to execute
 
 # M24Jan25-*: examples involving "gr 3" type
 verify("M24Jan25-1", pass){ f():(function (x:int)<decides>{x>3}) := 7 }

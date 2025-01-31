@@ -708,8 +708,7 @@ instance Pretty SrcExpr where
                          cat [ text "verify" <> parens (hsep (map (ppr 0) is))
                              , indent (braces (ppr 0 e)) ]
 
-          OfType e fx t -> --ppNormal (InfixOp e (Op ":") t)
-                           cat [ text "ofType" <> pPrint fx <> parens (ppr 0 e)
+          OfType e fx t -> cat [ parens (ppr 0 e) <+> text "|>" <> pPrint fx
                                , indent (braces (ppr 0 t)) ]
 
           Where e1 e2 -> maybeParens (p>0) $ sep [ ppr 0 e1, text "where" <+> ppr 0 e2 ]

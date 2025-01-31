@@ -671,8 +671,8 @@ data Input
   deriving( Show )
 
 data EffContext
-  = DomCtxt       -- In the argument of a function, nothing to push down
-  | RngCtxt Eff   -- In the range of a function with effects Eff
+  = DomCtxt       -- In the domain (argument) of a function, nothing to push down
+  | RngCtxt Eff   -- In the range (body) of a function with effects Eff
   deriving( Show )
 
 {- Note [Pushing down effects]
