@@ -152,7 +152,10 @@ arrStep env lhs =
      let k:xs:ys:zs:_ = identsNotIn (free lhs)
      pure $
        Exi $ bind k $ Exi $ bind xs $
-         (Var k  :=: mkSize (Lit (LInt 1)) (mkApp (someUnderscore e) (Tup []))) :>:
+         (Var k  :=: mkSize (Lit (LInt 1))
+                       ( (Op Gt :@: Tup [n, Lit (LInt 0)])
+                     >>> mkApp (someUnderscore e) (Tup [])
+                       )) :>:
          (Var xs :=: Choose (Var k) (Arr n (mkApp e (Tup [])))) :>:
          (mkDef ys e0 $ \ys' ->
            Exi $ bind zs $
