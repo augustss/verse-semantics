@@ -83,7 +83,7 @@ miniVerifyPrelude = ("miniverifyprelude", "\
 \Length     := lam y { isArr$[y]; arrLen$[y] };\n\
 \prefix'?'        := lam t { lam x { if (truth{y:any} = x) then { truth{t[y]} } else { x = () } } };\n\
 \prefix'[]'       := lam t { lam a   { exi j { j = isArr$[a]; arrMap$[t,j] } } };\n\
-\operator'..'     := lam p { exi x y i { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[i, operator'+'[1,operator'-'[y,x]]]; operator'+'[i,x] }};\n\
+\operator'..'     := lam p { exi x y i { (x,y) = p; isInt$[x]; isInt$[y]; dotDot$[i, operator'+'[operator'-'[1,x],y]]; operator'+'[i,x] }};\n\
 \operator'+'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intAdd$[x,y]; isInt$[z]; z } }}};\n\
 \operator'-'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intSub$[x,y]; isInt$[z]; z } }}};\n\
 \operator'*'      := lam p { exi x y { (x,y) = p; isInt$[x]; isInt$[y]; (x,y) >> some{ lam z { z = intMul$[x,y]; isInt$[z]; z } }}};\n\
