@@ -4,7 +4,6 @@ module Main where
 import Core.Expr
 import Core.TRS2024 as TRS2024
 import Core.Traced
-import Core.Bind
 import Test.QuickCheck
 
 --------------------------------------------------------------------------------

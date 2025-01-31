@@ -237,9 +237,9 @@ expToSrcExpr l (R.One e) = F.Macro1 (macro l "one") [] (lexp e)
 expToSrcExpr l (R.All e) = F.Macro1 (macro l "all") [] (lexp e)
 expToSrcExpr l (R.Not e) = F.PrefixOp (preOp l "not") (lexp e)
 expToSrcExpr l (R.Verify e)    = F.Macro1 (macro l "verify") [] (lexp e)
-expToSrcExpr l (R.Check eff e) = F.Macro1 (macro l "check") [refImplEffToSrcEff eff] (lexp e)
+expToSrcExpr _ (R.Check eff e) = F.Check (refImplEffToSrcEff eff) (lexp e)
 expToSrcExpr _ (R.OfType e1 e2) = --F.InfixOp (lexp e1) (inOp l ":") (lexp e2)
-  F.OfType (lexp e1) [] (lexp e2)
+           F.OfType (lexp e1) F.effTop (lexp e2)
 expToSrcExpr l (R.Assume e) = F.Macro1 (macro l "assume") [] (lexp e)
 -- expToSrcExpr l (R.Module e) = XXX
 -- expToSrcExpr l (R.Struct e) = XXX
@@ -262,10 +262,10 @@ expToSrcExpr _ (R.Int i) = F.Lit (F.LInt i)
 expToSrcExpr _ (R.Float f) = F.Lit (F.LRat (fromFloatDigits f) (show f))
 expToSrcExpr _ (R.Char c) = F.Lit (F.LChar (toEnum (fromEnum c)))
 expToSrcExpr _ (R.Char32 c) = F.Lit (F.LChar c)
-expToSrcExpr _ (R.Lam e1 oc eff e2) = F.Function (lexp e1) rs (lexp e2)
-  where rs = [ case oc of { R.O -> F.EOpen; R.C -> F.EClosed }
-             , refImplEffToSrcEff eff
-             ]
+expToSrcExpr _ (R.Lam e1 oc eff e2) = F.Function ap (lexp e1) rs (lexp e2)
+  where
+    ap = case oc of { R.O -> F.Open; R.C -> F.Closed }
+    rs = refImplEffToSrcEff eff
 expToSrcExpr l (R.InfixColonEqual _ q (L l' x) e) | ok q = F.InfixOp (F.Variable (ident l' x)) (inOp l ":=") (lexp e)
   where ok R.Var = False
         ok _ = True
@@ -281,9 +281,9 @@ expToSrcExpr _ (R.IfArchetypeName _ _ e2) = lexp e2
 expToSrcExpr _ e = error $ "expToSrcExpr: unimp " ++ show (pretty e) ++ "\n" ++ show e
 
 refImplEffToSrcEff :: S.Effect -> F.Eff
-refImplEffToSrcEff S.Fails    = F.EFails
-refImplEffToSrcEff S.Succeeds = F.ESucceeds
-refImplEffToSrcEff S.Decides  = F.EDecides
+refImplEffToSrcEff S.Fails    = F.effFails
+refImplEffToSrcEff S.Succeeds = F.effSucceeds
+refImplEffToSrcEff S.Decides  = F.effDecides
 
 toFrozen :: Core.Expr -> [V.FrozenVal]
 toFrozen (Core.Lit (Core.LInt i)) = pure $ V.FrozenVal (Just (V.Int i))
