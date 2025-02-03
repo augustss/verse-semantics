@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Core.Solver (unsat) where
+module Core.Solver (unsat, unsatAsms) where
 import Core.Expr
 import Epic.Print
 import qualified Epic.UnionFind as UF
@@ -8,10 +8,12 @@ import Data.Maybe (mapMaybe, listToMaybe, maybeToList)
 import Epic.List (groupKey, firstJust)
 import Data.Containers.ListUtils (nubOrd)
 import Epic.BellmanFord (negativeCycle)
-import qualified Debug.Trace as Debug
+-- import qualified Debug.Trace as Debug
 
-_traceShow :: Show a => String -> a -> a
-_traceShow msg x = Debug.trace (msg ++ ": " ++ show x) x
+import qualified Core.Bind as Bind
+
+-- traceShow :: Show a => String -> a -> a
+-- traceShow msg x = Debug.trace ("TRACE: " ++ msg ++ ": " ++ show x) x
 
 -- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
@@ -23,7 +25,10 @@ unsat env = {- ppTrace "TRACE: unsat" msg -} res
   where
     _msg  = pPrint (asms, res)
     asms = assumps env
-    res  = solver (mkSolver asms)
+    res  = unsatAsms asms
+
+unsatAsms :: [Assump] -> Maybe UnsatReason
+unsatAsms = solver . mkSolver
 
 -- `solve s` repeatedly loops, by generating new equalities, propagating them, and checking for unsatisfiability
 solver :: Solver -> Maybe UnsatReason
@@ -343,10 +348,11 @@ generateEqs s = filter (not . knownEq s) $
 knownEq :: Solver -> Equality -> Bool
 knownEq s (MkEqual v1 v2) = isEqual s v1 v2
 
+
 evalDefs :: Solver -> [Equality]
 evalDefs s = {- ppTrace "TRACE: evalDefs" msg -} res
   where
-    _msg    = pPrint (defs, res)
+    msg    = pPrint (defs, res)
     res    = mapMaybe (evalDef s) defs
     defs   = s_def s
 
@@ -558,18 +564,19 @@ data Vertex = GV GroundVal | V0
 
       v10 -----> x -----> y -----> z -----> v5 ----[5]--> v0 ---[-10]--> v10
 
-  (edges without weights have weight 0)
+  (where edges without weights have weight 0)
 
  -}
 
 
 arithGraph :: Solver -> [(Vertex, Vertex, Int)]
-arithGraph s = [ (GV u, GV v, w) | (u, v, w) <- edges ]
+arithGraph s = nubOrd [ (GV u, GV v, w) | (u, v, w) <- edges ]
   where
     edges    = -- traceShow "ARITHGRAPH" $
-               concatMap (arithEdges True)  (s_pos s)
-            ++ concatMap (arithEdges False) (s_neg s)
+               concatMap (arithEdges True)  (s_pos  s)
+            ++ concatMap (arithEdges False) (s_neg  s)
             ++ concatMap litEdges           (s_lits s)
+            ++ concatMap (defEdges s)       (s_def  s)
 
 arithEdges :: Bool -> FailableAssump -> [(GroundVal, GroundVal, Int)]
 arithEdges = go
@@ -582,7 +589,36 @@ arithEdges = go
     go False (A_RelOp Lt  (GVArr [gv1, gv2])) = arithLEq gv2 gv1
     go False (A_RelOp Gt  (GVArr [gv1, gv2])) = arithLEq gv1 gv2
     go False (A_RelOp GEq (GVArr [gv1, gv2])) = arithLt  gv1 gv2
+    go True  (A_GVEq  x   gv)                 = arithEq  (GVVar x) gv
     go _ _                                    = []
+
+-- NOTE: Technically, the below is a "hack" that takes us outside the "difference constraint" logic...
+
+defEdges :: Solver -> (Ident, (PrimOp, GroundVal)) -> [(GroundVal, GroundVal, Int)]
+defEdges s (x, (Add, GVArr [gv1, gv2]))
+
+  | Just (LInt k) <- evalsToLit s gv1
+  = -- x = k + gv2 ====> x - gv2 = k ====>  k <= x - gv2 <= k ====> [gv2 - x <= -k, x - gv2 <= k],
+  [ (gv2, GVVar x, fromIntegral (0 - k))
+  , (GVVar x, gv2, fromIntegral k)  ]
+
+  | Just (LInt k) <- evalsToLit s gv2
+  = -- x = y + k ====> ... ====> [y - x <= -k, x - y <= k],
+  [ (gv1, GVVar x, fromIntegral (0 - k))
+  , (GVVar x, gv1, fromIntegral k)
+  ]
+
+defEdges s (x, (Sub, GVArr [gv1, gv2]))
+  | Just (LInt k) <- evalsToLit s gv2
+  = -- x = gv1 - k  ====> x - gv1 = -k  ====> -k <= x - gv1 <= -k ====> [gv1 - x <= k, x - gv1 <= -k]
+  [ (gv1, GVVar x, fromIntegral k)
+  , (GVVar x, gv1, fromIntegral (0-k))
+  ]
+
+defEdges _ _ = []
+
+arithEq ::GroundVal -> GroundVal -> [(GroundVal, GroundVal, Int)]
+arithEq gv1 gv2 = arithLEq gv1 gv2 ++ arithLEq gv2 gv1
 
 arithLt :: GroundVal -> GroundVal -> [(GroundVal, GroundVal, Int)]
 arithLt gv1 gv2 = [(gv1, gv2, -1)]
@@ -621,3 +657,76 @@ instance Pretty UnsatReason where
 
 instance Pretty Equality where
   pPrint (MkEqual x y) = pPrint x <+> text "=" <+> pPrint y
+
+--------------------------------------------------------------------------------
+-- | Some tests below this
+--------------------------------------------------------------------------------
+
+-- >>> unsatAsms test4
+-- Just (Arith [GVVar {gv_var = $I1},GVLit 0,GVVar {gv_var = $R10}])
+
+_test4 :: [Assump]
+_test4 = [i1_gt_0, r10_eq_0, r5_eq_0, r10_eq_add_r5_1]
+  where
+    i1_gt_0         = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
+    r10_eq_0        = A_Pos (A_GVEq r10 zero)
+    r5_eq_0         = A_Pos (A_GVEq r5 zero)
+    r10_eq_add_r5_1 = A_PrimOp r10 (AO_Prim Add) (GVArr [GVVar r5, GVVar i1])
+    i1              = Bind.ident "$I1"
+    r10             = Bind.ident "$R10"
+    r5              = Bind.ident "$R5"
+
+-- >>> unsatAsms test3
+-- Just (Arith [GVVar {gv_var = $I1},GVLit 0,GVVar {gv_var = $R10}])
+
+_test3 :: [Assump]
+_test3 = [i1_gt_0, r10_eq_0, r10_eq_add_0_1]
+  where
+    i1_gt_0         = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
+    r10_eq_0        = A_Pos (A_GVEq r10 zero)
+    r10_eq_add_0_1  = A_PrimOp r10 (AO_Prim Add) (GVArr [zero, GVVar i1])
+    i1              = Bind.ident "$I1"
+    r10             = Bind.ident "$R10"
+
+-- >>> unsatAsms test2
+-- Just (Arith [GVVar {gv_var = $I1},GVLit 0,GVVar {gv_var = $R10}])
+
+_test2 :: [Assump]
+_test2 = [i1_gt_0, r10_eq_0, r10_eq_i1]
+  where
+    i1_gt_0   = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
+    r10_eq_0  = A_Pos (A_GVEq r10 zero)
+    r10_eq_i1 = A_Pos (A_GVEq r10 (GVVar i1))
+    i1        = Bind.ident "$I1"
+    r10       = Bind.ident "$R10"
+
+-- >>> unsatAsms test1
+-- Just (Arith [GVVar {gv_var = $I1},GVLit 0])
+
+_test1 :: [Assump]
+_test1 = [i1_gt_0, i1_eq_0]
+  where
+    i1_gt_0 = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
+    i1_eq_0 = A_Pos (A_GVEq i1 zero)
+    i1      = Bind.ident "$I1"
+
+
+-- >>> unsatAsms test0
+-- Just (Arith [GVVar {gv_var = $I1},GVLit 0])
+
+_test0 :: [Assump]
+_test0 = [i1_gt_zero, zero_gt_i1]
+  where
+    i1_gt_zero  = A_Pos (A_RelOp Gt (GVArr [GVVar i1, zero]) )
+    zero_gt_i1  = A_Pos (A_RelOp Gt (GVArr [zero, GVVar i1]) )
+    i1          = Bind.ident "$I1"
+
+-- >>> unsatAsms test00
+-- Just (DiseqLit 20 10)Nothing
+
+_test00 :: [Assump]
+_test00 = [i1_eq_10, i1_eq_20]
+  where
+    i1_eq_10 = A_Pos (A_GVEq i1 (GVLit (LInt 10)))
+    i1_eq_20 = A_Pos (A_GVEq i1 (GVLit (LInt 20)))
+    i1       = Bind.ident "$I1"
