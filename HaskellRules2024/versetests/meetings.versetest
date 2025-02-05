@@ -195,8 +195,9 @@ verify("TimL300-9", pass, broken)   { f( g(x:int):char ):int := 1
 
 
 # Meeting 9 August
-testeq( "M9Aug24-1", pass){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
+testeq( "M9Aug24-1", pass, broken){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
   # M9Aug24-1 uses bidirectional programming
+  # broken because the check<decides> messes up bidirectionality
 verify( "M9Aug24-2", pass,tim=skip_rej){ F1(X:int)<closed><decides> := X = 1|2 }
 verify( "M9Aug24-3", pass,tim=skip_rej){ F1(X:any)<closed><decides> := X = 1|2 }
 
@@ -208,7 +209,8 @@ verify( "M7Aug24-3", pass ) { G(f()<decides>:int):=3; G[ h()<decides>:=3=4 ] }
 
 verify( "M7Aug24-4", fail, tim=V10 ) { x:int := 'm' }
    # Manifestly, 'm' does not have type int
-verify( "M7Aug24-5", pass, tim=skip_rej ) { all{ x:int := (1 | 2) } }
+verify( "M7Aug24-5", pass, broken, tim=skip_rej ) { all{ x:int := (1 | 2) } }
+   # M7Aug24-5: broken because of the implicit cardinality check on the RHS of x:int :- ...
 verify( "M7Aug24-6", fail, tim=A00 ) { all{ x:int := (1 | 'm') } }
 
 
@@ -271,7 +273,7 @@ verify( "T26Jul24-2", pass ){ f( g():=3 )<succeeds> := g[] > 2 }
 # verify("T26Jul24-4", pass){ f( p := exists x { (x,x) } )<succeeds> :=  ((r,s):=p; r=s) }
   # Trickier still.  Domain is a pair with equal components
 # verify("T26Jul24-5", pass){ f( p := exists x { (x,x) } ) :=  ((r,s):=p; x=s) }
-  #  ..and x scopes over RHS 
+  #  ..and x scopes over RHS
 
 verify("T26Jul24-6", pass){ f( x:int, x  ) := x }
 verify("T26Jul24-7", pass){ f( x, x:int  ) := x }
@@ -296,7 +298,7 @@ verify("T24Jul24-2", fail, tim=skip_acc) {f(x:int)<decides>:type{x=10} := 7 }
 # Tim examples 8/9/2023
 #  These use 'assume' so they aren't real programs
 verify("T8Sep23-1", pass, broken) {f(x:int, y:int)<succeeds> := {assume{x=z}; z:=x=y}}
-verify("T8Sep23-1a", pass, broken) {f(x:int, y:int, g(z:int):type{x=z})<succeeds> := {g[z]; z:=x=y}}
+verify("T8Sep23-1a", pass, broken) {f(x:int, y:int, g(z:int):type{x=z})<succeeds> := {g[z2]; z2:=x=y}}
 verify("T8Sep23-2", fail,tim=skip_acc) {f(x:int, y:int)<succeeds> := {z:=x=y; assume{x=z}}}
 verify("T8Sep23-3", pass, broken) {f(x:int, y:int)<succeeds> := exists z { assume{z = x}; z = x; x = y } }
 

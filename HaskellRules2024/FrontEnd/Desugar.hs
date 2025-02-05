@@ -218,7 +218,7 @@ sDesugarExpr = ds
     -- assume<fx>{e}  ==   havoc<fx>; some(\x. x=e; x)
     ds (Macro1 (Ident _ "assume") fx e)  = do { x <- newIdent (getLoc e) "x"
                                               ; e' <- ds e
-                                              ; pure (eSeq [ eHavoc (toEff effTop fx)
+                                              ; pure (eSeq [ eHavoc (toEff effSucceeds fx)
                                                            , Some (Lam x (eSeq [Unify (Variable x) e'
                                                                                , Variable x]))]) }
 
