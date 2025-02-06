@@ -350,9 +350,9 @@ knownEq s (MkEqual v1 v2) = isEqual s v1 v2
 
 
 evalDefs :: Solver -> [Equality]
-evalDefs s = {- ppTrace "TRACE: evalDefs" msg -} res
+evalDefs s = {- ppTrace "TRACE: evalDefs" _msg -} res
   where
-    msg    = pPrint (defs, res)
+    _msg    = pPrint (defs, res)
     res    = mapMaybe (evalDef s) defs
     defs   = s_def s
 
@@ -498,14 +498,25 @@ data Equality = MkEqual GroundVal GroundVal
 type Definition = (Ident, (PrimOp, GroundVal))
 
 mkSolver :: [Assump] -> Solver
+-- Initialise the solver, given a bunch of assumptions
 mkSolver asms = MkSolver { s_lits = lits, s_tups = tups, s_uf = UF.new, s_pos = pos, s_neg = neg, s_def = defs }
   where
-    defs   = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
-    pos    = [asm           | A_Pos asm                  <- asms ]
-    neg    = [asm           | A_Neg asm                  <- asms ]
-    lits   = concatMap groundLit    groundVals
-    tups   = concatMap assumpTuples groundVals
+    defs = [(x, (op, gv)) | A_PrimOp x (AO_Prim op) gv <- asms ]
+    pos  = [asm           | A_Pos asm                  <- asms ] ++ defs_result_asms
+    neg  = [asm           | A_Neg asm                  <- asms ]
+    lits = concatMap groundLit    groundVals
+    tups = concatMap assumpTuples groundVals
     groundVals = nubOrd (assumpGroundVal <$> (pos ++ neg))
+
+    defs_result_asms :: [FailableAssump]
+    -- Given x = intAdd$[p,q], we know that isInt$[x] holds
+    -- See Note [Add arithmetic type assumptions]
+    defs_result_asms = mapMaybe type_asm defs
+        where
+          type_asm (x, (op,_))
+            = case primOpResultPred_maybe op of
+                Just pred_op -> Just (A_RelOp pred_op (GVVar x))
+                Nothing      -> Nothing
 
 assumpTuples :: GroundVal -> [[GroundVal]]
 assumpTuples (GVArr gvs) = gvs : concatMap assumpTuples gvs
@@ -532,8 +543,31 @@ data Vertex = GV GroundVal | V0
 
 ------------------------------------------------------------------------------------
 
-{- Note [Arithmetic Graph]
+{- Note [Add arithmetic type assumptions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we add x = intAdd$[p,q], then we know that isInt$[x] holds. This is obviously
+important to verify functions like
+   f(x:int):int := x+1
 
+Instead of adding this knowledge directly in the solver we could
+(and previously did) define (+) thus:
+   (+) := \p. ∃ x y. (x,y) = p; isInt$[x]; isInt$[y];
+                     (x,y) >> some(lam z. z = intAdd$[x,y]; isInt$[z]; z)
+
+That works ok, but it takes a lot more verifier steps (skolemisation of the
+`some` etc), and it's much faster to define (+) thus
+   (+) := \p. ∃ x y. (x,y) = p; isInt$[x]; isInt$[y]; intAdd$[x,y]
+and add the isInt$ assumption in the solver. That is what `defs_result_asms`
+does in `mkSolver`.
+
+Examples: in verify.versetest,
+         Using `some`    Using defs_result_asms
+  T11       102 steps       84 steps
+  T13       177 steps      141 steps
+  Rec1      279 steps      239 steps
+
+Note [Arithmetic Graph]
+~~~~~~~~~~~~~~~~~~~~~~~
    We use `Epic.BellmanFord` to solve a restricted form of arithmetic "difference constraints"
 
      https://www.cs.upc.edu/~oliveras/TDV/dl.pdf
@@ -592,7 +626,17 @@ arithEdges = go
     go True  (A_GVEq  x   gv)                 = arithEq  (GVVar x) gv
     go _ _                                    = []
 
--- NOTE: Technically, the below is a "hack" that takes us outside the "difference constraint" logic...
+primOpResultPred_maybe :: PrimOp -> Maybe PrimOp
+-- This function specifies what predicate is true of the result of a primop
+primOpResultPred_maybe Add = Just IsInt
+primOpResultPred_maybe Sub = Just IsInt
+primOpResultPred_maybe Mul = Just IsInt
+primOpResultPred_maybe Div = Just IsInt
+primOpResultPred_maybe Neg = Just IsInt
+primOpResultPred_maybe _   = Nothing
+
+
+-- NOTE: Technically, defEdges is a "hack" that takes us outside the "difference constraint" logic...
 
 defEdges :: Solver -> (Ident, (PrimOp, GroundVal)) -> [(GroundVal, GroundVal, Int)]
 defEdges s (x, (Add, GVArr [gv1, gv2]))
