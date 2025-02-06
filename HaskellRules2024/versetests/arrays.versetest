@@ -77,9 +77,9 @@ verify("arr-nest3", pass){ f( n:int ) : [][]type{1|2} := all{ for(i:=1..n){ 1|2 
 
 # arr-fail1: RHS fails for n>=1; but returns empty array for n <= 0, hence decides
 verify("arr-fail1", pass){ f( n:int )<decides>  : []int = for(i:=1..n){fail} }
-verify("arr-fail2", pass, broken){ f( n:int where n<=0 )<succeeds>    : []int = for(i:=1..n){fail} }
+verify("arr-fail2", pass){ f( n:int where n<=0 )<succeeds>    : []int = for(i:=1..n){fail} }
   # arr-fail2: if n<=0, f successfully returns an empty array, hence succeeds
-verify("arr-fail2a", pass, broken){ f( n:int where n>0 )<fails>    : []int = for(i:=1..n){fail} }
+verify("arr-fail2a", pass){ f( n:int where n>0 )<fails>    : []int = for(i:=1..n){fail} }
   # arr-fail2a: Since n>0 this always fails
 verify("arr-fail3", fail)        { f( n:int )<succeeds> : []int = for(i:=1..n){fail} }
 
