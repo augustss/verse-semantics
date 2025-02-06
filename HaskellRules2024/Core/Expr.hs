@@ -1190,14 +1190,24 @@ lookupIdSubst sub x
 --
 --------------------------------------------------------------------------------
 
-type Rule = RuleEnv -> Expr -> [(String,Expr)]
+type Rule = RuleEnv -> Expr -> [Rewrite]
+
+
+data Rewrite
+  = RW { rw_str  :: String     -- Describes the rewrites
+       , rw_verb :: Verbosity  -- Show this rule at verbosity rw_verb and above
+       , rw_expr :: Expr }
+
+type Verbosity = Int
+  -- At verbosity level V, when displaying a trace,
+  -- show only rewrites that have verbosity <= V.
 
 removeRule :: Rule -> String -> Rule
 removeRule rule name
-  = \env e -> [ (lab,e')
-              | (lab,e') <- rule env e
-              -- matches when lab is "NAME" or "NAME(..."
-              , not ((name ++ "(") `isPrefixOf` (lab ++ "("))
+  = \env e -> [ rewrite
+              | rewrite <- rule env e
+              -- matches when the rw_str of the rewrite is "NAME" or "NAME(..."
+              , not ((name ++ "(") `isPrefixOf` (rw_str rewrite ++ "("))
               ]
 
 data RuleEnv = RE { skolVars :: [Ident], assumps :: [Assump] }
@@ -1209,7 +1219,7 @@ extendRuleEnv :: RuleEnv -> [Ident] -> [Assump] -> RuleEnv
 extendRuleEnv rule_env@(RE { skolVars = skols, assumps = asms }) new_skols new_asms
   = rule_env { skolVars = new_skols ++ skols, assumps = new_asms ++ asms }
 
-stepRule :: Rule -> Expr -> [(String,Expr)]
+stepRule :: Rule -> Expr -> [Rewrite]
 stepRule rule expr = rule emptyRuleEnv     -- Empty set of skolems
                           expr
 
@@ -1229,39 +1239,37 @@ everywhere :: Rule -> Rule
 everywhere step env orig_e
   = step env orig_e ++ recurse orig_e
  where
-  recurse (Tup es)     = [ (s, Tup (take i es ++ [e'] ++ drop (i+1) es))
-                         | i <- [0..length es-1]
-                         , (s,e') <- everywhere step env (es!!i)
-                         ]
-  recurse (Tru e)      = [ (s, Tru e')  | (s,e') <- everywhere step env e ]
-  recurse (Lam _bnd)   = [] {- [ (s, Lam (bind x e')) | (s,e') <- everywhere step env' e ]
+  wrap = wrap_with_env env
+
+  wrap_with_env :: RuleEnv -> (Expr->Expr) -> Expr -> [Rewrite]
+  wrap_with_env env' rebuild e
+    = [ rewrite { rw_expr = rebuild e' }
+      | rewrite@(RW { rw_expr = e' }) <- everywhere step env' e ]
+
+  recurse (Tup es)     = concatMap do_one [0..length es-1]
                        where
-                         (env',x,e) = walkInsideBind env bnd -}
-  recurse (Exi bnd)    = [ (s, Exi (bind x e')) | (s,e') <- everywhere step env' e ]
+                         do_one i = wrap (rebuild i) (es !! i)
+                         rebuild i ei' = Tup (take i es ++ [ei'] ++ drop (i+1) es)
+
+  recurse (e1 :=: e2)  = wrap (:=: e2)  e1 ++ wrap (e1 :=:)  e2
+  recurse (e1 :>: e2)  = wrap (:>: e2)  e1 ++ wrap (e1 :>:)  e2
+  recurse (e1 :|: e2)  = wrap (:|: e2)  e1 ++ wrap (e1 :|:)  e2
+  recurse (e1 :@: e2)  = wrap (:@: e2)  e1 ++ wrap (e1 :@:)  e2
+  recurse (e1 :>>: e2) = wrap (:>>: e2) e1 ++ wrap (e1 :>>:) e2
+  recurse (Some e)     = wrap Some e
+  recurse (Tru e)      = wrap Tru e
+  recurse (Iter f e e0) = wrap (\e' -> Iter f e' e0) e ++ wrap (Iter f e) e0
+
+  recurse (Lam _bnd)   = []  -- Do not look under lambdas
+
+  recurse (Exi bnd)    = wrap_with_env env' (Exi . bind x) e
                        where
                          (env',x,e) = walkInsideBind env bnd
-  recurse (e1 :=: e2)  = [ (s, e1' :=: e2)  | (s,e1') <- everywhere step env e1 ]
-                      ++ [ (s, e1  :=: e2') | (s,e2') <- everywhere step env e2 ]
-  recurse (e1 :>: e2)  = [ (s, e1' :>: e2)  | (s,e1') <- everywhere step env e1 ]
-                      ++ [ (s, e1  :>: e2') | (s,e2') <- everywhere step env e2 ]
-  recurse (e1 :|: e2)  = [ (s, e1' :|: e2)  | (s,e1') <- everywhere step env e1 ]
-                      ++ [ (s, e1  :|: e2') | (s,e2') <- everywhere step env e2 ]
-  recurse (e1 :@: e2)  = [ (s, e1' :@: e2)  | (s,e1') <- everywhere step env e1 ]
-                      ++ [ (s, e1  :@: e2') | (s,e2') <- everywhere step env e2 ]
-  --recurse (All e)      = [ (s, All e')      | (s,e') <- everywhere step env e ]
-  recurse (Some e)     = [ (s, Some e')     | (s,e') <- everywhere step env e ]
-  --recurse (Size sz e)  = [ (s, Size sz e')  | (s,e') <- everywhere step env e ]
-  recurse (e1 :>>: e2) = [ (s, e1' :>>: e2) | (s,e1') <- everywhere step env e1 ]
-                      ++ [ (s, e1 :>>: e2') | (s,e2') <- everywhere step env e2 ]
-  --recurse (Check fx e) = [ (s, Check fx e') | (s,e') <- everywhere step env e ]
-  recurse (Verify bl)  = [ (s, Verify (bindList rs (as,e')))
-                         | (s,e') <- everywhere step env' e ]
+
+  recurse (Verify bl)  = wrap_with_env env' (\e' -> Verify (bindList rs (as,e'))) e
                        where
                          env' = extendRuleEnv env rs as
                          (rs,(as,e)) = alphaRenameVerify (skolVars env) bl
-  recurse (Iter f e e0) =
-                         [ (s, Iter f e' e0) | (s,e') <- everywhere step env e ] ++
-                         [ (s, Iter f e e0') | (s,e0') <- everywhere step env e0 ]
 
   recurse _            = []
 
