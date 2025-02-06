@@ -247,7 +247,7 @@ runTestFile tflg (fn, ts)
         do { putStrLn $ printf "%5d FAILED with unexpected results, of which" n_unexpected
            ; printSome failedButShouldPass unexpected "      %d should pass, but actually failed"
            ; printSome passedButShouldFail unexpected "      %d should fail, but actually passed"
-           ; printSome failedWithLoop      unexpected "      %d went into an unexpected loop"
+           ; printSome failedWithLoop      unexpected "      %d had an unexpected timeout"
            ; printSome isBrokenPass        unexpected "      %d expected broken, but actually passed" }
       ; printNZ n_skipped  "%5d skipped"
       ; putStrLn "---------------------------------------------------------"
@@ -477,10 +477,12 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
              (_, TFail)    -> "failure"
              (_, TLoop)    -> "loop   "
 
-    fail_what = case typ of
-             TPass -> "failure"
-             TFail -> "success"
-             TLoop -> "loop"
+    fail_what
+      | failedWithLoop test_res = "timeout"
+      | otherwise               = case typ of
+                                    TPass -> "failure"
+                                    TFail -> "success"
+                                    TLoop -> "termination" -- this case probably never happens?
 
 
 -- | Equivalence on values (or stuck expressions)
