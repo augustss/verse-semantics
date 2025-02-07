@@ -393,6 +393,7 @@ onlyApps f orig_e = go orig_e
     go (Lit {})     = True
     go (Op {})      = True
     go Fail         = True
+    go (Err {})     = True
     go HOLE         = True
 
     go (Var x)      = x /= f

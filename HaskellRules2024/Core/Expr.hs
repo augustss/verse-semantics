@@ -88,6 +88,7 @@ data Expr
   | Val  :@: Val     -- application      v1[v2]
   | Exi (Bind Expr)
   | Fail
+  | Err String
 
   -- Iterator over choices
   | Iter Iter Expr Expr -- choice iteration; see Note [iter]
@@ -329,7 +330,8 @@ mkCheck Decides e =
 -- WRONG for failed check
 wrongFx :: Effect -> Expr
 wrongFx fx =
-  Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []
+  Err ("check<" ++ show fx ++ ">")
+--  Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []
 
 -- matches expression against encoding of check<fx>{e} --> Just(fx,e)
 matchCheck :: Expr -> Maybe (Effect,Expr)
@@ -667,15 +669,22 @@ instance Pretty PrimOp where
 pPrintPrecE :: PrettyLevel -> Rational -> Expr -> Doc
 pPrintPrecE lvl prec the_expr
   = case the_expr of
+       -- basic
        HOLE       -> text "HOLE"
        Fail       -> text "fail"
+       Err s      -> text ("Err(" ++ s ++ ")")
        Var x      -> pPrint x
        Lit i      -> pPrint i
        Op op      -> pPrint op
 
        -- special pretty printing to help debugging
-       e | Just (fx,b) <- matchCheck e -> block "{}" (text ("CHECK<" ++ show fx ++ ">")) b
+       e | Just (fx,b) <- matchCheck e ->
+         block "{}" (text ("CHECK<" ++ show fx ++ ">")) b
 
+       --e | Just (n,b) <- matchSize e ->
+       --  block "{}" (text ("SIZE(" ++ show n ++ ")")) b
+
+       -- combinators
        e1 :=: e2   -> mbPar0 $ ppr1 e1 <+> char '=' <+> ppr1 e2
        e1 :|: e2   -> mbPar0 $ sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
        e1 :@: e2   -> block' "[]" (ppr1 e1) (pp_call_arg e2)
@@ -767,6 +776,7 @@ exprSize (Var {})      = 1
 exprSize (Lit {})      = 1
 exprSize (Op {})       = 1
 exprSize Fail          = 1
+exprSize (Err _)       = 1
 exprSize HOLE          = 1
 exprSize (Tup as)      = 1 + sum (map exprSize as)
 exprSize (Tru a)       = 1 + exprSize a
@@ -834,6 +844,7 @@ valid (Exi bnd)           = valid e where (_,e) = unsafeUnbind bnd
   -- SLPJ: todo: check binder is not _
 valid (Lam bnd)           = valid e where (_,e) = unsafeUnbind bnd
 valid Fail                = True
+valid (Err _)             = True
 valid (Some a)            = is_val a
 --valid (All e)             = valid e
 valid (a :>>: e)          = is_val a && valid e  -- Guard
@@ -871,6 +882,7 @@ prep (a  :=: e)   = prepVal a (\v -> (v :=: prep e) :>: v)
 prep (e1 :|: e2)  = prep e1 :|: prep e2
 prep (Exi bnd)    = Exi (bind x (prep e)) where (x,e) = unsafeUnbind bnd
 prep Fail         = Fail
+prep (Err s)      = Err s
 prep (Some a)     = prepVal a (\v -> Some v)
 --prep (All e)      = mkAll (prep e)
 prep (a :>>: e)   = prepVal a (\v -> v :>>: prep e)
@@ -921,6 +933,7 @@ instance Variables Expr where
   variables _ (Lit {})      = []
   variables _ (Op {})       = []
   variables _ Fail          = []
+  variables _ (Err _)       = []
   variables _ HOLE          = []
   variables f (Var x)       = variables f x
   variables f (Tup es)      = variables f es
@@ -1016,11 +1029,12 @@ norm orig_e = alpha 0 orig_e
   var i = ident ("_" ++ show i)
   skvar i = ident ("_r" ++ show i)
 
-  alpha _ e@(Lit {})     = e
-  alpha _ e@(Var {})     = e
-  alpha _ e@(Op {})     = e
-  alpha _ e@(Fail {})     = e
-  alpha _ e@(HOLE {})     = e
+  alpha _ e@(Lit {})   = e
+  alpha _ e@(Var {})   = e
+  alpha _ e@(Op {})    = e
+  alpha _ e@(Fail {})  = e
+  alpha _ e@(HOLE {})  = e
+  alpha _ e@(Err {})   = e
 
   alpha k (Tup es)     = Tup (map (alpha k) es)
   alpha k (Tru e)      = Tru ((alpha k) e)
@@ -1072,10 +1086,11 @@ subst sub orig_e
   | null sub  = orig_e      -- Short cut
   | otherwise = go orig_e
   where
-    go e@(Lit {})    = e
-    go e@(Op {})     = e
-    go e@(Fail {})   = e
-    go e@(HOLE {})   = e
+    go e@(Lit {})   = e
+    go e@(Op {})    = e
+    go e@(Fail {})  = e
+    go e@(Err {})   = e
+    go e@(HOLE {})  = e
 
     go (Var x)      = head $ [e | (y,e) <- sub, y == x] ++ [Var x]
     go (Tup es)     = Tup (map go es)
@@ -1438,6 +1453,7 @@ arbExprWith xs n =
   , (a, mkAll `fmap` arbExpr1)
   , (a, liftM2 mkCheck (elements [Fails, Succeeds, Decides]) arbExpr1)
   , (1, return Fail)
+  , (1, return (Err ""))
 {-
   | Some Val
   | Val :>>: Expr    -- guard           |>   <-- black triangle
@@ -1489,6 +1505,7 @@ e@(Var {})    <@ _ = e
 e@(Lit {})    <@ _ = e
 e@(Op  {})    <@ _ = e
 Fail          <@ _ = Fail
+Err s         <@ _ = Err s
 Tup as        <@ h = Tup (map (<@ h) as)
 Tru a         <@ h = Tru (a <@ h)
 Lam bnd       <@ h = Lam (bind x (e <@ h)) where (x,e) = unsafeUnbind bnd
