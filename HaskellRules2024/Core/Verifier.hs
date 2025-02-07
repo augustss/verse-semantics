@@ -27,10 +27,8 @@ import Core.Solver (unsat)
 verificationRules ::  Rule
 verificationRules
   = everywhere (verificationStep
-    -- Do all simple evaluation and normalisation before splitting
-    -- no no no!
-    <> splitStep
-    <> recStep)
+                <> splitStep
+                <> recStep)
 
 verificationStep :: Rule
 verificationStep =  TRS2024.runtimeAndVerificationStep
