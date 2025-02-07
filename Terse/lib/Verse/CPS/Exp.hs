@@ -18,8 +18,8 @@ data ExpF a
     {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Yield continuation
-    {-# UNPACK #-} !Label -- Success continuation
-    {-# UNPACK #-} !Label -- Failure continuation
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
     a
     a
@@ -29,45 +29,28 @@ data ExpF a
     {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Yield continuation
-    {-# UNPACK #-} !Label -- Success continuation
-    {-# UNPACK #-} !Label -- Failure continuation
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
-  | LetYield
-    {-# UNPACK #-} !Label
-    {-# UNPACK #-} !Label -- Level
-    {-# UNPACK #-} !Label -- Handler
-    {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Success continuation
-    {-# UNPACK #-} !Label -- Failure continuation
-    {-# UNPACK #-} !Label -- Empty continuation
-    a
-    a
-  | LetSuccess
+  | LetSucceed
     {-# UNPACK #-} !Label
     {-# UNPACK #-} !Label -- Parameter
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Failure continuation
+    {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
     a
     a
-  | AppSuccess
+  | AppSucceed
     {-# UNPACK #-} !Label -- Callee
     {-# UNPACK #-} !Val -- Argument
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Failure continuation
+    {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
-  | LetFailure
+  | LetFail
     {-# UNPACK #-} !Label
     a
     a
-  | AppFailure {-# UNPACK #-} !Label
-  | LetEmpty
-    {-# UNPACK #-} !Label
-    a
-    a
-  | AppEmpty {-# UNPACK #-} !Label
-  | LetEnv {-# UNPACK #-} !Label {-# UNPACK #-} !Label a
-  | LetState {-# UNPACK #-} !Label a
+  | AppFail {-# UNPACK #-} !Label
   | Exi {-# UNPACK #-} !Name a
   | Tup
     [Val]
@@ -80,7 +63,8 @@ data ExpF a
     {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Yield continuation
-    {-# UNPACK #-} !Label -- Success continuation
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
   | Less
     !Val -- Left
@@ -88,22 +72,23 @@ data ExpF a
     {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Yield continuation
-    {-# UNPACK #-} !Label -- Success continuation
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
   | Plus
     !Val -- Left
     !Val -- Right
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Yield continuation
-    {-# UNPACK #-} !Label -- Success continuation
-    {-# UNPACK #-} !Label -- Failure continuation
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
   | Minus
     !Val -- Left
     !Val -- Right
     {-# UNPACK #-} !Label -- State
     {-# UNPACK #-} !Label -- Yield continuation
-    {-# UNPACK #-} !Label -- Success continuation
-    {-# UNPACK #-} !Label -- Failure continuation
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
   deriving Show
 
 type Exp = Fix ExpF

@@ -3,7 +3,8 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Verse.CPS.Convert
-  ( convert
+  ( Result (..)
+  , convert
   ) where
 
 import Loc
@@ -32,11 +33,15 @@ data Arg = Arg
 
 newtype Convert a = Convert
   { unConvert :: In -> Out a
-  } deriving (Functor)
+  }
 
 type In = Label
 
 data Out a = Out !a {-# UNPACK #-} !Label deriving (Functor)
+
+instance Functor Convert where
+  fmap f x = Convert $ \ s -> case unConvert x s of
+    Out x s -> Out (f x) s
 
 instance Applicative Convert where
   pure = Convert . Out
@@ -70,7 +75,7 @@ convert' :: LExp -> Arg -> Convert CPS.LExp
 convert' (L loc e) arg = case e of
   Var x ->
     pure . L loc $
-    CPS.AppSuccess arg.succeed (CPS.Var x) arg.state arg.fail arg.empty
+    CPS.AppSucceed arg.succeed (CPS.Var x) arg.state arg.fail arg.empty
   Abs x e -> do
     f <- newLabel
     env <- newLabel
@@ -82,7 +87,7 @@ convert' (L loc e) arg = case e of
     e <- convert' e Arg {..}
     pure . L loc $
       CPS.Let f x env state yield succeed fail empty e . L loc $
-      CPS.AppSuccess arg.succeed (CPS.Label f) arg.state arg.fail arg.empty
+      CPS.AppSucceed arg.succeed (CPS.Label f) arg.state arg.fail arg.empty
   App f x -> seq' f x arg $ \ f x arg ->
     pure . L loc $ CPS.App f (CPS.Label x)
       arg.env
@@ -95,7 +100,7 @@ convert' (L loc e) arg = case e of
     L loc . CPS.Exi x <$> convert' e arg
   Int x ->
     pure . L loc $
-    CPS.AppSuccess arg.succeed (CPS.Int x) arg.state arg.fail arg.empty
+    CPS.AppSucceed arg.succeed (CPS.Int x) arg.state arg.fail arg.empty
   e1 :& e2 ->
     seq_ e1 e2 arg
   e1 := e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
@@ -104,6 +109,7 @@ convert' (L loc e) arg = case e of
       arg.state
       arg.yield
       arg.succeed
+      arg.fail
       arg.empty
   e1 :< e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
     pure . L loc $ CPS.Less (CPS.Label x1) (CPS.Label x2)
@@ -111,13 +117,14 @@ convert' (L loc e) arg = case e of
       arg.state
       arg.yield
       arg.succeed
+      arg.fail
       arg.empty
   e1 :| e2 -> do
     fail <- newLabel
     empty <- newLabel
     e1 <- convert' e1 arg { fail, empty }
     e2 <- convert' e2 arg
-    pure . L loc . CPS.LetFailure fail e2 . L loc $ CPS.LetEmpty empty e2 e1
+    pure . L loc . CPS.LetFail fail e2 . L loc $ CPS.LetFail empty e2 e1
   e1 :+ e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
     pure . L loc $ CPS.Plus (CPS.Label x1) (CPS.Label x2)
       arg.env
@@ -132,7 +139,7 @@ convert' (L loc e) arg = case e of
       arg.succeed
   Fail ->
     pure . L loc $
-    CPS.AppFailure arg.fail
+    CPS.AppFail arg.fail
 
 seq'
   :: LExp -> LExp -> Arg
@@ -164,11 +171,11 @@ seq' e1 e2 arg f = do
     , fail = fail2
     , empty = empty2
     }
-  pure . L (extract e1) $ CPS.LetSuccess succeed1 x1
+  pure . L (extract e1) $ CPS.LetSucceed succeed1 x1
     state1
     fail1
     empty1
-    (L (extract e2) $ CPS.LetSuccess succeed2 x2 state2 fail2 empty2 e3 e2)
+    (L (extract e2) $ CPS.LetSucceed succeed2 x2 state2 fail2 empty2 e3 e2)
     e1
 
 seq_
@@ -191,7 +198,7 @@ seq_ e1 e2 arg = do
     , fail = fail1
     , empty = empty1
     }
-  pure . L (extract e1) $ CPS.LetSuccess succeed1 x1
+  pure . L (extract e1) $ CPS.LetSucceed succeed1 x1
     state1
     fail1
     empty1
