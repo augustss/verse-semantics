@@ -41,7 +41,7 @@ verificationStep =  TRS2024.runtimeAndVerificationStep
 --------------------------------------------------------------------------------
 guardStep :: Rule
 guardStep env lhs =
-   "GUARD-ELIM" `nameWith`
+   "GUARD-ELIM" `labelRuleWith`
    do v :>>: e <- [lhs]
       guard (skolValue (skolVars env) v)
       pure (pPrintSmallExpr v, e)
@@ -49,7 +49,7 @@ guardStep env lhs =
 {- Guards only have values to the left
    ToDo: check in 'valid'
    ++
-   "GUARD-FAIL" `name`
+   "GUARD-FAIL" `labelRule`
    do Fail :>>: _ <- [lhs]
       pure Fail
 -}
@@ -71,7 +71,7 @@ arrStep :: Rule
 --     ---> if x is in flexis(P)
 --   verify(R,n;A){ P[ x = choose(n){some(\i. inrange[i,n])}; x ] }
 arrStep env lhs =
-  "DD-DODGY" `name`   -- v = DotDot[i,n];e  --> i = v; _ = DotDot[v,n]; e
+  "DD-DODGY" `labelBigRule`   -- v = DotDot[i,n];e  --> i = v; _ = DotDot[v,n]; e
                       -- Dodgy because it overlaps with DD-NARROW
   do (v :=: Op DotDot :@: Tup [i, n]) :>: e <- [lhs]
      guard (skolValue (skolVars env) v)
@@ -79,7 +79,7 @@ arrStep env lhs =
                    , Var underscore :=: Op DotDot :@: Tup [v,n]
                    , e ])
   ++
-  "DD-NARROW" `nameWith`
+  "DD-NARROW" `labelBigRuleWith`
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
      -- Use this rule when v is not a literal.
      guard (x `elem` exis)
@@ -87,14 +87,14 @@ arrStep env lhs =
                       ctx <@ ((Var x :=: Choose v (Some (inRangeType v)))
                               :>: Var x))
   ++
-  "DD-INRANGE" `nameWith`
+  "DD-INRANGE" `labelBigRuleWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, e1@(Op DotDot :@: Tup [i, sz]))) <- proofX all_rs e
       guard (isJust (groundValue all_rs i))
       pure (pPrint e1, Verify $ bindList rs
                          (as, ctx <@ inRange i sz))
   ++
-  "ARR-MAP" `nameWith`   -- ArrMap$[f,a] --> for(x:a){f[x]}
+  "ARR-MAP" `labelBigRuleWith`   -- ArrMap$[f,a] --> for(x:a){f[x]}
   do Op ArrMap :@: Tup [f, arr@(Arr _ _)] <- [lhs]
      let x:i:_ = identsNotIn (free (f,arr))
      pure (pPrint arr, Iter IterFor
@@ -104,19 +104,19 @@ arrStep env lhs =
              ) (Tup [])
           )
   ++
-  "ARR-APP" `nameWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
+  "ARR-APP" `labelBigRuleWith`  -- (Arr n e)[v] --> Dotdot$[v,n]; some(\_.e)
   do arr@(Arr sz e) :@: v <- [lhs]
      pure (pPrint arr, (Op DotDot :@: Tup [v,sz]) >>> someUnderscore e )
   ++
-  "CHOOSE0" `name`
+  "CHOOSE0" `labelBigRule`
   do Choose (LitInt 0) _ <- [lhs]
      pure Fail
   ++
-  "CHOOSE1" `name`
+  "CHOOSE1" `labelBigRule`
   do Choose (LitInt 1) e <- [lhs]
      pure (someUnderscore e)
   ++
-  "ITER-CHOOSE" `name`
+  "ITER-CHOOSE" `labelBigRule`
   do Iter f body e0 <- [lhs]
      (exis, ctx, Choose n e) <- evalCtxLift [] body
      guard (ctx /= HOLE)
@@ -128,17 +128,17 @@ arrStep env lhs =
        (Var k :=: mkSize n (mkExis exis $ ctx <@ someUnderscore e)) :>:
        Iter f (Choose (Var k) (mkExis exis $ ctx <@ e)) e0
   ++
-  "ONE-CHOOSE" `name`
+  "ONE-CHOOSE" `labelBigRule`
   do Iter IterOne (Choose n e) e0 <- [lhs]
      pure $ mkIf ((n :=: Lit (LInt 0)) :>: lamUnderscore e0)
                  (someUnderscore e)
   ++
-  "IF-CHOOSE" `name`
+  "IF-CHOOSE" `labelBigRule`
   do Iter IterIf (Choose n e) e0 <- [lhs]
      pure $ mkIf ((n :=: Lit (LInt 0)) :>: lamUnderscore e0)
                  (mkApp (someUnderscore e) (Tup []))
   ++
-  "ALL-CHOOSE" `name`
+  "ALL-CHOOSE" `labelBigRule`
   do Iter IterAll (Choose n e) e0 <- [lhs]
      let ys:zs:_ = identsNotIn (free lhs)
      pure $
@@ -147,7 +147,7 @@ arrStep env lhs =
            (Op ArrApp :@: Tup [ Arr n e, ys', Var zs ]) >>>
            Var zs
   ++
-  "FOR-CHOOSE" `name`
+  "FOR-CHOOSE" `labelBigRule`
   do Iter IterFor (Choose n e) e0 <- [lhs]
      let k:xs:ys:zs:_ = identsNotIn (free lhs)
      pure $
@@ -161,7 +161,7 @@ arrStep env lhs =
              (Op ArrApp :@: Tup [ Var xs, ys', Var zs ]) >>>
              Var zs)
   ++
-  "VERIFY-CHOOSE" `name`
+  "VERIFY-CHOOSE" `labelBigRule`
   do (_skols, rs, as, body) <- matchVerify env lhs
      (exis, ctx, Choose n e) <- evalCtxLift [] body
      guard (ctx /= HOLE)
@@ -188,7 +188,7 @@ arrStep env lhs =
 
 {-
   ++
-  "FOR-CHOOSE" `name`
+  "FOR-CHOOSE" `labelBigRule`
      -- FOR{ C[ choose(v){e} ] }
      -- --> n := size(v){ C[ some(\_.e) ] } ;
      --     Arr(n){ C[e] }
@@ -216,14 +216,14 @@ arrStep env lhs =
 -}
 {-
   ++
-  "ALL-CHOOSE" `name`
+  "ALL-CHOOSE" `labelBigRule`
      -- all{ C[ choose(v){e} ] }
      -- --> Arr(n){ C[e] }
      -- if boundvars(C) disjoint from freevars(v)
   do All (Choose n e) <- [lhs]
      pure ( Arr n e )
   ++
-  "CHOOSE-X" `name`
+  "CHOOSE-X" `labelBigRule`
      -- C[ choose(v){e} ]
      -- --> n := size(v){ C[ some(\_.e) ] } ;
      --     choose(n){ C[e] }
@@ -245,7 +245,7 @@ arrStep env lhs =
             (Choose (Var n) (wrapExis exis (ctx <@ e))) )
 -}
  ++
-  "U-ARR" `name`  -- Arr n1 e1 = Arr n2 e2; e
+  "U-ARR" `labelBigRule`  -- Arr n1 e1 = Arr n2 e2; e
                     -- --> (n1=n2); one{ n1=0 | some(\_.e1) = some(\_.e2) }; e
   do (Arr n1 e1 :=: Arr n2 e2) :>: e <- [lhs]
      pure (coreSeq [ n1 :=: n2
@@ -257,12 +257,12 @@ arrStep env lhs =
                                           (Tup []))
                    , e ])
  ++
-  "U-TUP-ARR" `name`  -- <v1,..,vk> = Arr n e1; e
+  "U-TUP-ARR" `labelBigRule`  -- <v1,..,vk> = Arr n e1; e
                     -- --> (n=k); v1=some{\_.e1}; ..; vk=some{\_.e1}; e
   do (Tup vs :=: Arr n e1) :>: e <- [lhs]
      pure ((Lit (LInt (fromIntegral (length vs))) :=: n) :>: foldr (\v -> ((v :=: e1) :>:)) e vs)
  ++
-  "U-ARR-TUP" `name`  -- <v1,..,vk> = Arr n e1; e
+  "U-ARR-TUP" `labelBigRule`  -- <v1,..,vk> = Arr n e1; e
                     -- --> (n=k); v1=some{\_.e1}; ..; vk=some{\_.e1}; e
   do (Arr n e1 :=: Tup vs) :>: e <- [lhs]
      pure ((Lit (LInt (fromIntegral (length vs))) :=: n) :>: foldr (\v -> ((v :=: e1) :>:)) e vs)
@@ -279,21 +279,21 @@ arrStep env lhs =
 
 {-
  ++
-  "SIZE0" `name`  -- Size(0){e} --> 0
+  "SIZE0" `labelBigRule`  -- Size(0){e} --> 0
   do Size (LitInt 0) _ <- [lhs]
      pure (litInt 0)
  ++
-  "SIZE-VAL" `name`  -- Size(n){v} --> n
+  "SIZE-VAL" `labelBigRule`  -- Size(n){v} --> n
   do Size n v <- [lhs]
      guard (isVal n)
      guard (isVal v)
      pure n
  ++
-  "SIZE-FAIL" `name`  -- Size(n){fail} --> 0
+  "SIZE-FAIL" `labelBigRule`  -- Size(n){fail} --> 0
   do Size n Fail <- [lhs]
      pure (LitInt 0)
  ++
-  "SIZE-CHOICE" `name`  -- Size(n){C[e1|e2]} --> Size(n){C[e1]} + Size(n){C[e2]}
+  "SIZE-CHOICE" `labelBigRule`  -- Size(n){C[e1|e2]} --> Size(n){C[e1]} + Size(n){C[e2]}
   do Size n e <- [lhs]
      guard (isVal n)
      (ctx, e1 :|: e2) <- evalCtx [] e
@@ -307,12 +307,12 @@ arrStep env lhs =
 -}
 {-
  ++
-  "SIZE0" `name`  -- Size(0){e} --> 0
+  "SIZE0" `labelBigRule`  -- Size(0){e} --> 0
   do Size (LitInt n) _ <- [lhs]
      guard (n==0)
      pure (litInt 0)
  ++
-  "SIZEn" `name`  -- Size(n){v1 | v2 | ...} --> some(nat) -- rules SIZE1, SIZEF0, SIZEFn, SIZEN
+  "SIZEn" `labelBigRule`  -- Size(n){v1 | v2 | ...} --> some(nat) -- rules SIZE1, SIZEF0, SIZEFn, SIZEN
   do Size n e <- [lhs]
      case multiplicity e of
        MDunno -> []      -- Rule does not apply
@@ -377,34 +377,34 @@ mkSizeX n e =
 --------------------------------------------------------------------------------
 verifyStep :: Rule
 verifyStep env lhs =
-   "VERIFY-VAL" `name`
+   "VERIFY-VAL" `labelBigRule`
    do (_skols, _rs, _as, v) <- matchVerify env lhs
       guard (isVal v)
       pure (Tup [])
    ++
-   "VERIFY-FAIL" `name`
+   "VERIFY-FAIL" `labelBigRule`
    do (_skols, _rs, _as, Fail) <- matchVerify env lhs
       pure (Tup [])
    ++
-   "VERIFY-ERR" `name`
+   "VERIFY-ERR" `labelBigRule`
    do (_skols, _rs, _as, Err s) <- matchVerify env lhs
       pure (Err s)
    ++
-   "VERIFY-CHOICE" `name`
+   "VERIFY-CHOICE" `labelBigRule`
    do (_skols, rs, as, e) <- matchVerify env lhs
       (ctx, e1 :|: e2) <- evalCtx [] e
       guard (blocked ctx)
       pure (     (Verify $ bindList rs (as,ctx <@ e1))
              >>> (Verify $ bindList rs (as,ctx <@ e2)) )
    ++
-   "SOLVER" `nameWith`
+   "SOLVER" `labelBigRuleWith`
    do (_skols, rs, as, _e) <- matchVerify env lhs
       let env' = extendRuleEnv env rs as
       case unsat env' of
         Just reason -> pure (pPrint reason, Tup [])
         Nothing     -> []
    ++
-   "SKOLEMIZE" `nameWith`
+   "SKOLEMIZE" `labelBigRuleWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Some v)) <- proofX all_rs e
       guard (skolValue all_rs v)
@@ -420,7 +420,7 @@ verifyStep env lhs =
 --------------------------------------------------------------------------------
 splitStep :: Rule
 splitStep env lhs =
-   "SPLIT-V" `nameWith`
+   "SPLIT-V" `labelBigRuleWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, (Var r :=: v) :>: rest)) <- proofX all_rs e
       guard (r `elem` all_rs)
@@ -429,7 +429,7 @@ splitStep env lhs =
            , caseSplit rs (A_GVEq r gv) as ctx rest )
 
    ++
-   "SPLIT-OP" `nameWith`
+   "SPLIT-OP" `labelBigRuleWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Op op :@: arg)) <- proofX all_rs e
       guard (op /= IsArr && op /= DotDot)   -- ToDo: this is a bit awkward
@@ -448,7 +448,7 @@ splitStep env lhs =
         -- whether or not the PrimOp can fail
 
    ++
-   "SPLIT-ISARR" `nameWith`
+   "SPLIT-ISARR" `labelBigRuleWith`
        -- verify(R,r;A){ P[ isArr$[r] ] }
        --  --> verify(R,r,n;A,isArr$[r],isInt$[n], n=arrLen$[r], n>=0){ P[ Arr(.){some(any)} ] }
        --      ..and the fail case..
@@ -466,7 +466,7 @@ splitStep env lhs =
              >>>
              (Verify (bindList (n:rs) (pos_asms ++ as, ctx <@ Arr (Var n) someAny))) )
    ++
-   "SPLIT-TUP" `nameWith`
+   "SPLIT-TUP" `labelBigRuleWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Var r :=: Tup vs :>: rest)) <- proofX all_rs e
       guard (r `elem` all_rs)
@@ -476,7 +476,7 @@ splitStep env lhs =
       pure (pPrint asm, caseSplit (rs ++ rs') asm as ctx rvs')
 
    ++
-   "SPLIT-TRU" `nameWith`
+   "SPLIT-TRU" `labelBigRuleWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Var r :=: Tru v :>: rest)) <- proofX all_rs e
       guard (r `elem` all_rs)
@@ -490,7 +490,7 @@ splitStep env lhs =
    -- Verify(rs ; as){ P[r[s]] }
    -- ---> Verify (r:rs ; r'=r[s], as) { P [r'] }  if r, s are skol, r' fresh
    ++
-   "SPLIT-APP" `nameWith`
+   "SPLIT-APP" `labelBigRuleWith`
    do (all_rs, rs, as, e) <- matchVerify env lhs
       (ctx, (_, Var r :@: s)) <- proofX all_rs e
       guard (r `elem` rs)

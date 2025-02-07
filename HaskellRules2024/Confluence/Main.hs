@@ -22,7 +22,7 @@ prop_ValidTrace =
      in whenFail (do putStrLn "== TRACE =="
                      displayTrace (np :<-- ps)) $
           resp == NormOK ==>
-            valid np && all valid [ q | (_,q) <- ps ]
+            valid np && all (valid . tsPayload) ps
  where
   arbExpr :: Gen Expr
   arbExpr =
@@ -62,13 +62,13 @@ prop_Confluent =
     k     = length tr `div` 2 -- 1<=k<length tr
     tr1   = drop k tr
     tr2   = take k tr
-    (_,r) = last tr2
+    r     = tsPayload (last tr2)
 
   shrinkFork (p, _) =
-    [ (p', q' :<-- [(s,p')])
-    | p' <- shrink p ++ map snd (stepRule trs2024_noREC p)
+    [ (p', tsPayload step :<-- [step `setTsPayload` p'])
+    | p' <- shrink p ++ map tsPayload (stepRule trs2024_noREC p)
     , valid p'
-    , (s,q') <- stepRule trs2024_noREC p'
+    , step <- stepRule trs2024_noREC p'
     ]
 
 --------------------------------------------------------------------------------

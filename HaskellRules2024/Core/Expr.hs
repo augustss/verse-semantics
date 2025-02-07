@@ -1244,15 +1244,15 @@ tryBefore rule1 rule2 env e
 
 -- apply a rule everywhere (recursively) in the expression
 everywhere :: Rule -> Rule
-everywhere step env orig_e
-  = step env orig_e ++ recurse orig_e
+everywhere take_step env orig_e
+  = take_step env orig_e ++ recurse orig_e
  where
   wrap = wrap_with_env env
 
   wrap_with_env :: RuleEnv -> (Expr->Expr) -> Expr -> [Rewrite]
   wrap_with_env env' rebuild e
-    = [ rewrite { ts_payload = rebuild e' }
-      | rewrite@(TS { ts_payload = e' }) <- everywhere step env' e ]
+    = [ updTsPayload rebuild step
+      | step <- everywhere take_step env' e ]
 
   recurse (Tup es)     = concatMap do_one [0..length es-1]
                        where
@@ -1362,13 +1362,14 @@ normalizeTrace fuel rule orig_e = go fuel [] orig_e
   go fuel_left tr e =
     case stepRule rule e of
       []                        -> (NormOK,      e  :<-- tr)
-      step@(TS { ts_payload = e' }) : _   -- Pick the first offered rewrite
+      step : _   -- Pick the first offered rewrite
         | fuel_left==0   -> (NormExpired, e  :<-- tr)
         | not (valid e') -> (NormInvalid, e' :<-- tr')
         | otherwise      -> -- ppTrace "norm" (int fuel <+> text s <> braces (pPrintBrief e')) $
                             go (fuel_left-1) tr' e'
         where
-          tr' = step { ts_payload = e } : tr
+          e'  = tsPayload step
+          tr' = step `setTsPayload` e : tr
 
 normalize :: Fuel    -- Maximum number of steps
           -> Rule -> Expr
@@ -1385,7 +1386,7 @@ normalize fuel rule orig_e = go 0 orig_e
     | otherwise       =
         case stepRule rule e of
           []       -> (NormOK, nr_steps, e)
-          step:_ -> go (nr_steps+1) (ts_payload step)
+          step:_ -> go (nr_steps+1) (tsPayload step)
 
 --------------------------------------------------------------------------------
 --

@@ -4,7 +4,9 @@
 module Core.TRS2024 (
      runtimeRules, runtimeAndVerificationStep, recStep
    , blocked, blkd, choiceFreeLH, choiceAndFailureFree
-   , name, nameWith, iff
+   , labelRule, labelBigRule, labelSmallRule
+   , labelRuleWith, labelBigRuleWith, labelSmallRuleWith
+   , iff
    , skolValue
    , bigRule, midRule, smallRule
    , LocalExis(..), makeRigid, addFlexi, allExis, wrapExis
@@ -58,7 +60,7 @@ evalDotDotStep :: Rule
 -- Used only for evaluation, not verification
 -- Also, try it /last/ so that U-DOTDOT gets first dibs
 evalDotDotStep _env lhs =
-  "DOTDOT-EXPAND" `nameWith`  -- DotDot$[v,k]  -->  v = (0 | 1 | ... | k-1); ()
+  "DOTDOT-EXPAND" `labelRuleWith`  -- DotDot$[v,k]  -->  v = (0 | 1 | ... | k-1); ()
   do Op DotDot :@: Tup [v, Lit (LInt k)] <- [lhs]
      let the_choice = foldr ((:|:) . Lit . LInt) Fail [0..(k-1)]
      pure (pPrint k, (v :=: the_choice) :>: Tup [])
@@ -68,7 +70,7 @@ evalDotDotStep _env lhs =
 
   -- Expand DotDot$[i,100] only if you really have to;
   -- i.e. i is an existential we are blocked on
-  "DOTDOT-EXPAND" `nameWith`
+  "DOTDOT-EXPAND" `labelRuleWith`
   do (exis, ctx, Op DotDot :@: Tup [Var x, Lit (LInt k)]) <- evalCtxLift (free lhs) lhs
      guard (x `elem` exis)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
@@ -79,117 +81,117 @@ evalDotDotStep _env lhs =
 --------------------------------------------------------------------------------
 applicationStep :: Rule
 applicationStep env lhs =
-  "APP-ADD" `name`
+  "APP-ADD" `labelSmallRule`
   do Op Add :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1+k2))
  ++
-  "APP-SUB" `name`
+  "APP-SUB" `labelSmallRule`
   do Op Sub :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1-k2))
  ++
-  "APP-MUL" `name`
+  "APP-MUL" `labelSmallRule`
   do Op Mul :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      pure (LitInt (k1*k2))
  ++
-  "APP-DIV" `name`
+  "APP-DIV" `labelSmallRule`
   do Op Div :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k2 /= 0)
      pure (LitInt (k1 `div` k2))
  ++
-  "APP-NEG" `name`
+  "APP-NEG" `labelSmallRule`
   do Op Neg :@: LitInt k <- [lhs]
      pure (LitInt (- k))
  ++
-  "APP-GT" `name`
+  "APP-GT" `labelSmallRule`
   do Op Gt :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 > k2)
      pure (LitInt k1)
  ++
-  "APP-GT-FAIL" `name`
+  "APP-GT-FAIL" `labelSmallRule`
   do Op Gt :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 > k2))
      pure Fail
  ++
-  "APP-LT" `name`
+  "APP-LT" `labelSmallRule`
   do Op Lt :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 < k2)
      pure (LitInt k1)
  ++
-  "APP-LT-FAIL" `name`
+  "APP-LT-FAIL" `labelSmallRule`
   do Op Lt :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 < k2))
      pure Fail
  ++
-  "APP-LE" `name`
+  "APP-LE" `labelSmallRule`
   do Op LEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 <= k2)
      pure (LitInt k1)
  ++
-  "APP-LE-FAIL" `name`
+  "APP-LE-FAIL" `labelSmallRule`
   do Op LEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 <= k2))
      pure Fail
  ++
-  "APP-GE" `name`
+  "APP-GE" `labelSmallRule`
   do Op GEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 >= k2)
      pure (LitInt k1)
  ++
-  "APP-GE-FAIL" `name`
+  "APP-GE-FAIL" `labelSmallRule`
   do Op GEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 >= k2))
      pure Fail
  ++
-  "APP-NE" `name`
+  "APP-NE" `labelSmallRule`
   do Op NEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (k1 /= k2)
      pure (LitInt k1)
  ++
-  "APP-NE-FAIL" `name`
+  "APP-NE-FAIL" `labelSmallRule`
   do Op NEq :@: Tup [LitInt k1, LitInt k2] <- [lhs]
      guard (not (k1 /= k2))
      pure Fail
  ++
-  "APP-ISGROUND" `name`
+  "APP-ISGROUND" `labelSmallRule`
    do Op IsGround :@: a <- [lhs]
       guard (skolValue (skolVars env) a)
       pure a
  ++
-  "APP-ISINT" `name`
+  "APP-ISINT" `labelSmallRule`
   do Op IsInt :@: a <- [lhs]
      case a of
        Lit (LInt _)  -> pure a
        _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
          | otherwise -> []
  ++
-  "APP-ISSTR" `name`
+  "APP-ISSTR" `labelSmallRule`
   do Op IsStr :@: a <- [lhs]
      case a of
        Lit (LStr _)  -> pure a
        _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
          | otherwise -> []
  ++
-  "APP-ISCHAR" `name`
+  "APP-ISCHAR" `labelSmallRule`
   do Op IsChar :@: a <- [lhs]
      case a of
        Lit (LChar _) -> pure a
        _ | isHNF a   -> pure Fail  -- Lambda, tuples, floats etc all fail
          | otherwise -> []
  ++
-  "APP-ISCOMP" `name`
+  "APP-ISCOMP" `labelSmallRule`
   do Op IsComp :@: a <- [lhs]
      if | isComparable a -> pure a
         | isHNF a        -> pure Fail
         | otherwise      -> []
  ++
-  "APP-ISTRU" `name`
+  "APP-ISTRU" `labelSmallRule`
   do Op IsTru :@: a <- [lhs]
      case a of
        Tru {}        -> pure a
        _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
          | otherwise -> []
  ++
-  "APP-LAM" `name`
+  "APP-LAM" `labelRule`
   do Lam bnd :@: v <- [lhs]
      guard (isVal v)
      let (x,e) = alphaRename (free v) bnd
@@ -198,19 +200,19 @@ applicationStep env lhs =
            then body
            else Exi (bind x body))
  ++
-  "APP-TRU" `name`
+  "APP-TRU" `labelSmallRule`
   do Tru a :@: v <- [lhs]
      guard (isVal v && isVal a)
      pure ((v :=: a) :>: a)
  ++
-  "APP-TUP-0" `name`
+  "APP-TUP-0" `labelSmallRule`
   do Tup [] :@: v <- [lhs]
      guard (isVal v)
      pure Fail
 
 arrayOpStep :: Rule
 arrayOpStep _env lhs =
-  "APP-TUPK" `name`   -- <v1,..,vn>[k] --> vk
+  "APP-TUPK" `labelRule`   -- <v1,..,vn>[k] --> vk
                       -- This rule isn't needed, but it makes the reduction
                       -- sequence much shorter when indexing with a constant
   do Tup vs :@: Lit (LInt i) <- [lhs]
@@ -221,12 +223,12 @@ arrayOpStep _env lhs =
       else
        pure Fail
  ++
-  "APP-TUP" `name`   -- <v1,..,vn>[v] --> (v=1;v1) | .. | (v=n;vn)
+  "APP-TUP" `labelRule`   -- <v1,..,vn>[v] --> (v=1;v1) | .. | (v=n;vn)
                      -- This does narrrowing
   do Tup vs@(_:_) :@: v <- [lhs]
      pure (foldr1 (:|:) [ (v :=: LitInt i) :>: vi | (i,vi) <- [0..] `zip` vs ])
  ++
-  "APP-LENGTH" `name`   -- Length$[<v1,..,vn>  --> n
+  "APP-LENGTH" `labelRule`   -- Length$[<v1,..,vn>  --> n
                         -- Length$[Arr(n){e}]  --> n
   do Op ArrLen :@: arg <- [lhs]
      case arg of
@@ -234,7 +236,7 @@ arrayOpStep _env lhs =
        Arr sz _ -> pure sz
        _        -> []   -- No match here
  ++
-  "APP-ISARR" `name`    -- IsArr$[<v1,..,vn>] -->  <v1,..vn>
+  "APP-ISARR" `labelRule`    -- IsArr$[<v1,..,vn>] -->  <v1,..vn>
                         -- IsArr$[Arr(n){e}]  -->  Arr(n){e}
   do Op IsArr :@: a <- [lhs]
      case a of
@@ -243,7 +245,7 @@ arrayOpStep _env lhs =
        _ | isHNF a   -> pure Fail  -- Lambda, ints, floats etc all fail
          | otherwise -> []
  ++
-  "TUP-MAP" `nameWith`   -- ArrMap$[f, <v1,..,vn>]
+  "TUP-MAP" `labelRuleWith`   -- ArrMap$[f, <v1,..,vn>]
                          --   --> x1=f[v1]; ..; xn=f[vn]; <x1,..,xn>
   do Op ArrMap :@: arg@(Tup [f, arr@(Tup vs)]) <- [lhs]
      let prs :: [(Ident,Val)]
@@ -251,7 +253,7 @@ arrayOpStep _env lhs =
          bind_one (x,v) e = Exi $ bind x $ (Var x :=: (f :@: v)) :>: e
      pure (pPrint arr, foldr bind_one (Tup [Var x | (x,_) <- prs]) prs)
  ++
-  "APP-ARRAPP" `name`  -- Array append
+  "APP-ARRAPP" `labelRule`  -- Array append
   do { Op ArrApp :@: Tup [e1,e2,res] <- [lhs]
      ; (do { Tup vs1 <- [e1]; Tup vs2 <- [e2]; pure $ equateArr res (vs1++vs2) })
      ++
@@ -291,27 +293,27 @@ drop_prefix (_:_)  []     = Nothing
 --------------------------------------------------------------------------------
 unificationStep :: Rule
 unificationStep _env lhs =
-  "U-LIT" `name`
+  "U-LIT" `labelRule`
   do (Lit l1 :=: Lit l2) :>: e <- [lhs]
      if l1 == l2
        then pure e
        else pure Fail
  ++
-  "U-TUP" `name`
+  "U-TUP" `labelRule`
   do (Tup vs :=: Tup vs') :>: e <- [lhs]
      if (length vs == length vs')
        then pure (foldr (:>:) e [ v :=: v' | (v,v') <- vs `zip` vs' ])
        else pure Fail
  ++
-  "U-DOTDOT" `nameWith`   --   DotDot[k,n]  --> inRange[k,n]; ()
+  "U-DOTDOT" `labelRuleWith`   --   DotDot[k,n]  --> inRange[k,n]; ()
   do Op DotDot :@: Tup [k@(Lit {}), n] <- [lhs]
      pure (pPrint lhs, (Var underscore :=: inRange k n) :>: Tup [])
  ++
-  "U-TRU" `name`
+  "U-TRU" `labelRule`
   do (Tru v :=: Tru v') :>: e <- [lhs]
      pure (( v :=: v') :>: e)
  ++
-  "U-FAIL" `name`
+  "U-FAIL" `labelRule`
   do (a1 :=: a2) :>: _ <- [lhs]
      guard (isHNF a1 && isHNF a2)
      guard $
@@ -325,14 +327,14 @@ unificationStep _env lhs =
          (_,      _)      -> True
      pure Fail
  ++
-  "U-OCCURS" `name`
+  "U-OCCURS" `labelRule`
   do (x@(Var _) :=: v) :>: _ <- [lhs]
      guard (v /= x)
      (_ctx, e) <- valueCtx v
      guard (e == x)
      pure Fail
  ++
-  "U-SWAP" `name`
+  "U-SWAP" `labelRule`
   do (a :=: Var x) :>: e <- [lhs]
      guard (isHNF a)
      pure ((Var x :=: a) :>: e)
@@ -340,31 +342,31 @@ unificationStep _env lhs =
 --------------------------------------------------------------------------------
 existentialStep :: Rule
 existentialStep _env lhs =
-  "UNDERSCORE-ELIM" `name`
+  "UNDERSCORE-ELIM" `labelSmallRule`
   do { (Var u :=: v) :>: e <- [lhs]
      ; guard (isUnderscore u)
      ; guard (isVal v)
      ; pure e }
  ++
-  "EXI-ELIM" `nameWith`
+  "EXI-ELIM" `labelSmallRuleWith`
   do (exis,x,e) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free e)
      pure (pPrint x, exis <@ e)
  ++
-  "EXI-FLOAT" `nameWith`
+  "EXI-FLOAT" `labelSmallRuleWith`
   do (v :=: exi_x_e1) :>: e2 <- [lhs]
      (exis,x,e1) <- matchExi_alphaRename (free (v,e2)) exi_x_e1
      pure (pPrint x, Exi (bind x ((v:=:(exis <@ e1)):>:e2)))
  ++  -- EXI-PUSH is necessary to let us do
      --    exi x. f[y]; x=3; 3+1; blah
      -- Here we want to substitute for x despite the intervening f[y]
-  "EXI-PUSH" `nameWith`
+  "EXI-PUSH" `labelSmallRuleWith`
   do (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] lhs
      guard (x `notElem` free (v,e1))
      pure (pPrint x, exis <@ ((v :=: e1) :>: Exi (bind x e2)))
   ++
   -- Do this last: most complex and expensive
-  "EXI-SUBST" `nameWith`
+  "EXI-SUBST" `labelRuleWith`
   do (exis, ctx, x_eq_v :>: e) <- evalCtxLift (free lhs) lhs
      (Var x,v) <- matchEq x_eq_v
      guard (isVal v)
@@ -377,7 +379,7 @@ existentialStep _env lhs =
           , wrapExis (exis \\ [x]) $
             subst [(x,v)] (ctx <@ e) )
  ++
-  "EXI-APP" `nameWith`
+  "EXI-APP" `labelRuleWith`
   do (exis,f,e) <- matchExi_alphaRename [] lhs
      guard (f `elem` free e)
      guard (onlyApps f e)
@@ -430,7 +432,7 @@ onlyApps f orig_e = go orig_e
 --------------------------------------------------------------------------------
 normalizationStep :: Rule
 normalizationStep _env lhs =
-  "SEQ-ASSOC" `name`
+  "SEQ-ASSOC" `labelSmallRule`
   do (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- [lhs]
      pure ((v1 :=: e1) :>: ((v2 :=: e2) :>: e3))
 
@@ -438,7 +440,7 @@ normalizationStep _env lhs =
 choiceStep :: Rule
 choiceStep _env lhs =
 {-
-  "CHOICE-ASSOC" `name`
+  "CHOICE-ASSOC" `labelRule`
   do (e1 :|: e2) :|: e3 <- [lhs]
      pure (e1 :|: (e2 :|: e3))
  ++
@@ -446,15 +448,15 @@ choiceStep _env lhs =
 {-
   -- CHOICE-FAIL-L and CHOICE-FAIL-R should not be needed,
   -- but some dubious verification tests don't pass without them.
-  "CHOICE-FAIL-L" `name`
+  "CHOICE-FAIL-L" `labelRule`
   do Fail :|: e <- [lhs]
      pure e
  ++
-  "CHOICE-FAIL-R" `name`
+  "CHOICE-FAIL-R" `labelRule`
   do e :|: Fail <- [lhs]
      pure e
  ++
-  "CHOICE" `nameWith`
+  "CHOICE" `labelRuleWith`
   do (ctx, the_choice@(e1 :|: e2)) <- evalCtx [] lhs
      guard (ctx /= HOLE)
      guard (choiceFreeLH ctx)
@@ -465,7 +467,7 @@ choiceStep _env lhs =
           , (ctx <@ e1) :|: (ctx <@ e2))
  ++
 -}
-  "FAIL" `name`
+  "FAIL" `labelRule`
   do (ctx, Fail) <- evalCtx [] lhs
      guard (ctx /= HOLE)
      guard (blocked ctx)
@@ -488,18 +490,18 @@ errStep _env lhs =
 oneAndAllStep :: Rule
 oneAndAllStep _env lhs =
   -- iter(fail){f, g}  -->  g <>
-  "ITER-FAIL" `name`
+  "ITER-FAIL" `labelRule`
   do Iter _f Fail e0 <- [lhs]
      pure e0
  ++
   -- iter(v){f, g}  -->  f v g
-  "ITER-VALUE" `name`
+  "ITER-VALUE" `labelRuleWith`
   do Iter f v e0 <- [lhs]
      guard (isVal v)
-     pure (iterApply f v e0)
+     pure (text (show f), iterApply f v e0)
  ++
   -- iter(C[e1] | C[e2]){f, g}  -->  iter(C[e1]){f, \ _ . iter(C[e2]){f, g} }
-  "ITER-CHOICE" `name`
+  "ITER-CHOICE" `labelRule`
   do Iter f e e0 <- [lhs]
      (ctx, e1 :|: e2) <- evalCtx [] e
      guard (choiceFreeLH ctx)
@@ -508,18 +510,18 @@ oneAndAllStep _env lhs =
 {-
  ++
   -- all(fail)  -->  <>
-  "ALL-FAIL" `name`
+  "ALL-FAIL" `labelRule`
   do All Fail <- [lhs]
      pure (Tup [])
  ++
   -- all(v)  -->  <v>
-  "ALL-VALUE" `name`
+  "ALL-VALUE" `labelRule`
   do All v <- [lhs]
      guard (isVal v)
      pure (Tup [v])
  ++
   -- all(C[e1] | C[e2])  -->  all(C[e1])++all(C[e2])
-  "ALL-CHOICE" `name`
+  "ALL-CHOICE" `labelRule`
   do All e <- [lhs]
      (ctx, e1 :|: e2) <- evalCtx [] e
      guard (choiceFreeLH ctx)
@@ -534,7 +536,7 @@ recStep :: Rule
 -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
 --   if x/=y, and x free in body
 recStep _env lhs =
-  "REC" `name`
+  "REC" `labelBigRule`
   do Var x :=: v <- [lhs]
      (ctx, Lam bnd) <- valueCtx v
      let (y,body) = alphaRename [x] bnd
@@ -547,7 +549,7 @@ recStep _env lhs =
 {-
 checkStep :: Rule
 checkStep env lhs =
-   "CHECK" `name`
+   "CHECK" `labelRule`
    do Check eff e <- [lhs]
       pure (mkCheck eff e)
  where
@@ -580,26 +582,26 @@ checkStep env lhs =
 -}
 {-
    ++
-   "CHECK-SUC-L" `name`
+   "CHECK-SUC-L" `labelRule`
    do Check eff (v :|: e) <- [lhs]
       guard (skolValue (skolVars env) v)
       guard (canSucceed eff)
       pure (Iter e (lamUnderscore $ lamUnderscore wrong) (lamUnderscore v)) -- e must fail
    ++
-   "CHECK-FAIL" `name`
+   "CHECK-FAIL" `labelRule`
    do Check eff Fail <- [lhs]
       guard (canFail eff)
       pure Fail
    ++
-   "CHECK-FAIL-L" `name`
+   "CHECK-FAIL-L" `labelRule`
    do Check eff (Fail :|: e) <- [lhs]
       pure (Check eff e)
    ++
-   "CHECK-CHOICE-L" `name`
+   "CHECK-CHOICE-L" `labelRule`
    do Check eff ((e1 :|: e2) :|: e3) <- [lhs]
       pure (Check eff (e1 :|: (e2 :|: e3)))
    ++
-   "CHECK-CHOICE" `name`
+   "CHECK-CHOICE" `labelRule`
    do Check eff e <- [lhs]
       (ctx, e1 :|: e2) <- evalCtx [] e
       guard (ctx /= HOLE)
@@ -614,7 +616,7 @@ skolValue rs e = isVal e && null (free e \\ rs)
 
 --------------------------------------------------------------------------------
 --
---            Auxiliary functions
+--            Adding rules labels
 --
 --------------------------------------------------------------------------------
 
@@ -623,16 +625,33 @@ bigRule   = 1
 midRule   = 2
 smallRule = 3
 
-name :: String -> [Expr] -> [Rewrite]
-name s es = [ TS { ts_str = s, ts_payload = e, ts_verb = smallRule }
-            | e <- es ]
+label_rule :: Verbosity -> String -> [Expr] -> [Rewrite]
+label_rule v s es = [ TS { ts_str = s, ts_payload = e, ts_verb = v }
+                    | e <- es ]
 
--- This is used to give rules names.
-nameWith :: String -> [(Doc, Expr)] -> [Rewrite]
-nameWith rulename as
-  = [ TS { ts_str = rulename ++ render (parens doc)
-         , ts_payload = a, ts_verb = midRule }
+label_rule_with :: Verbosity -> String -> [(Doc, Expr)] -> [Rewrite]
+label_rule_with v s as
+  = [ TS { ts_str = s ++ render (parens doc)
+         , ts_payload = a, ts_verb = v }
     | (doc, a) <- as]
+
+labelRule :: String -> [Expr] -> [Rewrite]
+labelRule = label_rule midRule
+
+labelSmallRule :: String -> [Expr] -> [Rewrite]
+labelSmallRule = label_rule smallRule
+
+labelBigRule :: String -> [Expr] -> [Rewrite]
+labelBigRule = label_rule bigRule
+
+labelRuleWith :: String -> [(Doc, Expr)] -> [Rewrite]
+labelRuleWith = label_rule_with midRule
+
+labelBigRuleWith :: String -> [(Doc, Expr)] -> [Rewrite]
+labelBigRuleWith = label_rule_with bigRule
+
+labelSmallRuleWith :: String -> [(Doc, Expr)] -> [Rewrite]
+labelSmallRuleWith = label_rule_with smallRule
 
 iff :: [Bool] -> [()]
 iff conds = [()| and conds]

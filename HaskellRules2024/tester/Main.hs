@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, RecordWildCards, ApplicativeDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Eta reduce" #-}
@@ -7,18 +7,18 @@
 module Main(main) where
 
 import FrontEnd.CopyHook
-import FrontEnd.Desugar( desugar ) as FrontEnd
-import FrontEnd.ToCore( convertToCore ) as FrontEnd
-import FrontEnd.Flags as FrontEnd
+import FrontEnd.Desugar as FrontEnd ( desugar )
+import FrontEnd.ToCore  as FrontEnd ( convertToCore )
+import FrontEnd.Flags   as FrontEnd
 import FrontEnd.Expr as Src
 import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pParens
                      , pString, pKeyword, many, optional, skip, eof )
 import FrontEnd.Prelude( findPrelude )
 
 import Core.Expr as Core
+import Core.Traced
 import Core.Verifier( verificationRules )
 import Core.TRS2024 ( runtimeRules )
-import Core.Traced as TRS ( Traced, term, trace, start )
 
 import Epic.Print hiding ( (<>) )
 import Data.Generics.Uniplate.Data( universeBi )
@@ -219,7 +219,7 @@ isBrokenFail tr@(TestRes { tr_info = info })
 
 runTestFile :: TestFlags -> (FilePath, [Test]) -> IO ()
 runTestFile tflg (fn, ts)
- = do { putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFlags tflg)
+ = do { putStrLn $ "Test " ++ show fn ++ " with: " ++ showFlags (testFlagsToFEFlags tflg)
 
       ; when (logUnexpected tflg) $ clearUnexpectedFiles fn
 
@@ -425,12 +425,12 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
 
        -- Display the trace if asked for, regardless of success/failure
        ; when (showTrace tflg) $
-         do { putStrLn "Trace is:"; displayDoc (pPrintTrace (traceVerbosity tflg) tr1) }
+         do { putStrLn "Trace is:"; displayTraceV (traceVerbosity tflg) tr1 }
 
        ; pure (TestRes { tr_info = info, tr_outcome = outcome }) }
   where
     (res1,ln1,tr1) = evalExpr tflg test core1
-    v1           = TRS.term tr1
+    v1           = Core.Traced.term tr1
     n_steps      = ln1
     mb_v2        = fmap ((\(_,_,tr) -> term tr) . evalExpr tflg test) mb_core2
                    -- Really we should check res2 as well, but it is always boring
@@ -677,123 +677,147 @@ verseTest = "tests.versetest"
 test1 :: FilePath
 test1     = "test1.verse"
 
+
 testFlags :: OA.Parser TestFlags
-testFlags = TestFlags
-  <$> OA.switch
-      (  OA.long "dfs"
-      <> OA.help "Only find one normal form"
-      )
-  <*> OA.switch
-      (  OA.long "split"
-      <> OA.help "Use split"
-      )
-  <*> OA.switch
-      (  OA.long "parse-only"
-      <> OA.help "Just do parsing"
-      )
-  <*> OA.switch
-      (  OA.long "simplify"
-      <> OA.help "Use simplifier"
-      )
-  <*> OA.switch
-      (  OA.long "no-under-lambda"
-      <> OA.help "do not reduce under lambda"
-      )
-  <*> OA.switch
-      (  OA.long "quiet"
-      <> OA.help "Be less noisy"
-      )
-  <*> OA.switch
-      (  OA.long "verbose"
-      <> OA.help "Be more noisy"
-      )
-  <*> OA.switch
-      (  OA.long "no-error"
-      <> OA.help "Do not show error message on failure"
-      )
-  <*> OA.switch
-      (  OA.long "post-process"
-      <> OA.help "Do post processing"
-      )
-  <*> OA.switch
-      (  OA.long "summary"
-      <> OA.help "Produce test summary"
-      )
-  <*> OA.switch
-      (  OA.long "trace"
-      <> OA.help "Print rewrite traces"
-      )
-  <*> OA.option OA.auto
-         ( OA.long "trace-verbosity"
-        <> OA.metavar "NUM"
-        <> OA.value 2
-        <> OA.help "Verbosity of rewrite trace (1,2,3)" )
-  <*> OA.switch
-      (  OA.long "log-unexpected"
-      <> OA.help "log unexpected results to file"
-      )
-  <*> OA.optional (OA.strOption
-         ( OA.long "only-test"
-        <> OA.metavar "TEST"
-        <> OA.help "Run only test named TEST" ))
-  <*> OA.optional (OA.strOption
-         ( OA.long "expr"
-        <> OA.metavar "EXPR"
-        <> OA.help "Use EXPR as a test" ))
-  <*> OA.option OA.auto
-         ( OA.long "max-steps"
-        <> OA.short 'm'
-        <> OA.metavar "NUM"
-        <> OA.value 1000   -- test M28Jul24-1 takes ages with 1000 steps
-        <> OA.help "Maximum number of rewrite steps" )
-  <*> OA.option OA.auto
-         ( OA.long "max-norm-steps"
-        <> OA.metavar "NUM"
-        <> OA.value 10000
-        <> OA.help "Maximum number of normalization steps" )
-  <*> OA.switch
-         ( OA.long "ignore-fuel-stop"
-        <> OA.help "Ignore running out of fuel" )
-  <*> OA.switch
-         ( OA.long "assume-verified"
-        <> OA.help "succeeds{} is a no-op" )
-  <*> OA.switch
-         ( OA.long "tim-run"
-        <> OA.help "run a Tim test" )
-  <*> OA.switch
-         ( OA.long "tim-verify"
-        <> OA.help "verify Tim test" )
-  <*> OA.switch
-         ( OA.long "tim-output"
-        <> OA.help "display as a Tim test" )
-  <*> OA.switch
-         ( OA.long "tim-csv"
-        <> OA.help "displkay status of Tim tests" )
-  <*> OA.switch
-         ( OA.long "show-desugared"
-        <> OA.help "show desugared version" )
-  <*> OA.strOption
-         ( OA.long "eval-prelude"
-        <> OA.metavar "NAME"
-        <> OA.value "miniprelude"
-        <> OA.help "use the given prelude for evaluation tests" )
-  <*> OA.strOption
-         ( OA.long "verify-prelude"
-        <> OA.metavar "NAME"
-        <> OA.value "miniverifyprelude"
-        <> OA.help "use the given prelude for verification tests" )
-  <*> OA.option OA.auto
-         ( OA.long "desugar"
-        <> OA.metavar "Name"
-        <> OA.value (fDesugar defaultFlags)
-        <> OA.help "Desugaring rules to use" )
-  <*> OA.switch
-         ( OA.long "all-as-iter"
-        <> OA.help "encode all with iter" )
-  <*> OA.many (OA.argument OA.str (OA.metavar "FILES..."))
+testFlags
+  = -- Uses ApplicativeDo, because OA.Parser isn't a monad
+    -- Order in this do-block is not important
+    --
+    -- NB: disambiguation is /on/, so you can't have both
+    --        --foo   and    --foo-wombat
+    -- Because then --foo is ambiguous
+    do { dfs <- OA.switch $
+                OA.long "dfs" <>
+                OA.help "Only find one normal form"
+
+       ; split <- OA.switch $
+                  OA.long "split" <>
+                  OA.help "Use split"
+
+       ; parseOnly <- OA.switch $
+                      OA.long "parse-only" <>
+                      OA.help "Just do parsing"
+
+       ; simplify <- OA.switch $
+                     OA.long "simplify" <>
+                     OA.help "Use simplifier"
+
+       ; noUnderLam <- OA.switch $
+                        OA.long "no-under-lambda" <>
+                        OA.help "do not reduce under lambda"
+
+       ; quiet <- OA.switch $
+                  OA.long "quiet" <>
+                  OA.help "Be less noisy"
+
+       ; verbose <- OA.switch $
+                    OA.long "verbose" <>
+                    OA.help "Be more noisy"
+
+       ; noError <- OA.switch $
+                    OA.long "no-error" <>
+                    OA.help "Do not show error message on failure"
+
+       ; postProc <- OA.switch $
+                     OA.long "post-process" <>
+                     OA.help "Do post processing"
+
+       ; summary <- OA.switch $
+                    OA.long "summary" <>
+                    OA.help "Produce test summary"
+
+       ; showTrace <- OA.switch $
+                      OA.long "trace" <>
+                      OA.help "Print rewrite traces"
+
+       ; traceVerbosity <- OA.option OA.auto $
+                           OA.long "tr-verbosity" <>
+                           OA.metavar "NUM" <>
+                           OA.value 2 <>
+                           OA.help "Verbosity of rewrite trace (1,2,3)"
+
+       ; logUnexpected <- OA.switch $
+                          OA.long "log-unexpected" <>
+                          OA.help "log unexpected results to file"
+
+       ; onlyTest <- OA.optional $ OA.strOption $
+                     OA.long "only" <>
+                     OA.metavar "TEST" <>
+                     OA.help "Run only test named TEST"
+
+       ; testExpr <- OA.optional $ OA.strOption $
+                     OA.long "expr" <>
+                     OA.metavar "EXPR" <>
+                     OA.help "Use EXPR as a test"
+
+       ; maxSteps <- OA.option OA.auto $
+                     OA.long "max-steps" <>
+                     OA.short 'm' <>
+                     OA.metavar "NUM" <>
+                     OA.value 1000 <>  -- test M28Jul24-1 takes ages with 1000 steps
+                     OA.help "Maximum number of rewrite steps"
+
+       ; maxNormSteps <- OA.option OA.auto $
+                         OA.long "max-norm-steps" <>
+                         OA.metavar "NUM" <>
+                         OA.value 10000 <>
+                         OA.help "Maximum number of normalization steps"
+
+       ; ignoreFuelStop <- OA.switch $
+                           OA.long "ignore-fuel-stop" <>
+                           OA.help "Ignore running out of fuel"
+
+       ; assumeVerified <- OA.switch $
+                           OA.long "assume-verified" <>
+                           OA.help "succeeds{} is a no-op"
+
+       ; timRun <- OA.switch $
+                   OA.long "tim-run" <>
+                   OA.help "run a Tim test"
+
+       ; timVerify <- OA.switch $
+                      OA.long "tim-verify" <>
+                      OA.help "verify Tim test"
+
+       ; timOutput <- OA.switch $
+                      OA.long "tim-output" <>
+                      OA.help "display as a Tim test"
+       ; timCSV <- OA.switch $
+                   OA.long "tim-csv" <>
+                   OA.help "displkay status of Tim tests"
+
+       ; showDesugared <- OA.switch $
+                          OA.long "show-desugared" <>
+                          OA.help "show desugared version"
+
+       ; preludeEval <- OA.strOption $
+                        OA.long "eval-prelude" <>
+                        OA.metavar "NAME" <>
+                        OA.value "miniprelude" <>
+                        OA.help "use the given prelude for evaluation tests"
+
+       ; preludeVerify <- OA.strOption $
+                          OA.long "verify-prelude" <>
+                          OA.metavar "NAME" <>
+                          OA.value "miniverifyprelude" <>
+                          OA.help "use the given prelude for verification tests"
+
+       ; desugarRules <- OA.option OA.auto $
+                         OA.long "desugar" <>
+                         OA.metavar "Name" <>
+                         OA.value (fDesugar defaultFlags) <>
+                         OA.help "Desugaring rules to use"
+
+       ; allAsIter <- OA.switch $
+                      OA.long "all-as-iter" <>
+                      OA.help "encode all with iter"
+
+       ; fileNames <- OA.many $
+                      OA.argument OA.str (OA.metavar "FILES...")
+       ; return (TestFlags { .. }) }
 
 testFlagsToFEFlags :: TestFlags -> FrontEnd.Flags
-testFlagsToFlags t =
+testFlagsToFEFlags t =
   let flags = defaultFlags
   in  flags{ fSplit = split t, fSimplify = simplify t,
              fTrace = showTrace t,
