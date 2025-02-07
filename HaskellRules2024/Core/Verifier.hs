@@ -78,6 +78,7 @@ arrStep env lhs =
                    , e ])
   ++
   "DD-NARROW" `labelBigRuleWith`
+  -- exists x. C[ dotdot$[x,n] ] --> exists x. C[ x = CHOOSE(n){some(inrange(n))}; x ]
   do (exis, ctx, e1@(Op DotDot :@: Tup [Var x, v])) <- evalCtxLift (free lhs) lhs
      -- Use this rule when v is not a literal.
      guard (x `elem` exis)
@@ -114,7 +115,7 @@ arrStep env lhs =
   do Choose (LitInt 1) e <- [lhs]
      pure (someUnderscore e)
   ++
-  "ITER-CHOOSE" `labelBigRule`
+  "ITER-CHOOSE" `labelBigRuleWith`
   do Iter f body e0 <- [lhs]
      (exis, ctx, Choose n e) <- evalCtxLift [] body
      guard (ctx /= HOLE)
@@ -122,9 +123,10 @@ arrStep env lhs =
      guard (free n `disjointFrom` exis)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
      let k = identNotIn (free lhs ++ exis)
-     pure $ Exi $ bind k $
-       (Var k :=: mkSize n (mkExis exis $ ctx <@ someUnderscore e)) :>:
-       Iter f (Choose (Var k) (mkExis exis $ ctx <@ e)) e0
+     pure ( text (show f)
+          , Exi $ bind k $
+            (Var k :=: mkSize n (mkExis exis $ ctx <@ someUnderscore e)) :>:
+            Iter f (Choose (Var k) (mkExis exis $ ctx <@ e)) e0 )
   ++
   "ONE-CHOOSE" `labelBigRule`
   do Iter IterOne (Choose n e) e0 <- [lhs]
