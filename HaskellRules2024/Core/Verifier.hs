@@ -383,9 +383,12 @@ verifyStep env lhs =
       pure (Tup [])
    ++
    "VERIFY-FAIL" `name`
-   do (_skols, _rs, _as, e) <- matchVerify env lhs
-      guard (e == Fail)
+   do (_skols, _rs, _as, Fail) <- matchVerify env lhs
       pure (Tup [])
+   ++
+   "VERIFY-ERR" `name`
+   do (_skols, _rs, _as, Err s) <- matchVerify env lhs
+      pure (Err s)
    ++
    "VERIFY-CHOICE" `name`
    do (_skols, rs, as, e) <- matchVerify env lhs

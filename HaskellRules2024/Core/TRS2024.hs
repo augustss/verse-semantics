@@ -46,6 +46,7 @@ runtimeAndVerificationStep
            <> existentialStep
            <> choiceStep
            <> oneAndAllStep
+           <> errStep
            -- <> checkStep
 
 -- currently:  everywhere (evalRulesNoRec `tryBefore` rulesRec)
@@ -467,6 +468,19 @@ choiceStep _env lhs =
      guard (ctx /= HOLE)
      guard (blocked ctx)
      pure Fail
+
+--------------------------------------------------------------------------------
+errStep :: Rule
+errStep _env lhs =
+  "ERR" `name`
+  do (ctx, Err s) <- evalCtx [] lhs
+     guard (ctx /= HOLE)
+     guard (blocked ctx)
+     pure (Err s)
+ ++
+  "ITER-ERR" `name`
+  do Iter _f (Err s) _e0 <- [lhs]
+     pure (Err s)
 
 --------------------------------------------------------------------------------
 oneAndAllStep :: Rule
