@@ -476,13 +476,13 @@ choiceStep _env lhs =
 --------------------------------------------------------------------------------
 errStep :: Rule
 errStep _env lhs =
-  "ERR" `name`
+  "ERR" `labelBigRule`
   do (ctx, Err s) <- evalCtx [] lhs
      guard (ctx /= HOLE)
      guard (blocked ctx)
      pure (Err s)
  ++
-  "ITER-ERR" `name`
+  "ITER-ERR" `labelBigRule`
   do Iter _f (Err s) _e0 <- [lhs]
      pure (Err s)
 
@@ -490,9 +490,9 @@ errStep _env lhs =
 oneAndAllStep :: Rule
 oneAndAllStep _env lhs =
   -- iter(fail){f, g}  -->  g <>
-  "ITER-FAIL" `labelRule`
-  do Iter _f Fail e0 <- [lhs]
-     pure e0
+  "ITER-FAIL" `labelRuleWith`
+  do Iter f Fail e0 <- [lhs]
+     pure (text (show f), e0)
  ++
   -- iter(v){f, g}  -->  f v g
   "ITER-VALUE" `labelRuleWith`
@@ -501,12 +501,12 @@ oneAndAllStep _env lhs =
      pure (text (show f), iterApply f v e0)
  ++
   -- iter(C[e1] | C[e2]){f, g}  -->  iter(C[e1]){f, \ _ . iter(C[e2]){f, g} }
-  "ITER-CHOICE" `labelRule`
+  "ITER-CHOICE" `labelRuleWith`
   do Iter f e e0 <- [lhs]
      (ctx, e1 :|: e2) <- evalCtx [] e
      guard (choiceFreeLH ctx)
      guard (blocked ctx)  -- was: e
-     pure $ Iter f (ctx <@ e1) (Iter f (ctx <@ e2) e0)
+     pure (text (show f), Iter f (ctx <@ e1) (Iter f (ctx <@ e2) e0))
 {-
  ++
   -- all(fail)  -->  <>
