@@ -938,7 +938,7 @@ miniToCore orig_md = go (orig_md,[])
            MV {} -> Check fx <$> go_nt md e   -- ToDo: check that go_mt
            MI    -> go md e
            MX    -> Check fx <$> go md e
-                 -- go md e  -- Drop the check here; see test `jan1`
+                 -- go md e  -- Drop the check here; see MaxVerse9, Feb 12.
 
     -- Functions proper: MCFUN+, MCFUN-, MCFUNX
     go (MV omit_client, xs) e@(XDLam Closed x e1 e2)
