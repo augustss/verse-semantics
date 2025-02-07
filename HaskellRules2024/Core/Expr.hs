@@ -344,11 +344,24 @@ mkCheck Decides e =
  where
   a:x:y:_ = identsNotIn (free e)
 
--- WRONG for failed check
+-- WRONG for definitely-failed check<fx>{e}
 wrongFx :: Effect -> Expr
-wrongFx fx =
-  Err ("check<" ++ show fx ++ ">")
---  Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []
+wrongFx fx =  -- See Note [wrongFx] for these two alternative implementations
+  Err ("check<" ++ show fx ++ ">")                        -- Use Err
+  -- Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []   -- Stuck
+
+{- Note [wrongFx]
+~~~~~~~~~~~~~~~~~
+With the Err form
+    check<succeeds>{fail}; fail
+    --> Err("check<succeeds>"); fail
+    --> Err("check<succeeds>")
+
+With the stuck form
+    check<succeeds>{fail}; fail
+    --> "check<succeeds>"[]; fail   -- Hack: string[] is simply stuck
+    --> fail
+-}
 
 -- matches expression against encoding of check<fx>{e} --> Just(fx,e)
 matchCheck :: Expr -> Maybe (Effect,Expr)

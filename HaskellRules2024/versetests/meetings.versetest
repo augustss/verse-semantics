@@ -1,5 +1,48 @@
 # Add new meetings at the top
 
+verify("M7Feb25-1", pass){ g1()<decides> := { (f(x:int):string := 27); fail }  }
+  # M7Feb25-1: actually passes the verifier;
+  # although f doesn't verify, it is never called
+verify("M7Feb25-2", fail){ g2()<decides> := { exists y { (f(x:int):string := {y >2; 27})
+                                                       ; fail } } }
+
+verify("M7Feb25-3", fail){ loop():type{fail} := { loop[] }
+                         ; h3(x:int)<succeeds> :=
+                             { if ( f()<succeeds>:type{x=3} := 3 )
+                               then { fail }
+                               else { fail }
+                             ; loop[] } }
+   # M7Feb25-3: If check<succeeds>{fail} is just stuck, then this program will verify.
+   # But h3[2] fails!  as you can see in M7Feb25-4
+testeq("M7Feb25-4", pass){ loop():type{fail} := { loop[] }
+                         ; h3(x:int)<succeeds> :=
+                             { if ( f()<succeeds>:type{x=3} := 3 )
+                               then { fail }
+                               else { fail }
+                             ; loop[] }
+                         ; h3[2] }
+      { fail }
+
+verify("M7Feb25-5", fail, broken)
+   { loop():type{fail} := { loop[] }
+   ; h3(x:int)<succeeds> :=
+        { if ( f()<succeeds>:type{x=3} := {y>4; 3} )
+          then { fail }
+          else { fail }
+         ; loop[]; y:=5 } }
+  # M7Feb25-5 fails when you call h3[2]; but it verifies,
+  #   REGARDLESS of the choice of wrongFx
+  # if ( verify(){ defn of f, stuck waiting for y }; \().blah ) then fail else fail
+
+verify("M7Feb25-6", fail, broken)
+   { loop():type{fail} := { loop[] }
+   ; h3(x:int)<succeeds> :=
+        { if ( f()<succeeds>:type{x=3} := {y>4; 3} )
+          then { f[] }
+          else { fail }
+         ; loop[]; y:=5 } }
+
+
 verify("M27Jan25-1", fail)
   { loop():false = loop[]
   ; x:int
