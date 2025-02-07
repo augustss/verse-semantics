@@ -940,6 +940,7 @@ status _lx (_hnf :@: _arg)
   = SomethingToDo
 
 status _  Fail        = SomethingToDo
+status _  (Err _)     = SomethingToDo
 status _  (e1 :|: e2) = BlockedOnExi (if isContext (e1 :|: e2) then HasHole else NoHole)
   -- status lx e1 `andStatus` status lx e2
   -- We must skolemise in verify(){check<succeeds>{ (x=some{t}; blah) | more-blah }}
