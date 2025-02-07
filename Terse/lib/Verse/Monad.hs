@@ -97,7 +97,7 @@ newtype Yield r m = Yield
     -> m r
   }
 
-type Handler m a = (a -> VerseT m ()) -> VerseT m ()
+type Handler m a = (VerseT m a -> VerseT m ()) -> VerseT m ()
 
 type Succeed r m a = S -> Mem m -> a -> Fail r m -> Empty r m -> m r
 
@@ -255,7 +255,8 @@ split' m s heap = splitS m s heap >>= \ case
     if i > level then
       stuck
     else
-      yield i $ \ g -> f $ \ x -> split' (alt (f_s x) m_f m_e) s mem.heap >>= g
+      yield i $ \ k ->
+      f $ \ m -> k $ split' (m >>= \ x -> alt (f_s x) m_f m_e) s mem.heap
   SucceedS s Mem {..} x m_f _m_e ->
     if s.count == 0 then do
       level <- getLevel
@@ -310,7 +311,7 @@ reflect = \ case
   YieldS i s mem f f_s m_f m_e ->
     putS s *>
     putMem mem *>
-    alt (yield i $ \ g -> f $ f_s >=> g) m_f m_e
+    alt (yield i $ \ k -> f $ \ m -> k $ m >>= f_s) m_f m_e
   SucceedS s mem x m_f m_e -> do
     putS s
     putMem mem
@@ -334,10 +335,10 @@ reflectF = \ case
     level <- getLevel
     if i < level then do
       putS s
-      alt (yield i $ \ g -> f $ \ x -> f_s x >>= g) m_f m_e
+      alt (yield i $ \ k -> f $ \ m -> k $ m >>= f_s) m_f m_e
     else do
       putS s { count = s.count + 1 }
-      alt (f $ \ x -> modifyCount (subtract 1) *> f_s x) m_f m_e
+      alt (f $ \ m -> modifyCount (subtract 1) >> m >>= f_s) m_f m_e
   SucceedS s mem () m_f m_e -> do
     putS s
     putMem mem
@@ -555,7 +556,7 @@ readLink var x = yield x.level $ \ f ->
   let
     !label = x.label
     !level = x.level
-    !susp = x.susp <> Ap . f
+    !susp = x.susp <> Ap . f . pure
   in
     writeVar var $ Unbound MkUnbound {..}
 
