@@ -7,9 +7,9 @@
 module Main(main) where
 
 import FrontEnd.CopyHook
-import FrontEnd.Desugar( desugar )
-import FrontEnd.ToCore( convertToCore )
-import FrontEnd.Flags
+import FrontEnd.Desugar( desugar ) as FrontEnd
+import FrontEnd.ToCore( convertToCore ) as FrontEnd
+import FrontEnd.Flags as FrontEnd
 import FrontEnd.Expr as Src
 import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pParens
                      , pString, pKeyword, many, optional, skip, eof )
@@ -306,10 +306,10 @@ widthFileName = 25
 --
 -----------------------------------------------
 
-srcToCore :: Flags -> Bool -> SrcExpr -> IO Core.Expr
+srcToCore :: FrontEnd.Flags -> Bool -> SrcExpr -> IO Core.Expr
 srcToCore flags add_verification e
-  = do { (e1 :: SrcCore, errs1)   <- FrontEnd.Desugar.desugar flags add_verification e
-       ; (e2 :: Core.Expr, errs2) <- FrontEnd.ToCore.convertToCore flags e1
+  = do { (e1 :: SrcCore, errs1)   <- FrontEnd.desugar flags add_verification e
+       ; (e2 :: Core.Expr, errs2) <- FrontEnd.convertToCore flags e1
        ; let e3 = Core.prep e2
 
        -- Replaces the code with FAIL if there was a
@@ -359,10 +359,10 @@ runTest :: TestFlags -> Test -> IO TestRes
 runTest tflg test@(TestVerify _ e)     = doTestCatchingExn tflg test e (Array [])
 runTest tflg test@(TestEvalEq _ e1 e2) = doTestCatchingExn tflg test e1 e2
 
-mkFlags :: TestFlags -> Bool -> Flags
-mkFlags tflg add_verification
+mkFEFlags :: TestFlags -> Bool -> FrontEnd.Flags
+mkFEFlags tflg add_verification
   = setPreludeFlag add_verification tflg $
-    testFlagsToFlags tflg
+    testFlagsToFEFlags tflg
 
 ----------------------------
 data TestMode = TEval | TVerify Effect deriving (Eq, Show)
@@ -395,7 +395,7 @@ doTestCatchingExn tflg test p1 p2
 --    which can throw an exception.
 doTest :: (HasCallStack) => TestFlags -> Test -> SrcExpr -> SrcExpr -> IO TestRes
 doTest tflg test src1 src2 = do
-  do { let flags     = mkFlags tflg add_verif
+  do { let flags     = mkFEFlags tflg add_verif
            add_verif = desugarForVerification test
 
      ; core1 <- srcToCore flags add_verif src1
@@ -425,7 +425,7 @@ checkResults tflg test (src1, core1) (src2, mb_core2)
 
        -- Display the trace if asked for, regardless of success/failure
        ; when (showTrace tflg) $
-         do { putStrLn "Trace is:"; display tr1 }
+         do { putStrLn "Trace is:"; displayDoc (pPrintTrace (traceVerbosity tflg) tr1) }
 
        ; pure (TestRes { tr_info = info, tr_outcome = outcome }) }
   where
@@ -624,9 +624,6 @@ pTimSkip = do
 --
 -----------------------------------------------
 
-data TraceLevel = NoTrace | BriefTrace | NormalTrace
-  deriving (Eq, Show)
-
 data TestFlags = TestFlags
   { dfs            :: !Bool                -- just find one normal form
   , split          :: !Bool                -- use split
@@ -639,6 +636,7 @@ data TestFlags = TestFlags
   , postProc       :: !Bool                -- Post processing
   , summary        :: !Bool                -- Produce a summary
   , showTrace      :: !Bool                -- Show traces
+  , traceVerbosity :: !Verbosity           -- Level of verbosity for traces
   , logUnexpected  :: !Bool                -- Log unexpected results
   , onlyTest       :: !(Maybe String)      -- run only this test
   , testExpr       :: !(Maybe String)      -- use this expression as a test
@@ -655,7 +653,6 @@ data TestFlags = TestFlags
   , preludeVerify  :: !String              -- use this prelude in TestVerify
   , desugarRules   :: !Desugar             -- desugaring rules
   , allAsIter      :: !Bool                -- encode all as iter
-  , xxxTrace       :: !TraceLevel          -- how much to trace
   , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -726,6 +723,11 @@ testFlags = TestFlags
       (  OA.long "trace"
       <> OA.help "Print rewrite traces"
       )
+  <*> OA.option OA.auto
+         ( OA.long "trace-verbosity"
+        <> OA.metavar "NUM"
+        <> OA.value 2
+        <> OA.help "Verbosity of rewrite trace (1,2,3)" )
   <*> OA.switch
       (  OA.long "log-unexpected"
       <> OA.help "log unexpected results to file"
@@ -788,14 +790,9 @@ testFlags = TestFlags
   <*> OA.switch
          ( OA.long "all-as-iter"
         <> OA.help "encode all with iter" )
-  <*> (OA.flag' BriefTrace (OA.long "brief-trace" <>
-                            OA.help "Print brief rewrite trace")
-       OA.<|>
-       OA.flag NoTrace NormalTrace (OA.long "xxxtrace" <>
-                                    OA.help "Print rewrite trace") )
   <*> OA.many (OA.argument OA.str (OA.metavar "FILES..."))
 
-testFlagsToFlags :: TestFlags -> Flags
+testFlagsToFEFlags :: TestFlags -> FrontEnd.Flags
 testFlagsToFlags t =
   let flags = defaultFlags
   in  flags{ fSplit = split t, fSimplify = simplify t,

@@ -6,6 +6,7 @@ module Core.TRS2024 (
    , blocked, blkd, choiceFreeLH, choiceAndFailureFree
    , name, nameWith, iff
    , skolValue
+   , bigRule, midRule, smallRule
    , LocalExis(..), makeRigid, addFlexi, allExis, wrapExis
    , evalCtxLift, evalCtx
  ) where
@@ -14,6 +15,7 @@ import Prelude
 
 import Core.Bind
 import Core.Expr
+import Core.Traced( Verbosity, TraceStep(..) )
 import Epic.Print hiding ( (<>) )
 import FrontEnd.Error
 
@@ -616,12 +618,21 @@ skolValue rs e = isVal e && null (free e \\ rs)
 --
 --------------------------------------------------------------------------------
 
-name :: String -> [Expr] -> [(String,Expr)]
-name s es = [ (s,e) | e <- es ]
+bigRule, midRule, smallRule :: Verbosity
+bigRule   = 1
+midRule   = 2
+smallRule = 3
+
+name :: String -> [Expr] -> [Rewrite]
+name s es = [ TS { ts_str = s, ts_payload = e, ts_verb = smallRule }
+            | e <- es ]
 
 -- This is used to give rules names.
-nameWith :: String -> [(Doc, a)] -> [(String, a)]
-nameWith rulename as = [(rulename ++ render (parens doc), a) | (doc, a) <- as]
+nameWith :: String -> [(Doc, Expr)] -> [Rewrite]
+nameWith rulename as
+  = [ TS { ts_str = rulename ++ render (parens doc)
+         , ts_payload = a, ts_verb = midRule }
+    | (doc, a) <- as]
 
 iff :: [Bool] -> [()]
 iff conds = [()| and conds]

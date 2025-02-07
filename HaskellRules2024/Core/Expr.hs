@@ -29,7 +29,7 @@ module Core.Expr
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
 
     -- Rewriting
-  , Rule, removeRule, Context, isContext, (<@)
+  , Rule, Rewrite, removeRule, Context, isContext, (<@)
   , stepRule, everywhere, tryBefore
   , NormResult(..), normalize, normalizeTrace, showNormResult
   , Fuel, lotsOfSteps
@@ -1190,24 +1190,15 @@ lookupIdSubst sub x
 --
 --------------------------------------------------------------------------------
 
-type Rule = RuleEnv -> Expr -> [Rewrite]
-
-
-data Rewrite
-  = RW { rw_str  :: String     -- Describes the rewrites
-       , rw_verb :: Verbosity  -- Show this rule at verbosity rw_verb and above
-       , rw_expr :: Expr }
-
-type Verbosity = Int
-  -- At verbosity level V, when displaying a trace,
-  -- show only rewrites that have verbosity <= V.
+type Rule    = RuleEnv -> Expr -> [Rewrite]
+type Rewrite = TraceStep Expr
 
 removeRule :: Rule -> String -> Rule
 removeRule rule name
   = \env e -> [ rewrite
               | rewrite <- rule env e
               -- matches when the rw_str of the rewrite is "NAME" or "NAME(..."
-              , not ((name ++ "(") `isPrefixOf` (rw_str rewrite ++ "("))
+              , not ((name ++ "(") `isPrefixOf` (ts_str rewrite ++ "("))
               ]
 
 data RuleEnv = RE { skolVars :: [Ident], assumps :: [Assump] }
@@ -1243,8 +1234,8 @@ everywhere step env orig_e
 
   wrap_with_env :: RuleEnv -> (Expr->Expr) -> Expr -> [Rewrite]
   wrap_with_env env' rebuild e
-    = [ rewrite { rw_expr = rebuild e' }
-      | rewrite@(RW { rw_expr = e' }) <- everywhere step env' e ]
+    = [ rewrite { ts_payload = rebuild e' }
+      | rewrite@(TS { ts_payload = e' }) <- everywhere step env' e ]
 
   recurse (Tup es)     = concatMap do_one [0..length es-1]
                        where
@@ -1348,18 +1339,19 @@ normalizeTrace :: Fuel    -- Maximum number of steps
 normalizeTrace fuel rule orig_e = go fuel [] orig_e
  where
   go :: Int
-     -> [(String,Expr)]
+     -> [Rewrite]
      -> Expr
      -> (NormResult, Traced Expr)
   go fuel_left tr e =
     case stepRule rule e of
       []                        -> (NormOK,      e  :<-- tr)
-      (s,e'):_ | fuel_left==0   -> (NormExpired, e  :<-- tr)
-               | not (valid e') -> (NormInvalid, e' :<-- tr')
-               | otherwise      -> -- ppTrace "norm" (int fuel <+> text s <> braces (pPrintBrief e')) $
-                                   go (fuel_left-1) tr' e'
-              where
-               tr' = (s,e):tr
+      step@(TS { ts_payload = e' }) : _   -- Pick the first offered rewrite
+        | fuel_left==0   -> (NormExpired, e  :<-- tr)
+        | not (valid e') -> (NormInvalid, e' :<-- tr')
+        | otherwise      -> -- ppTrace "norm" (int fuel <+> text s <> braces (pPrintBrief e')) $
+                            go (fuel_left-1) tr' e'
+        where
+          tr' = step { ts_payload = e } : tr
 
 normalize :: Fuel    -- Maximum number of steps
           -> Rule -> Expr
@@ -1376,7 +1368,7 @@ normalize fuel rule orig_e = go 0 orig_e
     | otherwise       =
         case stepRule rule e of
           []       -> (NormOK, nr_steps, e)
-          (_,e'):_ -> go (nr_steps+1) e'
+          step:_ -> go (nr_steps+1) (ts_payload step)
 
 --------------------------------------------------------------------------------
 --

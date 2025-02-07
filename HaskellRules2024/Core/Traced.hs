@@ -1,15 +1,26 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, DeriveFunctor #-}
 
 module Core.Traced(
-  Traced(..), term, trace, start, (++>), loop,
-  showTrace, showRevTrace, filterTrace,
+  Traced(..), TraceStep(..), Verbosity,
+  term, trace, start, (++>), loop,
+  filterTrace,
   displayTrace, displayRevTrace,
   PrettyBrief(..)
   ) where
 import Prelude hiding( (<>) )
 import Epic.Print
 
-data Traced a = a :<-- [(String,a)]
+data TraceStep a
+  = TS { ts_str     :: String     -- Describes the sep
+       , ts_verb    :: Verbosity  -- Show this rule at verbosity rw_verb and above
+       , ts_payload :: a }
+  deriving( Functor, Show )
+
+type Verbosity = Int
+  -- At verbosity level V, when displaying a trace,
+  -- show only rewrites that have verbosity <= V.
+
+data Traced a = a :<-- [TraceStep a]
   --    (e, [(sn,en), ..., (s1,e1)])
   -- represents the sequence of steps
   --    e1 --s1--> e2 --s2--> ... en --sn--> e
@@ -18,19 +29,21 @@ data Traced a = a :<-- [(String,a)]
 term :: Traced a -> a
 term (x :<-- _) = x
 
-trace :: Traced a -> [(String,a)]
+trace :: Traced a -> [TraceStep a]
 trace (_ :<-- tr) = tr
 
 start :: a -> Traced a
 start x = x :<-- []
 
-(++>) :: (a -> (String,a)) -> Traced a -> Traced a
-f ++> (x :<-- tr) = let (s,y) = f x in y :<-- ((s,x):tr)
+(++>) :: (a -> TraceStep a) -> Traced a -> Traced a
+f ++> (x :<-- tr) = ts_payload step :<-- (step { ts_payload = x } : tr)
+  where
+    step = f x
 
 instance Functor Traced where
-  fmap f (x :<-- tr) = f x :<-- [ (n,f y) | (n,y) <- tr ]
+  fmap f (x :<-- tr) = f x :<-- map (fmap f) tr
 
--- traced things are only identified by their top-level term
+-- Traced things are only identified by their top-level term
 instance Eq a => Eq (Traced a) where
   (x :<-- _) == (y :<-- _) = x == y
 
@@ -41,9 +54,9 @@ loop :: Eq a => Traced a -> Traced a
 loop (xx :<-- tr) = xx :<-- find xx tr
  where
   find _x []     = []
-  find  x ((s,y):sys)
-    | y == x    = [(s,y)]
-    | otherwise = (s,y) : find x sys
+  find  x (step:steps)
+    | ts_payload step == x  = [step]
+    | otherwise             = step : find x steps
 
 displayTrace, displayRevTrace :: PrettyBrief a => Traced a -> IO ()
 displayTrace    tr = mapM_ putStrLn (showTrace tr)
@@ -62,26 +75,27 @@ class Pretty a => PrettyBrief a where
 pPrintTrace, pPrintRevTrace :: forall a. PrettyBrief a => Traced a -> [Doc]
 pPrintTrace (res_expr :<-- tr) =  go 1 empty (reverse tr) -- Print forwards
   where
-    go :: Int -> Doc -> [(String,a)] -> [Doc]
+    go :: Int -> Doc -> [TraceStep a] -> [Doc]
     go _ herald [] = [pp_item herald res_expr]
-    go n herald ((s,e):ses) = pp_item herald e : go (n+1) (mkarrow n s e) ses
+    go n herald (step : steps) = pp_item herald (ts_payload step)
+                                 : go (n+1) (mkarrow n step) steps
 
---    pp_item herald _e = herald
-    pp_item herald e = vcat [text "", herald, indent (pPrint e)]
-      -- (text "") adds a blank line
+    pp_item herald expr = vcat [text "", herald, indent (pPrint expr)]
+                          -- (text "") adds a blank line
 
-    mkarrow n s _e = text (show n ++ ":--"++s++"-->") <> braces (pPrintBrief _e)
+    mkarrow n step = text (show n ++ ":--" ++ ts_str step ++ "-->")
+                     <> braces (pPrintBrief (ts_payload step))
 
-pPrintRevTrace (x :<-- tr) =  -- Print backwards, with terminal state first
-  pPrint x : [text ("<--"++n++"--") <+> pPrint y | (n,y) <- tr ]
+pPrintRevTrace (x :<-- tr)  -- Print backwards, with terminal state first
+  = pPrint x : [text ("<--"++ ts_str step ++"--") <+> pPrint (ts_payload step) | step <- tr]
 
 filterTrace :: (String -> Bool) -> Traced t -> Traced t
 filterTrace p (x :<-- nys) = x :<-- go nys
   where
     go [] = []
-    go ((n2, x2) : l)
-      | p n2 = (n2, x2) : go l
-    go ((_,x1) : l@((n2, x2) : nxs))
-      | p n2 = ("...", x1) : (n2, x2) : go nxs
-      | otherwise = go l
-    go [(_, x1)] = [("...", x1)]
+    go (step : steps)
+      | p (ts_str step) = step : go steps
+    go (step1 : step2 : steps)
+      | p (ts_str step2) = step1 { ts_str = "..." } : step2 : go steps
+      | otherwise        = go (step2 : steps)
+    go [step] = [step { ts_str = "..." }]
