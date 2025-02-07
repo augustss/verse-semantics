@@ -130,38 +130,55 @@ iterChoiceFree IterAll   = True
 iterChoiceFree IterFor   = False
 iterChoiceFree IterCount = True
 
--- TODO: use a combinator for introducing vars for exprs
 iterApply :: Iter -> Val -> Expr -> Expr
-iterApply IterIf    f  _e0 = f :@: Tup []
-iterApply IterOne   v  _e0 = v
-iterApply IterCount _v  e0 =
-  Exi $ bind n $
-    (Var n :=: e0) :>:
-    Op Add :@: Tup [Lit (LInt 1), Var n]
- where
-  n = identNotIn (free e0)
+-- If we see iter(f){v}{e0}, where the main argument of `iter`
+-- is a value `v`, we call (iterApply f v e0)
 
-iterApply IterFor   f  e0 =
-  Exi $ bind x $
-    (Var x :=: (f :@: Tup [])) :>:
-    iterApply IterAll (Var x) e0
- where
-  x = identNotIn (free (f,e0))
+-- IF(v){e0}  -->  v[]
+iterApply IterIf v _e0 = v :@: Tup []
 
-iterApply IterAll   v  e0
-  | isVal e0 =
-      Exi $ bind ys $
-        (Op ArrApp :@: Tup [Tup [v], e0, Var ys]) >>>
+-- ONE{v}{e0} --> e0
+iterApply IterOne v _e0 = v
+
+-- COUNT(v){e0} --> 1+e0
+iterApply IterCount _v  e0
+ = letBind fvs e0 $ \i0 ->
+   Op Add :@: Tup [Lit (LInt 1), i0]
+ where
+   fvs = free e0
+
+-- FOR(v){e0}  -->   x:=v[]; ALL{x}
+iterApply IterFor f e0
+  = letBind fvs (f :@: Tup []) $ \fapp ->
+    iterApply IterAll fapp e0
+ where
+    fvs = free (f,e0)
+
+-- ALL(v){e0} -->  exists ys; xs := e0; ArrApp$[<v>, xs, ys]; ys
+--   with a short cut if e0 is a value
+iterApply IterAll v e0
+  = letBind (ys:fvs) e0 $ \i0 ->
+    Exi $ bind ys $
+        (Op ArrApp :@: Tup [Tup [v], i0, Var ys]) >>>
         Var ys
-        
-  | otherwise =
-      Exi $ bind xs $
-      Exi $ bind ys $
-        (Var xs :=: e0) :>:
-        ((Op ArrApp :@: Tup [Tup [v], Var xs, Var ys]) >>>
-        Var ys)
  where
-  xs:ys:_ = identsNotIn (free (v,e0))
+  fvs = free (v,e0)
+  ys  = identNotIn fvs
+
+letBind :: [Ident]   -- Variables to avoid
+        -> Expr
+        -> (Expr -> Expr)
+        -> Expr
+-- This function has a shortcut, so that instead of introducing
+--    exists x. x=v; ...x...
+-- where v is a value, it just returns
+--    ...v...
+letBind fvs e k
+  | isVal e   = k e
+  | otherwise = Exi $ bind x $
+                (Var x :=: e) :>: k (Var x)
+  where
+    x = identNotIn fvs
 
 {- Note [iter]
 The iter construct is a (right) fold over choices.
