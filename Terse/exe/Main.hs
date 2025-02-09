@@ -54,8 +54,8 @@ main = getArgs >>= \ case
           True -> Terminal.hPutDoc stderr $ x <> hardline
     loop = parseInput >>= \ case
       Nothing -> pure ()
-      Just (input, Left (pos, ann)) -> do
-        outputErrLn $ prettyParseError input pos ann
+      Just (input, Left pos) -> do
+        outputErrLn $ prettyParseError input pos
         loop
       Just (input, Right e) -> do
         lift (Verse.eval e) >>= outputErrLn . \ case
@@ -70,19 +70,18 @@ main = getArgs >>= \ case
             outputStrLn . Text.unpack . Terminal.renderStrict $
             layoutPretty defaultLayoutOptions x
 
-parseInput :: InputT IO (Maybe (Text, Either (Pos, [Text]) Verse.LExp))
+parseInput :: InputT IO (Maybe (Text, Either Pos Verse.LExp))
 parseInput = getInputLine "> " >>= \ case
   Nothing -> pure Nothing
   Just (Text.pack -> xs) -> Just <$> parseWith (getInputLine' ". ") xs
   where
     getInputLine' xs = getInputLine xs <&> \ case
       Nothing -> mempty
-      Just [] -> mempty
       Just xs -> Text.pack $ '\n':xs
 
 parseWith
   :: Monad m
-  => m Text -> Text -> m (Text, Either (Pos, [Text]) Verse.LExp)
+  => m Text -> Text -> m (Text, Either Pos Verse.LExp)
 parseWith m = loop . Verse.parse'
   where
     loop = \ case
@@ -91,4 +90,4 @@ parseWith m = loop . Verse.parse'
         Parse.Yield f -> loop . f =<< m
         Parse.Pure x input -> pure (input, Right x)
       Parse.Pure x input -> pure (input, Right x)
-      Parse.Empty input pos ann -> pure (input, Left (pos, ann))
+      Parse.Empty input pos -> pure (input, Left pos)

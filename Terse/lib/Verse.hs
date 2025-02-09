@@ -22,8 +22,8 @@ import Verse.Val
 
 run :: Text -> IO (Either (Doc AnsiStyle) [Fix (Val Identity)])
 run input = case parse input of
-  Left (pos, ann) ->
-    pure . Left $ prettyParseError input pos ann
+  Left pos ->
+    pure . Left $ prettyParseError input pos
   Right x -> eval x <&> \ case
     Right xs -> Right xs
     Left xs -> Left $ prettyStuckError input xs

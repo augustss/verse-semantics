@@ -68,7 +68,7 @@ import Verse.Exp
   )
 import Verse.Exp qualified as Exp
 
-parse :: Text -> Either (Pos, [Text]) LExp
+parse :: Text -> Either Pos LExp
 parse = Parser.parse $ spaces *> exp <* eof
 
 parse' :: Text -> Result LExp

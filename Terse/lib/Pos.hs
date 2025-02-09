@@ -65,13 +65,13 @@ add !pos !x !i =
       in
         pos { indexWord8, column }
 
-prettyParseError :: Text -> Pos -> [Text] -> Doc AnsiStyle
-prettyParseError input pos ann =
+prettyParseError :: Text -> Pos -> Doc AnsiStyle
+prettyParseError input pos =
   bolded ("Parse" <+> "error" <+> "at") <> line' <>
-  indent 2 (prettyPos input pos ann)
+  indent 2 (prettyPos input pos)
 
-prettyPos :: Text -> Pos -> [Text] -> Doc AnsiStyle
-prettyPos input pos _ann =
+prettyPos :: Text -> Pos -> Doc AnsiStyle
+prettyPos input pos =
   bolded (pretty pos <> colon) <> line' <>
   indent 2 (prettyPosText input pos)
 
