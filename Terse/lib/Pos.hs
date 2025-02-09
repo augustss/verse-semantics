@@ -43,11 +43,11 @@ empty = Pos
   , column = 0
   }
 
-add :: Pos -> Int -> Char -> Pos
-add !pos !i =
+add :: Pos -> Char -> Int -> Pos
+add !pos !x !i =
   let
     !indexWord8 = pos.indexWord8 + i
-  in \ case
+  in case x of
     '\n' ->
       let
         !row = pos.row + 1

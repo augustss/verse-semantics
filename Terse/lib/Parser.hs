@@ -30,6 +30,7 @@ import Prelude
   , Either (..)
   , Int
   , Maybe (..)
+  , ($!)
   , ($)
   , (&&)
   , (+)
@@ -129,15 +130,15 @@ instance (Text ~ a) => IsString (Parser a) where
   fromString (fromString -> x) =
     Parser $ \ s ann yk sk fk ak ->
       let
-        loop x s =
+        loop z s =
           let
-            !n_x = Unsafe.lengthWord8 x
+            !n_z = Unsafe.lengthWord8 z
             !y = Unsafe.dropWord8 s.pos.indexWord8 s.input
             !n_y = Unsafe.lengthWord8 y
           in
-            if n_y < n_x
+            if n_y < n_z
             then
-              if Unsafe.takeWord8 n_y x == y
+              if Unsafe.takeWord8 n_y z == y
               then yk $ \ input ->
                 if Text.null input
                 then fk s ann ($ mempty)
@@ -147,20 +148,20 @@ instance (Text ~ a) => IsString (Parser a) where
                     !column = s.pos.column + n_y
                     !pos = s.pos { indexWord8, column }
                   in
-                    loop (Unsafe.dropWord8 n_y x) s
+                    loop (Unsafe.dropWord8 n_y z) s
                       { input = s.input <> input
                       , pos
                       }
               else fk s ann yk
             else
-              if Unsafe.takeWord8 n_x y == x
+              if Unsafe.takeWord8 n_z y == z
               then
-                if n_x == 0
+                if Text.null x
                 then sk x s ann yk fk
                 else
                   let
-                    !indexWord8 = s.pos.indexWord8 + n_x
-                    !column = s.pos.column + n_x
+                    !indexWord8 = s.pos.indexWord8 + n_z
+                    !column = s.pos.column + n_z
                     !pos = s.pos { indexWord8, column }
                   in
                     sk x s { pos } ann yk ak
@@ -201,7 +202,7 @@ skipWhile f = Parser $ \ s ann yk sk fk ak ->
   where
     g x i z =
       if f x
-      then Just (Pos.add z i x)
+      then Just $! Pos.add z x i
       else Nothing
 
 takeWhile :: (Char -> Bool) -> Parser Text
@@ -236,7 +237,7 @@ takeWhile f = Parser $ \ s ann yk sk fk ak ->
   where
     g x i z =
       if f x
-      then Just (Pos.add z i x)
+      then Just $! Pos.add z x i
       else Nothing
 
 satisfy :: (Char -> Bool) -> Parser Char
@@ -249,7 +250,7 @@ satisfy f = Parser $ \ s ann yk sk fk ak ->
         if f x
         then
           let
-            !pos = Pos.add s.pos i x
+            !pos = Pos.add s.pos x i
           in
             sk x s { pos } ann yk ak
         else fk s ann yk
@@ -271,7 +272,7 @@ char x = Parser $ \ s ann yk sk fk ak ->
         if y == x
         then
           let
-            !pos = Pos.add s.pos i x
+            !pos = Pos.add s.pos x i
           in
             sk x s { pos } ann yk ak
         else fk s ann yk
