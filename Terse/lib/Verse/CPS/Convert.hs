@@ -15,17 +15,13 @@ import Verse.Exp
 
 data Result = Result
   { exp :: CPS.LExp
-  , env :: {-# UNPACK #-} !CPS.Label
   , state :: {-# UNPACK #-} !CPS.Label
-  , yield :: {-# UNPACK #-} !CPS.Label
   , succeed :: {-# UNPACK #-} !CPS.Label
   , fail :: {-# UNPACK #-} !CPS.Label
   }
 
 data Arg = Arg
-  { env :: {-# UNPACK #-} !CPS.Label
-  , state :: {-# UNPACK #-} !CPS.Label
-  , yield :: {-# UNPACK #-} !CPS.Label
+  { state :: {-# UNPACK #-} !CPS.Label
   , succeed :: {-# UNPACK #-} !CPS.Label
   , fail :: {-# UNPACK #-} !CPS.Label
   , empty :: {-# UNPACK #-} !CPS.Label
@@ -62,9 +58,7 @@ newLabel = Convert $ \ s -> Out s $ s + 1
 
 convert :: LExp -> Result
 convert x = runConvert $ do
-  env <- newLabel
   state <- newLabel
-  yield <- newLabel
   succeed <- newLabel
   fail <- newLabel
   let empty = fail
@@ -78,21 +72,17 @@ convert' (L loc e) arg = case e of
     CPS.AppSucceed arg.succeed (CPS.Var x) arg.state arg.fail
   Abs x e -> do
     f <- newLabel
-    env <- newLabel
     state <- newLabel
-    yield <- newLabel
     succeed <- newLabel
     fail <- newLabel
     empty <- newLabel
     e <- convert' e Arg {..}
     pure . L loc $
-      CPS.Let f x env state yield succeed fail empty e . L loc $
+      CPS.Let f x state succeed fail empty e . L loc $
       CPS.AppSucceed arg.succeed (CPS.Label f) arg.state arg.fail
   App f x -> seq' f x arg $ \ f x arg ->
     pure . L loc $ CPS.App f (CPS.Label x)
-      arg.env
       arg.state
-      arg.yield
       arg.succeed
       arg.fail
       arg.empty
@@ -105,17 +95,13 @@ convert' (L loc e) arg = case e of
     seq_ e1 e2 arg
   e1 := e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
     pure . L loc $ CPS.Eq (CPS.Label x1) (CPS.Label x2)
-      arg.env
       arg.state
-      arg.yield
       arg.succeed
       arg.fail
       arg.empty
   e1 :< e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
     pure . L loc $ CPS.Less (CPS.Label x1) (CPS.Label x2)
-      arg.env
       arg.state
-      arg.yield
       arg.succeed
       arg.fail
       arg.empty
@@ -127,16 +113,12 @@ convert' (L loc e) arg = case e of
     pure . L loc . CPS.LetFail fail e2 . L loc $ CPS.LetFail empty e2 e1
   e1 :+ e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
     pure . L loc $ CPS.Plus (CPS.Label x1) (CPS.Label x2)
-      arg.env
       arg.state
-      arg.yield
       arg.succeed
       arg.fail
   e1 :- e2 -> seq' e1 e2 arg $ \ x1 x2 arg ->
     pure . L loc $ CPS.Minus (CPS.Label x1) (CPS.Label x2)
-      arg.env
       arg.state
-      arg.yield
       arg.succeed
       arg.fail
   Fail ->

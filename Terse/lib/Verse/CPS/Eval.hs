@@ -2,8 +2,10 @@ module Verse.CPS.Eval
   ( eval
   ) where
 
-import Verse.CPS.Exp (Exp)
+import Fix
+
+import Verse.CPS.Exp (LExp)
 import Verse.CPS.Val (Val)
 
-eval :: Exp -> IO Val
+eval :: LExp -> IO (Maybe [Fix Val])
 eval = undefined

@@ -20,9 +20,7 @@ data ExpF a
   = Let
     {-# UNPACK #-} !Label -- Callee
     {-# UNPACK #-} !Name -- Parameter
-    {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Yield continuation
     {-# UNPACK #-} !Label -- Succeed continuation
     {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
@@ -31,9 +29,7 @@ data ExpF a
   | App
     {-# UNPACK #-} !Label -- Callee
     {-# UNPACK #-} !Val -- Argument
-    {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Yield continuation
     {-# UNPACK #-} !Label -- Succeed continuation
     {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
@@ -55,43 +51,42 @@ data ExpF a
     a
   | AppFail {-# UNPACK #-} !Label
   | Exi {-# UNPACK #-} !Name a
+  | LetSplit
+    {-# UNPACK #-} !Label
+    {-# UNPACK #-} !Label -- State
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
+    a
+    a
   | Tup
     [Val]
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Success continuation
-    {-# UNPACK #-} !Label -- Failure continuation
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
   | Eq
     !Val -- Left
     !Val -- Right
-    {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Yield continuation
     {-# UNPACK #-} !Label -- Succeed continuation
     {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
   | Less
     !Val -- Left
     !Val -- Right
-    {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Yield continuation
     {-# UNPACK #-} !Label -- Succeed continuation
     {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
   | Plus
     !Val -- Left
     !Val -- Right
-    {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Yield continuation
     {-# UNPACK #-} !Label -- Succeed continuation
     {-# UNPACK #-} !Label -- Fail continuation
   | Minus
     !Val -- Left
     !Val -- Right
-    {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Yield continuation
     {-# UNPACK #-} !Label -- Succeed continuation
     {-# UNPACK #-} !Label -- Fail continuation
   deriving Show
@@ -116,15 +111,15 @@ instance Pretty a => Pretty (ExpF a) where
       "in" <+> pretty e2
     AppFail f ->
       prettyLabel f
-    Less x y env state yield succeed fail empty ->
+    Less x y state succeed fail empty ->
       parens (pretty x <+> pretty '<' <+> pretty y) <>
-      braced [env, state, yield, succeed, fail, empty]
-    Plus x y env state yield succeed fail ->
+      braced [state, succeed, fail, empty]
+    Plus x y state succeed fail ->
       parens (pretty x <+> pretty '+' <+> pretty y) <>
-      braced [env, state, yield, succeed, fail]
-    Minus x y env state yield succeed fail ->
+      braced [state, succeed, fail]
+    Minus x y state succeed fail ->
       parens (pretty x <+> pretty '-' <+> pretty y) <>
-      braced [env, state, yield, succeed, fail]
+      braced [state, succeed, fail]
     where
       braced = encloseSep lbrace rbrace comma . fmap prettyLabel
 

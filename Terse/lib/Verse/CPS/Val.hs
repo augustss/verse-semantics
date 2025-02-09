@@ -15,28 +15,26 @@ import Verse.CPS.Exp (Label, LExp)
 import Verse.Fun
 import Verse.Name
 
-data Val
+data Val a
   = Int !Integer
   | Lam
-    !Env
+    !(Env a)
     {-# UNPACK #-} !Label -- Parameter
-    {-# UNPACK #-} !Label -- Env
     {-# UNPACK #-} !Label -- State
-    {-# UNPACK #-} !Label -- Yield continuation
-    {-# UNPACK #-} !Label -- Success continuation
-    {-# UNPACK #-} !Label -- Failure continuation
+    {-# UNPACK #-} !Label -- Succeed continuation
+    {-# UNPACK #-} !Label -- Fail continuation
     {-# UNPACK #-} !Label -- Empty continuation
     LExp
-  | Tup [Val]
+  | Tup [a]
   | Fun !Fun deriving Show
 
-type Env = HashMap Name Val
+type Env = HashMap Name
 
-instance Pretty Val where
+instance Pretty a => Pretty (Val a) where
   pretty = \ case
     Int x ->
       pretty x
-    Lam _ x _r _s _yk _sk _fk _ek _e ->
+    Lam _ x _s _sk _fk _ek _e ->
       "fun" <>
       lparen <> pretty x <> rparen <+>
       lbrace <+> ".." <+> rbrace
