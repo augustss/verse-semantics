@@ -157,10 +157,13 @@ iterApply IterFor f e0
 -- ALL(v){e0} -->  exists ys; xs := e0; ArrApp$[<v>, xs, ys]; ys
 --   with a short cut if e0 is a value
 iterApply IterAll v e0
+  | Tup vs <- e0      -- OPTIONAL Short cut for very common case
+  = Tup (v:vs)
+  | otherwise
   = letBind (ys:fvs) e0 $ \i0 ->
     Exi $ bind ys $
-        (Op ArrApp :@: Tup [Tup [v], i0, Var ys]) >>>
-        Var ys
+    (Op ArrApp :@: Tup [Tup [v], i0, Var ys])
+    >>> Var ys
  where
   fvs = free (v,e0)
   ys  = identNotIn fvs
@@ -400,7 +403,8 @@ someNat = Some nat
 
 someUnderscore :: Expr -> Expr
 -- The expression: some( \_.e )
-someUnderscore e = Some (lamUnderscore e)
+someUnderscore (Some e) = Some e  -- OPTIONAL  some(\_.some(t)) = some(t)
+someUnderscore e        = Some (lamUnderscore e)
 
 mkDef :: Ident -> Expr -> (Val -> Expr) -> Expr
 mkDef x e k | isVal e   = k e
