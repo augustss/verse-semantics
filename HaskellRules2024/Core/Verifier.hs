@@ -122,11 +122,25 @@ arrStep env lhs =
      guard (choiceFreeLH ctx)
      guard (free n `disjointFrom` exis)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
+
      let k = identNotIn (free lhs ++ exis)
      pure ( text (show f)
           , Exi $ bind k $
             (Var k :=: mkSize n (mkExis exis $ ctx <@ someUnderscore e)) :>:
             Iter f (Choose (Var k) (mkExis exis $ ctx <@ e)) e0 )
+
+{- Alernative, not quite working version
+   See MaxVerse9, Feb 10 "Avoiding duplication in ITER-CHOOSE"
+     let (k:a:ae:x:_) = identsNotIn (free lhs ++ exis)
+     pure ( text (show f)
+          , Exi $ bind k $ Exi $ bind a $
+            (Var a :=: mkAll (someUnderscore e)) :>:
+            (Var k :=: Iter IterOne (   (Exi $ bind ae $ (Var a :=: Tup [Var ae]) :>: n)
+                                    :|: ((Var a :=: Tup []) :>: Lit (LInt 0)) )
+                             (Some (Lam (bind x (Op Gt :@: Tup [Var x, n])))) ) :>:
+            Iter f (Choose (Var k) (mkExis exis $ ctx <@ (Var a :@: Lit (LInt 0)))) e0 )
+-}
+
   ++
   "ONE-CHOOSE" `labelBigRule`
   do Iter IterOne (Choose n e) e0 <- [lhs]
