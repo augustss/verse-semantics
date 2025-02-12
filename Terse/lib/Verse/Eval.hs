@@ -59,7 +59,6 @@ type EvalT m = ReaderT (R m) (VerseT m)
 data R m = R
   { env :: !(Env m)
   , stack :: [Loc]
-  , first :: !Bool
   }
 
 data Mem = Mem
@@ -85,7 +84,6 @@ newR' = do
   pure R {..}
   where
     stack = mempty
-    first = False
 
 newEnv' :: MonadRef m => VerseT m (Env m)
 newEnv' =
@@ -186,7 +184,7 @@ eval' s1 s2 = wrap $ \ case
     heap <- newHeap s1
     fork $ do
       i <- addStack
-      unifyVar var <=< newTup <=< all' . local (\ r -> r { first = False }) $ do
+      unifyVar var <=< newTup <=< all' $ do
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
@@ -197,7 +195,7 @@ eval' s1 s2 = wrap $ \ case
     let
       init s1 = do
         heap <- newHeap s1
-        local (\ r -> r { first = False }) . split $ do
+        split $ do
           s1 <- newS
           s2 <- freshS
           localHeap (const heap) $ eval' s1 s2 e1
@@ -219,7 +217,7 @@ eval' s1 s2 = wrap $ \ case
     heap <- newHeap s1
     fork $ do
       i <- addStack
-      unifyVar var <=< one . local (\ r -> r { first = True }) $ do
+      unifyVar var <=< one $ do
         s1 <- newS
         s2 <- freshS
         localHeap (const heap) $ eval' s1 s2 e
@@ -230,8 +228,7 @@ eval' s1 s2 = wrap $ \ case
     var <- freshVar
     heap <- newHeap s1
     fork' $ unifyVar var =<< if'
-      (local (\ r -> r { first = True }) $
-       do s1 <- newS
+      (do s1 <- newS
           s2 <- freshS
           localHeap (const heap) $ eval' s1 s2 e1)
       (\ var1 -> localEnv (Env.insert x var1) $ eval' s1 s2 e2)
@@ -494,9 +491,9 @@ unifyVar :: MonadRef m => Var m -> Var m -> EvalT m ()
 unifyVar = (lift .) . Monad.unifyVar `on` getCompose . getFix
 
 freshS :: MonadRef m => EvalT m (S m)
-freshS = do
-  choiceFree <- lift . bool Monad.freshVar (Monad.newVar ()) =<< asks (.first)
-  storeFree <- lift Monad.freshVar
+freshS = lift $ do
+  choiceFree <- Monad.freshVar
+  storeFree <- Monad.freshVar
   pure S {..}
 
 freshS' :: MonadRef m => VerseT m (S m)
@@ -578,8 +575,3 @@ minInt = minBound
 
 maxInt :: Int
 maxInt = maxBound
-
-bool :: a -> a -> Bool -> a
-bool x y = \ case
-  False -> x
-  True -> y
