@@ -108,10 +108,12 @@ arrStep env lhs =
      pure (pPrint arr, (Op DotDot :@: Tup [v,sz]) >>> someUnderscore e )
   ++
   "CHOOSE0" `labelBigRule`
+  -- choose(0){e}  -->   fail
   do Choose (LitInt 0) _ <- [lhs]
      pure Fail
   ++
   "CHOOSE1" `labelBigRule`
+  -- choose(1){e}  -->   some(e)
   do Choose (LitInt 1) e <- [lhs]
      pure (someUnderscore e)
   ++
