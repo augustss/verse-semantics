@@ -533,35 +533,21 @@ unifyHeap :: MonadRef m => Heap m -> Heap m -> EvalT m ()
 unifyHeap = (lift .) . Monad.unifyVar
 
 addStack :: MonadState Mem m => EvalT m Int
-addStack =
-  ask >>= \ r ->
-  get >>= \ s ->
-  let
-    !label = s.label
-    !s' = Mem
-      { label = s.label + 1
-      , stacks = IntMap.insert label r.stack s.stacks
-      }
-  in
-    lift $
-    Monad.liftPut
-    (put s')
-    (modify' $ \ s -> s { stacks = IntMap.delete label s.stacks }) $>
-    s.label
+addStack = do
+  r <- ask
+  label <- gets (.label)
+  modify' $ \ s -> s { label = s.label + 1, stacks = IntMap.insert label r.stack s.stacks }
+  lift . Monad.tell . modify' $ \ s -> s { stacks = IntMap.delete label s.stacks }
+  pure label
 
 removeStack :: MonadState Mem m => Int -> EvalT m ()
 removeStack = lift . removeStack'
 
 removeStack' :: MonadState Mem m => Int -> VerseT m ()
-removeStack' label =
-  get >>= \ s ->
-  let
-    !stack = s.stacks!label
-    !s' = s { stacks = IntMap.delete label s.stacks }
-  in
-    Monad.liftPut
-    (put s')
-    (modify $ \ s -> s { stacks = IntMap.insert label stack s.stacks })
+removeStack' label = do
+  stack <- gets $ (! label) . (.stacks)
+  modify' $ \ s -> s { stacks = IntMap.delete label s.stacks }
+  Monad.tell . modify' $ \ s -> s { stacks = IntMap.insert label stack s.stacks }
 
 insert :: MonadRef m => Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
 insert k = IntMap.insertWith (++) k . (:[])

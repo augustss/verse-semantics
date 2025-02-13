@@ -8,7 +8,7 @@
 module Verse.Monad
   ( VerseT
   , runVerseT
-  , liftPut
+  , tell
   , all'
   , one
   , if'
@@ -158,9 +158,9 @@ instance MonadState s m => MonadState s (VerseT m) where
   put = lift . put
   state = lift . state
 
-liftPut :: Applicative m => m () -> m () -> VerseT m ()
-liftPut m n = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  m *> sk s mem () (\ env mem -> n *> fk env mem) (\ mem -> n *> ek mem)
+tell :: Applicative m => m () -> VerseT m ()
+tell m = VerseT $ \ _r s _env mem _yk sk fk ek ->
+  sk s mem () (\ env mem -> m *> fk env mem) (\ mem -> m *> ek mem)
 
 yield :: Level -> Handler m a -> VerseT m a
 yield i f = VerseT $ \ _r s _env mem yk ->
