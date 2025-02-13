@@ -56,7 +56,7 @@ import Ref
 newtype VerseT (m :: Type -> Type) a = VerseT
   { unVerseT
     :: forall r . R
-    -> S
+    -> S m
     -> Env m
     -> Mem m
     -> Yield r m
@@ -70,7 +70,10 @@ newtype R = R { level :: Level }
 
 type Level = Sum Int
 
-newtype S = S { count :: Int }
+data S m = S
+  { count :: {-# UNPACK #-} !Int
+  , reset :: !(m ())
+  }
 
 type Env m = Var m ()
 
@@ -88,7 +91,7 @@ data SomeVars m = forall a . Vars a m => SomeVars !a
 newtype Yield r m = Yield
   { unYield
     :: forall a . Level
-    -> S
+    -> S m
     -> Mem m
     -> Handler m a
     -> Succeed r m a
@@ -99,7 +102,7 @@ newtype Yield r m = Yield
 
 type Handler m a = (VerseT m a -> VerseT m ()) -> VerseT m ()
 
-type Succeed r m a = S -> Mem m -> a -> Fail r m -> Empty r m -> m r
+type Succeed r m a = S m -> Mem m -> a -> Fail r m -> Empty r m -> m r
 
 type Fail r m = Env m -> Mem m -> m r
 
@@ -160,7 +163,9 @@ instance MonadState s m => MonadState s (VerseT m) where
 
 tell :: Applicative m => m () -> VerseT m ()
 tell m = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  sk s mem () (\ env mem -> m *> fk env mem) (\ mem -> m *> ek mem)
+  sk s { reset = m *> s.reset } mem ()
+  (\ env mem -> m *> fk env mem)
+  (\ mem -> m *> ek mem)
 
 yield :: Level -> Handler m a -> VerseT m a
 yield i f = VerseT $ \ _r s _env mem yk ->
@@ -170,7 +175,7 @@ getLevel :: VerseT m Level
 getLevel = VerseT $ \ r s _env mem _yk sk ->
   sk s mem r.level
 
-putS :: S -> VerseT m ()
+putS :: S m -> VerseT m ()
 putS s = VerseT $ \ _r _s _env mem _yk sk ->
   sk s mem ()
 
@@ -209,7 +214,7 @@ runVerseT m = do
   unVerseT m r s env Mem {..} yk sk fk ek
   where
     r = R { level = 0 }
-    s = S { count = 0 }
+    s = S { count = 0, reset = pure () }
     heap = mempty
     yk = Yield $ \ _i _s _mem _f _sk _fk _ek ->
       pure Nothing
@@ -243,13 +248,14 @@ if' m f n = split m >>= \ case
   Step x _m -> f x
 
 split :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m (Stream m a)
-split m = split' m S { count = 0 } =<< getHeap
+split m = split' m S { count = 0, reset = pure () } =<< getHeap
 
 split'
   :: (MonadRef m, Vars a m)
-  => VerseT m a -> S -> Heap m -> VerseT m (Stream m a)
+  => VerseT m a -> S m -> Heap m -> VerseT m (Stream m a)
 split' m s heap = splitS m s heap >>= \ case
   YieldS i s mem f f_s m_f m_e -> do
+    tell s.reset
     putLabel mem.label
     level <- getLevel
     if i > level then
@@ -257,7 +263,8 @@ split' m s heap = splitS m s heap >>= \ case
     else
       yield i $ \ k ->
       f $ \ m -> k $ split' (m >>= \ x -> alt (f_s x) m_f m_e) s mem.heap
-  SucceedS s Mem {..} x m_f _m_e ->
+  SucceedS s Mem {..} x m_f _m_e -> do
+    tell s.reset
     if s.count == 0 then do
       level <- getLevel
       lift (runFindT (findVars (heap, x)) level label) >>= \ case
@@ -276,7 +283,7 @@ split' m s heap = splitS m s heap >>= \ case
 
 data Stream m a = Done | Step a (VerseT m (Stream m a))
 
-splitS :: Monad m => VerseT m a -> S -> Heap m -> VerseT m (Split m a)
+splitS :: Monad m => VerseT m a -> S m -> Heap m -> VerseT m (Split m a)
 splitS m !s' heap = VerseT $ \ r s env mem _yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
@@ -384,14 +391,14 @@ data Split m a
   = forall b .
     YieldS
     {-# UNPACK #-} !Level
-    {-# UNPACK #-} !S
+    !(S m)
     !(Mem m)
     !(Handler m b)
     !(b -> VerseT m a)
     !(VerseT m a)
     !(VerseT m a)
   | SucceedS
-    {-# UNPACK #-} !S
+    !(S m)
     !(Mem m)
     !a
     !(VerseT m a)
