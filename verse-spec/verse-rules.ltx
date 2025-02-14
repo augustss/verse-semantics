@@ -277,7 +277,27 @@ $\begin{array}{@@{}l}
 \label{fig:spj-verifier-rewrite-rules}
 \end{figure}
 
+% ------------------------------------------------------------
+%                Array rules
+% ------------------------------------------------------------
+
+\begin{figure}[t]
+$\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+\rulename{iter-choose}   & |iter2 ic (C^[choose n e]) e_0| & \movesto & |fail| \\
+\end{array}
+\end{array}$
+\\[0.1in]
+\caption{Verifier Rules for Arrays}
+\label{fig:verifier-rules-arrays}
+\end{figure}
+
+
+
+
 % --------------------------- Structural rules ----------------
+%    SLPJ I think these rules are no longer "live"
+\begin{comment}
   \begin{figure}
     $$
     \begin{array}{l}
@@ -296,3 +316,4 @@ $\begin{array}{@@{}l}
     \Description{The Verse calculus: Structural Rules}
       \label{fig:rules-structural}  \label{fig:structural}
    \end{figure}
+\end{comment}

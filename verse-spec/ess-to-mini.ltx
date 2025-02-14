@@ -1,0 +1,111 @@
+% ----------------------------------------------------
+%
+%        Denotational semantics: Plan A
+%
+%         Was: desugaring.ltx
+%
+% ----------------------------------------------------
+
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\begin{figure}
+$$
+% ------------- Syntax of Mini Verse ---------------
+\begin{array}{l}
+\textbf{Syntax of Mini Verse} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}l}
+  \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N e_1 e_2| \vb e_1; e_2
+     \vb |e_1 == e_2| \vb |defintro x| \vb |e_1 `choice` e_2| \vb |fail|
+     \vb |lamOC q i e_1 e_2| \\
+  && \vb & |arr (e_1, xdots, e_n)| \vb |oftypefx t_1 fx t_2| \vb |check fx e| \\
+  && \vb & |vif t_1 t_2 t_3| \vb |fordo t_1 t_2| \vb |all e| \\
+\multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x t|; no |x:=e|; no |where|; and lambda changes form}}
+\end{array} \\
+\\
+% ------------- Desugaring ---------------
+\begin{array}{@@{}l@@{\,}r@@{\;\;}c@@{\;\;}l@@{}l}
+  \text{Inputs} & |wu| & ::= & |mkwu dr u| \\
+  & |dr| & ::= & \multicolumn{2}{l}{|drdom |  \vb |drrng fx|
+     \hspace{1cm} \text{|drdom| for domain, |drrng fx| for range}} \\
+                & |u|  & ::= & |wrapemp| \vb |wrape e| \\[2mm]
+
+\rulename{wconst}      & |SS wu k| & = & |wu `ueq` k| \\
+\rulename{wprim}   & |SS wu o| & = & |wu `ueq` o| \\
+\rulename{wvar}    & |SS wu x| & = & |wu `ueq` x| \\
+\rulename{wwild}    & |SS wu _| & = & |wu `ueq` (defintro x; x)| \\
+% \rulename{wwild2}    & |SS (apeff e fx) _| & = & |e| \\
+\rulename{wapp}    & |SS wu (apply1N t_1 t_2)| & = & |wu `ueq` apply1N ((SS wuinit t_1)) (SS wuinit t_2)| \\
+\rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` SS wuinit t_1 `choice` SS wuinit t_2| \\
+\rulename{wfor}   & |SS wu (fordo t_1 t_2)|
+   & = & |wu `ueq` fordo (SS wuinit t_1) (SS wuinit t_2)| \\
+\rulename{wone} & |SS wu (one t)| & = & |wu `ueq` one (SS wuinit t)| \\
+\rulename{wall} & |SS wu (all t)| & = & |wu `ueq` all (SS wuinit t)| \\
+\rulename{wfail}   & |SS wu fail| & = & |fail| \\
+\rulename{wunify}   & |SS wu (t_1 == t_2)| & = & |(SS wu t_1) = (SS wu t_2)| \\
+\rulename{wsemi}\asktim   & |SS wu (t_1 ; t_2)| & = & |SS wuinit t_1 ; SS wu t_2| \\
+\rulename{wwhere}   & |SS wu (t_1 where t_2)| & = & |defintro r; r == (SS wu t_1); (SS wuinit t_2); r| \\
+\multicolumn{2}{@@{}l}{\rulename{wif} \; \hfill |SS wu (vif t_1 t_2 t_3)|}
+ & = & |vif(SS wuinit t_1) (SS wu t_2) (SS wu t_3)| \\
+\rulename{wdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
+\rulename{wsquig}   & |SS (mkwu dr u) (squig x t)|
+  & = & |(mkwu dr u) `ueq` x; SS (mkwu dr x) t| \\
+% \rulename{wsquig2}   & |SS (apeff e fx) (squig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
+\rulename{wchk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
+\rulename{wcol1}\asktim   & |SS (mkwu dr wrapemp) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
+\rulename{wcol2}   & |SS (mkwu drdom (wrape e)) (: t)| & = & |apply1N ((SS wuinit t)) e| \\
+\rulename{wcol3}   & |SS (mkwu (drrng fx) (wrape e)) (: t)| & = & |oftypefx e fx (SS wuinit t)| \\
+\rulename{wopaque}\asktim   & |SS (mkwu (drrng fx_2) u) (oftypefx t_1 fx_1 t_2)|
+    & = & |oftypefx (SS (mkwu drdom u) t_1) (andeffects fx_1 fx_2) (SS wuinit t_2)| \\
+\rulename{wtup1}   & |SS (mkwu dr wrapemp) (arr (t_1, xdots, t_n))|
+   & = & |arr( (SS (mkwu dr wrapemp) t_1), xdots, (SS (mkwu dr wrapemp) t_n))| \\
+\rulename{wtup2}   & |SS (mkwu dr (wrape e)) (arr (t_1, xdots, t_n))|
+& = & \begin{array}[t]{@@{}l}
+  |defintro (x_1 xdots x_n); e = arr(x_1, xdots, x_n);| \\
+  |arr( (SS (mkwu dr (wrape x_1)) t_1), xdots, (SS (mkwu dr (wrape x_n)) t_n))|
+  \end{array} & \text{|x_i| fresh}\\
+\rulename{wtru1} & |SS (mkwu dr wrapemp) (truth t)|
+   & = & |truth (SS (mkwu dr wrapemp) t)| \\
+\rulename{wtru2} & |SS (mkwu dr (wrape e)) (truth t)|
+   & = & |defintro x; e == truth x; truth (SS (mkwu dr (wrape x)) t)| & \text{|x| fresh} \\
+\rulename{wfun1} \asktim   & |SS (mkwu dr wrapemp) (functionOCX q t_1 fx t_2)|
+   & = & |lamOC q i (SS (mkwu drdom (wrape i)) t_1)
+                    (check fx (SS (mkwu (drrng fx) wrapemp) t_2))| & \text{|i| fresh} \\
+\rulename{wfun2}   & |SS (mkwu dr f) (functionOCX q t_1 fx t_2)|
+& = & |lamOCv q i
+         (defintro x; x = SS (mkwu drdom (wrape i)) t_1)
+         (checkfun q f t_1;
+             check fx (SS (mkwu (drrng fx) (wrape (apply1N f x))) t_2))|  & \text{|i,x| fresh}\\
+\rulename{wtype1} \asktim   & |SS (mkwu dr wrapemp) (type^{t})|
+   & = & |lam i (SS (mkwu drdom (wrape i)) t)| & \text{|i| fresh} \\
+\rulename{wtype2} \asktim   & |SS (mkwu dr (wrape f)) (type^{t})|
+   & = & |lam i (SS (mkwu drdom (wrape (apply1N f i))) t)| & \text{|i| fresh} \\
+\end{array} \\[1mm]
+\textbf{Auxiliary functions} \\
+\hspace{3cm}
+\begin{array}{@@{}l@@{\;\;}r@@{\;\;}c@@{\;\;}ll}
+\rulename{wp1} & |(mkwu dr wrapemp) `ueq`  e_2| & = & |e_2| \\
+\rulename{wp2} \asktim & |(mkwu drdom (wrape e_1)) `ueq`  e_2| & = & |e_1 == e_2| \\
+\rulename{wp3} \asktim & |(mkwu (drrng fx) (wrape e_1)) `ueq`  e_2|
+ & = & |oftypefx e_1 empty ((lam i (i == e_2)))| & \text{$|i| \not\in |freevars e_2|$}
+\\[2mm]
+& |checkfun open f e| & = & |emptytup| \\
+& |checkfun closed f e| & = & |lamOC closed x (apply1N f x) (x == SS wuinit e)|
+\end{array}
+\end{array}
+$$
+\caption{Plan C: Desugaring Essential Verse to Mini Verse} \label{fig:wrapping}
+\end{figure}
+
+Key points about \Cref{fig:wrapping}, the Essential-Verse-to-Mini-Verse wrapping step:
+\begin{itemize}
+\item Essential Verse has |(t_1 where t_2)| as well as |(t_1 ; t_2)|.  We can't flip the
+  order without risking getting choices in the wrong order.  But aft
+er the wrapping
+  step we can replace |where| by ordering ``|;|'', because we have by then
+  feed |u| into |t_1| rather than |t_2|, which is the key difference.
+\end{itemize}
+
