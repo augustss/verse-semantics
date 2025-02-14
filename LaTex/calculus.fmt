@@ -169,7 +169,7 @@
 %% %format applyx a b = a "\," b
 
 %% Function application with no arguments
-%format apply0 a = a "\langle\rangle"
+%format apply0 a = a "[]"
 
 %% Function application with 1 argument
 %format apply1 a (b) = a "(" b ")"
@@ -195,8 +195,8 @@
 %format lam2 x r e = "\lambda"x"\!\shortrightarrow{}\!"r".\," e
 %format lamhdr (x) = "\lambda" x".\,"
 %format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
-%format thunk (e) = "\lambda \langle\rangle.\," e
-%format force (e) = e "\langle\rangle"
+%format thunk (e) = "\lambda \_.\," e
+%format force (e) = e "[]"
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
 %format tlamx  (fx) (x) (y) (e1) (e2) = "\tlamFX{" fx "}" "(" x ")[" y "]\{" e1 "\}\{" e2 "\}"
@@ -285,6 +285,7 @@
 %format collect = "\textbf{collect}"
 %format orElse = "\textbf{orElse}"
 %format append = "\textbf{append}"
+%format `plusplus` = "+ \! +"
 %format app = "\textbf{app}"
 %% %format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
 %% %format eqsemiKW = "\fatsemi"
@@ -826,10 +827,13 @@
 %format someKW = "{\bf some}"
 %format (some (v)) =  someKW "(" v ")"
 %format chooseKW = "\textbf{choose}"
-%format choose n e = chooseKW "(" n ")\{" e "\}"
+%format choose (n) (e) = chooseKW "(" n ")\{" e "\}"
 
 %format varrKW = "\textbf{arr}"
-%format varr n e = varrKW  "(" n ")\{" e "\}"
+%format varr (n) (e) = varrKW  "(" n ")\{" e "\}"
+
+%format vsizeKW       = "size"
+%format vsize (n) (e) = vsizeKW "(" n ")\{" e "\}"
 
 %format mustKW = "\mathsf{Must}"
 %format must r b = mustKW "\langle" r "\rangle\{" b "\}"
