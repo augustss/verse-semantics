@@ -296,16 +296,16 @@ yieldS :: Monad m => Yield (Split m a) m
 yieldS = Yield $ \ i s mem f sk fk ek ->
   pure $
   YieldS i s mem f
-  (liftS sk >=> reflect)
-  (liftF fk >>= reflect)
-  (liftE ek >>= reflect)
+  (liftS sk >=> reflectS)
+  (liftF fk >>= reflectS)
+  (liftE ek >>= reflectS)
 
 succeedS :: Monad m => Succeed (Split m a) m a
 succeedS s mem x fk ek =
   pure $
   SucceedS s mem x
-  (liftF fk >>= reflect)
-  (liftE ek >>= reflect)
+  (liftF fk >>= reflectS)
+  (liftE ek >>= reflectS)
 
 failS :: Applicative m => Fail (Split m a) m
 failS _env = pure . FailS . (.label)
@@ -313,11 +313,11 @@ failS _env = pure . FailS . (.label)
 emptyS :: Applicative m => Empty (Split m a) m
 emptyS = pure . FailS . (.label)
 
-reflect :: Split m a -> VerseT m a
-reflect = \ case
-  YieldS i s mem f f_s m_f m_e ->
-    putS s *>
-    putMem mem *>
+reflectS :: Split m a -> VerseT m a
+reflectS = \ case
+  YieldS i s mem f f_s m_f m_e -> do
+    putS s
+    putMem mem
     alt (yield i $ \ k -> f $ \ m -> k $ m >>= f_s) m_f m_e
   SucceedS s mem x m_f m_e -> do
     putS s
