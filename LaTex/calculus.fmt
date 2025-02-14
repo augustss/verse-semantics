@@ -285,7 +285,7 @@
 %format collect = "\textbf{collect}"
 %format orElse = "\textbf{orElse}"
 %format append = "\textbf{append}"
-%format `plusplus` = "+ \! +"
+%format `plusplus` = "+ \! + \,"
 %format app = "\textbf{app}"
 %% %format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
 %% %format eqsemiKW = "\fatsemi"
@@ -326,8 +326,11 @@
 %format all2 (r) (x) = allKW "("r")\{" x "\}"
 %format one (x) = "\textbf{one}\{" x "\}"
 %format one2 (r) (x) = oneKW "("r")\{" x "\}"
+
+
 %format iter (e) (a) (f) (g) = iterKW "(" e ")\{" a ";" f ";" g "\}"
 %format iter2 (k) (e) (z) = iterKW "(" k ")\{"e "\}\{" z "\}"
+%format applyiter k (v) (e) = k "[" v "," e "]"
 
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
