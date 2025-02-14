@@ -206,11 +206,12 @@ runVerseT :: (MonadRef m, Vars a m) => VerseT m a -> m (Maybe [a])
 runVerseT m = do
   (env, label) <- newVar' () 0
   let
-    sk s Mem {..} x fk _ek
-      | s.count == 0 = runFindT (findVars (x, heap)) 0 label >>= \ case
-          Nothing -> pure Nothing
-          Just ((x, heap), label) -> fmap (x:) <$> fk env Mem {..}
-      | otherwise = pure Nothing
+    sk s Mem {..} x fk _ek =
+      if s.count == 0 then runFindT (findVars (x, heap)) 0 label >>= \ case
+        Nothing -> pure Nothing
+        Just ((x, heap), label) -> fmap (x:) <$> fk env Mem {..}
+      else
+        pure Nothing
   unVerseT m r s env Mem {..} yk sk fk ek
   where
     r = R { level = 0 }
@@ -262,7 +263,7 @@ split' m s heap = splitS m s heap >>= \ case
       stuck
     else
       yield i $ \ k ->
-      f $ \ m -> k $ split' (m >>= \ x -> alt (f_s x) m_f m_e) s mem.heap
+      f $ \ m -> k $ split' (alt (m >>= f_s) m_f m_e) s mem.heap
   SucceedS s Mem {..} x m_f _m_e -> do
     tell s.reset
     if s.count == 0 then do
