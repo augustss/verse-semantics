@@ -337,15 +337,17 @@ forkS m = VerseT $ \ r s env mem _yk sk fk ek ->
   unVerseT m r s env mem yieldF succeedF failF emptyF >>= \ x ->
   sk s mem x fk ek
 
-reflectF :: Split m () -> VerseT m ()
+reflectF :: Monad m => Split m () -> VerseT m ()
 reflectF = \ case
   YieldS i s mem f f_s m_f m_e -> do
     putMem mem
     level <- getLevel
-    if i < level then
-      alt (putS s >> yield i (\ k -> f $ \ m -> k $ m >>= f_s)) m_f m_e
-    else
-      alt (putS s { count = s.count + 1 } >> f (\ m -> modifyCount (subtract 1) >> m >>= f_s)) m_f m_e
+    if i < level then do
+      putS s
+      alt (yield i (\ k -> f $ \ m -> k . fork $ m >>= f_s)) m_f m_e
+    else do
+      putS s { count = s.count + 1 }
+      alt (f $ \ m -> modifyCount (subtract 1) >> fork (m >>= f_s)) m_f m_e
   SucceedS s mem () m_f m_e -> do
     putS s
     putMem mem
