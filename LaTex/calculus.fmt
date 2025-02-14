@@ -97,7 +97,12 @@
 %format underscore    = "{\bullet}"
 %   Input for wrapping
 %format wu            = "\kappa"
-%format wuinit        = "\langle \rangle"
+%format mkwu (dr) (inp) = dr ",\!" inp
+%format drdom         = "D"
+%format (drrng x)     = "R\langle" x "\rangle"
+%format wrapemp       = "\bullet"
+%format wrape (e)     = e
+%format wuinit        = "(" drdom "," wrapemp ")"
 
 %format FunCheck (pi) = "{\mathcal F}(" pi ")"
 
@@ -164,7 +169,7 @@
 %% %format applyx a b = a "\," b
 
 %% Function application with no arguments
-%format apply0 a = a "\langle\rangle"
+%format apply0 a = a "[]"
 
 %% Function application with 1 argument
 %format apply1 a (b) = a "(" b ")"
@@ -190,8 +195,8 @@
 %format lam2 x r e = "\lambda"x"\!\shortrightarrow{}\!"r".\," e
 %format lamhdr (x) = "\lambda" x".\,"
 %format mlam (e1) (e2) = "\mu\hspace{0.03em}" e1 ".\," e2
-%format thunk (e) = "\lambda \langle\rangle.\," e
-%format force (e) = e "\langle\rangle"
+%format thunk (e) = "\lambda \_.\," e
+%format force (e) = e "[]"
 %format lambda = "\lambda\!"
 %format BigLambda = "\Lambda\!"
 %format tlamx  (fx) (x) (y) (e1) (e2) = "\tlamFX{" fx "}" "(" x ")[" y "]\{" e1 "\}\{" e2 "\}"
@@ -280,6 +285,7 @@
 %format collect = "\textbf{collect}"
 %format orElse = "\textbf{orElse}"
 %format append = "\textbf{append}"
+%format `plusplus` = "+ \! +"
 %format app = "\textbf{app}"
 %% %format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
 %% %format eqsemiKW = "\fatsemi"
@@ -289,8 +295,6 @@
 %% Arrays and tuples
 %format array (x) = "\textbf{array}\{" x "\}"
 %format ar (x) = "\textbf{ar}\{" x "\}"
-%% %format arrKW = "\textbf{arr}"
-%% %format arr (x) = arrKW "\{" x "\}"
 %format arr (x) = "\langle" x "\rangle"
 %format arrsp (x) = "\langle\;" x "\;\rangle"
 %format (tup (x)) = "\langle{}" x "\rangle"
@@ -307,19 +311,23 @@
 %format left (x)  = "L \triangleright" x
 %format right (x)  = "R \triangleright" x
 
-%format tuple = "\textbf{tup}"
+%format ifKW = "\textbf{if}"
+%format forKW = "\textbf{for}"
+%format countKW = "\textbf{count}"
 %format typeKW (x) = "\textbf{type}"
-%format typex (x) = "\textbf{type}\{" x "\}"
-%format truth t = "\textbf{truth}\{" t "\}"
-%format allKW = "\textbf{all}"
-%format all (x) = "\textbf{all}\{" x "\}"
-%format all2 (r) (x) = "\textbf{all}("r")\{" x "\}"
 %format oneKW = "\textbf{one}"
-%format one (x) = "\textbf{one}\{" x "\}"
-%format one2 (r) (x) = "\textbf{one}("r")\{" x "\}"
+%format allKW = "\textbf{all}"
 %format iterKW = "\textbf{iter}"
-%format iter (e) (a) (f) (g) = "\textbf{iter}(" e ")\{" a ";" f ";" g "\}"
-%format iter2 (k) (e) (z) = "\textbf{iter}(" k ")\{"e "\}\{" z "\}"
+
+%format tuple = "\textbf{tup}"
+%format typex (x) = typeKW "\{" x "\}"
+%format truth t = "\textbf{truth}\{" t "\}"
+%format all (x) = allKW "\{" x "\}"
+%format all2 (r) (x) = allKW "("r")\{" x "\}"
+%format one (x) = "\textbf{one}\{" x "\}"
+%format one2 (r) (x) = oneKW "("r")\{" x "\}"
+%format iter (e) (a) (f) (g) = iterKW "(" e ")\{" a ";" f ";" g "\}"
+%format iter2 (k) (e) (z) = iterKW "(" k ")\{"e "\}\{" z "\}"
 
 %format splitKW = "\textbf{split}"
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
@@ -340,8 +348,8 @@
 %format range = "\textbf{range}"
 %format square(x) = x "^2"
 %format univ (x) (y) = "\nu" x ".\," y
-%format myite (x) (y) (z) = "\textbf{if}\;" x "\;\{" y "\}\;\{" z "\}"
-%format vif (x) (y) (z) = "\textbf{if}(" x ")\{" y "\}\textbf{else}\{" z "\}"
+%format myite (x) (y) (z) = ifKW ";" x "\;\{" y "\}\;\{" z "\}"
+%format vif (x) (y) (z) = ifKW "(" x ")\{" y "\}\textbf{else}\{" z "\}"
 %format in = "\textbf{in}"
 %format then = "\textbf{then}"
 %format else = "\textbf{else}"
@@ -815,8 +823,17 @@
 %format havocKW = "\mathcal K"
 %format havoc (fx) = "{\mathcal K}\langle{}" fx "\rangle{}"
 %format havoc2 (fx) (body) = "{\mathcal K}\langle{}" fx "\rangle{}\{" body "\}"
+
 %format someKW = "{\bf some}"
-%format (some (v)) =  "{\bf some}(" v ")"
+%format (some (v)) =  someKW "(" v ")"
+%format chooseKW = "\textbf{choose}"
+%format choose (n) (e) = chooseKW "(" n ")\{" e "\}"
+
+%format varrKW = "\textbf{arr}"
+%format varr (n) (e) = varrKW  "(" n ")\{" e "\}"
+
+%format vsizeKW       = "size"
+%format vsize (n) (e) = vsizeKW "(" n ")\{" e "\}"
 
 %format mustKW = "\mathsf{Must}"
 %format must r b = mustKW "\langle" r "\rangle\{" b "\}"

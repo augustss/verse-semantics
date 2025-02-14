@@ -3,8 +3,8 @@ LATEX=pdflatex -halt-on-error
 PAPER=verse-spec
 PAPERTEX = $(PAPER).tex
 PAPERSRC = $(PAPERTEX) ../LaTex/calculus.fmt ../LaTex/verse-macros.tex verse-spec.tex \
-           verse-source.tex verse-densem-planA.tex verse-desugar-to-icfp.tex verse-rules.tex \
-           verse-densem-planC.tex
+           verse-source.tex ess-to-mini.tex mini-to-core.tex verse-rules.tex \
+           densem-expr-style.tex
 
 $(PAPER).pdf: $(PAPERSRC)
 	$(LATEX) $(PAPER)

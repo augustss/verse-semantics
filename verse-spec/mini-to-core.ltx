@@ -1,8 +1,6 @@
 % ----------------------------------------------------
 %
-%          Desugar to ICFP lambdas
-%
-%         Was: desugaring.ltx
+%          Desugar Mini to Core
 %
 % ----------------------------------------------------
 
@@ -15,15 +13,37 @@
 \begin{figure}
 $$
 \begin{array}{@@{}l}
+
 \textbf{Syntax of Core Verse} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
  \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N e_1 e_2| \vb |e_1; e_2|
      \vb |e_1 == e_2| \vb |defKW x| \vb |e_1 `choice` e_2|  \\
-  && \vb &  |arr (e_1, dots, e_n)| \vb |truth e| \vb |lam x e| \vb |iter2 v e_1 e_2|\\
+  && \vb &  |arr (e_1, dots, e_n)| \vb |truth e| \vb |lam x e| \vb |iter2 ic e e_0|\\
+  && \vb & |choose v e| \vb |varr v e| \\
   && \vb & |some e| \vb |v guard e| \vb |check fx e| \vb |verify2 rs as e| \\
-\multicolumn{4}{l}{\hspace{3mm}\text{Note: ordinary |lam x e|; no |oftype e_1 e_2|; add |verifyKW| and |someKW| }} \\[2mm]
-\end{array}\\
+  \text{Iter combinators} & ic & ::=
+     & |allKW| \vb |oneKW| \vb |ifKW| \vb |forKW| \vb  |countKW|  \\
+\end{array}
+\\[1mm]
+\hspace{3mm}\text{Note: ordinary |lam x e|; no |oftype e_1 e_2|; add |verifyKW| and |someKW|, |chooseKW|, |varrKW| } \\[2mm]
 
+\textbf{Iteration combinators} \\
+\begin{array}{rcl}
+  |ifKW v e_0| & = & |force v| \\
+  |oneKW v e_0| & = & |force v| \\
+  |countKW v e_0| & = & |1 + e_0| \\
+  |forKW v e_0| & = & |def x (x == force v; allKW x e_0)| \\
+  |allKW v e_0| & = & |tup v `plusplus` e_0| 
+\end{array}
+
+\end{array}
+$$
+\caption{Syntax of Core Verse} \label{fig:core-verse}
+\end{figure}
+
+\begin{figure}
+$$
+\begin{array}{@@{}l}
 \mbox{{\bf Desugaring Mini Verse into Core Verse:} $|DMe3 md si t| = |e|$} \\
 
 % -------------- Syntax ----------------
@@ -49,11 +69,11 @@ $$
 \rulename{msemi}   & |DMe3 md si (e_1 ; e_2)|        & = & |DMe3 md si e_1 ; DMe3 md si e_2| \\
 \rulename{mchoice} & |DMe3 md si (e_1 `choice` e_2)| & = & |(DMe3 md si e_1) `choice` (DMe3 md si e_2)| \\
 \rulename{mfor}    & |DMe3 md si (fordo e_1 e_2)|
-   & = & |iter2 (lam (a r) (cons (force a) (force r))) (DMe3 md si e_1; lam underscore (DMe3 md si e_2)) emptytup| \\
-\rulename{mone}    & |DMe3 md si (one e)| & = & |iter2 (lam (a underscore) a) (DMe3 md si e) fail| \\
-\rulename{mall}    & |DMe3 md si (all e)| & = & |DMe3 md si (fordo (defintro v; v==e) v)| \\
+   & = & |iter2 forKW (DMe3 md si e_1; lam underscore (DMe3 md si e_2)) emptytup| \\
+\rulename{mall}    & |DMe3 md si (all e)| & = & |iter2 allKW (DMe3 md si e) emptytup| \\
+\rulename{mone}    & |DMe3 md si (one e)| & = & |iter2 oneKW (DMe3 md si e) fail| \\
 \multicolumn{2}{l}{\rulename{mif} \;\; \hfill |DMe3 md si (if e_1 then e_2 else e_3|}
-& = & \multicolumn{2}{@@{}l}{|iter2 (lam (a underscore) (force a))
+& = & \multicolumn{2}{@@{}l}{|iter2 ifKW
         (DMe3 md si e_1; lam underscore (DMe3 md si e_2))
         (DMe3 md si e_3)|}  \\
 \rulename{mcheck+} & |DMe3 mdpos    si (check fx e)| & = & |check fx (DMe3 mdpos si e)| \\

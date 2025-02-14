@@ -303,21 +303,12 @@ defn p@(EffAttr {}) e
 
 defn (Array ps) e = defnArray ps e
 
--- Rule (p1 ~> p2) := e  -->  p1 := x1; p2 := x2; (x1 -> x2) := e
-defn (InfixOp (Variable x1) (Op "->") (Variable x2)) e
-  = pure $ DefineIE x1 x2 e
-
-defn (InfixOp x1@Variable{} op@(Op "->") p2) e = do
-  x2 <- Variable <$> newIdent (getLoc p2) "x"
-  r2 <- defn p2 x2
-  r  <- defn (InfixOp x1 op x2) e
-  pure $ eSeq [r2, r]
-
-defn (InfixOp p1 op@(Op "->") p2) e = do
-  x1 <- Variable <$> newIdent (getLoc p2) "x"
-  r1 <- defn p1 x1
-  r  <- defn (InfixOp x1 op p2) e
-  pure $ eSeq [r1, r]
+-- Rule (p1 ~> p2) := e  -->  p1 := (exists x); p2 := (x -> e)
+defn (InfixOp p1 (Op "->") p2) e = do
+  x <- newIdent (getLoc p2) "x"
+  r1 <- defn p1 (Variable x)
+  r2 <- defn p2 (DefineIE x e)
+  pure $ eSeq [r1, r2]
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
@@ -473,10 +464,10 @@ _addDeref = pure . exprD S.empty
     expr s (Block e) = Block (exprD s e)
     expr s (Function q a rs e2) = Function q a rs (exprD s' e2)
       where s' = defs s a
-    expr s (Unify e1 e2) = Unify (expr s e1) (expr s e2)
-    expr _ (DefineV i)      = DefineV i
-    expr s (DefineE i e)    = DefineE i (expr s e)
-    expr s (DefineIE i j e) = DefineIE i j (expr s e)
+    expr s (Unify e1 e2)  = Unify (expr s e1) (expr s e2)
+    expr _ (DefineV i)    = DefineV i
+    expr s (DefineE i e)  = DefineE i (expr s e)
+    expr s (DefineIE i e) = DefineIE i (expr s e)
     expr s (Choice e1 e2) = Choice (exprD s e1) (exprD s e2)
     expr s (Set e1 (Ident l sop) e2) = set s e1 op (expr s e2)
       where op = Ident l ("in'" ++ sop ++ "'")
@@ -735,13 +726,9 @@ essToMini orig_e = go_expr orig_e
                               ; return (eSeq [DefineV x, eUnify (Variable x) e]) }
 
     -- WSQUIG (x~>y:=t)
-    go kap@(WC{ wc_inp = inp }) (DefineIE x y t)
-      = case inp of
-           NoInput -> do { e <- go (kap { wc_inp = PI (Variable x) }) t
-                         ; return (eSeq [DefineV x, DefineV y, eUnify (Variable y) e]) }
-           PI i    -> do { e <- go (kap { wc_inp = PI (Variable x) }) t
-                         ; return (eSeq [ DefineV x, DefineV y
-                                        , eUnify (Variable x) i, eUnify (Variable y) e]) }
+    go kap (DefineIE x t) = do { capture <- kap `ueq` pure (Variable x)
+                               ; e <- go (kap { wc_inp = PI (Variable x) }) t
+                               ; return (eSeq [DefineV x, capture, e]) }
 
     -- WCHK: check<fx>{t}
     go kap (Check fx t) = Check fx <$> go kap t
@@ -805,7 +792,7 @@ essToMini orig_e = go_expr orig_e
                      ; e <- go (kap { wc_inp = PI (Variable j) }) t
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
 
-    -- Functions
+    -- Functions: WTYPE1, WTYPE2
     go (WC { wc_inp = inp }) (Type t)
       = do { i <- newIdent (getLoc t) "i"
            ; let inp' = case inp of
@@ -814,8 +801,8 @@ essToMini orig_e = go_expr orig_e
            ; e <- go (WC { wc_inp = inp', wc_fxs = DomCtxt }) t
            ; return (Lam i e) }
 
+    -- Functions: WFUN1, WFUN2
     go (WC { wc_inp = inp }) (Function aperture t1 fxs1 t2)
-        -- NB: ignore wc_fxs
       = case inp of
           NoInput -> do { i <- newIdent (getLoc t1) "i"
                         ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = DomCtxt }

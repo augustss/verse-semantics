@@ -60,9 +60,42 @@
 %               Source Verse
 % -------------------------------------------------------------
 
-\section{Source Verse, Essential Verse, and desugaring}
+\section{Source Verse, Essential Verse, and superficial desugaring}
 
 \input{verse-source}
+
+% -------------------------------------------------------------
+%               Mini to Essential: wrapping
+% -------------------------------------------------------------
+
+\section{Desugaring Essential Verse to Mini Verse: wrapping}
+
+\input{ess-to-mini}
+
+% -------------------------------------------------------------
+%               Desugar to Core
+% -------------------------------------------------------------
+
+\section{Desugar to ICFP lambdas (Core)}
+
+\input{mini-to-core}
+
+% -------------------------------------------------------------
+%               Rewrite and verification rules
+% -------------------------------------------------------------
+
+\section{Rewrite and verification rules: runtime and verification}
+
+\input{verse-rules}
+
+
+% -------------------------------------------------------------
+%               Denotational semantics: Plan C
+% -------------------------------------------------------------
+
+\section{Denotational semantics: expression style}
+
+\input{densem-expr-style}
 
 
 % -------------------------------------------------------------
@@ -74,36 +107,12 @@
 {\bf Currently in google doc}
 
 % -------------------------------------------------------------
-%               Denotational semantics: Plan C
-% -------------------------------------------------------------
-
-\section{Denotational semantics Plan C: expression style}
-
-\input{verse-densem-planC}
-
-
-% -------------------------------------------------------------
-%               Semantics: Plan D
-% -------------------------------------------------------------
-
-\section{Semantics Plan D: desugar to ICFP lambdas}
-
-\input{verse-desugar-to-icfp}
-
-% -------------------------------------------------------------
-%               Rewrite and verification rules
-% -------------------------------------------------------------
-
-\section{Rewrite and verification rules: runtime and verification}
-
-\input{verse-rules}
-
-% -------------------------------------------------------------
 %               Denotational semantics: Plan A
 % -------------------------------------------------------------
 
-\section{Denotational semantics Plan A: direct}
-
-\input{verse-densem-planA}
+%            ---- We have abandoned Plan A
+% \section{Denotational semantics Plan A: direct}
+%
+% \input{verse-densem-planA}
 
 \end{document}

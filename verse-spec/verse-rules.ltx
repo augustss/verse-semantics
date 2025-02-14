@@ -199,8 +199,8 @@ $\begin{array}{@@{}l}
     \\[-0.8em]
 
 \rulegroupname{Iter}
-\rulename{iter-fail}    & |iter fail e_a e_f e_g| & \movesto & |apply1N e_g e_a| \\
-\rulename{iter-value}   & |iter v    e_a e_f e_g| & \movesto & |apply1Np (apply1Np (apply1N e_f e_a) v) e_g| \\
+\rulename{iter-fail}    & |iter2 ic fail e_0| & \movesto & |e_0| \\
+\rulename{iter-value}   & |iter2 v e e_0| & \movesto & |apply1Np (apply1Np (apply1N e_f e_a) v) e_g| \\
 \rulename{iter-choice}  & |iter (e_1 `choice` e_2) e_a e_f e_g| & \movesto &
    \multicolumn{2}{l}{|iter e_1 e_a e_f (lam x (iter e_2 x e_f e_g))|} \\
 
@@ -277,7 +277,41 @@ $\begin{array}{@@{}l}
 \label{fig:spj-verifier-rewrite-rules}
 \end{figure}
 
+% ------------------------------------------------------------
+%                Array rules
+% ------------------------------------------------------------
+
+\begin{figure}[t]
+$\begin{array}{@@{}l}
+\begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
+  \rulename{iter-choose}   & |iter2 ic (C^[choose v e]) e_0|
+  & \movesto & \begin{array}[t]{@@{}l}
+    |defintro k;  k == vsize v (C^[some(thunk e)]| \\
+    |iter2 ic (choose k (C^[e])) e_0|
+    \end{array} \\
+
+\rulename{one-choose} & |iter2 oneKW (choose v e) e_0|
+  & \movesto & |iter2 ifKW (v=0; thunk e_0) (some(thunk e))| \\
+
+\rulename{if-choose} & |iter2 ifKW (choose v e) e_0|
+  & \movesto & |iter2 ifKW (v=0; thunk e_0) (force (some(thunk e)))| \\
+
+\rulename{all-choose} & |iter2 allKW (choose v e) e_0|
+  & \movesto & |varr v e `plusplus` e_0| \\
+
+\end{array}
+\end{array}$
+\\[0.1in]
+\caption{Verifier Rules for Arrays}
+\label{fig:verifier-rules-arrays}
+\end{figure}
+
+
+
+
 % --------------------------- Structural rules ----------------
+%    SLPJ I think these rules are no longer "live"
+\begin{comment}
   \begin{figure}
     $$
     \begin{array}{l}
@@ -296,3 +330,4 @@ $\begin{array}{@@{}l}
     \Description{The Verse calculus: Structural Rules}
       \label{fig:rules-structural}  \label{fig:structural}
    \end{figure}
+\end{comment}
