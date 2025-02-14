@@ -249,12 +249,12 @@ if' m f n = split m >>= \ case
   Step x _m -> f x
 
 split :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m (Stream m a)
-split m = split' m S { count = 0, reset = pure () } =<< getHeap
+split m = split' m 0 =<< getHeap
 
 split'
   :: (MonadRef m, Vars a m)
-  => VerseT m a -> S m -> Heap m -> VerseT m (Stream m a)
-split' m s heap = splitS m s heap >>= \ case
+  => VerseT m a -> Int -> Heap m -> VerseT m (Stream m a)
+split' m count heap = splitS m count heap >>= \ case
   YieldS i s mem f f_s m_f m_e -> do
     tell s.reset
     putLabel mem.label
@@ -263,7 +263,7 @@ split' m s heap = splitS m s heap >>= \ case
       stuck
     else
       yield i $ \ k ->
-      f $ \ m -> k $ split' (alt (m >>= f_s) m_f m_e) s mem.heap
+      f $ \ m -> k $ split' (alt (m >>= f_s) m_f m_e) s.count mem.heap
   SucceedS s Mem {..} x m_f _m_e -> do
     tell s.reset
     if s.count == 0 then do
@@ -284,10 +284,11 @@ split' m s heap = splitS m s heap >>= \ case
 
 data Stream m a = Done | Step a (VerseT m (Stream m a))
 
-splitS :: Monad m => VerseT m a -> S m -> Heap m -> VerseT m (Split m a)
-splitS m !s' heap = VerseT $ \ r s env mem _yk sk fk ek ->
+splitS :: Monad m => VerseT m a -> Int -> Heap m -> VerseT m (Split m a)
+splitS m !count !heap = VerseT $ \ r s env mem _yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
+    !s' = S { count, reset = pure () }
     !mem' = Mem { label = mem.label, heap }
   in
     unVerseT m r' s' env mem' yieldS succeedS failS emptyS >>= \ x ->
@@ -341,12 +342,10 @@ reflectF = \ case
   YieldS i s mem f f_s m_f m_e -> do
     putMem mem
     level <- getLevel
-    if i < level then do
-      putS s
-      alt (yield i $ \ k -> f $ \ m -> k $ m >>= f_s) m_f m_e
-    else do
-      putS s { count = s.count + 1 }
-      alt (f $ \ m -> modifyCount (subtract 1) >> m >>= f_s) m_f m_e
+    if i < level then
+      alt (putS s >> yield i (\ k -> f $ \ m -> k $ m >>= f_s)) m_f m_e
+    else
+      alt (putS s { count = s.count + 1 } >> f (\ m -> modifyCount (subtract 1) >> m >>= f_s)) m_f m_e
   SucceedS s mem () m_f m_e -> do
     putS s
     putMem mem
