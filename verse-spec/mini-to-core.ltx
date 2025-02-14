@@ -27,13 +27,13 @@ $$
 \\[1mm]
 \hspace{3mm}\text{Note: ordinary |lam x e|; no |oftype e_1 e_2|; add |verifyKW| and |someKW|, |chooseKW|, |varrKW| } \\[2mm]
 
-\textbf{Iteration combinators} \\
+\textbf{Iteration macros} \\
 \begin{array}{rcl}
-  |ifKW v e_0| & = & |force v| \\
-  |oneKW v e_0| & = & |force v| \\
-  |countKW v e_0| & = & |1 + e_0| \\
-  |forKW v e_0| & = & |def x (x == force v; allKW x e_0)| \\
-  |allKW v e_0| & = & |tup v `plusplus` e_0| 
+  |applyiter ifKW v e_0| & = & |force v| \\
+  |applyiter oneKW v e_0| & = & |v| \\
+  |applyiter countKW v e_0| & = & |1 + e_0| \\
+  |applyiter forKW v e_0| & = & |def x (x == force v; applyiter allKW x e_0)| \\
+  |applyiter allKW v e_0| & = & |tup v `plusplus` e_0|
 \end{array}
 
 \end{array}

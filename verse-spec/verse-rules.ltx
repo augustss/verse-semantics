@@ -189,20 +189,15 @@ $\begin{array}{@@{}l}
     \\[-0.8em]
 
 \rulegroupname{Choice}
-\rulename{choice-fail-l} & |fail choice e| & \movesto & |e| & \text{Can be removed if all choices inside |iterKW|} \\
-\rulename{choice-fail-r} & |e choice fail| & \movesto & |e| & \text{Can be removed if all choices inside |iterKW|} \\
-\rulename{choice} & |C^[e_1 choice e_2]| & \movesto & |C^[e_1] choice C^[e_2]|
-    & \text{if |noteq C hole, blockedc emptyset C, choicefreec C|}\\
 \rulename{fail} & |C^[fail]| & \movesto & |fail|
     & \text{if |noteq C hole, blockedc emptyset C, choicefreec C|}\\
-
     \\[-0.8em]
 
 \rulegroupname{Iter}
 \rulename{iter-fail}    & |iter2 ic fail e_0| & \movesto & |e_0| \\
-\rulename{iter-value}   & |iter2 v e e_0| & \movesto & |apply1Np (apply1Np (apply1N e_f e_a) v) e_g| \\
-\rulename{iter-choice}  & |iter (e_1 `choice` e_2) e_a e_f e_g| & \movesto &
-   \multicolumn{2}{l}{|iter e_1 e_a e_f (lam x (iter e_2 x e_f e_g))|} \\
+\rulename{iter-value}   & |iter2 ic e e_0| & \movesto & |applyiter ic e e_0| \\
+\rulename{iter-choice}  & |iter2 ic (C^[e_1 `choice` e_2]) e_0| & \movesto &
+   |iter2 ic (C^[e_1]) (iter2 ic (C^[e_2]) e_0)| \\
 
 \end{array} \\
 \\[-0.8em]
