@@ -70,16 +70,15 @@ newtype R = R { level :: Level }
 
 type Level = Sum Int
 
-data S m = S
-  { count :: {-# UNPACK #-} !Int
-  , reset :: !(m ())
-  }
+newtype S m = S { count :: Int }
 
 type Env m = Var m ()
 
 data Mem m = Mem
   { label :: {-# UNPACK #-} !Label
   , heap :: !(Heap m)
+  , forward :: !(m ())
+  , backward :: !(m ())
   }
 
 type Label = Int
@@ -161,11 +160,16 @@ instance MonadState s m => MonadState s (VerseT m) where
   put = lift . put
   state = lift . state
 
-tell :: Applicative m => m () -> VerseT m ()
-tell m = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  sk s { reset = m *> s.reset } mem ()
-  (\ env mem -> m *> fk env mem)
-  (\ mem -> m *> ek mem)
+tell :: Applicative m => m () -> m () -> VerseT m ()
+tell m n = VerseT $ \ _r s _env mem _yk sk fk ek ->
+  sk s (append mem m n) ()
+  (\ env mem -> n *> fk env (append mem n m))
+  (\ mem -> n *> ek (append mem n m))
+  where
+    append mem m n = mem
+      { forward = mem.forward *> m
+      , backward = n *> mem.backward
+      }
 
 yield :: Level -> Handler m a -> VerseT m a
 yield i f = VerseT $ \ _r s _env mem yk ->
@@ -191,7 +195,7 @@ putMem mem = VerseT $ \ _r s _env _mem _yk sk ->
   sk s mem ()
 
 putLabel :: Label -> VerseT m ()
-putLabel label = VerseT $ \ _r s _env Mem { heap } _yk sk ->
+putLabel label = VerseT $ \ _r s _env Mem { heap, forward, backward } _yk sk ->
   sk s Mem {..} ()
 
 getHeap :: VerseT m (Heap m)
@@ -215,8 +219,10 @@ runVerseT m = do
   unVerseT m r s env Mem {..} yk sk fk ek
   where
     r = R { level = 0 }
-    s = S { count = 0, reset = pure () }
+    s = S { count = 0 }
     heap = mempty
+    forward = pure ()
+    backward = pure ()
     yk = Yield $ \ _i _s _mem _f _sk _fk _ek ->
       pure Nothing
     fk _env _mem =
@@ -256,7 +262,7 @@ split'
   => VerseT m a -> Int -> Heap m -> VerseT m (Stream m a)
 split' m count heap = splitS m count heap >>= \ case
   YieldS i s mem f f_s m_f m_e -> do
-    tell s.reset
+    tell mem.forward mem.backward
     putLabel mem.label
     level <- getLevel
     if i > level then
@@ -264,11 +270,11 @@ split' m count heap = splitS m count heap >>= \ case
     else
       yield i $ \ k ->
       f $ \ m -> k $ split' (alt (m >>= f_s) m_f m_e) s.count mem.heap
-  SucceedS s Mem {..} x m_f _m_e -> do
-    tell s.reset
+  SucceedS s mem x m_f _m_e -> do
+    tell mem.forward mem.backward
     if s.count == 0 then do
       level <- getLevel
-      lift (runFindT (findVars (heap, x)) level label) >>= \ case
+      lift (runFindT (findVars (mem.heap, x)) level mem.label) >>= \ case
         Nothing ->
           stuck
         Just ((heap, x), label) -> do
@@ -276,7 +282,7 @@ split' m count heap = splitS m count heap >>= \ case
           putHeap heap
           pure . Step x $ split m_f
     else do
-      putLabel label
+      putLabel mem.label
       stuck
   FailS label -> do
     putLabel label
@@ -288,8 +294,8 @@ splitS :: Monad m => VerseT m a -> Int -> Heap m -> VerseT m (Split m a)
 splitS m !count !heap = VerseT $ \ r s env mem _yk sk fk ek ->
   let
     !r' = R { level = r.level <> 1 }
-    !s' = S { count, reset = pure () }
-    !mem' = Mem { label = mem.label, heap }
+    !s' = S { count }
+    !mem' = mem { heap, forward = pure (), backward = pure () }
   in
     unVerseT m r' s' env mem' yieldS succeedS failS emptyS >>= \ x ->
     sk s mem x fk ek
@@ -360,7 +366,7 @@ yieldF :: Monad m => Yield (Split m ()) m
 yieldF = Yield $ \ i s mem f sk fk ek ->
   pure $
   YieldS i s mem f
-  (liftS sk >=> reflectF)
+  (liftS sk >=> reflectS)
   (liftF fk >>= reflectF)
   (liftE ek >>= reflectF)
 
@@ -531,7 +537,7 @@ freshVar :: MonadRef m => VerseT m (Var m a)
 freshVar = VerseT $ \ r s _env mem _yk sk fk ek ->
   let
     !label = mem.label
-    !mem' = Mem { label = label + 1, heap = mem.heap }
+    !mem' = mem { label = label + 1, heap = mem.heap }
     !level = r.level
     !susp = const $ pure ()
     !x = Unbound MkUnbound {..}
@@ -546,7 +552,7 @@ newBound :: a -> VerseT m (Bound a)
 newBound !binding = VerseT $ \ _r s _env mem _yk sk ->
   let
     !label = mem.label
-    !mem' = Mem { label = label + 1, heap = mem.heap }
+    !mem' = mem { label = label + 1, heap = mem.heap }
     !x = MkBound {..}
   in
     sk s mem' x
@@ -733,7 +739,7 @@ newVarsRef :: Vars a m => a -> VerseT m (VarsRef m a)
 newVarsRef x = VerseT $ \ _r s _env mem _yk sk ->
   let
     !label = mem.label
-    !mem' = Mem
+    !mem' = mem
       { label = label + 1
       , heap = IntMap.insert label (SomeVars x) mem.heap
       }
