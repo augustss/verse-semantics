@@ -23,7 +23,7 @@ import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as Env
-import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict (IntMap, (!))
 import Data.IntMap.Strict qualified as IntMap
 
 import Prettyprinter
@@ -533,21 +533,25 @@ unifyHeap :: MonadRef m => Heap m -> Heap m -> EvalT m ()
 unifyHeap = (lift .) . Monad.unifyVar
 
 addStack :: MonadState Mem m => EvalT m Int
-addStack = do
-  r <- ask
+addStack = asks (.stack) >>= \ stack -> lift $ do
   s <- get
   let i = s.label
-  put s { label = i + 1, stacks = IntMap.insert i r.stack s.stacks }
-  lift . Monad.tell . modify' $ \ s -> s { stacks = IntMap.delete i s.stacks }
+  put s { label = i + 1, stacks = IntMap.insert i stack s.stacks }
+  Monad.tell
+    (modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks })
+    (modify' $ \ s -> s { stacks = IntMap.delete i s.stacks })
   pure i
 
 removeStack :: MonadState Mem m => Int -> EvalT m ()
 removeStack = lift . removeStack'
 
 removeStack' :: MonadState Mem m => Int -> VerseT m ()
-removeStack' i = whenJustM (gets $ (IntMap.lookup i) . (.stacks)) $ \ stack -> do
+removeStack' i = do
+  stack <- gets $ (! i) . (.stacks)
   modify' $ \ s -> s { stacks = IntMap.delete i s.stacks }
-  Monad.tell . modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks }
+  Monad.tell
+    (modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks })
+    (modify' $ \ s -> s { stacks = IntMap.delete i s.stacks })
 
 insert :: MonadRef m => Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
 insert k = IntMap.insertWith (++) k . (:[])
@@ -561,8 +565,3 @@ minInt = minBound
 
 maxInt :: Int
 maxInt = maxBound
-
-whenJustM :: Monad m => m (Maybe a) -> (a -> m ()) -> m ()
-whenJustM m f = m >>= \ case
-  Nothing -> pure ()
-  Just x -> f x
