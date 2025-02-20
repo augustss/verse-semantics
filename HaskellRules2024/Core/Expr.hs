@@ -38,7 +38,7 @@ module Core.Expr
     -- Binding and substitution
   , subst
   , unbindAs, unExis
-  , alphaRename, matchExi_alphaRename, matchEq
+  , alphaRename
   , alphaRenameVerify
 
     -- Effects
@@ -307,10 +307,6 @@ mkAll e = Iter IterAll e (Tup [])
 
 mkCount :: Expr -> Expr
 mkCount e = Iter IterCount e (Lit (LInt 0))
-
-matchAll :: Expr -> Maybe Expr
-matchAll (Iter IterAll e e0) | e0 == Tup [] = Just e
-matchAll _                                  = Nothing
 
 -- encode check<fx>{e}
 mkCheck :: Effect -> Expr -> Expr
@@ -1311,35 +1307,6 @@ unExis (Exi bnd) = (Exi (bind x exis), body)
   (x,e)       = unsafeUnbind bnd
   (exis,body) = unExis e
 unExis e         = (HOLE, e)
-
--- structural rules matching
-matchExi_alphaRename :: [Ident] -> Expr -> [(Context, Ident, Expr)]
-matchExi_alphaRename zs e =
-  [ cxe
-  | Exi bnd <- [e]
-  , let (x,ex) = alphaRename zs bnd
-        cxes   = matchExi_alphaRename (x:zs) ex
-  , cxe <- -- just add "bind x" to the exis
-           [ (Exi (bind x ctx),y,ey)
-           | (ctx,y,ey) <- cxes
-           ]
-           -- add a case where "bind x" is the variable we're matching on
-        ++ case cxes of
-             [] -> [ (HOLE,x,ex) ]
-             _  -> [ (Exi (bind y ctx),x,ey)
-                   | (ctx,y,ey) <- [head cxes]
-                   ]
-  ]
-
-matchEq :: Expr -> [(Expr,Expr)]
--- Matches (v = e), and also (v1 = v2) returning (v2 = v1)
-matchEq e =
-  [ (lhs, rhs)
-  | e1 :=: e2 <- [e]
-  , (lhs,rhs) <- (e1,e2) : [ (Var y, Var x)
-                           | (Var x, Var y) <- [(e1,e2)]
-                           ]
-  ]
 
 type Fuel = Int
 
