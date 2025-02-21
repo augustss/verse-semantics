@@ -25,6 +25,7 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as Env
 import Data.IntMap.Strict (IntMap, (!))
 import Data.IntMap.Strict qualified as IntMap
+import Data.Maybe
 
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -547,7 +548,7 @@ removeStack = lift . removeStack'
 
 removeStack' :: MonadState Mem m => Int -> VerseT m ()
 removeStack' i = do
-  stack <- gets $ (! i) . (.stacks)
+  stack <- gets $ fromMaybe mempty . IntMap.lookup i . (.stacks)
   modify' $ \ s -> s { stacks = IntMap.delete i s.stacks }
   Monad.tell
     (modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks })

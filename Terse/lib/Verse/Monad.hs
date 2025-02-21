@@ -161,15 +161,16 @@ instance MonadState s m => MonadState s (VerseT m) where
   state = lift . state
 
 tell :: Applicative m => m () -> m () -> VerseT m ()
-tell m n = VerseT $ \ _r s _env mem _yk sk fk ek ->
-  sk s (append mem m n) ()
-  (\ env mem -> n *> fk env (append mem n m))
-  (\ mem -> n *> ek (append mem n m))
-  where
-    append mem m n = mem
-      { forward = mem.forward *> m
-      , backward = n *> mem.backward
-      }
+tell forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
+  sk s (appendMem mem forward backward) ()
+  (\ env mem -> backward *> fk env (appendMem mem backward forward))
+  (\ mem -> backward *> ek (appendMem mem backward forward))
+
+appendMem :: Applicative m => Mem m -> m () -> m () -> Mem m
+appendMem mem forward backward = mem
+  { forward = mem.forward *> forward
+  , backward = backward *> mem.backward
+  }
 
 yield :: Level -> Handler m a -> VerseT m a
 yield i f = VerseT $ \ _r s _env mem yk ->
@@ -284,8 +285,9 @@ split' m count heap = splitS m count heap >>= \ case
     else do
       putLabel mem.label
       stuck
-  FailS label -> do
-    putLabel label
+  FailS mem -> do
+    tell mem.forward mem.backward
+    putLabel mem.label
     pure Done
 
 data Stream m a = Done | Step a (VerseT m (Stream m a))
@@ -316,10 +318,10 @@ succeedS s mem x fk ek =
   (liftE ek >>= reflectS)
 
 failS :: Applicative m => Fail (Split m a) m
-failS _env = pure . FailS . (.label)
+failS _env = pure . FailS
 
 emptyS :: Applicative m => Empty (Split m a) m
-emptyS = pure . FailS . (.label)
+emptyS = pure . FailS
 
 reflectS :: Split m a -> VerseT m a
 reflectS = \ case
@@ -331,8 +333,8 @@ reflectS = \ case
     putS s
     putMem mem
     alt (pure x) m_f m_e
-  FailS label -> do
-    putLabel label
+  FailS mem -> do
+    putMem mem
     empty
 
 fork :: Monad m => VerseT m () -> VerseT m ()
@@ -358,8 +360,8 @@ reflectF = \ case
     putS s
     putMem mem
     alt (pure ()) m_f m_e
-  FailS label -> do
-    putLabel label
+  FailS mem -> do
+    putMem mem
     empty
 
 yieldF :: Monad m => Yield (Split m ()) m
@@ -412,8 +414,7 @@ data Split m a
     !(VerseT m a)
     !(VerseT m a)
   | FailS
-    {-# UNPACK #-}
-    !Label
+    !(Mem m)
 
 stuck :: VerseT m a
 stuck = VerseT $ \ r s _env mem yk ->
@@ -622,10 +623,13 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
 writeVar :: MonadRef m => Var m a -> VarState m a -> VerseT m ()
 writeVar (Var ref) x = VerseT $ \ _r s _env mem _yk sk fk ek -> do
   y <- readRef ref
-  writeRef ref x
-  sk s mem ()
-    (\ env mem -> writeRef ref y *> fk env mem)
-    (\ mem -> writeRef ref y *> ek mem)
+  let
+    forward = writeRef ref x
+    backward = writeRef ref y
+  forward
+  sk s (appendMem mem forward backward) ()
+    (\ env mem -> backward *> fk env (appendMem mem backward forward))
+    (\ mem -> backward *> ek (appendMem mem backward forward))
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 readRoot var@(Var ref) = lift (readRef ref) >>= \ case
