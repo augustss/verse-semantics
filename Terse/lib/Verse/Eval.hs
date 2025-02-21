@@ -25,7 +25,6 @@ import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as Env
 import Data.IntMap.Strict (IntMap, (!))
 import Data.IntMap.Strict qualified as IntMap
-import Data.Maybe
 
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -535,24 +534,28 @@ unifyHeap = (lift .) . Monad.unifyVar
 
 addStack :: MonadState Mem m => EvalT m Int
 addStack = asks (.stack) >>= \ stack -> lift $ do
-  s <- get
-  let i = s.label
-  put s { label = i + 1, stacks = IntMap.insert i stack s.stacks }
-  Monad.tell
-    (modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks })
-    (modify' $ \ s -> s { stacks = IntMap.delete i s.stacks })
+  i <- supply
+  let
+    forward = modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks }
+    backward = modify' $ \ s -> s { stacks = IntMap.delete i s.stacks }
+  lift forward
+  Monad.tell forward backward
   pure i
 
 removeStack :: MonadState Mem m => Int -> EvalT m ()
-removeStack = lift . removeStack'
+removeStack i = lift $ do
+  stack <- gets $ (! i) . (.stacks)
+  let
+    forward = modify' $ \ s -> s { stacks = IntMap.delete i s.stacks }
+    backward = modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks }
+  lift forward
+  Monad.tell forward backward
 
-removeStack' :: MonadState Mem m => Int -> VerseT m ()
-removeStack' i = do
-  stack <- gets $ fromMaybe mempty . IntMap.lookup i . (.stacks)
-  modify' $ \ s -> s { stacks = IntMap.delete i s.stacks }
-  Monad.tell
-    (modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks })
-    (modify' $ \ s -> s { stacks = IntMap.delete i s.stacks })
+supply :: MonadState Mem m =>  m Int
+supply = do
+  s <- get
+  put s { label = s.label + 1 }
+  pure s.label
 
 insert :: MonadRef m => Int -> Var m -> IntMap [Var m] -> IntMap [Var m]
 insert k = IntMap.insertWith (++) k . (:[])
