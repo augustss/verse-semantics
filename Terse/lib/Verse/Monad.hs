@@ -56,7 +56,7 @@ import Ref
 newtype VerseT (m :: Type -> Type) a = VerseT
   { unVerseT
     :: forall r . R
-    -> S m
+    -> S
     -> Env m
     -> Mem m
     -> Yield r m
@@ -70,7 +70,13 @@ newtype R = R { level :: Level }
 
 type Level = Sum Int
 
-newtype S m = S { count :: Int }
+newtype S = S { count :: Int }
+
+succS :: S -> S
+succS !s = s { count = s.count + 1 }
+
+predS :: S -> S
+predS !s = s { count = s.count - 1 }
 
 type Env m = Var m ()
 
@@ -79,6 +85,12 @@ data Mem m = Mem
   , heap :: !(Heap m)
   , forward :: !(m ())
   , backward :: !(m ())
+  }
+
+appendMem :: Applicative m => Mem m -> m () -> m () -> Mem m
+appendMem mem forward backward = mem
+  { forward = mem.forward *> forward
+  , backward = backward *> mem.backward
   }
 
 type Label = Int
@@ -90,7 +102,7 @@ data SomeVars m = forall a . Vars a m => SomeVars !a
 newtype Yield r m = Yield
   { unYield
     :: forall a . Level
-    -> S m
+    -> S
     -> Mem m
     -> Handler m a
     -> Succeed r m a
@@ -101,7 +113,7 @@ newtype Yield r m = Yield
 
 type Handler m a = (VerseT m a -> VerseT m ()) -> VerseT m ()
 
-type Succeed r m a = S m -> Mem m -> a -> Fail r m -> Empty r m -> m r
+type Succeed r m a = S -> Mem m -> a -> Fail r m -> Empty r m -> m r
 
 type Fail r m = Env m -> Mem m -> m r
 
@@ -166,12 +178,6 @@ tell forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
   (\ env mem -> backward *> fk env (appendMem mem backward forward))
   (\ mem -> backward *> ek (appendMem mem backward forward))
 
-appendMem :: Applicative m => Mem m -> m () -> m () -> Mem m
-appendMem mem forward backward = mem
-  { forward = mem.forward *> forward
-  , backward = backward *> mem.backward
-  }
-
 yield :: Level -> Handler m a -> VerseT m a
 yield i f = VerseT $ \ _r s _env mem yk ->
   unYield yk i s mem f
@@ -180,14 +186,14 @@ getLevel :: VerseT m Level
 getLevel = VerseT $ \ r s _env mem _yk sk ->
   sk s mem r.level
 
-putS :: S m -> VerseT m ()
-putS s = VerseT $ \ _r _s _env mem _yk sk ->
+putS :: S -> VerseT m ()
+putS !s = VerseT $ \ _r _s _env mem _yk sk ->
   sk s mem ()
 
-modifyCount :: (Int -> Int) -> VerseT m ()
-modifyCount f = VerseT $ \ _r s _env mem _yk sk ->
+modifyS :: (S -> S) -> VerseT m ()
+modifyS f = VerseT $ \ _r s _env mem _yk sk ->
   let
-    !s' = s { count = f s.count }
+    !s' = f s
   in
     sk s' mem ()
 
@@ -354,8 +360,8 @@ reflectF = \ case
       putS s
       alt (yield i (\ k -> f $ \ m -> k . fork $ m >>= f_s)) m_f m_e
     else do
-      putS s { count = s.count + 1 }
-      alt (f $ \ m -> modifyCount (subtract 1) >> fork (m >>= f_s)) m_f m_e
+      putS $ succS s
+      alt (f $ \ m -> modifyS predS >> fork (m >>= f_s)) m_f m_e
   SucceedS s mem () m_f m_e -> do
     putS s
     putMem mem
@@ -401,14 +407,14 @@ data Split m a
   = forall b .
     YieldS
     {-# UNPACK #-} !Level
-    !(S m)
+    {-# UNPACK #-} !S
     !(Mem m)
     !(Handler m b)
     !(b -> VerseT m a)
     !(VerseT m a)
     !(VerseT m a)
   | SucceedS
-    !(S m)
+    {-# UNPACK #-} !S
     !(Mem m)
     !a
     !(VerseT m a)
