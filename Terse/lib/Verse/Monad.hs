@@ -102,9 +102,9 @@ data SomeVars m = forall a . Vars a m => SomeVars !a
 newtype Yield r m = Yield
   { unYield
     :: forall a . Level
+    -> Handler m a
     -> S
     -> Mem m
-    -> Handler m a
     -> Succeed r m a
     -> Fail r m
     -> Empty r m
@@ -180,7 +180,7 @@ tell forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
 
 yield :: Level -> Handler m a -> VerseT m a
 yield i f = VerseT $ \ _r s _env mem yk ->
-  unYield yk i s mem f
+  unYield yk i f s mem
 
 getLevel :: VerseT m Level
 getLevel = VerseT $ \ r s _env mem _yk sk ->
@@ -217,30 +217,23 @@ runVerseT :: (MonadRef m, Vars a m) => VerseT m a -> m (Maybe [a])
 runVerseT m = do
   (env, label) <- newVar' () 0
   let
-    sk s Mem {..} x fk _ek =
-      if s.count == 0 then runFindT (findVars (x, heap)) 0 label >>= \ case
-        Nothing -> pure Nothing
-        Just ((x, heap), label) -> fmap (x:) <$> fk env Mem {..}
-      else
-        pure Nothing
+    sk s mem x fk _ek
+      | s.count == 0 =
+        runFindT (findVars (x, mem.heap)) level mem.label >>= \ case
+          Nothing -> pure Nothing
+          Just ((x, heap), label) -> fmap (x:) <$> fk env Mem {..}
+      | otherwise = pure Nothing
   unVerseT m r s env Mem {..} yk sk fk ek
   where
-    r = R { level = 0 }
+    r = R {..}
+    level = 0
     s = S { count = 0 }
     heap = mempty
     forward = pure ()
     backward = pure ()
-    yk = Yield $ \ _i _s _mem _f _sk _fk _ek ->
-      pure Nothing
-    fk _env _mem =
-      pure $ Just []
-    ek _mem =
-      pure $ Just []
-    newVar' binding label =
-      let
-        !label' = label + 1
-      in
-        fmap ((, label') . Var) . newRef $ Bound MkBound {..}
+    yk = Yield $ \ _i _f _s _mem _sk _fk _ek -> pure Nothing
+    fk _env _mem = pure $ Just []
+    ek _mem = pure $ Just []
 
 all' :: (MonadRef m, Vars a m) => VerseT m a -> VerseT m [a]
 all' = split >=> loop
@@ -268,7 +261,7 @@ split'
   :: (MonadRef m, Vars a m)
   => VerseT m a -> Int -> Heap m -> VerseT m (Stream m a)
 split' m count heap = splitS m count heap >>= \ case
-  YieldS i s mem f f_s m_f m_e -> do
+  YieldS i f s mem f_s m_f m_e -> do
     tell mem.forward mem.backward
     putLabel mem.label
     level <- getLevel
@@ -309,9 +302,9 @@ splitS m !count !heap = VerseT $ \ r s env mem _yk sk fk ek ->
     sk s mem x fk ek
 
 yieldS :: Monad m => Yield (Split m a) m
-yieldS = Yield $ \ i s mem f sk fk ek ->
+yieldS = Yield $ \ i f s mem sk fk ek ->
   pure $
-  YieldS i s mem f
+  YieldS i f s mem
   (liftS sk >=> reflectS)
   (liftF fk >>= reflectS)
   (liftE ek >>= reflectS)
@@ -331,7 +324,7 @@ emptyS = pure . FailS
 
 reflectS :: Split m a -> VerseT m a
 reflectS = \ case
-  YieldS i s mem f f_s m_f m_e -> do
+  YieldS i f s mem f_s m_f m_e -> do
     putS s
     putMem mem
     alt (yield i $ \ k -> f $ \ m -> k $ m >>= f_s) m_f m_e
@@ -353,7 +346,7 @@ forkS m = VerseT $ \ r s env mem _yk sk fk ek ->
 
 reflectF :: Monad m => Split m () -> VerseT m ()
 reflectF = \ case
-  YieldS i s mem f f_s m_f m_e -> do
+  YieldS i f s mem f_s m_f m_e -> do
     putMem mem
     level <- getLevel
     if i < level then do
@@ -371,9 +364,9 @@ reflectF = \ case
     empty
 
 yieldF :: Monad m => Yield (Split m ()) m
-yieldF = Yield $ \ i s mem f sk fk ek ->
+yieldF = Yield $ \ i f s mem sk fk ek ->
   pure $
-  YieldS i s mem f
+  YieldS i f s mem
   (liftS sk >=> reflectS)
   (liftF fk >>= reflectF)
   (liftE ek >>= reflectF)
@@ -407,9 +400,9 @@ data Split m a
   = forall b .
     YieldS
     {-# UNPACK #-} !Level
+    !(Handler m b)
     {-# UNPACK #-} !S
     !(Mem m)
-    !(Handler m b)
     !(b -> VerseT m a)
     !(VerseT m a)
     !(VerseT m a)
@@ -424,7 +417,7 @@ data Split m a
 
 stuck :: VerseT m a
 stuck = VerseT $ \ r s _env mem yk ->
-  unYield yk r.level s mem (const $ pure ())
+  unYield yk r.level (const $ pure ()) s mem
 
 newtype Var m a = Var (Ref m (VarState m a))
 
@@ -554,6 +547,13 @@ freshVar = VerseT $ \ r s _env mem _yk sk fk ek ->
 
 newVar :: MonadRef m => a -> VerseT m (Var m a)
 newVar = lift . fmap Var . newRef . Bound <=< newBound
+
+newVar' :: MonadRef m => a -> Label -> m (Var m a, Label)
+newVar' binding label =
+  let
+    !label' = label + 1
+  in
+    fmap ((, label') . Var) . newRef $ Bound MkBound {..}
 
 newBound :: a -> VerseT m (Bound a)
 newBound !binding = VerseT $ \ _r s _env mem _yk sk ->
