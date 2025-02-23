@@ -212,27 +212,6 @@ chooseRules =
        ( as
        , mkExis exis $ ctx <@ ((Op Gt :@: Tup [n, Lit (LInt 0)]) >>> someUnderscore e)
        )
- <|>
-  do label "FOR-CHOOSE"
-     interest 2
-     Iter IterFor body e0 <- lhs
-     (exis, ctx, Choose sz e) <- evalCtxExis (free body) body
-     guard (free sz `disjointFrom` exis)
-     guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
-       -- This guard seems to make no difference either way /Simon
-     let k:n:a:b:c:x:_ = identsNotIn $ free body
-     pure ( Exi $ bind n $ Exi $ bind k $
-            (Var k :=: Some (Lam $ bind x $ Op GEq :@: Tup [Var x, Lit (LInt 0)]))
-            :>:
-            (Var n :=: Some (Lam $ bind x $ Op GEq :@: Tup [Var x, Lit (LInt 0)]))
-            :>:
-            (Exi $ bind a $ Exi $ bind b $ Exi $ bind c $
-              (Var a :=: Choose (Var k) (Arr (Var n) (mkExis exis (ctx <@ e)))) :>: 
-              (Var b :=: e0) :>:
-              (Op ArrApp :@: Tup [Var a,Var b,Var c]) >>>
-              Var c
-            )
-          )
 
 mkSize :: Val -> Expr -> Expr
 mkSize n e =
