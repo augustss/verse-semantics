@@ -18,7 +18,8 @@ import FrontEnd.Prelude( findPrelude )
 import Core.Expr as Core
 import Core.Traced
 import Core.Verifier( verificationRules )
-import Core.TRS2024 ( runtimeRules )
+import Core.Rules ( runtimeRules )
+import Core.Rule( everywhere, normalize, NormResult(..) )
 
 import Epic.Print hiding ( (<>) )
 import Data.Generics.Uniplate.Data( universeBi )
@@ -322,15 +323,12 @@ srcToCore flags add_verification e
        ; return e4 }
 
 evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Int, Traced Core.Expr)
-evalExpr flags test e
-  | showTrace flags = (r1,length (trace tr),tr)
-  | otherwise       = (r2,k,start e')
+evalExpr flags test e = (r1,length (trace tr),tr)
   where
-    (r1,tr)   = Core.normalizeTrace (maxSteps flags) rules e
-    (r2,k,e') = Core.normalize (maxSteps flags) rules e
+    (r1,tr) = normalize (maxSteps flags) rules e
     rules = case test of
-              TestEvalEq {} -> runtimeRules
-              TestVerify {} -> verificationRules
+              TestEvalEq {} -> everywhere runtimeRules
+              TestVerify {} -> everywhere verificationRules
 
 type TimTag = Src.Ident
 
