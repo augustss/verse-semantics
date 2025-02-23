@@ -15,6 +15,7 @@ verify("M7Feb25-3", fail){ loop():type{fail} := { loop[] }
                              ; loop[] } }
    # M7Feb25-3: If check<succeeds>{fail} is just stuck, then this program will verify.
    # But h3[2] fails!  as you can see in M7Feb25-4
+
 testeq("M7Feb25-4", pass, broken){ loop():type{fail} := { loop[] }
                          ; h3(x:int)<succeeds> :=
                              { if ( f()<succeeds>:type{x=3} := 3 )
@@ -36,6 +37,7 @@ verify("M7Feb25-5", fail, broken)
   # M7Feb25-5 fails when you call h3[2]; but it verifies,
   #   REGARDLESS of the choice of wrongFx
   # if ( verify(){ defn of f, stuck waiting for y }; \().blah ) then fail else fail
+  # VERY BAD: verifies but gets stuck at runtime
 
 verify("M7Feb25-6", fail, broken)
    { loop():type{fail} := { loop[] }

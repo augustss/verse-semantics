@@ -143,7 +143,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | OfType SrcExpr Eff SrcExpr       -- e |>{fx} t
                                      -- Empty [Eff] means "all effects" (not none!)
 
-  | DefineIE Ident Ident SrcExpr       -- (i->x) := e
+  | DefineIE Ident SrcExpr             -- i->t    Capture input
   | Where SrcBlk SrcExpr               -- e1 where e2
   | If3 SrcExpr SrcBlk SrcBlk          -- if(e1) then e2 else e3
   | Splice SrcExpr                     -- Array splicing ..e
@@ -696,7 +696,7 @@ instance Pretty SrcExpr where
           ----
           DefineV i      -> text "exists" <+> pPrint i
           DefineE i e    -> pPrintPrec lvl p (InfixOp (Variable i) (Ident noLoc ":=") e)
-          DefineIE i x e -> pPrintPrec lvl p (InfixOp (InfixOp (Variable i) (Op "->") (Variable x)) (Op ":=") e)
+          DefineIE i e   -> pPrintPrec lvl p (InfixOp (Variable i) (Op "->") e)
           Choice e1 e2   -> pPrintPrec lvl p (InfixOp e1 (Op "|") e2)
           Unify e1 e2    -> pPrintPrec lvl p (InfixOp e1 (Op "=") e2)
           Fail           -> text "fail"
@@ -842,7 +842,7 @@ compos f (Macro2 m a b)     = Macro2 m <$> f a <*> f b
 compos f (Return e)         = Return <$> f e
 compos _ (DefineV i)        = pure $ DefineV i
 compos f (DefineE i e)      = DefineE i <$> f e
-compos f (DefineIE i x e)   = DefineIE i x <$> f e
+compos f (DefineIE i e)     = DefineIE i <$> f e
 compos f (Choice e1 e2)     = Choice <$> f e1 <*> f e2
 compos f (Unify e1 e2)      = Unify <$> f e1 <*> f e2
 compos f (Range e)          = Range <$> f e
@@ -1023,7 +1023,7 @@ getVar (Unify e1 e2)    = getVar e1 ++ getVar e2
 getVar Macro1 {}        = []
 getVar (DefineV _)      = []
 getVar (DefineE _ e)    = getVar e
-getVar (DefineIE _ _ e) = getVar e
+getVar (DefineIE _ e)   = getVar e
 getVar Choice{}         = []
 getVar (Set _ _ e)      = getVar e
 getVar (MVar i t e)     = i : maybe [] getVar t ++ maybe [] getVar e
