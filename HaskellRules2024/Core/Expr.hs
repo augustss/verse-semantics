@@ -19,8 +19,8 @@ module Core.Expr
 
     -- Particular expressions
   , someAny, someNat, nat, inRange, inRangeType
-  , litInt, litIntZero, coreSeq, (>>>)
-  , mkExis, mkApp, mkEqual, mkIf, mkOne, mkAll, mkFor, matchAll, mkCheck, matchCheck
+  , litInt, litIntZero, mkSeq, (>>>)
+  , mkExis, mkApp, mkEqual, mkIf, mkOne, mkAll, mkFor, mkCheck, matchCheck
   , mkCount
   , lamUnderscore, someUnderscore, wrong
   , mkDef
@@ -29,15 +29,11 @@ module Core.Expr
   , Assump(..), FailableAssump(..), AssumpOp(..), GroundVal(..), isPosAssump
 
     -- Rewriting
-  , Rule, Rewrite, removeRule, Context, isContext, (<@)
-  , stepRule, everywhere, tryBefore
-  , NormResult(..), normalize, normalizeTrace, showNormResult
-  , Fuel, lotsOfSteps
-  , RuleEnv(..), extendRuleEnv
-
+  , Context, isContext, (<@)
+  
     -- Binding and substitution
   , subst
-  , unbindAs, unExis
+  , unbindAs
   , alphaRename
   , alphaRenameVerify
 
@@ -52,7 +48,7 @@ import Prelude hiding( (<>) )
 import Epic.Print
 
 import Data.Data(Data)
-import Data.List( union, delete, isPrefixOf )
+import Data.List( union )
 import Core.Bind
 import Core.Traced
 import Test.QuickCheck
@@ -274,18 +270,20 @@ Underscore is treated specially in two rules
 
 -}
 
--- TODO: rename to mkSeq
-coreSeq :: [Expr] -> Expr
--- coreSeq [e1,e2,e3]  =   e1 :>: (e2 :>: e3)
-coreSeq [] = Tup [] -- otherwise this crashes on an empty list
-coreSeq es = foldr1 (:>:) es
+(>>>) :: Expr -> Expr -> Expr -- e1 >>> e2 = (_ = e1); e2
+eq@(_ :=: _) >>> e2 = eq :>: e2
+e1           >>> e2 = (Var underscore :=: e1) :>: e2
+
+mkSeq :: [Expr] -> Expr -- mkSeq [e1,e2,e3] = e1 >>> (e2 >>> e3)
+mkSeq [] = Tup [] -- otherwise this crashes on an empty list
+mkSeq es = foldr1 (>>>) es
 
 mkEqual :: Expr -> Expr -> Expr -> Expr
 -- mkEqual e1 e2 e3 =   (e1 :=: e2); e3
 -- Or more precisely   exists x. (x=e1; x=e2; e3)
 mkEqual e1 e2 e3
   = Exi $ bind x $
-    coreSeq [Var x :=: e1, Var x :=: e2, e3]
+    mkSeq [Var x :=: e1, Var x :=: e2, e3]
   where
     x = identNotIn $ free (e1,e2,e3)
 
@@ -377,10 +375,6 @@ matchCheck e0@(Iter IterIf (Exi bnd) _)
 
 matchCheck _ = Nothing
 
-(>>>) :: Expr -> Expr -> Expr
--- e1 >>> e2  =   (_ = e1); e2
-e1 >>> e2 = (Var underscore :=: e1) :>: e2
-
 lamUnderscore :: Expr -> Expr
 lamUnderscore e = Lam (bind underscore e)
 
@@ -416,19 +410,19 @@ litIntZero = litInt 0
 nat :: Expr
 -- nat = \x. isInt$[x]; x>=0
 nat = Lam $ bind x $
-      coreSeq [ Var underscore :=: (Op IsInt :@: Var x)
-              , Var underscore :=: (Op GEq :@: Tup [Var x, litIntZero])
-              , Var x ]
+      mkSeq [ Op IsInt :@: Var x
+            , Op GEq :@: Tup [Var x, litIntZero]
+            , Var x ]
   where
     x = ident "x"
 
 inRange :: Val -> Val -> Expr
 -- (inrange i n) retuns the expression (isInt$[i]; i >= 0; i < n; i)
-inRange i n = coreSeq [ Var underscore :=: (Op IsInt :@: i)
-                      , Var underscore :=: (Op IsInt :@: n)
-                      , Var underscore :=: (Op GEq :@: Tup [i, litIntZero])
-                      , Var underscore :=: (Op Lt :@: Tup [i,n])
-                      , i ]
+inRange i n = mkSeq [ Op IsInt :@: i
+                    , Op IsInt :@: n
+                    , Op GEq :@: Tup [i, litIntZero]
+                    , Op Lt :@: Tup [i,n]
+                    , i ]
 
 inRangeType :: Val -> Expr
 -- inRangeType n =    \i. inrange[i,n]
@@ -970,12 +964,9 @@ instance Variables Expr where
   variables f (e1 :|: e2)   = variables f (e1,e2)
   variables f (e1 :@: e2)   = variables f (e1,e2)
   variables f (Some e)      = variables f e
-  --variables f (All e)       = variables f e
   variables f (e1 :>>: e2)  = variables f (e1,e2)
-  --variables f (Check _ e)   = variables f e
   variables f (Exi bnd)     = variables f bnd
   variables f (Arr sz e)    = variables f (sz,e)
-  --variables f (Size sz e)   = variables f (sz,e)
   variables f (Choose sz e) = variables f (sz,e)
   variables f (Verify bnd)  = variables f bnd
   variables f (Iter _ e e0) = variables f (e, e0)
@@ -989,13 +980,11 @@ instance Variables Assump where
   variables f (A_Neg a)           = variables f a
   variables f (A_PrimOp i _ gv)   = [i] `union` variables f gv
 
-
 instance Variables GroundVal where
   variables _f (GVVar i)   = [i]
   variables _f (GVLit {})  = []
   variables f  (GVArr gvs) = variables f gvs
   variables f  (GVTru gv)  = variables f gv
-
 
 --------------------------------------------------------------------------------
 --
@@ -1209,164 +1198,6 @@ lookupIdSubst sub x
   = case [y | (x',y) <- sub, x==x'] of
       (y:_) -> y
       []    -> x
-
---------------------------------------------------------------------------------
---
---            Rewriting
---
---------------------------------------------------------------------------------
-
-type Rule    = RuleEnv -> Expr -> [Rewrite]
-type Rewrite = TraceStep Expr
-
-removeRule :: Rule -> String -> Rule
-removeRule rule name
-  = \env e -> [ rewrite
-              | rewrite <- rule env e
-              -- matches when the rw_str of the rewrite is "NAME" or "NAME(..."
-              , not ((name ++ "(") `isPrefixOf` (ts_str rewrite ++ "("))
-              ]
-
-data RuleEnv = RE { skolVars :: [Ident], assumps :: [Assump] }
-
-emptyRuleEnv :: RuleEnv
-emptyRuleEnv = RE { skolVars = [], assumps = [] }
-
-extendRuleEnv :: RuleEnv -> [Ident] -> [Assump] -> RuleEnv
-extendRuleEnv rule_env@(RE { skolVars = skols, assumps = asms }) new_skols new_asms
-  = rule_env { skolVars = new_skols ++ skols, assumps = new_asms ++ asms }
-
-stepRule :: Rule -> Expr -> [Rewrite]
-stepRule rule expr = rule emptyRuleEnv     -- Empty set of skolems
-                          expr
-
-delSkol :: RuleEnv -> Ident -> RuleEnv
-delSkol env@(RE { skolVars=skols }) x = env { skolVars = delete x skols }
-
-tryBefore :: Rule -> Rule -> Rule
--- Run rule1, and only if it can do nothing try rule2
-tryBefore rule1 rule2 env e
-  | null rule1_results = rule2 env e
-  | otherwise          = rule1_results
-  where
-    rule1_results = rule1 env e
-
--- apply a rule everywhere (recursively) in the expression
-everywhere :: Rule -> Rule
-everywhere take_step env orig_e
-  = take_step env orig_e ++ recurse orig_e
- where
-  wrap = wrap_with_env env
-
-  wrap_with_env :: RuleEnv -> (Expr->Expr) -> Expr -> [Rewrite]
-  wrap_with_env env' rebuild e
-    = [ updTsPayload rebuild step
-      | step <- everywhere take_step env' e ]
-
-  recurse (Tup es)     = concatMap do_one [0..length es-1]
-                       where
-                         do_one i = wrap (rebuild i) (es !! i)
-                         rebuild i ei' = Tup (take i es ++ [ei'] ++ drop (i+1) es)
-
-  recurse (e1 :=: e2)  = wrap (:=: e2)  e1 ++ wrap (e1 :=:)  e2
-  recurse (e1 :>: e2)  = wrap (:>: e2)  e1 ++ wrap (e1 :>:)  e2
-  recurse (e1 :|: e2)  = wrap (:|: e2)  e1 ++ wrap (e1 :|:)  e2
-  recurse (e1 :@: e2)  = wrap (:@: e2)  e1 ++ wrap (e1 :@:)  e2
-  recurse (e1 :>>: e2) = wrap (:>>: e2) e1 ++ wrap (e1 :>>:) e2
-  recurse (Some e)     = wrap Some e
-  recurse (Tru e)      = wrap Tru e
-  recurse (Iter f e e0) = wrap (\e' -> Iter f e' e0) e ++ wrap (Iter f e) e0
-
-  recurse (Lam _bnd)   = []  -- Do not look under lambdas
-
-  recurse (Exi bnd)    = wrap_with_env env' (Exi . bind x) e
-                       where
-                         (env',x,e) = walkInsideBind env bnd
-
-  recurse (Verify bl)  = wrap_with_env env' (\e' -> Verify (bindList rs (as,e'))) e
-                       where
-                         env' = extendRuleEnv env rs as
-                         (rs,(as,e)) = alphaRenameVerify (skolVars env) bl
-
-  recurse _            = []
-
-walkInsideBind :: RuleEnv -> Bind a -> (RuleEnv, Ident, a)
--- When we walk inside an (Exi x e) or (Lam x e) we need to delete
--- `x` from the skolems in the RuleEnv. This would not be necessary if
--- skolems and ordinary identifiers came from different name spaces, but
--- currently they are the same, so we need to take care
-walkInsideBind env bnd
-  = (delSkol env x, x, e)
-  where
-    (x,e) = unsafeUnbind bnd
-
--- treat "exi x1 .. exi xn" as one block when matching
-unExis :: Expr -> (Context, Expr)
-unExis (Exi bnd) = (Exi (bind x exis), body)
- where
-  (x,e)       = unsafeUnbind bnd
-  (exis,body) = unExis e
-unExis e         = (HOLE, e)
-
-type Fuel = Int
-
-lotsOfSteps :: Fuel
-lotsOfSteps = 1000
-
-data NormResult
-  = NormOK        -- No rewrites apply
-  | NormExpired   -- We ran out of fuel
-  | NormInvalid   -- A rewrite produced an invalid output
-                  -- according to the `valid` predicate
-  deriving( Eq )
-
-instance Show NormResult where
-   show = showNormResult
-
-showNormResult :: NormResult -> String
-showNormResult NormOK      = "reached a normal form"
-showNormResult NormExpired = "ran out of fuel (Unexpected)"
-showNormResult NormInvalid = "reached an invalid expression -- yikes!"
-
-normalizeTrace :: Fuel    -- Maximum number of steps
-               -> Rule -> Expr
-               -> (NormResult, Traced Expr)
--- Repeatedly apply the first in the
--- list of possiblities returned by the rule
-normalizeTrace fuel rule orig_e = go fuel [] orig_e
- where
-  go :: Int
-     -> [Rewrite]
-     -> Expr
-     -> (NormResult, Traced Expr)
-  go fuel_left tr e =
-    case stepRule rule e of
-      []                        -> (NormOK,      e  :<-- tr)
-      step : _   -- Pick the first offered rewrite
-        | fuel_left==0   -> (NormExpired, e  :<-- tr)
-        | not (valid e') -> (NormInvalid, e' :<-- tr')
-        | otherwise      -> -- ppTrace "norm" (int fuel <+> text s <> braces (pPrintBrief e')) $
-                            go (fuel_left-1) tr' e'
-        where
-          e'  = tsPayload step
-          tr' = step `setTsPayload` e : tr
-
-normalize :: Fuel    -- Maximum number of steps
-          -> Rule -> Expr
-          -> (NormResult, Int, Expr)
--- Repeatedly apply the first in the
--- list of possiblities returned by the rule
-normalize fuel rule orig_e = go 0 orig_e
- where
-  go :: Int
-     -> Expr
-     -> (NormResult, Int, Expr)
-  go nr_steps e
-    | nr_steps > fuel = (NormExpired, nr_steps, e)
-    | otherwise       =
-        case stepRule rule e of
-          []       -> (NormOK, nr_steps, e)
-          step:_ -> go (nr_steps+1) (tsPayload step)
 
 --------------------------------------------------------------------------------
 --
