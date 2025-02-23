@@ -49,7 +49,9 @@ executable confluence-check
     other-modules:
                       Core.Expr
                       Core.Solver
-                      Core.TRS2024
+                      Core.Rules
+                      Core.Rule
+                      Core.Blocked
                       Core.Bind
                       Core.Traced
                       Epic.Print
@@ -193,7 +195,9 @@ library verse-libs
                       FrontEnd.ToCore
                       Core.Expr
                       Core.Solver
-                      Core.TRS2024
+                      Core.Rules
+                      Core.Rule
+                      Core.Blocked
                       Core.Verifier
                       Core.Bind
                       Core.Traced
