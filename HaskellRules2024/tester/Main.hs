@@ -732,7 +732,7 @@ testFlags
                            OA.long "tr-verbosity" <>
                            OA.metavar "NUM" <>
                            OA.value 2 <>
-                           OA.help "Verbosity of rewrite trace (1,2,3)"
+                           OA.help "Verbosity of rewrite trace (0,1,2)"
 
        ; logUnexpected <- OA.switch $
                           OA.long "log-unexpected" <>

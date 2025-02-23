@@ -102,7 +102,7 @@ pPrintTrace verb (res_expr :<-- tr)
 
       | otherwise = go (n+1) False (herald $$ mkarrow n step) steps
       where
-        show_step = verb >= ts_verb step
+        show_step = verb >= 2 - ts_verb step
 
     pp_item herald expr = vcat [text "", herald, indent (pPrint expr)]
                           -- NB: (text "") adds a blank line
