@@ -17,14 +17,13 @@ import qualified Core.Bind as Bind
 
 -- `unsat` is an unsatisfiablity checker, which implements the SOLVER rule.
 -----------------------------------------------------------------------------------
-unsat :: RuleEnv -> Maybe UnsatReason
+unsat :: [Assump] -> Maybe UnsatReason
 -- Nothing <=> not unsatisfible
 -- Just r  <=> unsatisfiable for reason r
 -----------------------------------------------------------------------------------
-unsat env = {- ppTrace "TRACE: unsat" msg -} res
+unsat asms = {- ppTrace "TRACE: unsat" msg -} res
   where
     _msg  = pPrint (asms, res)
-    asms = assumps env
     res  = unsatAsms asms
 
 unsatAsms :: [Assump] -> Maybe UnsatReason
