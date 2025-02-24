@@ -123,8 +123,8 @@ assumps = Rule (\_ _ ass idfs -> [(ass, "", 1, idfs)])
 withAssumps :: [Assump] -> Rule a -> Rule a
 withAssumps ass (Rule m) = Rule (\e sks _ idfs -> m e sks ass idfs)
 
-fresh :: String -> Rule Ident
-fresh pref = Rule (\_ _ _ idfs ->
+_fresh :: String -> Rule Ident
+_fresh pref = Rule (\_ _ _ idfs ->
   let x:_ = identsNotInPrefix pref (S.toList idfs) in
     [(x, "", 1, S.insert x idfs)]
   )
