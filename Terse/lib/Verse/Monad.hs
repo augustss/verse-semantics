@@ -632,15 +632,9 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
     zipVars_ unifyVar x1 x2
 
 writeVar :: MonadRef m => Var m a -> VarState m a -> VerseT m ()
-writeVar (Var ref) x = VerseT $ \ _r s _env mem _yk sk fk ek -> do
-  y <- readRef ref
-  let
-    forward = writeRef ref x
-    backward = writeRef ref y
-  forward
-  sk s (appendMem mem forward backward) ()
-    (\ env mem -> backward *> fk env (appendMem mem backward forward))
-    (\ mem -> backward *> ek (appendMem mem backward forward))
+writeVar (Var ref) x = do
+  y <- lift $ readRef ref
+  liftPut (writeRef ref x) (writeRef ref y)
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 readRoot var@(Var ref) = lift (readRef ref) >>= \ case
