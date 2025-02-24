@@ -44,10 +44,11 @@ import qualified FrontEnd.Flags as F
 import qualified FrontEnd.Expr as F
 import qualified FrontEnd.Desugar
 import qualified FrontEnd.ToCore
-import Data.Scientific
+import Data.Scientific hiding ( normalize )
 import Data.Text(unpack)
 import qualified Core.Expr as Core
-import Core.TRS2024( runtimeRules )
+import Core.Rule hiding ( choices )
+import Core.Rules( runtimeRules )
 import Core.Traced(term)
 import Epic.Print(prettyShow, display)
 --import Debug.Trace
@@ -321,7 +322,7 @@ srcToCore flags add_verification e = do
 evalExpr :: TestFlags -> F.SrcExpr -> IO (Maybe Core.Expr)
 evalExpr tflg e = do
   ce <- srcToCore F.defaultFlags Prelude.False e
-  let (r, tr) = Core.normalizeTrace steps runtimeRules ce
+  let (r, tr) = normalize steps (everywhere runtimeRules) ce
       v = term tr
       steps = 20000
   when (showTrace tflg) $ do
@@ -329,12 +330,12 @@ evalExpr tflg e = do
     display tr
 
   case r of
-    Core.NormOK | isOKResult v -> return (Just v)
-                | otherwise -> return Nothing
-    Core.NormExpired -> do
+    NormOK | isOKResult v -> return (Just v)
+           | otherwise -> return Nothing
+    NormExpired -> do
       putStrLn "*** Ran out of fuel"
       return Nothing
-    Core.NormInvalid -> error $ "Invalid reduction result:\n" ++ prettyShow v
+    NormInvalid -> error $ "Invalid reduction result:\n" ++ prettyShow v
 
 data TestFlags = TestFlags
   { onlyTest       :: !(Maybe String)      -- run only this test
