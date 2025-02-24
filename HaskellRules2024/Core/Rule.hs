@@ -8,7 +8,10 @@ module Core.Rule
   , interest
   , skolems
   , assumps
-  , fresh
+  -- , fresh  -- fresh commented out for now because mixing identNotIn and fresh
+              -- is dangerous, and starting to use "fresh" needs to be accompanied
+              -- by some kind of invariant that all idents introduced by fresh
+              -- will not clash with other ways of creating idents
   , only
   , choices
   , normalize
@@ -143,7 +146,7 @@ choices = foldr (<|>) empty
 -----------------------------------------------------------------------------
 -- rewriting
 
--- apply the given rule at every immediate recursive occurrence of Expr
+-- apply the given rule at every immediate recursive occurrence of LHS
 dive :: Rule Expr -> Rule Expr
 dive r =
   do e <- lhs
