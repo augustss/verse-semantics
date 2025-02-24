@@ -16,6 +16,7 @@ module Core.Rule
   , choices
   , normalize
   , NormResult(..)
+  , showNormResult
   , lotsOfSteps
   , everywhere
   )

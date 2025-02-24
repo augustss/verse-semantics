@@ -5,7 +5,8 @@ module Main(main) where
 import Prelude
 
 import Core.Expr     as Core
-import Core.TRS2024  as TRS2024
+import Core.Rule
+import Core.Rules    as TRS2024
 import Core.Verifier as Verifier
 import Core.Traced
 
@@ -379,7 +380,7 @@ cEval
        ; putStrLn (prettyShow prepd_expr)
 
        ; putStrLn ("\n\n------- Evaluate ---------")
-       ; let eval_it = Core.normalizeTrace (fEvalSteps (cs_flags s)) TRS2024.runtimeRules
+       ; let eval_it = normalize (fEvalSteps (cs_flags s)) (everywhere TRS2024.runtimeRules)
 
        ; core_result <- showEvalResult (fTraceEval $ cs_flags s) "Evaluation" (eval_it prepd_expr)
 
@@ -391,8 +392,8 @@ cVerify
   = withLastExpr $ \ e s ->
     tryIt (pure s) (updateLastExpr s) $
     do { putStrLn ("\n\n------- Prep'd ---------")
-       ; let verify_it = Core.normalizeTrace (fEvalSteps (cs_flags s))
-                              (Core.everywhere Verifier.verificationRules)
+       ; let verify_it = normalize (fEvalSteps (cs_flags s))
+                              (everywhere Verifier.verificationRules)
        ; let core_expr, prepd_expr :: Core.Expr
              core_expr  = asCore e
              prepd_expr = prep core_expr
