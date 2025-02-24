@@ -8,7 +8,7 @@
 module Verse.Monad
   ( VerseT
   , runVerseT
-  , tell
+  , liftPut
   , all'
   , one
   , if'
@@ -171,6 +171,11 @@ instance MonadState s m => MonadState s (VerseT m) where
   get = lift get
   put = lift . put
   state = lift . state
+
+liftPut :: Monad m => m () -> m () -> VerseT m ()
+liftPut forward backward = do
+  lift forward
+  tell forward backward
 
 tell :: Applicative m => m () -> m () -> VerseT m ()
 tell forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
