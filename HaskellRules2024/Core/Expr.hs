@@ -344,8 +344,8 @@ mkCheck Decides e =
 -- WRONG for definitely-failed check<fx>{e}
 wrongFx :: Effect -> Expr
 wrongFx fx =  -- See Note [wrongFx] for these two alternative implementations
-  --Err ("check<" ++ show fx ++ ">")                        -- Use Err
-  Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []   -- Stuck
+  Err ("check<" ++ show fx ++ ">")                        -- Use Err
+  --Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []   -- Stuck
 
 {- Note [wrongFx]
 ~~~~~~~~~~~~~~~~~
