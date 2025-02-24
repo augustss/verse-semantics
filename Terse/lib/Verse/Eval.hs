@@ -535,21 +535,17 @@ unifyHeap = (lift .) . Monad.unifyVar
 addStack :: MonadState Mem m => EvalT m Int
 addStack = asks (.stack) >>= \ stack -> lift $ do
   i <- supply
-  let
-    forward = modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks }
-    backward = modify' $ \ s -> s { stacks = IntMap.delete i s.stacks }
-  lift forward
-  Monad.tell forward backward
+  Monad.liftPut
+    (modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks })
+    (modify' $ \ s -> s { stacks = IntMap.delete i s.stacks })
   pure i
 
 removeStack :: MonadState Mem m => Int -> EvalT m ()
 removeStack i = lift $ do
   stack <- gets $ (! i) . (.stacks)
-  let
-    forward = modify' $ \ s -> s { stacks = IntMap.delete i s.stacks }
-    backward = modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks }
-  lift forward
-  Monad.tell forward backward
+  Monad.liftPut
+    (modify' $ \ s -> s { stacks = IntMap.delete i s.stacks })
+    (modify' $ \ s -> s { stacks = IntMap.insert i stack s.stacks })
 
 supply :: MonadState Mem m =>  m Int
 supply = do

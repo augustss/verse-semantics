@@ -8,7 +8,7 @@
 module Verse.Monad
   ( VerseT
   , runVerseT
-  , tell
+  , liftPut
   , all'
   , one
   , if'
@@ -171,6 +171,11 @@ instance MonadState s m => MonadState s (VerseT m) where
   get = lift get
   put = lift . put
   state = lift . state
+
+liftPut :: Monad m => m () -> m () -> VerseT m ()
+liftPut forward backward = do
+  lift forward
+  tell forward backward
 
 tell :: Applicative m => m () -> m () -> VerseT m ()
 tell forward backward = VerseT $ \ _r s _env mem _yk sk fk ek ->
@@ -627,15 +632,9 @@ unifyVar var1 var2 = (,) <$> readRoot var1 <*> readRoot var2 >>= \ case
     zipVars_ unifyVar x1 x2
 
 writeVar :: MonadRef m => Var m a -> VarState m a -> VerseT m ()
-writeVar (Var ref) x = VerseT $ \ _r s _env mem _yk sk fk ek -> do
-  y <- readRef ref
-  let
-    forward = writeRef ref x
-    backward = writeRef ref y
-  forward
-  sk s (appendMem mem forward backward) ()
-    (\ env mem -> backward *> fk env (appendMem mem backward forward))
-    (\ mem -> backward *> ek (appendMem mem backward forward))
+writeVar (Var ref) x = do
+  y <- lift $ readRef ref
+  liftPut (writeRef ref x) (writeRef ref y)
 
 readRoot :: MonadRef m => Var m a -> VerseT m (Var m a, Root m a)
 readRoot var@(Var ref) = lift (readRef ref) >>= \ case
