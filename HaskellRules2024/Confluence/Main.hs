@@ -2,14 +2,18 @@
 module Main where
 
 import Core.Expr
-import Core.TRS2024 as TRS2024
+import Core.Bind
+import Core.Rule
+import Core.Rules
 import Core.Traced
+
+import qualified Data.Set as S
 import Test.QuickCheck
 
 --------------------------------------------------------------------------------
 
-trs2024_noREC :: Rule
-trs2024_noREC = TRS2024.runtimeRules `removeRule` "REC" -- no confluence with REC
+trs2024_noREC :: Rule Expr
+trs2024_noREC = runtimeRules `without` "REC" -- no confluence with REC
 
 prop_Valid :: Expr -> Bool
 prop_Valid t0 =
@@ -18,7 +22,7 @@ prop_Valid t0 =
 prop_ValidTrace :: Property
 prop_ValidTrace =
   forAllShrink arbExpr shrinkExpr $ \p ->
-    let (resp, np :<-- ps)  = normalizeTrace lotsOfSteps trs2024_noREC p
+    let (resp, np :<-- ps)  = normalize lotsOfSteps trs2024_noREC p
      in whenFail (do putStrLn "== TRACE =="
                      displayTrace (np :<-- ps)) $
           resp == NormOK ==>
@@ -34,8 +38,8 @@ prop_ValidTrace =
 prop_Confluent :: Property
 prop_Confluent =
   forAllShrinkBlind arbFork shrinkFork $ \(p, q :<-- qs1) ->
-    let (resp, np :<-- ps)  = normalizeTrace lotsOfSteps trs2024_noREC p
-        (resq, nq :<-- qs2) = normalizeTrace lotsOfSteps trs2024_noREC q
+    let (resp, np :<-- ps)  = normalize lotsOfSteps trs2024_noREC p
+        (resq, nq :<-- qs2) = normalize lotsOfSteps trs2024_noREC q
      in whenFail' (writeFile "counterexample.txt" (show p)) $
         whenFail (do putStrLn "== TRACE #1 =="
                      displayTrace (np :<-- ps)
@@ -48,9 +52,9 @@ prop_Confluent =
   arbFork =
     do p <- prep `fmap` arbitrary
        permf <- liftArbitrary arbPermutation
-       let perm_rules :: Rule
-           perm_rules = \env e -> permf e (trs2024_noREC env e)
-           (_res, tr) = normalizeTrace lotsOfSteps perm_rules p
+       let perm_rules :: Rule Expr
+           perm_rules = permute permf trs2024_noREC
+           (_res, tr) = normalize lotsOfSteps perm_rules p
        return (p,tr)
 
   shrinkFork :: (Expr, Traced Expr) -> [(Expr,Traced Expr)]
@@ -69,6 +73,11 @@ prop_Confluent =
     | p' <- shrink p ++ map tsPayload (stepRule trs2024_noREC p)
     , valid p'
     , step <- stepRule trs2024_noREC p'
+    ]
+
+  stepRule rule e =
+    [ TS lab v e'
+    | (e',lab,v) <- run rule (S.fromList (occurs e)) [] [] e
     ]
 
 --------------------------------------------------------------------------------

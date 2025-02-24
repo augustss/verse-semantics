@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module Core.Rule
   ( Rule
   , run
@@ -13,6 +12,7 @@ module Core.Rule
               -- by some kind of invariant that all idents introduced by fresh
               -- will not clash with other ways of creating idents
   , only
+  , permute
   , choices
   , normalize
   , NormResult(..)
@@ -136,6 +136,10 @@ only p (Rule m) =
     , p s
     ]
   )
+
+permute :: (Expr -> [(a,String,Int,Set Ident)] -> [(a,String,Int,Set Ident)])
+        -> Rule a -> Rule a
+permute f (Rule m) = Rule (\e sks ass idfs -> f e (m e sks ass idfs))
 
 -----------------------------------------------------------------------------
 -- auxiliary functions
