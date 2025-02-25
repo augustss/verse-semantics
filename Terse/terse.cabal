@@ -18,6 +18,7 @@ library
   import:           warnings
   hs-source-dirs:   lib
   exposed-modules:
+    AnsiStyle
     Fix
     IntMap
     Loc
