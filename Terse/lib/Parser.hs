@@ -73,23 +73,17 @@ data Result a
   | Empty {-# UNPACK #-} !Text {-# UNPACK #-} !Pos
 
 runParser :: Parser a -> Text -> Result a
-runParser m input =
-  let
-    s = S { input, pos = Pos.empty }
-  in
-    unParser m s yk sk fk fk
+runParser m input = unParser m s yk sk fk fk
   where
+    s = S { input, pos = Pos.empty }
     yk = Yield
     sk x s _yk _fk = Pure x s.input
     fk s _yk = Empty s.input s.pos
 
 parse :: Parser a -> Text -> Either Pos a
-parse m input =
-  let
-    s = S { input, pos = Pos.empty }
-  in
-    unParser m s yk sk fk fk
+parse m input = unParser m s yk sk fk fk
   where
+    s = S { input, pos = Pos.empty }
     yk f = f mempty
     sk x _s _yk _fk = Right x
     fk s _yk = Left s.pos
