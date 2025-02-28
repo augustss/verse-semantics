@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Verse.Parse
+module Verse.Core.Parse
   ( parse
   , parse'
   , Result (..)
@@ -55,7 +55,7 @@ import Parser
 import Parser qualified
 import Pos
 
-import Verse.Exp
+import Verse.Core.Exp
   ( ExpF
   , LExp
   , pattern (:&)
@@ -66,7 +66,7 @@ import Verse.Exp
   , pattern (:+)
   , pattern (:-)
   )
-import Verse.Exp qualified as Exp
+import Verse.Core.Exp qualified as Exp
 
 parse :: Text -> Either Pos LExp
 parse = Parser.parse $ spaces *> exp <* eof

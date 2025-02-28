@@ -28,10 +28,10 @@ import Text (Text)
 import Text qualified
 
 import Verse qualified
-import Verse.Exp qualified as Verse
-import Verse.Eval qualified as Verse
-import Verse.Parse qualified as Parse
-import Verse.Parse qualified as Verse (parse')
+import Verse.Core.Exp qualified as Verse
+import Verse.Core.Eval qualified as Verse
+import Verse.Core.Parse qualified as Parse
+import Verse.Core.Parse qualified as Verse (parse')
 
 main :: IO ()
 main = getArgs >>= \ case

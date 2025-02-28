@@ -9,9 +9,9 @@ module Verse.CPS.Convert
 
 import Loc
 
+import Verse.Core.Exp
 import Verse.CPS.Exp (Label)
 import Verse.CPS.Exp qualified as CPS
-import Verse.Exp
 
 data Result = Result
   { exp :: CPS.LExp

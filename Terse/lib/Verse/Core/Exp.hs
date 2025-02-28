@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
-module Verse.Exp
+module Verse.Core.Exp
   ( ExpF (..)
   , Exp
   , LExp

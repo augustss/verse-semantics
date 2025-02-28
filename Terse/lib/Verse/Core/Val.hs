@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Verse.Val
+module Verse.Core.Val
   ( Val (..)
   , Env
   ) where
@@ -17,7 +17,7 @@ import Data.IntMap.Strict qualified as IntMap
 
 import Prettyprinter
 
-import Verse.Exp (LExp)
+import Verse.Core.Exp (LExp)
 import Verse.Fun (Fun)
 import Verse.Monad
 import Verse.Name
