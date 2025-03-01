@@ -1,6 +1,4 @@
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Verse.Core.Parse
@@ -11,35 +9,20 @@ module Verse.Core.Parse
 
 import Control.Applicative
 
-import Data.Char
 import Data.Functor
 import Data.Monoid ((<>))
 import Data.Text (Text)
-import Data.Text qualified as Text
 
 import Prelude
-  ( Bool
-  , Either
-  , Integer
-  , Integral
-  , Num
+  ( Either
   , ($)
-  , (&&)
   , (.)
-  , (<=)
   , (=<<)
   , (>>)
   , (>>=)
-  , (+)
-  , (*)
-  , (-)
-  , flip
-  , foldl
-  , fromIntegral
-  , negate
-  , subtract
   )
 
+import List (last1, reverse2)
 import Loc
 import Parser
   ( Parser
@@ -49,9 +32,6 @@ import Parser
   , eof
   , get
   , runParser
-  , satisfy
-  , skipWhile
-  , takeWhile
   )
 import Parser qualified
 import Pos
@@ -68,6 +48,7 @@ import Verse.Core.Exp
   , pattern (:-)
   )
 import Verse.Core.Exp qualified as Exp
+import Verse.Token
 
 parse :: Text -> Either Pos LExp
 parse = Parser.parse $ spaces *> exp <* eof
@@ -180,111 +161,8 @@ wrapReverse2 :: ([L f] -> f (L f)) -> L f -> L f -> [L f] -> L f
 wrapReverse2 f x@(L i _) y xs =
   L (extract (last1 y xs) <> i) . f $ reverse2 x y xs
 
-last1 :: a -> [a] -> a
-last1 x = \ case
-  [] -> x
-  x:xs -> last1 x xs
-
-reverse2 :: a -> a -> [a] -> [a]
-reverse2 x y = foldl (flip (:)) [y, x]
-
 fun :: Parser ()
 fun = token $ void "fun"
 
 exists :: Parser ()
 exists = token $ void "exists"
-
-integer :: Parser Integer
-integer = token $ signed decimal
-
-fail :: Parser ()
-fail = token $ void "fail"
-
-all :: Parser ()
-all = token $ void "all"
-
-for :: Parser ()
-for = token $ void "for"
-
-do' :: Parser ()
-do' = token $ void "do"
-
-one :: Parser ()
-one = token $ void "one"
-
-if' :: Parser ()
-if' = token $ void "if"
-
-then' :: Parser ()
-then' = token $ void "then"
-
-else' :: Parser ()
-else' = token $ void "else"
-
-name :: Parser Text
-name = token $
-  "operator'+'" <|>
-  "operator'-'" <|>
-  "operator'<'" <|>
-  Text.cons <$> head <*> tail
-  where
-    head = alpha <|> char '_'
-    tail = takeWhile isAlphaNum
-
-lparen :: Parser ()
-lparen = token . void $ char '('
-
-rparen :: Parser ()
-rparen = token . void $ char ')'
-
-lbrace :: Parser ()
-lbrace = token . void $ char '{'
-
-rbrace :: Parser ()
-rbrace = token . void $ char '}'
-
-lbracket :: Parser ()
-lbracket = token . void $ char '['
-
-rbracket :: Parser ()
-rbracket = token . void $ char ']'
-
-langle :: Parser ()
-langle = token . void $ char '<'
-
-semi :: Parser ()
-semi = token . void $ char ';'
-
-comma :: Parser ()
-comma = token . void $ char ','
-
-pipe :: Parser ()
-pipe = token . void $ char '|'
-
-equal :: Parser ()
-equal = token . void $ char '='
-
-token :: Parser a -> Parser a
-token m = m <* spaces
-
-spaces :: Parser ()
-spaces = skipWhile isSpace
-
-alpha :: Parser Char
-alpha = satisfy isAlpha
-
-decimal :: Integral a => Parser a
-decimal = do
-  z <- fromIntegral . (subtract 48) . ord <$> satisfy isDecimal
-  Text.foldl' f z <$> takeWhile isDecimal
-  where
-    f z x = z * 10 + fromIntegral (ord x - 48)
-
-isDecimal :: Char -> Bool
-isDecimal x = '0' <= x && x <= '9'
-
-signed :: Num a => Parser a -> Parser a
-signed m =
-  negate <$> (char '-' *> m) <|>
-  char '+' *> m <|>
-  m

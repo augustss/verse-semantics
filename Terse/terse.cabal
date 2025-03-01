@@ -21,6 +21,7 @@ library
     AnsiStyle
     Fix
     IntMap
+    List
     Loc
     Parser
     Pos
@@ -38,6 +39,7 @@ library
     Verse.Fun
     Verse.Monad
     Verse.Name
+    Verse.Token
   build-depends:
     base,
     containers,
