@@ -44,6 +44,7 @@ import Loc
 import Parser
   ( Parser
   , Result (..)
+  , chainl1
   , char
   , eof
   , get
@@ -90,14 +91,7 @@ tup = (eq >>= loop []) <|> done0
       spaces *> get <&> \ i -> L (Loc i i) $ Exp.Tup []
     done1 x = \ case
       [] -> x
-      y:xs -> wrapRev2 Exp.Tup x y xs
-    wrapRev2 f x@(L i _) y xs =
-      L (extract (last1 y xs) <> i) . f $ reverse2 x y xs
-    last1 x = \ case
-      [] -> x
-      x:xs -> last1 x xs
-    reverse2 x y =
-      foldl (flip (:)) [y, x]
+      y:xs -> wrapReverse2 Exp.Tup x y xs
 
 eq :: Parser LExp
 eq = chainl1 less $ wrap2 (:=) <$ equal
@@ -124,7 +118,6 @@ app = base >>= loop
       (loop . wrap2 Exp.App x =<< arg) <|>
       pure x
     arg = do
-      spaces
       i <- get
       lbracket
       L _ x <- exp
@@ -133,11 +126,10 @@ app = base >>= loop
       pure $ L (Loc i j) x
 
 base :: Parser LExp
-base = parens <|> wrap baseF
+base = parens <|> wrapM baseF
 
 parens :: Parser LExp
 parens = do
-  spaces
   i <- get
   lparen
   L _ x <- exp
@@ -173,8 +165,8 @@ baseF =
   Exp.Var
   <$> name
 
-wrap :: Parser (f (L f)) -> Parser (L f)
-wrap m = do
+wrapM :: Parser (f (L f)) -> Parser (L f)
+wrapM m = do
   spaces
   i <- get
   x <- m
@@ -183,6 +175,18 @@ wrap m = do
 
 wrap2 :: (L f -> L f -> f (L f)) -> L f -> L f -> L f
 wrap2 f x@(L i _) y@(L j _) = L (i <> j) (f x y)
+
+wrapReverse2 :: ([L f] -> f (L f)) -> L f -> L f -> [L f] -> L f
+wrapReverse2 f x@(L i _) y xs =
+  L (extract (last1 y xs) <> i) . f $ reverse2 x y xs
+
+last1 :: a -> [a] -> a
+last1 x = \ case
+  [] -> x
+  x:xs -> last1 x xs
+
+reverse2 :: a -> a -> [a] -> [a]
+reverse2 x y = foldl (flip (:)) [y, x]
 
 fun :: Parser ()
 fun = token $ void "fun"
@@ -284,15 +288,3 @@ signed m =
   negate <$> (char '-' *> m) <|>
   char '+' *> m <|>
   m
-
-chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
-chainl1 m n = do
-  x <- m
-  loop x
-  where
-    loop x =
-      loop1 x <|> pure x
-    loop1 x = do
-      f <- n
-      y <- m
-      loop $ f x y

@@ -13,6 +13,7 @@ module Parser
   , satisfy
   , char
   , eof
+  , chainl1
   ) where
 
 import Control.Applicative
@@ -271,6 +272,18 @@ eof = Parser $ \ s yk sk fk _ak ->
     then sk () s ($ mempty) fk
     else fk s { input = s.input <> input } yk
   else fk s yk
+
+chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+chainl1 m n = do
+  x <- m
+  loop x
+  where
+    loop x =
+      loop1 x <|> pure x
+    loop1 x = do
+      f <- n
+      y <- m
+      loop $ f x y
 
 takeWhileAcc :: (Char -> Int -> a -> Maybe a) -> Text -> a -> (Text, a)
 takeWhileAcc f !xs = loop 0
