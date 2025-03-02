@@ -1,29 +1,16 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE UndecidableInstances #-}
 module Verse.Core.Exp
   ( ExpF (..)
   , Exp
   , LExp
   ) where
 
-import Prettyprinter
-
 import Fix
 import Loc
+import Pretty
 
 import Verse.Name
-
-class Pretty a => PrettyPrec a where
-  prettyPrec :: Int -> a -> Doc ann
-
-instance PrettyPrec (f (Fix f)) => PrettyPrec (Fix f) where
-  prettyPrec prec = prettyPrec prec . getFix
-
-prettyParens :: Bool -> Doc ann -> Doc ann
-prettyParens = \ case
-  True -> parens
-  False -> id
 
 data ExpF a
   = Var {-# UNPACK #-} !Name
@@ -106,8 +93,5 @@ instance PrettyPrec a => PrettyPrec (ExpF a) where
       "else" <+> lbrace <> prettyPrec 0 e3 <> rbrace
 
 type Exp = Fix ExpF
-
-instance PrettyPrec (f (L f)) => PrettyPrec (L f) where
-  prettyPrec prec = prettyPrec prec . unwrap
 
 type LExp = L ExpF

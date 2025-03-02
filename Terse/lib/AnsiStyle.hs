@@ -1,5 +1,6 @@
 module AnsiStyle
-  ( errorColor
+  ( AnsiStyle
+  , errorColor
   , bolded
   ) where
 

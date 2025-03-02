@@ -25,6 +25,7 @@ library
     Loc
     Parser
     Pos
+    Pretty
     Ref
     Text
     Verse

@@ -13,11 +13,10 @@ module Loc
 
 import Data.Text.Unsafe qualified as Unsafe
 
-import Prettyprinter
-import Prettyprinter.Render.Terminal
 
 import AnsiStyle
 import Pos
+import Pretty
 import Text (Text)
 import Text qualified as Text
 
@@ -32,6 +31,9 @@ instance Pretty Loc where
 data L f = L !Loc !(f (L f))
 
 deriving instance Show (f (L f)) => Show (L f)
+
+instance PrettyPrec (f (L f)) => PrettyPrec (L f) where
+  prettyPrec prec = prettyPrec prec . unwrap
 
 extract :: L f -> Loc
 extract (L x _) = x
