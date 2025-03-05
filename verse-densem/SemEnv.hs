@@ -99,8 +99,16 @@ data Value
  deriving ( Eq, Ord )
 
 instance Show Value where
-  show (Int k)   = show k
-  show (Fun xys) = show xys
+  show (Int k)    = show k
+  show (Fun xys)
+    | and [ x == Int i | (i,x:->_) <- [0..] `zip` xys ] = 
+        "<" ++ intercalate "," [ show y | (_:->y) <- xys ] ++ ">"
+
+    | otherwise =
+        show xys
+
+tup :: [Value] -> Value
+tup ys = Fun [ Int i :-> y | (i,y) <- [0..] `zip` ys ]
 
 ----------------------------------------------------------------------------------------
 
@@ -111,6 +119,9 @@ type Env = Set (Pair Ident Value)
 
 (?) :: Env -> Ident -> Value
 env ? x = head [ v | (y :-> v) <-from$ env, y==x ]
+
+del :: Ident -> Env -> Env
+del x env = set[ p | p@(y:->_) <-from$ env, y/=x ]
 
 univEnv :: [Ident] -> Set Env
 univEnv []     = set[ set[] ]
@@ -126,8 +137,13 @@ sem (Const k) =
   set[ [ (set[], Int k) ] ]
 
 sem (Var x) =
-  set[ [ (set[ x:->v ], v) ]
-     | v <-from$ univ
+  set[ [ (set[ x:->v ], v) | v <- vs ]
+     | vs <- permutations (from univ)
+     ]
+
+sem (Exi x e) =
+  set[ [ (del x env, v) | (env,v) <- s ]
+     | s <-from$ sem e
      ]
 
 sem (e1 :|: e2) =
@@ -136,15 +152,17 @@ sem (e1 :|: e2) =
      , s2 <-from$ sem e2
      ]
 
-sem (e1 :=: e2) =
-  set[ s3
-     | s1 <-from$ sem e1
-     , s3 <-from$ flat [ set[ [ (env1 \/ env2,v2) | (env2,v2)<-s2, env1 ~= env2, v1==v2 ]
-                            | s2 <-from$ sem e2
-                            ]
-                       | (env1,v1) <- s1
-                       ]
+sem (Var x :=: e) =
+  set[ [ (env1 \/ env2, v)
+       | (env1,v) <- s
+       , let env2 = set[ x:->v ]
+       , env1 ~= env2
+       ]
+     | s <-from$ sem e
      ]
+
+sem (e1 :=: e2) =
+  error "no expressions on the LHS of = (yet)"
 
 sem (e1 :>: e2) =
   set[ s3
@@ -156,6 +174,26 @@ sem (e1 :>: e2) =
                        ]
      ]
 
+sem (One e) =
+  set[ take 1 s
+     | s <-from$ sem e
+     ]
+
+sem (All e) =
+  set[ [ (env, tup (map snd t))  ]
+     | s <-from$ sem e
+     , t <- subs s
+     , env <- combine (map fst t)
+     ]
+ where
+  subs []     = [[]]
+  subs (x:xs) = [ x:ys | ys <- xss ] ++ xss where xss = subs xs
+
+  combine []       = [ set[] ]
+  combine [env]    = [ env ]
+  combine (env1:env2:envs)
+    | env1 ~= env2 = combine ((env1 \/ env2):envs)
+    | otherwise    = [] 
 
 sem _ =
   set[]
@@ -242,9 +280,12 @@ examples =
 
   , 1 :|: 2
   , x :=: (1 :|: 2)
-  , (1 :|: 2) :=: x
-  , (2 :|: 1) :=: (1 :|: 2 :|: 3)
+  -- , (1 :|: 2) :=: x
+  -- , (2 :|: 1) :=: (1 :|: 2 :|: 3)
   , (x :=: (1 :|: 2)) :>: (x :=: y)
+  , exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 3))
+  , One (exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 3)))
+  , All (exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 3)))
   ]
   
 ----------------------------------------------------------------------------------------
