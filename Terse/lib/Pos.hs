@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -15,15 +16,9 @@ import Text (Text)
 import Text qualified as Text
 
 import Prettyprinter
-  ( Doc
-  , Pretty (..)
-  , (<+>)
-  , annotate
-  , colon
-  , indent
-  , line'
-  )
 import Prettyprinter.Render.Terminal
+
+import AnsiStyle
 
 data Pos = Pos
   { indexWord8 :: {-# UNPACK #-} !Int
@@ -79,8 +74,5 @@ prettyPosText :: Text -> Pos -> Doc AnsiStyle
 prettyPosText input pos =
   pretty (Text.sliceWord8 pos.rowIndexWord8 pos.indexWord8 input) <>
   annotate
-  (color Red)
+  errorColor
   (pretty . Text.takeWhile (/= '\n') $ Unsafe.dropWord8 pos.indexWord8 input)
-
-bolded :: Doc AnsiStyle -> Doc AnsiStyle
-bolded = annotate bold

@@ -13,10 +13,10 @@ module Loc
 
 import Data.Text.Unsafe qualified as Unsafe
 
-import Prettyprinter
-import Prettyprinter.Render.Terminal
 
+import AnsiStyle
 import Pos
+import Pretty
 import Text (Text)
 import Text qualified as Text
 
@@ -31,6 +31,9 @@ instance Pretty Loc where
 data L f = L !Loc !(f (L f))
 
 deriving instance Show (f (L f)) => Show (L f)
+
+instance PrettyPrec (f (L f)) => PrettyPrec (L f) where
+  prettyPrec prec = prettyPrec prec . unwrap
 
 extract :: L f -> Loc
 extract (L x _) = x
@@ -65,13 +68,10 @@ prettyLocText input (Loc i j) =
   pretty (Text.sliceWord8 i.rowIndexWord8 i.indexWord8 input) <>
   if i.rowIndexWord8 == j.rowIndexWord8 then
     annotate
-    (color Red)
+    errorColor
     (pretty $ Text.sliceWord8 i.indexWord8 j.indexWord8 input) <>
     pretty (Text.takeWhile (/= '\n') $ Unsafe.dropWord8 j.indexWord8 input)
   else
     annotate
-    (color Red)
+    errorColor
     (pretty . Text.takeWhile (/= '\n') $ Unsafe.dropWord8 i.indexWord8 input)
-
-bolded :: Doc AnsiStyle -> Doc AnsiStyle
-bolded = annotate bold

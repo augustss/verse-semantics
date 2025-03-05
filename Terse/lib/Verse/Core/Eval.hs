@@ -4,7 +4,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-module Verse.Eval
+module Verse.Core.Eval
   ( eval
   ) where
 
@@ -33,14 +33,14 @@ import Fix
 import Loc
 import Ref
 
-import Verse.Exp
+import Verse.Core.Exp
+import Verse.Core.Val (Val)
+import Verse.Core.Val qualified as Val
 import Verse.Fun (Fun)
 import Verse.Fun qualified as Fun
 import Verse.Monad (VerseT, runVerseT)
 import Verse.Monad qualified as Monad
 import Verse.Name
-import Verse.Val (Val)
-import Verse.Val qualified as Val
 
 eval :: LExp -> IO (Either [[Loc]] [Fix (Val Identity)])
 eval e = fmap done . flip runStateT Mem {..} . runVerseT $ do

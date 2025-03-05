@@ -18,25 +18,29 @@ library
   import:           warnings
   hs-source-dirs:   lib
   exposed-modules:
+    AnsiStyle
     Fix
     IntMap
+    List
     Loc
     Parser
     Pos
+    Pretty
     Ref
     Text
     Verse
+    Verse.Core.Eval
+    Verse.Core.Exp
+    Verse.Core.Parse
+    Verse.Core.Val
     Verse.CPS.Convert
     Verse.CPS.Eval
     Verse.CPS.Exp
     Verse.CPS.Val
-    Verse.Eval
-    Verse.Exp
     Verse.Fun
     Verse.Monad
     Verse.Name
-    Verse.Parse
-    Verse.Val
+    Verse.Token
   build-depends:
     base,
     containers,

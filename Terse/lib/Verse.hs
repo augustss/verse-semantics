@@ -16,9 +16,9 @@ import Loc
 import Pos
 import Text (Text)
 
-import Verse.Eval
-import Verse.Parse
-import Verse.Val
+import Verse.Core.Eval
+import Verse.Core.Parse
+import Verse.Core.Val
 
 run :: Text -> IO (Either (Doc AnsiStyle) [Fix (Val Identity)])
 run input = case parse input of

@@ -224,14 +224,13 @@ runVerseT m = do
   let
     sk s mem x fk _ek
       | s.count == 0 =
-        runFindT (findVars (x, mem.heap)) level mem.label >>= \ case
+        runFindT (findVars (x, mem.heap)) 0 mem.label >>= \ case
           Nothing -> pure Nothing
           Just ((x, heap), label) -> fmap (x:) <$> fk env Mem {..}
       | otherwise = pure Nothing
   unVerseT m r s env Mem {..} yk sk fk ek
   where
-    r = R {..}
-    level = 0
+    r = R { level = 1 }
     s = S { count = 0 }
     heap = mempty
     forward = pure ()
@@ -723,7 +722,7 @@ findVar var@(Var ref) = readRef ref >>= \ case
         writeRef ref . Bound =<< newBound' =<< findVars x.binding
         pure var
   Unbound x -> do
-    guard =<< asks (<= x.level)
+    guard =<< asks (>= x.level)
     pure var
   where
     lookupInsertA k x =

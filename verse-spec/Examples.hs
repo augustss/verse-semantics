@@ -32,6 +32,26 @@ runExample eval (e, r) = do
 cint :: Exp
 cint = Colon (Prim Oint)
 
+-- 2
+exp01 :: Example
+exp01 = Int 2
+      === "2"
+
+-- x:=2; x
+exp02 :: Example
+exp02 = Def "x" (Int 2) `Seq` Var "x"
+      === "2"
+
+-- <1,2>
+exp03 :: Example
+exp03 = Tup [Int 1, Int 2]
+      === "<1,2>"
+
+-- add[<1,2>]
+exp04 :: Example
+exp04 = App (Prim Oadd) (Tup [Int 1, Int 2])
+      === "3"
+
 -- x:=2; y:=1; add[(x,y)]
 exp1 :: Example
 exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))

@@ -19,9 +19,11 @@ module SetX(
   minimumSet,
   foldSet,
   cartProd,
+  mapMaybe,
   ) where
 import Control.Applicative
 import Data.List(intercalate, sort)
+import qualified Data.Maybe as M
 import GHC.Stack
 
 -- Sets as lists with duplicates so it can be a monad.
@@ -110,3 +112,6 @@ cartProd = sequence
 foldSet :: HasCallStack => (a -> a -> a) -> SetX a -> a
 foldSet _ (S []) = error "foldSet"
 foldSet f (S a) = foldl1 f a
+
+mapMaybe :: (a -> Maybe b) -> SetX a -> SetX b
+mapMaybe f (S xs) = S (M.mapMaybe f xs)
