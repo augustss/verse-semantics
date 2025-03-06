@@ -40,7 +40,6 @@ instance Show Expr where
 
 show1 :: String -> Expr -> String
 show1 _  e@(Exi _ _) = showp e
---show1 op e@(_ :=: _) = show e
 show1 op e@(_ :>: _) = if op==";" then show e else showp e
 show1 op e@(_ :|: _) = if op=="|" then show e else showp e
 show1 _  e           = show e
@@ -127,87 +126,39 @@ univEnv :: [Ident] -> Set Env
 univEnv []     = set[ set[] ]
 univEnv (x:xs) = set[ set ((x :-> v):from env) | v <-from$ univ, env <-from$ univEnv xs ]
 
-(~=) :: Env -> Env -> Bool
-env1 ~= env2 = and [ v==w | (x:->v) <- from env1, (y:->w) <- from env2, x==y ]
+univEnvs :: [Ident] -> Set [Env]
+univEnvs []     = set[ [set[]] ]
+univEnvs (x:xs) = set[ [ set ((x :-> v):from env) | v <- vs, env <- envs ]
+                     | vs <- permutations (from univ)
+                     , envs <-from$ univEnvs xs
+                     ]
 
 ----------------------------------------------------------------------------------------
 
-sem :: Expr -> Set [(Env,Value)]
-sem (Const k) =
-  set[ [ (set[], Int k) ] ]
-
-sem (Var x) =
-  set[ [ (set[ x:->v ], v) | v <- vs ]
-     | vs <- permutations (from univ)
-     ]
-
-sem (Exi x e) =
-  set[ [ (del x env, v) | (env,v) <- s ]
-     | s <-from$ sem e
-     ]
-
-sem (e1 :|: e2) =
-  set[ s1++s2
-     | s1 <-from$ sem e1
-     , s2 <-from$ sem e2
-     ]
-
-sem (Var x :=: e) =
-  set[ [ (env1 \/ env2, v)
-       | (env1,v) <- s
-       , let env2 = set[ x:->v ]
-       , env1 ~= env2
-       ]
-     | s <-from$ sem e
-     ]
-
-sem (e1 :=: e2) =
-  error "no expressions on the LHS of = (yet)"
-
-sem (e1 :>: e2) =
-  set[ s3
-     | s1 <-from$ sem e1
-     , s3 <-from$ flat [ set[ [ (env1 \/ env2,v2) | (env2,v2)<-s2, env1 ~= env2 ]
-                            | s2 <-from$ sem e2
-                            ]
-                       | (env1,_) <- s1
-                       ]
-     ]
-
-sem (One e) =
-  set[ take 1 s
-     | s <-from$ sem e
-     ]
-
-sem (All e) =
-  set[ [ (env, tup (map snd t))  ]
-     | s <-from$ sem e
-     , t <- subs s
-     , env <- combine (map fst t)
-     ]
- where
-  subs []     = [[]]
-  subs (x:xs) = [ x:ys | ys <- xss ] ++ xss where xss = subs xs
-
-  combine []       = [ set[] ]
-  combine [env]    = [ env ]
-  combine (env1:env2:envs)
-    | env1 ~= env2 = combine ((env1 \/ env2):envs)
-    | otherwise    = [] 
-
-sem _ =
-  set[]
-
-{-
 sem :: Expr -> [Ident] -> Set [(Env,Value)]
+sem (Const k) scope =
+  set[ [ (env, Int k) | env <- envs ]
+     | envs <-from$ univEnvs scope
+     ]
+
+sem (Var x) scope =
+  set[ [ (env, env?x) | env <- envs ]
+     | envs <-from$ univEnvs scope
+     ]
+{-
 sem (Const k) scope =
   set[ [ (env, Int k) ]
      | env <-from$ univEnv scope
      ]
 
 sem (Var x) scope =
-  set[ [ (env, env ? x) ]
+  set[ [ (env, env?x) ]
      | env <-from$ univEnv scope
+     ]
+-}
+sem (Exi x e) scope =
+  set[ [ (del x env, v) | (env,v) <- s ]
+     | s <-from$ sem e ([x] `union` scope)
      ]
 
 sem (e1 :|: e2) scope =
@@ -216,29 +167,38 @@ sem (e1 :|: e2) scope =
      , s2 <-from$ sem e2 scope
      ]
 
-sem (e1 :=: e2) scope =
-  set[ s3
-     | s1 <-from$ sem e1 scope
-     , s3 <-from$ flat [ set[ [ (env2,v2) | (env2,v2)<-s2, env1==env2, v1==v2 ]
-                            | s2 <-from$ sem e2 scope
-                            ]
-                       | (env1,v1) <- s1
-                       ]
+sem (Var x :=: e) scope =
+  set[ [ (env,v)
+       | (env,v) <- s
+       , env?x == v
+       ]
+     | s <-from$ sem e scope
      ]
 
 sem (e1 :>: e2) scope =
   set[ s3
      | s1 <-from$ sem e1 scope
-     , s3 <-from$ flat [ set[ [ (env2,v2) | (env2,v2)<-s2, env1==env2 ]
+     , s3 <-from$ flat [ set[ [ (env,v2) | (env',v2)<-s2, env'==env ]
                             | s2 <-from$ sem e2 scope
                             ]
-                       | (env1,_) <- s1
+                       | (env,_) <- s1
                        ]
      ]
 
-sem _ _ =
-  set[]
--}
+sem (One e) scope =
+  set[ [(env,v) | env <- envs, v:_ <- [[ v | (env',v)<-s, env'==env ]] ]
+     | s <-from$ sem e scope
+     , envs <-from$ univEnvs scope
+     ]
+
+sem (All e) scope =
+  set[ [(env, tup [ v | (env',v)<-s, env'==env ]) | env <- envs]
+     | s <-from$ sem e scope
+     , envs <-from$ univEnvs scope
+     ]
+
+sem e scope =
+  error ("no semantics yet for " ++ show e)
 
 ----------------------------------------------------------------------------------------
 
@@ -249,8 +209,8 @@ main =
 printSem :: Expr -> IO ()
 printSem e =
   do putStrLn ("> " ++ show e)
-     --putStrLn ("--> " ++ show (sem e (free e)))
-     putStrLn ("--> " ++ show (sem e))
+     putStrLn ("--> " ++ show (sem e (free e)))
+     putStrLn ("(scope: " ++ show (free e) ++ ")")
 
 ----------------------------------------------------------------------------------------
 
@@ -283,9 +243,12 @@ examples =
   -- , (1 :|: 2) :=: x
   -- , (2 :|: 1) :=: (1 :|: 2 :|: 3)
   , (x :=: (1 :|: 2)) :>: (x :=: y)
-  , exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 3))
+  , exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 2:|: 3))
+
+  , One x
+  , All x
   , One (exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 3)))
-  , All (exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 3)))
+  , All (exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 2 :|: 3)))
   ]
   
 ----------------------------------------------------------------------------------------
