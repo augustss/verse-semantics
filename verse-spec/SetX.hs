@@ -20,9 +20,11 @@ module SetX(
   foldSet,
   cartProd,
   mapMaybe,
+  toListBy,
+  maybeToSet,
   ) where
 import Control.Applicative
-import Data.List(intercalate, sort)
+import Data.List(intercalate, sort, groupBy, sortBy)
 import qualified Data.Maybe as M
 import GHC.Stack
 
@@ -115,3 +117,11 @@ foldSet f (S a) = foldl1 f a
 
 mapMaybe :: (a -> Maybe b) -> SetX a -> SetX b
 mapMaybe f (S xs) = S (M.mapMaybe f xs)
+
+toListBy :: (a -> a -> Ordering) -> SetX a -> [SetX a]
+toListBy cmp (S xs) = map S $ groupBy eq $ sortBy cmp xs
+  where eq x y = cmp x y == EQ
+
+maybeToSet :: Maybe a -> SetX a
+maybeToSet Nothing = empty
+maybeToSet (Just a) = sing a

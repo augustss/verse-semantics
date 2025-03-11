@@ -19,6 +19,7 @@ data Exp
   | Where Exp Exp | Def2 Ident Ident Exp
   | OfType Exp Exp
   | UChoice Exp Exp
+  | Block Exp
   deriving (Eq, Ord, Data)
 
 data Op = Oint | Ogt | Oadd
@@ -51,6 +52,7 @@ instance Show Exp where
                               showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2)
   showsPrec p (OfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
+  showsPrec _ (Block e) = showString "block" . showBraces (showsPrec 0 e)
 
 showBraces :: (String -> String) -> (String -> String)
 showBraces a = showString "{" . a . showString "}"

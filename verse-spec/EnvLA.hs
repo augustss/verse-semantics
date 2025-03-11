@@ -1,10 +1,10 @@
 {-# LANGUAGE MonadComprehensions #-}
-module EnvK where
+module EnvLA where
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.List
 import Data.Maybe
-import ValK
+import ValLA
 import Exp
 import SetX
 
@@ -12,15 +12,14 @@ import SetX
 ---- Environment
 
 type W = Val
+type WS = SetX (Labelled W)
 
-data Env = Env { unEnv :: M.Map Ident Val }
-         | EPair Env Env
+newtype Env = Env { unEnv :: M.Map Ident Val }
   deriving (Eq, Ord)
 
 instance Show Env where
-  show (Env m) = "{|" ++ intercalate "," (map f (M.toList m)) ++ "|}"
+  show (Env m) = "[|" ++ intercalate "," (map f (M.toList m)) ++ "|]"
     where f (i,v) = i ++ "->" ++ show v
-  show (EPair r1 r2) = show r1 ++ "+" ++ show r2
 
 lookupEnv :: Ident -> Env -> W
 lookupEnv x rho = fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $ M.lookup x $ unEnv rho
@@ -28,35 +27,18 @@ lookupEnv x rho = fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $
 extend :: Env -> Ident -> W -> Env
 extend rho i w = Env $ M.insert i w $ unEnv rho
 
-{-
+mkEnv :: [(String, Val)] -> Env
+mkEnv = Env . M.fromList
+
 -- Initial environment
 rho0 :: Env
-rho0 = Env $ M.fromList $
+rho0 = mkEnv $
   [ (n, dO o) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd) ] ] ++
-  [ ("succ", vFcn fsucc), ("pred", vFcn fpred) ] ++
   [ ("false", VTup []) ]
--}
+  -- ++ [ ("succ", vFcn fsucc), ("pred", vFcn fpred) ]
 
 emptyEnv :: Env
 emptyEnv = Env M.empty
-
-singEnv :: Ident -> Val -> Env
-singEnv x v = Env $ M.singleton x v
-
-mkEnv :: [(Ident, Val)] -> Env
-mkEnv = Env . M.fromList
-
--- Return the union if the environments are compatible
-unifyEnv :: Env -> Env -> Maybe Env
-unifyEnv (Env m1) (Env m2) =
-  let ks = S.intersection (M.keysSet m1) (M.keysSet m2)
-      m1' = M.filterWithKey (\k _ -> k `S.member` ks) m1
-      m2' = M.filterWithKey (\k _ -> k `S.member` ks) m2
-  in  if m1' == m2' then Just (Env (M.union m1 m2)) else Nothing
-
-remVars :: [Ident] -> Env -> Env
-remVars [] r = r
-remVars xs (Env m) = Env $ M.filterWithKey (\ k _ -> k `notElem` xs) m
 
 --------------------
 ---- "Universal" set of values
@@ -68,24 +50,21 @@ allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
 allWs :: SetX Val
 allWs = mkSet allWsL
-
 allWsL :: [W]
-allWsL = allInts -- allNonFcnsL ++ allFcnsL
-
-allNonFcnsL :: [W]
-allNonFcnsL =
-  allInts ++
-  [VTup [x, y] | x <- allInts, y <- allInts]
-      --[VTup [VInt 2, VInt 1], VTup [VInt 1, VInt 2]]
-
-allFcnsL :: [W]
-allFcnsL =
-  [ f | o <- [Oint, Ogt, Oadd], f <- dO o ]
-  {- ++
+allWsL =
+  allInts
+{-
+allWsL :: [W]
+allWsL =
+  nonFcn ++
+  [ dO o | o <- [Oint, Ogt, Oadd] ] ++
   map vFcn [ id0, fid1, id2, id3, id01, f01, const0, const1, const2, const3, fsucc, -- succMod3,
              fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123, f0t12 ]
-  -}
   where
+    nonFcn =
+      allInts ++
+      [VTup [x, y] | x <- allInts, y <- allInts]
+      --[VTup [VInt 2, VInt 1], VTup [VInt 1, VInt 2]]
     id0 = mkFcn "id0" [(VInt 0, VInt 0)]
     id2 = mkFcn "id2" [(VInt 2, VInt 2)]
     id3 = mkFcn "id3" [(VInt 3, VInt 3)]
@@ -97,7 +76,7 @@ allFcnsL =
     const2 = mkFcn "const2" [(x, VInt 2) | x <- allInts]
     const3 = mkFcn "const3" [(x, VInt 3) | x <- allInts]
     succ0 = mkFcn "succ0" [(VInt 0, VInt 1)]
-    comp = mkFcn "comparable" [(w, w) | w <- allNonFcnsL ]
+    comp = mkFcn "comparable" [(w, w) | w <- nonFcn ]
     -- The function that accepts f:int->int as an argument and returns f[1]
     ho1 = mkFcn "ho1" [(vFcn fsucc, VInt 2), (vFcn fpred, VInt 0), (vFcn fint, VInt 1),
                        (vFcn fsuccsucc, VInt 3), --(vFcn comp, VInt 1),
@@ -128,7 +107,7 @@ allFcnsL =
 -}
 
 allFcns :: [Fcn]
-allFcns = [ f | VFcn f <- allWsL ]
+allFcns = [ f | VFcn [f] <- allWsL ]
 
 fid1 :: Fcn
 fid1 = mkFcn "id1" [(VInt 1, VInt 1)]
@@ -150,10 +129,11 @@ getW s = ([ w | w <- allWsL, show w == s ] ++ [error $ "undefined " ++ s]) !! 0
 
 --------------------
 ---- Primitive functions
+-}
 
-dO :: Op -> [W]
-dO Oint = vFcns $ mkFcn "int" [ (x, x) | x <- allInts ]
-dO Ogt  = vFcns $ mkFcn "gt"  [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y]
+dO :: Op -> W
+dO Oint = vFcn $ mkFcn "int" [ (x, x) | x <- allInts ]
+dO Ogt  = vFcn $ mkFcn "gt"  [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y]
 -- add is a single function, not many as in the doc.
-dO Oadd = vFcns $ mkFcn "add" [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
+dO Oadd = vFcn $ mkFcn "add" [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
 
