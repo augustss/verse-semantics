@@ -50,7 +50,6 @@ show1 :: String -> Expr -> String
 show1 _  e@(Exi _ _) = showp e
 show1 op e@(_ :>: _) = if op==";" then show e else showp e
 show1 op e@(_ :|: _) = if op=="|" then show e else showp e
-show1 _  e@(_ :@: _) = showp e
 show1 _  e           = show e
 
 showp :: Expr -> String
@@ -130,7 +129,7 @@ tup ys = Fun [ Int i :-> y | (i,y) <- [0..] `zip` ys ]
 ----------------------------------------------------------------------------------------
 
 univ :: Set Value
-univ = set$[ Int i | i <- [1..2] ] ++ [ Fun[1:->2,2:->1] , Fun[2:->1,1:->2] ]
+univ = set$[ Int i | i <- [1..3] ] ++ [ Fun[1:->2,2:->1] , Fun[2:->1,1:->2] ]
 
 type Env = Set (Pair Ident Value)
 
@@ -140,109 +139,80 @@ env ? x = head $ [ v | (y :-> v) <-from$ env, y==x ] ++ error (show x ++ " not i
 del :: Ident -> Env -> Env
 del x env = set[ p | p@(y:->_) <-from$ env, y/=x ]
 
-univEnv :: [Ident] -> Set Env
-univEnv []     = set[ set[] ]
-univEnv (x:xs) = set[ set ((x :-> v):from env) | v <-from$ univ, env <-from$ univEnv xs ]
-
-univEnvs :: [Ident] -> Set [Env]
-univEnvs []     = set[ [set[]] ]
-univEnvs (x:xs) = set[ [ set ((x :-> v):from env) | v <- vs, env <- envs ]
-                     | vs <- permutations (from univ)
-                     , envs <-from$ univEnvs xs
-                     ]
+(~=) :: Env -> Env -> Bool
+env1 ~= env2 = and [ v==w | (x:->v) <-from$ env1, (y:->w) <-from$ env2, x==y ]
 
 ----------------------------------------------------------------------------------------
 
-isVal :: Expr -> Bool
-isVal (Const k) = True
-isVal (Var x)   = True
-isVal _         = False
+fuse :: Ord a => Set [a] -> [Set a]
+fuse s = [ set[ x | xs <-from$ s, x:_ <- [drop i xs] ] | i <- [0..m-1] ]
+ where
+  m = maximum [ length xs | xs <-from$ s ]
+
+sequ :: Ord a => [Set a] -> Set [a]
+sequ []     = set[ [] ]
+sequ (s:ss) = set[ x:xs | x <-from$ s, xs <-from$ sequ ss ]
 
 ----------------------------------------------------------------------------------------
+
+sem :: Expr -> Set [(Env,Value)]
+sem (Const k) =
+  set[ [ (set[], Int k) ]
+     ]
+
+sem (Var x) =
+  set[ [ (set[x:->v], v) ]
+     | v <-from$ univ
+     ]
+
+sem (Exi x e) =
+  set[ [ (del x env, v) | (env,v) <-evs ]
+     | evs <-from$ sem e
+     ]
+
+sem (Var x :=: e) =
+  set[ [ (env \/ envx,v)
+       | (env,v) <- evs
+       , let envx = set[x:->v]
+       , env ~= envx
+       ]
+    | evs <-from$ sem e
+    ]
+
+sem (e1 :|: e2) =
+  set[ evs1 ++ evs2
+     | evs1 <-from$ sem e1
+     , evs2 <-from$ sem e2
+     ]
+
+sem (e1 :>: e2) =
+  sequ (fuse (sem e1) `seq2` fuse (sem e2))
+ where
+  seq2 :: [Set (Env,Value)] -> [Set (Env,Value)] -> [Set (Env,Value)]
+  ss `seq2` rs =
+    filter (not . null . from)
+    [ set[ (env1 \/ env2,v)
+         | (env1,_) <-from$ s
+         , (env2,v) <-from$ r
+         , env1 ~= env2
+         ]
+    | s <- ss
+    , r <- rs
+    ]
+
+sem fun | fun `elem` [F,G] =
+  set[ [ (set[], Fun [Int i :-> Int (3-i) | i <- dom]) ]
+     | dom <- [1,2] : [ [2,1] | fun == G ]
+     ]
+
+sem (Var f :@: Var x) =
+  set[ [ (set[f:->fun,x:->a],y)
+       | (a:->y) <- xys
+       ]
+     | fun@(Fun xys) <-from$ univ
+     ]
 
 {-
-semVal :: Expr -> [Ident] -> Set (Env,Value)
-semVal (Const k) scope =
-  set[ (env, Int k)
-     | env <-from$ univEnv scope
-     ]
-
-semVal (Var x) scope =
-  set[ (env, env ? x)
-     | env <-from$ univEnv scope
-     ]
-
-semVal e _ =
-  error ("not a value: " ++ show e)
-
-boost :: Set a -> Set [a]
-boost seta =
-  set[ as
-     | as <- permutations (from seta)
-     ]
--}
-
-----------------------------------------------------------------------------------------
-
-sem :: Expr -> [Ident] -> Set [(Env,Value)]
-sem (Const k) scope =
-  set[ [ (env, Int k) | env <- envs ]
-     | envs <-from$ univEnvs scope
-     ]
-
-sem (Var x) scope =
-  set[ [ (env, env ? x) | env <- envs ]
-     | envs <-from$ univEnvs scope
-     ]
-
-sem (Exi x e) scope =
-  set[ [ (del x env, v) | (env,v) <- s ]
-     | s <-from$ sem e ([x] `union` scope)
-     ]
-
-sem (e1 :|: e2) scope =
-  set[ s1++s2
-     | s1 <-from$ sem e1 scope
-     , s2 <-from$ sem e2 scope
-     ]
-
-sem (Var x :=: e) scope =
-  set[ [ (env,v)
-       | (env,v) <- s
-       , env?x == v
-       ]
-     | s <-from$ sem e scope
-     ]
-
-sem (Var f :@: Var x) scope =
-  set[ [ (set[f:->Fun xys,x:->a],y)
-       | Fun xys <-from$ univ
-       , (a:->y) <- xys
-       ]
-     
-     ]
-
-sem (e1 :>: e2) scope =
-  set[ s3
-     | s1 <-from$ sem e1 scope
-     , s3 <-from$ flat [ set[ [ (env,v2) | (env',v2)<-s2, env'==env ]
-                            | s2 <-from$ sem e2 scope
-                            ]
-                       | (env,_) <- s1
-                       ]
-     ]
-
-sem F scope =
-  set[ [ (env, Fun [Int i :-> Int (3-i) | i <- [1,2]]) | env <- envs ]
-     | envs <-from$ univEnvs scope
-     ]
-
-sem G scope =
-  set[ [ (env, Fun [Int i :-> Int (3-i) | i <- is]) | env <- envs ]
-     | envs <-from$ univEnvs scope
-     , is <- [[1,2],[2,1]]
-     ]
-
 sem (One e) scope =
   set[ [(env,v) | env <- envs, v:_ <- [[ v | (env',v)<-s, env'==env ]] ]
      | s <-from$ sem e scope
@@ -254,21 +224,23 @@ sem (All e) scope =
      | s <-from$ sem e scope
      , envs <-from$ univEnvs scope
      ]
+-}
 
-sem e scope =
+sem e =
   error ("no semantics yet for " ++ show e)
 
 ----------------------------------------------------------------------------------------
 
 main :: IO ()
 main =
-  do sequence_ [ printSem e >> putStrLn "" | e <- examples ]
+  do putStrLn ("univ = " ++ show univ)
+     putStrLn ""
+     sequence_ [ printSem e >> putStrLn "" | e <- examples ]
 
 printSem :: Expr -> IO ()
 printSem e =
   do putStrLn ("> " ++ show e)
-     putStrLn ("--> " ++ show (sem e (free e)))
-     putStrLn ("(scope: " ++ show (free e) ++ ")")
+     putStrLn ("--> " ++ show (sem e))
 
 ----------------------------------------------------------------------------------------
 
@@ -292,23 +264,27 @@ instance Num Expr where
 
 examples :: [Expr]
 examples =
-  [ f :@: x
-  , (x:=:1) :>: (f :@: x)
-  , exi y $ (y:=: 1) :>: (f :@: y)
-  , exi y $ (y:=: 1) :>: (f :=: F) :>: (f :@: y)
-  , (f :=: F) :>: (f :@: x)
-  , exi y $ (y :=: 1) :>: (exi f $ (f :=: F) :>: (f :@: y))
-  , exi f $ (f :=: F) :>: (f :@: x)
-
-  , g :@: x
-  , (x:=:1) :>: (g :@: x)
-  , exi y $ (y:=: 1) :>: (g :@: y)
-  , exi y $ (y:=: 1) :>: (g :=: G) :>: (g :@: y)
-  , (g :=: G) :>: (g :@: x)
-  , exi y $ (y :=: 1) :>: (exi g $ (g :=: G) :>: (g :@: y))
-  , exi g $ (g :=: G) :>: (g :@: x)
+  [ (x:=:(1:|:2))
+  , (x:=:(1:|:x))
+  , (x:=:(1:|:2)) :>: (x:=:(3:|:2))
+  , (x:=:1) :>: (y:=:(2:|:1))
+  , (x:=:(1:|:2)) :>: (y:=:(2:|:1))
+  , (y:>:(x:=:(1:|:2))) :>: (y:=:(2:|:1))
   ]
+  ++
+  funExamples f F
+  ++
+  funExamples g G
+ where
+  funExamples f fun =
+    [ exi f $ (f :=: fun) :>: f
+    , exi f $ (f :=: fun) :>: (f :@: x)
+    , exi f $ (f :=: fun) :>: (x :=: 1) :>: (f :@: x)
+    , exi f $ (f :=: fun) :>: (exi x $ f :@: x)
+    , exi x $ exi f $ (f :=: fun) :>: (f :@: x)
+    ]
   
+
 {-
   , 1 :|: 2
   , x :=: (1 :|: 2)
