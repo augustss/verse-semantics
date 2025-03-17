@@ -22,6 +22,7 @@ import CExp
 
 dE :: CExp -> Env -> SetX (Labelled W)
 dE (CVar "_")      _rho = noLabel <$> allWs
+dE (CVar "enum")   _rho = mkSet [ noLabel $ VFcn enum0_1, noLabel $ VFcn enum1_0 ]
 dE (CVar x)         rho = sing $ noLabel $ lookupEnv x rho
 dE (CInt i)        _rho = sing $ noLabel $ VInt i
 dE (CApp e1 e2)     rho = [ labels (labelOf w1 ++ labelOf w2) r
@@ -31,7 +32,7 @@ dE (CApp e1 e2)     rho = [ labels (labelOf w1 ++ labelOf w2) r
                           ]
 dE (CSeq CExi{} e)  rho = dE e rho
 dE (CSeq e1 e2)     rho = [ labels (labelOf w1) w2 | w1 <- dE e1 rho, w2 <- dE e2 rho ]
-dE (CEqu e1 e2)     rho = [ labels (labelOf w1 ++ labelof w2) (noLabel wr))
+dE (CEqu e1 e2)     rho = [ labels (labelOf w1 ++ labelOf w2) (noLabel wr)
                           | w1 <- dE e1 rho
                           , w2 <- dE e2 rho
                           , wr <- maybeToSet (isect (unLabel w1) (unLabel w2)) ]
@@ -86,11 +87,20 @@ dd = "x" ::: "any" :>
      "x" := 1 :| 2 :>
      "x" === "y"
 
+ee :: Exp
+ee = "x" ::: "any" :> ("x"===0 :> 1) :| ("x"===1 :> 2) :> "x"===1
+
 enum0_3 :: Fcn
 enum0_3 = mkEnumFcn "enum0_3" [(VInt i, VInt i) | i <- [0.. maxVInt-1]]
 
 enum3_0 :: Fcn
-enum3_0 = mkEnumFcn "enum0_3" $ reverse [(VInt i, VInt i) | i <- [0.. maxVInt-1]]
+enum3_0 = mkEnumFcn "enum3_0" $ reverse [(VInt i, VInt i) | i <- [0.. maxVInt-1]]
+
+enum0_1 :: Fcn
+enum0_1 = mkEnumFcn "enum0_1" [(VInt i, VInt i) | i <- [0.. 1]]
+
+enum1_0 :: Fcn
+enum1_0 = mkEnumFcn "enum1_0" $ reverse [(VInt i, VInt i) | i <- [0.. 1]]
 
 weird1 :: Fcn
 weird1 = Fcn "weird1" $ M.fromList [ (VInt 0, Lbl [L] (VInt 0)), (VInt 1, Lbl [L] (VInt 1))
@@ -107,5 +117,11 @@ den1 :: Exp -> SetX (Labelled W)
 den1 e = dD (syntax "_" e) rho1
 
 rho1 :: Env
-rho1 = mkEnv [("f", VFcn enum0_3), ("int", VFcn fint)]
+rho1 = mkEnv [
+              ("enum0_3", VFcn enum0_3)
+             ,("enum3_0", VFcn enum3_0)
+             ,("enum0_1", VFcn enum0_1)
+             ,("enum1_0", VFcn enum1_0)
+             ,("int", VFcn fint)
+             ]
 
