@@ -1,6 +1,6 @@
 {-# LANGUAGE MonadComprehensions #-}
 module EnvC(
-  W, WS,
+  W, Ws, WS,
   Env, lookupEnv, extendEnv, emptyEnv,
   rho0, allWs, allFcns,
   allWsL,
@@ -17,7 +17,8 @@ import SetX
 ---- Environment
 
 type W = Val
-type WS = SetX W
+type Ws = SetX W
+type WS = [Ws]
 
 newtype Env = Env { unEnv :: M.Map Ident Val }
   deriving (Eq, Ord)
@@ -50,7 +51,7 @@ emptyEnv = Env M.empty
 allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
-allWs :: WS
+allWs :: Ws
 allWs = mkSet allWsL
 allWsL :: [W]
 allWsL =
