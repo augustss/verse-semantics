@@ -25,7 +25,7 @@ instance Show Val where
   show (Const k) = show k
   show (Var x)   = show x
   show (Tup vs)  = "<" ++ intercalate "," (map show vs) ++ ">"
-  show F         = "fun(x:=1|2){x+1}"
+  show F         = "fun(x:=0|1){x+1}"
   show G         = "fun(x:=int){x+1}"
 
 data Oper
@@ -143,9 +143,9 @@ instance Num Value where
 ----------------------------------------------------------------------------------------
 
 univ :: Set Value
-univ = set$ [ Int i | i <- [1..3] ]
-         ++ [ Fun[set[1:->2],set[2:->3]]
-            , Fun[set[1:->2,2:->3]]
+univ = set$ [ Int i | i <- [0..2] ]
+         ++ [ Fun[set[0:->1],set[1:->2]]
+            , Fun[set[0:->1,1:->2]]
             ]
 
 type Env = Set (Pair Ident Value)
@@ -176,7 +176,7 @@ semVal :: Val -> Env -> Value
 semVal (Const k) env = Int k
 semVal (Var x)   env = env ? x
 semVal (Tup vs)  env = Fun [ set[Int i:->semVal v env] | (i,v) <- [0..] `zip` vs ]
-semVal F         env = Fun [ set[Int 1:->Int 2], set[Int 2:->Int 3] ]
+semVal F         env = Fun [ set[Int 0:->Int 1], set[Int 1:->Int 2] ]
 semVal G         env = Fun [ set[Int i:->Int (i+1) | Int i <-from$ univ, Int (i+1) `elm` univ] ]
 
 ----------------------------------------------------------------------------------------
@@ -314,46 +314,18 @@ examples :: [Oper]
 examples =
   [ (x=:1) :|: (x=:2)
   , ((x=:1) :|: (x=:2)) :>: (x=:y)
-  , ((x=:1) :|: (x=:2) :|: (x=:1)) :>: ((x=:2) :|: (x=:1) :|: (x=:3))
+  , ((x=:1) :|: (x=:2) :|: (x=:1)) :>: ((x=:2) :|: (x=:1) :|: (x=:0))
 
-  , If (exi z :>: ((z=:x) :>: (z=:y))) (r=@(F,z)) (r=:3)
-  , If (exi z :>: ((z=:x) :|: (z=:y))) (r=@(F,z)) (r=:3)
+  , If (exi z :>: ((z=:x) :>: (z=:y))) (r=@(F,z)) (r=:0)
+  , If (exi z :>: ((z=:x) :|: (z=:y))) (r=@(F,z)) (r=:0)
+  , If (exi z :>: ((x=:Tup[z,y]) :|: (z=:x))) (r=:z) (r=:0)
 
   , y =@ (F,x)
   , exi x :>: (y =@ (F,x))
   , y =@ (G,x)
   , exi x :>: (y =@ (G,x))
-  ]
-  
-{-
-  [ y:>:(x:=:(1:|:2))
-  , (y:>:(x:=:(1:|:2))) :>: (y:=:(2:|:3))
-  ] ++
-  [ exi g $ (g :=: G) :>: (x :=: 1) :>: (g :@: x)
-  ]
- where
-  funExamples f fun =
-    [ exi f $ (f :=: fun) :>: f
-    , exi f $ (f :=: fun) :>: (f :@: x)
-    , exi f $ (f :=: fun) :>: (x :=: 1) :>: (f :@: x)
-    , exi f $ (f :=: fun) :>: (exi x $ f :@: x)
-    , exi x $ exi f $ (f :=: fun) :>: (f :@: x)
-    ]
--}  
 
-{-
-  , 1 :|: 2
-  , x :=: (1 :|: 2)
-  -- , (1 :|: 2) :=: x
-  -- , (2 :|: 1) :=: (1 :|: 2 :|: 3)
-  , (x :=: (1 :|: 2)) :>: (x :=: y)
-  , exi x $ (x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 2:|: 3))
+  , y =@ (f,x)
+  ]
 
-  , One x
-  , All x
-  , One ((x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 3)))
-  , All ((x :=: (2 :|: 1)) :>: (x :=: (1 :|: 2 :|: 2 :|: 3)))
-  , All ((x :=: (2 :|: 1)) :>: ((x :=: 1) :|: 2 :|: 2 :|: 3))
--}
-  
 ----------------------------------------------------------------------------------------
