@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
-module ExpSugar where
+module ExpSugar(module ExpSugar) where
 import Data.String
 import Exp
 

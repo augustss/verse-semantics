@@ -18,7 +18,6 @@ module SetX(
   maximumSet,
   minimumSet,
   foldSet,
-  cartProd,
   mapMaybe,
   toListBy,
   maybeToSet,
@@ -43,9 +42,9 @@ instance (Show a, Ord a) => Show (SetX a) where
   show s =
     case toList s of
       [] -> "{}"
-      s@(a:_)
-        | length (show a) < 25 -> "{" ++ intercalate ","   (map show s) ++ "}"
-        | otherwise            -> "{" ++ intercalate ",\n" (map show s) ++ "}"
+      ss@(a:_)
+        | length (show a) < 25 -> "{" ++ intercalate ","   (map show ss) ++ "}"
+        | otherwise            -> "{" ++ intercalate ",\n" (map show ss) ++ "}"
 
 --empty :: SetX a
 --empty = S []
@@ -78,7 +77,7 @@ mkSet :: [a] -> SetX a
 mkSet = S
 
 toList :: Ord a => SetX a -> [a]
-toList (S xs) = unDup $ sort xs
+toList (S axs) = unDup $ sort axs
   where
     unDup (x:y:xs) | x == y    =     unDup (y:xs)
                    | otherwise = x : unDup (y:xs)
@@ -105,9 +104,6 @@ minimumSet (S a) = minimum a
 
 sing :: a -> SetX a
 sing x = S [x]
-
-cartProd :: [SetX a] -> SetX [a]
-cartProd = sequence
 
 -- Function should be commutative and associative.
 -- Set should be non-empty

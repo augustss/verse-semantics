@@ -1,4 +1,11 @@
-module ValC where
+module ValC(
+  Val(..),
+  RVal(..),
+  Fcn, mkFcn, vFcn, appM, dom, app, inDom, domV,
+  showPretty,
+  showListWith,
+  maxVInt, vadd,
+  ) where
 import qualified Data.Map as M
 import Data.List
 import Data.Maybe
@@ -59,23 +66,29 @@ dom :: Fcn -> SetX Val
 dom (Fcn _ m) = mkSet $ M.keys m
 
 -- Application when the argument is in the domain
-ap :: Fcn -> Val -> Val
-ap (Fcn f xys) x =
+app :: Fcn -> Val -> Val
+app (Fcn f xys) x =
   fromMaybe (error $ "ap: outside domain " ++ f ++ " " ++ show x) $
   M.lookup x xys
 
+appM :: Val -> Fcn -> Maybe Val
+appM x (Fcn _ xys) = M.lookup x xys
+
+{-
 inDomV :: Val -> Val -> Bool
 inDomV x (VFcn fs) = any (inDom x) fs
 inDomV (VInt x) (VTup vs) = 0 <= x && x < toInteger (length vs)
 inDomV _ _ = False
+-}
 
 domV :: Val -> SetX Val
 domV (VFcn fs) = mkSet (concatMap (\ (Fcn _ m) -> M.keys m) fs)
 domV (VTup es) = mkSet [ VInt (toInteger i) | i <- [0..length es-1] ]
 domV v = error $ "domV: " ++ show v
 
+{-
 apV :: Val -> Val -> [Val]
-apV (VFcn fs) x = [ ap f x | f <- fs, inDom x f ]
+apV (VFcn fs) x = [ app f x | f <- fs, inDom x f ]
 apV (VTup vs) (VInt x) = [ vs !! fromInteger x ]
 apV _ _ = error "apV outside domain"
 
@@ -83,6 +96,7 @@ function :: Val -> Bool
 function (VFcn _) = True
 function (VTup _) = True
 function _ = False
+-}
 
 --------------------
 

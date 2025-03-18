@@ -384,3 +384,7 @@ exp62 = Def "f" (Fun Open (Int 0) (Int 1)) `Seq`
         Var "f" `Equ` (Fun Open (Int 1) (Int 2)) `Seq`
         Tup [App (Var "f") (Int 0), App (Var "f") (Int 1)]
       === "<1,2>"
+
+exp63 :: Example
+exp63 = All (Tup [ Int 0 `Choice` Int 1, Int 2 `Choice` Int 3 ])
+      === "<<0,2>,<0,3>,<1,2>,<1,3>>"

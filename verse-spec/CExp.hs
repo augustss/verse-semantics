@@ -1,9 +1,9 @@
-module CExp where
+module CExp(CExp(..), syntax, dI) where
 import Control.Monad
 import Control.Monad.State.Strict
 import Data.Data
 import qualified Data.List as L
-import Exp hiding (dI)
+import Exp
 
 data CExp
   = CVar Ident
@@ -15,7 +15,6 @@ data CExp
   | CFail
   | CExi Ident
   | CBlock CExp
-  -- Less essential
   | CPrim Op
   | CTup [CExp]
   | CWhere CExp CExp
@@ -91,15 +90,6 @@ syntaxN u (Int k) = pure $ u =.= CInt k
 syntaxN u (Var x) = pure $ u =.= CVar x
 syntaxN u (Prim p) = pure $ u =.= CPrim p
 syntaxN _ Fail = pure CFail
-{-
-syntaxN u (App (Var f) (Var x)) = pure (u =.= CApp f x)
-syntaxN u (App e0 e1) = do
-  f <- newVar "f"
-  x <- newVar "x"
-  sf <- syntaxN "_" (Def f e0)
-  sx <- syntaxN "_" (Def x e1)
-  pure (sf `CSeq` sx `CSeq` (u =.= CApp f x))
--}
 syntaxN u (App e0 e1) = (u =.=) <$> (CApp <$> syntaxN "_" e0 <*> syntaxN "_" e1)
 syntaxN u (Equ e0 e1) = CEqu <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (Choice e0 e1) = CChoice <$> syntaxN u e0 <*> syntaxN u e1
@@ -153,9 +143,11 @@ checkQ Closed f e = do
     e' <- syntaxN "_" e
     pure (Just (f, e'))
 
+{-
 mustBeVar :: Ident -> N CExp
 mustBeVar "_" = do u <- newVar "u"; pure (CExi u `CSeq` CVar u)
 mustBeVar u = pure (CVar u)
+-}
 
 infix 4 =.=
 

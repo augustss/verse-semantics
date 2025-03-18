@@ -106,6 +106,8 @@ $$
 \newcommand{\applys}{\textbf{applys}}
 \newcommand{\squash}{\textbf{squash}}
 \newcommand{\Ws}{\textit{Ws}}
+\newcommand{\mkall}{\textbf{all}}
+\newcommand{\mkarr}{\textbf{arr}}
 
 \begin{figure}
 $$
@@ -131,7 +133,7 @@ Env^{*} & = & \powerset{Env} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = &
          [ r \, || \,
            |fs <-| \semapp{E}{|e_1|}{\rho}, \;
-           |as <-| \semapp{E}{|e_2|}{\rho}, \;
+            as|<-| \semapp{E}{|e_2|}{\rho}, \;
            |r| \inb \applys(fs, as) \}
          ]
            \\
@@ -145,8 +147,10 @@ Env^{*} & = & \powerset{Env} \\
       |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
 
   \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
-    [ \{ \mkfcn{ \{ (i,x_i) \vb i \in 0 \ldots n \} } \, ||\, x_0 \inb s_0,\; \mydots,\; x_n \inb s_n \}\, \\
-      & & ||\, s_0 |<-| \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \semapp{E}{|e_n|}{\rho} ] \\[1mm]
+    [ \{ \mkarr(x_0,\mydots,x_n) \, ||\, x_0 \inb s_0,\; \mydots,\; x_n \inb s_n \}\, \\
+      & & ||\, s_0 |<-| \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \semapp{E}{|e_n|}{\rho} ] \\
+
+  \semapp{E}{|all e|}{\rho} & = & [ \mkall(\semapp{E}{e}{\rho}) ] \\[1mm]
 
   \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
   \left\{
@@ -211,11 +215,14 @@ $$
 \textbf{Auxiliary functions}\\
 \begin{array}{lcll}
   \applys & : & (\Ws, \Ws) \rightarrow [\Ws] \\
-  \applys|(fss, as)| & = & \hat{\bigcup} \{ \applyf|(fs, as)| \, || \, |fs| \inb |fss|, \, |fs| \in [\semfcn] \} \\
+  \applys(|fss|, as) & = & \hat{\bigcup} \{ \applyf(|fs|, as) \, || \, |fs| \inb |fss| \} \\
   \applyf & : & ([\semfcn], \Ws) \rightarrow [\Ws] \\
   \applyf(|fs|, as) & = & \bar{\bigcup} \{ [ \apply(|f,a|) \, || \, |f| \inb |fs| ] \, || \, a \inb as \} \\
   \squash & : & \mtype \rightarrow \mtype \\
   \squash(xs) & = & [ x \, || \, x \inb xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
+  \mkall([s_1,\mydots,s_n]) & = & \{ \mkarr(x_1,\mydots,x_n) \, || \, x_1 \inb s_1, \, \mydots \, x_n \inb s_n \} \\
+  \mkarr(x_0,\mydots,x_n) & = & [ \mkfcn\{(0,x_0)\}, \mydots, \mkfcn{(n,x_n)} ]
+                              & \text{make an array-function} \\
 \\
 \end{array} \\ \\
 

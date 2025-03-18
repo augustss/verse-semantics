@@ -1,4 +1,9 @@
-module Exp where
+module Exp(
+  Exp(..), Op(..), OC(..),
+  Ident,
+  dIExp,
+  showBraces,
+  ) where
 import Data.List
 import Data.Data
 
@@ -60,8 +65,8 @@ showBraces a = showString "{" . a . showString "}"
 --------------------
 ---- Find all identifiers defined by := in this scope
 
-dI :: Exp -> [Ident]
-dI = checkDup . sort . dI'
+dIExp :: Exp -> [Ident]
+dIExp = checkDup . sort . dI'
   where
     checkDup (x:x':xs) | x == x' = error $ "Duplicate definition of " ++ x
                        | otherwise = x : checkDup (x':xs)

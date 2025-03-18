@@ -1,6 +1,11 @@
 {-# LANGUAGE MonadComprehensions #-}
-module EnvC where
-import qualified Data.Set as S
+module EnvC(
+  W, WS,
+  Env, lookupEnv, extendEnv, emptyEnv,
+  rho0, allWs, allFcns,
+  allWsL,
+  dO,
+  ) where
 import qualified Data.Map as M
 import Data.List
 import Data.Maybe
@@ -24,8 +29,8 @@ instance Show Env where
 lookupEnv :: Ident -> Env -> W
 lookupEnv x rho = fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $ M.lookup x $ unEnv rho
 
-extend :: Env -> Ident -> W -> Env
-extend rho i w = Env $ M.insert i w $ unEnv rho
+extendEnv :: Env -> Ident -> W -> Env
+extendEnv rho i w = Env $ M.insert i w $ unEnv rho
 
 -- Initial environment
 rho0 :: Env
@@ -99,8 +104,8 @@ allWsL =
                        (VTup [VInt 3, VInt 0], VInt 3)]
 -}
 
-allFcns :: [Fcn]
-allFcns = [ f | VFcn [f] <- allWsL ]
+allFcns :: SetX Fcn
+allFcns = mkSet [ f | VFcn fs <- allWsL, f <- fs ]
 
 fid1 :: Fcn
 fid1 = mkFcn "id1" [(VInt 1, VInt 1)]
@@ -117,9 +122,10 @@ fsuccsucc = mkFcn "succsucc" [(x, vadd x (VInt 2)) | x <- allInts ]
 fpred :: Fcn
 fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
 
+{-
 getW :: String -> W
 getW s = ([ w | w <- allWsL, show w == s ] ++ [error $ "undefined " ++ s]) !! 0
-
+-}
 --------------------
 ---- Primitive functions
 
