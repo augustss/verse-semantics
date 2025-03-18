@@ -145,7 +145,7 @@ instance Num Value where
 univ :: Set Value
 univ = set$ [ Int i | i <- [1..3] ]
          ++ [ Fun[set[1:->2],set[2:->3]]
-         --   , Fun[set[1:->2,2:->3,3:->4]]
+            , Fun[set[1:->2,2:->3]]
             ]
 
 type Env = Set (Pair Ident Value)
@@ -177,7 +177,7 @@ semVal (Const k) env = Int k
 semVal (Var x)   env = env ? x
 semVal (Tup vs)  env = Fun [ set[Int i:->semVal v env] | (i,v) <- [0..] `zip` vs ]
 semVal F         env = Fun [ set[Int 1:->Int 2], set[Int 2:->Int 3] ]
-semVal G         env = Fun [ set[Int i:->Int (i+1) | Int i <-from$ univ] ]
+semVal G         env = Fun [ set[Int i:->Int (i+1) | Int i <-from$ univ, Int (i+1) `elm` univ] ]
 
 ----------------------------------------------------------------------------------------
 
