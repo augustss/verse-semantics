@@ -55,37 +55,37 @@ $$
 
 % -------------- Basic rules ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\rulename{mfail}  & |DMe3 md si fail|                  & = & |fail| \\
-\rulename{mconst}  & |DMe3 md si k|                  & = & |k| \\
-\rulename{mvar}    & |DMe3 md si x|                  & = & |x| \\
-\rulename{mop}    & |DMe3 md si o|                  & = & |o| \\
-\rulename{mapp}    & |DMe3 md si (apply1N e_1 e_2)|
+\rulename{vfail}  & |DMe3 md si fail|                  & = & |fail| \\
+\rulename{vconst}  & |DMe3 md si k|                  & = & |k| \\
+\rulename{vvar}    & |DMe3 md si x|                  & = & |x| \\
+\rulename{vop}    & |DMe3 md si o|                  & = & |o| \\
+\rulename{vapp}    & |DMe3 md si (apply1N e_1 e_2)|
    & = & |apply1N ((DMe3 md si e_1)) (DMe3 md si e_2)| \\
-\rulename{mtup} & |DMe3 md si (arr(e_1, xdots, e_n))|
+\rulename{vtup} & |DMe3 md si (arr(e_1, xdots, e_n))|
     & = & |arr (DMe3 md si e_1, xdots, DMe3 md si e_n)| \\
-\rulename{mtruth}    & |DMe3 md si (truth e)|                  & = & |truth (DMe3 md si e)| \\
-\rulename{mbind}   & |DMe3 md si (defKW x)|          & = & |defKW x| \\
-\rulename{meq}     & |DMe3 md si (e_1=e_2)|          & = & |(DMe3 md si e_1) = (DMe3 md si e_2)| \\
-\rulename{msemi}   & |DMe3 md si (e_1 ; e_2)|        & = & |DMe3 md si e_1 ; DMe3 md si e_2| \\
-\rulename{mchoice} & |DMe3 md si (e_1 `choice` e_2)| & = & |(DMe3 md si e_1) `choice` (DMe3 md si e_2)| \\
-\rulename{mfor}    & |DMe3 md si (fordo e_1 e_2)|
+\rulename{vtruth}    & |DMe3 md si (truth e)|                  & = & |truth (DMe3 md si e)| \\
+\rulename{vbind}   & |DMe3 md si (defKW x)|          & = & |defKW x| \\
+\rulename{veq}     & |DMe3 md si (e_1=e_2)|          & = & |(DMe3 md si e_1) = (DMe3 md si e_2)| \\
+\rulename{vsemi}   & |DMe3 md si (e_1 ; e_2)|        & = & |DMe3 md si e_1 ; DMe3 md si e_2| \\
+\rulename{vchoice} & |DMe3 md si (e_1 `choice` e_2)| & = & |(DMe3 md si e_1) `choice` (DMe3 md si e_2)| \\
+\rulename{vfor}    & |DMe3 md si (fordo e_1 e_2)|
    & = & |iter2 forKW (DMe3 md si e_1; lam underscore (DMe3 md si e_2)) emptytup| \\
-\rulename{mall}    & |DMe3 md si (all e)| & = & |iter2 allKW (DMe3 md si e) emptytup| \\
-\rulename{mone}    & |DMe3 md si (one e)| & = & |iter2 oneKW (DMe3 md si e) fail| \\
-\multicolumn{2}{l}{\rulename{mif} \;\; \hfill |DMe3 md si (if e_1 then e_2 else e_3|}
+\rulename{vall}    & |DMe3 md si (all e)| & = & |iter2 allKW (DMe3 md si e) emptytup| \\
+\rulename{vone}    & |DMe3 md si (one e)| & = & |iter2 oneKW (DMe3 md si e) fail| \\
+\multicolumn{2}{l}{\rulename{vif} \;\; \hfill |DMe3 md si (if e_1 then e_2 else e_3|}
 & = & \multicolumn{2}{@@{}l}{|iter2 ifKW
         (DMe3 md si e_1; lam underscore (DMe3 md si e_2))
         (DMe3 md si e_3)|}  \\
-\rulename{mcheck+} & |DMe3 mdpos    si (check fx e)| & = & |check fx (DMe3 mdpos si e)| \\
-\rulename{mcheck-} & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si e| \\
-\rulename{mcheckx} & |DMe3 mdx    si (check fx e)| & = & |check fx (DMe3 mdx si e)| \\
+\rulename{vcheck+} & |DMe3 mdpos    si (check fx e)| & = & |check fx (DMe3 mdpos si e)| \\
+\rulename{vcheck-} & |DMe3 mdneg si (check fx e)| & = & |DMe3 mdneg si e| \\
+\rulename{vcheckx} & |DMe3 mdx    si (check fx e)| & = & |check fx (DMe3 mdx si e)| \\
 \end{array}
 \\
 
 %--------- (e1 |> e2) and check<fx>{e}----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
 \multicolumn{4}{l}{\mbox{\it Type rules}} \\
-\rulename{moftype+} & |DMe3 mdpos si (oftypefx e_1 fx e_2)|
+\rulename{voftype+} & |DMe3 mdpos si (oftypefx e_1 fx e_2)|
 & = & \begin{array}[t]{@@{}l}
   |verifyKW| (;) \left\{ \begin{array}{@@{}l}
        |defintro r; r == check fx (DMe3 mdpos si e_1);| \\
@@ -93,9 +93,9 @@ $$
   \end{array} \right\} ; \\
   |DMe3 mdneg si (oftypefx e_1 fx e_2|
   \end{array} \\
-\rulename{moftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
+\rulename{voftype-} & |DMe3 mdneg si (oftypefx e_1 fx e_2)|
  & = & |si guard (havoc fx; some (DMe3 mdneg emp e_2))| \\
-\rulename{moftypex} & |DMe3 mdx si (oftypefx e_1 fx e_2)|
+\rulename{voftypex} & |DMe3 mdx si (oftypefx e_1 fx e_2)|
 & = & \begin{array}[t]{@@{}l}
     |defintro r; r == check fx (DMe3 mdx si e_1);| \\
     |check succeeds (apply1N ((DMe3 mdx si e_2)) r))|
@@ -105,12 +105,12 @@ $$
 % -------------- Function rules ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
   \multicolumn{4}{l}{\mbox{\it Closed functions}} \\
- \rulename{mcfun+} &  |DMe3 mdpos si (lamOC closed x e_1 e_2)|
+ \rulename{vfun+} &  |DMe3 mdpos si (lamOC closed x e_1 e_2)|
  & = & \multicolumn{2}{@@{}l}{|verify2 x () (DMe3 mdneg ((si + x)) e_1; DMe3 mdpos ((si +x)) e_2);|} \\
  & & &       |DMe3 mdneg si (lamOC closed x e_1 e_2)| \\[1mm]
-\rulename{mcfun-} &  |DMe3 mdneg si (lamOC closed x e_1 e_2)|
+\rulename{vfun-} &  |DMe3 mdneg si (lamOC closed x e_1 e_2)|
 & = & |lam x (DMe3 mdpos ((si + x)) e_1; DMe3 mdneg ((si + x)) e_2)| \\[1mm]
-\rulename{mcfunx}& |DMe3 mdx si (lamOC closed x e_1 e_2)|
+\rulename{vfunx}& |DMe3 mdx si (lamOC closed x e_1 e_2)|
 & = & |lam x (DMe3 mdx ((si + x)) e_1; DMe3 mdx ((si + x)) e_2)| \\[2mm]
 \end{array} \\
 % -------------- Auxiliary functions ----------------
