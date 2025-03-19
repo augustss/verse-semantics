@@ -128,7 +128,7 @@ Env^{*} & = & \powerset{Env} \\
   \semapp{E}{|k|}{\rho} & = & [\msing{k}] \\
   \semapp{E}{|o|}{\rho} & = & [\msing{\semapp{O}{|o|}{}}] \\
   \semapp{E}{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
-  \semapp{E}{|fail|}{\rho} & = & [\{\}] \\
+  \semapp{E}{|fail|}{\rho} & = & [] \\
   \semapp{E}{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = &
          [ r \, || \,
