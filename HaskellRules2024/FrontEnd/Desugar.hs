@@ -717,6 +717,7 @@ essToMini orig_e = go_expr orig_e
     go kap (All t)        = kap `ueq` (All    <$> go_expr t)
     go kap (One t)        = kap `ueq` (One    <$> go_expr t)
     go kap (Choice e1 e2) = kap `ueq` (Choice <$> go_expr e1 <*> go_expr e2)
+    -- Or: go kap (Choice e1 e2)  = Choice <$> go kap e1 <*> go kap e2
     go kap (ApplyD t1 t2) = kap `ueq` (ApplyD <$> go_expr t1 <*> go_expr t2)
 
     -- WEXISTS (exists x);  WDEF (x:=t)

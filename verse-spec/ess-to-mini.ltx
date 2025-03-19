@@ -39,12 +39,16 @@ $$
 \rulename{wwild}    & |SS wu _| & = & |wu `ueq` (defintro x; x)| \\
 % \rulename{wwild2}    & |SS (apeff e fx) _| & = & |e| \\
 \rulename{wapp}    & |SS wu (apply1N t_1 t_2)| & = & |wu `ueq` apply1N ((SS wuinit t_1)) (SS wuinit t_2)| \\
-\rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` SS wuinit t_1 `choice` SS wuinit t_2| \\
 \rulename{wfor}   & |SS wu (fordo t_1 t_2)|
    & = & |wu `ueq` fordo (SS wuinit t_1) (SS wuinit t_2)| \\
 \rulename{wone} & |SS wu (one t)| & = & |wu `ueq` one (SS wuinit t)| \\
 \rulename{wall} & |SS wu (all t)| & = & |wu `ueq` all (SS wuinit t)| \\
 \rulename{wfail}   & |SS wu fail| & = & |fail| \\
+
+% Choice: do we want to push wu into the branches or not?
+\rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` (SS wuinit t_1 `choice` SS wuinit t_2)| \\
+% \rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |SS wu t_1 `choice` SS wu t_2| \\
+
 \rulename{wunify}   & |SS wu (t_1 == t_2)| & = & |(SS wu t_1) = (SS wu t_2)| \\
 \rulename{wsemi}\asktim   & |SS wu (t_1 ; t_2)| & = & |SS wuinit t_1 ; SS wu t_2| \\
 \rulename{wwhere}   & |SS wu (t_1 where t_2)| & = & |defintro r; r == (SS wu t_1); (SS wuinit t_2); r| \\
