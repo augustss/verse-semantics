@@ -503,7 +503,9 @@ instance Pretty SideEff where
   pPrintPrec _ _ STop = empty        -- Suppress <top>
   pPrintPrec _ _ eff  = angleBrackets (text (show eff))
 
-toEff :: Eff -> [EffString] -> Eff
+toEff :: Eff          -- Default effect: use this if the user specifies no explicit effects
+      -> [EffString]  -- What the user specified
+      -> Eff
 toEff (Eff {eff_card = default_card, eff_side = default_side })
       effs
   | Just ce <- get_card effs
