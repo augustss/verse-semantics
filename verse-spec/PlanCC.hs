@@ -155,9 +155,11 @@ dFx i e1 e2 rho v = dF e1 e2 (extendEnv rho i v)
 -- compute the sequence of result.  The result has
 -- a prefix of empty sets (possibly) followed by a non-empty set.
 -- E.g.
---  F (x:=0|1) (x)    [x->0]  =  [{0}]
---  F (x:=0|1) (x)    [x->1]  =  [{},{1}]
---  F (x:=0|1) (x||2) [x->0]  =  [{0,2}]
+--  F (x:=0|1)             (x)    [x->0]  =  [{0}]
+--  F (x:=0|1)             (x)    [x->1]  =  [{},{1}]
+--  F (x:=0|1)             (x||2) [x->0]  =  [{0,2}]
+--  F (2|3; x:=0|1)        (x)    [x->1]  =  [{},{1}]    (trunc ,{},{1}])
+--  F (x:=0|1 `where` 2|3) (x)    [x->1]  =  [{},{},{1}] (trunc ,{1}])
 dF :: CExp -> CExp -> Env -> WS
 dF e1 e2 rho = joiner
   [ map (\ s -> if isEmpty s then empty else justOne $ dD e2 rho') w1s
