@@ -1084,10 +1084,12 @@ ppTim = pp
                      -> text s
                    | otherwise
                      -> ppr 0 v
-        Seq []       -> error "Seq []"
-        Seq [e]      -> pp sem prec e
-        Seq es | sem -> ppSeq es
-               | otherwise -> ppBlock prec es
+        Seq e1 e2 | sem       -> ppSeq es
+                  | otherwise -> ppBlock prec es
+                  where
+                    es = e1 : grab e2
+                    grab (Seq s1 s2) = s1 : grab s2
+                    grab s           = [s]
         PrefixOp o e -> maybeParens (prec > q) $ ppOp o <> pp False qr e
           where (q, _, qr) = fixity ("pre" ++ identString o)
         PostfixOp e o -> maybeParens (prec > q) $ pp False ql e <> ppOp o
@@ -1136,7 +1138,7 @@ ppTim = pp
         Truth (Array []) -> text "true"
         Truth e -> text "truth" <> braces (pp True 0 e)
         Option me -> text "option" <> braces (maybe empty (pp True 0) me)
-        Exists is e -> pp sem prec $ Seq $ vars ++ unBlk e
+        Exists is e -> pp sem prec $ eSeq $ vars ++ unBlk e
           where vars = map (\ i -> InfixOp (Variable i) (Ident noLoc ":") (Variable (Ident noLoc "any"))) is
                 unBlk (Blk es) = es
                 unBlk ee = [ee]

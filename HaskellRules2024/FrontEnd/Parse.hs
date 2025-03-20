@@ -400,15 +400,7 @@ pIndBlock' = do
         _ -> fail "indentation"
 
 pExprSeq :: P SrcExpr
-pExprSeq = seqS <$> sepEndBy pExprT (pOp ";")
-
---pExprSeq1 :: P SrcExpr
---pExprSeq1 = seqS <$> sepEndBy1 pExprT (pOp ";")
-
-seqS :: [SrcExpr] -> SrcExpr
-seqS [] = Array []
-seqS [e] = e
-seqS es = Seq es
+pExprSeq = eSeq <$> sepEndBy pExprT (pOp ";")
 
 pIf :: P SrcExpr
 pIf = pKeyword "if" *> (
@@ -436,7 +428,7 @@ pLet :: P SrcExpr
 pLet = pKeyword "let" *> (Let <$> pParenBlock <*> (pKeywordOptDot "do" *> pBlock))
 
 pParenBlock :: P SrcExpr
-pParenBlock = pParens pExprSeq <|> (seqS <$> pIndBlock)
+pParenBlock = pParens pExprSeq <|> (eSeq <$> pIndBlock)
 
 pCase :: P SrcExpr
 pCase = pKeyword "case" *> (mkCase <$> optional (pParens pExprSeq) <*> (pKeywordOpt "of" *> pBlockM))
@@ -583,7 +575,7 @@ pFile = skip *> p <* eof
   where
     p = do
       S.modify $ \ ls -> ls{ blkIndent = [""] }
-      seqS <$> pIndBlock'
+      eSeq <$> pIndBlock'
 
 ------
 

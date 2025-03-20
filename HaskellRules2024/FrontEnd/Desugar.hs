@@ -169,7 +169,7 @@ sDesugarExpr = ds
     ds (Blk es)       = ds $ eSeq es
     ds e@(DefineV {}) = pure e
 
-    ds (Seq es) = eSeq <$> mapM ds es
+    ds (Seq e1 e2)        = mkSeq <$> ds e1 <*> ds e2
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
 
     -- Operators
@@ -186,7 +186,7 @@ sDesugarExpr = ds
 
     -- Infix ops
     ds (InfixOp e1 (Op "|") e2)     = Choice <$> ds e1 <*> ds e2
-    ds (InfixOp e1 (Op "and") e2)   = ds $ Seq [e1, e2]                  -- XXX multiplicity?
+    ds (InfixOp e1 (Op "and") e2)   = ds $ mkSeq e1 e2                   -- XXX multiplicity?
     --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 Fail) Fail    -- XXX binding
     ds (InfixOp e1 (Op "or") e2)    = ds $ If2E e1 $ If2E e2 Fail
     ds (InfixOp e1 (Ident l op) e2) = ds =<< call In l op (Array [e1, e2])
@@ -229,8 +229,8 @@ sDesugarExpr = ds
 
     -- type{t}  ==  Fun(x := t)<closed>{x}
     ds (Macro1 (Ident _ "type") _ e)
-      = do { e' <- ds e; encodeType e' }
---      = do { e' <- ds e; return (Type e') }
+--      = do { e' <- ds e; encodeType e' }
+      = do { e' <- ds e; return (Type e') }
 
     -- I want to desugar Exists to DefineV; but to do that I need to make up
     -- fresh identifiers (easy) and substitute the fresh one for the old one
@@ -246,8 +246,8 @@ sDesugarExpr = ds
       i <- Variable <$> newIdent loc "i"
       a <- Variable <$> newIdent loc "a"
       ds $ ApplyD (eMkMap loc) $
-                  For2 (Seq [InfixOp f (Ident loc ":") (Array es),
-                             InfixOp (InfixOp i (Ident loc "->") a) (Ident loc ":") f])
+                  For2 (mkSeq (InfixOp f (Ident loc ":") (Array es))
+                              (InfixOp (InfixOp i (Ident loc "->") a) (Ident loc ":") f))
                        (Array [i, a])
 
     ds e@(EffAttr {}) = errorMessage (showWithHerald "Unexpected effects" (pPrint e))
@@ -342,9 +342,7 @@ eDefine :: HasCallStack => Ident -> SrcEssential -> SrcEssential
 eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
 -- x := (e1; ...; en)   generates   e1; ... e(n-1); x:=en
 -- Smart contructor, floats out nested defines
-eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
-                   where
-                     (floats, rhs) = unSeq ts
+eDefine x (Seq e1 e2) = mkSeq e1 (eDefine x e2)
 eDefine x rhs = DefineE x rhs
 
 --------------------------------------------------------
@@ -461,7 +459,7 @@ _addDeref = pure . exprD S.empty
     expr s e@(Variable i) | i `S.member` s = applyPrimD "read$" e
                           | otherwise = e
     expr s (Array es) = Array $ map (expr s) es
-    expr s (Seq es) = Seq $ map (expr s) es
+    expr s (Seq    e1 e2) = Seq    (expr s e1) (expr s e2)
     expr s (ApplyS e1 e2) = ApplyS (expr s e1) (expr s e2)
     expr s (ApplyD e1 e2) = ApplyD (expr s e1) (expr s e2)
     expr s (If3 e1 e2 e3) = If3 (expr s' e1) (expr s' e2) (exprD s e3)
@@ -714,11 +712,10 @@ essToMini orig_e = go_expr orig_e
     go kap (Where t1 t2)   = do { (dr, r) <- defineDE "r" (go kap t1)
                                 ; e2 <- go_expr t2
                                 ; return (eSeq [dr, e2, r]) }
-    go kap (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
-                                ; es <- mapM (go (kap { wc_inp = NoInput })) ts
+    go kap (Seq t1 t2)     = do { e1 <- go (kap { wc_inp = NoInput }) t1
                                         -- Push ambient effects into both sides
-                                ; e  <- go kap t
-                                ; return (eSeq (es ++ [e])) }
+                                ; e2  <- go kap t2
+                                ; return (mkSeq e1 e2) }
 
     -- WIF, WFOR, WALL, WONE: If, for, all
     go kap (If3 t1 t2 t3) = If3  <$> go_expr t1 <*> go kap t2 <*> go kap t3
@@ -885,10 +882,7 @@ miniToCore orig_md = go (orig_md,[])
     -- MTUP, MTRUTH, MSEMI, MEQ, MCHOICE, MAPP
     go md (Array es)     = Array <$> mapM (go_nt md) es
     go md (Truth e)      = Truth <$> go md e
-    go md (Seq es_seq)   = do { let (es,e) = unSeq es_seq
-                              ; es' <- mapM (go_nt md) es
-                              ; e'  <- go md e
-                              ; return (eSeq (es' ++ [e'])) }
+    go md (Seq e1 e2)    = mkSeq  <$> go_nt md e1 <*> go md e2
     go md (Unify e1 e2)  = eUnify <$> go_nt md e1 <*> go_nt md e2
     go md (ApplyD e1 e2) = ApplyD <$> go_nt md e1 <*> go_nt md e2
     go md (Choice e1 e2) = Choice <$> go md    e1 <*> go md    e2
@@ -1001,10 +995,8 @@ defineDE nm ds_rhs
                  ; pure (coreDefine x rhs', Variable x) } }
 
 coreDefine :: Ident -> SrcCore -> SrcCore
-coreDefine x (Seq ts) = eSeq (floats ++ [coreDefine x rhs])
-                      where
-                        (floats, rhs) = unSeq ts
-coreDefine x rhs = eSeq [ DefineV x, Unify (Variable x) rhs ]
+coreDefine x (Seq e1 e2) = mkSeq e1 (coreDefine x e2)
+coreDefine x rhs         = mkSeq (DefineV x) (Unify (Variable x) rhs)
 
 -----------------------------------------------
 --
