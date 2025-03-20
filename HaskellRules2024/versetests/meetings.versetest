@@ -1,5 +1,10 @@
 # Add new meetings at the top
 
+verify("M20Mar25-1", pass) { f( :int | :string ):int := 3
+                           ; f[2]; f["monkey"] }
+verify("M20Mar25-2", fail) { f( :int | :string ):int := 3
+                           ; f['c'] }
+
 verify("M19Mar25-1", pass) { f( g:type{(:int) => :char} ):char := g[3] }
   # This should surely pass!  We apply g to 3, which gives a char.
 
@@ -9,8 +14,29 @@ verify("M19Mar25-3", pass) { (f( x:=(1|2) )<succeeds> := x);       all{ exists y
 
 verify("M19Mar25-4", fail) { (f( x:int )<decides>:int     := x=(1|2)); all{ exists y { f[y]; y } } = (1,2) }
 verify("M19Mar25-5", pass) { (f( x:=(1|2) )<succeeds>:int := x);       all{ exists y { f[y]; y } } = (1,2) }
-  # -4 iterates in the range and the caller can't see taht
+  # -4 iterates in the range and the caller can't see that
   # -5 iterates in the domain, and the caller /can/ see that
+
+verify("M19Mar25-6", pass) { (f( g():type{1|2} )<succeeds>:int := g[]) }
+verify("M19Mar25-7", pass) { (oneortwo(x:any)<decides> := x=1 | x=2)
+                           ; (f( g():oneortwo )<succeeds>:int := g[]) }
+
+verify("M19Mar25-8", pass) { (f( g(x:int):=4 )<succeeds>:int := g[7]=4)
+                           ; h(x:int):=4
+                           ; f[h] }
+verify("M19Mar25-9", fail) { (f( g(x:int):=4 )<succeeds>:int := g[7]=4)
+                           ; h(x:int):int:=4
+                           ; f[h] }
+verify("M19Mar25-10", pass) { (f( z:int, g(x:int)<decides>:=x=4 )<succeeds>:int
+                                 := if( y:=g[z] ) then{ y=z; y=4 } else{ 99 })
+                            ; (h(x:int)<decides>:=x=4)
+                            ; f[3,h] }
+verify("M19Mar25-11", fail) { f( z:int, g(x:int)<succeeds>:=x=4 )<succeeds>:int
+                                 := { g[z]; z=4 } }
+  # g is like a transparent function; the effect annotation doesn't do much
+
+verify("M19Mar25-12", pass) { f( g():=1|2 )<succeeds>:int := { g[]; 7} }
+  # If g behaves transparently, f would be rejected becuase multiple choices
 
 
 verify("M7Feb25-1", pass){ g1()<decides> := { (f(x:int):string := 27); fail }  }
@@ -290,6 +316,9 @@ verify("S1Aug24-2", fail, tim=A00) { f(x:int,y:int)<decides><closed> := x=y
                           ; exists a { f[a,a] } }
 verify("S1Aug24-3", pass) { f(x:int)<decides><closed> := x=3
                           ; exists a { f[a] } }
+testeq("S1Aug24-4", pass, broken)
+                          { f(x:int)<decides><closed> := x=3
+                          ; all{ exists a { f[a] } } } { array{3} }
 
 # -----------------------------------------
 # Email 28 July 24
