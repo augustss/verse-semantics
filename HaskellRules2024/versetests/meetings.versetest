@@ -1,5 +1,18 @@
 # Add new meetings at the top
 
+verify("M19Mar25-1", pass) { f( g:type{(:int) => :char} ):char := g[3] }
+  # This should surely pass!  We apply g to 3, which gives a char.
+
+verify("M19Mar25-2", pass) { (f( x:int    )<decides>  := x=(1|2)); all{ exists y { f[y] } } = (1,2) }
+verify("M19Mar25-3", pass) { (f( x:=(1|2) )<succeeds> := x);       all{ exists y { f[y] } } = (1,2) }
+  # -2 and -3 are transparent, so we can see the iteration order in both
+
+verify("M19Mar25-4", fail) { (f( x:int )<decides>:int     := x=(1|2)); all{ exists y { f[y]; y } } = (1,2) }
+verify("M19Mar25-5", pass) { (f( x:=(1|2) )<succeeds>:int := x);       all{ exists y { f[y]; y } } = (1,2) }
+  # -4 iterates in the range and the caller can't see taht
+  # -5 iterates in the domain, and the caller /can/ see that
+
+
 verify("M7Feb25-1", pass){ g1()<decides> := { (f(x:int):string := 27); fail }  }
   # M7Feb25-1: actually passes the verifier;
   # although f doesn't verify, it is never called
