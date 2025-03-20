@@ -699,7 +699,7 @@ essToMini orig_e = go_expr orig_e
     go :: WContext -> SrcEssential -> DsM SrcMini
     -- Typically (go kap t) = e, where `kap::(Input,[Eff])` is short for `kappa`
 
-    -- Simple cases: WCONST, WVAR, WPRIM, WFAIL, WSEQ, WSUNIFY, WCHOICE, WSEMI
+    -- Simple cases: WCONST, WVAR, WPRIM, WFAIL, WSEQ, WSUNIFY, WCHOICE
     go kap e@(Lit {})      = kap `ueq` return e
     go kap e@(Variable v)
        | isSrcUnderscore v = case wc_inp kap of
@@ -712,18 +712,21 @@ essToMini orig_e = go_expr orig_e
     go kap (Where t1 t2)   = do { (dr, r) <- defineDE "r" (go kap t1)
                                 ; e2 <- go_expr t2
                                 ; return (eSeq [dr, e2, r]) }
-    go kap (Seq t1 t2)     = do { e1 <- go (kap { wc_inp = NoInput }) t1
-                                        -- Push ambient effects into both sides
+
+    -- Sequential composition: WSEMI
+    go kap (Seq t1 t2)     = do { e1 <- go_expr t1 -- t1 gets no effects at all
                                 ; e2  <- go kap t2
                                 ; return (mkSeq e1 e2) }
 
-    -- WIF, WFOR, WALL, WONE: If, for, all
+    -- if, for, all one: WIF, WFOR, WALL, WONE
     go kap (If3 t1 t2 t3) = If3  <$> go_expr t1 <*> go kap t2 <*> go kap t3
     go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go kap t2)
     go kap (All t)        = kap `ueq` (All    <$> go_expr t)
     go kap (One t)        = kap `ueq` (One    <$> go_expr t)
     go kap (Choice e1 e2) = kap `ueq` (Choice <$> go_expr e1 <*> go_expr e2)
     -- Or: go kap (Choice e1 e2)  = Choice <$> go kap e1 <*> go kap e2
+
+    -- Application: WAPP
     go kap (ApplyD t1 t2) = kap `ueq` (ApplyD <$> go_expr t1 <*> go_expr t2)
 
     -- WEXISTS (exists x);  WDEF (x:=t)
@@ -766,17 +769,18 @@ essToMini orig_e = go_expr orig_e
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go kap (Splice t) = go kap t
 
+    -- Arrays: WTUP1 and WTUP2
     go kap@(WC { wc_inp = inp }) (Array ts)
       = case inp of
-          NoInput -> do { es <- mapM do_one ts
-                        ; mkArray es }
+          NoInput -> -- WTUP1
+                     do { es <- mapM do_one ts; mkArray es }
                    where
                      do_one (Splice t) = Splice <$> go kap t
                      do_one t          =            go kap t
 
           PI i | null ts   -- Optimisation: instead of (i=<>; <>), just generate (i=<>)
                -> pure (eUnify i (Array []))
-               | otherwise
+               | otherwise     -- WTUP2
                -> do { prs <- mapM do_one ts
                      ; let (exi_js, es) = unzip prs
                      ; exi_js_arr <- mkArray exi_js
@@ -791,7 +795,7 @@ essToMini orig_e = go_expr orig_e
                                        ; e <- go (kap { wc_inp = PI (Variable j) }) t
                                        ; pure (DefineV j, e) }
 
-    -- Truth
+    -- truth{t}: WTRU1 and WTRU2
     go kap@(WC { wc_inp = inp }) (Truth t)
       = case inp of
           NoInput -> Truth <$> go (kap { wc_inp = NoInput }) t
@@ -799,7 +803,7 @@ essToMini orig_e = go_expr orig_e
                      ; e <- go (kap { wc_inp = PI (Variable j) }) t
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
 
-    -- Functions: WTYPE1, WTYPE2
+    -- type{t}: WTYPE1, WTYPE2
     go (WC { wc_inp = inp }) (Type t)
       = do { i <- newIdent (getLoc t) "i"
            ; let inp' = case inp of
@@ -927,9 +931,17 @@ miniToCore orig_md = go (orig_md,[])
     go md@(m,_) (Check fx e)
       = case m of
            MV {} -> Check fx <$> go_nt md e   -- ToDo: check that go_mt
-           MI    -> go md e
+
+           MI    -> go md e  -- No Check here: needed for tests
+                             -- M19Mar25-2, M20Dec24-1, S1Aug24-3, T29Jul24-3
+                             -- Transparent functions act like "macros"
+
            MX    -> Check fx <$> go md e
-                 -- go md e  -- Drop the check here; see MaxVerse9, Feb 12.
+                    -- For consistency, we want no Check here either
+                    -- Again, transparent functions act like "macros"
+                    -- But if we remove the Check:
+                    --    S1Aug24-4, Ev23, EV23a start passing
+                    --    For6, check2, check7 start failing
 
     -- Functions proper: MCFUN+, MCFUN-, MCFUNX
     go (MV omit_client, xs) e@(XDLam Closed x e1 e2)
