@@ -62,7 +62,7 @@ applicationRules =
 
 appLambda :: Rule Expr
 appLambda =
-  do label "APP-LAMBDA"
+  do label "APP-LAM"
      Lam bnd :@: v <- lhs
      let (x,e) = alphaRename (free v) bnd
          body  = (Var x :=: v) :>: e
@@ -72,7 +72,7 @@ appLambda =
 
 appTruth :: Rule Expr
 appTruth =
-  do label "APP-TRUTH"
+  do label "APP-TRU"
      Tru a :@: v <- lhs
      pure ((v :=: a) :>: a)
 
@@ -89,8 +89,8 @@ appArray =
      -- <v1,..,vn>[k] --> vk
      -- This rule isn't needed, but it makes the reduction
      -- sequence much shorter when indexing with a constant
-     -- (it's also unsound/not confluent with our current way of doing choice,
-     -- which is why it is commented out for now)
+     -- Sadly it is unsound/not confluent with our current way of
+     -- doing choice, which is why it is commented out for now)
      Tup vs :@: Lit (LInt i) <- lhs
      guard (all isVal vs)
      let i' = fromInteger i
@@ -144,11 +144,11 @@ appPrimOp =
        -- unary predicates
        , do Op op :@: a <- lhs
             (lab, ans) <- case op of
-                            IsInt  -> pure ("ISINT",  [a|Lit(LInt _)<-[a]])
-                            IsStr  -> pure ("ISSTR",  [a|Lit(LStr _)<-[a]])
-                            IsChar -> pure ("ISCHAR", [a|Lit(LChar _)<-[a]])
-                            IsComp -> pure ("ISCOMP", [a|isComparable a])
-                            IsArr  -> pure ("ISARR",  [a|Tup{}<-[a]]++[a|Arr{}<-[a]])
+                            IsInt  -> pure ("ISINT",  [a | Lit(LInt _)<-[a]])
+                            IsStr  -> pure ("ISSTR",  [a | Lit(LStr _)<-[a]])
+                            IsChar -> pure ("ISCHAR", [a | Lit(LChar _)<-[a]])
+                            IsComp -> pure ("ISCOMP", [a | isComparable a])
+                            IsArr  -> pure ("ISARR",  [a | Tup{}<-[a]]++[a | Arr{}<-[a]])
                             _      -> empty
             label ("-" ++ lab)
             case ans of
@@ -210,7 +210,7 @@ appPrimOp =
                       :>: (Op ArrApp :@: Tup [Tup vs,a2,Tup ws])
                       >>> res
                         )
-              
+
               , do label "-TUP-R"
                    Tup (vs@(_:_)) <- pure a2
                    Tup (ws@(_:_)) <- pure res
@@ -278,7 +278,7 @@ normalizationRules =
      (v2 :=: ((v1 :=: e1) :>: e2)) :>: e3 <- lhs
      pure ((v1 :=: e1) :>: ((v2 :=: e2) :>: e3))
  <|>
-  do label "UNDERSCORE-ELIM"
+  do label "SEQ-ELIM"
      interest 0
      (Var u :=: v) :>: e <- lhs
      guard (isUnderscore u)

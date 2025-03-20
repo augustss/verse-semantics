@@ -229,8 +229,8 @@ sDesugarExpr = ds
 
     -- type{t}  ==  Fun(x := t)<closed>{x}
     ds (Macro1 (Ident _ "type") _ e)
---      = do { e' <- ds e; encodeType e' }
-      = do { e' <- ds e; return (Type e') }
+      = do { e' <- ds e; encodeType e' }
+--      = do { e' <- ds e; return (Type e') }
 
     -- I want to desugar Exists to DefineV; but to do that I need to make up
     -- fresh identifiers (easy) and substitute the fresh one for the old one

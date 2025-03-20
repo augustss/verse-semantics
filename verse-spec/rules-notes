@@ -1,0 +1,16 @@
+Rules done
+
+* APP-LAM
+* APP-TRU
+* APP-TUP-0, APP-TUP
+
+* unary ops: APP-NEG: not in verse-spec
+* binary ops: APP-ADD etc: only ADD in verse-spec
+* binary predicates: APP-GT etc: only GT in verse-spec
+* unary predicates: ISINT etc: only ISINT in verse-spec
+
+* ToDo:  APP-ISGROUND, APP-LENGTH, APP-ARRMAP, APP-ARRAPP
+
+* U-LIT, U-TRU, U-TUP, U-FAIL, U-OCCURS, U-SWAP
+
+* SEQ-ASSOC, SEQ-ELIM, EXI-ELIM, EXI-FLOAT, EXI-PUSH

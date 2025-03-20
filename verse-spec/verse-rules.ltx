@@ -133,8 +133,6 @@ $\begin{array}{@@{}l}
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Structural rules}
 \rulename{exi-swap} & |def x (def y e)| & \leftrightarrow & |def y (def x e)| \\
-\rulename{exi-swiz1} & |l == def x e_1; e_2| & \leftrightarrow & |def x (l==e_1; e_2| & |x| \not\in |freevars e_2|\\
-\rulename{exi-swiz2} & |l == e_1; def x e_2| & \leftrightarrow & |def x (l==e_1; e_2| & |x| \not\in |freevars e_1|\\
 \rulename{var-swap} & |x == y; e| & \leftrightarrow & |y == x; e| \\
 \rulename{exi-alpha} & |def x e| & \leftrightarrow & |def y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
 \rulename{lam-alpha} & |lam x e| & \leftrightarrow & |lam y (subst e y x)| & \text{if $|y| \not\in |freevars e `cup` boundvars e|$} \\
@@ -144,16 +142,20 @@ $\begin{array}{@@{}l}
 \rulename{app-add}          & |applyN add (k_1 ,k_2)| & \movesto & |k_3| & \text{where $k_3 = k_1 + k_2$}\\
 \rulename{app-gt}           & |applyN gt (k_1,k_2)|   & \movesto & |k_1| &  \text{if $k_1 > k_2$} \\
 \rulename{app-gt-fail}      & |applyN gt (k_1,k_2)|   & \movesto & |fail| &  \text{if $k_1 \leq k_2$} \\
+\rulename{app-isint}        & |apply1 isInt k|   & \movesto & |k| &  \text{if $k$ is an integer} \\
+\rulename{app-isint-fail}      & |applyN isInt v|   & \movesto & |fail| &  \text{if $v$ is not an integer} \\
 \rulename{app-lam}^{\alpha} & |apply1 (lam x e) v| & \movesto & |def x (x==v; e)|
                                                   & \text{if $x \not\in \freevars{|v|}$} \\
+\rulename{app-tru}           & |apply1 (truth v_1) v_2|   & \movesto & |v_1 == v_2; v_2|  \\
+\rulename{app-tup0}        & |apply1 emptytup v| & \movesto & |fail| \\
 \rulename{app-tup}          & |apply1 (tup (v_0,xdots, v_nm1)) v| & \movesto &
-                            |(v == 0^^^ v_0) choice xdots choice (v == (n-1)^^^ v_nm1)| & n \geq 0 \\
-\rulename{app-tup-0}        & |apply1 emptytup v| & \movesto & |fail|
+                            |(v == 0^^^ v_0) choice xdots choice (v == (n-1)^^^ v_nm1)| & n \geq 0
 \end{array}
 \\ \\[-0.8em]
 \begin{array}{@@{\hskip0.5em} l r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Unification}
   \rulename{u-lit}   & |k == k; e| & \movesto & |e| & \\
+  \rulename{u-tru} & |truth v_1 == truth v_2; e| & \movesto & |v_1 == v_2; e| \\
   \rulename{u-tup} & \hspace{-2.0em} |tup (v_1,xdots,v_n) == tup (v1',xdots,v_n'); e|
        & \movesto & |v_1==v1' `eqsemi` xdots `eqsemi` v_n==v_n' `eqsemi` e| & n \geq 0\\
   \rulename{u-fail} & |hnf_1 == hnf_2; e| & \movesto & |fail| & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
@@ -161,19 +163,19 @@ $\begin{array}{@@{}l}
   \rulename{u-swap} & |hnf == x; e| & \movesto & |x == hnf; e| \\
 \\[-0.8em]
 
-\rulegroupname{Existentials}
+\rulegroupname{Substitution}
 
-%\rulename{subst-exi} & |S^[x==v]| & \movesto & |subst S x v ^[x==v]|
-%  & \text{$|v|\ne|V^[x]|$} \\
 \rulename{exi-subst} & |def x (C^[x==v; e])| & \movesto & |subst (C^[e]) x v|
   & \text{if |blockedc (singleton x) C|, |((singleton x) `cup` boundvars C) `disjoint` freevars v|}  \\
+\rulename{rec} & |z = V^[lam x e_1]; e_2| & \movesto & \multicolumn{2}{l}{|z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
+  \hspace{4mm} \text{$|z| \in \freevars{|lam x e_1|}$}} \\
 %\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
 %  & \text{if |validc x emptyset C|, $x \not= y$}  \\
-\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
 % \rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $|noteq C hole|, x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
 % \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
 \end{array}
 \\ \\[-0.8em]
+
 \begin{array}{@@{\hskip0.5em} l  r @@{\;}c@@{\;} l l@@{}}
 \rulegroupname{Normalization}
 %\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
@@ -183,10 +185,9 @@ $\begin{array}{@@{}l}
 % \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
 % \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
 \rulename{seq-elim} & |_ == v ; e| & \movesto & |e| \\
-\rulename{rec} & |z = V^[lam x e_1]; e_2| & \movesto & \multicolumn{2}{l}{|z = V^[lam x (def z (z = V^[lam x e_1]; e_1))]; e_2|
-  \hspace{4mm} \text{$|z| \in \freevars{|lam x e_1|}$}} \\
-
-    \\[-0.8em]
+\rulename{exi-elim} & |def x e| & \movesto & |e| & \text{if $|x| \notin \freevars{|e|}$}\\
+\rulename{exi-float} & |l == def x e_1; e_2| & \movesto & |def x (l==e_1; e_2| & |x| \not\in |freevars e_2|\\
+\rulename{exi-push} &  |def x (l==e_1; e_2| & \movesto & |l == e_1; def x e_2| & |x| \not\in |freevars e_1|\\
 
 \rulegroupname{Choice}
 \rulename{fail} & |C^[fail]| & \movesto & |fail|
