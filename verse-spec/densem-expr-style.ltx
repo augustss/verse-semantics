@@ -108,6 +108,9 @@ $$
 \newcommand{\Ws}{\textit{Ws}}
 \newcommand{\mkall}{\textbf{all}}
 \newcommand{\mkarr}{\textbf{arr}}
+\newcommand{\combine}{\textbf{comb}}
+\newcommand{\trunc}{\textbf{trunc}}
+\newcommand{\once}{\textbf{once}}
 
 \begin{figure}
 $$
@@ -163,11 +166,14 @@ Env^{*} & = & \powerset{Env} \\
   \\[1mm]
 
 %  \textit{succeeds function:} \\
-  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & XXX \\
-  & & |where|
-    \begin{array}[t]{r@@{\;}c@@{\;}l}
-      |alts| & = & bb \\
-      cc & = & dd \\
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \combine \{ (v,r)\, ||\, v \inb \Value, |let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v, r \neq [] \} \\
+\\
+\semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v & = & \trunc(r, |ws|) \\
+& & |where|
+    \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
+      |ws| & = & \hat{\bigcup} \{ & [ |if s=|\mempty\,| then|\mempty\,| else|\, \once(\semapp{D}{e_2}{\rho'}\,||\,s \inb ws ] \\
+      & & & ||\, \rho' \inb \semapp{X}{|e_1|}{(\rho[i \fmapsto v])}, \\
+      & & & |let ws| = \semapp{E}{|e_1|}{\rho'},\, any (\neq \{\}) ws \} \\
     \end{array} \\
 
 
