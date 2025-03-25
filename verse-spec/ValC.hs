@@ -1,7 +1,7 @@
 module ValC(
   Val(..),
   RVal(..),
-  Fcn, mkFcn, vFcn, appM, dom, app, inDom, domV,
+  Fcn, mkFcn, vFcn, appM, dom, app, inDom, domV, eqFcnMap,
   showPretty,
   showListWith,
   maxVInt, vadd,
@@ -48,6 +48,9 @@ data Fcn = Fcn String (M.Map Val Val)    -- mapping from a to b
 
 mkFcn :: String -> [(Val, Val)] -> Fcn
 mkFcn s xys = Fcn s (M.fromList xys)
+
+eqFcnMap :: M.Map Val Val -> Fcn -> Bool
+eqFcnMap fm (Fcn _ m) = m == fm
 
 instance Eq Fcn where
   Fcn f _ == Fcn f' _  =  f == f'

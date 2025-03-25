@@ -21,9 +21,11 @@ module SetX(
   mapMaybe,
   toListBy,
   maybeToSet,
+  partitionSet,
+  cross,
   ) where
 import Control.Applicative
-import Data.List(intercalate, sort, groupBy, sortBy)
+import Data.List(intercalate, sort, groupBy, sortBy, partition, nub)
 import qualified Data.Maybe as M
 import GHC.Stack
 
@@ -43,7 +45,7 @@ instance (Show a, Ord a) => Show (SetX a) where
     case toList s of
       [] -> "{}"
       ss@(a:_)
-        | length (show a) < 25 -> "{" ++ intercalate ","   (map show ss) ++ "}"
+        | length (show a) < 25 && length ss < 10 -> "{" ++ intercalate ","   (map show ss) ++ "}"
         | otherwise            -> "{" ++ intercalate ",\n" (map show ss) ++ "}"
 
 --empty :: SetX a
@@ -73,8 +75,8 @@ difference (S as) (S bs) = S [ a | a <- as, a `notElem` bs ]
 isSubsetOf :: Eq a => SetX a -> SetX a -> Bool
 isSubsetOf (S as) (S bs) = all (\ a -> a `elem` bs) as
 
-mkSet :: [a] -> SetX a
-mkSet = S
+mkSet :: Eq a => [a] -> SetX a
+mkSet = S . nub
 
 toList :: Ord a => SetX a -> [a]
 toList (S axs) = unDup $ sort axs
@@ -107,9 +109,9 @@ sing x = S [x]
 
 -- Function should be commutative and associative.
 -- Set should be non-empty
-foldSet :: HasCallStack => (a -> a -> a) -> SetX a -> a
+foldSet :: (HasCallStack, Ord a) => (a -> a -> a) -> SetX a -> a
 foldSet _ (S []) = error "foldSet"
-foldSet f (S a) = foldl1 f a
+foldSet f s = foldl1 f (toList s)
 
 mapMaybe :: (a -> Maybe b) -> SetX a -> SetX b
 mapMaybe f (S xs) = S (M.mapMaybe f xs)
@@ -121,3 +123,9 @@ toListBy cmp (S xs) = map S $ groupBy eq $ sortBy cmp xs
 maybeToSet :: Maybe a -> SetX a
 maybeToSet Nothing = empty
 maybeToSet (Just a) = sing a
+
+partitionSet :: (a -> Bool) -> SetX a -> (SetX a, SetX a)
+partitionSet p (S sx) = (S a, S b) where (a, b) = partition p sx
+
+cross :: (Ord a) => SetX (SetX a) -> SetX (SetX a)
+cross (S ss) = mkSet $ map mkSet $ sequence $ map toList ss

@@ -3,7 +3,8 @@ module EnvC(
   W, Ws, WS,
   Env, lookupEnv, extendEnv, emptyEnv,
   rho0, allWs, allFcns,
-  allWsL,
+  allWsL, allInts,
+  findFcn,
   dO,
   ) where
 import qualified Data.Map as M
@@ -58,7 +59,8 @@ allWsL =
   nonFcn ++
   [ dO o | o <- [Oint, Ogt, Oadd] ] ++
   map vFcn [ id0, fid1, id2, id3, id01, f01, const0, const1, const2, const3, fsucc, -- succMod3,
-             fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123, f0t12 ]
+             fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123, f0t12,
+             const_12_1, id12 ]
   where
     nonFcn =
       allInts ++
@@ -69,11 +71,13 @@ allWsL =
     id3 = mkFcn "id3" [(VInt 3, VInt 3)]
     id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
     id123 = mkFcn "id123" [(VInt 1, VInt 1), (VInt 2, VInt 2), (VInt 3, VInt 3)]
+    id12 = mkFcn "id123" [(VInt 1, VInt 1), (VInt 2, VInt 2)]
     f01 = mkFcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
     const0 = mkFcn "const0" [(x, VInt 0) | x <- allInts]
     const1 = mkFcn "const1" [(x, VInt 1) | x <- allInts]
     const2 = mkFcn "const2" [(x, VInt 2) | x <- allInts]
     const3 = mkFcn "const3" [(x, VInt 3) | x <- allInts]
+    const_12_1 = mkFcn "const_12_1" [(VInt 1, VInt 1), (VInt 2, VInt 1)]
     succ0 = mkFcn "succ0" [(VInt 0, VInt 1)]
     comp = mkFcn "comparable" [(w, w) | w <- nonFcn ]
     -- The function that accepts f:int->int as an argument and returns f[1]
@@ -106,7 +110,10 @@ allWsL =
 -}
 
 allFcns :: SetX Fcn
-allFcns = mkSet [ f | VFcn fs <- allWsL, f <- fs ]
+allFcns = mkSet allFcnsL
+
+allFcnsL :: [Fcn]
+allFcnsL = [ f | VFcn fs <- allWsL, f <- fs ]
 
 fid1 :: Fcn
 fid1 = mkFcn "id1" [(VInt 1, VInt 1)]
@@ -122,6 +129,15 @@ fsuccsucc = mkFcn "succsucc" [(x, vadd x (VInt 2)) | x <- allInts ]
 
 fpred :: Fcn
 fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
+
+findFcn :: [(Val, Val)] -> Fcn
+findFcn fcn =
+  let fm = M.fromList fcn in
+  case find (eqFcnMap fm) allFcnsL of
+    Just f -> f
+    Nothing -> --error $ "Missing function " ++ show fcn
+      mkFcn name fcn
+      where name = "{" ++ intercalate "," (map show fcn) ++ "}"
 
 {-
 getW :: String -> W

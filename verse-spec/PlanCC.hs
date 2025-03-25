@@ -1,10 +1,10 @@
-{-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods #-}
+{-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods -Wno-x-partial #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MonadComprehensions #-}
 module Main where
 import Control.Arrow(second)
-import Control.Monad hiding (ap)
+--import Control.Monad hiding (ap)
 --import Data.Maybe
 --import Data.Generics.Uniplate.Data(universe)
 --import GHC.Stack
@@ -89,6 +89,11 @@ dE (CIf e1 e2 e3)       rho  =
         -- XXX what's the right one
         squash $ unionSetOfSeqs [ squash $ dD e2 rho' | rho' <- rhos ]
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
+dE e@(CLam _q _i _e1 _e2 _me3) rho = combine fs
+  where
+    fs :: SetX (W, [SetX W])
+    fs = [ (v, r) | v <- allWs, let r = dF e rho v, not (all isEmpty r) ]
+{-
 dE (CLam q i e1 e2 me3) rho =
   let alts :: SetX (Val, SetX [Perhaps Ws])
       alts =  [ (w, r) | w <- allWs, let r = useInput w, not (isEmpty r) ]
@@ -142,13 +147,7 @@ dE (CLam q i e1 e2 me3) rho =
         [vfcns']
       else
         [empty]
-
-ds = syntax "_"
-
-evalFcn (CLam _ i e1 e2 _) v = dFx i e1 e2 emptyEnv v
-
---dFx :: Ident -> CExp -> CExp -> Env -> Val -> WS
-dFx i e1 e2 rho v = dF e1 e2 (extendEnv rho i v)
+-}
 
 -- For a function with domain e1 and range e2,
 -- in an environment (which binds the function input),
@@ -160,32 +159,58 @@ dFx i e1 e2 rho v = dF e1 e2 (extendEnv rho i v)
 --  F (x:=0|1)             (x||2) [x->0]  =  [{0,2}]
 --  F (2|3; x:=0|1)        (x)    [x->1]  =  [{},{1}]    (trunc ,{},{1}])
 --  F (x:=0|1 `where` 2|3) (x)    [x->1]  =  [{},{},{1}] (trunc ,{1}])
-dF :: CExp -> CExp -> Env -> WS
-dF e1 e2 rho = joiner
-  [ map (\ s -> if isEmpty s then empty else justOne $ dD e2 rho') w1s
-  | rho' <- dX e1 rho                    -- for each possible environment
-  , let w1s = dE e1 rho'                 -- evaluate e1, a sequence of choices
-  , not $ all isEmpty w1s                -- and use it, if it succeeds at any choice
-  ]
+dF :: CExp -> Env -> W -> WS
+dF (CLam _oc i e1 e2 _) rho v = dF' i e1 e2 rho v
+dF _ _ _ = undefined
+
+dF' :: Ident -> CExp -> CExp -> Env -> W -> WS
+dF' i e1 e2 rho v = trunc ws
   where
-      justOne [x] = x
-      justOne _   = empty
-      joiner :: SetX [SetX W] -> WS
-      joiner ss =
-        let ws :: Ws
-            -- take all non-empty results and intersect them
-            ws = foldSet intersect . join . fmap (mkSet . filter (not . isEmpty)) $ ss
-            -- replace all non-empty sets with ws
-            ss' :: SetX WS
-            ss' = fmap (map rep) ss
-              where rep x = if isEmpty x then empty else ws
-            -- and combine the sequences into one
-            ss'' = unionSetOfSeqs ss'
-            -- truncate after first non-empty set
-            trunc [] = []
-            trunc (x:xs) | isEmpty x = empty : trunc xs
-                         | otherwise = [x]
-        in  trunc ss''
+    ss :: SetX [SetX W]
+    ss = [ map (\ s -> if isEmpty s then empty else once $ dD e2 rho') w1s
+         | rho' <- dX e1 (extendEnv rho i v)    -- for each possible environment
+         , let w1s = dE e1 rho'                 -- evaluate e1, a sequence of choices
+         , not $ all isEmpty w1s                -- and use it, if it succeeds at any choice
+         ]
+    ws :: [SetX W]
+    ws = unionSetOfSeqs' ss
+    res = foldr1 intersect $ filter (not . isEmpty) ws
+    once [x] = x
+    once _   = empty  -- WRONG?
+    trunc [] = []
+    trunc (x:xs) | isEmpty x = x : trunc xs
+                 | otherwise = [res]
+
+{-
+dEF :: CExp -> Env -> WS
+dEF e rho = combine fs
+  where
+    fs :: SetX (W, [SetX W])
+    fs = [ (v, r) | v <- mkSet allInts, let r = dF e rho v, not (all isEmpty r) ]
+-}
+
+combine :: SetX (W, [SetX W]) -> WS
+combine =(:[]) . fmap mk . sequence . map cross . distArg . groupByPos
+  where
+    mk :: [SetX (W, W)] -> Val
+    mk = VFcn . map funFromSet
+
+funFromSet :: SetX (W, W) -> Fcn
+funFromSet = findFcn . toList
+
+groupByPos :: SetX (W, [SetX W]) -> [ SetX (W, SetX W) ]
+groupByPos s | isEmpty s = []
+             | otherwise = fmap (second head) nes : groupByPos (fmap (second tail) es)
+  where
+    (es, nes) = partitionSet emptyHead s
+    emptyHead (_, x:_) = isEmpty x
+    emptyHead _ = undefined
+
+distArg :: [ SetX (W, SetX W) ] -> [ SetX (SetX (W,W)) ]
+distArg = map (fmap dist)
+  where
+    dist :: (W, SetX W) -> SetX (W, W)
+    dist (x, s) = fmap (x,) s
 
 {-
 dE ee@(CChkClsd x e) rho =
@@ -206,6 +231,22 @@ dE ee@(CChkClsd x e) rho =
 -}
 
 --dE e _ = error $ "unimplemented " ++ show e
+
+ds :: Exp -> CExp
+ds = syntax "_"
+
+fn, fnE1, fnE2 :: Exp
+fn = fun_c fnE1 fnE2
+fnE1 = "x":=(0 :| (1 :|| 2)) `wher` "y":=2:|3
+fnE2 = 1 :|| "x"
+fns, fnE1s, fnE2s :: CExp
+fns = ds fn
+fnE1s = ds fnE1
+fnE2s = ds fnE2
+
+gg :: Exp
+gg = fun_c("x":=0:|1 :> 0)(If("x"===1)(Tup ["_",2])(Tup[3,"_"]))
+
 
 getFcn :: OC -> SetX (Val, Ws) -> SetX Fcn
 {-
@@ -311,6 +352,10 @@ dXL :: CExp -> Env -> [Env]
 dXL e rho = 
   let exts = sequence $ map (\ x -> map (x,) allWsL) (dI e)
   in  map (foldr (\ (i,v) r -> extendEnv r i v) rho) exts
+
+unionSetOfSeqs' :: SetX WS -> WS
+unionSetOfSeqs' s | isEmpty s = []
+                  | otherwise = unionSetOfSeqs s
 
 unionSetOfSeqs :: SetX WS -> WS
 unionSetOfSeqs = foldSet unionSeqs
