@@ -108,9 +108,16 @@ $$
 \newcommand{\Ws}{\textit{Ws}}
 \newcommand{\mkall}{\textbf{all}}
 \newcommand{\mkarr}{\textbf{arr}}
-\newcommand{\combine}{\textbf{comb}}
+\newcommand{\combine}{\textbf{combine}}
 \newcommand{\trunc}{\textbf{trunc}}
 \newcommand{\once}{\textbf{once}}
+\newcommand{\sequence}{\textbf{seq}}
+\newcommand{\maplist}{\textbf{map}_{[]}}
+\newcommand{\mapset}{\textbf{map}_{\{\}}}
+\newcommand{\cross}{\textbf{cross}}
+\newcommand{\dist}{\textbf{dist}}
+\newcommand{\group}{\textbf{group}}
+\newcommand{\myset}[1]{\text{Set}(#1)}
 
 \begin{figure}
 $$
@@ -219,7 +226,7 @@ $$
 \begin{array}{l}
 
 \textbf{Auxiliary functions}\\
-\begin{array}{lcll}
+\begin{array}{l@@{\;}c@@{\;}ll}
   \applys & : & (\Ws, \Ws) \rightarrow [\Ws] \\
   \applys(|fss|, as) & = & \hat{\bigcup} \{ \applyf(|fs|, as) \, || \, |fs| \inb |fss| \} \\
   \applyf & : & ([\semfcn], \Ws) \rightarrow [\Ws] \\
@@ -229,6 +236,19 @@ $$
   \mkall([s_1,\mydots,s_n]) & = & \{ \mkarr(x_1,\mydots,x_n) \, || \, x_1 \inb s_1, \, \mydots \, x_n \inb s_n \} \\
   \mkarr(x_0,\mydots,x_n) & = & [ \mkfcn\{(0,x_0)\}, \mydots, \mkfcn{(n,x_n)} ]
                               & \text{make an array-function} \\
+  \once([x]) & = & x \\
+  \once(\_) & = & \mempty & \text{or WRONG} \\
+  \trunc(x,[\mempty, \mydots, s, \mydots]) & = & [\mempty, \mydots, x] & s \neq \mempty, \text{replace first non-empty} \\
+  \combine & = & \sequence \circ \maplist(\cross \circ \mapset(\dist)) \circ \group \\
+  \sequence & : & [\myset{\alpha}] \rightarrow \myset{[\alpha]} \\
+  \multicolumn{3}{l}{\sequence[\{s_{11},s_{12}\mydots\},\{s_{21},\mydots\},\mydots,\{s_{n1},\mydots\}] \,=} \\
+  & & \{[s_{11},s_{21},\mydots,s_{n1}],[s_{11},s_{21},\mydots,s_{n2}],\mydots] & \text{cross product}\\
+
+  \cross & : & \myset{\myset{\alpha}} \rightarrow \myset{\myset{\alpha}} \\
+  \multicolumn{3}{l}{\cross\{\{s_{11},s_{12}\mydots\},\{s_{21},\mydots\},\mydots,\{s_{n1},\mydots\}\} \,=} \\
+  & & \{\{s_{11},s_{21},\mydots,s_{n1}\},\{s_{11},s_{21},\mydots,s_{n2}\},\mydots] & \text{cross product}\\
+  \dist(x, \{y_1,y_2,\mydots\}) & = & \{ x \mapsto y_1, x \mapsto y_2, \mydots\} \\
+\group & : & \myset{\alpha \times [\myset{\beta}]} \rightarrow [ \myset{\alpha \times \myset{\beta}} ] \\
 \\
 \end{array} \\ \\
 

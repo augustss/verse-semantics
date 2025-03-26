@@ -198,7 +198,7 @@ combine =(:[]) . fmap mk . sequence . map cross . distArg . groupByPos
 funFromSet :: SetX (W, W) -> Fcn
 funFromSet = findFcn . toList
 
-groupByPos :: SetX (W, [SetX W]) -> [ SetX (W, SetX W) ]
+groupByPos :: SetX (a, [SetX b]) -> [ SetX (a, SetX b) ]
 groupByPos s | isEmpty s = []
              | otherwise = fmap (second head) nes : groupByPos (fmap (second tail) es)
   where
