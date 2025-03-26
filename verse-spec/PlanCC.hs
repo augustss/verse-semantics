@@ -89,7 +89,7 @@ dE (CIf e1 e2 e3)       rho  =
         -- XXX what's the right one
         squash $ unionSetOfSeqs [ squash $ dD e2 rho' | rho' <- rhos ]
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
-dE e@(CLam _q _i _e1 _e2 _me3) rho = combine fs
+dE e@(CLam _q _i _e1 _e2 _me3) rho = [combine fs]
   where
     fs :: SetX [SetX (W, W)]
     fs = [ map (dist v) r | v <- allWs, let r = dF e rho v, not (all isEmpty r) ]
@@ -190,8 +190,8 @@ dEF e rho = combine fs
     fs = [ (v, r) | v <- mkSet allInts, let r = dF e rho v, not (all isEmpty r) ]
 -}
 
-combine :: SetX [SetX (W, W)] -> WS
-combine = (:[]) . fmap mk . sequence . map cross . groupByPos
+combine :: SetX [SetX (W, W)] -> SetX W
+combine = fmap mk . sequence . map cross . groupByPos
   where
     mk :: [SetX (W, W)] -> Val
     mk = VFcn . map funFromSet
