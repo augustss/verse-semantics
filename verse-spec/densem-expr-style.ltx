@@ -186,6 +186,7 @@ Env^{*} & = & \powerset{Env} \\
       |ws| & = & \hat{\bigcup} \{ & [ |if s=|\mempty\,| then|\mempty\,| else|\, \once(\semapp{D}{e_2}{\rho'}\,||\,s \inb ws ] \\
       & & & ||\, \rho' \inb \semapp{X}{|e_1|}{(\rho[i \fmapsto v])}, \\
       & & & |let ws| = \semapp{E}{|e_1|}{\rho'},\, any (\neq \{\}) ws \} \\
+      |r| & = & & fold (\bigcap) (filter (\neq \mempty) ws)
     \end{array} \\
 
 
