@@ -91,8 +91,9 @@ dE (CIf e1 e2 e3)       rho  =
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
 dE e@(CLam _q _i _e1 _e2 _me3) rho = combine fs
   where
-    fs :: SetX (W, [SetX W])
-    fs = [ (v, r) | v <- allWs, let r = dF e rho v, not (all isEmpty r) ]
+    fs :: SetX [SetX (W, W)]
+    fs = [ map (dist v) r | v <- allWs, let r = dF e rho v, not (all isEmpty r) ]
+    dist v s = fmap (v,) s
 {-
 dE (CLam q i e1 e2 me3) rho =
   let alts :: SetX (Val, SetX [Perhaps Ws])
@@ -189,8 +190,8 @@ dEF e rho = combine fs
     fs = [ (v, r) | v <- mkSet allInts, let r = dF e rho v, not (all isEmpty r) ]
 -}
 
-combine :: SetX (W, [SetX W]) -> WS
-combine =(:[]) . fmap mk . sequence . map cross . distArg . groupByPos
+combine :: SetX [SetX (W, W)] -> WS
+combine = (:[]) . fmap mk . sequence . map cross . groupByPos
   where
     mk :: [SetX (W, W)] -> Val
     mk = VFcn . map funFromSet
@@ -198,19 +199,13 @@ combine =(:[]) . fmap mk . sequence . map cross . distArg . groupByPos
 funFromSet :: SetX (W, W) -> Fcn
 funFromSet = findFcn . toList
 
-groupByPos :: SetX (a, [SetX b]) -> [ SetX (a, SetX b) ]
+groupByPos :: SetX [SetX a] -> [ SetX (SetX a) ]
 groupByPos s | isEmpty s = []
-             | otherwise = fmap (second head) nes : groupByPos (fmap (second tail) es)
+             | otherwise = fmap head nes : groupByPos (fmap tail es)
   where
     (es, nes) = partitionSet emptyHead s
-    emptyHead (_, x:_) = isEmpty x
+    emptyHead (x:_) = isEmpty x
     emptyHead _ = undefined
-
-distArg :: [ SetX (W, SetX W) ] -> [ SetX (SetX (W,W)) ]
-distArg = map (fmap dist)
-  where
-    dist :: (W, SetX W) -> SetX (W, W)
-    dist (x, s) = fmap (x,) s
 
 {-
 dE ee@(CChkClsd x e) rho =

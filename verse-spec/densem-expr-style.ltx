@@ -108,11 +108,12 @@ $$
 \newcommand{\Ws}{\textit{Ws}}
 \newcommand{\mkall}{\textbf{all}}
 \newcommand{\mkarr}{\textbf{arr}}
-\newcommand{\combine}{\textbf{combine}}
+\newcommand{\combine}{\textbf{comb}}
 \newcommand{\trunc}{\textbf{trunc}}
 \newcommand{\once}{\textbf{once}}
 \newcommand{\sequence}{\textbf{seq}}
-\newcommand{\maplist}{\textbf{map}_{[]}}
+\newcommand{\maplist}{\textbf{map}}
+%% \newcommand{\maplist}{\textbf{map}_{[]}}
 \newcommand{\mapset}{\textbf{map}_{\{\}}}
 \newcommand{\cross}{\textbf{cross}}
 \newcommand{\dist}{\textbf{dist}}
@@ -173,7 +174,11 @@ Env^{*} & = & \powerset{Env} \\
   \\[1mm]
 
 %  \textit{succeeds function:} \\
-  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \combine \{ (v,r)\, ||\, v \inb \Value, |let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v, r \neq [] \} \\
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & [\combine \{
+    \begin{array}{l}
+      \maplist(\dist(v),r) \\
+      ||\, v \inb \Value, |let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v, r \neq [] \\
+  \end{array}  \} ] \\
 \\
 \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v & = & \trunc(r, |ws|) \\
 & & |where|
@@ -234,12 +239,13 @@ $$
   \squash & : & \mtype \rightarrow \mtype \\
   \squash(xs) & = & [ x \, || \, x \inb xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
   \mkall([s_1,\mydots,s_n]) & = & \{ \mkarr(x_1,\mydots,x_n) \, || \, x_1 \inb s_1, \, \mydots \, x_n \inb s_n \} \\
-  \mkarr(x_0,\mydots,x_n) & = & [ \mkfcn\{(0,x_0)\}, \mydots, \mkfcn{(n,x_n)} ]
+  \mkarr(x_0,\mydots,x_n) & = & [ \{0 \mapsto x_0\}, \mydots, \{n \mapsto x_n\} ]
                               & \text{make an array-function} \\
   \once([x]) & = & x \\
   \once(\_) & = & \mempty & \text{or WRONG} \\
   \trunc(x,[\mempty, \mydots, s, \mydots]) & = & [\mempty, \mydots, x] & s \neq \mempty, \text{replace first non-empty} \\
-  \combine & = & \sequence \circ \maplist(\cross \circ \mapset(\dist)) \circ \group \\
+  \combine & : & \myset{[\myset{\Value \times \Value}]} \rightarrow [\myset{\Value}] \\
+  \combine & = & \sequence \circ \maplist(\cross) \circ \group \\
   \sequence & : & [\myset{\alpha}] \rightarrow \myset{[\alpha]} \\
   \multicolumn{3}{l}{\sequence[\{s_{11},s_{12}\mydots\},\{s_{21},\mydots\},\mydots,\{s_{n1},\mydots\}] \,=} \\
   & & \{[s_{11},s_{21},\mydots,s_{n1}],[s_{11},s_{21},\mydots,s_{n2}],\mydots] & \text{cross product}\\
@@ -248,7 +254,10 @@ $$
   \multicolumn{3}{l}{\cross\{\{s_{11},s_{12}\mydots\},\{s_{21},\mydots\},\mydots,\{s_{n1},\mydots\}\} \,=} \\
   & & \{\{s_{11},s_{21},\mydots,s_{n1}\},\{s_{11},s_{21},\mydots,s_{n2}\},\mydots] & \text{cross product}\\
   \dist(x, \{y_1,y_2,\mydots\}) & = & \{ x \mapsto y_1, x \mapsto y_2, \mydots\} \\
-\group & : & \myset{\alpha \times [\myset{\beta}]} \rightarrow [ \myset{\alpha \times \myset{\beta}} ] \\
+  \group & : & \myset{[\myset{\alpha}]} \rightarrow [ \myset{\myset{\alpha}} ] \\
+  \multicolumn{4}{l}{\;\;\group\, \text{splits the set into a sequence, first element is the set of length 1 sequences, }}\\
+  \multicolumn{4}{l}{\;\;\text{second element is the set of length 2 sequences, etc. }}\\
+  \multicolumn{4}{l}{\;\;\text{Then the first non-empty element is extracted from each subsequence. }}\\
 \\
 \end{array} \\ \\
 
