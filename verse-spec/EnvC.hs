@@ -53,7 +53,7 @@ allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
 allWs :: Ws
-allWs = mkSet allWsL
+allWs = mkSetUnsafe allWsL
 allWsL :: [W]
 allWsL =
   nonFcn
@@ -109,7 +109,7 @@ allWsL =
 -}
 
 allFcns :: SetX Fcn
-allFcns = mkSet allFcnsL
+allFcns = mkSetUnsafe allFcnsL
 
 allFcnsL :: [Fcn]
 allFcnsL = [ f | VFcn fs <- allWsL, f <- fs ]

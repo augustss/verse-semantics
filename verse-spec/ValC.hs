@@ -66,7 +66,7 @@ inDom :: Val -> Fcn -> Bool
 inDom x (Fcn _ xys) = M.member x xys
 
 dom :: Fcn -> SetX Val
-dom (Fcn _ m) = mkSet $ M.keys m
+dom (Fcn _ m) = mkSetUnsafe $ M.keys m
 
 -- Application when the argument is in the domain
 app :: Fcn -> Val -> Val
@@ -86,7 +86,7 @@ inDomV _ _ = False
 
 domV :: Val -> SetX Val
 domV (VFcn fs) = mkSet (concatMap (\ (Fcn _ m) -> M.keys m) fs)
-domV (VTup es) = mkSet [ VInt (toInteger i) | i <- [0..length es-1] ]
+domV (VTup es) = mkSetUnsafe [ VInt (toInteger i) | i <- [0..length es-1] ]
 domV v = error $ "domV: " ++ show v
 
 {-

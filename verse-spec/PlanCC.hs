@@ -108,7 +108,7 @@ dE (CLam q i e1 e2 me3) rho =
                    ]
       justOne [x] = x
       justOne _ = error "multi-valued rhs"
-      seqPerhapsToSet :: Eq a => [Perhaps a] -> SetX a
+      seqPerhapsToSet :: Ord a => [Perhaps a] -> SetX a
       seqPerhapsToSet xs = mkSet [ a | Yes a <- xs ]
       inOuts :: SetX (Val, WS)
       inOuts = [ (x, joins r) | (x, r) <- alts ]
@@ -340,7 +340,7 @@ close Closed fs =
       r
 
 dX :: CExp -> Env -> SetX Env
-dX e rho = mkSet $ dXL e rho
+dX e rho = mkSetUnsafe $ dXL e rho
 
 dD :: CExp -> Env -> WS
 dD e rho = unionSetOfSeqs [ dE e rho' | rho' <- dX e rho ]

@@ -5,12 +5,11 @@ module SetX(
   union,
   unions,
   difference,
---  nub,
   isEmpty,
   empty,
   member,
   isSubsetOf,
-  mkSet,
+  mkSet, mkSetUnsafe,
   sing,
   toList,
   forAll, forAllL,
@@ -25,8 +24,9 @@ module SetX(
   cross,
   ) where
 import Control.Applicative
-import Data.List(intercalate, sort, groupBy, sortBy, partition, nub)
+import Data.List(intercalate, sort, groupBy, sortBy, partition)
 import qualified Data.Maybe as M
+import qualified Data.Set as S
 import GHC.Stack
 
 -- Sets as lists with duplicates so it can be a monad.
@@ -58,8 +58,6 @@ isEmpty _ = False
 member :: Eq a => a -> SetX a -> Bool
 member x (S xs) = x `elem` xs
 
---nub :: Eq a => SetX a -> SetX a
-
 union :: SetX a -> SetX a -> SetX a
 union (S a) (S b) = S (a ++ b)
 
@@ -75,8 +73,14 @@ difference (S as) (S bs) = S [ a | a <- as, a `notElem` bs ]
 isSubsetOf :: Eq a => SetX a -> SetX a -> Bool
 isSubsetOf (S as) (S bs) = all (\ a -> a `elem` bs) as
 
-mkSet :: Eq a => [a] -> SetX a
-mkSet = S . nub
+mkSet :: Ord a => [a] -> SetX a
+mkSet as@[] = S as    -- small speedup
+mkSet as@[_] = S as   -- small speedup
+mkSet s = S (nub s)
+
+-- Only use this if all elements of the list are distinct
+mkSetUnsafe :: [a] -> SetX a
+mkSetUnsafe = S
 
 toList :: Ord a => SetX a -> [a]
 toList (S axs) = unDup $ sort axs
@@ -129,3 +133,14 @@ partitionSet p (S sx) = (S a, S b) where (a, b) = partition p sx
 
 cross :: (Ord a) => SetX (SetX a) -> SetX (SetX a)
 cross (S ss) = mkSet $ map mkSet $ sequence $ map toList ss
+
+-----
+
+nub :: Ord a => [a] -> [a]
+nub = go S.empty
+ where
+  go _seen []            = []
+  go seen (x:xs)
+    | x `S.member` seen = go seen xs
+    | otherwise         = x : go (S.insert x seen) xs
+
