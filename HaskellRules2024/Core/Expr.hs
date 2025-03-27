@@ -309,35 +309,38 @@ mkAll e = Iter IterAll e (Tup [])
 mkCount :: Expr -> Expr
 mkCount e = Iter IterCount e (Lit (LInt 0))
 
--- encode check<fx>{e}
+-- mkCheck encode check<fx>{e}
+-- See Note [mkCheck]
 mkCheck :: Effect -> Expr -> Expr
 -- check<iterate>{e} --> e
 mkCheck Iterates e = e
 
 -- check<fails>{e} --> if(e){WRONG}{fail}
-mkCheck Fails e =
-  mkIf (e >>> lamUnderscore (wrongFx Fails)) Fail
+mkCheck Fails e
+  | isVal e   = wrongFx Fails  -- Short cut: see Note [mkCheck]
+  | otherwise = mkIf (e >>> lamUnderscore (wrongFx Fails)) Fail
 
 -- check<succeeds>{e} --> if(<x>:=all{e}){x}{WRONG}
-mkCheck Succeeds e =
-  mkIf
-    (Exi $ bind x $
-      (Tup [Var x] :=: mkAll e) :>: lamUnderscore (Var x))
-    (wrongFx Succeeds)
+mkCheck Succeeds e
+  | isVal e = e  -- Short cut: see Note [mkCheck]
+  | otherwise
+  = mkIf (Exi $ bind x $
+           (Tup [Var x] :=: mkAll e) :>: lamUnderscore (Var x))
+         (wrongFx Succeeds)
  where
   x:_ = identsNotIn (free e)
 
 -- check<decides>{e} --> if(a:=all{e};a=(<>|<_>)){<x>:=a;x}{WRONG}
-mkCheck Decides e =
-  mkIf
-    (Exi $ bind a $
-      (Var a :=: mkAll e) :>:
-      (Exi $ bind y $
-        (Var a :=: (Tup [] :|: Tup [Var y])) :>:
-        lamUnderscore (Exi $ bind x $ (Var a :=: Tup [Var x]) :>: Var x)
-      )
-    )
-    (wrongFx Decides)
+mkCheck Decides e
+  | isVal e = e  -- Short cut: see Note [mkCheck]
+  | otherwise
+  = mkIf (Exi $ bind a $
+           (Var a :=: mkAll e) :>:
+           (Exi $ bind y $
+             (Var a :=: (Tup [] :|: Tup [Var y])) :>:
+             lamUnderscore (Exi $ bind x $ (Var a :=: Tup [Var x]) :>: Var x)
+         ) )
+         (wrongFx Decides)
  where
   a:x:y:_ = identsNotIn (free e)
 
@@ -347,8 +350,17 @@ wrongFx fx =  -- See Note [wrongFx] for these two alternative implementations
   Err ("check<" ++ show fx ++ ">")                        -- Use Err
   --Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []   -- Stuck
 
-{- Note [wrongFx]
+{- Note [mkCheck}
 ~~~~~~~~~~~~~~~~~
+The desugaring can generate a lot of
+    Check<succeeds>{x}
+and it eliminates clutter to discard them early
+For example:
+   type{e}, desugars to fun(x:=e}<succeeds>{x}, and
+            we don't really want to generate check<succeeds>{x}
+
+Note [wrongFx]
+~~~~~~~~~~~~~~
 With the Err form
     check<succeeds>{fail}; fail
     --> Err("check<succeeds>"); fail

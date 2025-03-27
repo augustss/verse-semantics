@@ -652,6 +652,8 @@
 %format t_kp1 = "t_{k+1}"
 
 %format rs = "R"
+%format rs_1
+%format rs_2
 %format r_0
 %format r_1
 %format r_2
@@ -659,6 +661,8 @@
 %format r_n
 
 %format as = "A"
+%format as_1
+%format as_2
 
 %format E_1
 %format V_1

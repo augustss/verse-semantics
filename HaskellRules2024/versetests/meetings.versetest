@@ -1,5 +1,33 @@
 # Add new meetings at the top
 
+verify("M26Mar25-5", pass) { h( g(:int):char )<closed> := { g[2] }
+                           ; if (h[99]) then{ 1 }else{ 2 } = 2 }
+  # -5: 99 is definitely not a function so we get into the else branch
+
+verify("M26Mar25-6", pass) { h( g(:int):string )<closed>:string := { g[2] }
+                           ; if (h[x:int => "monkey"]) then{ 1 }else{ 2 } = 1 }
+  # -6: h's arg is a function of the right type, so we get into the then branch
+
+verify("M26Mar25-7", fail) { h( g(:int):string )<closed>:string := { g[2] }
+                           ; if (h[x:int => 3]) then{ 1 }else{ 2 } = 1 }
+  # -7: h's arg is a function of the wrong type, so we /reject/
+
+verify("M26Mar25-8", pass) { h( g(:int):string )<closed>:string := { g[2] }
+                           ; Goofy(p:=h[x:int=>3]):=p }
+  # -8: h's arg is a function of the wrong type, but it's in a domain, so accept
+
+verify("M26Mar25-1", pass) { t01( x:int where (0<=x; x<=1)) := x
+                           ; f( gg(:t01):=2 ) := { 3 }
+                           ; g(x:=(1|2)) := { 2 }
+                           ; f[ g ] }
+
+verify("M26Mar25-2", fail) { f()<decides> := { x:int := "monkey" } }
+  # Rejected because "monkey" does not have type int
+verify("M26Mar25-3", pass) { f()<decides> := {int["monkey"] } }
+  # Passes because int["monkey"] simply fails and f is <decides>
+verify("M26Mar25-4", pass) { f()<decides> := { x:int := int["monkey"] } }
+  # Passes becuase int["monkey"] fails, and then has type int
+
 verify("M20Mar25-1", pass) { f( :int | :string ):int := 3
                            ; f[2]; f["monkey"] }
 verify("M20Mar25-2", fail) { f( :int | :string ):int := 3

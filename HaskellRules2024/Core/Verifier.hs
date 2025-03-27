@@ -293,6 +293,15 @@ verifyRules =
 
 splitRules :: Rule Expr
 splitRules =
+  do label "DROP-VERIFY"
+     interest 2
+     (_, rs, as, e) <- matchVerify =<< lhs
+     (ctx, Verify inner_bind) <- evalCtx [] e
+     guard (blocked ctx)
+     labelArg (pPrint (fst (unsafeUnbindList inner_bind)))
+        -- Identify the site by showing the binders of the inner verify
+     pure (Verify (bindList rs (as, ctx <@ Tup [])))
+ <|>
   do label "SPLIT-V"
      interest 2
      (all_rs, rs, as, e) <- matchVerify =<< lhs

@@ -228,9 +228,7 @@ sDesugarExpr = ds
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
 
     -- type{t}  ==  Fun(x := t)<closed>{x}
-    ds (Macro1 (Ident _ "type") _ e)
-      = do { e' <- ds e; encodeType e' }
---      = do { e' <- ds e; return (Type e') }
+    ds (Macro1 (Ident _ "type") _ e) = do { e' <- ds e; encodeType e' }
 
     -- I want to desugar Exists to DefineV; but to do that I need to make up
     -- fresh identifiers (easy) and substitute the fresh one for the old one
@@ -802,15 +800,6 @@ essToMini orig_e = go_expr orig_e
           PI i -> do { j <- newIdent (getLoc t) "j"
                      ; e <- go (kap { wc_inp = PI (Variable j) }) t
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
-
-    -- type{t}: WTYPE1, WTYPE2
-    go (WC { wc_inp = inp }) (Type t)
-      = do { i <- newIdent (getLoc t) "i"
-           ; let inp' = case inp of
-                           NoInput -> PI (Variable i)
-                           PI f    -> PI (ApplyD f (Variable i))
-           ; e <- go (WC { wc_inp = inp', wc_fxs = DomCtxt }) t
-           ; return (Lam i e) }
 
     -- Functions: WFUN1, WFUN2
     go (WC { wc_inp = inp }) (Function aperture t1 fxs1 t2)

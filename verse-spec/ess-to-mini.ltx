@@ -82,11 +82,7 @@ $$
 & = & |lamOCv q i
          (defintro x; x = SS (mkwu drdom (wrape i)) t_1)
          (checkfun q f t_1;
-             check fx (SS (mkwu (drrng fx) (wrape (apply1N f x))) t_2))|  & \text{|i,x| fresh}\\
-\rulename{wtype1} \asktim   & |SS (mkwu dr wrapemp) (type^{t})|
-   & = & |lam i (SS (mkwu drdom (wrape i)) t)| & \text{|i| fresh} \\
-\rulename{wtype2} \asktim   & |SS (mkwu dr (wrape f)) (type^{t})|
-   & = & |lam i (SS (mkwu drdom (wrape (apply1N f i))) t)| & \text{|i| fresh} \\
+             check fx (SS (mkwu (drrng fx) (wrape (apply1N f x))) t_2))|  & \text{|i,x| fresh}
 \end{array} \\[1mm]
 \textbf{Auxiliary functions} \\
 \hspace{3cm}

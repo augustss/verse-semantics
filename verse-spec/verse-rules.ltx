@@ -248,6 +248,8 @@ $\begin{array}{@@{}l}
   \rulename{verify-val} & |verify2 rs as v|      & \movesto & |tup ()| & \\
   \rulename{verify-choice} & |verify2 rs as (e_1 choice e_2)|      & \movesto & |verify2 rs as e_1 ; verify2 rs as e_2| & \\
   \rulename{verify-fail} & |verify2 rs as fail|    & \movesto & |tup ()| & \\[1mm]
+  \rulename{verify-drop} & |verify2 rs_1 as_1 (C^[verify2 rs_2 as_2 e])|
+  & \movesto & |verify2 rs_1 as_1 (C^[emptytup])| & \\
   \rulename{skolemise}^{\alpha} & |verify2 rs as (P^[some v])| & \movesto
   & |verify2 (rs,r) as (def x (x = apply1N v r; P^[x]))| \\
   &&& \text{if $|r| \notin |rs|$ and |skolval (boundvars P) v|} \\

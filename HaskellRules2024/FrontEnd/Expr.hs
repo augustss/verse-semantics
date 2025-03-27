@@ -124,7 +124,6 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Option (Maybe SrcExpr)       -- option{e}
   | Parens SrcExpr               -- (e)
 
-  | Type SrcBlk                      -- type{t}
   | Macro1 Ident [EffString] SrcBlk  -- m<a>{e}
   | Macro2 Ident SrcExpr SrcBlk      -- m(e1){e2}
   | Return SrcExpr                   -- return e
@@ -326,18 +325,15 @@ eGuard xs orig_e = foldr gd orig_e xs
 eCheck :: Eff -> SrcExpr -> SrcExpr
 -- Smart constructor for (Check fxs e):
 --  * Combines with nested Check
---  * Combines with nested OfType
 --  * Discards entirely when effects are "all effects",
---    or when the payload is a value and the effects are happy with that
 --
--- These checks eliminate a lot of clutter. For example:
---    type{e}, which desugars to fun(x:=e}<succeeds>{x}, where we don't
---             want to generate check<succeeds>{x}
+-- But do NOT discard the Check for (Check fxs (\x.(e1){e2})), say, because
+-- tha lambda generates a `verify` that must be inside a Check
 eCheck fxs e
   | isTopEff fxs                      = e
-  | isValue e, valueSatisfies fxs     = e
+--   | isValue e, valueSatisfies fxs     = e
 eCheck fxs1 (Check fxs2 e)            = Check (fxs1 `intersectEffects` fxs2) e
-eCheck fxs1 (OfType e1 fxs2 e2)       = OfType e1 (fxs1 `intersectEffects` fxs2) e2
+-- eCheck fxs1 (OfType e1 fxs2 e2)       = OfType e1 (fxs1 `intersectEffects` fxs2) e2
 eCheck fxs e                          = Check fxs e
 
 eExists :: [Ident] -> SrcExpr -> SrcExpr
@@ -514,11 +510,6 @@ toEff (Eff {eff_card = default_card, eff_side = default_side })
                    , fx <- fxs
                    , fx == show e ]
 
-valueSatisfies :: Eff -> Bool
--- Is check<fx>{val} satisfied?
-valueSatisfies (Eff { eff_card = CFails }) = False
-valueSatisfies _                           = True
-
 intersectEffects :: Eff -> Eff -> Eff
 intersectEffects (Eff { eff_card = c1, eff_side = s1 })
                  (Eff { eff_card = c2, eff_side = s2 })
@@ -669,7 +660,6 @@ instance Pretty SrcExpr where
 
                   ppArs (q, e, rs) = parens (ppArg e) <> pPrint q <> pPrint rs
 
-          Type t       -> text "type" <> braces (ppr 0 t)
           Blk es       -> braces $ ppSeq lvl es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e     -> parens (ppr 0 e)
@@ -814,7 +804,6 @@ compos f (If3 e b1 b2)      = If3 <$> f e <*> f b1 <*> f b2
 compos f (For1 b)           = For1 <$> f b
 compos f (For2 e b)         = For2 <$> f e <*> f b
 compos f (Let e b)          = Let <$> f e <*> f b
-compos f (Type t)           = Type <$> f t
 compos f (Block b)          = Block <$> f b
 compos f (Case1 b)          = Case1 <$> f b
 compos f (Case2 e b)        = Case2 <$> f e <*> f b
@@ -918,7 +907,6 @@ getVisibleBinders = go
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e
-    go Type{}     = []
     go For2{}     = []
     go Block{}    = []
     go Let{}      = []  -- nothing visible from a let
@@ -969,7 +957,6 @@ getFree = fvs_blk
                             `remove` getVisibleBinders e1
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
-    fvs (Type t)          = fvs_blk t
     fvs (Range e)         = fvs_blk e
     fvs (Check _ e)       = fvs_blk e
     fvs (Some e)          = fvs_blk e
@@ -1005,7 +992,6 @@ getVar (ApplyS e1 e2)   = getVar e1 ++ getVar e2
 getVar (ApplyD e1 e2)   = getVar e1 ++ getVar e2
 getVar (If3 e _ _)      = getVar e
 getVar For2{}           = []
-getVar Type{}           = []
 getVar (Let _ e)        = getVar e
 getVar Block{}          = []
 getVar (Unify e1 e2)    = getVar e1 ++ getVar e2
