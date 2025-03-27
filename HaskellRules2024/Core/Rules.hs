@@ -147,6 +147,7 @@ appPrimOp =
                             IsInt  -> pure ("ISINT",  [a | Lit(LInt _)<-[a]])
                             IsStr  -> pure ("ISSTR",  [a | Lit(LStr _)<-[a]])
                             IsChar -> pure ("ISCHAR", [a | Lit(LChar _)<-[a]])
+                            IsFun  -> pure ("ISFUN",  [a | Lam{}<-[a]])
                             IsComp -> pure ("ISCOMP", [a | isComparable a])
                             IsArr  -> pure ("ISARR",  [a | Tup{}<-[a]]++[a | Arr{}<-[a]])
                             _      -> empty

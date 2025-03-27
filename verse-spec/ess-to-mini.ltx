@@ -46,8 +46,8 @@ $$
 \rulename{wfail}   & |SS wu fail| & = & |fail| \\
 
 % Choice: do we want to push wu into the branches or not?
-\rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` (SS wuinit t_1 `choice` SS wuinit t_2)| \\
-% \rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |SS wu t_1 `choice` SS wu t_2| \\
+% \rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |wu `ueq` (SS wuinit t_1 `choice` SS wuinit t_2)| \\
+\rulename{wchoice} \asktim & |SS wu (t_1 `choice` t_2)| & = & |SS wu t_1 `choice` SS wu t_2| \\
 
 \rulename{wunify}   & |SS wu (t_1 == t_2)| & = & |(SS wu t_1) = (SS wu t_2)| \\
 \rulename{wsemi}\asktim   & |SS wu (t_1 ; t_2)| & = & |SS wuinit t_1 ; SS wu t_2| \\
@@ -79,10 +79,13 @@ $$
    & = & |lamOC q i (SS (mkwu drdom (wrape i)) t_1)
                     (check fx (SS (mkwu (drrng fx) wrapemp) t_2))| & \text{|i| fresh} \\
 \rulename{wfun2}   & |SS (mkwu dr f) (functionOCX q t_1 fx t_2)|
-& = & |lamOCv q i
+& = & \begin{array}[t]{@@{}l}
+  |apply1N isFun f;| \\
+  |lamOCv q i
          (defintro x; x = SS (mkwu drdom (wrape i)) t_1)
          (checkfun q f t_1;
-             check fx (SS (mkwu (drrng fx) (wrape (apply1N f x))) t_2))|  & \text{|i,x| fresh}
+            check fx (SS (mkwu (drrng fx) (wrape (apply1N f x))) t_2))|
+  \end{array} & \text{|i,x| fresh}
 \end{array} \\[1mm]
 \textbf{Auxiliary functions} \\
 \hspace{3cm}

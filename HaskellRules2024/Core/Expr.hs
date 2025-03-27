@@ -467,7 +467,7 @@ data PrimOp
  | Gt | Lt | NEq | GEq | LEq
 
    -- Type tests
- | IsInt | IsStr | IsChar | IsArr | IsTru | IsGround
+ | IsInt | IsStr | IsChar | IsArr | IsTru | IsGround | IsFun
  | IsComp
 
  deriving
@@ -500,6 +500,7 @@ primOpString IsChar   = "isChar$"
 primOpString IsArr    = "isArr$"
 primOpString IsComp   = "isComp$"
 primOpString IsTru    = "isTru$"
+primOpString IsFun    = "isFun$"
 primOpString IsGround = "isGround$"
 
 primOpCanFail :: PrimOp -> Bool
@@ -514,6 +515,7 @@ primOpCanFail IsInt  = True
 primOpCanFail IsStr  = True
 primOpCanFail IsChar = True
 primOpCanFail IsArr  = True
+primOpCanFail IsFun  = True
 primOpCanFail IsComp = True
 primOpCanFail IsTru  = True
 primOpCanFail ArrApp = True
@@ -538,6 +540,7 @@ primOpIsTypeTest IsStr  = True
 primOpIsTypeTest IsChar = True
 primOpIsTypeTest IsTru  = True
 primOpIsTypeTest IsArr  = True
+primOpIsTypeTest IsFun  = True
 primOpIsTypeTest IsComp = False  -- Not really a type test
 primOpIsTypeTest _      = False
 

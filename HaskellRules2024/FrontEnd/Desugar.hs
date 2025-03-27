@@ -814,8 +814,10 @@ essToMini orig_e = go_expr orig_e
                            kap_body = WC { wc_inp = PI (ApplyD f (Variable x)), wc_fxs = RngCtxt fxs1 }
                      ; e1 <- go kap_arg  t1
                      ; e2 <- go kap_body t2
-                     ; return (XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
-                                                (eCheck fxs1 e2)) }
+                     ; return (eSeq [ ApplyD (EPrim IsFun) f
+                                    , XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
+                                                       (eCheck fxs1 e2) ]) }
+                                      -- IsFun[f]: see test M26Mar25-5
 
     -- Core constructs used (only) in the Prelude
     -- Only used in the NoInput case

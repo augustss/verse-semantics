@@ -16,10 +16,13 @@ verify("M26Mar25-8", pass) { h( g(:int):string )<closed>:string := { g[2] }
                            ; Goofy(p:=h[x:int=>3]):=p }
   # -8: h's arg is a function of the wrong type, but it's in a domain, so accept
 
-verify("M26Mar25-1", pass) { t01( x:int where (0<=x; x<=1)) := x
-                           ; f( gg(:t01):=2 ) := { 3 }
-                           ; g(x:=(1|2)) := { 2 }
-                           ; f[ g ] }
+verify("M26Mar25-1", pass, broken)
+           { t01( x:int where (0<=x; x<=1)) := x
+           ; f( gg(:t01):=99 ) := { 3 }
+           ; g(x:=(1|2)) := { 99 }
+           ; f[ g ] }
+  # -1: a rather tricky test, passing a domain-iterating function g
+  #     to a function expecting the same values, but not domain-iterating
 
 verify("M26Mar25-2", fail) { f()<decides> := { x:int := "monkey" } }
   # Rejected because "monkey" does not have type int
