@@ -7,12 +7,12 @@ module EnvC(
   findFcn,
   dO,
   ) where
-import qualified Data.Map as M
 import Data.List
 import Data.Maybe
-import ValC
 import Exp
+import qualified Map as M
 import SetX
+import ValC
 
 --------------------
 ---- Environment
@@ -56,16 +56,15 @@ allWs :: Ws
 allWs = mkSet allWsL
 allWsL :: [W]
 allWsL =
-  nonFcn ++
-  [ dO o | o <- [Oint, Ogt, Oadd] ] ++
-  map vFcn [ id0, fid1, id2, id3, id01, f01, const0, const1, const2, const3, fsucc, -- succMod3,
+  nonFcn
+--   ++ [ dO o | o <- [Oint, Ogt, Oadd] ]
+   ++ map vFcn [ id0, fid1, id2, id3 , id01, f01, const0, const1, const2, const3, fsucc, -- succMod3,
              fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123, f0t12,
              const_12_1, id12 ]
   where
     nonFcn =
-      allInts ++
-      [VTup [x, y] | x <- allInts, y <- allInts]
-      --[VTup [VInt 2, VInt 1], VTup [VInt 1, VInt 2]]
+      allInts
+      ++ [VTup [x, y] | x <- allInts, y <- allInts]
     id0 = mkFcn "id0" [(VInt 0, VInt 0)]
     id2 = mkFcn "id2" [(VInt 2, VInt 2)]
     id3 = mkFcn "id3" [(VInt 3, VInt 3)]
@@ -137,7 +136,8 @@ findFcn fcn =
     Just f -> f
     Nothing -> --error $ "Missing function " ++ show fcn
       mkFcn name fcn
-      where name = "{" ++ intercalate "," (map show fcn) ++ "}"
+      where name = "{" ++ intercalate "," (map showF fcn) ++ "}"
+            showF (a,b) = show a ++ "\x21a6" ++ show b
 
 {-
 getW :: String -> W

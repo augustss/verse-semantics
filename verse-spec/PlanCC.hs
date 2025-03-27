@@ -1,10 +1,11 @@
 {-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods -Wno-x-partial #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MonadComprehensions #-}
 module Main where
 import Control.Arrow(second)
---import Control.Monad hiding (ap)
+import Control.Monad hiding (ap)
 --import Data.Maybe
 --import Data.Generics.Uniplate.Data(universe)
 --import GHC.Stack
@@ -89,12 +90,13 @@ dE (CIf e1 e2 e3)       rho  =
         -- XXX what's the right one
         squash $ unionSetOfSeqs [ squash $ dD e2 rho' | rho' <- rhos ]
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
+#if 0
 dE e@(CLam _q _i _e1 _e2 _me3) rho = [combine fs]
   where
     fs :: SetX [SetX (W, W)]
     fs = [ map (dist v) r | v <- allWs, let r = dF e rho v, not (all isEmpty r) ]
     dist v s = fmap (v,) s
-{-
+#else
 dE (CLam q i e1 e2 me3) rho =
   let alts :: SetX (Val, SetX [Perhaps Ws])
       alts =  [ (w, r) | w <- allWs, let r = useInput w, not (isEmpty r) ]
@@ -106,7 +108,7 @@ dE (CLam q i e1 e2 me3) rho =
                    ]
       justOne [x] = x
       justOne _ = error "multi-valued rhs"
-      seqPerhapsToSet :: [Perhaps a] -> SetX a
+      seqPerhapsToSet :: Eq a => [Perhaps a] -> SetX a
       seqPerhapsToSet xs = mkSet [ a | Yes a <- xs ]
       inOuts :: SetX (Val, WS)
       inOuts = [ (x, joins r) | (x, r) <- alts ]
@@ -148,7 +150,7 @@ dE (CLam q i e1 e2 me3) rho =
         [vfcns']
       else
         [empty]
--}
+#endif
 
 -- For a function with domain e1 and range e2,
 -- in an environment (which binds the function input),
@@ -393,3 +395,20 @@ main :: IO ()
 main = do
   putStrLn "Start"
   runExamples dP allExps
+
+
+-- lamC(i_1)(lamC(i_2)((exi x_3; x_3 = (i_2 = 1))){((exi k_4; k_4 = i_1[x_3]); k_4 = 1)}){2}
+-- lamC(i_1)(lamC(i_2)
+--               (i_2 = 1)
+--               {((exi k_4; k_4 = i_1[i_2); k_4 = 1)  -- i_1[i_2] = 1
+--          })
+--          {2}
+foo = CLam Closed "i_1"
+          (CLam Closed "i_2"
+                (CEqu (CVar "i_2") (CInt 1))
+                --(CSeq (CSeq (CExi "k_4") (CEqu (CVar "k_4") (CApp (CVar "i_1") (CVar "i_2")))) (CEqu (CVar "k_4") (CInt 1)))
+                (CApp (CVar "i_1") (CVar "i_2") `CEqu` (CInt 1))
+                Nothing -- (Just ("i_1",CInt 1)))
+          )
+          (CInt 2)
+          Nothing

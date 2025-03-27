@@ -6,9 +6,9 @@ module ValC(
   showListWith,
   maxVInt, vadd,
   ) where
-import qualified Data.Map as M
 import Data.List
 import Data.Maybe
+import qualified Map as M
 import SetX
 
 --------------------
