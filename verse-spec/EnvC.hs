@@ -2,7 +2,7 @@
 {-# LANGUAGE MonadComprehensions #-}
 module EnvC(
   W, Ws, WS,
-  Env, lookupEnv, extendEnv, emptyEnv,
+  Env, lookupEnv, extendEnv, emptyEnv, toListEnv,
   rho0, allWs,
   allWsL, allInts,
   findFcn,
@@ -63,6 +63,9 @@ rho0 = Env $ M.fromList $
 
 emptyEnv :: Env
 emptyEnv = Env M.empty
+
+toListEnv :: Env -> [(String, Val)]
+toListEnv (Env m) = M.toList m
 
 --------------------
 ---- "Universal" set of values

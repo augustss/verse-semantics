@@ -10,7 +10,7 @@ data CExp
   | CInt Integer
   | CApp CExp CExp
   | CEqu CExp CExp
-  | CSeq CExp CExp
+  | CSeqs [CExp]
   | CChoice CExp CExp
   | CFail
   | CExi Ident
@@ -25,6 +25,7 @@ data CExp
   | CAll CExp
   | CDef Ident CExp
   | CUChoice CExp CExp
+  | CLHS                          -- HACK for fast lambda evaluation
   deriving (Eq, Ord, Data)
 
 instance Show CExp where
@@ -34,7 +35,7 @@ instance Show CExp where
   showsPrec _ (CTup es) = showString "<" . showString (L.intercalate "," $ map show es) . showString ">"
   showsPrec _ (CApp e1 e2) = showsPrec 11 e1 . showString "[" . showsPrec 0 e2 . showString "]"
   showsPrec p (CEqu e1 e2) = showParen (p > 5) $ showsPrec 6 e1 . showString " = " . showsPrec 6 e2
-  showsPrec p (CSeq e1 e2) = showParen (True || p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
+  showsPrec p (CSeqs es) = showParen (True || p > 3) $ foldr (.) id (L.intersperse (showString "; ") (map (showsPrec 3) es))
   showsPrec p (CWhere e1 e2) = showParen (p > 1) $ showsPrec 3 e1 . showString " where " . showsPrec 3 e2
   showsPrec _ (CExi i) = showString "exi " . showString i
   showsPrec _ CFail = showString "fail"
@@ -52,11 +53,12 @@ instance Show CExp where
   showsPrec _ (CFor e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
   showsPrec p (CDef x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
   showsPrec _ (CBlock e) = showString "block" . showBraces (showsPrec 0 e)
+  showsPrec _ CLHS = showString "LHS"
 
 dI :: CExp -> [Ident]
 dI (CApp e1 e2) = dI e1 `L.union` dI e2
 dI (CEqu e1 e2) = dI e1 `L.union` dI e2
-dI (CSeq e1 e2) = dI e1 `L.union` dI e2
+dI (CSeqs es) = foldr L.union [] (map dI es)
 dI (CWhere e1 e2) = dI e1 `L.union` dI e2
 dI (COfType e1 e2) = dI e1 `L.union` dI e2
 dI (CTup es) = foldr L.union [] (map dI es)
@@ -78,9 +80,12 @@ newVars :: Int -> String -> N [Ident]
 newVars n s = replicateM n (newVar s)
 
 cseqs :: [CExp] -> CExp
-cseqs [] = undefined
-cseqs [c] = c
-cseqs (c:cs) = c `CSeq` cseqs cs
+cseqs = CSeqs . concatMap flat
+  where flat (CSeqs es) = es
+        flat e = [e]
+
+cSeq :: CExp -> CExp -> CExp
+cSeq e1 e2 = cseqs [e1, e2]
 
 syntax :: Ident -> Exp -> CExp
 syntax u e = evalState (syntaxN u e) 1
@@ -94,14 +99,14 @@ syntaxN u (App e0 e1) = (u =.=) <$> (CApp <$> syntaxN "_" e0 <*> syntaxN "_" e1)
 syntaxN u (Equ e0 e1) = CEqu <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (Choice e0 e1) = CChoice <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (UChoice e0 e1) = CUChoice <$> syntaxN u e0 <*> syntaxN u e1
-syntaxN u (Seq e0 e1) = CSeq <$> syntaxN "_" e0 <*> syntaxN u e1
+syntaxN u (Seq e0 e1) = cSeq <$> syntaxN "_" e0 <*> syntaxN u e1
 --syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
 syntaxN u (Where e0 e1) = do
   a <- newVar "a"
   c0 <- syntaxN u e0
   c1 <- syntaxN "_" e1
   pure $ cseqs [ CDef a c0, c1, CVar a ]
-syntaxN "_" (Def x (Colon (Var "any"))) = pure $ CExi x `CSeq` CVar x   -- hack for x:any
+syntaxN "_" (Def x (Colon (Var "any"))) = pure $ CExi x `cSeq` CVar x   -- hack for x:any
 syntaxN u (Def x e) = do
   c <- syntaxN u e
   pure $ cseqs [CExi x, CVar x `CEqu` c]
@@ -112,7 +117,7 @@ syntaxN u (Def2 x y e) = do
 syntaxN "_" (Colon e) = do
   x <- newVar "x"
   e' <- syntaxN "_" e
-  pure $ COfType (CExi x `CSeq` CVar x) e'
+  pure $ COfType (CExi x `cSeq` CVar x) e'
 syntaxN u (Colon e) =
   COfType <$> pure (CVar u) <*> syntaxN "_" e
 -}
@@ -131,7 +136,7 @@ syntaxN u (For e0 e1) = (u =.=) <$> (CFor <$> syntaxN "_" e0 <*> syntaxN "_" e1)
 syntaxN u (All e) = (u =.=) <$> (CAll <$> syntaxN "_" e)
 syntaxN "_" (Fun q e0 e1) = do
   i <- newVar "i"
-  CLam q i <$> syntaxN i e0 <*> syntaxN "_" e1 <*> pure Nothing
+  CLam q i <$> (flip cSeq CLHS <$> syntaxN i e0) <*> syntaxN "_" e1 <*> pure Nothing
 syntaxN u (Fun q e0 e1) = do
   i <- newVar "i"
   x <- newVar "x"
@@ -139,8 +144,8 @@ syntaxN u (Fun q e0 e1) = do
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
-  pure $ CLam q i (cseqs [ CDef x c0 ]) (cseqs [CDef k $ CApp (CVar u) (CVar x), c1 ]) cq
---  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k `CSeq` (k =.= CApp (CVar u) (CVar x)), c1 ]) cq
+  pure $ CLam q i (cSeq (CDef x c0) CLHS) (cseqs [CDef k $ CApp (CVar u) (CVar x), c1 ]) cq
+--  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k `cSeq` (k =.= CApp (CVar u) (CVar x)), c1 ]) cq
 syntaxN u (Block e) = CBlock <$> syntaxN u e
 
 checkQ :: OC -> Ident -> Exp -> N (Maybe (Ident, CExp))
@@ -151,7 +156,7 @@ checkQ Closed f e = do
 
 {-
 mustBeVar :: Ident -> N CExp
-mustBeVar "_" = do u <- newVar "u"; pure (CExi u `CSeq` CVar u)
+mustBeVar "_" = do u <- newVar "u"; pure (CExi u `cSeq` CVar u)
 mustBeVar u = pure (CVar u)
 -}
 

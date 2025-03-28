@@ -33,19 +33,19 @@ compress bs xs = [ x | (True, x) <- zip bs xs ]
 redef :: CExp -> CExp
 redef | ()/=() = id
       | otherwise = red []
-  where red vs (CSeq (CExi x) (CEqu (CVar x') e))
-          | x == x', x `notElem` vs, x `notElem` allVars e = CDef x (red vs e)
-        red vs (CSeq (CExi x) (CSeq (CEqu (CVar x') e) e2))
-          | x == x', x `notElem` vs, x `notElem` allVars e = CDef x (red vs e) `CSeq` red vs e2
-        red vs (CSeq (CSeq e1 e2) e3) = red vs (CSeq e1 (CSeq e2 e3))
---        red vs (CSeq e1 (CSeq e2 e3)) = red vs (CSeq (CSeq e1 e2) e3)
-        red vs (CSeq e1 e2) = CSeq (red vs e1) (red (allVars e1 ++ vs) e2)
---        red vs (CWhere e1 e2) = CWhere (red vs e1) (red (allVars e1 ++ vs) e2)
+  where red vs (CSeqs es) = CSeqs $ reds vs es
         red vs (CDef i e) = CDef i (red vs e)
         red vs (CEqu e1 e2) = CEqu (red vs e1) (red (allVars e1 ++ vs) e2)
         red vs (CApp e1 e2) = CApp (red vs e1) (red (allVars e1 ++ vs) e2)
         red _ (CLam q i e1 e2 me3) = CLam q i (red [] e1) (red [] e2) me3
         red _ e = e
+
+        reds vs (CExi x : CEqu (CVar x') e : es) 
+          | x == x', x `notElem` vs, x `notElem` vs' = CDef x (red vs e) : (reds (vs' ++ vs) es)
+          where vs' = allVars e
+        reds vs (e : es) = red vs e : reds (allVars e ++ vs) es
+        reds _ [] = []
+
 
 allVars :: CExp -> [Ident]
 allVars e = [ i | CVar i <- universe e ]
@@ -77,11 +77,15 @@ dE (CTup es)            rho  = map (fmap VTup . sequence) $ mapM (\ e -> dE e rh
 dE (CApp e1 e2)         rho  = [ r | s1 <- dE e1 rho, s2 <- dE e2 rho, r <- applys s1 s2 ]
 dE (COfType e1 e2)      rho  = dE (CApp e2 e1) rho
 dE (CEqu e1 e2)         rho  = [ s1 `intersect` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
-dE (CSeq CExi{} e)      rho  = dE e rho                                 -- just a speedup
-dE (CSeq (CDef i e1) e2)rho  = concat [ if isEmpty s1 then empty else dEs e2 [ extendEnv rho i v | v <- s1 ]
+dE (CSeqs [])          _rho  = error "dE: empty seq"
+dE (CSeqs [e])          rho  = dE e rho
+dE (CSeqs (CExi{} : es))rho  = dE (CSeqs es) rho                                 -- just a speedup
+dE (CSeqs (CDef i e1:es))rho  = concat [ if isEmpty s1 then empty else dEs e2 [ extendEnv rho i v | v <- s1 ]
                                       | s1 <- dE e1 rho ]
-dE (CSeq e1 e2)         rho  = concat [ if isEmpty s1 then [empty] else dE e2 rho
+                               where e2 = CSeqs es
+dE (CSeqs (e1 : es))    rho  = concat [ if isEmpty s1 then [empty] else dE e2 rho
                                       | s1 <- dE e1 rho ]
+                               where e2 = CSeqs es
 dE (CWhere (CDef i e1) e2)rho= [ if isEmpty s2 then empty else s1
                                | s1 <- dE e1 rho,
                                  s2 <- dEs e2 [ extendEnv rho i v | v <- s1 ] ]
@@ -104,6 +108,7 @@ dE (CIf e1 e2 e3)       rho  =
         -- XXX what's the right one
         squash $ unionSetOfSeqs [ squash $ dD e2 rho' | rho' <- rhos ]
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
+dE CLHS                 rho  = [sing $ VEnv $ toListEnv rho]
 #if 1
 dE e@(CLam _q _i _e1 _e2 _me3) rho = [combine fs]
   where
@@ -432,24 +437,6 @@ main = do
   print $ dene $ fun :@ argc
   print $ dene $ func :@ arg
   print $ dene $ func :@ argc
-
--- fun_c(fun_c(1)
--- lamC(i_1)(lamC(i_2)((exi x_3; x_3 = (i_2 = 1))){((exi k_4; k_4 = i_1[x_3]); k_4 = 1)}){2}
--- lamC(i_1)(lamC(i_2)
---               (i_2 = 1)
---               {((exi k_4; k_4 = i_1[i_2); k_4 = 1)  -- i_1[i_2] = 1
---          })
---          {2}
-foo :: CExp
-foo = CLam Closed "i_1"
-          (CLam Closed "i_2"
-                (CEqu (CVar "i_2") (CInt 1))
-                --(CSeq (CSeq (CExi "k_4") (CEqu (CVar "k_4") (CApp (CVar "i_1") (CVar "i_2")))) (CEqu (CVar "k_4") (CInt 1)))
-                (CApp (CVar "i_1") (CVar "i_2") `CEqu` (CInt 1))
-                Nothing -- (Just ("i_1",CInt 1)))
-          )
-          (CInt 2)
-          Nothing
 
 arg, fun, argc, func :: Exp
 arg = fun_c(0:||1)2

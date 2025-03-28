@@ -14,6 +14,7 @@ import SetX
 ---- Values
 
 data Val = VInt Integer | VTup [Val] | VFcn [Fcn]
+         | VEnv [(String, Val)]                    -- HACK for fast lambda evaluation
   deriving (Eq, Ord)
 
 vFcn :: Fcn -> Val
@@ -25,6 +26,7 @@ instance Show Val where
   showsPrec p (VInt i) = showsPrec p i
   showsPrec p (VTup vs) = showString "<" . foldr (.) id (intersperse (showString ",") (map (showsPrec p) vs)) . showString ">"
   showsPrec p (VFcn fs) = showString "F" . showsPrec p fs
+  showsPrec p (VEnv r) = showsPrec p r
 
 instance Show RVal where
   showsPrec _ (RVal v) = showString (showPretty v)
@@ -35,6 +37,7 @@ showPretty (VInt i) = show i
 showPretty (VTup vs) = "<" ++ intercalate "," (map showPretty vs) ++ ">"
 showPretty (VFcn [f]) = show f
 showPretty (VFcn fs) = show fs
+showPretty (VEnv _) = "<<VEnv>>"
 
 showListWith :: (a -> String) -> [a] -> String
 showListWith f xs = "[" ++ intercalate "," (map f xs) ++ "]"
