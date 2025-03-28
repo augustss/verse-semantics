@@ -28,7 +28,7 @@ data Exp
   deriving (Eq, Ord, Data)
 
 data Op = Oint | Ogt | Oadd
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show, Data, Enum, Bounded)
 
 data OC = Open | Closed
   deriving (Eq, Ord, Show, Data)

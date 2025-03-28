@@ -7,8 +7,8 @@ module Main where
 import Control.Arrow(second)
 import Control.Monad hiding (ap)
 --import Data.Maybe
---import Data.Generics.Uniplate.Data(universe)
---import GHC.Stack
+import Data.Generics.Uniplate.Data(universe)
+import GHC.Stack
 import Exp
 import ExpSugar
 import ValC
@@ -28,14 +28,20 @@ compress bs xs = [ x | (True, x) <- zip bs xs ]
 
 -------------------------------------------
 
-{-
 -- Reintroduce CDef for definitions only mentioned to the right.
 -- Together with the direct semantics for CDef this is a big speedup.
 redef :: CExp -> CExp
-redef = red []
-  where red vs (CSeq (CExi x) (CEqu (CVar x') e)) | x == x', x `notElem` vs = CDef x (red vs e)
+redef | ()/=() = id
+      | otherwise = red []
+  where red vs (CSeq (CExi x) (CEqu (CVar x') e))
+          | x == x', x `notElem` vs, x `notElem` allVars e = CDef x (red vs e)
+        red vs (CSeq (CExi x) (CSeq (CEqu (CVar x') e) e2))
+          | x == x', x `notElem` vs, x `notElem` allVars e = CDef x (red vs e) `CSeq` red vs e2
         red vs (CSeq (CSeq e1 e2) e3) = red vs (CSeq e1 (CSeq e2 e3))
+--        red vs (CSeq e1 (CSeq e2 e3)) = red vs (CSeq (CSeq e1 e2) e3)
         red vs (CSeq e1 e2) = CSeq (red vs e1) (red (allVars e1 ++ vs) e2)
+--        red vs (CWhere e1 e2) = CWhere (red vs e1) (red (allVars e1 ++ vs) e2)
+        red vs (CDef i e) = CDef i (red vs e)
         red vs (CEqu e1 e2) = CEqu (red vs e1) (red (allVars e1 ++ vs) e2)
         red vs (CApp e1 e2) = CApp (red vs e1) (red (allVars e1 ++ vs) e2)
         red _ (CLam q i e1 e2 me3) = CLam q i (red [] e1) (red [] e2) me3
@@ -43,7 +49,6 @@ redef = red []
 
 allVars :: CExp -> [Ident]
 allVars e = [ i | CVar i <- universe e ]
--}
 
 -------------------------------------------
 
@@ -60,6 +65,9 @@ applys :: Ws -> Ws -> WS
 applys fs as | isEmpty fs || isEmpty as = []                  -- avoid empty sets in foldSet
 applys fs as = unionSetOfSeqs [ applyf f as | f <- fs ]
 
+dEs :: CExp -> SetX Env -> WS
+dEs e rhos = unionSetOfSeqs' $ fmap (dE e) rhos
+
 dE :: CExp -> Env -> WS
 dE (CVar "_")          _rho  = [allWs]
 dE (CVar x)             rho  = [sing $ lookupEnv x rho]
@@ -70,8 +78,13 @@ dE (CApp e1 e2)         rho  = [ r | s1 <- dE e1 rho, s2 <- dE e2 rho, r <- appl
 dE (COfType e1 e2)      rho  = dE (CApp e2 e1) rho
 dE (CEqu e1 e2)         rho  = [ s1 `intersect` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (CSeq CExi{} e)      rho  = dE e rho                                 -- just a speedup
-dE (CSeq e1 e2)         rho  = [ if isEmpty s1 then empty else s2
-                               | s1 <- dE e1 rho, s2 <- dE e2 rho ]
+dE (CSeq (CDef i e1) e2)rho  = concat [ if isEmpty s1 then empty else dEs e2 [ extendEnv rho i v | v <- s1 ]
+                                      | s1 <- dE e1 rho ]
+dE (CSeq e1 e2)         rho  = concat [ if isEmpty s1 then [empty] else dE e2 rho
+                                      | s1 <- dE e1 rho ]
+dE (CWhere (CDef i e1) e2)rho= [ if isEmpty s2 then empty else s1
+                               | s1 <- dE e1 rho,
+                                 s2 <- dEs e2 [ extendEnv rho i v | v <- s1 ] ]
 dE (CWhere e1 e2)       rho  = [ if isEmpty s2 then empty else s1
                                | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (CExi _)            _rho  = [sing $ VInt 99999]
@@ -80,7 +93,8 @@ dE (CChoice e1 e2)      rho  = dD e1 rho ++ dD e2 rho
 dE (CUChoice e1 e2)     rho  = [ s1 `union` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
 dE (CAll e)             rho  = [ fmap VTup $ sequence $ squash $ dD e rho ]
 dE (CBlock e)           rho  = dD e rho
-dE CDef{}              _rho  = error "CDef"
+dE e@(CDef _ _)        _rho  = error $ "CDef " ++ show e
+--dE (CDef _ e)           rho  = dE e rho
 dE CFor{}              _rho  = error "CFor"
 dE (CIf e1 e2 e3)       rho  =
   let rhos = oneE e1 rho
@@ -90,7 +104,7 @@ dE (CIf e1 e2 e3)       rho  =
         -- XXX what's the right one
         squash $ unionSetOfSeqs [ squash $ dD e2 rho' | rho' <- rhos ]
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
-#if 0
+#if 1
 dE e@(CLam _q _i _e1 _e2 _me3) rho = [combine fs]
   where
     fs :: SetX [SetX (W, W)]
@@ -167,6 +181,22 @@ dF (CLam _oc i e1 e2 _) rho v = dF' i e1 e2 rho v
 dF _ _ _ = undefined
 
 dF' :: Ident -> CExp -> CExp -> Env -> W -> WS
+dF' i (CDef xx e1) e2 rho v = trunc ws
+  where
+    ss :: SetX [SetX W]
+    ss = [ map (\ s -> if isEmpty s then empty else join [ once $ dD e2 (extendEnv rho' xx w) | w <- s ]) w1s
+         | rho' <- dX e1 (extendEnv rho i v)    -- for each possible environment
+         , let w1s = dE e1 rho'                 -- evaluate e1, a sequence of choices
+         , not $ all isEmpty w1s                -- and use it, if it succeeds at any choice
+         ]
+    ws :: [SetX W]
+    ws = unionSetOfSeqs' ss
+    res = foldr1 intersect $ filter (not . isEmpty) ws
+    once [x] = x
+    once _   = empty  -- WRONG?
+    trunc [] = []
+    trunc (x:xs) | isEmpty x = x : trunc xs
+                 | otherwise = [res]
 dF' i e1 e2 rho v = trunc ws
   where
     ss :: SetX [SetX W]
@@ -183,6 +213,7 @@ dF' i e1 e2 rho v = trunc ws
     trunc [] = []
     trunc (x:xs) | isEmpty x = x : trunc xs
                  | otherwise = [res]
+--dF' _ e1 _ _ _ = error $ "dF' " ++ show e1
 
 {-
 dEF :: CExp -> Env -> WS
@@ -230,7 +261,7 @@ dE ee@(CChkClsd x e) rho =
 --dE e _ = error $ "unimplemented " ++ show e
 
 ds :: Exp -> CExp
-ds = syntax "_"
+ds = redef . syntax "_"
 
 fn, fnE1, fnE2 :: Exp
 fn = fun_c fnE1 fnE2
@@ -260,7 +291,8 @@ getFcn Open _ = error "getFcn: Open"
 -}
 getFcn q xyss = close q
   [ f
-  | f <- allFcns
+  | VFcn fs <- allWs
+  , f <- mkSetUnsafe fs
   , domChk xyss f
   , forAll xyss ( \ (x, ys) -> isEmpty ys || app f x `member` ys)
   ]
@@ -354,7 +386,7 @@ unionSetOfSeqs' :: SetX WS -> WS
 unionSetOfSeqs' s | isEmpty s = []
                   | otherwise = unionSetOfSeqs s
 
-unionSetOfSeqs :: SetX WS -> WS
+unionSetOfSeqs :: HasCallStack => SetX WS -> WS
 unionSetOfSeqs = foldSet unionSeqs
 
 -- Pointwise union of sequences
@@ -367,7 +399,7 @@ den :: Exp -> WS
 den e = dD ({-redef $-} syntax "_" e) rho0
 
 dene :: Exp -> WS
-dene e = dD ({-redef $-} syntax "_" e) emptyEnv
+dene e = dD (redef $ syntax "_" e) emptyEnv
 
 dP :: Exp -> RVal
 dP e =
@@ -394,15 +426,21 @@ allExps = [exp01, exp02, exp03, exp04,
 main :: IO ()
 main = do
   putStrLn "Start"
-  runExamples dP allExps
+--  runExamples dP allExps
+  print $ dene $ fun
+  print $ dene $ fun :@ arg
+  print $ dene $ fun :@ argc
+  print $ dene $ func :@ arg
+  print $ dene $ func :@ argc
 
-
+-- fun_c(fun_c(1)
 -- lamC(i_1)(lamC(i_2)((exi x_3; x_3 = (i_2 = 1))){((exi k_4; k_4 = i_1[x_3]); k_4 = 1)}){2}
 -- lamC(i_1)(lamC(i_2)
 --               (i_2 = 1)
 --               {((exi k_4; k_4 = i_1[i_2); k_4 = 1)  -- i_1[i_2] = 1
 --          })
 --          {2}
+foo :: CExp
 foo = CLam Closed "i_1"
           (CLam Closed "i_2"
                 (CEqu (CVar "i_2") (CInt 1))
@@ -412,3 +450,9 @@ foo = CLam Closed "i_1"
           )
           (CInt 2)
           Nothing
+
+arg, fun, argc, func :: Exp
+arg = fun_c(0:||1)2
+fun = fun_c arg 3
+argc = fun_c(0:|1)2
+func = fun_c argc 3

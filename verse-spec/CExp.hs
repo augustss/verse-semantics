@@ -95,7 +95,12 @@ syntaxN u (Equ e0 e1) = CEqu <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (Choice e0 e1) = CChoice <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (UChoice e0 e1) = CUChoice <$> syntaxN u e0 <*> syntaxN u e1
 syntaxN u (Seq e0 e1) = CSeq <$> syntaxN "_" e0 <*> syntaxN u e1
-syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
+--syntaxN u (Where e0 e1) = CWhere <$> syntaxN u e0 <*> syntaxN "_" e1
+syntaxN u (Where e0 e1) = do
+  a <- newVar "a"
+  c0 <- syntaxN u e0
+  c1 <- syntaxN "_" e1
+  pure $ cseqs [ CDef a c0, c1, CVar a ]
 syntaxN "_" (Def x (Colon (Var "any"))) = pure $ CExi x `CSeq` CVar x   -- hack for x:any
 syntaxN u (Def x e) = do
   c <- syntaxN u e
@@ -134,7 +139,8 @@ syntaxN u (Fun q e0 e1) = do
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
-  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k `CSeq` (k =.= CApp (CVar u) (CVar x)), c1 ]) cq
+  pure $ CLam q i (cseqs [ CDef x c0 ]) (cseqs [CDef k $ CApp (CVar u) (CVar x), c1 ]) cq
+--  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k `CSeq` (k =.= CApp (CVar u) (CVar x)), c1 ]) cq
 syntaxN u (Block e) = CBlock <$> syntaxN u e
 
 checkQ :: OC -> Ident -> Exp -> N (Maybe (Ident, CExp))

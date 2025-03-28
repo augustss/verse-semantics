@@ -1,10 +1,9 @@
 module ValC(
   Val(..),
   RVal(..),
-  Fcn, mkFcn, vFcn, appM, dom, app, inDom, domV, eqFcnMap,
+  Fcn, mkFcn, vFcn, appM, dom, app, inDom, domV, eqFcnMap, isEmptyDom,
   showPretty,
   showListWith,
-  maxVInt, vadd,
   ) where
 import Data.List
 import Data.Maybe
@@ -68,6 +67,9 @@ inDom x (Fcn _ xys) = M.member x xys
 dom :: Fcn -> SetX Val
 dom (Fcn _ m) = mkSetUnsafe $ M.keys m
 
+isEmptyDom :: Fcn -> Bool
+isEmptyDom (Fcn _ m) = M.null m
+
 -- Application when the argument is in the domain
 app :: Fcn -> Val -> Val
 app (Fcn f xys) x =
@@ -100,13 +102,4 @@ function (VFcn _) = True
 function (VTup _) = True
 function _ = False
 -}
-
---------------------
-
-maxVInt :: Integer
-maxVInt = 4
-
-vadd :: Val -> Val -> Val
-vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
-vadd _ _ = undefined
 

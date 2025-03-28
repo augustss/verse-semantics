@@ -11,6 +11,7 @@ module SetX(
   isSubsetOf,
   mkSet, mkSetUnsafe,
   sing,
+  getSing,
   toList,
   forAll, forAllL,
   exists, existsL,
@@ -81,6 +82,10 @@ mkSet s = S (nub s)
 -- Only use this if all elements of the list are distinct
 mkSetUnsafe :: [a] -> SetX a
 mkSetUnsafe = S
+
+getSing :: SetX a -> Maybe a
+getSing (S [a]) = Just a
+getSing _ = Nothing
 
 toList :: Ord a => SetX a -> [a]
 toList (S axs) = unDup $ sort axs
