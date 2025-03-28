@@ -945,7 +945,7 @@ miniToCore orig_md = go (orig_md,[])
            ; return (eSeq [ever, efun]) }
       where
         omit_verify = shortCutDefnVerify e1 e2
-        do_verify = do { e1' <- go (MI,       x:xs) e1
+        do_verify = do { e1' <- go (MI,      x:xs) e1
                        ; e2' <- go (MV True, x:xs) e2
                        ; return (eVerify [x] (eSeq [e1',e2'])) }
 
