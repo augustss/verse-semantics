@@ -16,6 +16,18 @@ verify("M26Mar25-8", pass) { h( g(:int):string )<closed>:string := { g[2] }
                            ; Goofy(p:=h[x:int=>3]):=p }
   # -8: h's arg is a function of the wrong type, but it's in a domain, so accept
 
+# verify("M26Mar25-9", fail, broken) { f(x:int)<decides> := 3 }
+verify("M26Mar25-9", fail, broken) { f(x:int where g():int={"monkey"})<decides> := g() }
+  # -9: Tim said that this should be rejected
+  # In fact it succeeds, despite the call to g!  Becuase the client function
+  # for `g` just returns `some(int)`.  It's the /definition/ that should
+  # be rejected
+
+verify("M26Mar25-10", fail) { f(x:int where g():int={"monkey"}) := { 3 }
+                            ; f[3] }
+ # -10: like -9, but does fail, because at the call of `f`,
+ #      we cough up the task of verifying `g`
+
 verify("M26Mar25-1", pass, broken)
            { t01( x:int where (0<=x; x<=1)) := x
            ; f( gg(:t01):=99 ) := { 3 }
