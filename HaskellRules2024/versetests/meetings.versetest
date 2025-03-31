@@ -1,5 +1,20 @@
 # Add new meetings at the top
 
+# -------------- More examples that involve choice in the domain ------------
+verify("M28Mar25-1", fail) { f( g():=1|2 )<succeeds>:int := { g[]; 7} }
+  # -1: a copy of M19Mar25-12.  Should fail because g[] inlines to (1|2)
+verify("M28Mar25-2", pass) { f( g():=1|2 )<succeeds>:int := { 7 } }
+  # -2: passes; now g is not called
+verify("M28Mar25-3", pass) { f( g():int:=1|2 )<succeeds>:int := { g[]; 7} }
+  # -3: passes; g is now opaque, so we don't see the choice at the call site
+verify("M28Mar25-4", pass) { f( g():int:=1|2 )<succeeds>:int := { g[]; 7}
+                           ; f[ () => 1 ] }
+  # -4: Like -3, but we call f.  Yes: the argument returns 1 or 2
+verify("M28Mar25-5", fail) { f( g():int:=1|2 )<succeeds>:int := { g[]; 7}
+                           ; f[ () => 3 ] }
+  # -5: Like -3, but we call f.  No: the argument function does not return 1 or 2
+# -------------------------------------------------------------------------------------
+
 verify("M26Mar25-5", pass) { h( g(:int):char )<closed> := { g[2] }
                            ; if (h[99]) then{ 1 }else{ 2 } = 2 }
   # -5: 99 is definitely not a function so we get into the else branch
@@ -16,7 +31,6 @@ verify("M26Mar25-8", pass) { h( g(:int):string )<closed>:string := { g[2] }
                            ; Goofy(p:=h[x:int=>3]):=p }
   # -8: h's arg is a function of the wrong type, but it's in a domain, so accept
 
-# verify("M26Mar25-9", fail, broken) { f(x:int)<decides> := 3 }
 verify("M26Mar25-9", fail, broken) { f(x:int where g():int={"monkey"})<decides> := g() }
   # -9: Tim said that this should be rejected
   # In fact it succeeds, despite the call to g!  Becuase the client function
@@ -45,9 +59,18 @@ verify("M26Mar25-4", pass) { f()<decides> := { x:int := int["monkey"] } }
 
 verify("M20Mar25-1", pass) { f( :int | :string ):int := 3
                            ; f[2]; f["monkey"] }
+  # -1: this one actually just scrapes past, even without
+  #     pushing kappa inwards in WCHOICE, but only because int is
+  #     visibly a partial identity function.
+verify("M20Mar25-1a", pass) { succ(x:int) := x+1
+                            ; f( :succ | :string ):int := 3
+                            ; f[2]; f["monkey"] }
+  # -1a: This requires WCHOICE to push kappa inwards
+
 verify("M20Mar25-2", fail) { f( :int | :string ):int := 3
                            ; f['c'] }
 
+# -------------- A collection of examples that involve choice in the domain ------------
 verify("M19Mar25-1", pass) { f( g:type{(:int) => :char} ):char := g[3] }
   # This should surely pass!  We apply g to 3, which gives a char.
 
@@ -78,9 +101,9 @@ verify("M19Mar25-11", fail) { f( z:int, g(x:int)<succeeds>:=x=4 )<succeeds>:int
                                  := { g[z]; z=4 } }
   # g is like a transparent function; the effect annotation doesn't do much
 
-verify("M19Mar25-12", pass) { f( g():=1|2 )<succeeds>:int := { g[]; 7} }
-  # If g behaves transparently, f would be rejected becuase multiple choices
-
+verify("M19Mar25-12", fail) { f( g():=1|2 )<succeeds>:int := { g[]; 7} }
+  # g behaves transparently, so f should because the domain has choices
+# ----------------------------------------------------------------------------------
 
 verify("M7Feb25-1", pass){ g1()<decides> := { (f(x:int):string := 27); fail }  }
   # M7Feb25-1: actually passes the verifier;
@@ -411,12 +434,16 @@ verify( "T26Jul24-2", pass ){ f( g():=3 )<succeeds> := g[] > 2 }
 verify("T26Jul24-6", pass){ f( x:int, x  ) := x }
 verify("T26Jul24-7", pass){ f( x, x:int  ) := x }
 
-verify("T26Jul24-10",  pass){ f( x := 1|2 )<succeeds>          := x }
-verify("T26Jul24-11",  pass){ f( g() := 1|2        )<succeeds> := g[] > 0 }      # Tim can't do this
-verify("T26Jul24-11a", pass,tim=skip_rej){ f( g() := 1|2        )<succeeds> := g[] = (1|2) }
+verify("T26Jul24-10",  pass){ f(   x := 1|2 )<succeeds> := x }
+verify("T26Jul24-11",  fail){ f( g() := 1|2 )<succeeds> := g[] > 0 }
+  # Should fail:  g is transparent
+verify("T26Jul24-11a", fail,tim=skip_rej){ f( g() := 1|2)<succeeds> := g[] = (1|2) }
+  # Should fail:  g is transparent
 verify("T26Jul24-12",  pass){ f( g() := :type{1|2} )<succeeds> := g[] > 0 }      # Tim verifies this??? How?  there is no >
+  # Should pass: g returns 1 or 2
 verify("T26Jul24-12b", pass,tim=skip_rej){ f( g() := :type{1|2} )<succeeds> := g[] = (1|2) }  # Tim can't verify this
-verify("T26Jul24-13",  pass,tim=skip_rej){ f( g() := 1|2        )<succeeds> := g[]; f( () => 1 ) }
+verify("T26Jul24-13",  fail,tim=skip_rej){ f( g() := 1|2        )<succeeds> := g[]; f( () => 1 ) }
+  # Just a variant of -11
 
 # -----------------------------------------
 # Meeting 24 July 24: opacity and function result types

@@ -707,13 +707,14 @@ essToMini orig_e = go_expr orig_e
     go kap e@(EPrim {})    = kap `ueq` return e
     go _kp Fail            = return Fail
     go kap (Unify  e1 e2)  = eUnify  <$> go kap e1 <*> go kap e2
+    go kap (Choice e1 e2)  = Choice  <$> go kap e1 <*> go kap e2
     go kap (Where t1 t2)   = do { (dr, r) <- defineDE "r" (go kap t1)
                                 ; e2 <- go_expr t2
                                 ; return (eSeq [dr, e2, r]) }
 
     -- Sequential composition: WSEMI
-    go kap (Seq t1 t2)     = do { e1 <- go_expr t1 -- t1 gets no effects at all
-                                ; e2  <- go kap t2
+    go kap (Seq t1 t2)     = do { e1 <- go_expr t1 -- NB: t1 gets no effects at all
+                                ; e2 <- go kap t2
                                 ; return (mkSeq e1 e2) }
 
     -- if, for, all one: WIF, WFOR, WALL, WONE
@@ -721,8 +722,6 @@ essToMini orig_e = go_expr orig_e
     go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go kap t2)
     go kap (All t)        = kap `ueq` (All    <$> go_expr t)
     go kap (One t)        = kap `ueq` (One    <$> go_expr t)
-    go kap (Choice e1 e2) = kap `ueq` (Choice <$> go_expr e1 <*> go_expr e2)
-    -- Or: go kap (Choice e1 e2)  = Choice <$> go kap e1 <*> go kap e2
 
     -- Application: WAPP
     go kap (ApplyD t1 t2) = kap `ueq` (ApplyD <$> go_expr t1 <*> go_expr t2)
