@@ -14,8 +14,9 @@ $(PAPER).pdf: $(PAPERSRC)
 	lhs2TeX $< > $@
 
 clean:
-	-rm -f verse-*.tex
+	-rm -f verse-*.tex densem-expr*tex ess-*tex mini-*tex
 	-rm -f verse-spec.aux verse-spec.log verse-spec.out \
+	-rm -f *.log \
                verse-spec.pdf verse-spec.bbl verse-spec.blg
 	-rm -f verse-spec.pdf
 	-rm -f PlanA PlanADo PlanAM PlanC PlanAC PlanCC *.o *.hi *~
