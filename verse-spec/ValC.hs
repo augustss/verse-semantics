@@ -1,7 +1,12 @@
+{-# LANGUAGE PatternSynonyms #-}
 module ValC(
-  Val(..),
+  Val(..), pattern F,
   RVal(..),
-  Fcn, mkFcn, vFcn, appM, dom, app, inDom, domV, eqFcnMap, isEmptyDom,
+  Fcn(..), vFcn, appM, domFcn, app, inDom, domV, eqFcnMap, isEmptyDom,
+  subFcn,
+  Mapping, mkMapping,
+  fcnMapping,
+  showMapping, showMapping',
   showPretty,
   showListWith,
   ) where
@@ -10,12 +15,21 @@ import Data.Maybe
 import qualified Map as M
 import SetX
 
+data FunctionShow = JustNumber | NumberAndDefinition | HsSyntax
+  deriving (Eq)
+
+showFcnNo :: FunctionShow
+showFcnNo = HsSyntax -- NumberAndDefinition
+
 --------------------
 ---- Values
 
 data Val = VInt Integer | VTup [Val] | VFcn [Fcn]
          | VEnv [(String, Val)]                    -- HACK for fast lambda evaluation
   deriving (Eq, Ord)
+
+pattern F :: [Fcn] -> Val
+pattern F fs = VFcn fs
 
 vFcn :: Fcn -> Val
 vFcn f = VFcn [f]
@@ -25,7 +39,7 @@ data RVal = RVal Val | Wrong String
 instance Show Val where
   showsPrec p (VInt i) = showsPrec p i
   showsPrec p (VTup vs) = showString "<" . foldr (.) id (intersperse (showString ",") (map (showsPrec p) vs)) . showString ">"
-  showsPrec p (VFcn fs) = showString "F" . showsPrec p fs
+  showsPrec _ (VFcn fs) = showString "F" . showsPrec 0 fs
   showsPrec p (VEnv r) = showsPrec p r
 
 instance Show RVal where
@@ -35,7 +49,7 @@ instance Show RVal where
 showPretty :: Val -> String
 showPretty (VInt i) = show i
 showPretty (VTup vs) = "<" ++ intercalate "," (map showPretty vs) ++ ">"
-showPretty (VFcn [f]) = show f
+--showPretty (VFcn [f]) = show f
 showPretty (VFcn fs) = show fs
 showPretty (VEnv _) = "<<VEnv>>"
 
@@ -46,63 +60,75 @@ showListWith f xs = "[" ++ intercalate "," (map f xs) ++ "]"
 ---- Functions as tables
 -- All functions have a unique name
 
-data Fcn = Fcn String (M.Map Val Val)    -- mapping from a to b
+type FcnNo = Int                 -- unique function number
 
-mkFcn :: String -> [(Val, Val)] -> Fcn
-mkFcn s xys = Fcn s (M.fromList xys)
+type Mapping = M.Map Val Val
 
-eqFcnMap :: M.Map Val Val -> Fcn -> Bool
-eqFcnMap fm (Fcn _ m) = m == fm
+data Fcn = Fcn FcnNo (Maybe String) Mapping    -- mapping from a to b
+
+showMapping :: Mapping -> String
+showMapping xys ="{" ++ intercalate "," (map showM $ M.toList xys) ++ "}"
+  where showM (a,b) = show a ++ "\x21a6" ++ show b
+
+showMapping' :: Mapping -> String
+showMapping' xys ="[" ++ intercalate "\n," (map showM $ M.toList xys) ++ "]"
+  where showM (a,b) = show a ++ " \x21a6 " ++ show b
+
+eqFcnMap :: Mapping -> Fcn -> Bool
+eqFcnMap fm (Fcn _ _ m) = m == fm
 
 instance Eq Fcn where
-  Fcn f _ == Fcn f' _  =  f == f'
+  Fcn f _ _ == Fcn f' _ _  =  f == f'
 
 instance Ord Fcn where
-  Fcn f _ `compare` Fcn f' _  =  f `compare` f'
+  Fcn f _ _ `compare` Fcn f' _ _  =  f `compare` f'
 
 instance Show Fcn where
-  show (Fcn s _) = s
+  show (Fcn f ms m) =
+    case showFcnNo of
+      HsSyntax -> "noFcn " ++ show f ++ "{-=" ++ showMapping m ++ "-}"
+      _ -> case ms of
+             Just s -> s
+             _ | showFcnNo == JustNumber -> "f" ++ show f
+               | otherwise -> "f" ++ show f ++ "=" ++ showMapping m
 
 -- Domain test
 inDom :: Val -> Fcn -> Bool
-inDom x (Fcn _ xys) = M.member x xys
+inDom x (Fcn _ _ xys) = M.member x xys
 
-dom :: Fcn -> SetX Val
-dom (Fcn _ m) = mkSetUnsafe $ M.keys m
+domFcn :: Fcn -> SetX Val
+domFcn (Fcn _ _ m) = mkSetUnsafe $ M.keys m
 
 isEmptyDom :: Fcn -> Bool
-isEmptyDom (Fcn _ m) = M.null m
+isEmptyDom (Fcn _ _ m) = M.null m
 
 -- Application when the argument is in the domain
 app :: Fcn -> Val -> Val
-app (Fcn f xys) x =
-  fromMaybe (error $ "ap: outside domain " ++ f ++ " " ++ show x) $
+app f@(Fcn _ _ xys) x =
+  fromMaybe (error $ "ap: outside domain " ++ show f ++ " " ++ show x) $
   M.lookup x xys
 
 appM :: Val -> Fcn -> Maybe Val
-appM x (Fcn _ xys) = M.lookup x xys
-
-{-
-inDomV :: Val -> Val -> Bool
-inDomV x (VFcn fs) = any (inDom x) fs
-inDomV (VInt x) (VTup vs) = 0 <= x && x < toInteger (length vs)
-inDomV _ _ = False
--}
+appM x (Fcn _ _ xys) = M.lookup x xys
 
 domV :: Val -> SetX Val
-domV (VFcn fs) = mkSet (concatMap (\ (Fcn _ m) -> M.keys m) fs)
+domV (VFcn fs) = mkSetUnsafe (concatMap (\ (Fcn _ _ m) -> M.keys m) fs)
 domV (VTup es) = mkSetUnsafe [ VInt (toInteger i) | i <- [0..length es-1] ]
 domV v = error $ "domV: " ++ show v
 
-{-
-apV :: Val -> Val -> [Val]
-apV (VFcn fs) x = [ app f x | f <- fs, inDom x f ]
-apV (VTup vs) (VInt x) = [ vs !! fromInteger x ]
-apV _ _ = error "apV outside domain"
+fcnMapping :: Fcn -> Mapping
+fcnMapping (Fcn _ _ xys) = xys
 
-function :: Val -> Bool
-function (VFcn _) = True
-function (VTup _) = True
-function _ = False
--}
+mkMapping :: [(Val, Val)] -> Mapping
+mkMapping = mk M.empty
+  where mk :: M.Map Val Val -> [(Val, Val)] -> M.Map Val Val
+        mk m [] = m
+        mk m ((x,y):xys) =
+          case M.lookup x m of
+            Just y' | y /= y' -> error $ "mkMapping: inconsistent " ++ show (x, (y, y'))
+            _ -> mk (M.insert x y m) xys
 
+-- Is f a subset of g when viewed as sets?
+-- XXX could do better than \\
+subFcn :: Fcn -> Fcn -> Bool
+subFcn f g = null (M.toList (fcnMapping f) \\ M.toList (fcnMapping g))

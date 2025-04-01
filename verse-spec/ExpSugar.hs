@@ -50,3 +50,6 @@ wher = Where
 fun_c :: Exp -> Exp -> Exp
 fun_c e1 e2 = Fun Closed e1 e2
 
+fun_o :: Exp -> Exp -> Exp
+fun_o e1 e2 = Fun Open e1 e2
+

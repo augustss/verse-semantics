@@ -1,4 +1,6 @@
-module CExp(CExp(..), syntax, dI) where
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE StandaloneDeriving #-}
+module CExp(CExp(..), CBlk(..), syntax, dI, cexpb) where
 import Control.Monad
 import Control.Monad.State.Strict
 import Data.Data
@@ -34,6 +36,7 @@ data CBlk = CBlk [CExp]
 cexpb :: CBlk -> CExp
 cexpb (CBlk es) = foldl1 CSeq es
 
+#if 1
 instance Show CExp where
   showsPrec _ (CVar s) = showString s
   showsPrec p (CInt i) = showsPrec p i
@@ -41,14 +44,14 @@ instance Show CExp where
   showsPrec _ (CTup es) = showString "<" . showString (L.intercalate "," $ map show es) . showString ">"
   showsPrec _ (CApp e1 e2) = showsPrec 11 e1 . showString "[" . showsPrec 0 e2 . showString "]"
   showsPrec p (CEqu e1 e2) = showParen (p > 5) $ showsPrec 6 e1 . showString " = " . showsPrec 6 e2
-  showsPrec p (CSeq e1 e2) = showParen (True || p > 3) $ showsPrec 3 e1 . showString " = " . showsPrec 3 e2
+  showsPrec p (CSeq e1 e2) = showParen (True || p > 3) $ showsPrec 3 e1 . showString "; " . showsPrec 3 e2
 --  showsPrec p (CWhere e1 e2) = showParen (p > 1) $ showsPrec 3 e1 . showString " where " . showsPrec 3 e2
   showsPrec _ (CExi i) = showString "exi " . showString i
   showsPrec _ CFail = showString "fail"
   showsPrec _ (CIf e1 e2 e3) = showString "if " . showParen True (showsPrec 0 $ cexpb e1) . showsPrec 0 e2 . showsPrec 0 e3
   showsPrec _ (CLam q i e1 e2 me3) = showString ("lam" ++ [show q !! 0]) .
                               showParen True (showString i) . showParen True (showsPrec 0 $ cexpb e1) .
-                              showsPrec 0 e2 . (maybe (showString "") (showsPrec 0) me3)
+                              showsPrec 0 e2 . (maybe (showString "") (\e3 -> showString " M=" . showsPrec 11 e3) me3)
   showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
   showsPrec p (CChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " | " . showsPrec 5 (cexpb e2)
   showsPrec p (CUChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " || " . showsPrec 5 (cexpb e2)
@@ -60,6 +63,10 @@ instance Show CExp where
 
 instance Show CBlk where
   showsPrec _ (CBlk es) = showBraces $ foldr (.) id (L.intersperse (showString "; ") (map (showsPrec 3) es))
+#else
+deriving instance Show CExp
+deriving instance Show CBlk
+#endif
 
 dI :: CExp -> [Ident]
 dI (CApp e1 e2) = dI e1 `L.union` dI e2
@@ -68,6 +75,7 @@ dI (CSeq e1 e2) = dI e1 `L.union` dI e2
 --dI (CWhere e1 e2) = dI e1 `L.union` dI e2
 dI (COfType e1 e2) = dI e1 `L.union` dI e2
 dI (CTup es) = foldr L.union [] (map dI es)
+dI (CDef _ e) = dI e
 dI (CExi x) = [x]
 dI _ = []
 
@@ -99,7 +107,7 @@ cseqs [e] = e
 cseqs (e:es) = e `CSeq` cseqs es
 
 syntax :: Ident -> Exp -> CExp
-syntax u e = evalState (syntaxN u e) 1
+syntax u e = CBlock $ cblock $ evalState (syntaxN u e) 1
 
 syntaxNB :: Ident -> Exp -> N CBlk
 syntaxNB u e = cblock <$> syntaxN u e
@@ -151,7 +159,7 @@ syntaxN u (All e) = (u =.=) <$> (CAll <$> syntaxNB "_" e)
 syntaxN "_" (Fun q e0 e1) = do
   i <- newVar "i"
   c0 <- syntaxN i e0
-  CLam q i (CBlk [c0, CLHS]) <$> syntaxNB "_" e1 <*> pure Nothing
+  CLam q i (cblocks [c0, CLHS]) <$> syntaxNB "_" e1 <*> pure Nothing
 syntaxN u (Fun q e0 e1) = do
   i <- newVar "i"
   x <- newVar "x"
@@ -159,7 +167,7 @@ syntaxN u (Fun q e0 e1) = do
   c0 <- syntaxN i e0
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
-  pure $ CLam q i (CBlk [CDef x c0, CLHS]) (cblocks [CDef k $ CApp (CVar u) (CVar x), c1 ]) cq
+  pure $ CLam q i (cblocks [CDef x c0, CLHS]) (cblocks [CDef k $ CApp (CVar u) (CVar x), c1 ]) cq
 --  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k `cSeq` (k =.= CApp (CVar u) (CVar x)), c1 ]) cq
 syntaxN u (Block e) = CBlock <$> syntaxNB u e
 
