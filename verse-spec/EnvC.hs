@@ -47,7 +47,7 @@ mkVFcn :: MappingV -> Val
 mkVFcn = vFcn . mkFcn
 
 allFcns :: [Fcn]
-allFcns = setNos $ intFcns ++ pairFcns ++ hoFcns
+allFcns = setNos $ intFcns ++ pairFcns ++ hoFcns ++ extraFcns
 
 allFcnsA :: Array Int Fcn
 allFcnsA = array (0, length allFcns - 1) [ (n, f) | f@(Fcn n _ _) <- allFcns ]
@@ -118,6 +118,12 @@ knownFcns =
   [ (mkMapping m, s) | (m, s) <-
     [ (mint, "int")
     , (madd, "add")
+    , (mcomparable, "comparable")
+    , (msucc, "succ")
+    , (mpred, "pred")
+    , (mho1, "ho1")
+    , (mho2, "ho2")
+    , (mho3, "ho3")
     ]
   ]
 
@@ -175,6 +181,9 @@ fromListEnv = Env . M.fromList
 allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
+allTuples :: [Val]
+allTuples = [VTup [x, y] | x <- allInts, y <- allInts]
+
 allChoice2IntFcns :: [Val]
 allChoice2IntFcns = map VFcn $ pick2 intVFcns
   where pick2 fs = [ [f1, f2]
@@ -195,20 +204,127 @@ allWs = mkSetUnsafe allWsL
 allWsL :: [W]
 allWsL =
   let
-    nonFcn = allInts
---      ++ [VTup [x, y] | x <- allInts, y <- allInts]
+    nonFcn = allInts ++ allTuples
   in nonFcn ++ map vFcn allFcns ++ allChoice2IntFcns
 
 --------------
 
--- fun_c(fun_c(0){1}){2}
+extraFcns :: [Mapping]
+extraFcns = map mkMapping [mcomparable]
+
+-- Some function to make 'int' less lonely
+mcomparable :: MappingV
+mcomparable = [ (x, x) | x <- allInts ++ allTuples ]
+
+--------------
+
+
 hos :: [Mapping]
 hos = map mkMapping
- [ [ F[noFcn 2{-={0↦1}-}] ↦ VInt 2 ]
+ [ [ F[noFcn 2{-={0↦1}-}] ↦ VInt 2 ]           -- fun_c(fun_c(0){1}){2}
  , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2 ]
  , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2
    , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 2
    , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 2
    , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 2
    ]
+ , mho1
+ , mho2
+ , mho3
  ]
+
+-- fun_c(fun_c(:int){:int}){f[1]}
+mho1 :: MappingV
+mho1 =
+   [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 0
+   , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 0
+   , F[noFcn 40{-={0↦0,1↦1,2↦0}-}] ↦ VInt 1
+   , F[noFcn 41{-={0↦0,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 42{-={0↦0,1↦1,2↦2}-}] ↦ VInt 1
+   , F[noFcn 43{-={0↦0,1↦2,2↦0}-}] ↦ VInt 2
+   , F[noFcn 44{-={0↦0,1↦2,2↦1}-}] ↦ VInt 2
+   , F[noFcn 45{-={0↦0,1↦2,2↦2}-}] ↦ VInt 2
+   , F[noFcn 46{-={0↦1,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 47{-={0↦1,1↦0,2↦1}-}] ↦ VInt 0
+   , F[noFcn 48{-={0↦1,1↦0,2↦2}-}] ↦ VInt 0
+   , F[noFcn 49{-={0↦1,1↦1,2↦0}-}] ↦ VInt 1
+   , F[noFcn 50{-={0↦1,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 51{-={0↦1,1↦1,2↦2}-}] ↦ VInt 1
+   , F[noFcn 52{-={0↦1,1↦2,2↦0}-}] ↦ VInt 2
+   , F[noFcn 53{-={0↦1,1↦2,2↦1}-}] ↦ VInt 2
+   , F[noFcn 54{-={0↦1,1↦2,2↦2}-}] ↦ VInt 2
+   , F[noFcn 55{-={0↦2,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 56{-={0↦2,1↦0,2↦1}-}] ↦ VInt 0
+   , F[noFcn 57{-={0↦2,1↦0,2↦2}-}] ↦ VInt 0
+   , F[noFcn 58{-={0↦2,1↦1,2↦0}-}] ↦ VInt 1
+   , F[noFcn 59{-={0↦2,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 60{-={0↦2,1↦1,2↦2}-}] ↦ VInt 1
+   , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 2
+   , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 2
+   , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 2
+   ]
+
+-- XXX check if this is correct
+-- fun_c(fun_c(:succ){:int}){f[1]}
+mho2 :: MappingV
+mho2 = 
+   [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 2
+   , F[noFcn 40{-={0↦0,1↦1,2↦0}-}] ↦ VInt 0
+   , F[noFcn 41{-={0↦0,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 42{-={0↦0,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 43{-={0↦0,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 44{-={0↦0,1↦2,2↦1}-}] ↦ VInt 1
+   , F[noFcn 45{-={0↦0,1↦2,2↦2}-}] ↦ VInt 2
+   , F[noFcn 46{-={0↦1,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 47{-={0↦1,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 48{-={0↦1,1↦0,2↦2}-}] ↦ VInt 2
+   , F[noFcn 49{-={0↦1,1↦1,2↦0}-}] ↦ VInt 0
+   , F[noFcn 50{-={0↦1,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 51{-={0↦1,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 52{-={0↦1,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 53{-={0↦1,1↦2,2↦1}-}] ↦ VInt 1
+   , F[noFcn 54{-={0↦1,1↦2,2↦2}-}] ↦ VInt 2
+   , F[noFcn 55{-={0↦2,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 56{-={0↦2,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 57{-={0↦2,1↦0,2↦2}-}] ↦ VInt 2
+   , F[noFcn 58{-={0↦2,1↦1,2↦0}-}] ↦ VInt 0
+   , F[noFcn 59{-={0↦2,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 60{-={0↦2,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 1
+   , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 2
+   ]
+
+mho3 :: MappingV
+mho3 = 
+   [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 1
+   , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 1
+   , F[noFcn 40{-={0↦0,1↦1,2↦0}-}] ↦ VInt 2
+   , F[noFcn 41{-={0↦0,1↦1,2↦1}-}] ↦ VInt 2
+   , F[noFcn 42{-={0↦0,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 43{-={0↦0,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 44{-={0↦0,1↦2,2↦1}-}] ↦ VInt 0
+   , F[noFcn 45{-={0↦0,1↦2,2↦2}-}] ↦ VInt 0
+   , F[noFcn 46{-={0↦1,1↦0,2↦0}-}] ↦ VInt 1
+   , F[noFcn 47{-={0↦1,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 48{-={0↦1,1↦0,2↦2}-}] ↦ VInt 1
+   , F[noFcn 49{-={0↦1,1↦1,2↦0}-}] ↦ VInt 2
+   , F[noFcn 50{-={0↦1,1↦1,2↦1}-}] ↦ VInt 2
+   , F[noFcn 51{-={0↦1,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 52{-={0↦1,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 53{-={0↦1,1↦2,2↦1}-}] ↦ VInt 0
+   , F[noFcn 54{-={0↦1,1↦2,2↦2}-}] ↦ VInt 0
+   , F[noFcn 55{-={0↦2,1↦0,2↦0}-}] ↦ VInt 1
+   , F[noFcn 56{-={0↦2,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 57{-={0↦2,1↦0,2↦2}-}] ↦ VInt 1
+   , F[noFcn 58{-={0↦2,1↦1,2↦0}-}] ↦ VInt 2
+   , F[noFcn 59{-={0↦2,1↦1,2↦1}-}] ↦ VInt 2
+   , F[noFcn 60{-={0↦2,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 0
+   , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 0
+   ]

@@ -54,18 +54,18 @@ exp04 = App (Prim Oadd) (Tup [Int 1, Int 2])
 
 -- x:=2; y:=1; add[(x,y)]
 exp1 :: Example
-exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))
-     === "3"
+exp1 = Def "x" (Int 1) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))
+     === "2"
 
 -- fun_c(x:int){x}
 exp2 :: Example
 exp2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x")
-     === "int"
+     === "[int]"
 
 -- fun_o(x:int){x}
 exp3 :: Example
 exp3 = Fun Open (Def "x" (Colon (Var "int"))) (Var "x")
-     === "Wrong[comparable,int]"
+     === "Wrong[[int],[comparable]"
 
 -- fun_c(x:int){add[(x,1)]}
 exp4 :: Example
@@ -73,8 +73,8 @@ exp4 = Fun Closed (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Tup [Var "x", 
      === "succ"
 
 exp5 :: Example
-exp5 = App (fst exp4) (Int 2)
-     === "3"
+exp5 = App (fst exp4) (Int 1)
+     === "2"
 
 exp6 :: Example
 exp6 = App (fst exp3) (Int 1)
@@ -101,7 +101,7 @@ exp10 = App (fst exp7) (fst exp4)
 -- fun_c(f := fun_c(:succ){:int}){f[1]}
 exp11 :: Example
 exp11 = Fun Closed arg (App (Var "f") (Int 1))
-      === "ho2"
+      === "[ho2]"
   where arg = Def "f" (Fun Closed csucc cint)
         csucc = Colon (Var "succ")
 
@@ -135,7 +135,7 @@ exp16 = App (fst exp11) (Fun Closed (Colon (Var "int")) (Int 0))
 -- fun_c(f := fun_c(:int){:succ}){f[1]}
 exp17 :: Example
 exp17 = Fun Closed arg (App (Var "f") (Int 1))
-      === "ho3"
+      === "[ho3]"
   where arg = Def "f" (Fun Closed cint csucc)
         csucc = Colon (Var "succ")
 
@@ -157,18 +157,18 @@ exp21 :: Example
 exp21 = If (Int 1 `Equ` Int 3) (Int 2) (Int 0)
       === "0"
 
--- if (x:int){x}{999} = 3
+-- if (x:int){x}{0} = 1
 exp22 :: Example
-exp22 = If (Def "x" (Colon (Var "int"))) (Var "x") (Int 999) `Equ` Int 3
-      === "3"
+exp22 = If (Def "x" (Colon (Var "int"))) (Var "x") (Int 0) `Equ` Int 1
+      === "1"
 
 exp23 :: Example
 exp23 = All (Choice (Int 1) (Int 2))
       === "<1,2>"
 
 exp24 :: Example
-exp24 = All (Colon $ Tup [Int 2, Int 3])
-      === "<2,3>"
+exp24 = All (Colon $ Tup [Int 2, Int 1])
+      === "<2,1>"
 
 -- fun_c(x:=(0|1)){x}
 --  denotation id01LR = { [0->L0, 1->R1] }
@@ -202,6 +202,7 @@ exp30 :: Example
 exp30 = Fun Closed (Int 0) (Int 1 `Choice` Int 2)
       === "Wrong"
 
+-- WRONG?
 -- all{exp30[0]}
 exp31 :: Example
 exp31 = All (App (fst exp30) (Int 0))

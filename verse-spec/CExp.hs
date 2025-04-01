@@ -153,7 +153,9 @@ syntaxN u (Tup es) = do
   us <- newVars (length es) "u"
   cs <- zipWithM syntaxN us es
   pure $ cseqs $ map CExi us ++ [u =.= CTup (map CVar us)] ++ [CTup cs]
-syntaxN u (If e0 e1 e2) = CIf <$> syntaxNB "_" e0 <*> syntaxNB u e1 <*> syntaxNB u e2
+syntaxN u (If e0 e1 e2) = do
+  c0 <- syntaxN "_" e0
+  CIf (cblocks [c0, CLHS]) <$> syntaxNB u e1 <*> syntaxNB u e2
 syntaxN u (For e0 e1) = (u =.=) <$> (CFor <$> syntaxNB "_" e0 <*> syntaxNB "_" e1)
 syntaxN u (All e) = (u =.=) <$> (CAll <$> syntaxNB "_" e)
 syntaxN "_" (Fun q e0 e1) = do

@@ -224,9 +224,9 @@ dF' :: Ident -> CBlk -> CBlk -> Env -> W -> WS
 dF' i b1 b2 rho v = trunc ws
   where
     ss :: SetX [SetX W]
-    ss = [ map (\ s -> if isEmpty s then empty else join [ once $ dB b2 (unVEnv w) | w <- s ]) rho1s
+    ss = [ map (\ s -> if isEmpty s then empty else join [ once $ dB b2 w | w <- s ]) rho1s
          | rho' <- dXB b1 (extendEnv rho i v)     -- for each possible environment
-         , let rho1s = dB b1 rho'               -- evaluate e1, a sequence of choices
+         , let rho1s = dBEnv b1 rho'               -- evaluate e1, a sequence of choices
          , not $ all isEmpty rho1s                -- and use it, if it succeeds at any choice
          ]
     ws :: [SetX W]
@@ -353,6 +353,7 @@ squash = filter (not . isEmpty)
 -- Evaluate e with all possible local environments.
 -- Return the environments that result in a non-empty sequence
 oneE :: CBlk -> Env -> SetX Env
+--oneE b rho = dbEnv b rho
 oneE b rho = [ rho' | rho' <- dX e rho, not $ null $ squash $ dD e rho' ]
   where e = cexpb b
 
@@ -383,6 +384,9 @@ chkClsd (Just (x, e)) rho =
 
 dB :: CBlk -> Env -> WS
 dB (CBlk es) rho = unionSetOfSeqs [ dE' es rho' | rho' <- dX (cexpb $ CBlk es) rho ]
+
+dBEnv :: CBlk -> Env -> [SetX Env]
+dBEnv b rho = map (fmap unVEnv) $ dB b rho
 
 dE' :: [CExp] -> Env -> WS
 dE' [] _rho = undefined
@@ -425,7 +429,7 @@ unionSeqs xs [] = xs
 unionSeqs (x:xs) (y:ys) = union x y : unionSeqs xs ys
 
 den :: Exp -> WS
-den e = dD ({-redef $-} syntax "_" e) rho0
+den e = dD (redef $ syntax "_" e) rho0
 
 dene :: Exp -> WS
 dene e = dD (redef $ syntax "_" e) emptyEnv
@@ -456,7 +460,7 @@ main :: IO ()
 main = do
   putStrLn "Start"
 --  runExamples dP allExps
-  print $ dene funo
+  print $ den $ fst exp18
 {-
   print $ dene $ fun
   print $ dene $ fun :@ arg
