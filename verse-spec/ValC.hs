@@ -19,7 +19,7 @@ data FunctionShow = JustNumber | NumberAndDefinition | HsSyntax
   deriving (Eq)
 
 showFcnNo :: FunctionShow
-showFcnNo = HsSyntax -- NumberAndDefinition
+showFcnNo = NumberAndDefinition
 
 --------------------
 ---- Values

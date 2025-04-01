@@ -136,16 +136,19 @@ dE (CIf e1 e2 e3)       rho  =
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
 #if 1
 dE e@(CLam q _i _e1 _e2 me3) rho =
+    if anySet (all isEmpty) fs then [empty] else  -- Don't do this if the functions is decides.
     let res = if chkClsd me3 rho then [fcn] else [empty]
     in
-      -- trace ("=== dE wr enter e=" ++ show e ++ ", rho=" ++ show rho) $ 
-      -- trace ("=== dE wr exit  e=" ++ show e ++ ", rho=" ++ show rho ++ ", res=" ++ show res) $
+--      let wr = if null me3 then "un" else "wr" in
+--      trace ("=== dE " ++ wr ++ " enter e=" ++ show e ++ ", rho=" ++ show rho) $ 
+--      trace ("=== dE " ++ wr ++ " enter e=" ++ show e ++ ", rho=" ++ show rho ++ ", fs=" ++ show fs) $ 
+--      trace ("=== dE " ++ wr ++ " exit  e=" ++ show e ++ ", rho=" ++ show rho ++ ", res=" ++ show res) $
       res
   where
     fs :: SetX [SetX (W, W)]
-    fs = [ map (dist v) r | v <- allWs, let r = dF e rho v, not (all isEmpty r) ]
+    fs = [ map (dist v) r | v <- allWs, let r = dF e rho v, not (null r) ]
     dist v s = fmap (v,) s
-    fcn = combine q fs
+    fcn = combine q $ filterSet (not . all isEmpty) fs
 #else
 dE (CLam q i b1 b2 me3) rho =
   let e1 = cexpb b1; e2 = cexpb b2 in
@@ -453,7 +456,7 @@ main :: IO ()
 main = do
   putStrLn "Start"
 --  runExamples dP allExps
-  print $ dene xfn
+  print $ dene funo
 {-
   print $ dene $ fun
   print $ dene $ fun :@ arg
@@ -462,12 +465,13 @@ main = do
   print $ dene $ func :@ argc
 -}
 
-arg, fun, argc, func, funo :: Exp
+arg, fun, argc, func, argo, funo :: Exp
 arg = fun_c(0:||1)2
 fun = fun_c arg 2
 argc = fun_c(0:|1)2
 func = fun_c argc 2
-funo = fun_o arg 2
+argo = fun_o(0:||1)2
+funo = fun_c argo 2
 
 ds :: Exp -> CExp
 ds = redef . syntax "_"
@@ -483,7 +487,10 @@ fnE1s = ds fnE1
 fnE2s = ds fnE2
 
 gg :: Exp
-gg = fun_c("x":=0:|1 :> 0)(If("x"===1)(Tup ["_",2])(Tup[3,"_"]))
+gg = fun_c("x":=0:|1 :> 0)(If("x"===1)(Tup ["_",2])(Tup[1,"_"]))
+
+qq = "x" ::: "any" :> If("x"===1)(Tup ["_",2])(Tup[1,"_"])
+qq1 = Tup ["_",2] === Tup[1,"_"]
 
 xfno, xfn, xfnE1, xfnE2 :: Exp
 xfno = fun_o xfnE1 xfnE2

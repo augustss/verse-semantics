@@ -22,6 +22,8 @@ module SetX(
   toListBy,
   maybeToSet,
   partitionSet,
+  filterSet,
+  anySet,
   cross,
   ) where
 import Control.Applicative
@@ -138,6 +140,12 @@ partitionSet p (S sx) = (S a, S b) where (a, b) = partition p sx
 
 cross :: (Ord a) => SetX (SetX a) -> SetX (SetX a)
 cross (S ss) = mkSet $ map mkSet $ sequence $ map toList ss
+
+filterSet :: (a -> Bool) -> SetX a -> SetX a
+filterSet p (S ss) = S (filter p ss)
+
+anySet :: (a -> Bool) -> SetX a -> Bool
+anySet p (S ss) = any p ss
 
 -----
 

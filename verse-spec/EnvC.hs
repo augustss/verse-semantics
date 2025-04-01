@@ -93,10 +93,20 @@ intFcns =
   in  fs
 
 pairFcns :: [Mapping]
-pairFcns = []
+pairFcns = intToPairFcns ++ pairToIntFcns
+
+pairToIntFcns :: [Mapping]
+pairToIntFcns = -- [ mkMapping [(VTup [x,y], z) | x <- allInts, y <- allInts ] | z <- allInts ]
+  [ mkMapping madd ]  -- just one for now
+
+madd :: MappingV
+madd = [ (VTup [x,y], vadd x y) | x <- allInts, y <- allInts ]
+
+intToPairFcns :: [Mapping]
+intToPairFcns = [ mkMapping [(z, VTup [x,y])] | x <- allInts, y <- allInts, z <- allInts ]
 
 hoFcns :: [Mapping]
-hoFcns = [ho1]
+hoFcns = hos
 
 -- Set name field for some known functions
 setNos :: [Mapping] -> [Fcn]
@@ -107,6 +117,7 @@ knownFcns :: [(Mapping, String)]
 knownFcns =
   [ (mkMapping m, s) | (m, s) <-
     [ (mint, "int")
+    , (madd, "add")
     ]
   ]
 
@@ -142,7 +153,7 @@ extendEnv rho i w = Env $ M.insert i w $ unEnv rho
 
 -- Initial environment
 rho0 :: Env
-rho0 = Env $ M.fromList $
+rho0 = fromListEnv $
   [ (n, dO o) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd) ] ] ++
   [ ("succ", mkVFcn msucc), ("pred", mkVFcn mpred) ] ++
   [ ("false", mkVFcn emptym) ]
@@ -191,7 +202,13 @@ allWsL =
 --------------
 
 -- fun_c(fun_c(0){1}){2}
-ho1 :: Mapping
-ho1 = M.fromList
-  [ F[noFcn 2{-={0↦1}-}] ↦ VInt 2
-  ]
+hos :: [Mapping]
+hos = map mkMapping
+ [ [ F[noFcn 2{-={0↦1}-}] ↦ VInt 2 ]
+ , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2 ]
+ , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2
+   , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 2
+   , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 2
+   , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 2
+   ]
+ ]
