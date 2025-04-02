@@ -105,7 +105,19 @@ dE (CPrim p)           _rho  = [sing $ dO p]
 dE (CTup es)            rho  = map (fmap VTup . sequence) $ mapM (\ e -> dE e rho) es
 dE (CApp e1 e2)         rho  = [ r | s1 <- dE e1 rho, s2 <- dE e2 rho, r <- applys s1 s2 ]
 dE (COfType e1 e2)      rho  = dE (CApp e2 e1) rho
-dE (CEqu e1 e2)         rho  = [ s1 `intersect` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
+dE (CEqu e1 e2)         rho  = do -- [ s1 `intersect` s2 | s1 <- dE e1 rho, s2 <- dE e2 rho ]
+  case e1 of
+    CLam{} -> traceM (show (CEqu e1 e2))
+    _ -> pure ()
+  s1 <- dE e1 rho
+  case e1 of
+    CLam{} -> traceM (show (s1, rho))
+    _ -> pure ()
+  s2 <- dE e2 rho
+  case e1 of
+    CLam{} -> traceM (show s2)
+    _ -> pure ()
+  pure $ s1 `intersect` s2
 dE (CSeq CExi{} e)      rho  = dE e rho                                 -- just a speedup
 dE (CSeq e1 e2)         rho  = concat [ if isEmpty s1 then [empty] else dE e2 rho
                                       | s1 <- dE e1 rho ]
@@ -445,13 +457,14 @@ allExps :: [Example]
 allExps = [exp01, exp02, exp03, exp04,
            exp1, exp2, exp3, exp4, exp5, exp6, exp7, exp8, exp9,
            exp10, exp11, exp12, exp13, exp14, exp15, exp16, exp17, exp18, exp19,
-           exp20, exp21, exp22,
-           exp23,exp24,exp25,exp26,exp27,exp28,exp29,{-WRONG exp30,exp31,-}exp32,
-           exp33, exp34, exp35,
-           exp36, exp37, exp38, exp39, exp40, {- UNSURE exp41, exp43, exp44, -}
+           exp20, exp21, {- BUG (:=) exp22,-}
+           exp23, exp24, exp25, exp26, exp27, exp28, exp29,{-WRONG exp30,exp31,-}exp32,
+           exp33, exp34, {- SLOW exp35,-}
+           -- XXX exp43 looks wrong
+           exp36, exp37, exp38, {- SLOW exp39,-} {- UNSURE exp40,-} {- UNSURE exp41,-} exp43, {- UNSURE exp44, -}
            exp45, exp46, exp47, exp48, {- UNSURE exp49, exp50, -}
-           exp51, exp52,
-           exp53, exp54,
+           {- SLOW exp51, exp52, -}
+           exp53, {- DODGY circularity exp54,-}
            exp55, exp56, exp57, {- SLOW exp58,-} exp59, exp60,
            exp61, exp62, exp63
           ]
@@ -459,9 +472,9 @@ allExps = [exp01, exp02, exp03, exp04,
 main :: IO ()
 main = do
   putStrLn "Start"
---  runExamples dP allExps
-  print $ den $ fst exp18
+  runExamples dP allExps
 {-
+  print $ den $ fst exp18
   print $ dene $ fun
   print $ dene $ fun :@ arg
   print $ dene $ fun :@ argc

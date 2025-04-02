@@ -49,7 +49,7 @@ instance Show RVal where
 showPretty :: Val -> String
 showPretty (VInt i) = show i
 showPretty (VTup vs) = "<" ++ intercalate "," (map showPretty vs) ++ ">"
---showPretty (VFcn [f]) = show f
+showPretty (VFcn [f]) = show f
 showPretty (VFcn fs) = show fs
 showPretty (VEnv _) = "<<VEnv>>"
 

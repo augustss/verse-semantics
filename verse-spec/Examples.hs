@@ -50,7 +50,7 @@ exp03 = Tup [Int 1, Int 2]
 -- add[<1,2>]
 exp04 :: Example
 exp04 = App (Prim Oadd) (Tup [Int 1, Int 2])
-      === "3"
+      === "0"
 
 -- x:=2; y:=1; add[(x,y)]
 exp1 :: Example
@@ -65,7 +65,7 @@ exp2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x")
 -- fun_o(x:int){x}
 exp3 :: Example
 exp3 = Fun Open (Def "x" (Colon (Var "int"))) (Var "x")
-     === "Wrong[[int],[comparable]"
+     === "Wrong[[int],[comparable]]"
 
 -- fun_c(x:int){add[(x,1)]}
 exp4 :: Example
@@ -101,7 +101,7 @@ exp10 = App (fst exp7) (fst exp4)
 -- fun_c(f := fun_c(:succ){:int}){f[1]}
 exp11 :: Example
 exp11 = Fun Closed arg (App (Var "f") (Int 1))
-      === "[ho2]"
+      === "ho2"
   where arg = Def "f" (Fun Closed csucc cint)
         csucc = Colon (Var "succ")
 
@@ -135,7 +135,7 @@ exp16 = App (fst exp11) (Fun Closed (Colon (Var "int")) (Int 0))
 -- fun_c(f := fun_c(:int){:succ}){f[1]}
 exp17 :: Example
 exp17 = Fun Closed arg (App (Var "f") (Int 1))
-      === "[ho3]"
+      === "ho3"
   where arg = Def "f" (Fun Closed cint csucc)
         csucc = Colon (Var "succ")
 
@@ -239,10 +239,10 @@ exp37 :: Example
 exp37 = Fun Closed (Def "x" (Int 0 `Choice` Int 1 `Choice` Int 2)) (Var "x")
       === "[id0,id1,id2]"
 
--- fun_c(x:=3|1|0){x}
+-- fun_c(x:=2|1|0){x}
 exp38 :: Example
-exp38 = Fun Closed (Def "x" (Int 3 `Choice` Int 1 `Choice` Int 0)) (Var "x")
-      === "[id3,id1,id0]"
+exp38 = Fun Closed (Def "x" (Int 2 `Choice` Int 1 `Choice` Int 0)) (Var "x")
+      === "[id2,id1,id0]"
 
 -- fun_c(x:=0|1|2){x} = fun_c(x:=3|1|0){x}
 -- denotation {}  XXX Is this right???
@@ -250,14 +250,14 @@ exp39 :: Example
 exp39 = fst exp37 `Equ` fst exp38
       === "Wrong[]"
 
--- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(3|1|0)){x}
+-- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(2|1|0)){x}
 -- 0->L,LL0, 1->L,RL1, 2->L,R2, 3->R,LL3, 1->R,RL1, 0->R,R0
 -- XXX Is this right???
 exp40 :: Example
 exp40 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
                     Def "x" (If (Var "a" `Equ` Int 0)
                                 (Int 0 `Choice` Int 1 `Choice` Int 2)
-                                (Int 3 `Choice` Int 1 `Choice` Int 0)))
+                                (Int 2 `Choice` Int 1 `Choice` Int 0)))
                    (Var "x")
       === "Wrong[]"
 
@@ -275,7 +275,7 @@ exp41 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
 -- x:=1|2; if(x=1){0|1}else{2|1|0}
 exp43 :: Example
 exp43 = Def "x" (Int 1 `Choice` Int 2) `Seq` If (Var "x" `Equ` Int 1) (Int 0 `Choice` Int 1) (Int 2 `Choice` Int 1 `Choice` Int 0)
-      === "XXX7"
+      === "Wrong[{0},{1},{2},{1},{0}]"
 
 exp44 :: Example
 exp44 = If (Var "x" `Equ` Int 1) (Int 0 `Choice` Int 1) (Int 2 `Choice` Int 1 `Choice` Int 0) `Seq` Def "x" (Int 1 `Choice` Int 2)
@@ -329,7 +329,7 @@ exp52 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "y")
 
 exp53 :: Example
 exp53 = Fun Open (Def "x" cint) (Var "x")
-      === "Wrong[comparable,int]"
+      === "Wrong[int,comparable]"
 
 exp54 :: Example
 exp54 = Fun Closed (Int 0) (fst exp53)

@@ -15,6 +15,7 @@ import Data.Maybe
 import Exp
 import qualified Map as M
 import qualified Data.Map as DM
+import GHC.Stack
 import SetX
 import ValC
 
@@ -36,7 +37,7 @@ vadd _ _ = undefined
 
 dO :: Op -> W
 dO Oint = vFcn $ mkFcn [ (x, x) | x <- allInts ]
-dO Ogt  = vFcn $ mkFcn [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y]
+dO Ogt  = vFcn $ mkFcn [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y ]
 -- add is a single function, not many as in the doc.
 dO Oadd = vFcn $ mkFcn [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
 
@@ -55,7 +56,7 @@ allFcnsA = array (0, length allFcns - 1) [ (n, f) | f@(Fcn n _ _) <- allFcns ]
 allFcnsM :: DM.Map Mapping Fcn
 allFcnsM = DM.fromList [ (xys, f) | f@(Fcn _ _ xys) <- allFcns ]
 
-mkFcn :: MappingV -> Fcn
+mkFcn :: HasCallStack => MappingV -> Fcn
 mkFcn xys =
   let xys' = mkMapping xys in
   case DM.lookup xys' allFcnsM of
@@ -121,9 +122,16 @@ knownFcns =
     , (mcomparable, "comparable")
     , (msucc, "succ")
     , (mpred, "pred")
+    , (mgt, "gt")
     , (mho1, "ho1")
     , (mho2, "ho2")
     , (mho3, "ho3")
+    , ([(VInt 0, VInt 0)], "id0")
+    , ([(VInt 1, VInt 1)], "id1")
+    , ([(VInt 2, VInt 2)], "id2")
+    , ([(VInt 0, VTup [VInt 1, VInt 2])], "f0t12")
+    , ([(x, VInt 0) | x <- allInts], "const0")
+    , ([(VInt 0, VInt 1)], "succ0")
     ]
   ]
 
@@ -140,6 +148,9 @@ msucc = [ (x, vadd x (VInt 1)) | x <- allInts ]
 
 mpred :: MappingV
 mpred = [ (x, vadd x (last allInts)) | x <- allInts ]
+
+mgt :: MappingV
+mgt = [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y ]
 
 --------------------
 ---- Environment
@@ -210,7 +221,7 @@ allWsL =
 --------------
 
 extraFcns :: [Mapping]
-extraFcns = map mkMapping [mcomparable]
+extraFcns = map mkMapping [mcomparable, mgt]
 
 -- Some function to make 'int' less lonely
 mcomparable :: MappingV
@@ -220,7 +231,7 @@ mcomparable = [ (x, x) | x <- allInts ++ allTuples ]
 
 
 hos :: [Mapping]
-hos = map mkMapping
+hos = map mkMapping $
  [ [ F[noFcn 2{-={0↦1}-}] ↦ VInt 2 ]           -- fun_c(fun_c(0){1}){2}
  , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2 ]
  , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2
@@ -231,6 +242,7 @@ hos = map mkMapping
  , mho1
  , mho2
  , mho3
+ , mho6
  ]
 
 -- fun_c(fun_c(:int){:int}){f[1]}
@@ -328,3 +340,7 @@ mho3 =
    , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 0
    , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 0
    ]
+
+mho6 :: MappingV
+mho6 = [VInt 0 ↦ F[noFcn 42{-={0↦0,1↦1,2↦2}-}]]
+
