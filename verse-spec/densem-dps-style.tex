@@ -57,7 +57,7 @@
 \newcommand{\Y}{\M{Y}}
 \newcommand{\Exis}[1]{\M{\text{Exis}(#1)}}
 \newcommand{\where}[1]{\M{\SPP\mathbf{where}\SPP\SP #1}}
-\renewcommand{\Ws}{\M{W\!*}}
+\renewcommand{\Ws}{\M{W_{*}}}
 \newcommand{\concat}[2]{\M{ #1 +\!\!+\, #2}}
 \renewcommand{\P}{\M{^{\scalebox{0.8}{$\scriptstyle\prime$}}}}
 \newcommand{\PP}{\M{^{\scalebox{0.8}{$\scriptstyle\prime\prime$}}}}
@@ -83,6 +83,7 @@
   \Ws    & = &  \seq{\Set\Env}                       \\
 \end{array}                                       \\ \\
 
+\\
 
 \begin{array}{rcl}
  \E \op {}                  & : & \totfun {\Set\Ident} \Ws                                      \\
@@ -115,6 +116,8 @@
 
 \\ \\
 
+\\ \\
+
 \F{}{} \text{returns a set of functions. For closed lambdas that set has at most one element.}
 
 \\
@@ -123,10 +126,39 @@
  \F {\lamany \x\op\opp} {}       & : & \totfun \Env {\Set\Fun}                              \\
 \end{array}
 
-
-
   \end{array}
   $$
 \caption{Idealised denotational semantics of Mini Verse (dps)}
+\end{figure}
+
+\renewcommand{\ss}{\M{ss}}
+\renewcommand{\S}{\M{S}}
+\renewcommand{\Sp}{\M{S\P}}
+
+\begin{figure}
+  $$
+ \begin{array}{l} 
+ \begin{array}{rcl}
+  \Envs\X       & : & \totfun{\Set\Ident}{\Set\Env}                                          \\
+  \Envs\X       & = & \text{For a set of identifers, }\X\text{, yield all environments }
+                   \rho\text{ such that } \X= \dom(\rho)                                     \\
+  \pairin\x\y\f & : & \totfun{\Val \times \Val\times(\parfun\Val\Val)}{Bool}                 \\
+  \S \cup \Sp   & : & \totfun{\Ws \times\, \Ws}\Ws                                          \\
+  \S \cup \Sp   & = & \seqcomp{ \s_i \cup \sp_i}{ \pick i{1\dots n} \and
+                                \text{pad}(\S) = \seq{ \s_1 \dots \s_n } \and
+                                \text{pad}(\Sp) = \seq{ \sp_1 \dots \sp_n }}                 \\
+  \setmin\s\X   & : & \totfun{\Ws \times\, \Set\Ident}\Ws                                    \\
+  \setmin\s\X   & = & \setcomp{\setmin\rho\X}{\pick\rho\s}                                   \\
+  \s-\sp        & : & \totfun{\Set\Env\times\Set\Env}\Set\Env                                \\
+  \concat\S\Sp  & : & \totfun{\Ws\times\Ws}\Ws                                               \\
+  \Exis\op      & : & \Set\Ident                                                             \\
+  \one\X\S      & : & \totfun{\Set\Ident \times \Ws}{\Set\Env}                               \\
+  \one\X{\seq{}}& = & \set{}                                                                 \\
+  \one\X{\s:\ss}& = & \s \cup \setcomp\rho{\rho\in\one\X\ss \and \forall\rhop\in\s.\SP
+                                                       (\setmin\rho\X)\not=(\setmin\rhop\X)} \\
+  \end{array}
+  \end{array}
+  $$
+\caption{Auxilliaries}
 \end{figure}
 
