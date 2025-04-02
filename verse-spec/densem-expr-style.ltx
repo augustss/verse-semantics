@@ -176,7 +176,7 @@ Env^{*} & = & \powerset{Env} \\
   \\[1mm]
 
 %  \textit{succeeds function:} \\
-  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & \semopen{q} [\combine(|fs|)] \\
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & [\semopen{q}(\combine(|fs|))] \\
   & & |where|
     \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
       |fs| & = &
@@ -270,8 +270,8 @@ $$
   \multicolumn{4}{l}{\;\;\text{Then the first non-empty element is extracted from each subsequence. }}\\
 \\
 
-\semopen{q} & : & \mtype \rightarrow \mtype \\
-\semopen{|open|}{G} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subset f  \} ] \\
+\semopen{q} & : & [\semfcn] \rightarrow [\semfcn] \\
+\semopen{|open|}{G} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subseteq f  \} ] \\
 \semopen{|closed|}{G} & = & G \\[1mm]
 
 \end{array} \\ \\
