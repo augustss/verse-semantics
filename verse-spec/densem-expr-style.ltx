@@ -125,6 +125,7 @@
 %\newcommand{\filter}{\textbf{filter}}
 \newcommand{\myenv}[1]{E\{ #1 \}}
 \newcommand{\mybind}[2]{#1 \mapsto #2}
+\newcommand{\succeeds}{\textbf{succeeds}}
 
 \begin{figure}
 $$
@@ -180,7 +181,13 @@ Env^{*} & = & \myset{Env} \\
   \\[1mm]
 
 %  \textit{succeeds function:} \\
-  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = & [\semopen{q}(\combine(|fs|))] \\
+  \semapp{E}{|lamOC q x e_1 e_2|}{\rho} & = &
+  \left\{
+  \begin{array}{ll}
+    [\semopen{q}(\combine(|fs|))] & \text{if } \succeeds(|fs|) \\
+    \mbox{}[\mempty] & \text{otherwise}\\
+  \end{array}
+  \right. \\
   & & |where|
     \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
       |fs| & = &
@@ -270,6 +277,9 @@ $$
 \semopen{q} & : & [\semfcn] \rightarrow [\semfcn] \\
 \semopen{|open|}{G} & = & [ \{ f \in \semfcn\, ||\, \exists g \inb \bigcup G\, .\, g \subseteq f  \} ] \\
 \semopen{|closed|}{G} & = & G \\[1mm]
+
+\succeeds & : & \myset{[\myset{\Value}]} \rightarrow Bool \\
+\succeeds(s) & = & \text{if all sequences in $s$ have a non-empty element} \\[1mm]
 
 \bigcap[] & = & \mempty \\
 \bigcap[x_1,x_2,\mydots,x_n] & = & x_1 \cap x_2 \cap \mydots \cap x_n \\
@@ -442,7 +452,19 @@ The $r$ is the intersection of all the sets in the sequence, this is what all th
 in common, so this is what to return.  Finally, per Tim's wish, {\trunc}, will truncate the sequence after
 the first non-empty set, replacing it with $r$.
 
-Example, |functionOC c 0 5|, desugared |lamOC c x (x = 0) 5|, $\semappp{F}{|lamOC c x (x = 0) 5|}{\myenv{}}{v}$:
+Note that if the domain fails for the given value, $v$, then $semap{F}{}$ will return the empty sequence, $[]$.
+Whereas, if the range fails $semap{F}{}$ will return a sequence of empty sets.
+The range can fail for several reasons:
+\begin{enumerate}
+\item the range actually fails
+\item there are multiple elements in the sequence whose intersection is empty
+\item for a higher order function, the argument failed
+\item for a higher order argument, the closedness test failed (added my the \textbf{K} desugaring)
+\end{enumerate}
+
+Below I will use |a `uchoice` b| for unordered choice.  It can easily be defined by |block{x:int; if(x=0){a}else{b}}|.
+
+Example 1, |functionOC c 0 5|, desugared |lamOC c x (x = 0) 5|, $\semappp{F}{|lamOC c x (x = 0) 5|}{\myenv{}}{v}$:
 
 \begin{tabular}{||c||c||c||c||c||c||c||c||c||}
   \hline
@@ -454,7 +476,7 @@ Example, |functionOC c 0 5|, desugared |lamOC c x (x = 0) 5|, $\semappp{F}{|lamO
   \hline
 \end{tabular} \\[4mm]
 
-Example, |functionOC c (0 `choice` 1) 5|, desugared |lamOC c x ((x = 0) `choice` (x = 1)) 5|, $\semappp{F}{|lamOC c x ((x = 0) `choice` (x = 1)) 5|}{\myenv{}}{v}$:
+Example 2, |functionOC c (0 `choice` 1) 5|, desugared |lamOC c x ((x = 0) `choice` (x = 1)) 5|, $\semappp{F}{|lamOC c x ((x = 0) `choice` (x = 1)) 5|}{\myenv{}}{v}$:
 
 \begin{tabular}{||c||c||c||c||c||c||c||c||c||}
   \hline
@@ -468,7 +490,7 @@ Example, |functionOC c (0 `choice` 1) 5|, desugared |lamOC c x ((x = 0) `choice`
   \hline
 \end{tabular} \\[4mm]
 
-Example, |functionOC c (0 `choice` 1 `choice` 0) 5|, desugared |lamOC c x ((x = 0) `choice` (x = 1) `choice` 0) 5|, $\semappp{F}{|lamOC c x ((x = 0) `choice` (x = 1) `choice` 0) 5|}{\myenv{}}{v}$:
+Example 3, |functionOC c (0 `choice` 1 `choice` 0) 5|, desugared |lamOC c x ((x = 0) `choice` (x = 1) `choice` 0) 5|, $\semappp{F}{|lamOC c x ((x = 0) `choice` (x = 1) `choice` 0) 5|}{\myenv{}}{v}$:
 
 \begin{tabular}{||c||c||c||c||c||c||c||c||c||}
   \hline
@@ -481,3 +503,118 @@ Example, |functionOC c (0 `choice` 1 `choice` 0) 5|, desugared |lamOC c x ((x = 
   $2$ & $\{ \myenv{ \mybind{x}{2} } \}$ & \{ $[\{\},\{\},\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
   \hline
 \end{tabular} \\[4mm]
+
+Example 4, |functionOC c (0 `uchoice` 1) (5 `uchoice` 6)|, desugared |lamOC c x ((x = 0) `uchoice` (x = 1) (5 `uchoice` 6)|, $\semappp{F}{|lamOC c x ((x = 0) `uchoice` (x = 1)) (5 `uchoice` 6)|}{\myenv{}}{v}$:
+
+\begin{tabular}{||c||c||c||c||c||c||c||c||c||}
+  \hline
+  $v$ & $\semapp{X}{e_1}{\myenv{ \mybind{x}{v}}} $ & \mbox{ $ss$ } & $\squash(ss)$ & $w$ & $ \{ |if| \mydots$ \} & $ws$ & $r$ & $\trunc(r,ws)$\\
+  \hline
+  $0$ & $\{ \myenv{ \mybind{x}{0} } \}$ & \{ $[\{0\}]$ \} & $[\{0\}]$ & \{5,6\} & \{[\{5,6\}]\} & [\{5,6\}] & \{5,6\} & [\{5,6\}] \\
+  \hline
+  $1$ & $\{ \myenv{ \mybind{x}{1} } \}$ & \{ $[\{1\}]$ \} & $[\{1\}]$ & \{5,6\} & \{[\{5,6\}]\} & [\{5,6\}] & \{5,6\} & [\{5,6\}] \\
+  \hline
+  $2$ & $\{ \myenv{ \mybind{x}{2} } \}$ & \{ $[\{\}]$ \} & $[]$ & & \{\} & [] & \{\} & [] \\
+  \hline
+\end{tabular} \\[4mm]
+
+To obtain the denotation of a function the $\semap{E}{}$ function will iterate through all possible
+value and use $\semap{F}{}$ to find out how the function behaves for each of them.  It will then use this
+to stitch together (the singleton sequence of) the set of functions that is the denotation.  In more detail:
+\begin{itemize}
+\item $v \inb \Value$ \\
+  For all values $v$,
+\item $|let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v$ \\
+  find the function result (a sequence of sets) for that $v$,
+\item $r \neq []$ \\
+  and only keep the ones where the function succeeds.
+\item $[ \dist(v, s) \,||\, s \inb r ]$ \\
+  Pair up the argument with each possible result.
+  The pairs are formed by $\mapsto$ to indicate that they will form a function.
+\item $\combine(|fs|)$ \\
+  Form the actual closed functions from all the pieces.
+  \combine is described in more detail below.
+\item $\semopen{q}{(\mydots)}$ \\
+  If the function is open, select all functions that are compatible
+  with result of \combine.
+\item \succeeds \\
+  Check that all sequences in |fs| contain a non-empty set.  If not, it means that the range failed when the domain succeeded.
+  Omit this check for a \textbf{decides} function.
+\end{itemize}
+
+Continuing with the examples.
+
+Example 1, |functionOC c 0 5|
+
+\begin{tabular}{||c||c||c||c||c||}
+  \hline
+  $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
+  \hline
+  $0$ & $[\{5\}]$ & $[\{5\}]$ & $[\{0 \mapsto 5\}]$ & \multirow{2}{*}{$\{[\{0 \mapsto 5\}]\}$}\\
+  \cline{1-4}
+  $1$ & $[]$ & & & \\
+  \hline
+\end{tabular}\\
+\begin{tabular}{||c||c||c||c||}
+  \hline
+  |fs| & \group & \maplist(\cross) & \sequence \\
+  \hline
+  $\{[\{0 \mapsto 5\}]\}$ & $[\{0 \mapsto 5\}]$ & $[\{0 \mapsto 5\}]$ & $\{[0 \mapsto 5]\}$ \\
+  \hline
+\end{tabular}\\[5mm]
+
+Example 2, |functionOC c (0 `choice` 1) 5|
+\lennart{WRONG}
+\begin{tabular}{||c||c||c||c||c||}
+  \hline
+  $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
+  \hline
+  $0$ & $[\{5\}]$ & $[\{5\}]$ & $[\{0 \mapsto 5\}]$ & \multirow{3}{*}{$\{[\{0 \mapsto 5\}],[\{\},\{1 \mapsto 5\}]\}$}\\
+  \cline{1-4}
+  $1$ & $[\{\},\{5\}]$ & $[\{\},\{5\}]$ & $[\{\},\{1 \mapsto 5\}]$ & \\
+  \cline{1-4}
+  $2$ & $[]$ & & & \\
+  \hline
+\end{tabular}\\
+\begin{tabular}{||c||c||c||c||}
+  \hline
+  |fs| & \group & \maplist(\cross) & \sequence \\
+  \hline
+  $\{[\{0 \mapsto 5\}],[\{\},\{1 \mapsto 5\}]\}$ &
+    $[\{0 \mapsto 5\}, \{1 \mapsto 5\}]$ &
+    $[\{0 \mapsto 5\}, \{1 \mapsto 5\}]$ &
+    TBD \\
+  \hline
+\end{tabular}\\[5mm]
+
+Example 3, same as example 2
+
+Example 4, |functionOC c (0 `uchoice` 1) (5 `uchoice` 6)|
+\lennart{WRONG}
+
+\begin{tabular}{||c||c||c||c||c||}
+  \hline
+  $v$ & $r$ & $r \neq []$ & $[ \dist(v, s) \,||\, s \inb r ]$ & |fs| \\
+  \hline
+  $0$ & $[\{5,6\}]$ & $[\{5,6\}]$ & $[\{0 \mapsto 5, 0 \mapsto 6\}]$ & \multirow{3}{*}{
+    \makecell{$\{[\{0 \mapsto 5, 0 \mapsto 6,$ \\
+              $1 \mapsto 5, 1 \mapsto 6\}]\}$}
+  }\\
+  \cline{1-4}
+  $1$ & $[\{5,6\}]$ & $[\{5,6\}]$ & $[\{1 \mapsto 5, 0 \mapsto 6\}]$ & \\
+  \cline{1-4}
+  $2$ & $[]$ & & & \\
+  \hline
+\end{tabular}\\
+\begin{tabular}{||c||c||c||c||}
+  \hline
+  |fs| & \group & \maplist(\cross) & \sequence \\
+  \hline
+    \makecell{$\{[\{0 \mapsto 5, 0 \mapsto 6,$ \\
+              $1 \mapsto 5, 1 \mapsto 6\}]\}$} &
+    \makecell{$[\{0 \mapsto 5, 0 \mapsto 6,$ \\
+        $1 \mapsto 5, 1 \mapsto 6\}]$} &
+    TBD & TBD \\
+  \hline
+\end{tabular}\\[5mm]
+
