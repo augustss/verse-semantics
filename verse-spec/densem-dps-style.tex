@@ -126,7 +126,7 @@
                                           { \pick\s{\FOR\y\Gen\Bod} }                            \\
                             &   & \where{\ Y = \Exis\op  \and \Xp = \X \cup \Y}                \\
                             &   & \Gen = \E\op\Xp                                              \\
-                            &   & \Bod=\seqcomp{\setcomp{\rho[\y\mapsto\tuple{\inrho\y]}}{\rho\in\s}}
+                            &   & \Bod=\seqcomp{\setcomp{\rho[\y\mapsto\tuple{\inrho\y}]}{\rho\in\s}}
                                                {\pick\s{\E\opp{(\Xp\cup\{\y\})}}}
 \end{array}
 
@@ -144,7 +144,7 @@
                                                        (\setmin\rho\X)\not=(\setmin\rhop\X)}   \\
                                                                                                \\
   \EMPTY\y            & : &  \totfun\Ident\Ws                                                  \\
-  \EMPTY\y            & = &  \seq{ \setcomp{ \inrho\y=\tuple{} } { \pick\rho\Envs\X } }        \\
+  \EMPTY\y            & = &  \seq{ \setcomp{ \inrho\y=\tuple{} } { \pick\rho{\Envs\X} } }        \\
                                                                                                \\
   \APPEND{\_}{\_}{\_} & : &  \totfun{\Ident \times \Ws \times \Ws}\Ws                          \\
   \APPEND\y\S\Sp      & = &  \seqcomp {
@@ -156,7 +156,7 @@
                                                                                                \\
   \FOR{\_}{\_}{\_}    & : &  \totfun{\Ident \times \Ws \times \Ws}\Ws                          \\
   \FOR\y{[]}{\_}      & = &  \EMPTY\y                                                          \\
-  \FOR\y{\s:\S}\Sp    & = &  \APPEND\y { \IF\Y\s\Sp\EMPTY\y } { \FOR\y\S\Sp   }                \\
+  \FOR\y{\s:\S}\Sp    & = &  \APPEND\y { \IF\Y\s\Sp{\EMPTY\y} } { \FOR\y\S\Sp   }                \\
 \end{array}
 
 \\ \\
