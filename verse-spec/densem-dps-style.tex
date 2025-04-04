@@ -11,6 +11,9 @@
 \newcommand{\SP}{\hspace{.5mm}}
 \newcommand{\SPP}{\hspace{1mm}}
 \newcommand{\E}[2]{\M{\mathcal{E}\llbracket\SP #1 \SP\rrbracket\SP #2}}
+\renewcommand{\ss}{\M{ss}}
+\renewcommand{\S}{\M{S}}
+\renewcommand{\Sp}{\M{S\P}}
 
 \newcommand{\e}{\M{e}}
 \newcommand{\ep}{\M{\e\P}}
@@ -42,8 +45,7 @@
 \newcommand{\setcomp}[2]{\M{\set{\SP #1 \,\,|\,\,  #2 }}}
 \newcommand{\seqcomp}[2]{\M{\seq{\SP #1 \,\,|\,\,  #2 }}}
 \newcommand{\F}[2]{\M{ \mathcal{F} \llbracket\SP #1 \SP\rrbracket\SP #2 }}
-\newcommand{\lamc}[3]{\M{ \lambda_c #1 . \{ #2 \} \{ #3 \} }}
-\newcommand{\lamany}[3]{\M{ \lambda_{*} #1 . \{ #2 \} \{ #3 \} }}
+\newcommand{\lam}[5]{\M{ \lambda_{#1} (#2) \{ #3 \} \{ #4 \}(#5) }}
 \newcommand{\Lam}{\M{\mathit{lam}}}
 \newcommand{\f}{\M{\mathit{f}}}
 \newcommand{\fs}{\M{\mathit{fs}}}
@@ -56,7 +58,7 @@
 \newcommand{\scope}[1]{\M{ \{ #1 \} }}
 \newcommand{\Y}{\M{Y}}
 \newcommand{\Exis}[1]{\M{\text{Exis}(#1)}}
-\newcommand{\where}[1]{\M{\SPP\mathbf{where}\SPP\SP #1}}
+\newcommand{\where}[1]{\M{\mathbf{where}\SPP\SP #1}}
 \renewcommand{\Ws}{\M{W_{*}}}
 \newcommand{\concat}[2]{\M{ #1 +\!\!+\, #2}}
 \renewcommand{\P}{\M{^{\scalebox{0.8}{$\scriptstyle\prime$}}}}
@@ -69,8 +71,19 @@
 \newcommand{\nxt}{\M{\SPP;\SP}}
 \newcommand{\setmin}[2]{\M{#1\setminus #2}}
 \newcommand{\If}[3]{\M{\mathbf{if}\,\{ #1 \} \{ #2 \} \{ #3 \} }}
-\newcommand{\one}[2]{\M{\text{one}(#1,#2)}}
+\newcommand{\ONE}[2]{\M{\text{ONE}(#1,#2)}}
 \newcommand{\For}[3]{\M{\mathbf{for}\{ #1 \}\{ #2 \}( #3 )}}
+\renewcommand{\tuple}[1]{\M{\langle #1 \rangle}}
+\newcommand{\FOR}[3]{\M{\text{FOR}(#1,#2,#3)}}
+\newcommand{\IF}[4]{\M{\text{IF}(#1,#2,#3,#4)}}
+\newcommand{\Gen}{\M{\mathit{Gen}}}
+\newcommand{\Bod}{\M{\mathit{Bod}}}
+\newcommand{\Thens}{\M{\mathit{Thens}}}
+\newcommand{\Elses}{\M{\mathit{Elses}}}
+
+\newcommand{\EMPTY}[1]{\M{\text{EMPTY}(#1)}}
+\newcommand{\APPEND}[3]{\M{\text{APPEND}(#1,#2,#3)}}
+
 \begin{figure}
   $$
   \begin{array}{l} 
@@ -84,10 +97,9 @@
 \end{array}                                       \\ \\
 
 \\
-
+\textbf{Sematics}                                    \\
 \begin{array}{rcl}
  \E \op {}                  & : & \totfun {\Set\Ident} \Ws                                      \\
- \E \Noop \X                & = & \seq {\Envs\X}                                                \\
  \E {\exi\x} \X             & = & \seq{\Envs\X}                                                 \\
  \E {\x=\k} \X              & = & \seq{ \setcomp \rho {\pick\rho{\Envs\X}, \inrho\x=\k }}       \\
  \E {\x=\y} \X              & = & \seq{ \setcomp \rho {\pick\rho{\Envs\X}, \inrho\x=\inrho\y }} \\
@@ -105,16 +117,47 @@
  \E {\op \alt \opp} \X      & = & \concat{\E\op\X}{\E\opp\X}                                   \\
  \E \fail \X                & = & \seq{}                                                       \\
  \E {\scope\op}\X           & = & \seqcomp {\setmin\s\Y} {\pick \s{\E\op\Xp}}
-                                  \where  {\Y = \Exis\op} \and \Xp=\X\cup\Y                    \\
- \E {\If\op\opp\oppp}\X     & = & \seqcomp{\setmin{\s\cap\sp}\Y}{\pick\sp{\E\opp\Xp}}          \\
-                            &   & \cup                                                         \\
-                            &   & \seqcomp{\spp-(\setmin\s\Y)}{\pick\spp{\E\oppp\X}}           \\
-                            &   & \where{}                                                     \\
-                            &   & \s = \one\Y{\E\op\Xp} \and \Y=\Exis\op \and \Xp =\X\cup\Y    \\
- \E {\For\op\opp\x}\X       & = & 
+                                  \SPP\where  {\Y = \Exis\op} \and \Xp=\X\cup\Y                \\
+ \E {\If\op\opp\oppp}\X     & = & \IF\Y\s{\E\opp\Xp}{\E\opp\X}                                 \\
+                            &   & \where{\Y=\Exis\op \and \Xp =\X\cup\Y}                       \\
+                            &   & \SPP \s = \ONE\Y{\E\op\Xp}                                   \\
+ \E {\x=\For\op\opp\y}\X    & = & \seqcomp{ \setcomp {\setmin\rho{\{\y\}}}
+                                                     {\pick\rho\s \and \inrho\x=\inrho\y}}
+                                          { \pick\s{\FOR\y\Gen\Bod} }                            \\
+                            &   & \where{\ Y = \Exis\op  \and \Xp = \X \cup \Y}                \\
+                            &   & \Gen = \E\op\Xp                                              \\
+                            &   & \Bod=\seqcomp{\setcomp{\rho[\y\mapsto\tuple{\inrho\y]}}{\rho\in\s}}
+                                               {\pick\s{\E\opp{(\Xp\cup\{\y\})}}}
 \end{array}
 
 \\ \\
+
+\textbf{Auxiliaries}                                                                           \\
+\begin{array}{rcl}
+  \IF{\_}{\_}{\_}{\_} & : &  \totfun{\Set\Ident \times \Set\Env \times \Ws \times \Ws}{\Ws}    \\
+  \IF\Y\s\Thens\Elses & = &  \seqcomp { \setmin{(\s \cap \sp)}\Y} { \pick\sp\Thens }           \\
+                      &   &  \cup                                                              \\
+                      &   &  \seqcomp { \sp-(\setmin\s\Y) } { \pick\sp\Elses }                 \\\\
+  \ONE{\_}{\_}        & : & \totfun{\Set\Ident \times \Ws}{\Set\Env}                           \\
+  \ONE\X{\seq{}}      & = & \set{}                                                             \\
+  \ONE\X{\s:\S}       & = & \s \cup \setcomp\rho{\rho\in\ONE\X\S \and \forall\rhop\in\s.\SP
+                                                       (\setmin\rho\X)\not=(\setmin\rhop\X)}   \\
+                                                                                               \\
+  \EMPTY\y            & : &  \totfun\Ident\Ws                                                  \\
+  \EMPTY\y            & = &  \seq{ \setcomp{ \inrho\y=\tuple{} } { \pick\rho\Envs\X } }        \\
+                                                                                               \\
+  \APPEND{\_}{\_}{\_} & : &  \totfun{\Ident \times \Ws \times \Ws}\Ws                          \\
+  \APPEND\y\S\Sp      & = &  \seqcomp {
+                                  \setcomp{ \rho[\y\mapsto\concat{\inrho\y}{\rhop(\y)}] }
+                                          { \pick\rho\s \and \pick\rhop\sp \and
+                                            \setmin\rho\Y=\setmin\rhop\Y=\rho }
+                                   \\&& \SPP } { \pick\s\S \and \pick\sp\Sp }                  \\
+                      &   & \where{ \Y = \{\y\}}                                               \\
+                                                                                               \\
+  \FOR{\_}{\_}{\_}    & : &  \totfun{\Ident \times \Ws \times \Ws}\Ws                          \\
+  \FOR\y{[]}{\_}      & = &  \EMPTY\y                                                          \\
+  \FOR\y{\s:\S}\Sp    & = &  \APPEND\y { \IF\Y\s\Sp\EMPTY\y } { \FOR\y\S\Sp   }                \\
+\end{array}
 
 \\ \\
 
@@ -123,17 +166,13 @@
 \\
 
 \begin{array}{rcl}
- \F {\lamany \x\op\opp} {}       & : & \totfun \Env {\Set\Fun}                              \\
+ \F {\lam q \x\op\opp\y}{}  & : & \totfun \Env {\Set\Fun}                                      \\
 \end{array}
 
   \end{array}
   $$
 \caption{Idealised denotational semantics of Mini Verse (dps)}
 \end{figure}
-
-\renewcommand{\ss}{\M{ss}}
-\renewcommand{\S}{\M{S}}
-\renewcommand{\Sp}{\M{S\P}}
 
 \begin{figure}
   $$
@@ -151,12 +190,8 @@
   \setmin\s\X   & = & \setcomp{\setmin\rho\X}{\pick\rho\s}                                   \\
   \s-\sp        & : & \totfun{\Set\Env\times\Set\Env}\Set\Env                                \\
   \concat\S\Sp  & : & \totfun{\Ws\times\Ws}\Ws                                               \\
-  \Exis\op      & : & \Set\Ident                                                             \\
-  \one\X\S      & : & \totfun{\Set\Ident \times \Ws}{\Set\Env}                               \\
-  \one\X{\seq{}}& = & \set{}                                                                 \\
-  \one\X{\s:\ss}& = & \s \cup \setcomp\rho{\rho\in\one\X\ss \and \forall\rhop\in\s.\SP
-                                                       (\setmin\rho\X)\not=(\setmin\rhop\X)} \\
-  \end{array}
+  \Exis\op      & : & \Set\Ident                                                             \\ 
+ \end{array}
   \end{array}
   $$
 \caption{Auxilliaries}

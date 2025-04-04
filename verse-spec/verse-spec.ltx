@@ -1,17 +1,13 @@
-\documentclass[acmsmall,screen,review]{acmart}\settopmatter{}
-
+\documentclass[acmsmall,screen,review,9pt]{acmart}\settopmatter{}
 \let\Bbbk\relax      %% avoid LaTeX Error: Command `\Bbbk' already defined.
-
 %include lhs2TeX.fmt
 %include lhs2TeX.sty
 %include polycode.fmt
 %include forall.fmt
 %include ../LaTex/calculus.fmt
-
 % Boxed figures
 \floatstyle{boxed}
 \restylefloat{figure}
-
 \usepackage{../LaTex/quiver}
 \usepackage{framed}
 \usepackage{amssymb}
@@ -26,14 +22,9 @@
 \usepackage{tikz}
 \usepackage{multirow}
 \usepackage{makecell}
-
-% \renewcommand{\arraystretch}{1.1}
-
-% Useful Latex macros
 \input{../LaTex/verse-macros}
 
 \begin{document}
-
 \title{The Specification of Verse}
 \author{Tim, Jan, Andy S, Simon, Lennart, Koen, Ranjit \today}
 \maketitle
@@ -42,70 +33,68 @@
 
 \begin{itemize}
 \item {\bf Source Verse} is (an approximation of) the full source language.
-\item The \emph{superficial-desugar} pass desugars Source Verse into {\bf Essential Verse},
-  whose distinctive feature is TimLambdas.  Essential Verse is a subset of Source Verse.
-\item We have three different approaches to the denotational semantics of Essential Source Verse:
+\item The \emph{superficial-desugar} pass desugars Source Verse into
+  {\bf Essential Verse}, whose distinctive feature is TimLambdas.
+  Essential Verse is a subset of Source Verse.
+\item We have three different approaches to the denotational semantics
+  of Essential Source Verse:
   \begin{itemize}
-  \item Plan A: a direct denotational semantics.
-  \item Plan B: desugar into {\bf Destination Passing Style Verse} (DPS Verse), then give a semantics to that.
-  \item Plan C: desugar into {\bf Mini Verse}, still in expression style, and give a semantics to that.
-  \item Plan D: (older) desguar into {\bf ICFP Verse}, whose lambdas are simpler.
+  \item Plan A: a direct denotational semantics. (Not done)
+  \item Plan B: desugar into {\bf Destination Passing Style Verse}
+    (DpsVerse), then give a semantics to that.
+  \item Plan C: desugar into {\bf Mini Verse}, still in expression
+    style, and give a semantics to that.
   \end{itemize}
-
 \item The rewrite rules
-
 \item The verification rules
-
 \end{itemize}
 
 % -------------------------------------------------------------
 %               Source Verse
 % -------------------------------------------------------------
 
+\clearpage \newpage
 \section{Source Verse, Essential Verse, and superficial desugaring}
-
 \input{verse-source}
 
 % -------------------------------------------------------------
 %               Mini to Essential: wrapping
 % -------------------------------------------------------------
 
+\clearpage \newpage
 \section{Desugaring Essential Verse to Mini Verse: wrapping}
-
 \input{ess-to-mini}
 
 % -------------------------------------------------------------
 %               Desugar to Core
 % -------------------------------------------------------------
 
+\clearpage \newpage
 \section{Desugar Mini Verse to Core}
-
 \input{mini-to-core}
 
 % -------------------------------------------------------------
 %               Rewrite and verification rules
 % -------------------------------------------------------------
 
+\clearpage \newpage
 \section{Rewrite and verification rules: runtime and verification}
-
 \input{verse-rules}
-
 
 % -------------------------------------------------------------
 %               Denotational semantics: expression style
 % -------------------------------------------------------------
 
+\clearpage \newpage
 \section{Denotational semantics: expression style}
-
 \input{densem-expr-style}
-
 
 % -------------------------------------------------------------
 %               Denotational semantics: destination style
 % -------------------------------------------------------------
 
+\clearpage \newpage
 \section{Denotational semantics Plan B: destination passing style}
-
 \input{densem-dps-style}
  
 \end{document}
