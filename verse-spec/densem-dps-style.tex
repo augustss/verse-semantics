@@ -14,7 +14,7 @@
 \renewcommand{\ss}{\M{ss}}
 \renewcommand{\S}{\M{S}}
 \renewcommand{\Sp}{\M{S\P}}
-
+\newcommand{\U}{\M{\SPP\hat{\bigcup}\SPP}}
 \newcommand{\e}{\M{e}}
 \newcommand{\ep}{\M{\e\P}}
 \newcommand{\op}{\M{\mathit{op}}}
@@ -136,11 +136,11 @@
 \begin{array}{rcl}
   \IF{\_}{\_}{\_}{\_} & : &  \totfun{\Set\Ident \times \Set\Env \times \Ws \times \Ws}{\Ws}    \\
   \IF\Y\s\Thens\Elses & = &  \seqcomp { \setmin{(\s \cap \sp)}\Y} { \pick\sp\Thens }           \\
-                      &   &  \cup                                                              \\
+                      &   &  \U                                                              \\
                       &   &  \seqcomp { \sp-(\setmin\s\Y) } { \pick\sp\Elses }                 \\\\
   \ONE{\_}{\_}        & : & \totfun{\Set\Ident \times \Ws}{\Set\Env}                           \\
   \ONE\X{\seq{}}      & = & \set{}                                                             \\
-  \ONE\X{\s:\S}       & = & \s \cup \setcomp\rho{\rho\in\ONE\X\S \and \forall\rhop\in\s.\SP
+  \ONE\X{\s:\S}       & = & \s \U \setcomp\rho{\rho\in\ONE\X\S \and \forall\rhop\in\s.\SP
                                                        (\setmin\rho\X)\not=(\setmin\rhop\X)}   \\
                                                                                                \\
   \EMPTY\y            & : &  \totfun\Ident\Ws                                                  \\
@@ -182,8 +182,8 @@
   \Envs\X       & = & \text{For a set of identifers, }\X\text{, yield all environments }
                    \rho\text{ such that } \X= \dom(\rho)                                     \\
   \pairin\x\y\f & : & \totfun{\Val \times \Val\times(\parfun\Val\Val)}{Bool}                 \\
-  \S \cup \Sp   & : & \totfun{\Ws \times\, \Ws}\Ws                                          \\
-  \S \cup \Sp   & = & \seqcomp{ \s_i \cup \sp_i}{ \pick i{1\dots n} \and
+  \S \U \Sp   & : & \totfun{\Ws \times\, \Ws}\Ws                                          \\
+  \S \U \Sp   & = & \seqcomp{ \s_i \cup \sp_i}{ \pick i{1\dots n} \and
                                 \text{pad}(\S) = \seq{ \s_1 \dots \s_n } \and
                                 \text{pad}(\Sp) = \seq{ \sp_1 \dots \sp_n }}                 \\
   \setmin\s\X   & : & \totfun{\Ws \times\, \Set\Ident}\Ws                                    \\
