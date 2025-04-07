@@ -345,7 +345,7 @@ exp56c = App (Prim Ogt) (Tup [Var "x", Int 0])
 -- fun_c(x:int where y:= x>0){y}
 exp56 :: Example
 exp56 = Fun Closed (Def "x" cint `Where` Def "y" exp56c) (Var "y")
-      === "id123"
+      === "id12"
 
 -- fun_c(x:int){x>0}
 -- This function does not always succeed for its domain.
@@ -372,12 +372,12 @@ exp60 :: Example
 exp60 = exp59p `Seq` (App (Var "f") (Int 0) `Equ` Int 0)
       === "Wrong[]"
 
--- f := fun_c(:int){:int}; f = succ; f[0]
+-- f := fun_c(:int){:int}; f = succ; f[1]
 exp61 :: Example
 exp61 = Def "f" (Fun Closed cint cint) `Seq`
         Var "f" `Equ` Var "succ" `Seq`
-        App (Var "f") (Int 2)
-      === "3"
+        App (Var "f") (Int 1)
+      === "2"
 
 -- f := fun_o(0){1}; f = fun_o(1){2}; <f[0], f[1]>
 exp62 :: Example

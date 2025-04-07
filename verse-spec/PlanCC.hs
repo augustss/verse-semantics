@@ -464,8 +464,8 @@ allExps = [exp01, exp02, exp03, exp04,
            exp36, exp37, exp38, {- SLOW exp39,-} {- UNSURE exp40,-} {- UNSURE exp41,-} exp43, {- UNSURE exp44, -}
            exp45, exp46, exp47, exp48, {- UNSURE exp49, exp50, -}
            {- SLOW exp51, exp52, -}
-           exp53, {- DODGY circularity exp54,-}
-           exp55, exp56, exp57, {- SLOW exp58,-} exp59, exp60,
+           {- NOT CHECKED exp53,-} {- DODGY circularity exp54,-}
+           {- uses exp53 exp55,-} exp56, exp57, {- SLOW exp58,-} exp59, exp60,
            exp61, exp62, exp63
           ]
 

@@ -132,6 +132,7 @@ knownFcns =
     , ([(VInt 0, VTup [VInt 1, VInt 2])], "f0t12")
     , ([(x, VInt 0) | x <- allInts], "const0")
     , ([(VInt 0, VInt 1)], "succ0")
+    , ([(x, x) | x <- [VInt 1, VInt 2]], "id12")
     ]
   ]
 
