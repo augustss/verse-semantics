@@ -50,22 +50,22 @@ exp03 = Tup [Int 1, Int 2]
 -- add[<1,2>]
 exp04 :: Example
 exp04 = App (Prim Oadd) (Tup [Int 1, Int 2])
-      === "3"
+      === "0"
 
 -- x:=2; y:=1; add[(x,y)]
 exp1 :: Example
-exp1 = Def "x" (Int 2) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))
-     === "3"
+exp1 = Def "x" (Int 1) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x", Var "y"]))
+     === "2"
 
 -- fun_c(x:int){x}
 exp2 :: Example
 exp2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x")
-     === "int"
+     === "[int]"
 
 -- fun_o(x:int){x}
 exp3 :: Example
 exp3 = Fun Open (Def "x" (Colon (Var "int"))) (Var "x")
-     === "Wrong[comparable,int]"
+     === "Wrong[[int],[comparable]]"
 
 -- fun_c(x:int){add[(x,1)]}
 exp4 :: Example
@@ -73,8 +73,8 @@ exp4 = Fun Closed (Def "x" (Colon (Var "int"))) (App (Prim Oadd) (Tup [Var "x", 
      === "succ"
 
 exp5 :: Example
-exp5 = App (fst exp4) (Int 2)
-     === "3"
+exp5 = App (fst exp4) (Int 1)
+     === "2"
 
 exp6 :: Example
 exp6 = App (fst exp3) (Int 1)
@@ -157,18 +157,18 @@ exp21 :: Example
 exp21 = If (Int 1 `Equ` Int 3) (Int 2) (Int 0)
       === "0"
 
--- if (x:int){x}{999} = 3
+-- if (x:int){x}{0} = 1
 exp22 :: Example
-exp22 = If (Def "x" (Colon (Var "int"))) (Var "x") (Int 999) `Equ` Int 3
-      === "3"
+exp22 = If (Def "x" (Colon (Var "int"))) (Var "x") (Int 0) `Equ` Int 1
+      === "1"
 
 exp23 :: Example
 exp23 = All (Choice (Int 1) (Int 2))
       === "<1,2>"
 
 exp24 :: Example
-exp24 = All (Colon $ Tup [Int 2, Int 3])
-      === "<2,3>"
+exp24 = All (Colon $ Tup [Int 2, Int 1])
+      === "<2,1>"
 
 -- fun_c(x:=(0|1)){x}
 --  denotation id01LR = { [0->L0, 1->R1] }
@@ -202,6 +202,7 @@ exp30 :: Example
 exp30 = Fun Closed (Int 0) (Int 1 `Choice` Int 2)
       === "Wrong"
 
+-- WRONG?
 -- all{exp30[0]}
 exp31 :: Example
 exp31 = All (App (fst exp30) (Int 0))
@@ -238,10 +239,10 @@ exp37 :: Example
 exp37 = Fun Closed (Def "x" (Int 0 `Choice` Int 1 `Choice` Int 2)) (Var "x")
       === "[id0,id1,id2]"
 
--- fun_c(x:=3|1|0){x}
+-- fun_c(x:=2|1|0){x}
 exp38 :: Example
-exp38 = Fun Closed (Def "x" (Int 3 `Choice` Int 1 `Choice` Int 0)) (Var "x")
-      === "[id3,id1,id0]"
+exp38 = Fun Closed (Def "x" (Int 2 `Choice` Int 1 `Choice` Int 0)) (Var "x")
+      === "[id2,id1,id0]"
 
 -- fun_c(x:=0|1|2){x} = fun_c(x:=3|1|0){x}
 -- denotation {}  XXX Is this right???
@@ -249,14 +250,14 @@ exp39 :: Example
 exp39 = fst exp37 `Equ` fst exp38
       === "Wrong[]"
 
--- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(3|1|0)){x}
+-- fun_c(a:=0|1; x:=if(a=0)(0|1|2)else(2|1|0)){x}
 -- 0->L,LL0, 1->L,RL1, 2->L,R2, 3->R,LL3, 1->R,RL1, 0->R,R0
 -- XXX Is this right???
 exp40 :: Example
 exp40 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
                     Def "x" (If (Var "a" `Equ` Int 0)
                                 (Int 0 `Choice` Int 1 `Choice` Int 2)
-                                (Int 3 `Choice` Int 1 `Choice` Int 0)))
+                                (Int 2 `Choice` Int 1 `Choice` Int 0)))
                    (Var "x")
       === "Wrong[]"
 
@@ -274,7 +275,7 @@ exp41 = Fun Closed (Def "a" (Int 0 `Choice` Int 1) `Seq`
 -- x:=1|2; if(x=1){0|1}else{2|1|0}
 exp43 :: Example
 exp43 = Def "x" (Int 1 `Choice` Int 2) `Seq` If (Var "x" `Equ` Int 1) (Int 0 `Choice` Int 1) (Int 2 `Choice` Int 1 `Choice` Int 0)
-      === "XXX7"
+      === "Wrong[{0},{1},{2},{1},{0}]"
 
 exp44 :: Example
 exp44 = If (Var "x" `Equ` Int 1) (Int 0 `Choice` Int 1) (Int 2 `Choice` Int 1 `Choice` Int 0) `Seq` Def "x" (Int 1 `Choice` Int 2)
@@ -328,7 +329,7 @@ exp52 = Fun Closed (Def2 "x" "y" (Colon (Var "succ"))) (Var "y")
 
 exp53 :: Example
 exp53 = Fun Open (Def "x" cint) (Var "x")
-      === "Wrong[comparable,int]"
+      === "Wrong[int,comparable]"
 
 exp54 :: Example
 exp54 = Fun Closed (Int 0) (fst exp53)
@@ -384,3 +385,7 @@ exp62 = Def "f" (Fun Open (Int 0) (Int 1)) `Seq`
         Var "f" `Equ` (Fun Open (Int 1) (Int 2)) `Seq`
         Tup [App (Var "f") (Int 0), App (Var "f") (Int 1)]
       === "<1,2>"
+
+exp63 :: Example
+exp63 = All (Tup [ Int 0 `Choice` Int 1, Int 2 `Choice` Int 3 ])
+      === "<<0,2>,<0,3>,<1,2>,<1,3>>"

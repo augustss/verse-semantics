@@ -1,18 +1,159 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE MonadComprehensions #-}
-module EnvC where
-import qualified Data.Set as S
-import qualified Data.Map as M
-import Data.List
+module EnvC(
+  W, Ws, WS,
+  Env, lookupEnv, extendEnv, emptyEnv, toListEnv, fromListEnv,
+  rho0, allWs,
+  allWsL, allInts, allFcns,
+  dO,
+  maxVInt, vadd,
+  mkFcn, mkVFcn, noFcn,
+  ) where
+import Data.Array
+import Data.List hiding (intersect)
 import Data.Maybe
-import ValC
 import Exp
+import qualified Map as M
+import qualified Data.Map as DM
+import GHC.Stack
 import SetX
+import ValC
+
+type W = Val
+type Ws = SetX W
+type WS = [Ws]
+
+--------------------
+
+maxVInt :: Integer
+maxVInt = 3
+
+vadd :: Val -> Val -> Val
+vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
+vadd _ _ = undefined
+
+--------------------
+---- Primitive functions
+
+dO :: Op -> W
+dO Oint = vFcn $ mkFcn [ (x, x) | x <- allInts ]
+dO Ogt  = vFcn $ mkFcn [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y ]
+-- add is a single function, not many as in the doc.
+dO Oadd = vFcn $ mkFcn [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
+
+--------------------
+---- Functions
+
+mkVFcn :: MappingV -> Val
+mkVFcn = vFcn . mkFcn
+
+allFcns :: [Fcn]
+allFcns = setNos $ intFcns ++ pairFcns ++ hoFcns ++ extraFcns
+
+allFcnsA :: Array Int Fcn
+allFcnsA = array (0, length allFcns - 1) [ (n, f) | f@(Fcn n _ _) <- allFcns ]
+
+allFcnsM :: DM.Map Mapping Fcn
+allFcnsM = DM.fromList [ (xys, f) | f@(Fcn _ _ xys) <- allFcns ]
+
+mkFcn :: HasCallStack => MappingV -> Fcn
+mkFcn xys =
+  let xys' = mkMapping xys in
+  case DM.lookup xys' allFcnsM of
+    Nothing -> error $ "Function not in allFcns: " ++ showMapping' xys'
+    Just f  -> f
+
+noFcn :: Int -> Fcn
+noFcn i = allFcnsA ! i
+
+(↦) :: a -> b -> (a, b)
+(↦) = (,)
+
+-- Generate all function with the given domain
+-- and a subset of the range.
+-- mkAllFcn [0,1,2] [2,3] =
+--  [ Fcn [(0, 2), (1, 2), (2, 2)]
+--  , Fcn [(0, 2), (1, 2), (2, 3)]
+--  , Fcn [(0, 2), (1, 3), (2, 2)]
+--  , Fcn [(0, 2), (1, 3), (2, 3)]
+--  , Fcn [(0, 3), (1, 2), (2, 2)]
+--  , Fcn [(0, 3), (1, 2), (2, 3)]
+--  , Fcn [(0, 3), (1, 3), (2, 2)]
+--  , Fcn [(0, 3), (1, 3), (2, 3)]
+--  ]
+mkDomRng :: [Val] -> [Val] -> [Mapping]
+mkDomRng fdom frng =
+  let rs = sequence $ replicate (length fdom) frng
+      fs = map (zip fdom) rs
+  in  map mkMapping fs
+
+intFcns :: [Mapping]
+intFcns =
+  let ss = subsequences allInts
+      fs = concat [ mkDomRng d allInts | d <- ss ]
+  in  fs
+
+pairFcns :: [Mapping]
+pairFcns = intToPairFcns ++ pairToIntFcns
+
+pairToIntFcns :: [Mapping]
+pairToIntFcns = -- [ mkMapping [(VTup [x,y], z) | x <- allInts, y <- allInts ] | z <- allInts ]
+  [ mkMapping madd ]  -- just one for now
+
+madd :: MappingV
+madd = [ (VTup [x,y], vadd x y) | x <- allInts, y <- allInts ]
+
+intToPairFcns :: [Mapping]
+intToPairFcns = [ mkMapping [(z, VTup [x,y])] | x <- allInts, y <- allInts, z <- allInts ]
+
+hoFcns :: [Mapping]
+hoFcns = hos
+
+-- Set name field for some known functions
+setNos :: [Mapping] -> [Fcn]
+setNos = zipWith set [0..]
+  where set i m = Fcn i (lookup m knownFcns) m
+
+knownFcns :: [(Mapping, String)]
+knownFcns =
+  [ (mkMapping m, s) | (m, s) <-
+    [ (mint, "int")
+    , (madd, "add")
+    , (mcomparable, "comparable")
+    , (msucc, "succ")
+    , (mpred, "pred")
+    , (mgt, "gt")
+    , (mho1, "ho1")
+    , (mho2, "ho2")
+    , (mho3, "ho3")
+    , ([(VInt 0, VInt 0)], "id0")
+    , ([(VInt 1, VInt 1)], "id1")
+    , ([(VInt 2, VInt 2)], "id2")
+    , ([(VInt 0, VTup [VInt 1, VInt 2])], "f0t12")
+    , ([(x, VInt 0) | x <- allInts], "const0")
+    , ([(VInt 0, VInt 1)], "succ0")
+    ]
+  ]
+
+type MappingV = [(Val, Val)]
+
+emptym :: MappingV
+emptym = []
+
+mint :: MappingV
+mint = [ (x, x) | x <- allInts ]
+
+msucc :: MappingV
+msucc = [ (x, vadd x (VInt 1)) | x <- allInts ]
+
+mpred :: MappingV
+mpred = [ (x, vadd x (last allInts)) | x <- allInts ]
+
+mgt :: MappingV
+mgt = [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y ]
 
 --------------------
 ---- Environment
-
-type W = Val
-type WS = SetX W
 
 newtype Env = Env { unEnv :: M.Map Ident Val }
   deriving (Eq, Ord)
@@ -24,18 +165,24 @@ instance Show Env where
 lookupEnv :: Ident -> Env -> W
 lookupEnv x rho = fromMaybe (error $ "lookupEnv: undefined " ++ show (x, rho)) $ M.lookup x $ unEnv rho
 
-extend :: Env -> Ident -> W -> Env
-extend rho i w = Env $ M.insert i w $ unEnv rho
+extendEnv :: Env -> Ident -> W -> Env
+extendEnv rho i w = Env $ M.insert i w $ unEnv rho
 
 -- Initial environment
 rho0 :: Env
-rho0 = Env $ M.fromList $
+rho0 = fromListEnv $
   [ (n, dO o) | (n, o) <- [("int", Oint), ("gt", Ogt), ("add", Oadd) ] ] ++
-  [ ("succ", vFcn fsucc), ("pred", vFcn fpred) ] ++
-  [ ("false", VTup []) ]
+  [ ("succ", mkVFcn msucc), ("pred", mkVFcn mpred) ] ++
+  [ ("false", mkVFcn emptym) ]
 
 emptyEnv :: Env
 emptyEnv = Env M.empty
+
+toListEnv :: Env -> [(String, Val)]
+toListEnv (Env m) = M.toList m
+
+fromListEnv :: [(String, Val)] -> Env
+fromListEnv = Env . M.fromList
 
 --------------------
 ---- "Universal" set of values
@@ -45,87 +192,155 @@ emptyEnv = Env M.empty
 allInts :: [Val]
 allInts = [ VInt i | i <- [0 .. maxVInt - 1] ]
 
-allWs :: WS
-allWs = mkSet allWsL
+allTuples :: [Val]
+allTuples = [VTup [x, y] | x <- allInts, y <- allInts]
+
+allChoice2IntFcns :: [Val]
+allChoice2IntFcns = map VFcn $ pick2 intVFcns
+  where pick2 fs = [ [f1, f2]
+                   | f1 <- fs
+                   , let d1 = domFcn f1
+                   , not (isEmpty d1)
+                   , f2 <- fs
+                   , let d2 = domFcn f2
+                   , not (isEmpty d2)
+                   , isEmpty (d1 `intersect` d2)
+                   ]
+        intVFcns = filter intDom allFcns
+        intDom f = domFcn f `isSubsetOf` mkSet allInts
+
+allWs :: Ws
+allWs = mkSetUnsafe allWsL
+
 allWsL :: [W]
 allWsL =
-  nonFcn ++
-  [ dO o | o <- [Oint, Ogt, Oadd] ] ++
-  map vFcn [ id0, fid1, id2, id3, id01, f01, const0, const1, const2, const3, fsucc, -- succMod3,
-             fsuccsucc, fpred, succ0, comp, ho1, ho2, ho3, ho4, ho5, ho6, ho7, id123, f0t12 ]
-  where
-    nonFcn =
-      allInts ++
-      [VTup [x, y] | x <- allInts, y <- allInts]
-      --[VTup [VInt 2, VInt 1], VTup [VInt 1, VInt 2]]
-    id0 = mkFcn "id0" [(VInt 0, VInt 0)]
-    id2 = mkFcn "id2" [(VInt 2, VInt 2)]
-    id3 = mkFcn "id3" [(VInt 3, VInt 3)]
-    id01 = mkFcn "id01" [(VInt 0, VInt 0), (VInt 1, VInt 1)]
-    id123 = mkFcn "id123" [(VInt 1, VInt 1), (VInt 2, VInt 2), (VInt 3, VInt 3)]
-    f01 = mkFcn "f01" [(VInt 0, VInt 0), (VInt 1, VInt 2)]
-    const0 = mkFcn "const0" [(x, VInt 0) | x <- allInts]
-    const1 = mkFcn "const1" [(x, VInt 1) | x <- allInts]
-    const2 = mkFcn "const2" [(x, VInt 2) | x <- allInts]
-    const3 = mkFcn "const3" [(x, VInt 3) | x <- allInts]
-    succ0 = mkFcn "succ0" [(VInt 0, VInt 1)]
-    comp = mkFcn "comparable" [(w, w) | w <- nonFcn ]
-    -- The function that accepts f:int->int as an argument and returns f[1]
-    ho1 = mkFcn "ho1" [(vFcn fsucc, VInt 2), (vFcn fpred, VInt 0), (vFcn fint, VInt 1),
-                       (vFcn fsuccsucc, VInt 3), --(vFcn comp, VInt 1),
-                       (vFcn const0, VInt 0), (vFcn const1, VInt 1), (vFcn const2, VInt 2), (vFcn const3, VInt 3)
-                      ]
-    ho2 = mkFcn "ho2" [(vFcn fsucc, VInt 3), (vFcn fpred, VInt 1), (vFcn fint, VInt 2),
-                       (vFcn fsuccsucc, VInt 0), --(vFcn comp, VInt 2),
-                       (vFcn const0, VInt 0), (vFcn const1, VInt 1), (vFcn const2, VInt 2), (vFcn const3, VInt 3)
-                      ]
-    ho3 = mkFcn "ho3" [(vFcn fsucc, VInt 3), (vFcn fpred, VInt 1), (vFcn fint, VInt 2),
-                       (vFcn fsuccsucc, VInt 0), --(vFcn comp, VInt 2),
-                       (vFcn const0, VInt 1), (vFcn const1, VInt 2), (vFcn const2, VInt 3), (vFcn const3, VInt 0)
-                      ]
-    ho4 = mkFcn "ho4" $ [(vFcn fsucc, VInt 2), (vFcn succ0, VInt 2), (vFcn const1, VInt 2)]
-                      ++ [ (VTup [VInt 1,i], VInt 2) | i <- allInts ]
-    ho5 = mkFcn "ho5" [(vFcn succ0, VInt 2)]
-    ho6 = mkFcn "ho6" [(VInt 0, vFcn fint)]
-    ho7 = mkFcn "ho7" [(VInt 0, vFcn comp)]
-    f0t12 = mkFcn "f0t12" [(VInt 0, VTup [VInt 1, VInt 2])]
-    succMod3 = mkFcn "succMod3" [(VInt 0, VInt 1),
-                                 (VInt 1, VInt 2),
-                                 (VInt 2, VInt 0),
-                                 (VInt 3, VInt 1)]
-{-
-    gt0 = mkFcn "gt0" [(VTup [VInt 1, VInt 0], VInt 1),
-                       (VTup [VInt 2, VInt 0], VInt 2),
-                       (VTup [VInt 3, VInt 0], VInt 3)]
--}
+  let
+    nonFcn = allInts ++ allTuples
+  in nonFcn ++ map vFcn allFcns ++ allChoice2IntFcns
 
-allFcns :: [Fcn]
-allFcns = [ f | VFcn [f] <- allWsL ]
+--------------
 
-fid1 :: Fcn
-fid1 = mkFcn "id1" [(VInt 1, VInt 1)]
+extraFcns :: [Mapping]
+extraFcns = map mkMapping [mcomparable, mgt]
 
-fint :: Fcn
-fint = mkFcn "int" [(x, x) | x <- allInts ]
+-- Some function to make 'int' less lonely
+mcomparable :: MappingV
+mcomparable = [ (x, x) | x <- allInts ++ allTuples ]
 
-fsucc :: Fcn
-fsucc = mkFcn "succ" [(x, vadd x (VInt 1)) | x <- allInts ]
+--------------
 
-fsuccsucc :: Fcn
-fsuccsucc = mkFcn "succsucc" [(x, vadd x (VInt 2)) | x <- allInts ]
 
-fpred :: Fcn
-fpred = mkFcn "pred" [(x, vadd x (VInt 3)) | x <- allInts ]
+hos :: [Mapping]
+hos = map mkMapping $
+ [ [ F[noFcn 2{-={0↦1}-}] ↦ VInt 2 ]           -- fun_c(fun_c(0){1}){2}
+ , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2 ]
+ , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2
+   , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 2
+   , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 2
+   , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 2
+   ]
+ , mho1
+ , mho2
+ , mho3
+ , mho6
+ ]
 
-getW :: String -> W
-getW s = ([ w | w <- allWsL, show w == s ] ++ [error $ "undefined " ++ s]) !! 0
+-- fun_c(fun_c(:int){:int}){f[1]}
+mho1 :: MappingV
+mho1 =
+   [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 0
+   , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 0
+   , F[noFcn 40{-={0↦0,1↦1,2↦0}-}] ↦ VInt 1
+   , F[noFcn 41{-={0↦0,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 42{-={0↦0,1↦1,2↦2}-}] ↦ VInt 1
+   , F[noFcn 43{-={0↦0,1↦2,2↦0}-}] ↦ VInt 2
+   , F[noFcn 44{-={0↦0,1↦2,2↦1}-}] ↦ VInt 2
+   , F[noFcn 45{-={0↦0,1↦2,2↦2}-}] ↦ VInt 2
+   , F[noFcn 46{-={0↦1,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 47{-={0↦1,1↦0,2↦1}-}] ↦ VInt 0
+   , F[noFcn 48{-={0↦1,1↦0,2↦2}-}] ↦ VInt 0
+   , F[noFcn 49{-={0↦1,1↦1,2↦0}-}] ↦ VInt 1
+   , F[noFcn 50{-={0↦1,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 51{-={0↦1,1↦1,2↦2}-}] ↦ VInt 1
+   , F[noFcn 52{-={0↦1,1↦2,2↦0}-}] ↦ VInt 2
+   , F[noFcn 53{-={0↦1,1↦2,2↦1}-}] ↦ VInt 2
+   , F[noFcn 54{-={0↦1,1↦2,2↦2}-}] ↦ VInt 2
+   , F[noFcn 55{-={0↦2,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 56{-={0↦2,1↦0,2↦1}-}] ↦ VInt 0
+   , F[noFcn 57{-={0↦2,1↦0,2↦2}-}] ↦ VInt 0
+   , F[noFcn 58{-={0↦2,1↦1,2↦0}-}] ↦ VInt 1
+   , F[noFcn 59{-={0↦2,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 60{-={0↦2,1↦1,2↦2}-}] ↦ VInt 1
+   , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 2
+   , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 2
+   , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 2
+   ]
 
---------------------
----- Primitive functions
+-- XXX check if this is correct
+-- fun_c(fun_c(:succ){:int}){f[1]}
+mho2 :: MappingV
+mho2 = 
+   [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 2
+   , F[noFcn 40{-={0↦0,1↦1,2↦0}-}] ↦ VInt 0
+   , F[noFcn 41{-={0↦0,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 42{-={0↦0,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 43{-={0↦0,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 44{-={0↦0,1↦2,2↦1}-}] ↦ VInt 1
+   , F[noFcn 45{-={0↦0,1↦2,2↦2}-}] ↦ VInt 2
+   , F[noFcn 46{-={0↦1,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 47{-={0↦1,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 48{-={0↦1,1↦0,2↦2}-}] ↦ VInt 2
+   , F[noFcn 49{-={0↦1,1↦1,2↦0}-}] ↦ VInt 0
+   , F[noFcn 50{-={0↦1,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 51{-={0↦1,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 52{-={0↦1,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 53{-={0↦1,1↦2,2↦1}-}] ↦ VInt 1
+   , F[noFcn 54{-={0↦1,1↦2,2↦2}-}] ↦ VInt 2
+   , F[noFcn 55{-={0↦2,1↦0,2↦0}-}] ↦ VInt 0
+   , F[noFcn 56{-={0↦2,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 57{-={0↦2,1↦0,2↦2}-}] ↦ VInt 2
+   , F[noFcn 58{-={0↦2,1↦1,2↦0}-}] ↦ VInt 0
+   , F[noFcn 59{-={0↦2,1↦1,2↦1}-}] ↦ VInt 1
+   , F[noFcn 60{-={0↦2,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 1
+   , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 2
+   ]
 
-dO :: Op -> W
-dO Oint = vFcn $ mkFcn "int" [ (x, x) | x <- allInts ]
-dO Ogt  = vFcn $ mkFcn "gt"  [ (VTup [x, y], x) | x <- allInts, y <- allInts, x > y]
--- add is a single function, not many as in the doc.
-dO Oadd = vFcn $ mkFcn "add" [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
+mho3 :: MappingV
+mho3 = 
+   [ F[noFcn 37{-={0↦0,1↦0,2↦0}-}] ↦ VInt 1
+   , F[noFcn 38{-={0↦0,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 39{-={0↦0,1↦0,2↦2}-}] ↦ VInt 1
+   , F[noFcn 40{-={0↦0,1↦1,2↦0}-}] ↦ VInt 2
+   , F[noFcn 41{-={0↦0,1↦1,2↦1}-}] ↦ VInt 2
+   , F[noFcn 42{-={0↦0,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 43{-={0↦0,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 44{-={0↦0,1↦2,2↦1}-}] ↦ VInt 0
+   , F[noFcn 45{-={0↦0,1↦2,2↦2}-}] ↦ VInt 0
+   , F[noFcn 46{-={0↦1,1↦0,2↦0}-}] ↦ VInt 1
+   , F[noFcn 47{-={0↦1,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 48{-={0↦1,1↦0,2↦2}-}] ↦ VInt 1
+   , F[noFcn 49{-={0↦1,1↦1,2↦0}-}] ↦ VInt 2
+   , F[noFcn 50{-={0↦1,1↦1,2↦1}-}] ↦ VInt 2
+   , F[noFcn 51{-={0↦1,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 52{-={0↦1,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 53{-={0↦1,1↦2,2↦1}-}] ↦ VInt 0
+   , F[noFcn 54{-={0↦1,1↦2,2↦2}-}] ↦ VInt 0
+   , F[noFcn 55{-={0↦2,1↦0,2↦0}-}] ↦ VInt 1
+   , F[noFcn 56{-={0↦2,1↦0,2↦1}-}] ↦ VInt 1
+   , F[noFcn 57{-={0↦2,1↦0,2↦2}-}] ↦ VInt 1
+   , F[noFcn 58{-={0↦2,1↦1,2↦0}-}] ↦ VInt 2
+   , F[noFcn 59{-={0↦2,1↦1,2↦1}-}] ↦ VInt 2
+   , F[noFcn 60{-={0↦2,1↦1,2↦2}-}] ↦ VInt 2
+   , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 0
+   , F[noFcn 62{-={0↦2,1↦2,2↦1}-}] ↦ VInt 0
+   , F[noFcn 63{-={0↦2,1↦2,2↦2}-}] ↦ VInt 0
+   ]
+
+mho6 :: MappingV
+mho6 = [VInt 0 ↦ F[noFcn 42{-={0↦0,1↦1,2↦2}-}]]
 

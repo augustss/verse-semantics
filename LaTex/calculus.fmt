@@ -256,6 +256,7 @@
 %format choice = "\rule[-0.1em]{0.15em}{0.75em}"
 %% 1mm is about 0.3em with the current font
 %format `choice` = "\hspace{0.19em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}"
+%format `uchoice` = "||"
 
 %% New version: tall | for BNF, fat | for choice
 %%format vbar = "\mathop{\bigm|}"
@@ -320,11 +321,11 @@
 %format iterKW = "\textbf{iter}"
 
 %format tuple = "\textbf{tup}"
-%format typex (x) = typeKW "\{" x "\}"
-%format truth t = "\textbf{truth}\{" t "\}"
-%format all (x) = allKW "\{" x "\}"
+%format (typex (x)) = typeKW "\{" x "\}"
+%format (truth t) = "\textbf{truth}\{" t "\}"
+%format (all (x)) = allKW "\{" x "\}"
 %format all2 (r) (x) = allKW "("r")\{" x "\}"
-%format one (x) = "\textbf{one}\{" x "\}"
+%format (one (x)) = "\textbf{one}\{" x "\}"
 %format one2 (r) (x) = oneKW "("r")\{" x "\}"
 
 
@@ -652,6 +653,8 @@
 %format t_kp1 = "t_{k+1}"
 
 %format rs = "R"
+%format rs_1
+%format rs_2
 %format r_0
 %format r_1
 %format r_2
@@ -659,6 +662,8 @@
 %format r_n
 
 %format as = "A"
+%format as_1
+%format as_2
 
 %format E_1
 %format V_1

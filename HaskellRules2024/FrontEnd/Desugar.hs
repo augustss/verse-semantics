@@ -169,7 +169,7 @@ sDesugarExpr = ds
     ds (Blk es)       = ds $ eSeq es
     ds e@(DefineV {}) = pure e
 
-    ds (Seq es) = eSeq <$> mapM ds es
+    ds (Seq e1 e2)        = mkSeq <$> ds e1 <*> ds e2
     ds (OfType e1 eff e2) = OfType <$> ds e1 <*> pure eff <*> ds e2
 
     -- Operators
@@ -186,7 +186,7 @@ sDesugarExpr = ds
 
     -- Infix ops
     ds (InfixOp e1 (Op "|") e2)     = Choice <$> ds e1 <*> ds e2
-    ds (InfixOp e1 (Op "and") e2)   = ds $ Seq [e1, e2]                  -- XXX multiplicity?
+    ds (InfixOp e1 (Op "and") e2)   = ds $ mkSeq e1 e2                   -- XXX multiplicity?
     --ds (InfixOp e1 (Op "and") e2) = ds $ If3 e1 (If2E e2 Fail) Fail    -- XXX binding
     ds (InfixOp e1 (Op "or") e2)    = ds $ If2E e1 $ If2E e2 Fail
     ds (InfixOp e1 (Ident l op) e2) = ds =<< call In l op (Array [e1, e2])
@@ -228,8 +228,7 @@ sDesugarExpr = ds
     ds (Macro2 (Ident _ "first") e1 e2) = ds $ If3 e1 e2 Fail
 
     -- type{t}  ==  Fun(x := t)<closed>{x}
-    ds (Macro1 (Ident _ "type") _ e)
-      = do { e' <- ds e; return (Type e') }
+    ds (Macro1 (Ident _ "type") _ e) = do { e' <- ds e; encodeType e' }
 
     -- I want to desugar Exists to DefineV; but to do that I need to make up
     -- fresh identifiers (easy) and substitute the fresh one for the old one
@@ -245,8 +244,8 @@ sDesugarExpr = ds
       i <- Variable <$> newIdent loc "i"
       a <- Variable <$> newIdent loc "a"
       ds $ ApplyD (eMkMap loc) $
-                  For2 (Seq [InfixOp f (Ident loc ":") (Array es),
-                             InfixOp (InfixOp i (Ident loc "->") a) (Ident loc ":") f])
+                  For2 (mkSeq (InfixOp f (Ident loc ":") (Array es))
+                              (InfixOp (InfixOp i (Ident loc "->") a) (Ident loc ":") f))
                        (Array [i, a])
 
     ds e@(EffAttr {}) = errorMessage (showWithHerald "Unexpected effects" (pPrint e))
@@ -254,6 +253,14 @@ sDesugarExpr = ds
     ds e = compos ds e    -- Core expressions like Lit, Variable,
                           -- DefineE, Unify, EPrim, etc
 
+encodeType :: SrcEssential -> DsM SrcEssential
+ -- Encodes type{e}, returning  fun(x:=e}{x}
+ -- You might think that a more direct desugaring would be
+--      type{t} --> \x. x=t
+-- using a ICFP lambda.
+-- But it is a wrong desugaring. e.g   type{_(:int):int}  test "HO15"
+encodeType e = do { x <- newIdent noLoc "x"
+                  ; return (Function Closed (eDefine x e) effSucceeds (Variable x)) }
 
 --------------------------------------
 -- Patterns
@@ -333,9 +340,7 @@ eDefine :: HasCallStack => Ident -> SrcEssential -> SrcEssential
 eDefine x _ | isSrcUnderscore x = error "eDefine got '_'"
 -- x := (e1; ...; en)   generates   e1; ... e(n-1); x:=en
 -- Smart contructor, floats out nested defines
-eDefine x (Seq ts) = eSeq (floats ++ [eDefine x rhs])
-                   where
-                     (floats, rhs) = unSeq ts
+eDefine x (Seq e1 e2) = mkSeq e1 (eDefine x e2)
 eDefine x rhs = DefineE x rhs
 
 --------------------------------------------------------
@@ -452,7 +457,7 @@ _addDeref = pure . exprD S.empty
     expr s e@(Variable i) | i `S.member` s = applyPrimD "read$" e
                           | otherwise = e
     expr s (Array es) = Array $ map (expr s) es
-    expr s (Seq es) = Seq $ map (expr s) es
+    expr s (Seq    e1 e2) = Seq    (expr s e1) (expr s e2)
     expr s (ApplyS e1 e2) = ApplyS (expr s e1) (expr s e2)
     expr s (ApplyD e1 e2) = ApplyD (expr s e1) (expr s e2)
     expr s (If3 e1 e2 e3) = If3 (expr s' e1) (expr s' e2) (exprD s e3)
@@ -692,7 +697,7 @@ essToMini orig_e = go_expr orig_e
     go :: WContext -> SrcEssential -> DsM SrcMini
     -- Typically (go kap t) = e, where `kap::(Input,[Eff])` is short for `kappa`
 
-    -- Simple cases: WCONST, WVAR, WPRIM, WFAIL, WSEQ, WSUNIFY, WCHOICE, WSEMI
+    -- Simple cases: WCONST, WVAR, WPRIM, WFAIL, WSEQ, WSUNIFY, WCHOICE
     go kap e@(Lit {})      = kap `ueq` return e
     go kap e@(Variable v)
        | isSrcUnderscore v = case wc_inp kap of
@@ -702,21 +707,23 @@ essToMini orig_e = go_expr orig_e
     go kap e@(EPrim {})    = kap `ueq` return e
     go _kp Fail            = return Fail
     go kap (Unify  e1 e2)  = eUnify  <$> go kap e1 <*> go kap e2
+    go kap (Choice e1 e2)  = Choice  <$> go kap e1 <*> go kap e2
     go kap (Where t1 t2)   = do { (dr, r) <- defineDE "r" (go kap t1)
                                 ; e2 <- go_expr t2
                                 ; return (eSeq [dr, e2, r]) }
-    go kap (Seq ts_seq)    = do { let (ts,t) = unSeq ts_seq
-                                ; es <- mapM (go (kap { wc_inp = NoInput })) ts
-                                        -- Push ambient effects into both sides
-                                ; e  <- go kap t
-                                ; return (eSeq (es ++ [e])) }
 
-    -- WIF, WFOR, WALL, WONE: If, for, all
+    -- Sequential composition: WSEMI
+    go kap (Seq t1 t2)     = do { e1 <- go_expr t1 -- NB: t1 gets no effects at all
+                                ; e2 <- go kap t2
+                                ; return (mkSeq e1 e2) }
+
+    -- if, for, all one: WIF, WFOR, WALL, WONE
     go kap (If3 t1 t2 t3) = If3  <$> go_expr t1 <*> go kap t2 <*> go kap t3
     go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go kap t2)
     go kap (All t)        = kap `ueq` (All    <$> go_expr t)
     go kap (One t)        = kap `ueq` (One    <$> go_expr t)
-    go kap (Choice e1 e2) = kap `ueq` (Choice <$> go_expr e1 <*> go_expr e2)
+
+    -- Application: WAPP
     go kap (ApplyD t1 t2) = kap `ueq` (ApplyD <$> go_expr t1 <*> go_expr t2)
 
     -- WEXISTS (exists x);  WDEF (x:=t)
@@ -759,17 +766,18 @@ essToMini orig_e = go_expr orig_e
     -- Arrays: <t1, .., tn>.  Need to take care of splices
     go kap (Splice t) = go kap t
 
+    -- Arrays: WTUP1 and WTUP2
     go kap@(WC { wc_inp = inp }) (Array ts)
       = case inp of
-          NoInput -> do { es <- mapM do_one ts
-                        ; mkArray es }
+          NoInput -> -- WTUP1
+                     do { es <- mapM do_one ts; mkArray es }
                    where
                      do_one (Splice t) = Splice <$> go kap t
                      do_one t          =            go kap t
 
           PI i | null ts   -- Optimisation: instead of (i=<>; <>), just generate (i=<>)
                -> pure (eUnify i (Array []))
-               | otherwise
+               | otherwise     -- WTUP2
                -> do { prs <- mapM do_one ts
                      ; let (exi_js, es) = unzip prs
                      ; exi_js_arr <- mkArray exi_js
@@ -784,22 +792,13 @@ essToMini orig_e = go_expr orig_e
                                        ; e <- go (kap { wc_inp = PI (Variable j) }) t
                                        ; pure (DefineV j, e) }
 
-    -- Truth
+    -- truth{t}: WTRU1 and WTRU2
     go kap@(WC { wc_inp = inp }) (Truth t)
       = case inp of
           NoInput -> Truth <$> go (kap { wc_inp = NoInput }) t
           PI i -> do { j <- newIdent (getLoc t) "j"
                      ; e <- go (kap { wc_inp = PI (Variable j) }) t
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
-
-    -- Functions: WTYPE1, WTYPE2
-    go (WC { wc_inp = inp }) (Type t)
-      = do { i <- newIdent (getLoc t) "i"
-           ; let inp' = case inp of
-                           NoInput -> PI (Variable i)
-                           PI f    -> PI (ApplyD f (Variable i))
-           ; e <- go (WC { wc_inp = inp', wc_fxs = DomCtxt }) t
-           ; return (Lam i e) }
 
     -- Functions: WFUN1, WFUN2
     go (WC { wc_inp = inp }) (Function aperture t1 fxs1 t2)
@@ -814,8 +813,10 @@ essToMini orig_e = go_expr orig_e
                            kap_body = WC { wc_inp = PI (ApplyD f (Variable x)), wc_fxs = RngCtxt fxs1 }
                      ; e1 <- go kap_arg  t1
                      ; e2 <- go kap_body t2
-                     ; return (XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
-                                                (eCheck fxs1 e2)) }
+                     ; return (eSeq [ ApplyD (EPrim IsFun) f
+                                    , XDLam aperture i (eSeq [DefineV x, eUnify (Variable x) e1])
+                                                       (eCheck fxs1 e2) ]) }
+                                      -- IsFun[f]: see test M26Mar25-5
 
     -- Core constructs used (only) in the Prelude
     -- Only used in the NoInput case
@@ -875,10 +876,7 @@ miniToCore orig_md = go (orig_md,[])
     -- MTUP, MTRUTH, MSEMI, MEQ, MCHOICE, MAPP
     go md (Array es)     = Array <$> mapM (go_nt md) es
     go md (Truth e)      = Truth <$> go md e
-    go md (Seq es_seq)   = do { let (es,e) = unSeq es_seq
-                              ; es' <- mapM (go_nt md) es
-                              ; e'  <- go md e
-                              ; return (eSeq (es' ++ [e'])) }
+    go md (Seq e1 e2)    = mkSeq  <$> go_nt md e1 <*> go md e2
     go md (Unify e1 e2)  = eUnify <$> go_nt md e1 <*> go_nt md e2
     go md (ApplyD e1 e2) = ApplyD <$> go_nt md e1 <*> go_nt md e2
     go md (Choice e1 e2) = Choice <$> go md    e1 <*> go md    e2
@@ -923,9 +921,17 @@ miniToCore orig_md = go (orig_md,[])
     go md@(m,_) (Check fx e)
       = case m of
            MV {} -> Check fx <$> go_nt md e   -- ToDo: check that go_mt
-           MI    -> go md e
+
+           MI    -> go md e  -- No Check here: needed for tests
+                             -- M19Mar25-2, M20Dec24-1, S1Aug24-3, T29Jul24-3
+                             -- Transparent functions act like "macros"
+
            MX    -> Check fx <$> go md e
-                 -- go md e  -- Drop the check here; see MaxVerse9, Feb 12.
+                    -- For consistency, we want no Check here either
+                    -- Again, transparent functions act like "macros"
+                    -- But if we remove the Check:
+                    --    S1Aug24-4, Ev23, EV23a start passing
+                    --    For6, check2, check7 start failing
 
     -- Functions proper: MCFUN+, MCFUN-, MCFUNX
     go (MV omit_client, xs) e@(XDLam Closed x e1 e2)
@@ -938,7 +944,7 @@ miniToCore orig_md = go (orig_md,[])
            ; return (eSeq [ever, efun]) }
       where
         omit_verify = shortCutDefnVerify e1 e2
-        do_verify = do { e1' <- go (MI,       x:xs) e1
+        do_verify = do { e1' <- go (MI,      x:xs) e1
                        ; e2' <- go (MV True, x:xs) e2
                        ; return (eVerify [x] (eSeq [e1',e2'])) }
 
@@ -991,10 +997,8 @@ defineDE nm ds_rhs
                  ; pure (coreDefine x rhs', Variable x) } }
 
 coreDefine :: Ident -> SrcCore -> SrcCore
-coreDefine x (Seq ts) = eSeq (floats ++ [coreDefine x rhs])
-                      where
-                        (floats, rhs) = unSeq ts
-coreDefine x rhs = eSeq [ DefineV x, Unify (Variable x) rhs ]
+coreDefine x (Seq e1 e2) = mkSeq e1 (coreDefine x e2)
+coreDefine x rhs         = mkSeq (DefineV x) (Unify (Variable x) rhs)
 
 -----------------------------------------------
 --

@@ -77,7 +77,7 @@ conv sc = expr
     expr (Lam i e)      = (Core.Lam . Bind.bind (toCoreIdent i)) <$> convD (S.insert i sc) e
 
     -- combinators
-    expr (Seq es)       = foldr1 coreSeq2 <$> mapM expr es
+    expr (Seq e1 e2)    = coreMkSeq <$> expr e1 <*> expr e2
     expr (Unify e1 e2)  = (Core.:=:) <$> expr e1 <*> expr e2
     expr (Choice e1 e2) = (Core.:|:) <$> exprD e1 <*> exprD e2
     expr Fail           = pure Core.Fail
@@ -134,9 +134,9 @@ conv sc = expr
       pure (is, e', sc')
 
 -- smart constructor to declutter (Exists x) --> x trails
-coreSeq2 :: Core.Expr -> Core.Expr -> Core.Expr
-coreSeq2 v  e2 | Core.isVal v = e2
-coreSeq2 e1 e2                = e1 Core.:>: e2
+coreMkSeq :: Core.Expr -> Core.Expr -> Core.Expr
+coreMkSeq v  e2 | Core.isVal v = e2
+coreMkSeq e1 e2                = e1 Core.:>: e2
 
 coreExis :: [Ident] -> Core.Expr -> Core.Expr
 coreExis is e = Core.mkExis (map toCoreIdent is) e

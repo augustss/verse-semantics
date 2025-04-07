@@ -1,4 +1,9 @@
-module Exp where
+module Exp(
+  Exp(..), Op(..), OC(..),
+  Ident,
+  dIExp,
+  showBraces,
+  ) where
 import Data.List
 import Data.Data
 
@@ -19,10 +24,11 @@ data Exp
   | Where Exp Exp | Def2 Ident Ident Exp
   | OfType Exp Exp
   | UChoice Exp Exp
+  | Block Exp
   deriving (Eq, Ord, Data)
 
 data Op = Oint | Ogt | Oadd
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show, Data, Enum, Bounded)
 
 data OC = Open | Closed
   deriving (Eq, Ord, Show, Data)
@@ -51,6 +57,7 @@ instance Show Exp where
                               showParen True (showsPrec 0 e1) .
                               showBraces (showsPrec 0 e2)
   showsPrec p (OfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
+  showsPrec _ (Block e) = showString "block" . showBraces (showsPrec 0 e)
 
 showBraces :: (String -> String) -> (String -> String)
 showBraces a = showString "{" . a . showString "}"
@@ -58,8 +65,8 @@ showBraces a = showString "{" . a . showString "}"
 --------------------
 ---- Find all identifiers defined by := in this scope
 
-dI :: Exp -> [Ident]
-dI = checkDup . sort . dI'
+dIExp :: Exp -> [Ident]
+dIExp = checkDup . sort . dI'
   where
     checkDup (x:x':xs) | x == x' = error $ "Duplicate definition of " ++ x
                        | otherwise = x : checkDup (x':xs)

@@ -231,7 +231,7 @@ expToSrcExpr :: Loc -> R.Exp L Ident -> F.SrcExpr
 expToSrcExpr l (e1 R.:=:  e2) = F.InfixOp (lexp e1) (inOp l "=")  (lexp e2)
 -- expToSrcExpr l (e1 R.:.:  e2) = F.InfixOp (lexp e1) (inOp l ".")  (lexp e2)
 expToSrcExpr l (e1 R.:|:  e2) = F.InfixOp (lexp e1) (inOp l "|")  (lexp e2)
-expToSrcExpr _ (R.List es) = F.Seq (map lexp es)
+expToSrcExpr _ (R.List es) = F.eSeq (map lexp es)
 expToSrcExpr l (R.Where e1 e2) = F.InfixOp (lexp e1) (inOp l "where") (lexp e2)
 expToSrcExpr _ R.Fail = F.Fail
 expToSrcExpr l (R.One e) = F.Macro1 (macro l "one") [] (lexp e)

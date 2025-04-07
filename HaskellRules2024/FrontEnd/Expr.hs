@@ -18,7 +18,7 @@ module FrontEnd.Expr(
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
     , eAll, eExists, eCheck, eApplyD, eVerify
     , eThunk, eForce, eForceLam, existsXX, eSomeAny
-    , eSeq, eUnify, eFunction, fvArray
+    , mkSeq, eSeq, eUnify, eFunction, fvArray
     , srcUnderscore, isSrcUnderscore, identX
 
     , Store(..), Ptr
@@ -27,11 +27,10 @@ module FrontEnd.Expr(
     , CardEff(..), SideEff(..), effTop, effSucceeds, effDecides, effFails
 
     , Op, pattern Op
-    , compos, composOp, unSeq
+    , compos, composOp
     , getLoc
 
     , getFree, getAllIdents, getVisibleBinders, getAllBinders, getVar
-    , substMany
     , fixity,
   ) where
 
@@ -125,7 +124,6 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Option (Maybe SrcExpr)       -- option{e}
   | Parens SrcExpr               -- (e)
 
-  | Type SrcBlk                      -- type{t}
   | Macro1 Ident [EffString] SrcBlk  -- m<a>{e}
   | Macro2 Ident SrcExpr SrcBlk      -- m(e1){e2}
   | Return SrcExpr                   -- return e
@@ -164,7 +162,7 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   | Range SrcExpr                      -- :e
   | Check Eff SrcExpr                  -- check<fx>{e}
   | Array [SrcExpr]                    -- array{e1;e2;...}
-  | Seq [SrcExpr]                      -- e1;e2;...
+  | Seq SrcExpr SrcExpr                -- e1;e2;...
   | Choice SrcBlk SrcBlk               -- e1 | e2
   | Unify SrcExpr SrcExpr              -- e1 = e2
   | EPrim PrimOp                       -- Primop
@@ -255,20 +253,18 @@ existsXX = Exists [identX] (Variable identX)
 
 eUnify :: SrcExpr -> SrcExpr -> SrcExpr
 -- Smart constructors just floats things out of the arms
-eUnify e1 e2
-  | Seq es1 <- e1, (floats1, e1') <- unSeq es1
-  = eSeq (floats1 ++ [eUnify e1' e2])
-  | isValue e1, Seq es2 <- e2, (floats2, e2') <- unSeq es2
-  = eSeq (floats2 ++ [eUnify e1 e2'])
-  | otherwise
-  = Unify e1 e2
+eUnify (Seq e1 e2) e3              = mkSeq e1 (eUnify e2 e3)
+eUnify e1 (Seq e2 e3) | isValue e1 = mkSeq e2 (eUnify e1 e3)
+eUnify e1 e2                       = Unify e1 e2
 
 eSeq :: [SrcExpr] -> SrcExpr
-eSeq = mk . concatMap flat
-  where flat (Seq es) = es
-        flat e = [e]
-        mk [e] = e
-        mk es = Seq es
+eSeq [] = Array []
+eSeq es = foldr1 mkSeq es
+
+mkSeq :: SrcExpr -> SrcExpr -> SrcExpr
+-- Smart constructor that tries to right-associate ";"
+mkSeq (Seq e1 e2) e3 = mkSeq e1 (mkSeq e2 e3)
+mkSeq e1          e2 = Seq e1 e2
 
 eFalse :: SrcExpr
 eFalse = Array []
@@ -283,7 +279,7 @@ eMkMap l = Variable (Ident l "mkMap$")
 eHavoc :: Eff -> SrcExpr
 eHavoc (Eff { eff_card = c }) = havoc1 c
   where
-    havoc1 CSucceeds = eSeq []
+    havoc1 CSucceeds = Array []
     havoc1 CFails    = Fail
     havoc1 CDecides  = Unify eSomeAny (Array [])
     havoc1 CIterates = error "eHavoc:iterates"
@@ -329,18 +325,15 @@ eGuard xs orig_e = foldr gd orig_e xs
 eCheck :: Eff -> SrcExpr -> SrcExpr
 -- Smart constructor for (Check fxs e):
 --  * Combines with nested Check
---  * Combines with nested OfType
 --  * Discards entirely when effects are "all effects",
---    or when the payload is a value and the effects are happy with that
 --
--- These checks eliminate a lot of clutter. For example:
---    type{e}, which desugars to fun(x:=e}<succeeds>{x}, where we don't
---             want to generate check<succeeds>{x}
+-- But do NOT discard the Check for (Check fxs (\x.(e1){e2})), say, because
+-- tha lambda generates a `verify` that must be inside a Check
 eCheck fxs e
   | isTopEff fxs                      = e
-  | isValue e, valueSatisfies fxs     = e
+--   | isValue e, valueSatisfies fxs     = e
 eCheck fxs1 (Check fxs2 e)            = Check (fxs1 `intersectEffects` fxs2) e
-eCheck fxs1 (OfType e1 fxs2 e2)       = OfType e1 (fxs1 `intersectEffects` fxs2) e2
+-- eCheck fxs1 (OfType e1 fxs2 e2)       = OfType e1 (fxs1 `intersectEffects` fxs2) e2
 eCheck fxs e                          = Check fxs e
 
 eExists :: [Ident] -> SrcExpr -> SrcExpr
@@ -377,19 +370,6 @@ eFunction arg fxs body
     is_open_or_closed "open"   = True
     is_open_or_closed "closed" = True
     is_open_or_closed _        = False
-
---------------------------------------------------------
---            Decomposing SrcExpr
---------------------------------------------------------
-
-unSeq :: [SrcExpr] -> ([SrcExpr], SrcExpr)
--- Extracts the last expression of Seq
-unSeq = go []
-  where
-    go acc []     = (reverse acc, Array [])
-    go acc [t]    = (reverse acc, t)
-    go acc (t:ts) = go (t:acc) ts
-
 
 --------------------------------------------------------
 --               Op
@@ -503,7 +483,9 @@ instance Pretty SideEff where
   pPrintPrec _ _ STop = empty        -- Suppress <top>
   pPrintPrec _ _ eff  = angleBrackets (text (show eff))
 
-toEff :: Eff -> [EffString] -> Eff
+toEff :: Eff          -- Default effect: use this if the user specifies no explicit effects
+      -> [EffString]  -- What the user specified
+      -> Eff
 toEff (Eff {eff_card = default_card, eff_side = default_side })
       effs
   | Just ce <- get_card effs
@@ -527,11 +509,6 @@ toEff (Eff {eff_card = default_card, eff_side = default_side })
     get fxs = [ e | e <- [minBound..maxBound]
                    , fx <- fxs
                    , fx == show e ]
-
-valueSatisfies :: Eff -> Bool
--- Is check<fx>{val} satisfied?
-valueSatisfies (Eff { eff_card = CFails }) = False
-valueSatisfies _                           = True
 
 intersectEffects :: Eff -> Eff -> Eff
 intersectEffects (Eff { eff_card = c1, eff_side = s1 })
@@ -626,7 +603,10 @@ instance Pretty SrcExpr where
           Array es   -> text "array" <> braces (ppSeq lvl es)
           Splice e   -> text "splice" <> braces (ppr 0 e)
           Tuple es   -> parens (ppEs es)
-          Seq es     -> maybeParens (p > 0) $ ppSeq lvl es
+          Seq e1 e2  -> maybeParens (p > 0) $ ppSeq lvl (e1 : grab e2)
+                     where  -- Flatten the list (e1; e2; e3; e4)
+                        grab (Seq s1 s2) = s1 : grab s2
+                        grab s           = [s]
 
           ApplyS  f a -> maybeParens (p > q) $ ppr ql f <> parens (ppArg a)
             where (q, ql, _) = fixity "()"
@@ -680,7 +660,6 @@ instance Pretty SrcExpr where
 
                   ppArs (q, e, rs) = parens (ppArg e) <> pPrint q <> pPrint rs
 
-          Type t       -> text "type" <> braces (ppr 0 t)
           Blk es       -> braces $ ppSeq lvl es
           Option me    -> text "option" <> braces (maybe empty (ppr 0) me)
           Parens e     -> parens (ppr 0 e)
@@ -811,7 +790,7 @@ compos _ e@Variable{}       = pure e
 compos f (QualVariable e v) = QualVariable <$> f e <*> pure v
 compos f (Array es)         = Array <$> traverse f es
 compos f (Tuple es)         = Tuple <$> traverse f es
-compos f (Seq es)           = Seq <$> traverse f es
+compos f (Seq e1 e2)        = Seq    <$> f e1 <*> f e2
 compos f (ApplyS e1 e2)     = ApplyS <$> f e1 <*> f e2
 compos f (ApplyD e1 e2)     = ApplyD <$> f e1 <*> f e2
 compos f (EffAttr e r)      = EffAttr <$> f e <*> pure r
@@ -825,7 +804,6 @@ compos f (If3 e b1 b2)      = If3 <$> f e <*> f b1 <*> f b2
 compos f (For1 b)           = For1 <$> f b
 compos f (For2 e b)         = For2 <$> f e <*> f b
 compos f (Let e b)          = Let <$> f e <*> f b
-compos f (Type t)           = Type <$> f t
 compos f (Block b)          = Block <$> f b
 compos f (Case1 b)          = Case1 <$> f b
 compos f (Case2 e b)        = Case2 <$> f e <*> f b
@@ -917,9 +895,9 @@ getVisibleBinders = go
     go Lit{}          = []
     go EPrim{}        = []
     go Variable{}     = []
-    go (Seq es)       = concatMap go es
     go (Array es)     = concatMap go es
     go (Tuple es)     = concatMap go es
+    go (Seq e1 e2)    = go e1 ++ go e2
     go (ApplyS e1 e2) = go e1 ++ go e2
     go (ApplyD e1 e2) = go e1 ++ go e2
     go (Unify e1 e2)  = go e1 ++ go e2
@@ -929,7 +907,6 @@ getVisibleBinders = go
 
     go (If3 {})   = []  -- NB: Variables defined in scrutinee are not visible outside the 'if'
                         --     So this would be wrong: go (If3 e _ _) = go e
-    go Type{}     = []
     go For2{}     = []
     go Block{}    = []
     go Let{}      = []  -- nothing visible from a let
@@ -971,7 +948,7 @@ getFree = fvs_blk
     fvs (ApplyD e1 e2)    = fvs e1 ++ fvs e2
     fvs (Unify e1 e2)     = fvs e1 ++ fvs e2
     fvs (Choice b1 b2)    = fvs_blk b1 ++ fvs_blk b2
-    fvs (Seq es)          = concatMap fvs es
+    fvs (Seq e1 e2)       = fvs e1 ++ fvs e2
     fvs (Exists is e)     = fvs e `remove` is
     fvs (Verify is e)     = fvs e `remove` is
     fvs (Macro1 _ _ e)    = fvs e
@@ -980,7 +957,6 @@ getFree = fvs_blk
                             `remove` getVisibleBinders e1
     fvs (DefineE _ e)     = fvs e
     fvs (DefineV {})      = []
-    fvs (Type t)          = fvs_blk t
     fvs (Range e)         = fvs_blk e
     fvs (Check _ e)       = fvs_blk e
     fvs (Some e)          = fvs_blk e
@@ -1011,12 +987,11 @@ getVar :: HasCallStack => SrcExpr -> [Ident]
 getVar Lit{}            = []
 getVar Variable{}       = []
 getVar (Array es)       = concatMap getVar es
-getVar (Seq es)         = concatMap getVar es
+getVar (Seq e1 e2)      = getVar e1 ++ getVar e2
 getVar (ApplyS e1 e2)   = getVar e1 ++ getVar e2
 getVar (ApplyD e1 e2)   = getVar e1 ++ getVar e2
 getVar (If3 e _ _)      = getVar e
 getVar For2{}           = []
-getVar Type{}           = []
 getVar (Let _ e)        = getVar e
 getVar Block{}          = []
 getVar (Unify e1 e2)    = getVar e1 ++ getVar e2
@@ -1060,83 +1035,3 @@ getAllBinders expr = Epic.List.nub (execWriter (vars expr))
     vars e@(Exists is e') = do tell is; _ <- vars e'; pure e
     vars e@(Verify is e') = do tell is; _ <- vars e'; pure e
     vars e                = compos vars e
-
----------------------------------------------------------
--- Functions that only work on the core subset of SrcExpr
----------------------------------------------------------
-
-substMany :: [(Ident, SrcCore)] -> SrcCore -> SrcCore
-substMany [] = id
-substMany sb = sub
-  where
-    bs = getFree $ Seq $ map snd sb
-    sub :: SrcCore -> SrcCore
-    sub v@(Variable i) | Just b <- lookup i sb = b
-                       | otherwise = v
-    sub e@Lit{} = e
-    sub e@EPrim{} = e
-    sub (Array es) = Array (map sub es)
-    sub (Lam i e) = binder i (Lam i) e
-    sub (Unify e1 e2) = Unify (sub e1) (sub e2)
-    sub (ApplyD e1 e2) = ApplyD (sub e1) (sub e2)
-    sub (Seq es) = Seq (map sub es)
-    sub (Choice e1 e2) = Choice (sub e1) (sub e2)
-    sub (Exists [] e) = Exists [] (sub e)
-    sub (Exists (i:is) e) = binder i (exists1 i) (Exists is e)
-    sub (Verify [] e) = Verify [] (sub e)
-    sub (Verify (i:is) e) = binder i (forall1 i) (Verify is e)
-    sub e@Wrong{} = e
-    sub (Macro1 i rs e) = Macro1 i rs (sub e)
-    sub (If3 e1 e2 e3) = If3 (sub e1) (sub e2) (sub e3)
-    sub Fail = Fail
-    sub e = impossible "substMany" e
-
-    binder :: Ident -> (SrcExpr -> SrcExpr) -> SrcExpr -> SrcExpr
-    binder i con e | Just _ <- lookup i sb = substMany (filter ((/= i) . fst) sb) (con e)
-                   | i `notElem` bs = con (sub e)
-                   | otherwise = sub $ alphaConvert bs (con e)
-
-    exists1 i (Exists is e) = Exists (i:is) e
-    exists1 _ _ = undefined
-
-    forall1 i (Verify is e) = Verify (i:is) e
-    forall1 _ _ = undefined
-
-if3Hack :: (SrcExpr -> SrcExpr) -> [Ident] -> SrcExpr -> SrcExpr -> ([Ident], SrcExpr, SrcExpr)
-if3Hack f is e1 e2 =
-  case f (Exists is (Array [e1, e2])) of
-    Exists is' (Array [e1', e2']) -> (is', e1', e2')
---    Array [e1', e2'] -> ([], e1', e2')
-    e -> impossible "if3Hack" e
-
--- Alpha convert a term, avoiding vs as the names for bound
--- variables.
-alphaConvert :: [Ident] -> SrcCore -> SrcCore
-alphaConvert vs = alpha []
-  where
-    alpha :: [(Ident, Ident)] -> SrcCore -> SrcCore
-    alpha m (Variable i) = Variable $ fromMaybe i $ lookup i m
-    alpha _ e@Lit{} = e
-    alpha _ e@EPrim{} = e
-    alpha m (Array es) = Array (map (alpha m) es)
-    alpha m (Lam i e) = Lam i' $ alpha (add (i, i') m) e where i' = fresh i
-    alpha m (Unify e1 e2) = Unify (alpha m e1) (alpha m e2)
-    alpha m (Seq es) = Seq (map (alpha m) es)
-    alpha m (ApplyD e1 e2) = ApplyD (alpha m e1) (alpha m e2)
-    alpha m (Choice e1 e2) = Choice (alpha m e1) (alpha m e2)
-    alpha m (Macro1 i rs e) = Macro1 i rs (alpha m e)
-    alpha m (Exists is e) = Exists is' (alpha m' e)
-      where is' = map fresh is
-            m' = foldr add m $ zip is is'
-    alpha _ e@Wrong{} = e
-    alpha m (If3 (Exists is e1) e2 e3) =
-      let (is', e1', e2') = if3Hack (alpha m) is e1 e2
-      in  If3 (Exists is' e1') e2' (alpha m e3)
-    alpha _ Fail = Fail
-    alpha _ e = impossible "alphaConvert" e
-
-    add ii@(i, i') m | i == i' = m
-                     | otherwise = ii : m
-
-    fresh i@(Ident l s) | i `notElem` vs = i
-                        | otherwise = fresh $ Ident l (s ++ "'")
