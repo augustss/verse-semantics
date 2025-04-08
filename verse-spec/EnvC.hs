@@ -244,6 +244,7 @@ hos = map mkMapping $
  , mho2
  , mho3
  , mho6
+ , mho7
  ]
 
 -- fun_c(fun_c(:int){:int}){f[1]}
@@ -345,3 +346,5 @@ mho3 =
 mho6 :: MappingV
 mho6 = [VInt 0 ↦ F[noFcn 42{-={0↦0,1↦1,2↦2}-}]]
 
+mho7 :: MappingV
+mho7 = [F[noFcn 8{-={0↦0,1↦1}-}] ↦ VTup [VInt 1, VInt 0]]

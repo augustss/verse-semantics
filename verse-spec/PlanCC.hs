@@ -466,68 +466,15 @@ allExps = [exp01, exp02, exp03, exp04,
            {- SLOW exp51, exp52, -}
            {- NOT CHECKED exp53,-} {- DODGY circularity exp54,-}
            {- uses exp53 exp55,-} exp56, exp57, {- SLOW exp58,-} exp59, exp60,
-           exp61, exp62, exp63
+           exp61, exp62, exp63, exp64, exp65, exp66, exp67 {- SLOW , exp68-}
           ]
 
 main :: IO ()
 main = do
   putStrLn "Start"
+--  runExample dP exp68
   runExamples dP allExps
-{-
-  print $ den $ fst exp18
-  print $ dene $ fun
-  print $ dene $ fun :@ arg
-  print $ dene $ fun :@ argc
-  print $ dene $ func :@ arg
-  print $ dene $ func :@ argc
--}
-
-arg, fun, argc, func, argo, funo :: Exp
-arg = fun_c(0:||1)2
-fun = fun_c arg 2
-argc = fun_c(0:|1)2
-func = fun_c argc 2
-argo = fun_o(0:||1)2
-funo = fun_c argo 2
 
 ds :: Exp -> CExp
 ds = redef . syntax "_"
 
-fn, fno, fnE1, fnE2 :: Exp
-fn = fun_c fnE1 fnE2
-fno = fun_o fnE1 fnE2
-fnE1 = "x":=(0 :| (1 :|| 2)) `wher` "y":=2:|0
-fnE2 = 1 :|| "x"
-fns, fnE1s, fnE2s :: CExp
-fns = ds fn
-fnE1s = ds fnE1
-fnE2s = ds fnE2
-
-gg :: Exp
-gg = fun_c("x":=0:|1 :> 0)(If("x"===1)(Tup ["_",2])(Tup[1,"_"]))
-
-qq = "x" ::: "any" :> If("x"===1)(Tup ["_",2])(Tup[1,"_"])
-qq1 = Tup ["_",2] === Tup[1,"_"]
-
-xfno, xfn, xfnE1, xfnE2 :: Exp
-xfno = fun_o xfnE1 xfnE2
-xfn = fun_c xfnE1 xfnE2
-xfnE1 = "x":=(0 :| 1)
-xfnE2 = "x"
-
-yfno :: Exp
-yfno = fun_o 2 1
-
-zfn :: Exp
-zfn = xfno === yfno
-
-ff :: Exp
-ff = fun_c (fun_c 0 1) 2
-
--- x := if(x=1){1}else{2}
-tim :: Exp
-tim = "x" := If ("x"===1) 1 2
-
-unBlk :: CExp -> CExp
-unBlk (CBlock (CBlk [e])) = e
-unBlk _ = undefined

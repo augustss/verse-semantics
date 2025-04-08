@@ -32,6 +32,9 @@ runExample eval (e, r) = do
 cint :: Exp
 cint = Colon (Prim Oint)
 
+cany :: Exp
+cany = Colon (Var "any")
+
 -- 2
 exp01 :: Example
 exp01 = Int 2
@@ -60,12 +63,12 @@ exp1 = Def "x" (Int 1) `Seq` Def "y" (Int 1) `Seq` (App (Prim Oadd) (Tup [Var "x
 -- fun_c(x:int){x}
 exp2 :: Example
 exp2 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x")
-     === "[int]"
+     === "int"
 
 -- fun_o(x:int){x}
 exp3 :: Example
 exp3 = Fun Open (Def "x" (Colon (Var "int"))) (Var "x")
-     === "Wrong[[int],[comparable]]"
+     === "Wrong[int,comparable]"
 
 -- fun_c(x:int){add[(x,1)]}
 exp4 :: Example
@@ -294,7 +297,7 @@ exp46 = Fun Closed (Def "x" (Colon (Var "int"))) (Var "x" `Equ` Int 1)
 -- f:=fun_c(fun_c(0){1}){2}; h:= :any; f[h]; h
 exp47 :: Example
 exp47 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
-        Def "h" (Colon (Var "any")) `Seq`
+        Def "h" cany `Seq`
         App {-(Var "f")-}f (Var "h") `Seq`
         Var "h"
       === "succ0"
@@ -307,7 +310,7 @@ exp48 = App (fst exp47) (Int 0)
 -- f:=fun_c(fun_o(0){1}){2}; h:= :any; f[h]; h
 exp49 :: Example
 exp49 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
-        Def "h" (Colon (Var "any")) `Seq`
+        Def "h" cany `Seq`
         App {-(Var "f")-}f (Var "h") `Seq`
         Var "h"
       === "Wrong[[1,0],[1,1],[1,2],[1,3],const1,succ,succ0]"
@@ -386,6 +389,34 @@ exp62 = Def "f" (Fun Open (Int 0) (Int 1)) `Seq`
         Tup [App (Var "f") (Int 0), App (Var "f") (Int 1)]
       === "<1,2>"
 
+-- all{<0|1>,<2|3>}
 exp63 :: Example
 exp63 = All (Tup [ Int 0 `Choice` Int 1, Int 2 `Choice` Int 3 ])
       === "<<0,2>,<0,3>,<1,2>,<1,3>>"
+
+-- exi x; if(x=0){1}else{2}
+exp64 :: Example
+exp64 = Def "x" cany `Seq` If(Var "x" `Equ` Int 0) (Int 1) (Int 2)
+      === "Wrong[1,2]"
+
+-- h->f := fun_c(:int){:int}; h = succ; f[1]
+exp65 :: Example
+exp65 = Def2 "h" "f" (Fun Closed cint cint) `Seq` (Var "h" `Equ` Var "succ") `Seq` App (Var "f") (Int 1)
+      === "2"
+
+-- f := fun_c(:int){:int}; f[1]=0; f[1]
+exp66 :: Example
+exp66 = Def "f" (Fun Closed cint cint) `Seq` (App (Var "f") (Int 1) `Equ` Int 0) `Seq` App (Var "f") (Int 1)
+      === "0"
+
+-- x := if(x=1){1}else{2}
+exp67 :: Example
+exp67 = Def "x" (If (Var "x" `Equ` Int 1) (Int 1) (Int 2))
+      === "Wrong[1,2]"
+
+-- f := fun_c(g := fun_c(x:=1|0){x}}{all{:g}}; h:=fun_c(x:=0|1){x}; f[h]
+exp68 :: Example
+exp68 = Def "f" (Fun Closed g (All (Colon (Var "g")))) `Seq` h `Seq` App (Var "f") (Var "h")
+      === "<1,0>"
+  where g = Def "g" $ Fun Closed (Def "x" (Int 1 `Choice` Int 0)) (Var "x")
+        h = Def "h" $ Fun Closed (Def "x" (Int 0 `Choice` Int 1)) (Var "x")

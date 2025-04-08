@@ -133,7 +133,7 @@ syntaxN u (Def x e) = do
   c <- syntaxN u e
   pure $ cseqs [CExi x, CVar x `CEqu` c]
 syntaxN u (Def2 x y e) = do
-  c <- syntaxN u e
+  c <- syntaxN x e
   pure $ cseqs [CExi x, u =.= CVar x, CExi y, CVar y `CEqu` c]
 {-
 syntaxN "_" (Colon e) = do
