@@ -800,12 +800,6 @@ testFlags
                           OA.value "miniverifyprelude" <>
                           OA.help "use the given prelude for verification tests"
 
-       ; desugarRules <- OA.option OA.auto $
-                         OA.long "desugar" <>
-                         OA.metavar "Name" <>
-                         OA.value (fDesugar defaultFlags) <>
-                         OA.help "Desugaring rules to use"
-
        ; allAsIter <- OA.switch $
                       OA.long "all-as-iter" <>
                       OA.help "encode all with iter"
@@ -819,13 +813,12 @@ testFlagsToFEFlags t =
   let flags = defaultFlags
   in  flags{ fSplit = split t, fSimplify = simplify t,
              fTrace = showTrace t,
-             fDfs = dfs t, fPostProcess = postProc t,
+             fDfs = dfs t,
              fUnderLambda = not (noUnderLam t),
              fRewriteSteps = maxSteps t,
              fNoFuelStop = ignoreFuelStop t,
              fAssumeVerified = assumeVerified t,
              fTraceDesugar = verbose t,
-             fDesugar = desugarRules t,
              fAllAsIter = allAsIter t
            }
 

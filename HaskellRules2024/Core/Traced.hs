@@ -5,7 +5,7 @@ module Core.Traced(
   Verbosity, verbosityAll,
   term, trace, start, (++>), loop,
   filterTrace,
-  displayTrace, displayTraceV,
+  displayTrace, displayTraceV, pPrintTrace,
   PrettyBrief(..)
   ) where
 import Prelude hiding( (<>) )

@@ -5,10 +5,10 @@ module Main(main) where
 import Prelude
 
 import Core.Expr     as Core
-import Core.Rule
+import Core.Rule     as Core
 import Core.Rules    as TRS2024
 import Core.Verifier as Verifier
-import Core.Traced
+import Core.Traced   as Core
 
 import FrontEnd.CopyHook
 import FrontEnd.Flags( Flags(..), defaultFlags )
@@ -129,7 +129,7 @@ mainArgs = do
 --------------------------------------------------------
 
 data CState = CState
-  { cs_lastExpr    :: !SomeExpr
+  { cs_lastExpr    :: !(Maybe SrcExpr)
   , cs_lastFile    :: !(Maybe FilePath)
   , cs_definitions :: ![SrcExpr]
   , cs_flags       :: !Flags
@@ -138,58 +138,32 @@ data CState = CState
 
 data ESystem = ESystemPlaceHolder  -- Just for now
 
-data SomeExpr = NoExpr
-              | Parsed    SrcExpr
-              | Desugared SrcExpr
-              | Cores     [SrcCore]
-              | RulesCore Core.Expr
-              deriving( Show )
+printWithHdr :: String -> Doc -> DsM ()
+printWithHdr s d
+  = doIO_D (displayDoc (addHeader s d))
 
-instance Pretty SomeExpr where
-  pPrintPrec _ _ NoExpr        = text "No current expression"
-  pPrintPrec l p (Parsed e)    = pPrintPrec l p e
-  pPrintPrec l p (Desugared e) = pPrintPrec l p e
-  pPrintPrec _ _ (Cores [])    = text "No results"
-  pPrintPrec l p (Cores [e])   = pPrintPrec l p e
-  pPrintPrec l _ (Cores es)    = vcat $ text "Multiple results:" :
-                                   map (\ e -> pPrintPrec l 0 e $$ text "------------") es
-  pPrintPrec l p (RulesCore e) = pPrintPrec l p e
 
-asParsed :: SomeExpr -> SrcExpr
-asParsed NoExpr        = error "No current expression"
-asParsed (Parsed e)    = e
-asParsed (Desugared _) = error "Current expression is desugared"
-asParsed (Cores _)     = error "Current expression is [Core]"
-asParsed (RulesCore _) = error "Current expression is Core"
+addHeader :: String -> Doc -> Doc
+addHeader s doc
+ = vcat [ text ""
+        , text ("================ " ++ s ++ "===================")
+        , doc ]
 
-asSrcExpr :: SomeExpr -> SrcExpr
-asSrcExpr (Desugared e) = e
-asSrcExpr e = asParsed e
+updateLastExpr :: CState -> SrcExpr -> IO CState
+updateLastExpr s e
+  = do { display e
+       ; pure s{ cs_lastExpr = Just e } }
 
-asCore :: SomeExpr -> Core.Expr
-asCore (RulesCore e) = e
-asCore _             = error "Current expresion has not been desugared to Core"
-
-{-
-asDesugared :: Flags -> SomeExpr -> SrcExpr
-asDesugared f (Parsed e) = desugar f e
-asDesugared _ e = asSrcExpr e
-
-asCore :: Flags -> SomeExpr -> SrcCore
-asCore _ (Cores [e]) = e
-asCore _ Cores{} = error "Not a singleton Core value"
-asCore s e = asDesugared s e
--}
-
-updateLastExpr :: CState -> SomeExpr -> IO CState
-updateLastExpr s e = pure s{ cs_lastExpr = e }
-
-withLastExpr :: (SomeExpr -> CState -> IO CState) -> CmdRunner CState
-withLastExpr cmd _line s = do
---   s' <- if null line then pure s else cParseLine line s
-  let s' = s   -- Ignore input line for now
-  cmd (cs_lastExpr s') s'
-
+getInputExpr :: (SrcExpr -> CState -> IO CState) -> CmdRunner CState
+getInputExpr cmd line s
+  = do { -- Read the input expression, or use the current one
+         s' <- if null line
+               then pure s
+               else cParseLine line s
+       ; case cs_lastExpr s' of
+           Nothing -> do { putStrLn "No current expression"
+                         ; return s' }
+           Just e  -> cmd e s' }
 
 --------------------------------------------------------
 --
@@ -203,25 +177,26 @@ theCommandSet = CommandSet
   { c_commands =
       [ Cmd "show [EXPR]"          "Show [last] expression"                cShow
       , Cmd "print [EXPR]"         "Pretty print [last] expression"        cPrint
-      , Cmd "set"                  "Turn on flag"                          (cSet True)
+      , Cmd "set"                  "Turn on flag (':set' shows flags)"     (cSet True)
       , Cmd "unset"                "Turn off flag"                         (cSet False)
       , Cmd "prelude [NAME]"       "Select prelude"                        cPrelude
-      , Cmd "display"              "Show current global defs"              cDisplay
-      , Cmd "clear"                "Clear global defs"                     cClear
-      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
+--       , Cmd "display"              "Show current global defs"              cDisplay
+--       , Cmd "clear"                "Clear global defs"                     cClear
+--      , Cmd "define [EXPR]"        "Add [last] expression to global defs"  cDefine
 
       , Cmd "read FILE"            "Parse a file"                          cRead
-      , Cmd "desugar [EXPR]"       "Desugar [last] expression"             (cDesugar False)
-      , Cmd "vdesugar [EXPR]"      "Desugar (for verification) [last] expression" (cDesugar True)
 
-      , Cmd "tocore [EXPR]"        "Convert [last] expression to Core"     cToCore
+      , Cmd "essential [EXPR]"  "Desugar [last] expression to Essential" (runGetter getEssential)
+      , Cmd "mini [EXPR]"       "Desugar [last] expression to Mini"      (runGetter getMini)
+      , Cmd "src-core [EXPR]"   "Convert [last] expression to SrcCore"   (runGetter getSrcCore)
+      , Cmd "core [EXPR]"       "Convert [last] expression to Core"      (runGetter getCore)
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
 
-      , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
+--      , Cmd "verify [EXPR]"        "Verify [last] expression"              cVerify
 
 --      , Cmd "pcore EXPR"           "parse core expression"                 cPcore
 --      , Cmd "pdesugar [EXPR]"      "Desugar [last] expression pretty"      cPDesugar
@@ -230,16 +205,14 @@ theCommandSet = CommandSet
 --      , Cmd "preprocess"           "Preprocess for rule set"                 cPreprocess
 --      , Cmd "rules [NAME]"         "Select rule system"                    cRules
       ]
---  , c_exec = cParseLine
 
-  -- c_exec :: CmdRunner deals with a command /starting/ with colon
+  -- c_exec :: CmdRunner deals with a command not starting with colon
   , c_exec = cParseLine
-
   , c_help   = helpMsg
   , c_greet  = "Verse parse, desugar, and evaluation testing.\nUse :help for help, and :quit to quit."
   , c_bye    = "Bye!"
   , c_prompt = "> "
-  , c_state  = CState { cs_lastExpr = NoExpr
+  , c_state  = CState { cs_lastExpr = Nothing
                       , cs_lastFile = Nothing
                       , cs_definitions = []
                       , cs_flags = defaultFlags{fSplit=True, fNoFuelStop=True, fSimplify=True}
@@ -254,9 +227,8 @@ helpMsg = "\
 \Many commands operate on the last printed expression.\n\
 \Try\n\
 \  > 1+2\n\
-\  > :show\n\
-\  > :desugar\n\
-\  > :show\n\
+\  > :mini\n\
+\  > :core\n\
 \  > :eval\n\
 \\n\
 \Commands (can be abbreviated):\
@@ -275,16 +247,26 @@ helpMsg = "\
 --------------------------------------------------------
 
 cSet :: Bool -> CmdRunner CState
+-- Bool is True to set, False to unset
+
+-- :set on its own shows the current settings
 cSet _ "" s = do
   let f (d,(g,_)) = printf "  %-12s %s\n" d $ if g (cs_flags s) then "on" else "off"
   putStr $ concatMap f flagTable
   printf "  %-12s %d\n" "steps" (fRewriteSteps (cs_flags s))
-  printf "  %-12s %s\n" "desugar" (show (fDesugar (cs_flags s)))
   pure s
-cSet True l s | Just l' <- stripPrefix "steps=" l, Just n <- readMaybe l' =
-  pure $ s{ cs_flags = (cs_flags s){fRewriteSteps = n} }
-cSet True l s | Just l' <- stripPrefix "desugar=" l, Just d <- readMaybe l' =
-  pure $ s{ cs_flags = (cs_flags s){fDesugar = d} }
+
+-- Set fRewriteSteps
+cSet True l s | Just l' <- stripPrefix "steps=" l
+              , Just n <- readMaybe l'
+  = pure $ s{ cs_flags = (cs_flags s){fRewriteSteps = n} }
+
+-- Set fTraceVerbosity
+cSet True l s | Just l' <- stripPrefix "verbosity=" l
+              , Just n <- readMaybe l'
+  = pure $ s{ cs_flags = (cs_flags s){fTraceVerbosity = n} }
+
+-- Set/unset all the rest
 cSet b l s =
   case filter (isPrefixOf l . fst) flagTable of
     [] -> do putStrLn "Unknown flag"; pure s
@@ -293,18 +275,15 @@ cSet b l s =
 
 flagTable :: [(String, (Flags -> Bool, Bool -> Flags -> Flags))]
 flagTable =
-  [("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
-  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
-  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
-  ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
---  ,("densem",      (fDenSem,       \ b s -> s{fDenSem=b}))
-  ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
-  ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
-  ,("postProcess", (fPostProcess,  \ b s -> s{fPostProcess=b}))
-  ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
-  ,("verifytrace", (fTraceVerify,  \ b s -> s{fTraceVerify=b}))
-  ,("evaltrace",   (fTraceEval,    \ b s -> s{fTraceEval=b}))
-  ,("assumeVerified", (fAssumeVerified, \ b s -> s{fAssumeVerified=b}))
+  [("verify",      (fVerify,       \ b s -> s{fVerify=b}))
+  ,("trace-eval",   (fTraceEval,    \ b s -> s{fTraceEval=b}))
+--  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
+--  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
+--  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
+--  ,("underLambda", (fUnderLambda,  \ b s -> s{fUnderLambda=b}))
+--  ,("latex",       (fLatex,        \ b s -> s{fLatex=b}))
+--  ,("dfs",         (fDfs,          \ b s -> s{fDfs=b}))
+--  ,("desugartrace",(fTraceDesugar, \ b s -> s{fTraceDesugar=b}))
   ]
 
 --------------------------------------------------------
@@ -318,13 +297,19 @@ cRead afn s = do
   let fn | afn == "" = fromMaybe (error "No previous file name") (cs_lastFile s)
          | otherwise = afn
       s' = s{ cs_lastFile = Just fn }
-  tryIt (pure s') (updateLastExpr s' . Parsed) $ do
+  tryIt (pure s') (updateLastExpr s') $ do
     file <- readFile fn
     let prog = parseDie pFile fn file
     when (prog == prog) $
       putStrLn "OK"
     pure prog
 
+
+cParseLine :: CmdRunner CState
+cParseLine line s
+  = tryIt (pure s) (updateLastExpr s) $ do
+    let !prog = parseDie pFile "<interactive>" line
+    pure prog
 
 
 --------------------------------------------------------
@@ -333,35 +318,122 @@ cRead afn s = do
 --
 --------------------------------------------------------
 
-cDesugar :: Bool -> CmdRunner CState
-cDesugar add_verification
-  = withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $
+runGetter :: (Flags -> SrcExpr -> DsM a) -> CmdRunner CState
+runGetter getter
+  = getInputExpr $ \ e s ->
+    let flags = cs_flags s
+    in tryIt (pure s) (\_ -> pure s)
+             (runD flags (getter flags e))
 
+getEssential :: Flags -> SrcExpr -> DsM SrcEssential
+getEssential _ e_parsed
+  = do { e_prel <- addPrelude e_parsed
+       ; e_ess  <- sDesugarExpr e_prel
+       ; printWithHdr "Essential" (pPrint e_ess)
+       ; return e_ess }
+
+getMini :: Flags -> SrcExpr -> DsM SrcMini
+getMini flags e_parsed
+  = do { e_ess  <- getEssential flags e_parsed
+       ; e_mini <- essToMini e_ess
+       ; printWithHdr "Mini" (pPrint e_mini)
+       ; return e_mini }
+
+getSrcCore :: Flags -> SrcExpr -> DsM SrcCore
+getSrcCore flags e_parsed
+  = do { e_mini     <- getMini flags e_parsed
+       ; let add_verification = fVerify flags
+       ; e_src_core <- miniToCore add_verification e_mini
+       ; printWithHdr "SrcCore" (pPrint e_src_core)
+       ; return e_src_core }
+
+getCore :: Flags -> SrcExpr -> DsM Core.Expr
+getCore flags e_parsed
+  = do { e_src_core <- getSrcCore flags e_parsed
+       ; e_core     <- convert e_src_core
+       ; printWithHdr "Core" (pPrint e_core)
+       ; return e_core }
+
+
+cEval :: CmdRunner CState
+cEval
+  = getInputExpr $ \e s ->
+    tryIt (pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
+       ; core <- runD flags (getCore flags e)
+       ; let prepd_core = Core.prep core
+             rules | fVerify flags = everywhere verificationRules
+                   | otherwise     = everywhere runtimeRules
+       ; let (res, tr) = Core.normalize (fRewriteSteps flags) rules prepd_core
 
-       ; putStrLn $ "Desugar for execution: rules=" ++ show (fDesugar flags) ++
-             ", prelude=" ++ fst (fPrelude flags)
+       ; displayDoc $ addHeader "Evaluate" $
+         case res of
+           NormOK      -> text "Result = " <+> pPrint (Core.term tr)
+           NormExpired -> text "Ran out of fuel"
+           NormInvalid -> hang (text "Reached an invalid expression:")
+                             2 (pPrint (Core.term tr))
 
-       ; (e', _) <- FrontEnd.Desugar.desugar flags add_verification (asSrcExpr e)
+       ; when (fTraceEval flags) $
+         displayDoc (addHeader "Evaluation trace" $ vcat $
+                     pPrintTrace (fTraceVerbosity flags) tr)
 
-       -- Display the result
-       ; let display_result = not (fTraceDesugar flags)
-                  -- Don't display the result twice
-       ; when display_result $ display e'
+       ; return () }
 
-       ; pure (Desugared e') }
+--------------------------------------------------------
+--         Displaying the last expression
+--------------------------------------------------------
+
+cShow :: CmdRunner CState
+-- Use Hakell's derived Show to display all the data constructors
+cShow = getInputExpr $ \ e s ->
+        do { print e  -- Uses Haskell's Show 
+           ; pure s }
+
+cPrint :: CmdRunner CState
+-- Use the pretty-printer
+cPrint = getInputExpr $ \ e s ->
+         do { display e   -- Use the pretty-printer
+            ; pure s }
+
+--------------------------------------------------------
+--         Seting the Prelude
+--------------------------------------------------------
+
+cPrelude :: CmdRunner CState
+cPrelude "" s = do putStrLn $ "current prelude: " ++ fst (fPrelude (cs_flags s))
+                   pure s
+cPrelude line s = setPrelude line s
+
+setPrelude :: String -> CState -> IO CState
+setPrelude pn cs =
+  case findPrelude pn of
+    Left msg -> error $ "prelude failed " ++ msg
+    Right prel -> pure cs{ cs_flags = (cs_flags cs){ fPrelude = prel } }
 
 
-cToCore :: CmdRunner CState
-cToCore
-  = withLastExpr $ \ e s ->
-    tryIt (pure s) (updateLastExpr s) $
-    do { let flags = cs_flags s
-       ; putStrLn "\n\n------- Convert to Core ---------"
-       ; (e', _) <- FrontEnd.ToCore.convertToCore flags (asSrcExpr e)
-       ; display e'
-       ; pure (RulesCore e') }
+
+{-
+--------------------------------------------------------
+--         Adding and displaying definitions
+--------------------------------------------------------
+
+cDefine :: CmdRunner CState
+cDefine =
+  withLastExpr $ \ e s -> do
+    let !e' = asSrcExpr e
+    pure  s{ cs_definitions = cs_definitions s ++ [e'] }
+
+cClear :: CmdRunner CState
+cClear _ s = pure s{ cs_definitions = [] }
+
+cDisplay :: CmdRunner CState
+cDisplay _ s = do
+  let (prel, _) = fPrelude (cs_flags s)
+  putStrLn "prelude:"; display prel
+  putStrLn "definitions:"
+  mapM_ display $ cs_definitions s
+  pure s
+-}
 
 --------------------------------------------------------
 --
@@ -369,6 +441,7 @@ cToCore
 --
 --------------------------------------------------------
 
+{-
 cEval :: CmdRunner CState
 cEval
   = withLastExpr $ \ e s ->
@@ -414,14 +487,7 @@ showEvalResult _ what (res, tr@(e' :<-- _))
        ; display tr
        ; return e' }
 
-cParseLine :: CmdRunner CState
-cParseLine line s =
-  tryIt (pure s) (updateLastExpr s) $ do
-    let prog = parseDie (Parsed <$> pFile) "<interactive>" line
-    display prog
-    pure prog
 
-{-
 cTransform :: Bool                    -- True <=> display the result
            -> (SomeExpr -> SomeExpr)  -- How to transform
            -> CmdRunner CState
@@ -477,64 +543,6 @@ systemDescr s = sname s ++ ": " ++ description s
 
 isVerifyPrelude :: (PreludeName, SrcExpr) -> Bool
 isVerifyPrelude (pn, _) = "verify" `isPrefixOf` pn
--}
-
---------------------------------------------------------
---         Displaying the last expression
---------------------------------------------------------
-
-cShow :: CmdRunner CState
--- Use Hakell's derived Show to display all the data constructors
-cShow =
-  withLastExpr $ \ e s -> do
-    print e
-    pure s
-
-cPrint :: CmdRunner CState
--- Use the pretty-printer
-cPrint =
-  withLastExpr $ \ e s -> do
-    display e
-    pure s
-
---------------------------------------------------------
---         Adding and displaying definitions
---------------------------------------------------------
-
-cDefine :: CmdRunner CState
-cDefine =
-  withLastExpr $ \ e s -> do
-    let !e' = asSrcExpr e
-    pure  s{ cs_definitions = cs_definitions s ++ [e'] }
-
-cClear :: CmdRunner CState
-cClear _ s = pure s{ cs_definitions = [] }
-
-cDisplay :: CmdRunner CState
-cDisplay _ s = do
-  let (prel, _) = fPrelude (cs_flags s)
-  putStrLn "prelude:"; display prel
-  putStrLn "definitions:"
-  mapM_ display $ cs_definitions s
-  pure s
-
---------------------------------------------------------
---         Seting the Prelude
---------------------------------------------------------
-
-cPrelude :: CmdRunner CState
-cPrelude "" s = do putStrLn $ "current prelude: " ++ fst (fPrelude (cs_flags s))
-                   pure s
-cPrelude line s = setPrelude line s
-
-setPrelude :: String -> CState -> IO CState
-setPrelude pn cs =
-  case findPrelude pn of
-    Left msg -> error $ "prelude failed " ++ msg
-    Right prel -> pure cs{ cs_flags = (cs_flags cs){ fPrelude = prel } }
-
-
-{-
 
 cVerify :: CmdRunner CState
 cVerify = do
@@ -588,25 +596,10 @@ cDefEval c s = do
 
 
 tryIt :: IO b -> (a -> IO b) -> IO a -> IO b
-tryIt iob aiob ioa = do
-  e <- try ioa
+tryIt recover success_cont try_me = do
+  e <- try try_me
   case e of
     Left (exn :: SomeException) -> do
       print exn
-      iob
-    Right a -> aiob a
-
-
---------------------------------------------------------
---
---         Other utilities
---
---------------------------------------------------------
-
-{-
-dropDollar :: SrcExpr -> SrcExpr
-dropDollar = transform f . transformBi g
-  where g (Ident l s) = Ident l $ filter (/= '$') s
-        f (EPrim s) = EPrim $ filter (/= '$') s
-        f x = x
--}
+      recover
+    Right a -> success_cont a

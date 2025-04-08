@@ -4,7 +4,7 @@
 {-# HLINT ignore "Eta reduce" #-}
 
 module FrontEnd.ToCore(
-    convertToCore
+    convertToCore, convert
   ) where
 
 import Prelude hiding (pi)
@@ -33,13 +33,13 @@ import Debug.Trace ( traceM )
 --------------------------------------------------------
 
 
-convertToCore :: Flags -> SrcCore -> IO (Core.Expr, [DError])
+convertToCore :: Flags -> SrcCore -> IO Core.Expr
 convertToCore flags src
-  = do { (core,errs) <- runD flags (convert src)
+  = do { core <- runD flags (convert src)
        ; when (fTraceDesugar flags) $
          do { putStrLn ("\n------- Convert to core ---------")
             ; putStrLn (render (indent (pPrint core))) }
-       ; return (core,errs) }
+       ; return core }
 
 --------------------------------------------------------
 --

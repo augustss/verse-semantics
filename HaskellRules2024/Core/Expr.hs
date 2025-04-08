@@ -736,7 +736,7 @@ pPrintPrecE lvl prec the_expr
                       block "{}" (text (show f)) e <> braces (ppr0 e0)
        --All e   -> text "all"  <> braces (ppr0 e)
        Lam bnd -> mbPar0 $ char '\\' <> pprBind bnd
-       Exi {}  -> mbPar0 $ sep [ text "∃" <+> fsep (map pPrint bndrs) <> char '.'
+       Exi {}  -> mbPar0 $ sep [ text "∃" <> fsep (map pPrint bndrs) <> char '.'
                                , indent (ppr0 body) ]
                where
                   (bndrs, body) = unpackExis the_expr

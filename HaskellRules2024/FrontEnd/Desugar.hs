@@ -4,7 +4,9 @@
 {-# HLINT ignore "Use camelCase" #-}
 module FrontEnd.Desugar(
     desugar
-    , DsM, DError, runD, traceD, getDFlagsX, traceDS, putScopeErr
+    , DsM, DError, runD, traceD, getDFlagsX, traceDS, putScopeErr, doIO_D
+    , addPrelude, sDesugarExpr, essToMini
+    , miniToCore
   ) where
 
 import Prelude hiding (pi)
@@ -45,7 +47,7 @@ import GHC.Stack
 -----------------------------------------------
 
 
-desugar :: Flags -> Bool -> SrcExpr -> IO (SrcCore, [DError])
+desugar :: Flags -> Bool -> SrcExpr -> IO SrcCore
 desugar flgs add_verification e_parsed
   = runD flgs $
     do { _ <- traceDS "parsed" e_parsed
@@ -57,25 +59,19 @@ desugar flgs add_verification e_parsed
 
        -- Desugar into Essential Verse by doing superficial desugaring
        ; e_essential <- sDesugarExpr e_prel
-       ; let e_with_check | add_verification = Check effSucceeds e_essential
-                          | otherwise        = e_essential
-       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_with_check
+       ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential
 
-       ; e_mini <- essToMini e_with_check
+       ; e_mini <- essToMini e_essential
        ; _ <- traceDS "Desugar Essential Verse into Mini Verse" e_mini
 
-       ; e_ds <- miniToCore ds_model e_mini
+       ; e_ds <- miniToCore add_verification e_mini
 
-       ; let e_with_verify | add_verification = Verify [] e_ds
-                           | otherwise        = e_ds
-       ; _ <- traceDS "Desugar Mini Verse into Core Verse" e_with_verify
+       ; _ <- traceDS "Desugar Mini Verse into Core Verse" e_ds
 
-       ; return e_with_verify
+       ; return e_ds
        }
 
   where
-    ds_model | add_verification = MV True
-             | otherwise        = MX
 
 --------------------------------------------------------
 --
@@ -857,9 +853,15 @@ data DsMode
   | MI       -- ^ - "client" ("implementation")
   deriving (Eq, Ord, Show)
 
-miniToCore :: DsMode -> SrcMini -> DsM SrcCore
+miniToCore :: Bool -> SrcMini -> DsM SrcCore
 -- The V transformation; Fig 9 in verse-spec.pdf
-miniToCore orig_md = go (orig_md,[])
+miniToCore add_verification e_top
+  | add_verification
+  = do { e' <- go (MV True, []) e_top
+       ; return (Verify [] (Check effSucceeds e')) }
+  | otherwise
+  = go (MX, []) e_top
+
   where
     go_nt :: (DsMode,[Ident]) -> SrcMini -> DsM SrcCore
     -- go_nt is just `go` in a non-tail context
@@ -1078,15 +1080,18 @@ instance Applicative DsM where
 instance Functor DsM where
   fmap f (MkD m) = MkD (\env -> f <$> m env)
 
-runD :: Flags -> DsM a -> IO (a, [DError])
+runD :: Flags -> DsM a -> IO a
 -- Runs the DsM monad
+-- May throw an exception in case of errors
 runD flags (MkD thing_inside)
   = do { nextref <- newIORef 1
        ; scopeErrRef <- newIORef []
        ; let env = DEnv { nextNo = nextref, scopeErr = scopeErrRef, dflags = flags }
        ; res  <- thing_inside env
        ; errs <- readIORef scopeErrRef
-       ; return (res, nub errs)
+       ; case errs of
+           [] -> return res
+           _  -> error ("Errors: " ++ show (nub errs))
        }
 
 traceDS :: String -> SrcExpr -> DsM SrcExpr
