@@ -10,7 +10,7 @@ import Control.Monad hiding (ap)
 import Data.Generics.Uniplate.Data(universe)
 import GHC.Stack
 import Exp
-import ExpSugar
+--import ExpSugar
 import ValC
 import SetX
 import EnvC
@@ -265,8 +265,8 @@ dF' i b1 b2 rho v = trunc ws
     ws :: [SetX W]
     ws = unionSetOfSeqs' ss
     res = foldr1 intersect $ filter (not . isEmpty) ws
-    once [x] = x
-    once _   = empty  -- WRONG?
+    once [] = empty
+    once xs = foldr1 intersect xs
     trunc [] = []
     trunc (x:xs) | isEmpty x = x : trunc xs
                  | otherwise = [res]
