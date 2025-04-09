@@ -1,7 +1,12 @@
 # Add new meetings at the top
 
-testeq("M8Apr25-1", pass){ succ(x:int):int := x+1; h->f:=function(:int){:int}; h=succ; f[3] } { 4 }
+testeq("M8Apr25-1", pass){ succ(x:int):int := x+1
+                         ; h->f:=function(:int){:int}
+                         ; h=succ
+                         ; f[3] } { 4 }
+
 verify("M8Apr25-2", pass, broken){ succ(x:int):int := x+1; h->f:=function(:int){:int}; h=succ; f[3]=4 }
+
   # This rather strange test fails to verify at the moment
 
 # -------------- More examples that involve choice in the domain ------------
