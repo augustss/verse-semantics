@@ -309,7 +309,7 @@ defn (InfixOp p1 (Op "->") p2) e = do
   x <- newIdent (getLoc p2) "x"
   r1 <- defn p1 (Variable x)
   r2 <- defn p2 (DefineIE x e)
-  pure $ eSeq [r1, r2]
+  pure $ eSeq [DefineV x, r1, r2]
 
 defn p _ = errorMessage $ "Bad LHS to := " ++ prettyShow p
 
@@ -729,7 +729,7 @@ essToMini orig_e = go_expr orig_e
     -- WSQUIG (x~>y:=t)
     go kap (DefineIE x t) = do { capture <- kap `ueq` pure (Variable x)
                                ; e <- go (kap { wc_inp = PI (Variable x) }) t
-                               ; return (eSeq [DefineV x, capture, e]) }
+                               ; return (eSeq [capture, e]) }
 
     -- WCHK: check<fx>{t}
     go kap (Check fx t) = Check fx <$> go kap t

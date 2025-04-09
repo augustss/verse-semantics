@@ -113,8 +113,8 @@ $$
 &      & \vb & |t_1 ; t_2|                 & \text{Sequencing} \\
 &      & \vb & |t_1 where t_2|             & \text{Reverse sequencing} \\
 &      & \vb & |t_1 = t_2|                 & \text{Unification} \\
-&      & \vb & |x := t|                    & \text{Definition} \\
-&      & \vb & |squig x t|                 & \text{Capture input} \\
+&      & \vb & |x := t|                    & \text{Definition (binds |x| in |t|} \\
+&      & \vb & |squig x t|                 & \text{Capture input (does not bind |x|)} \\
 &      & \vb & |t_1 `choice` t_2|          & \text{Choice} \\
 &      & \vb & |if(t_1) then t_2 else t_3| & \text{Conditional expression} \\
 &      & \vb & |fordo t_1 t_2|             & \text{Finite loop} \\

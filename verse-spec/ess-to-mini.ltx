@@ -56,7 +56,7 @@ $$
  & = & |vif(SS wuinit t_1) (SS wu t_2) (SS wu t_3)| \\
 \rulename{wdef}   & |SS wu (x := t)| & = & |defintro x; x = SS wu t| \\
 \rulename{wsquig}   & |SS (mkwu dr u) (squig x t)|
-  & = & |defintro x; (mkwu dr u) `ueq` x; SS (mkwu dr x) t| \\
+  & = & |(mkwu dr u) `ueq` x; SS (mkwu dr x) t| \\
 % \rulename{wsquig2}   & |SS (apeff e fx) (squig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
 \rulename{wchk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
 \rulename{wcol1}\asktim   & |SS (mkwu dr wrapemp) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
