@@ -35,7 +35,7 @@ import Debug.Trace ( traceM )
 
 convertToCore :: Flags -> SrcCore -> IO Core.Expr
 convertToCore flags src
-  = do { core <- runD flags (convert src)
+  = do { core <- runD flags Core.Fail (convert src)
        ; when (fTraceDesugar flags) $
          do { putStrLn ("\n------- Convert to core ---------")
             ; putStrLn (render (indent (pPrint core))) }
@@ -183,5 +183,6 @@ errUndefined is = do
 
 reportScopeErr :: Ident -> DsM ()
 reportScopeErr i@(Ident l _) = do
-  putScopeErr i;
-  traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)
+  do { -- traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)
+       putScopeErr i }
+

@@ -309,18 +309,10 @@ widthFileName = 25
 
 srcToCore :: FrontEnd.Flags -> Bool -> SrcExpr -> IO Core.Expr
 srcToCore flags add_verification e
-  = do { (e1 :: SrcCore, errs1)   <- FrontEnd.desugar flags add_verification e
-       ; (e2 :: Core.Expr, errs2) <- FrontEnd.convertToCore flags e1
+  = do { e1 :: SrcCore <- FrontEnd.desugar flags add_verification e
+       ; e2 :: Core.Expr <- FrontEnd.convertToCore flags e1
        ; let e3 = Core.prep e2
-
-       -- Replaces the code with FAIL if there was a
-       --    desugaring error (e.g. unbound variable)
-       ; let errs = errs1 ++ errs2
-             e4 | null errs = e3
-                | otherwise = (Core.Lit (LInt 0) Core.:=: Core.Lit (LStr (prettyShow errs)))
-                              Core.:>: Core.Fail
-
-       ; return e4 }
+       ; return e3 }
 
 evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Int, Traced Core.Expr)
 evalExpr flags test e = (r1,length (trace tr),tr)
@@ -649,7 +641,6 @@ data TestFlags = TestFlags
   , showDesugared  :: !Bool                -- show desugared version just before evaluation
   , preludeEval    :: !String              -- use this prelude in TestEval
   , preludeVerify  :: !String              -- use this prelude in TestVerify
-  , desugarRules   :: !Desugar             -- desugaring rules
   , allAsIter      :: !Bool                -- encode all as iter
   , fileNames      :: ![FilePath]          -- input files
   }
@@ -817,7 +808,6 @@ testFlagsToFEFlags t =
              fUnderLambda = not (noUnderLam t),
              fRewriteSteps = maxSteps t,
              fNoFuelStop = ignoreFuelStop t,
-             fAssumeVerified = assumeVerified t,
              fTraceDesugar = verbose t,
              fAllAsIter = allAsIter t
            }

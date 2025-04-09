@@ -12,7 +12,7 @@ import Core.Traced   as Core
 
 import FrontEnd.CopyHook
 import FrontEnd.Flags( Flags(..), defaultFlags )
-import FrontEnd.Expr
+import FrontEnd.Expr as Src
 import FrontEnd.Desugar
 import FrontEnd.ToCore
 import FrontEnd.Parse(parseDie, pFile)
@@ -186,10 +186,10 @@ theCommandSet = CommandSet
 
       , Cmd "read FILE"            "Parse a file"                          cRead
 
-      , Cmd "essential [EXPR]"  "Desugar [last] expression to Essential" (runGetter getEssential)
-      , Cmd "mini [EXPR]"       "Desugar [last] expression to Mini"      (runGetter getMini)
-      , Cmd "src-core [EXPR]"   "Convert [last] expression to SrcCore"   (runGetter getSrcCore)
-      , Cmd "core [EXPR]"       "Convert [last] expression to Core"      (runGetter getCore)
+      , Cmd "essential [EXPR]"  "Desugar [last] expression to Essential" (runGetterSrc getEssential)
+      , Cmd "mini [EXPR]"       "Desugar [last] expression to Mini"      (runGetterSrc getMini)
+      , Cmd "src-core [EXPR]"   "Convert [last] expression to SrcCore"   (runGetterSrc getSrcCore)
+      , Cmd "core [EXPR]"       "Convert [last] expression to Core"      (runGetterCore getCore)
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
@@ -318,12 +318,18 @@ cParseLine line s
 --
 --------------------------------------------------------
 
-runGetter :: (Flags -> SrcExpr -> DsM a) -> CmdRunner CState
-runGetter getter
+runGetterSrc :: (Flags -> SrcExpr -> DsM SrcExpr) -> CmdRunner CState
+runGetterSrc = runGetter Src.Fail
+
+runGetterCore :: (Flags -> SrcExpr -> DsM Core.Expr) -> CmdRunner CState
+runGetterCore = runGetter Core.Fail
+
+runGetter :: a -> (Flags -> SrcExpr -> DsM a) -> CmdRunner CState
+runGetter err_result getter
   = getInputExpr $ \ e s ->
     let flags = cs_flags s
     in tryIt (pure s) (\_ -> pure s)
-             (runD flags (getter flags e))
+             (runD flags err_result (getter flags e))
 
 getEssential :: Flags -> SrcExpr -> DsM SrcEssential
 getEssential _ e_parsed
@@ -360,7 +366,7 @@ cEval
   = getInputExpr $ \e s ->
     tryIt (pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
-       ; core <- runD flags (getCore flags e)
+       ; core <- runD flags Core.Fail (getCore flags e)
        ; let prepd_core = Core.prep core
              rules | fVerify flags = everywhere verificationRules
                    | otherwise     = everywhere runtimeRules

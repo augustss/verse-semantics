@@ -14,7 +14,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
-import Core.Expr( PrimOp(..), allPrimOps, primOpString )
+import Core.Expr  ( PrimOp(..), allPrimOps, primOpString )
 
 -- Epic libraries
 import Epic.Print
@@ -48,8 +48,9 @@ import GHC.Stack
 
 
 desugar :: Flags -> Bool -> SrcExpr -> IO SrcCore
+-- If there is an error, report the error and return Fail
 desugar flgs add_verification e_parsed
-  = runD flgs $
+  = runD flgs Fail $
     do { _ <- traceDS "parsed" e_parsed
 
        -- Prepend prelude from
@@ -71,8 +72,6 @@ desugar flgs add_verification e_parsed
        ; return e_ds
        }
 
-  where
-
 --------------------------------------------------------
 --
 --           The S-desugaring
@@ -85,7 +84,6 @@ sDesugarExpr :: SrcExpr -> DsM SrcEssential
 sDesugarExpr = ds
   where
     ds :: SrcExpr -> DsM SrcEssential
-
 
     -- These can happen when going via Andy's stuff
 {-
@@ -1080,10 +1078,10 @@ instance Applicative DsM where
 instance Functor DsM where
   fmap f (MkD m) = MkD (\env -> f <$> m env)
 
-runD :: Flags -> DsM a -> IO a
+runD :: Flags -> a -> DsM a -> IO a
 -- Runs the DsM monad
 -- May throw an exception in case of errors
-runD flags (MkD thing_inside)
+runD flags err_result (MkD thing_inside)
   = do { nextref <- newIORef 1
        ; scopeErrRef <- newIORef []
        ; let env = DEnv { nextNo = nextref, scopeErr = scopeErrRef, dflags = flags }
@@ -1091,7 +1089,8 @@ runD flags (MkD thing_inside)
        ; errs <- readIORef scopeErrRef
        ; case errs of
            [] -> return res
-           _  -> error ("Errors: " ++ show (nub errs))
+           _  -> do { displayDoc (text "ERROR(s):" <+> vcat (map pPrint errs))
+                    ; return err_result }
        }
 
 traceDS :: String -> SrcExpr -> DsM SrcExpr
@@ -1131,4 +1130,4 @@ newIdent l s = do
 
 
 instance Pretty DError where
-  pPrintPrec l p (MkDError i) = text "unbound identifer" <+> pPrintPrec l p i
+  pPrintPrec l p (MkDError i) = text "Unbound identifer:" <+> pPrintPrec l p i
