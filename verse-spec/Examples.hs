@@ -307,6 +307,10 @@ exp48 :: Example
 exp48 = App (fst exp47) (Int 0)
       === "1"
 
+exp48b :: Example
+exp48b = App (fst exp47) (Int 1)
+      === "Wrong[]"
+
 -- f:=fun_c(fun_o(0){1}){2}; h:= :any; f[h]; h
 exp49 :: Example
 exp49 = --Def "f" (Fun Closed (Fun Closed (Int 0) (Int 1)) (Int 2)) `Seq`
@@ -415,8 +419,31 @@ exp67 = Def "x" (If (Var "x" `Equ` Int 1) (Int 1) (Int 2))
       === "Wrong[1,2]"
 
 -- f := fun_c(g := fun_c(x:=1|0){x}}{all{:g}}; h:=fun_c(x:=0|1){x}; f[h]
+-- XXX should this really be WRONG?
 exp68 :: Example
 exp68 = Def "f" (Fun Closed g (All (Colon (Var "g")))) `Seq` h `Seq` App (Var "f") (Var "h")
+      === "Wrong[]"
+  where g = Def "g" $ Fun Closed (Def "x" (Int 1 `Choice` Int 0)) (Var "x")
+        h = Def "h" $ Fun Closed (Def "y" (Int 0 `Choice` Int 1)) (Var "y")
+
+-- f := fun_c(g := fun_c(x:=1|0){x}}{all{:g}}; h:=fun_c(x:=0||1){x}; f[h]
+exp69 :: Example
+exp69 = Def "f" (Fun Closed g (All (Colon (Var "g")))) `Seq` h `Seq` App (Var "f") (Var "h")
       === "<1,0>"
   where g = Def "g" $ Fun Closed (Def "x" (Int 1 `Choice` Int 0)) (Var "x")
-        h = Def "h" $ Fun Closed (Def "x" (Int 0 `Choice` Int 1)) (Var "x")
+        h = Def "h" $ Fun Closed (Def "y" (Int 0 `UChoice` Int 1)) (Var "y")
+
+-- f := fun_c(x:=(0||1)|2){x}; all{:f}=<0,2>
+exp70 :: Example
+exp70 = exp70f `Seq` All (Colon (Var "f")) `Equ` Tup[Int 0,Int 2]
+      === "<0,2>"
+
+-- f := fun_c(x:=(0||1)|2){x}; all{:f}=<1,2>
+exp71 :: Example
+exp71 = exp70f `Seq` All (Colon (Var "f")) `Equ` Tup[Int 1,Int 2]
+      === "<1,2>"
+
+-- f := fun_c(x:=(0||1)|2){x}
+exp70f :: Exp
+exp70f = Def "f" $ Fun Closed (Def "x" ((Int 0 `UChoice` Int 1) `Choice` Int 2)) (Var "x")
+

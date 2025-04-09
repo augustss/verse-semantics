@@ -97,6 +97,14 @@ applys :: Ws -> Ws -> WS
 applys fs as | isEmpty fs || isEmpty as = []                  -- avoid empty sets in foldSet
 applys fs as = unionSetOfSeqs [ applyf f as | f <- fs ]
 
+applyo :: W -> W -> WS
+applyo (VTup ws) a = map (maybeToSet . aap  a) (zip [0..] ws)
+applyo (VFcn fs) a = map (maybeToSet . appM a) fs
+applyo _ _ = []
+
+applyo' :: W -> W -> WS
+applyo' f = reverse . dropWhile isEmpty . reverse . applyo f
+
 dE :: CExp -> Env -> WS
 dE (CVar "_")          _rho  = [allWs]
 dE (CVar x)             rho  = [sing $ lookupEnv x rho]
@@ -148,6 +156,7 @@ dE (CIf e1 e2 e3)       rho  =
         -- squash $ isectSetOfSeqs $ fmap (\ rho' -> squash $ dD e2 rho') rhos
 #if 1
 dE e@(CLam q _i _e1 _e2 me3) rho =
+#if 0
     if anySet (all isEmpty) fs then [empty] else  -- Don't do this if the functions is decides.
     let res = if chkClsd me3 rho then [fcn] else [empty]
     in
@@ -161,6 +170,13 @@ dE e@(CLam q _i _e1 _e2 me3) rho =
     fs = [ map (dist v) r | v <- allWs, let r = dF e rho v, not (null r) ]
     dist v s = fmap (v,) s
     fcn = combine q $ filterSet (not . all isEmpty) fs
+#else
+  let fs = [ f | f@VFcn{} <- allWs, forAll allWs $ \ v ->
+--            trace ("compat " ++ show (f, v, applyo f v, dF e rho v)) $
+            compat (applyo' f v) (dF e rho v) ]
+  in  if chkClsd me3 rho then [join $ fmap (open q) fs] else []
+#endif
+
 #else
 dE (CLam q i b1 b2 me3) rho =
   let e1 = cexpb b1; e2 = cexpb b2 in
@@ -218,6 +234,11 @@ dE (CLam q i b1 b2 me3) rho =
         [empty]
 #endif
 
+open :: OC -> W -> SetX W
+open Closed w = sing w
+open Open (VFcn fs) = [ VFcn [f] | f <- allFcns, all (`subFcn` f) fs ]
+open _ _ = undefined
+
 -- For a function with domain e1 and range e2,
 -- in an environment (which binds the function input),
 -- compute the sequence of result.  The result has
@@ -255,6 +276,17 @@ unVEnv :: Val -> Env
 unVEnv (VEnv e) = fromListEnv e
 unVEnv _ = undefined
 
+compat :: WS -> WS -> Bool
+compat ss ts = length ss == length ts && and (zipWith comp ss ts)
+
+comp :: Ws -> Ws -> Bool
+comp s t =
+--  trace ("comp " ++ show (s, t)) $
+  case (isEmpty s, isEmpty t) of
+    (True, True)   -> True
+    (False, False) -> s `isSubsetOf` t
+    _              -> False
+
 combine :: OC -> SetX [SetX (W, W)] -> SetX W
 combine q = join . fmap mk . sequence . map cross . groupByPos
   where
@@ -267,7 +299,7 @@ combine q = join . fmap mk . sequence . map cross . groupByPos
         Closed -> sing $ VFcn $ map funFromSet ss
         -- union all the choices and pick all functions that agree with this
         -- XXX only produce functions where dom f = W?
-        Open   -> mkSetUnsafe [ vFcn f | f <- allFcns, subFcn g f]
+        Open   -> mkSetUnsafe [ vFcn f | f <- allFcnsL, subFcn g f]
                   where g = funFromSet $ unions ss
 
 funFromSet :: SetX (W, W) -> Fcn
@@ -462,17 +494,17 @@ allExps = [exp01, exp02, exp03, exp04,
            exp33, exp34, {- SLOW exp35,-}
            -- XXX exp43 looks wrong
            exp36, exp37, exp38, {- SLOW exp39,-} {- UNSURE exp40,-} {- UNSURE exp41,-} exp43, {- UNSURE exp44, -}
-           exp45, exp46, exp47, exp48, {- UNSURE exp49, exp50, -}
+           exp45, exp46, exp47, exp48, exp48b, {- UNSURE exp49, exp50, -}
            {- SLOW exp51, exp52, -}
            {- NOT CHECKED exp53,-} {- DODGY circularity exp54,-}
            {- uses exp53 exp55,-} exp56, exp57, {- SLOW exp58,-} exp59, exp60,
-           exp61, exp62, exp63, exp64, exp65, exp66, exp67 {- SLOW , exp68-}
+           exp61, exp62, exp63, exp64, exp65, exp66, exp67, exp68, exp69,
+           exp70, exp71
           ]
 
 main :: IO ()
 main = do
   putStrLn "Start"
---  runExample dP exp68
   runExamples dP allExps
 
 ds :: Exp -> CExp

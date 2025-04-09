@@ -92,6 +92,10 @@ instance Show Fcn where
              _ | showFcnNo == JustNumber -> "f" ++ show f
                | otherwise -> "f" ++ show f ++ "=" ++ showMapping m
 
+-- is f a subset of g, when the functions are viewed as sets of pairs
+subFcn :: Fcn -> Fcn -> Bool
+subFcn (Fcn _ _ f) (Fcn _ _ g) = M.isSubmapOf f g
+
 -- Domain test
 inDom :: Val -> Fcn -> Bool
 inDom x (Fcn _ _ xys) = M.member x xys
@@ -127,8 +131,3 @@ mkMapping = mk M.empty
           case M.lookup x m of
             Just y' | y /= y' -> error $ "mkMapping: inconsistent " ++ show (x, (y, y'))
             _ -> mk (M.insert x y m) xys
-
--- Is f a subset of g when viewed as sets?
--- XXX could do better than \\
-subFcn :: Fcn -> Fcn -> Bool
-subFcn f g = null (M.toList (fcnMapping f) \\ M.toList (fcnMapping g))

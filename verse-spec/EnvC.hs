@@ -4,10 +4,10 @@ module EnvC(
   W, Ws, WS,
   Env, lookupEnv, extendEnv, emptyEnv, toListEnv, fromListEnv,
   rho0, allWs,
-  allWsL, allInts, allFcns,
+  allWsL, allInts, allFcns, allChoiceFcns, allFcnsL,
   dO,
   maxVInt, vadd,
-  mkFcn, mkVFcn, noFcn,
+  mkFcn, mkVFcn, noFcn, nameFcn,
   ) where
 import Data.Array
 import Data.List hiding (intersect)
@@ -47,14 +47,17 @@ dO Oadd = vFcn $ mkFcn [ (VTup [x, y], vadd x y) | x <- allInts, y <- allInts]
 mkVFcn :: MappingV -> Val
 mkVFcn = vFcn . mkFcn
 
-allFcns :: [Fcn]
-allFcns = setNos $ intFcns ++ pairFcns ++ hoFcns ++ extraFcns
+allFcnsL :: [Fcn]
+allFcnsL = setNos $ intFcns ++ pairFcns ++ hoFcns ++ extraFcns
+
+allFcns :: SetX Fcn
+allFcns = mkSetUnsafe allFcnsL
 
 allFcnsA :: Array Int Fcn
-allFcnsA = array (0, length allFcns - 1) [ (n, f) | f@(Fcn n _ _) <- allFcns ]
+allFcnsA = array (0, length allFcnsL - 1) [ (n, f) | f@(Fcn n _ _) <- allFcnsL ]
 
 allFcnsM :: DM.Map Mapping Fcn
-allFcnsM = DM.fromList [ (xys, f) | f@(Fcn _ _ xys) <- allFcns ]
+allFcnsM = DM.fromList [ (xys, f) | f@(Fcn _ _ xys) <- allFcnsL ]
 
 mkFcn :: HasCallStack => MappingV -> Fcn
 mkFcn xys =
@@ -65,6 +68,9 @@ mkFcn xys =
 
 noFcn :: Int -> Fcn
 noFcn i = allFcnsA ! i
+
+nameFcn :: String -> Fcn
+nameFcn s = [ f | f@(Fcn _ (Just n) _) <- allFcnsL, s == n ] !! 0
 
 (↦) :: a -> b -> (a, b)
 (↦) = (,)
@@ -207,8 +213,25 @@ allChoice2IntFcns = map VFcn $ pick2 intVFcns
                    , not (isEmpty d2)
                    , isEmpty (d1 `intersect` d2)
                    ]
-        intVFcns = filter intDom allFcns
+        intVFcns = filter intDom allFcnsL
         intDom f = domFcn f `isSubsetOf` mkSet allInts
+
+someChoice3IntFcns :: [Val]
+someChoice3IntFcns =
+  [ VFcn [ id0, id1, id2 ]
+  , VFcn [ id2, id1, id0 ]
+  ]
+  where
+    id0 = mkFcn [VInt 0 ↦ VInt 0]
+    id1 = mkFcn [VInt 1 ↦ VInt 1]
+    id2 = mkFcn [VInt 2 ↦ VInt 2]
+
+allChoiceFcnsL :: [Val]
+allChoiceFcnsL =
+  VFcn [] : map vFcn allFcnsL ++ allChoice2IntFcns ++ someChoice3IntFcns
+
+allChoiceFcns :: Ws
+allChoiceFcns = mkSetUnsafe allChoiceFcnsL
 
 allWs :: Ws
 allWs = mkSetUnsafe allWsL
@@ -217,7 +240,7 @@ allWsL :: [W]
 allWsL =
   let
     nonFcn = allInts ++ allTuples
-  in nonFcn ++ map vFcn allFcns ++ allChoice2IntFcns
+  in nonFcn ++ allChoiceFcnsL
 
 --------------
 
