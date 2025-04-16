@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE StandaloneDeriving #-}
+#define DESUGAR_WITH_H 0
 module CExp(CExp(..), CBlk(..), syntax, dI, cexpb) where
 import Control.Monad
 import Control.Monad.State.Strict
@@ -158,10 +159,17 @@ syntaxN u (If e0 e1 e2) = do
   CIf (cblocks [c0, CLHS]) <$> syntaxNB u e1 <*> syntaxNB u e2
 syntaxN u (For e0 e1) = (u =.=) <$> (CFor <$> syntaxNB "_" e0 <*> syntaxNB "_" e1)
 syntaxN u (All e) = (u =.=) <$> (CAll <$> syntaxNB "_" e)
+#if !DESUGAR_WITH_H
 syntaxN "_" (Fun q e0 e1) = do
   i <- newVar "i"
   c0 <- syntaxN i e0
   CLam q i (cblocks [c0, CLHS]) <$> syntaxNB "_" e1 <*> pure Nothing
+syntaxN u (Fun q e0 e1) = do
+#else
+syntaxN "_" f@Fun{} = do
+  u <- newVar "u"
+  CSeq (CExi u) <$> syntaxN u f
+#endif
 syntaxN u (Fun q e0 e1) = do
   i <- newVar "i"
   x <- newVar "x"
@@ -170,7 +178,6 @@ syntaxN u (Fun q e0 e1) = do
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
   pure $ CLam q i (cblocks [CDef x c0, CLHS]) (cblocks [CDef k $ CApp (CVar u) (CVar x), c1 ]) cq
---  pure $ CLam q i (cseqs [ CExi x, CVar x `CEqu` c0 ]) (cseqs [CExi k `cSeq` (k =.= CApp (CVar u) (CVar x)), c1 ]) cq
 syntaxN u (Block e) = CBlock <$> syntaxNB u e
 
 checkQ :: OC -> Ident -> Exp -> N (Maybe (Ident, CExp))
@@ -178,12 +185,6 @@ checkQ Open _ _ = pure Nothing
 checkQ Closed f e = do
     e' <- syntaxN "_" e
     pure (Just (f, e'))
-
-{-
-mustBeVar :: Ident -> N CExp
-mustBeVar "_" = do u <- newVar "u"; pure (CExi u `cSeq` CVar u)
-mustBeVar u = pure (CVar u)
--}
 
 infix 4 =.=
 

@@ -1,5 +1,8 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MonadComprehensions #-}
+#define HAS_HO 1
+#define HAS_CHOICE 1
 module EnvC(
   W, Ws, WS,
   Env, lookupEnv, extendEnv, emptyEnv, toListEnv, fromListEnv,
@@ -48,13 +51,19 @@ mkVFcn :: MappingV -> Val
 mkVFcn = vFcn . mkFcn
 
 allFcnsL :: [Fcn]
-allFcnsL = setNos $ intFcns ++ pairFcns ++ hoFcns ++ extraFcns
+allFcnsL = setNos $ intFcns ++ pairFcns ++ extraFcns
+#if HAS_HAS
+           ++ hoFcns
+#endif
 
 allFcns :: SetX Fcn
 allFcns = mkSetUnsafe allFcnsL
 
+numFcns :: Int
+numFcns = length allFcnsL
+
 allFcnsA :: Array Int Fcn
-allFcnsA = array (0, length allFcnsL - 1) [ (n, f) | f@(Fcn n _ _) <- allFcnsL ]
+allFcnsA = array (0, numFcns - 1) [ (n, f) | f@(Fcn n _ _) <- allFcnsL ]
 
 allFcnsM :: DM.Map Mapping Fcn
 allFcnsM = DM.fromList [ (xys, f) | f@(Fcn _ _ xys) <- allFcnsL ]
@@ -66,7 +75,8 @@ mkFcn xys =
     Nothing -> error $ "Function not in allFcns: " ++ showMapping' xys'
     Just f  -> f
 
-noFcn :: Int -> Fcn
+noFcn :: HasCallStack => Int -> Fcn
+noFcn i | i >= numFcns = error "noFcn"
 noFcn i = allFcnsA ! i
 
 nameFcn :: String -> Fcn
@@ -129,6 +139,7 @@ knownFcns =
     , (msucc, "succ")
     , (mpred, "pred")
     , (mgt, "gt")
+#if HAS_HO
     , (mho1, "ho1")
     , (mho2, "ho2")
     , (mho3, "ho3")
@@ -139,6 +150,7 @@ knownFcns =
     , ([(x, VInt 0) | x <- allInts], "const0")
     , ([(VInt 0, VInt 1)], "succ0")
     , ([(x, x) | x <- [VInt 1, VInt 2]], "id12")
+#endif
     ]
   ]
 
@@ -228,7 +240,10 @@ someChoice3IntFcns =
 
 allChoiceFcnsL :: [Val]
 allChoiceFcnsL =
-  VFcn [] : map vFcn allFcnsL ++ allChoice2IntFcns ++ someChoice3IntFcns
+  VFcn [] : map vFcn allFcnsL
+#if HAS_CHOICE
+            ++ allChoice2IntFcns ++ someChoice3IntFcns
+#endif
 
 allChoiceFcns :: Ws
 allChoiceFcns = mkSetUnsafe allChoiceFcnsL
@@ -237,10 +252,9 @@ allWs :: Ws
 allWs = mkSetUnsafe allWsL
 
 allWsL :: [W]
-allWsL =
-  let
-    nonFcn = allInts ++ allTuples
-  in nonFcn ++ allChoiceFcnsL
+allWsL = allInts
+         ++ allTuples
+         ++ allChoiceFcnsL
 
 --------------
 
