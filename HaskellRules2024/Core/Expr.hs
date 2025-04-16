@@ -30,7 +30,7 @@ module Core.Expr
 
     -- Rewriting
   , Context, isContext, (<@)
-  
+
     -- Binding and substitution
   , subst
   , unbindAs
