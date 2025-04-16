@@ -33,8 +33,8 @@ instance Show Oper where
   show (y:=@(f,x))         = show y ++ "=" ++ show f ++ "[" ++ show x ++ "]"
   show (f:=\(x,op1,op2,y)) = show f ++ "=\\" ++ show x ++ ".(" ++ show op1 ++ ")"
                              ++ "{" ++ show op2 ++ "}(" ++ show y ++ ")"
-  show (op1 :>: op2)       = show1 ";" op1 ++ ";" ++ show1 ";" op2
-  show (op1 :|: op2)       = show1 "|" op1 ++ "|" ++ show1 "|" op2
+  show (op1 :>: op2)       = show1 ";" op1 ++ "; " ++ show1 ";" op2
+  show (op1 :|: op2)       = show1 "|" op1 ++ " | " ++ show1 "|" op2
   show Fail                = "fail"
   show (Scope op)          = "{" ++ show op ++ "}"
   show (If op1 op2 op3)    = "if(" ++ show op1 ++ "){" ++ show op2 ++ "}else{" ++ show op3 ++ "}"
@@ -111,7 +111,7 @@ sem (y:=@(f,x)) = -- y=f[x]
 sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
   clean
   [ bigUnion
-    [ (f %= Fun hs) %/\ isFun hs (x,zs,sem op1,bigUnion (sem op2),y)
+    [ (f %= Fun hs) %/\ isFun hs (x,zs,sem op1,bigUnion (sem (Scope op2)),y)
     | Fun hs <- univ
     ]
   ]
@@ -153,6 +153,7 @@ sem op =
 -}
 
 -- helper function for if
+
 first :: [Ident] -> [ENV] -> ENV
 first ys []         = failE
 first ys (env:envs) = env %\/ first ys [env' %\\ hide ys env | env'<-envs]
@@ -170,10 +171,39 @@ isFun _ _ =
   failE
 
 isPartialFun :: (Value :->? Value) -> (Ident,[Ident],ENV,ENV,Ident) -> ENV
-isPartialFun h (x,zs,env1,env2,y)
-  | dom h == vals x env1 = hide ([x,y] `union` zs)
-                             (env1 %/\ env2 %/\ bigUnion [ x%=v %/\ y%=apply h v | v <- dom h ]) 
+isPartialFun h (x,zs,env1,env2,y) =
+  bigIntersect
+  [ hide ([x,y] `union` zs)
+      (env1 %/\ env2 %/\ x%=v %/\ y%=apply h v)
+  | v <- dom h 
+  ]
+
+  %/\
+
+  hide ([x,y] `union` zs)
+    (compl (env1 %/\ env2 %/\ compl (bigUnion [ x%=v %/\ y%=apply h v | v <- dom h ])))
+
+{-
+  -- 
+
+
+  -- domain of h is accepted by env1
+  bigIntersect [ hide (x:zs) (env1 %/\ (x %= v)) | v <- dom h ]
+  :/\
+  -- anything outside domain of h is not accepted by env1
+  compl (bigUnion [ hide (x:zs) (env1 %/\ (x %= v)) | v <- univ, v `notElem` dom h ])
+  :/\
+  -- 
+
+
+  
+  :/\ forAll x (dom h) (unique y 
+
+
+
+  | dom h == vals x env1 =  
   | otherwise            = failE
+-}
 
 ----------------------------------------------------------------------------------------
 
@@ -208,7 +238,10 @@ examples =
   , y:<=y :>: If(((y:=1) :|: (y:=2))) (x:=1)(x:=2)
   , If(Exi y :>: ((y:=1) :|: (y:=2))) (x:=:y)(x:=2)
 
-  , f:=\(x,(x:=1):|:(x:=2):|:(x:=3),x:=:y,y) :>: y :=@ (f,x)
+  , f:=\(x,(x:=1):|:(x:=2):|:(x:=3),x:=:y,y) -- :>: y :=@ (f,x)
+  , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
+  , f:=\(x,x:<=x,Exi z :>: y:=:z,y) -- :>: y :=@ (f,x)
+  , f:=\(x,x:<=x :>: Exi z,z:=3 :>: y:=:x,y)
   ]
 
 ----------------------------------------------------------------------------------------

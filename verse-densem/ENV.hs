@@ -12,6 +12,7 @@ univ = usort $
      [ Int i | i <- [1..3] ]
   ++ [ Fun [ PFun [1] id, PFun [2] id, PFun [3] id ]
      , Fun [ PFun [1,2,3] id ]
+     , Fun [ PFun [1,2] id ]
      ]
   ++ concat
      [ [ Fun [ PFun [1] f, PFun [2] f, PFun [3] f ]
