@@ -50,15 +50,15 @@ showp e = "(" ++ show e ++ ")"
 free :: Oper -> [Ident]
 free (x :=: y)           = nub [x,y]
 free (x := k)            = [x]
-free (x :<= y)           = [x,y]
+free (x :<= y)           = nub [x,y]
 free (Exi x)             = [x]
 free (y:=@(f,x))         = nub [f,x,y]
-free (f:=\(x,op1,op2,y)) = nub [f,x,y] `union` free op1 `union` free op2
+free (f:=\(x,op1,op2,y)) = nub [f,y] `union` (free (Scope op1) \\ [x]) `union` (free (Scope op2) \\ (x:exis op1))
 free (op1 :>: op2)       = free op1 `union` free op2
 free (op1 :|: op2)       = free (Scope op1) `union` free (Scope op2)
 free Fail                = []
 free (Scope op)          = free op \\ exis op
-free (If op1 op2 op3)    = free (Scope op1) `union` free (Scope op2) `union` free (Scope op3)
+free (If op1 op2 op3)    = free (Scope op1) `union` (free (Scope op2) \\ exis op1) `union` free (Scope op3)
 
 exis :: Oper -> [Ident]
 exis (Exi x)       = [x]
