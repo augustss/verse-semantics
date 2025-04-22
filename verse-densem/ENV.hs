@@ -1,4 +1,15 @@
-module ENV where
+{-# OPTIONS_GHC -Wno-x-partial #-}
+module ENV(
+  Ident(..),
+  univ,
+  ENV,
+    univE, failE,
+    hide, compl,
+    (%=), (%/\), (%\/), (%\\),
+  bigUnion,
+  bigIntersect,
+  clean,
+  ) where
 
 import Data.List( sort, group, intercalate )
 import qualified Data.Map as M

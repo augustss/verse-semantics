@@ -1,4 +1,7 @@
-module Dom where
+module Dom(
+  Value(..),
+  (:->?)(..),
+  )where
 
 import Data.List( intercalate )
 
