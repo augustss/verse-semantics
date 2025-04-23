@@ -19,9 +19,20 @@ import Dom
 
 ----------------------------------------------------------------------------------------
 
+ints :: [Integer]
+ints = [1..3]
+
+univInt :: [Value]
+univInt = map Int ints
+
+-- 0-, 1-, and 2-tuples of Int
+univTuples :: [Value]
+univTuples = [Tup []] ++ [ Tup [x] | x <- univInt ] ++ [ Tup [x,y] | x <- univInt, y <- univInt ]
+
 univ :: [Value]
 univ = usort $
-     [ Int i | i <- [1..3] ]
+     univInt
+  ++ univTuples
   ++ [ Fun [ PFun [1] id, PFun [2] id, PFun [3] id ]
      , Fun [ PFun [1,2,3] id ]
      , Fun [ PFun [1,2] id ]
