@@ -20,7 +20,7 @@ import Dom
 ----------------------------------------------------------------------------------------
 
 ints :: [Integer]
-ints = [1..3]
+ints = [0..2]
 
 univInt :: [Value]
 univInt = map Int ints
@@ -32,16 +32,16 @@ univTuples = [Tup []] ++ [ Tup [x] | x <- univInt ] ++ [ Tup [x,y] | x <- univIn
 univ :: [Value]
 univ = usort $
      univInt
-  ++ univTuples
-  ++ [ Fun [ PFun [1] id, PFun [2] id, PFun [3] id ]
-     , Fun [ PFun [1,2,3] id ]
-     , Fun [ PFun [1,2] id ]
+  ++ univTuples  -- Comment out this for better speed
+  ++ [ Fun [ PFun [0] id, PFun [1] id, PFun [2] id ]  -- = <0,1,2>
+     , Fun [ PFun univInt id ]
+     , Fun [ PFun [0,1] id ]
      ]
   ++ concat
-     [ [ Fun [ PFun [1] f, PFun [2] f, PFun [3] f ]
-       , Fun [ PFun [1,2,3] f ]
+     [ [ Fun [ PFun [0] f, PFun [1] f, PFun [2] f ]
+       , Fun [ PFun univInt f ]
        ]
-     | k <- [1,2,3]
+     | k <- ints
      , let f _ = Int k
      ]
 
