@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-module Main where
+module SemSeqENV where
 
 import Data.List( union )
 
@@ -36,6 +36,13 @@ sem (x :<= y) =
              , w@(Int b) <- univ
              , a<=b
              ]
+  ]
+
+sem (x :=<> ys) = -- x = <y0,y1,...yn>
+  [ bigUnion
+    [ bigIntersect ((x %= Tup vs) : zipWith (%=) ys vs)
+    | vs <- sequence (map (const univ) ys)
+    ]
   ]
 
 sem (Exi _x) =
@@ -88,6 +95,9 @@ sem (If op1 op2 op3) =
  where
   zs  = exis op1
   env = first zs (sem op1)
+
+sem NoOp =
+  [ univE ]
 
 {-
 sem op =
@@ -182,6 +192,7 @@ examples =
   , ((x:=1):|:(x:=2)) :>: If(x:=1)(y:=2)(y:=3) 
   , y:<=y :>: If(((y:=1) :|: (y:=2))) (x:=1)(x:=2)
   , If(Exi y :>: ((y:=1) :|: (y:=2))) (x:=:y)(x:=2)
+  , x:=1 :>: y:=2 :>: z:=<>[x,y]
 
   , f:=\(x,(x:=1):|:(x:=2):|:(x:=3),x:=:y,y) -- :>: y :=@ (f,x)
   , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
@@ -190,3 +201,4 @@ examples =
   ]
 
 ----------------------------------------------------------------------------------------
+

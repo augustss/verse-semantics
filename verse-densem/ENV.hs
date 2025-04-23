@@ -6,6 +6,7 @@ module ENV(
     univE, failE,
     hide, compl,
     (%=), (%/\), (%\/), (%\\),
+    vals,
   bigUnion,
   bigIntersect,
   clean,
@@ -103,13 +104,12 @@ infixr 3 %\/
 
 ----------------------------------------------------------------------------------------
 
-{-
 vals :: Ident -> ENV -> [Value]
 vals x (ENV xvss) =
   usort [ v | xvs <- xvss, v <- case lookup x xvs of
                                   Nothing -> univ
                                   Just v  -> [v] ]
--}
+
 ----------------------------------------------------------------------------------------
 -- derived operators
 
