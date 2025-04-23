@@ -61,12 +61,10 @@ sem (y:=@(f,x)) = -- y=f[x]
 sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
   clean
   [ bigUnion
-    [ (f %= Fun hs) %/\ isFun hs (x,zs,sem (op1 :>: Scope op2),y)
+    [ (f %= Fun hs) %/\ isFun hs (x,sem (Scope (op1 :>: op2)),y)
     | Fun hs <- univ
     ]
   ]
- where
-  zs = exis op1
 
 sem (op1 :|: op2) =
   sem op1 ++ sem op2
@@ -115,22 +113,44 @@ first :: [Ident] -> [ENV] -> ENV
 first _ys []         = failE
 first  ys (env:envs) = env %\/ first ys [env' %\\ hide ys env | env'<-envs]
 
+tuples :: Ident -> Ident -> [ENV] -> ENV
+tuples x y envs =
+  bigUnion
+  [ env %/\ x%=Tup vs
+  | (vs, env) <- combine
+                 [ [ (v, hide [y] (env %/\ y%=v))
+                   | v <- vals y env
+                   ]
+                 | env <- envs
+                 ]
+  ]
+ where
+  combine [] = [([],univE)]
+  combine (ves:vess) =
+    concat
+    [ [ (vs, compl env1 %/\ env2)
+      , (v:vs, env1 %/\ env2)
+      ]
+    | (v,env1) <- ves
+    , (vs,env2) <- combine vess
+    ]
+
 -- helper function for lambdas
-isFun :: [Value :->? Value] -> (Ident,[Ident],[ENV],Ident) -> ENV
-isFun [] (_,_,[],_) =
+isFun :: [Value :->? Value] -> (Ident,[ENV],Ident) -> ENV
+isFun [] (_,[],_) =
   univE
 
-isFun (h:hs) (x,zs,env:envs,y) =
-  isPartialFun h (x,zs,env,y)
-    %/\ isFun hs (x,zs,envs,y)
+isFun (h:hs) (x,env:envs,y) =
+  isPartialFun h (x,env,y)
+    %/\ isFun hs (x,envs,y)
 
 isFun _ _ =
   failE
 
-isPartialFun :: (Value :->? Value) -> (Ident,[Ident],ENV,Ident) -> ENV
-isPartialFun h (x,zs,env,y) =
+isPartialFun :: (Value :->? Value) -> (Ident,ENV,Ident) -> ENV
+isPartialFun h (x,env,y) =
   bigIntersect
-  [ hide ([x,y] `union` zs)
+  [ hide [x,y]
       (env %/\ x%=v %/\ y%=apply h v)
   | v <- dom h 
   ]
