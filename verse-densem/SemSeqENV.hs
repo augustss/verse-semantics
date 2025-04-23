@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 module SemSeqENV where
-
+import Control.Monad
 import Data.List( union )
 
 import Dom
@@ -163,12 +163,19 @@ main :: IO ()
 main =
   do putStrLn ("univ = " ++ show univ)
      putStrLn ""
-     sequence_ [ printSem e >> putStrLn "" | e <- examples ]
+--     sequence_ [ printSem e >> putStrLn "" | e <- examples ]
+     mapM_ printTest tests
 
 printSem :: Oper -> IO ()
 printSem op =
   do putStrLn ("> " ++ show op)
      putStrLn ("--> " ++ show (sem op))
+
+printTest :: Test -> IO ()
+printTest (op,res) = do
+  let r = sem op
+  when (show r /= res) $
+    putStrLn $ "test failed: " ++ show op ++ " " ++ show (r, res)
 
 ----------------------------------------------------------------------------------------
 
@@ -195,9 +202,43 @@ examples =
   , x:=1 :>: y:=2 :>: z:=<>[x,y]
 
   , f:=\(x,(x:=1):|:(x:=2):|:(x:=3),x:=:y,y) -- :>: y :=@ (f,x)
-  , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
+-- SLOW  , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
   , f:=\(x,x:<=x,Exi z :>: y:=:z,y) -- :>: y :=@ (f,x)
-  , f:=\(x,x:<=x :>: Exi z,z:=3 :>: y:=:x,y)
+  , f:=\(x,x:<=x :>: Exi z,z:=2 :>: y:=:x,y)
+  ]
+
+infix 0 -->
+type Test = (Oper, String)
+(-->) :: Oper -> String -> Test
+(-->) = (,)
+
+tests :: [Test]
+tests =
+  [ Scope (Exi y :>: Exi z :>: y:=1 :>: z:=2 :>: y:<=x :>: x:<=z)
+    --> "[x=1/x=2]"
+  , (x:=1):|:(x:=2)
+    --> "[x=1,x=2]"
+  , If(x:=1)(x:=1)(x:=2) :>: ((x:=1):|:(x:=2))
+    --> "[x=1,x=2]"
+  , ((x:=1):|:(x:=2)) :>: If(x:=1)(x:=1)(x:=2)
+    --> "[x=1,x=2]"
+  , If(x:=1)(y:=2)(y:=3) :>: ((x:=1):|:(x:=2))
+    --> "[x=1;y=2,x=2;y=3]"
+  , ((x:=1):|:(x:=2)) :>: If(x:=1)(y:=2)(y:=3) 
+    --> "[x=1;y=2,x=2;y=3]"
+  , y:<=y :>: If(((y:=1) :|: (y:=2))) (x:=1)(x:=2)
+    --> "[x=1;y=1/x=1;y=2/x=2;y=3]"
+  , If(Exi y :>: ((y:=1) :|: (y:=2))) (x:=:y)(x:=2)
+    --> "[x=1]"
+  , x:=1 :>: y:=2 :>: z:=<>[x,y]
+    --> "[x=1;y=2;z=<1,2>]"
+
+  , f:=\(x,(x:=1):|:(x:=2):|:(x:=3),x:=:y,y) -- :>: y :=@ (f,x)
+    --> "[f=[{1->1},{2->2},{3->3}]]"
+  , f:=\(x,x:<=x,Exi z :>: y:=:z,y) -- :>: y :=@ (f,x)
+    --> "[f=[{1->1,2->1,3->1}]/f=[{1->1,2->2}]/f=[{1->1,2->2,3->3}]/f=[{1->2,2->2,3->2}]/f=[{1->3,2->3,3->3}]]"
+  , f:=\(x,x:<=x :>: Exi z,z:=2 :>: y:=:x,y)
+    --> "[f=[{1->1,2->2}]/f=[{1->1,2->2,3->3}]]"
   ]
 
 ----------------------------------------------------------------------------------------
