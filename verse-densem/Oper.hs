@@ -23,6 +23,7 @@ data Oper
   | Fail                                 -- fail
   | Scope Oper                           -- {op}
   | If Oper Oper Oper                    -- if(op1){op2}else{op3}
+  | All Ident Ident Oper                 -- x=all(y){op}    binding occurence of y
   | NoOp
  deriving ( Eq, Ord )
 
@@ -54,6 +55,7 @@ instance Show Oper where
   show Fail                = "fail"
   show (Scope op)          = "{" ++ show op ++ "}"
   show (If op1 op2 op3)    = "if(" ++ show op1 ++ "){" ++ show op2 ++ "}else{" ++ show op3 ++ "}"
+  show (All x y op)        = show x ++ "=all(" ++ show y ++ "){" ++ show op ++ "}"
   show NoOp                = "nop"
 
 show1 :: String -> Oper -> String
@@ -78,6 +80,7 @@ free (op1 :|: op2)       = free (Scope op1) `union` free (Scope op2)
 free Fail                = []
 free (Scope op)          = free op \\ exis op
 free (If op1 op2 op3)    = free (Scope op1) `union` (free (Scope op2) \\ exis op1) `union` free (Scope op3)
+free (All x y op)        = [x] `union` (free (Scope op) \\ [y])
 free NoOp                = []
 
 exis :: Oper -> [Ident]

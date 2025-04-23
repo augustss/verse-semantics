@@ -96,6 +96,10 @@ sem (If op1 op2 op3) =
   zs  = exis op1
   env = first zs (sem op1)
 
+sem (All x y op) =
+  [ bigUnion $ map ((x %=) . Tup) $ mapM (vals y) (sem (Scope op))
+  ]
+
 sem NoOp =
   [ univE ]
 
@@ -180,7 +184,7 @@ printTest (op,res) = do
 ----------------------------------------------------------------------------------------
 
 -- These are somewhat error prone.
--- If you forget, e.g., and binder for x in the semantic
+-- If you forget, e.g., a binder for x in the semantic
 -- equations, you'll get the x here.
 x,y,z,f,g :: Ident
 x = Ident "x"
@@ -200,6 +204,8 @@ examples =
   , y:<=y :>: If(((y:=1) :|: (y:=2))) (x:=1)(x:=2)
   , If(Exi y :>: ((y:=1) :|: (y:=2))) (x:=:y)(x:=2)
   , x:=1 :>: y:=2 :>: z:=<>[x,y]
+  , All y x ((x:=1):|:(x:=2))
+  , All y x ((x:=1):|:((x:=2) :|||: (x:=0)))
 
   , f:=\(x,(x:=0):|:(x:=1):|:(x:=2),x:=:y,y) -- :>: y :=@ (f,x)
 -- SLOW  , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
@@ -232,6 +238,10 @@ tests =
     --> "[x=1]"
   , x:=1 :>: y:=2 :>: z:=<>[x,y]
     --> "[x=1;y=2;z=<1,2>]"
+  , All y x ((x:=1):|:(x:=2))
+    --> "[y=<1,2>]"
+  , All y x ((x:=1):|:((x:=2) :|||: (x:=0)))
+    --> "[y=<1,0>/y=<1,2>]"
 
   , f:=\(x,(x:=0):|:(x:=1):|:(x:=2),x:=:y,y) -- :>: y :=@ (f,x)
     --> "[f=<0,1,2>]"
