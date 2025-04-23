@@ -96,7 +96,7 @@ sem (If op1 op2 op3) =
   env = first zs (sem op1)
 
 sem (All x y op) =
-  [ bigUnion $ map ((x %=) . Tup) $ mapM (vals y) (sem (Scope op))
+  [ tuples x y (sem (Scope op))
   ]
 
 sem NoOp =
