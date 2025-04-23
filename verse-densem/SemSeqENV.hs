@@ -195,7 +195,7 @@ printTest :: Test -> IO ()
 printTest (op,res) = do
   let r = sem op
   when (show r /= res) $
-    putStrLn $ "test failed: " ++ show op ++ " " ++ show r ++ "/= " ++ res
+    putStrLn $ "test failed: " ++ show op ++ " " ++ show r ++ " /= " ++ res
 
 ----------------------------------------------------------------------------------------
 
