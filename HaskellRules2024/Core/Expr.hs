@@ -948,9 +948,16 @@ prepSeq (a :=: e1) e2 = prepVal a (\v -> (v :=: prep e1) :>: prep e2)
 prepSeq e1         e2 = (Var underscore :=: prep e1) :>: prep e2
 
 prepVal :: Expr -> (Val -> Expr) -> Expr
--- (prepVal e K) makes applies K to the value of e,
+-- (prepVal e K) applies K to the value of e,
 -- perhaps by adding an existential, thus (exi x. x = e; K[x])
 prepVal a k = prepVals [a] (k . head) -- avoiding -Wincomplete-uni-patterns by using head
+
+{-
+prepVals []     k = k []
+prepVals (e:es) k = prepVal e   $ \v ->
+                    prepVals es $ \vs ->
+                    k (v:vs)
+-}
 
 prepVals :: [Expr] -> ([Val] -> Expr) -> Expr
 prepVals as k = name (xs `zip` map prep as) k

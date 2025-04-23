@@ -62,7 +62,7 @@ desugar flgs add_verification e_parsed
        ; e_essential <- sDesugarExpr e_prel
        ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential
 
-       ; e_mini <- essToMini e_essential
+       ; e_mini <- essToMini flgs e_essential
        ; _ <- traceDS "Desugar Essential Verse into Mini Verse" e_mini
 
        ; e_ds <- miniToCore add_verification e_mini
@@ -677,16 +677,23 @@ the function definition.  This is the "pushing down" in `essToMini`:
 * The EffContext pushes into the body (range) of the function
 * It gets intersected into any |> opacity constructs
 
-The EffContext is also used in essToMini 
+The EffContext is also used in essToMini
 -}
 
-essToMini :: SrcEssential -> DsM SrcMini
+essToMini :: Flags -> SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
-essToMini orig_e = go_expr orig_e
+essToMini flags orig_e = go_expr orig_e
   where
-    kap_init = WC { wc_inp = NoInput, wc_fxs = DomCtxt }
-
-    go_expr = go kap_init
+    go_expr :: SrcEssential -> DsM SrcMini
+    -- Desugar an expression with "no input"
+    go_expr t
+      | fDsUniform flags
+      = do { r <- newIdent (getLoc t) "r"
+           ; t' <- go (WC { wc_inp = PI (Variable r), wc_fxs = DomCtxt }) t
+           ; return (eSeq [DefineV r, t']) }
+      | otherwise  -- Use the clever "non-uniform" method
+                   -- using \bullet (aka NoInput)
+      = go (WC { wc_inp = NoInput, wc_fxs = DomCtxt }) t
 
     go :: WContext -> SrcEssential -> DsM SrcMini
     -- Typically (go kap t) = e, where `kap::(Input,[Eff])` is short for `kappa`
@@ -732,7 +739,11 @@ essToMini orig_e = go_expr orig_e
                                ; return (eSeq [capture, e]) }
 
     -- WCHK: check<fx>{t}
-    go kap (Check fx t) = Check fx <$> go kap t
+    -- ToDo: check this use of ueq
+    -- Reason: desugaring    check<succ>{3} should no yield
+    --             exists r. check<succ>{r=3}
+    --    Better:  exists r. r=check<succ>{exists r2. r2=3}
+    go kap (Check fx t) = kap `ueq` (Check fx <$> go_expr t)
 
     -- WCOL1, WCOL2, WCOL3: (:t)
     go (WC { wc_inp = inp, wc_fxs = cfxs }) (Range t)
@@ -789,7 +800,7 @@ essToMini orig_e = go_expr orig_e
     -- truth{t}: WTRU1 and WTRU2
     go kap@(WC { wc_inp = inp }) (Truth t)
       = case inp of
-          NoInput -> Truth <$> go (kap { wc_inp = NoInput }) t
+          NoInput -> Truth <$> go kap t
           PI i -> do { j <- newIdent (getLoc t) "j"
                      ; e <- go (kap { wc_inp = PI (Variable j) }) t
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
@@ -813,10 +824,9 @@ essToMini orig_e = go_expr orig_e
                                       -- IsFun[f]: see test M26Mar25-5
 
     -- Core constructs used (only) in the Prelude
-    -- Only used in the NoInput case
-    go (WC { wc_inp = NoInput }) (Lam x t)    = Lam x <$> go_expr t
-    go (WC { wc_inp = NoInput }) (Some t)     = Some  <$> go_expr t
-    go (WC { wc_inp = NoInput }) (Guard xs t) = Guard <$> go_expr xs <*> go_expr t
+    go kap (Lam x t)    = kap `ueq` (Lam x <$> go_expr t)
+    go kap (Some t)     = kap `ueq` (Some  <$> go_expr t)
+    go kap (Guard xs t) = Guard <$> go_expr xs <*> go kap t
 
     -- Report any un-handled cases
     go kap t = error $ "TODO: essToMini " ++ show (kap, t)

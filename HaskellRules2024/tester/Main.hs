@@ -8,7 +8,7 @@ module Main(main) where
 
 import FrontEnd.CopyHook
 import FrontEnd.Desugar as FrontEnd ( desugar )
-import FrontEnd.ToCore  as FrontEnd ( convertToCore )
+import FrontEnd.ToCore  as FrontEnd ( convertToPrepdCore )
 import FrontEnd.Flags   as FrontEnd
 import FrontEnd.Expr as Src
 import FrontEnd.Parse( P, parseDie, pFile, pOp, pIdent, pExprSeq, pBraces, pParens
@@ -310,9 +310,7 @@ widthFileName = 25
 srcToCore :: FrontEnd.Flags -> Bool -> SrcExpr -> IO Core.Expr
 srcToCore flags add_verification e
   = do { e1 :: SrcCore <- FrontEnd.desugar flags add_verification e
-       ; e2 :: Core.Expr <- FrontEnd.convertToCore flags e1
-       ; let e3 = Core.prep e2
-       ; return e3 }
+       ; FrontEnd.convertToPrepdCore flags e1 }
 
 evalExpr :: TestFlags -> Test -> Core.Expr -> (NormResult, Int, Traced Core.Expr)
 evalExpr flags test e = (r1,length (trace tr),tr)
@@ -642,6 +640,7 @@ data TestFlags = TestFlags
   , preludeEval    :: !String              -- use this prelude in TestEval
   , preludeVerify  :: !String              -- use this prelude in TestVerify
   , allAsIter      :: !Bool                -- encode all as iter
+  , dsUniform      :: !Bool
   , fileNames      :: ![FilePath]          -- input files
   }
   deriving (Show)
@@ -795,6 +794,10 @@ testFlags
                       OA.long "all-as-iter" <>
                       OA.help "encode all with iter"
 
+       ; dsUniform <- OA.switch $
+                      OA.long "ds-uniform" <>
+                      OA.help "use uniform desugaring"
+
        ; fileNames <- OA.many $
                       OA.argument OA.str (OA.metavar "FILES...")
        ; return (TestFlags { .. }) }
@@ -802,14 +805,15 @@ testFlags
 testFlagsToFEFlags :: TestFlags -> FrontEnd.Flags
 testFlagsToFEFlags t =
   let flags = defaultFlags
-  in  flags{ fSplit = split t, fSimplify = simplify t,
-             fTrace = showTrace t,
-             fDfs = dfs t,
-             fUnderLambda = not (noUnderLam t),
-             fRewriteSteps = maxSteps t,
-             fNoFuelStop = ignoreFuelStop t,
-             fTraceDesugar = verbose t,
-             fAllAsIter = allAsIter t
+  in  flags{ fSplit        = split t, fSimplify = simplify t
+           , fTrace        = showTrace t
+           , fDfs          = dfs t
+           , fUnderLambda  = not (noUnderLam t)
+           , fRewriteSteps = maxSteps t
+           , fNoFuelStop   = ignoreFuelStop t
+           , fTraceDesugar = verbose t
+           , fAllAsIter    = allAsIter t
+           , fDsUniform    = dsUniform t
            }
 
 setPreludeFlag :: Bool    -- True <=> verifying

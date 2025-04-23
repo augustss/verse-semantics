@@ -303,7 +303,7 @@ normalizationRules =
      -- EXI-PUSH is necessary to let us do
      --    exi x. f[y]; x=3; 3+1; blah
      -- Here we want to substitute for x despite the intervening f[y]
-  do label "EXI-PUSH"   -- ∃x.v=e1;e2 --> v=e1;∃x.e2 
+  do label "EXI-PUSH"   -- ∃x.v=e1;e2 --> v=e1;∃x.e2
      interest 0
      (exis,x,(v :=: e1) :>: e2) <- matchExi_alphaRename [] =<< lhs
      guard (x `notElem` free (v,e1))
@@ -317,14 +317,16 @@ substitutionRules :: Rule Expr
 substitutionRules =
   do label "EXI-SUBST"
      e0 <- lhs
-     (exis, ctx, x_eq_v :>: e) <- evalCtxExis (free e0) e0 
+     (exis, ctx, x_eq_v :>: e) <- evalCtxExis (free e0) e0
      (Var x,v) <- matchEq x_eq_v
      guard (x `elem` exis)
      guard (isVal v)
      guard (x `notElem` free v)
      guard (blkd (LX { exi_flexi = exis, exi_rigid = [] }) ctx)
-     labelArg (pPrint x <+> text ":=" <+> pPrintSmallExpr v)
+--     labelArg (pPrint x <+> text ":=" <+> pPrintSmallExpr v)
+     labelArg ((pPrint x <+> text ":=" <+> pPrint v) $$ (text "ctx<e:" <+> pPrint (ctx <@ e)))
      pure (mkExis (exis \\ [x]) $ subst [(x,v)] (ctx <@ e))
+
  <|>
   -- x=V[\y.body]  --> x = V[\y. exists x. x=V[\y.body]; body]
   --   if x/=y, and x free in body
@@ -508,7 +510,7 @@ matchEq e =
 valueCtx :: Expr -> Rule (Context, Expr)
 -- V ::= HOLE | <e1,..,V,..en>
 -- Moreover we only return pairs whose Expr is /not/ a tuple
-valueCtx v = 
+valueCtx v =
    do pure (HOLE,v)
   <|>
    do Tup es <- pure v

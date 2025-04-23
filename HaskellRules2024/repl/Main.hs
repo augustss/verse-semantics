@@ -276,7 +276,8 @@ cSet b l s =
 flagTable :: [(String, (Flags -> Bool, Bool -> Flags -> Flags))]
 flagTable =
   [("verify",      (fVerify,       \ b s -> s{fVerify=b}))
-  ,("trace-eval",   (fTraceEval,    \ b s -> s{fTraceEval=b}))
+  ,("trace-eval",  (fTraceEval,    \ b s -> s{fTraceEval=b}))
+  ,("ds-uniform",  (fDsUniform,    \ b s -> s{fDsUniform=b}))
 --  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
 --  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
 --  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
@@ -341,7 +342,7 @@ getEssential _ e_parsed
 getMini :: Flags -> SrcExpr -> DsM SrcMini
 getMini flags e_parsed
   = do { e_ess  <- getEssential flags e_parsed
-       ; e_mini <- essToMini e_ess
+       ; e_mini <- essToMini flags e_ess
        ; printWithHdr "Mini" (pPrint e_mini)
        ; return e_mini }
 
@@ -357,18 +358,17 @@ getCore :: Flags -> SrcExpr -> DsM Core.Expr
 getCore flags e_parsed
   = do { e_src_core <- getSrcCore flags e_parsed
        ; e_core     <- convert e_src_core
-       ; printWithHdr "Core" (pPrint e_core)
-       ; return e_core }
-
+       ; let prepd_core = Core.prep e_core
+       ; printWithHdr "Prep'd Core" (pPrint prepd_core)
+       ; return prepd_core }
 
 cEval :: CmdRunner CState
 cEval
   = getInputExpr $ \e s ->
     tryIt (pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
-       ; core <- runD flags Core.Fail (getCore flags e)
-       ; let prepd_core = Core.prep core
-             rules | fVerify flags = everywhere verificationRules
+       ; prepd_core <- runD flags Core.Fail (getCore flags e)
+       ; let rules | fVerify flags = everywhere verificationRules
                    | otherwise     = everywhere runtimeRules
        ; let (res, tr) = Core.normalize (fRewriteSteps flags) rules prepd_core
 
