@@ -61,8 +61,16 @@ sem (y:=@(f,x)) = -- y=f[x]
 sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
   clean
   [ bigUnion
-    [ (f %= Fun hs) %/\ isFun hs (x,sem (Scope (op1 :>: op2)),y)
+    [ (f %= Fun hs) %/\
+        bigIntersect
+        [ hide [x,y]
+            (env %/\ x%=v %/\ y%=apply h v)
+        | (h,env) <- hs `zip` envs
+        , v <- dom h
+        ]
     | Fun hs <- univ
+    , let envs = sem (Scope (op1 :>: op2))
+    , length hs == length envs
     ]
   ]
 
