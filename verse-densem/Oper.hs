@@ -1,5 +1,8 @@
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module Oper(
   Oper(..),
+  pattern (:|||:),
   Ident(..),
   exis,
   free,
@@ -25,7 +28,16 @@ data Oper
 
 infix  5 :=:, :=, :<=, :=@, :=\, :=<>
 infixr 4 :>:
-infixr 3 :|:
+infixr 3 :|:, :|||:
+
+pattern (:|||:) :: Oper -> Oper -> Oper
+pattern op1 :|||: op2 <- (getUChoice -> Just (op1, op2))
+  where op1 :|||: op2 = Scope (Exi xx :>: If (xx := 0) op1 op2)
+          where xx = Ident "_x"
+
+getUChoice :: Oper -> Maybe (Oper, Oper)
+getUChoice (Scope (Exi (Ident "_x") :>: If (Ident "_x" := 0) op1 op2)) = Just (op1, op2)
+getUChoice _ = Nothing
 
 instance Show Oper where
   show (x :=: y)           = show x ++ "=" ++ show y
@@ -38,6 +50,7 @@ instance Show Oper where
                              ++ "{" ++ show op2 ++ "}(" ++ show y ++ ")"
   show (op1 :>: op2)       = show1 ";" op1 ++ "; " ++ show1 ";" op2
   show (op1 :|: op2)       = show1 "|" op1 ++ " | " ++ show1 "|" op2
+  show (op1 :|||: op2)     = show1 "|||" op1 ++ " ||| " ++ show1 "|||" op2
   show Fail                = "fail"
   show (Scope op)          = "{" ++ show op ++ "}"
   show (If op1 op2 op3)    = "if(" ++ show op1 ++ "){" ++ show op2 ++ "}else{" ++ show op3 ++ "}"
@@ -46,6 +59,7 @@ instance Show Oper where
 show1 :: String -> Oper -> String
 show1 op e@(_ :>: _) = if op==";" then show e else showp e
 show1 op e@(_ :|: _) = if op=="|" then show e else showp e
+show1 op e@(_ :|||: _) = if op=="|||" then show e else showp e
 show1 _  e           = show e
 
 showp :: Oper -> String
