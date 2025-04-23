@@ -353,7 +353,7 @@ substitutionRules =
 
 onlyApps :: Ident -> Expr -> Bool
 -- (onlyApps f e) returns True if the only occurrences of
--- `f` in `e` are in applications f[v]
+-- `f` in `e` are in applications f[v], or isFun$[f]
 onlyApps f orig_e = go orig_e
   where
     go (Lit {})     = True
@@ -370,7 +370,10 @@ onlyApps f orig_e = go orig_e
     go (e1 :=: e2)  = go e1 && go e2
     go (e1 :>: e2)  = go e1 && go e2
     go (e1 :|: e2)  = go e1 && go e2
-    go (e1 :@: e2)  = e1 == Var f || (go e1 && go e2)
+    go (e1 :@: e2)
+      | e1 == Var f                 = True
+      | e1 == Op IsFun, e2 == Var f = True
+      | otherwise                   = go e1 && go e2
     go (Iter _ e e0) = all go [e,e0]
     go (Some e)       = go e
     --go (All e)        = go e

@@ -686,14 +686,15 @@ essToMini flags orig_e = go_expr orig_e
   where
     go_expr :: SrcEssential -> DsM SrcMini
     -- Desugar an expression with "no input"
-    go_expr t
-      | fDsUniform flags
+    go_expr t = go (WC { wc_inp = NoInput, wc_fxs = DomCtxt }) t
+
+    try_again :: WContext -> SrcEssential -> DsM SrcMini
+    -- The context has NoInput; try again with a unification variable
+    try_again kap t
       = do { r <- newIdent (getLoc t) "r"
-           ; t' <- go (WC { wc_inp = PI (Variable r), wc_fxs = DomCtxt }) t
+           ; let kap' = kap { wc_inp = PI (Variable r) }
+           ; t' <- go kap' t
            ; return (eSeq [DefineV r, t']) }
-      | otherwise  -- Use the clever "non-uniform" method
-                   -- using \bullet (aka NoInput)
-      = go (WC { wc_inp = NoInput, wc_fxs = DomCtxt }) t
 
     go :: WContext -> SrcEssential -> DsM SrcMini
     -- Typically (go kap t) = e, where `kap::(Input,[Eff])` is short for `kappa`
@@ -720,7 +721,7 @@ essToMini flags orig_e = go_expr orig_e
 
     -- if, for, all one: WIF, WFOR, WALL, WONE
     go kap (If3 t1 t2 t3) = If3  <$> go_expr t1 <*> go kap t2 <*> go kap t3
-    go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go kap t2)
+    go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go_expr t2)
     go kap (All t)        = kap `ueq` (All    <$> go_expr t)
     go kap (One t)        = kap `ueq` (One    <$> go_expr t)
 
@@ -746,14 +747,18 @@ essToMini flags orig_e = go_expr orig_e
     go kap (Check fx t) = kap `ueq` (Check fx <$> go_expr t)
 
     -- WCOL1, WCOL2, WCOL3: (:t)
-    go (WC { wc_inp = inp, wc_fxs = cfxs }) (Range t)
+    go kap@(WC { wc_inp = inp, wc_fxs = cfxs }) t@(Range ty)
       = case inp of
-          NoInput -> do { e <- go_expr t
-                        ; x <- newIdent (getLoc t) "x"
-                        ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
+          NoInput
+               | fDsUniform flags
+               -> try_again kap t
+               | otherwise
+               -> do { e <- go_expr ty
+                     ; x <- newIdent (getLoc t) "x"
+                     ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
           PI i -> case cfxs of
-                     DomCtxt     -> ApplyD <$> go_expr t <*> pure i
-                     RngCtxt fxs -> OfType i fxs <$> go_expr t
+                     DomCtxt     -> ApplyD <$> go_expr ty <*> pure i
+                     RngCtxt fxs -> OfType i fxs <$> go_expr ty
                        -- See Note [Pushing down the effects]
 
     -- WOFTYPE: t1 |> t2
@@ -806,12 +811,16 @@ essToMini flags orig_e = go_expr orig_e
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
 
     -- Functions: WFUN1, WFUN2
-    go (WC { wc_inp = inp }) (Function aperture t1 fxs1 t2)
+    go kap@(WC { wc_inp = inp }) t@(Function aperture t1 fxs1 t2)
       = case inp of
-          NoInput -> do { i <- newIdent (getLoc t1) "i"
-                        ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = DomCtxt }
-                              kap_body = WC { wc_inp = NoInput,         wc_fxs = RngCtxt fxs1 }
-                        ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1) (go kap_body t2) }
+          NoInput
+               | fDsUniform flags
+               -> try_again kap t
+               | otherwise
+               -> do { i <- newIdent (getLoc t1) "i"
+                     ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = DomCtxt }
+                           kap_body = WC { wc_inp = NoInput,         wc_fxs = RngCtxt fxs1 }
+                     ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1) (go kap_body t2) }
           PI f -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
                      ; let kap_arg  = WC { wc_inp = PI (Variable i),            wc_fxs = DomCtxt}

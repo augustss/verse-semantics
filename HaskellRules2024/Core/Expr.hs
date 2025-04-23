@@ -910,64 +910,64 @@ prep :: Expr -> Expr
 -- In particular:
 --   * A-normal form; e.g. args of `:@:` are values
 --   * (v=e) only to the left of `:>:`
-prep (Var x)      = Var x
-prep (Lit k)      = Lit k
-prep (Tup as)     = prepVals as (\vs -> Tup vs)
-prep (Tru a)      = prepVal a Tru
-prep (Lam bnd)    = Lam (bind x (prep e)) where (x,e) = unsafeUnbind bnd
-prep (Op op)      = Op op
-prep (e1 :>: e2)  = prepSeq e1 e2
-prep (a  :=: e)   = prepVal a (\v -> (v :=: prep e) :>: v)
-prep (e1 :|: e2)  = prep e1 :|: prep e2
-prep (Exi bnd)    = Exi (bind x (prep e)) where (x,e) = unsafeUnbind bnd
-prep Fail         = Fail
-prep (Err s)      = Err s
-prep (Some a)     = prepVal a (\v -> Some v)
---prep (All e)      = mkAll (prep e)
-prep (a :>>: e)   = prepVal a (\v -> v :>>: prep e)
---prep (Check fx e) = Check fx (prep e)
+prep top_e = prepExpr (free top_e) top_e
+  where
 
-prep (a1 :@: Tup as) = prepVal a1 (\v1 -> prepVals as (\vs -> v1 :@: Tup vs))
-prep (a1 :@: a2)     = prepVal a1 (\v1 -> prepVal a2 (\v2 -> v1 :@: v2))
-   -- The Tup case for applications is just an optimisation.
-   -- If we have f[e1,e2], we prefer
-   --    a1:=e1; a2:=e2; f[a2,a2]
-   -- to
-   --    a := (a1:=e1; a2:=e2; <a1,a2>); f[a]
+prepExpr :: [Ident] -> Expr -> Expr
+prepExpr _ e | isAtomic e = e
 
-prep (Verify bl)  = Verify (bindList xs (as, prep e))
-                    where (xs,(as,e)) = unsafeUnbindList bl
+prepExpr xs (Tup as)     = prepVals xs as (\_ vs -> Tup vs)
+prepExpr xs (Tru a)      = prepVal xs  a  (\_ v  -> Tru v)
 
-prep (Iter f e e0) = Iter f (prep e) (prep e0)
+prepExpr xs (Lam bnd)    = Lam (bind x (prepExpr (x:xs) e))
+                   where (x,e) = unsafeUnbind bnd
+prepExpr xs (Exi bnd)    = Exi (bind x (prepExpr (x:xs) e))
+                   where (x,e) = unsafeUnbind bnd
 
-prep e  -- HOLE, Arr, Choose, Size
+prepExpr xs (e1 :>: e2)
+  | (a :=: rhs) <- e1 = prepVal xs a (\xs' v -> (v :=: prepExpr xs' rhs) :>: prepExpr xs' e2)
+  | otherwise         = (Var underscore :=: prepExpr xs e1) :>: prepExpr xs e2
+
+prepExpr xs (e1 :|: e2)  = prepExpr xs e1 :|: prepExpr xs e2
+prepExpr xs (a  :=: e)   = prepVal xs a (\xs' v -> (v :=: prepExpr xs' e) :>: v)
+prepExpr xs (a :>>: e)   = prepVal xs a (\xs' v -> v :>>: prepExpr xs' e)
+prepExpr xs (Some a)     = prepVal xs a (\_ v -> Some v)
+prepExpr xs (a1 :@: a2)  = prepVal xs a1 (\xs1 v1 -> prepVal xs1 a2 (\_ v2 -> v1 :@: v2))
+
+prepExpr xs (Verify bl)  = Verify (bindList ys (as, prepExpr (ys ++ xs) e))
+                   where (ys,(as,e)) = unsafeUnbindList bl
+
+prepExpr xs (Iter f e e0) = Iter f (prepExpr xs e) (prepExpr xs e0)
+
+prepExpr _ e  -- HOLE, Arr, Choose, Size
   = error ("prep bad: " ++ show e)
 
-prepSeq :: Expr -> Expr -> Expr
-prepSeq (a :=: e1) e2 = prepVal a (\v -> (v :=: prep e1) :>: prep e2)
-prepSeq e1         e2 = (Var underscore :=: prep e1) :>: prep e2
 
-prepVal :: Expr -> (Val -> Expr) -> Expr
+prepVal :: [Ident] -> Expr -> ([Ident] -> Val -> Expr) -> Expr
 -- (prepVal e K) applies K to the value of e,
 -- perhaps by adding an existential, thus (exi x. x = e; K[x])
-prepVal a k = prepVals [a] (k . head) -- avoiding -Wincomplete-uni-patterns by using head
+prepVal xs a k | isAtomic a = k xs a
+prepVal xs (Tup as) k = prepVals xs as $ \xs' vs -> k xs' (Tup vs)
+prepVal xs (Tru a)  k = prepVal  xs a  $ \xs' v  -> k xs' (Tru v)
+prepVal xs (e1 :=: e2) k = prepVal xs e1 $ \xs1 v1 ->
+                           (v1 :=: prepExpr xs1 e2) :>: k xs1 v1
+prepVal xs a        k = Exi (bind x ((Var x :=: prepExpr (x:xs) a) :>: k (x:xs) (Var x)))
+  where
+    x = identNotIn xs
 
-{-
-prepVals []     k = k []
-prepVals (e:es) k = prepVal e   $ \v ->
-                    prepVals es $ \vs ->
-                    k (v:vs)
--}
+prepVals :: [Ident] -> [Expr] -> ([Ident] -> [Val] -> Expr) -> Expr
+prepVals xs []     k = k xs []
+prepVals xs (e:es) k = prepVal xs   e  $ \xs1 v ->
+                       prepVals xs1 es $ \xs2 vs ->
+                       k xs2 (v:vs)
 
-prepVals :: [Expr] -> ([Val] -> Expr) -> Expr
-prepVals as k = name (xs `zip` map prep as) k
- where
-  xs = identsNotIn (free (k [HOLE | _ <- as] : as))
-
-  name []          h = h []
-  name ((x,a):xas) h
-    | isVal a || a == Var underscore = name xas (h . (a:))
-    | otherwise                      = Exi (bind x ((Var x :=: a) :>: name xas (h . (Var x :))))
+isAtomic :: Expr -> Bool
+isAtomic (Var {}) = True
+isAtomic (Lit {}) = True
+isAtomic (Op {})  = True
+isAtomic Fail     = True
+isAtomic (Err {}) = True
+isAtomic _        = False
 
 --------------------------------------------------------------------------------
 --
