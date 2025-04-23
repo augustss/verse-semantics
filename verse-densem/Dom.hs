@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-x-partial #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeOperators #-}
 module Dom(
   Value(..),
   pattern Tup,

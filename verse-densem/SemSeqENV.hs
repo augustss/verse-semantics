@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# LANGUAGE TypeOperators #-}
 module SemSeqENV where
 import Control.Monad
 import Data.List( union )
