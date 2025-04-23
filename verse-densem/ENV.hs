@@ -32,7 +32,7 @@ univTuples = [Tup []] ++ [ Tup [x] | x <- univInt ] ++ [ Tup [x,y] | x <- univIn
 univ :: [Value]
 univ = usort $
      univInt
-  ++ univTuples
+  ++ univTuples  -- Comment out this for better speed
   ++ [ Fun [ PFun [1] id, PFun [2] id, PFun [3] id ]
      , Fun [ PFun [1,2,3] id ]
      , Fun [ PFun [1,2] id ]
