@@ -38,13 +38,13 @@ univ :: [Value]
 univ = usort $
      univInt
   ++ univTuples  -- Comment out this for better speed
-  ++ [ Fun [ PFun [0] id, PFun [1] id, PFun [2] id ]  -- = <0,1,2>
-     , Fun [ PFun univInt id ]
-     , Fun [ PFun [0,1] id ]
+  ++ [ Fun [ mkFun [0] id, mkFun [1] id, mkFun [2] id ]  -- = <0,1,2>
+     , Fun [ mkFun univInt id ]
+     , Fun [ mkFun [0,1] id ]
      ]
   ++ concat
-     [ [ Fun [ PFun [0] f, PFun [1] f, PFun [2] f ]
-       , Fun [ PFun univInt f ]
+     [ [ Fun [ mkFun [0] f, mkFun [1] f, mkFun [2] f ]
+       , Fun [ mkFun univInt f ]
        ]
      | k <- ints
      , let f _ = Int k
@@ -55,15 +55,15 @@ usort :: Ord a => [a] -> [a]
 usort = map head . group . sort
 
 fcnAdd :: Value :->? Value
-fcnAdd = PFun { dom = map fst xyz, apply = \ xy -> fromJust $ lookup xy xyz }
+fcnAdd = mkFun (map fst xyz) (\ xy -> fromJust $ lookup xy xyz)
   where xyz = [ (Tup [Int x, Int y], Int ((x + y) `rem` (maxInt + 1))) | x <- ints, y <- ints ]
 
 fcnLE :: Value :->? Value
-fcnLE = PFun { dom = map fst xyz, apply = \ xy -> fromJust $ lookup xy xyz }
+fcnLE = mkFun (map fst xyz) (\ xy -> fromJust $ lookup xy xyz)
   where xyz = [ (Tup [Int x, Int y], Int x) | x <- ints, y <- ints, x <= y ]
 
 fcnInt :: Value :->? Value
-fcnInt = PFun { dom = map fst xy, apply = \ x -> fromJust $ lookup x xy }
+fcnInt = mkFun (map fst xy) (\ x -> fromJust $ lookup x xy)
   where xy = [ (Int x, Int x) | x <- ints ]
 
 ----------------------------------------------------------------------------------------
