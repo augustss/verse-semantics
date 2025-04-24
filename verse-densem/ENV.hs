@@ -2,6 +2,7 @@
 module ENV(
   Ident(..),
   univ,
+  fcnAdd, fcnLE, fcnInt,
   ENV,
     univE, failE,
     hide, compl,
@@ -13,11 +14,15 @@ module ENV(
   ) where
 
 import Data.List( sort, group, intercalate )
+import Data.Maybe(fromJust)
 --import qualified Data.Map as M
 
 import Dom
 
 ----------------------------------------------------------------------------------------
+
+maxInt :: Integer
+maxInt = 2
 
 ints :: [Integer]
 ints = [0..2]
@@ -44,9 +49,22 @@ univ = usort $
      | k <- ints
      , let f _ = Int k
      ]
+  ++ [Fun [fcnAdd], Fun [fcnLE], Fun [fcnInt] ]
 
 usort :: Ord a => [a] -> [a]
 usort = map head . group . sort
+
+fcnAdd :: Value :->? Value
+fcnAdd = PFun { dom = map fst xyz, apply = \ xy -> fromJust $ lookup xy xyz }
+  where xyz = [ (Tup [Int x, Int y], Int ((x + y) `rem` (maxInt + 1))) | x <- ints, y <- ints ]
+
+fcnLE :: Value :->? Value
+fcnLE = PFun { dom = map fst xyz, apply = \ xy -> fromJust $ lookup xy xyz }
+  where xyz = [ (Tup [Int x, Int y], Int x) | x <- ints, y <- ints, x <= y ]
+
+fcnInt :: Value :->? Value
+fcnInt = PFun { dom = map fst xy, apply = \ x -> fromJust $ lookup x xy }
+  where xy = [ (Int x, Int x) | x <- ints ]
 
 ----------------------------------------------------------------------------------------
 
@@ -70,7 +88,8 @@ showE []  = "()"
 showE xvs = intercalate ";" [ show x ++ "=" ++ show v | (x,v) <- xvs ]
 
 (%=) :: Ident -> Value -> ENV
-x %= v = ENV [ [(x,v)] ]
+x %= v = if x == Ident "_" then error "_ in %=" else
+         ENV [ [(x,v)] ]
 
 univE :: ENV
 univE = ENV [ [] ]
