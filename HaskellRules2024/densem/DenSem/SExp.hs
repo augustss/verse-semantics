@@ -1,7 +1,8 @@
 module DenSem.SExp(denSemDesugar, denSem) where
 import Control.Monad
 import Control.Monad.State.Strict
-import FrontEnd.Expr(SrcExpr(..), PrimOp(..), Aperture(..), Lit(..))
+import Data.Maybe
+import FrontEnd.Expr(SrcExpr(..), Aperture(..), Lit(..))
 import qualified FrontEnd.Expr as E
 import ENV(ENV)
 import Oper as O
@@ -57,17 +58,37 @@ syntax = syntax' us (Ident "res")
 syntax' :: Ident -> Ident -> SrcExpr -> Oper
 syntax' i o e = Scope $ evalState (srcExprToOperN i o e) 1
 
+getPrim :: String -> Maybe O.PrimOp
+getPrim s =
+  case s of
+    "operator'+'"  -> Just Padd
+    "operator'<='" -> Just PLE
+    "int"          -> Just Pint
+    "any"          -> Just Pany
+    _              -> Nothing
+
+apply :: Ident -> Ident -> Ident -> Oper
+apply o f@(Ident s) a
+  | Just p <- getPrim s = o :=@@(p,a)
+  | otherwise           = o :=@ (f,a)
+
 srcExprToOperN :: Ident -> Ident -> SrcExpr -> N Oper
 srcExprToOperN = to where
   to u o expr =
     case expr of
+      -- Hack around things pulled in from the prelude.
+      DefineE (E.Ident _ s) _
+        | isJust (getPrim s) -> pure NoOp  -- delete operator'...' := 
+      -------------------------------------
       Lit (LInt k)         -> pure $ u .:=  k  .:>: o .:=  k
-      Variable x           -> pure $ u .:=: x' .:>: o .:=: x' where x' = ident x
+      Variable x
+        | E.Ident l "_"<-x -> let v = E.Ident l "x" in to u o (Blk [DefineV v, Variable v])
+        | otherwise        -> pure $ u .:=: x' .:>: o .:=: x' where x' = ident x
 --      EPrim p              -> to $ Var $ Ident $ drop 1 $ show p
       ApplyD e0 e1         -> do
         (op0, f) <- toVar "f" e0
         (op1, a) <- toVar "a" e1
-        pure $ seqs [op0, op1, o :=@ (f,a), u .:=: o]
+        pure $ seqs [op0, op1, apply o f a, u .:=: o]
       Unify e0 e1
         | isUs u, isUs o, Variable x <- e0, Lit (LInt k) <- e1 -> pure $ ident x := k
         | isUs u, isUs o, Variable x <- e0, Variable y   <- e1 -> pure $ ident x :=: ident y
@@ -111,6 +132,11 @@ srcExprToOperN = to where
         op2 <- to  u  o e2
         pure $ If op0 op1 op2
       OfType e1 _ e2       -> to u o $ ApplyD e2 e1
+      Range e              -> do
+        (op, f) <- toVar "t" e
+        (opu, u') <- asVar "u" u
+        pure $ seqs [op, opu, apply o f u']
+      Blk es               -> Scope <$> to u o (blkToExpr es)
       Function Closed e0 _ e1 -> do
         (opu, u') <- asVar "h" u
         i <- newVar "i"
@@ -139,6 +165,10 @@ srcExprToOperN = to where
                                )
                         )
       e -> error $ "srcExprToOperN: cannot handle " ++ show e
+
+blkToExpr :: [SrcExpr] -> SrcExpr
+blkToExpr [] = Array []
+blkToExpr es = foldr1 Seq es
 
 
 (.:=) :: Ident -> Integer -> Oper

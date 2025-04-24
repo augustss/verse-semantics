@@ -124,6 +124,7 @@ semPrim :: PrimOp -> (Value :->? Value)
 semPrim Padd = fcnAdd
 semPrim PLE  = fcnLE
 semPrim Pint = fcnInt
+semPrim Pany = fcnAny
 
 first :: [Ident] -> [ENV] -> ENV
 first _ys []         = failE

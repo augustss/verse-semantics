@@ -33,12 +33,15 @@ data PrimOp
   = Padd                                 -- x+y
   | PLE                                  -- x<=y
   | Pint                                 -- int[x]
- deriving ( Eq, Ord )
+  | Pany                                 -- any[x]
+ deriving ( Eq, Ord, Show )
 
+{-
 instance Show PrimOp where
   show Padd = "add"
   show PLE  = "LE"
   show Pint = "int"
+-}
 
 infix  5 :=:, :=, :<=, :=@, :=@@, :=\, :=<>
 infixr 4 :>:
