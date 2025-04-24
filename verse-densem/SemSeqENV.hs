@@ -99,9 +99,9 @@ sem (Scope op) =
   
 sem (If op1 op2 op3) =
   clean $
-    [ hide zs (env %/\ env2) | env2 <- sem op2 ]
+    [ hide zs (env %/\ env2) | env2 <- sem (Scope op2) ]
   `unionHat`
-    [ env3 %\\ hide zs env   | env3 <- sem op3 ]
+    [ env3 %\\ hide zs env   | env3 <- sem (Scope op3) ]
  where
   zs  = exis op1
   env = first zs (sem op1)
