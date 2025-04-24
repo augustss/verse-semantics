@@ -212,11 +212,12 @@ testeq("For2",pass) {for(x:(1,5,2,7,3); x > 2){x}}        {(5,7,3)}
 testeq("For3",pass) {for(x:=1|2|3){x>0}}                  {(1,2,3)}
 testeq("For4",pass) {for(x:=1|2|3){x>1}}                  {:false}
 testeq("For5",pass) {for(x:=1|y; y:=2|3){(x,y)}}          {((1,2),(1,3),(2,2),(3,3))}
-testeq("For6",fail) {upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
+testeq("For6",fail, broken) {upto(i:int, n:int) := { if (i > n) then :false else i | upto[i+1,n] };
                      for(x:=upto[1,3]){x}}
                      {(1,2,3)}
   # For6: fail because `upto` <iterates>, and Verse does not allow that
   #       Even in testeq, the runtime check discovers this; c.f. check2
+  # 'broken' because we no longer do a runtime check for cardinality
 testeq("For6a",pass) {for(x:=1..3){x}}  {(1,2,3)}
 
 # tim=skip: runtime bug
@@ -312,10 +313,10 @@ testeq("EV21",pass) {f(x:int)<succeeds>:=x<10; f[11]}     {wrong}
 testeq("EV22",pass,tim=A00) {swapBad := (t:any => (x:any; y:any; (y, x)))
                             ; p:any; swapBad [p] = (2,3); p }
                             {wrong}
-testeq("EV23",pass, broken) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
+testeq("EV23",pass) { swapGood := (t:any => (x:any; y:any; t=(x, y); (y, x)))
                             ; p:any; swapGood[p] = (2,3); p }
                             {(3,2)}
-testeq("EV23a",pass, broken) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) }
+testeq("EV23a",pass) { swapGood(t:any)<decides> := { x:any; y:any; t=(x, y); (y, x) }
                              ; p:any; swapGood[p] = (2,3); p }
                              {(3,2)}
 verify("EV23b",fail,tim=A00) { swapGood(t:any) := { x:any; y:any; t=(x, y); (y, x) } }
@@ -469,15 +470,18 @@ testeq("fundom2", pass, broken) { f:=fun(x:=1|2 where y:=3|4):=x+y; all{ :f } } 
 
 # tests for check
 testeq("check1", pass){ check<fails>{ 3=4 } } {3=4}
-testeq("check2", fail){ check<fails>{ 33 } } { 33 }
+testeq("check2", fail, broken){ check<fails>{ 33 } } { 33 }
    # check2: depends on whether the runtime desugaring of check<fx>{e} is
    #           check<fx>{e} or just e
+   # 'broken' because we no longer do a runtime check for cardinality
+
 testeq("check3", fail){ check<fails>{ 33 | 44 } } { 33 }
 testeq("check4", pass){ check<decides>{ 3=4 } } {3=4}
 testeq("check5", pass){ check<decides>{ 33 } } { 33 }
 testeq("check6", fail){ check<decides>{ 33 | 44 } } { 33 }
-testeq("check7", fail){ check<succeeds>{ 3=4 } } {3=4}
+testeq("check7", fail, broken){ check<succeeds>{ 3=4 } } {3=4}
    # See check2
+   # 'broken' because we no longer do a runtime check for cardinality
 testeq("check8", pass){ check<succeeds>{ 33 } } { 33 }
 testeq("check9", fail){ check<succeeds>{ 33 | 44 } } { 33 }
 
@@ -492,4 +496,5 @@ testeq("choice4", pass){ all{ a:int; f[a]; y:=if(x>3){5}else{7}; (11|22); x:=2; 
 testeq("run-exitop1", pass){ x:int; f() := {x}; x=3; f[] } { 3 }
 testeq("run-exitop2", pass){ x:int; f():int := {x}; x=3; f[] } { 3 }
 testeq("run-exitop3", pass){ x:int; f() := {x}; f[]=3; f[] } { 3 }
-testeq("run-exitop4", pass, broken){ x:int; f():int := {x}; f[]=3; f[] } { 3 }   # not sure if this should be pass or fail
+testeq("run-exitop4", pass){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
+   # not sure if this should be pass or fail!

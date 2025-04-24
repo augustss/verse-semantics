@@ -130,7 +130,7 @@ verify("M7Feb25-3", fail){ loop():type{fail} := { loop[] }
    # M7Feb25-3: If check<succeeds>{fail} is just stuck, then this program will verify.
    # But h3[2] fails!  as you can see in M7Feb25-4
 
-testeq("M7Feb25-4", pass, broken){ loop():type{fail} := { loop[] }
+testeq("M7Feb25-4", pass){ loop():type{fail} := { loop[] }
                          ; h3(x:int)<succeeds> :=
                              { if ( f()<succeeds>:type{x=3} := 3 )
                                then { fail }
@@ -140,6 +140,7 @@ testeq("M7Feb25-4", pass, broken){ loop():type{fail} := { loop[] }
       { fail }
    # Actually it doesn't fail; rather it gets stuck on a runtime check<succeeds>
    # See MaxVerse9 Feb 12.
+   # Now passing because we discard runtime check<fx>
 
 verify("M7Feb25-5", fail, broken)
    { loop():type{fail} := { loop[] }
@@ -357,9 +358,10 @@ verify("TimL300-9", pass, broken)   { f( g(x:int):char ):int := 1
 
 
 # Meeting 9 August
-testeq( "M9Aug24-1", pass, broken){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
+testeq( "M9Aug24-1", pass){ foo(x:any)<decides> := { x=99 }; p:any; foo[p]; p } { 99 }
   # M9Aug24-1 uses bidirectional programming
   # broken because the check<decides> messes up bidirectionality
+  # Now working becuase we discard runtime check<fx>
 verify( "M9Aug24-2", pass,tim=skip_rej){ F1(X:int)<closed><decides> := X = 1|2 }
 verify( "M9Aug24-3", pass,tim=skip_rej){ F1(X:any)<closed><decides> := X = 1|2 }
 
@@ -391,8 +393,7 @@ verify("S1Aug24-2", fail, tim=A00) { f(x:int,y:int)<decides><closed> := x=y
                           ; exists a { f[a,a] } }
 verify("S1Aug24-3", pass) { f(x:int)<decides><closed> := x=3
                           ; exists a { f[a] } }
-testeq("S1Aug24-4", pass, broken)
-                          { f(x:int)<decides><closed> := x=3
+testeq("S1Aug24-4", pass) { f(x:int)<decides><closed> := x=3
                           ; all{ exists a { f[a] } } } { array{3} }
 
 # -----------------------------------------

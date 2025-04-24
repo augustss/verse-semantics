@@ -14,7 +14,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
-import Core.Expr  ( PrimOp(..), allPrimOps, primOpString )
+import Core.Expr  ( allPrimOps, primOpString )
 
 -- Epic libraries
 import Epic.Print
@@ -678,10 +678,41 @@ the function definition.  This is the "pushing down" in `essToMini`:
 * It gets intersected into any |> opacity constructs
 
 The EffContext is also used in essToMini
+
+Note [The Input parameter to essToMini]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The `Input` parameter to `essToMini` corresponds to the `u` part of the
+`kappa` argument to W in Fig 6: "Desugaring Essential Verse to MiniVerse".
+
+    u ::= bullet   -- Data constructor NoInput
+        | e        -- Data constructor PI
+
+When we are doing "uniform" desugaring (see flag `fDsUniform`), the `NoInput`
+form should be equivalent to a unification variable. Thus
+   W[e] NoInput   is equivalent to     exist i. W[e] (PI i)
+
+But in many cases it simply adds clutter to create the logic variable. E.g.
+   W[k] NoInput  =  exists i. W[k] PI(i)  = exists i. i=k   =  k
+
+So even when doing "uniform" desugaring, we use `NoInput` to say
+"not-yet-created unification variable".  When does it matter?
+
+  * In all the `ueq` cases, we don't need to create it at all;
+    see the example above.
+
+  * For `Array` and `Truth` it takes a little more thought, but in fact
+    we still don't need to create the unification varialbe.
+
+  * Only in the cases for `Range` (:t) and `Function` do we do something
+    special: there we call `try_again` which creates the logical variable
+    and tries again
+
+This little optimisation eliminates a huge amount of crap.
 -}
 
 essToMini :: Flags -> SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
+-- See Note [The Input parameter to essToMini]
 essToMini flags orig_e = go_expr orig_e
   where
     go_expr :: SrcEssential -> DsM SrcMini
@@ -908,10 +939,10 @@ miniToCore add_verification e_top
     go md (All e)        = All <$> go_nt md e
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
-    go md@(sig,xs) (OfType e1 fx e2)
-      = case sig of
-          MX       -> do_mvmx
+    go md@(dsm,xs) (OfType e1 fx e2)
+      = case dsm of
           MI       -> do_mi
+          MX       -> do_mvmx
           MV False -> do { body <- do_mvmx
                          ; rest <- do_mi
                          ; return (eSeq [eVerify [] body, rest]) }
@@ -931,26 +962,17 @@ miniToCore add_verification e_top
         do_mvmx = do { e1' <- go_nt md e1   -- Notice md; may be MV or MX
                      ; e2' <- go_nt md e2
                      ; if isAtomic e1'  -- Just an optimisation
-                       then return (Check effSucceeds (ApplyD e2' e1'))
+                       then return (add_check dsm effSucceeds (ApplyD e2' e1'))
                        else do { r <- newIdent (getLoc e1) "r"
-                              ; return (eSeq [ DefineV r, eUnify (Variable r) (eCheck fx e1')
-                                             , Check effSucceeds (ApplyD e2' (Variable r)) ]) } }
+                              ; return (eSeq [ DefineV r
+                                             , eUnify (Variable r) $
+                                               add_check dsm fx e1'
+                                             , add_check dsm effSucceeds $
+                                               ApplyD e2' (Variable r)
+                                 ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
-    go md@(m,_) (Check fx e)
-      = case m of
-           MV {} -> Check fx <$> go_nt md e   -- ToDo: check that go_mt
-
-           MI    -> go md e  -- No Check here: needed for tests
-                             -- M19Mar25-2, M20Dec24-1, S1Aug24-3, T29Jul24-3
-                             -- Transparent functions act like "macros"
-
-           MX    -> Check fx <$> go md e
-                    -- For consistency, we want no Check here either
-                    -- Again, transparent functions act like "macros"
-                    -- But if we remove the Check:
-                    --    S1Aug24-4, Ev23, EV23a start passing
-                    --    For6, check2, check7 start failing
+    go md@(dsm,_) (Check fx e) = add_check dsm fx <$> go_nt md e
 
     -- Functions proper: MCFUN+, MCFUN-, MCFUNX
     go (MV omit_client, xs) e@(XDLam Closed x e1 e2)
@@ -982,6 +1004,21 @@ miniToCore add_verification e_top
     go md (Some t)     = Some  <$> go md t
 
     go md e = error $ "TODO: miniToCore " ++ show (md, e)
+
+    add_check :: DsMode -> Eff -> SrcCore -> SrcCore
+    add_check MI      _  e = e
+    add_check MX      _  e = e
+    add_check (MV {}) fx e = eCheck fx e
+      -- No Check in the MX case: needed for tests
+      --    M19Mar25-2, M20Dec24-1, S1Aug24-3, T29Jul24-3
+      -- Transparent functions act like "macros"
+      --
+      -- For consistency, we want no Check in the MX case:
+      --    again, transparent functions act like "macros"
+      -- If we remove the Check in MX
+      --    For6, check2, check7 start failing
+      -- If we add the Check in MX
+      --    S1Aug24-4, Ev23, EV23a start failing
 
 shortCutDefnVerify :: SrcMini -> SrcMini -> Bool
 -- True if the expression definitely verifies
