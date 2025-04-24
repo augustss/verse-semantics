@@ -116,7 +116,7 @@ srcExprToOperN = to where
         c0 <- to i x e0
         c1 <- to k y e1
 --  cq <- checkQ q u e0 -- XXX
-        pure $ opu .:>: (o :=\ (i, Exi x :>: c0, Exi k :>: Exi y :>: k :=@(u', x) :>: c1, y))
+        pure $ opu .:>: (o :=\ (i, Exi x :>: c0, Exi k :>: k :=@(u', x) :>: c1, y))
       e -> error $ "srcExprToOperN: cannot handle " ++ show e
 
 
