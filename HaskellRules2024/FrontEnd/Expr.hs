@@ -10,6 +10,7 @@ module FrontEnd.Expr(
     , SrcExpr(..), Lit(..), Path(..)
     , Aperture(..), defaultAperture
     , SrcPat, SrcEssential, SrcMini, SrcCore, SrcBlk, SrcValue
+    , PrimOp(..)
 
       -- Predicates on SrcExpr
     , isConst, isAtomic, isValue

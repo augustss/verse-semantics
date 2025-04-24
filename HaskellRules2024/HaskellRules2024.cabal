@@ -29,6 +29,7 @@ executable verse-repl
     hs-source-dirs:   repl
 
     build-depends:    verse-libs,
+                      verse-densem,
                       haskeline,
                       optparse-applicative,
 
@@ -172,6 +173,23 @@ executable refimpltester
 --    default-language: Haskell2010
 
 
+library verse-densem
+    import:           general-libs
+    hs-source-dirs:   densem ../verse-densem
+    default-extensions:  TypeOperators
+    exposed-modules:
+                      DenSem.SExp
+                      Dom
+                      ENV
+                      Oper
+                      SemSeqENV
+    build-depends:    verse-libs,
+                      base,
+                      containers,
+                      text,
+                      pretty,
+                      QuickCheck,
+                      scientific,
 
 -- Various Verse utilities on which other stuff depends
 -- Should really have its own cabal project
@@ -193,14 +211,14 @@ library verse-libs
                       FrontEnd.Prelude
                       FrontEnd.Desugar
                       FrontEnd.ToCore
+                      Core.Bind
                       Core.Expr
                       Core.Solver
                       Core.Rules
                       Core.Rule
                       Core.Blocked
-                      Core.Verifier
-                      Core.Bind
                       Core.Traced
+                      Core.Verifier
 
 --                      Epic.Applicative
 --                      Epic.Lens
@@ -251,7 +269,6 @@ library verse-libs
                       QuickCheck,
                       megaparsec,
                       scientific,
-                      text,
                       transformers,
                       unordered-containers,
 --                      z3,

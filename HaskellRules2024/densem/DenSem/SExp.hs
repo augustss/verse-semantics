@@ -1,0 +1,135 @@
+module DenSem.SExp(denSemDesugar, denSem) where
+import Control.Monad
+import Control.Monad.State.Strict
+import FrontEnd.Expr(SrcExpr(..), PrimOp(..), Aperture(..), Lit(..))
+import qualified FrontEnd.Expr as E
+import ENV(ENV)
+import Oper as O
+import SemSeqENV(sem)
+--import Epic.Print
+
+denSemDesugar :: SrcExpr -> IO Oper
+denSemDesugar = return . syntax
+
+denSem :: Oper -> IO [ENV]
+denSem = return . sem
+
+-- Monad for generating new names
+type N a = State Int a
+
+newVar :: String -> N Ident
+newVar s = do
+  i <- get
+  put (i+1)
+  return $ Ident $ s ++ "_" ++ show i
+
+newVars :: Int -> String -> N [Ident]
+newVars n s = replicateM n (newVar s)
+
+ident :: E.Ident -> Ident
+ident (E.Ident _ i) = Ident i
+
+us :: Ident
+us = Ident "_"
+
+isUs :: Ident -> Bool
+isUs = (us ==)
+
+seqs :: [Oper] -> Oper
+seqs = foldr (.:>:) NoOp
+
+asVar :: String -> Ident -> N (Oper, Ident)
+asVar s (Ident "_") = do
+  o <- newVar s
+  pure (Exi o, o)
+asVar _ o = pure (NoOp, o)
+
+toVar :: String -> SrcExpr -> N (Oper, Ident)
+toVar _ (Variable x) = pure (NoOp, ident x)
+toVar s e = do
+  o <- newVar s
+  op <- srcExprToOperN us o e
+  pure (Exi o :>: op, o)
+
+syntax :: SrcExpr -> Oper
+syntax = syntax' us (Ident "res")
+
+syntax' :: Ident -> Ident -> SrcExpr -> Oper
+syntax' i o e = Scope $ evalState (srcExprToOperN i o e) 1
+
+srcExprToOperN :: Ident -> Ident -> SrcExpr -> N Oper
+srcExprToOperN = to where
+  to u o expr =
+    case expr of
+      Lit (LInt k)         -> pure $ u .:=  k  .:>: o .:=  k
+      Variable x           -> pure $ u .:=: x' .:>: o .:=: x' where x' = ident x
+--      EPrim p              -> to $ Var $ Ident $ drop 1 $ show p
+      ApplyD e0 e1         -> do
+        (op0, f) <- toVar "f" e0
+        (op1, a) <- toVar "a" e1
+        pure $ seqs [op0, op1, o :=@ (f,a), u .:=: o]
+      Unify e0 e1
+        | isUs u, isUs o, Variable x <- e0, Lit (LInt k) <- e1 -> pure $ ident x := k
+        | isUs u, isUs o, Variable x <- e0, Variable y   <- e1 -> pure $ ident x :=: ident y
+        | otherwise        -> do
+            (opo, o') <- asVar "o" o
+            op0 <- to u o' e0
+            op1 <- to u o' e1
+            pure $ seqs [opo, op0, op1]
+      Seq e0 e1            -> do
+        op0 <- to us us e0
+        op1 <- to  u  o e1
+        pure $ op0 .:>: op1
+      Choice e0 e1         -> (:|:) <$> to u o e0 <*> to u o e1
+      E.Fail               -> pure O.Fail
+      DefineV i            -> pure $ Exi $ ident i
+      DefineE i e          -> do
+        let i' = ident i
+        op <- to u i' e
+        pure $ seqs [Exi i', op, o .:=: i']
+      Array es
+        | isUs u           -> do
+          ss <- newVars (length es) "s"
+          ops <- zipWithM (to us) ss es
+          pure $ seqs $ map Exi ss ++ ops ++ [ o :=<> ss ]
+        | otherwise        -> do
+          ts <- newVars (length es) "t"
+          ss <- newVars (length es) "s"
+          ops <- sequence (zipWith3 to ts ss es)
+          pure $ seqs $ map Exi ts ++ map Exi ss ++ ops ++ [ u :=<> ts, o :=<> ss ]
+      E.All e              -> do
+        y <- newVar "y"
+        op <- to us y e
+        pure $ seqs [u .:=: o, O.All o op y]
+      If3 e0 e1 e2         -> do
+        op0 <- to us us e0
+        op1 <- to  u  o e1
+        op2 <- to  u  o e2
+        pure $ If op0 op1 op2
+      OfType e1 _ e2       -> to u o $ ApplyD e2 e1
+      Function Closed e0 _ e1 -> do
+        (opu, u') <- asVar "h" u
+        i <- newVar "i"
+        x <- newVar "x"
+        k <- newVar "k"
+        y <- newVar "y"
+        c0 <- to i x e0
+        c1 <- to k y e1
+--  cq <- checkQ q u e0 -- XXX
+        pure $ opu .:>: (o :=\ (i, Exi x :>: c0, Exi k :>: Exi y :>: k :=@(u', x) :>: c1, y))
+      e -> error $ "srcExprToOperN: cannot handle " ++ show e
+
+
+(.:=) :: Ident -> Integer -> Oper
+Ident "_" .:= _ = NoOp
+i         .:= k = i := k
+
+(.:=:) :: Ident -> Ident -> Oper
+Ident "_" .:=: _ = NoOp
+i         .:=: j = i :=: j
+
+infixr 4 .:>:
+(.:>:) :: Oper -> Oper -> Oper
+NoOp .:>: o    = o
+o    .:>: NoOp = o
+o1   .:>: o2   = o1 :>: o2

@@ -19,6 +19,8 @@ import FrontEnd.Parse(parseDie, pFile)
 import FrontEnd.Prelude( findPrelude )
 --import FrontEnd.Error
 
+import DenSem.SExp
+
 -- Epic libraries
 import Epic.Repl
 import Epic.Print hiding( (<>) )   -- In this module (<>) is Prelude.<>
@@ -192,6 +194,7 @@ theCommandSet = CommandSet
       , Cmd "core [EXPR]"       "Convert [last] expression to Core"      (runGetterCore getCore)
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
+      , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
@@ -382,6 +385,23 @@ cEval
        ; when (fTraceEval flags) $
          displayDoc (addHeader "Evaluation trace" $ vcat $
                      pPrintTrace (fTraceVerbosity flags) tr)
+
+       ; return () }
+
+cDensem :: CmdRunner CState
+cDensem
+  = getInputExpr $ \e s ->
+    tryIt (pure s) (\_ -> pure s) $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       ; e_ds <- denSemDesugar e_ess
+       ; res <- denSem e_ds
+
+       ; displayDoc $ addHeader "Desugared" $
+         text $ show e_ds
+
+       ; displayDoc $ addHeader "Den-sem" $
+           text $ show res
 
        ; return () }
 
