@@ -87,6 +87,10 @@ srcExprToOperN = to where
         let i' = ident i
         op <- to u i' e
         pure $ seqs [Exi i', op, o .:=: i']
+      DefineIE i e          -> do
+        let i' = ident i
+        op <- to i' o e
+        pure $ seqs [Exi i', op, u .:=: i']
       Array es
         | isUs u           -> do
           ss <- newVars (length es) "s"
@@ -117,6 +121,23 @@ srcExprToOperN = to where
         c1 <- to k y e1
 --  cq <- checkQ q u e0 -- XXX
         pure $ opu .:>: (o :=\ (i, Exi x :>: c0, Exi k :>: k :=@(u', x) :>: c1, y))
+      Function Open e0 _ e1 -> do
+        (opu, h) <- asVar "h" u
+        i <- newVar "i"
+        x <- newVar "x"
+        k <- newVar "k"
+        y <- newVar "y"
+        c0 <- to i x e0
+        c1 <- to k y e1
+--  cq <- checkQ q u e0 -- XXX
+        pure $ opu .:>: (o :=\ (i,
+                                NoOp,
+                                If (Exi x :>: c0)
+                                   (Exi k :>: k :=@(h, x) :>: c1)
+                                   (y :=@(h, i)),
+                                y
+                               )
+                        )
       e -> error $ "srcExprToOperN: cannot handle " ++ show e
 
 
