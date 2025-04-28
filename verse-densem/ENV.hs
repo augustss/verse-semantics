@@ -1,7 +1,8 @@
 {-# OPTIONS_GHC -Wno-x-partial #-}
 module ENV(
   Ident(..),
-  univ,
+  univ, univInt,
+  numInt,
   fcnAdd, fcnLE, fcnInt, fcnAny,
   ENV,
     univE, failE,

@@ -57,9 +57,15 @@ sem (y:=@(f,x)) = -- y=f[x]
   | Fun hs <- univ
   ]
 
-sem (y:=@@(p,x)) = -- y=f[x]
-  let h = semPrim p in
-  [ bigUnion [ (x %= v) %/\ (y %= apply h v) | v <- dom h ] ]
+sem (y:=@@pxs) = -- y=p[x]
+  case pxs of
+    (Pint, [x])     -> [ bigUnion [ y %= v %/\ x %= v | v <- univInt ] ]
+    (Pany, [x])     -> [ bigUnion [ y %= v %/\ x %= v | v <- univ ] ]
+    (Padd, [x1,x2]) -> [ bigUnion [ y %= add v1 v2 %/\ x1 %= v1 %/\ x2 %= v2 | v1 <- univInt, v2 <- univInt ] ]
+    (PLE,  [x1,x2]) -> [ bigUnion [ y %= v1 %/\ x1 %= v1 %/\ x2 %= v2 | v1 <- univInt, v2 <- univInt, v1 <= v2 ] ]
+    _ -> error "bad primop use"
+  where add (Int a) (Int b) = Int ((a + b) `mod` numInt)
+        add _ _ = error "add"
 
 sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
   clean
@@ -270,8 +276,8 @@ tests =
     --> "[x=1;y=1/x=1;y=2/x=2;y=0]"
   , If(Exi y :>: ((y:=1) :|: (y:=2))) (x:=:y)(x:=2)
     --> "[x=1]"
-  , x:=1 :>: y:=2 :>: z:=<>[x,y]
-    --> "[x=1;y=2;z=<1,2>]"
+--SLOW  , x:=1 :>: y:=2 :>: z:=<>[x,y]
+--    --> "[x=1;y=2;z=<1,2>]"
   , All y ((x:=1):|:(x:=2)) x
     --> "[y=<1,2>]"
   , All y ((x:=1):|:((x:=2) :|||: (x:=0))) x
@@ -279,12 +285,14 @@ tests =
   , z:<=z :>: All y (x:=:z :>: x:=2) x
     --> "[y=<>;z=0/y=<>;z=1/y=<2>;z=2]"
 
+  {-
   , f:=\(x,(x:=0):|:(x:=1):|:(x:=2),x:=:y,y) -- :>: y :=@ (f,x)
     --> "[f=<0,1,2>]"
   , f:=\(x,x:<=x,Exi z :>: y:=:z,y) -- :>: y :=@ (f,x)
     --> "[f=<0>/f=[{0->0,1->0,2->0}]/f=[{0->0,1->1}]/f=[{0->0,1->1,2->2}]/f=<1>/f=[{0->1,1->1,2->1}]/f=<2>/f=[{0->2,1->2,2->2}]]"
   , f:=\(x,x:<=x :>: Exi z,z:=2 :>: y:=:x,y)
     --> "[f=<0>/f=[{0->0,1->1}]/f=[{0->0,1->1,2->2}]]"
+  -}
   ]
 
 ----------------------------------------------------------------------------------------

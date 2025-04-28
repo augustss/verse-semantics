@@ -3,7 +3,7 @@
 module Oper(
   Oper(..),
   pattern (:|||:),
-  pattern (:<=),
+--  pattern (:<=),
   PrimOp(..),
   Ident(..),
   exis,
@@ -15,10 +15,11 @@ import ENV(Ident(..))
 data Oper
   = Ident :=: Ident                      -- x=y
   | Ident :=  Integer                    -- x=k
+  | Ident :<= Ident                      -- x<=y
   | Ident :=<> [Ident]                   -- x=<y1,y2,...>
   | Exi Ident                            -- ∃x
   | Ident :=@ (Ident,Ident)              -- y=f[x]
-  | Ident :=@@ (PrimOp,Ident)            -- y=p[x]
+  | Ident :=@@ (PrimOp,[Ident])          -- y=p[<x1,...>]
   | Ident :=\ (Ident, Oper, Oper, Ident) -- f=\x.(op1){op2}(y)
   | Oper :>: Oper                        -- op1;op2
   | Oper :|: Oper                        -- op1|op2
@@ -52,21 +53,22 @@ pattern op1 :|||: op2 <- (getUChoice -> Just (op1, op2))
   where op1 :|||: op2 = Scope (Exi xx :>: If (xx := 0) op1 op2)
           where xx = Ident "_x"
 
-pattern (:<=) :: Ident -> Ident -> Oper
-pattern x :<= y = Scope (Exi (Ident "_xy") :>: Ident "_xy" :=<> [x,y]) :>: (Ident "_" :=@@ (PLE, Ident "_xy"))
-
 getUChoice :: Oper -> Maybe (Oper, Oper)
 getUChoice (Scope (Exi (Ident "_x") :>: If (Ident "_x" := 0) op1 op2)) = Just (op1, op2)
 getUChoice _ = Nothing
 
+--pattern (:<=) :: Ident -> Ident -> Oper
+--pattern x :<= y = Scope (Exi (Ident "_xy") :>: Ident "_xy" :=<> [x,y]) :>: (Ident "_" :=@@ (PLE, Ident "_xy"))
+
 instance Show Oper where
   show (x :=: y)           = show x ++ "=" ++ show y
+  show (x :<= y)           = show x ++ "<=" ++ show y
   show (x := k)            = show x ++ "=" ++ show k
 --  show (x :<= y)           = show x ++ "<=" ++ show y
   show (x :=<> ys)         = show x ++ "=<" ++ intercalate "," (map show ys) ++ ">"
   show (Exi x)             = "∃" ++ show x
   show (y:=@(f,x))         = show y ++ "=" ++ show f ++ "[" ++ show x ++ "]"
-  show (y:=@@(f,x))        = show y ++ "=" ++ show f ++ "[" ++ show x ++ "]"
+  show (y:=@@(f,xs))        = show y ++ "=" ++ show f ++ show xs
   show (f:=\(x,op1,op2,y)) = show f ++ "=\\" ++ show x ++ ".(" ++ show op1 ++ ")"
                              ++ "{" ++ show op2 ++ "}(" ++ show y ++ ")"
   show (op1 :>: op2)       = show1 ";" op1 ++ "; " ++ show1 ";" op2
@@ -93,7 +95,7 @@ free (x := _k)           = [x]
 free (x :=<> ys)         = nub (x:ys)
 free (Exi x)             = [x]
 free (y:=@(f,x))         = nub [f,x,y]
-free (y:=@@(_,x))        = nub [x,y]
+free (y:=@@(_,xs))       = nub (y:xs)
 free (f:=\(x,op1,op2,y)) = nub [f,y] `union` (free (Scope op1) \\ [x]) `union` (free (Scope op2) \\ (x:exis op1))
 free (op1 :>: op2)       = free op1 `union` free op2
 free (op1 :|: op2)       = free (Scope op1) `union` free (Scope op2)
