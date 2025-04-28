@@ -62,8 +62,8 @@ instance (Ord a, Ord b) => Eq (a :->? b) where
   x == y = compare x y == EQ
 
 instance (Show a, Show b) => Show (a :->? b) where
-  show (PFun _dom f) =
-    "{" ++ intercalate "," [ show x ++ "↦" ++ show (f x) | x <- dom ] ++ "}"
+  show (PFun dm f) =
+    "{" ++ intercalate "," [ show x ++ "↦" ++ show (f x) | x <- dm ] ++ "}"
 
 pointFcn :: Eq a => a -> b -> (a :->? b)
 pointFcn a b = PFun { dom = [a], apply = \ x -> if x == a then b else undefined }
