@@ -39,12 +39,15 @@ isUs = (us ==)
 seqs :: [Oper] -> Oper
 seqs = foldr (.:>:) NoOp
 
+-- Make sure the Ident is not _
 asVar :: String -> Ident -> N (Oper, Ident)
 asVar s (Ident "_") = do
   o <- newVar s
   pure (Exi o, o)
 asVar _ o = pure (NoOp, o)
 
+-- Put SrcExpr into a variable, special case if
+-- it's already a variable.
 toVar :: String -> SrcExpr -> N (Oper, Ident)
 toVar _ (Variable x) = pure (NoOp, ident x)
 toVar s e = do
@@ -52,12 +55,14 @@ toVar s e = do
   op <- srcExprToOperN us o e
   pure (Exi o :>: op, o)
 
+-- The final result ends up in 'res'
 syntax :: SrcExpr -> Oper
 syntax = syntax' us (Ident "res")
 
 syntax' :: Ident -> Ident -> SrcExpr -> Oper
 syntax' i o e = Scope $ evalState (srcExprToOperN i o e) 1
 
+-- Hack some identifiers into primitives.
 getPrim :: String -> Maybe O.PrimOp
 getPrim s =
   case s of
