@@ -61,18 +61,38 @@ sem (y:=@(f,x)) = -- y=f[x]
 sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
   clean
   [ bigUnion
-    [ (f %= Fun hs) %/\
-        bigIntersect
-        [ hide [x,y]
-            (env %/\ x%=v %/\ y%=apply h v)
-        | (h,env) <- hs `zip` envs
-        , v <- dom h
+    [ (f %= Fun hs) %/\ env
+    | (hs, env) <-
+        combine
+        [ pfuns x y env
+        | env <- sem (Scope (op1 :>: op2))
         ]
-    | Fun hs <- univ
-    , let envs = sem (Scope (op1 :>: op2))
-    , length hs == length envs
     ]
   ]
+ where
+  combine :: [[(a,ENV)]] -> [([a],ENV)]
+  combine []       = [([], univE)]
+  combine (xe:xes) =
+    filter ((failE /=) . snd) $
+    concat
+    [ [ (x:xs, env1 %/\ env2)
+      , (xs,   compl env1 %/\ env2)
+      ]
+    | (x, env1) <- xe
+    , (xs,env2) <- combine xes
+    ]
+
+  pfuns :: Ident -> Ident -> ENV -> [(Value :->? Value, ENV)]
+  pfuns x y env =
+    [ (PFun (map fst vws) (\v -> head [ w | (v',w) <- vws, v'==v ]), env)
+    | (vws, env) <- combine
+                    [ [ ((v,w), hide [x,y] (env' %/\ (y%=w) %/\ compl (env' %/\ compl (y%=w))))
+                      | let env' = env %/\ (x%=v)
+                      , w <- vals y env'
+                      ]
+                    | v <- vals x env
+                    ]
+    ]
 
 sem (op1 :|: op2) =
   sem op1 ++ sem op2
@@ -124,24 +144,20 @@ first  ys (env:envs) = env %\/ first ys [env' %\\ hide ys env | env'<-envs]
 tuples :: Ident -> Ident -> [ENV] -> ENV
 tuples x y envs =
   bigUnion
-  [ env %/\ x%=Tup vs
-  | (vs, env) <- combine
-                 [ [ (v, hide [y] (env %/\ y%=v))
-                   | v <- vals y env
-                   ]
-                 | env <- envs
-                 ]
+  [ isTuple vs y envs %/\ x%=Tup vs
+  | Tup vs <- univ
   ]
- where
-  combine [] = [([],univE)]
-  combine (ves:vess) =
-    concat
-    [ [ (vs, compl env1 %/\ env2)
-      , (v:vs, env1 %/\ env2)
-      ]
-    | (v,env1) <- ves
-    , (vs,env2) <- combine vess
-    ]
+
+isTuple :: [Value] -> Ident -> [ENV] -> ENV
+isTuple []    y []         = univE
+isTuple (_:_) y []         = failE
+isTuple vs    y (env:envs) =
+  bigUnion $
+  [ hide [y] (y%=v %/\ env) %/\ isTuple vs' y envs
+  | v:vs' <- [vs]
+  ] ++
+  [ compl (hide [y] env) %/\ isTuple vs y envs
+  ]
 
 -- helper function for lambdas
 isFun :: [Value :->? Value] -> (Ident,[ENV],Ident) -> ENV
@@ -191,8 +207,8 @@ main :: IO ()
 main =
   do putStrLn ("univ = " ++ show univ)
      putStrLn ""
---     sequence_ [ printSem e >> putStrLn "" | e <- examples ]
-     mapM_ printTest tests
+     sequence_ [ printSem e >> putStrLn "" | e <- examples ]
+--     mapM_ printTest tests
 
 printSem :: Oper -> IO ()
 printSem op =
@@ -206,6 +222,10 @@ printTest (op,res) = do
     putStrLn $ "test failed: " ++ show op ++ " " ++ show r ++ " /= " ++ res
 
 ----------------------------------------------------------------------------------------
+-- ∃h ; f=\i.(i=0){∃k_4; ∃y_5; k_4=h_1[x_3]; k_4=1; y_5=1}(y_5); res=f}
+
+
+
 
 -- These are somewhat error prone.
 -- If you forget, e.g., a binder for x in the semantic
@@ -232,7 +252,7 @@ examples =
   , All y x ((x:=1):|:((x:=2) :|||: (x:=0)))
 
   , f:=\(x,(x:=0):|:(x:=1):|:(x:=2),x:=:y,y) -- :>: y :=@ (f,x)
--- SLOW  , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
+  , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
   , f:=\(x,x:<=x,Exi z :>: y:=:z,y) -- :>: y :=@ (f,x)
   , f:=\(x,x:<=x :>: Exi z,z:=2 :>: y:=:x,y)
   ]
