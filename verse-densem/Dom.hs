@@ -9,7 +9,7 @@ module Dom(
   pointFcn,
   )where
 
-import Data.List( intercalate )
+import Data.List( intercalate, union )
 
 ----------------------------------------------------------------------------------------
 
@@ -61,5 +61,12 @@ instance (Show a, Show b) => Show (a :->? b) where
 
 pointFcn :: Eq a => a -> b -> (a :->? b)
 pointFcn a b = PFun { dom = [a], apply = \ x -> if x == a then b else undefined }
+
+emptyFcn :: a :->? b
+emptyFcn = PFun [] undefined
+
+(?\/) :: Ord a => (a :->? b) -> (a :->? b) -> (a :->? b)
+f1 ?\/ f2 = PFun (dom f1 `union` dom f2)
+                 (\x -> if x `elem` dom f1 then apply f1 x else apply f2 x)
 
 ----------------------------------------------------------------------------------------
