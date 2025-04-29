@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-x-partial #-}
+{-# OPTIONS_GHC -Wno-x-partial -Wno-name-shadowing #-}
 module ENV(
   Ident(..),
   univ, univInt,
@@ -182,6 +182,7 @@ bigUnique envs = go envs cenvs (tail nenvs)
   go [] _ _ = failE
   go (env:envs) (cenv:cenvs) (nenv:nenvs) =
     (env %/\ nenv) %\/ (cenv %/\ go envs cenvs nenvs)
+  go _ _ _ = error "bigUnique"
 
 quant :: Ident -> ([ENV] -> ENV) -> ENV -> ENV
 quant x bigOp env = bigOp [ hide [x] (env %/\ x%=v) | v <- vals x env ]
