@@ -127,7 +127,7 @@ sem (All x op y) =
         [ [ (v, hide [y] (env %/\ y%=v))
           | v <- vals y env
           ]
-        | env <- sem op
+        | env <- sem (Scope op)
         ]
     ]
   ]
