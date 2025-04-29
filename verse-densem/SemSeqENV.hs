@@ -63,6 +63,7 @@ sem (y:=@@pxs) = -- y=p[x]
     (Pany, [x])     -> [ bigUnion [ y %= v %/\ x %= v | v <- univ ] ]
     (Padd, [x1,x2]) -> [ bigUnion [ y %= add v1 v2 %/\ x1 %= v1 %/\ x2 %= v2 | v1 <- univInt, v2 <- univInt ] ]
     (PLE,  [x1,x2]) -> [ bigUnion [ y %= v1 %/\ x1 %= v1 %/\ x2 %= v2 | v1 <- univInt, v2 <- univInt, v1 <= v2 ] ]
+    (Pfun, [g])     -> [ bigUnion [ g %= f | f@(Fun _) <- univ ] ]
     _ -> error "bad primop use"
   where add (Int a) (Int b) = Int ((a + b) `mod` numInt)
         add _ _ = error "add"
@@ -70,38 +71,24 @@ sem (y:=@@pxs) = -- y=p[x]
 sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
   clean
   [ bigUnion
-    [ (f %= Fun hs) %/\ env
-    | (hs, env) <-
+    [ (f %= Fun (filter (not . null . dom) hs)) %/\ fenv
+    | (hs, fenv) <-
         combine
-        [ pfuns x y env
+        [ [ (mkFun (map fst vws) (\v -> head [ w | (v',w) <- vws, v'==v ]), penv)
+          | (vws, penv) <-
+              combine
+              [ [ ((v,w), hide [x,y] (xenv %/\ (y%=w)))
+                | let xenv = qenv %/\ (x%=v)
+                , w <- vals y xenv
+                ]
+              | v <- vals x qenv
+              ]
+          ]
         | env <- sem (Scope (op1 :>: op2))
+        , let qenv = quant y bigUnique env %/\ env
         ]
     ]
   ]
- where
-  combine :: [[(a,ENV)]] -> [([a],ENV)]
-  combine []       = [([], univE)]
-  combine (xe:xes) =
-    filter ((failE /=) . snd) $
-    concat
-    [ [ (x:xs, env1 %/\ env2)
-      , (xs,   compl env1 %/\ env2)
-      ]
-    | (x, env1) <- xe
-    , (xs,env2) <- combine xes
-    ]
-
-  pfuns :: Ident -> Ident -> ENV -> [(Value :->? Value, ENV)]
-  pfuns x y env =
-    [ (mkFun (map fst vws) (\v -> head [ w | (v',w) <- vws, v'==v ]), env)
-    | (vws, env) <- combine
-                    [ [ ((v,w), hide [x,y] (env' %/\ (y%=w) %/\ compl (env' %/\ compl (y%=w))))
-                      | let env' = env %/\ (x%=v)
-                      , w <- vals y env'
-                      ]
-                    | v <- vals x env
-                    ]
-    ]
 
 sem (op1 :|: op2) =
   sem op1 ++ sem op2
@@ -133,7 +120,16 @@ sem (If op1 op2 op3) =
   env = first zs (sem op1)
 
 sem (All x op y) =
-  [ tuples x y (sem (Scope op))
+  [ bigUnion
+    [ x%=Tup vs %/\ tenv
+    | (vs, tenv) <-
+        combine
+        [ [ (v, hide [y] (env %/\ y%=v))
+          | v <- vals y env
+          ]
+        | env <- sem op
+        ]
+    ]
   ]
 
 sem NoOp =
@@ -144,6 +140,21 @@ sem op =
   error ("no semantics yet for '" ++ show op ++ "'")
 -}
 
+-- super-duper combine function, solves all semantic problems
+
+combine :: [[(a,ENV)]] -> [([a],ENV)]
+combine []       = [([], univE)]
+combine (xe:xes) =
+  filter ((failE /=) . snd) $
+  concat
+  [ [ (x:xs, e  %/\ env)
+    , (xs,   e' %/\ env)
+    ]
+  | let e' = compl (bigUnion (map snd xe))
+  , (x,e)    <- xe
+  , (xs,env) <- combine xes
+  ]
+
 -- helper function for if
 
 semPrim :: PrimOp -> (Value :->? Value)
@@ -151,70 +162,11 @@ semPrim Padd = fcnAdd
 semPrim PLE  = fcnLE
 semPrim Pint = fcnInt
 semPrim Pany = fcnAny
+semPrim Pfun = fcnFun
 
 first :: [Ident] -> [ENV] -> ENV
 first _ys []         = failE
 first  ys (env:envs) = env %\/ first ys [env' %\\ hide ys env | env'<-envs]
-
-tuples :: Ident -> Ident -> [ENV] -> ENV
-tuples x y envs =
-  bigUnion
-  [ isTuple vs y envs %/\ x%=Tup vs
-  | Tup vs <- univ
-  ]
-
-isTuple :: [Value] -> Ident -> [ENV] -> ENV
-isTuple []    y []         = univE
-isTuple (_:_) y []         = failE
-isTuple vs    y (env:envs) =
-  bigUnion $
-  [ hide [y] (y%=v %/\ env) %/\ isTuple vs' y envs
-  | v:vs' <- [vs]
-  ] ++
-  [ compl (hide [y] env) %/\ isTuple vs y envs
-  ]
-
--- helper function for lambdas
-isFun :: [Value :->? Value] -> (Ident,[ENV],Ident) -> ENV
-isFun [] (_,[],_) =
-  univE
-
-isFun (h:hs) (x,env:envs,y) =
-  isPartialFun h (x,env,y)
-    %/\ isFun hs (x,envs,y)
-
-isFun _ _ =
-  failE
-
-isPartialFun :: (Value :->? Value) -> (Ident,ENV,Ident) -> ENV
-isPartialFun h (x,env,y) =
-  bigIntersect
-  [ hide [x,y]
-      (env %/\ x%=v %/\ y%=apply h v)
-  | v <- dom h 
-  ]
-
-{-
-  -- 
-
-
-  -- domain of h is accepted by env1
-  bigIntersect [ hide (x:zs) (env1 %/\ (x %= v)) | v <- dom h ]
-  :/\
-  -- anything outside domain of h is not accepted by env1
-  compl (bigUnion [ hide (x:zs) (env1 %/\ (x %= v)) | v <- univ, v `notElem` dom h ])
-  :/\
-  -- 
-
-
-  
-  :/\ forAll x (dom h) (unique y 
-
-
-
-  | dom h == vals x env1 =  
-  | otherwise            = failE
--}
 
 ----------------------------------------------------------------------------------------
 
@@ -257,6 +209,7 @@ examples :: [Oper]
 examples =
   [ Scope $ Exi y :>: Exi z :>: y:=1 :>: z:=2 :>: y:<=x :>: x:<=z
   , (x:=1):|:(x:=2)
+  , Exi g :>: g:=@@(Pfun,[g]) :>: f:=\(x,NoOp,If(x:=1)(y:=2:>:y:=@(g,x))(y:=@(g,x)),y) -- f(1)<open>=2
   , If(x:=1)(x:=1)(x:=2) :>: ((x:=1):|:(x:=2))
   , ((x:=1):|:(x:=2)) :>: If(x:=1)(x:=1)(x:=2)
   , If(x:=1)(y:=2)(y:=3) :>: ((x:=1):|:(x:=2))
@@ -268,7 +221,7 @@ examples =
   , All y ((x:=1):|:((x:=2) :|||: (x:=0))) x
 
   , f:=\(x,(x:=0):|:(x:=1):|:(x:=2),x:=:y,y) -- :>: y :=@ (f,x)
-  , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
+  , f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
   , f:=\(x,x:<=x,Exi z :>: y:=:z,y) -- :>: y :=@ (f,x)
   , f:=\(x,x:<=x :>: Exi z,z:=2 :>: y:=:x,y)
   ]

@@ -3,7 +3,7 @@ module ENV(
   Ident(..),
   univ, univInt,
   numInt,
-  fcnAdd, fcnLE, fcnInt, fcnAny,
+  fcnAdd, fcnLE, fcnInt, fcnAny, fcnFun,
   ENV,
     univE, failE,
     hide, compl,
@@ -11,6 +11,8 @@ module ENV(
     vals,
   bigUnion,
   bigIntersect,
+  bigUnique,
+  quant,
   clean,
   ) where
 
@@ -47,13 +49,13 @@ mkDomRng fdom frng =
   in  map mkMapping fs
 
 univ :: [Value]
-univ = usort $ Fun [fcnAny] : univ'
+univ = usort $ {- Fun [fcnAny] : -} univ'
 
 univ' :: [Value]
 univ' = usort $
      univInt
-  ++ univTuples  -- Comment out this for better speed
-  ++ univIntToInt
+  -- ++ univTuples  -- Comment out this for better speed
+  -- ++ univIntToInt
   ++ [ Fun [ mkFun [0] id, mkFun [1] id, mkFun [2] id ]  -- = <0,1,2>
      , Fun [ mkFun univInt id ]
      , Fun [ mkFun [0,1] id ]
@@ -65,7 +67,7 @@ univ' = usort $
      | k <- ints
      , let f _ = Int k
      ]
-  ++ [Fun [fcnAdd], Fun [fcnLE], Fun [fcnInt] ]
+  -- ++ [Fun [fcnAdd], Fun [fcnLE], Fun [fcnInt] ]
 
 usort :: Ord a => [a] -> [a]
 usort = map head . group . sort
@@ -84,6 +86,9 @@ fcnInt = mkFun (map fst xy) (\ x -> fromJust $ lookup x xy)
 
 fcnAny :: Value :->? Value
 fcnAny = mkFun univ' id
+
+fcnFun :: Value :->? Value
+fcnFun = mkFun [ f | f@(Fun _) <- univ' ] id
 
 ----------------------------------------------------------------------------------------
 
@@ -167,6 +172,19 @@ bigUnion = foldr (%\/) failE
 
 bigIntersect :: [ENV] -> ENV
 bigIntersect = foldr (%/\) univE
+
+bigUnique :: [ENV] -> ENV
+bigUnique envs = go envs cenvs (tail nenvs)
+ where
+  cenvs = map compl envs
+  nenvs = scanr (%/\) univE cenvs
+
+  go [] _ _ = failE
+  go (env:envs) (cenv:cenvs) (nenv:nenvs) =
+    (env %/\ nenv) %\/ (cenv %/\ go envs cenvs nenvs)
+
+quant :: Ident -> ([ENV] -> ENV) -> ENV -> ENV
+quant x bigOp env = bigOp [ hide [x] (env %/\ x%=v) | v <- vals x env ]
 
 (%\\) :: ENV -> ENV -> ENV
 env1 %\\ env2 = env1 %/\ compl env2

@@ -35,6 +35,7 @@ data PrimOp
   | PLE                                  -- x<=y
   | Pint                                 -- int[x]
   | Pany                                 -- any[x]
+  | Pfun                                 -- isFun[f]
  deriving ( Eq, Ord, Show )
 
 {-
