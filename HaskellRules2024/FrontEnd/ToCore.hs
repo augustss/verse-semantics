@@ -4,7 +4,7 @@
 {-# HLINT ignore "Eta reduce" #-}
 
 module FrontEnd.ToCore(
-    convertToCore, convert
+    convertToCore, convertToPrepdCore, convert
   ) where
 
 import Prelude hiding (pi)
@@ -35,11 +35,21 @@ import Debug.Trace ( traceM )
 
 convertToCore :: Flags -> SrcCore -> IO Core.Expr
 convertToCore flags src
-  = do { core <- runD flags Core.Fail (convert src)
-       ; when (fTraceDesugar flags) $
-         do { putStrLn ("\n------- Convert to core ---------")
-            ; putStrLn (render (indent (pPrint core))) }
+  = runD flags Core.Fail $
+    do { core <- convert src
+       ; traceD "Convert to core" (pPrint core)
        ; return core }
+
+convertToPrepdCore :: Flags -> SrcCore -> IO Core.Expr
+convertToPrepdCore flags src
+  = runD flags Core.Fail $
+    do { core <- convert src
+       ; traceD "Convert to core" (pPrint core)
+
+       ; let prepd_core = Core.prep core
+       ; traceD "Prep'd core" (pPrint prepd_core)
+
+       ; return prepd_core }
 
 --------------------------------------------------------
 --
@@ -182,7 +192,7 @@ errUndefined is = do
     mapM_ reportScopeErr is
 
 reportScopeErr :: Ident -> DsM ()
-reportScopeErr i@(Ident l _) = do
-  do { -- traceM $ "scopeCheck: warning undefined " ++ prettyShow (l, i)
+reportScopeErr i@(Ident _l _) = do
+  do { -- traceM $ "scopeCheck: warning undefined " ++ prettyShow (_l, i)
        putScopeErr i }
 

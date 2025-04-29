@@ -10,6 +10,7 @@ module FrontEnd.Expr(
     , SrcExpr(..), Lit(..), Path(..)
     , Aperture(..), defaultAperture
     , SrcPat, SrcEssential, SrcMini, SrcCore, SrcBlk, SrcValue
+    , PrimOp(..)
 
       -- Predicates on SrcExpr
     , isConst, isAtomic, isValue
@@ -329,12 +330,9 @@ eCheck :: Eff -> SrcExpr -> SrcExpr
 --
 -- But do NOT discard the Check for (Check fxs (\x.(e1){e2})), say, because
 -- tha lambda generates a `verify` that must be inside a Check
-eCheck fxs e
-  | isTopEff fxs                      = e
---   | isValue e, valueSatisfies fxs     = e
-eCheck fxs1 (Check fxs2 e)            = Check (fxs1 `intersectEffects` fxs2) e
--- eCheck fxs1 (OfType e1 fxs2 e2)       = OfType e1 (fxs1 `intersectEffects` fxs2) e2
-eCheck fxs e                          = Check fxs e
+eCheck fxs1 (Check fxs2 e)  = eCheck (fxs1 `intersectEffects` fxs2) e
+eCheck fxs e | isTopEff fxs = e
+             | otherwise    = Check fxs e
 
 eExists :: [Ident] -> SrcExpr -> SrcExpr
 -- Smart constructor, drops empty list of binders

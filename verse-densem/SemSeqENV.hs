@@ -2,7 +2,6 @@
 {-# LANGUAGE TypeOperators #-}
 module SemSeqENV where
 import Control.Monad
-import Data.List( union )
 
 import Dom
 import ENV
@@ -58,6 +57,10 @@ sem (y:=@(f,x)) = -- y=f[x]
   | Fun hs <- univ
   ]
 
+sem (y:=@@(p,x)) = -- y=f[x]
+  let h = semPrim p in
+  [ bigUnion [ (x %= v) %/\ (y %= apply h v) | v <- dom h ] ]
+
 sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
   clean
   [ bigUnion
@@ -84,7 +87,7 @@ sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
 
   pfuns :: Ident -> Ident -> ENV -> [(Value :->? Value, ENV)]
   pfuns x y env =
-    [ (PFun (map fst vws) (\v -> head [ w | (v',w) <- vws, v'==v ]), env)
+    [ (mkFun (map fst vws) (\v -> head [ w | (v',w) <- vws, v'==v ]), env)
     | (vws, env) <- combine
                     [ [ ((v,w), hide [x,y] (env' %/\ (y%=w) %/\ compl (env' %/\ compl (y%=w))))
                       | let env' = env %/\ (x%=v)
@@ -116,14 +119,14 @@ sem (Scope op) =
   
 sem (If op1 op2 op3) =
   clean $
-    [ hide zs (env %/\ env2) | env2 <- sem op2 ]
+    [ hide zs (env %/\ env2) | env2 <- sem (Scope op2) ]
   `unionHat`
-    [ env3 %\\ hide zs env   | env3 <- sem op3 ]
+    [ env3 %\\ hide zs env   | env3 <- sem (Scope op3) ]
  where
   zs  = exis op1
   env = first zs (sem op1)
 
-sem (All x y op) =
+sem (All x op y) =
   [ tuples x y (sem (Scope op))
   ]
 
@@ -136,6 +139,12 @@ sem op =
 -}
 
 -- helper function for if
+
+semPrim :: PrimOp -> (Value :->? Value)
+semPrim Padd = fcnAdd
+semPrim PLE  = fcnLE
+semPrim Pint = fcnInt
+semPrim Pany = fcnAny
 
 first :: [Ident] -> [ENV] -> ENV
 first _ys []         = failE
@@ -230,10 +239,11 @@ printTest (op,res) = do
 -- These are somewhat error prone.
 -- If you forget, e.g., a binder for x in the semantic
 -- equations, you'll get the x here.
-x,y,z,f,g :: Ident
+x,y,z,w,f,g :: Ident
 x = Ident "x"
 y = Ident "y"
 z = Ident "z"
+w = Ident "w"
 f = Ident "f"
 g = Ident "g"
 
@@ -248,8 +258,8 @@ examples =
   , y:<=y :>: If(((y:=1) :|: (y:=2))) (x:=1)(x:=2)
   , If(Exi y :>: ((y:=1) :|: (y:=2))) (x:=:y)(x:=2)
   , x:=1 :>: y:=2 :>: z:=<>[x,y]
-  , All y x ((x:=1):|:(x:=2))
-  , All y x ((x:=1):|:((x:=2) :|||: (x:=0)))
+  , All y ((x:=1):|:(x:=2)) x
+  , All y ((x:=1):|:((x:=2) :|||: (x:=0))) x
 
   , f:=\(x,(x:=0):|:(x:=1):|:(x:=2),x:=:y,y) -- :>: y :=@ (f,x)
   , z:<=z :>: f:=\(x,x:<=x,y:=:z,y) -- :>: y :=@ (f,x)
@@ -282,11 +292,11 @@ tests =
     --> "[x=1]"
   , x:=1 :>: y:=2 :>: z:=<>[x,y]
     --> "[x=1;y=2;z=<1,2>]"
-  , All y x ((x:=1):|:(x:=2))
+  , All y ((x:=1):|:(x:=2)) x
     --> "[y=<1,2>]"
-  , All y x ((x:=1):|:((x:=2) :|||: (x:=0)))
+  , All y ((x:=1):|:((x:=2) :|||: (x:=0))) x
     --> "[y=<1,0>/y=<1,2>]"
-  , z:<=z :>: All y x (x:=:z :>: x:=2)
+  , z:<=z :>: All y (x:=:z :>: x:=2) x
     --> "[y=<>;z=0/y=<>;z=1/y=<2>;z=2]"
 
   , f:=\(x,(x:=0):|:(x:=1):|:(x:=2),x:=:y,y) -- :>: y :=@ (f,x)

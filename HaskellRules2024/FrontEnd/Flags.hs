@@ -25,6 +25,8 @@ data Flags = Flags
   , fNoWarn         :: !Bool
   , fKeepIf         :: !Bool
   , fAllAsIter      :: !Bool
+  , fDsUniform      :: !Bool   -- Desugar Essential->Mini in a "uniform" way
+                               -- i.e. without using "\bullet"
   }
   deriving (Show)
 
@@ -47,6 +49,7 @@ defaultFlags = Flags
   , fNoWarn         = False
   , fKeepIf         = False
   , fAllAsIter      = False
+  , fDsUniform      = False
   }
 
 showFlags :: Flags -> String

@@ -5,11 +5,12 @@
 module Dom(
   Value(..),
   pattern Tup,
-  (:->?)(..),
+  (:->?), dom, apply,
+  mkFun,
   pointFcn,
   )where
 
-import Data.List( intercalate, union )
+import Data.List( intercalate, union, sort )
 
 ----------------------------------------------------------------------------------------
 
@@ -48,6 +49,11 @@ getTup _ = Nothing
 data a :->? b
   = PFun{ dom :: [a], apply :: a -> b }
 
+-- The domain must be in a canonical for, otherwise
+-- the Ord instance does not work.
+mkFun :: Ord a => [a] -> (a -> b) -> (a :->? b)
+mkFun adom aapply = PFun { dom = sort adom, apply = aapply }
+
 instance (Ord a, Ord b) => Ord (a :->? b) where
   PFun dom1 f `compare` PFun dom2 g =
     [(x,f x)|x<-dom1] `compare` [(x,g x)|x<-dom2]
@@ -56,8 +62,8 @@ instance (Ord a, Ord b) => Eq (a :->? b) where
   x == y = compare x y == EQ
 
 instance (Show a, Show b) => Show (a :->? b) where
-  show (PFun dom f) =
-    "{" ++ intercalate "," [ show x ++ "->" ++ show (f x) | x <- dom ] ++ "}"
+  show (PFun dm f) =
+    "{" ++ intercalate "," [ show x ++ "↦" ++ show (f x) | x <- dm ] ++ "}"
 
 pointFcn :: Eq a => a -> b -> (a :->? b)
 pointFcn a b = PFun { dom = [a], apply = \ x -> if x == a then b else undefined }

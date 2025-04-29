@@ -14,7 +14,7 @@
 \renewcommand{\ss}{\M{ss}}
 \renewcommand{\S}{\M{S}}
 \renewcommand{\Sp}{\M{S\P}}
-\newcommand{\U}{\M{\SPP\hat{\bigcup}\SPP}}
+\newcommand{\UU}{\M{\SPP\hat{\bigcup}\SPP}}
 \newcommand{\e}{\M{e}}
 \newcommand{\ep}{\M{\e\P}}
 \newcommand{\op}{\M{\mathit{op}}}
@@ -23,7 +23,7 @@
 \newcommand{\x}{\M{x}}
 \newcommand{\xp}{\M{\x\P}}
 \newcommand{\y}{\M{y}}
-\newcommand{\yp}{\M{\y\P}} 
+\newcommand{\yp}{\M{\y\P}}
 \newcommand{\z}{\M{z}}
 \renewcommand{\k}{\M{k}}
 \newcommand{\kp}{\M{\k\P}}
@@ -86,7 +86,7 @@
 
 \begin{figure}
   $$
-  \begin{array}{l} 
+  \begin{array}{l}
 
 \textbf{Domains (sets)}                              \\
 \begin{array}{rcll}
@@ -107,8 +107,8 @@
                                                        \rho(\x)\in \F\Lam\rho }}                \\
  \E {\x=\y[\z]} \X          & = &
                      \begin{array}[t]{l@{~}l}
-                     \bigcup_{\fs\in\Fun} [\SP\{ \rho \SP\alt & \pick\rho{\Envs\X} \and  \\
-                                                         & \inrho\y=\fs \and 
+                     \UU_{\fs\in\Fun} [\SP\{ \rho \SP\alt & \pick\rho{\Envs\X} \and  \\
+                                                         & \inrho\y=\fs \and
                                                           \pairin{\inrho\z}{\inrho\x}\f \SPP\}
                                                          \SPP\alt\SPP {\pick \f \fs} \SPP ]
                                         \end{array} \\
@@ -136,11 +136,11 @@
 \begin{array}{rcl}
   \IF{\_}{\_}{\_}{\_} & : &  \totfun{\Set\Ident \times \Set\Env \times \Ws \times \Ws}{\Ws}    \\
   \IF\Y\s\Thens\Elses & = &  \seqcomp { \setmin{(\s \cap \sp)}\Y} { \pick\sp\Thens }           \\
-                      &   &  \U                                                              \\
+                      &   &  \UU                                                              \\
                       &   &  \seqcomp { \sp-(\setmin\s\Y) } { \pick\sp\Elses }                 \\\\
   \ONE{\_}{\_}        & : & \totfun{\Set\Ident \times \Ws}{\Set\Env}                           \\
   \ONE\X{\seq{}}      & = & \set{}                                                             \\
-  \ONE\X{\s:\S}       & = & \s \U \setcomp\rho{\rho\in\ONE\X\S \and \forall\rhop\in\s.\SP
+  \ONE\X{\s:\S}       & = & \s \UU \setcomp\rho{\rho\in\ONE\X\S \and \forall\rhop\in\s.\SP
                                                        (\setmin\rho\X)\not=(\setmin\rhop\X)}   \\
                                                                                                \\
   \EMPTY\y            & : &  \totfun\Ident\Ws                                                  \\
@@ -176,24 +176,23 @@
 
 \begin{figure}
   $$
- \begin{array}{l} 
+ \begin{array}{l}
  \begin{array}{rcl}
   \Envs\X       & : & \totfun{\Set\Ident}{\Set\Env}                                          \\
   \Envs\X       & = & \text{For a set of identifers, }\X\text{, yield all environments }
                    \rho\text{ such that } \X= \dom(\rho)                                     \\
   \pairin\x\y\f & : & \totfun{\Val \times \Val\times(\parfun\Val\Val)}{Bool}                 \\
-  \S \U \Sp   & : & \totfun{\Ws \times\, \Ws}\Ws                                          \\
-  \S \U \Sp   & = & \seqcomp{ \s_i \cup \sp_i}{ \pick i{1\dots n} \and
+  \S \UU \Sp   & : & \totfun{\Ws \times\, \Ws}\Ws                                          \\
+  \S \UU \Sp   & = & \seqcomp{ \s_i \cup \sp_i}{ \pick i{1\dots n} \and
                                 \text{pad}(\S) = \seq{ \s_1 \dots \s_n } \and
                                 \text{pad}(\Sp) = \seq{ \sp_1 \dots \sp_n }}                 \\
   \setmin\s\X   & : & \totfun{\Ws \times\, \Set\Ident}\Ws                                    \\
   \setmin\s\X   & = & \setcomp{\setmin\rho\X}{\pick\rho\s}                                   \\
   \s-\sp        & : & \totfun{\Set\Env\times\Set\Env}\Set\Env                                \\
   \concat\S\Sp  & : & \totfun{\Ws\times\Ws}\Ws                                               \\
-  \Exis\op      & : & \Set\Ident                                                             \\ 
+  \Exis\op      & : & \Set\Ident                                                             \\
  \end{array}
   \end{array}
   $$
 \caption{Auxilliaries}
 \end{figure}
-

@@ -19,6 +19,8 @@ import FrontEnd.Parse(parseDie, pFile)
 import FrontEnd.Prelude( findPrelude )
 --import FrontEnd.Error
 
+import DenSem.SExp
+
 -- Epic libraries
 import Epic.Repl
 import Epic.Print hiding( (<>) )   -- In this module (<>) is Prelude.<>
@@ -192,6 +194,7 @@ theCommandSet = CommandSet
       , Cmd "core [EXPR]"       "Convert [last] expression to Core"      (runGetterCore getCore)
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
+      , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
@@ -276,7 +279,8 @@ cSet b l s =
 flagTable :: [(String, (Flags -> Bool, Bool -> Flags -> Flags))]
 flagTable =
   [("verify",      (fVerify,       \ b s -> s{fVerify=b}))
-  ,("trace-eval",   (fTraceEval,    \ b s -> s{fTraceEval=b}))
+  ,("trace-eval",  (fTraceEval,    \ b s -> s{fTraceEval=b}))
+  ,("ds-uniform",  (fDsUniform,    \ b s -> s{fDsUniform=b}))
 --  ,("simplify",    (fSimplify,     \ b s -> s{fSimplify=b}))
 --  ,("split",       (fSplit,        \ b s -> s{fSplit=b}))
 --  ,("trace",       (fTrace,        \ b s -> s{fTrace=b}))
@@ -341,7 +345,7 @@ getEssential _ e_parsed
 getMini :: Flags -> SrcExpr -> DsM SrcMini
 getMini flags e_parsed
   = do { e_ess  <- getEssential flags e_parsed
-       ; e_mini <- essToMini e_ess
+       ; e_mini <- essToMini flags e_ess
        ; printWithHdr "Mini" (pPrint e_mini)
        ; return e_mini }
 
@@ -357,18 +361,17 @@ getCore :: Flags -> SrcExpr -> DsM Core.Expr
 getCore flags e_parsed
   = do { e_src_core <- getSrcCore flags e_parsed
        ; e_core     <- convert e_src_core
-       ; printWithHdr "Core" (pPrint e_core)
-       ; return e_core }
-
+       ; let prepd_core = Core.prep e_core
+       ; printWithHdr "Prep'd Core" (pPrint prepd_core)
+       ; return prepd_core }
 
 cEval :: CmdRunner CState
 cEval
   = getInputExpr $ \e s ->
     tryIt (pure s) (\_ -> pure s) $
     do { let flags = cs_flags s
-       ; core <- runD flags Core.Fail (getCore flags e)
-       ; let prepd_core = Core.prep core
-             rules | fVerify flags = everywhere verificationRules
+       ; prepd_core <- runD flags Core.Fail (getCore flags e)
+       ; let rules | fVerify flags = everywhere verificationRules
                    | otherwise     = everywhere runtimeRules
        ; let (res, tr) = Core.normalize (fRewriteSteps flags) rules prepd_core
 
@@ -382,6 +385,23 @@ cEval
        ; when (fTraceEval flags) $
          displayDoc (addHeader "Evaluation trace" $ vcat $
                      pPrintTrace (fTraceVerbosity flags) tr)
+
+       ; return () }
+
+cDensem :: CmdRunner CState
+cDensem
+  = getInputExpr $ \e s ->
+    tryIt (pure s) (\_ -> pure s) $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       ; e_ds <- denSemDesugar e_ess
+       ; res <- denSem e_ds
+
+       ; displayDoc $ addHeader "Desugared" $
+         text $ show e_ds
+
+       ; displayDoc $ addHeader "Den-sem" $
+           text $ show res
 
        ; return () }
 

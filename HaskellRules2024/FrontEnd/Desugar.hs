@@ -14,7 +14,7 @@ import Prelude hiding (pi)
 import FrontEnd.Error
 import FrontEnd.Expr
 import FrontEnd.Flags
-import Core.Expr  ( PrimOp(..), allPrimOps, primOpString )
+import Core.Expr  ( allPrimOps, primOpString )
 
 -- Epic libraries
 import Epic.Print
@@ -62,7 +62,7 @@ desugar flgs add_verification e_parsed
        ; e_essential <- sDesugarExpr e_prel
        ; _ <- traceDS "Superficial desugaring into Essential Verse" e_essential
 
-       ; e_mini <- essToMini e_essential
+       ; e_mini <- essToMini flgs e_essential
        ; _ <- traceDS "Desugar Essential Verse into Mini Verse" e_mini
 
        ; e_ds <- miniToCore add_verification e_mini
@@ -677,16 +677,55 @@ the function definition.  This is the "pushing down" in `essToMini`:
 * The EffContext pushes into the body (range) of the function
 * It gets intersected into any |> opacity constructs
 
-The EffContext is also used in essToMini 
+The EffContext is also used in essToMini
+
+Note [The Input parameter to essToMini]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The `Input` parameter to `essToMini` corresponds to the `u` part of the
+`kappa` argument to W in Fig 6: "Desugaring Essential Verse to MiniVerse".
+
+    u ::= bullet   -- Data constructor NoInput
+        | e        -- Data constructor PI
+
+When we are doing "uniform" desugaring (see flag `fDsUniform`), the `NoInput`
+form should be equivalent to a unification variable. Thus
+   W[e] NoInput   is equivalent to     exist i. W[e] (PI i)
+
+But in many cases it simply adds clutter to create the logic variable. E.g.
+   W[k] NoInput  =  exists i. W[k] PI(i)  = exists i. i=k   =  k
+
+So even when doing "uniform" desugaring, we use `NoInput` to say
+"not-yet-created unification variable".  When does it matter?
+
+  * In all the `ueq` cases, we don't need to create it at all;
+    see the example above.
+
+  * For `Array` and `Truth` it takes a little more thought, but in fact
+    we still don't need to create the unification varialbe.
+
+  * Only in the cases for `Range` (:t) and `Function` do we do something
+    special: there we call `try_again` which creates the logical variable
+    and tries again
+
+This little optimisation eliminates a huge amount of crap.
 -}
 
-essToMini :: SrcEssential -> DsM SrcMini
+essToMini :: Flags -> SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
-essToMini orig_e = go_expr orig_e
+-- See Note [The Input parameter to essToMini]
+essToMini flags orig_e = go_expr orig_e
   where
-    kap_init = WC { wc_inp = NoInput, wc_fxs = DomCtxt }
+    go_expr :: SrcEssential -> DsM SrcMini
+    -- Desugar an expression with "no input"
+    go_expr t = go (WC { wc_inp = NoInput, wc_fxs = DomCtxt }) t
 
-    go_expr = go kap_init
+    try_again :: WContext -> SrcEssential -> DsM SrcMini
+    -- The context has NoInput; try again with a unification variable
+    try_again kap t
+      = do { r <- newIdent (getLoc t) "r"
+           ; let kap' = kap { wc_inp = PI (Variable r) }
+           ; t' <- go kap' t
+           ; return (eSeq [DefineV r, t']) }
 
     go :: WContext -> SrcEssential -> DsM SrcMini
     -- Typically (go kap t) = e, where `kap::(Input,[Eff])` is short for `kappa`
@@ -713,7 +752,7 @@ essToMini orig_e = go_expr orig_e
 
     -- if, for, all one: WIF, WFOR, WALL, WONE
     go kap (If3 t1 t2 t3) = If3  <$> go_expr t1 <*> go kap t2 <*> go kap t3
-    go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go kap t2)
+    go kap (For2 t1 t2)   = kap `ueq` (For2   <$> go_expr t1 <*> go_expr t2)
     go kap (All t)        = kap `ueq` (All    <$> go_expr t)
     go kap (One t)        = kap `ueq` (One    <$> go_expr t)
 
@@ -732,17 +771,25 @@ essToMini orig_e = go_expr orig_e
                                ; return (eSeq [capture, e]) }
 
     -- WCHK: check<fx>{t}
-    go kap (Check fx t) = Check fx <$> go kap t
+    -- ToDo: check this use of ueq
+    -- Reason: desugaring    check<succ>{3} should no yield
+    --             exists r. check<succ>{r=3}
+    --    Better:  exists r. r=check<succ>{exists r2. r2=3}
+    go kap (Check fx t) = kap `ueq` (Check fx <$> go_expr t)
 
     -- WCOL1, WCOL2, WCOL3: (:t)
-    go (WC { wc_inp = inp, wc_fxs = cfxs }) (Range t)
+    go kap@(WC { wc_inp = inp, wc_fxs = cfxs }) t@(Range ty)
       = case inp of
-          NoInput -> do { e <- go_expr t
-                        ; x <- newIdent (getLoc t) "x"
-                        ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
+          NoInput
+               | fDsUniform flags
+               -> try_again kap t
+               | otherwise
+               -> do { e <- go_expr ty
+                     ; x <- newIdent (getLoc t) "x"
+                     ; return (eSeq [DefineV x, ApplyD e (Variable x)]) }
           PI i -> case cfxs of
-                     DomCtxt     -> ApplyD <$> go_expr t <*> pure i
-                     RngCtxt fxs -> OfType i fxs <$> go_expr t
+                     DomCtxt     -> ApplyD <$> go_expr ty <*> pure i
+                     RngCtxt fxs -> OfType i fxs <$> go_expr ty
                        -- See Note [Pushing down the effects]
 
     -- WOFTYPE: t1 |> t2
@@ -789,18 +836,22 @@ essToMini orig_e = go_expr orig_e
     -- truth{t}: WTRU1 and WTRU2
     go kap@(WC { wc_inp = inp }) (Truth t)
       = case inp of
-          NoInput -> Truth <$> go (kap { wc_inp = NoInput }) t
+          NoInput -> Truth <$> go kap t
           PI i -> do { j <- newIdent (getLoc t) "j"
                      ; e <- go (kap { wc_inp = PI (Variable j) }) t
                      ; return (eSeq [ DefineV j, eUnify i (Truth (Variable j)), Truth e ]) }
 
     -- Functions: WFUN1, WFUN2
-    go (WC { wc_inp = inp }) (Function aperture t1 fxs1 t2)
+    go kap@(WC { wc_inp = inp }) t@(Function aperture t1 fxs1 t2)
       = case inp of
-          NoInput -> do { i <- newIdent (getLoc t1) "i"
-                        ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = DomCtxt }
-                              kap_body = WC { wc_inp = NoInput,         wc_fxs = RngCtxt fxs1 }
-                        ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1) (go kap_body t2) }
+          NoInput
+               | fDsUniform flags
+               -> try_again kap t
+               | otherwise
+               -> do { i <- newIdent (getLoc t1) "i"
+                     ; let kap_arg  = WC { wc_inp = PI (Variable i), wc_fxs = DomCtxt }
+                           kap_body = WC { wc_inp = NoInput,         wc_fxs = RngCtxt fxs1 }
+                     ; XDLam Closed i <$> go kap_arg t1 <*> fmap (eCheck fxs1) (go kap_body t2) }
           PI f -> do { i <- newIdent (getLoc t1) "i"
                      ; x <- newIdent (getLoc t2) "x"
                      ; let kap_arg  = WC { wc_inp = PI (Variable i),            wc_fxs = DomCtxt}
@@ -813,10 +864,9 @@ essToMini orig_e = go_expr orig_e
                                       -- IsFun[f]: see test M26Mar25-5
 
     -- Core constructs used (only) in the Prelude
-    -- Only used in the NoInput case
-    go (WC { wc_inp = NoInput }) (Lam x t)    = Lam x <$> go_expr t
-    go (WC { wc_inp = NoInput }) (Some t)     = Some  <$> go_expr t
-    go (WC { wc_inp = NoInput }) (Guard xs t) = Guard <$> go_expr xs <*> go_expr t
+    go kap (Lam x t)    = kap `ueq` (Lam x <$> go_expr t)
+    go kap (Some t)     = kap `ueq` (Some  <$> go_expr t)
+    go kap (Guard xs t) = Guard <$> go_expr xs <*> go kap t
 
     -- Report any un-handled cases
     go kap t = error $ "TODO: essToMini " ++ show (kap, t)
@@ -889,10 +939,10 @@ miniToCore add_verification e_top
     go md (All e)        = All <$> go_nt md e
 
     -- MOFTYPE-, MOFTYPE+X: (e1 |> e2)
-    go md@(sig,xs) (OfType e1 fx e2)
-      = case sig of
-          MX       -> do_mvmx
+    go md@(dsm,xs) (OfType e1 fx e2)
+      = case dsm of
           MI       -> do_mi
+          MX       -> do_mvmx
           MV False -> do { body <- do_mvmx
                          ; rest <- do_mi
                          ; return (eSeq [eVerify [] body, rest]) }
@@ -912,26 +962,17 @@ miniToCore add_verification e_top
         do_mvmx = do { e1' <- go_nt md e1   -- Notice md; may be MV or MX
                      ; e2' <- go_nt md e2
                      ; if isAtomic e1'  -- Just an optimisation
-                       then return (Check effSucceeds (ApplyD e2' e1'))
+                       then return (add_check dsm effSucceeds (ApplyD e2' e1'))
                        else do { r <- newIdent (getLoc e1) "r"
-                              ; return (eSeq [ DefineV r, eUnify (Variable r) (eCheck fx e1')
-                                             , Check effSucceeds (ApplyD e2' (Variable r)) ]) } }
+                              ; return (eSeq [ DefineV r
+                                             , eUnify (Variable r) $
+                                               add_check dsm fx e1'
+                                             , add_check dsm effSucceeds $
+                                               ApplyD e2' (Variable r)
+                                 ]) } }
 
     -- MCHECK-, MCHECK+X:  check<fx>{e}
-    go md@(m,_) (Check fx e)
-      = case m of
-           MV {} -> Check fx <$> go_nt md e   -- ToDo: check that go_mt
-
-           MI    -> go md e  -- No Check here: needed for tests
-                             -- M19Mar25-2, M20Dec24-1, S1Aug24-3, T29Jul24-3
-                             -- Transparent functions act like "macros"
-
-           MX    -> Check fx <$> go md e
-                    -- For consistency, we want no Check here either
-                    -- Again, transparent functions act like "macros"
-                    -- But if we remove the Check:
-                    --    S1Aug24-4, Ev23, EV23a start passing
-                    --    For6, check2, check7 start failing
+    go md@(dsm,_) (Check fx e) = add_check dsm fx <$> go_nt md e
 
     -- Functions proper: MCFUN+, MCFUN-, MCFUNX
     go (MV omit_client, xs) e@(XDLam Closed x e1 e2)
@@ -963,6 +1004,21 @@ miniToCore add_verification e_top
     go md (Some t)     = Some  <$> go md t
 
     go md e = error $ "TODO: miniToCore " ++ show (md, e)
+
+    add_check :: DsMode -> Eff -> SrcCore -> SrcCore
+    add_check MI      _  e = e
+    add_check MX      _  e = e
+    add_check (MV {}) fx e = eCheck fx e
+      -- No Check in the MX case: needed for tests
+      --    M19Mar25-2, M20Dec24-1, S1Aug24-3, T29Jul24-3
+      -- Transparent functions act like "macros"
+      --
+      -- For consistency, we want no Check in the MX case:
+      --    again, transparent functions act like "macros"
+      -- If we remove the Check in MX
+      --    For6, check2, check7 start failing
+      -- If we add the Check in MX
+      --    S1Aug24-4, Ev23, EV23a start failing
 
 shortCutDefnVerify :: SrcMini -> SrcMini -> Bool
 -- True if the expression definitely verifies

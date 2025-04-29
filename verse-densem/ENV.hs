@@ -2,6 +2,7 @@
 module ENV(
   Ident(..),
   univ,
+  fcnAdd, fcnLE, fcnInt, fcnAny,
   ENV,
     univE, failE,
     hide, compl,
@@ -12,15 +13,19 @@ module ENV(
   clean,
   ) where
 
-import Data.List( sort, group, intercalate )
+import Data.List( sort, group, intercalate, subsequences )
+import Data.Maybe(fromJust)
 --import qualified Data.Map as M
 
 import Dom
 
 ----------------------------------------------------------------------------------------
 
+numInt :: Integer
+numInt = 3
+
 ints :: [Integer]
-ints = [0..2]
+ints = [0..numInt-1]
 
 univInt :: [Value]
 univInt = map Int ints
@@ -29,24 +34,55 @@ univInt = map Int ints
 univTuples :: [Value]
 univTuples = [Tup []] ++ [ Tup [x] | x <- univInt ] ++ [ Tup [x,y] | x <- univInt, y <- univInt ]
 
+-- All int->int functions
+univIntToInt :: [Value]
+univIntToInt = [ Fun [f] | d <- subsequences univInt, f <- mkDomRng d univInt ]
+
+mkDomRng :: [Value] -> [Value] -> [Value :->? Value]
+mkDomRng fdom frng =
+  let rs = sequence $ replicate (length fdom) frng
+      fs = map (zip fdom) rs
+      mkMapping xys = mkFun (map fst xys) (\ x -> fromJust $ lookup x xys)
+  in  map mkMapping fs
+
 univ :: [Value]
-univ = usort $
+univ = usort $ Fun [fcnAny] : univ'
+
+univ' :: [Value]
+univ' = usort $
      univInt
   ++ univTuples  -- Comment out this for better speed
-  ++ [ Fun [ PFun [0] id, PFun [1] id, PFun [2] id ]  -- = <0,1,2>
-     , Fun [ PFun univInt id ]
-     , Fun [ PFun [0,1] id ]
+  ++ univIntToInt
+  ++ [ Fun [ mkFun [0] id, mkFun [1] id, mkFun [2] id ]  -- = <0,1,2>
+     , Fun [ mkFun univInt id ]
+     , Fun [ mkFun [0,1] id ]
      ]
   ++ concat
-     [ [ Fun [ PFun [0] f, PFun [1] f, PFun [2] f ]
-       , Fun [ PFun univInt f ]
+     [ [ Fun [ mkFun [0] f, mkFun [1] f, mkFun [2] f ]
+       , Fun [ mkFun univInt f ]
        ]
      | k <- ints
      , let f _ = Int k
      ]
+  ++ [Fun [fcnAdd], Fun [fcnLE], Fun [fcnInt] ]
 
 usort :: Ord a => [a] -> [a]
 usort = map head . group . sort
+
+fcnAdd :: Value :->? Value
+fcnAdd = mkFun (map fst xyz) (\ xy -> fromJust $ lookup xy xyz)
+  where xyz = [ (Tup [Int x, Int y], Int ((x + y) `rem` numInt)) | x <- ints, y <- ints ]
+
+fcnLE :: Value :->? Value
+fcnLE = mkFun (map fst xyz) (\ xy -> fromJust $ lookup xy xyz)
+  where xyz = [ (Tup [Int x, Int y], Int x) | x <- ints, y <- ints, x <= y ]
+
+fcnInt :: Value :->? Value
+fcnInt = mkFun (map fst xy) (\ x -> fromJust $ lookup x xy)
+  where xy = [ (Int x, Int x) | x <- ints ]
+
+fcnAny :: Value :->? Value
+fcnAny = mkFun univ' id
 
 ----------------------------------------------------------------------------------------
 
@@ -70,7 +106,8 @@ showE []  = "()"
 showE xvs = intercalate ";" [ show x ++ "=" ++ show v | (x,v) <- xvs ]
 
 (%=) :: Ident -> Value -> ENV
-x %= v = ENV [ [(x,v)] ]
+x %= v = if x == Ident "_" then error "_ in %=" else
+         ENV [ [(x,v)] ]
 
 univE :: ENV
 univE = ENV [ [] ]
