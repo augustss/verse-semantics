@@ -63,19 +63,19 @@ syntax' :: Ident -> Ident -> SrcExpr -> Oper
 syntax' i o e = Scope $ evalState (srcExprToOperN i o e) 1
 
 -- Hack some identifiers into primitives.
-getPrim :: String -> Maybe O.PrimOp
+getPrim :: String -> Maybe (O.PrimOp, Int)
 getPrim s =
   case s of
-    "operator'+'"  -> Just Padd
-    "operator'<='" -> Just PLE
-    "int"          -> Just Pint
-    "any"          -> Just Pany
+    "operator'+'"  -> Just (Padd, 2)
+    "operator'<='" -> Just (PLE,  2)
+    "int"          -> Just (Pint, 1)
+    "any"          -> Just (Pany, 1)
     _              -> Nothing
 
 apply :: Ident -> Ident -> Ident -> Oper
 apply o f@(Ident s) a
-  | Just p <- getPrim s = o :=@@(p,a)
-  | otherwise           = o :=@ (f,a)
+  | Just (p,1) <- getPrim s = o :=@@(p,[a])
+  | otherwise               = o :=@ (f,a)
 
 srcExprToOperN :: Ident -> Ident -> SrcExpr -> N Oper
 srcExprToOperN = to where
@@ -90,10 +90,16 @@ srcExprToOperN = to where
         | E.Ident l "_"<-x -> let v = E.Ident l "x" in to u o (Blk [DefineV v, Variable v])
         | otherwise        -> pure $ u .:=: x' .:>: o .:=: x' where x' = ident x
 --      EPrim p              -> to $ Var $ Ident $ drop 1 $ show p
+      ApplyD (Variable (E.Ident _ s)) e | Just (p, n) <- getPrim s ->
+        case (n, e) of
+          (1, _) -> do (op, x) <- toVar "a" e; pure $ op .:>: (o:=@@(p,[x]))
+          (2, Array [e1, e2]) -> do (op1,x1) <- toVar "a" e1; (op2,x2) <- toVar "a" e2;
+                                    pure $ op1 .:>: op2 .:>: (o:=@@(p,[x1,x2]))
+          _ -> error $ "Bad primop use: " ++ show expr
       ApplyD e0 e1         -> do
         (op0, f) <- toVar "f" e0
         (op1, a) <- toVar "a" e1
-        pure $ seqs [op0, op1, apply o f a, u .:=: o]
+        pure $ seqs [op0, op1, o:=@(f, a), u .:=: o]
       Unify e0 e1
         | isUs u, isUs o, Variable x <- e0, Lit (LInt k) <- e1 -> pure $ ident x := k
         | isUs u, isUs o, Variable x <- e0, Variable y   <- e1 -> pure $ ident x :=: ident y
