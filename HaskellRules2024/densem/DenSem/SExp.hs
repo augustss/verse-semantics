@@ -92,9 +92,9 @@ srcExprToOperN = to where
 --      EPrim p              -> to $ Var $ Ident $ drop 1 $ show p
       ApplyD (Variable (E.Ident _ s)) e | Just (p, n) <- getPrim s ->
         case (n, e) of
-          (1, _) -> do (op, x) <- toVar "a" e; pure $ op .:>: (o:=@@(p,[x]))
+          (1, _) -> do (op, x) <- toVar "a" e; pure $ op .:>: (o:=@@(p,[x]) :>: u .:=: o)
           (2, Array [e1, e2]) -> do (op1,x1) <- toVar "a" e1; (op2,x2) <- toVar "a" e2;
-                                    pure $ op1 .:>: op2 .:>: (o:=@@(p,[x1,x2]))
+                                    pure $ op1 .:>: op2 .:>: (o:=@@(p,[x1,x2]) :>: u .:=: o)
           _ -> error $ "Bad primop use: " ++ show expr
       ApplyD e0 e1         -> do
         (op0, f) <- toVar "f" e0
