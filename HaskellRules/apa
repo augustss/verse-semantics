@@ -1,7 +1,0 @@
-packages: ../VerseReferenceImpl/verse.cabal HaskellRules.cabal
-source-repository-package
-  type: git
-  -- Normally this is a git URL, but a local path works too (but I think it must be absolute?):
-  location: https://github.com/Rewbert/quickcheck.git
-  -- Replace this with the commit you want to check out:
-  tag: df5b3d7ce8241eadd52c8b28f4878c49cc733779
