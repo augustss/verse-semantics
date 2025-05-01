@@ -1,0 +1,41 @@
+name: Haskell CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        ghc: ['9.4.7']
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up GHC and Cabal
+      uses: haskell/actions/setup@v2
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: '2.4'
+
+    - name: Install dependencies
+      working-directory: VersePrototypes
+      run: |
+        cabal update
+        cabal build all --only-dependencies
+
+    - name: Build All
+      working-directory: VersePrototypes
+      run: cabal build all
+
+    # - name: Tests
+      # working-directory: VersePrototypes
+      # run: make test

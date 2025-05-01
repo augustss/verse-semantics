@@ -1,8 +1,9 @@
 cabal-version:      2.4
-name:               HaskellRules2024
+name:               VersePrototypes
 version:            0.1.0.0
 synopsis:           Haskell prototypes and testing for Verse
 description:        Programs for automated and interactive tests of Core Verse rewrite systems.
+tested-with:        GHC==9.4
 copyright:          Epic Games 2022
 
 extra-source-files: CHANGELOG.md
