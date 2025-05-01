@@ -1,0 +1,797 @@
+% ----------------------------------------------------
+%
+%        Rewrite and verification rules
+%
+% ----------------------------------------------------
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+%
+%
+\makeatletter
+\@ifundefined{lhs2tex.lhs2tex.sty.read}%
+  {\@namedef{lhs2tex.lhs2tex.sty.read}{}%
+   \newcommand\SkipToFmtEnd{}%
+   \newcommand\EndFmtInput{}%
+   \long\def\SkipToFmtEnd#1\EndFmtInput{}%
+  }\SkipToFmtEnd
+
+\newcommand\ReadOnlyOnce[1]{\@ifundefined{#1}{\@namedef{#1}{}}\SkipToFmtEnd}
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\rbind}{\mathbin{=\mkern-6.7mu<\!\!\!<}}% suggested by Neil Mitchell
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\usepackage{polytable}
+
+%mathindent has to be defined
+\@ifundefined{mathindent}%
+  {\newdimen\mathindent\mathindent\leftmargini}%
+  {}%
+
+\def\resethooks{%
+  \global\let\SaveRestoreHook\empty
+  \global\let\ColumnHook\empty}
+\newcommand*{\savecolumns}[1][default]%
+  {\g@addto@macro\SaveRestoreHook{\savecolumns[#1]}}
+\newcommand*{\restorecolumns}[1][default]%
+  {\g@addto@macro\SaveRestoreHook{\restorecolumns[#1]}}
+\newcommand*{\aligncolumn}[2]%
+  {\g@addto@macro\ColumnHook{\column{#1}{#2}}}
+
+\resethooks
+
+\newcommand{\onelinecommentchars}{\quad-{}- }
+\newcommand{\commentbeginchars}{\enskip\{-}
+\newcommand{\commentendchars}{-\}\enskip}
+
+\newcommand{\visiblecomments}{%
+  \let\onelinecomment=\onelinecommentchars
+  \let\commentbegin=\commentbeginchars
+  \let\commentend=\commentendchars}
+
+\newcommand{\invisiblecomments}{%
+  \let\onelinecomment=\empty
+  \let\commentbegin=\empty
+  \let\commentend=\empty}
+
+\visiblecomments
+
+\newlength{\blanklineskip}
+\setlength{\blanklineskip}{0.66084ex}
+
+\newcommand{\hsindent}[1]{\quad}% default is fixed indentation
+\let\hspre\empty
+\let\hspost\empty
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\EndFmtInput
+\makeatother
+%
+%
+%
+%
+%
+%
+% This package provides two environments suitable to take the place
+% of hscode, called "plainhscode" and "arrayhscode". 
+%
+% The plain environment surrounds each code block by vertical space,
+% and it uses \abovedisplayskip and \belowdisplayskip to get spacing
+% similar to formulas. Note that if these dimensions are changed,
+% the spacing around displayed math formulas changes as well.
+% All code is indented using \leftskip.
+%
+% Changed 19.08.2004 to reflect changes in colorcode. Should work with
+% CodeGroup.sty.
+%
+\ReadOnlyOnce{polycode.fmt}%
+\makeatletter
+
+\newcommand{\hsnewpar}[1]%
+  {{\parskip=0pt\parindent=0pt\par\vskip #1\noindent}}
+
+% can be used, for instance, to redefine the code size, by setting the
+% command to \small or something alike
+\newcommand{\hscodestyle}{}
+
+% The command \sethscode can be used to switch the code formatting
+% behaviour by mapping the hscode environment in the subst directive
+% to a new LaTeX environment.
+
+\newcommand{\sethscode}[1]%
+  {\expandafter\let\expandafter\hscode\csname #1\endcsname
+   \expandafter\let\expandafter\endhscode\csname end#1\endcsname}
+
+% "compatibility" mode restores the non-polycode.fmt layout.
+
+\newenvironment{compathscode}%
+  {\par\noindent
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \let\hspre\(\let\hspost\)%
+   \pboxed}%
+  {\endpboxed\)%
+   \par\noindent
+   \ignorespacesafterend}
+
+\newcommand{\compaths}{\sethscode{compathscode}}
+
+% "plain" mode is the proposed default.
+% It should now work with \centering.
+% This required some changes. The old version
+% is still available for reference as oldplainhscode.
+
+\newenvironment{plainhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\hspre\(\let\hspost\)%
+   \pboxed}%
+  {\endpboxed%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+\newenvironment{oldplainhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \(\pboxed}%
+  {\endpboxed\)%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+% Here, we make plainhscode the default environment.
+
+\newcommand{\plainhs}{\sethscode{plainhscode}}
+\newcommand{\oldplainhs}{\sethscode{oldplainhscode}}
+\plainhs
+
+% The arrayhscode is like plain, but makes use of polytable's
+% parray environment which disallows page breaks in code blocks.
+
+\newenvironment{arrayhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \(\parray}%
+  {\endparray\)%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+\newcommand{\arrayhs}{\sethscode{arrayhscode}}
+
+% The mathhscode environment also makes use of polytable's parray 
+% environment. It is supposed to be used only inside math mode 
+% (I used it to typeset the type rules in my thesis).
+
+\newenvironment{mathhscode}%
+  {\parray}{\endparray}
+
+\newcommand{\mathhs}{\sethscode{mathhscode}}
+
+% texths is similar to mathhs, but works in text mode.
+
+\newenvironment{texthscode}%
+  {\(\parray}{\endparray\)}
+
+\newcommand{\texths}{\sethscode{texthscode}}
+
+% The framed environment places code in a framed box.
+
+\def\codeframewidth{\arrayrulewidth}
+\RequirePackage{calc}
+
+\newenvironment{framedhscode}%
+  {\parskip=\abovedisplayskip\par\noindent
+   \hscodestyle
+   \arrayrulewidth=\codeframewidth
+   \tabular{@{}|p{\linewidth-2\arraycolsep-2\arrayrulewidth-2pt}|@{}}%
+   \hline\framedhslinecorrect\\{-1.5ex}%
+   \let\endoflinesave=\\
+   \let\\=\@normalcr
+   \(\pboxed}%
+  {\endpboxed\)%
+   \framedhslinecorrect\endoflinesave{.5ex}\hline
+   \endtabular
+   \parskip=\belowdisplayskip\par\noindent
+   \ignorespacesafterend}
+
+\newcommand{\framedhslinecorrect}[2]%
+  {#1[#2]}
+
+\newcommand{\framedhs}{\sethscode{framedhscode}}
+
+% The inlinehscode environment is an experimental environment
+% that can be used to typeset displayed code inline.
+
+\newenvironment{inlinehscode}%
+  {\(\def\column##1##2{}%
+   \let\>\undefined\let\<\undefined\let\\\undefined
+   \newcommand\>[1][]{}\newcommand\<[1][]{}\newcommand\\[1][]{}%
+   \def\fromto##1##2##3{##3}%
+   \def\nextline{}}{\) }%
+
+\newcommand{\inlinehs}{\sethscode{inlinehscode}}
+
+% The joincode environment is a separate environment that
+% can be used to surround and thereby connect multiple code
+% blocks.
+
+\newenvironment{joincode}%
+  {\let\orighscode=\hscode
+   \let\origendhscode=\endhscode
+   \def\endhscode{\def\hscode{\endgroup\def\@currenvir{hscode}\\}\begingroup}
+   %\let\SaveRestoreHook=\empty
+   %\let\ColumnHook=\empty
+   %\let\resethooks=\empty
+   \orighscode\def\hscode{\endgroup\def\@currenvir{hscode}}}%
+  {\origendhscode
+   \global\let\hscode=\orighscode
+   \global\let\endhscode=\origendhscode}%
+
+\makeatother
+\EndFmtInput
+%
+%
+%
+% First, let's redefine the forall, and the dot.
+%
+%
+% This is made in such a way that after a forall, the next
+% dot will be printed as a period, otherwise the formatting
+% of `comp_` is used. By redefining `comp_`, as suitable
+% composition operator can be chosen. Similarly, period_
+% is used for the period.
+%
+\ReadOnlyOnce{forall.fmt}%
+\makeatletter
+
+% The HaskellResetHook is a list to which things can
+% be added that reset the Haskell state to the beginning.
+% This is to recover from states where the hacked intelligence
+% is not sufficient.
+
+\let\HaskellResetHook\empty
+\newcommand*{\AtHaskellReset}[1]{%
+  \g@addto@macro\HaskellResetHook{#1}}
+\newcommand*{\HaskellReset}{\HaskellResetHook}
+
+\global\let\hsforallread\empty
+
+\newcommand\hsforall{\global\let\hsdot=\hsperiodonce}
+\newcommand*\hsperiodonce[2]{#2\global\let\hsdot=\hscompose}
+\newcommand*\hscompose[2]{#1}
+
+\AtHaskellReset{\global\let\hsdot=\hscompose}
+
+% In the beginning, we should reset Haskell once.
+\HaskellReset
+
+\makeatother
+\EndFmtInput
+% ----------------------
+%% Stuff for TimCore
+
+
+%% 'g' inferences
+
+
+
+
+
+%% Intersection of effects
+
+%% --------- Effects ------------
+
+
+%% ----------------------
+
+
+%% --------------------------
+%%        Desugaring rules
+%% --------------------------
+
+
+
+% ----------------------------------------------------
+% New desugaring, just does the wrapping part:
+% ----------------------------------------------------
+%   Input for wrapping
+
+
+%%format Hide (e) = "{\mathcal H}\llbracket{}" e "\rrbracket{}"
+
+%% 'si' is short for "solve or infer" or "unification variable or not" resp
+
+%% 'md' is short for "mode" or "unification variable or not" resp
+
+%% flipsi is a no-op for now
+
+
+%% EXX is just EX, but with no argument
+
+
+
+
+%% ----------- Applications --------------
+%% %format applyx a b = a "@" b
+%% %format applyx a b = a "\," b
+
+%% Function application with no arguments
+
+%% Function application with 1 argument
+
+%% Function application with 1 argument, no parens
+
+%% Function application with 1 argument, without parenthesis
+
+%% Function application with many arguments
+
+%% ----------- End of Applications --------------
+
+
+
+
+
+%% Sequences e1; ...; en; v
+
+%% xs etc stole syntax used in examples.
+
+%% Old version: | for BNF, [] for choice
+%%%format choice = "[ \! ]"
+%%%format `choice` = "\mathop{[ \! ]}"
+%% 1mm is about 0.3em with the current font
+
+%% New version: tall | for BNF, fat | for choice
+%%format vbar = "\mathop{\bigm|}"
+%%format choice = "\boldsymbol{|}"
+%%format `choice` = "\mathop{\boldsymbol{|}}"
+
+
+
+
+%% %format ok = "\textbf{ok}"
+
+%% %format `eqsemi` = "\hspace{-0.5mm}\fatsemi{}"
+%% %format eqsemiKW = "\fatsemi"
+
+%% Arrays and tuples
+
+%% %format vmap (x) = "\llangle" x "\rrangle"
+
+
+
+
+
+
+%%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
+%% %format defKW = "\textbf{def}"
+% only used in comments, but still prettier this way:
+%%%%format map = "\textbf{map}"
+
+%% -------Functions ---------------
+
+
+%% functionOC has open/closed subscript
+
+
+%% -------End of f unctions ---------------
+
+
+
+
+
+%% Unification
+%%%format == = "\!=\!"
+
+
+% format := = "\mapsto"
+% %format squiggt = "\leadsto"
+% %format squiggt = "\!-\!\!>\!\!\!"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%% We combined S and C into one
+
+
+%% ----------- Metatheory --------------
+
+
+%% ----------------------------
+%%         Verification
+%% ----------------------------
+
+%% assert = succeed, abbreviated to suc
+
+
+
+%% Effects checking, like succeeds{e}
+
+
+
+
+
+%% <fx> brackets
+
+
+%  -------------------------- Syntax -----------------------
+\begin{figure}[t]
+  $$
+\begin{array}{l}
+\textbf{Execution Core Syntax} \\
+  \begin{array}{lrcl@{}}
+      \text{Integers} & k \\
+      \text{Variables} & \multicolumn{3}{l}{x,y,z,f,g} \\
+          & \ensuremath{X} & ::= & \ensuremath{\{\mskip1.5mu \Varid{x}_{\mathrm{1}},\mydots,\Varid{x}_{\Varid{n}}\mskip1.5mu\}}  \hspace{1cm} (n \geq 0)\\
+      \text{Skolems} & \multicolumn{3}{l}{r,s,t} \\
+          & \ensuremath{R} & ::= & \ensuremath{\{\mskip1.5mu \Varid{r}_{\mathrm{1}},\mydots,\Varid{r}_{\Varid{n}}\mskip1.5mu\}}  \hspace{1cm} (n \geq 0)\\
+      \text{Programs} & p  & ::=  & \ensuremath{{\bf chk}\langle\textbf{succeeds}\rangle\{\Varid{e}\}} \quad \text{where} \; \freevars{e} = \{ \} \\
+      \text{Expressions} & \ensuremath{\Varid{e}} & ::= & \ensuremath{\Varid{v}} \vb \ensuremath{\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}} \vb \ensuremath{\Varid{e}_{\mathrm{1}}\;\rule[-0.1em]{0.15em}{0.75em}\;\Varid{e}_{\mathrm{2}}} \vb \ensuremath{\textbf{fail}}
+                                     \vb \ensuremath{\exists\Varid{x}.\,\Varid{e}} \vb \ensuremath{\Varid{v}_{\mathrm{1}} [\!\Varid{v}_{\mathrm{2}}]} \vb \ensuremath{\textbf{iter}(\Varid{v}_{\mathrm{1}})\{\Varid{e}\}\{\Varid{v}_{\mathrm{2}}\}} \\
+      && \vb & \ensuremath{{\bf some}(\Varid{v})} \vb \ensuremath{\Varid{v}\;\!\blacktriangleright{}\!\;\Varid{e}} \vb \ensuremath{{\bf chk}\langle\omega\rangle\{\Varid{e}\}}
+      \vb \ensuremath{\textbf{verify}(R;\,A)\{\Varid{e}\}} \\
+      \text{Lvalues} & \ensuremath{\Varid{l}} & ::= & \ensuremath{{\bullet}} \vb \ensuremath{\Varid{v}} \\
+      \text{Values} & \ensuremath{\Varid{v}} & ::= & x  \vb \hnf \\
+      \text{Ground values} & \ensuremath{\Varid{gv}} & ::= & \ensuremath{\Varid{k}} \vb \ensuremath{\Varid{r}} \vb \ensuremath{\langle\Varid{gv}_{\mathrm{1}},\mydots,\Varid{gv}_{\Varid{n}}\rangle} \\
+      \text{Head values} & \hnf & ::= & \ensuremath{\Varid{k}} \vb \ensuremath{\Varid{r}}  \vb \ensuremath{\Varid{op}} \vb \ensuremath{\langle\Varid{v}_{\mathrm{1}},\mydots,\Varid{v}_{\Varid{n}}\rangle} \vb \ensuremath{\lambda\Varid{x} .\,\Varid{e}}
+             \vb \ensuremath{\textbf{olam}(\Varid{v},\lambda\Varid{x} .\,\Varid{e})}\\
+      \text{Prim operators} & \ensuremath{\Varid{op}}  & ::= & \ensuremath{\textbf{add}} \vb \ensuremath{\textbf{sub}} \vb \ensuremath{\textbf{gt}} \vb \ensuremath{\textbf{isInt}} \vb \ldots \\
+      \text{Effects} & \ensuremath{\omega} & ::= & \ensuremath{\textbf{succeeds}} \vb \ensuremath{\textbf{decides}} \vb \ensuremath{\textbf{fails}}  \\
+      \text{Assumptions} & \ensuremath{\Varid{a}} & ::= & \ensuremath{\Varid{r}\mathrel{=}\Varid{gv}} \vb \ensuremath{\Varid{r}\not=\Varid{gv}} \vb \ensuremath{\Varid{r}\mathrel{=}\Varid{op} [\!\Varid{gv}]} \vb \ensuremath{\neg\Varid{op} [\!\Varid{gv}]} \\
+      & \ensuremath{A} & ::= & \ensuremath{\{\mskip1.5mu \Varid{a}_{\mathrm{1}},\mydots,\Varid{a}_{\Varid{n}}\mskip1.5mu\}}   \hspace{1cm} (n \geq 0)
+\end{array}
+\\ \\
+\begin{array}{lrcl}
+\text{Value contexts}  & \ensuremath{\Conid{V}} & ::= & \hole \vb \ensuremath{\langle{}\Varid{v}_{\mathrm{1}},\mydots,\Conid{V},\mydots,\Varid{v}_{\Varid{n}}\rangle}\\
+\text{Scope contexts}  & \ensuremath{\Conid{SX}} & ::= & \ensuremath{\textbf{iter}(\hole)\{\Varid{e}_{\mathrm{2}};\Varid{e}_{\mathrm{3}};\Varid{e}_{\mathrm{4}}\}} \vb \ensuremath{\hole\;\rule[-0.1em]{0.15em}{0.75em}\;\Varid{e}} \vb \ensuremath{\Varid{e}\;\rule[-0.1em]{0.15em}{0.75em}\;\hole} \\
+\text{Evaluation contexts}  & \ensuremath{\Conid{C}} & ::= & \ensuremath{\hole} \vb \ensuremath{\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Conid{C};\,\Varid{e}} \vb \ensuremath{\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e};\,\Conid{C}} \vb \ensuremath{\exists\Varid{x}.\,\Conid{C}} \\
+\text{Proof contexts}  & \ensuremath{\Conid{P}} & ::= & \ensuremath{\hole} \vb \ensuremath{\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Conid{P};\,\Varid{e}} \vb \ensuremath{\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e};\,\Conid{P}} \vb \ensuremath{\exists\Varid{x}.\,\Conid{P}}  \\
+                       &     & \vb & \ensuremath{\textbf{iter}(\Conid{FC} [\mskip1.5mu \Conid{P}\mskip1.5mu])\{\Varid{e}_{\mathrm{2}};\Varid{e}_{\mathrm{3}};\Varid{e}_{\mathrm{4}}\}} \vb \ensuremath{{\bf chk}\langle\omega\rangle\{\Conid{P}\}} \\
+\text{First choice} & \ensuremath{\Conid{FC}} & ::= & \ensuremath{\hole} \vb \ensuremath{\Conid{FC}\hspace{0.19em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e}} \\
+% \text{Value choice} & |VC| & ::= & |FC| \vb |v `choice` VC| \\
+% \text{Choice-free exprs} & |cf| & ::= & |v | \vb |l==cf; cf| \vb op[v] \vb |one e| \vb |all e| \vb |cf guard cf| \\
+\end{array} \\
+\\
+
+\mbox{\em Substitution} \\
+\begin{array}{ll}
+  \ensuremath{\Varid{e}\{\Varid{v}/\Varid{x}\}} & \text{Substitute \ensuremath{\Varid{v}} for \ensuremath{\Varid{x}} everywhere in \ensuremath{\Varid{e}}} \\
+\end{array}
+\\ \\
+\mbox{\em Note}\\
+\hspace{1em} \text{In \ensuremath{\textbf{iter}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}};\Varid{e}_{\mathrm{3}};\Varid{e}_{\mathrm{4}}\}} the \ensuremath{\Varid{e}_{\mathrm{3}}} and \ensuremath{\Varid{e}_{\mathrm{4}}} are always explicit lambdas.}\\
+\hspace{1em} \text{The \ensuremath{\Varid{e}_{\mathrm{3}}} has three arguments, and the \ensuremath{\Varid{e}_{\mathrm{4}}} has one.}
+\\ \\
+\mbox{\em Free variables and bound variables (give definitions)} \\
+%  \begin{array}{rcl}
+%       |fvs(hole)| & = & \{ \} \\
+%       |fvs(v==E; e)| & = & |fvs(v) `cup` fvs(E) `cup` fvs(e)| \\
+%       |fvs(v==ef; E)| & = & |fvs(v) `cup` fvs(ef) `cup` fvs(E)| \\
+%       |fvs(def x E)| & = & |{x} `cup` fvs(E)| |-- this is correct| \\
+%    \end{array}
+\end{array}
+     $$
+  \caption{Execution Core Syntax} \label{fig:vc-syntax}
+\end{figure}
+
+\begin{figure}
+$\begin{array}{@{}l}
+\begin{array}{rcll}
+  \ensuremath{\mathsf{valid}(\Varid{x},\Conid{Y},\hole)} & = & \mathit{true} \\
+  \ensuremath{\mathsf{valid}(\Varid{x},\Conid{Y},\exists\Varid{y}.\,\Conid{C})} & = & \ensuremath{\mathsf{valid}(\Varid{x},(\Conid{Y},\Varid{y}),\Conid{C})} \\
+  \ensuremath{\mathsf{valid}(\Varid{x},\Conid{Y},\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e};\,\Conid{C})} & = & \ensuremath{\mathsf{blkd}_{\small c}((\Varid{x},\Conid{Y}),\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e};\,\Conid{C})} & \text{if $\ensuremath{\Varid{x}} \in \freevars{e}$} \\
+  \ensuremath{\mathsf{valid}(\Varid{x},\Conid{Y},\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e};\,\Conid{C})} & = & \ensuremath{\mathsf{blkd}_{\small e}((\Varid{x},\Conid{Y}),\Varid{e})\mathop{\wedge}\mathsf{valid}(\Varid{x},\Conid{Y},\Conid{C})} & \text{if $\ensuremath{\Varid{x}} \not\in \freevars{e}$} \\
+  & & \ensuremath{\mathop{\vee}\mathsf{valid}(\Varid{x},(\Conid{Y}\setminus\mathsf{fvs}(\Varid{e})),\Conid{C})}
+\\[2mm]
+  \ensuremath{\mathsf{blkd}_{\small c}(X,\hole)} & = & \ensuremath{\textbf{true}} \\
+  \ensuremath{\mathsf{blkd}_{\small c}(X,\exists\Varid{x}.\,\Conid{P})} & = & \ensuremath{\mathsf{blkd}_{\small c}((X,\Varid{x}),\Conid{P})} \\
+  \ensuremath{\mathsf{blkd}_{\small c}(X,\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Conid{P};\,\Varid{e})} & = & \ensuremath{\mathsf{blkd}_{\small c}(X,\Conid{P})} \\
+  \ensuremath{\mathsf{blkd}_{\small c}(X,\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e};\,\Conid{P})} & = & \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{e})\mathop{\wedge}\mathsf{blkd}_{\small c}(X,\Conid{P})} \\
+  \ensuremath{\mathsf{blkd}_{\small c}(X,{\bf chk}\langle\omega\rangle\{\Conid{P}\})} & = & \ensuremath{\mathsf{blkd}_{\small c}(X,\Conid{P})} \\
+  \ensuremath{\mathsf{blkd}_{\small c}(X,\textbf{iter}(\Conid{FC} [\mskip1.5mu \Conid{P}\mskip1.5mu])\{\Varid{e}_{\mathrm{2}};\Varid{e}_{\mathrm{3}};\Varid{e}_{\mathrm{4}}\})} & = & \ensuremath{\mathsf{blkd}_{\small c}(X,\Conid{P})} \\
+\end{array}
+\\ \\[-1mm] 
+\begin{array}{rcl}
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{v})} & = & \ensuremath{\textbf{false}}\\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}})} & = & \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{e}_{\mathrm{1}})\mathop{\wedge}\mathsf{blkd}_{\small e}(X,\Varid{e}_{\mathrm{2}})}\\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{e}_{\mathrm{1}}\;\rule[-0.1em]{0.15em}{0.75em}\;\Varid{e}_{\mathrm{2}})} & = & \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{e}_{\mathrm{1}})\mathop{\wedge}\mathsf{blkd}_{\small e}(X,\Varid{e}_{\mathrm{2}})}\\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\textbf{fail})} & = & \ensuremath{\textbf{false}} \\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\textbf{iter}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}};\Varid{e}_{\mathrm{3}};\Varid{e}_{\mathrm{4}}\})} & = & \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{e}_{\mathrm{1}})} \\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\exists\Varid{x}.\,\Varid{e})} & = & \ensuremath{\mathsf{blkd}_{\small e}((X,\Varid{x}),\Varid{e})} \\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{v}_{\mathrm{1}} [\!\Varid{v}_{\mathrm{2}}])} & = & (\ensuremath{\Varid{v}_{\mathrm{1}}} = \ensuremath{\Varid{x}} \in \ensuremath{X}) \\
+   & & \ensuremath{\mathop{\vee}} (\ensuremath{\Varid{v}_{\mathrm{1}}} = \ensuremath{\Varid{op}} \ensuremath{\mathop{\wedge}} \ensuremath{\Varid{v}_{\mathrm{2}}\mathrel{=}\Conid{V} [\mskip1.5mu \Varid{x}\mskip1.5mu]}) \hspace{2mm} \text{for some $\ensuremath{\Varid{x}} \in \ensuremath{X}$ and context \ensuremath{\Conid{V}}} \\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{e}_{\mathrm{1}}\;\!\blacktriangleright{}\!\;\Varid{e}_{\mathrm{2}})} & = & \ensuremath{X} \cap \freevars{\ensuremath{\Varid{v}}} \not= \emptyset\\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,\textbf{verify}(R;\,A)\{\Varid{e}\})} & = & \ensuremath{\textbf{true}} \\
+  \ensuremath{\mathsf{blkd}_{\small e}(X,{\bf chk}\langle\omega\rangle\{\Varid{e}\})} & = & \ensuremath{\mathsf{blkd}_{\small e}(X,\Varid{e})} \\
+\end{array}
+\\ \\[-1mm]
+\begin{array}{rcl}
+  \ensuremath{\mathsf{choicefree}_{\small c}(\hole)} & = & \ensuremath{\textbf{true}} \\
+  \ensuremath{\mathsf{choicefree}_{\small c}(\exists\Varid{x}.\,\Conid{C})} & = & \ensuremath{\mathsf{choicefree}_{\small c}(\Conid{C})} \\
+  \ensuremath{\mathsf{choicefree}_{\small c}(\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Conid{C};\,\Varid{e})} & = & \ensuremath{\mathsf{choicefree}_{\small c}(\Conid{C})} \\
+  \ensuremath{\mathsf{choicefree}_{\small c}(\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e};\,\Conid{C})} & = & \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{e})\mathop{\wedge}\mathsf{choicefree}_{\small c}(\Conid{C})} \\
+  \\[2mm]
+  \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{e}_{\mathrm{1}}\;\rule[-0.1em]{0.15em}{0.75em}\;\Varid{e}_{\mathrm{2}})} & = & \ensuremath{\textbf{false}}\\
+  \ensuremath{\mathsf{choicefree}_{\small e}(\textbf{fail})} & = & \ensuremath{\textbf{true}}\\
+  \ensuremath{\mathsf{choicefree}_{\small e}(\textbf{iter}(\Varid{e}_{\mathrm{1}})\{\Varid{e}_{\mathrm{2}};\lambda\anonymous \;\anonymous \;\anonymous  .\,\Varid{e}_{\mathrm{3}};\lambda\anonymous  .\,\Varid{e}_{\mathrm{4}}\})} & = & \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{e}_{\mathrm{3}})\mathop{\wedge}\mathsf{choicefree}_{\small e}(\Varid{e}_{\mathrm{4}})} \\
+  \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}})} & = & \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{e}_{\mathrm{1}})\mathop{\wedge}\mathsf{choicefree}_{\small e}(\Varid{e}_{\mathrm{2}})}\\
+  \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{v}\;\!\blacktriangleright{}\!\;\Varid{e})} & = & \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{e})}\\
+  \ensuremath{\mathsf{choicefree}_{\small e}(\exists\Varid{x}.\,\Varid{e})} & = & \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{e})} \\
+  \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{v}_{\mathrm{1}} [\!\Varid{v}_{\mathrm{2}}])} & = & \text{\ensuremath{\Varid{v}_{\mathrm{1}}} is a choice-free primop. \lennart{Wrong for iter}} \\
+  \ensuremath{\mathsf{choicefree}_{\small e}(\Varid{v})}  & = & \ensuremath{\textbf{true}} \\
+\end{array}
+\end{array}
+$
+  \caption{Blocked expressions and contexts} \label{fig:vc-contexts}
+\end{figure}
+
+\newcommand{\alphamark}{use $\alpha$}
+
+% -----------------------------------------------------
+%                 Rewrite rules
+% -----------------------------------------------------
+
+\begin{figure}
+$\begin{array}{@{}l}
+\begin{array}{@{\hskip0.5em} l r @{\;}c@{\;} l l@{}}
+\rulegroupname{Structural rules}
+\rulename{exi-swap} & \ensuremath{\exists\Varid{x}.\,\exists\Varid{y}.\,\Varid{e}} & \leftrightarrow & \ensuremath{\exists\Varid{y}.\,\exists\Varid{x}.\,\Varid{e}} \\
+\rulename{var-swap} & \ensuremath{\Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Varid{y};\,\Varid{e}} & \leftrightarrow & \ensuremath{\Varid{y}\hspace{-0.14em}=\hspace{-0.14em}\Varid{x};\,\Varid{e}} \\
+\rulename{exi-alpha} & \ensuremath{\exists\Varid{x}.\,\Varid{e}} & \leftrightarrow & \ensuremath{\exists\Varid{y}.\,\Varid{e}\{\Varid{x}/\Varid{y}\}} & \text{if $\ensuremath{\Varid{y}} \not\in \ensuremath{\mathsf{fvs}(\Varid{e})\mathop{\cup}\mathsf{bvs}(\Varid{e})}$} \\
+\rulename{lam-alpha} & \ensuremath{\lambda\Varid{x} .\,\Varid{e}} & \leftrightarrow & \ensuremath{\lambda\Varid{y} .\,\Varid{e}\{\Varid{x}/\Varid{y}\}} & \text{if $\ensuremath{\Varid{y}} \not\in \ensuremath{\mathsf{fvs}(\Varid{e})\mathop{\cup}\mathsf{bvs}(\Varid{e})}$} \\
+\\[-0.8em]
+
+\rulegroupname{Application}
+\rulename{app-add}          & \ensuremath{\textbf{add}\langle\Varid{k}_{\mathrm{1}},\Varid{k}_{\mathrm{2}}\rangle} & \movesto & \ensuremath{\Varid{k}_{\mathrm{3}}} & \text{where $k_3 = k_1 + k_2$}\\
+\rulename{app-gt}           & \ensuremath{\textbf{gt}\langle\Varid{k}_{\mathrm{1}},\Varid{k}_{\mathrm{2}}\rangle}   & \movesto & \ensuremath{\Varid{k}_{\mathrm{1}}} &  \text{if $k_1 > k_2$} \\
+\rulename{app-gt-fail}      & \ensuremath{\textbf{gt}\langle\Varid{k}_{\mathrm{1}},\Varid{k}_{\mathrm{2}}\rangle}   & \movesto & \ensuremath{\textbf{fail}} &  \text{if $k_1 \leq k_2$} \\
+\rulename{app-isint}        & \ensuremath{\textbf{isInt}(\Varid{k})}   & \movesto & \ensuremath{\Varid{k}} &  \text{if $k$ is an integer} \\
+\rulename{app-isint-fail}      & \ensuremath{\textbf{isInt}\langle\Varid{v}\rangle}   & \movesto & \ensuremath{\textbf{fail}} &  \text{if $v$ is not an integer} \\
+\rulename{app-lam}^{\alpha} & \ensuremath{(\lambda\Varid{x} .\,\Varid{e})(\Varid{v})} & \movesto & \ensuremath{\exists\Varid{x}.\,\Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v};\,\Varid{e}}
+                                                  & \text{if $x \not\in \freevars{\ensuremath{\Varid{v}}}$} \\
+\rulename{app-tru}           & \ensuremath{\textbf{truth}\{\Varid{v}_{\mathrm{1}}\}(\Varid{v}_{\mathrm{2}})}   & \movesto & \ensuremath{\Varid{v}_{\mathrm{1}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v}_{\mathrm{2}};\,\Varid{v}_{\mathrm{2}}}  \\
+\rulename{app-tup0}        & \ensuremath{\langle\rangle(\Varid{v})} & \movesto & \ensuremath{\textbf{fail}} \\
+\rulename{app-tup}          & \ensuremath{\langle{}\Varid{v}_{\mathrm{0}},\mydots,v_{n-1}\rangle(\Varid{v})} & \movesto &
+                            \ensuremath{(\Varid{v}\hspace{-0.14em}=\hspace{-0.14em}\mathrm{0};\Varid{v}_{\mathrm{0}})\;\rule[-0.1em]{0.15em}{0.75em}\;\mydots\;\rule[-0.1em]{0.15em}{0.75em}\;(\Varid{v}\hspace{-0.14em}=\hspace{-0.14em}(\Varid{n}\mathbin{-}\mathrm{1});v_{n-1})} & n \geq 0
+\end{array}
+\\ \\[-0.8em]
+\begin{array}{@{\hskip0.5em} l r @{\;}c@{\;} l l@{}}
+\rulegroupname{Unification}
+  \rulename{u-lit}   & \ensuremath{\Varid{k}\hspace{-0.14em}=\hspace{-0.14em}\Varid{k};\,\Varid{e}} & \movesto & \ensuremath{\Varid{e}} & \\
+  \rulename{u-tru} & \ensuremath{\textbf{truth}\{\Varid{v}_{\mathrm{1}}\}\hspace{-0.14em}=\hspace{-0.14em}\textbf{truth}\{\Varid{v}_{\mathrm{2}}\};\,\Varid{e}} & \movesto & \ensuremath{\Varid{v}_{\mathrm{1}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v}_{\mathrm{2}};\,\Varid{e}} \\
+  \rulename{u-tup} & \hspace{-2.0em} \ensuremath{\langle{}\Varid{v}_{\mathrm{1}},\mydots,\Varid{v}_{\Varid{n}}\rangle\hspace{-0.14em}=\hspace{-0.14em}\langle{}\Varid{v}_{1}',\mydots,\Varid{v}_{\Varid{n}}'\rangle;\,\Varid{e}}
+       & \movesto & \ensuremath{\Varid{v}_{\mathrm{1}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v}_{1}';\mydots;\Varid{v}_{\Varid{n}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v}_{\Varid{n}}';\Varid{e}} & n \geq 0\\
+  \rulename{u-fail} & \ensuremath{\mathit{hnf}_{\!1}\hspace{-0.14em}=\hspace{-0.14em}\mathit{hnf}_{\!2};\,\Varid{e}} & \movesto & \ensuremath{\textbf{fail}} & \text{if \rulename{u-lit}, \rulename{u-tup}, \rulename{u-olam} do not match} \\
+  \rulename{u-occurs} & \ensuremath{\Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Conid{V} [\mskip1.5mu \Varid{x}\mskip1.5mu];\,\Varid{e}} & \movesto & \ensuremath{\textbf{fail}} & \text{if $\ensuremath{\Conid{V}} \ne \ensuremath{\hole}$} \\
+  \rulename{u-swap} & \ensuremath{\mathit{hnf}\hspace{-0.14em}=\hspace{-0.14em}\Varid{x};\,\Varid{e}} & \movesto & \ensuremath{\Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\mathit{hnf};\,\Varid{e}} \\
+\\[-0.8em]
+
+\rulegroupname{Substitution}
+
+\rulename{exi-subst} & \ensuremath{\exists\Varid{x}.\,\Conid{C} [\mskip1.5mu \Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v};\,\Varid{e}\mskip1.5mu]} & \movesto & \ensuremath{\Conid{C} [\mskip1.5mu \Varid{e}\mskip1.5mu]\{\Varid{v}/\Varid{x}\}}
+  & \text{if \ensuremath{\mathsf{blkd}_{\small c}(\{\Varid{x}\},\Conid{C})}, \ensuremath{(\{\Varid{x}\}\mathop{\cup}\mathsf{bvs}(\Conid{C}))\mathop{\#}\mathsf{fvs}(\Varid{v})}}  \\
+\rulename{rec} & \ensuremath{\Varid{z}\mathrel{=}\Conid{V} [\mskip1.5mu \lambda\Varid{x} .\,\Varid{e}_{\mathrm{1}}\mskip1.5mu];\,\Varid{e}_{\mathrm{2}}} & \movesto & \multicolumn{2}{l}{\ensuremath{\Varid{z}\mathrel{=}\Conid{V} [\mskip1.5mu \lambda\Varid{x} .\,\exists\Varid{z}.\,\Varid{z}\mathrel{=}\Conid{V} [\mskip1.5mu \lambda\Varid{x} .\,\Varid{e}_{\mathrm{1}}\mskip1.5mu];\,\Varid{e}_{\mathrm{1}}\mskip1.5mu];\,\Varid{e}_{\mathrm{2}}}
+  \hspace{4mm} \text{$\ensuremath{\Varid{z}} \in \freevars{\ensuremath{\lambda\Varid{x} .\,\Varid{e}_{\mathrm{1}}}}$}} \\
+%\rulename{exi-subst-var} & |def x (C^[y==x; e])| & \movesto & |subst (C^[e]) x y|
+%  & \text{if |validc x emptyset C|, $x \not= y$}  \\
+% \rulename{exi-float}^{\alpha} & |C^[def x e]| & \movesto & |def x C^[e]| & \text{if $|noteq C hole|, x \notin \freevars{|C|}, \boundvars{|C|} = \emptyset$} \\
+% \rulename{exi-choice}^{\alpha} & |def x (C^[e_1 choice e_2])| & \movesto & |C^[(def x e_1) choice (def x e_2)]| & \text{if $x \notin \freevars{|C|} \cup \boundvars{|C|}$} \\
+\end{array}
+\\ \\[-0.8em]
+
+\begin{array}{@{\hskip0.5em} l  r @{\;}c@{\;} l l@{}}
+\rulegroupname{Normalization}
+%\rulename{def-elim} & |def x (E^[x==v])| & \movesto & |E^[ok]| & \text{if $|x| \notin \freevars{|E|}\cup \freevars{|v|}$}\\
+%\rulename{exi-move}^{\alpha} & |E^[def x e]| & \leftrightarrow & |def x E^[e]| & \text{if $x \notin \freevars{|E|} \cup \boundvars{|E|}$} \\
+\rulename{seq-assoc} & \ensuremath{\Varid{l}_{\mathrm{2}}\hspace{-0.14em}=\hspace{-0.14em}(\Varid{l}_{\mathrm{1}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}});\,\Varid{e}_{\mathrm{3}}} & \movesto & \ensuremath{\Varid{l}_{\mathrm{1}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{1}};\,\Varid{l}_{\mathrm{2}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{2}};\,\Varid{e}_{\mathrm{3}}} \\
+% \rulename{seq-float} & |v == (eq_1 ; e_2)| & \movesto & |eq_1 `eqsemi` v == e_2| \\
+% \rulename{eq-float} & |v_1 == (v_2 == e)| & \movesto & |v_2 == e; v_1 = ok| \\
+% \rulename{eq-result} & |v == e; ok| & \movesto & |v = e| \\
+\rulename{seq-elim} & \ensuremath{\anonymous \hspace{-0.14em}=\hspace{-0.14em}\Varid{v};\,\Varid{e}} & \movesto & \ensuremath{\Varid{e}} \\
+\rulename{exi-elim} & \ensuremath{\exists\Varid{x}.\,\Varid{e}} & \movesto & \ensuremath{\Varid{e}} & \text{if $\ensuremath{\Varid{x}} \notin \freevars{\ensuremath{\Varid{e}}}$}\\
+\rulename{exi-float} & \ensuremath{\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\exists\Varid{x}.\,\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}} & \movesto & \ensuremath{\exists\Varid{x}.\,\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}} & \ensuremath{\Varid{x}} \not\in \ensuremath{\mathsf{fvs}(\Varid{e}_{\mathrm{2}})}\\
+\rulename{exi-push} &  \ensuremath{\exists\Varid{x}.\,\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{1}};\,\Varid{e}_{\mathrm{2}}} & \movesto & \ensuremath{\Varid{l}\hspace{-0.14em}=\hspace{-0.14em}\Varid{e}_{\mathrm{1}};\,\exists\Varid{x}.\,\Varid{e}_{\mathrm{2}}} & \ensuremath{\Varid{x}} \not\in \ensuremath{\mathsf{fvs}(\Varid{e}_{\mathrm{1}})}\\
+
+\rulegroupname{Choice}
+\rulename{fail} & \ensuremath{\Conid{C} [\mskip1.5mu \textbf{fail}\mskip1.5mu]} & \movesto & \ensuremath{\textbf{fail}}
+    & \text{if \ensuremath{\Conid{C}\not=\hole,\mathsf{blkd}_{\small c}(\emptyset,\Conid{C}),\mathsf{choicefree}_{\small c}(\Conid{C})}}\\
+    \\[-0.8em]
+
+\rulegroupname{Iter}
+\rulename{iter-fail}    & \ensuremath{\textbf{iter}(\Varid{ic})\{\textbf{fail}\}\{\Varid{e}_{\mathrm{0}}\}} & \movesto & \ensuremath{\Varid{e}_{\mathrm{0}}} \\
+\rulename{iter-value}   & \ensuremath{\textbf{iter}(\Varid{ic})\{\Varid{e}\}\{\Varid{e}_{\mathrm{0}}\}} & \movesto & \ensuremath{\Varid{ic}[\Varid{e},\Varid{e}_{\mathrm{0}}]} \\
+\rulename{iter-choice}  & \ensuremath{\textbf{iter}(\Varid{ic})\{\Conid{C} [\mskip1.5mu \Varid{e}_{\mathrm{1}}\hspace{0.19em}\mathop{\rule[-0.1em]{0.15em}{0.75em}}\hspace{0.2em}\Varid{e}_{\mathrm{2}}\mskip1.5mu]\}\{\Varid{e}_{\mathrm{0}}\}} & \movesto &
+   \ensuremath{\textbf{iter}(\Varid{ic})\{\Conid{C} [\mskip1.5mu \Varid{e}_{\mathrm{1}}\mskip1.5mu]\}\{\textbf{iter}(\Varid{ic})\{\Conid{C} [\mskip1.5mu \Varid{e}_{\mathrm{2}}\mskip1.5mu]\}\{\Varid{e}_{\mathrm{0}}\}\}} \\
+
+\end{array} \\
+\\[-0.8em]
+\begin{array}{@{\hskip0.5em} l r @{\;}c@{\;} l l@{}}
+\rulegroupname{Open Lambdas}
+  \rulename{u-olam}   & \ensuremath{\textbf{olam}(\Varid{z}_{\mathrm{1}},\Varid{v}_{\mathrm{1}})\hspace{-0.14em}=\hspace{-0.14em}\textbf{olam}(\Varid{z}_{\mathrm{2}},\Varid{v}_{\mathrm{2}});\,\Varid{e}} & \movesto & \multicolumn{2}{@{}l}{\ensuremath{\exists\Varid{z}_{\mathrm{3}}.\,\Varid{z}_{\mathrm{1}}\hspace{-0.14em}=\hspace{-0.14em}\textbf{olam}(\Varid{z}_{\mathrm{3}},\Varid{v}_{\mathrm{2}});\,\Varid{z}_{\mathrm{2}}\hspace{-0.14em}=\hspace{-0.14em}\textbf{olam}(\Varid{z}_{\mathrm{3}},\Varid{v}_{\mathrm{1}});\,\Varid{e}}} \\
+  \rulename{app-olam} & \ensuremath{(\textbf{olam}(\Varid{z},\Varid{v}_{\mathrm{1}})) [\!\Varid{v}_{\mathrm{2}}]} & \movesto & \ensuremath{\exists\Varid{x}.\,\Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Varid{z} [\!\Varid{v}_{\mathrm{2}}];\,\Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v}_{\mathrm{1}} [\!\Varid{v}_{\mathrm{2}}];\,\Varid{x}} \\
+  \rulename{exi-app} & \ensuremath{\exists\Varid{z}.\,\Varid{e}} & \movesto &
+  \multicolumn{2}{@{}l}{\ensuremath{\Varid{e}\{(\lambda\Varid{x} .\,\exists\Varid{y}.\,\Varid{y})/\Varid{z}\}} \hspace{5mm} \text{if \ensuremath{\Varid{z}} occurs in \ensuremath{\Varid{e}} only as \ensuremath{\Varid{z} [\!\Varid{v}]}}}
+\end{array}
+\\
+\text{\textit{Note}: In rules marked with a superscript $\alpha$, use $\alpha$-conversion to satisfy the side condition.} \\
+\end{array}$
+
+\caption{\textbf{The \vcname: Rewrite rules for execution}} \label{fig:rules}
+\Description{A table that exhibits the rewrite rules for the Verse Calculus, groupesd into five categories: Application, Unification, Normalization, Garbage Collection, and Choice}
+\end{figure}
+
+% ----------------------------------------
+%             Verification rules
+% ----------------------------------------
+
+\begin{figure}[t]
+$\begin{array}{@{}l}
+\begin{array}{@{\hskip0.5em} l r @{\;}c@{\;} l l@{}}
+  \multicolumn{5}{l}{\textit{Auxiliary functions}} \\
+  & \ensuremath{\mathsf{skol}(X,\Varid{v})} & = & \ensuremath{X} \cap \ensuremath{\mathsf{fvs}(\Varid{v})} = \emptyset \\[2mm]
+
+
+\multicolumn{5}{l}{\textit{Guard}} \\
+\rulename{guard-elim} & \ensuremath{\Varid{v}\;\!\blacktriangleright{}\!\;\Varid{e}} & \movesto & \ensuremath{\Varid{e}} & \text{if $\skol{\ensuremath{\Varid{v}}}$}\\
+\end{array} \\
+\\[-2mm]
+
+\begin{array}{@{\hskip0.5em} l r @{\;}c@{\;} l l@{}}
+\multicolumn{5}{l}{\textit{Check}} \\
+\rulename{check-fail}   & \ensuremath{{\bf chk}\langle\omega\rangle\{\textbf{fail}\}}  & \movesto & \ensuremath{\textbf{fail}}
+   & \text{$\ensuremath{\omega} \in \{\ensuremath{\textbf{fails}},\ensuremath{\textbf{decides}}\}$}\\
+  \rulename{check-suc}    & \ensuremath{{\bf chk}\langle\omega\rangle\{\Varid{v}\}}  & \movesto & \ensuremath{\Varid{v}} & \text{$\skol{\ensuremath{\Varid{v}}}, \ensuremath{\omega} \in \{\ensuremath{\textbf{succeeds}},\ensuremath{\textbf{decides}}\}$} \\
+  \rulename{check-choice} & \ensuremath{{\bf chk}\langle\textbf{succeeds}\rangle\{\Varid{v}\;\rule[-0.1em]{0.15em}{0.75em}\;\Varid{e}\}}  & \movesto & \ensuremath{\Varid{v}\;\rule[-0.1em]{0.15em}{0.75em}\;{\bf chk}\langle\textbf{fails}\rangle\{\Varid{e}\}} & \text{$\skol{\ensuremath{\Varid{v}}}$} \\
+\end{array} \\
+\\[-0.6em]
+
+\begin{array}{@{\hskip0.5em} l r @{\;}c@{\;} l l@{}}
+\multicolumn{5}{l}{\textit{Verify} \hspace{3mm} \text{All rules require \ensuremath{\mathsf{blkd}_{\small c}(\emptyset,\Conid{P})}}} \\
+\rulename{solver} & \ensuremath{\textbf{verify}(R;\,A)\{\Varid{e}\}} & \movesto & \ensuremath{\langle{}\rangle} \hspace{5mm} \text{if $\ensuremath{R;\,A} \vDash \mathit{inconsistent}$} \\
+  \rulename{verify-val} & \ensuremath{\textbf{verify}(R;\,A)\{\Varid{v}\}}      & \movesto & \ensuremath{\langle{}\rangle} & \\
+  \rulename{verify-choice} & \ensuremath{\textbf{verify}(R;\,A)\{\Varid{e}_{\mathrm{1}}\;\rule[-0.1em]{0.15em}{0.75em}\;\Varid{e}_{\mathrm{2}}\}}      & \movesto & \ensuremath{\textbf{verify}(R;\,A)\{\Varid{e}_{\mathrm{1}}\};\,\textbf{verify}(R;\,A)\{\Varid{e}_{\mathrm{2}}\}} & \\
+  \rulename{verify-fail} & \ensuremath{\textbf{verify}(R;\,A)\{\textbf{fail}\}}    & \movesto & \ensuremath{\langle{}\rangle} & \\[1mm]
+  \rulename{verify-drop} & \ensuremath{\textbf{verify}(R_{\mathrm{1}};\,A_{\mathrm{1}})\{\Conid{C} [\mskip1.5mu \textbf{verify}(R_{\mathrm{2}};\,A_{\mathrm{2}})\{\Varid{e}\}\mskip1.5mu]\}}
+  & \movesto & \ensuremath{\textbf{verify}(R_{\mathrm{1}};\,A_{\mathrm{1}})\{\Conid{C} [\mskip1.5mu \langle\rangle\mskip1.5mu]\}} & \\
+  \rulename{skolemise}^{\alpha} & \ensuremath{\textbf{verify}(R;\,A)\{\Conid{P} [\mskip1.5mu {\bf some}(\Varid{v})\mskip1.5mu]\}} & \movesto
+  & \ensuremath{\textbf{verify}(R,\Varid{r};\,A)\{\exists\Varid{x}.\,\Varid{x}\mathrel{=}\Varid{v} [\!\Varid{r}];\,\Conid{P} [\mskip1.5mu \Varid{x}\mskip1.5mu]\}} \\
+  &&& \text{if $\ensuremath{\Varid{r}} \notin \ensuremath{R}$ and \ensuremath{\mathsf{skol}(\mathsf{bvs}(\Conid{P}),\Varid{v})}} \\
+ \rulename{split-v} & \ensuremath{\textbf{verify}(R;\,A)\{\Conid{P} [\mskip1.5mu \Varid{r}\hspace{-0.14em}=\hspace{-0.14em}\Varid{gv};\,\Varid{e}\mskip1.5mu]\}} & \movesto &
+    \ensuremath{\textbf{verify}(R;\,A,\Varid{r}\hspace{-0.14em}=\hspace{-0.14em}\Varid{gv})\{\Conid{P} [\mskip1.5mu \Varid{e}\mskip1.5mu]\};\,} \\
+    &&& \ensuremath{\textbf{verify}(R;\,A,\Varid{r}\not=\Varid{gv})\{\Conid{P} [\mskip1.5mu \textbf{fail}\mskip1.5mu]\}}\\[1mm]
+  \rulename{split-op} & \ensuremath{\textbf{verify}(R;\,A)\{\Conid{P} [\mskip1.5mu \Varid{op} [\!\Varid{gv}]\mskip1.5mu]\}} & \movesto &
+          \ensuremath{\textbf{verify}(R,\Varid{r};\,A,\Varid{r}\mathrel{=}\Varid{op} [\!\Varid{gv}])\{\Conid{P} [\mskip1.5mu \Varid{r}\mskip1.5mu]\};\,} \\
+    &&& \ensuremath{\textbf{verify}(R;\,A,\neg\Varid{op} [\!\Varid{gv}])\{\Conid{P} [\mskip1.5mu \textbf{fail}\mskip1.5mu]\}} \\
+    &&& \text{if $r \not\in R$} \\[1mm]
+ \rulename{split-tup} & \multicolumn{3}{l}{\ensuremath{\textbf{verify}(R;\,A)\{\Conid{P} [\mskip1.5mu \Varid{r}\hspace{-0.14em}=\hspace{-0.14em}\langle{}\Varid{v}_{\mathrm{1}},\mydots,\Varid{v}_{\Varid{n}}\rangle;\,\Varid{e}\mskip1.5mu]\}}} \\
+     && \movesto & \ensuremath{\textbf{verify}}
+           \begin{array}[t]{@{}l}
+             \ensuremath{(R,\Varid{r}_{\mathrm{1}}\;\mydots\;\Varid{r}_{\Varid{n}};\,A,\Varid{r}\hspace{-0.14em}=\hspace{-0.14em}\langle{}\Varid{r}_{\mathrm{1}},\mydots,\Varid{r}_{\Varid{n}}\rangle)} \\
+             \ensuremath{\{\mskip1.5mu \Conid{P} [\mskip1.5mu \Varid{r}_{\mathrm{1}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v}_{\mathrm{1}};\,\mydots;\,\Varid{r}_{\Varid{n}}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v}_{\Varid{n}};\,\Varid{e}\mskip1.5mu]\mskip1.5mu\};\,}
+           \end{array}\\
+    &&& \ensuremath{\textbf{verify}(R;\,A,\Varid{r}\not=\langle{}\anonymous ,\mydots,\anonymous \rangle)\{\Conid{P} [\mskip1.5mu \textbf{fail}\mskip1.5mu]\}} \\  \\[-2mm]
+\end{array}\\
+
+\end{array}$
+\\[0.1in]
+\caption{TRS Verifier Rewrite Rules}
+\label{fig:spj-verifier-rewrite-rules}
+\end{figure}
+
+% ------------------------------------------------------------
+%                Array rules
+% ------------------------------------------------------------
+
+\begin{figure}[t]
+$\begin{array}{@{}l}
+\begin{array}{@{\hskip0.5em} l r @{\;}c@{\;} l l@{}}
+  \rulename{iter-choose}   & \ensuremath{\textbf{iter}(\Varid{ic})\{\Conid{C} [\mskip1.5mu \textbf{choose}(\Varid{v})\{\Varid{e}\}\mskip1.5mu]\}\{\Varid{e}_{\mathrm{0}}\}}
+  & \movesto & \begin{array}[t]{@{}l}
+    \ensuremath{\exists\Varid{k};\,\Varid{k}\hspace{-0.14em}=\hspace{-0.14em}size(\Varid{v})\{\Conid{C} [\mskip1.5mu {\bf some}(\lambda \_.\,\Varid{e})\mskip1.5mu]\}} \\
+    \ensuremath{\textbf{iter}(\Varid{ic})\{\textbf{choose}(\Varid{k})\{\Conid{C} [\mskip1.5mu \Varid{e}\mskip1.5mu]\}\}\{\Varid{e}_{\mathrm{0}}\}}
+    \end{array} \\
+
+\rulename{one-choose} & \ensuremath{\textbf{iter}(\textbf{one})\{\textbf{choose}(\Varid{v})\{\Varid{e}\}\}\{\Varid{e}_{\mathrm{0}}\}}
+  & \movesto & \ensuremath{\textbf{iter}(\textbf{if})\{\Varid{v}\mathrel{=}\mathrm{0};\,\lambda \_.\,\Varid{e}_{\mathrm{0}}\}\{{\bf some}(\lambda \_.\,\Varid{e})\}} \\
+
+\rulename{if-choose} & \ensuremath{\textbf{iter}(\textbf{if})\{\textbf{choose}(\Varid{v})\{\Varid{e}\}\}\{\Varid{e}_{\mathrm{0}}\}}
+  & \movesto & \ensuremath{\textbf{iter}(\textbf{if})\{\Varid{v}\mathrel{=}\mathrm{0};\,\lambda \_.\,\Varid{e}_{\mathrm{0}}\}\{{\bf some}(\lambda \_.\,\Varid{e})[]\}} \\
+
+\rulename{all-choose} & \ensuremath{\textbf{iter}(\textbf{all})\{\textbf{choose}(\Varid{v})\{\Varid{e}\}\}\{\Varid{e}_{\mathrm{0}}\}}
+  & \movesto & \ensuremath{\textbf{arr}(\Varid{v})\{\Varid{e}\}+ \! + \,\Varid{e}_{\mathrm{0}}} \\
+
+\end{array}
+\end{array}$
+\\[0.1in]
+\caption{Verifier Rules for Arrays}
+\label{fig:verifier-rules-arrays}
+\end{figure}
+
+
+
+
+% --------------------------- Structural rules ----------------
+%    SLPJ I think these rules are no longer "live"
+\begin{comment}
+  \begin{figure}
+    $$
+    \begin{array}{l}
+      \textit{Structural rules} \\
+      \begin{array}{lr@{\;}c@{\;}ll}
+      \rulename{exi-swap} & \ensuremath{\exists\Varid{x}.\,\exists\Varid{y}.\,\Varid{e}} & \movesto & \ensuremath{\exists\Varid{y}.\,\exists\Varid{x}.\,\Varid{e}} \\
+      \rulename{val-swap} & \ensuremath{e;\,\Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v};\,\Varid{e}} & \movesto & \ensuremath{\Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Varid{v};\,e;\,\Varid{e}} \\
+      \text{\lennart{Plan D:}}\\
+      \rulename{var-swap-subst} & \ensuremath{X [\mskip1.5mu \Varid{x}\hspace{-0.14em}=\hspace{-0.14em}\Varid{y}\mskip1.5mu]} & \movesto & \ensuremath{X\{\Varid{x}/\Varid{y}\} [\mskip1.5mu \Varid{y}\hspace{-0.14em}=\hspace{-0.14em}\Varid{x}\mskip1.5mu]} \\
+      % \rulename{unify-swap} & |x == y)| & \movesto & |x == y| \\
+      \end{array} \\
+
+     \end{array}
+     $$
+    \caption{The Verse calculus: Structural Rules}
+    \Description{The Verse calculus: Structural Rules}
+      \label{fig:rules-structural}  \label{fig:structural}
+   \end{figure}
+\end{comment}
