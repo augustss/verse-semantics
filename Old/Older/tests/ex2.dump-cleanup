@@ -1,5 +1,0 @@
-def fac
-in {fac = (x#1 => (def n
-                   in {n = int[x#1];
-                       if (n = 0) then 1 else operator'*'(n, fac(operator'-'(n, 1)))}));
-    print(fac(5))}
