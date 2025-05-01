@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
+
 
 jobs:
   build:
@@ -26,11 +26,9 @@ jobs:
         ghc-version: ${{ matrix.ghc }}
         cabal-version: '2.4'
 
-    - name: Install dependencies
+    - name: Update dependencies
       working-directory: VersePrototypes
-      run: |
-        cabal update
-        cabal build all --only-dependencies
+      run: cabal update
 
     - name: Build All
       working-directory: VersePrototypes
