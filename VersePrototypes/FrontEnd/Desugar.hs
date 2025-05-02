@@ -877,6 +877,7 @@ essToMini flags orig_e = go_expr orig_e
 
     ueq :: WContext -> DsM SrcMini -> DsM SrcMini
     -- Typeset as "=" with a little circle above
+    -- Rules (WP1), (WP2), (WP3)
     ueq (WC { wc_inp = inp, wc_fxs = cfxs }) ds_e
       = case inp of
            NoInput -> ds_e
@@ -884,7 +885,9 @@ essToMini flags orig_e = go_expr orig_e
                     DomCtxt -> Unify i <$> ds_e  -- See M20Dec24-3 for a simple example
                     RngCtxt fxs -> do { e <- ds_e    -- See test `blame0` for a simple example
                                       ; v <- newIdent noLoc "i"
-                                      ; pure (OfType i fxs (Lam v (Unify (Variable v) e))) }
+                                      ; pure (OfType i effSucceeds (Lam v (Unify (Variable v) e))) }
+    -- Experimental: try effSucceeds rather than `fx` in this OfType call
+    -- Goal transparent higher-order functions behave better; see M2May25-*
 
 --------------------------------------------------------
 --

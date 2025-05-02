@@ -1,30 +1,51 @@
-# Add new meetings at the top
+#########################################
+#     Add new meetings at the top
+#########################################
 
-verify("M30Apr25-1", pass){ f3( g(x:int)<decides> := {x>3} )<decides> := { g[5] }
+# ------------ 2 May 2025 -------------
+verify("M2May25-1", pass){ f6a( p(x:int)<decides>:=7 )<succeeds> := p[3] }
+  # -1: accept: despite p <decides>, because p is transparent
+verify("M2May25-1a", fail){ f6a( p(x:int)<decides>:int )<succeeds> := p[3] }
+  # -1a: reject: p is opaque so <decides> wins
+verify("M2May25-1b", fail){ f6a( p(x:int)<decides>:int := 7 )<succeeds> := p[3] }
+  # -1b: reject just like -1a
+
+verify("M2May25-2", fail){ f6a( p(x:int)<decides>:=7 )<succeeds> := p[3]
+                         ; all { f6a[ p(x:int)<closed><decides>:=fail ]} }
+  # -2: reject because arg to f6a doesn't return 7
+
+verify("M2May25-3", pass){ f6a( p(x:int)<decides>:=7 )<succeeds> := p[3]
+                         ; all { f6a[ p(x:int)<closed><decides>:=7 ]} }
+  # -3: accept because arg to f6a does return 7
+
+verify("M2May25-4", pass){ f6a( p(x:int)<decides>:=7 )<succeeds> := p[3]
+                         ; all { f6a[ p(x:int)<closed><succeeds>:=7 ]} }
+  # -4: same as -3, but with a <succeeds> p
+
+
+# ------------ 30 Apr 2025 -------------
+verify("M30Apr25-0a", pass){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[5] } }
+verify("M30Apr25-0b", fail, broken){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[2] } }
+
+verify("M30Apr25-1", pass){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[5] }
                           ; k(x:int)<decides> := {x>2}
                           ; all{ f3[k] } }
-verify("M30Apr25-2", pass){ f6( p(x:int)<decides>:=7 )<decides> := { p[5] }
-                          ; k(x:int)<decides> := fail
-                          ; all{ f6[ k ] } }
+verify("M30Apr25-2", fail){ f3( g(x:int)<decides> := {x>3} )<decides> := { g[5] }
+                          ; k(x:int)<decides> := {x>4}
+                          ; all{ f3[k] } }
+  # -1 and -2: Should `k` be accepted as f3's argument?
+  # Yes if k's result, when it succeeds, is >3.
 
-verify("M30Apr25-3", pass){ f6( p(x:int)<decides>:=7 )<decides> := { p[5] } }
-verify("M30Apr25-3a", pass){ f6( p(x:int)<decides>:=7 )<decides> := { p[5] }
-                           ; all{ f6[ _=>7 ] } }
+verify("M30Apr25-6", pass, broken){ hof( f(x:int)<succeeds>:={2|3} ) := {f[5]} } # ; k(x:int):=3; hof[ k ] }
+  # Not sure what we want this one to do
 
-verify("M30Apr25-4", fail){ f6( p(x:int)<closed><decides>:=7 )<succeeds> := { p[5] } }
-  # Should fail because f6's body assumes that p can fail
-  # #asktim
-
-verify("M30Apr25-5", pass){ f6( p(x:int)<closed><succeeds>:=7 )<succeeds> := { p[5] } }
-
-verify("M30Apr25-6", pass){ hof( f(x:int)<succeeds>:={2|3} ) := {f[5]} } # ; k(x:int):=3; hof[ k ] }
-
-# ----------------
+# ------------ 28 Apr 2025 -------------
 verify("M28Apr25-1", pass){ g5( f(:int)<succeeds>:=(1|2|3) )<succeeds> := f[3]; g5[ x:int => x ] = 3 }
-testeq("M28Apr25-2", pass){ g5( f(:int)<succeeds>:=(1|2|3) )<succeeds> := f[3]; g5[ x:int => x ] } { 3 }
+testeq("M28Apr25-2", pass, broken){ g5( f(:int)<succeeds>:=(1|2|3) )<succeeds> := f[3]; g5[ x:int => x ] } { 3 }
+  # Not sure what we want this one to do
 
 
-
+# ------------ 8 Apr 2025 -------------
 testeq("M8Apr25-1", pass){ succ(x:int):int := x+1
                          ; h->f:=function(:int){:int}
                          ; h=succ
