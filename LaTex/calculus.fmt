@@ -672,9 +672,13 @@
 
 %% ----------- DPS Verse -------------
 %format scope (op) = "\{" op "\}"
-
+%format dpslam x (dom) (rng) rngvar = "\lambda" x ".(" dom ")\{" rng "\}(" rngvar ")"
 %format nop = "\textbf{nop}"
-%format alldps x op y = x == allKW "\{ op \}(" y ")"
+%format dpsall x op y = x == allKW "\{ op \}(" y ")"
+
+%% Translation from Mini Verse to DPS Verse
+%format DpsT (e) r = "\mathcal{T}\llbracket" e "\rrbracket{}" r
+
 %format op_a
 %format op_b
 %format op_i
