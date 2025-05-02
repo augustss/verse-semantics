@@ -34,6 +34,6 @@ jobs:
       working-directory: VersePrototypes
       run: cabal build all
 
-    # - name: Tests
-      # working-directory: VersePrototypes
-      # run: make test
+    - name: Tests
+      working-directory: VersePrototypes
+      run: make test
