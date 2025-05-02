@@ -444,10 +444,8 @@ data SideEff    -- Side effects
   | STop               -- Any side effect, top of the lattice
   deriving( Eq, Ord, Data, Bounded, Enum )
 
-effTop :: Eff
-effTop = Eff { eff_card = CIterates, eff_side = STop }
-
-effSucceeds, effDecides, effFails :: Eff
+effTop, effSucceeds, effDecides, effFails :: Eff
+effTop      = Eff { eff_card = CIterates, eff_side = STop }
 effSucceeds = Eff { eff_card = CSucceeds, eff_side = STop }
 effDecides  = Eff { eff_card = CDecides,  eff_side = STop }
 effFails    = Eff { eff_card = CFails,    eff_side = STop }
@@ -685,8 +683,9 @@ instance Pretty SrcExpr where
                          cat [ text "verify" <> parens (hsep (map (ppr 0) is))
                              , indent (braces (ppr 0 e)) ]
 
-          OfType e fx t -> cat [ parens (ppr 0 e) <+> text "|>" <> pPrint fx
-                               , indent (braces (ppr 0 t)) ]
+          OfType e fx t -> maybeParens (p>0) $
+                          sep [ (ppr 1 e)
+                              , text "|>" <> pPrint fx <+> ppr 1 t ]
 
           Where e1 e2 -> maybeParens (p>0) $ sep [ ppr 0 e1, text "where" <+> ppr 0 e2 ]
           Some e      -> text "some" <> parens (ppr 0 e)
@@ -694,7 +693,15 @@ instance Pretty SrcExpr where
           All e       -> text "all" <> parens (ppr 0 e)
           Check fx e  -> cat [ text "check" <> pPrint fx
                              , indent (braces (ppr 0 e)) ]
-          Guard e1 e2 -> maybeParens (p>0) $ sep [ ppr 1 e1, text ";;" <+> ppr 1 e2 ]
+
+          Guard g1 e -> maybeParens (p>0) $
+                        sep [ fsep [ ppr 0 g <+> text ";;" | g <- all_gs ]
+                            , ppr 0 etail ]
+                     where
+                        (all_gs, etail) = grab [g1] e
+                        grab gs (Guard g e2) = grab (g:gs) e2
+                        grab gs et           = (reverse gs, et)
+
           XDLam q i e1 e2 -> maybeParens (p > 0) $ text "\\" <> ppr 0 q <> ppr 0 i <> text "."
                                                    <> cat [braces (ppr 0 e1), braces (ppr 0 e2)]
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e

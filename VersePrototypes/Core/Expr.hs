@@ -729,7 +729,14 @@ pPrintPrecE lvl prec the_expr
        e1 :|: e2   -> mbPar0 $ sep [ ppr1 e1, char '|' <+> ppr1 e2 ]
        e1 :@: e2   -> block' "[]" (ppr1 e1) (pp_call_arg e2)
        e@(_ :>: _) -> mbPar0 $ sep (punctuate semi $ map ppr1 (gatherSeqs e))
-       e1 :>>: e2  -> mbPar0 $ ppr1 e1 <+> text ">>" <+> ppr1 e2
+
+       -- Guards; print together
+       g1 :>>: e  -> mbPar0 $ sep [ fsep [ ppr0 g <+> text ";;" | g <- all_gs ]
+                                  , ppr1 etail ]
+                  where
+                        (all_gs, etail) = grab [g1] e
+                        grab gs (g :>>: e2) = grab (g:gs) e2
+                        grab gs et          = (reverse gs, et)
 
        Tup as  -> char '<' <> fsep (punctuate comma $ map ppr0 as) <> char '>'
        Tru a   -> block "{}" (text "truth") a
