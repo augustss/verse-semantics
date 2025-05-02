@@ -345,10 +345,11 @@ mkCheck Decides e
   a:x:y:_ = identsNotIn (free e)
 
 -- WRONG for definitely-failed check<fx>{e}
+-- Change this definition to get more informative stuck states
 wrongFx :: Effect -> Expr
 wrongFx fx =  -- See Note [wrongFx] for these two alternative implementations
-  Err ("check<" ++ show fx ++ ">")                        -- Use Err
-  --Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []   -- Stuck
+---  Err ("check<" ++ show fx ++ ">")                        -- Use Err (more compact)
+   Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []   -- Stuck (more informative)
 
 {- Note [mkCheck}
 ~~~~~~~~~~~~~~~~~

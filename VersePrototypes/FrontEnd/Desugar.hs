@@ -75,12 +75,14 @@ desugar flgs add_verification e_parsed
 --------------------------------------------------------
 --
 --           The S-desugaring
---     Desugar into Small Source Verse
---     Figs 3 and 4 of desugaring.pdf
+--     Desugar into Essential Verse
+--     Figs 4 and 5 of desugaring.pdf
 --
 --------------------------------------------------------
 
 sDesugarExpr :: SrcExpr -> DsM SrcEssential
+-- Source Verse to Essential Verse
+-- Figs 4 and 5 in verse-spec.
 sDesugarExpr = ds
   where
     ds :: SrcExpr -> DsM SrcEssential
@@ -650,13 +652,14 @@ mkAppend x          y          = do { r    <- newIdent noLoc "r"
 --------------------------------------------------------
 
 data WContext   -- The context for the W transformation
+                -- Written \kappa in Fig 6
   = WC { wc_inp :: Input
        , wc_fxs :: EffContext
        }
   deriving( Show )
 
 data Input
-  = NoInput      -- ^ Typeset as bullet, circle, or underscore
+  = NoInput       -- ^ Typeset as bullet, circle, or underscore
   | PI SrcMini    -- ^ An input variable x
   deriving( Show )
 
@@ -712,6 +715,7 @@ This little optimisation eliminates a huge amount of crap.
 
 essToMini :: Flags -> SrcEssential -> DsM SrcMini
 -- Essential Verse --> Mini Verse
+-- Fig 6 in verse-spec
 -- See Note [The Input parameter to essToMini]
 essToMini flags orig_e = go_expr orig_e
   where
@@ -872,6 +876,7 @@ essToMini flags orig_e = go_expr orig_e
     go kap t = error $ "TODO: essToMini " ++ show (kap, t)
 
     ueq :: WContext -> DsM SrcMini -> DsM SrcMini
+    -- Typeset as "=" with a little circle above
     ueq (WC { wc_inp = inp, wc_fxs = cfxs }) ds_e
       = case inp of
            NoInput -> ds_e
@@ -902,7 +907,7 @@ data DsMode
   deriving (Eq, Ord, Show)
 
 miniToCore :: Bool -> SrcMini -> DsM SrcCore
--- The V transformation; Fig 9 in verse-spec.pdf
+-- The V transformation; Fig 8 in verse-spec.pdf
 miniToCore add_verification e_top
   | add_verification
   = do { e' <- go (MV True, []) e_top
