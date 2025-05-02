@@ -64,9 +64,9 @@ $$
 \rulename{wcol3}   & |SS (mkwu (drrng fx) (wrape e)) (: t)| & = & |oftypefx e fx (SS wuinit t)| \\
 \rulename{wopaque}\asktim   & |SS (mkwu (drrng fx_2) u) (oftypefx t_1 fx_1 t_2)|
     & = & |oftypefx (SS (mkwu drdom u) t_1) (andeffects fx_1 fx_2) (SS wuinit t_2)| \\
-\rulename{wtup1}   & |SS (mkwu dr wrapemp) (arr (t_1, xdots, t_n))|
+\rulename{wtup1}   & |SS (mkwu dr wrapemp) (array (t_1, xdots, t_n))|
    & = & |arr( (SS (mkwu dr wrapemp) t_1), xdots, (SS (mkwu dr wrapemp) t_n))| \\
-\rulename{wtup2}   & |SS (mkwu dr (wrape e)) (arr (t_1, xdots, t_n))|
+\rulename{wtup2}   & |SS (mkwu dr (wrape e)) (array (t_1, xdots, t_n))|
 & = & \begin{array}[t]{@@{}l}
   |defintro (x_1 xdots x_n); e = arr(x_1, xdots, x_n);| \\
   |arr( (SS (mkwu dr (wrape x_1)) t_1), xdots, (SS (mkwu dr (wrape x_n)) t_n))|
