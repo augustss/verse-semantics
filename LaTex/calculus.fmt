@@ -3,7 +3,7 @@
 
 %format timlam h fx i x s0 j y s1 = "\textbf{tlam}(" h "," fx ")\," i "," x "\{" s0 "\}" j "," y "\{" s1 "\}"
 %format lam2 x r e = "\lambda" x "\shortrightarrow{}" r ".\," e
-%format scope (vs) (stuff) (e) = "\textbf{scope}(" vs ";" stuff ").\," e
+%format timscope (vs) (stuff) (e) = "\textbf{scope}(" vs ";" stuff ").\," e
 
 %% 'g' inferences
 %format edge v w = v "\leftarrow" w
@@ -327,7 +327,7 @@
 %format all2 (r) (x) = allKW "("r")\{" x "\}"
 %format (one (x)) = "\textbf{one}\{" x "\}"
 %format one2 (r) (x) = oneKW "("r")\{" x "\}"
-
+%format if3 (e1) (e2) (e3) = ifKW "(" e1 ")\{" e2 "\}\!" else "\!\{" e3 "\}"
 
 %format iter (e) (a) (f) (g) = iterKW "(" e ")\{" a ";" f ";" g "\}"
 %format iter2 (k) (e) (z) = iterKW "(" k ")\{"e "\}\{" z "\}"
@@ -404,7 +404,7 @@
 %format lamOCv (oc) (x) (t1) (t2) = "\lambda_{" oc "}" x ".\begin{array}[t]{@{}l} (" t1 ") \\ \{" t2 "\} \end{array}"
 
 
-%% -------End of f unctions ---------------
+%% -------End of functions ---------------
 
 %format prefix op = "\textbf{prefix}\textquote " op "\textquote"
 %format postfix op = "\textbf{postfix}\textquote " op "\textquote"
@@ -670,9 +670,19 @@
 
 %format fun = "\mathit{fun}"
 
+%% ----------- DPS Verse -------------
+%format scope (op) = "\{" op "\}"
+
+%format nop = "\textbf{nop}"
+%format alldps x op y = x == allKW "\{ op \}(" y ")"
 %format op_a
 %format op_b
 %format op_i
+%format op_1
+%format op_2
+%format op_3
+
+%% ----------- End of DPS Verse -------------
 
 %format l_1
 %format l_2
