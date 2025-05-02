@@ -1,5 +1,30 @@
 # Add new meetings at the top
 
+verify("M30Apr25-1", pass){ f3( g(x:int)<decides> := {x>3} )<decides> := { g[5] }
+                          ; k(x:int)<decides> := {x>2}
+                          ; all{ f3[k] } }
+verify("M30Apr25-2", pass){ f6( p(x:int)<decides>:=7 )<decides> := { p[5] }
+                          ; k(x:int)<decides> := fail
+                          ; all{ f6[ k ] } }
+
+verify("M30Apr25-3", pass){ f6( p(x:int)<decides>:=7 )<decides> := { p[5] } }
+verify("M30Apr25-3a", pass){ f6( p(x:int)<decides>:=7 )<decides> := { p[5] }
+                           ; all{ f6[ _=>7 ] } }
+
+verify("M30Apr25-4", fail){ f6( p(x:int)<closed><decides>:=7 )<succeeds> := { p[5] } }
+  # Should fail because f6's body assumes that p can fail
+  # #asktim
+
+verify("M30Apr25-5", pass){ f6( p(x:int)<closed><succeeds>:=7 )<succeeds> := { p[5] } }
+
+verify("M30Apr25-6", pass){ hof( f(x:int)<succeeds>:={2|3} ) := {f[5]} } # ; k(x:int):=3; hof[ k ] }
+
+# ----------------
+verify("M28Apr25-1", pass){ g5( f(:int)<succeeds>:=(1|2|3) )<succeeds> := f[3]; g5[ x:int => x ] = 3 }
+testeq("M28Apr25-2", pass){ g5( f(:int)<succeeds>:=(1|2|3) )<succeeds> := f[3]; g5[ x:int => x ] } { 3 }
+
+
+
 testeq("M8Apr25-1", pass){ succ(x:int):int := x+1
                          ; h->f:=function(:int){:int}
                          ; h=succ
@@ -12,10 +37,13 @@ verify("M8Apr25-2", pass, broken){ succ(x:int):int := x+1; h->f:=function(:int){
 # -------------- More examples that involve choice in the domain ------------
 verify("M28Mar25-1", fail) { f( g():=1|2 )<succeeds>:int := { g[]; 7} }
   # -1: a copy of M19Mar25-12.  Should fail because g[] inlines to (1|2)
+
 verify("M28Mar25-2", pass) { f( g():=1|2 )<succeeds>:int := { 7 } }
   # -2: passes; now g is not called
+
 verify("M28Mar25-3", pass) { f( g():int:=1|2 )<succeeds>:int := { g[]; 7} }
   # -3: passes; g is now opaque, so we don't see the choice at the call site
+
 verify("M28Mar25-4", pass) { f( g():int:=1|2 )<succeeds>:int := { g[]; 7}
                            ; f[ () => 1 ] }
   # -4: Like -3, but we call f.  Yes: the argument returns 1 or 2
