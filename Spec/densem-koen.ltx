@@ -1,0 +1,84 @@
+%include lhs2TeX.fmt
+%include lhs2TeX.sty
+%include polycode.fmt
+%include forall.fmt
+%include ../LaTex/calculus.fmt
+
+\begin{figure}
+$$
+% ------------- Syntax of DPS Verse ---------------
+\begin{array}{l}
+\textbf{Syntax of DPS Verse} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}l}
+  \text{Ops} & op & ::= & |x = y| \vb |x = k| \vb |x = o| \vb |x = arr (x_1, xdots, x_n)| \vb |x = truth y|
+               \\
+  && \vb & |op_1; op_2| \vb |op_1 `choice` op_2| \vb |fail| \vb |defintro x| \vb |scope op| \\
+  && \vb & |x = dpslam x op_1 op_2 y|  \vb |x = apply1N f y| \\
+  && \vb & |if3 op_1 op_2 op_3| \vb |dpsall x op y|
+\end{array} \\
+\\
+
+\textbf{Translating Mini Verse to DPS Verse} \\
+\text{In all these equations, a ``|defintro x|'' on the RHS implies ``fresh x''.} \\
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
+\rulename{dpsv} & |DpsT x r| & = & |r = x| \\
+\rulename{dpsk} & |DpsT k r| & = & |r = k| \\
+\rulename{dpso} & |DpsT o r| & = & |r = o| \\
+\rulename{dpsapp} & |DpsT (apply1N e_1 e_2) r| & = & |defintro f; DpsT e_1 f; defintro x; DpsT e_2 x; r = apply1N f x| \\
+\rulename{dpsseq} & |DpsT (e_1 ; e_2) r| & = & |defintro s; DpsT e_1 s; DpsT e_2 r| & \text{Discards s}\\
+\rulename{dpsseq} & |DpsT (e_1 == e_2) r| & = & |DpsT e_1 r; DpsT e_2 r| & \text{Push r into both} \\
+\rulename{dpschoice} & |DpsT (e_1 `choice` e_2) r| & = & |DpsT e_1 r `choice` DpsT e_2 r| & \text{Push r into both} \\
+\rulename{dpsfail} & |DpsT fail r| & = & |fail| & \text{What about r?} \\
+\rulename{dpsexists} & |DpsT (defintro x) r| & = & |defintro x|  & \text{What about r?}  \\
+\rulename{dpslam} & |DpsT (lamOC q x e_1 e_2) r| & = & |r = dpslam x (defintro y; DpsT e_1 y) (DpsT e_2 z) z| \\
+\rulename{dpsarr} & |DpsT (arr (e_1, xdots, e_n)) r| & = & |defintro (r_1 xdots r_n); DpsT e_1 r_1; xdots; DpsT e_n r_n; r = arr (r_1,xdots, x_n)| \\
+\rulename{dpstru} & |DpsT (truth e) r| & = & |defintro y; DpsT e y; r = truth y| \\
+\rulename{dpsopq} & |DpsT (oftypefx t_1 fx t_2) r| & = & ??? \\
+\rulename{dpschk} & |DpsT (check fx e) r| & = & ??? \\
+\multicolumn{2}{@@{}l}{\rulename{dpsif} \;\; \hfill |DpsT (vif e_1 e_2 e_3) r|}
+     & = & |if3 (defintro x; DpsT e_1 x) (DpsT e_2 r) (DpsT e_3 r)| & \text{Push r into branches}\\
+\rulename{dpsfor} & |DpsT (fordo e_1 e_2) r| & = & ??? \\
+\rulename{dpsall} & |DpsT (all e) r| & = & |dpsall (DpsT e y) y|  \\
+\end{array}
+
+\end{array}
+$$
+\caption{Translating Mini Verse to DPS Verse} \label{fig:dps-verse}
+\end{figure}
+
+
+\begin{figure}
+$$
+% ------------- Denotationals semantics of DPS Verse ---------------
+\begin{array}{l}
+\textbf{Domains} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+  & \Val & = & \Z + \Fun \\
+  & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
+  & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
+  & \ENV & = & \powerset{ \Env } \\
+\end{array} \\
+\\
+\textbf{Operations over ENV} \\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+  univE & : & \ENV \\
+  univE & = & \{ \rho \in \Env \} \\
+  (:=) & : & \Ident \rightarrow \Z \rightarrow ENV  & \text{NB: overloaded}\\
+  x := k & = & \{ \rho \in \Env \vb \rho(x) = k \} \\
+  (:=) & : & \Ident \rightarrow \Ident \rightarrow ENV & \text{NB: overloaded}\\
+  x := y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\
+\end{array} \\
+\\
+
+\textbf{Denotational semantics} \\
+\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+ \semapp{E}{|e|} & : & \seq{ \Env } \\
+ \semapp{E}{|x=k|} & = & [ x:=k ] \\
+ \semapp{E}{|x=y|} & = & [ x:=y ] \\
+ \semapp{E}{|defintro x|} & = & [ univE ] \\
+\end{array} \\
+
+\end{array}
+$$
+\caption{Denotational semantics of DPS Verse} \label{fig:dps-verse-densem}
+\end{figure}
