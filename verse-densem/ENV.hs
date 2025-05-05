@@ -8,7 +8,8 @@ module ENV(
     univE, failE,
     hide, compl,
     (%=), (%/\), (%\/), (%\\),
-    vals,
+    extract,
+    extracts,
   bigUnion,
   bigIntersect,
   bigUnique,
@@ -158,11 +159,23 @@ infixr 3 %\/
 
 ----------------------------------------------------------------------------------------
 
-vals :: Ident -> ENV -> [Value]
-vals x (ENV xvss) =
-  usort [ v | xvs <- xvss, v <- case lookup x xvs of
-                                  Nothing -> univ
-                                  Just v  -> [v] ]
+extract :: Ident -> ENV -> [(Value, ENV)]
+extract x env@(ENV xvss) =
+  [ (v, hide [x] (env %/\ x%=v))
+  | v <- usort [ v
+               | xvs <- xvss
+               , v <- case lookup x xvs of
+                        Nothing -> univ
+                        Just v  -> [v]
+               ]
+  ]
+
+extracts :: [Ident] -> ENV -> [([Value], ENV)]
+extracts []     env = [([],env)]
+extracts (x:xs) env = [ (v:vs, env'')
+                      | (v,env') <- extract x env
+                      , (vs,env'') <- extracts xs env'
+                      ]
 
 ----------------------------------------------------------------------------------------
 -- derived operators
@@ -185,7 +198,7 @@ bigUnique envs = go envs cenvs (tail nenvs)
   go _ _ _ = error "bigUnique"
 
 quant :: Ident -> ([ENV] -> ENV) -> ENV -> ENV
-quant x bigOp env = bigOp [ hide [x] (env %/\ x%=v) | v <- vals x env ]
+quant x bigOp env = bigOp [ env' | (_,env') <- extract x env ]
 
 (%\\) :: ENV -> ENV -> ENV
 env1 %\\ env2 = env1 %/\ compl env2

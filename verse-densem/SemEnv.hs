@@ -165,6 +165,18 @@ sem (Var x) =
      | v <-from$ univ
      ]
 
+sem (Tup []) =
+  set[ [ (set[], Fun []) ]
+     ]
+
+sem (Tup (u:us)) =
+  set[ [ (env1 \/ env2, Fun((Int 0:->v):[Int (i+1):->w|(Int i:->w)<-ivs])) ]
+     | [(env1,v)]       <-from$ sem u
+     , [(env2,Fun ivs)] <-from$ sem (Tup us)
+     , env1 ~= env2
+     ]
+
+
 sem (Exi x e) =
   set[ [ (del x env, v) | (env,v) <-evs ]
      | evs <-from$ sem e
@@ -186,6 +198,44 @@ sem (e1 :|: e2) =
      ]
 
 sem (e1 :>: e2) =
+  sequ $
+  map react $
+  fuse $
+  set[ [ ((env1, env2), v)
+       | (env1,_) <- s1
+       , (env2,v) <- s2
+       ]
+     | s1 <-from$ sem e1
+     , s2 <-from$ sem e2
+     ]
+ where
+  react :: Set ((Env,Env),Value) -> Set (Env,Value)
+  react u = set[ (env1 \/ env2, v)
+               | ((env1,env2),v) <-from$ u
+               , env1 ~= env2
+               ]
+
+{-
+[Set a] -> Set [b] -> Set [(a,b)]
+
+[Set a] ->
+[Set (a,[b])] ->
+[Set [(a,b)]] ->
+Set [(a,b)]
+-}
+{-
+    sequ $
+    filter (not . null . from) $
+    [ set[ (env1 \/ env2,v)
+         | (env1,_) <-from$ s
+         , (env2,v) <-from$ r
+         , env1 ~= env2
+         ]
+    | s <- fuse (sem e1) -- ss
+    , r <- fuse (sem e2) -- rs
+    ]
+-}
+{-
   sequ (fuse (sem e1) `seq2` fuse (sem e2))
  where
   seq2 :: [Set (Env,Value)] -> [Set (Env,Value)] -> [Set (Env,Value)]
@@ -199,6 +249,7 @@ sem (e1 :>: e2) =
     | s <- ss
     , r <- rs
     ]
+-}
 
 sem fun | fun `elem` [F,G] =
   set[ [ (set[], Fun [Int i :-> Int (3-i) | i <- dom]) ]
@@ -264,17 +315,11 @@ instance Num Expr where
 
 examples :: [Expr]
 examples =
-  [ (x:=:(1:|:2))
-  , (x:=:(1:|:x))
-  , (x:=:(1:|:2)) :>: (x:=:(3:|:2))
-  , (x:=:1) :>: (y:=:(2:|:1))
-  , (x:=:(1:|:2)) :>: (y:=:(2:|:1))
-  , (y:>:(x:=:(1:|:2))) :>: (y:=:(2:|:1))
+  [ y:>:(x:=:(1:|:2))
+  , (y:>:(x:=:(1:|:2))) :>: (y:=:(2:|:3))
+  ] ++
+  [ exi g $ (g :=: G) :>: (x :=: 1) :>: (g :@: x)
   ]
-  ++
-  funExamples f F
-  ++
-  funExamples g G
  where
   funExamples f fun =
     [ exi f $ (f :=: fun) :>: f

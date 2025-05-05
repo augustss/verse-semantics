@@ -74,21 +74,33 @@ sem (f:=\(x,op1,op2,y)) = -- f=\x.(op1){op2}(y)
     [ (f %= Fun (filter (not . null . dom) hs)) %/\ fenv
     | (hs, fenv) <-
         combine
-        [ [ (mkFun (map fst vws) (\v -> head [ w | (v',w) <- vws, v'==v ]), penv)
-          | (vws, penv) <-
+        [ [ (pfun vws, penv)
+          | (vs, denv) <-
               combine
-              [ [ ((v,w), hide [x,y] (xenv %/\ (y%=w)))
-                | let xenv = qenv %/\ (x%=v)
-                , w <- vals y xenv
+              [ [(v, hide zs env)]
+              | (v, env) <- extract x env1
+              ]
+          , (vws, penv) <-
+              combine
+              [ [ ((v,w), env)
+                | (w, env) <-
+                    extract y $
+                      bigIntersect
+                      [ hide (x:zs) (bigIntersect [z%=u | (z,u) <- zs `zip` us] %/\ env %/\ env2)
+                      | (us, env) <- extracts zs (denv %/\ x%=v %/\ env1)
+                      ]
                 ]
-              | v <- vals x qenv
+              | v <- vs
               ]
           ]
-        | env <- sem (Scope (op1 :>: op2))
-        , let qenv = quant y bigUnique env %/\ env
+        | env1 <- sem op1
         ]
     ]
   ]
+ where
+  zs   = exis op1
+  env2 = bigUnique (sem op2)
+  pfun vws = mkFun (map fst vws) (\x -> head [ w | (v,w)<-vws, v==x ])
 
 sem (op1 :|: op2) =
   sem op1 ++ sem op2
@@ -124,10 +136,8 @@ sem (All x op y) =
     [ x%=Tup vs %/\ tenv
     | (vs, tenv) <-
         combine
-        [ [ (v, hide [y] (env %/\ y%=v))
-          | v <- vals y env
-          ]
-        | env <- sem (Scope op)
+        [ extract y env
+        | env <- sem op
         ]
     ]
   ]
@@ -209,7 +219,7 @@ examples :: [Oper]
 examples =
   [ Scope $ Exi y :>: Exi z :>: y:=1 :>: z:=2 :>: y:<=x :>: x:<=z
   , (x:=1):|:(x:=2)
-  , Exi g :>: g:=@@(Pfun,[g]) :>: f:=\(x,NoOp,If(x:=1)(y:=2:>:y:=@(g,x))(y:=@(g,x)),y) -- f(1)<open>=2
+  , Scope $ Exi g :>: g:=@@(Pfun,[g]) :>: f:=\(x,NoOp,If(x:=1)(y:=2:>:y:=@(g,x))(y:=@(g,x)),y) -- f(1)<open>=2
   , If(x:=1)(x:=1)(x:=2) :>: ((x:=1):|:(x:=2))
   , ((x:=1):|:(x:=2)) :>: If(x:=1)(x:=1)(x:=2)
   , If(x:=1)(y:=2)(y:=3) :>: ((x:=1):|:(x:=2))

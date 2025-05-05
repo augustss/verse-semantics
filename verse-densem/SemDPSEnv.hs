@@ -329,3 +329,20 @@ examples =
   ]
 
 ----------------------------------------------------------------------------------------
+
+data D = Thing | Fn (D -> Maybe D)
+
+instance Show D where
+  show Thing  = "1"
+  show (Fn f) = "Fn"
+
+w :: D
+w = Fn (\a -> case a of
+                 Fn f -> f a
+                 _    -> Nothing)
+
+ap :: D -> D -> Maybe D
+Fn f `ap` a = f a
+_    `ap` _ = Nothing
+
+
