@@ -53,32 +53,61 @@ $$
 \begin{array}{l}
 \textbf{Domains} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-  & \Val & = & \Z + \Fun \\
+  & \Val & = & \Z + \Fun \\\
   & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
-  & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
-  & \ENV & = & \powerset{ \Env } \\
+  & \rho \in \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
+  & \EV \in \ENV & = & \powerset{ \Env } \\
 \end{array} \\
 \\
 \textbf{Operations over ENV} \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
-  univE & : & \ENV \\
-  univE & = & \{ \rho \in \Env \} \\
-  (:=) & : & \Ident \rightarrow \Z \rightarrow ENV  & \text{NB: overloaded}\\
-  x := k & = & \{ \rho \in \Env \vb \rho(x) = k \} \\
-  (:=) & : & \Ident \rightarrow \Ident \rightarrow ENV & \text{NB: overloaded}\\
-  x := y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\
+  \univE & : & \ENV \\
+  \univE & = & \{ \rho \in \Env \} \\[1mm]
+ (\equalsE) & : & \Ident \rightarrow \Z \rightarrow \ENV  & \text{NB: $\equalsE$ is overloaded}\\
+  x \equalsE k & = & \{ \rho \in \Env \vb \rho(x) = k \} \\[1mm]
+ (\equalsE) & : & \Ident \rightarrow \Ident \rightarrow \ENV & \text{NB: $\equalsE$ is overloaded}\\
+  x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\[1mm]
+  \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
+  \cleanE(es) & = & [ \EV \vb \EV \in es, \EV \not= \{\} ] \\[1mm]
+  \hideE & : & [\Ident] \rightarrow \ENV \rightarrow \ENV \\
+  \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\
 \end{array} \\
 \\
 
 \textbf{Denotational semantics} \\
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
- \semapp{E}{|e|} & : & \seq{ \Env } \\
- \semapp{E}{|x=k|} & = & [ x:=k ] \\
- \semapp{E}{|x=y|} & = & [ x:=y ] \\
- \semapp{E}{|defintro x|} & = & [ univE ] \\
+\begin{array}{r@@{\;\;}c@@{\;\;}ll}
+ \semapp{E}{|e|} & : & \seq{ \ENV } \\
+ \semapp{E}{|defintro x|} & = & [ \univE ] \\
+ \semapp{E}{|x=k|} & = & [ x \equalsE k ] \\
+ \semapp{E}{|x=y|} & = & [ x \equalsE y ] \\
+ \semapp{E}{|x <= y|}
+   & = & [ \{ \rho \in \Env \vb \rho(x) \in \Z, \rho(y) \in \Z, \rho(x) \leq \rho(y) \} ] \\
+ \semapp{E}{|x = arr (x_1, xdots, x_n)|$$}
+ & = & [ \{ \rho \in \Env \vb
+   \begin{array}[t]{l}
+     \rho(x) = [Fun(f)],\, \dom(f)=\{0\ldots{}(n-1)\}, \\
+     \forall 0 \leq i < n.\, f(i) = \rho(x_i) \} ]
+     \end{array} \\
+ \semapp{E}{|op_1 `choice` op_2|} & = & \semapp{E}{op_1} \append \semapp{E}{op_2}  \\
+ \semapp{E}{|fail|} & = & [ ] \\
+ \semapp{E}{|op_1 ; op_2|}
+   & = &  \cleanE [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapp{E}{op_1}, \EV_2 \in \semapp{E}{op_2} ] \\
+ \semapp{E}{|x = dpslam x op_1 op2 y|} & = & ??? \\
+ \semapp{E}{|x = apply1N f y|} & = & ??? \\
+ \semapp{E}{|x = if3 op_1 op_2 op_3|} & = & ??? \\
+ \semapp{E}{|x = dpsall x op y|} & = & ??? \\
+\\
+\semapp{B}{|op|} & : & \seq{ \ENV } \\
+\semapp{B}{|op|} & = & [ \hideE(\semapp{I}{|op|}, \EV) \vb \EV \in \semapp{E}{op} ] \\
+\\
+\semap{I}{|op|} & : & [\Ident] \\
+\semap{I}{|op|} & = & \text{the outer $\exists$-bound variables in |op|} \\[1mm]
 \end{array} \\
 
 \end{array}
 $$
 \caption{Denotational semantics of DPS Verse} \label{fig:dps-verse-densem}
 \end{figure}
+
+Questions:
+* Why do we need ``scope'' and ``nop''?

@@ -268,6 +268,7 @@
 \newcommand{\parfun}[2]{\M{#1 \rightharpoonup #2}} % Partial function
 \newcommand{\totfun}[2]{\M{#1 \rightarrow #2}}     % Total function
 \newcommand{\semfcn}{\parfun{\Value}{\Value}}      % Partial function W->W
+\newcommand{\dom}{\mathbf{dom}}
 
 %% Domains
 \newcommand{\Term}{Term}
@@ -292,13 +293,23 @@
 \newcommand{\semappp}[4]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4}
 \newcommand{\semapppp}[5]{\semfun{#1}\llbracket #2 \rrbracket\, #3 \, #4 \, #5}
 
+% Functions over ENV
+\newcommand{\EV}{\Delta}   % A variable that ranges over \ENV
+\newcommand{\univE}{\mathbf{univ}}
+\newcommand{\equalsE}{\approx}
+\newcommand{\cleanE}{\mathbf{clean}}
+\newcommand{\intersectE}{\cap}
+\newcommand{\unionE}{\cup}
+\newcommand{\hideE}{\mathbf{hide}}
+
+% Functions over sequences
+\newcommand{\append}{+\!\!+\,}
 
 \newcommand{\tuple}[1]{\langle #1 \rangle}
 \newcommand{\equa}[1]{\begin{equation*}#1\end{equation*}}
 \newcommand{\mcompr}[2]{[ #1 \vb #2 ]}
 \newcommand{\mbind}[2]{ #1 \leftarrow #2 }
 \newcommand{\malt}{\diamond}
-\newcommand{\append}{+\!\!+\,}
 \newcommand{\semclose}[2]{\textbf{close}_{#1}\,#2}
 \newcommand{\semopen}[2]{\textbf{open}_{#1}\,#2}
 \newcommand{\semapply}[2]{\apply(#1,#2)}
@@ -354,4 +365,3 @@
 \newcommand{\mcross}{\scalebox{1.5}{$\Cup$}}
 \newcommand{\wrong}{\mathbf{wrong}}
 \newcommand{\ran}{\mathbf{ran}}
-\newcommand{\dom}{\mathbf{dom}}

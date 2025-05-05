@@ -390,7 +390,6 @@
 
 
 
-
 %%  OLD SYNTAX   %format split (x) (y) (z) = "\textbf{split}(" x ")\{" y "," z "\}"
 %% %format defKW = "\textbf{def}"
 % only used in comments, but still prettier this way:
@@ -402,7 +401,7 @@
 %% functionOC has open/closed subscript
 
 
-%% -------End of f unctions ---------------
+%% -------End of functions ---------------
 
 
 
@@ -444,6 +443,12 @@
 
 
 
+%% ----------- DPS Verse -------------
+
+%% Translation from Mini Verse to DPS Verse
+
+
+%% ----------- End of DPS Verse -------------
 
 
 
@@ -556,11 +561,19 @@
 \input{densem-expr-style}
 
 % -------------------------------------------------------------
+%               Denotational semantics: Koen style
+% -------------------------------------------------------------
+
+\clearpage \newpage
+\section{Denotational semantics: DPS (Koen style)}
+\input{densem-koen}
+
+% -------------------------------------------------------------
 %               Denotational semantics: destination style
 % -------------------------------------------------------------
 
 \clearpage \newpage
-\section{Denotational semantics Plan B: destination passing style}
+\section{Denotational semantics: DPS (Jan style)}
 \input{densem-dps-style}
  
 \end{document}

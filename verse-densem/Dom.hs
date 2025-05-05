@@ -46,8 +46,10 @@ getTup _ = Nothing
 
 ----------------------------------------------------------------------------------------
 
-data a :->? b
+data a :->? b  -- Partial functions from a to b
   = PFun{ dom :: [a], apply :: a -> b }
+    -- Represented by its domein [a], and
+    -- the function on members of that domain
 
 -- The domain must be in a canonical for, otherwise
 -- the Ord instance does not work.
@@ -66,9 +68,11 @@ instance (Show a, Show b) => Show (a :->? b) where
     "{" ++ intercalate "," [ show x ++ "↦" ++ show (f x) | x <- dm ] ++ "}"
 
 pointFcn :: Eq a => a -> b -> (a :->? b)
+-- A partial function with a single element in its domain
 pointFcn a b = PFun { dom = [a], apply = \ x -> if x == a then b else undefined }
 
 emptyFcn :: a :->? b
+-- A partial function with an empty domain
 emptyFcn = PFun [] undefined
 
 (?\/) :: Ord a => (a :->? b) -> (a :->? b) -> (a :->? b)
