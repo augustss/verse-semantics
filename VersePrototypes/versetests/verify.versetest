@@ -116,10 +116,11 @@ verify("T51",pass,tim=skip_any) { foo(x:any)<decides> := { x = 666 } }
 verify("T52",pass,tim=skip_any) { foo(x:any)<decides> := { x = 666; x }; bar(z:foo):foo := {z} }
 verify("T53",pass) {f(x:int)<succeeds>:=x/2}
 verify("T54",fail) {f(x:int)<succeeds>:=x/0}
-# T55: Tim bug
+  # T55: Tim bug
 verify("T55",fail,tim=skip_acc) {f(x:int)(y:int):int := (x,y)}
 verify("T56",pass) {x:int,x=3}
-
+verify("T57",fail) {x:int = 3,x=3}
+  # T57: x's defn should be opaque, so x=3 should fail
 
 # Effects
 verify("Eff1",pass) {f(x:int)<succeeds>:int := x}
