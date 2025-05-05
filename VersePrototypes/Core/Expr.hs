@@ -348,8 +348,9 @@ mkCheck Decides e
 -- Change this definition to get more informative stuck states
 wrongFx :: Effect -> Expr
 wrongFx fx =  -- See Note [wrongFx] for these two alternative implementations
----  Err ("check<" ++ show fx ++ ">")                        -- Use Err (more compact)
-   Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []   -- Stuck (more informative)
+  Err ("check<" ++ show fx ++ ">")                        -- (A) Use Err (more compact)
+--  Lit (LStr ("check<" ++ show fx ++ ">")) :@: Tup []   -- (B) Stuck (more informative)
+-- NB: using (B) instead of (A) breaks tests arr-uni2a and arr-uni3
 
 {- Note [mkCheck}
 ~~~~~~~~~~~~~~~~~
