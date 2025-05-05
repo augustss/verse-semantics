@@ -26,6 +26,7 @@ verify("M2May25-4", pass){ f6a( p(x:int)<decides>:=7 )<succeeds> := p[3]
 # ------------ 30 Apr 2025 -------------
 verify("M30Apr25-0a", pass){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[5] } }
 verify("M30Apr25-0b", fail, broken){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[2] } }
+  # Clearly g[2] doesn't succeed, hence broken
 
 verify("M30Apr25-1", pass){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[5] }
                           ; k(x:int)<decides> := {x>2}
