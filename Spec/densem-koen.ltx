@@ -10,11 +10,11 @@ $$
 \begin{array}{l}
 \textbf{Syntax of DPS Verse} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
-  \text{Ops} & op & ::= & |x = y| \vb |x = k| \vb |x = o| \vb |x = arr (x_1, xdots, x_n)| \vb |x = truth y|
+  \text{Ops} & op & ::= & |x == y| \vb |x == k| \vb |x == o| \vb |x == arr (x_1, xdots, x_n)| \vb |x = truth y|
                \\
   && \vb & |op_1; op_2| \vb |op_1 `choice` op_2| \vb |fail| \vb |defintro x| \vb |scope op| \\
-  && \vb & |x = dpslam x op_1 op_2 y|  \vb |x = apply1N f y| \\
-  && \vb & |if3 op_1 op_2 op_3| \vb |dpsall x op y|
+  && \vb & |x == dpslam x op_1 op_2 y|  \vb |x == apply1N f y| \\
+  && \vb & |if3 op_1 op_2 op_3| \vb |x == dpsall x op y|
 \end{array} \\
 \\
 
@@ -54,7 +54,7 @@ $$
 \textbf{Domains} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
   & \Val & = & \Z + \Fun \\\
-  & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
+  & Fun(|fs|) \in \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
   & \rho \in \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
   & \EV \in \ENV & = & \powerset{ \Env } \\
 \end{array} \\
@@ -85,7 +85,7 @@ $$
  \semapp{E}{|x = arr (x_1, xdots, x_n)|$$}
  & = & [ \{ \rho \in \Env \vb
    \begin{array}[t]{l}
-     \rho(x) = [Fun(f)],\, \dom(f)=\{0\ldots{}(n-1)\}, \\
+     \rho(x) = Fun [f],\, \dom(f)=\{0\ldots{}(n-1)\}, \\
      \forall 0 \leq i < n.\, f(i) = \rho(x_i) \} ]
      \end{array} \\
  \semapp{E}{|op_1 `choice` op_2|} & = & \semapp{E}{op_1} \append \semapp{E}{op_2}  \\
