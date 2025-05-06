@@ -71,6 +71,9 @@ univ' = usort $
   -- ++ [Fun [fcnAdd], Fun [fcnLE], Fun [fcnInt] ]
 
 usort :: Ord a => [a] -> [a]
+-- `usort` canonicalises a list by
+--     sorting it
+--     removing duplicates
 usort = map head . group . sort
 
 fcnAdd :: Value :->? Value
@@ -100,8 +103,26 @@ instance Show Ident where
   show (Ident x) = x
 
 ----------------------------------------------------------------------------------------
+{- Note [ENV]
+~~~~~~~~~~~~~
+* An Env is a total function from Ident to Value
 
-newtype ENV = ENV [ [(Ident,Value)] ] -- disj (conj pair)
+* An EnvSet represents a Set of Envs
+  * It is represented by a [Constraint], where the constraints specify
+    which Envs are in the set
+  * Invariant (I think): the list is kept canonicalised by `usort`
+
+* A ENV represents a Set(Env)
+  * It is represented by a [EnvSet], which represents the union of all
+    the Envs in the EnvSet
+  * Invariant (I think): the list is kept canonicalised by `usort`
+-}
+
+-- See Note [ENV]
+type Constraint = (Ident, Value)  -- The constraint x = v
+type EnvSet     = [Constraint]    -- Conjunction of constraints
+
+newtype ENV = ENV [ EnvSet ] -- See Note [ENV]
  deriving ( Eq, Ord )
 
 instance Show ENV where
@@ -125,6 +146,7 @@ failE = ENV []
 hide :: [Ident] -> ENV -> ENV
 hide xs (ENV xvss) =
   ENV (usort [ usort [ (x,v) | (x,v)<-xvs, x `notElem` xs ]
+             -- SPJ: is this inner usort necessary?
              | xvs <- xvss
              ])
 

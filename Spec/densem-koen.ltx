@@ -63,8 +63,8 @@ $$
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
   \univE & : & \ENV \\
   \univE & = & \{ \rho \in \Env \} \\[1mm]
- (\equalsE) & : & \Ident \rightarrow \Z \rightarrow \ENV  & \text{NB: $\equalsE$ is overloaded}\\
-  x \equalsE k & = & \{ \rho \in \Env \vb \rho(x) = k \} \\[1mm]
+ (\equalsE) & : & \Ident \rightarrow \Value \rightarrow \ENV  & \text{NB: $\equalsE$ is overloaded}\\
+  x \equalsE v & = & \{ \rho \in \Env \vb \rho(x) = v \} \\[1mm]
  (\equalsE) & : & \Ident \rightarrow \Ident \rightarrow \ENV & \text{NB: $\equalsE$ is overloaded}\\
   x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\[1mm]
   \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
@@ -93,7 +93,11 @@ $$
  \semapp{E}{|op_1 ; op_2|}
    & = &  \cleanE [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapp{E}{op_1}, \EV_2 \in \semapp{E}{op_2} ] \\
  \semapp{E}{|x = dpslam x op_1 op2 y|} & = & ??? \\
- \semapp{E}{|x = apply1N f y|} & = & ??? \\
+ \semapp{E}{|x = apply1N f y|}
+ & = & \begin{array}[t]{@@{}l}
+         [\;  \{ \rho \vb \rho(f)=Fun(hs), h = hs[i], \rho(x)\in \dom(h), \rho(y)=h(\rho(x)) \} \\\
+         |vbar| \; i \in 0\ldots ]
+       \end{array} \\
  \semapp{E}{|x = if3 op_1 op_2 op_3|} & = & ??? \\
  \semapp{E}{|x = dpsall x op y|} & = & ??? \\
 \\
