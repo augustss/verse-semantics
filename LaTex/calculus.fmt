@@ -178,7 +178,7 @@
 %format apply1np (a) (b) = a "(" b ")"
 
 %% Function application with 1 argument, without parenthesis
-%format apply1N a b = a^ "[\!" b "]"
+%format apply1N a (b) = a^ "[\!" b "]"
 %format apply1Np (a) b = a^ "[\!" b "]"
 
 %% Function application with many arguments
@@ -431,7 +431,7 @@
 %format appexi (f) (x) = "{\mathcal A" "\fbox{$" x "$}"
 
 
-%format xdots = "\mydots"
+%format xdots = "\mycdots"
 %format ctrdots = "\cdots"
 %format lowdots = "\ldots"
 %format commadots = "\;\ldots"
@@ -572,6 +572,10 @@
 %format v_f
 %format e_g
 %format e_a
+
+%format o_1
+%format o_2
+%format o_n
 
 %format eu = "eu"
 %format eu_1 = "eu_1"

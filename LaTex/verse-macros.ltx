@@ -181,7 +181,9 @@
 \else
 \newcommand{\pmatch}[2]{$#1 \leftarrow #2$}
 \fi
-\newcommand\mydots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
+% \newcommand\mydots{\makebox[0.55em][c]{\text{$.\hspace{-0.3em}.\hspace{-0.3em}.$}}}
+\newcommand\mydots{\makebox[0.55em][c]{...}}
+\newcommand\mycdots{\makebox[0.55em][c]{\text{$\cdot\hspace{-0.3em}\cdot\hspace{-0.3em}\cdot$}}}
 
 
 % ------------------------------------------------------------
@@ -269,6 +271,7 @@
 \newcommand{\totfun}[2]{\M{#1 \rightarrow #2}}     % Total function
 \newcommand{\semfcn}{\parfun{\Value}{\Value}}      % Partial function W->W
 \newcommand{\dom}{\mathbf{dom}}
+\newcommand{\fpr}[2]{#1 \! \Mapsto \! #2}
 
 %% Domains
 \newcommand{\Term}{Term}
