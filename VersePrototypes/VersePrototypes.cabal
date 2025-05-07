@@ -176,7 +176,7 @@ executable refimpltester
 
 library verse-densem
     import:           general-libs
-    hs-source-dirs:   densem ../verse-densem
+    hs-source-dirs:   densem verse-densem
     default-extensions:  TypeOperators
     exposed-modules:
                       DenSem.SExp
