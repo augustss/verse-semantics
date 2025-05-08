@@ -279,7 +279,8 @@ split' m count heap = splitS m count heap >>= \ case
     if s.count == 0 then do
       level <- getLevel
       lift (runFindT (findVars (mem.heap, x)) level mem.label) >>= \ case
-        Nothing ->
+        Nothing -> do
+          putLabel mem.label
           stuck
         Just ((heap, x), label) -> do
           putLabel label
@@ -328,28 +329,36 @@ emptyS = pure . FailS
 
 reflectS :: Split m a -> VerseT m a
 reflectS = \ case
+  FailS mem -> reflectFailS mem
+  SucceedS s mem x m_f m_e -> reflectSucceedS s mem x m_f m_e
   YieldS i f s mem f_s m_f m_e -> do
     putS s
     putMem mem
     alt (yield i $ \ k -> f $ \ m -> k $ m >>= f_s) m_f m_e
-  SucceedS s mem x m_f m_e -> do
-    putS s
-    putMem mem
-    alt (pure x) m_f m_e
-  FailS mem -> do
-    putMem mem
-    empty
+
+reflectSucceedS :: S -> Mem m -> a -> VerseT m a -> VerseT m a -> VerseT m a
+reflectSucceedS s mem x m_f m_e = do
+  putS s
+  putMem mem
+  alt (pure x) m_f m_e
+
+reflectFailS :: Mem m -> VerseT m a
+reflectFailS mem = do
+  putMem mem
+  empty
 
 fork :: Monad m => VerseT m () -> VerseT m ()
 fork m = forkS m >>= reflectF
 
 forkS :: Monad m => VerseT m () -> VerseT m (Split m ())
 forkS m = VerseT $ \ r s env mem _yk sk fk ek ->
-  unVerseT m r s env mem yieldF succeedF failF emptyF >>= \ x ->
+  unVerseT m r s env mem yieldF succeedF failS emptyS >>= \ x ->
   sk s mem x fk ek
 
 reflectF :: Monad m => Split m () -> VerseT m ()
 reflectF = \ case
+  FailS mem -> reflectFailS mem
+  SucceedS s mem () m_f m_e -> reflectSucceedS s mem () m_f m_e
   YieldS i f s mem f_s m_f m_e -> do
     putMem mem
     level <- getLevel
@@ -359,13 +368,6 @@ reflectF = \ case
     else do
       putS $ succS s
       alt (f $ \ m -> modifyS predS >> fork (m >>= f_s)) m_f m_e
-  SucceedS s mem () m_f m_e -> do
-    putS s
-    putMem mem
-    alt (pure ()) m_f m_e
-  FailS mem -> do
-    putMem mem
-    empty
 
 yieldF :: Monad m => Yield (Split m ()) m
 yieldF = Yield $ \ i f s mem sk fk ek ->
@@ -381,12 +383,6 @@ succeedF s mem () fk ek =
   SucceedS s mem ()
   (liftF fk >>= reflectF)
   (liftE ek >>= reflectF)
-
-failF :: Applicative m => Fail (Split m a) m
-failF = failS
-
-emptyF :: Applicative m => Empty (Split m a) m
-emptyF = emptyS
 
 liftS :: Monad m => Succeed (Split m a) m b -> b -> VerseT m (Split m a)
 liftS f x = VerseT $ \ _r s _env mem _yk sk fk ek ->
