@@ -644,7 +644,7 @@ newtype FindT m a = FindT
 data In = In
   { level :: {-# UNPACK #-} !Level
   , label :: {-# UNPACK #-} !Label
-  , visited :: {-# UNPACK #-} !(IntMap Any)
+  , visited :: !(IntMap Any)
   }
 
 data Out a = Err | Out !a {-# UNPACK #-} !Label !(IntMap Any)
