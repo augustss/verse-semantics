@@ -702,15 +702,13 @@ findVar var@(Var ref) = readRef ref >>= \ case
     findVar var
   Unbound x -> FindT $ \ In {..} ->
     pure $! if level >= x.level then Out var label visited else Err
-  Bound x -> do
-    (var@(Var ref), s) <- lookupInsertA x freshVar' =<< get
-    case s of
-      Nothing ->
-        pure var
-      Just !s -> do
-        put s
-        writeRef ref . Bound =<< newBound' =<< findVars x.binding
-        pure var
+  Bound x -> get >>= lookupInsertA x freshVar' >>= \ case
+    (var, Nothing) ->
+      pure var
+    (var@(Var ref), Just s) -> do
+      put s
+      writeRef ref . Bound =<< newBound' =<< findVars x.binding
+      pure var
   where
     lookupInsertA k x =
       fmap (first unsafeCoerce) .
