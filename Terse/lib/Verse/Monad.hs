@@ -265,6 +265,10 @@ split'
   :: (MonadRef m, Vars a m)
   => VerseT m a -> Int -> Heap m -> VerseT m (Stream m a)
 split' m count heap = splitS m count heap >>= \ case
+  FailS mem -> do
+    tell mem.forward mem.backward
+    putLabel mem.label
+    pure Done
   YieldS i f s mem f_s m_f m_e -> do
     tell mem.forward mem.backward
     putLabel mem.label
@@ -289,10 +293,6 @@ split' m count heap = splitS m count heap >>= \ case
     else do
       putLabel mem.label
       stuck
-  FailS mem -> do
-    tell mem.forward mem.backward
-    putLabel mem.label
-    pure Done
 
 data Stream m a = Done | Step a (VerseT m (Stream m a))
 
@@ -329,8 +329,10 @@ emptyS = pure . FailS
 
 reflectS :: Split m a -> VerseT m a
 reflectS = \ case
-  FailS mem -> reflectFailS mem
-  SucceedS s mem x m_f m_e -> reflectSucceedS s mem x m_f m_e
+  FailS mem ->
+    reflectFailS mem
+  SucceedS s mem x m_f m_e ->
+    reflectSucceedS s mem x m_f m_e
   YieldS i f s mem f_s m_f m_e -> do
     putS s
     putMem mem
@@ -357,8 +359,10 @@ forkS m = VerseT $ \ r s env mem _yk sk fk ek ->
 
 reflectF :: Monad m => Split m () -> VerseT m ()
 reflectF = \ case
-  FailS mem -> reflectFailS mem
-  SucceedS s mem () m_f m_e -> reflectSucceedS s mem () m_f m_e
+  FailS mem ->
+    reflectFailS mem
+  SucceedS s mem () m_f m_e ->
+    reflectSucceedS s mem () m_f m_e
   YieldS i f s mem f_s m_f m_e -> do
     putMem mem
     level <- getLevel
@@ -670,23 +674,11 @@ instance Monad m => Monad (FindT m) where
 instance MonadTrans FindT where
   lift m = FindT $ \ In {..} -> m <&> \ x -> Out x label visited
 
-instance Monad m => MonadReader Level (FindT m) where
-  ask = FindT $ \ In {..} -> pure $! Out level label visited
-  local f m = FindT $ \ In {..} -> unFindT m In { level = f level, .. }
-
 instance (Monad m, a ~ Any) => MonadState (IntMap a) (FindT m) where
   get = FindT $ \ In {..} -> pure $! Out visited label visited
   put visited = FindT $ \ In { label } -> pure $! Out () label visited
   state f = FindT $ \ In {..} -> case f visited of
     (x, visited) -> pure $! Out x label visited
-
-instance Monad m => Alternative (FindT m) where
-  empty = FindT . const $ pure Err
-  x <|> y = FindT $ \ s -> unFindT x s >>= \ case
-    Err -> unFindT y s
-    s@Out {} -> pure s
-
-instance Monad m => MonadPlus (FindT m)
 
 instance MonadRef m => MonadRef (FindT m) where
   type Ref (FindT m) = Ref m
@@ -708,6 +700,8 @@ findVar :: (MonadRef m, Vars a m) => Var m a -> FindT m (Var m a)
 findVar var@(Var ref) = readRef ref >>= \ case
   Link var ->
     findVar var
+  Unbound x -> FindT $ \ In {..} ->
+    pure $! if level >= x.level then Out var label visited else Err
   Bound x -> do
     (var@(Var ref), s) <- lookupInsertA x freshVar' =<< get
     case s of
@@ -717,9 +711,6 @@ findVar var@(Var ref) = readRef ref >>= \ case
         put s
         writeRef ref . Bound =<< newBound' =<< findVars x.binding
         pure var
-  Unbound x -> do
-    guard =<< asks (>= x.level)
-    pure var
   where
     lookupInsertA k x =
       fmap (first unsafeCoerce) .
