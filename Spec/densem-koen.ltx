@@ -10,10 +10,11 @@ $$
 \begin{array}{l}
 \textbf{Syntax of DPS Verse} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
-  \text{Ops} & op & ::= & |x == y| \vb |x == k| \vb |x == o| \vb |x == arr (x_1, xdots, x_n)| \vb |x = truth y|
+  \text{Ops} & op & ::= & |x == y| \vb |x == k| \vb |x == arr (x_1, xdots, x_n)| \vb |x = truth y|
                \\
   && \vb & |op_1; op_2| \vb |op_1 `choice` op_2| \vb |fail| \vb |defintro x| \vb |scope op| \\
-  && \vb & |x == dpslam x op_1 op_2 y|  \vb |x == apply1N f y| \\
+  && \vb & |x == dpslam x op_1 op_2 y|  \vb |x == apply1N f y|
+           \vb |x == apply1N op_1 y| \vb |x == apply1N op_2 (y_1,y_2)| \\
   && \vb & |if3 op_1 op_2 op_3| \vb |x == dpsall x op y|
 \end{array} \\
 \\
@@ -23,8 +24,11 @@ $$
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
 \rulename{dpsv} & |DpsT x r| & = & |r = x| \\
 \rulename{dpsk} & |DpsT k r| & = & |r = k| \\
-\rulename{dpso} & |DpsT o r| & = & |r = o| \\
-\rulename{dpsapp} & |DpsT (apply1N e_1 e_2) r| & = & |defintro f; DpsT e_1 f; defintro x; DpsT e_2 x; r = apply1N f x| \\
+\rulename{dpsop1} & |DpsT (apply1N o_1 e) r|
+  & = & |defintro x; DpsT e x; r = apply1N o_1 x| \\
+\rulename{dpsop2} & |DpsT (apply1N o_2 (e_1, e_2)) r|
+  & = & |defintro (x,y); DpsT e_1 x; DpsT e_2 y; r = apply1N o_2 (x,y)| \\
+\rulename{dpsapp} & |DpsT (apply1N e_1 e_2) r| & = & |defintro (f,x); DpsT e_1 f; DpsT e_2 x; r = apply1N f x| \\
 \rulename{dpsseq} & |DpsT (e_1 ; e_2) r| & = & |defintro s; DpsT e_1 s; DpsT e_2 r| & \text{Discards s}\\
 \rulename{dpsseq} & |DpsT (e_1 == e_2) r| & = & |DpsT e_1 r; DpsT e_2 r| & \text{Push r into both} \\
 \rulename{dpschoice} & |DpsT (e_1 `choice` e_2) r| & = & |DpsT e_1 r `choice` DpsT e_2 r| & \text{Push r into both} \\
@@ -37,8 +41,8 @@ $$
 \rulename{dpschk} & |DpsT (check fx e) r| & = & ??? \\
 \multicolumn{2}{@@{}l}{\rulename{dpsif} \;\; \hfill |DpsT (vif e_1 e_2 e_3) r|}
      & = & |if3 (defintro x; DpsT e_1 x) (DpsT e_2 r) (DpsT e_3 r)| & \text{Push r into branches}\\
-\rulename{dpsfor} & |DpsT (fordo e_1 e_2) r| & = & ??? \\
 \rulename{dpsall} & |DpsT (all e) r| & = & |dpsall (DpsT e y) y|  \\
+\rulename{dpsfor} & |DpsT (fordo e_1 e_2) r| & = & ??? \\
 \end{array}
 
 \end{array}
@@ -52,21 +56,23 @@ $$
 % ------------- Denotationals semantics of DPS Verse ---------------
 \begin{array}{l}
 \textbf{Domains} \\
-\begin{array}{lr@@{\;\;}c@@{\;\;}ll}
+\begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   & \Val & = & \Z + \Fun \\\
-  & Fun(|fs|) \in \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
-  & \rho \in \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
-  & \EV \in \ENV & = & \powerset{ \Env } \\
+  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
+  \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
+  \EV \in &\ENV & = & \powerset{ \Env } \\
+  \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
+        & \text{Partial functions}
 \end{array} \\
 \\
 \textbf{Operations over ENV} \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
   \univE & : & \ENV \\
   \univE & = & \{ \rho \in \Env \} \\[1mm]
- (\equalsE) & : & \Ident \rightarrow \Value \rightarrow \ENV  & \text{NB: $\equalsE$ is overloaded}\\
-  x \equalsE v & = & \{ \rho \in \Env \vb \rho(x) = v \} \\[1mm]
- (\equalsE) & : & \Ident \rightarrow \Ident \rightarrow \ENV & \text{NB: $\equalsE$ is overloaded}\\
-  x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\[1mm]
+%  (\equalsE) & : & \Ident \rightarrow \Value \rightarrow \ENV  & \text{NB: $\equalsE$ is overloaded}\\
+%   x \equalsE v & = & \{ \rho \in \Env \vb \rho(x) = v \} \\[1mm]
+%  (\equalsE) & : & \Ident \rightarrow \Ident \rightarrow \ENV & \text{NB: $\equalsE$ is overloaded}\\
+%   x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\[1mm]
   \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
   \cleanE(es) & = & [ \EV \vb \EV \in es, \EV \not= \{\} ] \\[1mm]
   \hideE & : & [\Ident] \rightarrow \ENV \rightarrow \ENV \\
@@ -75,37 +81,33 @@ $$
 \\
 
 \textbf{Denotational semantics} \\
-\begin{array}{r@@{\;\;}c@@{\;\;}ll}
- \semapp{E}{|e|} & : & \seq{ \ENV } \\
- \semapp{E}{|defintro x|} & = & [ \univE ] \\
- \semapp{E}{|x=k|} & = & [ x \equalsE k ] \\
- \semapp{E}{|x=y|} & = & [ x \equalsE y ] \\
- \semapp{E}{|x <= y|}
-   & = & [ \{ \rho \in \Env \vb \rho(x) \in \Z, \rho(y) \in \Z, \rho(x) \leq \rho(y) \} ] \\
- \semapp{E}{|x = arr (x_1, xdots, x_n)|$$}
+\begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
+& \semapp{E}{|e|} & : & \seq{ \ENV } \\
+\rulename{edef} & \semapp{E}{|defintro x|} & = & [ \univE ] \\
+\rulename{econst} &  \semapp{E}{|x=k|} & = & [  \{ \rho \in \Env \vb \rho(x) = v \} ] \\
+\rulename{eeq} &  \semapp{E}{|x=y|} & = & [  \{ \rho \in \Env \vb \rho(x) = \rho(y) \} ] \\
+\rulename{eop2} &  \semapp{E}{|r = apply1N o_2 (x,y)|}
+   & = & [ \{ \rho \in \Env \vb \rho(x) \in \Z, \rho(y) \in \Z, r = o_2( \rho(x), \rho(y)) \} ] \\
+\rulename{earr} &  \semapp{E}{|x = arr (x_0, xdots, x_n)|$$}
  & = & [ \{ \rho \in \Env \vb
-   \begin{array}[t]{l}
-     \rho(x) = Fun [f],\, \dom(f)=\{0\ldots{}(n-1)\}, \\
-     \forall 0 \leq i < n.\, f(i) = \rho(x_i) \} ]
-     \end{array} \\
- \semapp{E}{|op_1 `choice` op_2|} & = & \semapp{E}{op_1} \append \semapp{E}{op_2}  \\
- \semapp{E}{|fail|} & = & [ ] \\
- \semapp{E}{|op_1 ; op_2|}
-   & = &  \cleanE [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapp{E}{op_1}, \EV_2 \in \semapp{E}{op_2} ] \\
- \semapp{E}{|x = dpslam x op_1 op2 y|} & = & ??? \\
- \semapp{E}{|x = apply1N f y|}
- & = & \begin{array}[t]{@@{}l}
-         [\;  \{ \rho \vb \rho(f)=Fun(hs), h = hs[i], \rho(x)\in \dom(h), \rho(y)=h(\rho(x)) \} \\\
-         |vbar| \; i \in 0\ldots ]
-       \end{array} \\
- \semapp{E}{|x = if3 op_1 op_2 op_3|} & = & ??? \\
- \semapp{E}{|x = dpsall x op y|} & = & ??? \\
+     \rho(x) = Fun [\{ \fpr{i}{\rho(x_i)} \vb i \in 0 \mycdots n \}]  \\
+\rulename{echoice} &  \semapp{E}{|op_1 `choice` op_2|} & = & \semapp{E}{op_1} \append \semapp{E}{op_2}  \\
+\rulename{efail} &  \semapp{E}{|fail|} & = & [ ] \\
+\rulename{eseq} &  \semapp{E}{|op_1 ; op_2|}
+   & = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapp{E}{op_1}, \EV_2 \in \semapp{E}{op_2} ] \\
+\rulename{elam} &  \semapp{E}{|x = dpslam x op_1 op2 y|} & = & ??? \\
+\rulename{eapp} & \semapp{E}{|x = apply1N f y|}
+ & = & [ \{ \rho \in \Env \vb \rho(f)=Fun(hs), (\fpr{\rho(x)}{\rho(y)}) \in hs[i] \} \vb i \in 0\mydots ] \\
+\multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
+  \semapp{E}{|x = if3 op_1 op_2 op_3|} } & = & ??? \\
+\rulename{eall} & \semapp{E}{|x = dpsall x op y|} & = & ??? \\
 \\
-\semapp{B}{|op|} & : & \seq{ \ENV } \\
-\semapp{B}{|op|} & = & [ \hideE(\semapp{I}{|op|}, \EV) \vb \EV \in \semapp{E}{op} ] \\
+& \semapp{B}{|op|} & : & \seq{ \ENV } \\
+& \semapp{B}{|op|} & = & [ \hideE(\semapp{I}{|op|}, \EV) \vb \EV \in \semapp{E}{op} ] \\
 \\
-\semap{I}{|op|} & : & [\Ident] \\
-\semap{I}{|op|} & = & \text{the outer $\exists$-bound variables in |op|} \\[1mm]
+& \semap{I}{|op|} & : & [\Ident] \\
+& \semap{I}{|op|} & = & \text{the outer $\exists$-bound variables in |op|} \\[1mm]
+
 \end{array} \\
 
 \end{array}
