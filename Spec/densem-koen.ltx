@@ -73,8 +73,8 @@ $$
 %   x \equalsE v & = & \{ \rho \in \Env \vb \rho(x) = v \} \\[1mm]
 %  (\equalsE) & : & \Ident \rightarrow \Ident \rightarrow \ENV & \text{NB: $\equalsE$ is overloaded}\\
 %   x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\[1mm]
-  \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
-  \cleanE(es) & = & [ \EV \vb \EV \in es, \EV \not= \{\} ] \\[1mm]
+%  \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
+%  \cleanE(es) & = & [ \EV \vb \EV \in es, \EV \not= \{\} ] \\[1mm]
   \hideE & : & [\Ident] \rightarrow \ENV \rightarrow \ENV \\
   \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\
 \end{array} \\
