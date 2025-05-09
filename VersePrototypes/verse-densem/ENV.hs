@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-x-partial -Wno-name-shadowing #-}
 module ENV(
   Ident(..),
-  univ, univInt,
+  univ, univInt, univTuples, univIntToInt,
   numInt,
   fcnAdd, fcnLE, fcnInt, fcnAny, fcnFun,
   ENV,
@@ -15,6 +15,7 @@ module ENV(
   bigUnique,
   quant,
   clean,
+  mkDomRng
   ) where
 
 import Data.List( sort, group, intercalate, subsequences )

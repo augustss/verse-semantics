@@ -10,7 +10,7 @@ module Dom(
   pointFcn,
   )where
 
-import Data.List( intercalate, union, sort )
+import Data.List( intercalate, sort )
 
 ----------------------------------------------------------------------------------------
 
@@ -71,12 +71,13 @@ pointFcn :: Eq a => a -> b -> (a :->? b)
 -- A partial function with a single element in its domain
 pointFcn a b = PFun { dom = [a], apply = \ x -> if x == a then b else undefined }
 
-emptyFcn :: a :->? b
+-- Jeff: currently not used, but I don't want to throw them away
+-- emptyFcn :: a :->? b
 -- A partial function with an empty domain
-emptyFcn = PFun [] undefined
+-- emptyFcn = PFun [] undefined
 
-(?\/) :: Ord a => (a :->? b) -> (a :->? b) -> (a :->? b)
-f1 ?\/ f2 = PFun (dom f1 `union` dom f2)
-                 (\x -> if x `elem` dom f1 then apply f1 x else apply f2 x)
+-- (?\/) :: Ord a => (a :->? b) -> (a :->? b) -> (a :->? b)
+-- f1 ?\/ f2 = PFun (dom f1 `union` dom f2)
+                 -- (\x -> if x `elem` dom f1 then apply f1 x else apply f2 x)
 
 ----------------------------------------------------------------------------------------

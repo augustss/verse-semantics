@@ -883,9 +883,9 @@ essToMini flags orig_e = go_expr orig_e
            NoInput -> ds_e
            PI i -> case cfxs of
                     DomCtxt -> Unify i <$> ds_e  -- See M20Dec24-3 for a simple example
-                    RngCtxt fxs -> do { e <- ds_e    -- See test `blame0` for a simple example
-                                      ; v <- newIdent noLoc "i"
-                                      ; pure (OfType i effSucceeds (Lam v (Unify (Variable v) e))) }
+                    RngCtxt _fxs -> do { e <- ds_e    -- See test `blame0` for a simple example
+                                       ; v <- newIdent noLoc "i"
+                                       ; pure (OfType i effSucceeds (Lam v (Unify (Variable v) e))) }
     -- Experimental: try effSucceeds rather than `fx` in this OfType call
     -- Goal transparent higher-order functions behave better; see M2May25-*
 
