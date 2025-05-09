@@ -19,7 +19,8 @@ import FrontEnd.Parse(parseDie, pFile)
 import FrontEnd.Prelude( findPrelude )
 --import FrontEnd.Error
 
-import DenSem.SExp
+-- verse-densem
+import SExp
 
 -- Epic libraries
 import Epic.Repl
@@ -412,7 +413,7 @@ cDensem
 cShow :: CmdRunner CState
 -- Use Hakell's derived Show to display all the data constructors
 cShow = getInputExpr $ \ e s ->
-        do { print e  -- Uses Haskell's Show 
+        do { print e  -- Uses Haskell's Show
            ; pure s }
 
 cPrint :: CmdRunner CState

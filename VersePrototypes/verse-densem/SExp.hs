@@ -1,4 +1,4 @@
-module DenSem.SExp(denSemDesugar, denSem) where
+module SExp(denSemDesugar, denSem) where
 import Control.Monad
 import Control.Monad.State.Strict
 import Data.Maybe
@@ -83,7 +83,7 @@ srcExprToOperN = to where
     case expr of
       -- Hack around things pulled in from the prelude.
       DefineE (E.Ident _ s) _
-        | isJust (getPrim s) -> pure NoOp  -- delete operator'...' := 
+        | isJust (getPrim s) -> pure NoOp  -- delete operator'...' :=
       -------------------------------------
       Lit (LInt k)         -> pure $ u .:=  k  .:>: o .:=  k
       Variable x
