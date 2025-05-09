@@ -51,3 +51,13 @@ Machine/src/Control/Monad/.DS_Store
 Tim/TimVerse/.vs/Verse/v17/.suo
 Tim/TimVerse/VerseReference-x64-Release
 verse-densem-new/verse-densem.tex
+
+LaTex/verse-macros.tex
+
+Spec/densem-expr-style.tex
+Spec/ess-to-mini.tex
+Spec/mini-to-core.tex
+Spec/verse-rules.tex
+Spec/verse-source.tex
+Spec/verse-spec.tex
+Spec/densem-koen.tex
