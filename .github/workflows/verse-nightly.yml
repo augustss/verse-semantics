@@ -105,4 +105,4 @@ jobs:
           git bisect start
           git bisect bad HEAD
           git bisect good `cat good-commit.txt`
-          git bisect run bash -c "set -e; make test"
+          git bisect run bash -c "set -e; make profile"

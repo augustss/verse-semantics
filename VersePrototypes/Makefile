@@ -9,4 +9,5 @@ test:
 	cabal run tester -- versetests/arrays.versetest -m 3000
 	# cabal run refimpltester -- commented out for now
 
-
+profile:
+	cabal run tester -- versetests/arrays.versetest -m 3000 --only arr2
