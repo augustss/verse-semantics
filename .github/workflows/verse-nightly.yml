@@ -1,0 +1,108 @@
+name: Haskell CI
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # Every day at 04:00 UTC, this is 10:00 EST
+
+# [ Note: Nightly CI design ]
+# Our goals are to:
+# 1) allow development velocity by _not_ protecting main
+# 2) Yet, we want to track tests _and_ the commits that break them
+#
+# Thus, it is too heavy weight to prevent breakage by protecting main. Instead we
+# only ensure that all commits do not break the Haskell code regardless if they
+# break tests. This is the `verse-ci.yml` workflow, and runs on each commit to main
+# and on each PR.
+#
+# That satisfies (1) but not (2). This workflow satifies (2) by running a nightly
+# job every night at 0400 CET, 2200 EST, 1900 PST which runs the testsuite.
+# If the testsuite fails the workflow will bisect to find the offending commit.
+# To bisect we must persist the good commit hashes. We do this using github's
+# upload artifact script. See the 'Test' step. This commit hash is then read by
+# the conditional step named 'Bisect on Failure'. Note, bisecting itself is very
+# expensive and bisecting by running the whole testsuite is even more expensive
+# so TODO: patch the testsuite to return the failing tests and then use these in
+# the git bisect call
+
+
+# INFO: The following configuration block ensures that only one build runs per branch,
+# which may be desirable for projects with a costly build process.
+# Remove this block from the CI workflow to let each CI job run to completion.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nightly:
+   strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        ghc: ['9.6']
+      fail-fast: false
+
+   runs-on: ${{ matrix.os }}
+
+   steps:
+    - uses: actions/checkout@v4
+     - name: Set up GHC ${{ matrix.ghc-version }}
+        uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: ${{ matrix.ghc-version }}
+          cabal-version: 'latest'
+          cabal-update: true
+
+     - name: Configure the build
+        run: |
+          cabal configure --enable-tests --enable-benchmarks --disable-documentation
+          cabal build all --dry-run # The last step generates dist-newstyle/cache/plan.json for the cache key.
+
+     - name: Restore cached dependencies
+        uses: actions/cache/restore@v4
+        id: cache
+        env:
+          key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
+          restore-keys: ${{ env.key }}-
+
+     - name: Install dependencies
+        # If we had an exact cache hit, the dependencies will be up to date.
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cabal build all --only-dependencies
+
+     # Cache dependencies already here, so that we do not have to rebuild them should the subsequent steps fail.
+      - name: Save cached dependencies
+        uses: actions/cache/save@v4
+        # If we had an exact cache hit, trying to save the cache would error because of key clash.
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+     - name: Build All VersePrototypes
+        working-directory: VersePrototypes
+        run: cabal build all
+
+     - name: Test
+        id: test
+        working-directory: VersePrototypes
+        uses: actions/upload-artifact@v4
+        with:
+          name: test_pre
+          path: good-commit.txt
+        run: |
+          make test && git rev-parse HEAD > good-commit.txt
+
+     - name: Bisect on failure
+        if: failure()
+        uses: actions/download-artifact@v4
+        with:
+          name: test_pre
+        working-directory: VersePrototypes
+        run: |
+          git bisect start
+          git bisect bad HEAD
+          git bisect good `cat good-commit.txt`
+          git bisect run bash -c "set -e; make test"
