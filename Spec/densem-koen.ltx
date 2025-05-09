@@ -62,35 +62,49 @@ $$
   \rho \in & \Env & = & \Ident \rightarrow \Value  & \text{Gives a value for \emph{every} identifier} \\
   \EV \in &\ENV & = & \powerset{ \Env } \\
   \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
-        & \text{Partial functions}
+  & \text{Partial functions} \\
+  \\
+  & \tupE & : & [\Val] \rightarrow \Val \\
+  & \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mycdots n \} ]
 \end{array} \\
 \\
 \textbf{Operations over ENV} \\
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
   \univE & : & \ENV \\
   \univE & = & \{ \rho \in \Env \} \\[1mm]
-%  (\equalsE) & : & \Ident \rightarrow \Value \rightarrow \ENV  & \text{NB: $\equalsE$ is overloaded}\\
-%   x \equalsE v & = & \{ \rho \in \Env \vb \rho(x) = v \} \\[1mm]
-%  (\equalsE) & : & \Ident \rightarrow \Ident \rightarrow \ENV & \text{NB: $\equalsE$ is overloaded}\\
-%   x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\[1mm]
+ (\equalsE) & : & \Ident \rightarrow \Value \rightarrow \ENV  & \text{NB: $\equalsE$ is overloaded}\\
+  x \equalsE v & = & \{ \rho \in \Env \vb \rho(x) = v \} \\[1mm]
+(\equalsE) & : & \Ident \rightarrow \Ident \rightarrow \ENV & \text{NB: $\equalsE$ is overloaded}\\
+  x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\[1mm]
 %  \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
 %  \cleanE(es) & = & [ \EV \vb \EV \in es, \EV \not= \{\} ] \\[1mm]
-  \hideE & : & [\Ident] \rightarrow \ENV \rightarrow \ENV \\
-  \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\
-\end{array} \\
+
+ \hideE & : & \seq{\Ident} \rightarrow \ENV \rightarrow \ENV \\
+ \hideE(xs, \EV) & = & \{ \rho \in \Env \vb \exists \rho' \in \Delta .\, \forall x \not\in xs.\, \rho(x) =  \rho'(x) \} \\[1mm]
+
+ \extractE & : & (\Ident, \ENV) \rightarrow \powerset{\Val, \ENV} \\
+ \extractE(y, \EV) & = & \{ (v, \hideE(y, \EV'))
+                          \vb v \in \Val, \EV' = \{ \rho \in \EV \vb \rho(y)=v \} \} \\[1mm]
+ \combineE & : & \seq{ \powerset{\Val, \ENV} } \rightarrow \powerset{\seq{\Val}, \ENV} \\
+ \multicolumn{3}{c}{\text{Not quite right yet}} \\
+ \combineE[s_0,\mydots,s_n] & = & \begin{array}[t]{@@{}l@@{\,}l}
+     \{  & (\langle v_0, \mydots, v_n \rangle, \EV_1 \intersectE \mydots \intersectE \EV_n) \\
+     \vb & (v_0,\EV_0) \in s_0, \mydots, (v_n,\EV_n) \in s_n \}
+     \end{array}
+\\
+\end{array}\\
 \\
 
 \textbf{Denotational semantics} \\
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}ll}
 & \semapp{E}{|e|} & : & \seq{ \ENV } \\
 \rulename{edef} & \semapp{E}{|defintro x|} & = & [ \univE ] \\
-\rulename{econst} &  \semapp{E}{|x=k|} & = & [  \{ \rho \in \Env \vb \rho(x) = v \} ] \\
-\rulename{eeq} &  \semapp{E}{|x=y|} & = & [  \{ \rho \in \Env \vb \rho(x) = \rho(y) \} ] \\
+\rulename{econst} &  \semapp{E}{|x=k|} & = & [  x \equalsE k ] \\
+\rulename{eeq} &  \semapp{E}{|x=y|} & = & [  x \equalsE y ] \\
 \rulename{eop2} &  \semapp{E}{|r = apply1N o_2 (x,y)|}
    & = & [ \{ \rho \in \Env \vb \rho(x) \in \Z, \rho(y) \in \Z, r = o_2( \rho(x), \rho(y)) \} ] \\
 \rulename{earr} &  \semapp{E}{|x = arr (x_0, xdots, x_n)|$$}
- & = & [ \{ \rho \in \Env \vb
-     \rho(x) = Fun [\{ \fpr{i}{\rho(x_i)} \vb i \in 0 \mycdots n \}]  \\
+ & = & [ \{ \rho \in \Env \vb \rho(x) = \tupE[ \rho(x_0), \mydots, \rho(x_n) ] \}]  \\
 \rulename{echoice} &  \semapp{E}{|op_1 `choice` op_2|} & = & \semapp{E}{op_1} \append \semapp{E}{op_2}  \\
 \rulename{efail} &  \semapp{E}{|fail|} & = & [ ] \\
 \rulename{eseq} &  \semapp{E}{|op_1 ; op_2|}
@@ -100,11 +114,18 @@ $$
  & = & [ \{ \rho \in \Env \vb \rho(f)=Fun(hs), (\fpr{\rho(x)}{\rho(y)}) \in hs[i] \} \vb i \in 0\mydots ] \\
 \multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
   \semapp{E}{|x = if3 op_1 op_2 op_3|} } & = & ??? \\
-\rulename{eall} & \semapp{E}{|x = dpsall x op y|} & = & ??? \\
-\\
+\rulename{eall} & \semapp{E}{|x = dpsall op y|}
+& = & [ \, \{ (r \equalsE \tupE(vs)) \intersectE \Delta
+        \vb  (vs,\Delta) \in \combineE(\semapp{V}{op}y) \}\, ]
+\\[2mm]
+
+& \semapp{V}{|op|} & : & \Ident \rightarrow \seq{ \powerset{\Val, \ENV} } \\
+& \semapp{V}{|op|}y & = & [ \extractE(y,\EV) \vb \EV \in \semapp{B}{op} ]
+\\[1mm]
+
 & \semapp{B}{|op|} & : & \seq{ \ENV } \\
-& \semapp{B}{|op|} & = & [ \hideE(\semapp{I}{|op|}, \EV) \vb \EV \in \semapp{E}{op} ] \\
-\\
+& \semapp{B}{|op|} & = & [ \hideE(\semapp{I}{|op|}, \EV) \vb \EV \in \semapp{E}{op} ]
+\\[1mm]
 & \semap{I}{|op|} & : & [\Ident] \\
 & \semap{I}{|op|} & = & \text{the outer $\exists$-bound variables in |op|} \\[1mm]
 
