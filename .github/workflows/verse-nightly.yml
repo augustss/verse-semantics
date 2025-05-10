@@ -36,7 +36,9 @@ jobs:
   nightly:
    strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        # TODO: issue: #53, cutting CI costs
+        os: [ubuntu-latest]
         ghc: ['9.6']
       fail-fast: false
 
