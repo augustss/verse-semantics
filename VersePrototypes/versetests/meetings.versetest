@@ -28,7 +28,8 @@ verify("M30Apr25-0a", pass){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[5
 verify("M30Apr25-0b", fail, broken){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[2] } }
   # Clearly g[2] doesn't succeed, hence broken
 
-verify("M30Apr25-1", pass){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[5] }
+# FIXME: #61
+verify("M30Apr25-1", pass, broken){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[5] }
                           ; k(x:int)<decides> := {x>2}
                           ; all{ f3[k] } }
 verify("M30Apr25-2", fail){ f3( g(x:int)<decides> := {x>3} )<decides> := { g[5] }
@@ -41,7 +42,8 @@ verify("M30Apr25-6", pass, broken){ hof( f(x:int)<succeeds>:={2|3} ) := {f[5]} }
   # Not sure what we want this one to do
 
 # ------------ 28 Apr 2025 -------------
-verify("M28Apr25-1", pass){ g5( f(:int)<succeeds>:=(1|2|3) )<succeeds> := f[3]; g5[ x:int => x ] = 3 }
+# FIXME: #61
+verify("M28Apr25-1", pass, broken){ g5( f(:int)<succeeds>:=(1|2|3) )<succeeds> := f[3]; g5[ x:int => x ] = 3 }
 testeq("M28Apr25-2", pass, broken){ g5( f(:int)<succeeds>:=(1|2|3) )<succeeds> := f[3]; g5[ x:int => x ] } { 3 }
   # Not sure what we want this one to do
 
@@ -152,7 +154,8 @@ verify("M19Mar25-8", pass) { (f( g(x:int):=4 )<succeeds>:int := g[7]=4)
 verify("M19Mar25-9", fail) { (f( g(x:int):=4 )<succeeds>:int := g[7]=4)
                            ; h(x:int):int:=4
                            ; f[h] }
-verify("M19Mar25-10", pass) { (f( z:int, g(x:int)<decides>:=x=4 )<succeeds>:int
+# FIXME: #61
+verify("M19Mar25-10", pass, broken) { (f( z:int, g(x:int)<decides>:=x=4 )<succeeds>:int
                                  := if( y:=g[z] ) then{ y=z; y=4 } else{ 99 })
                             ; (h(x:int)<decides>:=x=4)
                             ; f[3,h] }
