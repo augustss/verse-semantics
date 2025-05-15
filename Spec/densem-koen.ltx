@@ -54,7 +54,7 @@ $$
 \begin{figure}
 $$
 % ------------- Denotationals semantics of DPS Verse ---------------
-\begin{array}{l}
+\begin{array}{c}
 \textbf{Domains} \\
 \begin{array}{rl@@{\;\;}c@@{\;\;}ll}
   & \Val & = & \Z + \Fun \\\
@@ -102,7 +102,7 @@ $$
 \rulename{econst} &  \semapp{E}{|x=k|} & = & [  x \equalsE k ] \\
 \rulename{eeq} &  \semapp{E}{|x=y|} & = & [  x \equalsE y ] \\
 \rulename{eop2} &  \semapp{E}{|r = apply1N o_2 (x,y)|}
-   & = & [ \{ \rho \in \Env \vb \rho(x) \in \Z, \rho(y) \in \Z, r = o_2( \rho(x), \rho(y)) \} ] \\
+   & = & [ \{ \rho \in \Env \vb r = \semapp{O}{o_2}( \rho(x), \rho(y)) \} ] \\
 \rulename{earr} &  \semapp{E}{|x = arr (x_0, xdots, x_n)|$$}
  & = & [ \{ \rho \in \Env \vb \rho(x) = \tupE[ \rho(x_0), \mydots, \rho(x_n) ] \}]  \\
 \rulename{echoice} &  \semapp{E}{|op_1 `choice` op_2|} & = & \semapp{E}{op_1} \append \semapp{E}{op_2}  \\
@@ -128,7 +128,11 @@ $$
 \\[1mm]
 & \semap{I}{|op|} & : & [\Ident] \\
 & \semap{I}{|op|} & = & \text{the outer $\exists$-bound variables in |op|} \\[1mm]
-
+\end{array} \\
+\\
+\begin{array}{rcll}
+\semap{O}{|o_2|} & : & \parfun{\Val \times \Val}{\Val} \\
+\semap{O}{|<=|}(x,y) & = & \{ \fpr{(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}
 \end{array} \\
 
 \end{array}
