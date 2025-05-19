@@ -138,7 +138,7 @@ $$
   v \in & \Value & = & \Z + \Fun \\\
   s \in & \VAL & = & \powerset{\Value} \\
   Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
-  \rho \in & \Env & = & \Ident \parfun \Value  & \text{Gives a value for \emph{in-scope} identifiers} \\
+  \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value for \emph{in-scope} identifiers} \\
   \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
   & \text{Partial functions} \\
 \end{array} \\
@@ -170,7 +170,7 @@ $$
   \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
     [\, \tupsE [ s_0, \mydots, s_n ] \vb s_0 |<-| \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \semapp{E}{|e_n|}{\rho} ] \,] \\
 
-  \semapp{E}{|all e|}{\rho} & = & [ \, \tupsE (\squash (\semapp{E}{e}{\rho}) \, ] \\[1mm]
+  \semapp{E}{|all e|}{\rho} & = & [ \, \tupsE (\squash (\semapp{E}{e}{\rho})) \, ] \\[1mm]
 
   \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
   \left\{
@@ -250,7 +250,7 @@ $$
   \tupE & : & [\Val] \rightarrow \Val \\
   \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mydots n \} ] \\
   \tupsE & : & [\VAL] \rightarrow \VAL \\
-  \tupsE [s_0,\mydots,s_n] & = & \{ \tupE [v_0, \mydots, v_n] \vb v_0 \inb s_0, \mydots v_n \in s_n \} \\[1mm]
+  \tupsE [s_0,\mydots,s_n] & = & \{ \tupE [v_0, \mydots, v_n] \vb v_0 \inb s_0, \mydots v_n \inb s_n \} \\[1mm]
 
   \squash & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
   \squash(xs) & = & [ x \, || \, x \inb xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
