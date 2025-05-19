@@ -108,7 +108,6 @@
 \newcommand{\applyf}{\textbf{applyf}}
 \newcommand{\applys}{\textbf{applys}}
 \newcommand{\squash}{\textbf{squash}}
-\newcommand{\Ws}{\textit{Ws}}
 \newcommand{\mkall}{\textbf{all}}
 \newcommand{\mkarr}{\textbf{arr}}
 \newcommand{\combine}{\textbf{comb}}
@@ -134,17 +133,18 @@
 $$
 \begin{array}{l}
 
-\textbf{Domains (sets)} \\
-\begin{array}{rcll}
-\Value & = & \mathbb{Z} + [\semfcn] \\
-\Env & = & |Ident| \rightarrow \Value \\
-\Ws & = & \powerset{W} \\
-W^{*} & = & [\Ws] \\
-Env^{*} & = & \myset{Env} \\
-\end{array}
-\\ \\
+\textbf{Domains} \\
+\begin{array}{rl@@{\;\;}c@@{\;\;}ll}
+  v \in & \Value & = & \Z + \Fun \\\
+  s \in & \VAL & = & \powerset{\Value} \\
+  Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
+  \rho \in & \Env & = & \Ident \parfun \Value  & \text{Gives a value for \emph{in-scope} identifiers} \\
+  \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
+  & \text{Partial functions} \\
+\end{array} \\
+\\
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
-  \semap{E}{|e|} & : & \Env \rightarrow \mtype \\
+  \semap{E}{|e|} & : & \Env \rightarrow \seq{ \VAL } \\
   \semapp{E}{|x|}{\rho} & = & [\msing{\rho(x)}] \\
   \semapp{E}{|k|}{\rho} & = & [\msing{k}] \\
   \semapp{E}{|o|}{\rho} & = & [\msing{\semapp{O}{|o|}{}}] \\
@@ -154,8 +154,8 @@ Env^{*} & = & \myset{Env} \\
   \semapp{E}{|apply1N e_1 e_2|}{\rho} & = &
          [ r \, || \,
            |fs <-| \semapp{E}{|e_1|}{\rho}, \;
-            as|<-| \semapp{E}{|e_2|}{\rho}, \;
-           |r| \inb \applys(fs, as) \}
+           |s <-| \semapp{E}{|e_2|}{\rho}, \;
+           |r <-| \applys(|fs|, |s|) \}
          ]
            \\
 
@@ -168,10 +168,9 @@ Env^{*} & = & \myset{Env} \\
       |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
 
   \semapp{E}{|arr (e_0, xdots, e_n)|}{\rho} & = &
-    [ \{ \mkarr(x_0,\mydots,x_n) \, ||\, x_0 \inb s_0,\; \mydots,\; x_n \inb s_n \}\, \\
-      & & ||\, s_0 |<-| \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \semapp{E}{|e_n|}{\rho} ] \\
+    [\, \tupsE [ s_0, \mydots, s_n ] \vb s_0 |<-| \semapp{E}{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \semapp{E}{|e_n|}{\rho} ] \,] \\
 
-  \semapp{E}{|all e|}{\rho} & = & [ \mkall(\semapp{E}{e}{\rho}) ] \\[1mm]
+  \semapp{E}{|all e|}{\rho} & = & [ \, \tupsE (\squash (\semapp{E}{e}{\rho}) \, ] \\[1mm]
 
   \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
   \left\{
@@ -204,8 +203,6 @@ Env^{*} & = & \myset{Env} \\
         & & \forall v \inb \Value .\\
         & & \seqcompat(\applyo(f,v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v}) \}
       \end{array}
-    
-  \\
   \\
 \semap{F}{e} & : & \Env \rightarrow \Value \rightarrow [\myset{\Value}] \\
 \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v & = & \trunc(r, |ws|) \\
@@ -217,18 +214,12 @@ Env^{*} & = & \myset{Env} \\
       & & & |let w| = \once(\semapp{D}{e_2}{\rho'}) \, \} \\
       |r| & = & \multicolumn{2}{l} { \bigcap [ w \, || \, w \inb ws, ws \neq \mempty ] }
     \end{array} \\
+\\
 
-
-%\end{array}
-\\ 
-%\begin{array}{r@@{\;\;\;}c@@{\;\;\;}ll}
-\semap{D}{|e|} & : & \Env \rightarrow \mtype \\
-%\semapp{D}{|e|}{\rho} & = & \hat{\bigcup}_{\rho' \dot{\in} \semapp{X}{|e|}{\rho}} \semapp{E}{|e|}\rho' \\[2mm]
+\semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
 \semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \semapp{E}{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
 \semap{R}{|e|}{} & : & \Env \rightarrow \myset{\Env} \\
 \semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \squash(\semapp{E}{|e|}{\rho'}) \neq [] \} \\[2mm]
-%% \semap{C}{|e|} & : & \Env -> \rightarrow [Env^{*}] \\
-%% \semapp{C}{|e|}{\rho} & = & xxx \\
 \semap{X}{e} & : & \Env \rightarrow \myset{\Env} \\
 \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n }
                                   \vb   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
@@ -241,7 +232,7 @@ Env^{*} & = & \myset{Env} \\
 
 \end{array}
 $$
-\caption{Denotational semantics of Mini Verse with choice}
+\caption{Denotational semantics of Mini Verse: expression style}
 \end{figure}
 
 
@@ -250,22 +241,19 @@ $$
 \begin{array}{l}
 
 \textbf{Auxiliary functions}\\
-\begin{array}{l@@{\;}c@@{\;}ll}
-\apply & : & (\Value \times \Value) \rightarrow \mtype \\
-\apply( f, w ) & = & \msing{f(w)} & f \in \semfcn, w \in \dom(f) \\
-\apply( f, w ) & = & \mempty & \text{otherwise} \\[1mm]
+\begin{array}{lcll}
+  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
+  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
+  \applyo & : & (\Fun \times \Value) \rightarrow [\VAL] \\
+  \applyo(f,v) & = & [ \{ r \vb \fpr{v}{r} \in h \} \vb h \inb f ] \\[1mm]
 
-  \applys & : & (\Ws, \Ws) \rightarrow [\Ws] \\
-  \applys(|fss|, as) & = & \hat{\bigcup} \{ \applyf(|fs|, as) \, || \, |fs| \inb |fss| \} \\
-  \applyf & : & ([\semfcn], \Ws) \rightarrow [\Ws] \\
-  \applyf(|fs|, as) & = & \bar{\bigcup} \{ \applyo(|fs|, a) \, || \, a \inb as \} \\
-  \applyo & : & ([\semfcn], \Value) \rightarrow [\Ws] \\
-  \applyo(|fs|,a) & = & [ \apply(|f,a|) \, || \, |f| \inb |fs| ] \\[2mm]
-  \squash & : & \mtype \rightarrow \mtype \\
+  \tupE & : & [\Val] \rightarrow \Val \\
+  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mydots n \} ] \\
+  \tupsE & : & [\VAL] \rightarrow \VAL \\
+  \tupsE [s_0,\mydots,s_n] & = & \{ \tupE [v_0, \mydots, v_n] \vb v_0 \inb s_0, \mydots v_n \in s_n \} \\[1mm]
+
+  \squash & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
   \squash(xs) & = & [ x \, || \, x \inb xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
-  \mkall([s_1,\mydots,s_n]) & = & \{ \mkarr(x_1,\mydots,x_n) \, || \, x_1 \inb s_1, \, \mydots \, x_n \inb s_n \} \\
-  \mkarr(x_0,\mydots,x_n) & = & [ \{0 \mapsto x_0\}, \mydots, \{n \mapsto x_n\} ]
-                              & \text{make an array-function} \\
   \once([x]) & = & x \\
   \once(\_) & = & \mempty & \text{or WRONG} \\
   \trunc(x,[\mempty, \mydots, s, \mydots]) & = & [\mempty, \mydots, x] & s \neq \mempty, \text{replace first non-empty} \\
@@ -281,7 +269,7 @@ $$
 \bigcap[] & = & \mempty \\
 \bigcap[x_1,x_2,\mydots,x_n] & = & x_1 \cap x_2 \cap \mydots \cap x_n \\[1mm]
 
-\seqcompat & : & (\mtype \times \mtype) \rightarrow |Bool| \\
+\seqcompat & : & (\seq{\VAL} \times \seq{\VAL}) \rightarrow |Bool| \\
 \seqcompat([s_1,\mydots,s_n], [t_1,\mydots,t_m]) & = & n = m \land \setcompat(s_1,t_1) \land \mydots \land \setcompat(s_n,t_n) \\
 \setcompat & : & (\myset{\Value} \times \myset{\Value}) \rightarrow Bool \\
 \setcompat(\{\},\{\}) & = & |true| \\
@@ -293,17 +281,17 @@ $$
 
 \textbf{Notation}\\
 \begin{array}{lcll}
-  |[e_1,xdots,e_n]| & : & \mtype & \text{sequence of items} \\[2mm]
+  |[e_1,xdots,e_n]| & : & \seq{A} & \text{sequence of items} \\[2mm]
 
-  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \mtype & \text{sequence comprehension (order preserving)}, \\[2mm]
+  |[e || x_1 <- e_1, x_2 <- e_2, xdots]| & : & \seq{A} & \text{sequence comprehension (order preserving)}, \\[2mm]
 
-  |++| & : & \mtype \rightarrow \mtype \rightarrow \mtype & \text{sequence concatenation} \\
+  |++| & : & \seq{A} \rightarrow \seq{A} \rightarrow \mtype & \text{sequence concatenation} \\
   |[x_1,xdots,x_n] ++ [y_1,xdots,y_n]| & = & |[x_1,xdots,x_n,y_1,xdots,y_n]| \\[2mm]
 
-  \hat{\cup} & : & \mtype \rightarrow \mtype \rightarrow \mtype & \text{elementwise union of sequences,} \\
+  \hat{\cup} & : & \seq{\VAL} \rightarrow \seq{\VAL} \rightarrow \seq{\VAL} & \text{elementwise union of sequences,} \\
   |[x_1,xdots,x_n]| \hat{\cup} |[y_1,xdots,y_n]| & = & |[x_1 `cup` y_1,xdots,x_n `cup` y_n]| & \text{right-padding shorter sequence with \mempty} \\[2mm]
 
-  \hat{\bigcup} & : & \powerset{\mtype} \rightarrow \mtype \\
+  \hat{\bigcup} & : & \powerset{\seq{\VAL}} \rightarrow \mtype \\
   \hat{\bigcup} & = & \cdots & \hat{\cup} \text{ extended to sets} \\[2mm]
 
 %  |re| & : & \mtype \rightarrow \mtype & \text{remove all empty sets} \\

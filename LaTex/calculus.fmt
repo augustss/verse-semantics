@@ -798,7 +798,7 @@
 %format phi         = "\varphi"
 %format psi         = "\psi"
 %format `elem`      = "\in"
-%format ++          = "\bowtie"
+%format ++          = "\append"
 %format term(v)     = "\termapp{" v "}"
 
 %format var         = "\textbf{var}"
