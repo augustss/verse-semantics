@@ -139,6 +139,7 @@ $$
   s \in & \VAL & = & \powerset{\Value} \\
   Fun(|fs|) \in & \Fun & = & \seq{\semfcn}  & \text{A sequence of partial functions} \\
   \rho \in & \Env & = & \parfun{\Ident}{\Value}  & \text{Gives a value for \emph{in-scope} identifiers} \\
+  \EV \in &\ENV & = & \powerset{ \Env } \\
   \{ \fpr{x_1}{y_1}, \ldots, \fpr{x_n}{y_n} \} \in & \semfcn & = & \powerset{ \Val \times \Val }
   & \text{Partial functions} \\
 \end{array} \\
@@ -160,7 +161,7 @@ $$
            \\
 
   \semapp{E}{|e_1 = e_2|}{\rho}      & = &
-      [ s_1 \cap s_2\, ||\, 
+      [ s_1 \cap s_2\, ||\,
            |s_1 <-| \semapp{E}{|e_1|}{\rho}, \; |s_2 <-| \semapp{E}{|e_2|}{\rho} ] \\
 
   \semapp{E}{|e_1 ; e_2|}{\rho}      & = &
@@ -175,11 +176,11 @@ $$
   \semapp{E}{|vif e_1 e_2 e_3|}{\rho} & = &
   \left\{
   \begin{array}{ll}
-    \semapp{D}{|e_3|}{\rho} & \text{if}\; \bar{\rho} = \mempty \\
-    \squash(\hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \bar{\rho} \} & \text{otherwise} \\
+    \semapp{D}{|e_3|}{\rho} & \text{if}\; \EV = \mempty \\
+    \squash(\hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \EV \} & \text{otherwise} \\
   \end{array}
   \right. \\
-  & &  |where|\; \bar{\rho} = \semapp{R}{e_1}{\rho}
+  & &  |where|\; \EV = \semapp{R}{e_1}{\rho}
   \\[1mm]
 
 %  \textit{succeeds function:} \\
@@ -218,9 +219,9 @@ $$
 
 \semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
 \semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \semapp{E}{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
-\semap{R}{|e|}{} & : & \Env \rightarrow \myset{\Env} \\
+\semap{R}{|e|}{} & : & \Env \rightarrow \ENV \\
 \semapp{R}{|e|}{\rho} & = & \{ \rho' \, || \, \rho' \inb \semapp{X}{|e|}{\rho}, \squash(\semapp{E}{|e|}{\rho'}) \neq [] \} \\[2mm]
-\semap{X}{e} & : & \Env \rightarrow \myset{\Env} \\
+\semap{X}{e} & : & \Env \rightarrow \ENV \\
 \semapp{X}{e}{\rho} & = & \{ \extendrho{\rho}{x_1 \fmapsto w_1, \mydots, x_n \fmapsto w_n }
                                   \vb   w_1 \inb \Value, \mydots, w_n \inb \Value \} \\
   & & |where [x_1,xdots,x_n]| = \semap{I}{|e|} \\[1mm]
@@ -253,7 +254,7 @@ $$
   \tupsE [s_0,\mydots,s_n] & = & \{ \tupE [v_0, \mydots, v_n] \vb v_0 \inb s_0, \mydots v_n \inb s_n \} \\[1mm]
 
   \squash & : & \seq{\VAL} \rightarrow \seq{\VAL} \\
-  \squash(xs) & = & [ x \, || \, x \inb xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
+  \squash(xs) & = & [ x \, || \, x |<-| xs, x \neq \{\} ] & \text{remove empty sets from the sequence} \\
   \once([x]) & = & x \\
   \once(\_) & = & \mempty & \text{or WRONG} \\
   \trunc(x,[\mempty, \mydots, s, \mydots]) & = & [\mempty, \mydots, x] & s \neq \mempty, \text{replace first non-empty} \\
