@@ -35,6 +35,7 @@ executable verse-repl
     hs-source-dirs:   repl
     build-depends:    verse-libs,
                       verse-densem,
+                      verse-plancc,
                       haskeline,
                       optparse-applicative,
 
@@ -196,6 +197,30 @@ library verse-densem
                       pretty,
                       QuickCheck,
                       scientific
+
+library verse-plancc
+    import:           general-libs
+    hs-source-dirs:   ../Spec
+    default-extensions:  TypeOperators TupleSections
+    exposed-modules:
+                      CExp
+                      EnvC
+                      Examples
+                      Exp
+                      Map
+                      PlanCC
+                      SetX
+                      SExpC
+                      ValC
+    build-depends:    verse-libs,
+                      array,
+                      base,
+                      containers,
+                      text,
+                      pretty,
+                      QuickCheck,
+                      scientific,
+                      uniplate,
 
 -- Various Verse utilities on which other stuff depends
 -- Should really have its own cabal project

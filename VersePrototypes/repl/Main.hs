@@ -35,6 +35,8 @@ import Text.Printf
 import Text.Read(readMaybe)
 import qualified Options.Applicative as OA
 
+import PlanCC(edenSem, edenSemDesugar)
+
 
 --------------------------------------------------------
 --
@@ -196,6 +198,7 @@ theCommandSet = CommandSet
 
       , Cmd "eval [EXPR]"          "Evaluate [last] expression"            cEval
       , Cmd "densem [EXPR]"        "Evaluate [last] expression"            cDensem
+      , Cmd "edensem [EXPR]"       "Evaluate [last] expression"            cEDensem
           -- Use Koen's:  normalizeTrace :: Rule -> Expr -> Traced Expr
 
 --       , Cmd "test [FILE]"          "Run the tests in FILE"              cTest
@@ -397,6 +400,23 @@ cDensem
        ; e_ess <- runD flags undefined $ getEssential flags e
        ; e_ds <- denSemDesugar e_ess
        ; res <- denSem e_ds
+
+       ; displayDoc $ addHeader "Desugared" $
+         text $ show e_ds
+
+       ; displayDoc $ addHeader "Den-sem" $
+           text $ show res
+
+       ; return () }
+
+cEDensem :: CmdRunner CState
+cEDensem
+  = getInputExpr $ \e s ->
+    tryIt (pure s) (\_ -> pure s) $
+    do { let flags = cs_flags s
+       ; e_ess <- runD flags undefined $ getEssential flags e
+       ; e_ds <- edenSemDesugar e_ess
+       ; res <- edenSem e_ds
 
        ; displayDoc $ addHeader "Desugared" $
          text $ show e_ds

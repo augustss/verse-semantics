@@ -1,9 +1,10 @@
 {-# OPTIONS_GHC -Wall -Wno-orphans -Wno-missing-methods -Wno-x-partial #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MonadComprehensions #-}
-module Main where
+module PlanCC where
 import Control.Arrow(second)
 import Control.Monad hiding (ap)
 --import Data.Maybe
@@ -17,6 +18,7 @@ import EnvC
 import CExp
 import Examples hiding ((===))
 import Debug.Trace
+import SExpC
 
 {-
 implies :: Bool -> Bool -> Bool
@@ -142,9 +144,9 @@ dE (CChoice e1 e2)      rho  = dB e1 rho ++ dB e2 rho
 dE (CUChoice e1 e2)     rho  = [ s1 `union` s2 | s1 <- dB e1 rho, s2 <- dB e2 rho ]
 dE (CAll e)             rho  = [ fmap VTup $ sequence $ squash $ dB e rho ]
 dE (CBlock e)           rho  = dB e rho
-dE e@(CDef _ _)        _rho  = error $ "CDef " ++ show e
+dE e@(CDef _ _)        _rho  = error $ "error: dE CDef " ++ show e
 --dE (CDef _ e)           rho  = dE e rho
-dE CFor{}              _rho  = error "CFor"
+dE CFor{}              _rho  = error "error: dE CFor"
 dE CLHS                 rho  = [sing $ VEnv $ toListEnv rho]
 dE (CIf e1 e2 e3)       rho  =
   let rhos = oneE e1 rho
@@ -434,6 +436,7 @@ dBEnv b rho = map (fmap unVEnv) $ dB b rho
 
 dE' :: [CExp] -> Env -> WS
 dE' [] _rho = undefined
+dE' [CDef i e] rho = dE' [CDef i e, CVar i] rho
 dE' [e] rho = dE e rho
 dE' (CDef i e : es) rho = concat
   [ if isEmpty s then [empty] else dEs es [ extendEnv rho i v | v <- s ]
@@ -509,4 +512,13 @@ main = do
 
 ds :: Exp -> CExp
 ds = redef . syntax "_"
+
+------------
+
+--edenSemDesugar
+edenSemDesugar e = return . ds . srcExprToExp $ e
+
+edenSem :: CExp -> IO WS
+edenSem e = return (dD e rho0)
+
 

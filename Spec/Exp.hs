@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Exp(
   Exp(..), Op(..), OC(..),
   Ident,
@@ -25,9 +26,11 @@ data Exp
   | OfType Exp Exp
   | UChoice Exp Exp
   | Block Exp
+  | DefI Ident Exp
+  | Exi Ident
   deriving (Eq, Ord, Data)
 
-data Op = Oint | Ogt | Oadd
+data Op = Oint | Ogt | Oadd | Oany
   deriving (Eq, Ord, Show, Data, Enum, Bounded)
 
 data OC = Open | Closed
@@ -58,6 +61,8 @@ instance Show Exp where
                               showBraces (showsPrec 0 e2)
   showsPrec p (OfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
   showsPrec _ (Block e) = showString "block" . showBraces (showsPrec 0 e)
+  showsPrec p (DefI x e) = showParen (p > 1) $ showString x . showString "~>" . showsPrec 6 e
+  showsPrec p (Exi x) = showString "exists " . showString x
 
 showBraces :: (String -> String) -> (String -> String)
 showBraces a = showString "{" . a . showString "}"
@@ -80,6 +85,8 @@ dI' (Where e1 e2) = dI' e1 ++ dI' e2
 dI' (Tup es) = concat (map dI' es)
 dI' (Def i e) = i : dI' e
 dI' (Def2 i1 i2 e) = i1 : i2 : dI' e
+dI' (DefI i e) = i : dI' e
 dI' (Colon e) = dI' e
+dI' (Exi i) = [i]
 dI' _ = []
 

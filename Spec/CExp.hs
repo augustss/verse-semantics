@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 #define DESUGAR_WITH_H 0
 module CExp(CExp(..), CBlk(..), syntax, dI, cexpb) where
@@ -106,6 +107,7 @@ cblock e = cblocks [e]
 cseqs :: [CExp] -> CExp
 cseqs [] = undefined
 cseqs [e] = e
+cseqs (CVar _:es@(_:_)) = cseqs es
 cseqs (e:es) = e `CSeq` cseqs es
 
 syntax :: Ident -> Exp -> CExp
@@ -134,9 +136,13 @@ syntaxN "_" (Def x (Colon (Var "any"))) = pure $ CExi x `CSeq` CVar x   -- hack 
 syntaxN u (Def x e) = do
   c <- syntaxN u e
   pure $ cseqs [CExi x, CVar x `CEqu` c]
+syntaxN u (DefI x e) = do
+  c <- syntaxN x e
+  pure $ cseqs [u =.= CVar x, c]  
 syntaxN u (Def2 x y e) = do
   c <- syntaxN x e
   pure $ cseqs [CExi x, u =.= CVar x, CExi y, CVar y `CEqu` c]
+syntaxN "_" (Exi x) = pure $ CExi x
 {-
 syntaxN "_" (Colon e) = do
   x <- newVar "x"
@@ -165,7 +171,6 @@ syntaxN "_" (Fun q e0 e1) = do
   i <- newVar "i"
   c0 <- syntaxN i e0
   CLam q i (cblocks [c0, CLHS]) <$> syntaxNB "_" e1 <*> pure Nothing
-syntaxN u (Fun q e0 e1) = do
 #else
 syntaxN "_" f@Fun{} = do
   u <- newVar "u"

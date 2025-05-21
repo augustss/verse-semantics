@@ -293,6 +293,10 @@ defn p rhs | ApplyS p2 a            <- p1 = defn_fun p2 a  fxs rhs   -- DSFUN1, 
 
 defn (Array ps) e = defnArray ps e
 
+-- Rule (x ~> p) := e  -->  p := (x -> e)
+defn (InfixOp (Variable x) (Op "->") p) e = do
+  r <- defn p (DefineIE x e)
+  pure $ eSeq [DefineV x, r]
 -- Rule (p1 ~> p2) := e  -->  p1 := (exists x); p2 := (x -> e)
 defn (InfixOp p1 (Op "->") p2) e = do
   x <- newIdent (getLoc p2) "x"
