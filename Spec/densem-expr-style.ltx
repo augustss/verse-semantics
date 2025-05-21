@@ -64,16 +64,12 @@ $$
   \EE{|k|}{\rho} & = & [\msing{k}] \\
   \EE{|o|}{\rho} & = & [\msing{\semapp{O}{|o|}{}}] \\
   \EE{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
+  \EE{|arr (x_0, xdots, x_n)|}{\rho} & = &
+    [\,\{ \tupE [ \rho(x_0), \mydots, \rho(x_n) ] \} \,] \\
+
+  \EE{|apply1N f x|}{\rho}      & = &   \applyo(\rho(f), \rho(x))       \\
   \EE{|fail|}{\rho} & = & [] \\
   \EE{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
-  \EE{|apply1N e_1 e_2|}{\rho} & = &
-         [ r \, || \,
-           |fs <-| \EE{|e_1|}{\rho}, \;
-           |s <-| \EE{|e_2|}{\rho}, \;
-           |r <-| \applys(|fs|, |s|) \}
-         ]
-           \\
-
   \EE{|e_1 = e_2|}{\rho}      & = &
       [ s_1 \cap s_2\, ||\,
            |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ] \\
@@ -81,9 +77,6 @@ $$
   \EE{|e_1 ; e_2|}{\rho}      & = &
     [ \{ x_2 \, || \, x_1 \inb s_1, \; x_2 \inb s_2 \}\, ||\,
       |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ] \\
-
-  \EE{|arr (e_0, xdots, e_n)|}{\rho} & = &
-    [\, \tupsE [ s_0, \mydots, s_n ] \vb s_0 |<-| \EE{|e_0|}{\rho}, \,\mydots,\; s_n |<-| \EE{|e_n|}{\rho} ] \,] \\
 
   \EE{|all e|}{\rho} & = & [ \, \tupsE (\squash (\EE{e}{\rho})) \, ] \\[1mm]
 
@@ -157,10 +150,11 @@ $$
 
 \textbf{Auxiliary functions}\\
 \begin{array}{lcll}
-  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
-  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
-  \applyo & : & (\Fun \times \Value) \rightarrow [\VAL] \\
-  \applyo(f,v) & = & [ \{ r \vb \fpr{v}{r} \in h \} \vb h \inb f ] \\[1mm]
+%  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
+%  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
+  \applyo & : & (\Value \times \Value) \rightarrow [\VAL] \\
+  \applyo(Fun(hs),v) & = & \multicolumn{2}{l}{[ \{ r \vb \fpr{v}{r} \in h \} \vb h \inb hs ] \hspace{5mm} \text{All elts singleton or empty}} \\
+  \applyo(k,v)) & = & [] \\[1mm]
 
   \tupE & : & [\Val] \rightarrow \Val \\
   \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mydots n \} ] \\

@@ -55,15 +55,13 @@ $$
 
 % -------------- Basic rules ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\rulename{vfail}  & |DMe3 md si fail|                  & = & |fail| \\
+\rulename{vfail}   & |DMe3 md si fail|                  & = & |fail| \\
 \rulename{vconst}  & |DMe3 md si k|                  & = & |k| \\
 \rulename{vvar}    & |DMe3 md si x|                  & = & |x| \\
-\rulename{vop}    & |DMe3 md si o|                  & = & |o| \\
-\rulename{vapp}    & |DMe3 md si (apply1N e_1 e_2)|
-   & = & |apply1N ((DMe3 md si e_1)) (DMe3 md si e_2)| \\
-\rulename{vtup} & |DMe3 md si (arr(e_1, xdots, e_n))|
-    & = & |arr (DMe3 md si e_1, xdots, DMe3 md si e_n)| \\
-\rulename{vtruth}    & |DMe3 md si (truth e)|                  & = & |truth (DMe3 md si e)| \\
+\rulename{vop}     & |DMe3 md si o|                  & = & |o| \\
+\rulename{vapp}    & |DMe3 md si (apply1N f x)|     & = & |apply1N f x| \\
+\rulename{vtup}    & |DMe3 md si (arr(x_1, xdots, x_n))| & = & |arr(x_1, xdots, x_n)| \\
+\rulename{vtruth}  & |DMe3 md si (truth x)|        & = & |truth x| \\
 \rulename{vbind}   & |DMe3 md si (defKW x)|          & = & |defKW x| \\
 \rulename{veq}     & |DMe3 md si (e_1=e_2)|          & = & |(DMe3 md si e_1) = (DMe3 md si e_2)| \\
 \rulename{vsemi}   & |DMe3 md si (e_1 ; e_2)|        & = & |DMe3 md si e_1 ; DMe3 md si e_2| \\
