@@ -777,6 +777,7 @@ fixity op = fromMaybe (internalErrorMsg op) $ lookup op tbl
       , inl "="       3 -- XXX is this right
       , inl ">>"      3 -- XXX is this right
 --      , inr "||"      4
+      , inr "|||"      7
       , inr "or"      4
 --      , inr "&&"      5
       , inr "and"     5

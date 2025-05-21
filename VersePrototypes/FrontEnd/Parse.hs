@@ -522,7 +522,7 @@ operatorTable =
 {-12-}   [op InfixL "*", op InfixL "/", op InfixL "&"],
 {-11-}   [op InfixL "+", op InfixL "-"],
 {-10-}   [op InfixR "->", op InfixR ".."],
-{-9-}    [op InfixR "|", op InfixL ":"],
+{-9-}    [op InfixR "|", op InfixL ":", op InfixR "|||"],
 {-8-}    [op InfixR ">=", op InfixR "<=", op InfixR "<", op InfixR ">", op InfixL "<>", op InfixL "="],
 {-7-}    [preOp "not"],
 {-6-}    [op InfixR "and"],

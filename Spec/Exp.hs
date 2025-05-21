@@ -53,7 +53,7 @@ instance Show Exp where
                               showBraces (showsPrec 0 e2) .
                               showBraces (showsPrec 0 e3)
   showsPrec p (Choice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " | " . showsPrec 5 e2
-  showsPrec p (UChoice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " || " . showsPrec 5 e2
+  showsPrec p (UChoice e1 e2) = showParen (p > 4) $ showsPrec 5 e1 . showString " ||| " . showsPrec 5 e2
   showsPrec _ (All e) = showString "all" . showBraces (showsPrec 0 e)
   showsPrec _ (For e1 e2) = showString "for" . showParen True (showsPrec 0 e1) . showBraces (showsPrec 0 e2)
   showsPrec _ (Fun q e1 e2) = showString (if q == Open then "fun_o" else "fun_c") .
@@ -62,7 +62,7 @@ instance Show Exp where
   showsPrec p (OfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
   showsPrec _ (Block e) = showString "block" . showBraces (showsPrec 0 e)
   showsPrec p (DefI x e) = showParen (p > 1) $ showString x . showString "~>" . showsPrec 6 e
-  showsPrec p (Exi x) = showString "exists " . showString x
+  showsPrec _ (Exi x) = showString "exists " . showString x
 
 showBraces :: (String -> String) -> (String -> String)
 showBraces a = showString "{" . a . showString "}"

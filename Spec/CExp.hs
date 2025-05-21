@@ -57,7 +57,7 @@ instance Show CExp where
                               showsPrec 0 e2 . (maybe (showString "") (\e3 -> showString " M=" . showsPrec 11 e3) me3)
   showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
   showsPrec p (CChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " | " . showsPrec 5 (cexpb e2)
-  showsPrec p (CUChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " || " . showsPrec 5 (cexpb e2)
+  showsPrec p (CUChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " ||| " . showsPrec 5 (cexpb e2)
   showsPrec _ (CAll e) = showString "all" .  (showsPrec 0 e)
   showsPrec _ (CFor e1 e2) = showString "for" . showParen True (showsPrec 0 $ cexpb e1) . (showsPrec 0 e2)
   showsPrec p (CDef x e) = showParen (p > 5) $ showString x . showString " := " . showsPrec 6 e
@@ -143,6 +143,7 @@ syntaxN u (Def2 x y e) = do
   c <- syntaxN x e
   pure $ cseqs [CExi x, u =.= CVar x, CExi y, CVar y `CEqu` c]
 syntaxN "_" (Exi x) = pure $ CExi x
+syntaxN u (Exi x) = pure $ cseqs [CExi x, u =.= CVar x]
 {-
 syntaxN "_" (Colon e) = do
   x <- newVar "x"
