@@ -25,10 +25,10 @@ $$
 \begin{array}{r@@{\;\;}c@@{\;\;}ll}
   \univE & : & \ENV \\
   \univE & = & \{ \rho \in \Env \} \\[1mm]
- (\equalsE) & : & \Ident \rightarrow \Value \rightarrow \ENV  & \text{NB: $\equalsE$ is overloaded}\\
-  x \equalsE v & = & \{ \rho \in \Env \vb \rho(x) = v \} \\[1mm]
-(\equalsE) & : & \Ident \rightarrow \Ident \rightarrow \ENV & \text{NB: $\equalsE$ is overloaded}\\
-  x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\[1mm]
+ (\equalsE) & : & \Ident \rightarrow \mathit{Atom} \rightarrow \ENV \\
+  x \equalsE k & = & \{ \rho \in \Env \vb \rho(x) = k \} \\
+  x \equalsE y & = & \{ \rho \in \Env \vb \rho(x) = \rho(y) \} \\
+  x \equalsE o & = & \{ \rho \in \Env \vb \rho(x) = \semap{O}{o} \} \\[1mm]
 %  \cleanE & : & [ \ENV ] \rightarrow [ \ENV ] \\
 %  \cleanE(es) & = & [ \EV \vb \EV \in es, \EV \not= \{\} ] \\[1mm]
 
@@ -52,15 +52,12 @@ $$
 \begin{array}{@@{}lr@@{\;\;}c@@{\;\;}l}
 & \semapsub{E}{d}{|e|} r & : & \seq{ \ENV } \\
 \rulename{edef} & \semapsub{E}{d}{|defintro x|}r & = & [ \univE ] \\
-\rulename{econst} &  \semapsub{E}{d}{|k|}r & = & [  r \equalsE k ] \\
-\rulename{eeq} &  \semapsub{E}{d}{|x|} & = & [  r \equalsE x ] \\
-\rulename{eop2} &  \semapsub{E}{d}{|apply1N o_2 (x,y)|}r
-   & = & [ \{ \rho \in \Env \vb \rho(r) = \semapp{O}{o_2}( \rho(x), \rho(y)) \} ] \\
+\rulename{eatom} &  \semapsub{E}{d}{|a|}r & = & [  r \equalsE a ] \\
 \rulename{earr} &  \semapsub{E}{d}{|arr (x_0, xdots, x_n)|}r
    & = & [ \{ \rho \in \Env \vb \rho(r) = \tupE [ \rho(x_0), \mydots, \rho(x_n) ] \} ] \\
+\rulename{efail} &  \semapsub{E}{d}{|fail|}r & = & [ ] \\
 \rulename{echoice} &  \semapsub{E}{d}{|op_1 `choice` op_2|}r
  & = & \semapsub{E}{d}{op_1}r \append \semapsub{E}{d}{op_2}r  \\
-\rulename{efail} &  \semapsub{E}{d}{|fail|}r & = & [ ] \\
 \rulename{eseq} &  \semapsub{E}{d}{|op_1 ; op_2|}r
 & = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{op_1}s,
           \EV_2 \in \semapsub{E}{d}{op_2}r ] \hspace{8mm} \text{|s| fresh} \\
@@ -70,8 +67,7 @@ $$
 \multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
   \semapsub{E}{d}{|if3 op_1 op_2 op_3|} }r & = & ??? \\
 \rulename{eall} & \semapsub{E}{d}{|all e|}r
-& = & [ \, \{ (r \equalsE \tupE(vs)) \intersectE \Delta
-        \vb  (vs,\Delta) \in \combineE(\semap{V}{e}) \}\, ]
+& = & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(\semap{V}{e}), \rho \in \EV, \rho(r)=\tupE(vs) \}\, ]
 \\[2mm]
 
 & \semap{V}{|e|} & : & \seq{ \powerset{\Val, \ENV} } \\

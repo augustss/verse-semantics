@@ -55,16 +55,14 @@ $$
 
 % -------------- Basic rules ----------------
 \begin{array}{lr@@{\;\;}c@@{\;\;}ll}
-\rulename{vfail}   & |DMe3 md si fail|                  & = & |fail| \\
-\rulename{vconst}  & |DMe3 md si k|                  & = & |k| \\
-\rulename{vvar}    & |DMe3 md si x|                  & = & |x| \\
-\rulename{vop}     & |DMe3 md si o|                  & = & |o| \\
-\rulename{vapp}    & |DMe3 md si (apply1N f x)|     & = & |apply1N f x| \\
-\rulename{vtup}    & |DMe3 md si (arr(x_1, xdots, x_n))| & = & |arr(x_1, xdots, x_n)| \\
-\rulename{vtruth}  & |DMe3 md si (truth x)|        & = & |truth x| \\
+\rulename{vatom}  & |DMe3 md si a|                  & = & |a| \\
+\rulename{vapp}    & |DMe3 md si (apply1N f a)|     & = & |apply1N f a| \\
+\rulename{vtup}    & |DMe3 md si (arr(a_1, xdots, a_n))| & = & |arr(a_1, xdots, a_n)| \\
+\rulename{vtruth}  & |DMe3 md si (truth a)|        & = & |truth a| \\
 \rulename{vbind}   & |DMe3 md si (defKW x)|          & = & |defKW x| \\
 \rulename{veq}     & |DMe3 md si (e_1=e_2)|          & = & |(DMe3 md si e_1) = (DMe3 md si e_2)| \\
 \rulename{vsemi}   & |DMe3 md si (e_1 ; e_2)|        & = & |DMe3 md si e_1 ; DMe3 md si e_2| \\
+\rulename{vfail}   & |DMe3 md si fail|                  & = & |fail| \\
 \rulename{vchoice} & |DMe3 md si (e_1 `choice` e_2)| & = & |(DMe3 md si e_1) `choice` (DMe3 md si e_2)| \\
 \rulename{vfor}    & |DMe3 md si (fordo e_1 e_2)|
    & = & |iter2 forKW (DMe3 md si e_1; lam underscore (DMe3 md si e_2)) emptytup| \\

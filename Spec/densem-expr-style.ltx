@@ -59,15 +59,17 @@ $$
 \end{array} \\
 \\
 \begin{array}{r@@{\;\;\;}c@@{\;\;\;}l}
-  \semapsub{E}{e}{|e|} & : & \Env \rightarrow \seq{ \VAL } \\
-  \EE{|x|}{\rho} & = & [\msing{\rho(x)}] \\
-  \EE{|k|}{\rho} & = & [\msing{k}] \\
-  \EE{|o|}{\rho} & = & [\msing{\semapp{O}{|o|}{}}] \\
+  \semappsub{A}{e}{|a|} & : & \Env \rightarrow \Val \\
+  \semappsub{A}{e}{|x|}\rho & = & \rho(x) \\
+  \semappsub{A}{e}{|k|}\rho & = & k \\
+  \semappsub{A}{e}{|o|}\rho & = & \semap{O}{o} \\[1mm]
+  \semappsub{E}{e}{|e|} & : & \Env \rightarrow \seq{ \VAL } \\
+  \EE{|a|}{\rho} & = & [\msing{\semappsub{A}{e}{a}\rho}] \\
   \EE{|defKW x|}{\rho} & = & [\msing{|emptytup|}] \\
-  \EE{|arr (x_0, xdots, x_n)|}{\rho} & = &
-    [\,\{ \tupE [ \rho(x_0), \mydots, \rho(x_n) ] \} \,] \\
+  \EE{|arr (a_0, xdots, a_n)|}{\rho} & = &
+    [\,\{ \tupE [ \semappsub{A}{e}{a_0}\rho, \mydots, \semappsub{A}{e}{a_n}\rho ] \} \,] \\
 
-  \EE{|apply1N f x|}{\rho}      & = &   \applyo(\rho(f), \rho(x))       \\
+  \EE{|apply1N f a|}{\rho}      & = &   \applyo(\rho(f),  \semappsub{A}{e}{a}\rho)       \\
   \EE{|fail|}{\rho} & = & [] \\
   \EE{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
   \EE{|e_1 = e_2|}{\rho}      & = &

@@ -18,10 +18,11 @@ $$
 \begin{array}{l}
 \textbf{Syntax of Mini Verse} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
-  \text{Expressions} & e & ::= & |x| \vb |k| \vb |o| \vb |apply1N f x| \vb e_1; e_2
+  \text{Atoms}       & a & ::= & |x| \vb |o| \vb |k|  \hspace{5mm} \text{Add strings, floats...} \\
+  \text{Expressions} & e & ::= & |a| \vb |apply1N f a| \vb e_1; e_2
      \vb |e_1 == e_2| \vb |defintro x| \vb |e_1 `choice` e_2| \vb |fail|
      \vb |lamOC q i e_1 e_2| \\
-  && \vb & |arr (x_1, xdots, x_n)| \vb |truth x| \vb |oftypefx e_1 fx e_2| \vb |check fx e| \\
+  && \vb & |arr (a_1, xdots, a_n)| \vb |truth a| \vb |oftypefx e_1 fx e_2| \vb |check fx e| \\
   && \vb & |vif e_1 e_2 e_3| \vb |fordo e_1 e_2| \vb |all e| \\
 \multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x t|; no |x:=e|; no |where|; and lambda changes form}}
 \end{array} \\
@@ -33,9 +34,7 @@ $$
      \hspace{1cm} \text{|drdom| for domain, |drrng fx| for range}} \\
                 & |u|  & ::= & |wrapemp| \vb |wrape e| \\[2mm]
 
-\rulename{wconst}      & |SS wu k| & = & |wu `ueq` k| \\
-\rulename{wprim}   & |SS wu o| & = & |wu `ueq` o| \\
-\rulename{wvar}    & |SS wu x| & = & |wu `ueq` x| \\
+\rulename{watom}      & |SS wu a| & = & |wu `ueq` a| \\
 \rulename{wwild}    & |SS wu _| & = & |wu `ueq` (defintro x; x)| \\
 % \rulename{wwild2}    & |SS (apeff e fx) _| & = & |e| \\
 \rulename{wapp}    & |SS wu (apply1N t_1 t_2)|
