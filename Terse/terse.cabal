@@ -24,6 +24,7 @@ library
     List
     Loc
     Parser
+    Parser.PWD
     Pos
     Pretty
     Ref
