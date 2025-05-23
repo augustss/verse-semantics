@@ -77,8 +77,8 @@ $$
            |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ] \\
 
   \EE{|e_1 ; e_2|}{\rho}      & = &
-    [ \{ x_2 \, || \, x_1 \inb s_1, \; x_2 \inb s_2 \}\, ||\,
-      |s_1 <-| \EE{|e_1|}{\rho}, \; |s_2 <-| \EE{|e_2|}{\rho} ] \\
+    [ s_2 \vb
+      |s_1 <-| \EE{|e_1|}{\rho},\; s_1 \not= \{\},\; |s_2 <-| \EE{|e_2|}{\rho} ] \\
 
   \EE{|all e|}{\rho} & = & [ \, \tupsE (\squash (\EE{e}{\rho})) \, ] \\[1mm]
 
@@ -86,7 +86,7 @@ $$
   \left\{
   \begin{array}{ll}
     \semapp{D}{|e_3|}{\rho} & \text{if}\; \EV = \mempty \\
-    \squash(\hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \EV \} & \text{otherwise} \\
+    \hat{\bigcup}\{ \semapp{D}{e_2}{\rho'} \, || \, \rho' \inb \EV \} & \text{otherwise} \\
   \end{array}
   \right. \\
   & &  |where|\; \EV = \semapp{R}{e_1}{\rho}
@@ -155,11 +155,11 @@ $$
 %  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
 %  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
   \applyo & : & (\Value \times \Value) \rightarrow [\VAL] \\
-  \applyo(Fun(hs),v) & = & \multicolumn{2}{l}{[ \{ r \vb \fpr{v}{r} \in h \} \vb h \inb hs ] \hspace{5mm} \text{All elts will be singleton or empty}} \\
-  \applyo(k,v)) & = & [] \\[1mm]
+  \applyo(Fun(hs),v) & = & \multicolumn{2}{l}{[ \{ r \vb \fpr{v}{r} \in h \} \vb h |<-| hs ] \hspace{5mm} \text{All elts will be singleton or empty}} \\
+  \applyo(k,v)) & = & []  & \text{WRONG would be better} \\[1mm]
 
   \tupE & : & [\Val] \rightarrow \Val \\
-  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \vb i \in 0 \mydots n \} ] \\
+  \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i |<-| 0 \mydots n ] \\
   \tupsE & : & [\VAL] \rightarrow \VAL \\
   \tupsE [s_0,\mydots,s_n] & = & \{ \tupE [v_0, \mydots, v_n] \vb v_0 \inb s_0, \mydots v_n \inb s_n \} \\[1mm]
 
