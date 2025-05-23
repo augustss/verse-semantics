@@ -56,16 +56,16 @@ $$
 \rulename{earr} &  \semapsub{E}{d}{|arr (x_0, xdots, x_n)|}r
    & = & [ \{ \rho \in \Env \vb \rho(r) = \tupE [ \rho(x_0), \mydots, \rho(x_n) ] \} ] \\
 \rulename{efail} &  \semapsub{E}{d}{|fail|}r & = & [ ] \\
-\rulename{echoice} &  \semapsub{E}{d}{|op_1 `choice` op_2|}r
- & = & \semapsub{E}{d}{op_1}r \append \semapsub{E}{d}{op_2}r  \\
-\rulename{eseq} &  \semapsub{E}{d}{|op_1 ; op_2|}r
-& = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{op_1}s,
-          \EV_2 \in \semapsub{E}{d}{op_2}r ] \hspace{8mm} \text{|s| fresh} \\
-\rulename{elam} &  \semapsub{E}{d}{|dpslam x op_1 op2 y|}r & = & ??? \\
+\rulename{echoice} &  \semapsub{E}{d}{|e_1 `choice` e_2|}r
+ & = & \semapsub{E}{d}{e_1}r \append \semapsub{E}{d}{e_2}r  \\
+\rulename{eseq} &  \semapsub{E}{d}{|e_1 ; e_2|}r
+& = &  [ \EV_1 \intersectE \EV_2 \vb \EV_1 \in \semapsub{E}{d}{e_1}s,
+          \EV_2 \in \semapsub{E}{d}{e_2}r ] \hspace{8mm} \text{|s| fresh} \\
+\rulename{elam} &  \semapsub{E}{d}{|dpslam x e_1 e2 y|}r & = & ??? \\
 \rulename{eapp} & \semapsub{E}{d}{|apply1N f x|}r
  & = & [ \{ \rho \in \Env \vb \rho(f)=Fun(hs), (\fpr{\rho(x)}{\rho(r)}) \in hs[i] \} \vb i \in 0\mydots ] \\
 \multicolumn{2}{@@{}l}{\rulename{eif} \; \hfill
-  \semapsub{E}{d}{|if3 op_1 op_2 op_3|} }r & = & ??? \\
+  \semapsub{E}{d}{|if3 e_1 e_2 e_3|} }r & = & ??? \\
 \rulename{eall} & \semapsub{E}{d}{|all e|}r
 & = & [ \, \{ \rho \vb  (vs,\EV) \in \combineE(\semap{V}{e}), \rho \in \EV, \rho(r)=\tupE(vs) \}\, ]
 \\[2mm]
@@ -83,8 +83,8 @@ $$
 \end{array}
 \\
 \begin{array}{rcll}
-\semap{O}{|o_2|} & : & \parfun{\Val \times \Val}{\Val} \\
-\semap{O}{|<=|}(x,y) & = & \{ \fpr{(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}
+\semap{O}{|o|} & : & \Val \\
+\semap{O}{|<=|} & = & \Fun[\,\{ \fpr{\tupE(x,y)}{x} \vb x \in \Z, y \in \Z, x \leq y \}\,]
 \end{array} \\
 
 \end{array}
