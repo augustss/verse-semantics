@@ -8,7 +8,6 @@ module Parser.PWD
   , step
   , satisfy
   , token
-  , chainl
   , chainl1
   ) where
 
@@ -78,13 +77,10 @@ token x = satisfy $ \ y -> if
   | x == y -> Just x
   | otherwise -> Nothing
 
-chainl :: Memo t => Parser t a -> Parser t (a -> a -> a) -> a -> Parser t a
-chainl x op y = chainl1 x op <|> pure y
-
 chainl1 :: Memo t => Parser t a -> Parser t (a -> a -> a) -> Parser t a
-chainl1 x op = f <$> x <*> optional ((,) <$> op <*> chainl1 x op)
+chainl1 x op = flip ($) <$> x <*> loop
   where
-    f x = maybe x $ \ (op, y) -> x `op` y
+    loop = flip (.) <$> (flip <$> op <*> x) <*> loop <|> pure id
 
 instance Memo t => Functor (Parser t) where
   fmap = (<*>) . pure
