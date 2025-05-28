@@ -11,6 +11,8 @@ module EnvC(
   dO,
   maxVInt, vadd,
   mkFcn, mkVFcn, noFcn, nameFcn,
+  mkIntFcn,
+  MappingV,
   ) where
 import Data.Array
 import Data.List hiding (intersect)
@@ -36,6 +38,7 @@ vadd (VInt x) (VInt y) = VInt ((x + y) `mod` maxVInt)
 vadd _ _ = undefined
 
 --------------------
+
 ---- Primitive functions
 
 dO :: Op -> W
@@ -52,7 +55,7 @@ mkVFcn = vFcn . mkFcn
 
 allFcnsL :: [Fcn]
 allFcnsL = setNos $ intFcns ++ pairFcns ++ extraFcns
-#if HAS_HAS
+#if HAS_HO
            ++ hoFcns
 #endif
 
@@ -68,6 +71,9 @@ allFcnsA = array (0, numFcns - 1) [ (n, f) | f@(Fcn n _ _) <- allFcnsL ]
 allFcnsM :: DM.Map Mapping Fcn
 allFcnsM = DM.fromList [ (xys, f) | f@(Fcn _ _ xys) <- allFcnsL ]
 
+allIntFcnsM :: DM.Map Mapping Fcn
+allIntFcnsM = DM.fromList [ (xys, f) | f@(Fcn _ _ xys) <- setNos intFcns ]
+
 mkFcn :: HasCallStack => MappingV -> Fcn
 mkFcn xys =
   let xys' = mkMapping xys in
@@ -75,12 +81,22 @@ mkFcn xys =
     Nothing -> error $ "Function not in allFcns: " ++ showMapping' xys'
     Just f  -> f
 
+mkIntFcn :: HasCallStack => MappingV -> Fcn
+mkIntFcn xys =
+  let xys' = mkMapping xys in
+  case DM.lookup xys' allIntFcnsM of
+    Nothing -> error $ "Function not in allIntFcns: " ++ showMapping' xys'
+    Just f  -> f
+
 noFcn :: HasCallStack => Int -> Fcn
 noFcn i | i >= numFcns = error "noFcn"
 noFcn i = allFcnsA ! i
 
 nameFcn :: String -> Fcn
-nameFcn s = [ f | f@(Fcn _ (Just n) _) <- allFcnsL, s == n ] !! 0
+nameFcn s =
+  case [ f | f@(Fcn _ (Just n) _) <- allFcnsL, s == n ] of
+    [] -> error $ "no function: " ++ s
+    f : _ -> f
 
 (↦) :: a -> b -> (a, b)
 (↦) = (,)
@@ -110,7 +126,7 @@ intFcns =
   in  fs
 
 pairFcns :: [Mapping]
-pairFcns = intToPairFcns ++ pairToIntFcns
+pairFcns = [] -- intToPairFcns ++ pairToIntFcns
 
 pairToIntFcns :: [Mapping]
 pairToIntFcns = -- [ mkMapping [(VTup [x,y], z) | x <- allInts, y <- allInts ] | z <- allInts ]
@@ -120,7 +136,7 @@ madd :: MappingV
 madd = [ (VTup [x,y], vadd x y) | x <- allInts, y <- allInts ]
 
 intToPairFcns :: [Mapping]
-intToPairFcns = [ mkMapping [(z, VTup [x,y])] | x <- allInts, y <- allInts, z <- allInts ]
+intToPairFcns = [] -- [ mkMapping [(z, VTup [x,y])] | x <- allInts, y <- allInts, z <- allInts ]
 
 hoFcns :: [Mapping]
 hoFcns = hos
@@ -133,16 +149,14 @@ setNos = zipWith set [0..]
 knownFcns :: [(Mapping, String)]
 knownFcns =
   [ (mkMapping m, s) | (m, s) <-
-    [ (mint, "int")
+    [ ([], "false")
+    , (mint, "int")
     , (madd, "add")
     , (mcomparable, "comparable")
     , (msucc, "succ")
     , (mpred, "pred")
     , (mgt, "gt")
-#if HAS_HO
-    , (mho1, "ho1")
-    , (mho2, "ho2")
-    , (mho3, "ho3")
+    , (mf012, "f012")
     , ([(VInt 0, VInt 0)], "id0")
     , ([(VInt 1, VInt 1)], "id1")
     , ([(VInt 2, VInt 2)], "id2")
@@ -150,6 +164,11 @@ knownFcns =
     , ([(x, VInt 0) | x <- allInts], "const0")
     , ([(VInt 0, VInt 1)], "succ0")
     , ([(x, x) | x <- [VInt 1, VInt 2]], "id12")
+#if HAS_HO
+    , (mho8, "ho8")
+    , (mho1, "ho1")
+    , (mho2, "ho2")
+    , (mho3, "ho3")
 #endif
     ]
   ]
@@ -219,7 +238,7 @@ allChoice2IntFcns = map VFcn $ pick2 intVFcns
   where pick2 fs = [ [f1, f2]
                    | f1 <- fs
                    , let d1 = domFcn f1
-                   , not (isEmpty d1)
+--                   , not (isEmpty d1)
                    , f2 <- fs
                    , let d2 = domFcn f2
                    , not (isEmpty d2)
@@ -253,7 +272,7 @@ allWs = mkSetUnsafe allWsL
 
 allWsL :: [W]
 allWsL = allInts
-         ++ allTuples
+--          ++ allTuples
          ++ allChoiceFcnsL
 
 --------------
@@ -270,7 +289,9 @@ mcomparable = [ (x, x) | x <- allInts ++ allTuples ]
 
 hos :: [Mapping]
 hos = map mkMapping $
- [ [ F[noFcn 2{-={0↦1}-}] ↦ VInt 2 ]           -- fun_c(fun_c(0){1}){2}
+ [ --[ F[noFcn 2{-={0↦1}-}] ↦ VInt 2 ]           -- fun_c(fun_c(0){1}){2}
+   mf012
+ , mfcon
  , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2 ]
  , [ F[noFcn 15{-={0↦2,1↦2}-}] ↦ VInt 2
    , F[noFcn 61{-={0↦2,1↦2,2↦0}-}] ↦ VInt 2
@@ -282,7 +303,25 @@ hos = map mkMapping $
  , mho3
  , mho6
  , mho7
+ , mho8
  ]
+
+-- fun(fun(0){1}){2}
+mf012 :: MappingV
+mf012 =
+  [ F[                noFcn 2{-={0↦1}-}] ↦ VInt 2
+  , F[noFcn 0{-={}-}, noFcn 2{-={0↦1}-}] ↦ VInt 2
+  ]
+
+-- fun(fun(0|||1){1}){2}
+mfcon :: MappingV
+mfcon =
+  [ VTup [VInt 1, VInt 1]             ↦ VInt 2
+  , F[noFcn 11]                       ↦ VInt 2
+  , F[nameFcn "false", noFcn 11]      ↦ VInt 2
+  , F[nameFcn "succ0", nameFcn "id1"] ↦ VInt 2
+  , F[nameFcn "id1", nameFcn "succ0"] ↦ VInt 2
+  ]
 
 -- fun_c(fun_c(:int){:int}){f[1]}
 mho1 :: MappingV
@@ -385,3 +424,7 @@ mho6 = [VInt 0 ↦ F[noFcn 42{-={0↦0,1↦1,2↦2}-}]]
 
 mho7 :: MappingV
 mho7 = [F[noFcn 8{-={0↦0,1↦1}-}] ↦ VTup [VInt 1, VInt 0]]
+
+-- fun(f:=fun(x:=0|||1){x}){f[1]}
+mho8 :: MappingV
+mho8 = [F[noFcn 8{-={0↦0,1↦1}-}] ↦ VInt 1]

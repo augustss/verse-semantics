@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
-#define DESUGAR_WITH_H 0
+#define DESUGAR_WITH_H 1
 module CExp(CExp(..), CBlk(..), syntax, dI, cexpb) where
 import Control.Monad
 import Control.Monad.State.Strict
@@ -23,10 +23,11 @@ data CExp
   | CTup [CExp]
 --  | CWhere CExp CExp
   | CIf CBlk CBlk CBlk
-  | CLam OC Ident CBlk CBlk (Maybe (Ident, CExp))
+  | CLam OC Ident CBlk CBlk CBlk (Maybe (Ident, CExp))
   | COfType CExp CExp
   | CFor CBlk CBlk
   | CAll CBlk
+  | COne CBlk
   | CDef Ident CExp
   | CUChoice CBlk CBlk
   | CBlock CBlk
@@ -52,9 +53,13 @@ instance Show CExp where
   showsPrec _ (CExi i) = showString "exi " . showString i
   showsPrec _ CFail = showString "fail"
   showsPrec _ (CIf e1 e2 e3) = showString "if " . showParen True (showsPrec 0 $ cexpb e1) . showsPrec 0 e2 . showsPrec 0 e3
-  showsPrec _ (CLam q i e1 e2 me3) = showString ("lam" ++ [show q !! 0]) .
-                              showParen True (showString i) . showParen True (showsPrec 0 $ cexpb e1) .
-                              showsPrec 0 e2 . (maybe (showString "") (\e3 -> showString " M=" . showsPrec 11 e3) me3)
+  showsPrec _ (CLam q i e1 e2 e3 me4) =
+    showString ("lam" ++ [show q !! 0]) .
+    showParen True (showString i) .
+    showParen True (showsPrec 0 $ cexpb e1) .
+    showParen True (showsPrec 0 $ cexpb e2) .
+    showsPrec 0 e3 .
+    maybe (showString "") (\ e4 -> showString " M=" . showsPrec 11 e4) me4
   showsPrec p (COfType e1 e2) = showParen (p > 3) $ showsPrec 4 e1 . showString " |> " . showsPrec 4 e2
   showsPrec p (CChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " | " . showsPrec 5 (cexpb e2)
   showsPrec p (CUChoice e1 e2) = showParen (p > 4) $ showsPrec 5 (cexpb e1) . showString " ||| " . showsPrec 5 (cexpb e2)
@@ -174,7 +179,7 @@ syntaxN "_" (Fun q e0 e1) = do
   CLam q i (cblocks [c0, CLHS]) <$> syntaxNB "_" e1 <*> pure Nothing
 #else
 syntaxN "_" f@Fun{} = do
-  u <- newVar "u"
+  u <- newVar "h"
   CSeq (CExi u) <$> syntaxN u f
 #endif
 syntaxN u (Fun q e0 e1) = do
@@ -185,7 +190,8 @@ syntaxN u (Fun q e0 e1) = do
   c1 <- syntaxN k e1
   cq <- checkQ q u e0
   pure $ CLam q i (cblocks [CDef x c0, CLHS])
-                  (cblocks [CDef k $ CApp (CVar u) (CVar x), c1 ])
+                  (cblocks [CDef k $ CApp (CVar u) (CVar x)])
+                  (cblocks [c1])
                   cq
 syntaxN u (Block e) = CBlock <$> syntaxNB u e
 

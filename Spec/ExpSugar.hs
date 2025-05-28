@@ -27,9 +27,9 @@ infixl 3 :|
 pattern (:|) :: Exp -> Exp -> Exp
 pattern x :| y = Choice x y
 
-infixl 3 :||
-pattern (:||) :: Exp -> Exp -> Exp
-pattern x :|| y = UChoice x y
+infixl 3 :|||
+pattern (:|||) :: Exp -> Exp -> Exp
+pattern x :||| y = UChoice x y
 
 infixl 4 ===
 (===) :: Exp -> Exp -> Exp

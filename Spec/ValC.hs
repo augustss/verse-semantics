@@ -1,6 +1,8 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module ValC(
-  Val(..), pattern F,
+  Val(..), pattern F, pattern VTup,
+  mkTup,
   RVal(..),
   Fcn(..), vFcn, appM, domFcn, app, inDom, domV, eqFcnMap, isEmptyDom,
   subFcn,
@@ -14,6 +16,7 @@ import Data.List
 import Data.Maybe
 import qualified Map as M
 import SetX
+import {-# SOURCE #-} EnvC(mkIntFcn)
 
 data FunctionShow = JustNumber | NumberAndDefinition | HsSyntax
   deriving (Eq)
@@ -24,15 +27,36 @@ showFcnNo = NumberAndDefinition
 --------------------
 ---- Values
 
-data Val = VInt Integer | VTup [Val] | VFcn [Fcn]
-         | VEnv [(String, Val)]                    -- HACK for fast lambda evaluation
+data Val
+  = VInt Integer
+--  | VTup [Val]
+  | VFcn [Fcn]
+  | VEnv [(String, Val)]                    -- HACK for fast lambda evaluation
   deriving (Eq, Ord)
+
+
+pattern VTup :: [Val] -> Val
+pattern VTup vs <- (getVTup -> Just vs)
+  where VTup = mkTup
+
+getVTup :: Val -> Maybe [Val]
+getVTup (VFcn fs) | map domFcn fs == map sing ixs = Just $ zipWith app fs ixs
+  where ixs = map VInt [0..toInteger (length fs)-1]
+getVTup _ = Nothing
+
+mkTup :: [Val] -> Val
+mkTup vs = VFcn $ zipWith (\ a r -> mkIntFcn [(VInt a, r)]) [0..] vs
+
+--mkTup :: [Val] -> Val
+--mkTup = VTup
 
 pattern F :: [Fcn] -> Val
 pattern F fs = VFcn fs
 
 vFcn :: Fcn -> Val
 vFcn f = VFcn [f]
+
+--------------------
 
 data RVal = RVal Val | Wrong String
 
