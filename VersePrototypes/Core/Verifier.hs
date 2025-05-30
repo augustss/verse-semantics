@@ -331,6 +331,24 @@ splitRules =
        do labelArg (pPrint asm)
           pure (Verify (bindList (r:rs) (asm : as, ctx <@ Var r)))
  <|>
+  do interest 2
+     (all_rs, rs, as, e) <- matchVerify =<< lhs
+     (ctx, (_, Var f :@: arg)) <- proofX all_rs e
+     guard (f `elem` all_rs)   -- f is a skolem
+     case groundValue all_rs arg of
+       Just gv -> do { let r    = skolNotIn all_rs
+                           asm  = A_PrimOp r AO_Apply (GVArr [GVVar f, gv])
+                     ; label "SPLIT-APP"
+                     ; labelArg (pPrint asm)
+                     ; pure (Verify (bindList (r:rs) (asm : as, ctx <@ Var r))) }
+       Nothing | Lam b <- arg
+               , all_rs `includes` free b
+               -> do { let r = skolNotIn all_rs
+                     ; label "SPLIT-APP-HO"
+                     ; pure (Verify (bindList (r:rs) (as, ctx <@ Var r))) }
+               | otherwise
+               -> Core.Rule.empty   -- Fails in the Rule monad
+ <|>
   do label "SPLIT-ISARR"
      interest 2
        -- verify(R,r;A){ P[ isArr$[r] ] }

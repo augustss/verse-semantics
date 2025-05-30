@@ -10,14 +10,14 @@ module FrontEnd.Expr(
     , SrcExpr(..), Lit(..), Path(..)
     , Aperture(..), defaultAperture
     , SrcPat, SrcEssential, SrcMini, SrcCore, SrcBlk, SrcValue
-    , PrimOp(..)
+    , PrimOp(..), MVLWrap(..)
 
       -- Predicates on SrcExpr
     , isConst, isAtomic, isValue
 
       -- Building SrcExpr
     , eFalse, eAny, eMkMap, eHavoc, eGuard, eSome, eOne
-    , eAll, eExists, eCheck, eApplyD, eVerify
+    , eAll, eExists, eCheck, eApplyD, eVerify, eUnit
     , eThunk, eForce, eForceLam, existsXX, eSomeAny
     , mkSeq, eSeq, eUnify, eFunction, fvArray
     , srcUnderscore, isSrcUnderscore, identX
@@ -152,7 +152,12 @@ data SrcExpr  -- See Note [The SrcExpr lifecycle]
   -- Only constructors below here appear in the output of the unwrapping desugaring
   -- See Note [How SrcExpr is parsed] and the dsSmall function
 
-  | XDLam Aperture Ident SrcExpr SrcExpr  -- Lambda with explicit domain
+  | MVLam { mvl_fxs  :: Eff      -- Effects
+          , mvl_i    :: Ident    -- Binder: scopes over mvl_dom and mvl_rng
+          , mvl_dom  :: SrcExpr  -- Domain
+          , mvl_wrap :: MVLWrap  -- The wrapped function, if any
+          , mvl_rng  :: SrcExpr  -- Range
+    }
 
   -----------------------------------------------------------
   -- Big Core: only constructors below here appear in the output of M-desugaring
@@ -222,6 +227,17 @@ defaultAperture :: Aperture
 defaultAperture = Closed  -- Just for now
 
 --------------------------------------------------------
+--      Wrapping
+
+data MVLWrap
+  = NoWrap
+  | Wrap { wp_x :: Ident   -- Occurrence: bound in mvl_dom
+         , wp_h :: Ident   -- Occurrence: bound outside
+         , wp_y :: Ident   -- Binder; scopes over mvl_rng
+         }
+  deriving (Eq, Ord, Show, Data)
+
+--------------------------------------------------------
 --      Smart constructors to construct SrcExpr
 --
 -- Warning: these functions are helpful to avoid clutter
@@ -259,16 +275,19 @@ eUnify e1 (Seq e2 e3) | isValue e1 = mkSeq e2 (eUnify e1 e3)
 eUnify e1 e2                       = Unify e1 e2
 
 eSeq :: [SrcExpr] -> SrcExpr
-eSeq [] = Array []
+eSeq [] = eUnit
 eSeq es = foldr1 mkSeq es
 
 mkSeq :: SrcExpr -> SrcExpr -> SrcExpr
 -- Smart constructor that tries to right-associate ";"
 mkSeq (Seq e1 e2) e3 = mkSeq e1 (mkSeq e2 e3)
-mkSeq e1          e2 = Seq e1 e2
+mkSeq e1 e2
+  | isValue e1       = e2
+  | otherwise        = Seq e1 e2
 
-eFalse :: SrcExpr
+eUnit, eFalse :: SrcExpr
 eFalse = Array []
+eUnit  = Array []
 
 eAny :: SrcExpr
 eAny = Variable (Ident noLoc "any")
@@ -280,9 +299,9 @@ eMkMap l = Variable (Ident l "mkMap$")
 eHavoc :: Eff -> SrcExpr
 eHavoc (Eff { eff_card = c }) = havoc1 c
   where
-    havoc1 CSucceeds = Array []
+    havoc1 CSucceeds = eUnit
     havoc1 CFails    = Fail
-    havoc1 CDecides  = Unify eSomeAny (Array [])
+    havoc1 CDecides  = Unify eSomeAny eUnit
     havoc1 CIterates = error "eHavoc:iterates"
 
 eThunk :: SrcExpr -> SrcExpr
@@ -291,11 +310,11 @@ eThunk e = Lam srcUnderscore e
 
 eForce :: SrcExpr -> SrcExpr
 -- Force a (\_.e) thunk, by applying it to <>
-eForce e = ApplyD e (Array [])
+eForce e = ApplyD e eUnit
 
 eForceLam :: SrcExpr
 -- \t. t[]
-eForceLam = Lam identX (ApplyD (Variable identX) (Array []))
+eForceLam = Lam identX (ApplyD (Variable identX) eUnit)
 
 eAll :: SrcExpr -> SrcExpr
 eAll = All
@@ -702,8 +721,16 @@ instance Pretty SrcExpr where
                         grab gs (Guard g e2) = grab (g:gs) e2
                         grab gs et           = (reverse gs, et)
 
-          XDLam q i e1 e2 -> maybeParens (p > 0) $ text "\\" <> ppr 0 q <> ppr 0 i <> text "."
-                                                   <> cat [braces (ppr 0 e1), braces (ppr 0 e2)]
+          MVLam { mvl_fxs = fxs, mvl_i = i, mvl_dom = e1, mvl_wrap = wrap, mvl_rng = e2 }
+            -> maybeParens (p > 0) $
+               text "\\" <> ppr 0 fxs <> ppr 0 i <> text "."
+                         <> sep [ parens (ppr 0 e1)
+                                , parens (pp_wrap wrap) <> braces (ppr 0 e2) ]
+            where
+              pp_wrap NoWrap = empty
+              pp_wrap (Wrap { wp_x = x, wp_h = h, wp_y = y })
+                 = ppr 0 y <> text ":=" <> ppr 0 h <> brackets (ppr 0 x)
+
           Lam i e -> maybeParens (p > 0) $ text "\\" <> ppr 0 i <> text "." <+> ppr 0 e
           Map es -> text "map" <> braces (ppSeq lvl es)
           Truth e -> text "truth" <> braces (ppr 0 e)
@@ -841,7 +868,9 @@ compos f (Verify is e)      = Verify is <$> f e
 compos f (OfType e1 fx e2)  = OfType <$> f e1 <*> pure fx <*> f e2
 compos _ e@EPrim{}          = pure e
 compos f (Lam i e)          = Lam i <$> f e
-compos f (XDLam q i e1 e2)  = XDLam q i <$> f e1 <*> f e2
+compos f e@(MVLam { mvl_dom = e1, mvl_rng = e2 })
+                            = (\e1' e2' -> e { mvl_dom = e1', mvl_rng = e2' })
+                              <$> f e1 <*> f e2
 compos _ e@Fail             = pure e
 compos f (Map es)           = Map <$> traverse f es
 compos f (Truth e)          = Truth <$> f e
@@ -867,7 +896,7 @@ isConst _       = False
 isValue :: SrcExpr -> Bool
 isValue Variable{} = True
 isValue (Lam {})   = True
-isValue (XDLam {}) = True
+isValue (MVLam {}) = True
 isValue (Array es) = all isValue es
 isValue (Truth e)  = isValue e
 isValue e          = isConst e
@@ -917,7 +946,7 @@ getVisibleBinders = go
     go Let{}      = []  -- nothing visible from a let
     go Choice{}   = []
     go Function{} = []
-    go XDLam{}    = []
+    go MVLam{}    = []
     go Check {}   = []  -- check<fx>{ e } is a new scope
     go Some{}     = []  -- Ditto some(e), one{e}, all{e}
     go One{}      = []
@@ -978,10 +1007,12 @@ getFree = fvs_blk
     fvs (Function _ arg _ body)
       = (fvs arg ++ fvs_blk body) `remove` getVisibleBinders arg
 
-    fvs (XDLam _ x e1 e2)
-      = (fvs e1 ++ fvs_blk e2) `remove` bndrs
+    fvs (MVLam { mvl_i = i, mvl_wrap = wrap, mvl_dom = e1, mvl_rng = e2 })
+      = (fvs e1 ++ fvs_wrap wrap (fvs_blk e2)) `remove` bndrs
       where
-        bndrs = x : getVisibleBinders e1
+        bndrs = i : getVisibleBinders e1
+        fvs_wrap NoWrap                        fvs2 = fvs2
+        fvs_wrap (Wrap { wp_h = h, wp_y = y }) fvs2 = h : (fvs2 `remove` [y])
 
     fvs e = impossible "getFree" e
 

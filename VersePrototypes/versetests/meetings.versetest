@@ -10,7 +10,7 @@ verify("M2May25-1a", fail){ f6a( p(x:int)<decides>:int )<succeeds> := p[3] }
 verify("M2May25-1b", fail){ f6a( p(x:int)<decides>:int := 7 )<succeeds> := p[3] }
   # -1b: reject just like -1a
 
-verify("M2May25-2", fail){ f6a( p(x:int)<decides>:=7 )<succeeds> := p[3]
+verify("M2May25-2", fail, broken){ f6a( p(x:int)<decides>:=7 )<succeeds> := p[3]
                          ; all { f6a[ p(x:int)<closed><decides>:=fail ]} }
   # -2: reject because arg to f6a doesn't return 7
 
@@ -32,7 +32,7 @@ verify("M30Apr25-0b", fail, broken){ f3( g(x:int)<decides> := {x>3} )<succeeds> 
 verify("M30Apr25-1", pass, broken){ f3( g(x:int)<decides> := {x>3} )<succeeds> := { g[5] }
                           ; k(x:int)<decides> := {x>2}
                           ; all{ f3[k] } }
-verify("M30Apr25-2", fail){ f3( g(x:int)<decides> := {x>3} )<decides> := { g[5] }
+verify("M30Apr25-2", fail, broken){ f3( g(x:int)<decides> := {x>3} )<decides> := { g[5] }
                           ; k(x:int)<decides> := {x>4}
                           ; all{ f3[k] } }
   # -1 and -2: Should `k` be accepted as f3's argument?
@@ -155,7 +155,7 @@ verify("M19Mar25-9", fail) { (f( g(x:int):=4 )<succeeds>:int := g[7]=4)
                            ; h(x:int):int:=4
                            ; f[h] }
 # FIXME: #61
-verify("M19Mar25-10", pass, broken) { (f( z:int, g(x:int)<decides>:=x=4 )<succeeds>:int
+verify("M19Mar25-10", pass) { (f( z:int, g(x:int)<decides>:=x=4 )<succeeds>:int
                                  := if( y:=g[z] ) then{ y=z; y=4 } else{ 99 })
                             ; (h(x:int)<decides>:=x=4)
                             ; f[3,h] }

@@ -18,10 +18,11 @@ $$
 \begin{array}{l}
 \textbf{Syntax of Mini Verse} \\
 \begin{array}{lr@@{\;\;}c@@{\;\;}l}
-  \text{Atoms}       & a & ::= & |x| \vb |o| \vb |k|  \hspace{5mm} \text{Add strings, floats...} \\
-  \text{Expressions} & e & ::= & |a| \vb |apply1N a_1 a_2| \vb e_1; e_2
-     \vb |e_1 == e_2| \vb |defintro x| \vb |e_1 `choice` e_2| \vb |fail|
-     \vb |lamOC q i e_1 e_2| \\
+  \text{Atoms}       & a & ::= & |x| \vb |o| \vb |k|  \hspace{5mm} \text{Can add strings, floats...} \\
+  \text{Wrappings}   & |hw| & ::= & |wrapemp| \vb |y:== apply1N h x| \\
+  \text{Expressions} & e & ::= & |a| \vb e_1; e_2
+     \vb |e_1 == e_2| \vb |defintro x| \vb |e_1 `choice` e_2| \vb |fail| \\
+     && \vb & |apply1N a_1 a_2| \vb |lamH fx i e_1 hw e_2| \\
   && \vb & |arr (a_1, xdots, a_n)| \vb |truth a| \vb |oftypefx e_1 fx e_2| \vb |check fx e| \\
   && \vb & |vif e_1 e_2 e_3| \vb |fordo e_1 e_2| \vb |all e| \\
 \multicolumn{4}{l}{\hspace{3mm}\text{Note: no |:t|; no |squig x t|; no |x:=e|; no |where|; and lambda changes form}}
@@ -32,7 +33,7 @@ $$
   \text{Inputs} & |wu| & ::= & |mkwu dr u| \\
   & |dr| & ::= & \multicolumn{2}{l}{|drdom |  \vb |drrng fx|
      \hspace{1cm} \text{|drdom| for domain, |drrng fx| for range}} \\
-                & |u|  & ::= & |wrapemp| \vb |wrape e| \\[2mm]
+                & |u|  & ::= & |wrapemp| \vb |x| \\[2mm]
 
 \rulename{watom}      & |SS wu a| & = & |wu `ueq` a| \\
 \rulename{wwild}    & |SS wu _| & = & |wu `ueq` (defintro x; x)| \\
@@ -60,43 +61,44 @@ $$
 % \rulename{wsquig2}   & |SS (apeff e fx) (squig x y := t)| & = & |defintro (x y); x == e; y == SS (apeff x fx) t| \\
 \rulename{wchk}   & |SS wu (check fx t)| & = & |check fx (SS wu t)| \\
 \rulename{wcol1}\asktim   & |SS (mkwu dr wrapemp) (: t)| & = & |defintro x; apply1N ((SS wuinit t)) x| & \text{|x| fresh}\\
-\rulename{wcol2}   & |SS (mkwu drdom (wrape e)) (: t)| & = & |apply1N ((SS wuinit t)) e| \\
-\rulename{wcol3}   & |SS (mkwu (drrng fx) (wrape e)) (: t)| & = & |oftypefx e fx (SS wuinit t)| \\
+\rulename{wcol2}   & |SS (mkwu drdom x) (: t)| & = & |apply1N ((SS wuinit t)) x| \\
+\rulename{wcol3}   & |SS (mkwu (drrng fx) x) (: t)| & = & |oftypefx x fx (SS wuinit t)| \\
 \rulename{wopq}\asktim  & |SS (mkwu (drrng fx_2) u) (oftypefx t_1 fx_1 t_2)|
     & = & |oftypefx (SS (mkwu drdom u) t_1) (andeffects fx_1 fx_2) (SS wuinit t_2)| \\
 \rulename{wtru1} & |SS (mkwu dr wrapemp) (truth t)|
    & = & |defintro x; x == SS (mkwu dr wrapemp) t; truth x| & \text{|x| fresh} \\
-\rulename{wtru2} & |SS (mkwu dr (wrape e)) (truth t)|
-   & = & |defintro (x y); truth y == e; x == SS (mkwu dr (wrape y)) t; truth x| & \text{|x,y| fresh} \\
+\rulename{wtru2} & |SS (mkwu dr x) (truth t)|
+   & = & |defintro (y z); truth y == x; z == SS (mkwu dr (wrape y)) t; truth z| & \text{|y,z| fresh} \\
 \rulename{wtup1}   & |SS (mkwu dr wrapemp) (array (t_1, xdots, t_n))|
-  & = & |defintro (x_1 xdots x_n); x_1 == (SS (mkwu dr wrapemp) t_1); xdots; x_n = SS (mkwu dr wrapemp) t_n;| & \text{|x_i| fresh}\\
-  &&&   |arr( x_1, xdots, x_n)| \\
-\rulename{wtup2}   & |SS (mkwu dr (wrape e)) (array (t_1, xdots, t_n))|
- & = & |defintro (x_1 xdots x_n, y_1 xdots y_n); arr(y_1, xdots, y_n) == e;| & \text{|x_i, y_i| fresh}\\
- &&&  |x_1 == SS (mkwu dr (wrape y_1)) t_1; xdots; x_n == SS (mkwu dr (wrape y_n)) t_n;| \\
- &&&  |arr( x_1, xdots, x_n))| \\
-\rulename{wfun1} \asktim   & |SS (mkwu dr wrapemp) (functionOCX q t_1 fx t_2)|
-   & = & |lamOC q i (SS (mkwu drdom (wrape i)) t_1)
-                    (check fx (SS (mkwu (drrng fx) wrapemp) t_2))| & \text{|i| fresh} \\
-\rulename{wfun2}   & |SS (mkwu dr f) (functionOCX q t_1 fx t_2)|
+  & = & |defintro (z_1 xdots z_n); z_1 == (SS (mkwu dr wrapemp) t_1); xdots; z_n = SS (mkwu dr wrapemp) t_n;| & \text{|z_i| fresh}\\
+  &&&   |arr( z_1, xdots, z_n)| \\
+\rulename{wtup2}   & |SS (mkwu dr x) (array (t_1, xdots, t_n))|
+ & = & |defintro (z_1 xdots z_n, y_1 xdots y_n); arr(y_1, xdots, y_n) == x;| & \text{|y_i, z_i| fresh}\\
+ &&&  |z_1 == SS (mkwu dr (wrape y_1)) t_1; xdots; z_n == SS (mkwu dr (wrape y_n)) t_n;| \\
+ &&&  |arr( z_1, xdots, z_n)| \\
+\rulename{wfun1} \asktim   & |SS (mkwu dr wrapemp) (functionOCX closed t_1 fx t_2)|
+   & = & |lamH fx i (SS (mkwu drdom (wrape i)) t_1) wrapemp
+                    (SS (mkwu (drrng fx) wrapemp) t_2)| & \text{|i| fresh} \\
+\rulename{wfun2}   & |SS (mkwu dr h) (functionOCX closed t_1 fx t_2)|
 & = & \begin{array}[t]{@@{}l}
-  |apply1N isFun f;| \\
-  |lamOCv q i
-         (defintro x; x = SS (mkwu drdom (wrape i)) t_1)
-         (checkfun q f t_1;
-            check fx (SS (mkwu (drrng fx) (wrape (apply1N f x))) t_2))|
+  |apply1N isFun h;| \\
+  |lamHv fx i
+         (defintro x; x = SS (mkwu drdom i) t_1) (y :== apply1N h x)
+         (SS (mkwu (drrng fx) y) t_2)|
   \end{array} & \text{|i,x| fresh}
 \end{array} \\[1mm]
 \textbf{Auxiliary functions} \\
 \hspace{3cm}
 \begin{array}{@@{}l@@{\;\;}r@@{\;\;}c@@{\;\;}ll}
-\rulename{wp1} & |(mkwu dr wrapemp) `ueq`  e_2| & = & |e_2| \\
-\rulename{wp2} \asktim & |(mkwu drdom (wrape e_1)) `ueq`  e_2| & = & |e_1 == e_2| \\
-\rulename{wp3} \asktim & |(mkwu (drrng fx) (wrape e_1)) `ueq`  e_2|
- & = & |oftypefx e_1 empty ((lam i (i == e_2)))| & \text{$|i| \not\in |freevars e_2|$}
-\\[2mm]
-& |checkfun open f e| & = & |emptytup| \\
-& |checkfun closed f e| & = & |lamOC closed x (apply1N f x) (x == SS wuinit e)|
+\rulename{wp1} & |(mkwu dr wrapemp) `ueq`  e| & = & |e| \\
+\rulename{wp2} \asktim & |(mkwu drdom x) `ueq`  e| & = & |x == e| \\
+\rulename{wp3} \asktim & |(mkwu (drrng fx) x)) `ueq`  e|
+ & = & |oftypefx x empty ((lam i (i == e)))| & \text{$|i| \not\in |freevars e|$}
+
+% K is not needed now we have the three-place lambda
+% \\[2mm]
+% & |checkfun open f e| & = & |emptytup| \\
+% & |checkfun closed f e| & = & |lamOC closed x (apply1N f x) (x == SS wuinit e)|
 \end{array}
 \end{array}
 $$
@@ -111,4 +113,3 @@ er the wrapping
   step we can replace |where| by ordering ``|;|'', because we have by then
   feed |u| into |t_1| rather than |t_2|, which is the key difference.
 \end{itemize}
-

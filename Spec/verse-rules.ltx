@@ -260,13 +260,19 @@ $\begin{array}{@@{}l}
           |verify2 (rs,r) (as, r = apply1N op gv) (P^[ r ]);| \\
     &&& |verify2 rs (as, not (apply1N op gv)) (P^[ fail ])| \\
     &&& \text{if $r \not\in R$} \\[1mm]
- \rulename{split-tup} & \multicolumn{3}{l}{|verify2 rs as (P^[r==tup (v_1, xdots, v_n); e])|} \\
-     && \movesto & |verifyKW|
+ \rulename{split-app} & |verify2 (rs) as (P^[apply1N f gv])| & \movesto &
+          |verify2 (rs,r) (as, r = applyN AP (f,gv)) (P^[ r ]);| \\
+    &&& \text{if $f \in R, r \not\in R$} \\
+ \rulename{split-appf} & |verify2 (rs) as (P^[apply1N f (lam x e)])| & \movesto &
+          |verify2 (rs,r) as (P^[ r ]);| \\
+    &&& \text{if $f \in R, r \not\in R$} \\
+ \rulename{split-tup} & |verify2 rs as (P^[r==tup (v_1, xdots, v_n); e])|
+     & \movesto & |verifyKW|
            \begin{array}[t]{@@{}l}
              |(rs, r_1 xdots r_n; as, r==tup (r_1, xdots, r_n))| \\
              |{ P^[ r_1==v_1; xdots; r_n == v_n; e ] };|
            \end{array}\\
-    &&& |verify2 rs (as, noteq r (tup (_, xdots,_))) (P^[ fail ])| \\  \\[-2mm]
+    &&& |verify2 rs (as, noteq r (tup (_, xdots,_))) (P^[ fail ])| \\
 \end{array}\\
 
 \end{array}$

@@ -470,18 +470,17 @@ testeq("fundom2", pass, broken) { f:=fun(x:=1|2 where y:=3|4):=x+y; all{ :f } } 
 
 # tests for check
 testeq("check1", pass){ check<fails>{ 3=4 } } {3=4}
-testeq("check2", fail, broken){ check<fails>{ 33 } } { 33 }
+testeq("check2", fail){ check<fails>{ 33 } } { 33 }
    # check2: depends on whether the runtime desugaring of check<fx>{e} is
    #           check<fx>{e} or just e
-   # 'broken' because we no longer do a runtime check for cardinality
 
 testeq("check3", fail){ check<fails>{ 33 | 44 } } { 33 }
 testeq("check4", pass){ check<decides>{ 3=4 } } {3=4}
 testeq("check5", pass){ check<decides>{ 33 } } { 33 }
 testeq("check6", fail){ check<decides>{ 33 | 44 } } { 33 }
-testeq("check7", fail, broken){ check<succeeds>{ 3=4 } } {3=4}
+testeq("check7", fail){ check<succeeds>{ 3=4 } } {3=4}
    # See check2
-   # 'broken' because we no longer do a runtime check for cardinality
+
 testeq("check8", pass){ check<succeeds>{ 33 } } { 33 }
 testeq("check9", fail){ check<succeeds>{ 33 | 44 } } { 33 }
 
@@ -496,5 +495,8 @@ testeq("choice4", pass){ all{ a:int; f[a]; y:=if(x>3){5}else{7}; (11|22); x:=2; 
 testeq("run-exitop1", pass){ x:int; f() := {x}; x=3; f[] } { 3 }
 testeq("run-exitop2", pass){ x:int; f():int := {x}; x=3; f[] } { 3 }
 testeq("run-exitop3", pass){ x:int; f() := {x}; f[]=3; f[] } { 3 }
-testeq("run-exitop4", pass){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
-   # not sure if this should be pass or fail!
+
+verify("verify-exitop4", fail){ x:int; f():int := {x} }
+testeq("run-exitop4", fail){ x:int; f():int := {x}; f[]=3; f[] } { 3 }
+   # Den-sem of f is empty, something wrong
+   # Fail because f itself doesn't verify

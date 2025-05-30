@@ -11,6 +11,7 @@ module Core.Rule
               -- is dangerous, and starting to use "fresh" needs to be accompanied
               -- by some kind of invariant that all idents introduced by fresh
               -- will not clash with other ways of creating idents
+  , empty
   , only
   , permute
   , choices
