@@ -69,7 +69,7 @@ $$
   \EE{|arr (a_0, xdots, a_n)|}{\rho} & = &
     [\,\{ \tupE [ \semappsub{A}{e}{a_0}\rho, \mydots, \semappsub{A}{e}{a_n}\rho ] \} \,] \\
 
-  \EE{|apply1N f a|}{\rho}      & = &   \applyo(\rho(f),  \semappsub{A}{e}{a}\rho)       \\
+  \EE{|apply1N a_1 a_2|}{\rho}      & = &   \apply( \semappsub{A}{e}{a_1}\rho,  \semappsub{A}{e}{a_2}\rho)       \\
   \EE{|fail|}{\rho} & = & [] \\
   \EE{|e_1 `choice` e_2|}{\rho} & = & \semapp{D}{|e_1|}{\rho} |++| \semapp{D}{|e_1|}{\rho} \\
   \EE{|e_1 = e_2|}{\rho}      & = &
@@ -92,6 +92,9 @@ $$
   & &  |where|\; \EV = \semapp{R}{e_1}{\rho}
   \\[1mm]
 
+  \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ {\color{red} \text{Working on this!}} ] \\
+  \\
+
 %  \textit{succeeds function:} \\
 %    \EE{|lamOC q x e_1 e_2|}{\rho} & = &
 %    \left\{
@@ -106,25 +109,25 @@ $$
 %        \{ [ \dist(v, s) \,||\, s \inb r ] \\
 %        & & ||\, v \inb \Value, |let r| = \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v, r \neq [] \} \\
 %      \end{array}
-    \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ \semopen{q}{(fs)} ] \\
-    & & |where|
-      \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
-        |fs| & = & \{ f \,||\, f \inb [\semfcn], \\
-        & & \forall v \inb \Value .\\
-        & & \seqcompat(\applyo(Fun(f),v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v}) \}
-      \end{array}
-  \\
-\semap{F}{e} & : & \Env \rightarrow \Value \rightarrow [\myset{\Value}] \\
-\semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v & = & \trunc(r, |ws|) \\
-& & |where|
-    \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
-      |ws| & = & \hat{\bigcup} \{ & [ |if s=|\mempty\,| then|\,\mempty\,| else|\, |w|\,||\, s \inb ss ] \\
-      & & & ||\, \rho' \inb \semapp{X}{|e_1|}{(\rho[x \fmapsto v])}, \\
-      & & & |let ss| = \EE{|e_1|}{\rho'},\, \squash(|ss|) \neq [], \\
-      & & & |let w| = \once(\semapp{D}{e_2}{\rho'}) \, \} \\
-      |r| & = & \multicolumn{2}{l} { \bigcap [ w \, || \, w \inb ws, ws \neq \mempty ] }
-    \end{array} \\
-\\
+%     \EE{|lamOC q x e_1 e_2|}{\rho} & = & [ \semopen{q}{(fs)} ] \\
+%     & & |where|
+%       \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
+%         |fs| & = & \{ f \,||\, f \inb [\semfcn], \\
+%         & & \forall v \inb \Value .\\
+%         & & \seqcompat(\applyo(Fun(f),v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v}) \}
+%       \end{array}
+%   \\
+% \semap{F}{e} & : & \Env \rightarrow \Value \rightarrow [\myset{\Value}] \\
+% \semapp{F}{|lamOC q x e_1 e_2|}{\rho}\;v & = & \trunc(r, |ws|) \\
+% & & |where|
+%     \begin{array}[t]{r@@{\;}c@@{\;}l@@{\;}l}
+%       |ws| & = & \hat{\bigcup} \{ & [ |if s=|\mempty\,| then|\,\mempty\,| else|\, |w|\,||\, s \inb ss ] \\
+%       & & & ||\, \rho' \inb \semapp{X}{|e_1|}{(\rho[x \fmapsto v])}, \\
+%       & & & |let ss| = \EE{|e_1|}{\rho'},\, \squash(|ss|) \neq [], \\
+%       & & & |let w| = \once(\semapp{D}{e_2}{\rho'}) \, \} \\
+%       |r| & = & \multicolumn{2}{l} { \bigcap [ w \, || \, w \inb ws, ws \neq \mempty ] }
+%     \end{array} \\
+% \\
 
 \semap{D}{|e|} & : & \Env \rightarrow \seq{\VAL} \\
 \semapp{D}{|e|}{\rho} & = & \hat{\bigcup}\{ \EE{e}{\rho'} \, || \, \rho' \inb \semapp{X}{e}{\rho} \} \\[2mm]
@@ -154,9 +157,9 @@ $$
 \begin{array}{lcll}
 %  \applys & : & (\VAL \times \VAL) \rightarrow [\VAL] \\
 %  \applys(|fs|, s) & = & \hat{\bigcup} \{ \applyo(|f|, v) \, || \, Fun(|f|) \inb |fs|, |v| \inb s \} \\
-  \applyo & : & (\Value \times \Value) \rightarrow [\VAL] \\
-  \applyo(Fun(hs),v) & = & \multicolumn{2}{l}{[ \{ r \vb \fpr{v}{r} \in h \} \vb h |<-| hs ] \hspace{5mm} \text{All elts will be singleton or empty}} \\
-  \applyo(k,v)) & = & []  & \text{WRONG would be better} \\[1mm]
+  \apply & : & (\Value \times \Value) \rightarrow [\VAL] \\
+  \apply(Fun(hs),v) & = & \multicolumn{2}{l}{[ \{ r \vb \fpr{v}{r} \in h \} \vb h |<-| hs ] \hspace{5mm} \text{All elts will be singleton or empty}} \\
+  \apply(k,v)) & = & []  & \text{WRONG would be better} \\[1mm]
 
   \tupE & : & [\Val] \rightarrow \Val \\
   \tupE [v_0,\mydots,v_n] & = & Fun [\{ \fpr{i}{v_i} \} \vb i |<-| 0 \mydots n ] \\
@@ -321,14 +324,14 @@ that are compatible with the function definition.
   For all functions (\ie, list of mathematical functions),
 \item $\forall v \inb \Value .$ \\
   for all values $v$ (\ie, possible function arguments)
-\item $\seqcompat(\applyo(f,v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v})$ \\
+\item $\seqcompat(\apply(f,v), \semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v})$ \\
   the result of applying the function, $f$, to the argument $v$ is compatible
   with the applying the function definition to the argument.
 \item $\semopen{q}{(fs)}$ \\
   Finally, if the is an open function get the set of all functions with a larger domain.
 \end{itemize}
 
-The result of $\applyo(f,v)$ will be a sequence of sets.
+The result of $\apply(f,v)$ will be a sequence of sets.
 Each set is either empty or a singleton set, because the sets come from applying
 mathematical functions to a single value.
 On the other hand, the result of $\semappp{F}{|lamOC q x e_1 e_2|}{\rho}{v}$ is a sequence
@@ -336,7 +339,7 @@ of sets where the sets can contain multiple values.  This is because the functio
 denote many functions.
 These two are compatible (checked by \seqcompat) if the sequences have the same length and the
 individual sets are compatible (checked by \setcompat).
-A set from $\applyo(f,v)$ is compatible with a set from $\semap{F}{\mydots}$ if they are
+A set from $\apply(f,v)$ is compatible with a set from $\semap{F}{\mydots}$ if they are
 both empty or, for non-empty sets, if the first is a subset of the second.
 
 \lennart{I need to think more about decides functions.  This doesn't smell quite right.}
